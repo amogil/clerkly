@@ -1,7 +1,9 @@
-// Requirements: E.G.1, E.G.2, E.G.3, E.G.9, E.G.10, E.G.11
+// Requirements: E.G.1, E.G.2, E.G.3, E.G.9, E.G.10, E.G.11, E.G.13
 // Tooling requirements: E.G.6, E.G.7, E.G.8 (see package.json)
 import { app, BrowserWindow } from "electron";
 import path from "path";
+
+import { ensureDatabase } from "./src/db";
 
 const createMainWindow = (): void => {
   const win = new BrowserWindow({
@@ -21,6 +23,7 @@ const createMainWindow = (): void => {
 };
 
 app.whenReady().then(() => {
+  ensureDatabase();
   createMainWindow();
 
   app.on("activate", () => {
