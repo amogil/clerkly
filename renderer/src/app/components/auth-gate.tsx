@@ -15,22 +15,15 @@ export function AuthGate({ isAuthorizing, errorMessage, onSignIn }: AuthGateProp
             Sign in with Google to access your workspace.
           </p>
         </div>
-
-        {errorMessage ? (
-          <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-            {errorMessage}
-          </div>
-        ) : null}
-
         <button
           type="button"
           onClick={onSignIn}
           disabled={isAuthorizing}
-          className="inline-flex items-center gap-3 rounded-md bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground shadow-sm transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-70"
+          className="inline-flex h-14 min-w-[320px] items-stretch overflow-hidden rounded-[3px] bg-[#4285F4] text-lg font-semibold text-white shadow-sm transition hover:bg-[#3977F5] disabled:cursor-not-allowed disabled:opacity-70"
         >
-          <span className="flex h-8 w-8 items-center justify-center rounded bg-white">
+          <span className="flex w-14 items-center justify-center border-2 border-[#4285F4] bg-white">
             <svg
-              className="h-5 w-5"
+              className="h-6 w-6"
               viewBox="0 0 18 18"
               aria-hidden="true"
               focusable="false"
@@ -53,8 +46,16 @@ export function AuthGate({ isAuthorizing, errorMessage, onSignIn }: AuthGateProp
               />
             </svg>
           </span>
-          {isAuthorizing ? "Opening Google..." : "Sign in with Google"}
+          <span className="flex flex-1 items-center justify-center px-6">
+            {isAuthorizing ? "Opening Google..." : "Sign in with Google"}
+          </span>
         </button>
+
+        {errorMessage ? (
+          <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            {errorMessage}
+          </div>
+        ) : null}
       </div>
     </div>
   );
