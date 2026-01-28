@@ -2,13 +2,14 @@
   "name": "clerkly",
   "version": "1.0.0",
   "description": "",
-  "main": "main.js",
+  "main": "dist/main.js",
   "directories": {
     "doc": "docs"
   },
   "scripts": {
-    "start": "electron .",
-    "dev": "electron .",
+    "build": "tsc",
+    "start": "npm run build && electron .",
+    "dev": "npm run build && electron .",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -24,6 +25,12 @@
     "node": "25.5.0"
   },
   "devDependencies": {
-    "electron": "40.0.0"
+    "@types/node": "^25.1.0",
+    "electron": "40.0.0",
+    "typescript": "^5.9.3"
+  },
+  "volta": {
+    "node": "25.5.0",
+    "npm": "11.8.0"
   }
 }

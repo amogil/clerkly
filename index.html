@@ -5,39 +5,514 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Clerkly</title>
     <style>
+      :root {
+        color-scheme: light;
+        --background: #fafafa;
+        --foreground: #1a1a1a;
+        --card: #ffffff;
+        --card-foreground: #1a1a1a;
+        --primary: #5b6cf2;
+        --primary-foreground: #ffffff;
+        --secondary: #f5f5f7;
+        --muted: #f5f5f7;
+        --muted-foreground: #6b7280;
+        --border: #e5e7eb;
+        --radius: 16px;
+        --sidebar: #ffffff;
+        --sidebar-foreground: #1a1a1a;
+        --sidebar-border: #e5e7eb;
+        --shadow: 0 6px 16px rgba(15, 23, 42, 0.08);
+        --shadow-soft: 0 2px 6px rgba(15, 23, 42, 0.06);
+        --success: #16a34a;
+        --success-bg: #ecfdf3;
+        --success-border: #bbf7d0;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
       body {
         margin: 0;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        background: #0b0f14;
-        color: #e6edf3;
-        display: grid;
-        place-items: center;
-        height: 100vh;
+        background: var(--background);
+        color: var(--foreground);
       }
-      .card {
-        text-align: center;
-        padding: 32px 40px;
-        border-radius: 12px;
-        background: #111826;
-        box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
+
+      .sidebar {
+        position: fixed;
+        inset: 0 auto 0 0;
+        width: 256px;
+        background: var(--sidebar);
+        border-right: 1px solid var(--sidebar-border);
+        display: flex;
+        flex-direction: column;
       }
-      .title {
+
+      .sidebar-header {
+        padding: 24px 22px 20px;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .brand {
+        margin: 0;
         font-size: 22px;
         font-weight: 600;
-        margin: 0 0 8px;
       }
-      .subtitle {
+
+      .brand-subtitle {
+        margin: 6px 0 0;
+        font-size: 13px;
+        color: var(--muted-foreground);
+      }
+
+      .nav {
+        flex: 1;
+        padding: 20px 14px;
+        display: grid;
+        gap: 6px;
+      }
+
+      .nav-item {
+        border: none;
+        background: transparent;
+        color: var(--sidebar-foreground);
+        text-align: left;
+        padding: 11px 14px;
+        border-radius: 12px;
+        font-size: 14px;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        transition: all 150ms ease;
+      }
+
+      .nav-item svg {
+        width: 18px;
+        height: 18px;
+      }
+
+      .nav-item:hover {
+        background: var(--secondary);
+      }
+
+      .nav-item.is-active {
+        background: var(--primary);
+        color: var(--primary-foreground);
+        box-shadow: 0 8px 16px rgba(91, 108, 242, 0.25);
+        font-weight: 600;
+      }
+
+      .sidebar-footer {
+        padding: 20px 24px;
+        border-top: 1px solid var(--border);
+        font-size: 12px;
+        color: var(--muted-foreground);
+        display: grid;
+        gap: 4px;
+      }
+
+      .content {
+        margin-left: 256px;
+        padding: 32px 40px 48px;
+      }
+
+      .page-header {
+        margin-bottom: 24px;
+      }
+
+      .page-title {
+        margin: 0 0 6px;
+        font-size: 28px;
+        font-weight: 600;
+      }
+
+      .page-subtitle {
         margin: 0;
-        opacity: 0.75;
+        color: var(--muted-foreground);
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+        gap: 24px;
+        margin-bottom: 24px;
+      }
+
+      .card {
+        background: var(--card);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow);
+        border: 1px solid var(--border);
+        overflow: hidden;
+      }
+
+      .card-header {
+        padding: 20px 22px 18px;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+      }
+
+      .card-title {
+        font-size: 18px;
+        font-weight: 600;
+        margin: 0;
+      }
+
+      .card-subtitle {
+        margin: 2px 0 0;
+        font-size: 13px;
+        color: var(--muted-foreground);
+      }
+
+      .card-list {
+        display: grid;
+      }
+
+      .card-item {
+        padding: 20px 22px;
+        border-top: 1px solid var(--border);
+      }
+
+      .meeting-title {
+        margin: 0 0 6px;
+        font-weight: 600;
+      }
+
+      .meeting-meta {
+        font-size: 13px;
+        color: var(--muted-foreground);
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .avatar-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin: 12px 0 16px;
+      }
+
+      .avatar {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: rgba(91, 108, 242, 0.1);
+        color: var(--primary);
+        display: grid;
+        place-items: center;
+        font-size: 11px;
+        font-weight: 600;
+      }
+
+      .meeting-actions {
+        margin-top: 12px;
+      }
+
+      .primary-button {
+        width: 100%;
+        border: none;
+        background: var(--primary);
+        color: var(--primary-foreground);
+        padding: 10px 14px;
+        border-radius: 10px;
+        font-size: 14px;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        box-shadow: var(--shadow-soft);
+      }
+
+      .secondary-button {
+        border: none;
+        background: transparent;
+        color: var(--primary);
+        font-size: 13px;
+        cursor: pointer;
+      }
+
+      .list-item {
+        padding: 16px 0;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .list-item:last-child {
+        border-bottom: none;
+      }
+
+      .list-title {
+        margin: 0 0 6px;
+        font-weight: 600;
+      }
+
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: var(--success-bg);
+        color: var(--success);
+        border-radius: 999px;
+        font-size: 12px;
+        padding: 4px 10px;
+        border: 1px solid var(--success-border);
+        margin-top: 12px;
+      }
+
+      .callout {
+        padding: 18px 20px;
+        border-radius: var(--radius);
+        background: linear-gradient(135deg, rgba(91, 108, 242, 0.15), rgba(91, 108, 242, 0.05));
+        border: 1px solid rgba(91, 108, 242, 0.25);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .callout-title {
+        margin: 0 0 6px;
+        font-weight: 600;
+      }
+
+      .status {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+        font-weight: 600;
+      }
+
+      .status-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 999px;
+        background: #22c55e;
+        box-shadow: 0 0 0 6px rgba(34, 197, 94, 0.15);
+      }
+
+      .meta-row {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        font-size: 13px;
+        color: var(--muted-foreground);
+        margin-top: 10px;
+      }
+
+      .meta-row span {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .icon {
+        width: 16px;
+        height: 16px;
       }
     </style>
   </head>
   <body>
-    <!-- Requirements: E.G.5, E.G.10 -->
-    <div class="card">
-      <p class="title">Clerkly</p>
-      <p class="subtitle">Renderer loaded successfully.</p>
-    </div>
-    <script src="./renderer.js"></script>
+    <!-- Requirements: E.G.5, E.G.10, E.G.12 -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <h1 class="brand">Clerkly</h1>
+        <p class="brand-subtitle">Your AI clerk</p>
+      </div>
+      <nav class="nav" aria-label="Primary">
+        <button class="nav-item is-active" data-screen="dashboard" aria-current="page">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <path d="M3 3h8v8H3zM13 3h8v5h-8zM13 10h8v11h-8zM3 13h8v8H3z" />
+          </svg>
+          Dashboard
+        </button>
+        <button class="nav-item" data-screen="calendar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <rect x="3" y="4" width="18" height="16" rx="2" />
+            <path d="M8 2v4M16 2v4M3 10h18" />
+          </svg>
+          Calendar
+        </button>
+        <button class="nav-item" data-screen="tasks">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <path d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+          Tasks
+        </button>
+        <button class="nav-item" data-screen="contacts">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <path d="M16 11a4 4 0 1 0-8 0 4 4 0 0 0 8 0Z" />
+            <path d="M4 20a8 8 0 0 1 16 0" />
+          </svg>
+          Contacts
+        </button>
+        <button class="nav-item" data-screen="settings">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z" />
+            <path
+              d="M19.4 15a7.9 7.9 0 0 0 .1-2l2-1.6-2-3.4-2.4 1a7.9 7.9 0 0 0-1.8-1l-.4-2.6h-4l-.4 2.6a7.9 7.9 0 0 0-1.8 1l-2.4-1-2 3.4 2 1.6a7.9 7.9 0 0 0 0 2l-2 1.6 2 3.4 2.4-1a7.9 7.9 0 0 0 1.8 1l.4 2.6h4l.4-2.6a7.9 7.9 0 0 0 1.8-1l2.4 1 2-3.4-2-1.6Z"
+            />
+          </svg>
+          Settings
+        </button>
+      </nav>
+      <div class="sidebar-footer">
+        <p>© 2026 Clerkly</p>
+        <p>AI-powered meeting assistant</p>
+      </div>
+    </aside>
+    <main class="content">
+      <header class="page-header">
+        <h1 class="page-title" id="screen-title">Dashboard</h1>
+        <p class="page-subtitle" id="screen-subtitle">Today is Thursday, January 29, 2026</p>
+      </header>
+
+      <section class="grid">
+        <section class="card">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title">Today's Schedule</h2>
+              <p class="card-subtitle">From Google Calendar</p>
+            </div>
+            <button class="secondary-button" type="button">View all</button>
+          </div>
+          <div class="card-list">
+            <div class="card-item">
+              <p class="meeting-title">Product Roadmap Review</p>
+              <p class="meeting-meta">
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                  <circle cx="12" cy="12" r="9" />
+                  <path d="M12 7v5l3 3" />
+                </svg>
+                2:30 PM - 3:15 PM
+              </p>
+              <div class="avatar-row">
+                <div class="avatar">SC</div>
+                <div class="avatar">MJ</div>
+                <div class="avatar">AR</div>
+              </div>
+              <button class="primary-button" type="button">
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                  <circle cx="12" cy="12" r="9" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+                Start Recording
+              </button>
+            </div>
+            <div class="card-item">
+              <p class="meeting-title">Sprint Planning</p>
+              <p class="meeting-meta">
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                  <circle cx="12" cy="12" r="9" />
+                  <path d="M12 7v5l3 3" />
+                </svg>
+                4:00 PM - 5:00 PM
+              </p>
+              <div class="avatar-row">
+                <div class="avatar">DL</div>
+                <div class="avatar">EW</div>
+                <div class="avatar">CB</div>
+              </div>
+              <button class="primary-button" type="button">
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                  <circle cx="12" cy="12" r="9" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+                Start Recording
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title">Recently Processed</h2>
+              <p class="card-subtitle">Meetings transcribed by Clerkly</p>
+            </div>
+          </div>
+          <div class="card-list">
+            <div class="card-item">
+              <p class="list-title">Client Demo Call</p>
+              <p class="meeting-meta">Today, 11:00 AM · 30 min</p>
+              <div class="meta-row">
+                <span>
+                  <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                    <circle cx="12" cy="12" r="9" />
+                    <path d="M8 12l2 2 4-4" />
+                  </svg>
+                  5 action items
+                </span>
+                <span>
+                  <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                    <path d="M4 14l4-4 4 4 8-8" />
+                  </svg>
+                  3 tasks created
+                </span>
+              </div>
+              <span class="badge">Completed</span>
+            </div>
+            <div class="card-item">
+              <p class="list-title">Weekly Team Sync</p>
+              <p class="meeting-meta">Yesterday, 9:00 AM · 45 min</p>
+              <div class="meta-row">
+                <span>
+                  <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                    <circle cx="12" cy="12" r="9" />
+                    <path d="M8 12l2 2 4-4" />
+                  </svg>
+                  8 action items
+                </span>
+                <span>
+                  <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                    <path d="M4 14l4-4 4 4 8-8" />
+                  </svg>
+                  6 tasks created
+                </span>
+              </div>
+              <span class="badge">Completed</span>
+            </div>
+            <div class="card-item">
+              <p class="list-title">Engineering Review</p>
+              <p class="meeting-meta">Jan 27, 2:00 PM · 60 min</p>
+              <div class="meta-row">
+                <span>
+                  <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                    <circle cx="12" cy="12" r="9" />
+                    <path d="M8 12l2 2 4-4" />
+                  </svg>
+                  12 action items
+                </span>
+                <span>
+                  <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                    <path d="M4 14l4-4 4 4 8-8" />
+                  </svg>
+                  10 tasks created
+                </span>
+              </div>
+              <span class="badge">Completed</span>
+            </div>
+          </div>
+        </section>
+      </section>
+
+      <section class="callout">
+        <div>
+          <p class="callout-title">Calendar Sync Active</p>
+          <p class="meeting-meta">Clerkly is monitoring your Google Calendar</p>
+        </div>
+        <div class="status">
+          <span class="status-dot"></span>
+          Connected
+        </div>
+      </section>
+    </main>
+    <script src="./dist/renderer.js"></script>
   </body>
 </html>
