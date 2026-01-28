@@ -1,4 +1,4 @@
-// Requirements: E.G.1, E.G.2, E.G.3, E.G.9
+// Requirements: E.G.1, E.G.2, E.G.3, E.G.9, E.G.10
 // Tooling requirements: E.G.6, E.G.7, E.G.8 (see package.json)
 const { app, BrowserWindow } = require("electron");
 const path = require("path");
@@ -7,7 +7,7 @@ const createMainWindow = () => {
   const win = new BrowserWindow({
     width: 900,
     height: 600,
-    title: "PP Electron App",
+    title: "Clerkly",
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
