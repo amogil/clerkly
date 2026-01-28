@@ -15,7 +15,7 @@ const createMainWindow = (): void => {
     },
   });
 
-  win.loadFile(path.join(__dirname, "..", "index.html"));
+  win.loadFile(path.join(__dirname, "renderer", "index.html"));
   // Requirement: E.G.9
   win.maximize();
 };
