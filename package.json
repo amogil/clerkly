@@ -1,0 +1,26 @@
+{
+  "name": "pp",
+  "version": "1.0.0",
+  "description": "",
+  "main": "main.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron .",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "packageManager": "npm@11.8.0",
+  "engines": {
+    "npm": "11.8.0",
+    "node": "25.5.0"
+  },
+  "devDependencies": {
+    "electron": "40.0.0"
+  }
+}
