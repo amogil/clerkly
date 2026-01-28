@@ -1,4 +1,4 @@
-// Requirements: E.G.5, E.G.11, E.G.12
+// Requirements: E.G.11, E.G.12, E.G.19
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './app/App'
