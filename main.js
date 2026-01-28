@@ -1,3 +1,5 @@
+// Requirements: E.G.1, E.G.2, E.G.3, E.G.9
+// Tooling requirements: E.G.6, E.G.7, E.G.8 (see package.json)
 const { app, BrowserWindow } = require("electron");
 const path = require("path");
 
@@ -14,6 +16,8 @@ const createMainWindow = () => {
   });
 
   win.loadFile(path.join(__dirname, "index.html"));
+  // Requirement: E.G.9
+  win.maximize();
 };
 
 app.whenReady().then(() => {
