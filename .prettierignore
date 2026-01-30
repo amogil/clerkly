@@ -1,0 +1,5 @@
+# E.T.8: Limit formatting to tracked source/config/test files.
+node_modules
+dist
+build
+coverage
