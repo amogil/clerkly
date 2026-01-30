@@ -1,5 +1,5 @@
 // Requirements: E.G.11, E.G.12, E.G.14, E.G.15, E.G.16, E.G.17, E.G.18
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AuthGate } from './components/auth-gate';
 import { Navigation } from './components/navigation';
 import { DashboardUpdated } from './components/dashboard-updated';
@@ -17,6 +17,23 @@ export default function App() {
   const [authState, setAuthState] = useState<AuthState>('unauthorized');
   const [authError, setAuthError] = useState<string | null>(null);
 
+  useEffect(() => {
+    const unsubscribe = window.clerkly.onAuthResult((result) => {
+      if (result.success) {
+        setAuthState('authorized');
+        setAuthError(null);
+        return;
+      }
+
+      setAuthError(result.error ?? 'Authorization failed. Please try again.');
+      setAuthState('error');
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, []);
+
   const handleSignIn = async () => {
     setAuthError(null);
     setAuthState('authorizing');
@@ -24,13 +41,10 @@ export default function App() {
     try {
       const result = await window.clerkly.openGoogleAuth();
 
-      if (result.success) {
-        setAuthState('authorized');
-        return;
+      if (!result.success) {
+        setAuthError(result.error ?? 'Authorization failed. Please try again.');
+        setAuthState('error');
       }
-
-      setAuthError(result.error ?? 'Authorization failed. Please try again.');
-      setAuthState('error');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Authorization failed. Please try again.';
       setAuthError(message);

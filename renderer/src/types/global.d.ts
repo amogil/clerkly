@@ -9,6 +9,7 @@ declare global {
   interface Window {
     clerkly: {
       openGoogleAuth: () => Promise<AuthResult>;
+      onAuthResult: (callback: (result: AuthResult) => void) => () => void;
     };
   }
 }
