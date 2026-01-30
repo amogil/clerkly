@@ -13,7 +13,7 @@
     "start": "npm run build && electron .",
     "dev": "npm run build && electron .",
     "postinstall": "electron-rebuild -f -w better-sqlite3",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "vitest run"
   },
   "keywords": [],
   "author": "",
@@ -86,15 +86,16 @@
     "vaul": "1.1.2"
   },
   "devDependencies": {
+    "@electron/rebuild": "^3.7.2",
     "@tailwindcss/vite": "4.1.12",
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^25.1.0",
     "@vitejs/plugin-react": "4.7.0",
     "electron": "40.0.0",
-    "@electron/rebuild": "^3.7.2",
     "tailwindcss": "4.1.12",
     "typescript": "^5.9.3",
-    "vite": "6.3.5"
+    "vite": "6.3.5",
+    "vitest": "^4.0.18"
   },
   "volta": {
     "node": "25.5.0",
