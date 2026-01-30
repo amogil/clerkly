@@ -1,7 +1,12 @@
-import { Calendar, CheckCircle2, Bell, User, Shield, Globe, Mic, FileText, Save } from 'lucide-react';
+// Requirements: E.A.14
+import { Calendar, CheckCircle2, Bell, User, Shield, Globe, Mic, FileText, Save, LogOut } from 'lucide-react';
 import { useState } from 'react';
 
-export function Settings() {
+type SettingsProps = {
+  onSignOut: () => void;
+};
+
+export function Settings({ onSignOut }: SettingsProps) {
   const [autoJoinMeetings, setAutoJoinMeetings] = useState(true);
   const [autoTranscribe, setAutoTranscribe] = useState(true);
   const [autoCreateTasks, setAutoCreateTasks] = useState(true);
@@ -45,6 +50,22 @@ export function Settings() {
               </div>
             </div>
             <div className="p-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-medium text-foreground mb-1">Session</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Sign out to remove stored authorization data
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={onSignOut}
+                  className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50"
+                >
+                  <LogOut className="w-4 h-4" />
+                  Sign Out
+                </button>
+              </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-2">

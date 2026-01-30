@@ -1,4 +1,4 @@
-// Requirements: E.T.4, E.U.1, E.A.1, E.A.2, E.A.3, E.A.4, E.A.5
+// Requirements: E.T.4, E.U.1, E.A.1, E.A.2, E.A.3, E.A.4, E.A.5, E.A.11, E.A.14
 import { useEffect, useState } from 'react';
 import { AuthGate } from './components/auth-gate';
 import { Navigation } from './components/navigation';
@@ -14,10 +14,19 @@ type AuthState = 'unauthorized' | 'authorizing' | 'authorized' | 'error';
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<string>('dashboard');
   const [selectedMeetingId, setSelectedMeetingId] = useState<string | null>(null);
-  const [authState, setAuthState] = useState<AuthState>('unauthorized');
+  const [authState, setAuthState] = useState<AuthState>('authorizing');
   const [authError, setAuthError] = useState<string | null>(null);
 
   useEffect(() => {
+    window.clerkly
+      .getAuthState()
+      .then((state) => {
+        setAuthState(state.authorized ? 'authorized' : 'unauthorized');
+      })
+      .catch(() => {
+        setAuthState('unauthorized');
+      });
+
     const unsubscribe = window.clerkly.onAuthResult((result) => {
       if (result.success) {
         setAuthState('authorized');
@@ -66,6 +75,14 @@ export default function App() {
     setCurrentScreen('calendar');
   };
 
+  const handleSignOut = async () => {
+    await window.clerkly.signOut();
+    setAuthState('unauthorized');
+    setAuthError(null);
+    setCurrentScreen('dashboard');
+    setSelectedMeetingId(null);
+  };
+
   const renderScreen = () => {
     switch (currentScreen) {
       case 'dashboard':
@@ -89,7 +106,7 @@ export default function App() {
       case 'contacts':
         return <Contacts />;
       case 'settings':
-        return <Settings />;
+        return <Settings onSignOut={handleSignOut} />;
       default:
         return (
           <DashboardUpdated

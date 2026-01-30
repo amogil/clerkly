@@ -4,6 +4,7 @@ export const authGoogleConfig = {
     "100365225505-2hnhs5iihioqfkg2ochgclfl3octgfp7.apps.googleusercontent.com",
   scopes: ["openid", "email", "profile"],
   authEndpoint: "https://accounts.google.com/o/oauth2/v2/auth",
+  tokenEndpoint: "https://oauth2.googleapis.com/token",
 };
 
 export const getGoogleAuthUrl = (clientId: string, port: number): string => {
