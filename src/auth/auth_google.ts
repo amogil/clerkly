@@ -1,4 +1,4 @@
-// Requirements: E.G.11, E.G.16, E.G.17
+// Requirements: E.T.4, E.A.6, E.A.7
 export const authGoogleConfig = {
   clientId:
     "100365225505-2hnhs5iihioqfkg2ochgclfl3octgfp7.apps.googleusercontent.com",

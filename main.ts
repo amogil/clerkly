@@ -1,5 +1,5 @@
-// Requirements: E.G.1, E.G.2, E.G.3, E.G.9, E.G.10, E.G.11, E.G.13, E.G.16, E.G.19
-// Tooling requirements: E.G.6, E.G.7, E.G.8 (see package.json)
+// Requirements: E.P.1, E.P.2, E.P.3, E.P.6, E.T.4, E.S.1, E.A.3, E.I.1
+// Tooling requirements: E.T.1 (see package.json)
 import { app, BrowserWindow, ipcMain, shell } from "electron";
 import http from "http";
 import path from "path";
@@ -155,7 +155,7 @@ const createMainWindow = (): void => {
   });
 
   mainWindow.loadFile(path.join(__dirname, "renderer", "index.html"));
-  // Requirement: E.G.9
+  // Requirement: E.P.3
   mainWindow.maximize();
 
   if (pendingAuthResult) {

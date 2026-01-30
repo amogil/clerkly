@@ -1,4 +1,4 @@
-// Requirements: E.G.13
+// Requirements: E.S.1, E.S.3, E.S.4, E.S.5, E.S.6
 import { app } from "electron";
 import Database from "better-sqlite3";
 import fs from "fs";

@@ -1,4 +1,4 @@
-// Requirements: E.G.11, E.G.14, E.G.15, E.G.16, E.G.17, E.G.18
+// Requirements: E.T.4, E.A.1, E.A.2, E.A.3, E.A.4, E.A.5
 type AuthGateProps = {
   isAuthorizing: boolean;
   errorMessage?: string | null;

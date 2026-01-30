@@ -1,4 +1,4 @@
-// Requirements: E.G.11, E.G.16, E.G.19
+// Requirements: E.T.4, E.A.3, E.I.1
 import { contextBridge, ipcRenderer } from "electron";
 
 type AuthResult = {
