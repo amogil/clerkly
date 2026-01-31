@@ -1,4 +1,4 @@
-// Requirements: E.P.1, E.P.2, E.P.3, E.P.6, E.T.4, E.S.1, E.S.7, E.A.3, E.A.4, E.A.6, E.A.7, E.A.8, E.A.11, E.A.12, E.A.13, E.A.14, E.A.15, E.A.16, E.A.18, E.A.19, E.A.20, E.A.21, E.A.23, E.A.24, E.A.25, E.A.26, E.A.27, E.TE.6, E.TE.11, E.I.1, E.I.3, E.Q.1
+// Requirements: E.P.1, E.P.2, E.P.3, E.P.6, E.P.7, E.T.4, E.S.1, E.S.7, E.A.3, E.A.4, E.A.6, E.A.7, E.A.8, E.A.11, E.A.12, E.A.13, E.A.14, E.A.15, E.A.16, E.A.18, E.A.19, E.A.20, E.A.21, E.A.23, E.A.24, E.A.25, E.A.26, E.A.27, E.TE.6, E.TE.11, E.I.1, E.I.3, E.Q.1
 // Tooling requirements: E.T.1 (see package.json)
 import { app, BrowserWindow, dialog, ipcMain, shell } from "electron";
 import Database from "better-sqlite3";
@@ -27,6 +27,7 @@ const userDataOverride = process.env.CLERKLY_E2E_USER_DATA;
 if (userDataOverride) {
   app.setPath("userData", userDataOverride);
 }
+app.setName("Clerkly");
 
 let mainWindow: BrowserWindow | null = null;
 let pendingAuthResult: AuthResult | null = null;

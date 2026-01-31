@@ -56,4 +56,13 @@ describe("Platform and App Shell requirements", () => {
     const mainSource = readText("main.ts");
     expect(mainSource).toMatch(/title:\s*"Clerkly"/);
   });
+
+  /* Preconditions: main.ts exists.
+     Action: read main.ts contents.
+     Assertions: app name is set to Clerkly.
+     Requirements: E.P.7 */
+  it("sets the app name capitalization for menus", () => {
+    const mainSource = readText("main.ts");
+    expect(mainSource).toContain('app.setName("Clerkly")');
+  });
 });
