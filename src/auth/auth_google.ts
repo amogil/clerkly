@@ -1,14 +1,43 @@
-// Requirements: E.T.4, E.A.6, E.A.7
+// Requirements: E.T.4, E.A.6, E.A.7, E.A.16, E.A.19, E.A.20, E.A.21
+import crypto from "crypto";
+
 export const authGoogleConfig = {
   clientId:
-    "100365225505-2hnhs5iihioqfkg2ochgclfl3octgfp7.apps.googleusercontent.com",
+    "100365225505-a9mp4sll4948tafotr1va0fvnl5hrpoa.apps.googleusercontent.com",
+  clientSecret: "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",
   scopes: ["openid", "email", "profile"],
   authEndpoint: "https://accounts.google.com/o/oauth2/v2/auth",
   tokenEndpoint: "https://oauth2.googleapis.com/token",
 };
 
-export const getGoogleAuthUrl = (clientId: string, port: number): string => {
-  const redirectUri = `http://127.0.0.1:${port}/auth/callback`;
+const base64UrlEncode = (input: Buffer): string => {
+  return input
+    .toString("base64")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+};
+
+export const generatePkceVerifier = (): string => {
+  return base64UrlEncode(crypto.randomBytes(32));
+};
+
+export const generatePkceChallenge = (verifier: string): string => {
+  const hash = crypto.createHash("sha256").update(verifier, "ascii").digest();
+  return base64UrlEncode(hash);
+};
+
+export const generateOauthState = (): string => {
+  return base64UrlEncode(crypto.randomBytes(32));
+};
+
+export const getGoogleAuthUrl = (
+  clientId: string,
+  port: number,
+  codeChallenge: string,
+  state: string
+): string => {
+  const redirectUri = `http://127.0.0.1:${port}`;
   const url = new URL(authGoogleConfig.authEndpoint);
   url.searchParams.set("client_id", clientId);
   url.searchParams.set("redirect_uri", redirectUri);
@@ -16,5 +45,8 @@ export const getGoogleAuthUrl = (clientId: string, port: number): string => {
   url.searchParams.set("scope", authGoogleConfig.scopes.join(" "));
   url.searchParams.set("access_type", "offline");
   url.searchParams.set("prompt", "consent");
+  url.searchParams.set("code_challenge", codeChallenge);
+  url.searchParams.set("code_challenge_method", "S256");
+  url.searchParams.set("state", state);
   return url.toString();
 };

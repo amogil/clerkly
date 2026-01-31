@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { authGoogleConfig, getGoogleAuthUrl } from "../../src/auth/auth_google";
+import {
+  authGoogleConfig,
+  generateOauthState,
+  generatePkceChallenge,
+  generatePkceVerifier,
+  getGoogleAuthUrl,
+} from "../../src/auth/auth_google";
 import { fileExists, readText } from "../utils/fs";
 
 describe("Auth and OAuth requirements", () => {
@@ -56,10 +62,10 @@ describe("Auth and OAuth requirements", () => {
      Assertions: uses loopback redirect.
      Requirements: E.A.6 */
   it("uses loopback redirect URIs", () => {
-    const url = getGoogleAuthUrl("client-id", 34123);
+    const url = getGoogleAuthUrl("client-id", 34123, "challenge", "state");
     const parsed = new URL(url);
     expect(parsed.searchParams.get("redirect_uri")).toBe(
-      "http://127.0.0.1:34123/auth/callback"
+      "http://127.0.0.1:34123"
     );
   });
 
@@ -123,5 +129,63 @@ describe("Auth and OAuth requirements", () => {
   it("stores runtime auth data in SQLite", () => {
     const source = readText("src/auth/token_store.ts");
     expect(source).toContain("auth_tokens");
+  });
+
+  /* Preconditions: PKCE helpers exist.
+     Action: generate PKCE verifier and challenge.
+     Assertions: challenge is derived and included in auth URL.
+     Requirements: E.A.16 */
+  it("uses PKCE for OAuth authorization", () => {
+    const verifier = generatePkceVerifier();
+    const challenge = generatePkceChallenge(verifier);
+    const url = getGoogleAuthUrl("client-id", 34123, challenge, "state");
+    const parsed = new URL(url);
+    expect(parsed.searchParams.get("code_challenge")).toBe(challenge);
+    expect(parsed.searchParams.get("code_challenge_method")).toBe("S256");
+  });
+
+  /* Preconditions: main process exists.
+     Action: inspect PKCE verifier handling.
+     Assertions: code_verifier is included in token exchange.
+     Requirements: E.A.18 */
+  it("clears and uses PKCE verifier only per attempt", () => {
+    const source = readText("main.ts");
+    expect(source).toContain("pendingCodeVerifier");
+    expect(source).toContain("code_verifier");
+  });
+
+  /* Preconditions: auth exchange requires a client secret.
+     Action: inspect token exchange and refresh payloads.
+     Assertions: client_secret is included in token requests.
+     Requirements: E.A.20 */
+  it("includes client secret in token exchange and refresh", () => {
+    const source = readText("main.ts");
+    expect(source).toContain('body.set("client_secret"');
+    expect(source).toContain("refresh_token");
+    expect(source).toContain("authorization_code");
+  });
+
+  /* Preconditions: auth config exists.
+     Action: inspect config source.
+     Assertions: secret is defined in config.
+     Requirements: E.A.21 */
+  it("defines client secret in auth config", () => {
+    const source = readText("src/auth/auth_google.ts");
+    expect(source).toContain("clientSecret:");
+    expect(authGoogleConfig.clientSecret).toBeTruthy();
+  });
+
+  /* Preconditions: state helper exists.
+     Action: generate auth URL with state.
+     Assertions: state is present and validated.
+     Requirements: E.A.19 */
+  it("includes and validates OAuth state", () => {
+    const state = generateOauthState();
+    const url = getGoogleAuthUrl("client-id", 34123, "challenge", state);
+    const parsed = new URL(url);
+    expect(parsed.searchParams.get("state")).toBe(state);
+    const source = readText("main.ts");
+    expect(source).toContain("pendingAuthState");
+    expect(source).toContain('searchParams.get("state")');
   });
 });
