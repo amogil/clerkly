@@ -1,7 +1,33 @@
-## Purpose
-General guidance for AI agents working in this repository.
+# Руководство для Агентов
 
-## Required and Critical
-- Always start by calling `reqlix_get_instructions` via MCP `reqlix` and follow its instructions.
-- Do not proceed with code changes until requirements are retrieved.
-- Never read or edit any files under `docs/development/requirements`.
+## Правила Именования Компонентов
+
+При написании спецификаций и документации:
+
+- **Названия компонентов** должны быть написаны на английском языке
+- **Не используйте подчеркивания** в названиях компонентов
+- **Можно использовать несколько слов** для описания компонента
+- **При ссылке на компоненты** всегда заключайте их в кавычки
+
+### Примеры правильного именования:
+
+✅ **Правильно:**
+- "Main Process" (вместо Главный_Процесс)
+- "OAuth Flow" (вместо Поток_OAuth)
+- "Sidebar State" (вместо Состояние_Сайдбара)
+- "Database Connection" (вместо Соединение_С_Базой_Данных)
+- "Logo Component" (вместо Компонент_Логотипа)
+
+❌ **Неправильно:**
+- Главный_Процесс
+- OAuth_Flow
+- Sidebar_State
+- Database_Connection
+- Logo_Component
+
+### Использование в тексте:
+
+```markdown
+КОГДА "Main Process" инициализируется, ТО "Renderer Process" ДОЛЖЕН запуститься
+ЕСЛИ "OAuth Flow" завершается успешно, ТО "User Session" ДОЛЖНА быть создана
+```
