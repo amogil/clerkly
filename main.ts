@@ -1,4 +1,4 @@
-// Requirements: E.P.1, E.P.2, E.P.3, E.P.6, E.T.4, E.S.1, E.A.3, E.A.4, E.A.6, E.A.7, E.A.8, E.A.11, E.A.12, E.A.13, E.A.14, E.A.15, E.A.16, E.A.18, E.A.19, E.A.20, E.A.21, E.I.1, E.Q.1
+// Requirements: E.P.1, E.P.2, E.P.3, E.P.6, E.T.4, E.S.1, E.S.7, E.A.3, E.A.4, E.A.6, E.A.7, E.A.8, E.A.11, E.A.12, E.A.13, E.A.14, E.A.15, E.A.16, E.A.18, E.A.19, E.A.20, E.A.21, E.I.1, E.I.3, E.Q.1
 // Tooling requirements: E.T.1 (see package.json)
 import { app, BrowserWindow, dialog, ipcMain, shell } from "electron";
 import Database from "better-sqlite3";
@@ -32,6 +32,7 @@ let pendingCodeVerifier: string | null = null;
 let pendingAuthState: string | null = null;
 
 type SqliteDatabase = InstanceType<typeof Database>;
+const SIDEBAR_STATE_KEY = "sidebar_collapsed";
 
 const sendAuthResultToRenderer = (result: AuthResult): void => {
   if (mainWindow && !mainWindow.isDestroyed()) {
@@ -92,6 +93,19 @@ const closeAuthServer = (): void => {
     authServer = null;
     authServerPort = null;
   }
+};
+
+const getSidebarCollapsed = (db: SqliteDatabase): boolean => {
+  const row = db
+    .prepare("SELECT value FROM app_meta WHERE key = ?")
+    .get(SIDEBAR_STATE_KEY) as { value: string } | undefined;
+  return row?.value === "1";
+};
+
+const setSidebarCollapsed = (db: SqliteDatabase, collapsed: boolean): void => {
+  db.prepare(
+    "INSERT INTO app_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value"
+  ).run(SIDEBAR_STATE_KEY, collapsed ? "1" : "0");
 };
 
 const exchangeCodeForTokens = async (
@@ -350,6 +364,17 @@ const registerAuthHandlers = (db: SqliteDatabase, rootDir: string): void => {
   });
 };
 
+const registerSidebarHandlers = (db: SqliteDatabase): void => {
+  ipcMain.handle("sidebar:get-state", () => {
+    return { collapsed: getSidebarCollapsed(db) };
+  });
+
+  ipcMain.handle("sidebar:set-state", (_event, payload: { collapsed: boolean }) => {
+    setSidebarCollapsed(db, Boolean(payload?.collapsed));
+    return { success: true };
+  });
+};
+
 const createMainWindow = (): void => {
   mainWindow = new BrowserWindow({
     width: 900,
@@ -411,6 +436,7 @@ app.whenReady().then(() => {
   }
 
   registerAuthHandlers(db, rootDir);
+  registerSidebarHandlers(db);
   registerProtocolHandling();
   createMainWindow();
 

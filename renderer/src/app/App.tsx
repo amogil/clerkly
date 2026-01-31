@@ -1,4 +1,4 @@
-// Requirements: E.T.4, E.U.1, E.A.1, E.A.2, E.A.3, E.A.4, E.A.5, E.A.11, E.A.14
+// Requirements: E.T.4, E.U.1, E.U.6, E.U.7, E.S.7, E.I.3, E.A.1, E.A.2, E.A.3, E.A.4, E.A.5, E.A.11, E.A.14
 import { useEffect, useState } from 'react';
 import { AuthGate } from './components/auth-gate';
 import { Navigation } from './components/navigation';
@@ -16,6 +16,7 @@ export default function App() {
   const [selectedMeetingId, setSelectedMeetingId] = useState<string | null>(null);
   const [authState, setAuthState] = useState<AuthState>('authorizing');
   const [authError, setAuthError] = useState<string | null>(null);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   useEffect(() => {
     window.clerkly
@@ -41,6 +42,17 @@ export default function App() {
     return () => {
       unsubscribe();
     };
+  }, []);
+
+  useEffect(() => {
+    window.clerkly
+      .getSidebarState()
+      .then((state) => {
+        setIsSidebarCollapsed(Boolean(state.collapsed));
+      })
+      .catch(() => {
+        setIsSidebarCollapsed(false);
+      });
   }, []);
 
   const handleSignIn = async () => {
@@ -117,12 +129,23 @@ export default function App() {
     }
   };
 
+  const handleToggleSidebar = async () => {
+    const next = !isSidebarCollapsed;
+    setIsSidebarCollapsed(next);
+    await window.clerkly.setSidebarState(next);
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {authState === 'authorized' ? (
         <>
-          <Navigation currentScreen={currentScreen} onNavigate={setCurrentScreen} />
-          <div className="ml-64">{renderScreen()}</div>
+          <Navigation
+            currentScreen={currentScreen}
+            onNavigate={setCurrentScreen}
+            collapsed={isSidebarCollapsed}
+            onToggleCollapse={handleToggleSidebar}
+          />
+          <div className={isSidebarCollapsed ? 'ml-20' : 'ml-64'}>{renderScreen()}</div>
         </>
       ) : (
         <AuthGate

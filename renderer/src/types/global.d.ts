@@ -11,6 +11,8 @@ declare global {
       openGoogleAuth: () => Promise<AuthResult>;
       getAuthState: () => Promise<{ authorized: boolean }>;
       signOut: () => Promise<{ success: boolean }>;
+      getSidebarState: () => Promise<{ collapsed: boolean }>;
+      setSidebarState: (collapsed: boolean) => Promise<{ success: boolean }>;
       onAuthResult: (callback: (result: AuthResult) => void) => () => void;
     };
   }

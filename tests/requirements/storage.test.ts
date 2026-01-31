@@ -59,4 +59,14 @@ describe("Storage and Migrations requirements", () => {
     const source = readText("src/db/index.ts");
     expect(source).toContain("schema_migrations");
   });
+
+  /* Preconditions: sidebar persistence is required.
+     Action: inspect main process storage usage.
+     Assertions: sidebar state is stored in app_meta table.
+     Requirements: E.S.7 */
+  it("stores sidebar state in SQLite app_meta", () => {
+    const source = readText("main.ts");
+    expect(source).toContain("app_meta");
+    expect(source).toContain("sidebar_collapsed");
+  });
 });

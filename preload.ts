@@ -1,4 +1,4 @@
-// Requirements: E.T.4, E.A.3, E.A.11, E.A.14, E.I.1
+// Requirements: E.T.4, E.A.3, E.A.11, E.A.14, E.I.1, E.I.3
 import { contextBridge, ipcRenderer } from "electron";
 
 type AuthResult = {
@@ -13,6 +13,10 @@ const api = {
     ipcRenderer.invoke("auth:get-state") as Promise<{ authorized: boolean }>,
   signOut: (): Promise<{ success: boolean }> =>
     ipcRenderer.invoke("auth:sign-out") as Promise<{ success: boolean }>,
+  getSidebarState: (): Promise<{ collapsed: boolean }> =>
+    ipcRenderer.invoke("sidebar:get-state") as Promise<{ collapsed: boolean }>,
+  setSidebarState: (collapsed: boolean): Promise<{ success: boolean }> =>
+    ipcRenderer.invoke("sidebar:set-state", { collapsed }) as Promise<{ success: boolean }>,
   onAuthResult: (callback: (result: AuthResult) => void): (() => void) => {
     const handler = (_: Electron.IpcRendererEvent, result: AuthResult) => {
       callback(result);

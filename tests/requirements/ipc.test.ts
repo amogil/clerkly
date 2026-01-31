@@ -25,4 +25,17 @@ describe("IPC and architecture requirements", () => {
     expect(preloadSource).toContain("auth:open-google");
     expect(preloadSource).toContain("auth:result");
   });
+
+  /* Preconditions: sidebar IPC is required.
+     Action: inspect IPC handlers and preload API.
+     Assertions: sidebar state handlers exist.
+     Requirements: E.I.3 */
+  it("exposes sidebar state via IPC", () => {
+    const mainSource = readText("main.ts");
+    const preloadSource = readText("preload.ts");
+    expect(mainSource).toContain("sidebar:get-state");
+    expect(mainSource).toContain("sidebar:set-state");
+    expect(preloadSource).toContain("getSidebarState");
+    expect(preloadSource).toContain("setSidebarState");
+  });
 });
