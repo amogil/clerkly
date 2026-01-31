@@ -1,4 +1,4 @@
-// Requirements: E.P.1, E.P.2, E.P.3, E.P.6, E.T.4, E.S.1, E.S.7, E.A.3, E.A.4, E.A.6, E.A.7, E.A.8, E.A.11, E.A.12, E.A.13, E.A.14, E.A.15, E.A.16, E.A.18, E.A.19, E.A.20, E.A.21, E.A.23, E.A.24, E.A.25, E.A.26, E.A.27, E.I.1, E.I.3, E.Q.1
+// Requirements: E.P.1, E.P.2, E.P.3, E.P.6, E.T.4, E.S.1, E.S.7, E.A.3, E.A.4, E.A.6, E.A.7, E.A.8, E.A.11, E.A.12, E.A.13, E.A.14, E.A.15, E.A.16, E.A.18, E.A.19, E.A.20, E.A.21, E.A.23, E.A.24, E.A.25, E.A.26, E.A.27, E.TE.6, E.TE.11, E.I.1, E.I.3, E.Q.1
 // Tooling requirements: E.T.1 (see package.json)
 import { app, BrowserWindow, dialog, ipcMain, shell } from "electron";
 import Database from "better-sqlite3";
@@ -23,6 +23,10 @@ type AuthResult = {
 };
 
 const PROTOCOL = "clerkly";
+const userDataOverride = process.env.CLERKLY_E2E_USER_DATA;
+if (userDataOverride) {
+  app.setPath("userData", userDataOverride);
+}
 
 let mainWindow: BrowserWindow | null = null;
 let pendingAuthResult: AuthResult | null = null;
@@ -66,6 +70,25 @@ const mapOauthErrorMessage = (error?: string | null): string | undefined => {
     return "Authorization failed. This client is not allowed to request access.";
   }
   return error;
+};
+
+const authSequence = (process.env.CLERKLY_E2E_AUTH_SEQUENCE ?? "")
+  .split(",")
+  .map((value) => value.trim())
+  .filter((value) => value.length > 0);
+
+const getAuthStubMode = (): "success" | "failure" | null => {
+  if (authSequence.length > 0) {
+    const next = authSequence.shift();
+    if (next === "success" || next === "failure") {
+      return next;
+    }
+  }
+  const mode = process.env.CLERKLY_E2E_AUTH_MODE;
+  if (mode === "success" || mode === "failure") {
+    return mode;
+  }
+  return null;
 };
 
 const scheduleTokenRefresh = (db: SqliteDatabase, rootDir: string, tokens: OAuthTokens): void => {
@@ -328,6 +351,25 @@ const registerProtocolHandling = (): void => {
 const registerAuthHandlers = (db: SqliteDatabase, rootDir: string): void => {
   ipcMain.handle("auth:open-google", async () => {
     try {
+      const stubMode = getAuthStubMode();
+      if (stubMode) {
+        if (stubMode === "success") {
+          const tokens: OAuthTokens = {
+            accessToken: "e2e-access-token",
+            refreshToken: "e2e-refresh-token",
+            expiresAt: Date.now() + 60 * 60 * 1000,
+          };
+          writeTokens(db, rootDir, tokens);
+          scheduleTokenRefresh(db, rootDir, tokens);
+          sendAuthResultToRenderer({ success: true });
+          return { success: true };
+        }
+
+        const message = "Authorization was canceled. Please try again.";
+        sendAuthResultToRenderer({ success: false, error: message });
+        return { success: false, error: message };
+      }
+
       const clientId = authGoogleConfig.clientId.trim();
       const clientSecret = authGoogleConfig.clientSecret.trim();
 

@@ -63,6 +63,22 @@ const REQUIREMENT_IDS = [
   "E.TE.1",
   "E.TE.2",
   "E.TE.3",
+  "E.TE.4",
+  "E.TE.5",
+  "E.TE.6",
+  "E.TE.7",
+  "E.TE.8",
+  "E.TE.9",
+  "E.TE.10",
+  "E.TE.11",
+  "E.TE.12",
+  "E.TE.13",
+  "E.TE.14",
+  "E.TE.15",
+  "E.TE.16",
+  "E.TE.17",
+  "E.TE.18",
+  "E.TE.19",
 ];
 
 const TEST_FILES = [
