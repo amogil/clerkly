@@ -6,7 +6,7 @@ describe("UI reference requirements", () => {
   /* Preconditions: docs folder exists.
      Action: check UI reference path.
      Assertions: UI reference directory exists.
-     Requirements: E.U.1 */
+     Requirements: branding-system.1.1 */
   it("retains the UI reference directory", () => {
     expect(fileExists("docs/development/ui_reference")).toBe(true);
   });
@@ -14,7 +14,7 @@ describe("UI reference requirements", () => {
   /* Preconditions: auth gate exists.
      Action: inspect auth gate layout.
      Assertions: Logo component is rendered with expected props.
-     Requirements: E.U.2 */
+     Requirements: branding-system.1.2 */
   it("renders the auth gate logo from the UI reference", () => {
     const source = readText("renderer/src/app/components/auth-gate.tsx");
     expect(source).toContain('<Logo size="md" showText={true} />');
@@ -23,7 +23,7 @@ describe("UI reference requirements", () => {
   /* Preconditions: navigation component exists.
      Action: inspect left navigation layout.
      Assertions: Logo component is rendered with expected props and toggled by collapse state.
-     Requirements: E.U.3 */
+     Requirements: sidebar-navigation.1.1 */
   it("renders the sidebar logo from the UI reference", () => {
     const source = readText("renderer/src/app/components/navigation.tsx");
     expect(source).toContain('<Logo size="md" showText={!collapsed} />');
@@ -32,7 +32,7 @@ describe("UI reference requirements", () => {
   /* Preconditions: navigation component exists.
      Action: inspect left navigation tagline.
      Assertions: tagline matches required text and hides when collapsed.
-     Requirements: E.U.4 */
+     Requirements: sidebar-navigation.1.2 */
   it("renders the sidebar tagline text", () => {
     const source = readText("renderer/src/app/components/navigation.tsx");
     expect(source).toContain("Stay on track");
@@ -42,7 +42,7 @@ describe("UI reference requirements", () => {
   /* Preconditions: navigation component exists.
      Action: inspect settings placement.
      Assertions: settings item is rendered in the bottom section.
-     Requirements: E.U.5 */
+     Requirements: sidebar-navigation.1.3 */
   it("renders settings in the sidebar bottom section", () => {
     const source = readText("renderer/src/app/components/navigation.tsx");
     expect(source).toContain("const settingsItem");
@@ -53,7 +53,7 @@ describe("UI reference requirements", () => {
   /* Preconditions: navigation component exists.
      Action: inspect collapse control.
      Assertions: toggle control is present.
-     Requirements: E.U.6 */
+     Requirements: sidebar-navigation.1.4 */
   it("includes a sidebar collapse control", () => {
     const source = readText("renderer/src/app/components/navigation.tsx");
     expect(source).toContain("onToggleCollapse");
@@ -64,7 +64,7 @@ describe("UI reference requirements", () => {
   /* Preconditions: navigation component exists.
      Action: inspect collapsed layout behavior.
      Assertions: width reduces and labels are hidden.
-     Requirements: E.U.7 */
+     Requirements: sidebar-navigation.1.5 */
   it("renders a collapsed sidebar layout", () => {
     const source = readText("renderer/src/app/components/navigation.tsx");
     expect(source).toContain('collapsed ? "w-20" : "w-64"');
@@ -74,7 +74,7 @@ describe("UI reference requirements", () => {
   /* Preconditions: navigation component exists.
      Action: inspect toggle placement layout.
      Assertions: header layout keeps logo and toggle in-row within bounds.
-     Requirements: E.U.8 */
+     Requirements: sidebar-navigation.1.6 */
   it("keeps the sidebar toggle within the logo header bounds", () => {
     const source = readText("renderer/src/app/components/navigation.tsx");
     expect(source).toContain('collapsed ? "pl-2 pr-1 py-3" : "p-6"');
@@ -85,7 +85,7 @@ describe("UI reference requirements", () => {
   /* Preconditions: navigation component exists.
      Action: inspect navigation icon sizing.
      Assertions: icon sizing uses a shared class name regardless of collapse.
-     Requirements: E.U.9 */
+     Requirements: sidebar-navigation.1.7 */
   it("keeps navigation icon sizes consistent when collapsed", () => {
     const source = readText("renderer/src/app/components/navigation.tsx");
     expect(source).toContain('const navIconClassName = "w-5 h-5 shrink-0"');
@@ -95,7 +95,7 @@ describe("UI reference requirements", () => {
   /* Preconditions: navigation component exists.
      Action: inspect collapsed layout alignment.
      Assertions: collapsed layout centers icons in the button.
-     Requirements: E.U.10 */
+     Requirements: sidebar-navigation.1.8 */
   it("centers collapsed navigation icons", () => {
     const source = readText("renderer/src/app/components/navigation.tsx");
     expect(source).toContain("const navButtonClassName = (isActive: boolean): string => {");

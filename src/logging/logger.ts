@@ -1,4 +1,4 @@
-// Requirements: E.Q.1
+// Requirements: platform-foundation.2.1
 import fs from "fs";
 import path from "path";
 

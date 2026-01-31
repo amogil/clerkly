@@ -1,4 +1,4 @@
-// Requirements: E.T.4, E.A.23, E.A.24, E.A.25, E.A.26
+// Requirements: platform-foundation.2.2, google-oauth-auth.4.2, google-oauth-auth.4.3, google-oauth-auth.4.4
 type AuthorizationCompletionPageParams = {
   success: boolean;
   error?: string | null;

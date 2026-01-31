@@ -1,4 +1,4 @@
-// Requirements: E.T.4, E.A.6, E.A.7, E.A.16, E.A.19, E.A.20, E.A.21
+// Requirements: platform-foundation.2.2, google-oauth-auth.1.7, google-oauth-auth.1.8, google-oauth-auth.3.1, google-oauth-auth.3.3
 import crypto from "crypto";
 
 export const authGoogleConfig = {

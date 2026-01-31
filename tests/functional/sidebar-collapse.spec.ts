@@ -6,7 +6,7 @@ test.describe("Sidebar collapse", () => {
   /* Preconditions: authorized app session.
      Action: collapse sidebar, relaunch, expand.
      Assertions: collapse persists and expands.
-     Requirements: E.TE.8 */
+     Requirements: testing-infrastructure.1.8 */
   test("persists collapsed state", async () => {
     const userDataDir = await createUserDataDir();
 
@@ -32,7 +32,7 @@ test.describe("Sidebar collapse", () => {
   /* Preconditions: authorized app session.
      Action: collapse sidebar.
      Assertions: content layout shifts to collapsed margin.
-     Requirements: E.TE.15 */
+     Requirements: testing-infrastructure.1.15 */
   test("shifts main content when collapsed", async () => {
     const userDataDir = await createUserDataDir();
     const { app, page } = await launchApp(userDataDir, { authMode: "success" });

@@ -6,7 +6,7 @@ test.describe("Auth flow", () => {
   /* Preconditions: app launched with auth stub success.
      Action: click Sign in with Google.
      Assertions: dashboard becomes visible.
-     Requirements: E.TE.7 */
+     Requirements: testing-infrastructure.1.7 */
   test("completes successful authorization", async () => {
     const userDataDir = await createUserDataDir();
     const { app, page } = await launchApp(userDataDir, { authMode: "success" });
@@ -21,7 +21,7 @@ test.describe("Auth flow", () => {
   /* Preconditions: app launched with auth stub failure.
      Action: click Sign in with Google.
      Assertions: friendly error shown and auth gate remains.
-     Requirements: E.TE.7 */
+     Requirements: testing-infrastructure.1.7 */
   test("shows friendly error on canceled authorization", async () => {
     const userDataDir = await createUserDataDir();
     const { app, page } = await launchApp(userDataDir, { authMode: "failure" });
@@ -37,7 +37,7 @@ test.describe("Auth flow", () => {
   /* Preconditions: app launched with auth sequence failure then success.
      Action: click Sign in, then click again.
      Assertions: error appears then dashboard loads on retry.
-     Requirements: E.TE.13 */
+     Requirements: testing-infrastructure.1.13 */
   test("retries authorization after cancel", async () => {
     const userDataDir = await createUserDataDir();
     const { app, page } = await launchApp(userDataDir, {

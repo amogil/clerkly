@@ -6,7 +6,7 @@ test.describe("Settings toggles", () => {
   /* Preconditions: authorized app session.
      Action: toggle meeting settings switches.
      Assertions: toggle button classes change.
-     Requirements: E.TE.18 */
+     Requirements: testing-infrastructure.1.18 */
   test("toggles meeting settings", async () => {
     const userDataDir = await createUserDataDir();
     const { app, page } = await launchApp(userDataDir, { authMode: "success" });

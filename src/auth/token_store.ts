@@ -1,4 +1,4 @@
-// Requirements: E.A.11, E.A.12, E.A.13, E.A.15, E.Q.1
+// Requirements: google-oauth-auth.2.1, google-oauth-auth.2.2, platform-foundation.2.1
 import crypto from "crypto";
 import fs from "fs";
 import path from "path";

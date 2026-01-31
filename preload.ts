@@ -1,4 +1,4 @@
-// Requirements: E.T.4, E.A.3, E.A.11, E.A.14, E.I.1, E.I.3
+// Requirements: platform-foundation.2.2, google-oauth-auth.5.1, platform-foundation.3.3, platform-foundation.3.4
 import { contextBridge, ipcRenderer } from "electron";
 
 type AuthResult = {

@@ -1,4 +1,4 @@
-// E.T.5, E.T.7, E.T.8: Lint TypeScript/React sources, config, and tests.
+// platform-foundation.2.3, platform-foundation.2.4: Lint TypeScript/React sources, config, and tests.
 import js from "@eslint/js";
 import globals from "globals";
 import react from "eslint-plugin-react";

@@ -7,7 +7,7 @@ test.describe("Migration smoke", () => {
   /* Preconditions: outdated database schema.
      Action: launch app to trigger migrations.
      Assertions: latest tables exist after startup.
-     Requirements: E.TE.19 */
+     Requirements: testing-infrastructure.1.19 */
   test("migrates outdated schema on startup", async () => {
     const userDataDir = await createUserDataDir();
     const dbPath = path.join(userDataDir, "clerkly.sqlite3");

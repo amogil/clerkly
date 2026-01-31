@@ -1,4 +1,4 @@
-// Requirements: E.S.1, E.S.6
+// Requirements: data-storage.1.1, data-storage.2.1
 import Database from "better-sqlite3";
 
 export type SqliteDatabase = InstanceType<typeof Database>;

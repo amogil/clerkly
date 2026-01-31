@@ -1,5 +1,5 @@
-// Requirements: E.P.1, E.P.2, E.P.3, E.P.6, E.P.7, E.T.4, E.S.1, E.S.7, E.A.3, E.A.4, E.A.6, E.A.7, E.A.8, E.A.11, E.A.12, E.A.13, E.A.14, E.A.15, E.A.16, E.A.18, E.A.19, E.A.20, E.A.21, E.A.23, E.A.24, E.A.25, E.A.26, E.A.27, E.TE.6, E.TE.11, E.I.1, E.I.3, E.Q.1
-// Tooling requirements: E.T.1 (see package.json)
+// Requirements: platform-foundation.1.1, platform-foundation.1.2, platform-foundation.1.3, platform-foundation.1.4, platform-foundation.2.2, data-storage.1.1, sidebar-navigation.4.1, google-oauth-auth.5.1, google-oauth-auth.1.4, google-oauth-auth.1.7, google-oauth-auth.1.8, google-oauth-auth.2.1, google-oauth-auth.2.2, google-oauth-auth.3.1, google-oauth-auth.4.2, google-oauth-auth.4.3, google-oauth-auth.4.4, platform-foundation.3.3, platform-foundation.3.4, platform-foundation.2.1
+// Tooling requirements: platform-foundation.2.1 (see package.json)
 import { app, BrowserWindow, dialog, ipcMain, Menu, shell } from "electron";
 import Database from "better-sqlite3";
 import http from "http";
@@ -454,7 +454,7 @@ const createMainWindow = (): void => {
   });
 
   mainWindow.loadFile(path.join(__dirname, "renderer", "index.html"));
-  // Requirement: E.P.3
+  // Requirement: platform-foundation.1.3
   mainWindow.maximize();
 
   if (pendingAuthResult) {

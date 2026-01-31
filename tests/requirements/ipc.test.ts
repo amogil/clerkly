@@ -6,7 +6,7 @@ describe("IPC and architecture requirements", () => {
   /* Preconditions: renderer sources exist.
      Action: inspect renderer for electron imports.
      Assertions: renderer does not import electron directly.
-     Requirements: E.I.1 */
+     Requirements: platform-foundation.3.1 */
   it("keeps renderer free of direct Electron imports", () => {
     const rendererMain = readText("renderer/src/main.tsx");
     const app = readText("renderer/src/app/App.tsx");
@@ -17,7 +17,7 @@ describe("IPC and architecture requirements", () => {
   /* Preconditions: main/preload exist.
      Action: inspect IPC channel usage.
      Assertions: auth IPC channels are present.
-     Requirements: E.I.2 */
+     Requirements: google-oauth-auth.5.1 */
   it("uses stable auth IPC channels", () => {
     const mainSource = readText("main.ts");
     const preloadSource = readText("preload.ts");
@@ -29,7 +29,7 @@ describe("IPC and architecture requirements", () => {
   /* Preconditions: sidebar IPC is required.
      Action: inspect IPC handlers and preload API.
      Assertions: sidebar state handlers exist.
-     Requirements: E.I.3 */
+     Requirements: platform-foundation.3.4 */
   it("exposes sidebar state via IPC", () => {
     const mainSource = readText("main.ts");
     const preloadSource = readText("preload.ts");
