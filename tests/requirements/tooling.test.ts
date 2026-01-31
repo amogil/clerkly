@@ -34,7 +34,7 @@ describe("Tooling and Language requirements", () => {
   /* Preconditions: linting tooling is configured.
      Action: check lint dependencies and config file.
      Assertions: ESLint tooling exists for TS/TSX.
-     Requirements: E.T.5 */
+     Requirements: platform-foundation.2.3 */
   it("configures ESLint for TypeScript and React", () => {
     const pkg = readJson<PackageJson>("package.json");
     expect(pkg.devDependencies?.eslint).toBeDefined();
@@ -48,7 +48,7 @@ describe("Tooling and Language requirements", () => {
   /* Preconditions: formatting tooling is configured.
      Action: check Prettier dependency and config file.
      Assertions: Prettier config exists in repo.
-     Requirements: E.T.6 */
+     Requirements: platform-foundation.2.4 */
   it("configures Prettier formatting", () => {
     const pkg = readJson<PackageJson>("package.json");
     expect(pkg.devDependencies?.prettier).toBeDefined();
@@ -59,7 +59,7 @@ describe("Tooling and Language requirements", () => {
   /* Preconditions: lint and format scripts are required.
      Action: read package scripts.
      Assertions: lint and format scripts are present.
-     Requirements: E.T.7 */
+     Requirements: platform-foundation.2.5 */
   it("defines lint and format scripts", () => {
     const pkg = readJson<PackageJson>("package.json");
     expect(pkg.scripts?.lint).toBeDefined();
@@ -71,7 +71,7 @@ describe("Tooling and Language requirements", () => {
   /* Preconditions: linting scope includes tracked config and tests.
      Action: check lint/format configuration files exist.
      Assertions: config and test paths are present in repo.
-     Requirements: E.T.8 */
+     Requirements: platform-foundation.2.6 */
   it("covers source, config, and test files in linting scope", () => {
     expect(fileExists("eslint.config.mjs")).toBe(true);
     expect(fileExists("prettier.config.cjs")).toBe(true);

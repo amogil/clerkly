@@ -1,4 +1,4 @@
-// Requirements: E.A.14
+// Requirements: google-oauth-auth.1.12
 import { Calendar, CheckCircle2, Bell, User, Shield, Globe, Mic, FileText, Save, LogOut } from 'lucide-react';
 import { useState } from 'react';
 
