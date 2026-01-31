@@ -2,8 +2,7 @@
 import crypto from "crypto";
 
 export const authGoogleConfig = {
-  clientId:
-    "100365225505-a9mp4sll4948tafotr1va0fvnl5hrpoa.apps.googleusercontent.com",
+  clientId: "100365225505-a9mp4sll4948tafotr1va0fvnl5hrpoa.apps.googleusercontent.com",
   clientSecret: "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",
   scopes: ["openid", "email", "profile"],
   authEndpoint: "https://accounts.google.com/o/oauth2/v2/auth",
@@ -11,11 +10,7 @@ export const authGoogleConfig = {
 };
 
 const base64UrlEncode = (input: Buffer): string => {
-  return input
-    .toString("base64")
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/, "");
+  return input.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 };
 
 export const generatePkceVerifier = (): string => {
@@ -35,7 +30,7 @@ export const getGoogleAuthUrl = (
   clientId: string,
   port: number,
   codeChallenge: string,
-  state: string
+  state: string,
 ): string => {
   const redirectUri = `http://127.0.0.1:${port}`;
   const url = new URL(authGoogleConfig.authEndpoint);

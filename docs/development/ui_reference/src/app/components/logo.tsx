@@ -1,18 +1,18 @@
 interface LogoProps {
-  size?: 'sm' | 'md' | 'lg';
+  size?: "sm" | "md" | "lg";
   showText?: boolean;
 }
 
-export function Logo({ size = 'md', showText = true }: LogoProps) {
+export function Logo({ size = "md", showText = true }: LogoProps) {
   const sizes = {
-    sm: { icon: 24, text: 'text-lg' },
-    md: { icon: 32, text: 'text-2xl' },
-    lg: { icon: 48, text: 'text-4xl' },
+    sm: { icon: 24, text: "text-lg" },
+    md: { icon: 32, text: "text-2xl" },
+    lg: { icon: 48, text: "text-4xl" },
   };
 
   const iconSize = sizes[size].icon;
   const textClass = sizes[size].text;
-  
+
   // Generate unique ID for gradient to avoid conflicts
   const gradientId = `logo-gradient-${size}`;
 
@@ -28,7 +28,7 @@ export function Logo({ size = 'md', showText = true }: LogoProps) {
       >
         {/* Background circle with gradient */}
         <circle cx="16" cy="16" r="16" fill={`url(#${gradientId})`} />
-        
+
         {/* Stylized "C" shape that also looks like a microphone wave */}
         <path
           d="M20 9C20 9 22 11 22 16C22 21 20 23 20 23"
@@ -42,10 +42,10 @@ export function Logo({ size = 'md', showText = true }: LogoProps) {
           strokeWidth="2.5"
           strokeLinecap="round"
         />
-        
+
         {/* Center dot/circle representing the AI core */}
         <circle cx="12" cy="16" r="3" fill="white" />
-        
+
         <defs>
           <linearGradient
             id={gradientId}
@@ -64,9 +64,7 @@ export function Logo({ size = 'md', showText = true }: LogoProps) {
       {/* Logo Text */}
       {showText && (
         <div>
-          <h1 className={`${textClass} font-semibold text-foreground leading-none`}>
-            Clerkly
-          </h1>
+          <h1 className={`${textClass} font-semibold text-foreground leading-none`}>Clerkly</h1>
         </div>
       )}
     </div>

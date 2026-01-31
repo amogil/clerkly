@@ -56,9 +56,7 @@ export function Logo({ size = "md", showText = true }: LogoProps) {
       </svg>
       {showText ? (
         <div>
-          <h1 className={`${textClass} font-semibold text-foreground leading-none`}>
-            Clerkly
-          </h1>
+          <h1 className={`${textClass} font-semibold text-foreground leading-none`}>Clerkly</h1>
         </div>
       ) : null}
     </div>

@@ -24,12 +24,7 @@ export function AuthGate({ isAuthorizing, errorMessage, onSignIn }: AuthGateProp
           className="inline-flex h-14 min-w-[320px] items-stretch overflow-hidden rounded-[3px] bg-[#4285F4] text-lg font-semibold text-white shadow-sm transition hover:bg-[#3977F5] disabled:cursor-not-allowed disabled:opacity-70"
         >
           <span className="flex w-14 items-center justify-center border-2 border-[#4285F4] bg-white">
-            <svg
-              className="h-6 w-6"
-              viewBox="0 0 18 18"
-              aria-hidden="true"
-              focusable="false"
-            >
+            <svg className="h-6 w-6" viewBox="0 0 18 18" aria-hidden="true" focusable="false">
               <path
                 fill="#EA4335"
                 d="M9 3.48c1.69 0 2.83.73 3.48 1.34l2.54-2.47C13.44.89 11.42 0 9 0 5.48 0 2.44 2.02 1.02 4.96l2.95 2.29C4.7 4.99 6.68 3.48 9 3.48Z"

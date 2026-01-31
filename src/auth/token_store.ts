@@ -57,9 +57,9 @@ type SqliteDatabase = InstanceType<typeof Database>;
 
 export const readTokens = (db: SqliteDatabase, rootDir: string): OAuthTokens | null => {
   try {
-    const row = db
-      .prepare("SELECT encrypted FROM auth_tokens WHERE id = 1")
-      .get() as TokenRecord | undefined;
+    const row = db.prepare("SELECT encrypted FROM auth_tokens WHERE id = 1").get() as
+      | TokenRecord
+      | undefined;
 
     if (!row) {
       return null;
@@ -80,7 +80,7 @@ export const writeTokens = (db: SqliteDatabase, rootDir: string, tokens: OAuthTo
   const encrypted = encryptPayload(payload, key);
 
   db.prepare(
-    "INSERT INTO auth_tokens (id, encrypted, updated_at) VALUES (1, ?, ?) ON CONFLICT(id) DO UPDATE SET encrypted = excluded.encrypted, updated_at = excluded.updated_at"
+    "INSERT INTO auth_tokens (id, encrypted, updated_at) VALUES (1, ?, ?) ON CONFLICT(id) DO UPDATE SET encrypted = excluded.encrypted, updated_at = excluded.updated_at",
   ).run(encrypted, Date.now());
 };
 

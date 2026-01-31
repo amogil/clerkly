@@ -3,20 +3,26 @@ import { describe, expect, it } from "vitest";
 import { readText } from "../utils/fs";
 
 const REQUIREMENT_IDS = [
+  // Platform Foundation Requirements
   "platform-foundation.1.1",
-  "platform-foundation.1.2", 
+  "platform-foundation.1.2",
   "platform-foundation.1.3",
   "platform-foundation.1.4",
   "platform-foundation.1.5",
-  "platform-foundation.1.6",
   "platform-foundation.2.1",
   "platform-foundation.2.2",
   "platform-foundation.2.3",
   "platform-foundation.2.4",
   "platform-foundation.2.5",
   "platform-foundation.2.6",
+  "platform-foundation.3.1",
+  "platform-foundation.3.4",
+
+  // Branding System Requirements
   "branding-system.1.1",
   "branding-system.1.2",
+
+  // Sidebar Navigation Requirements
   "sidebar-navigation.1.1",
   "sidebar-navigation.1.2",
   "sidebar-navigation.1.3",
@@ -25,12 +31,17 @@ const REQUIREMENT_IDS = [
   "sidebar-navigation.1.6",
   "sidebar-navigation.1.7",
   "sidebar-navigation.1.8",
+  "sidebar-navigation.4.1",
+
+  // Data Storage Requirements
   "data-storage.1.1",
   "data-storage.1.2",
   "data-storage.1.3",
-  "data-storage.1.4",
-  "data-storage.1.5",
-  "data-storage.1.6",
+  "data-storage.2.1",
+  "data-storage.2.5",
+  "data-storage.3.1",
+
+  // Google OAuth Auth Requirements
   "google-oauth-auth.1.1",
   "google-oauth-auth.1.2",
   "google-oauth-auth.1.3",
@@ -55,11 +66,9 @@ const REQUIREMENT_IDS = [
   "google-oauth-auth.1.22",
   "google-oauth-auth.1.23",
   "google-oauth-auth.1.24",
-  "platform-foundation.3.1",
-  "platform-foundation.3.2",
-  "platform-foundation.3.3",
-  "platform-foundation.4.1",
-  "platform-foundation.4.2",
+  "google-oauth-auth.5.1",
+
+  // Testing Infrastructure Requirements
   "testing-infrastructure.1.1",
   "testing-infrastructure.1.2",
   "testing-infrastructure.1.3",

@@ -13,7 +13,7 @@
   - Добавить npm скрипты для запуска unit тестов
   - _Requirements: testing-infrastructure.1.1, testing-infrastructure.1.2, testing-infrastructure.1.4_
 
-- [ ]* 1.1 Написать property тест для конфигурации покрытия кода
+- [ ]\* 1.1 Написать property тест для конфигурации покрытия кода
   - **Property 1: Покрытие кода**
   - **Validates: testing-infrastructure.1.2**
 
@@ -23,7 +23,7 @@
     - Создать валидацию существования соответствующих исходных файлов
     - _Requirements: testing-infrastructure.1.3_
 
-  - [ ]* 2.2 Написать property тест для организации файлов
+  - [ ]\* 2.2 Написать property тест для организации файлов
     - **Property 2: Организация тестовых файлов**
     - **Validates: testing-infrastructure.1.3**
 
@@ -48,11 +48,11 @@
     - Создать моки для межпроцессного взаимодействия
     - _Requirements: testing-infrastructure.2.4_
 
-  - [ ]* 3.5 Написать property тест для изоляции внешних зависимостей
+  - [ ]\* 3.5 Написать property тест для изоляции внешних зависимостей
     - **Property 3: Изоляция внешних зависимостей**
     - **Validates: testing-infrastructure.2.1, testing-infrastructure.2.2, testing-infrastructure.2.3**
 
-  - [ ]* 3.6 Написать unit тесты для Mock System
+  - [ ]\* 3.6 Написать unit тесты для Mock System
     - Тестировать каждый тип мока отдельно
     - Проверить корректность перехвата операций
     - _Requirements: testing-infrastructure.2.1, testing-infrastructure.2.2, testing-infrastructure.2.3, testing-infrastructure.2.4_
@@ -72,7 +72,7 @@
     - Создать кастомные shrinking стратегии для доменных объектов
     - _Requirements: testing-infrastructure.3.3_
 
-  - [ ]* 5.3 Написать property тест для PBT системы
+  - [ ]\* 5.3 Написать property тест для PBT системы
     - **Property 5: Property-based тестирование бизнес-логики**
     - **Validates: testing-infrastructure.3.1, testing-infrastructure.3.2, testing-infrastructure.3.3**
 
@@ -87,7 +87,7 @@
     - Создать помощники для тестирования boundary conditions
     - _Requirements: testing-infrastructure.4.2_
 
-  - [ ]* 6.3 Написать property тест для покрытия обработки ошибок
+  - [ ]\* 6.3 Написать property тест для покрытия обработки ошибок
     - **Property 6: Покрытие обработки ошибок**
     - **Validates: testing-infrastructure.4.1, testing-infrastructure.4.2, testing-infrastructure.4.3**
 
@@ -108,7 +108,7 @@
     - Настроить изолированные браузерные контексты
     - _Requirements: testing-infrastructure.5.3_
 
-  - [ ]* 7.4 Написать property тест для изоляции функциональных тестов
+  - [ ]\* 7.4 Написать property тест для изоляции функциональных тестов
     - **Property 7: Изоляция функциональных тестов**
     - **Validates: testing-infrastructure.5.3, testing-infrastructure.6.1**
 
@@ -126,7 +126,7 @@
     - Создать тест постоянства выхода после перезапуска
     - _Requirements: testing-infrastructure.6.1, testing-infrastructure.6.2, testing-infrastructure.6.3, testing-infrastructure.6.4, testing-infrastructure.6.5_
 
-  - [ ]* 8.3 Написать unit тесты для OAuth заглушек
+  - [ ]\* 8.3 Написать unit тесты для OAuth заглушек
     - Тестировать различные сценарии аутентификации
     - Проверить детерминированность поведения заглушек
     - _Requirements: testing-infrastructure.6.1, testing-infrastructure.6.2, testing-infrastructure.6.3, testing-infrastructure.6.4, testing-infrastructure.6.5_
@@ -141,7 +141,7 @@
     - Реализовать валидацию соответствия активного элемента текущему разделу
     - _Requirements: testing-infrastructure.7.2_
 
-  - [ ]* 9.3 Написать property тест для активного состояния навигации
+  - [ ]\* 9.3 Написать property тест для активного состояния навигации
     - **Property 8: Активное состояние навигации**
     - **Validates: testing-infrastructure.7.2**
 
@@ -150,7 +150,7 @@
     - Реализовать проверку адаптации макета основного содержимого
     - _Requirements: testing-infrastructure.7.3_
 
-  - [ ]* 9.5 Написать property тест для адаптивности макета
+  - [ ]\* 9.5 Написать property тест для адаптивности макета
     - **Property 9: Адаптивность макета боковой панели**
     - **Validates: testing-infrastructure.7.3**
 
@@ -160,7 +160,7 @@
     - Создать валидацию реактивности UI элементов
     - _Requirements: testing-infrastructure.8.1_
 
-  - [ ]* 10.2 Написать property тест для реактивности переключателей
+  - [ ]\* 10.2 Написать property тест для реактивности переключателей
     - **Property 10: Реактивность переключателей настроек**
     - **Validates: testing-infrastructure.8.1**
 
@@ -169,7 +169,7 @@
     - Создать smoke тесты базовой функциональности после миграции
     - _Requirements: testing-infrastructure.8.2, testing-infrastructure.8.3_
 
-  - [ ]* 10.4 Написать unit тесты для системы миграций
+  - [ ]\* 10.4 Написать unit тесты для системы миграций
     - Тестировать различные версии схем
     - Проверить корректность процесса миграции
     - _Requirements: testing-infrastructure.8.2, testing-infrastructure.8.3_
@@ -186,7 +186,7 @@
     - Настроить пороги покрытия кода и автоматические проверки
     - _Requirements: testing-infrastructure.1.2_
 
-  - [ ]* 11.3 Написать интеграционные тесты
+  - [ ]\* 11.3 Написать интеграционные тесты
     - Тестировать взаимодействие между unit и функциональными тестами
     - Проверить корректность общей системы отчетности
     - _Requirements: testing-infrastructure.1.1, testing-infrastructure.1.2, testing-infrastructure.5.1_

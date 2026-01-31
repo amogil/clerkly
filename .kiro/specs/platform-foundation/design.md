@@ -7,6 +7,7 @@
 ## Архитектурный Обзор
 
 ### Технологический Стек
+
 - **Electron**: 40.0.0 (оболочка приложения)
 - **Node.js**: 25.5.0 (runtime для main процесса)
 - **TypeScript**: 5.9.3 (язык разработки)
@@ -33,13 +34,15 @@
 ## Компонентная Архитектура
 
 ### 1. Main Process (main.ts)
+
 **Ответственность**: Управление жизненным циклом приложения, создание окон, обработка системных событий
 
 **Ключевые Функции**:
+
 ```typescript
 // Инициализация приложения
-app.setName("Clerkly")
-app.name = "Clerkly"
+app.setName("Clerkly");
+app.name = "Clerkly";
 
 // Создание главного окна
 const mainWindow = new BrowserWindow({
@@ -49,51 +52,55 @@ const mainWindow = new BrowserWindow({
   webPreferences: {
     nodeIntegration: false,
     contextIsolation: true,
-    preload: path.join(__dirname, "preload.js")
-  }
-})
+    preload: path.join(__dirname, "preload.js"),
+  },
+});
 ```
 
 **IPC Обработчики**:
+
 - `auth:open-google` - инициация OAuth
-- `auth:get-state` - получение статуса авторизации  
+- `auth:get-state` - получение статуса авторизации
 - `auth:sign-out` - выход из системы
 - `sidebar:get-state` - получение состояния сайдбара
 - `sidebar:set-state` - сохранение состояния сайдбара
 
 ### 2. Preload Script (preload.ts)
+
 **Ответственность**: Безопасный мост между renderer и main процессами
 
 **Паттерн**: Context Isolation + contextBridge
+
 ```typescript
 const api = {
-  openGoogleAuth: (): Promise<AuthResult> =>
-    ipcRenderer.invoke("auth:open-google"),
-  getAuthState: (): Promise<{ authorized: boolean }> =>
-    ipcRenderer.invoke("auth:get-state"),
+  openGoogleAuth: (): Promise<AuthResult> => ipcRenderer.invoke("auth:open-google"),
+  getAuthState: (): Promise<{ authorized: boolean }> => ipcRenderer.invoke("auth:get-state"),
   // ... другие методы
-}
+};
 
-contextBridge.exposeInMainWorld("clerkly", api)
+contextBridge.exposeInMainWorld("clerkly", api);
 ```
 
 ### 3. Renderer Process (React App)
+
 **Ответственность**: Пользовательский интерфейс и взаимодействие с пользователем
 
 **Точка входа**: `renderer/src/main.tsx` → `renderer/src/app/App.tsx`
 
 **Управление состоянием**:
-```typescript
-type AuthState = "unauthorized" | "authorizing" | "authorized" | "error"
 
-const [authState, setAuthState] = useState<AuthState>("authorizing")
-const [currentScreen, setCurrentScreen] = useState<string>("dashboard")
-const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
+```typescript
+type AuthState = "unauthorized" | "authorizing" | "authorized" | "error";
+
+const [authState, setAuthState] = useState<AuthState>("authorizing");
+const [currentScreen, setCurrentScreen] = useState<string>("dashboard");
+const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 ```
 
 ## Система Сборки и Разработки
 
 ### Конфигурация TypeScript
+
 ```json
 {
   "compilerOptions": {
@@ -107,6 +114,7 @@ const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
 ```
 
 ### Скрипты Сборки
+
 ```json
 {
   "build:main": "tsc",
@@ -120,23 +128,27 @@ const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
 ### Система Качества Кода
 
 **ESLint Конфигурация**:
+
 - TypeScript parser и правила
 - React hooks правила
 - Prettier интеграция
 - Область: main.ts, preload.ts, renderer/src/**, tests/**
 
 **Prettier Конфигурация**:
+
 - Автоматическое форматирование
 - Интеграция с ESLint
 
 ## Безопасность
 
 ### Context Isolation
+
 - `nodeIntegration: false` - отключение Node.js в renderer
 - `contextIsolation: true` - изоляция контекста
 - Все взаимодействие через preload script
 
 ### IPC Безопасность
+
 - Валидация всех IPC сообщений
 - Типизированные интерфейсы для всех каналов
 - Отсутствие прямого доступа к Electron API из renderer
@@ -144,22 +156,26 @@ const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
 ## Свойства Корректности
 
 ### Свойство 1: Инициализация Приложения
+
 **Описание**: Приложение должно корректно инициализироваться с правильным именем и окном
 
 **Формальное Свойство**:
+
 ```
 ∀ app_instance : Application
   WHEN app_instance.initialize()
-  THEN app_instance.name = "Clerkly" 
+  THEN app_instance.name = "Clerkly"
     AND app_instance.mainWindow.isVisible() = true
     AND app_instance.mainWindow.width = 900
     AND app_instance.mainWindow.height = 600
 ```
 
-### Свойство 2: IPC Канал Стабильность  
+### Свойство 2: IPC Канал Стабильность
+
 **Описание**: Все зарегистрированные IPC каналы должны быть доступны и отвечать
 
 **Формальное Свойство**:
+
 ```
 ∀ channel ∈ ["auth:open-google", "auth:get-state", "auth:sign-out", "sidebar:get-state", "sidebar:set-state"]
   WHEN renderer.invoke(channel, valid_params)
@@ -167,21 +183,25 @@ const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
 ```
 
 ### Свойство 3: Context Isolation
+
 **Описание**: Renderer процесс не должен иметь прямого доступа к Node.js API
 
 **Формальное Свойство**:
+
 ```
 ∀ renderer_context : RendererContext
   THEN renderer_context.require = undefined
-    AND renderer_context.process = undefined  
+    AND renderer_context.process = undefined
     AND renderer_context.global = undefined
     AND typeof renderer_context.clerkly = "object"
 ```
 
 ### Свойство 4: TypeScript Компиляция
+
 **Описание**: Весь код должен компилироваться без ошибок TypeScript
 
 **Формальное Свойство**:
+
 ```
 ∀ source_file ∈ [main.ts, preload.ts, src/**/*.ts]
   WHEN tsc.compile(source_file)
@@ -191,12 +211,14 @@ const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
 ## Интеграционные Точки
 
 ### Предоставляемые Интерфейсы
+
 1. **IPC Infrastructure**: Базовые каналы для межпроцессного взаимодействия
 2. **Window Management**: Управление главным окном приложения
 3. **App Lifecycle**: События запуска, закрытия, активации
 4. **Security Context**: Безопасная среда выполнения
 
 ### Зависимости
+
 - **Операционная система**: macOS (указано в package.json)
 - **Node.js**: v25.5.0 (точная версия)
 - **npm**: v11.8.0 (точная версия)
@@ -204,9 +226,11 @@ const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
 ## Конфигурация Среды
 
 ### Переменные Окружения
+
 - `CLERKLY_E2E_USER_DATA` - переопределение userData директории для тестов
 
 ### Файловая Структура
+
 ```
 dist/
 ├── main.js          # Скомпилированный main process
@@ -219,11 +243,13 @@ dist/
 ## Мониторинг и Логирование
 
 ### Система Логирования
+
 - **Файл**: `{userData}/clerkly.log`
 - **Ротация**: Максимум 1MB, 3 файла
 - **Формат**: ISO timestamp + уровень + сообщение + stack trace
 
 ### Метрики
+
 - Время запуска приложения
 - Количество IPC вызовов
 - Ошибки компиляции и runtime
@@ -231,16 +257,19 @@ dist/
 ## Тестирование
 
 ### Unit Tests
+
 - Тестирование IPC обработчиков
 - Валидация конфигурации TypeScript
 - Проверка безопасности Context Isolation
 
-### Integration Tests  
+### Integration Tests
+
 - E2E тесты запуска приложения
 - Тестирование взаимодействия main ↔ renderer
 - Проверка системы сборки
 
 ### Property-Based Tests
+
 - Генерация различных IPC сообщений
 - Тестирование стабильности каналов связи
 - Проверка корректности типизации

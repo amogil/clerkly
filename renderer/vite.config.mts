@@ -1,11 +1,11 @@
-import { defineConfig } from 'vite'
-import path from 'path'
-import tailwindcss from '@tailwindcss/vite'
-import react from '@vitejs/plugin-react'
+import { defineConfig } from "vite";
+import path from "path";
+import tailwindcss from "@tailwindcss/vite";
+import react from "@vitejs/plugin-react";
 
 export default defineConfig({
   root: __dirname,
-  base: './',
+  base: "./",
   plugins: [
     // The React and Tailwind plugins are both required for this UI.
     react(),
@@ -14,11 +14,11 @@ export default defineConfig({
   resolve: {
     alias: {
       // Alias @ to the src directory
-      '@': path.resolve(__dirname, './src'),
+      "@": path.resolve(__dirname, "./src"),
     },
   },
   build: {
-    outDir: path.resolve(__dirname, '../dist/renderer'),
+    outDir: path.resolve(__dirname, "../dist/renderer"),
     emptyOutDir: true,
   },
-})
+});

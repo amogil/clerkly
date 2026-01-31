@@ -1,53 +1,50 @@
-import { useState } from 'react';
-import { Navigation } from './components/navigation';
-import { DashboardUpdated } from './components/dashboard-updated';
-import { CalendarView } from './components/calendar-view';
-import { MeetingDetail } from './components/meeting-detail';
-import { TasksNew } from './components/tasks-new';
-import { Contacts } from './components/contacts';
-import { Settings } from './components/settings';
+import { useState } from "react";
+import { Navigation } from "./components/navigation";
+import { DashboardUpdated } from "./components/dashboard-updated";
+import { CalendarView } from "./components/calendar-view";
+import { MeetingDetail } from "./components/meeting-detail";
+import { TasksNew } from "./components/tasks-new";
+import { Contacts } from "./components/contacts";
+import { Settings } from "./components/settings";
 
 export default function App() {
-  const [currentScreen, setCurrentScreen] = useState<string>('dashboard');
+  const [currentScreen, setCurrentScreen] = useState<string>("dashboard");
   const [selectedMeetingId, setSelectedMeetingId] = useState<string | null>(null);
 
   const handleNavigateToMeeting = (meetingId: string) => {
     setSelectedMeetingId(meetingId);
-    setCurrentScreen('meeting-detail');
+    setCurrentScreen("meeting-detail");
   };
 
   const handleBackToDashboard = () => {
     setSelectedMeetingId(null);
-    setCurrentScreen('dashboard');
+    setCurrentScreen("dashboard");
   };
 
   const handleNavigateToCalendar = () => {
-    setCurrentScreen('calendar');
+    setCurrentScreen("calendar");
   };
 
   const renderScreen = () => {
     switch (currentScreen) {
-      case 'dashboard':
+      case "dashboard":
         return (
           <DashboardUpdated
             onNavigateToMeeting={handleNavigateToMeeting}
             onNavigateToCalendar={handleNavigateToCalendar}
           />
         );
-      case 'calendar':
+      case "calendar":
         return <CalendarView onNavigateToMeeting={handleNavigateToMeeting} />;
-      case 'meeting-detail':
+      case "meeting-detail":
         return (
-          <MeetingDetail
-            meetingId={selectedMeetingId || '1'}
-            onBack={handleBackToDashboard}
-          />
+          <MeetingDetail meetingId={selectedMeetingId || "1"} onBack={handleBackToDashboard} />
         );
-      case 'tasks':
+      case "tasks":
         return <TasksNew />;
-      case 'contacts':
+      case "contacts":
         return <Contacts />;
-      case 'settings':
+      case "settings":
         return <Settings />;
       default:
         return (

@@ -34,56 +34,60 @@
 ### 1. Database Manager (src/db/index.ts)
 
 **Инициализация БД**:
+
 ```typescript
 const getDatabasePath = (): string => {
-  const userDataPath = app.getPath("userData")
-  fs.mkdirSync(userDataPath, { recursive: true })
-  return path.join(userDataPath, "clerkly.sqlite3")
-}
+  const userDataPath = app.getPath("userData");
+  fs.mkdirSync(userDataPath, { recursive: true });
+  return path.join(userDataPath, "clerkly.sqlite3");
+};
 
 export const ensureDatabase = (): SqliteDatabase => {
-  const dbPath = getDatabasePath()
-  const db = new Database(dbPath)
-  
+  const dbPath = getDatabasePath();
+  const db = new Database(dbPath);
+
   // Включение WAL режима для лучшей производительности
-  db.pragma("journal_mode = WAL")
-  
-  ensureMigrationsTable(db)
-  runPendingMigrations(db)
-  
-  return db
-}
+  db.pragma("journal_mode = WAL");
+
+  ensureMigrationsTable(db);
+  runPendingMigrations(db);
+
+  return db;
+};
 ```
 
 **Управление Миграциями**:
+
 ```typescript
 const ensureMigrationsTable = (db: SqliteDatabase): void => {
   db.exec(`
     CREATE TABLE IF NOT EXISTS schema_migrations (
       version INTEGER NOT NULL
     );
-  `)
-  
+  `);
+
   // Инициализация версии 0 для новых БД
-  const row = db.prepare("SELECT version FROM schema_migrations LIMIT 1").get()
+  const row = db.prepare("SELECT version FROM schema_migrations LIMIT 1").get();
   if (!row) {
-    db.prepare("INSERT INTO schema_migrations (version) VALUES (0)").run()
+    db.prepare("INSERT INTO schema_migrations (version) VALUES (0)").run();
   }
-}
+};
 ```
 
 ### 2. Migration System (src/db/migrations.ts)
 
 **Структура Миграции**:
+
 ```typescript
 export type Migration = {
-  id: number
-  name: string
-  up: (db: SqliteDatabase) => void
-}
+  id: number;
+  name: string;
+  up: (db: SqliteDatabase) => void;
+};
 ```
 
 **Текущие Миграции**:
+
 ```typescript
 export const migrations: Migration[] = [
   {
@@ -95,11 +99,11 @@ export const migrations: Migration[] = [
           key TEXT PRIMARY KEY,
           value TEXT NOT NULL
         );
-      `)
-    }
+      `);
+    },
   },
   {
-    id: 2, 
+    id: 2,
     name: "auth-tokens",
     up: (db) => {
       db.exec(`
@@ -108,13 +112,14 @@ export const migrations: Migration[] = [
           encrypted TEXT NOT NULL,
           updated_at INTEGER NOT NULL
         );
-      `)
-    }
-  }
-]
+      `);
+    },
+  },
+];
 ```
 
 **Планируемые Миграции**:
+
 ```typescript
 // Migration 3: UI Settings
 {
@@ -134,7 +139,7 @@ export const migrations: Migration[] = [
 // Migration 4: Calendar Cache
 {
   id: 4,
-  name: "calendar-cache", 
+  name: "calendar-cache",
   up: (db) => {
     db.exec(`
       CREATE TABLE IF NOT EXISTS calendar_events (
@@ -147,7 +152,7 @@ export const migrations: Migration[] = [
         location TEXT,
         cached_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
       );
-      
+
       CREATE INDEX idx_calendar_events_time ON calendar_events(start_time, end_time);
     `)
   }
@@ -167,7 +172,7 @@ export const migrations: Migration[] = [
         phone TEXT,
         cached_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
       );
-      
+
       CREATE INDEX idx_contacts_name ON contacts(name);
     `)
   }
@@ -188,7 +193,7 @@ export const migrations: Migration[] = [
         created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
         updated_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
       );
-      
+
       CREATE INDEX idx_tasks_completed ON tasks(completed);
       CREATE INDEX idx_tasks_due_date ON tasks(due_date);
     `)
@@ -199,95 +204,108 @@ export const migrations: Migration[] = [
 ### 3. Backup System
 
 **Создание Резервных Копий**:
+
 ```typescript
 const createBackup = (dbPath: string): void => {
-  const backupDir = path.join(path.dirname(dbPath), "backups")
-  fs.mkdirSync(backupDir, { recursive: true })
-  
-  const timestamp = new Date().toISOString().replace(/[:.]/g, "-")
-  const backupPath = path.join(backupDir, `clerkly-${timestamp}.sqlite3`)
-  
-  fs.copyFileSync(dbPath, backupPath)
-  
+  const backupDir = path.join(path.dirname(dbPath), "backups");
+  fs.mkdirSync(backupDir, { recursive: true });
+
+  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const backupPath = path.join(backupDir, `clerkly-${timestamp}.sqlite3`);
+
+  fs.copyFileSync(dbPath, backupPath);
+
   // Очистка старых бэкапов (оставляем последние 3)
-  cleanupOldBackups(backupDir)
-}
+  cleanupOldBackups(backupDir);
+};
 
 const cleanupOldBackups = (backupDir: string): void => {
-  const files = fs.readdirSync(backupDir)
-    .filter(f => f.startsWith("clerkly-") && f.endsWith(".sqlite3"))
-    .map(f => ({
+  const files = fs
+    .readdirSync(backupDir)
+    .filter((f) => f.startsWith("clerkly-") && f.endsWith(".sqlite3"))
+    .map((f) => ({
       name: f,
       path: path.join(backupDir, f),
-      mtime: fs.statSync(path.join(backupDir, f)).mtime
+      mtime: fs.statSync(path.join(backupDir, f)).mtime,
     }))
-    .sort((a, b) => b.mtime.getTime() - a.mtime.getTime())
-  
+    .sort((a, b) => b.mtime.getTime() - a.mtime.getTime());
+
   // Удаляем все кроме последних 3
-  files.slice(3).forEach(file => {
-    fs.unlinkSync(file.path)
-  })
-}
+  files.slice(3).forEach((file) => {
+    fs.unlinkSync(file.path);
+  });
+};
 ```
 
 ### 4. Application State Management
 
 **Сайдбар Состояние**:
+
 ```typescript
-const SIDEBAR_STATE_KEY = "sidebar_collapsed"
+const SIDEBAR_STATE_KEY = "sidebar_collapsed";
 
 export const getSidebarCollapsed = (db: SqliteDatabase): boolean => {
-  const row = db.prepare("SELECT value FROM app_meta WHERE key = ?").get(SIDEBAR_STATE_KEY)
-  return row ? JSON.parse(row.value) : false // По умолчанию развернут
-}
+  const row = db.prepare("SELECT value FROM app_meta WHERE key = ?").get(SIDEBAR_STATE_KEY);
+  return row ? JSON.parse(row.value) : false; // По умолчанию развернут
+};
 
 export const setSidebarCollapsed = (db: SqliteDatabase, collapsed: boolean): void => {
-  db.prepare(`
+  db.prepare(
+    `
     INSERT OR REPLACE INTO app_meta (key, value) 
     VALUES (?, ?)
-  `).run(SIDEBAR_STATE_KEY, JSON.stringify(collapsed))
-}
+  `,
+  ).run(SIDEBAR_STATE_KEY, JSON.stringify(collapsed));
+};
 ```
 
 **Общие Настройки UI**:
+
 ```typescript
 export const getUISetting = (db: SqliteDatabase, key: string, defaultValue: any): any => {
-  const row = db.prepare("SELECT value FROM ui_settings WHERE key = ?").get(key)
-  return row ? JSON.parse(row.value) : defaultValue
-}
+  const row = db.prepare("SELECT value FROM ui_settings WHERE key = ?").get(key);
+  return row ? JSON.parse(row.value) : defaultValue;
+};
 
 export const setUISetting = (db: SqliteDatabase, key: string, value: any): void => {
-  const now = Math.floor(Date.now() / 1000)
-  db.prepare(`
+  const now = Math.floor(Date.now() / 1000);
+  db.prepare(
+    `
     INSERT OR REPLACE INTO ui_settings (key, value, updated_at) 
     VALUES (?, ?, ?)
-  `).run(key, JSON.stringify(value), now)
-}
+  `,
+  ).run(key, JSON.stringify(value), now);
+};
 ```
 
 ## Производительность и Оптимизация
 
 ### WAL Mode
+
 ```typescript
 // Включение Write-Ahead Logging для лучшей производительности
-db.pragma("journal_mode = WAL")
-db.pragma("synchronous = NORMAL") 
-db.pragma("cache_size = 1000")
-db.pragma("temp_store = memory")
+db.pragma("journal_mode = WAL");
+db.pragma("synchronous = NORMAL");
+db.pragma("cache_size = 1000");
+db.pragma("temp_store = memory");
 ```
 
 ### Prepared Statements
+
 ```typescript
 // Кэширование подготовленных запросов
 const statements = {
   getAppMeta: db.prepare("SELECT value FROM app_meta WHERE key = ?"),
   setAppMeta: db.prepare("INSERT OR REPLACE INTO app_meta (key, value) VALUES (?, ?)"),
   getAuthTokens: db.prepare("SELECT encrypted FROM auth_tokens WHERE id = 1"),
-  setAuthTokens: db.prepare("INSERT OR REPLACE INTO auth_tokens (id, encrypted, updated_at) VALUES (1, ?, ?)")
-}
+  setAuthTokens: db.prepare(
+    "INSERT OR REPLACE INTO auth_tokens (id, encrypted, updated_at) VALUES (1, ?, ?)",
+  ),
+};
 ```
 
 ### Индексы
+
 ```sql
 -- Для быстрого поиска по времени
 CREATE INDEX idx_calendar_events_time ON calendar_events(start_time, end_time);
@@ -303,28 +321,32 @@ CREATE INDEX idx_tasks_due_date ON tasks(due_date);
 ## Безопасность
 
 ### Права Доступа к Файлам
+
 ```typescript
 // Ограничение доступа к файлу БД (только владелец)
-fs.chmodSync(dbPath, 0o600)
+fs.chmodSync(dbPath, 0o600);
 ```
 
 ### Валидация Данных
+
 ```typescript
 const validateMigrationId = (id: number): boolean => {
-  return Number.isInteger(id) && id > 0 && id <= 1000
-}
+  return Number.isInteger(id) && id > 0 && id <= 1000;
+};
 
 const sanitizeKey = (key: string): string => {
-  return key.replace(/[^a-zA-Z0-9_-]/g, "").substring(0, 100)
-}
+  return key.replace(/[^a-zA-Z0-9_-]/g, "").substring(0, 100);
+};
 ```
 
 ## Свойства Корректности
 
 ### Свойство 1: Атомарность Миграций
+
 **Описание**: Миграции должны выполняться атомарно - либо полностью успешно, либо откатываться
 
 **Формальное Свойство**:
+
 ```
 ∀ migration : Migration
   WHEN runMigration(migration)
@@ -333,9 +355,11 @@ const sanitizeKey = (key: string): string => {
 ```
 
 ### Свойство 2: Целостность Резервных Копий
+
 **Описание**: Резервная копия должна создаваться до каждой миграции
 
 **Формальное Свойство**:
+
 ```
 ∀ migration : Migration
   WHEN migration.id > current_version
@@ -345,9 +369,11 @@ const sanitizeKey = (key: string): string => {
 ```
 
 ### Свойство 3: Монотонность Версий
+
 **Описание**: Версия схемы БД должна только увеличиваться
 
 **Формальное Свойство**:
+
 ```
 ∀ t1, t2 : Time
   WHERE t1 < t2
@@ -355,9 +381,11 @@ const sanitizeKey = (key: string): string => {
 ```
 
 ### Свойство 4: Персистентность Состояния
+
 **Описание**: Сохраненное состояние должно восстанавливаться после перезапуска
 
 **Формальное Свойство**:
+
 ```
 ∀ key : String, value : Any
   WHEN setState(key, value) AND app.restart()
@@ -367,6 +395,7 @@ const sanitizeKey = (key: string): string => {
 ## Мониторинг и Диагностика
 
 ### Метрики БД
+
 ```typescript
 export const getDatabaseStats = (db: SqliteDatabase) => {
   return {
@@ -374,33 +403,37 @@ export const getDatabaseStats = (db: SqliteDatabase) => {
     size: fs.statSync(getDatabasePath()).size,
     pageCount: db.pragma("page_count", { simple: true }),
     pageSize: db.pragma("page_size", { simple: true }),
-    walMode: db.pragma("journal_mode", { simple: true }) === "wal"
-  }
-}
+    walMode: db.pragma("journal_mode", { simple: true }) === "wal",
+  };
+};
 ```
 
 ### Проверка Целостности
+
 ```typescript
 export const checkDatabaseIntegrity = (db: SqliteDatabase): boolean => {
-  const result = db.pragma("integrity_check", { simple: true })
-  return result === "ok"
-}
+  const result = db.pragma("integrity_check", { simple: true });
+  return result === "ok";
+};
 ```
 
 ## Тестирование
 
 ### Unit Tests
+
 - Тестирование миграций в изоляции
 - Проверка создания резервных копий
 - Валидация сохранения/загрузки состояния
 - Тестирование обработки ошибок
 
 ### Integration Tests
+
 - E2E тестирование полного цикла миграций
 - Проверка восстановления из резервных копий
 - Тестирование производительности с большими данными
 
 ### Property-Based Tests
+
 - Генерация различных состояний приложения
 - Тестирование миграций с различными начальными данными
 - Проверка целостности при различных сценариях сбоев
@@ -408,15 +441,18 @@ export const checkDatabaseIntegrity = (db: SqliteDatabase): boolean => {
 ## Интеграционные Точки
 
 ### Предоставляемые Интерфейсы
+
 1. **Database Connection**: Подключение к SQLite БД
 2. **Migration System**: Система версионирования схемы
 3. **State Management**: Сохранение состояния приложения
 4. **Backup System**: Резервное копирование данных
 
 ### Зависимости
+
 - **platform-foundation**: Доступ к userData директории, файловая система
 
 ### Используется Фичами
+
 - **google-oauth-auth**: Хранение зашифрованных токенов
 - **sidebar-navigation**: Сохранение состояния сайдбара
 - **Будущие фичи**: Кэш календаря, контакты, задачи

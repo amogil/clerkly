@@ -1,5 +1,5 @@
-import { LayoutDashboard, Calendar, CheckSquare, Users, Settings } from 'lucide-react';
-import { Logo } from './logo';
+import { LayoutDashboard, Calendar, CheckSquare, Users, Settings } from "lucide-react";
+import { Logo } from "./logo";
 
 interface NavigationProps {
   currentScreen: string;
@@ -8,11 +8,11 @@ interface NavigationProps {
 
 export function Navigation({ currentScreen, onNavigate }: NavigationProps) {
   const navItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'calendar', label: 'Calendar', icon: Calendar },
-    { id: 'tasks', label: 'Tasks', icon: CheckSquare },
-    { id: 'contacts', label: 'Contacts', icon: Users },
-    { id: 'settings', label: 'Settings', icon: Settings },
+    { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+    { id: "calendar", label: "Calendar", icon: Calendar },
+    { id: "tasks", label: "Tasks", icon: CheckSquare },
+    { id: "contacts", label: "Contacts", icon: Users },
+    { id: "settings", label: "Settings", icon: Settings },
   ];
 
   return (
@@ -21,20 +21,20 @@ export function Navigation({ currentScreen, onNavigate }: NavigationProps) {
         <Logo size="md" showText={true} />
         <p className="text-sm text-muted-foreground mt-2">Your AI clerk</p>
       </div>
-      
+
       <div className="flex-1 p-4">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = currentScreen === item.id;
-          
+
           return (
             <button
               key={item.id}
               onClick={() => onNavigate(item.id)}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all mb-1 ${
                 isActive
-                  ? 'bg-primary text-primary-foreground shadow-sm'
-                  : 'text-foreground hover:bg-secondary'
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-foreground hover:bg-secondary"
               }`}
             >
               <Icon className="w-5 h-5" />
@@ -43,7 +43,7 @@ export function Navigation({ currentScreen, onNavigate }: NavigationProps) {
           );
         })}
       </div>
-      
+
       <div className="p-6 border-t border-border">
         <div className="text-xs text-muted-foreground">
           <p>© 2026 Clerkly</p>

@@ -22,9 +22,9 @@ const ensureMigrationsTable = (db: SqliteDatabase): void => {
     );
   `);
 
-  const row = db
-    .prepare("SELECT version FROM schema_migrations LIMIT 1")
-    .get() as { version: number } | undefined;
+  const row = db.prepare("SELECT version FROM schema_migrations LIMIT 1").get() as
+    | { version: number }
+    | undefined;
 
   if (!row) {
     db.prepare("INSERT INTO schema_migrations (version) VALUES (0)").run();
@@ -32,9 +32,9 @@ const ensureMigrationsTable = (db: SqliteDatabase): void => {
 };
 
 const getCurrentVersion = (db: SqliteDatabase): number => {
-  const row = db
-    .prepare("SELECT version FROM schema_migrations LIMIT 1")
-    .get() as { version: number } | undefined;
+  const row = db.prepare("SELECT version FROM schema_migrations LIMIT 1").get() as
+    | { version: number }
+    | undefined;
 
   return row?.version ?? 0;
 };
@@ -82,7 +82,7 @@ const openDatabase = (dbPath: string): SqliteDatabase => {
 const applyMigrations = (
   db: SqliteDatabase,
   currentVersion: number,
-  pending: Migration[]
+  pending: Migration[],
 ): void => {
   const runMigrations = db.transaction(() => {
     for (const migration of pending) {

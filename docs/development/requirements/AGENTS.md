@@ -8,9 +8,9 @@ These instructions are MANDATORY for all code operations. You MUST follow them s
 2. Never edit files in docs/development/requirements directly. Always use this MCP server for all
    requirements operations.
 3. Requirement index format: `{CATEGORY}.{CHAPTER}.{NUMBER}` (e.g., `T.R.1`, `T.U.2`).
-   Requirements are organized hierarchically: 
+   Requirements are organized hierarchically:
    **Category** groups related requirements together (e.g., general requirements, testing requirements).
-   **Chapter** groups related requirements within a category (e.g., a specific tool or feature). 
+   **Chapter** groups related requirements within a category (e.g., a specific tool or feature).
    **Requirement** is a single, atomic requirement with a unique index.
 
 # Finding Requirements
@@ -47,4 +47,3 @@ Before making any code changes, you MUST complete this entire workflow. Inform t
 11. **Confirm changes** - Obtain user confirmation that all changes are correct.
 
 **Remember: This workflow is MANDATORY. Do not skip any steps.**
-

@@ -1,5 +1,5 @@
-import { StatusBadge } from './status-badge';
-import { Calendar, Users, CheckCircle2, TrendingUp, Clock, Video } from 'lucide-react';
+import { StatusBadge } from "./status-badge";
+import { Calendar, Users, CheckCircle2, TrendingUp, Clock, Video } from "lucide-react";
 
 interface DashboardProps {
   onNavigateToMeeting: (meetingId: string) => void;
@@ -8,63 +8,63 @@ interface DashboardProps {
 
 export function DashboardNew({ onNavigateToMeeting, onNavigateToCalendar }: DashboardProps) {
   const stats = [
-    { label: 'Calls Processed', value: '47', icon: Calendar, trend: '+12 this week' },
-    { label: 'Action Items', value: '156', icon: CheckCircle2, trend: '89% completed' },
-    { label: 'Tasks Created', value: '142', icon: TrendingUp, trend: 'Auto-synced' },
-    { label: 'Hours Saved', value: '8.5', icon: Clock, trend: 'This week' },
+    { label: "Calls Processed", value: "47", icon: Calendar, trend: "+12 this week" },
+    { label: "Action Items", value: "156", icon: CheckCircle2, trend: "89% completed" },
+    { label: "Tasks Created", value: "142", icon: TrendingUp, trend: "Auto-synced" },
+    { label: "Hours Saved", value: "8.5", icon: Clock, trend: "This week" },
   ];
 
   const todaySchedule = [
     {
-      id: '1',
-      title: 'Product Roadmap Review',
-      time: '2:30 PM - 3:15 PM',
-      participants: ['Sarah Chen', 'Mike Johnson', 'Alex Rivera'],
-      status: 'upcoming' as const,
-      calendarSource: 'Google Calendar',
+      id: "1",
+      title: "Product Roadmap Review",
+      time: "2:30 PM - 3:15 PM",
+      participants: ["Sarah Chen", "Mike Johnson", "Alex Rivera"],
+      status: "upcoming" as const,
+      calendarSource: "Google Calendar",
       willListen: true,
     },
     {
-      id: '2',
-      title: 'Sprint Planning',
-      time: '4:00 PM - 5:00 PM',
-      participants: ['David Lee', 'Emma Wilson', 'Chris Brown'],
-      status: 'upcoming' as const,
-      calendarSource: 'Google Calendar',
+      id: "2",
+      title: "Sprint Planning",
+      time: "4:00 PM - 5:00 PM",
+      participants: ["David Lee", "Emma Wilson", "Chris Brown"],
+      status: "upcoming" as const,
+      calendarSource: "Google Calendar",
       willListen: true,
     },
   ];
 
   const recentProcessed = [
     {
-      id: '3',
-      title: 'Client Demo Call',
-      date: 'Today, 11:00 AM',
-      duration: '30 min',
-      status: 'completed' as const,
+      id: "3",
+      title: "Client Demo Call",
+      date: "Today, 11:00 AM",
+      duration: "30 min",
+      status: "completed" as const,
       actionItems: 5,
       tasksCreated: 3,
-      participants: ['Jennifer Smith', 'Tom Anderson'],
+      participants: ["Jennifer Smith", "Tom Anderson"],
     },
     {
-      id: '4',
-      title: 'Weekly Team Sync',
-      date: 'Yesterday, 9:00 AM',
-      duration: '45 min',
-      status: 'completed' as const,
+      id: "4",
+      title: "Weekly Team Sync",
+      date: "Yesterday, 9:00 AM",
+      duration: "45 min",
+      status: "completed" as const,
       actionItems: 8,
       tasksCreated: 6,
-      participants: ['Sarah Chen', 'David Lee', 'Emma Wilson', 'Mike Johnson'],
+      participants: ["Sarah Chen", "David Lee", "Emma Wilson", "Mike Johnson"],
     },
     {
-      id: '5',
-      title: 'Engineering Review',
-      date: 'Jan 27, 2:00 PM',
-      duration: '60 min',
-      status: 'completed' as const,
+      id: "5",
+      title: "Engineering Review",
+      date: "Jan 27, 2:00 PM",
+      duration: "60 min",
+      status: "completed" as const,
       actionItems: 12,
       tasksCreated: 10,
-      participants: ['Alex Rivera', 'Chris Brown', 'Lisa Park'],
+      participants: ["Alex Rivera", "Chris Brown", "Lisa Park"],
     },
   ];
 
@@ -73,9 +73,7 @@ export function DashboardNew({ onNavigateToMeeting, onNavigateToCalendar }: Dash
       <div className="max-w-7xl mx-auto">
         <div className="mb-8">
           <h1 className="text-3xl font-semibold text-foreground mb-2">Dashboard</h1>
-          <p className="text-muted-foreground">
-            Today is Wednesday, January 28, 2026
-          </p>
+          <p className="text-muted-foreground">Today is Wednesday, January 28, 2026</p>
         </div>
 
         {/* Stats Grid */}
@@ -92,9 +90,7 @@ export function DashboardNew({ onNavigateToMeeting, onNavigateToCalendar }: Dash
                     <Icon className="w-5 h-5 text-primary" />
                   </div>
                 </div>
-                <h3 className="text-3xl font-semibold text-foreground mb-1">
-                  {stat.value}
-                </h3>
+                <h3 className="text-3xl font-semibold text-foreground mb-1">{stat.value}</h3>
                 <p className="text-sm text-muted-foreground mb-2">{stat.label}</p>
                 <p className="text-xs text-primary">{stat.trend}</p>
               </div>
@@ -119,22 +115,17 @@ export function DashboardNew({ onNavigateToMeeting, onNavigateToCalendar }: Dash
             </div>
             <div className="divide-y divide-border">
               {todaySchedule.map((meeting) => (
-                <div
-                  key={meeting.id}
-                  className="p-6 hover:bg-secondary/30 transition-colors"
-                >
+                <div key={meeting.id} className="p-6 hover:bg-secondary/30 transition-colors">
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex-1">
-                      <h3 className="font-semibold text-foreground mb-1">
-                        {meeting.title}
-                      </h3>
+                      <h3 className="font-semibold text-foreground mb-1">{meeting.title}</h3>
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <Clock className="w-4 h-4" />
                         {meeting.time}
                       </div>
                     </div>
                   </div>
-                  
+
                   {meeting.willListen && (
                     <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3">
                       <div className="flex items-center gap-2">
@@ -145,14 +136,17 @@ export function DashboardNew({ onNavigateToMeeting, onNavigateToCalendar }: Dash
                       </div>
                     </div>
                   )}
-                  
+
                   <div className="flex items-center gap-2">
                     {meeting.participants.slice(0, 3).map((participant, idx) => (
                       <div
                         key={idx}
                         className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium text-primary"
                       >
-                        {participant.split(' ').map(n => n[0]).join('')}
+                        {participant
+                          .split(" ")
+                          .map((n) => n[0])
+                          .join("")}
                       </div>
                     ))}
                     {meeting.participants.length > 3 && (
@@ -163,7 +157,7 @@ export function DashboardNew({ onNavigateToMeeting, onNavigateToCalendar }: Dash
                   </div>
                 </div>
               ))}
-              
+
               {todaySchedule.length === 0 && (
                 <div className="p-8 text-center">
                   <p className="text-muted-foreground">No upcoming meetings today</p>
@@ -189,16 +183,14 @@ export function DashboardNew({ onNavigateToMeeting, onNavigateToCalendar }: Dash
                 >
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex-1">
-                      <h3 className="font-semibold text-foreground mb-1">
-                        {meeting.title}
-                      </h3>
+                      <h3 className="font-semibold text-foreground mb-1">{meeting.title}</h3>
                       <p className="text-sm text-muted-foreground">
                         {meeting.date} · {meeting.duration}
                       </p>
                     </div>
                     <StatusBadge status={meeting.status} size="sm" />
                   </div>
-                  
+
                   <div className="flex items-center gap-4 text-sm">
                     <div className="flex items-center gap-1.5">
                       <CheckCircle2 className="w-4 h-4 text-green-600" />
@@ -223,11 +215,10 @@ export function DashboardNew({ onNavigateToMeeting, onNavigateToCalendar }: Dash
         <div className="bg-gradient-to-br from-primary/10 to-primary/5 rounded-xl p-6 border border-primary/20">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="font-semibold text-foreground mb-1">
-                Calendar Sync Active
-              </h3>
+              <h3 className="font-semibold text-foreground mb-1">Calendar Sync Active</h3>
               <p className="text-sm text-muted-foreground">
-                Clerkly is monitoring your Google Calendar and will automatically join upcoming meetings
+                Clerkly is monitoring your Google Calendar and will automatically join upcoming
+                meetings
               </p>
             </div>
             <div className="flex items-center gap-2">

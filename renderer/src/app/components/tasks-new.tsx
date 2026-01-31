@@ -1,5 +1,15 @@
-import { CheckCircle2, Circle, Calendar, User, Plus, Edit2, Trash2, FolderOpen, Users as UsersIcon } from 'lucide-react';
-import { useState } from 'react';
+import {
+  CheckCircle2,
+  Circle,
+  Calendar,
+  User,
+  Plus,
+  Edit2,
+  Trash2,
+  FolderOpen,
+  Users as UsersIcon,
+} from "lucide-react";
+import { useState } from "react";
 
 interface Project {
   id: string;
@@ -16,118 +26,118 @@ interface Task {
   deadline: string;
   responsible: string;
   relatedContacts: string[];
-  status: 'pending' | 'completed';
-  priority: 'high' | 'medium' | 'low';
+  status: "pending" | "completed";
+  priority: "high" | "medium" | "low";
 }
 
 export function TasksNew() {
-  const [selectedProjectId, setSelectedProjectId] = useState<string>('1');
+  const [selectedProjectId, setSelectedProjectId] = useState<string>("1");
   const [showProjectModal, setShowProjectModal] = useState(false);
   const [showTaskModal, setShowTaskModal] = useState(false);
 
   const [projects, setProjects] = useState<Project[]>([
     {
-      id: '1',
-      name: 'Q2 Product Roadmap',
-      description: 'Planning and execution of Q2 product features',
+      id: "1",
+      name: "Q2 Product Roadmap",
+      description: "Planning and execution of Q2 product features",
       tasksCount: 8,
     },
     {
-      id: '2',
-      name: 'Mobile App Redesign',
-      description: 'Complete redesign of mobile application',
+      id: "2",
+      name: "Mobile App Redesign",
+      description: "Complete redesign of mobile application",
       tasksCount: 12,
     },
     {
-      id: '3',
-      name: 'Client Onboarding',
-      description: 'New client onboarding tasks and demos',
+      id: "3",
+      name: "Client Onboarding",
+      description: "New client onboarding tasks and demos",
       tasksCount: 5,
     },
   ]);
 
   const [tasks, setTasks] = useState<Task[]>([
     {
-      id: '1',
-      projectId: '1',
-      title: 'Prepare technical architecture document for AI integration',
-      description: 'Create detailed technical architecture for the new AI features',
-      deadline: 'February 3, 2026',
-      responsible: 'Alex Rivera',
-      relatedContacts: ['Sarah Chen', 'Mike Johnson'],
-      status: 'pending',
-      priority: 'high',
+      id: "1",
+      projectId: "1",
+      title: "Prepare technical architecture document for AI integration",
+      description: "Create detailed technical architecture for the new AI features",
+      deadline: "February 3, 2026",
+      responsible: "Alex Rivera",
+      relatedContacts: ["Sarah Chen", "Mike Johnson"],
+      status: "pending",
+      priority: "high",
     },
     {
-      id: '2',
-      projectId: '1',
-      title: 'Coordinate with design team for AI feature mockups',
-      description: 'Schedule and conduct design review sessions',
-      deadline: 'February 14, 2026',
-      responsible: 'Alex Rivera',
-      relatedContacts: ['Jessica Liu'],
-      status: 'pending',
-      priority: 'high',
+      id: "2",
+      projectId: "1",
+      title: "Coordinate with design team for AI feature mockups",
+      description: "Schedule and conduct design review sessions",
+      deadline: "February 14, 2026",
+      responsible: "Alex Rivera",
+      relatedContacts: ["Jessica Liu"],
+      status: "pending",
+      priority: "high",
     },
     {
-      id: '3',
-      projectId: '1',
-      title: 'Review Q2 budget allocation',
-      description: 'Review and approve budget for Q2 initiatives',
-      deadline: 'February 5, 2026',
-      responsible: 'Sarah Chen',
-      relatedContacts: ['Mike Johnson'],
-      status: 'pending',
-      priority: 'high',
+      id: "3",
+      projectId: "1",
+      title: "Review Q2 budget allocation",
+      description: "Review and approve budget for Q2 initiatives",
+      deadline: "February 5, 2026",
+      responsible: "Sarah Chen",
+      relatedContacts: ["Mike Johnson"],
+      status: "pending",
+      priority: "high",
     },
     {
-      id: '4',
-      projectId: '2',
-      title: 'Create wireframes for new mobile UI',
-      description: 'Design initial wireframes for mobile app screens',
-      deadline: 'February 10, 2026',
-      responsible: 'Jessica Liu',
-      relatedContacts: ['Sarah Chen', 'Alex Rivera'],
-      status: 'pending',
-      priority: 'medium',
+      id: "4",
+      projectId: "2",
+      title: "Create wireframes for new mobile UI",
+      description: "Design initial wireframes for mobile app screens",
+      deadline: "February 10, 2026",
+      responsible: "Jessica Liu",
+      relatedContacts: ["Sarah Chen", "Alex Rivera"],
+      status: "pending",
+      priority: "medium",
     },
     {
-      id: '5',
-      projectId: '2',
-      title: 'User testing for mobile prototype',
-      description: 'Conduct user testing sessions with beta users',
-      deadline: 'February 20, 2026',
-      responsible: 'Mike Johnson',
-      relatedContacts: ['Jessica Liu'],
-      status: 'pending',
-      priority: 'medium',
+      id: "5",
+      projectId: "2",
+      title: "User testing for mobile prototype",
+      description: "Conduct user testing sessions with beta users",
+      deadline: "February 20, 2026",
+      responsible: "Mike Johnson",
+      relatedContacts: ["Jessica Liu"],
+      status: "pending",
+      priority: "medium",
     },
     {
-      id: '6',
-      projectId: '3',
-      title: 'Prepare client demo presentation',
-      description: 'Create presentation materials for client demo',
-      deadline: 'January 30, 2026',
-      responsible: 'Jennifer Smith',
-      relatedContacts: ['Tom Anderson'],
-      status: 'completed',
-      priority: 'high',
+      id: "6",
+      projectId: "3",
+      title: "Prepare client demo presentation",
+      description: "Create presentation materials for client demo",
+      deadline: "January 30, 2026",
+      responsible: "Jennifer Smith",
+      relatedContacts: ["Tom Anderson"],
+      status: "completed",
+      priority: "high",
     },
   ]);
 
-  const selectedProject = projects.find(p => p.id === selectedProjectId);
-  const projectTasks = tasks.filter(t => t.projectId === selectedProjectId);
+  const selectedProject = projects.find((p) => p.id === selectedProjectId);
+  const projectTasks = tasks.filter((t) => t.projectId === selectedProjectId);
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case 'high':
-        return 'text-red-600 bg-red-50 border-red-200';
-      case 'medium':
-        return 'text-amber-600 bg-amber-50 border-amber-200';
-      case 'low':
-        return 'text-gray-600 bg-gray-50 border-gray-200';
+      case "high":
+        return "text-red-600 bg-red-50 border-red-200";
+      case "medium":
+        return "text-amber-600 bg-amber-50 border-amber-200";
+      case "low":
+        return "text-gray-600 bg-gray-50 border-gray-200";
       default:
-        return 'text-gray-600 bg-gray-50 border-gray-200';
+        return "text-gray-600 bg-gray-50 border-gray-200";
     }
   };
 
@@ -137,9 +147,7 @@ export function TasksNew() {
         <div className="mb-8 flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-semibold text-foreground mb-2">Tasks</h1>
-            <p className="text-muted-foreground">
-              Manage your projects and tasks
-            </p>
+            <p className="text-muted-foreground">Manage your projects and tasks</p>
           </div>
           <div className="flex gap-3">
             <button
@@ -171,15 +179,15 @@ export function TasksNew() {
                     key={project.id}
                     onClick={() => setSelectedProjectId(project.id)}
                     className={`w-full p-4 text-left hover:bg-secondary/50 transition-colors ${
-                      selectedProjectId === project.id ? 'bg-primary/5 border-l-4 border-l-primary' : ''
+                      selectedProjectId === project.id
+                        ? "bg-primary/5 border-l-4 border-l-primary"
+                        : ""
                     }`}
                   >
                     <div className="flex items-start justify-between mb-2">
                       <div className="flex items-center gap-2">
                         <FolderOpen className="w-4 h-4 text-primary" />
-                        <h3 className="font-semibold text-foreground">
-                          {project.name}
-                        </h3>
+                        <h3 className="font-semibold text-foreground">{project.name}</h3>
                       </div>
                       <div className="flex gap-1">
                         <button
@@ -220,41 +228,37 @@ export function TasksNew() {
                   <h2 className="text-xl font-semibold text-foreground mb-1">
                     {selectedProject.name}
                   </h2>
-                  <p className="text-sm text-muted-foreground">
-                    {selectedProject.description}
-                  </p>
+                  <p className="text-sm text-muted-foreground">{selectedProject.description}</p>
                 </div>
-                
+
                 <div className="divide-y divide-border">
                   {projectTasks.map((task) => (
                     <div
                       key={task.id}
                       className={`p-6 hover:bg-secondary/30 transition-colors ${
-                        task.status === 'completed' ? 'opacity-60' : ''
+                        task.status === "completed" ? "opacity-60" : ""
                       }`}
                     >
                       <div className="flex items-start gap-4">
                         <div className="mt-1">
-                          {task.status === 'completed' ? (
+                          {task.status === "completed" ? (
                             <CheckCircle2 className="w-5 h-5 text-green-600" />
                           ) : (
                             <Circle className="w-5 h-5 text-muted-foreground" />
                           )}
                         </div>
-                        
+
                         <div className="flex-1 min-w-0">
                           <h3
                             className={`font-medium text-foreground mb-2 ${
-                              task.status === 'completed' ? 'line-through' : ''
+                              task.status === "completed" ? "line-through" : ""
                             }`}
                           >
                             {task.title}
                           </h3>
-                          
-                          <p className="text-sm text-muted-foreground mb-3">
-                            {task.description}
-                          </p>
-                          
+
+                          <p className="text-sm text-muted-foreground mb-3">{task.description}</p>
+
                           <div className="flex flex-wrap gap-4 text-sm mb-3">
                             <div className="flex items-center gap-1.5 text-muted-foreground">
                               <User className="w-4 h-4" />
@@ -268,7 +272,7 @@ export function TasksNew() {
                             </div>
                             <span
                               className={`text-xs px-2 py-1 rounded-full border font-medium ${getPriorityColor(
-                                task.priority
+                                task.priority,
                               )}`}
                             >
                               {task.priority}
