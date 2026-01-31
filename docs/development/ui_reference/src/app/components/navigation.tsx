@@ -1,4 +1,5 @@
 import { LayoutDashboard, Calendar, CheckSquare, Users, Settings } from 'lucide-react';
+import { Logo } from './logo';
 
 interface NavigationProps {
   currentScreen: string;
@@ -17,8 +18,8 @@ export function Navigation({ currentScreen, onNavigate }: NavigationProps) {
   return (
     <nav className="fixed left-0 top-0 h-screen w-64 bg-card border-r border-border flex flex-col">
       <div className="p-6 border-b border-border">
-        <h1 className="text-2xl font-semibold text-foreground">Clerkly</h1>
-        <p className="text-sm text-muted-foreground mt-1">Your AI clerk</p>
+        <Logo size="md" showText={true} />
+        <p className="text-sm text-muted-foreground mt-2">Your AI clerk</p>
       </div>
       
       <div className="flex-1 p-4">
