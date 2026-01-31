@@ -224,4 +224,15 @@ describe("Auth and OAuth requirements", () => {
     const source = readText("src/auth/authorization_completion_page.ts");
     expect(source).toContain("Return to the Clerkly app to continue.");
   });
+
+  /* Preconditions: auth completion response exists.
+     Action: inspect completion copy selection.
+     Assertions: failure copy exists and success copy is conditional.
+     Requirements: E.A.26 */
+  it("renders a failure completion state without success copy", () => {
+    const source = readText("src/auth/authorization_completion_page.ts");
+    expect(source).toContain('const failureTitle = "Authorization canceled."');
+    expect(source).toContain('const failureSubtitle = "Return to the Clerkly app to try again."');
+    expect(source).toContain("${success ? successTitle : failureTitle}");
+  });
 });

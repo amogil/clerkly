@@ -1,5 +1,19 @@
-// Requirements: E.T.4, E.A.23, E.A.24, E.A.25
-export const getAuthorizationCompletionPage = (): string => {
+// Requirements: E.T.4, E.A.23, E.A.24, E.A.25, E.A.26
+type AuthorizationCompletionPageParams = {
+  success: boolean;
+  error?: string | null;
+};
+
+export const getAuthorizationCompletionPage = ({
+  success,
+  error,
+}: AuthorizationCompletionPageParams): string => {
+  const successTitle = "You're all set.";
+  const successSubtitle = "Return to the Clerkly app to continue.";
+  const failureTitle = "Authorization canceled.";
+  const failureSubtitle = "Return to the Clerkly app to try again.";
+  const detail = error ? `Error: ${error}` : "";
+
   return `<!doctype html>
 <html lang="en">
   <head>
@@ -47,6 +61,11 @@ export const getAuthorizationCompletionPage = (): string => {
         color: #475569;
         font-size: 14px;
       }
+      .detail {
+        margin: 0;
+        color: #94a3b8;
+        font-size: 12px;
+      }
     </style>
   </head>
   <body>
@@ -76,8 +95,10 @@ export const getAuthorizationCompletionPage = (): string => {
         </svg>
         <span>Clerkly</span>
       </div>
-      <div class="title">You're all set.</div>
-      <p class="subtitle">Return to the Clerkly app to continue.</p>
+      <div class="title">${success ? successTitle : failureTitle}</div>
+      <p class="subtitle">${success ? successSubtitle : failureSubtitle}</p>
+      <p class="subtitle">You can close this window.</p>
+      ${detail ? `<p class="detail">${detail}</p>` : ""}
     </div>
     <script>
       setTimeout(() => window.close(), 300);
