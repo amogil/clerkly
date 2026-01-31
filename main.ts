@@ -1,4 +1,4 @@
-// Requirements: E.P.1, E.P.2, E.P.3, E.P.6, E.T.4, E.S.1, E.S.7, E.A.3, E.A.4, E.A.6, E.A.7, E.A.8, E.A.11, E.A.12, E.A.13, E.A.14, E.A.15, E.A.16, E.A.18, E.A.19, E.A.20, E.A.21, E.A.23, E.A.24, E.A.25, E.A.26, E.I.1, E.I.3, E.Q.1
+// Requirements: E.P.1, E.P.2, E.P.3, E.P.6, E.T.4, E.S.1, E.S.7, E.A.3, E.A.4, E.A.6, E.A.7, E.A.8, E.A.11, E.A.12, E.A.13, E.A.14, E.A.15, E.A.16, E.A.18, E.A.19, E.A.20, E.A.21, E.A.23, E.A.24, E.A.25, E.A.26, E.A.27, E.I.1, E.I.3, E.Q.1
 // Tooling requirements: E.T.1 (see package.json)
 import { app, BrowserWindow, dialog, ipcMain, shell } from "electron";
 import Database from "better-sqlite3";
@@ -51,6 +51,23 @@ const sendAuthResultToRenderer = (result: AuthResult): void => {
   pendingAuthResult = result;
 };
 
+const mapOauthErrorMessage = (error?: string | null): string | undefined => {
+  if (!error) {
+    return undefined;
+  }
+  const normalized = error.trim().toLowerCase();
+  if (normalized === "access_denied") {
+    return "Authorization was canceled. Please try again.";
+  }
+  if (normalized === "invalid_request") {
+    return "Authorization failed due to an invalid request. Please try again.";
+  }
+  if (normalized === "unauthorized_client") {
+    return "Authorization failed. This client is not allowed to request access.";
+  }
+  return error;
+};
+
 const scheduleTokenRefresh = (db: SqliteDatabase, rootDir: string, tokens: OAuthTokens): void => {
   const refreshToken = tokens.refreshToken;
   if (!refreshToken) {
@@ -78,9 +95,10 @@ const handleAuthCallbackUrl = (callbackUrl: string): void => {
     const code = url.searchParams.get("code");
     const success = url.searchParams.get("success") === "1" || Boolean(code);
 
+    const mappedError = mapOauthErrorMessage(error);
     sendAuthResultToRenderer({
       success,
-      error: success ? undefined : error || "Authorization failed. Please try again.",
+      error: success ? undefined : mappedError || "Authorization failed. Please try again.",
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Invalid auth callback.";
@@ -231,10 +249,11 @@ const startAuthServer = (db: SqliteDatabase, rootDir: string): Promise<number> =
       const error = url.searchParams.get("error");
 
       res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+      const mappedError = mapOauthErrorMessage(error);
       res.end(
         getAuthorizationCompletionPage({
           success: Boolean(code) && !error,
-          error,
+          error: mappedError,
         }),
       );
 

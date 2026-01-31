@@ -235,4 +235,35 @@ describe("Auth and OAuth requirements", () => {
     expect(source).toContain('const failureSubtitle = "Return to the Clerkly app to try again."');
     expect(source).toContain("${success ? successTitle : failureTitle}");
   });
+
+  /* Preconditions: main process exists.
+     Action: inspect OAuth error handling.
+     Assertions: raw error codes are mapped to human-friendly text.
+     Requirements: E.A.27 */
+  it("maps OAuth error codes to friendly messages", () => {
+    const source = readText("main.ts");
+    expect(source).toContain('if (normalized === "access_denied")');
+    expect(source).toContain("Authorization was canceled. Please try again.");
+  });
+
+  /* Preconditions: completion page component exists.
+     Action: inspect error detail handling.
+     Assertions: default cancel message is not duplicated as detail.
+     Requirements: E.A.27 */
+  it("avoids duplicating the default cancel message", () => {
+    const source = readText("src/auth/authorization_completion_page.ts");
+    expect(source).toContain(
+      'error && error !== "Authorization was canceled. Please try again." ? error : ""',
+    );
+  });
+
+  /* Preconditions: App component exists.
+     Action: inspect auth error mapping in the renderer.
+     Assertions: access_denied is converted to a friendly message.
+     Requirements: E.A.27 */
+  it("maps access_denied in the renderer", () => {
+    const source = readText("renderer/src/app/App.tsx");
+    expect(source).toContain('if (normalized === "access_denied")');
+    expect(source).toContain("Authorization was canceled. Please try again.");
+  });
 });

@@ -12,7 +12,7 @@ export const getAuthorizationCompletionPage = ({
   const successSubtitle = "Return to the Clerkly app to continue.";
   const failureTitle = "Authorization canceled.";
   const failureSubtitle = "Return to the Clerkly app to try again.";
-  const detail = error ? `Error: ${error}` : "";
+  const detail = error && error !== "Authorization was canceled. Please try again." ? error : "";
 
   return `<!doctype html>
 <html lang="en">

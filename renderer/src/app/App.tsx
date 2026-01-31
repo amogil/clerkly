@@ -1,4 +1,4 @@
-// Requirements: E.T.4, E.U.1, E.U.6, E.U.7, E.S.7, E.I.3, E.A.1, E.A.2, E.A.3, E.A.4, E.A.5, E.A.11, E.A.14, E.A.22
+// Requirements: E.T.4, E.U.1, E.U.6, E.U.7, E.S.7, E.I.3, E.A.1, E.A.2, E.A.3, E.A.4, E.A.5, E.A.11, E.A.14, E.A.22, E.A.27
 import { useEffect, useState } from "react";
 import { AuthGate } from "./components/auth-gate";
 import { Navigation } from "./components/navigation";
@@ -10,6 +10,16 @@ import { Contacts } from "./components/contacts";
 import { Settings } from "./components/settings";
 
 type AuthState = "unauthorized" | "authorizing" | "authorized" | "error";
+const mapAuthErrorMessage = (error?: string | null): string | null => {
+  if (!error) {
+    return null;
+  }
+  const normalized = error.trim().toLowerCase();
+  if (normalized === "access_denied") {
+    return "Authorization was canceled. Please try again.";
+  }
+  return error;
+};
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<string>("dashboard");
@@ -35,7 +45,7 @@ export default function App() {
         return;
       }
 
-      setAuthError(result.error ?? "Authorization failed. Please try again.");
+      setAuthError(mapAuthErrorMessage(result.error) ?? "Authorization failed. Please try again.");
       setAuthState("error");
     });
 
@@ -63,7 +73,9 @@ export default function App() {
       const result = await window.clerkly.openGoogleAuth();
 
       if (!result.success) {
-        setAuthError(result.error ?? "Authorization failed. Please try again.");
+        setAuthError(
+          mapAuthErrorMessage(result.error) ?? "Authorization failed. Please try again.",
+        );
         setAuthState("error");
         return;
       }
@@ -72,7 +84,7 @@ export default function App() {
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Authorization failed. Please try again.";
-      setAuthError(message);
+      setAuthError(mapAuthErrorMessage(message) ?? message);
       setAuthState("error");
     }
   };
