@@ -1,4 +1,4 @@
-// Requirements: E.T.4, E.U.3, E.U.4, E.U.5, E.U.6, E.U.7, E.U.8
+// Requirements: E.T.4, E.U.3, E.U.4, E.U.5, E.U.6, E.U.7, E.U.8, E.U.9, E.U.10
 import {
   LayoutDashboard,
   Calendar,
@@ -23,6 +23,15 @@ export function Navigation({
   collapsed,
   onToggleCollapse,
 }: NavigationProps) {
+  const navIconClassName = "w-5 h-5 shrink-0";
+  const navButtonClassName = (isActive: boolean): string => {
+    const baseClasses = "w-full flex items-center rounded-lg transition-all mb-1 py-3";
+    const stateClasses = isActive
+      ? "bg-primary text-primary-foreground shadow-sm"
+      : "text-foreground hover:bg-secondary";
+    const layoutClasses = collapsed ? "justify-center px-0" : "gap-3 px-4";
+    return `${baseClasses} ${layoutClasses} ${stateClasses}`;
+  };
   const navItems = [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
     { id: "calendar", label: "Calendar", icon: Calendar },
@@ -63,13 +72,9 @@ export function Navigation({
             <button
               key={item.id}
               onClick={() => onNavigate(item.id)}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all mb-1 ${
-                isActive
-                  ? "bg-primary text-primary-foreground shadow-sm"
-                  : "text-foreground hover:bg-secondary"
-              }`}
+              className={navButtonClassName(isActive)}
             >
-              <Icon className="w-5 h-5" />
+              <Icon className={navIconClassName} />
               {!collapsed ? <span>{item.label}</span> : null}
             </button>
           );
@@ -82,13 +87,9 @@ export function Navigation({
           return (
             <button
               onClick={() => onNavigate(settingsItem.id)}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
-                isActive
-                  ? "bg-primary text-primary-foreground shadow-sm"
-                  : "text-foreground hover:bg-secondary"
-              }`}
+              className={navButtonClassName(isActive)}
             >
-              <Icon className="w-5 h-5" />
+              <Icon className={navIconClassName} />
               {!collapsed ? <span>{settingsItem.label}</span> : null}
             </button>
           );

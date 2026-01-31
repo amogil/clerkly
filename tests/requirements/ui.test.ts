@@ -81,4 +81,26 @@ describe("UI reference requirements", () => {
     expect(source).toContain('collapsed ? "gap-1" : "gap-2"');
     expect(source).toContain("shrink-0 p-1");
   });
+
+  /* Preconditions: navigation component exists.
+     Action: inspect navigation icon sizing.
+     Assertions: icon sizing uses a shared class name regardless of collapse.
+     Requirements: E.U.9 */
+  it("keeps navigation icon sizes consistent when collapsed", () => {
+    const source = readText("renderer/src/app/components/navigation.tsx");
+    expect(source).toContain('const navIconClassName = "w-5 h-5 shrink-0"');
+    expect(source).toContain("className={navIconClassName}");
+  });
+
+  /* Preconditions: navigation component exists.
+     Action: inspect collapsed layout alignment.
+     Assertions: collapsed layout centers icons in the button.
+     Requirements: E.U.10 */
+  it("centers collapsed navigation icons", () => {
+    const source = readText("renderer/src/app/components/navigation.tsx");
+    expect(source).toContain("const navButtonClassName = (isActive: boolean): string => {");
+    expect(source).toContain(
+      'const layoutClasses = collapsed ? "justify-center px-0" : "gap-3 px-4"',
+    );
+  });
 });
