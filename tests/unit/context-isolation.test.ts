@@ -517,26 +517,26 @@ describe("Context Isolation", () => {
        Requirements: platform-foundation.3.1, platform-foundation.3.2 */
     it("should have correctly typed authentication methods", async () => {
       // Requirements: platform-foundation.3.1, platform-foundation.3.2
-      
+
       // Verify openGoogleAuth returns AuthResult type
       const authResult = await exposedAPI.openGoogleAuth();
-      expect(authResult).toHaveProperty('success');
-      expect(typeof authResult.success).toBe('boolean');
-      if ('error' in authResult) {
-        expect(typeof authResult.error).toBe('string');
+      expect(authResult).toHaveProperty("success");
+      expect(typeof authResult.success).toBe("boolean");
+      if ("error" in authResult) {
+        expect(typeof authResult.error).toBe("string");
       }
 
       // Verify getAuthState returns AuthState type
       const authState = await exposedAPI.getAuthState();
-      expect(authState).toHaveProperty('authorized');
-      expect(typeof authState.authorized).toBe('boolean');
+      expect(authState).toHaveProperty("authorized");
+      expect(typeof authState.authorized).toBe("boolean");
 
       // Verify signOut returns OperationResult type
       const signOutResult = await exposedAPI.signOut();
-      expect(signOutResult).toHaveProperty('success');
-      expect(typeof signOutResult.success).toBe('boolean');
-      if ('error' in signOutResult) {
-        expect(typeof signOutResult.error).toBe('string');
+      expect(signOutResult).toHaveProperty("success");
+      expect(typeof signOutResult.success).toBe("boolean");
+      if ("error" in signOutResult) {
+        expect(typeof signOutResult.error).toBe("string");
       }
     });
 
@@ -546,18 +546,18 @@ describe("Context Isolation", () => {
        Requirements: platform-foundation.3.1, platform-foundation.3.2 */
     it("should have correctly typed sidebar methods", async () => {
       // Requirements: platform-foundation.3.1, platform-foundation.3.2
-      
+
       // Verify getSidebarState returns SidebarState type
       const sidebarState = await exposedAPI.getSidebarState();
-      expect(sidebarState).toHaveProperty('collapsed');
-      expect(typeof sidebarState.collapsed).toBe('boolean');
+      expect(sidebarState).toHaveProperty("collapsed");
+      expect(typeof sidebarState.collapsed).toBe("boolean");
 
       // Verify setSidebarState accepts boolean parameter and returns OperationResult
       const setStateResult = await exposedAPI.setSidebarState(true);
-      expect(setStateResult).toHaveProperty('success');
-      expect(typeof setStateResult.success).toBe('boolean');
-      if ('error' in setStateResult) {
-        expect(typeof setStateResult.error).toBe('string');
+      expect(setStateResult).toHaveProperty("success");
+      expect(typeof setStateResult.success).toBe("boolean");
+      if ("error" in setStateResult) {
+        expect(typeof setStateResult.error).toBe("string");
       }
     });
 
@@ -567,21 +567,22 @@ describe("Context Isolation", () => {
        Requirements: platform-foundation.3.1, platform-foundation.3.2 */
     it("should have correctly typed event listener methods", () => {
       // Requirements: platform-foundation.3.1, platform-foundation.3.2
-      
+
       // Verify onAuthResult accepts callback with AuthResult parameter
       const mockCallback = vi.fn((result: any) => {
-        expect(result).toHaveProperty('success');
-        expect(typeof result.success).toBe('boolean');
-        if ('error' in result) {
-          expect(typeof result.error).toBe('string');
+        expect(result).toHaveProperty("success");
+        expect(typeof result.success).toBe("boolean");
+        if ("error" in result) {
+          expect(typeof result.error).toBe("string");
         }
       });
 
       const unsubscribe = exposedAPI.onAuthResult(mockCallback);
-      expect(typeof unsubscribe).toBe('function');
+      expect(typeof unsubscribe).toBe("function");
 
       // Test the callback type by simulating an event
-      const eventHandler = mockedIpcRenderer.on.mock.calls[mockedIpcRenderer.on.mock.calls.length - 1][1];
+      const eventHandler =
+        mockedIpcRenderer.on.mock.calls[mockedIpcRenderer.on.mock.calls.length - 1][1];
       const mockEvent = {} as any;
       const mockResult = { success: true };
       eventHandler(mockEvent, mockResult);
@@ -595,20 +596,20 @@ describe("Context Isolation", () => {
        Requirements: platform-foundation.3.1, platform-foundation.3.2 */
     it("should conform to ClerklyAPI interface structure", () => {
       // Requirements: platform-foundation.3.1, platform-foundation.3.2
-      
+
       // Verify all required methods exist
       const requiredMethods = [
-        'openGoogleAuth',
-        'getAuthState', 
-        'signOut',
-        'getSidebarState',
-        'setSidebarState',
-        'onAuthResult'
+        "openGoogleAuth",
+        "getAuthState",
+        "signOut",
+        "getSidebarState",
+        "setSidebarState",
+        "onAuthResult",
       ];
 
-      requiredMethods.forEach(method => {
+      requiredMethods.forEach((method) => {
         expect(exposedAPI).toHaveProperty(method);
-        expect(typeof exposedAPI[method as keyof typeof exposedAPI]).toBe('function');
+        expect(typeof exposedAPI[method as keyof typeof exposedAPI]).toBe("function");
       });
 
       // Verify no unexpected methods are exposed
@@ -622,26 +623,28 @@ describe("Context Isolation", () => {
        Requirements: platform-foundation.3.1, platform-foundation.3.2 */
     it("should use correctly typed IPC channels", async () => {
       // Requirements: platform-foundation.3.1, platform-foundation.3.2
-      
+
       // Clear previous mock calls
       vi.clearAllMocks();
 
       // Test authentication channels
       await exposedAPI.openGoogleAuth();
-      expect(mockedIpcRenderer.invoke).toHaveBeenCalledWith('auth:open-google');
+      expect(mockedIpcRenderer.invoke).toHaveBeenCalledWith("auth:open-google");
 
       await exposedAPI.getAuthState();
-      expect(mockedIpcRenderer.invoke).toHaveBeenCalledWith('auth:get-state');
+      expect(mockedIpcRenderer.invoke).toHaveBeenCalledWith("auth:get-state");
 
       await exposedAPI.signOut();
-      expect(mockedIpcRenderer.invoke).toHaveBeenCalledWith('auth:sign-out');
+      expect(mockedIpcRenderer.invoke).toHaveBeenCalledWith("auth:sign-out");
 
       // Test sidebar channels
       await exposedAPI.getSidebarState();
-      expect(mockedIpcRenderer.invoke).toHaveBeenCalledWith('sidebar:get-state');
+      expect(mockedIpcRenderer.invoke).toHaveBeenCalledWith("sidebar:get-state");
 
       await exposedAPI.setSidebarState(false);
-      expect(mockedIpcRenderer.invoke).toHaveBeenCalledWith('sidebar:set-state', { collapsed: false });
+      expect(mockedIpcRenderer.invoke).toHaveBeenCalledWith("sidebar:set-state", {
+        collapsed: false,
+      });
 
       // Verify correct number of IPC calls
       expect(mockedIpcRenderer.invoke).toHaveBeenCalledTimes(5);
@@ -653,13 +656,13 @@ describe("Context Isolation", () => {
        Requirements: platform-foundation.3.1, platform-foundation.3.2 */
     it("should maintain compile-time type safety", () => {
       // Requirements: platform-foundation.3.1, platform-foundation.3.2
-      
+
       // These tests verify that TypeScript would catch type errors at compile time
       // We test this by ensuring the API methods have the expected signatures
 
       // Verify method signatures match expected types
       const api = exposedAPI as any;
-      
+
       // Authentication methods should be callable without parameters
       expect(() => api.openGoogleAuth()).not.toThrow();
       expect(() => api.getAuthState()).not.toThrow();
@@ -672,7 +675,11 @@ describe("Context Isolation", () => {
 
       // onAuthResult should require a callback function
       expect(() => api.onAuthResult(() => {})).not.toThrow();
-      expect(() => api.onAuthResult((result: any) => { console.log(result); })).not.toThrow();
+      expect(() =>
+        api.onAuthResult((result: any) => {
+          console.log(result);
+        }),
+      ).not.toThrow();
     });
 
     /* Preconditions: API methods return properly typed promises
@@ -681,37 +688,37 @@ describe("Context Isolation", () => {
        Requirements: platform-foundation.3.1, platform-foundation.3.2 */
     it("should return properly typed promises", async () => {
       // Requirements: platform-foundation.3.1, platform-foundation.3.2
-      
+
       // Test that all async methods return promises that resolve to correct types
       const authResultPromise = exposedAPI.openGoogleAuth();
       expect(authResultPromise).toBeInstanceOf(Promise);
       const authResult = await authResultPromise;
-      expect(typeof authResult).toBe('object');
-      expect('success' in authResult).toBe(true);
+      expect(typeof authResult).toBe("object");
+      expect("success" in authResult).toBe(true);
 
       const authStatePromise = exposedAPI.getAuthState();
       expect(authStatePromise).toBeInstanceOf(Promise);
       const authState = await authStatePromise;
-      expect(typeof authState).toBe('object');
-      expect('authorized' in authState).toBe(true);
+      expect(typeof authState).toBe("object");
+      expect("authorized" in authState).toBe(true);
 
       const signOutPromise = exposedAPI.signOut();
       expect(signOutPromise).toBeInstanceOf(Promise);
       const signOutResult = await signOutPromise;
-      expect(typeof signOutResult).toBe('object');
-      expect('success' in signOutResult).toBe(true);
+      expect(typeof signOutResult).toBe("object");
+      expect("success" in signOutResult).toBe(true);
 
       const sidebarStatePromise = exposedAPI.getSidebarState();
       expect(sidebarStatePromise).toBeInstanceOf(Promise);
       const sidebarState = await sidebarStatePromise;
-      expect(typeof sidebarState).toBe('object');
-      expect('collapsed' in sidebarState).toBe(true);
+      expect(typeof sidebarState).toBe("object");
+      expect("collapsed" in sidebarState).toBe(true);
 
       const setStatePromise = exposedAPI.setSidebarState(true);
       expect(setStatePromise).toBeInstanceOf(Promise);
       const setStateResult = await setStatePromise;
-      expect(typeof setStateResult).toBe('object');
-      expect('success' in setStateResult).toBe(true);
+      expect(typeof setStateResult).toBe("object");
+      expect("success" in setStateResult).toBe(true);
     });
   });
 
