@@ -1,0 +1,15 @@
+{
+  "enabled": true,
+  "name": "Validate Requirements",
+  "description": "Validates all requirements for completeness, consistency, and non-redundancy across specifications when manually triggered",
+  "version": "1",
+  "when": {
+    "type": "userTriggered"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Проверь все требования на: \n1. Полноту - покрывают ли все аспекты функциональности \n2. Непротиворечивость - нет ли конфликтующих требований \n3. Отсутствие избыточности - нет ли дублирования между спецификациями. Проанализируй все файлы спецификаций в .kiro/specs/ и предоставь детальный отчет с рекомендациями по улучшению."
+  },
+  "workspaceFolderName": "clerkly",
+  "shortName": "validate-requirements"
+}

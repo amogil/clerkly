@@ -1,14 +1,14 @@
 {
   "enabled": true,
   "name": "Agent Completion Validation",
-  "description": "Automatically validates requirements completeness, consistency, and redundancy, then runs npm run validate to check all changes when agent execution finishes",
+  "description": "Runs npm run validate to check all changes when agent execution finishes",
   "version": "1",
   "when": {
     "type": "agentStop"
   },
   "then": {
     "type": "askAgent",
-    "prompt": "Проверь все требования на: \n1. Полноту - покрывают ли все аспекты функциональности\n2. Непротиворечивость - нет ли конфликтующих требований\n3. Отсутствие избыточности - нет ли дублирования между спецификациями. \n\nЗатем запусти `npm run validate` для валидации всех изменений. Если есть ошибки или замечания - исправь их согласно правилам из AGENTS.md\n"
+    "prompt": "Запусти `npm run validate` для валидации всех изменений. Если есть ошибки или замечания - исправь их согласно правилам из AGENTS.md\n"
   },
   "workspaceFolderName": "clerkly",
   "shortName": "agent-completion-validation"
