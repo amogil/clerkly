@@ -1,4 +1,5 @@
-// Requirements: E.T.4, E.A.1, E.A.2, E.A.3, E.A.4, E.A.5
+// Requirements: E.T.4, E.A.1, E.A.2, E.A.3, E.A.4, E.A.5, E.U.2
+import { Logo } from "./logo";
 type AuthGateProps = {
   isAuthorizing: boolean;
   errorMessage?: string | null;
@@ -9,6 +10,7 @@ export function AuthGate({ isAuthorizing, errorMessage, onSignIn }: AuthGateProp
   return (
     <div className="min-h-screen bg-background">
       <div className="mx-auto flex min-h-screen max-w-2xl flex-col items-center justify-center gap-6 px-6 text-center">
+        <Logo size="md" showText={true} />
         <div className="space-y-3">
           <h1 className="text-3xl font-semibold text-foreground">Welcome to Clerkly</h1>
           <p className="text-base text-muted-foreground">

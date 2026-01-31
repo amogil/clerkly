@@ -15,6 +15,7 @@ const REQUIREMENT_IDS = [
   "E.T.7",
   "E.T.8",
   "E.U.1",
+  "E.U.2",
   "E.S.1",
   "E.S.2",
   "E.S.3",
