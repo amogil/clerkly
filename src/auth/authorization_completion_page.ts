@@ -47,11 +47,6 @@ export const getAuthorizationCompletionPage = (): string => {
         color: #475569;
         font-size: 14px;
       }
-      .hint {
-        margin: 0;
-        color: #64748b;
-        font-size: 13px;
-      }
     </style>
   </head>
   <body>
@@ -81,9 +76,8 @@ export const getAuthorizationCompletionPage = (): string => {
         </svg>
         <span>Clerkly</span>
       </div>
-      <div class="title">Authorization complete.</div>
-      <p class="subtitle">You can close this window.</p>
-      <p class="hint">You can now return to the Clerkly app.</p>
+      <div class="title">You're all set.</div>
+      <p class="subtitle">Return to the Clerkly app to continue.</p>
     </div>
     <script>
       setTimeout(() => window.close(), 300);

@@ -222,6 +222,6 @@ describe("Auth and OAuth requirements", () => {
      Requirements: E.A.25 */
   it("mentions returning to the app on completion", () => {
     const source = readText("src/auth/authorization_completion_page.ts");
-    expect(source).toContain("return to the Clerkly app");
+    expect(source).toContain("Return to the Clerkly app to continue.");
   });
 });
