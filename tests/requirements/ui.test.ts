@@ -19,4 +19,13 @@ describe("UI reference requirements", () => {
     const source = readText("renderer/src/app/components/auth-gate.tsx");
     expect(source).toContain('<Logo size="md" showText={true} />');
   });
+
+  /* Preconditions: navigation component exists.
+     Action: inspect left navigation layout.
+     Assertions: Logo component is rendered with expected props.
+     Requirements: E.U.3 */
+  it("renders the sidebar logo from the UI reference", () => {
+    const source = readText("renderer/src/app/components/navigation.tsx");
+    expect(source).toContain('<Logo size="md" showText={true} />');
+  });
 });
