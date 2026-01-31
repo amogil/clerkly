@@ -228,6 +228,7 @@ const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 ### Переменные Окружения
 
 - `CLERKLY_E2E_USER_DATA` - переопределение userData директории для тестов
+- `CLERKLY_LOG_LEVEL` - уровень логирования (DEBUG, INFO, WARN, ERROR), по умолчанию INFO
 
 ### Файловая Структура
 
@@ -247,6 +248,8 @@ dist/
 - **Файл**: `{userData}/clerkly.log`
 - **Ротация**: Максимум 1MB, 3 файла
 - **Формат**: ISO timestamp + уровень + сообщение + stack trace
+- **Уровни**: DEBUG, INFO, WARN, ERROR (по умолчанию INFO)
+- **Конфигурация**: Через переменную окружения `CLERKLY_LOG_LEVEL` или программно через `setLogLevel()`
 
 ### Метрики
 

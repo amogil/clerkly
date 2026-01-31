@@ -16,12 +16,8 @@ import { getAuthorizationCompletionPage } from "./src/auth/authorization_complet
 import { clearTokens, readTokens, type OAuthTokens, writeTokens } from "./src/auth/token_store";
 import { ensureDatabase } from "./src/db";
 import { IPCValidationError, validateIPCParams } from "./src/ipc/validators";
-import { logError } from "./src/logging/logger";
-
-type AuthResult = {
-  success: boolean;
-  error?: string;
-};
+import type { AuthResult, AuthState, SidebarState, OperationResult } from "./src/ipc/types";
+import { logError, logDebug, createIPCTimer } from "./src/logging/logger";
 
 const PROTOCOL = "clerkly";
 const userDataOverride = process.env.CLERKLY_E2E_USER_DATA;
@@ -44,15 +40,21 @@ const SIDEBAR_STATE_KEY = "sidebar_collapsed";
 
 const sendAuthResultToRenderer = (result: AuthResult): void => {
   if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.webContents.send("auth:result", result);
-    if (!mainWindow.isVisible()) {
-      mainWindow.show();
+    try {
+      mainWindow.webContents.send("auth:result", result);
+      if (!mainWindow.isVisible()) {
+        mainWindow.show();
+      }
+      if (mainWindow.isMinimized()) {
+        mainWindow.restore();
+      }
+      mainWindow.focus();
+      return;
+    } catch (error) {
+      const rootDir = app.getPath("userData");
+      logError(rootDir, "Failed to send auth result to renderer", error);
+      // Still store as pending result as fallback
     }
-    if (mainWindow.isMinimized()) {
-      mainWindow.restore();
-    }
-    mainWindow.focus();
-    return;
   }
 
   pendingAuthResult = result;
@@ -351,163 +353,286 @@ const registerProtocolHandling = (): void => {
   app.setAsDefaultProtocolClient(PROTOCOL, process.execPath, [appPath]);
 };
 
-const registerAuthHandlers = (db: SqliteDatabase, rootDir: string): void => {
-  ipcMain.handle("auth:open-google", async (_event, params) => {
+// Helper function to wrap IPC handlers with timing
+const wrapIPCHandler = <T extends unknown[], R>(
+  channel: string,
+  handler: (...args: T) => R | Promise<R>,
+) => {
+  return async (...args: T): Promise<R> => {
+    const rootDir = app.getPath("userData");
+    const timer = createIPCTimer();
+
     try {
-      // Validate IPC parameters
-      validateIPCParams("auth:open-google", params);
-
-      const stubMode = getAuthStubMode();
-      if (stubMode) {
-        if (stubMode === "success") {
-          const tokens: OAuthTokens = {
-            accessToken: "e2e-access-token",
-            refreshToken: "e2e-refresh-token",
-            expiresAt: Date.now() + 60 * 60 * 1000,
-          };
-          writeTokens(db, rootDir, tokens);
-          scheduleTokenRefresh(db, rootDir, tokens);
-          sendAuthResultToRenderer({ success: true });
-          return { success: true };
-        }
-
-        const message = "Authorization was canceled. Please try again.";
-        sendAuthResultToRenderer({ success: false, error: message });
-        return { success: false, error: message };
-      }
-
-      const clientId = authGoogleConfig.clientId.trim();
-      const clientSecret = authGoogleConfig.clientSecret.trim();
-
-      if (clientId.length === 0) {
-        return {
-          success: false,
-          error: "Google OAuth client is not configured.",
-        };
-      }
-
-      if (clientSecret.length === 0) {
-        return {
-          success: false,
-          error: "Google OAuth client secret is not configured.",
-        };
-      }
-
-      const port = await startAuthServer(db, rootDir);
-      const codeVerifier = generatePkceVerifier();
-      const codeChallenge = generatePkceChallenge(codeVerifier);
-      const state = generateOauthState();
-      pendingCodeVerifier = codeVerifier;
-      pendingAuthState = state;
-      await shell.openExternal(getGoogleAuthUrl(clientId, port, codeChallenge, state));
-      return { success: true };
+      const result = await handler(...args);
+      timer.end(rootDir, channel, true);
+      return result;
     } catch (error) {
-      pendingCodeVerifier = null;
-
-      if (error instanceof IPCValidationError) {
-        logError(rootDir, "IPC validation failed for auth:open-google", error);
-        return { success: false, error: "Invalid request parameters." };
-      }
-
-      const message = error instanceof Error ? error.message : "Unknown error";
-      logError(rootDir, "Auth open-google failed", error);
-      return { success: false, error: message };
+      timer.end(rootDir, channel, false, error);
+      throw error;
     }
-  });
-
-  ipcMain.handle("auth:get-state", (_event, params) => {
-    try {
-      // Validate IPC parameters
-      validateIPCParams("auth:get-state", params);
-
-      const tokens = readTokens(db, rootDir);
-      if (!tokens) {
-        return { authorized: false };
-      }
-
-      if (tokens.expiresAt > Date.now() + 60_000) {
-        scheduleTokenRefresh(db, rootDir, tokens);
-        return { authorized: true };
-      }
-
-      if (tokens.refreshToken) {
-        void refreshTokens(db, rootDir, tokens.refreshToken);
-        return { authorized: false };
-      }
-
-      return { authorized: false };
-    } catch (error) {
-      if (error instanceof IPCValidationError) {
-        logError(rootDir, "IPC validation failed for auth:get-state", error);
-        return { authorized: false };
-      }
-
-      logError(rootDir, "Auth get-state failed", error);
-      return { authorized: false };
-    }
-  });
-
-  ipcMain.handle("auth:sign-out", (_event, params) => {
-    try {
-      // Validate IPC parameters
-      validateIPCParams("auth:sign-out", params);
-
-      clearTokens(db, rootDir);
-      sendAuthResultToRenderer({ success: false, error: "Signed out." });
-      return { success: true };
-    } catch (error) {
-      if (error instanceof IPCValidationError) {
-        logError(rootDir, "IPC validation failed for auth:sign-out", error);
-        return { success: false, error: "Invalid request parameters." };
-      }
-
-      logError(rootDir, "Auth sign-out failed", error);
-      return { success: false, error: "Sign out failed." };
-    }
-  });
+  };
 };
 
-const registerSidebarHandlers = (db: SqliteDatabase): void => {
-  ipcMain.handle("sidebar:get-state", (_event, params) => {
-    try {
-      // Validate IPC parameters
-      validateIPCParams("sidebar:get-state", params);
+const registerAuthHandlers = (db: SqliteDatabase, rootDir: string): void => {
+  try {
+    ipcMain.handle(
+      "auth:open-google",
+      wrapIPCHandler("auth:open-google", async (_event, params) => {
+        logDebug(rootDir, "IPC call: auth:open-google", { params });
 
-      return { collapsed: getSidebarCollapsed(db) };
-    } catch (error) {
-      if (error instanceof IPCValidationError) {
-        const rootDir = app.getPath("userData");
-        logError(rootDir, "IPC validation failed for sidebar:get-state", error);
-        return { collapsed: false }; // Return default state on validation error
+        try {
+          // Validate IPC parameters
+          validateIPCParams("auth:open-google", params);
+
+          const stubMode = getAuthStubMode();
+          if (stubMode) {
+            if (stubMode === "success") {
+              const tokens: OAuthTokens = {
+                accessToken: "e2e-access-token",
+                refreshToken: "e2e-refresh-token",
+                expiresAt: Date.now() + 60 * 60 * 1000,
+              };
+              writeTokens(db, rootDir, tokens);
+              scheduleTokenRefresh(db, rootDir, tokens);
+              sendAuthResultToRenderer({ success: true });
+              return { success: true };
+            }
+
+            const message = "Authorization was canceled. Please try again.";
+            sendAuthResultToRenderer({ success: false, error: message });
+            const result = { success: false, error: message };
+            logDebug(rootDir, "IPC response: auth:open-google", { result });
+            return result;
+          }
+
+          const clientId = authGoogleConfig.clientId.trim();
+          const clientSecret = authGoogleConfig.clientSecret.trim();
+
+          if (clientId.length === 0) {
+            const result = {
+              success: false,
+              error: "Google OAuth client is not configured.",
+            };
+            logDebug(rootDir, "IPC response: auth:open-google", { result });
+            return result;
+          }
+
+          if (clientSecret.length === 0) {
+            const result = {
+              success: false,
+              error: "Google OAuth client secret is not configured.",
+            };
+            logDebug(rootDir, "IPC response: auth:open-google", { result });
+            return result;
+          }
+
+          const port = await startAuthServer(db, rootDir);
+          const codeVerifier = generatePkceVerifier();
+          const codeChallenge = generatePkceChallenge(codeVerifier);
+          const state = generateOauthState();
+          pendingCodeVerifier = codeVerifier;
+          pendingAuthState = state;
+          await shell.openExternal(getGoogleAuthUrl(clientId, port, codeChallenge, state));
+          const result = { success: true };
+          logDebug(rootDir, "IPC response: auth:open-google", { result });
+          return result;
+        } catch (error) {
+          pendingCodeVerifier = null;
+
+          if (error instanceof IPCValidationError) {
+            logError(rootDir, "IPC validation failed for auth:open-google", error);
+            const result = { success: false, error: "Invalid request parameters." };
+            logDebug(rootDir, "IPC response: auth:open-google", { result });
+            return result;
+          }
+
+          const message = error instanceof Error ? error.message : "Unknown error";
+          logError(rootDir, "Auth open-google failed", error);
+          const result = { success: false, error: message };
+          logDebug(rootDir, "IPC response: auth:open-google", { result });
+          return result;
+        }
+      }),
+    );
+
+    ipcMain.handle(
+      "auth:get-state",
+      wrapIPCHandler("auth:get-state", (_event, params) => {
+        logDebug(rootDir, "IPC call: auth:get-state", { params });
+
+        try {
+          // Validate IPC parameters
+          validateIPCParams("auth:get-state", params);
+
+          const tokens = readTokens(db, rootDir);
+          if (!tokens) {
+            const result = { authorized: false };
+            logDebug(rootDir, "IPC response: auth:get-state", { result });
+            return result;
+          }
+
+          if (tokens.expiresAt > Date.now() + 60_000) {
+            scheduleTokenRefresh(db, rootDir, tokens);
+            const result = { authorized: true };
+            logDebug(rootDir, "IPC response: auth:get-state", { result });
+            return result;
+          }
+
+          if (tokens.refreshToken) {
+            void refreshTokens(db, rootDir, tokens.refreshToken);
+            const result = { authorized: false };
+            logDebug(rootDir, "IPC response: auth:get-state", { result });
+            return result;
+          }
+
+          const result = { authorized: false };
+          logDebug(rootDir, "IPC response: auth:get-state", { result });
+          return result;
+        } catch (error) {
+          if (error instanceof IPCValidationError) {
+            logError(rootDir, "IPC validation failed for auth:get-state", error);
+            const result = { authorized: false };
+            logDebug(rootDir, "IPC response: auth:get-state", { result });
+            return result;
+          }
+
+          logError(rootDir, "Auth get-state failed", error);
+          const result = { authorized: false };
+          logDebug(rootDir, "IPC response: auth:get-state", { result });
+          return result;
+        }
+      }),
+    );
+
+    ipcMain.handle(
+      "auth:sign-out",
+      wrapIPCHandler("auth:sign-out", (_event, params) => {
+        logDebug(rootDir, "IPC call: auth:sign-out", { params });
+
+        try {
+          // Validate IPC parameters
+          validateIPCParams("auth:sign-out", params);
+
+          clearTokens(db, rootDir);
+          sendAuthResultToRenderer({ success: false, error: "Signed out." });
+          const result = { success: true };
+          logDebug(rootDir, "IPC response: auth:sign-out", { result });
+          return result;
+        } catch (error) {
+          if (error instanceof IPCValidationError) {
+            logError(rootDir, "IPC validation failed for auth:sign-out", error);
+            const result = { success: false, error: "Invalid request parameters." };
+            logDebug(rootDir, "IPC response: auth:sign-out", { result });
+            return result;
+          }
+
+          logError(rootDir, "Auth sign-out failed", error);
+          const result = { success: false, error: "Sign out failed." };
+          logDebug(rootDir, "IPC response: auth:sign-out", { result });
+          return result;
+        }
+      }),
+    );
+  } catch (error) {
+    logError(rootDir, "Failed to register auth IPC handlers", error);
+    throw error; // Re-throw to prevent app from starting with broken IPC
+  }
+};
+
+const registerPreloadLogHandler = (rootDir: string): void => {
+  try {
+    // Handle log messages from preload script
+    ipcMain.on("preload:log", (_event, logData: { level: string, message: string, data?: unknown }) => {
+      const { level, message, data } = logData;
+      const preloadMessage = `[PRELOAD] ${message}`;
+      
+      switch (level.toUpperCase()) {
+        case "DEBUG":
+          logDebug(rootDir, preloadMessage, data);
+          break;
+        case "INFO":
+          logInfo(rootDir, preloadMessage, data);
+          break;
+        case "WARN":
+          logWarn(rootDir, preloadMessage, data);
+          break;
+        case "ERROR":
+          logError(rootDir, preloadMessage, data);
+          break;
+        default:
+          logInfo(rootDir, preloadMessage, data);
       }
+    });
+  } catch (error) {
+    logError(rootDir, "Failed to register preload log handler", error);
+    throw error;
+  }
+};
+  const rootDir = app.getPath("userData");
 
-      // Log unexpected errors but still return a valid response
-      const rootDir = app.getPath("userData");
-      logError(rootDir, "Sidebar get-state failed", error);
-      return { collapsed: false };
-    }
-  });
+  try {
+    ipcMain.handle(
+      "sidebar:get-state",
+      wrapIPCHandler("sidebar:get-state", (_event, params) => {
+        logDebug(rootDir, "IPC call: sidebar:get-state", { params });
 
-  ipcMain.handle("sidebar:set-state", (_event, params) => {
-    try {
-      // Validate IPC parameters
-      validateIPCParams("sidebar:set-state", params);
+        try {
+          // Validate IPC parameters
+          validateIPCParams("sidebar:get-state", params);
 
-      setSidebarCollapsed(db, params.collapsed);
-      return { success: true };
-    } catch (error) {
-      if (error instanceof IPCValidationError) {
-        const rootDir = app.getPath("userData");
-        logError(rootDir, "IPC validation failed for sidebar:set-state", error);
-        return { success: false, error: "Invalid request parameters." };
-      }
+          const result = { collapsed: getSidebarCollapsed(db) };
+          logDebug(rootDir, "IPC response: sidebar:get-state", { result });
+          return result;
+        } catch (error) {
+          if (error instanceof IPCValidationError) {
+            logError(rootDir, "IPC validation failed for sidebar:get-state", error);
+            const result = { collapsed: false }; // Return default state on validation error
+            logDebug(rootDir, "IPC response: sidebar:get-state", { result });
+            return result;
+          }
 
-      // Log unexpected errors
-      const rootDir = app.getPath("userData");
-      logError(rootDir, "Sidebar set-state failed", error);
-      return { success: false, error: "Failed to update sidebar state." };
-    }
-  });
+          // Log unexpected errors but still return a valid response
+          logError(rootDir, "Sidebar get-state failed", error);
+          const result = { collapsed: false };
+          logDebug(rootDir, "IPC response: sidebar:get-state", { result });
+          return result;
+        }
+      }),
+    );
+
+    ipcMain.handle(
+      "sidebar:set-state",
+      wrapIPCHandler("sidebar:set-state", (_event, params) => {
+        logDebug(rootDir, "IPC call: sidebar:set-state", { params });
+
+        try {
+          // Validate IPC parameters
+          validateIPCParams("sidebar:set-state", params);
+
+          setSidebarCollapsed(db, params.collapsed);
+          const result = { success: true };
+          logDebug(rootDir, "IPC response: sidebar:set-state", { result });
+          return result;
+        } catch (error) {
+          if (error instanceof IPCValidationError) {
+            logError(rootDir, "IPC validation failed for sidebar:set-state", error);
+            const result = { success: false, error: "Invalid request parameters." };
+            logDebug(rootDir, "IPC response: sidebar:set-state", { result });
+            return result;
+          }
+
+          // Log unexpected errors
+          logError(rootDir, "Sidebar set-state failed", error);
+          const result = { success: false, error: "Failed to update sidebar state." };
+          logDebug(rootDir, "IPC response: sidebar:set-state", { result });
+          return result;
+        }
+      }),
+    );
+  } catch (error) {
+    logError(rootDir, "Failed to register sidebar IPC handlers", error);
+    throw error; // Re-throw to prevent app from starting with broken IPC
+  }
 };
 
 const createMainWindow = (): void => {
@@ -593,9 +718,16 @@ app.whenReady().then(() => {
     return;
   }
 
-  registerAuthHandlers(db, rootDir);
-  registerSidebarHandlers(db);
-  registerProtocolHandling();
+  try {
+    registerAuthHandlers(db, rootDir);
+    registerSidebarHandlers(db);
+    registerProtocolHandling();
+  } catch (error) {
+    logError(rootDir, "Failed to register IPC handlers", error);
+    dialog.showErrorBox("IPC Error", "Failed to register IPC handlers. The app will now exit.");
+    app.exit(1);
+    return;
+  }
   createMainWindow();
 
   const deepLink = process.argv.find((arg) => arg.startsWith(`${PROTOCOL}://`));
@@ -618,4 +750,17 @@ app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {
     app.quit();
   }
+});
+
+// Global error handlers for IPC-related errors
+process.on("uncaughtException", (error) => {
+  const rootDir = app.getPath("userData");
+  logError(rootDir, "Uncaught exception in main process", error);
+  console.error("Uncaught Exception:", error);
+});
+
+process.on("unhandledRejection", (reason, promise) => {
+  const rootDir = app.getPath("userData");
+  logError(rootDir, "Unhandled promise rejection in main process", { reason, promise });
+  console.error("Unhandled Rejection at:", promise, "reason:", reason);
 });

@@ -1,19 +1,12 @@
-export {};
+// Requirements: platform-foundation.3.3, platform-foundation.3.4
+// Global type definitions for renderer process
 
-type AuthResult = {
-  success: boolean;
-  error?: string;
-};
+import type { ClerklyAPI } from "./ipc";
+
+export {};
 
 declare global {
   interface Window {
-    clerkly: {
-      openGoogleAuth: () => Promise<AuthResult>;
-      getAuthState: () => Promise<{ authorized: boolean }>;
-      signOut: () => Promise<{ success: boolean }>;
-      getSidebarState: () => Promise<{ collapsed: boolean }>;
-      setSidebarState: (collapsed: boolean) => Promise<{ success: boolean }>;
-      onAuthResult: (callback: (result: AuthResult) => void) => () => void;
-    };
+    clerkly: ClerklyAPI;
   }
 }
