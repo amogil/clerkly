@@ -1,4 +1,4 @@
-// Requirements: E.P.1, E.P.2, E.P.3, E.P.6, E.T.4, E.S.1, E.S.7, E.A.3, E.A.4, E.A.6, E.A.7, E.A.8, E.A.11, E.A.12, E.A.13, E.A.14, E.A.15, E.A.16, E.A.18, E.A.19, E.A.20, E.A.21, E.I.1, E.I.3, E.Q.1
+// Requirements: E.P.1, E.P.2, E.P.3, E.P.6, E.T.4, E.S.1, E.S.7, E.A.3, E.A.4, E.A.6, E.A.7, E.A.8, E.A.11, E.A.12, E.A.13, E.A.14, E.A.15, E.A.16, E.A.18, E.A.19, E.A.20, E.A.21, E.A.23, E.A.24, E.A.25, E.I.1, E.I.3, E.Q.1
 // Tooling requirements: E.T.1 (see package.json)
 import { app, BrowserWindow, dialog, ipcMain, shell } from "electron";
 import Database from "better-sqlite3";
@@ -12,6 +12,7 @@ import {
   generatePkceVerifier,
   getGoogleAuthUrl,
 } from "./src/auth/auth_google";
+import { getAuthorizationCompletionPage } from "./src/auth/authorization_completion_page";
 import { clearTokens, readTokens, type OAuthTokens, writeTokens } from "./src/auth/token_store";
 import { ensureDatabase } from "./src/db";
 import { logError } from "./src/logging/logger";
@@ -96,22 +97,22 @@ const closeAuthServer = (): void => {
 };
 
 const getSidebarCollapsed = (db: SqliteDatabase): boolean => {
-  const row = db
-    .prepare("SELECT value FROM app_meta WHERE key = ?")
-    .get(SIDEBAR_STATE_KEY) as { value: string } | undefined;
+  const row = db.prepare("SELECT value FROM app_meta WHERE key = ?").get(SIDEBAR_STATE_KEY) as
+    | { value: string }
+    | undefined;
   return row?.value === "1";
 };
 
 const setSidebarCollapsed = (db: SqliteDatabase, collapsed: boolean): void => {
   db.prepare(
-    "INSERT INTO app_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value"
+    "INSERT INTO app_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
   ).run(SIDEBAR_STATE_KEY, collapsed ? "1" : "0");
 };
 
 const exchangeCodeForTokens = async (
   code: string,
   port: number,
-  codeVerifier: string
+  codeVerifier: string,
 ): Promise<OAuthTokens> => {
   if (codeVerifier.length === 0) {
     throw new Error("PKCE verifier is missing.");
@@ -158,7 +159,7 @@ const exchangeCodeForTokens = async (
 const refreshTokens = async (
   db: SqliteDatabase,
   rootDir: string,
-  refreshToken: string
+  refreshToken: string,
 ): Promise<void> => {
   const clientSecret = authGoogleConfig.clientSecret.trim();
   if (clientSecret.length === 0) {
@@ -219,35 +220,33 @@ const startAuthServer = (db: SqliteDatabase, rootDir: string): Promise<number> =
       }
 
       const url = new URL(req.url, `http://127.0.0.1:${authServerPort}`);
-    if (url.pathname !== "/" && url.pathname !== "/auth/callback") {
+      if (url.pathname !== "/" && url.pathname !== "/auth/callback") {
         res.writeHead(404);
         res.end();
         return;
       }
 
-    const code = url.searchParams.get("code");
-    const state = url.searchParams.get("state");
+      const code = url.searchParams.get("code");
+      const state = url.searchParams.get("state");
       const error = url.searchParams.get("error");
 
       res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-      res.end(
-        "<html><body><h3>Authorization complete.</h3><p>You can close this window.</p></body></html>"
-      );
+      res.end(getAuthorizationCompletionPage());
 
-    if (code) {
-      const expectedState = pendingAuthState;
-      const codeVerifier = pendingCodeVerifier;
-      pendingCodeVerifier = null;
-      pendingAuthState = null;
+      if (code) {
+        const expectedState = pendingAuthState;
+        const codeVerifier = pendingCodeVerifier;
+        pendingCodeVerifier = null;
+        pendingAuthState = null;
 
-      if (!codeVerifier || !expectedState || state !== expectedState) {
-        sendAuthResultToRenderer({
-          success: false,
-          error: "Authorization failed. Please try again.",
-        });
-        closeAuthServer();
-        return;
-      }
+        if (!codeVerifier || !expectedState || state !== expectedState) {
+          sendAuthResultToRenderer({
+            success: false,
+            error: "Authorization failed. Please try again.",
+          });
+          closeAuthServer();
+          return;
+        }
 
         exchangeCodeForTokens(code, authServerPort, codeVerifier)
           .then((tokens) => {
@@ -270,15 +269,14 @@ const startAuthServer = (db: SqliteDatabase, rootDir: string): Promise<number> =
             closeAuthServer();
           });
       } else {
-      pendingCodeVerifier = null;
-      pendingAuthState = null;
+        pendingCodeVerifier = null;
+        pendingAuthState = null;
         sendAuthResultToRenderer({
           success: false,
           error: error || "Authorization failed. Please try again.",
         });
         closeAuthServer();
       }
-
     });
 
     authServer.listen(0, "127.0.0.1", () => {

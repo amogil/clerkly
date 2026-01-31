@@ -26,7 +26,7 @@ describe("Auth and OAuth requirements", () => {
   it("shows the auth gate when unauthorized", () => {
     const source = readText("renderer/src/app/App.tsx");
     expect(source).toContain("<AuthGate");
-    expect(source).toContain("authState === 'authorized'");
+    expect(source).toContain('authState === "authorized"');
   });
 
   /* Preconditions: main process exists.
@@ -35,7 +35,7 @@ describe("Auth and OAuth requirements", () => {
      Requirements: E.A.3 */
   it("opens the system browser for Google login", () => {
     const source = readText("main.ts");
-    expect(source).toContain('shell.openExternal');
+    expect(source).toContain("shell.openExternal");
     expect(source).toContain("auth:open-google");
   });
 
@@ -45,7 +45,7 @@ describe("Auth and OAuth requirements", () => {
      Requirements: E.A.4 */
   it("shows full UI only after successful authorization", () => {
     const source = readText("renderer/src/app/App.tsx");
-    expect(source).toContain("authState === 'authorized'");
+    expect(source).toContain('authState === "authorized"');
   });
 
   /* Preconditions: auth gate component exists.
@@ -57,6 +57,15 @@ describe("Auth and OAuth requirements", () => {
     expect(source).toContain("errorMessage");
   });
 
+  /* Preconditions: App component exists.
+     Action: inspect auth retry handling.
+     Assertions: authorizing state resets to unauthorized for retry.
+     Requirements: E.A.22 */
+  it("keeps auth gate available after browser close", () => {
+    const source = readText("renderer/src/app/App.tsx");
+    expect(source).toContain('prev === "authorizing" ? "unauthorized" : prev');
+  });
+
   /* Preconditions: auth config exists.
      Action: generate auth URL for a port.
      Assertions: uses loopback redirect.
@@ -64,9 +73,7 @@ describe("Auth and OAuth requirements", () => {
   it("uses loopback redirect URIs", () => {
     const url = getGoogleAuthUrl("client-id", 34123, "challenge", "state");
     const parsed = new URL(url);
-    expect(parsed.searchParams.get("redirect_uri")).toBe(
-      "http://127.0.0.1:34123"
-    );
+    expect(parsed.searchParams.get("redirect_uri")).toBe("http://127.0.0.1:34123");
   });
 
   /* Preconditions: auth config exists.
@@ -187,5 +194,34 @@ describe("Auth and OAuth requirements", () => {
     const source = readText("main.ts");
     expect(source).toContain("pendingAuthState");
     expect(source).toContain('searchParams.get("state")');
+  });
+
+  /* Preconditions: auth callback response exists.
+     Action: inspect authorization completion response.
+     Assertions: completion page attempts to close itself.
+     Requirements: E.A.23 */
+  it("auto-closes the authorization completion page", () => {
+    const source = readText("src/auth/authorization_completion_page.ts");
+    expect(source).toContain("setTimeout(() => window.close(), 300)");
+  });
+
+  /* Preconditions: auth completion response exists.
+     Action: inspect completion page markup.
+     Assertions: completion page renders the Clerkly logo and styled content.
+     Requirements: E.A.24 */
+  it("renders a branded authorization completion page", () => {
+    const source = readText("src/auth/authorization_completion_page.ts");
+    expect(source).toContain("<span>Clerkly</span>");
+    expect(source).toContain('class="card"');
+    expect(source).toContain("<svg");
+  });
+
+  /* Preconditions: auth completion response exists.
+     Action: inspect completion copy.
+     Assertions: completion page mentions returning to the app.
+     Requirements: E.A.25 */
+  it("mentions returning to the app on completion", () => {
+    const source = readText("src/auth/authorization_completion_page.ts");
+    expect(source).toContain("return to the Clerkly app");
   });
 });
