@@ -16,8 +16,8 @@ import { getAuthorizationCompletionPage } from "./src/auth/authorization_complet
 import { clearTokens, readTokens, type OAuthTokens, writeTokens } from "./src/auth/token_store";
 import { ensureDatabase } from "./src/db";
 import { IPCValidationError, validateIPCParams } from "./src/ipc/validators";
-import type { AuthResult, AuthState, SidebarState, OperationResult } from "./src/ipc/types";
-import { logError, logDebug, createIPCTimer } from "./src/logging/logger";
+import type { AuthResult } from "./src/ipc/types";
+import { logError, logDebug, logInfo, logWarn, createIPCTimer } from "./src/logging/logger";
 
 const PROTOCOL = "clerkly";
 const userDataOverride = process.env.CLERKLY_E2E_USER_DATA;
@@ -344,13 +344,22 @@ const startAuthServer = (db: SqliteDatabase, rootDir: string): Promise<number> =
 };
 
 const registerProtocolHandling = (): void => {
+  const rootDir = app.getPath("userData");
+  
   if (app.isPackaged) {
+    logInfo(rootDir, "Registering protocol handler for packaged app", { protocol: PROTOCOL });
     app.setAsDefaultProtocolClient(PROTOCOL);
-    return;
+  } else {
+    const appPath = path.resolve(process.argv[1]);
+    logInfo(rootDir, "Registering protocol handler for development", { 
+      protocol: PROTOCOL,
+      execPath: process.execPath,
+      appPath,
+    });
+    app.setAsDefaultProtocolClient(PROTOCOL, process.execPath, [appPath]);
   }
-
-  const appPath = path.resolve(process.argv[1]);
-  app.setAsDefaultProtocolClient(PROTOCOL, process.execPath, [appPath]);
+  
+  logInfo(rootDir, "Protocol handler registered successfully", { protocol: PROTOCOL });
 };
 
 // Helper function to wrap IPC handlers with timing
@@ -539,35 +548,7 @@ const registerAuthHandlers = (db: SqliteDatabase, rootDir: string): void => {
   }
 };
 
-const registerPreloadLogHandler = (rootDir: string): void => {
-  try {
-    // Handle log messages from preload script
-    ipcMain.on("preload:log", (_event, logData: { level: string, message: string, data?: unknown }) => {
-      const { level, message, data } = logData;
-      const preloadMessage = `[PRELOAD] ${message}`;
-      
-      switch (level.toUpperCase()) {
-        case "DEBUG":
-          logDebug(rootDir, preloadMessage, data);
-          break;
-        case "INFO":
-          logInfo(rootDir, preloadMessage, data);
-          break;
-        case "WARN":
-          logWarn(rootDir, preloadMessage, data);
-          break;
-        case "ERROR":
-          logError(rootDir, preloadMessage, data);
-          break;
-        default:
-          logInfo(rootDir, preloadMessage, data);
-      }
-    });
-  } catch (error) {
-    logError(rootDir, "Failed to register preload log handler", error);
-    throw error;
-  }
-};
+const registerSidebarHandlers = (db: SqliteDatabase): void => {
   const rootDir = app.getPath("userData");
 
   try {
@@ -635,7 +616,44 @@ const registerPreloadLogHandler = (rootDir: string): void => {
   }
 };
 
+const registerPreloadLogHandler = (rootDir: string): void => {
+  try {
+    // Handle log messages from preload script
+    ipcMain.on(
+      "preload:log",
+      (_event, logData: { level: string; message: string; data?: unknown }) => {
+        const { level, message, data } = logData;
+        const preloadMessage = `[PRELOAD] ${message}`;
+
+        switch (level.toUpperCase()) {
+          case "DEBUG":
+            logDebug(rootDir, preloadMessage, data);
+            break;
+          case "INFO":
+            logInfo(rootDir, preloadMessage, data);
+            break;
+          case "WARN":
+            logWarn(rootDir, preloadMessage, data);
+            break;
+          case "ERROR":
+            logError(rootDir, preloadMessage, data);
+            break;
+          default:
+            logInfo(rootDir, preloadMessage, data);
+        }
+      },
+    );
+  } catch (error) {
+    logError(rootDir, "Failed to register preload log handler", error);
+    throw error;
+  }
+};
+
 const createMainWindow = (): void => {
+  const rootDir = app.getPath("userData");
+  
+  logInfo(rootDir, "Creating main window");
+  
   mainWindow = new BrowserWindow({
     width: 900,
     height: 600,
@@ -647,16 +665,31 @@ const createMainWindow = (): void => {
     },
   });
 
+  logInfo(rootDir, "Main window created", {
+    width: 900,
+    height: 600,
+    title: "Clerkly",
+    contextIsolation: true,
+    nodeIntegration: false,
+  });
+
   mainWindow.loadFile(path.join(__dirname, "renderer", "index.html"));
+  logInfo(rootDir, "Renderer loaded", {
+    path: path.join(__dirname, "renderer", "index.html"),
+  });
+  
   // Requirement: platform-foundation.1.3
   mainWindow.maximize();
+  logInfo(rootDir, "Main window maximized");
 
   if (pendingAuthResult) {
     sendAuthResultToRenderer(pendingAuthResult);
     pendingAuthResult = null;
+    logInfo(rootDir, "Sent pending auth result to renderer");
   }
 
   mainWindow.on("closed", () => {
+    logInfo(rootDir, "Main window closed");
     mainWindow = null;
   });
 };
@@ -664,11 +697,17 @@ const createMainWindow = (): void => {
 const gotSingleInstanceLock = app.requestSingleInstanceLock();
 
 if (!gotSingleInstanceLock) {
+  // Note: We can't log here because userData path isn't available yet
+  console.log("Another instance is already running. Exiting.");
   app.quit();
 } else {
   app.on("second-instance", (_event, argv) => {
+    const rootDir = app.getPath("userData");
+    logInfo(rootDir, "Second instance detected, focusing main window");
+    
     const deepLink = argv.find((arg) => arg.startsWith(`${PROTOCOL}://`));
     if (deepLink) {
+      logInfo(rootDir, "Processing deep link from second instance", { deepLink });
       handleAuthCallbackUrl(deepLink);
     }
 
@@ -682,6 +721,18 @@ if (!gotSingleInstanceLock) {
 }
 
 app.whenReady().then(() => {
+  const rootDir = app.getPath("userData");
+  
+  // Log main process startup
+  logInfo(rootDir, "Main process started", {
+    version: app.getVersion(),
+    platform: process.platform,
+    arch: process.arch,
+    nodeVersion: process.version,
+    electronVersion: process.versions.electron,
+    userDataPath: rootDir,
+  });
+
   const menu = Menu.buildFromTemplate([
     {
       label: "Clerkly",
@@ -704,13 +755,17 @@ app.whenReady().then(() => {
     { role: "help" },
   ]);
   Menu.setApplicationMenu(menu);
+  logInfo(rootDir, "Application menu initialized");
 
-  const rootDir = app.getPath("userData");
   let db: SqliteDatabase;
 
   try {
+    logInfo(rootDir, "Initializing database");
     ensureDatabase();
     db = new Database(path.join(rootDir, "clerkly.sqlite3"));
+    logInfo(rootDir, "Database initialized successfully", {
+      path: path.join(rootDir, "clerkly.sqlite3"),
+    });
   } catch (error) {
     logError(rootDir, "Database migration failed.", error);
     dialog.showErrorBox("Database Error", "Database migration failed. The app will now exit.");
@@ -719,9 +774,12 @@ app.whenReady().then(() => {
   }
 
   try {
+    logInfo(rootDir, "Registering IPC handlers");
     registerAuthHandlers(db, rootDir);
     registerSidebarHandlers(db);
+    registerPreloadLogHandler(rootDir);
     registerProtocolHandling();
+    logInfo(rootDir, "IPC handlers registered successfully");
   } catch (error) {
     logError(rootDir, "Failed to register IPC handlers", error);
     dialog.showErrorBox("IPC Error", "Failed to register IPC handlers. The app will now exit.");
@@ -732,22 +790,30 @@ app.whenReady().then(() => {
 
   const deepLink = process.argv.find((arg) => arg.startsWith(`${PROTOCOL}://`));
   if (deepLink) {
+    logInfo(rootDir, "Processing deep link on startup", { deepLink });
     handleAuthCallbackUrl(deepLink);
   }
 
   app.on("activate", () => {
+    logInfo(rootDir, "App activated");
     if (BrowserWindow.getAllWindows().length === 0) {
+      logInfo(rootDir, "No windows open, creating main window");
       createMainWindow();
     }
   });
 });
 app.on("open-url", (event, url) => {
   event.preventDefault();
+  const rootDir = app.getPath("userData");
+  logInfo(rootDir, "Received open-url event", { url });
   handleAuthCallbackUrl(url);
 });
 
 app.on("window-all-closed", () => {
+  const rootDir = app.getPath("userData");
+  logInfo(rootDir, "All windows closed", { platform: process.platform });
   if (process.platform !== "darwin") {
+    logInfo(rootDir, "Quitting application (non-macOS platform)");
     app.quit();
   }
 });
@@ -763,4 +829,17 @@ process.on("unhandledRejection", (reason, promise) => {
   const rootDir = app.getPath("userData");
   logError(rootDir, "Unhandled promise rejection in main process", { reason, promise });
   console.error("Unhandled Rejection at:", promise, "reason:", reason);
+});
+
+// Log process startup information
+const rootDir = app.getPath("userData");
+logInfo(rootDir, "Clerkly main process initializing", {
+  pid: process.pid,
+  argv: process.argv,
+  cwd: process.cwd(),
+  env: {
+    NODE_ENV: process.env.NODE_ENV,
+    CLERKLY_LOG_LEVEL: process.env.CLERKLY_LOG_LEVEL,
+    CLERKLY_E2E_USER_DATA: process.env.CLERKLY_E2E_USER_DATA,
+  },
 });

@@ -34,18 +34,18 @@ const createLoggedIPCCall = <T extends unknown[], R>(
     try {
       const result = await ipcCall(...args);
       const duration = performance.now() - startTime;
-      preloadLog.debug(`IPC call completed: ${channel}`, { 
-        duration: `${duration.toFixed(2)}ms`, 
+      preloadLog.debug(`IPC call completed: ${channel}`, {
+        duration: `${duration.toFixed(2)}ms`,
         success: true,
-        result 
+        result,
       });
       return result;
     } catch (error) {
       const duration = performance.now() - startTime;
-      preloadLog.error(`IPC call failed: ${channel}`, { 
-        duration: `${duration.toFixed(2)}ms`, 
+      preloadLog.error(`IPC call failed: ${channel}`, {
+        duration: `${duration.toFixed(2)}ms`,
         error: error instanceof Error ? error.message : String(error),
-        args 
+        args,
       });
       throw error;
     }
@@ -55,28 +55,28 @@ const createLoggedIPCCall = <T extends unknown[], R>(
 const api = {
   openGoogleAuth: createLoggedIPCCall(
     "auth:open-google",
-    (): Promise<AuthResult> => ipcRenderer.invoke("auth:open-google") as Promise<AuthResult>
+    (): Promise<AuthResult> => ipcRenderer.invoke("auth:open-google") as Promise<AuthResult>,
   ),
   getAuthState: createLoggedIPCCall(
-    "auth:get-state", 
-    (): Promise<AuthState> => ipcRenderer.invoke("auth:get-state") as Promise<AuthState>
+    "auth:get-state",
+    (): Promise<AuthState> => ipcRenderer.invoke("auth:get-state") as Promise<AuthState>,
   ),
   signOut: createLoggedIPCCall(
     "auth:sign-out",
-    (): Promise<OperationResult> => ipcRenderer.invoke("auth:sign-out") as Promise<OperationResult>
+    (): Promise<OperationResult> => ipcRenderer.invoke("auth:sign-out") as Promise<OperationResult>,
   ),
   getSidebarState: createLoggedIPCCall(
     "sidebar:get-state",
-    (): Promise<SidebarState> => ipcRenderer.invoke("sidebar:get-state") as Promise<SidebarState>
+    (): Promise<SidebarState> => ipcRenderer.invoke("sidebar:get-state") as Promise<SidebarState>,
   ),
   setSidebarState: createLoggedIPCCall(
     "sidebar:set-state",
-    (collapsed: boolean): Promise<OperationResult> => 
-      ipcRenderer.invoke("sidebar:set-state", { collapsed }) as Promise<OperationResult>
+    (collapsed: boolean): Promise<OperationResult> =>
+      ipcRenderer.invoke("sidebar:set-state", { collapsed }) as Promise<OperationResult>,
   ),
   onAuthResult: (callback: (result: AuthResult) => void): (() => void) => {
     preloadLog.debug("Setting up auth result listener");
-    
+
     const handler = (_: Electron.IpcRendererEvent, result: AuthResult) => {
       preloadLog.debug("Received auth result from main process", { result });
       callback(result);
@@ -93,8 +93,8 @@ const api = {
 contextBridge.exposeInMainWorld("clerkly", api);
 
 // Log preload script initialization
-preloadLog.info("Preload script initialized", { 
+preloadLog.info("Preload script initialized", {
   contextIsolation: true,
   nodeIntegration: false,
-  apiMethods: Object.keys(api)
+  apiMethods: Object.keys(api),
 });
