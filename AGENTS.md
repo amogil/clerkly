@@ -111,6 +111,105 @@ class SidebarComponent {
 - **Актуальность**: Обновлять комментарии при изменении кода или требований
 - **Формат**: Использовать точный формат `// Requirements: req-id.1.1, req-id.1.2`
 
+### Обязательная Структура Тестов
+
+**КРИТИЧЕСКИ ВАЖНО**: Каждый тест ДОЛЖЕН содержать структурированный комментарий с описанием всех аспектов тестирования.
+
+#### Формат комментариев для тестов:
+
+```typescript
+/* Preconditions: описание начального состояния системы
+   Action: описание выполняемого действия
+   Assertions: описание ожидаемых результатов и проверок
+   Requirements: requirement-id.1.1, requirement-id.1.2 */
+it("should perform expected behavior", () => {
+  // Тест реализация
+});
+```
+
+#### Примеры правильного оформления тестов:
+
+✅ **Правильно:**
+
+```typescript
+describe("Auth IPC Handlers", () => {
+  /* Preconditions: Google OAuth client is configured, no existing tokens
+     Action: call auth:open-google IPC handler with no parameters
+     Assertions: returns success true, opens external browser with auth URL
+     Requirements: google-oauth-auth.1.1, google-oauth-auth.1.2 */
+  it("should handle valid auth:open-google request", async () => {
+    const result = await handler({}, undefined);
+    expect(result).toEqual({ success: true });
+    expect(mockedShell.openExternal).toHaveBeenCalled();
+  });
+
+  /* Preconditions: database contains valid non-expired tokens
+     Action: call auth:get-state IPC handler
+     Assertions: returns authorized true
+     Requirements: google-oauth-auth.1.5, google-oauth-auth.1.6 */
+  it("should return authorized true for valid tokens", async () => {
+    mockedReadTokens.mockReturnValue({
+      accessToken: "valid-token",
+      expiresAt: Date.now() + 120000,
+    });
+
+    const result = await handler({}, undefined);
+    expect(result).toEqual({ authorized: true });
+  });
+});
+```
+
+```typescript
+describe("Sidebar State Management", () => {
+  /* Preconditions: database is empty, no sidebar state stored
+     Action: call sidebar:get-state IPC handler
+     Assertions: returns collapsed false (default state)
+     Requirements: sidebar-navigation.1.1, sidebar-navigation.1.2 */
+  it("should return default state when no database record exists", async () => {
+    mockGet.mockReturnValue(undefined);
+
+    const result = await handler({}, undefined);
+    expect(result).toEqual({ collapsed: false });
+  });
+
+  /* Preconditions: valid collapsed parameter provided
+     Action: call sidebar:set-state with collapsed: true
+     Assertions: database updated with "1", returns success true
+     Requirements: sidebar-navigation.1.3, sidebar-navigation.1.4 */
+  it("should save collapsed state to database", async () => {
+    const result = await handler({}, { collapsed: true });
+
+    expect(result).toEqual({ success: true });
+    expect(mockRun).toHaveBeenCalledWith("sidebar_collapsed", "1");
+  });
+});
+```
+
+❌ **Неправильно:**
+
+```typescript
+// Тест авторизации
+it("should handle auth request", async () => {
+  const result = await handler({}, undefined);
+  expect(result.success).toBe(true);
+});
+
+// Проверяет состояние сайдбара
+it("gets sidebar state", async () => {
+  const result = await handler({}, undefined);
+  expect(result.collapsed).toBe(false);
+});
+```
+
+#### Требования к структуре тестов:
+
+- **Предусловия (Preconditions)**: Четко описать начальное состояние системы, моков, данных
+- **Действие (Action)**: Конкретно указать, какое действие выполняется в тесте
+- **Постусловия (Assertions)**: Детально описать все ожидаемые результаты и проверки
+- **Требования (Requirements)**: Перечислить все требования, которые покрывает данный тест
+- **Обязательность**: Каждый тест ДОЛЖЕН содержать все четыре компонента
+- **Формат**: Использовать точный формат многострочного комментария перед `it()`
+
 ## Обязательная Валидация Изменений
 
 **КРИТИЧЕСКИ ВАЖНО**: Каждое изменение в коде, спецификациях или тестах ДОЛЖНО быть провалидировано перед завершением работы.
@@ -212,6 +311,7 @@ npm test -- tests/requirements/coverage.test.ts
 - Убедиться что все требования покрыты тестами
 - Проверить соответствие кода спецификациям
 - **Проверить наличие комментариев с требованиями в коде**: Каждая функция, класс, метод должны содержать ссылки на реализуемые требования
+- **Проверить структуру тестов**: Каждый тест должен содержать Preconditions, Action, Assertions, Requirements
 
 ### 5. Правила Выполнения Команд Валидации
 
@@ -264,3 +364,4 @@ npm run test:functional
 - ✅ Все требования покрыты тестами
 - ✅ Соблюдены стандарты "Максимального покрытия кода", "Краевых случаев" и "Исключительных ситуаций" (см. определения терминов)
 - ✅ **Код содержит комментарии с требованиями**: Все функции, классы и методы имеют ссылки на реализуемые требования
+- ✅ **Тесты имеют правильную структуру**: Каждый тест содержит Preconditions, Action, Assertions, Requirements
