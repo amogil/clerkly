@@ -345,20 +345,20 @@ const startAuthServer = (db: SqliteDatabase, rootDir: string): Promise<number> =
 
 const registerProtocolHandling = (): void => {
   const rootDir = app.getPath("userData");
-  
+
   if (app.isPackaged) {
     logInfo(rootDir, "Registering protocol handler for packaged app", { protocol: PROTOCOL });
     app.setAsDefaultProtocolClient(PROTOCOL);
   } else {
     const appPath = path.resolve(process.argv[1]);
-    logInfo(rootDir, "Registering protocol handler for development", { 
+    logInfo(rootDir, "Registering protocol handler for development", {
       protocol: PROTOCOL,
       execPath: process.execPath,
       appPath,
     });
     app.setAsDefaultProtocolClient(PROTOCOL, process.execPath, [appPath]);
   }
-  
+
   logInfo(rootDir, "Protocol handler registered successfully", { protocol: PROTOCOL });
 };
 
@@ -383,7 +383,10 @@ const wrapIPCHandler = <T extends unknown[], R>(
 };
 
 const registerAuthHandlers = (db: SqliteDatabase, rootDir: string): void => {
+  logInfo(rootDir, "Starting auth IPC handlers registration");
+
   try {
+    logInfo(rootDir, "Registering IPC handler", { channel: "auth:open-google" });
     ipcMain.handle(
       "auth:open-google",
       wrapIPCHandler("auth:open-google", async (_event, params) => {
@@ -463,7 +466,9 @@ const registerAuthHandlers = (db: SqliteDatabase, rootDir: string): void => {
         }
       }),
     );
+    logInfo(rootDir, "Successfully registered IPC handler", { channel: "auth:open-google" });
 
+    logInfo(rootDir, "Registering IPC handler", { channel: "auth:get-state" });
     ipcMain.handle(
       "auth:get-state",
       wrapIPCHandler("auth:get-state", (_event, params) => {
@@ -512,7 +517,9 @@ const registerAuthHandlers = (db: SqliteDatabase, rootDir: string): void => {
         }
       }),
     );
+    logInfo(rootDir, "Successfully registered IPC handler", { channel: "auth:get-state" });
 
+    logInfo(rootDir, "Registering IPC handler", { channel: "auth:sign-out" });
     ipcMain.handle(
       "auth:sign-out",
       wrapIPCHandler("auth:sign-out", (_event, params) => {
@@ -542,6 +549,11 @@ const registerAuthHandlers = (db: SqliteDatabase, rootDir: string): void => {
         }
       }),
     );
+    logInfo(rootDir, "Successfully registered IPC handler", { channel: "auth:sign-out" });
+
+    logInfo(rootDir, "Auth IPC handlers registration completed successfully", {
+      handlers: ["auth:open-google", "auth:get-state", "auth:sign-out"],
+    });
   } catch (error) {
     logError(rootDir, "Failed to register auth IPC handlers", error);
     throw error; // Re-throw to prevent app from starting with broken IPC
@@ -550,8 +562,10 @@ const registerAuthHandlers = (db: SqliteDatabase, rootDir: string): void => {
 
 const registerSidebarHandlers = (db: SqliteDatabase): void => {
   const rootDir = app.getPath("userData");
+  logInfo(rootDir, "Starting sidebar IPC handlers registration");
 
   try {
+    logInfo(rootDir, "Registering IPC handler", { channel: "sidebar:get-state" });
     ipcMain.handle(
       "sidebar:get-state",
       wrapIPCHandler("sidebar:get-state", (_event, params) => {
@@ -580,7 +594,9 @@ const registerSidebarHandlers = (db: SqliteDatabase): void => {
         }
       }),
     );
+    logInfo(rootDir, "Successfully registered IPC handler", { channel: "sidebar:get-state" });
 
+    logInfo(rootDir, "Registering IPC handler", { channel: "sidebar:set-state" });
     ipcMain.handle(
       "sidebar:set-state",
       wrapIPCHandler("sidebar:set-state", (_event, params) => {
@@ -610,6 +626,11 @@ const registerSidebarHandlers = (db: SqliteDatabase): void => {
         }
       }),
     );
+    logInfo(rootDir, "Successfully registered IPC handler", { channel: "sidebar:set-state" });
+
+    logInfo(rootDir, "Sidebar IPC handlers registration completed successfully", {
+      handlers: ["sidebar:get-state", "sidebar:set-state"],
+    });
   } catch (error) {
     logError(rootDir, "Failed to register sidebar IPC handlers", error);
     throw error; // Re-throw to prevent app from starting with broken IPC
@@ -617,7 +638,10 @@ const registerSidebarHandlers = (db: SqliteDatabase): void => {
 };
 
 const registerPreloadLogHandler = (rootDir: string): void => {
+  logInfo(rootDir, "Starting preload log handler registration");
+
   try {
+    logInfo(rootDir, "Registering IPC handler", { channel: "preload:log" });
     // Handle log messages from preload script
     ipcMain.on(
       "preload:log",
@@ -643,6 +667,11 @@ const registerPreloadLogHandler = (rootDir: string): void => {
         }
       },
     );
+    logInfo(rootDir, "Successfully registered IPC handler", { channel: "preload:log" });
+
+    logInfo(rootDir, "Preload log handler registration completed successfully", {
+      handlers: ["preload:log"],
+    });
   } catch (error) {
     logError(rootDir, "Failed to register preload log handler", error);
     throw error;
@@ -651,10 +680,11 @@ const registerPreloadLogHandler = (rootDir: string): void => {
 
 const createMainWindow = (): void => {
   const rootDir = app.getPath("userData");
-  
-  logInfo(rootDir, "Creating main window");
-  
-  mainWindow = new BrowserWindow({
+
+  logInfo(rootDir, "Starting main window creation process");
+
+  // Log window configuration before creation
+  const windowConfig = {
     width: 900,
     height: 600,
     title: "Clerkly",
@@ -663,35 +693,123 @@ const createMainWindow = (): void => {
       nodeIntegration: false,
       preload: path.join(__dirname, "preload.js"),
     },
-  });
+  };
 
-  logInfo(rootDir, "Main window created", {
-    width: 900,
-    height: 600,
-    title: "Clerkly",
-    contextIsolation: true,
-    nodeIntegration: false,
-  });
+  logInfo(rootDir, "Window configuration prepared", windowConfig);
 
-  mainWindow.loadFile(path.join(__dirname, "renderer", "index.html"));
-  logInfo(rootDir, "Renderer loaded", {
-    path: path.join(__dirname, "renderer", "index.html"),
-  });
-  
+  try {
+    mainWindow = new BrowserWindow(windowConfig);
+    logInfo(rootDir, "Main window instance created successfully", {
+      id: mainWindow.id,
+      isVisible: mainWindow.isVisible(),
+      isMinimized: mainWindow.isMinimized(),
+      isMaximized: mainWindow.isMaximized(),
+      bounds: mainWindow.getBounds(),
+    });
+  } catch (error) {
+    logError(rootDir, "Failed to create main window", error);
+    throw error;
+  }
+
+  // Log renderer loading process
+  const rendererPath = path.join(__dirname, "renderer", "index.html");
+  logInfo(rootDir, "Loading renderer content", { path: rendererPath });
+
+  try {
+    mainWindow.loadFile(rendererPath);
+    logInfo(rootDir, "Renderer content loaded successfully");
+  } catch (error) {
+    logError(rootDir, "Failed to load renderer content", error);
+    throw error;
+  }
+
+  // Log window show/maximize process
   // Requirement: platform-foundation.1.3
-  mainWindow.maximize();
-  logInfo(rootDir, "Main window maximized");
+  logInfo(rootDir, "Maximizing main window");
+  try {
+    mainWindow.maximize();
+    logInfo(rootDir, "Main window maximized successfully", {
+      isMaximized: mainWindow.isMaximized(),
+      bounds: mainWindow.getBounds(),
+    });
+  } catch (error) {
+    logError(rootDir, "Failed to maximize main window", error);
+  }
 
+  // Set up window event logging
+  mainWindow.once("ready-to-show", () => {
+    logInfo(rootDir, "Main window ready to show", {
+      id: mainWindow?.id,
+      isVisible: mainWindow?.isVisible(),
+      bounds: mainWindow?.getBounds(),
+    });
+  });
+
+  mainWindow.once("show", () => {
+    logInfo(rootDir, "Main window shown", {
+      id: mainWindow?.id,
+      isVisible: mainWindow?.isVisible(),
+      isMaximized: mainWindow?.isMaximized(),
+    });
+  });
+
+  mainWindow.on("resize", () => {
+    logDebug(rootDir, "Main window resized", {
+      bounds: mainWindow?.getBounds(),
+    });
+  });
+
+  mainWindow.on("move", () => {
+    logDebug(rootDir, "Main window moved", {
+      bounds: mainWindow?.getBounds(),
+    });
+  });
+
+  mainWindow.on("focus", () => {
+    logDebug(rootDir, "Main window focused");
+  });
+
+  mainWindow.on("blur", () => {
+    logDebug(rootDir, "Main window lost focus");
+  });
+
+  mainWindow.on("minimize", () => {
+    logInfo(rootDir, "Main window minimized");
+  });
+
+  mainWindow.on("restore", () => {
+    logInfo(rootDir, "Main window restored");
+  });
+
+  mainWindow.on("maximize", () => {
+    logInfo(rootDir, "Main window maximized via event");
+  });
+
+  mainWindow.on("unmaximize", () => {
+    logInfo(rootDir, "Main window unmaximized");
+  });
+
+  mainWindow.on("enter-full-screen", () => {
+    logInfo(rootDir, "Main window entered full screen");
+  });
+
+  mainWindow.on("leave-full-screen", () => {
+    logInfo(rootDir, "Main window left full screen");
+  });
+
+  mainWindow.on("closed", () => {
+    logInfo(rootDir, "Main window closed");
+    mainWindow = null;
+  });
+
+  // Handle pending auth result
   if (pendingAuthResult) {
     sendAuthResultToRenderer(pendingAuthResult);
     pendingAuthResult = null;
     logInfo(rootDir, "Sent pending auth result to renderer");
   }
 
-  mainWindow.on("closed", () => {
-    logInfo(rootDir, "Main window closed");
-    mainWindow = null;
-  });
+  logInfo(rootDir, "Main window creation process completed successfully");
 };
 
 const gotSingleInstanceLock = app.requestSingleInstanceLock();
@@ -704,7 +822,7 @@ if (!gotSingleInstanceLock) {
   app.on("second-instance", (_event, argv) => {
     const rootDir = app.getPath("userData");
     logInfo(rootDir, "Second instance detected, focusing main window");
-    
+
     const deepLink = argv.find((arg) => arg.startsWith(`${PROTOCOL}://`));
     if (deepLink) {
       logInfo(rootDir, "Processing deep link from second instance", { deepLink });
@@ -722,7 +840,7 @@ if (!gotSingleInstanceLock) {
 
 app.whenReady().then(() => {
   const rootDir = app.getPath("userData");
-  
+
   // Log main process startup
   logInfo(rootDir, "Main process started", {
     version: app.getVersion(),
@@ -774,12 +892,34 @@ app.whenReady().then(() => {
   }
 
   try {
-    logInfo(rootDir, "Registering IPC handlers");
+    logInfo(rootDir, "Starting IPC handlers registration process");
+
+    logInfo(rootDir, "Registering auth IPC handlers");
     registerAuthHandlers(db, rootDir);
+
+    logInfo(rootDir, "Registering sidebar IPC handlers");
     registerSidebarHandlers(db);
+
+    logInfo(rootDir, "Registering preload log handler");
     registerPreloadLogHandler(rootDir);
+
+    logInfo(rootDir, "Registering protocol handling");
     registerProtocolHandling();
-    logInfo(rootDir, "IPC handlers registered successfully");
+
+    logInfo(rootDir, "All IPC handlers registered successfully", {
+      totalHandlers: 6,
+      authHandlers: 3,
+      sidebarHandlers: 2,
+      preloadHandlers: 1,
+      channels: [
+        "auth:open-google",
+        "auth:get-state",
+        "auth:sign-out",
+        "sidebar:get-state",
+        "sidebar:set-state",
+        "preload:log",
+      ],
+    });
   } catch (error) {
     logError(rootDir, "Failed to register IPC handlers", error);
     dialog.showErrorBox("IPC Error", "Failed to register IPC handlers. The app will now exit.");

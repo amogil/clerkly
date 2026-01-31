@@ -9,5 +9,7 @@
   "then": {
     "type": "askAgent",
     "prompt": "Задача завершена. Теперь необходимо выполнить все проверки согласно AGENTS.md:\n\n1. Проверить TypeScript компиляцию: `npm run build`\n2. Проверить ESLint: `npm run lint` (исправить автоматически: `npm run lint:fix`)\n3. Проверить Prettier: `npm run format:check` (исправить: `npm run format`)\n4. Запустить модульные тесты: `npm test`\n5. Запустить функциональные тесты: `npm run test:functional`\n6. Проверить покрытие тестами: `npm test -- tests/requirements/coverage.test.ts`\n\nИсправь все найденные проблемы и убедись, что все проверки проходят успешно перед завершением работы."
-  }
+  },
+  "workspaceFolderName": "clerkly",
+  "shortName": "validation-on-completion"
 }
