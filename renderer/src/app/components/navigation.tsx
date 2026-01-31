@@ -1,4 +1,4 @@
-// Requirements: E.T.4, E.U.3
+// Requirements: E.T.4, E.U.3, E.U.4, E.U.5
 import { LayoutDashboard, Calendar, CheckSquare, Users, Settings } from 'lucide-react';
 import { Logo } from './logo';
 
@@ -13,14 +13,14 @@ export function Navigation({ currentScreen, onNavigate }: NavigationProps) {
     { id: 'calendar', label: 'Calendar', icon: Calendar },
     { id: 'tasks', label: 'Tasks', icon: CheckSquare },
     { id: 'contacts', label: 'Contacts', icon: Users },
-    { id: 'settings', label: 'Settings', icon: Settings },
   ];
+  const settingsItem = { id: 'settings', label: 'Settings', icon: Settings };
 
   return (
     <nav className="fixed left-0 top-0 h-screen w-64 bg-card border-r border-border flex flex-col">
       <div className="p-6 border-b border-border">
         <Logo size="md" showText={true} />
-        <p className="text-sm text-muted-foreground mt-1">Your AI clerk</p>
+        <p className="text-sm text-muted-foreground mt-1">Stay on track</p>
       </div>
       
       <div className="flex-1 p-4">
@@ -44,12 +44,24 @@ export function Navigation({ currentScreen, onNavigate }: NavigationProps) {
           );
         })}
       </div>
-      
-      <div className="p-6 border-t border-border">
-        <div className="text-xs text-muted-foreground">
-          <p>© 2026 Clerkly</p>
-          <p className="mt-1">AI-powered meeting assistant</p>
-        </div>
+      <div className="p-4 border-t border-border">
+        {(() => {
+          const Icon = settingsItem.icon;
+          const isActive = currentScreen === settingsItem.id;
+          return (
+            <button
+              onClick={() => onNavigate(settingsItem.id)}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
+                isActive
+                  ? 'bg-primary text-primary-foreground shadow-sm'
+                  : 'text-foreground hover:bg-secondary'
+              }`}
+            >
+              <Icon className="w-5 h-5" />
+              <span>{settingsItem.label}</span>
+            </button>
+          );
+        })()}
       </div>
     </nav>
   );
