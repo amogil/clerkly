@@ -60,7 +60,7 @@
 - [x] 4. Checkpoint - Проверка базовой инфраструктуры
   - Убедиться, что все тесты проходят, задать вопросы пользователю при необходимости.
 
-- [ ] 5. Настройка Property-Based тестирования
+- [x] 5. Настройка Property-Based тестирования
   - [x] 5.1 Интеграция fast-check библиотеки
     - Установить и настроить fast-check для TypeScript
     - Создать базовые генераторы для тестовых данных
@@ -72,7 +72,7 @@
     - Создать кастомные shrinking стратегии для доменных объектов
     - _Requirements: testing-infrastructure.3.3_
 
-  - [~] 5.3 Написать property тест для PBT системы
+  - [x] 5.3 Написать property тест для PBT системы
     - **Property 5: Property-based тестирование бизнес-логики**
     - **Validates: testing-infrastructure.3.1, testing-infrastructure.3.2, testing-infrastructure.3.3**
 

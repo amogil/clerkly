@@ -1,4 +1,4 @@
-// Requirements: testing-infrastructure.1.2, testing-infrastructure.2.1, testing-infrastructure.2.2, testing-infrastructure.2.3
+// Requirements: testing-infrastructure.1.2, testing-infrastructure.1.3, testing-infrastructure.2.1, testing-infrastructure.2.2, testing-infrastructure.2.3, testing-infrastructure.3.1, testing-infrastructure.3.2, testing-infrastructure.3.3
 import { describe, it, expect } from "vitest";
 import { fc } from "@fast-check/vitest";
 import { readFileSync } from "fs";
@@ -504,4 +504,141 @@ describe("Testing Infrastructure Property-Based Tests", () => {
       { numRuns: 25 },
     );
   });
+});
+
+/* Preconditions: fast-check library is integrated and configured
+     Action: validate that PBT system runs with minimum 100 iterations and automatic shrinking
+     Assertions: property tests should execute minimum 100 iterations, provide shrinking on failure
+     Requirements: testing-infrastructure.3.1, testing-infrastructure.3.2, testing-infrastructure.3.3 */
+it("should validate property-based testing system with fast-check", async () => {
+  // **Feature: testing-infrastructure, Property 5: Property-based тестирование бизнес-логики**
+  const { globalFastCheckConfig, testConfigurations } = await import("../fast-check.config");
+
+  // Property 1: Global configuration should enforce minimum 100 iterations
+  expect(globalFastCheckConfig.numRuns).toBeGreaterThanOrEqual(100);
+
+  // Property 2: All test configurations should meet minimum iteration requirements
+  Object.entries(testConfigurations).forEach(([name, config]) => {
+    // Quick config is allowed to have fewer iterations for development
+    const minIterations = name === "quick" ? 10 : 100;
+    expect(config.numRuns).toBeGreaterThanOrEqual(minIterations);
+  });
+
+  // Property 3: Fast-check should be properly integrated with Vitest
+  expect(fc).toBeDefined();
+  expect(fc.assert).toBeDefined();
+  expect(fc.property).toBeDefined();
+
+  // Property 4: Test that property-based testing actually works with 100+ iterations
+  let iterationCount = 0;
+  fc.assert(
+    fc.property(fc.integer({ min: 1, max: 1000 }), (num) => {
+      iterationCount++;
+      // Simple property: positive integers should be greater than 0
+      expect(num).toBeGreaterThan(0);
+      return true;
+    }),
+    { numRuns: 100 },
+  );
+
+  // Verify that at least 100 iterations were executed
+  expect(iterationCount).toBeGreaterThanOrEqual(100);
+
+  // Property 5: Shrinking should be enabled in configuration
+  const { shrinkingConfig } = await import("../fast-check.config");
+  expect(shrinkingConfig.enabled).toBe(true);
+  expect(shrinkingConfig.maxAttempts).toBeGreaterThan(0);
+
+  // Property 6: Custom generators should be available
+  const generators = await import("../generators");
+  expect(generators.nonEmptyString).toBeDefined();
+  expect(generators.positiveInteger).toBeDefined();
+  expect(generators.userProfile).toBeDefined();
+  expect(generators.coverageConfig).toBeDefined();
+
+  // Property 7: Custom shrinkers should be available
+  expect(generators.userProfileWithShrinking).toBeDefined();
+  expect(generators.coverageConfigWithShrinking).toBeDefined();
+  expect(generators.withCustomShrinking).toBeDefined();
+});
+
+/* Preconditions: fast-check generators are available
+     Action: test that generators produce valid data across many iterations
+     Assertions: all generated data should meet domain constraints
+     Requirements: testing-infrastructure.3.1, testing-infrastructure.3.2 */
+it("should validate fast-check generators produce valid domain data", async () => {
+  // **Feature: testing-infrastructure, Property 5: Property-based тестирование бизнес-логики**
+  const { userProfile, coverageConfig, ipcChannel } = await import("../generators");
+
+  // Test user profile generator
+  fc.assert(
+    fc.property(userProfile(), (profile) => {
+      // Property: User profiles should have valid structure
+      expect(profile.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+      expect(profile.email).toMatch(/^[^\s@]+@[^\s@]+\.[^\s@]+$/);
+      expect(profile.name.length).toBeGreaterThan(0);
+      return true;
+    }),
+    { numRuns: 100 },
+  );
+
+  // Test coverage config generator
+  fc.assert(
+    fc.property(coverageConfig(), (config) => {
+      // Property: Coverage configs should meet minimum thresholds
+      expect(config.branches).toBeGreaterThanOrEqual(85);
+      expect(config.functions).toBeGreaterThanOrEqual(85);
+      expect(config.lines).toBeGreaterThanOrEqual(85);
+      expect(config.statements).toBeGreaterThanOrEqual(85);
+      return true;
+    }),
+    { numRuns: 100 },
+  );
+
+  // Test IPC channel generator
+  fc.assert(
+    fc.property(ipcChannel(), (channel) => {
+      // Property: IPC channels should follow naming convention
+      expect(channel).toMatch(/^[a-z]+:[a-z-]+$/);
+      return true;
+    }),
+    { numRuns: 100 },
+  );
+});
+
+/* Preconditions: custom shrinking strategies are implemented
+     Action: validate that shrinking strategies produce minimal counterexamples
+     Assertions: shrinking should reduce values to minimal failing cases
+     Requirements: testing-infrastructure.3.3 */
+it("should validate custom shrinking strategies reduce to minimal values", async () => {
+  // **Feature: testing-infrastructure, Property 5: Property-based тестирование бизнес-логики**
+  const { shrinkingStrategies } = await import("../generators/custom-shrinkers");
+
+  // Test towardsZero shrinking strategy
+  const shrunkToZero = shrinkingStrategies.towardsZero(100);
+  expect(shrunkToZero).toContain(0);
+  expect(shrunkToZero.length).toBeGreaterThan(1);
+
+  // Test shorterStrings shrinking strategy
+  const shrunkString = shrinkingStrategies.shorterStrings("hello world");
+  expect(shrunkString).toContain("");
+  expect(shrunkString.some((s) => s.length < "hello world".length)).toBe(true);
+
+  // Test smallerArrays shrinking strategy
+  const shrunkArray = shrinkingStrategies.smallerArrays([1, 2, 3, 4, 5]);
+  expect(shrunkArray).toContainEqual([]);
+  expect(shrunkArray.some((arr) => arr.length < 5)).toBe(true);
+
+  // Property: Shrinking strategies should always include minimal values
+  fc.assert(
+    fc.property(fc.integer({ min: 1, max: 1000 }), (value) => {
+      const shrunk = shrinkingStrategies.towardsZero(value);
+      // Should always try zero as minimal value
+      expect(shrunk).toContain(0);
+      // Should include original value
+      expect(shrunk).toContain(value);
+      return true;
+    }),
+    { numRuns: 100 },
+  );
 });
