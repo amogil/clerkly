@@ -68,7 +68,7 @@
     - _Requirements: 2.1, 2.3_
 
 - [ ] 3. Реализация Window Manager
-  - [~] 3.1 Создать WindowManager класс
+  - [-] 3.1 Создать WindowManager класс
     - Реализовать конструктор
     - Реализовать createWindow() с нативным Mac OS X интерфейсом
     - Настроить параметры окна (width: 800, height: 600, minWidth: 600, minHeight: 400)
