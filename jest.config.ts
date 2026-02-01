@@ -1,21 +1,29 @@
 // Requirements: clerkly.2.1, clerkly.2.5
-module.exports = {
+import type { Config } from 'jest';
+
+const config: Config = {
   testEnvironment: 'node',
   roots: ['<rootDir>/tests'],
-  testMatch: ['**/*.test.js'],
+  testMatch: ['**/*.test.ts'],
+  
+  // TypeScript support
+  preset: 'ts-jest',
+  transform: {
+    '^.+\\.ts$': 'ts-jest',
+  },
   
   // Electron-specific settings
-  setupFilesAfterEnv: ['<rootDir>/tests/setup.js'],
+  setupFilesAfterEnv: ['<rootDir>/tests/setup.ts'],
   moduleNameMapper: {
-    '^electron$': '<rootDir>/tests/mocks/electron.js',
-    '^better-sqlite3$': '<rootDir>/tests/mocks/better-sqlite3.js'
+    '^electron$': '<rootDir>/tests/mocks/electron.ts',
+    '^better-sqlite3$': '<rootDir>/tests/mocks/better-sqlite3.ts'
   },
   
   // Coverage configuration
   collectCoverageFrom: [
-    'src/**/*.js',
-    'main.js',
-    '!src/**/*.test.js',
+    'src/**/*.ts',
+    'main.ts',
+    '!src/**/*.test.ts',
     '!**/node_modules/**',
     '!tests/**'
   ],
@@ -37,14 +45,11 @@ module.exports = {
   resetMocks: true,
   restoreMocks: true,
   
-  // Transform settings for modern JavaScript
-  transform: {
-    '^.+\\.js$': 'babel-jest'
-  },
-  
   // Ignore patterns
   testPathIgnorePatterns: [
     '/node_modules/',
     '/coverage/'
   ]
 };
+
+export default config;

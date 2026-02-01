@@ -1,15 +1,22 @@
-const { BrowserWindow } = require('electron');
-const path = require('path');
-
 // Requirements: clerkly.1.2, clerkly.1.3
+import { BrowserWindow } from 'electron';
+import * as path from 'path';
+
+interface WindowOptions {
+  width?: number;
+  height?: number;
+  minWidth?: number;
+  minHeight?: number;
+  title?: string;
+  resizable?: boolean;
+  fullscreen?: boolean;
+}
+
 class WindowManager {
-  // Requirements: clerkly.1.2, clerkly.1.3
-  constructor() {
-    this.mainWindow = null;
-  }
+  public mainWindow: BrowserWindow | null = null;
 
   // Requirements: clerkly.1.2, clerkly.1.3
-  createWindow() {
+  createWindow(): BrowserWindow {
     // Create the browser window with native Mac OS X interface
     this.mainWindow = new BrowserWindow({
       width: 800,
@@ -40,7 +47,7 @@ class WindowManager {
   }
 
   // Requirements: clerkly.1.2, clerkly.1.3
-  configureWindow(options) {
+  configureWindow(options: WindowOptions): BrowserWindow {
     if (!this.mainWindow) {
       throw new Error('Window not created. Call createWindow() first.');
     }
@@ -76,7 +83,7 @@ class WindowManager {
   }
 
   // Requirements: clerkly.1.2, clerkly.1.3
-  closeWindow() {
+  closeWindow(): void {
     if (this.mainWindow) {
       // Remove all listeners to prevent memory leaks
       this.mainWindow.removeAllListeners();
@@ -92,14 +99,14 @@ class WindowManager {
   }
 
   // Requirements: clerkly.1.2, clerkly.1.3
-  getWindow() {
+  getWindow(): BrowserWindow | null {
     return this.mainWindow;
   }
 
   // Requirements: clerkly.1.2, clerkly.1.3
-  isWindowCreated() {
+  isWindowCreated(): boolean {
     return this.mainWindow !== null && !this.mainWindow.isDestroyed();
   }
 }
 
-module.exports = WindowManager;
+export default WindowManager;

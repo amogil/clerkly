@@ -1,46 +1,57 @@
 // Requirements: clerkly.1.4
-const Database = require('better-sqlite3');
-const path = require('path');
-const fs = require('fs');
-const os = require('os');
-const MigrationRunner = require('./MigrationRunner');
+import Database from 'better-sqlite3';
+import * as path from 'path';
+import * as fs from 'fs';
+import * as os from 'os';
+import MigrationRunner from './MigrationRunner';
 
-/**
- * DataManager class
- * Manages local data storage using SQLite database
- * 
- * Requirements: clerkly.1.4
- */
+interface InitializeResult {
+  success: boolean;
+  migrations?: {
+    success: boolean;
+    appliedCount: number;
+    message: string;
+  };
+  warning?: string;
+  path?: string;
+}
+
+interface SaveDataResult {
+  success: boolean;
+  error?: string;
+}
+
+interface LoadDataResult {
+  success: boolean;
+  data?: any;
+  error?: string;
+}
+
+interface DeleteDataResult {
+  success: boolean;
+  error?: string;
+}
+
 class DataManager {
-  /**
-   * Constructor
-   * @param {string} storagePath - Path to storage directory
-   * 
-   * Requirements: clerkly.1.4
-   */
-  constructor(storagePath) {
+  public storagePath: string;
+  private db: Database.Database | null = null;
+
+  // Requirements: clerkly.1.4
+  constructor(storagePath: string) {
     if (!storagePath || typeof storagePath !== 'string') {
       throw new Error('Invalid storagePath: must be non-empty string');
     }
     this.storagePath = storagePath;
-    this.db = null;
   }
 
-  /**
-   * Initialize the database
-   * Creates necessary directories and database file
-   * Sets up the schema for user data storage using migrations
-   * Handles permission errors, corrupted databases, and initialization failures
-   * 
-   * Requirements: clerkly.1.4
-   */
-  initialize() {
+  // Requirements: clerkly.1.4
+  initialize(): InitializeResult {
     try {
       // Create storage directory if it doesn't exist
       if (!fs.existsSync(this.storagePath)) {
         try {
           fs.mkdirSync(this.storagePath, { recursive: true });
-        } catch (dirError) {
+        } catch (dirError: any) {
           // Handle permission errors - try to use temp directory
           if (dirError.code === 'EACCES' || dirError.code === 'EPERM') {
             console.warn(`Permission denied for ${this.storagePath}, using temp directory`);
@@ -62,7 +73,7 @@ class DataManager {
         const testFile = path.join(this.storagePath, '.write-test');
         fs.writeFileSync(testFile, 'test');
         fs.unlinkSync(testFile);
-      } catch (permError) {
+      } catch (permError: any) {
         if (permError.code === 'EACCES' || permError.code === 'EPERM') {
           console.warn(`No write permission for ${this.storagePath}, using temp directory`);
           const tempPath = path.join(os.tmpdir(), 'clerkly-fallback');
@@ -132,22 +143,15 @@ class DataManager {
         throw new Error(`Migration failed: ${migrationResult.error}`);
       }
 
-      return { success: true, migrations: migrationResult };
-    } catch (error) {
+      return { success: true, migrations: migrationResult as any };
+    } catch (error: any) {
       console.error('Failed to initialize database:', error);
       throw new Error(`Database initialization failed: ${error.message}`);
     }
   }
 
-  /**
-   * Save data to local storage
-   * @param {string} key - Unique identifier for the data
-   * @param {any} value - Data to save (will be serialized to JSON)
-   * @returns {Object} Result object with success status
-   * 
-   * Requirements: clerkly.1.4
-   */
-  saveData(key, value) {
+  // Requirements: clerkly.1.4
+  saveData(key: string, value: any): SaveDataResult {
     try {
       // Validate key
       if (!key || typeof key !== 'string') {
@@ -170,12 +174,11 @@ class DataManager {
       }
 
       // Serialize value to JSON string
-      let serializedValue;
+      let serializedValue: string;
       try {
         // Always JSON.stringify to ensure consistent round-trip behavior
-        // This prevents issues where string "0" would be parsed as number 0
         serializedValue = JSON.stringify(value);
-      } catch (serializeError) {
+      } catch (serializeError: any) {
         return { success: false, error: `Failed to serialize value: ${serializeError.message}` };
       }
 
@@ -187,11 +190,10 @@ class DataManager {
       const timestamp = Date.now();
 
       // Check if key already exists
-      let existingData;
+      let existingData: any;
       try {
         existingData = this.db.prepare('SELECT key FROM user_data WHERE key = ?').get(key);
-      } catch (queryError) {
-        // Database might be corrupted or locked
+      } catch (queryError: any) {
         return { success: false, error: `Database query failed: ${queryError.message}` };
       }
 
@@ -212,8 +214,8 @@ class DataManager {
           `);
           stmt.run(key, serializedValue, timestamp, timestamp, timestamp);
         }
-      } catch (writeError) {
-        // Handle database write errors (disk full, locked, etc.)
+      } catch (writeError: any) {
+        // Handle database write errors
         if (writeError.code === 'SQLITE_FULL') {
           return { success: false, error: 'Database is full: no space left on device' };
         } else if (writeError.code === 'SQLITE_BUSY' || writeError.code === 'SQLITE_LOCKED') {
@@ -225,20 +227,14 @@ class DataManager {
       }
 
       return { success: true };
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to save data:', error);
       return { success: false, error: error.message };
     }
   }
 
-  /**
-   * Load data from local storage
-   * @param {string} key - Unique identifier for the data
-   * @returns {Object} Result object with success status and data
-   * 
-   * Requirements: clerkly.1.4
-   */
-  loadData(key) {
+  // Requirements: clerkly.1.4
+  loadData(key: string): LoadDataResult {
     try {
       // Validate key
       if (!key || typeof key !== 'string') {
@@ -261,12 +257,11 @@ class DataManager {
       }
 
       // Query data from database
-      let row;
+      let row: any;
       try {
         const stmt = this.db.prepare('SELECT value FROM user_data WHERE key = ?');
         row = stmt.get(key);
-      } catch (queryError) {
-        // Database might be corrupted or locked
+      } catch (queryError: any) {
         if (queryError.code === 'SQLITE_BUSY' || queryError.code === 'SQLITE_LOCKED') {
           return { success: false, error: 'Database is locked: try again later' };
         }
@@ -278,29 +273,23 @@ class DataManager {
       }
 
       // Deserialize value
-      let data;
+      let data: any;
       try {
         data = JSON.parse(row.value);
       } catch (e) {
-        // If parsing fails, return as string (might be plain string value)
+        // If parsing fails, return as string
         data = row.value;
       }
 
       return { success: true, data };
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to load data:', error);
       return { success: false, error: error.message };
     }
   }
 
-  /**
-   * Delete data from local storage
-   * @param {string} key - Unique identifier for the data
-   * @returns {Object} Result object with success status
-   * 
-   * Requirements: clerkly.1.4
-   */
-  deleteData(key) {
+  // Requirements: clerkly.1.4
+  deleteData(key: string): DeleteDataResult {
     try {
       // Validate key
       if (!key || typeof key !== 'string') {
@@ -323,12 +312,11 @@ class DataManager {
       }
 
       // Delete data from database
-      let result;
+      let result: any;
       try {
         const stmt = this.db.prepare('DELETE FROM user_data WHERE key = ?');
         result = stmt.run(key);
-      } catch (deleteError) {
-        // Handle database delete errors
+      } catch (deleteError: any) {
         if (deleteError.code === 'SQLITE_BUSY' || deleteError.code === 'SQLITE_LOCKED') {
           return { success: false, error: 'Database is locked: try again later' };
         } else if (deleteError.code === 'SQLITE_READONLY') {
@@ -342,43 +330,27 @@ class DataManager {
       }
 
       return { success: true };
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to delete data:', error);
       return { success: false, error: error.message };
     }
   }
 
-  /**
-   * Get the storage path
-   * @returns {string} Path to storage directory
-   * 
-   * Requirements: clerkly.1.4
-   */
-  getStoragePath() {
+  // Requirements: clerkly.1.4
+  getStoragePath(): string {
     return this.storagePath;
   }
 
-  /**
-   * Close the database connection
-   * Should be called when shutting down the application
-   * 
-   * Requirements: clerkly.1.4
-   */
-  close() {
+  // Requirements: clerkly.1.4
+  close(): void {
     if (this.db) {
       this.db.close();
       this.db = null;
     }
   }
 
-  /**
-   * Get migration runner instance
-   * Provides access to migration operations
-   * @returns {MigrationRunner} Migration runner instance
-   * 
-   * Requirements: clerkly.1.4
-   */
-  getMigrationRunner() {
+  // Requirements: clerkly.1.4
+  getMigrationRunner(): MigrationRunner {
     if (!this.db) {
       throw new Error('Database not initialized');
     }
@@ -387,4 +359,4 @@ class DataManager {
   }
 }
 
-module.exports = DataManager;
+export default DataManager;

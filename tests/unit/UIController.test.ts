@@ -4,7 +4,7 @@
 
 // Requirements: clerkly.2.1, clerkly.2.3
 
-const UIController = require('../../src/renderer/UIController');
+import { UIController } from '../../src/renderer/UIController';
 
 /**
  * Unit tests for UIController class

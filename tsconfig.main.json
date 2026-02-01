@@ -1,0 +1,21 @@
+// Requirements: clerkly.1.5, clerkly.2.5
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "commonjs",
+    "lib": ["ES2020"],
+    "outDir": "./dist/main",
+    "rootDir": "./src/main",
+    "types": ["node"]
+  },
+  "include": [
+    "src/main/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "**/*.test.ts",
+    "**/*.test.js"
+  ]
+}

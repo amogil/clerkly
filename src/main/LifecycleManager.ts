@@ -1,17 +1,33 @@
-const { app } = require('electron');
-
 // Requirements: clerkly.1.2, clerkly.1.3
+import { app } from 'electron';
+import WindowManager from './WindowManager';
+import DataManager from './DataManager';
+
+interface InitializeResult {
+  success: boolean;
+  loadTime?: number;
+  error?: string;
+}
+
+interface QuitResult {
+  success: boolean;
+  error?: string;
+}
+
 class LifecycleManager {
+  private windowManager: WindowManager;
+  private dataManager: DataManager;
+  private startTime: number | null = null;
+  private isInitialized: boolean = false;
+
   // Requirements: clerkly.1.2, clerkly.1.3
-  constructor(windowManager, dataManager) {
+  constructor(windowManager: WindowManager, dataManager: DataManager) {
     this.windowManager = windowManager;
     this.dataManager = dataManager;
-    this.startTime = null;
-    this.isInitialized = false;
   }
 
   // Requirements: clerkly.1.2, clerkly.1.3
-  async initialize() {
+  async initialize(): Promise<InitializeResult> {
     if (this.isInitialized) {
       return { success: true, loadTime: 0 };
     }
@@ -40,14 +56,14 @@ class LifecycleManager {
       this.isInitialized = true;
 
       return { success: true, loadTime };
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to initialize application:', error);
       return { success: false, error: error.message };
     }
   }
 
   // Requirements: clerkly.1.2, clerkly.1.3
-  handleActivation() {
+  handleActivation(): void {
     // Mac OS X specific behavior: recreate window when dock icon is clicked
     // and no other windows are open
     if (process.platform === 'darwin' && this.windowManager) {
@@ -58,7 +74,7 @@ class LifecycleManager {
   }
 
   // Requirements: clerkly.1.2, clerkly.1.3
-  async handleQuit() {
+  async handleQuit(): Promise<QuitResult> {
     try {
       // Save any pending data before quitting
       if (this.dataManager) {
@@ -72,14 +88,14 @@ class LifecycleManager {
       }
 
       return { success: true };
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error during quit:', error);
       return { success: false, error: error.message };
     }
   }
 
   // Requirements: clerkly.1.2, clerkly.1.3
-  handleWindowClose() {
+  handleWindowClose(): void {
     // Mac OS X specific behavior: when all windows are closed,
     // the app stays active (doesn't quit)
     if (process.platform !== 'darwin') {
@@ -90,7 +106,7 @@ class LifecycleManager {
   }
 
   // Requirements: clerkly.1.2, clerkly.1.3
-  getStartupTime() {
+  getStartupTime(): number | null {
     if (!this.startTime) {
       return null;
     }
@@ -98,9 +114,9 @@ class LifecycleManager {
   }
 
   // Requirements: clerkly.1.2, clerkly.1.3
-  isAppInitialized() {
+  isAppInitialized(): boolean {
     return this.isInitialized;
   }
 }
 
-module.exports = LifecycleManager;
+export default LifecycleManager;

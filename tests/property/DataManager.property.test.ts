@@ -1,9 +1,9 @@
 // Requirements: clerkly.2.1, clerkly.2.3
-const fc = require('fast-check');
-const DataManager = require('../../src/main/DataManager');
-const path = require('path');
-const fs = require('fs');
-const os = require('os');
+import fc from 'fast-check';
+import { DataManager } from '../../src/main/DataManager';
+import path from 'path';
+import fs from 'fs';
+import os from 'os';
 
 describe('DataManager Property-Based Tests', () => {
   let dataManager;

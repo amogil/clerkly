@@ -1,7 +1,7 @@
 // Requirements: clerkly.2.1, clerkly.2.3, clerkly.2.4
-const IPCHandlers = require('../../src/main/IPCHandlers');
-const IPCClient = require('../../src/renderer/IPCClient');
-const { ipcMain, ipcRenderer, resetAllMocks } = require('../mocks/electron');
+import { IPCHandlers } from '../../src/main/IPCHandlers';
+import { IPCClient } from '../../src/renderer/IPCClient';
+import { ipcMain, ipcRenderer, resetAllMocks } from '../mocks/electron';
 
 /**
  * Unit tests for IPC communication

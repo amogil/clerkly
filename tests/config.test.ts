@@ -1,7 +1,5 @@
 // Requirements: clerkly.2.1, clerkly.2.5
-// Test to verify Jest and Electron mock configuration
-
-const { app, BrowserWindow, ipcMain, resetAllMocks } = require('electron');
+import { app, BrowserWindow, ipcMain, resetAllMocks } from 'electron';
 
 describe('Jest Configuration Tests', () => {
   /* Preconditions: Jest is configured with Electron mocks
@@ -31,8 +29,8 @@ describe('Jest Configuration Tests', () => {
   it('should mock BrowserWindow correctly', () => {
     const window = new BrowserWindow({ width: 800, height: 600 });
     expect(window).toBeDefined();
-    expect(window.options.width).toBe(800);
-    expect(window.options.height).toBe(600);
+    expect((window as any).options.width).toBe(800);
+    expect((window as any).options.height).toBe(600);
   });
 
   /* Preconditions: ipcMain mock exists
@@ -40,11 +38,11 @@ describe('Jest Configuration Tests', () => {
      Assertions: IPC handler can be registered and called
      Requirements: clerkly.2.1, clerkly.2.5 */
   it('should mock ipcMain correctly', async () => {
-    const handler = jest.fn((event, arg) => `received: ${arg}`);
+    const handler = jest.fn((event: any, arg: string) => `received: ${arg}`);
     ipcMain.handle('test-channel', handler);
     
     const mockEvent = { sender: { send: jest.fn() } };
-    const result = await ipcMain._invokeHandler('test-channel', mockEvent, 'test-data');
+    const result = await (ipcMain as any)._invokeHandler('test-channel', mockEvent, 'test-data');
     
     expect(handler).toHaveBeenCalled();
     expect(result).toBe('received: test-data');
@@ -79,10 +77,10 @@ describe('Jest Configuration Tests', () => {
      Requirements: clerkly.2.1, clerkly.2.5 */
   it('should reset mocks correctly', () => {
     ipcMain.handle('test', jest.fn());
-    expect(Object.keys(ipcMain.handlers).length).toBeGreaterThan(0);
+    expect(Object.keys((ipcMain as any).handlers).length).toBeGreaterThan(0);
     
     resetAllMocks();
-    expect(Object.keys(ipcMain.handlers).length).toBe(0);
+    expect(Object.keys((ipcMain as any).handlers).length).toBe(0);
   });
 });
 

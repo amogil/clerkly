@@ -1,12 +1,25 @@
 // Requirements: clerkly.2.1, clerkly.2.5
-// Mock implementation of Electron API for testing
 
-/**
- * Mock BrowserWindow class
- * Simulates Electron's BrowserWindow for testing window management
- */
-class BrowserWindow {
-  constructor(options = {}) {
+export class BrowserWindow {
+  options: any;
+  _isDestroyed: boolean;
+  webContents: any;
+  listeners: Record<string, Function[]>;
+  loadedFile?: string;
+  loadedURL?: string;
+  isVisible?: boolean;
+  isFocused?: boolean;
+  title?: string;
+  bounds?: { x: number; y: number; width: number; height: number };
+  minWidth?: number;
+  minHeight?: number;
+  resizable?: boolean;
+  fullscreen?: boolean;
+
+  static _windows: BrowserWindow[] = [];
+  static _focusedWindow: BrowserWindow | null = null;
+
+  constructor(options: any = {}) {
     this.options = options;
     this._isDestroyed = false;
     this.webContents = {
@@ -16,143 +29,161 @@ class BrowserWindow {
       closeDevTools: jest.fn(),
       isDevToolsOpened: jest.fn(() => false),
       session: {
-        clearCache: jest.fn((callback) => callback()),
+        clearCache: jest.fn((callback: Function) => callback()),
         clearStorageData: jest.fn()
       }
     };
     this.listeners = {};
   }
 
-  loadFile(filePath) {
+  loadFile(filePath: string): Promise<void> {
     this.loadedFile = filePath;
     return Promise.resolve();
   }
 
-  loadURL(url) {
+  loadURL(url: string): Promise<void> {
     this.loadedURL = url;
     return Promise.resolve();
   }
 
-  on(event, callback) {
+  on(event: string, callback: Function): void {
     if (!this.listeners[event]) {
       this.listeners[event] = [];
     }
     this.listeners[event].push(callback);
   }
 
-  once(event, callback) {
+  once(event: string, callback: Function): void {
     this.on(event, callback);
   }
 
-  removeListener(event, callback) {
+  removeListener(event: string, callback: Function): void {
     if (this.listeners[event]) {
       this.listeners[event] = this.listeners[event].filter(cb => cb !== callback);
     }
   }
 
-  emit(event, ...args) {
+  emit(event: string, ...args: any[]): void {
     if (this.listeners[event]) {
       this.listeners[event].forEach(callback => callback(...args));
     }
   }
 
-  close() {
+  close(): void {
     this.emit('close');
     this._isDestroyed = true;
   }
 
-  destroy() {
+  destroy(): void {
     this._isDestroyed = true;
   }
 
-  show() {
+  show(): void {
     this.isVisible = true;
   }
 
-  hide() {
+  hide(): void {
     this.isVisible = false;
   }
 
-  focus() {
+  focus(): void {
     this.isFocused = true;
   }
 
-  setTitle(title) {
+  setTitle(title: string): void {
     this.title = title;
   }
 
-  getTitle() {
+  getTitle(): string {
     return this.title || '';
   }
 
-  setBounds(bounds) {
+  setBounds(bounds: { x: number; y: number; width: number; height: number }): void {
     this.bounds = bounds;
   }
 
-  getBounds() {
+  getBounds(): { x: number; y: number; width: number; height: number } {
     return this.bounds || { x: 0, y: 0, width: 800, height: 600 };
   }
 
-  setSize(width, height) {
+  setSize(width: number, height: number): void {
     if (!this.bounds) this.bounds = { x: 0, y: 0, width: 800, height: 600 };
     this.bounds.width = width;
     this.bounds.height = height;
   }
 
-  getSize() {
+  getSize(): [number, number] {
     const bounds = this.getBounds();
     return [bounds.width, bounds.height];
   }
 
-  setMinimumSize(width, height) {
+  setMinimumSize(width: number, height: number): void {
     this.minWidth = width;
     this.minHeight = height;
   }
 
-  getMinimumSize() {
+  getMinimumSize(): [number, number] {
     return [this.minWidth || 0, this.minHeight || 0];
   }
 
-  setResizable(resizable) {
+  setResizable(resizable: boolean): void {
     this.resizable = resizable;
   }
 
-  setFullScreen(fullscreen) {
+  setFullScreen(fullscreen: boolean): void {
     this.fullscreen = fullscreen;
   }
 
-  removeAllListeners() {
+  removeAllListeners(): void {
     this.listeners = {};
   }
 
-  isDestroyed() {
+  isDestroyed(): boolean {
     return this._isDestroyed || false;
   }
 
-  static getAllWindows() {
+  static getAllWindows(): BrowserWindow[] {
     return BrowserWindow._windows || [];
   }
 
-  static getFocusedWindow() {
+  static getFocusedWindow(): BrowserWindow | null {
     return BrowserWindow._focusedWindow || null;
   }
 }
 
-BrowserWindow._windows = [];
-BrowserWindow._focusedWindow = null;
+interface AppType {
+  listeners: Record<string, Function[]>;
+  isReady: boolean;
+  isQuitting: boolean;
+  name: string;
+  version: string;
+  isPackaged: boolean;
+  on(event: string, callback: Function): AppType;
+  once(event: string, callback: Function): AppType;
+  removeListener(event: string, callback: Function): AppType;
+  emit(event: string, ...args: any[]): void;
+  whenReady(): Promise<void>;
+  quit(): void;
+  exit(code?: number): void;
+  getPath(name: string): string;
+  getVersion(): string;
+  getName(): string;
+  setName(name: string): void;
+  getAppPath(): string;
+  requestSingleInstanceLock(): boolean;
+  hasSingleInstanceLock(): boolean;
+  releaseSingleInstanceLock(): void;
+}
 
-/**
- * Mock App class
- * Simulates Electron's app module for testing application lifecycle
- */
-const app = {
+export const app: AppType = {
   listeners: {},
   isReady: false,
   isQuitting: false,
   name: 'Clerkly',
   version: '1.0.0',
+  isPackaged: false,
 
-  on(event, callback) {
+  on(event: string, callback: Function): AppType {
     if (!this.listeners[event]) {
       this.listeners[event] = [];
     }
@@ -160,25 +191,25 @@ const app = {
     return this;
   },
 
-  once(event, callback) {
+  once(event: string, callback: Function): AppType {
     this.on(event, callback);
     return this;
   },
 
-  removeListener(event, callback) {
+  removeListener(event: string, callback: Function): AppType {
     if (this.listeners[event]) {
       this.listeners[event] = this.listeners[event].filter(cb => cb !== callback);
     }
     return this;
   },
 
-  emit(event, ...args) {
+  emit(event: string, ...args: any[]): void {
     if (this.listeners[event]) {
       this.listeners[event].forEach(callback => callback(...args));
     }
   },
 
-  whenReady() {
+  whenReady(): Promise<void> {
     return new Promise((resolve) => {
       if (this.isReady) {
         resolve();
@@ -188,20 +219,20 @@ const app = {
     });
   },
 
-  quit() {
+  quit(): void {
     this.isQuitting = true;
     this.emit('before-quit');
     this.emit('will-quit');
     this.emit('quit');
   },
 
-  exit(code = 0) {
+  exit(code = 0): void {
     this.quit();
     process.exit(code);
   },
 
-  getPath(name) {
-    const paths = {
+  getPath(name: string): string {
+    const paths: Record<string, string> = {
       home: '/mock/home',
       appData: '/mock/appData',
       userData: '/mock/userData',
@@ -219,75 +250,69 @@ const app = {
     return paths[name] || '/mock/path';
   },
 
-  getVersion() {
+  getVersion(): string {
     return this.version;
   },
 
-  getName() {
+  getName(): string {
     return this.name;
   },
 
-  setName(name) {
+  setName(name: string): void {
     this.name = name;
   },
 
-  isPackaged: false,
-
-  getAppPath() {
+  getAppPath(): string {
     return '/mock/app/path';
   },
 
-  requestSingleInstanceLock() {
+  requestSingleInstanceLock(): boolean {
     return true;
   },
 
-  hasSingleInstanceLock() {
+  hasSingleInstanceLock(): boolean {
     return true;
   },
 
-  releaseSingleInstanceLock() {
+  releaseSingleInstanceLock(): void {
     // Mock implementation
   }
 };
 
-/**
- * Mock IPC Main
- * Simulates Electron's ipcMain for testing IPC communication
- */
-const ipcMain = {
-  handlers: {},
-  listeners: {},
+export const ipcMain = {
+  handlers: {} as Record<string, Function>,
+  listeners: {} as Record<string, Function[]>,
 
-  handle(channel, handler) {
+  handle(channel: string, handler: Function): void {
     this.handlers[channel] = handler;
   },
 
-  handleOnce(channel, handler) {
+  handleOnce(channel: string, handler: Function): void {
     this.handle(channel, handler);
   },
 
-  removeHandler(channel) {
+  removeHandler(channel: string): void {
     delete this.handlers[channel];
   },
 
-  on(channel, listener) {
+  on(channel: string, listener: Function): void {
     if (!this.listeners[channel]) {
       this.listeners[channel] = [];
     }
     this.listeners[channel].push(listener);
   },
 
-  once(channel, listener) {
+  once(channel: string, listener: Function): void {
     this.on(channel, listener);
   },
 
-  removeListener(channel, listener) {
+  removeListener(channel: string, listener: Function): void {
     if (this.listeners[channel]) {
       this.listeners[channel] = this.listeners[channel].filter(l => l !== listener);
     }
   },
 
-  removeAllListeners(channel) {
+  removeAllListeners(channel?: string): void {
     if (channel) {
       delete this.listeners[channel];
     } else {
@@ -295,39 +320,43 @@ const ipcMain = {
     }
   },
 
-  // Helper method for testing - simulate IPC call
-  async _invokeHandler(channel, event, ...args) {
+  async _invokeHandler(channel: string, event: any, ...args: any[]): Promise<any> {
     if (this.handlers[channel]) {
       return await this.handlers[channel](event, ...args);
     }
     throw new Error(`No handler registered for channel: ${channel}`);
   },
 
-  // Helper method for testing - simulate IPC event
-  _emitEvent(channel, event, ...args) {
+  _emitEvent(channel: string, event: any, ...args: any[]): void {
     if (this.listeners[channel]) {
       this.listeners[channel].forEach(listener => listener(event, ...args));
     }
   }
 };
 
-/**
- * Mock IPC Renderer
- * Simulates Electron's ipcRenderer for testing renderer process communication
- */
-const ipcRenderer = {
+interface IpcRendererType {
+  listeners: Record<string, Function[]>;
+  send(_channel: string, ..._args: any[]): void;
+  invoke(_channel: string, ..._args: any[]): Promise<any>;
+  on(channel: string, listener: Function): IpcRendererType;
+  once(channel: string, listener: Function): IpcRendererType;
+  removeListener(channel: string, listener: Function): IpcRendererType;
+  removeAllListeners(channel?: string): IpcRendererType;
+  _simulateMessage(channel: string, event: any, ...args: any[]): void;
+}
+
+export const ipcRenderer: IpcRendererType = {
   listeners: {},
 
-  send(channel, ...args) {
-    // Mock implementation - in real tests, this would communicate with ipcMain
+  send(_channel: string, ..._args: any[]): void {
+    // Mock implementation
   },
 
-  invoke(channel, ...args) {
-    // Mock implementation - in real tests, this would call ipcMain handlers
+  invoke(_channel: string, ..._args: any[]): Promise<any> {
     return Promise.resolve();
   },
 
-  on(channel, listener) {
+  on(channel: string, listener: Function): IpcRendererType {
     if (!this.listeners[channel]) {
       this.listeners[channel] = [];
     }
@@ -335,19 +364,19 @@ const ipcRenderer = {
     return this;
   },
 
-  once(channel, listener) {
+  once(channel: string, listener: Function): IpcRendererType {
     this.on(channel, listener);
     return this;
   },
 
-  removeListener(channel, listener) {
+  removeListener(channel: string, listener: Function): IpcRendererType {
     if (this.listeners[channel]) {
       this.listeners[channel] = this.listeners[channel].filter(l => l !== listener);
     }
     return this;
   },
 
-  removeAllListeners(channel) {
+  removeAllListeners(channel?: string): IpcRendererType {
     if (channel) {
       delete this.listeners[channel];
     } else {
@@ -356,21 +385,16 @@ const ipcRenderer = {
     return this;
   },
 
-  // Helper method for testing - simulate receiving message from main
-  _simulateMessage(channel, event, ...args) {
+  _simulateMessage(channel: string, event: any, ...args: any[]): void {
     if (this.listeners[channel]) {
       this.listeners[channel].forEach(listener => listener(event, ...args));
     }
   }
 };
 
-/**
- * Mock shell module
- * Simulates Electron's shell for testing external operations
- */
-const shell = {
-  openExternal: jest.fn((url) => Promise.resolve()),
-  openPath: jest.fn((path) => Promise.resolve('')),
+export const shell = {
+  openExternal: jest.fn((_url: string) => Promise.resolve()),
+  openPath: jest.fn((_path: string) => Promise.resolve('')),
   showItemInFolder: jest.fn(),
   moveItemToTrash: jest.fn(() => true),
   beep: jest.fn(),
@@ -378,11 +402,7 @@ const shell = {
   readShortcutLink: jest.fn(() => ({}))
 };
 
-/**
- * Mock dialog module
- * Simulates Electron's dialog for testing user interactions
- */
-const dialog = {
+export const dialog = {
   showOpenDialog: jest.fn(() => Promise.resolve({ canceled: false, filePaths: [] })),
   showSaveDialog: jest.fn(() => Promise.resolve({ canceled: false, filePath: '' })),
   showMessageBox: jest.fn(() => Promise.resolve({ response: 0 })),
@@ -390,96 +410,84 @@ const dialog = {
   showCertificateTrustDialog: jest.fn(() => Promise.resolve())
 };
 
-/**
- * Mock Menu module
- * Simulates Electron's Menu for testing application menus
- */
-class Menu {
-  constructor() {
-    this.items = [];
-  }
+export class Menu {
+  items: any[] = [];
+  static _applicationMenu: Menu | null = null;
 
-  static buildFromTemplate(template) {
+  static buildFromTemplate(template: any[]): Menu {
     const menu = new Menu();
     menu.items = template;
     return menu;
   }
 
-  static setApplicationMenu(menu) {
+  static setApplicationMenu(menu: Menu | null): void {
     Menu._applicationMenu = menu;
   }
 
-  static getApplicationMenu() {
+  static getApplicationMenu(): Menu | null {
     return Menu._applicationMenu || null;
   }
 
-  append(menuItem) {
+  append(menuItem: any): void {
     this.items.push(menuItem);
   }
 
-  insert(pos, menuItem) {
+  insert(pos: number, menuItem: any): void {
     this.items.splice(pos, 0, menuItem);
   }
 
-  popup(options) {
+  popup(_options?: any): void {
     // Mock implementation
   }
 
-  closePopup(browserWindow) {
+  closePopup(_browserWindow?: BrowserWindow): void {
     // Mock implementation
   }
 }
 
-/**
- * Mock MenuItem class
- * Simulates Electron's MenuItem for testing menu items
- */
-class MenuItem {
-  constructor(options) {
+export class MenuItem {
+  [key: string]: any;
+
+  constructor(options: any) {
     Object.assign(this, options);
   }
 }
 
-/**
- * Mock Notification class
- * Simulates Electron's Notification for testing notifications
- */
-class Notification {
-  constructor(options) {
+export class Notification {
+  options: any;
+  listeners: Record<string, Function[]> = {};
+  isShown = false;
+
+  constructor(options: any) {
     this.options = options;
-    this.listeners = {};
   }
 
-  show() {
+  show(): void {
     this.isShown = true;
   }
 
-  close() {
+  close(): void {
     this.isShown = false;
   }
 
-  on(event, callback) {
+  on(event: string, callback: Function): void {
     if (!this.listeners[event]) {
       this.listeners[event] = [];
     }
     this.listeners[event].push(callback);
   }
 
-  static isSupported() {
+  static isSupported(): boolean {
     return true;
   }
 }
 
-/**
- * Mock nativeTheme module
- * Simulates Electron's nativeTheme for testing theme settings
- */
-const nativeTheme = {
+export const nativeTheme = {
   shouldUseDarkColors: false,
   themeSource: 'system',
-  listeners: {},
+  listeners: {} as Record<string, Function[]>,
 
-  on(event, callback) {
+  on(event: string, callback: Function): void {
     if (!this.listeners[event]) {
       this.listeners[event] = [];
     }
@@ -487,51 +495,27 @@ const nativeTheme = {
   }
 };
 
-/**
- * Reset all mocks
- * Helper function to reset all mock state between tests
- */
-function resetAllMocks() {
-  // Reset app
+export function resetAllMocks(): void {
   app.listeners = {};
   app.isReady = false;
   app.isQuitting = false;
 
-  // Reset ipcMain
   ipcMain.handlers = {};
   ipcMain.listeners = {};
 
-  // Reset ipcRenderer
   ipcRenderer.listeners = {};
 
-  // Reset BrowserWindow
   BrowserWindow._windows = [];
   BrowserWindow._focusedWindow = null;
 
-  // Reset jest mocks
-  shell.openExternal.mockClear();
-  shell.openPath.mockClear();
-  shell.showItemInFolder.mockClear();
-  shell.moveItemToTrash.mockClear();
-  shell.beep.mockClear();
+  (shell.openExternal as jest.Mock).mockClear();
+  (shell.openPath as jest.Mock).mockClear();
+  (shell.showItemInFolder as jest.Mock).mockClear();
+  (shell.moveItemToTrash as jest.Mock).mockClear();
+  (shell.beep as jest.Mock).mockClear();
 
-  dialog.showOpenDialog.mockClear();
-  dialog.showSaveDialog.mockClear();
-  dialog.showMessageBox.mockClear();
-  dialog.showErrorBox.mockClear();
+  (dialog.showOpenDialog as jest.Mock).mockClear();
+  (dialog.showSaveDialog as jest.Mock).mockClear();
+  (dialog.showMessageBox as jest.Mock).mockClear();
+  (dialog.showErrorBox as jest.Mock).mockClear();
 }
-
-// Export all mocks
-module.exports = {
-  app,
-  BrowserWindow,
-  ipcMain,
-  ipcRenderer,
-  shell,
-  dialog,
-  Menu,
-  MenuItem,
-  Notification,
-  nativeTheme,
-  resetAllMocks
-};

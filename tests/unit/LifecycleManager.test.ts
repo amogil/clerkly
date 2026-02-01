@@ -1,6 +1,6 @@
 // Requirements: clerkly.2.1, clerkly.2.3
-const LifecycleManager = require('../../src/main/LifecycleManager');
-const { app } = require('electron');
+import { LifecycleManager } from '../../src/main/LifecycleManager';
+import { app } from 'electron';
 
 describe('LifecycleManager', () => {
   let lifecycleManager;

@@ -1,12 +1,12 @@
 // Requirements: clerkly.2.1, clerkly.2.3
-const DataManager = require('../../src/main/DataManager');
-const path = require('path');
-const fs = require('fs');
-const os = require('os');
+import DataManager from '../../dist/src/main/DataManager';
+import * as path from 'path';
+import * as fs from 'fs';
+import * as os from 'os';
 
 describe('DataManager', () => {
-  let dataManager;
-  let testStoragePath;
+  let dataManager: DataManager;
+  let testStoragePath: string;
 
   beforeEach(() => {
     // Create a unique temporary directory for each test
@@ -16,7 +16,7 @@ describe('DataManager', () => {
 
   afterEach(() => {
     // Clean up: close database and remove test directory
-    if (dataManager && dataManager.db) {
+    if (dataManager && (dataManager as any).db) {
       dataManager.close();
     }
     if (fs.existsSync(testStoragePath)) {
@@ -32,7 +32,7 @@ describe('DataManager', () => {
     it('should create instance with valid storagePath', () => {
       expect(dataManager).toBeDefined();
       expect(dataManager.storagePath).toBe(testStoragePath);
-      expect(dataManager.db).toBeNull();
+      expect((dataManager as any).db).toBeNull();
     });
 
     /* Preconditions: DataManager class is available
@@ -48,7 +48,7 @@ describe('DataManager', () => {
        Assertions: throws error with message about invalid storagePath
        Requirements: clerkly.1.4 */
     it('should reject null storagePath', () => {
-      expect(() => new DataManager(null)).toThrow('Invalid storagePath: must be non-empty string');
+      expect(() => new DataManager(null as any)).toThrow('Invalid storagePath: must be non-empty string');
     });
 
     /* Preconditions: DataManager class is available
@@ -56,7 +56,7 @@ describe('DataManager', () => {
        Assertions: throws error with message about invalid storagePath
        Requirements: clerkly.1.4 */
     it('should reject non-string storagePath', () => {
-      expect(() => new DataManager(123)).toThrow('Invalid storagePath: must be non-empty string');
+      expect(() => new DataManager(123 as any)).toThrow('Invalid storagePath: must be non-empty string');
     });
   });
 
@@ -70,8 +70,8 @@ describe('DataManager', () => {
       
       expect(result.success).toBe(true);
       expect(fs.existsSync(testStoragePath)).toBe(true);
-      expect(dataManager.db).toBeDefined();
-      expect(dataManager.db.open).toBe(true);
+      expect((dataManager as any).db).toBeDefined();
+      expect((dataManager as any).db.open).toBe(true);
     });
 
     /* Preconditions: DataManager instance created, storage directory already exists
@@ -84,7 +84,7 @@ describe('DataManager', () => {
       const result = dataManager.initialize();
       
       expect(result.success).toBe(true);
-      expect(dataManager.db).toBeDefined();
+      expect((dataManager as any).db).toBeDefined();
     });
 
     /* Preconditions: DataManager instance initialized
@@ -95,7 +95,7 @@ describe('DataManager', () => {
       dataManager.initialize();
       
       // Query to check if table exists
-      const tableInfo = dataManager.db.prepare(
+      const tableInfo = (dataManager as any).db.prepare(
         "SELECT name FROM sqlite_master WHERE type='table' AND name='user_data'"
       ).get();
       
@@ -111,7 +111,7 @@ describe('DataManager', () => {
       dataManager.initialize();
       
       // Query to check if index exists
-      const indexInfo = dataManager.db.prepare(
+      const indexInfo = (dataManager as any).db.prepare(
         "SELECT name FROM sqlite_master WHERE type='index' AND name='idx_timestamp'"
       ).get();
       
@@ -254,7 +254,7 @@ describe('DataManager', () => {
        Assertions: returns success false with error message about invalid key
        Requirements: clerkly.1.4 */
     it('should reject null key', () => {
-      const result = dataManager.saveData(null, 'value');
+      const result = dataManager.saveData(null as any, 'value');
       
       expect(result.success).toBe(false);
       expect(result.error).toContain('Invalid key');
@@ -265,7 +265,7 @@ describe('DataManager', () => {
        Assertions: returns success false with error message about invalid key
        Requirements: clerkly.1.4 */
     it('should reject non-string key', () => {
-      const result = dataManager.saveData(123, 'value');
+      const result = dataManager.saveData(123 as any, 'value');
       
       expect(result.success).toBe(false);
       expect(result.error).toContain('Invalid key');
@@ -386,7 +386,7 @@ describe('DataManager', () => {
        Assertions: returns success false with error message about invalid key
        Requirements: clerkly.1.4 */
     it('should reject null key', () => {
-      const result = dataManager.loadData(null);
+      const result = dataManager.loadData(null as any);
       
       expect(result.success).toBe(false);
       expect(result.error).toContain('Invalid key');
@@ -456,7 +456,7 @@ describe('DataManager', () => {
        Assertions: returns success false with error message about invalid key
        Requirements: clerkly.1.4 */
     it('should reject null key', () => {
-      const result = dataManager.deleteData(null);
+      const result = dataManager.deleteData(null as any);
       
       expect(result.success).toBe(false);
       expect(result.error).toContain('Invalid key');
@@ -495,12 +495,12 @@ describe('DataManager', () => {
        Requirements: clerkly.1.4 */
     it('should close database connection', () => {
       dataManager.initialize();
-      expect(dataManager.db).toBeDefined();
-      expect(dataManager.db.open).toBe(true);
+      expect((dataManager as any).db).toBeDefined();
+      expect((dataManager as any).db.open).toBe(true);
       
       dataManager.close();
       
-      expect(dataManager.db).toBeNull();
+      expect((dataManager as any).db).toBeNull();
     });
 
     /* Preconditions: database not initialized
@@ -509,7 +509,7 @@ describe('DataManager', () => {
        Requirements: clerkly.1.4 */
     it('should handle closing uninitialized database', () => {
       expect(() => dataManager.close()).not.toThrow();
-      expect(dataManager.db).toBeNull();
+      expect((dataManager as any).db).toBeNull();
     });
   });
 
@@ -520,16 +520,15 @@ describe('DataManager', () => {
        Requirements: clerkly.1.4 */
     it('should handle permission errors by using temp directory', () => {
       // Mock fs.mkdirSync to throw permission error
-      const originalMkdirSync = fs.mkdirSync;
       let callCount = 0;
-      fs.mkdirSync = jest.fn((path, options) => {
+      const mkdirSyncSpy = jest.spyOn(fs, 'mkdirSync').mockImplementation((path: any, options: any) => {
         callCount++;
         if (callCount === 1) {
-          const error = new Error('Permission denied');
+          const error: any = new Error('Permission denied');
           error.code = 'EACCES';
           throw error;
         }
-        return originalMkdirSync(path, options);
+        return undefined as any;
       });
 
       const result = dataManager.initialize();
@@ -539,7 +538,7 @@ describe('DataManager', () => {
       expect(dataManager.storagePath).toContain('clerkly-fallback');
 
       // Restore original function
-      fs.mkdirSync = originalMkdirSync;
+      mkdirSyncSpy.mockRestore();
     });
 
     /* Preconditions: storage directory exists but no write permission
@@ -551,9 +550,8 @@ describe('DataManager', () => {
       fs.mkdirSync(testStoragePath, { recursive: true });
 
       // Mock fs.writeFileSync to throw permission error
-      const originalWriteFileSync = fs.writeFileSync;
-      fs.writeFileSync = jest.fn(() => {
-        const error = new Error('Permission denied');
+      const writeFileSyncSpy = jest.spyOn(fs, 'writeFileSync').mockImplementation(() => {
+        const error: any = new Error('Permission denied');
         error.code = 'EACCES';
         throw error;
       });
@@ -564,7 +562,7 @@ describe('DataManager', () => {
       expect(result.warning).toContain('permission');
 
       // Restore original function
-      fs.writeFileSync = originalWriteFileSync;
+      writeFileSyncSpy.mockRestore();
     });
 
     /* Preconditions: corrupted database file exists in storage path
@@ -586,8 +584,8 @@ describe('DataManager', () => {
       const result = dataManager.initialize();
 
       expect(result.success).toBe(true);
-      expect(dataManager.db).toBeDefined();
-      expect(dataManager.db.open).toBe(true);
+      expect((dataManager as any).db).toBeDefined();
+      expect((dataManager as any).db.open).toBe(true);
 
       // Check that backup was created and new database exists
       const filesAfter = fs.readdirSync(testStoragePath);
@@ -674,7 +672,7 @@ describe('DataManager', () => {
        Assertions: returns success false with serialization error
        Requirements: clerkly.1.4 */
     it('should handle serialization errors for circular references', () => {
-      const circularObj = { name: 'test' };
+      const circularObj: any = { name: 'test' };
       circularObj.self = circularObj;
 
       const result = dataManager.saveData('test-key', circularObj);

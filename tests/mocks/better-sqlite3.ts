@@ -1,40 +1,33 @@
 // Requirements: clerkly.2.1, clerkly.2.5
-// Mock implementation of better-sqlite3 for testing
 
-/**
- * Mock Database class
- * Simulates better-sqlite3 Database for testing data storage
- */
 class Database {
-  constructor(filename, options = {}) {
+  filename: string;
+  options: any;
+  isOpen: boolean;
+  _inTransaction: boolean;
+  data: Map<string, any>;
+  statements: Map<string, Statement>;
+  tables: Set<string>;
+  indexes: Set<string>;
+
+  constructor(filename: string, options: any = {}) {
     this.filename = filename;
     this.options = options;
     this.isOpen = true;
     this._inTransaction = false;
     this.data = new Map();
     this.statements = new Map();
-    this.tables = new Set(); // Track created tables
-    this.indexes = new Set(); // Track created indexes
+    this.tables = new Set();
+    this.indexes = new Set();
   }
 
-  /**
-   * Prepare a SQL statement
-   * @param {string} sql - SQL query string
-   * @returns {Statement} Mock statement object
-   */
-  prepare(sql) {
+  prepare(sql: string): Statement {
     const statement = new Statement(this, sql);
     this.statements.set(sql, statement);
     return statement;
   }
 
-  /**
-   * Execute a SQL statement
-   * @param {string} sql - SQL query string
-   * @returns {Object} Result info
-   */
-  exec(sql) {
-    // Handle CREATE TABLE statements
+  exec(sql: string): { changes: number; lastInsertRowid: number } {
     if (sql.toLowerCase().includes('create table')) {
       const tableMatch = sql.match(/create table (?:if not exists )?(\w+)/i);
       if (tableMatch) {
@@ -42,12 +35,10 @@ class Database {
       }
     }
     
-    // Handle DROP TABLE statements
     if (sql.toLowerCase().includes('drop table')) {
       const tableMatch = sql.match(/drop table (?:if exists )?(\w+)/i);
       if (tableMatch) {
         this.tables.delete(tableMatch[1]);
-        // Clear data for this table
         const tableName = tableMatch[1];
         for (const [key, value] of this.data.entries()) {
           if (value._table === tableName) {
@@ -57,7 +48,6 @@ class Database {
       }
     }
     
-    // Handle CREATE INDEX statements
     if (sql.toLowerCase().includes('create index')) {
       const indexMatch = sql.match(/create index (?:if not exists )?(\w+)/i);
       if (indexMatch) {
@@ -65,7 +55,6 @@ class Database {
       }
     }
     
-    // Handle DROP INDEX statements
     if (sql.toLowerCase().includes('drop index')) {
       const indexMatch = sql.match(/drop index (?:if exists )?(\w+)/i);
       if (indexMatch) {
@@ -76,20 +65,12 @@ class Database {
     return { changes: 0, lastInsertRowid: 0 };
   }
 
-  /**
-   * Close the database
-   */
-  close() {
+  close(): void {
     this.isOpen = false;
   }
 
-  /**
-   * Create a transaction function
-   * @param {Function} fn - Function to wrap in transaction
-   * @returns {Function} Transaction function
-   */
-  transaction(fn) {
-    return (...args) => {
+  transaction(fn: Function): Function {
+    return (...args: any[]) => {
       this._inTransaction = true;
       try {
         const result = fn(...args);
@@ -102,14 +83,8 @@ class Database {
     };
   }
 
-  /**
-   * Get database pragma
-   * @param {string} name - Pragma name
-   * @param {boolean} simple - Return simple value
-   * @returns {any} Pragma value
-   */
-  pragma(name, simple = false) {
-    const pragmas = {
+  pragma(name: string, simple = false): any {
+    const pragmas: any = {
       journal_mode: 'wal',
       synchronous: 'normal',
       foreign_keys: 1
@@ -117,72 +92,42 @@ class Database {
     return simple ? pragmas[name] : { [name]: pragmas[name] };
   }
 
-  /**
-   * Check if database is open
-   * @returns {boolean} True if open
-   */
-  get open() {
+  get open(): boolean {
     return this.isOpen;
   }
 
-  /**
-   * Check if in transaction
-   * @returns {boolean} True if in transaction
-   */
-  get inTransaction() {
+  get inTransaction(): boolean {
     return this._inTransaction;
   }
 
-  /**
-   * Get database name
-   * @returns {string} Database filename
-   */
-  get name() {
+  get name(): string {
     return this.filename;
   }
 
-  /**
-   * Get database memory status
-   * @returns {boolean} True if in-memory database
-   */
-  get memory() {
+  get memory(): boolean {
     return this.filename === ':memory:';
   }
 
-  /**
-   * Get database readonly status
-   * @returns {boolean} True if readonly
-   */
-  get readonly() {
+  get readonly(): boolean {
     return this.options.readonly || false;
   }
 }
 
-/**
- * Mock Statement class
- * Simulates better-sqlite3 prepared statements
- */
 class Statement {
-  constructor(database, sql) {
+  database: Database;
+  sql: string;
+  _reader: boolean;
+
+  constructor(database: Database, sql: string) {
     this.database = database;
     this.sql = sql;
     this._reader = false;
   }
 
-  /**
-   * Run the statement (for INSERT, UPDATE, DELETE)
-   * @param {...any} params - Statement parameters
-   * @returns {Object} Result info
-   */
-  run(...params) {
-    // Mock implementation
-    // For INSERT statements, simulate adding data
+  run(...params: any[]): { changes: number; lastInsertRowid: number } {
     if (this.sql.toLowerCase().includes('insert')) {
-      // Check if it's for schema_migrations table
       if (this.sql.toLowerCase().includes('schema_migrations')) {
-        const version = params[0];
-        const name = params[1];
-        const applied_at = params[2];
+        const [version, name, applied_at] = params;
         this.database.data.set(`migration_${version}`, {
           _table: 'schema_migrations',
           version,
@@ -192,9 +137,7 @@ class Statement {
         return { changes: 1, lastInsertRowid: version };
       }
       
-      // Regular user_data inserts
-      const key = params[0];
-      const value = params[1];
+      const [key, value] = params;
       if (key && value !== undefined) {
         this.database.data.set(key, {
           _table: 'user_data',
@@ -207,13 +150,8 @@ class Statement {
       return { changes: 1, lastInsertRowid: this.database.data.size };
     }
     
-    // For UPDATE statements
     if (this.sql.toLowerCase().includes('update')) {
-      // Parameters order: value, timestamp, updated_at, key (from WHERE clause)
-      const value = params[0];
-      const timestamp = params[1];
-      const updated_at = params[2];
-      const key = params[3]; // key is last param in WHERE clause
+      const [value, timestamp, updated_at, key] = params;
       
       if (key && this.database.data.has(key)) {
         const existing = this.database.data.get(key);
@@ -225,11 +163,9 @@ class Statement {
       return { changes: 0, lastInsertRowid: 0 };
     }
     
-    // For DELETE statements
     if (this.sql.toLowerCase().includes('delete')) {
-      // Check if it's for schema_migrations table
       if (this.sql.toLowerCase().includes('schema_migrations')) {
-        const version = params[0];
+        const [version] = params;
         const key = `migration_${version}`;
         if (this.database.data.has(key)) {
           this.database.data.delete(key);
@@ -238,8 +174,7 @@ class Statement {
         return { changes: 0, lastInsertRowid: 0 };
       }
       
-      // Regular user_data deletes
-      const key = params[0];
+      const [key] = params;
       if (key && this.database.data.has(key)) {
         this.database.data.delete(key);
         return { changes: 1, lastInsertRowid: 0 };
@@ -250,15 +185,8 @@ class Statement {
     return { changes: 0, lastInsertRowid: 0 };
   }
 
-  /**
-   * Get a single row (for SELECT)
-   * @param {...any} params - Statement parameters
-   * @returns {Object|undefined} Row data or undefined
-   */
-  get(...params) {
-    // Mock implementation for sqlite_master queries
+  get(...params: any[]): any {
     if (this.sql.toLowerCase().includes('sqlite_master')) {
-      // Check if querying for table
       if (this.sql.toLowerCase().includes("type='table'")) {
         const tableMatch = this.sql.match(/name='(\w+)'/);
         if (tableMatch) {
@@ -268,7 +196,6 @@ class Statement {
           }
         }
       }
-      // Check if querying for index
       if (this.sql.toLowerCase().includes("type='index'")) {
         const indexMatch = this.sql.match(/name='(\w+)'/);
         if (indexMatch) {
@@ -281,9 +208,7 @@ class Statement {
       return undefined;
     }
     
-    // Handle schema_migrations queries
     if (this.sql.toLowerCase().includes('schema_migrations')) {
-      // MAX(version) query
       if (this.sql.toLowerCase().includes('max(version)')) {
         let maxVersion = 0;
         for (const [key, value] of this.database.data.entries()) {
@@ -294,7 +219,6 @@ class Statement {
         return { version: maxVersion || null };
       }
       
-      // SELECT with WHERE version = ? (parameterized)
       if (this.sql.toLowerCase().includes('where version = ?') && params.length > 0) {
         const version = params[0];
         const key = `migration_${version}`;
@@ -309,7 +233,6 @@ class Statement {
         return undefined;
       }
       
-      // SELECT with WHERE version = <number> (literal)
       if (this.sql.toLowerCase().includes('where version =')) {
         const versionMatch = this.sql.match(/where version = (\d+)/i);
         if (versionMatch) {
@@ -330,9 +253,8 @@ class Statement {
       return undefined;
     }
     
-    // Regular SELECT queries for user_data
     if (this.sql.toLowerCase().includes('select')) {
-      const key = params[0];
+      const [key] = params;
       if (key && this.database.data.has(key)) {
         const data = this.database.data.get(key);
         if (data._table === 'user_data') {
@@ -349,15 +271,9 @@ class Statement {
     return undefined;
   }
 
-  /**
-   * Get all rows (for SELECT)
-   * @param {...any} params - Statement parameters
-   * @returns {Array} Array of row data
-   */
-  all(...params) {
-    // Handle schema_migrations queries
+  all(...params: any[]): any[] {
     if (this.sql.toLowerCase().includes('schema_migrations')) {
-      const results = [];
+      const results: any[] = [];
       for (const [key, value] of this.database.data.entries()) {
         if (value._table === 'schema_migrations') {
           results.push({
@@ -367,13 +283,11 @@ class Statement {
           });
         }
       }
-      // Sort by version
       results.sort((a, b) => a.version - b.version);
       return results;
     }
     
-    // Regular user_data queries
-    const results = [];
+    const results: any[] = [];
     for (const [key, data] of this.database.data.entries()) {
       if (data._table === 'user_data') {
         results.push({
@@ -388,54 +302,29 @@ class Statement {
     return results;
   }
 
-  /**
-   * Iterate over rows
-   * @param {...any} params - Statement parameters
-   * @returns {Iterator} Row iterator
-   */
-  iterate(...params) {
+  iterate(...params: any[]): Iterator<any> {
     return this.all(...params)[Symbol.iterator]();
   }
 
-  /**
-   * Get the SQL source
-   * @returns {string} SQL string
-   */
-  get source() {
+  get source(): string {
     return this.sql;
   }
 
-  /**
-   * Check if statement returns data
-   * @returns {boolean} True if SELECT statement
-   */
-  get reader() {
+  get reader(): boolean {
     return this.sql.toLowerCase().includes('select');
   }
 }
 
-/**
- * Helper function to create in-memory database for testing
- * @returns {Database} In-memory database instance
- */
-function createInMemoryDatabase() {
+function createInMemoryDatabase(): Database {
   return new Database(':memory:');
 }
 
-/**
- * Helper function to reset database mock
- * @param {Database} db - Database instance to reset
- */
-function resetDatabase(db) {
+function resetDatabase(db: Database): void {
   if (db) {
     db.data.clear();
     db.statements.clear();
   }
 }
 
-// Export mock
-module.exports = Database;
-module.exports.Database = Database;
-module.exports.Statement = Statement;
-module.exports.createInMemoryDatabase = createInMemoryDatabase;
-module.exports.resetDatabase = resetDatabase;
+export default Database;
+export { Database, Statement, createInMemoryDatabase, resetDatabase };

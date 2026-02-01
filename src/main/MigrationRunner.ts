@@ -1,22 +1,38 @@
 // Requirements: clerkly.1.4
-const fs = require('fs');
-const path = require('path');
+import * as fs from 'fs';
+import * as path from 'path';
+import Database from 'better-sqlite3';
 
-/**
- * MigrationRunner class
- * Manages database schema migrations with versioning
- * 
- * Requirements: clerkly.1.4
- */
+interface MigrationResult {
+  success: boolean;
+  appliedCount?: number;
+  message?: string;
+  error?: string;
+}
+
+interface MigrationStatus {
+  currentVersion: number;
+  appliedMigrations: number;
+  pendingMigrations: number;
+  totalMigrations: number;
+  pending: Array<{version: number; name: string; description?: string}>;
+  error?: string;
+}
+
+interface Migration {
+  version: number;
+  name: string;
+  description?: string;
+  up: (db: Database.Database) => void;
+  down: (db: Database.Database) => void;
+}
+
 class MigrationRunner {
-  /**
-   * Constructor
-   * @param {Database} db - SQLite database instance
-   * @param {string} migrationsPath - Path to migrations directory
-   * 
-   * Requirements: clerkly.1.4
-   */
-  constructor(db, migrationsPath) {
+  private db: Database.Database;
+  private migrationsPath: string;
+
+  // Requirements: clerkly.1.4
+  constructor(db: Database.Database, migrationsPath: string) {
     if (!db) {
       throw new Error('Database instance is required');
     }
@@ -27,13 +43,8 @@ class MigrationRunner {
     this.migrationsPath = migrationsPath;
   }
 
-  /**
-   * Initialize migration tracking table
-   * Creates schema_migrations table to track applied migrations
-   * 
-   * Requirements: clerkly.1.4
-   */
-  initializeMigrationTable() {
+  // Requirements: clerkly.1.4
+  initializeMigrationTable(): void {
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS schema_migrations (
         version INTEGER PRIMARY KEY,
@@ -43,17 +54,12 @@ class MigrationRunner {
     `);
   }
 
-  /**
-   * Get current schema version
-   * @returns {number} Current schema version (0 if no migrations applied)
-   * 
-   * Requirements: clerkly.1.4
-   */
-  getCurrentVersion() {
+  // Requirements: clerkly.1.4
+  getCurrentVersion(): number {
     try {
       const result = this.db.prepare(
         'SELECT MAX(version) as version FROM schema_migrations'
-      ).get();
+      ).get() as { version: number | null };
       return result.version || 0;
     } catch (error) {
       // Table might not exist yet
@@ -61,17 +67,12 @@ class MigrationRunner {
     }
   }
 
-  /**
-   * Get list of applied migration versions
-   * @returns {number[]} Array of applied migration versions
-   * 
-   * Requirements: clerkly.1.4
-   */
-  getAppliedMigrations() {
+  // Requirements: clerkly.1.4
+  getAppliedMigrations(): number[] {
     try {
       const results = this.db.prepare(
         'SELECT version FROM schema_migrations ORDER BY version'
-      ).all();
+      ).all() as Array<{ version: number }>;
       return results.map(row => row.version);
     } catch (error) {
       // Table might not exist yet
@@ -79,24 +80,19 @@ class MigrationRunner {
     }
   }
 
-  /**
-   * Load migration files from migrations directory
-   * @returns {Array} Array of migration objects sorted by version
-   * 
-   * Requirements: clerkly.1.4
-   */
-  loadMigrations() {
+  // Requirements: clerkly.1.4
+  loadMigrations(): Migration[] {
     if (!fs.existsSync(this.migrationsPath)) {
       throw new Error(`Migrations directory not found: ${this.migrationsPath}`);
     }
 
     const files = fs.readdirSync(this.migrationsPath)
-      .filter(file => file.endsWith('.js'))
+      .filter(file => file.endsWith('.js') || file.endsWith('.ts'))
       .sort();
 
     const migrations = files.map(file => {
       const filePath = path.join(this.migrationsPath, file);
-      const migration = require(filePath);
+      const migration = require(filePath) as Migration;
       
       // Validate migration structure
       if (!migration.version || typeof migration.version !== 'number') {
@@ -121,14 +117,8 @@ class MigrationRunner {
     return migrations;
   }
 
-  /**
-   * Run pending migrations
-   * Applies all migrations that haven't been applied yet
-   * @returns {Object} Result with success status and applied migrations count
-   * 
-   * Requirements: clerkly.1.4
-   */
-  runMigrations() {
+  // Requirements: clerkly.1.4
+  runMigrations(): MigrationResult {
     try {
       // Initialize migration tracking table
       this.initializeMigrationTable();
@@ -176,7 +166,7 @@ class MigrationRunner {
         appliedCount,
         message: `Applied ${appliedCount} migration(s)`
       };
-    } catch (error) {
+    } catch (error: any) {
       console.error('Migration failed:', error);
       return {
         success: false,
@@ -185,14 +175,8 @@ class MigrationRunner {
     }
   }
 
-  /**
-   * Rollback last migration
-   * Reverts the most recently applied migration
-   * @returns {Object} Result with success status
-   * 
-   * Requirements: clerkly.1.4
-   */
-  rollbackLastMigration() {
+  // Requirements: clerkly.1.4
+  rollbackLastMigration(): MigrationResult {
     try {
       const currentVersion = this.getCurrentVersion();
       
@@ -233,7 +217,7 @@ class MigrationRunner {
         success: true,
         message: `Rolled back migration ${migration.name} (version ${currentVersion})`
       };
-    } catch (error) {
+    } catch (error: any) {
       console.error('Rollback failed:', error);
       return {
         success: false,
@@ -242,14 +226,8 @@ class MigrationRunner {
     }
   }
 
-  /**
-   * Get migration status
-   * Returns information about current schema version and pending migrations
-   * @returns {Object} Status object with version info and pending migrations
-   * 
-   * Requirements: clerkly.1.4
-   */
-  getStatus() {
+  // Requirements: clerkly.1.4
+  getStatus(): MigrationStatus {
     try {
       const currentVersion = this.getCurrentVersion();
       const appliedVersions = this.getAppliedMigrations();
@@ -270,12 +248,17 @@ class MigrationRunner {
           description: m.description
         }))
       };
-    } catch (error) {
+    } catch (error: any) {
       return {
+        currentVersion: 0,
+        appliedMigrations: 0,
+        pendingMigrations: 0,
+        totalMigrations: 0,
+        pending: [],
         error: error.message
       };
     }
   }
 }
 
-module.exports = MigrationRunner;
+export default MigrationRunner;

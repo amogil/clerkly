@@ -14,7 +14,7 @@
 
 ## Задачи
 
-- [ ] 1. Настройка проекта и базовой структуры
+- [x] 1. Настройка проекта и базовой структуры
   - Создать структуру директорий проекта (src/main, src/renderer, tests/unit, tests/property, tests/functional)
   - Настроить package.json с зависимостями (electron, better-sqlite3, jest, ts-jest, fast-check)
   - Настроить TypeScript конфигурацию (tsconfig.json для main и renderer процессов)
@@ -23,7 +23,7 @@
   - _Requirements: clerkly.1.1, clerkly.1.5, clerkly.2.5_
 
 - [ ] 2. Реализация компонентов Main Process
-  - [ ] 2.1 Реализовать Window Manager
+  - [x] 2.1 Реализовать Window Manager
     - Создать класс WindowManager с методами createWindow(), configureWindow(), closeWindow()
     - Настроить нативный Mac OS X вид (titleBarStyle: 'hiddenInset', vibrancy, trafficLightPosition)
     - Реализовать корректное закрытие окна с очисткой listeners

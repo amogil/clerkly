@@ -1,9 +1,9 @@
 // Requirements: clerkly.2.1, clerkly.2.3
-const MigrationRunner = require('../../src/main/MigrationRunner');
-const Database = require('better-sqlite3');
-const path = require('path');
-const fs = require('fs');
-const os = require('os');
+import { MigrationRunner } from '../../src/main/MigrationRunner';
+import Database from 'better-sqlite3';
+import path from 'path';
+import fs from 'fs';
+import os from 'os';
 
 describe('MigrationRunner', () => {
   let db;

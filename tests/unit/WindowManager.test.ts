@@ -1,14 +1,14 @@
 // Requirements: clerkly.2.1, clerkly.2.3
-const WindowManager = require('../../src/main/WindowManager');
-const { BrowserWindow } = require('electron');
+import WindowManager from '../../dist/src/main/WindowManager';
+import { BrowserWindow } from 'electron';
 
 describe('WindowManager', () => {
-  let windowManager;
+  let windowManager: WindowManager;
 
   beforeEach(() => {
     windowManager = new WindowManager();
     // Clear any existing windows
-    BrowserWindow._windows = [];
+    (BrowserWindow as any)._windows = [];
   });
 
   afterEach(() => {
@@ -42,10 +42,10 @@ describe('WindowManager', () => {
       expect(windowManager.mainWindow).toBe(window);
       
       // Check window options
-      expect(window.options.width).toBe(800);
-      expect(window.options.height).toBe(600);
-      expect(window.options.minWidth).toBe(600);
-      expect(window.options.minHeight).toBe(400);
+      expect((window as any).options.width).toBe(800);
+      expect((window as any).options.height).toBe(600);
+      expect((window as any).options.minWidth).toBe(600);
+      expect((window as any).options.minHeight).toBe(400);
     });
 
     /* Preconditions: WindowManager instance created
@@ -55,10 +55,10 @@ describe('WindowManager', () => {
     it('should create window with Mac OS X native appearance', () => {
       const window = windowManager.createWindow();
 
-      expect(window.options.titleBarStyle).toBe('hiddenInset');
-      expect(window.options.trafficLightPosition).toEqual({ x: 10, y: 10 });
-      expect(window.options.vibrancy).toBe('under-window');
-      expect(window.options.visualEffectState).toBe('active');
+      expect((window as any).options.titleBarStyle).toBe('hiddenInset');
+      expect((window as any).options.trafficLightPosition).toEqual({ x: 10, y: 10 });
+      expect((window as any).options.vibrancy).toBe('under-window');
+      expect((window as any).options.visualEffectState).toBe('active');
     });
 
     /* Preconditions: WindowManager instance created
@@ -68,10 +68,10 @@ describe('WindowManager', () => {
     it('should create window with correct security settings', () => {
       const window = windowManager.createWindow();
 
-      expect(window.options.webPreferences.nodeIntegration).toBe(false);
-      expect(window.options.webPreferences.contextIsolation).toBe(true);
-      expect(window.options.webPreferences.preload).toBeDefined();
-      expect(window.options.webPreferences.preload).toContain('preload.js');
+      expect((window as any).options.webPreferences.nodeIntegration).toBe(false);
+      expect((window as any).options.webPreferences.contextIsolation).toBe(true);
+      expect((window as any).options.webPreferences.preload).toBeDefined();
+      expect((window as any).options.webPreferences.preload).toContain('preload.js');
     });
 
     /* Preconditions: WindowManager instance created
@@ -81,7 +81,7 @@ describe('WindowManager', () => {
     it('should load index.html file', () => {
       const window = windowManager.createWindow();
 
-      expect(window.loadedFile).toBe('index.html');
+      expect((window as any).loadedFile).toBe('index.html');
     });
 
     /* Preconditions: WindowManager instance created, window created
@@ -93,7 +93,7 @@ describe('WindowManager', () => {
       expect(windowManager.mainWindow).toBe(window);
 
       // Simulate window close event
-      window.emit('closed');
+      (window as any).emit('closed');
 
       expect(windowManager.mainWindow).toBeNull();
     });
@@ -125,7 +125,7 @@ describe('WindowManager', () => {
     it('should update window size', () => {
       windowManager.configureWindow({ width: 1024, height: 768 });
 
-      const size = windowManager.mainWindow.getSize();
+      const size = windowManager.mainWindow!.getSize();
       expect(size[0]).toBe(1024);
       expect(size[1]).toBe(768);
     });
@@ -137,7 +137,7 @@ describe('WindowManager', () => {
     it('should update window minimum size', () => {
       windowManager.configureWindow({ minWidth: 800, minHeight: 600 });
 
-      const minSize = windowManager.mainWindow.getMinimumSize();
+      const minSize = windowManager.mainWindow!.getMinimumSize();
       expect(minSize[0]).toBe(800);
       expect(minSize[1]).toBe(600);
     });
@@ -149,7 +149,7 @@ describe('WindowManager', () => {
     it('should update window title', () => {
       windowManager.configureWindow({ title: 'Clerkly - AI Assistant' });
 
-      expect(windowManager.mainWindow.title).toBe('Clerkly - AI Assistant');
+      expect((windowManager.mainWindow as any).title).toBe('Clerkly - AI Assistant');
     });
 
     /* Preconditions: window created
@@ -159,7 +159,7 @@ describe('WindowManager', () => {
     it('should update window resizable property', () => {
       windowManager.configureWindow({ resizable: false });
 
-      expect(windowManager.mainWindow.resizable).toBe(false);
+      expect((windowManager.mainWindow as any).resizable).toBe(false);
     });
 
     /* Preconditions: window created
@@ -169,7 +169,7 @@ describe('WindowManager', () => {
     it('should update window fullscreen property', () => {
       windowManager.configureWindow({ fullscreen: true });
 
-      expect(windowManager.mainWindow.fullscreen).toBe(true);
+      expect((windowManager.mainWindow as any).fullscreen).toBe(true);
     });
 
     /* Preconditions: window created with default size
@@ -177,10 +177,10 @@ describe('WindowManager', () => {
        Assertions: width is updated, height remains unchanged
        Requirements: clerkly.1.2, clerkly.1.3 */
     it('should update only specified dimensions', () => {
-      const originalSize = windowManager.mainWindow.getSize();
+      const originalSize = windowManager.mainWindow!.getSize();
       windowManager.configureWindow({ width: 1000 });
 
-      const newSize = windowManager.mainWindow.getSize();
+      const newSize = windowManager.mainWindow!.getSize();
       expect(newSize[0]).toBe(1000);
       expect(newSize[1]).toBe(originalSize[1]);
     });
@@ -197,11 +197,11 @@ describe('WindowManager', () => {
         resizable: false
       });
 
-      const size = windowManager.mainWindow.getSize();
+      const size = windowManager.mainWindow!.getSize();
       expect(size[0]).toBe(1200);
       expect(size[1]).toBe(800);
-      expect(windowManager.mainWindow.title).toBe('Test Title');
-      expect(windowManager.mainWindow.resizable).toBe(false);
+      expect((windowManager.mainWindow as any).title).toBe('Test Title');
+      expect((windowManager.mainWindow as any).resizable).toBe(false);
     });
 
     /* Preconditions: WindowManager instance created, no window created
@@ -221,13 +221,13 @@ describe('WindowManager', () => {
        Assertions: does not throw error, window remains unchanged
        Requirements: clerkly.1.2, clerkly.1.3 */
     it('should handle empty options object', () => {
-      const originalSize = windowManager.mainWindow.getSize();
+      const originalSize = windowManager.mainWindow!.getSize();
       
       expect(() => {
         windowManager.configureWindow({});
       }).not.toThrow();
 
-      const newSize = windowManager.mainWindow.getSize();
+      const newSize = windowManager.mainWindow!.getSize();
       expect(newSize).toEqual(originalSize);
     });
 
@@ -250,16 +250,16 @@ describe('WindowManager', () => {
        Requirements: clerkly.1.2, clerkly.1.3 */
     it('should close window and clean up resources', () => {
       windowManager.createWindow();
-      const window = windowManager.mainWindow;
+      const window = windowManager.mainWindow!;
       
       // Add some listeners to verify cleanup
-      window.on('test-event', () => {});
+      (window as any).on('test-event', () => {});
       
       windowManager.closeWindow();
 
-      expect(window.isDestroyed()).toBe(true);
+      expect((window as any).isDestroyed()).toBe(true);
       expect(windowManager.mainWindow).toBeNull();
-      expect(Object.keys(window.listeners).length).toBe(0);
+      expect(Object.keys((window as any).listeners).length).toBe(0);
     });
 
     /* Preconditions: WindowManager instance created, no window created
@@ -295,18 +295,18 @@ describe('WindowManager', () => {
        Requirements: clerkly.1.2, clerkly.1.3 */
     it('should remove all listeners before closing', () => {
       windowManager.createWindow();
-      const window = windowManager.mainWindow;
+      const window = windowManager.mainWindow!;
       
       // Add multiple listeners
-      window.on('event1', () => {});
-      window.on('event2', () => {});
-      window.on('event3', () => {});
+      (window as any).on('event1', () => {});
+      (window as any).on('event2', () => {});
+      (window as any).on('event3', () => {});
       
-      expect(Object.keys(window.listeners).length).toBeGreaterThan(0);
+      expect(Object.keys((window as any).listeners).length).toBeGreaterThan(0);
       
       windowManager.closeWindow();
       
-      expect(Object.keys(window.listeners).length).toBe(0);
+      expect(Object.keys((window as any).listeners).length).toBe(0);
     });
   });
 
@@ -382,7 +382,7 @@ describe('WindowManager', () => {
        Requirements: clerkly.1.2, clerkly.1.3 */
     it('should return false when window is destroyed', () => {
       windowManager.createWindow();
-      windowManager.mainWindow.destroy();
+      windowManager.mainWindow!.destroy();
       
       expect(windowManager.isWindowCreated()).toBe(false);
     });
@@ -400,7 +400,7 @@ describe('WindowManager', () => {
         windowManager.configureWindow({ width: 5000, height: 3000 });
       }).not.toThrow();
 
-      const size = windowManager.mainWindow.getSize();
+      const size = windowManager.mainWindow!.getSize();
       expect(size[0]).toBe(5000);
       expect(size[1]).toBe(3000);
     });
@@ -416,7 +416,7 @@ describe('WindowManager', () => {
         windowManager.configureWindow({ width: 100, height: 100 });
       }).not.toThrow();
 
-      const size = windowManager.mainWindow.getSize();
+      const size = windowManager.mainWindow!.getSize();
       expect(size[0]).toBe(100);
       expect(size[1]).toBe(100);
     });
@@ -432,7 +432,7 @@ describe('WindowManager', () => {
         windowManager.configureWindow({ width: 0, height: 0 });
       }).not.toThrow();
 
-      const size = windowManager.mainWindow.getSize();
+      const size = windowManager.mainWindow!.getSize();
       expect(size[0]).toBe(0);
       expect(size[1]).toBe(0);
     });
@@ -459,7 +459,7 @@ describe('WindowManager', () => {
       
       windowManager.configureWindow({ title: specialTitle });
 
-      expect(windowManager.mainWindow.title).toBe(specialTitle);
+      expect((windowManager.mainWindow as any).title).toBe(specialTitle);
     });
 
     /* Preconditions: window created
@@ -474,7 +474,7 @@ describe('WindowManager', () => {
         windowManager.configureWindow({ title: longTitle });
       }).not.toThrow();
 
-      expect(windowManager.mainWindow.title).toBe(longTitle);
+      expect((windowManager.mainWindow as any).title).toBe(longTitle);
     });
 
     /* Preconditions: window created
@@ -488,7 +488,7 @@ describe('WindowManager', () => {
         windowManager.configureWindow({ title: '' });
       }).not.toThrow();
 
-      expect(windowManager.mainWindow.title).toBe('');
+      expect((windowManager.mainWindow as any).title).toBe('');
     });
 
     /* Preconditions: window created
@@ -496,7 +496,7 @@ describe('WindowManager', () => {
        Assertions: each call creates a new window without errors
        Requirements: clerkly.1.2, clerkly.1.3 */
     it('should handle rapid window creation', () => {
-      const windows = [];
+      const windows: any[] = [];
       
       for (let i = 0; i < 10; i++) {
         const window = windowManager.createWindow();

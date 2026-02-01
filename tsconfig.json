@@ -1,0 +1,36 @@
+// Requirements: clerkly.1.5, clerkly.2.5
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "commonjs",
+    "lib": ["ES2020"],
+    "outDir": "./dist",
+    "rootDir": "./",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "moduleResolution": "node",
+    "allowSyntheticDefaultImports": true,
+    "declaration": true,
+    "sourceMap": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true
+  },
+  "include": [
+    "src/**/*",
+    "main.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "dist-build",
+    "coverage",
+    "tests",
+    "**/*.test.ts",
+    "**/*.test.js"
+  ]
+}
