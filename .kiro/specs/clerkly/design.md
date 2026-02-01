@@ -6,9 +6,42 @@ Clerkly - это Electron-приложение для Mac OS X, предназн
 
 Реализация включает систему миграций базы данных, расширенную обработку ошибок, IPC коммуникацию с таймаутами и валидацией, а также компоненты управления состоянием и UI с мониторингом производительности.
 
+**Ключевые характеристики:**
+- Нативное Mac OS X приложение на базе Electron 28+
+- Локальное хранение данных с использованием SQLite
+- Комплексное тестовое покрытие (модульные, property-based, функциональные тесты)
+- Производительность: запуск < 3 секунды, UI отклик < 100ms
+- Безопасность: локальное хранение, валидация IPC, изоляция процессов
+- Надежность: обработка ошибок, backup базы данных, graceful degradation
+
 ## Архитектура
 
 Приложение следует стандартной архитектуре Electron с разделением на "Main Process" и "Renderer Process", с добавлением слоя для локального хранения данных и системы миграций.
+
+### Реализация нефункциональных требований
+
+**Производительность (NFR 1):**
+- **NFR 1.1 - Запуск < 3 секунды**: Оптимизация инициализации, ленивая загрузка компонентов, мониторинг времени запуска в "Lifecycle Manager"
+- **NFR 1.2 - UI отклик < 100ms**: Мониторинг производительности в "UI Controller", предупреждения при превышении порога
+- **NFR 1.3 - Длительные операции > 200ms**: Автоматические индикаторы загрузки через `withLoading()` в "UI Controller"
+- **NFR 1.4 - Операции с данными < 50ms**: Индексирование SQLite, оптимизированные запросы, prepared statements
+
+**Надежность (NFR 2):**
+- **NFR 2.1 - Обработка ошибок инициализации**: Fallback на temp directory при проблемах с правами, backup при повреждении базы данных
+- **NFR 2.2 - Сохранение данных перед завершением**: Graceful shutdown в "Lifecycle Manager" с таймаутом 5 секунд
+- **NFR 2.3 - IPC таймауты**: 10 секунд на операцию в "IPC Handlers", предотвращение зависания
+- **NFR 2.4 - Backup при повреждении**: Автоматическое создание backup и пересоздание базы данных в "Data Manager"
+
+**Совместимость (NFR 3):**
+- **NFR 3.1 - Mac OS X 10.13+**: Использование стабильных Electron API, тестирование на разных версиях
+- **NFR 3.2 - Нативный интерфейс**: titleBarStyle 'hiddenInset', vibrancy, traffic light positioning в "Window Manager"
+- **NFR 3.3 - Mac OS X конвенции**: Приложение остается активным при закрытии окна в "Lifecycle Manager"
+
+**Тестируемость (NFR 4):**
+- **NFR 4.1 - Изоляция компонентов**: Dependency injection, моки для Electron API
+- **NFR 4.2 - Моки Electron API**: Jest моки для BrowserWindow, ipcMain, app в тестах
+- **NFR 4.3 - Отчеты о покрытии**: Jest coverage, минимум 80% для бизнес-логики, 100% для критических компонентов
+- **NFR 4.4 - Property-based тесты**: Минимум 100 итераций, fast-check для генерации данных
 
 ```mermaid
 graph TB
@@ -60,11 +93,18 @@ graph TB
 - **Electron** (v28+) - для создания desktop приложения
 - **Node.js** (v18+) - runtime для main process
 - **HTML5/CSS3** - для отображения UI
-- **TypeScript** (v5+) - язык программирования
-- **SQLite** - для локального хранения данных
+- **TypeScript** (v5+) - основной язык программирования для всего проекта
+- **SQLite** (better-sqlite3) - для локального хранения данных
 - **Jest** - для модульного и функционального тестирования
-- **ts-jest** - для запуска TypeScript тестов
+- **ts-jest** - для запуска TypeScript тестов в Jest
+- **fast-check** - для property-based тестирования
 - **Electron Builder** - для сборки Mac OS X приложения
+
+**Обоснование выбора технологий:**
+- **Electron 28+**: Стабильная версия с поддержкой Mac OS X 10.13+, обеспечивает нативный вид и производительность
+- **TypeScript**: Статическая типизация обеспечивает раннее обнаружение ошибок, улучшает поддерживаемость кода и IDE поддержку
+- **SQLite**: Легковесная встроенная база данных, не требует отдельного сервера, идеальна для локального хранения
+- **Jest + ts-jest + fast-check**: Комплексное тестирование (unit + property-based) с полной поддержкой TypeScript
 
 ## Компоненты и интерфейсы
 
@@ -74,6 +114,7 @@ graph TB
 Управляет созданием и конфигурацией окна приложения с нативным Mac OS X интерфейсом.
 
 ```typescript
+// Requirements: clerkly.1.2, clerkly.1.3
 import { BrowserWindow } from 'electron';
 
 interface WindowOptions {
@@ -87,27 +128,43 @@ interface WindowOptions {
 class WindowManager {
   private mainWindow: BrowserWindow | null = null;
   
+  /**
+   * Создает окно с нативным Mac OS X видом
+   * @returns {BrowserWindow} instance
+   */
   createWindow(): BrowserWindow {
-    // Создает окно с нативным Mac OS X видом
     // Настраивает titleBarStyle: 'hiddenInset', vibrancy, trafficLightPosition
     // Возвращает: BrowserWindow instance
   }
   
+  /**
+   * Настраивает параметры окна
+   * @param options - { width, height, title, resizable, fullscreen }
+   */
   configureWindow(options: WindowOptions): void {
     // Настраивает параметры окна
   }
   
+  /**
+   * Корректно закрывает окно с очисткой listeners
+   */
   closeWindow(): void {
     // Корректно закрывает окно с очисткой listeners
   }
   
+  /**
+   * Возвращает текущее окно
+   * @returns {BrowserWindow|null}
+   */
   getWindow(): BrowserWindow | null {
-    // Возвращает текущее окно
     return this.mainWindow;
   }
   
+  /**
+   * Проверяет, создано ли окно
+   * @returns {boolean}
+   */
   isWindowCreated(): boolean {
-    // Проверяет, создано ли окно
     return this.mainWindow !== null;
   }
 }
@@ -117,6 +174,7 @@ class WindowManager {
 Управляет жизненным циклом приложения, включая запуск, активацию и завершение.
 
 ```typescript
+// Requirements: clerkly.1.2, clerkly.1.3
 interface InitializeResult {
   success: boolean;
   loadTime: number;
@@ -133,33 +191,53 @@ class LifecycleManager {
     this.dataManager = dataManager;
   }
   
+  /**
+   * Инициализирует приложение
+   * Обеспечивает запуск менее чем за 3 секунды
+   * @returns {Promise<InitializeResult>}
+   */
   async initialize(): Promise<InitializeResult> {
     // Инициализирует приложение
-    // Обеспечивает запуск менее чем за 3 секунды
   }
   
+  /**
+   * Обрабатывает активацию приложения (Mac OS X специфика)
+   * Пересоздает окно при клике на dock icon
+   */
   handleActivation(): void {
-    // Обрабатывает активацию приложения (Mac OS X специфика)
-    // Пересоздает окно при клике на dock icon
+    // Обрабатывает активацию приложения
   }
   
+  /**
+   * Корректно завершает приложение
+   * Сохраняет все данные перед выходом
+   * @returns {Promise<void>}
+   */
   async handleQuit(): Promise<void> {
     // Корректно завершает приложение
-    // Сохраняет все данные перед выходом
   }
   
+  /**
+   * Обрабатывает закрытие всех окон
+   * Mac OS X: приложение остается активным
+   */
   handleWindowClose(): void {
     // Обрабатывает закрытие всех окон
-    // Mac OS X: приложение остается активным
   }
   
+  /**
+   * Возвращает время запуска
+   * @returns {number|null}
+   */
   getStartupTime(): number | null {
-    // Возвращает время запуска
     return this.startTime;
   }
   
+  /**
+   * Проверяет, инициализировано ли приложение
+   * @returns {boolean}
+   */
   isAppInitialized(): boolean {
-    // Проверяет, инициализировано ли приложение
     return this.initialized;
   }
 }
@@ -168,77 +246,85 @@ class LifecycleManager {
 #### Data Manager
 Управляет локальным хранением данных пользователя с использованием SQLite.
 
-```typescript
-import Database from 'better-sqlite3';
-
-interface InitializeResult {
-  success: boolean;
-  migrations?: number;
-  warning?: string;
-  path?: string;
-}
-
-interface SaveResult {
-  success: boolean;
-  error?: string;
-}
-
-interface LoadResult<T = any> {
-  success: boolean;
-  data?: T;
-  error?: string;
-}
-
+```javascript
+// Requirements: clerkly.1.4, clerkly.2.7
 class DataManager {
-  private storagePath: string;
-  private db: Database.Database | null = null;
-  private migrationRunner: MigrationRunner | null = null;
-  
-  constructor(storagePath: string) {
+  constructor(storagePath) {
     this.storagePath = storagePath;
+    this.db = null;
+    this.migrationRunner = null;
   }
   
-  initialize(): InitializeResult {
+  /**
+   * Инициализирует локальное хранилище
+   * Создает необходимые директории и файлы
+   * Запускает миграции базы данных
+   * Обрабатывает ошибки прав доступа (fallback на temp directory)
+   * Обрабатывает поврежденные базы данных (backup и пересоздание)
+   * @returns {{success: boolean, migrations?: {success: boolean, appliedCount: number, message: string}, warning?: string, path?: string}}
+   */
+  initialize() {
     // Инициализирует локальное хранилище
-    // Создает необходимые директории и файлы
-    // Запускает миграции базы данных
-    // Обрабатывает ошибки прав доступа (fallback на temp directory)
-    // Обрабатывает поврежденные базы данных (backup и пересоздание)
   }
   
-  saveData(key: string, value: any): SaveResult {
+  /**
+   * Сохраняет данные локально
+   * Валидирует key (non-empty string, max 1000 chars)
+   * Сериализует value в JSON
+   * Проверяет размер (max 10MB)
+   * Обрабатывает ошибки (SQLITE_FULL, SQLITE_BUSY, SQLITE_LOCKED, SQLITE_READONLY)
+   * @param {string} key
+   * @param {any} value
+   * @returns {{success: boolean, error?: string}}
+   */
+  saveData(key, value) {
     // Сохраняет данные локально
-    // Валидирует key (non-empty string, max 1000 chars)
-    // Сериализует value в JSON
-    // Проверяет размер (max 10MB)
-    // Обрабатывает ошибки (SQLITE_FULL, SQLITE_BUSY, SQLITE_LOCKED, SQLITE_READONLY)
   }
   
-  loadData<T = any>(key: string): LoadResult<T> {
+  /**
+   * Загружает данные из локального хранилища
+   * Валидирует key
+   * Десериализует JSON
+   * Обрабатывает ошибки (SQLITE_BUSY, SQLITE_LOCKED)
+   * @param {string} key
+   * @returns {{success: boolean, data?: any, error?: string}}
+   */
+  loadData(key) {
     // Загружает данные из локального хранилища
-    // Валидирует key
-    // Десериализует JSON
-    // Обрабатывает ошибки (SQLITE_BUSY, SQLITE_LOCKED)
   }
   
-  deleteData(key: string): SaveResult {
+  /**
+   * Удаляет данные из локального хранилища
+   * Валидирует key
+   * Обрабатывает ошибки
+   * @param {string} key
+   * @returns {{success: boolean, error?: string}}
+   */
+  deleteData(key) {
     // Удаляет данные из локального хранилища
-    // Валидирует key
-    // Обрабатывает ошибки
   }
   
-  getStoragePath(): string {
-    // Возвращает путь к локальному хранилищу
+  /**
+   * Возвращает путь к локальному хранилищу
+   * @returns {string}
+   */
+  getStoragePath() {
     return this.storagePath;
   }
   
-  close(): void {
+  /**
+   * Закрывает соединение с базой данных
+   */
+  close() {
     // Закрывает соединение с базой данных
   }
   
-  getMigrationRunner(): MigrationRunner | null {
-    // Возвращает экземпляр Migration Runner
-    return this.migrationRunner;
+  /**
+   * Возвращает экземпляр Migration Runner
+   * @returns {MigrationRunner}
+   */
+  getMigrationRunner() {
+    // Создает и возвращает новый экземпляр MigrationRunner
   }
 }
 ```
@@ -246,36 +332,70 @@ class DataManager {
 #### Migration Runner
 Управляет миграциями схемы базы данных.
 
-```typescript
-import Database from 'better-sqlite3';
-
-interface MigrationResult {
-  success: boolean;
-  appliedMigrations?: number;
-  error?: string;
-}
-
+```javascript
+// Requirements: clerkly.1.4
 class MigrationRunner {
-  private db: Database.Database;
-  private migrationsPath: string;
-  
-  constructor(db: Database.Database, migrationsPath: string) {
+  constructor(db, migrationsPath) {
     this.db = db;
     this.migrationsPath = migrationsPath;
   }
   
-  runMigrations(): MigrationResult {
-    // Запускает все pending миграции
-    // Создает таблицу migrations для отслеживания
-    // Выполняет миграции в порядке возрастания версий
+  /**
+   * Инициализирует таблицу отслеживания миграций
+   * Создает таблицу schema_migrations для отслеживания примененных миграций
+   */
+  initializeMigrationTable() {
+    // Создает таблицу schema_migrations
   }
   
-  getCurrentVersion(): number {
+  /**
+   * Возвращает текущую версию схемы
+   * @returns {number} Текущая версия схемы (0 если миграции не применены)
+   */
+  getCurrentVersion() {
     // Возвращает текущую версию схемы
   }
   
-  getPendingMigrations(): string[] {
-    // Возвращает список pending миграций
+  /**
+   * Возвращает список примененных версий миграций
+   * @returns {number[]} Массив примененных версий миграций
+   */
+  getAppliedMigrations() {
+    // Возвращает список примененных миграций
+  }
+  
+  /**
+   * Загружает файлы миграций из директории
+   * @returns {Array} Массив объектов миграций, отсортированных по версии
+   */
+  loadMigrations() {
+    // Загружает и валидирует файлы миграций
+  }
+  
+  /**
+   * Запускает все pending миграции
+   * Создает таблицу migrations для отслеживания
+   * Выполняет миграции в порядке возрастания версий
+   * @returns {{success: boolean, appliedCount?: number, message?: string, error?: string}}
+   */
+  runMigrations() {
+    // Запускает все pending миграции
+  }
+  
+  /**
+   * Откатывает последнюю примененную миграцию
+   * @returns {{success: boolean, message?: string, error?: string}}
+   */
+  rollbackLastMigration() {
+    // Откатывает последнюю миграцию
+  }
+  
+  /**
+   * Возвращает статус миграций
+   * @returns {{currentVersion: number, appliedMigrations: number, pendingMigrations: number, totalMigrations: number, pending: Array}}
+   */
+  getStatus() {
+    // Возвращает информацию о текущем состоянии миграций
   }
 }
 ```
@@ -283,58 +403,93 @@ class MigrationRunner {
 #### IPC Handlers
 Управляет IPC коммуникацией между Main и Renderer процессами.
 
-```typescript
-import { IpcMainInvokeEvent } from 'electron';
-
+```javascript
+// Requirements: clerkly.1.4, clerkly.2.5
 class IPCHandlers {
-  private dataManager: DataManager;
-  private timeout: number = 10000; // 10 секунд
-  
-  constructor(dataManager: DataManager) {
+  constructor(dataManager) {
     this.dataManager = dataManager;
+    this.timeout = 10000; // 10 секунд
   }
   
-  registerHandlers(): void {
+  /**
+   * Регистрирует все IPC handlers
+   * Каналы: 'save-data', 'load-data', 'delete-data'
+   */
+  registerHandlers() {
     // Регистрирует все IPC handlers
-    // Каналы: 'save-data', 'load-data', 'delete-data'
   }
   
-  unregisterHandlers(): void {
+  /**
+   * Удаляет все IPC handlers
+   */
+  unregisterHandlers() {
     // Удаляет все IPC handlers
   }
   
-  async handleSaveData(event: IpcMainInvokeEvent, key: string, value: any): Promise<SaveResult> {
+  /**
+   * Обрабатывает save-data запрос
+   * Валидирует параметры
+   * Применяет timeout (10 секунд)
+   * Логирует ошибки
+   * @param {IpcMainInvokeEvent} event
+   * @param {string} key
+   * @param {any} value
+   * @returns {Promise<{success: boolean, error?: string}>}
+   */
+  async handleSaveData(event, key, value) {
     // Обрабатывает save-data запрос
-    // Валидирует параметры
-    // Применяет timeout (10 секунд)
-    // Логирует ошибки
   }
   
-  async handleLoadData<T = any>(event: IpcMainInvokeEvent, key: string): Promise<LoadResult<T>> {
+  /**
+   * Обрабатывает load-data запрос
+   * Валидирует параметры
+   * Применяет timeout
+   * Логирует ошибки
+   * @param {IpcMainInvokeEvent} event
+   * @param {string} key
+   * @returns {Promise<{success: boolean, data?: any, error?: string}>}
+   */
+  async handleLoadData(event, key) {
     // Обрабатывает load-data запрос
-    // Валидирует параметры
-    // Применяет timeout
-    // Логирует ошибки
   }
   
-  async handleDeleteData(event: IpcMainInvokeEvent, key: string): Promise<SaveResult> {
+  /**
+   * Обрабатывает delete-data запрос
+   * Валидирует параметры
+   * Применяет timeout
+   * Логирует ошибки
+   * @param {IpcMainInvokeEvent} event
+   * @param {string} key
+   * @returns {Promise<{success: boolean, error?: string}>}
+   */
+  async handleDeleteData(event, key) {
     // Обрабатывает delete-data запрос
-    // Валидирует параметры
-    // Применяет timeout
-    // Логирует ошибки
   }
   
-  withTimeout<T>(promise: Promise<T>, timeoutMs: number, timeoutMessage: string): Promise<T> {
+  /**
+   * Выполняет promise с timeout
+   * @param {Promise<T>} promise
+   * @param {number} timeoutMs
+   * @param {string} timeoutMessage
+   * @returns {Promise<T>}
+   */
+  withTimeout(promise, timeoutMs, timeoutMessage) {
     // Выполняет promise с timeout
   }
   
-  setTimeout(timeoutMs: number): void {
-    // Устанавливает timeout для IPC запросов
+  /**
+   * Устанавливает timeout для IPC запросов
+   * @param {number} timeoutMs
+   */
+  setTimeout(timeoutMs) {
     this.timeout = timeoutMs;
   }
   
-  getTimeout(): number {
-    // Возвращает текущий timeout
+  /**
+   * Возвращает текущий timeout
+   * @returns {number}
+   */
+  getTimeout() {
     return this.timeout;
   }
 }
@@ -345,81 +500,124 @@ class IPCHandlers {
 #### UI Controller
 Отвечает за отображение пользовательского интерфейса с мониторингом производительности.
 
-```typescript
-interface RenderResult {
-  success: boolean;
-  renderTime: number;
-  performanceWarning?: boolean;
-}
-
-interface UpdateResult {
-  success: boolean;
-  updateTime: number;
-  performanceWarning?: boolean;
-}
-
-interface LoadingResult {
-  success: boolean;
-  duration?: number;
-  error?: string;
-}
-
+```javascript
+// Requirements: clerkly.1.3, clerkly.2.1
 class UIController {
-  private container: HTMLElement;
-  private loadingIndicators: Map<string, { element: HTMLElement; startTime: number }>;
-  private performanceThreshold: number = 100; // ms
-  private loadingThreshold: number = 200; // ms
-  
-  constructor(container: HTMLElement) {
+  constructor(container) {
     this.container = container;
     this.loadingIndicators = new Map();
+    this.performanceThreshold = 100; // ms
+    this.loadingThreshold = 200; // ms
   }
   
-  render(): RenderResult {
+  /**
+   * Отрисовывает UI
+   * Создает header, content, footer
+   * Мониторит время отрисовки (< 100ms)
+   * Логирует предупреждения при медленной отрисовке
+   * @returns {{success: boolean, renderTime: number, performanceWarning?: boolean}}
+   */
+  render() {
     // Отрисовывает UI
-    // Создает header, content, footer
-    // Мониторит время отрисовки (< 100ms)
-    // Логирует предупреждения при медленной отрисовке
   }
   
-  updateView(data: any): UpdateResult {
+  /**
+   * Обновляет отображение с новыми данными
+   * Эффективное обновление без полной перерисовки
+   * Мониторит время обновления (< 100ms)
+   * @param {any} data
+   * @returns {{success: boolean, updateTime: number, performanceWarning?: boolean}}
+   */
+  updateView(data) {
     // Обновляет отображение с новыми данными
-    // Эффективное обновление без полной перерисовки
-    // Мониторит время обновления (< 100ms)
   }
   
-  showLoading(operationId: string, message: string): LoadingResult {
+  /**
+   * Показывает индикатор загрузки
+   * Для операций > 200ms
+   * @param {string} operationId
+   * @param {string} message
+   * @returns {{success: boolean, duration?: number, error?: string}}
+   */
+  showLoading(operationId, message) {
     // Показывает индикатор загрузки
-    // Для операций > 200ms
   }
   
-  hideLoading(operationId: string): LoadingResult {
+  /**
+   * Скрывает индикатор загрузки
+   * @param {string} operationId
+   * @returns {{success: boolean, duration?: number, error?: string}}
+   */
+  hideLoading(operationId) {
     // Скрывает индикатор загрузки
   }
   
-  async withLoading<T>(operationId: string, operation: () => Promise<T>, loadingMessage: string): Promise<T> {
+  /**
+   * Выполняет операцию с автоматическим индикатором загрузки
+   * Показывает индикатор после 200ms
+   * @param {string} operationId
+   * @param {Function} operation
+   * @param {string} loadingMessage
+   * @returns {Promise<any>}
+   */
+  async withLoading(operationId, operation, loadingMessage) {
     // Выполняет операцию с автоматическим индикатором загрузки
-    // Показывает индикатор после 200ms
   }
   
-  private createHeader(): HTMLElement {
+  /**
+   * Создает header элемент
+   * @returns {HTMLElement}
+   */
+  createHeader() {
     // Создает header элемент
   }
   
-  private createContent(): HTMLElement {
+  /**
+   * Создает content area элемент
+   * @returns {HTMLElement}
+   */
+  createContent() {
     // Создает content area элемент
   }
   
-  private createFooter(): HTMLElement {
+  /**
+   * Создает footer элемент
+   * @returns {HTMLElement}
+   */
+  createFooter() {
     // Создает footer элемент
   }
   
-  private createDataDisplay(data: any): HTMLElement {
-    // Создает отображение данных (таблица/список)
+  /**
+   * Создает отображение данных (таблица/список)
+   * @param {any} data
+   * @returns {HTMLElement}
+   */
+  createDataDisplay(data) {
+    // Создает отображение данных
   }
   
-  clearAllLoading(): void {
+  /**
+   * Очищает все индикаторы загрузки
+   */
+  clearAllLoading() {
     // Очищает все индикаторы загрузки
+  }
+  
+  /**
+   * Возвращает текущий контейнер
+   * @returns {HTMLElement}
+   */
+  getContainer() {
+    return this.container;
+  }
+  
+  /**
+   * Устанавливает новый контейнер
+   * @param {HTMLElement} container
+   */
+  setContainer(container) {
+    // Устанавливает новый контейнер
   }
 }
 ```
@@ -427,80 +625,116 @@ class UIController {
 #### State Controller
 Управляет состоянием приложения в renderer process.
 
-```typescript
-interface AppState {
-  [key: string]: any;
-}
-
-interface StateResult {
-  success: boolean;
-  state?: AppState;
-  error?: string;
-}
-
+```javascript
+// Requirements: clerkly.1.3, clerkly.2.1
 class StateController {
-  private state: AppState;
-  private stateHistory: AppState[] = [];
-  private maxHistorySize: number = 10;
-  
-  constructor(initialState?: AppState) {
-    this.state = initialState || {};
+  constructor(initialState = {}) {
+    this.state = initialState;
+    this.stateHistory = [];
+    this.maxHistorySize = 10;
   }
   
-  setState(newState: Partial<AppState>): StateResult {
+  /**
+   * Обновляет состояние приложения
+   * Выполняет shallow merge
+   * Сохраняет историю изменений
+   * @param {Object} newState
+   * @returns {{success: boolean, state?: Object, error?: string}}
+   */
+  setState(newState) {
     // Обновляет состояние приложения
-    // Выполняет shallow merge
-    // Сохраняет историю изменений
   }
   
-  getState(): AppState {
+  /**
+   * Возвращает копию текущего состояния
+   * @returns {Object}
+   */
+  getState() {
     // Возвращает копию текущего состояния
   }
   
-  resetState(newState?: AppState): StateResult {
+  /**
+   * Сбрасывает состояние
+   * @param {Object} newState
+   * @returns {{success: boolean, state?: Object, error?: string}}
+   */
+  resetState(newState = {}) {
     // Сбрасывает состояние
   }
   
-  getStateProperty(key: string): any {
-    // Возвращает конкретное свойство состояния
+  /**
+   * Возвращает конкретное свойство состояния
+   * @param {string} key
+   * @returns {any}
+   */
+  getStateProperty(key) {
     return this.state[key];
   }
   
-  setStateProperty(key: string, value: any): void {
+  /**
+   * Устанавливает конкретное свойство состояния
+   * @param {string} key
+   * @param {any} value
+   */
+  setStateProperty(key, value) {
     // Устанавливает конкретное свойство состояния
   }
   
-  removeStateProperty(key: string): void {
+  /**
+   * Удаляет свойство из состояния
+   * @param {string} key
+   */
+  removeStateProperty(key) {
     // Удаляет свойство из состояния
   }
   
-  hasStateProperty(key: string): boolean {
-    // Проверяет наличие свойства
+  /**
+   * Проверяет наличие свойства
+   * @param {string} key
+   * @returns {boolean}
+   */
+  hasStateProperty(key) {
     return key in this.state;
   }
   
-  getStateHistory(): AppState[] {
-    // Возвращает историю изменений состояния
+  /**
+   * Возвращает историю изменений состояния
+   * @returns {Object[]}
+   */
+  getStateHistory() {
     return [...this.stateHistory];
   }
   
-  clearStateHistory(): void {
-    // Очищает историю состояний
+  /**
+   * Очищает историю состояний
+   * @returns {{success: boolean}}
+   */
+  clearStateHistory() {
     this.stateHistory = [];
+    return { success: true };
   }
   
-  getStateKeys(): string[] {
-    // Возвращает все ключи состояния
+  /**
+   * Возвращает все ключи состояния
+   * @returns {string[]}
+   */
+  getStateKeys() {
     return Object.keys(this.state);
   }
   
-  getStateSize(): number {
-    // Возвращает количество свойств в состоянии
+  /**
+   * Возвращает количество свойств в состоянии
+   * @returns {number}
+   */
+  getStateSize() {
     return Object.keys(this.state).length;
   }
   
-  isStateEmpty(): boolean {
-    // Проверяет, пусто ли состояние
+  /**
+   * Проверяет, пусто ли состояние
+   * @returns {boolean}
+   */
+  isStateEmpty() {
     return Object.keys(this.state).length === 0;
   }
 }
@@ -509,39 +743,53 @@ class StateController {
 #### Preload Script (IPC Client)
 Обеспечивает безопасную IPC коммуникацию из renderer process.
 
-```typescript
+```javascript
+// Requirements: clerkly.1.4, clerkly.2.5
 // Preload script с contextBridge
-import { contextBridge, ipcRenderer } from 'electron';
+const { contextBridge, ipcRenderer } = require('electron');
 
-interface API {
-  saveData(key: string, value: any): Promise<SaveResult>;
-  loadData<T = any>(key: string): Promise<LoadResult<T>>;
-  deleteData(key: string): Promise<SaveResult>;
-}
+/**
+ * API для безопасной IPC коммуникации
+ * @typedef {Object} API
+ * @property {Function} saveData - Сохраняет данные
+ * @property {Function} loadData - Загружает данные
+ * @property {Function} deleteData - Удаляет данные
+ */
 
 contextBridge.exposeInMainWorld('api', {
-  async saveData(key: string, value: any): Promise<SaveResult> {
-    // Вызывает 'save-data' через ipcRenderer.invoke
+  /**
+   * Вызывает 'save-data' через ipcRenderer.invoke
+   * @param {string} key
+   * @param {any} value
+   * @returns {Promise<{success: boolean, error?: string}>}
+   */
+  async saveData(key, value) {
     return await ipcRenderer.invoke('save-data', key, value);
   },
   
-  async loadData<T = any>(key: string): Promise<LoadResult<T>> {
-    // Вызывает 'load-data' через ipcRenderer.invoke
+  /**
+   * Вызывает 'load-data' через ipcRenderer.invoke
+   * @param {string} key
+   * @returns {Promise<{success: boolean, data?: any, error?: string}>}
+   */
+  async loadData(key) {
     return await ipcRenderer.invoke('load-data', key);
   },
   
-  async deleteData(key: string): Promise<SaveResult> {
-    // Вызывает 'delete-data' через ipcRenderer.invoke
+  /**
+   * Вызывает 'delete-data' через ipcRenderer.invoke
+   * @param {string} key
+   * @returns {Promise<{success: boolean, error?: string}>}
+   */
+  async deleteData(key) {
     return await ipcRenderer.invoke('delete-data', key);
   }
-} as API);
+});
 
-// Глобальное объявление типов для window.api
-declare global {
-  interface Window {
-    api: API;
-  }
-}
+// Глобальное объявление для window.api доступно в renderer process
+// window.api.saveData(key, value)
+// window.api.loadData(key)
+// window.api.deleteData(key)
 ```
 
 ### IPC Communication
@@ -549,24 +797,7 @@ declare global {
 Коммуникация между Main и Renderer процессами через IPC (Inter-Process Communication) с использованием contextBridge для безопасности.
 
 ```javascript
-// Main Process - IPC Handlers
-const ipcHandlers = new IPCHandlers(dataManager)
-ipcHandlers.registerHandlers()
-
-// Renderer Process - через Preload Script
-const result = await window.api.saveData('my-key', 'my-value')
-if (result.success) {
-  console.log('Data saved successfully')
-} else {
-  console.error('Failed to save data:', result.error)
-}
-```
-
-### IPC Communication
-
-Коммуникация между Main и Renderer процессами через IPC (Inter-Process Communication) с использованием contextBridge для безопасности.
-
-```typescript
+// Requirements: clerkly.1.4, clerkly.2.4, clerkly.2.5
 // Main Process - IPC Handlers
 const ipcHandlers = new IPCHandlers(dataManager);
 ipcHandlers.registerHandlers();
@@ -582,40 +813,40 @@ if (result.success) {
 
 ### Application Configuration
 
-```typescript
-interface WindowSettings {
-  width: number;
-  height: number;
-  minWidth: number;
-  minHeight: number;
-  titleBarStyle: string;
-  vibrancy: string;
-}
-
+```javascript
+// Requirements: clerkly.1.2, clerkly.1.3
 class AppConfig {
-  readonly version: string = '1.0.0';
-  readonly platform: string = 'darwin'; // Mac OS X
-  readonly minOSVersion: string = '10.13';
-  readonly windowSettings: WindowSettings = {
-    width: 800,
-    height: 600,
-    minWidth: 600,
-    minHeight: 400,
-    titleBarStyle: 'hiddenInset',
-    vibrancy: 'under-window'
-  };
+  constructor() {
+    this.version = '1.0.0';
+    this.platform = 'darwin'; // Mac OS X
+    this.minOSVersion = '10.13';
+    this.windowSettings = {
+      width: 800,
+      height: 600,
+      minWidth: 600,
+      minHeight: 400,
+      titleBarStyle: 'hiddenInset',
+      vibrancy: 'under-window'
+    };
+  }
 }
 ```
 
 ### User Data
 
-```typescript
+```javascript
+// Requirements: clerkly.1.4
 class UserData {
-  constructor(
-    public readonly key: string,      // уникальный идентификатор (max 1000 chars)
-    public readonly value: any,       // данные пользователя (сериализуются в JSON, max 10MB)
-    public readonly timestamp: number // время создания/обновления
-  ) {}
+  /**
+   * @param {string} key - уникальный идентификатор (max 1000 chars)
+   * @param {any} value - данные пользователя (сериализуются в JSON, max 10MB)
+   * @param {number} timestamp - время создания/обновления
+   */
+  constructor(key, value, timestamp) {
+    this.key = key;
+    this.value = value;
+    this.timestamp = timestamp;
+  }
 }
 ```
 
@@ -636,7 +867,7 @@ CREATE TABLE user_data (
 CREATE INDEX idx_timestamp ON user_data(timestamp);
 
 -- Migration tracking table
-CREATE TABLE migrations (
+CREATE TABLE schema_migrations (
   version INTEGER PRIMARY KEY,
   name TEXT NOT NULL,
   applied_at INTEGER NOT NULL
@@ -651,9 +882,9 @@ CREATE TABLE migrations (
 
 *Для любых* валидных данных пользователя (key-value пары), сохранение данных с последующей загрузкой должно возвращать эквивалентное значение.
 
-**Validates: Requirements 1.4**
+**Validates: Requirements 1.4, 2.6**
 
-**Обоснование:** Это свойство проверяет, что локальное хранилище данных работает корректно. Если мы сохраняем данные и затем загружаем их, мы должны получить те же данные обратно. Это классическое round-trip свойство, которое гарантирует целостность данных при сохранении и загрузке через SQLite.
+**Обоснование:** Это свойство проверяет, что локальное хранилище данных работает корректно. Если мы сохраняем данные и затем загружаем их, мы должны получить те же данные обратно. Это классическое round-trip свойство, которое гарантирует целостность данных при сохранении и загрузке через SQLite. Это также демонстрирует property-based тестирование (требование 2.6).
 
 **Тестовый сценарий:**
 - Генерируем случайные key-value пары различных типов (строки, числа, объекты, массивы, boolean)
@@ -673,9 +904,9 @@ CREATE TABLE migrations (
 
 *Для любых* невалидных ключей (пустые строки, null, undefined, не-строки, слишком длинные строки > 1000 символов), операции saveData, loadData и deleteData должны возвращать ошибку без изменения состояния базы данных.
 
-**Validates: Requirements 1.4**
+**Validates: Requirements 1.4, 2.3, 2.6**
 
-**Обоснование:** Это свойство проверяет, что система корректно валидирует входные данные и отклоняет невалидные запросы. Это критически важно для безопасности и надежности приложения, предотвращая некорректные операции с базой данных.
+**Обоснование:** Это свойство проверяет, что система корректно валидирует входные данные и отклоняет невалидные запросы. Это критически важно для безопасности и надежности приложения, предотвращая некорректные операции с базой данных. Это также демонстрирует тестирование edge cases (требование 2.3) и property-based тестирование (требование 2.6).
 
 **Тестовый сценарий:**
 - Генерируем различные типы невалидных ключей
@@ -694,9 +925,9 @@ CREATE TABLE migrations (
 
 *Для любого* состояния в "State Controller", вызов getState() должен возвращать копию состояния, и изменения в возвращенном объекте не должны влиять на внутреннее состояние.
 
-**Validates: Requirements 1.3**
+**Validates: Requirements 1.3, 2.6**
 
-**Обоснование:** Это свойство проверяет, что "State Controller" корректно изолирует внутреннее состояние от внешних изменений. Это предотвращает непреднамеренные мутации состояния и обеспечивает предсказуемое поведение приложения.
+**Обоснование:** Это свойство проверяет, что "State Controller" корректно изолирует внутреннее состояние от внешних изменений. Это предотвращает непреднамеренные мутации состояния и обеспечивает предсказуемое поведение приложения. Это также демонстрирует property-based тестирование (требование 2.6).
 
 **Тестовый сценарий:**
 - Создаем "State Controller" с начальным состоянием
@@ -715,7 +946,7 @@ CREATE TABLE migrations (
 
 *Для любой* IPC операции (save-data, load-data, delete-data), если операция не завершается в течение установленного timeout (по умолчанию 10 секунд), должна возвращаться ошибка timeout.
 
-**Validates: Requirements 1.4**
+**Validates: Requirements 1.4, NFR 2.3**
 
 **Обоснование:** Это свойство проверяет, что IPC коммуникация корректно обрабатывает таймауты, предотвращая зависание приложения при медленных или зависших операциях. Это критически важно для отзывчивости UI и надежности приложения.
 
@@ -730,6 +961,49 @@ CREATE TABLE migrations (
 - Операции, завершающиеся чуть быстрее timeout
 - Операции, завершающиеся значительно медленнее timeout
 - Различные значения timeout (изменение через setTimeout)
+
+### Property 5: Migration Idempotence
+
+*Для любой* миграции базы данных, повторное применение той же миграции не должно изменять схему базы данных или вызывать ошибки.
+
+**Validates: Requirements 1.4, NFR 2.1**
+
+**Обоснование:** Это свойство проверяет, что система миграций корректно отслеживает примененные миграции и не применяет их повторно. Это критически важно для надежности приложения и предотвращения повреждения базы данных.
+
+**Тестовый сценарий:**
+- Создаем базу данных и применяем набор миграций
+- Запоминаем текущую версию схемы и состояние базы данных
+- Пытаемся применить те же миграции снова
+- Проверяем, что версия схемы не изменилась
+- Проверяем, что состояние базы данных не изменилось
+- Проверяем, что не возникло ошибок
+
+**Edge cases для тестирования:**
+- Пустая база данных (первое применение миграций)
+- База данных с частично примененными миграциями
+- База данных со всеми примененными миграциями
+- Попытка применить миграции в неправильном порядке
+
+### Property 6: Performance Threshold Monitoring
+
+*Для любой* операции UI (render, updateView), если время выполнения превышает установленный порог (100ms), должно генерироваться предупреждение о производительности.
+
+**Validates: Requirements NFR 1.2, NFR 1.3**
+
+**Обоснование:** Это свойство проверяет, что система мониторинга производительности корректно отслеживает время выполнения операций и предупреждает о медленных операциях. Это критически важно для поддержания отзывчивости UI и выявления проблем производительности.
+
+**Тестовый сценарий:**
+- Создаем UIController с установленным порогом производительности
+- Выполняем операции render/updateView с различным временем выполнения
+- Для операций < 100ms: проверяем, что performanceWarning = false
+- Для операций > 100ms: проверяем, что performanceWarning = true
+- Проверяем, что время выполнения корректно измеряется и возвращается
+
+**Edge cases для тестирования:**
+- Операции, выполняющиеся ровно на границе порога (100ms)
+- Очень быстрые операции (< 10ms)
+- Очень медленные операции (> 1000ms)
+- Различные значения порога производительности
 
 ## Обработка ошибок
 
@@ -753,14 +1027,15 @@ CREATE TABLE migrations (
 ### Ошибки хранения данных
 
 **Ошибки инициализации хранилища:**
-```typescript
-initialize(): InitializeResult {
+```javascript
+// Requirements: clerkly.1.4
+initialize() {
   try {
     // Создание директории
     if (!fs.existsSync(this.storagePath)) {
       fs.mkdirSync(this.storagePath, { recursive: true });
     }
-  } catch (dirError: any) {
+  } catch (dirError) {
     // Обработка ошибок прав доступа
     if (dirError.code === 'EACCES' || dirError.code === 'EPERM') {
       console.warn('Permission denied, using temp directory');
@@ -789,8 +1064,9 @@ initialize(): InitializeResult {
 ```
 
 **Ошибки операций сохранения:**
-```typescript
-saveData(key: string, value: any): SaveResult {
+```javascript
+// Requirements: clerkly.1.4
+saveData(key, value) {
   try {
     // Валидация ключа
     if (!key || typeof key !== 'string') {
@@ -802,10 +1078,10 @@ saveData(key: string, value: any): SaveResult {
     }
     
     // Сериализация значения
-    let serializedValue: string;
+    let serializedValue;
     try {
       serializedValue = JSON.stringify(value);
-    } catch (serializeError: any) {
+    } catch (serializeError) {
       return { success: false, error: `Failed to serialize value: ${serializeError.message}` };
     }
     
@@ -817,7 +1093,7 @@ saveData(key: string, value: any): SaveResult {
     // Сохранение в базу данных
     // ...
     return { success: true };
-  } catch (writeError: any) {
+  } catch (writeError) {
     // Обработка специфичных ошибок SQLite
     if (writeError.code === 'SQLITE_FULL') {
       return { success: false, error: 'Database is full: no space left on device' };
@@ -832,8 +1108,9 @@ saveData(key: string, value: any): SaveResult {
 ```
 
 **Ошибки операций загрузки:**
-```typescript
-loadData<T = any>(key: string): LoadResult<T> {
+```javascript
+// Requirements: clerkly.1.4
+loadData(key) {
   try {
     // Валидация ключа
     if (!key || typeof key !== 'string') {
@@ -850,22 +1127,22 @@ loadData<T = any>(key: string): LoadResult<T> {
     }
     
     // Запрос данных
-    const row = this.db.prepare('SELECT value FROM user_data WHERE key = ?').get(key) as { value: string } | undefined;
+    const row = this.db.prepare('SELECT value FROM user_data WHERE key = ?').get(key);
     
     if (!row) {
       return { success: false, error: 'Key not found' };
     }
     
     // Десериализация
-    let data: T;
+    let data;
     try {
       data = JSON.parse(row.value);
     } catch (e) {
-      data = row.value as any; // Fallback для plain string
+      data = row.value; // Fallback для plain string
     }
     
     return { success: true, data };
-  } catch (queryError: any) {
+  } catch (queryError) {
     if (queryError.code === 'SQLITE_BUSY' || queryError.code === 'SQLITE_LOCKED') {
       return { success: false, error: 'Database is locked: try again later' };
     }
@@ -877,9 +1154,10 @@ loadData<T = any>(key: string): LoadResult<T> {
 ### Ошибки IPC коммуникации
 
 **Ошибки каналов:**
-```typescript
+```javascript
+// Requirements: clerkly.1.4, clerkly.2.5
 class IPCHandlers {
-  async handleSaveData(event: IpcMainInvokeEvent, key: string, value: any): Promise<SaveResult> {
+  async handleSaveData(event, key, value) {
     try {
       // Валидация параметров
       if (key === undefined || key === null) {
@@ -907,16 +1185,16 @@ class IPCHandlers {
       }
       
       return result;
-    } catch (error: any) {
+    } catch (error) {
       console.error(`[IPC] save-data exception: ${error.message}`);
       return { success: false, error: error.message };
     }
   }
   
-  withTimeout<T>(promise: Promise<T>, timeoutMs: number, timeoutMessage: string): Promise<T> {
+  withTimeout(promise, timeoutMs, timeoutMessage) {
     return Promise.race([
       promise,
-      new Promise<T>((_, reject) => {
+      new Promise((_, reject) => {
         setTimeout(() => reject(new Error(timeoutMessage)), timeoutMs);
       })
     ]);
@@ -932,7 +1210,8 @@ class IPCHandlers {
 ### Мониторинг производительности
 
 **Мониторинг времени запуска:**
-```typescript
+```javascript
+// Requirements: clerkly.1.2, clerkly.1.3
 const startTime = Date.now();
 app.whenReady().then(async () => {
   await lifecycleManager.initialize();
@@ -944,9 +1223,10 @@ app.whenReady().then(async () => {
 ```
 
 **Отзывчивость UI:**
-```typescript
+```javascript
+// Requirements: clerkly.1.3, clerkly.2.1
 class UIController {
-  render(): RenderResult {
+  render() {
     const startTime = performance.now();
     // ... отрисовка UI ...
     const renderTime = performance.now() - startTime;
@@ -958,7 +1238,7 @@ class UIController {
     return { success: true, renderTime, performanceWarning: renderTime > this.performanceThreshold };
   }
   
-  async withLoading<T>(operationId: string, operation: () => Promise<T>, loadingMessage: string): Promise<T> {
+  async withLoading(operationId, operation, loadingMessage) {
     // Показывать индикатор загрузки для операций > 200ms
     const loadingTimeout = setTimeout(() => {
       this.showLoading(operationId, loadingMessage);
@@ -988,6 +1268,49 @@ class UIController {
 - **Property-based тесты:** Проверяют универсальные свойства на множестве сгенерированных входных данных
 
 Оба подхода дополняют друг друга и необходимы для комплексного покрытия.
+
+### Требования к документированию кода и тестов
+
+**Комментарии с требованиями в коде (Requirements 2.9):**
+
+Каждый фрагмент кода ДОЛЖЕН содержать комментарии со ссылками на требования, которые он реализует:
+
+```javascript
+// Requirements: clerkly.1.4, clerkly.2.7
+class DataManager {
+  // Requirements: clerkly.1.4
+  initialize() {
+    // Инициализирует локальное хранилище
+  }
+  
+  // Requirements: clerkly.1.4
+  saveData(key, value) {
+    // Сохраняет данные локально
+  }
+}
+```
+
+**Структурированные комментарии в тестах (Requirements 2.8):**
+
+Каждый тест ДОЛЖЕН содержать структурированный комментарий с описанием всех аспектов тестирования:
+
+```javascript
+/* Preconditions: описание начального состояния системы
+   Action: описание выполняемого действия
+   Assertions: описание ожидаемых результатов и проверок
+   Requirements: requirement-id.1.1, requirement-id.1.2 */
+it("should perform expected behavior", () => {
+  // Тест реализация
+});
+```
+
+**Обязательные компоненты структурированного комментария:**
+- **Preconditions**: Четко описать начальное состояние системы, моков, данных
+- **Action**: Конкретно указать, какое действие выполняется в тесте
+- **Assertions**: Детально описать все ожидаемые результаты и проверки
+- **Requirements**: Перечислить все требования, которые покрывает данный тест
+
+Эти требования обеспечивают прослеживаемость между требованиями, кодом и тестами, упрощая поддержку и валидацию покрытия требований.
 
 ### Фреймворк тестирования
 
@@ -1061,7 +1384,7 @@ class UIController {
 
 **Примеры модульных тестов:**
 
-```typescript
+```javascript
 /* Preconditions: DataManager initialized with test storage path, database is empty
    Action: save string data with valid key, then load it back
    Assertions: save returns success true, load returns success true with same data
@@ -1149,11 +1472,12 @@ test('should return immutable copy of state', () => {
 
 **Property 1: Data Storage Round-Trip**
 
-```typescript
-import * as fc from 'fast-check';
+```javascript
+// Requirements: clerkly.1.4, clerkly.2.6
+const fc = require('fast-check');
 
 describe('Property Tests - Data Storage', () => {
-  let dataManager: DataManager;
+  let dataManager;
   
   beforeEach(() => {
     dataManager = new DataManager('/tmp/test-storage');
@@ -1181,7 +1505,7 @@ describe('Property Tests - Data Storage', () => {
           fc.object(),
           fc.array(fc.anything())
         ), // value
-        async (key: string, value: any) => {
+        async (key, value) => {
           // Save data
           const saveResult = dataManager.saveData(key, value);
           expect(saveResult.success).toBe(true);
@@ -1214,7 +1538,7 @@ describe('Property Tests - Data Storage', () => {
           fc.object(),
           fc.string({ minLength: 1001 })
         ),
-        (invalidKey: any) => {
+        (invalidKey) => {
           const saveResult = dataManager.saveData(invalidKey, 'value');
           expect(saveResult.success).toBe(false);
           expect(saveResult.error).toBeTruthy();
@@ -1241,7 +1565,7 @@ describe('Property Tests - Data Storage', () => {
     fc.assert(
       fc.property(
         fc.object(),
-        (initialState: any) => {
+        (initialState) => {
           const stateController = new StateController(initialState);
           
           const state1 = stateController.getState();
@@ -1344,7 +1668,8 @@ test('Property 1 edge case: large objects', () => {
 
 **Пример функционального теста:**
 
-```typescript
+```javascript
+// Requirements: clerkly.1.4, clerkly.2.4
 /* Preconditions: application not running, test database does not exist
    Action: start app, save data, quit app, restart app, load data
    Assertions: loaded data equals saved data (persistence across restarts)
@@ -1441,7 +1766,8 @@ npm run validate
 - Время операций с данными: < 50ms для простых операций
 - Показ индикаторов загрузки для операций > 200ms
 
-```typescript
+```javascript
+// Requirements: clerkly.1.2, clerkly.1.3
 /* Preconditions: application not running
    Action: start application and measure startup time
    Assertions: startup time is less than 3000ms
