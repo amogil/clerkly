@@ -22,13 +22,13 @@ export interface NavigationActiveState {
  */
 export function getNavigationItems(page: Page): Record<NavigationItem, Locator> {
   const nav = page.locator("nav");
-  
+
   // Get all navigation buttons in the main section (not settings)
   const mainNavButtons = nav.locator("div.flex-1").locator("button");
-  
+
   // Settings button is in the bottom section
   const settingsButton = nav.locator("div.border-t").locator("button");
-  
+
   return {
     dashboard: mainNavButtons.nth(0),
     calendar: mainNavButtons.nth(1),

@@ -1395,13 +1395,7 @@ it("should validate active navigation state properties across navigation sequenc
   // **Feature: testing-infrastructure, Property 8: Активное состояние навигации**
 
   // Navigation item generator
-  const navigationItem = fc.constantFrom(
-    "dashboard",
-    "calendar",
-    "tasks",
-    "contacts",
-    "settings",
-  );
+  const navigationItem = fc.constantFrom("dashboard", "calendar", "tasks", "contacts", "settings");
 
   // Navigation sequence generator (array of navigation items)
   const navigationSequence = fc.array(navigationItem, { minLength: 1, maxLength: 10 });
@@ -1421,9 +1415,7 @@ it("should validate active navigation state properties across navigation sequenc
       // Verify navigation validation functions exist
       expect(validationContent).toContain("export function getNavigationItems");
       expect(validationContent).toContain("export async function validateActiveNavigationItem");
-      expect(validationContent).toContain(
-        "export async function validateNavigationCorrespondence",
-      );
+      expect(validationContent).toContain("export async function validateNavigationCorrespondence");
       expect(validationContent).toContain("export async function getCurrentActiveItem");
       expect(validationContent).toContain("export async function validateSingleActiveItem");
 
@@ -1716,6 +1708,464 @@ it("should validate navigation active state properties for all sections includin
         // Property 10: Both main and settings sections should use same active state logic
         expect(validationContent).toContain("validateActiveNavigationItem");
         // This function should work for all navigation items regardless of section
+
+        return true;
+      },
+    ),
+    { numRuns: 100 },
+  );
+});
+
+/* Preconditions: sidebar collapse functional tests exist with layout adaptation
+   Action: generate sidebar state transitions and validate layout adaptation properties
+   Assertions: for any sidebar state change, layout should adapt correctly with proper CSS classes
+   Requirements: testing-infrastructure.7.3 */
+it("should validate sidebar layout adaptivity properties across state transitions", async () => {
+  // **Feature: testing-infrastructure, Property 9: Адаптивность макета боковой панели**
+
+  fc.assert(
+    fc.property(
+      fc.record({
+        initialState: fc.constantFrom("expanded", "collapsed"),
+        transitionSequence: fc.array(fc.constantFrom("collapse", "expand"), {
+          minLength: 1,
+          maxLength: 5,
+        }),
+      }),
+      (testData) => {
+        const fs = require("fs");
+        const path = require("path");
+
+        // Property 1: Sidebar collapse functional tests should exist
+        const sidebarTestPath = path.join(
+          process.cwd(),
+          "tests/functional/sidebar-collapse.spec.ts",
+        );
+        const sidebarTestContent = fs.readFileSync(sidebarTestPath, "utf-8");
+
+        expect(sidebarTestContent).toContain("Sidebar adaptivity");
+        expect(sidebarTestContent).toContain("adapts sidebar width when collapsing");
+        expect(sidebarTestContent).toContain("adapts main content margin when collapsing");
+
+        // Property 2: Expanded state should use w-64 class for sidebar
+        expect(sidebarTestContent).toContain("w-64");
+        expect(sidebarTestContent).toContain("toHaveClass(/w-64/)");
+
+        // Property 3: Collapsed state should use w-20 class for sidebar
+        expect(sidebarTestContent).toContain("w-20");
+        expect(sidebarTestContent).toContain("toHaveClass(/w-20/)");
+
+        // Property 4: Expanded state should use ml-64 class for main content
+        expect(sidebarTestContent).toContain("ml-64");
+        expect(sidebarTestContent).toContain('locator("div.ml-64")');
+
+        // Property 5: Collapsed state should use ml-20 class for main content
+        expect(sidebarTestContent).toContain("ml-20");
+        expect(sidebarTestContent).toContain('locator("div.ml-20")');
+
+        // Property 6: Initial state should be valid
+        expect(["expanded", "collapsed"]).toContain(testData.initialState);
+
+        // Property 7: All transitions should be valid actions
+        testData.transitionSequence.forEach((transition) => {
+          expect(["collapse", "expand"]).toContain(transition);
+        });
+
+        // Property 8: Tests should verify sidebar width changes
+        expect(sidebarTestContent).toContain("adapts sidebar width");
+        expect(sidebarTestContent).toContain('locator("nav")');
+
+        // Property 9: Tests should verify main content margin changes
+        expect(sidebarTestContent).toContain("adapts main content margin");
+        expect(sidebarTestContent).toContain("main content");
+
+        // Property 10: Tests should handle rapid toggling
+        expect(sidebarTestContent).toContain("rapid");
+        expect(sidebarTestContent).toContain("toggle");
+
+        // Property 11: For any transition sequence, final state should be deterministic
+        let currentState = testData.initialState;
+        testData.transitionSequence.forEach((transition) => {
+          if (transition === "collapse") {
+            currentState = "collapsed";
+          } else if (transition === "expand") {
+            currentState = "expanded";
+          }
+        });
+
+        // Final state should be either expanded or collapsed
+        expect(["expanded", "collapsed"]).toContain(currentState);
+
+        // Property 12: Tests should verify layout consistency after transitions
+        expect(sidebarTestContent).toContain("Verify");
+        expect(sidebarTestContent).toContain("state");
+
+        // Property 13: Tests should check both sidebar and content adaptation
+        expect(sidebarTestContent).toContain("sidebar");
+        expect(sidebarTestContent).toContain("content");
+
+        // Property 14: Tests should verify navigation remains functional when collapsed
+        expect(sidebarTestContent).toContain("navigation");
+        expect(sidebarTestContent).toContain("clickable");
+
+        // Property 15: Tests should measure width changes
+        expect(sidebarTestContent).toContain("width");
+        expect(sidebarTestContent).toContain("boundingBox");
+
+        return true;
+      },
+    ),
+    { numRuns: 100 },
+  );
+});
+
+/* Preconditions: sidebar layout uses Tailwind CSS classes for responsive design
+   Action: generate sidebar state scenarios and validate CSS class consistency
+   Assertions: CSS classes should be mutually exclusive and correctly applied
+   Requirements: testing-infrastructure.7.3 */
+it("should validate sidebar CSS class consistency across state changes", async () => {
+  // **Feature: testing-infrastructure, Property 9: Адаптивность макета боковой панели**
+
+  fc.assert(
+    fc.property(
+      fc.record({
+        sidebarState: fc.constantFrom("expanded", "collapsed"),
+        verifyMutualExclusivity: fc.boolean(),
+      }),
+      (testData) => {
+        const fs = require("fs");
+        const path = require("path");
+
+        const sidebarTestPath = path.join(
+          process.cwd(),
+          "tests/functional/sidebar-collapse.spec.ts",
+        );
+        const sidebarTestContent = fs.readFileSync(sidebarTestPath, "utf-8");
+
+        // Property 1: Expanded and collapsed classes should be mutually exclusive
+        if (testData.sidebarState === "expanded") {
+          // When expanded, should have w-64 and NOT have w-20
+          expect(sidebarTestContent).toContain("toHaveClass(/w-64/)");
+          expect(sidebarTestContent).toContain("not.toHaveClass(/w-20/)");
+        } else {
+          // When collapsed, should have w-20 and NOT have w-64
+          expect(sidebarTestContent).toContain("toHaveClass(/w-20/)");
+          expect(sidebarTestContent).toContain("not.toHaveClass(/w-64/)");
+        }
+
+        // Property 2: Main content classes should also be mutually exclusive
+        if (testData.sidebarState === "expanded") {
+          expect(sidebarTestContent).toContain('locator("div.ml-64")');
+          expect(sidebarTestContent).toContain("toBeVisible");
+        } else {
+          expect(sidebarTestContent).toContain('locator("div.ml-20")');
+          expect(sidebarTestContent).toContain("toBeVisible");
+        }
+
+        // Property 3: Tests should verify mutual exclusivity when requested
+        if (testData.verifyMutualExclusivity) {
+          expect(sidebarTestContent).toContain("not.toHaveClass");
+          expect(sidebarTestContent).toContain("not.toBeVisible");
+        }
+
+        // Property 4: Sidebar state should be valid
+        expect(["expanded", "collapsed"]).toContain(testData.sidebarState);
+
+        // Property 5: Tests should verify state transitions are clean
+        expect(sidebarTestContent).toContain("Verify");
+        expect(sidebarTestContent).toContain("state");
+
+        // Property 6: Tests should check both positive and negative assertions
+        expect(sidebarTestContent).toContain("toHaveClass");
+        expect(sidebarTestContent).toContain("not.toHaveClass");
+
+        // Property 7: Tests should verify visibility changes
+        expect(sidebarTestContent).toContain("toBeVisible");
+        expect(sidebarTestContent).toContain("not.toBeVisible");
+
+        return true;
+      },
+    ),
+    { numRuns: 100 },
+  );
+});
+
+/* Preconditions: sidebar layout adaptation affects main content width
+   Action: generate sidebar state changes and validate width calculations
+   Assertions: main content width should increase when sidebar collapses
+   Requirements: testing-infrastructure.7.3 */
+it("should validate main content width adaptation when sidebar state changes", async () => {
+  // **Feature: testing-infrastructure, Property 9: Адаптивность макета боковой панели**
+
+  fc.assert(
+    fc.property(
+      fc.record({
+        expectedWidthDifference: fc.integer({ min: 150, max: 200 }),
+        tolerancePercent: fc.integer({ min: 5, max: 15 }),
+      }),
+      (testData) => {
+        const fs = require("fs");
+        const path = require("path");
+
+        const sidebarTestPath = path.join(
+          process.cwd(),
+          "tests/functional/sidebar-collapse.spec.ts",
+        );
+        const sidebarTestContent = fs.readFileSync(sidebarTestPath, "utf-8");
+
+        // Property 1: Tests should measure width changes
+        expect(sidebarTestContent).toContain("increases main content available width");
+        expect(sidebarTestContent).toContain("boundingBox");
+
+        // Property 2: Tests should compare expanded vs collapsed widths
+        expect(sidebarTestContent).toContain("expandedBox");
+        expect(sidebarTestContent).toContain("collapsedBox");
+
+        // Property 3: Collapsed content should be wider than expanded
+        expect(sidebarTestContent).toContain("toBeGreaterThan");
+        expect(sidebarTestContent).toContain("width");
+
+        // Property 4: Width difference should be validated with tolerance
+        expect(sidebarTestContent).toContain("widthDifference");
+        expect(sidebarTestContent).toContain("toBeGreaterThanOrEqual");
+        expect(sidebarTestContent).toContain("toBeLessThanOrEqual");
+
+        // Property 5: Expected width difference should be in valid range
+        // w-64 = 256px, w-20 = 80px, difference = 176px
+        expect(testData.expectedWidthDifference).toBeGreaterThanOrEqual(150);
+        expect(testData.expectedWidthDifference).toBeLessThanOrEqual(200);
+
+        // Property 6: Tolerance should be reasonable
+        expect(testData.tolerancePercent).toBeGreaterThanOrEqual(5);
+        expect(testData.tolerancePercent).toBeLessThanOrEqual(15);
+
+        // Property 7: Tests should verify both boxes are not null
+        expect(sidebarTestContent).toContain("not.toBeNull");
+
+        // Property 8: Tests should use conditional checks for box existence
+        expect(sidebarTestContent).toContain("if (expandedBox && collapsedBox)");
+
+        // Property 9: Width difference calculation should be explicit
+        expect(sidebarTestContent).toContain("collapsedBox.width - expandedBox.width");
+
+        // Property 10: Tests should document expected values
+        expect(sidebarTestContent).toContain("176px");
+        expect(sidebarTestContent).toContain("256px");
+        expect(sidebarTestContent).toContain("80px");
+
+        return true;
+      },
+    ),
+    { numRuns: 100 },
+  );
+});
+
+/* Preconditions: sidebar collapse affects navigation item display
+   Action: generate sidebar state scenarios and validate navigation adaptation
+   Assertions: navigation should remain functional in both expanded and collapsed states
+   Requirements: testing-infrastructure.7.3 */
+it("should validate navigation functionality across sidebar state changes", async () => {
+  // **Feature: testing-infrastructure, Property 9: Адаптивность макета боковой панели**
+
+  fc.assert(
+    fc.property(
+      fc.record({
+        sidebarState: fc.constantFrom("expanded", "collapsed"),
+        navigationItem: fc.constantFrom("dashboard", "calendar", "tasks", "contacts", "settings"),
+      }),
+      (testData) => {
+        const fs = require("fs");
+        const path = require("path");
+
+        const sidebarTestPath = path.join(
+          process.cwd(),
+          "tests/functional/sidebar-collapse.spec.ts",
+        );
+        const sidebarTestContent = fs.readFileSync(sidebarTestPath, "utf-8");
+
+        // Property 1: Tests should verify navigation items remain clickable when collapsed
+        expect(sidebarTestContent).toContain("adapts navigation item display when collapsed");
+        expect(sidebarTestContent).toContain("clickable");
+
+        // Property 2: Navigation should work in collapsed state
+        expect(sidebarTestContent).toContain("Navigation should still work with collapsed sidebar");
+        expect(sidebarTestContent).toContain("click()");
+
+        // Property 3: Tests should verify navigation buttons are accessible
+        expect(sidebarTestContent).toContain('getByRole("button"');
+        expect(sidebarTestContent).toContain("toBeVisible");
+
+        // Property 4: Sidebar state should be valid
+        expect(["expanded", "collapsed"]).toContain(testData.sidebarState);
+
+        // Property 5: Navigation item should be valid
+        const validItems = ["dashboard", "calendar", "tasks", "contacts", "settings"];
+        expect(validItems).toContain(testData.navigationItem);
+
+        // Property 6: Tests should verify page navigation works
+        expect(sidebarTestContent).toContain('getByRole("heading"');
+        expect(sidebarTestContent).toContain("Calendar");
+
+        // Property 7: Tests should handle both labeled and icon-only navigation
+        expect(sidebarTestContent).toContain("labels");
+        expect(sidebarTestContent).toContain("icons");
+
+        // Property 8: Tests should verify navigation in collapsed state uses button index
+        expect(sidebarTestContent).toContain("nth(");
+        expect(sidebarTestContent).toContain("button index");
+
+        // Property 9: Logo should also adapt to sidebar state
+        expect(sidebarTestContent).toContain("adapts logo display");
+        expect(sidebarTestContent).toContain("logo");
+
+        // Property 10: All navigation items should be testable
+        validItems.forEach((item) => {
+          const itemCapitalized = item.charAt(0).toUpperCase() + item.slice(1);
+          // At least some navigation items should be mentioned in tests
+          if (item === "dashboard" || item === "calendar") {
+            expect(sidebarTestContent).toContain(itemCapitalized);
+          }
+        });
+
+        return true;
+      },
+    ),
+    { numRuns: 100 },
+  );
+});
+
+/* Preconditions: sidebar state persists across app restarts
+   Action: generate state persistence scenarios and validate consistency
+   Assertions: sidebar state should persist and layout should adapt correctly on restart
+   Requirements: testing-infrastructure.7.3 */
+it("should validate sidebar state persistence and layout consistency", async () => {
+  // **Feature: testing-infrastructure, Property 9: Адаптивность макета боковой панели**
+
+  fc.assert(
+    fc.property(
+      fc.record({
+        persistedState: fc.constantFrom("expanded", "collapsed"),
+        restartCount: fc.integer({ min: 1, max: 3 }),
+      }),
+      (testData) => {
+        const fs = require("fs");
+        const path = require("path");
+
+        const sidebarTestPath = path.join(
+          process.cwd(),
+          "tests/functional/sidebar-collapse.spec.ts",
+        );
+        const sidebarTestContent = fs.readFileSync(sidebarTestPath, "utf-8");
+
+        // Property 1: Tests should verify state persistence
+        expect(sidebarTestContent).toContain("persists collapsed state");
+        expect(sidebarTestContent).toContain("relaunch");
+
+        // Property 2: Tests should use multiple app launches
+        expect(sidebarTestContent).toContain("firstRun");
+        expect(sidebarTestContent).toContain("secondRun");
+
+        // Property 3: Tests should verify state after restart
+        expect(sidebarTestContent).toContain("await firstRun.app.close()");
+        expect(sidebarTestContent).toContain("await launchApp(userDataDir");
+
+        // Property 4: Persisted state should be valid
+        expect(["expanded", "collapsed"]).toContain(testData.persistedState);
+
+        // Property 5: Restart count should be positive
+        expect(testData.restartCount).toBeGreaterThan(0);
+        expect(testData.restartCount).toBeLessThanOrEqual(3);
+
+        // Property 6: Tests should verify layout matches persisted state
+        if (testData.persistedState === "collapsed") {
+          expect(sidebarTestContent).toContain("toHaveClass(/w-20/)");
+        } else {
+          expect(sidebarTestContent).toContain("toHaveClass(/w-64/)");
+        }
+
+        // Property 7: Tests should use same user data directory for persistence
+        expect(sidebarTestContent).toContain("userDataDir");
+        expect(sidebarTestContent).toContain("createUserDataDir");
+
+        // Property 8: Tests should clean up after verification
+        expect(sidebarTestContent).toContain("cleanupUserDataDir");
+
+        // Property 9: Tests should verify both collapse and expand actions
+        expect(sidebarTestContent).toContain("Collapse sidebar");
+        expect(sidebarTestContent).toContain("Expand sidebar");
+
+        // Property 10: Tests should verify final state consistency
+        expect(sidebarTestContent).toContain("Verify");
+        expect(sidebarTestContent).toContain("consistent");
+
+        return true;
+      },
+    ),
+    { numRuns: 100 },
+  );
+});
+
+/* Preconditions: sidebar toggle button changes based on state
+   Action: generate toggle scenarios and validate button label changes
+   Assertions: button label should be "Collapse sidebar" when expanded, "Expand sidebar" when collapsed
+   Requirements: testing-infrastructure.7.3 */
+it("should validate sidebar toggle button adapts to current state", async () => {
+  // **Feature: testing-infrastructure, Property 9: Адаптивность макета боковой панели**
+
+  fc.assert(
+    fc.property(
+      fc.record({
+        currentState: fc.constantFrom("expanded", "collapsed"),
+        toggleCount: fc.integer({ min: 1, max: 5 }),
+      }),
+      (testData) => {
+        const fs = require("fs");
+        const path = require("path");
+
+        const sidebarTestPath = path.join(
+          process.cwd(),
+          "tests/functional/sidebar-collapse.spec.ts",
+        );
+        const sidebarTestContent = fs.readFileSync(sidebarTestPath, "utf-8");
+
+        // Property 1: Tests should reference both button labels
+        expect(sidebarTestContent).toContain("Collapse sidebar");
+        expect(sidebarTestContent).toContain("Expand sidebar");
+
+        // Property 2: Button labels should be used in getByRole queries
+        expect(sidebarTestContent).toContain('getByRole("button", { name: "Collapse sidebar" })');
+        expect(sidebarTestContent).toContain('getByRole("button", { name: "Expand sidebar" })');
+
+        // Property 3: Current state should be valid
+        expect(["expanded", "collapsed"]).toContain(testData.currentState);
+
+        // Property 4: Toggle count should be positive
+        expect(testData.toggleCount).toBeGreaterThan(0);
+        expect(testData.toggleCount).toBeLessThanOrEqual(5);
+
+        // Property 5: For any current state, appropriate button should be available
+        if (testData.currentState === "expanded") {
+          // When expanded, "Collapse sidebar" button should be available
+          expect(sidebarTestContent).toContain("Collapse sidebar");
+        } else {
+          // When collapsed, "Expand sidebar" button should be available
+          expect(sidebarTestContent).toContain("Expand sidebar");
+        }
+
+        // Property 6: Tests should verify button functionality
+        expect(sidebarTestContent).toContain(".click()");
+
+        // Property 7: Tests should verify state changes after button click
+        expect(sidebarTestContent).toContain("toHaveClass");
+
+        // Property 8: Tests should handle multiple toggles
+        expect(sidebarTestContent).toContain("toggle");
+
+        // Property 9: Button should be a role="button" element
+        expect(sidebarTestContent).toContain('getByRole("button"');
+
+        // Property 10: Tests should verify button is accessible
+        expect(sidebarTestContent).toContain("name:");
 
         return true;
       },

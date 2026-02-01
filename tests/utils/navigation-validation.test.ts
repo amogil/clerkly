@@ -8,13 +8,7 @@ describe("Navigation validation type definitions", () => {
      Assertions: type includes all expected sections.
      Requirements: testing-infrastructure.7.2 */
   it("should define all navigation item types", () => {
-    const validItems: NavigationItem[] = [
-      "dashboard",
-      "calendar",
-      "tasks",
-      "contacts",
-      "settings",
-    ];
+    const validItems: NavigationItem[] = ["dashboard", "calendar", "tasks", "contacts", "settings"];
 
     // Type check - this will fail at compile time if types are wrong
     expect(validItems).toHaveLength(5);

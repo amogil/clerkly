@@ -15,6 +15,8 @@ export default [
       "**/coverage/**",
       "**/build/**",
       "docs/development/ui_reference/**",
+      "**/test-results/**",
+      "**/playwright-report/**",
     ],
   },
   {
