@@ -1,9 +1,8 @@
-// Requirements: platform-foundation.2.2, google-oauth-auth.5.1, platform-foundation.3.3, platform-foundation.3.4
+// Requirements: platform-foundation.2.2, google-oauth-auth.5.1, platform-foundation.3.3, platform-foundation.3.4, ui-cleanup.3.4, ui-cleanup.8.1
 import { contextBridge, ipcRenderer } from "electron";
 import type {
   AuthResult,
   AuthState,
-  SidebarState,
   OperationResult,
   PerformanceMetrics,
   SecurityAuditResult,
@@ -71,37 +70,6 @@ const api = {
   signOut: createLoggedIPCCall(
     "auth:sign-out",
     (): Promise<OperationResult> => ipcRenderer.invoke("auth:sign-out") as Promise<OperationResult>,
-  ),
-  /**
-   * Get the current sidebar collapsed state
-   * Requirements: sidebar-navigation.5.1, sidebar-navigation.5.3
-   *
-   * @returns Promise resolving to SidebarState with collapsed boolean
-   * @example
-   * const state = await window.clerkly.getSidebarState();
-   * console.log(state.collapsed); // true or false
-   */
-  getSidebarState: createLoggedIPCCall(
-    "sidebar:get-state",
-    (): Promise<SidebarState> => ipcRenderer.invoke("sidebar:get-state") as Promise<SidebarState>,
-  ),
-
-  /**
-   * Set the sidebar collapsed state
-   * Requirements: sidebar-navigation.5.1, sidebar-navigation.5.3
-   *
-   * @param collapsed - Boolean indicating whether sidebar should be collapsed
-   * @returns Promise resolving to OperationResult with success boolean
-   * @example
-   * const result = await window.clerkly.setSidebarState(true);
-   * if (result.success) {
-   *   console.log('Sidebar state saved successfully');
-   * }
-   */
-  setSidebarState: createLoggedIPCCall(
-    "sidebar:set-state",
-    (collapsed: boolean): Promise<OperationResult> =>
-      ipcRenderer.invoke("sidebar:set-state", { collapsed }) as Promise<OperationResult>,
   ),
   getPerformanceMetrics: createLoggedIPCCall(
     "performance:get-metrics",

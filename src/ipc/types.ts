@@ -25,20 +25,6 @@ export interface AuthState {
 }
 
 /**
- * Sidebar state information
- */
-export interface SidebarState {
-  collapsed: boolean;
-}
-
-/**
- * Parameters for setting sidebar state
- */
-export interface SetSidebarStateParams {
-  collapsed: boolean;
-}
-
-/**
  * Performance metrics information
  */
 export interface PerformanceMetrics {
@@ -90,16 +76,6 @@ export interface IPCChannels {
   };
   "auth:sign-out": {
     params: void;
-    returns: OperationResult;
-  };
-
-  // Sidebar channels
-  "sidebar:get-state": {
-    params: void;
-    returns: SidebarState;
-  };
-  "sidebar:set-state": {
-    params: SetSidebarStateParams;
     returns: OperationResult;
   };
 

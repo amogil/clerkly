@@ -18,19 +18,13 @@ describe("Platform Foundation Property-Based Tests", () => {
             "auth:open-google",
             "auth:get-state",
             "auth:sign-out",
-            "sidebar:get-state",
-            "sidebar:set-state",
             "performance:get-metrics",
             "security:audit",
           ),
           (channel: IPCChannelName) => {
             // Test that all valid channels have validators
             expect(() => {
-              if (channel === "sidebar:set-state") {
-                validateIPCParams(channel, { collapsed: true });
-              } else {
-                validateIPCParams(channel, undefined);
-              }
+              validateIPCParams(channel, undefined);
             }).not.toThrow();
           },
         ),
@@ -85,40 +79,6 @@ describe("Platform Foundation Property-Based Tests", () => {
           (invalidParam) => {
             expect(() => {
               validateIPCParams("performance:get-metrics", invalidParam);
-            }).toThrow(IPCValidationError);
-          },
-        ),
-        { numRuns: 50 },
-      );
-    });
-
-    /* Preconditions: sidebar:set-state channel validator is available
-       Action: generate various parameter combinations for sidebar state
-       Assertions: only valid boolean collapsed values are accepted
-       Requirements: platform-foundation.3.3, platform-foundation.3.4 */
-    it("should validate sidebar parameters correctly", () => {
-      fc.assert(
-        fc.property(fc.boolean(), (collapsed: boolean) => {
-          expect(() => {
-            validateIPCParams("sidebar:set-state", { collapsed });
-          }).not.toThrow();
-        }),
-        { numRuns: 50 },
-      );
-
-      // Test invalid parameters
-      fc.assert(
-        fc.property(
-          fc.oneof(
-            fc.string(),
-            fc.integer(),
-            fc.constant(null),
-            fc.constant(undefined),
-            fc.object(),
-          ),
-          (invalidCollapsed) => {
-            expect(() => {
-              validateIPCParams("sidebar:set-state", { collapsed: invalidCollapsed });
             }).toThrow(IPCValidationError);
           },
         ),

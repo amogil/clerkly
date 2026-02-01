@@ -1,6 +1,6 @@
 // Requirements: platform-foundation.1.1, platform-foundation.1.2, platform-foundation.1.3, platform-foundation.1.4, platform-foundation.2.2, data-storage.1.1, sidebar-navigation.4.1, google-oauth-auth.5.1, google-oauth-auth.1.4, google-oauth-auth.1.7, google-oauth-auth.1.8, google-oauth-auth.2.1, google-oauth-auth.2.2, google-oauth-auth.3.1, google-oauth-auth.4.2, google-oauth-auth.4.3, google-oauth-auth.4.4, platform-foundation.3.3, platform-foundation.3.4, platform-foundation.2.1
 // Tooling requirements: platform-foundation.2.1 (see package.json)
-import { app, BrowserWindow, dialog, ipcMain, Menu, screen, shell } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Menu, shell } from "electron";
 import Database from "better-sqlite3";
 import http from "http";
 import path from "path";
@@ -36,8 +36,6 @@ let pendingCodeVerifier: string | null = null;
 let pendingAuthState: string | null = null;
 
 type SqliteDatabase = InstanceType<typeof Database>;
-// Requirements: sidebar-navigation.4.1
-const SIDEBAR_STATE_KEY = "sidebar_collapsed";
 
 const sendAuthResultToRenderer = (result: AuthResult): void => {
   if (mainWindow && !mainWindow.isDestroyed()) {
@@ -145,21 +143,6 @@ const closeAuthServer = (): void => {
     authServer = null;
     authServerPort = null;
   }
-};
-
-// Requirements: sidebar-navigation.4.1, sidebar-navigation.4.3
-const getSidebarCollapsed = (db: SqliteDatabase): boolean => {
-  const row = db.prepare("SELECT value FROM app_meta WHERE key = ?").get(SIDEBAR_STATE_KEY) as
-    | { value: string }
-    | undefined;
-  return row?.value === "1";
-};
-
-// Requirements: sidebar-navigation.4.1, sidebar-navigation.4.2
-const setSidebarCollapsed = (db: SqliteDatabase, collapsed: boolean): void => {
-  db.prepare(
-    "INSERT INTO app_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
-  ).run(SIDEBAR_STATE_KEY, collapsed ? "1" : "0");
 };
 
 const exchangeCodeForTokens = async (
@@ -563,83 +546,6 @@ const registerAuthHandlers = (db: SqliteDatabase, rootDir: string): void => {
     });
   } catch (error) {
     logError(rootDir, "Failed to register auth IPC handlers", error);
-    throw error; // Re-throw to prevent app from starting with broken IPC
-  }
-};
-
-const registerSidebarHandlers = (db: SqliteDatabase): void => {
-  const rootDir = app.getPath("userData");
-  logInfo(rootDir, "Starting sidebar IPC handlers registration");
-
-  try {
-    logInfo(rootDir, "Registering IPC handler", { channel: "sidebar:get-state" });
-    ipcMain.handle(
-      "sidebar:get-state",
-      wrapIPCHandler("sidebar:get-state", (_event, params) => {
-        logDebug(rootDir, "IPC call: sidebar:get-state", { params });
-
-        try {
-          // Validate IPC parameters
-          validateIPCParams("sidebar:get-state", params);
-
-          const result = { collapsed: getSidebarCollapsed(db) };
-          logDebug(rootDir, "IPC response: sidebar:get-state", { result });
-          return result;
-        } catch (error) {
-          if (error instanceof IPCValidationError) {
-            logError(rootDir, "IPC validation failed for sidebar:get-state", error);
-            const result = { collapsed: false }; // Return default state on validation error
-            logDebug(rootDir, "IPC response: sidebar:get-state", { result });
-            return result;
-          }
-
-          // Log unexpected errors but still return a valid response
-          logError(rootDir, "Sidebar get-state failed", error);
-          const result = { collapsed: false };
-          logDebug(rootDir, "IPC response: sidebar:get-state", { result });
-          return result;
-        }
-      }),
-    );
-    logInfo(rootDir, "Successfully registered IPC handler", { channel: "sidebar:get-state" });
-
-    logInfo(rootDir, "Registering IPC handler", { channel: "sidebar:set-state" });
-    ipcMain.handle(
-      "sidebar:set-state",
-      wrapIPCHandler("sidebar:set-state", (_event, params) => {
-        logDebug(rootDir, "IPC call: sidebar:set-state", { params });
-
-        try {
-          // Validate IPC parameters
-          validateIPCParams("sidebar:set-state", params);
-
-          setSidebarCollapsed(db, params.collapsed);
-          const result = { success: true };
-          logDebug(rootDir, "IPC response: sidebar:set-state", { result });
-          return result;
-        } catch (error) {
-          if (error instanceof IPCValidationError) {
-            logError(rootDir, "IPC validation failed for sidebar:set-state", error);
-            const result = { success: false, error: "Invalid request parameters." };
-            logDebug(rootDir, "IPC response: sidebar:set-state", { result });
-            return result;
-          }
-
-          // Log unexpected errors
-          logError(rootDir, "Sidebar set-state failed", error);
-          const result = { success: false, error: "Failed to update sidebar state." };
-          logDebug(rootDir, "IPC response: sidebar:set-state", { result });
-          return result;
-        }
-      }),
-    );
-    logInfo(rootDir, "Successfully registered IPC handler", { channel: "sidebar:set-state" });
-
-    logInfo(rootDir, "Sidebar IPC handlers registration completed successfully", {
-      handlers: ["sidebar:get-state", "sidebar:set-state"],
-    });
-  } catch (error) {
-    logError(rootDir, "Failed to register sidebar IPC handlers", error);
     throw error; // Re-throw to prevent app from starting with broken IPC
   }
 };
@@ -1168,9 +1074,6 @@ app.whenReady().then(() => {
     logInfo(rootDir, "Registering auth IPC handlers");
     registerAuthHandlers(db, rootDir);
 
-    logInfo(rootDir, "Registering sidebar IPC handlers");
-    registerSidebarHandlers(db);
-
     logInfo(rootDir, "Registering performance IPC handlers");
     registerPerformanceHandlers();
 
@@ -1184,9 +1087,8 @@ app.whenReady().then(() => {
     registerProtocolHandling();
 
     logInfo(rootDir, "All IPC handlers registered successfully", {
-      totalHandlers: 8,
+      totalHandlers: 6,
       authHandlers: 3,
-      sidebarHandlers: 2,
       performanceHandlers: 1,
       securityHandlers: 1,
       preloadHandlers: 1,
@@ -1194,8 +1096,6 @@ app.whenReady().then(() => {
         "auth:open-google",
         "auth:get-state",
         "auth:sign-out",
-        "sidebar:get-state",
-        "sidebar:set-state",
         "performance:get-metrics",
         "security:audit",
         "preload:log",

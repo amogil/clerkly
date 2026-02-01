@@ -67,16 +67,6 @@ describe("Testing requirements", () => {
     expect(source).toContain('"failure"');
   });
 
-  /* Preconditions: sidebar tests exist.
-     Action: inspect sidebar flow test.
-     Assertions: collapse and expand are covered.
-     Requirements: testing-infrastructure.1.8 */
-  it("covers sidebar collapse and expansion", () => {
-    const source = readText("tests/functional/sidebar-collapse.spec.ts");
-    expect(source).toContain("Collapse sidebar");
-    expect(source).toContain("Expand sidebar");
-  });
-
   /* Preconditions: sign-out tests exist.
      Action: inspect sign-out flow test.
      Assertions: sign-out and return to auth gate are covered.
@@ -84,18 +74,6 @@ describe("Testing requirements", () => {
   it("covers sign-out flow", () => {
     const source = readText("tests/functional/sign-out.spec.ts");
     expect(source).toContain("Sign Out");
-  });
-
-  /* Preconditions: navigation tests exist.
-     Action: inspect navigation flow test.
-     Assertions: main section navigation is covered.
-     Requirements: testing-infrastructure.1.10 */
-  it("covers core navigation flows", () => {
-    const source = readText("tests/functional/navigation.spec.ts");
-    expect(source).toContain("Calendar");
-    expect(source).toContain("Tasks");
-    expect(source).toContain("Contacts");
-    expect(source).toContain("Settings");
   });
 
   /* Preconditions: auth stub exists.
@@ -137,47 +115,12 @@ describe("Testing requirements", () => {
   });
 
   /* Preconditions: functional tests exist.
-     Action: inspect layout shift coverage.
-     Assertions: main content shift is tested.
-     Requirements: testing-infrastructure.1.15 */
-  it("covers sidebar layout shift", () => {
-    const source = readText("tests/functional/sidebar-collapse.spec.ts");
-    expect(source).toContain("shifts main content when collapsed");
-  });
-
-  /* Preconditions: functional tests exist.
      Action: inspect sign-out persistence coverage.
      Assertions: relaunch after sign-out is tested.
      Requirements: testing-infrastructure.1.16 */
   it("covers sign-out persistence", () => {
     const source = readText("tests/functional/sign-out.spec.ts");
     expect(source).toContain("persists signed-out state after relaunch");
-  });
-
-  /* Preconditions: functional tests exist.
-     Action: inspect nav active state coverage.
-     Assertions: active nav styling is tested.
-     Requirements: testing-infrastructure.1.17 */
-  it("covers nav active state updates", () => {
-    const source = readText("tests/functional/navigation.spec.ts");
-    expect(source).toContain("highlights the active navigation item");
-  });
-
-  /* Preconditions: functional tests exist.
-     Action: inspect settings toggles coverage.
-     Assertions: settings toggles are tested.
-     Requirements: testing-infrastructure.1.18 */
-  /* Preconditions: settings toggles functional test exists
-     Action: read settings-toggles.spec.ts file content
-     Assertions: contains toggle state validation and reactivity tests
-     Requirements: testing-infrastructure.8.1 */
-  it("covers settings toggles", () => {
-    const source = readText("tests/functional/settings-toggles.spec.ts");
-    expect(source).toContain("Settings Toggles - State Changes");
-    expect(source).toContain("Settings Toggles - UI Reactivity");
-    expect(source).toContain("Settings Toggles - Edge Cases");
-    expect(source).toContain("validateToggleState");
-    expect(source).toContain("validateToggleReactivity");
   });
 
   /* Preconditions: functional tests exist.

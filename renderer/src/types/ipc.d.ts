@@ -4,7 +4,6 @@
 import type {
   AuthResult,
   AuthState,
-  SidebarState,
   OperationResult,
   IPCChannels,
   IPCEvents,
@@ -15,28 +14,13 @@ import type {
 /**
  * Renderer-side IPC API interface
  * Defines the methods available on window.clerkly
- * Requirements: platform-foundation.3.3, platform-foundation.3.4, sidebar-navigation.5.3
+ * Requirements: platform-foundation.3.3, platform-foundation.3.4, ui-cleanup.3.4, ui-cleanup.8.2
  */
 export interface ClerklyAPI {
   // Authentication methods
   openGoogleAuth: () => Promise<AuthResult>;
   getAuthState: () => Promise<AuthState>;
   signOut: () => Promise<OperationResult>;
-
-  /**
-   * Get the current sidebar collapsed state
-   * Requirements: sidebar-navigation.5.1, sidebar-navigation.5.3
-   * @returns Promise resolving to SidebarState with collapsed boolean
-   */
-  getSidebarState: () => Promise<SidebarState>;
-
-  /**
-   * Set the sidebar collapsed state
-   * Requirements: sidebar-navigation.5.1, sidebar-navigation.5.3
-   * @param collapsed - Boolean indicating whether sidebar should be collapsed
-   * @returns Promise resolving to OperationResult with success boolean
-   */
-  setSidebarState: (collapsed: boolean) => Promise<OperationResult>;
 
   // Event listeners
   onAuthResult: (callback: (result: AuthResult) => void) => () => void;
@@ -69,4 +53,4 @@ export interface ClerklyWindow extends Window {
 }
 
 // Re-export commonly used types for convenience
-export type { AuthResult, AuthState, SidebarState, OperationResult, IPCChannelName, IPCEventName };
+export type { AuthResult, AuthState, OperationResult, IPCChannelName, IPCEventName };

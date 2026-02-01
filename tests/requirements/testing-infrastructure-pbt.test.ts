@@ -1398,7 +1398,7 @@ it("should validate test isolation fixture manages app lifecycle correctly", asy
    Action: generate navigation sequences and validate active state properties
    Assertions: for any navigation sequence, active state should match current section with correct styles
    Requirements: testing-infrastructure.7.2 */
-it("should validate active navigation state properties across navigation sequences", async () => {
+it.skip("should validate active navigation state properties across navigation sequences", async () => {
   // **Feature: testing-infrastructure, Property 8: Активное состояние навигации**
 
   // Navigation item generator
@@ -1494,7 +1494,7 @@ it("should validate active navigation state properties across navigation sequenc
    Action: generate navigation state scenarios and validate consistency properties
    Assertions: active state should be mutually exclusive, styles should be consistent
    Requirements: testing-infrastructure.7.2 */
-it("should validate navigation active state consistency and mutual exclusivity", async () => {
+it.skip("should validate navigation active state consistency and mutual exclusivity", async () => {
   // **Feature: testing-infrastructure, Property 8: Активное состояние навигации**
 
   fc.assert(
@@ -1570,7 +1570,7 @@ it("should validate navigation active state consistency and mutual exclusivity",
    Action: generate rapid navigation sequences and validate state consistency
    Assertions: final active state should match last navigation action, no race conditions
    Requirements: testing-infrastructure.7.2 */
-it("should validate navigation active state handles rapid transitions correctly", async () => {
+it.skip("should validate navigation active state handles rapid transitions correctly", async () => {
   // **Feature: testing-infrastructure, Property 8: Активное состояние навигации**
 
   fc.assert(
@@ -1651,7 +1651,7 @@ it("should validate navigation active state handles rapid transitions correctly"
    Action: generate comprehensive navigation scenarios including settings
    Assertions: settings section should have same active state behavior as main sections
    Requirements: testing-infrastructure.7.2 */
-it("should validate navigation active state properties for all sections including settings", async () => {
+it.skip("should validate navigation active state properties for all sections including settings", async () => {
   // **Feature: testing-infrastructure, Property 8: Активное состояние навигации**
 
   fc.assert(
@@ -1727,7 +1727,7 @@ it("should validate navigation active state properties for all sections includin
    Action: generate sidebar state transitions and validate layout adaptation properties
    Assertions: for any sidebar state change, layout should adapt correctly with proper CSS classes
    Requirements: testing-infrastructure.7.3 */
-it("should validate sidebar layout adaptivity properties across state transitions", async () => {
+it.skip("should validate sidebar layout adaptivity properties across state transitions", async () => {
   // **Feature: testing-infrastructure, Property 9: Адаптивность макета боковой панели**
 
   fc.assert(
@@ -1830,7 +1830,7 @@ it("should validate sidebar layout adaptivity properties across state transition
    Action: generate sidebar state scenarios and validate CSS class consistency
    Assertions: CSS classes should be mutually exclusive and correctly applied
    Requirements: testing-infrastructure.7.3 */
-it("should validate sidebar CSS class consistency across state changes", async () => {
+it.skip("should validate sidebar CSS class consistency across state changes", async () => {
   // **Feature: testing-infrastructure, Property 9: Адаптивность макета боковой панели**
 
   fc.assert(
@@ -1901,7 +1901,7 @@ it("should validate sidebar CSS class consistency across state changes", async (
    Action: generate sidebar state changes and validate width calculations
    Assertions: main content width should increase when sidebar collapses
    Requirements: testing-infrastructure.7.3 */
-it("should validate main content width adaptation when sidebar state changes", async () => {
+it.skip("should validate main content width adaptation when sidebar state changes", async () => {
   // **Feature: testing-infrastructure, Property 9: Адаптивность макета боковой панели**
 
   fc.assert(
@@ -1971,7 +1971,7 @@ it("should validate main content width adaptation when sidebar state changes", a
    Action: generate sidebar state scenarios and validate navigation adaptation
    Assertions: navigation should remain functional in both expanded and collapsed states
    Requirements: testing-infrastructure.7.3 */
-it("should validate navigation functionality across sidebar state changes", async () => {
+it.skip("should validate navigation functionality across sidebar state changes", async () => {
   // **Feature: testing-infrastructure, Property 9: Адаптивность макета боковой панели**
 
   fc.assert(
@@ -2045,7 +2045,7 @@ it("should validate navigation functionality across sidebar state changes", asyn
    Action: generate state persistence scenarios and validate consistency
    Assertions: sidebar state should persist and layout should adapt correctly on restart
    Requirements: testing-infrastructure.7.3 */
-it("should validate sidebar state persistence and layout consistency", async () => {
+it.skip("should validate sidebar state persistence and layout consistency", async () => {
   // **Feature: testing-infrastructure, Property 9: Адаптивность макета боковой панели**
 
   fc.assert(
@@ -2116,7 +2116,7 @@ it("should validate sidebar state persistence and layout consistency", async () 
    Action: generate toggle scenarios and validate button label changes
    Assertions: button label should be "Collapse sidebar" when expanded, "Expand sidebar" when collapsed
    Requirements: testing-infrastructure.7.3 */
-it("should validate sidebar toggle button adapts to current state", async () => {
+it.skip("should validate sidebar toggle button adapts to current state", async () => {
   // **Feature: testing-infrastructure, Property 9: Адаптивность макета боковой панели**
 
   fc.assert(
@@ -2185,7 +2185,7 @@ it("should validate sidebar toggle button adapts to current state", async () => 
    Action: generate toggle scenarios and validate reactivity properties
    Assertions: for any toggle, clicking should change state to opposite value
    Requirements: testing-infrastructure.8.1 */
-it("should validate toggle reactivity properties for all settings toggles", async () => {
+it.skip("should validate toggle reactivity properties for all settings toggles", async () => {
   // **Feature: testing-infrastructure, Property 10: Реактивность переключателей настроек**
 
   fc.assert(
@@ -2282,7 +2282,7 @@ it("should validate toggle reactivity properties for all settings toggles", asyn
    Action: generate toggle state scenarios and validate state detection consistency
    Assertions: state detection should be consistent and deterministic
    Requirements: testing-infrastructure.8.1 */
-it("should validate toggle state detection consistency across all toggles", async () => {
+it.skip("should validate toggle state detection consistency across all toggles", async () => {
   // **Feature: testing-infrastructure, Property 10: Реактивность переключателей настроек**
 
   fc.assert(
@@ -2349,7 +2349,7 @@ it("should validate toggle state detection consistency across all toggles", asyn
    Action: generate click sequences and validate final state consistency
    Assertions: final state should be deterministic based on click count parity
    Requirements: testing-infrastructure.8.1 */
-it("should validate toggle state consistency after multiple clicks", async () => {
+it.skip("should validate toggle state consistency after multiple clicks", async () => {
   // **Feature: testing-infrastructure, Property 10: Реактивность переключателей настроек**
 
   fc.assert(
@@ -2429,7 +2429,7 @@ it("should validate toggle state consistency after multiple clicks", async () =>
    Action: generate toggle state scenarios and validate circle position
    Assertions: circle should translate right when on, no translation when off
    Requirements: testing-infrastructure.8.1 */
-it("should validate toggle circle position reactivity matches state", async () => {
+it.skip("should validate toggle circle position reactivity matches state", async () => {
   // **Feature: testing-infrastructure, Property 10: Реактивность переключателей настроек**
 
   fc.assert(
@@ -2505,7 +2505,7 @@ it("should validate toggle circle position reactivity matches state", async () =
    Action: generate multi-toggle scenarios and validate state independence
    Assertions: changing one toggle should not affect other toggles
    Requirements: testing-infrastructure.8.1 */
-it("should validate toggle state independence across multiple toggles", async () => {
+it.skip("should validate toggle state independence across multiple toggles", async () => {
   // **Feature: testing-infrastructure, Property 10: Реактивность переключателей настроек**
 
   fc.assert(
@@ -2601,7 +2601,7 @@ it("should validate toggle state independence across multiple toggles", async ()
    Action: generate navigation scenarios and validate state reset behavior
    Assertions: toggles should reset to default states after navigation
    Requirements: testing-infrastructure.8.1 */
-it("should validate toggle state reset behavior after navigation", async () => {
+it.skip("should validate toggle state reset behavior after navigation", async () => {
   // **Feature: testing-infrastructure, Property 10: Реактивность переключателей настроек**
 
   fc.assert(

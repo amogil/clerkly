@@ -1,7 +1,7 @@
 // Requirements: platform-foundation.3.3, platform-foundation.3.4
 // IPC Message Validation
 
-import type { IPCChannelName, IPCChannelParams, SetSidebarStateParams } from "./types";
+import type { IPCChannelName, IPCChannelParams } from "./types";
 
 /**
  * Validation error class for IPC parameter validation
@@ -140,49 +140,6 @@ const validateAuthSignOutParams = (params: unknown): void => {
 };
 
 /**
- * Validates parameters for the sidebar:get-state channel
- * This channel expects no parameters (void)
- */
-const validateSidebarGetStateParams = (params: unknown): void => {
-  // sidebar:get-state expects no parameters
-  if (params !== undefined && params !== null) {
-    throw new IPCValidationError(
-      "sidebar:get-state",
-      "Expected no parameters, but received: " + typeof params,
-    );
-  }
-};
-
-/**
- * Validates parameters for the sidebar:set-state channel
- * This channel expects SetSidebarStateParams: { collapsed: boolean }
- */
-const validateSidebarSetStateParams = (
-  params: unknown,
-): asserts params is SetSidebarStateParams => {
-  if (!isObject(params)) {
-    throw new IPCValidationError(
-      "sidebar:set-state",
-      "Expected object with 'collapsed' property, but received: " + typeof params,
-    );
-  }
-
-  // Validate against injection attacks
-  validateObjectSafety(params, "sidebar:set-state");
-
-  if (!("collapsed" in params)) {
-    throw new IPCValidationError("sidebar:set-state", "Missing required property 'collapsed'");
-  }
-
-  if (!isBoolean(params.collapsed)) {
-    throw new IPCValidationError(
-      "sidebar:set-state",
-      "Property 'collapsed' must be a boolean, but received: " + typeof params.collapsed,
-    );
-  }
-};
-
-/**
  * Validates parameters for the performance:get-metrics channel
  * This channel expects no parameters (void)
  */
@@ -217,8 +174,6 @@ const channelValidators = {
   "auth:open-google": validateAuthOpenGoogleParams,
   "auth:get-state": validateAuthGetStateParams,
   "auth:sign-out": validateAuthSignOutParams,
-  "sidebar:get-state": validateSidebarGetStateParams,
-  "sidebar:set-state": validateSidebarSetStateParams,
   "performance:get-metrics": validatePerformanceGetMetricsParams,
   "security:audit": validateSecurityAuditParams,
 } as const;
@@ -273,8 +228,6 @@ export function validateChannelName(channel: unknown): asserts channel is IPCCha
     "auth:open-google",
     "auth:get-state",
     "auth:sign-out",
-    "sidebar:get-state",
-    "sidebar:set-state",
     "performance:get-metrics",
     "security:audit",
   ];

@@ -20,18 +20,6 @@ const REQUIREMENT_IDS = [
 
   // Branding System Requirements
   "branding-system.1.1",
-  "branding-system.1.2",
-
-  // Sidebar Navigation Requirements
-  "sidebar-navigation.1.1",
-  "sidebar-navigation.1.2",
-  "sidebar-navigation.1.3",
-  "sidebar-navigation.1.4",
-  "sidebar-navigation.1.5",
-  "sidebar-navigation.1.6",
-  "sidebar-navigation.1.7",
-  "sidebar-navigation.1.8",
-  "sidebar-navigation.4.1",
 
   // Data Storage Requirements
   "data-storage.1.1",
@@ -75,19 +63,6 @@ const REQUIREMENT_IDS = [
   "testing-infrastructure.1.4",
   "testing-infrastructure.1.5",
   "testing-infrastructure.1.6",
-  "testing-infrastructure.1.7",
-  "testing-infrastructure.1.8",
-  "testing-infrastructure.1.9",
-  "testing-infrastructure.1.10",
-  "testing-infrastructure.1.11",
-  "testing-infrastructure.1.12",
-  "testing-infrastructure.1.13",
-  "testing-infrastructure.1.14",
-  "testing-infrastructure.1.15",
-  "testing-infrastructure.1.16",
-  "testing-infrastructure.1.17",
-  "testing-infrastructure.1.18",
-  "testing-infrastructure.8.1",
   "testing-infrastructure.8.2",
   "testing-infrastructure.8.3",
 ];

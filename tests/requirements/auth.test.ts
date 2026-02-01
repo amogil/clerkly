@@ -120,13 +120,14 @@ describe("Auth and OAuth requirements", () => {
     expect(source).toContain("scheduleTokenRefresh");
   });
 
-  /* Preconditions: settings component exists.
-     Action: inspect sign-out UI.
-     Assertions: sign-out button present.
+  /* Preconditions: main process exists.
+     Action: inspect sign-out IPC handler.
+     Assertions: sign-out handler is registered.
      Requirements: google-oauth-auth.1.12 */
   it("provides a sign-out action", () => {
-    const source = readText("renderer/src/app/components/settings.tsx");
-    expect(source).toContain("Sign Out");
+    const source = readText("main.ts");
+    expect(source).toContain("auth:sign-out");
+    expect(source).toContain("clearTokens");
   });
 
   /* Preconditions: token store exists.

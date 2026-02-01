@@ -26,16 +26,16 @@ describe("IPC and architecture requirements", () => {
     expect(preloadSource).toContain("auth:result");
   });
 
-  /* Preconditions: sidebar IPC is required.
+  /* Preconditions: auth IPC is required.
      Action: inspect IPC handlers and preload API.
-     Assertions: sidebar state handlers exist.
+     Assertions: auth state handlers exist.
      Requirements: platform-foundation.3.4 */
-  it("exposes sidebar state via IPC", () => {
+  it("exposes auth state via IPC", () => {
     const mainSource = readText("main.ts");
     const preloadSource = readText("preload.ts");
-    expect(mainSource).toContain("sidebar:get-state");
-    expect(mainSource).toContain("sidebar:set-state");
-    expect(preloadSource).toContain("getSidebarState");
-    expect(preloadSource).toContain("setSidebarState");
+    expect(mainSource).toContain("auth:get-state");
+    expect(mainSource).toContain("auth:sign-out");
+    expect(preloadSource).toContain("getAuthState");
+    expect(preloadSource).toContain("signOut");
   });
 });

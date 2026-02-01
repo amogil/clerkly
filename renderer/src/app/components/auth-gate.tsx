@@ -1,5 +1,4 @@
-// Requirements: E.T.4, E.A.1, E.A.2, E.A.3, E.A.4, E.A.5, E.U.2
-import { Logo } from "./logo";
+// Requirements: E.T.4, E.A.1, E.A.2, E.A.3, E.A.4, E.A.5, E.U.2, ui-cleanup.2.10
 type AuthGateProps = {
   isAuthorizing: boolean;
   errorMessage?: string | null;
@@ -10,7 +9,32 @@ export function AuthGate({ isAuthorizing, errorMessage, onSignIn }: AuthGateProp
   return (
     <div className="min-h-screen bg-background">
       <div className="mx-auto flex min-h-screen max-w-2xl flex-col items-center justify-center gap-6 px-6 text-center">
-        <Logo size="md" showText={true} />
+        <div className="flex items-center gap-3">
+          <svg
+            className="h-12 w-12"
+            viewBox="0 0 48 48"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <rect width="48" height="48" rx="8" fill="#2563EB" />
+            <path
+              d="M24 12L16 20H20V28H28V20H32L24 12Z"
+              fill="white"
+              stroke="white"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            <path
+              d="M14 36H34"
+              stroke="white"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+          <span className="text-2xl font-bold text-foreground">Clerkly</span>
+        </div>
         <div className="space-y-3">
           <h1 className="text-3xl font-semibold text-foreground">Welcome to Clerkly</h1>
           <p className="text-base text-muted-foreground">
