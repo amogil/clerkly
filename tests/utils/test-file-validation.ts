@@ -144,6 +144,11 @@ function shouldSkipTestFile(testFilePath: string): boolean {
     return true;
   }
 
+  // Skip test files in tests/examples/ as they demonstrate usage patterns
+  if (testFilePath.includes("tests/examples/")) {
+    return true;
+  }
+
   // Skip test files in tests/unit/ that are integration tests or test handlers
   if (
     testFilePath.includes("tests/unit/") &&

@@ -141,6 +141,9 @@ describe("Testing Infrastructure Property-Based Tests", () => {
       // Skip mock test files - they test the mock system itself
       if (testFile.includes("tests/mocks/") && testFile.endsWith("-mock.test.ts")) return false;
 
+      // Skip example test files - they demonstrate usage patterns
+      if (testFile.includes("tests/examples/")) return false;
+
       // Skip setup and utility test files
       if (testFile.includes("setup.test.ts") || testFile.includes("config.test.ts")) return false;
 

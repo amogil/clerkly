@@ -25,12 +25,14 @@ tests/generators/
 ├── basic-generators.ts         # Basic data type generators
 ├── domain-generators.ts        # Application-specific generators
 ├── config-generators.ts        # Configuration generators
+├── custom-shrinkers.ts         # Custom shrinking strategies
 └── README.md                   # This file
 
 tests/
 ├── fast-check.config.ts        # Global fast-check configuration
 ├── examples/
-│   └── fast-check-integration.test.ts  # Usage examples
+│   ├── fast-check-integration.test.ts  # Usage examples
+│   └── custom-shrinking.test.ts        # Shrinking examples
 └── setup.ts                    # Test setup with fast-check config
 ```
 
@@ -192,6 +194,89 @@ fc.assert(
 
 If the property fails, fast-check will automatically shrink the counterexample to the smallest possible values that still cause the failure.
 
+### Custom Shrinking Strategies
+
+For domain-specific objects, custom shrinking strategies provide better minimal counterexamples:
+
+```typescript
+import { userProfileWithShrinking, coverageConfigWithShrinking } from "../generators";
+
+// User profile with custom shrinking to minimal valid profile
+fc.assert(
+  fc.property(userProfileWithShrinking(), (profile) => {
+    // If this fails, shrinks to: { id: "00000000-...", email: "a@b.c", name: "A", picture: undefined }
+    expect(profile.email).toMatch(/^[^\s@]+@[^\s@]+\.[^\s@]+$/);
+    return true;
+  }),
+  { numRuns: 100 },
+);
+
+// Coverage config with custom shrinking to minimum thresholds (85%)
+fc.assert(
+  fc.property(coverageConfigWithShrinking(), (config) => {
+    // If this fails, shrinks to: { branches: 85, functions: 85, lines: 85, statements: 85 }
+    expect(config.branches).toBeGreaterThanOrEqual(85);
+    return true;
+  }),
+  { numRuns: 100 },
+);
+```
+
+### Available Custom Shrinkers
+
+- `userProfileWithShrinking()` - Shrinks to minimal valid user profile
+- `authTokensWithShrinking()` - Shrinks to minimal token structure
+- `coverageConfigWithShrinking()` - Shrinks to minimum thresholds (85%)
+- `ipcParamsWithShrinking()` - Shrinks to undefined or simplest structure
+- `networkErrorWithShrinking()` - Shrinks to minimal error structure
+- `testFilePathWithShrinking()` - Shrinks to simplest valid path
+- `sidebarStateWithShrinking()` - Shrinks to default state
+- `mockResponseWithShrinking()` - Shrinks to minimal response
+
+### Creating Custom Shrinking Strategies
+
+Use the `withCustomShrinking` utility to add custom shrinking to any arbitrary:
+
+```typescript
+import { withCustomShrinking } from "../generators";
+
+const customNumber = withCustomShrinking(fc.integer({ min: 1, max: 1000 }), (value) => {
+  // Return array of shrunk values to try
+  if (value === 1) return [1];
+  const half = Math.floor(value / 2);
+  return [1, half, value]; // Try 1 first, then half, then original
+});
+
+fc.assert(
+  fc.property(customNumber, (num) => {
+    // If this fails, fast-check will try shrunk values
+    expect(num).toBeGreaterThan(0);
+    return true;
+  }),
+  { numRuns: 100 },
+);
+```
+
+### Shrinking Strategy Utilities
+
+Common shrinking patterns are available as utilities:
+
+```typescript
+import { shrinkingStrategies } from "../generators";
+
+// Shrink to minimal value
+const shrunk = shrinkingStrategies.toMinimal(actualValue, minimalValue);
+
+// Shrink numeric values towards zero
+const shrunkNum = shrinkingStrategies.towardsZero(100); // [0, 50, 100]
+
+// Shrink strings to shorter versions
+const shrunkStr = shrinkingStrategies.shorterStrings("hello"); // ["", "he", "hello"]
+
+// Shrink arrays to smaller sizes
+const shrunkArr = shrinkingStrategies.smallerArrays([1, 2, 3, 4]); // [[], [1, 2], [1, 2, 3, 4]]
+```
+
 ## Best Practices
 
 1. **Always use minimum 100 iterations** for property tests
@@ -235,3 +320,10 @@ See `tests/examples/fast-check-integration.test.ts` for comprehensive usage exam
 - Configuration presets
 - Shrinking behavior
 - Complex property combinations
+
+See `tests/examples/custom-shrinking.test.ts` for custom shrinking examples demonstrating:
+
+- Custom shrinking strategies for domain objects
+- Using withCustomShrinking utility
+- Shrinking strategy utilities
+- Controlled failure scenarios showing shrinking in action

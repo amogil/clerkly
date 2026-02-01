@@ -67,7 +67,7 @@
     - Настроить конфигурацию с минимум 100 итерациями
     - _Requirements: testing-infrastructure.3.1, testing-infrastructure.3.2_
 
-  - [-] 5.2 Реализация системы shrinking для контрпримеров
+  - [x] 5.2 Реализация системы shrinking для контрпримеров
     - Настроить автоматическое shrinking в fast-check
     - Создать кастомные shrinking стратегии для доменных объектов
     - _Requirements: testing-infrastructure.3.3_
