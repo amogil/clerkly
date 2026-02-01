@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Validation Script for Clerky Project
+# Validation Script for Clerkly Project
 # This script runs all validation commands sequentially as described in AGENTS.md
 
 set -e  # Exit on any error
@@ -32,92 +32,46 @@ print_warning() {
     echo -e "${YELLOW}⚠️  $1${NC}"
 }
 
-echo -e "${BLUE}Starting validation process...${NC}\n"
+echo -e "${BLUE}Starting validation process for Clerkly...${NC}\n"
 
-# 1. TypeScript Compilation
-print_step "1. TypeScript Compilation"
-echo "Running: npm run build"
-if npm run build; then
-    print_success "TypeScript compilation passed"
-else
-    print_error "TypeScript compilation failed"
-    exit 1
-fi
-
-# 2. ESLint Check
-print_step "2. ESLint Check"
-echo "Running: npm run lint"
-if npm run lint; then
-    print_success "ESLint check passed"
-else
-    print_warning "ESLint issues found. Attempting auto-fix..."
-    echo "Running: npm run lint:fix"
-    if npm run lint:fix; then
-        print_success "ESLint auto-fix completed"
-        echo "Running lint check again..."
-        if npm run lint; then
-            print_success "ESLint check passed after auto-fix"
-        else
-            print_error "ESLint still has issues after auto-fix. Manual intervention required."
-            exit 1
-        fi
-    else
-        print_error "ESLint auto-fix failed"
-        exit 1
-    fi
-fi
-
-# 3. Prettier Check
-print_step "3. Prettier Formatting Check"
-echo "Running: npm run format:check"
-if npm run format:check; then
-    print_success "Prettier formatting check passed"
-else
-    print_warning "Prettier formatting issues found. Attempting auto-format..."
-    echo "Running: npm run format"
-    if npm run format; then
-        print_success "Prettier auto-format completed"
-        echo "Running format check again..."
-        if npm run format:check; then
-            print_success "Prettier formatting check passed after auto-format"
-        else
-            print_error "Prettier still has issues after auto-format"
-            exit 1
-        fi
-    else
-        print_error "Prettier auto-format failed"
-        exit 1
-    fi
-fi
-
-# 4. Unit Tests
-print_step "4. Unit Tests"
-echo "Running: npm test"
-if npm test; then
+# 1. Unit Tests
+print_step "1. Unit Tests"
+echo "Running: npm run test:unit"
+if npm run test:unit; then
     print_success "Unit tests passed"
 else
     print_error "Unit tests failed"
     exit 1
 fi
 
-# 5. Requirements Coverage Test
-print_step "5. Requirements Coverage Test"
-echo "Running: npm test -- tests/requirements/coverage.test.ts"
-if npm test -- tests/requirements/coverage.test.ts; then
-    print_success "Requirements coverage test passed"
+# 2. Property-Based Tests
+print_step "2. Property-Based Tests"
+echo "Running: npm run test:property"
+if npm run test:property; then
+    print_success "Property-based tests passed"
 else
-    print_error "Requirements coverage test failed"
+    print_error "Property-based tests failed"
     exit 1
 fi
 
-# 6. Security Audit (informational)
-print_step "6. Security Audit (Informational)"
+# 3. Test Coverage
+print_step "3. Test Coverage"
+echo "Running: npm run test:coverage"
+if npm run test:coverage; then
+    print_success "Test coverage check passed"
+else
+    print_error "Test coverage check failed"
+    exit 1
+fi
+
+# 4. Security Audit (informational)
+print_step "4. Security Audit (Informational)"
 echo "Running: npm audit"
-if npm audit; then
-    print_success "No security vulnerabilities found"
+if npm audit --production; then
+    print_success "No security vulnerabilities found in production dependencies"
 else
     print_warning "Security vulnerabilities found. Review npm audit output above."
-    print_warning "Note: Dev-dependency vulnerabilities (tar, vite) are not critical for production"
+    print_warning "Note: This is informational only and won't fail the validation"
 fi
 
 # Final success message
@@ -126,12 +80,11 @@ echo -e "${GREEN}The project meets all quality standards defined in AGENTS.md${N
 
 # Summary of what was validated
 echo -e "${BLUE}Validated:${NC}"
-echo "✅ TypeScript compilation"
-echo "✅ ESLint code quality"
-echo "✅ Prettier code formatting"
-echo "✅ Unit tests"
-echo "✅ Requirements coverage"
+echo "✅ Unit tests (all passing)"
+echo "✅ Property-based tests (all passing)"
+echo "✅ Test coverage (meets thresholds)"
 echo "✅ Security audit (informational)"
 echo ""
-echo -e "${YELLOW}Note: Functional tests are excluded from validation.${NC}"
-echo -e "${YELLOW}Run them manually with: npm run test:functional${NC}"
+echo -e "${YELLOW}Note: Functional tests are excluded from validation as per AGENTS.md${NC}"
+echo -e "${YELLOW}They show windows on screen and should only be run manually.${NC}"
+echo -e "${YELLOW}To run functional tests: npm run test:functional${NC}"

@@ -665,7 +665,7 @@ describe('LifecycleManager', () => {
       
       mockDataManager.initialize.mockImplementation(() => {
         return new Promise(resolve => {
-          setTimeout(() => resolve({ success: true }), 3001);
+          setTimeout(() => resolve({ success: true }), 3050);
         });
       });
 

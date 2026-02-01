@@ -10,6 +10,7 @@
     "test:property": "jest tests/property",
     "test:functional": "jest tests/functional",
     "test:coverage": "jest --coverage",
+    "validate": "bash scripts/validate.sh",
     "build": "electron-builder --mac",
     "dist": "electron-builder --mac --publish never"
   },
