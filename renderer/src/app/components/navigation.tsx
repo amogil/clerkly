@@ -29,9 +29,11 @@ export const Navigation = memo(function Navigation({
 }: NavigationProps) {
   // Requirements: sidebar-navigation.2.5, sidebar-navigation.2.4
   // Memoize keyboard navigation handler with useCallback
+  // Note: Space key is handled natively by button elements via onClick
+  // We only need to handle Enter key explicitly for consistency
   const handleKeyDown = useCallback(
     (event: React.KeyboardEvent, itemId: string) => {
-      if (event.key === "Enter" || event.key === " ") {
+      if (event.key === "Enter") {
         event.preventDefault();
         onNavigate(itemId);
       }

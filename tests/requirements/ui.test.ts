@@ -145,9 +145,8 @@ describe("UI reference requirements", () => {
     // handleKeyDown function exists with useCallback
     expect(source).toContain("const handleKeyDown = useCallback(");
     expect(source).toContain("(event: React.KeyboardEvent, itemId: string)");
-    // Checks for Enter and Space keys
+    // Checks for Enter key (Space is handled natively by button elements)
     expect(source).toContain('event.key === "Enter"');
-    expect(source).toContain('event.key === " "');
     // Prevents default behavior
     expect(source).toContain("event.preventDefault()");
     // Calls onNavigate
@@ -155,5 +154,8 @@ describe("UI reference requirements", () => {
     // Applied to navigation buttons
     expect(source).toContain("onKeyDown={(e) => handleKeyDown(e, item.id)}");
     expect(source).toContain("onKeyDown={(e) => handleKeyDown(e, settingsItem.id)}");
+    // Buttons have onClick for native Space key support
+    expect(source).toContain("onClick={() => onNavigate(item.id)}");
+    expect(source).toContain("onClick={() => onNavigate(settingsItem.id)}");
   });
 });

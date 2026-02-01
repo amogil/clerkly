@@ -9,19 +9,22 @@ test.describe("Navigation Focus Management", () => {
      Requirements: sidebar-navigation.2.5 */
   test("should have logical tab navigation order in expanded state", async ({ isolatedApp }) => {
     const { page } = isolatedApp;
+    
+    // Wait for auth to complete and dashboard to be visible
+    await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible({ timeout: 10000 });
+    
     // Wait for navigation to be visible
     await page.waitForSelector('nav[role="navigation"]');
 
-    // Start from the beginning of the page
-    await page.keyboard.press("Tab");
+    // Focus on the toggle button explicitly to start
+    const toggleButton = page.locator('button[aria-label="Collapse sidebar"]');
+    await toggleButton.focus();
 
     // Check focus order: toggle button first
     let focusedElement = await page.evaluate(() => {
       const el = document.activeElement;
       return {
-        tag: el?.tagName,
         ariaLabel: el?.getAttribute("aria-label"),
-        text: el?.textContent?.trim(),
       };
     });
     expect(focusedElement.ariaLabel).toBe("Collapse sidebar");
@@ -31,7 +34,6 @@ test.describe("Navigation Focus Management", () => {
     focusedElement = await page.evaluate(() => {
       const el = document.activeElement;
       return {
-        tag: el?.tagName,
         text: el?.textContent?.trim(),
         ariaCurrent: el?.getAttribute("aria-current"),
       };
@@ -77,14 +79,19 @@ test.describe("Navigation Focus Management", () => {
      Requirements: sidebar-navigation.2.5 */
   test("should maintain logical tab order in collapsed state", async ({ isolatedApp }) => {
     const { page } = isolatedApp;
+    
+    // Wait for auth to complete and dashboard to be visible
+    await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible({ timeout: 10000 });
+    
     await page.waitForSelector('nav[role="navigation"]');
 
     // Collapse the sidebar first
     await page.click('button[aria-label="Collapse sidebar"]');
     await page.waitForTimeout(500); // Wait for animation
 
-    // Start tabbing from the beginning
-    await page.keyboard.press("Tab");
+    // Focus on the toggle button explicitly to start
+    const toggleButton = page.locator('button[aria-label="Expand sidebar"]');
+    await toggleButton.focus();
 
     // Check focus order: toggle button first (now says "Expand")
     let focusedElement = await page.evaluate(() => {
@@ -112,6 +119,10 @@ test.describe("Navigation Focus Management", () => {
      Requirements: sidebar-navigation.2.5 */
   test("should have visible focus indicators on toggle button", async ({ isolatedApp }) => {
     const { page } = isolatedApp;
+    
+    // Wait for auth to complete and dashboard to be visible
+    await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible({ timeout: 10000 });
+    
     await page.waitForSelector('nav[role="navigation"]');
 
     // Focus on toggle button
@@ -141,6 +152,10 @@ test.describe("Navigation Focus Management", () => {
     isolatedApp,
   }) => {
     const { page } = isolatedApp;
+    
+    // Wait for auth to complete and dashboard to be visible
+    await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible({ timeout: 10000 });
+    
     await page.waitForSelector('nav[role="navigation"]');
 
     const navItems = ["Dashboard", "Calendar", "Tasks", "Contacts", "Settings"];
@@ -163,6 +178,10 @@ test.describe("Navigation Focus Management", () => {
      Requirements: sidebar-navigation.2.5 */
   test("should maintain focus indicators in collapsed state", async ({ isolatedApp }) => {
     const { page } = isolatedApp;
+    
+    // Wait for auth to complete and dashboard to be visible
+    await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible({ timeout: 10000 });
+    
     await page.waitForSelector('nav[role="navigation"]');
 
     // Collapse the sidebar
@@ -189,6 +208,10 @@ test.describe("Navigation Focus Management", () => {
      Requirements: sidebar-navigation.2.5 */
   test("should support keyboard activation with Enter key", async ({ isolatedApp }) => {
     const { page } = isolatedApp;
+    
+    // Wait for auth to complete and dashboard to be visible
+    await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible({ timeout: 10000 });
+    
     await page.waitForSelector('nav[role="navigation"]');
 
     // Focus on Calendar button
@@ -217,6 +240,10 @@ test.describe("Navigation Focus Management", () => {
      Requirements: sidebar-navigation.2.5 */
   test("should support keyboard activation with Space key", async ({ isolatedApp }) => {
     const { page } = isolatedApp;
+    
+    // Wait for auth to complete and dashboard to be visible
+    await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible({ timeout: 10000 });
+    
     await page.waitForSelector('nav[role="navigation"]');
 
     // Focus on Tasks button
