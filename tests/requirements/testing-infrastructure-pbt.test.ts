@@ -276,7 +276,7 @@ describe("Testing Infrastructure Property-Based Tests", () => {
     fc.assert(
       fc.property(
         fc.record({
-          filePath: fc.string({ minLength: 1, maxLength: 50 }).filter(s => s.trim().length > 0),
+          filePath: fc.string({ minLength: 1, maxLength: 50 }).filter((s) => s.trim().length > 0),
           fileContent: fc.string({ maxLength: 100 }),
           fileExists: fc.boolean(),
         }),
@@ -289,29 +289,29 @@ describe("Testing Infrastructure Property-Based Tests", () => {
           if (testData.fileExists) {
             // Set mock data and verify it's properly stored
             fileSystemMock.setMockData(testData.filePath, testData.fileContent);
-            
+
             // Verify exists() method properly checks mock data
             const existsResult = fileSystemMock.exists(testData.filePath);
             expect(existsResult).toBe(true);
-            
+
             // Verify content can be retrieved
             const retrievedContent = fileSystemMock.getMockData(testData.filePath);
             expect(retrievedContent).toBe(testData.fileContent);
-            
+
             // Verify existsSync also works
             expect(fileSystemMock.existsSync(testData.filePath)).toBe(true);
           } else {
             // Explicitly set file as non-existent
             fileSystemMock.setFileExists(testData.filePath, false);
-            
+
             // Verify exists() method properly returns false
             const existsResult = fileSystemMock.exists(testData.filePath);
             expect(existsResult).toBe(false);
-            
+
             // Verify getMockData returns undefined for non-existent files
             const retrievedContent = fileSystemMock.getMockData(testData.filePath);
             expect(retrievedContent).toBeUndefined();
-            
+
             // Verify existsSync also returns false
             expect(fileSystemMock.existsSync(testData.filePath)).toBe(false);
           }
@@ -319,7 +319,7 @@ describe("Testing Infrastructure Property-Based Tests", () => {
           // Verify mock isolation - no real file system operations should occur
           // The mock should handle all operations internally
           expect(fileSystemMock.existsSync).toBeDefined();
-          expect(typeof fileSystemMock.existsSync).toBe('function');
+          expect(typeof fileSystemMock.existsSync).toBe("function");
 
           return true;
         },
@@ -338,8 +338,10 @@ describe("Testing Infrastructure Property-Based Tests", () => {
     fc.assert(
       fc.property(
         fc.record({
-          filePath: fc.string({ minLength: 1, maxLength: 50 }).filter(s => s.trim().length > 0),
-          errorMessage: fc.string({ minLength: 1, maxLength: 100 }).filter(s => s.trim().length > 0),
+          filePath: fc.string({ minLength: 1, maxLength: 50 }).filter((s) => s.trim().length > 0),
+          errorMessage: fc
+            .string({ minLength: 1, maxLength: 100 })
+            .filter((s) => s.trim().length > 0),
         }),
         (testData) => {
           // Reset all mocks before each test to ensure clean state
@@ -353,7 +355,7 @@ describe("Testing Infrastructure Property-Based Tests", () => {
           // Verify error is properly simulated and isolated
           let errorThrown = false;
           let thrownError: Error | null = null;
-          
+
           try {
             fileSystemMock.readFileSync(testData.filePath);
           } catch (error) {
@@ -395,7 +397,9 @@ describe("Testing Infrastructure Property-Based Tests", () => {
         fc.array(
           fc.record({
             operationType: fc.constantFrom("filesystem", "network", "database"),
-            identifier: fc.string({ minLength: 1, maxLength: 20 }).filter(s => s.trim().length > 0),
+            identifier: fc
+              .string({ minLength: 1, maxLength: 20 })
+              .filter((s) => s.trim().length > 0),
             data: fc.string({ maxLength: 50 }),
           }),
           { minLength: 2, maxLength: 5 },
@@ -423,7 +427,7 @@ describe("Testing Infrastructure Property-Based Tests", () => {
                 expect(fileSystemMock.getMockData(op.uniqueId)).toBe(op.data);
                 break;
               }
-              
+
               case "network": {
                 // Use the correct network mock methods
                 const testUrl = `http://test.com/${op.uniqueId}`;
@@ -436,7 +440,7 @@ describe("Testing Infrastructure Property-Based Tests", () => {
                 networkMock.clearHistory();
                 break;
               }
-              
+
               case "database": {
                 // Use the correct database mock methods
                 const tableName = "test_table";
@@ -457,14 +461,14 @@ describe("Testing Infrastructure Property-Based Tests", () => {
                 expect(fileSystemMock.getMockData(op.uniqueId)).toBe(op.data);
                 break;
               }
-              
+
               case "network": {
                 // Verify network mock maintains its interceptors
                 expect(networkMock.getRequestHistory).toBeDefined();
-                expect(typeof networkMock.getRequestHistory).toBe('function');
+                expect(typeof networkMock.getRequestHistory).toBe("function");
                 break;
               }
-              
+
               case "database": {
                 // Verify database mock maintains its data
                 const dbResult = databaseMock.getMockData("test_table");
@@ -475,12 +479,16 @@ describe("Testing Infrastructure Property-Based Tests", () => {
           });
 
           // Verify operations don't interfere with each other
-          const fileSystemOps = processedOperations.filter(op => op.operationType === "filesystem");
-          const networkOps = processedOperations.filter(op => op.operationType === "network");
-          const databaseOps = processedOperations.filter(op => op.operationType === "database");
+          const fileSystemOps = processedOperations.filter(
+            (op) => op.operationType === "filesystem",
+          );
+          const networkOps = processedOperations.filter((op) => op.operationType === "network");
+          const databaseOps = processedOperations.filter((op) => op.operationType === "database");
 
           // Each type should maintain its own isolated state
-          expect(fileSystemOps.length + networkOps.length + databaseOps.length).toBe(processedOperations.length);
+          expect(fileSystemOps.length + networkOps.length + databaseOps.length).toBe(
+            processedOperations.length,
+          );
 
           // Verify each mock system is independent
           expect(fileSystemMock).not.toBe(networkMock);
