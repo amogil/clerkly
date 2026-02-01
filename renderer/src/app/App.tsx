@@ -1,5 +1,5 @@
-// Requirements: E.T.4, E.U.1, E.U.6, E.U.7, E.S.7, E.I.3, E.A.1, E.A.2, E.A.3, E.A.4, E.A.5, E.A.11, E.A.14, E.A.22, E.A.27
-import { useEffect, useState } from "react";
+// Requirements: E.T.4, E.U.1, E.U.6, E.U.7, E.S.7, E.I.3, E.A.1, E.A.2, E.A.3, E.A.4, E.A.5, E.A.11, E.A.14, E.A.22, E.A.27, sidebar-navigation.4.1, sidebar-navigation.4.3, sidebar-navigation.4.4
+import { useEffect, useLayoutEffect, useState } from "react";
 import { AuthGate } from "./components/auth-gate";
 import { Navigation } from "./components/navigation";
 import { DashboardUpdated } from "./components/dashboard-updated";
@@ -27,6 +27,8 @@ export default function App() {
   const [authState, setAuthState] = useState<AuthState>("authorizing");
   const [authError, setAuthError] = useState<string | null>(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  // Requirements: sidebar-navigation.4.4
+  const [isSidebarLoading, setIsSidebarLoading] = useState(true);
 
   useEffect(() => {
     window.clerkly
@@ -54,14 +56,24 @@ export default function App() {
     };
   }, []);
 
-  useEffect(() => {
+  // Requirements: sidebar-navigation.4.1, sidebar-navigation.4.3, sidebar-navigation.4.4
+  // Load sidebar state before first render to prevent UI flickering
+  useLayoutEffect(() => {
     window.clerkly
       .getSidebarState()
       .then((state) => {
+        // Requirements: sidebar-navigation.4.1
         setIsSidebarCollapsed(Boolean(state.collapsed));
       })
-      .catch(() => {
+      .catch((error) => {
+        // Requirements: sidebar-navigation.4.3
+        // Fallback to default expanded state on error
+        console.error("Failed to load sidebar state:", error);
         setIsSidebarCollapsed(false);
+      })
+      .finally(() => {
+        // Requirements: sidebar-navigation.4.4
+        setIsSidebarLoading(false);
       });
   }, []);
 
@@ -142,23 +154,45 @@ export default function App() {
     }
   };
 
+  // Requirements: sidebar-navigation.4.2, sidebar-navigation.5.2
   const handleToggleSidebar = async () => {
-    const next = !isSidebarCollapsed;
-    setIsSidebarCollapsed(next);
-    await window.clerkly.setSidebarState(next);
+    const newState = !isSidebarCollapsed;
+
+    // Optimistic UI update
+    setIsSidebarCollapsed(newState);
+
+    try {
+      // Immediately save to database via IPC
+      const result = await window.clerkly.setSidebarState(newState);
+
+      if (!result.success) {
+        // Rollback UI state on save error
+        setIsSidebarCollapsed(!newState);
+        console.error("Failed to save sidebar state");
+      }
+    } catch (error) {
+      // Rollback UI state on IPC/network error
+      setIsSidebarCollapsed(!newState);
+      console.error("Failed to save sidebar state:", error);
+    }
   };
 
   return (
     <div className="min-h-screen bg-background">
       {authState === "authorized" ? (
         <>
-          <Navigation
-            currentScreen={currentScreen}
-            onNavigate={setCurrentScreen}
-            collapsed={isSidebarCollapsed}
-            onToggleCollapse={handleToggleSidebar}
-          />
-          <div className={isSidebarCollapsed ? "ml-20" : "ml-64"}>{renderScreen()}</div>
+          {/* Requirements: sidebar-navigation.4.4 - Prevent UI flickering during sidebar state load */}
+          {!isSidebarLoading && (
+            <>
+              <Navigation
+                currentScreen={currentScreen}
+                onNavigate={setCurrentScreen}
+                collapsed={isSidebarCollapsed}
+                onToggleCollapse={handleToggleSidebar}
+              />
+              <div className={isSidebarCollapsed ? "ml-20" : "ml-64"}>{renderScreen()}</div>
+            </>
+          )}
         </>
       ) : (
         <AuthGate
