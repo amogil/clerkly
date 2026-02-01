@@ -10,6 +10,7 @@ export default defineConfig({
       "tests/unit/**/*.test.ts",
       "tests/utils/**/*.test.ts",
       "tests/mocks/**/*.test.ts",
+      "tests/examples/**/*.test.ts",
       "src/**/*.test.ts",
     ],
     exclude: ["tests/functional/**", "node_modules/**", "dist/**"],

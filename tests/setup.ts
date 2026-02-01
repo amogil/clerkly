@@ -1,5 +1,6 @@
-// Requirements: testing-infrastructure.2.1, testing-infrastructure.2.2, testing-infrastructure.2.3, testing-infrastructure.2.4
+// Requirements: testing-infrastructure.2.1, testing-infrastructure.2.2, testing-infrastructure.2.3, testing-infrastructure.2.4, testing-infrastructure.3.1, testing-infrastructure.3.2
 import { vi } from "vitest";
+import { globalFastCheckConfig } from "./fast-check.config";
 
 // Mock network operations to prevent external calls during unit tests
 const blockNetwork = () => {
@@ -105,3 +106,16 @@ vi.mock("electron", () => ({
     close: vi.fn(),
   })),
 }));
+// Configure fast-check global settings for property-based testing
+// Requirements: testing-infrastructure.3.1, testing-infrastructure.3.2
+import { fc } from "@fast-check/vitest";
+
+// Apply global fast-check configuration
+fc.configureGlobal({
+  ...globalFastCheckConfig,
+  // Ensure minimum 100 iterations for all property tests
+  numRuns: Math.max(globalFastCheckConfig.numRuns, 100),
+});
+
+// Validate fast-check configuration on setup
+console.log(`Fast-check configured with ${globalFastCheckConfig.numRuns} iterations minimum`);
