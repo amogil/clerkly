@@ -36,6 +36,7 @@ let pendingCodeVerifier: string | null = null;
 let pendingAuthState: string | null = null;
 
 type SqliteDatabase = InstanceType<typeof Database>;
+// Requirements: sidebar-navigation.4.1
 const SIDEBAR_STATE_KEY = "sidebar_collapsed";
 
 const sendAuthResultToRenderer = (result: AuthResult): void => {
@@ -142,6 +143,7 @@ const closeAuthServer = (): void => {
   }
 };
 
+// Requirements: sidebar-navigation.4.1, sidebar-navigation.4.3
 const getSidebarCollapsed = (db: SqliteDatabase): boolean => {
   const row = db.prepare("SELECT value FROM app_meta WHERE key = ?").get(SIDEBAR_STATE_KEY) as
     | { value: string }
@@ -149,6 +151,7 @@ const getSidebarCollapsed = (db: SqliteDatabase): boolean => {
   return row?.value === "1";
 };
 
+// Requirements: sidebar-navigation.4.1, sidebar-navigation.4.2
 const setSidebarCollapsed = (db: SqliteDatabase, collapsed: boolean): void => {
   db.prepare(
     "INSERT INTO app_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",

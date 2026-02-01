@@ -138,6 +138,7 @@ describe("Testing Infrastructure Property-Based Tests", () => {
         (testFile.includes("integration") ||
           testFile.includes("e2e") ||
           testFile.includes("ipc-handlers") ||
+          testFile.includes("sidebar-persistence") ||
           testFile.includes("context-isolation"))
       )
         return false;

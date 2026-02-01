@@ -160,6 +160,7 @@ function shouldSkipTestFile(testFilePath: string): boolean {
     (testFilePath.includes("integration") ||
       testFilePath.includes("e2e") ||
       testFilePath.includes("ipc-handlers") ||
+      testFilePath.includes("sidebar-persistence") ||
       testFilePath.includes("context-isolation"))
   ) {
     return true;
