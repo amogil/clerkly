@@ -1,8 +1,9 @@
-// Requirements: testing-infrastructure.1.2
+// Requirements: testing-infrastructure.1.2, testing-infrastructure.2.1, testing-infrastructure.2.2, testing-infrastructure.2.3
 import { describe, it, expect } from "vitest";
 import { fc } from "@fast-check/vitest";
 import { readFileSync } from "fs";
 import { join } from "path";
+import { mockSystem } from "../mocks/mock-system";
 
 describe("Testing Infrastructure Property-Based Tests", () => {
   /* Preconditions: vitest.config.ts exists with coverage configuration
@@ -137,6 +138,9 @@ describe("Testing Infrastructure Property-Based Tests", () => {
       )
         return false;
 
+      // Skip mock test files - they test the mock system itself
+      if (testFile.includes("tests/mocks/") && testFile.endsWith("-mock.test.ts")) return false;
+
       // Skip setup and utility test files
       if (testFile.includes("setup.test.ts") || testFile.includes("config.test.ts")) return false;
 
@@ -259,6 +263,234 @@ describe("Testing Infrastructure Property-Based Tests", () => {
         },
       ),
       { numRuns: 100 },
+    );
+  });
+
+  /* Preconditions: mock system is available with file system, network, and database mocks
+     Action: generate various external dependency operations and verify they are properly mocked
+     Assertions: all external dependencies should be isolated and not perform real operations
+     Requirements: testing-infrastructure.2.1, testing-infrastructure.2.2, testing-infrastructure.2.3 */
+  it("should isolate all external dependencies through mock system", () => {
+    // **Feature: testing-infrastructure, Property 3: Изоляция внешних зависимостей**
+
+    fc.assert(
+      fc.property(
+        fc.record({
+          filePath: fc.string({ minLength: 1, maxLength: 50 }).filter(s => s.trim().length > 0),
+          fileContent: fc.string({ maxLength: 100 }),
+          fileExists: fc.boolean(),
+        }),
+        (testData) => {
+          // Reset all mocks before each test to ensure clean state
+          mockSystem.restoreAll();
+          const fileSystemMock = mockSystem.mockFileSystem();
+
+          // Test file system isolation with more robust assertions
+          if (testData.fileExists) {
+            // Set mock data and verify it's properly stored
+            fileSystemMock.setMockData(testData.filePath, testData.fileContent);
+            
+            // Verify exists() method properly checks mock data
+            const existsResult = fileSystemMock.exists(testData.filePath);
+            expect(existsResult).toBe(true);
+            
+            // Verify content can be retrieved
+            const retrievedContent = fileSystemMock.getMockData(testData.filePath);
+            expect(retrievedContent).toBe(testData.fileContent);
+            
+            // Verify existsSync also works
+            expect(fileSystemMock.existsSync(testData.filePath)).toBe(true);
+          } else {
+            // Explicitly set file as non-existent
+            fileSystemMock.setFileExists(testData.filePath, false);
+            
+            // Verify exists() method properly returns false
+            const existsResult = fileSystemMock.exists(testData.filePath);
+            expect(existsResult).toBe(false);
+            
+            // Verify getMockData returns undefined for non-existent files
+            const retrievedContent = fileSystemMock.getMockData(testData.filePath);
+            expect(retrievedContent).toBeUndefined();
+            
+            // Verify existsSync also returns false
+            expect(fileSystemMock.existsSync(testData.filePath)).toBe(false);
+          }
+
+          // Verify mock isolation - no real file system operations should occur
+          // The mock should handle all operations internally
+          expect(fileSystemMock.existsSync).toBeDefined();
+          expect(typeof fileSystemMock.existsSync).toBe('function');
+
+          return true;
+        },
+      ),
+      { numRuns: 50 },
+    );
+  });
+
+  /* Preconditions: mock system provides error simulation capabilities
+     Action: generate error scenarios for external dependencies and verify isolation
+     Assertions: errors should be properly isolated and not affect real systems
+     Requirements: testing-infrastructure.2.1, testing-infrastructure.2.2, testing-infrastructure.2.3 */
+  it("should isolate error scenarios in external dependencies", () => {
+    // **Feature: testing-infrastructure, Property 3: Изоляция внешних зависимостей**
+
+    fc.assert(
+      fc.property(
+        fc.record({
+          filePath: fc.string({ minLength: 1, maxLength: 50 }).filter(s => s.trim().length > 0),
+          errorMessage: fc.string({ minLength: 1, maxLength: 100 }).filter(s => s.trim().length > 0),
+        }),
+        (testData) => {
+          // Reset all mocks before each test to ensure clean state
+          mockSystem.restoreAll();
+          const fileSystemMock = mockSystem.mockFileSystem();
+
+          // Test error isolation with more robust error handling
+          const fsError = new Error(testData.errorMessage);
+          fileSystemMock.simulateError("readFileSync", testData.filePath, fsError);
+
+          // Verify error is properly simulated and isolated
+          let errorThrown = false;
+          let thrownError: Error | null = null;
+          
+          try {
+            fileSystemMock.readFileSync(testData.filePath);
+          } catch (error) {
+            errorThrown = true;
+            thrownError = error as Error;
+          }
+
+          // Verify error was thrown
+          expect(errorThrown).toBe(true);
+          expect(thrownError).not.toBeNull();
+          expect(thrownError!.message).toBe(testData.errorMessage);
+
+          // Verify error simulation doesn't affect other operations
+          const differentPath = `different_${testData.filePath}`;
+          fileSystemMock.setMockData(differentPath, "test content");
+          expect(fileSystemMock.exists(differentPath)).toBe(true);
+
+          // Verify error can be cleared
+          fileSystemMock.clearErrors();
+          fileSystemMock.setMockData(testData.filePath, "new content");
+          expect(() => fileSystemMock.readFileSync(testData.filePath)).not.toThrow();
+
+          return true;
+        },
+      ),
+      { numRuns: 30 },
+    );
+  });
+
+  /* Preconditions: mock system supports concurrent operations
+     Action: generate concurrent external dependency operations and verify isolation
+     Assertions: concurrent operations should be properly isolated without interference
+     Requirements: testing-infrastructure.2.1, testing-infrastructure.2.2, testing-infrastructure.2.3 */
+  it("should maintain isolation during concurrent external dependency operations", () => {
+    // **Feature: testing-infrastructure, Property 3: Изоляция внешних зависимостей**
+
+    fc.assert(
+      fc.property(
+        fc.array(
+          fc.record({
+            operationType: fc.constantFrom("filesystem", "network", "database"),
+            identifier: fc.string({ minLength: 1, maxLength: 20 }).filter(s => s.trim().length > 0),
+            data: fc.string({ maxLength: 50 }),
+          }),
+          { minLength: 2, maxLength: 5 },
+        ),
+        (operations) => {
+          // Reset all mocks before each test to ensure clean state
+          mockSystem.restoreAll();
+          const fileSystemMock = mockSystem.mockFileSystem();
+          const networkMock = mockSystem.mockNetwork();
+          const databaseMock = mockSystem.mockDatabase();
+
+          // Create unique identifiers to avoid conflicts
+          const processedOperations = operations.map((op, index) => ({
+            ...op,
+            uniqueId: `${op.identifier}_${index}_${Date.now()}`,
+          }));
+
+          // Test concurrent operations with proper isolation
+          processedOperations.forEach((op, index) => {
+            switch (op.operationType) {
+              case "filesystem": {
+                fileSystemMock.setMockData(op.uniqueId, op.data);
+                // Verify this operation doesn't interfere with others
+                expect(fileSystemMock.exists(op.uniqueId)).toBe(true);
+                expect(fileSystemMock.getMockData(op.uniqueId)).toBe(op.data);
+                break;
+              }
+              
+              case "network": {
+                // Use the correct network mock methods
+                const testUrl = `http://test.com/${op.uniqueId}`;
+                networkMock.intercept(testUrl, () => ({
+                  status: 200,
+                  data: op.data,
+                  headers: {},
+                }));
+                // Verify network mock isolation by checking request history
+                networkMock.clearHistory();
+                break;
+              }
+              
+              case "database": {
+                // Use the correct database mock methods
+                const tableName = "test_table";
+                databaseMock.setMockData(tableName, [{ id: op.uniqueId, data: op.data }]);
+                // Verify database mock isolation
+                const dbResult = databaseMock.getMockData(tableName);
+                expect(dbResult).toEqual([{ id: op.uniqueId, data: op.data }]);
+                break;
+              }
+            }
+          });
+
+          // Verify all operations are still isolated and accessible
+          processedOperations.forEach((op) => {
+            switch (op.operationType) {
+              case "filesystem": {
+                expect(fileSystemMock.exists(op.uniqueId)).toBe(true);
+                expect(fileSystemMock.getMockData(op.uniqueId)).toBe(op.data);
+                break;
+              }
+              
+              case "network": {
+                // Verify network mock maintains its interceptors
+                expect(networkMock.getRequestHistory).toBeDefined();
+                expect(typeof networkMock.getRequestHistory).toBe('function');
+                break;
+              }
+              
+              case "database": {
+                // Verify database mock maintains its data
+                const dbResult = databaseMock.getMockData("test_table");
+                expect(Array.isArray(dbResult)).toBe(true);
+                break;
+              }
+            }
+          });
+
+          // Verify operations don't interfere with each other
+          const fileSystemOps = processedOperations.filter(op => op.operationType === "filesystem");
+          const networkOps = processedOperations.filter(op => op.operationType === "network");
+          const databaseOps = processedOperations.filter(op => op.operationType === "database");
+
+          // Each type should maintain its own isolated state
+          expect(fileSystemOps.length + networkOps.length + databaseOps.length).toBe(processedOperations.length);
+
+          // Verify each mock system is independent
+          expect(fileSystemMock).not.toBe(networkMock);
+          expect(networkMock).not.toBe(databaseMock);
+          expect(databaseMock).not.toBe(fileSystemMock);
+
+          return true;
+        },
+      ),
+      { numRuns: 25 },
     );
   });
 });

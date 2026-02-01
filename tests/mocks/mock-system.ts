@@ -390,9 +390,7 @@ class IPCMockImpl implements IPCMock {
     }
 
     if (expectedArgs) {
-      return calls.some((call) => 
-        JSON.stringify(call.args) === JSON.stringify(expectedArgs)
-      );
+      return calls.some((call) => JSON.stringify(call.args) === JSON.stringify(expectedArgs));
     }
 
     return true;

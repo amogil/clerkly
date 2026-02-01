@@ -17,7 +17,7 @@ describe("IPC Mock System", () => {
        Requirements: testing-infrastructure.2.4 */
     it("should handle basic invoke/handle operations", async () => {
       const mockHandler = vi.fn().mockResolvedValue({ success: true });
-      
+
       ipcMock.handle("test:channel", mockHandler);
       const result = await ipcMock.invoke("test:channel", "arg1", "arg2");
 
@@ -40,7 +40,7 @@ describe("IPC Mock System", () => {
        Requirements: testing-infrastructure.2.4 */
     it("should handle send/on event operations", () => {
       const mockListener = vi.fn();
-      
+
       ipcMock.on("test:event", mockListener);
       ipcMock.send("test:event", "data1", "data2");
 
@@ -54,7 +54,7 @@ describe("IPC Mock System", () => {
     it("should support multiple event listeners", () => {
       const listener1 = vi.fn();
       const listener2 = vi.fn();
-      
+
       ipcMock.on("test:event", listener1);
       ipcMock.on("test:event", listener2);
       ipcMock.send("test:event", "data");
@@ -72,7 +72,7 @@ describe("IPC Mock System", () => {
     it("should remove specific event listeners", () => {
       const listener1 = vi.fn();
       const listener2 = vi.fn();
-      
+
       ipcMock.on("test:event", listener1);
       ipcMock.on("test:event", listener2);
       ipcMock.removeListener("test:event", listener1);
@@ -90,13 +90,13 @@ describe("IPC Mock System", () => {
       const listener1 = vi.fn();
       const listener2 = vi.fn();
       const listener3 = vi.fn();
-      
+
       ipcMock.on("channel1", listener1);
       ipcMock.on("channel1", listener2);
       ipcMock.on("channel2", listener3);
-      
+
       ipcMock.removeAllListeners("channel1");
-      
+
       ipcMock.send("channel1", "data");
       ipcMock.send("channel2", "data");
 
@@ -112,12 +112,12 @@ describe("IPC Mock System", () => {
     it("should remove all listeners from all channels", () => {
       const listener1 = vi.fn();
       const listener2 = vi.fn();
-      
+
       ipcMock.on("channel1", listener1);
       ipcMock.on("channel2", listener2);
-      
+
       ipcMock.removeAllListeners();
-      
+
       ipcMock.send("channel1", "data");
       ipcMock.send("channel2", "data");
 
@@ -134,10 +134,10 @@ describe("IPC Mock System", () => {
     it("should return mock responses", async () => {
       const mockResponse = { mocked: true, data: "test" };
       const handler = vi.fn().mockResolvedValue({ original: true });
-      
+
       ipcMock.handle("test:channel", handler);
       ipcMock.setMockResponse("test:channel", mockResponse);
-      
+
       const result = await ipcMock.invoke("test:channel");
 
       expect(result).toEqual(mockResponse);
@@ -151,7 +151,7 @@ describe("IPC Mock System", () => {
     it("should throw mock errors", async () => {
       const mockError = new Error("Mock error");
       const handler = vi.fn().mockResolvedValue({ success: true });
-      
+
       ipcMock.handle("test:channel", handler);
       ipcMock.setMockError("test:channel", mockError);
 
@@ -166,10 +166,10 @@ describe("IPC Mock System", () => {
     it("should use interceptors", async () => {
       const interceptor = vi.fn().mockResolvedValue({ intercepted: true });
       const handler = vi.fn().mockResolvedValue({ original: true });
-      
+
       ipcMock.handle("test:channel", handler);
       ipcMock.setInterceptor("test:channel", interceptor);
-      
+
       const result = await ipcMock.invoke("test:channel", "arg1");
 
       expect(result).toEqual({ intercepted: true });
@@ -186,14 +186,14 @@ describe("IPC Mock System", () => {
     it("should track call history", async () => {
       const handler = vi.fn().mockResolvedValue({ success: true });
       const listener = vi.fn();
-      
+
       ipcMock.handle("test:channel", handler);
       ipcMock.on("test:event", listener);
       await ipcMock.invoke("test:channel", "arg1");
       ipcMock.send("test:event", "data");
 
       const history = ipcMock.getCallHistory();
-      
+
       expect(history).toHaveLength(4);
       expect(history[0]).toMatchObject({
         channel: "test:channel",
@@ -225,7 +225,7 @@ describe("IPC Mock System", () => {
       await ipcMock.invoke("channel1", "arg3");
 
       const channel1Calls = ipcMock.getCallsForChannel("channel1");
-      
+
       expect(channel1Calls).toHaveLength(2);
       expect(channel1Calls[0].args).toEqual(["arg1"]);
       expect(channel1Calls[1].args).toEqual(["arg3"]);
@@ -241,7 +241,7 @@ describe("IPC Mock System", () => {
       await ipcMock.invoke("test:channel", "last");
 
       const lastCall = ipcMock.getLastCall("test:channel");
-      
+
       expect(lastCall).toBeDefined();
       expect(lastCall!.args).toEqual(["last"]);
     });
@@ -253,9 +253,9 @@ describe("IPC Mock System", () => {
     it("should clear call history", async () => {
       await ipcMock.invoke("test:channel", "arg");
       expect(ipcMock.getCallHistory().length).toBeGreaterThan(0);
-      
+
       ipcMock.clearHistory();
-      
+
       expect(ipcMock.getCallHistory()).toHaveLength(0);
     });
   });
@@ -267,7 +267,7 @@ describe("IPC Mock System", () => {
        Requirements: testing-infrastructure.2.4 */
     it("should verify if channel was called", async () => {
       await ipcMock.invoke("called:channel", "arg");
-      
+
       expect(ipcMock.verifyCall("called:channel")).toBe(true);
       expect(ipcMock.verifyCall("not-called:channel")).toBe(false);
     });
@@ -279,7 +279,7 @@ describe("IPC Mock System", () => {
     it("should verify calls with specific arguments", async () => {
       await ipcMock.invoke("test:channel", "arg1", "arg2");
       await ipcMock.invoke("test:channel", "different", "args");
-      
+
       expect(ipcMock.verifyCall("test:channel", ["arg1", "arg2"])).toBe(true);
       expect(ipcMock.verifyCall("test:channel", ["wrong", "args"])).toBe(false);
     });
@@ -292,7 +292,7 @@ describe("IPC Mock System", () => {
       await ipcMock.invoke("test:channel", "call1");
       await ipcMock.invoke("test:channel", "call2");
       await ipcMock.invoke("other:channel", "other");
-      
+
       expect(ipcMock.verifyCallCount("test:channel", 2)).toBe(true);
       expect(ipcMock.verifyCallCount("test:channel", 1)).toBe(false);
       expect(ipcMock.verifyCallCount("other:channel", 1)).toBe(true);
@@ -307,7 +307,7 @@ describe("IPC Mock System", () => {
        Requirements: testing-infrastructure.2.4 */
     it("should throw error when disabled", async () => {
       ipcMock.setEnabled(false);
-      
+
       await expect(ipcMock.invoke("test:channel")).rejects.toThrow("IPC Mock is disabled");
       expect(ipcMock.isIPCEnabled()).toBe(false);
     });
@@ -318,13 +318,13 @@ describe("IPC Mock System", () => {
        Requirements: testing-infrastructure.2.4 */
     it("should work normally when re-enabled", async () => {
       const handler = vi.fn().mockResolvedValue({ success: true });
-      
+
       ipcMock.handle("test:channel", handler);
       ipcMock.setEnabled(false);
       ipcMock.setEnabled(true);
-      
+
       const result = await ipcMock.invoke("test:channel");
-      
+
       expect(result).toEqual({ success: true });
       expect(ipcMock.isIPCEnabled()).toBe(true);
     });
@@ -335,11 +335,11 @@ describe("IPC Mock System", () => {
        Requirements: testing-infrastructure.2.4 */
     it("should ignore send operations when disabled", () => {
       const listener = vi.fn();
-      
+
       ipcMock.on("test:event", listener);
       ipcMock.setEnabled(false);
       ipcMock.send("test:event", "data");
-      
+
       expect(listener).not.toHaveBeenCalled();
     });
   });
@@ -352,14 +352,14 @@ describe("IPC Mock System", () => {
     it("should simulate network delays", async () => {
       const handler = vi.fn().mockResolvedValue({ success: true });
       const delayMs = 100;
-      
+
       ipcMock.handle("test:channel", handler);
       await ipcMock.simulateDelay("test:channel", delayMs);
-      
+
       const startTime = Date.now();
       const result = await ipcMock.invoke("test:channel");
       const endTime = Date.now();
-      
+
       expect(result).toEqual({ success: true });
       expect(endTime - startTime).toBeGreaterThanOrEqual(delayMs - 10); // Allow 10ms tolerance
     });
@@ -373,11 +373,11 @@ describe("IPC Mock System", () => {
     it("should handle and record handler errors", async () => {
       const error = new Error("Handler error");
       const handler = vi.fn().mockRejectedValue(error);
-      
+
       ipcMock.handle("test:channel", handler);
-      
+
       await expect(ipcMock.invoke("test:channel")).rejects.toThrow("Handler error");
-      
+
       const lastCall = ipcMock.getLastCall("test:channel");
       expect(lastCall?.error).toEqual(error);
     });
@@ -392,19 +392,19 @@ describe("IPC Mock System", () => {
       });
       const goodListener = vi.fn();
       const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-      
+
       ipcMock.on("test:event", errorListener);
       ipcMock.on("test:event", goodListener);
-      
+
       ipcMock.send("test:event", "data");
-      
+
       expect(errorListener).toHaveBeenCalled();
       expect(goodListener).toHaveBeenCalledWith("data");
       expect(consoleSpy).toHaveBeenCalledWith(
         expect.stringContaining("Error in IPC event listener"),
-        expect.any(Error)
+        expect.any(Error),
       );
-      
+
       consoleSpy.mockRestore();
     });
   });
@@ -419,10 +419,10 @@ describe("IPC Mock System", () => {
       for (let i = 0; i < 1100; i++) {
         await ipcMock.invoke("test:channel", i);
       }
-      
+
       const history = ipcMock.getCallHistory();
       expect(history.length).toBeLessThanOrEqual(1000);
-      
+
       // Should keep the most recent calls
       const lastCall = history[history.length - 1];
       expect(lastCall.args).toEqual([1099]);
@@ -437,7 +437,7 @@ describe("IPC Mock System", () => {
     it("should reset all state", async () => {
       const handler = vi.fn();
       const listener = vi.fn();
-      
+
       // Set up various state
       ipcMock.handle("test:channel", handler);
       ipcMock.on("test:event", listener);
@@ -445,30 +445,30 @@ describe("IPC Mock System", () => {
       ipcMock.setMockError("error:channel", new Error("Mock error"));
       await ipcMock.invoke("test:channel");
       ipcMock.setEnabled(false);
-      
+
       // Verify state exists
       expect(ipcMock.getCallHistory().length).toBeGreaterThan(0);
       expect(ipcMock.isIPCEnabled()).toBe(false);
-      
+
       // Reset
       ipcMock.reset();
-      
+
       // Verify all state is cleared
       expect(ipcMock.getCallHistory()).toHaveLength(0);
       expect(ipcMock.isIPCEnabled()).toBe(true);
-      
+
       // Verify handlers are cleared - should return default response
       const result = await ipcMock.invoke("test:channel");
       expect(result).toEqual({}); // Default response
-      
+
       // Verify listeners are cleared
       ipcMock.send("test:event", "data");
       expect(listener).not.toHaveBeenCalled();
-      
+
       // Verify mock responses are cleared
       const mockResult = await ipcMock.invoke("mock:channel");
       expect(mockResult).toEqual({}); // Should not return mocked response
-      
+
       // Verify mock errors are cleared - should not throw
       const errorResult = await ipcMock.invoke("error:channel");
       expect(errorResult).toEqual({}); // Should not throw error
@@ -483,10 +483,10 @@ describe("IPC Mock System", () => {
     it("should integrate with mock system", async () => {
       const systemIpcMock = mockSystem.mockIPC();
       const handler = vi.fn().mockResolvedValue({ integrated: true });
-      
+
       systemIpcMock.handle("integration:test", handler);
       const result = await systemIpcMock.invoke("integration:test", "data");
-      
+
       expect(result).toEqual({ integrated: true });
       expect(handler).toHaveBeenCalledWith("data");
     });
@@ -497,14 +497,14 @@ describe("IPC Mock System", () => {
        Requirements: testing-infrastructure.2.4 */
     it("should be reset when restoring all mocks", async () => {
       const systemIpcMock = mockSystem.mockIPC();
-      
+
       systemIpcMock.handle("test:channel", vi.fn());
       await systemIpcMock.invoke("test:channel");
-      
+
       expect(systemIpcMock.getCallHistory().length).toBeGreaterThan(0);
-      
+
       mockSystem.restoreAll();
-      
+
       expect(systemIpcMock.getCallHistory()).toHaveLength(0);
     });
   });
