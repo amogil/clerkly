@@ -1,516 +1,398 @@
-# Список Задач - Навигация Сайдбара
+# План Реализации - Навигация Сайдбара
 
-## Текущий Статус
+## Обзор
 
-**Анализ соответствия коду**: 90% (18/20 требований реализовано)
+Этот документ содержит план реализации для системы навигации со складывающимся сайдбаром. Система обеспечивает адаптивное поведение, сохранение состояния между сессиями и полную интеграцию с архитектурой Electron приложения.
 
-### Реализованные Компоненты
+## Статус Реализации
 
-- ✅ Базовая структура Navigation компонента
-- ✅ Адаптивное поведение складывания
-- ✅ Интеграция с Logo компонентом
-- ✅ Основные элементы навигации
-- ✅ Responsive стили и анимации
+**Общий прогресс: 60% (12/20 критериев приемки) ⚠️**  
+**Покрытие тестами: 0% ❌**  
+**Последнее обновление: 2025-02-01**
 
-### Пропущенные Компоненты
+### ✅ Реализовано
 
-- ❌ Сохранение состояния в SQLite
-- ❌ IPC интеграция для состояния сайдбара
+- Базовая структура "Navigation Component"
+- Адаптивное поведение складывания (UI)
+- Интеграция с "Logo Component"
+- Основные элементы навигации
+- Responsive стили и анимации
+
+### ⚠️ Частично Реализовано
+
+- Управление состоянием в "App Component" (без персистентности)
+- Визуальные правила видимости контента
+
+### ❌ Не Реализовано
+
+- IPC обработчики для состояния сайдбара
+- Сохранение состояния в SQLite
+- Preload API для состояния сайдбара
+- Тестирование (unit, property-based, E2E)
+- Accessibility улучшения
+- Обработка ошибок и откат состояния
 
 ## Задачи
 
-### 1. Интеграция Сохранения Состояния
-
-#### 1.1 Реализовать IPC обработчики для состояния сайдбара
-
-- [ ] Добавить IPC обработчики в `main.ts`
-- [ ] Создать каналы `sidebar:get-state` и `sidebar:set-state`
-- [ ] Интегрировать с функциями БД из data-storage
-- [ ] Добавить обработку ошибок и логирование
-
-**Детали реализации**:
-
-```typescript
-// В main.ts
-ipcMain.handle("sidebar:get-state", async (): Promise<{ collapsed: boolean }> => {
-  try {
-    const db = ensureDatabase();
-    const collapsed = getSidebarCollapsed(db);
-    return { collapsed };
-  } catch (error) {
-    logError(app.getPath("userData"), "Failed to get sidebar state", error);
-    return { collapsed: false };
-  }
-});
-
-ipcMain.handle(
-  "sidebar:set-state",
-  async (_, { collapsed }: { collapsed: boolean }): Promise<{ success: boolean }> => {
-    try {
-      const db = ensureDatabase();
-      setSidebarCollapsed(db, collapsed);
-      return { success: true };
-    } catch (error) {
-      logError(app.getPath("userData"), "Failed to set sidebar state", error);
-      return { success: false };
-    }
-  },
-);
-```
-
-**Критерии приемки**:
-
-- IPC каналы зарегистрированы корректно
-- Состояние сохраняется в SQLite
-- Ошибки обрабатываются и логируются
-- Возвращаются корректные типы данных
-
-#### 1.2 Обновить preload.ts для sidebar API
-
-- [ ] Добавить методы `getSidebarState()` и `setSidebarState()` в clerkly API
-- [ ] Обеспечить типизацию для TypeScript
-- [ ] Добавить JSDoc документацию
-- [ ] Протестировать IPC коммуникацию
-
-**Детали реализации**:
-
-```typescript
-// В preload.ts
-const clerklyAPI = {
-  // ... существующие методы
-
-  getSidebarState: (): Promise<{ collapsed: boolean }> => ipcRenderer.invoke("sidebar:get-state"),
-
-  setSidebarState: (collapsed: boolean): Promise<{ success: boolean }> =>
-    ipcRenderer.invoke("sidebar:set-state", { collapsed }),
-};
-
-// Типы для renderer
-interface ClerklyAPI {
-  // ... существующие типы
-  getSidebarState(): Promise<{ collapsed: boolean }>;
-  setSidebarState(collapsed: boolean): Promise<{ success: boolean }>;
-}
-```
-
-**Критерии приемки**:
-
-- API методы доступны в renderer процессе
-- TypeScript типы корректны
-- JSDoc документация добавлена
-- Нет утечек IPC каналов
-
-### 2. Улучшение Navigation Компонента
-
-#### 2.1 Интегрировать сохранение состояния в App.tsx
-
-- [ ] Добавить загрузку состояния при инициализации
-- [ ] Реализовать сохранение при изменении состояния
-- [ ] Добавить обработку ошибок с откатом состояния
-- [ ] Оптимизировать частоту сохранения
-
-**Детали реализации**:
-
-```typescript
-// В App.tsx
-const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-
-// Загрузка состояния при инициализации
-useEffect(() => {
-  window.clerkly
-    .getSidebarState()
-    .then((state) => {
-      setIsSidebarCollapsed(state.collapsed);
-    })
-    .catch(() => {
-      setIsSidebarCollapsed(false); // По умолчанию развернут
-    });
-}, []);
-
-// Обработчик переключения с сохранением
-const handleToggleCollapse = async () => {
-  const newState = !isSidebarCollapsed;
-  setIsSidebarCollapsed(newState);
-
-  try {
-    await window.clerkly.setSidebarState(newState);
-  } catch (error) {
-    // Откат состояния при ошибке
-    setIsSidebarCollapsed(!newState);
-    console.error("Failed to save sidebar state:", error);
-  }
-};
-```
-
-**Критерии приемки**:
-
-- Состояние загружается при запуске приложения
-- Изменения сохраняются немедленно
-- Ошибки обрабатываются с откатом UI
-- Нет лишних вызовов API
-
-#### 2.2 Улучшить адаптивность Navigation компонента
-
-- [ ] Добавить debounce для частых переключений
-- [ ] Улучшить анимации переходов
-- [ ] Оптимизировать рендеринг с useMemo
-- [ ] Добавить поддержку keyboard shortcuts
-
-**Детали реализации**:
-
-```typescript
-// Debounced сохранение состояния
-const debouncedSetSidebarState = useMemo(
-  () =>
-    debounce((collapsed: boolean) => {
-      window.clerkly.setSidebarState(collapsed);
-    }, 300),
-  [],
-);
-
-// Мемоизация стилей
-const navButtonClassName = useMemo(
-  () =>
-    (isActive: boolean): string => {
-      const baseClasses = "w-full flex items-center rounded-lg transition-all mb-1 py-3";
-      const stateClasses = isActive
-        ? "bg-primary text-primary-foreground shadow-sm"
-        : "text-foreground hover:bg-secondary";
-      const layoutClasses = collapsed ? "justify-center px-0" : "gap-3 px-4";
-      return `${baseClasses} ${layoutClasses} ${stateClasses}`;
-    },
-  [collapsed],
-);
-
-// Keyboard shortcuts
-useEffect(() => {
-  const handleKeyDown = (event: KeyboardEvent) => {
-    if (event.ctrlKey && event.key === "b") {
-      event.preventDefault();
-      handleToggleCollapse();
-    }
-  };
-
-  window.addEventListener("keydown", handleKeyDown);
-  return () => window.removeEventListener("keydown", handleKeyDown);
-}, [handleToggleCollapse]);
-```
-
-**Критерии приемки**:
-
-- Debounce предотвращает лишние сохранения
-- Анимации плавные и производительные
-- Мемоизация улучшает производительность
-- Keyboard shortcuts работают корректно
-
-### 3. Accessibility Улучшения
-
-#### 3.1 Добавить ARIA атрибуты и keyboard navigation
-
-- [ ] Добавить правильные ARIA роли и атрибуты
-- [ ] Реализовать keyboard navigation между элементами
-- [ ] Добавить focus management
-- [ ] Обеспечить screen reader поддержку
-
-**Детали реализации**:
-
-```typescript
-// ARIA атрибуты для навигации
-<nav role="navigation" aria-label="Main navigation">
-  <button
-    role="button"
-    aria-label={collapsed ? `${item.label} (collapsed)` : item.label}
-    aria-expanded={!collapsed}
-    aria-current={currentScreen === item.id ? "page" : undefined}
-    tabIndex={0}
-    onKeyDown={(e) => handleKeyDown(e, item.id)}
-  >
-    <item.icon aria-hidden="true" className="w-5 h-5 shrink-0" />
-    {!collapsed && <span>{item.label}</span>}
-  </button>
-</nav>
-
-// Keyboard navigation
-const handleKeyDown = (event: KeyboardEvent, itemId: string) => {
-  if (event.key === "Enter" || event.key === " ") {
-    event.preventDefault()
-    onNavigate(itemId)
-  }
-  // Arrow key navigation
-  if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-    event.preventDefault()
-    focusNextItem(event.key === "ArrowDown")
-  }
-}
-```
-
-**Критерии приемки**:
-
-- Все элементы имеют правильные ARIA атрибуты
-- Keyboard navigation работает интуитивно
-- Focus visible и управляется корректно
-- Screen readers читают контент правильно
-
-#### 3.2 Улучшить контрастность и визуальные индикаторы
-
-- [ ] Проверить цветовой контраст для всех состояний
-- [ ] Добавить focus indicators
-- [ ] Улучшить hover states
-- [ ] Добавить high contrast mode поддержку
-
-**Детали реализации**:
-
-```css
-/* Focus indicators */
-.nav-button:focus {
-  outline: 2px solid var(--ring);
-  outline-offset: 2px;
-}
-
-/* High contrast mode */
-@media (prefers-contrast: high) {
-  .nav-button {
-    border: 1px solid var(--border);
-  }
-
-  .nav-button-active {
-    border: 2px solid var(--primary);
-    background-color: var(--primary);
-  }
-}
-
-/* Hover states */
-.nav-button:hover:not(.nav-button-active) {
-  background-color: var(--secondary);
-  transform: translateX(2px);
-}
-```
-
-**Критерии приемки**:
-
-- Контраст соответствует WCAG AA (4.5:1)
-- Focus indicators четко видны
-- Hover states улучшают UX
-- High contrast mode поддерживается
-
-### 4. Тестирование
-
-#### 4.1 Unit тесты для Navigation компонента
-
-- [ ] Тестировать рендеринг в обоих состояниях
-- [ ] Проверить обработку событий
-- [ ] Тестировать интеграцию с Logo
-- [ ] Проверить accessibility атрибуты
-
-**Детали реализации**:
-
-```typescript
-describe("Navigation Component", () => {
-  it("should render all navigation items", () => {
-    render(<Navigation currentScreen="dashboard" onNavigate={jest.fn()} collapsed={false} onToggleCollapse={jest.fn()} />)
-
-    expect(screen.getByText("Dashboard")).toBeInTheDocument()
-    expect(screen.getByText("Calendar")).toBeInTheDocument()
-    expect(screen.getByText("Tasks")).toBeInTheDocument()
-    expect(screen.getByText("Contacts")).toBeInTheDocument()
-    expect(screen.getByText("Settings")).toBeInTheDocument()
-  })
-
-  it("should hide text labels when collapsed", () => {
-    render(<Navigation currentScreen="dashboard" onNavigate={jest.fn()} collapsed={true} onToggleCollapse={jest.fn()} />)
-
-    expect(screen.queryByText("Dashboard")).not.toBeInTheDocument()
-    expect(screen.queryByText("Stay on track")).not.toBeInTheDocument()
-  })
-
-  it("should call onToggleCollapse when toggle button is clicked", () => {
-    const mockToggle = jest.fn()
-    render(<Navigation currentScreen="dashboard" onNavigate={jest.fn()} collapsed={false} onToggleCollapse={mockToggle} />)
-
-    fireEvent.click(screen.getByRole("button", { name: /collapse/i }))
-    expect(mockToggle).toHaveBeenCalledTimes(1)
-  })
-})
-```
-
-**Критерии приемки**:
-
-- Все основные сценарии покрыты тестами
-- Тесты проходят стабильно
-- Mock функции используются корректно
-- Accessibility тестируется
-
-#### 4.2 Integration тесты для состояния сайдбара
-
-- [ ] Тестировать сохранение/загрузку состояния
-- [ ] Проверить IPC коммуникацию
-- [ ] Тестировать обработку ошибок
-- [ ] E2E тесты с реальной БД
-
-**Property-Based Test 1: Персистентность Состояния Сайдбара**
-
-```typescript
-// **Validates: sidebar-navigation.4.2**
-describe("Sidebar State Persistence Property", () => {
-  it("should persist sidebar state across app restarts", () => {
-    fc.assert(
-      fc.property(fc.boolean(), async (collapsed) => {
-        // Сохраняем состояние
-        const saveResult = await window.clerkly.setSidebarState(collapsed);
-        expect(saveResult.success).toBe(true);
-
-        // Симулируем перезапуск (новый запрос состояния)
-        const loadResult = await window.clerkly.getSidebarState();
-
-        return loadResult.collapsed === collapsed;
-      }),
-    );
-  });
-});
-```
-
-#### 4.3 Visual regression тесты
-
-- [ ] Снимки экрана для expanded состояния
-- [ ] Снимки экрана для collapsed состояния
-- [ ] Тестирование анимаций переходов
-- [ ] Проверка на разных размерах экрана
-
-**Property-Based Test 2: Визуальная Согласованность**
-
-```typescript
-// **Validates: sidebar-navigation.2.2**
-describe("Visual Consistency Property", () => {
-  it("should maintain icon sizes in both states", () => {
-    fc.assert(fc.property(
-      fc.boolean(),
-      (collapsed) => {
-        render(<Navigation currentScreen="dashboard" onNavigate={jest.fn()} collapsed={collapsed} onToggleCollapse={jest.fn()} />)
-
-        const icons = screen.getAllByRole("img", { hidden: true })
-
-        return icons.every(icon => {
-          const styles = window.getComputedStyle(icon)
-          return styles.width === "20px" && styles.height === "20px"
-        })
-      }
-    ))
-  })
-})
-```
-
-#### 4.4 Accessibility тесты
-
-- [ ] Проверить keyboard navigation
-- [ ] Тестировать screen reader поддержку
-- [ ] Проверить цветовой контраст
-- [ ] Тестировать focus management
-
-**Property-Based Test 3: Доступность Навигации**
-
-```typescript
-// **Validates: sidebar-navigation.5.3**
-describe("Navigation Accessibility Property", () => {
-  it("should maintain keyboard accessibility in both states", () => {
-    fc.assert(fc.property(
-      fc.boolean(),
-      (collapsed) => {
-        render(<Navigation currentScreen="dashboard" onNavigate={jest.fn()} collapsed={collapsed} onToggleCollapse={jest.fn()} />)
-
-        const buttons = screen.getAllByRole("button")
-
-        return buttons.every(button => {
-          return button.tabIndex >= 0 &&
-                 button.getAttribute("aria-label") !== null &&
-                 button.getAttribute("role") === "button"
-        })
-      }
-    ))
-  })
-})
-```
-
-### 5. Производительность и Оптимизация
-
-#### 5.1 Оптимизировать рендеринг компонента
-
-- [ ] Добавить React.memo для Navigation
-- [ ] Мемоизировать callback функции
-- [ ] Оптимизировать CSS transitions
-- [ ] Добавить lazy loading для иконок
-
-**Детали реализации**:
-
-```typescript
-// Мемоизация компонента
-const Navigation = React.memo(
-  ({ currentScreen, onNavigate, collapsed, onToggleCollapse }: NavigationProps) => {
-    // ... компонент
-  },
-);
-
-// Мемоизация callbacks в App.tsx
-const handleNavigate = useCallback((screen: string) => {
-  setCurrentScreen(screen);
-}, []);
-
-const handleToggleCollapse = useCallback(async () => {
-  // ... логика переключения
-}, [isSidebarCollapsed]);
-```
-
-**Критерии приемки**:
-
-- Компонент не перерендеривается без необходимости
-- Callbacks стабильны между рендерами
-- CSS анимации не блокируют UI
-- Иконки загружаются эффективно
-
-#### 5.2 Мониторинг производительности
-
-- [ ] Добавить метрики времени переключения
-- [ ] Мониторить частоту сохранения состояния
-- [ ] Отслеживать размер bundle для компонента
-- [ ] Профилировать memory usage
-
-**Критерии приемки**:
-
-- Переключение происходит < 100ms
-- Состояние сохраняется < 50ms
-- Bundle size оптимален
-- Нет memory leaks
+### 1. Реализация Персистентности Состояния
+
+- [ ] 1.1 Создать функции персистентности в main.ts
+  - Реализовать `getSidebarCollapsed(db)` для чтения состояния из SQLite
+  - Реализовать `setSidebarCollapsed(db, collapsed)` для записи состояния
+  - Использовать таблицу `app_meta` с ключом `sidebar_collapsed`
+  - Обеспечить безопасное значение по умолчанию (false = развернут)
+  - _Требования: sidebar-navigation.4.1, sidebar-navigation.4.3_
+
+- [ ] 1.2 Реализовать IPC обработчики для состояния сайдбара
+  - Добавить обработчик `sidebar:get-state` в main.ts
+  - Добавить обработчик `sidebar:set-state` в main.ts
+  - Интегрировать с функциями персистентности из задачи 1.1
+  - Добавить обработку ошибок с логированием через platform-foundation
+  - Обеспечить возврат безопасных значений при ошибках
+  - _Требования: sidebar-navigation.5.1, sidebar-navigation.5.2, sidebar-navigation.4.2_
+
+- [ ] 1.3 Обновить preload.ts для Sidebar API
+  - Добавить метод `getSidebarState()` в clerkly API
+  - Добавить метод `setSidebarState(collapsed: boolean)` в clerkly API
+  - Обеспечить полную типизацию для TypeScript
+  - Добавить JSDoc документацию для методов
+  - Обновить интерфейс ClerklyAPI в renderer типах
+  - _Требования: sidebar-navigation.5.1, sidebar-navigation.5.3_
+
+- [ ] 1.4 Обновить IPC контракт документацию
+  - Добавить описание каналов `sidebar:get-state` и `sidebar:set-state` в docs/ipc-contract.md
+  - Документировать типы параметров и возвращаемых значений
+  - Добавить примеры использования
+  - Описать поведение при ошибках
+  - _Требования: sidebar-navigation.5.3_
+
+### 2. Интеграция Управления Состоянием в App Component
+
+- [ ] 2.1 Реализовать загрузку состояния при инициализации
+  - Добавить useEffect для загрузки состояния из IPC при монтировании
+  - Обеспечить загрузку до первого рендеринга UI (useLayoutEffect если необходимо)
+  - Обработать ошибки загрузки с fallback на значение по умолчанию
+  - Добавить состояние загрузки для предотвращения мерцания UI
+  - _Требования: sidebar-navigation.4.1, sidebar-navigation.4.3, sidebar-navigation.4.4_
+
+- [ ] 2.2 Реализовать сохранение состояния при изменении
+  - Создать обработчик `handleToggleCollapse` с оптимистичным обновлением UI
+  - Вызывать `window.clerkly.setSidebarState()` при переключении
+  - Реализовать откат состояния UI при ошибке сохранения
+  - Добавить логирование ошибок в консоль
+  - _Требования: sidebar-navigation.4.2, sidebar-navigation.5.2_
+
+- [ ] 2.3 Передать состояние и обработчики в Navigation Component
+  - Передать `collapsed` prop в Navigation Component
+  - Передать `onToggleCollapse` callback в Navigation Component
+  - Обеспечить корректную типизацию props
+  - _Требования: sidebar-navigation.2.1, sidebar-navigation.5.2_
+
+### 3. Улучшения Accessibility и UX
+
+- [ ] 3.1 Добавить ARIA атрибуты для навигации
+  - Добавить `role="navigation"` и `aria-label="Main navigation"` для nav элемента
+  - Добавить `aria-expanded` для кнопки складывания
+  - Добавить `aria-current="page"` для активного элемента навигации
+  - Добавить `aria-label` для кнопок в collapsed режиме
+  - Добавить `aria-hidden="true"` для декоративных иконок
+  - _Требования: sidebar-navigation.2.5_
+
+- [ ] 3.2 Реализовать keyboard navigation
+  - Обеспечить tabIndex для всех интерактивных элементов
+  - Добавить обработку Enter и Space для активации кнопок
+  - Реализовать навигацию стрелками между элементами (опционально)
+  - Добавить keyboard shortcut для складывания (Ctrl+B)
+  - _Требования: sidebar-navigation.2.5_
+
+- [ ] 3.3 Улучшить focus management
+  - Добавить видимые focus indicators (outline)
+  - Обеспечить логический порядок tab navigation
+  - Добавить focus trap для модальных элементов (если применимо)
+  - _Требования: sidebar-navigation.2.5_
+
+- [ ] 3.4 Оптимизировать производительность рендеринга
+  - Обернуть Navigation Component в React.memo
+  - Мемоизировать callback функции с useCallback
+  - Мемоизировать вычисление className с useMemo
+  - Использовать CSS transitions вместо JavaScript анимаций
+  - _Требования: sidebar-navigation.2.4_
+
+### 4. Unit Тестирование
+
+- [ ] 4.1 Unit тесты для Navigation Component
+  - Тестировать рендеринг всех навигационных элементов
+  - Проверить размещение Settings в нижней секции
+  - Тестировать вызов onToggleCollapse при клике на кнопку
+  - Проверить скрытие текстовых элементов в collapsed режиме
+  - Тестировать постоянство размера иконок в обоих состояниях
+  - _Требования: sidebar-navigation.1.1, sidebar-navigation.1.2, sidebar-navigation.1.4, sidebar-navigation.2.2, sidebar-navigation.3.1, sidebar-navigation.3.2_
+
+- [ ] 4.2 Unit тесты для IPC обработчиков
+  - Тестировать возврат значения по умолчанию (false) при отсутствии записи в БД
+  - Проверить возврат сохраненного состояния из базы данных
+  - Тестировать успешное сохранение состояния в БД
+  - Проверить обработку ошибок БД с возвратом безопасных значений
+  - _Требования: sidebar-navigation.4.1, sidebar-navigation.4.3, sidebar-navigation.5.1, sidebar-navigation.5.2_
+
+- [ ] 4.3 Unit тесты для управления состоянием в App
+  - Тестировать загрузку состояния при инициализации
+  - Проверить оптимистичное обновление UI при переключении
+  - Тестировать откат состояния при ошибке сохранения
+  - Проверить передачу props в Navigation Component
+  - _Требования: sidebar-navigation.4.1, sidebar-navigation.4.2, sidebar-navigation.5.2_
+
+- [ ] 4.4 Unit тесты для accessibility
+  - Проверить наличие всех ARIA атрибутов
+  - Тестировать keyboard navigation (Enter, Space)
+  - Проверить tabIndex для всех интерактивных элементов
+  - Тестировать focus indicators
+  - _Требования: sidebar-navigation.2.5_
+
+### 5. Property-Based Тестирование
+
+- [ ] 5.1 Property Test 1: Состояние UI зависит от collapsed flag
+  - **Свойство 1 из design.md**: Для любого состояния сайдбара, видимость текстовых элементов и ширина сайдбара должны соответствовать значению флага collapsed
+  - Генерировать случайные boolean значения для collapsed
+  - Рендерить Navigation Component с каждым значением
+  - Проверять ширину сайдбара (w-20 vs w-64)
+  - Проверять видимость navigation labels, tagline, logo text
+  - Конфигурация: минимум 100 итераций
+  - _Требования: sidebar-navigation.2.1, sidebar-navigation.3.1, sidebar-navigation.3.2, sidebar-navigation.3.3_
+
+- [ ] 5.2 Property Test 2: Инварианты размера иконок
+  - **Свойство 2 из design.md**: Для любого состояния сайдбара, размер навигационных иконок должен оставаться постоянным
+  - Генерировать случайные boolean значения для collapsed
+  - Рендерить Navigation Component с каждым значением
+  - Проверять что все иконки имеют классы w-5 h-5 shrink-0
+  - Проверять что размер иконок = 20px независимо от состояния
+  - Конфигурация: минимум 100 итераций
+  - _Требования: sidebar-navigation.2.2_
+
+- [ ] 5.3 Property Test 3: Центрирование иконок в collapsed режиме
+  - **Свойство 3 из design.md**: Для любого состояния сайдбара, когда он сложен, иконки должны быть центрированы в своих контейнерах
+  - Генерировать случайные boolean значения для collapsed
+  - Рендерить Navigation Component с каждым значением
+  - Когда collapsed=true, проверять justify-center в className кнопок
+  - Когда collapsed=false, проверять gap-3 px-4 в className кнопок
+  - Конфигурация: минимум 100 итераций
+  - _Требования: sidebar-navigation.2.3_
+
+- [ ] 5.4 Property Test 4: Функциональная эквивалентность состояний
+  - **Свойство 4 из design.md**: Для любого элемента навигации, все навигационные действия должны быть доступны в обоих состояниях сайдбара
+  - Генерировать случайные boolean значения для collapsed
+  - Рендерить Navigation Component с каждым значением
+  - Проверять что все кнопки навигации кликабельны
+  - Проверять что все кнопки имеют tabIndex >= 0
+  - Проверять что все кнопки имеют aria-label
+  - Конфигурация: минимум 100 итераций
+  - _Требования: sidebar-navigation.2.5_
+
+- [ ] 5.5 Property Test 5: Персистентность состояния (Round-Trip)
+  - **Свойство 5 из design.md**: Для любого состояния сайдбара, сохранение и последующая загрузка должны вернуть то же самое значение
+  - Генерировать случайные boolean значения для collapsed
+  - Вызывать setSidebarState(collapsed) через mock IPC
+  - Вызывать getSidebarState() через mock IPC
+  - Проверять что загруженное значение === сохраненному значению
+  - Конфигурация: минимум 100 итераций
+  - _Требования: sidebar-navigation.4.1, sidebar-navigation.4.2_
+
+- [ ] 5.6 Property Test 6: IPC синхронизация состояния
+  - **Свойство 6 из design.md**: Для любого изменения состояния через IPC, состояние должно быть согласованным между "Renderer Process" и "Main Process"
+  - Генерировать случайные boolean значения для collapsed
+  - Вызывать setSidebarState через IPC handler
+  - Проверять что состояние сохранено в mock database
+  - Вызывать getSidebarState через IPC handler
+  - Проверять согласованность между renderer, main process и database
+  - Конфигурация: минимум 100 итераций
+  - _Требования: sidebar-navigation.5.1, sidebar-navigation.5.2_
+
+- [ ] 5.7 Property Test 7: Границы контрола складывания
+  - **Свойство 7 из design.md**: Для любого состояния сайдбара, контрол складывания не должен перекрывать логотип и должен оставаться в границах сайдбара
+  - Генерировать случайные boolean значения для collapsed
+  - Рендерить Navigation Component с каждым значением
+  - Получить bounding boxes для toggle button, logo, sidebar
+  - Проверять что toggle button не пересекается с logo
+  - Проверять что toggle button находится внутри sidebar
+  - Конфигурация: минимум 100 итераций
+  - _Требования: sidebar-navigation.1.3_
+
+### 6. Функциональное (E2E) Тестирование
+
+- [ ] 6.1 E2E тест: Персистентность состояния между перезапусками
+  - Запустить приложение с чистой БД
+  - Проверить что сайдбар развернут по умолчанию (w-64)
+  - Кликнуть на кнопку складывания
+  - Проверить что сайдбар сложен (w-20)
+  - Перезапустить приложение
+  - Проверить что сайдбар остается сложенным после перезапуска
+  - _Требования: sidebar-navigation.4.1, sidebar-navigation.4.2, sidebar-navigation.4.4_
+
+- [ ] 6.2 E2E тест: Навигация между экранами в обоих состояниях
+  - Запустить приложение
+  - Кликнуть на каждый элемент навигации в развернутом состоянии
+  - Проверить что активный экран меняется
+  - Сложить сайдбар
+  - Кликнуть на каждый элемент навигации в сложенном состоянии
+  - Проверить что навигация работает в обоих состояниях
+  - _Требования: sidebar-navigation.1.1, sidebar-navigation.1.4, sidebar-navigation.2.5_
+
+- [ ] 6.3 E2E тест: Keyboard navigation и accessibility
+  - Запустить приложение
+  - Использовать Tab для навигации между элементами
+  - Проверить видимость focus indicators
+  - Использовать Enter/Space для активации кнопок
+  - Использовать Ctrl+B для складывания сайдбара
+  - Проверить что все действия доступны с клавиатуры
+  - _Требования: sidebar-navigation.2.5_
+
+- [ ] 6.4 E2E тест: Обработка ошибок сохранения состояния
+  - Запустить приложение с mock БД, которая возвращает ошибки
+  - Попытаться переключить состояние сайдбара
+  - Проверить что UI откатывается к предыдущему состоянию
+  - Проверить что ошибка логируется в консоль
+  - Проверить что приложение остается стабильным
+  - _Требования: sidebar-navigation.4.2, sidebar-navigation.5.2_
+
+### 7. Интеграционное Тестирование
+
+- [ ] 7.1 Integration тест: IPC коммуникация между процессами
+  - Создать integration тест с реальными IPC каналами
+  - Вызвать sidebar:get-state из renderer process
+  - Проверить что main process обрабатывает запрос
+  - Вызвать sidebar:set-state из renderer process
+  - Проверить что состояние сохраняется в БД
+  - Проверить что последующий get-state возвращает сохраненное значение
+  - _Требования: sidebar-navigation.5.1, sidebar-navigation.5.2_
+
+- [ ] 7.2 Integration тест: Интеграция с Logo Component
+  - Рендерить Navigation Component с Logo
+  - Проверить что Logo отображается корректно в развернутом состоянии
+  - Проверить что Logo text скрывается в сложенном состоянии
+  - Проверить что Logo icon остается видимым в обоих состояниях
+  - Проверить что toggle button не перекрывает Logo
+  - _Требования: sidebar-navigation.1.3, sidebar-navigation.3.3_
+
+- [ ] 7.3 Integration тест: Интеграция с data-storage
+  - Создать integration тест с реальной SQLite БД
+  - Проверить что таблица app_meta используется корректно
+  - Сохранить состояние через setSidebarCollapsed
+  - Загрузить состояние через getSidebarCollapsed
+  - Проверить корректность JSON сериализации/десериализации
+  - Проверить обработку отсутствующих записей в БД
+  - _Требования: sidebar-navigation.4.1, sidebar-navigation.4.3_
+
+### 8. Контрольная Точка - Финальная Верификация
+
+- [ ] 8.1 Контрольная точка - убедиться что все тесты проходят
+  - Запустить полный набор unit тестов
+  - Запустить все property-based тесты (минимум 100 итераций каждый)
+  - Запустить все E2E тесты
+  - Запустить все integration тесты
+  - Проверить покрытие тестами (цель: >85%, стремление к 90%+)
+  - Убедиться что нет критических ошибок
+  - Спросить пользователя если возникают вопросы
 
 ## Критерии Завершения
 
 ### Функциональные Требования
 
-- [ ] Состояние сайдбара сохраняется в SQLite
-- [ ] IPC интеграция работает корректно
-- [ ] Все элементы навигации функциональны
-- [ ] Анимации плавные и производительные
+- [ ] Все 5 требований из requirements.md реализованы
+- [ ] Все 20 критериев приемки выполнены
+- [ ] Состояние сайдбара сохраняется в SQLite через IPC
+- [ ] UI адаптивно реагирует на изменение состояния
+- [ ] Все элементы навигации функциональны в обоих состояниях
+- [ ] Анимации плавные и производительные (CSS transitions)
 
 ### Качество Кода
 
-- [ ] Покрытие тестами > 90%
-- [ ] Все property-based тесты проходят
+- [ ] Покрытие тестами >85% (стремление к 90%+)
+- [ ] Все 7 property-based тестов проходят (минимум 100 итераций каждый)
+- [ ] Все unit тесты проходят
+- [ ] Все E2E тесты проходят
+- [ ] Все integration тесты проходят
+- [ ] Код соответствует стандартам проекта (ESLint, Prettier)
+- [ ] TypeScript компилируется без ошибок
+- [ ] Все функции имеют комментарии с Requirements
+- [ ] Все тесты имеют структуру Preconditions/Action/Assertions/Requirements
+
+### Accessibility
+
 - [ ] Accessibility соответствует WCAG AA
-- [ ] Код соответствует стандартам проекта
+- [ ] Все ARIA атрибуты корректны
+- [ ] Keyboard navigation работает полностью
+- [ ] Focus indicators видимы
+- [ ] Screen readers поддерживаются
 
 ### Интеграция
 
-- [ ] Совместимость с branding-system
-- [ ] Интеграция с data-storage
-- [ ] IPC каналы стабильны
+- [ ] Совместимость с branding-system (Logo Component)
+- [ ] Интеграция с data-storage (SQLite, app_meta таблица)
+- [ ] Интеграция с platform-foundation (IPC, логирование)
+- [ ] IPC каналы стабильны и документированы
 - [ ] Нет конфликтов с другими компонентами
+
+### Тестирование Краевых Случаев
+
+- [ ] База данных недоступна - возврат значения по умолчанию
+- [ ] Некорректные данные в БД - парсинг с fallback
+- [ ] IPC канал недоступен - UI остается стабильным
+- [ ] Одновременные изменения состояния - last-write-wins
+- [ ] Пустые/null значения обрабатываются корректно
+- [ ] Максимальные/минимальные значения протестированы
+
+### Документация
+
+- [ ] IPC контракт обновлен в docs/ipc-contract.md
+- [ ] Примеры использования добавлены
+- [ ] Комментарии в коде актуальны
+- [ ] README обновлен (если необходимо)
+
+## Зависимости
+
+**Требует:**
+
+- ✅ platform-foundation: IPC инфраструктура, логирование
+- ✅ data-storage: SQLite база данных, таблица app_meta
+- ✅ branding-system: Logo Component, цветовая схема
+
+**Предоставляет для других спецификаций:**
+
+- Интерфейс навигации между экранами
+- Складывающийся UI компонент
+- Персистентное состояние UI
 
 ## Приоритизация
 
-**Высокий приоритет**:
+### Высокий Приоритет (Критично для MVP)
 
-1. IPC интеграция для состояния (1.1, 1.2)
-2. Сохранение состояния в App.tsx (2.1)
-3. Unit тесты (4.1)
+1. Персистентность состояния (Задачи 1.1-1.4)
+2. Управление состоянием в App (Задачи 2.1-2.3)
+3. Unit тесты для основной функциональности (Задачи 4.1-4.2)
+4. Property-based тесты для свойств 1, 2, 5 (Задачи 5.1, 5.2, 5.5)
 
-**Средний приоритет**: 4. Accessibility улучшения (3.1, 3.2) 5. Integration тесты (4.2) 6. Производительность (5.1)
+### Средний Приоритет (Важно для качества)
 
-**Низкий приоритет**: 7. Visual regression тесты (4.3) 8. Мониторинг производительности (5.2)
+5. Accessibility улучшения (Задачи 3.1-3.3)
+6. Остальные property-based тесты (Задачи 5.3, 5.4, 5.6, 5.7)
+7. Unit тесты для accessibility (Задача 4.4)
+8. E2E тесты (Задачи 6.1-6.2)
+
+### Низкий Приоритет (Улучшения)
+
+9. Производительность оптимизации (Задача 3.4)
+10. E2E тесты для ошибок (Задача 6.4)
+11. Integration тесты (Задачи 7.1-7.3)
+12. Keyboard shortcuts (Задача 3.2)
+
+## Примечания
+
+- Все задачи написаны на русском языке согласно AGENTS.md
+- Названия компонентов на английском в кавычках ("Navigation Component", "App Component")
+- Каждая задача ссылается на конкретные требования из requirements.md
+- Property-based тесты соответствуют 7 свойствам корректности из design.md
+- Минимум 100 итераций для каждого property-based теста
+- Структура тестов: Preconditions/Action/Assertions/Requirements
+- Комментарии в коде должны содержать Requirements: sidebar-navigation.X.Y
+- Покрытие тестами: минимум 85%, стремление к 90%+
+- Особое внимание к краевым случаям и исключительным ситуациям
