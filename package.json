@@ -5,13 +5,49 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "jest",
+    "test:unit": "jest tests/unit",
+    "test:property": "jest tests/property",
+    "test:functional": "jest tests/functional",
+    "test:coverage": "jest --coverage",
+    "build": "electron-builder --mac",
+    "dist": "electron-builder --mac --publish never"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
+  "build": {
+    "appId": "com.clerkly.app",
+    "productName": "Clerkly",
+    "mac": {
+      "target": "dmg",
+      "category": "public.app-category.productivity",
+      "minimumSystemVersion": "10.13.0"
+    },
+    "files": [
+      "main.js",
+      "index.html",
+      "src/**/*",
+      "node_modules/**/*"
+    ],
+    "directories": {
+      "output": "dist"
+    }
+  },
   "devDependencies": {
-    "electron": "^40.1.0"
+    "@babel/core": "^7.29.0",
+    "@babel/preset-env": "^7.29.0",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^25.2.0",
+    "babel-jest": "^30.2.0",
+    "electron": "^40.1.0",
+    "electron-builder": "^26.7.0",
+    "fast-check": "^4.5.3",
+    "jest": "^30.2.0",
+    "ts-jest": "^29.4.6"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.6.2"
   }
 }

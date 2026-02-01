@@ -7,9 +7,13 @@ import { MeetingDetail } from './components/meeting-detail';
 import { TasksViewNew } from './components/tasks-view-new';
 import { Contacts } from './components/contacts';
 import { Settings } from './components/settings';
+import { AuthDemo } from './components/auth-demo';
 import { parseCommand } from './utils/command-parser';
 
 export default function App() {
+  // Show auth demo by default
+  const [showAuthDemo] = useState(true);
+  
   const [currentScreen, setCurrentScreen] = useState<string>('dashboard');
   const [selectedMeetingId, setSelectedMeetingId] = useState<string | null>(null);
   const [triggerAction, setTriggerAction] = useState<{ action: string; params: any } | null>(null);
@@ -58,6 +62,11 @@ export default function App() {
       }
     }
   };
+
+  // Show auth demo
+  if (showAuthDemo) {
+    return <AuthDemo />;
+  }
 
   const renderScreen = () => {
     switch (currentScreen) {
