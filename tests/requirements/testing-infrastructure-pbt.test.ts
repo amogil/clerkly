@@ -147,6 +147,9 @@ describe("Testing Infrastructure Property-Based Tests", () => {
       // Skip setup and utility test files
       if (testFile.includes("setup.test.ts") || testFile.includes("config.test.ts")) return false;
 
+      // Skip test isolation fixture tests - they test the test infrastructure itself
+      if (testFile.includes("test-isolation") && testFile.endsWith(".test.ts")) return false;
+
       return true;
     });
 
@@ -502,6 +505,443 @@ describe("Testing Infrastructure Property-Based Tests", () => {
         },
       ),
       { numRuns: 25 },
+    );
+  });
+
+  /* Preconditions: components with error handling exist in the codebase
+     Action: generate various error scenarios and validate comprehensive error handling coverage
+     Assertions: all error paths, boundary cases, and error messages should be properly handled
+     Requirements: testing-infrastructure.4.1, testing-infrastructure.4.2, testing-infrastructure.4.3 */
+  it("should provide comprehensive error handling coverage for all error paths", async () => {
+    // **Feature: testing-infrastructure, Property 6: Комплексное покрытие обработки ошибок**
+    const { testErrorHandler } = await import("../utils/test-error-handler");
+    const { emptyString, nullValue, undefinedValue, numericEdgeCases, invalidUrls, invalidEmails } =
+      await import("../utils/edge-case-generators");
+
+    // Clear error history before test
+    testErrorHandler.clearErrorHistory();
+
+    fc.assert(
+      fc.property(
+        fc.record({
+          errorType: fc.constantFrom("async", "mock", "assertion", "timeout"),
+          errorMessage: fc
+            .string({ minLength: 1, maxLength: 100 })
+            .filter((s) => s.trim().length > 0),
+          testName: fc.string({ minLength: 1, maxLength: 50 }).filter((s) => s.trim().length > 0),
+        }),
+        (testData) => {
+          // Property 1: Error handler should handle all error types
+          const context = {
+            testName: testData.testName,
+            startTime: Date.now(),
+          };
+
+          // Test different error types
+          switch (testData.errorType) {
+            case "async": {
+              const asyncError = new Error(testData.errorMessage);
+              try {
+                testErrorHandler.handleAsyncError(asyncError, context);
+              } catch (error) {
+                // Error should be re-thrown with proper context
+                expect(error).toBeInstanceOf(Error);
+                expect((error as Error).message).toContain(testData.testName);
+                expect((error as Error).message).toContain(testData.errorMessage);
+              }
+              break;
+            }
+
+            case "mock": {
+              const mockError = new Error(testData.errorMessage);
+              try {
+                testErrorHandler.handleMockError(testData.testName, mockError);
+              } catch (error) {
+                // Error should be re-thrown with mock context
+                expect(error).toBeInstanceOf(Error);
+                expect((error as Error).message).toContain(testData.testName);
+                expect((error as Error).message).toContain(testData.errorMessage);
+              }
+              break;
+            }
+
+            case "assertion": {
+              try {
+                testErrorHandler.handleAssertionError(
+                  testData.testName,
+                  "expected value",
+                  "actual value",
+                );
+              } catch (error) {
+                // Assertion error should contain expected and actual values
+                expect(error).toBeInstanceOf(Error);
+                expect((error as Error).message).toContain("expected value");
+                expect((error as Error).message).toContain("actual value");
+              }
+              break;
+            }
+
+            case "timeout": {
+              testErrorHandler.handleTimeoutError(testData.testName, 5000);
+              // Timeout error should be recorded
+              const lastError = testErrorHandler.getLastError();
+              expect(lastError).toBeDefined();
+              expect(lastError?.errorType).toBe("timeout");
+              expect(lastError?.message).toContain(testData.testName);
+              expect(lastError?.message).toContain("5000");
+              break;
+            }
+          }
+
+          // Property 2: All errors should be recorded in history
+          expect(testErrorHandler.hasErrors()).toBe(true);
+
+          // Property 3: Error history should be retrievable
+          const errorHistory = testErrorHandler.getErrorHistory();
+          expect(errorHistory.length).toBeGreaterThan(0);
+
+          // Property 4: Errors should be filterable by type
+          const errorsByType = testErrorHandler.getErrorsByType(testData.errorType);
+          expect(errorsByType.length).toBeGreaterThan(0);
+
+          // Clear for next iteration
+          testErrorHandler.clearErrorHistory();
+
+          return true;
+        },
+      ),
+      { numRuns: 100 },
+    );
+  });
+
+  /* Preconditions: edge case generators are available
+     Action: generate boundary cases and validate error handling for edge cases
+     Assertions: error handling should properly handle empty data, null/undefined, and extreme values
+     Requirements: testing-infrastructure.4.2 */
+  it("should handle boundary cases in error scenarios", async () => {
+    // **Feature: testing-infrastructure, Property 6: Комплексное покрытие обработки ошибок**
+    const { testErrorHandler } = await import("../utils/test-error-handler");
+    const { emptyString, nullValue, undefinedValue, numericEdgeCases, emptyArray, emptyObject } =
+      await import("../utils/edge-case-generators");
+
+    testErrorHandler.clearErrorHistory();
+
+    fc.assert(
+      fc.property(
+        fc.oneof(
+          emptyString(),
+          nullValue(),
+          undefinedValue(),
+          numericEdgeCases(),
+          emptyArray(),
+          emptyObject(),
+        ),
+        (edgeCase) => {
+          // Property: Error handler should handle edge cases gracefully
+          const context = {
+            testName: "edge-case-test",
+            metadata: { edgeCase },
+          };
+
+          try {
+            // Simulate error with edge case data - handle undefined specially
+            let errorMessage: string;
+            try {
+              errorMessage = `Edge case error: ${JSON.stringify(edgeCase)}`;
+            } catch {
+              // Handle cases where JSON.stringify fails (e.g., undefined)
+              errorMessage = `Edge case error: ${String(edgeCase)}`;
+            }
+            const error = new Error(errorMessage);
+            testErrorHandler.handleAsyncError(error, context);
+          } catch (error) {
+            // Error should be properly formatted even with edge case data
+            expect(error).toBeInstanceOf(Error);
+            expect((error as Error).message).toBeDefined();
+            expect((error as Error).message.length).toBeGreaterThan(0);
+          }
+
+          // Property: Error history should contain the edge case error
+          const errorHistory = testErrorHandler.getErrorHistory();
+          expect(errorHistory.length).toBeGreaterThan(0);
+
+          const lastError = errorHistory[errorHistory.length - 1];
+          // Note: edgeCase might be undefined, which is valid for testing
+          expect(lastError.context.metadata).toBeDefined();
+
+          testErrorHandler.clearErrorHistory();
+
+          return true;
+        },
+      ),
+      { numRuns: 100 },
+    );
+  });
+
+  /* Preconditions: error handler provides error message formatting
+     Action: generate various data types and validate error message correctness
+     Assertions: error messages should be properly formatted and informative
+     Requirements: testing-infrastructure.4.3 */
+  it("should validate error message correctness and formatting", async () => {
+    // **Feature: testing-infrastructure, Property 6: Комплексное покрытие обработки ошибок**
+    const { testErrorHandler } = await import("../utils/test-error-handler");
+
+    testErrorHandler.clearErrorHistory();
+
+    fc.assert(
+      fc.property(
+        fc.record({
+          expected: fc.oneof(
+            fc.string(),
+            fc.integer(),
+            fc.boolean(),
+            fc.array(fc.integer()),
+            fc.record({ key: fc.string() }),
+          ),
+          actual: fc.oneof(
+            fc.string(),
+            fc.integer(),
+            fc.boolean(),
+            fc.array(fc.integer()),
+            fc.record({ key: fc.string() }),
+          ),
+          assertion: fc.string({ minLength: 5, maxLength: 50 }).filter((s) => s.trim().length > 0),
+        }),
+        (testData) => {
+          // Property: Error messages should contain expected and actual values
+          try {
+            testErrorHandler.handleAssertionError(
+              testData.assertion,
+              testData.expected,
+              testData.actual,
+            );
+          } catch (error) {
+            const errorMessage = (error as Error).message;
+
+            // Property 1: Error message should contain assertion description
+            expect(errorMessage).toContain(testData.assertion);
+
+            // Property 2: Error message should contain "Expected" and "Actual" labels
+            expect(errorMessage).toContain("Expected:");
+            expect(errorMessage).toContain("Actual:");
+
+            // Property 3: Error message should be non-empty and informative
+            expect(errorMessage.length).toBeGreaterThan(testData.assertion.length);
+
+            // Property 4: Error should have AssertionError name
+            expect((error as Error).name).toBe("AssertionError");
+          }
+
+          // Property 5: Error should be recorded with correct metadata
+          const lastError = testErrorHandler.getLastError();
+          expect(lastError).toBeDefined();
+          expect(lastError?.errorType).toBe("assertion");
+          expect(lastError?.context.metadata?.assertion).toBe(testData.assertion);
+          expect(lastError?.context.metadata?.expected).toEqual(testData.expected);
+          expect(lastError?.context.metadata?.actual).toEqual(testData.actual);
+
+          testErrorHandler.clearErrorHistory();
+
+          return true;
+        },
+      ),
+      { numRuns: 100 },
+    );
+  });
+
+  /* Preconditions: error handler supports error callbacks and history management
+     Action: generate error scenarios and validate error tracking capabilities
+     Assertions: error history should be properly managed with size limits and filtering
+     Requirements: testing-infrastructure.4.1, testing-infrastructure.4.3 */
+  it("should properly manage error history and callbacks", async () => {
+    // **Feature: testing-infrastructure, Property 6: Комплексное покрытие обработки ошибок**
+    const { TestErrorHandlerImpl } = await import("../utils/test-error-handler");
+
+    fc.assert(
+      fc.property(
+        fc.record({
+          maxHistorySize: fc.integer({ min: 1, max: 50 }),
+          errorCount: fc.integer({ min: 1, max: 100 }),
+        }),
+        (testData) => {
+          const handler = new TestErrorHandlerImpl();
+          handler.setMaxHistorySize(testData.maxHistorySize);
+
+          // Track callback invocations
+          let callbackCount = 0;
+          handler.setErrorCallback(() => {
+            callbackCount++;
+          });
+
+          // Generate multiple errors
+          for (let i = 0; i < testData.errorCount; i++) {
+            handler.handleTimeoutError(`test-${i}`, 1000);
+          }
+
+          // Property 1: Callback should be invoked for each error
+          expect(callbackCount).toBe(testData.errorCount);
+
+          // Property 2: History size should not exceed max size
+          const history = handler.getErrorHistory();
+          expect(history.length).toBeLessThanOrEqual(testData.maxHistorySize);
+
+          // Property 3: If more errors than max size, history should contain most recent errors
+          if (testData.errorCount > testData.maxHistorySize) {
+            expect(history.length).toBe(testData.maxHistorySize);
+            // Most recent error should be in history
+            const lastError = history[history.length - 1];
+            expect(lastError.context.testName).toBe(`test-${testData.errorCount - 1}`);
+          } else {
+            expect(history.length).toBe(testData.errorCount);
+          }
+
+          // Property 4: Clear history should remove all errors
+          handler.clearErrorHistory();
+          expect(handler.getErrorHistory().length).toBe(0);
+          expect(handler.hasErrors()).toBe(false);
+
+          return true;
+        },
+      ),
+      { numRuns: 100 },
+    );
+  });
+
+  /* Preconditions: IPC validators exist with error handling
+     Action: generate invalid IPC messages and validate error handling
+     Assertions: validation errors should be properly thrown and contain correct information
+     Requirements: testing-infrastructure.4.1, testing-infrastructure.4.3 */
+  it("should validate error handling in IPC validation", async () => {
+    // **Feature: testing-infrastructure, Property 6: Комплексное покрытие обработки ошибок**
+    const { validateIPCMessage, IPCValidationError } = await import("../../src/ipc/validators");
+
+    fc.assert(
+      fc.property(
+        fc.record({
+          channel: fc.constantFrom(
+            "auth:open-google",
+            "auth:get-state",
+            "auth:sign-out",
+            "sidebar:get-state",
+            "sidebar:set-state",
+          ),
+          invalidParams: fc.oneof(
+            fc.constant("invalid string"),
+            fc.integer(),
+            fc.array(fc.string(), { minLength: 1 }), // Ensure non-empty array
+            fc.constant(true),
+            fc.record({ invalid: fc.string() }),
+          ),
+        }),
+        (testData) => {
+          // Property: Invalid parameters should throw IPCValidationError
+          try {
+            // For channels that expect no parameters, any parameter should fail
+            if (
+              testData.channel === "auth:open-google" ||
+              testData.channel === "auth:get-state" ||
+              testData.channel === "auth:sign-out" ||
+              testData.channel === "sidebar:get-state"
+            ) {
+              validateIPCMessage(testData.channel, testData.invalidParams);
+              // Should not reach here
+              return false;
+            }
+
+            // For sidebar:set-state, invalid params should fail
+            if (testData.channel === "sidebar:set-state") {
+              validateIPCMessage(testData.channel, testData.invalidParams);
+              // Should not reach here if params are invalid
+              return false;
+            }
+          } catch (error) {
+            // Property 1: Error should be IPCValidationError
+            expect(error).toBeInstanceOf(IPCValidationError);
+
+            // Property 2: Error message should contain channel name
+            expect((error as IPCValidationError).message).toContain(testData.channel);
+
+            // Property 3: Error should have descriptive message
+            expect((error as IPCValidationError).message).toBeDefined();
+            expect((error as IPCValidationError).message.length).toBeGreaterThan(0);
+
+            // Property 4: Error should have correct name
+            expect((error as IPCValidationError).name).toBe("IPCValidationError");
+
+            return true;
+          }
+
+          return true;
+        },
+      ),
+      { numRuns: 100 },
+    );
+  });
+
+  /* Preconditions: edge case generators provide invalid data generators
+     Action: test error handling with invalid URLs, emails, and file paths
+     Assertions: error handling should properly validate and reject invalid inputs
+     Requirements: testing-infrastructure.4.2, testing-infrastructure.4.3 */
+  it("should handle invalid input validation errors", async () => {
+    // **Feature: testing-infrastructure, Property 6: Комплексное покрытие обработки ошибок**
+    const { invalidUrls, invalidEmails, invalidFilePaths } =
+      await import("../utils/edge-case-generators");
+
+    fc.assert(
+      fc.property(
+        fc.record({
+          inputType: fc.constantFrom("url", "email", "filepath"),
+        }),
+        (testData) => {
+          let invalidInput: string;
+
+          // Generate invalid input based on type
+          switch (testData.inputType) {
+            case "url":
+              invalidInput = fc.sample(invalidUrls(), 1)[0];
+              break;
+            case "email":
+              invalidInput = fc.sample(invalidEmails(), 1)[0];
+              break;
+            case "filepath":
+              invalidInput = fc.sample(invalidFilePaths(), 1)[0];
+              break;
+          }
+
+          // Property: Invalid inputs should be detectable
+          // Test URL validation
+          if (testData.inputType === "url") {
+            const urlPattern = /^https?:\/\/.+\..+/;
+            const isValid = urlPattern.test(invalidInput);
+            // Invalid URLs should not match the pattern
+            expect(isValid).toBe(false);
+          }
+
+          // Test email validation
+          if (testData.inputType === "email") {
+            const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            const isValid = emailPattern.test(invalidInput);
+            // Invalid emails should not match the pattern
+            expect(isValid).toBe(false);
+          }
+
+          // Test filepath validation
+          if (testData.inputType === "filepath") {
+            const hasInvalidChars = /[\0*?<>|:]/.test(invalidInput);
+            const isEmpty = invalidInput.trim().length === 0;
+            const isReserved = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i.test(invalidInput);
+            const isJustSlash = invalidInput === "/" || invalidInput === "//";
+            const isJustDots = invalidInput === "." || invalidInput === "..";
+
+            // Invalid filepaths should have at least one invalid characteristic
+            const isInvalid = hasInvalidChars || isEmpty || isReserved || isJustSlash || isJustDots;
+            expect(isInvalid).toBe(true);
+          }
+
+          return true;
+        },
+      ),
+      { numRuns: 100 },
     );
   });
 });
