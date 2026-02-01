@@ -68,7 +68,7 @@
     - _Requirements: 2.1, 2.3_
 
 - [ ] 3. Реализация Window Manager
-  - [-] 3.1 Создать WindowManager класс
+  - [x] 3.1 Создать WindowManager класс
     - Реализовать конструктор
     - Реализовать createWindow() с нативным Mac OS X интерфейсом
     - Настроить параметры окна (width: 800, height: 600, minWidth: 600, minHeight: 400)
@@ -76,7 +76,7 @@
     - Реализовать closeWindow() с корректным освобождением ресурсов
     - _Requirements: 1.2, 1.3_
   
-  - [~] 3.2 Написать модульные тесты для WindowManager
+  - [x] 3.2 Написать модульные тесты для WindowManager
     - Тест создания окна с корректными параметрами
     - Тест конфигурации окна
     - Тест закрытия окна
@@ -84,7 +84,7 @@
     - _Requirements: 2.1, 2.3_
 
 - [ ] 4. Реализация Lifecycle Manager
-  - [~] 4.1 Создать LifecycleManager класс
+  - [x] 4.1 Создать LifecycleManager класс
     - Реализовать initialize() с мониторингом времени запуска (< 3 секунды)
     - Реализовать handleActivation() для Mac OS X специфики
     - Реализовать handleQuit() с корректным сохранением данных
@@ -92,7 +92,7 @@
     - Добавить логирование медленного запуска (> 3000ms)
     - _Requirements: 1.2, 1.3_
   
-  - [~] 4.2 Написать модульные тесты для LifecycleManager
+  - [x] 4.2 Написать модульные тесты для LifecycleManager
     - Тест инициализации приложения
     - Тест обработки активации (Mac OS X)
     - Тест корректного завершения
@@ -107,7 +107,7 @@
   - Спросить пользователя, если возникли вопросы
 
 - [ ] 6. Реализация IPC коммуникации
-  - [~] 6.1 Создать IPC handlers в Main Process
+  - [x] 6.1 Создать IPC handlers в Main Process
     - Реализовать 'save-data' handler с валидацией параметров
     - Реализовать 'load-data' handler с обработкой ошибок
     - Реализовать 'delete-data' handler
@@ -115,14 +115,14 @@
     - Добавить логирование неудачных IPC вызовов
     - _Requirements: 1.4_
   
-  - [~] 6.2 Создать IPC client в Renderer Process
+  - [x] 6.2 Создать IPC client в Renderer Process
     - Реализовать saveData(key, value) через ipcRenderer.invoke
     - Реализовать loadData(key) через ipcRenderer.invoke
     - Реализовать deleteData(key) через ipcRenderer.invoke
     - Добавить обработку таймаутов
     - _Requirements: 1.4_
   
-  - [~] 6.3 Написать модульные тесты для IPC
+  - [x] 6.3 Написать модульные тесты для IPC
     - Тест корректной передачи сообщений между процессами
     - Тест обработки таймаутов
     - Тест валидации параметров
@@ -130,13 +130,13 @@
     - _Requirements: 2.1, 2.3, 2.4_
 
 - [ ] 7. Реализация Renderer Process компонентов
-  - [~] 7.1 Создать UIController класс
+  - [x] 7.1 Создать UIController класс
     - Реализовать render() с отзывчивым UI (< 100ms)
     - Реализовать updateView(data)
     - Добавить индикаторы загрузки для операций > 200ms
     - _Requirements: 1.3_
   
-  - [~] 7.2 Создать StateController класс
+  - [-] 7.2 Создать StateController класс
     - Реализовать конструктор с начальным состоянием
     - Реализовать setState(newState)
     - Реализовать getState()
