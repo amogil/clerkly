@@ -259,89 +259,358 @@ interface OperationResult {
 
 ### Sidebar Channels
 
+<!-- Requirements: sidebar-navigation.5.3 -->
+
+The sidebar channels manage the persistent state of the application's collapsible sidebar navigation component. These channels enable the renderer process to save and restore the user's preferred sidebar layout across application sessions.
+
 #### `sidebar:get-state`
 
-**Purpose**: Retrieves current sidebar collapse state
+**Purpose**: Retrieves the current sidebar collapse state from persistent storage
 
 **Type**: Request-Response (invoke/handle)
+
+**Direction**: Renderer → Main → Renderer
 
 **Parameters**: None (`void`)
 
 **Returns**: `SidebarState`
 
 ```typescript
+// Requirements: sidebar-navigation.5.1, sidebar-navigation.5.3
 interface SidebarState {
-  collapsed: boolean;
+  collapsed: boolean; // true if sidebar is collapsed, false if expanded
 }
 ```
 
 **Implementation Details**:
 
-- Reads state from persistent SQLite database
-- Returns default state (`collapsed: false`) if no data exists
-- Single database query with fallback logic
-- State persists across application restarts
+- Reads state from persistent SQLite database (`app_meta` table)
+- Returns default state (`collapsed: false`) if no data exists in database
+- Single optimized database query with fallback logic
+- State persists across application restarts and system reboots
+- No network requests involved (local database only)
+- Thread-safe database access with proper locking
 
 **Default Behavior**:
 
-- **First Launch**: Returns `{ collapsed: false }`
-- **Subsequent Launches**: Returns last saved state
-- **Database Error**: Returns `{ collapsed: false }` (safe default)
+- **First Launch**: Returns `{ collapsed: false }` (expanded sidebar)
+- **Subsequent Launches**: Returns last saved state from database
+- **Database Error**: Returns `{ collapsed: false }` (safe default, logs error)
+- **Corrupted Data**: Returns `{ collapsed: false }` (safe default, logs warning)
 
 **Performance Characteristics**:
 
 - **Response Time**: < 3ms (single database read)
-- **Database Table**: `app_settings` with key-value storage
+- **Database Table**: `app_meta` with key-value storage
+- **Storage Key**: `sidebar_collapsed`
 - **Storage Size**: < 10 bytes per state
-
-#### `sidebar:set-state`
-
-**Purpose**: Updates and persists sidebar collapse state
-
-**Type**: Request-Response (invoke/handle)
-
-**Parameters**: `SetSidebarStateParams`
-
-```typescript
-interface SetSidebarStateParams {
-  collapsed: boolean;
-}
-```
-
-**Returns**: `OperationResult`
-
-**Implementation Details**:
-
-- Validates input parameters (boolean type checking)
-- Persists state to SQLite database using UPSERT operation
-- State immediately available for subsequent `sidebar:get-state` calls
-- Operation is atomic and transactional
-
-**Validation Rules**:
-
-- `collapsed` must be boolean type
-- `null`, `undefined`, or other types rejected with validation error
-- Empty parameters object rejected
+- **Caching**: No caching (always fresh from database)
+- **Memory Usage**: Minimal (< 1KB)
 
 **Database Schema**:
 
 ```sql
-CREATE TABLE app_settings (
+-- Requirements: sidebar-navigation.4.1
+CREATE TABLE IF NOT EXISTS app_meta (
   key TEXT PRIMARY KEY,
   value TEXT NOT NULL
 );
 
 -- Sidebar state stored as:
 -- key: 'sidebar_collapsed'
--- value: '0' (false) or '1' (true)
+-- value: JSON serialized boolean ("true" or "false")
 ```
 
 **Error Conditions**:
 
-| Error Type                    | Description             | Resolution                 |
-| ----------------------------- | ----------------------- | -------------------------- |
-| `Parameter validation failed` | Invalid collapsed value | Provide boolean value      |
-| `Database write error`        | Cannot save to database | Check database permissions |
+| Error Type            | Description                  | Behavior                                   | Resolution                 |
+| --------------------- | ---------------------------- | ------------------------------------------ | -------------------------- |
+| `Database read error` | Cannot access database       | Returns `{ collapsed: false }`, logs error | Check database permissions |
+| `Data corruption`     | Invalid JSON in database     | Returns `{ collapsed: false }`, logs warn  | Re-save state              |
+| `Missing table`       | app_meta table doesn't exist | Returns `{ collapsed: false }`, logs error | Run database migrations    |
+
+**Usage Example**:
+
+```typescript
+// Requirements: sidebar-navigation.4.1, sidebar-navigation.5.1
+// Load sidebar state on application initialization
+const loadSidebarState = async () => {
+  try {
+    const state = await window.clerkly.getSidebarState();
+    console.log(`Sidebar is ${state.collapsed ? "collapsed" : "expanded"}`);
+
+    // Apply state to UI
+    applySidebarState(state.collapsed);
+  } catch (error) {
+    console.error("Failed to load sidebar state:", error);
+    // Use default expanded state
+    applySidebarState(false);
+  }
+};
+
+// React hook example
+const useSidebarState = () => {
+  const [collapsed, setCollapsed] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadState = async () => {
+      try {
+        const state = await window.clerkly.getSidebarState();
+        setCollapsed(state.collapsed);
+      } catch (error) {
+        console.error("Failed to load sidebar state:", error);
+        setCollapsed(false); // Default to expanded
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadState();
+  }, []);
+
+  return { collapsed, loading };
+};
+```
+
+**Sequence Diagram**:
+
+```mermaid
+sequenceDiagram
+    participant R as Renderer
+    participant P as Preload
+    participant M as Main Process
+    participant D as SQLite Database
+
+    R->>P: getSidebarState()
+    P->>M: sidebar:get-state
+    M->>D: SELECT value FROM app_meta WHERE key='sidebar_collapsed'
+    D-->>M: JSON value or null
+    M->>M: Parse JSON or use default
+    M-->>P: { collapsed: boolean }
+    P-->>R: { collapsed: boolean }
+```
+
+#### `sidebar:set-state`
+
+**Purpose**: Updates and persists the sidebar collapse state to database
+
+**Type**: Request-Response (invoke/handle)
+
+**Direction**: Renderer → Main → Renderer
+
+**Parameters**: `SetSidebarStateParams`
+
+```typescript
+// Requirements: sidebar-navigation.5.1, sidebar-navigation.5.3
+interface SetSidebarStateParams {
+  collapsed: boolean; // true to collapse sidebar, false to expand
+}
+```
+
+**Returns**: `OperationResult`
+
+```typescript
+// Requirements: sidebar-navigation.5.1, sidebar-navigation.5.3
+interface OperationResult {
+  success: boolean; // true if state was saved successfully
+  error?: string; // error message if success is false
+}
+```
+
+**Implementation Details**:
+
+- Validates input parameters (strict boolean type checking)
+- Persists state to SQLite database using INSERT OR REPLACE (UPSERT) operation
+- State immediately available for subsequent `sidebar:get-state` calls
+- Operation is atomic and transactional (all-or-nothing)
+- Logs all state changes for debugging and audit trail
+- Thread-safe database access with proper locking
+
+**Validation Rules**:
+
+- `collapsed` parameter is **required** and must be boolean type
+- `null`, `undefined`, or other types rejected with validation error
+- Empty parameters object rejected with validation error
+- Non-object parameters rejected with validation error
+
+**Database Operation**:
+
+```sql
+-- Requirements: sidebar-navigation.4.2
+INSERT OR REPLACE INTO app_meta (key, value)
+VALUES ('sidebar_collapsed', ?);
+-- ? is JSON.stringify(collapsed)
+```
+
+**Success Criteria**:
+
+- Database write completes without errors
+- Returns `{ success: true }`
+- State persisted to disk
+- Subsequent `sidebar:get-state` calls return new value
+
+**Error Conditions**:
+
+| Error Type                    | Description             | Response                                       | Resolution                 |
+| ----------------------------- | ----------------------- | ---------------------------------------------- | -------------------------- |
+| `Parameter validation failed` | Invalid collapsed value | `{ success: false, error: "..." }`             | Provide boolean value      |
+| `Database write error`        | Cannot save to database | `{ success: false, error: "..." }`, logs error | Check database permissions |
+| `Database locked`             | Database is locked      | `{ success: false, error: "..." }`, logs error | Retry operation            |
+| `Disk full`                   | No disk space available | `{ success: false, error: "..." }`, logs error | Free up disk space         |
+
+**Usage Example**:
+
+```typescript
+// Requirements: sidebar-navigation.4.2, sidebar-navigation.5.1
+// Save sidebar state when user toggles
+const toggleSidebar = async (currentCollapsed: boolean) => {
+  const newCollapsed = !currentCollapsed;
+
+  try {
+    // Optimistic UI update
+    updateSidebarUI(newCollapsed);
+
+    // Persist to database
+    const result = await window.clerkly.setSidebarState(newCollapsed);
+
+    if (result.success) {
+      console.log(`Sidebar state saved: ${newCollapsed ? "collapsed" : "expanded"}`);
+    } else {
+      // Revert UI on failure
+      updateSidebarUI(currentCollapsed);
+      console.error("Failed to save sidebar state:", result.error);
+      showErrorNotification("Failed to save sidebar preference");
+    }
+  } catch (error) {
+    // Revert UI on error
+    updateSidebarUI(currentCollapsed);
+    console.error("Sidebar state error:", error);
+    showErrorNotification("System error occurred");
+  }
+};
+
+// React hook example with optimistic updates
+const useSidebarToggle = () => {
+  const [collapsed, setCollapsed] = useState(false);
+
+  const toggleSidebar = async () => {
+    const newCollapsed = !collapsed;
+
+    // Optimistic update
+    setCollapsed(newCollapsed);
+
+    try {
+      const result = await window.clerkly.setSidebarState(newCollapsed);
+
+      if (!result.success) {
+        // Revert on failure
+        setCollapsed(!newCollapsed);
+        console.error("Failed to save sidebar state:", result.error);
+      }
+    } catch (error) {
+      // Revert on error
+      setCollapsed(!newCollapsed);
+      console.error("Sidebar state error:", error);
+    }
+  };
+
+  return { collapsed, toggleSidebar };
+};
+
+// Validation example
+const setSidebarStateWithValidation = async (collapsed: unknown) => {
+  // Client-side validation
+  if (typeof collapsed !== "boolean") {
+    console.error("Invalid collapsed value:", collapsed);
+    showErrorNotification("Invalid sidebar state");
+    return;
+  }
+
+  const result = await window.clerkly.setSidebarState(collapsed);
+
+  if (!result.success) {
+    console.error("Failed to save sidebar state:", result.error);
+    showErrorNotification(result.error || "Failed to save sidebar preference");
+  }
+};
+```
+
+**Sequence Diagram**:
+
+```mermaid
+sequenceDiagram
+    participant R as Renderer
+    participant P as Preload
+    participant M as Main Process
+    participant D as SQLite Database
+
+    R->>P: setSidebarState(collapsed)
+    P->>M: sidebar:set-state { collapsed }
+    M->>M: Validate parameters
+    M->>D: INSERT OR REPLACE INTO app_meta
+    D-->>M: Success/Error
+    M->>M: Log operation
+    M-->>P: { success: true/false, error? }
+    P-->>R: { success: true/false, error? }
+
+    Note over R: If success=false, revert UI
+```
+
+**Best Practices**:
+
+1. **Optimistic Updates**: Update UI immediately, then persist to database
+2. **Error Handling**: Always check `success` field and handle failures
+3. **Revert on Failure**: Revert UI state if database save fails
+4. **User Feedback**: Show notifications for errors (optional for success)
+5. **Validation**: Validate parameters on client side before IPC call
+6. **Logging**: Log all state changes for debugging
+
+**Integration with State Management**:
+
+```typescript
+// Requirements: sidebar-navigation.4.2, sidebar-navigation.5.2
+// Complete state management integration
+class SidebarStateManager {
+  private collapsed = false;
+
+  async initialize() {
+    // Load initial state
+    const state = await window.clerkly.getSidebarState();
+    this.collapsed = state.collapsed;
+    this.applyState();
+  }
+
+  async toggle() {
+    const newCollapsed = !this.collapsed;
+
+    // Optimistic update
+    this.collapsed = newCollapsed;
+    this.applyState();
+
+    // Persist
+    const result = await window.clerkly.setSidebarState(newCollapsed);
+
+    if (!result.success) {
+      // Revert on failure
+      this.collapsed = !newCollapsed;
+      this.applyState();
+      throw new Error(result.error || "Failed to save state");
+    }
+  }
+
+  private applyState() {
+    const sidebar = document.getElementById("sidebar");
+    if (sidebar) {
+      sidebar.classList.toggle("collapsed", this.collapsed);
+    }
+  }
+
+  getState(): boolean {
+    return this.collapsed;
+  }
+}
+```
 
 ### Event Channels
 

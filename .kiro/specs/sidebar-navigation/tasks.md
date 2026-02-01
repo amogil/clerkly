@@ -43,7 +43,7 @@
   - Обеспечить безопасное значение по умолчанию (false = развернут)
   - _Требования: sidebar-navigation.4.1, sidebar-navigation.4.3_
 
-- [-] 1.2 Реализовать IPC обработчики для состояния сайдбара
+- [x] 1.2 Реализовать IPC обработчики для состояния сайдбара
   - Добавить обработчик `sidebar:get-state` в main.ts
   - Добавить обработчик `sidebar:set-state` в main.ts
   - Интегрировать с функциями персистентности из задачи 1.1
@@ -51,7 +51,7 @@
   - Обеспечить возврат безопасных значений при ошибках
   - _Требования: sidebar-navigation.5.1, sidebar-navigation.5.2, sidebar-navigation.4.2_
 
-- [~] 1.3 Обновить preload.ts для Sidebar API
+- [x] 1.3 Обновить preload.ts для Sidebar API
   - Добавить метод `getSidebarState()` в clerkly API
   - Добавить метод `setSidebarState(collapsed: boolean)` в clerkly API
   - Обеспечить полную типизацию для TypeScript
@@ -59,7 +59,7 @@
   - Обновить интерфейс ClerklyAPI в renderer типах
   - _Требования: sidebar-navigation.5.1, sidebar-navigation.5.3_
 
-- [~] 1.4 Обновить IPC контракт документацию
+- [x] 1.4 Обновить IPC контракт документацию
   - Добавить описание каналов `sidebar:get-state` и `sidebar:set-state` в docs/ipc-contract.md
   - Документировать типы параметров и возвращаемых значений
   - Добавить примеры использования
