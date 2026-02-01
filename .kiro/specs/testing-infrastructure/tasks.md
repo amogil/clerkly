@@ -91,7 +91,7 @@
     - **Property 6: Покрытие обработки ошибок**
     - **Validates: testing-infrastructure.4.1, testing-infrastructure.4.2, testing-infrastructure.4.3**
 
-- [-] 7. Настройка Playwright для функциональных тестов
+- [x] 7. Настройка Playwright для функциональных тестов
   - [x] 7.1 Установка и базовая конфигурация Playwright
     - Установить Playwright с поддержкой всех браузеров
     - Создать базовую конфигурацию с timeout и retry настройками
@@ -108,25 +108,25 @@
     - Настроить изолированные браузерные контексты
     - _Requirements: testing-infrastructure.5.3_
 
-  - [-] 7.4 Написать property тест для изоляции функциональных тестов
+  - [x] 7.4 Написать property тест для изоляции функциональных тестов
     - **Property 7: Изоляция функциональных тестов**
     - **Validates: testing-infrastructure.5.3, testing-infrastructure.6.1**
 
-- [~] 8. Реализация OAuth заглушек для тестирования
-  - [~] 8.1 Создать OAuthStub интерфейс и реализацию
+- [x] 8. Реализация OAuth заглушек для тестирования
+  - [x] 8.1 Создать OAuthStub интерфейс и реализацию
     - Реализовать детерминированную OAuth заглушку
     - Создать моки для успешной и неудачной аутентификации
     - Обеспечить отсутствие внешних сетевых вызовов
     - _Requirements: testing-infrastructure.6.1_
 
-  - [~] 8.2 Создать тестовые сценарии для аутентификации
+  - [x] 8.2 Создать тестовые сценарии для аутентификации
     - Реализовать тест выхода из системы и возврата к экрану авторизации
     - Создать тест отмены авторизации и повторной попытки
     - Реализовать тест текста успеха/неудачи на странице завершения
     - Создать тест постоянства выхода после перезапуска
     - _Requirements: testing-infrastructure.6.1, testing-infrastructure.6.2, testing-infrastructure.6.3, testing-infrastructure.6.4, testing-infrastructure.6.5_
 
-  - [~] 8.3 Написать unit тесты для OAuth заглушек
+  - [x] 8.3 Написать unit тесты для OAuth заглушек
     - Тестировать различные сценарии аутентификации
     - Проверить детерминированность поведения заглушек
     - _Requirements: testing-infrastructure.6.1, testing-infrastructure.6.2, testing-infrastructure.6.3, testing-infrastructure.6.4, testing-infrastructure.6.5_

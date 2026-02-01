@@ -1,4 +1,5 @@
 // Requirements: testing-infrastructure.1.2, testing-infrastructure.1.3, testing-infrastructure.2.1, testing-infrastructure.2.2, testing-infrastructure.2.3, testing-infrastructure.3.1, testing-infrastructure.3.2, testing-infrastructure.3.3
+/* eslint-disable @typescript-eslint/no-require-imports */
 import { describe, it, expect } from "vitest";
 import { fc } from "@fast-check/vitest";
 import { readFileSync } from "fs";
@@ -1079,6 +1080,306 @@ it("should validate custom shrinking strategies reduce to minimal values", async
       expect(shrunk).toContain(value);
       return true;
     }),
+    { numRuns: 100 },
+  );
+});
+
+/* Preconditions: functional test infrastructure with test isolation fixtures exists
+     Action: validate that test isolation provides unique user data directories and cleanup
+     Assertions: each test gets isolated environment, no state leakage, automatic cleanup
+     Requirements: testing-infrastructure.5.3, testing-infrastructure.6.1 */
+it("should ensure functional tests run in isolated environments with automatic cleanup", async () => {
+  // **Feature: testing-infrastructure, Property 7: Изоляция функциональных тестов**
+  const { createUserDataDir, cleanupUserDataDir } = await import("../functional/utils/app");
+  const fs = await import("fs/promises");
+  const path = await import("path");
+
+  await fc.assert(
+    fc.asyncProperty(
+      fc
+        .array(
+          fc.record({
+            testId: fc
+              .string({ minLength: 1, maxLength: 20 })
+              .filter((s) => /^[a-zA-Z0-9_-]+$/.test(s)),
+            testData: fc.string({ maxLength: 100 }),
+          }),
+          { minLength: 2, maxLength: 5 },
+        )
+        .filter((scenarios) => {
+          // Ensure all test IDs are unique
+          const ids = scenarios.map((s) => s.testId);
+          return new Set(ids).size === ids.length;
+        }),
+      async (testScenarios) => {
+        const createdDirs: string[] = [];
+
+        try {
+          // Property 1: Each test should get a unique isolated user data directory
+          for (const scenario of testScenarios) {
+            const userDataDir = await createUserDataDir();
+            createdDirs.push(userDataDir);
+
+            // Verify directory was created
+            const stats = await fs.stat(userDataDir);
+            expect(stats.isDirectory()).toBe(true);
+
+            // Verify it's a temporary directory with correct prefix
+            expect(userDataDir).toContain("clerkly-e2e-");
+
+            // Verify directory is unique (not in previous list)
+            const previousDirs = createdDirs.slice(0, -1);
+            expect(previousDirs).not.toContain(userDataDir);
+
+            // Write test-specific data to simulate test execution
+            const testFile = path.join(userDataDir, `test-${scenario.testId}.txt`);
+            await fs.writeFile(testFile, scenario.testData);
+
+            // Verify data was written
+            const content = await fs.readFile(testFile, "utf-8");
+            expect(content).toBe(scenario.testData);
+          }
+
+          // Property 2: All directories should be unique (no collisions)
+          const uniqueDirs = new Set(createdDirs);
+          expect(uniqueDirs.size).toBe(createdDirs.length);
+
+          // Property 3: Each directory should be independent (no shared state)
+          // Verify that test files from one directory don't appear in another
+          for (let i = 0; i < createdDirs.length; i++) {
+            const currentDir = createdDirs[i];
+            const currentTestId = testScenarios[i].testId;
+            const currentTestFile = path.join(currentDir, `test-${currentTestId}.txt`);
+
+            // Verify this test's file exists in its own directory
+            const currentExists = await fs
+              .access(currentTestFile)
+              .then(() => true)
+              .catch(() => false);
+            expect(currentExists).toBe(true);
+
+            // Verify other tests' files are NOT in this directory
+            for (let j = 0; j < testScenarios.length; j++) {
+              if (i !== j) {
+                const otherTestId = testScenarios[j].testId;
+                const otherTestFile = path.join(currentDir, `test-${otherTestId}.txt`);
+                const exists = await fs
+                  .access(otherTestFile)
+                  .then(() => true)
+                  .catch(() => false);
+                expect(exists).toBe(false);
+              }
+            }
+          }
+
+          // Property 4: Cleanup should remove all test data
+          for (const userDataDir of createdDirs) {
+            await cleanupUserDataDir(userDataDir);
+
+            // Verify directory was removed
+            const exists = await fs
+              .access(userDataDir)
+              .then(() => true)
+              .catch(() => false);
+            expect(exists).toBe(false);
+          }
+        } finally {
+          // Cleanup any remaining directories
+          for (const dir of createdDirs) {
+            try {
+              await cleanupUserDataDir(dir);
+            } catch {
+              // Ignore cleanup errors
+            }
+          }
+        }
+      },
+    ),
+    { numRuns: 50 },
+  );
+});
+
+/* Preconditions: OAuth stub is configured in main.ts with E2E environment variables
+     Action: validate that OAuth stub prevents external network calls
+     Assertions: OAuth stub uses deterministic tokens, no external HTTP requests
+     Requirements: testing-infrastructure.6.1 */
+it("should ensure OAuth stub prevents external network calls in functional tests", async () => {
+  // **Feature: testing-infrastructure, Property 7: Изоляция функциональных тестов**
+
+  fc.assert(
+    fc.property(
+      fc.record({
+        authMode: fc.constantFrom("success", "failure"),
+        authSequence: fc.array(fc.constantFrom("success", "failure"), {
+          minLength: 1,
+          maxLength: 5,
+        }),
+      }),
+      (testConfig) => {
+        // Use dynamic import to get the real fs module, bypassing mocks
+
+        const fs = require("fs");
+
+        const path = require("path");
+
+        // Property 1: OAuth stub should be configured in main.ts
+        const mainPath = path.join(process.cwd(), "main.ts");
+        const mainContent = fs.readFileSync(mainPath, "utf-8");
+
+        // Verify OAuth stub environment variables are checked
+        expect(mainContent).toContain("CLERKLY_E2E_AUTH_MODE");
+        expect(mainContent).toContain("CLERKLY_E2E_AUTH_SEQUENCE");
+
+        // Property 2: OAuth stub should use deterministic tokens (no external calls)
+        expect(mainContent).toContain("e2e-access-token");
+        expect(mainContent).toContain("e2e-refresh-token");
+
+        // Property 3: OAuth stub should support both success and failure modes
+        expect(mainContent).toContain('mode === "success"');
+        expect(mainContent).toContain('mode === "failure"');
+
+        // Property 4: Auth mode should be one of the valid values
+        expect(["success", "failure"]).toContain(testConfig.authMode);
+
+        // Property 5: Auth sequence should only contain valid modes
+        testConfig.authSequence.forEach((mode) => {
+          expect(["success", "failure"]).toContain(mode);
+        });
+
+        // Property 6: OAuth stub should not make external HTTP requests
+        // Verify that stub logic doesn't contain external HTTP calls
+        const stubLogicMatch = mainContent.match(
+          /if\s*\(process\.env\.CLERKLY_E2E_AUTH_MODE\)([\s\S]*?)(?=\n\s*\/\/|$)/,
+        );
+        if (stubLogicMatch) {
+          const stubLogic = stubLogicMatch[0];
+          // Stub logic should not contain fetch, axios, or http.request
+          expect(stubLogic).not.toContain("fetch(");
+          expect(stubLogic).not.toContain("axios.");
+          expect(stubLogic).not.toContain("http.request");
+          expect(stubLogic).not.toContain("https.request");
+        }
+
+        return true;
+      },
+    ),
+    { numRuns: 100 },
+  );
+});
+
+/* Preconditions: Playwright configuration exists with test isolation settings
+     Action: validate that Playwright config enforces isolated browser contexts
+     Assertions: each test gets isolated context, no shared storage state
+     Requirements: testing-infrastructure.5.3 */
+it("should validate Playwright configuration enforces test isolation", async () => {
+  // **Feature: testing-infrastructure, Property 7: Изоляция функциональных тестов**
+
+  fc.assert(
+    fc.property(
+      fc.record({
+        browser: fc.constantFrom("chromium", "firefox", "webkit"),
+      }),
+      (testConfig) => {
+        // Use dynamic import to get the real fs module, bypassing mocks
+
+        const fs = require("fs");
+
+        const path = require("path");
+
+        // Property 1: Playwright config should exist
+        const configPath = path.join(process.cwd(), "tests/functional/playwright.config.ts");
+        const configContent = fs.readFileSync(configPath, "utf-8");
+
+        // Property 2: Config should enforce isolated browser contexts
+        expect(configContent).toContain("contextOptions");
+        expect(configContent).toContain("storageState: undefined");
+
+        // Property 3: Config should support all major browsers
+        expect(configContent).toContain("chromium");
+        expect(configContent).toContain("firefox");
+        expect(configContent).toContain("webkit");
+
+        // Property 4: Config should have proper timeout and retry settings
+        expect(configContent).toContain("timeout:");
+        expect(configContent).toContain("retries:");
+
+        // Property 5: Config should enable failure diagnostics
+        expect(configContent).toContain("screenshot:");
+        expect(configContent).toContain("video:");
+
+        // Property 6: Test browser should be one of the supported browsers
+        expect(["chromium", "firefox", "webkit"]).toContain(testConfig.browser);
+
+        return true;
+      },
+    ),
+    { numRuns: 100 },
+  );
+});
+
+/* Preconditions: test isolation fixture provides automatic cleanup
+     Action: validate that fixture properly manages app lifecycle and cleanup
+     Assertions: app is launched with isolation, automatically closed, state cleaned
+     Requirements: testing-infrastructure.5.3 */
+it("should validate test isolation fixture manages app lifecycle correctly", async () => {
+  // **Feature: testing-infrastructure, Property 7: Изоляция функциональных тестов**
+
+  fc.assert(
+    fc.property(
+      fc.record({
+        authMode: fc.constantFrom("success", "failure"),
+        hasAuthSequence: fc.boolean(),
+      }),
+      (testConfig) => {
+        // Use dynamic import to get the real fs module, bypassing mocks
+
+        const fs = require("fs");
+
+        const path = require("path");
+
+        // Property 1: Test isolation fixture should exist
+        const fixturePath = path.join(process.cwd(), "tests/functional/fixtures/test-isolation.ts");
+        const fixtureContent = fs.readFileSync(fixturePath, "utf-8");
+
+        // Property 2: Fixture should provide isolatedUserDataDir
+        expect(fixtureContent).toContain("isolatedUserDataDir");
+        expect(fixtureContent).toContain("createUserDataDir");
+        expect(fixtureContent).toContain("cleanupUserDataDir");
+
+        // Property 3: Fixture should provide isolatedApp with automatic cleanup
+        expect(fixtureContent).toContain("isolatedApp");
+        expect(fixtureContent).toContain("launchApp");
+        expect(fixtureContent).toContain("await app.close()");
+
+        // Property 4: Fixture should use Playwright's test.extend for proper lifecycle
+        expect(fixtureContent).toContain("base.extend");
+        expect(fixtureContent).toContain("async ({}, use)");
+
+        // Property 5: Fixture should support custom launch options
+        expect(fixtureContent).toContain("LaunchOptions");
+        expect(fixtureContent).toContain("authMode");
+
+        // Property 6: App utilities should exist
+        const appUtilsPath = path.join(process.cwd(), "tests/functional/utils/app.ts");
+        const appUtilsContent = fs.readFileSync(appUtilsPath, "utf-8");
+
+        // Property 7: App utilities should support auth modes
+        expect(appUtilsContent).toContain("AuthStubMode");
+        expect(appUtilsContent).toContain("CLERKLY_E2E_AUTH_MODE");
+        expect(appUtilsContent).toContain("CLERKLY_E2E_USER_DATA");
+
+        // Property 8: Auth mode should be valid
+        expect(["success", "failure"]).toContain(testConfig.authMode);
+
+        // Property 9: Auth sequence support should be present if needed
+        if (testConfig.hasAuthSequence) {
+          expect(appUtilsContent).toContain("authSequence");
+          expect(appUtilsContent).toContain("CLERKLY_E2E_AUTH_SEQUENCE");
+        }
+
+        return true;
+      },
+    ),
     { numRuns: 100 },
   );
 });

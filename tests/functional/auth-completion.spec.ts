@@ -8,7 +8,7 @@ test.describe("Auth completion copy", () => {
   /* Preconditions: auth completion page component exists.
      Action: render success completion HTML.
      Assertions: success copy is shown.
-     Requirements: testing-infrastructure.6.4 */
+     Requirements: testing-infrastructure.6.1, testing-infrastructure.6.4 */
   test("shows success completion copy", async () => {
     const userDataDir = await createUserDataDir();
     const { app, page } = await launchApp(userDataDir, { authMode: "success" });
@@ -29,7 +29,7 @@ test.describe("Auth completion copy", () => {
   /* Preconditions: auth completion page component exists.
      Action: render failure completion HTML.
      Assertions: failure copy is shown.
-     Requirements: testing-infrastructure.6.4 */
+     Requirements: testing-infrastructure.6.1, testing-infrastructure.6.4 */
   test("shows failure completion copy", async () => {
     const userDataDir = await createUserDataDir();
     const { app, page } = await launchApp(userDataDir, { authMode: "failure" });

@@ -1,4 +1,4 @@
-// Requirements: testing-infrastructure.2.1, testing-infrastructure.2.2, testing-infrastructure.2.3, testing-infrastructure.2.4
+// Requirements: testing-infrastructure.2.1, testing-infrastructure.2.2, testing-infrastructure.2.3, testing-infrastructure.2.4, testing-infrastructure.6.1
 import { FileSystemMock, FileSystemMockImpl } from "./file-system-mock";
 import {
   NetworkMock,
@@ -11,6 +11,15 @@ import {
   NetworkRequest,
 } from "./network-mock";
 import { DatabaseMock, DatabaseMockImpl, MockStatement } from "./database-mock";
+import {
+  OAuthStub,
+  OAuthStubImpl,
+  UserProfile,
+  AuthError,
+  OAuthStubConfig,
+  OAuthTokens,
+  OAuthStubMode,
+} from "./oauth-stub";
 
 // Re-export network mock types for convenience
 export type {
@@ -26,6 +35,10 @@ export { NetworkMock };
 // Re-export database mock types for convenience
 export type { MockStatement };
 export { DatabaseMock };
+
+// Re-export OAuth stub types for convenience
+export type { UserProfile, AuthError, OAuthStubConfig, OAuthTokens, OAuthStubMode };
+export { OAuthStub };
 
 /**
  * Interface for IPC mock operations
@@ -55,31 +68,34 @@ export interface IPCMock {
 
 /**
  * Main mock system interface for managing all external dependencies
- * Requirements: testing-infrastructure.2.1, testing-infrastructure.2.2, testing-infrastructure.2.3, testing-infrastructure.2.4
+ * Requirements: testing-infrastructure.2.1, testing-infrastructure.2.2, testing-infrastructure.2.3, testing-infrastructure.2.4, testing-infrastructure.6.1
  */
 export interface MockSystem {
   mockFileSystem(): FileSystemMock;
   mockNetwork(): NetworkMock;
   mockDatabase(): DatabaseMock;
   mockIPC(): IPCMock;
+  mockOAuth(): OAuthStub;
   restoreAll(): void;
 }
 
 /**
  * Implementation of the main mock system
- * Requirements: testing-infrastructure.2.1, testing-infrastructure.2.2, testing-infrastructure.2.3, testing-infrastructure.2.4
+ * Requirements: testing-infrastructure.2.1, testing-infrastructure.2.2, testing-infrastructure.2.3, testing-infrastructure.2.4, testing-infrastructure.6.1
  */
 export class MockSystemImpl implements MockSystem {
   private fileSystemMock: FileSystemMock;
   private networkMock: NetworkMock;
   private databaseMock: DatabaseMock;
   private ipcMock: IPCMock;
+  private oauthStub: OAuthStub;
 
   constructor() {
     this.fileSystemMock = new FileSystemMockImpl();
     this.networkMock = new NetworkMockImpl();
     this.databaseMock = new DatabaseMockImpl();
     this.ipcMock = new IPCMockImpl();
+    this.oauthStub = new OAuthStubImpl();
   }
 
   /**
@@ -115,14 +131,23 @@ export class MockSystemImpl implements MockSystem {
   }
 
   /**
+   * Get OAuth stub instance
+   * Requirements: testing-infrastructure.6.1
+   */
+  mockOAuth(): OAuthStub {
+    return this.oauthStub;
+  }
+
+  /**
    * Restore all mocks to their original state
-   * Requirements: testing-infrastructure.2.1, testing-infrastructure.2.2, testing-infrastructure.2.3, testing-infrastructure.2.4
+   * Requirements: testing-infrastructure.2.1, testing-infrastructure.2.2, testing-infrastructure.2.3, testing-infrastructure.2.4, testing-infrastructure.6.1
    */
   restoreAll(): void {
     this.fileSystemMock.reset();
     this.networkMock.reset();
     this.databaseMock.reset();
     this.ipcMock.reset();
+    this.oauthStub.reset();
   }
 }
 
