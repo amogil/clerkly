@@ -1,5 +1,0 @@
-# platform-foundation.2.4: Limit formatting to tracked source/config/test files.
-node_modules
-dist
-build
-coverage
