@@ -7,8 +7,8 @@
 This document defines the comprehensive Inter-Process Communication (IPC) contract for the Clerkly desktop application. The IPC system enables secure communication between the "Main Process" (Electron backend) and "Renderer Process" (React frontend) while maintaining strict security boundaries through Context Isolation.
 
 **Contract Version**: 1.0.0  
-**Total Channels**: 6 (5 invoke + 1 event + 1 logging)  
-**Security Level**: Maximum (Context Isolation + Parameter Validation)
+**Total Channels**: 7 (6 invoke + 1 event + 1 logging)  
+**Security Level**: Maximum (Context Isolation + Parameter Validation + Version Compatibility)
 
 ## Architecture
 
@@ -33,6 +33,7 @@ This document defines the comprehensive Inter-Process Communication (IPC) contra
 1. **Request-Response (invoke/handle)**: Bidirectional communication with return values
 2. **Event Broadcasting (send/on)**: One-way communication from Main to Renderer
 3. **Logging (send)**: One-way logging from Preload to Main
+4. **Version Negotiation**: Compatibility checking between client and server versions
 
 ### Security Model
 
@@ -45,6 +46,73 @@ This document defines the comprehensive Inter-Process Communication (IPC) contra
 - **Logging Security**: All IPC calls logged for audit trail
 
 ## IPC Channel Registry
+
+### Version Management Channels
+
+#### `ipc:version-check`
+
+**Purpose**: Negotiates IPC contract version compatibility between client and server
+
+**Type**: Request-Response (invoke/handle)
+
+**Parameters**: `{ clientVersion: IPCVersion }`
+
+```typescript
+interface IPCVersion {
+  major: number;
+  minor: number;
+  patch: number;
+}
+```
+
+**Returns**: `VersionNegotiationResult`
+
+```typescript
+interface VersionNegotiationResult {
+  success: boolean;
+  agreedVersion: IPCVersion;
+  error?: string;
+}
+```
+
+**Implementation Details**:
+
+- Validates client version compatibility using semantic versioning rules
+- Supports backward compatibility within same major version
+- Returns agreed version for communication (typically the lower version)
+- Provides detailed error messages for incompatible versions
+- Logs all version negotiation attempts for debugging
+
+**Version Compatibility Rules**:
+
+- **Same Major Version**: Compatible (uses lower minor/patch version)
+- **Different Major Version**: Incompatible (breaking changes)
+- **Below Minimum Supported**: Incompatible (client must upgrade)
+- **Future Minor/Patch**: Compatible (forward compatibility)
+
+**Error Conditions**:
+
+| Error Type                   | Description                  | Resolution                   |
+| ---------------------------- | ---------------------------- | ---------------------------- |
+| `Incompatible major version` | Client major version differs | Upgrade/downgrade client     |
+| `Below minimum supported`    | Client version too old       | Upgrade client               |
+| `Invalid version format`     | Malformed version object     | Fix version object structure |
+
+**Usage Example**:
+
+```typescript
+// Check version compatibility
+const clientVersion = { major: 1, minor: 0, patch: 0 };
+const result = await window.clerkly.checkVersion(clientVersion);
+
+if (result.success) {
+  console.log(
+    `Using IPC version ${result.agreedVersion.major}.${result.agreedVersion.minor}.${result.agreedVersion.patch}`,
+  );
+} else {
+  console.error(`Version incompatible: ${result.error}`);
+}
+```
 
 ### Authentication Channels
 
@@ -626,6 +694,754 @@ expect(window.global).toBeUndefined();
 expect(typeof window.clerkly).toBe("object");
 ```
 
+## Usage Examples
+
+### Quick Start Guide
+
+#### Basic Setup
+
+Before using any IPC channels, ensure your renderer process has access to the `window.clerkly` API:
+
+```typescript
+// Check if API is available
+if (typeof window.clerkly === "undefined") {
+  console.error("Clerkly API not available. Check preload script configuration.");
+  return;
+}
+
+// API is ready to use
+console.log("Clerkly API available:", Object.keys(window.clerkly));
+```
+
+#### Simple Authentication Check
+
+```typescript
+// Requirements: platform-foundation.3.3
+// Quick authentication status check
+const checkAuth = async () => {
+  try {
+    const authState = await window.clerkly.getAuthState();
+    if (authState.authorized) {
+      console.log("User is authenticated");
+      showDashboard();
+    } else {
+      console.log("User needs to authenticate");
+      showLoginScreen();
+    }
+  } catch (error) {
+    console.error("Auth check failed:", error);
+    showErrorMessage("Unable to check authentication status");
+  }
+};
+
+// Call on app startup
+checkAuth();
+```
+
+#### Simple Login Flow
+
+```typescript
+// Requirements: platform-foundation.3.3
+// Basic login implementation
+const handleLogin = async () => {
+  try {
+    // Start OAuth flow
+    const result = await window.clerkly.openGoogleAuth();
+
+    if (result.success) {
+      console.log("OAuth flow started successfully");
+      showMessage("Please complete authentication in your browser");
+    } else {
+      console.error("Failed to start OAuth:", result.error);
+      showErrorMessage(result.error || "Authentication failed to start");
+    }
+  } catch (error) {
+    console.error("Login error:", error);
+    showErrorMessage("System error occurred during login");
+  }
+};
+
+// Listen for authentication result
+const cleanup = window.clerkly.onAuthResult((result) => {
+  if (result.success) {
+    console.log("Authentication successful");
+    showMessage("Welcome! You are now logged in.");
+    redirectToDashboard();
+  } else {
+    console.error("Authentication failed:", result.error);
+    showErrorMessage(result.error || "Authentication failed");
+  }
+});
+
+// Don't forget to cleanup when component unmounts
+// cleanup();
+```
+
+#### Simple Sidebar Toggle
+
+```typescript
+// Requirements: platform-foundation.3.4
+// Basic sidebar state management
+const toggleSidebar = async () => {
+  try {
+    // Get current state
+    const currentState = await window.clerkly.getSidebarState();
+    const newCollapsed = !currentState.collapsed;
+
+    // Update state
+    const result = await window.clerkly.setSidebarState(newCollapsed);
+
+    if (result.success) {
+      console.log(`Sidebar ${newCollapsed ? "collapsed" : "expanded"}`);
+      updateSidebarUI(newCollapsed);
+    } else {
+      console.error("Failed to update sidebar:", result.error);
+    }
+  } catch (error) {
+    console.error("Sidebar toggle error:", error);
+  }
+};
+```
+
+### Common Use Cases
+
+#### Application Initialization
+
+```typescript
+// Requirements: platform-foundation.3.3, platform-foundation.3.4
+// Complete app initialization with IPC
+const initializeApp = async () => {
+  console.log("Initializing Clerkly application...");
+
+  try {
+    // 1. Check authentication status
+    const authState = await window.clerkly.getAuthState();
+    console.log("Auth status:", authState.authorized ? "authenticated" : "not authenticated");
+
+    // 2. Load sidebar state
+    const sidebarState = await window.clerkly.getSidebarState();
+    console.log("Sidebar state:", sidebarState.collapsed ? "collapsed" : "expanded");
+
+    // 3. Set up auth event listener
+    const authCleanup = window.clerkly.onAuthResult((result) => {
+      console.log("Auth event received:", result);
+      handleAuthStateChange(result);
+    });
+
+    // 4. Initialize UI based on loaded state
+    initializeUI({
+      authenticated: authState.authorized,
+      sidebarCollapsed: sidebarState.collapsed,
+    });
+
+    console.log("Application initialized successfully");
+
+    // Return cleanup function
+    return () => {
+      authCleanup();
+      console.log("Application cleanup completed");
+    };
+  } catch (error) {
+    console.error("Application initialization failed:", error);
+    showCriticalError("Failed to initialize application");
+    throw error;
+  }
+};
+
+// Usage
+let appCleanup: (() => void) | null = null;
+
+// Initialize on app start
+initializeApp()
+  .then((cleanup) => {
+    appCleanup = cleanup;
+  })
+  .catch((error) => {
+    console.error("Critical initialization error:", error);
+  });
+
+// Cleanup on app shutdown
+window.addEventListener("beforeunload", () => {
+  if (appCleanup) {
+    appCleanup();
+  }
+});
+```
+
+#### User Session Management
+
+```typescript
+// Requirements: platform-foundation.3.3
+// Complete session management implementation
+class SessionManager {
+  private authCleanup: (() => void) | null = null;
+  private currentUser: { authenticated: boolean } = { authenticated: false };
+
+  async initialize() {
+    // Check initial auth state
+    const authState = await window.clerkly.getAuthState();
+    this.currentUser.authenticated = authState.authorized;
+
+    // Set up auth event listener
+    this.authCleanup = window.clerkly.onAuthResult((result) => {
+      this.handleAuthResult(result);
+    });
+
+    console.log("Session manager initialized");
+  }
+
+  async login() {
+    try {
+      const result = await window.clerkly.openGoogleAuth();
+      if (!result.success) {
+        throw new Error(result.error || "Login failed");
+      }
+      // Actual result will come via event
+    } catch (error) {
+      console.error("Login failed:", error);
+      throw error;
+    }
+  }
+
+  async logout() {
+    try {
+      const result = await window.clerkly.signOut();
+      if (!result.success) {
+        throw new Error(result.error || "Logout failed");
+      }
+      // Auth state will update via event
+    } catch (error) {
+      console.error("Logout failed:", error);
+      throw error;
+    }
+  }
+
+  private handleAuthResult(result: AuthResult) {
+    if (result.success) {
+      this.currentUser.authenticated = true;
+      this.onAuthStateChange?.(true);
+    } else {
+      this.currentUser.authenticated = false;
+      this.onAuthStateChange?.(false);
+    }
+  }
+
+  isAuthenticated(): boolean {
+    return this.currentUser.authenticated;
+  }
+
+  onAuthStateChange?: (authenticated: boolean) => void;
+
+  destroy() {
+    if (this.authCleanup) {
+      this.authCleanup();
+      this.authCleanup = null;
+    }
+  }
+}
+
+// Usage
+const sessionManager = new SessionManager();
+
+// Initialize
+await sessionManager.initialize();
+
+// Set up auth state change handler
+sessionManager.onAuthStateChange = (authenticated) => {
+  if (authenticated) {
+    showDashboard();
+  } else {
+    showLoginScreen();
+  }
+};
+
+// Login
+document.getElementById("login-btn")?.addEventListener("click", async () => {
+  try {
+    await sessionManager.login();
+  } catch (error) {
+    showErrorMessage("Login failed: " + error.message);
+  }
+});
+
+// Logout
+document.getElementById("logout-btn")?.addEventListener("click", async () => {
+  try {
+    await sessionManager.logout();
+  } catch (error) {
+    showErrorMessage("Logout failed: " + error.message);
+  }
+});
+```
+
+#### Persistent UI State Management
+
+```typescript
+// Requirements: platform-foundation.3.4
+// UI state management with persistence
+class UIStateManager {
+  private sidebarCollapsed = false;
+
+  async initialize() {
+    // Load saved sidebar state
+    try {
+      const sidebarState = await window.clerkly.getSidebarState();
+      this.sidebarCollapsed = sidebarState.collapsed;
+      this.applySidebarState();
+    } catch (error) {
+      console.error("Failed to load UI state:", error);
+      // Use default state
+      this.sidebarCollapsed = false;
+    }
+  }
+
+  async toggleSidebar() {
+    const newCollapsed = !this.sidebarCollapsed;
+
+    try {
+      // Optimistic update
+      this.sidebarCollapsed = newCollapsed;
+      this.applySidebarState();
+
+      // Persist to backend
+      const result = await window.clerkly.setSidebarState(newCollapsed);
+
+      if (!result.success) {
+        // Revert on failure
+        this.sidebarCollapsed = !newCollapsed;
+        this.applySidebarState();
+        throw new Error(result.error || "Failed to save sidebar state");
+      }
+    } catch (error) {
+      console.error("Sidebar toggle failed:", error);
+      showErrorMessage("Failed to update sidebar state");
+    }
+  }
+
+  private applySidebarState() {
+    const sidebar = document.getElementById("sidebar");
+    const mainContent = document.getElementById("main-content");
+
+    if (sidebar && mainContent) {
+      if (this.sidebarCollapsed) {
+        sidebar.classList.add("collapsed");
+        mainContent.classList.add("sidebar-collapsed");
+      } else {
+        sidebar.classList.remove("collapsed");
+        mainContent.classList.remove("sidebar-collapsed");
+      }
+    }
+  }
+
+  isSidebarCollapsed(): boolean {
+    return this.sidebarCollapsed;
+  }
+}
+
+// Usage
+const uiStateManager = new UIStateManager();
+
+// Initialize
+await uiStateManager.initialize();
+
+// Toggle sidebar
+document.getElementById("sidebar-toggle")?.addEventListener("click", () => {
+  uiStateManager.toggleSidebar();
+});
+```
+
+### Error Handling Examples
+
+#### Robust Error Handling
+
+```typescript
+// Requirements: platform-foundation.3.3, platform-foundation.3.4
+// Comprehensive error handling for IPC calls
+class IPCErrorHandler {
+  static async withRetry<T>(
+    operation: () => Promise<T>,
+    maxRetries: number = 3,
+    delay: number = 1000,
+  ): Promise<T> {
+    let lastError: Error;
+
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        return await operation();
+      } catch (error) {
+        lastError = error as Error;
+
+        // Don't retry validation errors
+        if (error instanceof Error && error.message.includes("validation")) {
+          throw error;
+        }
+
+        if (attempt < maxRetries - 1) {
+          console.warn(`Attempt ${attempt + 1} failed, retrying in ${delay}ms...`);
+          await new Promise((resolve) => setTimeout(resolve, delay));
+          delay *= 2; // Exponential backoff
+        }
+      }
+    }
+
+    throw lastError!;
+  }
+
+  static async withFallback<T>(
+    operation: () => Promise<T>,
+    fallback: T,
+    context: string,
+  ): Promise<T> {
+    try {
+      return await operation();
+    } catch (error) {
+      console.warn(`Operation failed (${context}), using fallback:`, error);
+      return fallback;
+    }
+  }
+
+  static handleError(error: unknown, context: string): void {
+    console.error(`Error in ${context}:`, error);
+
+    if (error instanceof Error) {
+      if (error.message.includes("validation")) {
+        showErrorMessage("Invalid input. Please check your data.");
+      } else if (error.message.includes("network")) {
+        showErrorMessage("Network error. Please check your connection.");
+      } else if (error.message.includes("auth")) {
+        showErrorMessage("Authentication required. Please sign in.");
+        redirectToLogin();
+      } else {
+        showErrorMessage("An unexpected error occurred. Please try again.");
+      }
+    } else {
+      showErrorMessage("System error occurred. Please restart the application.");
+    }
+  }
+}
+
+// Usage examples
+const robustAuthCheck = async () => {
+  try {
+    const authState = await IPCErrorHandler.withRetry(
+      () => window.clerkly.getAuthState(),
+      3, // max retries
+      1000, // initial delay
+    );
+    return authState.authorized;
+  } catch (error) {
+    IPCErrorHandler.handleError(error, "authentication check");
+    return false;
+  }
+};
+
+const safeSidebarState = async () => {
+  return await IPCErrorHandler.withFallback(
+    () => window.clerkly.getSidebarState(),
+    { collapsed: false }, // fallback
+    "sidebar state retrieval",
+  );
+};
+```
+
+#### Network Error Recovery
+
+```typescript
+// Requirements: platform-foundation.3.3
+// Network error handling for authentication
+const handleNetworkErrors = async () => {
+  try {
+    const result = await window.clerkly.openGoogleAuth();
+    return result;
+  } catch (error) {
+    if (error instanceof Error) {
+      if (error.message.includes("network") || error.message.includes("timeout")) {
+        // Show network error dialog
+        const retry = await showNetworkErrorDialog();
+        if (retry) {
+          // Retry after user confirmation
+          return handleNetworkErrors();
+        }
+      } else if (error.message.includes("browser")) {
+        // Browser launch failed
+        showBrowserErrorDialog();
+      }
+    }
+    throw error;
+  }
+};
+
+const showNetworkErrorDialog = (): Promise<boolean> => {
+  return new Promise((resolve) => {
+    const dialog = document.createElement("div");
+    dialog.innerHTML = `
+      <div class="error-dialog">
+        <h3>Network Error</h3>
+        <p>Unable to connect to authentication server. Please check your internet connection.</p>
+        <button id="retry-btn">Retry</button>
+        <button id="cancel-btn">Cancel</button>
+      </div>
+    `;
+
+    document.body.appendChild(dialog);
+
+    dialog.querySelector("#retry-btn")?.addEventListener("click", () => {
+      document.body.removeChild(dialog);
+      resolve(true);
+    });
+
+    dialog.querySelector("#cancel-btn")?.addEventListener("click", () => {
+      document.body.removeChild(dialog);
+      resolve(false);
+    });
+  });
+};
+```
+
+### Performance Optimization Examples
+
+#### Debounced State Updates
+
+```typescript
+// Requirements: platform-foundation.3.4
+// Optimized sidebar state updates with debouncing
+class OptimizedSidebarManager {
+  private pendingUpdate: boolean | null = null;
+  private updateTimeout: NodeJS.Timeout | null = null;
+  private readonly DEBOUNCE_DELAY = 300; // ms
+
+  async updateSidebarState(collapsed: boolean) {
+    // Store pending update
+    this.pendingUpdate = collapsed;
+
+    // Clear existing timeout
+    if (this.updateTimeout) {
+      clearTimeout(this.updateTimeout);
+    }
+
+    // Apply UI change immediately (optimistic update)
+    this.applyUIState(collapsed);
+
+    // Debounce the backend update
+    this.updateTimeout = setTimeout(async () => {
+      if (this.pendingUpdate !== null) {
+        try {
+          const result = await window.clerkly.setSidebarState(this.pendingUpdate);
+          if (!result.success) {
+            console.error("Failed to persist sidebar state:", result.error);
+            // Could revert UI state here if needed
+          }
+        } catch (error) {
+          console.error("Sidebar state persistence error:", error);
+        } finally {
+          this.pendingUpdate = null;
+          this.updateTimeout = null;
+        }
+      }
+    }, this.DEBOUNCE_DELAY);
+  }
+
+  private applyUIState(collapsed: boolean) {
+    const sidebar = document.getElementById("sidebar");
+    if (sidebar) {
+      sidebar.classList.toggle("collapsed", collapsed);
+    }
+  }
+
+  destroy() {
+    if (this.updateTimeout) {
+      clearTimeout(this.updateTimeout);
+    }
+  }
+}
+
+// Usage
+const sidebarManager = new OptimizedSidebarManager();
+
+// Rapid toggle calls will be debounced
+document.getElementById("toggle-btn")?.addEventListener("click", () => {
+  const isCollapsed = document.getElementById("sidebar")?.classList.contains("collapsed");
+  sidebarManager.updateSidebarState(!isCollapsed);
+});
+```
+
+#### Cached Authentication State
+
+```typescript
+// Requirements: platform-foundation.3.3
+// Authentication state with caching
+class CachedAuthManager {
+  private authCache: {
+    authorized: boolean;
+    timestamp: number;
+    ttl: number;
+  } | null = null;
+
+  private readonly CACHE_TTL = 30000; // 30 seconds
+
+  async getAuthState(useCache: boolean = true): Promise<{ authorized: boolean }> {
+    // Check cache first
+    if (useCache && this.authCache) {
+      const now = Date.now();
+      if (now - this.authCache.timestamp < this.authCache.ttl) {
+        console.log("Using cached auth state");
+        return { authorized: this.authCache.authorized };
+      }
+    }
+
+    // Fetch fresh state
+    try {
+      const authState = await window.clerkly.getAuthState();
+
+      // Update cache
+      this.authCache = {
+        authorized: authState.authorized,
+        timestamp: Date.now(),
+        ttl: this.CACHE_TTL,
+      };
+
+      console.log("Fetched fresh auth state");
+      return authState;
+    } catch (error) {
+      // Return cached state on error if available
+      if (this.authCache) {
+        console.warn("Using stale cached auth state due to error:", error);
+        return { authorized: this.authCache.authorized };
+      }
+      throw error;
+    }
+  }
+
+  invalidateCache() {
+    this.authCache = null;
+  }
+
+  // Call this when auth state changes
+  onAuthStateChange(authorized: boolean) {
+    this.authCache = {
+      authorized,
+      timestamp: Date.now(),
+      ttl: this.CACHE_TTL,
+    };
+  }
+}
+
+// Usage
+const authManager = new CachedAuthManager();
+
+// Fast auth checks (uses cache)
+const isAuthenticated = await authManager.getAuthState();
+
+// Force fresh check
+const freshAuthState = await authManager.getAuthState(false);
+
+// Invalidate cache when needed
+authManager.invalidateCache();
+```
+
+### Testing Examples
+
+#### Unit Testing IPC Calls
+
+```typescript
+// Requirements: platform-foundation.3.3, platform-foundation.3.4
+// Unit tests for IPC functionality
+describe("IPC Integration Tests", () => {
+  beforeEach(() => {
+    // Mock window.clerkly API
+    (global as any).window = {
+      clerkly: {
+        getAuthState: jest.fn(),
+        openGoogleAuth: jest.fn(),
+        signOut: jest.fn(),
+        getSidebarState: jest.fn(),
+        setSidebarState: jest.fn(),
+        onAuthResult: jest.fn(),
+      },
+    };
+  });
+
+  /* Preconditions: mocked window.clerkly API available
+     Action: call getAuthState and verify response handling
+     Assertions: correct state returned and errors handled
+     Requirements: platform-foundation.3.3 */
+  it("should handle auth state correctly", async () => {
+    const mockAuthState = { authorized: true };
+    (window.clerkly.getAuthState as jest.Mock).mockResolvedValue(mockAuthState);
+
+    const result = await window.clerkly.getAuthState();
+
+    expect(result).toEqual(mockAuthState);
+    expect(window.clerkly.getAuthState).toHaveBeenCalledTimes(1);
+  });
+
+  /* Preconditions: mocked window.clerkly API with error simulation
+     Action: call IPC method that throws error
+     Assertions: error is properly caught and handled
+     Requirements: platform-foundation.3.3 */
+  it("should handle IPC errors gracefully", async () => {
+    const mockError = new Error("Network error");
+    (window.clerkly.getAuthState as jest.Mock).mockRejectedValue(mockError);
+
+    await expect(window.clerkly.getAuthState()).rejects.toThrow("Network error");
+  });
+
+  /* Preconditions: mocked sidebar state API
+     Action: toggle sidebar state multiple times
+     Assertions: state updates correctly and persists
+     Requirements: platform-foundation.3.4 */
+  it("should handle sidebar state updates", async () => {
+    (window.clerkly.getSidebarState as jest.Mock).mockResolvedValue({ collapsed: false });
+    (window.clerkly.setSidebarState as jest.Mock).mockResolvedValue({ success: true });
+
+    // Get initial state
+    const initialState = await window.clerkly.getSidebarState();
+    expect(initialState.collapsed).toBe(false);
+
+    // Update state
+    const updateResult = await window.clerkly.setSidebarState(true);
+    expect(updateResult.success).toBe(true);
+    expect(window.clerkly.setSidebarState).toHaveBeenCalledWith(true);
+  });
+});
+```
+
+#### Integration Testing
+
+```typescript
+// Requirements: platform-foundation.3.3, platform-foundation.3.4
+// Integration tests for complete workflows
+describe("Complete Workflow Integration", () => {
+  /* Preconditions: full application environment with real IPC
+     Action: perform complete authentication workflow
+     Assertions: all steps complete successfully
+     Requirements: platform-foundation.3.3 */
+  it("should complete full authentication workflow", async () => {
+    // Initial state should be unauthenticated
+    const initialState = await window.clerkly.getAuthState();
+    expect(initialState.authorized).toBe(false);
+
+    // Start authentication
+    const authResult = await window.clerkly.openGoogleAuth();
+    expect(authResult.success).toBe(true);
+
+    // Simulate successful OAuth callback (would happen in real app)
+    // This would trigger the auth:result event
+
+    // After authentication, state should be updated
+    // (In real test, you'd wait for the event or simulate it)
+
+    // Sign out
+    const signOutResult = await window.clerkly.signOut();
+    expect(signOutResult.success).toBe(true);
+
+    // Final state should be unauthenticated
+    const finalState = await window.clerkly.getAuthState();
+    expect(finalState.authorized).toBe(false);
+  });
+});
+```
+
 ## Usage Patterns
 
 ### Renderer Process (React)
@@ -1159,7 +1975,7 @@ node -e "console.log(process.env.GOOGLE_CLIENT_ID ? 'OAuth configured' : 'OAuth 
 
 ### Contract Versioning
 
-Comprehensive versioning strategy for IPC contract evolution:
+Comprehensive versioning strategy for IPC contract evolution with automated compatibility checking:
 
 - **Semantic Versioning**: Major.Minor.Patch versioning scheme following semver.org
 - **Breaking Changes**: Major version increments for breaking changes (parameter changes, removed channels)
@@ -1167,21 +1983,75 @@ Comprehensive versioning strategy for IPC contract evolution:
 - **Bug Fixes**: Patch version increments for bug fixes and performance improvements
 - **Backward Compatibility**: Maintained within major versions with deprecation warnings
 - **Deprecation Policy**: 2 minor version deprecation period before removal
+- **Automatic Negotiation**: Built-in version negotiation via `ipc:version-check` channel
+
+### Version Management System
+
+**Current Implementation**:
+
+```typescript
+// Current IPC contract version
+export const CURRENT_IPC_VERSION: IPCVersion = {
+  major: 1,
+  minor: 0,
+  patch: 0,
+};
+
+// Minimum supported version for backward compatibility
+export const MIN_SUPPORTED_IPC_VERSION: IPCVersion = {
+  major: 1,
+  minor: 0,
+  patch: 0,
+};
+```
+
+**Channel Version Tracking**:
+
+Each IPC channel is tracked with its introduction version:
+
+```typescript
+export const CHANNEL_VERSIONS: Record<IPCChannelName, IPCVersion> = {
+  "ipc:version-check": { major: 1, minor: 0, patch: 0 },
+  "auth:open-google": { major: 1, minor: 0, patch: 0 },
+  "auth:get-state": { major: 1, minor: 0, patch: 0 },
+  "auth:sign-out": { major: 1, minor: 0, patch: 0 },
+  "sidebar:get-state": { major: 1, minor: 0, patch: 0 },
+  "sidebar:set-state": { major: 1, minor: 0, patch: 0 },
+};
+```
+
+**Compatibility Checking**:
+
+Automatic compatibility validation for all IPC calls:
+
+```typescript
+// Check if client version is compatible
+const compatibility = isVersionCompatible(clientVersion);
+if (!compatibility.compatible) {
+  throw new IPCVersionError(compatibility.reason);
+}
+
+// Check if specific channel is available in client version
+if (!isChannelAvailable(channel, clientVersion)) {
+  throw new IPCVersionError(`Channel not available in version ${versionToString(clientVersion)}`);
+}
+```
 
 ### Current Version
 
 **Version**: 1.0.0  
 **Release Date**: 2024-01-15  
-**Supported Channels**: 6 total (5 invoke + 1 event + 1 logging)
+**Supported Channels**: 7 total (6 invoke + 1 event + 1 logging)
 
 **Channel Inventory**:
 
-| Category       | Channels                                              | Status |
-| -------------- | ----------------------------------------------------- | ------ |
-| Authentication | `auth:open-google`, `auth:get-state`, `auth:sign-out` | Stable |
-| Sidebar        | `sidebar:get-state`, `sidebar:set-state`              | Stable |
-| Events         | `auth:result`                                         | Stable |
-| Logging        | `preload:log`                                         | Stable |
+| Category           | Channels                                              | Status |
+| ------------------ | ----------------------------------------------------- | ------ |
+| Version Management | `ipc:version-check`                                   | Stable |
+| Authentication     | `auth:open-google`, `auth:get-state`, `auth:sign-out` | Stable |
+| Sidebar            | `sidebar:get-state`, `sidebar:set-state`              | Stable |
+| Events             | `auth:result`                                         | Stable |
+| Logging            | `preload:log`                                         | Stable |
 
 ### Version History
 

@@ -39,6 +39,42 @@ export interface SetSidebarStateParams {
 }
 
 /**
+ * Performance metrics information
+ */
+export interface PerformanceMetrics {
+  latest: {
+    memoryUsageMB: number;
+    heapTotalMB: number;
+    externalMB: number;
+    cpuUser: number;
+    cpuSystem: number;
+    timestamp: number;
+  } | null;
+  averageMemoryUsageMB: number;
+  uptime: number;
+  pid: number;
+}
+
+/**
+ * Security audit result
+ */
+export interface SecurityAuditResult {
+  passed: boolean;
+  results: Array<{
+    contextIsolation: boolean;
+    nodeIntegration: boolean;
+    webSecurity: boolean;
+    allowRunningInsecureContent: boolean;
+    experimentalFeatures: boolean;
+    preloadScript: string | null;
+    timestamp: number;
+    passed: boolean;
+    issues: string[];
+  }>;
+  timestamp: number;
+}
+
+/**
  * IPC Channel Definitions
  * Maps channel names to their parameter and return types
  */
@@ -65,6 +101,18 @@ export interface IPCChannels {
   "sidebar:set-state": {
     params: SetSidebarStateParams;
     returns: OperationResult;
+  };
+
+  // Performance channels
+  "performance:get-metrics": {
+    params: void;
+    returns: PerformanceMetrics;
+  };
+
+  // Security channels
+  "security:audit": {
+    params: void;
+    returns: SecurityAuditResult;
   };
 }
 

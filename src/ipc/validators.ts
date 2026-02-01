@@ -35,6 +35,76 @@ const isObject = (value: unknown): value is Record<string, unknown> => {
 };
 
 /**
+ * Validates that a string doesn't contain potential injection patterns
+ */
+const validateNoInjection = (value: string, fieldName: string): void => {
+  // Check for common injection patterns
+  const injectionPatterns = [
+    /<script/i, // Script injection
+    /javascript:/i, // JavaScript protocol
+    /on\w+\s*=/i, // Event handlers
+    /eval\s*\(/i, // Eval calls
+    /function\s*\(/i, // Function declarations
+    /\$\{.*\}/, // Template literals
+    /`.*`/, // Backticks
+    /__proto__/i, // Prototype pollution
+    /constructor/i, // Constructor access
+  ];
+
+  for (const pattern of injectionPatterns) {
+    if (pattern.test(value)) {
+      throw new IPCValidationError(
+        "injection-protection",
+        `Potential injection attack detected in ${fieldName}: ${pattern.source}`,
+      );
+    }
+  }
+
+  // Check for excessive length (potential DoS)
+  if (value.length > 10000) {
+    throw new IPCValidationError(
+      "injection-protection",
+      `Value too long in ${fieldName}: ${value.length} characters (max 10000)`,
+    );
+  }
+};
+
+/**
+ * Sanitizes and validates object properties recursively
+ */
+const validateObjectSafety = (obj: Record<string, unknown>, path = ""): void => {
+  for (const [key, value] of Object.entries(obj)) {
+    const currentPath = path ? `${path}.${key}` : key;
+
+    // Validate key names
+    if (typeof key === "string") {
+      validateNoInjection(key, `property name ${currentPath}`);
+    }
+
+    // Validate string values
+    if (typeof value === "string") {
+      validateNoInjection(value, currentPath);
+    }
+
+    // Recursively validate nested objects
+    if (isObject(value)) {
+      validateObjectSafety(value, currentPath);
+    }
+
+    // Validate arrays
+    if (Array.isArray(value)) {
+      value.forEach((item, index) => {
+        if (typeof item === "string") {
+          validateNoInjection(item, `${currentPath}[${index}]`);
+        } else if (isObject(item)) {
+          validateObjectSafety(item, `${currentPath}[${index}]`);
+        }
+      });
+    }
+  }
+};
+
+/**
  * Validates parameters for the auth:open-google channel
  * This channel expects no parameters (void)
  */
@@ -104,6 +174,9 @@ const validateSidebarSetStateParams = (
     );
   }
 
+  // Validate against injection attacks
+  validateObjectSafety(params, "sidebar:set-state");
+
   if (!("collapsed" in params)) {
     throw new IPCValidationError("sidebar:set-state", "Missing required property 'collapsed'");
   }
@@ -117,6 +190,34 @@ const validateSidebarSetStateParams = (
 };
 
 /**
+ * Validates parameters for the performance:get-metrics channel
+ * This channel expects no parameters (void)
+ */
+const validatePerformanceGetMetricsParams = (params: unknown): void => {
+  // performance:get-metrics expects no parameters
+  if (params !== undefined && params !== null) {
+    throw new IPCValidationError(
+      "performance:get-metrics",
+      "Expected no parameters, but received: " + typeof params,
+    );
+  }
+};
+
+/**
+ * Validates parameters for the security:audit channel
+ * This channel expects no parameters (void)
+ */
+const validateSecurityAuditParams = (params: unknown): void => {
+  // security:audit expects no parameters
+  if (params !== undefined && params !== null) {
+    throw new IPCValidationError(
+      "security:audit",
+      "Expected no parameters, but received: " + typeof params,
+    );
+  }
+};
+
+/**
  * Channel-specific validator mapping
  */
 const channelValidators = {
@@ -125,6 +226,8 @@ const channelValidators = {
   "auth:sign-out": validateAuthSignOutParams,
   "sidebar:get-state": validateSidebarGetStateParams,
   "sidebar:set-state": validateSidebarSetStateParams,
+  "performance:get-metrics": validatePerformanceGetMetricsParams,
+  "security:audit": validateSecurityAuditParams,
 } as const;
 
 /**
@@ -179,6 +282,8 @@ export function validateChannelName(channel: unknown): asserts channel is IPCCha
     "auth:sign-out",
     "sidebar:get-state",
     "sidebar:set-state",
+    "performance:get-metrics",
+    "security:audit",
   ];
 
   if (!supportedChannels.includes(channel as IPCChannelName)) {
