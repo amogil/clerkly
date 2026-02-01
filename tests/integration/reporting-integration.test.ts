@@ -130,10 +130,7 @@ describe("Reporting System Integration", () => {
     // Create mock results file
     const functionalDir = path.join(testOutputDir, "functional");
     fs.mkdirSync(functionalDir, { recursive: true });
-    fs.writeFileSync(
-      path.join(functionalDir, "results.json"),
-      JSON.stringify(mockPlaywrightData),
-    );
+    fs.writeFileSync(path.join(functionalDir, "results.json"), JSON.stringify(mockPlaywrightData));
 
     const results = await testReporter.loadFunctionalTestResults();
 

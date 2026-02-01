@@ -63,7 +63,7 @@ describe("Test System Integration", () => {
   it("should initialize test reporter with output directory", () => {
     // Requirements: testing-infrastructure.1.1, testing-infrastructure.5.1
     expect(testReporter).toBeDefined();
-    
+
     // The directory is created lazily when needed, so we just verify the reporter exists
     expect(testReporter).toBeInstanceOf(TestReporter);
   });
@@ -324,7 +324,7 @@ describe("Test System Integration", () => {
 
     // Verify functional tests have separate directory
     expect(functionalDir).toBe("tests/functional");
-    
+
     // Verify integration tests are included in unit patterns
     expect(unitPatterns.some((pattern) => pattern.includes("integration"))).toBe(true);
   });
