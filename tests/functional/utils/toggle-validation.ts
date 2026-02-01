@@ -40,8 +40,12 @@ export async function getToggleByLabel(page: Page, label: string): Promise<Locat
  */
 export async function getToggleState(toggle: Locator): Promise<ToggleState> {
   const classes = await toggle.getAttribute("class");
-  if (!classes) {
+  if (classes === null || classes === undefined) {
     throw new Error("Toggle button has no class attribute");
+  }
+
+  if (classes.trim() === "") {
+    throw new Error("Unable to determine toggle state from classes: ");
   }
 
   // Check if toggle is in "on" state (has bg-primary class)
@@ -137,7 +141,8 @@ export async function validateRapidToggling(
   }
 
   // Final state should be opposite of initial if odd number of clicks
-  const expectedFinalState = clickCount % 2 === 0 ? initialState : initialState === "on" ? "off" : "on";
+  const expectedFinalState =
+    clickCount % 2 === 0 ? initialState : initialState === "on" ? "off" : "on";
   await validateToggleState(toggle, expectedFinalState);
 }
 

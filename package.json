@@ -16,6 +16,7 @@
     "test": "vitest run",
     "test:unit": "vitest run --coverage",
     "test:unit:watch": "vitest --coverage",
+    "test:property": "vitest run tests/requirements/**/*-pbt.test.ts",
     "test:functional": "npm run build && playwright test --config tests/functional/playwright.config.ts",
     "test:functional:headed": "npm run build && playwright test --config tests/functional/playwright.config.ts --headed",
     "test:functional:debug": "npm run build && playwright test --config tests/functional/playwright.config.ts --debug",
@@ -24,6 +25,11 @@
     "test:functional:webkit": "npm run build && playwright test --config tests/functional/playwright.config.ts --project=webkit",
     "test:functional:parallel": "npm run build && playwright test --config tests/functional/playwright.config.ts --workers=4",
     "test:functional:serial": "npm run build && playwright test --config tests/functional/playwright.config.ts --workers=1",
+    "test:all": "npm run test:unit && npm run test:functional",
+    "test:all:coverage": "npm run test:unit && npm run test:functional && npm run test:report",
+    "test:report": "ts-node tests/reporting/test-reporter.ts",
+    "test:ci": "npm run test:unit && npm run test:functional && npm run test:report",
+    "test:coverage:check": "./scripts/check-coverage.sh",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier . --write",
@@ -126,7 +132,8 @@
     "tailwindcss": "4.1.12",
     "typescript": "^5.9.3",
     "vite": "^6.4.1",
-    "vitest": "^4.0.18"
+    "vitest": "^4.0.18",
+    "yaml": "^2.8.2"
   },
   "volta": {
     "node": "25.5.0",

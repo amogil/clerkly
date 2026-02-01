@@ -18,7 +18,14 @@ import path from "path";
 
 // Initialize mock with real files that tests expect to exist
 const initializeMockWithRealFiles = () => {
-  const filesToMock = ["vitest.config.ts", "package.json", "tsconfig.json"];
+  const filesToMock = [
+    "vitest.config.ts",
+    "package.json",
+    "tsconfig.json",
+    ".github/workflows/test.yml",
+    "scripts/check-coverage.sh",
+    "docs/ci-configuration.md",
+  ];
 
   filesToMock.forEach((filePath) => {
     try {
@@ -47,6 +54,18 @@ vi.mock("fs", async (importOriginal) => {
     existsSync: fileSystemMock.existsSync,
     mkdirSync: fileSystemMock.mkdirSync,
     rmSync: fileSystemMock.rmSync,
+    statSync: vi.fn((path: string) => {
+      // For CI configuration files, return actual stats
+      if (
+        path.includes(".github/workflows") ||
+        path.includes("scripts/check-coverage.sh") ||
+        path.includes("docs/ci-configuration.md")
+      ) {
+        return fs.statSync(path);
+      }
+      // For other files, return mock stats
+      return { mode: 0o755, size: 1024 } as any;
+    }),
   };
 });
 

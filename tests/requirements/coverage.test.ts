@@ -87,7 +87,9 @@ const REQUIREMENT_IDS = [
   "testing-infrastructure.1.16",
   "testing-infrastructure.1.17",
   "testing-infrastructure.1.18",
-  "testing-infrastructure.1.19",
+  "testing-infrastructure.8.1",
+  "testing-infrastructure.8.2",
+  "testing-infrastructure.8.3",
 ];
 
 const TEST_FILES = [

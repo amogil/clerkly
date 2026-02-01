@@ -167,17 +167,25 @@ describe("Testing requirements", () => {
      Action: inspect settings toggles coverage.
      Assertions: settings toggles are tested.
      Requirements: testing-infrastructure.1.18 */
+  /* Preconditions: settings toggles functional test exists
+     Action: read settings-toggles.spec.ts file content
+     Assertions: contains toggle state validation and reactivity tests
+     Requirements: testing-infrastructure.8.1 */
   it("covers settings toggles", () => {
     const source = readText("tests/functional/settings-toggles.spec.ts");
-    expect(source).toContain("toggles meeting settings");
+    expect(source).toContain("Settings Toggles - State Changes");
+    expect(source).toContain("Settings Toggles - UI Reactivity");
+    expect(source).toContain("Settings Toggles - Edge Cases");
+    expect(source).toContain("validateToggleState");
+    expect(source).toContain("validateToggleReactivity");
   });
 
   /* Preconditions: functional tests exist.
      Action: inspect migration smoke coverage.
      Assertions: migration smoke test is present.
-     Requirements: testing-infrastructure.1.19 */
+     Requirements: testing-infrastructure.8.2, testing-infrastructure.8.3 */
   it("covers migration smoke", () => {
     const source = readText("tests/functional/migration-smoke.spec.ts");
-    expect(source).toContain("migrates outdated schema on startup");
+    expect(source).toContain("migrates outdated schema from version 1 to version 2");
   });
 });
