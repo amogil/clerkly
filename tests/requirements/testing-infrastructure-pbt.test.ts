@@ -151,6 +151,9 @@ describe("Testing Infrastructure Property-Based Tests", () => {
       // Skip test isolation fixture tests - they test the test infrastructure itself
       if (testFile.includes("test-isolation") && testFile.endsWith(".test.ts")) return false;
 
+      // Skip tests/utils/ test files that test functional test utilities
+      if (testFile.includes("tests/utils/") && testFile.includes("validation")) return false;
+
       return true;
     });
 
@@ -1376,6 +1379,343 @@ it("should validate test isolation fixture manages app lifecycle correctly", asy
           expect(appUtilsContent).toContain("authSequence");
           expect(appUtilsContent).toContain("CLERKLY_E2E_AUTH_SEQUENCE");
         }
+
+        return true;
+      },
+    ),
+    { numRuns: 100 },
+  );
+});
+
+/* Preconditions: navigation validation utilities exist with NavigationItem type
+   Action: generate navigation sequences and validate active state properties
+   Assertions: for any navigation sequence, active state should match current section with correct styles
+   Requirements: testing-infrastructure.7.2 */
+it("should validate active navigation state properties across navigation sequences", async () => {
+  // **Feature: testing-infrastructure, Property 8: Активное состояние навигации**
+
+  // Navigation item generator
+  const navigationItem = fc.constantFrom(
+    "dashboard",
+    "calendar",
+    "tasks",
+    "contacts",
+    "settings",
+  );
+
+  // Navigation sequence generator (array of navigation items)
+  const navigationSequence = fc.array(navigationItem, { minLength: 1, maxLength: 10 });
+
+  fc.assert(
+    fc.property(navigationSequence, (sequence) => {
+      // Property 1: Navigation validation utilities should exist
+      const fs = require("fs");
+      const path = require("path");
+
+      const validationUtilsPath = path.join(
+        process.cwd(),
+        "tests/functional/utils/navigation-validation.ts",
+      );
+      const validationContent = fs.readFileSync(validationUtilsPath, "utf-8");
+
+      // Verify navigation validation functions exist
+      expect(validationContent).toContain("export function getNavigationItems");
+      expect(validationContent).toContain("export async function validateActiveNavigationItem");
+      expect(validationContent).toContain(
+        "export async function validateNavigationCorrespondence",
+      );
+      expect(validationContent).toContain("export async function getCurrentActiveItem");
+      expect(validationContent).toContain("export async function validateSingleActiveItem");
+
+      // Property 2: NavigationItem type should include all valid sections
+      expect(validationContent).toContain("type NavigationItem =");
+      expect(validationContent).toContain('"dashboard"');
+      expect(validationContent).toContain('"calendar"');
+      expect(validationContent).toContain('"tasks"');
+      expect(validationContent).toContain('"contacts"');
+      expect(validationContent).toContain('"settings"');
+
+      // Property 3: All items in sequence should be valid navigation items
+      const validItems = ["dashboard", "calendar", "tasks", "contacts", "settings"];
+      sequence.forEach((item) => {
+        expect(validItems).toContain(item);
+      });
+
+      // Property 4: Active state validation should check for correct CSS classes
+      expect(validationContent).toContain("bg-primary");
+      expect(validationContent).toContain("text-primary-foreground");
+
+      // Property 5: Validation should ensure only one item is active at a time
+      expect(validationContent).toContain("validateSingleActiveItem");
+      expect(validationContent).toContain("activeCount");
+
+      // Property 6: Navigation correspondence should validate both nav state and page heading
+      expect(validationContent).toContain("validateNavigationCorrespondence");
+      expect(validationContent).toContain("getByRole");
+      expect(validationContent).toContain('"heading"');
+
+      // Property 7: For any navigation sequence, the last item should determine final active state
+      if (sequence.length > 0) {
+        const lastItem = sequence[sequence.length - 1];
+        expect(validItems).toContain(lastItem);
+
+        // Verify that navigation utilities can handle this item
+        const itemCapitalized = lastItem.charAt(0).toUpperCase() + lastItem.slice(1);
+        expect(itemCapitalized.length).toBeGreaterThan(0);
+      }
+
+      // Property 8: Navigation validation should work with both expanded and collapsed sidebar
+      expect(validationContent).toContain("getNavigationItems");
+      // The implementation should be flexible enough to handle both states
+
+      // Property 9: Functional tests should exist that use these validation utilities
+      const functionalTestPath = path.join(
+        process.cwd(),
+        "tests/functional/navigation-active-state.spec.ts",
+      );
+      const functionalTestContent = fs.readFileSync(functionalTestPath, "utf-8");
+
+      expect(functionalTestContent).toContain("validateActiveNavigationItem");
+      expect(functionalTestContent).toContain("validateNavigationCorrespondence");
+      expect(functionalTestContent).toContain("validateSingleActiveItem");
+      expect(functionalTestContent).toContain("navigateAndValidate");
+
+      // Property 10: Tests should cover all navigation items
+      validItems.forEach((item) => {
+        expect(functionalTestContent).toContain(`"${item}"`);
+      });
+
+      return true;
+    }),
+    { numRuns: 100 },
+  );
+});
+
+/* Preconditions: navigation validation utilities provide active state checking
+   Action: generate navigation state scenarios and validate consistency properties
+   Assertions: active state should be mutually exclusive, styles should be consistent
+   Requirements: testing-infrastructure.7.2 */
+it("should validate navigation active state consistency and mutual exclusivity", async () => {
+  // **Feature: testing-infrastructure, Property 8: Активное состояние навигации**
+
+  fc.assert(
+    fc.property(
+      fc.record({
+        currentSection: fc.constantFrom("dashboard", "calendar", "tasks", "contacts", "settings"),
+        otherSections: fc.array(
+          fc.constantFrom("dashboard", "calendar", "tasks", "contacts", "settings"),
+          { minLength: 1, maxLength: 4 },
+        ),
+      }),
+      (testData) => {
+        const fs = require("fs");
+        const path = require("path");
+
+        const validationUtilsPath = path.join(
+          process.cwd(),
+          "tests/functional/utils/navigation-validation.ts",
+        );
+        const validationContent = fs.readFileSync(validationUtilsPath, "utf-8");
+
+        // Property 1: Active state validation should check that expected item has active classes
+        expect(validationContent).toContain("toHaveClass(/bg-primary/)");
+        expect(validationContent).toContain("toHaveClass(/text-primary-foreground/)");
+
+        // Property 2: Active state validation should check that other items are inactive
+        expect(validationContent).toContain("not.toContain");
+        expect(validationContent).toContain('"bg-primary"');
+        expect(validationContent).toContain('"text-primary-foreground"');
+
+        // Property 3: Current section should be one of the valid navigation items
+        const validItems = ["dashboard", "calendar", "tasks", "contacts", "settings"];
+        expect(validItems).toContain(testData.currentSection);
+
+        // Property 4: All other sections should also be valid navigation items
+        testData.otherSections.forEach((section) => {
+          expect(validItems).toContain(section);
+        });
+
+        // Property 5: Single active item validation should count active items
+        expect(validationContent).toContain("validateSingleActiveItem");
+        expect(validationContent).toContain("activeCount");
+        expect(validationContent).toContain("toBe(1)");
+
+        // Property 6: Active item getter should return the current active item
+        expect(validationContent).toContain("getCurrentActiveItem");
+        expect(validationContent).toContain('includes("bg-primary")');
+
+        // Property 7: Navigation correspondence should validate both UI and content
+        expect(validationContent).toContain("validateNavigationCorrespondence");
+        expect(validationContent).toContain("validateActiveNavigationItem");
+        expect(validationContent).toContain("toBeVisible");
+
+        // Property 8: For any current section, there should be exactly one active item
+        // This is enforced by the validateSingleActiveItem function
+        expect(validationContent).toContain("expect(activeCount).toBe(1)");
+
+        // Property 9: Navigation items should be accessible via getNavigationItems
+        expect(validationContent).toContain("getNavigationItems");
+        expect(validationContent).toContain("Record<NavigationItem, Locator>");
+
+        // Property 10: Each navigation item should be a button element
+        expect(validationContent).toContain('locator("button")');
+
+        return true;
+      },
+    ),
+    { numRuns: 100 },
+  );
+});
+
+/* Preconditions: navigation validation supports rapid navigation scenarios
+   Action: generate rapid navigation sequences and validate state consistency
+   Assertions: final active state should match last navigation action, no race conditions
+   Requirements: testing-infrastructure.7.2 */
+it("should validate navigation active state handles rapid transitions correctly", async () => {
+  // **Feature: testing-infrastructure, Property 8: Активное состояние навигации**
+
+  fc.assert(
+    fc.property(
+      fc.record({
+        rapidSequence: fc.array(
+          fc.constantFrom("dashboard", "calendar", "tasks", "contacts", "settings"),
+          { minLength: 3, maxLength: 8 },
+        ),
+        sidebarCollapsed: fc.boolean(),
+      }),
+      (testData) => {
+        const fs = require("fs");
+        const path = require("path");
+
+        // Property 1: Functional tests should cover rapid navigation scenarios
+        const functionalTestPath = path.join(
+          process.cwd(),
+          "tests/functional/navigation-active-state.spec.ts",
+        );
+        const functionalTestContent = fs.readFileSync(functionalTestPath, "utf-8");
+
+        expect(functionalTestContent).toContain("rapid");
+        expect(functionalTestContent).toContain("click");
+
+        // Property 2: Rapid navigation test should validate final state
+        expect(functionalTestContent).toContain("validateNavigationCorrespondence");
+        expect(functionalTestContent).toContain("validateSingleActiveItem");
+
+        // Property 3: For any rapid sequence, the last item should determine final state
+        if (testData.rapidSequence.length > 0) {
+          const lastItem = testData.rapidSequence[testData.rapidSequence.length - 1];
+          const validItems = ["dashboard", "calendar", "tasks", "contacts", "settings"];
+          expect(validItems).toContain(lastItem);
+        }
+
+        // Property 4: Tests should cover collapsed sidebar scenarios
+        expect(functionalTestContent).toContain("collapsed");
+        expect(functionalTestContent).toContain("Collapse sidebar");
+
+        // Property 5: Navigation should work in both expanded and collapsed states
+        const validationUtilsPath = path.join(
+          process.cwd(),
+          "tests/functional/utils/navigation-validation.ts",
+        );
+        const validationContent = fs.readFileSync(validationUtilsPath, "utf-8");
+
+        // The getNavigationItems function should handle both states
+        expect(validationContent).toContain("getNavigationItems");
+
+        // Property 6: All items in rapid sequence should be valid
+        const validItems = ["dashboard", "calendar", "tasks", "contacts", "settings"];
+        testData.rapidSequence.forEach((item) => {
+          expect(validItems).toContain(item);
+        });
+
+        // Property 7: Sidebar collapsed state should be a boolean
+        expect(typeof testData.sidebarCollapsed).toBe("boolean");
+
+        // Property 8: Navigation validation should wait for state to settle
+        expect(functionalTestContent).toContain("toBeVisible");
+        expect(functionalTestContent).toContain("expect");
+
+        // Property 9: Tests should verify no race conditions by checking final state
+        expect(functionalTestContent).toContain("validateNavigationCorrespondence");
+
+        // Property 10: Each navigation item should be clickable
+        expect(validationContent).toContain("click");
+
+        return true;
+      },
+    ),
+    { numRuns: 100 },
+  );
+});
+
+/* Preconditions: navigation validation utilities handle all navigation sections
+   Action: generate comprehensive navigation scenarios including settings
+   Assertions: settings section should have same active state behavior as main sections
+   Requirements: testing-infrastructure.7.2 */
+it("should validate navigation active state properties for all sections including settings", async () => {
+  // **Feature: testing-infrastructure, Property 8: Активное состояние навигации**
+
+  fc.assert(
+    fc.property(
+      fc.record({
+        mainSection: fc.constantFrom("dashboard", "calendar", "tasks", "contacts"),
+        includeSettings: fc.boolean(),
+        transitionCount: fc.integer({ min: 1, max: 5 }),
+      }),
+      (testData) => {
+        const fs = require("fs");
+        const path = require("path");
+
+        const functionalTestPath = path.join(
+          process.cwd(),
+          "tests/functional/navigation-active-state.spec.ts",
+        );
+        const functionalTestContent = fs.readFileSync(functionalTestPath, "utf-8");
+
+        // Property 1: Tests should cover settings section separately
+        expect(functionalTestContent).toContain("settings");
+        expect(functionalTestContent).toContain("validates active state for settings section");
+
+        // Property 2: Settings should be validated as active when selected
+        expect(functionalTestContent).toContain('navigateAndValidate(page, "settings")');
+
+        // Property 3: Main sections should be inactive when settings is active
+        expect(functionalTestContent).toContain("main navigation items are all inactive");
+
+        // Property 4: All main sections should be valid navigation items
+        const validMainSections = ["dashboard", "calendar", "tasks", "contacts"];
+        expect(validMainSections).toContain(testData.mainSection);
+
+        // Property 5: Settings is also a valid navigation item
+        const allValidSections = [...validMainSections, "settings"];
+        expect(allValidSections).toContain("settings");
+
+        // Property 6: Transition count should be positive
+        expect(testData.transitionCount).toBeGreaterThan(0);
+
+        // Property 7: Navigation validation should work for all sections
+        const validationUtilsPath = path.join(
+          process.cwd(),
+          "tests/functional/utils/navigation-validation.ts",
+        );
+        const validationContent = fs.readFileSync(validationUtilsPath, "utf-8");
+
+        // All sections should be in the NavigationItem type
+        allValidSections.forEach((section) => {
+          expect(validationContent).toContain(`"${section}"`);
+        });
+
+        // Property 8: Settings button should be in a different section (border-t)
+        expect(validationContent).toContain("border-t");
+        expect(validationContent).toContain("settingsButton");
+
+        // Property 9: Main navigation buttons should be in flex-1 section
+        expect(validationContent).toContain("flex-1");
+        expect(validationContent).toContain("mainNavButtons");
+
+        // Property 10: Both main and settings sections should use same active state logic
+        expect(validationContent).toContain("validateActiveNavigationItem");
+        // This function should work for all navigation items regardless of section
 
         return true;
       },

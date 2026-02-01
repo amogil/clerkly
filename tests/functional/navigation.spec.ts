@@ -6,7 +6,7 @@ test.describe("Core navigation", () => {
   /* Preconditions: authorized app session.
      Action: navigate across main sections.
      Assertions: each section heading is visible.
-     Requirements: testing-infrastructure.1.10 */
+     Requirements: testing-infrastructure.7.1 */
   test("navigates between main sections", async () => {
     const userDataDir = await createUserDataDir();
     const { app, page } = await launchApp(userDataDir, { authMode: "success" });
@@ -35,7 +35,7 @@ test.describe("Core navigation", () => {
   /* Preconditions: authorized app session.
      Action: click navigation items.
      Assertions: active item styling updates.
-     Requirements: testing-infrastructure.1.17 */
+     Requirements: testing-infrastructure.7.2 */
   test("highlights the active navigation item", async () => {
     const userDataDir = await createUserDataDir();
     const { app, page } = await launchApp(userDataDir, { authMode: "success" });
