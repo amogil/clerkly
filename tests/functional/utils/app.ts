@@ -32,6 +32,8 @@ export const launchApp = async (
   } else {
     delete env.CLERKLY_E2E_AUTH_SEQUENCE;
   }
+
+  // Requirements: testing-infrastructure.5.1
   const app = await electron.launch({
     executablePath: electronPath,
     args: [appEntry],

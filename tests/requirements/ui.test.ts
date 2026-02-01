@@ -98,9 +98,62 @@ describe("UI reference requirements", () => {
      Requirements: sidebar-navigation.1.8 */
   it("centers collapsed navigation icons", () => {
     const source = readText("renderer/src/app/components/navigation.tsx");
-    expect(source).toContain("const navButtonClassName = (isActive: boolean): string => {");
+    // Check for useMemo-wrapped navButtonClassName
+    expect(source).toContain("const navButtonClassName = useMemo(");
+    expect(source).toContain("(isActive: boolean): string => {");
     expect(source).toContain(
       'const layoutClasses = collapsed ? "justify-center px-0" : "gap-3 px-4"',
     );
+  });
+
+  /* Preconditions: navigation component exists.
+     Action: inspect ARIA attributes for accessibility.
+     Assertions: nav has role and aria-label, buttons have aria-expanded, aria-current, aria-label, icons have aria-hidden.
+     Requirements: sidebar-navigation.2.5 */
+  it("includes ARIA attributes for accessibility", () => {
+    const source = readText("renderer/src/app/components/navigation.tsx");
+    // Nav element has role and aria-label
+    expect(source).toContain('role="navigation"');
+    expect(source).toContain('aria-label="Main navigation"');
+    // Toggle button has aria-expanded
+    expect(source).toContain("aria-expanded={!collapsed}");
+    // Navigation buttons have aria-label in collapsed mode
+    expect(source).toContain("aria-label={collapsed ? item.label : undefined}");
+    expect(source).toContain("aria-label={collapsed ? settingsItem.label : undefined}");
+    // Active navigation items have aria-current
+    expect(source).toContain('aria-current={isActive ? "page" : undefined}');
+    // Icons have aria-hidden
+    expect(source).toContain('aria-hidden="true"');
+  });
+
+  /* Preconditions: navigation component exists.
+     Action: inspect tabIndex attributes for keyboard navigation.
+     Assertions: all interactive buttons have tabIndex={0} for keyboard accessibility.
+     Requirements: sidebar-navigation.2.5 */
+  it("includes tabIndex for keyboard navigation", () => {
+    const source = readText("renderer/src/app/components/navigation.tsx");
+    // All buttons should have tabIndex={0}
+    expect(source).toContain("tabIndex={0}");
+  });
+
+  /* Preconditions: navigation component exists.
+     Action: inspect keyboard event handlers.
+     Assertions: Enter and Space key handlers are implemented for navigation items.
+     Requirements: sidebar-navigation.2.5 */
+  it("includes keyboard event handlers for Enter and Space keys", () => {
+    const source = readText("renderer/src/app/components/navigation.tsx");
+    // handleKeyDown function exists with useCallback
+    expect(source).toContain("const handleKeyDown = useCallback(");
+    expect(source).toContain("(event: React.KeyboardEvent, itemId: string)");
+    // Checks for Enter and Space keys
+    expect(source).toContain('event.key === "Enter"');
+    expect(source).toContain('event.key === " "');
+    // Prevents default behavior
+    expect(source).toContain("event.preventDefault()");
+    // Calls onNavigate
+    expect(source).toContain("onNavigate(itemId)");
+    // Applied to navigation buttons
+    expect(source).toContain("onKeyDown={(e) => handleKeyDown(e, item.id)}");
+    expect(source).toContain("onKeyDown={(e) => handleKeyDown(e, settingsItem.id)}");
   });
 });

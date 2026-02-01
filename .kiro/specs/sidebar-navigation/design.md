@@ -1131,7 +1131,6 @@ interface SidebarIPCContract {
 ### Доступность
 
 - Поддержка screen readers с детальными ARIA описаниями
-- Keyboard shortcuts для быстрой навигации
 - High contrast режим для пользователей с нарушениями зрения
 - Настраиваемые размеры шрифтов
 

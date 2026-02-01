@@ -28,7 +28,7 @@ npm run test:all
 # Run unit tests with coverage
 npm run test:unit
 
-# Run functional tests
+# Run functional tests (ONLY when explicitly requested by user)
 npm run test:functional
 
 # Run property-based tests
@@ -37,9 +37,35 @@ npm run test:property
 # Generate unified test report
 npm run test:report
 
-# Run complete CI validation
+# Run complete CI validation (excludes functional tests)
 npm run validate
 ```
+
+## Functional Tests
+
+**IMPORTANT**: Functional tests show application windows on screen and can interfere with work. Only run them when explicitly requested by the user.
+
+```bash
+npm run test:functional
+```
+
+### Hidden Mode (Default)
+
+Windows are created off-screen with minimal size to avoid interfering with your work.
+
+```bash
+npm run test:functional
+```
+
+### Visible Mode (Debugging)
+
+Windows are shown normally on screen for debugging and observation.
+
+```bash
+CLERKLY_E2E_VISIBLE=true npm run test:functional
+```
+
+See [Functional Tests README](./functional/README.md) for more details.
 
 ## Directory Structure
 

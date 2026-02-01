@@ -1,6 +1,6 @@
 // Requirements: platform-foundation.1.1, platform-foundation.1.2, platform-foundation.1.3, platform-foundation.1.4, platform-foundation.2.2, data-storage.1.1, sidebar-navigation.4.1, google-oauth-auth.5.1, google-oauth-auth.1.4, google-oauth-auth.1.7, google-oauth-auth.1.8, google-oauth-auth.2.1, google-oauth-auth.2.2, google-oauth-auth.3.1, google-oauth-auth.4.2, google-oauth-auth.4.3, google-oauth-auth.4.4, platform-foundation.3.3, platform-foundation.3.4, platform-foundation.2.1
 // Tooling requirements: platform-foundation.2.1 (see package.json)
-import { app, BrowserWindow, dialog, ipcMain, Menu, shell } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Menu, screen, shell } from "electron";
 import Database from "better-sqlite3";
 import http from "http";
 import path from "path";
@@ -43,13 +43,17 @@ const sendAuthResultToRenderer = (result: AuthResult): void => {
   if (mainWindow && !mainWindow.isDestroyed()) {
     try {
       mainWindow.webContents.send("auth:result", result);
-      if (!mainWindow.isVisible()) {
-        mainWindow.show();
+      // Requirements: testing-infrastructure.5.1
+      // Don't show window in E2E tests
+      if (!process.env.CLERKLY_E2E_USER_DATA) {
+        if (!mainWindow.isVisible()) {
+          mainWindow.show();
+        }
+        if (mainWindow.isMinimized()) {
+          mainWindow.restore();
+        }
+        mainWindow.focus();
       }
-      if (mainWindow.isMinimized()) {
-        mainWindow.restore();
-      }
-      mainWindow.focus();
       return;
     } catch (error) {
       const rootDir = app.getPath("userData");
@@ -942,10 +946,17 @@ const createMainWindow = (): void => {
   logInfo(rootDir, "Starting main window creation process");
 
   // Log window configuration before creation
+  const isE2ETest = !!process.env.CLERKLY_E2E_USER_DATA;
+
+  // Requirements: testing-infrastructure.5.1
   const windowConfig = {
     width: 900,
     height: 600,
     title: "Clerkly",
+    show: !isE2ETest,
+    ...(isE2ETest && {
+      skipTaskbar: true,
+    }),
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
@@ -1087,7 +1098,9 @@ if (!gotSingleInstanceLock) {
       handleAuthCallbackUrl(deepLink);
     }
 
-    if (mainWindow) {
+    // Requirements: testing-infrastructure.5.1
+    // Don't show window in E2E tests
+    if (mainWindow && !process.env.CLERKLY_E2E_USER_DATA) {
       if (mainWindow.isMinimized()) {
         mainWindow.restore();
       }

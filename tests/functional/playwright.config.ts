@@ -6,7 +6,7 @@ export default defineConfig({
   timeout: 60_000,
   retries: 2,
   workers: 4,
-  reporter: [["list"], ["html", { outputFolder: "test-results/html" }]],
+  reporter: [["list"], ["html", { outputFolder: "test-results/html", open: "never" }]],
 
   use: {
     headless: true,

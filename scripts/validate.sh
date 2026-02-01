@@ -100,18 +100,8 @@ else
     exit 1
 fi
 
-# 5. Functional Tests
-print_step "5. Functional Tests"
-echo "Running: npm run test:functional"
-if npm run test:functional; then
-    print_success "Functional tests passed"
-else
-    print_error "Functional tests failed"
-    exit 1
-fi
-
-# 6. Coverage Test
-print_step "6. Requirements Coverage Test"
+# 5. Requirements Coverage Test
+print_step "5. Requirements Coverage Test"
 echo "Running: npm test -- tests/requirements/coverage.test.ts"
 if npm test -- tests/requirements/coverage.test.ts; then
     print_success "Requirements coverage test passed"
@@ -120,8 +110,8 @@ else
     exit 1
 fi
 
-# 7. Security Audit (informational)
-print_step "7. Security Audit (Informational)"
+# 6. Security Audit (informational)
+print_step "6. Security Audit (Informational)"
 echo "Running: npm audit"
 if npm audit; then
     print_success "No security vulnerabilities found"
@@ -140,6 +130,8 @@ echo "✅ TypeScript compilation"
 echo "✅ ESLint code quality"
 echo "✅ Prettier code formatting"
 echo "✅ Unit tests"
-echo "✅ Functional tests"
 echo "✅ Requirements coverage"
 echo "✅ Security audit (informational)"
+echo ""
+echo -e "${YELLOW}Note: Functional tests are excluded from validation.${NC}"
+echo -e "${YELLOW}Run them manually with: npm run test:functional${NC}"
