@@ -14,13 +14,6 @@ export class IPCValidationError extends Error {
 }
 
 /**
- * Validates that a value is not null or undefined
- */
-const isNotNullish = (value: unknown): boolean => {
-  return value !== null && value !== undefined;
-};
-
-/**
  * Validates that a value is a boolean
  */
 const isBoolean = (value: unknown): value is boolean => {
