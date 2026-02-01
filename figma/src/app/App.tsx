@@ -1,0 +1,103 @@
+import { useState } from 'react';
+import { TopNavigation } from './components/top-navigation';
+import { AIAgentPanel } from './components/ai-agent-panel';
+import { DashboardUpdated } from './components/dashboard-updated';
+import { CalendarView } from './components/calendar-view';
+import { MeetingDetail } from './components/meeting-detail';
+import { TasksViewNew } from './components/tasks-view-new';
+import { Contacts } from './components/contacts';
+import { Settings } from './components/settings';
+import { parseCommand } from './utils/command-parser';
+
+export default function App() {
+  const [currentScreen, setCurrentScreen] = useState<string>('dashboard');
+  const [selectedMeetingId, setSelectedMeetingId] = useState<string | null>(null);
+  const [triggerAction, setTriggerAction] = useState<{ action: string; params: any } | null>(null);
+
+  const handleNavigateToMeeting = (meetingId: string) => {
+    setSelectedMeetingId(meetingId);
+    setCurrentScreen('meeting-detail');
+  };
+
+  const handleBackToDashboard = () => {
+    setSelectedMeetingId(null);
+    setCurrentScreen('dashboard');
+  };
+
+  const handleNavigateToCalendar = () => {
+    setCurrentScreen('calendar');
+  };
+
+  const handleCommand = (command: string) => {
+    const parsed = parseCommand(command);
+    
+    // Handle navigation
+    if (parsed.action === 'navigate' && parsed.entity === 'screen') {
+      setCurrentScreen(parsed.params.screen);
+    }
+    
+    // Handle entity creation/manipulation
+    if (parsed.action === 'create') {
+      if (parsed.entity === 'project' || parsed.entity === 'task') {
+        setCurrentScreen('tasks');
+      } else if (parsed.entity === 'contact') {
+        setCurrentScreen('contacts');
+      }
+      
+      // Trigger the action in the respective component
+      setTriggerAction({ action: parsed.action, params: { entity: parsed.entity, ...parsed.params } });
+      
+      // Reset trigger after a short delay
+      setTimeout(() => setTriggerAction(null), 100);
+    }
+    
+    // Handle show commands
+    if (parsed.action === 'show') {
+      if (parsed.entity === 'task') {
+        setCurrentScreen('tasks');
+      }
+    }
+  };
+
+  const renderScreen = () => {
+    switch (currentScreen) {
+      case 'dashboard':
+        return (
+          <DashboardUpdated
+            onNavigateToMeeting={handleNavigateToMeeting}
+            onNavigateToCalendar={handleNavigateToCalendar}
+          />
+        );
+      case 'calendar':
+        return <CalendarView onNavigateToMeeting={handleNavigateToMeeting} />;
+      case 'meeting-detail':
+        return (
+          <MeetingDetail
+            meetingId={selectedMeetingId || '1'}
+            onBack={handleBackToDashboard}
+          />
+        );
+      case 'tasks':
+        return <TasksViewNew triggerAction={triggerAction} />;
+      case 'contacts':
+        return <Contacts triggerAction={triggerAction} />;
+      case 'settings':
+        return <Settings />;
+      default:
+        return (
+          <DashboardUpdated
+            onNavigateToMeeting={handleNavigateToMeeting}
+            onNavigateToCalendar={handleNavigateToCalendar}
+          />
+        );
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-background">
+      <TopNavigation currentScreen={currentScreen} onNavigate={setCurrentScreen} />
+      <AIAgentPanel onCommand={handleCommand} />
+      <div className="pt-16 pr-[33.333333%]">{renderScreen()}</div>
+    </div>
+  );
+}
