@@ -64,6 +64,34 @@ describe("Platform Foundation Property-Based Tests", () => {
       }
     });
 
+    /* Preconditions: performance:get-metrics channel validator is available
+       Action: generate various parameter combinations for performance metrics
+       Assertions: only undefined/null parameters are accepted, all other parameters are rejected
+       Requirements: platform-foundation.5.3 */
+    it("should validate performance metrics parameters correctly", () => {
+      // Test valid parameters (undefined/null)
+      expect(() => {
+        validateIPCParams("performance:get-metrics", undefined);
+      }).not.toThrow();
+
+      expect(() => {
+        validateIPCParams("performance:get-metrics", null);
+      }).not.toThrow();
+
+      // Test invalid parameters
+      fc.assert(
+        fc.property(
+          fc.oneof(fc.string(), fc.integer(), fc.boolean(), fc.object(), fc.array(fc.anything())),
+          (invalidParam) => {
+            expect(() => {
+              validateIPCParams("performance:get-metrics", invalidParam);
+            }).toThrow(IPCValidationError);
+          },
+        ),
+        { numRuns: 50 },
+      );
+    });
+
     /* Preconditions: sidebar:set-state channel validator is available
        Action: generate various parameter combinations for sidebar state
        Assertions: only valid boolean collapsed values are accepted
@@ -91,6 +119,34 @@ describe("Platform Foundation Property-Based Tests", () => {
           (invalidCollapsed) => {
             expect(() => {
               validateIPCParams("sidebar:set-state", { collapsed: invalidCollapsed });
+            }).toThrow(IPCValidationError);
+          },
+        ),
+        { numRuns: 50 },
+      );
+    });
+
+    /* Preconditions: security:audit channel validator is available
+       Action: generate various parameter combinations for security audit
+       Assertions: only undefined/null parameters are accepted, all other parameters are rejected
+       Requirements: platform-foundation.4.1, platform-foundation.4.2 */
+    it("should validate security audit parameters correctly", () => {
+      // Test valid parameters (undefined/null)
+      expect(() => {
+        validateIPCParams("security:audit", undefined);
+      }).not.toThrow();
+
+      expect(() => {
+        validateIPCParams("security:audit", null);
+      }).not.toThrow();
+
+      // Test invalid parameters
+      fc.assert(
+        fc.property(
+          fc.oneof(fc.string(), fc.integer(), fc.boolean(), fc.object(), fc.array(fc.anything())),
+          (invalidParam) => {
+            expect(() => {
+              validateIPCParams("security:audit", invalidParam);
             }).toThrow(IPCValidationError);
           },
         ),

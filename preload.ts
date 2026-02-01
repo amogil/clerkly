@@ -1,6 +1,13 @@
 // Requirements: platform-foundation.2.2, google-oauth-auth.5.1, platform-foundation.3.3, platform-foundation.3.4
 import { contextBridge, ipcRenderer } from "electron";
-import type { AuthResult, AuthState, SidebarState, OperationResult } from "./src/ipc/types";
+import type {
+  AuthResult,
+  AuthState,
+  SidebarState,
+  OperationResult,
+  PerformanceMetrics,
+  SecurityAuditResult,
+} from "./src/ipc/types";
 
 // Preload logging utility - sends log messages to main process for centralized logging
 const logToMain = (level: string, message: string, data?: unknown): void => {
@@ -73,6 +80,16 @@ const api = {
     "sidebar:set-state",
     (collapsed: boolean): Promise<OperationResult> =>
       ipcRenderer.invoke("sidebar:set-state", { collapsed }) as Promise<OperationResult>,
+  ),
+  getPerformanceMetrics: createLoggedIPCCall(
+    "performance:get-metrics",
+    (): Promise<PerformanceMetrics> =>
+      ipcRenderer.invoke("performance:get-metrics") as Promise<PerformanceMetrics>,
+  ),
+  performSecurityAudit: createLoggedIPCCall(
+    "security:audit",
+    (): Promise<SecurityAuditResult> =>
+      ipcRenderer.invoke("security:audit") as Promise<SecurityAuditResult>,
   ),
   onAuthResult: (callback: (result: AuthResult) => void): (() => void) => {
     preloadLog.debug("Setting up auth result listener");

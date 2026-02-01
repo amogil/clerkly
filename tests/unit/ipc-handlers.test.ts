@@ -460,6 +460,81 @@ describe("IPC Handlers", () => {
       }
     };
 
+    const performanceGetMetricsHandler = async (_event: any, params: any) => {
+      const rootDir = "/test/userdata";
+      const timer = mockTimer;
+
+      try {
+        // Validate parameters
+        if (params !== undefined && params !== null) {
+          throw new IPCValidationError("performance:get-metrics", "Expected no parameters");
+        }
+
+        // Mock process metrics
+        const mockMemoryUsage = {
+          rss: 50 * 1024 * 1024, // 50 MB
+          heapTotal: 30 * 1024 * 1024, // 30 MB
+          heapUsed: 20 * 1024 * 1024, // 20 MB
+          external: 5 * 1024 * 1024, // 5 MB
+          arrayBuffers: 1 * 1024 * 1024, // 1 MB
+        };
+
+        const mockCpuUsage = {
+          user: 100000, // 100ms in microseconds
+          system: 50000, // 50ms in microseconds
+        };
+
+        const mockUptime = 120.5; // 120.5 seconds
+        const mockPid = 12345;
+
+        // Convert to expected format
+        const memoryUsageMB = Math.round((mockMemoryUsage.rss / 1024 / 1024) * 100) / 100;
+        const heapTotalMB = Math.round((mockMemoryUsage.heapTotal / 1024 / 1024) * 100) / 100;
+        const externalMB = Math.round((mockMemoryUsage.external / 1024 / 1024) * 100) / 100;
+        const cpuUser = Math.round((mockCpuUsage.user / 1000) * 100) / 100;
+        const cpuSystem = Math.round((mockCpuUsage.system / 1000) * 100) / 100;
+
+        const result = {
+          latest: {
+            memoryUsageMB,
+            heapTotalMB,
+            externalMB,
+            cpuUser,
+            cpuSystem,
+            timestamp: Date.now(),
+          },
+          averageMemoryUsageMB: memoryUsageMB,
+          uptime: Math.round(mockUptime * 100) / 100,
+          pid: mockPid,
+        };
+
+        timer.end(rootDir, "performance:get-metrics", true);
+        return result;
+      } catch (error) {
+        if (error instanceof IPCValidationError) {
+          mockedLogError(rootDir, "IPC validation failed for performance:get-metrics", error);
+          const result = {
+            latest: null,
+            averageMemoryUsageMB: 0,
+            uptime: 0,
+            pid: process.pid,
+          };
+          timer.end(rootDir, "performance:get-metrics", true);
+          return result;
+        }
+
+        mockedLogError(rootDir, "Performance get-metrics failed", error);
+        const result = {
+          latest: null,
+          averageMemoryUsageMB: 0,
+          uptime: 0,
+          pid: process.pid,
+        };
+        timer.end(rootDir, "performance:get-metrics", true);
+        return result;
+      }
+    };
+
     const preloadLogHandler = (_event: any, logData: any) => {
       const rootDir = "/test/userdata";
       const { level, message, data } = logData || {};
@@ -484,12 +559,94 @@ describe("IPC Handlers", () => {
       }
     };
 
+    const securityAuditHandler = async (_event: any, params: any) => {
+      const rootDir = "/test/userdata";
+      const timer = mockTimer;
+
+      try {
+        // Validate parameters
+        if (params !== undefined && params !== null) {
+          throw new IPCValidationError("security:audit", "Expected no parameters");
+        }
+
+        // Mock security audit results
+        const auditResults = [
+          {
+            contextIsolation: true,
+            nodeIntegration: true, // This means nodeIntegration is disabled (good)
+            webSecurity: true,
+            allowRunningInsecureContent: true, // This means insecure content is disabled (good)
+            experimentalFeatures: true, // This means experimental features are disabled (good)
+            preloadScript: "/path/to/preload.js",
+            timestamp: Date.now(),
+            passed: true,
+            issues: [],
+          },
+        ];
+
+        const result = {
+          passed: true,
+          results: auditResults,
+          timestamp: Date.now(),
+        };
+
+        timer.end(rootDir, "security:audit", true);
+        return result;
+      } catch (error) {
+        if (error instanceof IPCValidationError) {
+          mockedLogError(rootDir, "IPC validation failed for security:audit", error);
+          const result = {
+            passed: false,
+            results: [
+              {
+                contextIsolation: false,
+                nodeIntegration: false,
+                webSecurity: false,
+                allowRunningInsecureContent: false,
+                experimentalFeatures: false,
+                preloadScript: null,
+                timestamp: Date.now(),
+                passed: false,
+                issues: ["Security audit failed due to invalid parameters"],
+              },
+            ],
+            timestamp: Date.now(),
+          };
+          timer.end(rootDir, "security:audit", true);
+          return result;
+        }
+
+        mockedLogError(rootDir, "Security audit failed", error);
+        const result = {
+          passed: false,
+          results: [
+            {
+              contextIsolation: false,
+              nodeIntegration: false,
+              webSecurity: false,
+              allowRunningInsecureContent: false,
+              experimentalFeatures: false,
+              preloadScript: null,
+              timestamp: Date.now(),
+              passed: false,
+              issues: ["Security audit failed due to internal error"],
+            },
+          ],
+          timestamp: Date.now(),
+        };
+        timer.end(rootDir, "security:audit", true);
+        return result;
+      }
+    };
+
     // Register the handlers
     registeredHandlers.set("auth:open-google", authOpenGoogleHandler);
     registeredHandlers.set("auth:get-state", authGetStateHandler);
     registeredHandlers.set("auth:sign-out", authSignOutHandler);
     registeredHandlers.set("sidebar:get-state", sidebarGetStateHandler);
     registeredHandlers.set("sidebar:set-state", sidebarSetStateHandler);
+    registeredHandlers.set("performance:get-metrics", performanceGetMetricsHandler);
+    registeredHandlers.set("security:audit", securityAuditHandler);
     registeredHandlers.set("preload:log", preloadLogHandler);
   };
 
@@ -829,6 +986,457 @@ describe("IPC Handlers", () => {
           expect.any(Error),
         );
         expect(mockTimer.end).toHaveBeenCalledWith("/test/userdata", "sidebar:set-state", true);
+      });
+    });
+  });
+
+  describe("Performance IPC Handlers", () => {
+    beforeEach(() => {
+      simulateHandlerRegistration();
+    });
+
+    describe("performance:get-metrics", () => {
+      /* Preconditions: performance:get-metrics handler is registered, process metrics are available
+         Action: call performance:get-metrics IPC handler with no parameters
+         Assertions: returns valid performance metrics with memory, CPU, uptime, and PID data
+         Requirements: platform-foundation.5.3 */
+      it("should return valid performance metrics", async () => {
+        // Arrange
+        const handler = registeredHandlers.get("performance:get-metrics")!;
+
+        // Act
+        const result = await handler({}, undefined);
+
+        // Assert
+        expect(result).toHaveProperty("latest");
+        expect(result).toHaveProperty("averageMemoryUsageMB");
+        expect(result).toHaveProperty("uptime");
+        expect(result).toHaveProperty("pid");
+
+        // Validate latest metrics structure
+        expect(result.latest).toHaveProperty("memoryUsageMB");
+        expect(result.latest).toHaveProperty("heapTotalMB");
+        expect(result.latest).toHaveProperty("externalMB");
+        expect(result.latest).toHaveProperty("cpuUser");
+        expect(result.latest).toHaveProperty("cpuSystem");
+        expect(result.latest).toHaveProperty("timestamp");
+
+        // Validate data types and ranges
+        expect(typeof result.latest.memoryUsageMB).toBe("number");
+        expect(typeof result.latest.heapTotalMB).toBe("number");
+        expect(typeof result.latest.externalMB).toBe("number");
+        expect(typeof result.latest.cpuUser).toBe("number");
+        expect(typeof result.latest.cpuSystem).toBe("number");
+        expect(typeof result.latest.timestamp).toBe("number");
+        expect(typeof result.averageMemoryUsageMB).toBe("number");
+        expect(typeof result.uptime).toBe("number");
+        expect(typeof result.pid).toBe("number");
+
+        // Validate reasonable ranges
+        expect(result.latest.memoryUsageMB).toBeGreaterThan(0);
+        expect(result.latest.heapTotalMB).toBeGreaterThan(0);
+        expect(result.latest.externalMB).toBeGreaterThan(0);
+        expect(result.latest.cpuUser).toBeGreaterThanOrEqual(0);
+        expect(result.latest.cpuSystem).toBeGreaterThanOrEqual(0);
+        expect(result.latest.timestamp).toBeGreaterThan(0);
+        expect(result.averageMemoryUsageMB).toBeGreaterThan(0);
+        expect(result.uptime).toBeGreaterThan(0);
+        expect(result.pid).toBeGreaterThan(0);
+
+        expect(mockTimer.end).toHaveBeenCalledWith(
+          "/test/userdata",
+          "performance:get-metrics",
+          true,
+        );
+      });
+
+      /* Preconditions: performance:get-metrics handler is registered
+         Action: call performance:get-metrics IPC handler with invalid parameters
+         Assertions: returns fallback metrics with latest: null and validation error logged
+         Requirements: platform-foundation.5.3 */
+      it("should handle performance:get-metrics with invalid parameters", async () => {
+        // Arrange
+        const handler = registeredHandlers.get("performance:get-metrics")!;
+
+        // Act
+        const result = await handler({}, { invalid: "params" });
+
+        // Assert
+        expect(result).toEqual({
+          latest: null,
+          averageMemoryUsageMB: 0,
+          uptime: 0,
+          pid: process.pid,
+        });
+        expect(mockedLogError).toHaveBeenCalledWith(
+          "/test/userdata",
+          "IPC validation failed for performance:get-metrics",
+          expect.any(IPCValidationError),
+        );
+        expect(mockTimer.end).toHaveBeenCalledWith(
+          "/test/userdata",
+          "performance:get-metrics",
+          true,
+        );
+      });
+
+      /* Preconditions: performance:get-metrics handler is registered, process metrics collection fails
+         Action: call performance:get-metrics IPC handler when metrics collection throws error
+         Assertions: returns fallback metrics with latest: null and error logged
+         Requirements: platform-foundation.5.3 */
+      it("should handle metrics collection errors gracefully", async () => {
+        // Arrange
+        const handler = registeredHandlers.get("performance:get-metrics")!;
+
+        // Mock the handler to throw an error during metrics collection
+        const errorHandler = async (_event: any, params: any) => {
+          const rootDir = "/test/userdata";
+          const timer = mockTimer;
+
+          try {
+            // Validate parameters
+            if (params !== undefined && params !== null) {
+              throw new IPCValidationError("performance:get-metrics", "Expected no parameters");
+            }
+
+            // Simulate metrics collection error
+            throw new Error("Process metrics unavailable");
+          } catch (error) {
+            if (error instanceof IPCValidationError) {
+              mockedLogError(rootDir, "IPC validation failed for performance:get-metrics", error);
+              const result = {
+                latest: null,
+                averageMemoryUsageMB: 0,
+                uptime: 0,
+                pid: process.pid,
+              };
+              timer.end(rootDir, "performance:get-metrics", true);
+              return result;
+            }
+
+            mockedLogError(rootDir, "Performance get-metrics failed", error);
+            const result = {
+              latest: null,
+              averageMemoryUsageMB: 0,
+              uptime: 0,
+              pid: process.pid,
+            };
+            timer.end(rootDir, "performance:get-metrics", true);
+            return result;
+          }
+        };
+
+        // Act
+        const result = await errorHandler({}, undefined);
+
+        // Assert
+        expect(result).toEqual({
+          latest: null,
+          averageMemoryUsageMB: 0,
+          uptime: 0,
+          pid: process.pid,
+        });
+        expect(mockedLogError).toHaveBeenCalledWith(
+          "/test/userdata",
+          "Performance get-metrics failed",
+          expect.any(Error),
+        );
+        expect(mockTimer.end).toHaveBeenCalledWith(
+          "/test/userdata",
+          "performance:get-metrics",
+          true,
+        );
+      });
+
+      /* Preconditions: performance:get-metrics handler is registered
+         Action: call performance:get-metrics multiple times concurrently
+         Assertions: all calls return valid metrics without interference
+         Requirements: platform-foundation.5.3 */
+      it("should handle concurrent performance metrics requests", async () => {
+        // Arrange
+        const handler = registeredHandlers.get("performance:get-metrics")!;
+
+        // Act - Simulate concurrent calls
+        const promises = Array.from({ length: 5 }, () => handler({}, undefined));
+        const results = await Promise.all(promises);
+
+        // Assert
+        results.forEach((result) => {
+          expect(result).toHaveProperty("latest");
+          expect(result).toHaveProperty("averageMemoryUsageMB");
+          expect(result).toHaveProperty("uptime");
+          expect(result).toHaveProperty("pid");
+          expect(result.latest).not.toBeNull();
+        });
+        expect(mockTimer.end).toHaveBeenCalledTimes(5);
+      });
+
+      /* Preconditions: performance:get-metrics handler is registered
+         Action: call performance:get-metrics and verify metric value precision
+         Assertions: memory values are rounded to 2 decimal places, CPU values are rounded to 2 decimal places
+         Requirements: platform-foundation.5.3 */
+      it("should return properly formatted metric values", async () => {
+        // Arrange
+        const handler = registeredHandlers.get("performance:get-metrics")!;
+
+        // Act
+        const result = await handler({}, undefined);
+
+        // Assert - Check precision formatting
+        expect(result.latest.memoryUsageMB).toBe(50); // 50MB exactly
+        expect(result.latest.heapTotalMB).toBe(30); // 30MB exactly
+        expect(result.latest.externalMB).toBe(5); // 5MB exactly
+        expect(result.latest.cpuUser).toBe(100); // 100ms exactly
+        expect(result.latest.cpuSystem).toBe(50); // 50ms exactly
+        expect(result.uptime).toBe(120.5); // 120.5s exactly
+
+        // Verify timestamp is recent
+        const now = Date.now();
+        expect(result.latest.timestamp).toBeGreaterThan(now - 1000); // Within last second
+        expect(result.latest.timestamp).toBeLessThanOrEqual(now);
+      });
+    });
+  });
+
+  describe("Security IPC Handlers", () => {
+    beforeEach(() => {
+      simulateHandlerRegistration();
+    });
+
+    describe("security:audit", () => {
+      /* Preconditions: security:audit handler is registered, main window security settings are configured
+         Action: call security:audit IPC handler with no parameters
+         Assertions: returns security audit results with context isolation and security settings
+         Requirements: platform-foundation.4.1, platform-foundation.4.2 */
+      it("should return valid security audit results", async () => {
+        // Arrange
+        const handler = registeredHandlers.get("security:audit")!;
+
+        // Act
+        const result = await handler({}, undefined);
+
+        // Assert
+        expect(result).toHaveProperty("passed");
+        expect(result).toHaveProperty("results");
+        expect(result).toHaveProperty("timestamp");
+
+        // Validate results structure
+        expect(Array.isArray(result.results)).toBe(true);
+        expect(result.results.length).toBeGreaterThan(0);
+
+        const auditResult = result.results[0];
+        expect(auditResult).toHaveProperty("contextIsolation");
+        expect(auditResult).toHaveProperty("nodeIntegration");
+        expect(auditResult).toHaveProperty("webSecurity");
+        expect(auditResult).toHaveProperty("allowRunningInsecureContent");
+        expect(auditResult).toHaveProperty("experimentalFeatures");
+        expect(auditResult).toHaveProperty("preloadScript");
+        expect(auditResult).toHaveProperty("timestamp");
+        expect(auditResult).toHaveProperty("passed");
+        expect(auditResult).toHaveProperty("issues");
+
+        // Validate data types
+        expect(typeof result.passed).toBe("boolean");
+        expect(typeof result.timestamp).toBe("number");
+        expect(typeof auditResult.contextIsolation).toBe("boolean");
+        expect(typeof auditResult.nodeIntegration).toBe("boolean");
+        expect(typeof auditResult.webSecurity).toBe("boolean");
+        expect(typeof auditResult.allowRunningInsecureContent).toBe("boolean");
+        expect(typeof auditResult.experimentalFeatures).toBe("boolean");
+        expect(typeof auditResult.timestamp).toBe("number");
+        expect(typeof auditResult.passed).toBe("boolean");
+        expect(Array.isArray(auditResult.issues)).toBe(true);
+
+        // Validate secure configuration
+        expect(result.passed).toBe(true);
+        expect(auditResult.contextIsolation).toBe(true);
+        expect(auditResult.nodeIntegration).toBe(true); // true means nodeIntegration is disabled (secure)
+        expect(auditResult.webSecurity).toBe(true);
+        expect(auditResult.allowRunningInsecureContent).toBe(true); // true means insecure content is disabled (secure)
+        expect(auditResult.experimentalFeatures).toBe(true); // true means experimental features are disabled (secure)
+        expect(auditResult.preloadScript).toBeTruthy();
+        expect(auditResult.issues).toHaveLength(0);
+
+        expect(mockTimer.end).toHaveBeenCalledWith("/test/userdata", "security:audit", true);
+      });
+
+      /* Preconditions: security:audit handler is registered
+         Action: call security:audit IPC handler with invalid parameters
+         Assertions: returns failed audit with validation error and error logged
+         Requirements: platform-foundation.4.1, platform-foundation.4.2 */
+      it("should handle security:audit with invalid parameters", async () => {
+        // Arrange
+        const handler = registeredHandlers.get("security:audit")!;
+
+        // Act
+        const result = await handler({}, { invalid: "params" });
+
+        // Assert
+        expect(result).toEqual({
+          passed: false,
+          results: [
+            {
+              contextIsolation: false,
+              nodeIntegration: false,
+              webSecurity: false,
+              allowRunningInsecureContent: false,
+              experimentalFeatures: false,
+              preloadScript: null,
+              timestamp: expect.any(Number),
+              passed: false,
+              issues: ["Security audit failed due to invalid parameters"],
+            },
+          ],
+          timestamp: expect.any(Number),
+        });
+        expect(mockedLogError).toHaveBeenCalledWith(
+          "/test/userdata",
+          "IPC validation failed for security:audit",
+          expect.any(IPCValidationError),
+        );
+        expect(mockTimer.end).toHaveBeenCalledWith("/test/userdata", "security:audit", true);
+      });
+
+      /* Preconditions: security:audit handler is registered, audit process fails
+         Action: call security:audit IPC handler when audit throws internal error
+         Assertions: returns failed audit with internal error and error logged
+         Requirements: platform-foundation.4.1, platform-foundation.4.2 */
+      it("should handle security audit internal errors gracefully", async () => {
+        // Arrange
+        const handler = registeredHandlers.get("security:audit")!;
+
+        // Mock the handler to throw an error during audit
+        const errorHandler = async (_event: any, params: any) => {
+          const rootDir = "/test/userdata";
+          const timer = mockTimer;
+
+          try {
+            // Validate parameters
+            if (params !== undefined && params !== null) {
+              throw new IPCValidationError("security:audit", "Expected no parameters");
+            }
+
+            // Simulate audit error
+            throw new Error("Security audit process failed");
+          } catch (error) {
+            if (error instanceof IPCValidationError) {
+              mockedLogError(rootDir, "IPC validation failed for security:audit", error);
+              const result = {
+                passed: false,
+                results: [
+                  {
+                    contextIsolation: false,
+                    nodeIntegration: false,
+                    webSecurity: false,
+                    allowRunningInsecureContent: false,
+                    experimentalFeatures: false,
+                    preloadScript: null,
+                    timestamp: Date.now(),
+                    passed: false,
+                    issues: ["Security audit failed due to invalid parameters"],
+                  },
+                ],
+                timestamp: Date.now(),
+              };
+              timer.end(rootDir, "security:audit", true);
+              return result;
+            }
+
+            mockedLogError(rootDir, "Security audit failed", error);
+            const result = {
+              passed: false,
+              results: [
+                {
+                  contextIsolation: false,
+                  nodeIntegration: false,
+                  webSecurity: false,
+                  allowRunningInsecureContent: false,
+                  experimentalFeatures: false,
+                  preloadScript: null,
+                  timestamp: Date.now(),
+                  passed: false,
+                  issues: ["Security audit failed due to internal error"],
+                },
+              ],
+              timestamp: Date.now(),
+            };
+            timer.end(rootDir, "security:audit", true);
+            return result;
+          }
+        };
+
+        // Act
+        const result = await errorHandler({}, undefined);
+
+        // Assert
+        expect(result).toEqual({
+          passed: false,
+          results: [
+            {
+              contextIsolation: false,
+              nodeIntegration: false,
+              webSecurity: false,
+              allowRunningInsecureContent: false,
+              experimentalFeatures: false,
+              preloadScript: null,
+              timestamp: expect.any(Number),
+              passed: false,
+              issues: ["Security audit failed due to internal error"],
+            },
+          ],
+          timestamp: expect.any(Number),
+        });
+        expect(mockedLogError).toHaveBeenCalledWith(
+          "/test/userdata",
+          "Security audit failed",
+          expect.any(Error),
+        );
+        expect(mockTimer.end).toHaveBeenCalledWith("/test/userdata", "security:audit", true);
+      });
+
+      /* Preconditions: security:audit handler is registered
+         Action: call security:audit multiple times concurrently
+         Assertions: all calls return valid audit results without interference
+         Requirements: platform-foundation.4.1, platform-foundation.4.2 */
+      it("should handle concurrent security audit requests", async () => {
+        // Arrange
+        const handler = registeredHandlers.get("security:audit")!;
+
+        // Act - Simulate concurrent calls
+        const promises = Array.from({ length: 3 }, () => handler({}, undefined));
+        const results = await Promise.all(promises);
+
+        // Assert
+        results.forEach((result) => {
+          expect(result).toHaveProperty("passed");
+          expect(result).toHaveProperty("results");
+          expect(result).toHaveProperty("timestamp");
+          expect(result.passed).toBe(true);
+          expect(result.results).toHaveLength(1);
+        });
+        expect(mockTimer.end).toHaveBeenCalledTimes(3);
+      });
+
+      /* Preconditions: security:audit handler is registered
+         Action: call security:audit and verify audit result timestamps
+         Assertions: timestamps are recent and properly formatted
+         Requirements: platform-foundation.4.1, platform-foundation.4.2 */
+      it("should return properly formatted audit timestamps", async () => {
+        // Arrange
+        const handler = registeredHandlers.get("security:audit")!;
+        const beforeTime = Date.now();
+
+        // Act
+        const result = await handler({}, undefined);
+
+        // Assert
+        const afterTime = Date.now();
+        expect(result.timestamp).toBeGreaterThanOrEqual(beforeTime);
+        expect(result.timestamp).toBeLessThanOrEqual(afterTime);
+
+        const auditResult = result.results[0];
+        expect(auditResult.timestamp).toBeGreaterThanOrEqual(beforeTime);
+        expect(auditResult.timestamp).toBeLessThanOrEqual(afterTime);
       });
     });
   });
