@@ -53,9 +53,7 @@ app.whenReady().then(async () => {
     // Requirements: clerkly.nfr.1.1
     // Warn if startup time exceeds 3 seconds
     if (loadTime > 3000) {
-      console.warn(
-        `[Main] Slow startup detected: ${loadTime}ms (target: <3000ms)`
-      );
+      console.warn(`[Main] Slow startup detected: ${loadTime}ms (target: <3000ms)`);
     }
 
     // Requirements: clerkly.1.4, clerkly.2.5

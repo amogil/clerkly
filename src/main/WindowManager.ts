@@ -26,8 +26,8 @@ class WindowManager {
     try {
       // Requirements: clerkly.1- Native Mac OS X interface configuration
       const windowConfig: BrowserWindowConstructorOptions = {
-        width: 800,
-        height: 600,
+        width: 1200,
+        height: 800,
         titleBarStyle: 'hiddenInset', // Native Mac OS X title bar style
         vibrancy: 'under-window', // Mac OS X vibrancy effect
         trafficLightPosition: { x: 20, y: 20 }, // Position of Mac OS X window controls
@@ -35,16 +35,35 @@ class WindowManager {
           preload: path.join(__dirname, '../preload/index.js'),
           contextIsolation: true,
           nodeIntegration: false,
-          sandbox: true,
+          sandbox: false,
+          webSecurity: true,
         },
       };
 
       this.mainWindow = new BrowserWindow(windowConfig);
 
+      // Set CSP header
+      this.mainWindow.webContents.session.webRequest.onHeadersReceived((details, callback) => {
+        callback({
+          responseHeaders: {
+            ...details.responseHeaders,
+            'Content-Security-Policy': [
+              "default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; script-src 'self' 'unsafe-inline' 'unsafe-eval'; img-src 'self' data: https:;",
+            ],
+          },
+        });
+      });
+
       // Load the renderer HTML file
       const htmlPath = path.join(__dirname, '../renderer/index.html');
-      this.mainWindow.loadFile(htmlPath).catch((error) => {
+      const fileUrl = `file://${htmlPath}`;
+      this.mainWindow.loadURL(fileUrl).catch((error) => {
         console.error('Failed to load HTML file:', error);
+      });
+
+      // Log console messages from renderer
+      this.mainWindow.webContents.on('console-message', (_event, level, message) => {
+        console.log(`[Renderer] ${message}`);
       });
 
       // Clean up reference when window is closed

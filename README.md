@@ -169,10 +169,27 @@ clerkly/
 │   │   ├── IPCHandlers.ts     # IPC обработчики
 │   │   └── AppConfig.ts       # Конфигурация приложения
 │   ├── renderer/       # Renderer process (UI)
-│   │   ├── index.ts           # Точка входа UI
+│   │   ├── index.tsx          # Точка входа React приложения
 │   │   ├── index.html         # HTML шаблон
-│   │   ├── UIController.ts    # Управление UI
-│   │   └── StateController.ts # Управление состоянием
+│   │   ├── App.tsx            # Главный компонент приложения
+│   │   ├── components/        # React компоненты
+│   │   │   ├── top-navigation.tsx
+│   │   │   ├── ai-agent-panel.tsx
+│   │   │   ├── dashboard-updated.tsx
+│   │   │   ├── calendar-view.tsx
+│   │   │   ├── tasks-view-new.tsx
+│   │   │   ├── contacts.tsx
+│   │   │   ├── settings.tsx
+│   │   │   └── ui/            # UI компоненты (Radix UI)
+│   │   ├── styles/            # CSS стили
+│   │   │   ├── index.css
+│   │   │   ├── fonts.css
+│   │   │   ├── tailwind.css
+│   │   │   └── theme.css
+│   │   ├── types/             # TypeScript типы для UI
+│   │   ├── utils/             # Утилиты
+│   │   ├── UIController.ts    # Legacy UI Controller
+│   │   └── StateController.ts # Legacy State Controller
 │   ├── preload/        # Preload script (IPC bridge)
 │   │   └── index.ts           # Безопасный IPC мост
 │   └── types/          # TypeScript типы и интерфейсы
@@ -188,6 +205,8 @@ clerkly/
 ├── dist/               # Скомпилированные файлы (генерируется)
 ├── release/            # Готовые дистрибутивы (генерируется)
 ├── coverage/           # Отчеты о покрытии (генерируется)
+├── vite.config.ts      # Конфигурация Vite для renderer
+├── postcss.config.mjs  # Конфигурация PostCSS
 └── .kiro/              # Спецификации проекта
     └── specs/clerkly/
         ├── requirements.md    # Требования
@@ -199,7 +218,12 @@ clerkly/
 
 - **Electron** 28+ - Desktop приложение
 - **TypeScript** 5+ - Язык программирования
+- **React** 18+ - UI библиотека
+- **Tailwind CSS** 4+ - CSS фреймворк
+- **Radix UI** - Компоненты UI
+- **Lucide React** - Иконки
 - **SQLite** (better-sqlite3) - Локальное хранение данных
+- **Vite** 6+ - Сборщик для renderer процесса
 - **Jest** - Тестирование
 - **fast-check** - Property-based тестирование
 - **ESLint** - Линтинг
@@ -219,8 +243,14 @@ clerkly/
 
 ### Renderer Process (Процесс отрисовки)
 Отвечает за UI и взаимодействие с пользователем:
-- **UI Controller** - Отрисовка и обновление пользовательского интерфейса
-- **State Controller** - Управление состоянием приложения в UI
+- **React Application** - Современный UI с компонентным подходом
+- **Top Navigation** - Навигация между разделами приложения
+- **AI Agent Panel** - Панель взаимодействия с AI ассистентом
+- **Dashboard** - Главный экран с обзором задач и встреч
+- **Calendar View** - Календарь встреч и событий
+- **Tasks View** - Управление задачами и проектами
+- **Contacts** - Управление контактами
+- **Settings** - Настройки приложения
 
 ### Preload Script (Предзагрузочный скрипт)
 Обеспечивает безопасную IPC коммуникацию между процессами через `contextBridge`:

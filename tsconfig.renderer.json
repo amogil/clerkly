@@ -3,9 +3,19 @@
   "compilerOptions": {
     "outDir": "./dist/renderer",
     "rootDir": "./src",
-    "lib": ["ES2020", "DOM"],
-    "types": ["node"]
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "types": ["node"],
+    "jsx": "react-jsx",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "paths": {
+      "@/*": ["./src/renderer/*"]
+    }
   },
   "include": ["src/renderer/**/*", "src/types/**/*"],
-  "exclude": ["node_modules", "dist", "tests", "src/renderer/index.html"]
+  "exclude": ["node_modules", "dist", "tests"]
 }
