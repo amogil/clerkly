@@ -8,7 +8,7 @@
   },
   "then": {
     "type": "askAgent",
-    "prompt": "Запусти функциональные тесты"
+    "prompt": "Запусти функциональные тесты. Спрашивать подтверждение не нужно. Это запрос пользователя. "
   },
   "workspaceFolderName": "clerkly2",
   "shortName": "run-functional-tests"
