@@ -1,6 +1,4 @@
-import { StatusBadge } from './status-badge';
-import { Calendar, Users, CheckCircle2, TrendingUp, Clock, PlayCircle, AlertCircle, Play } from 'lucide-react';
-import type { AgentTask } from '@/app/types/agent-task';
+import { Clock, PlayCircle, Play } from 'lucide-react';
 
 interface DashboardProps {
   onNavigateToMeeting: (meetingId: string) => void;
@@ -12,6 +10,7 @@ export function DashboardUpdated({ onNavigateToMeeting, onNavigateToCalendar }: 
     {
       id: '1',
       title: 'Product Roadmap Review',
+      description: 'Review Q2 roadmap priorities and discuss feature timelines with product team',
       time: '2:30 PM - 3:15 PM',
       participants: ['Sarah Chen', 'Mike Johnson', 'Alex Rivera'],
       status: 'upcoming' as const,
@@ -20,6 +19,7 @@ export function DashboardUpdated({ onNavigateToMeeting, onNavigateToCalendar }: 
     {
       id: '2',
       title: 'Sprint Planning',
+      description: 'Plan upcoming sprint tasks and estimate story points with engineering team',
       time: '4:00 PM - 5:00 PM',
       participants: ['David Lee', 'Emma Wilson', 'Chris Brown'],
       status: 'upcoming' as const,
@@ -28,6 +28,7 @@ export function DashboardUpdated({ onNavigateToMeeting, onNavigateToCalendar }: 
     {
       id: '3',
       title: 'Weekly Team Sync',
+      description: 'Weekly check-in on project progress and blockers',
       time: '10:00 AM - 10:45 AM',
       participants: ['Sarah Chen', 'Mike Johnson'],
       status: 'recorded' as const,
@@ -36,58 +37,52 @@ export function DashboardUpdated({ onNavigateToMeeting, onNavigateToCalendar }: 
     },
   ];
 
-  const agentTasks: AgentTask[] = [
+  // Tasks for today
+  const todayTasks = [
     {
-      id: 'task-1',
-      title: 'Analyze Client Demo Call',
-      description: 'Processing transcript and extracting action items',
-      status: 'working',
-      createdAt: new Date('2026-01-28T11:30:00'),
-      updatedAt: new Date('2026-01-28T11:35:00'),
-      progress: 65,
+      id: '1',
+      title: 'Review API documentation',
+      project: 'Backend Migration',
+      assignee: 'Sarah Chen',
+      deadline: '2026-01-28',
+      priority: 'high' as const,
+      status: 'in-progress' as const,
     },
     {
-      id: 'task-2',
-      title: 'Create Jira tasks from Sprint Planning',
-      description: 'Waiting for user confirmation on task assignments',
-      status: 'requesting-info',
-      createdAt: new Date('2026-01-28T10:15:00'),
-      updatedAt: new Date('2026-01-28T10:20:00'),
+      id: '2',
+      title: 'Update user authentication flow',
+      project: 'Security Updates',
+      assignee: 'Mike Johnson',
+      deadline: '2026-01-28',
+      priority: 'high' as const,
+      status: 'todo' as const,
     },
     {
-      id: 'task-3',
-      title: 'Update contact information',
-      description: 'Waiting for your input on duplicate contacts',
-      status: 'waiting-input',
-      createdAt: new Date('2026-01-28T08:00:00'),
-      updatedAt: new Date('2026-01-28T08:05:00'),
+      id: '3',
+      title: 'Design system color tokens',
+      project: 'Design System v2',
+      assignee: 'Alex Rivera',
+      deadline: '2026-01-28',
+      priority: 'medium' as const,
+      status: 'in-progress' as const,
     },
     {
-      id: 'task-4',
-      title: 'Import calendar events to timeline',
-      description: 'Failed to authenticate with Google Calendar API',
-      status: 'error',
-      createdAt: new Date('2026-01-28T07:45:00'),
-      updatedAt: new Date('2026-01-28T07:50:00'),
-      errorMessage: 'Authentication failed. Please reconnect your Google Calendar in Settings.',
+      id: '4',
+      title: 'Write test cases for payment module',
+      project: 'Payment Integration',
+      assignee: 'Emma Wilson',
+      deadline: '2026-01-28',
+      priority: 'medium' as const,
+      status: 'todo' as const,
     },
     {
-      id: 'task-5',
-      title: 'Sync calendar events to project timeline',
-      description: 'Successfully synced 12 calendar events',
-      status: 'completed',
-      createdAt: new Date('2026-01-28T09:00:00'),
-      updatedAt: new Date('2026-01-28T09:05:00'),
-      completedAt: new Date('2026-01-28T09:05:00'),
-    },
-    {
-      id: 'task-6',
-      title: 'Generate meeting summary',
-      description: 'Completed summary for Weekly Team Sync',
-      status: 'completed',
-      createdAt: new Date('2026-01-27T09:45:00'),
-      updatedAt: new Date('2026-01-27T09:50:00'),
-      completedAt: new Date('2026-01-27T09:50:00'),
+      id: '5',
+      title: 'Code review for PR #234',
+      project: 'Feature Development',
+      assignee: 'David Lee',
+      deadline: '2026-01-28',
+      priority: 'low' as const,
+      status: 'completed' as const,
     },
   ];
 
@@ -95,28 +90,27 @@ export function DashboardUpdated({ onNavigateToMeeting, onNavigateToCalendar }: 
     console.log('Starting recording for meeting:', meetingId);
   };
 
-  const getTimeAgo = (date: Date) => {
-    const now = new Date('2026-01-28T14:00:00'); // Current time in the demo
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMins / 60);
-    const diffDays = Math.floor(diffHours / 24);
-
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins} min ago`;
-    if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
-    return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+  const getPriorityColor = (priority: 'high' | 'medium' | 'low') => {
+    switch (priority) {
+      case 'high':
+        return 'bg-red-100 text-red-700 border-red-200';
+      case 'medium':
+        return 'bg-amber-100 text-amber-700 border-amber-200';
+      case 'low':
+        return 'bg-blue-100 text-blue-700 border-blue-200';
+    }
   };
 
-  const activeTasksCount = agentTasks.filter(t => 
-    t.status === 'working' || t.status === 'waiting-input' || t.status === 'requesting-info'
-  ).length;
-
-  const completedTodayCount = agentTasks.filter(t => 
-    t.status === 'completed' && 
-    t.completedAt && 
-    t.completedAt.toDateString() === new Date('2026-01-28').toDateString()
-  ).length;
+  const getTaskStatusColor = (status: 'todo' | 'in-progress' | 'completed') => {
+    switch (status) {
+      case 'todo':
+        return 'text-muted-foreground';
+      case 'in-progress':
+        return 'text-blue-600';
+      case 'completed':
+        return 'text-green-600';
+    }
+  };
 
   return (
     <div className="p-8">
@@ -144,55 +138,61 @@ export function DashboardUpdated({ onNavigateToMeeting, onNavigateToCalendar }: 
               {todaySchedule.map((meeting, index) => (
                 <div
                   key={meeting.id}
-                  className={`p-6 hover:bg-secondary/30 transition-colors ${
-                    index === todaySchedule.length - 1 ? 'border-b border-border' : ''
-                  }`}
+                  className={`p-6 hover:bg-secondary/30 transition-colors ${index === todaySchedule.length - 1 ? 'border-b border-border' : ''}`}
                 >
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-foreground mb-1">
-                        {meeting.title}
-                      </h3>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Clock className="w-4 h-4" />
-                        {meeting.time}
-                      </div>
+                  <h3 className="font-semibold text-foreground mb-1">
+                    {meeting.title}
+                  </h3>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    {meeting.description}
+                  </p>
+
+                  {/* Action button */}
+                  {meeting.status === 'upcoming' ? (
+                    <div className="flex gap-2 mb-3">
+                      <button
+                        onClick={() => handleStartRecording(meeting.id)}
+                        className="flex-1 px-4 py-2.5 bg-primary text-primary-foreground text-sm rounded-lg hover:bg-primary/90 transition-colors flex items-center justify-center gap-2"
+                      >
+                        <PlayCircle className="w-4 h-4" />
+                        <span>Join</span>
+                      </button>
+                      <div className="flex-1"></div>
+                    </div>
+                  ) : meeting.status === 'recorded' && (
+                    <div className="flex gap-2 mb-3">
+                      <button
+                        onClick={() => onNavigateToMeeting(meeting.id)}
+                        className="flex-1 px-4 py-2.5 bg-secondary text-foreground text-sm rounded-lg hover:bg-secondary/80 transition-colors border border-border flex items-center justify-center gap-2"
+                      >
+                        <Play className="w-4 h-4" />
+                        <span>Open Recording</span>
+                      </button>
+                      <div className="flex-1"></div>
+                    </div>
+                  )}
+                  
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Clock className="w-4 h-4" />
+                      {meeting.time}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {meeting.participants.slice(0, 3).map((participant, idx) => (
+                        <div
+                          key={idx}
+                          className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium text-primary"
+                        >
+                          {participant.split(' ').map(n => n[0]).join('')}
+                        </div>
+                      ))}
+                      {meeting.participants.length > 3 && (
+                        <span className="text-xs text-muted-foreground">
+                          +{meeting.participants.length - 3}
+                        </span>
+                      )}
                     </div>
                   </div>
-                  
-                  <div className="flex items-center gap-2 mb-4">
-                    {meeting.participants.slice(0, 3).map((participant, idx) => (
-                      <div
-                        key={idx}
-                        className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium text-primary"
-                      >
-                        {participant.split(' ').map(n => n[0]).join('')}
-                      </div>
-                    ))}
-                    {meeting.participants.length > 3 && (
-                      <span className="text-xs text-muted-foreground">
-                        +{meeting.participants.length - 3} more
-                      </span>
-                    )}
-                  </div>
-
-                  {meeting.status === 'upcoming' ? (
-                    <button
-                      onClick={() => handleStartRecording(meeting.id)}
-                      className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
-                    >
-                      <PlayCircle className="w-4 h-4" />
-                      <span>Join & Record</span>
-                    </button>
-                  ) : meeting.status === 'recorded' && (
-                    <button
-                      onClick={() => onNavigateToMeeting(meeting.id)}
-                      className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-secondary text-foreground rounded-lg hover:bg-secondary/80 transition-colors border border-border"
-                    >
-                      <Play className="w-4 h-4" />
-                      <span>Open Recording</span>
-                    </button>
-                  )}
                 </div>
               ))}
               
@@ -204,77 +204,70 @@ export function DashboardUpdated({ onNavigateToMeeting, onNavigateToCalendar }: 
             </div>
           </div>
 
-          {/* Agent Tasks */}
+          {/* Tasks for Today */}
           <div className="bg-card rounded-xl border border-border shadow-sm">
-            <div className="p-6 border-b border-border">
-              <h2 className="text-xl font-semibold text-foreground">Agent Tasks</h2>
+            <div className="p-6 border-b border-border flex items-center justify-between">
+              <h2 className="text-xl font-semibold text-foreground">Tasks for Today</h2>
+              <button
+                className="text-sm text-primary hover:underline"
+              >
+                View all
+              </button>
             </div>
             <div className="divide-y divide-border">
-              {agentTasks.map((task) => (
+              {todayTasks.map((task) => (
                 <div
                   key={task.id}
-                  className="p-6 hover:bg-secondary/50 transition-colors"
+                  className="p-6 hover:bg-secondary/30 transition-colors cursor-pointer"
+                  onClick={() => console.log('Open task:', task.id)}
                 >
-                  <div className="flex items-start justify-between mb-3">
+                  <div className="flex items-start gap-3">
+                    <input
+                      type="checkbox"
+                      checked={task.status === 'completed'}
+                      onChange={(e) => {
+                        e.stopPropagation();
+                        console.log('Toggle task:', task.id);
+                      }}
+                      className="mt-1 w-4 h-4 rounded border-border text-primary focus:ring-primary"
+                    />
                     <div className="flex-1">
-                      <h3 className="font-semibold text-foreground mb-1">
+                      <h3 className={`font-semibold mb-1 ${task.status === 'completed' ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
                         {task.title}
                       </h3>
-                      <p className="text-sm text-muted-foreground">
-                        {task.description}
-                      </p>
-                    </div>
-                    <StatusBadge status={task.status} size="sm" />
-                  </div>
-
-                  {/* Error message */}
-                  {task.status === 'error' && task.errorMessage && (
-                    <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-lg mb-3">
-                      <AlertCircle className="w-4 h-4 text-red-600 mt-0.5 flex-shrink-0" />
-                      <div className="flex-1">
-                        <p className="text-sm text-red-700">{task.errorMessage}</p>
+                      <p className="text-sm text-muted-foreground mb-2">{task.project}</p>
+                      
+                      <div className="flex items-center gap-3">
+                        {/* Priority badge */}
+                        <span className={`text-xs px-2 py-1 rounded border ${getPriorityColor(task.priority)}`}>
+                          {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
+                        </span>
+                        
+                        {/* Status */}
+                        <span className={`text-xs ${getTaskStatusColor(task.status)}`}>
+                          {task.status === 'todo' && 'To Do'}
+                          {task.status === 'in-progress' && 'In Progress'}
+                          {task.status === 'completed' && 'Completed'}
+                        </span>
+                        
+                        {/* Assignee */}
+                        <div className="flex items-center gap-1.5">
+                          <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium text-primary">
+                            {task.assignee.split(' ').map(n => n[0]).join('')}
+                          </div>
+                          <span className="text-xs text-muted-foreground">{task.assignee}</span>
+                        </div>
                       </div>
                     </div>
-                  )}
-
-                  {/* Action buttons for errors */}
-                  {task.status === 'error' && (
-                    <div className="flex gap-2 mb-3">
-                      <button className="flex-1 px-3 py-1.5 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 transition-colors">
-                        Retry
-                      </button>
-                      <button className="px-3 py-1.5 bg-secondary text-foreground text-sm rounded-lg hover:bg-secondary/80 transition-colors">
-                        Dismiss
-                      </button>
-                    </div>
-                  )}
-
-                  {/* Action buttons for tasks requiring input */}
-                  {(task.status === 'waiting-input' || task.status === 'requesting-info') && (
-                    <div className="flex gap-2 mb-3">
-                      <button className="flex-1 px-3 py-1.5 bg-primary text-primary-foreground text-sm rounded-lg hover:bg-primary/90 transition-colors">
-                        {task.status === 'waiting-input' ? 'Start' : 'Respond'}
-                      </button>
-                      <button className="px-3 py-1.5 bg-secondary text-foreground text-sm rounded-lg hover:bg-secondary/80 transition-colors">
-                        Dismiss
-                      </button>
-                    </div>
-                  )}
-                  
-                  <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                    <div className="flex items-center gap-1.5">
-                      <Clock className="w-3 h-3" />
-                      <span>{getTimeAgo(task.updatedAt)}</span>
-                    </div>
-                    {task.completedAt && (
-                      <div className="flex items-center gap-1.5">
-                        <CheckCircle2 className="w-3 h-3 text-green-600" />
-                        <span>Completed {getTimeAgo(task.completedAt)}</span>
-                      </div>
-                    )}
                   </div>
                 </div>
               ))}
+              
+              {todayTasks.length === 0 && (
+                <div className="p-8 text-center">
+                  <p className="text-muted-foreground">No tasks due today</p>
+                </div>
+              )}
             </div>
           </div>
         </div>

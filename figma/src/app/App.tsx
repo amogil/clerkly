@@ -12,7 +12,7 @@ import { parseCommand } from './utils/command-parser';
 
 export default function App() {
   // Show auth demo by default
-  const [showAuthDemo] = useState(true);
+  const [showAuthDemo, setShowAuthDemo] = useState(false);
   
   const [currentScreen, setCurrentScreen] = useState<string>('dashboard');
   const [selectedMeetingId, setSelectedMeetingId] = useState<string | null>(null);
@@ -30,6 +30,10 @@ export default function App() {
 
   const handleNavigateToCalendar = () => {
     setCurrentScreen('calendar');
+  };
+
+  const handleSignOut = () => {
+    setShowAuthDemo(true);
   };
 
   const handleCommand = (command: string) => {
@@ -65,7 +69,7 @@ export default function App() {
 
   // Show auth demo
   if (showAuthDemo) {
-    return <AuthDemo />;
+    return <AuthDemo onLoginSuccess={() => setShowAuthDemo(false)} />;
   }
 
   const renderScreen = () => {
@@ -91,7 +95,7 @@ export default function App() {
       case 'contacts':
         return <Contacts triggerAction={triggerAction} />;
       case 'settings':
-        return <Settings />;
+        return <Settings onSignOut={handleSignOut} />;
       default:
         return (
           <DashboardUpdated

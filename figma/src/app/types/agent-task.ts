@@ -1,9 +1,9 @@
 export type AgentTaskStatus = 
-  | 'waiting-input'      // Waiting for user input
-  | 'requesting-info'    // Agent is requesting information from user
-  | 'working'            // Agent is working
-  | 'completed'          // Agent finished work
-  | 'error';             // Error occurred
+  | 'new'                // New chat (light blue)
+  | 'in-progress'        // Agent is working (blue with spinner)
+  | 'awaiting-user'      // Awaiting user response (yellow)
+  | 'error'              // Error occurred (red)
+  | 'completed';         // Agent finished work (green)
 
 export interface AgentTask {
   id: string;
@@ -14,5 +14,5 @@ export interface AgentTask {
   updatedAt: Date;
   completedAt?: Date;
   errorMessage?: string;
-  progress?: number; // 0-100 for working tasks
+  progress?: number; // 0-100 for in-progress tasks
 }

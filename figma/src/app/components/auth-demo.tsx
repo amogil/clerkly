@@ -4,7 +4,11 @@ import { LoginError } from './login-error';
 
 type AuthState = 'login' | 'error';
 
-export function AuthDemo() {
+interface AuthDemoProps {
+  onLoginSuccess: () => void;
+}
+
+export function AuthDemo({ onLoginSuccess }: AuthDemoProps) {
   const [authState, setAuthState] = useState<AuthState>('login');
 
   // Demo controls
@@ -16,9 +20,8 @@ export function AuthDemo() {
     if (random > 0.7) {
       setAuthState('error');
     } else {
-      // In real app, would navigate to dashboard
-      alert('Login successful! Would navigate to dashboard.');
-      // Keep on login screen for demo purposes
+      // Navigate to dashboard on successful login
+      onLoginSuccess();
     }
   };
 

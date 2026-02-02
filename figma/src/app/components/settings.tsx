@@ -1,7 +1,11 @@
 import { Calendar, CheckCircle2, Bell, User, Shield, Globe, Mic, FileText, Save, MessageSquare, LogOut, Clock, Cpu } from 'lucide-react';
 import { useState } from 'react';
 
-export function Settings() {
+interface SettingsProps {
+  onSignOut?: () => void;
+}
+
+export function Settings({ onSignOut }: SettingsProps) {
   const [autoJoinMeetings, setAutoJoinMeetings] = useState(true);
   const [autoTranscribe, setAutoTranscribe] = useState(true);
   const [autoCreateTasks, setAutoCreateTasks] = useState(true);
@@ -50,6 +54,9 @@ export function Settings() {
                   onClick={() => {
                     // Handle logout
                     console.log('Logging out...');
+                    if (onSignOut) {
+                      onSignOut();
+                    }
                   }}
                   className="flex items-center gap-2 text-sm text-red-600 hover:underline"
                 >
@@ -322,7 +329,7 @@ export function Settings() {
                           </button>
                         </>
                       ) : (
-                        <button className="text-sm px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors">
+                        <button className="text-sm px-4 py-2.5 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors">
                           Connect
                         </button>
                       )}
@@ -376,7 +383,7 @@ export function Settings() {
               </div>
 
               <div className="pt-4 border-t border-border">
-                <button className="text-sm px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors">
+                <button className="text-sm px-4 py-2.5 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors">
                   Test Connection
                 </button>
               </div>

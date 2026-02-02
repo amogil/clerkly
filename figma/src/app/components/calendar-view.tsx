@@ -1,5 +1,5 @@
 import { StatusBadge } from './status-badge';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, Users, PlayCircle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, Users, PlayCircle, Play } from 'lucide-react';
 import { useState } from 'react';
 
 interface CalendarViewProps {
@@ -17,14 +17,16 @@ export function CalendarView({ onNavigateToMeeting }: CalendarViewProps) {
       id: '1',
       date: '2026-01-28',
       title: 'Sprint Planning',
+      description: 'Plan upcoming sprint tasks and estimate story points with engineering team',
       time: '10:00 AM - 11:00 AM',
       duration: '60 min',
       participants: ['David Lee', 'Emma Wilson', 'Chris Brown', 'Lisa Park'],
-      status: 'completed' as const,
+      status: 'recorded' as const,
     },
     {
       id: '2',
       title: 'Product Roadmap Review',
+      description: 'Review Q2 roadmap priorities and discuss feature timelines with product team',
       date: '2026-01-28',
       time: '2:30 PM - 3:15 PM',
       duration: '45 min',
@@ -34,6 +36,7 @@ export function CalendarView({ onNavigateToMeeting }: CalendarViewProps) {
     {
       id: '3',
       title: 'Client Demo Call',
+      description: 'Product demo presentation and Q&A session with prospective client',
       date: '2026-01-28',
       time: '4:00 PM - 4:30 PM',
       duration: '30 min',
@@ -43,6 +46,7 @@ export function CalendarView({ onNavigateToMeeting }: CalendarViewProps) {
     {
       id: '4',
       title: 'Design Review',
+      description: 'Review new UI designs and discuss implementation approach',
       date: '2026-01-29',
       time: '11:00 AM - 12:00 PM',
       duration: '60 min',
@@ -52,24 +56,27 @@ export function CalendarView({ onNavigateToMeeting }: CalendarViewProps) {
     {
       id: '5',
       title: 'Weekly Team Sync',
+      description: 'Weekly check-in on project progress and blockers',
       date: '2026-01-27',
       time: '9:00 AM - 9:45 AM',
       duration: '45 min',
       participants: ['Sarah Chen', 'David Lee', 'Emma Wilson', 'Mike Johnson', 'Alex Rivera'],
-      status: 'completed' as const,
+      status: 'recorded' as const,
     },
     {
       id: '6',
       title: 'Engineering Review',
+      description: 'Technical architecture review and code quality discussion',
       date: '2026-01-27',
       time: '2:00 PM - 3:00 PM',
       duration: '60 min',
       participants: ['Alex Rivera', 'Chris Brown', 'Lisa Park'],
-      status: 'completed' as const,
+      status: 'recorded' as const,
     },
     {
       id: '7',
       title: '1:1 with Sarah',
+      description: 'One-on-one catch up on career development and goals',
       date: '2026-01-30',
       time: '2:00 PM - 2:30 PM',
       duration: '30 min',
@@ -239,35 +246,63 @@ export function CalendarView({ onNavigateToMeeting }: CalendarViewProps) {
                     className="p-4 bg-secondary/50 rounded-lg hover:bg-secondary transition-colors cursor-pointer"
                     onClick={() => onNavigateToMeeting(meeting.id)}
                   >
-                    <div className="flex items-start justify-between mb-2">
-                      <h4 className="font-medium text-foreground text-sm">{meeting.title}</h4>
-                      <StatusBadge status={meeting.status} size="sm" />
-                    </div>
-                    
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
-                      <Clock className="w-3 h-3" />
-                      <span>{meeting.time}</span>
-                    </div>
+                    <h4 className="font-semibold text-foreground mb-1">{meeting.title}</h4>
+                    <p className="text-sm text-muted-foreground mb-3">
+                      {meeting.description}
+                    </p>
 
-                    <div className="flex items-center gap-1.5">
-                      <Users className="w-3 h-3 text-muted-foreground" />
-                      <span className="text-xs text-muted-foreground">
-                        {meeting.participants.length} participant{meeting.participants.length > 1 ? 's' : ''}
-                      </span>
-                    </div>
-
-                    {meeting.status === 'upcoming' && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          console.log('Start recording:', meeting.id);
-                        }}
-                        className="w-full mt-3 flex items-center justify-center gap-2 px-3 py-1.5 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors text-xs"
-                      >
-                        <PlayCircle className="w-3 h-3" />
-                        <span>Join & Record</span>
-                      </button>
+                    {/* Action button */}
+                    {meeting.status === 'upcoming' ? (
+                      <div className="flex gap-2 mb-3">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            console.log('Start recording:', meeting.id);
+                          }}
+                          className="flex-1 px-4 py-2.5 bg-primary text-primary-foreground text-sm rounded-lg hover:bg-primary/90 transition-colors flex items-center justify-center gap-2"
+                        >
+                          <PlayCircle className="w-4 h-4" />
+                          <span>Join</span>
+                        </button>
+                        <div className="flex-1"></div>
+                      </div>
+                    ) : meeting.status === 'recorded' && (
+                      <div className="flex gap-2 mb-3">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onNavigateToMeeting(meeting.id);
+                          }}
+                          className="flex-1 px-4 py-2.5 bg-secondary text-foreground text-sm rounded-lg hover:bg-secondary/80 transition-colors border border-border flex items-center justify-center gap-2"
+                        >
+                          <Play className="w-4 h-4" />
+                          <span>Open Recording</span>
+                        </button>
+                        <div className="flex-1"></div>
+                      </div>
                     )}
+                    
+                    <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Clock className="w-4 h-4" />
+                        {meeting.time}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {meeting.participants.slice(0, 3).map((participant, idx) => (
+                          <div
+                            key={idx}
+                            className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium text-primary"
+                          >
+                            {participant.split(' ').map(n => n[0]).join('')}
+                          </div>
+                        ))}
+                        {meeting.participants.length > 3 && (
+                          <span className="text-xs text-muted-foreground">
+                            +{meeting.participants.length - 3}
+                          </span>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>

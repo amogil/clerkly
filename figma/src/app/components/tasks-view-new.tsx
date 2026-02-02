@@ -187,7 +187,7 @@ export function TasksViewNew({ triggerAction }: TasksViewNewProps) {
       <div className="w-80 border-r border-border bg-card overflow-y-auto">
         <div className="p-6 border-b border-border">
           <h2 className="text-lg font-semibold text-foreground mb-4">Projects</h2>
-          <button className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors">
+          <button className="flex items-center justify-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors">
             <Plus className="w-4 h-4" />
             <span>New Project</span>
           </button>
@@ -491,7 +491,7 @@ export function TasksViewNew({ triggerAction }: TasksViewNewProps) {
             <div className="p-6 border-t border-border flex items-center justify-end gap-3">
               <button
                 onClick={() => setShowNewTaskModal(false)}
-                className="px-4 py-2 bg-secondary text-foreground rounded-lg hover:bg-secondary/80 transition-colors"
+                className="min-w-[120px] px-4 py-2.5 bg-secondary text-foreground rounded-lg hover:bg-secondary/80 transition-colors"
               >
                 Cancel
               </button>
@@ -500,7 +500,7 @@ export function TasksViewNew({ triggerAction }: TasksViewNewProps) {
                   // Handle task creation
                   setShowNewTaskModal(false);
                 }}
-                className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
+                className="min-w-[120px] px-4 py-2.5 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
               >
                 Create Task
               </button>
