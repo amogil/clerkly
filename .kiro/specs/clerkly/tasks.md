@@ -27,7 +27,7 @@
 
 **Статус выполнения:**
 - ✅ Задачи 1-8: Завершены (настройка проекта, Data Manager, Main Process, Renderer Process, интеграция)
-- ⏳ Задача 9: В процессе (функциональные тесты - опциональные, помечены `*`)
+- ⏳ Задача 9: Не начата (функциональные тесты интеграции)
 - ⏳ Задача 11: Не начата (сборка и упаковка)
 - ✅ Задачи 10, 12, 13: Завершены (checkpoints и валидация)
 
@@ -303,36 +303,36 @@
     - Добавить комментарии с требованиями
     - _Requirements: clerkly.1.2, clerkly.1.3, clerkly.2.9, clerkly.nfr.3.1, clerkly.nfr.3.2_
 
-- [ ] 9. Функциональные тесты интеграции (ОПЦИОНАЛЬНЫЕ - запускаются ТОЛЬКО при явной просьбе пользователя)
-  - [ ]* 9.1 Написать функциональный тест жизненного цикла приложения
+- [ ] 9. Функциональные тесты интеграции (запускаются ТОЛЬКО при явной просьбе пользователя)
+  - [ ] 9.1 Написать функциональный тест жизненного цикла приложения
     - Тест запуска приложения → создание окна → инициализация хранилища → запуск миграций
     - Тест закрытия окна → корректное завершение → сохранение данных
     - Проверка, что все компоненты корректно инициализированы и завершены
     - Тест должен иметь структурированный комментарий (Preconditions, Action, Assertions, Requirements)
     - _Requirements: clerkly.2.2, clerkly.2.4, clerkly.2.8_
   
-  - [ ]* 9.2 Написать функциональный тест персистентности данных
+  - [ ] 9.2 Написать функциональный тест персистентности данных
     - Тест сохранения данных → перезапуск приложения → загрузка данных
     - Проверка, что данные сохраняются между запусками (SQLite файл персистентен)
     - Проверка, что все типы данных корректно сохраняются и загружаются
     - Тест должен иметь структурированный комментарий (Preconditions, Action, Assertions, Requirements)
     - _Requirements: clerkly.2.2, clerkly.2.4, clerkly.2.8_
   
-  - [ ]* 9.3 Написать функциональный тест IPC коммуникации
+  - [ ] 9.3 Написать функциональный тест IPC коммуникации
     - Тест Renderer process → IPC запрос через preload (window.api) → Main process → "Data Manager" → ответ
     - Тест обработки ошибок через IPC (невалидные параметры, timeout)
     - Проверка, что contextBridge корректно изолирует процессы
     - Тест должен иметь структурированный комментарий (Preconditions, Action, Assertions, Requirements)
     - _Requirements: clerkly.2.2, clerkly.2.4, clerkly.2.8_
   
-  - [ ]* 9.4 Написать функциональный тест системы миграций
+  - [ ] 9.4 Написать функциональный тест системы миграций
     - Тест первого запуска → создание схемы через миграции (001_initial_schema.sql)
     - Тест обновления схемы → запуск новых миграций (добавление новых файлов миграций)
     - Проверка, что schema_migrations таблица корректно отслеживает примененные миграции
     - Тест должен иметь структурированный комментарий (Preconditions, Action, Assertions, Requirements)
     - _Requirements: clerkly.2.2, clerkly.2.4, clerkly.2.8_
   
-  - [ ]* 9.5 Написать property-based тест для системы миграций
+  - [ ] 9.5 Написать property-based тест для системы миграций
     - **Property 5: Migration Idempotence**
     - Применять набор миграций, затем пытаться применить их снова
     - Проверять, что версия схемы и состояние базы данных не изменились
@@ -342,7 +342,7 @@
     - **Validates: Requirements clerkly.1.4, clerkly.nfr.2.1**
     - _Requirements: clerkly.1.4, clerkly.nfr.2.1, clerkly.2.6, clerkly.2.8, clerkly.nfr.4.4_
   
-  - [ ]* 9.6 Написать property-based тест для производительности запуска
+  - [ ] 9.6 Написать property-based тест для производительности запуска
     - **Property 7: Application Startup Performance**
     - Запускать приложение и измерять время от app.whenReady() до готовности окна
     - Проверять, что время запуска < 3000ms на современных Mac системах
@@ -352,7 +352,7 @@
     - **Validates: Requirements clerkly.nfr.1.1**
     - _Requirements: clerkly.nfr.1.1, clerkly.2.6, clerkly.2.8, clerkly.nfr.4.4_
   
-  - [ ]* 9.7 Написать property-based тест для производительности операций с данными
+  - [ ] 9.7 Написать property-based тест для производительности операций с данными
     - **Property 8: Data Operations Performance**
     - Генерировать случайные небольшие объекты данных (< 1KB)
     - Выполнять операции saveData, loadData, deleteData и измерять время
@@ -362,7 +362,7 @@
     - **Validates: Requirements clerkly.nfr.1.4**
     - _Requirements: clerkly.nfr.1.4, clerkly.2.6, clerkly.2.8, clerkly.nfr.4.4_
   
-  - [ ]* 9.8 Написать property-based тест для персистентности данных при завершении
+  - [ ] 9.8 Написать property-based тест для персистентности данных при завершении
     - **Property 9: Graceful Shutdown Data Persistence**
     - Запускать приложение, сохранять случайные данные, корректно завершать через handleQuit(), перезапускать
     - Проверять, что все данные доступны после перезапуска и эквивалентны сохраненным (deep equality)
@@ -372,7 +372,7 @@
     - **Validates: Requirements clerkly.nfr.2.2**
     - _Requirements: clerkly.nfr.2.2, clerkly.2.6, clerkly.2.8, clerkly.nfr.4.4_
   
-  - [ ]* 9.9 Написать property-based тест для восстановления поврежденной базы данных
+  - [ ] 9.9 Написать property-based тест для восстановления поврежденной базы данных
     - **Property 10: Database Corruption Recovery**
     - Создавать поврежденную базу данных (невалидный SQLite файл)
     - Запускать инициализацию "Data Manager"
@@ -446,14 +446,14 @@
     - Проверить покрытие всех 10 свойств:
       - ✅ Property 1: Data Storage Round-Trip (обязательный)
       - ✅ Property 2: Invalid Key Rejection (обязательный)
-      - ✅ Property 3: State Immutability (обязательный)
-      - ✅ Property 4: IPC Timeout Enforcement (обязательный)
-      - ⏳ Property 5: Migration Idempotence (опциональный)
-      - ✅ Property 6: Performance Threshold Monitoring (обязательный)
-      - ⏳ Property 7: Application Startup Performance (опциональный)
-      - ⏳ Property 8: Data Operations Performance (опциональный)
-      - ⏳ Property 9: Graceful Shutdown Data Persistence (опциональный)
-      - ⏳ Property 10: Database Corruption Recovery (опциональный)
+      - ✅ Property 3: State Immutability
+      - ✅ Property 4: IPC Timeout Enforcement
+      - ⏳ Property 5: Migration Idempotence (задача 9.5)
+      - ✅ Property 6: Performance Threshold Monitoring
+      - ⏳ Property 7: Application Startup Performance (задача 9.6)
+      - ⏳ Property 8: Data Operations Performance (задача 9.7)
+      - ⏳ Property 9: Graceful Shutdown Data Persistence (задача 9.8)
+      - ⏳ Property 10: Database Corruption Recovery (задача 9.9)
     - _Requirements: clerkly.2.6, clerkly.nfr.4.4_
 
 - [x] 13. Финальный checkpoint - Завершение реализации
@@ -469,7 +469,6 @@
 
 ## Примечания
 
-- Задачи, помеченные `*`, являются опциональными и могут быть пропущены для более быстрого MVP
 - Каждая задача ссылается на конкретные требования для прослеживаемости (формат: _Requirements: clerkly.1.4, clerkly.2.7_)
 - Checkpoints обеспечивают инкрементальную валидацию на каждом этапе
 - Property-based тесты валидируют универсальные свойства корректности (Property 1-10)
@@ -496,7 +495,7 @@
    - Минимум 100 итераций на каждый property тест (numRuns: 100)
    - Каждый property тест ДОЛЖЕН иметь тег в комментарии: `// Feature: clerkly, Property N: {property_text}`
    - Использовать fast-check для генерации тестовых данных
-   - Все 10 свойств корректности ДОЛЖНЫ быть реализованы (6 обязательных + 4 опциональных)
+   - Все 10 свойств корректности ДОЛЖНЫ быть реализованы
 
 4. **Покрытие кода (Requirements clerkly.2.7):**
    - Минимум 80% покрытие для бизнес-логики
@@ -592,15 +591,14 @@ test('Property 1: saving then loading data returns equivalent value', async () =
 | clerkly.nfr.4.4 | - | ✓ | - |
 
 **Легенда:**
-- ✓ - Требование покрыто данным типом тестов (обязательные тесты)
-- ✓* - Требование покрыто данным типом тестов (опциональные тесты, помечены `*` в задачах)
+- ✓ - Требование покрыто данным типом тестов
 - \- - Требование не покрыто данным типом тестов
 
 **Примечания:**
 - Все функциональные требования (clerkly.1.x, clerkly.2.x) покрыты соответствующими типами тестов
 - Все нефункциональные требования (clerkly.nfr.x.x) покрыты соответствующими типами тестов
 - Property-based тесты фокусируются на универсальных свойствах корректности (Property 1-10)
-- Функциональные тесты проверяют интеграцию между компонентами (опциональные, помечены `*`)
+- Функциональные тесты проверяют интеграцию между компонентами
 - Модульные тесты покрывают конкретные примеры, граничные случаи и обработку ошибок
 
 
@@ -635,16 +633,14 @@ test('Property 1: saving then loading data returns equivalent value', async () =
 | Property 2: Invalid Key Rejection | Data Manager | ✅ | clerkly.1.4, clerkly.2.3, clerkly.2.6 |
 | Property 3: State Immutability | State Controller | ✅ | clerkly.1.3, clerkly.2.6 |
 | Property 4: IPC Timeout Enforcement | IPC Handlers | ✅ | clerkly.1.4, clerkly.nfr.2.3 |
-| Property 5: Migration Idempotence | Migration Runner | ⏳ Опциональный | clerkly.1.4, clerkly.nfr.2.1 |
+| Property 5: Migration Idempotence | Migration Runner | ⏳ | clerkly.1.4, clerkly.nfr.2.1 |
 | Property 6: Performance Monitoring | UI Controller | ✅ | clerkly.nfr.1.2, clerkly.nfr.1.3 |
-| Property 7: Startup Performance | Lifecycle Manager | ⏳ Опциональный | clerkly.nfr.1.1 |
-| Property 8: Data Operations Performance | Data Manager | ⏳ Опциональный | clerkly.nfr.1.4 |
-| Property 9: Graceful Shutdown | Lifecycle Manager | ⏳ Опциональный | clerkly.nfr.2.2 |
-| Property 10: Database Corruption Recovery | Data Manager | ⏳ Опциональный | clerkly.nfr.2.4 |
+| Property 7: Startup Performance | Lifecycle Manager | ⏳ | clerkly.nfr.1.1 |
+| Property 8: Data Operations Performance | Data Manager | ⏳ | clerkly.nfr.1.4 |
+| Property 9: Graceful Shutdown | Lifecycle Manager | ⏳ | clerkly.nfr.2.2 |
+| Property 10: Database Corruption Recovery | Data Manager | ⏳ | clerkly.nfr.2.4 |
 
 ### Функциональные тесты (Integration Tests)
-
-**Статус: Опциональные (помечены `*`)**
 
 - ⏳ Application Lifecycle Integration - запуск, инициализация, завершение
 - ⏳ Data Persistence Integration - сохранение между перезапусками
@@ -676,24 +672,24 @@ test('Property 1: saving then loading data returns equivalent value', async () =
 - ✅ clerkly.1.4 (SQLite хранение) - Модульные + Property тесты Data Manager, IPC Handlers
 - ✅ clerkly.1.5 (TypeScript) - Все тесты используют TypeScript
 - ✅ clerkly.2.1 (Модульные тесты) - Все компоненты покрыты
-- ⏳ clerkly.2.2 (Функциональные тесты) - Опциональные тесты интеграции
+- ⏳ clerkly.2.2 (Функциональные тесты) - Тесты интеграции (задача 9)
 - ✅ clerkly.2.3 (Edge cases) - Модульные тесты граничных условий
-- ⏳ clerkly.2.4 (Интеграция) - Опциональные функциональные тесты
+- ⏳ clerkly.2.4 (Интеграция) - Функциональные тесты (задача 9)
 - ✅ clerkly.2.5 (Автоматизация) - npm test, npm run validate
-- ✅ clerkly.2.6 (Property-based) - 6 обязательных + 4 опциональных property теста
+- ✅ clerkly.2.6 (Property-based) - Все 10 property тестов (Property 1-10)
 - ✅ clerkly.2.7 (Покрытие 80%+) - 95%+ общее покрытие
 - ✅ clerkly.2.8 (Структурированные комментарии) - Все тесты имеют Preconditions/Action/Assertions/Requirements
 - ✅ clerkly.2.9 (Комментарии с требованиями) - Весь код имеет // Requirements: ...
 
 **Нефункциональные требования:**
-- ⏳ clerkly.nfr.1.1 (Запуск < 3с) - Property 7 (опциональный)
+- ⏳ clerkly.nfr.1.1 (Запуск < 3с) - Property 7 (задача 9.6)
 - ✅ clerkly.nfr.1.2 (UI < 100ms) - Property 6, модульные тесты UI Controller
 - ✅ clerkly.nfr.1.3 (Индикаторы > 200ms) - Property 6, модульные тесты UI Controller
-- ⏳ clerkly.nfr.1.4 (Данные < 50ms) - Property 8 (опциональный)
-- ⏳ clerkly.nfr.2.1 (Ошибки инициализации) - Property 5 (опциональный), модульные тесты
-- ⏳ clerkly.nfr.2.2 (Graceful shutdown) - Property 9 (опциональный)
+- ⏳ clerkly.nfr.1.4 (Данные < 50ms) - Property 8 (задача 9.7)
+- ⏳ clerkly.nfr.2.1 (Ошибки инициализации) - Property 5 (задача 9.5), модульные тесты
+- ⏳ clerkly.nfr.2.2 (Graceful shutdown) - Property 9 (задача 9.8)
 - ✅ clerkly.nfr.2.3 (IPC таймауты) - Property 4, модульные тесты IPC Handlers
-- ⏳ clerkly.nfr.2.4 (Backup при повреждении) - Property 10 (опциональный), модульные тесты
+- ⏳ clerkly.nfr.2.4 (Backup при повреждении) - Property 10 (задача 9.9), модульные тесты
 - ✅ clerkly.nfr.3.1 (Mac OS X 10.13+) - Модульные тесты, ручное тестирование
 - ✅ clerkly.nfr.3.2 (Нативный интерфейс) - Модульные тесты Window Manager
 - ✅ clerkly.nfr.3.3 (Mac конвенции) - Модульные тесты Lifecycle Manager
@@ -704,20 +700,20 @@ test('Property 1: saving then loading data returns equivalent value', async () =
 
 ## Следующие шаги
 
-### Для завершения MVP (минимальные требования выполнены):
+### Для завершения реализации:
 
-1. ✅ Все обязательные модульные тесты завершены
-2. ✅ Все обязательные property-based тесты завершены (Property 1-4, 6)
+1. ⏳ Все функциональные тесты завершены (задачи 9.1-9.4)
+2. ⏳ Все property-based тесты завершены (Property 5, 7-10 - задачи 9.5-9.9)
 3. ✅ Покрытие кода превышает требования (95%+ vs 80% требуемых)
 4. ✅ Все тесты имеют структурированные комментарии
 5. ✅ Весь код имеет комментарии с требованиями
 6. ⏳ Задача 11: Настройка сборки и упаковки (осталось)
 
-### Для полного покрытия (опциональные тесты):
+### Для завершения реализации:
 
 1. ⏳ Функциональные тесты интеграции (задача 9.1-9.4)
-2. ⏳ Property-based тесты производительности (Property 5, 7, 8, 9, 10)
-3. ⏳ Ручное тестирование на разных версиях Mac OS X
+2. ⏳ Property-based тесты производительности (Property 5, 7, 8, 9, 10 - задачи 9.5-9.9)
+3. ⏳ Настройка сборки и упаковки (задача 11)
 
 ### Команды для проверки:
 
@@ -737,9 +733,10 @@ npm run test:functional
 
 ## Критерии готовности к релизу
 
-### Обязательные критерии (MVP):
+### Обязательные критерии:
 - ✅ Все модульные тесты проходят
-- ✅ Все обязательные property-based тесты проходят (Property 1-4, 6)
+- ✅ Property-based тесты 1-4, 6 проходят
+- ⏳ Property-based тесты 5, 7-10 проходят (задачи 9.5-9.9)
 - ✅ Покрытие кода >= 80% для бизнес-логики
 - ✅ Покрытие кода = 100% для критических компонентов
 - ✅ Все тесты имеют структурированные комментарии
@@ -747,12 +744,7 @@ npm run test:functional
 - ✅ TypeScript компилируется без ошибок
 - ✅ ESLint проходит без замечаний
 - ✅ Prettier форматирование корректно
+- ⏳ Все функциональные тесты проходят (задачи 9.1-9.4)
 - ⏳ Приложение собирается и запускается на Mac OS X (задача 11)
 
-### Дополнительные критерии (полная версия):
-- ⏳ Все функциональные тесты проходят
-- ⏳ Все 10 property-based тестов реализованы
-- ⏳ Ручное тестирование на Mac OS X 10.13+
-- ⏳ Performance тесты подтверждают соответствие NFR
-
-**Текущий статус:** MVP практически готов, осталась только задача 11 (сборка и упаковка)
+**Текущий статус:** Осталось выполнить задачи 9 (функциональные и property-based тесты) и 11 (сборка и упаковка)
