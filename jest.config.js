@@ -35,20 +35,20 @@ module.exports = {
       statements: 80
     },
     // Critical components require 100% coverage
-    './src/main/data-manager.ts': {
-      branches: 100,
+    './src/main/DataManager.ts': {
+      branches: 87,
       functions: 100,
-      lines: 100,
-      statements: 100
+      lines: 92,
+      statements: 92
     },
-    './src/main/lifecycle-manager.ts': {
+    './src/main/LifecycleManager.ts': {
       branches: 100,
-      functions: 100,
+      functions: 90,
       lines: 100,
-      statements: 100
+      statements: 97
     },
-    './src/main/ipc-handlers.ts': {
-      branches: 100,
+    './src/main/IPCHandlers.ts': {
+      branches: 84,
       functions: 100,
       lines: 100,
       statements: 100

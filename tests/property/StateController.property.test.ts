@@ -26,22 +26,36 @@ describe('Property Tests - State Controller', () => {
     const safeKeyFilter = (key: string) =>
       key !== '__proto__' && key !== 'constructor' && key !== 'prototype';
 
+    // Recursively filter special properties from nested objects
+    const filterSpecialProps = (obj: any): any => {
+      if (obj === null || typeof obj !== 'object') {
+        return obj;
+      }
+
+      if (Array.isArray(obj)) {
+        return obj.map((item) => filterSpecialProps(item));
+      }
+
+      const filtered: Record<string, any> = {};
+      for (const key in obj) {
+        if (Object.prototype.hasOwnProperty.call(obj, key) && safeKeyFilter(key)) {
+          filtered[key] = filterSpecialProps(obj[key]);
+        }
+      }
+      return filtered;
+    };
+
     const stateArbitrary = fc
       .dictionary(fc.string({ minLength: 1, maxLength: 50 }), jsonSafeValue, {
         minKeys: 1,
         maxKeys: 20,
       })
       .map((obj) => {
-        // Filter out special properties
-        const filtered: Record<string, any> = {};
-        for (const key in obj) {
-          if (safeKeyFilter(key)) {
-            filtered[key] = obj[key];
-          }
-        }
+        // Filter out special properties recursively
+        const filtered = filterSpecialProps(obj);
         // Ensure at least one property remains
         if (Object.keys(filtered).length === 0) {
-          filtered['safeKey'] = 'value';
+          return { safeKey: 'value' };
         }
         return filtered;
       });
