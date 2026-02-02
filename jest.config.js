@@ -14,7 +14,8 @@ module.exports = {
       {
         tsconfig: {
           esModuleInterop: true,
-          allowSyntheticDefaultImports: true
+          allowSyntheticDefaultImports: true,
+          lib: ['ES2020', 'DOM']
         }
       }
     ]
