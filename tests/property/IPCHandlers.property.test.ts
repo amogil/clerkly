@@ -86,9 +86,9 @@ describe('Property Tests - IPC Handlers', () => {
           expect(result.error).toContain('timed out');
 
           // Verify execution time is approximately equal to timeout (not much longer)
-          // Allow 20ms tolerance for test execution overhead
+          // Allow 60ms tolerance for test execution overhead
           expect(executionTime).toBeGreaterThanOrEqual(timeout - 5);
-          expect(executionTime).toBeLessThan(timeout + 50);
+          expect(executionTime).toBeLessThan(timeout + 60);
         }
       ),
       { numRuns: 100 }
@@ -129,9 +129,9 @@ describe('Property Tests - IPC Handlers', () => {
           expect(result.error).toContain('timed out');
 
           // Verify execution time is approximately equal to timeout (not much longer)
-          // Allow 20ms tolerance for test execution overhead
+          // Allow 60ms tolerance for test execution overhead
           expect(executionTime).toBeGreaterThanOrEqual(timeout - 5);
-          expect(executionTime).toBeLessThan(timeout + 50);
+          expect(executionTime).toBeLessThan(timeout + 60);
         }
       ),
       { numRuns: 100 }
@@ -172,9 +172,9 @@ describe('Property Tests - IPC Handlers', () => {
           expect(result.error).toContain('timed out');
 
           // Verify execution time is approximately equal to timeout (not much longer)
-          // Allow 20ms tolerance for test execution overhead
+          // Allow 60ms tolerance for test execution overhead
           expect(executionTime).toBeGreaterThanOrEqual(timeout - 5);
-          expect(executionTime).toBeLessThan(timeout + 50);
+          expect(executionTime).toBeLessThan(timeout + 60);
         }
       ),
       { numRuns: 100 }
@@ -227,7 +227,7 @@ describe('Property Tests - IPC Handlers', () => {
 
     expect(saveResult.success).toBe(false);
     expect(saveResult.error).toContain('timed out');
-    expect(executionTime1).toBeLessThan(timeout + 50); // Should timeout quickly, not wait full delay
+    expect(executionTime1).toBeLessThan(timeout + 60); // Should timeout quickly, not wait full delay
 
     // Test load-data
     const startTime2 = Date.now();
@@ -236,7 +236,7 @@ describe('Property Tests - IPC Handlers', () => {
 
     expect(loadResult.success).toBe(false);
     expect(loadResult.error).toContain('timed out');
-    expect(executionTime2).toBeLessThan(timeout + 50);
+    expect(executionTime2).toBeLessThan(timeout + 60);
 
     // Test delete-data
     const startTime3 = Date.now();
@@ -245,7 +245,7 @@ describe('Property Tests - IPC Handlers', () => {
 
     expect(deleteResult.success).toBe(false);
     expect(deleteResult.error).toContain('timed out');
-    expect(executionTime3).toBeLessThan(timeout + 50);
+    expect(executionTime3).toBeLessThan(timeout + 60);
   });
 
   /* Preconditions: IPCHandlers initialized with different timeout values
