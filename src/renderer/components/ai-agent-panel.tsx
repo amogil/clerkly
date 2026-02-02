@@ -478,9 +478,9 @@ export function AIAgentPanel({ onCommand }: AIAgentPanelProps) {
     );
 
     return (
-      <div className="fixed right-0 top-8 bottom-0 w-1/3 bg-card border-l border-border flex flex-col">
+      <div className="fixed right-0 top-0 bottom-0 w-1/3 bg-card border-l border-border flex flex-col">
         {/* Header with back button */}
-        <div className="h-16 px-6 border-b border-border flex items-center gap-4 pt-2">
+        <div className="h-16 px-6 border-b border-border flex items-center gap-4">
           <button
             onClick={() => setShowAllTasksPage(false)}
             className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
@@ -582,9 +582,9 @@ export function AIAgentPanel({ onCommand }: AIAgentPanelProps) {
   const style = getStatusStyles(selectedTask.status);
 
   return (
-    <div className="fixed right-0 top-8 bottom-0 w-1/3 bg-card border-l border-border flex flex-col">
+    <div className="fixed right-0 top-0 bottom-0 w-1/3 bg-card border-l border-border flex flex-col">
       {/* Header - always shows task information */}
-      <div className="h-auto px-6 py-4 border-b border-border pt-6">
+      <div className="h-auto px-6 py-4 border-b border-border">
         <div className="flex items-start gap-3">
           {/* Task icon */}
           <div

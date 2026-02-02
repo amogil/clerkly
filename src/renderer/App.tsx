@@ -115,10 +115,10 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-background pt-8">
+    <div className="min-h-screen bg-background">
       <TopNavigation currentScreen={currentScreen} onNavigate={setCurrentScreen} />
       <AIAgentPanel onCommand={handleCommand} />
-      <div className="pt-24 pr-[33.333333%]">{renderScreen()}</div>
+      <div className="pt-16 pr-[33.333333%]">{renderScreen()}</div>
     </div>
   );
 }

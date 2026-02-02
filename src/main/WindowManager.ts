@@ -28,9 +28,7 @@ class WindowManager {
       const windowConfig: BrowserWindowConstructorOptions = {
         width: 1200,
         height: 800,
-        titleBarStyle: 'hiddenInset', // Native Mac OS X title bar style
-        vibrancy: 'under-window', // Mac OS X vibrancy effect
-        trafficLightPosition: { x: 20, y: 20 }, // Position of Mac OS X window controls
+        titleBarStyle: 'default', // Standard macOS title bar
         webPreferences: {
           preload: path.join(__dirname, '../preload/index.js'),
           contextIsolation: true,
