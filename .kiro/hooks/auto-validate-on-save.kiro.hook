@@ -1,0 +1,15 @@
+{
+  "enabled": true,
+  "name": "Auto Validate on Agent Stop",
+  "description": "Automatically runs `npm run validate` on Agent Stop",
+  "version": "1",
+  "when": {
+    "type": "agentStop"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Run `npm run validate`. Fix all problems. Do NOT run functional tests as they show windows and interrupt work."
+  },
+  "workspaceFolderName": "clerkly2",
+  "shortName": "auto-validate-on-save"
+}
