@@ -46,7 +46,7 @@ class WindowManager {
           responseHeaders: {
             ...details.responseHeaders,
             'Content-Security-Policy': [
-              "default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; script-src 'self' 'unsafe-inline' 'unsafe-eval'; img-src 'self' data: https:;",
+j              "default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; script-src 'self'; img-src 'self' data: https:;",
             ],
           },
         });
@@ -54,8 +54,7 @@ class WindowManager {
 
       // Load the renderer HTML file
       const htmlPath = path.join(__dirname, '../renderer/index.html');
-      const fileUrl = `file://${htmlPath}`;
-      this.mainWindow.loadURL(fileUrl).catch((error) => {
+      this.mainWindow.loadFile(htmlPath).catch((error) => {
         console.error('Failed to load HTML file:', error);
       });
 

@@ -61,14 +61,6 @@ app.whenReady().then(async () => {
     ipcHandlers.registerHandlers();
     console.log('[Main] IPC handlers registered');
 
-    // Requirements: clerkly.1.2, clerkly.1.3
-    // Create main window
-    const mainWindow = windowManager.createWindow();
-
-    // Load renderer HTML
-    const rendererPath = path.join(__dirname, '../renderer/index.html');
-    await mainWindow.loadFile(rendererPath);
-
     console.log('[Main] Main window created and loaded');
   } catch (error: any) {
     console.error('[Main] Startup error:', error.message);
@@ -87,11 +79,13 @@ app.on('activate', () => {
 // Handle window-all-closed event
 app.on('window-all-closed', () => {
   console.log('[Main] All windows closed');
-  lifecycleManager.handleWindowClose();
+  // Quit the app when all windows are closed (including macOS)
+  app.quit();
 });
 
 // Requirements: clerkly.1.2
 // Handle before-quit event
 app.on('before-quit', () => {
   console.log('[Main] Application quitting...');
+  lifecycleManager.handleWindowClose();
 });
