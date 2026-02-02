@@ -1,0 +1,15 @@
+{
+  "enabled": true,
+  "name": "Run Functional Tests",
+  "description": "Manually trigger functional tests (npm run test:functional). Warning: This will show application windows on screen and may interfere with your work.",
+  "version": "1",
+  "when": {
+    "type": "userTriggered"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Запусти функциональные тесты"
+  },
+  "workspaceFolderName": "clerkly2",
+  "shortName": "run-functional-tests"
+}
