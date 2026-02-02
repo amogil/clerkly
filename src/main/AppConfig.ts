@@ -1,5 +1,4 @@
-// Requirements: clerkly.1.2, clerkly.1.3
-
+// Requirements: clerkly.1
 /**
  * Window settings interface
  */

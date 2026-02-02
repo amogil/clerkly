@@ -1,4 +1,5 @@
-// Requirements: clerkly.1.2, clerkly.1.3, clerkly.nfr.1.1, clerkly.nfr.2.2
+// Requirements: clerkly.1, clerkly.nfr.1, clerkly.nfr.2
+
 import WindowManager from './WindowManager';
 import { DataManager } from './DataManager';
 
@@ -27,8 +28,7 @@ export class LifecycleManager {
   /**
    * Инициализирует приложение
    * Обеспечивает запуск менее чем за 3 секунды
-   * Requirements: clerkly.1.2, clerkly.1.3, clerkly.nfr.1.1
-   * @returns {Promise<InitializeResult>}
+   * Requirements: clerkly.1, clerkly.nfr.1   * @returns {Promise<InitializeResult>}
    */
   async initialize(): Promise<InitializeResult> {
     const startTime = Date.now();
@@ -63,8 +63,7 @@ export class LifecycleManager {
   /**
    * Обрабатывает активацию приложения (Mac OS X специфика)
    * Пересоздает окно при клике на dock icon
-   * Requirements: clerkly.1.2, clerkly.1.3, clerkly.nfr.3.3
-   */
+   * Requirements: clerkly.1, clerkly.nfr.3   */
   handleActivation(): void {
     try {
       // Mac OS X специфика: пересоздать окно при активации если оно закрыто
@@ -79,8 +78,7 @@ export class LifecycleManager {
   /**
    * Корректно завершает приложение
    * Сохраняет все данные перед выходом
-   * Requirements: clerkly.1.2, clerkly.1.3, clerkly.nfr.2.2
-   * @returns {Promise<void>}
+   * Requirements: clerkly.1, clerkly.nfr.2   * @returns {Promise<void>}
    */
   async handleQuit(): Promise<void> {
     try {
@@ -99,8 +97,7 @@ export class LifecycleManager {
 
   /**
    * Выполняет процедуру завершения приложения
-   * Requirements: clerkly.nfr.2.2
-   * @private
+   * Requirements: clerkly.nfr.2   * @private
    */
   private async performShutdown(): Promise<void> {
     // Закрываем окно
@@ -117,8 +114,7 @@ export class LifecycleManager {
   /**
    * Обрабатывает закрытие всех окон
    * Mac OS X: приложение остается активным
-   * Requirements: clerkly.1.2, clerkly.1.3, clerkly.nfr.3.3
-   */
+   * Requirements: clerkly.1, clerkly.nfr.3   */
   handleWindowClose(): void {
     // Mac OS X специфика: приложение остается активным при закрытии окна
     // Не завершаем приложение, только очищаем ссылку на окно
@@ -127,8 +123,7 @@ export class LifecycleManager {
 
   /**
    * Возвращает время запуска
-   * Requirements: clerkly.nfr.1.1
-   * @returns {number | null}
+   * Requirements: clerkly.nfr.1   * @returns {number | null}
    */
   getStartupTime(): number | null {
     return this.startTime;
@@ -136,8 +131,7 @@ export class LifecycleManager {
 
   /**
    * Проверяет, инициализировано ли приложение
-   * Requirements: clerkly.1.2, clerkly.1.3
-   * @returns {boolean}
+   * Requirements: clerkly.1   * @returns {boolean}
    */
   isAppInitialized(): boolean {
     return this.initialized;

@@ -2,7 +2,8 @@
  * @jest-environment jsdom
  */
 
-// Requirements: clerkly.nfr.1.2, clerkly.nfr.1.3, clerkly.2.6, clerkly.2.8
+// Requirements: clerkly.2, clerkly.nfr.1
+
 import * as fc from 'fast-check';
 import { UIController } from '../../src/renderer/UIController';
 
@@ -26,7 +27,7 @@ describe('Property Tests - UI Controller', () => {
   /* Preconditions: UIController initialized with container, performance threshold set to 100ms
      Action: execute render() operations with various simulated execution times (both < 100ms and > 100ms)
      Assertions: for all operations < 100ms, performanceWarning is false; for all operations > 100ms, performanceWarning is true
-     Requirements: clerkly.nfr.1.2, clerkly.nfr.1.3 */
+     Requirements: clerkly.nfr.1*/
   // Feature: clerkly, Property 6
   test('Property 6: Performance Threshold Monitoring - render() correctly sets performanceWarning based on execution time', () => {
     // Generate arbitrary execution times: mix of fast (<= 100ms) and slow (> 100ms)
@@ -75,7 +76,7 @@ describe('Property Tests - UI Controller', () => {
   /* Preconditions: UIController initialized with container, UI already rendered
      Action: execute updateView() operations with various simulated execution times (both < 100ms and > 100ms)
      Assertions: for all operations < 100ms, performanceWarning is false; for all operations > 100ms, performanceWarning is true
-     Requirements: clerkly.nfr.1.2, clerkly.nfr.1.3 */
+     Requirements: clerkly.nfr.1*/
   // Feature: clerkly, Property 6
   test('Property 6: Performance Threshold Monitoring - updateView() correctly sets performanceWarning based on execution time', () => {
     // Generate arbitrary execution times and data
@@ -136,7 +137,7 @@ describe('Property Tests - UI Controller', () => {
   /* Preconditions: UIController initialized with container
      Action: execute render() with execution time exactly at threshold boundary (100ms)
      Assertions: performanceWarning is false (threshold is exclusive, > 100ms)
-     Requirements: clerkly.nfr.1.2, clerkly.nfr.1.3 */
+     Requirements: clerkly.nfr.1*/
   // Feature: clerkly, Property 6
   test('Property 6 edge case: render() at exact threshold boundary (100ms) does not trigger warning', () => {
     const uiController = new UIController(container);
@@ -164,7 +165,7 @@ describe('Property Tests - UI Controller', () => {
   /* Preconditions: UIController initialized with container, UI rendered
      Action: execute updateView() with execution time exactly at threshold boundary (100ms)
      Assertions: performanceWarning is false (threshold is exclusive, > 100ms)
-     Requirements: clerkly.nfr.1.2, clerkly.nfr.1.3 */
+     Requirements: clerkly.nfr.1*/
   // Feature: clerkly, Property 6
   test('Property 6 edge case: updateView() at exact threshold boundary (100ms) does not trigger warning', () => {
     const uiController = new UIController(container);
@@ -193,7 +194,7 @@ describe('Property Tests - UI Controller', () => {
   /* Preconditions: UIController initialized with container
      Action: execute render() with very fast execution time (< 10ms)
      Assertions: performanceWarning is false, renderTime is accurate
-     Requirements: clerkly.nfr.1.2, clerkly.nfr.1.3 */
+     Requirements: clerkly.nfr.1*/
   // Feature: clerkly, Property 6
   test('Property 6 edge case: very fast render() operations (< 10ms) do not trigger warning', () => {
     const fastTimeArbitrary = fc.integer({ min: 0, max: 9 });
@@ -228,7 +229,7 @@ describe('Property Tests - UI Controller', () => {
   /* Preconditions: UIController initialized with container
      Action: execute render() with very slow execution time (> 1000ms)
      Assertions: performanceWarning is true, renderTime is accurate
-     Requirements: clerkly.nfr.1.2, clerkly.nfr.1.3 */
+     Requirements: clerkly.nfr.1*/
   // Feature: clerkly, Property 6
   test('Property 6 edge case: very slow render() operations (> 1000ms) trigger warning', () => {
     const slowTimeArbitrary = fc.integer({ min: 1000, max: 5000 });
@@ -263,7 +264,7 @@ describe('Property Tests - UI Controller', () => {
   /* Preconditions: UIController initialized with container, UI rendered
      Action: execute updateView() with very fast execution time (< 10ms)
      Assertions: performanceWarning is false, updateTime is accurate
-     Requirements: clerkly.nfr.1.2, clerkly.nfr.1.3 */
+     Requirements: clerkly.nfr.1*/
   // Feature: clerkly, Property 6
   test('Property 6 edge case: very fast updateView() operations (< 10ms) do not trigger warning', () => {
     const fastTimeArbitrary = fc.integer({ min: 0, max: 9 });
@@ -299,7 +300,7 @@ describe('Property Tests - UI Controller', () => {
   /* Preconditions: UIController initialized with container, UI rendered
      Action: execute updateView() with very slow execution time (> 1000ms)
      Assertions: performanceWarning is true, updateTime is accurate
-     Requirements: clerkly.nfr.1.2, clerkly.nfr.1.3 */
+     Requirements: clerkly.nfr.1*/
   // Feature: clerkly, Property 6
   test('Property 6 edge case: very slow updateView() operations (> 1000ms) trigger warning', () => {
     const slowTimeArbitrary = fc.integer({ min: 1000, max: 5000 });
@@ -335,7 +336,7 @@ describe('Property Tests - UI Controller', () => {
   /* Preconditions: UIController initialized with container
      Action: execute render() with execution time just at threshold (100ms)
      Assertions: performanceWarning is false (threshold is exclusive)
-     Requirements: clerkly.nfr.1.2, clerkly.nfr.1.3 */
+     Requirements: clerkly.nfr.1*/
   // Feature: clerkly, Property 6
   test('Property 6 edge case: render() at threshold (100ms) does not trigger warning', () => {
     const uiController = new UIController(container);
@@ -363,7 +364,7 @@ describe('Property Tests - UI Controller', () => {
   /* Preconditions: UIController initialized with container
      Action: execute render() with execution time just above threshold (101ms)
      Assertions: performanceWarning is true
-     Requirements: clerkly.nfr.1.2, clerkly.nfr.1.3 */
+     Requirements: clerkly.nfr.1*/
   // Feature: clerkly, Property 6
   test('Property 6 edge case: render() just above threshold (101ms) triggers warning', () => {
     const uiController = new UIController(container);
@@ -391,7 +392,7 @@ describe('Property Tests - UI Controller', () => {
   /* Preconditions: UIController initialized with container, UI rendered
      Action: execute updateView() with execution time just at threshold (100ms)
      Assertions: performanceWarning is false (threshold is exclusive)
-     Requirements: clerkly.nfr.1.2, clerkly.nfr.1.3 */
+     Requirements: clerkly.nfr.1*/
   // Feature: clerkly, Property 6
   test('Property 6 edge case: updateView() at threshold (100ms) does not trigger warning', () => {
     const uiController = new UIController(container);
@@ -420,7 +421,7 @@ describe('Property Tests - UI Controller', () => {
   /* Preconditions: UIController initialized with container, UI rendered
      Action: execute updateView() with execution time just above threshold (101ms)
      Assertions: performanceWarning is true
-     Requirements: clerkly.nfr.1.2, clerkly.nfr.1.3 */
+     Requirements: clerkly.nfr.1*/
   // Feature: clerkly, Property 6
   test('Property 6 edge case: updateView() just above threshold (101ms) triggers warning', () => {
     const uiController = new UIController(container);
@@ -449,7 +450,7 @@ describe('Property Tests - UI Controller', () => {
   /* Preconditions: UIController initialized with container
      Action: execute multiple render() operations with varying execution times
      Assertions: each operation independently sets performanceWarning correctly
-     Requirements: clerkly.nfr.1.2, clerkly.nfr.1.3 */
+     Requirements: clerkly.nfr.1*/
   // Feature: clerkly, Property 6
   test('Property 6: multiple operations independently monitor performance', () => {
     const executionTimesArbitrary = fc.array(fc.integer({ min: 0, max: 500 }), {
@@ -492,7 +493,7 @@ describe('Property Tests - UI Controller', () => {
   /* Preconditions: UIController initialized with container
      Action: execute render() that fails with error, measure time
      Assertions: performanceWarning still set correctly based on execution time even on failure
-     Requirements: clerkly.nfr.1.2, clerkly.nfr.1.3 */
+     Requirements: clerkly.nfr.1*/
   // Feature: clerkly, Property 6
   test('Property 6 edge case: performance monitoring works even when operation fails', () => {
     const executionTimeArbitrary = fc.oneof(
@@ -550,7 +551,7 @@ describe('Property Tests - UI Controller', () => {
   /* Preconditions: UIController initialized with container
      Action: execute render() with zero execution time
      Assertions: performanceWarning is false, renderTime is 0
-     Requirements: clerkly.nfr.1.2, clerkly.nfr.1.3 */
+     Requirements: clerkly.nfr.1*/
   // Feature: clerkly, Property 6
   test('Property 6 edge case: zero execution time does not trigger warning', () => {
     const uiController = new UIController(container);

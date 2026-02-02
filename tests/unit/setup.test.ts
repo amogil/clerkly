@@ -1,9 +1,8 @@
-// Requirements: clerkly.2.5
-
+// Requirements: clerkly.2, clerkly.nfr.4
 /* Preconditions: Jest test environment is configured
    Action: run a simple test to verify setup
    Assertions: test passes, confirming Jest is working correctly
-   Requirements: clerkly.2.5 */
+   Requirements: clerkly.2, clerkly.nfr.4*/
 describe('Test Setup', () => {
   it('should run tests successfully', () => {
     expect(true).toBe(true);

@@ -1,4 +1,5 @@
-// Requirements: clerkly.1.4, clerkly.nfr.2.1, clerkly.2.6, clerkly.2.8
+// Requirements: clerkly.1, clerkly.2, clerkly.nfr.2
+
 import * as fc from 'fast-check';
 import Database from 'better-sqlite3';
 import * as fs from 'fs';
@@ -56,7 +57,7 @@ describe('Property Tests - Migration Runner', () => {
   /* Preconditions: database is empty, random set of migration files created
      Action: apply migrations, record database state, attempt to apply migrations again
      Assertions: for all migration sets, version and database state unchanged after second application
-     Requirements: clerkly.1.4, clerkly.nfr.2.1, clerkly.2.6, clerkly.2.8 */
+     Requirements: clerkly.1, clerkly.2, clerkly.nfr.2*/
   // Feature: clerkly, Property 5
   test('Property 5: Migration Idempotence - applying migrations twice does not change database state', async () => {
     await fc.assert(
@@ -184,7 +185,7 @@ DROP TABLE test_table_${i};`;
   /* Preconditions: database is empty, no migration files exist
      Action: attempt to apply migrations twice
      Assertions: both applications return success with 0 applied count, database remains empty
-     Requirements: clerkly.1.4, clerkly.nfr.2.1, clerkly.2.6, clerkly.2.8 */
+     Requirements: clerkly.1, clerkly.2, clerkly.nfr.2*/
   // Feature: clerkly, Property 5
   test('Property 5 edge case: empty database with no migrations is idempotent', () => {
     // First application
@@ -214,7 +215,7 @@ DROP TABLE test_table_${i};`;
   /* Preconditions: database has partially applied migrations
      Action: add new migrations, apply all, attempt to apply again
      Assertions: only new migrations applied first time, no changes second time
-     Requirements: clerkly.1.4, clerkly.nfr.2.1, clerkly.2.6, clerkly.2.8 */
+     Requirements: clerkly.1, clerkly.2, clerkly.nfr.2*/
   // Feature: clerkly, Property 5
   test('Property 5 edge case: partially applied migrations remain idempotent', () => {
     // Create and apply first migration
@@ -275,7 +276,7 @@ DROP TABLE second_table;`
   /* Preconditions: all migrations already applied
      Action: attempt to apply migrations multiple times
      Assertions: all attempts return success with 0 applied count, database unchanged
-     Requirements: clerkly.1.4, clerkly.nfr.2.1, clerkly.2.6, clerkly.2.8 */
+     Requirements: clerkly.1, clerkly.2, clerkly.nfr.2*/
   // Feature: clerkly, Property 5
   test('Property 5 edge case: fully applied migrations remain idempotent across multiple attempts', () => {
     // Create migrations
@@ -331,7 +332,7 @@ DROP TABLE second_table;`
   /* Preconditions: migrations with complex schema changes (indexes, constraints)
      Action: apply migrations, verify schema, attempt to apply again
      Assertions: schema unchanged after second application, no errors
-     Requirements: clerkly.1.4, clerkly.nfr.2.1, clerkly.2.6, clerkly.2.8 */
+     Requirements: clerkly.1, clerkly.2, clerkly.nfr.2*/
   // Feature: clerkly, Property 5
   test('Property 5 edge case: complex migrations with indexes and constraints are idempotent', () => {
     // Create complex migration
@@ -415,7 +416,7 @@ DROP TABLE users;`
   /* Preconditions: migrations applied, then rolled back, then reapplied
      Action: apply, rollback, apply again, attempt to apply once more
      Assertions: final state matches first application, idempotent after reapplication
-     Requirements: clerkly.1.4, clerkly.nfr.2.1, clerkly.2.6, clerkly.2.8 */
+     Requirements: clerkly.1, clerkly.2, clerkly.nfr.2*/
   // Feature: clerkly, Property 5
   test('Property 5 edge case: migrations remain idempotent after rollback and reapplication', () => {
     // Create migration
@@ -470,7 +471,7 @@ DROP TABLE test_table;`
   /* Preconditions: migrations with data insertion
      Action: apply migrations with INSERT statements, verify data, attempt to apply again
      Assertions: data unchanged after second application, no duplicate inserts
-     Requirements: clerkly.1.4, clerkly.nfr.2.1, clerkly.2.6, clerkly.2.8 */
+     Requirements: clerkly.1, clerkly.2, clerkly.nfr.2*/
   // Feature: clerkly, Property 5
   test('Property 5 edge case: migrations with data insertion are idempotent', () => {
     // Create migration with data insertion
@@ -522,7 +523,7 @@ DROP TABLE config;`
   /* Preconditions: schema_migrations table manually corrupted
      Action: manually delete migration record, attempt to apply migrations
      Assertions: system detects and handles corruption gracefully
-     Requirements: clerkly.1.4, clerkly.nfr.2.1, clerkly.2.6, clerkly.2.8 */
+     Requirements: clerkly.1, clerkly.2, clerkly.nfr.2*/
   // Feature: clerkly, Property 5
   test('Property 5 edge case: system handles schema_migrations table corruption', () => {
     // Create and apply migration

@@ -1,4 +1,5 @@
-// Requirements: clerkly.1.4, clerkly.2.7
+// Requirements: clerkly.1, clerkly.2
+
 import Database from 'better-sqlite3';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -62,8 +63,7 @@ export class DataManager {
    * Запускает миграции базы данных
    * Обрабатывает ошибки прав доступа (fallback на temp directory)
    * Обрабатывает поврежденные базы данных (backup и пересоздание)
-   * Requirements: clerkly.1.4, clerkly.2.7
-   * @returns {InitializeResult}
+   * Requirements: clerkly.1, clerkly.2   * @returns {InitializeResult}
    */
   initialize(): InitializeResult {
     try {
@@ -143,8 +143,7 @@ export class DataManager {
    * Сериализует value в JSON
    * Проверяет размер (max 10MB)
    * Обрабатывает ошибки (SQLITE_FULL, SQLITE_BUSY, SQLITE_LOCKED, SQLITE_READONLY)
-   * Requirements: clerkly.1.4
-   * @param {string} key
+   * Requirements: clerkly.1   * @param {string} key
    * @param {any} value
    * @returns {SaveDataResult}
    */
@@ -215,8 +214,7 @@ export class DataManager {
    * Валидирует key
    * Десериализует JSON
    * Обрабатывает ошибки (SQLITE_BUSY, SQLITE_LOCKED)
-   * Requirements: clerkly.1.4
-   * @param {string} key
+   * Requirements: clerkly.1   * @param {string} key
    * @returns {LoadDataResult}
    */
   loadData(key: string): LoadDataResult {
@@ -273,8 +271,7 @@ export class DataManager {
    * Удаляет данные из локального хранилища
    * Валидирует key
    * Обрабатывает ошибки
-   * Requirements: clerkly.1.4
-   * @param {string} key
+   * Requirements: clerkly.1   * @param {string} key
    * @returns {DeleteDataResult}
    */
   deleteData(key: string): DeleteDataResult {
@@ -314,8 +311,7 @@ export class DataManager {
 
   /**
    * Возвращает путь к локальному хранилищу
-   * Requirements: clerkly.1.4
-   * @returns {string}
+   * Requirements: clerkly.1   * @returns {string}
    */
   getStoragePath(): string {
     return this.storagePath;
@@ -323,8 +319,7 @@ export class DataManager {
 
   /**
    * Закрывает соединение с базой данных
-   * Requirements: clerkly.1.4
-   */
+   * Requirements: clerkly.1   */
   close(): void {
     if (this.db && this.db.open) {
       this.db.close();
@@ -334,8 +329,7 @@ export class DataManager {
 
   /**
    * Возвращает экземпляр Migration Runner
-   * Requirements: clerkly.1.4
-   * @returns {MigrationRunner}
+   * Requirements: clerkly.1   * @returns {MigrationRunner}
    */
   getMigrationRunner(): MigrationRunner {
     if (!this.db) {

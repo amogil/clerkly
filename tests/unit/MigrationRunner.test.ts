@@ -1,4 +1,5 @@
-// Requirements: clerkly.2.1, clerkly.2.3, clerkly.2.8
+// Requirements: clerkly.2
+
 import Database from 'better-sqlite3';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -50,7 +51,7 @@ describe('MigrationRunner', () => {
     /* Preconditions: database is empty, no schema_migrations table exists
        Action: call initializeMigrationTable()
        Assertions: schema_migrations table is created with correct structure
-       Requirements: clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.2*/
     it('should create schema_migrations table', () => {
       migrationRunner.initializeMigrationTable();
 
@@ -75,7 +76,7 @@ describe('MigrationRunner', () => {
     /* Preconditions: schema_migrations table already exists
        Action: call initializeMigrationTable() again
        Assertions: no error thrown, table remains unchanged (idempotent)
-       Requirements: clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.2*/
     it('should be idempotent - calling multiple times does not cause errors', () => {
       migrationRunner.initializeMigrationTable();
 
@@ -97,7 +98,7 @@ describe('MigrationRunner', () => {
     /* Preconditions: database is empty, no migrations applied
        Action: call getCurrentVersion()
        Assertions: returns 0 (no migrations applied yet)
-       Requirements: clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.2*/
     it('should return 0 when no migrations have been applied', () => {
       const version = migrationRunner.getCurrentVersion();
       expect(version).toBe(0);
@@ -106,7 +107,7 @@ describe('MigrationRunner', () => {
     /* Preconditions: schema_migrations table has one migration record (version 1)
        Action: call getCurrentVersion()
        Assertions: returns 1 (highest version number)
-       Requirements: clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.2*/
     it('should return highest version number when migrations exist', () => {
       migrationRunner.initializeMigrationTable();
 
@@ -124,7 +125,7 @@ describe('MigrationRunner', () => {
     /* Preconditions: schema_migrations table has multiple migration records
        Action: call getCurrentVersion()
        Assertions: returns highest version number (3)
-       Requirements: clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.2*/
     it('should return highest version when multiple migrations exist', () => {
       migrationRunner.initializeMigrationTable();
 
@@ -154,7 +155,7 @@ describe('MigrationRunner', () => {
     /* Preconditions: database is empty, no migrations applied
        Action: call getAppliedMigrations()
        Assertions: returns empty array
-       Requirements: clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.2*/
     it('should return empty array when no migrations applied', () => {
       const applied = migrationRunner.getAppliedMigrations();
       expect(applied).toEqual([]);
@@ -163,7 +164,7 @@ describe('MigrationRunner', () => {
     /* Preconditions: schema_migrations table has multiple migration records
        Action: call getAppliedMigrations()
        Assertions: returns array of version numbers sorted in ascending order
-       Requirements: clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.2*/
     it('should return sorted array of applied migration versions', () => {
       migrationRunner.initializeMigrationTable();
 
@@ -193,7 +194,7 @@ describe('MigrationRunner', () => {
     /* Preconditions: migrations directory is empty
        Action: call loadMigrations()
        Assertions: returns empty array
-       Requirements: clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.2*/
     it('should return empty array when no migration files exist', () => {
       const migrations = migrationRunner.loadMigrations();
       expect(migrations).toEqual([]);
@@ -202,7 +203,7 @@ describe('MigrationRunner', () => {
     /* Preconditions: migrations directory does not exist
        Action: call loadMigrations()
        Assertions: returns empty array without throwing error
-       Requirements: clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.2*/
     it('should return empty array when migrations directory does not exist', () => {
       // Remove migrations directory
       fs.rmdirSync(testMigrationsPath);
@@ -214,7 +215,7 @@ describe('MigrationRunner', () => {
     /* Preconditions: migrations directory contains valid migration file
        Action: call loadMigrations()
        Assertions: returns array with one migration object containing version, name, up, down
-       Requirements: clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.2*/
     it('should load valid migration file', () => {
       // Create test migration file
       const migrationContent = `-- UP
@@ -242,7 +243,7 @@ DROP TABLE test_table;`;
     /* Preconditions: migrations directory contains multiple migration files
        Action: call loadMigrations()
        Assertions: returns array sorted by version in ascending order
-       Requirements: clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.2*/
     it('should load and sort multiple migration files by version', () => {
       // Create multiple migration files
       fs.writeFileSync(
@@ -269,7 +270,7 @@ DROP TABLE test_table;`;
     /* Preconditions: migrations directory contains file with invalid name format
        Action: call loadMigrations()
        Assertions: invalid file is skipped, warning logged, no error thrown
-       Requirements: clerkly.2.1, clerkly.2.3, clerkly.2.8 */
+       Requirements: clerkly.2*/
     it('should skip files with invalid naming format', () => {
       // Create valid and invalid migration files
       fs.writeFileSync(
@@ -291,7 +292,7 @@ DROP TABLE test_table;`;
     /* Preconditions: migrations directory contains .gitkeep file
        Action: call loadMigrations()
        Assertions: .gitkeep file is ignored, no error thrown
-       Requirements: clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.2*/
     it('should ignore .gitkeep files', () => {
       fs.writeFileSync(path.join(testMigrationsPath, '.gitkeep'), '');
       fs.writeFileSync(
@@ -308,7 +309,7 @@ DROP TABLE test_table;`;
     /* Preconditions: migrations directory contains migration file with empty UP section
        Action: call loadMigrations()
        Assertions: throws error indicating empty UP section
-       Requirements: clerkly.2.1, clerkly.2.3, clerkly.2.8 */
+       Requirements: clerkly.2*/
     it('should throw error for migration with empty UP section', () => {
       fs.writeFileSync(
         path.join(testMigrationsPath, '001_empty_up.sql'),
@@ -323,7 +324,7 @@ DROP TABLE test_table;`;
     /* Preconditions: migrations directory contains files with duplicate version numbers
        Action: call loadMigrations()
        Assertions: throws error indicating duplicate versions
-       Requirements: clerkly.2.1, clerkly.2.3, clerkly.2.8 */
+       Requirements: clerkly.2*/
     it('should throw error for duplicate migration versions', () => {
       fs.writeFileSync(
         path.join(testMigrationsPath, '001_first.sql'),
@@ -344,7 +345,7 @@ DROP TABLE test_table;`;
     /* Preconditions: database is empty, no migration files exist
        Action: call runMigrations()
        Assertions: returns success true, appliedCount 0, message "No migrations found"
-       Requirements: clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.2*/
     it('should return success with no migrations when directory is empty', () => {
       const result = migrationRunner.runMigrations();
 
@@ -356,7 +357,7 @@ DROP TABLE test_table;`;
     /* Preconditions: database is empty, one valid migration file exists
        Action: call runMigrations()
        Assertions: migration is applied, table created, schema_migrations updated, returns success true
-       Requirements: clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.2*/
     it('should apply single pending migration', () => {
       // Create migration file
       fs.writeFileSync(
@@ -391,7 +392,7 @@ DROP TABLE users;`
     /* Preconditions: database is empty, multiple migration files exist
        Action: call runMigrations()
        Assertions: all migrations applied in order, all tables created, returns success true
-       Requirements: clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.2*/
     it('should apply multiple pending migrations in order', () => {
       // Create multiple migration files
       fs.writeFileSync(
@@ -429,7 +430,7 @@ DROP TABLE users;`
     /* Preconditions: some migrations already applied, new migration files added
        Action: call runMigrations()
        Assertions: only new migrations applied, existing migrations skipped
-       Requirements: clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.2*/
     it('should only apply pending migrations, skip already applied', () => {
       // Create and apply first migration
       fs.writeFileSync(
@@ -458,7 +459,7 @@ DROP TABLE users;`
     /* Preconditions: all migrations already applied
        Action: call runMigrations()
        Assertions: returns success true, appliedCount 0, message "All migrations already applied"
-       Requirements: clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.2*/
     it('should return success when all migrations already applied', () => {
       // Create and apply migration
       fs.writeFileSync(
@@ -479,7 +480,7 @@ DROP TABLE users;`
     /* Preconditions: migration file contains invalid SQL
        Action: call runMigrations()
        Assertions: returns success false, error message contains migration name and SQL error
-       Requirements: clerkly.2.1, clerkly.2.3, clerkly.2.8 */
+       Requirements: clerkly.2*/
     it('should handle migration with invalid SQL', () => {
       fs.writeFileSync(
         path.join(testMigrationsPath, '001_invalid.sql'),
@@ -496,7 +497,7 @@ DROP TABLE users;`
     /* Preconditions: first migration succeeds, second migration fails
        Action: call runMigrations()
        Assertions: first migration applied, second fails, returns error, appliedCount 1
-       Requirements: clerkly.2.1, clerkly.2.3, clerkly.2.8 */
+       Requirements: clerkly.2*/
     it('should stop on first failed migration and report partial success', () => {
       fs.writeFileSync(
         path.join(testMigrationsPath, '001_valid.sql'),
@@ -522,7 +523,7 @@ DROP TABLE users;`
     /* Preconditions: no migrations applied
        Action: call rollbackLastMigration()
        Assertions: returns success false, error "No migrations to rollback"
-       Requirements: clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.2*/
     it('should return error when no migrations to rollback', () => {
       const result = migrationRunner.rollbackLastMigration();
 
@@ -533,7 +534,7 @@ DROP TABLE users;`
     /* Preconditions: one migration applied with valid DOWN section
        Action: call rollbackLastMigration()
        Assertions: migration rolled back, table dropped, schema_migrations updated, returns success true
-       Requirements: clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.2*/
     it('should rollback last applied migration', () => {
       // Create and apply migration
       fs.writeFileSync(
@@ -576,7 +577,7 @@ DROP TABLE users;`
     /* Preconditions: multiple migrations applied
        Action: call rollbackLastMigration()
        Assertions: only last migration rolled back, earlier migrations remain
-       Requirements: clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.2*/
     it('should rollback only the last migration when multiple exist', () => {
       // Create and apply multiple migrations
       fs.writeFileSync(
@@ -613,7 +614,7 @@ DROP TABLE users;`
     /* Preconditions: migration applied but has no DOWN section
        Action: call rollbackLastMigration()
        Assertions: returns success false, error "has no DOWN section"
-       Requirements: clerkly.2.1, clerkly.2.3, clerkly.2.8 */
+       Requirements: clerkly.2*/
     it('should return error when migration has no DOWN section', () => {
       fs.writeFileSync(
         path.join(testMigrationsPath, '001_no_down.sql'),
@@ -631,7 +632,7 @@ DROP TABLE users;`
     /* Preconditions: migration applied but migration file deleted
        Action: call rollbackLastMigration()
        Assertions: returns success false, error "Migration file not found"
-       Requirements: clerkly.2.1, clerkly.2.3, clerkly.2.8 */
+       Requirements: clerkly.2*/
     it('should return error when migration file not found', () => {
       // Create and apply migration
       const migrationPath = path.join(testMigrationsPath, '001_test.sql');
@@ -654,7 +655,7 @@ DROP TABLE users;`
     /* Preconditions: migration applied, DOWN section contains invalid SQL
        Action: call rollbackLastMigration()
        Assertions: returns success false, error contains migration name and SQL error
-       Requirements: clerkly.2.1, clerkly.2.3, clerkly.2.8 */
+       Requirements: clerkly.2*/
     it('should handle invalid SQL in DOWN section', () => {
       fs.writeFileSync(
         path.join(testMigrationsPath, '001_invalid_down.sql'),
@@ -675,7 +676,7 @@ DROP TABLE users;`
     /* Preconditions: database is empty, no migrations exist
        Action: call getStatus()
        Assertions: returns currentVersion 0, all counts 0, empty pending array
-       Requirements: clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.2*/
     it('should return correct status when no migrations exist', () => {
       const status = migrationRunner.getStatus();
 
@@ -689,7 +690,7 @@ DROP TABLE users;`
     /* Preconditions: migration files exist but none applied
        Action: call getStatus()
        Assertions: currentVersion 0, appliedMigrations 0, pendingMigrations equals totalMigrations
-       Requirements: clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.2*/
     it('should return correct status with pending migrations', () => {
       // Create migration files
       fs.writeFileSync(
@@ -715,7 +716,7 @@ DROP TABLE users;`
     /* Preconditions: some migrations applied, some pending
        Action: call getStatus()
        Assertions: correct counts, pending array contains only unapplied migrations
-       Requirements: clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.2*/
     it('should return correct status with mixed applied and pending migrations', () => {
       // Create migrations
       fs.writeFileSync(
@@ -749,7 +750,7 @@ DROP TABLE users;`
     /* Preconditions: all migrations applied
        Action: call getStatus()
        Assertions: pendingMigrations 0, empty pending array, appliedMigrations equals totalMigrations
-       Requirements: clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.2*/
     it('should return correct status when all migrations applied', () => {
       // Create and apply migrations
       fs.writeFileSync(

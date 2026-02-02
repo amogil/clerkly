@@ -1,5 +1,4 @@
-// Requirements: clerkly.2.2, clerkly.2.4, clerkly.2.8
-
+// Requirements: clerkly.2
 /**
  * Functional tests for IPC communication
  * Tests the integration of Renderer process → Preload → IPC → Main process → Data Manager
@@ -79,7 +78,7 @@ describe('IPC Communication Functional Tests', () => {
     /* Preconditions: IPC handlers registered, data manager initialized, no existing data
        Action: send save-data IPC request with valid key and value, then send load-data request
        Assertions: save returns success true, load returns success true with same data, data persisted to database
-       Requirements: clerkly.2.2, clerkly.2.4, clerkly.2.8 */
+       Requirements: clerkly.2*/
     it('should handle complete IPC flow: Renderer → Preload → Main → Data Manager → Response', async () => {
       const testKey = 'ipc-test-key';
       const testValue = { message: 'Hello from renderer', timestamp: Date.now() };
@@ -108,7 +107,7 @@ describe('IPC Communication Functional Tests', () => {
     /* Preconditions: IPC handlers registered, data manager initialized
        Action: send save-data request, then load-data request, then delete-data request, then load-data again
        Assertions: save succeeds, first load succeeds, delete succeeds, second load fails with "Key not found"
-       Requirements: clerkly.2.2, clerkly.2.4, clerkly.2.8 */
+       Requirements: clerkly.2*/
     it('should handle complete CRUD cycle through IPC', async () => {
       const testKey = 'crud-test-key';
       const testValue = 'test value for CRUD';
@@ -135,7 +134,7 @@ describe('IPC Communication Functional Tests', () => {
     /* Preconditions: IPC handlers registered, data manager initialized
        Action: send multiple save-data requests with different keys and data types
        Assertions: all saves succeed, all loads return correct data with correct types
-       Requirements: clerkly.2.2, clerkly.2.4, clerkly.2.8 */
+       Requirements: clerkly.2*/
     it('should handle multiple IPC requests with different data types', async () => {
       const testData = [
         { key: 'string-key', value: 'string value' },
@@ -163,7 +162,7 @@ describe('IPC Communication Functional Tests', () => {
     /* Preconditions: IPC handlers registered, data manager initialized
        Action: send save-data request, update same key with new value, load data
        Assertions: save succeeds, update succeeds, load returns updated value
-       Requirements: clerkly.2.2, clerkly.2.4, clerkly.2.8 */
+       Requirements: clerkly.2*/
     it('should handle data updates through IPC', async () => {
       const testKey = 'update-key';
       const initialValue = 'initial value';
@@ -191,7 +190,7 @@ describe('IPC Communication Functional Tests', () => {
     /* Preconditions: IPC handlers registered, data manager initialized
        Action: send 50 concurrent IPC save-data requests
        Assertions: all requests complete successfully, all data persisted correctly
-       Requirements: clerkly.2.2, clerkly.2.4, clerkly.2.8 */
+       Requirements: clerkly.2*/
     it('should handle concurrent IPC requests', async () => {
       const requestCount = 50;
       const requests: Array<Promise<any>> = [];
@@ -226,7 +225,7 @@ describe('IPC Communication Functional Tests', () => {
     /* Preconditions: IPC handlers registered, data manager initialized
        Action: send save-data request with invalid key (empty string)
        Assertions: returns success false with error message about invalid key
-       Requirements: clerkly.2.2, clerkly.2.4, clerkly.2.8 */
+       Requirements: clerkly.2*/
     it('should handle invalid key parameter in save-data request', async () => {
       const invalidKeys = ['', null as any, undefined as any];
 
@@ -241,7 +240,7 @@ describe('IPC Communication Functional Tests', () => {
     /* Preconditions: IPC handlers registered, data manager initialized
        Action: send save-data request with undefined value
        Assertions: returns success false with error message about invalid value
-       Requirements: clerkly.2.2, clerkly.2.4, clerkly.2.8 */
+       Requirements: clerkly.2*/
     it('should handle invalid value parameter in save-data request', async () => {
       const result = await ipcHandlers.handleSaveData(mockEvent, 'test-key', undefined);
       expect(result.success).toBe(false);
@@ -252,7 +251,7 @@ describe('IPC Communication Functional Tests', () => {
     /* Preconditions: IPC handlers registered, data manager initialized
        Action: send load-data request with invalid key (empty string, null, undefined)
        Assertions: returns success false with error message about invalid key
-       Requirements: clerkly.2.2, clerkly.2.4, clerkly.2.8 */
+       Requirements: clerkly.2*/
     it('should handle invalid key parameter in load-data request', async () => {
       const invalidKeys = ['', null as any, undefined as any];
 
@@ -267,7 +266,7 @@ describe('IPC Communication Functional Tests', () => {
     /* Preconditions: IPC handlers registered, data manager initialized
        Action: send delete-data request with invalid key (empty string, null, undefined)
        Assertions: returns success false with error message about invalid key
-       Requirements: clerkly.2.2, clerkly.2.4, clerkly.2.8 */
+       Requirements: clerkly.2*/
     it('should handle invalid key parameter in delete-data request', async () => {
       const invalidKeys = ['', null as any, undefined as any];
 
@@ -282,7 +281,7 @@ describe('IPC Communication Functional Tests', () => {
     /* Preconditions: IPC handlers registered, data manager initialized
        Action: send load-data request for non-existent key
        Assertions: returns success false with "Key not found" error
-       Requirements: clerkly.2.2, clerkly.2.4, clerkly.2.8 */
+       Requirements: clerkly.2*/
     it('should handle load request for non-existent key', async () => {
       const result = await ipcHandlers.handleLoadData(mockEvent, 'non-existent-key');
       expect(result.success).toBe(false);
@@ -292,7 +291,7 @@ describe('IPC Communication Functional Tests', () => {
     /* Preconditions: IPC handlers registered, data manager initialized
        Action: send delete-data request for non-existent key
        Assertions: returns success false with "Key not found" error
-       Requirements: clerkly.2.2, clerkly.2.4, clerkly.2.8 */
+       Requirements: clerkly.2*/
     it('should handle delete request for non-existent key', async () => {
       const result = await ipcHandlers.handleDeleteData(mockEvent, 'non-existent-key');
       expect(result.success).toBe(false);
@@ -302,7 +301,7 @@ describe('IPC Communication Functional Tests', () => {
     /* Preconditions: IPC handlers registered, data manager initialized
        Action: send save-data request with key exceeding 1000 characters
        Assertions: returns success false with error about key length
-       Requirements: clerkly.2.2, clerkly.2.4, clerkly.2.8 */
+       Requirements: clerkly.2*/
     it('should handle key exceeding maximum length', async () => {
       const longKey = 'a'.repeat(1001);
       const result = await ipcHandlers.handleSaveData(mockEvent, longKey, 'value');
@@ -314,7 +313,7 @@ describe('IPC Communication Functional Tests', () => {
     /* Preconditions: IPC handlers registered, data manager initialized
        Action: send save-data request with value exceeding 10MB
        Assertions: returns success false with error about value size
-       Requirements: clerkly.2.2, clerkly.2.4, clerkly.2.8 */
+       Requirements: clerkly.2*/
     it('should handle value exceeding maximum size', async () => {
       // Create a large value (> 10MB)
       const largeValue = 'x'.repeat(11 * 1024 * 1024);
@@ -329,7 +328,7 @@ describe('IPC Communication Functional Tests', () => {
     /* Preconditions: IPC handlers registered with short timeout, data manager with artificial delay
        Action: send save-data request that takes longer than timeout
        Assertions: returns success false with timeout error, operation completes within timeout period
-       Requirements: clerkly.2.2, clerkly.2.4, clerkly.nfr.2.3, clerkly.2.8 */
+       Requirements: clerkly.2, clerkly.nfr.2*/
     it('should timeout IPC requests that exceed timeout threshold', async () => {
       // Create a mock data manager with artificial delay that returns a promise
       const slowDataManager = {
@@ -365,7 +364,7 @@ describe('IPC Communication Functional Tests', () => {
     /* Preconditions: IPC handlers registered with default timeout (10 seconds)
        Action: send load-data request that completes within timeout
        Assertions: returns success true, no timeout error
-       Requirements: clerkly.2.2, clerkly.2.4, clerkly.nfr.2.3, clerkly.2.8 */
+       Requirements: clerkly.2, clerkly.nfr.2*/
     it('should not timeout IPC requests that complete within timeout', async () => {
       // Verify default timeout is 10 seconds
       expect(ipcHandlers.getTimeout()).toBe(10000);
@@ -388,7 +387,7 @@ describe('IPC Communication Functional Tests', () => {
     /* Preconditions: IPC handlers registered with custom timeout
        Action: change timeout value, send request
        Assertions: timeout is applied correctly, can be changed dynamically
-       Requirements: clerkly.2.2, clerkly.2.4, clerkly.nfr.2.3, clerkly.2.8 */
+       Requirements: clerkly.2, clerkly.nfr.2*/
     it('should allow changing timeout dynamically', async () => {
       // Change timeout to 5 seconds
       ipcHandlers.setTimeout(5000);
@@ -412,7 +411,7 @@ describe('IPC Communication Functional Tests', () => {
     /* Preconditions: IPC handlers not registered
        Action: register handlers, verify ipcMain.handle called for each channel
        Assertions: ipcMain.handle called 3 times (save-data, load-data, delete-data)
-       Requirements: clerkly.2.2, clerkly.2.4, clerkly.2.8 */
+       Requirements: clerkly.2*/
     it('should register all IPC handlers correctly', () => {
       // Create new handlers (beforeEach already registered, so create fresh instance)
       const newDataManager = new DataManager(testStoragePath);
@@ -439,7 +438,7 @@ describe('IPC Communication Functional Tests', () => {
     /* Preconditions: IPC handlers registered
        Action: unregister handlers, verify ipcMain.removeHandler called for each channel
        Assertions: ipcMain.removeHandler called 3 times (save-data, load-data, delete-data)
-       Requirements: clerkly.2.2, clerkly.2.4, clerkly.2.8 */
+       Requirements: clerkly.2*/
     it('should unregister all IPC handlers correctly', () => {
       // Clear mocks
       (ipcMain.removeHandler as jest.Mock).mockClear();
@@ -457,7 +456,7 @@ describe('IPC Communication Functional Tests', () => {
     /* Preconditions: IPC handlers registered
        Action: unregister handlers, then try to use them
        Assertions: handlers are unregistered, subsequent registration works
-       Requirements: clerkly.2.2, clerkly.2.4, clerkly.2.8 */
+       Requirements: clerkly.2*/
     it('should allow re-registration after unregistering', () => {
       // Unregister handlers
       ipcHandlers.unregisterHandlers();
@@ -480,7 +479,7 @@ describe('IPC Communication Functional Tests', () => {
     /* Preconditions: IPC handlers registered, data manager initialized
        Action: save data through IPC, verify data in database directly, load through IPC
        Assertions: IPC save persists to database, direct database query returns same data, IPC load returns same data
-       Requirements: clerkly.2.2, clerkly.2.4, clerkly.2.8 */
+       Requirements: clerkly.2*/
     it('should correctly integrate IPC handlers with Data Manager', async () => {
       const testKey = 'integration-key';
       const testValue = { integration: true, data: 'test' };
@@ -503,7 +502,7 @@ describe('IPC Communication Functional Tests', () => {
     /* Preconditions: IPC handlers registered, data manager initialized, data exists in database
        Action: load data through IPC that was saved directly to database
        Assertions: IPC can load data saved directly to database
-       Requirements: clerkly.2.2, clerkly.2.4, clerkly.2.8 */
+       Requirements: clerkly.2*/
     it('should load data saved directly to Data Manager through IPC', async () => {
       const testKey = 'direct-save-key';
       const testValue = 'directly saved value';
@@ -521,7 +520,7 @@ describe('IPC Communication Functional Tests', () => {
     /* Preconditions: IPC handlers registered, data manager initialized, data exists
        Action: delete data through IPC, verify deletion in database directly
        Assertions: IPC delete removes data from database, direct database query returns "Key not found"
-       Requirements: clerkly.2.2, clerkly.2.4, clerkly.2.8 */
+       Requirements: clerkly.2*/
     it('should correctly delete data from Data Manager through IPC', async () => {
       const testKey = 'delete-integration-key';
       const testValue = 'to be deleted';
@@ -550,7 +549,7 @@ describe('IPC Communication Functional Tests', () => {
     /* Preconditions: IPC handlers registered, data manager initialized
        Action: save data with special characters in key
        Assertions: save succeeds, load returns correct data
-       Requirements: clerkly.2.2, clerkly.2.4, clerkly.2.8 */
+       Requirements: clerkly.2*/
     it('should handle keys with special characters', async () => {
       const specialKeys = [
         'key-with-dash',
@@ -575,7 +574,7 @@ describe('IPC Communication Functional Tests', () => {
     /* Preconditions: IPC handlers registered, data manager initialized
        Action: save empty values (empty string, empty array, empty object)
        Assertions: all saves succeed, all loads return correct empty values
-       Requirements: clerkly.2.2, clerkly.2.4, clerkly.2.8 */
+       Requirements: clerkly.2*/
     it('should handle empty values correctly', async () => {
       const emptyValues = [
         { key: 'empty-string', value: '' },
@@ -596,7 +595,7 @@ describe('IPC Communication Functional Tests', () => {
     /* Preconditions: IPC handlers registered, data manager initialized
        Action: save deeply nested object through IPC
        Assertions: save succeeds, load returns correct deeply nested structure
-       Requirements: clerkly.2.2, clerkly.2.4, clerkly.2.8 */
+       Requirements: clerkly.2*/
     it('should handle deeply nested objects', async () => {
       const testKey = 'nested-key';
       const testValue = {
@@ -625,7 +624,7 @@ describe('IPC Communication Functional Tests', () => {
     /* Preconditions: IPC handlers registered, data manager initialized
        Action: save null value through IPC
        Assertions: save succeeds, load returns null
-       Requirements: clerkly.2.2, clerkly.2.4, clerkly.2.8 */
+       Requirements: clerkly.2*/
     it('should handle null values correctly', async () => {
       const testKey = 'null-key';
       const testValue = null;

@@ -1,5 +1,4 @@
-// Requirements: clerkly.2.2, clerkly.2.4, clerkly.2.8
-
+// Requirements: clerkly.2
 /**
  * Functional tests for application lifecycle
  * Tests the integration of WindowManager, LifecycleManager, DataManager, and MigrationRunner
@@ -80,7 +79,7 @@ describe('Application Lifecycle Functional Tests', () => {
     /* Preconditions: application not running, storage does not exist
        Action: initialize lifecycle manager (creates window, initializes storage, runs migrations)
        Assertions: initialization succeeds, window created, storage initialized, migrations applied, startup time < 3 seconds
-       Requirements: clerkly.2.2, clerkly.2.4, clerkly.2.8 */
+       Requirements: clerkly.2*/
     it('should start application successfully with window creation, storage initialization, and migrations', async () => {
       const startTime = Date.now();
 
@@ -117,7 +116,7 @@ describe('Application Lifecycle Functional Tests', () => {
     /* Preconditions: application not running
        Action: initialize lifecycle manager, measure startup time
        Assertions: startup completes within 3 seconds (performance requirement)
-       Requirements: clerkly.2.2, clerkly.nfr.1.1, clerkly.2.8 */
+       Requirements: clerkly.2, clerkly.nfr.1*/
     it('should start within 3 seconds (performance requirement)', async () => {
       const startTime = Date.now();
 
@@ -134,7 +133,7 @@ describe('Application Lifecycle Functional Tests', () => {
     /* Preconditions: application not running, storage directory does not exist
        Action: initialize lifecycle manager
        Assertions: storage directory created, database file created, migrations table created
-       Requirements: clerkly.2.2, clerkly.2.4, clerkly.1.4, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should create storage directory and database on first startup', async () => {
       // Ensure storage does not exist
       expect(fs.existsSync(testStoragePath)).toBe(false);
@@ -161,7 +160,7 @@ describe('Application Lifecycle Functional Tests', () => {
     /* Preconditions: application not running, migrations exist
        Action: initialize lifecycle manager
        Assertions: migrations are applied, migration count reported correctly
-       Requirements: clerkly.2.2, clerkly.2.4, clerkly.1.4, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should run database migrations during startup', async () => {
       const result = await lifecycleManager.initialize();
 
@@ -184,7 +183,7 @@ describe('Application Lifecycle Functional Tests', () => {
     /* Preconditions: application not running
        Action: initialize lifecycle manager, verify all components initialized
        Assertions: window manager initialized, data manager initialized, lifecycle manager initialized
-       Requirements: clerkly.2.2, clerkly.2.4, clerkly.2.8 */
+       Requirements: clerkly.2*/
     it('should initialize all components in correct order', async () => {
       const result = await lifecycleManager.initialize();
 
@@ -212,7 +211,7 @@ describe('Application Lifecycle Functional Tests', () => {
     /* Preconditions: application running, window created, data in storage
        Action: save data, close window, quit application
        Assertions: window closed, data manager closed, data persisted to disk, application no longer initialized
-       Requirements: clerkly.2.2, clerkly.2.4, clerkly.2.8 */
+       Requirements: clerkly.2*/
     it('should close window, save data, and shutdown gracefully', async () => {
       // Save some test data
       const testKey = 'test-shutdown-key';
@@ -249,7 +248,7 @@ describe('Application Lifecycle Functional Tests', () => {
     /* Preconditions: application running
        Action: quit application, measure shutdown time
        Assertions: shutdown completes within 5 seconds (timeout requirement)
-       Requirements: clerkly.2.2, clerkly.nfr.2.2, clerkly.2.8 */
+       Requirements: clerkly.2, clerkly.nfr.2*/
     it('should complete shutdown within 5 seconds', async () => {
       const startTime = Date.now();
 
@@ -264,7 +263,7 @@ describe('Application Lifecycle Functional Tests', () => {
     /* Preconditions: application running, data in storage
        Action: save multiple data items, quit application
        Assertions: all data persisted correctly, can be loaded after restart
-       Requirements: clerkly.2.2, clerkly.2.4, clerkly.2.8 */
+       Requirements: clerkly.2*/
     it('should persist all data before shutdown', async () => {
       // Save multiple data items
       const testData = [
@@ -299,7 +298,7 @@ describe('Application Lifecycle Functional Tests', () => {
     /* Preconditions: application running
        Action: close window (Mac OS X behavior)
        Assertions: application remains running, window can be recreated on activation
-       Requirements: clerkly.2.2, clerkly.nfr.3.3, clerkly.2.8 */
+       Requirements: clerkly.2, clerkly.nfr.3*/
     it('should keep application running when window closed (Mac OS X behavior)', () => {
       // Close window
       lifecycleManager.handleWindowClose();
@@ -319,7 +318,7 @@ describe('Application Lifecycle Functional Tests', () => {
     /* Preconditions: application not running
        Action: start app, save data, close window, activate, save more data, quit
        Assertions: complete lifecycle works correctly, all data persisted
-       Requirements: clerkly.2.2, clerkly.2.4, clerkly.2.8 */
+       Requirements: clerkly.2*/
     it('should handle complete application lifecycle: start → save → close → activate → save → quit', async () => {
       // Start application
       const initResult = await lifecycleManager.initialize();
@@ -365,7 +364,7 @@ describe('Application Lifecycle Functional Tests', () => {
     /* Preconditions: application not running
        Action: start app, save data, quit, restart app, load data
        Assertions: data persists across application restarts
-       Requirements: clerkly.2.2, clerkly.2.4, clerkly.2.8 */
+       Requirements: clerkly.2*/
     it('should persist data across application restarts', async () => {
       // First session: start and save data
       await lifecycleManager.initialize();
@@ -399,7 +398,7 @@ describe('Application Lifecycle Functional Tests', () => {
     /* Preconditions: application not running
        Action: start app, verify migrations applied, restart app, verify migrations not re-applied
        Assertions: migrations are idempotent, not re-applied on subsequent startups
-       Requirements: clerkly.2.2, clerkly.2.4, clerkly.1.4, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should not re-apply migrations on subsequent startups', async () => {
       // First startup: apply migrations
       const initResult1 = await lifecycleManager.initialize();
@@ -436,7 +435,7 @@ describe('Application Lifecycle Functional Tests', () => {
     /* Preconditions: application not running
        Action: start app multiple times in sequence
        Assertions: each startup succeeds, data persists across all sessions
-       Requirements: clerkly.2.2, clerkly.2.4, clerkly.2.8 */
+       Requirements: clerkly.2*/
     it('should handle multiple startup/shutdown cycles', async () => {
       const cycles = 3;
       const testKey = 'multi-cycle-key';
@@ -479,7 +478,7 @@ describe('Application Lifecycle Functional Tests', () => {
     /* Preconditions: application not running, storage path has permission issues (simulated)
        Action: initialize lifecycle manager
        Assertions: initialization handles error gracefully, falls back to temp directory
-       Requirements: clerkly.2.2, clerkly.nfr.2.1, clerkly.2.8 */
+       Requirements: clerkly.2, clerkly.nfr.2*/
     it('should handle storage initialization errors gracefully', async () => {
       // Create a read-only directory to simulate permission issues
       const readOnlyPath = path.join(os.tmpdir(), `clerkly-readonly-${Date.now()}`);
@@ -509,7 +508,7 @@ describe('Application Lifecycle Functional Tests', () => {
     /* Preconditions: application running
        Action: quit application multiple times
        Assertions: multiple quit calls handled gracefully (idempotent)
-       Requirements: clerkly.2.2, clerkly.nfr.2.2, clerkly.2.8 */
+       Requirements: clerkly.2, clerkly.nfr.2*/
     it('should handle multiple quit calls gracefully', async () => {
       await lifecycleManager.initialize();
 

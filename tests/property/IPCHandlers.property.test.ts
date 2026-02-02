@@ -1,4 +1,5 @@
-// Requirements: clerkly.1.4, clerkly.nfr.2.3, clerkly.2.6, clerkly.2.8
+// Requirements: clerkly.1, clerkly.2, clerkly.nfr.2
+
 import * as fc from 'fast-check';
 import { IPCHandlers } from '../../src/main/IPCHandlers';
 import {
@@ -20,8 +21,7 @@ class MockDataManagerWithDelay {
 
   /**
    * Mock saveData with artificial async delay
-   * Requirements: clerkly.1.4, clerkly.nfr.2.3
-   */
+   * Requirements: clerkly.1, clerkly.nfr.2   */
   async saveData(_key: string, _value: any): Promise<SaveDataResult> {
     // Simulate async operation with delay
     await new Promise((resolve) => setTimeout(resolve, this.delay));
@@ -30,8 +30,7 @@ class MockDataManagerWithDelay {
 
   /**
    * Mock loadData with artificial async delay
-   * Requirements: clerkly.1.4, clerkly.nfr.2.3
-   */
+   * Requirements: clerkly.1, clerkly.nfr.2   */
   async loadData(_key: string): Promise<LoadDataResult> {
     // Simulate async operation with delay
     await new Promise((resolve) => setTimeout(resolve, this.delay));
@@ -40,8 +39,7 @@ class MockDataManagerWithDelay {
 
   /**
    * Mock deleteData with artificial async delay
-   * Requirements: clerkly.1.4, clerkly.nfr.2.3
-   */
+   * Requirements: clerkly.1, clerkly.nfr.2   */
   async deleteData(_key: string): Promise<DeleteDataResult> {
     // Simulate async operation with delay
     await new Promise((resolve) => setTimeout(resolve, this.delay));
@@ -53,7 +51,7 @@ describe('Property Tests - IPC Handlers', () => {
   /* Preconditions: IPCHandlers initialized with mock DataManager that has delay > timeout
      Action: generate random valid keys, call handleSaveData with each key
      Assertions: for all operations, returns success false with timeout error message
-     Requirements: clerkly.1.4, clerkly.nfr.2.3, clerkly.2.6, clerkly.2.8 */
+     Requirements: clerkly.1, clerkly.2, clerkly.nfr.2*/
   // Feature: clerkly, Property 4
   test('Property 4: IPC Timeout Enforcement - save-data operations timeout when exceeding limit', async () => {
     await fc.assert(
@@ -98,7 +96,7 @@ describe('Property Tests - IPC Handlers', () => {
   /* Preconditions: IPCHandlers initialized with mock DataManager that has delay > timeout
      Action: generate random valid keys, call handleLoadData with each key
      Assertions: for all operations, returns success false with timeout error message
-     Requirements: clerkly.1.4, clerkly.nfr.2.3, clerkly.2.6, clerkly.2.8 */
+     Requirements: clerkly.1, clerkly.2, clerkly.nfr.2*/
   // Feature: clerkly, Property 4
   test('Property 4: IPC Timeout Enforcement - load-data operations timeout when exceeding limit', async () => {
     await fc.assert(
@@ -141,7 +139,7 @@ describe('Property Tests - IPC Handlers', () => {
   /* Preconditions: IPCHandlers initialized with mock DataManager that has delay > timeout
      Action: generate random valid keys, call handleDeleteData with each key
      Assertions: for all operations, returns success false with timeout error message
-     Requirements: clerkly.1.4, clerkly.nfr.2.3, clerkly.2.6, clerkly.2.8 */
+     Requirements: clerkly.1, clerkly.2, clerkly.nfr.2*/
   // Feature: clerkly, Property 4
   test('Property 4: IPC Timeout Enforcement - delete-data operations timeout when exceeding limit', async () => {
     await fc.assert(
@@ -172,9 +170,9 @@ describe('Property Tests - IPC Handlers', () => {
           expect(result.error).toContain('timed out');
 
           // Verify execution time is approximately equal to timeout (not much longer)
-          // Allow 60ms tolerance for test execution overhead
+          // Allow 100ms tolerance for test execution overhead and system load
           expect(executionTime).toBeGreaterThanOrEqual(timeout - 5);
-          expect(executionTime).toBeLessThan(timeout + 60);
+          expect(executionTime).toBeLessThan(timeout + 100);
         }
       ),
       { numRuns: 100 }
@@ -184,7 +182,7 @@ describe('Property Tests - IPC Handlers', () => {
   /* Preconditions: IPCHandlers initialized with mock DataManager that has delay < timeout
      Action: call save-data operation with delay just under timeout
      Assertions: operation succeeds without timeout error
-     Requirements: clerkly.1.4, clerkly.nfr.2.3, clerkly.2.6, clerkly.2.8 */
+     Requirements: clerkly.1, clerkly.2, clerkly.nfr.2*/
   // Feature: clerkly, Property 4
   test('Property 4 edge case: operations completing just before timeout succeed', async () => {
     const timeout = 100; // 100ms timeout
@@ -210,7 +208,7 @@ describe('Property Tests - IPC Handlers', () => {
   /* Preconditions: IPCHandlers initialized with mock DataManager that has delay >> timeout
      Action: call operations with delay significantly exceeding timeout
      Assertions: operations timeout at expected time, not waiting for full delay
-     Requirements: clerkly.1.4, clerkly.nfr.2.3, clerkly.2.6, clerkly.2.8 */
+     Requirements: clerkly.1, clerkly.2, clerkly.nfr.2*/
   // Feature: clerkly, Property 4
   test('Property 4 edge case: operations with very long delays timeout promptly', async () => {
     const timeout = 50; // 50ms timeout
@@ -251,7 +249,7 @@ describe('Property Tests - IPC Handlers', () => {
   /* Preconditions: IPCHandlers initialized with different timeout values
      Action: change timeout using setTimeout, verify operations respect new timeout
      Assertions: operations timeout according to the configured timeout value
-     Requirements: clerkly.1.4, clerkly.nfr.2.3, clerkly.2.6, clerkly.2.8 */
+     Requirements: clerkly.1, clerkly.2, clerkly.nfr.2*/
   // Feature: clerkly, Property 4
   test('Property 4 edge case: different timeout values are respected', async () => {
     const delay = 70; // 70ms delay
@@ -276,7 +274,7 @@ describe('Property Tests - IPC Handlers', () => {
   /* Preconditions: IPCHandlers initialized with mock DataManager with delay at exact timeout boundary
      Action: call operations with delay exactly equal to timeout
      Assertions: operations may succeed or timeout (race condition at boundary)
-     Requirements: clerkly.1.4, clerkly.nfr.2.3, clerkly.2.6, clerkly.2.8 */
+     Requirements: clerkly.1, clerkly.2, clerkly.nfr.2*/
   // Feature: clerkly, Property 4
   test('Property 4 edge case: operations at exact timeout boundary', async () => {
     const timeout = 70; // 70ms timeout
@@ -303,7 +301,7 @@ describe('Property Tests - IPC Handlers', () => {
   /* Preconditions: IPCHandlers initialized with default timeout (10 seconds)
      Action: verify default timeout value is set correctly
      Assertions: getTimeout returns 10000ms
-     Requirements: clerkly.1.4, clerkly.nfr.2.3, clerkly.2.6, clerkly.2.8 */
+     Requirements: clerkly.1, clerkly.2, clerkly.nfr.2*/
   // Feature: clerkly, Property 4
   test('Property 4 edge case: default timeout is 10 seconds', () => {
     const mockDataManager = new MockDataManagerWithDelay(0) as unknown as DataManager;

@@ -1,4 +1,5 @@
-// Requirements: clerkly.2.1, clerkly.2.8
+// Requirements: clerkly.2
+
 import { LifecycleManager } from '../../src/main/LifecycleManager';
 import WindowManager from '../../src/main/WindowManager';
 import { DataManager } from '../../src/main/DataManager';
@@ -41,7 +42,7 @@ describe('LifecycleManager', () => {
     /* Preconditions: LifecycleManager created, WindowManager and DataManager mocked
        Action: call initialize()
        Assertions: returns success true, loadTime < 3000ms, DataManager.initialize called, WindowManager.createWindow called, isAppInitialized returns true
-       Requirements: clerkly.1.2, clerkly.1.3, clerkly.nfr.1.1, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2, clerkly.nfr.1*/
     it('should initialize application successfully within 3 seconds', async () => {
       const result = await lifecycleManager.initialize();
 
@@ -56,7 +57,7 @@ describe('LifecycleManager', () => {
     /* Preconditions: LifecycleManager created, DataManager and WindowManager initialize quickly
        Action: call initialize()
        Assertions: loadTime measured correctly, startupTime set
-       Requirements: clerkly.nfr.1.1, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.2, clerkly.nfr.1*/
     it('should measure startup time correctly', async () => {
       const startTime = Date.now();
       const result = await lifecycleManager.initialize();
@@ -70,7 +71,7 @@ describe('LifecycleManager', () => {
     /* Preconditions: LifecycleManager created, DataManager.initialize takes > 3 seconds (simulated)
        Action: call initialize() with delayed DataManager
        Assertions: returns success true, console.warn called with slow startup message
-       Requirements: clerkly.nfr.1.1, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.2, clerkly.nfr.1*/
     it('should warn about slow startup when exceeding 3 seconds', async () => {
       // Mock slow initialization
       mockDataManager.initialize = jest.fn().mockImplementation(() => {
@@ -100,7 +101,7 @@ describe('LifecycleManager', () => {
     /* Preconditions: LifecycleManager created, DataManager.initialize throws error
        Action: call initialize()
        Assertions: throws error with descriptive message, isAppInitialized returns false
-       Requirements: clerkly.1.2, clerkly.2.3, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should handle DataManager initialization failure', async () => {
       mockDataManager.initialize = jest.fn().mockImplementation(() => {
         throw new Error('Database initialization failed');
@@ -116,7 +117,7 @@ describe('LifecycleManager', () => {
     /* Preconditions: LifecycleManager created, WindowManager.createWindow throws error
        Action: call initialize()
        Assertions: throws error with descriptive message, isAppInitialized returns false
-       Requirements: clerkly.1.3, clerkly.2.3, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should handle WindowManager creation failure', async () => {
       mockWindowManager.createWindow = jest.fn().mockImplementation(() => {
         throw new Error('Window creation failed');
@@ -132,7 +133,7 @@ describe('LifecycleManager', () => {
     /* Preconditions: LifecycleManager created and initialized
        Action: call initialize() again
        Assertions: succeeds, can be called multiple times
-       Requirements: clerkly.1.2, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should allow multiple initializations', async () => {
       await lifecycleManager.initialize();
       const result = await lifecycleManager.initialize();
@@ -147,7 +148,7 @@ describe('LifecycleManager', () => {
     /* Preconditions: LifecycleManager initialized, window does not exist
        Action: call handleActivation()
        Assertions: WindowManager.createWindow called to recreate window
-       Requirements: clerkly.1.2, clerkly.1.3, clerkly.nfr.3.3, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2, clerkly.nfr.3*/
     it('should recreate window when not created (Mac OS X behavior)', () => {
       mockWindowManager.isWindowCreated = jest.fn().mockReturnValue(false);
 
@@ -160,7 +161,7 @@ describe('LifecycleManager', () => {
     /* Preconditions: LifecycleManager initialized, window already exists
        Action: call handleActivation()
        Assertions: WindowManager.createWindow not called (window already exists)
-       Requirements: clerkly.1.2, clerkly.1.3, clerkly.nfr.3.3, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2, clerkly.nfr.3*/
     it('should not recreate window when already created', () => {
       mockWindowManager.isWindowCreated = jest.fn().mockReturnValue(true);
 
@@ -173,7 +174,7 @@ describe('LifecycleManager', () => {
     /* Preconditions: LifecycleManager initialized, WindowManager.createWindow throws error
        Action: call handleActivation()
        Assertions: error caught and logged, no exception thrown
-       Requirements: clerkly.1.3, clerkly.2.3, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should handle window creation failure gracefully', () => {
       mockWindowManager.isWindowCreated = jest.fn().mockReturnValue(false);
       mockWindowManager.createWindow = jest.fn().mockImplementation(() => {
@@ -197,7 +198,7 @@ describe('LifecycleManager', () => {
     /* Preconditions: LifecycleManager created, handleActivation called multiple times
        Action: call handleActivation() multiple times with window not created
        Assertions: createWindow called each time
-       Requirements: clerkly.1.3, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should handle multiple activation calls', () => {
       mockWindowManager.isWindowCreated = jest.fn().mockReturnValue(false);
 
@@ -217,7 +218,7 @@ describe('LifecycleManager', () => {
     /* Preconditions: LifecycleManager initialized, window created, data manager open
        Action: call handleQuit()
        Assertions: WindowManager.closeWindow called, DataManager.close called, isAppInitialized returns false, completes within 5 seconds
-       Requirements: clerkly.1.2, clerkly.1.3, clerkly.nfr.2.2, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2, clerkly.nfr.2*/
     it('should perform graceful shutdown within 5 seconds', async () => {
       mockWindowManager.isWindowCreated = jest.fn().mockReturnValue(true);
 
@@ -234,7 +235,7 @@ describe('LifecycleManager', () => {
     /* Preconditions: LifecycleManager initialized, window not created
        Action: call handleQuit()
        Assertions: WindowManager.closeWindow not called, DataManager.close called
-       Requirements: clerkly.1.3, clerkly.nfr.2.2, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2, clerkly.nfr.2*/
     it('should handle quit when window not created', async () => {
       mockWindowManager.isWindowCreated = jest.fn().mockReturnValue(false);
 
@@ -248,7 +249,7 @@ describe('LifecycleManager', () => {
     /* Preconditions: LifecycleManager initialized, WindowManager.closeWindow throws error
        Action: call handleQuit()
        Assertions: error caught and logged, no exception thrown to caller
-       Requirements: clerkly.nfr.2.2, clerkly.2.3, clerkly.2.8 */
+       Requirements: clerkly.2, clerkly.nfr.2*/
     it('should handle window close failure during quit', async () => {
       mockWindowManager.isWindowCreated = jest.fn().mockReturnValue(true);
       mockWindowManager.closeWindow = jest.fn().mockImplementation(() => {
@@ -272,7 +273,7 @@ describe('LifecycleManager', () => {
     /* Preconditions: LifecycleManager initialized, DataManager.close throws error
        Action: call handleQuit()
        Assertions: error caught and logged, no exception thrown
-       Requirements: clerkly.nfr.2.2, clerkly.2.3, clerkly.2.8 */
+       Requirements: clerkly.2, clerkly.nfr.2*/
     it('should handle data manager close failure during quit', async () => {
       mockWindowManager.isWindowCreated = jest.fn().mockReturnValue(true);
       mockDataManager.close = jest.fn().mockImplementation(() => {
@@ -292,7 +293,7 @@ describe('LifecycleManager', () => {
     /* Preconditions: LifecycleManager initialized, shutdown operations complete quickly
        Action: call handleQuit()
        Assertions: completes within 5 seconds (timeout not triggered for fast operations)
-       Requirements: clerkly.nfr.2.2, clerkly.2.3, clerkly.2.8 */
+       Requirements: clerkly.2, clerkly.nfr.2*/
     it('should complete shutdown quickly when operations are fast', async () => {
       mockWindowManager.isWindowCreated = jest.fn().mockReturnValue(true);
 
@@ -310,7 +311,7 @@ describe('LifecycleManager', () => {
     /* Preconditions: LifecycleManager initialized and quit
        Action: call handleQuit() again
        Assertions: no error thrown, operations still performed (idempotent)
-       Requirements: clerkly.nfr.2.2, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.2, clerkly.nfr.2*/
     it('should be idempotent - multiple quit calls do not cause errors', async () => {
       mockWindowManager.isWindowCreated = jest.fn().mockReturnValue(true);
 
@@ -325,7 +326,7 @@ describe('LifecycleManager', () => {
     /* Preconditions: LifecycleManager initialized, window closed by user
        Action: call handleWindowClose()
        Assertions: no error thrown, application remains initialized (Mac OS X behavior)
-       Requirements: clerkly.1.2, clerkly.1.3, clerkly.nfr.3.3, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2, clerkly.nfr.3*/
     it('should keep application running when window closed (Mac OS X behavior)', () => {
       expect(() => {
         lifecycleManager.handleWindowClose();
@@ -340,7 +341,7 @@ describe('LifecycleManager', () => {
     /* Preconditions: LifecycleManager initialized
        Action: call handleWindowClose() multiple times
        Assertions: no error thrown, no operations performed (Mac OS X behavior)
-       Requirements: clerkly.1.3, clerkly.nfr.3.3, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2, clerkly.nfr.3*/
     it('should handle multiple window close events', () => {
       expect(() => {
         lifecycleManager.handleWindowClose();
@@ -355,7 +356,7 @@ describe('LifecycleManager', () => {
     /* Preconditions: LifecycleManager not initialized
        Action: call handleWindowClose()
        Assertions: no error thrown (safe to call anytime)
-       Requirements: clerkly.1.3, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should handle window close before initialization', () => {
       const newLifecycleManager = new LifecycleManager(mockWindowManager, mockDataManager);
 
@@ -369,7 +370,7 @@ describe('LifecycleManager', () => {
     /* Preconditions: LifecycleManager created but not initialized
        Action: call getStartupTime()
        Assertions: returns null
-       Requirements: clerkly.nfr.1.1, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.2, clerkly.nfr.1*/
     it('should return null before initialization', () => {
       const startupTime = lifecycleManager.getStartupTime();
 
@@ -379,7 +380,7 @@ describe('LifecycleManager', () => {
     /* Preconditions: LifecycleManager initialized
        Action: call getStartupTime()
        Assertions: returns timestamp (number) of when initialize was called
-       Requirements: clerkly.nfr.1.1, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.2, clerkly.nfr.1*/
     it('should return startup timestamp after initialization', async () => {
       const beforeInit = Date.now();
       await lifecycleManager.initialize();
@@ -395,7 +396,7 @@ describe('LifecycleManager', () => {
     /* Preconditions: LifecycleManager initialized multiple times
        Action: call getStartupTime() after each initialization
        Assertions: returns timestamp of most recent initialization
-       Requirements: clerkly.nfr.1.1, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.2, clerkly.nfr.1*/
     it('should update startup time on re-initialization', async () => {
       await lifecycleManager.initialize();
       const firstStartupTime = lifecycleManager.getStartupTime();
@@ -415,7 +416,7 @@ describe('LifecycleManager', () => {
     /* Preconditions: LifecycleManager created but not initialized
        Action: call isAppInitialized()
        Assertions: returns false
-       Requirements: clerkly.1.2, clerkly.1.3, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should return false before initialization', () => {
       expect(lifecycleManager.isAppInitialized()).toBe(false);
     });
@@ -423,7 +424,7 @@ describe('LifecycleManager', () => {
     /* Preconditions: LifecycleManager initialized successfully
        Action: call isAppInitialized()
        Assertions: returns true
-       Requirements: clerkly.1.2, clerkly.1.3, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should return true after successful initialization', async () => {
       await lifecycleManager.initialize();
 
@@ -433,7 +434,7 @@ describe('LifecycleManager', () => {
     /* Preconditions: LifecycleManager initialization failed
        Action: call isAppInitialized()
        Assertions: returns false
-       Requirements: clerkly.1.2, clerkly.2.3, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should return false after failed initialization', async () => {
       mockDataManager.initialize = jest.fn().mockImplementation(() => {
         throw new Error('Initialization failed');
@@ -451,7 +452,7 @@ describe('LifecycleManager', () => {
     /* Preconditions: LifecycleManager initialized and then quit
        Action: call isAppInitialized()
        Assertions: returns false
-       Requirements: clerkly.1.2, clerkly.1.3, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should return false after quit', async () => {
       await lifecycleManager.initialize();
       expect(lifecycleManager.isAppInitialized()).toBe(true);
@@ -463,7 +464,7 @@ describe('LifecycleManager', () => {
     /* Preconditions: LifecycleManager initialized, quit, then initialized again
        Action: call isAppInitialized() after each step
        Assertions: returns true after re-initialization
-       Requirements: clerkly.1.2, clerkly.1.3, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should return true after re-initialization following quit', async () => {
       await lifecycleManager.initialize();
       await lifecycleManager.handleQuit();
@@ -477,7 +478,7 @@ describe('LifecycleManager', () => {
     /* Preconditions: LifecycleManager created
        Action: initialize, close window, activate, quit
        Assertions: full lifecycle works correctly
-       Requirements: clerkly.1.2, clerkly.1.3, clerkly.nfr.3.3, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2, clerkly.nfr.3*/
     it('should handle complete application lifecycle', async () => {
       // Initialize
       await lifecycleManager.initialize();
@@ -505,7 +506,7 @@ describe('LifecycleManager', () => {
     /* Preconditions: LifecycleManager created
        Action: initialize, activate multiple times, quit
        Assertions: handles multiple activations correctly
-       Requirements: clerkly.1.3, clerkly.nfr.3.3, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2, clerkly.nfr.3*/
     it('should handle multiple activation cycles', async () => {
       await lifecycleManager.initialize();
 
@@ -521,7 +522,7 @@ describe('LifecycleManager', () => {
     /* Preconditions: LifecycleManager created
        Action: initialize with slow startup, verify warning
        Assertions: warning logged for slow startup
-       Requirements: clerkly.nfr.1.1, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.2, clerkly.nfr.1*/
     it('should monitor and warn about slow startup performance', async () => {
       mockDataManager.initialize = jest.fn().mockImplementation(() => {
         const start = Date.now();

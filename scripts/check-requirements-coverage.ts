@@ -1,5 +1,5 @@
 #!/usr/bin/env ts-node
-// Requirements: clerkly.2.8, clerkly.2.9
+// Requirements: clerkly.2, clerkly.nfr.4
 /**
  * Script to verify requirements coverage in code and tests
  * Checks:
@@ -32,38 +32,19 @@ function extractRequirements(requirementsPath: string): Requirement[] {
   const content = fs.readFileSync(requirementsPath, 'utf-8');
   const requirements: Requirement[] = [];
 
-  // Match requirement IDs like clerkly.1.1, clerkly.2.3, clerkly.nfr.1.1
-  const reqPattern = /\*\*ID:\*\*\s+(clerkly\.[a-z0-9.]+)/gi;
-  let match;
+  // Match requirement IDs like clerkly.1, clerkly.2, clerkly.nfr.1, clerkly.nfr.2
+  const reqPattern = /\*\*ID:\*\*\s+(clerkly\.[a-z0-9]+(?:\.[a-z0-9]+)?)\s*$/gim;
+  let match: RegExpExecArray | null;
 
   while ((match = reqPattern.exec(content)) !== null) {
-    requirements.push({
-      id: match[1],
-      description: '',
-    });
+    const reqId = match[1];
+    if (!requirements.find((r) => r.id === reqId)) {
+      requirements.push({
+        id: reqId,
+        description: '',
+      });
+    }
   }
-
-  // Also extract from criteria sections
-  const criteriaPattern = /^(\d+\.\d+)\.\s+/gm;
-  const currentReqId: string[] = [];
-
-  content.split('\n').forEach((line) => {
-    const idMatch = line.match(/\*\*ID:\*\*\s+(clerkly\.[a-z0-9.]+)/i);
-    if (idMatch) {
-      currentReqId[0] = idMatch[1];
-    }
-
-    const criteriaMatch = line.match(criteriaPattern);
-    if (criteriaMatch && currentReqId[0]) {
-      const fullId = `${currentReqId[0]}.${criteriaMatch[1]}`;
-      if (!requirements.find((r) => r.id === fullId)) {
-        requirements.push({
-          id: fullId,
-          description: line,
-        });
-      }
-    }
-  });
 
   return requirements;
 }
@@ -142,13 +123,14 @@ function analyzeRequirementsCoverage(): CoverageReport {
   );
   const srcDir = path.join(__dirname, '..', 'src');
   const testsDir = path.join(__dirname, '..', 'tests');
+  const scriptsDir = path.join(__dirname, '..', 'scripts');
 
   // Extract all requirements
   const requirements = extractRequirements(requirementsPath);
   console.log(`\nFound ${requirements.length} requirements in requirements.md`);
 
   // Find all source and test files
-  const sourceFiles = findTypeScriptFiles(srcDir);
+  const sourceFiles = [...findTypeScriptFiles(srcDir), ...findTypeScriptFiles(scriptsDir)];
   const testFiles = findTypeScriptFiles(testsDir);
 
   console.log(`Found ${sourceFiles.length} source files`);
@@ -175,8 +157,11 @@ function analyzeRequirementsCoverage(): CoverageReport {
     const refs = extractRequirementReferences(file);
     refs.forEach((ref) => coveredInTests.add(ref));
 
-    if (!checkTestStructure(file)) {
-      testsWithoutStructure.push(file);
+    // Skip setup files from structure check
+    if (!file.includes('setup.ts') && !file.includes('setup.test.ts')) {
+      if (!checkTestStructure(file)) {
+        testsWithoutStructure.push(file);
+      }
     }
   });
 

@@ -1,4 +1,5 @@
-// Requirements: clerkly.1.3, clerkly.2.6, clerkly.2.8
+// Requirements: clerkly.1, clerkly.2
+
 import * as fc from 'fast-check';
 import { StateController } from '../../src/renderer/StateController';
 
@@ -6,7 +7,7 @@ describe('Property Tests - State Controller', () => {
   /* Preconditions: StateController initialized with random state containing various data types
      Action: call getState() to get state copy, mutate the returned object (add/modify/delete properties), call getState() again
      Assertions: for all states, internal state remains unchanged after mutations to returned object (deep equality with original)
-     Requirements: clerkly.1.3, clerkly.2.6 */
+     Requirements: clerkly.1, clerkly.2*/
   // Feature: clerkly, Property 3
   test('Property 3: State Immutability - getState() returns copy and mutations do not affect internal state', () => {
     // Create JSON-safe arbitrary generator for state objects
@@ -127,7 +128,7 @@ describe('Property Tests - State Controller', () => {
   /* Preconditions: StateController initialized with nested objects
      Action: get state, mutate nested objects deeply, get state again
      Assertions: nested objects in internal state remain unchanged
-     Requirements: clerkly.1.3, clerkly.2.6 */
+     Requirements: clerkly.1, clerkly.2*/
   // Feature: clerkly, Property 3
   test('Property 3 edge case: deeply nested objects remain immutable', () => {
     const initialState = {
@@ -168,7 +169,7 @@ describe('Property Tests - State Controller', () => {
   /* Preconditions: StateController initialized with arrays in state
      Action: get state, mutate arrays (push, pop, splice), get state again
      Assertions: arrays in internal state remain unchanged
-     Requirements: clerkly.1.3, clerkly.2.6 */
+     Requirements: clerkly.1, clerkly.2*/
   // Feature: clerkly, Property 3
   test('Property 3 edge case: arrays remain immutable', () => {
     const initialState = {
@@ -212,7 +213,7 @@ describe('Property Tests - State Controller', () => {
   /* Preconditions: StateController initialized with empty state
      Action: get state, add properties to returned object, get state again
      Assertions: internal state remains empty
-     Requirements: clerkly.1.3, clerkly.2.6 */
+     Requirements: clerkly.1, clerkly.2*/
   // Feature: clerkly, Property 3
   test('Property 3 edge case: empty state remains immutable', () => {
     const stateController = new StateController({});
@@ -234,7 +235,7 @@ describe('Property Tests - State Controller', () => {
   /* Preconditions: StateController initialized with state containing many properties
      Action: get state, delete multiple properties from returned object, get state again
      Assertions: all properties remain in internal state
-     Requirements: clerkly.1.3, clerkly.2.6 */
+     Requirements: clerkly.1, clerkly.2*/
   // Feature: clerkly, Property 3
   test('Property 3 edge case: state with many properties remains immutable', () => {
     const initialState: Record<string, any> = {};
@@ -264,7 +265,7 @@ describe('Property Tests - State Controller', () => {
   /* Preconditions: StateController initialized with state
      Action: get state multiple times, mutate each copy differently, get state again
      Assertions: internal state remains unchanged regardless of multiple mutations
-     Requirements: clerkly.1.3, clerkly.2.6 */
+     Requirements: clerkly.1, clerkly.2*/
   // Feature: clerkly, Property 3
   test('Property 3 edge case: multiple getState calls return independent copies', () => {
     const initialState = {
@@ -304,7 +305,7 @@ describe('Property Tests - State Controller', () => {
   /* Preconditions: StateController initialized with state containing Date objects
      Action: get state, mutate Date objects, get state again
      Assertions: Date objects in internal state remain unchanged
-     Requirements: clerkly.1.3, clerkly.2.6 */
+     Requirements: clerkly.1, clerkly.2*/
   // Feature: clerkly, Property 3
   test('Property 3 edge case: Date objects remain immutable', () => {
     const originalDate = new Date('2024-01-01T00:00:00Z');
@@ -333,7 +334,7 @@ describe('Property Tests - State Controller', () => {
   /* Preconditions: StateController initialized with state
      Action: call setState to update state, get state, mutate returned object, get state again
      Assertions: state after setState is preserved, mutations do not affect it
-     Requirements: clerkly.1.3, clerkly.2.6 */
+     Requirements: clerkly.1, clerkly.2*/
   // Feature: clerkly, Property 3
   test('Property 3 edge case: state immutability after setState', () => {
     const stateController = new StateController({ initial: 'value' });
@@ -360,7 +361,7 @@ describe('Property Tests - State Controller', () => {
   /* Preconditions: StateController initialized with state
      Action: call getStateProperty for nested object, mutate returned value, call getStateProperty again
      Assertions: property value remains unchanged in internal state
-     Requirements: clerkly.1.3, clerkly.2.6 */
+     Requirements: clerkly.1, clerkly.2*/
   // Feature: clerkly, Property 3
   test('Property 3 edge case: getStateProperty returns immutable copy', () => {
     const initialState = {
@@ -403,7 +404,7 @@ describe('Property Tests - State Controller', () => {
   /* Preconditions: StateController initialized with complex nested structure
      Action: generate random mutations on nested structures, verify immutability
      Assertions: for all mutation patterns, internal state remains unchanged
-     Requirements: clerkly.1.3, clerkly.2.6 */
+     Requirements: clerkly.1, clerkly.2*/
   // Feature: clerkly, Property 3
   test('Property 3: complex nested structures remain immutable with random mutations', () => {
     const complexStateArbitrary = fc.record({

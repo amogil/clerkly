@@ -1,5 +1,4 @@
-// Requirements: clerkly.2.1, clerkly.2.8
-
+// Requirements: clerkly.2
 /**
  * Unit tests for Preload Script
  * Tests secure IPC API exposure via contextBridge
@@ -41,7 +40,7 @@ describe('Preload Script', () => {
   /* Preconditions: contextBridge is available, preload script is loaded
      Action: load preload script
      Assertions: contextBridge.exposeInMainWorld is called with 'api' and API object
-     Requirements: clerkly.1.4, clerkly.2.5 */
+     Requirements: clerkly.1, clerkly.2*/
   it('should expose API via contextBridge', () => {
     expect(contextBridge.exposeInMainWorld).toHaveBeenCalledWith('api', expect.any(Object));
     expect(exposedAPI).toBeDefined();
@@ -53,7 +52,7 @@ describe('Preload Script', () => {
   /* Preconditions: API is exposed via contextBridge, ipcRenderer.invoke is mocked
      Action: call exposedAPI.saveData with key and value
      Assertions: ipcRenderer.invoke is called with 'save-data', key, value
-     Requirements: clerkly.1.4, clerkly.2.5 */
+     Requirements: clerkly.1, clerkly.2*/
   it('should call ipcRenderer.invoke for saveData', async () => {
     const mockResponse = { success: true };
     (ipcRenderer.invoke as jest.Mock).mockResolvedValue(mockResponse);
@@ -69,7 +68,7 @@ describe('Preload Script', () => {
   /* Preconditions: API is exposed via contextBridge, ipcRenderer.invoke is mocked
      Action: call exposedAPI.loadData with key
      Assertions: ipcRenderer.invoke is called with 'load-data', key
-     Requirements: clerkly.1.4, clerkly.2.5 */
+     Requirements: clerkly.1, clerkly.2*/
   it('should call ipcRenderer.invoke for loadData', async () => {
     const mockResponse = { success: true, data: { data: 'test-value' } };
     (ipcRenderer.invoke as jest.Mock).mockResolvedValue(mockResponse);
@@ -83,7 +82,7 @@ describe('Preload Script', () => {
   /* Preconditions: API is exposed via contextBridge, ipcRenderer.invoke is mocked
      Action: call exposedAPI.deleteData with key
      Assertions: ipcRenderer.invoke is called with 'delete-data', key
-     Requirements: clerkly.1.4, clerkly.2.5 */
+     Requirements: clerkly.1, clerkly.2*/
   it('should call ipcRenderer.invoke for deleteData', async () => {
     const mockResponse = { success: true };
     (ipcRenderer.invoke as jest.Mock).mockResolvedValue(mockResponse);
@@ -97,7 +96,7 @@ describe('Preload Script', () => {
   /* Preconditions: API is exposed via contextBridge, ipcRenderer.invoke returns error
      Action: call exposedAPI.saveData with invalid parameters
      Assertions: error response is returned from ipcRenderer.invoke
-     Requirements: clerkly.1.4, clerkly.2.5 */
+     Requirements: clerkly.1, clerkly.2*/
   it('should handle saveData errors from IPC', async () => {
     const mockError = { success: false, error: 'Invalid key' };
     (ipcRenderer.invoke as jest.Mock).mockResolvedValue(mockError);
@@ -111,7 +110,7 @@ describe('Preload Script', () => {
   /* Preconditions: API is exposed via contextBridge, ipcRenderer.invoke returns error
      Action: call exposedAPI.loadData with non-existent key
      Assertions: error response is returned from ipcRenderer.invoke
-     Requirements: clerkly.1.4, clerkly.2.5 */
+     Requirements: clerkly.1, clerkly.2*/
   it('should handle loadData errors from IPC', async () => {
     const mockError = { success: false, error: 'Key not found' };
     (ipcRenderer.invoke as jest.Mock).mockResolvedValue(mockError);
@@ -125,7 +124,7 @@ describe('Preload Script', () => {
   /* Preconditions: API is exposed via contextBridge, ipcRenderer.invoke returns error
      Action: call exposedAPI.deleteData with non-existent key
      Assertions: error response is returned from ipcRenderer.invoke
-     Requirements: clerkly.1.4, clerkly.2.5 */
+     Requirements: clerkly.1, clerkly.2*/
   it('should handle deleteData errors from IPC', async () => {
     const mockError = { success: false, error: 'Key not found' };
     (ipcRenderer.invoke as jest.Mock).mockResolvedValue(mockError);
@@ -139,7 +138,7 @@ describe('Preload Script', () => {
   /* Preconditions: API is exposed via contextBridge, ipcRenderer.invoke is mocked
      Action: call all API methods with various data types
      Assertions: all methods work correctly with different data types
-     Requirements: clerkly.1.4, clerkly.2.5 */
+     Requirements: clerkly.1, clerkly.2*/
   it('should handle various data types in saveData', async () => {
     const testCases = [
       { key: 'string-key', value: 'string-value' },

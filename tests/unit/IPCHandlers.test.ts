@@ -1,4 +1,5 @@
-// Requirements: clerkly.2.1, clerkly.2.3, clerkly.2.8
+// Requirements: clerkly.2
+
 import { ipcMain, IpcMainInvokeEvent } from 'electron';
 import { IPCHandlers } from '../../src/main/IPCHandlers';
 import { DataManager } from '../../src/main/DataManager';
@@ -41,7 +42,7 @@ describe('IPCHandlers', () => {
     /* Preconditions: IPCHandlers instance created, no handlers registered
        Action: call registerHandlers()
        Assertions: ipcMain.handle called 3 times for save-data, load-data, delete-data
-       Requirements: clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.2*/
     it('should register all IPC handlers', () => {
       ipcHandlers.registerHandlers();
 
@@ -56,7 +57,7 @@ describe('IPCHandlers', () => {
     /* Preconditions: IPCHandlers instance created, handlers registered
        Action: call registerHandlers() then unregisterHandlers()
        Assertions: ipcMain.removeHandler called 3 times for all channels
-       Requirements: clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.2*/
     it('should unregister all IPC handlers', () => {
       ipcHandlers.registerHandlers();
       ipcHandlers.unregisterHandlers();
@@ -70,7 +71,7 @@ describe('IPCHandlers', () => {
     /* Preconditions: IPCHandlers instance created, no handlers registered
        Action: call unregisterHandlers() without registering first
        Assertions: ipcMain.removeHandler not called, no errors thrown
-       Requirements: clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.2*/
     it('should handle unregister when no handlers are registered', () => {
       ipcHandlers.unregisterHandlers();
 
@@ -82,7 +83,7 @@ describe('IPCHandlers', () => {
     /* Preconditions: DataManager mock configured to return success true
        Action: call handleSaveData with valid key and value
        Assertions: returns success true, DataManager.saveData called with correct params
-       Requirements: clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.2*/
     it('should handle valid save-data request', async () => {
       mockDataManager.saveData.mockReturnValue({ success: true });
 
@@ -95,7 +96,7 @@ describe('IPCHandlers', () => {
     /* Preconditions: DataManager mock configured to return success true
        Action: call handleSaveData with various data types (string, number, object, array, boolean)
        Assertions: all calls succeed, DataManager.saveData called with correct values
-       Requirements: clerkly.2.1, clerkly.2.3, clerkly.2.8 */
+       Requirements: clerkly.2*/
     it('should handle save-data with different value types', async () => {
       mockDataManager.saveData.mockReturnValue({ success: true });
 
@@ -117,7 +118,7 @@ describe('IPCHandlers', () => {
     /* Preconditions: IPCHandlers instance created
        Action: call handleSaveData with undefined key
        Assertions: returns success false with error about required key, DataManager not called
-       Requirements: clerkly.2.1, clerkly.2.3, clerkly.2.8 */
+       Requirements: clerkly.2*/
     it('should reject save-data with undefined key', async () => {
       const result = await ipcHandlers.handleSaveData(mockEvent, undefined as any, 'value');
 
@@ -129,7 +130,7 @@ describe('IPCHandlers', () => {
     /* Preconditions: IPCHandlers instance created
        Action: call handleSaveData with null key
        Assertions: returns success false with error about required key, DataManager not called
-       Requirements: clerkly.2.1, clerkly.2.3, clerkly.2.8 */
+       Requirements: clerkly.2*/
     it('should reject save-data with null key', async () => {
       const result = await ipcHandlers.handleSaveData(mockEvent, null as any, 'value');
 
@@ -141,7 +142,7 @@ describe('IPCHandlers', () => {
     /* Preconditions: IPCHandlers instance created
        Action: call handleSaveData with valid key but undefined value
        Assertions: returns success false with error about required value, DataManager not called
-       Requirements: clerkly.2.1, clerkly.2.3, clerkly.2.8 */
+       Requirements: clerkly.2*/
     it('should reject save-data with undefined value', async () => {
       const result = await ipcHandlers.handleSaveData(mockEvent, 'test-key', undefined);
 
@@ -153,7 +154,7 @@ describe('IPCHandlers', () => {
     /* Preconditions: DataManager mock configured to return error
        Action: call handleSaveData with valid parameters
        Assertions: returns success false with error message, error logged
-       Requirements: clerkly.2.1, clerkly.2.3, clerkly.2.8 */
+       Requirements: clerkly.2*/
     it('should handle DataManager save error', async () => {
       const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
       mockDataManager.saveData.mockReturnValue({ success: false, error: 'Database error' });
@@ -170,7 +171,7 @@ describe('IPCHandlers', () => {
     /* Preconditions: DataManager mock configured to throw exception
        Action: call handleSaveData with valid parameters
        Assertions: returns success false with exception message, exception logged
-       Requirements: clerkly.2.1, clerkly.2.3, clerkly.2.8 */
+       Requirements: clerkly.2*/
     it('should handle DataManager exception', async () => {
       const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
       mockDataManager.saveData.mockImplementation(() => {
@@ -191,7 +192,7 @@ describe('IPCHandlers', () => {
     /* Preconditions: DataManager mock configured to return success true with data
        Action: call handleLoadData with valid key
        Assertions: returns success true with data, DataManager.loadData called with correct key
-       Requirements: clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.2*/
     it('should handle valid load-data request', async () => {
       mockDataManager.loadData.mockReturnValue({ success: true, data: 'test-value' });
 
@@ -205,7 +206,7 @@ describe('IPCHandlers', () => {
     /* Preconditions: DataManager mock configured to return various data types
        Action: call handleLoadData with different keys
        Assertions: all calls succeed, correct data returned for each type
-       Requirements: clerkly.2.1, clerkly.2.3, clerkly.2.8 */
+       Requirements: clerkly.2*/
     it('should handle load-data with different data types', async () => {
       const testCases = [
         { key: 'string-key', data: 'string-value' },
@@ -226,7 +227,7 @@ describe('IPCHandlers', () => {
     /* Preconditions: IPCHandlers instance created
        Action: call handleLoadData with undefined key
        Assertions: returns success false with error about required key, DataManager not called
-       Requirements: clerkly.2.1, clerkly.2.3, clerkly.2.8 */
+       Requirements: clerkly.2*/
     it('should reject load-data with undefined key', async () => {
       const result = await ipcHandlers.handleLoadData(mockEvent, undefined as any);
 
@@ -238,7 +239,7 @@ describe('IPCHandlers', () => {
     /* Preconditions: IPCHandlers instance created
        Action: call handleLoadData with null key
        Assertions: returns success false with error about required key, DataManager not called
-       Requirements: clerkly.2.1, clerkly.2.3, clerkly.2.8 */
+       Requirements: clerkly.2*/
     it('should reject load-data with null key', async () => {
       const result = await ipcHandlers.handleLoadData(mockEvent, null as any);
 
@@ -250,7 +251,7 @@ describe('IPCHandlers', () => {
     /* Preconditions: DataManager mock configured to return error (key not found)
        Action: call handleLoadData with non-existent key
        Assertions: returns success false with error message, error logged
-       Requirements: clerkly.2.1, clerkly.2.3, clerkly.2.8 */
+       Requirements: clerkly.2*/
     it('should handle DataManager load error', async () => {
       const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
       mockDataManager.loadData.mockReturnValue({ success: false, error: 'Key not found' });
@@ -267,7 +268,7 @@ describe('IPCHandlers', () => {
     /* Preconditions: DataManager mock configured to throw exception
        Action: call handleLoadData with valid key
        Assertions: returns success false with exception message, exception logged
-       Requirements: clerkly.2.1, clerkly.2.3, clerkly.2.8 */
+       Requirements: clerkly.2*/
     it('should handle DataManager exception', async () => {
       const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
       mockDataManager.loadData.mockImplementation(() => {
@@ -288,7 +289,7 @@ describe('IPCHandlers', () => {
     /* Preconditions: DataManager mock configured to return success true
        Action: call handleDeleteData with valid key
        Assertions: returns success true, DataManager.deleteData called with correct key
-       Requirements: clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.2*/
     it('should handle valid delete-data request', async () => {
       mockDataManager.deleteData.mockReturnValue({ success: true });
 
@@ -301,7 +302,7 @@ describe('IPCHandlers', () => {
     /* Preconditions: IPCHandlers instance created
        Action: call handleDeleteData with undefined key
        Assertions: returns success false with error about required key, DataManager not called
-       Requirements: clerkly.2.1, clerkly.2.3, clerkly.2.8 */
+       Requirements: clerkly.2*/
     it('should reject delete-data with undefined key', async () => {
       const result = await ipcHandlers.handleDeleteData(mockEvent, undefined as any);
 
@@ -313,7 +314,7 @@ describe('IPCHandlers', () => {
     /* Preconditions: IPCHandlers instance created
        Action: call handleDeleteData with null key
        Assertions: returns success false with error about required key, DataManager not called
-       Requirements: clerkly.2.1, clerkly.2.3, clerkly.2.8 */
+       Requirements: clerkly.2*/
     it('should reject delete-data with null key', async () => {
       const result = await ipcHandlers.handleDeleteData(mockEvent, null as any);
 
@@ -325,7 +326,7 @@ describe('IPCHandlers', () => {
     /* Preconditions: DataManager mock configured to return error
        Action: call handleDeleteData with valid key
        Assertions: returns success false with error message, error logged
-       Requirements: clerkly.2.1, clerkly.2.3, clerkly.2.8 */
+       Requirements: clerkly.2*/
     it('should handle DataManager delete error', async () => {
       const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
       mockDataManager.deleteData.mockReturnValue({ success: false, error: 'Key not found' });
@@ -342,7 +343,7 @@ describe('IPCHandlers', () => {
     /* Preconditions: DataManager mock configured to throw exception
        Action: call handleDeleteData with valid key
        Assertions: returns success false with exception message, exception logged
-       Requirements: clerkly.2.1, clerkly.2.3, clerkly.2.8 */
+       Requirements: clerkly.2*/
     it('should handle DataManager exception', async () => {
       const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
       mockDataManager.deleteData.mockImplementation(() => {
@@ -365,7 +366,7 @@ describe('IPCHandlers', () => {
     /* Preconditions: IPCHandlers instance created
        Action: call withTimeout with promise that resolves quickly (< timeout)
        Assertions: promise resolves successfully with expected value
-       Requirements: clerkly.2.1, clerkly.nfr.2.3, clerkly.2.8 */
+       Requirements: clerkly.2, clerkly.nfr.2*/
     it('should resolve promise that completes before timeout', async () => {
       const promise = Promise.resolve('success');
       const result = await ipcHandlers.withTimeout(promise, 1000, 'timeout message');
@@ -376,7 +377,7 @@ describe('IPCHandlers', () => {
     /* Preconditions: IPCHandlers instance created
        Action: call withTimeout with promise that takes longer than timeout
        Assertions: promise rejects with timeout error message
-       Requirements: clerkly.2.1, clerkly.nfr.2.3, clerkly.2.8 */
+       Requirements: clerkly.2, clerkly.nfr.2*/
     it('should reject promise that exceeds timeout', async () => {
       const promise = new Promise((resolve) => setTimeout(() => resolve('too late'), 2000));
 
@@ -388,7 +389,7 @@ describe('IPCHandlers', () => {
     /* Preconditions: IPCHandlers instance created
        Action: call withTimeout with promise that rejects before timeout
        Assertions: promise rejects with original error, not timeout error
-       Requirements: clerkly.2.1, clerkly.nfr.2.3, clerkly.2.8 */
+       Requirements: clerkly.2, clerkly.nfr.2*/
     it('should propagate promise rejection before timeout', async () => {
       const promise = Promise.reject(new Error('Original error'));
 
@@ -400,7 +401,7 @@ describe('IPCHandlers', () => {
     /* Preconditions: IPCHandlers instance created
        Action: call withTimeout with promise that completes exactly at timeout boundary
        Assertions: promise resolves or rejects based on race condition
-       Requirements: clerkly.2.1, clerkly.nfr.2.3, clerkly.2.8 */
+       Requirements: clerkly.2, clerkly.nfr.2*/
     it('should handle promise completing near timeout boundary', async () => {
       const promise = new Promise((resolve) => setTimeout(() => resolve('boundary'), 50));
 
@@ -414,7 +415,7 @@ describe('IPCHandlers', () => {
     /* Preconditions: IPCHandlers instance created with default timeout (10000ms)
        Action: call getTimeout()
        Assertions: returns 10000
-       Requirements: clerkly.2.1, clerkly.nfr.2.3, clerkly.2.8 */
+       Requirements: clerkly.2, clerkly.nfr.2*/
     it('should return default timeout of 10000ms', () => {
       expect(ipcHandlers.getTimeout()).toBe(10000);
     });
@@ -422,7 +423,7 @@ describe('IPCHandlers', () => {
     /* Preconditions: IPCHandlers instance created
        Action: call setTimeout with new value, then getTimeout
        Assertions: getTimeout returns new value
-       Requirements: clerkly.2.1, clerkly.nfr.2.3, clerkly.2.8 */
+       Requirements: clerkly.2, clerkly.nfr.2*/
     it('should update timeout value', () => {
       ipcHandlers.setTimeout(5000);
       expect(ipcHandlers.getTimeout()).toBe(5000);
@@ -431,7 +432,7 @@ describe('IPCHandlers', () => {
     /* Preconditions: IPCHandlers instance created, timeout set to custom value
        Action: call setTimeout multiple times with different values
        Assertions: getTimeout always returns most recent value
-       Requirements: clerkly.2.1, clerkly.nfr.2.3, clerkly.2.8 */
+       Requirements: clerkly.2, clerkly.nfr.2*/
     it('should allow multiple timeout updates', () => {
       ipcHandlers.setTimeout(3000);
       expect(ipcHandlers.getTimeout()).toBe(3000);
@@ -448,7 +449,7 @@ describe('IPCHandlers', () => {
     /* Preconditions: IPCHandlers instance created, timeout set to 100ms, DataManager mock with slow operation
        Action: call handleSaveData with operation that takes > 100ms
        Assertions: returns success false with timeout error message
-       Requirements: clerkly.2.1, clerkly.nfr.2.3, clerkly.2.8 */
+       Requirements: clerkly.2, clerkly.nfr.2*/
     it('should enforce timeout on save-data operation', async () => {
       const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
       ipcHandlers.setTimeout(100);
@@ -473,7 +474,7 @@ describe('IPCHandlers', () => {
     /* Preconditions: IPCHandlers instance created, timeout set to 100ms, DataManager mock with slow operation
        Action: call handleLoadData with operation that takes > 100ms
        Assertions: returns success false with timeout error message
-       Requirements: clerkly.2.1, clerkly.nfr.2.3, clerkly.2.8 */
+       Requirements: clerkly.2, clerkly.nfr.2*/
     it('should enforce timeout on load-data operation', async () => {
       const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
       ipcHandlers.setTimeout(100);
@@ -498,7 +499,7 @@ describe('IPCHandlers', () => {
     /* Preconditions: IPCHandlers instance created, timeout set to 100ms, DataManager mock with slow operation
        Action: call handleDeleteData with operation that takes > 100ms
        Assertions: returns success false with timeout error message
-       Requirements: clerkly.2.1, clerkly.nfr.2.3, clerkly.2.8 */
+       Requirements: clerkly.2, clerkly.nfr.2*/
     it('should enforce timeout on delete-data operation', async () => {
       const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
       ipcHandlers.setTimeout(100);
@@ -525,7 +526,7 @@ describe('IPCHandlers', () => {
     /* Preconditions: IPCHandlers instance created, timeout set to 200ms, DataManager mock with fast operation
        Action: call handleSaveData with operation that completes in 50ms
        Assertions: returns success true, operation completes before timeout
-       Requirements: clerkly.2.1, clerkly.nfr.2.3, clerkly.2.8 */
+       Requirements: clerkly.2, clerkly.nfr.2*/
     it('should not timeout when operation completes quickly', async () => {
       ipcHandlers.setTimeout(200);
 
@@ -547,7 +548,7 @@ describe('IPCHandlers', () => {
     /* Preconditions: IPCHandlers instance created, DataManager returns error
        Action: call handleSaveData, handleLoadData, handleDeleteData with errors
        Assertions: console.error called for each operation with appropriate message
-       Requirements: clerkly.2.1, clerkly.2.3, clerkly.2.8 */
+       Requirements: clerkly.2*/
     it('should log errors for all failed operations', async () => {
       const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
 
@@ -570,7 +571,7 @@ describe('IPCHandlers', () => {
     /* Preconditions: IPCHandlers instance created
        Action: call handlers with invalid parameters
        Assertions: console.error called with parameter validation errors
-       Requirements: clerkly.2.1, clerkly.2.3, clerkly.2.8 */
+       Requirements: clerkly.2*/
     it('should log parameter validation errors', async () => {
       const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
 

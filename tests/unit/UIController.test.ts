@@ -2,7 +2,8 @@
  * @jest-environment jsdom
  */
 
-// Requirements: clerkly.2.1, clerkly.2.8
+// Requirements: clerkly.2
+
 import { UIController } from '../../src/renderer/UIController';
 
 describe('UIController', () => {
@@ -27,7 +28,7 @@ describe('UIController', () => {
     /* Preconditions: no UIController instance exists, container element created
        Action: create UIController with container element
        Assertions: container is set, loadingIndicators map is empty
-       Requirements: clerkly.1.3, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should initialize with container and empty loading indicators', () => {
       const controller = new UIController(container);
 
@@ -37,7 +38,7 @@ describe('UIController', () => {
     /* Preconditions: no UIController instance exists
        Action: create UIController with different container
        Assertions: correct container is stored
-       Requirements: clerkly.1.3, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should store provided container', () => {
       const customContainer = document.createElement('div');
       const controller = new UIController(customContainer);
@@ -50,7 +51,7 @@ describe('UIController', () => {
     /* Preconditions: UIController initialized with empty container
        Action: call render()
        Assertions: returns success true, container has main-container with header/content/footer, renderTime measured
-       Requirements: clerkly.1.3, clerkly.nfr.1.2, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2, clerkly.nfr.1*/
     it('should render UI with header, content, and footer', () => {
       const result = uiController.render();
 
@@ -76,7 +77,7 @@ describe('UIController', () => {
     /* Preconditions: UIController initialized, container has existing content
        Action: call render()
        Assertions: existing content cleared, new UI rendered
-       Requirements: clerkly.1.3, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should clear existing content before rendering', () => {
       container.innerHTML = '<div>Old content</div>';
 
@@ -90,7 +91,7 @@ describe('UIController', () => {
     /* Preconditions: UIController initialized
        Action: call render() and measure performance
        Assertions: renderTime is less than 100ms (performance threshold), performanceWarning is false
-       Requirements: clerkly.nfr.1.2, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.2, clerkly.nfr.1*/
     it('should render within performance threshold', () => {
       const result = uiController.render();
 
@@ -102,7 +103,7 @@ describe('UIController', () => {
     /* Preconditions: UIController initialized
        Action: call render() multiple times
        Assertions: each render succeeds, UI is re-rendered correctly
-       Requirements: clerkly.1.3, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should handle multiple renders', () => {
       const result1 = uiController.render();
       expect(result1.success).toBe(true);
@@ -117,7 +118,7 @@ describe('UIController', () => {
     /* Preconditions: UIController initialized
        Action: call render(), verify performance warning logic
        Assertions: if renderTime > 100ms, performanceWarning is true
-       Requirements: clerkly.nfr.1.2, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.2, clerkly.nfr.1*/
     it('should set performanceWarning when render exceeds threshold', () => {
       // Mock performance.now to simulate slow render
       const originalNow = performance.now;
@@ -141,7 +142,7 @@ describe('UIController', () => {
     /* Preconditions: UIController initialized
        Action: call render() with error condition (container removed from DOM)
        Assertions: returns success false, renderTime still measured
-       Requirements: clerkly.1.3, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should handle render errors gracefully', () => {
       // Create a scenario that might cause errors
       const badController = new UIController(container);
@@ -171,7 +172,7 @@ describe('UIController', () => {
     /* Preconditions: UIController initialized, UI rendered
        Action: call updateView with data object
        Assertions: returns success true, data display created in content area, updateTime measured
-       Requirements: clerkly.1.3, clerkly.nfr.1.2, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2, clerkly.nfr.1*/
     it('should update view with new data', () => {
       uiController.render();
 
@@ -193,7 +194,7 @@ describe('UIController', () => {
     /* Preconditions: UIController initialized, UI rendered with existing data
        Action: call updateView with new data
        Assertions: old data display removed, new data display created
-       Requirements: clerkly.1.3, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should replace existing data display', () => {
       uiController.render();
       uiController.updateView({ old: 'data' });
@@ -210,7 +211,7 @@ describe('UIController', () => {
     /* Preconditions: UIController initialized, UI rendered
        Action: call updateView() and measure performance
        Assertions: updateTime is less than 100ms, performanceWarning is false
-       Requirements: clerkly.nfr.1.2, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.2, clerkly.nfr.1*/
     it('should update within performance threshold', () => {
       uiController.render();
 
@@ -224,7 +225,7 @@ describe('UIController', () => {
     /* Preconditions: UIController initialized, UI rendered
        Action: call updateView with various data types
        Assertions: all data types displayed correctly
-       Requirements: clerkly.1.3, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should handle various data types', () => {
       uiController.render();
 
@@ -254,7 +255,7 @@ describe('UIController', () => {
     /* Preconditions: UIController initialized, UI rendered
        Action: call updateView with slow performance
        Assertions: performanceWarning is true when updateTime > 100ms
-       Requirements: clerkly.nfr.1.2, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.2, clerkly.nfr.1*/
     it('should set performanceWarning when update exceeds threshold', () => {
       uiController.render();
 
@@ -280,7 +281,7 @@ describe('UIController', () => {
     /* Preconditions: UIController initialized, UI not rendered
        Action: call updateView without rendering first
        Assertions: returns success false, error about content area not found
-       Requirements: clerkly.1.3, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should handle missing content area', () => {
       // Don't render first
       const result = uiController.updateView({ test: 'data' });
@@ -294,7 +295,7 @@ describe('UIController', () => {
     /* Preconditions: UIController initialized
        Action: call showLoading with operationId and message
        Assertions: returns success true, loading indicator element created and appended to container
-       Requirements: clerkly.nfr.1.3, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.2, clerkly.nfr.1*/
     it('should show loading indicator', () => {
       const result = uiController.showLoading('test-op', 'Loading...');
 
@@ -309,7 +310,7 @@ describe('UIController', () => {
     /* Preconditions: UIController initialized
        Action: call showLoading with same operationId twice
        Assertions: second call returns success false, error about existing indicator
-       Requirements: clerkly.nfr.1.3, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.2, clerkly.nfr.1*/
     it('should reject duplicate loading indicators', () => {
       const result1 = uiController.showLoading('test-op', 'Loading...');
       expect(result1.success).toBe(true);
@@ -322,7 +323,7 @@ describe('UIController', () => {
     /* Preconditions: UIController initialized
        Action: call showLoading with multiple different operationIds
        Assertions: all loading indicators created successfully
-       Requirements: clerkly.nfr.1.3, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.2, clerkly.nfr.1*/
     it('should handle multiple loading indicators', () => {
       const result1 = uiController.showLoading('op1', 'Loading 1...');
       const result2 = uiController.showLoading('op2', 'Loading 2...');
@@ -340,7 +341,7 @@ describe('UIController', () => {
     /* Preconditions: UIController initialized
        Action: call showLoading with empty message
        Assertions: loading indicator created with empty message
-       Requirements: clerkly.nfr.1.3, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.2, clerkly.nfr.1*/
     it('should handle empty loading message', () => {
       const result = uiController.showLoading('test-op', '');
 
@@ -356,7 +357,7 @@ describe('UIController', () => {
     /* Preconditions: UIController initialized, loading indicator shown
        Action: call hideLoading with operationId
        Assertions: returns success true, loading indicator removed, duration calculated
-       Requirements: clerkly.nfr.1.3, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.2, clerkly.nfr.1*/
     it('should hide loading indicator and return duration', () => {
       uiController.showLoading('test-op', 'Loading...');
 
@@ -379,7 +380,7 @@ describe('UIController', () => {
     /* Preconditions: UIController initialized, no loading indicator shown
        Action: call hideLoading with non-existent operationId
        Assertions: returns success false, error about indicator not found
-       Requirements: clerkly.nfr.1.3, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.2, clerkly.nfr.1*/
     it('should handle hiding non-existent loading indicator', () => {
       const result = uiController.hideLoading('non-existent');
 
@@ -390,7 +391,7 @@ describe('UIController', () => {
     /* Preconditions: UIController initialized, multiple loading indicators shown
        Action: call hideLoading for one indicator
        Assertions: only specified indicator removed, others remain
-       Requirements: clerkly.nfr.1.3, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.2, clerkly.nfr.1*/
     it('should hide only specified loading indicator', () => {
       uiController.showLoading('op1', 'Loading 1...');
       uiController.showLoading('op2', 'Loading 2...');
@@ -407,7 +408,7 @@ describe('UIController', () => {
     /* Preconditions: UIController initialized, loading indicator shown then hidden
        Action: call hideLoading again with same operationId
        Assertions: returns success false, error about indicator not found
-       Requirements: clerkly.nfr.1.3, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.2, clerkly.nfr.1*/
     it('should handle hiding already hidden indicator', () => {
       uiController.showLoading('test-op', 'Loading...');
       uiController.hideLoading('test-op');
@@ -423,7 +424,7 @@ describe('UIController', () => {
     /* Preconditions: UIController initialized
        Action: call withLoading with fast operation (< 200ms)
        Assertions: operation completes, loading indicator not shown, result returned
-       Requirements: clerkly.nfr.1.3, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.2, clerkly.nfr.1*/
     it('should not show loading for fast operations', async () => {
       const fastOperation = jest.fn(async () => {
         return 'result';
@@ -442,7 +443,7 @@ describe('UIController', () => {
     /* Preconditions: UIController initialized
        Action: call withLoading with slow operation (> 200ms)
        Assertions: loading indicator shown after 200ms, then hidden after completion
-       Requirements: clerkly.nfr.1.3, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.2, clerkly.nfr.1*/
     it('should show loading for slow operations', async () => {
       const slowOperation = jest.fn(async () => {
         await new Promise((resolve) => setTimeout(resolve, 250));
@@ -472,7 +473,7 @@ describe('UIController', () => {
     /* Preconditions: UIController initialized
        Action: call withLoading with operation that throws error
        Assertions: error propagated, loading indicator hidden
-       Requirements: clerkly.nfr.1.3, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.2, clerkly.nfr.1*/
     it('should handle operation errors and hide loading', async () => {
       const errorOperation = jest.fn(async () => {
         await new Promise((resolve) => setTimeout(resolve, 250));
@@ -499,7 +500,7 @@ describe('UIController', () => {
     /* Preconditions: UIController initialized
        Action: call withLoading with operation that returns various types
        Assertions: all return types handled correctly
-       Requirements: clerkly.nfr.1.3, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.2, clerkly.nfr.1*/
     it('should handle various return types', async () => {
       // Test with object
       let result = await uiController.withLoading(
@@ -527,7 +528,7 @@ describe('UIController', () => {
     /* Preconditions: UIController initialized
        Action: call createHeader()
        Assertions: returns header element with correct attributes and content
-       Requirements: clerkly.1.3, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should create header element', () => {
       const header = uiController.createHeader();
 
@@ -540,7 +541,7 @@ describe('UIController', () => {
     /* Preconditions: UIController initialized
        Action: call createHeader() multiple times
        Assertions: each call returns new independent element
-       Requirements: clerkly.1.3, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should create independent header elements', () => {
       const header1 = uiController.createHeader();
       const header2 = uiController.createHeader();
@@ -554,7 +555,7 @@ describe('UIController', () => {
     /* Preconditions: UIController initialized
        Action: call createContent()
        Assertions: returns content div element with correct attributes
-       Requirements: clerkly.1.3, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should create content area element', () => {
       const content = uiController.createContent();
 
@@ -566,7 +567,7 @@ describe('UIController', () => {
     /* Preconditions: UIController initialized
        Action: call createContent() multiple times
        Assertions: each call returns new independent element
-       Requirements: clerkly.1.3, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should create independent content elements', () => {
       const content1 = uiController.createContent();
       const content2 = uiController.createContent();
@@ -579,7 +580,7 @@ describe('UIController', () => {
     /* Preconditions: UIController initialized
        Action: call createFooter()
        Assertions: returns footer element with correct attributes and version
-       Requirements: clerkly.1.3, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should create footer element', () => {
       const footer = uiController.createFooter();
 
@@ -592,7 +593,7 @@ describe('UIController', () => {
     /* Preconditions: UIController initialized
        Action: call createFooter() multiple times
        Assertions: each call returns new independent element
-       Requirements: clerkly.1.3, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should create independent footer elements', () => {
       const footer1 = uiController.createFooter();
       const footer2 = uiController.createFooter();
@@ -606,7 +607,7 @@ describe('UIController', () => {
     /* Preconditions: UIController initialized
        Action: call createDataDisplay with object data
        Assertions: returns div with data-display testid, displays key-value pairs
-       Requirements: clerkly.1.3, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should create data display for object', () => {
       const data = { key1: 'value1', key2: 42, key3: true };
       const display = uiController.createDataDisplay(data);
@@ -632,7 +633,7 @@ describe('UIController', () => {
     /* Preconditions: UIController initialized
        Action: call createDataDisplay with array data
        Assertions: displays array items with indices
-       Requirements: clerkly.1.3, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should create data display for array', () => {
       const data = ['item1', 'item2', 'item3'];
       const display = uiController.createDataDisplay(data);
@@ -651,7 +652,7 @@ describe('UIController', () => {
     /* Preconditions: UIController initialized
        Action: call createDataDisplay with null
        Assertions: displays "No data" message
-       Requirements: clerkly.1.3, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should handle null data', () => {
       const display = uiController.createDataDisplay(null);
 
@@ -662,7 +663,7 @@ describe('UIController', () => {
     /* Preconditions: UIController initialized
        Action: call createDataDisplay with undefined
        Assertions: displays "No data" message
-       Requirements: clerkly.1.3, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should handle undefined data', () => {
       const display = uiController.createDataDisplay(undefined);
 
@@ -673,7 +674,7 @@ describe('UIController', () => {
     /* Preconditions: UIController initialized
        Action: call createDataDisplay with primitive string
        Assertions: displays string value directly
-       Requirements: clerkly.1.3, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should handle primitive string data', () => {
       const display = uiController.createDataDisplay('simple string');
 
@@ -684,7 +685,7 @@ describe('UIController', () => {
     /* Preconditions: UIController initialized
        Action: call createDataDisplay with primitive number
        Assertions: displays number value as string
-       Requirements: clerkly.1.3, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should handle primitive number data', () => {
       const display = uiController.createDataDisplay(42);
 
@@ -695,7 +696,7 @@ describe('UIController', () => {
     /* Preconditions: UIController initialized
        Action: call createDataDisplay with nested object
        Assertions: nested objects displayed as JSON strings
-       Requirements: clerkly.1.3, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should handle nested objects', () => {
       const data = {
         nested: { key: 'value' },
@@ -711,7 +712,7 @@ describe('UIController', () => {
     /* Preconditions: UIController initialized
        Action: call createDataDisplay with empty object
        Assertions: creates display with no items
-       Requirements: clerkly.1.3, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should handle empty object', () => {
       const display = uiController.createDataDisplay({});
 
@@ -724,7 +725,7 @@ describe('UIController', () => {
     /* Preconditions: UIController initialized
        Action: call createDataDisplay with empty array
        Assertions: creates display with no items
-       Requirements: clerkly.1.3, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should handle empty array', () => {
       const display = uiController.createDataDisplay([]);
 
@@ -739,7 +740,7 @@ describe('UIController', () => {
     /* Preconditions: UIController initialized, multiple loading indicators shown
        Action: call clearAllLoading()
        Assertions: all loading indicators removed from DOM
-       Requirements: clerkly.1.3, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should clear all loading indicators', () => {
       uiController.showLoading('op1', 'Loading 1...');
       uiController.showLoading('op2', 'Loading 2...');
@@ -755,7 +756,7 @@ describe('UIController', () => {
     /* Preconditions: UIController initialized, no loading indicators shown
        Action: call clearAllLoading()
        Assertions: no error, operation completes successfully (idempotent)
-       Requirements: clerkly.1.3, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should handle clearing when no loading indicators exist', () => {
       expect(() => {
         uiController.clearAllLoading();
@@ -765,7 +766,7 @@ describe('UIController', () => {
     /* Preconditions: UIController initialized, loading indicators shown and cleared
        Action: show new loading indicators after clearing
        Assertions: new indicators can be shown successfully
-       Requirements: clerkly.1.3, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should allow new loading indicators after clearing', () => {
       uiController.showLoading('op1', 'Loading...');
       uiController.clearAllLoading();
@@ -781,7 +782,7 @@ describe('UIController', () => {
     /* Preconditions: UIController initialized with container
        Action: call getContainer()
        Assertions: returns the container element
-       Requirements: clerkly.1.3, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should return current container', () => {
       const returnedContainer = uiController.getContainer();
 
@@ -791,7 +792,7 @@ describe('UIController', () => {
     /* Preconditions: UIController initialized
        Action: call getContainer() multiple times
        Assertions: always returns same container reference
-       Requirements: clerkly.1.3, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should return same container reference', () => {
       const container1 = uiController.getContainer();
       const container2 = uiController.getContainer();
@@ -805,7 +806,7 @@ describe('UIController', () => {
     /* Preconditions: UIController initialized with container
        Action: call setContainer with new container
        Assertions: container updated, getContainer returns new container
-       Requirements: clerkly.1.3, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should update container', () => {
       const newContainer = document.createElement('div');
       document.body.appendChild(newContainer);
@@ -821,7 +822,7 @@ describe('UIController', () => {
     /* Preconditions: UIController initialized with loading indicators shown
        Action: call setContainer with new container
        Assertions: all loading indicators cleared before container change
-       Requirements: clerkly.1.3, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should clear loading indicators when changing container', () => {
       uiController.showLoading('op1', 'Loading...');
       uiController.showLoading('op2', 'Loading...');
@@ -841,7 +842,7 @@ describe('UIController', () => {
     /* Preconditions: UIController initialized, UI rendered in old container
        Action: call setContainer with new container, then render
        Assertions: UI rendered in new container, old container unchanged
-       Requirements: clerkly.1.3, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should render in new container after setContainer', () => {
       uiController.render();
 
@@ -865,7 +866,7 @@ describe('UIController', () => {
     /* Preconditions: UIController initialized
        Action: call render with very large data structure
        Assertions: render completes successfully, performance may be slower
-       Requirements: clerkly.1.3, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should handle large data structures', () => {
       uiController.render();
 
@@ -883,7 +884,7 @@ describe('UIController', () => {
     /* Preconditions: UIController initialized
        Action: call methods with special characters in data
        Assertions: special characters handled correctly, no XSS vulnerabilities
-       Requirements: clerkly.1.3, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should handle special characters in data', () => {
       uiController.render();
 
@@ -905,7 +906,7 @@ describe('UIController', () => {
     /* Preconditions: UIController initialized
        Action: rapidly call render multiple times
        Assertions: all renders complete successfully
-       Requirements: clerkly.1.3, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should handle rapid consecutive renders', () => {
       for (let i = 0; i < 10; i++) {
         const result = uiController.render();
@@ -919,7 +920,7 @@ describe('UIController', () => {
     /* Preconditions: UIController initialized
        Action: call updateView with circular reference object
        Assertions: handles gracefully, returns success (displays what it can)
-       Requirements: clerkly.1.3, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should handle circular references in data', () => {
       uiController.render();
 
@@ -938,7 +939,7 @@ describe('UIController', () => {
     /* Preconditions: UIController initialized, multiple operations in progress
        Action: call showLoading, hideLoading, render, updateView in various orders
        Assertions: all operations complete successfully without interference
-       Requirements: clerkly.1.3, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should handle concurrent operations', () => {
       uiController.showLoading('op1', 'Loading 1...');
       const renderResult = uiController.render();
@@ -957,7 +958,7 @@ describe('UIController', () => {
     /* Preconditions: UIController initialized
        Action: call render and verify performance warning logged
        Assertions: console.warn called when renderTime > 100ms
-       Requirements: clerkly.nfr.1.2, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.2, clerkly.nfr.1*/
     it('should log performance warning for slow render', () => {
       const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation();
 
@@ -982,7 +983,7 @@ describe('UIController', () => {
     /* Preconditions: UIController initialized, UI rendered
        Action: call updateView and verify performance warning logged
        Assertions: console.warn called when updateTime > 100ms
-       Requirements: clerkly.nfr.1.2, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.2, clerkly.nfr.1*/
     it('should log performance warning for slow update', () => {
       uiController.render();
 
@@ -1009,7 +1010,7 @@ describe('UIController', () => {
     /* Preconditions: UIController initialized
        Action: call render with fast performance
        Assertions: no console.warn called when renderTime < 100ms
-       Requirements: clerkly.nfr.1.2, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.2, clerkly.nfr.1*/
     it('should not log warning for fast render', () => {
       const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation();
 
@@ -1023,7 +1024,7 @@ describe('UIController', () => {
     /* Preconditions: UIController initialized
        Action: measure actual render time
        Assertions: renderTime accurately reflects elapsed time
-       Requirements: clerkly.nfr.1.2, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.2, clerkly.nfr.1*/
     it('should accurately measure render time', () => {
       const result = uiController.render();
 
@@ -1036,7 +1037,7 @@ describe('UIController', () => {
     /* Preconditions: UIController initialized, UI rendered
        Action: measure actual update time
        Assertions: updateTime accurately reflects elapsed time
-       Requirements: clerkly.nfr.1.2, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.2, clerkly.nfr.1*/
     it('should accurately measure update time', () => {
       uiController.render();
 

@@ -1,4 +1,5 @@
-// Requirements: clerkly.2.1, clerkly.2.3, clerkly.2.8
+// Requirements: clerkly.2
+
 import Database from 'better-sqlite3';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -44,7 +45,7 @@ describe('DataManager', () => {
     /* Preconditions: storage directory does not exist, no database file exists
        Action: create DataManager and call initialize()
        Assertions: returns success true, directory created, database file created, migrations run
-       Requirements: clerkly.1.4, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should successfully initialize storage and run migrations', () => {
       dataManager = new DataManager(testStoragePath);
       const result = dataManager.initialize();
@@ -59,7 +60,7 @@ describe('DataManager', () => {
     /* Preconditions: storage directory exists with write permissions
        Action: create DataManager and call initialize()
        Assertions: returns success true, no warning about fallback
-       Requirements: clerkly.1.4, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should initialize successfully when directory already exists', () => {
       // Pre-create directory
       fs.mkdirSync(testStoragePath, { recursive: true });
@@ -74,7 +75,7 @@ describe('DataManager', () => {
     /* Preconditions: storage path has no write permissions (simulated)
        Action: create DataManager with restricted path and call initialize()
        Assertions: returns success true, warning about temp directory, path set to temp
-       Requirements: clerkly.1.4, clerkly.2.3, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it.skip('should fallback to temp directory on permission error', () => {
       // Note: This test is skipped because mocking fs.mkdirSync with permission errors
       // is complex in Jest due to property redefinition restrictions.
@@ -87,7 +88,7 @@ describe('DataManager', () => {
     /* Preconditions: database file exists but is corrupted
        Action: create DataManager and call initialize()
        Assertions: backup created, corrupted db deleted, new db created, returns success true
-       Requirements: clerkly.1.4, clerkly.2.3, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should handle corrupted database by creating backup and recreating', () => {
       // Create corrupted database file
       fs.mkdirSync(testStoragePath, { recursive: true });
@@ -120,7 +121,7 @@ describe('DataManager', () => {
     /* Preconditions: DataManager initialized, database is empty
        Action: save string data with valid key
        Assertions: returns success true, no error
-       Requirements: clerkly.1.4, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should save string data successfully', () => {
       const result = dataManager.saveData('test-key', 'test-value');
 
@@ -131,7 +132,7 @@ describe('DataManager', () => {
     /* Preconditions: DataManager initialized
        Action: save number data with valid key
        Assertions: returns success true, no error
-       Requirements: clerkly.1.4, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should save number data successfully', () => {
       const result = dataManager.saveData('number-key', 42);
 
@@ -142,7 +143,7 @@ describe('DataManager', () => {
     /* Preconditions: DataManager initialized
        Action: save object data with valid key
        Assertions: returns success true, no error
-       Requirements: clerkly.1.4, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should save object data successfully', () => {
       const testObject = { name: 'test', value: 123, nested: { key: 'value' } };
       const result = dataManager.saveData('object-key', testObject);
@@ -154,7 +155,7 @@ describe('DataManager', () => {
     /* Preconditions: DataManager initialized
        Action: save array data with valid key
        Assertions: returns success true, no error
-       Requirements: clerkly.1.4, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should save array data successfully', () => {
       const testArray = [1, 2, 3, 'four', { five: 5 }];
       const result = dataManager.saveData('array-key', testArray);
@@ -166,7 +167,7 @@ describe('DataManager', () => {
     /* Preconditions: DataManager initialized
        Action: save boolean data with valid key
        Assertions: returns success true, no error
-       Requirements: clerkly.1.4, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should save boolean data successfully', () => {
       const result = dataManager.saveData('boolean-key', true);
 
@@ -177,7 +178,7 @@ describe('DataManager', () => {
     /* Preconditions: DataManager initialized, key already exists in database
        Action: save new value with same key
        Assertions: returns success true, old value overwritten
-       Requirements: clerkly.1.4, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should overwrite existing key with new value', () => {
       dataManager.saveData('overwrite-key', 'old-value');
       const result = dataManager.saveData('overwrite-key', 'new-value');
@@ -191,7 +192,7 @@ describe('DataManager', () => {
     /* Preconditions: DataManager initialized
        Action: attempt to save data with empty string key
        Assertions: returns success false, error message about invalid key
-       Requirements: clerkly.1.4, clerkly.2.3, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should reject empty string key', () => {
       const result = dataManager.saveData('', 'value');
 
@@ -203,7 +204,7 @@ describe('DataManager', () => {
     /* Preconditions: DataManager initialized
        Action: attempt to save data with null key
        Assertions: returns success false, error message about invalid key
-       Requirements: clerkly.1.4, clerkly.2.3, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should reject null key', () => {
       const result = dataManager.saveData(null as any, 'value');
 
@@ -215,7 +216,7 @@ describe('DataManager', () => {
     /* Preconditions: DataManager initialized
        Action: attempt to save data with undefined key
        Assertions: returns success false, error message about invalid key
-       Requirements: clerkly.1.4, clerkly.2.3, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should reject undefined key', () => {
       const result = dataManager.saveData(undefined as any, 'value');
 
@@ -227,7 +228,7 @@ describe('DataManager', () => {
     /* Preconditions: DataManager initialized
        Action: attempt to save data with number as key
        Assertions: returns success false, error message about invalid key
-       Requirements: clerkly.1.4, clerkly.2.3, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should reject non-string key (number)', () => {
       const result = dataManager.saveData(123 as any, 'value');
 
@@ -239,7 +240,7 @@ describe('DataManager', () => {
     /* Preconditions: DataManager initialized
        Action: attempt to save data with object as key
        Assertions: returns success false, error message about invalid key
-       Requirements: clerkly.1.4, clerkly.2.3, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should reject non-string key (object)', () => {
       const result = dataManager.saveData({ key: 'value' } as any, 'value');
 
@@ -251,7 +252,7 @@ describe('DataManager', () => {
     /* Preconditions: DataManager initialized
        Action: attempt to save data with key longer than 1000 characters
        Assertions: returns success false, error message about maximum length
-       Requirements: clerkly.1.4, clerkly.2.3, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should reject key exceeding 1000 characters', () => {
       const longKey = 'a'.repeat(1001);
       const result = dataManager.saveData(longKey, 'value');
@@ -265,7 +266,7 @@ describe('DataManager', () => {
     /* Preconditions: DataManager initialized
        Action: save data with key exactly 1000 characters long
        Assertions: returns success true (boundary test)
-       Requirements: clerkly.1.4, clerkly.2.3, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should accept key with exactly 1000 characters', () => {
       const maxKey = 'a'.repeat(1000);
       const result = dataManager.saveData(maxKey, 'value');
@@ -276,7 +277,7 @@ describe('DataManager', () => {
     /* Preconditions: DataManager initialized
        Action: attempt to save value that cannot be serialized to JSON
        Assertions: returns success false, error message about serialization failure
-       Requirements: clerkly.1.4, clerkly.2.3, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should handle serialization errors', () => {
       // Create circular reference
       const circular: any = { a: 1 };
@@ -291,7 +292,7 @@ describe('DataManager', () => {
     /* Preconditions: DataManager initialized
        Action: attempt to save value exceeding 10MB when serialized
        Assertions: returns success false, error message about size limit
-       Requirements: clerkly.1.4, clerkly.2.3, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should reject value exceeding 10MB limit', () => {
       // Create large object (> 10MB)
       const largeValue = 'x'.repeat(11 * 1024 * 1024);
@@ -305,7 +306,7 @@ describe('DataManager', () => {
     /* Preconditions: DataManager initialized
        Action: save data with Infinity value
        Assertions: returns success true, value serialized correctly
-       Requirements: clerkly.1.4, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should handle Infinity values', () => {
       const result = dataManager.saveData('infinity-key', Infinity);
 
@@ -319,7 +320,7 @@ describe('DataManager', () => {
     /* Preconditions: DataManager initialized
        Action: save data with -Infinity value
        Assertions: returns success true, value serialized correctly
-       Requirements: clerkly.1.4, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should handle -Infinity values', () => {
       const result = dataManager.saveData('neg-infinity-key', -Infinity);
 
@@ -333,7 +334,7 @@ describe('DataManager', () => {
     /* Preconditions: DataManager initialized
        Action: save data with NaN value
        Assertions: returns success true, value serialized correctly
-       Requirements: clerkly.1.4, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should handle NaN values', () => {
       const result = dataManager.saveData('nan-key', NaN);
 
@@ -347,7 +348,7 @@ describe('DataManager', () => {
     /* Preconditions: DataManager initialized
        Action: save object containing Infinity, -Infinity, and NaN
        Assertions: returns success true, all special values preserved
-       Requirements: clerkly.1.4, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should handle objects with special numeric values', () => {
       const specialObject = {
         positive: Infinity,
@@ -370,7 +371,7 @@ describe('DataManager', () => {
     /* Preconditions: DataManager initialized but database closed
        Action: close database, then attempt to save data
        Assertions: returns success false, error about database not initialized
-       Requirements: clerkly.1.4, clerkly.2.3, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should handle closed database', () => {
       dataManager.close();
       const result = dataManager.saveData('test-key', 'value');
@@ -389,7 +390,7 @@ describe('DataManager', () => {
     /* Preconditions: DataManager initialized, string data saved with key
        Action: load data with same key
        Assertions: returns success true, data matches saved value
-       Requirements: clerkly.1.4, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should load string data successfully', () => {
       dataManager.saveData('string-key', 'test-value');
       const result = dataManager.loadData('string-key');
@@ -402,7 +403,7 @@ describe('DataManager', () => {
     /* Preconditions: DataManager initialized, number data saved
        Action: load number data
        Assertions: returns success true, data matches saved number
-       Requirements: clerkly.1.4, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should load number data successfully', () => {
       dataManager.saveData('number-key', 42);
       const result = dataManager.loadData('number-key');
@@ -414,7 +415,7 @@ describe('DataManager', () => {
     /* Preconditions: DataManager initialized, object data saved
        Action: load object data
        Assertions: returns success true, data deeply equals saved object
-       Requirements: clerkly.1.4, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should load object data successfully', () => {
       const testObject = { name: 'test', value: 123, nested: { key: 'value' } };
       dataManager.saveData('object-key', testObject);
@@ -427,7 +428,7 @@ describe('DataManager', () => {
     /* Preconditions: DataManager initialized, array data saved
        Action: load array data
        Assertions: returns success true, data deeply equals saved array
-       Requirements: clerkly.1.4, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should load array data successfully', () => {
       const testArray = [1, 2, 3, 'four', { five: 5 }];
       dataManager.saveData('array-key', testArray);
@@ -440,7 +441,7 @@ describe('DataManager', () => {
     /* Preconditions: DataManager initialized, boolean data saved
        Action: load boolean data
        Assertions: returns success true, data matches saved boolean
-       Requirements: clerkly.1.4, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should load boolean data successfully', () => {
       dataManager.saveData('boolean-key', false);
       const result = dataManager.loadData('boolean-key');
@@ -452,7 +453,7 @@ describe('DataManager', () => {
     /* Preconditions: DataManager initialized, key does not exist in database
        Action: attempt to load data with non-existent key
        Assertions: returns success false, error "Key not found"
-       Requirements: clerkly.1.4, clerkly.2.3, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should handle missing key', () => {
       const result = dataManager.loadData('non-existent-key');
 
@@ -463,7 +464,7 @@ describe('DataManager', () => {
     /* Preconditions: DataManager initialized
        Action: attempt to load data with empty string key
        Assertions: returns success false, error about invalid key
-       Requirements: clerkly.1.4, clerkly.2.3, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should reject empty string key', () => {
       const result = dataManager.loadData('');
 
@@ -475,7 +476,7 @@ describe('DataManager', () => {
     /* Preconditions: DataManager initialized
        Action: attempt to load data with null key
        Assertions: returns success false, error about invalid key
-       Requirements: clerkly.1.4, clerkly.2.3, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should reject null key', () => {
       const result = dataManager.loadData(null as any);
 
@@ -486,7 +487,7 @@ describe('DataManager', () => {
     /* Preconditions: DataManager initialized
        Action: attempt to load data with undefined key
        Assertions: returns success false, error about invalid key
-       Requirements: clerkly.1.4, clerkly.2.3, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should reject undefined key', () => {
       const result = dataManager.loadData(undefined as any);
 
@@ -497,7 +498,7 @@ describe('DataManager', () => {
     /* Preconditions: DataManager initialized
        Action: attempt to load data with key longer than 1000 characters
        Assertions: returns success false, error about maximum length
-       Requirements: clerkly.1.4, clerkly.2.3, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should reject key exceeding 1000 characters', () => {
       const longKey = 'a'.repeat(1001);
       const result = dataManager.loadData(longKey);
@@ -510,7 +511,7 @@ describe('DataManager', () => {
     /* Preconditions: DataManager initialized but database closed
        Action: close database, then attempt to load data
        Assertions: returns success false, error about database not initialized
-       Requirements: clerkly.1.4, clerkly.2.3, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should handle closed database', () => {
       dataManager.close();
       const result = dataManager.loadData('test-key');
@@ -522,7 +523,7 @@ describe('DataManager', () => {
     /* Preconditions: DataManager initialized, database contains corrupted JSON data
        Action: manually insert invalid JSON, then attempt to load
        Assertions: returns success true, data returned as plain string (fallback)
-       Requirements: clerkly.1.4, clerkly.2.3, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should handle corrupted JSON data with fallback to plain string', () => {
       // Manually insert invalid JSON into database
       const db = new Database(testDbPath);
@@ -555,7 +556,7 @@ describe('DataManager', () => {
     /* Preconditions: DataManager initialized, data saved with key
        Action: delete data with same key
        Assertions: returns success true, subsequent load fails with "Key not found"
-       Requirements: clerkly.1.4, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should delete data successfully', () => {
       dataManager.saveData('delete-key', 'delete-value');
       const deleteResult = dataManager.deleteData('delete-key');
@@ -572,7 +573,7 @@ describe('DataManager', () => {
     /* Preconditions: DataManager initialized, key does not exist
        Action: attempt to delete non-existent key
        Assertions: returns success false, error "Key not found"
-       Requirements: clerkly.1.4, clerkly.2.3, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should handle deleting non-existent key', () => {
       const result = dataManager.deleteData('non-existent-key');
 
@@ -583,7 +584,7 @@ describe('DataManager', () => {
     /* Preconditions: DataManager initialized
        Action: attempt to delete with empty string key
        Assertions: returns success false, error about invalid key
-       Requirements: clerkly.1.4, clerkly.2.3, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should reject empty string key', () => {
       const result = dataManager.deleteData('');
 
@@ -595,7 +596,7 @@ describe('DataManager', () => {
     /* Preconditions: DataManager initialized
        Action: attempt to delete with null key
        Assertions: returns success false, error about invalid key
-       Requirements: clerkly.1.4, clerkly.2.3, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should reject null key', () => {
       const result = dataManager.deleteData(null as any);
 
@@ -606,7 +607,7 @@ describe('DataManager', () => {
     /* Preconditions: DataManager initialized
        Action: attempt to delete with undefined key
        Assertions: returns success false, error about invalid key
-       Requirements: clerkly.1.4, clerkly.2.3, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should reject undefined key', () => {
       const result = dataManager.deleteData(undefined as any);
 
@@ -617,7 +618,7 @@ describe('DataManager', () => {
     /* Preconditions: DataManager initialized
        Action: attempt to delete with key longer than 1000 characters
        Assertions: returns success false, error about maximum length
-       Requirements: clerkly.1.4, clerkly.2.3, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should reject key exceeding 1000 characters', () => {
       const longKey = 'a'.repeat(1001);
       const result = dataManager.deleteData(longKey);
@@ -630,7 +631,7 @@ describe('DataManager', () => {
     /* Preconditions: DataManager initialized but database closed
        Action: close database, then attempt to delete data
        Assertions: returns success false, error about database not initialized
-       Requirements: clerkly.1.4, clerkly.2.3, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should handle closed database', () => {
       dataManager.close();
       const result = dataManager.deleteData('test-key');
@@ -642,7 +643,7 @@ describe('DataManager', () => {
     /* Preconditions: DataManager initialized with read-only database (simulated)
        Action: attempt to delete data from read-only database
        Assertions: returns success false, error about read-only database
-       Requirements: clerkly.1.4, clerkly.2.3, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should handle SQLITE_READONLY error on delete', () => {
       // Save data first
       dataManager.saveData('readonly-key', 'test-value');
@@ -674,7 +675,7 @@ describe('DataManager', () => {
     /* Preconditions: DataManager created with specific path
        Action: call getStoragePath()
        Assertions: returns the path provided in constructor
-       Requirements: clerkly.1.4, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should return storage path', () => {
       dataManager = new DataManager(testStoragePath);
       const path = dataManager.getStoragePath();
@@ -687,7 +688,7 @@ describe('DataManager', () => {
     /* Preconditions: DataManager initialized with open database
        Action: call close()
        Assertions: database connection closed, subsequent operations fail
-       Requirements: clerkly.1.4, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should close database connection', () => {
       dataManager = new DataManager(testStoragePath);
       dataManager.initialize();
@@ -703,7 +704,7 @@ describe('DataManager', () => {
     /* Preconditions: DataManager created but not initialized
        Action: call close()
        Assertions: no error thrown (safe to call on uninitialized manager)
-       Requirements: clerkly.1.4, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should handle close on uninitialized database', () => {
       dataManager = new DataManager(testStoragePath);
 
@@ -715,7 +716,7 @@ describe('DataManager', () => {
     /* Preconditions: DataManager initialized and already closed
        Action: call close() again
        Assertions: no error thrown (idempotent)
-       Requirements: clerkly.1.4, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should handle multiple close calls', () => {
       dataManager = new DataManager(testStoragePath);
       dataManager.initialize();
@@ -731,7 +732,7 @@ describe('DataManager', () => {
     /* Preconditions: DataManager initialized
        Action: call getMigrationRunner()
        Assertions: returns MigrationRunner instance
-       Requirements: clerkly.1.4, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should return MigrationRunner instance', () => {
       dataManager = new DataManager(testStoragePath);
       dataManager.initialize();
@@ -746,7 +747,7 @@ describe('DataManager', () => {
     /* Preconditions: DataManager created but not initialized
        Action: call getMigrationRunner()
        Assertions: throws error about database not initialized
-       Requirements: clerkly.1.4, clerkly.2.3, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should throw error when database not initialized', () => {
       dataManager = new DataManager(testStoragePath);
 
@@ -765,7 +766,7 @@ describe('DataManager', () => {
     /* Preconditions: DataManager initialized, database operations work normally
        Action: save and load data to verify normal operation
        Assertions: operations succeed (baseline for error tests)
-       Requirements: clerkly.1.4, clerkly.2.3, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should handle normal database operations', () => {
       const saveResult = dataManager.saveData('test-key', 'test-value');
       expect(saveResult.success).toBe(true);
@@ -778,7 +779,7 @@ describe('DataManager', () => {
     /* Preconditions: DataManager initialized, database full (simulated)
        Action: attempt to save data when database is full
        Assertions: returns success false, error about database full
-       Requirements: clerkly.1.4, clerkly.2.3, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should handle SQLITE_FULL error on save', () => {
       // Mock database prepare to throw SQLITE_FULL error
       const mockPrepare = jest.fn().mockImplementation(() => {
@@ -809,7 +810,7 @@ describe('DataManager', () => {
     /* Preconditions: DataManager initialized, database busy (simulated)
        Action: attempt to save data when database is busy
        Assertions: returns success false, error about database locked
-       Requirements: clerkly.1.4, clerkly.2.3, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should handle SQLITE_BUSY error on save', () => {
       // Mock database prepare to throw SQLITE_BUSY error
       const mockPrepare = jest.fn().mockImplementation(() => {
@@ -840,7 +841,7 @@ describe('DataManager', () => {
     /* Preconditions: DataManager initialized, database locked (simulated)
        Action: attempt to save data when database is locked
        Assertions: returns success false, error about database locked
-       Requirements: clerkly.1.4, clerkly.2.3, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should handle SQLITE_LOCKED error on save', () => {
       // Mock database prepare to throw SQLITE_LOCKED error
       const mockPrepare = jest.fn().mockImplementation(() => {
@@ -871,7 +872,7 @@ describe('DataManager', () => {
     /* Preconditions: DataManager initialized, database read-only (simulated)
        Action: attempt to save data to read-only database
        Assertions: returns success false, error about read-only database
-       Requirements: clerkly.1.4, clerkly.2.3, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should handle SQLITE_READONLY error on save', () => {
       // Mock database prepare to throw SQLITE_READONLY error
       const mockPrepare = jest.fn().mockImplementation(() => {
@@ -902,7 +903,7 @@ describe('DataManager', () => {
     /* Preconditions: DataManager initialized
        Action: save data, close database, attempt to load
        Assertions: load returns error about database being locked/closed
-       Requirements: clerkly.1.4, clerkly.2.3, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should handle SQLITE_BUSY/SQLITE_LOCKED errors on load', () => {
       dataManager.saveData('test-key', 'test-value');
       dataManager.close();
@@ -916,7 +917,7 @@ describe('DataManager', () => {
     /* Preconditions: DataManager initialized
        Action: close database, attempt to delete
        Assertions: delete returns error about database being locked/closed
-       Requirements: clerkly.1.4, clerkly.2.3, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should handle SQLITE_BUSY/SQLITE_LOCKED errors on delete', () => {
       dataManager.close();
 

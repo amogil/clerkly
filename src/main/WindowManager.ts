@@ -1,4 +1,5 @@
-// Requirements: clerkly.1.2, clerkly.1.3
+// Requirements: clerkly.1
+
 import { BrowserWindow, BrowserWindowConstructorOptions } from 'electron';
 import * as path from 'path';
 
@@ -18,13 +19,12 @@ class WindowManager {
 
   /**
    * Creates window with native Mac OS X interface
-   * Requirements: clerkly.1.2, clerkly.1.3
-   * @returns {BrowserWindow} The created browser window instance
+   * Requirements: clerkly.1   * @returns {BrowserWindow} The created browser window instance
    * @throws {Error} If window creation fails
    */
   createWindow(): BrowserWindow {
     try {
-      // Requirements: clerkly.1.3 - Native Mac OS X interface configuration
+      // Requirements: clerkly.1- Native Mac OS X interface configuration
       const windowConfig: BrowserWindowConstructorOptions = {
         width: 800,
         height: 600,
@@ -62,8 +62,7 @@ class WindowManager {
 
   /**
    * Configures window parameters
-   * Requirements: clerkly.1.3
-   * @param {WindowOptions} options - Window configuration options
+   * Requirements: clerkly.1   * @param {WindowOptions} options - Window configuration options
    */
   configureWindow(options: WindowOptions): void {
     if (!this.mainWindow) {
@@ -72,7 +71,7 @@ class WindowManager {
     }
 
     try {
-      // Requirements: clerkly.1.3 - Configure window parameters
+      // Requirements: clerkly.1- Configure window parameters
       if (options.width !== undefined && options.height !== undefined) {
         this.mainWindow.setSize(options.width, options.height);
       }
@@ -96,15 +95,14 @@ class WindowManager {
 
   /**
    * Closes window with cleanup
-   * Requirements: clerkly.1.3
-   */
+   * Requirements: clerkly.1   */
   closeWindow(): void {
     if (!this.mainWindow) {
       return;
     }
 
     try {
-      // Requirements: clerkly.1.3 - Close window with cleanup of listeners
+      // Requirements: clerkly.1- Close window with cleanup of listeners
       this.mainWindow.removeAllListeners();
       this.mainWindow.close();
       this.mainWindow = null;
@@ -118,8 +116,7 @@ class WindowManager {
 
   /**
    * Gets current window
-   * Requirements: clerkly.1.3
-   * @returns {BrowserWindow | null} The current window instance or null if not created
+   * Requirements: clerkly.1   * @returns {BrowserWindow | null} The current window instance or null if not created
    */
   getWindow(): BrowserWindow | null {
     return this.mainWindow;
@@ -127,8 +124,7 @@ class WindowManager {
 
   /**
    * Checks if window is created
-   * Requirements: clerkly.1.3
-   * @returns {boolean} True if window exists, false otherwise
+   * Requirements: clerkly.1   * @returns {boolean} True if window exists, false otherwise
    */
   isWindowCreated(): boolean {
     return this.mainWindow !== null;

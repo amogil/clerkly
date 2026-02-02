@@ -1,4 +1,5 @@
-// Requirements: clerkly.1.4
+// Requirements: clerkly.1
+
 import Database from 'better-sqlite3';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -49,8 +50,7 @@ export class MigrationRunner {
   /**
    * Инициализирует таблицу отслеживания миграций
    * Создает таблицу schema_migrations для отслеживания примененных миграций
-   * Requirements: clerkly.1.4
-   */
+   * Requirements: clerkly.1   */
   initializeMigrationTable(): void {
     try {
       this.db
@@ -71,8 +71,7 @@ export class MigrationRunner {
 
   /**
    * Возвращает текущую версию схемы
-   * Requirements: clerkly.1.4
-   * @returns {number} Текущая версия схемы (0 если миграции не применены)
+   * Requirements: clerkly.1   * @returns {number} Текущая версия схемы (0 если миграции не применены)
    */
   getCurrentVersion(): number {
     try {
@@ -90,8 +89,7 @@ export class MigrationRunner {
 
   /**
    * Возвращает список примененных версий миграций
-   * Requirements: clerkly.1.4
-   * @returns {number[]} Массив примененных версий миграций
+   * Requirements: clerkly.1   * @returns {number[]} Массив примененных версий миграций
    */
   getAppliedMigrations(): number[] {
     try {
@@ -109,8 +107,7 @@ export class MigrationRunner {
 
   /**
    * Загружает файлы миграций из директории
-   * Requirements: clerkly.1.4
-   * @returns {Migration[]} Массив объектов миграций, отсортированных по версии
+   * Requirements: clerkly.1   * @returns {Migration[]} Массив объектов миграций, отсортированных по версии
    */
   loadMigrations(): Migration[] {
     try {
@@ -180,8 +177,7 @@ export class MigrationRunner {
    * Запускает все pending миграции
    * Создает таблицу migrations для отслеживания
    * Выполняет миграции в порядке возрастания версий
-   * Requirements: clerkly.1.4
-   * @returns {MigrationResult}
+   * Requirements: clerkly.1   * @returns {MigrationResult}
    */
   runMigrations(): MigrationResult {
     try {
@@ -264,8 +260,7 @@ export class MigrationRunner {
 
   /**
    * Откатывает последнюю примененную миграцию
-   * Requirements: clerkly.1.4
-   * @returns {MigrationResult}
+   * Requirements: clerkly.1   * @returns {MigrationResult}
    */
   rollbackLastMigration(): MigrationResult {
     try {
@@ -346,8 +341,7 @@ export class MigrationRunner {
 
   /**
    * Возвращает статус миграций
-   * Requirements: clerkly.1.4
-   * @returns {MigrationStatus}
+   * Requirements: clerkly.1   * @returns {MigrationStatus}
    */
   getStatus(): MigrationStatus {
     try {

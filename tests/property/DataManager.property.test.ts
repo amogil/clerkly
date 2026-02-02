@@ -1,4 +1,5 @@
-// Requirements: clerkly.1.4, clerkly.2.6, clerkly.2.8
+// Requirements: clerkly.1, clerkly.2
+
 import * as fc from 'fast-check';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -47,7 +48,7 @@ describe('Property Tests - Data Manager', () => {
   /* Preconditions: DataManager initialized with clean database
      Action: generate random key-value pairs of various types, save each, then load each
      Assertions: for all pairs, loaded value equals saved value (deep equality)
-     Requirements: clerkly.1.4, clerkly.2.6 */
+     Requirements: clerkly.1, clerkly.2*/
   // Feature: clerkly, Property 1
   test('Property 1: Data Storage Round-Trip - saving then loading data returns equivalent value', async () => {
     // Create JSON-safe arbitrary generator (excludes undefined, functions, symbols)
@@ -56,7 +57,8 @@ describe('Property Tests - Data Manager', () => {
         fc.string(),
         fc.integer(),
         fc.boolean(),
-        fc.double(),
+        // Filter out -0 as JSON.stringify converts -0 to 0
+        fc.double().filter((n) => !Object.is(n, -0)),
         fc.constantFrom(null),
         fc.dictionary(fc.string(), tie('value') as fc.Arbitrary<any>, { maxKeys: 10 }),
         fc.array(tie('value') as fc.Arbitrary<any>, { maxLength: 20 })
@@ -93,7 +95,7 @@ describe('Property Tests - Data Manager', () => {
   /* Preconditions: DataManager initialized
      Action: save empty string value with valid key
      Assertions: save succeeds, load returns same empty string
-     Requirements: clerkly.1.4, clerkly.2.6 */
+     Requirements: clerkly.1, clerkly.2*/
   // Feature: clerkly, Property 1
   test('Property 1 edge case: empty string values', () => {
     const key = 'test-empty-string';
@@ -110,7 +112,7 @@ describe('Property Tests - Data Manager', () => {
   /* Preconditions: DataManager initialized
      Action: save data with keys containing special characters (dashes, underscores, dots)
      Assertions: all saves succeed, all loads return correct values
-     Requirements: clerkly.1.4, clerkly.2.6 */
+     Requirements: clerkly.1, clerkly.2*/
   // Feature: clerkly, Property 1
   test('Property 1 edge case: special characters in keys', () => {
     const specialKeys = [
@@ -136,7 +138,7 @@ describe('Property Tests - Data Manager', () => {
   /* Preconditions: DataManager initialized
      Action: save large object (1000 items array)
      Assertions: save succeeds, load returns equivalent object
-     Requirements: clerkly.1.4, clerkly.2.6 */
+     Requirements: clerkly.1, clerkly.2*/
   // Feature: clerkly, Property 1
   test('Property 1 edge case: large objects', () => {
     const key = 'large-object';
@@ -157,7 +159,7 @@ describe('Property Tests - Data Manager', () => {
   /* Preconditions: DataManager initialized
      Action: save nested objects with multiple levels
      Assertions: save succeeds, load returns equivalent nested structure
-     Requirements: clerkly.1.4, clerkly.2.6 */
+     Requirements: clerkly.1, clerkly.2*/
   // Feature: clerkly, Property 1
   test('Property 1 edge case: deeply nested objects', () => {
     const key = 'nested-object';
@@ -186,7 +188,7 @@ describe('Property Tests - Data Manager', () => {
   /* Preconditions: DataManager initialized
      Action: save data with key, overwrite with new value, load
      Assertions: load returns the new value, not the old one
-     Requirements: clerkly.1.4, clerkly.2.6 */
+     Requirements: clerkly.1, clerkly.2*/
   // Feature: clerkly, Property 1
   test('Property 1 edge case: overwriting existing keys', () => {
     const key = 'overwrite-key';
@@ -210,7 +212,7 @@ describe('Property Tests - Data Manager', () => {
   /* Preconditions: DataManager initialized
      Action: save data with boundary values (0, negative numbers, fractional numbers)
      Assertions: all saves succeed, all loads return correct values
-     Requirements: clerkly.1.4, clerkly.2.6 */
+     Requirements: clerkly.1, clerkly.2*/
   // Feature: clerkly, Property 1
   test('Property 1 edge case: boundary values for numbers', () => {
     const testCases = [
@@ -235,7 +237,7 @@ describe('Property Tests - Data Manager', () => {
   /* Preconditions: DataManager initialized
      Action: save arrays with mixed types
      Assertions: save succeeds, load returns equivalent array
-     Requirements: clerkly.1.4, clerkly.2.6 */
+     Requirements: clerkly.1, clerkly.2*/
   // Feature: clerkly, Property 1
   test('Property 1 edge case: arrays with mixed types', () => {
     const key = 'mixed-array';
@@ -252,7 +254,7 @@ describe('Property Tests - Data Manager', () => {
   /* Preconditions: DataManager initialized
      Action: save null value
      Assertions: save succeeds, load returns null
-     Requirements: clerkly.1.4, clerkly.2.6 */
+     Requirements: clerkly.1, clerkly.2*/
   // Feature: clerkly, Property 1
   test('Property 1 edge case: null values', () => {
     const key = 'null-value';
@@ -269,7 +271,7 @@ describe('Property Tests - Data Manager', () => {
   /* Preconditions: DataManager initialized
      Action: save multiple key-value pairs, load all
      Assertions: all saves succeed, all loads return correct values
-     Requirements: clerkly.1.4, clerkly.2.6 */
+     Requirements: clerkly.1, clerkly.2*/
   // Feature: clerkly, Property 1
   test('Property 1 edge case: multiple concurrent key-value pairs', () => {
     const testData = [
@@ -297,7 +299,7 @@ describe('Property Tests - Data Manager', () => {
   /* Preconditions: DataManager initialized, database has some valid data
      Action: attempt operations with invalid keys
      Assertions: invalid operations fail, but database state remains unchanged (no corruption)
-     Requirements: clerkly.1.4, clerkly.2.3, clerkly.2.6 */
+     Requirements: clerkly.1, clerkly.2*/
   // Feature: clerkly, Property 2
   test('Property 2 edge case: database state unchanged after invalid operations', () => {
     // Save some valid data first
@@ -323,7 +325,7 @@ describe('Property Tests - Data Manager', () => {
   /* Preconditions: DataManager initialized
      Action: generate random invalid keys (empty strings, null, undefined, non-strings, too long strings)
      Assertions: for all invalid keys, saveData/loadData/deleteData return success false with error message
-     Requirements: clerkly.1.4, clerkly.2.3, clerkly.2.6 */
+     Requirements: clerkly.1, clerkly.2*/
   // Feature: clerkly, Property 2
   test('Property 2: Invalid Key Rejection - invalid keys are rejected by all operations', async () => {
     await fc.assert(
@@ -366,7 +368,7 @@ describe('Property Tests - Data Manager', () => {
   /* Preconditions: DataManager initialized
      Action: attempt to save data with empty string key
      Assertions: returns success false with error message about invalid key
-     Requirements: clerkly.1.4, clerkly.2.3, clerkly.2.6 */
+     Requirements: clerkly.1, clerkly.2*/
   // Feature: clerkly, Property 2
   test('Property 2 edge case: empty string key', () => {
     const invalidKey = '';
@@ -388,7 +390,7 @@ describe('Property Tests - Data Manager', () => {
   /* Preconditions: DataManager initialized
      Action: attempt operations with null key
      Assertions: all operations return success false with error message
-     Requirements: clerkly.1.4, clerkly.2.3, clerkly.2.6 */
+     Requirements: clerkly.1, clerkly.2*/
   // Feature: clerkly, Property 2
   test('Property 2 edge case: null key', () => {
     const invalidKey = null as any;
@@ -410,7 +412,7 @@ describe('Property Tests - Data Manager', () => {
   /* Preconditions: DataManager initialized
      Action: attempt operations with undefined key
      Assertions: all operations return success false with error message
-     Requirements: clerkly.1.4, clerkly.2.3, clerkly.2.6 */
+     Requirements: clerkly.1, clerkly.2*/
   // Feature: clerkly, Property 2
   test('Property 2 edge case: undefined key', () => {
     const invalidKey = undefined as any;
@@ -432,7 +434,7 @@ describe('Property Tests - Data Manager', () => {
   /* Preconditions: DataManager initialized
      Action: attempt operations with non-string keys (numbers, objects, arrays, booleans)
      Assertions: all operations return success false with error message
-     Requirements: clerkly.1.4, clerkly.2.3, clerkly.2.6 */
+     Requirements: clerkly.1, clerkly.2*/
   // Feature: clerkly, Property 2
   test('Property 2 edge case: non-string keys', () => {
     const invalidKeys = [
@@ -461,7 +463,7 @@ describe('Property Tests - Data Manager', () => {
   /* Preconditions: DataManager initialized
      Action: attempt operations with string key exactly at boundary (1000 chars)
      Assertions: operations succeed (boundary is inclusive)
-     Requirements: clerkly.1.4, clerkly.2.3, clerkly.2.6 */
+     Requirements: clerkly.1, clerkly.2*/
   // Feature: clerkly, Property 2
   test('Property 2 edge case: key at exact boundary (1000 chars)', () => {
     const validKey = 'a'.repeat(1000); // Exactly 1000 characters
@@ -481,7 +483,7 @@ describe('Property Tests - Data Manager', () => {
   /* Preconditions: DataManager initialized
      Action: attempt operations with string key exceeding max length (1001+ chars)
      Assertions: all operations return success false with error about exceeding max length
-     Requirements: clerkly.1.4, clerkly.2.3, clerkly.2.6 */
+     Requirements: clerkly.1, clerkly.2*/
   // Feature: clerkly, Property 2
   test('Property 2 edge case: key exceeding max length', () => {
     const invalidKeys = [
@@ -508,7 +510,7 @@ describe('Property Tests - Data Manager', () => {
   /* Preconditions: DataManager initialized, database has some valid data
      Action: attempt operations with invalid keys
      Assertions: invalid operations fail, but database state remains unchanged (no corruption)
-     Requirements: clerkly.1.4, clerkly.2.3, clerkly.2.6 */
+     Requirements: clerkly.1, clerkly.2*/
   // Feature: clerkly, Property 2
   test('Property 2 edge case: database state unchanged after invalid operations', () => {
     // Save some valid data first

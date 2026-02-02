@@ -1,5 +1,4 @@
-// Requirements: clerkly.1.3, clerkly.1.4
-
+// Requirements: clerkly.1
 /**
  * Renderer Process Entry Point
  * Инициализирует UIController и StateController
@@ -15,8 +14,7 @@ import { StateController } from './StateController';
  * Создает UIController и StateController
  * Настраивает обработчики событий UI
  * Добавляет демонстрационный функционал
- * Requirements: clerkly.1.3, clerkly.1.4
- */
+ * Requirements: clerkly.1 */
 async function initializeRenderer(): Promise<void> {
   console.log('Clerkly - Initializing Renderer Process');
 
@@ -27,12 +25,10 @@ async function initializeRenderer(): Promise<void> {
       throw new Error('Root container not found');
     }
 
-    // Requirements: clerkly.1.3
-    // Инициализируем UIController
+    // Requirements: clerkly.1    // Инициализируем UIController
     const uiController = new UIController(rootContainer);
 
-    // Requirements: clerkly.1.3
-    // Инициализируем StateController с начальным состоянием
+    // Requirements: clerkly.1    // Инициализируем StateController с начальным состоянием
     const stateController = new StateController({
       appName: 'Clerkly',
       version: '1.0.0',
@@ -47,8 +43,7 @@ async function initializeRenderer(): Promise<void> {
 
     console.log(`UI rendered in ${renderResult.renderTime.toFixed(2)}ms`);
 
-    // Requirements: clerkly.1.3, clerkly.1.4
-    // Настраиваем демонстрационный функционал
+    // Requirements: clerkly.1    // Настраиваем демонстрационный функционал
     setupDemoFunctionality(uiController, stateController);
 
     console.log('Renderer Process initialized successfully');
@@ -67,8 +62,7 @@ async function initializeRenderer(): Promise<void> {
 /**
  * Настраивает демонстрационный функционал для работы с данными
  * Добавляет UI элементы и обработчики событий для сохранения/загрузки данных через IPC
- * Requirements: clerkly.1.3, clerkly.1.4
- */
+ * Requirements: clerkly.1 */
 function setupDemoFunctionality(
   uiController: UIController,
   stateController: StateController
@@ -80,8 +74,7 @@ function setupDemoFunctionality(
     return;
   }
 
-  // Requirements: clerkly.1.4
-  // Создаем демонстрационную форму для работы с данными
+  // Requirements: clerkly.1  // Создаем демонстрационную форму для работы с данными
   const demoForm = createDemoForm();
   contentArea.appendChild(demoForm);
 
@@ -91,8 +84,7 @@ function setupDemoFunctionality(
 
 /**
  * Создает демонстрационную форму для работы с данными
- * Requirements: clerkly.1.3, clerkly.1.4
- */
+ * Requirements: clerkly.1 */
 function createDemoForm(): HTMLElement {
   const form = document.createElement('div');
   form.setAttribute('data-testid', 'demo-form');
@@ -166,8 +158,7 @@ function createDemoForm(): HTMLElement {
 
 /**
  * Настраивает обработчики событий для демонстрационной формы
- * Requirements: clerkly.1.3, clerkly.1.4
- */
+ * Requirements: clerkly.1 */
 function setupEventHandlers(
   uiController: UIController,
   stateController: StateController,
@@ -185,8 +176,7 @@ function setupEventHandlers(
     return;
   }
 
-  // Requirements: clerkly.1.4
-  // Обработчик сохранения данных
+  // Requirements: clerkly.1  // Обработчик сохранения данных
   saveBtn.addEventListener('click', async () => {
     const key = keyInput.value.trim();
     const valueStr = valueInput.value.trim();
@@ -238,8 +228,7 @@ function setupEventHandlers(
     }
   });
 
-  // Requirements: clerkly.1.4
-  // Обработчик загрузки данных
+  // Requirements: clerkly.1  // Обработчик загрузки данных
   loadBtn.addEventListener('click', async () => {
     const key = keyInput.value.trim();
 
@@ -286,8 +275,7 @@ function setupEventHandlers(
     }
   });
 
-  // Requirements: clerkly.1.4
-  // Обработчик удаления данных
+  // Requirements: clerkly.1  // Обработчик удаления данных
   deleteBtn.addEventListener('click', async () => {
     const key = keyInput.value.trim();
 
@@ -325,8 +313,7 @@ function setupEventHandlers(
 
 /**
  * Отображает результат операции в result area
- * Requirements: clerkly.1.3
- */
+ * Requirements: clerkly.1 */
 function showResult(element: HTMLElement, message: string, type: 'success' | 'error'): void {
   element.textContent = message;
   element.style.background = type === 'success' ? '#d4edda' : '#f8d7da';
@@ -334,8 +321,7 @@ function showResult(element: HTMLElement, message: string, type: 'success' | 'er
   element.style.borderColor = type === 'success' ? '#c3e6cb' : '#f5c6cb';
 }
 
-// Requirements: clerkly.1.3, clerkly.1.4
-// Инициализируем renderer process когда DOM готов
+// Requirements: clerkly.1// Инициализируем renderer process когда DOM готов
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', initializeRenderer);
 } else {

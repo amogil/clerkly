@@ -1,5 +1,4 @@
-// Requirements: clerkly.1.4, clerkly.2.5
-
+// Requirements: clerkly.1, clerkly.2
 /**
  * Preload script for secure IPC communication
  * Exposes secure API to renderer process via contextBridge
@@ -17,7 +16,8 @@ interface API {
   deleteData: (key: string) => Promise<{ success: boolean; error?: string }>;
 }
 
-// Requirements: clerkly.1.4, clerkly.2.5
+// Requirements: clerkly.1, clerkly.2
+
 /**
  * Expose secure IPC API to renderer process
  * Uses contextBridge for security isolation
@@ -25,8 +25,7 @@ interface API {
 contextBridge.exposeInMainWorld('api', {
   /**
    * Save data to local storage via IPC
-   * Requirements: clerkly.1.4
-   * @param {string} key - Data key (non-empty string, max 1000 chars)
+   * Requirements: clerkly.1   * @param {string} key - Data key (non-empty string, max 1000 chars)
    * @param {any} value - Data value (serializable to JSON, max 10MB)
    * @returns {Promise<{success: boolean, error?: string}>}
    */
@@ -36,8 +35,7 @@ contextBridge.exposeInMainWorld('api', {
 
   /**
    * Load data from local storage via IPC
-   * Requirements: clerkly.1.4
-   * @param {string} key - Data key to load
+   * Requirements: clerkly.1   * @param {string} key - Data key to load
    * @returns {Promise<{success: boolean, data?: any, error?: string}>}
    */
   async loadData(key: string): Promise<{ success: boolean; data?: any; error?: string }> {
@@ -46,8 +44,7 @@ contextBridge.exposeInMainWorld('api', {
 
   /**
    * Delete data from local storage via IPC
-   * Requirements: clerkly.1.4
-   * @param {string} key - Data key to delete
+   * Requirements: clerkly.1   * @param {string} key - Data key to delete
    * @returns {Promise<{success: boolean, error?: string}>}
    */
   async deleteData(key: string): Promise<{ success: boolean; error?: string }> {

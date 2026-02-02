@@ -1,4 +1,5 @@
-// Requirements: clerkly.1.4, clerkly.2.5, clerkly.nfr.2.3
+// Requirements: clerkly.1, clerkly.2, clerkly.nfr.2
+
 import { ipcMain, IpcMainInvokeEvent } from 'electron';
 import { DataManager } from './DataManager';
 
@@ -26,8 +27,7 @@ export class IPCHandlers {
   /**
    * Регистрирует все IPC handlers
    * Каналы: 'save-data', 'load-data', 'delete-data'
-   * Requirements: clerkly.1.4, clerkly.2.5
-   */
+   * Requirements: clerkly.1, clerkly.2   */
   registerHandlers(): void {
     // Register save-data handler
     ipcMain.handle('save-data', this.handleSaveData.bind(this));
@@ -44,8 +44,7 @@ export class IPCHandlers {
 
   /**
    * Удаляет все IPC handlers
-   * Requirements: clerkly.1.4, clerkly.2.5
-   */
+   * Requirements: clerkly.1, clerkly.2   */
   unregisterHandlers(): void {
     for (const channel of this.registeredChannels) {
       ipcMain.removeHandler(channel);
@@ -58,8 +57,7 @@ export class IPCHandlers {
    * Валидирует параметры
    * Применяет timeout (10 секунд)
    * Логирует ошибки
-   * Requirements: clerkly.1.4, clerkly.nfr.2.3
-   * @param {IpcMainInvokeEvent} event
+   * Requirements: clerkly.1, clerkly.nfr.2   * @param {IpcMainInvokeEvent} event
    * @param {string} key
    * @param {any} value
    * @returns {Promise<IPCResult>}
@@ -104,8 +102,7 @@ export class IPCHandlers {
    * Валидирует параметры
    * Применяет timeout
    * Логирует ошибки
-   * Requirements: clerkly.1.4, clerkly.nfr.2.3
-   * @param {IpcMainInvokeEvent} event
+   * Requirements: clerkly.1, clerkly.nfr.2   * @param {IpcMainInvokeEvent} event
    * @param {string} key
    * @returns {Promise<IPCResult>}
    */
@@ -143,8 +140,7 @@ export class IPCHandlers {
    * Валидирует параметры
    * Применяет timeout
    * Логирует ошибки
-   * Requirements: clerkly.1.4, clerkly.nfr.2.3
-   * @param {IpcMainInvokeEvent} event
+   * Requirements: clerkly.1, clerkly.nfr.2   * @param {IpcMainInvokeEvent} event
    * @param {string} key
    * @returns {Promise<IPCResult>}
    */
@@ -179,8 +175,7 @@ export class IPCHandlers {
 
   /**
    * Выполняет promise с timeout
-   * Requirements: clerkly.nfr.2.3
-   * @param {Promise<T>} promise
+   * Requirements: clerkly.nfr.2   * @param {Promise<T>} promise
    * @param {number} timeoutMs
    * @param {string} timeoutMessage
    * @returns {Promise<T>}
@@ -196,8 +191,7 @@ export class IPCHandlers {
 
   /**
    * Устанавливает timeout для IPC запросов
-   * Requirements: clerkly.nfr.2.3
-   * @param {number} timeoutMs
+   * Requirements: clerkly.nfr.2   * @param {number} timeoutMs
    */
   setTimeout(timeoutMs: number): void {
     this.timeout = timeoutMs;
@@ -205,8 +199,7 @@ export class IPCHandlers {
 
   /**
    * Возвращает текущий timeout
-   * Requirements: clerkly.nfr.2.3
-   * @returns {number}
+   * Requirements: clerkly.nfr.2   * @returns {number}
    */
   getTimeout(): number {
     return this.timeout;

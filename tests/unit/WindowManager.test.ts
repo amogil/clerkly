@@ -1,4 +1,5 @@
-// Requirements: clerkly.2.1, clerkly.2.8
+// Requirements: clerkly.2
+
 import { BrowserWindow } from 'electron';
 import WindowManager from '../../src/main/WindowManager';
 
@@ -46,7 +47,7 @@ describe('WindowManager', () => {
     /* Preconditions: WindowManager created, no window exists yet
        Action: call createWindow()
        Assertions: BrowserWindow created with correct Mac OS X parameters (titleBarStyle, vibrancy, trafficLightPosition), returns BrowserWindow instance
-       Requirements: clerkly.1.2, clerkly.1.3, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should create window with native Mac OS X interface', () => {
       const window = windowManager.createWindow();
 
@@ -73,7 +74,7 @@ describe('WindowManager', () => {
     /* Preconditions: WindowManager created, no window exists
        Action: call createWindow()
        Assertions: window loads HTML file, loadFile called with correct path
-       Requirements: clerkly.1.3, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should load HTML file after creating window', () => {
       windowManager.createWindow();
       const mockWindow = getMockWindow();
@@ -87,7 +88,7 @@ describe('WindowManager', () => {
     /* Preconditions: WindowManager created, no window exists
        Action: call createWindow()
        Assertions: closed event listener registered to clean up window reference
-       Requirements: clerkly.1.3, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should register closed event listener for cleanup', () => {
       windowManager.createWindow();
       const mockWindow = getMockWindow();
@@ -98,7 +99,7 @@ describe('WindowManager', () => {
     /* Preconditions: WindowManager created, no window exists
        Action: call createWindow(), trigger closed event
        Assertions: window reference set to null, isWindowCreated returns false
-       Requirements: clerkly.1.3, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should clean up window reference when closed event fires', () => {
       windowManager.createWindow();
       const mockWindow = getMockWindow();
@@ -116,7 +117,7 @@ describe('WindowManager', () => {
     /* Preconditions: WindowManager created, window already exists
        Action: call createWindow() again
        Assertions: new window created, old window reference replaced
-       Requirements: clerkly.1.3, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should replace existing window when called multiple times', () => {
       windowManager.createWindow();
       windowManager.createWindow();
@@ -128,7 +129,7 @@ describe('WindowManager', () => {
     /* Preconditions: WindowManager created, BrowserWindow constructor throws error
        Action: call createWindow()
        Assertions: throws error with descriptive message
-       Requirements: clerkly.1.3, clerkly.2.3, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should throw error when window creation fails', () => {
       // Mock BrowserWindow to throw error
       (BrowserWindow as jest.MockedClass<typeof BrowserWindow>).mockImplementationOnce(() => {
@@ -149,7 +150,7 @@ describe('WindowManager', () => {
     /* Preconditions: window created
        Action: call configureWindow with width and height
        Assertions: setSize called with correct parameters
-       Requirements: clerkly.1.3, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should configure window size', () => {
       windowManager.configureWindow({ width: 1024, height: 768 });
       const mockWindow = getMockWindow();
@@ -160,7 +161,7 @@ describe('WindowManager', () => {
     /* Preconditions: window created
        Action: call configureWindow with title
        Assertions: setTitle called with correct title
-       Requirements: clerkly.1.3, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should configure window title', () => {
       windowManager.configureWindow({ title: 'Clerkly - Test' });
       const mockWindow = getMockWindow();
@@ -171,7 +172,7 @@ describe('WindowManager', () => {
     /* Preconditions: window created
        Action: call configureWindow with resizable false
        Assertions: setResizable called with false
-       Requirements: clerkly.1.3, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should configure window resizable property', () => {
       windowManager.configureWindow({ resizable: false });
       const mockWindow = getMockWindow();
@@ -182,7 +183,7 @@ describe('WindowManager', () => {
     /* Preconditions: window created
        Action: call configureWindow with fullscreen true
        Assertions: setFullScreen called with true
-       Requirements: clerkly.1.3, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should configure window fullscreen property', () => {
       windowManager.configureWindow({ fullscreen: true });
       const mockWindow = getMockWindow();
@@ -193,7 +194,7 @@ describe('WindowManager', () => {
     /* Preconditions: window created
        Action: call configureWindow with multiple options
        Assertions: all corresponding methods called with correct parameters
-       Requirements: clerkly.1.3, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should configure multiple window properties at once', () => {
       windowManager.configureWindow({
         width: 1280,
@@ -213,7 +214,7 @@ describe('WindowManager', () => {
     /* Preconditions: window created
        Action: call configureWindow with empty options object
        Assertions: no setter methods called
-       Requirements: clerkly.1.3, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should handle empty options object', () => {
       windowManager.configureWindow({});
       const mockWindow = getMockWindow();
@@ -227,7 +228,7 @@ describe('WindowManager', () => {
     /* Preconditions: window not created
        Action: call configureWindow
        Assertions: no error thrown, warning logged, no methods called
-       Requirements: clerkly.1.3, clerkly.2.3, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should handle configuration when window not created', () => {
       const newWindowManager = new WindowManager();
 
@@ -243,7 +244,7 @@ describe('WindowManager', () => {
     /* Preconditions: window created, setSize throws error
        Action: call configureWindow with size
        Assertions: error caught and logged, no exception thrown
-       Requirements: clerkly.1.3, clerkly.2.3, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should handle errors during configuration', () => {
       const mockWindow = getMockWindow();
       mockWindow.setSize.mockImplementation(() => {
@@ -261,7 +262,7 @@ describe('WindowManager', () => {
     /* Preconditions: window created
        Action: call closeWindow()
        Assertions: removeAllListeners called, close called, window reference set to null
-       Requirements: clerkly.1.3, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should close window with cleanup of listeners', () => {
       windowManager.createWindow();
       const mockWindow = getMockWindow();
@@ -277,7 +278,7 @@ describe('WindowManager', () => {
     /* Preconditions: window not created
        Action: call closeWindow()
        Assertions: no error thrown, no methods called
-       Requirements: clerkly.1.3, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should handle close when window not created', () => {
       const newWindowManager = new WindowManager();
 
@@ -291,7 +292,7 @@ describe('WindowManager', () => {
     /* Preconditions: window created, close method throws error
        Action: call closeWindow()
        Assertions: error caught, window reference still cleared
-       Requirements: clerkly.1.3, clerkly.2.3, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should clear window reference even if close fails', () => {
       windowManager.createWindow();
       const mockWindow = getMockWindow();
@@ -313,7 +314,7 @@ describe('WindowManager', () => {
     /* Preconditions: window created and closed
        Action: call closeWindow() again
        Assertions: no error thrown (idempotent)
-       Requirements: clerkly.1.3, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should be idempotent - multiple calls do not cause errors', () => {
       windowManager.createWindow();
       windowManager.closeWindow();
@@ -330,7 +331,7 @@ describe('WindowManager', () => {
     /* Preconditions: window created
        Action: call getWindow()
        Assertions: returns BrowserWindow instance
-       Requirements: clerkly.1.3, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should return window instance when window exists', () => {
       const window = windowManager.createWindow();
       const retrievedWindow = windowManager.getWindow();
@@ -342,7 +343,7 @@ describe('WindowManager', () => {
     /* Preconditions: window not created
        Action: call getWindow()
        Assertions: returns null
-       Requirements: clerkly.1.3, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should return null when window not created', () => {
       const window = windowManager.getWindow();
 
@@ -352,7 +353,7 @@ describe('WindowManager', () => {
     /* Preconditions: window created then closed
        Action: call getWindow()
        Assertions: returns null
-       Requirements: clerkly.1.3, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should return null after window is closed', () => {
       windowManager.createWindow();
       windowManager.closeWindow();
@@ -367,7 +368,7 @@ describe('WindowManager', () => {
     /* Preconditions: window not created
        Action: call isWindowCreated()
        Assertions: returns false
-       Requirements: clerkly.1.3, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should return false when window not created', () => {
       expect(windowManager.isWindowCreated()).toBe(false);
     });
@@ -375,7 +376,7 @@ describe('WindowManager', () => {
     /* Preconditions: window created
        Action: call isWindowCreated()
        Assertions: returns true
-       Requirements: clerkly.1.3, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should return true when window exists', () => {
       windowManager.createWindow();
 
@@ -385,7 +386,7 @@ describe('WindowManager', () => {
     /* Preconditions: window created then closed
        Action: call isWindowCreated()
        Assertions: returns false
-       Requirements: clerkly.1.3, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should return false after window is closed', () => {
       windowManager.createWindow();
       windowManager.closeWindow();
@@ -396,7 +397,7 @@ describe('WindowManager', () => {
     /* Preconditions: window created, closed event triggered
        Action: call isWindowCreated()
        Assertions: returns false
-       Requirements: clerkly.1.3, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should return false after closed event is triggered', () => {
       windowManager.createWindow();
       const mockWindow = getMockWindow();
@@ -413,7 +414,7 @@ describe('WindowManager', () => {
     /* Preconditions: WindowManager created
        Action: call createWindow()
        Assertions: titleBarStyle set to 'hiddenInset' (Mac OS X native style)
-       Requirements: clerkly.1.2, clerkly.1.3, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should set titleBarStyle to hiddenInset for Mac OS X', () => {
       windowManager.createWindow();
 
@@ -427,7 +428,7 @@ describe('WindowManager', () => {
     /* Preconditions: WindowManager created
        Action: call createWindow()
        Assertions: vibrancy set to 'under-window' (Mac OS X effect)
-       Requirements: clerkly.1.2, clerkly.1.3, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should set vibrancy to under-window for Mac OS X', () => {
       windowManager.createWindow();
 
@@ -441,7 +442,7 @@ describe('WindowManager', () => {
     /* Preconditions: WindowManager created
        Action: call createWindow()
        Assertions: trafficLightPosition set to {x: 20, y: 20} (Mac OS X window controls)
-       Requirements: clerkly.1.2, clerkly.1.3, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should set trafficLightPosition for Mac OS X window controls', () => {
       windowManager.createWindow();
 
@@ -455,7 +456,7 @@ describe('WindowManager', () => {
     /* Preconditions: WindowManager created
        Action: call createWindow()
        Assertions: webPreferences configured with security settings (contextIsolation, nodeIntegration, sandbox)
-       Requirements: clerkly.1.2, clerkly.1.3, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should configure secure webPreferences', () => {
       windowManager.createWindow();
 
@@ -473,7 +474,7 @@ describe('WindowManager', () => {
     /* Preconditions: WindowManager created
        Action: call createWindow()
        Assertions: preload script path configured in webPreferences
-       Requirements: clerkly.1.3, clerkly.2.1, clerkly.2.8 */
+       Requirements: clerkly.1, clerkly.2*/
     it('should configure preload script path', () => {
       windowManager.createWindow();
 

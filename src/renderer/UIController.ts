@@ -1,5 +1,4 @@
-// Requirements: clerkly.1.3, clerkly.2.1, clerkly.nfr.1.2, clerkly.nfr.1.3
-
+// Requirements: clerkly.1, clerkly.2, clerkly.nfr.1
 /**
  * UI Controller - manages user interface rendering and performance monitoring
  */
@@ -36,8 +35,7 @@ export class UIController {
   /**
    * Renders the UI with header, content, and footer
    * Monitors render time and warns if it exceeds performance threshold
-   * Requirements: clerkly.1.3, clerkly.nfr.1.2
-   */
+   * Requirements: clerkly.1, clerkly.nfr.1   */
   render(): RenderResult {
     const startTime = performance.now();
 
@@ -89,8 +87,7 @@ export class UIController {
   /**
    * Updates the view with new data efficiently without full re-render
    * Monitors update time and warns if it exceeds performance threshold
-   * Requirements: clerkly.1.3, clerkly.nfr.1.2
-   */
+   * Requirements: clerkly.1, clerkly.nfr.1   */
   updateView(data: any): UpdateResult {
     const startTime = performance.now();
 
@@ -134,8 +131,7 @@ export class UIController {
 
   /**
    * Shows loading indicator for long-running operations
-   * Requirements: clerkly.nfr.1.3
-   */
+   * Requirements: clerkly.nfr.1   */
   showLoading(operationId: string, message: string): LoadingResult {
     try {
       // Check if loading indicator already exists
@@ -170,8 +166,7 @@ export class UIController {
 
   /**
    * Hides loading indicator and returns duration
-   * Requirements: clerkly.nfr.1.3
-   */
+   * Requirements: clerkly.nfr.1   */
   hideLoading(operationId: string): LoadingResult {
     try {
       const indicator = this.loadingIndicators.get(operationId);
@@ -200,8 +195,7 @@ export class UIController {
 
   /**
    * Executes operation with automatic loading indicator for operations > 200ms
-   * Requirements: clerkly.nfr.1.3
-   */
+   * Requirements: clerkly.nfr.1   */
   async withLoading(
     operationId: string,
     operation: () => Promise<any>,
@@ -226,8 +220,7 @@ export class UIController {
 
   /**
    * Creates header element
-   * Requirements: clerkly.1.3
-   */
+   * Requirements: clerkly.1   */
   createHeader(): HTMLElement {
     const header = document.createElement('header');
     header.setAttribute('data-testid', 'header');
@@ -238,8 +231,7 @@ export class UIController {
 
   /**
    * Creates content area element
-   * Requirements: clerkly.1.3
-   */
+   * Requirements: clerkly.1   */
   createContent(): HTMLElement {
     const content = document.createElement('div');
     content.setAttribute('data-testid', 'content-area');
@@ -249,8 +241,7 @@ export class UIController {
 
   /**
    * Creates footer element
-   * Requirements: clerkly.1.3
-   */
+   * Requirements: clerkly.1   */
   createFooter(): HTMLElement {
     const footer = document.createElement('footer');
     footer.setAttribute('data-testid', 'footer');
@@ -261,8 +252,7 @@ export class UIController {
 
   /**
    * Creates data display element (table/list)
-   * Requirements: clerkly.1.3
-   */
+   * Requirements: clerkly.1   */
   createDataDisplay(data: any): HTMLElement {
     const display = document.createElement('div');
     display.setAttribute('data-testid', 'data-display');
@@ -309,8 +299,7 @@ export class UIController {
 
   /**
    * Clears all loading indicators
-   * Requirements: clerkly.1.3
-   */
+   * Requirements: clerkly.1   */
   clearAllLoading(): void {
     for (const [operationId] of this.loadingIndicators) {
       this.hideLoading(operationId);
@@ -319,16 +308,14 @@ export class UIController {
 
   /**
    * Returns current container
-   * Requirements: clerkly.1.3
-   */
+   * Requirements: clerkly.1   */
   getContainer(): HTMLElement {
     return this.container;
   }
 
   /**
    * Sets new container and clears loading indicators
-   * Requirements: clerkly.1.3
-   */
+   * Requirements: clerkly.1   */
   setContainer(container: HTMLElement): void {
     this.clearAllLoading();
     this.container = container;

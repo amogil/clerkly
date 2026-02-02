@@ -1,5 +1,4 @@
-// Requirements: clerkly.2.5
-
+// Requirements: clerkly.2
 /**
  * Jest test setup file
  * This file runs before all tests to configure the test environment
