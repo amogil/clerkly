@@ -25,9 +25,15 @@ jest.mock('electron', () => ({
     on: jest.fn(),
     removeAllListeners: jest.fn(),
     destroy: jest.fn(),
+    close: jest.fn(),
     isDestroyed: jest.fn().mockReturnValue(false),
     webContents: {
       on: jest.fn(),
+      session: {
+        webRequest: {
+          onHeadersReceived: jest.fn(),
+        },
+      },
     },
   })),
   ipcMain: {

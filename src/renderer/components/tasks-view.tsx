@@ -1,4 +1,4 @@
-import { CheckCircle2, Circle, Calendar, User, ExternalLink, Filter, Clock } from 'lucide-react';
+import { CheckCircle2, Circle, Calendar, User, Filter, Clock } from 'lucide-react';
 import { useState } from 'react';
 
 export function TasksView() {
@@ -126,11 +126,7 @@ export function TasksView() {
     }
   };
 
-  const stats = {
-    total: tasks.length,
-    pending: tasks.filter((t) => t.status === 'pending').length,
-    completed: tasks.filter((t) => t.status === 'completed').length,
-  };
+  // Removed unused stats variable
 
   return (
     <div className="p-8">

@@ -250,15 +250,15 @@ export function DashboardUpdated({ onNavigateToMeeting, onNavigateToCalendar }: 
                         </span>
 
                         {/* Assignee */}
-                        <div className="flex items-center gap-1.5">
-                          <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium text-primary">
-                            {task.assignee
-                              .split(' ')
-                              .map((n) => n[0])
-                              .join('')}
-                          </div>
-                          <span className="text-xs text-muted-foreground">{task.assignee}</span>
+                      <div className="flex items-center gap-1.5">
+                        <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium text-primary">
+                          {task.assignee
+                            .split(' ')
+                            .map((n) => n[0])
+                            .join('')}
                         </div>
+                        <span className="text-xs text-muted-foreground">{task.assignee}</span>
+                      </div>
                       </div>
                     </div>
                   </div>

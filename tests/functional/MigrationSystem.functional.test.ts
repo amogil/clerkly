@@ -27,9 +27,15 @@ jest.mock('electron', () => ({
     on: jest.fn(),
     removeAllListeners: jest.fn(),
     destroy: jest.fn(),
+    close: jest.fn(),
     isDestroyed: jest.fn().mockReturnValue(false),
     webContents: {
       on: jest.fn(),
+      session: {
+        webRequest: {
+          onHeadersReceived: jest.fn(),
+        },
+      },
     },
   })),
   ipcMain: {
@@ -81,7 +87,7 @@ describe('Migration System Functional Tests', () => {
     /* Preconditions: application not running, no database exists, migration files exist
        Action: start application (initialize lifecycle manager)
        Assertions: database created, schema_migrations table created, initial migration applied, user_data table created
-       Requirements: clerkly.2*/
+       Requirements: clerkly.2.2, clerkly.2.4, clerkly.2.8 */
     it('should create database schema through migrations on first startup', async () => {
       // Create initial migration file
       const migrationContent = `-- UP
@@ -165,7 +171,7 @@ DROP TABLE IF EXISTS user_data;
     /* Preconditions: application not running, no database exists, no migration files exist
        Action: start application
        Assertions: database created, schema_migrations table created, no migrations applied (count = 0)
-       Requirements: clerkly.2*/
+       Requirements: clerkly.2.2, clerkly.2.4, clerkly.2.8 */
     it('should handle first startup with no migration files', async () => {
       // Don't create any migration files
 
@@ -200,7 +206,7 @@ DROP TABLE IF EXISTS user_data;
     /* Preconditions: application not running, no database exists, multiple migration files exist
        Action: start application
        Assertions: all migrations applied in order, final version correct, all tables created
-       Requirements: clerkly.2*/
+       Requirements: clerkly.2.2, clerkly.2.4, clerkly.2.8 */
     it('should apply multiple migrations in order on first startup', async () => {
       // Create multiple migration files
       const migration1 = `-- UP
@@ -284,7 +290,7 @@ DROP INDEX IF EXISTS idx_timestamp;
     /* Preconditions: database exists with initial migration applied, new migration file added
        Action: restart application (run migrations again)
        Assertions: only new migration applied, version updated, old migrations not re-applied
-       Requirements: clerkly.2*/
+       Requirements: clerkly.2.2, clerkly.2.4, clerkly.2.8 */
     it('should apply only new migrations on subsequent startup', async () => {
       // Create initial migration
       const migration1 = `-- UP
@@ -367,7 +373,7 @@ DROP TABLE IF EXISTS settings;
     /* Preconditions: database exists with all migrations applied
        Action: restart application (run migrations again)
        Assertions: no migrations applied, version unchanged, message indicates all migrations already applied
-       Requirements: clerkly.2*/
+       Requirements: clerkly.2.2, clerkly.2.4, clerkly.2.8 */
     it('should not re-apply migrations that are already applied', async () => {
       // Create migration files
       const migration1 = `-- UP
@@ -437,7 +443,7 @@ DROP TABLE IF EXISTS settings;
     /* Preconditions: database exists with some migrations applied, multiple new migrations added
        Action: restart application
        Assertions: all new migrations applied in order, version updated correctly
-       Requirements: clerkly.2*/
+       Requirements: clerkly.2.2, clerkly.2.4, clerkly.2.8 */
     it('should apply multiple new migrations in order', async () => {
       // Create initial migration
       const migration1 = `-- UP
@@ -548,7 +554,7 @@ DROP INDEX IF EXISTS idx_timestamp;
     /* Preconditions: application not running, migration files exist
        Action: start application through lifecycle manager, verify migrations applied
        Assertions: application starts successfully, migrations applied during initialization, data can be saved and loaded
-       Requirements: clerkly.2*/
+       Requirements: clerkly.2.2, clerkly.2.4, clerkly.2.8 */
     it('should integrate migrations with application lifecycle', async () => {
       // Initialize components (uses real migrations directory from DataManager)
       const windowManager = new WindowManager();
@@ -595,7 +601,7 @@ DROP INDEX IF EXISTS idx_timestamp;
     /* Preconditions: application not running, database exists with migrations applied
        Action: restart application multiple times
        Assertions: each restart succeeds, migrations not re-applied, data persists across restarts
-       Requirements: clerkly.2*/
+       Requirements: clerkly.2.2, clerkly.2.4, clerkly.2.8 */
     it('should handle multiple application restarts with migrations', async () => {
       const testKey = 'restart-test-key';
       const cycles = 3;
@@ -647,7 +653,7 @@ DROP INDEX IF EXISTS idx_timestamp;
     /* Preconditions: application not running, database exists with data
        Action: add new migration, restart application, verify data still accessible
        Assertions: new migration applied, old data preserved, new schema features available
-       Requirements: clerkly.2*/
+       Requirements: clerkly.2.2, clerkly.2.4, clerkly.2.8 */
     it('should preserve existing data when applying new migrations', async () => {
       // First startup: create initial schema and save data
       const migration1 = `-- UP
@@ -737,7 +743,7 @@ DROP TABLE IF EXISTS settings;
     /* Preconditions: database exists, migration file with invalid SQL exists
        Action: attempt to run migrations
        Assertions: migration fails, error reported, database state unchanged (rollback)
-       Requirements: clerkly.2*/
+       Requirements: clerkly.2.2, clerkly.2.4, clerkly.2.8 */
     it('should handle migration errors gracefully', async () => {
       // Create valid initial migration
       const migration1 = `-- UP
@@ -808,7 +814,7 @@ DROP TABLE IF EXISTS invalid_table;
     /* Preconditions: database exists with migrations applied
        Action: attempt to rollback migration without DOWN section
        Assertions: rollback fails with appropriate error message
-       Requirements: clerkly.2*/
+       Requirements: clerkly.2.2, clerkly.2.4, clerkly.2.8 */
     it('should handle missing DOWN section in rollback', async () => {
       // Create migration without DOWN section
       const migration1 = `-- UP
@@ -855,7 +861,7 @@ CREATE TABLE user_data (
     /* Preconditions: database exists with some migrations applied, some pending
        Action: get migration status
        Assertions: status correctly reports current version, applied count, pending count, pending list
-       Requirements: clerkly.2*/
+       Requirements: clerkly.2.2, clerkly.2.4, clerkly.2.8 */
     it('should correctly report migration status', async () => {
       // Create multiple migrations
       const migration1 = `-- UP

@@ -1,10 +1,8 @@
-import { StatusBadge } from './status-badge';
 import {
   ChevronLeft,
   ChevronRight,
   Calendar as CalendarIcon,
   Clock,
-  Users,
   PlayCircle,
   Play,
 } from 'lucide-react';
@@ -160,13 +158,7 @@ export function CalendarView({ onNavigateToMeeting }: CalendarViewProps) {
     setSelectedDate(dateStr);
   };
 
-  const stats = {
-    totalThisMonth: meetings.filter((m) => m.date.startsWith('2026-01')).length,
-    completedThisMonth: meetings.filter(
-      (m) => m.date.startsWith('2026-01') && m.status === 'completed'
-    ).length,
-    totalDuration: meetings.reduce((acc, m) => acc + parseInt(m.duration), 0),
-  };
+  // Removed unused stats variable
 
   return (
     <div className="p-8">

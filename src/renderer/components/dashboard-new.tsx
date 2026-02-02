@@ -1,5 +1,5 @@
 import { StatusBadge } from './status-badge';
-import { Calendar, Users, CheckCircle2, TrendingUp, Clock, Video } from 'lucide-react';
+import { Calendar, CheckCircle2, TrendingUp, Clock, Video } from 'lucide-react';
 
 interface DashboardProps {
   onNavigateToMeeting: (meetingId: string) => void;

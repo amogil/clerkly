@@ -7,7 +7,6 @@ import {
   X,
   HelpCircle,
   ArrowLeft,
-  CheckSquare,
   Plus,
   FileText,
   Calendar,
@@ -116,20 +115,7 @@ export function AIAgentPanel({ onCommand }: AIAgentPanelProps) {
     });
   };
 
-  const getStatusIcon = (status: AgentTask['status']) => {
-    switch (status) {
-      case 'new':
-        return <Plus className="w-3.5 h-3.5 text-sky-500" />;
-      case 'in-progress':
-        return <Loader2 className="w-3.5 h-3.5 text-blue-500 animate-spin" />;
-      case 'awaiting-user':
-        return <HelpCircle className="w-3.5 h-3.5 text-amber-500" />;
-      case 'error':
-        return <AlertCircle className="w-3.5 h-3.5 text-red-500" />;
-      case 'completed':
-        return <CheckSquare className="w-3.5 h-3.5 text-green-500" />;
-    }
-  };
+  // Removed unused function getStatusIcon
 
   const getStatusText = (status: AgentTask['status']) => {
     switch (status) {

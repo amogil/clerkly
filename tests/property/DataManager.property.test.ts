@@ -532,4 +532,196 @@ describe('Property Tests - Data Manager', () => {
     expect(loadResult.success).toBe(true);
     expect(loadResult.data).toBe(validValue);
   });
+
+  /* Preconditions: DataManager initialized with clean database
+     Action: generate random small data objects (< 1KB), perform saveData/loadData/deleteData operations and measure time
+     Assertions: each operation completes in < 50ms for simple operations
+     Requirements: clerkly.nfr.1.4, clerkly.2.6, clerkly.2.8, clerkly.nfr.4.4 */
+  // Feature: clerkly, Property 8: Data Operations Performance
+  test('Property 8: Data Operations Performance - operations complete in < 50ms', async () => {
+    // Generator for small data objects (< 1KB)
+    const smallDataObject = fc.oneof(
+      fc.string({ maxLength: 100 }),
+      fc.integer({ min: -1000, max: 1000 }),
+      fc.boolean(),
+      fc.record({
+        id: fc.integer({ min: 1, max: 100 }),
+        name: fc.string({ maxLength: 50 }),
+        active: fc.boolean(),
+      }),
+      fc.array(fc.string({ maxLength: 20 }), { maxLength: 10 }),
+      fc.record({
+        data: fc.array(fc.integer(), { maxLength: 20 }),
+        metadata: fc.record({
+          created: fc.integer(),
+          updated: fc.integer(),
+        }),
+      })
+    );
+
+    await fc.assert(
+      fc.asyncProperty(
+        fc.string({ minLength: 1, maxLength: 50 }),
+        smallDataObject,
+        async (key: string, value: any) => {
+          // Measure saveData performance
+          const saveStart = performance.now();
+          const saveResult = dataManager.saveData(key, value);
+          const saveTime = performance.now() - saveStart;
+
+          expect(saveResult.success).toBe(true);
+          expect(saveTime).toBeLessThan(50);
+
+          // Measure loadData performance
+          const loadStart = performance.now();
+          const loadResult = dataManager.loadData(key);
+          const loadTime = performance.now() - loadStart;
+
+          expect(loadResult.success).toBe(true);
+          expect(loadResult.data).toEqual(value);
+          expect(loadTime).toBeLessThan(50);
+
+          // Measure deleteData performance
+          const deleteStart = performance.now();
+          const deleteResult = dataManager.deleteData(key);
+          const deleteTime = performance.now() - deleteStart;
+
+          expect(deleteResult.success).toBe(true);
+          expect(deleteTime).toBeLessThan(50);
+        }
+      ),
+      { numRuns: 100 }
+    );
+  });
+
+  /* Preconditions: DataManager initialized
+     Action: save small string data and measure time
+     Assertions: operation completes in < 50ms
+     Requirements: clerkly.nfr.1.4 */
+  // Feature: clerkly, Property 8: Data Operations Performance
+  test('Property 8 edge case: saveData performance with small strings', () => {
+    const key = 'perf-test-string';
+    const value = 'small test string';
+
+    const start = performance.now();
+    const result = dataManager.saveData(key, value);
+    const duration = performance.now() - start;
+
+    expect(result.success).toBe(true);
+    expect(duration).toBeLessThan(50);
+  });
+
+  /* Preconditions: DataManager initialized with saved data
+     Action: load small data and measure time
+     Assertions: operation completes in < 50ms
+     Requirements: clerkly.nfr.1.4 */
+  // Feature: clerkly, Property 8: Data Operations Performance
+  test('Property 8 edge case: loadData performance with small objects', () => {
+    const key = 'perf-test-load';
+    const value = { id: 1, name: 'test', active: true };
+
+    // Save first
+    dataManager.saveData(key, value);
+
+    // Measure load performance
+    const start = performance.now();
+    const result = dataManager.loadData(key);
+    const duration = performance.now() - start;
+
+    expect(result.success).toBe(true);
+    expect(result.data).toEqual(value);
+    expect(duration).toBeLessThan(50);
+  });
+
+  /* Preconditions: DataManager initialized with saved data
+     Action: delete data and measure time
+     Assertions: operation completes in < 50ms
+     Requirements: clerkly.nfr.1.4 */
+  // Feature: clerkly, Property 8: Data Operations Performance
+  test('Property 8 edge case: deleteData performance', () => {
+    const key = 'perf-test-delete';
+    const value = 'test data';
+
+    // Save first
+    dataManager.saveData(key, value);
+
+    // Measure delete performance
+    const start = performance.now();
+    const result = dataManager.deleteData(key);
+    const duration = performance.now() - start;
+
+    expect(result.success).toBe(true);
+    expect(duration).toBeLessThan(50);
+  });
+
+  /* Preconditions: DataManager initialized
+     Action: perform multiple sequential operations and measure cumulative time
+     Assertions: average time per operation < 50ms
+     Requirements: clerkly.nfr.1.4 */
+  // Feature: clerkly, Property 8: Data Operations Performance
+  test('Property 8 edge case: multiple sequential operations performance', () => {
+    const operations = 10;
+    const totalStart = performance.now();
+
+    for (let i = 0; i < operations; i++) {
+      const key = `perf-test-${i}`;
+      const value = { index: i, data: `test-${i}` };
+
+      dataManager.saveData(key, value);
+      dataManager.loadData(key);
+      dataManager.deleteData(key);
+    }
+
+    const totalDuration = performance.now() - totalStart;
+    const avgTimePerOperation = totalDuration / (operations * 3); // 3 operations per iteration
+
+    expect(avgTimePerOperation).toBeLessThan(50);
+  });
+
+  /* Preconditions: DataManager initialized
+     Action: save data with various sizes (small to medium) and measure time
+     Assertions: all operations complete in < 50ms for data < 1KB
+     Requirements: clerkly.nfr.1.4 */
+  // Feature: clerkly, Property 8: Data Operations Performance
+  test('Property 8 edge case: performance with varying data sizes', () => {
+    const testCases = [
+      { key: 'tiny', value: 'x' },
+      { key: 'small', value: 'x'.repeat(100) },
+      { key: 'medium', value: 'x'.repeat(500) },
+      { key: 'array-small', value: Array(10).fill({ id: 1, name: 'test' }) },
+      { key: 'nested', value: { level1: { level2: { level3: { data: 'test' } } } } },
+    ];
+
+    for (const testCase of testCases) {
+      const start = performance.now();
+      const result = dataManager.saveData(testCase.key, testCase.value);
+      const duration = performance.now() - start;
+
+      expect(result.success).toBe(true);
+      expect(duration).toBeLessThan(50);
+    }
+  });
+
+  /* Preconditions: DataManager initialized with multiple saved keys
+     Action: load multiple different keys sequentially and measure time
+     Assertions: each load operation completes in < 50ms
+     Requirements: clerkly.nfr.1.4 */
+  // Feature: clerkly, Property 8: Data Operations Performance
+  test('Property 8 edge case: load performance with multiple keys', () => {
+    // Save multiple keys first
+    const keys = ['key1', 'key2', 'key3', 'key4', 'key5'];
+    keys.forEach((key, index) => {
+      dataManager.saveData(key, { index, data: `value-${index}` });
+    });
+
+    // Measure load performance for each key
+    keys.forEach((key) => {
+      const start = performance.now();
+      const result = dataManager.loadData(key);
+      const duration = performance.now() - start;
+
+      expect(result.success).toBe(true);
+      expect(duration).toBeLessThan(50);
+    });
+  });
 });

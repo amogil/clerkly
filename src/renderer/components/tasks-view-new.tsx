@@ -1,23 +1,8 @@
 import { useState } from 'react';
-import {
-  Plus,
-  Filter,
-  ChevronDown,
-  ChevronRight,
-  Clock,
-  User,
-  Users,
-  Folder,
-  CheckSquare,
-  X,
-} from 'lucide-react';
+import { Plus, Filter, Clock, User, Users, Folder, CheckSquare, X } from 'lucide-react';
 import type { Project, Task, TaskPriority, TaskStatus } from '@/app/types/project';
 
-interface TasksViewNewProps {
-  triggerAction?: { action: string; params: any } | null;
-}
-
-export function TasksViewNew({ triggerAction }: TasksViewNewProps) {
+export function TasksViewNew() {
   const [selectedProject, setSelectedProject] = useState<string | null>(null);
   const [priorityFilter, setPriorityFilter] = useState<TaskPriority | 'all'>('all');
   const [statusFilter, setStatusFilter] = useState<TaskStatus | 'all'>('all');

@@ -1,5 +1,5 @@
 import { Logo } from './logo';
-import { AlertCircle, RefreshCw } from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
 
 interface LoginErrorProps {
   errorMessage?: string;
@@ -111,7 +111,7 @@ export function LoginError({
           {/* Additional Info */}
           <div className="mt-8 text-center">
             <p className="text-xs text-muted-foreground leading-relaxed">
-              By continuing, you agree to Clerkly's Terms of Service and Privacy Policy
+              By continuing, you agree to Clerkly&apos;s Terms of Service and Privacy Policy
             </p>
           </div>
         </div>

@@ -36,8 +36,6 @@ interface TasksNewProps {
 
 export function TasksNew({ triggerAction }: TasksNewProps) {
   const [selectedProjectId, setSelectedProjectId] = useState<string>('1');
-  const [showProjectModal, setShowProjectModal] = useState(false);
-  const [showTaskModal, setShowTaskModal] = useState(false);
 
   const [projects, setProjects] = useState<Project[]>([
     {
@@ -196,7 +194,7 @@ export function TasksNew({ triggerAction }: TasksNewProps) {
         prev.map((p) => (p.id === targetProjectId ? { ...p, tasksCount: p.tasksCount + 1 } : p))
       );
     }
-  }, [triggerAction]);
+  }, [triggerAction, projects, selectedProjectId, setProjects, setTasks, setSelectedProjectId]);
 
   return (
     <div className="p-8">
@@ -207,14 +205,14 @@ export function TasksNew({ triggerAction }: TasksNewProps) {
           </div>
           <div className="flex gap-3">
             <button
-              onClick={() => setShowProjectModal(true)}
+              onClick={() => console.log('New project')}
               className="flex items-center gap-2 px-4 py-2 bg-secondary text-foreground rounded-lg hover:bg-secondary/80 transition-colors"
             >
               <Plus className="w-4 h-4" />
               New Project
             </button>
             <button
-              onClick={() => setShowTaskModal(true)}
+              onClick={() => console.log('New task')}
               className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
             >
               <Plus className="w-4 h-4" />
@@ -250,7 +248,7 @@ export function TasksNew({ triggerAction }: TasksNewProps) {
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            setShowProjectModal(true);
+                            console.log('Edit project');
                           }}
                           className="p-1 hover:bg-secondary rounded"
                         >
@@ -357,7 +355,7 @@ export function TasksNew({ triggerAction }: TasksNewProps) {
 
                         <div className="flex gap-1">
                           <button
-                            onClick={() => setShowTaskModal(true)}
+                            onClick={() => console.log('Edit task')}
                             className="p-2 hover:bg-secondary rounded-lg transition-colors"
                           >
                             <Edit2 className="w-4 h-4 text-muted-foreground" />
@@ -379,7 +377,7 @@ export function TasksNew({ triggerAction }: TasksNewProps) {
                     <div className="p-12 text-center">
                       <p className="text-muted-foreground">No tasks in this project</p>
                       <button
-                        onClick={() => setShowTaskModal(true)}
+                        onClick={() => console.log('Create task')}
                         className="mt-4 text-sm text-primary hover:underline"
                       >
                         Create your first task

@@ -1,16 +1,12 @@
 import {
-  Calendar,
   CheckCircle2,
   Bell,
   User,
   Shield,
   Globe,
   Mic,
-  FileText,
-  Save,
   MessageSquare,
   LogOut,
-  Clock,
   Cpu,
 } from 'lucide-react';
 import { useState } from 'react';

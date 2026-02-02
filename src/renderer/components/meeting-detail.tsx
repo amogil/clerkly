@@ -9,7 +9,6 @@ import {
   Users,
   ExternalLink,
   MapPin,
-  Video,
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -18,7 +17,7 @@ interface MeetingDetailProps {
   onBack: () => void;
 }
 
-export function MeetingDetail({ meetingId, onBack }: MeetingDetailProps) {
+export function MeetingDetail({ onBack }: MeetingDetailProps) {
   const [isPlaying, setIsPlaying] = useState(false);
 
   // Mock data - in real app this would be fetched based on meetingId

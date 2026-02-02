@@ -102,7 +102,7 @@ export function generateResponse(command: ParsedCommand, success: boolean = true
   }
 
   switch (command.action) {
-    case 'navigate':
+    case 'navigate': {
       const screenNames: Record<string, string> = {
         dashboard: 'Dashboard',
         calendar: 'Calendar',
@@ -111,6 +111,7 @@ export function generateResponse(command: ParsedCommand, success: boolean = true
         settings: 'Settings',
       };
       return `✓ Перешел на экран ${screenNames[command.params.screen] || command.params.screen}`;
+    }
 
     case 'create':
       if (command.entity === 'project') {

@@ -1,14 +1,4 @@
-import {
-  Plus,
-  Mail,
-  Phone,
-  Building,
-  Calendar,
-  Edit2,
-  Trash2,
-  Search,
-  UserPlus,
-} from 'lucide-react';
+import { Mail, Phone, Building, Calendar, Edit2, Trash2, Search, UserPlus } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
 interface Contact {
@@ -127,11 +117,7 @@ export function Contacts({ triggerAction }: ContactsProps) {
       contact.company?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const stats = {
-    total: contacts.length,
-    fromCalendar: contacts.filter((c) => c.source === 'google-calendar').length,
-    manual: contacts.filter((c) => c.source === 'manual').length,
-  };
+  // Removed unused stats variable
 
   // Handle AI agent commands
   useEffect(() => {

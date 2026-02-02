@@ -545,6 +545,220 @@ describe('IPC Communication Functional Tests', () => {
     });
   });
 
+  describe('ContextBridge Isolation', () => {
+    /* Preconditions: contextBridge mock configured, preload script loaded
+       Action: load preload script and verify that window.api is exposed through contextBridge, verify ipcRenderer is not directly accessible
+       Assertions: contextBridge.exposeInMainWorld called with 'api', window.api has saveData/loadData/deleteData methods, ipcRenderer is not exposed to renderer
+       Requirements: clerkly.2.2, clerkly.2.4, clerkly.2.8 */
+    it('should isolate renderer process from main process through contextBridge', () => {
+      const electron = jest.requireMock('electron');
+      const { contextBridge } = electron;
+
+      // Clear previous calls
+      (contextBridge.exposeInMainWorld as jest.Mock).mockClear();
+
+      // Load preload script to trigger contextBridge setup
+      jest.isolateModules(() => {
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        require('../../src/preload/index');
+      });
+
+      // Verify contextBridge.exposeInMainWorld was called
+      expect(contextBridge.exposeInMainWorld).toHaveBeenCalled();
+
+      // Get the call arguments
+      const calls = (contextBridge.exposeInMainWorld as jest.Mock).mock.calls;
+      const apiCall = calls.find((call: unknown[]) => call[0] === 'api');
+
+      // Verify 'api' was exposed
+      expect(apiCall).toBeDefined();
+      expect(apiCall[0]).toBe('api');
+
+      // Verify the exposed API has the correct methods
+      const exposedApi = apiCall[1];
+      expect(exposedApi).toHaveProperty('saveData');
+      expect(exposedApi).toHaveProperty('loadData');
+      expect(exposedApi).toHaveProperty('deleteData');
+
+      // Verify methods are functions
+      expect(typeof exposedApi.saveData).toBe('function');
+      expect(typeof exposedApi.loadData).toBe('function');
+      expect(typeof exposedApi.deleteData).toBe('function');
+    });
+
+    /* Preconditions: preload script loaded with contextBridge
+       Action: attempt to access Electron APIs directly from renderer context
+       Assertions: only window.api is accessible, ipcRenderer and other Electron APIs are not directly accessible
+       Requirements: clerkly.2.2, clerkly.2.4, clerkly.2.8 */
+    it('should prevent direct access to Electron APIs from renderer process', () => {
+      const electron = jest.requireMock('electron');
+      const { contextBridge } = electron;
+
+      // Clear previous calls
+      (contextBridge.exposeInMainWorld as jest.Mock).mockClear();
+
+      // Load preload script
+      jest.isolateModules(() => {
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        require('../../src/preload/index');
+      });
+
+      // Get the exposed API
+      const calls = (contextBridge.exposeInMainWorld as jest.Mock).mock.calls;
+      const apiCall = calls.find((call: unknown[]) => call[0] === 'api');
+      const exposedApi = apiCall[1];
+
+      // Verify that the exposed API does not contain raw Electron objects
+      expect(exposedApi).not.toHaveProperty('ipcRenderer');
+      expect(exposedApi).not.toHaveProperty('remote');
+      expect(exposedApi).not.toHaveProperty('require');
+      expect(exposedApi).not.toHaveProperty('process');
+
+      // Verify that only the intended methods are exposed
+      const apiKeys = Object.keys(exposedApi);
+      expect(apiKeys).toEqual(['saveData', 'loadData', 'deleteData']);
+    });
+
+    /* Preconditions: preload script loaded, contextBridge configured
+       Action: call window.api methods and verify they use ipcRenderer.invoke internally
+       Assertions: window.api.saveData calls ipcRenderer.invoke('save-data'), window.api.loadData calls ipcRenderer.invoke('load-data'), window.api.deleteData calls ipcRenderer.invoke('delete-data')
+       Requirements: clerkly.2.2, clerkly.2.4, clerkly.2.8 */
+    it('should use ipcRenderer.invoke internally for all API methods', async () => {
+      const electron = jest.requireMock('electron');
+      const { contextBridge, ipcRenderer } = electron;
+
+      // Clear previous calls
+      (contextBridge.exposeInMainWorld as jest.Mock).mockClear();
+      (ipcRenderer.invoke as jest.Mock).mockClear();
+
+      // Load preload script
+      jest.isolateModules(() => {
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        require('../../src/preload/index');
+      });
+
+      // Get the exposed API
+      const calls = (contextBridge.exposeInMainWorld as jest.Mock).mock.calls;
+      const apiCall = calls.find((call: unknown[]) => call[0] === 'api');
+      const exposedApi = apiCall[1];
+
+      // Mock ipcRenderer.invoke to return success
+      (ipcRenderer.invoke as jest.Mock).mockResolvedValue({ success: true });
+
+      // Test saveData
+      await exposedApi.saveData('test-key', 'test-value');
+      expect(ipcRenderer.invoke).toHaveBeenCalledWith('save-data', 'test-key', 'test-value');
+
+      // Clear mock
+      (ipcRenderer.invoke as jest.Mock).mockClear();
+
+      // Test loadData
+      (ipcRenderer.invoke as jest.Mock).mockResolvedValue({ success: true, data: 'test-value' });
+      await exposedApi.loadData('test-key');
+      expect(ipcRenderer.invoke).toHaveBeenCalledWith('load-data', 'test-key');
+
+      // Clear mock
+      (ipcRenderer.invoke as jest.Mock).mockClear();
+
+      // Test deleteData
+      (ipcRenderer.invoke as jest.Mock).mockResolvedValue({ success: true });
+      await exposedApi.deleteData('test-key');
+      expect(ipcRenderer.invoke).toHaveBeenCalledWith('delete-data', 'test-key');
+    });
+
+    /* Preconditions: preload script loaded, contextBridge configured
+       Action: verify that API methods return promises with correct structure
+       Assertions: saveData returns Promise<{success: boolean, error?: string}>, loadData returns Promise<{success: boolean, data?: any, error?: string}>, deleteData returns Promise<{success: boolean, error?: string}>
+       Requirements: clerkly.2.2, clerkly.2.4, clerkly.2.8 */
+    it('should return correctly typed promises from API methods', async () => {
+      const electron = jest.requireMock('electron');
+      const { contextBridge, ipcRenderer } = electron;
+
+      // Clear previous calls
+      (contextBridge.exposeInMainWorld as jest.Mock).mockClear();
+
+      // Load preload script
+      jest.isolateModules(() => {
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        require('../../src/preload/index');
+      });
+
+      // Get the exposed API
+      const calls = (contextBridge.exposeInMainWorld as jest.Mock).mock.calls;
+      const apiCall = calls.find((call: unknown[]) => call[0] === 'api');
+      const exposedApi = apiCall[1];
+
+      // Test saveData return type
+      (ipcRenderer.invoke as jest.Mock).mockResolvedValue({ success: true });
+      const saveResult = await exposedApi.saveData('key', 'value');
+      expect(saveResult).toHaveProperty('success');
+      expect(typeof saveResult.success).toBe('boolean');
+
+      // Test loadData return type
+      (ipcRenderer.invoke as jest.Mock).mockResolvedValue({ success: true, data: 'test' });
+      const loadResult = await exposedApi.loadData('key');
+      expect(loadResult).toHaveProperty('success');
+      expect(loadResult).toHaveProperty('data');
+      expect(typeof loadResult.success).toBe('boolean');
+
+      // Test deleteData return type
+      (ipcRenderer.invoke as jest.Mock).mockResolvedValue({ success: true });
+      const deleteResult = await exposedApi.deleteData('key');
+      expect(deleteResult).toHaveProperty('success');
+      expect(typeof deleteResult.success).toBe('boolean');
+    });
+
+    /* Preconditions: preload script loaded, contextBridge configured
+       Action: verify that errors from IPC are properly propagated through the API
+       Assertions: when ipcRenderer.invoke returns error, API methods return error in result object
+       Requirements: clerkly.2.2, clerkly.2.4, clerkly.2.8 */
+    it('should properly propagate errors through contextBridge API', async () => {
+      const electron = jest.requireMock('electron');
+      const { contextBridge, ipcRenderer } = electron;
+
+      // Clear previous calls
+      (contextBridge.exposeInMainWorld as jest.Mock).mockClear();
+
+      // Load preload script
+      jest.isolateModules(() => {
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        require('../../src/preload/index');
+      });
+
+      // Get the exposed API
+      const calls = (contextBridge.exposeInMainWorld as jest.Mock).mock.calls;
+      const apiCall = calls.find((call: unknown[]) => call[0] === 'api');
+      const exposedApi = apiCall[1];
+
+      // Test error propagation in saveData
+      (ipcRenderer.invoke as jest.Mock).mockResolvedValue({
+        success: false,
+        error: 'Invalid key',
+      });
+      const saveResult = await exposedApi.saveData('', 'value');
+      expect(saveResult.success).toBe(false);
+      expect(saveResult.error).toBe('Invalid key');
+
+      // Test error propagation in loadData
+      (ipcRenderer.invoke as jest.Mock).mockResolvedValue({
+        success: false,
+        error: 'Key not found',
+      });
+      const loadResult = await exposedApi.loadData('nonexistent');
+      expect(loadResult.success).toBe(false);
+      expect(loadResult.error).toBe('Key not found');
+
+      // Test error propagation in deleteData
+      (ipcRenderer.invoke as jest.Mock).mockResolvedValue({
+        success: false,
+        error: 'Key not found',
+      });
+      const deleteResult = await exposedApi.deleteData('nonexistent');
+      expect(deleteResult.success).toBe(false);
+      expect(deleteResult.error).toBe('Key not found');
+    });
+  });
+
   describe('IPC Edge Cases', () => {
     /* Preconditions: IPC handlers registered, data manager initialized
        Action: save data with special characters in key
