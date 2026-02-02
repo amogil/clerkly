@@ -46,7 +46,7 @@ class WindowManager {
           responseHeaders: {
             ...details.responseHeaders,
             'Content-Security-Policy': [
-j              "default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; script-src 'self'; img-src 'self' data: https:;",
+              "default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; script-src 'self'; img-src 'self' data: https:;",
             ],
           },
         });
