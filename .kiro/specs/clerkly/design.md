@@ -1110,6 +1110,92 @@ CREATE TABLE schema_migrations (
 - Очень медленные операции (> 1000ms)
 - Различные значения порога производительности
 
+### Property 7: Application Startup Performance
+
+*Для любого* запуска приложения, время инициализации (от старта до готовности окна) должно быть меньше 3000 миллисекунд на современных Mac системах.
+
+**Validates: Requirements NFR 1.1**
+
+**Обоснование:** Это свойство проверяет, что приложение запускается достаточно быстро для обеспечения хорошего пользовательского опыта. Быстрый запуск критически важен для продуктивности пользователей.
+
+**Тестовый сценарий:**
+- Запускаем приложение и измеряем время от app.whenReady() до завершения initialize()
+- Проверяем, что время запуска < 3000ms
+- Проверяем, что логируется предупреждение, если время > 3000ms
+- Проверяем, что все компоненты корректно инициализированы
+
+**Edge cases для тестирования:**
+- Первый запуск (создание базы данных, миграции)
+- Последующие запуски (база данных уже существует)
+- Запуск с большим объемом данных в базе
+- Запуск на медленных системах
+
+### Property 8: Data Operations Performance
+
+*Для любой* простой операции с данными (saveData, loadData, deleteData с небольшими объектами < 1KB), время выполнения должно быть меньше 50 миллисекунд.
+
+**Validates: Requirements NFR 1.4**
+
+**Обоснование:** Это свойство проверяет, что операции с данными выполняются достаточно быстро для обеспечения отзывчивости приложения. Медленные операции с данными могут привести к зависанию UI.
+
+**Тестовый сценарий:**
+- Генерируем случайные небольшие объекты данных (< 1KB)
+- Выполняем операции saveData, loadData, deleteData
+- Измеряем время выполнения каждой операции
+- Проверяем, что время < 50ms для каждой операции
+
+**Edge cases для тестирования:**
+- Операции с пустыми строками
+- Операции с простыми примитивами (числа, boolean)
+- Операции с небольшими объектами
+- Операции с небольшими массивами
+- Конкурентные операции (несколько операций одновременно)
+
+### Property 9: Graceful Shutdown Data Persistence
+
+*Для любых* данных, сохраненных перед завершением приложения, эти данные должны быть доступны после перезапуска приложения.
+
+**Validates: Requirements NFR 2.2**
+
+**Обоснование:** Это свойство проверяет, что приложение корректно сохраняет все данные перед завершением и что данные персистентны между сессиями. Это критически важно для надежности приложения и предотвращения потери данных пользователя.
+
+**Тестовый сценарий:**
+- Запускаем приложение и сохраняем случайные данные
+- Корректно завершаем приложение через handleQuit()
+- Перезапускаем приложение
+- Загружаем сохраненные данные
+- Проверяем, что все данные доступны и эквивалентны сохраненным
+
+**Edge cases для тестирования:**
+- Завершение с одним ключом данных
+- Завершение с множеством ключей данных
+- Завершение с большими объектами данных
+- Завершение во время выполнения операции сохранения
+- Завершение с таймаутом (проверка, что данные сохраняются в течение 5 секунд)
+
+### Property 10: Database Corruption Recovery
+
+*Для любой* поврежденной базы данных, при инициализации приложение должно создать backup поврежденной базы и создать новую рабочую базу данных.
+
+**Validates: Requirements NFR 2.4**
+
+**Обоснование:** Это свойство проверяет, что приложение корректно обрабатывает повреждение базы данных и восстанавливается без потери данных (через backup). Это критически важно для надежности приложения.
+
+**Тестовый сценарий:**
+- Создаем поврежденную базу данных (невалидный SQLite файл)
+- Запускаем инициализацию DataManager
+- Проверяем, что создан backup файл с timestamp
+- Проверяем, что создана новая рабочая база данных
+- Проверяем, что новая база данных функциональна (можно сохранять/загружать данные)
+- Проверяем, что backup файл содержит данные поврежденной базы
+
+**Edge cases для тестирования:**
+- Полностью поврежденная база (невалидный формат)
+- Частично поврежденная база (некоторые таблицы доступны)
+- Поврежденная база с большим объемом данных
+- Ошибки прав доступа при создании backup
+- Недостаточно места на диске для backup
+
 ## Обработка ошибок
 
 ### Ошибки жизненного цикла приложения
@@ -1740,6 +1826,109 @@ describe('Property Tests - Data Storage', () => {
       { numRuns: 100 }
     );
   });
+  
+  /* Preconditions: application not running
+     Action: start application and measure startup time
+     Assertions: for all startups, time is less than 3000ms
+     Requirements: clerkly.nfr.1.1 */
+  // Feature: clerkly, Property 7: Application Startup Performance
+  test('Property 7: application starts within 3 seconds', async () => {
+    await fc.assert(
+      fc.asyncProperty(
+        fc.constant(null), // No input needed
+        async () => {
+          const startTime = Date.now();
+          const app = await startTestApp();
+          const loadTime = Date.now() - startTime;
+          
+          expect(loadTime).toBeLessThan(3000);
+          
+          await app.quit();
+        }
+      ),
+      { numRuns: 100 }
+    );
+  });
+  
+  /* Preconditions: DataManager initialized
+     Action: generate random small data objects, perform save/load/delete operations
+     Assertions: for all operations, execution time is less than 50ms
+     Requirements: clerkly.nfr.1.4 */
+  // Feature: clerkly, Property 8: Data Operations Performance
+  test('Property 8: data operations complete within 50ms', () => {
+    fc.assert(
+      fc.property(
+        fc.string({ minLength: 1, maxLength: 100 }), // key
+        fc.oneof(
+          fc.string({ maxLength: 1000 }),
+          fc.integer(),
+          fc.boolean()
+        ), // small value < 1KB
+        (key: string, value: any) => {
+          const dataManager = new DataManager('/tmp/test-storage');
+          dataManager.initialize();
+          
+          // Test saveData performance
+          const saveStart = performance.now();
+          const saveResult = dataManager.saveData(key, value);
+          const saveTime = performance.now() - saveStart;
+          expect(saveResult.success).toBe(true);
+          expect(saveTime).toBeLessThan(50);
+          
+          // Test loadData performance
+          const loadStart = performance.now();
+          const loadResult = dataManager.loadData(key);
+          const loadTime = performance.now() - loadStart;
+          expect(loadResult.success).toBe(true);
+          expect(loadTime).toBeLessThan(50);
+          
+          // Test deleteData performance
+          const deleteStart = performance.now();
+          const deleteResult = dataManager.deleteData(key);
+          const deleteTime = performance.now() - deleteStart;
+          expect(deleteResult.success).toBe(true);
+          expect(deleteTime).toBeLessThan(50);
+          
+          dataManager.close();
+        }
+      ),
+      { numRuns: 100 }
+    );
+  });
+  
+  /* Preconditions: application not running, test database does not exist
+     Action: start app, save random data, quit app, restart app, load data
+     Assertions: for all data, loaded data equals saved data after restart
+     Requirements: clerkly.nfr.2.2 */
+  // Feature: clerkly, Property 9: Graceful Shutdown Data Persistence
+  test('Property 9: data persists across application restarts', async () => {
+    await fc.assert(
+      fc.asyncProperty(
+        fc.string({ minLength: 1, maxLength: 100 }), // key
+        fc.oneof(fc.string(), fc.integer(), fc.object()), // value
+        async (key: string, value: any) => {
+          // Start application and save data
+          const app1 = await startTestApp();
+          const dataManager1 = app1.getDataManager();
+          const saveResult = dataManager1.saveData(key, value);
+          expect(saveResult.success).toBe(true);
+          
+          // Gracefully quit application
+          await app1.quit();
+          
+          // Restart application and load data
+          const app2 = await startTestApp();
+          const dataManager2 = app2.getDataManager();
+          const loadResult = dataManager2.loadData(key);
+          expect(loadResult.success).toBe(true);
+          expect(loadResult.data).toEqual(value);
+          
+          await app2.quit();
+        }
+      ),
+      { numRuns: 100 }
+    );
+  });
 });
 ```
 
@@ -1796,6 +1985,39 @@ test('Property 1 edge case: large objects', () => {
   const loadResult = dataManager.loadData(key);
   expect(loadResult.success).toBe(true);
   expect(loadResult.data).toEqual(value);
+});
+
+/* Preconditions: corrupted SQLite database file exists at storage path
+   Action: initialize DataManager
+   Assertions: backup file created, new database created and functional
+   Requirements: clerkly.nfr.2.4 */
+test('Property 10: database corruption recovery', () => {
+  const storagePath = '/tmp/test-storage-corrupted';
+  const dbPath = path.join(storagePath, 'clerkly.db');
+  
+  // Create corrupted database file
+  fs.mkdirSync(storagePath, { recursive: true });
+  fs.writeFileSync(dbPath, 'CORRUPTED DATA NOT VALID SQLITE');
+  
+  // Initialize DataManager (should detect corruption and recover)
+  const dataManager = new DataManager(storagePath);
+  const initResult = dataManager.initialize();
+  
+  expect(initResult.success).toBe(true);
+  
+  // Check that backup was created
+  const backupFiles = fs.readdirSync(storagePath).filter(f => f.startsWith('clerkly.db.backup-'));
+  expect(backupFiles.length).toBeGreaterThan(0);
+  
+  // Check that new database is functional
+  const saveResult = dataManager.saveData('test-key', 'test-value');
+  expect(saveResult.success).toBe(true);
+  
+  const loadResult = dataManager.loadData('test-key');
+  expect(loadResult.success).toBe(true);
+  expect(loadResult.data).toBe('test-value');
+  
+  dataManager.close();
 });
 ```
 
@@ -1956,6 +2178,51 @@ test('UI should render within 100ms', () => {
 });
 ```
 
+### Покрытие Требований
+
+| Требование | Модульные Тесты | Property-Based Тесты | Функциональные Тесты |
+|------------|-----------------|----------------------|----------------------|
+| clerkly.1.1 | ✓ | - | - |
+| clerkly.1.2 | ✓ | - | ✓ |
+| clerkly.1.3 | ✓ | ✓ | ✓ |
+| clerkly.1.4 | ✓ | ✓ | ✓ |
+| clerkly.1.5 | ✓ | - | - |
+| clerkly.2.1 | ✓ | - | - |
+| clerkly.2.2 | - | - | ✓ |
+| clerkly.2.3 | ✓ | ✓ | - |
+| clerkly.2.4 | - | - | ✓ |
+| clerkly.2.5 | ✓ | - | - |
+| clerkly.2.6 | - | ✓ | - |
+| clerkly.2.7 | ✓ | - | - |
+| clerkly.2.8 | ✓ | - | - |
+| clerkly.2.9 | ✓ | - | - |
+| clerkly.nfr.1.1 | ✓ | ✓ | ✓ |
+| clerkly.nfr.1.2 | ✓ | ✓ | - |
+| clerkly.nfr.1.3 | ✓ | ✓ | - |
+| clerkly.nfr.1.4 | ✓ | ✓ | - |
+| clerkly.nfr.2.1 | ✓ | ✓ | - |
+| clerkly.nfr.2.2 | ✓ | ✓ | ✓ |
+| clerkly.nfr.2.3 | ✓ | ✓ | ✓ |
+| clerkly.nfr.2.4 | ✓ | ✓ | - |
+| clerkly.nfr.3.1 | ✓ | - | - |
+| clerkly.nfr.3.2 | ✓ | - | - |
+| clerkly.nfr.3.3 | ✓ | - | ✓ |
+| clerkly.nfr.4.1 | ✓ | - | - |
+| clerkly.nfr.4.2 | ✓ | - | - |
+| clerkly.nfr.4.3 | ✓ | - | - |
+| clerkly.nfr.4.4 | - | ✓ | - |
+
+**Легенда:**
+- ✓ - Требование покрыто данным типом тестов
+- \- - Требование не покрыто данным типом тестов
+
+**Примечания:**
+- Все функциональные требования (clerkly.1.x, clerkly.2.x) покрыты соответствующими типами тестов
+- Все нефункциональные требования (clerkly.nfr.x.x) покрыты соответствующими типами тестов
+- Property-based тесты фокусируются на универсальных свойствах корректности (Property 1-10)
+- Функциональные тесты проверяют интеграцию между компонентами
+- Модульные тесты покрывают конкретные примеры, граничные случаи и обработку ошибок
+
 ## Трассировка требований
 
 Эта секция обеспечивает полную прослеживаемость между требованиями и элементами дизайна.
@@ -2044,6 +2311,7 @@ test('UI should render within 100ms', () => {
 **NFR 1.1 (Запуск < 3 секунды):**
 - Реализовано: Оптимизация инициализации, ленивая загрузка
 - Компоненты: "Lifecycle Manager"
+- Свойства: Property 7 (Application Startup Performance)
 - Тестирование: Performance тесты
 - Мониторинг: Логирование предупреждений при медленном запуске
 
@@ -2056,22 +2324,25 @@ test('UI should render within 100ms', () => {
 **NFR 1.3 (Индикаторы загрузки > 200ms):**
 - Реализовано: Автоматические индикаторы через withLoading()
 - Компоненты: "UI Controller"
+- Свойства: Property 6 (Performance Monitoring)
 - Тестирование: Модульные тесты
 
 **NFR 1.4 (Операции с данными < 50ms):**
 - Реализовано: Индексирование SQLite, оптимизированные запросы
 - Компоненты: "Data Manager"
+- Свойства: Property 8 (Data Operations Performance)
 - Тестирование: Performance тесты
 
 **NFR 2.1 (Обработка ошибок инициализации):**
 - Реализовано: Fallback на temp directory, backup при повреждении
 - Компоненты: "Data Manager"
-- Свойства: Property 5 (Migration Idempotence)
+- Свойства: Property 5 (Migration Idempotence), Property 10 (Database Corruption Recovery)
 - Тестирование: Модульные тесты обработки ошибок
 
 **NFR 2.2 (Сохранение данных перед завершением):**
 - Реализовано: Graceful shutdown с таймаутом 5 секунд
 - Компоненты: "Lifecycle Manager"
+- Свойства: Property 9 (Graceful Shutdown Data Persistence)
 - Тестирование: Функциональные тесты персистентности
 
 **NFR 2.3 (IPC таймауты):**
@@ -2083,6 +2354,7 @@ test('UI should render within 100ms', () => {
 **NFR 2.4 (Backup при повреждении):**
 - Реализовано: Автоматическое создание backup и пересоздание базы
 - Компоненты: "Data Manager"
+- Свойства: Property 10 (Database Corruption Recovery)
 - Тестирование: Модульные тесты обработки ошибок
 
 **NFR 3.1 (Mac OS X 10.13+):**
