@@ -34,8 +34,48 @@ print_warning() {
 
 echo -e "${BLUE}Starting validation process for Clerkly...${NC}\n"
 
-# 1. Unit Tests
-print_step "1. Unit Tests"
+# 1. TypeScript Compilation
+print_step "1. TypeScript Compilation"
+echo "Running: npm run build"
+if npm run build; then
+    print_success "TypeScript compilation passed"
+else
+    print_error "TypeScript compilation failed"
+    exit 1
+fi
+
+# 2. ESLint
+print_step "2. ESLint"
+echo "Running: npm run lint"
+if npm run lint; then
+    print_success "ESLint checks passed"
+else
+    print_warning "ESLint checks failed. Attempting to fix..."
+    if npm run lint:fix; then
+        print_success "ESLint auto-fix successful"
+    else
+        print_error "ESLint checks failed and could not be auto-fixed"
+        exit 1
+    fi
+fi
+
+# 3. Prettier
+print_step "3. Prettier"
+echo "Running: npm run format:check"
+if npm run format:check; then
+    print_success "Prettier formatting checks passed"
+else
+    print_warning "Prettier formatting issues found. Attempting to fix..."
+    if npm run format; then
+        print_success "Prettier auto-format successful"
+    else
+        print_error "Prettier formatting failed"
+        exit 1
+    fi
+fi
+
+# 4. Unit Tests
+print_step "4. Unit Tests"
 echo "Running: npm run test:unit"
 if npm run test:unit; then
     print_success "Unit tests passed"
@@ -44,8 +84,8 @@ else
     exit 1
 fi
 
-# 2. Property-Based Tests
-print_step "2. Property-Based Tests"
+# 5. Property-Based Tests
+print_step "5. Property-Based Tests"
 echo "Running: npm run test:property"
 if npm run test:property; then
     print_success "Property-based tests passed"
@@ -54,8 +94,8 @@ else
     exit 1
 fi
 
-# 3. Test Coverage
-print_step "3. Test Coverage"
+# 6. Test Coverage
+print_step "6. Test Coverage"
 echo "Running: npm run test:coverage"
 if npm run test:coverage; then
     print_success "Test coverage check passed"
@@ -64,8 +104,8 @@ else
     exit 1
 fi
 
-# 4. Security Audit (informational)
-print_step "4. Security Audit (Informational)"
+# 7. Security Audit (informational)
+print_step "7. Security Audit (Informational)"
 echo "Running: npm audit"
 if npm audit --production; then
     print_success "No security vulnerabilities found in production dependencies"
@@ -80,6 +120,9 @@ echo -e "${GREEN}The project meets all quality standards defined in AGENTS.md${N
 
 # Summary of what was validated
 echo -e "${BLUE}Validated:${NC}"
+echo "✅ TypeScript compilation (no errors)"
+echo "✅ ESLint (all checks passing)"
+echo "✅ Prettier (code formatting correct)"
 echo "✅ Unit tests (all passing)"
 echo "✅ Property-based tests (all passing)"
 echo "✅ Test coverage (meets thresholds)"

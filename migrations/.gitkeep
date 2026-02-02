@@ -1,0 +1,3 @@
+# Database migrations directory
+# Migration files should follow the naming convention: XXX_description.sql
+# Example: 001_initial_schema.sql

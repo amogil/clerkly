@@ -1,0 +1,3 @@
+# Functional tests directory
+# This directory will contain functional/integration tests
+# NOTE: These tests show windows on screen and should only be run manually
