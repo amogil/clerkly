@@ -108,8 +108,8 @@ DROP TABLE IF EXISTS user_data;
       fs.writeFileSync(path.join(testMigrationsPath, '001_initial_schema.sql'), migrationContent);
 
       // Initialize components with test migrations path
-      const windowManager = new WindowManager();
       const dataManager = new DataManager(testStoragePath);
+      const windowManager = new WindowManager(dataManager);
       const lifecycleManager = new LifecycleManager(windowManager, dataManager);
 
       // Override migrations path for testing
@@ -557,8 +557,8 @@ DROP INDEX IF EXISTS idx_timestamp;
        Requirements: clerkly.2.2, clerkly.2.4, clerkly.2.8 */
     it('should integrate migrations with application lifecycle', async () => {
       // Initialize components (uses real migrations directory from DataManager)
-      const windowManager = new WindowManager();
       const dataManager = new DataManager(testStoragePath);
+      const windowManager = new WindowManager(dataManager);
       const lifecycleManager = new LifecycleManager(windowManager, dataManager);
 
       // Initialize application (this should run migrations)
@@ -607,8 +607,8 @@ DROP INDEX IF EXISTS idx_timestamp;
       const cycles = 3;
 
       for (let i = 0; i < cycles; i++) {
-        const windowManager = new WindowManager();
         const dataManager = new DataManager(testStoragePath);
+        const windowManager = new WindowManager(dataManager);
         const lifecycleManager = new LifecycleManager(windowManager, dataManager);
 
         // Initialize application
@@ -636,8 +636,8 @@ DROP INDEX IF EXISTS idx_timestamp;
       }
 
       // Verify final data persisted
-      const finalWindowManager = new WindowManager();
       const finalDataManager = new DataManager(testStoragePath);
+      const finalWindowManager = new WindowManager(finalDataManager);
       const finalLifecycleManager = new LifecycleManager(finalWindowManager, finalDataManager);
 
       await finalLifecycleManager.initialize();

@@ -24,10 +24,14 @@ jest.mock('electron', () => ({
   BrowserWindow: jest.fn().mockImplementation(() => ({
     loadFile: jest.fn().mockResolvedValue(undefined),
     on: jest.fn(),
+    once: jest.fn(),
     removeAllListeners: jest.fn(),
     destroy: jest.fn(),
     close: jest.fn(),
     isDestroyed: jest.fn().mockReturnValue(false),
+    maximize: jest.fn(),
+    isMaximized: jest.fn().mockReturnValue(false),
+    getBounds: jest.fn().mockReturnValue({ x: 100, y: 100, width: 1200, height: 800 }),
     webContents: {
       on: jest.fn(),
       session: {
@@ -40,6 +44,16 @@ jest.mock('electron', () => ({
   ipcMain: {
     handle: jest.fn(),
     removeHandler: jest.fn(),
+  },
+  screen: {
+    getPrimaryDisplay: jest.fn().mockReturnValue({
+      workAreaSize: { width: 1920, height: 1080 },
+    }),
+    getAllDisplays: jest.fn().mockReturnValue([
+      {
+        bounds: { x: 0, y: 0, width: 1920, height: 1080 },
+      },
+    ]),
   },
 }));
 
@@ -108,8 +122,8 @@ describe('Property Tests - Graceful Shutdown Data Persistence', () => {
           }
 
           // First startup - save data
-          const windowManager1 = new WindowManager();
           const dataManager1 = new DataManager(testStoragePath);
+          const windowManager1 = new WindowManager(dataManager1);
           const lifecycleManager1 = new LifecycleManager(windowManager1, dataManager1);
 
           await lifecycleManager1.initialize();
@@ -139,8 +153,8 @@ describe('Property Tests - Graceful Shutdown Data Persistence', () => {
           jest.clearAllMocks();
 
           // Second startup - verify data persisted
-          const windowManager2 = new WindowManager();
           const dataManager2 = new DataManager(testStoragePath);
+          const windowManager2 = new WindowManager(dataManager2);
           const lifecycleManager2 = new LifecycleManager(windowManager2, dataManager2);
 
           await lifecycleManager2.initialize();
@@ -178,8 +192,8 @@ describe('Property Tests - Graceful Shutdown Data Persistence', () => {
     }
 
     // First startup - save data
-    const windowManager1 = new WindowManager();
     const dataManager1 = new DataManager(testStoragePath);
+    const windowManager1 = new WindowManager(dataManager1);
     const lifecycleManager1 = new LifecycleManager(windowManager1, dataManager1);
 
     await lifecycleManager1.initialize();
@@ -203,8 +217,8 @@ describe('Property Tests - Graceful Shutdown Data Persistence', () => {
     jest.clearAllMocks();
 
     // Second startup - verify data persisted
-    const windowManager2 = new WindowManager();
     const dataManager2 = new DataManager(testStoragePath);
+    const windowManager2 = new WindowManager(dataManager2);
     const lifecycleManager2 = new LifecycleManager(windowManager2, dataManager2);
 
     await lifecycleManager2.initialize();
@@ -230,8 +244,8 @@ describe('Property Tests - Graceful Shutdown Data Persistence', () => {
     }
 
     // First startup - save data
-    const windowManager1 = new WindowManager();
     const dataManager1 = new DataManager(testStoragePath);
+    const windowManager1 = new WindowManager(dataManager1);
     const lifecycleManager1 = new LifecycleManager(windowManager1, dataManager1);
 
     await lifecycleManager1.initialize();
@@ -265,8 +279,8 @@ describe('Property Tests - Graceful Shutdown Data Persistence', () => {
     jest.clearAllMocks();
 
     // Second startup - verify all data persisted
-    const windowManager2 = new WindowManager();
     const dataManager2 = new DataManager(testStoragePath);
+    const windowManager2 = new WindowManager(dataManager2);
     const lifecycleManager2 = new LifecycleManager(windowManager2, dataManager2);
 
     await lifecycleManager2.initialize();
@@ -295,8 +309,8 @@ describe('Property Tests - Graceful Shutdown Data Persistence', () => {
     }
 
     // First startup - save data
-    const windowManager1 = new WindowManager();
     const dataManager1 = new DataManager(testStoragePath);
+    const windowManager1 = new WindowManager(dataManager1);
     const lifecycleManager1 = new LifecycleManager(windowManager1, dataManager1);
 
     await lifecycleManager1.initialize();
@@ -334,8 +348,8 @@ describe('Property Tests - Graceful Shutdown Data Persistence', () => {
     jest.clearAllMocks();
 
     // Second startup - verify data persisted
-    const windowManager2 = new WindowManager();
     const dataManager2 = new DataManager(testStoragePath);
+    const windowManager2 = new WindowManager(dataManager2);
     const lifecycleManager2 = new LifecycleManager(windowManager2, dataManager2);
 
     await lifecycleManager2.initialize();
@@ -361,8 +375,8 @@ describe('Property Tests - Graceful Shutdown Data Persistence', () => {
     }
 
     // First startup - save and update data
-    const windowManager1 = new WindowManager();
     const dataManager1 = new DataManager(testStoragePath);
+    const windowManager1 = new WindowManager(dataManager1);
     const lifecycleManager1 = new LifecycleManager(windowManager1, dataManager1);
 
     await lifecycleManager1.initialize();
@@ -391,8 +405,8 @@ describe('Property Tests - Graceful Shutdown Data Persistence', () => {
     jest.clearAllMocks();
 
     // Second startup - verify updated data persisted
-    const windowManager2 = new WindowManager();
     const dataManager2 = new DataManager(testStoragePath);
+    const windowManager2 = new WindowManager(dataManager2);
     const lifecycleManager2 = new LifecycleManager(windowManager2, dataManager2);
 
     await lifecycleManager2.initialize();
@@ -419,8 +433,8 @@ describe('Property Tests - Graceful Shutdown Data Persistence', () => {
     }
 
     // First startup - save and delete data
-    const windowManager1 = new WindowManager();
     const dataManager1 = new DataManager(testStoragePath);
+    const windowManager1 = new WindowManager(dataManager1);
     const lifecycleManager1 = new LifecycleManager(windowManager1, dataManager1);
 
     await lifecycleManager1.initialize();
@@ -451,8 +465,8 @@ describe('Property Tests - Graceful Shutdown Data Persistence', () => {
     jest.clearAllMocks();
 
     // Second startup - verify persistence state
-    const windowManager2 = new WindowManager();
     const dataManager2 = new DataManager(testStoragePath);
+    const windowManager2 = new WindowManager(dataManager2);
     const lifecycleManager2 = new LifecycleManager(windowManager2, dataManager2);
 
     await lifecycleManager2.initialize();
@@ -484,8 +498,8 @@ describe('Property Tests - Graceful Shutdown Data Persistence', () => {
     }
 
     // First startup - save data
-    const windowManager1 = new WindowManager();
     const dataManager1 = new DataManager(testStoragePath);
+    const windowManager1 = new WindowManager(dataManager1);
     const lifecycleManager1 = new LifecycleManager(windowManager1, dataManager1);
 
     await lifecycleManager1.initialize();
@@ -517,8 +531,8 @@ describe('Property Tests - Graceful Shutdown Data Persistence', () => {
     jest.clearAllMocks();
 
     // Second startup - verify all data persisted
-    const windowManager2 = new WindowManager();
     const dataManager2 = new DataManager(testStoragePath);
+    const windowManager2 = new WindowManager(dataManager2);
     const lifecycleManager2 = new LifecycleManager(windowManager2, dataManager2);
 
     await lifecycleManager2.initialize();
@@ -554,8 +568,8 @@ describe('Property Tests - Graceful Shutdown Data Persistence', () => {
       // Clear mocks for each cycle
       jest.clearAllMocks();
 
-      const windowManager = new WindowManager();
       const dataManager = new DataManager(testStoragePath);
+      const windowManager = new WindowManager(dataManager);
       const lifecycleManager = new LifecycleManager(windowManager, dataManager);
 
       await lifecycleManager.initialize();
@@ -584,8 +598,8 @@ describe('Property Tests - Graceful Shutdown Data Persistence', () => {
     // Final verification - restart and check data
     jest.clearAllMocks();
 
-    const windowManager = new WindowManager();
     const dataManager = new DataManager(testStoragePath);
+    const windowManager = new WindowManager(dataManager);
     const lifecycleManager = new LifecycleManager(windowManager, dataManager);
 
     await lifecycleManager.initialize();
@@ -611,8 +625,8 @@ describe('Property Tests - Graceful Shutdown Data Persistence', () => {
     }
 
     // First startup - no data saved
-    const windowManager1 = new WindowManager();
     const dataManager1 = new DataManager(testStoragePath);
+    const windowManager1 = new WindowManager(dataManager1);
     const lifecycleManager1 = new LifecycleManager(windowManager1, dataManager1);
 
     await lifecycleManager1.initialize();
@@ -630,8 +644,8 @@ describe('Property Tests - Graceful Shutdown Data Persistence', () => {
     jest.clearAllMocks();
 
     // Second startup - verify clean state
-    const windowManager2 = new WindowManager();
     const dataManager2 = new DataManager(testStoragePath);
+    const windowManager2 = new WindowManager(dataManager2);
     const lifecycleManager2 = new LifecycleManager(windowManager2, dataManager2);
 
     await lifecycleManager2.initialize();
@@ -658,8 +672,8 @@ describe('Property Tests - Graceful Shutdown Data Persistence', () => {
     }
 
     // First startup - save data
-    const windowManager1 = new WindowManager();
     const dataManager1 = new DataManager(testStoragePath);
+    const windowManager1 = new WindowManager(dataManager1);
     const lifecycleManager1 = new LifecycleManager(windowManager1, dataManager1);
 
     await lifecycleManager1.initialize();
@@ -701,8 +715,8 @@ describe('Property Tests - Graceful Shutdown Data Persistence', () => {
     jest.clearAllMocks();
 
     // Second startup - verify data persisted
-    const windowManager2 = new WindowManager();
     const dataManager2 = new DataManager(testStoragePath);
+    const windowManager2 = new WindowManager(dataManager2);
     const lifecycleManager2 = new LifecycleManager(windowManager2, dataManager2);
 
     await lifecycleManager2.initialize();

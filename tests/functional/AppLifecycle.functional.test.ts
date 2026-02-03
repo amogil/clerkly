@@ -59,8 +59,9 @@ describe('Application Lifecycle Functional Tests', () => {
     (app.getPath as jest.Mock).mockReturnValue(testStoragePath);
 
     // Initialize components
-    windowManager = new WindowManager();
+    // Requirements: ui.5
     dataManager = new DataManager(testStoragePath);
+    windowManager = new WindowManager(dataManager);
     lifecycleManager = new LifecycleManager(windowManager, dataManager);
   });
 
@@ -386,8 +387,9 @@ describe('Application Lifecycle Functional Tests', () => {
       await lifecycleManager.handleQuit();
 
       // Second session: restart and load data
-      const newWindowManager = new WindowManager();
+      // Requirements: ui.5
       const newDataManager = new DataManager(testStoragePath);
+      const newWindowManager = new WindowManager(newDataManager);
       const newLifecycleManager = new LifecycleManager(newWindowManager, newDataManager);
 
       const initResult = await newLifecycleManager.initialize();
@@ -417,8 +419,9 @@ describe('Application Lifecycle Functional Tests', () => {
       await lifecycleManager.handleQuit();
 
       // Second startup: migrations should not be re-applied
-      const newWindowManager = new WindowManager();
+      // Requirements: ui.5
       const newDataManager = new DataManager(testStoragePath);
+      const newWindowManager = new WindowManager(newDataManager);
       const newLifecycleManager = new LifecycleManager(newWindowManager, newDataManager);
 
       const initResult2 = await newLifecycleManager.initialize();
@@ -447,8 +450,9 @@ describe('Application Lifecycle Functional Tests', () => {
       const testKey = 'multi-cycle-key';
 
       for (let i = 0; i < cycles; i++) {
-        const wm = new WindowManager();
+        // Requirements: ui.5
         const dm = new DataManager(testStoragePath);
+        const wm = new WindowManager(dm);
         const lm = new LifecycleManager(wm, dm);
 
         // Start application

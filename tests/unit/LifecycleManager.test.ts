@@ -1,4 +1,4 @@
-// Requirements: clerkly.2
+// Requirements: clerkly.2, ui.5
 
 import { LifecycleManager } from '../../src/main/LifecycleManager';
 import WindowManager from '../../src/main/WindowManager';
@@ -20,8 +20,9 @@ describe('LifecycleManager', () => {
     jest.clearAllMocks();
 
     // Create mock instances
-    mockWindowManager = new WindowManager() as jest.Mocked<WindowManager>;
+    // Requirements: ui.5
     mockDataManager = new DataManager('/tmp/test') as jest.Mocked<DataManager>;
+    mockWindowManager = new WindowManager(mockDataManager) as jest.Mocked<WindowManager>;
 
     // Setup default mock implementations
     mockWindowManager.createWindow = jest.fn().mockReturnValue({});

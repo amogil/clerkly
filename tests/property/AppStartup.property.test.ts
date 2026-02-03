@@ -24,10 +24,14 @@ jest.mock('electron', () => ({
   BrowserWindow: jest.fn().mockImplementation(() => ({
     loadFile: jest.fn().mockResolvedValue(undefined),
     on: jest.fn(),
+    once: jest.fn(),
     removeAllListeners: jest.fn(),
     destroy: jest.fn(),
     close: jest.fn(),
     isDestroyed: jest.fn().mockReturnValue(false),
+    maximize: jest.fn(),
+    isMaximized: jest.fn().mockReturnValue(false),
+    getBounds: jest.fn().mockReturnValue({ x: 100, y: 100, width: 1200, height: 800 }),
     webContents: {
       on: jest.fn(),
       session: {
@@ -40,6 +44,16 @@ jest.mock('electron', () => ({
   ipcMain: {
     handle: jest.fn(),
     removeHandler: jest.fn(),
+  },
+  screen: {
+    getPrimaryDisplay: jest.fn().mockReturnValue({
+      workAreaSize: { width: 1920, height: 1080 },
+    }),
+    getAllDisplays: jest.fn().mockReturnValue([
+      {
+        bounds: { x: 0, y: 0, width: 1920, height: 1080 },
+      },
+    ]),
   },
 }));
 
@@ -79,8 +93,9 @@ describe('Property Tests - Application Startup Performance', () => {
         fc.constant(null), // No input needed - we're testing startup performance
         async () => {
           // Create fresh components for each iteration
-          const windowManager = new WindowManager();
+          // Requirements: ui.5
           const dataManager = new DataManager(testStoragePath);
+          const windowManager = new WindowManager(dataManager);
           const lifecycleManager = new LifecycleManager(windowManager, dataManager);
 
           // Measure startup time
@@ -127,8 +142,9 @@ describe('Property Tests - Application Startup Performance', () => {
       fs.rmSync(testStoragePath, { recursive: true, force: true });
     }
 
-    const windowManager = new WindowManager();
+    // Requirements: ui.5
     const dataManager = new DataManager(testStoragePath);
+    const windowManager = new WindowManager(dataManager);
     const lifecycleManager = new LifecycleManager(windowManager, dataManager);
 
     // Measure first startup time
@@ -162,8 +178,9 @@ describe('Property Tests - Application Startup Performance', () => {
   // Feature: clerkly, Property 7: Application Startup Performance
   test('Property 7 edge case: subsequent startups with existing database complete within 3 seconds', async () => {
     // First startup to create database
-    const windowManager1 = new WindowManager();
+    // Requirements: ui.5
     const dataManager1 = new DataManager(testStoragePath);
+    const windowManager1 = new WindowManager(dataManager1);
     const lifecycleManager1 = new LifecycleManager(windowManager1, dataManager1);
 
     await lifecycleManager1.initialize();
@@ -174,8 +191,9 @@ describe('Property Tests - Application Startup Performance', () => {
     jest.clearAllMocks();
 
     // Second startup - should be fast since database exists
-    const windowManager2 = new WindowManager();
+    // Requirements: ui.5
     const dataManager2 = new DataManager(testStoragePath);
+    const windowManager2 = new WindowManager(dataManager2);
     const lifecycleManager2 = new LifecycleManager(windowManager2, dataManager2);
 
     const startTime = Date.now();
@@ -199,8 +217,9 @@ describe('Property Tests - Application Startup Performance', () => {
   // Feature: clerkly, Property 7: Application Startup Performance
   test('Property 7 edge case: startup with large database completes within 3 seconds', async () => {
     // First startup to create database
-    const windowManager1 = new WindowManager();
+    // Requirements: ui.5
     const dataManager1 = new DataManager(testStoragePath);
+    const windowManager1 = new WindowManager(dataManager1);
     const lifecycleManager1 = new LifecycleManager(windowManager1, dataManager1);
 
     await lifecycleManager1.initialize();
@@ -227,8 +246,9 @@ describe('Property Tests - Application Startup Performance', () => {
     jest.clearAllMocks();
 
     // Second startup with large database
-    const windowManager2 = new WindowManager();
+    // Requirements: ui.5
     const dataManager2 = new DataManager(testStoragePath);
+    const windowManager2 = new WindowManager(dataManager2);
     const lifecycleManager2 = new LifecycleManager(windowManager2, dataManager2);
 
     const startTime = Date.now();
@@ -262,8 +282,9 @@ describe('Property Tests - Application Startup Performance', () => {
       // Clear mocks for each iteration
       jest.clearAllMocks();
 
-      const windowManager = new WindowManager();
+      // Requirements: ui.5
       const dataManager = new DataManager(testStoragePath);
+      const windowManager = new WindowManager(dataManager);
       const lifecycleManager = new LifecycleManager(windowManager, dataManager);
 
       const startTime = Date.now();
@@ -296,8 +317,9 @@ describe('Property Tests - Application Startup Performance', () => {
      Requirements: clerkly.nfr.1.1, clerkly.2.6, clerkly.2.8, clerkly.nfr.4.4 */
   // Feature: clerkly, Property 7: Application Startup Performance
   test('Property 7 edge case: startup time is measured and reported correctly', async () => {
-    const windowManager = new WindowManager();
+    // Requirements: ui.5
     const dataManager = new DataManager(testStoragePath);
+    const windowManager = new WindowManager(dataManager);
     const lifecycleManager = new LifecycleManager(windowManager, dataManager);
 
     const startTime = Date.now();
@@ -334,8 +356,9 @@ describe('Property Tests - Application Startup Performance', () => {
       warnings.push(message);
     });
 
-    const windowManager = new WindowManager();
+    // Requirements: ui.5
     const dataManager = new DataManager(testStoragePath);
+    const windowManager = new WindowManager(dataManager);
     const lifecycleManager = new LifecycleManager(windowManager, dataManager);
 
     const startTime = Date.now();
@@ -365,8 +388,9 @@ describe('Property Tests - Application Startup Performance', () => {
      Requirements: clerkly.nfr.1.1, clerkly.2.6, clerkly.2.8, clerkly.nfr.4.4 */
   // Feature: clerkly, Property 7: Application Startup Performance
   test('Property 7 edge case: all components initialize within 3 seconds', async () => {
-    const windowManager = new WindowManager();
+    // Requirements: ui.5
     const dataManager = new DataManager(testStoragePath);
+    const windowManager = new WindowManager(dataManager);
     const lifecycleManager = new LifecycleManager(windowManager, dataManager);
 
     const startTime = Date.now();

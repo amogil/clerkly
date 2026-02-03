@@ -74,8 +74,8 @@ describe('Data Persistence Functional Tests', () => {
        Requirements: clerkly.2.2, clerkly.2.4, clerkly.2.8 */
     it('should persist string data across application restarts', async () => {
       // First session: start and save data
-      const windowManager1 = new WindowManager();
       const dataManager1 = new DataManager(testStoragePath);
+      const windowManager1 = new WindowManager(dataManager1);
       const lifecycleManager1 = new LifecycleManager(windowManager1, dataManager1);
 
       await lifecycleManager1.initialize();
@@ -94,8 +94,8 @@ describe('Data Persistence Functional Tests', () => {
       expect(fs.existsSync(dbPath)).toBe(true);
 
       // Second session: restart and load data
-      const windowManager2 = new WindowManager();
       const dataManager2 = new DataManager(testStoragePath);
+      const windowManager2 = new WindowManager(dataManager2);
       const lifecycleManager2 = new LifecycleManager(windowManager2, dataManager2);
 
       await lifecycleManager2.initialize();
@@ -114,8 +114,8 @@ describe('Data Persistence Functional Tests', () => {
        Requirements: clerkly.2.2, clerkly.2.4, clerkly.2.8 */
     it('should persist object data across application restarts', async () => {
       // First session: start and save data
-      const windowManager1 = new WindowManager();
       const dataManager1 = new DataManager(testStoragePath);
+      const windowManager1 = new WindowManager(dataManager1);
       const lifecycleManager1 = new LifecycleManager(windowManager1, dataManager1);
 
       await lifecycleManager1.initialize();
@@ -138,8 +138,8 @@ describe('Data Persistence Functional Tests', () => {
       dataManager1.close();
 
       // Second session: restart and load data
-      const windowManager2 = new WindowManager();
       const dataManager2 = new DataManager(testStoragePath);
+      const windowManager2 = new WindowManager(dataManager2);
       const lifecycleManager2 = new LifecycleManager(windowManager2, dataManager2);
 
       await lifecycleManager2.initialize();
@@ -158,8 +158,8 @@ describe('Data Persistence Functional Tests', () => {
        Requirements: clerkly.2.2, clerkly.2.4, clerkly.2.8 */
     it('should persist array data across application restarts', async () => {
       // First session: start and save data
-      const windowManager1 = new WindowManager();
       const dataManager1 = new DataManager(testStoragePath);
+      const windowManager1 = new WindowManager(dataManager1);
       const lifecycleManager1 = new LifecycleManager(windowManager1, dataManager1);
 
       await lifecycleManager1.initialize();
@@ -174,8 +174,8 @@ describe('Data Persistence Functional Tests', () => {
       dataManager1.close();
 
       // Second session: restart and load data
-      const windowManager2 = new WindowManager();
       const dataManager2 = new DataManager(testStoragePath);
+      const windowManager2 = new WindowManager(dataManager2);
       const lifecycleManager2 = new LifecycleManager(windowManager2, dataManager2);
 
       await lifecycleManager2.initialize();
@@ -194,8 +194,8 @@ describe('Data Persistence Functional Tests', () => {
        Requirements: clerkly.2.2, clerkly.2.4, clerkly.2.8 */
     it('should persist number data across application restarts', async () => {
       // First session: start and save data
-      const windowManager1 = new WindowManager();
       const dataManager1 = new DataManager(testStoragePath);
+      const windowManager1 = new WindowManager(dataManager1);
       const lifecycleManager1 = new LifecycleManager(windowManager1, dataManager1);
 
       await lifecycleManager1.initialize();
@@ -210,8 +210,8 @@ describe('Data Persistence Functional Tests', () => {
       dataManager1.close();
 
       // Second session: restart and load data
-      const windowManager2 = new WindowManager();
       const dataManager2 = new DataManager(testStoragePath);
+      const windowManager2 = new WindowManager(dataManager2);
       const lifecycleManager2 = new LifecycleManager(windowManager2, dataManager2);
 
       await lifecycleManager2.initialize();
@@ -230,8 +230,8 @@ describe('Data Persistence Functional Tests', () => {
        Requirements: clerkly.2.2, clerkly.2.4, clerkly.2.8 */
     it('should persist boolean data across application restarts', async () => {
       // First session: start and save data
-      const windowManager1 = new WindowManager();
       const dataManager1 = new DataManager(testStoragePath);
+      const windowManager1 = new WindowManager(dataManager1);
       const lifecycleManager1 = new LifecycleManager(windowManager1, dataManager1);
 
       await lifecycleManager1.initialize();
@@ -246,8 +246,8 @@ describe('Data Persistence Functional Tests', () => {
       dataManager1.close();
 
       // Second session: restart and load data
-      const windowManager2 = new WindowManager();
       const dataManager2 = new DataManager(testStoragePath);
+      const windowManager2 = new WindowManager(dataManager2);
       const lifecycleManager2 = new LifecycleManager(windowManager2, dataManager2);
 
       await lifecycleManager2.initialize();
@@ -268,8 +268,8 @@ describe('Data Persistence Functional Tests', () => {
        Requirements: clerkly.2.2, clerkly.2.4, clerkly.2.8 */
     it('should persist multiple data items across application restarts', async () => {
       // First session: start and save multiple data items
-      const windowManager1 = new WindowManager();
       const dataManager1 = new DataManager(testStoragePath);
+      const windowManager1 = new WindowManager(dataManager1);
       const lifecycleManager1 = new LifecycleManager(windowManager1, dataManager1);
 
       await lifecycleManager1.initialize();
@@ -296,8 +296,8 @@ describe('Data Persistence Functional Tests', () => {
       dataManager1.close();
 
       // Second session: restart and load all data
-      const windowManager2 = new WindowManager();
       const dataManager2 = new DataManager(testStoragePath);
+      const windowManager2 = new WindowManager(dataManager2);
       const lifecycleManager2 = new LifecycleManager(windowManager2, dataManager2);
 
       await lifecycleManager2.initialize();
@@ -319,8 +319,8 @@ describe('Data Persistence Functional Tests', () => {
        Requirements: clerkly.2.2, clerkly.2.4, clerkly.2.8 */
     it('should persist large number of data items across application restarts', async () => {
       // First session: start and save many data items
-      const windowManager1 = new WindowManager();
       const dataManager1 = new DataManager(testStoragePath);
+      const windowManager1 = new WindowManager(dataManager1);
       const lifecycleManager1 = new LifecycleManager(windowManager1, dataManager1);
 
       await lifecycleManager1.initialize();
@@ -353,8 +353,8 @@ describe('Data Persistence Functional Tests', () => {
       dataManager1.close();
 
       // Second session: restart and load all data
-      const windowManager2 = new WindowManager();
       const dataManager2 = new DataManager(testStoragePath);
+      const windowManager2 = new WindowManager(dataManager2);
       const lifecycleManager2 = new LifecycleManager(windowManager2, dataManager2);
 
       await lifecycleManager2.initialize();
@@ -382,8 +382,8 @@ describe('Data Persistence Functional Tests', () => {
       const updatedValue = 'updated value';
 
       // First session: save initial data
-      const windowManager1 = new WindowManager();
       const dataManager1 = new DataManager(testStoragePath);
+      const windowManager1 = new WindowManager(dataManager1);
       const lifecycleManager1 = new LifecycleManager(windowManager1, dataManager1);
 
       await lifecycleManager1.initialize();
@@ -395,8 +395,8 @@ describe('Data Persistence Functional Tests', () => {
       dataManager1.close();
 
       // Second session: update data
-      const windowManager2 = new WindowManager();
       const dataManager2 = new DataManager(testStoragePath);
+      const windowManager2 = new WindowManager(dataManager2);
       const lifecycleManager2 = new LifecycleManager(windowManager2, dataManager2);
 
       await lifecycleManager2.initialize();
@@ -414,8 +414,8 @@ describe('Data Persistence Functional Tests', () => {
       dataManager2.close();
 
       // Third session: verify updated value persisted
-      const windowManager3 = new WindowManager();
       const dataManager3 = new DataManager(testStoragePath);
+      const windowManager3 = new WindowManager(dataManager3);
       const lifecycleManager3 = new LifecycleManager(windowManager3, dataManager3);
 
       await lifecycleManager3.initialize();
@@ -437,8 +437,8 @@ describe('Data Persistence Functional Tests', () => {
       const updates = ['value1', 'value2', 'value3', 'value4', 'final value'];
 
       // First session: save and update multiple times
-      const windowManager1 = new WindowManager();
       const dataManager1 = new DataManager(testStoragePath);
+      const windowManager1 = new WindowManager(dataManager1);
       const lifecycleManager1 = new LifecycleManager(windowManager1, dataManager1);
 
       await lifecycleManager1.initialize();
@@ -453,8 +453,8 @@ describe('Data Persistence Functional Tests', () => {
       dataManager1.close();
 
       // Second session: verify final value persisted
-      const windowManager2 = new WindowManager();
       const dataManager2 = new DataManager(testStoragePath);
+      const windowManager2 = new WindowManager(dataManager2);
       const lifecycleManager2 = new LifecycleManager(windowManager2, dataManager2);
 
       await lifecycleManager2.initialize();
@@ -478,8 +478,8 @@ describe('Data Persistence Functional Tests', () => {
       const testValue = 'to be deleted';
 
       // First session: save and delete data
-      const windowManager1 = new WindowManager();
       const dataManager1 = new DataManager(testStoragePath);
+      const windowManager1 = new WindowManager(dataManager1);
       const lifecycleManager1 = new LifecycleManager(windowManager1, dataManager1);
 
       await lifecycleManager1.initialize();
@@ -494,8 +494,8 @@ describe('Data Persistence Functional Tests', () => {
       dataManager1.close();
 
       // Second session: verify data was deleted
-      const windowManager2 = new WindowManager();
       const dataManager2 = new DataManager(testStoragePath);
+      const windowManager2 = new WindowManager(dataManager2);
       const lifecycleManager2 = new LifecycleManager(windowManager2, dataManager2);
 
       await lifecycleManager2.initialize();
@@ -516,8 +516,8 @@ describe('Data Persistence Functional Tests', () => {
        Requirements: clerkly.2.2, clerkly.2.4, clerkly.2.8 */
     it('should persist data with special characters in keys', async () => {
       // First session: save data with special character keys
-      const windowManager1 = new WindowManager();
       const dataManager1 = new DataManager(testStoragePath);
+      const windowManager1 = new WindowManager(dataManager1);
       const lifecycleManager1 = new LifecycleManager(windowManager1, dataManager1);
 
       await lifecycleManager1.initialize();
@@ -539,8 +539,8 @@ describe('Data Persistence Functional Tests', () => {
       dataManager1.close();
 
       // Second session: verify all data persisted
-      const windowManager2 = new WindowManager();
       const dataManager2 = new DataManager(testStoragePath);
+      const windowManager2 = new WindowManager(dataManager2);
       const lifecycleManager2 = new LifecycleManager(windowManager2, dataManager2);
 
       await lifecycleManager2.initialize();
@@ -561,8 +561,8 @@ describe('Data Persistence Functional Tests', () => {
        Requirements: clerkly.2.2, clerkly.2.4, clerkly.2.8 */
     it('should persist deeply nested objects', async () => {
       // First session: save deeply nested object
-      const windowManager1 = new WindowManager();
       const dataManager1 = new DataManager(testStoragePath);
+      const windowManager1 = new WindowManager(dataManager1);
       const lifecycleManager1 = new LifecycleManager(windowManager1, dataManager1);
 
       await lifecycleManager1.initialize();
@@ -590,8 +590,8 @@ describe('Data Persistence Functional Tests', () => {
       dataManager1.close();
 
       // Second session: verify nested object persisted
-      const windowManager2 = new WindowManager();
       const dataManager2 = new DataManager(testStoragePath);
+      const windowManager2 = new WindowManager(dataManager2);
       const lifecycleManager2 = new LifecycleManager(windowManager2, dataManager2);
 
       await lifecycleManager2.initialize();
@@ -610,8 +610,8 @@ describe('Data Persistence Functional Tests', () => {
        Requirements: clerkly.2.2, clerkly.2.4, clerkly.2.8 */
     it('should persist empty values correctly', async () => {
       // First session: save empty values
-      const windowManager1 = new WindowManager();
       const dataManager1 = new DataManager(testStoragePath);
+      const windowManager1 = new WindowManager(dataManager1);
       const lifecycleManager1 = new LifecycleManager(windowManager1, dataManager1);
 
       await lifecycleManager1.initialize();
@@ -631,8 +631,8 @@ describe('Data Persistence Functional Tests', () => {
       dataManager1.close();
 
       // Second session: verify empty values persisted
-      const windowManager2 = new WindowManager();
       const dataManager2 = new DataManager(testStoragePath);
+      const windowManager2 = new WindowManager(dataManager2);
       const lifecycleManager2 = new LifecycleManager(windowManager2, dataManager2);
 
       await lifecycleManager2.initialize();
@@ -657,8 +657,8 @@ describe('Data Persistence Functional Tests', () => {
       const cycles = 5;
 
       // First session: save initial data
-      const windowManager1 = new WindowManager();
       const dataManager1 = new DataManager(testStoragePath);
+      const windowManager1 = new WindowManager(dataManager1);
       const lifecycleManager1 = new LifecycleManager(windowManager1, dataManager1);
 
       await lifecycleManager1.initialize();
@@ -671,8 +671,9 @@ describe('Data Persistence Functional Tests', () => {
 
       // Multiple restart cycles
       for (let i = 0; i < cycles; i++) {
-        const wm = new WindowManager();
+        // Requirements: ui.5
         const dm = new DataManager(testStoragePath);
+        const wm = new WindowManager(dm);
         const lm = new LifecycleManager(wm, dm);
 
         await lm.initialize();

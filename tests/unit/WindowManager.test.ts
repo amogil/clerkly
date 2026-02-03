@@ -1,19 +1,27 @@
-// Requirements: clerkly.2
+// Requirements: clerkly.2, ui.5
 
 import { BrowserWindow } from 'electron';
 import WindowManager from '../../src/main/WindowManager';
+import { DataManager } from '../../src/main/DataManager';
+
+// Mock DataManager
+jest.mock('../../src/main/DataManager');
 
 // Mock Electron's BrowserWindow
 jest.mock('electron', () => ({
   BrowserWindow: jest.fn().mockImplementation(() => ({
     loadFile: jest.fn().mockResolvedValue(undefined),
     on: jest.fn(),
+    once: jest.fn(),
     removeAllListeners: jest.fn(),
     close: jest.fn(),
     setSize: jest.fn(),
     setTitle: jest.fn(),
     setResizable: jest.fn(),
     setFullScreen: jest.fn(),
+    maximize: jest.fn(),
+    isMaximized: jest.fn().mockReturnValue(false),
+    getBounds: jest.fn().mockReturnValue({ x: 100, y: 100, width: 1200, height: 800 }),
     webContents: {
       session: {
         webRequest: {
@@ -23,17 +31,35 @@ jest.mock('electron', () => ({
       on: jest.fn(),
     },
   })),
+  screen: {
+    getPrimaryDisplay: jest.fn(() => ({
+      workAreaSize: { width: 1920, height: 1080 },
+    })),
+    getAllDisplays: jest.fn(() => [
+      {
+        bounds: { x: 0, y: 0, width: 1920, height: 1080 },
+      },
+    ]),
+  },
 }));
 
 describe('WindowManager', () => {
   let windowManager: WindowManager;
+  let mockDataManager: jest.Mocked<DataManager>;
 
   beforeEach(() => {
     // Clear all mocks before each test
     jest.clearAllMocks();
 
-    // Create new WindowManager instance
-    windowManager = new WindowManager();
+    // Create mock DataManager
+    mockDataManager = {
+      loadData: jest.fn().mockReturnValue({ success: false }),
+      saveData: jest.fn(),
+    } as any;
+
+    // Create new WindowManager instance with mock DataManager
+    // Requirements: ui.5
+    windowManager = new WindowManager(mockDataManager);
   });
 
   // Helper function to get the most recent mock BrowserWindow instance
@@ -55,16 +81,16 @@ describe('WindowManager', () => {
     /* Preconditions: WindowManager created, no window exists yet
        Action: call createWindow()
        Assertions: BrowserWindow created with correct Mac OS X parameters (titleBarStyle), returns BrowserWindow instance
-       Requirements: clerkly.1, clerkly.2*/
+       Requirements: ui.1.1, ui.1.2, ui.2.1, ui.3.1, ui.4.1, ui.4.2, ui.5.4, ui.5.5 */
     it('should create window with native Mac OS X interface', () => {
       const window = windowManager.createWindow();
 
       expect(BrowserWindow).toHaveBeenCalledTimes(1);
       expect(BrowserWindow).toHaveBeenCalledWith(
         expect.objectContaining({
-          width: 1200,
-          height: 800,
-          titleBarStyle: 'default',
+          title: '', // Requirements: ui.2.1
+          show: false,
+          titleBarStyle: 'default', // Requirements: ui.3.1
           webPreferences: expect.objectContaining({
             contextIsolation: true,
             nodeIntegration: false,
@@ -76,6 +102,115 @@ describe('WindowManager', () => {
 
       expect(window).toBeDefined();
       expect(windowManager.isWindowCreated()).toBe(true);
+    });
+
+    /* Preconditions: WindowManager created, no saved state exists
+       Action: call createWindow()
+       Assertions: window created with default state dimensions based on screen size
+       Requirements: ui.4.1, ui.4.2, ui.5.5 */
+    it('should create window with default state when no saved state exists', () => {
+      windowManager.createWindow();
+
+      // Default state should be 90% of screen size (1920x1080)
+      expect(BrowserWindow).toHaveBeenCalledWith(
+        expect.objectContaining({
+          x: Math.floor(1920 * 0.05), // 96
+          y: Math.floor(1080 * 0.05), // 54
+          width: Math.floor(1920 * 0.9), // 1728
+          height: Math.floor(1080 * 0.9), // 972
+        })
+      );
+    });
+
+    /* Preconditions: WindowManager created, saved state exists
+       Action: call createWindow()
+       Assertions: window created with saved state dimensions
+       Requirements: ui.5.4 */
+    it('should create window with saved state when it exists', () => {
+      // Mock saved state
+      mockDataManager.loadData.mockReturnValue({
+        success: true,
+        data: JSON.stringify({
+          x: 200,
+          y: 150,
+          width: 1400,
+          height: 900,
+          isMaximized: false,
+        }),
+      });
+
+      windowManager.createWindow();
+
+      expect(BrowserWindow).toHaveBeenCalledWith(
+        expect.objectContaining({
+          x: 200,
+          y: 150,
+          width: 1400,
+          height: 900,
+        })
+      );
+    });
+
+    /* Preconditions: WindowManager created, saved state has isMaximized: true
+       Action: call createWindow()
+       Assertions: maximize() called on window
+       Requirements: ui.1.1 */
+    it('should maximize window when saved state has isMaximized: true', () => {
+      // Mock saved state with isMaximized: true
+      mockDataManager.loadData.mockReturnValue({
+        success: true,
+        data: JSON.stringify({
+          x: 100,
+          y: 100,
+          width: 1200,
+          height: 800,
+          isMaximized: true,
+        }),
+      });
+
+      windowManager.createWindow();
+      const mockWindow = getMockWindow();
+
+      expect(mockWindow.maximize).toHaveBeenCalledTimes(1);
+    });
+
+    /* Preconditions: WindowManager created, saved state has isMaximized: false
+       Action: call createWindow()
+       Assertions: maximize() not called on window
+       Requirements: ui.1.1 */
+    it('should not maximize window when saved state has isMaximized: false', () => {
+      // Mock saved state with isMaximized: false
+      mockDataManager.loadData.mockReturnValue({
+        success: true,
+        data: JSON.stringify({
+          x: 100,
+          y: 100,
+          width: 1200,
+          height: 800,
+          isMaximized: false,
+        }),
+      });
+
+      windowManager.createWindow();
+      const mockWindow = getMockWindow();
+
+      expect(mockWindow.maximize).not.toHaveBeenCalled();
+    });
+
+    /* Preconditions: WindowManager created
+       Action: call createWindow()
+       Assertions: setupStateTracking called, event listeners registered
+       Requirements: ui.5.1, ui.5.2, ui.5.3 */
+    it('should setup state tracking after creating window', () => {
+      windowManager.createWindow();
+      const mockWindow = getMockWindow();
+
+      // Verify event listeners are registered
+      expect(mockWindow.on).toHaveBeenCalledWith('resize', expect.any(Function));
+      expect(mockWindow.on).toHaveBeenCalledWith('move', expect.any(Function));
+      expect(mockWindow.on).toHaveBeenCalledWith('maximize', expect.any(Function));
+      expect(mockWindow.on).toHaveBeenCalledWith('unmaximize', expect.any(Function));
+      expect(mockWindow.on).toHaveBeenCalledWith('close', expect.any(Function));
     });
 
     /* Preconditions: WindowManager created, no window exists
@@ -237,7 +372,8 @@ describe('WindowManager', () => {
        Assertions: no error thrown, warning logged, no methods called
        Requirements: clerkly.1, clerkly.2*/
     it('should handle configuration when window not created', () => {
-      const newWindowManager = new WindowManager();
+      // Requirements: ui.5
+      const newWindowManager = new WindowManager(mockDataManager);
 
       // Should not throw
       expect(() => {
@@ -287,7 +423,8 @@ describe('WindowManager', () => {
        Assertions: no error thrown, no methods called
        Requirements: clerkly.1, clerkly.2*/
     it('should handle close when window not created', () => {
-      const newWindowManager = new WindowManager();
+      // Requirements: ui.5
+      const newWindowManager = new WindowManager(mockDataManager);
 
       expect(() => {
         newWindowManager.closeWindow();

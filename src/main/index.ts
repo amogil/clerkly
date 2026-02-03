@@ -18,9 +18,9 @@ const userDataPath = app.getPath('userData');
 const storagePath = path.join(userDataPath, 'storage');
 const dataManager = new DataManager(storagePath);
 
-// Requirements: clerkly.1.2, clerkly.1.3
+// Requirements: clerkly.1.2, clerkly.1.3, ui.5
 // Initialize Window Manager
-const windowManager = new WindowManager();
+const windowManager = new WindowManager(dataManager);
 
 // Requirements: clerkly.1.2, clerkly.1.3, clerkly.1.4
 // Initialize Lifecycle Manager
