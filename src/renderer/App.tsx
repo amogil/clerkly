@@ -18,7 +18,10 @@ export default function App() {
 
   const [currentScreen, setCurrentScreen] = useState<string>('dashboard');
   const [selectedMeetingId, setSelectedMeetingId] = useState<string | null>(null);
-  const [triggerAction, setTriggerAction] = useState<{ action: string; params: any } | null>(null);
+  const [triggerAction, setTriggerAction] = useState<{
+    action: string;
+    params: Record<string, unknown>;
+  } | null>(null);
 
   // Requirements: clerkly.1
   const handleNavigateToMeeting = (meetingId: string) => {

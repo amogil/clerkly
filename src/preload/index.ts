@@ -11,8 +11,8 @@ import { contextBridge, ipcRenderer } from 'electron';
  * Exposed to renderer process via contextBridge
  */
 interface API {
-  saveData: (key: string, value: any) => Promise<{ success: boolean; error?: string }>;
-  loadData: (key: string) => Promise<{ success: boolean; data?: any; error?: string }>;
+  saveData: (key: string, value: unknown) => Promise<{ success: boolean; error?: string }>;
+  loadData: (key: string) => Promise<{ success: boolean; data?: unknown; error?: string }>;
   deleteData: (key: string) => Promise<{ success: boolean; error?: string }>;
   // Requirements: google-oauth-auth.8.1, google-oauth-auth.8.2, google-oauth-auth.8.3
   auth: {
@@ -34,19 +34,19 @@ contextBridge.exposeInMainWorld('api', {
   /**
    * Save data to local storage via IPC
    * Requirements: clerkly.1   * @param {string} key - Data key (non-empty string, max 1000 chars)
-   * @param {any} value - Data value (serializable to JSON, max 10MB)
+   * @param {unknown} value - Data value (serializable to JSON, max 10MB)
    * @returns {Promise<{success: boolean, error?: string}>}
    */
-  async saveData(key: string, value: any): Promise<{ success: boolean; error?: string }> {
+  async saveData(key: string, value: unknown): Promise<{ success: boolean; error?: string }> {
     return await ipcRenderer.invoke('save-data', key, value);
   },
 
   /**
    * Load data from local storage via IPC
    * Requirements: clerkly.1   * @param {string} key - Data key to load
-   * @returns {Promise<{success: boolean, data?: any, error?: string}>}
+   * @returns {Promise<{success: boolean, data?: unknown, error?: string}>}
    */
-  async loadData(key: string): Promise<{ success: boolean; data?: any; error?: string }> {
+  async loadData(key: string): Promise<{ success: boolean; data?: unknown; error?: string }> {
     return await ipcRenderer.invoke('load-data', key);
   },
 

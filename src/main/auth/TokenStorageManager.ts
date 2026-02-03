@@ -71,8 +71,9 @@ export class TokenStorageManager {
       if (!typeResult.success) {
         throw new Error(`Failed to save token type: ${typeResult.error}`);
       }
-    } catch (error: any) {
-      throw new Error(`Failed to save tokens: ${error.message}`);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      throw new Error(`Failed to save tokens: ${errorMessage}`);
     }
   }
 
@@ -125,8 +126,9 @@ export class TokenStorageManager {
       this.dataManager.deleteData(this.TOKEN_KEYS.REFRESH_TOKEN);
       this.dataManager.deleteData(this.TOKEN_KEYS.EXPIRES_AT);
       this.dataManager.deleteData(this.TOKEN_KEYS.TOKEN_TYPE);
-    } catch (error: any) {
-      throw new Error(`Failed to delete tokens: ${error.message}`);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      throw new Error(`Failed to delete tokens: ${errorMessage}`);
     }
   }
 
@@ -145,7 +147,7 @@ export class TokenStorageManager {
       // Check if access token is expired
       const now = Date.now();
       return tokens.expiresAt > now;
-    } catch (error: any) {
+    } catch (error: unknown) {
       // If there's an error loading tokens, consider them invalid
       return false;
     }

@@ -104,8 +104,9 @@ app.whenReady().then(async () => {
     console.log('[Main] Auth Window Manager initialized');
 
     console.log('[Main] Main window created and loaded');
-  } catch (error: any) {
-    console.error('[Main] Startup error:', error.message);
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('[Main] Startup error:', errorMessage);
     app.quit();
   }
 });
@@ -158,9 +159,10 @@ app.on('open-url', async (event, url) => {
         }
         mainWindow.focus();
       }
-    } catch (error: any) {
-      console.error('[Main] Deep link handling error:', error.message);
-      authIPCHandlers.sendAuthError(error.message, 'unknown_error');
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('[Main] Deep link handling error:', errorMessage);
+      authIPCHandlers.sendAuthError(errorMessage, 'unknown_error');
     }
   }
 });
@@ -190,9 +192,10 @@ if (!gotTheLock) {
         } else if (authStatus.error) {
           authIPCHandlers.sendAuthError(authStatus.error, authStatus.error);
         }
-      } catch (error: any) {
-        console.error('[Main] Deep link handling error:', error.message);
-        authIPCHandlers.sendAuthError(error.message, 'unknown_error');
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        console.error('[Main] Deep link handling error:', errorMessage);
+        authIPCHandlers.sendAuthError(errorMessage, 'unknown_error');
       }
     }
 
