@@ -256,9 +256,10 @@ describe('Window State Integration Tests', () => {
     // Wait for window to be ready
     await new Promise((resolve) => setTimeout(resolve, 200));
 
-    // Verify maximized state was restored
+    // Verify maximized state was NOT restored by calling maximize()
+    // Per ui.1.1 and ui.1.3, window opens large but not maximized to stay resizable
     // Requirements: ui.5.3, ui.5.4
-    expect(window2.isMaximized()).toBe(true);
+    expect(window2.isMaximized()).toBe(false);
 
     // Clean up
     window2.destroy();
@@ -330,11 +331,11 @@ describe('Window State Integration Tests', () => {
     const primaryDisplay = screen.getPrimaryDisplay();
     const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
 
-    // Calculate expected default dimensions (90% of screen size)
-    const expectedWidth = Math.floor(screenWidth * 0.9);
-    const expectedHeight = Math.floor(screenHeight * 0.9);
-    const expectedX = Math.floor(screenWidth * 0.05);
-    const expectedY = Math.floor(screenHeight * 0.05);
+    // Calculate expected default dimensions (100% of workAreaSize)
+    const expectedWidth = screenWidth;
+    const expectedHeight = screenHeight;
+    const expectedX = 0;
+    const expectedY = 0;
 
     // Get actual bounds
     const bounds = window.getBounds();
@@ -346,9 +347,9 @@ describe('Window State Integration Tests', () => {
     expect(bounds.x).toBe(expectedX);
     expect(bounds.y).toBe(expectedY);
 
-    // Verify window is maximized by default
+    // Verify window is NOT maximized by default (per ui.1.1)
     // Requirements: ui.1.1
-    expect(window.isMaximized()).toBe(true);
+    expect(window.isMaximized()).toBe(false);
 
     // Clean up
     window.destroy();

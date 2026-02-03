@@ -99,26 +99,24 @@ describe('Property Tests - WindowStateManager', () => {
           expect(state.width).toBeGreaterThan(0);
           expect(state.height).toBeGreaterThan(0);
 
-          // Verify dimensions are calculated as 90% of screen size
-          expect(state.width).toBe(Math.floor(screenSize.width * 0.9));
-          expect(state.height).toBe(Math.floor(screenSize.height * 0.9));
+          // Verify dimensions match workAreaSize (100% of available screen)
+          expect(state.width).toBe(screenSize.width);
+          expect(state.height).toBe(screenSize.height);
 
-          // Verify position is calculated as 5% offset
-          expect(state.x).toBe(Math.floor(screenSize.width * 0.05));
-          expect(state.y).toBe(Math.floor(screenSize.height * 0.05));
+          // Verify position is at (0, 0)
+          expect(state.x).toBe(0);
+          expect(state.y).toBe(0);
 
           // Verify dimensions are not hardcoded to 1920x1080
           // Only check when screen size is different from 1920x1080
           if (screenSize.width !== 1920 || screenSize.height !== 1080) {
             // Verify that dimensions match the screen size, not hardcoded values
-            const expectedWidth = Math.floor(screenSize.width * 0.9);
-            const expectedHeight = Math.floor(screenSize.height * 0.9);
-            expect(state.width).toBe(expectedWidth);
-            expect(state.height).toBe(expectedHeight);
+            expect(state.width).toBe(screenSize.width);
+            expect(state.height).toBe(screenSize.height);
           }
 
-          // Verify default maximized state
-          expect(state.isMaximized).toBe(true);
+          // Verify default state is NOT maximized (ui.1.1)
+          expect(state.isMaximized).toBe(false);
         }
       ),
       { numRuns: 100 }
@@ -141,11 +139,11 @@ describe('Property Tests - WindowStateManager', () => {
 
     const state = windowStateManager.loadState();
 
-    expect(state.width).toBe(Math.floor(800 * 0.9));
-    expect(state.height).toBe(Math.floor(600 * 0.9));
-    expect(state.x).toBe(Math.floor(800 * 0.05));
-    expect(state.y).toBe(Math.floor(600 * 0.05));
-    expect(state.isMaximized).toBe(true);
+    expect(state.width).toBe(800);
+    expect(state.height).toBe(600);
+    expect(state.x).toBe(0);
+    expect(state.y).toBe(0);
+    expect(state.isMaximized).toBe(false);
   });
 
   /* Preconditions: large 4K screen size (3840x2160)
@@ -164,11 +162,11 @@ describe('Property Tests - WindowStateManager', () => {
 
     const state = windowStateManager.loadState();
 
-    expect(state.width).toBe(Math.floor(3840 * 0.9));
-    expect(state.height).toBe(Math.floor(2160 * 0.9));
-    expect(state.x).toBe(Math.floor(3840 * 0.05));
-    expect(state.y).toBe(Math.floor(2160 * 0.05));
-    expect(state.isMaximized).toBe(true);
+    expect(state.width).toBe(3840);
+    expect(state.height).toBe(2160);
+    expect(state.x).toBe(0);
+    expect(state.y).toBe(0);
+    expect(state.isMaximized).toBe(false);
   });
 
   /* Preconditions: ultrawide screen size (2560x1080)
@@ -187,11 +185,11 @@ describe('Property Tests - WindowStateManager', () => {
 
     const state = windowStateManager.loadState();
 
-    expect(state.width).toBe(Math.floor(2560 * 0.9));
-    expect(state.height).toBe(Math.floor(1080 * 0.9));
-    expect(state.x).toBe(Math.floor(2560 * 0.05));
-    expect(state.y).toBe(Math.floor(1080 * 0.05));
-    expect(state.isMaximized).toBe(true);
+    expect(state.width).toBe(2560);
+    expect(state.height).toBe(1080);
+    expect(state.x).toBe(0);
+    expect(state.y).toBe(0);
+    expect(state.isMaximized).toBe(false);
   });
 
   /* Preconditions: portrait orientation screen (1080x1920)
@@ -210,11 +208,11 @@ describe('Property Tests - WindowStateManager', () => {
 
     const state = windowStateManager.loadState();
 
-    expect(state.width).toBe(Math.floor(1080 * 0.9));
-    expect(state.height).toBe(Math.floor(1920 * 0.9));
-    expect(state.x).toBe(Math.floor(1080 * 0.05));
-    expect(state.y).toBe(Math.floor(1920 * 0.05));
-    expect(state.isMaximized).toBe(true);
+    expect(state.width).toBe(1080);
+    expect(state.height).toBe(1920);
+    expect(state.x).toBe(0);
+    expect(state.y).toBe(0);
+    expect(state.isMaximized).toBe(false);
   });
 
   /* Preconditions: minimum viable screen size (800x600)
@@ -296,19 +294,19 @@ describe('Property Tests - WindowStateManager', () => {
 
       const state = windowStateManager.loadState();
 
-      // Verify proportional calculation
-      expect(state.width).toBe(Math.floor(resolution.width * 0.9));
-      expect(state.height).toBe(Math.floor(resolution.height * 0.9));
-      expect(state.x).toBe(Math.floor(resolution.width * 0.05));
-      expect(state.y).toBe(Math.floor(resolution.height * 0.05));
+      // Verify dimensions match workAreaSize
+      expect(state.width).toBe(resolution.width);
+      expect(state.height).toBe(resolution.height);
+      expect(state.x).toBe(0);
+      expect(state.y).toBe(0);
 
       // Verify not hardcoded (except when resolution is exactly 1920x1080)
       if (resolution.width !== 1920 || resolution.height !== 1080) {
-        expect(state.width).not.toBe(1728);
-        expect(state.height).not.toBe(972);
+        expect(state.width).not.toBe(1920);
+        expect(state.height).not.toBe(1080);
       }
 
-      expect(state.isMaximized).toBe(true);
+      expect(state.isMaximized).toBe(false);
     });
   });
 
@@ -328,11 +326,11 @@ describe('Property Tests - WindowStateManager', () => {
 
     const state = windowStateManager.loadState();
 
-    // Verify Math.floor is applied correctly
-    expect(state.width).toBe(Math.floor(1367 * 0.9)); // 1230
-    expect(state.height).toBe(Math.floor(769 * 0.9)); // 692
-    expect(state.x).toBe(Math.floor(1367 * 0.05)); // 68
-    expect(state.y).toBe(Math.floor(769 * 0.05)); // 38
+    // Verify dimensions match workAreaSize
+    expect(state.width).toBe(1367);
+    expect(state.height).toBe(769);
+    expect(state.x).toBe(0);
+    expect(state.y).toBe(0);
 
     // Verify integer values
     expect(Number.isInteger(state.width)).toBe(true);
@@ -379,8 +377,8 @@ describe('Property Tests - WindowStateManager', () => {
     mockDataManager.loadData.mockReturnValue({ success: false });
 
     const state1 = windowStateManager.loadState();
-    expect(state1.width).toBe(Math.floor(1920 * 0.9));
-    expect(state1.height).toBe(Math.floor(1080 * 0.9));
+    expect(state1.width).toBe(1920);
+    expect(state1.height).toBe(1080);
 
     // Change screen size
     mockScreen.getPrimaryDisplay.mockReturnValue({
@@ -388,8 +386,8 @@ describe('Property Tests - WindowStateManager', () => {
     });
 
     const state2 = windowStateManager.loadState();
-    expect(state2.width).toBe(Math.floor(2560 * 0.9));
-    expect(state2.height).toBe(Math.floor(1440 * 0.9));
+    expect(state2.width).toBe(2560);
+    expect(state2.height).toBe(1440);
 
     // Verify states are different
     expect(state1.width).not.toBe(state2.width);
@@ -495,9 +493,9 @@ describe('Property Tests - WindowStateManager', () => {
 
     // Verify default state is returned (position is invalid)
     expect(loadedState).not.toEqual(invalidState);
-    expect(loadedState.isMaximized).toBe(true);
-    expect(loadedState.width).toBe(Math.floor(1920 * 0.9));
-    expect(loadedState.height).toBe(Math.floor(1080 * 0.9));
+    expect(loadedState.isMaximized).toBe(false);
+    expect(loadedState.width).toBe(1920);
+    expect(loadedState.height).toBe(1080);
   });
 
   /* Preconditions: state with negative coordinates
@@ -738,9 +736,9 @@ describe('Property Tests - WindowStateManager', () => {
     const loadedState = windowStateManager.loadState();
 
     // Verify default state is returned
-    expect(loadedState.isMaximized).toBe(true);
-    expect(loadedState.width).toBe(Math.floor(1920 * 0.9));
-    expect(loadedState.height).toBe(Math.floor(1080 * 0.9));
+    expect(loadedState.isMaximized).toBe(false);
+    expect(loadedState.width).toBe(1920);
+    expect(loadedState.height).toBe(1080);
   });
 
   /* Preconditions: empty data in storage
@@ -763,9 +761,9 @@ describe('Property Tests - WindowStateManager', () => {
     const loadedState = windowStateManager.loadState();
 
     // Verify default state is returned
-    expect(loadedState.isMaximized).toBe(true);
-    expect(loadedState.width).toBe(Math.floor(1920 * 0.9));
-    expect(loadedState.height).toBe(Math.floor(1080 * 0.9));
+    expect(loadedState.isMaximized).toBe(false);
+    expect(loadedState.width).toBe(1920);
+    expect(loadedState.height).toBe(1080);
   });
 
   /* Preconditions: loadData returns success: false
@@ -787,9 +785,9 @@ describe('Property Tests - WindowStateManager', () => {
     const loadedState = windowStateManager.loadState();
 
     // Verify default state is returned
-    expect(loadedState.isMaximized).toBe(true);
-    expect(loadedState.width).toBe(Math.floor(1920 * 0.9));
-    expect(loadedState.height).toBe(Math.floor(1080 * 0.9));
+    expect(loadedState.isMaximized).toBe(false);
+    expect(loadedState.width).toBe(1920);
+    expect(loadedState.height).toBe(1080);
   });
 });
 

@@ -14,7 +14,6 @@ import { DataManager } from '../../src/main/DataManager';
 // Mock Electron app and BrowserWindow
 jest.mock('electron', () => {
   let mockBounds = { x: 100, y: 100, width: 1200, height: 800 };
-  let mockIsMaximized = true;
 
   return {
     app: {
@@ -24,18 +23,21 @@ jest.mock('electron', () => {
       quit: jest.fn(),
     },
     BrowserWindow: jest.fn().mockImplementation(() => {
+      // Each new BrowserWindow instance starts with isMaximized = false
+      let instanceIsMaximized = false;
+
       const instance = {
         loadFile: jest.fn().mockResolvedValue(undefined),
         on: jest.fn(),
         once: jest.fn(),
         show: jest.fn(),
         maximize: jest.fn(() => {
-          mockIsMaximized = true;
+          instanceIsMaximized = true;
         }),
         unmaximize: jest.fn(() => {
-          mockIsMaximized = false;
+          instanceIsMaximized = false;
         }),
-        isMaximized: jest.fn(() => mockIsMaximized),
+        isMaximized: jest.fn(() => instanceIsMaximized),
         isFullScreen: jest.fn().mockReturnValue(false),
         getBounds: jest.fn(() => ({ ...mockBounds })),
         setBounds: jest.fn((newBounds) => {
@@ -438,11 +440,13 @@ describe('Window State Persistence Functional Tests', () => {
       // Verify window was created
       expect(windowManager2.isWindowCreated()).toBe(true);
 
-      // Verify window.maximize() was called (because isMaximized was true in saved state)
-      expect(window2.maximize).toHaveBeenCalled();
+      // Note: maximize() is NOT called even when isMaximized was true in saved state
+      // This is intentional per ui.1.1 and ui.1.3 - window opens large but resizable
+      // On macOS, calling maximize() would make the window non-resizable
+      expect(window2.maximize).not.toHaveBeenCalled();
 
-      // Verify window is in maximized state
-      expect(window2.isMaximized()).toBe(true);
+      // Window should report as not maximized (but will have large size from saved state)
+      expect(window2.isMaximized()).toBe(false);
 
       // Clean up
       windowManager2.closeWindow();
@@ -552,9 +556,10 @@ describe('Window State Persistence Functional Tests', () => {
       const windowManager2 = new WindowManager(dataManager);
       const window2 = windowManager2.createWindow();
 
-      // Verify window is maximized
-      expect(window2.maximize).toHaveBeenCalled();
-      expect(window2.isMaximized()).toBe(true);
+      // Verify window is NOT maximized (per ui.1.1, ui.1.3)
+      // maximize() is not called to keep window resizable on macOS
+      expect(window2.maximize).not.toHaveBeenCalled();
+      expect(window2.isMaximized()).toBe(false);
 
       // Clean up
       windowManager2.closeWindow();
@@ -705,8 +710,8 @@ describe('Window State Persistence Functional Tests', () => {
       expect(window).toBeDefined();
       expect(windowManager.isWindowCreated()).toBe(true);
 
-      // Window should be maximized (default state)
-      expect(window.maximize).toHaveBeenCalled();
+      // Window should NOT be maximized (default state per ui.1.1)
+      expect(window.maximize).not.toHaveBeenCalled();
 
       // Clean up
       windowManager.closeWindow();

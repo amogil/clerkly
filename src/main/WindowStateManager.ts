@@ -225,36 +225,36 @@ export class WindowStateManager {
    * Gets the default window state based on primary display size.
    *
    * This private method calculates the default window state when no saved state
-   * exists or when the saved state is invalid. The window size is calculated as
-   * 90% of the primary display's work area (screen size minus system UI elements
-   * like menu bar and dock), centered with 5% margins on each side.
+   * exists or when the saved state is invalid. The window size is set to fill
+   * the entire work area (screen size minus system UI elements like menu bar
+   * and dock), positioned at (0, 0).
    *
-   * The default state always has isMaximized set to true, ensuring the window
-   * opens in maximized state on first launch.
+   * The default state has isMaximized set to false, ensuring the window
+   * opens in a large size but remains resizable by the user.
    *
-   * Requirements: ui.1.1, ui.4.1, ui.4.2, ui.4.3
+   * Requirements: ui.1.1, ui.1.3, ui.4.1, ui.4.2, ui.4.3
    *
    * @returns Default WindowState object with position, size, and maximized status
    *          calculated based on the primary display's dimensions.
    *
    * @example
    * ```typescript
-   * // For a 1920x1080 display:
+   * // For a 1920x1080 display with workAreaSize 1920x1055 (25px menu bar):
    * // Returns: {
-   * //   x: 96,        // 5% of 1920
-   * //   y: 54,        // 5% of 1080
-   * //   width: 1728,  // 90% of 1920
-   * //   height: 972,  // 90% of 1080
-   * //   isMaximized: true
+   * //   x: 0,
+   * //   y: 0,
+   * //   width: 1920,
+   * //   height: 1055,
+   * //   isMaximized: false
    * // }
    *
-   * // For a smaller 1366x768 display:
+   * // For a smaller 1366x768 display with workAreaSize 1366x743:
    * // Returns: {
-   * //   x: 68,        // 5% of 1366
-   * //   y: 38,        // 5% of 768
-   * //   width: 1229,  // 90% of 1366
-   * //   height: 691,  // 90% of 768
-   * //   isMaximized: true
+   * //   x: 0,
+   * //   y: 0,
+   * //   width: 1366,
+   * //   height: 743,
+   * //   isMaximized: false
    * // }
    * ```
    */
@@ -262,13 +262,13 @@ export class WindowStateManager {
     const primaryDisplay = screen.getPrimaryDisplay();
     const { width, height } = primaryDisplay.workAreaSize;
 
-    // Requirements: ui.4.1, ui.4.2, ui.4.3
+    // Requirements: ui.1.1, ui.1.3, ui.4.1, ui.4.2, ui.4.3
     return {
-      x: Math.floor(width * 0.05),
-      y: Math.floor(height * 0.05),
-      width: Math.floor(width * 0.9),
-      height: Math.floor(height * 0.9),
-      isMaximized: true, // Requirements: ui.1.1
+      x: 0,
+      y: 0,
+      width: width,
+      height: height,
+      isMaximized: false, // Requirements: ui.1.1, ui.1.3 - large window but not maximized, so it's resizable
     };
   }
 

@@ -7,7 +7,8 @@
 ### Цели Дизайна
 
 - Обеспечить нативный macOS опыт использования приложения
-- Максимизировать использование экранного пространства при запуске
+- Максимизировать использование экранного пространства при запуске (окно размером с workAreaSize)
+- Обеспечить возможность изменения размера окна сразу после запуска
 - Сохранять предпочтения пользователя по размеру и позиции окна
 - Адаптироваться к различным размерам экранов
 - Поддерживать минималистичный интерфейс без лишних элементов
@@ -102,6 +103,7 @@ class WindowManager {
       height: windowState.height,
       title: '', // Requirements: ui.2.1
       show: false,
+      resizable: true, // Requirements: ui.1.3
       
       // Requirements: ui.3.1, ui.3.2
       titleBarStyle: 'default',
@@ -119,10 +121,11 @@ class WindowManager {
     // Requirements: ui.1.1, ui.1.2, ui.1.3
     this.mainWindow = new BrowserWindow(windowConfig);
 
-    // Requirements: ui.1.1
-    if (windowState.isMaximized) {
-      this.mainWindow.maximize();
-    }
+    // Note: We don't call maximize() here even if windowState.isMaximized is true
+    // because on macOS, maximized windows cannot be resized by dragging edges.
+    // The window will open with the saved size (or full workAreaSize by default),
+    // which provides a large window that is still resizable.
+    // Requirements: ui.1.1, ui.1.3
 
     this.mainWindow.once('ready-to-show', () => {
       this.mainWindow?.show();
@@ -237,21 +240,19 @@ class WindowStateManager {
     }
   }
 
-  // Requirements: ui.1.1, ui.4.1, ui.4.2
-  private getDefaultState(): WindowState {
-  // Requirements: ui.1.1, ui.4.1, ui.4.2
+  // Requirements: ui.1.1, ui.1.3, ui.4.1, ui.4.2
   private getDefaultState(): WindowState {
     const { screen } = require('electron');
     const primaryDisplay = screen.getPrimaryDisplay();
     const { width, height } = primaryDisplay.workAreaSize;
 
-    // Requirements: ui.4.1, ui.4.2, ui.4.3
+    // Requirements: ui.1.1, ui.1.3, ui.4.1, ui.4.2, ui.4.3
     return {
-      x: Math.floor(width * 0.05),
-      y: Math.floor(height * 0.05),
-      width: Math.floor(width * 0.9),
-      height: Math.floor(height * 0.9),
-      isMaximized: true, // Requirements: ui.1.1
+      x: 0,
+      y: 0,
+      width: width,
+      height: height,
+      isMaximized: false, // Requirements: ui.1.1, ui.1.3 - large window but not maximized, so it's resizable
     };
   }
 
@@ -369,11 +370,11 @@ interface WindowState {
 
 Свойство - это характеристика или поведение, которое должно быть истинным для всех валидных выполнений системы. По сути, это формальное утверждение о том, что система должна делать. Свойства служат мостом между человекочитаемыми спецификациями и машинно-проверяемыми гарантиями корректности.
 
-### Property 1: Окно открывается в развернутом состоянии
+### Property 1: Окно открывается размером с workAreaSize
 
-*Для любого* запуска приложения, когда создается главное окно, оно должно находиться в развернутом состоянии (maximized), но не в полноэкранном режиме (fullscreen).
+*Для любого* запуска приложения, когда создается главное окно, оно должно иметь размер равный workAreaSize (весь экран минус системные элементы macOS), но НЕ находиться в maximized состоянии, чтобы пользователь мог сразу изменять его размер.
 
-**Validates: Requirements ui.1.1, ui.1.2**
+**Validates: Requirements ui.1.1, ui.1.3**
 
 ### Property 2: Окно поддерживает изменение размера
 
@@ -395,7 +396,7 @@ interface WindowState {
 
 ### Property 5: Размер окна основан на размере экрана
 
-*Для любого* первого запуска приложения (когда сохраненное состояние отсутствует), размеры окна по умолчанию должны быть вычислены на основе размера экрана пользователя, а не использовать хардкоженные значения.
+*Для любого* первого запуска приложения (когда сохраненное состояние отсутствует), размеры окна по умолчанию должны быть равны workAreaSize (полный размер доступного экрана), а не использовать хардкоженные значения.
 
 **Validates: Requirements ui.4.1, ui.4.3**
 
@@ -415,9 +416,9 @@ interface WindowState {
 
 Следующие граничные случаи должны быть обработаны корректно:
 
-1. **Маленький экран (ui.4.4)**: Когда размер экрана меньше стандартного, размеры окна должны адаптироваться к доступному пространству и не превышать размер экрана.
+1. **Маленький экран (ui.4.4)**: Когда размер экрана меньше стандартного, размеры окна должны адаптироваться к доступному пространству (workAreaSize) и не превышать размер экрана.
 
-2. **Первый запуск (ui.5.5)**: Когда сохраненное состояние отсутствует, должно использоваться состояние по умолчанию с развернутым окном.
+2. **Первый запуск (ui.5.5)**: Когда сохраненное состояние отсутствует, должно использоваться состояние по умолчанию с окном размером workAreaSize, но НЕ в maximized состоянии.
 
 3. **Невалидная позиция (ui.5.6)**: Когда сохраненная позиция находится за пределами доступных экранов, должно использоваться состояние по умолчанию на основном экране.
 
@@ -942,7 +943,7 @@ describe('Window UI Functional Tests', () => {
 |------------|-----------------|----------------------|----------------------|
 | ui.1.1 | ✓ | ✓ | ✓ |
 | ui.1.2 | ✓ | ✓ | ✓ |
-| ui.1.3 | ✓ | - | - |
+| ui.1.3 | ✓ | - | ✓ |
 | ui.1.4 | ✓ | - | - |
 | ui.2.1 | ✓ | - | ✓ |
 | ui.2.2 | ✓ | - | - |

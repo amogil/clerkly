@@ -34,8 +34,18 @@ print_warning() {
 
 echo -e "${BLUE}Starting validation process for Clerkly...${NC}\n"
 
-# 1. TypeScript Compilation
-print_step "1. TypeScript Compilation"
+# 1. TypeScript Type Checking (fast, no build)
+print_step "1. TypeScript Type Checking"
+echo "Running: npm run typecheck"
+if npm run typecheck; then
+    print_success "TypeScript type checking passed"
+else
+    print_error "TypeScript type checking failed"
+    exit 1
+fi
+
+# 2. TypeScript Compilation
+print_step "2. TypeScript Compilation"
 echo "Running: npm run build"
 if npm run build; then
     print_success "TypeScript compilation passed"
@@ -44,8 +54,8 @@ else
     exit 1
 fi
 
-# 2. ESLint
-print_step "2. ESLint"
+# 3. ESLint
+print_step "3. ESLint"
 echo "Running: npm run lint"
 if npm run lint; then
     print_success "ESLint checks passed"
@@ -59,8 +69,8 @@ else
     fi
 fi
 
-# 3. Prettier
-print_step "3. Prettier"
+# 4. Prettier
+print_step "4. Prettier"
 echo "Running: npm run format:check"
 if npm run format:check; then
     print_success "Prettier formatting checks passed"
@@ -74,8 +84,8 @@ else
     fi
 fi
 
-# 4. Unit Tests
-print_step "4. Unit Tests"
+# 5. Unit Tests
+print_step "5. Unit Tests"
 echo "Running: npm run test:unit"
 if npm run test:unit; then
     print_success "Unit tests passed"
@@ -84,8 +94,8 @@ else
     exit 1
 fi
 
-# 5. Property-Based Tests
-print_step "5. Property-Based Tests"
+# 6. Property-Based Tests
+print_step "6. Property-Based Tests"
 echo "Running: npm run test:property"
 if npm run test:property; then
     print_success "Property-based tests passed"
@@ -94,8 +104,8 @@ else
     exit 1
 fi
 
-# 6. Test Coverage
-print_step "6. Test Coverage"
+# 7. Test Coverage (only unit + property tests)
+print_step "7. Test Coverage"
 echo "Running: npm run test:coverage"
 if npm run test:coverage; then
     print_success "Test coverage check passed"
@@ -104,13 +114,58 @@ else
     exit 1
 fi
 
-# 7. Security Audit (informational)
-print_step "7. Security Audit (Informational)"
-echo "Running: npm audit"
-if npm audit --production; then
+# 8. Project Structure Check
+print_step "8. Project Structure Check"
+echo "Checking critical files and directories..."
+
+REQUIRED_DIRS=("src/main" "src/renderer" "src/preload" "tests/unit" "tests/property" "migrations")
+REQUIRED_FILES=("package.json" "tsconfig.json" "jest.config.js" ".eslintrc.json" ".prettierrc.json")
+
+STRUCTURE_OK=true
+
+for dir in "${REQUIRED_DIRS[@]}"; do
+    if [ ! -d "$dir" ]; then
+        print_error "Missing required directory: $dir"
+        STRUCTURE_OK=false
+    fi
+done
+
+for file in "${REQUIRED_FILES[@]}"; do
+    if [ ! -f "$file" ]; then
+        print_error "Missing required file: $file"
+        STRUCTURE_OK=false
+    fi
+done
+
+if [ "$STRUCTURE_OK" = true ]; then
+    print_success "Project structure check passed"
+else
+    print_error "Project structure check failed"
+    exit 1
+fi
+
+# 9. Security Audit (informational, with timeout)
+print_step "9. Security Audit (Informational)"
+echo "Running: npm audit --production (with 30s timeout)"
+if timeout 30s npm audit --production 2>/dev/null; then
     print_success "No security vulnerabilities found in production dependencies"
 else
-    print_warning "Security vulnerabilities found. Review npm audit output above."
+    EXIT_CODE=$?
+    if [ $EXIT_CODE -eq 124 ]; then
+        print_warning "Security audit timed out after 30 seconds"
+    else
+        print_warning "Security vulnerabilities found. Run 'npm audit' for details."
+    fi
+    print_warning "Note: This is informational only and won't fail the validation"
+fi
+
+# 10. Dependency Check (informational)
+print_step "10. Dependency Check (Informational)"
+echo "Checking for outdated dependencies..."
+if npm outdated 2>/dev/null; then
+    print_success "All dependencies are up to date"
+else
+    print_warning "Some dependencies are outdated. Run 'npm outdated' for details."
     print_warning "Note: This is informational only and won't fail the validation"
 fi
 
@@ -120,14 +175,18 @@ echo -e "${GREEN}The project meets all quality standards defined in AGENTS.md${N
 
 # Summary of what was validated
 echo -e "${BLUE}Validated:${NC}"
+echo "✅ TypeScript type checking (no errors)"
 echo "✅ TypeScript compilation (no errors)"
 echo "✅ ESLint (all checks passing)"
 echo "✅ Prettier (code formatting correct)"
 echo "✅ Unit tests (all passing)"
 echo "✅ Property-based tests (all passing)"
-echo "✅ Test coverage (meets thresholds)"
+echo "✅ Test coverage (meets thresholds, unit + property only)"
+echo "✅ Project structure (all required files present)"
 echo "✅ Security audit (informational)"
+echo "✅ Dependency check (informational)"
 echo ""
-echo -e "${YELLOW}Note: Functional tests are excluded from validation as per AGENTS.md${NC}"
-echo -e "${YELLOW}They show windows on screen and should only be run manually.${NC}"
+echo -e "${YELLOW}Note: Integration and functional tests are excluded from validation${NC}"
+echo -e "${YELLOW}They use real Electron and may show windows on screen.${NC}"
+echo -e "${YELLOW}To run integration tests: npm run test:integration${NC}"
 echo -e "${YELLOW}To run functional tests: npm run test:functional${NC}"

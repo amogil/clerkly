@@ -49,19 +49,19 @@ describe('WindowStateManager', () => {
   describe('loadState', () => {
     /* Preconditions: no saved state in database
        Action: call loadState()
-       Assertions: returns default state with isMaximized: true, dimensions based on screen size
-       Requirements: ui.4.1, ui.5.5 */
+       Assertions: returns default state with isMaximized: false, dimensions equal to workAreaSize
+       Requirements: ui.1.1, ui.4.1, ui.5.5 */
     it('should return default state when no saved state exists', () => {
       mockDataManager.loadData.mockReturnValue({ success: false });
 
       const result = windowStateManager.loadState();
 
       expect(result).toBeDefined();
-      expect(result.isMaximized).toBe(true);
-      expect(result.width).toBe(Math.floor(1920 * 0.9));
-      expect(result.height).toBe(Math.floor(1080 * 0.9));
-      expect(result.x).toBe(Math.floor(1920 * 0.05));
-      expect(result.y).toBe(Math.floor(1080 * 0.05));
+      expect(result.isMaximized).toBe(false); // Not maximized to keep resizable
+      expect(result.width).toBe(1920); // Full workAreaSize width
+      expect(result.height).toBe(1080); // Full workAreaSize height
+      expect(result.x).toBe(0);
+      expect(result.y).toBe(0);
     });
 
     /* Preconditions: valid state saved in database
@@ -109,9 +109,11 @@ describe('WindowStateManager', () => {
       const result = windowStateManager.loadState();
 
       // Should return default state instead
-      expect(result.isMaximized).toBe(true);
-      expect(result.x).toBe(Math.floor(1920 * 0.05));
-      expect(result.y).toBe(Math.floor(1080 * 0.05));
+      expect(result.isMaximized).toBe(false); // Not maximized to keep resizable
+      expect(result.x).toBe(0);
+      expect(result.y).toBe(0);
+      expect(result.width).toBe(1920);
+      expect(result.height).toBe(1080);
     });
 
     /* Preconditions: corrupted JSON in database
@@ -127,7 +129,7 @@ describe('WindowStateManager', () => {
 
       const result = windowStateManager.loadState();
 
-      expect(result.isMaximized).toBe(true);
+      expect(result.isMaximized).toBe(false); // Not maximized to keep resizable
       expect(consoleErrorSpy).toHaveBeenCalledWith(
         'Failed to load window state:',
         expect.any(Error)
@@ -148,7 +150,7 @@ describe('WindowStateManager', () => {
 
       const result = windowStateManager.loadState();
 
-      expect(result.isMaximized).toBe(true);
+      expect(result.isMaximized).toBe(false); // Not maximized to keep resizable
       expect(consoleErrorSpy).toHaveBeenCalledWith(
         'Failed to load window state:',
         expect.any(Error)
@@ -242,8 +244,8 @@ describe('WindowStateManager', () => {
   describe('getDefaultState', () => {
     /* Preconditions: screen size is 1920x1080
        Action: call getDefaultState()
-       Assertions: returns state with 90% of screen size, 5% offset, maximized
-       Requirements: ui.1.1, ui.4.1, ui.4.2, ui.4.3 */
+       Assertions: returns state with full workAreaSize, not maximized
+       Requirements: ui.1.1, ui.1.3, ui.4.1, ui.4.2, ui.4.3 */
     it('should generate default state based on screen size', () => {
       mockScreen.getPrimaryDisplay.mockReturnValue({
         workAreaSize: { width: 1920, height: 1080 },
@@ -251,11 +253,11 @@ describe('WindowStateManager', () => {
 
       const result = (windowStateManager as any).getDefaultState();
 
-      expect(result.width).toBe(Math.floor(1920 * 0.9));
-      expect(result.height).toBe(Math.floor(1080 * 0.9));
-      expect(result.x).toBe(Math.floor(1920 * 0.05));
-      expect(result.y).toBe(Math.floor(1080 * 0.05));
-      expect(result.isMaximized).toBe(true);
+      expect(result.width).toBe(1920); // Full workAreaSize
+      expect(result.height).toBe(1080); // Full workAreaSize
+      expect(result.x).toBe(0);
+      expect(result.y).toBe(0);
+      expect(result.isMaximized).toBe(false); // Not maximized to keep resizable
     });
 
     /* Preconditions: small screen size (1366x768)
@@ -269,11 +271,11 @@ describe('WindowStateManager', () => {
 
       const result = (windowStateManager as any).getDefaultState();
 
-      expect(result.width).toBe(Math.floor(1366 * 0.9));
-      expect(result.height).toBe(Math.floor(768 * 0.9));
-      expect(result.x).toBe(Math.floor(1366 * 0.05));
-      expect(result.y).toBe(Math.floor(768 * 0.05));
-      expect(result.isMaximized).toBe(true);
+      expect(result.width).toBe(1366); // Full workAreaSize
+      expect(result.height).toBe(768); // Full workAreaSize
+      expect(result.x).toBe(0);
+      expect(result.y).toBe(0);
+      expect(result.isMaximized).toBe(false);
     });
 
     /* Preconditions: large screen size (3840x2160)
@@ -287,11 +289,11 @@ describe('WindowStateManager', () => {
 
       const result = (windowStateManager as any).getDefaultState();
 
-      expect(result.width).toBe(Math.floor(3840 * 0.9));
-      expect(result.height).toBe(Math.floor(2160 * 0.9));
-      expect(result.x).toBe(Math.floor(3840 * 0.05));
-      expect(result.y).toBe(Math.floor(2160 * 0.05));
-      expect(result.isMaximized).toBe(true);
+      expect(result.width).toBe(3840); // Full workAreaSize
+      expect(result.height).toBe(2160); // Full workAreaSize
+      expect(result.x).toBe(0);
+      expect(result.y).toBe(0);
+      expect(result.isMaximized).toBe(false);
     });
 
     /* Preconditions: various screen sizes
@@ -313,9 +315,11 @@ describe('WindowStateManager', () => {
 
         const result = (windowStateManager as any).getDefaultState();
 
-        // Verify dimensions are based on screen size, not hardcoded
-        expect(result.width).toBe(Math.floor(size.width * 0.9));
-        expect(result.height).toBe(Math.floor(size.height * 0.9));
+        // Verify dimensions are based on screen size (full workAreaSize), not hardcoded
+        expect(result.width).toBe(size.width);
+        expect(result.height).toBe(size.height);
+        expect(result.x).toBe(0);
+        expect(result.y).toBe(0);
       });
     });
   });

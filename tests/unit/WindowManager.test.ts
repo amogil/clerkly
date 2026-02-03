@@ -81,7 +81,7 @@ describe('WindowManager', () => {
     /* Preconditions: WindowManager created, no window exists yet
        Action: call createWindow()
        Assertions: BrowserWindow created with correct Mac OS X parameters (titleBarStyle), returns BrowserWindow instance
-       Requirements: ui.1.1, ui.1.2, ui.2.1, ui.3.1, ui.4.1, ui.4.2, ui.5.4, ui.5.5 */
+       Requirements: ui.1.1, ui.1.2, ui.1.3, ui.2.1, ui.3.1, ui.4.1, ui.4.2, ui.5.4, ui.5.5 */
     it('should create window with native Mac OS X interface', () => {
       const window = windowManager.createWindow();
 
@@ -90,6 +90,7 @@ describe('WindowManager', () => {
         expect.objectContaining({
           title: '', // Requirements: ui.2.1
           show: false,
+          resizable: true, // Requirements: ui.1.3
           titleBarStyle: 'default', // Requirements: ui.3.1
           webPreferences: expect.objectContaining({
             contextIsolation: true,
@@ -104,20 +105,34 @@ describe('WindowManager', () => {
       expect(windowManager.isWindowCreated()).toBe(true);
     });
 
+    /* Preconditions: WindowManager created
+       Action: call createWindow()
+       Assertions: window created with resizable: true
+       Requirements: ui.1.3 */
+    it('should create resizable window', () => {
+      windowManager.createWindow();
+
+      expect(BrowserWindow).toHaveBeenCalledWith(
+        expect.objectContaining({
+          resizable: true,
+        })
+      );
+    });
+
     /* Preconditions: WindowManager created, no saved state exists
        Action: call createWindow()
-       Assertions: window created with default state dimensions based on screen size
-       Requirements: ui.4.1, ui.4.2, ui.5.5 */
+       Assertions: window created with default state dimensions equal to workAreaSize
+       Requirements: ui.1.1, ui.4.1, ui.4.2, ui.5.5 */
     it('should create window with default state when no saved state exists', () => {
       windowManager.createWindow();
 
-      // Default state should be 90% of screen size (1920x1080)
+      // Default state should be full workAreaSize (1920x1080)
       expect(BrowserWindow).toHaveBeenCalledWith(
         expect.objectContaining({
-          x: Math.floor(1920 * 0.05), // 96
-          y: Math.floor(1080 * 0.05), // 54
-          width: Math.floor(1920 * 0.9), // 1728
-          height: Math.floor(1080 * 0.9), // 972
+          x: 0,
+          y: 0,
+          width: 1920,
+          height: 1080,
         })
       );
     });
@@ -153,9 +168,9 @@ describe('WindowManager', () => {
 
     /* Preconditions: WindowManager created, saved state has isMaximized: true
        Action: call createWindow()
-       Assertions: maximize() called on window
-       Requirements: ui.1.1 */
-    it('should maximize window when saved state has isMaximized: true', () => {
+       Assertions: maximize() NOT called on window (to keep window resizable)
+       Requirements: ui.1.1, ui.1.3 */
+    it('should not maximize window even when saved state has isMaximized: true', () => {
       // Mock saved state with isMaximized: true
       mockDataManager.loadData.mockReturnValue({
         success: true,
@@ -171,13 +186,14 @@ describe('WindowManager', () => {
       windowManager.createWindow();
       const mockWindow = getMockWindow();
 
-      expect(mockWindow.maximize).toHaveBeenCalledTimes(1);
+      // Window should NOT be maximized to keep it resizable
+      expect(mockWindow.maximize).not.toHaveBeenCalled();
     });
 
     /* Preconditions: WindowManager created, saved state has isMaximized: false
        Action: call createWindow()
        Assertions: maximize() not called on window
-       Requirements: ui.1.1 */
+       Requirements: ui.1.1, ui.1.3 */
     it('should not maximize window when saved state has isMaximized: false', () => {
       // Mock saved state with isMaximized: false
       mockDataManager.loadData.mockReturnValue({

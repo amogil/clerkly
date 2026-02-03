@@ -23,35 +23,42 @@ jest.mock('electron', () => {
       on: jest.fn(),
       quit: jest.fn(),
     },
-    BrowserWindow: jest.fn().mockImplementation((options) => ({
-      loadFile: jest.fn().mockResolvedValue(undefined),
-      on: jest.fn(),
-      once: jest.fn(),
-      show: jest.fn(),
-      maximize: jest.fn(),
-      isMaximized: jest.fn().mockReturnValue(true),
-      isFullScreen: jest.fn().mockReturnValue(false),
-      getBounds: jest.fn().mockReturnValue({
-        x: options.x || 0,
-        y: options.y || 0,
-        width: options.width || Math.floor(currentScreenSize.width * 0.9),
-        height: options.height || Math.floor(currentScreenSize.height * 0.9),
-      }),
-      getTitle: jest.fn().mockReturnValue(''),
-      setTitle: jest.fn(),
-      removeAllListeners: jest.fn(),
-      destroy: jest.fn(),
-      close: jest.fn(),
-      isDestroyed: jest.fn().mockReturnValue(false),
-      webContents: {
+    BrowserWindow: jest.fn().mockImplementation((options) => {
+      // Each instance starts with isMaximized = false
+      let instanceIsMaximized = false;
+
+      return {
+        loadFile: jest.fn().mockResolvedValue(undefined),
         on: jest.fn(),
-        session: {
-          webRequest: {
-            onHeadersReceived: jest.fn(),
+        once: jest.fn(),
+        show: jest.fn(),
+        maximize: jest.fn(() => {
+          instanceIsMaximized = true;
+        }),
+        isMaximized: jest.fn(() => instanceIsMaximized),
+        isFullScreen: jest.fn().mockReturnValue(false),
+        getBounds: jest.fn().mockReturnValue({
+          x: options.x || 0,
+          y: options.y || 0,
+          width: options.width || currentScreenSize.width,
+          height: options.height || currentScreenSize.height,
+        }),
+        getTitle: jest.fn().mockReturnValue(''),
+        setTitle: jest.fn(),
+        removeAllListeners: jest.fn(),
+        destroy: jest.fn(),
+        close: jest.fn(),
+        isDestroyed: jest.fn().mockReturnValue(false),
+        webContents: {
+          on: jest.fn(),
+          session: {
+            webRequest: {
+              onHeadersReceived: jest.fn(),
+            },
           },
         },
-      },
-    })),
+      };
+    }),
     ipcMain: {
       handle: jest.fn(),
       removeHandler: jest.fn(),
@@ -146,9 +153,9 @@ describe('Small Screen Adaptation Functional Tests', () => {
       expect(bounds.width).toBeGreaterThan(0);
       expect(bounds.height).toBeGreaterThan(0);
 
-      // Verify dimensions are based on screen size (should be ~90% of screen)
-      const expectedWidth = Math.floor(screenSize.width * 0.9);
-      const expectedHeight = Math.floor(screenSize.height * 0.9);
+      // Verify dimensions are based on screen size (should be 100% of workAreaSize)
+      const expectedWidth = screenSize.width;
+      const expectedHeight = screenSize.height;
 
       // Allow small variance due to rounding
       expect(bounds.width).toBeGreaterThanOrEqual(expectedWidth - 10);
@@ -184,15 +191,15 @@ describe('Small Screen Adaptation Functional Tests', () => {
       expect(browserWindowCall.width).not.toBe(1920);
       expect(browserWindowCall.height).not.toBe(1080);
 
-      // Verify dimensions are proportional to screen size
+      // Verify dimensions are proportional to screen size (should be 100%)
       const widthRatio = browserWindowCall.width / screenSize.width;
       const heightRatio = browserWindowCall.height / screenSize.height;
 
-      // Both ratios should be similar (around 0.9)
-      expect(widthRatio).toBeGreaterThan(0.8);
-      expect(widthRatio).toBeLessThan(1.0);
-      expect(heightRatio).toBeGreaterThan(0.8);
-      expect(heightRatio).toBeLessThan(1.0);
+      // Both ratios should be 1.0 (100% of workAreaSize)
+      expect(widthRatio).toBeGreaterThanOrEqual(0.95);
+      expect(widthRatio).toBeLessThanOrEqual(1.05);
+      expect(heightRatio).toBeGreaterThanOrEqual(0.95);
+      expect(heightRatio).toBeLessThanOrEqual(1.05);
     });
 
     /* Preconditions: application running on small screen
@@ -222,16 +229,17 @@ describe('Small Screen Adaptation Functional Tests', () => {
     });
 
     /* Preconditions: application running on small screen, no saved state
-       Action: create window and verify it's maximized
-       Assertions: window is maximized even on small screen
+       Action: create window and verify it's NOT maximized
+       Assertions: window is large but not maximized (per ui.1.1)
        Requirements: ui.1.1, ui.4.4 */
     it('should maximize window on small screen', () => {
       // Create window
       const window = windowManager.createWindow();
 
-      // Verify window is maximized (Requirements: ui.1.1)
-      expect(window.maximize).toHaveBeenCalled();
-      expect(window.isMaximized()).toBe(true);
+      // Verify window is NOT maximized (Requirements: ui.1.1)
+      // Window opens large (workAreaSize) but not maximized to stay resizable
+      expect(window.maximize).not.toHaveBeenCalled();
+      expect(window.isMaximized()).toBe(false);
 
       // Verify window is not in fullscreen mode
       expect(window.isFullScreen()).toBe(false);
@@ -270,9 +278,10 @@ describe('Small Screen Adaptation Functional Tests', () => {
       expect(browserWindowCall.width).toBeLessThanOrEqual(screenSize.width);
       expect(browserWindowCall.height).toBeLessThanOrEqual(screenSize.height);
 
-      // Verify window is maximized (Requirements: ui.1.1)
-      expect(window.maximize).toHaveBeenCalled();
-      expect(window.isMaximized()).toBe(true);
+      // Verify window is NOT maximized (Requirements: ui.1.1)
+      // Window opens large but not maximized to stay resizable
+      expect(window.maximize).not.toHaveBeenCalled();
+      expect(window.isMaximized()).toBe(false);
 
       // Verify window is not in fullscreen (Requirements: ui.1.2)
       expect(window.isFullScreen()).toBe(false);

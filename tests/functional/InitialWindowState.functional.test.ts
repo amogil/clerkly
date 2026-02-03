@@ -117,9 +117,10 @@ describe('Initial Window State Functional Tests', () => {
       expect(window).toBeDefined();
       expect(windowManager.isWindowCreated()).toBe(true);
 
-      // Verify window is maximized (Requirements: ui.1.1)
-      expect(window.maximize).toHaveBeenCalled();
-      expect(window.isMaximized()).toBe(true);
+      // Verify window is NOT maximized (Requirements: ui.1.1)
+      // Window opens large (workAreaSize) but not maximized to stay resizable
+      expect(window.maximize).not.toHaveBeenCalled();
+      expect(window.isMaximized()).toBe(false);
 
       // Verify window has empty title (Requirements: ui.2.1)
       expect(window.getTitle()).toBe('');
@@ -169,8 +170,9 @@ describe('Initial Window State Functional Tests', () => {
       const browserWindowCall = (BrowserWindow as unknown as jest.Mock).mock.calls[0][0];
       expect(browserWindowCall.fullscreen).not.toBe(true);
 
-      // Verify window is maximized after creation (Requirements: ui.1.1)
-      expect(window.maximize).toHaveBeenCalled();
+      // Verify window is NOT maximized after creation (Requirements: ui.1.1)
+      // Window opens large (workAreaSize) but not maximized to stay resizable
+      expect(window.maximize).not.toHaveBeenCalled();
     });
 
     /* Preconditions: fresh application start, clean database
@@ -333,8 +335,8 @@ describe('Initial Window State Functional Tests', () => {
       expect(window).toBeDefined();
       expect(BrowserWindow).toHaveBeenCalled();
 
-      // Window should be maximized (default state)
-      expect(window.maximize).toHaveBeenCalled();
+      // Window should NOT be maximized (default state per ui.1.1)
+      expect(window.maximize).not.toHaveBeenCalled();
     });
   });
 });
