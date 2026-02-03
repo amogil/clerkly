@@ -180,13 +180,30 @@ export class IPCHandlers {
    * @param {string} timeoutMessage
    * @returns {Promise<T>}
    */
-  withTimeout<T>(promise: Promise<T>, timeoutMs: number, timeoutMessage: string): Promise<T> {
-    return Promise.race([
-      promise,
-      new Promise<T>((_, reject) => {
-        setTimeout(() => reject(new Error(timeoutMessage)), timeoutMs);
-      }),
-    ]);
+  async withTimeout<T>(promise: Promise<T>, timeoutMs: number, timeoutMessage: string): Promise<T> {
+    let timeoutHandle: NodeJS.Timeout | undefined;
+
+    try {
+      const result = await Promise.race([
+        promise,
+        new Promise<T>((_, reject) => {
+          timeoutHandle = setTimeout(() => reject(new Error(timeoutMessage)), timeoutMs);
+        }),
+      ]);
+
+      // Clear timeout if operation completed successfully
+      if (timeoutHandle) {
+        clearTimeout(timeoutHandle);
+      }
+
+      return result;
+    } catch (error) {
+      // Clear timeout on error
+      if (timeoutHandle) {
+        clearTimeout(timeoutHandle);
+      }
+      throw error;
+    }
   }
 
   /**
