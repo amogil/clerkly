@@ -31,7 +31,7 @@ interface Task {
 }
 
 interface TasksNewProps {
-  triggerAction?: { action: string; params: any } | null;
+  triggerAction?: { action: string; params: Record<string, unknown> } | null;
 }
 
 export function TasksNew({ triggerAction }: TasksNewProps) {

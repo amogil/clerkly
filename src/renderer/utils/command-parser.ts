@@ -3,7 +3,7 @@
 export interface ParsedCommand {
   action: 'create' | 'add' | 'update' | 'delete' | 'show' | 'navigate' | 'unknown';
   entity: 'project' | 'task' | 'contact' | 'meeting' | 'screen' | 'unknown';
-  params: Record<string, any>;
+  params: Record<string, unknown>;
 }
 
 export function parseCommand(input: string): ParsedCommand {

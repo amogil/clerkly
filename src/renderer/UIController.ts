@@ -73,7 +73,7 @@ export class UIController {
       }
 
       return { success: true, renderTime, performanceWarning };
-    } catch (error: any) {
+    } catch (error: unknown) {
       const renderTime = performance.now() - startTime;
       console.error('Failed to render UI:', error);
       return {
@@ -88,7 +88,7 @@ export class UIController {
    * Updates the view with new data efficiently without full re-render
    * Monitors update time and warns if it exceeds performance threshold
    * Requirements: clerkly.1, clerkly.nfr.1   */
-  updateView(data: any): UpdateResult {
+  updateView(data: Record<string, unknown> | unknown[]): UpdateResult {
     const startTime = performance.now();
 
     try {
@@ -118,7 +118,7 @@ export class UIController {
       }
 
       return { success: true, updateTime, performanceWarning };
-    } catch (error: any) {
+    } catch (error: unknown) {
       const updateTime = performance.now() - startTime;
       console.error('Failed to update view:', error);
       return {
@@ -158,9 +158,10 @@ export class UIController {
       });
 
       return { success: true };
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       console.error('Failed to show loading indicator:', error);
-      return { success: false, error: error.message };
+      return { success: false, error: errorMessage };
     }
   }
 
@@ -187,20 +188,21 @@ export class UIController {
       this.loadingIndicators.delete(operationId);
 
       return { success: true, duration };
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       console.error('Failed to hide loading indicator:', error);
-      return { success: false, error: error.message };
+      return { success: false, error: errorMessage };
     }
   }
 
   /**
    * Executes operation with automatic loading indicator for operations > 200ms
    * Requirements: clerkly.nfr.1   */
-  async withLoading(
+  async withLoading<T>(
     operationId: string,
-    operation: () => Promise<any>,
+    operation: () => Promise<T>,
     loadingMessage: string
-  ): Promise<any> {
+  ): Promise<T> {
     // Set timeout to show loading indicator after threshold
     const loadingTimeout = setTimeout(() => {
       this.showLoading(operationId, loadingMessage);
@@ -253,7 +255,7 @@ export class UIController {
   /**
    * Creates data display element (table/list)
    * Requirements: clerkly.1   */
-  createDataDisplay(data: any): HTMLElement {
+  createDataDisplay(data: Record<string, unknown> | unknown[] | null | undefined): HTMLElement {
     const display = document.createElement('div');
     display.setAttribute('data-testid', 'data-display');
     display.className = 'data-display';
@@ -282,7 +284,9 @@ export class UIController {
 
         const valueSpan = document.createElement('span');
         valueSpan.className = 'data-value';
-        valueSpan.textContent = typeof value === 'object' ? JSON.stringify(value) : String(value);
+        const valueStr =
+          typeof value === 'object' && value !== null ? JSON.stringify(value) : String(value);
+        valueSpan.textContent = valueStr;
 
         item.appendChild(keySpan);
         item.appendChild(valueSpan);

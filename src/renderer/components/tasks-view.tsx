@@ -148,7 +148,7 @@ export function TasksView() {
               ].map((option) => (
                 <button
                   key={option.value}
-                  onClick={() => setFilter(option.value as any)}
+                  onClick={() => setFilter(option.value as 'all' | 'pending' | 'completed')}
                   className={`px-4 py-2 rounded-lg transition-colors ${
                     filter === option.value
                       ? 'bg-primary text-primary-foreground'

@@ -14,7 +14,7 @@ interface Contact {
 }
 
 interface ContactsProps {
-  triggerAction?: { action: string; params: any } | null;
+  triggerAction?: { action: string; params: Record<string, unknown> } | null;
 }
 
 export function Contacts({ triggerAction }: ContactsProps) {

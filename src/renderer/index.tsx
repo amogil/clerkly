@@ -33,13 +33,14 @@ async function initializeRenderer(): Promise<void> {
     );
 
     console.log('Renderer Process initialized successfully');
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Failed to initialize Renderer Process:', error);
     // Показываем ошибку пользователю
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     document.body.innerHTML = `
       <div style="padding: 20px; color: red;">
         <h1>Initialization Error</h1>
-        <p>${error.message}</p>
+        <p>${errorMessage}</p>
       </div>
     `;
   }
