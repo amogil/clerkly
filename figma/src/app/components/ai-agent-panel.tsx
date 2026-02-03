@@ -561,130 +561,119 @@ export function AIAgentPanel({ onCommand }: AIAgentPanelProps) {
 
   return (
     <div className="fixed right-0 top-0 bottom-0 w-1/3 bg-card border-l border-border flex flex-col">
-      {/* Header - always shows task information */}
-      <div className="h-auto px-6 py-4 border-b border-border">
-        <div className="flex items-start gap-3">
-          {/* Task icon */}
-          <div className={`relative flex-shrink-0 w-10 h-10 rounded-full ${style.bg} flex items-center justify-center`}>
-            {selectedTask.status === 'completed' ? (
-              <Check className="w-5 h-5 text-white" />
-            ) : selectedTask.status === 'error' ? (
-              <X className="w-5 h-5 text-white" />
-            ) : selectedTask.status === 'awaiting-user' ? (
-              <>
-                <span className="text-white text-sm font-semibold">{letter}</span>
-                <div className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full ${style.bg} border-2 border-card flex items-center justify-center`}>
-                  <HelpCircle className="w-2.5 h-2.5 text-white" />
-                </div>
-              </>
-            ) : (
+      {/* Header - same height as menu (h-16) */}
+      <div className="h-16 px-6 border-b border-border flex items-center gap-3">
+        {/* Task icon */}
+        <div className={`relative flex-shrink-0 w-10 h-10 rounded-full ${style.bg} flex items-center justify-center`}>
+          {selectedTask.status === 'completed' ? (
+            <Check className="w-5 h-5 text-white" />
+          ) : selectedTask.status === 'error' ? (
+            <X className="w-5 h-5 text-white" />
+          ) : selectedTask.status === 'awaiting-user' ? (
+            <>
               <span className="text-white text-sm font-semibold">{letter}</span>
-            )}
-            
-            {selectedTask.status === 'in-progress' && (
-              <div className="absolute inset-0 rounded-full border-2 border-white border-t-transparent animate-spin" />
-            )}
-            
-            {selectedTask.status === 'awaiting-user' && (
-              <div className={`absolute -inset-1 rounded-full ring-2 ${style.ring} animate-pulse`} />
-            )}
-          </div>
-
-          {/* Task info */}
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1">
-              <h3 className="text-base font-semibold text-foreground">{selectedTask.title}</h3>
-            </div>
-            <p className="text-sm text-muted-foreground mb-2">{selectedTask.description}</p>
-            
-            {/* Status and time */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3 text-xs">
-                <div className={`${style.text}`}>
-                  <span>{getStatusText(selectedTask.status)}</span>
-                </div>
-                <div className="text-muted-foreground">
-                  <span>·</span>
-                  <span className="ml-1.5">
-                    {selectedTask.createdAt.toLocaleDateString('en-US', { 
-                      month: 'short', 
-                      day: 'numeric',
-                      hour: 'numeric',
-                      minute: '2-digit'
-                    })}
-                  </span>
-                </div>
+              <div className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full ${style.bg} border-2 border-card flex items-center justify-center`}>
+                <HelpCircle className="w-2.5 h-2.5 text-white" />
               </div>
+            </>
+          ) : (
+            <span className="text-white text-sm font-semibold">{letter}</span>
+          )}
+          
+          {selectedTask.status === 'in-progress' && (
+            <div className="absolute inset-0 rounded-full border-2 border-white border-t-transparent animate-spin" />
+          )}
+          
+          {selectedTask.status === 'awaiting-user' && (
+            <div className={`absolute -inset-1 rounded-full ring-2 ${style.ring} animate-pulse`} />
+          )}
+        </div>
 
-              {/* Agent Tasks as Icons - right side */}
-              <div className="flex items-center gap-2">
-                {/* New chat button - ALWAYS FIRST, light blue */}
-                <div
-                  onClick={handleNewChat}
-                  className="w-8 h-8 rounded-full bg-sky-400 flex items-center justify-center cursor-pointer hover:bg-sky-500 transition-colors group"
-                  title="New chat"
-                >
-                  <Plus className="w-4 h-4 text-white" />
-                </div>
-                
-                {/* Show tasks with all 5 different statuses in short list */}
-                {displayTasks.slice(0, 5).map((task) => {
-                  const taskLetter = task.title.charAt(0).toUpperCase();
-                  const taskStyle = getStatusStyles(task.status);
-                  const isSelected = task.id === selectedTask.id;
+        {/* Task title, status and timestamp */}
+        <div className="flex-1 min-w-0">
+          <h3 className="font-semibold text-foreground truncate">{selectedTask.title}</h3>
+          <div className="flex items-center gap-2 text-xs">
+            <span className={`${style.text}`}>{getStatusText(selectedTask.status)}</span>
+            <span className="text-muted-foreground">·</span>
+            <span className="text-muted-foreground">
+              {selectedTask.createdAt.toLocaleDateString('en-US', { 
+                month: 'short', 
+                day: 'numeric',
+                hour: 'numeric',
+                minute: '2-digit'
+              })}
+            </span>
+          </div>
+        </div>
+      </div>
 
-                  return (
-                    <div
-                      key={task.id}
-                      onClick={() => handleTaskClick(task)}
-                      className={`relative w-8 h-8 rounded-full ${taskStyle.bg} flex items-center justify-center cursor-pointer hover:scale-110 transition-transform group ${isSelected ? 'ring-2 ring-primary ring-offset-2' : ''}`}
-                      title={task.title}
-                    >
-                      {task.status === 'completed' ? (
-                        <Check className="w-4 h-4 text-white" />
-                      ) : task.status === 'error' ? (
-                        <X className="w-4 h-4 text-white" />
-                      ) : task.status === 'awaiting-user' ? (
-                        <>
-                          <span className="text-white text-xs font-semibold">{taskLetter}</span>
-                          <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full ${taskStyle.bg} border-2 border-card flex items-center justify-center`}>
-                            <HelpCircle className="w-2 h-2 text-white" />
-                          </div>
-                        </>
-                      ) : (
-                        <span className="text-white text-xs font-semibold">{taskLetter}</span>
-                      )}
-                      
-                      {task.status === 'in-progress' && (
-                        <div className="absolute inset-0 rounded-full border-2 border-white border-t-transparent animate-spin" />
-                      )}
-                      
-                      {task.status === 'awaiting-user' && (
-                        <div className={`absolute -inset-1 rounded-full ring-2 ${taskStyle.ring} animate-pulse`} />
-                      )}
-                      
-                      {/* Tooltip on hover */}
-                      <div className="absolute top-full right-0 mt-2 w-64 bg-gray-900 text-white text-xs rounded-lg p-3 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 shadow-lg">
-                        <p className="font-semibold mb-1">{task.title}</p>
-                        <div className="flex items-center gap-1.5 text-xs text-gray-300">
-                          <span>{getStatusText(task.status)}</span>
-                        </div>
-                      </div>
+      {/* Agent Tasks as Icons - separate row, full width */}
+      <div className="px-6 py-3 border-b border-border bg-card">
+        <div className="flex items-center gap-2 justify-end">
+          {/* New chat button - ALWAYS FIRST, light blue */}
+          <div
+            onClick={handleNewChat}
+            className="w-8 h-8 rounded-full bg-sky-400 flex items-center justify-center cursor-pointer hover:bg-sky-500 transition-colors group"
+            title="New chat"
+          >
+            <Plus className="w-4 h-4 text-white" />
+          </div>
+          
+          {/* Show tasks with all 5 different statuses in short list */}
+          {displayTasks.slice(0, 5).map((task) => {
+            const taskLetter = task.title.charAt(0).toUpperCase();
+            const taskStyle = getStatusStyles(task.status);
+            const isSelected = task.id === selectedTask.id;
+
+            return (
+              <div
+                key={task.id}
+                onClick={() => handleTaskClick(task)}
+                className={`relative w-8 h-8 rounded-full ${taskStyle.bg} flex items-center justify-center cursor-pointer hover:scale-110 transition-transform group ${isSelected ? 'ring-2 ring-primary ring-offset-2' : ''}`}
+                title={task.title}
+              >
+                {task.status === 'completed' ? (
+                  <Check className="w-4 h-4 text-white" />
+                ) : task.status === 'error' ? (
+                  <X className="w-4 h-4 text-white" />
+                ) : task.status === 'awaiting-user' ? (
+                  <>
+                    <span className="text-white text-xs font-semibold">{taskLetter}</span>
+                    <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full ${taskStyle.bg} border-2 border-card flex items-center justify-center`}>
+                      <HelpCircle className="w-2 h-2 text-white" />
                     </div>
-                  );
-                })}
-                
-                {displayTasks.length > 5 && (
-                  <div
-                    onClick={() => setShowAllTasksPage(true)}
-                    className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-semibold text-muted-foreground cursor-pointer hover:bg-primary/10 hover:text-primary transition-colors"
-                  >
-                    +{displayTasks.length - 5}
-                  </div>
+                  </>
+                ) : (
+                  <span className="text-white text-xs font-semibold">{taskLetter}</span>
                 )}
+                
+                {task.status === 'in-progress' && (
+                  <div className="absolute inset-0 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                )}
+                
+                {task.status === 'awaiting-user' && (
+                  <div className={`absolute -inset-1 rounded-full ring-2 ${taskStyle.ring} animate-pulse`} />
+                )}
+                
+                {/* Tooltip on hover */}
+                <div className="absolute top-full right-0 mt-2 w-64 bg-gray-900 text-white text-xs rounded-lg p-3 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 shadow-lg">
+                  <p className="font-semibold mb-1">{task.title}</p>
+                  <div className="flex items-center gap-1.5 text-xs text-gray-300">
+                    <span>{getStatusText(task.status)}</span>
+                  </div>
+                </div>
               </div>
+            );
+          })}
+          
+          {displayTasks.length > 5 && (
+            <div
+              onClick={() => setShowAllTasksPage(true)}
+              className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-semibold text-muted-foreground cursor-pointer hover:bg-primary/10 hover:text-primary transition-colors"
+            >
+              +{displayTasks.length - 5}
             </div>
-          </div>
+          )}
         </div>
       </div>
 

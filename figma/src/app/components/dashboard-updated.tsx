@@ -3,9 +3,10 @@ import { Clock, PlayCircle, Play } from 'lucide-react';
 interface DashboardProps {
   onNavigateToMeeting: (meetingId: string) => void;
   onNavigateToCalendar: () => void;
+  onNavigateToTasks?: () => void;
 }
 
-export function DashboardUpdated({ onNavigateToMeeting, onNavigateToCalendar }: DashboardProps) {
+export function DashboardUpdated({ onNavigateToMeeting, onNavigateToCalendar, onNavigateToTasks }: DashboardProps) {
   const todaySchedule = [
     {
       id: '1',
@@ -209,6 +210,7 @@ export function DashboardUpdated({ onNavigateToMeeting, onNavigateToCalendar }: 
             <div className="p-6 border-b border-border flex items-center justify-between">
               <h2 className="text-xl font-semibold text-foreground">Tasks for Today</h2>
               <button
+                onClick={onNavigateToTasks}
                 className="text-sm text-primary hover:underline"
               >
                 View all

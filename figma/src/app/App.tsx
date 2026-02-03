@@ -32,6 +32,10 @@ export default function App() {
     setCurrentScreen('calendar');
   };
 
+  const handleNavigateToTasks = () => {
+    setCurrentScreen('tasks');
+  };
+
   const handleSignOut = () => {
     setShowAuthDemo(true);
   };
@@ -79,6 +83,7 @@ export default function App() {
           <DashboardUpdated
             onNavigateToMeeting={handleNavigateToMeeting}
             onNavigateToCalendar={handleNavigateToCalendar}
+            onNavigateToTasks={handleNavigateToTasks}
           />
         );
       case 'calendar':
@@ -101,6 +106,7 @@ export default function App() {
           <DashboardUpdated
             onNavigateToMeeting={handleNavigateToMeeting}
             onNavigateToCalendar={handleNavigateToCalendar}
+            onNavigateToTasks={handleNavigateToTasks}
           />
         );
     }

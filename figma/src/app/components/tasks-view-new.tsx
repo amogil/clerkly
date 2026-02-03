@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Filter, ChevronDown, ChevronRight, Clock, User, Users, Folder, CheckSquare, X } from 'lucide-react';
+import { Plus, Filter, ChevronDown, ChevronRight, Clock, User, Users, Layers, CheckSquare, X } from 'lucide-react';
 import type { Project, Task, TaskPriority, TaskStatus } from '@/app/types/project';
 
 interface TasksViewNewProps {
@@ -227,7 +227,7 @@ export function TasksViewNew({ triggerAction }: TasksViewNewProps) {
                   }`}
                 >
                   <div className="flex items-center gap-3 text-left flex-1 min-w-0">
-                    <Folder className="w-5 h-5 flex-shrink-0" />
+                    <Layers className="w-5 h-5 flex-shrink-0" />
                     <div className="flex-1 min-w-0">
                       <div className="font-medium truncate">{project.title}</div>
                       <div className="text-xs text-muted-foreground truncate">
@@ -328,7 +328,7 @@ export function TasksViewNew({ triggerAction }: TasksViewNewProps) {
                           </p>
                           {!selectedProject && (
                             <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                              <Folder className="w-3 h-3" />
+                              <Layers className="w-3 h-3" />
                               <span>
                                 {projects.find(p => p.id === task.projectId)?.title}
                               </span>
