@@ -22,6 +22,44 @@ npm install
 
 **Примечание**: Первая установка может занять несколько минут, так как устанавливаются нативные модули (better-sqlite3) и Electron.
 
+### Настройка Google OAuth
+
+Для работы авторизации через Google необходимо настроить OAuth 2.0:
+
+1. **Создайте проект в Google Cloud Console**:
+   - Перейдите на [Google Cloud Console](https://console.cloud.google.com/)
+   - Создайте новый проект или выберите существующий
+   - Включите Google+ API для проекта
+
+2. **Настройте OAuth consent screen**:
+   - Перейдите в "APIs & Services" → "OAuth consent screen"
+   - Выберите "External" user type
+   - Заполните обязательные поля (название приложения, email поддержки)
+   - Добавьте scopes: `openid`, `email`, `profile`
+
+3. **Создайте OAuth 2.0 Client ID**:
+   - Перейдите в "APIs & Services" → "Credentials"
+   - Нажмите "Create Credentials" → "OAuth client ID"
+   - Выберите "Desktop app" как тип приложения
+   - Скопируйте Client ID
+
+4. **Настройте Client ID в коде**:
+   - Откройте файл `src/main/auth/OAuthConfig.ts`
+   - Замените `'YOUR_GOOGLE_CLIENT_ID_HERE'` на ваш реальный Client ID:
+   ```typescript
+   export const OAUTH_CONFIG = {
+     clientId: 'your-client-id.apps.googleusercontent.com', // Ваш Client ID
+     redirectUri: 'clerkly://oauth/callback',
+     scopes: ['openid', 'email', 'profile'],
+   } as const;
+   ```
+
+5. **Настройте Redirect URI**:
+   - В Google Cloud Console добавьте `clerkly://oauth/callback` в список разрешенных Redirect URIs
+   - Это необходимо для работы deep link авторизации
+
+**Примечание**: Приложение использует PKCE (Proof Key for Code Exchange) flow без client secret, что соответствует требованиям безопасности для desktop приложений.
+
 ## Разработка
 
 ### Быстрый старт
@@ -228,6 +266,55 @@ clerkly/
 - **fast-check** - Property-based тестирование
 - **ESLint** - Линтинг
 - **Prettier** - Форматирование кода
+
+## Авторизация
+
+Приложение использует Google OAuth 2.0 для авторизации пользователей:
+
+### Процесс авторизации
+
+1. **Первый запуск**: При первом запуске приложения отображается экран входа
+2. **Клик "Continue with Google"**: Открывается системный браузер с формой авторизации Google
+3. **Авторизация в браузере**: Пользователь входит в свой Google аккаунт и предоставляет разрешения
+4. **Deep Link Callback**: Google перенаправляет на `clerkly://oauth/callback` с authorization code
+5. **Обмен кода на токены**: Приложение обменивает код на access и refresh токены
+6. **Сохранение токенов**: Токены безопасно сохраняются в локальной SQLite базе данных
+7. **Главный экран**: Открывается главное окно приложения
+
+### Безопасность авторизации
+
+- **PKCE Flow**: Используется PKCE (Proof Key for Code Exchange) без client secret
+- **Локальное хранение**: Токены хранятся только локально в зашифрованной SQLite базе
+- **Автоматическое обновление**: Access токены автоматически обновляются при истечении
+- **Deep Link**: Используется custom protocol `clerkly://` вместо localhost сервера
+
+### API авторизации
+
+Renderer process имеет доступ к следующим методам через безопасный IPC мост:
+
+```typescript
+// Начать процесс авторизации
+await window.api.auth.startLogin();
+
+// Получить текущий статус авторизации
+const status = await window.api.auth.getAuthStatus();
+// Возвращает: { authorized: boolean, error?: string }
+
+// Выйти из системы
+await window.api.auth.logout();
+```
+
+### Обработка ошибок
+
+Приложение обрабатывает следующие типы ошибок авторизации:
+
+- **popup_closed_by_user**: Пользователь закрыл окно браузера до завершения авторизации
+- **access_denied**: Пользователь отказал в доступе к Google аккаунту
+- **network_error**: Проблемы с сетевым подключением
+- **invalid_grant**: Сессия авторизации истекла
+- **csrf_attack_detected**: Обнаружена попытка CSRF атаки
+
+Для каждой ошибки отображается понятное сообщение с рекомендациями по устранению.
 
 ## Архитектура
 

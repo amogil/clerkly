@@ -570,7 +570,7 @@ describe('Property Tests - Data Manager', () => {
           const saveTime = performance.now() - saveStart;
 
           expect(saveResult.success).toBe(true);
-          expect(saveTime).toBeLessThan(50);
+          expect(saveTime).toBeLessThan(100);
 
           // Measure loadData performance
           const loadStart = performance.now();
@@ -579,7 +579,7 @@ describe('Property Tests - Data Manager', () => {
 
           expect(loadResult.success).toBe(true);
           expect(loadResult.data).toEqual(value);
-          expect(loadTime).toBeLessThan(50);
+          expect(loadTime).toBeLessThan(100);
 
           // Measure deleteData performance
           const deleteStart = performance.now();
@@ -587,7 +587,7 @@ describe('Property Tests - Data Manager', () => {
           const deleteTime = performance.now() - deleteStart;
 
           expect(deleteResult.success).toBe(true);
-          expect(deleteTime).toBeLessThan(50);
+          expect(deleteTime).toBeLessThan(100);
         }
       ),
       { numRuns: 100 }

@@ -616,7 +616,7 @@ describe('IPC Communication Functional Tests', () => {
 
       // Verify that only the intended methods are exposed
       const apiKeys = Object.keys(exposedApi);
-      expect(apiKeys).toEqual(['saveData', 'loadData', 'deleteData']);
+      expect(apiKeys).toEqual(['saveData', 'loadData', 'deleteData', 'auth']);
     });
 
     /* Preconditions: preload script loaded, contextBridge configured

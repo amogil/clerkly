@@ -1,0 +1,325 @@
+// Requirements: google-oauth-auth.8.1, google-oauth-auth.8.2, google-oauth-auth.8.3, google-oauth-auth.8.4, google-oauth-auth.8.5
+
+import { ipcMain, BrowserWindow } from 'electron';
+import { AuthIPCHandlers } from '../../../src/main/auth/AuthIPCHandlers';
+import { OAuthClientManager } from '../../../src/main/auth/OAuthClientManager';
+
+// Mock Electron modules
+jest.mock('electron', () => ({
+  ipcMain: {
+    handle: jest.fn(),
+    removeHandler: jest.fn(),
+  },
+  BrowserWindow: {
+    getAllWindows: jest.fn(() => []),
+  },
+}));
+
+// Mock OAuthClientManager
+jest.mock('../../../src/main/auth/OAuthClientManager');
+
+describe('AuthIPCHandlers', () => {
+  let authIPCHandlers: AuthIPCHandlers;
+  let mockOAuthClient: jest.Mocked<OAuthClientManager>;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+
+    mockOAuthClient = {
+      startAuthFlow: jest.fn(),
+      getAuthStatus: jest.fn(),
+      logout: jest.fn(),
+    } as any;
+
+    authIPCHandlers = new AuthIPCHandlers(mockOAuthClient);
+  });
+
+  describe('Handler Registration', () => {
+    /* Preconditions: AuthIPCHandlers instance created, handlers not yet registered
+       Action: Call registerHandlers()
+       Assertions: All three IPC handlers are registered (auth:start-login, auth:get-status, auth:logout)
+       Requirements: google-oauth-auth.8.1 */
+    it('should register all IPC handlers', () => {
+      authIPCHandlers.registerHandlers();
+
+      expect(ipcMain.handle).toHaveBeenCalledWith('auth:start-login', expect.any(Function));
+      expect(ipcMain.handle).toHaveBeenCalledWith('auth:get-status', expect.any(Function));
+      expect(ipcMain.handle).toHaveBeenCalledWith('auth:logout', expect.any(Function));
+    });
+
+    /* Preconditions: Handlers already registered
+       Action: Call registerHandlers() again
+       Assertions: Warning is logged, handlers are not registered twice
+       Requirements: google-oauth-auth.8.1 */
+    it('should not register handlers twice', () => {
+      const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation();
+
+      authIPCHandlers.registerHandlers();
+      const firstCallCount = (ipcMain.handle as jest.Mock).mock.calls.length;
+
+      authIPCHandlers.registerHandlers();
+      const secondCallCount = (ipcMain.handle as jest.Mock).mock.calls.length;
+
+      expect(secondCallCount).toBe(firstCallCount);
+      expect(consoleWarnSpy).toHaveBeenCalledWith('[AuthIPCHandlers] Handlers already registered');
+
+      consoleWarnSpy.mockRestore();
+    });
+
+    /* Preconditions: Handlers registered
+       Action: Call unregisterHandlers()
+       Assertions: All three IPC handlers are removed
+       Requirements: google-oauth-auth.8.1 */
+    it('should unregister all IPC handlers', () => {
+      authIPCHandlers.registerHandlers();
+      authIPCHandlers.unregisterHandlers();
+
+      expect(ipcMain.removeHandler).toHaveBeenCalledWith('auth:start-login');
+      expect(ipcMain.removeHandler).toHaveBeenCalledWith('auth:get-status');
+      expect(ipcMain.removeHandler).toHaveBeenCalledWith('auth:logout');
+    });
+  });
+
+  describe('auth:start-login Handler', () => {
+    /* Preconditions: OAuth client ready, user initiates login
+       Action: Call auth:start-login handler
+       Assertions: OAuthClientManager.startAuthFlow is called, returns success: true
+       Requirements: google-oauth-auth.8.1, google-oauth-auth.8.5 */
+    it('should handle start login request successfully', async () => {
+      mockOAuthClient.startAuthFlow.mockResolvedValue(undefined);
+
+      authIPCHandlers.registerHandlers();
+      const handler = (ipcMain.handle as jest.Mock).mock.calls.find(
+        (call) => call[0] === 'auth:start-login'
+      )?.[1];
+
+      const result = await handler({});
+
+      expect(mockOAuthClient.startAuthFlow).toHaveBeenCalled();
+      expect(result).toEqual({ success: true });
+    });
+
+    /* Preconditions: OAuth client throws error during startAuthFlow
+       Action: Call auth:start-login handler
+       Assertions: Returns success: false with error message
+       Requirements: google-oauth-auth.8.1, google-oauth-auth.8.5 */
+    it('should handle start login error', async () => {
+      const errorMessage = 'Failed to open browser';
+      mockOAuthClient.startAuthFlow.mockRejectedValue(new Error(errorMessage));
+
+      authIPCHandlers.registerHandlers();
+      const handler = (ipcMain.handle as jest.Mock).mock.calls.find(
+        (call) => call[0] === 'auth:start-login'
+      )?.[1];
+
+      const result = await handler({});
+
+      expect(result).toEqual({
+        success: false,
+        error: errorMessage,
+      });
+    });
+  });
+
+  describe('auth:get-status Handler', () => {
+    /* Preconditions: User is authorized with valid tokens
+       Action: Call auth:get-status handler
+       Assertions: Returns success: true, authorized: true
+       Requirements: google-oauth-auth.8.2, google-oauth-auth.8.5 */
+    it('should return authorized status when user is logged in', async () => {
+      mockOAuthClient.getAuthStatus.mockResolvedValue({ authorized: true });
+
+      authIPCHandlers.registerHandlers();
+      const handler = (ipcMain.handle as jest.Mock).mock.calls.find(
+        (call) => call[0] === 'auth:get-status'
+      )?.[1];
+
+      const result = await handler({});
+
+      expect(mockOAuthClient.getAuthStatus).toHaveBeenCalled();
+      expect(result).toEqual({
+        success: true,
+        authorized: true,
+        error: undefined,
+      });
+    });
+
+    /* Preconditions: User is not authorized, no tokens exist
+       Action: Call auth:get-status handler
+       Assertions: Returns success: true, authorized: false
+       Requirements: google-oauth-auth.8.2, google-oauth-auth.8.5 */
+    it('should return not authorized status when user is not logged in', async () => {
+      mockOAuthClient.getAuthStatus.mockResolvedValue({ authorized: false });
+
+      authIPCHandlers.registerHandlers();
+      const handler = (ipcMain.handle as jest.Mock).mock.calls.find(
+        (call) => call[0] === 'auth:get-status'
+      )?.[1];
+
+      const result = await handler({});
+
+      expect(result).toEqual({
+        success: true,
+        authorized: false,
+        error: undefined,
+      });
+    });
+
+    /* Preconditions: OAuth client throws error during getAuthStatus
+       Action: Call auth:get-status handler
+       Assertions: Returns success: false, authorized: false with error message
+       Requirements: google-oauth-auth.8.2, google-oauth-auth.8.5 */
+    it('should handle get status error', async () => {
+      const errorMessage = 'Database error';
+      mockOAuthClient.getAuthStatus.mockRejectedValue(new Error(errorMessage));
+
+      authIPCHandlers.registerHandlers();
+      const handler = (ipcMain.handle as jest.Mock).mock.calls.find(
+        (call) => call[0] === 'auth:get-status'
+      )?.[1];
+
+      const result = await handler({});
+
+      expect(result).toEqual({
+        success: false,
+        authorized: false,
+        error: errorMessage,
+      });
+    });
+  });
+
+  describe('auth:logout Handler', () => {
+    /* Preconditions: User is logged in, logout initiated
+       Action: Call auth:logout handler
+       Assertions: OAuthClientManager.logout is called, returns success: true, sends auth:logout-complete event
+       Requirements: google-oauth-auth.8.3, google-oauth-auth.8.4, google-oauth-auth.8.5 */
+    it('should handle logout request successfully', async () => {
+      const mockWindow = {
+        webContents: {
+          send: jest.fn(),
+        },
+      };
+      (BrowserWindow.getAllWindows as jest.Mock).mockReturnValue([mockWindow]);
+
+      mockOAuthClient.logout.mockResolvedValue(undefined);
+
+      authIPCHandlers.registerHandlers();
+      const handler = (ipcMain.handle as jest.Mock).mock.calls.find(
+        (call) => call[0] === 'auth:logout'
+      )?.[1];
+
+      const result = await handler({});
+
+      expect(mockOAuthClient.logout).toHaveBeenCalled();
+      expect(result).toEqual({ success: true });
+      expect(mockWindow.webContents.send).toHaveBeenCalledWith('auth:logout-complete', {
+        success: true,
+      });
+    });
+
+    /* Preconditions: OAuth client throws error during logout
+       Action: Call auth:logout handler
+       Assertions: Returns success: false with error message
+       Requirements: google-oauth-auth.8.3, google-oauth-auth.8.5 */
+    it('should handle logout error', async () => {
+      const errorMessage = 'Logout failed';
+      mockOAuthClient.logout.mockRejectedValue(new Error(errorMessage));
+
+      authIPCHandlers.registerHandlers();
+      const handler = (ipcMain.handle as jest.Mock).mock.calls.find(
+        (call) => call[0] === 'auth:logout'
+      )?.[1];
+
+      const result = await handler({});
+
+      expect(result).toEqual({
+        success: false,
+        error: errorMessage,
+      });
+    });
+  });
+
+  describe('Event Broadcasting', () => {
+    /* Preconditions: Multiple windows open, auth success event triggered
+       Action: Call sendAuthSuccess()
+       Assertions: auth:success event sent to all windows
+       Requirements: google-oauth-auth.8.4 */
+    it('should send auth success event to all windows', () => {
+      const mockWindow1 = { webContents: { send: jest.fn() } };
+      const mockWindow2 = { webContents: { send: jest.fn() } };
+      (BrowserWindow.getAllWindows as jest.Mock).mockReturnValue([mockWindow1, mockWindow2]);
+
+      authIPCHandlers.sendAuthSuccess();
+
+      expect(mockWindow1.webContents.send).toHaveBeenCalledWith('auth:success', {
+        authorized: true,
+      });
+      expect(mockWindow2.webContents.send).toHaveBeenCalledWith('auth:success', {
+        authorized: true,
+      });
+    });
+
+    /* Preconditions: Multiple windows open, auth error event triggered
+       Action: Call sendAuthError()
+       Assertions: auth:error event sent to all windows with error details
+       Requirements: google-oauth-auth.8.4 */
+    it('should send auth error event to all windows', () => {
+      const mockWindow1 = { webContents: { send: jest.fn() } };
+      const mockWindow2 = { webContents: { send: jest.fn() } };
+      (BrowserWindow.getAllWindows as jest.Mock).mockReturnValue([mockWindow1, mockWindow2]);
+
+      const errorMessage = 'Authentication failed';
+      const errorCode = 'access_denied';
+      authIPCHandlers.sendAuthError(errorMessage, errorCode);
+
+      expect(mockWindow1.webContents.send).toHaveBeenCalledWith('auth:error', {
+        error: errorMessage,
+        errorCode: errorCode,
+      });
+      expect(mockWindow2.webContents.send).toHaveBeenCalledWith('auth:error', {
+        error: errorMessage,
+        errorCode: errorCode,
+      });
+    });
+  });
+
+  describe('Response Structure', () => {
+    /* Preconditions: Any IPC handler called
+       Action: Execute handler and get response
+       Assertions: Response contains success boolean field
+       Requirements: google-oauth-auth.8.5 */
+    it('should return structured response with success field', async () => {
+      mockOAuthClient.startAuthFlow.mockResolvedValue(undefined);
+
+      authIPCHandlers.registerHandlers();
+      const handler = (ipcMain.handle as jest.Mock).mock.calls.find(
+        (call) => call[0] === 'auth:start-login'
+      )?.[1];
+
+      const result = await handler({});
+
+      expect(result).toHaveProperty('success');
+      expect(typeof result.success).toBe('boolean');
+    });
+
+    /* Preconditions: IPC handler encounters error
+       Action: Execute handler that throws error
+       Assertions: Response contains success: false and error string field
+       Requirements: google-oauth-auth.8.5 */
+    it('should return structured error response with success and error fields', async () => {
+      mockOAuthClient.startAuthFlow.mockRejectedValue(new Error('Test error'));
+
+      authIPCHandlers.registerHandlers();
+      const handler = (ipcMain.handle as jest.Mock).mock.calls.find(
+        (call) => call[0] === 'auth:start-login'
+      )?.[1];
+
+      const result = await handler({});
+
+      expect(result).toHaveProperty('success');
+      expect(result.success).toBe(false);
+      expect(result).toHaveProperty('error');
+      expect(typeof result.error).toBe('string');
+    });
+  });
+});

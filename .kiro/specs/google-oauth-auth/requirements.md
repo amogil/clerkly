@@ -145,7 +145,7 @@
 
 #### Критерии Приемки
 
-1. "OAuth Client" ДОЛЖЕН хранить client_id в конфигурационном файле или переменных окружения
+1. "OAuth Client" ДОЛЖЕН хранить client_id как константу в конфигурационном файле кода
 2. "OAuth Client" ДОЛЖЕН использовать redirect_uri в формате "clerkly://oauth/callback"
 3. "OAuth Client" ДОЛЖЕН запрашивать следующие scopes: "openid", "email", "profile"
 4. "OAuth Client" ДОЛЖЕН использовать authorization endpoint: "https://accounts.google.com/o/oauth2/v2/auth"

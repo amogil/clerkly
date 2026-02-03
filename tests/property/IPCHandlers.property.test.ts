@@ -105,8 +105,9 @@ describe('Property Tests - IPC Handlers', () => {
         fc.string({ minLength: 1, maxLength: 100 }),
         async (key: string) => {
           // Create mock DataManager with delay > timeout
+          // Use larger gap to ensure timeout always occurs
           const timeout = 50; // 50ms timeout for faster tests
-          const delay = 80; // 80ms delay (exceeds timeout)
+          const delay = 150; // 150ms delay (significantly exceeds timeout)
           const mockDataManager = new MockDataManagerWithDelay(delay) as unknown as DataManager;
 
           // Create IPC handlers with short timeout

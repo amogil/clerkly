@@ -104,9 +104,9 @@ describe('Window State Integration Tests', () => {
   beforeEach(() => {
     // Create a temporary directory for test database
     testDbPath = path.join(os.tmpdir(), `clerkly-test-${Date.now()}`);
-    if (!fs.existsSync(testDbPath)) {
-      fs.mkdirSync(testDbPath, { recursive: true });
-    }
+
+    // Ensure directory exists before initializing DataManager
+    fs.mkdirSync(testDbPath, { recursive: true });
 
     // Initialize real DataManager with test database
     dataManager = new DataManager(testDbPath);

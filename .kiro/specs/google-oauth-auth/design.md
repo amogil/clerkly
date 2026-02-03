@@ -413,13 +413,15 @@ interface PKCEStorage {
 
 ### OAuth Configuration
 
-Конфигурация OAuth хранится в переменных окружения или конфигурационном файле:
+Конфигурация OAuth хранится как константы в конфигурационном файле кода:
 
 ```typescript
-// .env или config file
-GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
-OAUTH_REDIRECT_URI=clerkly://oauth/callback
-OAUTH_SCOPES=openid,email,profile
+// src/main/auth/OAuthConfig.ts
+export const OAUTH_CONFIG = {
+  clientId: 'YOUR_GOOGLE_CLIENT_ID_HERE', // Replace with your actual Google OAuth Client ID
+  redirectUri: 'clerkly://oauth/callback',
+  scopes: ['openid', 'email', 'profile'],
+} as const;
 ```
 
 

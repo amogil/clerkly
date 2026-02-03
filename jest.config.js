@@ -6,16 +6,19 @@ module.exports = {
   roots: ['<rootDir>/tests'],
   testMatch: [
     '**/__tests__/**/*.ts',
-    '**/?(*.)+(spec|test).ts'
+    '**/__tests__/**/*.tsx',
+    '**/?(*.)+(spec|test).ts',
+    '**/?(*.)+(spec|test).tsx'
   ],
   transform: {
-    '^.+\\.ts$': [
+    '^.+\\.tsx?$': [
       'ts-jest',
       {
         tsconfig: {
           esModuleInterop: true,
           allowSyntheticDefaultImports: true,
-          lib: ['ES2020', 'DOM']
+          lib: ['ES2020', 'DOM'],
+          jsx: 'react'
         }
       }
     ]

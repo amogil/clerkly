@@ -467,6 +467,7 @@ describe('Application Lifecycle Functional Tests', () => {
       for (let i = 0; i < cycles; i++) {
         // Requirements: ui.5
         const dm = new DataManager(testStoragePath);
+        dm.initialize();
         const wm = new WindowManager(dm);
         const lm = new LifecycleManager(wm, dm);
 

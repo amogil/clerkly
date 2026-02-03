@@ -14,6 +14,14 @@ interface API {
   saveData: (key: string, value: any) => Promise<{ success: boolean; error?: string }>;
   loadData: (key: string) => Promise<{ success: boolean; data?: any; error?: string }>;
   deleteData: (key: string) => Promise<{ success: boolean; error?: string }>;
+  // Requirements: google-oauth-auth.8.1, google-oauth-auth.8.2, google-oauth-auth.8.3
+  auth: {
+    startLogin: () => Promise<{ success: boolean; error?: string }>;
+    getStatus: () => Promise<{ authorized: boolean; error?: string }>;
+    logout: () => Promise<{ success: boolean; error?: string }>;
+    onAuthSuccess: (callback: () => void) => void;
+    onAuthError: (callback: (error: string, errorCode?: string) => void) => void;
+  };
 }
 
 // Requirements: clerkly.1, clerkly.2
@@ -49,6 +57,60 @@ contextBridge.exposeInMainWorld('api', {
    */
   async deleteData(key: string): Promise<{ success: boolean; error?: string }> {
     return await ipcRenderer.invoke('delete-data', key);
+  },
+
+  // Requirements: google-oauth-auth.8.1, google-oauth-auth.8.2, google-oauth-auth.8.3
+  /**
+   * Authentication API
+   * Provides methods for OAuth authentication flow
+   */
+  auth: {
+    /**
+     * Start OAuth login flow
+     * Requirements: google-oauth-auth.8.1
+     * @returns {Promise<{success: boolean, error?: string}>}
+     */
+    async startLogin(): Promise<{ success: boolean; error?: string }> {
+      return await ipcRenderer.invoke('auth:start-login');
+    },
+
+    /**
+     * Get current authentication status
+     * Requirements: google-oauth-auth.8.2
+     * @returns {Promise<{authorized: boolean, error?: string}>}
+     */
+    async getStatus(): Promise<{ authorized: boolean; error?: string }> {
+      return await ipcRenderer.invoke('auth:get-status');
+    },
+
+    /**
+     * Logout and revoke tokens
+     * Requirements: google-oauth-auth.8.3
+     * @returns {Promise<{success: boolean, error?: string}>}
+     */
+    async logout(): Promise<{ success: boolean; error?: string }> {
+      return await ipcRenderer.invoke('auth:logout');
+    },
+
+    /**
+     * Listen for authentication success events
+     * Requirements: google-oauth-auth.8.4
+     * @param {Function} callback - Callback function to execute on success
+     */
+    onAuthSuccess(callback: () => void): void {
+      ipcRenderer.on('auth:success', callback);
+    },
+
+    /**
+     * Listen for authentication error events
+     * Requirements: google-oauth-auth.8.4
+     * @param {Function} callback - Callback function to execute on error
+     */
+    onAuthError(callback: (error: string, errorCode?: string) => void): void {
+      ipcRenderer.on('auth:error', (_event, error: string, errorCode?: string) => {
+        callback(error, errorCode);
+      });
+    },
   },
 } as API);
 
