@@ -103,7 +103,7 @@ export function DashboardNew({ onNavigateToMeeting, onNavigateToCalendar }: Dash
           <div className="bg-card rounded-xl border border-border shadow-sm">
             <div className="p-6 border-b border-border flex items-center justify-between">
               <div>
-                <h2 className="text-xl font-semibold text-foreground">Today's Schedule</h2>
+                <h2 className="text-xl font-semibold text-foreground">Today&apos;s Schedule</h2>
                 <p className="text-sm text-muted-foreground mt-0.5">From Google Calendar</p>
               </div>
               <button

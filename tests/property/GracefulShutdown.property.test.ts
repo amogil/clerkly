@@ -114,12 +114,13 @@ describe('Property Tests - Graceful Shutdown Data Persistence', () => {
 
           await lifecycleManager1.initialize();
 
-          // Save all data
-          const savedData: Array<{ key: string; value: any }> = [];
+          // Save all data and track the last value for each key
+          // When duplicate keys exist, only the last value should persist
+          const lastValueByKey = new Map<string, any>();
           for (const item of dataToSave) {
             const saveResult = dataManager1.saveData(item.key, item.value);
             if (saveResult.success) {
-              savedData.push(item);
+              lastValueByKey.set(item.key, item.value);
             }
           }
 
@@ -144,11 +145,11 @@ describe('Property Tests - Graceful Shutdown Data Persistence', () => {
 
           await lifecycleManager2.initialize();
 
-          // Load and verify all saved data
-          for (const item of savedData) {
-            const loadResult = dataManager2.loadData(item.key);
+          // Load and verify the last saved value for each key
+          for (const [key, expectedValue] of lastValueByKey.entries()) {
+            const loadResult = dataManager2.loadData(key);
             expect(loadResult.success).toBe(true);
-            expect(loadResult.data).toEqual(item.value);
+            expect(loadResult.data).toEqual(expectedValue);
           }
 
           // Clean up

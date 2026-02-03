@@ -124,7 +124,7 @@ export function DashboardUpdated({ onNavigateToMeeting, onNavigateToCalendar }: 
           {/* Today's Schedule */}
           <div className="bg-card rounded-xl border border-border shadow-sm">
             <div className="p-6 border-b border-border flex items-center justify-between">
-              <h2 className="text-xl font-semibold text-foreground">Today's Schedule</h2>
+              <h2 className="text-xl font-semibold text-foreground">Today&apos;s Schedule</h2>
               <button
                 onClick={onNavigateToCalendar}
                 className="text-sm text-primary hover:underline"
@@ -250,15 +250,15 @@ export function DashboardUpdated({ onNavigateToMeeting, onNavigateToCalendar }: 
                         </span>
 
                         {/* Assignee */}
-                      <div className="flex items-center gap-1.5">
-                        <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium text-primary">
-                          {task.assignee
-                            .split(' ')
-                            .map((n) => n[0])
-                            .join('')}
+                        <div className="flex items-center gap-1.5">
+                          <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium text-primary">
+                            {task.assignee
+                              .split(' ')
+                              .map((n) => n[0])
+                              .join('')}
+                          </div>
+                          <span className="text-xs text-muted-foreground">{task.assignee}</span>
                         </div>
-                        <span className="text-xs text-muted-foreground">{task.assignee}</span>
-                      </div>
                       </div>
                     </div>
                   </div>

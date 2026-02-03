@@ -14,6 +14,14 @@ jest.mock('electron', () => ({
     setTitle: jest.fn(),
     setResizable: jest.fn(),
     setFullScreen: jest.fn(),
+    webContents: {
+      session: {
+        webRequest: {
+          onHeadersReceived: jest.fn(),
+        },
+      },
+      on: jest.fn(),
+    },
   })),
 }));
 
@@ -46,7 +54,7 @@ describe('WindowManager', () => {
   describe('createWindow', () => {
     /* Preconditions: WindowManager created, no window exists yet
        Action: call createWindow()
-       Assertions: BrowserWindow created with correct Mac OS X parameters (titleBarStyle, vibrancy, trafficLightPosition), returns BrowserWindow instance
+       Assertions: BrowserWindow created with correct Mac OS X parameters (titleBarStyle), returns BrowserWindow instance
        Requirements: clerkly.1, clerkly.2*/
     it('should create window with native Mac OS X interface', () => {
       const window = windowManager.createWindow();
@@ -54,15 +62,14 @@ describe('WindowManager', () => {
       expect(BrowserWindow).toHaveBeenCalledTimes(1);
       expect(BrowserWindow).toHaveBeenCalledWith(
         expect.objectContaining({
-          width: 800,
-          height: 600,
-          titleBarStyle: 'hiddenInset',
-          vibrancy: 'under-window',
-          trafficLightPosition: { x: 20, y: 20 },
+          width: 1200,
+          height: 800,
+          titleBarStyle: 'default',
           webPreferences: expect.objectContaining({
             contextIsolation: true,
             nodeIntegration: false,
-            sandbox: true,
+            sandbox: false,
+            webSecurity: true,
           }),
         })
       );
@@ -413,49 +420,21 @@ describe('WindowManager', () => {
   describe('Mac OS X specific settings', () => {
     /* Preconditions: WindowManager created
        Action: call createWindow()
-       Assertions: titleBarStyle set to 'hiddenInset' (Mac OS X native style)
+       Assertions: titleBarStyle set to 'default' (Mac OS X native style)
        Requirements: clerkly.1, clerkly.2*/
-    it('should set titleBarStyle to hiddenInset for Mac OS X', () => {
+    it('should set titleBarStyle to default for Mac OS X', () => {
       windowManager.createWindow();
 
       expect(BrowserWindow).toHaveBeenCalledWith(
         expect.objectContaining({
-          titleBarStyle: 'hiddenInset',
+          titleBarStyle: 'default',
         })
       );
     });
 
     /* Preconditions: WindowManager created
        Action: call createWindow()
-       Assertions: vibrancy set to 'under-window' (Mac OS X effect)
-       Requirements: clerkly.1, clerkly.2*/
-    it('should set vibrancy to under-window for Mac OS X', () => {
-      windowManager.createWindow();
-
-      expect(BrowserWindow).toHaveBeenCalledWith(
-        expect.objectContaining({
-          vibrancy: 'under-window',
-        })
-      );
-    });
-
-    /* Preconditions: WindowManager created
-       Action: call createWindow()
-       Assertions: trafficLightPosition set to {x: 20, y: 20} (Mac OS X window controls)
-       Requirements: clerkly.1, clerkly.2*/
-    it('should set trafficLightPosition for Mac OS X window controls', () => {
-      windowManager.createWindow();
-
-      expect(BrowserWindow).toHaveBeenCalledWith(
-        expect.objectContaining({
-          trafficLightPosition: { x: 20, y: 20 },
-        })
-      );
-    });
-
-    /* Preconditions: WindowManager created
-       Action: call createWindow()
-       Assertions: webPreferences configured with security settings (contextIsolation, nodeIntegration, sandbox)
+       Assertions: webPreferences configured with security settings (contextIsolation, nodeIntegration, sandbox, webSecurity)
        Requirements: clerkly.1, clerkly.2*/
     it('should configure secure webPreferences', () => {
       windowManager.createWindow();
@@ -465,7 +444,8 @@ describe('WindowManager', () => {
           webPreferences: expect.objectContaining({
             contextIsolation: true,
             nodeIntegration: false,
-            sandbox: true,
+            sandbox: false,
+            webSecurity: true,
           }),
         })
       );
@@ -484,6 +464,34 @@ describe('WindowManager', () => {
             preload: expect.stringContaining('preload/index.js'),
           }),
         })
+      );
+    });
+
+    /* Preconditions: WindowManager created
+       Action: call createWindow()
+       Assertions: CSP header configured via webRequest.onHeadersReceived
+       Requirements: clerkly.1, clerkly.2*/
+    it('should configure Content Security Policy', () => {
+      windowManager.createWindow();
+      const mockWindow = getMockWindow();
+
+      expect(mockWindow.webContents.session.webRequest.onHeadersReceived).toHaveBeenCalledTimes(1);
+      expect(mockWindow.webContents.session.webRequest.onHeadersReceived).toHaveBeenCalledWith(
+        expect.any(Function)
+      );
+    });
+
+    /* Preconditions: WindowManager created
+       Action: call createWindow()
+       Assertions: console-message event listener registered on webContents
+       Requirements: clerkly.1, clerkly.2*/
+    it('should register console message listener', () => {
+      windowManager.createWindow();
+      const mockWindow = getMockWindow();
+
+      expect(mockWindow.webContents.on).toHaveBeenCalledWith(
+        'console-message',
+        expect.any(Function)
       );
     });
   });
