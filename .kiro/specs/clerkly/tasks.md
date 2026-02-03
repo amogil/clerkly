@@ -43,7 +43,7 @@
   - Создать скрипт валидации (scripts/validate.sh) для автоматической проверки
   - _Requirements: clerkly.1.1, clerkly.1.4, clerkly.1.5, clerkly.2.5, clerkly.nfr.4.2_
 
-- [ ] 2. Реализация "Data Manager" и системы миграций
+- [x] 2. Реализация "Data Manager" и системы миграций
   - [x] 2.1 Создать "Migration Runner"
     - Реализовать класс MigrationRunner с методами: initializeMigrationTable(), getCurrentVersion(), getAppliedMigrations(), loadMigrations(), runMigrations(), rollbackLastMigration(), getStatus()
     - Добавить обработку ошибок миграций (валидация файлов, транзакции, откат при ошибках)
@@ -118,7 +118,7 @@
   - Спросить пользователя, если возникли вопросы
   - _Requirements: clerkly.2.7, clerkly.2.8, clerkly.2.9_
 
-- [ ] 4. Реализация Main Process компонентов
+- [x] 4. Реализация Main Process компонентов
   - [x] 4.1 Создать "Window Manager"
     - Реализовать класс WindowManager с методами: createWindow(), configureWindow(), closeWindow(), getWindow(), isWindowCreated()
     - Настроить нативный Mac OS X интерфейс (titleBarStyle: 'hiddenInset', vibrancy: 'under-window', trafficLightPosition)
@@ -191,7 +191,7 @@
   - Спросить пользователя, если возникли вопросы
   - _Requirements: clerkly.2.7, clerkly.2.8, clerkly.2.9_
 
-- [ ] 6. Реализация Renderer Process компонентов
+- [x] 6. Реализация Renderer Process компонентов
   - [x] 6.1 Создать "State Controller"
     - Реализовать класс StateController с методами: setState(), getState(), resetState(), getStateProperty(), setStateProperty(), removeStateProperty(), hasStateProperty(), getStateHistory(), clearStateHistory(), getStateKeys(), getStateSize(), isStateEmpty()
     - Добавить shallow merge для обновления состояния
