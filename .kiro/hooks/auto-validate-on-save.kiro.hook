@@ -1,6 +1,6 @@
 {
   "enabled": true,
-  "name": "Run `npm run validate` ",
+  "name": "Validate",
   "description": "Runs `npm run validate`",
   "version": "1",
   "when": {
@@ -11,5 +11,5 @@
     "prompt": "Run `npm run validate`. Fix all problems. Do NOT run functional tests as they show windows and interrupt work."
   },
   "workspaceFolderName": "clerkly2",
-  "shortName": "auto-validate-on-save"
+  "shortName": "validate"
 }
