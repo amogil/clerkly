@@ -25,6 +25,11 @@ jest.mock('electron', () => ({
   BrowserWindow: jest.fn().mockImplementation(() => ({
     loadFile: jest.fn().mockResolvedValue(undefined),
     on: jest.fn(),
+    once: jest.fn(),
+    show: jest.fn(),
+    maximize: jest.fn(),
+    isMaximized: jest.fn().mockReturnValue(false),
+    getBounds: jest.fn().mockReturnValue({ x: 100, y: 100, width: 1200, height: 800 }),
     removeAllListeners: jest.fn(),
     destroy: jest.fn(),
     close: jest.fn(),
@@ -41,6 +46,16 @@ jest.mock('electron', () => ({
   ipcMain: {
     handle: jest.fn(),
     removeHandler: jest.fn(),
+  },
+  screen: {
+    getPrimaryDisplay: jest.fn().mockReturnValue({
+      workAreaSize: { width: 1920, height: 1080 },
+    }),
+    getAllDisplays: jest.fn().mockReturnValue([
+      {
+        bounds: { x: 0, y: 0, width: 1920, height: 1080 },
+      },
+    ]),
   },
 }));
 

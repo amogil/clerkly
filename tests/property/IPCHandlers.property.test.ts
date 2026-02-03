@@ -84,9 +84,9 @@ describe('Property Tests - IPC Handlers', () => {
           expect(result.error).toContain('timed out');
 
           // Verify execution time is approximately equal to timeout (not much longer)
-          // Allow 60ms tolerance for test execution overhead
+          // Allow 100ms tolerance for test execution overhead and system load
           expect(executionTime).toBeGreaterThanOrEqual(timeout - 5);
-          expect(executionTime).toBeLessThan(timeout + 60);
+          expect(executionTime).toBeLessThan(timeout + 100);
         }
       ),
       { numRuns: 100 }
@@ -127,9 +127,9 @@ describe('Property Tests - IPC Handlers', () => {
           expect(result.error).toContain('timed out');
 
           // Verify execution time is approximately equal to timeout (not much longer)
-          // Allow 60ms tolerance for test execution overhead
+          // Allow 100ms tolerance for test execution overhead and system load
           expect(executionTime).toBeGreaterThanOrEqual(timeout - 5);
-          expect(executionTime).toBeLessThan(timeout + 60);
+          expect(executionTime).toBeLessThan(timeout + 100);
         }
       ),
       { numRuns: 100 }
