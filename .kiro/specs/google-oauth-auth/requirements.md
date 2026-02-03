@@ -129,6 +129,15 @@
 3. ЕСЛИ Google возвращает ошибку, ТО "OAuth Client" ДОЛЖЕН вернуть код ошибки и описание от Google
 4. ЕСЛИ state параметр не совпадает, ТО "OAuth Client" ДОЛЖЕН вернуть ошибку "csrf_attack_detected"
 5. ВСЕ ошибки ДОЛЖНЫ логироваться в консоль с достаточным контекстом для отладки
+6. ДЛЯ распространенных ошибок "OAuth Client" ДОЛЖЕН предоставлять человекочитаемые тексты:
+   - "popup_closed_by_user": заголовок "Sign in cancelled", сообщение "You closed the sign-in window before completing authentication.", предложение "Please try again and complete the sign-in process."
+   - "access_denied": заголовок "Access denied", сообщение "You denied access to your Google account.", предложение "Clerkly needs access to your Google account to function properly."
+   - "network_error": заголовок "Network error", сообщение "Unable to connect to Google authentication servers.", предложение "Please check your internet connection and try again."
+   - "invalid_grant": заголовок "Session expired", сообщение "Your authentication session has expired.", предложение "Please sign in again to continue."
+   - "invalid_request": заголовок "Invalid request", сообщение "The authentication request was malformed.", предложение "Please try again or contact support if the problem persists."
+   - "server_error": заголовок "Server error", сообщение "Google authentication servers are experiencing issues.", предложение "Please try again in a few moments."
+   - "temporarily_unavailable": заголовок "Service unavailable", сообщение "Google authentication service is temporarily unavailable.", предложение "Please try again in a few moments."
+   - default (неизвестная ошибка): заголовок "Authentication failed", сообщение из errorMessage, предложение "Please try signing in again or contact support if the problem persists."
 
 ### Требование 10: Конфигурация OAuth
 
@@ -161,11 +170,15 @@
 
 #### Критерии Приемки
 
-1. "Login Screen" ДОЛЖЕН отображать логотип Clerkly и название приложения
-2. "Login Screen" ДОЛЖЕН отображать заголовок "Welcome" и описание "Your autonomous AI agent that listens, organizes, and acts"
-3. "Login Screen" ДОЛЖЕН отображать кнопку "Continue with Google" с иконкой Google
-4. "Login Screen" ДОЛЖЕН отображать превью функций: "Listen & Transcribe", "Extract Tasks", "Automate Actions", "Auto-Sync"
-5. "Login Screen" ДОЛЖЕН отображать текст о согласии с Terms of Service и Privacy Policy
+1. "Login Screen" ДОЛЖЕН отображать логотип Clerkly и заголовок "Clerkly" размером text-4xl
+2. "Login Screen" ДОЛЖЕН отображать заголовок карты "Welcome" и описание "Your autonomous AI agent that listens, organizes, and acts"
+3. "Login Screen" ДОЛЖЕН отображать кнопку с текстом "Continue with Google" и иконкой Google
+4. "Login Screen" ДОЛЖЕН отображать превью функций с иконками и текстами:
+   - "Listen & Transcribe" с иконкой микрофона
+   - "Extract Tasks" с иконкой чеклиста
+   - "Automate Actions" с иконкой обновления
+   - "Auto-Sync" с иконкой молнии
+5. "Login Screen" ДОЛЖЕН отображать текст "By continuing, you agree to Clerkly's Terms of Service and Privacy Policy"
 6. "Login Screen" ДОЛЖЕН использовать дизайн из прототипа `figma/src/app/components/login-screen.tsx`
 
 ### Требование 13: Login Error Screen Компонент
@@ -174,12 +187,12 @@
 
 #### Критерии Приемки
 
-1. "Login Error Screen" ДОЛЖЕН отображать все элементы "Login Screen" (логотип, заголовок, кнопку, превью функций)
-2. "Login Error Screen" ДОЛЖЕН отображать красный блок с иконкой ошибки и описанием проблемы
-3. КОГДА ошибка "popup_closed_by_user", ТО "Login Error Screen" ДОЛЖЕН показать "Sign in cancelled" и предложение попробовать снова
-4. КОГДА ошибка "access_denied", ТО "Login Error Screen" ДОЛЖЕН показать "Access denied" и объяснение необходимости доступа
-5. КОГДА ошибка "network_error", ТО "Login Error Screen" ДОЛЖЕН показать "Network error" и предложение проверить интернет
-6. КОГДА ошибка неизвестна, ТО "Login Error Screen" ДОЛЖЕН показать "Authentication failed" и общее сообщение об ошибке
+1. "Login Error Screen" ДОЛЖЕН отображать все элементы "Login Screen" (логотип, заголовок "Clerkly", заголовок карты "Welcome", описание, кнопку "Continue with Google", превью функций)
+2. "Login Error Screen" ДОЛЖЕН отображать красный блок ошибки (bg-red-50 border-red-200) с иконкой AlertCircle
+3. КОГДА ошибка "popup_closed_by_user", ТО "Login Error Screen" ДОЛЖЕН показать заголовок "Sign in cancelled" и текст "You closed the sign-in window before completing authentication." с предложением "Please try again and complete the sign-in process."
+4. КОГДА ошибка "access_denied", ТО "Login Error Screen" ДОЛЖЕН показать заголовок "Access denied" и текст "You denied access to your Google account." с предложением "Clerkly needs access to your Google account to function properly."
+5. КОГДА ошибка "network_error", ТО "Login Error Screen" ДОЛЖЕН показать заголовок "Network error" и текст "Unable to connect to Google authentication servers." с предложением "Please check your internet connection and try again."
+6. КОГДА ошибка неизвестна, ТО "Login Error Screen" ДОЛЖЕН показать заголовок "Authentication failed" и переданное сообщение об ошибке с предложением "Please try signing in again or contact support if the problem persists."
 7. "Login Error Screen" ДОЛЖЕН использовать дизайн из прототипа `figma/src/app/components/login-error.tsx`
 
 ### Требование 14: Управление Окнами Авторизации
