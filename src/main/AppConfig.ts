@@ -82,6 +82,14 @@ export class AppConfig {
    * @param {Partial<WindowSettings>} settings - Settings to update
    */
   updateWindowSettings(settings: Partial<WindowSettings>): void {
-    this.windowSettings = { ...this.windowSettings, ...settings };
+    // Filter out undefined values to avoid overwriting existing settings
+    const filteredSettings: Partial<WindowSettings> = {};
+    for (const key in settings) {
+      const value = settings[key as keyof WindowSettings];
+      if (value !== undefined) {
+        (filteredSettings as any)[key] = value;
+      }
+    }
+    this.windowSettings = { ...this.windowSettings, ...filteredSettings };
   }
 }

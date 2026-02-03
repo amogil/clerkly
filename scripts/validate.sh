@@ -2,6 +2,10 @@
 
 # Validation Script for Clerkly Project
 # This script runs all validation commands sequentially as described in AGENTS.md
+#
+# Usage:
+#   ./scripts/validate.sh           # Run with minimal output (only failures)
+#   ./scripts/validate.sh --verbose # Run with detailed output (all tests)
 
 set -e  # Exit on any error
 
@@ -11,6 +15,12 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
+
+# Parse command line arguments
+VERBOSE=false
+if [[ "$1" == "--verbose" || "$1" == "-v" ]]; then
+    VERBOSE=true
+fi
 
 # Function to print step header
 print_step() {
@@ -32,7 +42,12 @@ print_warning() {
     echo -e "${YELLOW}⚠️  $1${NC}"
 }
 
-echo -e "${BLUE}Starting validation process for Clerkly...${NC}\n"
+echo -e "${BLUE}Starting validation process for Clerkly...${NC}"
+if [ "$VERBOSE" = true ]; then
+    echo -e "${BLUE}Running in verbose mode${NC}\n"
+else
+    echo -e "${BLUE}Running in quiet mode (use --verbose for detailed output)${NC}\n"
+fi
 
 # 1. TypeScript Type Checking (fast, no build)
 print_step "1. TypeScript Type Checking"
@@ -86,32 +101,83 @@ fi
 
 # 5. Unit Tests
 print_step "5. Unit Tests"
-echo "Running: npm run test:unit"
-if npm run test:unit; then
-    print_success "Unit tests passed"
+if [ "$VERBOSE" = true ]; then
+    echo "Running: npm run test:unit"
+    if npm run test:unit; then
+        print_success "Unit tests passed"
+    else
+        print_error "Unit tests failed"
+        exit 1
+    fi
 else
-    print_error "Unit tests failed"
-    exit 1
+    echo "Running: npm run test:unit (quiet mode - showing only summary)"
+    OUTPUT=$(npm run test:unit 2>&1)
+    EXIT_CODE=$?
+    
+    if [ $EXIT_CODE -eq 0 ]; then
+        # Show only summary
+        echo "$OUTPUT" | grep -E "(Test Suites:|Tests:|Time:)" | tail -3
+        print_success "Unit tests passed"
+    else
+        # Show failures
+        echo "$OUTPUT" | grep -A 10 "FAIL"
+        print_error "Unit tests failed"
+        exit 1
+    fi
 fi
 
 # 6. Property-Based Tests
 print_step "6. Property-Based Tests"
-echo "Running: npm run test:property"
-if npm run test:property; then
-    print_success "Property-based tests passed"
+if [ "$VERBOSE" = true ]; then
+    echo "Running: npm run test:property"
+    if npm run test:property; then
+        print_success "Property-based tests passed"
+    else
+        print_error "Property-based tests failed"
+        exit 1
+    fi
 else
-    print_error "Property-based tests failed"
-    exit 1
+    echo "Running: npm run test:property (quiet mode - showing only summary)"
+    OUTPUT=$(npm run test:property 2>&1)
+    EXIT_CODE=$?
+    
+    if [ $EXIT_CODE -eq 0 ]; then
+        # Show only summary
+        echo "$OUTPUT" | grep -E "(Test Suites:|Tests:|Time:)" | tail -3
+        print_success "Property-based tests passed"
+    else
+        # Show failures
+        echo "$OUTPUT" | grep -A 10 "FAIL"
+        print_error "Property-based tests failed"
+        exit 1
+    fi
 fi
 
 # 7. Test Coverage (only unit + property tests)
 print_step "7. Test Coverage"
-echo "Running: npm run test:coverage"
-if npm run test:coverage; then
-    print_success "Test coverage check passed"
+if [ "$VERBOSE" = true ]; then
+    echo "Running: npm run test:coverage"
+    if npm run test:coverage; then
+        print_success "Test coverage check passed"
+    else
+        print_error "Test coverage check failed"
+        exit 1
+    fi
 else
-    print_error "Test coverage check failed"
-    exit 1
+    echo "Running: npm run test:coverage (quiet mode - showing only summary)"
+    OUTPUT=$(npm run test:coverage 2>&1)
+    EXIT_CODE=$?
+    
+    if [ $EXIT_CODE -eq 0 ]; then
+        # Show only coverage summary table
+        echo "$OUTPUT" | grep -A 20 "^-*$" | tail -25
+        print_success "Test coverage check passed"
+    else
+        # Show failures and coverage issues
+        echo "$OUTPUT" | grep -E "(FAIL|Jest:.*not met)" | head -20
+        print_error "Test coverage check failed"
+        exit 1
+    fi
 fi
 
 # 8. Project Structure Check
@@ -190,3 +256,7 @@ echo -e "${YELLOW}Note: Integration and functional tests are excluded from valid
 echo -e "${YELLOW}They use real Electron and may show windows on screen.${NC}"
 echo -e "${YELLOW}To run integration tests: npm run test:integration${NC}"
 echo -e "${YELLOW}To run functional tests: npm run test:functional${NC}"
+echo ""
+if [ "$VERBOSE" = false ]; then
+    echo -e "${BLUE}Tip: Run with --verbose flag to see detailed test output${NC}"
+fi

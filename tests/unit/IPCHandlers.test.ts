@@ -379,11 +379,17 @@ describe('IPCHandlers', () => {
        Assertions: promise rejects with timeout error message
        Requirements: clerkly.2, clerkly.nfr.2*/
     it('should reject promise that exceeds timeout', async () => {
-      const promise = new Promise((resolve) => setTimeout(() => resolve('too late'), 2000));
+      jest.useFakeTimers();
 
-      await expect(ipcHandlers.withTimeout(promise, 100, 'Operation timed out')).rejects.toThrow(
-        'Operation timed out'
-      );
+      const promise = new Promise((resolve) => setTimeout(() => resolve('too late'), 2000));
+      const timeoutPromise = ipcHandlers.withTimeout(promise, 100, 'Operation timed out');
+
+      // Fast-forward time to trigger timeout
+      jest.advanceTimersByTime(100);
+
+      await expect(timeoutPromise).rejects.toThrow('Operation timed out');
+
+      jest.useRealTimers();
     });
 
     /* Preconditions: IPCHandlers instance created
@@ -403,11 +409,19 @@ describe('IPCHandlers', () => {
        Assertions: promise resolves or rejects based on race condition
        Requirements: clerkly.2, clerkly.nfr.2*/
     it('should handle promise completing near timeout boundary', async () => {
+      jest.useFakeTimers();
+
       const promise = new Promise((resolve) => setTimeout(() => resolve('boundary'), 50));
+      const timeoutPromise = ipcHandlers.withTimeout(promise, 100, 'timeout message');
+
+      // Fast-forward time to complete the promise
+      jest.advanceTimersByTime(50);
 
       // This should succeed as promise completes before timeout
-      const result = await ipcHandlers.withTimeout(promise, 100, 'timeout message');
+      const result = await timeoutPromise;
       expect(result).toBe('boundary');
+
+      jest.useRealTimers();
     });
   });
 
@@ -451,6 +465,7 @@ describe('IPCHandlers', () => {
        Assertions: returns success false with timeout error message
        Requirements: clerkly.2, clerkly.nfr.2*/
     it('should enforce timeout on save-data operation', async () => {
+      jest.useFakeTimers();
       const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
       ipcHandlers.setTimeout(100);
 
@@ -462,13 +477,19 @@ describe('IPCHandlers', () => {
           }) as any
       );
 
-      const result = await ipcHandlers.handleSaveData(mockEvent, 'test-key', 'test-value');
+      const resultPromise = ipcHandlers.handleSaveData(mockEvent, 'test-key', 'test-value');
+
+      // Fast-forward time to trigger timeout
+      jest.advanceTimersByTime(100);
+
+      const result = await resultPromise;
 
       expect(result.success).toBe(false);
       expect(result.error).toContain('timed out');
       expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('save-data exception'));
 
       consoleErrorSpy.mockRestore();
+      jest.useRealTimers();
     });
 
     /* Preconditions: IPCHandlers instance created, timeout set to 100ms, DataManager mock with slow operation
@@ -476,6 +497,7 @@ describe('IPCHandlers', () => {
        Assertions: returns success false with timeout error message
        Requirements: clerkly.2, clerkly.nfr.2*/
     it('should enforce timeout on load-data operation', async () => {
+      jest.useFakeTimers();
       const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
       ipcHandlers.setTimeout(100);
 
@@ -487,13 +509,19 @@ describe('IPCHandlers', () => {
           }) as any
       );
 
-      const result = await ipcHandlers.handleLoadData(mockEvent, 'test-key');
+      const resultPromise = ipcHandlers.handleLoadData(mockEvent, 'test-key');
+
+      // Fast-forward time to trigger timeout
+      jest.advanceTimersByTime(100);
+
+      const result = await resultPromise;
 
       expect(result.success).toBe(false);
       expect(result.error).toContain('timed out');
       expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('load-data exception'));
 
       consoleErrorSpy.mockRestore();
+      jest.useRealTimers();
     });
 
     /* Preconditions: IPCHandlers instance created, timeout set to 100ms, DataManager mock with slow operation
@@ -501,6 +529,7 @@ describe('IPCHandlers', () => {
        Assertions: returns success false with timeout error message
        Requirements: clerkly.2, clerkly.nfr.2*/
     it('should enforce timeout on delete-data operation', async () => {
+      jest.useFakeTimers();
       const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
       ipcHandlers.setTimeout(100);
 
@@ -512,7 +541,12 @@ describe('IPCHandlers', () => {
           }) as any
       );
 
-      const result = await ipcHandlers.handleDeleteData(mockEvent, 'test-key');
+      const resultPromise = ipcHandlers.handleDeleteData(mockEvent, 'test-key');
+
+      // Fast-forward time to trigger timeout
+      jest.advanceTimersByTime(100);
+
+      const result = await resultPromise;
 
       expect(result.success).toBe(false);
       expect(result.error).toContain('timed out');
@@ -521,6 +555,7 @@ describe('IPCHandlers', () => {
       );
 
       consoleErrorSpy.mockRestore();
+      jest.useRealTimers();
     });
 
     /* Preconditions: IPCHandlers instance created, timeout set to 200ms, DataManager mock with fast operation
@@ -528,6 +563,7 @@ describe('IPCHandlers', () => {
        Assertions: returns success true, operation completes before timeout
        Requirements: clerkly.2, clerkly.nfr.2*/
     it('should not timeout when operation completes quickly', async () => {
+      jest.useFakeTimers();
       ipcHandlers.setTimeout(200);
 
       // Mock fast operation
@@ -538,9 +574,16 @@ describe('IPCHandlers', () => {
           }) as any
       );
 
-      const result = await ipcHandlers.handleSaveData(mockEvent, 'test-key', 'test-value');
+      const resultPromise = ipcHandlers.handleSaveData(mockEvent, 'test-key', 'test-value');
+
+      // Fast-forward time to complete the operation
+      jest.advanceTimersByTime(50);
+
+      const result = await resultPromise;
 
       expect(result.success).toBe(true);
+
+      jest.useRealTimers();
     });
   });
 

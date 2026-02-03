@@ -219,4 +219,156 @@ describe('AuthWindowManager', () => {
 
     expect(mockWindowManager.createWindow).toHaveBeenCalled();
   });
+
+  /* Preconditions: AuthWindowManager is instantiated
+     Action: call initializeApp when createWindow returns null
+     Assertions: error is thrown because showLoginWindow fails in catch block
+     Requirements: google-oauth-auth.14.2 */
+  it('should handle window creation failure in showLoginWindow', async () => {
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+    mockOAuthClient.getAuthStatus.mockResolvedValue({ authorized: false });
+    mockWindowManager.createWindow.mockReturnValue(null as any);
+
+    await expect(authWindowManager.initializeApp()).rejects.toThrow('Failed to create window');
+
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      '[AuthWindowManager] Failed to show login window:',
+      expect.any(Error)
+    );
+
+    consoleErrorSpy.mockRestore();
+  });
+
+  /* Preconditions: AuthWindowManager is instantiated
+     Action: call initializeApp when configureWindow throws error
+     Assertions: error is thrown because showLoginWindow fails in catch block
+     Requirements: google-oauth-auth.14.2 */
+  it('should handle configuration error in showLoginWindow', async () => {
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+    mockOAuthClient.getAuthStatus.mockResolvedValue({ authorized: false });
+    mockWindowManager.configureWindow.mockImplementation(() => {
+      throw new Error('Configuration failed');
+    });
+
+    await expect(authWindowManager.initializeApp()).rejects.toThrow('Configuration failed');
+
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      '[AuthWindowManager] Failed to show login window:',
+      expect.any(Error)
+    );
+
+    consoleErrorSpy.mockRestore();
+  });
+
+  /* Preconditions: AuthWindowManager is instantiated
+     Action: call onAuthSuccess when createWindow returns null
+     Assertions: error is thrown and logged
+     Requirements: google-oauth-auth.14.4 */
+  it('should handle window creation failure in showMainWindow', async () => {
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+    mockWindowManager.isWindowCreated.mockReturnValue(true);
+    mockWindowManager.createWindow.mockReturnValue(null as any);
+
+    await expect(authWindowManager.onAuthSuccess()).rejects.toThrow('Failed to create main window');
+
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      '[AuthWindowManager] Failed to show main window:',
+      expect.any(Error)
+    );
+
+    consoleErrorSpy.mockRestore();
+  });
+
+  /* Preconditions: AuthWindowManager is instantiated
+     Action: call onAuthSuccess when closeWindow throws error
+     Assertions: error is caught and logged
+     Requirements: google-oauth-auth.14.4 */
+  it('should handle close window error in showMainWindow', async () => {
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+    mockWindowManager.isWindowCreated.mockReturnValue(true);
+    mockWindowManager.closeWindow.mockImplementation(() => {
+      throw new Error('Close failed');
+    });
+
+    await expect(authWindowManager.onAuthSuccess()).rejects.toThrow();
+
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      '[AuthWindowManager] Failed to show main window:',
+      expect.any(Error)
+    );
+
+    consoleErrorSpy.mockRestore();
+  });
+
+  /* Preconditions: AuthWindowManager is instantiated
+     Action: call onAuthError when showLoginWindow throws error
+     Assertions: error is caught and logged
+     Requirements: google-oauth-auth.14.5 */
+  it('should handle error when showLoginError fails to create window', async () => {
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+    mockWindowManager.isWindowCreated.mockReturnValue(false);
+    mockWindowManager.createWindow.mockReturnValue(null as any);
+
+    await expect(authWindowManager.onAuthError('Test error')).rejects.toThrow();
+
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      '[AuthWindowManager] Failed to show login error:',
+      expect.any(Error)
+    );
+
+    consoleErrorSpy.mockRestore();
+  });
+
+  /* Preconditions: AuthWindowManager is instantiated
+     Action: call onRetry when createWindow throws error
+     Assertions: error is caught and logged
+     Requirements: google-oauth-auth.14.6 */
+  it('should handle error when retry fails', async () => {
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+    mockWindowManager.isWindowCreated.mockReturnValue(false);
+    mockWindowManager.createWindow.mockImplementation(() => {
+      throw new Error('Create failed');
+    });
+
+    await expect(authWindowManager.onRetry()).rejects.toThrow();
+
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      '[AuthWindowManager] Failed to retry authentication:',
+      expect.any(Error)
+    );
+
+    consoleErrorSpy.mockRestore();
+  });
+
+  /* Preconditions: AuthWindowManager is instantiated
+     Action: call onAuthSuccess when handleAuthSuccess throws error
+     Assertions: error is propagated
+     Requirements: google-oauth-auth.14.4 */
+  it('should propagate error from handleAuthSuccess', async () => {
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+    mockWindowManager.isWindowCreated.mockReturnValue(true);
+    mockWindowManager.createWindow.mockReturnValue(null as any);
+
+    await expect(authWindowManager.onAuthSuccess()).rejects.toThrow();
+
+    expect(consoleErrorSpy).toHaveBeenCalled();
+
+    consoleErrorSpy.mockRestore();
+  });
+
+  /* Preconditions: AuthWindowManager is instantiated
+     Action: call onAuthError when handleAuthError throws error
+     Assertions: error is propagated
+     Requirements: google-oauth-auth.14.5 */
+  it('should propagate error from handleAuthError', async () => {
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+    mockWindowManager.isWindowCreated.mockReturnValue(false);
+    mockWindowManager.createWindow.mockReturnValue(null as any);
+
+    await expect(authWindowManager.onAuthError('Test error', 'code')).rejects.toThrow();
+
+    expect(consoleErrorSpy).toHaveBeenCalled();
+
+    consoleErrorSpy.mockRestore();
+  });
 });

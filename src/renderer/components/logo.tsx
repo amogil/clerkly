@@ -1,3 +1,6 @@
+// Requirements: visual-design.1.1, visual-design.1.2
+import React from 'react';
+
 interface LogoProps {
   size?: 'sm' | 'md' | 'lg';
   showText?: boolean;

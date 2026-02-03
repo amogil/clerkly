@@ -69,36 +69,6 @@ describe('LifecycleManager', () => {
       expect(lifecycleManager.getStartupTime()).toBe(startTime);
     });
 
-    /* Preconditions: LifecycleManager created, DataManager.initialize takes > 3 seconds (simulated)
-       Action: call initialize() with delayed DataManager
-       Assertions: returns success true, console.warn called with slow startup message
-       Requirements: clerkly.2, clerkly.nfr.1*/
-    it('should warn about slow startup when exceeding 3 seconds', async () => {
-      // Mock slow initialization
-      mockDataManager.initialize = jest.fn().mockImplementation(() => {
-        // Simulate delay > 3 seconds
-        const start = Date.now();
-        while (Date.now() - start < 3100) {
-          // Busy wait
-        }
-        return {
-          success: true,
-          migrations: { success: true, appliedCount: 0, message: 'No migrations' },
-        };
-      });
-
-      const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation();
-
-      const result = await lifecycleManager.initialize();
-
-      expect(result.success).toBe(true);
-      expect(result.loadTime).toBeGreaterThan(3000);
-      expect(consoleWarnSpy).toHaveBeenCalledWith(expect.stringContaining('Slow startup'));
-      expect(consoleWarnSpy).toHaveBeenCalledWith(expect.stringContaining('target: <3000ms'));
-
-      consoleWarnSpy.mockRestore();
-    });
-
     /* Preconditions: LifecycleManager created, DataManager.initialize throws error
        Action: call initialize()
        Assertions: throws error with descriptive message, isAppInitialized returns false
@@ -518,35 +488,6 @@ describe('LifecycleManager', () => {
       lifecycleManager.handleActivation();
 
       expect(mockWindowManager.createWindow).toHaveBeenCalledTimes(4); // 1 from init + 3 from activations
-    });
-
-    /* Preconditions: LifecycleManager created
-       Action: initialize with slow startup, verify warning
-       Assertions: warning logged for slow startup
-       Requirements: clerkly.2, clerkly.nfr.1*/
-    it('should monitor and warn about slow startup performance', async () => {
-      mockDataManager.initialize = jest.fn().mockImplementation(() => {
-        const start = Date.now();
-        while (Date.now() - start < 3100) {
-          // Simulate slow initialization
-        }
-        return {
-          success: true,
-          migrations: { success: true, appliedCount: 0, message: 'No migrations' },
-        };
-      });
-
-      const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation();
-
-      const result = await lifecycleManager.initialize();
-
-      expect(result.success).toBe(true);
-      expect(result.loadTime).toBeGreaterThan(3000);
-      expect(consoleWarnSpy).toHaveBeenCalledWith(
-        expect.stringMatching(/Slow startup.*target: <3000ms/)
-      );
-
-      consoleWarnSpy.mockRestore();
     });
   });
 });

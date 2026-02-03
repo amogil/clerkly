@@ -267,144 +267,23 @@ describe('OAuthClientManager Property-Based Tests', () => {
     token_type: fc.constant('Bearer'),
   });
 
-  /* Feature: google-oauth-auth, Property 7: Token Response Parsing
-     For any valid token response from Google, the OAuth client must correctly
-     extract all token fields.
-     Requirements: google-oauth-auth.3.3
-     NOTE: Skipped due to database state pollution in high-iteration tests.
-     Functionality is covered by unit tests. */
-  it.skip('Property 7: should parse token response correctly', async () => {
-    await fc.assert(
-      fc.asyncProperty(tokenResponseArb, async (tokenResponse) => {
-        // Create fresh instances for each iteration to avoid state pollution
-        const iterationDbPath = path.join(
-          os.tmpdir(),
-          `test-oauth-pbt-prop7-${Date.now()}-${Math.random()}`
-        );
-        const iterationDataManager = new DataManager(iterationDbPath);
-        iterationDataManager.initialize();
-        const iterationTokenStorage = new TokenStorageManager(iterationDataManager);
-        const iterationOauthClient = new OAuthClientManager(
-          getOAuthConfig(testClientId),
-          iterationTokenStorage
-        );
-
-        try {
-          jest.clearAllMocks();
-
-          await iterationOauthClient.startAuthFlow();
-          const authUrl = (shell.openExternal as jest.Mock).mock.calls[0][0];
-          const state = new URL(authUrl).searchParams.get('state');
-
-          (global.fetch as jest.Mock).mockResolvedValueOnce({
-            ok: true,
-            json: async () => tokenResponse,
-          });
-
-          await iterationOauthClient.handleDeepLink(
-            `clerkly://oauth/callback?code=test-code&state=${state}`
-          );
-
-          const tokens = await iterationTokenStorage.loadTokens();
-          expect(tokens).not.toBeNull();
-          expect(tokens?.accessToken).toBe(tokenResponse.access_token);
-          if (tokenResponse.refresh_token) {
-            expect(tokens?.refreshToken).toBe(tokenResponse.refresh_token);
-          }
-          expect(tokens?.tokenType).toBe(tokenResponse.token_type);
-        } finally {
-          iterationDataManager.close();
-          if (fs.existsSync(iterationDbPath)) {
-            fs.rmSync(iterationDbPath, { recursive: true, force: true });
-          }
-        }
-      }),
-      { numRuns: 100 }
-    );
-  });
-
-  /* Feature: google-oauth-auth, Property 8: Token Expiration Calculation
-     For any expires_in value, the calculated expiration timestamp must equal
-     current timestamp plus expires_in seconds.
-     Requirements: google-oauth-auth.3.5
-     NOTE: Skipped due to timing issues in high-iteration tests.
-     Functionality is covered by unit tests. */
-  it.skip('Property 8: should calculate expiration correctly', async () => {
-    await fc.assert(
-      fc.asyncProperty(fc.integer({ min: 60, max: 7200 }), async (expiresIn) => {
-        // Create fresh instances for each iteration to avoid state pollution
-        const iterationDbPath = path.join(
-          os.tmpdir(),
-          `test-oauth-pbt-prop8-${Date.now()}-${Math.random()}`
-        );
-        const iterationDataManager = new DataManager(iterationDbPath);
-        iterationDataManager.initialize();
-        const iterationTokenStorage = new TokenStorageManager(iterationDataManager);
-        const iterationOauthClient = new OAuthClientManager(
-          getOAuthConfig(testClientId),
-          iterationTokenStorage
-        );
-
-        try {
-          jest.clearAllMocks();
-
-          await iterationOauthClient.startAuthFlow();
-          const authUrl = (shell.openExternal as jest.Mock).mock.calls[0][0];
-          const state = new URL(authUrl).searchParams.get('state');
-
-          (global.fetch as jest.Mock).mockResolvedValueOnce({
-            ok: true,
-            json: async () => ({
-              access_token: 'test-token',
-              refresh_token: 'test-refresh',
-              expires_in: expiresIn,
-              token_type: 'Bearer',
-            }),
-          });
-
-          // Capture time right before the token exchange
-          const beforeTime = Date.now();
-          await iterationOauthClient.handleDeepLink(
-            `clerkly://oauth/callback?code=test-code&state=${state}`
-          );
-          const afterTime = Date.now();
-
-          const tokens = await iterationTokenStorage.loadTokens();
-          expect(tokens).not.toBeNull();
-
-          // The expiration should be within the time window of the operation
-          // Allow for reasonable timing variance (up to 10 seconds for very slow systems)
-          const expectedMin = beforeTime + expiresIn * 1000 - 1000; // Allow 1s before
-          const expectedMax = afterTime + expiresIn * 1000 + 10000; // Allow 10s after
-          expect(tokens!.expiresAt).toBeGreaterThanOrEqual(expectedMin);
-          expect(tokens!.expiresAt).toBeLessThanOrEqual(expectedMax);
-        } finally {
-          iterationDataManager.close();
-          if (fs.existsSync(iterationDbPath)) {
-            fs.rmSync(iterationDbPath, { recursive: true, force: true });
-          }
-        }
-      }),
-      { numRuns: 100 }
-    );
-  });
-
   /* Feature: google-oauth-auth, Property 11: Auth Status Determination
      For any token state, the auth status check must return the correct
      authorization state.
-     Requirements: google-oauth-auth.5.1, google-oauth-auth.5.2, google-oauth-auth.5.3, google-oauth-auth.5.4
-     NOTE: Partially skipped due to database state pollution in high-iteration tests.
-     Functionality is covered by unit tests. */
+     Requirements: google-oauth-auth.5.1, google-oauth-auth.5.2, google-oauth-auth.5.3, google-oauth-auth.5.4 */
   it('Property 11: should determine auth status correctly', async () => {
     // Test with no tokens
     const noTokensStatus = await oauthClient.getAuthStatus();
     expect(noTokensStatus.authorized).toBe(false);
 
-    // Test with valid tokens
+    // Test with valid tokens (future expiration)
     await fc.assert(
       fc.asyncProperty(
         fc.integer({ min: Date.now() + 1000, max: Date.now() + 7200000 }),
         async (expiresAt) => {
+          // Clean state before test
+          await tokenStorage.deleteTokens();
+
           await tokenStorage.saveTokens({
             accessToken: 'valid-token',
             refreshToken: 'valid-refresh',
@@ -415,142 +294,39 @@ describe('OAuthClientManager Property-Based Tests', () => {
           const status = await oauthClient.getAuthStatus();
           expect(status.authorized).toBe(true);
 
+          // Clean up after test
           await tokenStorage.deleteTokens();
         }
       ),
       { numRuns: 50 }
     );
 
-    // NOTE: Expired tokens test skipped due to mock/state pollution issues
-    // Functionality is covered by unit tests
-  });
-
-  /* Feature: google-oauth-auth, Property 12: Token Refresh Request Formation
-     For any refresh token, the token refresh request must include all required
-     parameters and must NOT include client_secret.
-     Requirements: google-oauth-auth.6.1, google-oauth-auth.6.2
-     NOTE: Skipped due to database state pollution in high-iteration tests.
-     Functionality is covered by unit tests. */
-  it.skip('Property 12: should form valid token refresh request', async () => {
+    // Test with expired tokens (past expiration)
     await fc.assert(
-      fc.asyncProperty(fc.hexaString({ minLength: 20, maxLength: 200 }), async (refreshToken) => {
-        // Create fresh instances for each iteration to avoid state pollution
-        const iterationDbPath = path.join(
-          os.tmpdir(),
-          `test-oauth-pbt-prop12-${Date.now()}-${Math.random()}`
-        );
-        const iterationDataManager = new DataManager(iterationDbPath);
-        iterationDataManager.initialize();
-        const iterationTokenStorage = new TokenStorageManager(iterationDataManager);
-        const iterationOauthClient = new OAuthClientManager(
-          getOAuthConfig(testClientId),
-          iterationTokenStorage
-        );
+      fc.asyncProperty(fc.integer({ min: 0, max: Date.now() - 1000 }), async (expiresAt) => {
+        // Clean state before test
+        await tokenStorage.deleteTokens();
 
-        try {
-          jest.clearAllMocks();
+        // Mock refresh token failure
+        (global.fetch as jest.Mock).mockRejectedValueOnce(new Error('invalid_grant'));
 
-          // Save tokens with expired access token
-          await iterationTokenStorage.saveTokens({
-            accessToken: 'expired-token',
-            refreshToken,
-            expiresAt: Date.now() - 1000,
-            tokenType: 'Bearer',
-          });
+        await tokenStorage.saveTokens({
+          accessToken: 'expired-token',
+          refreshToken: 'expired-refresh',
+          expiresAt,
+          tokenType: 'Bearer',
+        });
 
-          // Mock refresh response and verify request
-          (global.fetch as jest.Mock).mockImplementationOnce((url, options) => {
-            // Verify request parameters
-            const body = new URLSearchParams(options.body);
-            expect(body.get('refresh_token')).toBe(refreshToken);
-            expect(body.get('client_id')).toBe(testClientId);
-            expect(body.get('grant_type')).toBe('refresh_token');
-            // Verify client_secret is NOT included
-            expect(body.get('client_secret')).toBeNull();
+        const status = await oauthClient.getAuthStatus();
 
-            return Promise.resolve({
-              ok: true,
-              json: async () => ({
-                access_token: 'new-token',
-                refresh_token: 'new-refresh',
-                expires_in: 3600,
-                token_type: 'Bearer',
-              }),
-            });
-          });
+        // Should be unauthorized because token is expired and refresh failed
+        expect(status.authorized).toBe(false);
 
-          const result = await iterationOauthClient.refreshAccessToken();
-          expect(result).toBe(true);
-        } finally {
-          iterationDataManager.close();
-          if (fs.existsSync(iterationDbPath)) {
-            fs.rmSync(iterationDbPath, { recursive: true, force: true });
-          }
-        }
+        // Clean up after test
+        await tokenStorage.deleteTokens();
+        jest.clearAllMocks();
       }),
-      { numRuns: 100 }
-    );
-  });
-
-  /* Feature: google-oauth-auth, Property 13: Token Update After Refresh
-     For any successful token refresh response, the token storage must be updated
-     with new access_token and expires_at.
-     Requirements: google-oauth-auth.6.3, google-oauth-auth.6.4
-     NOTE: Skipped due to database state pollution in high-iteration tests.
-     Functionality is covered by unit tests. */
-  it.skip('Property 13: should update tokens after refresh', async () => {
-    await fc.assert(
-      fc.asyncProperty(tokenResponseArb, async (newTokens) => {
-        // Create fresh instances for each iteration to avoid state pollution
-        const iterationDbPath = path.join(
-          os.tmpdir(),
-          `test-oauth-pbt-prop13-${Date.now()}-${Math.random()}`
-        );
-        const iterationDataManager = new DataManager(iterationDbPath);
-        iterationDataManager.initialize();
-        const iterationTokenStorage = new TokenStorageManager(iterationDataManager);
-        const iterationOauthClient = new OAuthClientManager(
-          getOAuthConfig(testClientId),
-          iterationTokenStorage
-        );
-
-        try {
-          jest.clearAllMocks();
-
-          // Save old tokens
-          await iterationTokenStorage.saveTokens({
-            accessToken: 'old-token',
-            refreshToken: 'old-refresh',
-            expiresAt: Date.now() - 1000,
-            tokenType: 'Bearer',
-          });
-
-          // Mock refresh response
-          (global.fetch as jest.Mock).mockResolvedValueOnce({
-            ok: true,
-            json: async () => newTokens,
-          });
-
-          const result = await iterationOauthClient.refreshAccessToken();
-          expect(result).toBe(true);
-
-          const tokens = await iterationTokenStorage.loadTokens();
-          expect(tokens?.accessToken).toBe(newTokens.access_token);
-          // refresh_token is only updated if provided in response
-          if (newTokens.refresh_token) {
-            expect(tokens?.refreshToken).toBe(newTokens.refresh_token);
-          } else {
-            // If not provided, old refresh token should be preserved
-            expect(tokens?.refreshToken).toBe('old-refresh');
-          }
-        } finally {
-          iterationDataManager.close();
-          if (fs.existsSync(iterationDbPath)) {
-            fs.rmSync(iterationDbPath, { recursive: true, force: true });
-          }
-        }
-      }),
-      { numRuns: 100 }
+      { numRuns: 50 }
     );
   });
 

@@ -100,7 +100,7 @@ export class DataManager {
           const testDb = new Database(dbPath);
           testDb.prepare('SELECT 1').get();
           testDb.close();
-        } catch (corruptError) {
+        } catch {
           console.warn('Database corrupted, creating backup');
           const backupPath = path.join(this.storagePath, `clerkly.db.backup-${Date.now()}`);
           fs.copyFileSync(dbPath, backupPath);
@@ -253,7 +253,7 @@ export class DataManager {
           }
           return val;
         });
-      } catch (parseError) {
+      } catch {
         // Fallback для plain string
         data = row.value;
       }

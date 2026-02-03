@@ -72,19 +72,6 @@ describe('DataManager', () => {
       expect(result.warning).toBeUndefined();
     });
 
-    /* Preconditions: storage path has no write permissions (simulated)
-       Action: create DataManager with restricted path and call initialize()
-       Assertions: returns success true, warning about temp directory, path set to temp
-       Requirements: clerkly.1, clerkly.2*/
-    it.skip('should fallback to temp directory on permission error', () => {
-      // Note: This test is skipped because mocking fs.mkdirSync with permission errors
-      // is complex in Jest due to property redefinition restrictions.
-      // The implementation is correct and handles EACCES/EPERM errors (see DataManager.ts lines 82-92).
-      // Manual testing confirms this works correctly.
-      // The fallback logic is tested indirectly through other tests that verify
-      // the DataManager can initialize successfully in various scenarios.
-    });
-
     /* Preconditions: database file exists but is corrupted
        Action: create DataManager and call initialize()
        Assertions: backup created, corrupted db deleted, new db created, returns success true

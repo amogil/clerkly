@@ -84,11 +84,19 @@ export class LifecycleManager {
     try {
       // Таймаут 5 секунд для graceful shutdown
       const shutdownPromise = this.performShutdown();
+
+      let timeoutId: NodeJS.Timeout;
       const timeoutPromise = new Promise<void>((_, reject) => {
-        setTimeout(() => reject(new Error('Shutdown timeout exceeded')), 5000);
+        timeoutId = setTimeout(() => reject(new Error('Shutdown timeout exceeded')), 5000);
+        timeoutId.unref();
       });
 
-      await Promise.race([shutdownPromise, timeoutPromise]);
+      try {
+        await Promise.race([shutdownPromise, timeoutPromise]);
+      } finally {
+        // Очищаем таймер, если shutdown завершился первым
+        clearTimeout(timeoutId!);
+      }
     } catch (error: any) {
       console.error('Error during shutdown:', error.message);
       // Продолжаем завершение даже при ошибках

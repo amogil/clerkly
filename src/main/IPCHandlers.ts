@@ -188,6 +188,7 @@ export class IPCHandlers {
         promise,
         new Promise<T>((_, reject) => {
           timeoutHandle = setTimeout(() => reject(new Error(timeoutMessage)), timeoutMs);
+          timeoutHandle.unref();
         }),
       ]);
 
