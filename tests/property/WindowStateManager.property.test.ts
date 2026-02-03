@@ -108,10 +108,13 @@ describe('Property Tests - WindowStateManager', () => {
           expect(state.y).toBe(Math.floor(screenSize.height * 0.05));
 
           // Verify dimensions are not hardcoded to 1920x1080
-          // Only check when BOTH width and height are different from 1920x1080
-          if (screenSize.width !== 1920 && screenSize.height !== 1080) {
-            expect(state.width).not.toBe(1728); // 1920 * 0.9
-            expect(state.height).not.toBe(972); // 1080 * 0.9
+          // Only check when screen size is different from 1920x1080
+          if (screenSize.width !== 1920 || screenSize.height !== 1080) {
+            // Verify that dimensions match the screen size, not hardcoded values
+            const expectedWidth = Math.floor(screenSize.width * 0.9);
+            const expectedHeight = Math.floor(screenSize.height * 0.9);
+            expect(state.width).toBe(expectedWidth);
+            expect(state.height).toBe(expectedHeight);
           }
 
           // Verify default maximized state
