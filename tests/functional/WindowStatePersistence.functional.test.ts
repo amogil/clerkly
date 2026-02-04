@@ -451,13 +451,12 @@ describe('Window State Persistence Functional Tests', () => {
       // Verify window was created
       expect(windowManager2.isWindowCreated()).toBe(true);
 
-      // Note: maximize() is NOT called even when isMaximized was true in saved state
-      // This is intentional per ui.1.1 and ui.1.3 - window opens large but resizable
-      // On macOS, calling maximize() would make the window non-resizable
-      expect(window2.maximize).not.toHaveBeenCalled();
+      // Per ui.5.3 and ui.5.4, saved maximized state SHOULD be restored
+      // maximize() IS called when isMaximized was true in saved state
+      expect(window2.maximize).toHaveBeenCalled();
 
-      // Window should report as not maximized (but will have large size from saved state)
-      expect(window2.isMaximized()).toBe(false);
+      // Window should report as maximized (restored from saved state)
+      expect(window2.isMaximized()).toBe(true);
 
       // Clean up
       windowManager2.closeWindow();
@@ -567,10 +566,10 @@ describe('Window State Persistence Functional Tests', () => {
       const windowManager2 = new WindowManager(dataManager);
       const window2 = windowManager2.createWindow();
 
-      // Verify window is NOT maximized (per ui.1.1, ui.1.3)
-      // maximize() is not called to keep window resizable on macOS
-      expect(window2.maximize).not.toHaveBeenCalled();
-      expect(window2.isMaximized()).toBe(false);
+      // Verify window IS maximized (per ui.5.3, ui.5.4)
+      // maximize() IS called to restore saved maximized state
+      expect(window2.maximize).toHaveBeenCalled();
+      expect(window2.isMaximized()).toBe(true);
 
       // Clean up
       windowManager2.closeWindow();

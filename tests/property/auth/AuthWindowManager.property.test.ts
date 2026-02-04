@@ -67,10 +67,11 @@ describe('AuthWindowManager Property-Based Tests', () => {
     } as any;
   });
 
-  /* Feature: google-oauth-auth, Property 17: Window State Based on Auth Status
-     For any application startup, if the user is not authorized, the login window must be shown;
-     if authorized, the main application window must be shown.
-     Validates: Requirements google-oauth-auth.11.1 */
+  /* Preconditions: application starting, auth status can be authorized or not authorized
+     Action: initialize app and check auth status
+     Assertions: if not authorized show login window, if authorized show main window
+     Requirements: google-oauth-auth.11.1 */
+  // Feature: google-oauth-auth, Property 17: Window State Based on Auth Status
   it('Property 17: should show correct window based on auth status', async () => {
     await fc.assert(
       fc.asyncProperty(fc.boolean(), async (isAuthorized) => {
@@ -95,10 +96,11 @@ describe('AuthWindowManager Property-Based Tests', () => {
     );
   });
 
-  /* Feature: google-oauth-auth, Property 18: Error Screen Display
-     For any authentication error, the login error screen must be displayed with the error message
-     and appropriate error code mapping.
-     Validates: Requirements google-oauth-auth.11.5 */
+  /* Preconditions: authentication error occurred with various error codes
+     Action: display error screen with error message and code
+     Assertions: error screen displayed with correct error message and code mapping
+     Requirements: google-oauth-auth.11.5 */
+  // Feature: google-oauth-auth, Property 18: Error Screen Display
   it('Property 18: should display error screen for any authentication error', async () => {
     // Generator for error codes
     const errorCodeArb = fc.constantFrom(
@@ -145,9 +147,11 @@ describe('AuthWindowManager Property-Based Tests', () => {
     );
   });
 
-  /* Feature: google-oauth-auth, Property: Window Transition on Success
-     For any successful authentication, the window content transitions to main application.
-     Validates: Requirements google-oauth-auth.14.4 */
+  /* Preconditions: user successfully authenticated
+     Action: call onAuthSuccess() to transition window content
+     Assertions: window content transitions to main application
+     Requirements: google-oauth-auth.14.4 */
+  // Feature: google-oauth-auth, Property: Window Transition on Success
   it('Property: should transition from login to main window on success', async () => {
     await fc.assert(
       fc.asyncProperty(fc.constant(null), async () => {
@@ -167,9 +171,11 @@ describe('AuthWindowManager Property-Based Tests', () => {
     );
   });
 
-  /* Feature: google-oauth-auth, Property: Retry Shows Login Screen
-     For any retry action, the login screen must be displayed again.
-     Validates: Requirements google-oauth-auth.14.6 */
+  /* Preconditions: authentication error occurred, user clicks retry
+     Action: call onRetry() to show login screen again
+     Assertions: login screen displayed, retry logged
+     Requirements: google-oauth-auth.14.6 */
+  // Feature: google-oauth-auth, Property: Retry Shows Login Screen
   it('Property: should show login screen on retry', async () => {
     await fc.assert(
       fc.asyncProperty(fc.constant(null), async () => {

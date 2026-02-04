@@ -345,6 +345,7 @@ class WindowManager {
    * // Now window state changes are automatically persisted
    * ```
    */
+  // Requirements: ui.5.1, ui.5.2, ui.5.3
   private setupStateTracking(): void {
     if (!this.mainWindow) {
       return;
@@ -391,6 +392,7 @@ class WindowManager {
    * // { x: 100, y: 100, width: 1200, height: 800, isMaximized: false }
    * ```
    */
+  // Requirements: ui.5.1, ui.5.2, ui.5.3
   private saveCurrentState(): void {
     if (!this.mainWindow) {
       return;

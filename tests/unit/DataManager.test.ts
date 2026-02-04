@@ -48,13 +48,18 @@ describe('DataManager', () => {
        Requirements: clerkly.1, clerkly.2*/
     it('should successfully initialize storage and run migrations', () => {
       dataManager = new DataManager(testStoragePath);
-      const result = dataManager.initialize();
+      try {
+        const result = dataManager.initialize();
 
-      expect(result.success).toBe(true);
-      expect(fs.existsSync(testStoragePath)).toBe(true);
-      expect(fs.existsSync(testDbPath)).toBe(true);
-      expect(result.migrations).toBeDefined();
-      expect(result.migrations?.success).toBe(true);
+        expect(result.success).toBe(true);
+        expect(fs.existsSync(testStoragePath)).toBe(true);
+        expect(fs.existsSync(testDbPath)).toBe(true);
+        expect(result.migrations).toBeDefined();
+        expect(result.migrations?.success).toBe(true);
+      } catch (error) {
+        console.log('Test caught error:', error);
+        throw error;
+      }
     });
 
     /* Preconditions: storage directory exists with write permissions

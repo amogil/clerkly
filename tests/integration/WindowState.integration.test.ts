@@ -256,10 +256,10 @@ describe('Window State Integration Tests', () => {
     // Wait for window to be ready
     await new Promise((resolve) => setTimeout(resolve, 200));
 
-    // Verify maximized state was NOT restored by calling maximize()
-    // Per ui.1.1 and ui.1.3, window opens large but not maximized to stay resizable
+    // Verify maximized state WAS restored
+    // Per ui.5.3 and ui.5.4, saved maximized state should be restored on restart
     // Requirements: ui.5.3, ui.5.4
-    expect(window2.isMaximized()).toBe(false);
+    expect(window2.isMaximized()).toBe(true);
 
     // Clean up
     window2.destroy();

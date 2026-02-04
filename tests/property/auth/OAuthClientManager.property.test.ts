@@ -48,13 +48,11 @@ describe('OAuthClientManager Property-Based Tests', () => {
     }
   });
 
-  /* Feature: google-oauth-auth, Property 1: PKCE Parameters Generation
-     For any OAuth flow initialization, the generated PKCE parameters must satisfy:
-     - Code verifier length is between 43 and 128 characters
-     - Code challenge is a valid SHA-256 hash of the code verifier
-     - State parameter is unique and has sufficient entropy (minimum 32 characters)
-     - All generated parameters are cryptographically random
+  /* Preconditions: OAuth client initialized with valid configuration
+     Action: generate PKCE parameters multiple times
+     Assertions: code verifier length 43-128 chars, code challenge is SHA-256 of verifier, state length >= 32 chars
      Requirements: google-oauth-auth.1.1, google-oauth-auth.1.2, google-oauth-auth.1.3 */
+  // Feature: google-oauth-auth, Property 1: PKCE Parameters Generation
   it('Property 1: should generate valid PKCE parameters', () => {
     fc.assert(
       fc.property(fc.constant(null), () => {
@@ -78,10 +76,11 @@ describe('OAuthClientManager Property-Based Tests', () => {
     );
   });
 
-  /* Feature: google-oauth-auth, Property 2: PKCE Parameters Persistence
-     For any generated PKCE parameters, they should be stored and retrievable
-     during the OAuth flow.
+  /* Preconditions: OAuth client initialized, no auth flow started
+     Action: start auth flow which generates and stores PKCE params
+     Assertions: PKCE parameters stored and retrievable during OAuth flow
      Requirements: google-oauth-auth.1.4 */
+  // Feature: google-oauth-auth, Property 2: PKCE Parameters Persistence
   it('Property 2: should persist PKCE parameters during auth flow', async () => {
     await fc.assert(
       fc.asyncProperty(fc.constant(null), async () => {
@@ -124,10 +123,11 @@ describe('OAuthClientManager Property-Based Tests', () => {
     );
   });
 
-  /* Feature: google-oauth-auth, Property 3: Authorization URL Formation
-     For any set of OAuth parameters, the generated authorization URL must contain
-     all required parameters with correct values and proper URL encoding.
+  /* Preconditions: OAuth client initialized, no auth flow started
+     Action: start auth flow and verify generated authorization URL
+     Assertions: URL contains all required OAuth parameters (client_id, redirect_uri, response_type, scope, code_challenge, state)
      Requirements: google-oauth-auth.1.5 */
+  // Feature: google-oauth-auth, Property 3: Authorization URL Formation
   it('Property 3: should form valid authorization URL', async () => {
     await fc.assert(
       fc.asyncProperty(fc.constant(null), async () => {
@@ -158,10 +158,11 @@ describe('OAuthClientManager Property-Based Tests', () => {
     state: fc.string({ minLength: 32, maxLength: 128 }),
   });
 
-  /* Feature: google-oauth-auth, Property 4: Deep Link Parameter Extraction
-     For any valid deep link URL, extracting parameters should correctly parse
-     both code and state values.
+  /* Preconditions: valid deep link URL with code and state parameters
+     Action: parse deep link URL and extract parameters
+     Assertions: code and state values correctly extracted from URL
      Requirements: google-oauth-auth.2.2 */
+  // Feature: google-oauth-auth, Property 4: Deep Link Parameter Extraction
   it('Property 4: should extract parameters from deep link', () => {
     fc.assert(
       fc.property(deepLinkArb, ({ code, state }) => {
@@ -175,10 +176,11 @@ describe('OAuthClientManager Property-Based Tests', () => {
     );
   });
 
-  /* Feature: google-oauth-auth, Property 5: State Validation
-     For any incoming state parameter that doesn't match the stored state,
-     the OAuth client must reject the request.
+  /* Preconditions: OAuth flow started with stored state parameter
+     Action: handle deep link with mismatched state parameter
+     Assertions: request rejected, returns unauthorized with csrf_attack_detected error
      Requirements: google-oauth-auth.2.3, google-oauth-auth.9.4 */
+  // Feature: google-oauth-auth, Property 5: State Validation
   it('Property 5: should reject mismatched state', async () => {
     await fc.assert(
       fc.asyncProperty(fc.string({ minLength: 32, maxLength: 128 }), async (wrongState) => {
@@ -204,10 +206,11 @@ describe('OAuthClientManager Property-Based Tests', () => {
     );
   });
 
-  /* Feature: google-oauth-auth, Property 6: Token Exchange Request Formation
-     For any authorization code and code verifier, the token exchange request must
-     include all required parameters and must NOT include client_secret.
+  /* Preconditions: OAuth client initialized, authorization code and code verifier available
+     Action: form token exchange request
+     Assertions: request includes all required parameters (code, client_id, redirect_uri, code_verifier, grant_type), does NOT include client_secret
      Requirements: google-oauth-auth.3.1, google-oauth-auth.3.2 */
+  // Feature: google-oauth-auth, Property 6: Token Exchange Request Formation
   it('Property 6: should form valid token exchange request', async () => {
     await fc.assert(
       fc.asyncProperty(
@@ -267,10 +270,11 @@ describe('OAuthClientManager Property-Based Tests', () => {
     token_type: fc.constant('Bearer'),
   });
 
-  /* Feature: google-oauth-auth, Property 11: Auth Status Determination
-     For any token state, the auth status check must return the correct
-     authorization state.
+  /* Preconditions: OAuth client initialized, various token states (no tokens, valid tokens, expired tokens)
+     Action: call getAuthStatus() for each token state
+     Assertions: returns correct authorization status based on token state (false for no/expired tokens, true for valid tokens)
      Requirements: google-oauth-auth.5.1, google-oauth-auth.5.2, google-oauth-auth.5.3, google-oauth-auth.5.4 */
+  // Feature: google-oauth-auth, Property 11: Auth Status Determination
   it('Property 11: should determine auth status correctly', async () => {
     // Test with no tokens
     const noTokensStatus = await oauthClient.getAuthStatus();
@@ -330,10 +334,11 @@ describe('OAuthClientManager Property-Based Tests', () => {
     );
   });
 
-  /* Feature: google-oauth-auth, Property 14: Logout Token Cleanup
-     For any logout operation, all tokens must be removed from storage regardless
-     of the revoke endpoint response.
+  /* Preconditions: OAuth client initialized, valid tokens saved in storage
+     Action: call logout() which may succeed or fail at revoke endpoint
+     Assertions: tokens removed from storage regardless of revoke endpoint response
      Requirements: google-oauth-auth.7.2 */
+  // Feature: google-oauth-auth, Property 14: Logout Token Cleanup
   it('Property 14: should cleanup tokens on logout', async () => {
     await fc.assert(
       fc.asyncProperty(tokenResponseArb, async (tokens) => {
@@ -378,10 +383,11 @@ describe('OAuthClientManager Property-Based Tests', () => {
     'temporarily_unavailable'
   );
 
-  /* Feature: google-oauth-auth, Property 16: Error Propagation
-     For any error returned by Google OAuth API, the OAuth client must propagate
-     the error without losing information.
+  /* Preconditions: OAuth flow started, authorization code received
+     Action: exchange code for tokens, Google API returns OAuth error
+     Assertions: error propagated without losing information, error code preserved
      Requirements: google-oauth-auth.9.3 */
+  // Feature: google-oauth-auth, Property 16: Error Propagation
   it('Property 16: should propagate OAuth errors', async () => {
     await fc.assert(
       fc.asyncProperty(oauthErrorArb, async (errorCode) => {

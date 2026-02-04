@@ -46,10 +46,11 @@ describe('Token Refresh Property-Based Tests', () => {
     }
   });
 
-  /* Feature: google-oauth-auth, Property 12: Token Refresh Success
-     For any expired access token with valid refresh token, the OAuth client must
-     successfully refresh the access token and update storage.
+  /* Preconditions: OAuth client configured, expired access token with valid refresh token saved in storage
+     Action: call getAuthStatus() which triggers automatic token refresh
+     Assertions: refresh succeeds, new access token saved, refresh token preserved, expiration time updated
      Requirements: google-oauth-auth.6.1, google-oauth-auth.6.2, google-oauth-auth.6.3 */
+  // Feature: google-oauth-auth, Property 12: Token Refresh Success
   it('Property 12: should refresh expired access token successfully', async () => {
     await fc.assert(
       fc.asyncProperty(
@@ -103,10 +104,11 @@ describe('Token Refresh Property-Based Tests', () => {
     );
   });
 
-  /* Feature: google-oauth-auth, Property 13: Token Refresh with New Refresh Token
-     For any token refresh that returns a new refresh token, the OAuth client must
-     update both access and refresh tokens in storage.
+  /* Preconditions: OAuth client configured, expired access token with old refresh token saved
+     Action: call getAuthStatus() which triggers refresh, server returns new refresh token
+     Assertions: both access and refresh tokens updated in storage
      Requirements: google-oauth-auth.6.4 */
+  // Feature: google-oauth-auth, Property 13: Token Refresh with New Refresh Token
   it('Property 13: should update both tokens when new refresh token returned', async () => {
     await fc.assert(
       fc.asyncProperty(
@@ -158,10 +160,11 @@ describe('Token Refresh Property-Based Tests', () => {
     );
   });
 
-  /* Feature: google-oauth-auth, Property 14: Token Refresh Failure Cleanup
-     For any token refresh that fails with invalid_grant, the OAuth client must
-     clear all tokens and return unauthorized status.
+  /* Preconditions: OAuth client configured, expired access token with refresh token saved
+     Action: call getAuthStatus() which triggers refresh, server returns invalid_grant error
+     Assertions: tokens cleared from storage, status returns unauthorized
      Requirements: google-oauth-auth.6.5 */
+  // Feature: google-oauth-auth, Property 14: Token Refresh Failure Cleanup
   it('Property 14: should clear tokens on invalid_grant error', async () => {
     await fc.assert(
       fc.asyncProperty(
