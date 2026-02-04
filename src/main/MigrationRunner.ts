@@ -64,8 +64,9 @@ export class MigrationRunner {
       `
         )
         .run();
-    } catch (error: any) {
-      throw new Error(`Failed to initialize migration table: ${error.message}`);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      throw new Error(`Failed to initialize migration table: ${errorMessage}`);
     }
   }
 
@@ -82,8 +83,9 @@ export class MigrationRunner {
         .get() as { version: number | null };
 
       return row.version ?? 0;
-    } catch (error: any) {
-      throw new Error(`Failed to get current version: ${error.message}`);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      throw new Error(`Failed to get current version: ${errorMessage}`);
     }
   }
 
@@ -100,8 +102,9 @@ export class MigrationRunner {
         .all() as Array<{ version: number }>;
 
       return rows.map((row) => row.version);
-    } catch (error: any) {
-      throw new Error(`Failed to get applied migrations: ${error.message}`);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      throw new Error(`Failed to get applied migrations: ${errorMessage}`);
     }
   }
 
@@ -168,8 +171,9 @@ export class MigrationRunner {
       }
 
       return migrations;
-    } catch (error: any) {
-      throw new Error(`Failed to load migrations: ${error.message}`);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      throw new Error(`Failed to load migrations: ${errorMessage}`);
     }
   }
 
@@ -234,12 +238,14 @@ export class MigrationRunner {
           appliedCount++;
 
           console.log(`Applied migration ${migration.version}_${migration.name}`);
-        } catch (migrationError: any) {
+        } catch (migrationError: unknown) {
+          const errorMessage =
+            migrationError instanceof Error ? migrationError.message : 'Unknown error';
           // Откат при ошибке миграции
           return {
             success: false,
             appliedCount,
-            error: `Failed to apply migration ${migration.version}_${migration.name}: ${migrationError.message}`,
+            error: `Failed to apply migration ${migration.version}_${migration.name}: ${errorMessage}`,
           };
         }
       }
@@ -249,11 +255,12 @@ export class MigrationRunner {
         appliedCount,
         message: `Successfully applied ${appliedCount} migration(s)`,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       return {
         success: false,
         appliedCount: 0,
-        error: `Migration execution failed: ${error.message}`,
+        error: `Migration execution failed: ${errorMessage}`,
       };
     }
   }
@@ -325,16 +332,19 @@ export class MigrationRunner {
           appliedCount: 1,
           message: `Successfully rolled back migration ${migration.version}_${migration.name}`,
         };
-      } catch (rollbackError: any) {
+      } catch (rollbackError: unknown) {
+        const errorMessage =
+          rollbackError instanceof Error ? rollbackError.message : 'Unknown error';
         return {
           success: false,
-          error: `Failed to rollback migration ${migration.version}_${migration.name}: ${rollbackError.message}`,
+          error: `Failed to rollback migration ${migration.version}_${migration.name}: ${errorMessage}`,
         };
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       return {
         success: false,
-        error: `Rollback failed: ${error.message}`,
+        error: `Rollback failed: ${errorMessage}`,
       };
     }
   }
@@ -372,8 +382,9 @@ export class MigrationRunner {
         totalMigrations: allMigrations.length,
         pending: pendingMigrations,
       };
-    } catch (error: any) {
-      throw new Error(`Failed to get migration status: ${error.message}`);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      throw new Error(`Failed to get migration status: ${errorMessage}`);
     }
   }
 }

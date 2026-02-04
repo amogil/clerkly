@@ -8,7 +8,7 @@ import { DataManager } from './DataManager';
  */
 export interface IPCResult {
   success: boolean;
-  data?: any;
+  data?: unknown;
   error?: string;
 }
 
@@ -62,7 +62,7 @@ export class IPCHandlers {
    * @param {any} value
    * @returns {Promise<IPCResult>}
    */
-  async handleSaveData(event: IpcMainInvokeEvent, key: string, value: any): Promise<IPCResult> {
+  async handleSaveData(event: IpcMainInvokeEvent, key: string, value: unknown): Promise<IPCResult> {
     try {
       // Валидация параметров
       if (key === undefined || key === null) {
@@ -90,8 +90,8 @@ export class IPCHandlers {
       }
 
       return result;
-    } catch (error: any) {
-      const errorMessage = error.message || String(error);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
       console.error(`[IPC] save-data exception: ${errorMessage}`);
       return { success: false, error: errorMessage };
     }
@@ -128,8 +128,8 @@ export class IPCHandlers {
       }
 
       return result;
-    } catch (error: any) {
-      const errorMessage = error.message || String(error);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
       console.error(`[IPC] load-data exception: ${errorMessage}`);
       return { success: false, error: errorMessage };
     }
@@ -166,8 +166,8 @@ export class IPCHandlers {
       }
 
       return result;
-    } catch (error: any) {
-      const errorMessage = error.message || String(error);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
       console.error(`[IPC] delete-data exception: ${errorMessage}`);
       return { success: false, error: errorMessage };
     }

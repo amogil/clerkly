@@ -87,7 +87,7 @@ export class AppConfig {
     for (const key in settings) {
       const value = settings[key as keyof WindowSettings];
       if (value !== undefined) {
-        (filteredSettings as any)[key] = value;
+        (filteredSettings as Record<string, unknown>)[key] = value;
       }
     }
     this.windowSettings = { ...this.windowSettings, ...filteredSettings };

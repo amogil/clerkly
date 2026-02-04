@@ -503,7 +503,7 @@ describe('UIController', () => {
        Requirements: clerkly.2, clerkly.nfr.1*/
     it('should handle various return types', async () => {
       // Test with object
-      let result = await uiController.withLoading(
+      let result: unknown = await uiController.withLoading(
         'op1',
         async () => ({ key: 'value' }),
         'Loading...'

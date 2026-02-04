@@ -18,7 +18,7 @@ export interface ErrorResponse {
   success: false;
   error: string;
   errorCode?: string;
-  details?: any;
+  details?: Record<string, unknown>;
 }
 
 /**
@@ -99,9 +99,14 @@ export function getErrorDetails(errorCode?: string, errorMessage?: string): Erro
  * @param error Error object or message
  * @param context Additional context for debugging
  */
-export function logError(operation: string, error: any, context?: any): void {
-  const errorMessage = error?.message || error?.toString() || 'Unknown error';
-  const errorCode = error?.code || error?.error || 'unknown';
+export function logError(
+  operation: string,
+  error: unknown,
+  context?: Record<string, unknown>
+): void {
+  const errorObj = error as { message?: string; code?: string; error?: string };
+  const errorMessage = errorObj?.message || String(error) || 'Unknown error';
+  const errorCode = errorObj?.code || errorObj?.error || 'unknown';
 
   console.error(`[OAuth] ${operation} failed: ${errorMessage}`, {
     errorCode,
@@ -121,7 +126,7 @@ export function logError(operation: string, error: any, context?: any): void {
 export function createErrorResponse(
   error: string,
   errorCode?: string,
-  details?: any
+  details?: Record<string, unknown>
 ): ErrorResponse {
   return {
     success: false,

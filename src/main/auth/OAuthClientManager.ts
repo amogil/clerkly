@@ -107,8 +107,9 @@ export class OAuthClientManager {
 
       // Open system browser with authorization URL
       await shell.openExternal(authUrl.toString());
-    } catch (error: any) {
-      throw new Error(`Failed to start auth flow: ${error.message}`);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      throw new Error(`Failed to start auth flow: ${errorMessage}`);
     }
   }
 
@@ -176,10 +177,11 @@ export class OAuthClientManager {
       return {
         authorized: true,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       return {
         authorized: false,
-        error: error.message || 'unknown_error',
+        error: errorMessage || 'unknown_error',
       };
     }
   }
@@ -218,8 +220,9 @@ export class OAuthClientManager {
 
       const tokenResponse = (await response.json()) as TokenResponse;
       return tokenResponse;
-    } catch (error: any) {
-      if (error.message && error.message.includes('fetch')) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      if (errorMessage && errorMessage.includes('fetch')) {
         throw new Error('network_error');
       }
       throw error;
@@ -252,10 +255,11 @@ export class OAuthClientManager {
       }
 
       return { authorized: false };
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       return {
         authorized: false,
-        error: error.message,
+        error: errorMessage,
       };
     }
   }
@@ -310,7 +314,7 @@ export class OAuthClientManager {
 
       await this.tokenStorage.saveTokens(updatedTokens);
       return true;
-    } catch (error: any) {
+    } catch (error: unknown) {
       return false;
     }
   }
@@ -343,10 +347,11 @@ export class OAuthClientManager {
 
       // Always delete local tokens regardless of revoke result
       await this.tokenStorage.deleteTokens();
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       // Ensure tokens are deleted even if there's an error
       await this.tokenStorage.deleteTokens();
-      throw new Error(`Logout failed: ${error.message}`);
+      throw new Error(`Logout failed: ${errorMessage}`);
     }
   }
 }

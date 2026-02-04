@@ -896,7 +896,7 @@ describe('Property Tests - WindowManager State Changes', () => {
           const saveCall = mockDataManager.saveData.mock.calls[0];
           expect(saveCall[0]).toBe('window_state');
 
-          const savedState = JSON.parse(saveCall[1]);
+          const savedState = JSON.parse(saveCall[1] as string);
           expect(savedState.x).toBe(newState.x);
           expect(savedState.y).toBe(newState.y);
           expect(savedState.width).toBe(newState.width);
@@ -916,7 +916,7 @@ describe('Property Tests - WindowManager State Changes', () => {
           const moveCall = mockDataManager.saveData.mock.calls[0];
           expect(moveCall[0]).toBe('window_state');
 
-          const movedState = JSON.parse(moveCall[1]);
+          const movedState = JSON.parse(moveCall[1] as string);
           expect(movedState.x).toBe(newState.x);
           expect(movedState.y).toBe(newState.y);
 
@@ -932,7 +932,7 @@ describe('Property Tests - WindowManager State Changes', () => {
             const maxCall = mockDataManager.saveData.mock.calls[0];
             expect(maxCall[0]).toBe('window_state');
 
-            const maxState = JSON.parse(maxCall[1]);
+            const maxState = JSON.parse(maxCall[1] as string);
             expect(maxState.isMaximized).toBe(true);
           }
 
@@ -1232,7 +1232,7 @@ describe('Property Tests - WindowManager State Changes', () => {
     // Verify save was called with final state
     expect(mockDataManager.saveData).toHaveBeenCalled();
     const saveCall = mockDataManager.saveData.mock.calls[0];
-    const savedState = JSON.parse(saveCall[1]);
+    const savedState = JSON.parse(saveCall[1] as string);
     expect(savedState.x).toBe(300);
     expect(savedState.y).toBe(200);
     expect(savedState.width).toBe(1600);

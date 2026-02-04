@@ -96,7 +96,7 @@ describe('Property Tests - State Controller', () => {
             if (Array.isArray(value)) {
               value.push('__mutated_array__');
             } else {
-              value['__mutated_nested__'] = 'mutated';
+              (value as Record<string, unknown>)['__mutated_nested__'] = 'mutated';
             }
           }
         }
@@ -149,14 +149,27 @@ describe('Property Tests - State Controller', () => {
     const stateController = new StateController(initialState);
 
     // Get state and mutate deeply
-    const state1 = stateController.getState();
+    const state1 = stateController.getState() as {
+      level1: {
+        level2: {
+          level3: {
+            level4: {
+              data: string;
+              array: number[];
+              newProp?: string;
+            };
+          };
+          newLevel?: string;
+        };
+      };
+    };
     state1.level1.level2.level3.level4.data = 'MUTATED';
     state1.level1.level2.level3.level4.array.push(999);
     state1.level1.level2.level3.level4.newProp = 'NEW';
     state1.level1.level2.newLevel = 'ADDED';
 
     // Get state again
-    const state2 = stateController.getState();
+    const state2 = stateController.getState() as typeof state1;
 
     // Verify no mutations propagated
     expect(state2).toEqual(initialState);
@@ -185,9 +198,13 @@ describe('Property Tests - State Controller', () => {
     const stateController = new StateController(initialState);
 
     // Get state and mutate arrays
-    const state1 = stateController.getState();
+    const state1 = stateController.getState() as {
+      simpleArray: number[];
+      nestedArray: number[][];
+      mixedArray: unknown[];
+    };
     state1.simpleArray.push(999);
-    state1.simpleArray[0] = 'MUTATED';
+    state1.simpleArray[0] = 999 as never; // Type assertion needed for mutation
     state1.nestedArray[0].push(999);
     state1.nestedArray.push([999, 999]);
     // Mutate the array element before splicing
@@ -197,7 +214,7 @@ describe('Property Tests - State Controller', () => {
     state1.mixedArray.splice(2, 1);
 
     // Get state again
-    const state2 = stateController.getState();
+    const state2 = stateController.getState() as typeof state1;
 
     // Verify no mutations propagated
     expect(state2).toEqual(initialState);
@@ -277,23 +294,35 @@ describe('Property Tests - State Controller', () => {
     const stateController = new StateController(initialState);
 
     // Get state multiple times and mutate each copy
-    const state1 = stateController.getState();
+    const state1 = stateController.getState() as {
+      counter: number;
+      data: { value: string };
+      items: number[];
+    };
     state1.counter = 100;
     state1.data.value = 'mutated1';
     state1.items.push(999);
 
-    const state2 = stateController.getState();
+    const state2 = stateController.getState() as typeof state1;
     state2.counter = 200;
     state2.data.value = 'mutated2';
     state2.items.splice(0, 1);
 
-    const state3 = stateController.getState();
+    const state3 = stateController.getState() as {
+      counter: number;
+      data?: { value: string };
+      items: number[];
+    };
     state3.counter = 300;
     delete state3.data;
     state3.items = [];
 
     // Get final state
-    const finalState = stateController.getState();
+    const finalState = stateController.getState() as {
+      counter: number;
+      data: { value: string };
+      items: number[];
+    };
 
     // Verify internal state is unchanged
     expect(finalState).toEqual(initialState);
@@ -319,12 +348,15 @@ describe('Property Tests - State Controller', () => {
     const stateController = new StateController(initialState);
 
     // Get state and mutate Date objects
-    const state1 = stateController.getState();
+    const state1 = stateController.getState() as {
+      timestamp: Date;
+      nested: { date: Date };
+    };
     state1.timestamp.setFullYear(2099);
     state1.nested.date.setMonth(0);
 
     // Get state again
-    const state2 = stateController.getState();
+    const state2 = stateController.getState() as typeof state1;
 
     // Verify Date objects are unchanged
     expect(state2.timestamp.getTime()).toBe(originalDate.getTime());
@@ -378,18 +410,22 @@ describe('Property Tests - State Controller', () => {
     const stateController = new StateController(initialState);
 
     // Get property and mutate
-    const user1 = stateController.getStateProperty('user');
+    const user1 = stateController.getStateProperty('user') as {
+      name: string;
+      settings: { theme: string };
+      newProp?: string;
+    };
     user1.name = 'MUTATED';
     user1.settings.theme = 'MUTATED';
     user1.newProp = 'NEW';
 
-    const items1 = stateController.getStateProperty('items');
+    const items1 = stateController.getStateProperty('items') as (number | string)[];
     items1.push(999);
     items1[0] = 'MUTATED';
 
     // Get properties again
-    const user2 = stateController.getStateProperty('user');
-    const items2 = stateController.getStateProperty('items');
+    const user2 = stateController.getStateProperty('user') as typeof user1;
+    const items2 = stateController.getStateProperty('items') as number[];
 
     // Verify properties are unchanged
     expect(user2).toEqual(initialState.user);
@@ -434,7 +470,28 @@ describe('Property Tests - State Controller', () => {
         const stateController = new StateController(initialState);
 
         // Get state and perform various mutations
-        const state1 = stateController.getState();
+        const state1 = stateController.getState() as {
+          primitives: {
+            string: string;
+            number: number;
+            boolean: boolean;
+            null: null;
+          };
+          arrays: {
+            numbers: number[];
+            strings: string[];
+            mixed: (string | number | boolean)[];
+          };
+          nested: {
+            level1: {
+              level2: {
+                data: string;
+                values: number[];
+              };
+              newProp?: string;
+            };
+          };
+        };
 
         // Mutate primitives
         state1.primitives.string = 'MUTATED';

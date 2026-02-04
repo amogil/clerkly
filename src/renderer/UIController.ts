@@ -88,7 +88,7 @@ export class UIController {
    * Updates the view with new data efficiently without full re-render
    * Monitors update time and warns if it exceeds performance threshold
    * Requirements: clerkly.1, clerkly.nfr.1   */
-  updateView(data: Record<string, unknown> | unknown[]): UpdateResult {
+  updateView(data: unknown): UpdateResult {
     const startTime = performance.now();
 
     try {
@@ -255,7 +255,7 @@ export class UIController {
   /**
    * Creates data display element (table/list)
    * Requirements: clerkly.1   */
-  createDataDisplay(data: Record<string, unknown> | unknown[] | null | undefined): HTMLElement {
+  createDataDisplay(data: unknown): HTMLElement {
     const display = document.createElement('div');
     display.setAttribute('data-testid', 'data-display');
     display.className = 'data-display';

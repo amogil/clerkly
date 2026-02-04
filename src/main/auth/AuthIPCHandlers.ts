@@ -10,7 +10,7 @@ import { OAuthClientManager } from './OAuthClientManager';
 interface IPCResult {
   success: boolean;
   error?: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 /**
@@ -75,11 +75,12 @@ export class AuthIPCHandlers {
       return {
         success: true,
       };
-    } catch (error: any) {
-      console.error('[AuthIPCHandlers] Start login error:', error.message);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('[AuthIPCHandlers] Start login error:', errorMessage);
       return {
         success: false,
-        error: error.message || 'Failed to start login',
+        error: errorMessage || 'Failed to start login',
       };
     }
   }
@@ -100,12 +101,13 @@ export class AuthIPCHandlers {
         authorized: authStatus.authorized,
         error: authStatus.error,
       };
-    } catch (error: any) {
-      console.error('[AuthIPCHandlers] Get status error:', error.message);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('[AuthIPCHandlers] Get status error:', errorMessage);
       return {
         success: false,
         authorized: false,
-        error: error.message || 'Failed to get auth status',
+        error: errorMessage || 'Failed to get auth status',
       };
     }
   }
@@ -127,11 +129,12 @@ export class AuthIPCHandlers {
       return {
         success: true,
       };
-    } catch (error: any) {
-      console.error('[AuthIPCHandlers] Logout error:', error.message);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('[AuthIPCHandlers] Logout error:', errorMessage);
       return {
         success: false,
-        error: error.message || 'Failed to logout',
+        error: errorMessage || 'Failed to logout',
       };
     }
   }
@@ -142,7 +145,7 @@ export class AuthIPCHandlers {
    * @param channel Event channel
    * @param data Event data
    */
-  private sendAuthEvent(channel: string, data: any): void {
+  private sendAuthEvent(channel: string, data: Record<string, unknown>): void {
     const windows = BrowserWindow.getAllWindows();
     windows.forEach((window) => {
       window.webContents.send(channel, data);

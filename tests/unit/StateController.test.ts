@@ -48,7 +48,7 @@ describe('StateController', () => {
       // Mutate original object
       initialState.nested.key = 'modified';
 
-      const state = controller.getState();
+      const state = controller.getState() as { nested: { key: string } };
       expect(state.nested.key).toBe('value');
     });
   });
@@ -182,11 +182,12 @@ describe('StateController', () => {
 
       // Mutate returned state
       if (result.state) {
-        result.state.nested.key = 'modified';
-        result.state.key2 = 'modified';
+        const state = result.state as { nested: { key: string }; key2: string };
+        state.nested.key = 'modified';
+        state.key2 = 'modified';
       }
 
-      const currentState = stateController.getState();
+      const currentState = stateController.getState() as { nested: { key: string }; key2: string };
       expect(currentState.nested.key).toBe('value');
       expect(currentState.key2).toBe('value2');
     });
@@ -213,12 +214,20 @@ describe('StateController', () => {
     it('should return immutable copy (mutations do not affect internal state)', () => {
       stateController.setState({ nested: { key: 'value' }, array: [1, 2, 3] });
 
-      const state1 = stateController.getState();
+      const state1 = stateController.getState() as {
+        nested: { key: string };
+        array: number[];
+        newKey?: string;
+      };
       state1.nested.key = 'modified';
       state1.array.push(4);
       state1.newKey = 'new';
 
-      const state2 = stateController.getState();
+      const state2 = stateController.getState() as {
+        nested: { key: string };
+        array: number[];
+        newKey?: string;
+      };
       expect(state2.nested.key).toBe('value');
       expect(state2.array).toEqual([1, 2, 3]);
       expect(state2.newKey).toBeUndefined();
@@ -252,11 +261,15 @@ describe('StateController', () => {
       };
       stateController.setState(complexState);
 
-      const state = stateController.getState();
+      const state = stateController.getState() as {
+        level1: { level2: { level3: { value: string } }; array: Array<{ id: number }> };
+      };
       state.level1.level2.level3.value = 'modified';
       state.level1.array[0].id = 999;
 
-      const state2 = stateController.getState();
+      const state2 = stateController.getState() as {
+        level1: { level2: { level3: { value: string } }; array: Array<{ id: number }> };
+      };
       expect(state2.level1.level2.level3.value).toBe('deep');
       expect(state2.level1.array[0].id).toBe(1);
     });
@@ -372,10 +385,10 @@ describe('StateController', () => {
     it('should return deep copy for object properties', () => {
       stateController.setState({ nested: { key: 'value' } });
 
-      const nested = stateController.getStateProperty('nested');
+      const nested = stateController.getStateProperty('nested') as { key: string };
       nested.key = 'modified';
 
-      const nested2 = stateController.getStateProperty('nested');
+      const nested2 = stateController.getStateProperty('nested') as { key: string };
       expect(nested2.key).toBe('value');
     });
 
@@ -386,7 +399,7 @@ describe('StateController', () => {
     it('should return deep copy for array properties', () => {
       stateController.setState({ array: [1, 2, 3] });
 
-      const array = stateController.getStateProperty('array');
+      const array = stateController.getStateProperty('array') as number[];
       array.push(4);
 
       const array2 = stateController.getStateProperty('array');
@@ -651,10 +664,12 @@ describe('StateController', () => {
       stateController.setState({ nested: { key: 'value1' } });
       stateController.setState({ nested: { key: 'value2' } });
 
-      const history = stateController.getStateHistory();
+      const history = stateController.getStateHistory() as Array<{
+        nested?: { key: string };
+      }>;
 
       expect(history[0]).toEqual({});
-      expect(history[1].nested.key).toBe('value1');
+      expect(history[1].nested?.key).toBe('value1');
     });
   });
 
@@ -875,11 +890,15 @@ describe('StateController', () => {
       };
 
       stateController.setState(deepState);
-      const retrieved = stateController.getState();
+      const retrieved = stateController.getState() as {
+        level1: { level2: { level3: { level4: { value: string } } } };
+      };
 
       retrieved.level1.level2.level3.level4.value = 'modified';
 
-      const retrieved2 = stateController.getState();
+      const retrieved2 = stateController.getState() as {
+        level1: { level2: { level3: { level4: { value: string } } } };
+      };
       expect(retrieved2.level1.level2.level3.level4.value).toBe('deep');
     });
 
@@ -895,11 +914,15 @@ describe('StateController', () => {
         ],
       });
 
-      const state = stateController.getState();
+      const state = stateController.getState() as {
+        items: Array<{ id: number; name: string }>;
+      };
       state.items[0].name = 'modified';
       state.items.push({ id: 3, name: 'item3' });
 
-      const state2 = stateController.getState();
+      const state2 = stateController.getState() as {
+        items: Array<{ id: number; name: string }>;
+      };
       expect(state2.items).toHaveLength(2);
       expect(state2.items[0].name).toBe('item1');
     });
@@ -912,10 +935,10 @@ describe('StateController', () => {
       const date = new Date('2024-01-01');
       stateController.setState({ timestamp: date });
 
-      const state = stateController.getState();
+      const state = stateController.getState() as { timestamp: Date };
       state.timestamp.setFullYear(2025);
 
-      const state2 = stateController.getState();
+      const state2 = stateController.getState() as { timestamp: Date };
       expect(state2.timestamp.getFullYear()).toBe(2024);
     });
 

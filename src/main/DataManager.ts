@@ -33,7 +33,7 @@ export interface SaveDataResult {
  */
 export interface LoadDataResult {
   success: boolean;
-  data?: any;
+  data?: unknown;
   error?: string;
 }
 
@@ -75,9 +75,10 @@ export class DataManager {
         if (!fs.existsSync(this.storagePath)) {
           fs.mkdirSync(this.storagePath, { recursive: true });
         }
-      } catch (dirError: any) {
+      } catch (dirError: unknown) {
+        const errorObj = dirError as { code?: string };
         // Обработка ошибок прав доступа - fallback на temp directory
-        if (dirError.code === 'EACCES' || dirError.code === 'EPERM') {
+        if (errorObj.code === 'EACCES' || errorObj.code === 'EPERM') {
           console.warn('Permission denied, using temp directory');
           this.storagePath = path.join(os.tmpdir(), 'clerkly-fallback');
           usedFallback = true;
@@ -132,8 +133,9 @@ export class DataManager {
       }
 
       return result;
-    } catch (error: any) {
-      throw new Error(`Failed to initialize storage: ${error.message}`);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      throw new Error(`Failed to initialize storage: ${errorMessage}`);
     }
   }
 
@@ -144,10 +146,10 @@ export class DataManager {
    * Проверяет размер (max 10MB)
    * Обрабатывает ошибки (SQLITE_FULL, SQLITE_BUSY, SQLITE_LOCKED, SQLITE_READONLY)
    * Requirements: clerkly.1   * @param {string} key
-   * @param {any} value
+   * @param {unknown} value
    * @returns {SaveDataResult}
    */
-  saveData(key: string, value: any): SaveDataResult {
+  saveData(key: string, value: unknown): SaveDataResult {
     try {
       // Валидация ключа
       if (!key || typeof key !== 'string') {
@@ -172,8 +174,10 @@ export class DataManager {
           if (typeof val === 'number' && isNaN(val)) return { __type: 'NaN' };
           return val;
         });
-      } catch (serializeError: any) {
-        return { success: false, error: `Failed to serialize value: ${serializeError.message}` };
+      } catch (serializeError: unknown) {
+        const errorMessage =
+          serializeError instanceof Error ? serializeError.message : 'Unknown error';
+        return { success: false, error: `Failed to serialize value: ${errorMessage}` };
       }
 
       // Проверка размера (max 10MB)
@@ -196,16 +200,18 @@ export class DataManager {
       stmt.run(key, serializedValue, timestamp, timestamp, timestamp);
 
       return { success: true };
-    } catch (writeError: any) {
+    } catch (writeError: unknown) {
+      const errorObj = writeError as { code?: string; message?: string };
       // Обработка специфичных ошибок SQLite
-      if (writeError.code === 'SQLITE_FULL') {
+      if (errorObj.code === 'SQLITE_FULL') {
         return { success: false, error: 'Database is full: no space left on device' };
-      } else if (writeError.code === 'SQLITE_BUSY' || writeError.code === 'SQLITE_LOCKED') {
+      } else if (errorObj.code === 'SQLITE_BUSY' || errorObj.code === 'SQLITE_LOCKED') {
         return { success: false, error: 'Database is locked: try again later' };
-      } else if (writeError.code === 'SQLITE_READONLY') {
+      } else if (errorObj.code === 'SQLITE_READONLY') {
         return { success: false, error: 'Database is read-only: check permissions' };
       }
-      return { success: false, error: `Database write failed: ${writeError.message}` };
+      const errorMessage = errorObj.message || 'Unknown error';
+      return { success: false, error: `Database write failed: ${errorMessage}` };
     }
   }
 
@@ -243,7 +249,7 @@ export class DataManager {
       }
 
       // Десериализация с поддержкой Infinity/-Infinity
-      let data: any;
+      let data: unknown;
       try {
         data = JSON.parse(row.value, (key, val) => {
           if (val && typeof val === 'object' && val.__type) {
@@ -259,11 +265,13 @@ export class DataManager {
       }
 
       return { success: true, data };
-    } catch (queryError: any) {
-      if (queryError.code === 'SQLITE_BUSY' || queryError.code === 'SQLITE_LOCKED') {
+    } catch (queryError: unknown) {
+      const errorObj = queryError as { code?: string; message?: string };
+      if (errorObj.code === 'SQLITE_BUSY' || errorObj.code === 'SQLITE_LOCKED') {
         return { success: false, error: 'Database is locked: try again later' };
       }
-      return { success: false, error: `Database query failed: ${queryError.message}` };
+      const errorMessage = errorObj.message || 'Unknown error';
+      return { success: false, error: `Database query failed: ${errorMessage}` };
     }
   }
 
@@ -299,13 +307,15 @@ export class DataManager {
       }
 
       return { success: true };
-    } catch (deleteError: any) {
-      if (deleteError.code === 'SQLITE_BUSY' || deleteError.code === 'SQLITE_LOCKED') {
+    } catch (deleteError: unknown) {
+      const errorObj = deleteError as { code?: string; message?: string };
+      if (errorObj.code === 'SQLITE_BUSY' || errorObj.code === 'SQLITE_LOCKED') {
         return { success: false, error: 'Database is locked: try again later' };
-      } else if (deleteError.code === 'SQLITE_READONLY') {
+      } else if (errorObj.code === 'SQLITE_READONLY') {
         return { success: false, error: 'Database is read-only: check permissions' };
       }
-      return { success: false, error: `Database delete failed: ${deleteError.message}` };
+      const errorMessage = errorObj.message || 'Unknown error';
+      return { success: false, error: `Database delete failed: ${errorMessage}` };
     }
   }
 

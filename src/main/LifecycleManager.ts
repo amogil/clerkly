@@ -54,9 +54,10 @@ export class LifecycleManager {
         success: true,
         loadTime,
       };
-    } catch (error: any) {
-      console.error('Failed to initialize application:', error.message);
-      throw new Error(`Application initialization failed: ${error.message}`);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('Failed to initialize application:', errorMessage);
+      throw new Error(`Application initialization failed: ${errorMessage}`);
     }
   }
 
@@ -70,8 +71,9 @@ export class LifecycleManager {
       if (!this.windowManager.isWindowCreated()) {
         this.windowManager.createWindow();
       }
-    } catch (error: any) {
-      console.error('Failed to handle activation:', error.message);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('Failed to handle activation:', errorMessage);
     }
   }
 
@@ -97,8 +99,9 @@ export class LifecycleManager {
         // Очищаем таймер, если shutdown завершился первым
         clearTimeout(timeoutId!);
       }
-    } catch (error: any) {
-      console.error('Error during shutdown:', error.message);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('Error during shutdown:', errorMessage);
       // Продолжаем завершение даже при ошибках
     }
   }

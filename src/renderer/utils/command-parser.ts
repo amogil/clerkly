@@ -110,7 +110,8 @@ export function generateResponse(command: ParsedCommand, success: boolean = true
         contacts: 'Contacts',
         settings: 'Settings',
       };
-      return `✓ Перешел на экран ${screenNames[command.params.screen] || command.params.screen}`;
+      const screen = command.params.screen as string;
+      return `✓ Перешел на экран ${screenNames[screen] || screen}`;
     }
 
     case 'create':

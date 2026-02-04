@@ -185,7 +185,7 @@ describe('ErrorHandler Property-Based Tests', () => {
         fc.property(
           fc.string({ minLength: 1 }),
           fc.option(fc.string(), { nil: undefined }),
-          fc.option(fc.oneof(fc.string(), fc.integer(), fc.boolean(), fc.object()), {
+          fc.option(fc.object(), {
             nil: undefined,
           }),
           (error, errorCode, details) => {
@@ -203,8 +203,8 @@ describe('ErrorHandler Property-Based Tests', () => {
               expect(response.errorCode).toBe(errorCode);
             }
 
-            // Property: details are preserved if provided (excluding empty string)
-            if (details !== undefined && details !== '') {
+            // Property: details are preserved if provided
+            if (details !== undefined) {
               expect(response.details).toBe(details);
             }
           }
@@ -224,7 +224,7 @@ describe('ErrorHandler Property-Based Tests', () => {
             fc.record({
               error: fc.string({ minLength: 1 }),
               errorCode: fc.option(fc.string(), { nil: undefined }),
-              details: fc.option(fc.oneof(fc.string(), fc.integer(), fc.boolean()), {
+              details: fc.option(fc.object(), {
                 nil: undefined,
               }),
             }),

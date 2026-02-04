@@ -108,10 +108,10 @@ export class TokenStorageManager {
     }
 
     return {
-      accessToken: accessResult.data,
-      refreshToken: refreshResult.success ? refreshResult.data : undefined,
-      expiresAt: parseInt(expiresResult.data, 10),
-      tokenType: typeResult.data,
+      accessToken: accessResult.data as string,
+      refreshToken: refreshResult.success ? (refreshResult.data as string) : undefined,
+      expiresAt: parseInt(expiresResult.data as string, 10),
+      tokenType: typeResult.data as string,
     };
   }
 

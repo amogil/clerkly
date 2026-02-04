@@ -349,10 +349,16 @@ describe('DataManager', () => {
 
       const loadResult = dataManager.loadData('special-key');
       expect(loadResult.success).toBe(true);
-      expect(loadResult.data.positive).toBe(Infinity);
-      expect(loadResult.data.negative).toBe(-Infinity);
-      expect(loadResult.data.notANumber).toBeNaN();
-      expect(loadResult.data.normal).toBe(42);
+      const data = loadResult.data as {
+        positive: number;
+        negative: number;
+        notANumber: number;
+        normal: number;
+      };
+      expect(data.positive).toBe(Infinity);
+      expect(data.negative).toBe(-Infinity);
+      expect(data.notANumber).toBeNaN();
+      expect(data.normal).toBe(42);
     });
 
     /* Preconditions: DataManager initialized but database closed
