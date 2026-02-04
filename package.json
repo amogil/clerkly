@@ -10,13 +10,15 @@
     "node": ">=18.0.0"
   },
   "scripts": {
-    "dev": "npm run build && electron .",
+    "rebuild:electron": "electron-rebuild -f -w better-sqlite3",
+    "rebuild:node": "npm rebuild better-sqlite3",
+    "dev": "npm run rebuild:electron && npm run build && electron .",
     "build": "npm run build:main && npm run build:renderer && npm run build:preload",
     "build:main": "tsc -p tsconfig.main.json",
     "build:renderer": "vite build",
     "build:preload": "tsc -p tsconfig.preload.json",
     "typecheck": "tsc -p tsconfig.main.json --noEmit && tsc -p tsconfig.preload.json --noEmit",
-    "test": "npm run test:unit && npm run test:property && npm run test:integration && npm run test:functional",
+    "test": "npm run rebuild:node && npm run test:unit && npm run test:property && npm run test:integration && npm run test:functional",
     "test:unit": "jest --config jest.unit.config.js",
     "test:property": "jest --config jest.property.config.js",
     "test:integration": "jest --config jest.integration.config.js",
