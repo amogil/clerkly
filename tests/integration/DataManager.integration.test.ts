@@ -64,7 +64,7 @@ describe('DataManager Integration Tests', () => {
 
     // Check if warning was logged (may vary by system)
     if (result.warning) {
-      expect(result.warning).toContain('temp directory');
+      expect(result.warning).toContain('temporary directory');
     }
 
     consoleWarnSpy.mockRestore();

@@ -7,6 +7,72 @@ import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
 
+// Mock Electron's BrowserWindow
+jest.mock('electron', () => ({
+  BrowserWindow: jest.fn().mockImplementation(function (
+    this: Record<string, unknown>,
+    options: Record<string, unknown>
+  ) {
+    this.bounds = {
+      x: (options.x as number) || 0,
+      y: (options.y as number) || 0,
+      width: (options.width as number) || 800,
+      height: (options.height as number) || 600,
+    };
+    this.maximized = false;
+    this.destroyed = false;
+    this.listeners = new Map();
+
+    this.loadFile = jest.fn().mockResolvedValue(undefined);
+    this.on = jest.fn((event: string, callback: (...args: unknown[]) => void) => {
+      if (!(this.listeners as Map<string, unknown[]>).has(event)) {
+        (this.listeners as Map<string, unknown[]>).set(event, []);
+      }
+      (this.listeners as Map<string, unknown[]>).get(event)?.push(callback);
+    });
+    this.once = jest.fn();
+    this.removeAllListeners = jest.fn(() => {
+      (this.listeners as Map<string, unknown[]>).clear();
+    });
+    this.close = jest.fn();
+    this.destroy = jest.fn(() => {
+      this.destroyed = true;
+    });
+    this.isDestroyed = jest.fn(() => this.destroyed);
+    this.getBounds = jest.fn(() => ({ ...(this.bounds as Record<string, number>) }));
+    this.maximize = jest.fn(() => {
+      this.maximized = true;
+    });
+    this.unmaximize = jest.fn(() => {
+      this.maximized = false;
+    });
+    this.isMaximized = jest.fn(() => this.maximized);
+    this.show = jest.fn();
+    this.webContents = {
+      session: {
+        webRequest: {
+          onHeadersReceived: jest.fn(),
+        },
+      },
+      on: jest.fn(),
+    };
+
+    return this;
+  }),
+  screen: {
+    getPrimaryDisplay: jest.fn().mockReturnValue({
+      workAreaSize: { width: 1920, height: 1080 },
+    }),
+  },
+  app: {
+    getPath: jest.fn(),
+  },
+  ipcMain: {
+    handle: jest.fn(),
+    removeHandler: jest.fn(),
+  },
+}));
+
 /**
  * Integration tests for LifecycleManager with real timing behavior
  * These tests use real Electron and real delays to test performance requirements

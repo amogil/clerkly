@@ -10,5 +10,7 @@ module.exports = {
   automock: false,
   setupFilesAfterEnv: ['<rootDir>/tests/setup.ts'],
   // CRITICAL: Do NOT mock Electron - use real Electron API
-  moduleNameMapper: {}
+  moduleNameMapper: {},
+  // Show only failures by default, full output with --verbose flag
+  verbose: false
 };
