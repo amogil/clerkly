@@ -73,7 +73,10 @@ describe('Window Size and Persistence Functional Tests', () => {
 
   beforeEach(() => {
     // Create unique test storage path for each test
-    testStoragePath = path.join(os.tmpdir(), `clerkly-test-${Date.now()}`);
+    testStoragePath = path.join(
+      os.tmpdir(),
+      `clerkly-test-${Date.now()}-${Math.random().toString(36).substring(7)}`
+    );
 
     // Ensure directory exists
     fs.mkdirSync(testStoragePath, { recursive: true });
@@ -90,6 +93,9 @@ describe('Window Size and Persistence Functional Tests', () => {
     if (!initResult.success) {
       throw new Error(`Failed to initialize DataManager: ${initResult.warning || 'Unknown error'}`);
     }
+
+    // Create window manager AFTER data manager is initialized
+    windowManager = new WindowManager(dataManager);
   });
 
   afterEach(() => {
@@ -115,9 +121,6 @@ describe('Window Size and Persistence Functional Tests', () => {
        Assertions: window opens at full workAreaSize, not maximized, resizable
        Requirements: ui.1.1, ui.1.3 */
     it('should open window at full workAreaSize on first launch', () => {
-      // Create window manager
-      windowManager = new WindowManager(dataManager);
-
       // Start application by creating main window
       const window = windowManager.createWindow();
 
@@ -308,8 +311,16 @@ describe('Window Size and Persistence Functional Tests', () => {
       mockWindow.getBounds.mockReturnValue({ x: 0, y: 0, width: 1100, height: 750 });
       resizeHandler?.();
 
+      // Trigger close event to ensure state is saved
+      const closeHandler = mockWindow.on.mock.calls.find((call: any) => call[0] === 'close')?.[1];
+      closeHandler?.();
+
       // Close window
       windowManager.closeWindow();
+
+      // Verify state was saved
+      const savedState = dataManager.loadData('window_state');
+      expect(savedState.success).toBe(true);
 
       // Clear mocks for second launch
       jest.clearAllMocks();
@@ -332,6 +343,11 @@ describe('Window Size and Persistence Functional Tests', () => {
        Assertions: both size and position are restored
        Requirements: ui.5.1, ui.5.2, ui.5.4 */
     it('should remember both size and position together', () => {
+      // Ensure directory exists
+      if (!fs.existsSync(testStoragePath)) {
+        fs.mkdirSync(testStoragePath, { recursive: true });
+      }
+
       // First launch
       windowManager = new WindowManager(dataManager);
       let window = windowManager.createWindow();
@@ -351,8 +367,16 @@ describe('Window Size and Persistence Functional Tests', () => {
       const resizeHandler = mockWindow.on.mock.calls.find((call: any) => call[0] === 'resize')?.[1];
       resizeHandler?.();
 
+      // Trigger close event to ensure state is saved
+      const closeHandler = mockWindow.on.mock.calls.find((call: any) => call[0] === 'close')?.[1];
+      closeHandler?.();
+
       // Close window
       windowManager.closeWindow();
+
+      // Verify state was saved
+      const savedState = dataManager.loadData('window_state');
+      expect(savedState.success).toBe(true);
 
       // Clear mocks for second launch
       jest.clearAllMocks();
@@ -451,6 +475,11 @@ describe('Window Size and Persistence Functional Tests', () => {
        Assertions: window opens with saved small size
        Requirements: ui.5.1, ui.5.4 */
     it('should handle small window sizes', () => {
+      // Ensure directory exists
+      if (!fs.existsSync(testStoragePath)) {
+        fs.mkdirSync(testStoragePath, { recursive: true });
+      }
+
       // First launch
       windowManager = new WindowManager(dataManager);
       let window = windowManager.createWindow();
@@ -559,6 +588,10 @@ describe('Window Size and Persistence Functional Tests', () => {
           (call: any) => call[0] === 'resize'
         )?.[1];
         resizeHandler?.();
+
+        // Trigger close event to ensure state is saved
+        const closeHandler = mockWindow.on.mock.calls.find((call: any) => call[0] === 'close')?.[1];
+        closeHandler?.();
 
         // Close window
         windowManager.closeWindow();

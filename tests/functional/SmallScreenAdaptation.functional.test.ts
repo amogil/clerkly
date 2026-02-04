@@ -86,7 +86,13 @@ describe('Small Screen Adaptation Functional Tests', () => {
 
   beforeEach(() => {
     // Create unique test storage path for each test
-    testStoragePath = path.join(os.tmpdir(), `clerkly-test-${Date.now()}`);
+    testStoragePath = path.join(
+      os.tmpdir(),
+      `clerkly-test-${Date.now()}-${Math.random().toString(36).substring(7)}`
+    );
+
+    // Ensure directory exists before initializing DataManager
+    fs.mkdirSync(testStoragePath, { recursive: true });
 
     // Clear all mocks
     jest.clearAllMocks();
@@ -300,6 +306,11 @@ describe('Small Screen Adaptation Functional Tests', () => {
       // Update screen size in mock
       (screen as any).__setCurrentScreenSize(verySmallScreen);
 
+      // Ensure directory exists
+      if (!fs.existsSync(testStoragePath)) {
+        fs.mkdirSync(testStoragePath, { recursive: true });
+      }
+
       // Create new window manager with updated screen mock
       const newDataManager = new DataManager(testStoragePath);
       newDataManager.initialize();
@@ -423,6 +434,11 @@ describe('Small Screen Adaptation Functional Tests', () => {
 
       // Update screen size in mock
       (screen as any).__setCurrentScreenSize(differentAspectScreen);
+
+      // Ensure directory exists
+      if (!fs.existsSync(testStoragePath)) {
+        fs.mkdirSync(testStoragePath, { recursive: true });
+      }
 
       // Create new window manager
       const newDataManager = new DataManager(testStoragePath);

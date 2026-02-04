@@ -65,8 +65,14 @@ describe('Migration System Functional Tests', () => {
 
   beforeEach(() => {
     // Create unique test storage path for each test
-    testStoragePath = path.join(os.tmpdir(), `clerkly-migration-test-${Date.now()}`);
-    testMigrationsPath = path.join(os.tmpdir(), `clerkly-migrations-${Date.now()}`);
+    testStoragePath = path.join(
+      os.tmpdir(),
+      `clerkly-migration-test-${Date.now()}-${Math.random().toString(36).substring(7)}`
+    );
+    testMigrationsPath = path.join(
+      os.tmpdir(),
+      `clerkly-migrations-${Date.now()}-${Math.random().toString(36).substring(7)}`
+    );
 
     // Create test migrations directory
     fs.mkdirSync(testMigrationsPath, { recursive: true });

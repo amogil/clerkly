@@ -65,7 +65,10 @@ describe('Window Title Functional Tests', () => {
 
   beforeEach(() => {
     // Create unique test storage path for each test
-    testStoragePath = path.join(os.tmpdir(), `clerkly-test-${Date.now()}`);
+    testStoragePath = path.join(
+      os.tmpdir(),
+      `clerkly-test-${Date.now()}-${Math.random().toString(36).substring(7)}`
+    );
 
     // Clear all mocks
     jest.clearAllMocks();

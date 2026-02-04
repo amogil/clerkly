@@ -65,7 +65,13 @@ describe('Application Lifecycle Functional Tests', () => {
 
   beforeEach(() => {
     // Create unique test storage path for each test
-    testStoragePath = path.join(os.tmpdir(), `clerkly-test-${Date.now()}`);
+    testStoragePath = path.join(
+      os.tmpdir(),
+      `clerkly-test-${Date.now()}-${Math.random().toString(36).substring(7)}`
+    );
+
+    // Ensure directory exists before initializing DataManager
+    fs.mkdirSync(testStoragePath, { recursive: true });
 
     // Clear all mocks
     jest.clearAllMocks();
@@ -157,11 +163,26 @@ describe('Application Lifecycle Functional Tests', () => {
        Assertions: storage directory created, database file created, migrations table created
        Requirements: clerkly.1, clerkly.2*/
     it('should create storage directory and database on first startup', async () => {
+      // Remove the directory created in beforeEach to test first startup
+      if (fs.existsSync(testStoragePath)) {
+        try {
+          dataManager.close();
+        } catch (error) {
+          // Ignore errors
+        }
+        fs.rmSync(testStoragePath, { recursive: true, force: true });
+      }
+
       // Ensure storage does not exist
       expect(fs.existsSync(testStoragePath)).toBe(false);
 
+      // Create new components for fresh initialization
+      const newDataManager = new DataManager(testStoragePath);
+      const newWindowManager = new WindowManager(newDataManager);
+      const newLifecycleManager = new LifecycleManager(newWindowManager, newDataManager);
+
       // Initialize application
-      const result = await lifecycleManager.initialize();
+      const result = await newLifecycleManager.initialize();
 
       expect(result.success).toBe(true);
 
@@ -173,10 +194,14 @@ describe('Application Lifecycle Functional Tests', () => {
       expect(fs.existsSync(dbPath)).toBe(true);
 
       // Verify migrations were applied by checking migration runner
-      const migrationRunner = dataManager.getMigrationRunner();
+      const migrationRunner = newDataManager.getMigrationRunner();
       expect(migrationRunner).toBeDefined();
       const currentVersion = migrationRunner.getCurrentVersion();
       expect(currentVersion).toBeGreaterThanOrEqual(0);
+
+      // Clean up
+      await newLifecycleManager.handleQuit();
+      newDataManager.close();
     });
 
     /* Preconditions: application not running, migrations exist
@@ -303,6 +328,11 @@ describe('Application Lifecycle Functional Tests', () => {
 
       // Quit application
       await lifecycleManager.handleQuit();
+
+      // Ensure directory exists for new DataManager
+      if (!fs.existsSync(testStoragePath)) {
+        fs.mkdirSync(testStoragePath, { recursive: true });
+      }
 
       // Verify all data persisted
       const newDataManager = new DataManager(testStoragePath);
@@ -507,7 +537,10 @@ describe('Application Lifecycle Functional Tests', () => {
        Requirements: clerkly.2, clerkly.nfr.2*/
     it('should handle storage initialization errors gracefully', async () => {
       // Create a read-only directory to simulate permission issues
-      const readOnlyPath = path.join(os.tmpdir(), `clerkly-readonly-${Date.now()}`);
+      const readOnlyPath = path.join(
+        os.tmpdir(),
+        `clerkly-readonly-${Date.now()}-${Math.random().toString(36).substring(7)}`
+      );
       fs.mkdirSync(readOnlyPath, { recursive: true });
 
       // On Unix systems, we can make it read-only

@@ -83,7 +83,13 @@ describe('Window State Persistence Functional Tests', () => {
 
   beforeEach(() => {
     // Create unique test storage path for each test
-    testStoragePath = path.join(os.tmpdir(), `clerkly-test-${Date.now()}`);
+    testStoragePath = path.join(
+      os.tmpdir(),
+      `clerkly-test-${Date.now()}-${Math.random().toString(36).substring(7)}`
+    );
+
+    // Ensure directory exists before initializing DataManager
+    fs.mkdirSync(testStoragePath, { recursive: true });
 
     // Clear all mocks
     jest.clearAllMocks();
@@ -119,6 +125,11 @@ describe('Window State Persistence Functional Tests', () => {
        Assertions: window opens with saved size and position
        Requirements: ui.5.1, ui.5.2, ui.5.4 */
     it('should persist window state across restarts', async () => {
+      // Ensure directory exists
+      if (!fs.existsSync(testStoragePath)) {
+        fs.mkdirSync(testStoragePath, { recursive: true });
+      }
+
       // First launch - create window with default state
       const windowManager1 = new WindowManager(dataManager);
       const window1 = windowManager1.createWindow();
@@ -127,9 +138,9 @@ describe('Window State Persistence Functional Tests', () => {
       expect(window1).toBeDefined();
       expect(windowManager1.isWindowCreated()).toBe(true);
 
-      // Change window size and position
+      // Mock getBounds to return new bounds
       const newBounds = { x: 150, y: 200, width: 900, height: 700 };
-      window1.setBounds(newBounds);
+      (window1.getBounds as jest.Mock).mockReturnValue(newBounds);
 
       // Trigger resize and move events to save state
       const resizeHandler = (window1.on as jest.Mock).mock.calls.find(

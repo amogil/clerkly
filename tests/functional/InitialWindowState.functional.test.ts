@@ -25,7 +25,7 @@ jest.mock('electron', () => ({
     once: jest.fn(),
     show: jest.fn(),
     maximize: jest.fn(),
-    isMaximized: jest.fn().mockReturnValue(true),
+    isMaximized: jest.fn().mockReturnValue(false),
     isFullScreen: jest.fn().mockReturnValue(false),
     getBounds: jest.fn().mockReturnValue({ x: 100, y: 100, width: 1200, height: 800 }),
     getTitle: jest.fn().mockReturnValue(''),
@@ -66,7 +66,10 @@ describe('Initial Window State Functional Tests', () => {
 
   beforeEach(() => {
     // Create unique test storage path for each test
-    testStoragePath = path.join(os.tmpdir(), `clerkly-test-${Date.now()}`);
+    testStoragePath = path.join(
+      os.tmpdir(),
+      `clerkly-test-${Date.now()}-${Math.random().toString(36).substring(7)}`
+    );
 
     // Ensure directory exists before initializing DataManager
     fs.mkdirSync(testStoragePath, { recursive: true });
@@ -249,8 +252,9 @@ describe('Initial Window State Functional Tests', () => {
       // Verify window is not in fullscreen mode (which would hide system elements)
       expect(window.isFullScreen()).toBe(false);
 
-      // Verify window is maximized but not fullscreen (Requirements: ui.1.1, ui.1.4)
-      expect(window.isMaximized()).toBe(true);
+      // Verify window is NOT maximized (Requirements: ui.1.1, ui.1.4)
+      // Window opens large (workAreaSize) but not maximized to stay resizable
+      expect(window.isMaximized()).toBe(false);
       expect(window.isFullScreen()).toBe(false);
     });
   });
