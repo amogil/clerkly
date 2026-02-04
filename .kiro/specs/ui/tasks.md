@@ -35,10 +35,10 @@
 
 - [x] 1.5 Реализовать метод getDefaultState()
   - Получать размер экрана через screen.getPrimaryDisplay()
-  - Вычислять размеры как 90% от размера экрана
-  - Устанавливать isMaximized: true
-  - Вычислять позицию с отступом 5%
-  - **Requirements:** ui.1.1, ui.4.1, ui.4.2, ui.4.3
+  - Использовать workAreaSize (полный размер доступного экрана)
+  - Устанавливать isMaximized: false (окно не максимизировано, но занимает весь экран)
+  - Устанавливать позицию x: 0, y: 0
+  - **Requirements:** ui.1.1, ui.1.3, ui.4.1, ui.4.2, ui.4.3
 
 - [x] 1.6 Реализовать метод isPositionValid()
   - Получать список всех дисплеев через screen.getAllDisplays()
@@ -57,10 +57,12 @@
   - Загружать состояние через windowStateManager.loadState()
   - Устанавливать title: '' в конфигурации
   - Устанавливать titleBarStyle: 'default'
+  - Устанавливать resizable: true
   - Применять загруженные x, y, width, height
-  - Вызывать maximize() если isMaximized === true
+  - Вызывать maximize() ТОЛЬКО если isMaximized === true (восстановление сохраненного состояния)
+  - НЕ вызывать maximize() при первом запуске (isMaximized: false по умолчанию)
   - Вызывать setupStateTracking() после создания окна
-  - **Requirements:** ui.1.1, ui.1.2, ui.2.1, ui.3.1, ui.4.1, ui.4.2, ui.5.4, ui.5.5
+  - **Requirements:** ui.1.1, ui.1.2, ui.1.3, ui.2.1, ui.3.1, ui.4.1, ui.4.2, ui.5.4, ui.5.5
 
 - [x] 2.3 Реализовать метод setupStateTracking()
   - Подписаться на событие 'resize'
@@ -84,9 +86,9 @@
   - Mock DataManager.get() возвращает undefined
   - Вызвать loadState()
   - Проверить, что возвращается состояние по умолчанию
-  - Проверить isMaximized: true
-  - Проверить, что размеры основаны на размере экрана
-  - **Requirements:** ui.4.1, ui.5.5
+  - Проверить isMaximized: false (не максимизировано по умолчанию)
+  - Проверить, что размеры равны workAreaSize
+  - **Requirements:** ui.1.1, ui.1.3, ui.4.1, ui.5.5
 
 - [x] 3.2 Написать тест: should load saved state from database
   - Mock DataManager.get() возвращает валидный JSON
@@ -202,11 +204,13 @@
 - [x] 7.1 Написать функциональный тест: should open application with correct initial window state
   - Запустить приложение с чистой базой данных
   - Получить главное окно
-  - Проверить, что окно в состоянии maximized
+  - Проверить, что окно НЕ в состоянии maximized (isMaximized: false)
+  - Проверить, что окно занимает весь экран (размер = workAreaSize)
+  - Проверить, что окно resizable (можно изменять размер)
   - Проверить, что title пустой
   - Проверить, что не в fullscreen режиме
   - Закрыть приложение
-  - **Requirements:** ui.1.1, ui.1.2, ui.2.1, ui.3.1
+  - **Requirements:** ui.1.1, ui.1.2, ui.1.3, ui.2.1, ui.3.1
 
 - [x] 7.2 Написать функциональный тест: should persist window state across restarts
   - Запустить приложение

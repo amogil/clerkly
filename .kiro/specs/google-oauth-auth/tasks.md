@@ -47,6 +47,12 @@
 - [x] Создать генератор `tokenDataArb` для случайных токенов
 - **Requirements:** google-oauth-auth.4.1, google-oauth-auth.4.3, google-oauth-auth.4.4
 
+### 2.4 Создать property-based тесты для Token Refresh
+- [x] Создать файл `tests/property/auth/TokenRefresh.property.test.ts`
+- [x] Property тест: Token Update After Refresh (Property 13)
+- [x] Создать генератор для refresh token responses
+- **Requirements:** google-oauth-auth.6.3, google-oauth-auth.6.4
+
 ## 3. Реализация OAuth Client Manager
 
 ### 3.1 Создать базовую структуру OAuth Client Manager
@@ -97,7 +103,7 @@
 ### 3.6 Реализовать обновление access token
 - [x] Реализовать метод `refreshAccessToken(): Promise<boolean>`
 - [x] Формирование POST запроса на token endpoint с refresh_token
-- [ ] НЕ включать client_secret в запрос
+- [x] НЕ включать client_secret в запрос
 - [x] Обработка успешного ответа (обновление access_token и expires_at)
 - [x] Обработка нового refresh_token если предоставлен
 - [x] Обработка ошибки invalid_grant (очистка токенов)
@@ -127,7 +133,7 @@
 - [x] Тест: обработка invalid_grant при refresh
 - [x] Тест: logout с успешным revoke
 - [x] Тест: logout с неуспешным revoke
-- [ ] Тест: обработка сетевых ошибок
+- [x] Тест: обработка сетевых ошибок
 - **Requirements:** google-oauth-auth.1.1, google-oauth-auth.1.2, google-oauth-auth.1.3, google-oauth-auth.1.5, google-oauth-auth.2.2, google-oauth-auth.2.3, google-oauth-auth.3.1, google-oauth-auth.3.2, google-oauth-auth.3.3, google-oauth-auth.3.5, google-oauth-auth.5.1, google-oauth-auth.5.2, google-oauth-auth.5.3, google-oauth-auth.5.4, google-oauth-auth.6.1, google-oauth-auth.6.2, google-oauth-auth.6.3, google-oauth-auth.6.4, google-oauth-auth.6.5, google-oauth-auth.7.1, google-oauth-auth.7.2, google-oauth-auth.9.2
 
 ### 3.9 Создать property-based тесты для OAuth Client Manager
@@ -243,7 +249,7 @@
 - [x] Реализовать приватный метод `handleAuthSuccess(): Promise<void>`
 - [x] Реализовать приватный метод `handleAuthError(error: string, errorCode?: string): Promise<void>`
 - [x] Интегрировать с существующим WindowManager
-- **Requirements:** google-oauth-auth.14.1, google-oauth-auth.14.2, google-oauth-auth.14.3, google-oauth-auth.14.4, google-oauth-auth.14.5, google-oauth-auth.14.6
+- **Requirements:** google-oauth-auth.11.1, google-oauth-auth.11.4, google-oauth-auth.11.5
 
 ### 7.2 Создать модульные тесты для Auth Window Manager
 - [x] Создать файл `tests/unit/auth/AuthWindowManager.test.ts`
@@ -253,7 +259,7 @@
 - [x] Тест: закрытие Login Window и открытие Main Window при успешной авторизации
 - [x] Тест: обновление содержимого окна на Login Error Screen при ошибке
 - [x] Тест: обновление содержимого окна на Login Screen при retry
-- **Requirements:** google-oauth-auth.14.1, google-oauth-auth.14.2, google-oauth-auth.14.3, google-oauth-auth.14.4, google-oauth-auth.14.5, google-oauth-auth.14.6
+- **Requirements:** google-oauth-auth.11.1, google-oauth-auth.11.4, google-oauth-auth.11.5
 
 ### 7.3 Создать property-based тесты для Auth Window Manager
 - [x] Создать файл `tests/property/auth/AuthWindowManager.property.test.ts`
@@ -293,7 +299,7 @@
 - [x] Зарегистрировать deep link handler
 - [x] Зарегистрировать IPC handlers
 - [x] Инициализировать AuthWindowManager
-- **Requirements:** google-oauth-auth.2.1, google-oauth-auth.8.1, google-oauth-auth.14.1
+- **Requirements:** google-oauth-auth.2.1, google-oauth-auth.8.1, google-oauth-auth.11.1
 
 ### 9.2 Обновить preload script
 - [x] Обновить `src/preload/index.ts` для экспорта auth API
@@ -321,7 +327,7 @@
 - [x] Тест: обработка отмены авторизации пользователем
 - [x] Тест: обработка сетевых ошибок
 - [x] Тест: автоматическое обновление токена при истечении
-- **Requirements:** google-oauth-auth.11.1, google-oauth-auth.11.2, google-oauth-auth.11.3, google-oauth-auth.11.4, google-oauth-auth.11.5, google-oauth-auth.12.1, google-oauth-auth.12.2, google-oauth-auth.12.3, google-oauth-auth.12.4, google-oauth-auth.12.5, google-oauth-auth.12.6, google-oauth-auth.13.1, google-oauth-auth.13.2, google-oauth-auth.13.3, google-oauth-auth.13.4, google-oauth-auth.13.5, google-oauth-auth.13.6, google-oauth-auth.13.7, google-oauth-auth.14.1, google-oauth-auth.14.2, google-oauth-auth.14.3, google-oauth-auth.14.4, google-oauth-auth.14.5, google-oauth-auth.14.6, google-oauth-auth.7.3, google-oauth-auth.7.4, google-oauth-auth.7.5, google-oauth-auth.8.1, google-oauth-auth.8.3
+- **Requirements:** google-oauth-auth.11.1, google-oauth-auth.11.2, google-oauth-auth.11.3, google-oauth-auth.11.4, google-oauth-auth.11.5, google-oauth-auth.12.1, google-oauth-auth.12.2, google-oauth-auth.12.3, google-oauth-auth.12.4, google-oauth-auth.12.5, google-oauth-auth.12.6, google-oauth-auth.13.1, google-oauth-auth.13.2, google-oauth-auth.13.3, google-oauth-auth.13.4, google-oauth-auth.13.5, google-oauth-auth.13.6, google-oauth-auth.13.7, google-oauth-auth.7.3, google-oauth-auth.7.4, google-oauth-auth.7.5, google-oauth-auth.8.1, google-oauth-auth.8.3
 
 ## 11. Документация и Финализация
 

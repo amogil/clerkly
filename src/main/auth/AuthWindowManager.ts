@@ -77,16 +77,9 @@ export class AuthWindowManager {
         throw new Error('Failed to create window');
       }
 
-      // Configure window for login screen (smaller size)
-      this.windowManager.configureWindow({
-        width: 600,
-        height: 800,
-        resizable: false,
-      });
-
-      // Load login screen route
-      // Note: The actual routing will be handled by the renderer process
-      // This is just setting up the window
+      // Note: Window size and resizability are controlled by WindowManager
+      // Login screen is just content displayed in the main window
+      // The actual routing will be handled by the renderer process
     } catch (error) {
       console.error('[AuthWindowManager] Failed to show login window:', error);
       throw error;
@@ -102,20 +95,19 @@ export class AuthWindowManager {
    */
   private async showMainWindow(): Promise<void> {
     try {
-      // Close existing window if it's the login window
-      if (this.windowManager.isWindowCreated()) {
-        await this.windowManager.closeWindow();
-        this.currentWindow = null;
+      // Create window if not exists
+      if (!this.windowManager.isWindowCreated()) {
+        this.currentWindow = this.windowManager.createWindow();
+      } else {
+        this.currentWindow = this.windowManager.getWindow();
       }
-
-      // Create main window
-      this.currentWindow = this.windowManager.createWindow();
 
       if (!this.currentWindow) {
         throw new Error('Failed to create main window');
       }
 
-      // Main window uses default configuration (maximized, resizable)
+      // Note: Window uses default configuration from WindowManager
+      // Main content will be loaded by renderer process
     } catch (error) {
       console.error('[AuthWindowManager] Failed to show main window:', error);
       throw error;

@@ -96,7 +96,7 @@ describe('AuthWindowManager Property-Based Tests', () => {
           expect(mockWindowManager.configureWindow).toHaveBeenCalledWith({
             width: 600,
             height: 800,
-            resizable: false,
+            resizable: true,
           });
         }
       }),
@@ -202,7 +202,7 @@ describe('AuthWindowManager Property-Based Tests', () => {
         expect(mockWindowManager.configureWindow).toHaveBeenCalledWith({
           width: 600,
           height: 800,
-          resizable: false,
+          resizable: true,
         });
 
         consoleSpy.mockRestore();

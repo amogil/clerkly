@@ -88,7 +88,7 @@ describe('AuthWindowManager', () => {
     expect(mockWindowManager.configureWindow).toHaveBeenCalledWith({
       width: 600,
       height: 800,
-      resizable: false,
+      resizable: true,
     });
   });
 
@@ -155,7 +155,7 @@ describe('AuthWindowManager', () => {
     expect(mockWindowManager.configureWindow).toHaveBeenCalledWith({
       width: 600,
       height: 800,
-      resizable: false,
+      resizable: true,
     });
 
     consoleSpy.mockRestore();
@@ -203,7 +203,7 @@ describe('AuthWindowManager', () => {
     expect(mockWindowManager.configureWindow).toHaveBeenCalledWith({
       width: 600,
       height: 800,
-      resizable: false,
+      resizable: true,
     });
   });
 

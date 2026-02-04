@@ -197,11 +197,14 @@ class WindowManager {
 
       this.mainWindow = new BrowserWindow(windowConfig);
 
-      // Note: We don't call maximize() here even if windowState.isMaximized is true
-      // because on macOS, maximized windows cannot be resized by dragging edges.
-      // The window will open with the saved size (or full workAreaSize by default),
-      // which provides a large window that is still resizable.
       // Requirements: ui.1.1, ui.1.3
+      // On first launch, the window opens with workAreaSize dimensions but is NOT maximized.
+      // This ensures the window is immediately resizable by the user (ui.1.3).
+      // If the user previously maximized the window and we saved that state (ui.5.3, ui.5.4),
+      // we restore the maximized state here.
+      if (windowState.isMaximized) {
+        this.mainWindow.maximize();
+      }
 
       this.mainWindow.once('ready-to-show', () => {
         this.mainWindow?.show();

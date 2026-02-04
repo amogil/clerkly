@@ -168,9 +168,9 @@ describe('WindowManager', () => {
 
     /* Preconditions: WindowManager created, saved state has isMaximized: true
        Action: call createWindow()
-       Assertions: maximize() NOT called on window (to keep window resizable)
-       Requirements: ui.1.1, ui.1.3 */
-    it('should not maximize window even when saved state has isMaximized: true', () => {
+       Assertions: maximize() IS called to restore saved maximized state
+       Requirements: ui.1.1, ui.1.3, ui.5.3, ui.5.4 */
+    it('should maximize window when saved state has isMaximized: true', () => {
       // Mock saved state with isMaximized: true
       mockDataManager.loadData.mockReturnValue({
         success: true,
@@ -186,8 +186,9 @@ describe('WindowManager', () => {
       windowManager.createWindow();
       const mockWindow = getMockWindow();
 
-      // Window should NOT be maximized to keep it resizable
-      expect(mockWindow.maximize).not.toHaveBeenCalled();
+      // Window SHOULD be maximized to restore saved state (ui.5.3, ui.5.4)
+      // Maximized windows are still resizable on macOS when resizable: true (ui.1.3)
+      expect(mockWindow.maximize).toHaveBeenCalled();
     });
 
     /* Preconditions: WindowManager created, saved state has isMaximized: false
