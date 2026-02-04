@@ -308,11 +308,11 @@
 - **Requirements:** google-oauth-auth.8.1, google-oauth-auth.8.2, google-oauth-auth.8.3
 
 ### 9.3 Создать модульные тесты для интеграции
-- [ ] Создать файл `tests/unit/auth/Integration.test.ts`
-- [ ] Тест: инициализация всех OAuth компонентов
-- [ ] Тест: регистрация deep link handler
-- [ ] Тест: регистрация IPC handlers
-- [ ] Тест: доступность auth API в preload
+- [x] Создать файл `tests/unit/auth/Integration.test.ts`
+- [x] Тест: инициализация всех OAuth компонентов
+- [x] Тест: регистрация deep link handler
+- [x] Тест: регистрация IPC handlers
+- [x] Тест: доступность auth API в preload
 - **Requirements:** google-oauth-auth.2.1, google-oauth-auth.8.1
 
 ## 10. Функциональные Тесты

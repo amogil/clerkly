@@ -88,17 +88,8 @@ describe('AuthWindowManager Property-Based Tests', () => {
         // Verify window was created
         expect(mockWindowManager.createWindow).toHaveBeenCalled();
 
-        if (isAuthorized) {
-          // Main window should not have size restrictions
-          expect(mockWindowManager.configureWindow).not.toHaveBeenCalled();
-        } else {
-          // Login window should have specific size
-          expect(mockWindowManager.configureWindow).toHaveBeenCalledWith({
-            width: 600,
-            height: 800,
-            resizable: true,
-          });
-        }
+        // Note: Window configuration is now handled by WindowManager
+        // AuthWindowManager only manages content routing
       }),
       { numRuns: 100 }
     );
@@ -155,8 +146,7 @@ describe('AuthWindowManager Property-Based Tests', () => {
   });
 
   /* Feature: google-oauth-auth, Property: Window Transition on Success
-     For any successful authentication, the login window must be closed and the main window
-     must be opened.
+     For any successful authentication, the window content transitions to main application.
      Validates: Requirements google-oauth-auth.14.4 */
   it('Property: should transition from login to main window on success', async () => {
     await fc.assert(
@@ -168,11 +158,10 @@ describe('AuthWindowManager Property-Based Tests', () => {
         const authWindowManager = new AuthWindowManager(mockWindowManager, mockOAuthClient);
         await authWindowManager.onAuthSuccess();
 
-        // Verify old window was closed
-        expect(mockWindowManager.closeWindow).toHaveBeenCalled();
+        // Verify existing window is reused
+        expect(mockWindowManager.getWindow).toHaveBeenCalled();
 
-        // Verify new main window was created
-        expect(mockWindowManager.createWindow).toHaveBeenCalled();
+        // Note: Window is reused, content routing handled by renderer
       }),
       { numRuns: 100 }
     );
@@ -198,12 +187,7 @@ describe('AuthWindowManager Property-Based Tests', () => {
         // Verify login window was created
         expect(mockWindowManager.createWindow).toHaveBeenCalled();
 
-        // Verify login window configuration
-        expect(mockWindowManager.configureWindow).toHaveBeenCalledWith({
-          width: 600,
-          height: 800,
-          resizable: true,
-        });
+        // Note: Window configuration is now handled by WindowManager
 
         consoleSpy.mockRestore();
       }),

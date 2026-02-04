@@ -52,8 +52,13 @@ export class AuthWindowManager {
       }
     } catch (error) {
       console.error('[AuthWindowManager] Failed to initialize app:', error);
-      // Show login window on error
-      await this.showLoginWindow();
+      // Try to show login window on error, but don't retry if it fails
+      try {
+        await this.showLoginWindow();
+      } catch (loginError) {
+        console.error('[AuthWindowManager] Failed to show login window after error:', loginError);
+        throw loginError;
+      }
     }
   }
 

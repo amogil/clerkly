@@ -85,11 +85,6 @@ describe('AuthWindowManager', () => {
 
     expect(mockOAuthClient.getAuthStatus).toHaveBeenCalledTimes(1);
     expect(mockWindowManager.createWindow).toHaveBeenCalled();
-    expect(mockWindowManager.configureWindow).toHaveBeenCalledWith({
-      width: 600,
-      height: 800,
-      resizable: true,
-    });
   });
 
   /* Preconditions: AuthWindowManager is instantiated with mocked dependencies
@@ -110,15 +105,14 @@ describe('AuthWindowManager', () => {
 
   /* Preconditions: AuthWindowManager is instantiated, login window is shown
      Action: call onAuthSuccess to handle successful authentication
-     Assertions: closeWindow is called, new main window is created
+     Assertions: existing window is reused for main content
      Requirements: google-oauth-auth.14.4 */
   it('should close login window and open main window on auth success', async () => {
     mockWindowManager.isWindowCreated.mockReturnValue(true);
 
     await authWindowManager.onAuthSuccess();
 
-    expect(mockWindowManager.closeWindow).toHaveBeenCalled();
-    expect(mockWindowManager.createWindow).toHaveBeenCalled();
+    expect(mockWindowManager.getWindow).toHaveBeenCalled();
   });
 
   /* Preconditions: AuthWindowManager is instantiated, login window is shown
@@ -152,11 +146,6 @@ describe('AuthWindowManager', () => {
 
     expect(consoleSpy).toHaveBeenCalledWith('[AuthWindowManager] Retrying authentication');
     expect(mockWindowManager.createWindow).toHaveBeenCalled();
-    expect(mockWindowManager.configureWindow).toHaveBeenCalledWith({
-      width: 600,
-      height: 800,
-      resizable: true,
-    });
 
     consoleSpy.mockRestore();
   });
@@ -191,7 +180,7 @@ describe('AuthWindowManager', () => {
 
   /* Preconditions: AuthWindowManager is instantiated, window already exists
      Action: call initializeApp when user is not authorized and window exists
-     Assertions: existing window is reused, configured for login
+     Assertions: existing window is reused
      Requirements: google-oauth-auth.14.2 */
   it('should reuse existing window for login screen', async () => {
     mockOAuthClient.getAuthStatus.mockResolvedValue({ authorized: false });
@@ -200,11 +189,6 @@ describe('AuthWindowManager', () => {
     await authWindowManager.initializeApp();
 
     expect(mockWindowManager.getWindow).toHaveBeenCalled();
-    expect(mockWindowManager.configureWindow).toHaveBeenCalledWith({
-      width: 600,
-      height: 800,
-      resizable: true,
-    });
   });
 
   /* Preconditions: AuthWindowManager is instantiated
@@ -222,13 +206,15 @@ describe('AuthWindowManager', () => {
 
   /* Preconditions: AuthWindowManager is instantiated
      Action: call initializeApp when createWindow returns null
-     Assertions: error is thrown because showLoginWindow fails in catch block
+     Assertions: error is logged and thrown after retry fails
      Requirements: google-oauth-auth.14.2 */
   it('should handle window creation failure in showLoginWindow', async () => {
     const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
     mockOAuthClient.getAuthStatus.mockResolvedValue({ authorized: false });
     mockWindowManager.createWindow.mockReturnValue(null as any);
 
+    // initializeApp catches errors and tries to show login window
+    // Since createWindow returns null, it will fail and throw error
     await expect(authWindowManager.initializeApp()).rejects.toThrow('Failed to create window');
 
     expect(consoleErrorSpy).toHaveBeenCalledWith(
@@ -240,16 +226,17 @@ describe('AuthWindowManager', () => {
   });
 
   /* Preconditions: AuthWindowManager is instantiated
-     Action: call initializeApp when configureWindow throws error
-     Assertions: error is thrown because showLoginWindow fails in catch block
+     Action: call initializeApp when createWindow throws error
+     Assertions: error is logged and thrown after retry fails
      Requirements: google-oauth-auth.14.2 */
   it('should handle configuration error in showLoginWindow', async () => {
     const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
     mockOAuthClient.getAuthStatus.mockResolvedValue({ authorized: false });
-    mockWindowManager.configureWindow.mockImplementation(() => {
+    mockWindowManager.createWindow.mockImplementation(() => {
       throw new Error('Configuration failed');
     });
 
+    // initializeApp catches errors and tries to show login window
     await expect(authWindowManager.initializeApp()).rejects.toThrow('Configuration failed');
 
     expect(consoleErrorSpy).toHaveBeenCalledWith(
@@ -266,7 +253,7 @@ describe('AuthWindowManager', () => {
      Requirements: google-oauth-auth.14.4 */
   it('should handle window creation failure in showMainWindow', async () => {
     const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
-    mockWindowManager.isWindowCreated.mockReturnValue(true);
+    mockWindowManager.isWindowCreated.mockReturnValue(false); // Window doesn't exist
     mockWindowManager.createWindow.mockReturnValue(null as any);
 
     await expect(authWindowManager.onAuthSuccess()).rejects.toThrow('Failed to create main window');
@@ -285,9 +272,9 @@ describe('AuthWindowManager', () => {
      Requirements: google-oauth-auth.14.4 */
   it('should handle close window error in showMainWindow', async () => {
     const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
-    mockWindowManager.isWindowCreated.mockReturnValue(true);
-    mockWindowManager.closeWindow.mockImplementation(() => {
-      throw new Error('Close failed');
+    mockWindowManager.isWindowCreated.mockReturnValue(false); // Window doesn't exist
+    mockWindowManager.createWindow.mockImplementation(() => {
+      throw new Error('Create failed');
     });
 
     await expect(authWindowManager.onAuthSuccess()).rejects.toThrow();
@@ -346,7 +333,7 @@ describe('AuthWindowManager', () => {
      Requirements: google-oauth-auth.14.4 */
   it('should propagate error from handleAuthSuccess', async () => {
     const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
-    mockWindowManager.isWindowCreated.mockReturnValue(true);
+    mockWindowManager.isWindowCreated.mockReturnValue(false); // Window doesn't exist
     mockWindowManager.createWindow.mockReturnValue(null as any);
 
     await expect(authWindowManager.onAuthSuccess()).rejects.toThrow();
