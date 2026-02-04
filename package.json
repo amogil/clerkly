@@ -20,7 +20,7 @@
     "test:unit": "jest --config jest.unit.config.js",
     "test:property": "jest --config jest.property.config.js",
     "test:integration": "echo '⚠️  Integration tests use real Electron and may show windows' && jest --config jest.integration.config.js",
-    "test:functional": "echo '⚠️  Functional tests use real Electron and WILL show windows on screen' && jest --config jest.functional.config.js",
+    "test:functional": "jest --config jest.functional.config.js",
     "test:coverage": "jest --config jest.combined.config.js --coverage",
     "test:coverage:separate": "jest --config jest.unit.config.js --coverage --coverageDirectory=coverage/unit && jest --config jest.property.config.js --coverage --coverageDirectory=coverage/property",
     "test:watch": "jest --watch",
