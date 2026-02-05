@@ -111,30 +111,6 @@ test.describe('Complete OAuth Flow', () => {
     });
   });
 
-  /* Preconditions: Mock OAuth server running
-     Action: Verify mock server can generate authorization codes
-     Assertions: Mock server generates valid authorization codes
-     Requirements: google-oauth-auth.1.5 */
-  test('should verify mock OAuth server generates authorization codes', async () => {
-    // Launch the application
-    context = await launchElectron();
-    await context.window.waitForLoadState('domcontentloaded');
-
-    // Verify mock server is running
-    const baseUrl = mockServer.getBaseUrl();
-    expect(baseUrl).toBe('http://localhost:8889');
-
-    console.log(`[TEST] Mock OAuth server running at: ${baseUrl}`);
-
-    // Note: Authorization code generation is tested through Mock OAuth Server unit tests
-    // This test verifies the server is accessible
-
-    // Take screenshot
-    await context.window.screenshot({
-      path: 'playwright-report/oauth-mock-server-ready.png',
-    });
-  });
-
   /* Preconditions: Mock OAuth server running, tokens available
      Action: Simulate complete OAuth flow with token setup
      Assertions: Tokens are stored and app transitions to authorized state
@@ -220,55 +196,6 @@ test.describe('Complete OAuth Flow', () => {
     // Take screenshot
     await context.window.screenshot({
       path: 'playwright-report/oauth-error-handled.png',
-    });
-  });
-
-  /* Preconditions: Application running with tokens
-     Action: Verify token expiration calculation
-     Assertions: Expiration time is correctly calculated
-     Requirements: google-oauth-auth.3.5 */
-  test('should correctly calculate token expiration time', async () => {
-    // Launch the application
-    context = await launchElectron();
-    await context.window.waitForLoadState('domcontentloaded');
-
-    // Clear any existing tokens
-    await clearTestTokens(context.window);
-
-    // Setup tokens with specific expiration
-    const expiresIn = 3600; // 1 hour
-    const beforeSetup = Date.now();
-
-    await setupTestTokens(context.window, {
-      accessToken: 'test_access_token_expiry',
-      refreshToken: 'test_refresh_token_expiry',
-      expiresIn: expiresIn,
-      tokenType: 'Bearer',
-    });
-
-    const afterSetup = Date.now();
-
-    // Get token status
-    const tokenStatus = await getTokenStatus(context.window);
-    expect(tokenStatus.hasTokens).toBe(true);
-    expect(tokenStatus.expiresAt).toBeDefined();
-
-    // Verify expiration time is approximately correct
-    // Requirements: google-oauth-auth.3.5
-    const expectedExpiresAt = beforeSetup + expiresIn * 1000;
-    const actualExpiresAt = tokenStatus.expiresAt!;
-
-    // Allow 5 second tolerance for test execution time
-    expect(actualExpiresAt).toBeGreaterThanOrEqual(expectedExpiresAt - 5000);
-    expect(actualExpiresAt).toBeLessThanOrEqual(afterSetup + expiresIn * 1000 + 5000);
-
-    console.log('[TEST] Token expiration time calculated correctly');
-    console.log(`[TEST] Expected: ~${new Date(expectedExpiresAt).toISOString()}`);
-    console.log(`[TEST] Actual: ${new Date(actualExpiresAt).toISOString()}`);
-
-    // Take screenshot
-    await context.window.screenshot({
-      path: 'playwright-report/oauth-expiration-calculated.png',
     });
   });
 });

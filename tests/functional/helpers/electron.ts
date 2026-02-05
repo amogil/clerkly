@@ -209,7 +209,6 @@ export async function setupTestTokens(
     tokenType?: string;
   }
 ): Promise<void> {
-  const now = Date.now();
   const defaultTokens = {
     accessToken: tokens?.accessToken || 'test_access_token',
     refreshToken: tokens?.refreshToken || 'test_refresh_token',

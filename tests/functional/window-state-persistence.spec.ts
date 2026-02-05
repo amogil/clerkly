@@ -387,7 +387,7 @@ test.describe('Window State Persistence', () => {
 
     // Verify app is visible and can be activated
     // Requirements: ui.3.5
-    const appInfo = await context.app.evaluate(({ app, BrowserWindow }) => {
+    const appInfo = await context.app.evaluate(({ BrowserWindow }) => {
       const window = BrowserWindow.getAllWindows()[0];
 
       return {

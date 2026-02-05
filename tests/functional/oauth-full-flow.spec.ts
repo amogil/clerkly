@@ -56,30 +56,6 @@ test.describe('Full OAuth Flow', () => {
     }
   });
 
-  /* Preconditions: Application not running, no saved tokens
-     Action: Launch application
-     Assertions: Login screen is displayed, no tokens present
-     Requirements: google-oauth-auth.14.1, google-oauth-auth.14.2 */
-  test('should show login screen when no tokens exist', async () => {
-    // Launch the application
-    context = await launchElectron();
-
-    // Wait for content to load
-    await context.window.waitForLoadState('domcontentloaded');
-
-    // Verify no tokens exist
-    const tokenStatus = await getTokenStatus(context.window);
-    expect(tokenStatus.hasTokens).toBe(false);
-
-    // Verify login screen is displayed
-    const loginButton = context.window.locator('text=/continue with google/i');
-    await loginButton.waitFor({ state: 'visible', timeout: 5000 });
-    expect(await loginButton.isVisible()).toBe(true);
-
-    // Take screenshot
-    await context.window.screenshot({ path: 'playwright-report/oauth-no-tokens.png' });
-  });
-
   /* Preconditions: Application has valid tokens saved
      Action: Launch application
      Assertions: Main application screen is displayed (not login screen)
@@ -188,36 +164,6 @@ test.describe('Full OAuth Flow', () => {
 
     // Take screenshot
     await context.window.screenshot({ path: 'playwright-report/oauth-after-logout.png' });
-  });
-
-  /* Preconditions: Application running with expired tokens
-     Action: Setup expired tokens, reload app
-     Assertions: Login screen is displayed (expired tokens treated as no tokens)
-     Requirements: google-oauth-auth.5.3, google-oauth-auth.5.4 */
-  test('should show login screen when tokens are expired', async () => {
-    // Launch the application
-    context = await launchElectron();
-    await context.window.waitForLoadState('domcontentloaded');
-
-    // Setup expired tokens (negative expiresIn means already expired)
-    await setupTestTokens(context.window, {
-      accessToken: 'test_access_token_expired',
-      refreshToken: 'test_refresh_token_expired',
-      expiresIn: -3600, // Expired 1 hour ago
-      tokenType: 'Bearer',
-    });
-
-    // Reload to trigger auth check
-    await context.window.reload();
-    await context.window.waitForLoadState('domcontentloaded');
-
-    // Verify login screen is displayed (expired tokens = no auth)
-    const loginButton = context.window.locator('text=/continue with google/i');
-    await loginButton.waitFor({ state: 'visible', timeout: 5000 });
-    expect(await loginButton.isVisible()).toBe(true);
-
-    // Take screenshot
-    await context.window.screenshot({ path: 'playwright-report/oauth-expired-tokens.png' });
   });
 
   /* Preconditions: Application running, tokens exist

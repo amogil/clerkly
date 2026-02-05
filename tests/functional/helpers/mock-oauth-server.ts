@@ -115,7 +115,7 @@ export class MockOAuthServer {
    * Handle authorization request (GET /auth)
    */
   private handleAuthRequest(query: any, res: http.ServerResponse): void {
-    const { client_id, redirect_uri, state, response_type, scope } = query;
+    const { client_id, redirect_uri, state, response_type } = query;
 
     // Validate request
     if (client_id !== this.config.clientId) {
