@@ -14,5 +14,4 @@ export interface AgentTask {
   updatedAt: Date;
   completedAt?: Date;
   errorMessage?: string;
-  progress?: number; // 0-100 for in-progress tasks
 }

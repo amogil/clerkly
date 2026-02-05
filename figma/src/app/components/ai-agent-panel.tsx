@@ -35,7 +35,6 @@ export function AIAgentPanel({ onCommand }: AIAgentPanelProps) {
       status: 'in-progress',
       createdAt: new Date('2026-02-02T14:30:00'),
       updatedAt: new Date('2026-02-02T14:35:00'),
-      progress: 65,
     },
     {
       id: 'task-3',
@@ -171,18 +170,6 @@ export function AIAgentPanel({ onCommand }: AIAgentPanelProps) {
           content: (
             <div className="space-y-2">
               <p>Transcription in progress. Identified 8 action items so far.</p>
-              <div className="p-3 bg-blue-500/5 border border-blue-500/20 rounded-lg">
-                <div className="flex items-center gap-2 mb-2">
-                  <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />
-                  <span className="text-sm font-medium text-blue-600">Processing...</span>
-                </div>
-                <div className="w-full bg-secondary rounded-full h-2 mb-1">
-                  <div className="bg-blue-500 h-2 rounded-full" style={{ width: '65%' }} />
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  Progress: 65% complete
-                </div>
-              </div>
             </div>
           ),
           timestamp: new Date('2026-02-02T14:35:00'),
@@ -686,11 +673,18 @@ export function AIAgentPanel({ onCommand }: AIAgentPanelProps) {
                 <p className="text-sm leading-relaxed text-foreground">{message.content}</p>
               </div>
             ) : (
-              <div className="max-w-[90%] text-sm leading-relaxed text-foreground">
-                {message.content}
+              <div className="flex gap-3 items-start">
+                {/* Agent avatar with animated logo */}
+                <div className="flex-shrink-0 mt-0.5">
+                  <Logo size="sm" showText={false} animated={selectedTask.status === 'in-progress'} />
+                </div>
+                {/* Agent message content */}
+                <div className="flex-1 max-w-[85%] text-sm leading-relaxed text-foreground">
+                  {message.content}
+                </div>
               </div>
             )}
-            <div className={`text-xs text-muted-foreground ${message.type === 'user' ? 'text-right' : 'text-left'}`}>
+            <div className={`text-xs text-muted-foreground ${message.type === 'user' ? 'text-right' : 'ml-12'}`}>
               {formatTime(message.timestamp)}
             </div>
           </div>

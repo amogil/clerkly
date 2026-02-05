@@ -25,7 +25,7 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
               Welcome
             </h2>
             <p className="text-sm text-muted-foreground">
-              Your autonomous AI agent that listens, organizes, and acts
+              Your autonomous AI agent that listens, organizes, and&nbsp;acts
             </p>
           </div>
 
@@ -47,7 +47,7 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
           {/* Additional Info */}
           <div className="mt-8 text-center">
             <p className="text-xs text-muted-foreground leading-relaxed">
-              By continuing, you agree to Clerkly's Terms of Service and Privacy Policy
+              By continuing, you agree to Clerkly's Terms of Service and Privacy&nbsp;Policy
             </p>
           </div>
         </div>
