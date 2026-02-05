@@ -412,6 +412,48 @@ interface WindowState {
 
 **Validates: Requirements ui.5.4**
 
+### Property 8: Автоматическое заполнение профиля после авторизации
+
+*Для любого* пользователя, успешно авторизовавшегося через Google OAuth, Account Block должен автоматически заполниться данными профиля (имя, email), полученными из Google UserInfo API endpoint (`https://www.googleapis.com/oauth2/v1/userinfo`).
+
+**Validates: Requirements ui.6.2, ui.6.6**
+
+### Property 9: Отображение обязательных полей профиля
+
+*Для любого* профиля пользователя, Account Block должен отображать поля "Name" (имя пользователя) и "Email" (email адрес).
+
+**Validates: Requirements ui.6.3**
+
+### Property 10: Read-only поля профиля
+
+*Для любого* отображаемого профиля, все поля в Account Block должны иметь атрибут `readOnly` и не позволять пользователю редактировать данные.
+
+**Validates: Requirements ui.6.4**
+
+### Property 11: Автоматическое обновление при refresh token
+
+*Для любого* авторизованного пользователя, при каждом успешном обновлении access token (refresh token operation), система должна автоматически запрашивать актуальные данные профиля из Google UserInfo API и обновлять отображение в Account Block.
+
+**Validates: Requirements ui.6.5**
+
+### Property 12: Автоматическое обновление при запуске приложения
+
+*Для любого* авторизованного пользователя, при запуске приложения система должна автоматически запрашивать актуальные данные профиля из Google UserInfo API и отображать их в Account Block.
+
+**Validates: Requirements ui.6.5**
+
+### Property 13: Кэширование профиля при ошибках API
+
+*Для любого* запроса к UserInfo API, если запрос не удается (ошибка сети, таймаут, ошибка сервера), Account Block должен продолжать отображать последние сохраненные данные профиля из локального кэша.
+
+**Validates: Requirements ui.6.7**
+
+### Property 14: Очистка профиля при logout
+
+*Для любого* авторизованного пользователя, при выходе из системы (logout) Account Block должен очистить все данные профиля и вернуться к пустому состоянию.
+
+**Validates: Requirements ui.6.8**
+
 ### Edge Cases
 
 Следующие граничные случаи должны быть обработаны корректно:
@@ -421,6 +463,8 @@ interface WindowState {
 2. **Первый запуск (ui.5.5)**: Когда сохраненное состояние отсутствует, должно использоваться состояние по умолчанию с окном размером workAreaSize, но НЕ в maximized состоянии.
 
 3. **Невалидная позиция (ui.5.6)**: Когда сохраненная позиция находится за пределами доступных экранов, должно использоваться состояние по умолчанию на основном экране.
+
+4. **Не авторизован (ui.6.1)**: Когда пользователь не авторизован, Account Block должен отображать пустое состояние с сообщением "Not signed in".
 
 
 ## Обработка Ошибок
@@ -528,15 +572,117 @@ createWindow(): BrowserWindow {
 
 **Результат:** Ошибка пробрасывается выше, приложение не может продолжить работу без главного окна.
 
+#### 5. Ошибка получения профиля из Google API
+
+**Причины:**
+- Ошибка сети (нет интернета)
+- Таймаут запроса
+- Ошибка сервера Google (5xx)
+- Невалидный access token
+- Превышен лимит запросов API
+
+**Обработка:**
+```typescript
+// Requirements: ui.6.7
+async fetchProfile(): Promise<UserProfile | null> {
+  try {
+    const response = await fetch('https://www.googleapis.com/oauth2/v1/userinfo', {
+      headers: { 'Authorization': `Bearer ${accessToken}` }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`UserInfo API error: ${response.status}`);
+    }
+    
+    const profile = await response.json();
+    await this.saveProfile(profile);
+    return profile;
+  } catch (error) {
+    console.error('[UserProfileManager] Failed to fetch profile:', error);
+    // Return cached profile on error
+    return await this.loadProfile();
+  }
+}
+```
+
+**Результат:** Возвращаются кэшированные данные профиля, пользователь продолжает видеть последние известные данные.
+
+#### 6. Ошибка сохранения профиля
+
+**Причины:**
+- Ошибка записи в базу данных
+- Недостаточно места на диске
+- Проблемы с правами доступа
+
+**Обработка:**
+```typescript
+// Requirements: ui.6.2
+async saveProfile(profile: UserProfile): Promise<void> {
+  try {
+    await this.dataManager.saveData('user_profile', profile);
+  } catch (error) {
+    console.error('[UserProfileManager] Failed to save profile:', error);
+    throw error; // Propagate error to caller
+  }
+}
+```
+
+**Результат:** Ошибка логируется и пробрасывается. Профиль не сохраняется в кэш, но текущая сессия продолжает работать с данными в памяти.
+
+#### 7. Ошибка загрузки профиля из кэша
+
+**Причины:**
+- Поврежденные данные в базе данных
+- Ошибка чтения из базы данных
+- Несовместимый формат данных (после обновления приложения)
+
+**Обработка:**
+```typescript
+// Requirements: ui.6.7
+async loadProfile(): Promise<UserProfile | null> {
+  try {
+    const result = await this.dataManager.loadData('user_profile');
+    if (result.success && result.data) {
+      return result.data as UserProfile;
+    }
+    return null;
+  } catch (error) {
+    console.error('[UserProfileManager] Failed to load profile:', error);
+    return null; // Return null instead of throwing
+  }
+}
+```
+
+**Результат:** Возвращается null, компонент отображает пустое состояние. При следующем успешном запросе к API данные будут восстановлены.
+
 ### Логирование
 
 Все ошибки должны логироваться с достаточным контекстом для диагностики:
 
 ```typescript
+// Window management errors
 console.error('Failed to load window state:', error);
 console.error('Failed to save window state:', error);
 console.error('Failed to create window:', errorMessage);
+
+// Profile management errors
+console.error('[UserProfileManager] Failed to fetch profile:', error);
+console.error('[UserProfileManager] Failed to save profile:', error);
+console.error('[UserProfileManager] Failed to load profile:', error);
+console.error('[UserProfileManager] Failed to clear profile:', error);
+
+// IPC handler errors
+console.error('[AuthIPCHandlers] Failed to get profile:', errorMessage);
+console.error('[AuthIPCHandlers] Failed to refresh profile:', errorMessage);
+
+// Component errors
+console.error('[Account] Failed to load profile:', errorMessage);
 ```
+
+**Формат логов:**
+- Префикс с именем компонента в квадратных скобках
+- Описательное сообщение об ошибке
+- Объект ошибки для stack trace
 
 ## Стратегия Тестирования
 
@@ -964,6 +1110,16 @@ describe('Window UI Functional Tests', () => {
 | ui.5.4 | ✓ | ✓ | ✓ |
 | ui.5.5 | ✓ | - | - |
 | ui.5.6 | ✓ | - | - |
+| ui.6.1 | ✓ (planned) | - | ✓ (planned) |
+| ui.6.2 | ✓ (planned) | - | ✓ (planned) |
+| ui.6.3 | ✓ (planned) | - | ✓ (planned) |
+| ui.6.4 | ✓ (planned) | - | ✓ (planned) |
+| ui.6.5 | ✓ (planned) | - | ✓ (planned) |
+| ui.6.6 | ✓ (planned) | - | - |
+| ui.6.7 | ✓ (planned) | - | - |
+| ui.6.8 | ✓ (planned) | - | ✓ (planned) |
+
+**Примечание:** Требования ui.6.x (Блок Account) находятся в стадии планирования. Детальная стратегия тестирования описана в секции "Тестирование Account Block" ниже.
 
 ### Критерии Успеха
 
@@ -972,6 +1128,230 @@ describe('Window UI Functional Tests', () => {
 - Покрытие кода минимум 85%
 - Все требования покрыты тестами
 - Все граничные случаи обработаны корректно
+
+### Тестирование Account Block
+
+#### Модульные Тесты для UserProfileManager
+
+```typescript
+describe('UserProfileManager', () => {
+  /* Preconditions: OAuthClientManager returns valid tokens, Google UserInfo API mocked
+     Action: call fetchProfile()
+     Assertions: correct API request (URL, headers), profile data saved to DataManager
+     Requirements: ui.6.2, ui.6.6 */
+  it('should fetch profile from Google UserInfo API', async () => {
+    // Тест успешного получения профиля
+  });
+
+  /* Preconditions: Google UserInfo API returns error, cached profile exists in DataManager
+     Action: call fetchProfile()
+     Assertions: returns cached profile data, error logged
+     Requirements: ui.6.7 */
+  it('should return cached profile on API error', async () => {
+    // Тест возврата кэшированных данных при ошибке
+  });
+
+  /* Preconditions: OAuthClientManager returns null tokens
+     Action: call fetchProfile()
+     Assertions: returns null, no API request made
+     Requirements: ui.6.1 */
+  it('should return null when not authenticated', async () => {
+    // Тест возврата null для неавторизованного пользователя
+  });
+
+  /* Preconditions: valid profile object
+     Action: call saveProfile()
+     Assertions: DataManager.saveData called with correct key and data
+     Requirements: ui.6.2 */
+  it('should save profile to DataManager', async () => {
+    // Тест сохранения профиля
+  });
+
+  /* Preconditions: profile exists in DataManager
+     Action: call loadProfile()
+     Assertions: returns correct profile data
+     Requirements: ui.6.7 */
+  it('should load profile from DataManager', async () => {
+    // Тест загрузки профиля
+  });
+
+  /* Preconditions: profile exists in DataManager
+     Action: call clearProfile()
+     Assertions: DataManager.deleteData called with correct key
+     Requirements: ui.6.8 */
+  it('should clear profile from DataManager', async () => {
+    // Тест очистки профиля
+  });
+
+  /* Preconditions: UserProfileManager initialized
+     Action: call updateProfileAfterTokenRefresh()
+     Assertions: fetchProfile() called
+     Requirements: ui.6.5 */
+  it('should update profile after token refresh', async () => {
+    // Тест обновления профиля после refresh token
+  });
+});
+```
+
+#### Модульные Тесты для IPC Handlers
+
+```typescript
+describe('AuthIPCHandlers - Profile', () => {
+  /* Preconditions: UserProfileManager.loadProfile() returns profile
+     Action: invoke 'auth:get-profile' handler
+     Assertions: returns success response with profile data
+     Requirements: ui.6.2 */
+  it('should handle get-profile request', async () => {
+    // Тест получения профиля через IPC
+  });
+
+  /* Preconditions: UserProfileManager.loadProfile() throws error
+     Action: invoke 'auth:get-profile' handler
+     Assertions: returns error response
+     Requirements: ui.6.7 */
+  it('should handle get-profile errors', async () => {
+    // Тест обработки ошибок получения профиля
+  });
+
+  /* Preconditions: UserProfileManager.fetchProfile() returns updated profile
+     Action: invoke 'auth:refresh-profile' handler
+     Assertions: returns success response with fresh profile data
+     Requirements: ui.6.5 */
+  it('should handle refresh-profile request', async () => {
+    // Тест обновления профиля через IPC
+  });
+});
+```
+
+#### Модульные Тесты для Account Component
+
+```typescript
+describe('Account Component', () => {
+  /* Preconditions: window.api.auth.getProfile() returns null
+     Action: render Account component
+     Assertions: displays "Not signed in" message, no profile fields shown
+     Requirements: ui.6.1 */
+  it('should display empty state when not authenticated', () => {
+    // Тест отображения пустого состояния
+  });
+
+  /* Preconditions: window.api.auth.getProfile() returns profile data
+     Action: render Account component
+     Assertions: displays name and email fields with correct values
+     Requirements: ui.6.2, ui.6.3 */
+  it('should display profile data after authentication', () => {
+    // Тест отображения данных профиля
+  });
+
+  /* Preconditions: Account component rendered with profile data
+     Action: inspect input fields
+     Assertions: all input fields have readOnly attribute
+     Requirements: ui.6.4 */
+  it('should have read-only profile fields', () => {
+    // Тест read-only полей
+  });
+
+  /* Preconditions: Account component mounted, auth:success event triggered
+     Action: trigger auth:success event
+     Assertions: getProfile() called again, UI updated with new data
+     Requirements: ui.6.2 */
+  it('should reload profile on auth success event', () => {
+    // Тест перезагрузки профиля при успешной авторизации
+  });
+
+  /* Preconditions: Account component with profile data, logout triggered
+     Action: trigger logout event
+     Assertions: component returns to empty state, profile data cleared
+     Requirements: ui.6.8 */
+  it('should clear profile on logout', () => {
+    // Тест очистки профиля при logout
+  });
+});
+```
+
+#### Интеграционные Тесты
+
+```typescript
+describe('Account Integration Tests', () => {
+  /* Preconditions: real OAuthClientManager and UserProfileManager, mocked Google APIs
+     Action: perform OAuth login, wait for profile fetch
+     Assertions: profile automatically loaded, data saved to DataManager
+     Requirements: ui.6.2, ui.6.6 */
+  it('should load profile after OAuth login', async () => {
+    // Тест полного цикла авторизации и загрузки профиля
+  });
+
+  /* Preconditions: expired access token, valid refresh token
+     Action: trigger token refresh
+     Assertions: profile automatically updated after refresh
+     Requirements: ui.6.5 */
+  it('should update profile after token refresh', async () => {
+    // Тест автоматического обновления при refresh token
+  });
+
+  /* Preconditions: authenticated user, LifecycleManager initialized
+     Action: call LifecycleManager.initialize()
+     Assertions: profile automatically fetched on startup
+     Requirements: ui.6.5 */
+  it('should fetch profile on app startup', async () => {
+    // Тест загрузки профиля при запуске
+  });
+
+  /* Preconditions: cached profile in DataManager, Google API returns error
+     Action: call fetchProfile()
+     Assertions: returns cached data, no exception thrown
+     Requirements: ui.6.7 */
+  it('should use cached profile on API error', async () => {
+    // Тест использования кэша при ошибке API
+  });
+});
+```
+
+#### Функциональные Тесты
+
+```typescript
+describe('Account Functional Tests', () => {
+  /* Preconditions: fresh app start, no authentication
+     Action: launch app, navigate to Account block
+     Assertions: displays empty state with "Not signed in"
+     Requirements: ui.6.1 */
+  it('should show empty profile when not authenticated', async () => {
+    // Функциональный тест пустого состояния
+  });
+
+  /* Preconditions: fresh app start
+     Action: perform Google OAuth login, check Account block
+     Assertions: Account block populated with name and email from Google
+     Requirements: ui.6.2, ui.6.3 */
+  it('should populate profile after Google OAuth login', async () => {
+    // Функциональный тест заполнения профиля
+  });
+
+  /* Preconditions: authenticated user with profile displayed
+     Action: attempt to edit profile fields
+     Assertions: fields are read-only, cannot be edited
+     Requirements: ui.6.4 */
+  it('should not allow editing profile fields', async () => {
+    // Функциональный тест read-only полей
+  });
+
+  /* Preconditions: authenticated user, profile data changed in Google (mocked)
+     Action: wait for token refresh or trigger manually
+     Assertions: Account block displays updated data
+     Requirements: ui.6.5 */
+  it('should update profile when changed in Google', async () => {
+    // Функциональный тест обновления профиля
+  });
+
+  /* Preconditions: authenticated user with profile displayed
+     Action: perform logout
+     Assertions: Account block cleared, returns to empty state
+     Requirements: ui.6.8 */
+  it('should clear profile on logout', async () => {
+    // Функциональный тест очистки при logout
+  });
+});
+```
 
 ## Технические Решения и Обоснование
 
@@ -1063,6 +1443,691 @@ describe('Window UI Functional Tests', () => {
 - Эффективно - сохранение только при изменениях
 - Использует нативные события Electron
 
+### Решение 7: Стратегия Обновления Профиля
+
+**Решение:** Использовать **комбинированный подход** - обновление при запуске приложения И при каждом refresh token.
+
+**Альтернативы:**
+- Только при запуске приложения
+- Только при refresh token
+- Ручное обновление по кнопке
+- Периодический polling (каждые N минут)
+
+**Обоснование:**
+- Соответствует требованию ui.6.5 о автоматическом обновлении
+- Обеспечивает максимальную актуальность данных
+- Покрывает оба сценария: длительная работа приложения (обновление каждый час) и перезапуски (обновление при старте)
+- Не требует действий от пользователя
+- Дополнительные API запросы (при старте + каждый час) - приемлемая нагрузка для актуальности данных
+- Интегрируется с существующими механизмами (lifecycle и token refresh)
+- Оптимальный баланс между актуальностью и нагрузкой на Google API
+
+### Решение 8: Хранение Данных Профиля
+
+**Решение:** Хранить данные профиля в SQLite через существующий DataManager с ключом `user_profile`.
+
+**Альтернативы:**
+- Создать отдельную таблицу для профилей
+- Хранить в файловой системе (JSON файл)
+- Хранить только в памяти (без персистентности)
+
+**Обоснование:**
+- Использует существующую инфраструктуру
+- Обеспечивает персистентность между запусками
+- Позволяет отображать кэшированные данные при ошибках API (ui.6.7)
+- Легко очищается при logout (ui.6.8)
+- Транзакционность и надежность SQLite
+- Не требуется создание новых таблиц
+- Единая точка доступа к данным
+
+### Решение 9: Read-Only Поля
+
+**Решение:** Использовать HTML атрибут `readOnly` для полей ввода.
+
+**Альтернативы:**
+- Использовать disabled атрибут
+- Отображать данные как обычный текст (не input)
+- Использовать CSS pointer-events: none
+
+**Обоснование:**
+- Соответствует требованию ui.6.4
+- Визуально показывает, что поля не редактируемые
+- Позволяет копировать текст из полей (в отличие от disabled)
+- Поля остаются доступными для screen readers
+- Стандартный HTML подход
+- Лучшая accessibility по сравнению с disabled
+
+### Решение 10: Интеграция с OAuth через Dependency Injection
+
+**Решение:** Передавать OAuthClientManager в конструктор UserProfileManager и использовать метод `setProfileManager()` для обратной связи.
+
+**Альтернативы:**
+- Использовать глобальный singleton
+- Использовать event emitter для связи компонентов
+- Прямой импорт и использование модулей
+
+**Обоснование:**
+- Явные зависимости упрощают тестирование
+- Легко мокировать зависимости в тестах
+- Избегает циклических зависимостей
+- Следует принципам SOLID (Dependency Inversion)
+- Упрощает понимание потока данных
+- Позволяет легко заменить реализацию
+
+## Блок Account (Профиль Пользователя)
+
+### Обзор
+
+Блок Account отображает информацию о профиле пользователя, полученную из Google OAuth. Данные профиля автоматически синхронизируются с Google аккаунтом и не могут быть отредактированы пользователем в приложении.
+
+### Архитектура Компонента
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                      Main Process                            │
+│                                                               │
+│  ┌──────────────────────┐       ┌─────────────────────┐     │
+│  │ OAuthClientManager   │──────▶│ UserProfileManager  │     │
+│  │                      │       │                     │     │
+│  │ - refreshAccessToken()│       │ - fetchProfile()    │     │
+│  │ - getAuthStatus()    │       │ - saveProfile()     │     │
+│  └──────────────────────┘       │ - loadProfile()     │     │
+│           │                      │ - clearProfile()    │     │
+│           │                      └─────────────────────┘     │
+│           │                                │                 │
+│           ▼                                ▼                 │
+│  ┌──────────────────────┐       ┌─────────────────────┐     │
+│  │ Google UserInfo API  │       │    DataManager      │     │
+│  │ (HTTPS Request)      │       │     (SQLite)        │     │
+│  └──────────────────────┘       └─────────────────────┘     │
+│           │                                │                 │
+└───────────┼────────────────────────────────┼─────────────────┘
+            │                                │
+            ▼                                ▼
+   ┌─────────────────────────────────────────────┐
+   │          Renderer Process                   │
+   │                                              │
+   │  ┌────────────────────────────────┐         │
+   │  │     Account Component          │         │
+   │  │                                │         │
+   │  │  - Display name                │         │
+   │  │  - Display email               │         │
+   │  │  - Read-only fields            │         │
+   │  └────────────────────────────────┘         │
+   └─────────────────────────────────────────────┘
+```
+
+### Компоненты
+
+#### UserProfileManager
+
+Новый класс для управления данными профиля пользователя.
+
+```typescript
+// Requirements: ui.6.2, ui.6.3, ui.6.5, ui.6.6, ui.6.7, ui.6.8
+
+interface UserProfile {
+  id: string;
+  email: string;
+  verified_email: boolean;
+  name: string;
+  given_name: string;
+  family_name: string;
+  locale: string;
+  picture?: string; // Optional: URL to profile picture
+  lastUpdated: number; // Unix timestamp
+}
+
+class UserProfileManager {
+  private dataManager: DataManager;
+  private oauthClient: OAuthClientManager;
+  private readonly profileKey = 'user_profile';
+  
+  constructor(dataManager: DataManager, oauthClient: OAuthClientManager) {
+    this.dataManager = dataManager;
+    this.oauthClient = oauthClient;
+  }
+
+  /**
+   * Fetch user profile from Google UserInfo API
+   * Requirements: ui.6.2, ui.6.6
+   */
+  async fetchProfile(): Promise<UserProfile | null> {
+    try {
+      // Requirements: ui.6.6 - Check authentication status
+      const authStatus = await this.oauthClient.getAuthStatus();
+      if (!authStatus.authorized || !authStatus.tokens?.accessToken) {
+        console.log('[UserProfileManager] Not authenticated, cannot fetch profile');
+        return null;
+      }
+
+      // Requirements: ui.6.6 - Use Google UserInfo API endpoint
+      const response = await fetch('https://www.googleapis.com/oauth2/v1/userinfo', {
+        headers: {
+          'Authorization': `Bearer ${authStatus.tokens.accessToken}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`UserInfo API error: ${response.status} ${response.statusText}`);
+      }
+
+      const profileData = await response.json();
+      const profile: UserProfile = {
+        ...profileData,
+        lastUpdated: Date.now()
+      };
+
+      // Requirements: ui.6.2 - Save to local storage
+      await this.saveProfile(profile);
+      
+      console.log('[UserProfileManager] Profile fetched and saved successfully');
+      return profile;
+    } catch (error) {
+      console.error('[UserProfileManager] Failed to fetch profile:', error);
+      // Requirements: ui.6.7 - Return cached profile on error
+      return await this.loadProfile();
+    }
+  }
+
+  /**
+   * Save user profile to local storage
+   * Requirements: ui.6.2
+   */
+  async saveProfile(profile: UserProfile): Promise<void> {
+    try {
+      await this.dataManager.saveData(this.profileKey, profile);
+      console.log('[UserProfileManager] Profile saved to local storage');
+    } catch (error) {
+      console.error('[UserProfileManager] Failed to save profile:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Load user profile from local storage
+   * Requirements: ui.6.7
+   */
+  async loadProfile(): Promise<UserProfile | null> {
+    try {
+      const result = await this.dataManager.loadData(this.profileKey);
+      if (result.success && result.data) {
+        console.log('[UserProfileManager] Profile loaded from local storage');
+        return result.data as UserProfile;
+      }
+      return null;
+    } catch (error) {
+      console.error('[UserProfileManager] Failed to load profile:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Clear user profile from local storage
+   * Requirements: ui.6.8
+   */
+  async clearProfile(): Promise<void> {
+    try {
+      await this.dataManager.deleteData(this.profileKey);
+      console.log('[UserProfileManager] Profile cleared from local storage');
+    } catch (error) {
+      console.error('[UserProfileManager] Failed to clear profile:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Update profile after token refresh
+   * Called automatically by OAuthClientManager after successful token refresh
+   * Requirements: ui.6.5
+   */
+  async updateProfileAfterTokenRefresh(): Promise<void> {
+    console.log('[UserProfileManager] Updating profile after token refresh');
+    await this.fetchProfile();
+  }
+}
+```
+
+#### IPC Handlers для Profile
+
+Расширение `AuthIPCHandlers` для работы с профилем пользователя.
+
+```typescript
+// Requirements: ui.6.2, ui.6.5, ui.6.8
+
+interface IPCResult {
+  success: boolean;
+  profile?: UserProfile | null;
+  error?: string;
+}
+
+class AuthIPCHandlers {
+  private profileManager: UserProfileManager;
+
+  constructor(profileManager: UserProfileManager) {
+    this.profileManager = profileManager;
+  }
+
+  /**
+   * Register profile-related IPC handlers
+   * Should be called during app initialization
+   */
+  registerProfileHandlers(): void {
+    ipcMain.handle('auth:get-profile', this.handleGetProfile.bind(this));
+    ipcMain.handle('auth:refresh-profile', this.handleRefreshProfile.bind(this));
+    console.log('[AuthIPCHandlers] Profile handlers registered');
+  }
+
+  /**
+   * Handle get profile request
+   * Returns cached profile from local storage
+   * Requirements: ui.6.2, ui.6.7
+   */
+  private async handleGetProfile(): Promise<IPCResult> {
+    try {
+      const profile = await this.profileManager.loadProfile();
+      return {
+        success: true,
+        profile: profile
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('[AuthIPCHandlers] Failed to get profile:', errorMessage);
+      return {
+        success: false,
+        error: errorMessage
+      };
+    }
+  }
+
+  /**
+   * Handle refresh profile request
+   * Fetches fresh profile data from Google API
+   * Requirements: ui.6.5
+   */
+  private async handleRefreshProfile(): Promise<IPCResult> {
+    try {
+      const profile = await this.profileManager.fetchProfile();
+      return {
+        success: true,
+        profile: profile
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('[AuthIPCHandlers] Failed to refresh profile:', errorMessage);
+      return {
+        success: false,
+        error: errorMessage
+      };
+    }
+  }
+}
+```
+
+#### Account Component (Renderer)
+
+React компонент для отображения профиля пользователя.
+
+```typescript
+// Requirements: ui.6.1, ui.6.2, ui.6.3, ui.6.4, ui.6.8
+
+import { useState, useEffect } from 'react';
+
+interface UserProfile {
+  id: string;
+  email: string;
+  verified_email: boolean;
+  name: string;
+  given_name: string;
+  family_name: string;
+  locale: string;
+  picture?: string;
+  lastUpdated: number;
+}
+
+interface AccountProps {
+  className?: string;
+}
+
+export function Account({ className }: AccountProps) {
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Load profile on mount
+    loadProfile();
+    
+    // Requirements: ui.6.2 - Listen for auth success to reload profile
+    const unsubscribeAuthSuccess = window.api.auth.onAuthSuccess(() => {
+      console.log('[Account] Auth success event received, reloading profile');
+      loadProfile();
+    });
+
+    // Requirements: ui.6.8 - Listen for logout to clear profile
+    const unsubscribeLogout = window.api.auth.onLogout(() => {
+      console.log('[Account] Logout event received, clearing profile');
+      setProfile(null);
+      setError(null);
+    });
+
+    return () => {
+      unsubscribeAuthSuccess();
+      unsubscribeLogout();
+    };
+  }, []);
+
+  const loadProfile = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await window.api.auth.getProfile();
+      if (result.success && result.profile) {
+        setProfile(result.profile);
+        console.log('[Account] Profile loaded successfully');
+      } else if (result.error) {
+        setError(result.error);
+        console.error('[Account] Failed to load profile:', result.error);
+      } else {
+        // Not authenticated
+        setProfile(null);
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      setError(errorMessage);
+      console.error('[Account] Failed to load profile:', errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Requirements: ui.6.1 - Display empty state when not authenticated
+  if (loading) {
+    return (
+      <div className={`account-block ${className || ''}`}>
+        <div className="profile-loading">
+          <p>Loading profile...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className={`account-block ${className || ''}`}>
+        <div className="profile-error">
+          <p>Error loading profile: {error}</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!profile) {
+    return (
+      <div className={`account-block ${className || ''}`}>
+        <div className="profile-empty">
+          <p>Not signed in</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Requirements: ui.6.3, ui.6.4 - Display name and email as read-only fields
+  return (
+    <div className={`account-block ${className || ''}`}>
+      <div className="profile-info">
+        {profile.picture && (
+          <div className="profile-picture">
+            <img src={profile.picture} alt={profile.name} />
+          </div>
+        )}
+        <div className="profile-fields">
+          <div className="profile-field">
+            <label htmlFor="profile-name">Name</label>
+            <input
+              id="profile-name"
+              type="text"
+              value={profile.name}
+              readOnly
+              className="profile-input"
+            />
+          </div>
+          <div className="profile-field">
+            <label htmlFor="profile-email">Email</label>
+            <input
+              id="profile-email"
+              type="text"
+              value={profile.email}
+              readOnly
+              className="profile-input"
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+```
+
+**Ключевые особенности:**
+- Автоматическая загрузка профиля при монтировании компонента
+- Слушатели событий для auth:success и logout
+- Отображение состояний: loading, error, empty (не авторизован), filled (с данными)
+- Read-only поля для имени и email (ui.6.4)
+- Опциональное отображение аватара пользователя
+- Очистка подписок при размонтировании компонента
+```
+
+### Стратегии Обновления Профиля
+
+**Важное ограничение:** Google не предоставляет webhook/push notifications для изменений профиля обычных пользователей. Push notifications доступны только в Google Workspace Admin API для корпоративных аккаунтов. Для личных Google аккаунтов необходимо использовать polling (периодические запросы к API).
+
+#### Комбинированный подход: Обновление при запуске + при refresh token (Выбранная стратегия)
+
+**Реализация:**
+
+**1. Интеграция с LifecycleManager (обновление при запуске):**
+
+```typescript
+// Requirements: ui.6.5
+// In src/main/LifecycleManager.ts
+
+class LifecycleManager {
+  private profileManager: UserProfileManager;
+  private oauthClient: OAuthClientManager;
+
+  constructor(
+    dataManager: DataManager,
+    oauthClient: OAuthClientManager,
+    // ... other dependencies
+  ) {
+    this.oauthClient = oauthClient;
+    this.profileManager = new UserProfileManager(dataManager, oauthClient);
+    // ... other initializations
+  }
+
+  async initialize(): Promise<void> {
+    console.log('[LifecycleManager] Initializing application');
+    
+    // ... existing initialization logic ...
+    
+    // Requirements: ui.6.5 - Fetch profile on startup if authenticated
+    const authStatus = await this.oauthClient.getAuthStatus();
+    if (authStatus.authorized) {
+      console.log('[LifecycleManager] User authenticated, fetching profile');
+      await this.profileManager.fetchProfile();
+    } else {
+      console.log('[LifecycleManager] User not authenticated, skipping profile fetch');
+    }
+    
+    console.log('[LifecycleManager] Initialization complete');
+  }
+}
+```
+
+**2. Интеграция с OAuthClientManager (обновление при refresh token):**
+
+```typescript
+// Requirements: ui.6.5
+// In src/main/auth/OAuthClientManager.ts
+
+class OAuthClientManager {
+  private profileManager: UserProfileManager | null = null;
+
+  /**
+   * Set profile manager for automatic profile updates
+   * Should be called during initialization
+   */
+  setProfileManager(profileManager: UserProfileManager): void {
+    this.profileManager = profileManager;
+    console.log('[OAuthClientManager] Profile manager set for automatic updates');
+  }
+
+  async refreshAccessToken(): Promise<boolean> {
+    console.log('[OAuthClientManager] Refreshing access token');
+    
+    // ... existing token refresh logic ...
+    
+    if (refreshed) {
+      console.log('[OAuthClientManager] Token refreshed successfully');
+      
+      // Requirements: ui.6.5 - Automatically update profile after token refresh
+      if (this.profileManager) {
+        console.log('[OAuthClientManager] Triggering profile update after token refresh');
+        await this.profileManager.updateProfileAfterTokenRefresh();
+      }
+    }
+    
+    return refreshed;
+  }
+}
+```
+
+**3. Инициализация в Main Process:**
+
+```typescript
+// Requirements: ui.6.5
+// In src/main/index.ts
+
+async function initializeApp() {
+  const dataManager = new DataManager(/* ... */);
+  const oauthClient = new OAuthClientManager(/* ... */);
+  const profileManager = new UserProfileManager(dataManager, oauthClient);
+  
+  // Connect profile manager to oauth client for automatic updates
+  oauthClient.setProfileManager(profileManager);
+  
+  const lifecycleManager = new LifecycleManager(
+    dataManager,
+    oauthClient,
+    profileManager,
+    // ... other dependencies
+  );
+  
+  await lifecycleManager.initialize();
+}
+```
+
+**Преимущества:**
+- Данные всегда актуальны (обновляются при запуске и каждый час)
+- Не требует действий от пользователя
+- Минимальная задержка при отображении (данные в кэше)
+- Покрывает случаи длительной работы приложения и перезапусков
+- Оптимальный баланс между актуальностью и нагрузкой на API
+
+**Недостатки:**
+- Дополнительный API запрос при запуске
+- Дополнительный API запрос каждый час
+- Небольшое увеличение времени запуска и refresh операции
+
+**Частота обновлений:**
+- При запуске приложения: 1 раз
+- При работе приложения: каждый час (при refresh token)
+- Итого: ~25 запросов в день при непрерывной работе приложения 24 часа
+
+#### Альтернативный вариант: Ручное обновление (Не выбран)
+
+**Реализация:**
+```typescript
+// Добавить кнопку "Refresh Profile" в UI
+<button onClick={handleRefreshProfile}>
+  Refresh Profile
+</button>
+
+const handleRefreshProfile = async () => {
+  await window.api.auth.refreshProfile();
+  await loadProfile();
+};
+```
+
+**Преимущества:**
+- Полный контроль пользователя
+- Минимум API запросов
+- Простая реализация
+
+**Недостатки:**
+- Требует действий от пользователя
+- Данные могут быть устаревшими
+
+### Решения по Дизайну Account Block
+
+#### Решение 7: Стратегия Обновления Профиля
+
+**Решение:** Использовать **комбинированный подход** - обновление при запуске приложения И при каждом refresh token.
+
+**Обоснование:**
+- Соответствует требованию ui.6.5 о автоматическом обновлении
+- Обеспечивает максимальную актуальность данных
+- Покрывает оба сценария: длительная работа приложения (обновление каждый час) и перезапуски (обновление при старте)
+- Не требует действий от пользователя
+- Дополнительные API запросы (при старте + каждый час) - приемлемая нагрузка для актуальности данных
+- Интегрируется с существующими механизмами (lifecycle и token refresh)
+
+#### Решение 8: Хранение Данных Профиля
+
+**Решение:** Хранить данные профиля в SQLite через существующий DataManager с ключом `user_profile`.
+
+**Обоснование:**
+- Использует существующую инфраструктуру
+- Обеспечивает персистентность между запусками
+- Позволяет отображать кэшированные данные при ошибках API (ui.6.7)
+- Легко очищается при logout (ui.6.8)
+
+#### Решение 9: Read-Only Поля
+
+**Решение:** Использовать HTML атрибут `readOnly` для полей ввода.
+
+**Обоснование:**
+- Соответствует требованию ui.6.4
+- Визуально показывает, что поля не редактируемые
+- Позволяет копировать текст из полей
+- Стандартный HTML подход
+
 ## Заключение
 
 Данный дизайн обеспечивает надежное управление UI приложения с фокусом на нативный macOS опыт, персистентность состояния и адаптивность к различным конфигурациям экранов. Архитектура разделяет ответственность между `WindowManager` (управление жизненным циклом окна) и `WindowStateManager` (управление персистентностью состояния), обеспечивая чистоту кода и легкость тестирования.
+
+Блок Account интегрируется с существующей OAuth инфраструктурой и обеспечивает автоматическую синхронизацию данных профиля с Google аккаунтом пользователя. Комбинированная стратегия обновления (при запуске + при refresh token) гарантирует актуальность данных без необходимости действий от пользователя.
+
+### Статус Реализации
+
+**Фазы 1-2 (WindowManager, WindowStateManager):**
+- ✅ Полностью реализованы
+- ✅ Покрыты модульными, property-based и функциональными тестами
+- ✅ Все требования ui.1.x - ui.5.x выполнены
+
+**Фаза 3 (Account Block):**
+- ⏳ В стадии планирования
+- 📋 Требования ui.6.x определены
+- 📐 Дизайн детализирован
+- 📝 Задачи сформированы в tasks.md
+- ⏸️ Ожидает начала реализации
+
+### Следующие Шаги
+
+1. Начать реализацию Фазы 3 согласно tasks.md (задачи 10-20)
+2. Создать UserProfileManager с интеграцией в OAuth инфраструктуру
+3. Расширить IPC handlers для работы с профилем
+4. Создать Account React компонент
+5. Написать модульные, интеграционные и функциональные тесты
+6. Обновить таблицу покрытия требований после реализации

@@ -133,6 +133,73 @@
 
 - `tests/functional/window-state-persistence.spec.ts` - "should persist window size across restarts"
 
+### 6. Блок Account (Профиль Пользователя)
+
+**ID:** ui.6
+
+**User Story:** Как пользователь, я хочу видеть информацию о моем Google аккаунте в приложении, чтобы понимать под каким аккаунтом я авторизован, и чтобы эта информация автоматически обновлялась при изменении в Google.
+
+**Зависимости:** google-oauth-auth.3, google-oauth-auth.5
+
+#### Критерии Приемки
+
+6.1. WHEN пользователь не авторизован, THE "Account Block" SHALL отображать пустые поля профиля
+
+6.2. WHEN пользователь успешно авторизуется через Google OAuth, THE "Account Block" SHALL автоматически заполниться данными профиля из Google (имя, email)
+
+6.3. THE "Account Block" SHALL отображать следующие поля:
+   - Имя пользователя (name)
+   - Email адрес (email)
+
+6.4. THE "Account Block" SHALL НЕ позволять пользователю редактировать поля профиля (read-only)
+
+6.5. WHEN пользователь изменяет данные профиля в Google аккаунте, THE "Account Block" SHALL обновлять отображаемые данные следующими способами:
+   - При каждом обновлении access token (каждый час) автоматически запрашивать актуальные данные профиля через Google UserInfo API
+   - При запуске приложения запрашивать актуальные данные профиля
+
+**Примечание:** Google не предоставляет webhook/push notifications для изменений профиля обычных пользователей (личные аккаунты). Push notifications доступны только для Google Workspace Admin API (корпоративные аккаунты) для отслеживания изменений пользователей в организации. Для личных аккаунтов необходимо использовать polling (периодические запросы).
+
+6.6. THE "Account Block" SHALL использовать Google UserInfo API endpoint (`https://www.googleapis.com/oauth2/v1/userinfo`) для получения данных профиля
+
+6.7. WHEN запрос к UserInfo API не удается, THE "Account Block" SHALL продолжать отображать последние сохраненные данные профиля
+
+6.8. WHEN пользователь выходит из системы (logout), THE "Account Block" SHALL очищать все данные профиля и возвращаться к пустому состоянию
+
+#### Технические Детали
+
+**Данные профиля из Google UserInfo API:**
+```json
+{
+  "id": "123456789",
+  "email": "user@example.com",
+  "verified_email": true,
+  "name": "John Doe",
+  "given_name": "John",
+  "family_name": "Doe",
+  "locale": "en"
+}
+```
+
+**Стратегия обновления профиля:**
+- **При запуске приложения:** Загрузить актуальные данные профиля из UserInfo API
+- **При обновлении токена:** Автоматически обновлять профиль при каждом успешном refresh token (каждый час)
+- Сохранять данные профиля в базу данных (SQLite через DataManager)
+- Обновлять UI с новыми данными
+
+**Преимущества:**
+- Данные всегда актуальны (обновляются при запуске и каждый час)
+- Не требует действий от пользователя
+- Минимальная задержка при отображении (данные в базе данных)
+- Покрывает случаи длительной работы приложения и перезапусков
+
+#### Функциональные Тесты
+
+- `tests/functional/account-profile.spec.ts` - "should show empty profile when not authenticated"
+- `tests/functional/account-profile.spec.ts` - "should populate profile data (name, email) after Google OAuth login"
+- `tests/functional/account-profile.spec.ts` - "should not allow editing profile fields"
+- `tests/functional/account-profile.spec.ts` - "should update profile data when changed in Google"
+- `tests/functional/account-profile.spec.ts` - "should clear profile data on logout"
+
 ## Вне Области Применения
 
 Следующие элементы явно исключены из данной спецификации:
@@ -142,3 +209,4 @@
 - Сохранение состояния содержимого окна (только геометрия окна)
 - Управление несколькими окнами приложения
 - Полноэкранный режим (fullscreen mode)
+- Редактирование данных профиля пользователя в приложении
