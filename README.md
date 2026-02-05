@@ -14,8 +14,8 @@ Electron-приложение для Mac OS X с локальным хранен
 # Установка зависимостей
 npm install
 
-# Запуск приложения
-npm run dev
+# Запуск приложения (production build с полной функциональностью)
+npm start
 
 # Валидация проекта
 npm run validate
@@ -40,7 +40,8 @@ npm run validate
 
 ### Разработка
 ```bash
-npm run dev              # Запуск приложения
+npm start                # Запуск приложения (production build)
+npm run dev              # Запуск для разработки (быстрая сборка)
 npm run build            # Сборка проекта
 npm run typecheck        # Проверка типов
 ```

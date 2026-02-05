@@ -16,24 +16,50 @@ import { TokenStorageManager } from './auth/TokenStorageManager';
 import { getOAuthConfig, OAUTH_CONFIG } from './auth/OAuthConfig';
 import { AuthIPCHandlers } from './auth/AuthIPCHandlers';
 
+// Set app name for single instance lock
+// This helps macOS identify the app correctly
+app.setName('Clerkly');
+
 // Requirements: google-oauth-auth.2.2, google-oauth-auth.2.5
 // Request single instance lock BEFORE registering protocol
 // This ensures that deep links are handled by the existing instance
 const gotTheLock = app.requestSingleInstanceLock();
 
+console.log('[Main] Single instance lock:', gotTheLock ? 'ACQUIRED' : 'FAILED');
+console.log('[Main] Process args:', process.argv);
+console.log('[Main] Process defaultApp:', process.defaultApp);
+
 // Requirements: google-oauth-auth.2.1
 // Extract protocol scheme from redirect URI for deep link handling
 const protocolScheme = OAUTH_CONFIG.redirectUri.split(':')[0];
+console.log('[Main] Protocol scheme:', protocolScheme);
+
+// Track application initialization state
+let isAppInitialized = false;
+let pendingDeepLink: string | null = null;
 
 if (!gotTheLock) {
+  console.log('[Main] Another instance is already running');
+
+  // Check if this instance was launched with a deep link
+  const launchUrl = process.argv.find((arg) => arg.startsWith(protocolScheme));
+  if (launchUrl) {
+    console.log('[Main] This instance has deep link, will pass to primary instance:', launchUrl);
+    // The deep link will be passed to the primary instance via second-instance event
+  }
+
+  console.log('[Main] Quitting secondary instance...');
   app.quit();
 } else {
+  console.log('[Main] This is the primary instance');
+
   // Handle custom user data directory for functional tests
   // Check for --user-data-dir argument
   const userDataDirIndex = process.argv.indexOf('--user-data-dir');
   if (userDataDirIndex !== -1 && process.argv[userDataDirIndex + 1]) {
     const customUserDataPath = process.argv[userDataDirIndex + 1];
     app.setPath('userData', customUserDataPath);
+    console.log('[Main] Using custom user data path:', customUserDataPath);
   }
 
   // Register custom protocol for deep link handling
@@ -41,11 +67,14 @@ if (!gotTheLock) {
   if (process.defaultApp) {
     if (process.argv.length >= 2) {
       const execPath = process.execPath;
-      // In dev mode, point to the compiled main file
-      const mainPath = path.join(__dirname, 'index.js');
+      // In dev mode, we need to register with the full path to the entry point
+      // Get the absolute path to the main file
+      const mainPath = path.resolve(__dirname, 'index.js');
+      console.log('[Main] Registering protocol in dev mode:', { execPath, mainPath });
       app.setAsDefaultProtocolClient(protocolScheme, execPath, [mainPath]);
     }
   } else {
+    console.log('[Main] Registering protocol in production mode');
     app.setAsDefaultProtocolClient(protocolScheme);
   }
 }
@@ -55,6 +84,13 @@ if (!gotTheLock) {
 const userDataPath = app.getPath('userData');
 const storagePath = path.join(userDataPath, 'storage');
 const dataManager = new DataManager(storagePath);
+
+// Check if app was launched with a deep link
+const launchUrl = process.argv.find((arg) => arg.startsWith(protocolScheme));
+if (launchUrl) {
+  console.log('[Main] App launched with deep link:', launchUrl);
+  pendingDeepLink = launchUrl;
+}
 
 // Requirements: google-oauth-auth.4.1, google-oauth-auth.4.2
 // Initialize Token Storage Manager
@@ -168,6 +204,16 @@ app.whenReady().then(async () => {
     console.log('[Main] Auth Window Manager initialized');
 
     console.log('[Main] Main window created and loaded');
+
+    // Mark app as initialized
+    isAppInitialized = true;
+
+    // Process pending deep link if any
+    if (pendingDeepLink) {
+      console.log('[Main] Processing pending deep link:', pendingDeepLink);
+      await handleDeepLinkUrl(pendingDeepLink);
+      pendingDeepLink = null;
+    }
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     console.error('[Main] Startup error:', errorMessage);
@@ -200,91 +246,107 @@ app.on('before-quit', () => {
   lifecycleManager.handleWindowClose();
 });
 
+/**
+ * Handle deep link URL processing
+ * Requirements: google-oauth-auth.2.2, google-oauth-auth.2.5
+ * @param url Deep link URL to process
+ */
+async function handleDeepLinkUrl(url: string): Promise<void> {
+  if (!url.startsWith(protocolScheme)) {
+    return;
+  }
+
+  try {
+    console.log('[Main] Handling deep link:', url);
+
+    // Handle deep link first
+    const authStatus = await oauthClient.handleDeepLink(url);
+    console.log('[Main] Deep link auth status:', authStatus);
+
+    // Get main window
+    const mainWindow = BrowserWindow.getAllWindows()[0];
+
+    if (mainWindow) {
+      // Send auth event to renderer
+      if (authStatus.authorized) {
+        console.log('[Main] Sending auth success event');
+        authIPCHandlers.sendAuthSuccess();
+      } else if (authStatus.error) {
+        console.log('[Main] Sending auth error event:', authStatus.error);
+        authIPCHandlers.sendAuthError(authStatus.error, authStatus.error);
+      }
+
+      // Focus and restore window
+      if (mainWindow.isMinimized()) {
+        mainWindow.restore();
+      }
+      mainWindow.focus();
+      mainWindow.show();
+    } else {
+      console.warn('[Main] No window available to send auth event');
+    }
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('[Main] Deep link handling error:', errorMessage);
+
+    // Try to send error to window if available
+    const mainWindow = BrowserWindow.getAllWindows()[0];
+    if (mainWindow) {
+      authIPCHandlers.sendAuthError(errorMessage, 'unknown_error');
+    }
+  }
+}
+
 // Requirements: google-oauth-auth.2.2, google-oauth-auth.2.5
 // Handle deep link on macOS (open-url event)
 app.on('open-url', async (event, url) => {
   event.preventDefault();
+  console.log('[Main] open-url event received:', url);
 
-  if (url.startsWith(protocolScheme)) {
-    try {
-      // Handle deep link first
-      const authStatus = await oauthClient.handleDeepLink(url);
-
-      // Check if app is already initialized
-      const existingWindows = BrowserWindow.getAllWindows();
-
-      if (existingWindows.length > 0) {
-        // App is already running
-        const mainWindow = existingWindows[0];
-
-        // Send auth event to renderer
-        if (authStatus.authorized) {
-          authIPCHandlers.sendAuthSuccess();
-        } else if (authStatus.error) {
-          authIPCHandlers.sendAuthError(authStatus.error, authStatus.error);
-        }
-
-        mainWindow.focus();
-      } else {
-        // App is not initialized yet, initialize it now
-
-        // Initialize application
-        const initResult = await lifecycleManager.initialize();
-        if (!initResult.success) {
-          console.error('[Main] Application initialization failed');
-          app.quit();
-          return;
-        }
-
-        // Register IPC handlers
-        ipcHandlers.registerHandlers();
-        authIPCHandlers.registerHandlers();
-
-        // Initialize Auth Window Manager (will show Dashboard if authorized)
-        await authWindowManager.initializeApp();
-
-        // Focus the new window
-        const mainWindow = BrowserWindow.getAllWindows()[0];
-        if (mainWindow) {
-          mainWindow.focus();
-        }
-      }
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      console.error('[Main] Deep link handling error:', errorMessage);
-    }
+  if (!url.startsWith(protocolScheme)) {
+    return;
   }
+
+  // If app is not initialized yet, store the deep link for later processing
+  if (!isAppInitialized) {
+    console.log('[Main] App not initialized yet, storing deep link for later');
+    pendingDeepLink = url;
+    return;
+  }
+
+  // Process deep link immediately if app is initialized
+  await handleDeepLinkUrl(url);
 });
 
 // Requirements: google-oauth-auth.2.2, google-oauth-auth.2.5
 // Handle deep link on Windows/Linux (second-instance event)
 // Single instance lock is already requested at the top of the file
 app.on('second-instance', async (_event, commandLine, _workingDirectory) => {
+  console.log('[Main] second-instance event received');
+  console.log('[Main] Command line args:', commandLine);
+
   // Find deep link URL in command line arguments
   const url = commandLine.find((arg) => arg.startsWith(protocolScheme));
   if (url) {
-    try {
-      const authStatus = await oauthClient.handleDeepLink(url);
+    console.log('[Main] Deep link found in second-instance:', url);
 
-      // Send auth event to renderer
-      if (authStatus.authorized) {
-        authIPCHandlers.sendAuthSuccess();
-      } else if (authStatus.error) {
-        authIPCHandlers.sendAuthError(authStatus.error, authStatus.error);
+    // If app is not initialized yet, store the deep link for later processing
+    if (!isAppInitialized) {
+      console.log('[Main] App not initialized yet, storing deep link for later');
+      pendingDeepLink = url;
+    } else {
+      // Process deep link immediately if app is initialized
+      await handleDeepLinkUrl(url);
+    }
+  } else {
+    console.log('[Main] No deep link in command line, just activating window');
+    // No deep link, just activate the window
+    const mainWindow = BrowserWindow.getAllWindows()[0];
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) {
+        mainWindow.restore();
       }
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      console.error('[Main] Deep link handling error:', errorMessage);
-      authIPCHandlers.sendAuthError(errorMessage, 'unknown_error');
+      mainWindow.focus();
     }
-  }
-
-  // Activate application window
-  const mainWindow = BrowserWindow.getAllWindows()[0];
-  if (mainWindow) {
-    if (mainWindow.isMinimized()) {
-      mainWindow.restore();
-    }
-    mainWindow.focus();
   }
 });
