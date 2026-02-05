@@ -125,10 +125,16 @@ class WindowManager {
     // because on macOS, maximized windows cannot be resized by dragging edges.
     // The window will open with the saved size (or full workAreaSize by default),
     // which provides a large window that is still resizable.
+    // If the user previously maximized the window, we restore that state after showing.
     // Requirements: ui.1.1, ui.1.3
 
     this.mainWindow.once('ready-to-show', () => {
       this.mainWindow?.show();
+      
+      // Requirements: ui.5.4 - Restore maximized state if it was saved
+      if (windowState.isMaximized) {
+        this.mainWindow?.maximize();
+      }
     });
 
     // Requirements: ui.5.1, ui.5.2, ui.5.3
@@ -247,12 +253,14 @@ class WindowStateManager {
     const { width, height } = primaryDisplay.workAreaSize;
 
     // Requirements: ui.1.1, ui.1.3, ui.4.1, ui.4.2, ui.4.3
+    // Window opens at full workAreaSize but NOT in maximized state
+    // This allows immediate resizing by dragging window edges
     return {
       x: 0,
       y: 0,
       width: width,
       height: height,
-      isMaximized: false, // Requirements: ui.1.1, ui.1.3 - large window but not maximized, so it's resizable
+      isMaximized: false, // NOT maximized - window is resizable from the start
     };
   }
 
@@ -372,7 +380,7 @@ interface WindowState {
 
 ### Property 1: Окно открывается размером с workAreaSize, но не максимизировано
 
-*Для любого* первого запуска приложения (когда сохраненное состояние отсутствует), окно должно иметь размер равный workAreaSize (весь экран минус системные элементы macOS), но НЕ находиться в maximized состоянии, чтобы пользователь мог сразу изменять его размер.
+*Для любого* первого запуска приложения (когда сохраненное состояние отсутствует), окно должно иметь размер равный workAreaSize (весь экран минус системные элементы macOS), но НЕ находиться в maximized состоянии (isMaximized: false), чтобы пользователь мог сразу изменять его размер через перетаскивание краев окна.
 
 **Validates: Requirements ui.1.1, ui.1.3**
 
@@ -933,10 +941,10 @@ describe('WindowStateManager Property Tests', () => {
 });
 ```
 
-### Интеграционные Тесты
+### Функциональные Тесты (Window State)
 
 ```typescript
-describe('Window UI Integration', () => {
+describe('Window UI Functional Tests - State Persistence', () => {
   /* Preconditions: fresh application start, no saved state
      Action: create window, modify state, restart application
      Assertions: window opens with saved state
@@ -1269,10 +1277,10 @@ describe('Account Component', () => {
 });
 ```
 
-#### Интеграционные Тесты
+#### Функциональные Тесты (Profile Integration)
 
 ```typescript
-describe('Account Integration Tests', () => {
+describe('Account Functional Tests - Profile Integration', () => {
   /* Preconditions: real OAuthClientManager and UserProfileManager, mocked Google APIs
      Action: perform OAuth login, wait for profile fetch
      Assertions: profile automatically loaded, data saved to DataManager
@@ -2129,5 +2137,5 @@ const handleRefreshProfile = async () => {
 2. Создать UserProfileManager с интеграцией в OAuth инфраструктуру
 3. Расширить IPC handlers для работы с профилем
 4. Создать Account React компонент
-5. Написать модульные, интеграционные и функциональные тесты
+5. Написать модульные и функциональные тесты
 6. Обновить таблицу покрытия требований после реализации

@@ -187,9 +187,9 @@
   - **Property 6**
   - **Requirements:** ui.5.1, ui.5.2, ui.5.3
 
-### 6. Интеграционные Тесты
+### 6. Функциональные Тесты (Window State)
 
-- [x] 6.1 Написать интеграционный тест: should persist and restore window state across restarts
+- [x] 6.1 Написать функциональный тест: should persist and restore window state across restarts
   - Создать WindowManager с реальным DataManager
   - Создать окно
   - Изменить размер и позицию окна
@@ -305,9 +305,12 @@
   - **Requirements:** ui.6.2, ui.6.5, ui.6.6, ui.6.7, ui.6.8
 
 - [ ] 10.3 Интегрировать UserProfileManager с OAuthClientManager и LifecycleManager
-  - Добавить вызов `updateProfileAfterTokenRefresh()` в метод `refreshAccessToken()`
-  - Добавить вызов `fetchProfile()` в метод `LifecycleManager.initialize()` при авторизованном пользователе
+  - Добавить метод `setProfileManager()` в OAuthClientManager для установки связи с UserProfileManager
+  - Добавить вызов `updateProfileAfterTokenRefresh()` в метод `refreshAccessToken()` OAuthClientManager
+  - Добавить инициализацию UserProfileManager в LifecycleManager конструкторе
+  - Добавить вызов `fetchProfile()` в метод `LifecycleManager.initialize()` при авторизованном пользователе (проверка через `getAuthStatus()`)
   - Передать OAuthClientManager в конструктор UserProfileManager
+  - Связать компоненты через `oauthClient.setProfileManager(profileManager)` в main/index.ts
   - **Requirements:** ui.6.5
 
 ### 11. Расширение IPC Handlers
@@ -318,16 +321,16 @@
   - Обрабатывать ошибки и возвращать структурированный ответ
   - **Requirements:** ui.6.2, ui.6.7
 
-- [ ] 11.2 Добавить IPC handler для обновления профиля (опционально для Варианта C)
-  - Реализовать `auth:refresh-profile` handler
-  - Вызывать `fetchProfile()` для получения свежих данных
+- [ ] 11.2 Добавить IPC handler для обновления профиля
+  - Реализовать `auth:refresh-profile` handler в AuthIPCHandlers
+  - Вызывать `fetchProfile()` для получения свежих данных из Google API
   - Обрабатывать ошибки и возвращать структурированный ответ
   - **Requirements:** ui.6.5
 
 - [ ] 11.3 Расширить preload API
-  - Добавить метод `window.api.auth.getProfile()`
-  - Добавить метод `window.api.auth.refreshProfile()` (опционально)
-  - Обновить TypeScript типы для API
+  - Добавить метод `window.api.auth.getProfile()` в preload/index.ts
+  - Добавить метод `window.api.auth.refreshProfile()` в preload/index.ts
+  - Обновить TypeScript типы для API в src/types/index.ts
   - **Requirements:** ui.6.2, ui.6.5
 
 ### 12. Создание Account Component
@@ -373,172 +376,198 @@
 ### 14. Модульные Тесты для UserProfileManager
 
 - [ ] 14.1 Тест: fetchProfile() успешно получает данные из Google API
-  - Мокировать fetch для UserInfo API
-  - Мокировать OAuthClientManager.getTokens()
-  - Проверить корректность запроса (URL, headers)
-  - Проверить сохранение данных через DataManager
+  - Мокировать fetch для UserInfo API (https://www.googleapis.com/oauth2/v1/userinfo)
+  - Мокировать OAuthClientManager.getAuthStatus() для возврата authorized: true и валидного accessToken
+  - Вызвать fetchProfile()
+  - Проверить корректность запроса (URL, Authorization header с Bearer token)
+  - Проверить сохранение данных через DataManager.saveData()
   - **Requirements:** ui.6.2, ui.6.6
 
 - [ ] 14.2 Тест: fetchProfile() возвращает кэшированные данные при ошибке API
-  - Мокировать fetch для возврата ошибки
-  - Мокировать DataManager.loadData() с кэшированными данными
-  - Проверить, что возвращаются кэшированные данные
+  - Мокировать fetch для возврата ошибки (network error или HTTP error)
+  - Мокировать DataManager.loadProfile() с кэшированными данными
+  - Вызвать fetchProfile()
+  - Проверить, что возвращаются кэшированные данные из loadProfile()
+  - Проверить, что ошибка залогирована
   - **Requirements:** ui.6.7
 
 - [ ] 14.3 Тест: fetchProfile() возвращает null если нет токенов
-  - Мокировать OAuthClientManager.getTokens() для возврата null
+  - Мокировать OAuthClientManager.getAuthStatus() для возврата authorized: false или null tokens
+  - Вызвать fetchProfile()
   - Проверить, что метод возвращает null
-  - Проверить, что API запрос не выполняется
+  - Проверить, что API запрос не выполняется (fetch не вызывается)
   - **Requirements:** ui.6.1
 
 - [ ] 14.4 Тест: saveProfile() корректно сохраняет данные
-  - Создать тестовый профиль
-  - Вызвать saveProfile()
-  - Проверить вызов DataManager.saveData() с правильными параметрами
+  - Создать тестовый профиль с полями (id, email, name, etc.)
+  - Вызвать saveProfile(profile)
+  - Проверить вызов DataManager.saveData() с ключом 'user_profile' и правильными данными
   - **Requirements:** ui.6.2
 
 - [ ] 14.5 Тест: loadProfile() корректно загружает данные
-  - Мокировать DataManager.loadData()
+  - Мокировать DataManager.loadData() для возврата { success: true, data: profileData }
   - Вызвать loadProfile()
-  - Проверить корректность возвращаемых данных
+  - Проверить корректность возвращаемых данных (соответствие UserProfile интерфейсу)
   - **Requirements:** ui.6.7
 
 - [ ] 14.6 Тест: clearProfile() удаляет данные
   - Вызвать clearProfile()
   - Проверить вызов DataManager.deleteData() с ключом 'user_profile'
+  - Проверить, что метод не выбрасывает исключений
   - **Requirements:** ui.6.8
 
 - [ ] 14.7 Тест: updateProfileAfterTokenRefresh() вызывает fetchProfile()
-  - Мокировать fetchProfile()
+  - Мокировать fetchProfile() метод
   - Вызвать updateProfileAfterTokenRefresh()
-  - Проверить, что fetchProfile() был вызван
+  - Проверить, что fetchProfile() был вызван один раз
+  - Проверить, что метод не выбрасывает исключений
   - **Requirements:** ui.6.5
 
 ### 15. Модульные Тесты для IPC Handlers
 
 - [ ] 15.1 Тест: auth:get-profile возвращает профиль
-  - Мокировать UserProfileManager.loadProfile()
-  - Вызвать IPC handler
-  - Проверить структуру ответа
+  - Мокировать UserProfileManager.loadProfile() для возврата тестового профиля
+  - Вызвать IPC handler 'auth:get-profile'
+  - Проверить структуру ответа { success: true, profile: {...} }
+  - Проверить, что profile содержит все необходимые поля
   - **Requirements:** ui.6.2
 
 - [ ] 15.2 Тест: auth:get-profile обрабатывает ошибки
   - Мокировать UserProfileManager.loadProfile() для выброса ошибки
-  - Вызвать IPC handler
-  - Проверить, что возвращается ошибка
+  - Вызвать IPC handler 'auth:get-profile'
+  - Проверить, что возвращается { success: false, error: "..." }
+  - Проверить, что ошибка залогирована
   - **Requirements:** ui.6.7
 
 - [ ] 15.3 Тест: auth:refresh-profile обновляет профиль
-  - Мокировать UserProfileManager.fetchProfile()
-  - Вызвать IPC handler
+  - Мокировать UserProfileManager.fetchProfile() для возврата обновленного профиля
+  - Вызвать IPC handler 'auth:refresh-profile'
   - Проверить, что fetchProfile() был вызван
-  - Проверить структуру ответа
+  - Проверить структуру ответа { success: true, profile: {...} }
   - **Requirements:** ui.6.5
 
 ### 16. Модульные Тесты для Account Component
 
 - [ ] 16.1 Тест: отображает пустое состояние когда не авторизован
-  - Мокировать window.api.auth.getProfile() для возврата null
-  - Рендерить компонент
-  - Проверить отображение "Not signed in"
+  - Мокировать window.api.auth.getProfile() для возврата { success: true, profile: null }
+  - Рендерить компонент Account
+  - Проверить отображение текста "Not signed in"
+  - Проверить отсутствие полей профиля
   - **Requirements:** ui.6.1
 
 - [ ] 16.2 Тест: отображает данные профиля после авторизации
-  - Мокировать window.api.auth.getProfile() с тестовыми данными
-  - Рендерить компонент
-  - Проверить отображение имени, email
+  - Мокировать window.api.auth.getProfile() с тестовыми данными профиля
+  - Рендерить компонент Account
+  - Проверить отображение имени (name field)
+  - Проверить отображение email (email field)
+  - Проверить, что значения соответствуют тестовым данным
   - **Requirements:** ui.6.2, ui.6.3
 
 - [ ] 16.3 Тест: поля профиля read-only
-  - Рендерить компонент с данными профиля
-  - Проверить, что input поля имеют атрибут readOnly
-  - Попытаться изменить значение
+  - Рендерить компонент Account с данными профиля
+  - Найти input поля для name и email
+  - Проверить, что input поля имеют атрибут readOnly={true}
+  - Попытаться изменить значение через fireEvent.change()
   - Проверить, что значение не изменилось
   - **Requirements:** ui.6.4
 
 - [ ] 16.4 Тест: перезагружает профиль при событии auth:success
-  - Мокировать window.api.auth.onAuthSuccess()
-  - Рендерить компонент
-  - Триггернуть событие auth:success
-  - Проверить, что getProfile() вызван повторно
+  - Мокировать window.api.auth.onAuthSuccess() для регистрации callback
+  - Мокировать window.api.auth.getProfile() с начальными данными
+  - Рендерить компонент Account
+  - Триггернуть событие auth:success через callback
+  - Проверить, что getProfile() вызван повторно (второй раз)
   - **Requirements:** ui.6.2
 
 - [ ] 16.5 Тест: очищает профиль при logout
-  - Рендерить компонент с данными профиля
-  - Триггернуть logout
-  - Проверить, что компонент вернулся к пустому состоянию
+  - Рендерить компонент Account с данными профиля
+  - Мокировать window.api.auth.onLogout() для регистрации callback
+  - Триггернуть logout через callback
+  - Проверить, что компонент вернулся к пустому состоянию (отображает "Not signed in")
+  - Проверить, что поля профиля не отображаются
   - **Requirements:** ui.6.8
 
-### 17. Интеграционные Тесты
+### 17. Функциональные Тесты (Profile Integration)
 
 - [ ] 17.1 Тест: полный цикл авторизации и загрузки профиля
-  - Создать реальный OAuthClientManager и UserProfileManager
-  - Мокировать Google OAuth API и UserInfo API
-  - Выполнить авторизацию
-  - Проверить, что профиль автоматически загружен
-  - Проверить, что данные сохранены в DataManager
+  - Создать реальный OAuthClientManager и UserProfileManager с DataManager
+  - Мокировать Google OAuth API и UserInfo API (https://www.googleapis.com/oauth2/v1/userinfo)
+  - Выполнить авторизацию через OAuthClientManager
+  - Проверить, что профиль автоматически загружен через fetchProfile()
+  - Проверить, что данные сохранены в DataManager с ключом 'user_profile'
   - **Requirements:** ui.6.2, ui.6.6
 
 - [ ] 17.2 Тест: автоматическое обновление профиля при refresh token
   - Создать реальный OAuthClientManager и UserProfileManager
-  - Мокировать токены с истекшим access token
-  - Вызвать getAuthStatus() для триггера refresh
-  - Проверить, что профиль автоматически обновлен
+  - Мокировать токены с истекшим access token (expired)
+  - Мокировать Google Token API для refresh
+  - Мокировать Google UserInfo API
+  - Вызвать refreshAccessToken() или getAuthStatus() для триггера refresh
+  - Проверить, что профиль автоматически обновлен через updateProfileAfterTokenRefresh()
   - **Requirements:** ui.6.5
 
 - [ ] 17.3 Тест: автоматическое обновление профиля при запуске приложения
-  - Создать реальный LifecycleManager и UserProfileManager
-  - Мокировать авторизованное состояние
-  - Вызвать initialize()
-  - Проверить, что профиль автоматически загружен
+  - Создать реальный LifecycleManager, OAuthClientManager и UserProfileManager
+  - Мокировать авторизованное состояние (getAuthStatus возвращает authorized: true)
+  - Мокировать Google UserInfo API
+  - Вызвать LifecycleManager.initialize()
+  - Проверить, что fetchProfile() был вызван автоматически
+  - Проверить, что профиль сохранен в DataManager
   - **Requirements:** ui.6.5
 
 - [ ] 17.4 Тест: кэширование профиля при ошибке API
-  - Создать реальный UserProfileManager
-  - Сохранить тестовый профиль в DataManager
-  - Мокировать UserInfo API для возврата ошибки
+  - Создать реальный UserProfileManager с DataManager
+  - Сохранить тестовый профиль в DataManager через saveProfile()
+  - Мокировать UserInfo API для возврата ошибки (network error или 500)
   - Вызвать fetchProfile()
-  - Проверить, что возвращены кэшированные данные
+  - Проверить, что возвращены кэшированные данные из DataManager
+  - Проверить, что ошибка залогирована
   - **Requirements:** ui.6.7
 
 ### 18. Функциональные Тесты
 
 - [ ] 18.1 Функциональный тест: should show empty profile when not authenticated
-  - Запустить приложение без авторизации
-  - Открыть Account блок
-  - Проверить отображение пустого состояния
+  - Запустить приложение без авторизации (чистая база данных)
+  - Открыть Account блок в UI
+  - Проверить отображение пустого состояния с текстом "Not signed in"
+  - Проверить отсутствие полей профиля
   - Закрыть приложение
   - **Requirements:** ui.6.1
 
 - [ ] 18.2 Функциональный тест: should populate profile data after Google OAuth login
   - Запустить приложение
-  - Выполнить авторизацию через Google OAuth
+  - Выполнить авторизацию через Google OAuth (с mock OAuth server)
+  - Дождаться завершения авторизации
   - Проверить, что Account блок заполнен данными профиля
-  - Проверить отображение имени, email
+  - Проверить отображение имени (name field с корректным значением)
+  - Проверить отображение email (email field с корректным значением)
   - Закрыть приложение
   - **Requirements:** ui.6.2, ui.6.3
 
 - [ ] 18.3 Функциональный тест: should not allow editing profile fields
-  - Запустить приложение с авторизацией
+  - Запустить приложение с авторизацией (предварительно сохраненные токены)
   - Открыть Account блок
-  - Попытаться изменить поля профиля
-  - Проверить, что поля read-only
+  - Попытаться кликнуть на поля профиля (name, email)
+  - Попытаться изменить текст в полях
+  - Проверить, что поля read-only (не редактируются)
   - Закрыть приложение
   - **Requirements:** ui.6.4
 
 - [ ] 18.4 Функциональный тест: should update profile data when changed in Google
   - Запустить приложение с авторизацией
-  - Изменить данные профиля в Google (эмулировать через mock)
-  - Подождать обновления токена или триггернуть вручную
-  - Проверить, что данные в Account блоке обновились
+  - Проверить начальные данные профиля в Account блоке
+  - Изменить данные профиля в Google (эмулировать через mock - обновить UserInfo API response)
+  - Подождать обновления токена (триггернуть refresh) или триггернуть вручную через IPC
+  - Проверить, что данные в Account блоке обновились на новые значения
   - Закрыть приложение
   - **Requirements:** ui.6.5
 
 - [ ] 18.5 Функциональный тест: should clear profile data on logout
   - Запустить приложение с авторизацией
-  - Проверить, что Account блок заполнен
-  - Выполнить logout
-  - Проверить, что Account блок очищен
+  - Проверить, что Account блок заполнен данными профиля
+  - Выполнить logout через UI или IPC
+  - Проверить, что Account блок очищен и отображает "Not signed in"
+  - Проверить, что данные профиля удалены из DataManager
   - Закрыть приложение
   - **Requirements:** ui.6.8
 
