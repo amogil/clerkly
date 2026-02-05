@@ -31,8 +31,9 @@ describe('OAuthConfig Property-Based Tests', () => {
           // Property: Client ID is preserved
           expect(config.clientId).toBe(clientId);
 
-          // Property: Redirect URI is correct format (google-oauth-auth.10.2)
-          expect(config.redirectUri).toBe('clerkly://oauth/callback');
+          // Property: Redirect URI is in reverse client ID format (google-oauth-auth.10.2)
+          expect(config.redirectUri).toMatch(/^com\.googleusercontent\.apps\./);
+          expect(config.redirectUri).toContain(':/oauth2redirect');
 
           // Property: Scopes are correct (google-oauth-auth.10.3)
           expect(config.scopes).toEqual(['openid', 'email', 'profile']);
@@ -108,11 +109,9 @@ describe('OAuthConfig Property-Based Tests', () => {
         fc.property(fc.string({ minLength: 10, maxLength: 200 }), (clientId) => {
           const config = getOAuthConfig(clientId);
 
-          // Property: Redirect URI is custom protocol
-          expect(config.redirectUri).toMatch(/^clerkly:\/\//);
-
-          // Property: Redirect URI has correct path
-          expect(config.redirectUri).toBe('clerkly://oauth/callback');
+          // Property: Redirect URI is in reverse client ID format
+          expect(config.redirectUri).toMatch(/^com\.googleusercontent\.apps\./);
+          expect(config.redirectUri).toContain(':/oauth2redirect');
 
           // Property: Redirect URI is valid URL
           expect(() => new URL(config.redirectUri)).not.toThrow();
@@ -224,14 +223,13 @@ describe('OAuthConfig Property-Based Tests', () => {
             // because getOAuthConfig uses || operator which treats empty string as falsy
             // Non-empty strings (even whitespace) should be used as-is
             if (!clientId) {
-              expect(config.clientId).toBe(
-                '100365225505-a9mp4sll4948tafotr1va0fvnl5hrpoa.apps.googleusercontent.com'
-              );
+              expect(config.clientId).toBe(OAUTH_CONFIG.clientId);
             } else {
               expect(config.clientId).toBe(clientId);
             }
 
-            expect(config.redirectUri).toBe('clerkly://oauth/callback');
+            expect(config.redirectUri).toMatch(/^com\.googleusercontent\.apps\./);
+            expect(config.redirectUri).toContain(':/oauth2redirect');
             expect(config.scopes).toEqual(['openid', 'email', 'profile']);
           }
         ),
@@ -253,7 +251,8 @@ describe('OAuthConfig Property-Based Tests', () => {
           expect(config.clientId.length).toBeGreaterThanOrEqual(200);
 
           // Property: Other fields are unaffected
-          expect(config.redirectUri).toBe('clerkly://oauth/callback');
+          expect(config.redirectUri).toMatch(/^com\.googleusercontent\.apps\./);
+          expect(config.redirectUri).toContain(':/oauth2redirect');
           expect(config.scopes).toEqual(['openid', 'email', 'profile']);
         }),
         { numRuns: 100 }

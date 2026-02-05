@@ -2,7 +2,7 @@
 
 ## Введение
 
-Данная спецификация описывает функциональность авторизации пользователей через Google OAuth в Electron приложении Clerkly. Авторизация реализуется с использованием PKCE (Proof Key for Code Exchange) flow без использования client secret, что соответствует требованиям безопасности для публичных desktop приложений.
+Данная спецификация описывает функциональность авторизации пользователей через Google OAuth в Electron приложении Clerkly. Авторизация реализуется с использованием PKCE (Proof Key for Code Exchange) flow с использованием client secret, что требуется Google OAuth API даже для Desktop приложений. Несмотря на то, что client secret не может быть полностью защищен в публичных desktop приложениях, Google требует его наличия для всех типов OAuth клиентов.
 
 ## Глоссарий
 
@@ -39,11 +39,12 @@
 
 #### Критерии Приемки
 
-1. КОГДА приложение запускается, ТО "Main Process" ДОЛЖЕН зарегистрировать custom protocol handler для схемы "clerkly://"
-2. КОГДА deep link получен, ТО "Main Process" ДОЛЖЕН извлечь параметры code и state из URL
-3. ЕСЛИ state параметр не совпадает с сохраненным значением, ТО "OAuth Client" ДОЛЖЕН отклонить запрос и вернуть ошибку
-4. ЕСЛИ state параметр совпадает, ТО "OAuth Client" ДОЛЖЕН продолжить обработку authorization code
-5. КОГДА deep link обработан, ТО "Main Process" ДОЛЖЕН активировать окно приложения
+1. КОГДА приложение запускается, ТО "Main Process" ДОЛЖЕН запросить single instance lock ПЕРЕД регистрацией protocol handler
+2. КОГДА single instance lock получен, ТО "Main Process" ДОЛЖЕН зарегистрировать custom protocol handler для схемы в формате "com.googleusercontent.apps.CLIENT_ID"
+3. КОГДА deep link получен, ТО "Main Process" ДОЛЖЕН извлечь параметры code и state из URL
+4. ЕСЛИ state параметр не совпадает с сохраненным значением, ТО "OAuth Client" ДОЛЖЕН отклонить запрос и вернуть ошибку
+5. ЕСЛИ state параметр совпадает, ТО "OAuth Client" ДОЛЖЕН продолжить обработку authorization code
+6. КОГДА deep link обработан, ТО "Main Process" ДОЛЖЕН активировать окно приложения
 
 ### Требование 3: Обмен Authorization Code на Токены
 
@@ -51,8 +52,8 @@
 
 #### Критерии Приемки
 
-1. КОГДА authorization code получен, ТО "OAuth Client" ДОЛЖЕН отправить POST запрос на token endpoint с параметрами: code, client_id, redirect_uri, code_verifier
-2. КОГДА запрос отправлен, ТО "OAuth Client" ДОЛЖЕН НЕ включать client_secret в запрос
+1. КОГДА authorization code получен, ТО "OAuth Client" ДОЛЖЕН отправить POST запрос на token endpoint с параметрами: code, client_id, client_secret, redirect_uri, code_verifier
+2. КОГДА запрос отправлен, ТО "OAuth Client" ДОЛЖЕН включать client_secret в запрос (требование Google OAuth API)
 3. ЕСЛИ Google возвращает успешный ответ, ТО "OAuth Client" ДОЛЖЕН извлечь access_token, refresh_token, expires_in и token_type
 4. ЕСЛИ Google возвращает ошибку, ТО "OAuth Client" ДОЛЖЕН вернуть описательное сообщение об ошибке
 5. КОГДА токены получены, ТО "OAuth Client" ДОЛЖЕН вычислить время истечения access token (текущее время + expires_in)
@@ -88,8 +89,8 @@
 
 #### Критерии Приемки
 
-1. КОГДА access token истек, ТО "OAuth Client" ДОЛЖЕН отправить POST запрос на token endpoint с параметрами: refresh_token, client_id, grant_type=refresh_token
-2. КОГДА запрос отправлен, ТО "OAuth Client" ДОЛЖЕН НЕ включать client_secret в запрос
+1. КОГДА access token истек, ТО "OAuth Client" ДОЛЖЕН отправить POST запрос на token endpoint с параметрами: refresh_token, client_id, client_secret, grant_type=refresh_token
+2. КОГДА запрос отправлен, ТО "OAuth Client" ДОЛЖЕН включать client_secret в запрос (требование Google OAuth API)
 3. ЕСЛИ Google возвращает новый access token, ТО "OAuth Client" ДОЛЖЕН обновить access_token и expires_at в "Token Storage"
 4. ЕСЛИ Google возвращает новый refresh token, ТО "OAuth Client" ДОЛЖЕН также обновить refresh_token в "Token Storage"
 5. ЕСЛИ Google возвращает ошибку invalid_grant, ТО "OAuth Client" ДОЛЖЕН очистить все токены и вернуть статус "требуется повторная авторизация"
@@ -145,12 +146,13 @@
 
 #### Критерии Приемки
 
-1. "OAuth Client" ДОЛЖЕН хранить client_id как константу в конфигурационном файле кода
-2. "OAuth Client" ДОЛЖЕН использовать redirect_uri в формате "clerkly://oauth/callback"
+1. "OAuth Client" ДОЛЖЕН хранить client_id и client_secret как константы в конфигурационном файле кода
+2. "OAuth Client" ДОЛЖЕН использовать redirect_uri в формате "com.googleusercontent.apps.CLIENT_ID:/oauth2redirect" (reverse client ID format)
 3. "OAuth Client" ДОЛЖЕН запрашивать следующие scopes: "openid", "email", "profile"
 4. "OAuth Client" ДОЛЖЕН использовать authorization endpoint: "https://accounts.google.com/o/oauth2/v2/auth"
 5. "OAuth Client" ДОЛЖЕН использовать token endpoint: "https://oauth2.googleapis.com/token"
 6. "OAuth Client" ДОЛЖЕН использовать revoke endpoint: "https://oauth2.googleapis.com/revoke"
+7. "OAuth Client" ДОЛЖЕН включать параметры access_type=offline и prompt=consent для получения refresh token
 
 ### Требование 11: UI Flow Авторизации
 

@@ -22,11 +22,11 @@ describe('OAuthConfig', () => {
 
   /* Preconditions: None
      Action: Access OAUTH_CONFIG constant
-     Assertions: redirect_uri is in correct format "clerkly://oauth/callback"
+     Assertions: redirect_uri is in reverse client ID format
      Requirements: google-oauth-auth.10.2 */
   it('should have correct redirect_uri format', () => {
-    expect(OAUTH_CONFIG.redirectUri).toBe('clerkly://oauth/callback');
-    expect(OAUTH_CONFIG.redirectUri).toMatch(/^clerkly:\/\//);
+    expect(OAUTH_CONFIG.redirectUri).toMatch(/^com\.googleusercontent\.apps\./);
+    expect(OAUTH_CONFIG.redirectUri).toContain(':/oauth2redirect');
   });
 
   /* Preconditions: None
@@ -49,7 +49,9 @@ describe('OAuthConfig', () => {
     const config: OAuthConfig = getOAuthConfig(clientId);
 
     expect(config.clientId).toBe(clientId);
-    expect(config.redirectUri).toBe('clerkly://oauth/callback');
+    expect(config.redirectUri).toMatch(/^com\.googleusercontent\.apps\./);
+    expect(config.redirectUri).toContain(':/oauth2redirect');
+    expect(config.clientSecret).toBeTruthy();
     expect(config.authorizationEndpoint).toBe('https://accounts.google.com/o/oauth2/v2/auth');
     expect(config.tokenEndpoint).toBe('https://oauth2.googleapis.com/token');
     expect(config.revokeEndpoint).toBe('https://oauth2.googleapis.com/revoke');

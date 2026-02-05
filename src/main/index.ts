@@ -13,17 +13,33 @@ import { DataManager } from './DataManager';
 import { IPCHandlers } from './IPCHandlers';
 import { OAuthClientManager } from './auth/OAuthClientManager';
 import { TokenStorageManager } from './auth/TokenStorageManager';
-import { getOAuthConfig } from './auth/OAuthConfig';
+import { getOAuthConfig, OAUTH_CONFIG } from './auth/OAuthConfig';
 import { AuthIPCHandlers } from './auth/AuthIPCHandlers';
 
+// Requirements: google-oauth-auth.2.2, google-oauth-auth.2.5
+// Request single instance lock BEFORE registering protocol
+// This ensures that deep links are handled by the existing instance
+const gotTheLock = app.requestSingleInstanceLock();
+
 // Requirements: google-oauth-auth.2.1
-// Register custom protocol for deep link handling
-if (process.defaultApp) {
-  if (process.argv.length >= 2) {
-    app.setAsDefaultProtocolClient('clerkly', process.execPath, [path.resolve(process.argv[1])]);
-  }
+// Extract protocol scheme from redirect URI for deep link handling
+const protocolScheme = OAUTH_CONFIG.redirectUri.split(':')[0];
+
+if (!gotTheLock) {
+  app.quit();
 } else {
-  app.setAsDefaultProtocolClient('clerkly');
+  // Register custom protocol for deep link handling
+  // Using reverse client ID format: com.googleusercontent.apps.CLIENT_ID
+  if (process.defaultApp) {
+    if (process.argv.length >= 2) {
+      const execPath = process.execPath;
+      // In dev mode, point to the compiled main file
+      const mainPath = path.join(__dirname, 'index.js');
+      app.setAsDefaultProtocolClient(protocolScheme, execPath, [mainPath]);
+    }
+  } else {
+    app.setAsDefaultProtocolClient(protocolScheme);
+  }
 }
 
 // Requirements: clerkly.1.4
@@ -122,8 +138,11 @@ app.on('activate', () => {
 // Handle window-all-closed event
 app.on('window-all-closed', () => {
   console.log('[Main] All windows closed');
-  // Quit the app when all windows are closed (including macOS)
-  app.quit();
+  // On macOS, keep app running even when all windows are closed
+  // This allows deep link handling to work properly
+  if (process.platform !== 'darwin') {
+    app.quit();
+  }
 });
 
 // Requirements: clerkly.1.2
@@ -137,27 +156,73 @@ app.on('before-quit', () => {
 // Handle deep link on macOS (open-url event)
 app.on('open-url', async (event, url) => {
   event.preventDefault();
-  console.log('[Main] Deep link received:', url);
 
-  if (url.startsWith('clerkly://')) {
+  if (url.startsWith(protocolScheme)) {
+    try {
+      // Handle deep link first
+      const authStatus = await oauthClient.handleDeepLink(url);
+
+      // Check if app is already initialized
+      const existingWindows = BrowserWindow.getAllWindows();
+
+      if (existingWindows.length > 0) {
+        // App is already running
+        const mainWindow = existingWindows[0];
+
+        // Send auth event to renderer
+        if (authStatus.authorized) {
+          authIPCHandlers.sendAuthSuccess();
+        } else if (authStatus.error) {
+          authIPCHandlers.sendAuthError(authStatus.error, authStatus.error);
+        }
+
+        mainWindow.focus();
+      } else {
+        // App is not initialized yet, initialize it now
+
+        // Initialize application
+        const initResult = await lifecycleManager.initialize();
+        if (!initResult.success) {
+          console.error('[Main] Application initialization failed');
+          app.quit();
+          return;
+        }
+
+        // Register IPC handlers
+        ipcHandlers.registerHandlers();
+        authIPCHandlers.registerHandlers();
+
+        // Initialize Auth Window Manager (will show Dashboard if authorized)
+        await authWindowManager.initializeApp();
+
+        // Focus the new window
+        const mainWindow = BrowserWindow.getAllWindows()[0];
+        if (mainWindow) {
+          mainWindow.focus();
+        }
+      }
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('[Main] Deep link handling error:', errorMessage);
+    }
+  }
+});
+
+// Requirements: google-oauth-auth.2.2, google-oauth-auth.2.5
+// Handle deep link on Windows/Linux (second-instance event)
+// Single instance lock is already requested at the top of the file
+app.on('second-instance', async (_event, commandLine, _workingDirectory) => {
+  // Find deep link URL in command line arguments
+  const url = commandLine.find((arg) => arg.startsWith(protocolScheme));
+  if (url) {
     try {
       const authStatus = await oauthClient.handleDeepLink(url);
-      console.log('[Main] Deep link handled:', authStatus);
 
-      // Send event to renderer processes
+      // Send auth event to renderer
       if (authStatus.authorized) {
         authIPCHandlers.sendAuthSuccess();
       } else if (authStatus.error) {
         authIPCHandlers.sendAuthError(authStatus.error, authStatus.error);
-      }
-
-      // Activate application window
-      const mainWindow = BrowserWindow.getAllWindows()[0];
-      if (mainWindow) {
-        if (mainWindow.isMinimized()) {
-          mainWindow.restore();
-        }
-        mainWindow.focus();
       }
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -165,47 +230,13 @@ app.on('open-url', async (event, url) => {
       authIPCHandlers.sendAuthError(errorMessage, 'unknown_error');
     }
   }
+
+  // Activate application window
+  const mainWindow = BrowserWindow.getAllWindows()[0];
+  if (mainWindow) {
+    if (mainWindow.isMinimized()) {
+      mainWindow.restore();
+    }
+    mainWindow.focus();
+  }
 });
-
-// Requirements: google-oauth-auth.2.2, google-oauth-auth.2.5
-// Handle deep link on Windows/Linux (second-instance event)
-const gotTheLock = app.requestSingleInstanceLock();
-
-if (!gotTheLock) {
-  app.quit();
-} else {
-  app.on('second-instance', async (event, commandLine, _workingDirectory) => {
-    console.log('[Main] Second instance detected');
-
-    // Find deep link URL in command line arguments
-    const url = commandLine.find((arg) => arg.startsWith('clerkly://'));
-    if (url) {
-      console.log('[Main] Deep link received:', url);
-
-      try {
-        const authStatus = await oauthClient.handleDeepLink(url);
-        console.log('[Main] Deep link handled:', authStatus);
-
-        // Send event to renderer processes
-        if (authStatus.authorized) {
-          authIPCHandlers.sendAuthSuccess();
-        } else if (authStatus.error) {
-          authIPCHandlers.sendAuthError(authStatus.error, authStatus.error);
-        }
-      } catch (error: unknown) {
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        console.error('[Main] Deep link handling error:', errorMessage);
-        authIPCHandlers.sendAuthError(errorMessage, 'unknown_error');
-      }
-    }
-
-    // Activate application window
-    const mainWindow = BrowserWindow.getAllWindows()[0];
-    if (mainWindow) {
-      if (mainWindow.isMinimized()) {
-        mainWindow.restore();
-      }
-      mainWindow.focus();
-    }
-  });
-}

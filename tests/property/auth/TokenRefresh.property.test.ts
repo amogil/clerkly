@@ -24,6 +24,7 @@ describe('Token Refresh Property-Based Tests', () => {
   let tokenStorage: TokenStorageManager;
   let oauthClient: OAuthClientManager;
   let testDbPath: string;
+  let testConfig: ReturnType<typeof getOAuthConfig>;
   const testClientId = 'test-client-id.apps.googleusercontent.com';
 
   beforeEach(() => {
@@ -33,8 +34,8 @@ describe('Token Refresh Property-Based Tests', () => {
     dataManager.initialize();
     tokenStorage = new TokenStorageManager(dataManager);
 
-    const config = getOAuthConfig(testClientId);
-    oauthClient = new OAuthClientManager(config, tokenStorage);
+    testConfig = getOAuthConfig(testClientId);
+    oauthClient = new OAuthClientManager(testConfig, tokenStorage);
 
     jest.clearAllMocks();
   });
@@ -209,9 +210,9 @@ describe('Token Refresh Property-Based Tests', () => {
 
   /* Feature: google-oauth-auth, Property 15: Token Refresh Request Format
      For any token refresh request, the OAuth client must send correct parameters
-     and must NOT include client_secret.
+     including client_secret.
      Requirements: google-oauth-auth.6.1, google-oauth-auth.6.2 */
-  it('Property 15: should send correct refresh request without client_secret', async () => {
+  it('Property 15: should send correct refresh request with client_secret', async () => {
     await fc.assert(
       fc.asyncProperty(
         fc.record({
@@ -233,9 +234,8 @@ describe('Token Refresh Property-Based Tests', () => {
             const body = new URLSearchParams(options.body);
             expect(body.get('refresh_token')).toBe(refreshToken);
             expect(body.get('client_id')).toBe(testClientId);
+            expect(body.get('client_secret')).toBe(testConfig.clientSecret);
             expect(body.get('grant_type')).toBe('refresh_token');
-            // Verify client_secret is NOT included
-            expect(body.get('client_secret')).toBeNull();
 
             return Promise.resolve({
               ok: true,

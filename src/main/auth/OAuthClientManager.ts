@@ -104,6 +104,8 @@ export class OAuthClientManager {
       authUrl.searchParams.set('code_challenge', pkceParams.codeChallenge);
       authUrl.searchParams.set('code_challenge_method', 'S256');
       authUrl.searchParams.set('state', pkceParams.state);
+      authUrl.searchParams.set('access_type', 'offline'); // Required for refresh token
+      authUrl.searchParams.set('prompt', 'consent'); // Force consent screen to get refresh token
 
       // Open system browser with authorization URL
       await shell.openExternal(authUrl.toString());
@@ -203,15 +205,15 @@ export class OAuthClientManager {
         body: new URLSearchParams({
           code,
           client_id: this.config.clientId,
+          client_secret: this.config.clientSecret,
           redirect_uri: this.config.redirectUri,
           grant_type: 'authorization_code',
           code_verifier: codeVerifier,
-          // Note: client_secret is NOT included (PKCE flow)
         }),
       });
 
       if (!response.ok) {
-        const errorData = (await response.json()) as { error?: string };
+        const errorData = (await response.json()) as { error?: string; error_description?: string };
         const errorCode = errorData.error || 'token_exchange_failed';
         const error = new Error(errorCode);
         error.name = errorCode;
@@ -284,8 +286,8 @@ export class OAuthClientManager {
         body: new URLSearchParams({
           refresh_token: tokens.refreshToken,
           client_id: this.config.clientId,
+          client_secret: this.config.clientSecret,
           grant_type: 'refresh_token',
-          // Note: client_secret is NOT included (PKCE flow)
         }),
       });
 

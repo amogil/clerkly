@@ -26,6 +26,7 @@ describe('OAuthClientManager Property-Based Tests', () => {
   let tokenStorage: TokenStorageManager;
   let oauthClient: OAuthClientManager;
   let testDbPath: string;
+  let testConfig: ReturnType<typeof getOAuthConfig>;
   const testClientId = 'test-client-id.apps.googleusercontent.com';
 
   beforeEach(() => {
@@ -35,8 +36,8 @@ describe('OAuthClientManager Property-Based Tests', () => {
     dataManager.initialize();
     tokenStorage = new TokenStorageManager(dataManager);
 
-    const config = getOAuthConfig(testClientId);
-    oauthClient = new OAuthClientManager(config, tokenStorage);
+    testConfig = getOAuthConfig(testClientId);
+    oauthClient = new OAuthClientManager(testConfig, tokenStorage);
 
     jest.clearAllMocks();
   });
@@ -139,12 +140,15 @@ describe('OAuthClientManager Property-Based Tests', () => {
 
         // Verify all required parameters
         expect(urlObj.searchParams.get('client_id')).toBe(testClientId);
-        expect(urlObj.searchParams.get('redirect_uri')).toBe('clerkly://oauth/callback');
+        expect(urlObj.searchParams.get('redirect_uri')).toBeTruthy();
+        expect(urlObj.searchParams.get('redirect_uri')).toMatch(/^com\.googleusercontent\.apps\./);
         expect(urlObj.searchParams.get('response_type')).toBe('code');
         expect(urlObj.searchParams.get('scope')).toBe('openid email profile');
         expect(urlObj.searchParams.get('code_challenge')).toBeTruthy();
         expect(urlObj.searchParams.get('code_challenge_method')).toBe('S256');
         expect(urlObj.searchParams.get('state')).toBeTruthy();
+        expect(urlObj.searchParams.get('access_type')).toBe('offline');
+        expect(urlObj.searchParams.get('prompt')).toBe('consent');
 
         jest.clearAllMocks();
       }),
@@ -208,7 +212,7 @@ describe('OAuthClientManager Property-Based Tests', () => {
 
   /* Preconditions: OAuth client initialized, authorization code and code verifier available
      Action: form token exchange request
-     Assertions: request includes all required parameters (code, client_id, redirect_uri, code_verifier, grant_type), does NOT include client_secret
+     Assertions: request includes all required parameters (code, client_id, client_secret, redirect_uri, code_verifier, grant_type)
      Requirements: google-oauth-auth.3.1, google-oauth-auth.3.2 */
   // Feature: google-oauth-auth, Property 6: Token Exchange Request Formation
   it('Property 6: should form valid token exchange request', async () => {
@@ -235,11 +239,10 @@ describe('OAuthClientManager Property-Based Tests', () => {
             const body = new URLSearchParams(options.body);
             expect(body.get('code')).toBeTruthy();
             expect(body.get('client_id')).toBe(testClientId);
-            expect(body.get('redirect_uri')).toBe('clerkly://oauth/callback');
+            expect(body.get('client_secret')).toBe(testConfig.clientSecret);
+            expect(body.get('redirect_uri')).toBeTruthy();
             expect(body.get('grant_type')).toBe('authorization_code');
             expect(body.get('code_verifier')).toBeTruthy();
-            // Verify client_secret is NOT included
-            expect(body.get('client_secret')).toBeNull();
 
             return Promise.resolve({
               ok: true,

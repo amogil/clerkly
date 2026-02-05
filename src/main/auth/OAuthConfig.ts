@@ -6,6 +6,7 @@
  */
 export interface OAuthConfig {
   clientId: string;
+  clientSecret: string;
   redirectUri: string;
   authorizationEndpoint: string;
   tokenEndpoint: string;
@@ -71,7 +72,9 @@ export const GOOGLE_OAUTH_ENDPOINTS = {
  */
 export const OAUTH_CONFIG = {
   clientId: '100365225505-a9mp4sll4948tafotr1va0fvnl5hrpoa.apps.googleusercontent.com', // Replace with your actual Google OAuth Client ID
-  redirectUri: 'clerkly://oauth/callback',
+  clientSecret: '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', // Replace with your actual Google OAuth Client Secret
+  redirectUri:
+    'com.googleusercontent.apps.100365225505-a9mp4sll4948tafotr1va0fvnl5hrpoa:/oauth2redirect', // Reverse client ID format
   scopes: ['openid', 'email', 'profile'],
 } as const;
 
@@ -82,6 +85,7 @@ export const OAUTH_CONFIG = {
 export function getOAuthConfig(clientId?: string): OAuthConfig {
   return {
     clientId: clientId || OAUTH_CONFIG.clientId,
+    clientSecret: OAUTH_CONFIG.clientSecret,
     redirectUri: OAUTH_CONFIG.redirectUri,
     authorizationEndpoint: GOOGLE_OAUTH_ENDPOINTS.authorization,
     tokenEndpoint: GOOGLE_OAUTH_ENDPOINTS.token,

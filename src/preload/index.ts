@@ -98,7 +98,9 @@ contextBridge.exposeInMainWorld('api', {
      * @param {Function} callback - Callback function to execute on success
      */
     onAuthSuccess(callback: () => void): void {
-      ipcRenderer.on('auth:success', callback);
+      ipcRenderer.on('auth:success', () => {
+        callback();
+      });
     },
 
     /**
@@ -107,8 +109,8 @@ contextBridge.exposeInMainWorld('api', {
      * @param {Function} callback - Callback function to execute on error
      */
     onAuthError(callback: (error: string, errorCode?: string) => void): void {
-      ipcRenderer.on('auth:error', (_event, error: string, errorCode?: string) => {
-        callback(error, errorCode);
+      ipcRenderer.on('auth:error', (_event, data: { error: string; errorCode?: string }) => {
+        callback(data.error, data.errorCode);
       });
     },
   },

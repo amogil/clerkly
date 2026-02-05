@@ -162,7 +162,7 @@ describe('OAuth Flow Functional Tests', () => {
     expect(authUrl).toContain('client_id=test-client-id');
     expect(authUrl).toContain('response_type=code');
     expect(authUrl).toContain('code_challenge_method=S256');
-    expect(authUrl).toContain('redirect_uri=clerkly');
+    expect(authUrl).toContain('redirect_uri=');
   });
 
   /* Preconditions: OAuth flow completes successfully

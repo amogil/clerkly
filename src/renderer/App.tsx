@@ -1,5 +1,5 @@
-// Requirements: clerkly.1
-import { useState } from 'react';
+// Requirements: clerkly.1, google-oauth-auth.12.1, google-oauth-auth.12.2
+import { useState, useEffect } from 'react';
 import { TopNavigation } from './components/top-navigation';
 import { AIAgentPanel } from './components/ai-agent-panel';
 import { DashboardUpdated } from './components/dashboard-updated';
@@ -8,13 +8,15 @@ import { MeetingDetail } from './components/meeting-detail';
 import { TasksViewNew } from './components/tasks-view-new';
 import { Contacts } from './components/contacts';
 import { Settings } from './components/settings';
-import { AuthDemo } from './components/auth-demo';
+import { LoginScreen } from './components/auth/LoginScreen';
+import { LoginError } from './components/auth/LoginError';
 import { parseCommand } from './utils/command-parser';
 
-// Requirements: clerkly.1
+// Requirements: clerkly.1, google-oauth-auth.12.1, google-oauth-auth.12.2
 export default function App() {
-  // Show auth demo by default
-  const [showAuthDemo, setShowAuthDemo] = useState(false);
+  // Requirements: google-oauth-auth.12.1, google-oauth-auth.12.2
+  const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null);
+  const [authError, setAuthError] = useState<{ message: string; code?: string } | null>(null);
 
   const [currentScreen, setCurrentScreen] = useState<string>('dashboard');
   const [selectedMeetingId, setSelectedMeetingId] = useState<string | null>(null);
@@ -22,6 +24,37 @@ export default function App() {
     action: string;
     params: Record<string, unknown>;
   } | null>(null);
+
+  // Requirements: google-oauth-auth.12.1, google-oauth-auth.12.2
+  // Check authentication status on mount
+  useEffect(() => {
+    const checkAuthStatus = async () => {
+      try {
+        const status = await window.api.auth.getStatus();
+        setIsAuthorized(status.authorized);
+      } catch (error) {
+        console.error('[App] Failed to check auth status:', error);
+        setIsAuthorized(false);
+      }
+    };
+
+    checkAuthStatus();
+
+    // Requirements: google-oauth-auth.8.4
+    // Listen for auth success events
+    window.api.auth.onAuthSuccess(() => {
+      setIsAuthorized(true);
+      setAuthError(null);
+    });
+
+    // Requirements: google-oauth-auth.8.4
+    // Listen for auth error events
+    window.api.auth.onAuthError((error: string, errorCode?: string) => {
+      console.error('[App] Auth error:', error, errorCode);
+      setAuthError({ message: error, code: errorCode });
+      setIsAuthorized(false);
+    });
+  }, []);
 
   // Requirements: clerkly.1
   const handleNavigateToMeeting = (meetingId: string) => {
@@ -45,9 +78,29 @@ export default function App() {
     setCurrentScreen('tasks');
   };
 
-  // Requirements: clerkly.1
-  const handleSignOut = () => {
-    setShowAuthDemo(true);
+  // Requirements: clerkly.1, google-oauth-auth.12.3
+  const handleLogin = async () => {
+    try {
+      setAuthError(null);
+      const result = await window.api.auth.startLogin();
+      if (!result.success) {
+        setAuthError({ message: result.error || 'Failed to start login' });
+      }
+    } catch (error) {
+      console.error('[App] Login failed:', error);
+      setAuthError({ message: 'Failed to start login' });
+    }
+  };
+
+  // Requirements: clerkly.1, google-oauth-auth.8.3
+  const handleSignOut = async () => {
+    try {
+      await window.api.auth.logout();
+      setIsAuthorized(false);
+      setAuthError(null);
+    } catch (error) {
+      console.error('[App] Logout failed:', error);
+    }
   };
 
   // Requirements: clerkly.1
@@ -85,9 +138,38 @@ export default function App() {
     }
   };
 
-  // Show auth demo
-  if (showAuthDemo) {
-    return <AuthDemo onLoginSuccess={() => setShowAuthDemo(false)} />;
+  // Requirements: google-oauth-auth.12.1, google-oauth-auth.12.2
+  // Show loading state while checking auth
+  if (isAuthorized === null) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Requirements: google-oauth-auth.12.5
+  // Show error screen if authentication failed
+  if (authError) {
+    return (
+      <LoginError
+        error={authError.message}
+        errorCode={authError.code}
+        onRetry={() => {
+          setAuthError(null);
+          handleLogin();
+        }}
+      />
+    );
+  }
+
+  // Requirements: google-oauth-auth.12.2
+  // Show login screen if not authorized
+  if (!isAuthorized) {
+    return <LoginScreen onLogin={handleLogin} />;
   }
 
   // Requirements: clerkly.1

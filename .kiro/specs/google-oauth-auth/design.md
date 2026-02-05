@@ -2,7 +2,7 @@
 
 ## Обзор
 
-Данный документ описывает архитектуру и дизайн системы авторизации через Google OAuth для Electron приложения Clerkly. Система реализует PKCE (Proof Key for Code Exchange) flow без использования client secret, что соответствует требованиям безопасности для публичных desktop приложений. Авторизация использует deep link схему для перехвата ответа от OAuth провайдера вместо локального сервера.
+Данный документ описывает архитектуру и дизайн системы авторизации через Google OAuth для Electron приложения Clerkly. Система реализует PKCE (Proof Key for Code Exchange) flow с использованием client secret, что требуется Google OAuth API даже для Desktop приложений. Несмотря на то, что client secret не может быть полностью защищен в публичных desktop приложениях, Google требует его наличия для всех типов OAuth клиентов. Авторизация использует deep link схему с reverse client ID format для перехвата ответа от OAuth провайдера вместо локального сервера.
 
 ## Архитектура
 
@@ -90,18 +90,20 @@
      │                                                              │
      │ 6. Open browser with authorization URL:                     │
      │    - client_id                                              │
-     │    - redirect_uri=clerkly://oauth/callback                  │
+     │    - redirect_uri=com.googleusercontent.apps.CLIENT_ID:/oauth2redirect │
      │    - response_type=code                                     │
      │    - scope=openid email profile                             │
      │    - code_challenge                                         │
      │    - code_challenge_method=S256                             │
      │    - state                                                  │
+     │    - access_type=offline                                    │
+     │    - prompt=consent                                         │
      │────────────────────────────────────────────────────────────▶│
      │                                                              │
      │                    User authenticates                        │
      │◀────────────────────────────────────────────────────────────│
      │                                                              │
-     │ 7. Google redirects to: clerkly://oauth/callback?           │
+     │ 7. Google redirects to: com.googleusercontent.apps.CLIENT_ID:/oauth2redirect? │
      │    code=AUTH_CODE&state=STATE                               │
      │◀────────────────────────────────────────────────────────────│
      │                                                              │
@@ -112,7 +114,8 @@
      │ 11. Exchange code for tokens (POST to token endpoint):      │
      │     - code=AUTH_CODE                                        │
      │     - client_id                                             │
-     │     - redirect_uri=clerkly://oauth/callback                 │
+     │     - client_secret                                         │
+     │     - redirect_uri=com.googleusercontent.apps.CLIENT_ID:/oauth2redirect │
      │     - grant_type=authorization_code                         │
      │     - code_verifier (original random string)                │
      │────────────────────────────────────────────────────────────▶│
@@ -142,6 +145,7 @@
 // OAuth configuration
 interface OAuthConfig {
   clientId: string;
+  clientSecret: string;
   redirectUri: string;
   authorizationEndpoint: string;
   tokenEndpoint: string;
@@ -419,7 +423,8 @@ interface PKCEStorage {
 // src/main/auth/OAuthConfig.ts
 export const OAUTH_CONFIG = {
   clientId: 'YOUR_GOOGLE_CLIENT_ID_HERE', // Replace with your actual Google OAuth Client ID
-  redirectUri: 'clerkly://oauth/callback',
+  clientSecret: 'YOUR_GOOGLE_CLIENT_SECRET_HERE', // Replace with your actual Google OAuth Client Secret
+  redirectUri: 'com.googleusercontent.apps.YOUR_CLIENT_ID:/oauth2redirect', // Reverse client ID format
   scopes: ['openid', 'email', 'profile'],
 } as const;
 ```
@@ -702,7 +707,7 @@ export const OAUTH_CONFIG = {
 
 ### Property 6: Token Exchange Request Formation
 
-*For any* authorization code and code verifier, the token exchange request must include all required parameters (code, client_id, redirect_uri, code_verifier, grant_type) and must NOT include client_secret.
+*For any* authorization code and code verifier, the token exchange request must include all required parameters (code, client_id, client_secret, redirect_uri, code_verifier, grant_type).
 
 **Validates: Requirements 3.1, 3.2**
 
@@ -742,7 +747,7 @@ export const OAUTH_CONFIG = {
 
 ### Property 12: Token Refresh Request Formation
 
-*For any* refresh token, the token refresh request must include all required parameters (refresh_token, client_id, grant_type=refresh_token) and must NOT include client_secret.
+*For any* refresh token, the token refresh request must include all required parameters (refresh_token, client_id, client_secret, grant_type=refresh_token).
 
 **Validates: Requirements 6.1, 6.2**
 

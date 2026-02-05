@@ -25,6 +25,7 @@ describe('OAuthClientManager', () => {
   let tokenStorage: TokenStorageManager;
   let oauthClient: OAuthClientManager;
   let testDbPath: string;
+  let testConfig: ReturnType<typeof getOAuthConfig>;
   const testClientId = 'test-client-id.apps.googleusercontent.com';
 
   beforeEach(() => {
@@ -35,8 +36,8 @@ describe('OAuthClientManager', () => {
     tokenStorage = new TokenStorageManager(dataManager);
 
     // Create OAuth client
-    const config = getOAuthConfig(testClientId);
-    oauthClient = new OAuthClientManager(config, tokenStorage);
+    testConfig = getOAuthConfig(testClientId);
+    oauthClient = new OAuthClientManager(testConfig, tokenStorage);
 
     // Clear mocks
     jest.clearAllMocks();
@@ -109,12 +110,14 @@ describe('OAuthClientManager', () => {
 
       expect(calledUrl).toContain('https://accounts.google.com/o/oauth2/v2/auth');
       expect(calledUrl).toContain(`client_id=${testClientId}`);
-      expect(calledUrl).toContain('redirect_uri=clerkly%3A%2F%2Foauth%2Fcallback');
+      expect(calledUrl).toContain('redirect_uri=');
       expect(calledUrl).toContain('response_type=code');
       expect(calledUrl).toContain('scope=openid+email+profile');
       expect(calledUrl).toContain('code_challenge=');
       expect(calledUrl).toContain('code_challenge_method=S256');
       expect(calledUrl).toContain('state=');
+      expect(calledUrl).toContain('access_type=offline');
+      expect(calledUrl).toContain('prompt=consent');
     });
   });
 
@@ -176,9 +179,9 @@ describe('OAuthClientManager', () => {
   describe('Token Exchange', () => {
     /* Preconditions: Valid authorization code and code verifier
        Action: Exchange code for tokens
-       Assertions: Request includes all required parameters without client_secret
+       Assertions: Request includes all required parameters including client_secret
        Requirements: google-oauth-auth.3.1, google-oauth-auth.3.2 */
-    it('should form token exchange request without client_secret', async () => {
+    it('should form token exchange request with client_secret', async () => {
       await oauthClient.startAuthFlow();
       const authUrl = (shell.openExternal as jest.Mock).mock.calls[0][0];
       const state = new URL(authUrl).searchParams.get('state');
@@ -210,9 +213,9 @@ describe('OAuthClientManager', () => {
       const body = fetchCall.body.toString();
       expect(body).toContain('code=test-code');
       expect(body).toContain(`client_id=${testClientId}`);
+      expect(body).toContain(`client_secret=${testConfig.clientSecret}`);
       expect(body).toContain('grant_type=authorization_code');
       expect(body).toContain('code_verifier=');
-      expect(body).not.toContain('client_secret');
     });
 
     /* Preconditions: Successful token response from Google
@@ -350,9 +353,9 @@ describe('OAuthClientManager', () => {
   describe('Token Refresh', () => {
     /* Preconditions: Valid refresh token in storage
        Action: Call refreshAccessToken
-       Assertions: Request includes refresh_token without client_secret
+       Assertions: Request includes refresh_token with client_secret
        Requirements: google-oauth-auth.6.1, google-oauth-auth.6.2 */
-    it('should form refresh request without client_secret', async () => {
+    it('should form refresh request with client_secret', async () => {
       await tokenStorage.saveTokens({
         accessToken: 'old-access-token',
         refreshToken: 'test-refresh-token',
@@ -381,8 +384,8 @@ describe('OAuthClientManager', () => {
       const fetchCall = (global.fetch as jest.Mock).mock.calls[0][1];
       const body = fetchCall.body.toString();
       expect(body).toContain('refresh_token=test-refresh-token');
+      expect(body).toContain(`client_secret=${testConfig.clientSecret}`);
       expect(body).toContain('grant_type=refresh_token');
-      expect(body).not.toContain('client_secret');
     });
 
     /* Preconditions: Successful refresh response
