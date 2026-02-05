@@ -86,6 +86,46 @@ const ipcHandlers = new IPCHandlers(dataManager);
 // Initialize Auth IPC Handlers
 const authIPCHandlers = new AuthIPCHandlers(oauthClient);
 
+// Requirements: testing.3.8
+// Initialize Test IPC Handlers (only in test environment)
+if (process.env.NODE_ENV === 'test') {
+  // Register test IPC handlers inline to avoid import issues
+  const { ipcMain } = require('electron');
+
+  ipcMain.handle('test:setup-tokens', async (_event: any, tokens: any) => {
+    await tokenStorage.saveTokens({
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+      expiresAt: Date.now() + tokens.expiresIn * 1000,
+      tokenType: tokens.tokenType || 'Bearer',
+    });
+    return { success: true };
+  });
+
+  ipcMain.handle('test:clear-tokens', async () => {
+    await tokenStorage.deleteTokens();
+    return { success: true };
+  });
+
+  ipcMain.handle('test:get-token-status', async () => {
+    const tokens = await tokenStorage.loadTokens();
+    return {
+      hasTokens: !!tokens,
+      accessToken: tokens?.accessToken ? '***' : null,
+      refreshToken: tokens?.refreshToken ? '***' : null,
+      expiresAt: tokens?.expiresAt || null,
+    };
+  });
+
+  ipcMain.handle('test:clear-data', async () => {
+    const db = (dataManager as any).db;
+    db.prepare('DELETE FROM user_data').run();
+    return { success: true };
+  });
+
+  console.log('[TEST] Test IPC handlers registered');
+}
+
 // Requirements: clerkly.1.1, clerkly.1.2
 // Handle application ready event
 app.whenReady().then(async () => {

@@ -142,3 +142,109 @@ export async function isWindowMaximized(app: ElectronApplication): Promise<boole
     return window ? window.isMaximized() : false;
   });
 }
+
+/**
+ * Set window position
+ *
+ * @param app - ElectronApplication object
+ * @param x - X coordinate
+ * @param y - Y coordinate
+ */
+export async function setWindowPosition(
+  app: ElectronApplication,
+  x: number,
+  y: number
+): Promise<void> {
+  await app.evaluate(
+    ({ BrowserWindow }, { x, y }) => {
+      const window = BrowserWindow.getAllWindows()[0];
+      if (window) {
+        window.setPosition(x, y);
+      }
+    },
+    { x, y }
+  );
+}
+
+/**
+ * Maximize window
+ *
+ * @param app - ElectronApplication object
+ */
+export async function maximizeWindow(app: ElectronApplication): Promise<void> {
+  await app.evaluate(({ BrowserWindow }) => {
+    const window = BrowserWindow.getAllWindows()[0];
+    if (window) {
+      window.maximize();
+    }
+  });
+}
+
+/**
+ * Unmaximize window
+ *
+ * @param app - ElectronApplication object
+ */
+export async function unmaximizeWindow(app: ElectronApplication): Promise<void> {
+  await app.evaluate(({ BrowserWindow }) => {
+    const window = BrowserWindow.getAllWindows()[0];
+    if (window) {
+      window.unmaximize();
+    }
+  });
+}
+
+/**
+ * Setup test tokens using IPC handler
+ *
+ * @param window - Playwright Page object
+ * @param tokens - Token data to setup
+ */
+export async function setupTestTokens(
+  window: Page,
+  tokens?: {
+    accessToken?: string;
+    refreshToken?: string;
+    expiresIn?: number;
+    tokenType?: string;
+  }
+): Promise<void> {
+  const now = Date.now();
+  const defaultTokens = {
+    accessToken: tokens?.accessToken || 'test_access_token',
+    refreshToken: tokens?.refreshToken || 'test_refresh_token',
+    expiresIn: tokens?.expiresIn || 3600,
+    tokenType: tokens?.tokenType || 'Bearer',
+  };
+
+  await window.evaluate(async (tokens) => {
+    await (window as any).electron.ipcRenderer.invoke('test:setup-tokens', tokens);
+  }, defaultTokens);
+}
+
+/**
+ * Clear all tokens using IPC handler
+ *
+ * @param window - Playwright Page object
+ */
+export async function clearTestTokens(window: Page): Promise<void> {
+  await window.evaluate(async () => {
+    await (window as any).electron.ipcRenderer.invoke('test:clear-tokens');
+  });
+}
+
+/**
+ * Get token status using IPC handler
+ *
+ * @param window - Playwright Page object
+ */
+export async function getTokenStatus(window: Page): Promise<{
+  hasTokens: boolean;
+  accessToken: string | null;
+  refreshToken: string | null;
+  expiresAt: number | null;
+}> {
+  return await window.evaluate(async () => {
+    return await (window as any).electron.ipcRenderer.invoke('test:get-token-status');
+  });
+}

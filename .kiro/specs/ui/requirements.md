@@ -55,6 +55,10 @@
 
 2.3. THE "Main Window" SHALL сохранять стандартные элементы управления окном macOS (кнопки закрыть, свернуть, развернуть)
 
+#### Функциональные Тесты
+
+- `tests/functional/window-state-persistence.spec.ts` - "should have empty window title"
+
 ### 3. Нативный Mac OS X Интерфейс
 
 **ID:** ui.3
@@ -74,6 +78,12 @@
 3.4. THE "Main Window" SHALL следовать Mac OS X конвенциям активации приложения
 
 3.5. THE "Main Window" SHALL интегрироваться с системным dock macOS
+
+#### Функциональные Тесты
+
+- `tests/functional/window-state-persistence.spec.ts` - "should have native Mac OS X window controls"
+- `tests/functional/window-state-persistence.spec.ts` - "should follow Mac OS X window close conventions"
+- `tests/functional/window-state-persistence.spec.ts` - "should integrate with Mac OS X dock"
 
 ### 4. Адаптация Размера Окна к Экрану
 

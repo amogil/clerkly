@@ -36,6 +36,9 @@
 #### Функциональные Тесты
 
 - `tests/functional/auth-flow.spec.ts` - "should initiate OAuth flow when clicking login button"
+- `tests/functional/oauth-flow.spec.ts` - "should register custom protocol handler on startup"
+- `tests/functional/oauth-complete-flow.spec.ts` - "should complete full OAuth flow with authorization code exchange"
+- `tests/functional/oauth-complete-flow.spec.ts` - "should verify mock OAuth server generates authorization codes"
 
 ### Требование 2: Регистрация Deep Link Handler
 
@@ -50,6 +53,17 @@
 5. ЕСЛИ state параметр совпадает, ТО "OAuth Client" ДОЛЖЕН продолжить обработку authorization code
 6. КОГДА deep link обработан, ТО "Main Process" ДОЛЖЕН активировать окно приложения
 
+#### Функциональные Тесты
+
+- `tests/functional/deep-link-validation.spec.ts` - "should register custom protocol handler on startup"
+- `tests/functional/deep-link-validation.spec.ts` - "should extract code and state parameters from deep link"
+- `tests/functional/deep-link-validation.spec.ts` - "should reject deep link with invalid state parameter"
+- `tests/functional/deep-link-validation.spec.ts` - "should continue processing after valid state validation"
+- `tests/functional/deep-link-validation.spec.ts` - "should activate application window after deep link"
+- `tests/functional/deep-link-validation.spec.ts` - "should handle deep link during app initialization"
+- `tests/functional/deep-link-validation.spec.ts` - "should handle malformed deep link gracefully"
+- `tests/functional/deep-link-validation.spec.ts` - "should correctly decode URL-encoded parameters"
+
 ### Требование 3: Обмен Authorization Code на Токены
 
 **User Story:** Как система, я хочу обменять authorization code на access token и refresh token, чтобы получить доступ к Google API.
@@ -61,6 +75,12 @@
 3. ЕСЛИ Google возвращает успешный ответ, ТО "OAuth Client" ДОЛЖЕН извлечь access_token, refresh_token, expires_in и token_type
 4. ЕСЛИ Google возвращает ошибку, ТО "OAuth Client" ДОЛЖЕН вернуть описательное сообщение об ошибке
 5. КОГДА токены получены, ТО "OAuth Client" ДОЛЖЕН вычислить время истечения access token (текущее время + expires_in)
+
+#### Функциональные Тесты
+
+- `tests/functional/oauth-complete-flow.spec.ts` - "should simulate token exchange and storage"
+- `tests/functional/oauth-complete-flow.spec.ts` - "should handle OAuth errors gracefully"
+- `tests/functional/oauth-complete-flow.spec.ts` - "should correctly calculate token expiration time"
 
 ### Требование 4: Безопасное Хранение Токенов
 
@@ -74,6 +94,11 @@
 4. КОГДА токены удаляются (logout), ТО "Token Storage" ДОЛЖЕН полностью очистить все данные авторизации из базы
 5. ЕСЛИ база данных недоступна, ТО "Token Storage" ДОЛЖЕН вернуть ошибку с описанием проблемы
 
+#### Функциональные Тесты
+
+- `tests/functional/oauth-flow.spec.ts` - "should have no tokens on first launch"
+- `tests/functional/oauth-flow.spec.ts` - "should load tokens from database on startup"
+
 ### Требование 5: Проверка Статуса Авторизации
 
 **User Story:** Как приложение, я хочу проверять статус авторизации пользователя, чтобы показывать соответствующий UI.
@@ -86,6 +111,10 @@
 4. ЕСЛИ access token истек, но refresh token существует, ТО "OAuth Client" ДОЛЖЕН попытаться обновить токен
 5. ЕСЛИ обновление токена успешно, ТО "OAuth Client" ДОЛЖЕН вернуть статус "авторизован"
 6. ЕСЛИ обновление токена неуспешно, ТО "OAuth Client" ДОЛЖЕН вернуть статус "не авторизован" и очистить токены
+
+#### Функциональные Тесты
+
+- `tests/functional/oauth-flow.spec.ts` - "should detect expired tokens"
 
 ### Требование 6: Обновление Access Token
 
@@ -110,6 +139,10 @@
 3. ЕСЛИ запрос на revoke успешен, ТО "OAuth Client" ДОЛЖЕН вернуть статус "успешный выход"
 4. ЕСЛИ запрос на revoke неуспешен, ТО "OAuth Client" ДОЛЖЕН все равно удалить локальные токены и вернуть статус "локальный выход"
 5. КОГДА выход завершен, ТО приложение ДОЛЖНО обновить UI для отображения неавторизованного состояния
+
+#### Функциональные Тесты
+
+- `tests/functional/oauth-flow.spec.ts` - "should delete tokens on logout"
 
 ### Требование 8: IPC Коммуникация
 
@@ -158,6 +191,10 @@
 6. "OAuth Client" ДОЛЖЕН использовать revoke endpoint: "https://oauth2.googleapis.com/revoke"
 7. "OAuth Client" ДОЛЖЕН включать параметры access_type=offline и prompt=consent для получения refresh token
 
+#### Функциональные Тесты
+
+- `tests/functional/oauth-flow.spec.ts` - "should have correct OAuth configuration"
+
 ### Требование 11: UI Flow Авторизации
 
 **User Story:** Как пользователь, я хочу видеть понятный интерфейс авторизации при первом запуске приложения, чтобы легко войти через Google аккаунт.
@@ -173,6 +210,9 @@
 #### Функциональные Тесты
 
 - `tests/functional/auth-flow.spec.ts` - "should show login screen on first launch"
+- `tests/functional/auth-flow.spec.ts` - "should show main app when already authorized"
+- `tests/functional/auth-flow.spec.ts` - "should show main app after successful authentication"
+- `tests/functional/login-ui.spec.ts` - "should maintain all Login Screen elements in error state"
 
 ### Требование 12: Login Screen Компонент
 
@@ -191,6 +231,10 @@
 5. "Login Screen" ДОЛЖЕН отображать текст "By continuing, you agree to Clerkly's Terms of Service and Privacy Policy"
 6. "Login Screen" ДОЛЖЕН использовать дизайн из прототипа `figma/src/app/components/login-screen.tsx`
 
+#### Функциональные Тесты
+
+- `tests/functional/login-ui.spec.ts` - "should display all Login Screen elements correctly"
+
 ### Требование 13: Login Error Screen Компонент
 
 **User Story:** Как пользователь, я хочу видеть понятное сообщение об ошибке, чтобы понимать что пошло не так и как это исправить.
@@ -204,4 +248,9 @@
 5. КОГДА ошибка "network_error", ТО "Login Error Screen" ДОЛЖЕН показать заголовок "Network error" и текст "Unable to connect to Google authentication servers." с предложением "Please check your internet connection and try again."
 6. КОГДА ошибка неизвестна, ТО "Login Error Screen" ДОЛЖЕН показать заголовок "Authentication failed" и переданное сообщение об ошибке с предложением "Please try signing in again or contact support if the problem persists."
 7. "Login Error Screen" ДОЛЖЕН использовать дизайн из прототипа `figma/src/app/components/login-error.tsx`
+
+#### Функциональные Тесты
+
+- `tests/functional/login-ui.spec.ts` - "should display error block with correct styling"
+- `tests/functional/login-ui.spec.ts` - "should maintain all Login Screen elements in error state"
 

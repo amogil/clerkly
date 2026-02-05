@@ -22,6 +22,10 @@ interface API {
     onAuthSuccess: (callback: () => void) => void;
     onAuthError: (callback: (error: string, errorCode?: string) => void) => void;
   };
+  // Requirements: testing.3.8 - Test IPC methods (only available in test environment)
+  ipcRenderer?: {
+    invoke: (channel: string, ...args: any[]) => Promise<any>;
+  };
 }
 
 // Requirements: clerkly.1, clerkly.2
@@ -30,7 +34,7 @@ interface API {
  * Expose secure IPC API to renderer process
  * Uses contextBridge for security isolation
  */
-contextBridge.exposeInMainWorld('api', {
+const api: API = {
   /**
    * Save data to local storage via IPC
    * Requirements: clerkly.1   * @param {string} key - Data key (non-empty string, max 1000 chars)
@@ -114,7 +118,22 @@ contextBridge.exposeInMainWorld('api', {
       });
     },
   },
-} as API);
+};
+
+// Requirements: testing.3.8
+// Expose ipcRenderer in test environment for test IPC handlers
+if (process.env.NODE_ENV === 'test') {
+  api.ipcRenderer = {
+    invoke: (channel: string, ...args: any[]) => ipcRenderer.invoke(channel, ...args),
+  };
+}
+
+contextBridge.exposeInMainWorld('api', api);
+contextBridge.exposeInMainWorld('electron', {
+  ipcRenderer: {
+    invoke: (channel: string, ...args: any[]) => ipcRenderer.invoke(channel, ...args),
+  },
+});
 
 /**
  * Global window interface extension for renderer process

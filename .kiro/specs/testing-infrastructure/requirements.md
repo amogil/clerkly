@@ -87,6 +87,59 @@
 
 3.11. EACH требование с пользовательским сценарием SHALL указывать функциональные тесты, которые его покрывают
 
+### 3.1. Test IPC Handlers для Функциональных Тестов
+
+**ID:** testing.3.1
+
+**User Story:** Как разработчик, я хочу иметь специальные IPC handlers для тестов, чтобы управлять состоянием приложения из Playwright тестов без использования better-sqlite3 напрямую.
+
+**Зависимости:** testing.3
+
+#### Критерии Приемки
+
+3.1.1. WHEN приложение запущено в тестовом режиме (NODE_ENV=test), THE test IPC handlers SHALL быть зарегистрированы
+
+3.1.2. THE test IPC handlers SHALL предоставлять следующие методы:
+- `test:setup-tokens` - установка тестовых токенов в БД
+- `test:clear-tokens` - очистка всех токенов из БД
+- `test:get-token-status` - получение статуса токенов
+- `test:clear-data` - очистка всех данных из БД
+
+3.1.3. THE test IPC handlers SHALL быть доступны ТОЛЬКО в тестовом режиме
+
+3.1.4. THE test IPC handlers SHALL использовать реальные классы приложения (TokenStorageManager, DataManager)
+
+3.1.5. THE test IPC handlers SHALL быть расположены в `tests/functional/helpers/test-ipc-handlers.ts`
+
+3.1.6. THE preload script SHALL экспортировать `window.electron.ipcRenderer.invoke` для доступа к test IPC handlers
+
+### 3.2. Mock OAuth Server для Функциональных Тестов
+
+**ID:** testing.3.2
+
+**User Story:** Как разработчик, я хочу иметь mock OAuth server, чтобы тестировать полный OAuth flow без реальных Google credentials.
+
+**Зависимости:** testing.3
+
+#### Критерии Приемки
+
+3.2.1. THE mock OAuth server SHALL эмулировать Google OAuth endpoints:
+- `/auth` - authorization endpoint
+- `/token` - token exchange endpoint
+- `/refresh` - token refresh endpoint
+
+3.2.2. THE mock OAuth server SHALL возвращать тестовые токены в формате Google OAuth
+
+3.2.3. THE mock OAuth server SHALL валидировать client_id и client_secret
+
+3.2.4. THE mock OAuth server SHALL генерировать уникальные authorization codes
+
+3.2.5. THE mock OAuth server SHALL поддерживать CORS для browser requests
+
+3.2.6. THE mock OAuth server SHALL быть расположен в `tests/functional/helpers/mock-oauth-server.ts`
+
+3.2.7. THE mock OAuth server SHALL запускаться перед функциональными тестами и останавливаться после
+
 ### 4. Процесс Валидации
 
 **ID:** testing.4

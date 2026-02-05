@@ -93,7 +93,6 @@ Clerkly - это Electron-приложение для Mac OS X, представ
 #### Функциональные Тесты
 
 - `tests/functional/app-lifecycle.spec.ts` - "should launch application successfully"
-- `tests/functional/data-persistence.spec.ts` - "should persist user data across restarts"
 
 ## Нефункциональные требования
 
