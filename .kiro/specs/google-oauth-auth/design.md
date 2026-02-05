@@ -132,6 +132,39 @@
      │                                                              │
 ```
 
+### Sign Out Flow
+
+```
+User                    Renderer Process         Main Process          Google OAuth
+ │                            │                        │                      │
+ │ 1. Click "Sign Out"        │                        │                      │
+ │───────────────────────────▶│                        │                      │
+ │                            │                        │                      │
+ │                            │ 2. IPC: auth:logout    │                      │
+ │                            │───────────────────────▶│                      │
+ │                            │                        │                      │
+ │                            │                        │ 3. Revoke token      │
+ │                            │                        │─────────────────────▶│
+ │                            │                        │                      │
+ │                            │                        │ 4. Revoke response   │
+ │                            │                        │◀─────────────────────│
+ │                            │                        │                      │
+ │                            │                        │ 5. Delete tokens     │
+ │                            │                        │    from SQLite       │
+ │                            │                        │                      │
+ │                            │ 6. Event: auth:logout-complete                │
+ │                            │◀───────────────────────│                      │
+ │                            │                        │                      │
+ │                            │ 7. Update state:       │                      │
+ │                            │    isAuthorized=false  │                      │
+ │                            │                        │                      │
+ │ 8. Show Login Screen       │                        │                      │
+ │◀───────────────────────────│                        │                      │
+ │                            │                        │                      │
+```
+
+**Примечание:** Если revoke запрос к Google не удается (шаг 3-4), приложение все равно удаляет локальные токены (шаг 5) и показывает Login Screen (шаг 8).
+
 
 ## Компоненты и Интерфейсы
 
@@ -385,6 +418,23 @@ export function LoginError({
 //   * csrf_attack_detected: "Security error" + детали
 //   * database_error: "Storage error" + детали
 //   * default: "Authentication failed" + errorMessage
+```
+
+**Settings Component with Sign Out:**
+
+```typescript
+// Requirements: google-oauth-auth.15.1
+interface SettingsProps {
+  onSignOut?: () => void;
+}
+
+export function Settings({ onSignOut }: SettingsProps): JSX.Element;
+
+// Содержимое компонента:
+// - Различные настройки приложения (автоматическое присоединение к встречам, транскрипция и т.д.)
+// - Кнопка "Sign out" с иконкой LogOut
+// - При клике на кнопку вызывается onSignOut callback
+// - onSignOut в App.tsx вызывает window.api.auth.logout()
 ```
 
 
@@ -1150,6 +1200,13 @@ it('should preserve token data through save/load cycle', () => {
 | google-oauth-auth.13.5 | ✓ | - | ✓ |
 | google-oauth-auth.13.6 | ✓ | - | ✓ |
 | google-oauth-auth.13.7 | ✓ | - | ✓ |
+| google-oauth-auth.15.1 | ✓ | - | ✓ |
+| google-oauth-auth.15.2 | ✓ | - | ✓ |
+| google-oauth-auth.15.3 | ✓ | - | ✓ |
+| google-oauth-auth.15.4 | ✓ | - | ✓ |
+| google-oauth-auth.15.5 | ✓ | - | ✓ |
+| google-oauth-auth.15.6 | ✓ | - | ✓ |
+| google-oauth-auth.15.7 | ✓ | - | ✓ |
 
 ### Критерии Успеха
 

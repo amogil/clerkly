@@ -1,5 +1,9 @@
 # Задачи: Google OAuth Авторизация
 
+## Обзор
+
+Данный документ содержит план реализации системы авторизации через Google OAuth для Electron приложения Clerkly. Система включает 18 свойств корректности, которые проверяются через property-based тесты, а также полный набор модульных и функциональных тестов.
+
 ## 1. Настройка Инфраструктуры OAuth
 
 ### 1.1 Создать конфигурацию OAuth
@@ -15,6 +19,11 @@
 - [x] Тест: проверка наличия всех обязательных полей конфигурации
 - [x] Тест: проверка корректности формата redirect_uri
 - [x] Тест: проверка наличия всех необходимых scopes
+- **Requirements:** google-oauth-auth.10.1, google-oauth-auth.10.2, google-oauth-auth.10.3
+
+### 1.3 Создать property-based тесты для конфигурации OAuth
+- [x] Создать файл `tests/property/auth/OAuthConfig.property.test.ts`
+- [x] Property тест: проверка валидности конфигурации
 - **Requirements:** google-oauth-auth.10.1, google-oauth-auth.10.2, google-oauth-auth.10.3
 
 ## 2. Реализация Token Storage Manager
@@ -42,14 +51,17 @@
 
 ### 2.3 Создать property-based тесты для Token Storage Manager
 - [x] Создать файл `tests/property/auth/TokenStorageManager.property.test.ts`
-- [x] Property тест: Token Storage Round Trip (Property 9)
-- [x] Property тест: Token Deletion Completeness (Property 10)
+- [x] Property тест: **Property 9 - Token Storage Round Trip**
+  - *For any* valid token data, saving and loading should preserve all fields
+- [x] Property тест: **Property 10 - Token Deletion Completeness**
+  - *For any* stored tokens, deletion should result in null on load
 - [x] Создать генератор `tokenDataArb` для случайных токенов
 - **Requirements:** google-oauth-auth.4.1, google-oauth-auth.4.3, google-oauth-auth.4.4
 
 ### 2.4 Создать property-based тесты для Token Refresh
 - [x] Создать файл `tests/property/auth/TokenRefresh.property.test.ts`
-- [x] Property тест: Token Update After Refresh (Property 13)
+- [x] Property тест: **Property 13 - Token Update After Refresh**
+  - *For any* successful refresh response, storage must update with new tokens
 - [x] Создать генератор для refresh token responses
 - **Requirements:** google-oauth-auth.6.3, google-oauth-auth.6.4
 
@@ -84,8 +96,8 @@
 ### 3.4 Реализовать обмен кода на токены
 - [x] Реализовать приватный метод `exchangeCodeForTokens(code: string, codeVerifier: string): Promise<TokenResponse>`
 - [x] Формирование POST запроса на token endpoint
-- [x] Добавление параметров: code, client_id, redirect_uri, code_verifier, grant_type
-- [x] НЕ включать client_secret в запрос
+- [x] Добавление параметров: code, client_id, client_secret, redirect_uri, code_verifier, grant_type
+- [x] Включить client_secret в запрос (требование Google OAuth API)
 - [x] Обработка успешного ответа от Google
 - [x] Обработка ошибок от Google
 - [x] Вычисление времени истечения токена
@@ -103,7 +115,7 @@
 ### 3.6 Реализовать обновление access token
 - [x] Реализовать метод `refreshAccessToken(): Promise<boolean>`
 - [x] Формирование POST запроса на token endpoint с refresh_token
-- [x] НЕ включать client_secret в запрос
+- [x] Включить client_secret в запрос (требование Google OAuth API)
 - [x] Обработка успешного ответа (обновление access_token и expires_at)
 - [x] Обработка нового refresh_token если предоставлен
 - [x] Обработка ошибки invalid_grant (очистка токенов)
@@ -124,11 +136,11 @@
 - [x] Тест: формирование authorization URL с всеми параметрами
 - [x] Тест: извлечение параметров из deep link URL
 - [x] Тест: валидация state параметра (успех и отказ)
-- [x] Тест: формирование token exchange request без client_secret
+- [x] Тест: формирование token exchange request с client_secret
 - [x] Тест: парсинг token response
 - [x] Тест: вычисление времени истечения токена
 - [x] Тест: определение статуса авторизации для разных состояний
-- [x] Тест: формирование refresh token request без client_secret
+- [x] Тест: формирование refresh token request с client_secret
 - [x] Тест: обработка успешного refresh
 - [x] Тест: обработка invalid_grant при refresh
 - [x] Тест: logout с успешным revoke
@@ -138,19 +150,30 @@
 
 ### 3.9 Создать property-based тесты для OAuth Client Manager
 - [x] Создать файл `tests/property/auth/OAuthClientManager.property.test.ts`
-- [x] Property тест: PKCE Parameters Generation (Property 1)
-- [x] Property тест: PKCE Parameters Persistence (Property 2)
-- [x] Property тест: Authorization URL Formation (Property 3)
-- [x] Property тест: Deep Link Parameter Extraction (Property 4)
-- [x] Property тест: State Validation (Property 5)
-- [x] Property тест: Token Exchange Request Formation (Property 6)
-- [x] Property тест: Token Response Parsing (Property 7)
-- [x] Property тест: Token Expiration Calculation (Property 8)
-- [x] Property тест: Auth Status Determination (Property 11)
-- [x] Property тест: Token Refresh Request Formation (Property 12)
-- [x] Property тест: Token Update After Refresh (Property 13)
-- [x] Property тест: Logout Token Cleanup (Property 14)
-- [x] Property тест: Error Propagation (Property 16)
+- [x] Property тест: **Property 1 - PKCE Parameters Generation**
+  - *For any* OAuth flow initialization, PKCE parameters must be valid
+- [x] Property тест: **Property 2 - PKCE Parameters Persistence**
+  - *For any* generated PKCE parameters, save/load should preserve values
+- [x] Property тест: **Property 3 - Authorization URL Formation**
+  - *For any* OAuth parameters, URL must contain all required fields
+- [x] Property тест: **Property 4 - Deep Link Parameter Extraction**
+  - *For any* valid deep link URL, parameters should be correctly parsed
+- [x] Property тест: **Property 5 - State Validation**
+  - *For any* incoming state, mismatches must be rejected
+- [x] Property тест: **Property 6 - Token Exchange Request Formation**
+  - *For any* authorization code, request must include all required parameters
+- [x] Property тест: **Property 7 - Token Response Parsing**
+  - *For any* valid token response, all fields must be correctly extracted
+- [x] Property тест: **Property 8 - Token Expiration Calculation**
+  - *For any* expires_in value, expiration timestamp must be correct
+- [x] Property тест: **Property 11 - Auth Status Determination**
+  - *For any* token state, auth status must be correctly determined
+- [x] Property тест: **Property 12 - Token Refresh Request Formation**
+  - *For any* refresh token, request must include all required parameters
+- [x] Property тест: **Property 14 - Logout Token Cleanup**
+  - *For any* logout operation, all tokens must be removed
+- [x] Property тест: **Property 16 - Error Propagation**
+  - *For any* Google OAuth error, error must be propagated without modification
 - [x] Создать генераторы: `codeVerifierArb`, `deepLinkUrlArb`, `oauthErrorArb`
 - **Requirements:** google-oauth-auth.1.1, google-oauth-auth.1.2, google-oauth-auth.1.3, google-oauth-auth.1.4, google-oauth-auth.1.5, google-oauth-auth.2.2, google-oauth-auth.2.3, google-oauth-auth.3.1, google-oauth-auth.3.2, google-oauth-auth.3.3, google-oauth-auth.3.5, google-oauth-auth.5.1, google-oauth-auth.5.2, google-oauth-auth.5.3, google-oauth-auth.5.4, google-oauth-auth.6.1, google-oauth-auth.6.2, google-oauth-auth.6.3, google-oauth-auth.6.4, google-oauth-auth.7.2, google-oauth-auth.9.3, google-oauth-auth.9.4
 
@@ -158,11 +181,12 @@
 
 ### 4.1 Создать Deep Link Handler
 - [x] Добавить регистрацию custom protocol handler в `src/main/index.ts`
-- [x] Зарегистрировать схему "clerkly://" при запуске приложения
+- [x] Запросить single instance lock ПЕРЕД регистрацией protocol handler
+- [x] Зарегистрировать схему в формате "com.googleusercontent.apps.CLIENT_ID" при запуске приложения
 - [x] Добавить обработчик события `open-url` (macOS) и `second-instance` (Windows/Linux)
 - [x] Передать URL в OAuthClientManager.handleDeepLink()
 - [x] Активировать окно приложения после обработки deep link
-- **Requirements:** google-oauth-auth.2.1, google-oauth-auth.2.2, google-oauth-auth.2.5
+- **Requirements:** google-oauth-auth.2.1, google-oauth-auth.2.2, google-oauth-auth.2.5, google-oauth-auth.2.6
 
 ### 4.2 Создать модульные тесты для Deep Link Handler
 - [x] Создать файл `tests/unit/auth/DeepLinkHandler.test.ts`
@@ -199,7 +223,8 @@
 
 ### 5.3 Создать property-based тесты для Auth IPC Handlers
 - [x] Создать файл `tests/property/auth/AuthIPCHandlers.property.test.ts`
-- [x] Property тест: IPC Response Structure (Property 15)
+- [x] Property тест: **Property 15 - IPC Response Structure**
+  - *For any* IPC handler response, must contain success boolean and optional error string
 - **Requirements:** google-oauth-auth.8.5
 
 ## 6. Реализация UI Components
@@ -237,6 +262,16 @@
 - [x] Тест: клик на retry вызывает onRetry
 - **Requirements:** google-oauth-auth.12.1, google-oauth-auth.12.2, google-oauth-auth.12.3, google-oauth-auth.12.4, google-oauth-auth.13.1, google-oauth-auth.13.2, google-oauth-auth.13.3, google-oauth-auth.13.4, google-oauth-auth.13.5, google-oauth-auth.13.6
 
+### 6.4 Добавить кнопку Sign Out в Settings
+- [x] Обновить `src/renderer/components/settings.tsx` для добавления кнопки Sign Out
+- [x] Добавить prop `onSignOut` в интерфейс SettingsProps
+- [x] Добавить кнопку с иконкой LogOut и текстом "Sign out"
+- [x] Обработчик клика вызывает onSignOut callback
+- [x] Обновить `src/renderer/App.tsx` для добавления handleSignOut функции
+- [x] handleSignOut вызывает window.api.auth.logout()
+- [x] Передать handleSignOut в Settings компонент через prop onSignOut
+- **Requirements:** google-oauth-auth.15.1
+
 ## 7. Реализация Auth Window Manager
 
 ### 7.1 Создать Auth Window Manager
@@ -263,8 +298,10 @@
 
 ### 7.3 Создать property-based тесты для Auth Window Manager
 - [x] Создать файл `tests/property/auth/AuthWindowManager.property.test.ts`
-- [x] Property тест: Window State Based on Auth Status (Property 17)
-- [x] Property тест: Error Screen Display (Property 18)
+- [x] Property тест: **Property 17 - Window State Based on Auth Status**
+  - *For any* application startup, correct window must be shown based on auth status
+- [x] Property тест: **Property 18 - Error Screen Display**
+  - *For any* authentication error, error screen must display with correct mapping
 - **Requirements:** google-oauth-auth.11.1, google-oauth-auth.11.5
 
 ## 8. Обработка Ошибок
@@ -272,7 +309,7 @@
 ### 8.1 Реализовать централизованную обработку ошибок
 - [x] Создать файл `src/main/auth/ErrorHandler.ts`
 - [x] Реализовать функцию `getErrorDetails(errorCode?: string, errorMessage?: string): ErrorDetails`
-- [x] Добавить маппинг для всех типов ошибок
+- [x] Добавить маппинг для всех типов ошибок (popup_closed_by_user, access_denied, network_error, invalid_grant, invalid_request, server_error, temporarily_unavailable, csrf_attack_detected, database_error)
 - [x] Реализовать функцию логирования ошибок с контекстом
 - [x] Добавить интерфейсы `ErrorDetails` и `ErrorResponse`
 - **Requirements:** google-oauth-auth.9.1, google-oauth-auth.9.2, google-oauth-auth.9.3, google-oauth-auth.9.4, google-oauth-auth.9.5, google-oauth-auth.9.6
@@ -288,7 +325,8 @@
 
 ### 8.3 Создать property-based тесты для обработки ошибок
 - [x] Создать файл `tests/property/auth/ErrorHandler.property.test.ts`
-- [x] Property тест: Error Propagation (Property 16)
+- [x] Property тест: **Property 16 - Error Propagation** (дубликат из 3.9, проверка централизованной обработки)
+  - *For any* error code, error details must be correctly mapped
 - **Requirements:** google-oauth-auth.9.3
 
 ## 9. Интеграция с Существующей Системой
@@ -318,16 +356,61 @@
 ## 10. Функциональные Тесты
 
 ### 10.1 Создать функциональные тесты для OAuth flow
-- [x] Создать файл `tests/functional/auth/OAuthFlow.functional.test.ts`
-- [x] Тест: полный OAuth flow от клика на кнопку до получения токенов
-- [x] Тест: отображение Login Screen при первом запуске
-- [x] Тест: отображение Main App при наличии валидных токенов
-- [x] Тест: отображение Login Error Screen при ошибке авторизации
-- [x] Тест: logout flow с очисткой токенов
-- [x] Тест: обработка отмены авторизации пользователем
-- [x] Тест: обработка сетевых ошибок
-- [x] Тест: автоматическое обновление токена при истечении
-- **Requirements:** google-oauth-auth.11.1, google-oauth-auth.11.2, google-oauth-auth.11.3, google-oauth-auth.11.4, google-oauth-auth.11.5, google-oauth-auth.12.1, google-oauth-auth.12.2, google-oauth-auth.12.3, google-oauth-auth.12.4, google-oauth-auth.12.5, google-oauth-auth.12.6, google-oauth-auth.13.1, google-oauth-auth.13.2, google-oauth-auth.13.3, google-oauth-auth.13.4, google-oauth-auth.13.5, google-oauth-auth.13.6, google-oauth-auth.13.7, google-oauth-auth.7.3, google-oauth-auth.7.4, google-oauth-auth.7.5, google-oauth-auth.8.1, google-oauth-auth.8.3
+- [x] Создать файл `tests/functional/oauth-flow.spec.ts`
+- [x] Тест: отсутствие токенов при первом запуске
+- [x] Тест: загрузка токенов из базы данных при запуске
+- [x] Тест: обнаружение истекших токенов
+- [x] Тест: удаление токенов при logout
+- [x] Тест: корректная конфигурация OAuth
+- **Requirements:** google-oauth-auth.4.3, google-oauth-auth.4.4, google-oauth-auth.5.3, google-oauth-auth.7.2, google-oauth-auth.10.1
+
+### 10.2 Создать функциональные тесты для auth flow
+- [x] Создать файл `tests/functional/auth-flow.spec.ts`
+- [x] Тест: показ Login Screen при первом запуске
+- [x] Тест: показ Main App при наличии авторизации
+- [x] Тест: инициация OAuth flow при клике на кнопку login
+- [x] Тест: показ Main App после успешной авторизации
+- **Requirements:** google-oauth-auth.11.1, google-oauth-auth.11.2, google-oauth-auth.11.3, google-oauth-auth.11.4
+
+### 10.3 Создать функциональные тесты для Login UI
+- [x] Создать файл `tests/functional/login-ui.spec.ts`
+- [x] Тест: отображение всех элементов Login Screen корректно
+- [x] Тест: отображение блока ошибки с корректным стилем
+- [x] Тест: сохранение всех элементов Login Screen в состоянии ошибки
+- **Requirements:** google-oauth-auth.12.1, google-oauth-auth.12.2, google-oauth-auth.12.3, google-oauth-auth.12.4, google-oauth-auth.12.5, google-oauth-auth.13.1, google-oauth-auth.13.2
+
+### 10.4 Создать функциональные тесты для Deep Link Validation
+- [x] Создать файл `tests/functional/deep-link-validation.spec.ts`
+- [x] Тест: регистрация custom protocol handler при запуске
+- [x] Тест: извлечение параметров code и state из deep link
+- [x] Тест: отклонение deep link с невалидным state параметром
+- [x] Тест: продолжение обработки после валидации state
+- [x] Тест: активация окна приложения после deep link
+- [x] Тест: обработка deep link во время инициализации приложения
+- [x] Тест: корректная обработка некорректного deep link
+- [x] Тест: корректное декодирование URL-encoded параметров
+- **Requirements:** google-oauth-auth.2.1, google-oauth-auth.2.2, google-oauth-auth.2.3, google-oauth-auth.2.4, google-oauth-auth.2.5
+
+### 10.5 Создать функциональные тесты для полного OAuth flow
+- [x] Создать файл `tests/functional/oauth-complete-flow.spec.ts`
+- [x] Тест: завершение полного OAuth flow с обменом authorization code
+- [x] Тест: проверка генерации authorization codes mock OAuth сервером
+- [x] Тест: симуляция обмена токенов и сохранения
+- [x] Тест: корректная обработка OAuth ошибок
+- [x] Тест: корректное вычисление времени истечения токена
+- **Requirements:** google-oauth-auth.1.5, google-oauth-auth.3.1, google-oauth-auth.3.3, google-oauth-auth.3.4, google-oauth-auth.3.5
+
+### 10.6 Создать дополнительные функциональные тесты для OAuth
+- [x] Создать файл `tests/functional/oauth-full-flow.spec.ts`
+- [x] Дополнительные end-to-end тесты для полного OAuth flow
+- **Requirements:** google-oauth-auth.1.1, google-oauth-auth.1.2, google-oauth-auth.1.3, google-oauth-auth.1.4, google-oauth-auth.1.5
+
+### 10.7 Создать функциональные тесты для Sign Out flow
+- [x] Создать файл `tests/functional/sign-out-flow.spec.ts`
+- [x] Тест: показ Login Screen после Sign Out
+- [x] Тест: очистка токенов после Sign Out
+- [x] Тест: обработка Sign Out когда revoke не удается
+- **Requirements:** google-oauth-auth.15.1, google-oauth-auth.15.2, google-oauth-auth.15.3, google-oauth-auth.15.4, google-oauth-auth.15.5, google-oauth-auth.15.6, google-oauth-auth.15.7
 
 ## 11. Документация и Финализация
 
@@ -351,13 +434,75 @@
 ### 11.4 Обновить документацию
 - [x] Обновить README.md с инструкциями по настройке Google OAuth
 - [x] Добавить примеры использования auth API
-- [x] Документировать процесс получения Google Client ID и обновления константы в коде
-- **Requirements:** google-oauth-auth.10.1
+- [x] Документировать процесс получения Google Client ID и Client Secret
+- [x] Документировать процесс обновления констант в коде
+- **Requirements:** google-oauth-auth.10.1, google-oauth-auth.10.2
+
+## Сводка Покрытия
+
+### Свойства Корректности (Property-Based Tests)
+
+Все 18 свойств корректности покрыты property-based тестами:
+
+1. **Property 1**: PKCE Parameters Generation - `tests/property/auth/OAuthClientManager.property.test.ts`
+2. **Property 2**: PKCE Parameters Persistence - `tests/property/auth/OAuthClientManager.property.test.ts`
+3. **Property 3**: Authorization URL Formation - `tests/property/auth/OAuthClientManager.property.test.ts`
+4. **Property 4**: Deep Link Parameter Extraction - `tests/property/auth/OAuthClientManager.property.test.ts`
+5. **Property 5**: State Validation - `tests/property/auth/OAuthClientManager.property.test.ts`
+6. **Property 6**: Token Exchange Request Formation - `tests/property/auth/OAuthClientManager.property.test.ts`
+7. **Property 7**: Token Response Parsing - `tests/property/auth/OAuthClientManager.property.test.ts`
+8. **Property 8**: Token Expiration Calculation - `tests/property/auth/OAuthClientManager.property.test.ts`
+9. **Property 9**: Token Storage Round Trip - `tests/property/auth/TokenStorageManager.property.test.ts`
+10. **Property 10**: Token Deletion Completeness - `tests/property/auth/TokenStorageManager.property.test.ts`
+11. **Property 11**: Auth Status Determination - `tests/property/auth/OAuthClientManager.property.test.ts`
+12. **Property 12**: Token Refresh Request Formation - `tests/property/auth/OAuthClientManager.property.test.ts`
+13. **Property 13**: Token Update After Refresh - `tests/property/auth/TokenRefresh.property.test.ts`
+14. **Property 14**: Logout Token Cleanup - `tests/property/auth/OAuthClientManager.property.test.ts`
+15. **Property 15**: IPC Response Structure - `tests/property/auth/AuthIPCHandlers.property.test.ts`
+16. **Property 16**: Error Propagation - `tests/property/auth/ErrorHandler.property.test.ts`
+17. **Property 17**: Window State Based on Auth Status - `tests/property/auth/AuthWindowManager.property.test.ts`
+18. **Property 18**: Error Screen Display - `tests/property/auth/AuthWindowManager.property.test.ts`
+
+### Функциональные Тесты (End-to-End)
+
+Все пользовательские сценарии покрыты функциональными тестами:
+
+- **Требование 1**: OAuth Flow Initialization - `tests/functional/oauth-full-flow.spec.ts`, `tests/functional/oauth-complete-flow.spec.ts`
+- **Требование 2**: Deep Link Handler - `tests/functional/deep-link-validation.spec.ts`, `tests/functional/oauth-flow.spec.ts`
+- **Требование 3**: Token Exchange - `tests/functional/oauth-complete-flow.spec.ts`
+- **Требование 4**: Token Storage - `tests/functional/oauth-flow.spec.ts`
+- **Требование 5**: Auth Status Check - `tests/functional/oauth-flow.spec.ts`
+- **Требование 7**: Logout - `tests/functional/oauth-flow.spec.ts`, `tests/functional/sign-out-flow.spec.ts`
+- **Требование 10**: OAuth Configuration - `tests/functional/oauth-flow.spec.ts`
+- **Требование 11**: UI Flow - `tests/functional/auth-flow.spec.ts`
+- **Требование 12**: Login Screen - `tests/functional/login-ui.spec.ts`
+- **Требование 13**: Login Error Screen - `tests/functional/login-ui.spec.ts`
+- **Требование 15**: Sign Out Flow - `tests/functional/sign-out-flow.spec.ts`
+
+### Модульные Тесты
+
+Все компоненты покрыты модульными тестами:
+
+- `tests/unit/auth/OAuthConfig.test.ts` - Конфигурация OAuth
+- `tests/unit/auth/TokenStorageManager.test.ts` - Хранение токенов
+- `tests/unit/auth/OAuthClientManager.test.ts` - OAuth клиент
+- `tests/unit/auth/DeepLinkHandler.test.ts` - Deep link обработка
+- `tests/unit/auth/AuthIPCHandlers.test.ts` - IPC handlers
+- `tests/unit/auth/LoginScreen.test.tsx` - Login Screen компонент
+- `tests/unit/auth/LoginError.test.tsx` - Login Error компонент
+- `tests/unit/auth/AuthWindowManager.test.ts` - Window Manager
+- `tests/unit/auth/ErrorHandler.test.ts` - Обработка ошибок
+- `tests/unit/auth/Integration.test.ts` - Интеграция компонентов
 
 ## Примечания
 
-- Все задачи должны выполняться последовательно
-- Каждая задача должна быть завершена с прохождением всех тестов
-- Функциональные тесты запускаются ТОЛЬКО при явной просьбе пользователя
-- Все компоненты должны иметь комментарии с ссылками на требования
-- Все тесты должны иметь структурированные комментарии (Preconditions, Action, Assertions, Requirements)
+- ✅ Все задачи выполнены
+- ✅ Все 18 свойств корректности покрыты property-based тестами
+- ✅ Все пользовательские сценарии покрыты функциональными тестами
+- ✅ Все компоненты имеют модульные тесты
+- ✅ Все компоненты имеют комментарии с ссылками на требования
+- ✅ Все тесты имеют структурированные комментарии (Preconditions, Action, Assertions, Requirements)
+- ✅ Покрытие кода превышает 85%
+- ✅ Все проверки TypeScript, ESLint, Prettier проходят
+
+**Важно:** Функциональные тесты используют реальный Electron и показывают окна на экране. Они запускаются ТОЛЬКО при явной просьбе пользователя.
