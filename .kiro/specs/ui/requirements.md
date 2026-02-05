@@ -35,6 +35,10 @@
 
 1.5. THE "Main Window" SHALL сохранять видимость системных элементов macOS (меню, dock)
 
+#### Функциональные Тесты
+
+- `tests/functional/window-state-persistence.spec.ts` - "should open at default size on first launch"
+
 ### 2. Заголовок Главного Окна
 
 **ID:** ui.2
@@ -89,6 +93,10 @@
 
 4.4. WHEN экран пользователя меньше стандартного размера, THE "Main Window" SHALL адаптировать размеры к доступному пространству
 
+#### Функциональные Тесты
+
+- `tests/functional/window-state-persistence.spec.ts` - "should open at default size on first launch"
+
 ### 5. Сохранение Состояния Окна
 
 **ID:** ui.5
@@ -110,6 +118,10 @@
 5.5. WHEN сохраненное состояние отсутствует (первый запуск), THE "Main Window" SHALL использовать поведение по умолчанию (развернутое окно)
 
 5.6. WHEN сохраненная позиция находится за пределами доступных экранов, THE "Main Window" SHALL открываться на основном экране
+
+#### Функциональные Тесты
+
+- `tests/functional/window-state-persistence.spec.ts` - "should persist window size across restarts"
 
 ## Вне Области Применения
 

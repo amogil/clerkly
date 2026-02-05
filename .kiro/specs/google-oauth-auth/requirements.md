@@ -33,6 +33,10 @@
 4. КОГДА все параметры подготовлены, ТО "OAuth Client" ДОЛЖЕН сохранить Code Verifier и state во временном хранилище
 5. КОГДА параметры сохранены, ТО "OAuth Client" ДОЛЖЕН открыть системный браузер с authorization URL содержащим client_id, redirect_uri, code_challenge, code_challenge_method=S256, state и scope
 
+#### Функциональные Тесты
+
+- `tests/functional/auth-flow.spec.ts` - "should initiate OAuth flow when clicking login button"
+
 ### Требование 2: Регистрация Deep Link Handler
 
 **User Story:** Как система, я хочу перехватывать ответы от Google OAuth, чтобы завершить процесс авторизации без использования localhost сервера.
@@ -165,6 +169,10 @@
 3. КОГДА пользователь нажимает кнопку "Continue with Google", ТО "OAuth Client" ДОЛЖЕН инициировать OAuth flow
 4. ЕСЛИ авторизация успешна, ТО "Window Manager" ДОЛЖЕН закрыть "Login Screen" и открыть главное окно приложения
 5. ЕСЛИ авторизация неуспешна, ТО "Window Manager" ДОЛЖЕН показать "Login Error Screen" с описанием ошибки и кнопкой повтора
+
+#### Функциональные Тесты
+
+- `tests/functional/auth-flow.spec.ts` - "should show login screen on first launch"
 
 ### Требование 12: Login Screen Компонент
 

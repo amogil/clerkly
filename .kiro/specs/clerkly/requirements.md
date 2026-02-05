@@ -52,6 +52,12 @@ Clerkly - это Electron-приложение для Mac OS X, представ
 
 **Тестируемость:** Да - через модульные тесты компонентов "Data Manager", "Lifecycle Manager", проверку версий зависимостей в package.json, функциональные тесты запуска приложения
 
+#### Функциональные Тесты
+
+- `tests/functional/app-lifecycle.spec.ts` - "should launch application successfully"
+- `tests/functional/app-lifecycle.spec.ts` - "should close application gracefully"
+- `tests/functional/app-lifecycle.spec.ts` - "should remain stable after launch"
+
 ### Требование 2: Тестирование
 
 **ID:** clerkly.2
@@ -84,6 +90,11 @@ Clerkly - это Electron-приложение для Mac OS X, представ
 
 **Тестируемость:** Да - через Jest framework с fast-check для property-based тестов, автоматизированные тестовые скрипты, отчеты о покрытии кода (npm run test:coverage)
 
+#### Функциональные Тесты
+
+- `tests/functional/app-lifecycle.spec.ts` - "should launch application successfully"
+- `tests/functional/data-persistence.spec.ts` - "should persist user data across restarts"
+
 ## Нефункциональные требования
 
 ### Производительность
@@ -107,6 +118,10 @@ nfr.1.3. Длительные операции (> 200ms) ДОЛЖНЫ выпол
 nfr.1.4. Операции с данными ДОЛЖНЫ завершаться менее чем за 50ms для простых операций
 
 **Тестируемость:** Да - через performance тесты с измерением времени запуска, отклика UI и операций с данными, мониторинг производительности в "Lifecycle Manager" и "UI Controller"
+
+#### Функциональные Тесты
+
+- `tests/functional/app-lifecycle.spec.ts` - "should start within 3 seconds"
 
 ### Надежность
 

@@ -10,7 +10,12 @@ module.exports = {
   automock: false,
   setupFilesAfterEnv: ['<rootDir>/tests/setup.ts'],
   // CRITICAL: Do NOT mock Electron - use real Electron API and show windows
+  // Requirements: testing.4.2
   moduleNameMapper: {},
   // Show only failures by default, full output with --verbose flag
-  verbose: false
+  verbose: false,
+  // Ensure Electron is available in test environment
+  testEnvironmentOptions: {
+    customExportConditions: ['node', 'node-addons'],
+  },
 };

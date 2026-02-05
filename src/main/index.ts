@@ -28,6 +28,14 @@ const protocolScheme = OAUTH_CONFIG.redirectUri.split(':')[0];
 if (!gotTheLock) {
   app.quit();
 } else {
+  // Handle custom user data directory for functional tests
+  // Check for --user-data-dir argument
+  const userDataDirIndex = process.argv.indexOf('--user-data-dir');
+  if (userDataDirIndex !== -1 && process.argv[userDataDirIndex + 1]) {
+    const customUserDataPath = process.argv[userDataDirIndex + 1];
+    app.setPath('userData', customUserDataPath);
+  }
+
   // Register custom protocol for deep link handling
   // Using reverse client ID format: com.googleusercontent.apps.CLIENT_ID
   if (process.defaultApp) {
