@@ -1,7 +1,7 @@
 // Requirements: google-oauth-auth.10.1, google-oauth-auth.10.2, google-oauth-auth.10.3, google-oauth-auth.10.4, google-oauth-auth.10.5, google-oauth-auth.10.6
 
 import * as fc from 'fast-check';
-import { getOAuthConfig } from '../../../src/main/auth/OAuthConfig';
+import { getOAuthConfig, OAUTH_CONFIG } from '../../../src/main/auth/OAuthConfig';
 
 describe('OAuthConfig Property-Based Tests', () => {
   /**
