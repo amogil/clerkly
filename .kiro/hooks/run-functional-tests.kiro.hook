@@ -1,14 +1,14 @@
 {
   "enabled": true,
   "name": "Run Functional Tests",
-  "description": "Manually trigger functional and integration tests (npm run test:functional, npm run test:integration). \nWarning: This will show application windows on screen and may interfere with your work.",
+  "description": "Manually trigger functional tests (npm run test:functional). \nWarning: This will show application windows on screen and may interfere with your work.",
   "version": "1",
   "when": {
     "type": "userTriggered"
   },
   "then": {
     "type": "askAgent",
-    "prompt": "Запусти функциональные и интеграционные тесты. Спрашивать подтверждение не нужно. Это запрос пользователя. "
+    "prompt": "Запусти функциональные тесты. Спрашивать подтверждение не нужно. Это запрос пользователя. "
   },
   "workspaceFolderName": "clerkly2",
   "shortName": "run-functional-tests"
