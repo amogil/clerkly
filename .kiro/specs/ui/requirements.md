@@ -128,15 +128,15 @@ Token Expiring → OAuthClientManager.refreshAccessToken() → Update Tokens in 
 
 #### Критерии Приемки
 
-1.1. WHEN приложение запускается впервые (нет сохраненного состояния), THE "Main Window" SHALL открываться размером с workAreaSize (весь экран минус системные элементы macOS), но НЕ в maximized состоянии
+1.1. КОГДА приложение запускается впервые (нет сохраненного состояния), ТО "Main Window" ДОЛЖНО открываться размером с workAreaSize (весь экран минус системные элементы macOS), но НЕ в maximized состоянии
 
-1.2. THE "Main Window" SHALL НЕ открываться в полноэкранном режиме (fullscreen)
+1.2. "Main Window" ДОЛЖНО НЕ открываться в полноэкранном режиме (fullscreen)
 
-1.3. THE "Main Window" SHALL позволять пользователю изменять размер окна (resizable: true)
+1.3. "Main Window" ДОЛЖНО позволять пользователю изменять размер окна (resizable: true)
 
-1.4. THE "Main Window" SHALL позволять пользователю максимизировать окно через стандартные элементы управления macOS
+1.4. "Main Window" ДОЛЖНО позволять пользователю максимизировать окно через стандартные элементы управления macOS
 
-1.5. THE "Main Window" SHALL сохранять видимость системных элементов macOS (меню, dock)
+1.5. "Main Window" ДОЛЖНО сохранять видимость системных элементов macOS (меню, dock)
 
 #### Функциональные Тесты
 
@@ -152,11 +152,11 @@ Token Expiring → OAuthClientManager.refreshAccessToken() → Update Tokens in 
 
 #### Критерии Приемки
 
-2.1. WHEN приложение запускается, THE "Main Window" SHALL иметь пустой заголовок (title: '')
+2.1. КОГДА приложение запускается, ТО "Main Window" ДОЛЖНО иметь пустой заголовок (title: '')
 
-2.2. THE "Main Window" SHALL НЕ отображать название приложения в заголовке окна
+2.2. "Main Window" ДОЛЖНО НЕ отображать название приложения в заголовке окна
 
-2.3. THE "Main Window" SHALL сохранять стандартные элементы управления окном macOS (кнопки закрыть, свернуть, развернуть)
+2.3. "Main Window" ДОЛЖНО сохранять стандартные элементы управления окном macOS (кнопки закрыть, свернуть, развернуть)
 
 #### Функциональные Тесты
 
@@ -172,15 +172,15 @@ Token Expiring → OAuthClientManager.refreshAccessToken() → Update Tokens in 
 
 #### Критерии Приемки
 
-3.1. THE "Main Window" SHALL использовать нативные Mac OS X элементы управления окном
+3.1. "Main Window" ДОЛЖНО использовать нативные Mac OS X элементы управления окном
 
-3.2. THE "Main Window" SHALL использовать стандартные Mac OS X элементы интерфейса (кнопки, меню, диалоги)
+3.2. "Main Window" ДОЛЖНО использовать стандартные Mac OS X элементы интерфейса (кнопки, меню, диалоги)
 
-3.3. THE "Main Window" SHALL следовать Mac OS X конвенциям поведения окна при закрытии
+3.3. "Main Window" ДОЛЖНО следовать Mac OS X конвенциям поведения окна при закрытии
 
-3.4. THE "Main Window" SHALL следовать Mac OS X конвенциям активации приложения
+3.4. "Main Window" ДОЛЖНО следовать Mac OS X конвенциям активации приложения
 
-3.5. THE "Main Window" SHALL интегрироваться с системным dock macOS
+3.5. "Main Window" ДОЛЖНО интегрироваться с системным dock macOS
 
 #### Функциональные Тесты
 
@@ -198,13 +198,13 @@ Token Expiring → OAuthClientManager.refreshAccessToken() → Update Tokens in 
 
 #### Критерии Приемки
 
-4.1. WHEN приложение запускается впервые, THE "Main Window" SHALL определять размер экрана пользователя
+4.1. КОГДА приложение запускается впервые, ТО "Main Window" ДОЛЖНО определять размер экрана пользователя
 
-4.2. THE "Main Window" SHALL использовать размеры экрана для определения начальных размеров окна
+4.2. "Main Window" ДОЛЖНО использовать размеры экрана для определения начальных размеров окна
 
-4.3. THE "Main Window" SHALL НЕ использовать хардкоженные размеры (например, 1920x1080)
+4.3. "Main Window" ДОЛЖНО НЕ использовать хардкоженные размеры (например, 1920x1080)
 
-4.4. WHEN экран пользователя меньше стандартного размера, THE "Main Window" SHALL адаптировать размеры к доступному пространству
+4.4. КОГДА экран пользователя меньше стандартного размера, ТО "Main Window" ДОЛЖНО адаптировать размеры к доступному пространству
 
 #### Функциональные Тесты
 
@@ -220,17 +220,17 @@ Token Expiring → OAuthClientManager.refreshAccessToken() → Update Tokens in 
 
 #### Критерии Приемки
 
-5.1. WHEN пользователь изменяет размер окна, THE "Main Window" SHALL сохранять новый размер в постоянное хранилище
+5.1. КОГДА пользователь изменяет размер окна, ТО "Main Window" ДОЛЖНО сохранять новый размер в постоянное хранилище
 
-5.2. WHEN пользователь перемещает окно, THE "Main Window" SHALL сохранять новую позицию в постоянное хранилище
+5.2. КОГДА пользователь перемещает окно, ТО "Main Window" ДОЛЖНО сохранять новую позицию в постоянное хранилище
 
-5.3. WHEN пользователь разворачивает или сворачивает окно, THE "Main Window" SHALL сохранять состояние развернутости
+5.3. КОГДА пользователь разворачивает или сворачивает окно, ТО "Main Window" ДОЛЖНО сохранять состояние развернутости
 
-5.4. WHEN приложение запускается повторно, THE "Main Window" SHALL восстанавливать сохраненные размер, позицию и состояние
+5.4. КОГДА приложение запускается повторно, ТО "Main Window" ДОЛЖНО восстанавливать сохраненные размер, позицию и состояние
 
-5.5. WHEN сохраненное состояние отсутствует (первый запуск), THE "Main Window" SHALL использовать поведение по умолчанию (развернутое окно)
+5.5. КОГДА сохраненное состояние отсутствует (первый запуск), ТО "Main Window" ДОЛЖНО использовать поведение по умолчанию (развернутое окно)
 
-5.6. WHEN сохраненная позиция находится за пределами доступных экранов, THE "Main Window" SHALL открываться на основном экране
+5.6. КОГДА сохраненная позиция находится за пределами доступных экранов, ТО "Main Window" ДОЛЖНО открываться на основном экране
 
 #### Функциональные Тесты
 
@@ -246,13 +246,13 @@ Token Expiring → OAuthClientManager.refreshAccessToken() → Update Tokens in 
 
 #### Критерии Приемки
 
-6.1. THE "Account Block" SHALL отображать следующие поля из профиля пользователя:
+6.1. "Account Block" ДОЛЖЕН отображать следующие поля из профиля пользователя:
    - Имя пользователя (name)
    - Email адрес (email)
 
-6.2. THE "Account Block" SHALL НЕ позволять пользователю редактировать поля профиля (read-only)
+6.2. "Account Block" ДОЛЖЕН НЕ позволять пользователю редактировать поля профиля (read-only)
 
-6.3. THE система SHALL загружать данные профиля из Google UserInfo API:
+6.3. Система ДОЛЖНА загружать данные профиля из Google UserInfo API:
    - При успешной авторизации
    - При запуске приложения (если пользователь авторизован)
    - При обновлении access token (refresh)
@@ -261,9 +261,9 @@ Token Expiring → OAuthClientManager.refreshAccessToken() → Update Tokens in 
 
 #### Функциональные Тесты
 
-- `tests/functional/account-profile.spec.ts` - "should populate profile after Google OAuth login" (ui.6.1, ui.6.3)
-- `tests/functional/account-profile.spec.ts` - "should not allow editing profile fields" (ui.6.2)
-- `tests/functional/account-profile.spec.ts` - "should update profile data when changed in Google" (ui.6.3)
+- `tests/functional/account-profile.spec.ts` - "should populate profile after Google OAuth login"
+- `tests/functional/account-profile.spec.ts` - "should not allow editing profile fields"
+- `tests/functional/account-profile.spec.ts` - "should update profile data when changed in Google"
 
 ### 7. Обработка Ошибок
 
@@ -275,22 +275,22 @@ Token Expiring → OAuthClientManager.refreshAccessToken() → Update Tokens in 
 
 #### Критерии Приемки
 
-7.1. WHEN происходит ошибка в фоновом процессе (загрузка данных, синхронизация, API запрос), THE приложение SHALL показать уведомление об ошибке пользователю
+7.1. КОГДА происходит ошибка в фоновом процессе (загрузка данных, синхронизация, API запрос), ТО приложение ДОЛЖНО показать уведомление об ошибке пользователю
 
-7.2. THE уведомление об ошибке SHALL содержать:
+7.2. Уведомление об ошибке ДОЛЖНО содержать:
    - Краткое описание проблемы
    - Контекст операции (что пыталось выполниться)
 
-7.3. THE уведомление об ошибке SHALL автоматически исчезать через 5 секунд ИЛИ при клике пользователя
+7.3. Уведомление об ошибке ДОЛЖНО автоматически исчезать через 15 секунд ИЛИ при клике пользователя
 
-7.4. THE приложение SHALL логировать все ошибки в консоль для отладки
+7.4. Приложение ДОЛЖНО логировать все ошибки в консоль для отладки
 
 #### Функциональные Тесты
 
-- `tests/functional/error-handling.spec.ts` - "should show error notification on background process failure" (ui.7.1)
-- `tests/functional/error-handling.spec.ts` - "should display error context and description" (ui.7.2)
-- `tests/functional/error-handling.spec.ts` - "should auto-dismiss error notification after 5 seconds" (ui.7.3)
-- `tests/functional/error-handling.spec.ts` - "should log errors to console" (ui.7.4)
+- `tests/functional/error-handling.spec.ts` - "should show error notification on background process failure"
+- `tests/functional/error-handling.spec.ts` - "should display error context and description"
+- `tests/functional/error-handling.spec.ts` - "should auto-dismiss error notification after 5 seconds"
+- `tests/functional/error-handling.spec.ts` - "should log errors to console"
 
 ### 8. Навигация и Авторизация
 
@@ -302,20 +302,20 @@ Token Expiring → OAuthClientManager.refreshAccessToken() → Update Tokens in 
 
 #### Критерии Приемки
 
-8.1. WHEN пользователь не авторизован, THE приложение SHALL показывать экран логина
+8.1. КОГДА пользователь не авторизован, ТО приложение ДОЛЖНО показывать экран логина
 
-8.2. WHEN пользователь не авторизован, THE пользователь НЕ МОЖЕТ получить доступ к защищенным экранам (Dashboard, Settings, Tasks, Calendar, Contacts)
+8.2. КОГДА пользователь не авторизован, ТО пользователь НЕ МОЖЕТ получить доступ к защищенным экранам (Dashboard, Settings, Tasks, Calendar, Contacts)
 
-8.3. WHEN пользователь успешно авторизуется через Google OAuth, THE приложение SHALL автоматически перенаправить пользователя на Dashboard (главный экран приложения)
+8.3. КОГДА пользователь успешно авторизуется через Google OAuth, ТО приложение ДОЛЖНО автоматически перенаправить пользователя на Dashboard (главный экран приложения)
 
-8.4. WHEN пользователь выходит из системы (logout), THE приложение SHALL автоматически перенаправить пользователя на экран логина
+8.4. КОГДА пользователь выходит из системы (logout), ТО приложение ДОЛЖНО очистить все токены авторизации (см. google-oauth-auth.7) И автоматически перенаправить пользователя на экран логина
 
 #### Функциональные Тесты
 
-- `tests/functional/navigation.spec.ts` - "should show login screen when not authenticated" (ui.8.1)
-- `tests/functional/navigation.spec.ts` - "should block access to protected screens without authentication" (ui.8.2)
-- `tests/functional/navigation.spec.ts` - "should redirect to dashboard after successful authentication" (ui.8.3)
-- `tests/functional/navigation.spec.ts` - "should redirect to login screen after logout" (ui.8.4)
+- `tests/functional/navigation.spec.ts` - "should show login screen when not authenticated"
+- `tests/functional/navigation.spec.ts` - "should block access to protected screens without authentication"
+- `tests/functional/navigation.spec.ts` - "should redirect to dashboard after successful authentication"
+- `tests/functional/navigation.spec.ts` - "should redirect to login screen after logout"
 
 ### 9. Управление Токенами и Обработка Ошибок Авторизации
 
@@ -327,29 +327,30 @@ Token Expiring → OAuthClientManager.refreshAccessToken() → Update Tokens in 
 
 #### Критерии Приемки
 
-9.1. WHEN access token истекает (expires_in), THE система SHALL автоматически обновить токен через refresh token в фоновом режиме без участия пользователя
+9.1. КОГДА access token истекает (expires_in), ТО система ДОЛЖНА автоматически обновить токен через refresh token в фоновом режиме без участия пользователя
 
-9.2. WHEN автоматическое обновление токена успешно, THE пользователь SHALL продолжать работу без прерываний и уведомлений
+9.2. КОГДА автоматическое обновление токена успешно, ТО пользователь ДОЛЖЕН продолжать работу без прерываний и уведомлений
 
-9.3. WHEN любой API запрос (Google UserInfo, Calendar, Tasks и т.д.) возвращает ошибку HTTP 401 Unauthorized, THE система SHALL:
+9.3. КОГДА любой API запрос (Google UserInfo, Calendar, Tasks и т.д.) возвращает ошибку HTTP 401 Unauthorized, ТО система ДОЛЖНА:
    - Немедленно очистить все токены из хранилища
    - Показать экран логина (LoginError компонент с errorCode 'invalid_grant')
    - Пользователь может повторно авторизоваться через кнопку "Continue with Google"
    - **НЕ** очищать данные пользователя из базы данных (данные сохраняются для отображения при следующей авторизации)
 
-9.4. THE система SHALL использовать централизованный обработчик для всех API запросов, который проверяет статус авторизации (HTTP 401)
+9.4. Система ДОЛЖНА использовать централизованный обработчик для всех API запросов, который проверяет статус авторизации (HTTP 401)
 
-9.5. WHEN происходит ошибка авторизации (401), THE система SHALL логировать событие с контекстом (какой API запрос вызвал ошибку)
+9.5. КОГДА происходит ошибка авторизации (401), ТО система ДОЛЖНА логировать событие с контекстом (какой API запрос вызвал ошибку)
 
-9.6. THE система SHALL показывать пользователю понятное сообщение об истечении сессии на английском языке (errorCode 'invalid_grant' в LoginError компоненте)
+9.6. Система ДОЛЖНА показывать пользователю понятное сообщение об истечении сессии на английском языке (errorCode 'invalid_grant' в LoginError компоненте)
 
 #### Функциональные Тесты
 
-- `tests/functional/token-management.spec.ts` - "should automatically refresh expired access token" (ui.9.1, ui.9.2)
-- `tests/functional/token-management.spec.ts` - "should clear session and show login on 401 error" (ui.9.3)
-- `tests/functional/token-management.spec.ts` - "should handle 401 from any API endpoint consistently" (ui.9.4)
-- `tests/functional/token-management.spec.ts` - "should log authorization errors with context" (ui.9.5)
-- `tests/functional/token-management.spec.ts` - "should show user-friendly error message on session expiry" (ui.9.6)
+- `tests/functional/token-management.spec.ts` - "should automatically refresh expired access token"
+- `tests/functional/token-management.spec.ts` - "should clear session and show login on 401 error"
+- `tests/functional/token-management.spec.ts` - "should handle 401 from any API endpoint consistently"
+- `tests/functional/token-management.spec.ts` - "should log authorization errors with context"
+- `tests/functional/token-management.spec.ts` - "should show user-friendly error message on session expiry"
+
 ## Вне Области Применения
 
 Следующие элементы явно исключены из данной спецификации:
