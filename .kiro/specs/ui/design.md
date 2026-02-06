@@ -479,13 +479,13 @@ interface WindowState {
 
 *Для любого* пользователя, который не авторизован, приложение должно показывать экран логина, и пользователь НЕ МОЖЕТ попасть в Settings (где находится Account Block) без авторизации.
 
-**Validates: Requirements ui.6.1**
+**Validates: Requirements ui.8.1, ui.8.2**
 
 ### Property 9: Показ Dashboard после успешной авторизации
 
 *Для любого* пользователя, успешно авторизовавшегося через Google OAuth, приложение должно показывать Dashboard (главный экран), а не Account Block или Settings.
 
-**Validates: Requirements ui.6.2**
+**Validates: Requirements ui.8.3**
 
 ### Property 10: Фоновая загрузка профиля после авторизации
 
@@ -497,49 +497,49 @@ interface WindowState {
 
 *Для любого* запроса данных профиля, пока данные загружаются, Account Block должен отображать предыдущие значения профиля (если они существуют в локальной базе данных) или пустые поля (если это первая авторизация).
 
-**Validates: Requirements ui.6.4**
+**Validates: Requirements ui.6.1**
 
 ### Property 12: Отображение актуальных данных профиля при успешной загрузке
 
 *Для любого* успешного запроса к UserInfo API, полученные данные профиля должны быть отображены в Account Block (имя, email).
 
-**Validates: Requirements ui.6.5**
+**Validates: Requirements ui.6.1**
 
 ### Property 13: Сохранение данных профиля при успешной загрузке
 
 *Для любого* успешного запроса к UserInfo API, полученные данные профиля должны быть сохранены в локальную базу данных (SQLite через DataManager).
 
-**Validates: Requirements ui.6.6**
+**Validates: Requirements ui.6.3**
 
 ### Property 14: Сохранение данных из базы при ошибке загрузки
 
 *Для любого* неудачного запроса к UserInfo API (ошибка сети, таймаут, ошибка сервера), Account Block должен показать сообщение об ошибке и сохранить данные из локальной базы данных (предыдущие значения или пустые поля), НЕ очищая существующие данные профиля.
 
-**Validates: Requirements ui.6.7**
+**Validates: Requirements ui.6.1**
 
 ### Property 15: Отображение обязательных полей профиля
 
 *Для любого* профиля пользователя, Account Block должен отображать поля "Name" (имя пользователя) и "Email" (email адрес).
 
-**Validates: Requirements ui.6.8**
+**Validates: Requirements ui.6.1**
 
 ### Property 16: Read-only поля профиля
 
 *Для любого* отображаемого профиля, все поля в Account Block должны иметь атрибут `readOnly` и не позволять пользователю редактировать данные.
 
-**Validates: Requirements ui.6.9**
+**Validates: Requirements ui.6.2**
 
 ### Property 17: Автоматическое обновление при refresh token
 
 *Для любого* авторизованного пользователя, при каждом успешном обновлении access token (refresh token operation), система должна автоматически запрашивать актуальные данные профиля из Google UserInfo API и обновлять отображение в Account Block.
 
-**Validates: Requirements ui.6.10**
+**Validates: Requirements ui.6.3**
 
 ### Property 18: Автоматическое обновление при запуске приложения
 
 *Для любого* авторизованного пользователя, при запуске приложения система должна автоматически запрашивать актуальные данные профиля из Google UserInfo API и отображать их в Account Block.
 
-**Validates: Requirements ui.6.10**
+**Validates: Requirements ui.6.3**
 
 ### Property 19: Очистка токенов и показ экрана логина при logout
 
@@ -561,7 +561,7 @@ interface WindowState {
 
 ### Property 22: Автоматическое исчезновение уведомления
 
-*Для любого* показанного уведомления об ошибке, оно должно автоматически исчезнуть через 5 секунд ИЛИ при клике пользователя на уведомление.
+*Для любого* показанного уведомления об ошибке, оно должно автоматически исчезнуть через 15 секунд ИЛИ при клике пользователя на уведомление.
 
 **Validates: Requirements ui.7.3**
 
@@ -629,13 +629,13 @@ interface WindowState {
 
 3. **Невалидная позиция (ui.5.6)**: Когда сохраненная позиция находится за пределами доступных экранов, должно использоваться состояние по умолчанию на основном экране.
 
-4. **Не авторизован (ui.6.1)**: Когда пользователь не авторизован, приложение показывает экран логина, и пользователь НЕ МОЖЕТ попасть в Settings (где находится Account Block). Это не edge case для Account компонента, так как компонент не должен быть доступен неавторизованным пользователям.
+4. **Не авторизован (ui.8.1, ui.8.2)**: Когда пользователь не авторизован, приложение показывает экран логина, и пользователь НЕ МОЖЕТ попасть в Settings (где находится Account Block). Это не edge case для Account компонента, так как компонент не должен быть доступен неавторизованным пользователям.
 
-5. **Первая авторизация (ui.6.4)**: Когда пользователь авторизуется впервые и в локальной базе данных нет данных профиля, Account Block должен отображать пустые поля во время загрузки данных профиля, затем заполниться актуальными данными после успешной загрузки (ui.6.5, ui.6.6).
+5. **Первая авторизация (ui.6.1, ui.6.3)**: Когда пользователь авторизуется впервые и в локальной базе данных нет данных профиля, Account Block должен отображать пустые поля во время загрузки данных профиля, затем заполниться актуальными данными после успешной загрузки.
 
-6. **Ошибка загрузки профиля (ui.6.7)**: Когда загрузка данных профиля не удается (ошибка сети, таймаут, ошибка API), Account Block должен показать сообщение об ошибке и сохранить данные из локальной базы данных (предыдущие значения или пустые поля), НЕ очищая существующие данные.
+6. **Ошибка загрузки профиля (ui.6.1, ui.6.3)**: Когда загрузка данных профиля не удается (ошибка сети, таймаут, ошибка API), Account Block должен показать сообщение об ошибке и сохранить данные из локальной базы данных (предыдущие значения или пустые поля), НЕ очищая существующие данные.
 
-7. **Повторная авторизация с сохраненными данными (ui.6.4)**: Когда пользователь авторизуется повторно и в локальной базе данных есть данные профиля, Account Block должен отображать сохраненные данные во время загрузки новых данных, затем обновиться актуальными данными после успешной загрузки (ui.6.5, ui.6.6).
+7. **Повторная авторизация с сохраненными данными (ui.6.1, ui.6.3)**: Когда пользователь авторизуется повторно и в локальной базе данных есть данные профиля, Account Block должен отображать сохраненные данные во время загрузки новых данных, затем обновиться актуальными данными после успешной загрузки.
 
 8. **Истечение access token (ui.9.1, ui.9.2)**: Когда access token истекает во время работы приложения, система должна автоматически обновить его через refresh token в фоновом режиме. Пользователь продолжает работу без прерываний, уведомлений или видимых изменений в UI.
 
@@ -761,7 +761,7 @@ createWindow(): BrowserWindow {
 
 **Обработка:**
 ```typescript
-// Requirements: ui.6.7
+// Requirements: ui.6.1, ui.6.3
 async fetchProfile(): Promise<UserProfile | null> {
   try {
     const response = await fetch('https://www.googleapis.com/oauth2/v1/userinfo', {
@@ -816,7 +816,7 @@ async saveProfile(profile: UserProfile): Promise<void> {
 
 **Обработка:**
 ```typescript
-// Requirements: ui.6.7
+// Requirements: ui.6.1
 async loadProfile(): Promise<UserProfile | null> {
   try {
     const result = await this.dataManager.loadData('user_profile');
@@ -1364,15 +1364,6 @@ describe('Window UI Functional Tests', () => {
 | ui.6.1 | ✓ | - | ✓ |
 | ui.6.2 | ✓ | - | ✓ |
 | ui.6.3 | ✓ | - | ✓ |
-| ui.6.4 | ✓ | - | ✓ |
-| ui.6.5 | ✓ | - | ✓ |
-| ui.6.6 | ✓ | - | ✓ |
-| ui.6.7 | ✓ | - | ✓ |
-| ui.6.8 | ✓ | - | ✓ |
-| ui.6.9 | ✓ | - | ✓ |
-| ui.6.10 | ✓ | - | ✓ |
-| ui.6.11 | ✓ | - | - |
-| ui.6.12 | ✓ | - | ✓ |
 | ui.7.1 | ✓ | - | ✓ |
 | ui.7.2 | ✓ | - | ✓ |
 | ui.7.3 | ✓ | - | ✓ |
@@ -1413,7 +1404,7 @@ describe('UserProfileManager', () => {
   /* Preconditions: Google UserInfo API returns error, cached profile exists in DataManager
      Action: call fetchProfile()
      Assertions: returns cached profile data, error logged
-     Requirements: ui.6.7 */
+     Requirements: ui.6.1, ui.6.3 */
   it('should return cached profile on API error', async () => {
     // Тест возврата кэшированных данных при ошибке
   });
@@ -1437,7 +1428,7 @@ describe('UserProfileManager', () => {
   /* Preconditions: profile exists in DataManager
      Action: call loadProfile()
      Assertions: returns correct profile data
-     Requirements: ui.6.7 */
+     Requirements: ui.6.1 */
   it('should load profile from DataManager', async () => {
     // Тест загрузки профиля
   });
@@ -1453,7 +1444,7 @@ describe('UserProfileManager', () => {
   /* Preconditions: UserProfileManager initialized
      Action: call updateProfileAfterTokenRefresh()
      Assertions: fetchProfile() called
-     Requirements: ui.6.5 */
+     Requirements: ui.6.3 */
   it('should update profile after token refresh', async () => {
     // Тест обновления профиля после refresh token
   });
@@ -1475,7 +1466,7 @@ describe('AuthIPCHandlers - Profile', () => {
   /* Preconditions: UserProfileManager.loadProfile() throws error
      Action: invoke 'auth:get-profile' handler
      Assertions: returns error response
-     Requirements: ui.6.7 */
+     Requirements: ui.6.1 */
   it('should handle get-profile errors', async () => {
     // Тест обработки ошибок получения профиля
   });
@@ -1483,7 +1474,7 @@ describe('AuthIPCHandlers - Profile', () => {
   /* Preconditions: UserProfileManager.fetchProfile() returns updated profile
      Action: invoke 'auth:refresh-profile' handler
      Assertions: returns success response with fresh profile data
-     Requirements: ui.6.5 */
+     Requirements: ui.6.3 */
   it('should handle refresh-profile request', async () => {
     // Тест обновления профиля через IPC
   });
@@ -1515,7 +1506,7 @@ describe('Account Component', () => {
   /* Preconditions: Account component rendered with profile data
      Action: inspect input fields
      Assertions: all input fields have readOnly attribute
-     Requirements: ui.6.4 */
+     Requirements: ui.6.2 */
   it('should have read-only profile fields', () => {
     // Тест read-only полей
   });
@@ -1553,7 +1544,7 @@ describe('Account Functional Tests - Profile Integration', () => {
   /* Preconditions: expired access token, valid refresh token
      Action: trigger token refresh
      Assertions: profile automatically updated after refresh
-     Requirements: ui.6.5 */
+     Requirements: ui.6.3 */
   it('should update profile after token refresh', async () => {
     // Тест автоматического обновления при refresh token
   });
@@ -1561,7 +1552,7 @@ describe('Account Functional Tests - Profile Integration', () => {
   /* Preconditions: authenticated user, LifecycleManager initialized
      Action: call LifecycleManager.initialize()
      Assertions: profile automatically fetched on startup
-     Requirements: ui.6.5 */
+     Requirements: ui.6.3 */
   it('should fetch profile on app startup', async () => {
     // Тест загрузки профиля при запуске
   });
@@ -1569,7 +1560,7 @@ describe('Account Functional Tests - Profile Integration', () => {
   /* Preconditions: cached profile in DataManager, Google API returns error
      Action: call fetchProfile()
      Assertions: returns cached data, no exception thrown
-     Requirements: ui.6.7 */
+     Requirements: ui.6.1, ui.6.3 */
   it('should use cached profile on API error', async () => {
     // Тест использования кэша при ошибке API
   });
@@ -1599,7 +1590,7 @@ describe('Account Functional Tests', () => {
   /* Preconditions: authenticated user with profile displayed
      Action: attempt to edit profile fields
      Assertions: fields are read-only, cannot be edited
-     Requirements: ui.6.4 */
+     Requirements: ui.6.2 */
   it('should not allow editing profile fields', async () => {
     // Функциональный тест read-only полей
   });
@@ -1607,7 +1598,7 @@ describe('Account Functional Tests', () => {
   /* Preconditions: authenticated user, profile data changed in Google (mocked)
      Action: wait for token refresh or trigger manually
      Assertions: Account block displays updated data
-     Requirements: ui.6.5 */
+     Requirements: ui.6.3 */
   it('should update profile when changed in Google', async () => {
     // Функциональный тест обновления профиля
   });
@@ -1810,7 +1801,7 @@ describe('Account Functional Tests', () => {
 - Отображать ошибки только в консоли без UI уведомлений
 
 **Обоснование:**
-- Полный контроль над поведением уведомлений (ui.7.3 - автоматическое исчезновение через 5 секунд)
+- Полный контроль над поведением уведомлений (ui.7.3 - автоматическое исчезновение через 15 секунд)
 - Легко интегрируется с IPC для ошибок из main process (ui.7.1)
 - Не добавляет внешних зависимостей
 - Простая реализация с подпиской на изменения
@@ -2116,7 +2107,7 @@ Logout → auth:logout event → onLogout() → redirectToLogin()
 
 ### Обзор
 
-Система уведомлений отображает пользователю понятные сообщения об ошибках, возникающих в фоновых процессах (загрузка данных, синхронизация, API запросы). Уведомления автоматически исчезают через 5 секунд или при клике пользователя.
+Система уведомлений отображает пользователю понятные сообщения об ошибках, возникающих в фоновых процессах (загрузка данных, синхронизация, API запросы). Уведомления автоматически исчезают через 15 секунд или при клике пользователя.
 
 ### Архитектура Уведомлений
 
@@ -2181,7 +2172,7 @@ interface ErrorNotification {
 class ErrorNotificationManager {
   private notifications: ErrorNotification[] = [];
   private listeners: ((notifications: ErrorNotification[]) => void)[] = [];
-  private readonly AUTO_DISMISS_DELAY = 5000; // 5 seconds
+  private readonly AUTO_DISMISS_DELAY = 15000; // 15 seconds
 
   /**
    * Show error notification
@@ -2198,7 +2189,7 @@ class ErrorNotificationManager {
     this.notifications.push(notification);
     this.notifyListeners();
 
-    // Requirements: ui.7.3 - Auto-dismiss after 5 seconds
+    // Requirements: ui.7.3 - Auto-dismiss after 15 seconds
     setTimeout(() => {
       this.dismissNotification(notification.id);
     }, this.AUTO_DISMISS_DELAY);
@@ -2448,14 +2439,14 @@ class UserProfileManager {
    */
   async fetchProfile(): Promise<UserProfile | null> {
     try {
-      // Requirements: ui.6.6 - Check authentication status
+      // Requirements: ui.6.3 - Check authentication status
       const authStatus = await this.oauthClient.getAuthStatus();
       if (!authStatus.authorized || !authStatus.tokens?.accessToken) {
         console.log('[UserProfileManager] Not authenticated, cannot fetch profile');
         return null;
       }
 
-      // Requirements: ui.6.6 - Use Google UserInfo API endpoint
+      // Requirements: ui.6.3 - Use Google UserInfo API endpoint
       const response = await fetch('https://www.googleapis.com/oauth2/v1/userinfo', {
         headers: {
           'Authorization': `Bearer ${authStatus.tokens.accessToken}`
@@ -2479,7 +2470,7 @@ class UserProfileManager {
       return profile;
     } catch (error) {
       console.error('[UserProfileManager] Failed to fetch profile:', error);
-      // Requirements: ui.6.7 - Return cached profile on error
+      // Requirements: ui.6.1 - Return cached profile on error
       return await this.loadProfile();
     }
   }
@@ -2500,7 +2491,7 @@ class UserProfileManager {
 
   /**
    * Load user profile from local storage
-   * Requirements: ui.6.7
+   * Requirements: ui.6.1
    */
   async loadProfile(): Promise<UserProfile | null> {
     try {
@@ -2519,9 +2510,11 @@ class UserProfileManager {
   /**
    * Clear user profile from local storage
    * 
-   * @deprecated This method is not currently used. Profile data persists in database
-   * even after logout or session expiry to provide better UX when user re-authenticates.
-   * Only tokens are cleared on logout/401 errors.
+   * @deprecated This method is not currently used in the application flow.
+   * Profile data persists in database even after logout or session expiry (HTTP 401)
+   * to provide better UX when user re-authenticates. Only tokens are cleared on
+   * logout/401 errors, not profile data. This allows the UI to display cached
+   * profile information immediately upon re-authentication.
    * 
    * Requirements: N/A (method exists for potential future use)
    */
@@ -2538,7 +2531,7 @@ class UserProfileManager {
   /**
    * Update profile after token refresh
    * Called automatically by OAuthClientManager after successful token refresh
-   * Requirements: ui.6.5
+   * Requirements: ui.6.3
    */
   async updateProfileAfterTokenRefresh(): Promise<void> {
     console.log('[UserProfileManager] Updating profile after token refresh');
@@ -2602,7 +2595,7 @@ class AuthIPCHandlers {
   /**
    * Handle refresh profile request
    * Fetches fresh profile data from Google API
-   * Requirements: ui.6.5
+   * Requirements: ui.6.3
    */
   private async handleRefreshProfile(): Promise<IPCResult> {
     try {
@@ -2788,7 +2781,7 @@ export function Account({ className }: AccountProps) {
 **1. Интеграция с LifecycleManager (обновление при запуске):**
 
 ```typescript
-// Requirements: ui.6.5
+// Requirements: ui.6.3
 // In src/main/LifecycleManager.ts
 
 class LifecycleManager {
@@ -2810,7 +2803,7 @@ class LifecycleManager {
     
     // ... existing initialization logic ...
     
-    // Requirements: ui.6.5 - Fetch profile on startup if authenticated
+    // Requirements: ui.6.3 - Fetch profile on startup if authenticated
     const authStatus = await this.oauthClient.getAuthStatus();
     if (authStatus.authorized) {
       console.log('[LifecycleManager] User authenticated, fetching profile');
@@ -2827,7 +2820,7 @@ class LifecycleManager {
 **2. Интеграция с OAuthClientManager (обновление при refresh token):**
 
 ```typescript
-// Requirements: ui.6.5
+// Requirements: ui.6.3
 // In src/main/auth/OAuthClientManager.ts
 
 class OAuthClientManager {
@@ -2850,7 +2843,7 @@ class OAuthClientManager {
     if (refreshed) {
       console.log('[OAuthClientManager] Token refreshed successfully');
       
-      // Requirements: ui.6.5 - Automatically update profile after token refresh
+      // Requirements: ui.6.3 - Automatically update profile after token refresh
       if (this.profileManager) {
         console.log('[OAuthClientManager] Triggering profile update after token refresh');
         await this.profileManager.updateProfileAfterTokenRefresh();
@@ -2865,7 +2858,7 @@ class OAuthClientManager {
 **3. Инициализация в Main Process:**
 
 ```typescript
-// Requirements: ui.6.5
+// Requirements: ui.6.3
 // In src/main/index.ts
 
 async function initializeApp() {
@@ -2970,7 +2963,7 @@ const handleRefreshProfile = async () => {
 
 Система навигации обеспечивает защиту маршрутов и автоматическое перенаправление пользователей в зависимости от статуса авторизации. NavigationManager и AuthGuard работают совместно для предотвращения несанкционированного доступа к защищенным экранам.
 
-Система уведомлений об ошибках предоставляет пользователю понятную обратную связь о проблемах в фоновых процессах, автоматически скрывая уведомления через 5 секунд для минимизации отвлечения.
+Система уведомлений об ошибках предоставляет пользователю понятную обратную связь о проблемах в фоновых процессах, автоматически скрывая уведомления через 15 секунд для минимизации отвлечения.
 
 Система управления токенами обеспечивает автоматическое обновление access token в фоновом режиме и корректную обработку ошибок авторизации (HTTP 401). Централизованный обработчик API запросов гарантирует консистентное поведение при истечении сессии, немедленно очищая токены и данные пользователя, и показывая понятное сообщение о необходимости повторной авторизации.
 
