@@ -24,6 +24,7 @@ interface API {
     onAuthSuccess: (callback: () => void) => void;
     onAuthError: (callback: (error: string, errorCode?: string) => void) => void;
     onLogout: (callback: () => void) => void;
+    onProfileUpdated: (callback: (profile: any) => void) => void;
   };
   // Requirements: testing.3.8 - Test IPC methods (only available in test environment)
   ipcRenderer?: {
@@ -149,6 +150,17 @@ const api: API = {
     onLogout(callback: () => void): void {
       ipcRenderer.on('auth:logout-complete', () => {
         callback();
+      });
+    },
+
+    /**
+     * Listen for profile update events
+     * Requirements: ui.6.5
+     * @param {Function} callback - Callback function to execute when profile is updated
+     */
+    onProfileUpdated(callback: (profile: any) => void): void {
+      ipcRenderer.on('auth:profile-updated', (_event, profile: any) => {
+        callback(profile);
       });
     },
   },

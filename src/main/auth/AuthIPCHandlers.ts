@@ -214,6 +214,13 @@ export class AuthIPCHandlers {
       console.log('[AuthIPCHandlers] Refreshing profile');
       const profile = await this.profileManager.fetchProfile();
 
+      // Broadcast profile update event to all windows
+      // Requirements: ui.6.5 - Notify UI about profile updates
+      const windows = BrowserWindow.getAllWindows();
+      windows.forEach((window) => {
+        window.webContents.send('auth:profile-updated', profile);
+      });
+
       return {
         success: true,
         profile: profile,

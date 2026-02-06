@@ -198,6 +198,16 @@ if (process.env.NODE_ENV === 'test') {
     }
   });
 
+  ipcMain.handle('test:setup-profile', async (_event: any, profileData: any) => {
+    try {
+      await profileManager.saveProfile(profileData);
+      return { success: true };
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      return { success: false, error: errorMessage };
+    }
+  });
+
   console.log('[TEST] Test IPC handlers registered');
 }
 

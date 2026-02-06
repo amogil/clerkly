@@ -38,7 +38,7 @@ test.afterAll(async () => {
    Assertions: Login Screen is shown, tokens are cleared from database
    Requirements: google-oauth-auth.15.1, google-oauth-auth.15.2, google-oauth-auth.15.3, google-oauth-auth.15.4, google-oauth-auth.15.5, google-oauth-auth.15.6 */
 test('should show login screen after sign out', async () => {
-  // Setup: Create valid tokens
+  // Setup: Create valid tokens and profile
   await window.evaluate(async () => {
     await window.electron.ipcRenderer.invoke('test:setup-tokens', {
       accessToken: 'test_access_token',
@@ -46,12 +46,24 @@ test('should show login screen after sign out', async () => {
       expiresIn: 3600,
       tokenType: 'Bearer',
     });
+
+    // Setup profile data
+    await window.electron.ipcRenderer.invoke('test:setup-profile', {
+      id: '123456789',
+      email: 'test@example.com',
+      verified_email: true,
+      name: 'Test User',
+      given_name: 'Test',
+      family_name: 'User',
+      locale: 'en',
+      lastUpdated: Date.now(),
+    });
   });
 
   // Reload to show main app
   await window.reload();
   await window.waitForLoadState('domcontentloaded');
-  await window.waitForTimeout(1000);
+  await window.waitForTimeout(2000);
 
   // Verify main app is shown (not login screen)
   const loginButton = await window.locator('button:has-text("Continue with Google")').count();
@@ -59,10 +71,13 @@ test('should show login screen after sign out', async () => {
 
   // Navigate to settings by clicking Settings button in navigation
   await window.click('button:has-text("Settings")');
-  await window.waitForTimeout(500);
+  await window.waitForTimeout(1000);
 
-  // Click Sign Out button
-  await window.click('button:has-text("Sign out")');
+  // Wait for Account component to load with profile
+  await window.waitForSelector('.sign-out-button', { timeout: 5000 });
+
+  // Click Sign Out button using class selector
+  await window.click('.sign-out-button');
   await window.waitForTimeout(1000);
 
   // Verify Login Screen is shown

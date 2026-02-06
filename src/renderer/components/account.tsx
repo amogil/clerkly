@@ -107,6 +107,23 @@ export function Account({ className = '', onSignOut }: AccountProps) {
     // The listener will be cleaned up when the window is closed
   }, []);
 
+  /**
+   * Listen for profile update events and reload profile
+   * Requirements: ui.6.5
+   */
+  useEffect(() => {
+    const handleProfileUpdated = (updatedProfile: UserProfile | null) => {
+      console.log('[Account] Profile updated event received, updating UI');
+      setProfile(updatedProfile);
+      setError(null);
+    };
+
+    window.api.auth.onProfileUpdated(handleProfileUpdated);
+
+    // Note: Electron IPC doesn't provide removeListener for contextBridge exposed functions
+    // The listener will be cleaned up when the window is closed
+  }, []);
+
   // Requirements: ui.6.2
   // Show loading state
   if (loading) {
