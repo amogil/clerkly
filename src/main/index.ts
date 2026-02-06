@@ -24,7 +24,8 @@ app.setName('Clerkly');
 // Requirements: google-oauth-auth.2.2, google-oauth-auth.2.5
 // Request single instance lock BEFORE registering protocol
 // This ensures that deep links are handled by the existing instance
-const gotTheLock = app.requestSingleInstanceLock();
+// Skip single instance lock in test environment to allow multiple test instances
+const gotTheLock = process.env.NODE_ENV === 'test' ? true : app.requestSingleInstanceLock();
 
 console.log('[Main] Single instance lock:', gotTheLock ? 'ACQUIRED' : 'FAILED');
 console.log('[Main] Process args:', process.argv);
@@ -204,6 +205,27 @@ if (process.env.NODE_ENV === 'test') {
       return { success: true };
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      return { success: false, error: errorMessage };
+    }
+  });
+
+  ipcMain.handle('test:trigger-error-notification', async (event: any, data: { message: string; context: string }) => {
+    try {
+      // Send error notification to renderer process
+      // This simulates what happens when Main Process encounters an error
+      // Use WindowManager to send to main window
+      const mainWindow = windowManager.getWindow();
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('error:notify', data.message, data.context);
+        console.log('[TEST] Sent error:notify event to main window:', data);
+      } else {
+        console.log('[TEST] Main window not available, using event.sender');
+        event.sender.send('error:notify', data.message, data.context);
+      }
+      return { success: true };
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('[TEST] Error sending notification:', errorMessage);
       return { success: false, error: errorMessage };
     }
   });

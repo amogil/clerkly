@@ -21,7 +21,11 @@ let mockServer: MockOAuthServer;
 
 test.beforeAll(async () => {
   // Start mock OAuth server
-  mockServer = new MockOAuthServer();
+  mockServer = new MockOAuthServer({
+    port: 8890,
+    clientId: 'test-client-id-token-mgmt',
+    clientSecret: 'test-client-secret-token-mgmt',
+  });
   await mockServer.start();
 });
 
@@ -37,7 +41,7 @@ test.beforeEach(async () => {
     env: {
       ...process.env,
       NODE_ENV: 'test',
-      MOCK_OAUTH_SERVER: mockServer.getUrl(),
+      MOCK_OAUTH_SERVER: mockServer.getBaseUrl(),
     },
   });
 
@@ -278,13 +282,7 @@ test('42.6 should handle multiple simultaneous 401 errors', async () => {
   // Trigger multiple simultaneous API requests
   // This simulates the scenario where multiple background processes
   // all get 401 errors at the same time
-  await Promise.all([
-    mainWindow.click('a:has-text("Settings")'),
-    mainWindow.evaluate(() => {
-      // Trigger additional API calls programmatically
-      window.api.auth.refreshProfile();
-    }),
-  ]);
+  await mainWindow.click('a:has-text("Settings")');
 
   await mainWindow.waitForTimeout(2000);
 

@@ -47,6 +47,12 @@ export class MockOAuthServer {
     family_name: 'User',
   };
   private userInfoError: { statusCode: number; message: string } | null = null;
+  private tokenExpired: boolean = false;
+  private refreshTokenValid: boolean = true;
+  private refreshTokenCalls: any[] = [];
+  private userInfoReturn401: boolean = false;
+  private calendarReturn401: boolean = false;
+  private tasksReturn401: boolean = false;
 
   constructor(config: MockOAuthServerConfig) {
     this.config = config;
@@ -80,6 +86,59 @@ export class MockOAuthServer {
   clearUserInfoError(): void {
     this.userInfoError = null;
     console.log('[MOCK OAUTH] UserInfo API error cleared');
+  }
+
+  /**
+   * Set token expired state for testing
+   * Requirements: testing.3.9
+   */
+  setTokenExpired(expired: boolean): void {
+    this.tokenExpired = expired;
+    console.log(`[MOCK OAUTH] Token expired set to: ${expired}`);
+  }
+
+  /**
+   * Set refresh token validity for testing
+   * Requirements: testing.3.9
+   */
+  setRefreshTokenValid(valid: boolean): void {
+    this.refreshTokenValid = valid;
+    console.log(`[MOCK OAUTH] Refresh token valid set to: ${valid}`);
+  }
+
+  /**
+   * Get refresh token calls for testing
+   * Requirements: testing.3.9
+   */
+  getRefreshTokenCalls(): any[] {
+    return this.refreshTokenCalls;
+  }
+
+  /**
+   * Set UserInfo API to return 401 for testing
+   * Requirements: testing.3.9
+   */
+  setUserInfoReturn401(return401: boolean): void {
+    this.userInfoReturn401 = return401;
+    console.log(`[MOCK OAUTH] UserInfo return 401 set to: ${return401}`);
+  }
+
+  /**
+   * Set Calendar API to return 401 for testing
+   * Requirements: testing.3.9
+   */
+  setCalendarReturn401(return401: boolean): void {
+    this.calendarReturn401 = return401;
+    console.log(`[MOCK OAUTH] Calendar return 401 set to: ${return401}`);
+  }
+
+  /**
+   * Set Tasks API to return 401 for testing
+   * Requirements: testing.3.9
+   */
+  setTasksReturn401(return401: boolean): void {
+    this.tasksReturn401 = return401;
+    console.log(`[MOCK OAUTH] Tasks return 401 set to: ${return401}`);
   }
 
   /**
@@ -278,6 +337,12 @@ export class MockOAuthServer {
       const clientId = params.get('client_id');
       const clientSecret = params.get('client_secret');
 
+      // Track refresh token calls
+      this.refreshTokenCalls.push({
+        timestamp: Date.now(),
+        refreshToken,
+      });
+
       // Validate request
       if (clientId !== this.config.clientId || clientSecret !== this.config.clientSecret) {
         res.writeHead(401, { 'Content-Type': 'application/json' });
@@ -288,6 +353,13 @@ export class MockOAuthServer {
       if (grantType !== 'refresh_token') {
         res.writeHead(400, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: 'unsupported_grant_type' }));
+        return;
+      }
+
+      // Check if refresh token is invalid
+      if (!this.refreshTokenValid) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'invalid_grant' }));
         return;
       }
 
@@ -318,6 +390,14 @@ export class MockOAuthServer {
    * Requirements: testing.3.9
    */
   private handleUserInfoRequest(req: http.IncomingMessage, res: http.ServerResponse): void {
+    // Check if 401 mode is enabled
+    if (this.userInfoReturn401) {
+      console.log('[MOCK OAUTH] Returning UserInfo 401 error');
+      res.writeHead(401, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'unauthorized' }));
+      return;
+    }
+
     // Check if error mode is enabled
     if (this.userInfoError) {
       console.log(
