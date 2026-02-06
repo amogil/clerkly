@@ -173,6 +173,7 @@ export interface API {
     onAuthSuccess: (callback: () => void) => void;
     onAuthError: (callback: (error: string, errorCode?: string) => void) => void;
     onLogout: (callback: () => void) => void;
+    onProfileUpdated: (callback: (profile: UserProfile | null) => void) => void;
   };
 }
 

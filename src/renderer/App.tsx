@@ -54,6 +54,14 @@ export default function App() {
       setAuthError({ message: error, code: errorCode });
       setIsAuthorized(false);
     });
+
+    // Requirements: ui.6.8
+    // Listen for logout events
+    window.api.auth.onLogout(() => {
+      console.log('[App] Logout event received');
+      setIsAuthorized(false);
+      setAuthError(null);
+    });
   }, []);
 
   // Requirements: clerkly.1

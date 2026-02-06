@@ -156,17 +156,16 @@ export function Account({ className = '', onSignOut }: AccountProps) {
   }
 
   // Requirements: ui.6.1
-  // Show empty state when not authenticated
+  // If no profile, show loading state (user should not be in Settings if not authenticated)
+  // According to ui.6.1: "пользователь не может попасть в Settings без авторизации"
   if (!profile) {
     return (
       <div className={`account-container ${className}`}>
         <div className="account-card">
           <h2 className="account-title">Account</h2>
-          <div className="account-empty">
-            <p className="text-muted-foreground">Not signed in</p>
-            <p className="text-sm text-muted-foreground mt-2">
-              Sign in to view your account information
-            </p>
+          <div className="account-loading">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+            <p className="text-sm text-muted-foreground mt-2">Loading profile...</p>
           </div>
         </div>
       </div>

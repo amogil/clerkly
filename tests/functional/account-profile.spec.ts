@@ -64,10 +64,10 @@ test.describe('Account Profile', () => {
   });
 
   /* Preconditions: Application not running, clean database, no tokens
-     Action: Launch application and locate Account block in Settings
-     Assertions: "Not signed in" is displayed, profile fields (name, email inputs) are not present
+     Action: Launch application
+     Assertions: Login screen is displayed (user cannot access Settings without authentication)
      Requirements: ui.6.1 */
-  test('should show empty profile when not authenticated', async () => {
+  test('should show login screen when not authenticated', async () => {
     // Launch the application with clean database
     // Requirements: testing.3.1, testing.3.2 - Real Electron, no mocks
     context = await launchElectron();
@@ -78,62 +78,19 @@ test.describe('Account Profile', () => {
     // Wait a moment for React components to render
     await context.window.waitForTimeout(1000);
 
-    // The app shows login screen when not authenticated
-    // We need to check if login screen is shown first
+    // Requirements: ui.6.1 - When user is not authenticated, app shows login screen
+    // User cannot access Settings (and Account block) without authentication
     const loginButton = context.window.locator('text=/continue with google/i');
-    const hasLoginScreen = await loginButton.isVisible().catch(() => false);
+    await loginButton.waitFor({ state: 'visible', timeout: 5000 });
+    expect(await loginButton.isVisible()).toBe(true);
 
-    if (hasLoginScreen) {
-      console.log('✓ Login screen is shown (user not authenticated)');
-      console.log('✓ Account block would show empty state in Settings after login');
+    console.log('✓ Login screen is shown (user not authenticated)');
+    console.log('✓ User cannot access Settings without authentication (per ui.6.1)');
 
-      // Take screenshot of login screen
-      await context.window.screenshot({
-        path: 'playwright-report/account-empty-state-login-screen.png',
-      });
-
-      // For this test, we verify that when not authenticated, the login screen is shown
-      // The Account component will show empty state when accessed after login
-      expect(hasLoginScreen).toBe(true);
-      return;
-    }
-
-    // If somehow authenticated (shouldn't happen with clean DB), navigate to Settings
-    // Click on Settings in navigation
-    const settingsNav = context.window.locator('text=/settings/i');
-    await settingsNav.click();
-    await context.window.waitForTimeout(500);
-
-    // Find Account block by looking for the "Account" heading
-    // Requirements: ui.6.1
-    const accountHeading = context.window.locator('text=/^Account$/i');
-    await accountHeading.waitFor({ state: 'visible', timeout: 5000 });
-    expect(await accountHeading.isVisible()).toBe(true);
-
-    // Verify "Not signed in" text is displayed
-    // Requirements: ui.6.1
-    const notSignedInText = context.window.locator('text=/Not signed in/i');
-    await notSignedInText.waitFor({ state: 'visible', timeout: 5000 });
-    expect(await notSignedInText.isVisible()).toBe(true);
-
-    // Verify profile input fields are NOT present
-    // Requirements: ui.6.1
-    const nameInput = context.window.locator('#profile-name');
-    const emailInput = context.window.locator('#profile-email');
-
-    // These fields should not exist when not authenticated
-    const nameExists = await nameInput.count();
-    const emailExists = await emailInput.count();
-
-    expect(nameExists).toBe(0);
-    expect(emailExists).toBe(0);
-
-    // Take screenshot for debugging
+    // Take screenshot of login screen
     await context.window.screenshot({
-      path: 'playwright-report/account-empty-state.png',
+      path: 'playwright-report/account-login-screen-unauthenticated.png',
     });
-
-    console.log('✓ Account block shows empty state when not authenticated');
   });
 
   /* Preconditions: Application not running, clean database, mock OAuth server running
@@ -370,7 +327,7 @@ test.describe('Account Profile', () => {
       path: 'playwright-report/account-readonly-account-block-found.png',
     });
 
-    // Wait for profile to load - check if profile fields appear (not "Not signed in")
+    // Wait for profile to load - check if profile fields appear
     // Requirements: ui.6.4 - Profile should be loaded and displayed
     const nameInput = context.window.locator('#profile-name');
 
@@ -379,16 +336,16 @@ test.describe('Account Profile', () => {
       await nameInput.waitFor({ state: 'visible', timeout: 10000 });
       console.log('[TEST] Profile fields are visible');
     } catch (error) {
-      // If profile fields don't appear, check if "Not signed in" is shown
-      const notSignedInText = context.window.locator('text=/Not signed in/i');
-      const isNotSignedIn = await notSignedInText.isVisible().catch(() => false);
+      // If profile fields don't appear, check if loading state is shown
+      const loadingText = context.window.locator('text=/Loading profile/i');
+      const isLoading = await loadingText.isVisible().catch(() => false);
 
-      if (isNotSignedIn) {
-        console.log('[TEST] ERROR: Profile not loaded, showing "Not signed in"');
+      if (isLoading) {
+        console.log('[TEST] ERROR: Profile still loading');
         await context.window.screenshot({
-          path: 'playwright-report/account-readonly-not-signed-in.png',
+          path: 'playwright-report/account-readonly-still-loading.png',
         });
-        throw new Error('Profile not loaded - Account block shows "Not signed in"');
+        throw new Error('Profile not loaded - Account block still shows loading state');
       }
 
       // Re-throw if it's a different error
@@ -635,6 +592,10 @@ test.describe('Account Profile', () => {
      Action: Verify profile is displayed, save values, execute logout via IPC, wait for completion
      Assertions: Account block cleared, "Not signed in" displayed, profile fields removed, data deleted from database
      Requirements: ui.6.8 */
+  /* Preconditions: Application running with authentication, profile data loaded and displayed
+     Action: Verify profile is displayed, save values, execute logout via IPC, wait for completion
+     Assertions: Login screen is shown, profile data deleted from database
+     Requirements: ui.6.8 */
   test('should clear profile data on logout', async () => {
     // Set user profile data for this test
     mockServer.setUserProfile({
@@ -736,30 +697,20 @@ test.describe('Account Profile', () => {
     // Requirements: ui.6.8 - Allow time for logout operation to complete
     await context.window.waitForTimeout(2000);
 
-    // Verify Account block is cleared and returned to empty state
-    // Requirements: ui.6.8 - Check that Account block shows empty state
-    const notSignedInText = context.window.locator('text=/Not signed in/i');
-    await notSignedInText.waitFor({ state: 'visible', timeout: 5000 });
-    expect(await notSignedInText.isVisible()).toBe(true);
+    // Verify login screen is shown after logout
+    // Requirements: ui.6.1, ui.6.8 - After logout, user should see login screen
+    const loginButtonAfterLogout = context.window.locator('text=/continue with google/i');
+    await loginButtonAfterLogout.waitFor({ state: 'visible', timeout: 5000 });
+    expect(await loginButtonAfterLogout.isVisible()).toBe(true);
 
-    console.log('✓ "Not signed in" text is displayed after logout');
-
-    // Verify profile fields are no longer displayed
-    // Requirements: ui.6.8 - Profile fields should be removed from UI
-    const nameInputCount = await nameInput.count();
-    const emailInputCount = await emailInput.count();
-
-    expect(nameInputCount).toBe(0);
-    expect(emailInputCount).toBe(0);
-
-    console.log('✓ Profile fields are removed from UI after logout');
+    console.log('✓ Login screen is shown after logout');
 
     // Take screenshot after logout
     await context.window.screenshot({
       path: 'playwright-report/account-profile-after-logout.png',
     });
 
-    // Optional: Verify data is deleted from database
+    // Verify data is deleted from database
     // Requirements: ui.6.8 - Check that profile data is removed from storage
     const profileCheck = await context.window.evaluate(async () => {
       return await (window as any).electron.ipcRenderer.invoke('test:get-profile');
@@ -771,6 +722,6 @@ test.describe('Account Profile', () => {
     expect(profileCheck.profile).toBeNull();
 
     console.log('✓ Profile data deleted from database');
-    console.log('✓ Account block cleared successfully on logout');
+    console.log('✓ Logout completed successfully: login screen shown, profile data cleared');
   });
 });

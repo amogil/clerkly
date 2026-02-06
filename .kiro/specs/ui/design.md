@@ -4,6 +4,60 @@
 
 Данный документ описывает архитектуру и дизайн пользовательского интерфейса приложения Clerkly, включая управление главным окном, его конфигурацию при запуске, сохранение состояния и интеграцию с нативными элементами macOS.
 
+### Архитектурный Принцип: База Данных как Единственный Источник Истины
+
+Приложение построено на фундаментальном архитектурном принципе: **база данных (SQLite через DataManager) является единственным источником истины для всех данных приложения**.
+
+**Ключевые аспекты:**
+
+1. **UI отображает данные из базы**: Все компоненты интерфейса читают данные из базы данных, а не хранят собственное состояние данных
+2. **Реактивное обновление**: При изменении данных в базе UI автоматически обновляется через систему событий (IPC)
+3. **Фоновая синхронизация**: Фоновые процессы обновляют базу данных, изменения автоматически попадают в UI
+
+**Поток данных:**
+```
+External API → Main Process → Database → IPC Event → Renderer → UI Update
+```
+
+Этот принцип обеспечивает:
+- Консистентность данных во всем приложении
+- Offline-first подход (приложение работает с локальными данными)
+- Плавный UX без мерцания пустых состояний
+- Простоту отладки и тестирования
+- Надежность (данные персистентны)
+
+### Архитектурный Принцип: Управление Токенами и Авторизацией
+
+Приложение следует строгим правилам управления токенами авторизации и обработки ошибок авторизации:
+
+**Ключевые правила:**
+
+1. **Автоматическое обновление токенов**: Когда access token истекает (expires_in), система автоматически обновляет его через refresh token без участия пользователя. Это происходит в фоновом режиме через `OAuthClientManager.refreshAccessToken()`.
+
+2. **Обработка ошибок авторизации**: При получении ошибки авторизации (HTTP 401 Unauthorized) от любого API (Google UserInfo, Calendar, Tasks и т.д.), система должна:
+   - Немедленно очистить все токены из хранилища
+   - Показать экран логина (LoginError компонент с errorCode 'invalid_grant') с сообщением "Сессия истекла. Пожалуйста, войдите снова."
+   - Перенаправить пользователя на экран авторизации
+   - **Примечание**: Данные пользователя в базе данных НЕ очищаются - они сохраняются для отображения при следующей авторизации
+
+3. **Централизованная обработка**: Все API запросы должны проходить через централизованный обработчик ошибок, который проверяет статус авторизации и выполняет необходимые действия при ошибках 401.
+
+**Поток обработки ошибки авторизации:**
+```
+API Request → HTTP 401 → Clear Tokens → Show LoginError Component → Redirect to OAuth
+```
+
+**Поток автоматического обновления токена:**
+```
+Token Expiring → OAuthClientManager.refreshAccessToken() → Update Tokens in Storage → Continue Operation
+```
+
+Эти правила обеспечивают:
+- Безопасность: Немедленное прекращение доступа при невалидных токенах
+- Прозрачность: Автоматическое обновление токенов без прерывания работы пользователя
+- Понятность: Четкое сообщение пользователю о необходимости повторной авторизации
+- Консистентность: Единый подход к обработке ошибок авторизации во всем приложении
+
 ### Цели Дизайна
 
 - Обеспечить нативный macOS опыт использования приложения
@@ -12,6 +66,7 @@
 - Сохранять предпочтения пользователя по размеру и позиции окна
 - Адаптироваться к различным размерам экранов
 - Поддерживать минималистичный интерфейс без лишних элементов
+- Следовать принципу единого источника истины (база данных)
 
 ### Технологический Стек
 
@@ -420,47 +475,149 @@ interface WindowState {
 
 **Validates: Requirements ui.5.4**
 
-### Property 8: Автоматическое заполнение профиля после авторизации
+### Property 8: Показ экрана логина для неавторизованных пользователей
 
-*Для любого* пользователя, успешно авторизовавшегося через Google OAuth, Account Block должен автоматически заполниться данными профиля (имя, email), полученными из Google UserInfo API endpoint (`https://www.googleapis.com/oauth2/v1/userinfo`).
+*Для любого* пользователя, который не авторизован, приложение должно показывать экран логина, и пользователь НЕ МОЖЕТ попасть в Settings (где находится Account Block) без авторизации.
 
-**Validates: Requirements ui.6.2, ui.6.6**
+**Validates: Requirements ui.6.1**
 
-### Property 9: Отображение обязательных полей профиля
+### Property 9: Показ Dashboard после успешной авторизации
 
-*Для любого* профиля пользователя, Account Block должен отображать поля "Name" (имя пользователя) и "Email" (email адрес).
+*Для любого* пользователя, успешно авторизовавшегося через Google OAuth, приложение должно показывать Dashboard (главный экран), а не Account Block или Settings.
+
+**Validates: Requirements ui.6.2**
+
+### Property 10: Фоновая загрузка профиля после авторизации
+
+*Для любого* пользователя, успешно авторизовавшегося через Google OAuth, система должна автоматически начать загрузку данных профиля из Google UserInfo API в фоновом режиме.
 
 **Validates: Requirements ui.6.3**
 
-### Property 10: Read-only поля профиля
+### Property 11: Отображение сохраненных данных во время загрузки
 
-*Для любого* отображаемого профиля, все поля в Account Block должны иметь атрибут `readOnly` и не позволять пользователю редактировать данные.
+*Для любого* запроса данных профиля, пока данные загружаются, Account Block должен отображать предыдущие значения профиля (если они существуют в локальной базе данных) или пустые поля (если это первая авторизация).
 
 **Validates: Requirements ui.6.4**
 
-### Property 11: Автоматическое обновление при refresh token
+### Property 12: Отображение актуальных данных профиля при успешной загрузке
 
-*Для любого* авторизованного пользователя, при каждом успешном обновлении access token (refresh token operation), система должна автоматически запрашивать актуальные данные профиля из Google UserInfo API и обновлять отображение в Account Block.
-
-**Validates: Requirements ui.6.5**
-
-### Property 12: Автоматическое обновление при запуске приложения
-
-*Для любого* авторизованного пользователя, при запуске приложения система должна автоматически запрашивать актуальные данные профиля из Google UserInfo API и отображать их в Account Block.
+*Для любого* успешного запроса к UserInfo API, полученные данные профиля должны быть отображены в Account Block (имя, email).
 
 **Validates: Requirements ui.6.5**
 
-### Property 13: Кэширование профиля при ошибках API
+### Property 13: Сохранение данных профиля при успешной загрузке
 
-*Для любого* запроса к UserInfo API, если запрос не удается (ошибка сети, таймаут, ошибка сервера), Account Block должен продолжать отображать последние сохраненные данные профиля из локального кэша.
+*Для любого* успешного запроса к UserInfo API, полученные данные профиля должны быть сохранены в локальную базу данных (SQLite через DataManager).
+
+**Validates: Requirements ui.6.6**
+
+### Property 14: Сохранение данных из базы при ошибке загрузки
+
+*Для любого* неудачного запроса к UserInfo API (ошибка сети, таймаут, ошибка сервера), Account Block должен показать сообщение об ошибке и сохранить данные из локальной базы данных (предыдущие значения или пустые поля), НЕ очищая существующие данные профиля.
 
 **Validates: Requirements ui.6.7**
 
-### Property 14: Очистка профиля при logout
+### Property 15: Отображение обязательных полей профиля
 
-*Для любого* авторизованного пользователя, при выходе из системы (logout) Account Block должен очистить все данные профиля и вернуться к пустому состоянию.
+*Для любого* профиля пользователя, Account Block должен отображать поля "Name" (имя пользователя) и "Email" (email адрес).
 
 **Validates: Requirements ui.6.8**
+
+### Property 16: Read-only поля профиля
+
+*Для любого* отображаемого профиля, все поля в Account Block должны иметь атрибут `readOnly` и не позволять пользователю редактировать данные.
+
+**Validates: Requirements ui.6.9**
+
+### Property 17: Автоматическое обновление при refresh token
+
+*Для любого* авторизованного пользователя, при каждом успешном обновлении access token (refresh token operation), система должна автоматически запрашивать актуальные данные профиля из Google UserInfo API и обновлять отображение в Account Block.
+
+**Validates: Requirements ui.6.10**
+
+### Property 18: Автоматическое обновление при запуске приложения
+
+*Для любого* авторизованного пользователя, при запуске приложения система должна автоматически запрашивать актуальные данные профиля из Google UserInfo API и отображать их в Account Block.
+
+**Validates: Requirements ui.6.10**
+
+### Property 19: Очистка токенов и показ экрана логина при logout
+
+*Для любого* авторизованного пользователя, при выходе из системы (logout) приложение должно показать экран логина, очистить все данные профиля из памяти (UI state), и очистить все токены авторизации. Данные профиля в базе данных сохраняются для отображения при следующей авторизации.
+
+**Validates: Requirements ui.8.4, google-oauth-auth.15**
+
+### Property 20: Показ уведомления при ошибке фонового процесса
+
+*Для любой* ошибки, возникающей в фоновом процессе (загрузка данных, синхронизация, API запрос), приложение должно показать уведомление об ошибке пользователю.
+
+**Validates: Requirements ui.7.1**
+
+### Property 21: Содержимое уведомления об ошибке
+
+*Для любого* уведомления об ошибке, оно должно содержать краткое описание проблемы И контекст операции (что пыталось выполниться).
+
+**Validates: Requirements ui.7.2**
+
+### Property 22: Автоматическое исчезновение уведомления
+
+*Для любого* показанного уведомления об ошибке, оно должно автоматически исчезнуть через 5 секунд ИЛИ при клике пользователя на уведомление.
+
+**Validates: Requirements ui.7.3**
+
+### Property 23: Логирование ошибок в консоль
+
+*Для любой* ошибки в приложении, она должна быть залогирована в консоль с достаточным контекстом для отладки.
+
+**Validates: Requirements ui.7.4**
+
+### Property 24: Показ экрана логина для неавторизованных пользователей
+
+*Для любого* пользователя, который не авторизован, приложение должно показывать экран логина при запуске или при попытке доступа к приложению.
+
+**Validates: Requirements ui.8.1**
+
+### Property 25: Блокировка доступа к защищенным экранам
+
+*Для любого* неавторизованного пользователя, попытка доступа к защищенным экранам (Dashboard, Settings, Tasks, Calendar, Contacts) должна быть заблокирована, и пользователь должен быть перенаправлен на экран логина.
+
+**Validates: Requirements ui.8.2**
+
+### Property 26: Перенаправление на Dashboard после успешной авторизации
+
+*Для любого* пользователя, успешно авторизовавшегося через Google OAuth, приложение должно автоматически перенаправить пользователя на Dashboard (главный экран приложения).
+
+**Validates: Requirements ui.8.3**
+
+### Property 27: Перенаправление на Login после logout
+
+*Для любого* авторизованного пользователя, при выходе из системы (logout) приложение должно автоматически перенаправить пользователя на экран логина.
+
+**Validates: Requirements ui.8.4**
+
+### Property 28: Автоматическое обновление токена при истечении
+
+*Для любого* access token, который истекает (expires_in), система должна автоматически обновить его через refresh token в фоновом режиме без участия пользователя, и пользователь должен продолжать работу без прерываний.
+
+**Validates: Requirements ui.9.1, ui.9.2**
+
+### Property 29: Очистка токенов при ошибке авторизации
+
+*Для любого* API запроса, который возвращает HTTP 401 Unauthorized, система должна немедленно очистить все токены из хранилища и показать экран логина (LoginError компонент с errorCode 'invalid_grant') с сообщением "Сессия истекла. Пожалуйста, войдите снова." Данные пользователя в базе данных НЕ очищаются и сохраняются для отображения при следующей авторизации.
+
+**Validates: Requirements ui.9.3**
+
+### Property 30: Централизованная обработка ошибок авторизации
+
+*Для любого* API запроса к внешним сервисам (Google UserInfo, Calendar, Tasks и т.д.), запрос должен проходить через централизованный обработчик, который проверяет статус HTTP 401 и выполняет необходимые действия по очистке сессии.
+
+**Validates: Requirements ui.9.4**
+
+### Property 31: Логирование ошибок авторизации с контекстом
+
+*Для любой* ошибки авторизации (HTTP 401), система должна залогировать событие с контекстом (какой API запрос вызвал ошибку, timestamp, URL), но показать пользователю только понятное сообщение без технических деталей.
+
+**Validates: Requirements ui.9.5, ui.9.6**
 
 ### Edge Cases
 
@@ -472,8 +629,21 @@ interface WindowState {
 
 3. **Невалидная позиция (ui.5.6)**: Когда сохраненная позиция находится за пределами доступных экранов, должно использоваться состояние по умолчанию на основном экране.
 
-4. **Не авторизован (ui.6.1)**: Когда пользователь не авторизован, приложение показывает экран логина, и пользователь не может попасть в Settings (где находится Account Block). Account компонент должен корректно обрабатывать случай отсутствия профиля, отображая пустое состояние с сообщением "Not signed in".
+4. **Не авторизован (ui.6.1)**: Когда пользователь не авторизован, приложение показывает экран логина, и пользователь НЕ МОЖЕТ попасть в Settings (где находится Account Block). Это не edge case для Account компонента, так как компонент не должен быть доступен неавторизованным пользователям.
 
+5. **Первая авторизация (ui.6.4)**: Когда пользователь авторизуется впервые и в локальной базе данных нет данных профиля, Account Block должен отображать пустые поля во время загрузки данных профиля, затем заполниться актуальными данными после успешной загрузки (ui.6.5, ui.6.6).
+
+6. **Ошибка загрузки профиля (ui.6.7)**: Когда загрузка данных профиля не удается (ошибка сети, таймаут, ошибка API), Account Block должен показать сообщение об ошибке и сохранить данные из локальной базы данных (предыдущие значения или пустые поля), НЕ очищая существующие данные.
+
+7. **Повторная авторизация с сохраненными данными (ui.6.4)**: Когда пользователь авторизуется повторно и в локальной базе данных есть данные профиля, Account Block должен отображать сохраненные данные во время загрузки новых данных, затем обновиться актуальными данными после успешной загрузки (ui.6.5, ui.6.6).
+
+8. **Истечение access token (ui.9.1, ui.9.2)**: Когда access token истекает во время работы приложения, система должна автоматически обновить его через refresh token в фоновом режиме. Пользователь продолжает работу без прерываний, уведомлений или видимых изменений в UI.
+
+9. **Истечение refresh token (ui.9.3)**: Когда refresh token также становится невалидным (истек или был отозван), любой API запрос вернет HTTP 401. Система должна немедленно очистить все токены, показать экран логина (LoginError компонент с errorCode 'invalid_grant') с сообщением "Сессия истекла. Пожалуйста, войдите снова." и перенаправить на OAuth авторизацию. Данные пользователя в базе данных НЕ очищаются и сохраняются для отображения при следующей авторизации.
+
+10. **Ошибка 401 во время фоновой операции (ui.9.3, ui.9.4)**: Когда фоновый процесс (например, автоматическая синхронизация календаря) получает HTTP 401, система должна обработать это так же, как и для пользовательских запросов: очистить токены, показать экран логина (LoginError компонент) с ошибкой, перенаправить на авторизацию. Данные пользователя в базе данных сохраняются.
+
+11. **Множественные одновременные запросы с ошибкой 401 (ui.9.4)**: Когда несколько API запросов одновременно получают HTTP 401 (например, при загрузке профиля, календаря и задач), централизованный обработчик должен выполнить очистку токенов только один раз, избегая дублирования действий и race conditions. Данные пользователя в базе данных сохраняются.
 
 ## Обработка Ошибок
 
@@ -662,6 +832,80 @@ async loadProfile(): Promise<UserProfile | null> {
 ```
 
 **Результат:** Возвращается null, компонент отображает пустое состояние. При следующем успешном запросе к API данные будут восстановлены.
+
+#### 8. Ошибка авторизации (HTTP 401 Unauthorized)
+
+**Причины:**
+- Access token истек и refresh token также невалиден
+- Токены были отозваны пользователем в настройках Google аккаунта
+- Токены были удалены или повреждены в локальном хранилище
+- Изменились права доступа приложения в Google
+
+**Обработка:**
+```typescript
+// Централизованный обработчик API запросов
+async function handleAPIRequest(url: string, options: RequestInit): Promise<Response> {
+  try {
+    const response = await fetch(url, options);
+    
+    // Check for authorization error
+    if (response.status === 401) {
+      console.error('[API] Authorization error (401), clearing tokens and showing login');
+      
+      // Clear all tokens
+      await window.api.auth.clearTokens();
+      
+      // Show LoginError component with session expired message
+      // This will trigger the App component to show LoginError with:
+      // errorCode: 'invalid_grant' (maps to "Session expired" message)
+      // errorMessage: 'Сессия истекла. Пожалуйста, войдите снова.'
+      window.api.auth.emitAuthError('Сессия истекла. Пожалуйста, войдите снова.', 'invalid_grant');
+      
+      throw new Error('Authorization failed: Session expired');
+    }
+    
+    return response;
+  } catch (error) {
+    console.error('[API] Request failed:', error);
+    throw error;
+  }
+}
+
+// В UserProfileManager
+async fetchProfile(): Promise<UserProfile | null> {
+  try {
+    const authStatus = await this.oauthClient.getAuthStatus();
+    if (!authStatus.authorized || !authStatus.tokens?.accessToken) {
+      return null;
+    }
+
+    // Use centralized handler that checks for 401
+    const response = await handleAPIRequest(
+      'https://www.googleapis.com/oauth2/v1/userinfo',
+      {
+        headers: { 'Authorization': `Bearer ${authStatus.tokens.accessToken}` }
+      }
+    );
+
+    const profile = await response.json();
+    await this.saveProfile(profile);
+    return profile;
+  } catch (error) {
+    // If it's an auth error, tokens are already cleared
+    // Return cached profile for other errors
+    if (error.message?.includes('Authorization failed')) {
+      return null;
+    }
+    return await this.loadProfile();
+  }
+}
+```
+
+**Результат:** 
+- Все токены очищены из хранилища
+- Пользователь перенаправлен на экран логина (LoginError компонент) с понятным сообщением об ошибке
+- Данные пользователя в базе данных сохраняются и будут отображены при следующей авторизации
+- Приложение готово к новой авторизации
 
 ### Логирование
 
@@ -1123,9 +1367,27 @@ describe('Window UI Functional Tests', () => {
 | ui.6.3 | ✓ | - | ✓ |
 | ui.6.4 | ✓ | - | ✓ |
 | ui.6.5 | ✓ | - | ✓ |
-| ui.6.6 | ✓ | - | - |
-| ui.6.7 | ✓ | - | - |
+| ui.6.6 | ✓ | - | ✓ |
+| ui.6.7 | ✓ | - | ✓ |
 | ui.6.8 | ✓ | - | ✓ |
+| ui.6.9 | ✓ | - | ✓ |
+| ui.6.10 | ✓ | - | ✓ |
+| ui.6.11 | ✓ | - | - |
+| ui.6.12 | ✓ | - | ✓ |
+| ui.7.1 | ✓ | - | ✓ |
+| ui.7.2 | ✓ | - | ✓ |
+| ui.7.3 | ✓ | - | ✓ |
+| ui.7.4 | ✓ | - | - |
+| ui.8.1 | ✓ | - | ✓ |
+| ui.8.2 | ✓ | - | ✓ |
+| ui.8.3 | ✓ | - | ✓ |
+| ui.8.4 | ✓ | - | ✓ |
+| ui.9.1 | ✓ | - | ✓ |
+| ui.9.2 | ✓ | - | ✓ |
+| ui.9.3 | ✓ | - | ✓ |
+| ui.9.4 | ✓ | - | ✓ |
+| ui.9.5 | ✓ | - | - |
+| ui.9.6 | ✓ | - | ✓ |
 
 ### Критерии Успеха
 
@@ -1269,10 +1531,10 @@ describe('Account Component', () => {
 
   /* Preconditions: Account component with profile data, logout triggered
      Action: trigger logout event
-     Assertions: component returns to empty state, profile data cleared
-     Requirements: ui.6.8 */
-  it('should clear profile on logout', () => {
-    // Тест очистки профиля при logout
+     Assertions: component returns to empty state (UI state cleared), profile data in database persists
+     Requirements: ui.8.4, google-oauth-auth.15 */
+  it('should clear profile from UI on logout', () => {
+    // Тест очистки профиля из UI при logout
   });
 });
 ```
@@ -1353,10 +1615,10 @@ describe('Account Functional Tests', () => {
 
   /* Preconditions: authenticated user with profile displayed
      Action: perform logout
-     Assertions: Account block cleared, returns to empty state
-     Requirements: ui.6.8 */
-  it('should clear profile on logout', async () => {
-    // Функциональный тест очистки при logout
+     Assertions: Account block cleared from UI, returns to empty state, profile data in database persists
+     Requirements: ui.8.4, google-oauth-auth.15 */
+  it('should clear profile from UI on logout', async () => {
+    // Функциональный тест очистки UI при logout
   });
 });
 ```
@@ -1521,6 +1783,591 @@ describe('Account Functional Tests', () => {
 - Следует принципам SOLID (Dependency Inversion)
 - Упрощает понимание потока данных
 - Позволяет легко заменить реализацию
+
+### Решение 11: Архитектура Навигации
+
+**Решение:** Использовать комбинацию NavigationManager + AuthGuard + Router для управления навигацией и защиты маршрутов.
+
+**Альтернативы:**
+- Использовать только React Router с custom hooks
+- Использовать глобальное состояние (Redux/Zustand) для навигации
+- Проверять авторизацию в каждом компоненте отдельно
+
+**Обоснование:**
+- Централизованная логика навигации упрощает поддержку
+- AuthGuard обеспечивает единую точку проверки авторизации (ui.8.2)
+- Легко добавлять новые защищенные маршруты
+- Явное разделение ответственности между компонентами
+- Упрощает тестирование (можно мокировать NavigationManager)
+- Интегрируется с OAuth событиями (auth:success, logout)
+
+### Решение 12: Система Уведомлений об Ошибках
+
+**Решение:** Использовать централизованный ErrorNotificationManager с IPC интеграцией для отображения ошибок из main process.
+
+**Альтернативы:**
+- Использовать готовую библиотеку toast notifications (react-toastify, sonner)
+- Использовать глобальное состояние (Redux) для уведомлений
+- Отображать ошибки только в консоли без UI уведомлений
+
+**Обоснование:**
+- Полный контроль над поведением уведомлений (ui.7.3 - автоматическое исчезновение через 5 секунд)
+- Легко интегрируется с IPC для ошибок из main process (ui.7.1)
+- Не добавляет внешних зависимостей
+- Простая реализация с подпиской на изменения
+- Легко тестировать (можно мокировать manager)
+- Соответствует всем требованиям ui.7.x без необходимости адаптации сторонней библиотеки
+
+### Решение 13: Формат Уведомлений об Ошибках
+
+**Решение:** Уведомления содержат два поля: context (контекст операции) и message (описание ошибки).
+
+**Альтернативы:**
+- Только message без контекста
+- Детальный stack trace в уведомлении
+- Категоризация ошибок (error, warning, info)
+
+**Обоснование:**
+- Соответствует требованию ui.7.2 (контекст + описание)
+- Контекст помогает пользователю понять, что пошло не так
+- Message дает конкретное описание проблемы
+- Не перегружает пользователя техническими деталями
+- Stack trace логируется в консоль (ui.7.4), но не показывается пользователю
+- Простой и понятный формат для пользователя
+
+### Решение 14: Централизованный Обработчик API Запросов
+
+**Решение:** Использовать централизованную функцию `handleAPIRequest()` для всех внешних API запросов, которая проверяет HTTP 401 и выполняет очистку сессии.
+
+**Альтернативы:**
+- Проверять статус 401 в каждом API вызове отдельно
+- Использовать HTTP interceptors (axios/fetch interceptors)
+- Обрабатывать ошибки авторизации на уровне компонентов
+
+**Обоснование:**
+- Единая точка обработки ошибок авторизации (ui.9.4)
+- Гарантирует консистентное поведение для всех API запросов
+- Предотвращает дублирование логики очистки сессии
+- Легко тестировать (один обработчик вместо множества)
+- Упрощает добавление новых API endpoints
+- Предотвращает race conditions при множественных одновременных 401 ошибках
+- Централизованное логирование всех ошибок авторизации (ui.9.5)
+
+### Решение 15: Автоматическое Обновление Токенов
+
+**Решение:** Использовать проактивное обновление токенов через `OAuthClientManager.refreshAccessToken()` перед истечением срока действия (за 5 минут до expires_in).
+
+**Альтернативы:**
+- Обновлять токен только при получении 401 ошибки (реактивный подход)
+- Обновлять токен при каждом API запросе
+- Использовать фиксированный интервал обновления (например, каждые 30 минут)
+
+**Обоснование:**
+- Проактивный подход предотвращает ошибки 401 во время работы пользователя (ui.9.1, ui.9.2)
+- Пользователь не испытывает прерываний в работе
+- Уменьшает количество ошибок и повторных запросов
+- Обновление за 5 минут до истечения дает запас времени на случай сетевых задержек
+- Интегрируется с существующим механизмом refresh в OAuthClientManager
+- Не создает избыточной нагрузки на Google Token API
+
+### Решение 16: Сообщение об Истечении Сессии
+
+**Решение:** Показывать пользователю понятное сообщение "Сессия истекла. Пожалуйста, войдите снова." вместо технических деталей ошибки.
+
+**Альтернативы:**
+- Показывать полный текст ошибки HTTP 401
+- Показывать код ошибки и stack trace
+- Не показывать сообщение, только перенаправлять на логин
+
+**Обоснование:**
+- Соответствует требованию ui.9.6 (не показывать технические детали)
+- Понятно обычному пользователю без технических знаний
+- Объясняет, что произошло и что нужно делать
+- Не пугает пользователя техническими терминами
+- Технические детали логируются в консоль для отладки (ui.9.5)
+- Соответствует best practices UX для сообщений об ошибках
+
+## Навигация и Авторизация
+
+### Обзор
+
+Система навигации управляет переходами между экранами приложения в зависимости от статуса авторизации пользователя. Неавторизованные пользователи видят только экран логина, авторизованные получают доступ ко всем функциям приложения.
+
+### Архитектура Навигации
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                      Main Process                            │
+│                                                               │
+│  ┌──────────────────────┐                                    │
+│  │ OAuthClientManager   │                                    │
+│  │                      │                                    │
+│  │ - getAuthStatus()    │                                    │
+│  └──────────────────────┘                                    │
+│           │                                                   │
+└───────────┼───────────────────────────────────────────────────┘
+            │ IPC: auth:status
+            ▼
+   ┌─────────────────────────────────────────────┐
+   │          Renderer Process                   │
+   │                                              │
+   │  ┌────────────────────────────────┐         │
+   │  │     NavigationManager          │         │
+   │  │                                │         │
+   │  │  - checkAuthStatus()           │         │
+   │  │  - redirectToLogin()           │         │
+   │  │  - redirectToDashboard()       │         │
+   │  └────────────────────────────────┘         │
+   │           │                                  │
+   │           ▼                                  │
+   │  ┌────────────────────────────────┐         │
+   │  │        AuthGuard               │         │
+   │  │                                │         │
+   │  │  - canActivate()               │         │
+   │  │  - protectedRoutes[]           │         │
+   │  └────────────────────────────────┘         │
+   │           │                                  │
+   │           ▼                                  │
+   │  ┌────────────────────────────────┐         │
+   │  │         Router                 │         │
+   │  │                                │         │
+   │  │  - /login                      │         │
+   │  │  - /dashboard (protected)      │         │
+   │  │  - /settings (protected)       │         │
+   │  │  - /tasks (protected)          │         │
+   │  │  - /calendar (protected)       │         │
+   │  │  - /contacts (protected)       │         │
+   │  └────────────────────────────────┘         │
+   └─────────────────────────────────────────────┘
+```
+
+### Компоненты Навигации
+
+#### NavigationManager
+
+Класс для управления навигацией и перенаправлениями.
+
+```typescript
+// Requirements: ui.8.1, ui.8.3, ui.8.4
+
+class NavigationManager {
+  private router: Router;
+  
+  constructor(router: Router) {
+    this.router = router;
+  }
+
+  /**
+   * Check authentication status and redirect if needed
+   * Requirements: ui.8.1
+   */
+  async checkAuthStatus(): Promise<boolean> {
+    try {
+      const result = await window.api.auth.getAuthStatus();
+      return result.authorized;
+    } catch (error) {
+      console.error('[NavigationManager] Failed to check auth status:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Redirect to login screen
+   * Requirements: ui.8.1, ui.8.4
+   */
+  redirectToLogin(): void {
+    console.log('[NavigationManager] Redirecting to login');
+    this.router.navigate('/login');
+  }
+
+  /**
+   * Redirect to dashboard
+   * Requirements: ui.8.3
+   */
+  redirectToDashboard(): void {
+    console.log('[NavigationManager] Redirecting to dashboard');
+    this.router.navigate('/dashboard');
+  }
+
+  /**
+   * Initialize navigation on app start
+   * Requirements: ui.8.1, ui.8.3
+   */
+  async initialize(): Promise<void> {
+    const isAuthenticated = await this.checkAuthStatus();
+    
+    if (!isAuthenticated) {
+      this.redirectToLogin();
+    } else {
+      // If already on login screen, redirect to dashboard
+      if (this.router.currentRoute === '/login') {
+        this.redirectToDashboard();
+      }
+    }
+  }
+}
+```
+
+#### AuthGuard
+
+Компонент для защиты маршрутов от неавторизованного доступа.
+
+```typescript
+// Requirements: ui.8.2
+
+class AuthGuard {
+  private navigationManager: NavigationManager;
+  private protectedRoutes: string[] = [
+    '/dashboard',
+    '/settings',
+    '/tasks',
+    '/calendar',
+    '/contacts'
+  ];
+
+  constructor(navigationManager: NavigationManager) {
+    this.navigationManager = navigationManager;
+  }
+
+  /**
+   * Check if route can be activated
+   * Requirements: ui.8.2
+   */
+  async canActivate(route: string): Promise<boolean> {
+    // Public routes are always accessible
+    if (!this.isProtectedRoute(route)) {
+      return true;
+    }
+
+    // Check authentication for protected routes
+    const isAuthenticated = await this.navigationManager.checkAuthStatus();
+    
+    if (!isAuthenticated) {
+      console.log('[AuthGuard] Access denied to protected route:', route);
+      this.navigationManager.redirectToLogin();
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * Check if route is protected
+   */
+  private isProtectedRoute(route: string): boolean {
+    return this.protectedRoutes.some(protected => route.startsWith(protected));
+  }
+}
+```
+
+#### Интеграция с OAuth Events
+
+```typescript
+// Requirements: ui.8.3, ui.8.4
+
+// In App.tsx or main application component
+useEffect(() => {
+  // Requirements: ui.8.3 - Redirect to dashboard after successful auth
+  const unsubscribeAuthSuccess = window.api.auth.onAuthSuccess(() => {
+    console.log('[App] Auth success event received, redirecting to dashboard');
+    navigationManager.redirectToDashboard();
+  });
+
+  // Requirements: ui.8.4 - Redirect to login after logout
+  const unsubscribeLogout = window.api.auth.onLogout(() => {
+    console.log('[App] Logout event received, redirecting to login');
+    navigationManager.redirectToLogin();
+  });
+
+  return () => {
+    unsubscribeAuthSuccess();
+    unsubscribeLogout();
+  };
+}, []);
+```
+
+### Поток Навигации
+
+**1. Запуск приложения (неавторизованный пользователь):**
+```
+App Start → NavigationManager.initialize() → checkAuthStatus() → not authorized → redirectToLogin()
+```
+
+**2. Запуск приложения (авторизованный пользователь):**
+```
+App Start → NavigationManager.initialize() → checkAuthStatus() → authorized → stay on current route or redirectToDashboard()
+```
+
+**3. Успешная авторизация:**
+```
+OAuth Success → auth:success event → onAuthSuccess() → redirectToDashboard()
+```
+
+**4. Попытка доступа к защищенному маршруту:**
+```
+Navigate to /settings → AuthGuard.canActivate() → checkAuthStatus() → not authorized → redirectToLogin()
+```
+
+**5. Выход из системы:**
+```
+Logout → auth:logout event → onLogout() → redirectToLogin()
+```
+
+## Система Уведомлений об Ошибках
+
+### Обзор
+
+Система уведомлений отображает пользователю понятные сообщения об ошибках, возникающих в фоновых процессах (загрузка данных, синхронизация, API запросы). Уведомления автоматически исчезают через 5 секунд или при клике пользователя.
+
+### Архитектура Уведомлений
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                      Main Process                            │
+│                                                               │
+│  ┌──────────────────────┐                                    │
+│  │  Background Process  │                                    │
+│  │  (API, Sync, etc)    │                                    │
+│  └──────────────────────┘                                    │
+│           │ Error occurs                                     │
+│           ▼                                                   │
+│  ┌──────────────────────┐                                    │
+│  │  Error Handler       │                                    │
+│  │                      │                                    │
+│  │  - captureError()    │                                    │
+│  │  - logError()        │                                    │
+│  └──────────────────────┘                                    │
+│           │ IPC: error:notify                                │
+└───────────┼───────────────────────────────────────────────────┘
+            ▼
+   ┌─────────────────────────────────────────────┐
+   │          Renderer Process                   │
+   │                                              │
+   │  ┌────────────────────────────────┐         │
+   │  │ ErrorNotificationManager       │         │
+   │  │                                │         │
+   │  │  - showNotification()          │         │
+   │  │  - dismissNotification()       │         │
+   │  │  - notifications[]             │         │
+   │  └────────────────────────────────┘         │
+   │           │                                  │
+   │           ▼                                  │
+   │  ┌────────────────────────────────┐         │
+   │  │    NotificationUI              │         │
+   │  │                                │         │
+   │  │  - Display error message       │         │
+   │  │  - Display context             │         │
+   │  │  - Auto-dismiss timer          │         │
+   │  │  - Click to dismiss            │         │
+   │  └────────────────────────────────┘         │
+   └─────────────────────────────────────────────┘
+```
+
+### Компоненты Уведомлений
+
+#### ErrorNotificationManager
+
+Класс для управления уведомлениями об ошибках.
+
+```typescript
+// Requirements: ui.7.1, ui.7.2, ui.7.3
+
+interface ErrorNotification {
+  id: string;
+  message: string;
+  context: string;
+  timestamp: number;
+}
+
+class ErrorNotificationManager {
+  private notifications: ErrorNotification[] = [];
+  private listeners: ((notifications: ErrorNotification[]) => void)[] = [];
+  private readonly AUTO_DISMISS_DELAY = 5000; // 5 seconds
+
+  /**
+   * Show error notification
+   * Requirements: ui.7.1, ui.7.2
+   */
+  showNotification(message: string, context: string): string {
+    const notification: ErrorNotification = {
+      id: `error-${Date.now()}-${Math.random()}`,
+      message,
+      context,
+      timestamp: Date.now()
+    };
+
+    this.notifications.push(notification);
+    this.notifyListeners();
+
+    // Requirements: ui.7.3 - Auto-dismiss after 5 seconds
+    setTimeout(() => {
+      this.dismissNotification(notification.id);
+    }, this.AUTO_DISMISS_DELAY);
+
+    console.log('[ErrorNotificationManager] Notification shown:', notification);
+    return notification.id;
+  }
+
+  /**
+   * Dismiss notification
+   * Requirements: ui.7.3
+   */
+  dismissNotification(id: string): void {
+    const index = this.notifications.findIndex(n => n.id === id);
+    if (index !== -1) {
+      this.notifications.splice(index, 1);
+      this.notifyListeners();
+      console.log('[ErrorNotificationManager] Notification dismissed:', id);
+    }
+  }
+
+  /**
+   * Subscribe to notification changes
+   */
+  subscribe(listener: (notifications: ErrorNotification[]) => void): () => void {
+    this.listeners.push(listener);
+    return () => {
+      const index = this.listeners.indexOf(listener);
+      if (index !== -1) {
+        this.listeners.splice(index, 1);
+      }
+    };
+  }
+
+  private notifyListeners(): void {
+    this.listeners.forEach(listener => listener([...this.notifications]));
+  }
+}
+```
+
+#### NotificationUI Component
+
+React компонент для отображения уведомлений.
+
+```typescript
+// Requirements: ui.7.1, ui.7.2, ui.7.3
+
+import { useState, useEffect } from 'react';
+
+interface NotificationUIProps {
+  notificationManager: ErrorNotificationManager;
+}
+
+export function NotificationUI({ notificationManager }: NotificationUIProps) {
+  const [notifications, setNotifications] = useState<ErrorNotification[]>([]);
+
+  useEffect(() => {
+    const unsubscribe = notificationManager.subscribe(setNotifications);
+    return unsubscribe;
+  }, [notificationManager]);
+
+  const handleDismiss = (id: string) => {
+    notificationManager.dismissNotification(id);
+  };
+
+  return (
+    <div className="notification-container">
+      {notifications.map(notification => (
+        <div
+          key={notification.id}
+          className="error-notification"
+          onClick={() => handleDismiss(notification.id)}
+        >
+          <div className="notification-content">
+            {/* Requirements: ui.7.2 - Display context */}
+            <div className="notification-context">
+              {notification.context}
+            </div>
+            {/* Requirements: ui.7.2 - Display message */}
+            <div className="notification-message">
+              {notification.message}
+            </div>
+          </div>
+          <button
+            className="notification-dismiss"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleDismiss(notification.id);
+            }}
+          >
+            ×
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
+```
+
+#### Интеграция с IPC
+
+```typescript
+// Requirements: ui.7.1, ui.7.4
+
+// In preload script
+contextBridge.exposeInMainWorld('api', {
+  error: {
+    onNotify: (callback: (message: string, context: string) => void) => {
+      ipcRenderer.on('error:notify', (_event, message, context) => {
+        callback(message, context);
+      });
+      return () => ipcRenderer.removeAllListeners('error:notify');
+    }
+  }
+});
+
+// In renderer
+useEffect(() => {
+  const unsubscribe = window.api.error.onNotify((message, context) => {
+    notificationManager.showNotification(message, context);
+  });
+  return unsubscribe;
+}, []);
+
+// In main process - error handler
+function handleBackgroundError(error: Error, context: string): void {
+  // Requirements: ui.7.4 - Log to console
+  console.error(`[${context}] Error:`, error);
+  
+  // Requirements: ui.7.1 - Notify renderer
+  const mainWindow = windowManager.getWindow();
+  if (mainWindow) {
+    mainWindow.webContents.send('error:notify', error.message, context);
+  }
+}
+```
+
+### Примеры Использования
+
+**1. Ошибка загрузки профиля:**
+```typescript
+try {
+  await fetchProfile();
+} catch (error) {
+  handleBackgroundError(error, 'Profile Loading');
+  // User sees: "Profile Loading: Failed to fetch user profile"
+}
+```
+
+**2. Ошибка синхронизации:**
+```typescript
+try {
+  await syncData();
+} catch (error) {
+  handleBackgroundError(error, 'Data Synchronization');
+  // User sees: "Data Synchronization: Network connection failed"
+}
+```
+
+**3. Ошибка API запроса:**
+```typescript
+try {
+  await apiRequest();
+} catch (error) {
+  handleBackgroundError(error, 'API Request');
+  // User sees: "API Request: Server returned error 500"
+}
+```
 
 ## Блок Account (Профиль Пользователя)
 
@@ -1812,9 +2659,9 @@ export function Account({ className }: AccountProps) {
       loadProfile();
     });
 
-    // Requirements: ui.6.8 - Listen for logout to clear profile
+    // Requirements: ui.8.4, google-oauth-auth.15 - Listen for logout to clear profile from UI
     const unsubscribeLogout = window.api.auth.onLogout(() => {
-      console.log('[Account] Logout event received, clearing profile');
+      console.log('[Account] Logout event received, clearing profile from UI');
       setProfile(null);
       setError(null);
     });
@@ -2117,6 +2964,12 @@ const handleRefreshProfile = async () => {
 
 Блок Account интегрируется с существующей OAuth инфраструктурой и обеспечивает автоматическую синхронизацию данных профиля с Google аккаунтом пользователя. Комбинированная стратегия обновления (при запуске + при refresh token) гарантирует актуальность данных без необходимости действий от пользователя.
 
+Система навигации обеспечивает защиту маршрутов и автоматическое перенаправление пользователей в зависимости от статуса авторизации. NavigationManager и AuthGuard работают совместно для предотвращения несанкционированного доступа к защищенным экранам.
+
+Система уведомлений об ошибках предоставляет пользователю понятную обратную связь о проблемах в фоновых процессах, автоматически скрывая уведомления через 5 секунд для минимизации отвлечения.
+
+Система управления токенами обеспечивает автоматическое обновление access token в фоновом режиме и корректную обработку ошибок авторизации (HTTP 401). Централизованный обработчик API запросов гарантирует консистентное поведение при истечении сессии, немедленно очищая токены и данные пользователя, и показывая понятное сообщение о необходимости повторной авторизации.
+
 ### Статус Реализации
 
 **Фазы 1-2 (WindowManager, WindowStateManager):**
@@ -2131,6 +2984,27 @@ const handleRefreshProfile = async () => {
 - 📝 Задачи сформированы в tasks.md
 - ⏸️ Ожидает начала реализации
 
+**Фаза 4 (Навигация и Авторизация):**
+- ⏳ В стадии планирования
+- 📋 Требования ui.8.x определены
+- 📐 Дизайн детализирован
+- 📝 Задачи будут добавлены в tasks.md
+- ⏸️ Ожидает начала реализации
+
+**Фаза 5 (Система Уведомлений об Ошибках):**
+- ⏳ В стадии планирования
+- 📋 Требования ui.7.x определены
+- 📐 Дизайн детализирован
+- 📝 Задачи будут добавлены в tasks.md
+- ⏸️ Ожидает начала реализации
+
+**Фаза 6 (Управление Токенами и Обработка Ошибок Авторизации):**
+- ⏳ В стадии планирования
+- 📋 Требования ui.9.x определены
+- 📐 Дизайн детализирован
+- 📝 Задачи будут добавлены в tasks.md
+- ⏸️ Ожидает начала реализации
+
 ### Следующие Шаги
 
 1. Начать реализацию Фазы 3 согласно tasks.md (задачи 10-20)
@@ -2138,4 +3012,11 @@ const handleRefreshProfile = async () => {
 3. Расширить IPC handlers для работы с профилем
 4. Создать Account React компонент
 5. Написать модульные и функциональные тесты
-6. Обновить таблицу покрытия требований после реализации
+6. После завершения Фазы 3, перейти к Фазе 4 (Навигация)
+7. Создать NavigationManager, AuthGuard и интегрировать с Router
+8. После завершения Фазы 4, перейти к Фазе 5 (Уведомления)
+9. Создать ErrorNotificationManager и NotificationUI компонент
+10. После завершения Фазы 5, перейти к Фазе 6 (Управление Токенами)
+11. Реализовать централизованный обработчик API запросов с проверкой HTTP 401
+12. Интегрировать автоматическое обновление токенов в фоновом режиме
+13. Обновить таблицу покрытия требований после реализации каждой фазы

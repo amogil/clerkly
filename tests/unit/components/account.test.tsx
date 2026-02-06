@@ -9,6 +9,7 @@ const mockGetProfile = jest.fn();
 const mockOnAuthSuccess = jest.fn();
 const mockOnLogout = jest.fn();
 const mockOnAuthError = jest.fn();
+const mockOnProfileUpdated = jest.fn();
 
 // Setup window.api mock using Object.defineProperty to ensure it persists in jsdom
 Object.defineProperty(window, 'api', {
@@ -20,6 +21,7 @@ Object.defineProperty(window, 'api', {
       onAuthSuccess: mockOnAuthSuccess,
       onLogout: mockOnLogout,
       onAuthError: mockOnAuthError,
+      onProfileUpdated: mockOnProfileUpdated,
     },
   },
 });
@@ -47,15 +49,16 @@ beforeEach(() => {
   mockOnAuthSuccess.mockImplementation(() => {});
   mockOnLogout.mockImplementation(() => {});
   mockOnAuthError.mockImplementation(() => {});
+  mockOnProfileUpdated.mockImplementation(() => {});
 });
 
 describe('Account Component', () => {
   /* Preconditions: window.api.auth.getProfile() mocked to return { success: true, profile: null }
      Action: render Account component with React Testing Library
-     Assertions: displays "Not signed in" text, no profile fields (name, email inputs), no loading state
-     Requirements: ui.6.1 */
-  it('should display empty state when not authenticated', async () => {
-    // Mock getProfile to return no profile (user not authenticated)
+     Assertions: displays loading state (not "Not signed in"), no profile fields
+     Requirements: ui.6.1 - User cannot access Settings without authentication, so Account should show loading if no profile */
+  it('should display loading state when profile is not available', async () => {
+    // Mock getProfile to return no profile (user not authenticated or profile not loaded yet)
     mockGetProfile.mockResolvedValue({
       success: true,
       profile: null,
@@ -64,23 +67,18 @@ describe('Account Component', () => {
     // Render the Account component
     render(<Account />);
 
-    // Wait for loading to complete and check for "Not signed in" text
+    // Wait for loading to complete and check for loading state (not "Not signed in")
+    // Requirements: ui.6.1 - According to requirements, user should not be in Settings if not authenticated
+    // So if Account component is rendered without profile, it should show loading state
     await waitFor(() => {
-      expect(screen.getByText('Not signed in')).toBeInTheDocument();
+      expect(screen.getByText('Loading profile...')).toBeInTheDocument();
     });
-
-    // Verify "Sign in to view your account information" helper text is present
-    expect(screen.getByText('Sign in to view your account information')).toBeInTheDocument();
 
     // Verify profile fields are NOT present
     const nameInput = screen.queryByLabelText('Name');
     const emailInput = screen.queryByLabelText('Email');
     expect(nameInput).not.toBeInTheDocument();
     expect(emailInput).not.toBeInTheDocument();
-
-    // Verify loading state is NOT present
-    const loadingText = screen.queryByText('Loading profile...');
-    expect(loadingText).not.toBeInTheDocument();
 
     // Verify the Account heading is present
     expect(screen.getByText('Account')).toBeInTheDocument();
@@ -133,10 +131,6 @@ describe('Account Component', () => {
     // Verify email field has correct id and value
     expect(emailInput.id).toBe('profile-email');
     expect(emailInput.value).toBe('john@example.com');
-
-    // Verify "Not signed in" text is NOT present
-    const notSignedInText = screen.queryByText('Not signed in');
-    expect(notSignedInText).not.toBeInTheDocument();
 
     // Verify the Account heading is present
     expect(screen.getByText('Account')).toBeInTheDocument();
@@ -352,9 +346,6 @@ describe('Account Component', () => {
     expect(nameInputBefore.value).toBe('John Doe');
     expect(emailInputBefore.value).toBe('john@example.com');
 
-    // Verify "Not signed in" text is NOT present
-    expect(screen.queryByText('Not signed in')).not.toBeInTheDocument();
-
     // Verify that onLogout was called to register the listener
     expect(mockOnLogout).toHaveBeenCalledTimes(1);
     expect(logoutCallback).toBeDefined();
@@ -364,16 +355,15 @@ describe('Account Component', () => {
       logoutCallback();
     }
 
-    // Wait for component to update and return to empty state
+    // Wait for component to update and return to loading state (no profile)
+    // Requirements: ui.6.1 - User should not be in Settings if not authenticated
+    // After logout, component shows loading state (not "Not signed in")
     await waitFor(() => {
-      expect(screen.getByText('Not signed in')).toBeInTheDocument();
+      expect(screen.getByText('Loading profile...')).toBeInTheDocument();
     });
 
-    // Verify "Not signed in" text is displayed
-    expect(screen.getByText('Not signed in')).toBeInTheDocument();
-
-    // Verify helper text is displayed
-    expect(screen.getByText('Sign in to view your account information')).toBeInTheDocument();
+    // Verify loading state is displayed
+    expect(screen.getByText('Loading profile...')).toBeInTheDocument();
 
     // Verify profile fields are NO LONGER displayed
     const nameInputAfter = screen.queryByLabelText('Name');
