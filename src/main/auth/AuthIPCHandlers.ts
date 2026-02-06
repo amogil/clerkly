@@ -266,4 +266,21 @@ export class AuthIPCHandlers {
   sendAuthError(error: string, errorCode?: string): void {
     this.sendAuthEvent('auth:error', { error, errorCode });
   }
+
+  /**
+   * Send error notification to all renderer processes
+   * Requirements: ui.7.1, ui.7.4
+   * @param message Error message
+   * @param context Context of the operation that failed
+   */
+  sendErrorNotification(message: string, context: string): void {
+    // Requirements: ui.7.4 - Log to console
+    console.error(`[${context}] Error:`, message);
+
+    // Requirements: ui.7.1 - Notify renderer
+    const windows = BrowserWindow.getAllWindows();
+    windows.forEach((window) => {
+      window.webContents.send('error:notify', message, context);
+    });
+  }
 }

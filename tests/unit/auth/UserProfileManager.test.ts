@@ -8,6 +8,13 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 
+// Mock electron BrowserWindow for error notifications
+jest.mock('electron', () => ({
+  BrowserWindow: {
+    getAllWindows: jest.fn(() => []),
+  },
+}));
+
 // Mock fetch
 global.fetch = jest.fn();
 

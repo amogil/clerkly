@@ -21,10 +21,14 @@ interface API {
     logout: () => Promise<{ success: boolean; error?: string }>;
     getProfile: () => Promise<{ success: boolean; profile?: any; error?: string }>;
     refreshProfile: () => Promise<{ success: boolean; profile?: any; error?: string }>;
-    onAuthSuccess: (callback: () => void) => void;
-    onAuthError: (callback: (error: string, errorCode?: string) => void) => void;
-    onLogout: (callback: () => void) => void;
-    onProfileUpdated: (callback: (profile: any) => void) => void;
+    onAuthSuccess: (callback: () => void) => () => void;
+    onAuthError: (callback: (error: string, errorCode?: string) => void) => () => void;
+    onLogout: (callback: () => void) => () => void;
+    onProfileUpdated: (callback: (profile: any) => void) => () => void;
+  };
+  // Requirements: ui.7.1
+  error: {
+    onNotify: (callback: (message: string, context: string) => void) => () => void;
   };
   // Requirements: testing.3.8 - Test IPC methods (only available in test environment)
   ipcRenderer?: {
@@ -124,44 +128,87 @@ const api: API = {
      * Listen for authentication success events
      * Requirements: google-oauth-auth.8.4
      * @param {Function} callback - Callback function to execute on success
+     * @returns {Function} Unsubscribe function to remove the listener
      */
-    onAuthSuccess(callback: () => void): void {
-      ipcRenderer.on('auth:success', () => {
+    onAuthSuccess(callback: () => void): () => void {
+      const listener = () => {
         callback();
-      });
+      };
+      ipcRenderer.on('auth:success', listener);
+      return () => {
+        ipcRenderer.removeListener('auth:success', listener);
+      };
     },
 
     /**
      * Listen for authentication error events
      * Requirements: google-oauth-auth.8.4
      * @param {Function} callback - Callback function to execute on error
+     * @returns {Function} Unsubscribe function to remove the listener
      */
-    onAuthError(callback: (error: string, errorCode?: string) => void): void {
-      ipcRenderer.on('auth:error', (_event, data: { error: string; errorCode?: string }) => {
+    onAuthError(callback: (error: string, errorCode?: string) => void): () => void {
+      const listener = (_event: any, data: { error: string; errorCode?: string }) => {
         callback(data.error, data.errorCode);
-      });
+      };
+      ipcRenderer.on('auth:error', listener);
+      return () => {
+        ipcRenderer.removeListener('auth:error', listener);
+      };
     },
 
     /**
      * Listen for logout events
      * Requirements: ui.6.8
      * @param {Function} callback - Callback function to execute on logout
+     * @returns {Function} Unsubscribe function to remove the listener
      */
-    onLogout(callback: () => void): void {
-      ipcRenderer.on('auth:logout-complete', () => {
+    onLogout(callback: () => void): () => void {
+      const listener = () => {
         callback();
-      });
+      };
+      ipcRenderer.on('auth:logout-complete', listener);
+      return () => {
+        ipcRenderer.removeListener('auth:logout-complete', listener);
+      };
     },
 
     /**
      * Listen for profile update events
      * Requirements: ui.6.5
      * @param {Function} callback - Callback function to execute when profile is updated
+     * @returns {Function} Unsubscribe function to remove the listener
      */
-    onProfileUpdated(callback: (profile: any) => void): void {
-      ipcRenderer.on('auth:profile-updated', (_event, profile: any) => {
+    onProfileUpdated(callback: (profile: any) => void): () => void {
+      const listener = (_event: any, profile: any) => {
         callback(profile);
-      });
+      };
+      ipcRenderer.on('auth:profile-updated', listener);
+      return () => {
+        ipcRenderer.removeListener('auth:profile-updated', listener);
+      };
+    },
+  },
+
+  // Requirements: ui.7.1
+  /**
+   * Error notification API
+   * Provides methods for receiving error notifications from main process
+   */
+  error: {
+    /**
+     * Listen for error notification events
+     * Requirements: ui.7.1, ui.7.2
+     * @param {Function} callback - Callback function to execute when error notification is received
+     * @returns {Function} Unsubscribe function to remove the listener
+     */
+    onNotify(callback: (message: string, context: string) => void): () => void {
+      const listener = (_event: any, message: string, context: string) => {
+        callback(message, context);
+      };
+      ipcRenderer.on('error:notify', listener);
+      return () => {
+        ipcRenderer.removeListener('error:notify', listener);
+      };
     },
   },
 };

@@ -24,7 +24,9 @@ jest.mock('electron', () => ({
     handle: jest.fn(),
     removeHandler: jest.fn(),
   },
-  BrowserWindow: jest.fn(),
+  BrowserWindow: {
+    getAllWindows: jest.fn(() => []),
+  },
   shell: {
     openExternal: jest.fn(),
   },

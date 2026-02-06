@@ -1,8 +1,10 @@
-// Requirements: ui.6.2, ui.6.5, ui.6.6, ui.6.7, ui.6.8
+// Requirements: ui.6.2, ui.6.5, ui.6.6, ui.6.7, ui.6.8, ui.7.1, ui.9.3, ui.9.4
 
 import { DataManager } from '../DataManager';
 import { OAuthClientManager } from './OAuthClientManager';
 import { TokenStorageManager } from './TokenStorageManager';
+import { handleBackgroundError } from '../ErrorHandler';
+import { handleAPIRequest } from './APIRequestHandler';
 
 /**
  * User profile data from Google OAuth
@@ -86,11 +88,12 @@ export class UserProfileManager {
 
   /**
    * Fetch user profile from Google UserInfo API
-   * Requirements: ui.6.2, ui.6.6
+   * Requirements: ui.6.2, ui.6.6, ui.7.1, ui.9.3, ui.9.4
    *
    * Fetches fresh profile data from Google's UserInfo API endpoint.
    * On success, saves the profile to local storage.
    * On error, returns cached profile data (graceful error handling).
+   * Uses centralized API request handler for automatic HTTP 401 detection.
    *
    * @returns User profile data or null if not authenticated
    */
@@ -118,11 +121,18 @@ export class UserProfileManager {
         : `${googleApiBaseUrl}/oauth2/v1/userinfo`; // Google uses /oauth2/v1/userinfo
 
       console.log('[UserProfileManager] Fetching profile from Google UserInfo API');
-      const response = await fetch(userInfoUrl, {
-        headers: {
-          Authorization: `Bearer ${tokens.accessToken}`,
+
+      // Requirements: ui.9.3, ui.9.4 - Use centralized handler for automatic 401 detection
+      const response = await handleAPIRequest(
+        userInfoUrl,
+        {
+          headers: {
+            Authorization: `Bearer ${tokens.accessToken}`,
+          },
         },
-      });
+        this.tokenStorage,
+        'UserInfo API'
+      );
 
       if (!response.ok) {
         throw new Error(`UserInfo API error: ${response.status} ${response.statusText}`);
@@ -140,10 +150,30 @@ export class UserProfileManager {
       console.log('[UserProfileManager] Profile fetched and saved successfully');
       return profile;
     } catch (error) {
+      // Requirements: ui.9.3 - If it's a 401 error, tokens are already cleared by handleAPIRequest
+      // Just return null to indicate no profile available
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      if (errorMessage.includes('Authorization failed') || errorMessage.includes('401')) {
+        console.log('[UserProfileManager] Session expired (401), returning null');
+        return null;
+      }
+
       console.error('[UserProfileManager] Failed to fetch profile:', error);
-      // Requirements: ui.6.7 - Return cached profile on error
+
+      // Requirements: ui.6.7 - Return cached profile on other errors (network, timeout, etc.)
       console.log('[UserProfileManager] Returning cached profile due to API error');
-      return await this.loadProfile();
+      const cachedProfile = await this.loadProfile();
+
+      // Requirements: ui.7.1 - Notify user about the error
+      if (cachedProfile) {
+        // Graceful degradation: show warning that using cached data
+        handleBackgroundError(error, 'Profile Fetch (using cached data)');
+      } else {
+        // Critical error: no cached data available
+        handleBackgroundError(error, 'Profile Fetch (no cached data available)');
+      }
+
+      return cachedProfile;
     }
   }
 

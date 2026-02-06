@@ -153,7 +153,7 @@ export interface AppConfig {
 
 /**
  * API exposed to renderer process via contextBridge
- * Requirements: clerkly.1, google-oauth-auth.8, ui.6.2, ui.6.5
+ * Requirements: clerkly.1, google-oauth-auth.8, ui.6.2, ui.6.5, ui.7.1
  */
 export interface API {
   saveData: (key: string, value: any) => Promise<{ success: boolean; error?: string }>;
@@ -170,10 +170,14 @@ export interface API {
       profile?: UserProfile | null;
       error?: string;
     }>;
-    onAuthSuccess: (callback: () => void) => void;
-    onAuthError: (callback: (error: string, errorCode?: string) => void) => void;
-    onLogout: (callback: () => void) => void;
-    onProfileUpdated: (callback: (profile: UserProfile | null) => void) => void;
+    onAuthSuccess: (callback: () => void) => () => void;
+    onAuthError: (callback: (error: string, errorCode?: string) => void) => () => void;
+    onLogout: (callback: () => void) => () => void;
+    onProfileUpdated: (callback: (profile: UserProfile | null) => void) => () => void;
+  };
+  // Requirements: ui.7.1
+  error: {
+    onNotify: (callback: (message: string, context: string) => void) => () => void;
   };
 }
 

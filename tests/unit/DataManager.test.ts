@@ -6,6 +6,13 @@ import * as path from 'path';
 import * as os from 'os';
 import { DataManager } from '../../src/main/DataManager';
 
+// Mock electron BrowserWindow for error notifications
+jest.mock('electron', () => ({
+  BrowserWindow: {
+    getAllWindows: jest.fn(() => []),
+  },
+}));
+
 describe('DataManager', () => {
   let dataManager: DataManager;
   let testStoragePath: string;

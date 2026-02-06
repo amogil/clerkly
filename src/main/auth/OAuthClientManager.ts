@@ -1,9 +1,10 @@
-// Requirements: google-oauth-auth.1.1, google-oauth-auth.1.2, google-oauth-auth.1.3, google-oauth-auth.1.4, google-oauth-auth.1.5, google-oauth-auth.2.2, google-oauth-auth.2.3, google-oauth-auth.2.4, google-oauth-auth.3.1, google-oauth-auth.3.2, google-oauth-auth.3.3, google-oauth-auth.3.4, google-oauth-auth.3.5, google-oauth-auth.5.1, google-oauth-auth.5.2, google-oauth-auth.5.3, google-oauth-auth.5.4, google-oauth-auth.5.5, google-oauth-auth.5.6, google-oauth-auth.6.1, google-oauth-auth.6.2, google-oauth-auth.6.3, google-oauth-auth.6.4, google-oauth-auth.6.5, google-oauth-auth.7.1, google-oauth-auth.7.2, google-oauth-auth.7.3, google-oauth-auth.7.4
+// Requirements: google-oauth-auth.1.1, google-oauth-auth.1.2, google-oauth-auth.1.3, google-oauth-auth.1.4, google-oauth-auth.1.5, google-oauth-auth.2.2, google-oauth-auth.2.3, google-oauth-auth.2.4, google-oauth-auth.3.1, google-oauth-auth.3.2, google-oauth-auth.3.3, google-oauth-auth.3.4, google-oauth-auth.3.5, google-oauth-auth.5.1, google-oauth-auth.5.2, google-oauth-auth.5.3, google-oauth-auth.5.4, google-oauth-auth.5.5, google-oauth-auth.5.6, google-oauth-auth.6.1, google-oauth-auth.6.2, google-oauth-auth.6.3, google-oauth-auth.6.4, google-oauth-auth.6.5, google-oauth-auth.7.1, google-oauth-auth.7.2, google-oauth-auth.7.3, google-oauth-auth.7.4, ui.7.1
 
 import * as crypto from 'crypto';
 import { shell } from 'electron';
 import { OAuthConfig, PKCEParams, TokenResponse, TokenData, AuthStatus } from './OAuthConfig';
 import { TokenStorageManager } from './TokenStorageManager';
+import { handleBackgroundError } from '../ErrorHandler';
 
 /**
  * PKCE storage for temporary state during OAuth flow
@@ -17,7 +18,22 @@ interface PKCEStorage {
 /**
  * OAuth Client Manager
  * Manages the complete OAuth PKCE flow for Google authentication
- * Requirements: google-oauth-auth.1, google-oauth-auth.2, google-oauth-auth.3, google-oauth-auth.5, google-oauth-auth.6, google-oauth-auth.7, ui.6.5
+ *
+ * Token Management Strategy:
+ * - Automatic token refresh: When access token expires, automatically refreshes using refresh token (ui.9.1, ui.9.2)
+ * - Transparent to user: Token refresh happens in background without user interaction
+ * - Profile updates: Automatically updates user profile after successful token refresh (ui.6.5)
+ * - Error handling: On refresh failure (invalid_grant), clears tokens and notifies user (ui.9.3)
+ * - Session preservation: Profile data persists in database even after logout/401 errors (ui.8.4)
+ *
+ * Authorization Error Handling:
+ * - HTTP 401 errors are handled by centralized handleAPIRequest() function (ui.9.4)
+ * - On 401: All tokens cleared, LoginError shown, profile data preserved (ui.9.3)
+ * - Consistent handling across all API endpoints (ui.9.4)
+ * - Errors logged with context for debugging (ui.9.5)
+ * - User sees friendly messages without technical details (ui.9.6)
+ *
+ * Requirements: google-oauth-auth.1, google-oauth-auth.2, google-oauth-auth.3, google-oauth-auth.5, google-oauth-auth.6, google-oauth-auth.7, ui.6.5, ui.9.1, ui.9.2, ui.9.3, ui.9.4
  */
 export class OAuthClientManager {
   private config: OAuthConfig;
@@ -280,7 +296,7 @@ export class OAuthClientManager {
 
   /**
    * Refresh access token using refresh token
-   * Requirements: google-oauth-auth.6.1, google-oauth-auth.6.2, google-oauth-auth.6.3, google-oauth-auth.6.4, google-oauth-auth.6.5, ui.6.5
+   * Requirements: google-oauth-auth.6.1, google-oauth-auth.6.2, google-oauth-auth.6.3, google-oauth-auth.6.4, google-oauth-auth.6.5, ui.6.5, ui.7.1
    * @returns True if refresh successful, false otherwise
    */
   async refreshAccessToken(): Promise<boolean> {
@@ -308,6 +324,13 @@ export class OAuthClientManager {
         if (errorData.error === 'invalid_grant') {
           // Refresh token is invalid, clear all tokens
           await this.tokenStorage.deleteTokens();
+
+          // Requirements: ui.7.1 - Notify user about critical error
+          handleBackgroundError(
+            new Error('Refresh token invalid or expired'),
+            'Token Refresh (session expired)'
+          );
+
           return false;
         }
         throw new Error(errorData.error || 'token_refresh_failed');
@@ -336,6 +359,13 @@ export class OAuthClientManager {
 
       return true;
     } catch (error: unknown) {
+      // Requirements: ui.7.1 - Notify user about token refresh errors
+      // Only notify for unexpected errors, not for invalid_grant (already handled above)
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      if (!errorMessage.includes('invalid_grant') && !errorMessage.includes('session expired')) {
+        handleBackgroundError(error, 'Token Refresh');
+      }
+
       return false;
     }
   }

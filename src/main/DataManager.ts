@@ -1,10 +1,11 @@
-// Requirements: clerkly.1, clerkly.2
+// Requirements: clerkly.1, clerkly.2, ui.7.1
 
 import Database from 'better-sqlite3';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { MigrationRunner } from './MigrationRunner';
+import { handleBackgroundError } from './ErrorHandler';
 
 /**
  * Initialize result
@@ -145,7 +146,7 @@ export class DataManager {
    * Сериализует value в JSON
    * Проверяет размер (max 10MB)
    * Обрабатывает ошибки (SQLITE_FULL, SQLITE_BUSY, SQLITE_LOCKED, SQLITE_READONLY)
-   * Requirements: clerkly.1   * @param {string} key
+   * Requirements: clerkly.1, ui.7.1   * @param {string} key
    * @param {unknown} value
    * @returns {SaveDataResult}
    */
@@ -204,10 +205,20 @@ export class DataManager {
       const errorObj = writeError as { code?: string; message?: string };
       // Обработка специфичных ошибок SQLite
       if (errorObj.code === 'SQLITE_FULL') {
+        // Requirements: ui.7.1 - Notify user about critical database error
+        handleBackgroundError(
+          new Error('Database is full: no space left on device'),
+          'Database Storage (disk full)'
+        );
         return { success: false, error: 'Database is full: no space left on device' };
       } else if (errorObj.code === 'SQLITE_BUSY' || errorObj.code === 'SQLITE_LOCKED') {
         return { success: false, error: 'Database is locked: try again later' };
       } else if (errorObj.code === 'SQLITE_READONLY') {
+        // Requirements: ui.7.1 - Notify user about critical database error
+        handleBackgroundError(
+          new Error('Database is read-only: check permissions'),
+          'Database Storage (read-only)'
+        );
         return { success: false, error: 'Database is read-only: check permissions' };
       }
       const errorMessage = errorObj.message || 'Unknown error';

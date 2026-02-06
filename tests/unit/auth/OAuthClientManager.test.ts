@@ -15,6 +15,9 @@ jest.mock('electron', () => ({
   shell: {
     openExternal: jest.fn(),
   },
+  BrowserWindow: {
+    getAllWindows: jest.fn(() => []),
+  },
 }));
 
 // Mock fetch
