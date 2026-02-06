@@ -1,8 +1,9 @@
-// Requirements: google-oauth-auth.8.1, google-oauth-auth.8.2, google-oauth-auth.8.3, google-oauth-auth.8.4, google-oauth-auth.8.5
+// Requirements: google-oauth-auth.8.1, google-oauth-auth.8.2, google-oauth-auth.8.3, google-oauth-auth.8.4, google-oauth-auth.8.5, ui.6.2, ui.6.7
 
 import { ipcMain, BrowserWindow } from 'electron';
 import { AuthIPCHandlers } from '../../../src/main/auth/AuthIPCHandlers';
 import { OAuthClientManager } from '../../../src/main/auth/OAuthClientManager';
+import { UserProfileManager, UserProfile } from '../../../src/main/auth/UserProfileManager';
 
 // Mock Electron modules
 jest.mock('electron', () => ({
@@ -18,9 +19,13 @@ jest.mock('electron', () => ({
 // Mock OAuthClientManager
 jest.mock('../../../src/main/auth/OAuthClientManager');
 
+// Mock UserProfileManager
+jest.mock('../../../src/main/auth/UserProfileManager');
+
 describe('AuthIPCHandlers', () => {
   let authIPCHandlers: AuthIPCHandlers;
   let mockOAuthClient: jest.Mocked<OAuthClientManager>;
+  let mockProfileManager: jest.Mocked<UserProfileManager>;
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -31,20 +36,30 @@ describe('AuthIPCHandlers', () => {
       logout: jest.fn(),
     } as any;
 
+    mockProfileManager = {
+      loadProfile: jest.fn(),
+      fetchProfile: jest.fn(),
+      saveProfile: jest.fn(),
+      clearProfile: jest.fn(),
+      updateProfileAfterTokenRefresh: jest.fn(),
+    } as any;
+
     authIPCHandlers = new AuthIPCHandlers(mockOAuthClient);
   });
 
   describe('Handler Registration', () => {
     /* Preconditions: AuthIPCHandlers instance created, handlers not yet registered
        Action: Call registerHandlers()
-       Assertions: All three IPC handlers are registered (auth:start-login, auth:get-status, auth:logout)
-       Requirements: google-oauth-auth.8.1 */
+       Assertions: All five IPC handlers are registered (auth:start-login, auth:get-status, auth:logout, auth:get-profile, auth:refresh-profile)
+       Requirements: google-oauth-auth.8.1, ui.6.2, ui.6.5 */
     it('should register all IPC handlers', () => {
       authIPCHandlers.registerHandlers();
 
       expect(ipcMain.handle).toHaveBeenCalledWith('auth:start-login', expect.any(Function));
       expect(ipcMain.handle).toHaveBeenCalledWith('auth:get-status', expect.any(Function));
       expect(ipcMain.handle).toHaveBeenCalledWith('auth:logout', expect.any(Function));
+      expect(ipcMain.handle).toHaveBeenCalledWith('auth:get-profile', expect.any(Function));
+      expect(ipcMain.handle).toHaveBeenCalledWith('auth:refresh-profile', expect.any(Function));
     });
 
     /* Preconditions: Handlers already registered
@@ -68,8 +83,8 @@ describe('AuthIPCHandlers', () => {
 
     /* Preconditions: Handlers registered
        Action: Call unregisterHandlers()
-       Assertions: All three IPC handlers are removed
-       Requirements: google-oauth-auth.8.1 */
+       Assertions: All five IPC handlers are removed
+       Requirements: google-oauth-auth.8.1, ui.6.2, ui.6.5 */
     it('should unregister all IPC handlers', () => {
       authIPCHandlers.registerHandlers();
       authIPCHandlers.unregisterHandlers();
@@ -77,6 +92,8 @@ describe('AuthIPCHandlers', () => {
       expect(ipcMain.removeHandler).toHaveBeenCalledWith('auth:start-login');
       expect(ipcMain.removeHandler).toHaveBeenCalledWith('auth:get-status');
       expect(ipcMain.removeHandler).toHaveBeenCalledWith('auth:logout');
+      expect(ipcMain.removeHandler).toHaveBeenCalledWith('auth:get-profile');
+      expect(ipcMain.removeHandler).toHaveBeenCalledWith('auth:refresh-profile');
     });
   });
 
@@ -235,6 +252,213 @@ describe('AuthIPCHandlers', () => {
       expect(result).toEqual({
         success: false,
         error: errorMessage,
+      });
+    });
+  });
+
+  describe('auth:get-profile Handler', () => {
+    /* Preconditions: UserProfileManager set, profile exists in cache
+       Action: Call auth:get-profile handler
+       Assertions: Returns success: true with profile data
+       Requirements: ui.6.2, ui.6.7 */
+    it('should return profile when profile manager is set and profile exists', async () => {
+      const mockProfile: UserProfile = {
+        id: '123',
+        email: 'test@example.com',
+        verified_email: true,
+        name: 'Test User',
+        given_name: 'Test',
+        family_name: 'User',
+        locale: 'en',
+        lastUpdated: Date.now(),
+      };
+
+      authIPCHandlers.setProfileManager(mockProfileManager);
+      mockProfileManager.loadProfile.mockResolvedValue(mockProfile);
+
+      authIPCHandlers.registerHandlers();
+      const handler = (ipcMain.handle as jest.Mock).mock.calls.find(
+        (call) => call[0] === 'auth:get-profile'
+      )?.[1];
+
+      const result = await handler({});
+
+      expect(mockProfileManager.loadProfile).toHaveBeenCalled();
+      expect(result).toEqual({
+        success: true,
+        profile: mockProfile,
+      });
+    });
+
+    /* Preconditions: UserProfileManager set, no profile in cache
+       Action: Call auth:get-profile handler
+       Assertions: Returns success: true with profile: null
+       Requirements: ui.6.2, ui.6.7 */
+    it('should return null profile when no profile exists in cache', async () => {
+      authIPCHandlers.setProfileManager(mockProfileManager);
+      mockProfileManager.loadProfile.mockResolvedValue(null);
+
+      authIPCHandlers.registerHandlers();
+      const handler = (ipcMain.handle as jest.Mock).mock.calls.find(
+        (call) => call[0] === 'auth:get-profile'
+      )?.[1];
+
+      const result = await handler({});
+
+      expect(mockProfileManager.loadProfile).toHaveBeenCalled();
+      expect(result).toEqual({
+        success: true,
+        profile: null,
+      });
+    });
+
+    /* Preconditions: UserProfileManager not set
+       Action: Call auth:get-profile handler
+       Assertions: Returns success: true with profile: null, warning logged
+       Requirements: ui.6.2 */
+    it('should return null when profile manager is not set', async () => {
+      const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation();
+
+      authIPCHandlers.registerHandlers();
+      const handler = (ipcMain.handle as jest.Mock).mock.calls.find(
+        (call) => call[0] === 'auth:get-profile'
+      )?.[1];
+
+      const result = await handler({});
+
+      expect(consoleWarnSpy).toHaveBeenCalledWith('[AuthIPCHandlers] Profile manager not set');
+      expect(result).toEqual({
+        success: true,
+        profile: null,
+      });
+
+      consoleWarnSpy.mockRestore();
+    });
+
+    /* Preconditions: UserProfileManager throws error during loadProfile
+       Action: Call auth:get-profile handler
+       Assertions: Returns success: false with error message
+       Requirements: ui.6.7 */
+    it('should handle profile loading error', async () => {
+      const errorMessage = 'Database error';
+      authIPCHandlers.setProfileManager(mockProfileManager);
+      mockProfileManager.loadProfile.mockRejectedValue(new Error(errorMessage));
+
+      authIPCHandlers.registerHandlers();
+      const handler = (ipcMain.handle as jest.Mock).mock.calls.find(
+        (call) => call[0] === 'auth:get-profile'
+      )?.[1];
+
+      const result = await handler({});
+
+      expect(result).toEqual({
+        success: false,
+        error: errorMessage,
+        profile: null,
+      });
+    });
+  });
+
+  describe('auth:refresh-profile Handler', () => {
+    /* Preconditions: UserProfileManager set, user authenticated, Google API available
+       Action: Call auth:refresh-profile handler
+       Assertions: fetchProfile() called, returns success: true with fresh profile data
+       Requirements: ui.6.5 */
+    it('should refresh profile successfully', async () => {
+      const mockProfile: UserProfile = {
+        id: '123',
+        email: 'test@example.com',
+        verified_email: true,
+        name: 'Test User Updated',
+        given_name: 'Test',
+        family_name: 'User',
+        locale: 'en',
+        lastUpdated: Date.now(),
+      };
+
+      authIPCHandlers.setProfileManager(mockProfileManager);
+      mockProfileManager.fetchProfile.mockResolvedValue(mockProfile);
+
+      authIPCHandlers.registerHandlers();
+      const handler = (ipcMain.handle as jest.Mock).mock.calls.find(
+        (call) => call[0] === 'auth:refresh-profile'
+      )?.[1];
+
+      const result = await handler({});
+
+      expect(mockProfileManager.fetchProfile).toHaveBeenCalled();
+      expect(result).toEqual({
+        success: true,
+        profile: mockProfile,
+      });
+    });
+
+    /* Preconditions: UserProfileManager set, user not authenticated
+       Action: Call auth:refresh-profile handler
+       Assertions: fetchProfile() called, returns success: true with profile: null
+       Requirements: ui.6.5 */
+    it('should return null when user is not authenticated', async () => {
+      authIPCHandlers.setProfileManager(mockProfileManager);
+      mockProfileManager.fetchProfile.mockResolvedValue(null);
+
+      authIPCHandlers.registerHandlers();
+      const handler = (ipcMain.handle as jest.Mock).mock.calls.find(
+        (call) => call[0] === 'auth:refresh-profile'
+      )?.[1];
+
+      const result = await handler({});
+
+      expect(mockProfileManager.fetchProfile).toHaveBeenCalled();
+      expect(result).toEqual({
+        success: true,
+        profile: null,
+      });
+    });
+
+    /* Preconditions: UserProfileManager not set
+       Action: Call auth:refresh-profile handler
+       Assertions: Returns success: false with error message, warning logged
+       Requirements: ui.6.5 */
+    it('should return error when profile manager is not set', async () => {
+      const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation();
+
+      authIPCHandlers.registerHandlers();
+      const handler = (ipcMain.handle as jest.Mock).mock.calls.find(
+        (call) => call[0] === 'auth:refresh-profile'
+      )?.[1];
+
+      const result = await handler({});
+
+      expect(consoleWarnSpy).toHaveBeenCalledWith('[AuthIPCHandlers] Profile manager not set');
+      expect(result).toEqual({
+        success: false,
+        error: 'Profile manager not initialized',
+        profile: null,
+      });
+
+      consoleWarnSpy.mockRestore();
+    });
+
+    /* Preconditions: UserProfileManager throws error during fetchProfile
+       Action: Call auth:refresh-profile handler
+       Assertions: Returns success: false with error message
+       Requirements: ui.6.5 */
+    it('should handle profile refresh error', async () => {
+      const errorMessage = 'Network error';
+      authIPCHandlers.setProfileManager(mockProfileManager);
+      mockProfileManager.fetchProfile.mockRejectedValue(new Error(errorMessage));
+
+      authIPCHandlers.registerHandlers();
+      const handler = (ipcMain.handle as jest.Mock).mock.calls.find(
+        (call) => call[0] === 'auth:refresh-profile'
+      )?.[1];
+
+      const result = await handler({});
+
+      expect(result).toEqual({
+        success: false,
+        error: errorMessage,
+        profile: null,
       });
     });
   });

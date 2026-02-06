@@ -12,6 +12,9 @@ import * as os from 'os';
 import WindowManager from '../../src/main/WindowManager';
 import { LifecycleManager } from '../../src/main/LifecycleManager';
 import { DataManager } from '../../src/main/DataManager';
+import { OAuthClientManager } from '../../src/main/auth/OAuthClientManager';
+import { TokenStorageManager } from '../../src/main/auth/TokenStorageManager';
+import { getOAuthConfig } from '../../src/main/auth/OAuthConfig';
 
 // Mock Electron app and BrowserWindow
 jest.mock('electron', () => ({
@@ -60,6 +63,15 @@ jest.mock('electron', () => ({
 describe('Property Tests - Application Startup Performance', () => {
   let testStoragePath: string;
 
+  // Helper function to create mock OAuth components
+  const createMockOAuthComponents = (dataManager: DataManager) => {
+    const tokenStorage = new TokenStorageManager(dataManager);
+    const oauthClient = new OAuthClientManager(getOAuthConfig(), tokenStorage);
+    // Mock getAuthStatus to return not authorized (skip profile fetch in tests)
+    jest.spyOn(oauthClient, 'getAuthStatus').mockResolvedValue({ authorized: false });
+    return { tokenStorage, oauthClient };
+  };
+
   beforeEach(() => {
     // Create unique test storage path for each test
     testStoragePath = path.join(os.tmpdir(), `clerkly-test-startup-${Date.now()}-${Math.random()}`);
@@ -96,7 +108,13 @@ describe('Property Tests - Application Startup Performance', () => {
           // Requirements: ui.5
           const dataManager = new DataManager(testStoragePath);
           const windowManager = new WindowManager(dataManager);
-          const lifecycleManager = new LifecycleManager(windowManager, dataManager);
+          const { tokenStorage, oauthClient } = createMockOAuthComponents(dataManager);
+          const lifecycleManager = new LifecycleManager(
+            windowManager,
+            dataManager,
+            oauthClient,
+            tokenStorage
+          );
 
           // Measure startup time
           const startTime = Date.now();
@@ -145,7 +163,13 @@ describe('Property Tests - Application Startup Performance', () => {
     // Requirements: ui.5
     const dataManager = new DataManager(testStoragePath);
     const windowManager = new WindowManager(dataManager);
-    const lifecycleManager = new LifecycleManager(windowManager, dataManager);
+    const { tokenStorage, oauthClient } = createMockOAuthComponents(dataManager);
+    const lifecycleManager = new LifecycleManager(
+      windowManager,
+      dataManager,
+      oauthClient,
+      tokenStorage
+    );
 
     // Measure first startup time
     const startTime = Date.now();
@@ -181,7 +205,14 @@ describe('Property Tests - Application Startup Performance', () => {
     // Requirements: ui.5
     const dataManager1 = new DataManager(testStoragePath);
     const windowManager1 = new WindowManager(dataManager1);
-    const lifecycleManager1 = new LifecycleManager(windowManager1, dataManager1);
+    const { tokenStorage: tokenStorage1, oauthClient: oauthClient1 } =
+      createMockOAuthComponents(dataManager1);
+    const lifecycleManager1 = new LifecycleManager(
+      windowManager1,
+      dataManager1,
+      oauthClient1,
+      tokenStorage1
+    );
 
     await lifecycleManager1.initialize();
     await lifecycleManager1.handleQuit();
@@ -194,7 +225,14 @@ describe('Property Tests - Application Startup Performance', () => {
     // Requirements: ui.5
     const dataManager2 = new DataManager(testStoragePath);
     const windowManager2 = new WindowManager(dataManager2);
-    const lifecycleManager2 = new LifecycleManager(windowManager2, dataManager2);
+    const { tokenStorage: tokenStorage2, oauthClient: oauthClient2 } =
+      createMockOAuthComponents(dataManager2);
+    const lifecycleManager2 = new LifecycleManager(
+      windowManager2,
+      dataManager2,
+      oauthClient2,
+      tokenStorage2
+    );
 
     const startTime = Date.now();
     const result = await lifecycleManager2.initialize();
@@ -220,7 +258,14 @@ describe('Property Tests - Application Startup Performance', () => {
     // Requirements: ui.5
     const dataManager1 = new DataManager(testStoragePath);
     const windowManager1 = new WindowManager(dataManager1);
-    const lifecycleManager1 = new LifecycleManager(windowManager1, dataManager1);
+    const { tokenStorage: tokenStorage1, oauthClient: oauthClient1 } =
+      createMockOAuthComponents(dataManager1);
+    const lifecycleManager1 = new LifecycleManager(
+      windowManager1,
+      dataManager1,
+      oauthClient1,
+      tokenStorage1
+    );
 
     await lifecycleManager1.initialize();
 
@@ -249,7 +294,14 @@ describe('Property Tests - Application Startup Performance', () => {
     // Requirements: ui.5
     const dataManager2 = new DataManager(testStoragePath);
     const windowManager2 = new WindowManager(dataManager2);
-    const lifecycleManager2 = new LifecycleManager(windowManager2, dataManager2);
+    const { tokenStorage: tokenStorage2, oauthClient: oauthClient2 } =
+      createMockOAuthComponents(dataManager2);
+    const lifecycleManager2 = new LifecycleManager(
+      windowManager2,
+      dataManager2,
+      oauthClient2,
+      tokenStorage2
+    );
 
     const startTime = Date.now();
     const result = await lifecycleManager2.initialize();
@@ -285,7 +337,13 @@ describe('Property Tests - Application Startup Performance', () => {
       // Requirements: ui.5
       const dataManager = new DataManager(testStoragePath);
       const windowManager = new WindowManager(dataManager);
-      const lifecycleManager = new LifecycleManager(windowManager, dataManager);
+      const { tokenStorage, oauthClient } = createMockOAuthComponents(dataManager);
+      const lifecycleManager = new LifecycleManager(
+        windowManager,
+        dataManager,
+        oauthClient,
+        tokenStorage
+      );
 
       const startTime = Date.now();
       const result = await lifecycleManager.initialize();
@@ -320,7 +378,13 @@ describe('Property Tests - Application Startup Performance', () => {
     // Requirements: ui.5
     const dataManager = new DataManager(testStoragePath);
     const windowManager = new WindowManager(dataManager);
-    const lifecycleManager = new LifecycleManager(windowManager, dataManager);
+    const { tokenStorage, oauthClient } = createMockOAuthComponents(dataManager);
+    const lifecycleManager = new LifecycleManager(
+      windowManager,
+      dataManager,
+      oauthClient,
+      tokenStorage
+    );
 
     const startTime = Date.now();
     const result = await lifecycleManager.initialize();
@@ -359,7 +423,13 @@ describe('Property Tests - Application Startup Performance', () => {
     // Requirements: ui.5
     const dataManager = new DataManager(testStoragePath);
     const windowManager = new WindowManager(dataManager);
-    const lifecycleManager = new LifecycleManager(windowManager, dataManager);
+    const { tokenStorage, oauthClient } = createMockOAuthComponents(dataManager);
+    const lifecycleManager = new LifecycleManager(
+      windowManager,
+      dataManager,
+      oauthClient,
+      tokenStorage
+    );
 
     const startTime = Date.now();
     const result = await lifecycleManager.initialize();
@@ -391,7 +461,13 @@ describe('Property Tests - Application Startup Performance', () => {
     // Requirements: ui.5
     const dataManager = new DataManager(testStoragePath);
     const windowManager = new WindowManager(dataManager);
-    const lifecycleManager = new LifecycleManager(windowManager, dataManager);
+    const { tokenStorage, oauthClient } = createMockOAuthComponents(dataManager);
+    const lifecycleManager = new LifecycleManager(
+      windowManager,
+      dataManager,
+      oauthClient,
+      tokenStorage
+    );
 
     const startTime = Date.now();
     const result = await lifecycleManager.initialize();

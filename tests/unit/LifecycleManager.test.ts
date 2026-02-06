@@ -1,8 +1,10 @@
-// Requirements: clerkly.2, ui.5
+// Requirements: clerkly.2, ui.5, ui.6.5
 
 import { LifecycleManager } from '../../src/main/LifecycleManager';
 import WindowManager from '../../src/main/WindowManager';
 import { DataManager } from '../../src/main/DataManager';
+import { OAuthClientManager } from '../../src/main/auth/OAuthClientManager';
+import { TokenStorageManager } from '../../src/main/auth/TokenStorageManager';
 
 // Mock WindowManager
 jest.mock('../../src/main/WindowManager');
@@ -10,10 +12,18 @@ jest.mock('../../src/main/WindowManager');
 // Mock DataManager
 jest.mock('../../src/main/DataManager');
 
+// Mock OAuthClientManager
+jest.mock('../../src/main/auth/OAuthClientManager');
+
+// Mock TokenStorageManager
+jest.mock('../../src/main/auth/TokenStorageManager');
+
 describe('LifecycleManager', () => {
   let lifecycleManager: LifecycleManager;
   let mockWindowManager: jest.Mocked<WindowManager>;
   let mockDataManager: jest.Mocked<DataManager>;
+  let mockOAuthClient: jest.Mocked<OAuthClientManager>;
+  let mockTokenStorage: jest.Mocked<TokenStorageManager>;
 
   beforeEach(() => {
     // Clear all mocks before each test
@@ -23,6 +33,10 @@ describe('LifecycleManager', () => {
     // Requirements: ui.5
     mockDataManager = new DataManager('/tmp/test') as jest.Mocked<DataManager>;
     mockWindowManager = new WindowManager(mockDataManager) as jest.Mocked<WindowManager>;
+    mockTokenStorage = new TokenStorageManager(mockDataManager) as jest.Mocked<TokenStorageManager>;
+    mockOAuthClient = {
+      getAuthStatus: jest.fn().mockResolvedValue({ authorized: false }),
+    } as any;
 
     // Setup default mock implementations
     mockWindowManager.createWindow = jest.fn().mockReturnValue({});
@@ -34,9 +48,17 @@ describe('LifecycleManager', () => {
       migrations: { success: true, appliedCount: 0, message: 'No migrations to apply' },
     });
     mockDataManager.close = jest.fn();
+    mockDataManager.saveData = jest.fn().mockReturnValue({ success: true });
+    mockDataManager.loadData = jest.fn().mockReturnValue({ success: false });
+    mockDataManager.deleteData = jest.fn().mockReturnValue({ success: true });
 
     // Create LifecycleManager instance
-    lifecycleManager = new LifecycleManager(mockWindowManager, mockDataManager);
+    lifecycleManager = new LifecycleManager(
+      mockWindowManager,
+      mockDataManager,
+      mockOAuthClient,
+      mockTokenStorage
+    );
   });
 
   describe('initialize', () => {
@@ -112,6 +134,40 @@ describe('LifecycleManager', () => {
       expect(result.success).toBe(true);
       expect(mockDataManager.initialize).toHaveBeenCalledTimes(2);
       expect(mockWindowManager.createWindow).toHaveBeenCalledTimes(2);
+    });
+
+    /* Preconditions: LifecycleManager created, user is authenticated
+       Action: call initialize()
+       Assertions: profile is fetched automatically
+       Requirements: ui.6.5*/
+    it('should fetch profile on startup when user is authenticated', async () => {
+      // Mock authenticated user
+      mockOAuthClient.getAuthStatus = jest.fn().mockResolvedValue({ authorized: true });
+
+      // Spy on UserProfileManager.fetchProfile
+      const fetchProfileSpy = jest.spyOn((lifecycleManager as any).profileManager, 'fetchProfile');
+
+      await lifecycleManager.initialize();
+
+      expect(mockOAuthClient.getAuthStatus).toHaveBeenCalled();
+      expect(fetchProfileSpy).toHaveBeenCalled();
+    });
+
+    /* Preconditions: LifecycleManager created, user is not authenticated
+       Action: call initialize()
+       Assertions: profile is not fetched
+       Requirements: ui.6.5*/
+    it('should not fetch profile on startup when user is not authenticated', async () => {
+      // Mock unauthenticated user (default)
+      mockOAuthClient.getAuthStatus = jest.fn().mockResolvedValue({ authorized: false });
+
+      // Spy on UserProfileManager.fetchProfile
+      const fetchProfileSpy = jest.spyOn((lifecycleManager as any).profileManager, 'fetchProfile');
+
+      await lifecycleManager.initialize();
+
+      expect(mockOAuthClient.getAuthStatus).toHaveBeenCalled();
+      expect(fetchProfileSpy).not.toHaveBeenCalled();
     });
 
     /* Preconditions: LifecycleManager created, initialization takes longer than 3 seconds
@@ -360,7 +416,12 @@ describe('LifecycleManager', () => {
        Assertions: no error thrown (safe to call anytime)
        Requirements: clerkly.1, clerkly.2*/
     it('should handle window close before initialization', () => {
-      const newLifecycleManager = new LifecycleManager(mockWindowManager, mockDataManager);
+      const newLifecycleManager = new LifecycleManager(
+        mockWindowManager,
+        mockDataManager,
+        mockOAuthClient,
+        mockTokenStorage
+      );
 
       expect(() => {
         newLifecycleManager.handleWindowClose();

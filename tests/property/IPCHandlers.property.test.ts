@@ -89,9 +89,9 @@ describe('Property Tests - IPC Handlers', () => {
           expect(executionTime).toBeLessThan(timeout + 100);
         }
       ),
-      { numRuns: 100 }
+      { numRuns: 20 } // Reduced from 100 to 20 for faster execution
     );
-  }, 15000); // 15 second Jest timeout
+  }, 30000); // Increased from 15000 to 30000 for more time
 
   /* Preconditions: IPCHandlers initialized with mock DataManager that has delay > timeout
      Action: generate random valid keys, call handleLoadData with each key

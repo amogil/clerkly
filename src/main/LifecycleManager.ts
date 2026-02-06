@@ -1,7 +1,10 @@
-// Requirements: clerkly.1, clerkly.nfr.1, clerkly.nfr.2
+// Requirements: clerkly.1, clerkly.nfr.1, clerkly.nfr.2, ui.6.5
 
 import WindowManager from './WindowManager';
 import { DataManager } from './DataManager';
+import { OAuthClientManager } from './auth/OAuthClientManager';
+import { UserProfileManager } from './auth/UserProfileManager';
+import { TokenStorageManager } from './auth/TokenStorageManager';
 
 /**
  * Initialize result
@@ -13,22 +16,34 @@ export interface InitializeResult {
 
 /**
  * Manages application lifecycle including startup, activation, and shutdown
+ * Requirements: clerkly.1, clerkly.nfr.1, clerkly.nfr.2, ui.6.5
  */
 export class LifecycleManager {
   private windowManager: WindowManager;
   private dataManager: DataManager;
+  private oauthClient: OAuthClientManager;
+  private profileManager: UserProfileManager;
   private startTime: number | null = null;
   private initialized: boolean = false;
 
-  constructor(windowManager: WindowManager, dataManager: DataManager) {
+  constructor(
+    windowManager: WindowManager,
+    dataManager: DataManager,
+    oauthClient: OAuthClientManager,
+    tokenStorage: TokenStorageManager
+  ) {
     this.windowManager = windowManager;
     this.dataManager = dataManager;
+    this.oauthClient = oauthClient;
+    // Requirements: ui.6.5 - Initialize UserProfileManager
+    this.profileManager = new UserProfileManager(dataManager, oauthClient, tokenStorage);
   }
 
   /**
    * Инициализирует приложение
    * Обеспечивает запуск менее чем за 3 секунды
-   * Requirements: clerkly.1, clerkly.nfr.1   * @returns {Promise<InitializeResult>}
+   * Requirements: clerkly.1, clerkly.nfr.1, ui.6.5
+   * @returns {Promise<InitializeResult>}
    */
   async initialize(): Promise<InitializeResult> {
     const startTime = Date.now();
@@ -40,6 +55,15 @@ export class LifecycleManager {
 
       // Создание окна приложения
       this.windowManager.createWindow();
+
+      // Requirements: ui.6.5 - Fetch profile on startup if authenticated
+      const authStatus = await this.oauthClient.getAuthStatus();
+      if (authStatus.authorized) {
+        console.log('[LifecycleManager] User authenticated, fetching profile');
+        await this.profileManager.fetchProfile();
+      } else {
+        console.log('[LifecycleManager] User not authenticated, skipping profile fetch');
+      }
 
       this.initialized = true;
 

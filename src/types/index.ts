@@ -153,11 +153,79 @@ export interface AppConfig {
 
 /**
  * API exposed to renderer process via contextBridge
+ * Requirements: clerkly.1, google-oauth-auth.8, ui.6.2, ui.6.5
  */
 export interface API {
   saveData: (key: string, value: any) => Promise<{ success: boolean; error?: string }>;
   loadData: (key: string) => Promise<{ success: boolean; data?: any; error?: string }>;
   deleteData: (key: string) => Promise<{ success: boolean; error?: string }>;
+  // Requirements: google-oauth-auth.8.1, google-oauth-auth.8.2, google-oauth-auth.8.3, ui.6.2, ui.6.5
+  auth: {
+    startLogin: () => Promise<{ success: boolean; error?: string }>;
+    getStatus: () => Promise<{ authorized: boolean; error?: string }>;
+    logout: () => Promise<{ success: boolean; error?: string }>;
+    getProfile: () => Promise<{ success: boolean; profile?: UserProfile | null; error?: string }>;
+    refreshProfile: () => Promise<{
+      success: boolean;
+      profile?: UserProfile | null;
+      error?: string;
+    }>;
+    onAuthSuccess: (callback: () => void) => void;
+    onAuthError: (callback: (error: string, errorCode?: string) => void) => void;
+    onLogout: (callback: () => void) => void;
+  };
+}
+
+/**
+ * User profile data from Google UserInfo API
+ * Requirements: ui.6.2, ui.6.3
+ */
+export interface UserProfile {
+  /**
+   * Unique user identifier from Google
+   */
+  id: string;
+
+  /**
+   * User's email address
+   */
+  email: string;
+
+  /**
+   * Whether the email has been verified
+   */
+  verified_email: boolean;
+
+  /**
+   * User's full name
+   */
+  name: string;
+
+  /**
+   * User's given name (first name)
+   */
+  given_name: string;
+
+  /**
+   * User's family name (last name)
+   */
+  family_name: string;
+
+  /**
+   * User's locale/language preference
+   */
+  locale: string;
+
+  /**
+   * URL to user's profile picture (optional)
+   */
+  picture?: string;
+
+  /**
+   * Unix timestamp of when the profile was last updated
+   * Used for tracking profile freshness
+   */
+  lastUpdated: number;
 }
 
 /**

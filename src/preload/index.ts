@@ -14,13 +14,16 @@ interface API {
   saveData: (key: string, value: unknown) => Promise<{ success: boolean; error?: string }>;
   loadData: (key: string) => Promise<{ success: boolean; data?: unknown; error?: string }>;
   deleteData: (key: string) => Promise<{ success: boolean; error?: string }>;
-  // Requirements: google-oauth-auth.8.1, google-oauth-auth.8.2, google-oauth-auth.8.3
+  // Requirements: google-oauth-auth.8.1, google-oauth-auth.8.2, google-oauth-auth.8.3, ui.6.2, ui.6.5
   auth: {
     startLogin: () => Promise<{ success: boolean; error?: string }>;
     getStatus: () => Promise<{ authorized: boolean; error?: string }>;
     logout: () => Promise<{ success: boolean; error?: string }>;
+    getProfile: () => Promise<{ success: boolean; profile?: any; error?: string }>;
+    refreshProfile: () => Promise<{ success: boolean; profile?: any; error?: string }>;
     onAuthSuccess: (callback: () => void) => void;
     onAuthError: (callback: (error: string, errorCode?: string) => void) => void;
+    onLogout: (callback: () => void) => void;
   };
   // Requirements: testing.3.8 - Test IPC methods (only available in test environment)
   ipcRenderer?: {
@@ -63,7 +66,7 @@ const api: API = {
     return await ipcRenderer.invoke('delete-data', key);
   },
 
-  // Requirements: google-oauth-auth.8.1, google-oauth-auth.8.2, google-oauth-auth.8.3
+  // Requirements: google-oauth-auth.8.1, google-oauth-auth.8.2, google-oauth-auth.8.3, ui.6.2, ui.6.5
   /**
    * Authentication API
    * Provides methods for OAuth authentication flow
@@ -97,6 +100,26 @@ const api: API = {
     },
 
     /**
+     * Get user profile from local cache
+     * Returns cached profile data from DataManager
+     * Requirements: ui.6.2
+     * @returns {Promise<{success: boolean, profile?: any, error?: string}>}
+     */
+    async getProfile(): Promise<{ success: boolean; profile?: any; error?: string }> {
+      return await ipcRenderer.invoke('auth:get-profile');
+    },
+
+    /**
+     * Refresh user profile from Google API
+     * Fetches fresh profile data from Google UserInfo API
+     * Requirements: ui.6.5
+     * @returns {Promise<{success: boolean, profile?: any, error?: string}>}
+     */
+    async refreshProfile(): Promise<{ success: boolean; profile?: any; error?: string }> {
+      return await ipcRenderer.invoke('auth:refresh-profile');
+    },
+
+    /**
      * Listen for authentication success events
      * Requirements: google-oauth-auth.8.4
      * @param {Function} callback - Callback function to execute on success
@@ -117,6 +140,17 @@ const api: API = {
         callback(data.error, data.errorCode);
       });
     },
+
+    /**
+     * Listen for logout events
+     * Requirements: ui.6.8
+     * @param {Function} callback - Callback function to execute on logout
+     */
+    onLogout(callback: () => void): void {
+      ipcRenderer.on('auth:logout-complete', () => {
+        callback();
+      });
+    },
   },
 };
 
@@ -134,13 +168,3 @@ contextBridge.exposeInMainWorld('electron', {
     invoke: (channel: string, ...args: any[]) => ipcRenderer.invoke(channel, ...args),
   },
 });
-
-/**
- * Global window interface extension for renderer process
- * Allows TypeScript to recognize window.api
- */
-declare global {
-  interface Window {
-    api: API;
-  }
-}

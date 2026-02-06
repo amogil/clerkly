@@ -445,6 +445,69 @@ describe('OAuthClientManager', () => {
       expect(tokens?.refreshToken).toBe('new-refresh-token');
     });
 
+    /* Preconditions: Profile manager is set, refresh token succeeds
+       Action: Refresh access token
+       Assertions: Profile manager's updateProfileAfterTokenRefresh is called
+       Requirements: ui.6.5 */
+    it('should trigger profile update after successful token refresh', async () => {
+      await tokenStorage.saveTokens({
+        accessToken: 'old-access-token',
+        refreshToken: 'test-refresh-token',
+        expiresAt: Date.now() - 1000,
+        tokenType: 'Bearer',
+      });
+
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          access_token: 'new-access-token',
+          expires_in: 3600,
+          token_type: 'Bearer',
+        }),
+      });
+
+      // Create mock profile manager
+      const mockProfileManager = {
+        updateProfileAfterTokenRefresh: jest.fn().mockResolvedValue(undefined),
+      };
+
+      // Set profile manager
+      oauthClient.setProfileManager(mockProfileManager);
+
+      // Refresh token
+      const result = await oauthClient.refreshAccessToken();
+
+      expect(result).toBe(true);
+      expect(mockProfileManager.updateProfileAfterTokenRefresh).toHaveBeenCalledTimes(1);
+    });
+
+    /* Preconditions: Profile manager is not set, refresh token succeeds
+       Action: Refresh access token
+       Assertions: No error thrown, refresh succeeds
+       Requirements: ui.6.5 */
+    it('should not fail when profile manager is not set', async () => {
+      await tokenStorage.saveTokens({
+        accessToken: 'old-access-token',
+        refreshToken: 'test-refresh-token',
+        expiresAt: Date.now() - 1000,
+        tokenType: 'Bearer',
+      });
+
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          access_token: 'new-access-token',
+          expires_in: 3600,
+          token_type: 'Bearer',
+        }),
+      });
+
+      // Don't set profile manager
+      const result = await oauthClient.refreshAccessToken();
+
+      expect(result).toBe(true);
+    });
+
     /* Preconditions: Refresh returns invalid_grant error
        Action: Attempt to refresh token
        Assertions: Clears all tokens and returns false

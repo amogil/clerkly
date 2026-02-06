@@ -17,16 +17,28 @@ interface PKCEStorage {
 /**
  * OAuth Client Manager
  * Manages the complete OAuth PKCE flow for Google authentication
- * Requirements: google-oauth-auth.1, google-oauth-auth.2, google-oauth-auth.3, google-oauth-auth.5, google-oauth-auth.6, google-oauth-auth.7
+ * Requirements: google-oauth-auth.1, google-oauth-auth.2, google-oauth-auth.3, google-oauth-auth.5, google-oauth-auth.6, google-oauth-auth.7, ui.6.5
  */
 export class OAuthClientManager {
   private config: OAuthConfig;
   private tokenStorage: TokenStorageManager;
   private pkceStorage: PKCEStorage | null = null;
+  private profileManager: any | null = null; // Using any to avoid circular dependency
 
   constructor(config: OAuthConfig, tokenStorage: TokenStorageManager) {
     this.config = config;
     this.tokenStorage = tokenStorage;
+  }
+
+  /**
+   * Set profile manager for automatic profile updates
+   * Requirements: ui.6.5
+   * Should be called during initialization to enable automatic profile updates
+   * @param profileManager UserProfileManager instance
+   */
+  setProfileManager(profileManager: any): void {
+    this.profileManager = profileManager;
+    console.log('[OAuthClientManager] Profile manager set for automatic updates');
   }
 
   /**
@@ -268,7 +280,7 @@ export class OAuthClientManager {
 
   /**
    * Refresh access token using refresh token
-   * Requirements: google-oauth-auth.6.1, google-oauth-auth.6.2, google-oauth-auth.6.3, google-oauth-auth.6.4, google-oauth-auth.6.5
+   * Requirements: google-oauth-auth.6.1, google-oauth-auth.6.2, google-oauth-auth.6.3, google-oauth-auth.6.4, google-oauth-auth.6.5, ui.6.5
    * @returns True if refresh successful, false otherwise
    */
   async refreshAccessToken(): Promise<boolean> {
@@ -315,6 +327,13 @@ export class OAuthClientManager {
       };
 
       await this.tokenStorage.saveTokens(updatedTokens);
+
+      // Requirements: ui.6.5 - Automatically update profile after token refresh
+      if (this.profileManager) {
+        console.log('[OAuthClientManager] Triggering profile update after token refresh');
+        await this.profileManager.updateProfileAfterTokenRefresh();
+      }
+
       return true;
     } catch (error: unknown) {
       return false;

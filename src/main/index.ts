@@ -13,6 +13,7 @@ import { DataManager } from './DataManager';
 import { IPCHandlers } from './IPCHandlers';
 import { OAuthClientManager } from './auth/OAuthClientManager';
 import { TokenStorageManager } from './auth/TokenStorageManager';
+import { UserProfileManager } from './auth/UserProfileManager';
 import { getOAuthConfig, OAUTH_CONFIG } from './auth/OAuthConfig';
 import { AuthIPCHandlers } from './auth/AuthIPCHandlers';
 
@@ -101,6 +102,14 @@ const tokenStorage = new TokenStorageManager(dataManager);
 const oauthConfig = getOAuthConfig();
 const oauthClient = new OAuthClientManager(oauthConfig, tokenStorage);
 
+// Requirements: ui.6.5
+// Initialize User Profile Manager
+const profileManager = new UserProfileManager(dataManager, oauthClient, tokenStorage);
+
+// Requirements: ui.6.5
+// Connect profile manager to oauth client for automatic updates
+oauthClient.setProfileManager(profileManager);
+
 // Requirements: clerkly.1.2, clerkly.1.3, ui.5
 // Initialize Window Manager
 const windowManager = new WindowManager(dataManager);
@@ -110,9 +119,14 @@ const windowManager = new WindowManager(dataManager);
 import { AuthWindowManager } from './auth/AuthWindowManager';
 const authWindowManager = new AuthWindowManager(windowManager, oauthClient);
 
-// Requirements: clerkly.1.2, clerkly.1.3, clerkly.1.4
+// Requirements: clerkly.1.2, clerkly.1.3, clerkly.1.4, ui.6.5
 // Initialize Lifecycle Manager
-const lifecycleManager = new LifecycleManager(windowManager, dataManager);
+const lifecycleManager = new LifecycleManager(
+  windowManager,
+  dataManager,
+  oauthClient,
+  tokenStorage
+);
 
 // Requirements: clerkly.1.4, clerkly.2.5
 // Initialize IPC Handlers
