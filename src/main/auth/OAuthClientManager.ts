@@ -367,19 +367,13 @@ export class OAuthClientManager {
       }
 
       // Always delete local tokens regardless of revoke result
+      // Requirements: ui.8.4 - Only tokens are cleared, profile data is preserved
       await this.tokenStorage.deleteTokens();
 
-      // Delete user profile if profile manager is set
-      // Requirements: ui.6.8
-      if (this.profileManager) {
-        try {
-          await this.profileManager.deleteProfile();
-          console.log('[OAuthClientManager] User profile deleted');
-        } catch (profileError) {
-          console.warn('[OAuthClientManager] Failed to delete profile:', profileError);
-          // Continue even if profile deletion fails
-        }
-      }
+      // Note: Profile data is NOT deleted - it's preserved in database for next login
+      // This follows the architectural principle: database is single source of truth
+      // Requirements: ui.8.4, Architectural Principles
+      console.log('[OAuthClientManager] Tokens cleared, profile data preserved in database');
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       // Ensure tokens are deleted even if there's an error

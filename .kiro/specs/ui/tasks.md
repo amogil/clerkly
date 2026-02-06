@@ -534,7 +534,7 @@
   - Закрыть приложение
   - **Requirements:** ui.6.1
 
-- [ ] 18.2 Функциональный тест: should show dashboard after successful authentication
+- [x] 18.2 Функциональный тест: should show dashboard after successful authentication
   - Запустить приложение
   - Выполнить авторизацию через Google OAuth (с mock OAuth server)
   - Дождаться завершения авторизации
@@ -543,7 +543,7 @@
   - **Requirements:** ui.8.3
   - **Property:** 9, 26
 
-- [ ] 18.3 Функциональный тест: should load profile in background after authentication
+- [x] 18.3 Функциональный тест: should load profile in background after authentication
   - Запустить приложение
   - Выполнить авторизацию через Google OAuth
   - Проверить, что запрос к Google UserInfo API был выполнен в фоновом режиме
@@ -552,7 +552,7 @@
   - **Requirements:** ui.6.3
   - **Property:** 10
 
-- [ ] 18.4 Функциональный тест: should show cached data while loading profile
+- [x] 18.4 Функциональный тест: should show cached data while loading profile
   - Запустить приложение с предварительно сохраненными данными профиля в локальной базе данных
   - Выполнить авторизацию
   - Открыть Settings → Account Block
@@ -563,7 +563,7 @@
   - **Requirements:** ui.6.1
   - **Property:** 11
 
-- [ ] 18.5 Функциональный тест: should show empty fields on first authentication
+- [x] 18.5 Функциональный тест: should show empty fields on first authentication
   - Запустить приложение без сохраненных данных профиля в базе (первая авторизация)
   - Выполнить авторизацию
   - Открыть Settings → Account Block
@@ -574,7 +574,7 @@
   - **Requirements:** ui.6.1
   - **Property:** 11
 
-- [ ] 18.6 Функциональный тест: should populate profile data when fetch succeeds
+- [x] 18.6 Функциональный тест: should populate profile data when fetch succeeds
   - Запустить приложение с авторизацией
   - Mock Google UserInfo API для возврата тестовых данных профиля
   - Открыть Settings → Account Block
@@ -587,7 +587,7 @@
   - **Requirements:** ui.6.1, ui.6.2
   - **Property:** 12, 13, 15
 
-- [ ] 18.7 Функциональный тест: should show error and keep cached data when fetch fails
+- [x] 18.7 Функциональный тест: should show error and keep cached data when fetch fails
   - Запустить приложение с предварительно сохраненными данными профиля в локальной базе данных
   - Mock Google UserInfo API для возврата ошибки (network error или 500)
   - Выполнить авторизацию
@@ -617,7 +617,7 @@
   - Закрыть приложение
   - **Requirements:** ui.6.9
 
-- [ ] 18.10 Функциональный тест: should show login screen and clear UI on logout
+- [x] 18.10 Функциональный тест: should show login screen and clear UI on logout
   - Запустить приложение с авторизацией
   - Проверить, что Account блок заполнен данными профиля
   - Выполнить logout через UI или IPC
@@ -672,7 +672,7 @@
 
 ### 21. Создание NavigationManager
 
-- [ ] 21.1 Создать класс NavigationManager
+- [x] 21.1 Создать класс NavigationManager
   - Реализовать метод `checkAuthStatus()` для проверки статуса авторизации
   - Реализовать метод `redirectToLogin()` для перенаправления на экран логина
   - Реализовать метод `redirectToDashboard()` для перенаправления на Dashboard
@@ -681,7 +681,7 @@
   - **Requirements:** ui.8.1, ui.8.3, ui.8.4
   - **Property:** 8, 9, 24, 26, 27
 
-- [ ] 21.2 Создать класс AuthGuard
+- [x] 21.2 Создать класс AuthGuard
   - Реализовать метод `canActivate()` для проверки доступа к маршруту
   - Определить список защищенных маршрутов (dashboard, settings, tasks, calendar, contacts)
   - Реализовать метод `isProtectedRoute()` для проверки типа маршрута
@@ -689,7 +689,7 @@
   - **Requirements:** ui.8.2
   - **Property:** 25
 
-- [ ] 21.3 Интегрировать NavigationManager с OAuth events
+- [x] 21.3 Интегрировать NavigationManager с OAuth events
   - Добавить слушатель события `auth:success` для перенаправления на Dashboard
   - Добавить слушатель события `auth:logout` для перенаправления на Login
   - Реализовать в App.tsx или главном компоненте приложения
@@ -699,13 +699,13 @@
 
 ### 22. Интеграция с Router
 
-- [ ] 22.1 Настроить маршруты приложения
+- [x] 22.1 Настроить маршруты приложения
   - Определить публичный маршрут `/login`
   - Определить защищенные маршруты: `/dashboard`, `/settings`, `/tasks`, `/calendar`, `/contacts`
   - Интегрировать AuthGuard для защиты маршрутов
   - **Requirements:** ui.8.1, ui.8.2
 
-- [ ] 22.2 Реализовать логику перенаправления
+- [x] 22.2 Реализовать логику перенаправления
   - При попытке доступа к защищенному маршруту без авторизации → redirect to login
   - При успешной авторизации на экране логина → redirect to dashboard
   - При logout → redirect to login
@@ -714,7 +714,7 @@
 
 ### 23. Модульные Тесты для NavigationManager
 
-- [ ]* 23.1 Тест: checkAuthStatus() возвращает корректный статус
+- [~] 23.1 Тест: checkAuthStatus() возвращает корректный статус
   - Мокировать window.api.auth.getAuthStatus() для возврата authorized: true
   - Вызвать checkAuthStatus()
   - Проверить, что возвращается true
@@ -723,25 +723,25 @@
   - Проверить, что возвращается false
   - **Requirements:** ui.8.1
 
-- [ ]* 23.2 Тест: redirectToLogin() перенаправляет на /login
+- [~] 23.2 Тест: redirectToLogin() перенаправляет на /login
   - Создать mock Router
   - Вызвать redirectToLogin()
   - Проверить, что router.navigate() вызван с '/login'
   - **Requirements:** ui.8.1, ui.8.4
 
-- [ ]* 23.3 Тест: redirectToDashboard() перенаправляет на /dashboard
+- [~] 23.3 Тест: redirectToDashboard() перенаправляет на /dashboard
   - Создать mock Router
   - Вызвать redirectToDashboard()
   - Проверить, что router.navigate() вызван с '/dashboard'
   - **Requirements:** ui.8.3
 
-- [ ]* 23.4 Тест: initialize() перенаправляет неавторизованного пользователя на login
+- [~] 23.4 Тест: initialize() перенаправляет неавторизованного пользователя на login
   - Мокировать checkAuthStatus() для возврата false
   - Вызвать initialize()
   - Проверить, что redirectToLogin() был вызван
   - **Requirements:** ui.8.1
 
-- [ ]* 23.5 Тест: initialize() не перенаправляет авторизованного пользователя
+- [~] 23.5 Тест: initialize() не перенаправляет авторизованного пользователя
   - Мокировать checkAuthStatus() для возврата true
   - Мокировать router.currentRoute = '/dashboard'
   - Вызвать initialize()
@@ -750,26 +750,26 @@
 
 ### 24. Модульные Тесты для AuthGuard
 
-- [ ]* 24.1 Тест: canActivate() разрешает доступ к публичным маршрутам
+- [~] 24.1 Тест: canActivate() разрешает доступ к публичным маршрутам
   - Вызвать canActivate('/login')
   - Проверить, что возвращается true без проверки авторизации
   - **Requirements:** ui.8.1
 
-- [ ]* 24.2 Тест: canActivate() блокирует доступ к защищенным маршрутам без авторизации
+- [~] 24.2 Тест: canActivate() блокирует доступ к защищенным маршрутам без авторизации
   - Мокировать navigationManager.checkAuthStatus() для возврата false
   - Вызвать canActivate('/dashboard')
   - Проверить, что возвращается false
   - Проверить, что navigationManager.redirectToLogin() был вызван
   - **Requirements:** ui.8.2
 
-- [ ]* 24.3 Тест: canActivate() разрешает доступ к защищенным маршрутам с авторизацией
+- [~] 24.3 Тест: canActivate() разрешает доступ к защищенным маршрутам с авторизацией
   - Мокировать navigationManager.checkAuthStatus() для возврата true
   - Вызвать canActivate('/dashboard')
   - Проверить, что возвращается true
   - Проверить, что redirectToLogin() НЕ был вызван
   - **Requirements:** ui.8.2
 
-- [ ]* 24.4 Тест: isProtectedRoute() корректно определяет защищенные маршруты
+- [~] 24.4 Тест: isProtectedRoute() корректно определяет защищенные маршруты
   - Проверить, что isProtectedRoute('/login') возвращает false
   - Проверить, что isProtectedRoute('/dashboard') возвращает true
   - Проверить, что isProtectedRoute('/settings') возвращает true
@@ -779,7 +779,7 @@
 
 ### 25. Функциональные Тесты (Navigation)
 
-- [ ] 25.1 Функциональный тест: should show login screen when not authenticated
+- [~] 25.1 Функциональный тест: should show login screen when not authenticated
   - Запустить приложение без авторизации
   - Проверить, что показывается экран логина (/login)
   - Попытаться перейти на /dashboard
@@ -788,7 +788,7 @@
   - **Requirements:** ui.8.1, ui.8.2
   - **Property:** 8, 24, 25
 
-- [ ] 25.2 Функциональный тест: should redirect to dashboard after successful authentication
+- [~] 25.2 Функциональный тест: should redirect to dashboard after successful authentication
   - Запустить приложение
   - Выполнить авторизацию через Google OAuth
   - Проверить, что автоматически перенаправлен на /dashboard
@@ -797,7 +797,7 @@
   - **Requirements:** ui.8.3
   - **Property:** 9, 26
 
-- [ ] 25.3 Функциональный тест: should block access to protected routes without authentication
+- [~] 25.3 Функциональный тест: should block access to protected routes without authentication
   - Запустить приложение без авторизации
   - Попытаться перейти на /settings
   - Проверить, что перенаправлен на /login
@@ -809,7 +809,7 @@
   - **Requirements:** ui.8.2
   - **Property:** 25
 
-- [ ] 25.4 Функциональный тест: should redirect to login after logout
+- [~] 25.4 Функциональный тест: should redirect to login after logout
   - Запустить приложение с авторизацией
   - Проверить, что находимся на /dashboard или другом защищенном маршруте
   - Выполнить logout
@@ -820,7 +820,7 @@
   - **Requirements:** ui.8.4
   - **Property:** 27
 
-- [ ] 25.5 Функциональный тест: should allow access to all routes when authenticated
+- [~] 25.5 Функциональный тест: should allow access to all routes when authenticated
   - Запустить приложение с авторизацией
   - Перейти на /dashboard
   - Проверить успешный доступ
@@ -833,38 +833,38 @@
 
 ### 26. Обновление Документации (Navigation)
 
-- [ ] 26.1 Добавить JSDoc комментарии к NavigationManager
+- [~] 26.1 Добавить JSDoc комментарии к NavigationManager
   - Документировать все публичные методы
   - Добавить примеры использования
   - Указать ссылки на требования в комментариях
   - **Requirements:** ui.8
 
-- [ ] 26.2 Добавить JSDoc комментарии к AuthGuard
+- [~] 26.2 Добавить JSDoc комментарии к AuthGuard
   - Документировать все публичные методы
   - Указать ссылки на требования в комментариях
   - **Requirements:** ui.8
 
-- [ ] 26.3 Обновить таблицу покрытия требований в design.md
+- [~] 26.3 Обновить таблицу покрытия требований в design.md
   - Добавить требования ui.8.x
   - Указать покрытие модульными и функциональными тестами
   - **Requirements:** ui.8
 
 ### 27. Валидация и Финализация (Navigation)
 
-- [ ] 27.1 Запустить автоматическую валидацию
+- [~] 27.1 Запустить автоматическую валидацию
   - Выполнить `npm run validate`
   - Исправить все ошибки TypeScript
   - Исправить все ошибки ESLint
   - Исправить форматирование Prettier
   - **Requirements:** ui.8
 
-- [ ] 27.2 Проверить покрытие тестами
+- [~] 27.2 Проверить покрытие тестами
   - Убедиться, что покрытие >= 85%
   - Убедиться, что все требования ui.8.x покрыты тестами
   - Обновить таблицу покрытия в design.md
   - **Requirements:** ui.8
 
-- [ ] 27.3 Проверить комментарии с требованиями
+- [~] 27.3 Проверить комментарии с требованиями
   - Убедиться, что все функции имеют комментарии // Requirements:
   - Убедиться, что все тесты имеют структурированные комментарии
   - Проверить корректность ссылок на требования
@@ -875,12 +875,12 @@
 
 ### 28. Создание ErrorNotificationManager
 
-- [ ] 28.1 Создать интерфейс ErrorNotification
+- [~] 28.1 Создать интерфейс ErrorNotification
   - Определить структуру уведомления (id, message, context, timestamp)
   - Добавить JSDoc комментарии для каждого поля
   - **Requirements:** ui.7.2
 
-- [ ] 28.2 Создать класс ErrorNotificationManager
+- [~] 28.2 Создать класс ErrorNotificationManager
   - Реализовать метод `showNotification()` для отображения уведомления
   - Реализовать метод `dismissNotification()` для закрытия уведомления
   - Реализовать метод `subscribe()` для подписки на изменения
@@ -889,7 +889,7 @@
   - **Requirements:** ui.7.1, ui.7.2, ui.7.3
   - **Property:** 20, 21, 22
 
-- [ ] 28.3 Добавить IPC handler для уведомлений об ошибках
+- [~] 28.3 Добавить IPC handler для уведомлений об ошибках
   - Реализовать событие `error:notify` в Main Process
   - Добавить метод `window.api.error.onNotify()` в preload
   - Обновить TypeScript типы для API
@@ -897,7 +897,7 @@
 
 ### 29. Создание NotificationUI Component
 
-- [ ] 29.1 Создать React компонент NotificationUI
+- [~] 29.1 Создать React компонент NotificationUI
   - Создать файл `src/renderer/components/NotificationUI.tsx`
   - Реализовать отображение списка уведомлений
   - Реализовать отображение контекста и сообщения для каждого уведомления
@@ -906,7 +906,7 @@
   - **Requirements:** ui.7.1, ui.7.2, ui.7.3
   - **Property:** 20, 21, 22
 
-- [ ] 29.2 Интегрировать NotificationUI с ErrorNotificationManager
+- [~] 29.2 Интегрировать NotificationUI с ErrorNotificationManager
   - Подписаться на изменения через subscribe()
   - Обновлять состояние компонента при изменении уведомлений
   - Обеспечить очистку подписки при размонтировании
@@ -937,21 +937,21 @@
 
 ### 31. Модульные Тесты для ErrorNotificationManager
 
-- [ ]* 31.1 Тест: showNotification() создает уведомление с корректными данными
+- [ ] 31.1 Тест: showNotification() создает уведомление с корректными данными
   - Вызвать showNotification('Error message', 'Context')
   - Проверить, что уведомление добавлено в массив notifications
   - Проверить, что уведомление содержит message, context, id, timestamp
   - Проверить, что listeners уведомлены об изменении
   - **Requirements:** ui.7.1, ui.7.2
 
-- [ ]* 31.2 Тест: showNotification() автоматически закрывает уведомление через 15 секунд
+- [ ] 31.2 Тест: showNotification() автоматически закрывает уведомление через 15 секунд
   - Вызвать showNotification('Error message', 'Context')
   - Получить id уведомления
   - Подождать 15 секунд (использовать jest.useFakeTimers())
   - Проверить, что уведомление удалено из массива
   - **Requirements:** ui.7.3
 
-- [ ]* 31.3 Тест: dismissNotification() удаляет уведомление
+- [ ] 31.3 Тест: dismissNotification() удаляет уведомление
   - Создать уведомление через showNotification()
   - Получить id уведомления
   - Вызвать dismissNotification(id)
@@ -959,7 +959,7 @@
   - Проверить, что listeners уведомлены об изменении
   - **Requirements:** ui.7.3
 
-- [ ]* 31.4 Тест: subscribe() регистрирует listener и возвращает unsubscribe функцию
+- [ ] 31.4 Тест: subscribe() регистрирует listener и возвращает unsubscribe функцию
   - Создать mock listener
   - Вызвать subscribe(listener)
   - Создать уведомление
@@ -971,28 +971,28 @@
 
 ### 32. Модульные Тесты для NotificationUI Component
 
-- [ ]* 32.1 Тест: отображает список уведомлений
+- [ ] 32.1 Тест: отображает список уведомлений
   - Создать mock ErrorNotificationManager с несколькими уведомлениями
   - Рендерить компонент NotificationUI
   - Проверить, что все уведомления отображаются
   - Проверить, что для каждого уведомления отображается context и message
   - **Requirements:** ui.7.1, ui.7.2
 
-- [ ]* 32.2 Тест: закрывает уведомление при клике на кнопку
+- [ ] 32.2 Тест: закрывает уведомление при клике на кнопку
   - Создать mock ErrorNotificationManager с уведомлением
   - Рендерить компонент NotificationUI
   - Кликнуть на кнопку закрытия
   - Проверить, что dismissNotification() был вызван с правильным id
   - **Requirements:** ui.7.3
 
-- [ ]* 32.3 Тест: закрывает уведомление при клике на само уведомление
+- [ ] 32.3 Тест: закрывает уведомление при клике на само уведомление
   - Создать mock ErrorNotificationManager с уведомлением
   - Рендерить компонент NotificationUI
   - Кликнуть на уведомление
   - Проверить, что dismissNotification() был вызван с правильным id
   - **Requirements:** ui.7.3
 
-- [ ]* 32.4 Тест: обновляется при изменении уведомлений
+- [ ] 32.4 Тест: обновляется при изменении уведомлений
   - Создать mock ErrorNotificationManager
   - Рендерить компонент NotificationUI
   - Проверить, что subscribe() был вызван
@@ -1157,14 +1157,14 @@
 
 ### 40. Модульные Тесты для handleAPIRequest()
 
-- [ ]* 40.1 Тест: успешный API запрос возвращает response
+- [ ] 40.1 Тест: успешный API запрос возвращает response
   - Мокировать fetch для возврата успешного response (200)
   - Вызвать handleAPIRequest()
   - Проверить, что возвращается response
   - Проверить, что clearTokens() НЕ вызван
   - **Requirements:** ui.9.4
 
-- [ ]* 40.2 Тест: HTTP 401 очищает токены и показывает LoginError
+- [ ] 40.2 Тест: HTTP 401 очищает токены и показывает LoginError
   - Мокировать fetch для возврата 401
   - Мокировать window.api.auth.clearTokens()
   - Мокировать window.api.auth.emitAuthError()
@@ -1174,7 +1174,7 @@
   - Проверить, что выброшена ошибка
   - **Requirements:** ui.9.3, ui.9.4
 
-- [ ]* 40.3 Тест: HTTP 401 логирует событие с контекстом
+- [ ] 40.3 Тест: HTTP 401 логирует событие с контекстом
   - Мокировать fetch для возврата 401
   - Мокировать console.error
   - Вызвать handleAPIRequest() с URL
@@ -1182,7 +1182,7 @@
   - Проверить, что лог содержит URL и контекст
   - **Requirements:** ui.9.5
 
-- [ ]* 40.4 Тест: другие HTTP ошибки не очищают токены
+- [ ] 40.4 Тест: другие HTTP ошибки не очищают токены
   - Мокировать fetch для возврата 500
   - Мокировать window.api.auth.clearTokens()
   - Вызвать handleAPIRequest()
@@ -1193,14 +1193,14 @@
 
 ### 41. Модульные Тесты для Автоматического Обновления Токенов
 
-- [ ]* 41.1 Тест: refreshAccessToken() работает в фоновом режиме
+- [ ] 41.1 Тест: refreshAccessToken() работает в фоновом режиме
   - Мокировать Google Token API
   - Вызвать refreshAccessToken()
   - Проверить, что метод выполняется асинхронно
   - Проверить, что не показываются уведомления пользователю
   - **Requirements:** ui.9.1, ui.9.2
 
-- [ ]* 41.2 Тест: getAuthStatus() автоматически обновляет истекший токен
+- [ ] 41.2 Тест: getAuthStatus() автоматически обновляет истекший токен
   - Мокировать токены с истекшим access token
   - Мокировать Google Token API для refresh
   - Вызвать getAuthStatus()
@@ -1208,7 +1208,7 @@
   - Проверить, что возвращается обновленный токен
   - **Requirements:** ui.9.1
 
-- [ ]* 41.3 Тест: профиль обновляется после успешного refresh
+- [ ] 41.3 Тест: профиль обновляется после успешного refresh
   - Мокировать истекший access token
   - Мокировать успешный refresh
   - Мокировать UserProfileManager.updateProfileAfterTokenRefresh()

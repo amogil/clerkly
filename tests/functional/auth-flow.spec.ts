@@ -157,4 +157,85 @@ test.describe('Authentication Flow', () => {
     // Take screenshot
     await context.window.screenshot({ path: 'playwright-report/after-oauth-callback.png' });
   });
+
+  /* Preconditions: Application not running, mock OAuth server available
+     Action: Complete OAuth flow and verify Dashboard is shown
+     Assertions: Dashboard is displayed (not Settings or Account Block)
+     Requirements: ui.8.3
+     Property: 9, 26 */
+  test('should show dashboard after successful authentication', async () => {
+    // Launch the application
+    context = await launchElectron();
+    await context.window.waitForLoadState('domcontentloaded');
+
+    // Verify login screen is displayed initially
+    const loginButton = context.window.locator('text=/continue with google/i');
+    await loginButton.waitFor({ state: 'visible', timeout: 5000 });
+    expect(await loginButton.isVisible()).toBe(true);
+
+    console.log('[TEST] Login screen displayed, simulating OAuth flow...');
+
+    // Simulate successful authentication by setting up test tokens
+    // This simulates what happens after successful OAuth flow
+    // Requirements: ui.8.3
+    await context.window.evaluate(async () => {
+      // Setup test tokens directly through test IPC handler
+      await (window as any).electron.ipcRenderer.invoke('test:setup-tokens', {
+        accessToken: 'test_access_token_dashboard',
+        refreshToken: 'test_refresh_token_dashboard',
+        expiresIn: 3600,
+        tokenType: 'Bearer',
+      });
+
+      // Trigger auth success event to update UI
+      // This simulates what happens after successful OAuth
+      await (window as any).electron.ipcRenderer.invoke('test:trigger-auth-success');
+    });
+
+    // Wait for UI to update after authentication
+    await context.window.waitForTimeout(2000);
+
+    console.log('[TEST] Authentication completed, checking for Dashboard...');
+
+    // Verify Dashboard is displayed (not login screen)
+    // Dashboard should have specific elements that identify it
+    // Requirements: ui.8.3 - Dashboard should be shown after successful authentication
+    // Property 9, 26 - Show Dashboard after successful authorization
+
+    // Check that login button is no longer visible
+    const loginButtonAfterAuth = context.window.locator('text=/continue with google/i');
+    const isLoginVisible = await loginButtonAfterAuth.isVisible().catch(() => false);
+    expect(isLoginVisible).toBe(false);
+
+    // Check for Dashboard-specific heading
+    // Dashboard has a heading "Dashboard" at the top of the page
+    const dashboardHeading = context.window.locator('h1:has-text("Dashboard")');
+    await dashboardHeading.waitFor({ state: 'visible', timeout: 5000 });
+    expect(await dashboardHeading.isVisible()).toBe(true);
+
+    console.log('[TEST] ✓ Dashboard heading found');
+
+    // Verify Dashboard-specific content is visible
+    // Dashboard shows "Today's Schedule" section
+    const todaysSchedule = context.window.locator('h2:has-text("Today\'s Schedule")');
+    expect(await todaysSchedule.isVisible()).toBe(true);
+
+    console.log("[TEST] ✓ Today's Schedule section found");
+
+    // Verify we're NOT on Settings page
+    // Settings page would have "Account" heading or "Profile" section
+    // Dashboard does NOT have these elements
+    const accountHeading = context.window.locator('h2:has-text("Account")');
+    const isAccountVisible = await accountHeading.isVisible().catch(() => false);
+    expect(isAccountVisible).toBe(false);
+
+    console.log('[TEST] ✓ Verified: Dashboard is shown, not Settings or Account Block');
+
+    // Take screenshot of Dashboard
+    await context.window.screenshot({
+      path: 'playwright-report/dashboard-after-auth.png',
+    });
+
+    console.log('[TEST] ✓ Dashboard displayed successfully after authentication');
+  });
 });

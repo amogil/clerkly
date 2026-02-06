@@ -319,17 +319,18 @@ async function handleDeepLinkUrl(url: string): Promise<void> {
       // Send auth event to renderer
       if (authStatus.authorized) {
         console.log('[Main] Sending auth success event');
-        
+
         // Requirements: ui.6.2 - Fetch profile after successful authentication
         try {
           await profileManager.fetchProfile();
           console.log('[Main] Profile fetched successfully after OAuth');
         } catch (profileError: unknown) {
-          const profileErrorMessage = profileError instanceof Error ? profileError.message : 'Unknown error';
+          const profileErrorMessage =
+            profileError instanceof Error ? profileError.message : 'Unknown error';
           console.error('[Main] Failed to fetch profile after OAuth:', profileErrorMessage);
           // Continue anyway - user is authenticated, profile can be fetched later
         }
-        
+
         authIPCHandlers.sendAuthSuccess();
       } else if (authStatus.error) {
         console.log('[Main] Sending auth error event:', authStatus.error);

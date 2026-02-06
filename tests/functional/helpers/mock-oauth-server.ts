@@ -46,6 +46,7 @@ export class MockOAuthServer {
     given_name: 'Test',
     family_name: 'User',
   };
+  private userInfoError: { statusCode: number; message: string } | null = null;
 
   constructor(config: MockOAuthServerConfig) {
     this.config = config;
@@ -59,6 +60,26 @@ export class MockOAuthServer {
   setUserProfile(profile: MockUserProfile): void {
     this.userProfile = profile;
     console.log('[MOCK OAUTH] User profile updated:', profile);
+  }
+
+  /**
+   * Set UserInfo API to return an error
+   * Requirements: testing.3.9
+   * @param statusCode HTTP status code (e.g., 500, 503)
+   * @param message Error message
+   */
+  setUserInfoError(statusCode: number, message: string): void {
+    this.userInfoError = { statusCode, message };
+    console.log(`[MOCK OAUTH] UserInfo API will return error: ${statusCode} ${message}`);
+  }
+
+  /**
+   * Clear UserInfo API error (return to normal behavior)
+   * Requirements: testing.3.9
+   */
+  clearUserInfoError(): void {
+    this.userInfoError = null;
+    console.log('[MOCK OAUTH] UserInfo API error cleared');
   }
 
   /**
@@ -297,6 +318,16 @@ export class MockOAuthServer {
    * Requirements: testing.3.9
    */
   private handleUserInfoRequest(req: http.IncomingMessage, res: http.ServerResponse): void {
+    // Check if error mode is enabled
+    if (this.userInfoError) {
+      console.log(
+        `[MOCK OAUTH] Returning UserInfo error: ${this.userInfoError.statusCode} ${this.userInfoError.message}`
+      );
+      res.writeHead(this.userInfoError.statusCode, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: this.userInfoError.message }));
+      return;
+    }
+
     // Check for Authorization header
     const authHeader = req.headers.authorization;
 
