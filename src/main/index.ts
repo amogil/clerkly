@@ -132,9 +132,11 @@ const lifecycleManager = new LifecycleManager(
 // Initialize IPC Handlers
 const ipcHandlers = new IPCHandlers(dataManager);
 
-// Requirements: google-oauth-auth.8.1
+// Requirements: google-oauth-auth.8.1, ui.6.2
 // Initialize Auth IPC Handlers
 const authIPCHandlers = new AuthIPCHandlers(oauthClient);
+// Requirements: ui.6.2 - Connect profile manager to auth IPC handlers
+authIPCHandlers.setProfileManager(profileManager);
 
 // Requirements: testing.3.8
 // Initialize Test IPC Handlers (only in test environment)
@@ -171,6 +173,29 @@ if (process.env.NODE_ENV === 'test') {
     const db = (dataManager as any).db;
     db.prepare('DELETE FROM user_data').run();
     return { success: true };
+  });
+
+  ipcMain.handle('test:trigger-auth-success', async () => {
+    // Fetch profile after auth success
+    try {
+      await profileManager.fetchProfile();
+      authIPCHandlers.sendAuthSuccess();
+      return { success: true };
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('[TEST] Failed to fetch profile:', errorMessage);
+      return { success: false, error: errorMessage };
+    }
+  });
+
+  ipcMain.handle('test:get-profile', async () => {
+    try {
+      const profile = await profileManager.loadProfile();
+      return { success: true, profile };
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      return { success: false, error: errorMessage, profile: null };
+    }
   });
 
   console.log('[TEST] Test IPC handlers registered');

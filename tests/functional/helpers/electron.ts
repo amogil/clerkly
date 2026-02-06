@@ -25,9 +25,13 @@ export interface ElectronTestContext {
  * Launch Electron application for testing
  *
  * @param testDataPath - Path to temporary test data directory
+ * @param env - Additional environment variables
  * @returns ElectronApplication and first window
  */
-export async function launchElectron(testDataPath?: string): Promise<ElectronTestContext> {
+export async function launchElectron(
+  testDataPath?: string,
+  env?: Record<string, string>
+): Promise<ElectronTestContext> {
   // Create temporary test data directory if not provided
   if (!testDataPath) {
     testDataPath = path.join(
@@ -51,6 +55,7 @@ export async function launchElectron(testDataPath?: string): Promise<ElectronTes
     env: {
       ...process.env,
       NODE_ENV: 'test',
+      ...env, // Merge additional environment variables
     },
   });
 

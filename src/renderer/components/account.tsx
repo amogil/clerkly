@@ -22,6 +22,7 @@ interface UserProfile {
  */
 interface AccountProps {
   className?: string;
+  onSignOut?: () => void;
 }
 
 /**
@@ -30,7 +31,7 @@ interface AccountProps {
  * All profile fields are read-only
  * Requirements: ui.6.1, ui.6.2, ui.6.3, ui.6.4, ui.6.8
  */
-export function Account({ className = '' }: AccountProps) {
+export function Account({ className = '', onSignOut }: AccountProps) {
   // Requirements: ui.6.1, ui.6.2
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -160,7 +161,14 @@ export function Account({ className = '' }: AccountProps) {
   return (
     <div className={`account-container ${className}`}>
       <div className="account-card">
-        <h2 className="account-title">Account</h2>
+        <div className="account-header">
+          <h2 className="account-title">Account</h2>
+          {onSignOut && (
+            <button onClick={onSignOut} className="sign-out-button">
+              Sign out
+            </button>
+          )}
+        </div>
         <div className="account-profile">
           {/* Requirements: ui.6.3 - Display name field */}
           <div className="profile-field">
@@ -208,8 +216,29 @@ export function Account({ className = '' }: AccountProps) {
         .account-title {
           font-size: 1.25rem;
           font-weight: 600;
-          margin-bottom: 1rem;
           color: #1f2937;
+        }
+
+        .account-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 1rem;
+        }
+
+        .sign-out-button {
+          font-size: 0.875rem;
+          color: #dc2626;
+          background: none;
+          border: none;
+          cursor: pointer;
+          padding: 0.5rem 1rem;
+          border-radius: 0.375rem;
+          transition: background-color 0.2s;
+        }
+
+        .sign-out-button:hover {
+          background-color: #fee2e2;
         }
 
         .account-loading,

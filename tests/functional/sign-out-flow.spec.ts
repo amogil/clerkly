@@ -24,6 +24,9 @@ test.beforeAll(async () => {
   // Get the first window
   window = await electronApp.firstWindow();
   await window.waitForLoadState('domcontentloaded');
+
+  // Wait for app to fully initialize (IPC handlers registration)
+  await window.waitForTimeout(2000);
 });
 
 test.afterAll(async () => {
@@ -48,17 +51,18 @@ test('should show login screen after sign out', async () => {
   // Reload to show main app
   await window.reload();
   await window.waitForLoadState('domcontentloaded');
+  await window.waitForTimeout(1000);
 
   // Verify main app is shown (not login screen)
   const loginButton = await window.locator('button:has-text("Continue with Google")').count();
   expect(loginButton).toBe(0);
 
-  // Navigate to settings
-  await window.click('[data-testid="settings-button"]');
+  // Navigate to settings by clicking Settings button in navigation
+  await window.click('button:has-text("Settings")');
   await window.waitForTimeout(500);
 
-  // Click Sign Out
-  await window.click('button:has-text("Sign Out")');
+  // Click Sign Out button
+  await window.click('button:has-text("Sign out")');
   await window.waitForTimeout(1000);
 
   // Verify Login Screen is shown
@@ -93,9 +97,9 @@ test('should clear tokens after sign out', async () => {
   });
   expect(tokenStatus.hasTokens).toBe(true);
 
-  // Call logout
+  // Call logout via IPC
   await window.evaluate(async () => {
-    await window.api.auth.logout();
+    await window.electron.ipcRenderer.invoke('auth:logout');
   });
 
   await window.waitForTimeout(500);
@@ -133,9 +137,9 @@ test('should handle sign out when revoke fails', async () => {
     };
   });
 
-  // Call logout
+  // Call logout via IPC
   const result = await window.evaluate(async () => {
-    return await window.api.auth.logout();
+    return await window.electron.ipcRenderer.invoke('auth:logout');
   });
 
   // Logout should still succeed locally

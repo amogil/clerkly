@@ -26,13 +26,39 @@ export interface MockTokenResponse {
   scope?: string;
 }
 
+export interface MockUserProfile {
+  id: string;
+  email: string;
+  name: string;
+  given_name?: string;
+  family_name?: string;
+  picture?: string;
+}
+
 export class MockOAuthServer {
   private server: http.Server | null = null;
   private config: MockOAuthServerConfig;
   private authCodes: Map<string, { redirectUri: string; state: string }> = new Map();
+  private userProfile: MockUserProfile = {
+    id: '123456789',
+    email: 'test@example.com',
+    name: 'Test User',
+    given_name: 'Test',
+    family_name: 'User',
+  };
 
   constructor(config: MockOAuthServerConfig) {
     this.config = config;
+  }
+
+  /**
+   * Set custom user profile data for testing
+   * Requirements: testing.3.9
+   * @param profile User profile data
+   */
+  setUserProfile(profile: MockUserProfile): void {
+    this.userProfile = profile;
+    console.log('[MOCK OAUTH] User profile updated:', profile);
   }
 
   /**
@@ -105,6 +131,11 @@ export class MockOAuthServer {
       this.handleTokenRequest(req, res);
     } else if (pathname === '/refresh' && req.method === 'POST') {
       this.handleRefreshRequest(req, res);
+    } else if (
+      (pathname === '/oauth2/v2/userinfo' || pathname === '/userinfo') &&
+      req.method === 'GET'
+    ) {
+      this.handleUserInfoRequest(req, res);
     } else {
       res.writeHead(404, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Not found' }));
@@ -259,5 +290,35 @@ export class MockOAuthServer {
 
       console.log('[MOCK OAUTH] Refreshed tokens');
     });
+  }
+
+  /**
+   * Handle user info request (GET /oauth2/v2/userinfo)
+   * Requirements: testing.3.9
+   */
+  private handleUserInfoRequest(req: http.IncomingMessage, res: http.ServerResponse): void {
+    // Check for Authorization header
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      res.writeHead(401, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'unauthorized' }));
+      return;
+    }
+
+    const accessToken = authHeader.substring(7); // Remove "Bearer " prefix
+
+    // Validate access token (simple check for test tokens)
+    if (!accessToken.startsWith('test_access_token')) {
+      res.writeHead(401, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'invalid_token' }));
+      return;
+    }
+
+    // Return user profile
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(this.userProfile));
+
+    console.log('[MOCK OAUTH] Returned user profile:', this.userProfile.email);
   }
 }

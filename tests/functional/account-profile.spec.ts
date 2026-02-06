@@ -180,38 +180,87 @@ test.describe('Account Profile', () => {
 
     console.log('[TEST] Auth success triggered, profile should be loaded');
 
-    // Wait a moment for UI to update
-    await context.window.waitForTimeout(1000);
+    // Wait longer for profile to be fetched, saved, and UI to update
+    await context.window.waitForTimeout(3000);
+
+    // Verify profile is in database
+    const profileCheck = await context.window.evaluate(async () => {
+      return await (window as any).electron.ipcRenderer.invoke('test:get-profile');
+    });
+    console.log('[TEST] Profile in database:', profileCheck.profile ? 'YES' : 'NO');
+    if (profileCheck.profile) {
+      console.log('[TEST] Profile data:', profileCheck.profile);
+    }
 
     // Navigate to Settings to see Account block
     // First check if we're on login screen or main app
     const loginButton = context.window.locator('text=/continue with google/i');
     const hasLoginScreen = await loginButton.isVisible().catch(() => false);
 
+    console.log('[TEST] Is on login screen:', hasLoginScreen);
+
     if (hasLoginScreen) {
       // If still on login screen, reload to trigger auth check
+      console.log('[TEST] Reloading to trigger auth check...');
       await context.window.reload();
       await context.window.waitForLoadState('domcontentloaded');
-      await context.window.waitForTimeout(1000);
+      await context.window.waitForTimeout(2000);
+
+      // Check again
+      const stillOnLogin = await loginButton.isVisible().catch(() => false);
+      console.log('[TEST] Still on login screen after reload:', stillOnLogin);
     }
 
     // Navigate to Settings
     const settingsNav = context.window.locator('text=/settings/i');
+    console.log('[TEST] Looking for Settings button...');
+    const settingsVisible = await settingsNav.isVisible().catch(() => false);
+    console.log('[TEST] Settings button visible:', settingsVisible);
+
     await settingsNav.waitFor({ state: 'visible', timeout: 5000 });
     await settingsNav.click();
+    console.log('[TEST] Clicked Settings button');
     await context.window.waitForTimeout(500);
 
     // Find Account block by looking for the "Account" heading
     // Requirements: ui.6.2, ui.6.3
     const accountHeading = context.window.locator('text=/^Account$/i');
+    console.log('[TEST] Looking for Account heading...');
     await accountHeading.waitFor({ state: 'visible', timeout: 5000 });
     expect(await accountHeading.isVisible()).toBe(true);
+    console.log('[TEST] Account heading found');
+
+    // Check if "Not signed in" is displayed
+    const notSignedIn = context.window.locator('text=/Not signed in/i');
+    const hasNotSignedIn = await notSignedIn.isVisible().catch(() => false);
+    console.log('[TEST] "Not signed in" visible:', hasNotSignedIn);
+
+    // Check if loading state is displayed
+    const loadingText = context.window.locator('text=/Loading profile/i');
+    const hasLoading = await loadingText.isVisible().catch(() => false);
+    console.log('[TEST] "Loading profile" visible:', hasLoading);
+
+    // Check if error is displayed
+    const errorText = context.window.locator('.account-error');
+    const hasError = await errorText.isVisible().catch(() => false);
+    console.log('[TEST] Error visible:', hasError);
+    if (hasError) {
+      const errorMessage = await errorText.textContent();
+      console.log('[TEST] Error message:', errorMessage);
+    }
+
+    // Take screenshot to see what's displayed
+    await context.window.screenshot({
+      path: 'playwright-report/account-profile-debug.png',
+    });
+    console.log('[TEST] Screenshot saved');
 
     // Verify profile fields are populated
     // Requirements: ui.6.3 - Display name and email fields
     const nameInput = context.window.locator('#profile-name');
     const emailInput = context.window.locator('#profile-email');
 
+    console.log('[TEST] Looking for profile input fields...');
     // Wait for inputs to be visible
     await nameInput.waitFor({ state: 'visible', timeout: 5000 });
     await emailInput.waitFor({ state: 'visible', timeout: 5000 });

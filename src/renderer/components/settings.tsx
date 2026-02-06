@@ -1,15 +1,6 @@
-import {
-  CheckCircle2,
-  Bell,
-  User,
-  Shield,
-  Globe,
-  Mic,
-  MessageSquare,
-  LogOut,
-  Cpu,
-} from 'lucide-react';
+import { CheckCircle2, Bell, Shield, Globe, Mic, MessageSquare, Cpu } from 'lucide-react';
 import { useState } from 'react';
+import { Account } from './account';
 
 interface SettingsProps {
   onSignOut?: () => void;
@@ -53,59 +44,7 @@ export function Settings({ onSignOut }: SettingsProps) {
 
         <div className="space-y-6">
           {/* Account Settings */}
-          <div className="bg-card rounded-xl border border-border shadow-sm">
-            <div className="p-6 border-b border-border">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <User className="w-5 h-5 text-primary" />
-                  <h2 className="font-semibold text-foreground">Account</h2>
-                </div>
-                <button
-                  onClick={() => {
-                    // Handle logout
-                    console.log('Logging out...');
-                    if (onSignOut) {
-                      onSignOut();
-                    }
-                  }}
-                  className="flex items-center gap-2 text-sm text-red-600 hover:underline"
-                >
-                  <LogOut className="w-4 h-4" />
-                  Sign out
-                </button>
-              </div>
-            </div>
-            <div className="p-6 space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-2">
-                    Full Name
-                  </label>
-                  <input
-                    type="text"
-                    defaultValue="Sarah Chen"
-                    className="w-full px-4 py-2 bg-input-background border border-border rounded-lg text-foreground"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-2">Email</label>
-                  <input
-                    type="email"
-                    defaultValue="sarah.chen@company.com"
-                    className="w-full px-4 py-2 bg-input-background border border-border rounded-lg text-foreground"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-2">Company</label>
-                <input
-                  type="text"
-                  defaultValue="TechCorp"
-                  className="w-full px-4 py-2 bg-input-background border border-border rounded-lg text-foreground"
-                />
-              </div>
-            </div>
-          </div>
+          <Account onSignOut={onSignOut} />
 
           {/* Meeting Settings */}
           <div className="bg-card rounded-xl border border-border shadow-sm">

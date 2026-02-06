@@ -226,4 +226,13 @@ export class UserProfileManager {
     console.log('[UserProfileManager] Updating profile after token refresh');
     await this.fetchProfile();
   }
+
+  /**
+   * Delete profile data from DataManager
+   * Alias for clearProfile() for consistency with other delete methods
+   * Requirements: ui.6.8
+   */
+  async deleteProfile(): Promise<void> {
+    return await this.clearProfile();
+  }
 }

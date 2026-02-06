@@ -472,7 +472,7 @@ interface WindowState {
 
 3. **Невалидная позиция (ui.5.6)**: Когда сохраненная позиция находится за пределами доступных экранов, должно использоваться состояние по умолчанию на основном экране.
 
-4. **Не авторизован (ui.6.1)**: Когда пользователь не авторизован, Account Block должен отображать пустое состояние с сообщением "Not signed in".
+4. **Не авторизован (ui.6.1)**: Когда пользователь не авторизован, приложение показывает экран логина, и пользователь не может попасть в Settings (где находится Account Block). Account компонент должен корректно обрабатывать случай отсутствия профиля, отображая пустое состояние с сообщением "Not signed in".
 
 
 ## Обработка Ошибок
@@ -1236,7 +1236,9 @@ describe('Account Component', () => {
   /* Preconditions: window.api.auth.getProfile() returns null
      Action: render Account component
      Assertions: displays "Not signed in" message, no profile fields shown
-     Requirements: ui.6.1 */
+     Requirements: ui.6.1 
+     Note: В реальном приложении пользователь не может попасть в Settings без авторизации,
+     но компонент должен корректно обрабатывать случай отсутствия профиля */
   it('should display empty state when not authenticated', () => {
     // Тест отображения пустого состояния
   });
