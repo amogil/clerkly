@@ -36,8 +36,8 @@ External API → Main Process → Database → IPC Event → Renderer → UI Upd
 
 2. **Обработка ошибок авторизации**: При получении ошибки авторизации (HTTP 401 Unauthorized) от любого API (Google UserInfo, Calendar, Tasks и т.д.), система должна:
    - Немедленно очистить все токены из хранилища
-   - Показать экран логина (LoginError компонент с errorCode 'invalid_grant') с сообщением "Сессия истекла. Пожалуйста, войдите снова."
-   - Перенаправить пользователя на экран авторизации
+   - Показать экран логина (LoginError компонент с errorCode 'invalid_grant')
+   - Пользователь может повторно авторизоваться через кнопку "Continue with Google"
    - **Примечание**: Данные пользователя в базе данных НЕ очищаются - они сохраняются для отображения при следующей авторизации
 
 3. **Централизованная обработка**: Все API запросы должны проходить через централизованный обработчик ошибок, который проверяет статус авторизации и выполняет необходимые действия при ошибках 401.
@@ -603,7 +603,7 @@ interface WindowState {
 
 ### Property 29: Очистка токенов при ошибке авторизации
 
-*Для любого* API запроса, который возвращает HTTP 401 Unauthorized, система должна немедленно очистить все токены из хранилища и показать экран логина (LoginError компонент с errorCode 'invalid_grant') с сообщением "Сессия истекла. Пожалуйста, войдите снова." Данные пользователя в базе данных НЕ очищаются и сохраняются для отображения при следующей авторизации.
+*Для любого* API запроса, который возвращает HTTP 401 Unauthorized, система должна немедленно очистить все токены из хранилища и показать экран логина (LoginError компонент с errorCode 'invalid_grant'). Данные пользователя в базе данных НЕ очищаются и сохраняются для отображения при следующей авторизации.
 
 **Validates: Requirements ui.9.3**
 
@@ -639,7 +639,7 @@ interface WindowState {
 
 8. **Истечение access token (ui.9.1, ui.9.2)**: Когда access token истекает во время работы приложения, система должна автоматически обновить его через refresh token в фоновом режиме. Пользователь продолжает работу без прерываний, уведомлений или видимых изменений в UI.
 
-9. **Истечение refresh token (ui.9.3)**: Когда refresh token также становится невалидным (истек или был отозван), любой API запрос вернет HTTP 401. Система должна немедленно очистить все токены, показать экран логина (LoginError компонент с errorCode 'invalid_grant') с сообщением "Сессия истекла. Пожалуйста, войдите снова." и перенаправить на OAuth авторизацию. Данные пользователя в базе данных НЕ очищаются и сохраняются для отображения при следующей авторизации.
+9. **Истечение refresh token (ui.9.3)**: Когда refresh token также становится невалидным (истек или был отозван), любой API запрос вернет HTTP 401. Система должна немедленно очистить все токены, показать экран логина (LoginError компонент с errorCode 'invalid_grant') и пользователь может повторно авторизоваться через кнопку "Continue with Google". Данные пользователя в базе данных НЕ очищаются и сохраняются для отображения при следующей авторизации.
 
 10. **Ошибка 401 во время фоновой операции (ui.9.3, ui.9.4)**: Когда фоновый процесс (например, автоматическая синхронизация календаря) получает HTTP 401, система должна обработать это так же, как и для пользовательских запросов: очистить токены, показать экран логина (LoginError компонент) с ошибкой, перенаправить на авторизацию. Данные пользователя в базе данных сохраняются.
 
@@ -857,9 +857,8 @@ async function handleAPIRequest(url: string, options: RequestInit): Promise<Resp
       
       // Show LoginError component with session expired message
       // This will trigger the App component to show LoginError with:
-      // errorCode: 'invalid_grant' (maps to "Session expired" message)
-      // errorMessage: 'Сессия истекла. Пожалуйста, войдите снова.'
-      window.api.auth.emitAuthError('Сессия истекла. Пожалуйста, войдите снова.', 'invalid_grant');
+      // errorCode: 'invalid_grant' (maps to "Session expired" message in English)
+      window.api.auth.emitAuthError('Session expired', 'invalid_grant');
       
       throw new Error('Authorization failed: Session expired');
     }
@@ -1446,9 +1445,9 @@ describe('UserProfileManager', () => {
   /* Preconditions: profile exists in DataManager
      Action: call clearProfile()
      Assertions: DataManager.deleteData called with correct key
-     Requirements: ui.6.8 */
+     Requirements: N/A (method exists but not currently used in application flow) */
   it('should clear profile from DataManager', async () => {
-    // Тест очистки профиля
+    // Тест очистки профиля (метод существует, но не используется в текущем flow)
   });
 
   /* Preconditions: UserProfileManager initialized
@@ -2519,7 +2518,12 @@ class UserProfileManager {
 
   /**
    * Clear user profile from local storage
-   * Requirements: ui.6.8
+   * 
+   * @deprecated This method is not currently used. Profile data persists in database
+   * even after logout or session expiry to provide better UX when user re-authenticates.
+   * Only tokens are cleared on logout/401 errors.
+   * 
+   * Requirements: N/A (method exists for potential future use)
    */
   async clearProfile(): Promise<void> {
     try {
