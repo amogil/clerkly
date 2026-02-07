@@ -307,7 +307,7 @@ function AppContent() {
       case 'triggers':
         return <Triggers />;
       case 'settings':
-        return <Settings onSignOut={handleSignOut} />;
+        return <Settings onSignOut={handleSignOut} onNavigate={navigateToScreen} />;
       case 'error-demo':
         return <ErrorDemoPage onBack={() => navigateToScreen('settings')} />;
       default:

@@ -3,9 +3,10 @@ import { useState } from 'react';
 
 interface SettingsProps {
   onSignOut?: () => void;
+  onNavigate?: (screen: string) => void;
 }
 
-export function Settings({ onSignOut }: SettingsProps) {
+export function Settings({ onSignOut, onNavigate }: SettingsProps) {
   const [timeFormat, setTimeFormat] = useState('12h');
   const [dateFormat, setDateFormat] = useState('MM/DD/YYYY');
   const [llmProvider, setLlmProvider] = useState('openai');
@@ -186,8 +187,9 @@ export function Settings({ onSignOut }: SettingsProps) {
               </p>
               <button
                 onClick={() => {
-                  // Navigate to error demo page
-                  window.location.hash = '#error-demo';
+                  if (onNavigate) {
+                    onNavigate('error-demo');
+                  }
                 }}
                 className="inline-flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-medium"
               >
