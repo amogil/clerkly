@@ -1,5 +1,5 @@
+import React, { useState } from 'react';
 import { Clock, Cpu, Eye, EyeOff, User, LogOut, AlertCircle } from 'lucide-react';
-import { useState } from 'react';
 
 interface SettingsProps {
   onSignOut?: () => void;

@@ -1,18 +1,30 @@
 /**
- * Unit tests for App.tsx IPC integration with ErrorNotificationManager
- * Tests the integration between error:notify IPC events and NotificationUI component
+ * Unit tests for App.tsx IPC integration with error notification system
+ * Tests the integration between error:notify IPC events and useError hook
  * @jest-environment jsdom
  */
 
-/* Preconditions: App component with ErrorNotificationManager and NotificationUI integrated
+/* Preconditions: App component with ErrorProvider and useError hook integrated
    Action: Test IPC event listener setup and notification display
-   Assertions: Component listens to error:notify events and shows notifications
+   Assertions: Component listens to error:notify events and shows notifications via toast
    Requirements: ui.7.1 */
 
 import React from 'react';
 import { render, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import App from '../../src/renderer/App';
+import { toast } from 'sonner';
+
+// Mock sonner toast
+jest.mock('sonner', () => ({
+  toast: {
+    success: jest.fn(),
+    error: jest.fn(),
+    warning: jest.fn(),
+    info: jest.fn(),
+  },
+  Toaster: () => <div data-testid="toaster">Toaster</div>,
+}));
 
 // Mock all child components to isolate App logic
 jest.mock('../../src/renderer/components/top-navigation', () => ({
@@ -43,28 +55,19 @@ jest.mock('../../src/renderer/components/contacts', () => ({
   Contacts: () => <div data-testid="contacts">Contacts</div>,
 }));
 
-jest.mock('../../src/renderer/components/settings', () => ({
-  Settings: () => <div data-testid="settings">Settings</div>,
+jest.mock('../../src/renderer/components/triggers', () => ({
+  Triggers: () => <div data-testid="triggers">Triggers</div>,
 }));
 
-jest.mock('../../src/renderer/components/auth/LoginScreen', () => ({
-  LoginScreen: () => <div data-testid="login-screen">LoginScreen</div>,
+jest.mock('../../src/renderer/components/error-demo-page', () => ({
+  ErrorDemoPage: () => <div data-testid="error-demo">ErrorDemoPage</div>,
 }));
 
-jest.mock('../../src/renderer/components/auth/LoginError', () => ({
-  LoginError: () => <div data-testid="login-error">LoginError</div>,
+jest.mock('../../src/renderer/components/ErrorBoundary', () => ({
+  ErrorBoundary: ({ children }: any) => <div data-testid="error-boundary">{children}</div>,
 }));
 
-// Mock NotificationUI to verify it receives the manager
-jest.mock('../../src/renderer/components/NotificationUI', () => ({
-  NotificationUI: ({ manager }: any) => (
-    <div data-testid="notification-ui" data-manager={manager ? 'present' : 'missing'}>
-      NotificationUI
-    </div>
-  ),
-}));
-
-describe('App IPC Integration with ErrorNotificationManager', () => {
+describe('App IPC Integration with Error Notification System', () => {
   let mockOnNotify: jest.Mock;
   let mockUnsubscribe: jest.Mock;
   let errorNotifyCallback: ((message: string, context: string) => void) | null = null;
@@ -124,9 +127,9 @@ describe('App IPC Integration with ErrorNotificationManager', () => {
 
   /* Preconditions: App component is mounted and IPC listener is set up
      Action: Trigger error:notify event through callback
-     Assertions: ErrorNotificationManager.showNotification is called with correct parameters
+     Assertions: toast.error is called with correct message
      Requirements: ui.7.1 */
-  it('should call showNotification when error:notify event is received', async () => {
+  it('should call toast.error when error:notify event is received', async () => {
     // Spy on console.log to verify notification logging
     const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
 
@@ -151,6 +154,11 @@ describe('App IPC Integration with ErrorNotificationManager', () => {
         message: testMessage,
         context: testContext,
       });
+    });
+
+    // Verify toast.error was called
+    await waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith(`${testContext}: ${testMessage}`);
     });
 
     consoleLogSpy.mockRestore();
@@ -179,22 +187,21 @@ describe('App IPC Integration with ErrorNotificationManager', () => {
 
   /* Preconditions: App component is mounted
      Action: Render App component
-     Assertions: NotificationUI component is rendered with ErrorNotificationManager
+     Assertions: Toaster component is rendered
      Requirements: ui.7.1 */
-  it('should render NotificationUI component with ErrorNotificationManager', async () => {
+  it('should render Toaster component', async () => {
     const { getByTestId } = render(<App />);
 
     // Wait for component to render
     await waitFor(() => {
-      const notificationUI = getByTestId('notification-ui');
-      expect(notificationUI).toBeInTheDocument();
-      expect(notificationUI).toHaveAttribute('data-manager', 'present');
+      const toaster = getByTestId('toaster');
+      expect(toaster).toBeInTheDocument();
     });
   });
 
   /* Preconditions: App component is mounted and multiple error events are received
      Action: Trigger multiple error:notify events
-     Assertions: Each event is handled correctly
+     Assertions: Each event triggers toast.error
      Requirements: ui.7.1 */
   it('should handle multiple error:notify events', async () => {
     const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
@@ -226,6 +233,13 @@ describe('App IPC Integration with ErrorNotificationManager', () => {
           message: error.message,
           context: error.context,
         });
+      });
+    });
+
+    // Verify toast.error was called for each error
+    await waitFor(() => {
+      errors.forEach((error) => {
+        expect(toast.error).toHaveBeenCalledWith(`${error.context}: ${error.message}`);
       });
     });
 

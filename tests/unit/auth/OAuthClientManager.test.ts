@@ -34,6 +34,13 @@ describe('OAuthClientManager', () => {
   beforeEach(() => {
     // Create test database
     testDbPath = path.join(os.tmpdir(), `test-oauth-client-${Date.now()}`);
+
+    // Ensure migrations directory exists for tests
+    const migrationsPath = path.join(__dirname, '..', '..', '..', 'migrations');
+    if (!fs.existsSync(migrationsPath)) {
+      fs.mkdirSync(migrationsPath, { recursive: true });
+    }
+
     dataManager = new DataManager(testDbPath);
     dataManager.initialize();
     tokenStorage = new TokenStorageManager(dataManager);

@@ -23,7 +23,10 @@ describe('MigrationRunner', () => {
 
     // Initialize database
     db = new Database(testDbPath);
+
+    // Initialize migration table
     migrationRunner = new MigrationRunner(db, testMigrationsPath);
+    migrationRunner.initializeMigrationTable();
   });
 
   afterEach(() => {

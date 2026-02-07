@@ -22,6 +22,12 @@ describe('DataManager', () => {
     // Create temporary storage directory
     testStoragePath = fs.mkdtempSync(path.join(os.tmpdir(), 'datamanager-test-'));
     testDbPath = path.join(testStoragePath, 'clerkly.db');
+
+    // Ensure migrations directory exists for tests
+    const migrationsPath = path.join(__dirname, '..', '..', 'migrations');
+    if (!fs.existsSync(migrationsPath)) {
+      fs.mkdirSync(migrationsPath, { recursive: true });
+    }
   });
 
   afterEach(() => {
@@ -55,18 +61,13 @@ describe('DataManager', () => {
        Requirements: clerkly.1, clerkly.2*/
     it('should successfully initialize storage and run migrations', () => {
       dataManager = new DataManager(testStoragePath);
-      try {
-        const result = dataManager.initialize();
+      const result = dataManager.initialize();
 
-        expect(result.success).toBe(true);
-        expect(fs.existsSync(testStoragePath)).toBe(true);
-        expect(fs.existsSync(testDbPath)).toBe(true);
-        expect(result.migrations).toBeDefined();
-        expect(result.migrations?.success).toBe(true);
-      } catch (error) {
-        console.log('Test caught error:', error);
-        throw error;
-      }
+      expect(result.success).toBe(true);
+      expect(fs.existsSync(testStoragePath)).toBe(true);
+      expect(fs.existsSync(testDbPath)).toBe(true);
+      expect(result.migrations).toBeDefined();
+      expect(result.migrations?.success).toBe(true);
     });
 
     /* Preconditions: storage directory exists with write permissions

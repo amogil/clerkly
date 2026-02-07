@@ -15,6 +15,13 @@ describe('TokenStorageManager', () => {
   beforeEach(() => {
     // Create a temporary directory for test database
     testDbPath = path.join(os.tmpdir(), `test-token-storage-${Date.now()}`);
+
+    // Ensure migrations directory exists for tests
+    const migrationsPath = path.join(__dirname, '..', '..', '..', 'migrations');
+    if (!fs.existsSync(migrationsPath)) {
+      fs.mkdirSync(migrationsPath, { recursive: true });
+    }
+
     dataManager = new DataManager(testDbPath);
     dataManager.initialize();
     tokenStorage = new TokenStorageManager(dataManager);

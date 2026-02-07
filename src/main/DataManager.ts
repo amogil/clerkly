@@ -135,7 +135,7 @@ export class DataManager {
 
       return result;
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = error instanceof Error ? error.message : String(error);
       throw new Error(`Failed to initialize storage: ${errorMessage}`);
     }
   }
