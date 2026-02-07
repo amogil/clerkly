@@ -104,8 +104,17 @@ npm run build
 ### 8. Запустите приложение
 
 ```bash
+# Production build с DMG (медленно, 60-90 сек)
 npm start
+
+# Dev mode с deep links (быстро, 20-30 сек) - РЕКОМЕНДУЕТСЯ для разработки
+npm run dev:app
+
+# Dev mode без deep links (очень быстро, 10-15 сек) - для UI разработки
+npm run dev
 ```
+
+**Рекомендация**: Используйте `npm run dev:app` для разработки с OAuth - это создает unpacked .app bundle с правильной регистрацией protocol handler, но без создания DMG.
 
 ## Как это работает
 
@@ -159,6 +168,22 @@ const protocolScheme = 'com.googleusercontent.apps.100365225505-a9mp4sll4948tafo
 
 ## Troubleshooting
 
+### Deep Links не работают в dev mode (`npm run dev`)
+
+**Проблема**: При запуске через `electron .` приложение не регистрируется как обработчик custom protocol в macOS.
+
+**Решение**: Используйте `npm run dev:app` вместо `npm run dev` для тестирования OAuth flow. Эта команда создает unpacked .app bundle с правильным Info.plist, который macOS распознает как обработчик протокола.
+
+```bash
+# ❌ Deep links НЕ работают
+npm run dev
+
+# ✅ Deep links работают
+npm run dev:app
+```
+
+**Почему**: macOS требует `.app` bundle с Info.plist, содержащим CFBundleURLTypes. Команда `npm run dev:app` использует `electron-builder --dir` для создания unpacked bundle без DMG, что быстрее production build.
+
 ### Ошибка "invalid_request" с redirect_uri
 
 Убедитесь что:
@@ -171,3 +196,4 @@ const protocolScheme = 'com.googleusercontent.apps.100365225505-a9mp4sll4948tafo
 1. Проверьте, что protocol scheme зарегистрирован в `index.ts`
 2. Убедитесь, что приложение перебилдено после изменений
 3. На macOS может потребоваться перезапуск системы для регистрации protocol
+4. Используйте `npm run dev:app` вместо `npm run dev` для тестирования OAuth

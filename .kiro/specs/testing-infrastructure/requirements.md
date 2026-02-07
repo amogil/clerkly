@@ -263,6 +263,36 @@
 - `tests/functional/auth-flow.spec.ts` - "should show login screen on first launch"
 ```
 
+### 9. Development Mode с Поддержкой Deep Links
+
+**ID:** testing.9
+
+**User Story:** Как разработчик, я хочу иметь быстрый dev mode с поддержкой OAuth deep links, чтобы тестировать полный OAuth flow без создания production build.
+
+**Зависимости:** Нет
+
+#### Критерии Приемки
+
+9.1. THE команда `npm run dev:app` SHALL создавать unpacked .app bundle с помощью electron-builder
+
+9.2. THE unpacked .app bundle SHALL корректно регистрировать custom protocol handler для deep links
+
+9.3. THE dev mode SHALL НЕ создавать DMG или ZIP архивы
+
+9.4. THE dev mode SHALL использовать флаг `--dir` для electron-builder
+
+9.5. THE dev mode SHALL быть быстрее чем полный production build (target: <30 секунд)
+
+9.6. THE unpacked .app bundle SHALL быть расположен в `release/mac-arm64/Clerkly.app`
+
+9.7. THE команда `npm run dev:app` SHALL автоматически открывать приложение после сборки
+
+9.8. WHEN OAuth callback происходит, THE deep link SHALL корректно обрабатываться приложением
+
+9.9. THE dev mode SHALL поддерживать hot reload через пересборку и перезапуск
+
+9.10. THE команда `npm run dev` (без :app) SHALL оставаться для быстрой разработки без deep links
+
 ## Вне Области Применения
 
 Следующие элементы явно исключены из данной спецификации:

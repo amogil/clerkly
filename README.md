@@ -40,11 +40,17 @@ npm run validate
 
 ### Разработка
 ```bash
-npm start                # Запуск приложения (production build)
-npm run dev              # Запуск для разработки (быстрая сборка)
+npm start                # Запуск приложения (production build с DMG, 60-90 сек)
+npm run dev              # Быстрая разработка БЕЗ deep links (10-15 сек)
+npm run dev:app          # Разработка С deep links для OAuth (20-30 сек)
 npm run build            # Сборка проекта
 npm run typecheck        # Проверка типов
 ```
+
+**Выбор режима разработки:**
+- `npm run dev` - для обычной разработки UI/логики (быстро)
+- `npm run dev:app` - для тестирования OAuth flow с Google (средне)
+- `npm start` - для финального тестирования перед релизом (медленно)
 
 ### Тестирование
 ```bash

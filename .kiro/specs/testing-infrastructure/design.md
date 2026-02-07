@@ -315,6 +315,70 @@ afterEach(() => {
 # Интеграционные и функциональные тесты НЕ запускаются в CI
 ```
 
+## Development Mode с Поддержкой Deep Links
+
+**Requirements**: testing.9
+
+### Проблема
+
+В обычном dev mode (`npm run dev`) приложение запускается через `electron .`, что не создает `.app` bundle. Это приводит к проблемам:
+
+1. **Deep links не работают**: macOS не может зарегистрировать custom protocol handler без `.app` bundle с Info.plist
+2. **OAuth callback не работает**: Google OAuth redirect на `clerkly://oauth/callback` не обрабатывается
+3. **Невозможно тестировать OAuth flow**: Приходится использовать полный production build (`npm run start`), который занимает 60-90 секунд
+
+### Решение: Unpacked .app Bundle
+
+**Requirements**: testing.9.1, testing.9.2, testing.9.3, testing.9.4
+
+Используем `electron-builder --dir` для создания unpacked `.app` bundle без DMG/ZIP архивов:
+
+```json
+{
+  "scripts": {
+    "dev": "npm run build && electron .",
+    "dev:app": "npm run build && electron-builder --mac --dir && open release/mac-arm64/Clerkly.app"
+  }
+}
+```
+
+### Преимущества
+
+**Requirements**: testing.9.5, testing.9.6, testing.9.7, testing.9.8
+
+1. **Быстрее production build**: ~20-30 секунд vs 60-90 секунд
+2. **Deep links работают**: `.app` bundle корректно регистрирует protocol handler
+3. **OAuth flow работает**: Можно тестировать полный OAuth flow с Google
+4. **Автоматический запуск**: Приложение открывается автоматически после сборки
+
+### Использование
+
+**Requirements**: testing.9.9, testing.9.10
+
+```bash
+# Быстрая разработка БЕЗ deep links (10-15 секунд)
+npm run dev
+
+# Разработка С deep links для тестирования OAuth (20-30 секунд)
+npm run dev:app
+```
+
+### Workflow
+
+1. **Обычная разработка**: Используйте `npm run dev` для быстрого цикла разработки
+2. **Тестирование OAuth**: Используйте `npm run dev:app` когда нужно протестировать OAuth flow
+3. **Production build**: Используйте `npm run start` перед релизом для создания DMG
+
+### Технические Детали
+
+**Requirements**: testing.9.2
+
+Флаг `--dir` создает unpacked `.app` bundle в `release/mac-arm64/Clerkly.app` с:
+- Правильным Info.plist с CFBundleURLTypes для custom protocol
+- Правильной структурой .app bundle
+- Всеми необходимыми ресурсами и зависимостями
+- Корректной регистрацией protocol handler в macOS
+
 ## Критерии Успеха
 
 1. ✅ Модульные тесты выполняются < 10 секунд

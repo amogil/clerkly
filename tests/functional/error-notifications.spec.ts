@@ -125,8 +125,7 @@ test('should log errors to console', async () => {
 
   // Check that error was logged
   const hasErrorLog = consoleMessages.some(
-    (msg) =>
-      msg.includes('[App] Error notification received') && msg.includes('Test error logging')
+    (msg) => msg.includes('[App] Error notification received') && msg.includes('Test error logging')
   );
 
   expect(hasErrorLog).toBe(true);

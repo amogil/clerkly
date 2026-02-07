@@ -559,6 +559,193 @@ npm test
 
 ---
 
+## 10. Development Mode с Поддержкой Deep Links
+
+### 10.1 Добавить npm скрипт для dev mode с deep links
+
+**Requirements:** testing.9.1, testing.9.2, testing.9.3, testing.9.4
+
+**Описание:** Создать команду `npm run dev:app` для быстрой разработки с поддержкой OAuth deep links.
+
+**Детали:**
+- Использовать `electron-builder --mac --dir` для создания unpacked .app bundle
+- Не создавать DMG или ZIP архивы
+- Автоматически открывать приложение после сборки
+- Обеспечить правильную регистрацию custom protocol handler
+
+- [x] 10.1.1 Добавить команду dev:app в package.json
+
+**Requirements:** testing.9.1, testing.9.4, testing.9.7
+
+**Детали:**
+```json
+{
+  "scripts": {
+    "dev:app": "npm run build && npx electron-builder --mac --dir && open release/mac-arm64/Clerkly.app"
+  }
+}
+```
+
+- [x] 10.1.2 Добавить protocols конфигурацию в package.json
+
+**Requirements:** testing.9.2
+
+**Детали:**
+```json
+{
+  "build": {
+    "protocols": [
+      {
+        "name": "Clerkly OAuth",
+        "schemes": [
+          "com.googleusercontent.apps.100365225505-a9mp4sll4948tafotr1va0fvnl5hrpoa"
+        ]
+      }
+    ]
+  }
+}
+```
+
+### 10.2 Обновить документацию
+
+**Requirements:** testing.9.5, testing.9.9, testing.9.10
+
+**Описание:** Добавить документацию о новом dev mode в README.md и OAUTH_SETUP.md.
+
+**Детали:**
+- Объяснить разницу между `npm run dev` и `npm run dev:app`
+- Указать время выполнения каждой команды
+- Добавить рекомендации по использованию
+
+- [x] 10.2.1 Обновить README.md
+
+**Requirements:** testing.9.5, testing.9.10
+
+**Детали:**
+```markdown
+### Разработка
+```bash
+npm start                # Запуск приложения (production build с DMG, 60-90 сек)
+npm run dev              # Быстрая разработка БЕЗ deep links (10-15 сек)
+npm run dev:app          # Разработка С deep links для OAuth (20-30 сек)
+npm run build            # Сборка проекта
+npm run typecheck        # Проверка типов
+```
+
+**Выбор режима разработки:**
+- `npm run dev` - для обычной разработки UI/логики (быстро)
+- `npm run dev:app` - для тестирования OAuth flow с Google (средне)
+- `npm start` - для финального тестирования перед релизом (медленно)
+```
+
+- [x] 10.2.2 Обновить OAUTH_SETUP.md
+
+**Requirements:** testing.9.8, testing.9.9
+
+**Детали:**
+```markdown
+### 8. Запустите приложение
+
+```bash
+# Production build с DMG (медленно, 60-90 сек)
+npm start
+
+# Dev mode с deep links (быстро, 20-30 сек) - РЕКОМЕНДУЕТСЯ для разработки
+npm run dev:app
+
+# Dev mode без deep links (очень быстро, 10-15 сек) - для UI разработки
+npm run dev
+```
+
+**Рекомендация**: Используйте `npm run dev:app` для разработки с OAuth - это создает unpacked .app bundle с правильной регистрацией protocol handler, но без создания DMG.
+```
+
+- [x] 10.2.3 Добавить troubleshooting секцию в OAUTH_SETUP.md
+
+**Requirements:** testing.9.8
+
+**Детали:**
+```markdown
+### Deep Links не работают в dev mode (`npm run dev`)
+
+**Проблема**: При запуске через `electron .` приложение не регистрируется как обработчик custom protocol в macOS.
+
+**Решение**: Используйте `npm run dev:app` вместо `npm run dev` для тестирования OAuth flow.
+
+**Почему**: macOS требует `.app` bundle с Info.plist, содержащим CFBundleURLTypes.
+```
+
+### 10.3 Обновить спецификации
+
+**Requirements:** testing.9
+
+**Описание:** Добавить требование testing.9 в requirements.md и дизайн в design.md.
+
+**Детали:**
+- Добавить новое требование testing.9 в requirements.md
+- Добавить секцию "Development Mode с Поддержкой Deep Links" в design.md
+- Объяснить проблему и решение
+
+- [x] 10.3.1 Добавить требование testing.9 в requirements.md
+
+**Requirements:** testing.9
+
+**Детали:**
+```markdown
+### 9. Development Mode с Поддержкой Deep Links
+
+**ID:** testing.9
+
+**User Story:** Как разработчик, я хочу иметь быстрый dev mode с поддержкой OAuth deep links, чтобы тестировать полный OAuth flow без создания production build.
+
+**Зависимости:** Нет
+
+#### Критерии Приемки
+
+9.1. THE команда `npm run dev:app` SHALL создавать unpacked .app bundle с помощью electron-builder
+9.2. THE unpacked .app bundle SHALL корректно регистрировать custom protocol handler для deep links
+9.3. THE dev mode SHALL НЕ создавать DMG или ZIP архивы
+9.4. THE dev mode SHALL использовать флаг `--dir` для electron-builder
+9.5. THE dev mode SHALL быть быстрее чем полный production build (target: <30 секунд)
+9.6. THE unpacked .app bundle SHALL быть расположен в `release/mac-arm64/Clerkly.app`
+9.7. THE команда `npm run dev:app` SHALL автоматически открывать приложение после сборки
+9.8. WHEN OAuth callback происходит, THE deep link SHALL корректно обрабатываться приложением
+9.9. THE dev mode SHALL поддерживать hot reload через пересборку и перезапуск
+9.10. THE команда `npm run dev` (без :app) SHALL оставаться для быстрой разработки без deep links
+```
+
+- [x] 10.3.2 Добавить секцию в design.md
+
+**Requirements:** testing.9
+
+**Детали:**
+```markdown
+## Development Mode с Поддержкой Deep Links
+
+**Requirements**: testing.9
+
+### Проблема
+
+В обычном dev mode (`npm run dev`) приложение запускается через `electron .`, что не создает `.app` bundle. Это приводит к проблемам:
+
+1. **Deep links не работают**: macOS не может зарегистрировать custom protocol handler без `.app` bundle с Info.plist
+2. **OAuth callback не работает**: Google OAuth redirect на `clerkly://oauth/callback` не обрабатывается
+3. **Невозможно тестировать OAuth flow**: Приходится использовать полный production build (`npm run start`), который занимает 60-90 секунд
+
+### Решение: Unpacked .app Bundle
+
+Используем `electron-builder --dir` для создания unpacked `.app` bundle без DMG/ZIP архивов.
+
+### Преимущества
+
+1. **Быстрее production build**: ~20-30 секунд vs 60-90 секунд
+2. **Deep links работают**: `.app` bundle корректно регистрирует protocol handler
+3. **OAuth flow работает**: Можно тестировать полный OAuth flow с Google
+4. **Автоматический запуск**: Приложение открывается автоматически после сборки
+```
+
+---
+
 ## Критерии Завершения
 
 Все задачи считаются завершенными когда:
@@ -574,4 +761,5 @@ npm test
 - ✅ Проверка графической среды реализована
 - ✅ Документация обновлена
 - ✅ `npm run validate` проходит успешно
+- ✅ Dev mode с deep links реализован и задокументирован
 - ✅ Все требования покрыты задачами
