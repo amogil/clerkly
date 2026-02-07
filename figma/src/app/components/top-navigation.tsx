@@ -1,4 +1,4 @@
-import { LayoutDashboard, Calendar, CheckSquare, Users, Settings } from 'lucide-react';
+import { LayoutDashboard, Calendar, CheckSquare, Users, Settings, Zap } from 'lucide-react';
 import { Logo } from './logo';
 
 interface TopNavigationProps {
@@ -12,6 +12,7 @@ export function TopNavigation({ currentScreen, onNavigate }: TopNavigationProps)
     { id: 'calendar', label: 'Calendar', icon: Calendar },
     { id: 'tasks', label: 'Tasks', icon: CheckSquare },
     { id: 'contacts', label: 'Contacts', icon: Users },
+    { id: 'triggers', label: 'Triggers', icon: Zap },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
 

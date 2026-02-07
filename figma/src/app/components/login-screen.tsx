@@ -25,7 +25,7 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
               Welcome
             </h2>
             <p className="text-sm text-muted-foreground">
-              Your autonomous AI agent that listens, organizes, and&nbsp;acts
+              Your autonomous AI agent that listens, organizes, and acts
             </p>
           </div>
 

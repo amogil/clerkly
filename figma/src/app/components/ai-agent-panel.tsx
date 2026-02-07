@@ -147,6 +147,12 @@ export function AIAgentPanel({ onCommand }: AIAgentPanelProps) {
       'task-2': [
         {
           id: 't2-1',
+          type: 'user',
+          content: 'Transcribe the Product Roadmap Review meeting and extract all action items',
+          timestamp: new Date('2026-02-02T14:29:00'),
+        },
+        {
+          id: 't2-2',
           type: 'agent',
           content: (
             <div className="space-y-2">
@@ -157,7 +163,7 @@ export function AIAgentPanel({ onCommand }: AIAgentPanelProps) {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-sm">Product Roadmap Review</p>
-                  <p className="text-xs text-muted-foreground">Audio duration: 45 minutes</p>
+                  <p className="text-xs text-muted-foreground">Audio duration: 45 minutes · 6 participants</p>
                 </div>
               </div>
             </div>
@@ -165,13 +171,40 @@ export function AIAgentPanel({ onCommand }: AIAgentPanelProps) {
           timestamp: new Date('2026-02-02T14:30:00'),
         },
         {
-          id: 't2-2',
+          id: 't2-3',
+          type: 'user',
+          content: 'How many action items have you found so far?',
+          timestamp: new Date('2026-02-02T14:33:00'),
+        },
+        {
+          id: 't2-4',
           type: 'agent',
           content: (
             <div className="space-y-2">
-              <p>Transcription in progress. Identified 8 action items so far.</p>
+              <p>I've identified <strong>8 action items</strong> so far from the first 15 minutes:</p>
+              <div className="mt-3 space-y-2 pl-3 border-l-2 border-primary/30">
+                <div className="text-sm">
+                  <p className="text-muted-foreground text-xs mb-1">Sarah Chen</p>
+                  <p>Review API authentication flow by Friday</p>
+                </div>
+                <div className="text-sm">
+                  <p className="text-muted-foreground text-xs mb-1">Alex Kumar</p>
+                  <p>Schedule design critique for mobile redesign</p>
+                </div>
+                <div className="text-sm">
+                  <p className="text-muted-foreground text-xs mb-1">Maria Santos</p>
+                  <p>Update Jira roadmap with Q2 priorities</p>
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">+ 5 more items being processed...</p>
+              </div>
             </div>
           ),
+          timestamp: new Date('2026-02-02T14:33:30'),
+        },
+        {
+          id: 't2-5',
+          type: 'agent',
+          content: 'Still processing the meeting audio and analyzing context...',
           timestamp: new Date('2026-02-02T14:35:00'),
         },
       ],
@@ -666,29 +699,36 @@ export function AIAgentPanel({ onCommand }: AIAgentPanelProps) {
 
       {/* Messages Area - always shows current task messages */}
       <div className="flex-1 overflow-y-auto p-6 space-y-4">
-        {currentMessages.map((message) => (
-          <div key={message.id} className="space-y-1">
-            {message.type === 'user' ? (
-              <div className="ml-auto max-w-[80%] rounded-lg border-2 border-primary bg-primary/5 px-4 py-3">
-                <p className="text-sm leading-relaxed text-foreground">{message.content}</p>
-              </div>
-            ) : (
-              <div className="flex gap-3 items-start">
-                {/* Agent avatar with animated logo */}
-                <div className="flex-shrink-0 mt-0.5">
-                  <Logo size="sm" showText={false} animated={selectedTask.status === 'in-progress'} />
+        {currentMessages.map((message, index) => {
+          // Check if we should show the agent avatar
+          // Show it only if this is the first message or the previous message was from user
+          const showAvatar = message.type === 'agent' && (index === 0 || currentMessages[index - 1].type === 'user');
+          
+          return (
+            <div key={message.id}>
+              {message.type === 'user' ? (
+                <div className="flex justify-end">
+                  <div className="rounded-lg border-2 border-primary bg-primary/5 px-4 py-3">
+                    <p className="text-sm leading-relaxed text-foreground text-right">{message.content}</p>
+                  </div>
                 </div>
-                {/* Agent message content */}
-                <div className="flex-1 max-w-[85%] text-sm leading-relaxed text-foreground">
-                  {message.content}
-                </div>
-              </div>
-            )}
-            <div className={`text-xs text-muted-foreground ${message.type === 'user' ? 'text-right' : 'ml-12'}`}>
-              {formatTime(message.timestamp)}
+              ) : (
+                <>
+                  {/* Agent avatar above first message in sequence */}
+                  {showAvatar && (
+                    <div className="mb-2">
+                      <Logo size="sm" showText={false} animated={selectedTask.status === 'in-progress'} />
+                    </div>
+                  )}
+                  {/* Agent message content */}
+                  <div className="max-w-[85%] text-sm leading-relaxed text-foreground">
+                    {message.content}
+                  </div>
+                </>
+              )}
             </div>
-          </div>
-        ))}
+          );
+        })}
         <div ref={messagesEndRef} />
       </div>
 

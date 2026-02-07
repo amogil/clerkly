@@ -1,124 +1,30 @@
 import { Plus, Mail, Phone, Building, Calendar, Edit2, Trash2, Search, UserPlus } from 'lucide-react';
 import { useState, useEffect } from 'react';
-
-interface Contact {
-  id: string;
-  name: string;
-  email: string;
-  phone?: string;
-  company?: string;
-  role?: string;
-  source: 'manual' | 'google-calendar';
-  meetingsCount: number;
-  lastMeeting?: string;
-}
+import { useContacts } from '@/app/contexts/contacts-context';
+import { getDisplayName, getPrimaryEmail, getPrimaryPhone, getCompanyName, getJobTitle, getInitials, isGoogleContact } from '@/app/types/contact';
 
 interface ContactsProps {
   triggerAction?: { action: string; params: any } | null;
 }
 
 export function Contacts({ triggerAction }: ContactsProps) {
+  const { contacts, addContact, deleteContact } = useContacts();
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
 
-  const [contacts, setContacts] = useState<Contact[]>([
-    {
-      id: '1',
-      name: 'Sarah Chen',
-      email: 'sarah.chen@company.com',
-      phone: '+1 (555) 123-4567',
-      company: 'TechCorp',
-      role: 'Product Manager',
-      source: 'google-calendar',
-      meetingsCount: 24,
-      lastMeeting: 'Today, 2:30 PM',
-    },
-    {
-      id: '2',
-      name: 'Mike Johnson',
-      email: 'mike.johnson@company.com',
-      phone: '+1 (555) 234-5678',
-      company: 'TechCorp',
-      role: 'Engineering Manager',
-      source: 'google-calendar',
-      meetingsCount: 18,
-      lastMeeting: 'Today, 2:30 PM',
-    },
-    {
-      id: '3',
-      name: 'Alex Rivera',
-      email: 'alex.rivera@company.com',
-      phone: '+1 (555) 345-6789',
-      company: 'TechCorp',
-      role: 'Senior Engineer',
-      source: 'google-calendar',
-      meetingsCount: 15,
-      lastMeeting: 'Today, 2:30 PM',
-    },
-    {
-      id: '4',
-      name: 'Jessica Liu',
-      email: 'jessica.liu@company.com',
-      company: 'TechCorp',
-      role: 'UX Designer',
-      source: 'google-calendar',
-      meetingsCount: 12,
-      lastMeeting: 'Yesterday, 10:00 AM',
-    },
-    {
-      id: '5',
-      name: 'David Lee',
-      email: 'david.lee@company.com',
-      phone: '+1 (555) 456-7890',
-      company: 'TechCorp',
-      role: 'Product Designer',
-      source: 'manual',
-      meetingsCount: 10,
-      lastMeeting: 'Yesterday, 9:00 AM',
-    },
-    {
-      id: '6',
-      name: 'Emma Wilson',
-      email: 'emma.wilson@company.com',
-      company: 'TechCorp',
-      role: 'Frontend Developer',
-      source: 'google-calendar',
-      meetingsCount: 14,
-      lastMeeting: 'Yesterday, 9:00 AM',
-    },
-    {
-      id: '7',
-      name: 'Jennifer Smith',
-      email: 'jennifer.smith@clientco.com',
-      phone: '+1 (555) 567-8901',
-      company: 'ClientCo',
-      role: 'CEO',
-      source: 'manual',
-      meetingsCount: 3,
-      lastMeeting: 'Yesterday, 3:15 PM',
-    },
-    {
-      id: '8',
-      name: 'Tom Anderson',
-      email: 'tom.anderson@clientco.com',
-      company: 'ClientCo',
-      role: 'CTO',
-      source: 'google-calendar',
-      meetingsCount: 3,
-      lastMeeting: 'Yesterday, 3:15 PM',
-    },
-  ]);
-
-  const filteredContacts = contacts.filter(contact =>
-    contact.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    contact.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    contact.company?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredContacts = contacts.filter(contact => {
+    const displayName = getDisplayName(contact).toLowerCase();
+    const email = getPrimaryEmail(contact)?.toLowerCase() || '';
+    const company = getCompanyName(contact)?.toLowerCase() || '';
+    const query = searchQuery.toLowerCase();
+    
+    return displayName.includes(query) || email.includes(query) || company.includes(query);
+  });
 
   const stats = {
     total: contacts.length,
-    fromCalendar: contacts.filter(c => c.source === 'google-calendar').length,
-    manual: contacts.filter(c => c.source === 'manual').length,
+    fromGoogle: contacts.filter(c => isGoogleContact(c)).length,
+    manual: contacts.filter(c => !isGoogleContact(c)).length,
   };
 
   // Handle AI agent commands
@@ -126,16 +32,16 @@ export function Contacts({ triggerAction }: ContactsProps) {
     if (!triggerAction) return;
     
     if (triggerAction.action === 'create' && triggerAction.params.entity === 'contact') {
-      const newContact: Contact = {
-        id: Date.now().toString(),
-        name: triggerAction.params.name || 'Unnamed Contact',
-        email: '',
-        source: 'manual',
+      const newContact = {
+        resourceName: `people/c${Date.now()}`,
+        names: [{ displayName: triggerAction.params.name || 'Unnamed Contact' }],
+        emailAddresses: [],
+        metadata: { sources: [{ type: 'PROFILE' }] },
         meetingsCount: 0,
       };
-      setContacts((prev) => [...prev, newContact]);
+      addContact(newContact);
     }
-  }, [triggerAction]);
+  }, [triggerAction, addContact]);
 
   return (
     <div className="p-8">
@@ -163,96 +69,108 @@ export function Contacts({ triggerAction }: ContactsProps) {
         {/* Contacts List */}
         <div className="bg-card rounded-xl border border-border shadow-sm">
           <div className="divide-y divide-border">
-            {filteredContacts.map((contact) => (
-              <div
-                key={contact.id}
-                className="p-6 hover:bg-secondary/30 transition-colors"
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex items-start gap-4 flex-1">
-                    <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-                      <span className="text-lg font-semibold text-primary">
-                        {contact.name.split(' ').map(n => n[0]).join('')}
-                      </span>
-                    </div>
-                    
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-1">
-                        <h3 className="font-semibold text-foreground">
-                          {contact.name}
-                        </h3>
-                        <span
-                          className={`text-xs px-2 py-0.5 rounded-full ${
-                            contact.source === 'google-calendar'
-                              ? 'bg-blue-50 text-blue-700 border border-blue-200'
-                              : 'bg-green-50 text-green-700 border border-green-200'
-                          }`}
-                        >
-                          {contact.source === 'google-calendar' ? 'Google Calendar' : 'Manual'}
+            {filteredContacts.map((contact) => {
+              const displayName = getDisplayName(contact);
+              const email = getPrimaryEmail(contact);
+              const phone = getPrimaryPhone(contact);
+              const company = getCompanyName(contact);
+              const jobTitle = getJobTitle(contact);
+              const initials = getInitials(contact);
+              const isFromGoogle = isGoogleContact(contact);
+              
+              return (
+                <div
+                  key={contact.resourceName}
+                  className="p-6 hover:bg-secondary/30 transition-colors"
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-start gap-4 flex-1">
+                      <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                        <span className="text-lg font-semibold text-primary">
+                          {initials}
                         </span>
                       </div>
                       
-                      {contact.role && (
-                        <p className="text-sm text-muted-foreground mb-3">
-                          {contact.role} {contact.company && `at ${contact.company}`}
-                        </p>
-                      )}
-                      
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2 text-sm">
-                          <Mail className="w-4 h-4 text-muted-foreground" />
-                          <a
-                            href={`mailto:${contact.email}`}
-                            className="text-primary hover:underline"
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-1">
+                          <h3 className="font-semibold text-foreground">
+                            {displayName}
+                          </h3>
+                          <span
+                            className={`text-xs px-2 py-0.5 rounded-full ${
+                              isFromGoogle
+                                ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                                : 'bg-green-50 text-green-700 border border-green-200'
+                            }`}
                           >
-                            {contact.email}
-                          </a>
+                            {isFromGoogle ? 'Google Contacts' : 'Manual'}
+                          </span>
                         </div>
                         
-                        {contact.phone && (
-                          <div className="flex items-center gap-2 text-sm">
-                            <Phone className="w-4 h-4 text-muted-foreground" />
-                            <span className="text-foreground">{contact.phone}</span>
-                          </div>
+                        {jobTitle && (
+                          <p className="text-sm text-muted-foreground mb-3">
+                            {jobTitle} {company && `at ${company}`}
+                          </p>
                         )}
                         
-                        {contact.company && (
-                          <div className="flex items-center gap-2 text-sm">
-                            <Building className="w-4 h-4 text-muted-foreground" />
-                            <span className="text-foreground">{contact.company}</span>
-                          </div>
-                        )}
-                        
-                        <div className="flex items-center gap-2 text-sm">
-                          <Calendar className="w-4 h-4 text-muted-foreground" />
-                          <span className="text-muted-foreground">
-                            {contact.meetingsCount} meetings
-                            {contact.lastMeeting && ` · Last: ${contact.lastMeeting}`}
-                          </span>
+                        <div className="space-y-2">
+                          {email && (
+                            <div className="flex items-center gap-2 text-sm">
+                              <Mail className="w-4 h-4 text-muted-foreground" />
+                              <a
+                                href={`mailto:${email}`}
+                                className="text-primary hover:underline"
+                              >
+                                {email}
+                              </a>
+                            </div>
+                          )}
+                          
+                          {phone && (
+                            <div className="flex items-center gap-2 text-sm">
+                              <Phone className="w-4 h-4 text-muted-foreground" />
+                              <span className="text-foreground">{phone}</span>
+                            </div>
+                          )}
+                          
+                          {company && !jobTitle && (
+                            <div className="flex items-center gap-2 text-sm">
+                              <Building className="w-4 h-4 text-muted-foreground" />
+                              <span className="text-foreground">{company}</span>
+                            </div>
+                          )}
+                          
+                          {contact.meetingsCount !== undefined && (
+                            <div className="flex items-center gap-2 text-sm">
+                              <Calendar className="w-4 h-4 text-muted-foreground" />
+                              <span className="text-muted-foreground">
+                                {contact.meetingsCount} meetings
+                                {contact.lastMeeting && ` · Last: ${contact.lastMeeting}`}
+                              </span>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
-                  </div>
 
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => setShowAddModal(true)}
-                      className="p-2 hover:bg-secondary rounded-lg transition-colors"
-                    >
-                      <Edit2 className="w-4 h-4 text-muted-foreground" />
-                    </button>
-                    <button
-                      onClick={() => {
-                        // Delete contact logic
-                      }}
-                      className="p-2 hover:bg-secondary rounded-lg transition-colors"
-                    >
-                      <Trash2 className="w-4 h-4 text-muted-foreground" />
-                    </button>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setShowAddModal(true)}
+                        className="p-2 hover:bg-secondary rounded-lg transition-colors"
+                      >
+                        <Edit2 className="w-4 h-4 text-muted-foreground" />
+                      </button>
+                      <button
+                        onClick={() => deleteContact(contact.resourceName)}
+                        className="p-2 hover:bg-secondary rounded-lg transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4 text-muted-foreground" />
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {filteredContacts.length === 0 && (

@@ -1,4 +1,5 @@
 import { Clock, PlayCircle, Play } from 'lucide-react';
+import { useTasks } from '@/app/contexts/tasks-context';
 
 interface DashboardProps {
   onNavigateToMeeting: (meetingId: string) => void;
@@ -7,6 +8,8 @@ interface DashboardProps {
 }
 
 export function DashboardUpdated({ onNavigateToMeeting, onNavigateToCalendar, onNavigateToTasks }: DashboardProps) {
+  const { tasks, taskLists, updateTask } = useTasks();
+
   const todaySchedule = [
     {
       id: '1',
@@ -38,54 +41,13 @@ export function DashboardUpdated({ onNavigateToMeeting, onNavigateToCalendar, on
     },
   ];
 
-  // Tasks for today
-  const todayTasks = [
-    {
-      id: '1',
-      title: 'Review API documentation',
-      project: 'Backend Migration',
-      assignee: 'Sarah Chen',
-      deadline: '2026-01-28',
-      priority: 'high' as const,
-      status: 'in-progress' as const,
-    },
-    {
-      id: '2',
-      title: 'Update user authentication flow',
-      project: 'Security Updates',
-      assignee: 'Mike Johnson',
-      deadline: '2026-01-28',
-      priority: 'high' as const,
-      status: 'todo' as const,
-    },
-    {
-      id: '3',
-      title: 'Design system color tokens',
-      project: 'Design System v2',
-      assignee: 'Alex Rivera',
-      deadline: '2026-01-28',
-      priority: 'medium' as const,
-      status: 'in-progress' as const,
-    },
-    {
-      id: '4',
-      title: 'Write test cases for payment module',
-      project: 'Payment Integration',
-      assignee: 'Emma Wilson',
-      deadline: '2026-01-28',
-      priority: 'medium' as const,
-      status: 'todo' as const,
-    },
-    {
-      id: '5',
-      title: 'Code review for PR #234',
-      project: 'Feature Development',
-      assignee: 'David Lee',
-      deadline: '2026-01-28',
-      priority: 'low' as const,
-      status: 'completed' as const,
-    },
-  ];
+  // Tasks for today (filter by due date = today: 2026-02-05)
+  const today = '2026-02-05';
+  const todayTasks = tasks.filter(task => {
+    if (!task.due) return false;
+    const taskDate = task.due.split('T')[0];
+    return taskDate === today;
+  });
 
   const handleStartRecording = (meetingId: string) => {
     console.log('Starting recording for meeting:', meetingId);
@@ -217,53 +179,50 @@ export function DashboardUpdated({ onNavigateToMeeting, onNavigateToCalendar, on
               </button>
             </div>
             <div className="divide-y divide-border">
-              {todayTasks.map((task) => (
-                <div
-                  key={task.id}
-                  className="p-6 hover:bg-secondary/30 transition-colors cursor-pointer"
-                  onClick={() => console.log('Open task:', task.id)}
-                >
-                  <div className="flex items-start gap-3">
-                    <input
-                      type="checkbox"
-                      checked={task.status === 'completed'}
-                      onChange={(e) => {
-                        e.stopPropagation();
-                        console.log('Toggle task:', task.id);
-                      }}
-                      className="mt-1 w-4 h-4 rounded border-border text-primary focus:ring-primary"
-                    />
-                    <div className="flex-1">
-                      <h3 className={`font-semibold mb-1 ${task.status === 'completed' ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
-                        {task.title}
-                      </h3>
-                      <p className="text-sm text-muted-foreground mb-2">{task.project}</p>
-                      
-                      <div className="flex items-center gap-3">
-                        {/* Priority badge */}
-                        <span className={`text-xs px-2 py-1 rounded border ${getPriorityColor(task.priority)}`}>
-                          {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
-                        </span>
+              {todayTasks.map((task) => {
+                const taskListTitle = taskLists.find(list => list.id === task.taskListId)?.title || 'Unknown List';
+                return (
+                  <div
+                    key={task.id}
+                    className="p-6 hover:bg-secondary/30 transition-colors cursor-pointer"
+                    onClick={() => console.log('Open task:', task.id)}
+                  >
+                    <div className="flex items-start gap-3">
+                      <input
+                        type="checkbox"
+                        checked={task.status === 'completed'}
+                        onChange={(e) => {
+                          e.stopPropagation();
+                          updateTask(task.id, { 
+                            status: task.status === 'completed' ? 'needsAction' : 'completed' 
+                          });
+                        }}
+                        className="mt-1 w-4 h-4 rounded border-border text-primary focus:ring-primary"
+                      />
+                      <div className="flex-1">
+                        <h3 className={`font-semibold mb-1 ${task.status === 'completed' ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
+                          {task.title}
+                        </h3>
+                        {task.notes && (
+                          <p className="text-sm text-muted-foreground mb-2">{task.notes}</p>
+                        )}
                         
-                        {/* Status */}
-                        <span className={`text-xs ${getTaskStatusColor(task.status)}`}>
-                          {task.status === 'todo' && 'To Do'}
-                          {task.status === 'in-progress' && 'In Progress'}
-                          {task.status === 'completed' && 'Completed'}
-                        </span>
-                        
-                        {/* Assignee */}
-                        <div className="flex items-center gap-1.5">
-                          <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium text-primary">
-                            {task.assignee.split(' ').map(n => n[0]).join('')}
-                          </div>
-                          <span className="text-xs text-muted-foreground">{task.assignee}</span>
+                        <div className="flex items-center gap-3">
+                          {/* Task List badge */}
+                          <span className="text-xs px-2 py-1 rounded border bg-blue-50 text-blue-700 border-blue-200">
+                            {taskListTitle}
+                          </span>
+                          
+                          {/* Status */}
+                          <span className={`text-xs ${task.status === 'completed' ? 'text-green-600' : 'text-muted-foreground'}`}>
+                            {task.status === 'needsAction' ? 'Pending' : 'Completed'}
+                          </span>
                         </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
               
               {todayTasks.length === 0 && (
                 <div className="p-8 text-center">

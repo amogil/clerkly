@@ -1,24 +1,22 @@
-export type TaskPriority = 'low' | 'medium' | 'high' | 'urgent';
-export type TaskStatus = 'pending' | 'in-progress' | 'completed';
+export type TaskStatus = 'needsAction' | 'completed';
 
 export interface Task {
   id: string;
   title: string;
-  description: string;
-  priority: TaskPriority;
+  notes?: string;  // Optional description field from Google Tasks
   status: TaskStatus;
-  assignee: string;
-  relatedPeople: string[];
-  dueDate: Date;
-  projectId: string;
+  due?: string;  // RFC 3339 timestamp, optional
+  taskListId: string;  // Reference to task list
+  parent?: string;  // Parent task ID for subtasks
+  position?: string;  // String indicating position in list
+  links?: Array<{ type: string; description: string; link: string }>;
   createdAt: Date;
   updatedAt: Date;
 }
 
-export interface Project {
+export interface TaskList {
   id: string;
   title: string;
-  description: string;
   createdAt: Date;
   updatedAt: Date;
 }
