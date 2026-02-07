@@ -906,6 +906,179 @@ async fetchProfile(): Promise<UserProfile | null> {
 - Данные пользователя в базе данных сохраняются и будут отображены при следующей авторизации
 - Приложение готово к новой авторизации
 
+#### 9. Ошибка шифрования API ключа
+
+**Причины:**
+- safeStorage API недоступен на некоторых Linux системах
+- Проблемы с системным keychain (macOS)
+- Недостаточно прав доступа
+
+**Обработка:**
+```typescript
+// Requirements: ui.10.9, ui.10.10
+async saveAPIKey(provider: string, apiKey: string): Promise<void> {
+  try {
+    const { safeStorage } = require('electron');
+    let encryptedKey: string;
+    let isEncrypted: boolean;
+
+    if (safeStorage.isEncryptionAvailable()) {
+      try {
+        const buffer = safeStorage.encryptString(apiKey);
+        encryptedKey = buffer.toString('base64');
+        isEncrypted = true;
+        console.log(`[AIAgentSettingsManager] API key encrypted for ${provider}`);
+      } catch (encryptError) {
+        console.warn(`[AIAgentSettingsManager] Encryption failed, falling back to plain text:`, encryptError);
+        encryptedKey = apiKey;
+        isEncrypted = false;
+      }
+    } else {
+      console.log(`[AIAgentSettingsManager] Encryption unavailable, storing plain text for ${provider}`);
+      encryptedKey = apiKey;
+      isEncrypted = false;
+    }
+
+    await this.dataManager.saveData(`ai_agent_api_key_${provider}`, encryptedKey);
+    await this.dataManager.saveData(`ai_agent_api_key_${provider}_encrypted`, isEncrypted);
+  } catch (error) {
+    console.error(`[AIAgentSettingsManager] Failed to save API key:`, error);
+    throw error;
+  }
+}
+```
+
+**Результат:** API ключ сохраняется как plain text, флаг encrypted=false. Приложение продолжает работу.
+
+#### 10. Ошибка дешифрования API ключа
+
+**Причины:**
+- Ключ был зашифрован на другой системе
+- Системный keychain изменился
+- Поврежденные данные
+
+**Обработка:**
+```typescript
+// Requirements: ui.10.17
+async loadAPIKey(provider: string): Promise<string | null> {
+  try {
+    const keyResult = await this.dataManager.loadData(`ai_agent_api_key_${provider}`);
+    const encryptedResult = await this.dataManager.loadData(`ai_agent_api_key_${provider}_encrypted`);
+
+    if (!keyResult.success || !keyResult.data) {
+      return null;
+    }
+
+    const storedKey = keyResult.data as string;
+    const isEncrypted = encryptedResult.success && encryptedResult.data === true;
+
+    if (isEncrypted) {
+      try {
+        const { safeStorage } = require('electron');
+        const buffer = Buffer.from(storedKey, 'base64');
+        const decryptedKey = safeStorage.decryptString(buffer);
+        return decryptedKey;
+      } catch (decryptError) {
+        console.error(`[AIAgentSettingsManager] Decryption failed for ${provider}:`, decryptError);
+        // Return null, user will need to re-enter the key
+        return null;
+      }
+    }
+
+    return storedKey;
+  } catch (error) {
+    console.error(`[AIAgentSettingsManager] Failed to load API key:`, error);
+    return null;
+  }
+}
+```
+
+**Результат:** Возвращается null, пользователь видит пустое поле и может ввести ключ заново.
+
+#### 11. Ошибка загрузки системной локали
+
+**Причины:**
+- Некорректные системные настройки
+- Неподдерживаемая локаль
+- Ошибка Intl API
+
+**Обработка:**
+```typescript
+// Requirements: ui.11.1
+static formatDate(timestamp: number): string {
+  try {
+    const formatter = new Intl.DateTimeFormat(undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+    return formatter.format(new Date(timestamp));
+  } catch (error) {
+    console.error('[DateTimeFormatter] Failed to format date:', error);
+    // Fallback to default locale
+    return new Date(timestamp).toLocaleDateString();
+  }
+}
+```
+
+**Результат:** Используется fallback форматирование через `toLocaleDateString()`.
+
+#### 12. Ошибка изоляции данных (No user logged in)
+
+**Причины:**
+- Пользователь не авторизован
+- Сессия истекла во время операции
+- Race condition при logout
+
+**Обработка:**
+```typescript
+// Requirements: ui.12.13, ui.12.19, ui.12.20, ui.12.21
+async saveData(key: string, value: any): Promise<void> {
+  const userEmail = this.userProfileManager.getCurrentEmail();
+  if (!userEmail) {
+    throw new Error('No user logged in');
+  }
+  // ... save logic ...
+}
+
+// In application code
+try {
+  await dataManager.saveData('some_key', someValue);
+} catch (error) {
+  if (error.message === 'No user logged in') {
+    // Requirements: ui.12.19 - Not authenticated
+    if (!await isUserAuthenticated()) {
+      navigationManager.redirectToLogin();
+      clearAllCaches();
+    } else {
+      // Requirements: ui.12.20 - Session expired during operation
+      try {
+        await oauthClient.refreshAccessToken();
+        await dataManager.saveData('some_key', someValue); // Retry
+      } catch (refreshError) {
+        navigationManager.redirectToLogin();
+      }
+    }
+  }
+}
+
+// Requirements: ui.12.21 - During logout (ignore silently)
+async function handleLogout() {
+  try {
+    await dataManager.saveData('last_action', 'logout');
+  } catch (error) {
+    if (error.message === 'No user logged in') {
+      console.log('[Logout] Data save failed due to cleared session (expected)');
+    }
+  }
+}
+```
+
+**Результат:** 
+- Если не авторизован: перенаправление на логин
+- Если сессия истекла: попытка refresh и retry
+- При logout: молча игнорируется
+
 ### Логирование
 
 Все ошибки должны логироваться с достаточным контекстом для диагностики:
@@ -928,6 +1101,23 @@ console.error('[AuthIPCHandlers] Failed to refresh profile:', errorMessage);
 
 // Component errors
 console.error('[Account] Failed to load profile:', errorMessage);
+
+// AI Agent Settings errors
+console.error('[AIAgentSettingsManager] Failed to save LLM provider:', error);
+console.error('[AIAgentSettingsManager] Failed to save API key:', error);
+console.error('[AIAgentSettingsManager] Failed to load API key:', error);
+console.error('[AIAgentSettingsManager] Encryption failed, falling back to plain text:', error);
+console.error('[AIAgentSettingsManager] Decryption failed:', error);
+
+// Date/Time Formatter errors
+console.error('[DateTimeFormatter] Failed to format date:', error);
+console.error('[DateTimeFormatter] Failed to format datetime:', error);
+
+// Data Manager errors (user isolation)
+console.error('[DataManager] No user logged in');
+console.error('[DataManager] Failed to save data:', error);
+console.error('[DataManager] Failed to load data:', error);
+console.error('[DataManager] Failed to delete data:', error);
 ```
 
 **Формат логов:**
@@ -1378,6 +1568,61 @@ describe('Window UI Functional Tests', () => {
 | ui.9.4 | ✓ | - | ✓ |
 | ui.9.5 | ✓ | - | - |
 | ui.9.6 | ✓ | - | ✓ |
+| ui.10.1 | ✓ | - | ✓ |
+| ui.10.2 | ✓ | - | ✓ |
+| ui.10.3 | ✓ | - | ✓ |
+| ui.10.4 | ✓ | ✓ | ✓ |
+| ui.10.5 | ✓ | ✓ | ✓ |
+| ui.10.6 | ✓ | ✓ | ✓ |
+| ui.10.7 | ✓ | - | ✓ |
+| ui.10.8 | ✓ | - | ✓ |
+| ui.10.9 | ✓ | ✓ | ✓ |
+| ui.10.10 | ✓ | ✓ | ✓ |
+| ui.10.11 | ✓ | ✓ | ✓ |
+| ui.10.12 | ✓ | - | - |
+| ui.10.13 | ✓ | - | - |
+| ui.10.14 | ✓ | ✓ | ✓ |
+| ui.10.15 | ✓ | - | ✓ |
+| ui.10.16 | ✓ | - | ✓ |
+| ui.10.17 | ✓ | ✓ | ✓ |
+| ui.10.18 | ✓ | - | - |
+| ui.10.19 | ✓ | - | - |
+| ui.10.20 | ✓ | - | - |
+| ui.10.21 | ✓ | - | - |
+| ui.10.22 | ✓ | - | ✓ |
+| ui.10.23 | ✓ | - | ✓ |
+| ui.10.24 | ✓ | ✓ | ✓ |
+| ui.11.1 | ✓ | ✓ | ✓ |
+| ui.11.2 | ✓ | - | ✓ |
+| ui.11.3 | ✓ | ✓ | ✓ |
+| ui.11.4 | ✓ | ✓ | ✓ |
+| ui.11.5 | ✓ | - | - |
+| ui.11.6 | ✓ | - | ✓ |
+| ui.11.7 | ✓ | - | ✓ |
+| ui.12.1 | ✓ | - | - |
+| ui.12.2 | ✓ | - | - |
+| ui.12.3 | ✓ | ✓ | ✓ |
+| ui.12.4 | ✓ | ✓ | ✓ |
+| ui.12.5 | ✓ | - | ✓ |
+| ui.12.6 | ✓ | - | ✓ |
+| ui.12.7 | ✓ | ✓ | ✓ |
+| ui.12.8 | ✓ | - | - |
+| ui.12.9 | ✓ | - | - |
+| ui.12.10 | ✓ | - | - |
+| ui.12.11 | ✓ | ✓ | ✓ |
+| ui.12.12 | ✓ | ✓ | ✓ |
+| ui.12.13 | ✓ | ✓ | ✓ |
+| ui.12.14 | ✓ | - | - |
+| ui.12.15 | ✓ | - | ✓ |
+| ui.12.16 | ✓ | - | ✓ |
+| ui.12.17 | ✓ | - | ✓ |
+| ui.12.18 | ✓ | - | ✓ |
+| ui.12.19 | ✓ | - | ✓ |
+| ui.12.20 | ✓ | - | ✓ |
+| ui.12.21 | ✓ | - | ✓ |
+| ui.12.22 | ✓ | - | ✓ |
+| ui.12.23 | ✓ | - | ✓ |
+| ui.12.24 | ✓ | - | ✓ |
 
 ### Критерии Успеха
 
@@ -1609,6 +1854,270 @@ describe('Account Functional Tests', () => {
      Requirements: ui.8.4, google-oauth-auth.15 */
   it('should clear profile from UI on logout', async () => {
     // Функциональный тест очистки UI при logout
+  });
+});
+```
+
+### Тестирование AI Agent Settings
+
+#### Модульные Тесты для AIAgentSettingsManager
+
+```typescript
+describe('AIAgentSettingsManager', () => {
+  /* Preconditions: DataManager mocked, UserProfileManager returns valid email
+     Action: call saveLLMProvider('anthropic')
+     Assertions: DataManager.saveData called with correct key and value
+     Requirements: ui.10.5 */
+  it('should save LLM provider immediately', async () => {
+    // Тест сохранения провайдера
+  });
+
+  /* Preconditions: safeStorage.isEncryptionAvailable() returns true
+     Action: call saveAPIKey('openai', 'test-key')
+     Assertions: key encrypted, saved with encrypted=true flag
+     Requirements: ui.10.9 */
+  it('should encrypt API key when encryption available', async () => {
+    // Тест шифрования ключа
+  });
+
+  /* Preconditions: safeStorage.isEncryptionAvailable() returns false
+     Action: call saveAPIKey('openai', 'test-key')
+     Assertions: key saved as plain text, encrypted=false flag
+     Requirements: ui.10.10 */
+  it('should save API key as plain text when encryption unavailable', async () => {
+    // Тест сохранения без шифрования
+  });
+
+  /* Preconditions: encrypted key saved in database
+     Action: call loadAPIKey('openai')
+     Assertions: key decrypted correctly, returns original value
+     Requirements: ui.10.17 */
+  it('should decrypt API key when loading', async () => {
+    // Тест дешифрования ключа
+  });
+
+  /* Preconditions: API keys saved for multiple providers
+     Action: call loadAPIKey for each provider
+     Assertions: each provider returns its own key, no cross-contamination
+     Requirements: ui.10.11, ui.10.14 */
+  it('should isolate API keys by provider', async () => {
+    // Тест изоляции ключей по провайдерам
+  });
+
+  /* Preconditions: API key saved for provider
+     Action: call deleteAPIKey(provider)
+     Assertions: both key and encrypted flag deleted from database
+     Requirements: ui.10.6 */
+  it('should delete API key and metadata', async () => {
+    // Тест удаления ключа
+  });
+});
+```
+
+#### Модульные Тесты для Settings Component (AI Agent)
+
+```typescript
+describe('AIAgentSettings Component', () => {
+  /* Preconditions: component mounted, settings loaded
+     Action: change LLM provider dropdown
+     Assertions: saveL LMProvider called immediately, API key field updated
+     Requirements: ui.10.5 */
+  it('should save provider immediately on change', async () => {
+    // Тест немедленного сохранения провайдера
+  });
+
+  /* Preconditions: component mounted, API key field focused
+     Action: type API key, wait 500ms
+     Assertions: saveAPIKey called after debounce delay
+     Requirements: ui.10.4 */
+  it('should save API key with 500ms debounce', async () => {
+    // Тест debounce сохранения ключа
+  });
+
+  /* Preconditions: API key field has value
+     Action: clear field (empty string)
+     Assertions: deleteAPIKey called
+     Requirements: ui.10.6 */
+  it('should delete API key when field cleared', async () => {
+    // Тест удаления при очистке поля
+  });
+
+  /* Preconditions: API key field in password mode
+     Action: click toggle visibility button
+     Assertions: field type changes to text, icon changes to EyeOff
+     Requirements: ui.10.3, ui.10.5 */
+  it('should toggle API key visibility', () => {
+    // Тест переключения видимости
+  });
+});
+```
+
+#### Функциональные Тесты (AI Agent Settings)
+
+```typescript
+describe('AI Agent Settings Functional Tests', () => {
+  /* Preconditions: fresh app start, user authenticated
+     Action: navigate to Settings, change LLM provider, enter API key
+     Assertions: settings saved, persist across app restart
+     Requirements: ui.10.4, ui.10.5, ui.10.9 */
+  it('should persist AI Agent settings across restarts', async () => {
+    // Тест персистентности настроек
+  });
+
+  /* Preconditions: user A logged in, settings saved
+     Action: logout user A, login user B, check settings
+     Assertions: user B sees empty/default settings, not user A's settings
+     Requirements: ui.10.22, ui.10.23 */
+  it('should isolate settings between users', async () => {
+    // Тест изоляции настроек между пользователями
+  });
+
+  /* Preconditions: API keys saved for all providers
+     Action: switch between providers
+     Assertions: correct API key loaded for each provider
+     Requirements: ui.10.14 */
+  it('should load correct API key when switching providers', async () => {
+    // Тест загрузки правильного ключа при переключении
+  });
+});
+```
+
+### Тестирование Date/Time Formatting
+
+#### Модульные Тесты для DateTimeFormatter
+
+```typescript
+describe('DateTimeFormatter', () => {
+  /* Preconditions: system locale set to various locales
+     Action: call formatDate() with timestamp
+     Assertions: uses Intl.DateTimeFormat with undefined locale (system locale)
+     Requirements: ui.11.1 */
+  it('should use system locale for date formatting', () => {
+    // Тест использования системной локали
+  });
+
+  /* Preconditions: valid timestamp
+     Action: call formatLogTimestamp()
+     Assertions: returns format YYYY-MM-DD HH:MM:SS, independent of locale
+     Requirements: ui.11.3 */
+  it('should use fixed format for log timestamps', () => {
+    // Тест фиксированного формата для логов
+  });
+
+  /* Preconditions: Intl.DateTimeFormat throws error
+     Action: call formatDate()
+     Assertions: falls back to toLocaleDateString(), no exception thrown
+     Requirements: ui.11.1 */
+  it('should handle locale errors gracefully', () => {
+    // Тест обработки ошибок локали
+  });
+});
+```
+
+#### Функциональные Тесты (Date/Time Formatting)
+
+```typescript
+describe('Date/Time Formatting Functional Tests', () => {
+  /* Preconditions: system locale set to en-US
+     Action: display tasks, calendar events, contacts
+     Assertions: all dates formatted in en-US format (MM/DD/YYYY)
+     Requirements: ui.11.1, ui.11.2 */
+  it('should format dates using system locale', async () => {
+    // Тест форматирования по системной локали
+  });
+
+  /* Preconditions: app running, logs generated
+     Action: check log output
+     Assertions: all log timestamps in YYYY-MM-DD HH:MM:SS format
+     Requirements: ui.11.3 */
+  it('should use fixed format for logs', async () => {
+    // Тест фиксированного формата логов
+  });
+
+  /* Preconditions: system locale changed
+     Action: restart app, check date formatting
+     Assertions: dates formatted in new locale
+     Requirements: ui.11.6 */
+  it('should apply new locale after system settings change', async () => {
+    // Тест применения новой локали
+  });
+});
+```
+
+### Тестирование User Data Isolation
+
+#### Модульные Тесты для DataManager (Extended)
+
+```typescript
+describe('DataManager - User Isolation', () => {
+  /* Preconditions: UserProfileManager returns valid email
+     Action: call saveData('key', 'value')
+     Assertions: SQL query includes user_email in WHERE clause
+     Requirements: ui.12.3, ui.12.11 */
+  it('should automatically add user_email when saving', async () => {
+    // Тест автоматического добавления email
+  });
+
+  /* Preconditions: UserProfileManager returns valid email
+     Action: call loadData('key')
+     Assertions: SQL query filters by user_email
+     Requirements: ui.12.4, ui.12.12 */
+  it('should automatically filter by user_email when loading', async () => {
+    // Тест автоматической фильтрации
+  });
+
+  /* Preconditions: UserProfileManager returns null (not logged in)
+     Action: call saveData('key', 'value')
+     Assertions: throws error "No user logged in"
+     Requirements: ui.12.13 */
+  it('should throw error when user not logged in', async () => {
+    // Тест ошибки при отсутствии пользователя
+  });
+
+  /* Preconditions: data saved for user A and user B
+     Action: load data as user A
+     Assertions: only user A's data returned, user B's data not visible
+     Requirements: ui.12.6, ui.12.7 */
+  it('should isolate data between users', async () => {
+    // Тест изоляции данных
+  });
+});
+```
+
+#### Функциональные Тесты (User Data Isolation)
+
+```typescript
+describe('User Data Isolation Functional Tests', () => {
+  /* Preconditions: user A logged in, data saved
+     Action: logout user A, login user B, check data
+     Assertions: user B sees empty data, not user A's data
+     Requirements: ui.12.5, ui.12.6 */
+  it('should isolate data between different users', async () => {
+    // Тест изоляции между пользователями
+  });
+
+  /* Preconditions: user A logged in, data saved, logout
+     Action: login user A again
+     Assertions: user A's data restored from database
+     Requirements: ui.12.7 */
+  it('should restore user data after re-login', async () => {
+    // Тест восстановления данных
+  });
+
+  /* Preconditions: user A logged in, data saved
+     Action: logout user A
+     Assertions: data persists in database (not deleted)
+     Requirements: ui.12.5 */
+  it('should persist data after logout', async () => {
+    // Тест персистентности после logout
+  });
+
+  /* Preconditions: multiple users with data
+     Action: login as each user, check data
+     Assertions: each user sees only their own data
+     Requirements: ui.12.8 */
+  it('should filter data by user email', async () => {
+    // Тест фильтрации по email
   });
 });
 ```
@@ -1876,6 +2385,125 @@ describe('Account Functional Tests', () => {
 - Не пугает пользователя техническими терминами
 - Технические детали логируются в консоль для отладки (ui.9.5)
 - Соответствует best practices UX для сообщений об ошибках
+
+### Решение 17: Шифрование API Ключей с Fallback
+
+**Решение:** Использовать Electron `safeStorage` API для шифрования API ключей с автоматическим fallback на plain text когда шифрование недоступно.
+
+**Альтернативы:**
+- Всегда хранить в plain text
+- Требовать шифрование (блокировать функциональность если недоступно)
+- Использовать собственную реализацию шифрования
+
+**Обоснование:**
+- Соответствует требованиям ui.10.9, ui.10.10
+- Максимальная безопасность когда возможно
+- Graceful degradation когда шифрование недоступно
+- Использует нативные системные механизмы (Keychain на macOS)
+- Не блокирует функциональность на системах без шифрования
+- Прозрачно для пользователя (автоматический выбор)
+
+### Решение 18: Раздельное Хранилище для Провайдеров LLM
+
+**Решение:** Хранить API ключ каждого провайдера в отдельном ключе базы данных (`ai_agent_api_key_{provider}`).
+
+**Альтернативы:**
+- Хранить все ключи в одном JSON объекте
+- Перезаписывать ключ при смене провайдера
+- Хранить только активный ключ
+
+**Обоснование:**
+- Соответствует требованиям ui.10.11, ui.10.14
+- Позволяет сохранять ключи всех провайдеров одновременно
+- Упрощает переключение между провайдерами (ui.10.5)
+- Пользователь не теряет ключи при экспериментах с разными провайдерами
+- Каждый ключ имеет свой флаг шифрования
+- Легко расширяется для новых провайдеров
+
+### Решение 19: Debounce для Сохранения API Ключа
+
+**Решение:** Использовать debounce 500ms для сохранения API ключа при вводе.
+
+**Альтернативы:**
+- Сохранять при каждом изменении (без debounce)
+- Сохранять только при blur (потеря фокуса)
+- Использовать кнопку "Save"
+
+**Обоснование:**
+- Соответствует требованию ui.10.4
+- Уменьшает количество операций записи в базу данных
+- Не создает задержку для пользователя (500ms незаметно)
+- Автоматическое сохранение без действий пользователя
+- Баланс между отзывчивостью и производительностью
+- Стандартный UX паттерн для auto-save
+
+### Решение 20: Использование Intl.DateTimeFormat для Локализации
+
+**Решение:** Использовать встроенный JavaScript API `Intl.DateTimeFormat(undefined, ...)` для форматирования дат по системной локали.
+
+**Альтернативы:**
+- Использовать библиотеку moment.js или date-fns
+- Хардкодить формат даты
+- Добавить настройку формата в UI
+
+**Обоснование:**
+- Соответствует требованию ui.11.1
+- Нативный API, не требует зависимостей
+- Автоматически использует системную локаль (undefined = system default)
+- Поддерживает все локали без дополнительной конфигурации
+- Легковесное решение
+- Стандартный подход для локализации дат
+
+### Решение 21: Фиксированный Формат для Логов
+
+**Решение:** Использовать фиксированный формат `YYYY-MM-DD HH:MM:SS` для логов независимо от системной локали.
+
+**Альтернативы:**
+- Использовать системную локаль для логов
+- Использовать ISO 8601 формат
+- Использовать Unix timestamp
+
+**Обоснование:**
+- Соответствует требованию ui.11.3
+- Консистентность логов независимо от локали пользователя
+- Легко читается человеком
+- Легко парсится программно
+- Сортируется лексикографически
+- Стандартный формат для логов
+
+### Решение 22: Автоматическая Изоляция Данных по Email
+
+**Решение:** Автоматически добавлять `user_email` при сохранении и фильтровать по `user_email` при загрузке данных без явных параметров в методах DataManager.
+
+**Альтернативы:**
+- Требовать явную передачу user_email в каждый метод
+- Использовать отдельные таблицы для каждого пользователя
+- Использовать отдельные базы данных для каждого пользователя
+
+**Обоснование:**
+- Соответствует требованиям ui.12.3, ui.12.4, ui.12.11, ui.12.12
+- Невозможно забыть добавить фильтрацию (автоматически)
+- Упрощает код приложения (не нужно передавать email везде)
+- Централизованная логика изоляции
+- Меньше вероятность ошибок безопасности
+- Прозрачно для остального кода приложения
+
+### Решение 23: Кэширование Email в UserProfileManager
+
+**Решение:** Хранить `currentUserEmail` в памяти в UserProfileManager и обновлять при авторизации/logout.
+
+**Альтернативы:**
+- Запрашивать email из базы данных при каждом вызове
+- Хранить email в глобальной переменной
+- Передавать email через все слои приложения
+
+**Обоснование:**
+- Соответствует требованиям ui.12.14, ui.12.15, ui.12.17, ui.12.18
+- Быстрый доступ к email (в памяти)
+- Централизованное управление текущим пользователем
+- Автоматическое обновление при авторизации
+- Автоматическая очистка при logout
+- Единственный источник истины для текущего пользователя
 
 ## Навигация и Авторизация
 
@@ -2955,6 +3583,880 @@ const handleRefreshProfile = async () => {
 - Позволяет копировать текст из полей
 - Стандартный HTML подход
 
+## Настройки AI Agent
+
+### Обзор
+
+Настройки AI Agent позволяют пользователю настроить провайдера языковой модели (LLM) и API ключ для работы с AI агентом. Данные изолированы по пользователям и хранятся с шифрованием (когда доступно).
+
+### Архитектура Компонента
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                      Main Process                            │
+│                                                               │
+│  ┌──────────────────────┐       ┌─────────────────────┐     │
+│  │ AIAgentSettingsManager│──────▶│    DataManager      │     │
+│  │                      │       │     (SQLite)        │     │
+│  │ - saveSettings()     │       │  - saveData()       │     │
+│  │ - loadSettings()     │       │  - loadData()       │     │
+│  │ - encryptAPIKey()    │       │  - deleteData()     │     │
+│  │ - decryptAPIKey()    │       └─────────────────────┘     │
+│  └──────────────────────┘                                    │
+│           │                                                   │
+│           ▼                                                   │
+│  ┌──────────────────────┐                                    │
+│  │  Electron            │                                    │
+│  │  safeStorage API     │                                    │
+│  └──────────────────────┘                                    │
+│           │                                                   │
+└───────────┼───────────────────────────────────────────────────┘
+            │ IPC
+            ▼
+   ┌─────────────────────────────────────────────┐
+   │          Renderer Process                   │
+   │                                              │
+   │  ┌────────────────────────────────┐         │
+   │  │  Settings Component            │         │
+   │  │  (AI Agent Section)            │         │
+   │  │                                │         │
+   │  │  - LLM Provider dropdown       │         │
+   │  │  - API Key input (password)    │         │
+   │  │  - Toggle visibility button    │         │
+   │  │  - Auto-save with debounce     │         │
+   │  └────────────────────────────────┘         │
+   └─────────────────────────────────────────────┘
+```
+
+### Компоненты
+
+#### AIAgentSettingsManager
+
+Новый класс для управления настройками AI агента.
+
+```typescript
+// Requirements: ui.10
+
+interface AIAgentSettings {
+  llmProvider: 'openai' | 'anthropic' | 'google';
+  apiKeys: {
+    openai?: string;
+    anthropic?: string;
+    google?: string;
+  };
+  encryptionStatus: {
+    openai?: boolean;
+    anthropic?: boolean;
+    google?: boolean;
+  };
+}
+
+class AIAgentSettingsManager {
+  private dataManager: DataManager;
+  private userProfileManager: UserProfileManager;
+  
+  constructor(dataManager: DataManager, userProfileManager: UserProfileManager) {
+    this.dataManager = dataManager;
+    this.userProfileManager = userProfileManager;
+  }
+
+  /**
+   * Save LLM provider selection
+   * Requirements: ui.10.5
+   */
+  async saveLLMProvider(provider: 'openai' | 'anthropic' | 'google'): Promise<void> {
+    try {
+      await this.dataManager.saveData('ai_agent_llm_provider', provider);
+      console.log('[AIAgentSettingsManager] LLM provider saved:', provider);
+    } catch (error) {
+      console.error('[AIAgentSettingsManager] Failed to save LLM provider:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Save API key for specific provider
+   * Requirements: ui.10.4, ui.10.9, ui.10.10, ui.10.11, ui.10.12
+   */
+  async saveAPIKey(provider: 'openai' | 'anthropic' | 'google', apiKey: string): Promise<void> {
+    try {
+      const { safeStorage } = require('electron');
+      let encryptedKey: string;
+      let isEncrypted: boolean;
+
+      // Requirements: ui.10.9, ui.10.10 - Try to encrypt, fallback to plain text
+      if (safeStorage.isEncryptionAvailable()) {
+        const buffer = safeStorage.encryptString(apiKey);
+        encryptedKey = buffer.toString('base64');
+        isEncrypted = true;
+        console.log(`[AIAgentSettingsManager] API key encrypted for ${provider}`);
+      } else {
+        encryptedKey = apiKey;
+        isEncrypted = false;
+        console.log(`[AIAgentSettingsManager] Encryption unavailable, storing plain text for ${provider}`);
+      }
+
+      // Requirements: ui.10.11, ui.10.12 - Save with provider-specific keys
+      await this.dataManager.saveData(`ai_agent_api_key_${provider}`, encryptedKey);
+      await this.dataManager.saveData(`ai_agent_api_key_${provider}_encrypted`, isEncrypted);
+      
+      console.log(`[AIAgentSettingsManager] API key saved for ${provider}`);
+    } catch (error) {
+      console.error(`[AIAgentSettingsManager] Failed to save API key for ${provider}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Load API key for specific provider
+   * Requirements: ui.10.15, ui.10.17
+   */
+  async loadAPIKey(provider: 'openai' | 'anthropic' | 'google'): Promise<string | null> {
+    try {
+      const keyResult = await this.dataManager.loadData(`ai_agent_api_key_${provider}`);
+      const encryptedResult = await this.dataManager.loadData(`ai_agent_api_key_${provider}_encrypted`);
+
+      if (!keyResult.success || !keyResult.data) {
+        return null;
+      }
+
+      const storedKey = keyResult.data as string;
+      const isEncrypted = encryptedResult.success && encryptedResult.data === true;
+
+      // Requirements: ui.10.17 - Decrypt if encrypted
+      if (isEncrypted) {
+        const { safeStorage } = require('electron');
+        const buffer = Buffer.from(storedKey, 'base64');
+        const decryptedKey = safeStorage.decryptString(buffer);
+        console.log(`[AIAgentSettingsManager] API key decrypted for ${provider}`);
+        return decryptedKey;
+      }
+
+      console.log(`[AIAgentSettingsManager] API key loaded (plain text) for ${provider}`);
+      return storedKey;
+    } catch (error) {
+      console.error(`[AIAgentSettingsManager] Failed to load API key for ${provider}:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Delete API key for specific provider
+   * Requirements: ui.10.6
+   */
+  async deleteAPIKey(provider: 'openai' | 'anthropic' | 'google'): Promise<void> {
+    try {
+      await this.dataManager.deleteData(`ai_agent_api_key_${provider}`);
+      await this.dataManager.deleteData(`ai_agent_api_key_${provider}_encrypted`);
+      console.log(`[AIAgentSettingsManager] API key deleted for ${provider}`);
+    } catch (error) {
+      console.error(`[AIAgentSettingsManager] Failed to delete API key for ${provider}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Load all settings
+   * Requirements: ui.10.15, ui.10.16
+   */
+  async loadSettings(): Promise<AIAgentSettings> {
+    try {
+      const providerResult = await this.dataManager.loadData('ai_agent_llm_provider');
+      const provider = (providerResult.success && providerResult.data) 
+        ? providerResult.data as 'openai' | 'anthropic' | 'google'
+        : 'openai'; // Requirements: ui.10.16 - Default to openai
+
+      const apiKeys = {
+        openai: await this.loadAPIKey('openai'),
+        anthropic: await this.loadAPIKey('anthropic'),
+        google: await this.loadAPIKey('google')
+      };
+
+      const encryptionStatus = {
+        openai: await this.isKeyEncrypted('openai'),
+        anthropic: await this.isKeyEncrypted('anthropic'),
+        google: await this.isKeyEncrypted('google')
+      };
+
+      return {
+        llmProvider: provider,
+        apiKeys: {
+          ...(apiKeys.openai && { openai: apiKeys.openai }),
+          ...(apiKeys.anthropic && { anthropic: apiKeys.anthropic }),
+          ...(apiKeys.google && { google: apiKeys.google })
+        },
+        encryptionStatus
+      };
+    } catch (error) {
+      console.error('[AIAgentSettingsManager] Failed to load settings:', error);
+      // Requirements: ui.10.16 - Return defaults on error
+      return {
+        llmProvider: 'openai',
+        apiKeys: {},
+        encryptionStatus: {}
+      };
+    }
+  }
+
+  private async isKeyEncrypted(provider: 'openai' | 'anthropic' | 'google'): Promise<boolean> {
+    const result = await this.dataManager.loadData(`ai_agent_api_key_${provider}_encrypted`);
+    return result.success && result.data === true;
+  }
+}
+```
+
+#### Settings Component (AI Agent Section)
+
+React компонент для настройки AI агента.
+
+```typescript
+// Requirements: ui.10
+
+import { useState, useEffect, useCallback } from 'react';
+import { Eye, EyeOff } from 'lucide-react';
+
+type LLMProvider = 'openai' | 'anthropic' | 'google';
+
+export function AIAgentSettings() {
+  const [llmProvider, setLLMProvider] = useState<LLMProvider>('openai');
+  const [apiKey, setAPIKey] = useState('');
+  const [showAPIKey, setShowAPIKey] = useState(false); // Requirements: ui.10.8
+  const [loading, setLoading] = useState(true);
+  const [saveTimeout, setSaveTimeout] = useState<NodeJS.Timeout | null>(null);
+
+  // Load settings on mount
+  useEffect(() => {
+    loadSettings();
+  }, []);
+
+  // Requirements: ui.10.5 - Load API key when provider changes
+  useEffect(() => {
+    if (!loading) {
+      loadAPIKeyForProvider(llmProvider);
+    }
+  }, [llmProvider, loading]);
+
+  const loadSettings = async () => {
+    try {
+      const settings = await window.api.aiAgent.getSettings();
+      setLLMProvider(settings.llmProvider);
+      setAPIKey(settings.apiKeys[settings.llmProvider] || '');
+    } catch (error) {
+      console.error('[AIAgentSettings] Failed to load settings:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadAPIKeyForProvider = async (provider: LLMProvider) => {
+    try {
+      const key = await window.api.aiAgent.getAPIKey(provider);
+      setAPIKey(key || '');
+    } catch (error) {
+      console.error(`[AIAgentSettings] Failed to load API key for ${provider}:`, error);
+      setAPIKey('');
+    }
+  };
+
+  // Requirements: ui.10.5 - Save provider immediately
+  const handleProviderChange = async (provider: LLMProvider) => {
+    setLLMProvider(provider);
+    try {
+      await window.api.aiAgent.saveLLMProvider(provider);
+      console.log('[AIAgentSettings] Provider saved:', provider);
+    } catch (error) {
+      console.error('[AIAgentSettings] Failed to save provider:', error);
+      // Requirements: ui.10.8 - Show error notification
+      window.api.error.notify('Failed to save LLM provider', 'AI Agent Settings');
+    }
+  };
+
+  // Requirements: ui.10.4 - Save API key with debounce
+  const handleAPIKeyChange = useCallback((value: string) => {
+    setAPIKey(value);
+
+    // Clear existing timeout
+    if (saveTimeout) {
+      clearTimeout(saveTimeout);
+    }
+
+    // Requirements: ui.10.4 - Debounce 500ms
+    const timeout = setTimeout(async () => {
+      try {
+        if (value.trim() === '') {
+          // Requirements: ui.10.6 - Delete if empty
+          await window.api.aiAgent.deleteAPIKey(llmProvider);
+          console.log('[AIAgentSettings] API key deleted');
+        } else {
+          await window.api.aiAgent.saveAPIKey(llmProvider, value);
+          console.log('[AIAgentSettings] API key saved');
+        }
+      } catch (error) {
+        console.error('[AIAgentSettings] Failed to save API key:', error);
+        // Requirements: ui.10.8 - Show error notification
+        window.api.error.notify('Failed to save API key', 'AI Agent Settings');
+      }
+    }, 500);
+
+    setSaveTimeout(timeout);
+  }, [llmProvider, saveTimeout]);
+
+  // Requirements: ui.10.3, ui.10.5, ui.10.7 - Toggle visibility
+  const toggleAPIKeyVisibility = () => {
+    setShowAPIKey(!showAPIKey);
+  };
+
+  if (loading) {
+    return <div>Loading AI Agent settings...</div>;
+  }
+
+  return (
+    <div className="ai-agent-settings">
+      <h3>AI Agent Settings</h3>
+      
+      {/* Requirements: ui.10.1 - LLM Provider dropdown */}
+      <div className="setting-field">
+        <label htmlFor="llm-provider">LLM Provider</label>
+        <select
+          id="llm-provider"
+          value={llmProvider}
+          onChange={(e) => handleProviderChange(e.target.value as LLMProvider)}
+        >
+          <option value="openai">OpenAI (GPT)</option>
+          <option value="anthropic">Anthropic (Claude)</option>
+          <option value="google">Google (Gemini)</option>
+        </select>
+      </div>
+
+      {/* Requirements: ui.10.1, ui.10.2, ui.10.3 - API Key input with toggle */}
+      <div className="setting-field">
+        <label htmlFor="api-key">API Key</label>
+        <div className="api-key-input-wrapper">
+          <input
+            id="api-key"
+            type={showAPIKey ? 'text' : 'password'}
+            value={apiKey}
+            onChange={(e) => handleAPIKeyChange(e.target.value)}
+            placeholder="Enter your API key"
+          />
+          {/* Requirements: ui.10.3, ui.10.4, ui.10.5, ui.10.6, ui.10.7 */}
+          <button
+            type="button"
+            className="toggle-visibility"
+            onClick={toggleAPIKeyVisibility}
+            aria-label={showAPIKey ? 'Hide API key' : 'Show API key'}
+          >
+            {showAPIKey ? <EyeOff size={20} /> : <Eye size={20} />}
+          </button>
+        </div>
+      </div>
+
+      {/* Requirements: ui.10.19 - Security message */}
+      <p className="security-message">
+        Your API key is stored securely. It will only be used to communicate with your selected LLM provider.
+      </p>
+
+      {/* Requirements: ui.10.20 - Test Connection button (placeholder) */}
+      <button type="button" className="test-connection" disabled>
+        Test Connection
+      </button>
+    </div>
+  );
+}
+```
+
+### Свойства Корректности (AI Agent Settings)
+
+#### Property 32: Сохранение LLM провайдера
+
+*Для любого* выбранного LLM провайдера (openai, anthropic, google), изменение провайдера должно немедленно сохраниться в базу данных без debounce.
+
+**Validates: Requirements ui.10.5**
+
+#### Property 33: Сохранение API ключа с debounce
+
+*Для любого* введенного API ключа, изменения должны сохраняться в базу данных с задержкой 500ms после последнего изменения.
+
+**Validates: Requirements ui.10.4**
+
+#### Property 34: Удаление пустого API ключа
+
+*Для любого* провайдера, если пользователь очищает поле API ключа (пустая строка), запись для этого провайдера должна быть удалена из базы данных.
+
+**Validates: Requirements ui.10.6**
+
+#### Property 35: Шифрование API ключа
+
+*Для любого* API ключа, если `safeStorage.isEncryptionAvailable()` возвращает true, ключ должен быть зашифрован перед сохранением, и флаг `ai_agent_api_key_{provider}_encrypted` должен быть установлен в true.
+
+**Validates: Requirements ui.10.9**
+
+#### Property 36: Сохранение без шифрования
+
+*Для любого* API ключа, если `safeStorage.isEncryptionAvailable()` возвращает false, ключ должен быть сохранен как plain text, и флаг `ai_agent_api_key_{provider}_encrypted` должен быть установлен в false.
+
+**Validates: Requirements ui.10.10**
+
+#### Property 37: Раздельное хранилище для провайдеров
+
+*Для любого* LLM провайдера, API ключ должен храниться в отдельном ключе `ai_agent_api_key_{provider}`, и изменение ключа одного провайдера НЕ должно влиять на ключи других провайдеров.
+
+**Validates: Requirements ui.10.11, ui.10.14**
+
+#### Property 38: Загрузка ключа при переключении провайдера
+
+*Для любого* переключения между провайдерами, поле API Key должно автоматически загрузить ключ выбранного провайдера из базы данных (если он был сохранен ранее) или отобразить пустое поле с placeholder.
+
+**Validates: Requirements ui.10.5**
+
+#### Property 39: Round-trip шифрования/дешифрования
+
+*Для любого* API ключа, если он был зашифрован при сохранении (encrypted=true), то при загрузке он должен быть корректно расшифрован и вернуть исходное значение.
+
+**Validates: Requirements ui.10.17**
+
+#### Property 40: Изоляция настроек по пользователям
+
+*Для любых* двух пользователей с разными email, настройки AI Agent (провайдер и API ключи) должны быть изолированы - изменения одного пользователя НЕ должны влиять на настройки другого пользователя.
+
+**Validates: Requirements ui.10.22, ui.10.23, ui.10.24**
+
+## Форматирование Дат и Времени
+
+### Обзор
+
+Система форматирования дат использует системные настройки локали операционной системы для отображения дат и времени в привычном для пользователя формате.
+
+### Архитектура Компонента
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                   Operating System                           │
+│                                                               │
+│  ┌──────────────────────┐                                    │
+│  │  System Locale       │                                    │
+│  │  (macOS Settings)    │                                    │
+│  └──────────────────────┘                                    │
+│           │                                                   │
+└───────────┼───────────────────────────────────────────────────┘
+            │
+            ▼
+   ┌─────────────────────────────────────────────┐
+   │          Application                         │
+   │                                              │
+   │  ┌────────────────────────────────┐         │
+   │  │   DateTimeFormatter            │         │
+   │  │                                │         │
+   │  │  - formatDate()                │         │
+   │  │  - formatDateTime()            │         │
+   │  │  - formatLogTimestamp()        │         │
+   │  └────────────────────────────────┘         │
+   │           │                                  │
+   │           ▼                                  │
+   │  ┌────────────────────────────────┐         │
+   │  │  Intl.DateTimeFormat           │         │
+   │  │  (Browser API)                 │         │
+   │  └────────────────────────────────┘         │
+   └─────────────────────────────────────────────┘
+```
+
+### Компоненты
+
+#### DateTimeFormatter
+
+Утилитный класс для форматирования дат и времени.
+
+```typescript
+// Requirements: ui.11
+
+class DateTimeFormatter {
+  /**
+   * Format date using system locale
+   * Requirements: ui.11.1, ui.11.2
+   */
+  static formatDate(timestamp: number): string {
+    try {
+      // Requirements: ui.11.1 - Use system locale
+      const formatter = new Intl.DateTimeFormat(undefined, {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
+      return formatter.format(new Date(timestamp));
+    } catch (error) {
+      console.error('[DateTimeFormatter] Failed to format date:', error);
+      return new Date(timestamp).toLocaleDateString();
+    }
+  }
+
+  /**
+   * Format date and time using system locale
+   * Requirements: ui.11.1, ui.11.2
+   */
+  static formatDateTime(timestamp: number): string {
+    try {
+      // Requirements: ui.11.1 - Use system locale
+      const formatter = new Intl.DateTimeFormat(undefined, {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+      return formatter.format(new Date(timestamp));
+    } catch (error) {
+      console.error('[DateTimeFormatter] Failed to format datetime:', error);
+      return new Date(timestamp).toLocaleString();
+    }
+  }
+
+  /**
+   * Format timestamp for logs (fixed format)
+   * Requirements: ui.11.3
+   */
+  static formatLogTimestamp(timestamp: number): string {
+    const date = new Date(timestamp);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const seconds = String(date.getSeconds()).padStart(2, '0');
+    
+    // Requirements: ui.11.3 - Fixed format YYYY-MM-DD HH:MM:SS
+    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+  }
+}
+```
+
+### Использование в Компонентах
+
+```typescript
+// Requirements: ui.11.2, ui.11.5
+
+// In Tasks component
+<div className="task-date">
+  {DateTimeFormatter.formatDate(task.dueDate)}
+</div>
+
+// In Calendar component
+<div className="event-time">
+  {DateTimeFormatter.formatDateTime(event.startTime)}
+</div>
+
+// In Contacts component
+<div className="contact-updated">
+  Last updated: {DateTimeFormatter.formatDate(contact.lastUpdated)}
+</div>
+
+// In logs
+console.log(`[${DateTimeFormatter.formatLogTimestamp(Date.now())}] Operation completed`);
+```
+
+### Свойства Корректности (Date/Time Formatting)
+
+#### Property 41: Использование системной локали
+
+*Для любого* timestamp, форматирование даты или времени должно использовать системную локаль через `Intl.DateTimeFormat(undefined, ...)`, а не хардкоженную локаль.
+
+**Validates: Requirements ui.11.1**
+
+#### Property 42: Фиксированный формат для логов
+
+*Для любого* timestamp в логах, форматирование должно использовать фиксированный формат `YYYY-MM-DD HH:MM:SS`, независимо от системной локали.
+
+**Validates: Requirements ui.11.3**
+
+#### Property 43: Отсутствие относительных форматов
+
+*Для любого* отображаемого timestamp, система НЕ должна использовать относительные форматы времени (например, "2 hours ago", "yesterday").
+
+**Validates: Requirements ui.11.4**
+
+## Изоляция Данных Пользователей
+
+### Обзор
+
+Система изоляции данных обеспечивает, что данные каждого пользователя (настройки, задачи, контакты) хранятся отдельно и не смешиваются между пользователями. Идентификация пользователя происходит по email из Google OAuth профиля.
+
+### Архитектура Компонента
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                      Main Process                            │
+│                                                               │
+│  ┌──────────────────────┐       ┌─────────────────────┐     │
+│  │ UserProfileManager   │──────▶│ DataManager         │     │
+│  │                      │       │                     │     │
+│  │ - currentUserEmail   │       │ - saveData()        │     │
+│  │ - getCurrentEmail()  │       │ - loadData()        │     │
+│  └──────────────────────┘       │ - deleteData()      │     │
+│           │                      │ + user_email filter │     │
+│           │                      └─────────────────────┘     │
+│           │                                │                 │
+│           ▼                                ▼                 │
+│  ┌──────────────────────┐       ┌─────────────────────┐     │
+│  │ Google OAuth         │       │    SQLite DB        │     │
+│  │ (email from profile) │       │  user_data table    │     │
+│  └──────────────────────┘       │  + user_email col   │     │
+│                                  └─────────────────────┘     │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Модификации Существующих Компонентов
+
+#### DataManager (Расширенный)
+
+Расширение существующего DataManager для поддержки изоляции по пользователям.
+
+```typescript
+// Requirements: ui.12
+
+class DataManager {
+  private userProfileManager: UserProfileManager;
+
+  constructor(/* existing params */, userProfileManager: UserProfileManager) {
+    // ... existing initialization ...
+    this.userProfileManager = userProfileManager;
+  }
+
+  /**
+   * Save data with automatic user_email filtering
+   * Requirements: ui.12.3, ui.12.11
+   */
+  async saveData(key: string, value: any): Promise<void> {
+    // Requirements: ui.12.13 - Check if user is logged in
+    const userEmail = this.userProfileManager.getCurrentEmail();
+    if (!userEmail) {
+      throw new Error('No user logged in');
+    }
+
+    try {
+      const valueJson = JSON.stringify(value);
+      
+      // Requirements: ui.12.3 - Automatically add user_email
+      await this.db.run(
+        `INSERT OR REPLACE INTO user_data (key, value, user_email) VALUES (?, ?, ?)`,
+        [key, valueJson, userEmail]
+      );
+      
+      console.log(`[DataManager] Data saved for user ${userEmail}, key: ${key}`);
+    } catch (error) {
+      console.error('[DataManager] Failed to save data:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Load data with automatic user_email filtering
+   * Requirements: ui.12.4, ui.12.12
+   */
+  async loadData(key: string): Promise<{ success: boolean; data?: any; error?: string }> {
+    // Requirements: ui.12.13 - Check if user is logged in
+    const userEmail = this.userProfileManager.getCurrentEmail();
+    if (!userEmail) {
+      return {
+        success: false,
+        error: 'No user logged in'
+      };
+    }
+
+    try {
+      // Requirements: ui.12.4 - Filter by user_email
+      const row = await this.db.get(
+        `SELECT value FROM user_data WHERE key = ? AND user_email = ?`,
+        [key, userEmail]
+      );
+
+      if (row) {
+        const data = JSON.parse(row.value);
+        console.log(`[DataManager] Data loaded for user ${userEmail}, key: ${key}`);
+        return { success: true, data };
+      }
+
+      return { success: true, data: null };
+    } catch (error) {
+      console.error('[DataManager] Failed to load data:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+  }
+
+  /**
+   * Delete data with automatic user_email filtering
+   * Requirements: ui.12.4
+   */
+  async deleteData(key: string): Promise<void> {
+    // Requirements: ui.12.13 - Check if user is logged in
+    const userEmail = this.userProfileManager.getCurrentEmail();
+    if (!userEmail) {
+      throw new Error('No user logged in');
+    }
+
+    try {
+      // Requirements: ui.12.4 - Filter by user_email
+      await this.db.run(
+        `DELETE FROM user_data WHERE key = ? AND user_email = ?`,
+        [key, userEmail]
+      );
+      
+      console.log(`[DataManager] Data deleted for user ${userEmail}, key: ${key}`);
+    } catch (error) {
+      console.error('[DataManager] Failed to delete data:', error);
+      throw error;
+    }
+  }
+}
+```
+
+#### UserProfileManager (Расширенный)
+
+Расширение UserProfileManager для кэширования email текущего пользователя.
+
+```typescript
+// Requirements: ui.12
+
+class UserProfileManager {
+  private currentUserEmail: string | null = null; // Requirements: ui.12.14
+
+  /**
+   * Get current user email
+   * Requirements: ui.12.10, ui.12.14
+   */
+  getCurrentEmail(): string | null {
+    return this.currentUserEmail;
+  }
+
+  /**
+   * Fetch user profile and cache email
+   * Requirements: ui.12.15
+   */
+  async fetchProfile(): Promise<UserProfile | null> {
+    try {
+      // ... existing fetch logic ...
+      
+      const profile = await response.json();
+      
+      // Requirements: ui.12.15 - Cache email
+      this.currentUserEmail = profile.email;
+      
+      await this.saveProfile(profile);
+      return profile;
+    } catch (error) {
+      console.error('[UserProfileManager] Failed to fetch profile:', error);
+      return await this.loadProfile();
+    }
+  }
+
+  /**
+   * Load profile on app start and cache email
+   * Requirements: ui.12.17
+   */
+  async loadProfileOnStartup(): Promise<void> {
+    try {
+      const profile = await this.loadProfile();
+      if (profile) {
+        // Requirements: ui.12.17 - Set currentUserEmail from cached profile
+        this.currentUserEmail = profile.email;
+        console.log('[UserProfileManager] Email cached from stored profile:', profile.email);
+      }
+    } catch (error) {
+      console.error('[UserProfileManager] Failed to load profile on startup:', error);
+    }
+  }
+
+  /**
+   * Clear email on logout
+   * Requirements: ui.12.18
+   */
+  async clearSession(): Promise<void> {
+    // Requirements: ui.12.18 - Clear currentUserEmail
+    this.currentUserEmail = null;
+    console.log('[UserProfileManager] User email cleared');
+  }
+}
+```
+
+### Обработка Ошибок "No user logged in"
+
+```typescript
+// Requirements: ui.12.19, ui.12.20, ui.12.21
+
+// In application code
+try {
+  await dataManager.saveData('some_key', someValue);
+} catch (error) {
+  if (error.message === 'No user logged in') {
+    // Requirements: ui.12.19 - User not authenticated
+    if (!await isUserAuthenticated()) {
+      navigationManager.redirectToLogin();
+      clearAllCaches();
+    } else {
+      // Requirements: ui.12.20 - Session expired during operation
+      try {
+        await oauthClient.refreshAccessToken();
+        // Retry operation
+        await dataManager.saveData('some_key', someValue);
+      } catch (refreshError) {
+        // Refresh failed, redirect to login
+        navigationManager.redirectToLogin();
+      }
+    }
+  } else {
+    // Other error
+    throw error;
+  }
+}
+
+// Requirements: ui.12.21 - During logout (race condition)
+async function handleLogout() {
+  try {
+    await dataManager.saveData('last_action', 'logout');
+  } catch (error) {
+    if (error.message === 'No user logged in') {
+      // Ignore silently during logout
+      console.log('[Logout] Data save failed due to cleared session (expected)');
+    } else {
+      throw error;
+    }
+  }
+}
+```
+
+### Свойства Корректности (User Data Isolation)
+
+#### Property 44: Автоматическое добавление user_email при сохранении
+
+*Для любого* вызова `saveData()`, система должна автоматически добавить `user_email` текущего авторизованного пользователя к сохраняемым данным без явного параметра в методе.
+
+**Validates: Requirements ui.12.3, ui.12.11**
+
+#### Property 45: Автоматическая фильтрация по user_email при загрузке
+
+*Для любого* вызова `loadData()`, система должна автоматически фильтровать данные по `user_email` текущего авторизованного пользователя без явного параметра в методе.
+
+**Validates: Requirements ui.12.4, ui.12.12**
+
+#### Property 46: Изоляция данных между пользователями
+
+*Для любых* двух пользователей A и B с разными email, данные сохраненные пользователем A НЕ должны быть доступны пользователю B при вызове `loadData()` с тем же ключом.
+
+**Validates: Requirements ui.12.5, ui.12.6, ui.12.7, ui.12.8**
+
+#### Property 47: Персистентность данных после logout
+
+*Для любого* пользователя, после выхода из системы (logout) все его данные должны оставаться в базе данных и быть доступны при повторной авторизации того же пользователя.
+
+**Validates: Requirements ui.12.5, ui.12.7**
+
+#### Property 48: Ошибка при отсутствии авторизации
+
+*Для любого* вызова `saveData()`, `loadData()` или `deleteData()` когда пользователь не авторизован (нет email), метод должен вернуть ошибку "No user logged in".
+
+**Validates: Requirements ui.12.13**
+
 ## Заключение
 
 Данный дизайн обеспечивает надежное управление UI приложения с фокусом на нативный macOS опыт, персистентность состояния и адаптивность к различным конфигурациям экранов. Архитектура разделяет ответственность между `WindowManager` (управление жизненным циклом окна) и `WindowStateManager` (управление персистентностью состояния), обеспечивая чистоту кода и легкость тестирования.
@@ -2965,7 +4467,13 @@ const handleRefreshProfile = async () => {
 
 Система уведомлений об ошибках предоставляет пользователю понятную обратную связь о проблемах в фоновых процессах, автоматически скрывая уведомления через 15 секунд для минимизации отвлечения.
 
-Система управления токенами обеспечивает автоматическое обновление access token в фоновом режиме и корректную обработку ошибок авторизации (HTTP 401). Централизованный обработчик API запросов гарантирует консистентное поведение при истечении сессии, немедленно очищая токены и данные пользователя, и показывая понятное сообщение о необходимости повторной авторизации.
+Система управления токенами обеспечивает автоматическое обновление access token в фоновом режиме и корректную обработку ошибок авторизации (HTTP 401). Централизованный обработчик API запросов гарантирует консистентное поведение при истечении сессии, немедленно очищая токены и показывая понятное сообщение о необходимости повторной авторизации.
+
+Настройки AI Agent позволяют пользователю выбрать провайдера LLM и безопасно хранить API ключи с автоматическим шифрованием (когда доступно). Система поддерживает несколько провайдеров с раздельным хранилищем ключей и автоматическим переключением между ними.
+
+Форматирование дат и времени использует системные настройки локали для отображения в привычном для пользователя формате, обеспечивая консистентность с другими приложениями macOS.
+
+Изоляция данных пользователей гарантирует, что данные каждого пользователя (настройки, задачи, контакты) хранятся отдельно и автоматически фильтруются по email из Google OAuth профиля. Это обеспечивает multi-user support с полной приватностью данных.
 
 ### Статус Реализации
 
@@ -3002,6 +4510,27 @@ const handleRefreshProfile = async () => {
 - 📝 Задачи будут добавлены в tasks.md
 - ⏸️ Ожидает начала реализации
 
+**Фаза 7 (Изоляция Данных Пользователей):**
+- ⏳ В стадии планирования
+- 📋 Требования ui.12.x определены
+- 📐 Дизайн детализирован
+- 📝 Задачи будут добавлены в tasks.md
+- ⏸️ Ожидает начала реализации (критично для multi-user support)
+
+**Фаза 8 (Настройки AI Agent):**
+- ⏳ В стадии планирования
+- 📋 Требования ui.10.x определены
+- 📐 Дизайн детализирован
+- 📝 Задачи будут добавлены в tasks.md
+- ⏸️ Ожидает начала реализации (зависит от Фазы 7)
+
+**Фаза 9 (Форматирование Дат и Времени):**
+- ⏳ В стадии планирования
+- 📋 Требования ui.11.x определены
+- 📐 Дизайн детализирован
+- 📝 Задачи будут добавлены в tasks.md
+- ⏸️ Ожидает начала реализации
+
 ### Следующие Шаги
 
 1. Начать реализацию Фазы 3 согласно tasks.md (задачи 10-20)
@@ -3016,4 +4545,14 @@ const handleRefreshProfile = async () => {
 10. После завершения Фазы 5, перейти к Фазе 6 (Управление Токенами)
 11. Реализовать централизованный обработчик API запросов с проверкой HTTP 401
 12. Интегрировать автоматическое обновление токенов в фоновом режиме
-13. Обновить таблицу покрытия требований после реализации каждой фазы
+13. После завершения Фазы 6, перейти к Фазе 7 (Изоляция Данных) - КРИТИЧНО
+14. Обновить схему базы данных (добавить колонку user_email в таблицу user_data)
+15. Расширить DataManager для автоматической фильтрации по user_email
+16. Расширить UserProfileManager для кэширования currentUserEmail
+17. После завершения Фазы 7, перейти к Фазе 8 (Настройки AI Agent)
+18. Создать AIAgentSettingsManager с поддержкой шифрования
+19. Создать Settings компонент с секцией AI Agent
+20. После завершения Фазы 8, перейти к Фазе 9 (Форматирование Дат)
+21. Создать DateTimeFormatter утилиту
+22. Интегрировать форматирование во все компоненты (Tasks, Calendar, Contacts)
+23. Обновить таблицу покрытия требований после реализации каждой фазы

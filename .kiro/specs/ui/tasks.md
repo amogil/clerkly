@@ -1361,3 +1361,1128 @@
   - **Requirements:** ui.1-ui.9
 
 
+
+
+## Фаза 7: Настройки AI Agent
+
+### 46. Создание AIAgentSettingsManager
+
+- [ ] 46.1 Создать интерфейс AIAgentSettings
+  - Определить структуру настроек (llmProvider, apiKeys для каждого провайдера)
+  - Добавить JSDoc комментарии для каждого поля
+  - **Requirements:** ui.10.1, ui.10.11
+
+- [ ] 46.2 Создать класс AIAgentSettingsManager
+  - Реализовать метод `saveLLMProvider()` для сохранения выбранного провайдера
+  - Реализовать метод `loadLLMProvider()` для загрузки провайдера
+  - Реализовать метод `saveAPIKey()` для сохранения API ключа с шифрованием
+  - Реализовать метод `loadAPIKey()` для загрузки и дешифрования API ключа
+  - Реализовать метод `deleteAPIKey()` для удаления API ключа
+  - Добавить зависимость от DataManager
+  - **Requirements:** ui.10.4, ui.10.5, ui.10.6, ui.10.9, ui.10.10, ui.10.17
+
+- [ ] 46.3 Реализовать шифрование API ключей
+  - Использовать `safeStorage.encryptString()` для шифрования
+  - Проверять доступность шифрования через `safeStorage.isEncryptionAvailable()`
+  - Сохранять флаг `ai_agent_api_key_{provider}_encrypted`
+  - Fallback к plain text если шифрование недоступно
+  - **Requirements:** ui.10.9, ui.10.10, ui.10.12
+
+- [ ] 46.4 Реализовать дешифрование API ключей
+  - Использовать `safeStorage.decryptString()` для дешифрования
+  - Проверять флаг encrypted перед дешифрованием
+  - Обрабатывать ошибки дешифрования gracefully (возвращать null)
+  - **Requirements:** ui.10.17
+
+- [ ] 46.5 Реализовать хранилище для каждого провайдера
+  - OpenAI: ключи `ai_agent_api_key_openai` и `ai_agent_api_key_openai_encrypted`
+  - Anthropic: ключи `ai_agent_api_key_anthropic` и `ai_agent_api_key_anthropic_encrypted`
+  - Google: ключи `ai_agent_api_key_google` и `ai_agent_api_key_google_encrypted`
+  - LLM Provider: ключ `ai_agent_llm_provider`
+  - **Requirements:** ui.10.11, ui.10.13
+
+
+### 47. Расширение IPC Handlers для AI Agent Settings
+
+- [ ] 47.1 Добавить IPC handler для сохранения LLM провайдера
+  - Реализовать `settings:save-llm-provider` handler
+  - Вызывать AIAgentSettingsManager.saveLLMProvider()
+  - Обрабатывать ошибки и возвращать структурированный ответ
+  - **Requirements:** ui.10.4, ui.10.21
+
+- [ ] 47.2 Добавить IPC handler для загрузки LLM провайдера
+  - Реализовать `settings:load-llm-provider` handler
+  - Вызывать AIAgentSettingsManager.loadLLMProvider()
+  - Возвращать провайдера или значение по умолчанию
+  - **Requirements:** ui.10.15, ui.10.16, ui.10.21
+
+- [ ] 47.3 Добавить IPC handler для сохранения API ключа
+  - Реализовать `settings:save-api-key` handler
+  - Вызывать AIAgentSettingsManager.saveAPIKey()
+  - Обрабатывать ошибки и показывать уведомление через ui.7
+  - **Requirements:** ui.10.4, ui.10.8, ui.10.21
+
+- [ ] 47.4 Добавить IPC handler для загрузки API ключа
+  - Реализовать `settings:load-api-key` handler
+  - Вызывать AIAgentSettingsManager.loadAPIKey()
+  - Возвращать ключ или null
+  - **Requirements:** ui.10.15, ui.10.17, ui.10.21
+
+- [ ] 47.5 Добавить IPC handler для удаления API ключа
+  - Реализовать `settings:delete-api-key` handler
+  - Вызывать AIAgentSettingsManager.deleteAPIKey()
+  - Обрабатывать ошибки
+  - **Requirements:** ui.10.6, ui.10.21
+
+- [ ] 47.6 Расширить preload API
+  - Добавить методы в `window.api.settings.*`
+  - Обновить TypeScript типы для API
+  - **Requirements:** ui.10.21
+
+
+### 48. Создание Settings UI Component для AI Agent
+
+- [ ] 48.1 Добавить секцию AI Agent Settings в Settings компонент
+  - Создать секцию "AI Agent Settings" в существующем Settings компоненте
+  - Добавить выпадающий список для LLM Provider (OpenAI, Anthropic, Google)
+  - Добавить текстовое поле для API Key с type="password" по умолчанию
+  - Добавить кнопку toggle visibility (Eye/EyeOff иконка) внутри поля API Key
+  - Добавить placeholder текст "Enter your API key"
+  - **Requirements:** ui.10.1, ui.10.2, ui.10.3
+
+- [ ] 48.2 Реализовать toggle visibility для API ключа
+  - Добавить state для отслеживания видимости (showApiKey)
+  - При клике на кнопку: переключать между type="password" и type="text"
+  - Показывать иконку Eye когда скрыто, EyeOff когда видно
+  - НЕ сохранять состояние видимости между сессиями
+  - Кнопка НЕ должна триггерить сохранение данных
+  - **Requirements:** ui.10.3, ui.10.4, ui.10.5, ui.10.6, ui.10.7, ui.10.8
+
+- [ ] 48.3 Реализовать загрузку настроек при монтировании
+  - Вызывать `window.api.settings.loadLLMProvider()` в useEffect
+  - Вызывать `window.api.settings.loadAPIKey(provider)` для текущего провайдера
+  - Устанавливать значения по умолчанию если настройки не найдены
+  - **Requirements:** ui.10.15, ui.10.16
+
+- [ ] 48.4 Реализовать немедленное сохранение при изменении провайдера
+  - При изменении LLM Provider: сохранять немедленно без debounce
+  - Загружать API ключ для нового провайдера
+  - Если ключ не найден: показывать пустое поле с placeholder
+  - **Requirements:** ui.10.5, ui.10.14
+
+- [ ] 48.5 Реализовать debounced сохранение API ключа
+  - При изменении API Key: сохранять с debounce 500ms
+  - Использовать useEffect с cleanup для debounce
+  - НЕ показывать визуальный индикатор сохранения
+  - **Requirements:** ui.10.4, ui.10.7
+
+- [ ] 48.6 Реализовать удаление API ключа при очистке поля
+  - Когда пользователь очищает поле (пустая строка): удалять ключ из базы
+  - Вызывать deleteAPIKey() для текущего провайдера
+  - **Requirements:** ui.10.6
+
+
+- [ ] 48.7 Добавить информационный текст и placeholder кнопку
+  - Добавить текст: "Your API key is stored securely. It will only be used to communicate with your selected LLM provider."
+  - Добавить кнопку "Test Connection" (disabled, placeholder для будущей функциональности)
+  - **Requirements:** ui.10.19, ui.10.20
+
+- [ ] 48.8 Реализовать обработку ошибок сохранения
+  - При ошибке сохранения: показывать уведомление через ErrorNotificationManager
+  - Использовать существующий механизм ui.7
+  - **Requirements:** ui.10.8
+
+### 49. Стилизация AI Agent Settings
+
+- [ ] 49.1 Создать стили для секции AI Agent Settings
+  - Добавить стили для выпадающего списка LLM Provider
+  - Добавить стили для поля API Key с кнопкой toggle visibility
+  - Добавить стили для информационного текста
+  - Добавить стили для кнопки Test Connection (disabled state)
+  - Обеспечить адаптивность на разных размерах экрана
+  - **Requirements:** ui.10.1, ui.10.3
+
+- [ ] 49.2 Интегрировать с существующей темой Settings
+  - Использовать существующие цвета и шрифты
+  - Следовать визуальному стилю других секций Settings
+  - Обеспечить консистентность с другими компонентами
+  - **Requirements:** ui.10.1
+
+
+### 50. Модульные Тесты для AIAgentSettingsManager
+
+- [ ] 50.1 Тест: saveLLMProvider() сохраняет провайдера в базу
+  - Мокировать DataManager.saveData()
+  - Вызвать saveLLMProvider('openai')
+  - Проверить, что saveData() вызван с ключом 'ai_agent_llm_provider' и значением 'openai'
+  - **Requirements:** ui.10.4, ui.10.13
+
+- [ ] 50.2 Тест: loadLLMProvider() загружает провайдера из базы
+  - Мокировать DataManager.loadData() для возврата 'anthropic'
+  - Вызвать loadLLMProvider()
+  - Проверить, что возвращается 'anthropic'
+  - **Requirements:** ui.10.15
+
+- [ ] 50.3 Тест: loadLLMProvider() возвращает значение по умолчанию
+  - Мокировать DataManager.loadData() для возврата null
+  - Вызвать loadLLMProvider()
+  - Проверить, что возвращается 'openai' (значение по умолчанию)
+  - **Requirements:** ui.10.16
+
+- [ ] 50.4 Тест: saveAPIKey() шифрует и сохраняет ключ
+  - Мокировать safeStorage.isEncryptionAvailable() для возврата true
+  - Мокировать safeStorage.encryptString()
+  - Мокировать DataManager.saveData()
+  - Вызвать saveAPIKey('openai', 'test-key')
+  - Проверить, что encryptString() был вызван
+  - Проверить, что saveData() вызван с зашифрованным ключом и флагом encrypted=true
+  - **Requirements:** ui.10.9, ui.10.11, ui.10.12
+
+- [ ] 50.5 Тест: saveAPIKey() сохраняет plain text если шифрование недоступно
+  - Мокировать safeStorage.isEncryptionAvailable() для возврата false
+  - Мокировать DataManager.saveData()
+  - Вызвать saveAPIKey('openai', 'test-key')
+  - Проверить, что saveData() вызван с plain text и флагом encrypted=false
+  - **Requirements:** ui.10.10, ui.10.12
+
+- [ ] 50.6 Тест: loadAPIKey() дешифрует и возвращает ключ
+  - Мокировать DataManager.loadData() для возврата зашифрованного ключа и флага encrypted=true
+  - Мокировать safeStorage.decryptString()
+  - Вызвать loadAPIKey('openai')
+  - Проверить, что decryptString() был вызван
+  - Проверить, что возвращается дешифрованный ключ
+  - **Requirements:** ui.10.17
+
+- [ ] 50.7 Тест: loadAPIKey() возвращает plain text если не зашифровано
+  - Мокировать DataManager.loadData() для возврата plain text ключа и флага encrypted=false
+  - Вызвать loadAPIKey('openai')
+  - Проверить, что возвращается plain text ключ без дешифрования
+  - **Requirements:** ui.10.17
+
+
+- [ ] 50.8 Тест: loadAPIKey() возвращает null при ошибке дешифрования
+  - Мокировать DataManager.loadData() для возврата зашифрованного ключа
+  - Мокировать safeStorage.decryptString() для выброса ошибки
+  - Вызвать loadAPIKey('openai')
+  - Проверить, что возвращается null
+  - Проверить, что ошибка залогирована
+  - **Requirements:** ui.10.17
+
+- [ ] 50.9 Тест: deleteAPIKey() удаляет ключ и флаг из базы
+  - Мокировать DataManager.deleteData()
+  - Вызвать deleteAPIKey('openai')
+  - Проверить, что deleteData() вызван дважды (для ключа и флага)
+  - **Requirements:** ui.10.6
+
+- [ ] 50.10 Тест: каждый провайдер имеет отдельное хранилище
+  - Сохранить ключи для всех трех провайдеров
+  - Проверить, что каждый ключ сохранен с уникальным ключом в базе
+  - Загрузить ключи для каждого провайдера
+  - Проверить, что возвращаются правильные ключи
+  - **Requirements:** ui.10.11, ui.10.14
+
+### 51. Модульные Тесты для Settings Component (AI Agent)
+
+- [ ] 51.1 Тест: отображает секцию AI Agent Settings
+  - Рендерить Settings компонент
+  - Проверить наличие выпадающего списка LLM Provider
+  - Проверить наличие поля API Key
+  - Проверить наличие кнопки toggle visibility
+  - Проверить наличие информационного текста
+  - **Requirements:** ui.10.1, ui.10.2, ui.10.3
+
+- [ ] 51.2 Тест: загружает настройки при монтировании
+  - Мокировать window.api.settings.loadLLMProvider()
+  - Мокировать window.api.settings.loadAPIKey()
+  - Рендерить Settings компонент
+  - Проверить, что loadLLMProvider() был вызван
+  - Проверить, что loadAPIKey() был вызван с текущим провайдером
+  - **Requirements:** ui.10.15
+
+- [ ] 51.3 Тест: немедленно сохраняет при изменении провайдера
+  - Мокировать window.api.settings.saveLLMProvider()
+  - Мокировать window.api.settings.loadAPIKey()
+  - Рендерить Settings компонент
+  - Изменить LLM Provider через выпадающий список
+  - Проверить, что saveLLMProvider() вызван немедленно
+  - Проверить, что loadAPIKey() вызван для нового провайдера
+  - **Requirements:** ui.10.5, ui.10.14
+
+
+- [ ] 51.4 Тест: сохраняет API ключ с debounce
+  - Мокировать window.api.settings.saveAPIKey()
+  - Использовать jest.useFakeTimers()
+  - Рендерить Settings компонент
+  - Изменить API Key несколько раз быстро
+  - Проверить, что saveAPIKey() НЕ вызван сразу
+  - Продвинуть таймеры на 500ms
+  - Проверить, что saveAPIKey() вызван один раз с последним значением
+  - **Requirements:** ui.10.4, ui.10.7
+
+- [ ] 51.5 Тест: удаляет API ключ при очистке поля
+  - Мокировать window.api.settings.deleteAPIKey()
+  - Рендерить Settings компонент с заполненным API Key
+  - Очистить поле API Key (установить пустую строку)
+  - Продвинуть таймеры на 500ms
+  - Проверить, что deleteAPIKey() был вызван
+  - **Requirements:** ui.10.6
+
+- [ ] 51.6 Тест: toggle visibility переключает тип поля
+  - Рендерить Settings компонент
+  - Проверить, что поле API Key имеет type="password"
+  - Проверить, что иконка Eye отображается
+  - Кликнуть на кнопку toggle visibility
+  - Проверить, что поле изменилось на type="text"
+  - Проверить, что иконка изменилась на EyeOff
+  - Кликнуть снова
+  - Проверить, что вернулось к type="password" и иконке Eye
+  - **Requirements:** ui.10.3, ui.10.4, ui.10.5
+
+- [ ] 51.7 Тест: toggle visibility НЕ триггерит сохранение
+  - Мокировать window.api.settings.saveAPIKey()
+  - Рендерить Settings компонент
+  - Кликнуть на кнопку toggle visibility
+  - Проверить, что saveAPIKey() НЕ был вызван
+  - **Requirements:** ui.10.7
+
+- [ ] 51.8 Тест: состояние видимости НЕ сохраняется между сессиями
+  - Рендерить Settings компонент
+  - Переключить visibility на visible
+  - Размонтировать компонент
+  - Рендерить компонент снова
+  - Проверить, что поле снова type="password" (скрыто)
+  - **Requirements:** ui.10.8
+
+- [ ] 51.9 Тест: показывает уведомление при ошибке сохранения
+  - Мокировать window.api.settings.saveAPIKey() для выброса ошибки
+  - Мокировать ErrorNotificationManager
+  - Рендерить Settings компонент
+  - Изменить API Key
+  - Продвинуть таймеры на 500ms
+  - Проверить, что ErrorNotificationManager.showNotification() был вызван
+  - **Requirements:** ui.10.8
+
+
+### 52. Property-Based Тесты для AI Agent Settings
+
+- [ ] 52.1 Property-based тест: сохранение и загрузка API ключа (round-trip)
+  - Использовать fast-check для генерации различных API ключей
+  - Для каждого провайдера: сохранить ключ, затем загрузить
+  - Проверить, что загруженный ключ равен сохраненному
+  - Минимум 100 итераций
+  - **Requirements:** ui.10.4, ui.10.17
+
+- [ ] 52.2 Property-based тест: шифрование сохраняет данные корректно
+  - Использовать fast-check для генерации различных API ключей
+  - Мокировать safeStorage для шифрования/дешифрования
+  - Сохранить ключ с шифрованием
+  - Загрузить и дешифровать ключ
+  - Проверить, что дешифрованный ключ равен оригинальному
+  - Минимум 100 итераций
+  - **Requirements:** ui.10.9, ui.10.17
+
+- [ ] 52.3 Property-based тест: переключение между провайдерами сохраняет ключи
+  - Использовать fast-check для генерации ключей для всех провайдеров
+  - Сохранить ключи для всех провайдеров
+  - Переключаться между провайдерами в случайном порядке
+  - Проверить, что каждый провайдер возвращает свой ключ
+  - Минимум 100 итераций
+  - **Requirements:** ui.10.11, ui.10.14
+
+### 53. Функциональные Тесты (AI Agent Settings)
+
+- [ ] 53.1 Функциональный тест: should save and load LLM provider selection
+  - Запустить приложение с авторизацией
+  - Открыть Settings → AI Agent Settings
+  - Выбрать LLM Provider (например, Anthropic)
+  - Закрыть приложение
+  - Запустить приложение снова
+  - Открыть Settings → AI Agent Settings
+  - Проверить, что выбран Anthropic
+  - Закрыть приложение
+  - **Requirements:** ui.10.4, ui.10.15
+
+- [ ] 53.2 Функциональный тест: should save and load API key with encryption
+  - Запустить приложение с авторизацией
+  - Открыть Settings → AI Agent Settings
+  - Ввести API ключ для OpenAI
+  - Подождать 500ms (debounce)
+  - Закрыть приложение
+  - Запустить приложение снова
+  - Открыть Settings → AI Agent Settings
+  - Проверить, что API ключ загружен (поле заполнено, но скрыто)
+  - Переключить visibility
+  - Проверить, что отображается правильный ключ
+  - Закрыть приложение
+  - **Requirements:** ui.10.4, ui.10.9, ui.10.15, ui.10.17
+
+
+- [ ] 53.3 Функциональный тест: should delete API key when field is cleared
+  - Запустить приложение с авторизацией
+  - Открыть Settings → AI Agent Settings
+  - Ввести API ключ
+  - Подождать 500ms
+  - Очистить поле API Key (пустая строка)
+  - Подождать 500ms
+  - Закрыть приложение
+  - Запустить приложение снова
+  - Открыть Settings → AI Agent Settings
+  - Проверить, что поле API Key пустое
+  - Закрыть приложение
+  - **Requirements:** ui.10.6
+
+- [ ] 53.4 Функциональный тест: should preserve API keys when switching providers
+  - Запустить приложение с авторизацией
+  - Открыть Settings → AI Agent Settings
+  - Ввести API ключ для OpenAI
+  - Подождать 500ms
+  - Переключить на Anthropic
+  - Ввести API ключ для Anthropic
+  - Подождать 500ms
+  - Переключить обратно на OpenAI
+  - Проверить, что поле заполнено ключом OpenAI
+  - Переключить на Anthropic
+  - Проверить, что поле заполнено ключом Anthropic
+  - Закрыть приложение
+  - **Requirements:** ui.10.11, ui.10.14
+
+- [ ] 53.5 Функциональный тест: should toggle API key visibility
+  - Запустить приложение с авторизацией
+  - Открыть Settings → AI Agent Settings
+  - Ввести API ключ
+  - Проверить, что поле type="password" (символы скрыты)
+  - Проверить, что иконка Eye отображается
+  - Кликнуть на кнопку toggle visibility
+  - Проверить, что поле type="text" (символы видны)
+  - Проверить, что иконка EyeOff отображается
+  - Кликнуть снова
+  - Проверить, что вернулось к type="password"
+  - Закрыть приложение
+  - **Requirements:** ui.10.3, ui.10.4, ui.10.5
+
+- [ ] 53.6 Функциональный тест: should show error notification on save failure
+  - Запустить приложение с авторизацией
+  - Мокировать DataManager для выброса ошибки при сохранении
+  - Открыть Settings → AI Agent Settings
+  - Ввести API ключ
+  - Подождать 500ms
+  - Проверить, что показывается уведомление об ошибке
+  - Закрыть приложение
+  - **Requirements:** ui.10.8
+
+
+- [ ] 53.7 Функциональный тест: should isolate settings between users
+  - Запустить приложение, авторизоваться как User A
+  - Открыть Settings → AI Agent Settings
+  - Выбрать OpenAI и ввести API ключ A
+  - Подождать 500ms
+  - Выполнить logout
+  - Авторизоваться как User B
+  - Открыть Settings → AI Agent Settings
+  - Проверить, что настройки пустые (провайдер по умолчанию, пустой ключ)
+  - Выбрать Anthropic и ввести API ключ B
+  - Подождать 500ms
+  - Выполнить logout
+  - Авторизоваться как User A снова
+  - Открыть Settings → AI Agent Settings
+  - Проверить, что выбран OpenAI и загружен ключ A
+  - Закрыть приложение
+  - **Requirements:** ui.10.22, ui.10.23, ui.10.24
+
+### 54. Обновление Документации (AI Agent Settings)
+
+- [ ] 54.1 Добавить JSDoc комментарии к AIAgentSettingsManager
+  - Документировать все публичные методы
+  - Добавить примеры использования
+  - Указать ссылки на требования в комментариях
+  - **Requirements:** ui.10
+
+- [ ] 54.2 Добавить JSDoc комментарии к IPC handlers
+  - Документировать новые handlers для AI Agent Settings
+  - Указать ссылки на требования в комментариях
+  - **Requirements:** ui.10
+
+- [ ] 54.3 Обновить таблицу покрытия требований в design.md
+  - Добавить требования ui.10.x
+  - Указать покрытие модульными, property-based и функциональными тестами
+  - **Requirements:** ui.10
+
+### 55. Валидация и Финализация (AI Agent Settings)
+
+- [ ] 55.1 Запустить автоматическую валидацию
+  - Выполнить `npm run validate`
+  - Исправить все ошибки TypeScript
+  - Исправить все ошибки ESLint
+  - Исправить форматирование Prettier
+  - **Requirements:** ui.10
+
+- [ ] 55.2 Проверить покрытие тестами
+  - Убедиться, что покрытие >= 85%
+  - Убедиться, что все требования ui.10.x покрыты тестами
+  - Обновить таблицу покрытия в design.md
+  - **Requirements:** ui.10
+
+- [ ] 55.3 Проверить комментарии с требованиями
+  - Убедиться, что все функции имеют комментарии // Requirements:
+  - Убедиться, что все тесты имеют структурированные комментарии
+  - Проверить корректность ссылок на требования
+  - **Requirements:** ui.10
+
+
+
+## Фаза 8: Форматирование Дат и Времени
+
+### 56. Создание DateTimeFormatter Utility
+
+- [ ] 56.1 Создать класс DateTimeFormatter
+  - Реализовать статический метод `formatDate()` для форматирования только даты
+  - Реализовать статический метод `formatDateTime()` для форматирования даты и времени
+  - Реализовать статический метод `formatLogTimestamp()` для фиксированного формата логов
+  - Использовать `Intl.DateTimeFormat` с системной локалью (undefined)
+  - **Requirements:** ui.11.1, ui.11.3
+
+- [ ] 56.2 Реализовать formatDate()
+  - Использовать `Intl.DateTimeFormat(undefined, { year, month, day })`
+  - Обрабатывать ошибки gracefully (fallback к toLocaleDateString)
+  - Логировать ошибки
+  - **Requirements:** ui.11.1
+
+- [ ] 56.3 Реализовать formatDateTime()
+  - Использовать `Intl.DateTimeFormat(undefined, { year, month, day, hour, minute })`
+  - Обрабатывать ошибки gracefully (fallback к toLocaleString)
+  - Логировать ошибки
+  - **Requirements:** ui.11.1
+
+- [ ] 56.4 Реализовать formatLogTimestamp()
+  - Использовать фиксированный формат `YYYY-MM-DD HH:MM:SS`
+  - НЕ использовать системную локаль для логов
+  - Обрабатывать ошибки gracefully
+  - **Requirements:** ui.11.3
+
+- [ ] 56.5 Добавить обработку ошибок для некорректных локалей
+  - При ошибке Intl API: использовать fallback форматирование
+  - Логировать ошибки с контекстом
+  - Не выбрасывать исключения
+  - **Requirements:** ui.11.1
+
+### 57. Интеграция DateTimeFormatter с Компонентами
+
+- [ ] 57.1 Применить форматирование к Tasks компоненту
+  - Заменить прямое форматирование дат на DateTimeFormatter.formatDate()
+  - Заменить форматирование даты+времени на DateTimeFormatter.formatDateTime()
+  - Использовать существующие паттерны отображения (только дата vs дата+время)
+  - **Requirements:** ui.11.2, ui.11.5
+
+- [ ] 57.2 Применить форматирование к Calendar компоненту
+  - Заменить прямое форматирование дат на DateTimeFormatter.formatDate()
+  - Заменить форматирование даты+времени на DateTimeFormatter.formatDateTime()
+  - Использовать существующие паттерны отображения
+  - **Requirements:** ui.11.2, ui.11.5
+
+
+- [ ] 57.3 Применить форматирование к Contacts компоненту
+  - Заменить прямое форматирование дат на DateTimeFormatter.formatDate()
+  - Заменить форматирование даты+времени на DateTimeFormatter.formatDateTime()
+  - Использовать существующие паттерны отображения
+  - **Requirements:** ui.11.2, ui.11.5
+
+- [ ] 57.4 Применить форматирование к истории изменений
+  - Заменить прямое форматирование дат на DateTimeFormatter.formatDate()
+  - Заменить форматирование даты+времени на DateTimeFormatter.formatDateTime()
+  - **Requirements:** ui.11.2
+
+- [ ] 57.5 Обновить логирование для использования фиксированного формата
+  - Заменить форматирование timestamp в логах на DateTimeFormatter.formatLogTimestamp()
+  - Проверить все места логирования в приложении
+  - Убедиться, что логи используют формат YYYY-MM-DD HH:MM:SS
+  - **Requirements:** ui.11.3
+
+### 58. Удаление Display Preferences из Settings
+
+- [ ] 58.1 Удалить секцию Display Preferences из Settings UI
+  - Удалить все компоненты, связанные с Display Preferences
+  - Удалить настройки формата даты/времени из UI
+  - Удалить настройки относительного времени из UI
+  - **Requirements:** ui.11.7
+
+- [ ] 58.2 Удалить код обработки Display Preferences
+  - Удалить IPC handlers для Display Preferences (если существуют)
+  - Удалить код сохранения/загрузки настроек формата
+  - Очистить неиспользуемый код
+  - **Requirements:** ui.11.7
+
+### 59. Модульные Тесты для DateTimeFormatter
+
+- [ ] 59.1 Тест: formatDate() форматирует дату с системной локалью
+  - Мокировать Intl.DateTimeFormat
+  - Вызвать formatDate(timestamp)
+  - Проверить, что Intl.DateTimeFormat вызван с undefined (системная локаль)
+  - Проверить, что возвращается отформатированная дата
+  - **Requirements:** ui.11.1
+
+- [ ] 59.2 Тест: formatDateTime() форматирует дату и время с системной локалью
+  - Мокировать Intl.DateTimeFormat
+  - Вызвать formatDateTime(timestamp)
+  - Проверить, что Intl.DateTimeFormat вызван с undefined и опциями для даты+времени
+  - Проверить, что возвращается отформатированная дата и время
+  - **Requirements:** ui.11.1
+
+- [ ] 59.3 Тест: formatLogTimestamp() использует фиксированный формат
+  - Вызвать formatLogTimestamp(timestamp)
+  - Проверить, что возвращается строка в формате YYYY-MM-DD HH:MM:SS
+  - Проверить, что НЕ используется Intl.DateTimeFormat
+  - **Requirements:** ui.11.3
+
+
+- [ ] 59.4 Тест: formatDate() использует fallback при ошибке Intl
+  - Мокировать Intl.DateTimeFormat для выброса ошибки
+  - Вызвать formatDate(timestamp)
+  - Проверить, что возвращается результат toLocaleDateString()
+  - Проверить, что ошибка залогирована
+  - **Requirements:** ui.11.1
+
+- [ ] 59.5 Тест: formatDateTime() использует fallback при ошибке Intl
+  - Мокировать Intl.DateTimeFormat для выброса ошибки
+  - Вызвать formatDateTime(timestamp)
+  - Проверить, что возвращается результат toLocaleString()
+  - Проверить, что ошибка залогирована
+  - **Requirements:** ui.11.1
+
+- [ ] 59.6 Тест: НЕ использует относительные форматы времени
+  - Вызвать formatDate() и formatDateTime() с различными timestamp
+  - Проверить, что результат НЕ содержит относительные форматы ("2 hours ago", "yesterday")
+  - Проверить, что всегда возвращается абсолютная дата
+  - **Requirements:** ui.11.4
+
+### 60. Property-Based Тесты для DateTimeFormatter
+
+- [ ] 60.1 Property-based тест: форматирование использует системную локаль
+  - Использовать fast-check для генерации различных timestamp
+  - Для каждого timestamp: вызвать formatDate() и formatDateTime()
+  - Проверить, что Intl.DateTimeFormat вызван с undefined (системная локаль)
+  - Проверить, что результат не пустой
+  - Минимум 100 итераций
+  - **Requirements:** ui.11.1
+
+- [ ] 60.2 Property-based тест: логи используют фиксированный формат
+  - Использовать fast-check для генерации различных timestamp
+  - Для каждого timestamp: вызвать formatLogTimestamp()
+  - Проверить, что результат соответствует регулярному выражению YYYY-MM-DD HH:MM:SS
+  - Минимум 100 итераций
+  - **Requirements:** ui.11.3
+
+- [ ] 60.3 Property-based тест: НЕ использует относительные форматы
+  - Использовать fast-check для генерации различных timestamp (прошлое, настоящее, будущее)
+  - Для каждого timestamp: вызвать formatDate() и formatDateTime()
+  - Проверить, что результат НЕ содержит слова "ago", "yesterday", "tomorrow", "hours", "minutes"
+  - Минимум 100 итераций
+  - **Requirements:** ui.11.4
+
+
+### 61. Функциональные Тесты (Date/Time Formatting)
+
+- [ ] 61.1 Функциональный тест: should format dates using system locale
+  - Запустить приложение с определенной системной локалью (например, en-US)
+  - Открыть Tasks/Calendar/Contacts с датами
+  - Проверить, что даты отформатированы согласно системной локали
+  - Закрыть приложение
+  - Изменить системную локаль (например, на ru-RU)
+  - Запустить приложение снова
+  - Проверить, что даты отформатированы согласно новой локали
+  - Закрыть приложение
+  - **Requirements:** ui.11.1, ui.11.6
+
+- [ ] 61.2 Функциональный тест: should format times using system locale
+  - Запустить приложение с определенной системной локалью
+  - Открыть компоненты с датой+временем
+  - Проверить, что время отформатировано согласно системной локали (12h vs 24h)
+  - Закрыть приложение
+  - **Requirements:** ui.11.1
+
+- [ ] 61.3 Функциональный тест: should use fixed format for logs
+  - Запустить приложение с доступом к консоли
+  - Триггернуть события, которые логируются
+  - Проверить, что timestamp в логах имеет формат YYYY-MM-DD HH:MM:SS
+  - Проверить, что формат НЕ зависит от системной локали
+  - Закрыть приложение
+  - **Requirements:** ui.11.3
+
+- [ ] 61.4 Функциональный тест: should not display relative time formats
+  - Запустить приложение
+  - Открыть Tasks/Calendar/Contacts с различными датами (прошлое, настоящее, будущее)
+  - Проверить, что НЕ отображаются относительные форматы ("2 hours ago", "yesterday")
+  - Проверить, что всегда отображаются абсолютные даты
+  - Закрыть приложение
+  - **Requirements:** ui.11.4
+
+- [ ] 61.5 Функциональный тест: should not show Display Preferences section
+  - Запустить приложение с авторизацией
+  - Открыть Settings
+  - Проверить, что секция "Display Preferences" отсутствует
+  - Проверить, что нет настроек формата даты/времени
+  - Закрыть приложение
+  - **Requirements:** ui.11.7
+
+
+### 62. Обновление Документации (Date/Time Formatting)
+
+- [ ] 62.1 Добавить JSDoc комментарии к DateTimeFormatter
+  - Документировать все статические методы
+  - Добавить примеры использования
+  - Указать ссылки на требования в комментариях
+  - **Requirements:** ui.11
+
+- [ ] 62.2 Обновить таблицу покрытия требований в design.md
+  - Добавить требования ui.11.x
+  - Указать покрытие модульными, property-based и функциональными тестами
+  - **Requirements:** ui.11
+
+### 63. Валидация и Финализация (Date/Time Formatting)
+
+- [ ] 63.1 Запустить автоматическую валидацию
+  - Выполнить `npm run validate`
+  - Исправить все ошибки TypeScript
+  - Исправить все ошибки ESLint
+  - Исправить форматирование Prettier
+  - **Requirements:** ui.11
+
+- [ ] 63.2 Проверить покрытие тестами
+  - Убедиться, что покрытие >= 85%
+  - Убедиться, что все требования ui.11.x покрыты тестами
+  - Обновить таблицу покрытия в design.md
+  - **Requirements:** ui.11
+
+- [ ] 63.3 Проверить комментарии с требованиями
+  - Убедиться, что все функции имеют комментарии // Requirements:
+  - Убедиться, что все тесты имеют структурированные комментарии
+  - Проверить корректность ссылок на требования
+  - **Requirements:** ui.11
+
+
+
+## Фаза 9: Изоляция Данных Пользователей
+
+### 64. Обновление Схемы Базы Данных
+
+- [ ] 64.1 Добавить колонку user_email в таблицу user_data
+  - Выполнить миграцию базы данных вручную (пересоздание)
+  - Добавить колонку `user_email TEXT`
+  - Создать индекс `idx_user_email` на колонке user_email
+  - **Requirements:** ui.12.2, ui.12.9
+  - **Примечание:** Это требует ручного вмешательства разработчика
+
+- [ ] 64.2 Обновить схему таблицы user_data
+  - Убедиться, что таблица имеет структуру: (key TEXT, value TEXT, user_email TEXT)
+  - Проверить, что индекс создан корректно
+  - **Requirements:** ui.12.2, ui.12.9
+
+### 65. Расширение UserProfileManager для Кэширования Email
+
+- [ ] 65.1 Добавить свойство currentUserEmail в UserProfileManager
+  - Добавить приватное поле `currentUserEmail: string | null`
+  - Инициализировать как null
+  - **Requirements:** ui.12.14
+
+- [ ] 65.2 Обновить fetchProfile() для установки currentUserEmail
+  - После успешного получения профиля: установить currentUserEmail из profile.email
+  - Сохранить email в памяти
+  - **Requirements:** ui.12.15
+
+- [ ] 65.3 Обновить updateProfileAfterTokenRefresh() для обновления email
+  - После успешного refresh: обновить currentUserEmail из обновленного профиля
+  - **Requirements:** ui.12.16
+
+- [ ] 65.4 Обновить initialize() в LifecycleManager для загрузки email
+  - При запуске приложения: загрузить профиль из базы данных
+  - Установить currentUserEmail из загруженного профиля
+  - **Requirements:** ui.12.17
+
+- [ ] 65.5 Обновить clearProfile() для очистки currentUserEmail
+  - При logout: установить currentUserEmail в null
+  - **Requirements:** ui.12.18
+
+- [ ] 65.6 Добавить метод getCurrentEmail()
+  - Реализовать публичный метод для получения currentUserEmail
+  - Возвращать string | null
+  - **Requirements:** ui.12.10
+
+
+### 66. Расширение DataManager для Изоляции Данных
+
+- [ ] 66.1 Добавить зависимость от UserProfileManager в DataManager
+  - Добавить приватное поле userProfileManager
+  - Инициализировать в конструкторе
+  - **Requirements:** ui.12.10
+
+- [ ] 66.2 Обновить метод saveData() для добавления user_email
+  - Получать currentUserEmail через userProfileManager.getCurrentEmail()
+  - Если email === null: выбросить ошибку "No user logged in"
+  - Добавлять user_email в SQL INSERT запрос
+  - **Requirements:** ui.12.3, ui.12.11, ui.12.13
+
+- [ ] 66.3 Обновить метод loadData() для фильтрации по user_email
+  - Получать currentUserEmail через userProfileManager.getCurrentEmail()
+  - Если email === null: выбросить ошибку "No user logged in"
+  - Добавлять WHERE user_email = ? в SQL SELECT запрос
+  - **Requirements:** ui.12.4, ui.12.12, ui.12.13
+
+- [ ] 66.4 Обновить метод deleteData() для фильтрации по user_email
+  - Получать currentUserEmail через userProfileManager.getCurrentEmail()
+  - Если email === null: выбросить ошибку "No user logged in"
+  - Добавлять WHERE user_email = ? в SQL DELETE запрос
+  - **Requirements:** ui.12.12, ui.12.13
+
+- [ ] 66.5 Обновить все методы DataManager для изоляции
+  - Проверить все методы, работающие с user_data
+  - Убедиться, что все запросы фильтруются по user_email
+  - **Requirements:** ui.12.3, ui.12.4
+
+### 67. Обработка Ошибок "No user logged in"
+
+- [ ] 67.1 Реализовать обработку в случае неавторизованного пользователя
+  - При ошибке "No user logged in" И пользователь не авторизован:
+  - Перенаправить на экран логина через NavigationManager
+  - Очистить все кэши
+  - **Requirements:** ui.12.19
+
+- [ ] 67.2 Реализовать обработку при истечении сессии во время операции
+  - При ошибке "No user logged in" И пользователь авторизован:
+  - Попытаться обновить токен через refreshAccessToken()
+  - При успешном refresh: повторить операцию с данными
+  - При неудачном refresh: перенаправить на логин
+  - **Requirements:** ui.12.20
+
+- [ ] 67.3 Реализовать обработку при logout (race condition)
+  - При ошибке "No user logged in" во время logout:
+  - Молча игнорировать ошибку
+  - Логировать в консоль для отладки
+  - **Requirements:** ui.12.21
+
+
+### 68. Применение Изоляции к Всем Типам Данных
+
+- [ ] 68.1 Применить изоляцию к настройкам AI Agent
+  - Убедиться, что LLM Provider изолирован по user_email
+  - Убедиться, что API ключи изолированы по user_email
+  - **Requirements:** ui.12.8, ui.10.22, ui.10.23
+
+- [ ] 68.2 Применить изоляцию к профилю пользователя
+  - Убедиться, что user_profile изолирован по user_email
+  - Каждый пользователь имеет свой профиль
+  - **Requirements:** ui.12.22
+
+- [ ] 68.3 Применить изоляцию к состоянию окна
+  - Убедиться, что window_state изолировано по user_email
+  - Каждый пользователь имеет свое положение окна
+  - **Requirements:** ui.12.23
+
+- [ ] 68.4 Применить изоляцию к OAuth токенам
+  - Убедиться, что токены изолированы по user_email
+  - Каждый пользователь имеет свои токены
+  - **Requirements:** ui.12.24
+
+- [ ] 68.5 Применить изоляцию к задачам (Tasks)
+  - Убедиться, что задачи изолированы по user_email
+  - Каждый пользователь видит только свои задачи
+  - **Requirements:** ui.12.8
+
+- [ ] 68.6 Применить изоляцию к контактам (Contacts)
+  - Убедиться, что контакты изолированы по user_email
+  - Каждый пользователь видит только свои контакты
+  - **Requirements:** ui.12.8
+
+- [ ] 68.7 Применить изоляцию к календарю (Calendar)
+  - Убедиться, что события календаря изолированы по user_email
+  - Каждый пользователь видит только свои события
+  - **Requirements:** ui.12.8
+
+### 69. Модульные Тесты для UserProfileManager (Email Caching)
+
+- [ ] 69.1 Тест: fetchProfile() устанавливает currentUserEmail
+  - Мокировать Google UserInfo API для возврата профиля с email
+  - Вызвать fetchProfile()
+  - Проверить, что getCurrentEmail() возвращает правильный email
+  - **Requirements:** ui.12.15
+
+- [ ] 69.2 Тест: updateProfileAfterTokenRefresh() обновляет currentUserEmail
+  - Установить начальный email
+  - Мокировать fetchProfile() для возврата профиля с новым email
+  - Вызвать updateProfileAfterTokenRefresh()
+  - Проверить, что getCurrentEmail() возвращает новый email
+  - **Requirements:** ui.12.16
+
+
+- [ ] 69.3 Тест: initialize() загружает email при запуске
+  - Мокировать loadProfile() для возврата профиля с email
+  - Вызвать initialize() в LifecycleManager
+  - Проверить, что getCurrentEmail() возвращает правильный email
+  - **Requirements:** ui.12.17
+
+- [ ] 69.4 Тест: clearProfile() очищает currentUserEmail
+  - Установить email через fetchProfile()
+  - Вызвать clearProfile()
+  - Проверить, что getCurrentEmail() возвращает null
+  - **Requirements:** ui.12.18
+
+- [ ] 69.5 Тест: getCurrentEmail() возвращает текущий email
+  - Установить email через fetchProfile()
+  - Вызвать getCurrentEmail()
+  - Проверить, что возвращается правильный email
+  - **Requirements:** ui.12.10
+
+### 70. Модульные Тесты для DataManager (User Isolation)
+
+- [ ] 70.1 Тест: saveData() добавляет user_email в запрос
+  - Мокировать userProfileManager.getCurrentEmail() для возврата 'user@example.com'
+  - Вызвать saveData('test_key', 'test_value')
+  - Проверить, что SQL запрос содержит user_email
+  - Проверить, что значение user_email = 'user@example.com'
+  - **Requirements:** ui.12.3, ui.12.11
+
+- [ ] 70.2 Тест: saveData() выбрасывает ошибку если нет email
+  - Мокировать userProfileManager.getCurrentEmail() для возврата null
+  - Вызвать saveData('test_key', 'test_value')
+  - Проверить, что выброшена ошибка "No user logged in"
+  - **Requirements:** ui.12.13
+
+- [ ] 70.3 Тест: loadData() фильтрует по user_email
+  - Мокировать userProfileManager.getCurrentEmail() для возврата 'user@example.com'
+  - Вызвать loadData('test_key')
+  - Проверить, что SQL запрос содержит WHERE user_email = 'user@example.com'
+  - **Requirements:** ui.12.4, ui.12.12
+
+- [ ] 70.4 Тест: loadData() выбрасывает ошибку если нет email
+  - Мокировать userProfileManager.getCurrentEmail() для возврата null
+  - Вызвать loadData('test_key')
+  - Проверить, что выброшена ошибка "No user logged in"
+  - **Requirements:** ui.12.13
+
+- [ ] 70.5 Тест: deleteData() фильтрует по user_email
+  - Мокировать userProfileManager.getCurrentEmail() для возврата 'user@example.com'
+  - Вызвать deleteData('test_key')
+  - Проверить, что SQL запрос содержит WHERE user_email = 'user@example.com'
+  - **Requirements:** ui.12.12
+
+
+- [ ] 70.6 Тест: deleteData() выбрасывает ошибку если нет email
+  - Мокировать userProfileManager.getCurrentEmail() для возврата null
+  - Вызвать deleteData('test_key')
+  - Проверить, что выброшена ошибка "No user logged in"
+  - **Requirements:** ui.12.13
+
+- [ ] 70.7 Тест: данные разных пользователей изолированы
+  - Сохранить данные для user A (email: 'userA@example.com')
+  - Сохранить данные для user B (email: 'userB@example.com')
+  - Загрузить данные как user A
+  - Проверить, что возвращаются только данные user A
+  - Загрузить данные как user B
+  - Проверить, что возвращаются только данные user B
+  - **Requirements:** ui.12.3, ui.12.4, ui.12.6
+
+### 71. Модульные Тесты для Обработки Ошибок
+
+- [ ] 71.1 Тест: обработка "No user logged in" для неавторизованного пользователя
+  - Мокировать isUserAuthenticated() для возврата false
+  - Мокировать NavigationManager.redirectToLogin()
+  - Триггернуть ошибку "No user logged in"
+  - Проверить, что redirectToLogin() был вызван
+  - Проверить, что кэши очищены
+  - **Requirements:** ui.12.19
+
+- [ ] 71.2 Тест: обработка "No user logged in" при истечении сессии
+  - Мокировать isUserAuthenticated() для возврата true
+  - Мокировать refreshAccessToken() для успешного refresh
+  - Триггернуть ошибку "No user logged in"
+  - Проверить, что refreshAccessToken() был вызван
+  - Проверить, что операция повторена после refresh
+  - **Requirements:** ui.12.20
+
+- [ ] 71.3 Тест: обработка "No user logged in" при logout
+  - Триггернуть ошибку "No user logged in" во время logout
+  - Проверить, что ошибка молча игнорируется
+  - Проверить, что ошибка залогирована в консоль
+  - **Requirements:** ui.12.21
+
+### 72. Property-Based Тесты для User Isolation
+
+- [ ] 72.1 Property-based тест: данные пользователей изолированы
+  - Использовать fast-check для генерации различных user emails и данных
+  - Для каждого пользователя: сохранить данные
+  - Для каждого пользователя: загрузить данные
+  - Проверить, что каждый пользователь видит только свои данные
+  - Минимум 100 итераций
+  - **Requirements:** ui.12.3, ui.12.4, ui.12.6
+
+
+- [ ] 72.2 Property-based тест: сохранение и загрузка данных (round-trip) с изоляцией
+  - Использовать fast-check для генерации различных user emails, ключей и значений
+  - Для каждого пользователя: сохранить данные, затем загрузить
+  - Проверить, что загруженные данные равны сохраненным
+  - Проверить, что данные других пользователей не затронуты
+  - Минимум 100 итераций
+  - **Requirements:** ui.12.3, ui.12.4, ui.12.7
+
+- [ ] 72.3 Property-based тест: logout сохраняет данные пользователя
+  - Использовать fast-check для генерации различных user emails и данных
+  - Для каждого пользователя: сохранить данные, выполнить logout
+  - Проверить, что данные остались в базе данных
+  - Авторизоваться снова как тот же пользователь
+  - Проверить, что данные восстановлены
+  - Минимум 100 итераций
+  - **Requirements:** ui.12.5, ui.12.7
+
+### 73. Функциональные Тесты (User Data Isolation)
+
+- [ ] 73.1 Функциональный тест: should isolate data between different users
+  - Запустить приложение, авторизоваться как User A
+  - Создать данные (настройки, задачи, контакты)
+  - Выполнить logout
+  - Авторизоваться как User B
+  - Проверить, что данные User A не видны
+  - Создать данные для User B
+  - Выполнить logout
+  - Авторизоваться как User A снова
+  - Проверить, что данные User A восстановлены
+  - Проверить, что данные User B не видны
+  - Закрыть приложение
+  - **Requirements:** ui.12.3, ui.12.4, ui.12.5, ui.12.6, ui.12.7
+
+- [ ] 73.2 Функциональный тест: should restore user data after re-login
+  - Запустить приложение, авторизоваться как User A
+  - Создать данные (настройки AI Agent, window state, профиль)
+  - Выполнить logout
+  - Авторизоваться как User A снова
+  - Проверить, что все данные восстановлены:
+    - Настройки AI Agent (LLM Provider, API ключи)
+    - Window State (позиция, размер)
+    - Профиль пользователя
+  - Закрыть приложение
+  - **Requirements:** ui.12.7, ui.12.22, ui.12.23, ui.12.24
+
+- [ ] 73.3 Функциональный тест: should persist data after logout
+  - Запустить приложение, авторизоваться как User A
+  - Создать данные (задачи, контакты, календарь)
+  - Выполнить logout
+  - Проверить базу данных напрямую
+  - Убедиться, что данные User A сохранены с user_email
+  - Авторизоваться как User A снова
+  - Проверить, что данные восстановлены
+  - Закрыть приложение
+  - **Requirements:** ui.12.5, ui.12.8
+
+
+- [ ] 73.4 Функциональный тест: should filter data by user email
+  - Запустить приложение, авторизоваться как User A
+  - Создать данные с ключом 'test_key' и значением 'value_A'
+  - Выполнить logout
+  - Авторизоваться как User B
+  - Создать данные с ключом 'test_key' и значением 'value_B'
+  - Загрузить данные с ключом 'test_key'
+  - Проверить, что возвращается 'value_B' (не 'value_A')
+  - Выполнить logout
+  - Авторизоваться как User A снова
+  - Загрузить данные с ключом 'test_key'
+  - Проверить, что возвращается 'value_A' (не 'value_B')
+  - Закрыть приложение
+  - **Requirements:** ui.12.4, ui.12.6
+
+- [ ] 73.5 Функциональный тест: should handle "No user logged in" error gracefully
+  - Запустить приложение без авторизации
+  - Попытаться сохранить данные через DataManager
+  - Проверить, что показывается экран логина
+  - Проверить, что кэши очищены
+  - Авторизоваться
+  - Попытаться сохранить данные снова
+  - Проверить, что данные сохранены успешно
+  - Закрыть приложение
+  - **Requirements:** ui.12.13, ui.12.19
+
+- [ ] 73.6 Функциональный тест: should retry operation after token refresh
+  - Запустить приложение с авторизацией
+  - Мокировать истечение сессии (currentUserEmail становится null)
+  - Попытаться сохранить данные
+  - Проверить, что система автоматически обновляет токен
+  - Проверить, что операция повторена после refresh
+  - Проверить, что данные сохранены успешно
+  - Закрыть приложение
+  - **Requirements:** ui.12.20
+
+### 74. Обновление Документации (User Data Isolation)
+
+- [ ] 74.1 Добавить JSDoc комментарии к DataManager (изоляция)
+  - Документировать обновленные методы saveData, loadData, deleteData
+  - Добавить примеры использования с изоляцией
+  - Указать ссылки на требования в комментариях
+  - **Requirements:** ui.12
+
+- [ ] 74.2 Добавить JSDoc комментарии к UserProfileManager (email caching)
+  - Документировать getCurrentEmail() и обновленные методы
+  - Указать ссылки на требования в комментариях
+  - **Requirements:** ui.12
+
+- [ ] 74.3 Обновить таблицу покрытия требований в design.md
+  - Добавить требования ui.12.x
+  - Указать покрытие модульными, property-based и функциональными тестами
+  - **Requirements:** ui.12
+
+
+### 75. Валидация и Финализация (User Data Isolation)
+
+- [ ] 75.1 Запустить автоматическую валидацию
+  - Выполнить `npm run validate`
+  - Исправить все ошибки TypeScript
+  - Исправить все ошибки ESLint
+  - Исправить форматирование Prettier
+  - **Requirements:** ui.12
+
+- [ ] 75.2 Проверить покрытие тестами
+  - Убедиться, что покрытие >= 85%
+  - Убедиться, что все требования ui.12.x покрыты тестами
+  - Обновить таблицу покрытия в design.md
+  - **Requirements:** ui.12
+
+- [ ] 75.3 Проверить комментарии с требованиями
+  - Убедиться, что все функции имеют комментарии // Requirements:
+  - Убедиться, что все тесты имеют структурированные комментарии
+  - Проверить корректность ссылок на требования
+  - **Requirements:** ui.12
+
+- [ ] 75.4 Проверить изоляцию данных во всех компонентах
+  - Убедиться, что все типы данных изолированы по user_email
+  - Проверить AI Agent Settings, Window State, Profile, Tasks, Contacts, Calendar, OAuth Tokens
+  - Убедиться, что нет утечек данных между пользователями
+  - **Requirements:** ui.12.8, ui.12.22, ui.12.23, ui.12.24
+
+## Финальная Валидация Всех Фаз (Обновленная)
+
+### 76. Комплексная Проверка (Все Фазы)
+
+- [ ] 76.1 Проверить покрытие всех требований
+  - Убедиться, что все требования ui.1-ui.12 покрыты задачами
+  - Убедиться, что все свойства покрыты тестами
+  - Проверить таблицу покрытия в design.md
+  - **Requirements:** ui.1-ui.12
+
+- [ ] 76.2 Запустить полную валидацию
+  - Выполнить `npm run validate`
+  - Убедиться, что все проверки проходят
+  - Убедиться, что покрытие >= 85%
+  - **Requirements:** ui.1-ui.12
+
+- [ ] 76.3 Проверить интеграцию между всеми фазами
+  - Убедиться, что Window Management работает корректно
+  - Убедиться, что Account Profile интегрирован с OAuth
+  - Убедиться, что Navigation работает с авторизацией
+  - Убедиться, что Error Notifications работают во всех компонентах
+  - Убедиться, что Token Management работает прозрачно
+  - Убедиться, что AI Agent Settings изолированы по пользователям
+  - Убедиться, что Date/Time Formatting применено везде
+  - Убедиться, что User Data Isolation работает для всех типов данных
+  - **Requirements:** ui.1-ui.12
+
+- [ ] 76.4 Запустить функциональные тесты (при явной просьбе пользователя)
+  - Запустить все функциональные тесты из фаз 1-9
+  - Убедиться, что все тесты проходят
+  - Исправить любые найденные проблемы
+  - **Requirements:** ui.1-ui.12
+
