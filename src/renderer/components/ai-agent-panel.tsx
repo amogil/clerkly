@@ -106,15 +106,7 @@ export function AIAgentPanel({ onCommand }: AIAgentPanelProps) {
     setTaskInput('');
   };
 
-  const formatTime = (date: Date) => {
-    return date.toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
-    });
-  };
-
-  // Removed unused function getStatusIcon
+  // Removed unused function formatTime and getStatusIcon
 
   const getStatusText = (status: AgentTask['status']) => {
     switch (status) {
@@ -684,35 +676,43 @@ export function AIAgentPanel({ onCommand }: AIAgentPanelProps) {
 
       {/* Messages Area - always shows current task messages */}
       <div className="flex-1 overflow-y-auto p-6 space-y-4">
-        {currentMessages.map((message) => (
-          <div key={message.id} className="space-y-1">
-            {message.type === 'user' ? (
-              <div className="ml-auto max-w-[80%] rounded-lg border-2 border-primary bg-primary/5 px-4 py-3">
-                <p className="text-sm leading-relaxed text-foreground">{message.content}</p>
-              </div>
-            ) : (
-              <div className="flex gap-3 items-start">
-                {/* Agent avatar with animated logo */}
-                <div className="flex-shrink-0 mt-0.5">
-                  <Logo
-                    size="sm"
-                    showText={false}
-                    animated={selectedTask.status === 'in-progress'}
-                  />
+        {currentMessages.map((message, index) => {
+          // Check if we should show the agent avatar
+          // Show it only if this is the first message or the previous message was from user
+          const showAvatar =
+            message.type === 'agent' && (index === 0 || currentMessages[index - 1].type === 'user');
+
+          return (
+            <div key={message.id}>
+              {message.type === 'user' ? (
+                <div className="flex justify-end">
+                  <div className="rounded-lg border-2 border-primary bg-primary/5 px-4 py-3">
+                    <p className="text-sm leading-relaxed text-foreground text-right">
+                      {message.content}
+                    </p>
+                  </div>
                 </div>
-                {/* Agent message content */}
-                <div className="flex-1 max-w-[85%] text-sm leading-relaxed text-foreground">
-                  {message.content}
-                </div>
-              </div>
-            )}
-            <div
-              className={`text-xs text-muted-foreground ${message.type === 'user' ? 'text-right' : 'ml-12'}`}
-            >
-              {formatTime(message.timestamp)}
+              ) : (
+                <>
+                  {/* Agent avatar above first message in sequence */}
+                  {showAvatar && (
+                    <div className="mb-2">
+                      <Logo
+                        size="sm"
+                        showText={false}
+                        animated={selectedTask.status === 'in-progress'}
+                      />
+                    </div>
+                  )}
+                  {/* Agent message content */}
+                  <div className="max-w-[85%] text-sm leading-relaxed text-foreground">
+                    {message.content}
+                  </div>
+                </>
+              )}
             </div>
-          </div>
-        ))}
+          );
+        })}
         <div ref={messagesEndRef} />
       </div>
 

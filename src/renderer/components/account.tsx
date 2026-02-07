@@ -196,7 +196,8 @@ export function Account({ className = '', onSignOut }: AccountProps) {
               type="text"
               value={profile.name}
               readOnly
-              className="profile-input"
+              disabled
+              className="profile-input profile-input-disabled"
             />
           </div>
 
@@ -210,10 +211,12 @@ export function Account({ className = '', onSignOut }: AccountProps) {
               type="text"
               value={profile.email}
               readOnly
-              className="profile-input"
+              disabled
+              className="profile-input profile-input-disabled"
             />
           </div>
         </div>
+        <p className="text-xs text-muted-foreground mt-4">Synced from Google Account</p>
       </div>
 
       {/* Inline styles for Account component */}
@@ -245,16 +248,16 @@ export function Account({ className = '', onSignOut }: AccountProps) {
         .sign-out-button {
           font-size: 0.875rem;
           color: #dc2626;
-          background: none;
-          border: none;
+          background: #fee2e2;
+          border: 1px solid #fecaca;
           cursor: pointer;
           padding: 0.5rem 1rem;
-          border-radius: 0.375rem;
+          border-radius: 0.5rem;
           transition: background-color 0.2s;
         }
 
         .sign-out-button:hover {
-          background-color: #fee2e2;
+          background-color: #fecaca;
         }
 
         .account-loading,
@@ -291,6 +294,12 @@ export function Account({ className = '', onSignOut }: AccountProps) {
           background-color: #f9fafb;
           color: #1f2937;
           cursor: default;
+        }
+
+        .profile-input-disabled {
+          background-color: rgba(0, 0, 0, 0.05);
+          color: #6b7280;
+          cursor: not-allowed;
         }
 
         .profile-input:focus {

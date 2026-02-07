@@ -42,79 +42,57 @@ export function DashboardUpdated({
     },
   ];
 
-  // Tasks for today
+  // Tasks for today - using Google Tasks structure with mocks
   const todayTasks = [
     {
-      id: '1',
+      id: 'task-1',
+      title: 'Design new login screen',
+      notes: 'Create mockups for the new login experience',
+      status: 'needsAction' as const,
+      due: '2026-02-05T00:00:00.000Z',
+      taskListId: 'tasklist-1',
+      taskListTitle: 'Mobile App Redesign',
+    },
+    {
+      id: 'task-7',
       title: 'Review API documentation',
-      project: 'Backend Migration',
-      assignee: 'Sarah Chen',
-      deadline: '2026-01-28',
-      priority: 'high' as const,
-      status: 'in-progress' as const,
+      notes: 'Review and approve backend API documentation',
+      status: 'needsAction' as const,
+      due: '2026-02-05T00:00:00.000Z',
+      taskListId: 'tasklist-2',
+      taskListTitle: 'Backend API v2',
     },
     {
-      id: '2',
+      id: 'task-8',
       title: 'Update user authentication flow',
-      project: 'Security Updates',
-      assignee: 'Mike Johnson',
-      deadline: '2026-01-28',
-      priority: 'high' as const,
-      status: 'todo' as const,
+      notes: 'Improve security and UX of authentication process',
+      status: 'needsAction' as const,
+      due: '2026-02-05T00:00:00.000Z',
+      taskListId: 'tasklist-2',
+      taskListTitle: 'Backend API v2',
     },
     {
-      id: '3',
+      id: 'task-9',
       title: 'Design system color tokens',
-      project: 'Design System v2',
-      assignee: 'Alex Rivera',
-      deadline: '2026-01-28',
-      priority: 'medium' as const,
-      status: 'in-progress' as const,
+      notes: 'Define and implement new color system',
+      status: 'needsAction' as const,
+      due: '2026-02-05T00:00:00.000Z',
+      taskListId: 'tasklist-1',
+      taskListTitle: 'Mobile App Redesign',
     },
     {
-      id: '4',
+      id: 'task-10',
       title: 'Write test cases for payment module',
-      project: 'Payment Integration',
-      assignee: 'Emma Wilson',
-      deadline: '2026-01-28',
-      priority: 'medium' as const,
-      status: 'todo' as const,
-    },
-    {
-      id: '5',
-      title: 'Code review for PR #234',
-      project: 'Feature Development',
-      assignee: 'David Lee',
-      deadline: '2026-01-28',
-      priority: 'low' as const,
-      status: 'completed' as const,
+      notes: 'Create comprehensive test coverage for payment integration',
+      status: 'needsAction' as const,
+      due: '2026-02-05T00:00:00.000Z',
+      taskListId: 'tasklist-2',
+      taskListTitle: 'Backend API v2',
     },
   ];
 
   const handleStartRecording = (meetingId: string) => {
     console.log('Starting recording for meeting:', meetingId);
-  };
-
-  const getPriorityColor = (priority: 'high' | 'medium' | 'low') => {
-    switch (priority) {
-      case 'high':
-        return 'bg-red-100 text-red-700 border-red-200';
-      case 'medium':
-        return 'bg-amber-100 text-amber-700 border-amber-200';
-      case 'low':
-        return 'bg-blue-100 text-blue-700 border-blue-200';
-    }
-  };
-
-  const getTaskStatusColor = (status: 'todo' | 'in-progress' | 'completed') => {
-    switch (status) {
-      case 'todo':
-        return 'text-muted-foreground';
-      case 'in-progress':
-        return 'text-blue-600';
-      case 'completed':
-        return 'text-green-600';
-    }
   };
 
   return (
@@ -239,33 +217,22 @@ export function DashboardUpdated({
                       >
                         {task.title}
                       </h3>
-                      <p className="text-sm text-muted-foreground mb-2">{task.project}</p>
+                      {task.notes && (
+                        <p className="text-sm text-muted-foreground mb-2">{task.notes}</p>
+                      )}
 
                       <div className="flex items-center gap-3">
-                        {/* Priority badge */}
-                        <span
-                          className={`text-xs px-2 py-1 rounded border ${getPriorityColor(task.priority)}`}
-                        >
-                          {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
+                        {/* Task List badge */}
+                        <span className="text-xs px-2 py-1 rounded border bg-blue-50 text-blue-700 border-blue-200">
+                          {task.taskListTitle}
                         </span>
 
                         {/* Status */}
-                        <span className={`text-xs ${getTaskStatusColor(task.status)}`}>
-                          {task.status === 'todo' && 'To Do'}
-                          {task.status === 'in-progress' && 'In Progress'}
-                          {task.status === 'completed' && 'Completed'}
+                        <span
+                          className={`text-xs ${task.status === 'completed' ? 'text-green-600' : 'text-muted-foreground'}`}
+                        >
+                          {task.status === 'needsAction' ? 'Pending' : 'Completed'}
                         </span>
-
-                        {/* Assignee */}
-                        <div className="flex items-center gap-1.5">
-                          <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium text-primary">
-                            {task.assignee
-                              .split(' ')
-                              .map((n) => n[0])
-                              .join('')}
-                          </div>
-                          <span className="text-xs text-muted-foreground">{task.assignee}</span>
-                        </div>
                       </div>
                     </div>
                   </div>

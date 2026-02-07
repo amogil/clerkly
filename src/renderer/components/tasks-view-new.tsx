@@ -1,150 +1,131 @@
-import { useState } from 'react';
-import { Plus, Filter, Clock, User, Users, Layers, CheckSquare, X } from 'lucide-react';
-import type { Project, Task, TaskPriority, TaskStatus } from '@/app/types/project';
+import React, { useState } from 'react';
+import { Plus, Filter, Clock, Layers, CheckSquare, X, List } from 'lucide-react';
+
+// Google Tasks API structure
+type TaskStatus = 'needsAction' | 'completed';
+
+interface Task {
+  id: string;
+  title: string;
+  notes?: string;
+  status: TaskStatus;
+  due: string; // RFC 3339 timestamp
+  taskListId: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+interface TaskList {
+  id: string;
+  title: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
 
 export function TasksViewNew() {
-  const [selectedProject, setSelectedProject] = useState<string | null>(null);
-  const [priorityFilter, setPriorityFilter] = useState<TaskPriority | 'all'>('all');
+  const [selectedTaskList, setSelectedTaskList] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<TaskStatus | 'all'>('all');
-  const [assigneeFilter, setAssigneeFilter] = useState<string>('all');
   const [showNewTaskModal, setShowNewTaskModal] = useState(false);
 
-  // Mock data
-  const projects: Project[] = [
+  // Mock Task Lists (Google Tasks structure)
+  const taskLists: TaskList[] = [
     {
-      id: 'proj-1',
+      id: 'tasklist-1',
       title: 'Mobile App Redesign',
-      description: 'Complete overhaul of the mobile application UI/UX',
       createdAt: new Date('2026-01-15'),
       updatedAt: new Date('2026-01-28'),
     },
     {
-      id: 'proj-2',
+      id: 'tasklist-2',
       title: 'Backend API v2',
-      description: 'Migrate to new REST API architecture',
       createdAt: new Date('2026-01-10'),
       updatedAt: new Date('2026-01-27'),
     },
     {
-      id: 'proj-3',
+      id: 'tasklist-3',
       title: 'Marketing Campaign',
-      description: 'Q1 2026 product launch marketing initiatives',
       createdAt: new Date('2026-01-20'),
       updatedAt: new Date('2026-01-28'),
     },
   ];
 
+  // Mock Tasks (Google Tasks structure)
   const tasks: Task[] = [
     {
       id: 'task-1',
       title: 'Design new login screen',
-      description: 'Create mockups for the new login experience',
-      priority: 'high',
-      status: 'in-progress',
-      assignee: 'Sarah Chen',
-      relatedPeople: ['Mike Johnson', 'Alex Rivera'],
-      dueDate: new Date('2026-02-05'),
-      projectId: 'proj-1',
+      notes: 'Create mockups for the new login experience',
+      status: 'needsAction',
+      due: '2026-02-05T00:00:00.000Z',
+      taskListId: 'tasklist-1',
       createdAt: new Date('2026-01-20'),
       updatedAt: new Date('2026-01-28'),
     },
     {
       id: 'task-2',
       title: 'Implement dark mode',
-      description: 'Add dark mode support across all screens',
-      priority: 'medium',
-      status: 'pending',
-      assignee: 'Alex Rivera',
-      relatedPeople: ['Sarah Chen'],
-      dueDate: new Date('2026-02-10'),
-      projectId: 'proj-1',
+      notes: 'Add dark mode support across all screens',
+      status: 'needsAction',
+      due: '2026-02-10T00:00:00.000Z',
+      taskListId: 'tasklist-1',
       createdAt: new Date('2026-01-22'),
       updatedAt: new Date('2026-01-27'),
     },
     {
       id: 'task-3',
       title: 'Update navigation bar',
-      description: 'Redesign and implement new navigation patterns',
-      priority: 'urgent',
-      status: 'in-progress',
-      assignee: 'Mike Johnson',
-      relatedPeople: ['Sarah Chen', 'David Lee'],
-      dueDate: new Date('2026-02-01'),
-      projectId: 'proj-1',
+      notes: 'Redesign and implement new navigation patterns',
+      status: 'needsAction',
+      due: '2026-02-01T00:00:00.000Z',
+      taskListId: 'tasklist-1',
       createdAt: new Date('2026-01-18'),
       updatedAt: new Date('2026-01-28'),
     },
     {
       id: 'task-4',
       title: 'Setup authentication endpoints',
-      description: 'Implement JWT-based authentication',
-      priority: 'urgent',
+      notes: 'Implement JWT-based authentication',
       status: 'completed',
-      assignee: 'David Lee',
-      relatedPeople: ['Emma Wilson'],
-      dueDate: new Date('2026-01-25'),
-      projectId: 'proj-2',
+      due: '2026-01-25T00:00:00.000Z',
+      taskListId: 'tasklist-2',
       createdAt: new Date('2026-01-10'),
       updatedAt: new Date('2026-01-24'),
     },
     {
       id: 'task-5',
       title: 'Create API documentation',
-      description: 'Write comprehensive API docs using OpenAPI',
-      priority: 'medium',
-      status: 'in-progress',
-      assignee: 'Emma Wilson',
-      relatedPeople: ['David Lee', 'Chris Brown'],
-      dueDate: new Date('2026-02-15'),
-      projectId: 'proj-2',
+      notes: 'Write comprehensive API docs using OpenAPI',
+      status: 'needsAction',
+      due: '2026-02-15T00:00:00.000Z',
+      taskListId: 'tasklist-2',
       createdAt: new Date('2026-01-15'),
       updatedAt: new Date('2026-01-28'),
     },
     {
       id: 'task-6',
       title: 'Database migration script',
-      description: 'Create scripts for migrating existing data to new schema',
-      priority: 'high',
-      status: 'pending',
-      assignee: 'Chris Brown',
-      relatedPeople: ['David Lee'],
-      dueDate: new Date('2026-02-08'),
-      projectId: 'proj-2',
+      notes: 'Create scripts for migrating existing data to new schema',
+      status: 'needsAction',
+      due: '2026-02-08T00:00:00.000Z',
+      taskListId: 'tasklist-2',
       createdAt: new Date('2026-01-12'),
       updatedAt: new Date('2026-01-26'),
     },
   ];
 
-  const getFilteredTasks = (projectId?: string) => {
+  const getFilteredTasks = (taskListId?: string) => {
     return tasks.filter((task) => {
-      if (projectId && task.projectId !== projectId) return false;
-      if (priorityFilter !== 'all' && task.priority !== priorityFilter) return false;
+      if (taskListId && task.taskListId !== taskListId) return false;
       if (statusFilter !== 'all' && task.status !== statusFilter) return false;
-      if (assigneeFilter !== 'all' && task.assignee !== assigneeFilter) return false;
       return true;
     });
-  };
-
-  const getPriorityColor = (priority: TaskPriority) => {
-    switch (priority) {
-      case 'urgent':
-        return 'text-red-600 bg-red-50 border-red-200';
-      case 'high':
-        return 'text-orange-600 bg-orange-50 border-orange-200';
-      case 'medium':
-        return 'text-blue-600 bg-blue-50 border-blue-200';
-      case 'low':
-        return 'text-gray-600 bg-gray-50 border-gray-200';
-    }
   };
 
   const getStatusColor = (status: TaskStatus) => {
     switch (status) {
       case 'completed':
         return 'text-green-600 bg-green-50 border-green-200';
-      case 'in-progress':
-        return 'text-blue-600 bg-blue-50 border-blue-200';
-      case 'pending':
+      case 'needsAction':
         return 'text-gray-600 bg-gray-50 border-gray-200';
     }
   };
@@ -167,137 +148,103 @@ export function TasksViewNew() {
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
 
-  const allAssignees = Array.from(new Set(tasks.map((t) => t.assignee))).sort();
+  const displayedTasks = selectedTaskList ? getFilteredTasks(selectedTaskList) : getFilteredTasks();
 
-  const displayedTasks = selectedProject ? getFilteredTasks(selectedProject) : getFilteredTasks();
-
-  const getProjectTaskCount = (projectId: string) => {
-    return getFilteredTasks(projectId).length;
+  const getTaskListTaskCount = (taskListId: string) => {
+    return getFilteredTasks(taskListId).length;
   };
 
   return (
-    <div className="flex h-full">
-      {/* Projects Sidebar */}
-      <div className="w-80 border-r border-border bg-card overflow-y-auto">
-        <div className="p-6 border-b border-border">
-          <h2 className="text-lg font-semibold text-foreground mb-4">Projects</h2>
-          <button className="flex items-center justify-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors">
+    <div className="p-8">
+      <div className="max-w-7xl mx-auto">
+        {/* Header */}
+        <div className="mb-8 flex items-center justify-between">
+          <h1 className="text-3xl font-semibold text-foreground">Tasks</h1>
+          <button
+            onClick={() => setShowNewTaskModal(true)}
+            className="flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
+          >
             <Plus className="w-4 h-4" />
-            <span>New Project</span>
+            <span>New Task</span>
           </button>
         </div>
 
-        <div className="p-4">
-          {/* All Tasks Option */}
-          <button
-            onClick={() => setSelectedProject(null)}
-            className={`w-full flex items-center justify-between p-3 rounded-lg mb-2 transition-colors ${
-              selectedProject === null
-                ? 'bg-primary/10 text-primary'
-                : 'hover:bg-secondary text-foreground'
-            }`}
-          >
-            <div className="flex items-center gap-3">
-              <CheckSquare className="w-5 h-5" />
-              <span className="font-medium">All Tasks</span>
-            </div>
-            <span className="text-sm text-muted-foreground">{getFilteredTasks().length}</span>
-          </button>
+        <div className="grid grid-cols-6 gap-6">
+          {/* Task Lists Sidebar */}
+          <div className="col-span-2">
+            <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
+              <div className="p-4 border-b border-border">
+                <h2 className="font-semibold text-foreground mb-3">Task Lists</h2>
+                <button className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm bg-secondary text-foreground rounded-lg hover:bg-secondary/80 transition-colors">
+                  <Plus className="w-4 h-4" />
+                  <span>New List</span>
+                </button>
+              </div>
 
-          {/* Project List */}
-          <div className="space-y-1">
-            {projects.map((project) => {
-              const taskCount = getProjectTaskCount(project.id);
-              return (
+              <div className="p-2">
+                {/* All Tasks Option */}
                 <button
-                  key={project.id}
-                  onClick={() => setSelectedProject(project.id)}
-                  className={`w-full flex items-center justify-between p-3 rounded-lg transition-colors ${
-                    selectedProject === project.id
+                  onClick={() => setSelectedTaskList(null)}
+                  className={`w-full flex items-center justify-between p-3 rounded-lg mb-1 transition-colors ${
+                    selectedTaskList === null
                       ? 'bg-primary/10 text-primary'
                       : 'hover:bg-secondary text-foreground'
                   }`}
                 >
-                  <div className="flex items-center gap-3 text-left flex-1 min-w-0">
-                    <Layers className="w-5 h-5 flex-shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <div className="font-medium truncate">{project.title}</div>
-                      <div className="text-xs text-muted-foreground truncate">
-                        {project.description}
-                      </div>
-                    </div>
+                  <div className="flex items-center gap-3">
+                    <CheckSquare className="w-4 h-4" />
+                    <span className="text-sm font-medium">All Tasks</span>
                   </div>
-                  <span className="text-sm text-muted-foreground ml-2">{taskCount}</span>
+                  <span className="text-xs font-medium">{getFilteredTasks().length}</span>
                 </button>
-              );
-            })}
-          </div>
-        </div>
-      </div>
 
-      {/* Main Content Area */}
-      <div className="flex-1 overflow-y-auto">
-        <div className="p-8">
-          <div className="max-w-5xl mx-auto">
-            <div className="mb-8 flex items-center justify-between">
-              <div>
-                <h1 className="text-3xl font-semibold text-foreground mb-2">
-                  {selectedProject
-                    ? projects.find((p) => p.id === selectedProject)?.title
-                    : 'All Tasks'}
-                </h1>
-                <p className="text-muted-foreground">
-                  {selectedProject
-                    ? projects.find((p) => p.id === selectedProject)?.description
-                    : 'View and manage all your tasks across projects'}
-                </p>
+                {/* Task Lists */}
+                <div className="space-y-1">
+                  {taskLists.map((taskList) => {
+                    const taskCount = getTaskListTaskCount(taskList.id);
+                    return (
+                      <button
+                        key={taskList.id}
+                        onClick={() => setSelectedTaskList(taskList.id)}
+                        className={`w-full flex items-center justify-between p-3 rounded-lg transition-colors ${
+                          selectedTaskList === taskList.id
+                            ? 'bg-primary/10 text-primary'
+                            : 'hover:bg-secondary text-foreground'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3 text-left flex-1 min-w-0">
+                          <List className="w-4 h-4 flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-medium truncate">{taskList.title}</div>
+                          </div>
+                        </div>
+                        <span className="text-xs font-medium ml-2">{taskCount}</span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-              <button
-                onClick={() => setShowNewTaskModal(true)}
-                className="flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
-              >
-                <Plus className="w-4 h-4" />
-                <span>New Task</span>
-              </button>
             </div>
+          </div>
 
+          {/* Main Content Area */}
+          <div className="col-span-4">
             {/* Filters */}
             <div className="bg-card rounded-xl border border-border shadow-sm mb-6 p-4">
               <div className="flex items-center gap-3 flex-wrap">
                 <Filter className="w-4 h-4 text-muted-foreground" />
                 <select
-                  value={priorityFilter}
-                  onChange={(e) => setPriorityFilter(e.target.value as TaskPriority | 'all')}
-                  className="px-2.5 py-1.5 bg-secondary border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                >
-                  <option value="all">All Priority</option>
-                  <option value="urgent">Urgent</option>
-                  <option value="high">High</option>
-                  <option value="medium">Medium</option>
-                  <option value="low">Low</option>
-                </select>
-                <select
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value as TaskStatus | 'all')}
-                  className="px-2.5 py-1.5 bg-secondary border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="px-3 py-1.5 bg-secondary border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                 >
                   <option value="all">All Status</option>
-                  <option value="pending">Pending</option>
-                  <option value="in-progress">In Progress</option>
+                  <option value="needsAction">Pending</option>
                   <option value="completed">Completed</option>
                 </select>
-                <select
-                  value={assigneeFilter}
-                  onChange={(e) => setAssigneeFilter(e.target.value)}
-                  className="px-2.5 py-1.5 bg-secondary border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                >
-                  <option value="all">All Assignees</option>
-                  {allAssignees.map((assignee) => (
-                    <option key={assignee} value={assignee}>
-                      {assignee}
-                    </option>
-                  ))}
-                </select>
+                <div className="ml-auto text-sm text-muted-foreground">
+                  {displayedTasks.length} {displayedTasks.length === 1 ? 'task' : 'tasks'}
+                </div>
               </div>
             </div>
 
@@ -306,74 +253,44 @@ export function TasksViewNew() {
               {displayedTasks.length > 0 ? (
                 <div className="divide-y divide-border">
                   {displayedTasks.map((task) => (
-                    <div key={task.id} className="p-6 hover:bg-secondary/30 transition-colors">
+                    <div
+                      key={task.id}
+                      className="p-6 hover:bg-secondary/30 transition-colors cursor-pointer"
+                    >
                       <div className="flex items-start justify-between mb-3">
                         <div className="flex-1">
                           <h3 className="font-semibold text-foreground mb-1">{task.title}</h3>
-                          <p className="text-sm text-muted-foreground mb-2">{task.description}</p>
-                          {!selectedProject && (
-                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          {task.notes && (
+                            <p className="text-sm text-muted-foreground mb-2">{task.notes}</p>
+                          )}
+                          {!selectedTaskList && (
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground mt-2">
                               <Layers className="w-3 h-3" />
-                              <span>{projects.find((p) => p.id === task.projectId)?.title}</span>
+                              <span>{taskLists.find((p) => p.id === task.taskListId)?.title}</span>
                             </div>
                           )}
                         </div>
                         <div className="flex items-center gap-2 ml-4">
                           <span
-                            className={`px-2 py-1 text-xs font-medium rounded-full border ${getPriorityColor(task.priority)}`}
+                            className={`px-2.5 py-1 text-xs font-medium rounded-full border ${getStatusColor(task.status)}`}
                           >
-                            {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
-                          </span>
-                          <span
-                            className={`px-2 py-1 text-xs font-medium rounded-full border ${getStatusColor(task.status)}`}
-                          >
-                            {task.status === 'in-progress'
-                              ? 'In Progress'
-                              : task.status.charAt(0).toUpperCase() + task.status.slice(1)}
+                            {task.status === 'needsAction' ? 'Pending' : 'Completed'}
                           </span>
                         </div>
                       </div>
 
                       <div className="flex items-center gap-6 text-sm">
                         <div className="flex items-center gap-2 text-muted-foreground">
-                          <User className="w-4 h-4" />
-                          <span>{task.assignee}</span>
-                        </div>
-
-                        {task.relatedPeople.length > 0 && (
-                          <div className="flex items-center gap-2 text-muted-foreground">
-                            <Users className="w-4 h-4" />
-                            <div className="flex items-center gap-1">
-                              {task.relatedPeople.slice(0, 2).map((person, idx) => (
-                                <div
-                                  key={idx}
-                                  className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium text-primary"
-                                >
-                                  {person
-                                    .split(' ')
-                                    .map((n) => n[0])
-                                    .join('')}
-                                </div>
-                              ))}
-                              {task.relatedPeople.length > 2 && (
-                                <span className="text-xs ml-1">
-                                  +{task.relatedPeople.length - 2}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        )}
-
-                        <div className="flex items-center gap-2 text-muted-foreground">
                           <Clock className="w-4 h-4" />
                           <span
                             className={
-                              new Date('2026-01-28') > task.dueDate && task.status !== 'completed'
+                              new Date('2026-01-28') > new Date(task.due) &&
+                              task.status !== 'completed'
                                 ? 'text-red-600 font-medium'
                                 : ''
                             }
                           >
-                            {formatDate(task.dueDate)}
+                            {formatDate(new Date(task.due))}
                           </span>
                         </div>
                       </div>
@@ -381,11 +298,11 @@ export function TasksViewNew() {
                   ))}
                 </div>
               ) : (
-                <div className="p-12 text-center">
-                  <CheckSquare className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                <div className="p-16 text-center">
+                  <CheckSquare className="w-12 h-12 text-muted-foreground mx-auto mb-4 opacity-50" />
                   <p className="text-muted-foreground mb-2">No tasks found</p>
                   <p className="text-sm text-muted-foreground">
-                    {selectedProject
+                    {selectedTaskList
                       ? 'Try adjusting your filters or create a new task'
                       : 'Create a new task to get started'}
                   </p>
@@ -412,12 +329,12 @@ export function TasksViewNew() {
 
             <div className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-foreground mb-2">Project</label>
+                <label className="block text-sm font-medium text-foreground mb-2">Task List</label>
                 <select className="w-full px-3 py-2 bg-secondary border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary">
-                  <option value="">Select a project</option>
-                  {projects.map((project) => (
-                    <option key={project.id} value={project.id}>
-                      {project.title}
+                  <option value="">Select a task list</option>
+                  {taskLists.map((taskList) => (
+                    <option key={taskList.id} value={taskList.id}>
+                      {taskList.title}
                     </option>
                   ))}
                 </select>
@@ -433,46 +350,20 @@ export function TasksViewNew() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-foreground mb-2">
-                  Description
-                </label>
+                <label className="block text-sm font-medium text-foreground mb-2">Notes</label>
                 <textarea
-                  placeholder="Enter task description"
+                  placeholder="Enter task notes"
                   rows={4}
                   className="w-full px-3 py-2 bg-secondary border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none"
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-2">Priority</label>
-                  <select className="w-full px-3 py-2 bg-secondary border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary">
-                    <option value="low">Low</option>
-                    <option value="medium">Medium</option>
-                    <option value="high">High</option>
-                    <option value="urgent">Urgent</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-2">Due Date</label>
-                  <input
-                    type="date"
-                    className="w-full px-3 py-2 bg-secondary border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                  />
-                </div>
-              </div>
-
               <div>
-                <label className="block text-sm font-medium text-foreground mb-2">Assignee</label>
-                <select className="w-full px-3 py-2 bg-secondary border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary">
-                  <option value="">Select assignee</option>
-                  {allAssignees.map((assignee) => (
-                    <option key={assignee} value={assignee}>
-                      {assignee}
-                    </option>
-                  ))}
-                </select>
+                <label className="block text-sm font-medium text-foreground mb-2">Due Date</label>
+                <input
+                  type="date"
+                  className="w-full px-3 py-2 bg-secondary border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                />
               </div>
             </div>
 

@@ -1,5 +1,8 @@
 // Requirements: clerkly.1, google-oauth-auth.12.1, google-oauth-auth.12.2, ui.8.1, ui.8.2, ui.8.3, ui.8.4, ui.7.1
 import React, { useState, useEffect, useMemo } from 'react';
+import { Toaster } from 'sonner';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import { ErrorProvider, useError } from './contexts/error-context';
 import { TopNavigation } from './components/top-navigation';
 import { AIAgentPanel } from './components/ai-agent-panel';
 import { DashboardUpdated } from './components/dashboard-updated';
@@ -7,16 +10,27 @@ import { CalendarView } from './components/calendar-view';
 import { MeetingDetail } from './components/meeting-detail';
 import { TasksViewNew } from './components/tasks-view-new';
 import { Contacts } from './components/contacts';
+import { Triggers } from './components/triggers';
 import { Settings } from './components/settings';
+import { ErrorDemoPage } from './components/error-demo-page';
 import { LoginScreen } from './components/auth/LoginScreen';
 import { LoginError } from './components/auth/LoginError';
-import { NotificationUI } from './components/NotificationUI';
-import { ErrorNotificationManager } from './managers/ErrorNotificationManager';
 import { parseCommand } from './utils/command-parser';
 import { SimpleRouter, NavigationManager, AuthGuard } from './navigation';
 
 // Requirements: clerkly.1, google-oauth-auth.12.1, google-oauth-auth.12.2, ui.8.1, ui.8.3, ui.8.4, ui.7.1
 export default function App() {
+  return (
+    <ErrorProvider>
+      <ErrorBoundary>
+        <Toaster position="top-right" richColors closeButton />
+        <AppContent />
+      </ErrorBoundary>
+    </ErrorProvider>
+  );
+}
+
+function AppContent() {
   // Requirements: google-oauth-auth.12.1, google-oauth-auth.12.2
   const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null);
   const [authError, setAuthError] = useState<{ message: string; code?: string } | null>(null);
@@ -24,10 +38,8 @@ export default function App() {
   const [currentScreen, setCurrentScreen] = useState<string>('dashboard');
   const [selectedMeetingId, setSelectedMeetingId] = useState<string | null>(null);
 
-  // Requirements: ui.7.1 - Create ErrorNotificationManager instance
-  const errorNotificationManager = useMemo(() => {
-    return new ErrorNotificationManager();
-  }, []);
+  // Requirements: ui.7.1 - Use new error notification system
+  const { showError } = useError();
 
   // Requirements: ui.8.1, ui.8.2, ui.8.3, ui.8.4
   // Create router, navigation manager, and auth guard
@@ -41,6 +53,8 @@ export default function App() {
         '/tasks': 'tasks',
         '/contacts': 'contacts',
         '/settings': 'settings',
+        '/triggers': 'triggers',
+        '/error-demo': 'error-demo',
       };
       const screen = screenMap[route] || 'dashboard';
       setCurrentScreen(screen);
@@ -66,6 +80,8 @@ export default function App() {
       tasks: '/tasks',
       contacts: '/contacts',
       settings: '/settings',
+      triggers: '/triggers',
+      'error-demo': '/error-demo',
     };
     const route = routeMap[currentScreen] || '/dashboard';
     router.updateCurrentRoute(route);
@@ -81,6 +97,8 @@ export default function App() {
       tasks: '/tasks',
       contacts: '/contacts',
       settings: '/settings',
+      triggers: '/triggers',
+      'error-demo': '/error-demo',
       'meeting-detail': '/dashboard', // Meeting detail is part of dashboard
     };
     const route = routeMap[screen] || '/dashboard';
@@ -145,10 +163,9 @@ export default function App() {
     });
 
     // Requirements: ui.7.1 - Listen for error notification events from Main Process
-    // Property: 20
     const unsubscribeErrorNotify = window.api.error.onNotify((message: string, context: string) => {
       console.log('[App] Error notification received:', { message, context });
-      errorNotificationManager.showNotification(message, context);
+      showError(`${context}: ${message}`);
     });
 
     return () => {
@@ -157,7 +174,7 @@ export default function App() {
       unsubscribeLogout();
       unsubscribeErrorNotify();
     };
-  }, [navigationManager, errorNotificationManager]);
+  }, [navigationManager, showError]);
 
   // Requirements: clerkly.1
   const handleNavigateToMeeting = (meetingId: string) => {
@@ -236,17 +253,12 @@ export default function App() {
   // Show loading state while checking auth
   if (isAuthorized === null) {
     return (
-      <>
-        <div className="min-h-screen bg-background flex items-center justify-center">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-            <p className="text-muted-foreground">Loading...</p>
-          </div>
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading...</p>
         </div>
-        {/* Requirements: ui.7.1 - Display error notifications */}
-        {/* Property: 20, 21, 22 */}
-        <NotificationUI manager={errorNotificationManager} />
-      </>
+      </div>
     );
   }
 
@@ -254,33 +266,21 @@ export default function App() {
   // Show error screen if authentication failed
   if (authError) {
     return (
-      <>
-        <LoginError
-          errorMessage={authError.message}
-          errorCode={authError.code}
-          onRetry={() => {
-            setAuthError(null);
-            handleLogin();
-          }}
-        />
-        {/* Requirements: ui.7.1 - Display error notifications */}
-        {/* Property: 20, 21, 22 */}
-        <NotificationUI manager={errorNotificationManager} />
-      </>
+      <LoginError
+        errorMessage={authError.message}
+        errorCode={authError.code}
+        onRetry={() => {
+          setAuthError(null);
+          handleLogin();
+        }}
+      />
     );
   }
 
   // Requirements: google-oauth-auth.12.2
   // Show login screen if not authorized
   if (!isAuthorized) {
-    return (
-      <>
-        <LoginScreen onLogin={handleLogin} />
-        {/* Requirements: ui.7.1 - Display error notifications */}
-        {/* Property: 20, 21, 22 */}
-        <NotificationUI manager={errorNotificationManager} />
-      </>
-    );
+    return <LoginScreen onLogin={handleLogin} />;
   }
 
   // Requirements: clerkly.1
@@ -304,8 +304,12 @@ export default function App() {
         return <TasksViewNew />;
       case 'contacts':
         return <Contacts />;
+      case 'triggers':
+        return <Triggers />;
       case 'settings':
         return <Settings onSignOut={handleSignOut} />;
+      case 'error-demo':
+        return <ErrorDemoPage onBack={() => navigateToScreen('settings')} />;
       default:
         return (
           <DashboardUpdated
@@ -322,9 +326,6 @@ export default function App() {
       <TopNavigation currentScreen={currentScreen} onNavigate={navigateToScreen} />
       <AIAgentPanel onCommand={handleCommand} />
       <div className="pt-16 pr-[33.333333%]">{renderScreen()}</div>
-      {/* Requirements: ui.7.1 - Display error notifications */}
-      {/* Property: 20, 21, 22 */}
-      <NotificationUI manager={errorNotificationManager} />
     </div>
   );
 }
