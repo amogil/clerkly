@@ -1,6 +1,6 @@
 /* Preconditions: Application running with ErrorNotificationManager
    Action: Trigger background process error, wait for notification display
-   Assertions: Error notification appears with message and context, auto-dismisses after 15 seconds
+   Assertions: Error notification appears with message and context, auto-dismisses after timeout
    Requirements: ui.7.1, ui.7.2, ui.7.3, ui.7.4 */
 
 import { test, expect } from '@playwright/test';
@@ -23,7 +23,7 @@ test.afterEach(async () => {
 
 /* Preconditions: Application running, background process can fail
    Action: Trigger error in background process (e.g., fetchProfile)
-   Assertions: Notification displayed with message and context
+   Assertions: Toast notification displayed with message and context
    Requirements: ui.7.1, ui.7.2
    Property: 20, 21 */
 test('should show error notification on background process failure', async () => {
@@ -38,25 +38,20 @@ test('should show error notification on background process failure', async () =>
     });
   });
 
-  // Wait for notification to appear
-  const notification = context.window.locator('.notification-item');
-  await expect(notification).toBeVisible({ timeout: 10000 });
+  // Wait for toast notification to appear (sonner uses [data-sonner-toast] attribute)
+  const toast = context.window.locator('[data-sonner-toast]');
+  await expect(toast).toBeVisible({ timeout: 10000 });
 
-  // Check that notification contains context
-  const notificationContext = notification.locator('.notification-context');
-  await expect(notificationContext).toHaveText('Profile Loading');
-
-  // Check that notification contains message
-  const message = notification.locator('.notification-message');
-  await expect(message).toHaveText('Failed to load user profile');
+  // Check that toast contains the full message (context + message)
+  await expect(toast).toContainText('Profile Loading: Failed to load user profile');
 });
 
 /* Preconditions: Error notification displayed
-   Action: Wait 15 seconds
+   Action: Wait for auto-dismiss timeout
    Assertions: Notification automatically dismissed
    Requirements: ui.7.3
    Property: 22 */
-test('should auto-dismiss error notification after 15 seconds', async () => {
+test('should auto-dismiss error notification after timeout', async () => {
   // Show a notification via IPC
   await context.window.evaluate(async () => {
     await (window as any).electron.ipcRenderer.invoke('test:trigger-error-notification', {
@@ -65,15 +60,15 @@ test('should auto-dismiss error notification after 15 seconds', async () => {
     });
   });
 
-  // Wait for notification to appear
-  const notification = context.window.locator('.notification-item');
-  await expect(notification).toBeVisible({ timeout: 5000 });
+  // Wait for toast notification to appear
+  const toast = context.window.locator('[data-sonner-toast]');
+  await expect(toast).toBeVisible({ timeout: 5000 });
 
-  // Wait for auto-dismiss (15 seconds + buffer)
+  // Wait for auto-dismiss (15 seconds as per ui.7.3 requirement)
   await context.window.waitForTimeout(16000);
 
   // Check that notification is gone
-  await expect(notification).not.toBeVisible();
+  await expect(toast).not.toBeVisible();
 });
 
 /* Preconditions: Error notification displayed
@@ -93,16 +88,16 @@ test('should dismiss notification on click', async () => {
     });
   });
 
-  // Wait for notification to appear
-  const notification = context.window.locator('.notification-item');
-  await expect(notification).toBeVisible({ timeout: 10000 });
+  // Wait for toast notification to appear
+  const toast = context.window.locator('[data-sonner-toast]');
+  await expect(toast).toBeVisible({ timeout: 10000 });
 
-  // Click the close button
-  const closeButton = notification.locator('.notification-close');
+  // Click the close button (sonner uses [data-close-button] attribute)
+  const closeButton = toast.locator('[data-close-button]');
   await closeButton.click();
 
   // Check that notification is gone immediately
-  await expect(notification).not.toBeVisible({ timeout: 1000 });
+  await expect(toast).not.toBeVisible({ timeout: 1000 });
 });
 
 /* Preconditions: Application running with console access
@@ -131,8 +126,7 @@ test('should log errors to console', async () => {
   // Check that error was logged
   const hasErrorLog = consoleMessages.some(
     (msg) =>
-      (msg.includes('Error notification received') || msg.includes('Notification shown')) &&
-      msg.includes('Test error logging')
+      msg.includes('[App] Error notification received') && msg.includes('Test error logging')
   );
 
   expect(hasErrorLog).toBe(true);

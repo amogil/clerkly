@@ -23,7 +23,7 @@ export default function App() {
   return (
     <ErrorProvider>
       <ErrorBoundary>
-        <Toaster position="top-right" richColors closeButton />
+        <Toaster position="top-right" richColors closeButton duration={15000} />
         <AppContent />
       </ErrorBoundary>
     </ErrorProvider>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Clock, Cpu, Eye, EyeOff, User, LogOut, AlertCircle } from 'lucide-react';
 
 interface SettingsProps {
@@ -12,6 +12,60 @@ export function Settings({ onSignOut, onNavigate }: SettingsProps) {
   const [llmProvider, setLlmProvider] = useState('openai');
   const [apiKey, setApiKey] = useState('');
   const [showApiKey, setShowApiKey] = useState(false);
+  const [profile, setProfile] = useState<{
+    name: string;
+    email: string;
+    loading: boolean;
+  }>({
+    name: '',
+    email: '',
+    loading: true,
+  });
+
+  // Load profile data on mount
+  useEffect(() => {
+    const loadProfile = async () => {
+      try {
+        const result = await window.api.auth.getProfile();
+        if (result.success && result.profile) {
+          setProfile({
+            name: result.profile.name || '',
+            email: result.profile.email || '',
+            loading: false,
+          });
+        } else {
+          setProfile({
+            name: '',
+            email: '',
+            loading: false,
+          });
+        }
+      } catch (error) {
+        console.error('Failed to load profile:', error);
+        setProfile({
+          name: '',
+          email: '',
+          loading: false,
+        });
+      }
+    };
+
+    loadProfile();
+
+    // Listen for profile updates
+    const handleProfileUpdate = () => {
+      console.log('[Settings] Profile updated, reloading...');
+      loadProfile();
+    };
+
+    window.api.auth.onProfileUpdated(handleProfileUpdate);
+
+    // Cleanup
+    return () => {
+      // Note: There's no removeListener for onProfileUpdated in the current API
+      // If needed, this should be added to the preload API
+    };
+  }, []);
 
   return (
     <div className="p-8">
@@ -36,7 +90,7 @@ export function Settings({ onSignOut, onNavigate }: SettingsProps) {
                       onSignOut();
                     }
                   }}
-                  className="flex items-center gap-2 px-4 py-2 text-sm bg-red-50 text-red-600 rounded-lg border border-red-200 hover:bg-red-100 transition-colors"
+                  className="sign-out-button flex items-center gap-2 px-4 py-2 text-sm bg-red-50 text-red-600 rounded-lg border border-red-200 hover:bg-red-100 transition-colors"
                 >
                   <LogOut className="w-4 h-4" />
                   Sign out
@@ -46,22 +100,32 @@ export function Settings({ onSignOut, onNavigate }: SettingsProps) {
             <div className="p-6 space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-2">
+                  <label
+                    htmlFor="profile-name"
+                    className="block text-sm font-medium text-foreground mb-2"
+                  >
                     Full Name
                   </label>
                   <input
+                    id="profile-name"
                     type="text"
-                    defaultValue="Sarah Chen"
-                    disabled
+                    value={profile.loading ? 'Loading...' : profile.name || 'Not available'}
+                    readOnly
                     className="w-full px-4 py-2 bg-secondary/30 border border-border rounded-lg text-muted-foreground cursor-not-allowed"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-2">Email</label>
+                  <label
+                    htmlFor="profile-email"
+                    className="block text-sm font-medium text-foreground mb-2"
+                  >
+                    Email
+                  </label>
                   <input
+                    id="profile-email"
                     type="email"
-                    defaultValue="sarah.chen@company.com"
-                    disabled
+                    value={profile.loading ? 'Loading...' : profile.email || 'Not available'}
+                    readOnly
                     className="w-full px-4 py-2 bg-secondary/30 border border-border rounded-lg text-muted-foreground cursor-not-allowed"
                   />
                 </div>
