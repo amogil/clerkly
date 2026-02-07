@@ -915,7 +915,7 @@ async fetchProfile(): Promise<UserProfile | null> {
 
 **Обработка:**
 ```typescript
-// Requirements: ui.10.9, ui.10.10
+// Requirements: ui.10.14, ui.10.15
 async saveAPIKey(provider: string, apiKey: string): Promise<void> {
   try {
     const { safeStorage } = require('electron');
@@ -959,7 +959,7 @@ async saveAPIKey(provider: string, apiKey: string): Promise<void> {
 
 **Обработка:**
 ```typescript
-// Requirements: ui.10.17
+// Requirements: ui.10.22
 async loadAPIKey(provider: string): Promise<string | null> {
   try {
     const keyResult = await this.dataManager.loadData(`ai_agent_api_key_${provider}`);
@@ -1571,27 +1571,29 @@ describe('Window UI Functional Tests', () => {
 | ui.10.1 | ✓ | - | ✓ |
 | ui.10.2 | ✓ | - | ✓ |
 | ui.10.3 | ✓ | - | ✓ |
-| ui.10.4 | ✓ | ✓ | ✓ |
-| ui.10.5 | ✓ | ✓ | ✓ |
-| ui.10.6 | ✓ | ✓ | ✓ |
+| ui.10.4 | ✓ | - | ✓ |
+| ui.10.5 | ✓ | - | ✓ |
+| ui.10.6 | ✓ | - | ✓ |
 | ui.10.7 | ✓ | - | ✓ |
 | ui.10.8 | ✓ | - | ✓ |
 | ui.10.9 | ✓ | ✓ | ✓ |
 | ui.10.10 | ✓ | ✓ | ✓ |
 | ui.10.11 | ✓ | ✓ | ✓ |
-| ui.10.12 | ✓ | - | - |
-| ui.10.13 | ✓ | - | - |
+| ui.10.12 | ✓ | - | ✓ |
+| ui.10.13 | ✓ | - | ✓ |
 | ui.10.14 | ✓ | ✓ | ✓ |
-| ui.10.15 | ✓ | - | ✓ |
-| ui.10.16 | ✓ | - | ✓ |
-| ui.10.17 | ✓ | ✓ | ✓ |
+| ui.10.15 | ✓ | ✓ | ✓ |
+| ui.10.16 | ✓ | ✓ | ✓ |
+| ui.10.17 | ✓ | - | - |
 | ui.10.18 | ✓ | - | - |
-| ui.10.19 | ✓ | - | - |
-| ui.10.20 | ✓ | - | - |
-| ui.10.21 | ✓ | - | - |
-| ui.10.22 | ✓ | - | ✓ |
-| ui.10.23 | ✓ | - | ✓ |
-| ui.10.24 | ✓ | ✓ | ✓ |
+| ui.10.19 | ✓ | ✓ | ✓ |
+| ui.10.20 | ✓ | - | ✓ |
+| ui.10.21 | ✓ | - | ✓ |
+| ui.10.22 | ✓ | ✓ | ✓ |
+| ui.10.23 | ✓ | - | - |
+| ui.10.24 | ✓ | - | - |
+| ui.10.25 | ✓ | - | - |
+| ui.10.26 | ✓ | - | - |
 | ui.11.1 | ✓ | ✓ | ✓ |
 | ui.11.2 | ✓ | - | ✓ |
 | ui.11.3 | ✓ | ✓ | ✓ |
@@ -1867,7 +1869,7 @@ describe('AIAgentSettingsManager', () => {
   /* Preconditions: DataManager mocked, UserProfileManager returns valid email
      Action: call saveLLMProvider('anthropic')
      Assertions: DataManager.saveData called with correct key and value
-     Requirements: ui.10.5 */
+     Requirements: ui.10.10 */
   it('should save LLM provider immediately', async () => {
     // Тест сохранения провайдера
   });
@@ -1875,7 +1877,7 @@ describe('AIAgentSettingsManager', () => {
   /* Preconditions: safeStorage.isEncryptionAvailable() returns true
      Action: call saveAPIKey('openai', 'test-key')
      Assertions: key encrypted, saved with encrypted=true flag
-     Requirements: ui.10.9 */
+     Requirements: ui.10.14 */
   it('should encrypt API key when encryption available', async () => {
     // Тест шифрования ключа
   });
@@ -1883,7 +1885,7 @@ describe('AIAgentSettingsManager', () => {
   /* Preconditions: safeStorage.isEncryptionAvailable() returns false
      Action: call saveAPIKey('openai', 'test-key')
      Assertions: key saved as plain text, encrypted=false flag
-     Requirements: ui.10.10 */
+     Requirements: ui.10.15 */
   it('should save API key as plain text when encryption unavailable', async () => {
     // Тест сохранения без шифрования
   });
@@ -1891,7 +1893,7 @@ describe('AIAgentSettingsManager', () => {
   /* Preconditions: encrypted key saved in database
      Action: call loadAPIKey('openai')
      Assertions: key decrypted correctly, returns original value
-     Requirements: ui.10.17 */
+     Requirements: ui.10.22 */
   it('should decrypt API key when loading', async () => {
     // Тест дешифрования ключа
   });
@@ -1899,7 +1901,7 @@ describe('AIAgentSettingsManager', () => {
   /* Preconditions: API keys saved for multiple providers
      Action: call loadAPIKey for each provider
      Assertions: each provider returns its own key, no cross-contamination
-     Requirements: ui.10.11, ui.10.14 */
+     Requirements: ui.10.16, ui.10.19 */
   it('should isolate API keys by provider', async () => {
     // Тест изоляции ключей по провайдерам
   });
@@ -1907,7 +1909,7 @@ describe('AIAgentSettingsManager', () => {
   /* Preconditions: API key saved for provider
      Action: call deleteAPIKey(provider)
      Assertions: both key and encrypted flag deleted from database
-     Requirements: ui.10.6 */
+     Requirements: ui.10.11 */
   it('should delete API key and metadata', async () => {
     // Тест удаления ключа
   });
@@ -1920,8 +1922,8 @@ describe('AIAgentSettingsManager', () => {
 describe('AIAgentSettings Component', () => {
   /* Preconditions: component mounted, settings loaded
      Action: change LLM provider dropdown
-     Assertions: saveL LMProvider called immediately, API key field updated
-     Requirements: ui.10.5 */
+     Assertions: saveLLMProvider called immediately, API key field updated
+     Requirements: ui.10.10 */
   it('should save provider immediately on change', async () => {
     // Тест немедленного сохранения провайдера
   });
@@ -1929,7 +1931,7 @@ describe('AIAgentSettings Component', () => {
   /* Preconditions: component mounted, API key field focused
      Action: type API key, wait 500ms
      Assertions: saveAPIKey called after debounce delay
-     Requirements: ui.10.4 */
+     Requirements: ui.10.9 */
   it('should save API key with 500ms debounce', async () => {
     // Тест debounce сохранения ключа
   });
@@ -1937,7 +1939,7 @@ describe('AIAgentSettings Component', () => {
   /* Preconditions: API key field has value
      Action: clear field (empty string)
      Assertions: deleteAPIKey called
-     Requirements: ui.10.6 */
+     Requirements: ui.10.11 */
   it('should delete API key when field cleared', async () => {
     // Тест удаления при очистке поля
   });
@@ -1959,7 +1961,7 @@ describe('AI Agent Settings Functional Tests', () => {
   /* Preconditions: fresh app start, user authenticated
      Action: navigate to Settings, change LLM provider, enter API key
      Assertions: settings saved, persist across app restart
-     Requirements: ui.10.4, ui.10.5, ui.10.9 */
+     Requirements: ui.10.9, ui.10.10, ui.10.14 */
   it('should persist AI Agent settings across restarts', async () => {
     // Тест персистентности настроек
   });
@@ -1967,15 +1969,15 @@ describe('AI Agent Settings Functional Tests', () => {
   /* Preconditions: user A logged in, settings saved
      Action: logout user A, login user B, check settings
      Assertions: user B sees empty/default settings, not user A's settings
-     Requirements: ui.10.22, ui.10.23 */
+     Requirements: ui.12.8 */
   it('should isolate settings between users', async () => {
-    // Тест изоляции настроек между пользователями
+    // Тест изоляции настроек между пользователями (покрывается через ui.12)
   });
 
   /* Preconditions: API keys saved for all providers
      Action: switch between providers
      Assertions: correct API key loaded for each provider
-     Requirements: ui.10.14 */
+     Requirements: ui.10.19 */
   it('should load correct API key when switching providers', async () => {
     // Тест загрузки правильного ключа при переключении
   });
@@ -2396,7 +2398,7 @@ describe('User Data Isolation Functional Tests', () => {
 - Использовать собственную реализацию шифрования
 
 **Обоснование:**
-- Соответствует требованиям ui.10.9, ui.10.10
+- Соответствует требованиям ui.10.14, ui.10.15
 - Максимальная безопасность когда возможно
 - Graceful degradation когда шифрование недоступно
 - Использует нативные системные механизмы (Keychain на macOS)
@@ -2413,9 +2415,9 @@ describe('User Data Isolation Functional Tests', () => {
 - Хранить только активный ключ
 
 **Обоснование:**
-- Соответствует требованиям ui.10.11, ui.10.14
+- Соответствует требованиям ui.10.16, ui.10.19
 - Позволяет сохранять ключи всех провайдеров одновременно
-- Упрощает переключение между провайдерами (ui.10.5)
+- Упрощает переключение между провайдерами (ui.10.10)
 - Пользователь не теряет ключи при экспериментах с разными провайдерами
 - Каждый ключ имеет свой флаг шифрования
 - Легко расширяется для новых провайдеров
@@ -2984,6 +2986,223 @@ try {
 } catch (error) {
   handleBackgroundError(error, 'API Request');
   // User sees: "API Request: Server returned error 500"
+}
+```
+
+## Централизованный Обработчик API Запросов
+
+### Обзор
+
+APIRequestHandler обеспечивает централизованную обработку всех внешних API запросов с автоматической проверкой ошибок авторизации (HTTP 401) и выполнением необходимых действий по очистке сессии.
+
+### Архитектура Компонента
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                      Main Process                            │
+│                                                               │
+│  ┌──────────────────────┐                                    │
+│  │  APIRequestHandler   │                                    │
+│  │                      │                                    │
+│  │  - handleRequest()   │                                    │
+│  │  - checkAuth()       │                                    │
+│  │  - clearSession()    │                                    │
+│  └──────────────────────┘                                    │
+│           │                                                   │
+│           ▼                                                   │
+│  ┌──────────────────────┐       ┌─────────────────────┐     │
+│  │  External API        │       │  TokenStorage       │     │
+│  │  (Google, etc)       │       │  Manager            │     │
+│  └──────────────────────┘       └─────────────────────┘     │
+│           │                                │                 │
+└───────────┼────────────────────────────────┼─────────────────┘
+            │ HTTP 401                       │ Clear tokens
+            ▼                                ▼
+   ┌─────────────────────────────────────────────┐
+   │          Renderer Process                   │
+   │                                              │
+   │  ┌────────────────────────────────┐         │
+   │  │  LoginError Component          │         │
+   │  │  (errorCode: 'invalid_grant')  │         │
+   │  └────────────────────────────────┘         │
+   └─────────────────────────────────────────────┘
+```
+
+### Компоненты
+
+#### APIRequestHandler
+
+Класс для централизованной обработки API запросов.
+
+```typescript
+// Requirements: ui.9.3, ui.9.4, ui.9.5
+
+class APIRequestHandler {
+  private tokenStorageManager: TokenStorageManager;
+  private windowManager: WindowManager;
+
+  constructor(
+    tokenStorageManager: TokenStorageManager,
+    windowManager: WindowManager
+  ) {
+    this.tokenStorageManager = tokenStorageManager;
+    this.windowManager = windowManager;
+  }
+
+  /**
+   * Handle API request with automatic 401 checking
+   * Requirements: ui.9.3, ui.9.4
+   */
+  async handleRequest(url: string, options: RequestInit): Promise<Response> {
+    try {
+      const response = await fetch(url, options);
+
+      // Requirements: ui.9.3, ui.9.4 - Check for authorization error
+      if (response.status === 401) {
+        await this.handleAuthError(url);
+        throw new Error('Authorization failed: Session expired');
+      }
+
+      return response;
+    } catch (error) {
+      // Requirements: ui.9.5 - Log with context
+      console.error('[APIRequestHandler] Request failed:', {
+        url,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        timestamp: new Date().toISOString()
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Handle authorization error (HTTP 401)
+   * Requirements: ui.9.3
+   */
+  private async handleAuthError(url: string): Promise<void> {
+    // Requirements: ui.9.5 - Log with context
+    console.error('[APIRequestHandler] Authorization error (401):', {
+      url,
+      action: 'clearing tokens and showing login',
+      timestamp: new Date().toISOString()
+    });
+
+    // Requirements: ui.9.3 - Clear all tokens
+    await this.tokenStorageManager.clearTokens();
+
+    // Requirements: ui.9.3 - Show LoginError component
+    const mainWindow = this.windowManager.getWindow();
+    if (mainWindow) {
+      mainWindow.webContents.send('auth:error', {
+        message: 'Session expired',
+        errorCode: 'invalid_grant'
+      });
+    }
+  }
+}
+```
+
+### Использование в Других Компонентах
+
+```typescript
+// Requirements: ui.9.4
+
+// In UserProfileManager
+async fetchProfile(): Promise<UserProfile | null> {
+  try {
+    const authStatus = await this.oauthClient.getAuthStatus();
+    if (!authStatus.authorized || !authStatus.tokens?.accessToken) {
+      return null;
+    }
+
+    // Use centralized handler that checks for 401
+    const response = await this.apiRequestHandler.handleRequest(
+      'https://www.googleapis.com/oauth2/v1/userinfo',
+      {
+        headers: { 'Authorization': `Bearer ${authStatus.tokens.accessToken}` }
+      }
+    );
+
+    const profile = await response.json();
+    await this.saveProfile(profile);
+    return profile;
+  } catch (error) {
+    // If it's an auth error, tokens are already cleared
+    // Return cached profile for other errors
+    if (error.message?.includes('Authorization failed')) {
+      return null;
+    }
+    return await this.loadProfile();
+  }
+}
+
+// In CalendarManager (example)
+async fetchCalendarEvents(): Promise<CalendarEvent[]> {
+  try {
+    const authStatus = await this.oauthClient.getAuthStatus();
+    if (!authStatus.authorized || !authStatus.tokens?.accessToken) {
+      return [];
+    }
+
+    // Use centralized handler
+    const response = await this.apiRequestHandler.handleRequest(
+      'https://www.googleapis.com/calendar/v3/calendars/primary/events',
+      {
+        headers: { 'Authorization': `Bearer ${authStatus.tokens.accessToken}` }
+      }
+    );
+
+    const data = await response.json();
+    return data.items || [];
+  } catch (error) {
+    if (error.message?.includes('Authorization failed')) {
+      return [];
+    }
+    throw error;
+  }
+}
+```
+
+### Предотвращение Race Conditions
+
+```typescript
+// Requirements: ui.9.4 - Handle multiple simultaneous 401 errors
+
+class APIRequestHandler {
+  private clearingSession: boolean = false;
+
+  private async handleAuthError(url: string): Promise<void> {
+    // Prevent multiple simultaneous session clears
+    if (this.clearingSession) {
+      console.log('[APIRequestHandler] Session clear already in progress, skipping');
+      return;
+    }
+
+    this.clearingSession = true;
+
+    try {
+      console.error('[APIRequestHandler] Authorization error (401):', {
+        url,
+        action: 'clearing tokens and showing login',
+        timestamp: new Date().toISOString()
+      });
+
+      await this.tokenStorageManager.clearTokens();
+
+      const mainWindow = this.windowManager.getWindow();
+      if (mainWindow) {
+        mainWindow.webContents.send('auth:error', {
+          message: 'Session expired',
+          errorCode: 'invalid_grant'
+        });
+      }
+    } finally {
+      // Reset flag after a short delay to allow event propagation
+      setTimeout(() => {
+        this.clearingSession = false;
+      }, 1000);
+    }
+  }
 }
 ```
 
@@ -4459,21 +4678,73 @@ async function handleLogout() {
 
 ## Заключение
 
-Данный дизайн обеспечивает надежное управление UI приложения с фокусом на нативный macOS опыт, персистентность состояния и адаптивность к различным конфигурациям экранов. Архитектура разделяет ответственность между `WindowManager` (управление жизненным циклом окна) и `WindowStateManager` (управление персистентностью состояния), обеспечивая чистоту кода и легкость тестирования.
+Данный дизайн обеспечивает комплексное управление UI приложения Clerkly, покрывая все аспекты пользовательского интерфейса от управления окнами до изоляции данных пользователей.
 
+### Ключевые Архитектурные Решения
+
+**Управление Окнами (ui.1-ui.5):**
+Архитектура разделяет ответственность между `WindowManager` (управление жизненным циклом окна) и `WindowStateManager` (управление персистентностью состояния), обеспечивая нативный macOS опыт, персистентность состояния и адаптивность к различным конфигурациям экранов.
+
+**Профиль Пользователя (ui.6):**
 Блок Account интегрируется с существующей OAuth инфраструктурой и обеспечивает автоматическую синхронизацию данных профиля с Google аккаунтом пользователя. Комбинированная стратегия обновления (при запуске + при refresh token) гарантирует актуальность данных без необходимости действий от пользователя.
 
-Система навигации обеспечивает защиту маршрутов и автоматическое перенаправление пользователей в зависимости от статуса авторизации. NavigationManager и AuthGuard работают совместно для предотвращения несанкционированного доступа к защищенным экранам.
-
+**Обработка Ошибок (ui.7):**
 Система уведомлений об ошибках предоставляет пользователю понятную обратную связь о проблемах в фоновых процессах, автоматически скрывая уведомления через 15 секунд для минимизации отвлечения.
 
-Система управления токенами обеспечивает автоматическое обновление access token в фоновом режиме и корректную обработку ошибок авторизации (HTTP 401). Централизованный обработчик API запросов гарантирует консистентное поведение при истечении сессии, немедленно очищая токены и показывая понятное сообщение о необходимости повторной авторизации.
+**Навигация и Авторизация (ui.8):**
+Система навигации обеспечивает защиту маршрутов и автоматическое перенаправление пользователей в зависимости от статуса авторизации. NavigationManager и AuthGuard работают совместно для предотвращения несанкционированного доступа к защищенным экранам.
 
+**Управление Токенами (ui.9):**
+Система управления токенами обеспечивает автоматическое обновление access token в фоновом режиме и корректную обработку ошибок авторизации (HTTP 401). Централизованный обработчик API запросов (APIRequestHandler) гарантирует консистентное поведение при истечении сессии, немедленно очищая токены и показывая понятное сообщение о необходимости повторной авторизации.
+
+**Настройки AI Agent (ui.10):**
 Настройки AI Agent позволяют пользователю выбрать провайдера LLM и безопасно хранить API ключи с автоматическим шифрованием (когда доступно). Система поддерживает несколько провайдеров с раздельным хранилищем ключей и автоматическим переключением между ними.
 
+**Форматирование Дат (ui.11):**
 Форматирование дат и времени использует системные настройки локали для отображения в привычном для пользователя формате, обеспечивая консистентность с другими приложениями macOS.
 
+**Изоляция Данных (ui.12):**
 Изоляция данных пользователей гарантирует, что данные каждого пользователя (настройки, задачи, контакты) хранятся отдельно и автоматически фильтруются по email из Google OAuth профиля. Это обеспечивает multi-user support с полной приватностью данных.
+
+### Покрытие Требований
+
+Дизайн полностью покрывает все требования из requirements.md:
+
+- ✅ **ui.1** - Конфигурация главного окна при запуске (5 критериев)
+- ✅ **ui.2** - Заголовок главного окна (3 критерия)
+- ✅ **ui.3** - Нативный Mac OS X интерфейс (5 критериев)
+- ✅ **ui.4** - Адаптация размера окна к экрану (4 критерия)
+- ✅ **ui.5** - Сохранение состояния окна (6 критериев)
+- ✅ **ui.6** - Блок Account (профиль пользователя) (3 критерия)
+- ✅ **ui.7** - Обработка ошибок (4 критерия)
+- ✅ **ui.8** - Навигация и авторизация (4 критерия)
+- ✅ **ui.9** - Управление токенами и обработка ошибок авторизации (6 критериев)
+- ✅ **ui.10** - Настройки AI Agent (26 критериев)
+- ✅ **ui.11** - Форматирование дат и времени (7 критериев)
+- ✅ **ui.12** - Изоляция данных пользователей (24 критериев)
+
+**Итого: 97 критериев приемки полностью покрыты дизайном**
+
+### Свойства Корректности
+
+Дизайн определяет 48 свойств корректности для property-based тестирования:
+- Properties 1-7: Window management
+- Properties 8-19: Account profile and navigation
+- Properties 20-23: Error notifications
+- Properties 24-27: Navigation and authorization
+- Properties 28-31: Token management and auth errors
+- Properties 32-40: AI Agent settings
+- Properties 41-43: Date/time formatting
+- Properties 44-48: User data isolation
+
+### Стратегия Тестирования
+
+Комплексная стратегия тестирования включает:
+- **Модульные тесты**: Конкретные примеры, граничные случаи, условия ошибок
+- **Property-based тесты**: Универсальные свойства на множестве входных данных (минимум 100 итераций)
+- **Функциональные тесты**: End-to-end проверка пользовательских сценариев
+
+Все 97 критериев приемки покрыты тестами согласно таблице покрытия требований.
 
 ### Статус Реализации
 
@@ -4482,77 +4753,38 @@ async function handleLogout() {
 - ✅ Покрыты модульными, property-based и функциональными тестами
 - ✅ Все требования ui.1.x - ui.5.x выполнены
 
-**Фаза 3 (Account Block):**
-- ⏳ В стадии планирования
-- 📋 Требования ui.6.x определены
-- 📐 Дизайн детализирован
-- 📝 Задачи сформированы в tasks.md
-- ⏸️ Ожидает начала реализации
-
-**Фаза 4 (Навигация и Авторизация):**
-- ⏳ В стадии планирования
-- 📋 Требования ui.8.x определены
-- 📐 Дизайн детализирован
-- 📝 Задачи будут добавлены в tasks.md
-- ⏸️ Ожидает начала реализации
-
-**Фаза 5 (Система Уведомлений об Ошибках):**
-- ⏳ В стадии планирования
-- 📋 Требования ui.7.x определены
-- 📐 Дизайн детализирован
-- 📝 Задачи будут добавлены в tasks.md
-- ⏸️ Ожидает начала реализации
-
-**Фаза 6 (Управление Токенами и Обработка Ошибок Авторизации):**
-- ⏳ В стадии планирования
-- 📋 Требования ui.9.x определены
-- 📐 Дизайн детализирован
-- 📝 Задачи будут добавлены в tasks.md
-- ⏸️ Ожидает начала реализации
-
-**Фаза 7 (Изоляция Данных Пользователей):**
-- ⏳ В стадии планирования
-- 📋 Требования ui.12.x определены
-- 📐 Дизайн детализирован
-- 📝 Задачи будут добавлены в tasks.md
-- ⏸️ Ожидает начала реализации (критично для multi-user support)
-
-**Фаза 8 (Настройки AI Agent):**
-- ⏳ В стадии планирования
-- 📋 Требования ui.10.x определены
-- 📐 Дизайн детализирован
-- 📝 Задачи будут добавлены в tasks.md
-- ⏸️ Ожидает начала реализации (зависит от Фазы 7)
-
-**Фаза 9 (Форматирование Дат и Времени):**
-- ⏳ В стадии планирования
-- 📋 Требования ui.11.x определены
-- 📐 Дизайн детализирован
-- 📝 Задачи будут добавлены в tasks.md
-- ⏸️ Ожидает начала реализации
+**Фазы 3-9 (Account, Navigation, Errors, Tokens, AI Agent, DateTime, User Isolation):**
+- 📋 Требования ui.6.x - ui.12.x определены
+- 📐 Дизайн детализирован в данном документе
+- 📝 Задачи для реализации будут добавлены в tasks.md
+- ⏸️ Ожидают начала реализации
 
 ### Следующие Шаги
 
-1. Начать реализацию Фазы 3 согласно tasks.md (задачи 10-20)
-2. Создать UserProfileManager с интеграцией в OAuth инфраструктуру
-3. Расширить IPC handlers для работы с профилем
-4. Создать Account React компонент
-5. Написать модульные и функциональные тесты
-6. После завершения Фазы 3, перейти к Фазе 4 (Навигация)
-7. Создать NavigationManager, AuthGuard и интегрировать с Router
-8. После завершения Фазы 4, перейти к Фазе 5 (Уведомления)
-9. Создать ErrorNotificationManager и NotificationUI компонент
-10. После завершения Фазы 5, перейти к Фазе 6 (Управление Токенами)
-11. Реализовать централизованный обработчик API запросов с проверкой HTTP 401
-12. Интегрировать автоматическое обновление токенов в фоновом режиме
-13. После завершения Фазы 6, перейти к Фазе 7 (Изоляция Данных) - КРИТИЧНО
-14. Обновить схему базы данных (добавить колонку user_email в таблицу user_data)
-15. Расширить DataManager для автоматической фильтрации по user_email
-16. Расширить UserProfileManager для кэширования currentUserEmail
-17. После завершения Фазы 7, перейти к Фазе 8 (Настройки AI Agent)
-18. Создать AIAgentSettingsManager с поддержкой шифрования
-19. Создать Settings компонент с секцией AI Agent
-20. После завершения Фазы 8, перейти к Фазе 9 (Форматирование Дат)
-21. Создать DateTimeFormatter утилиту
-22. Интегрировать форматирование во все компоненты (Tasks, Calendar, Contacts)
-23. Обновить таблицу покрытия требований после реализации каждой фазы
+1. **Обновить tasks.md** с задачами для реализации фаз 3-9
+2. **Начать реализацию** согласно приоритетам:
+   - Фаза 7 (Изоляция Данных) - КРИТИЧНО для multi-user support
+   - Фаза 6 (Управление Токенами) - Обеспечивает безопасность
+   - Фаза 4 (Навигация) - Базовая функциональность
+   - Фаза 3 (Account Block) - Отображение профиля
+   - Фаза 5 (Уведомления) - Обратная связь пользователю
+   - Фаза 8 (AI Agent Settings) - Зависит от Фазы 7
+   - Фаза 9 (Форматирование Дат) - Улучшение UX
+3. **Написать тесты** для каждой фазы (модульные, property-based, функциональные)
+4. **Обновлять таблицу покрытия** после реализации каждой фазы
+5. **Валидировать** через `npm run validate` после каждого изменения
+
+### Заключительные Замечания
+
+Данный дизайн обеспечивает:
+- ✅ Полное покрытие всех требований (ui.1 - ui.12)
+- ✅ Четкую архитектуру с разделением ответственности
+- ✅ Комплексную стратегию тестирования
+- ✅ Обработку всех граничных случаев и ошибок
+- ✅ Безопасность (шифрование, изоляция данных, управление токенами)
+- ✅ Нативный macOS опыт
+- ✅ Multi-user support с полной приватностью данных
+- ✅ Автоматическую синхронизацию и обновление данных
+- ✅ Понятную обратную связь пользователю
+
+Дизайн готов к реализации.

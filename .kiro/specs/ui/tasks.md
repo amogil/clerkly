@@ -1370,7 +1370,7 @@
 - [ ] 46.1 Создать интерфейс AIAgentSettings
   - Определить структуру настроек (llmProvider, apiKeys для каждого провайдера)
   - Добавить JSDoc комментарии для каждого поля
-  - **Requirements:** ui.10.1, ui.10.11
+  - **Requirements:** ui.10.1, ui.10.16
 
 - [ ] 46.2 Создать класс AIAgentSettingsManager
   - Реализовать метод `saveLLMProvider()` для сохранения выбранного провайдера
@@ -1379,27 +1379,27 @@
   - Реализовать метод `loadAPIKey()` для загрузки и дешифрования API ключа
   - Реализовать метод `deleteAPIKey()` для удаления API ключа
   - Добавить зависимость от DataManager
-  - **Requirements:** ui.10.4, ui.10.5, ui.10.6, ui.10.9, ui.10.10, ui.10.17
+  - **Requirements:** ui.10.9, ui.10.10, ui.10.11, ui.10.14, ui.10.15, ui.10.22
 
 - [ ] 46.3 Реализовать шифрование API ключей
   - Использовать `safeStorage.encryptString()` для шифрования
   - Проверять доступность шифрования через `safeStorage.isEncryptionAvailable()`
   - Сохранять флаг `ai_agent_api_key_{provider}_encrypted`
   - Fallback к plain text если шифрование недоступно
-  - **Requirements:** ui.10.9, ui.10.10, ui.10.12
+  - **Requirements:** ui.10.14, ui.10.15, ui.10.17
 
 - [ ] 46.4 Реализовать дешифрование API ключей
   - Использовать `safeStorage.decryptString()` для дешифрования
   - Проверять флаг encrypted перед дешифрованием
   - Обрабатывать ошибки дешифрования gracefully (возвращать null)
-  - **Requirements:** ui.10.17
+  - **Requirements:** ui.10.22
 
 - [ ] 46.5 Реализовать хранилище для каждого провайдера
   - OpenAI: ключи `ai_agent_api_key_openai` и `ai_agent_api_key_openai_encrypted`
   - Anthropic: ключи `ai_agent_api_key_anthropic` и `ai_agent_api_key_anthropic_encrypted`
   - Google: ключи `ai_agent_api_key_google` и `ai_agent_api_key_google_encrypted`
   - LLM Provider: ключ `ai_agent_llm_provider`
-  - **Requirements:** ui.10.11, ui.10.13
+  - **Requirements:** ui.10.16, ui.10.18
 
 
 ### 47. Расширение IPC Handlers для AI Agent Settings
@@ -1408,36 +1408,36 @@
   - Реализовать `settings:save-llm-provider` handler
   - Вызывать AIAgentSettingsManager.saveLLMProvider()
   - Обрабатывать ошибки и возвращать структурированный ответ
-  - **Requirements:** ui.10.4, ui.10.21
+  - **Requirements:** ui.10.9, ui.10.26
 
 - [ ] 47.2 Добавить IPC handler для загрузки LLM провайдера
   - Реализовать `settings:load-llm-provider` handler
   - Вызывать AIAgentSettingsManager.loadLLMProvider()
   - Возвращать провайдера или значение по умолчанию
-  - **Requirements:** ui.10.15, ui.10.16, ui.10.21
+  - **Requirements:** ui.10.20, ui.10.21, ui.10.26
 
 - [ ] 47.3 Добавить IPC handler для сохранения API ключа
   - Реализовать `settings:save-api-key` handler
   - Вызывать AIAgentSettingsManager.saveAPIKey()
   - Обрабатывать ошибки и показывать уведомление через ui.7
-  - **Requirements:** ui.10.4, ui.10.8, ui.10.21
+  - **Requirements:** ui.10.9, ui.10.13, ui.10.26
 
 - [ ] 47.4 Добавить IPC handler для загрузки API ключа
   - Реализовать `settings:load-api-key` handler
   - Вызывать AIAgentSettingsManager.loadAPIKey()
   - Возвращать ключ или null
-  - **Requirements:** ui.10.15, ui.10.17, ui.10.21
+  - **Requirements:** ui.10.20, ui.10.22, ui.10.26
 
 - [ ] 47.5 Добавить IPC handler для удаления API ключа
   - Реализовать `settings:delete-api-key` handler
   - Вызывать AIAgentSettingsManager.deleteAPIKey()
   - Обрабатывать ошибки
-  - **Requirements:** ui.10.6, ui.10.21
+  - **Requirements:** ui.10.11, ui.10.26
 
 - [ ] 47.6 Расширить preload API
   - Добавить методы в `window.api.settings.*`
   - Обновить TypeScript типы для API
-  - **Requirements:** ui.10.21
+  - **Requirements:** ui.10.26
 
 
 ### 48. Создание Settings UI Component для AI Agent
@@ -1462,35 +1462,35 @@
   - Вызывать `window.api.settings.loadLLMProvider()` в useEffect
   - Вызывать `window.api.settings.loadAPIKey(provider)` для текущего провайдера
   - Устанавливать значения по умолчанию если настройки не найдены
-  - **Requirements:** ui.10.15, ui.10.16
+  - **Requirements:** ui.10.20, ui.10.21
 
 - [ ] 48.4 Реализовать немедленное сохранение при изменении провайдера
   - При изменении LLM Provider: сохранять немедленно без debounce
   - Загружать API ключ для нового провайдера
   - Если ключ не найден: показывать пустое поле с placeholder
-  - **Requirements:** ui.10.5, ui.10.14
+  - **Requirements:** ui.10.10, ui.10.19
 
 - [ ] 48.5 Реализовать debounced сохранение API ключа
   - При изменении API Key: сохранять с debounce 500ms
   - Использовать useEffect с cleanup для debounce
   - НЕ показывать визуальный индикатор сохранения
-  - **Requirements:** ui.10.4, ui.10.7
+  - **Requirements:** ui.10.9, ui.10.12
 
 - [ ] 48.6 Реализовать удаление API ключа при очистке поля
   - Когда пользователь очищает поле (пустая строка): удалять ключ из базы
   - Вызывать deleteAPIKey() для текущего провайдера
-  - **Requirements:** ui.10.6
+  - **Requirements:** ui.10.11
 
 
 - [ ] 48.7 Добавить информационный текст и placeholder кнопку
   - Добавить текст: "Your API key is stored securely. It will only be used to communicate with your selected LLM provider."
   - Добавить кнопку "Test Connection" (disabled, placeholder для будущей функциональности)
-  - **Requirements:** ui.10.19, ui.10.20
+  - **Requirements:** ui.10.24, ui.10.25
 
 - [ ] 48.8 Реализовать обработку ошибок сохранения
   - При ошибке сохранения: показывать уведомление через ErrorNotificationManager
   - Использовать существующий механизм ui.7
-  - **Requirements:** ui.10.8
+  - **Requirements:** ui.10.13
 
 ### 49. Стилизация AI Agent Settings
 
@@ -1515,19 +1515,19 @@
   - Мокировать DataManager.saveData()
   - Вызвать saveLLMProvider('openai')
   - Проверить, что saveData() вызван с ключом 'ai_agent_llm_provider' и значением 'openai'
-  - **Requirements:** ui.10.4, ui.10.13
+  - **Requirements:** ui.10.9, ui.10.18
 
 - [ ] 50.2 Тест: loadLLMProvider() загружает провайдера из базы
   - Мокировать DataManager.loadData() для возврата 'anthropic'
   - Вызвать loadLLMProvider()
   - Проверить, что возвращается 'anthropic'
-  - **Requirements:** ui.10.15
+  - **Requirements:** ui.10.20
 
 - [ ] 50.3 Тест: loadLLMProvider() возвращает значение по умолчанию
   - Мокировать DataManager.loadData() для возврата null
   - Вызвать loadLLMProvider()
   - Проверить, что возвращается 'openai' (значение по умолчанию)
-  - **Requirements:** ui.10.16
+  - **Requirements:** ui.10.21
 
 - [ ] 50.4 Тест: saveAPIKey() шифрует и сохраняет ключ
   - Мокировать safeStorage.isEncryptionAvailable() для возврата true
@@ -1536,14 +1536,14 @@
   - Вызвать saveAPIKey('openai', 'test-key')
   - Проверить, что encryptString() был вызван
   - Проверить, что saveData() вызван с зашифрованным ключом и флагом encrypted=true
-  - **Requirements:** ui.10.9, ui.10.11, ui.10.12
+  - **Requirements:** ui.10.14, ui.10.16, ui.10.17
 
 - [ ] 50.5 Тест: saveAPIKey() сохраняет plain text если шифрование недоступно
   - Мокировать safeStorage.isEncryptionAvailable() для возврата false
   - Мокировать DataManager.saveData()
   - Вызвать saveAPIKey('openai', 'test-key')
   - Проверить, что saveData() вызван с plain text и флагом encrypted=false
-  - **Requirements:** ui.10.10, ui.10.12
+  - **Requirements:** ui.10.15, ui.10.17
 
 - [ ] 50.6 Тест: loadAPIKey() дешифрует и возвращает ключ
   - Мокировать DataManager.loadData() для возврата зашифрованного ключа и флага encrypted=true
@@ -1551,13 +1551,13 @@
   - Вызвать loadAPIKey('openai')
   - Проверить, что decryptString() был вызван
   - Проверить, что возвращается дешифрованный ключ
-  - **Requirements:** ui.10.17
+  - **Requirements:** ui.10.22
 
 - [ ] 50.7 Тест: loadAPIKey() возвращает plain text если не зашифровано
   - Мокировать DataManager.loadData() для возврата plain text ключа и флага encrypted=false
   - Вызвать loadAPIKey('openai')
   - Проверить, что возвращается plain text ключ без дешифрования
-  - **Requirements:** ui.10.17
+  - **Requirements:** ui.10.22
 
 
 - [ ] 50.8 Тест: loadAPIKey() возвращает null при ошибке дешифрования
@@ -1566,20 +1566,20 @@
   - Вызвать loadAPIKey('openai')
   - Проверить, что возвращается null
   - Проверить, что ошибка залогирована
-  - **Requirements:** ui.10.17
+  - **Requirements:** ui.10.22
 
 - [ ] 50.9 Тест: deleteAPIKey() удаляет ключ и флаг из базы
   - Мокировать DataManager.deleteData()
   - Вызвать deleteAPIKey('openai')
   - Проверить, что deleteData() вызван дважды (для ключа и флага)
-  - **Requirements:** ui.10.6
+  - **Requirements:** ui.10.11
 
 - [ ] 50.10 Тест: каждый провайдер имеет отдельное хранилище
   - Сохранить ключи для всех трех провайдеров
   - Проверить, что каждый ключ сохранен с уникальным ключом в базе
   - Загрузить ключи для каждого провайдера
   - Проверить, что возвращаются правильные ключи
-  - **Requirements:** ui.10.11, ui.10.14
+  - **Requirements:** ui.10.16, ui.10.19
 
 ### 51. Модульные Тесты для Settings Component (AI Agent)
 
@@ -1606,7 +1606,7 @@
   - Изменить LLM Provider через выпадающий список
   - Проверить, что saveLLMProvider() вызван немедленно
   - Проверить, что loadAPIKey() вызван для нового провайдера
-  - **Requirements:** ui.10.5, ui.10.14
+  - **Requirements:** ui.10.10, ui.10.19
 
 
 - [ ] 51.4 Тест: сохраняет API ключ с debounce
@@ -1617,7 +1617,7 @@
   - Проверить, что saveAPIKey() НЕ вызван сразу
   - Продвинуть таймеры на 500ms
   - Проверить, что saveAPIKey() вызван один раз с последним значением
-  - **Requirements:** ui.10.4, ui.10.7
+  - **Requirements:** ui.10.9, ui.10.12
 
 - [ ] 51.5 Тест: удаляет API ключ при очистке поля
   - Мокировать window.api.settings.deleteAPIKey()
@@ -1625,7 +1625,7 @@
   - Очистить поле API Key (установить пустую строку)
   - Продвинуть таймеры на 500ms
   - Проверить, что deleteAPIKey() был вызван
-  - **Requirements:** ui.10.6
+  - **Requirements:** ui.10.11
 
 - [ ] 51.6 Тест: toggle visibility переключает тип поля
   - Рендерить Settings компонент
@@ -1768,7 +1768,7 @@
   - Подождать 500ms
   - Проверить, что показывается уведомление об ошибке
   - Закрыть приложение
-  - **Requirements:** ui.10.8
+  - **Requirements:** ui.10.13
 
 
 - [ ] 53.7 Функциональный тест: should isolate settings between users
@@ -1787,7 +1787,7 @@
   - Открыть Settings → AI Agent Settings
   - Проверить, что выбран OpenAI и загружен ключ A
   - Закрыть приложение
-  - **Requirements:** ui.10.22, ui.10.23, ui.10.24
+  - **Requirements:** ui.12.8 (изоляция данных AI Agent покрывается через общую изоляцию пользовательских данных)
 
 ### 54. Обновление Документации (AI Agent Settings)
 
