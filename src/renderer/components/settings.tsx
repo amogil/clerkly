@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Clock, Cpu, Eye, EyeOff, User, LogOut, AlertCircle } from 'lucide-react';
 
 interface SettingsProps {
@@ -9,7 +9,7 @@ interface SettingsProps {
 export function Settings({ onSignOut, onNavigate }: SettingsProps) {
   const [timeFormat, setTimeFormat] = useState('12h');
   const [dateFormat, setDateFormat] = useState('MM/DD/YYYY');
-  const [llmProvider, setLlmProvider] = useState('openai');
+  const [llmProvider, setLlmProvider] = useState<'openai' | 'anthropic' | 'google'>('openai');
   const [apiKey, setApiKey] = useState('');
   const [showApiKey, setShowApiKey] = useState(false);
   const [profile, setProfile] = useState<{
@@ -21,6 +21,9 @@ export function Settings({ onSignOut, onNavigate }: SettingsProps) {
     email: '',
     loading: true,
   });
+
+  // Track if this is the first render to avoid saving on initial mount
+  const isFirstRender = useRef(true);
 
   // Load profile data on mount
   useEffect(() => {
@@ -66,6 +69,104 @@ export function Settings({ onSignOut, onNavigate }: SettingsProps) {
       // If needed, this should be added to the preload API
     };
   }, []);
+
+  // Requirements: ui.10.20, ui.10.21 - Load AI Agent settings on mount
+  useEffect(() => {
+    const loadAIAgentSettings = async () => {
+      try {
+        // Load LLM provider
+        const providerResult = await window.api.settings.loadLLMProvider();
+        if (providerResult.success && providerResult.provider) {
+          setLlmProvider(providerResult.provider);
+
+          // Load API key for the loaded provider
+          const keyResult = await window.api.settings.loadAPIKey(providerResult.provider);
+          if (keyResult.success && keyResult.apiKey) {
+            setApiKey(keyResult.apiKey);
+          } else {
+            setApiKey('');
+          }
+        } else {
+          // Default values: openai provider, empty API key
+          setLlmProvider('openai');
+          setApiKey('');
+        }
+      } catch (error) {
+        console.error('Failed to load AI Agent settings:', error);
+        // Use default values on error
+        setLlmProvider('openai');
+        setApiKey('');
+      }
+    };
+
+    loadAIAgentSettings();
+  }, []);
+
+  // Requirements: ui.10.10, ui.10.19 - Save provider immediately and load API key for new provider
+  useEffect(() => {
+    // Skip on initial mount (initial load is handled by the load effect above)
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+
+    const saveProviderAndLoadKey = async () => {
+      try {
+        // Save provider immediately (no debounce)
+        const saveResult = await window.api.settings.saveLLMProvider(llmProvider);
+        if (!saveResult.success) {
+          console.error('Failed to save LLM provider:', saveResult.error);
+          // Requirements: ui.10.13 - Show error notification on save failure
+          // Note: Error notification will be handled by task 48.8
+        }
+
+        // Load API key for the new provider
+        const keyResult = await window.api.settings.loadAPIKey(llmProvider);
+        if (keyResult.success && keyResult.apiKey) {
+          setApiKey(keyResult.apiKey);
+        } else {
+          // If key not found, show empty field with placeholder
+          setApiKey('');
+        }
+      } catch (error) {
+        console.error('Failed to save provider or load API key:', error);
+      }
+    };
+
+    saveProviderAndLoadKey();
+  }, [llmProvider]);
+
+  // Requirements: ui.10.9, ui.10.11, ui.10.12 - Debounced save for API key (500ms)
+  useEffect(() => {
+    // Debounce API key save
+    const timeoutId = setTimeout(async () => {
+      try {
+        if (apiKey.trim() === '') {
+          // Requirements: ui.10.11 - Delete API key when field is cleared
+          const deleteResult = await window.api.settings.deleteAPIKey(llmProvider);
+          if (!deleteResult.success) {
+            console.error('Failed to delete API key:', deleteResult.error);
+            // Requirements: ui.10.13 - Show error notification on save failure
+            // Note: Error notification will be handled by task 48.8
+          }
+        } else {
+          // Save API key with debounce
+          const saveResult = await window.api.settings.saveAPIKey(llmProvider, apiKey);
+          if (!saveResult.success) {
+            console.error('Failed to save API key:', saveResult.error);
+            // Requirements: ui.10.13 - Show error notification on save failure
+            // Note: Error notification will be handled by task 48.8
+          }
+          // Requirements: ui.10.12 - No visual indicator for saving (silent save)
+        }
+      } catch (error) {
+        console.error('Failed to save/delete API key:', error);
+      }
+    }, 500);
+
+    // Cleanup: cancel previous timeout
+    return () => clearTimeout(timeoutId);
+  }, [apiKey, llmProvider]);
 
   return (
     <div className="p-8">
@@ -189,7 +290,9 @@ export function Settings({ onSignOut, onNavigate }: SettingsProps) {
                 </label>
                 <select
                   value={llmProvider}
-                  onChange={(e) => setLlmProvider(e.target.value)}
+                  onChange={(e) =>
+                    setLlmProvider(e.target.value as 'openai' | 'anthropic' | 'google')
+                  }
                   className="w-full px-4 py-2 bg-input-background border border-border rounded-lg text-foreground"
                 >
                   <option value="openai">OpenAI (GPT)</option>
@@ -221,13 +324,16 @@ export function Settings({ onSignOut, onNavigate }: SettingsProps) {
                   </button>
                 </div>
                 <p className="text-xs text-muted-foreground mt-2">
-                  Your API key is encrypted and stored securely. It will only be used to communicate
-                  with your selected LLM provider.
+                  Your API key is stored securely. It will only be used to communicate with your
+                  selected LLM provider.
                 </p>
               </div>
 
               <div className="pt-4 border-t border-border">
-                <button className="text-sm px-4 py-2.5 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors">
+                <button
+                  disabled
+                  className="text-sm px-4 py-2.5 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
                   Test Connection
                 </button>
               </div>

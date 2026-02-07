@@ -30,6 +30,27 @@ interface API {
   error: {
     onNotify: (callback: (message: string, context: string) => void) => () => void;
   };
+  // Requirements: ui.10.26
+  settings: {
+    saveLLMProvider: (
+      provider: 'openai' | 'anthropic' | 'google'
+    ) => Promise<{ success: boolean; error?: string }>;
+    loadLLMProvider: () => Promise<{
+      success: boolean;
+      provider?: 'openai' | 'anthropic' | 'google';
+      error?: string;
+    }>;
+    saveAPIKey: (
+      provider: 'openai' | 'anthropic' | 'google',
+      apiKey: string
+    ) => Promise<{ success: boolean; error?: string }>;
+    loadAPIKey: (
+      provider: 'openai' | 'anthropic' | 'google'
+    ) => Promise<{ success: boolean; apiKey?: string | null; error?: string }>;
+    deleteAPIKey: (
+      provider: 'openai' | 'anthropic' | 'google'
+    ) => Promise<{ success: boolean; error?: string }>;
+  };
   // Requirements: testing.3.8 - Test IPC methods (only available in test environment)
   ipcRenderer?: {
     invoke: (channel: string, ...args: any[]) => Promise<any>;
@@ -209,6 +230,79 @@ const api: API = {
       return () => {
         ipcRenderer.removeListener('error:notify', listener);
       };
+    },
+  },
+
+  // Requirements: ui.10.26
+  /**
+   * Settings API
+   * Provides methods for managing application settings including AI Agent configuration
+   */
+  settings: {
+    /**
+     * Save LLM provider selection
+     * Requirements: ui.10.9, ui.10.26
+     * @param {string} provider - LLM provider ('openai', 'anthropic', or 'google')
+     * @returns {Promise<{success: boolean, error?: string}>}
+     */
+    async saveLLMProvider(
+      provider: 'openai' | 'anthropic' | 'google'
+    ): Promise<{ success: boolean; error?: string }> {
+      return await ipcRenderer.invoke('settings:save-llm-provider', provider);
+    },
+
+    /**
+     * Load LLM provider selection
+     * Returns 'openai' as default if not found
+     * Requirements: ui.10.20, ui.10.21, ui.10.26
+     * @returns {Promise<{success: boolean, provider?: string, error?: string}>}
+     */
+    async loadLLMProvider(): Promise<{
+      success: boolean;
+      provider?: 'openai' | 'anthropic' | 'google';
+      error?: string;
+    }> {
+      return await ipcRenderer.invoke('settings:load-llm-provider');
+    },
+
+    /**
+     * Save API key for specific provider
+     * Key is encrypted when safeStorage is available
+     * Requirements: ui.10.9, ui.10.13, ui.10.26
+     * @param {string} provider - LLM provider ('openai', 'anthropic', or 'google')
+     * @param {string} apiKey - API key to save
+     * @returns {Promise<{success: boolean, error?: string}>}
+     */
+    async saveAPIKey(
+      provider: 'openai' | 'anthropic' | 'google',
+      apiKey: string
+    ): Promise<{ success: boolean; error?: string }> {
+      return await ipcRenderer.invoke('settings:save-api-key', provider, apiKey);
+    },
+
+    /**
+     * Load API key for specific provider
+     * Decrypts key if it was encrypted
+     * Requirements: ui.10.20, ui.10.22, ui.10.26
+     * @param {string} provider - LLM provider ('openai', 'anthropic', or 'google')
+     * @returns {Promise<{success: boolean, apiKey?: string | null, error?: string}>}
+     */
+    async loadAPIKey(
+      provider: 'openai' | 'anthropic' | 'google'
+    ): Promise<{ success: boolean; apiKey?: string | null; error?: string }> {
+      return await ipcRenderer.invoke('settings:load-api-key', provider);
+    },
+
+    /**
+     * Delete API key for specific provider
+     * Requirements: ui.10.11, ui.10.26
+     * @param {string} provider - LLM provider ('openai', 'anthropic', or 'google')
+     * @returns {Promise<{success: boolean, error?: string}>}
+     */
+    async deleteAPIKey(
+      provider: 'openai' | 'anthropic' | 'google'
+    ): Promise<{ success: boolean; error?: string }> {
+      return await ipcRenderer.invoke('settings:delete-api-key', provider);
     },
   },
 };

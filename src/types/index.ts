@@ -153,7 +153,7 @@ export interface AppConfig {
 
 /**
  * API exposed to renderer process via contextBridge
- * Requirements: clerkly.1, google-oauth-auth.8, ui.6.2, ui.6.5, ui.7.1
+ * Requirements: clerkly.1, google-oauth-auth.8, ui.6.2, ui.6.5, ui.7.1, ui.10.26
  */
 export interface API {
   saveData: (key: string, value: any) => Promise<{ success: boolean; error?: string }>;
@@ -178,6 +178,27 @@ export interface API {
   // Requirements: ui.7.1
   error: {
     onNotify: (callback: (message: string, context: string) => void) => () => void;
+  };
+  // Requirements: ui.10.26
+  settings: {
+    saveLLMProvider: (
+      provider: 'openai' | 'anthropic' | 'google'
+    ) => Promise<{ success: boolean; error?: string }>;
+    loadLLMProvider: () => Promise<{
+      success: boolean;
+      provider?: 'openai' | 'anthropic' | 'google';
+      error?: string;
+    }>;
+    saveAPIKey: (
+      provider: 'openai' | 'anthropic' | 'google',
+      apiKey: string
+    ) => Promise<{ success: boolean; error?: string }>;
+    loadAPIKey: (
+      provider: 'openai' | 'anthropic' | 'google'
+    ) => Promise<{ success: boolean; apiKey?: string | null; error?: string }>;
+    deleteAPIKey: (
+      provider: 'openai' | 'anthropic' | 'google'
+    ) => Promise<{ success: boolean; error?: string }>;
   };
 }
 
@@ -231,6 +252,65 @@ export interface UserProfile {
    * Used for tracking profile freshness
    */
   lastUpdated: number;
+}
+
+/**
+ * AI Agent Settings configuration
+ * Requirements: ui.10.1, ui.10.16
+ */
+export interface AIAgentSettings {
+  /**
+   * Selected LLM provider for AI agent operations
+   * Supported providers: OpenAI (GPT), Anthropic (Claude), Google (Gemini)
+   * Requirements: ui.10.1
+   */
+  llmProvider: 'openai' | 'anthropic' | 'google';
+
+  /**
+   * API keys for each LLM provider
+   * Each provider has separate storage for its API key
+   * Keys are stored encrypted when safeStorage is available
+   * Requirements: ui.10.16
+   */
+  apiKeys: {
+    /**
+     * OpenAI API key (optional)
+     */
+    openai?: string;
+
+    /**
+     * Anthropic API key (optional)
+     */
+    anthropic?: string;
+
+    /**
+     * Google API key (optional)
+     */
+    google?: string;
+  };
+
+  /**
+   * Encryption status for each provider's API key
+   * true: key is encrypted using safeStorage
+   * false: key is stored as plain text (fallback when encryption unavailable)
+   * Requirements: ui.10.14, ui.10.15, ui.10.17
+   */
+  encryptionStatus: {
+    /**
+     * OpenAI API key encryption status
+     */
+    openai?: boolean;
+
+    /**
+     * Anthropic API key encryption status
+     */
+    anthropic?: boolean;
+
+    /**
+     * Google API key encryption status
+     */
+    google?: boolean;
+  };
 }
 
 /**

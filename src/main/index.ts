@@ -16,6 +16,8 @@ import { TokenStorageManager } from './auth/TokenStorageManager';
 import { UserProfileManager } from './auth/UserProfileManager';
 import { getOAuthConfig, OAUTH_CONFIG } from './auth/OAuthConfig';
 import { AuthIPCHandlers } from './auth/AuthIPCHandlers';
+import { AIAgentSettingsManager } from './AIAgentSettingsManager';
+import { SettingsIPCHandlers } from './SettingsIPCHandlers';
 
 // Set app name for single instance lock
 // This helps macOS identify the app correctly
@@ -144,6 +146,14 @@ const authIPCHandlers = new AuthIPCHandlers(oauthClient);
 // Requirements: ui.6.2 - Connect profile manager to auth IPC handlers
 authIPCHandlers.setProfileManager(profileManager);
 
+// Requirements: ui.10.9, ui.10.26
+// Initialize AI Agent Settings Manager
+const aiAgentSettingsManager = new AIAgentSettingsManager(dataManager);
+
+// Requirements: ui.10.9, ui.10.26
+// Initialize Settings IPC Handlers
+const settingsIPCHandlers = new SettingsIPCHandlers(aiAgentSettingsManager);
+
 // Requirements: testing.3.8
 // Initialize Test IPC Handlers (only in test environment)
 if (process.env.NODE_ENV === 'test') {
@@ -269,6 +279,11 @@ app.whenReady().then(async () => {
     // Register Auth IPC handlers
     authIPCHandlers.registerHandlers();
     console.log('[Main] Auth IPC handlers registered');
+
+    // Requirements: ui.10.9, ui.10.26
+    // Register Settings IPC handlers
+    settingsIPCHandlers.registerHandlers();
+    console.log('[Main] Settings IPC handlers registered');
 
     // Requirements: google-oauth-auth.14.1
     // Initialize Auth Window Manager to check auth status and show appropriate window
