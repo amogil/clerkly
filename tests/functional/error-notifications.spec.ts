@@ -4,11 +4,7 @@
    Requirements: ui.7.1, ui.7.2, ui.7.3, ui.7.4 */
 
 import { test, expect } from '@playwright/test';
-import {
-  launchElectron,
-  closeElectron,
-  ElectronTestContext,
-} from './helpers/electron';
+import { launchElectron, closeElectron, ElectronTestContext } from './helpers/electron';
 
 let context: ElectronTestContext;
 
@@ -60,7 +56,7 @@ test('should show error notification on background process failure', async () =>
    Assertions: Notification automatically dismissed
    Requirements: ui.7.3
    Property: 22 */
-test.skip('should auto-dismiss error notification after 15 seconds', async () => {
+test('should auto-dismiss error notification after 15 seconds', async () => {
   // Show a notification via IPC
   await context.window.evaluate(async () => {
     await (window as any).electron.ipcRenderer.invoke('test:trigger-error-notification', {

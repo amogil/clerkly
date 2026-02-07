@@ -181,9 +181,7 @@ describe('UserProfileManager', () => {
       expect(global.fetch).not.toHaveBeenCalled();
 
       // Verify log message
-      expect(consoleLogSpy).toHaveBeenCalledWith(
-        '[UserProfileManager] Not authenticated, cannot fetch profile'
-      );
+      expect(consoleLogSpy).toHaveBeenCalledWith('[UserProfileManager] No access token available');
 
       consoleLogSpy.mockRestore();
     });

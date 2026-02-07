@@ -99,13 +99,6 @@ export class UserProfileManager {
    */
   async fetchProfile(): Promise<UserProfile | null> {
     try {
-      // Requirements: ui.6.6 - Check authentication status
-      const authStatus = await this.oauthClient.getAuthStatus();
-      if (!authStatus.authorized) {
-        console.log('[UserProfileManager] Not authenticated, cannot fetch profile');
-        return null;
-      }
-
       // Get access token from token storage
       const tokens = await this.tokenStorage.loadTokens();
       if (!tokens || !tokens.accessToken) {
@@ -121,6 +114,7 @@ export class UserProfileManager {
         : `${googleApiBaseUrl}/oauth2/v1/userinfo`; // Google uses /oauth2/v1/userinfo
 
       console.log('[UserProfileManager] Fetching profile from Google UserInfo API');
+      console.log('[UserProfileManager] About to call handleAPIRequest with URL:', userInfoUrl);
 
       // Requirements: ui.9.3, ui.9.4 - Use centralized handler for automatic 401 detection
       const response = await handleAPIRequest(

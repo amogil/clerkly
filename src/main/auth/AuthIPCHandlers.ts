@@ -201,6 +201,8 @@ export class AuthIPCHandlers {
    */
   private async handleRefreshProfile(_event: IpcMainInvokeEvent): Promise<IPCResult> {
     try {
+      console.log('[AuthIPCHandlers] ===== handleRefreshProfile called =====');
+
       // Requirements: ui.6.5
       if (!this.profileManager) {
         console.warn('[AuthIPCHandlers] Profile manager not set');
@@ -213,6 +215,10 @@ export class AuthIPCHandlers {
 
       console.log('[AuthIPCHandlers] Refreshing profile');
       const profile = await this.profileManager.fetchProfile();
+      console.log(
+        '[AuthIPCHandlers] Profile refresh completed, result:',
+        profile ? 'success' : 'null'
+      );
 
       // Broadcast profile update event to all windows
       // Requirements: ui.6.5 - Notify UI about profile updates

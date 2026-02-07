@@ -35,7 +35,9 @@ test.afterEach(async () => {
    Property: 24 */
 test('should show login screen when not authenticated', async () => {
   // Wait for the login screen to be visible
-  const loginScreen = window.locator('[data-testid="login-screen"]').or(window.locator('text=Welcome'));
+  const loginScreen = window
+    .locator('[data-testid="login-screen"]')
+    .or(window.locator('text=Welcome'));
   await expect(loginScreen).toBeVisible({ timeout: 10000 });
 
   // Verify Google sign-in button is present
@@ -54,7 +56,9 @@ test('should show login screen when not authenticated', async () => {
    Property: 25 */
 test('should block access to protected screens without authentication', async () => {
   // Verify login screen is shown initially
-  const loginScreen = window.locator('[data-testid="login-screen"]').or(window.locator('text=Welcome'));
+  const loginScreen = window
+    .locator('[data-testid="login-screen"]')
+    .or(window.locator('text=Welcome'));
   await expect(loginScreen).toBeVisible({ timeout: 10000 });
 
   // Try to access Dashboard via evaluate (simulating direct navigation)
@@ -107,12 +111,13 @@ test('should block access to protected screens without authentication', async ()
   await expect(loginScreen).toBeVisible();
 
   // Verify protected content is not accessible
-  const protectedContent = window.locator('[data-testid="dashboard"]')
+  const protectedContent = window
+    .locator('[data-testid="dashboard"]')
     .or(window.locator('[data-testid="settings"]'))
     .or(window.locator('[data-testid="tasks"]'))
     .or(window.locator('[data-testid="calendar"]'))
     .or(window.locator('[data-testid="contacts"]'));
-  
+
   await expect(protectedContent).not.toBeVisible();
 });
 
@@ -123,7 +128,9 @@ test('should block access to protected screens without authentication', async ()
    Property: 26 */
 test('should redirect to dashboard after successful authentication', async () => {
   // Wait for login screen
-  const loginScreen = window.locator('[data-testid="login-screen"]').or(window.locator('text=Welcome'));
+  const loginScreen = window
+    .locator('[data-testid="login-screen"]')
+    .or(window.locator('text=Welcome'));
   await expect(loginScreen).toBeVisible({ timeout: 10000 });
 
   // Simulate successful authentication by setting tokens directly
@@ -144,7 +151,9 @@ test('should redirect to dashboard after successful authentication', async () =>
   await window.waitForTimeout(2000);
 
   // Verify dashboard is visible or we're no longer on login screen
-  const dashboard = window.locator('[data-testid="dashboard"]').or(window.locator('text=Dashboard'));
+  const dashboard = window
+    .locator('[data-testid="dashboard"]')
+    .or(window.locator('text=Dashboard'));
   const isOnDashboard = await dashboard.isVisible().catch(() => false);
   const isOnLogin = await loginScreen.isVisible().catch(() => false);
 
@@ -166,7 +175,7 @@ test('should redirect to login screen after logout', async () => {
       expiresIn: 3600,
       tokenType: 'Bearer',
     });
-    
+
     await (window as any).electron.ipcRenderer.invoke('test:trigger-auth-success');
   });
 
@@ -182,7 +191,9 @@ test('should redirect to login screen after logout', async () => {
   await window.waitForTimeout(2000);
 
   // Verify login screen is shown
-  const loginScreen = window.locator('[data-testid="login-screen"]').or(window.locator('text=Welcome'));
+  const loginScreen = window
+    .locator('[data-testid="login-screen"]')
+    .or(window.locator('text=Welcome'));
   await expect(loginScreen).toBeVisible({ timeout: 5000 });
 
   // Verify sign-in button is present
@@ -190,7 +201,8 @@ test('should redirect to login screen after logout', async () => {
   await expect(signInButton).toBeVisible();
 
   // Verify we're not on any protected screen
-  const protectedContent = window.locator('[data-testid="dashboard"]')
+  const protectedContent = window
+    .locator('[data-testid="dashboard"]')
     .or(window.locator('[data-testid="settings"]'));
   await expect(protectedContent).not.toBeVisible();
 });

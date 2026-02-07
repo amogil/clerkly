@@ -101,7 +101,7 @@ describe('APIRequestHandler', () => {
 
     expect(mockTokenStorage.deleteTokens).toHaveBeenCalledTimes(1);
     expect(mockBrowserWindow.webContents.send).toHaveBeenCalledWith('auth:error', {
-      message: 'Session expired',
+      error: 'Session expired',
       errorCode: 'invalid_grant',
     });
   });

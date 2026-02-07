@@ -126,9 +126,11 @@ export default function App() {
     // Listen for auth error events
     const unsubscribeAuthError = window.api.auth.onAuthError(
       (error: string, errorCode?: string) => {
-        console.error('[App] Auth error:', error, errorCode);
+        console.error('[App] Auth error event received:', { error, errorCode });
+        console.log('[App] Setting authError state and isAuthorized=false');
         setAuthError({ message: error, code: errorCode });
         setIsAuthorized(false);
+        console.log('[App] State updated, should trigger re-render');
       }
     );
 
@@ -234,12 +236,17 @@ export default function App() {
   // Show loading state while checking auth
   if (isAuthorized === null) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading...</p>
+      <>
+        <div className="min-h-screen bg-background flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Loading...</p>
+          </div>
         </div>
-      </div>
+        {/* Requirements: ui.7.1 - Display error notifications */}
+        {/* Property: 20, 21, 22 */}
+        <NotificationUI manager={errorNotificationManager} />
+      </>
     );
   }
 
@@ -247,21 +254,33 @@ export default function App() {
   // Show error screen if authentication failed
   if (authError) {
     return (
-      <LoginError
-        errorMessage={authError.message}
-        errorCode={authError.code}
-        onRetry={() => {
-          setAuthError(null);
-          handleLogin();
-        }}
-      />
+      <>
+        <LoginError
+          errorMessage={authError.message}
+          errorCode={authError.code}
+          onRetry={() => {
+            setAuthError(null);
+            handleLogin();
+          }}
+        />
+        {/* Requirements: ui.7.1 - Display error notifications */}
+        {/* Property: 20, 21, 22 */}
+        <NotificationUI manager={errorNotificationManager} />
+      </>
     );
   }
 
   // Requirements: google-oauth-auth.12.2
   // Show login screen if not authorized
   if (!isAuthorized) {
-    return <LoginScreen onLogin={handleLogin} />;
+    return (
+      <>
+        <LoginScreen onLogin={handleLogin} />
+        {/* Requirements: ui.7.1 - Display error notifications */}
+        {/* Property: 20, 21, 22 */}
+        <NotificationUI manager={errorNotificationManager} />
+      </>
+    );
   }
 
   // Requirements: clerkly.1

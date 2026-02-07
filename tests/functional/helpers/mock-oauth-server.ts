@@ -115,6 +115,15 @@ export class MockOAuthServer {
   }
 
   /**
+   * Reset refresh token calls for testing
+   * Requirements: testing.3.9
+   */
+  resetRefreshTokenCalls(): void {
+    this.refreshTokenCalls = [];
+    console.log('[MOCK OAUTH] Refresh token calls reset');
+  }
+
+  /**
    * Set UserInfo API to return 401 for testing
    * Requirements: testing.3.9
    */
@@ -269,55 +278,122 @@ export class MockOAuthServer {
     req.on('end', () => {
       const params = new URLSearchParams(body);
       const grantType = params.get('grant_type');
-      const code = params.get('code');
-      const clientId = params.get('client_id');
-      const clientSecret = params.get('client_secret');
-      const redirectUri = params.get('redirect_uri');
 
-      // Validate request
-      if (clientId !== this.config.clientId || clientSecret !== this.config.clientSecret) {
-        res.writeHead(401, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'invalid_client' }));
+      // Handle refresh_token grant type
+      if (grantType === 'refresh_token') {
+        this.handleRefreshTokenGrant(params, res);
         return;
       }
 
-      if (grantType !== 'authorization_code') {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'unsupported_grant_type' }));
+      // Handle authorization_code grant type
+      if (grantType === 'authorization_code') {
+        this.handleAuthorizationCodeGrant(params, res);
         return;
       }
 
-      // Validate authorization code
-      const authData = this.authCodes.get(code || '');
-      if (!authData) {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'invalid_grant' }));
-        return;
-      }
-
-      if (authData.redirectUri !== redirectUri) {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'redirect_uri_mismatch' }));
-        return;
-      }
-
-      // Remove used authorization code
-      this.authCodes.delete(code || '');
-
-      // Generate tokens
-      const tokenResponse: MockTokenResponse = {
-        access_token: `test_access_token_${Date.now()}`,
-        refresh_token: `test_refresh_token_${Date.now()}`,
-        expires_in: 3600,
-        token_type: 'Bearer',
-        scope: 'https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/tasks',
-      };
-
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify(tokenResponse));
-
-      console.log('[MOCK OAUTH] Issued tokens');
+      // Unsupported grant type
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'unsupported_grant_type' }));
     });
+  }
+
+  /**
+   * Handle authorization code grant
+   */
+  private handleAuthorizationCodeGrant(params: URLSearchParams, res: http.ServerResponse): void {
+    const code = params.get('code');
+    const clientId = params.get('client_id');
+    const clientSecret = params.get('client_secret');
+    const redirectUri = params.get('redirect_uri');
+
+    // Validate request
+    if (clientId !== this.config.clientId || clientSecret !== this.config.clientSecret) {
+      res.writeHead(401, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'invalid_client' }));
+      return;
+    }
+
+    // Validate authorization code
+    const authData = this.authCodes.get(code || '');
+    if (!authData) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'invalid_grant' }));
+      return;
+    }
+
+    if (authData.redirectUri !== redirectUri) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'redirect_uri_mismatch' }));
+      return;
+    }
+
+    // Remove used authorization code
+    this.authCodes.delete(code || '');
+
+    // Generate tokens
+    const tokenResponse: MockTokenResponse = {
+      access_token: `test_access_token_${Date.now()}`,
+      refresh_token: `test_refresh_token_${Date.now()}`,
+      expires_in: 3600,
+      token_type: 'Bearer',
+      scope: 'https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/tasks',
+    };
+
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(tokenResponse));
+
+    console.log('[MOCK OAUTH] Issued tokens');
+  }
+
+  /**
+   * Handle refresh token grant
+   */
+  private handleRefreshTokenGrant(params: URLSearchParams, res: http.ServerResponse): void {
+    const refreshToken = params.get('refresh_token');
+    const clientId = params.get('client_id');
+    const clientSecret = params.get('client_secret');
+
+    // Track refresh token calls
+    this.refreshTokenCalls.push({
+      timestamp: Date.now(),
+      refreshToken,
+    });
+
+    console.log('[MOCK OAUTH] Refresh token request received');
+
+    // Validate request
+    if (clientId !== this.config.clientId || clientSecret !== this.config.clientSecret) {
+      res.writeHead(401, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'invalid_client' }));
+      return;
+    }
+
+    // Check if refresh token is invalid
+    if (!this.refreshTokenValid) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'invalid_grant' }));
+      return;
+    }
+
+    if (!refreshToken || !refreshToken.startsWith('test_refresh_token_')) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'invalid_grant' }));
+      return;
+    }
+
+    // Generate new access token
+    const tokenResponse: MockTokenResponse = {
+      access_token: `test_access_token_refreshed_${Date.now()}`,
+      refresh_token: refreshToken, // Keep same refresh token
+      expires_in: 3600,
+      token_type: 'Bearer',
+      scope: 'https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/tasks',
+    };
+
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(tokenResponse));
+
+    console.log('[MOCK OAUTH] Refreshed tokens');
   }
 
   /**

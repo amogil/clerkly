@@ -1,6 +1,7 @@
-// Requirements: ui.9.3, ui.9.4, ui.9.5, ui.9.6
+// Requirements: ui.9.1, ui.9.2, ui.9.3, ui.9.4, ui.9.5, ui.9.6
 
 import { TokenStorageManager } from './TokenStorageManager';
+import { BrowserWindow } from 'electron';
 
 /**
  * Flag to prevent multiple simultaneous token clearances
@@ -9,11 +10,27 @@ import { TokenStorageManager } from './TokenStorageManager';
 let isClearing401 = false;
 
 /**
+ * OAuth Client Manager instance for token refresh
+ * Set by the main process during initialization
+ */
+let oauthClientManager: any = null;
+
+/**
+ * Set the OAuth Client Manager instance
+ * Requirements: ui.9.1, ui.9.2 - Enable automatic token refresh
+ * @param manager OAuthClientManager instance
+ */
+export function setOAuthClientManager(manager: any): void {
+  oauthClientManager = manager;
+}
+
+/**
  * Centralized API Request Handler
  * Handles all API requests with automatic HTTP 401 detection and token management
- * Requirements: ui.9.3, ui.9.4, ui.9.5
+ * Requirements: ui.9.1, ui.9.2, ui.9.3, ui.9.4, ui.9.5
  *
  * This handler wraps fetch() to provide:
+ * - Automatic token refresh when access token is expired (ui.9.1, ui.9.2)
  * - Automatic detection of HTTP 401 Unauthorized errors
  * - Centralized token clearing on authorization failures
  * - Protection against race conditions when multiple requests fail simultaneously
@@ -32,9 +49,39 @@ export async function handleAPIRequest(
   tokenStorage: TokenStorageManager,
   context?: string
 ): Promise<Response> {
+  console.log('[APIRequestHandler] Making API request:', { url, context });
+
   try {
+    // Requirements: ui.9.1, ui.9.2 - Check if access token is expired and refresh if needed
+    if (oauthClientManager) {
+      const tokens = await tokenStorage.loadTokens();
+      if (tokens && tokens.expiresAt) {
+        const now = Date.now();
+        const isExpired = tokens.expiresAt <= now;
+
+        if (isExpired) {
+          console.log('[APIRequestHandler] Access token expired, refreshing automatically');
+          const refreshed = await oauthClientManager.refreshAccessToken();
+
+          if (refreshed) {
+            console.log('[APIRequestHandler] Token refreshed successfully');
+            // Reload tokens to get the new access token
+            const newTokens = await tokenStorage.loadTokens();
+            if (newTokens && options.headers) {
+              // Update Authorization header with new token
+              (options.headers as Record<string, string>)['Authorization'] =
+                `Bearer ${newTokens.accessToken}`;
+            }
+          } else {
+            console.log('[APIRequestHandler] Token refresh failed, continuing with expired token');
+          }
+        }
+      }
+    }
+
     // Requirements: ui.9.4 - Make the API request
     const response = await fetch(url, options);
+    console.log('[APIRequestHandler] Response received:', { status: response.status, url });
 
     // Requirements: ui.9.3, ui.9.4 - Check for authorization error
     if (response.status === 401) {
@@ -57,15 +104,20 @@ export async function handleAPIRequest(
 
           // Requirements: ui.9.3 - Emit auth error event to show LoginError component
           // The event will be handled by the renderer process to show LoginError with errorCode 'invalid_grant'
-          if (process.type === 'browser') {
-            const { BrowserWindow } = require('electron');
-            const mainWindow = BrowserWindow.getAllWindows()[0];
-            if (mainWindow) {
-              mainWindow.webContents.send('auth:error', {
-                message: 'Session expired',
-                errorCode: 'invalid_grant',
-              });
-            }
+          const allWindows = BrowserWindow.getAllWindows();
+          console.log('[APIRequestHandler] Total windows:', allWindows.length);
+          const mainWindow = allWindows[0];
+          console.log('[APIRequestHandler] Main window found:', !!mainWindow);
+          if (mainWindow) {
+            console.log('[APIRequestHandler] Main window ID:', mainWindow.id);
+            console.log('[APIRequestHandler] Sending auth:error event to renderer');
+            mainWindow.webContents.send('auth:error', {
+              error: 'Session expired',
+              errorCode: 'invalid_grant',
+            });
+            console.log('[APIRequestHandler] auth:error event sent successfully');
+          } else {
+            console.error('[APIRequestHandler] No main window found, cannot send auth:error event');
           }
         } finally {
           // Reset flag after a short delay to allow other requests to see the cleared state

@@ -103,6 +103,11 @@ const tokenStorage = new TokenStorageManager(dataManager);
 const oauthConfig = getOAuthConfig();
 const oauthClient = new OAuthClientManager(oauthConfig, tokenStorage);
 
+// Requirements: ui.9.1, ui.9.2
+// Set OAuth Client Manager for automatic token refresh in API requests
+import { setOAuthClientManager } from './auth/APIRequestHandler';
+setOAuthClientManager(oauthClient);
+
 // Requirements: ui.6.5
 // Initialize User Profile Manager
 const profileManager = new UserProfileManager(dataManager, oauthClient, tokenStorage);
@@ -209,26 +214,22 @@ if (process.env.NODE_ENV === 'test') {
     }
   });
 
-  ipcMain.handle('test:trigger-error-notification', async (event: any, data: { message: string; context: string }) => {
-    try {
-      // Send error notification to renderer process
-      // This simulates what happens when Main Process encounters an error
-      // Use WindowManager to send to main window
-      const mainWindow = windowManager.getWindow();
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send('error:notify', data.message, data.context);
-        console.log('[TEST] Sent error:notify event to main window:', data);
-      } else {
-        console.log('[TEST] Main window not available, using event.sender');
-        event.sender.send('error:notify', data.message, data.context);
+  ipcMain.handle(
+    'test:trigger-error-notification',
+    async (event: any, data: { message: string; context: string }) => {
+      try {
+        // Send error notification to renderer process using AuthIPCHandlers
+        // This simulates what happens when Main Process encounters an error
+        authIPCHandlers.sendErrorNotification(data.message, data.context);
+        console.log('[TEST] Sent error notification via AuthIPCHandlers:', data);
+        return { success: true };
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        console.error('[TEST] Error sending notification:', errorMessage);
+        return { success: false, error: errorMessage };
       }
-      return { success: true };
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      console.error('[TEST] Error sending notification:', errorMessage);
-      return { success: false, error: errorMessage };
     }
-  });
+  );
 
   console.log('[TEST] Test IPC handlers registered');
 }

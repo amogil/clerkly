@@ -67,6 +67,25 @@ export const GOOGLE_OAUTH_ENDPOINTS = {
 } as const;
 
 /**
+ * Get Google OAuth endpoints with optional override for testing
+ * Requirements: google-oauth-auth.10.4, google-oauth-auth.10.5, google-oauth-auth.10.6
+ */
+function getGoogleOAuthEndpoints() {
+  // Use CLERKLY_GOOGLE_OAUTH_URL environment variable for testing
+  const baseUrl = process.env.CLERKLY_GOOGLE_OAUTH_URL;
+
+  if (baseUrl) {
+    return {
+      authorization: `${baseUrl}/auth`,
+      token: `${baseUrl}/token`,
+      revoke: `${baseUrl}/revoke`,
+    };
+  }
+
+  return GOOGLE_OAUTH_ENDPOINTS;
+}
+
+/**
  * OAuth configuration constants
  * Requirements: google-oauth-auth.10.1, google-oauth-auth.10.2, google-oauth-auth.10.3
  */
@@ -83,13 +102,15 @@ export const OAUTH_CONFIG = {
  * Requirements: google-oauth-auth.10.1, google-oauth-auth.10.2, google-oauth-auth.10.3, google-oauth-auth.10.4, google-oauth-auth.10.5, google-oauth-auth.10.6
  */
 export function getOAuthConfig(clientId?: string): OAuthConfig {
+  const endpoints = getGoogleOAuthEndpoints();
+
   return {
     clientId: clientId || OAUTH_CONFIG.clientId,
     clientSecret: OAUTH_CONFIG.clientSecret,
     redirectUri: OAUTH_CONFIG.redirectUri,
-    authorizationEndpoint: GOOGLE_OAUTH_ENDPOINTS.authorization,
-    tokenEndpoint: GOOGLE_OAUTH_ENDPOINTS.token,
-    revokeEndpoint: GOOGLE_OAUTH_ENDPOINTS.revoke,
+    authorizationEndpoint: endpoints.authorization,
+    tokenEndpoint: endpoints.token,
+    revokeEndpoint: endpoints.revoke,
     scopes: [...OAUTH_CONFIG.scopes],
   };
 }
