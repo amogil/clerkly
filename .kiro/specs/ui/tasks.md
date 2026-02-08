@@ -2273,26 +2273,26 @@
   - Проверить, что SQL запрос содержит WHERE user_email = 'user@example.com'
   - **Requirements:** ui.12.4, ui.12.12
 
-- [ ] 70.4 Тест: loadData() выбрасывает ошибку если нет email
+- [x] 70.4 Тест: loadData() выбрасывает ошибку если нет email
   - Мокировать userProfileManager.getCurrentEmail() для возврата null
   - Вызвать loadData('test_key')
   - Проверить, что выброшена ошибка "No user logged in"
   - **Requirements:** ui.12.13
 
-- [ ] 70.5 Тест: deleteData() фильтрует по user_email
+- [x] 70.5 Тест: deleteData() фильтрует по user_email
   - Мокировать userProfileManager.getCurrentEmail() для возврата 'user@example.com'
   - Вызвать deleteData('test_key')
   - Проверить, что SQL запрос содержит WHERE user_email = 'user@example.com'
   - **Requirements:** ui.12.12
 
 
-- [ ] 70.6 Тест: deleteData() выбрасывает ошибку если нет email
+- [x] 70.6 Тест: deleteData() выбрасывает ошибку если нет email
   - Мокировать userProfileManager.getCurrentEmail() для возврата null
   - Вызвать deleteData('test_key')
   - Проверить, что выброшена ошибка "No user logged in"
   - **Requirements:** ui.12.13
 
-- [ ] 70.7 Тест: данные разных пользователей изолированы
+- [x] 70.7 Тест: данные разных пользователей изолированы
   - Сохранить данные для user A (email: 'userA@example.com')
   - Сохранить данные для user B (email: 'userB@example.com')
   - Загрузить данные как user A
@@ -2303,7 +2303,7 @@
 
 ### 71. Модульные Тесты для Обработки Ошибок
 
-- [ ] 71.1 Тест: обработка "No user logged in" для неавторизованного пользователя
+- [x] 71.1 Тест: обработка "No user logged in" для неавторизованного пользователя
   - Мокировать isUserAuthenticated() для возврата false
   - Мокировать NavigationManager.redirectToLogin()
   - Триггернуть ошибку "No user logged in"
@@ -2311,7 +2311,7 @@
   - Проверить, что кэши очищены
   - **Requirements:** ui.12.19
 
-- [ ] 71.2 Тест: обработка "No user logged in" при истечении сессии
+- [x] 71.2 Тест: обработка "No user logged in" при истечении сессии
   - Мокировать isUserAuthenticated() для возврата true
   - Мокировать refreshAccessToken() для успешного refresh
   - Триггернуть ошибку "No user logged in"
@@ -2319,7 +2319,7 @@
   - Проверить, что операция повторена после refresh
   - **Requirements:** ui.12.20
 
-- [ ] 71.3 Тест: обработка "No user logged in" при logout
+- [x] 71.3 Тест: обработка "No user logged in" при logout
   - Триггернуть ошибку "No user logged in" во время logout
   - Проверить, что ошибка молча игнорируется
   - Проверить, что ошибка залогирована в консоль
@@ -2327,7 +2327,7 @@
 
 ### 72. Property-Based Тесты для User Isolation
 
-- [ ] 72.1 Property-based тест: данные пользователей изолированы
+- [x] 72.1 Property-based тест: данные пользователей изолированы
   - Использовать fast-check для генерации различных user emails и данных
   - Для каждого пользователя: сохранить данные
   - Для каждого пользователя: загрузить данные
@@ -2336,7 +2336,7 @@
   - **Requirements:** ui.12.3, ui.12.4, ui.12.6
 
 
-- [ ] 72.2 Property-based тест: сохранение и загрузка данных (round-trip) с изоляцией
+- [x] 72.2 Property-based тест: сохранение и загрузка данных (round-trip) с изоляцией
   - Использовать fast-check для генерации различных user emails, ключей и значений
   - Для каждого пользователя: сохранить данные, затем загрузить
   - Проверить, что загруженные данные равны сохраненным
@@ -2344,7 +2344,7 @@
   - Минимум 100 итераций
   - **Requirements:** ui.12.3, ui.12.4, ui.12.7
 
-- [ ] 72.3 Property-based тест: logout сохраняет данные пользователя
+- [x] 72.3 Property-based тест: logout сохраняет данные пользователя
   - Использовать fast-check для генерации различных user emails и данных
   - Для каждого пользователя: сохранить данные, выполнить logout
   - Проверить, что данные остались в базе данных

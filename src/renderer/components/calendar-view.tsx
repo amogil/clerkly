@@ -7,6 +7,7 @@ import {
   Play,
 } from 'lucide-react';
 import { useState } from 'react';
+import { DateTimeFormatter } from '../utils/DateTimeFormatter';
 
 interface CalendarViewProps {
   onNavigateToMeeting: (meetingId: string) => void;
@@ -245,12 +246,10 @@ export function CalendarView({ onNavigateToMeeting }: CalendarViewProps) {
           {/* Selected Day Meetings */}
           <div className="bg-card rounded-xl border border-border shadow-sm p-6">
             <h3 className="text-lg font-semibold text-foreground mb-4">
+              {/* Requirements: ui.11.2, ui.11.5 - Use DateTimeFormatter for system locale formatting */}
               {selectedDate === '2026-01-28'
                 ? 'Today'
-                : new Date(selectedDate).toLocaleDateString('en-US', {
-                    month: 'long',
-                    day: 'numeric',
-                  })}
+                : DateTimeFormatter.formatDate(new Date(selectedDate).getTime())}
             </h3>
 
             {selectedDateMeetings.length === 0 ? (

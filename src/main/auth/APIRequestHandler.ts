@@ -2,6 +2,7 @@
 
 import { TokenStorageManager } from './TokenStorageManager';
 import { BrowserWindow } from 'electron';
+import { DateTimeFormatter } from '../utils/DateTimeFormatter';
 
 /**
  * Flag to prevent multiple simultaneous token clearances
@@ -92,9 +93,11 @@ export async function handleAPIRequest(
         try {
           // Requirements: ui.9.5 - Log error with context
           const logContext = context || 'API Request';
+          // Requirements: ui.9.5 - Log authorization errors with context
+          // Requirements: ui.11.3 - Use fixed format for log timestamps
           console.error(`[APIRequestHandler] Authorization error (401) from ${logContext}`, {
             url,
-            timestamp: new Date().toISOString(),
+            timestamp: DateTimeFormatter.formatLogTimestamp(Date.now()),
             context: logContext,
           });
 

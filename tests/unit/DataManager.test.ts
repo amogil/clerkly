@@ -1020,4 +1020,69 @@ describe('DataManager', () => {
       expect(result.error).toBeDefined();
     });
   });
+
+  describe('User Data Isolation - Additional Tests', () => {
+    /* Preconditions: UserProfileManager returns null for getCurrentEmail
+       Action: call loadData('test_key')
+       Assertions: returns error result with message containing "No user logged in"
+       Requirements: ui.12.13 */
+    it('should reject load when no user logged in', () => {
+      const { dataManager: dm } = initializeDataManagerWithoutUser();
+      dataManager = dm;
+
+      // Mock getCurrentEmail to return null
+      mockProfileManager.getCurrentEmail.mockReturnValue(null);
+      dataManager.setUserProfileManager(mockProfileManager);
+
+      const result = dataManager.loadData('test_key');
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('No user logged in');
+    });
+
+    /* Preconditions: UserProfileManager returns null for getCurrentEmail
+       Action: call deleteData('test_key')
+       Assertions: returns error result with message containing "No user logged in"
+       Requirements: ui.12.13 */
+    it('should reject delete when no user logged in', () => {
+      const { dataManager: dm } = initializeDataManagerWithoutUser();
+      dataManager = dm;
+
+      // Mock getCurrentEmail to return null
+      mockProfileManager.getCurrentEmail.mockReturnValue(null);
+      dataManager.setUserProfileManager(mockProfileManager);
+
+      const result = dataManager.deleteData('test_key');
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('No user logged in');
+    });
+
+    /* Preconditions: Two users with different emails, each saves data with same key
+       Action: save data for user A, save data for user B, load as user A, load as user B
+       Assertions: each user sees only their own data
+       Requirements: ui.12.3, ui.12.4, ui.12.6 */
+    it('should isolate data between different users', () => {
+      const { dataManager: dm } = initializeDataManager();
+      dataManager = dm;
+
+      // Save data as user A
+      mockProfileManager.getCurrentEmail.mockReturnValue('userA@example.com');
+      dataManager.saveData('test_key', 'value_A');
+
+      // Save data as user B
+      mockProfileManager.getCurrentEmail.mockReturnValue('userB@example.com');
+      dataManager.saveData('test_key', 'value_B');
+
+      // Load as user A
+      mockProfileManager.getCurrentEmail.mockReturnValue('userA@example.com');
+      const resultA = dataManager.loadData('test_key');
+      expect(resultA.success).toBe(true);
+      expect(resultA.data).toBe('value_A');
+
+      // Load as user B
+      mockProfileManager.getCurrentEmail.mockReturnValue('userB@example.com');
+      const resultB = dataManager.loadData('test_key');
+      expect(resultB.success).toBe(true);
+      expect(resultB.data).toBe('value_B');
+    });
+  });
 });

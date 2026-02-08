@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import type { Trigger, TriggerEventType } from '../types/trigger';
 import { triggerEventLabels, triggerEventDescriptions } from '../types/trigger';
+import { DateTimeFormatter } from '../utils/DateTimeFormatter';
 
 const mockTriggers: Trigger[] = [
   {
@@ -291,22 +292,13 @@ export function Triggers() {
     setNewTriggerPrompt('');
   };
 
+  // Requirements: ui.11.2, ui.11.5 - Use DateTimeFormatter for system locale formatting
   const formatDate = (date: Date) => {
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    });
+    return DateTimeFormatter.formatDate(date.getTime());
   };
 
   const formatDateTime = (date: Date) => {
-    return date.toLocaleString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
-    });
+    return DateTimeFormatter.formatDateTime(date.getTime());
   };
 
   const eventTypeOptions: TriggerEventType[] = [
