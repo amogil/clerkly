@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Plus, Filter, Clock, Layers, CheckSquare, X, List } from 'lucide-react';
+import { DateTimeFormatter } from '../utils/DateTimeFormatter';
 
 // Google Tasks API structure
 type TaskStatus = 'needsAction' | 'completed';
@@ -145,7 +146,8 @@ export function TasksViewNew() {
       return `${diffDays}d`;
     }
 
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    // Requirements: ui.11.2, ui.11.5 - Use DateTimeFormatter for system locale formatting
+    return DateTimeFormatter.formatDate(date.getTime());
   };
 
   const displayedTasks = selectedTaskList ? getFilteredTasks(selectedTaskList) : getFilteredTasks();

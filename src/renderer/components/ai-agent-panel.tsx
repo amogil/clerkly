@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import type { AgentTask } from '@/app/types/agent-task';
 import { Logo } from './logo';
+import { DateTimeFormatter } from '../utils/DateTimeFormatter';
 
 interface AIAgentPanelProps {
   onCommand: (command: string) => void;
@@ -518,12 +519,8 @@ export function AIAgentPanel({ onCommand }: AIAgentPanelProps) {
                       <div className="text-muted-foreground">
                         <span>·</span>
                         <span className="ml-1.5">
-                          {task.createdAt.toLocaleDateString('en-US', {
-                            month: 'short',
-                            day: 'numeric',
-                            hour: 'numeric',
-                            minute: '2-digit',
-                          })}
+                          {/* Requirements: ui.11.2, ui.11.5 - Use DateTimeFormatter for system locale formatting */}
+                          {DateTimeFormatter.formatDateTime(task.createdAt.getTime())}
                         </span>
                       </div>
                     </div>
@@ -589,12 +586,8 @@ export function AIAgentPanel({ onCommand }: AIAgentPanelProps) {
             <span className={`${style.text}`}>{getStatusText(selectedTask.status)}</span>
             <span className="text-muted-foreground">·</span>
             <span className="text-muted-foreground">
-              {selectedTask.createdAt.toLocaleDateString('en-US', {
-                month: 'short',
-                day: 'numeric',
-                hour: 'numeric',
-                minute: '2-digit',
-              })}
+              {/* Requirements: ui.11.2, ui.11.5 - Use DateTimeFormatter for system locale formatting */}
+              {DateTimeFormatter.formatDateTime(selectedTask.createdAt.getTime())}
             </span>
           </div>
         </div>
