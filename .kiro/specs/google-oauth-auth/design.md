@@ -417,6 +417,7 @@ export function LoginError({
 //   * temporarily_unavailable: "Service unavailable" + детали
 //   * csrf_attack_detected: "Security error" + детали
 //   * database_error: "Storage error" + детали
+//   * profile_fetch_failed: "Profile loading failed" + детали (ui.6.4, ui.6.5)
 //   * default: "Authentication failed" + errorMessage
 ```
 

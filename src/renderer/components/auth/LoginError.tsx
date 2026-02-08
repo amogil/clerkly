@@ -104,6 +104,15 @@ function getErrorDetails(errorCode?: string, errorMessage?: string): ErrorDetail
     };
   }
 
+  // Requirements: ui.6.4, ui.6.5
+  if (errorCode === 'profile_fetch_failed') {
+    return {
+      title: 'Profile loading failed',
+      message: 'Unable to load your Google profile information.',
+      suggestion: 'Please check your internet connection and try signing in again.',
+    };
+  }
+
   // Requirements: google-oauth-auth.13.6 - Default error
   return {
     title: 'Authentication failed',

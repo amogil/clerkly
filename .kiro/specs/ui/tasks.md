@@ -313,6 +313,14 @@
   - Связать компоненты через `oauthClient.setProfileManager(profileManager)` в main/index.ts
   - **Requirements:** ui.6.5
 
+- [ ] 10.4 Имплементировать синхронный процесс получения профиля при авторизации
+  - Добавить метод `fetchProfileSynchronously()` в UserProfileManager для синхронного получения профиля
+  - Интегрировать вызов `fetchProfileSynchronously()` в метод `handleAuthorizationCode()` OAuthClientManager после успешного обмена code на токены
+  - При успешной загрузке профиля: сохранить профиль в базу данных И вернуть success
+  - При ошибке загрузки профиля: очистить токены через TokenStorageManager И вернуть ошибку с errorCode 'profile_fetch_failed'
+  - Обеспечить, что процесс блокирующий (await) - Dashboard показывается только после успешной загрузки профиля
+  - **Requirements:** google-oauth-auth.3.6, google-oauth-auth.3.7, google-oauth-auth.3.8, ui.6.3, ui.6.4, ui.6.5
+
 ### 11. Расширение IPC Handlers
 
 - [x] 11.1 Добавить IPC handler для получения профиля
@@ -348,12 +356,25 @@
   - Обрабатывать ошибки загрузки
   - **Requirements:** ui.6.2, ui.6.7
 
-- [x] 12.3 Добавить слушатель события auth:success
+- [ ] 12.3 Добавить loader для синхронной загрузки профиля при авторизации
+  - Создать состояние loading в компоненте авторизации (или использовать существующий loader)
+  - Показывать loader во время синхронной загрузки профиля (после обмена code на токены)
+  - При успехе: скрыть loader И показать Dashboard
+  - При ошибке: скрыть loader И показать LoginError компонент с errorCode 'profile_fetch_failed'
+  - **Requirements:** ui.6.4
+
+- [ ] 12.4 Расширить LoginError компонент для обработки ошибки profile_fetch_failed
+  - Добавить обработку errorCode 'profile_fetch_failed' в LoginError компоненте
+  - Показывать сообщение: "Failed to load your profile. Please try again."
+  - Показывать кнопку "Continue with Google" для повторной авторизации
+  - **Requirements:** google-oauth-auth.3.7, ui.6.4, ui.6.5
+
+- [x] 12.5 Добавить слушатель события auth:success
   - Автоматически перезагружать профиль после успешной авторизации
   - Обновлять UI с новыми данными
   - **Requirements:** ui.6.2
 
-- [x] 12.4 Добавить очистку профиля при logout
+- [x] 12.6 Добавить очистку профиля при logout
   - Слушать событие logout
   - Очищать состояние компонента
   - Возвращаться к пустому состоянию
@@ -422,6 +443,22 @@
   - Проверить, что fetchProfile() был вызван один раз
   - Проверить, что метод не выбрасывает исключений
   - **Requirements:** ui.6.5
+
+- [ ] 14.8 Тест: fetchProfileSynchronously() успешно получает профиль при авторизации
+  - Мокировать fetch для UserInfo API для возврата успешного ответа
+  - Мокировать OAuthClientManager.getAuthStatus() для возврата authorized: true и валидного accessToken
+  - Вызвать fetchProfileSynchronously()
+  - Проверить, что профиль сохранен через DataManager.saveData()
+  - Проверить, что метод возвращает { success: true, profile: {...} }
+  - **Requirements:** google-oauth-auth.3.6, google-oauth-auth.3.8, ui.6.3, ui.6.4
+
+- [ ] 14.9 Тест: fetchProfileSynchronously() очищает токены при ошибке
+  - Мокировать fetch для UserInfo API для возврата ошибки (network error или HTTP 500)
+  - Мокировать TokenStorageManager.clearTokens()
+  - Вызвать fetchProfileSynchronously()
+  - Проверить, что TokenStorageManager.clearTokens() был вызван
+  - Проверить, что метод возвращает { success: false, error: 'profile_fetch_failed' }
+  - **Requirements:** google-oauth-auth.3.7, ui.6.4, ui.6.5
 
 ### 15. Модульные Тесты для IPC Handlers
 
@@ -524,6 +561,30 @@
   - Проверить, что ошибка залогирована
   - **Requirements:** ui.6.7
 
+- [ ] 17.5 Тест: синхронная загрузка профиля при авторизации (успех)
+  - Создать реальный OAuthClientManager, UserProfileManager и TokenStorageManager с DataManager
+  - Мокировать Google OAuth Token API для успешного обмена code на токены
+  - Мокировать Google UserInfo API для успешного возврата профиля
+  - Вызвать handleAuthorizationCode() с валидным authorization code
+  - Проверить, что токены сохранены в TokenStorageManager
+  - Проверить, что fetchProfileSynchronously() был вызван после сохранения токенов
+  - Проверить, что профиль сохранен в DataManager
+  - Проверить, что метод возвращает { success: true }
+  - **Requirements:** google-oauth-auth.3.6, google-oauth-auth.3.8, ui.6.3, ui.6.4
+
+- [ ] 17.6 Тест: синхронная загрузка профиля при авторизации (ошибка)
+  - Создать реальный OAuthClientManager, UserProfileManager и TokenStorageManager с DataManager
+  - Мокировать Google OAuth Token API для успешного обмена code на токены
+  - Мокировать Google UserInfo API для возврата ошибки (network error или HTTP 500)
+  - Вызвать handleAuthorizationCode() с валидным authorization code
+  - Проверить, что токены были сохранены временно
+  - Проверить, что fetchProfileSynchronously() был вызван
+  - Проверить, что TokenStorageManager.clearTokens() был вызван (токены очищены)
+  - Проверить, что метод возвращает { success: false, error: 'profile_fetch_failed' }
+  - **Requirements:** google-oauth-auth.3.7, ui.6.4, ui.6.5
+  - Проверить, что ошибка залогирована
+  - **Requirements:** ui.6.7
+
 ### 18. Функциональные Тесты
 
 - [x] 18.1 Функциональный тест: should show login screen when not authenticated
@@ -586,6 +647,34 @@
   - Закрыть приложение
   - **Requirements:** ui.6.1, ui.6.2
   - **Property:** 12, 13, 15
+
+- [ ] 18.7 Функциональный тест: should show loader during synchronous profile fetch
+  - Запустить приложение без авторизации
+  - Начать авторизацию через Google OAuth
+  - Mock Google OAuth Token API для успешного обмена code на токены (с задержкой)
+  - Mock Google UserInfo API для успешного возврата профиля (с задержкой)
+  - После обмена code на токены: проверить, что показывается loader
+  - Проверить, что Dashboard НЕ показывается во время загрузки профиля
+  - Дождаться завершения загрузки профиля
+  - Проверить, что loader скрылся И показался Dashboard
+  - Закрыть приложение
+  - **Requirements:** ui.6.4
+  - **Property:** 10, 11, 12
+
+- [ ] 18.8 Функциональный тест: should show LoginError when profile fetch fails
+  - Запустить приложение без авторизации
+  - Начать авторизацию через Google OAuth
+  - Mock Google OAuth Token API для успешного обмена code на токены
+  - Mock Google UserInfo API для возврата ошибки (network error или HTTP 500)
+  - После обмена code на токены: проверить, что показывается loader
+  - Дождаться завершения попытки загрузки профиля
+  - Проверить, что loader скрылся
+  - Проверить, что показывается LoginError компонент с сообщением "Failed to load your profile. Please try again."
+  - Проверить, что кнопка "Continue with Google" отображается
+  - Проверить, что токены были очищены (проверить через getAuthStatus)
+  - Закрыть приложение
+  - **Requirements:** google-oauth-auth.3.7, ui.6.4, ui.6.5
+  - **Property:** 13
 
 - [x] 18.7 Функциональный тест: should show error and keep cached data when fetch fails
   - Запустить приложение с предварительно сохраненными данными профиля в локальной базе данных

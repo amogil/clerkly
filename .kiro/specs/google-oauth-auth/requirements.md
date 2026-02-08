@@ -178,6 +178,7 @@
    - "invalid_request": заголовок "Invalid request", сообщение "The authentication request was malformed.", предложение "Please try again or contact support if the problem persists."
    - "server_error": заголовок "Server error", сообщение "Google authentication servers are experiencing issues.", предложение "Please try again in a few moments."
    - "temporarily_unavailable": заголовок "Service unavailable", сообщение "Google authentication service is temporarily unavailable.", предложение "Please try again in a few moments."
+   - "profile_fetch_failed": заголовок "Profile loading failed", сообщение "Unable to load your Google profile information.", предложение "Please check your internet connection and try signing in again." (ui.6.4, ui.6.5)
    - default (неизвестная ошибка): заголовок "Authentication failed", сообщение из errorMessage, предложение "Please try signing in again or contact support if the problem persists."
 
 ### Требование 10: Конфигурация OAuth
