@@ -227,6 +227,38 @@ if (process.env.NODE_ENV === 'test') {
     }
   });
 
+  // Requirements: ui.12.3, ui.12.4, ui.12.13
+  // Test handlers for data isolation testing
+  ipcMain.handle('test:save-data', async (_event: any, key: string, value: string) => {
+    try {
+      await dataManager.saveData(key, value);
+      return { success: true };
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      return { success: false, error: errorMessage };
+    }
+  });
+
+  ipcMain.handle('test:load-data', async (_event: any, key: string) => {
+    try {
+      const result = await dataManager.loadData(key);
+      return result;
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      return { success: false, error: errorMessage };
+    }
+  });
+
+  ipcMain.handle('test:delete-data', async (_event: any, key: string) => {
+    try {
+      await dataManager.deleteData(key);
+      return { success: true };
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      return { success: false, error: errorMessage };
+    }
+  });
+
   ipcMain.handle(
     'test:trigger-error-notification',
     async (event: any, data: { message: string; context: string }) => {

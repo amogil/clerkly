@@ -319,5 +319,10 @@ export interface AIAgentSettings {
 declare global {
   interface Window {
     api: API;
+    electron: {
+      ipcRenderer: {
+        invoke: (channel: string, ...args: any[]) => Promise<any>;
+      };
+    };
   }
 }

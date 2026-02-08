@@ -17,7 +17,11 @@ test.beforeEach(async () => {
   testStoragePath = fs.mkdtempSync(path.join(os.tmpdir(), 'clerkly-isolation-test-'));
 
   // Start mock OAuth server
-  mockOAuthServer = new MockOAuthServer();
+  mockOAuthServer = new MockOAuthServer({
+    port: 3333,
+    clientId: 'test-client-id',
+    clientSecret: 'test-client-secret',
+  });
   await mockOAuthServer.start();
 
   // Launch Electron app with test storage path
@@ -55,13 +59,12 @@ test.afterEach(async () => {
    Requirements: ui.12.3, ui.12.4, ui.12.5, ui.12.6, ui.12.7 */
 test('should isolate data between different users', async () => {
   // User A: Login and create data
-  await mockOAuthServer.setUserProfile({
+  mockOAuthServer.setUserProfile({
     id: 'user-a-id',
     email: 'userA@example.com',
     name: 'User A',
     given_name: 'User',
     family_name: 'A',
-    locale: 'en',
   });
 
   // Perform OAuth flow for User A
@@ -91,13 +94,12 @@ test('should isolate data between different users', async () => {
   await mainWindow.waitForTimeout(1000);
 
   // User B: Login and create data
-  await mockOAuthServer.setUserProfile({
+  mockOAuthServer.setUserProfile({
     id: 'user-b-id',
     email: 'userB@example.com',
     name: 'User B',
     given_name: 'User',
     family_name: 'B',
-    locale: 'en',
   });
 
   await mainWindow.click('button:has-text("Continue with Google")');
@@ -131,13 +133,12 @@ test('should isolate data between different users', async () => {
   await mainWindow.waitForTimeout(1000);
 
   // User A: Login again and verify data restored
-  await mockOAuthServer.setUserProfile({
+  mockOAuthServer.setUserProfile({
     id: 'user-a-id',
     email: 'userA@example.com',
     name: 'User A',
     given_name: 'User',
     family_name: 'A',
-    locale: 'en',
   });
 
   await mainWindow.click('button:has-text("Continue with Google")');
@@ -166,13 +167,12 @@ test('should isolate data between different users', async () => {
    Requirements: ui.12.7, ui.12.22, ui.12.23, ui.12.24 */
 test('should restore user data after re-login', async () => {
   // Login
-  await mockOAuthServer.setUserProfile({
+  mockOAuthServer.setUserProfile({
     id: 'test-user-id',
     email: 'test@example.com',
     name: 'Test User',
     given_name: 'Test',
     family_name: 'User',
-    locale: 'en',
   });
 
   await mainWindow.click('button:has-text("Continue with Google")');
@@ -228,13 +228,12 @@ test('should restore user data after re-login', async () => {
    Requirements: ui.12.5, ui.12.8 */
 test('should persist data after logout', async () => {
   // Login
-  await mockOAuthServer.setUserProfile({
+  mockOAuthServer.setUserProfile({
     id: 'persist-test-id',
     email: 'persist@example.com',
     name: 'Persist Test',
     given_name: 'Persist',
     family_name: 'Test',
-    locale: 'en',
   });
 
   await mainWindow.click('button:has-text("Continue with Google")');
@@ -287,13 +286,12 @@ test('should persist data after logout', async () => {
    Requirements: ui.12.4, ui.12.6 */
 test('should filter data by user email', async () => {
   // User A: Login and save data
-  await mockOAuthServer.setUserProfile({
+  mockOAuthServer.setUserProfile({
     id: 'filter-a-id',
     email: 'filterA@example.com',
     name: 'Filter A',
     given_name: 'Filter',
     family_name: 'A',
-    locale: 'en',
   });
 
   await mainWindow.click('button:has-text("Continue with Google")');
@@ -309,13 +307,12 @@ test('should filter data by user email', async () => {
   await mainWindow.waitForTimeout(1000);
 
   // User B: Login and save data with same key
-  await mockOAuthServer.setUserProfile({
+  mockOAuthServer.setUserProfile({
     id: 'filter-b-id',
     email: 'filterB@example.com',
     name: 'Filter B',
     given_name: 'Filter',
     family_name: 'B',
-    locale: 'en',
   });
 
   await mainWindow.click('button:has-text("Continue with Google")');
@@ -337,13 +334,12 @@ test('should filter data by user email', async () => {
   await mainWindow.waitForTimeout(1000);
 
   // User A: Login again and load data
-  await mockOAuthServer.setUserProfile({
+  mockOAuthServer.setUserProfile({
     id: 'filter-a-id',
     email: 'filterA@example.com',
     name: 'Filter A',
     given_name: 'Filter',
     family_name: 'A',
-    locale: 'en',
   });
 
   await mainWindow.click('button:has-text("Continue with Google")');
@@ -380,13 +376,12 @@ test('should handle "No user logged in" error gracefully', async () => {
   await expect(mainWindow.locator('button:has-text("Continue with Google")')).toBeVisible();
 
   // Now authenticate and try again
-  await mockOAuthServer.setUserProfile({
+  mockOAuthServer.setUserProfile({
     id: 'error-test-id',
     email: 'error@example.com',
     name: 'Error Test',
     given_name: 'Error',
     family_name: 'Test',
-    locale: 'en',
   });
 
   await mainWindow.click('button:has-text("Continue with Google")');
@@ -406,13 +401,12 @@ test('should handle "No user logged in" error gracefully', async () => {
    Requirements: ui.12.20 */
 test('should retry operation after token refresh', async () => {
   // Login
-  await mockOAuthServer.setUserProfile({
+  mockOAuthServer.setUserProfile({
     id: 'refresh-test-id',
     email: 'refresh@example.com',
     name: 'Refresh Test',
     given_name: 'Refresh',
     family_name: 'Test',
-    locale: 'en',
   });
 
   await mainWindow.click('button:has-text("Continue with Google")');
