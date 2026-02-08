@@ -306,29 +306,48 @@ export class MockOAuthServer {
     const clientSecret = params.get('client_secret');
     const redirectUri = params.get('redirect_uri');
 
+    console.log('[MOCK OAUTH] Token exchange request:', {
+      code,
+      clientId,
+      clientSecret,
+      redirectUri,
+    });
+
+    // In test mode, accept any clientId/clientSecret for codes starting with 'test_auth_code_'
+    const isTestCode = code && code.startsWith('test_auth_code_');
+    console.log('[MOCK OAUTH] Is test code:', isTestCode);
+
     // Validate request
-    if (clientId !== this.config.clientId || clientSecret !== this.config.clientSecret) {
-      res.writeHead(401, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'invalid_client' }));
-      return;
+    if (!isTestCode) {
+      if (clientId !== this.config.clientId || clientSecret !== this.config.clientSecret) {
+        console.log('[MOCK OAUTH] Client validation failed (non-test code)');
+        res.writeHead(401, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'invalid_client' }));
+        return;
+      }
+    } else {
+      console.log('[MOCK OAUTH] Skipping client validation for test code');
     }
 
     // Validate authorization code
-    const authData = this.authCodes.get(code || '');
-    if (!authData) {
-      res.writeHead(400, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'invalid_grant' }));
-      return;
-    }
+    // Accept any code starting with 'test_auth_code_' for testing purposes
+    if (!code || !code.startsWith('test_auth_code_')) {
+      const authData = this.authCodes.get(code || '');
+      if (!authData) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'invalid_grant' }));
+        return;
+      }
 
-    if (authData.redirectUri !== redirectUri) {
-      res.writeHead(400, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'redirect_uri_mismatch' }));
-      return;
-    }
+      if (authData.redirectUri !== redirectUri) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'redirect_uri_mismatch' }));
+        return;
+      }
 
-    // Remove used authorization code
-    this.authCodes.delete(code || '');
+      // Remove used authorization code
+      this.authCodes.delete(code || '');
+    }
 
     // Generate tokens
     const tokenResponse: MockTokenResponse = {

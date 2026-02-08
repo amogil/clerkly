@@ -590,4 +590,229 @@ describe('UserProfileManager', () => {
       expect(email).toBe('updated@example.com');
     });
   });
+
+  describe('fetchProfileSynchronously', () => {
+    /* Preconditions: TokenStorageManager returns valid access token, fetch returns successful response from Google UserInfo API
+       Action: Call fetchProfileSynchronously()
+       Assertions: Profile fetched from API, profile saved via DataManager.saveData(), method returns { success: true, profile: {...} }, currentUserEmail cached
+       Requirements: google-oauth-auth.3.6, google-oauth-auth.3.8, ui.6.3, ui.6.4 */
+    it('should successfully fetch and save profile synchronously', async () => {
+      // Mock valid tokens
+      (tokenStorage.loadTokens as jest.Mock).mockResolvedValue({
+        accessToken: 'test-access-token',
+        refreshToken: 'test-refresh-token',
+        expiresAt: Date.now() + 3600000,
+      });
+
+      // Mock successful API response
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => mockProfile,
+      });
+
+      // Spy on console.log
+      const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
+
+      // Call fetchProfileSynchronously
+      const result = await profileManager.fetchProfileSynchronously();
+
+      // Verify success result
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.profile).toMatchObject(mockProfile);
+        expect(result.profile.lastUpdated).toBeDefined();
+      }
+
+      // Verify fetch was called with correct parameters
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+      expect(global.fetch).toHaveBeenCalledWith(
+        'https://www.googleapis.com/oauth2/v1/userinfo',
+        expect.objectContaining({
+          headers: {
+            Authorization: 'Bearer test-access-token',
+          },
+        })
+      );
+
+      // Verify profile was saved to database
+      const savedProfile = dataManager.loadData('user_profile');
+      expect(savedProfile.success).toBe(true);
+      expect(savedProfile.data).toMatchObject(mockProfile);
+
+      // Verify currentUserEmail was cached
+      expect(profileManager.getCurrentEmail()).toBe('test@example.com');
+
+      // Verify success log
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        '[UserProfileManager] Profile fetched and saved synchronously'
+      );
+
+      consoleLogSpy.mockRestore();
+    });
+
+    /* Preconditions: TokenStorageManager returns valid access token, fetch returns HTTP error (500, 401, etc.)
+       Action: Call fetchProfileSynchronously()
+       Assertions: TokenStorageManager.deleteTokens() called, method returns { success: false, error: 'profile_fetch_failed' }, error logged
+       Requirements: google-oauth-auth.3.7, ui.6.4, ui.6.5 */
+    it('should clear tokens and return error when API request fails', async () => {
+      // Mock valid tokens
+      (tokenStorage.loadTokens as jest.Mock).mockResolvedValue({
+        accessToken: 'test-access-token',
+        refreshToken: 'test-refresh-token',
+        expiresAt: Date.now() + 3600000,
+      });
+
+      // Mock deleteTokens
+      const deleteTokensMock = jest.fn().mockResolvedValue(undefined);
+      (tokenStorage as any).deleteTokens = deleteTokensMock;
+
+      // Mock API error (HTTP 500)
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: false,
+        status: 500,
+      });
+
+      // Spy on console.error
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+
+      // Call fetchProfileSynchronously
+      const result = await profileManager.fetchProfileSynchronously();
+
+      // Verify error result
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toBe('profile_fetch_failed');
+      }
+
+      // Verify tokens were cleared
+      expect(deleteTokensMock).toHaveBeenCalledTimes(1);
+
+      // Verify error was logged
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[UserProfileManager] UserInfo API error during sync fetch')
+      );
+
+      consoleErrorSpy.mockRestore();
+    });
+
+    /* Preconditions: TokenStorageManager returns null or no access token
+       Action: Call fetchProfileSynchronously()
+       Assertions: TokenStorageManager.deleteTokens() called, method returns { success: false, error: 'profile_fetch_failed' }, error logged
+       Requirements: google-oauth-auth.3.7, ui.6.4 */
+    it('should clear tokens and return error when no access token available', async () => {
+      // Mock no tokens
+      (tokenStorage.loadTokens as jest.Mock).mockResolvedValue(null);
+
+      // Mock deleteTokens
+      const deleteTokensMock = jest.fn().mockResolvedValue(undefined);
+      (tokenStorage as any).deleteTokens = deleteTokensMock;
+
+      // Spy on console.error
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+
+      // Call fetchProfileSynchronously
+      const result = await profileManager.fetchProfileSynchronously();
+
+      // Verify error result
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toBe('profile_fetch_failed');
+      }
+
+      // Verify tokens were cleared
+      expect(deleteTokensMock).toHaveBeenCalledTimes(1);
+
+      // Verify error was logged
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        '[UserProfileManager] No access token available for synchronous fetch'
+      );
+
+      consoleErrorSpy.mockRestore();
+    });
+
+    /* Preconditions: TokenStorageManager returns valid access token, fetch throws network error
+       Action: Call fetchProfileSynchronously()
+       Assertions: TokenStorageManager.deleteTokens() called, method returns { success: false, error: 'profile_fetch_failed' }, error logged
+       Requirements: google-oauth-auth.3.7, ui.6.4, ui.6.5 */
+    it('should clear tokens and return error when network error occurs', async () => {
+      // Mock valid tokens
+      (tokenStorage.loadTokens as jest.Mock).mockResolvedValue({
+        accessToken: 'test-access-token',
+        refreshToken: 'test-refresh-token',
+        expiresAt: Date.now() + 3600000,
+      });
+
+      // Mock deleteTokens
+      const deleteTokensMock = jest.fn().mockResolvedValue(undefined);
+      (tokenStorage as any).deleteTokens = deleteTokensMock;
+
+      // Mock network error
+      (global.fetch as jest.Mock).mockRejectedValue(new Error('Network error'));
+
+      // Spy on console.error
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+
+      // Call fetchProfileSynchronously
+      const result = await profileManager.fetchProfileSynchronously();
+
+      // Verify error result
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toBe('profile_fetch_failed');
+      }
+
+      // Verify tokens were cleared
+      expect(deleteTokensMock).toHaveBeenCalledTimes(1);
+
+      // Verify error was logged
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        '[UserProfileManager] Failed to fetch profile synchronously:',
+        expect.any(Error)
+      );
+
+      consoleErrorSpy.mockRestore();
+    });
+
+    /* Preconditions: TokenStorageManager returns valid access token, fetch times out after 10 seconds
+       Action: Call fetchProfileSynchronously()
+       Assertions: TokenStorageManager.deleteTokens() called, method returns { success: false, error: 'profile_fetch_failed' }, timeout handled gracefully
+       Requirements: google-oauth-auth.3.7, ui.6.4 */
+    it('should handle timeout and clear tokens', async () => {
+      // Mock valid tokens
+      (tokenStorage.loadTokens as jest.Mock).mockResolvedValue({
+        accessToken: 'test-access-token',
+        refreshToken: 'test-refresh-token',
+        expiresAt: Date.now() + 3600000,
+      });
+
+      // Mock deleteTokens
+      const deleteTokensMock = jest.fn().mockResolvedValue(undefined);
+      (tokenStorage as any).deleteTokens = deleteTokensMock;
+
+      // Mock fetch that never resolves (simulating timeout)
+      (global.fetch as jest.Mock).mockImplementation(
+        () =>
+          new Promise((_, reject) => {
+            setTimeout(() => reject(new Error('AbortError')), 100);
+          })
+      );
+
+      // Spy on console.error
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+
+      // Call fetchProfileSynchronously
+      const result = await profileManager.fetchProfileSynchronously();
+
+      // Verify error result
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toBe('profile_fetch_failed');
+      }
+
+      // Verify tokens were cleared
+      expect(deleteTokensMock).toHaveBeenCalled();
+
+      consoleErrorSpy.mockRestore();
+    });
+  });
 });

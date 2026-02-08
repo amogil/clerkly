@@ -133,7 +133,10 @@ export function LoginError({ errorMessage, errorCode, onRetry }: LoginErrorProps
   const errorDetails = getErrorDetails(errorCode, errorMessage);
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-6">
+    <div
+      className="min-h-screen bg-background flex items-center justify-center p-6"
+      data-testid="login-error"
+    >
       <div className="w-full max-w-md">
         {/* Logo and Header - Requirements: google-oauth-auth.13.1 */}
         <div className="text-center mb-12">

@@ -288,4 +288,100 @@ export class UserProfileManager {
   async deleteProfile(): Promise<void> {
     return await this.clearProfile();
   }
+
+  /**
+   * Fetch user profile synchronously during authorization
+   * Requirements: google-oauth-auth.3.6, google-oauth-auth.3.7, google-oauth-auth.3.8, ui.6.3, ui.6.4, ui.6.5
+   *
+   * This method is called synchronously during the OAuth authorization flow,
+   * after tokens have been successfully exchanged. It ensures that the user's
+   * profile is loaded before showing the Dashboard.
+   *
+   * On success:
+   * - Saves profile to database
+   * - Caches email for data isolation
+   * - Returns { success: true, profile: UserProfile }
+   *
+   * On error:
+   * - Clears all tokens (authorization is considered failed)
+   * - Returns { success: false, error: 'profile_fetch_failed' }
+   * - Does NOT throw exceptions (graceful error handling)
+   *
+   * This is a blocking operation - the UI will show a loader until it completes.
+   *
+   * @returns Result object with success status, profile data, or error code
+   */
+  async fetchProfileSynchronously(): Promise<
+    { success: true; profile: UserProfile } | { success: false; error: string }
+  > {
+    try {
+      // Get access token from token storage
+      const tokens = await this.tokenStorage.loadTokens();
+      if (!tokens || !tokens.accessToken) {
+        console.error('[UserProfileManager] No access token available for synchronous fetch');
+        // Clear tokens since authorization is incomplete
+        await this.tokenStorage.deleteTokens();
+        return { success: false, error: 'profile_fetch_failed' };
+      }
+
+      // Requirements: ui.6.6 - Use Google UserInfo API endpoint
+      const googleApiBaseUrl = process.env.CLERKLY_GOOGLE_API_URL || 'https://www.googleapis.com';
+      const userInfoUrl = process.env.CLERKLY_GOOGLE_API_URL
+        ? `${googleApiBaseUrl}/userinfo`
+        : `${googleApiBaseUrl}/oauth2/v1/userinfo`;
+
+      console.log('[UserProfileManager] Fetching profile synchronously during authorization');
+
+      // Make API request (with timeout to prevent blocking indefinitely)
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
+      const response = await fetch(userInfoUrl, {
+        headers: {
+          Authorization: `Bearer ${tokens.accessToken}`,
+        },
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        console.error(
+          `[UserProfileManager] UserInfo API error during sync fetch: ${response.status}`
+        );
+        // Requirements: google-oauth-auth.3.7 - Clear tokens on profile fetch failure
+        await this.tokenStorage.deleteTokens();
+        return { success: false, error: 'profile_fetch_failed' };
+      }
+
+      const profileData = (await response.json()) as Omit<UserProfile, 'lastUpdated'>;
+      const profile: UserProfile = {
+        ...profileData,
+        lastUpdated: Date.now(),
+      };
+
+      // Requirements: google-oauth-auth.3.6, google-oauth-auth.3.8 - Save profile to database
+      await this.saveProfile(profile);
+
+      // Requirements: ui.12.15 - Cache email in memory for data isolation
+      this.currentUserEmail = profile.email;
+
+      console.log('[UserProfileManager] Profile fetched and saved synchronously');
+      return { success: true, profile };
+    } catch (error) {
+      console.error('[UserProfileManager] Failed to fetch profile synchronously:', error);
+
+      // Requirements: google-oauth-auth.3.7 - Clear tokens on any error
+      try {
+        await this.tokenStorage.deleteTokens();
+      } catch (clearError) {
+        console.error(
+          '[UserProfileManager] Failed to clear tokens after profile error:',
+          clearError
+        );
+      }
+
+      return { success: false, error: 'profile_fetch_failed' };
+    }
+  }
 }

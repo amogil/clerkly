@@ -71,8 +71,8 @@ export const GOOGLE_OAUTH_ENDPOINTS = {
  * Requirements: google-oauth-auth.10.4, google-oauth-auth.10.5, google-oauth-auth.10.6
  */
 function getGoogleOAuthEndpoints() {
-  // Use CLERKLY_GOOGLE_OAUTH_URL environment variable for testing
-  const baseUrl = process.env.CLERKLY_GOOGLE_OAUTH_URL;
+  // Use CLERKLY_GOOGLE_API_URL environment variable for testing (same as UserInfo API)
+  const baseUrl = process.env.CLERKLY_GOOGLE_API_URL;
 
   if (baseUrl) {
     return {
@@ -86,16 +86,30 @@ function getGoogleOAuthEndpoints() {
 }
 
 /**
+ * Get OAuth configuration constants
+ * Requirements: google-oauth-auth.10.1, google-oauth-auth.10.2, google-oauth-auth.10.3
+ */
+function getOAuthConfigConstants() {
+  const isTest = process.env.NODE_ENV === 'test';
+  console.log('[OAuthConfig] NODE_ENV:', process.env.NODE_ENV, 'isTest:', isTest);
+
+  return {
+    clientId: isTest
+      ? 'test-client-id-12345'
+      : '100365225505-a9mp4sll4948tafotr1va0fvnl5hrpoa.apps.googleusercontent.com',
+    clientSecret: isTest ? 'test-client-secret-67890' : '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',
+    redirectUri: isTest
+      ? 'com.googleusercontent.apps.test-client-id-12345:/oauth2redirect'
+      : 'com.googleusercontent.apps.100365225505-a9mp4sll4948tafotr1va0fvnl5hrpoa:/oauth2redirect',
+    scopes: ['openid', 'email', 'profile'],
+  };
+}
+
+/**
  * OAuth configuration constants
  * Requirements: google-oauth-auth.10.1, google-oauth-auth.10.2, google-oauth-auth.10.3
  */
-export const OAUTH_CONFIG = {
-  clientId: '100365225505-a9mp4sll4948tafotr1va0fvnl5hrpoa.apps.googleusercontent.com', // Replace with your actual Google OAuth Client ID
-  clientSecret: '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', // Replace with your actual Google OAuth Client Secret
-  redirectUri:
-    'com.googleusercontent.apps.100365225505-a9mp4sll4948tafotr1va0fvnl5hrpoa:/oauth2redirect', // Reverse client ID format
-  scopes: ['openid', 'email', 'profile'],
-} as const;
+export const OAUTH_CONFIG = getOAuthConfigConstants();
 
 /**
  * Get OAuth configuration
@@ -103,14 +117,22 @@ export const OAUTH_CONFIG = {
  */
 export function getOAuthConfig(clientId?: string): OAuthConfig {
   const endpoints = getGoogleOAuthEndpoints();
+  const config = getOAuthConfigConstants();
+
+  // Allow overriding clientId and clientSecret via environment variables (for testing)
+  const effectiveClientId = clientId || process.env.CLERKLY_OAUTH_CLIENT_ID || config.clientId;
+  const effectiveClientSecret = process.env.CLERKLY_OAUTH_CLIENT_SECRET || config.clientSecret;
+
+  // Construct redirectUri based on clientId
+  const effectiveRedirectUri = `com.googleusercontent.apps.${effectiveClientId}:/oauth2redirect`;
 
   return {
-    clientId: clientId || OAUTH_CONFIG.clientId,
-    clientSecret: OAUTH_CONFIG.clientSecret,
-    redirectUri: OAUTH_CONFIG.redirectUri,
+    clientId: effectiveClientId,
+    clientSecret: effectiveClientSecret,
+    redirectUri: effectiveRedirectUri,
     authorizationEndpoint: endpoints.authorization,
     tokenEndpoint: endpoints.token,
     revokeEndpoint: endpoints.revoke,
-    scopes: [...OAUTH_CONFIG.scopes],
+    scopes: [...config.scopes],
   };
 }

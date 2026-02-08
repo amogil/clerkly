@@ -33,6 +33,13 @@ interface PKCEStorage {
  * - Errors logged with context for debugging (ui.9.5)
  * - User sees friendly messages without technical details (ui.9.6)
  *
+ * Synchronous Profile Fetch During Authorization:
+ * - After successful token exchange, profile is fetched synchronously (google-oauth-auth.3.6)
+ * - UI shows loader during profile fetch (ui.6.4)
+ * - On success: Dashboard is shown with profile data (google-oauth-auth.3.8)
+ * - On error: Tokens are cleared and LoginError is shown (google-oauth-auth.3.7)
+ * - This ensures user always has valid profile data when entering the app
+ *
  * Requirements: google-oauth-auth.1, google-oauth-auth.2, google-oauth-auth.3, google-oauth-auth.5, google-oauth-auth.6, google-oauth-auth.7, ui.6.5, ui.9.1, ui.9.2, ui.9.3, ui.9.4
  */
 export class OAuthClientManager {
@@ -145,7 +152,7 @@ export class OAuthClientManager {
 
   /**
    * Handle deep link callback from OAuth provider
-   * Requirements: google-oauth-auth.2.2, google-oauth-auth.2.3, google-oauth-auth.2.4
+   * Requirements: google-oauth-auth.2.2, google-oauth-auth.2.3, google-oauth-auth.2.4, google-oauth-auth.3.6, google-oauth-auth.3.7, google-oauth-auth.3.8
    * @param url Deep link URL
    * @returns Authorization status
    */
@@ -187,7 +194,7 @@ export class OAuthClientManager {
       // Calculate expiration timestamp
       const expiresAt = Date.now() + tokenResponse.expires_in * 1000;
 
-      // Save tokens
+      // Create token data object (but don't save yet - need profile first)
       const tokenData: TokenData = {
         accessToken: tokenResponse.access_token,
         expiresAt,
@@ -199,7 +206,39 @@ export class OAuthClientManager {
         tokenData.refreshToken = tokenResponse.refresh_token;
       }
 
-      await this.tokenStorage.saveTokens(tokenData);
+      // Requirements: google-oauth-auth.3.6, google-oauth-auth.3.7, google-oauth-auth.3.8
+      // Synchronously fetch user profile BEFORE saving tokens
+      // This ensures we have user email for database isolation
+      if (this.profileManager) {
+        console.log('[OAuthClientManager] Fetching profile synchronously before saving tokens');
+
+        // Temporarily store tokens in memory for profile fetch
+        const tempTokens = tokenData;
+
+        // Fetch profile using temporary tokens
+        const profileResult = await this.fetchProfileWithTokens(tempTokens);
+
+        if (!profileResult.success) {
+          // Requirements: google-oauth-auth.3.7 - Profile fetch failed, don't save tokens
+          console.error('[OAuthClientManager] Profile fetch failed, authorization incomplete');
+          // Clear PKCE storage
+          this.pkceStorage = null;
+          return {
+            authorized: false,
+            error: 'profile_fetch_failed',
+          };
+        }
+
+        // Requirements: google-oauth-auth.3.8 - Profile fetched successfully
+        console.log('[OAuthClientManager] Profile fetched successfully, now saving tokens');
+
+        // Now save tokens to database (profile manager has email set)
+        await this.tokenStorage.saveTokens(tokenData);
+      } else {
+        console.warn('[OAuthClientManager] Profile manager not set, saving tokens without profile');
+        // Fallback: save tokens without profile (will fail if DataManager requires email)
+        await this.tokenStorage.saveTokens(tokenData);
+      }
 
       // Clear PKCE storage
       this.pkceStorage = null;
@@ -213,6 +252,81 @@ export class OAuthClientManager {
         authorized: false,
         error: errorMessage || 'unknown_error',
       };
+    }
+  }
+
+  /**
+   * Fetch user profile using provided tokens (without saving tokens to database)
+   * This is used during OAuth flow to get profile before saving tokens
+   * Requirements: google-oauth-auth.3.6, google-oauth-auth.3.8
+   * @param tokens Temporary tokens to use for API request
+   * @returns Profile fetch result
+   */
+  private async fetchProfileWithTokens(
+    tokens: TokenData
+  ): Promise<{ success: boolean; profile?: any; error?: string }> {
+    try {
+      console.log('[OAuthClientManager] fetchProfileWithTokens: Starting profile fetch');
+
+      if (!this.profileManager) {
+        console.error('[OAuthClientManager] fetchProfileWithTokens: Profile manager not set');
+        return { success: false, error: 'Profile manager not set' };
+      }
+
+      // Fetch profile from Google UserInfo API
+      // Use same URL format as UserProfileManager for consistency
+      const googleApiBaseUrl = process.env.CLERKLY_GOOGLE_API_URL || 'https://www.googleapis.com';
+      const userInfoUrl = process.env.CLERKLY_GOOGLE_API_URL
+        ? `${googleApiBaseUrl}/oauth2/v2/userinfo` // Mock server uses /oauth2/v2/userinfo
+        : `${googleApiBaseUrl}/oauth2/v2/userinfo`; // Google uses /oauth2/v2/userinfo
+
+      console.log('[OAuthClientManager] fetchProfileWithTokens: Fetching from', userInfoUrl);
+
+      const response = await fetch(userInfoUrl, {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${tokens.accessToken}`,
+        },
+      });
+
+      if (!response.ok) {
+        console.error(
+          '[OAuthClientManager] fetchProfileWithTokens: UserInfo API error:',
+          response.status
+        );
+        return { success: false, error: `UserInfo API returned ${response.status}` };
+      }
+
+      const profileData = (await response.json()) as { email: string; [key: string]: any };
+      console.log(
+        '[OAuthClientManager] fetchProfileWithTokens: Profile fetched:',
+        profileData.email
+      );
+
+      // Add lastUpdated timestamp
+      const profile = {
+        ...profileData,
+        lastUpdated: Date.now(),
+      };
+
+      // CRITICAL: Set email in ProfileManager BEFORE saving to database
+      // This is required because DataManager.saveData() needs getCurrentEmail()
+      console.log('[OAuthClientManager] fetchProfileWithTokens: Setting email in ProfileManager');
+      (this.profileManager as any).currentUserEmail = profile.email;
+
+      // Save profile to database
+      console.log('[OAuthClientManager] fetchProfileWithTokens: Saving profile to database');
+      await this.profileManager.saveProfile(profile);
+      console.log('[OAuthClientManager] fetchProfileWithTokens: Profile saved successfully');
+
+      return { success: true, profile };
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error(
+        '[OAuthClientManager] fetchProfileWithTokens: Failed to fetch profile:',
+        errorMessage
+      );
+      return { success: false, error: errorMessage };
     }
   }
 
