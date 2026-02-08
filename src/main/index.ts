@@ -370,7 +370,7 @@ app.on('before-quit', () => {
 
 /**
  * Handle deep link URL processing
- * Requirements: google-oauth-auth.2.2, google-oauth-auth.2.5
+ * Requirements: google-oauth-auth.2.2, google-oauth-auth.2.5, ui.6.2, ui.6.3
  * @param url Deep link URL to process
  */
 async function handleDeepLinkUrl(url: string): Promise<void> {
@@ -391,20 +391,37 @@ async function handleDeepLinkUrl(url: string): Promise<void> {
     if (mainWindow) {
       // Send auth event to renderer
       if (authStatus.authorized) {
-        console.log('[Main] Sending auth success event');
+        console.log('[Main] Authorization successful, fetching profile synchronously');
 
-        // Requirements: ui.6.2 - Fetch profile after successful authentication
+        // Requirements: ui.6.3 - Fetch profile synchronously during authorization
+        // Show loader while fetching profile
         try {
-          await profileManager.fetchProfile();
-          console.log('[Main] Profile fetched successfully after OAuth');
+          const profile = await profileManager.fetchProfile();
+
+          if (!profile) {
+            // Profile fetch failed - treat as auth error
+            console.error('[Main] Profile fetch returned null after successful OAuth');
+            authIPCHandlers.sendAuthError('Failed to fetch user profile', 'profile_fetch_failed');
+            return;
+          }
+
+          console.log('[Main] Profile fetched successfully, sending auth success');
+          authIPCHandlers.sendAuthSuccess();
         } catch (profileError: unknown) {
+          // Requirements: ui.6.3 - Show login error if profile fetch fails
           const profileErrorMessage =
             profileError instanceof Error ? profileError.message : 'Unknown error';
           console.error('[Main] Failed to fetch profile after OAuth:', profileErrorMessage);
-          // Continue anyway - user is authenticated, profile can be fetched later
-        }
 
-        authIPCHandlers.sendAuthSuccess();
+          // Clear tokens since we can't proceed without profile
+          await tokenStorage.deleteTokens();
+
+          authIPCHandlers.sendAuthError(
+            'Failed to fetch user profile. Please try again.',
+            'profile_fetch_failed'
+          );
+          return;
+        }
       } else if (authStatus.error) {
         console.log('[Main] Sending auth error event:', authStatus.error);
         authIPCHandlers.sendAuthError(authStatus.error, authStatus.error);
