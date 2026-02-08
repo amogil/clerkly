@@ -72,13 +72,13 @@ describe('OAuthConfig Property-Based Tests', () => {
 
     /* Preconditions: Different client IDs provided
        Action: Get configuration for different client IDs
-       Assertions: Only client ID differs, all other fields are identical
+       Assertions: Redirect URI contains client ID, other fields are identical
        Requirements: google-oauth-auth.10.1, google-oauth-auth.10.2, google-oauth-auth.10.3, google-oauth-auth.10.4, google-oauth-auth.10.5, google-oauth-auth.10.6 */
     it('should have consistent endpoints and scopes regardless of client ID', () => {
       fc.assert(
         fc.property(
-          fc.string({ minLength: 10, maxLength: 200 }),
-          fc.string({ minLength: 10, maxLength: 200 }),
+          fc.stringMatching(/^[a-zA-Z][a-zA-Z0-9-]{8,198}[a-zA-Z0-9]$/),
+          fc.stringMatching(/^[a-zA-Z][a-zA-Z0-9-]{8,198}[a-zA-Z0-9]$/),
           (clientId1, clientId2) => {
             fc.pre(clientId1 !== clientId2);
 
@@ -88,8 +88,11 @@ describe('OAuthConfig Property-Based Tests', () => {
             // Property: Client IDs are different
             expect(config1.clientId).not.toBe(config2.clientId);
 
-            // Property: All other fields are identical
-            expect(config1.redirectUri).toBe(config2.redirectUri);
+            // Property: Redirect URIs contain respective client IDs
+            expect(config1.redirectUri).toContain(clientId1);
+            expect(config2.redirectUri).toContain(clientId2);
+
+            // Property: Scopes and endpoints are identical
             expect(config1.scopes).toEqual(config2.scopes);
             expect(config1.authorizationEndpoint).toBe(config2.authorizationEndpoint);
             expect(config1.tokenEndpoint).toBe(config2.tokenEndpoint);
@@ -100,18 +103,19 @@ describe('OAuthConfig Property-Based Tests', () => {
       );
     });
 
-    /* Preconditions: Any client ID
+    /* Preconditions: Any valid client ID (starts with letter, no underscores for URL compatibility)
        Action: Get configuration, verify redirect URI format
        Assertions: Redirect URI is valid custom protocol URL
        Requirements: google-oauth-auth.10.2 */
     it('should have valid redirect URI format', () => {
       fc.assert(
-        fc.property(fc.string({ minLength: 10, maxLength: 200 }), (clientId) => {
+        fc.property(fc.stringMatching(/^[a-zA-Z][a-zA-Z0-9-]{8,198}[a-zA-Z0-9]$/), (clientId) => {
           const config = getOAuthConfig(clientId);
 
           // Property: Redirect URI is in reverse client ID format
           expect(config.redirectUri).toMatch(/^com\.googleusercontent\.apps\./);
           expect(config.redirectUri).toContain(':/oauth2redirect');
+          expect(config.redirectUri).toContain(clientId);
 
           // Property: Redirect URI is valid URL
           expect(() => new URL(config.redirectUri)).not.toThrow();
