@@ -1,4 +1,4 @@
-// Requirements: clerkly.1, clerkly.2, ui.7.1
+// Requirements: clerkly.1, clerkly.2, ui.7.1, ui.12.10, ui.12.11, ui.12.12, ui.12.13
 
 import Database from 'better-sqlite3';
 import * as fs from 'fs';
@@ -6,6 +6,7 @@ import * as path from 'path';
 import * as os from 'os';
 import { MigrationRunner } from './MigrationRunner';
 import { handleBackgroundError } from './ErrorHandler';
+import type { UserProfileManager } from './auth/UserProfileManager';
 
 /**
  * Initialize result
@@ -48,14 +49,31 @@ export interface DeleteDataResult {
 
 /**
  * Manages local data storage using SQLite
+ * Requirements: ui.12.10 - Supports user data isolation via UserProfileManager
  */
 export class DataManager {
   private storagePath: string;
   private db: Database.Database | null = null;
   private migrationRunner: MigrationRunner | null = null;
+  // Requirements: ui.12.10 - Reference to UserProfileManager for getting current user email
+  private userProfileManager: UserProfileManager | null = null;
 
   constructor(storagePath: string) {
     this.storagePath = storagePath;
+  }
+
+  /**
+   * Set UserProfileManager for user data isolation
+   * Requirements: ui.12.10
+   *
+   * Must be called after DataManager initialization to enable user data isolation.
+   * This avoids circular dependency between DataManager and UserProfileManager.
+   *
+   * @param profileManager UserProfileManager instance
+   */
+  setUserProfileManager(profileManager: UserProfileManager): void {
+    this.userProfileManager = profileManager;
+    console.log('[DataManager] UserProfileManager set for data isolation');
   }
 
   /**
@@ -146,7 +164,9 @@ export class DataManager {
    * Сериализует value в JSON
    * Проверяет размер (max 10MB)
    * Обрабатывает ошибки (SQLITE_FULL, SQLITE_BUSY, SQLITE_LOCKED, SQLITE_READONLY)
-   * Requirements: clerkly.1, ui.7.1   * @param {string} key
+   * Requirements: clerkly.1, ui.7.1, ui.12.3, ui.12.11, ui.12.13
+   *
+   * @param {string} key
    * @param {unknown} value
    * @returns {SaveDataResult}
    */
@@ -187,18 +207,26 @@ export class DataManager {
         return { success: false, error: 'Value too large: exceeds 10MB limit' };
       }
 
-      // Сохранение в базу данных
+      // Requirements: ui.12.11, ui.12.13 - Get current user email for data isolation
+      const userEmail = this.userProfileManager?.getCurrentEmail();
+
+      if (!userEmail) {
+        throw new Error('No user logged in: UserProfileManager not set or user not authenticated');
+      }
+
       const timestamp = Date.now();
+
+      // Requirements: ui.12.3 - Save with user_email for data isolation
       const stmt = this.db.prepare(`
-        INSERT INTO user_data (key, value, timestamp, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?)
-        ON CONFLICT(key) DO UPDATE SET
+        INSERT INTO user_data (key, value, user_email, timestamp, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(key, user_email) DO UPDATE SET
           value = excluded.value,
           timestamp = excluded.timestamp,
           updated_at = excluded.updated_at
       `);
 
-      stmt.run(key, serializedValue, timestamp, timestamp, timestamp);
+      stmt.run(key, serializedValue, userEmail, timestamp, timestamp, timestamp);
 
       return { success: true };
     } catch (writeError: unknown) {
@@ -231,7 +259,9 @@ export class DataManager {
    * Валидирует key
    * Десериализует JSON
    * Обрабатывает ошибки (SQLITE_BUSY, SQLITE_LOCKED)
-   * Requirements: clerkly.1   * @param {string} key
+   * Requirements: clerkly.1, ui.12.4, ui.12.12, ui.12.13
+   *
+   * @param {string} key
    * @returns {LoadDataResult}
    */
   loadData(key: string): LoadDataResult {
@@ -250,10 +280,17 @@ export class DataManager {
         return { success: false, error: 'Database not initialized or closed' };
       }
 
-      // Запрос данных
-      const row = this.db.prepare('SELECT value FROM user_data WHERE key = ?').get(key) as
-        | { value: string }
-        | undefined;
+      // Requirements: ui.12.12, ui.12.13 - Get current user email for data isolation
+      const userEmail = this.userProfileManager?.getCurrentEmail();
+
+      if (!userEmail) {
+        throw new Error('No user logged in: UserProfileManager not set or user not authenticated');
+      }
+
+      // Requirements: ui.12.4 - Query with user_email filter for data isolation
+      const row = this.db
+        .prepare('SELECT value FROM user_data WHERE key = ? AND user_email = ?')
+        .get(key, userEmail) as { value: string } | undefined;
 
       if (!row) {
         return { success: false, error: 'Key not found' };
@@ -290,7 +327,9 @@ export class DataManager {
    * Удаляет данные из локального хранилища
    * Валидирует key
    * Обрабатывает ошибки
-   * Requirements: clerkly.1   * @param {string} key
+   * Requirements: clerkly.1, ui.12.12, ui.12.13
+   *
+   * @param {string} key
    * @returns {DeleteDataResult}
    */
   deleteData(key: string): DeleteDataResult {
@@ -309,9 +348,16 @@ export class DataManager {
         return { success: false, error: 'Database not initialized or closed' };
       }
 
-      // Удаление данных
-      const stmt = this.db.prepare('DELETE FROM user_data WHERE key = ?');
-      const result = stmt.run(key);
+      // Requirements: ui.12.12, ui.12.13 - Get current user email for data isolation
+      const userEmail = this.userProfileManager?.getCurrentEmail();
+
+      if (!userEmail) {
+        throw new Error('No user logged in: UserProfileManager not set or user not authenticated');
+      }
+
+      // Requirements: ui.12.12 - Delete with user_email filter for data isolation
+      const stmt = this.db.prepare('DELETE FROM user_data WHERE key = ? AND user_email = ?');
+      const result = stmt.run(key, userEmail);
 
       if (result.changes === 0) {
         return { success: false, error: 'Key not found' };

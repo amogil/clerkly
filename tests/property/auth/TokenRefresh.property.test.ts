@@ -32,6 +32,13 @@ describe('Token Refresh Property-Based Tests', () => {
     testDbPath = path.join(os.tmpdir(), `test-token-refresh-pbt-${Date.now()}-${Math.random()}`);
     dataManager = new DataManager(testDbPath);
     dataManager.initialize();
+
+    // Requirements: ui.12.10 - Mock UserProfileManager for data isolation
+    const mockProfileManager = {
+      getCurrentEmail: jest.fn().mockReturnValue('test@example.com'),
+    } as any;
+
+    dataManager.setUserProfileManager(mockProfileManager);
     tokenStorage = new TokenStorageManager(dataManager);
 
     testConfig = getOAuthConfig(testClientId);

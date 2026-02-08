@@ -1,4 +1,4 @@
-// Requirements: ui.6.2, ui.6.5, ui.6.6, ui.6.7, ui.6.8, ui.7.1, ui.9.3, ui.9.4
+// Requirements: ui.6.2, ui.6.5, ui.6.6, ui.6.7, ui.6.8, ui.7.1, ui.9.3, ui.9.4, ui.12.14, ui.12.15, ui.12.16, ui.12.17, ui.12.18
 
 import { DataManager } from '../DataManager';
 import { OAuthClientManager } from './OAuthClientManager';
@@ -62,13 +62,15 @@ export interface UserProfile {
  * User Profile Manager
  * Manages user profile data from Google OAuth
  * Handles fetching, caching, and updating profile information
- * Requirements: ui.6.2, ui.6.5, ui.6.6, ui.6.7, ui.6.8
+ * Requirements: ui.6.2, ui.6.5, ui.6.6, ui.6.7, ui.6.8, ui.12.14, ui.12.15, ui.12.16, ui.12.17, ui.12.18
  */
 export class UserProfileManager {
   private dataManager: DataManager;
   private oauthClient: OAuthClientManager;
   private tokenStorage: TokenStorageManager;
   private readonly profileKey = 'user_profile';
+  // Requirements: ui.12.14 - Cache current user email for data isolation
+  private currentUserEmail: string | null = null;
 
   /**
    * Create a new UserProfileManager
@@ -87,11 +89,24 @@ export class UserProfileManager {
   }
 
   /**
+   * Get current user email
+   * Requirements: ui.12.10
+   *
+   * Returns the cached email of the currently logged in user.
+   * Used by DataManager to filter data by user_email.
+   *
+   * @returns Current user email or null if not logged in
+   */
+  getCurrentEmail(): string | null {
+    return this.currentUserEmail;
+  }
+
+  /**
    * Fetch user profile from Google UserInfo API
-   * Requirements: ui.6.2, ui.6.6, ui.7.1, ui.9.3, ui.9.4
+   * Requirements: ui.6.2, ui.6.6, ui.7.1, ui.9.3, ui.9.4, ui.12.15
    *
    * Fetches fresh profile data from Google's UserInfo API endpoint.
-   * On success, saves the profile to local storage.
+   * On success, saves the profile to local storage and caches email.
    * On error, returns cached profile data (graceful error handling).
    * Uses centralized API request handler for automatic HTTP 401 detection.
    *
@@ -140,6 +155,9 @@ export class UserProfileManager {
 
       // Requirements: ui.6.2 - Save to local storage
       await this.saveProfile(profile);
+
+      // Requirements: ui.12.15 - Cache email in memory for data isolation
+      this.currentUserEmail = profile.email;
 
       console.log('[UserProfileManager] Profile fetched and saved successfully');
       return profile;
@@ -195,9 +213,10 @@ export class UserProfileManager {
 
   /**
    * Load user profile from local storage
-   * Requirements: ui.6.7
+   * Requirements: ui.6.7, ui.12.17
    *
    * Loads cached profile data from DataManager.
+   * Sets currentUserEmail from loaded profile for data isolation.
    * Returns null if no profile data exists or on error.
    *
    * @returns User profile data or null if not found
@@ -206,8 +225,13 @@ export class UserProfileManager {
     try {
       const result = this.dataManager.loadData(this.profileKey);
       if (result.success && result.data) {
+        const profile = result.data as UserProfile;
+
+        // Requirements: ui.12.17 - Set currentUserEmail from loaded profile
+        this.currentUserEmail = profile.email;
+
         console.log('[UserProfileManager] Profile loaded from local storage');
-        return result.data as UserProfile;
+        return profile;
       }
       console.log('[UserProfileManager] No profile found in local storage');
       return null;
@@ -219,9 +243,9 @@ export class UserProfileManager {
 
   /**
    * Clear user profile from local storage
-   * Requirements: ui.6.8
+   * Requirements: ui.6.8, ui.12.18
    *
-   * Deletes profile data from DataManager.
+   * Deletes profile data from DataManager and clears cached email.
    * Called during logout to remove all user data.
    * Throws error if delete operation fails.
    */
@@ -231,6 +255,10 @@ export class UserProfileManager {
       if (!result.success) {
         throw new Error(result.error || 'Failed to clear profile');
       }
+
+      // Requirements: ui.12.18 - Clear cached email
+      this.currentUserEmail = null;
+
       console.log('[UserProfileManager] Profile cleared from local storage');
     } catch (error) {
       console.error('[UserProfileManager] Failed to clear profile:', error);
@@ -240,11 +268,12 @@ export class UserProfileManager {
 
   /**
    * Update profile after token refresh
-   * Requirements: ui.6.5
+   * Requirements: ui.6.5, ui.12.16
    *
    * Called automatically by OAuthClientManager after successful token refresh.
    * Fetches fresh profile data from Google API to keep profile up-to-date.
    * This ensures profile data is refreshed every hour (when tokens are refreshed).
+   * Also updates cached email if profile changed.
    */
   async updateProfileAfterTokenRefresh(): Promise<void> {
     console.log('[UserProfileManager] Updating profile after token refresh');

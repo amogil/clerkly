@@ -18,6 +18,13 @@ describe('TokenStorageManager Property-Based Tests', () => {
     testDbPath = path.join(os.tmpdir(), `test-token-storage-pbt-${Date.now()}`);
     dataManager = new DataManager(testDbPath);
     dataManager.initialize();
+
+    // Requirements: ui.12.10 - Mock UserProfileManager for data isolation
+    const mockProfileManager = {
+      getCurrentEmail: jest.fn().mockReturnValue('test@example.com'),
+    } as any;
+
+    dataManager.setUserProfileManager(mockProfileManager);
     tokenStorage = new TokenStorageManager(dataManager);
   });
 

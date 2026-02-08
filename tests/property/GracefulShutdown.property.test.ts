@@ -63,6 +63,20 @@ jest.mock('electron', () => ({
 describe('Property Tests - Graceful Shutdown Data Persistence', () => {
   let testStoragePath: string;
 
+  // Helper function to create DataManager with mock UserProfileManager
+  const createDataManagerWithMockUser = (storagePath: string) => {
+    const dataManager = new DataManager(storagePath);
+    dataManager.initialize();
+
+    // Requirements: ui.12.10 - Mock UserProfileManager for data isolation
+    const mockProfileManager = {
+      getCurrentEmail: jest.fn().mockReturnValue('test@example.com'),
+    } as any;
+
+    dataManager.setUserProfileManager(mockProfileManager);
+    return dataManager;
+  };
+
   // Helper function to create mock OAuth components
   const createMockOAuthComponents = (dataManager: DataManager) => {
     const tokenStorage = new TokenStorageManager(dataManager);
@@ -134,7 +148,7 @@ describe('Property Tests - Graceful Shutdown Data Persistence', () => {
           }
 
           // First startup - save data
-          const dataManager1 = new DataManager(testStoragePath);
+          const dataManager1 = createDataManagerWithMockUser(testStoragePath);
           const windowManager1 = new WindowManager(dataManager1);
           const { tokenStorage: tokenStorage1, oauthClient: oauthClient1 } =
             createMockOAuthComponents(dataManager1);
@@ -172,7 +186,7 @@ describe('Property Tests - Graceful Shutdown Data Persistence', () => {
           jest.clearAllMocks();
 
           // Second startup - verify data persisted
-          const dataManager2 = new DataManager(testStoragePath);
+          const dataManager2 = createDataManagerWithMockUser(testStoragePath);
           const windowManager2 = new WindowManager(dataManager2);
           const { tokenStorage: tokenStorage2, oauthClient: oauthClient2 } =
             createMockOAuthComponents(dataManager2);
@@ -218,7 +232,7 @@ describe('Property Tests - Graceful Shutdown Data Persistence', () => {
     }
 
     // First startup - save data
-    const dataManager1 = new DataManager(testStoragePath);
+    const dataManager1 = createDataManagerWithMockUser(testStoragePath);
     const windowManager1 = new WindowManager(dataManager1);
     const { tokenStorage: tokenStorage1, oauthClient: oauthClient1 } =
       createMockOAuthComponents(dataManager1);
@@ -250,7 +264,7 @@ describe('Property Tests - Graceful Shutdown Data Persistence', () => {
     jest.clearAllMocks();
 
     // Second startup - verify data persisted
-    const dataManager2 = new DataManager(testStoragePath);
+    const dataManager2 = createDataManagerWithMockUser(testStoragePath);
     const windowManager2 = new WindowManager(dataManager2);
     const { tokenStorage: tokenStorage2, oauthClient: oauthClient2 } =
       createMockOAuthComponents(dataManager2);
@@ -284,7 +298,7 @@ describe('Property Tests - Graceful Shutdown Data Persistence', () => {
     }
 
     // First startup - save data
-    const dataManager1 = new DataManager(testStoragePath);
+    const dataManager1 = createDataManagerWithMockUser(testStoragePath);
     const windowManager1 = new WindowManager(dataManager1);
     const { tokenStorage: tokenStorage1, oauthClient: oauthClient1 } =
       createMockOAuthComponents(dataManager1);
@@ -326,7 +340,7 @@ describe('Property Tests - Graceful Shutdown Data Persistence', () => {
     jest.clearAllMocks();
 
     // Second startup - verify all data persisted
-    const dataManager2 = new DataManager(testStoragePath);
+    const dataManager2 = createDataManagerWithMockUser(testStoragePath);
     const windowManager2 = new WindowManager(dataManager2);
     const { tokenStorage: tokenStorage2, oauthClient: oauthClient2 } =
       createMockOAuthComponents(dataManager2);
@@ -363,7 +377,7 @@ describe('Property Tests - Graceful Shutdown Data Persistence', () => {
     }
 
     // First startup - save data
-    const dataManager1 = new DataManager(testStoragePath);
+    const dataManager1 = createDataManagerWithMockUser(testStoragePath);
     const windowManager1 = new WindowManager(dataManager1);
     const { tokenStorage: tokenStorage1, oauthClient: oauthClient1 } =
       createMockOAuthComponents(dataManager1);
@@ -409,7 +423,7 @@ describe('Property Tests - Graceful Shutdown Data Persistence', () => {
     jest.clearAllMocks();
 
     // Second startup - verify data persisted
-    const dataManager2 = new DataManager(testStoragePath);
+    const dataManager2 = createDataManagerWithMockUser(testStoragePath);
     const windowManager2 = new WindowManager(dataManager2);
     const { tokenStorage: tokenStorage2, oauthClient: oauthClient2 } =
       createMockOAuthComponents(dataManager2);
@@ -443,7 +457,7 @@ describe('Property Tests - Graceful Shutdown Data Persistence', () => {
     }
 
     // First startup - save and update data
-    const dataManager1 = new DataManager(testStoragePath);
+    const dataManager1 = createDataManagerWithMockUser(testStoragePath);
     const windowManager1 = new WindowManager(dataManager1);
     const { tokenStorage: tokenStorage1, oauthClient: oauthClient1 } =
       createMockOAuthComponents(dataManager1);
@@ -480,7 +494,7 @@ describe('Property Tests - Graceful Shutdown Data Persistence', () => {
     jest.clearAllMocks();
 
     // Second startup - verify updated data persisted
-    const dataManager2 = new DataManager(testStoragePath);
+    const dataManager2 = createDataManagerWithMockUser(testStoragePath);
     const windowManager2 = new WindowManager(dataManager2);
     const { tokenStorage: tokenStorage2, oauthClient: oauthClient2 } =
       createMockOAuthComponents(dataManager2);
@@ -515,7 +529,7 @@ describe('Property Tests - Graceful Shutdown Data Persistence', () => {
     }
 
     // First startup - save and delete data
-    const dataManager1 = new DataManager(testStoragePath);
+    const dataManager1 = createDataManagerWithMockUser(testStoragePath);
     const windowManager1 = new WindowManager(dataManager1);
     const { tokenStorage: tokenStorage1, oauthClient: oauthClient1 } =
       createMockOAuthComponents(dataManager1);
@@ -554,7 +568,7 @@ describe('Property Tests - Graceful Shutdown Data Persistence', () => {
     jest.clearAllMocks();
 
     // Second startup - verify persistence state
-    const dataManager2 = new DataManager(testStoragePath);
+    const dataManager2 = createDataManagerWithMockUser(testStoragePath);
     const windowManager2 = new WindowManager(dataManager2);
     const { tokenStorage: tokenStorage2, oauthClient: oauthClient2 } =
       createMockOAuthComponents(dataManager2);
@@ -594,7 +608,7 @@ describe('Property Tests - Graceful Shutdown Data Persistence', () => {
     }
 
     // First startup - save data
-    const dataManager1 = new DataManager(testStoragePath);
+    const dataManager1 = createDataManagerWithMockUser(testStoragePath);
     const windowManager1 = new WindowManager(dataManager1);
     const { tokenStorage: tokenStorage1, oauthClient: oauthClient1 } =
       createMockOAuthComponents(dataManager1);
@@ -634,7 +648,7 @@ describe('Property Tests - Graceful Shutdown Data Persistence', () => {
     jest.clearAllMocks();
 
     // Second startup - verify all data persisted
-    const dataManager2 = new DataManager(testStoragePath);
+    const dataManager2 = createDataManagerWithMockUser(testStoragePath);
     const windowManager2 = new WindowManager(dataManager2);
     const { tokenStorage: tokenStorage2, oauthClient: oauthClient2 } =
       createMockOAuthComponents(dataManager2);
@@ -678,7 +692,7 @@ describe('Property Tests - Graceful Shutdown Data Persistence', () => {
       // Clear mocks for each cycle
       jest.clearAllMocks();
 
-      const dataManager = new DataManager(testStoragePath);
+      const dataManager = createDataManagerWithMockUser(testStoragePath);
       const windowManager = new WindowManager(dataManager);
       const { tokenStorage, oauthClient } = createMockOAuthComponents(dataManager);
       const lifecycleManager = new LifecycleManager(
@@ -714,7 +728,7 @@ describe('Property Tests - Graceful Shutdown Data Persistence', () => {
     // Final verification - restart and check data
     jest.clearAllMocks();
 
-    const dataManager = new DataManager(testStoragePath);
+    const dataManager = createDataManagerWithMockUser(testStoragePath);
     const windowManager = new WindowManager(dataManager);
     const { tokenStorage, oauthClient } = createMockOAuthComponents(dataManager);
     const lifecycleManager = new LifecycleManager(
@@ -747,7 +761,7 @@ describe('Property Tests - Graceful Shutdown Data Persistence', () => {
     }
 
     // First startup - no data saved
-    const dataManager1 = new DataManager(testStoragePath);
+    const dataManager1 = createDataManagerWithMockUser(testStoragePath);
     const windowManager1 = new WindowManager(dataManager1);
     const { tokenStorage: tokenStorage1, oauthClient: oauthClient1 } =
       createMockOAuthComponents(dataManager1);
@@ -773,7 +787,7 @@ describe('Property Tests - Graceful Shutdown Data Persistence', () => {
     jest.clearAllMocks();
 
     // Second startup - verify clean state
-    const dataManager2 = new DataManager(testStoragePath);
+    const dataManager2 = createDataManagerWithMockUser(testStoragePath);
     const windowManager2 = new WindowManager(dataManager2);
     const { tokenStorage: tokenStorage2, oauthClient: oauthClient2 } =
       createMockOAuthComponents(dataManager2);
@@ -808,7 +822,7 @@ describe('Property Tests - Graceful Shutdown Data Persistence', () => {
     }
 
     // First startup - save data
-    const dataManager1 = new DataManager(testStoragePath);
+    const dataManager1 = createDataManagerWithMockUser(testStoragePath);
     const windowManager1 = new WindowManager(dataManager1);
     const { tokenStorage: tokenStorage1, oauthClient: oauthClient1 } =
       createMockOAuthComponents(dataManager1);
@@ -858,7 +872,7 @@ describe('Property Tests - Graceful Shutdown Data Persistence', () => {
     jest.clearAllMocks();
 
     // Second startup - verify data persisted
-    const dataManager2 = new DataManager(testStoragePath);
+    const dataManager2 = createDataManagerWithMockUser(testStoragePath);
     const windowManager2 = new WindowManager(dataManager2);
     const { tokenStorage: tokenStorage2, oauthClient: oauthClient2 } =
       createMockOAuthComponents(dataManager2);

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Clock, Cpu, Eye, EyeOff, User, LogOut, AlertCircle } from 'lucide-react';
+import { Cpu, Eye, EyeOff, User, LogOut, AlertCircle } from 'lucide-react';
 
 interface SettingsProps {
   onSignOut?: () => void;
@@ -7,8 +7,6 @@ interface SettingsProps {
 }
 
 export function Settings({ onSignOut, onNavigate }: SettingsProps) {
-  const [timeFormat, setTimeFormat] = useState('12h');
-  const [dateFormat, setDateFormat] = useState('MM/DD/YYYY');
   const [llmProvider, setLlmProvider] = useState<'openai' | 'anthropic' | 'google'>('openai');
   const [apiKey, setApiKey] = useState('');
   const [showApiKey, setShowApiKey] = useState(false);
@@ -232,46 +230,6 @@ export function Settings({ onSignOut, onNavigate }: SettingsProps) {
                 </div>
               </div>
               <p className="text-xs text-muted-foreground">Synced from Google Account</p>
-            </div>
-          </div>
-
-          {/* Display Preferences */}
-          <div className="bg-card rounded-xl border border-border shadow-sm">
-            <div className="p-6 border-b border-border">
-              <div className="flex items-center gap-3">
-                <Clock className="w-5 h-5 text-primary" />
-                <h2 className="font-semibold text-foreground">Display Preferences</h2>
-              </div>
-            </div>
-            <div className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-2">
-                  Time Format
-                </label>
-                <select
-                  value={timeFormat}
-                  onChange={(e) => setTimeFormat(e.target.value)}
-                  className="w-full px-4 py-2 bg-input-background border border-border rounded-lg text-foreground"
-                >
-                  <option value="12h">12-hour</option>
-                  <option value="24h">24-hour</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-2">
-                  Date Format
-                </label>
-                <select
-                  value={dateFormat}
-                  onChange={(e) => setDateFormat(e.target.value)}
-                  className="w-full px-4 py-2 bg-input-background border border-border rounded-lg text-foreground"
-                >
-                  <option value="MM/DD/YYYY">MM/DD/YYYY</option>
-                  <option value="DD/MM/YYYY">DD/MM/YYYY</option>
-                  <option value="YYYY/MM/DD">YYYY/MM/DD</option>
-                </select>
-              </div>
             </div>
           </div>
 

@@ -24,6 +24,7 @@ describe('UserProfileManager', () => {
   let tokenStorage: TokenStorageManager;
   let profileManager: UserProfileManager;
   let testDbPath: string;
+  let mockSelfProfileManager: jest.Mocked<UserProfileManager>;
 
   const mockProfile: Omit<UserProfile, 'lastUpdated'> = {
     id: '123456789',
@@ -48,6 +49,14 @@ describe('UserProfileManager', () => {
 
     dataManager = new DataManager(testDbPath);
     dataManager.initialize();
+
+    // Requirements: ui.12.10 - Mock UserProfileManager for data isolation
+    // Note: We need to mock it BEFORE creating the real profileManager
+    mockSelfProfileManager = {
+      getCurrentEmail: jest.fn().mockReturnValue('test@example.com'),
+    } as unknown as jest.Mocked<UserProfileManager>;
+
+    dataManager.setUserProfileManager(mockSelfProfileManager);
 
     // Create mocked dependencies
     tokenStorage = {
@@ -456,6 +465,129 @@ describe('UserProfileManager', () => {
 
       fetchProfileSpy.mockRestore();
       consoleLogSpy.mockRestore();
+    });
+  });
+
+  describe('getCurrentEmail', () => {
+    /* Preconditions: fetchProfile() successfully fetched profile with email
+       Action: Call getCurrentEmail()
+       Assertions: Returns the email from the fetched profile
+       Requirements: ui.12.10, ui.12.15 */
+    it('should return current email after fetchProfile()', async () => {
+      // Mock authorized status and tokens
+      (oauthClient.getAuthStatus as jest.Mock).mockResolvedValue({
+        authorized: true,
+      });
+      (tokenStorage.loadTokens as jest.Mock).mockResolvedValue({
+        accessToken: 'test-access-token',
+      });
+
+      // Mock fetch to return profile
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => mockProfile,
+      });
+
+      // Fetch profile
+      await profileManager.fetchProfile();
+
+      // Get current email
+      const email = profileManager.getCurrentEmail();
+
+      expect(email).toBe('test@example.com');
+    });
+
+    /* Preconditions: loadProfile() successfully loaded profile with email
+       Action: Call getCurrentEmail()
+       Assertions: Returns the email from the loaded profile
+       Requirements: ui.12.10, ui.12.17 */
+    it('should return current email after loadProfile()', async () => {
+      const testProfile: UserProfile = {
+        ...mockProfile,
+        lastUpdated: Date.now(),
+      };
+
+      // Save profile first
+      dataManager.saveData('user_profile', testProfile);
+
+      // Load profile
+      await profileManager.loadProfile();
+
+      // Get current email
+      const email = profileManager.getCurrentEmail();
+
+      expect(email).toBe('test@example.com');
+    });
+
+    /* Preconditions: clearProfile() was called
+       Action: Call getCurrentEmail()
+       Assertions: Returns null
+       Requirements: ui.12.10, ui.12.18 */
+    it('should return null after clearProfile()', async () => {
+      // First set email by fetching profile
+      (oauthClient.getAuthStatus as jest.Mock).mockResolvedValue({
+        authorized: true,
+      });
+      (tokenStorage.loadTokens as jest.Mock).mockResolvedValue({
+        accessToken: 'test-access-token',
+      });
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => mockProfile,
+      });
+
+      await profileManager.fetchProfile();
+      expect(profileManager.getCurrentEmail()).toBe('test@example.com');
+
+      // Clear profile
+      await profileManager.clearProfile();
+
+      // Get current email
+      const email = profileManager.getCurrentEmail();
+
+      expect(email).toBeNull();
+    });
+
+    /* Preconditions: No profile fetched or loaded
+       Action: Call getCurrentEmail()
+       Assertions: Returns null
+       Requirements: ui.12.10 */
+    it('should return null when no profile exists', () => {
+      const email = profileManager.getCurrentEmail();
+
+      expect(email).toBeNull();
+    });
+
+    /* Preconditions: updateProfileAfterTokenRefresh() successfully updated profile
+       Action: Call getCurrentEmail()
+       Assertions: Returns the updated email
+       Requirements: ui.12.10, ui.12.16 */
+    it('should return updated email after updateProfileAfterTokenRefresh()', async () => {
+      // Mock authorized status and tokens
+      (oauthClient.getAuthStatus as jest.Mock).mockResolvedValue({
+        authorized: true,
+      });
+      (tokenStorage.loadTokens as jest.Mock).mockResolvedValue({
+        accessToken: 'test-access-token',
+      });
+
+      // Mock fetch to return profile with new email
+      const updatedProfile = {
+        ...mockProfile,
+        email: 'updated@example.com',
+      };
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => updatedProfile,
+      });
+
+      // Update profile after token refresh
+      await profileManager.updateProfileAfterTokenRefresh();
+
+      // Get current email
+      const email = profileManager.getCurrentEmail();
+
+      expect(email).toBe('updated@example.com');
     });
   });
 });

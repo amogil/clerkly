@@ -1,10 +1,11 @@
-// Requirements: clerkly.2
+// Requirements: clerkly.2, ui.12.10
 
 import Database from 'better-sqlite3';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { DataManager } from '../../src/main/DataManager';
+import type { UserProfileManager } from '../../src/main/auth/UserProfileManager';
 
 // Mock electron BrowserWindow for error notifications
 jest.mock('electron', () => ({
@@ -17,6 +18,7 @@ describe('DataManager', () => {
   let dataManager: DataManager;
   let testStoragePath: string;
   let testDbPath: string;
+  let mockProfileManager: jest.Mocked<UserProfileManager>;
 
   beforeEach(() => {
     // Create temporary storage directory
@@ -28,7 +30,28 @@ describe('DataManager', () => {
     if (!fs.existsSync(migrationsPath)) {
       fs.mkdirSync(migrationsPath, { recursive: true });
     }
+
+    // Requirements: ui.12.10 - Mock UserProfileManager for data isolation tests
+    mockProfileManager = {
+      getCurrentEmail: jest.fn().mockReturnValue('test@example.com'),
+    } as unknown as jest.Mocked<UserProfileManager>;
   });
+
+  // Helper function to initialize DataManager with mock profile manager
+  const initializeDataManager = () => {
+    const dm = new DataManager(testStoragePath);
+    const result = dm.initialize();
+    dm.setUserProfileManager(mockProfileManager);
+    return { dataManager: dm, result };
+  };
+
+  // Helper function to initialize DataManager WITHOUT profile manager (for error testing)
+  const initializeDataManagerWithoutUser = () => {
+    const dm = new DataManager(testStoragePath);
+    const result = dm.initialize();
+    // Do NOT set UserProfileManager
+    return { dataManager: dm, result };
+  };
 
   afterEach(() => {
     // Clean up
@@ -60,8 +83,8 @@ describe('DataManager', () => {
        Assertions: returns success true, directory created, database file created, migrations run
        Requirements: clerkly.1, clerkly.2*/
     it('should successfully initialize storage and run migrations', () => {
-      dataManager = new DataManager(testStoragePath);
-      const result = dataManager.initialize();
+      const { dataManager: dm, result } = initializeDataManager();
+      dataManager = dm;
 
       expect(result.success).toBe(true);
       expect(fs.existsSync(testStoragePath)).toBe(true);
@@ -78,8 +101,8 @@ describe('DataManager', () => {
       // Pre-create directory
       fs.mkdirSync(testStoragePath, { recursive: true });
 
-      dataManager = new DataManager(testStoragePath);
-      const result = dataManager.initialize();
+      const { dataManager: dm, result } = initializeDataManager();
+      dataManager = dm;
 
       expect(result.success).toBe(true);
       expect(result.warning).toBeUndefined();
@@ -94,8 +117,8 @@ describe('DataManager', () => {
       fs.mkdirSync(testStoragePath, { recursive: true });
       fs.writeFileSync(testDbPath, 'CORRUPTED DATA NOT A VALID SQLITE FILE');
 
-      dataManager = new DataManager(testStoragePath);
-      const result = dataManager.initialize();
+      const { dataManager: dm, result } = initializeDataManager();
+      dataManager = dm;
 
       expect(result.success).toBe(true);
 
@@ -114,8 +137,8 @@ describe('DataManager', () => {
 
   describe('saveData', () => {
     beforeEach(() => {
-      dataManager = new DataManager(testStoragePath);
-      dataManager.initialize();
+      const { dataManager: dm } = initializeDataManager();
+      dataManager = dm;
     });
 
     /* Preconditions: DataManager initialized, database is empty
@@ -123,7 +146,18 @@ describe('DataManager', () => {
        Assertions: returns success true, no error
        Requirements: clerkly.1, clerkly.2*/
     it('should save string data successfully', () => {
+      // Check if user_email column exists
+      const db = (dataManager as any).db;
+      const tableInfo = db.prepare('PRAGMA table_info(user_data)').all();
+      console.log(
+        'Table columns:',
+        tableInfo.map((col: any) => col.name)
+      );
+
       const result = dataManager.saveData('test-key', 'test-value');
+      if (!result.success) {
+        console.log('Save failed:', result.error);
+      }
 
       expect(result.success).toBe(true);
       expect(result.error).toBeUndefined();
@@ -385,12 +419,26 @@ describe('DataManager', () => {
       expect(result.success).toBe(false);
       expect(result.error).toContain('Database not initialized or closed');
     });
+
+    /* Preconditions: DataManager initialized but UserProfileManager not set
+       Action: attempt to save data without user logged in
+       Assertions: returns success false, error about no user logged in
+       Requirements: ui.12.11, ui.12.13*/
+    it('should reject save when no user logged in', () => {
+      const { dataManager: dm } = initializeDataManagerWithoutUser();
+      dataManager = dm;
+
+      const result = dataManager.saveData('test-key', 'value');
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('No user logged in');
+    });
   });
 
   describe('loadData', () => {
     beforeEach(() => {
-      dataManager = new DataManager(testStoragePath);
-      dataManager.initialize();
+      const { dataManager: dm } = initializeDataManager();
+      dataManager = dm;
     });
 
     /* Preconditions: DataManager initialized, string data saved with key
@@ -526,25 +574,46 @@ describe('DataManager', () => {
       expect(result.error).toContain('Database not initialized or closed');
     });
 
+    /* Preconditions: DataManager initialized but UserProfileManager not set
+       Action: attempt to load data without user logged in
+       Assertions: returns success false, error about no user logged in
+       Requirements: ui.12.12, ui.12.13*/
+    it('should reject load when no user logged in', () => {
+      const { dataManager: dm } = initializeDataManagerWithoutUser();
+      dataManager = dm;
+
+      const result = dataManager.loadData('test-key');
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('No user logged in');
+    });
+
     /* Preconditions: DataManager initialized, database contains corrupted JSON data
        Action: manually insert invalid JSON, then attempt to load
        Assertions: returns success true, data returned as plain string (fallback)
-       Requirements: clerkly.1, clerkly.2*/
+       Requirements: clerkly.1, clerkly.2, ui.12.10*/
     it('should handle corrupted JSON data with fallback to plain string', () => {
-      // Manually insert invalid JSON into database
+      // Manually insert invalid JSON into database with user_email
       const db = new Database(testDbPath);
       const timestamp = Date.now();
       db.prepare(
         `
-        INSERT INTO user_data (key, value, timestamp, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO user_data (key, value, timestamp, user_email, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?)
       `
-      ).run('corrupted-key', 'not valid json {[', timestamp, timestamp, timestamp);
+      ).run(
+        'corrupted-key',
+        'not valid json {[',
+        timestamp,
+        'test@example.com',
+        timestamp,
+        timestamp
+      );
       db.close();
 
       // Reinitialize DataManager
-      dataManager = new DataManager(testStoragePath);
-      dataManager.initialize();
+      const { dataManager: dm } = initializeDataManager();
+      dataManager = dm;
 
       const result = dataManager.loadData('corrupted-key');
 
@@ -555,8 +624,8 @@ describe('DataManager', () => {
 
   describe('deleteData', () => {
     beforeEach(() => {
-      dataManager = new DataManager(testStoragePath);
-      dataManager.initialize();
+      const { dataManager: dm } = initializeDataManager();
+      dataManager = dm;
     });
 
     /* Preconditions: DataManager initialized, data saved with key
@@ -646,6 +715,20 @@ describe('DataManager', () => {
       expect(result.error).toContain('Database not initialized or closed');
     });
 
+    /* Preconditions: DataManager initialized but UserProfileManager not set
+       Action: attempt to delete data without user logged in
+       Assertions: returns success false, error about no user logged in
+       Requirements: ui.12.12, ui.12.13*/
+    it('should reject delete when no user logged in', () => {
+      const { dataManager: dm } = initializeDataManagerWithoutUser();
+      dataManager = dm;
+
+      const result = dataManager.deleteData('test-key');
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('No user logged in');
+    });
+
     /* Preconditions: DataManager initialized with read-only database (simulated)
        Action: attempt to delete data from read-only database
        Assertions: returns success false, error about read-only database
@@ -683,7 +766,8 @@ describe('DataManager', () => {
        Assertions: returns the path provided in constructor
        Requirements: clerkly.1, clerkly.2*/
     it('should return storage path', () => {
-      dataManager = new DataManager(testStoragePath);
+      const { dataManager: dm } = initializeDataManager();
+      dataManager = dm;
       const path = dataManager.getStoragePath();
 
       expect(path).toBe(testStoragePath);
@@ -696,8 +780,8 @@ describe('DataManager', () => {
        Assertions: database connection closed, subsequent operations fail
        Requirements: clerkly.1, clerkly.2*/
     it('should close database connection', () => {
-      dataManager = new DataManager(testStoragePath);
-      dataManager.initialize();
+      const { dataManager: dm } = initializeDataManager();
+      dataManager = dm;
 
       dataManager.close();
 
@@ -712,7 +796,8 @@ describe('DataManager', () => {
        Assertions: no error thrown (safe to call on uninitialized manager)
        Requirements: clerkly.1, clerkly.2*/
     it('should handle close on uninitialized database', () => {
-      dataManager = new DataManager(testStoragePath);
+      const { dataManager: dm } = initializeDataManager();
+      dataManager = dm;
 
       expect(() => {
         dataManager.close();
@@ -724,8 +809,8 @@ describe('DataManager', () => {
        Assertions: no error thrown (idempotent)
        Requirements: clerkly.1, clerkly.2*/
     it('should handle multiple close calls', () => {
-      dataManager = new DataManager(testStoragePath);
-      dataManager.initialize();
+      const { dataManager: dm } = initializeDataManager();
+      dataManager = dm;
       dataManager.close();
 
       expect(() => {
@@ -740,8 +825,8 @@ describe('DataManager', () => {
        Assertions: returns MigrationRunner instance
        Requirements: clerkly.1, clerkly.2*/
     it('should return MigrationRunner instance', () => {
-      dataManager = new DataManager(testStoragePath);
-      dataManager.initialize();
+      const { dataManager: dm } = initializeDataManager();
+      dataManager = dm;
 
       const migrationRunner = dataManager.getMigrationRunner();
 
@@ -755,7 +840,9 @@ describe('DataManager', () => {
        Assertions: throws error about database not initialized
        Requirements: clerkly.1, clerkly.2*/
     it('should throw error when database not initialized', () => {
-      dataManager = new DataManager(testStoragePath);
+      // Create DataManager without initializing
+      const dm = new DataManager(testStoragePath);
+      dataManager = dm;
 
       expect(() => {
         dataManager.getMigrationRunner();
@@ -765,8 +852,8 @@ describe('DataManager', () => {
 
   describe('SQLite error handling', () => {
     beforeEach(() => {
-      dataManager = new DataManager(testStoragePath);
-      dataManager.initialize();
+      const { dataManager: dm } = initializeDataManager();
+      dataManager = dm;
     });
 
     /* Preconditions: DataManager initialized, database operations work normally

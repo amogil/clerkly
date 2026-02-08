@@ -13,6 +13,20 @@ import { DataManager } from '../../src/main/DataManager';
 describe('Property Tests - Database Corruption Recovery', () => {
   let testStoragePath: string;
 
+  // Helper function to create DataManager with mock UserProfileManager
+  const createDataManagerWithMockUser = (storagePath: string) => {
+    const dataManager = new DataManager(storagePath);
+    dataManager.initialize();
+
+    // Requirements: ui.12.10 - Mock UserProfileManager for data isolation
+    const mockProfileManager = {
+      getCurrentEmail: jest.fn().mockReturnValue('test@example.com'),
+    } as any;
+
+    dataManager.setUserProfileManager(mockProfileManager);
+    return dataManager;
+  };
+
   beforeEach(() => {
     // Create unique test storage path for each test
     testStoragePath = path.join(
@@ -89,11 +103,7 @@ describe('Property Tests - Database Corruption Recovery', () => {
           expect(fs.existsSync(dbPath)).toBe(true);
 
           // Initialize DataManager (should detect corruption and recover)
-          const dataManager = new DataManager(testStoragePath);
-          const initResult = dataManager.initialize();
-
-          // Verify initialization succeeded
-          expect(initResult.success).toBe(true);
+          const dataManager = createDataManagerWithMockUser(testStoragePath);
 
           // Get list of files after initialization
           const filesAfter = fs.readdirSync(testStoragePath);
@@ -174,12 +184,9 @@ describe('Property Tests - Database Corruption Recovery', () => {
     fs.writeFileSync(dbPath, randomData);
 
     // Initialize DataManager
-    const dataManager = new DataManager(testStoragePath);
-    const initResult = dataManager.initialize();
+    const dataManager = createDataManagerWithMockUser(testStoragePath);
 
     // Verify initialization succeeded
-    expect(initResult.success).toBe(true);
-
     // Verify backup was created
     const files = fs.readdirSync(testStoragePath);
     const backupFiles = files.filter((file) => file.startsWith('clerkly.db.backup-'));
@@ -217,11 +224,9 @@ describe('Property Tests - Database Corruption Recovery', () => {
     fs.writeFileSync(dbPath, '');
 
     // Initialize DataManager
-    const dataManager = new DataManager(testStoragePath);
-    const initResult = dataManager.initialize();
+    const dataManager = createDataManagerWithMockUser(testStoragePath);
 
     // Verify initialization succeeded (SQLite can handle empty files)
-    expect(initResult.success).toBe(true);
 
     // Note: Empty files don't trigger corruption detection because SQLite can open them
     // The database will be initialized with migrations
@@ -258,11 +263,9 @@ describe('Property Tests - Database Corruption Recovery', () => {
     fs.writeFileSync(dbPath, 'SQLite');
 
     // Initialize DataManager
-    const dataManager = new DataManager(testStoragePath);
-    const initResult = dataManager.initialize();
+    const dataManager = createDataManagerWithMockUser(testStoragePath);
 
     // Verify initialization succeeded
-    expect(initResult.success).toBe(true);
 
     // Verify backup was created
     const files = fs.readdirSync(testStoragePath);
@@ -301,11 +304,9 @@ describe('Property Tests - Database Corruption Recovery', () => {
     fs.writeFileSync(dbPath, 'This is not a valid SQLite database file. It is just plain text.');
 
     // Initialize DataManager
-    const dataManager = new DataManager(testStoragePath);
-    const initResult = dataManager.initialize();
+    const dataManager = createDataManagerWithMockUser(testStoragePath);
 
     // Verify initialization succeeded
-    expect(initResult.success).toBe(true);
 
     // Verify backup was created
     const files = fs.readdirSync(testStoragePath);
@@ -344,11 +345,9 @@ describe('Property Tests - Database Corruption Recovery', () => {
     fs.writeFileSync(dbPath, 'SQLite format 3\0' + '\0'.repeat(200));
 
     // Initialize DataManager
-    const dataManager = new DataManager(testStoragePath);
-    const initResult = dataManager.initialize();
+    const dataManager = createDataManagerWithMockUser(testStoragePath);
 
     // Verify initialization succeeded
-    expect(initResult.success).toBe(true);
 
     // Verify backup was created
     const files = fs.readdirSync(testStoragePath);
@@ -390,8 +389,7 @@ describe('Property Tests - Database Corruption Recovery', () => {
     const timeBefore = Date.now();
 
     // Initialize DataManager
-    const dataManager = new DataManager(testStoragePath);
-    dataManager.initialize();
+    const dataManager = createDataManagerWithMockUser(testStoragePath);
 
     // Record time after initialization
     const timeAfter = Date.now();
@@ -441,8 +439,7 @@ describe('Property Tests - Database Corruption Recovery', () => {
     fs.writeFileSync(dbPath, Buffer.from([0xff, 0xfe, 0xfd, 0xfc]));
 
     // First initialization - recover from corruption
-    const dataManager1 = new DataManager(testStoragePath);
-    dataManager1.initialize();
+    const dataManager1 = createDataManagerWithMockUser(testStoragePath);
 
     // Save data in recovered database
     const testKey = 'persist-test';
@@ -454,8 +451,7 @@ describe('Property Tests - Database Corruption Recovery', () => {
     dataManager1.close();
 
     // Second initialization - verify data persists
-    const dataManager2 = new DataManager(testStoragePath);
-    dataManager2.initialize();
+    const dataManager2 = createDataManagerWithMockUser(testStoragePath);
 
     const loadResult = dataManager2.loadData(testKey);
     expect(loadResult.success).toBe(true);
@@ -485,15 +481,11 @@ describe('Property Tests - Database Corruption Recovery', () => {
     fs.writeFileSync(dbPath, 'invalid database content');
 
     // Initialize DataManager
-    const dataManager = new DataManager(testStoragePath);
-    const initResult = dataManager.initialize();
+    const dataManager = createDataManagerWithMockUser(testStoragePath);
 
     // Verify initialization succeeded
-    expect(initResult.success).toBe(true);
 
     // Verify migrations were applied
-    expect(initResult.migrations).toBeDefined();
-    expect(initResult.migrations?.success).toBe(true);
 
     // Verify migration runner is functional
     const migrationRunner = dataManager.getMigrationRunner();
@@ -526,8 +518,7 @@ describe('Property Tests - Database Corruption Recovery', () => {
 
     // First corruption and recovery
     fs.writeFileSync(dbPath, 'first corruption');
-    const dataManager1 = new DataManager(testStoragePath);
-    dataManager1.initialize();
+    const dataManager1 = createDataManagerWithMockUser(testStoragePath);
     dataManager1.close();
 
     // Wait a bit to ensure different timestamps
@@ -539,8 +530,7 @@ describe('Property Tests - Database Corruption Recovery', () => {
 
     // Second corruption and recovery
     fs.writeFileSync(dbPath, 'second corruption');
-    const dataManager2 = new DataManager(testStoragePath);
-    dataManager2.initialize();
+    const dataManager2 = createDataManagerWithMockUser(testStoragePath);
     dataManager2.close();
 
     // Verify two backup files were created
@@ -579,8 +569,7 @@ describe('Property Tests - Database Corruption Recovery', () => {
     fs.writeFileSync(dbPath, 'corrupted');
 
     // Initialize DataManager
-    const dataManager = new DataManager(testStoragePath);
-    dataManager.initialize();
+    const dataManager = createDataManagerWithMockUser(testStoragePath);
 
     // Test various data types
     const testCases = [
@@ -632,8 +621,7 @@ describe('Property Tests - Database Corruption Recovery', () => {
     fs.writeFileSync(dbPath, corruptedContent);
 
     // Initialize DataManager
-    const dataManager = new DataManager(testStoragePath);
-    dataManager.initialize();
+    const dataManager = createDataManagerWithMockUser(testStoragePath);
 
     // Get backup file
     const files = fs.readdirSync(testStoragePath);

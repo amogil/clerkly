@@ -114,6 +114,9 @@ setOAuthClientManager(oauthClient);
 // Initialize User Profile Manager
 const profileManager = new UserProfileManager(dataManager, oauthClient, tokenStorage);
 
+// Requirements: ui.12.10 - Set UserProfileManager in DataManager for data isolation
+dataManager.setUserProfileManager(profileManager);
+
 // Requirements: ui.6.5
 // Connect profile manager to oauth client for automatic updates
 oauthClient.setProfileManager(profileManager);

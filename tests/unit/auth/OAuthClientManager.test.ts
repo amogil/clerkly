@@ -29,6 +29,7 @@ describe('OAuthClientManager', () => {
   let oauthClient: OAuthClientManager;
   let testDbPath: string;
   let testConfig: ReturnType<typeof getOAuthConfig>;
+  let mockProfileManager: jest.Mocked<any>;
   const testClientId = 'test-client-id.apps.googleusercontent.com';
 
   beforeEach(() => {
@@ -43,6 +44,13 @@ describe('OAuthClientManager', () => {
 
     dataManager = new DataManager(testDbPath);
     dataManager.initialize();
+
+    // Requirements: ui.12.10 - Mock UserProfileManager for data isolation
+    mockProfileManager = {
+      getCurrentEmail: jest.fn().mockReturnValue('test@example.com'),
+    };
+
+    dataManager.setUserProfileManager(mockProfileManager);
     tokenStorage = new TokenStorageManager(dataManager);
 
     // Create OAuth client
