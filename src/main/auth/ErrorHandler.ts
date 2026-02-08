@@ -71,6 +71,11 @@ const ERROR_MAP: Record<string, ErrorDetails> = {
     message: 'Unable to save authentication data.',
     suggestion: 'Please check application permissions and try again.',
   },
+  profile_fetch_failed: {
+    title: 'Profile loading failed',
+    message: 'Unable to load your Google profile information.',
+    suggestion: 'Please check your internet connection and try signing in again.',
+  },
 };
 
 /**

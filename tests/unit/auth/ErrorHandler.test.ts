@@ -122,6 +122,20 @@ describe('ErrorHandler', () => {
       expect(details.suggestion).toBe('Please check application permissions and try again.');
     });
 
+    /* Preconditions: Error code is 'profile_fetch_failed'
+       Action: Call getErrorDetails with error code
+       Assertions: Returns correct title, message, and suggestion for profile fetch failure
+       Requirements: google-oauth-auth.9.1, google-oauth-auth.9.6, google-oauth-auth.3.7 */
+    it('should return correct details for profile_fetch_failed error', () => {
+      const details = getErrorDetails('profile_fetch_failed');
+
+      expect(details.title).toBe('Profile loading failed');
+      expect(details.message).toBe('Unable to load your Google profile information.');
+      expect(details.suggestion).toBe(
+        'Please check your internet connection and try signing in again.'
+      );
+    });
+
     /* Preconditions: Error code is unknown or not in error map
        Action: Call getErrorDetails with unknown error code
        Assertions: Returns default error details with generic message

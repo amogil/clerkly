@@ -309,7 +309,7 @@
 ### 8.1 Реализовать централизованную обработку ошибок
 - [x] Создать файл `src/main/auth/ErrorHandler.ts`
 - [x] Реализовать функцию `getErrorDetails(errorCode?: string, errorMessage?: string): ErrorDetails`
-- [ ] Добавить маппинг для всех типов ошибок (popup_closed_by_user, access_denied, network_error, invalid_grant, invalid_request, server_error, temporarily_unavailable, csrf_attack_detected, database_error, profile_fetch_failed)
+- [x] Добавить маппинг для всех типов ошибок (popup_closed_by_user, access_denied, network_error, invalid_grant, invalid_request, server_error, temporarily_unavailable, csrf_attack_detected, database_error, profile_fetch_failed)
 - [x] Реализовать функцию логирования ошибок с контекстом
 - [x] Добавить интерфейсы `ErrorDetails` и `ErrorResponse`
 - **Requirements:** google-oauth-auth.9.1, google-oauth-auth.9.2, google-oauth-auth.9.3, google-oauth-auth.9.4, google-oauth-auth.9.5, google-oauth-auth.9.6
