@@ -359,11 +359,10 @@ describe('Settings Component - AI Agent Settings', () => {
     // Advance timers
     jest.advanceTimersByTime(500);
 
-    // Error should be logged
+    // Error should be logged with new Logger format: [timestamp] [ERROR] [Settings] message
     await waitFor(() => {
       expect(consoleErrorSpy).toHaveBeenCalledWith(
-        'Failed to save/delete API key:',
-        expect.any(Error)
+        expect.stringContaining('[ERROR] [Settings] Failed to save/delete API key:')
       );
     });
 
