@@ -72,8 +72,10 @@ test.describe('Full OAuth Flow', () => {
      Assertions: Main application screen is displayed (not login screen)
      Requirements: google-oauth-auth.14.1, google-oauth-auth.14.3 */
   test('should show main app when valid tokens exist', async () => {
-    // Launch the application
-    context = await launchElectron();
+    // Launch the application with mock OAuth server URL
+    context = await launchElectron(undefined, {
+      CLERKLY_GOOGLE_API_URL: mockServer.getBaseUrl(),
+    });
 
     // Wait for content to load
     await context.window.waitForLoadState('domcontentloaded');
@@ -95,8 +97,10 @@ test.describe('Full OAuth Flow', () => {
      Assertions: App transitions from login to main screen
      Requirements: google-oauth-auth.11.4, google-oauth-auth.14.4 */
   test('should transition from login to main app after token setup', async () => {
-    // Launch the application
-    context = await launchElectron();
+    // Launch the application with mock OAuth server URL
+    context = await launchElectron(undefined, {
+      CLERKLY_GOOGLE_API_URL: mockServer.getBaseUrl(),
+    });
     await context.window.waitForLoadState('domcontentloaded');
 
     // Verify login screen is displayed
@@ -120,8 +124,10 @@ test.describe('Full OAuth Flow', () => {
      Assertions: App transitions from main screen to login
      Requirements: google-oauth-auth.7.2, google-oauth-auth.14.1 */
   test('should transition from main app to login after logout', async () => {
-    // Launch the application
-    context = await launchElectron();
+    // Launch the application with mock OAuth server URL
+    context = await launchElectron(undefined, {
+      CLERKLY_GOOGLE_API_URL: mockServer.getBaseUrl(),
+    });
     await context.window.waitForLoadState('domcontentloaded');
 
     // Complete OAuth flow first
@@ -152,8 +158,10 @@ test.describe('Full OAuth Flow', () => {
      Assertions: Tokens survive app restart
      Requirements: google-oauth-auth.4.3, google-oauth-auth.14.3 */
   test('should persist tokens across app restarts', async () => {
-    // First launch
-    context = await launchElectron();
+    // First launch with mock OAuth server URL
+    context = await launchElectron(undefined, {
+      CLERKLY_GOOGLE_API_URL: mockServer.getBaseUrl(),
+    });
     await context.window.waitForLoadState('domcontentloaded');
 
     // Complete OAuth flow
@@ -171,8 +179,10 @@ test.describe('Full OAuth Flow', () => {
     // Wait a moment
     await new Promise((resolve) => setTimeout(resolve, 1000));
 
-    // Relaunch with same data path
-    context = await launchElectron(testDataPath);
+    // Relaunch with same data path and mock OAuth server URL
+    context = await launchElectron(testDataPath, {
+      CLERKLY_GOOGLE_API_URL: mockServer.getBaseUrl(),
+    });
     await context.window.waitForLoadState('domcontentloaded');
     await context.window.waitForTimeout(2000);
 
