@@ -131,23 +131,46 @@ import { DateTimeFormatter } from './utils/DateTimeFormatter';
 type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
 class Logger {
+  private context: string;
+  
   /**
-   * Логирует сообщение с указанным уровнем
-   * Requirements: clerkly.3.5, clerkly.3.6
+   * Приватный конструктор для создания параметризованного logger
+   * Requirements: clerkly.3.5
+   * 
+   * @param {string} context - Контекст (имя компонента)
+   */
+  private constructor(context: string) {
+    this.context = context;
+  }
+  
+  /**
+   * Создает параметризованный logger для модуля
+   * Requirements: clerkly.3.5, clerkly.3.7
+   * 
+   * @param {string} context - Контекст (имя компонента)
+   * @returns {Logger} - Экземпляр logger с заданным контекстом
+   */
+  static create(context: string): Logger {
+    return new Logger(context);
+  }
+  
+  /**
+   * Логирует сообщение с указанным уровнем (статический метод)
+   * Requirements: clerkly.3.5, clerkly.3.6, clerkly.3.8
    * 
    * @param {string} context - Контекст (имя компонента), обязательный
-   * @param {string} message - Сообщение для логирования, обязательное
+   * @param {string} message - Сообщение для логирования (БЕЗ дублирования контекста), обязательное
    * @param {LogLevel} level - Уровень логирования, опциональный (по умолчанию 'info')
    */
   static log(context: string, message: string, level: LogLevel = 'info'): void {
-    // Requirements: clerkly.3.2, clerkly.3.3, clerkly.3.6
+    // Requirements: clerkly.3.2, clerkly.3.3, clerkly.3.8
     const timestamp = DateTimeFormatter.formatLogTimestamp(new Date());
     
-    // Requirements: clerkly.3.5
+    // Requirements: clerkly.3.6
     const formattedMessage = `[${timestamp}] [${level.toUpperCase()}] [${context}] ${message}`;
     
     // Используем console.* только внутри Logger класса
-    // Requirements: clerkly.3.9
+    // Requirements: clerkly.3.12
     switch (level) {
       case 'debug':
         console.debug(formattedMessage);
@@ -165,8 +188,19 @@ class Logger {
   }
   
   /**
-   * Логирует debug сообщение
-   * Requirements: clerkly.3.4, clerkly.3.5
+   * Логирует сообщение с указанным уровнем (метод экземпляра)
+   * Requirements: clerkly.3.5, clerkly.3.7
+   * 
+   * @param {string} message - Сообщение для логирования (БЕЗ дублирования контекста)
+   * @param {LogLevel} level - Уровень логирования, опциональный (по умолчанию 'info')
+   */
+  log(message: string, level: LogLevel = 'info'): void {
+    Logger.log(this.context, message, level);
+  }
+  
+  /**
+   * Логирует debug сообщение (статический)
+   * Requirements: clerkly.3.4, clerkly.3.6
    * 
    * @param {string} context - Контекст (имя компонента)
    * @param {string} message - Сообщение для логирования
@@ -176,8 +210,18 @@ class Logger {
   }
   
   /**
-   * Логирует info сообщение
-   * Requirements: clerkly.3.4, clerkly.3.5
+   * Логирует debug сообщение (экземпляр)
+   * Requirements: clerkly.3.4, clerkly.3.7
+   * 
+   * @param {string} message - Сообщение для логирования
+   */
+  debug(message: string): void {
+    this.log(message, 'debug');
+  }
+  
+  /**
+   * Логирует info сообщение (статический)
+   * Requirements: clerkly.3.4, clerkly.3.6
    * 
    * @param {string} context - Контекст (имя компонента)
    * @param {string} message - Сообщение для логирования
@@ -187,8 +231,18 @@ class Logger {
   }
   
   /**
-   * Логирует warning сообщение
-   * Requirements: clerkly.3.4, clerkly.3.5
+   * Логирует info сообщение (экземпляр)
+   * Requirements: clerkly.3.4, clerkly.3.7
+   * 
+   * @param {string} message - Сообщение для логирования
+   */
+  info(message: string): void {
+    this.log(message, 'info');
+  }
+  
+  /**
+   * Логирует warning сообщение (статический)
+   * Requirements: clerkly.3.4, clerkly.3.6
    * 
    * @param {string} context - Контекст (имя компонента)
    * @param {string} message - Сообщение для логирования
@@ -198,8 +252,18 @@ class Logger {
   }
   
   /**
-   * Логирует error сообщение
-   * Requirements: clerkly.3.4, clerkly.3.5
+   * Логирует warning сообщение (экземпляр)
+   * Requirements: clerkly.3.4, clerkly.3.7
+   * 
+   * @param {string} message - Сообщение для логирования
+   */
+  warn(message: string): void {
+    this.log(message, 'warn');
+  }
+  
+  /**
+   * Логирует error сообщение (статический)
+   * Requirements: clerkly.3.4, clerkly.3.6
    * 
    * @param {string} context - Контекст (имя компонента)
    * @param {string} message - Сообщение для логирования
@@ -207,27 +271,48 @@ class Logger {
   static error(context: string, message: string): void {
     Logger.log(context, message, 'error');
   }
+  
+  /**
+   * Логирует error сообщение (экземпляр)
+   * Requirements: clerkly.3.4, clerkly.3.7
+   * 
+   * @param {string} message - Сообщение для логирования
+   */
+  error(message: string): void {
+    this.log(message, 'error');
+  }
 }
 
 **Примеры использования:**
 
 ```typescript
-// Requirements: clerkly.3.7
-// В компонентах приложения
+// Requirements: clerkly.3.5, clerkly.3.7, clerkly.3.9
+// Способ 1: Статические методы (для разовых вызовов)
 Logger.info('WindowManager', 'Window created successfully');
 Logger.error('DataManager', 'Failed to save data');
 Logger.debug('LifecycleManager', 'Application initialized');
 
-// С уровнем по умолчанию (info)
-Logger.log('Component', 'Some message'); // level = 'info'
+// Способ 2: Параметризованный экземпляр (рекомендуется для модулей)
+const logger = Logger.create('Main');
+logger.info('Process defaultApp: ' + process.defaultApp);
+logger.debug('Application starting');
+logger.error('Failed to initialize: ' + error.message);
 
-// С явным указанием уровня
-Logger.log('Component', 'Debug message', 'debug');
+// НЕПРАВИЛЬНО - дублирование контекста в сообщении
+Logger.info('Main', '[Main] Process defaultApp: ' + process.defaultApp); // ❌
+
+// ПРАВИЛЬНО - контекст только в параметре
+Logger.info('Main', 'Process defaultApp: ' + process.defaultApp); // ✅
+
+// ПРАВИЛЬНО - использование параметризованного экземпляра
+const logger = Logger.create('Main');
+logger.info('Process defaultApp: ' + process.defaultApp); // ✅
 ```
 
 **Важно:** 
-- Requirements: clerkly.3.2, clerkly.3.6 - Logger автоматически форматирует timestamp через DateTimeFormatter.formatLogTimestamp()
-- Requirements: clerkly.3.12 - "DateTimeFormatter" НЕ использует "Logger" для избежания циклической зависимости (Logger → DateTimeFormatter)
+- Requirements: clerkly.3.2, clerkly.3.8 - Logger автоматически форматирует timestamp через DateTimeFormatter.formatLogTimestamp()
+- Requirements: clerkly.3.15 - "DateTimeFormatter" НЕ использует "Logger" для избежания циклической зависимости (Logger → DateTimeFormatter)
+- Requirements: clerkly.3.9 - Сообщения НЕ ДОЛЖНЫ дублировать контекст (контекст добавляется автоматически)
 - Requirements: clerkly.3.9 - Прямые вызовы console.* разрешены только в "Logger" и "DateTimeFormatter"
 ```
 

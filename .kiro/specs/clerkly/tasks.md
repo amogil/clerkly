@@ -114,13 +114,17 @@
 
 - [x] 3. Реализация централизованного Logger класса
   - [x] 3.1 Создать "Logger" класс
-    - Реализовать класс Logger со статическими методами: log(context, message, level='info'), debug(context, message), info(context, message), warn(context, message), error(context, message)
-    - Метод log() принимает обязательные параметры context (строка) и message (строка), опциональный параметр level (по умолчанию 'info')
+    - Реализовать класс Logger с двумя способами использования:
+      1. Статические методы: log(context, message, level='info'), debug(context, message), info(context, message), warn(context, message), error(context, message)
+      2. Параметризованный экземпляр: create(context) возвращает экземпляр с методами log(message, level='info'), debug(message), info(message), warn(message), error(message)
+    - Статические методы принимают обязательные параметры context (строка) и message (строка), опциональный параметр level (по умолчанию 'info')
+    - Методы экземпляра принимают только message (контекст задан при создании через create())
     - Logger автоматически форматирует timestamp через DateTimeFormatter.formatLogTimestamp() (вызывающий код НЕ передает timestamp)
+    - Сообщения НЕ ДОЛЖНЫ дублировать контекст (контекст добавляется автоматически в формат)
     - Добавить форматирование сообщений: `[timestamp] [LEVEL] [context] message`
     - Использовать console.* методы только внутри Logger класса (debug → console.debug, info → console.info, warn → console.warn, error → console.error)
     - Добавить комментарии с требованиями к каждому методу (формат: `// Requirements: clerkly.3.1`)
-    - _Requirements: clerkly.3.1, clerkly.3.2, clerkly.3.3, clerkly.3.4, clerkly.3.5, clerkly.3.6, clerkly.3.7, clerkly.3.9, clerkly.2.9_
+    - _Requirements: clerkly.3.1, clerkly.3.2, clerkly.3.3, clerkly.3.4, clerkly.3.5, clerkly.3.6, clerkly.3.7, clerkly.3.8, clerkly.3.9, clerkly.3.12, clerkly.2.9_
   
   - [x] 3.2 Написать модульные тесты для "Logger"
     - Тест логирования на уровне debug (вызов console.debug с правильным форматом)
@@ -142,12 +146,15 @@
     - Добавить комментарии с требованиями
     - _Requirements: clerkly.3.2, clerkly.3.3, ui.11.3, clerkly.2.9_
   
-  - [x] 3.4 Написать модульные тесты для DateTimeFormatter.formatLogTimestamp()
-    - Тест формата timestamp с часовым поясом (regex: /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}$/)
-    - Тест независимости от системной локали (фиксированный формат)
-    - Тест корректности вычисления timezone offset
-    - Все тесты должны иметь структурированные комментарии
-    - _Requirements: clerkly.3.2, clerkly.3.3, ui.11.3, clerkly.2.1, clerkly.2.8_
+  - [ ] 3.5 Рефакторинг кода для использования параметризованного Logger
+    - Обновить все модули для использования `Logger.create(context)` вместо повторяющихся вызовов `Logger.method(context, ...)`
+    - Удалить дублирование контекста в сообщениях (например, `[Main]` в сообщении, если контекст уже 'Main')
+    - Примеры изменений:
+      - Было: `Logger.info('Main', '[Main] Starting app')`
+      - Стало: `const logger = Logger.create('Main'); logger.info('Starting app')`
+    - Обновить все файлы в src/main/, src/renderer/, src/main/auth/
+    - Обновить тесты для проверки нового формата (без дублирования контекста)
+    - _Requirements: clerkly.3.5, clerkly.3.7, clerkly.3.9_
 
 - [x] 4. Checkpoint - Проверка Logger и DateTimeFormatter
   - Убедиться, что все тесты Logger и DateTimeFormatter проходят

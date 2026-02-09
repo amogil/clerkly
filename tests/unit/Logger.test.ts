@@ -220,4 +220,114 @@ describe('Logger', () => {
     expect(consoleInfoSpy.mock.calls[0][0]).toContain('[Context1]');
     expect(consoleInfoSpy.mock.calls[1][0]).toContain('[Context2]');
   });
+
+  /* Preconditions: Logger class is available with create() method
+     Action: call Logger.create() with a context
+     Assertions: returns a Logger instance
+     Requirements: clerkly.3.5, clerkly.3.7 */
+  it('should create parameterized logger instance', () => {
+    const logger = Logger.create('TestModule');
+
+    expect(logger).toBeInstanceOf(Logger);
+  });
+
+  /* Preconditions: Logger instance created with Logger.create()
+     Action: call instance.info() method
+     Assertions: console.info is called with formatted message containing context from create()
+     Requirements: clerkly.3.5, clerkly.3.7 */
+  it('should log info message using instance method', () => {
+    const logger = Logger.create('TestModule');
+    logger.info('Instance info message');
+
+    expect(consoleInfoSpy).toHaveBeenCalledTimes(1);
+    expect(consoleInfoSpy).toHaveBeenCalledWith(
+      expect.stringContaining('[INFO] [TestModule] Instance info message')
+    );
+  });
+
+  /* Preconditions: Logger instance created with Logger.create()
+     Action: call instance.debug() method
+     Assertions: console.debug is called with formatted message containing context from create()
+     Requirements: clerkly.3.5, clerkly.3.7 */
+  it('should log debug message using instance method', () => {
+    const logger = Logger.create('TestModule');
+    logger.debug('Instance debug message');
+
+    expect(consoleDebugSpy).toHaveBeenCalledTimes(1);
+    expect(consoleDebugSpy).toHaveBeenCalledWith(
+      expect.stringContaining('[DEBUG] [TestModule] Instance debug message')
+    );
+  });
+
+  /* Preconditions: Logger instance created with Logger.create()
+     Action: call instance.warn() method
+     Assertions: console.warn is called with formatted message containing context from create()
+     Requirements: clerkly.3.5, clerkly.3.7 */
+  it('should log warn message using instance method', () => {
+    const logger = Logger.create('TestModule');
+    logger.warn('Instance warn message');
+
+    expect(consoleWarnSpy).toHaveBeenCalledTimes(1);
+    expect(consoleWarnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('[WARN] [TestModule] Instance warn message')
+    );
+  });
+
+  /* Preconditions: Logger instance created with Logger.create()
+     Action: call instance.error() method
+     Assertions: console.error is called with formatted message containing context from create()
+     Requirements: clerkly.3.5, clerkly.3.7 */
+  it('should log error message using instance method', () => {
+    const logger = Logger.create('TestModule');
+    logger.error('Instance error message');
+
+    expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      expect.stringContaining('[ERROR] [TestModule] Instance error message')
+    );
+  });
+
+  /* Preconditions: Logger instance created with Logger.create()
+     Action: call instance.log() with message and no level (default)
+     Assertions: console.info is called (default level is 'info')
+     Requirements: clerkly.3.5, clerkly.3.7 */
+  it('should use info level by default when calling instance log()', () => {
+    const logger = Logger.create('TestModule');
+    logger.log('Default level message');
+
+    expect(consoleInfoSpy).toHaveBeenCalledTimes(1);
+    expect(consoleInfoSpy).toHaveBeenCalledWith(
+      expect.stringContaining('[INFO] [TestModule] Default level message')
+    );
+  });
+
+  /* Preconditions: Logger instance created with Logger.create()
+     Action: call instance.log() with message and explicit level 'error'
+     Assertions: console.error is called with correct level
+     Requirements: clerkly.3.5, clerkly.3.7 */
+  it('should use specified level when calling instance log() with explicit level', () => {
+    const logger = Logger.create('TestModule');
+    logger.log('Explicit error message', 'error');
+
+    expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      expect.stringContaining('[ERROR] [TestModule] Explicit error message')
+    );
+  });
+
+  /* Preconditions: Multiple Logger instances created with different contexts
+     Action: call methods on different instances
+     Assertions: each instance uses its own context correctly
+     Requirements: clerkly.3.5, clerkly.3.7 */
+  it('should maintain separate contexts for different instances', () => {
+    const logger1 = Logger.create('Module1');
+    const logger2 = Logger.create('Module2');
+
+    logger1.info('Message from module 1');
+    logger2.info('Message from module 2');
+
+    expect(consoleInfoSpy).toHaveBeenCalledTimes(2);
+    expect(consoleInfoSpy.mock.calls[0][0]).toContain('[Module1]');
+    expect(consoleInfoSpy.mock.calls[1][0]).toContain('[Module2]');
+  });
 });
