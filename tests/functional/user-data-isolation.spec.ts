@@ -11,6 +11,7 @@ import {
   completeOAuthFlow,
   clearTestTokens,
   ElectronTestContext,
+  getWindowBounds,
 } from './helpers/electron';
 
 let context: ElectronTestContext;
@@ -164,49 +165,45 @@ test('should restore user data after re-login', async () => {
     family_name: 'User',
   });
 
-  await mainWindow.click('button:has-text("Continue with Google")');
-  await mainWindow.waitForTimeout(2000);
+  await completeOAuthFlow(context.app, context.window, TEST_CLIENT_ID);
+  await context.window.waitForTimeout(1000);
 
   // Create AI Agent settings
-  await mainWindow.click('text=Settings');
-  await mainWindow.waitForTimeout(500);
-  await mainWindow.selectOption('select:near(:text("LLM Provider"))', 'google');
-  await mainWindow.fill('input[placeholder="Enter your API key"]', 'test-api-key-xyz');
-  await mainWindow.waitForTimeout(600);
+  await context.window.click('text=Settings');
+  await context.window.waitForSelector('text=AI Agent Settings');
+  await context.window.waitForTimeout(500);
+  await context.window.selectOption('select:near(:text("LLM Provider"))', 'google');
+  await context.window.fill('input[placeholder="Enter your API key"]', 'test-api-key-xyz');
+  await context.window.waitForTimeout(600);
 
   // Get window state
-  const initialBounds = await mainWindow.evaluate(() => {
-    return window.electron.ipcRenderer.invoke('window:get-bounds');
-  });
+  const initialBounds = await getWindowBounds(context.app);
 
   // Logout
-  await mainWindow.click('button:has-text("Sign Out")');
-  await mainWindow.waitForTimeout(1000);
+  await context.window.click('button:has-text("Sign out")');
+  await context.window.waitForTimeout(1000);
 
   // Login again
-  await mainWindow.click('button:has-text("Continue with Google")');
-  await mainWindow.waitForTimeout(2000);
+  await completeOAuthFlow(context.app, context.window, TEST_CLIENT_ID);
+  await context.window.waitForTimeout(1000);
 
   // Verify AI Agent settings restored
-  await mainWindow.click('text=Settings');
-  await mainWindow.waitForTimeout(500);
-  const provider = await mainWindow.inputValue('select:near(:text("LLM Provider"))');
-  const apiKey = await mainWindow.inputValue('input[placeholder="Enter your API key"]');
+  await context.window.click('text=Settings');
+  await context.window.waitForSelector('text=AI Agent Settings');
+  await context.window.waitForTimeout(500);
+  const provider = await context.window.inputValue('select:near(:text("LLM Provider"))');
+  const apiKey = await context.window.inputValue('input[placeholder="Enter your API key"]');
   expect(provider).toBe('google');
   expect(apiKey).toBeTruthy();
 
-  // Verify profile restored
-  await mainWindow.click('[data-testid="account-link"]');
-  await mainWindow.waitForTimeout(500);
-  const nameValue = await mainWindow.inputValue('input[data-testid="profile-name"]');
-  const emailValue = await mainWindow.inputValue('input[data-testid="profile-email"]');
+  // Verify profile restored (Account section is on Settings page)
+  const nameValue = await context.window.inputValue('input:near(:text("Full Name"))');
+  const emailValue = await context.window.inputValue('input:near(:text("Email"))');
   expect(nameValue).toBe('Test User');
   expect(emailValue).toBe('test@example.com');
 
   // Verify window state restored (approximately)
-  const restoredBounds = await mainWindow.evaluate(() => {
-    return window.electron.ipcRenderer.invoke('window:get-bounds');
-  });
+  const restoredBounds = await getWindowBounds(context.app);
   expect(restoredBounds.width).toBeCloseTo(initialBounds.width, -1);
   expect(restoredBounds.height).toBeCloseTo(initialBounds.height, -1);
 });
