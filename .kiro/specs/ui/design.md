@@ -575,9 +575,9 @@ interface WindowState {
 
 ### Property 23: Логирование ошибок в консоль
 
-*Для любой* ошибки в приложении, она должна быть залогирована в консоль с достаточным контекстом для отладки.
+*Для любой* ошибки в приложении, она должна быть залогирована в консоль с достаточным контекстом для отладки через централизованный Logger класс.
 
-**Validates: Requirements ui.7.4**
+**Validates: Requirements ui.7.4, clerkly.3.1, clerkly.3.6**
 
 ### Property 24: Показ экрана логина для неавторизованных пользователей
 
@@ -623,9 +623,9 @@ interface WindowState {
 
 ### Property 31: Логирование ошибок авторизации с контекстом
 
-*Для любой* ошибки авторизации (HTTP 401), система должна залогировать событие с контекстом (какой API запрос вызвал ошибку, timestamp, URL), но показать пользователю только понятное сообщение без технических деталей.
+*Для любой* ошибки авторизации (HTTP 401), система должна залогировать событие с контекстом (какой API запрос вызвал ошибку, timestamp, URL) через централизованный Logger класс, но показать пользователю только понятное сообщение без технических деталей.
 
-**Validates: Requirements ui.9.5, ui.9.6**
+**Validates: Requirements ui.9.5, ui.9.6, clerkly.3.1, clerkly.3.5, clerkly.3.6**
 
 ### Edge Cases
 
@@ -1139,7 +1139,7 @@ async function handleLogout() {
 
 ### Логирование
 
-Все ошибки должны логироваться с достаточным контекстом для диагностики:
+Все ошибки должны логироваться с достаточным контекстом для диагностики через централизованный Logger класс (clerkly.3):
 
 ```typescript
 // Window management errors
@@ -2060,10 +2060,14 @@ describe('DateTimeFormatter', () => {
 
   /* Preconditions: valid timestamp
      Action: call formatLogTimestamp()
-     Assertions: returns format YYYY-MM-DD HH:MM:SS, independent of locale
-     Requirements: ui.11.3 */
-  it('should use fixed format for log timestamps', () => {
-    // Тест фиксированного формата для логов
+     Assertions: returns format YYYY-MM-DD HH:MM:SS±HH:MM (with timezone), independent of locale
+     Requirements: ui.11.3, clerkly.3.2, clerkly.3.3 */
+  it('should use fixed format with timezone for log timestamps', () => {
+    const timestamp = new Date('2024-01-15T10:30:45Z').getTime();
+    const formatted = DateTimeFormatter.formatLogTimestamp(timestamp);
+    
+    // Проверяем формат YYYY-MM-DD HH:MM:SS±HH:MM
+    expect(formatted).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}$/);
   });
 
   /* Preconditions: Intl.DateTimeFormat throws error
@@ -2076,6 +2080,8 @@ describe('DateTimeFormatter', () => {
 });
 ```
 
+**Примечание:** Тест "should use fixed format for logs" перенесен в модульные тесты Logger класса (см. clerkly дизайн), так как логирование теперь выполняется через централизованный Logger, а не напрямую через DateTimeFormatter.
+
 #### Функциональные Тесты (Date/Time Formatting)
 
 ```typescript
@@ -2086,14 +2092,6 @@ describe('Date/Time Formatting Functional Tests', () => {
      Requirements: ui.11.1, ui.11.2 */
   it('should format dates using system locale', async () => {
     // Тест форматирования по системной локали
-  });
-
-  /* Preconditions: app running, logs generated
-     Action: check log output
-     Assertions: all log timestamps in YYYY-MM-DD HH:MM:SS format
-     Requirements: ui.11.3 */
-  it('should use fixed format for logs', async () => {
-    // Тест фиксированного формата логов
   });
 
   /* Preconditions: system locale changed
@@ -2412,7 +2410,7 @@ describe('User Data Isolation Functional Tests', () => {
 - Легко тестировать (один обработчик вместо множества)
 - Упрощает добавление новых API endpoints
 - Предотвращает race conditions при множественных одновременных 401 ошибках
-- Централизованное логирование всех ошибок авторизации (ui.9.5)
+- Централизованное логирование всех ошибок авторизации через Logger класс (ui.9.5, clerkly.3.1, clerkly.3.6)
 
 ### Решение 15: Автоматическое Обновление Токенов
 
@@ -4390,8 +4388,8 @@ class DateTimeFormatter {
   }
 
   /**
-   * Format timestamp for logs (fixed format)
-   * Requirements: ui.11.3
+   * Format timestamp for logs (fixed format with timezone)
+   * Requirements: ui.11.3, clerkly.3.2, clerkly.3.3
    */
   static formatLogTimestamp(timestamp: number): string {
     const date = new Date(timestamp);
@@ -4402,8 +4400,15 @@ class DateTimeFormatter {
     const minutes = String(date.getMinutes()).padStart(2, '0');
     const seconds = String(date.getSeconds()).padStart(2, '0');
     
-    // Requirements: ui.11.3 - Fixed format YYYY-MM-DD HH:MM:SS
-    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+    // Get timezone offset in format ±HH:MM
+    const timezoneOffset = -date.getTimezoneOffset(); // in minutes
+    const offsetHours = Math.floor(Math.abs(timezoneOffset) / 60);
+    const offsetMinutes = Math.abs(timezoneOffset) % 60;
+    const offsetSign = timezoneOffset >= 0 ? '+' : '-';
+    const timezone = `${offsetSign}${String(offsetHours).padStart(2, '0')}:${String(offsetMinutes).padStart(2, '0')}`;
+    
+    // Requirements: ui.11.3, clerkly.3.3 - Fixed format YYYY-MM-DD HH:MM:SS±HH:MM
+    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}${timezone}`;
   }
 }
 ```
@@ -4440,11 +4445,11 @@ console.log(`[${DateTimeFormatter.formatLogTimestamp(Date.now())}] Operation com
 
 **Validates: Requirements ui.11.1**
 
-#### Property 42: Фиксированный формат для логов
+#### Property 42: Фиксированный формат для логов с часовым поясом
 
-*Для любого* timestamp в логах, форматирование должно использовать фиксированный формат `YYYY-MM-DD HH:MM:SS`, независимо от системной локали.
+*Для любого* timestamp в логах, форматирование должно использовать фиксированный формат `YYYY-MM-DD HH:MM:SS±HH:MM` (с указанием часового пояса), независимо от системной локали.
 
-**Validates: Requirements ui.11.3**
+**Validates: Requirements ui.11.3, clerkly.3.2, clerkly.3.3**
 
 #### Property 43: Отсутствие относительных форматов
 

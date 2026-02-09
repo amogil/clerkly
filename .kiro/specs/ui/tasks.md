@@ -1984,12 +1984,12 @@
   - **Requirements:** ui.11.2
   - **Примечание:** Компонент истории изменений не существует как отдельный файл. Task History в ai-agent-panel.tsx не отображает даты.
 
-- [x] 57.5 Обновить логирование для использования фиксированного формата
-  - Заменить форматирование timestamp в логах на DateTimeFormatter.formatLogTimestamp()
+- [ ] 57.5 Обновить логирование для использования централизованного Logger класса
+  - Заменить все прямые вызовы console.* на использование Logger класса (clerkly.3)
   - Проверить все места логирования в приложении
-  - Убедиться, что логи используют формат YYYY-MM-DD HH:MM:SS
-  - **Requirements:** ui.11.3
-  - **Примечание:** Уже выполнено - APIRequestHandler.ts использует DateTimeFormatter.formatLogTimestamp() (строка 103)
+  - Убедиться, что Logger использует DateTimeFormatter.formatLogTimestamp() с часовым поясом
+  - **Requirements:** ui.11.3, clerkly.3.1, clerkly.3.6
+  - **Примечание:** Зависит от задачи clerkly.3.1 (создание Logger класса)
 
 ### 58. Удаление Display Preferences из Settings
 
@@ -2093,13 +2093,11 @@
   - Закрыть приложение
   - **Requirements:** ui.11.1
 
-- [x] 61.3 Функциональный тест: should use fixed format for logs
-  - Запустить приложение с доступом к консоли
-  - Триггернуть события, которые логируются
-  - Проверить, что timestamp в логах имеет формат YYYY-MM-DD HH:MM:SS
-  - Проверить, что формат НЕ зависит от системной локали
-  - Закрыть приложение
-  - **Requirements:** ui.11.3
+- [x] 61.3 Удалить функциональный тест "should use fixed format for logs"
+  - Удалить тест из tests/functional/date-time-formatting.spec.ts
+  - Логирование теперь тестируется через модульные тесты Logger класса (clerkly.3)
+  - **Requirements:** ui.11.3, clerkly.3.1
+  - **Примечание:** Функциональный тест удален, так как логирование теперь выполняется через централизованный Logger класс
 
 - [x] 61.4 Функциональный тест: should not display relative time formats
   - Запустить приложение

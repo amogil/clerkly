@@ -112,23 +112,59 @@
     - Определить таблицу schema_migrations для отслеживания миграций (version INTEGER PRIMARY KEY, name TEXT, applied_at INTEGER)
     - _Requirements: clerkly.1.4_
 
-- [x] 3. Checkpoint - Проверка "Data Manager" и миграций
-  - Убедиться, что все тесты "Data Manager" и "Migration Runner" проходят
-  - Проверить покрытие кода (должно быть 100% для "Data Manager" и "Migration Runner" как критических компонентов)
+- [ ] 3. Реализация централизованного Logger класса
+  - [ ] 3.1 Создать "Logger" класс
+    - Реализовать класс Logger с методами: debug(), info(), warn(), error(), log() (private), create() (static)
+    - Добавить поддержку контекста (имя компонента) в конструкторе
+    - Интегрировать DateTimeFormatter.formatLogTimestamp() для форматирования timestamp
+    - Добавить форматирование сообщений: `[timestamp] [LEVEL] [context] message`
+    - Использовать console.* методы только внутри Logger класса (debug → console.debug, info → console.info, warn → console.warn, error → console.error)
+    - Добавить комментарии с требованиями к каждому методу (формат: `// Requirements: clerkly.3.1`)
+    - _Requirements: clerkly.3.1, clerkly.3.2, clerkly.3.3, clerkly.3.4, clerkly.3.5, clerkly.3.8, clerkly.3.9, clerkly.2.9_
+  
+  - [ ] 3.2 Написать модульные тесты для "Logger"
+    - Тест создания Logger с контекстом (Logger.create('TestComponent'))
+    - Тест логирования на уровне debug (вызов console.debug с правильным форматом)
+    - Тест логирования на уровне info (вызов console.info с правильным форматом)
+    - Тест логирования на уровне warn (вызов console.warn с правильным форматом)
+    - Тест логирования на уровне error (вызов console.error с правильным форматом)
+    - Тест формата timestamp (YYYY-MM-DD HH:MM:SS±HH:MM с часовым поясом)
+    - Тест наличия контекста в каждом сообщении ([context])
+    - Тест наличия уровня логирования в каждом сообщении ([DEBUG], [INFO], [WARN], [ERROR])
+    - Все тесты должны иметь структурированные комментарии (Preconditions, Action, Assertions, Requirements)
+    - _Requirements: clerkly.3.1, clerkly.3.2, clerkly.3.3, clerkly.3.4, clerkly.3.5, clerkly.2.1, clerkly.2.8_
+  
+  - [ ] 3.3 Обновить DateTimeFormatter для поддержки часового пояса
+    - Обновить метод formatLogTimestamp() для включения часового пояса в формат ±HH:MM
+    - Формат: YYYY-MM-DD HH:MM:SS±HH:MM (например, 2024-01-15 10:30:45+03:00)
+    - Вычислить timezone offset из Date.getTimezoneOffset()
+    - Добавить комментарии с требованиями
+    - _Requirements: clerkly.3.2, clerkly.3.3, ui.11.3, clerkly.2.9_
+  
+  - [ ] 3.4 Написать модульные тесты для DateTimeFormatter.formatLogTimestamp()
+    - Тест формата timestamp с часовым поясом (regex: /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}$/)
+    - Тест независимости от системной локали (фиксированный формат)
+    - Тест корректности вычисления timezone offset
+    - Все тесты должны иметь структурированные комментарии
+    - _Requirements: clerkly.3.2, clerkly.3.3, ui.11.3, clerkly.2.1, clerkly.2.8_
+
+- [ ] 4. Checkpoint - Проверка Logger и DateTimeFormatter
+  - Убедиться, что все тесты Logger и DateTimeFormatter проходят
+  - Проверить покрытие кода (должно быть 100% для Logger как критического компонента)
   - Проверить, что все тесты имеют структурированные комментарии (Preconditions, Action, Assertions, Requirements)
   - Проверить, что весь код имеет комментарии с требованиями (// Requirements: ...)
   - Спросить пользователя, если возникли вопросы
-  - _Requirements: clerkly.2.7, clerkly.2.8, clerkly.2.9_
+  - _Requirements: clerkly.2.7, clerkly.2.8, clerkly.2.9, clerkly.3.1, clerkly.3.2, clerkly.3.3_
 
-- [x] 4. Реализация Main Process компонентов
-  - [x] 4.1 Создать "Window Manager"
+- [x] 5. Реализация Main Process компонентов
+  - [x] 5.1 Создать "Window Manager"
     - Реализовать класс WindowManager с методами: createWindow(), configureWindow(), closeWindow(), getWindow(), isWindowCreated()
     - Настроить нативный Mac OS X интерфейс (titleBarStyle: 'hiddenInset', vibrancy: 'under-window', trafficLightPosition)
     - Добавить обработку ошибок создания окна
     - Добавить комментарии с требованиями к каждому методу (формат: `// Requirements: clerkly.1.2`)
     - _Requirements: clerkly.1.2, clerkly.1.3, clerkly.2.9, clerkly.nfr.3.2_
   
-  - [x] 4.2 Написать модульные тесты для "Window Manager"
+  - [x] 5.2 Написать модульные тесты для "Window Manager"
     - Тест создания окна с корректными параметрами (BrowserWindow instance)
     - Тест конфигурации окна (размеры, заголовок, resizable, fullscreen)
     - Тест закрытия окна с очисткой listeners
@@ -137,7 +173,7 @@
     - Все тесты должны иметь структурированные комментарии
     - _Requirements: clerkly.2.1, clerkly.2.8, clerkly.nfr.3.2, clerkly.nfr.4.1, clerkly.nfr.4.2_
   
-  - [x] 4.3 Создать "Lifecycle Manager"
+  - [x] 5.3 Создать "Lifecycle Manager"
     - Реализовать класс LifecycleManager с методами: initialize(), handleActivation(), handleQuit(), handleWindowClose(), getStartupTime(), isAppInitialized()
     - Добавить мониторинг времени запуска (< 3 секунды, логирование предупреждений при превышении)
     - Добавить обработку активации приложения (Mac OS X специфика - пересоздание окна при клике на dock icon)
@@ -146,7 +182,7 @@
     - Добавить комментарии с требованиями к каждому методу
     - _Requirements: clerkly.1.2, clerkly.1.3, clerkly.2.9, clerkly.nfr.1.1, clerkly.nfr.2.2, clerkly.nfr.3.3_
   
-  - [x] 4.4 Написать модульные тесты для "Lifecycle Manager"
+  - [x] 5.4 Написать модульные тесты для "Lifecycle Manager"
     - Тест инициализации приложения (< 3 секунды, измерение loadTime)
     - Тест обработки активации (пересоздание окна при отсутствии окон)
     - Тест корректного завершения (сохранение данных через DataManager, закрытие соединений)
@@ -156,7 +192,7 @@
     - Все тесты должны иметь структурированные комментарии
     - _Requirements: clerkly.2.1, clerkly.2.8, clerkly.nfr.1.1, clerkly.nfr.2.2, clerkly.nfr.3.3, clerkly.nfr.4.1_
   
-  - [x] 4.5 Создать "IPC Handlers"
+  - [x] 5.5 Создать "IPC Handlers"
     - Реализовать класс IPCHandlers с методами: registerHandlers(), unregisterHandlers(), handleSaveData(), handleLoadData(), handleDeleteData(), withTimeout(), setTimeout(), getTimeout()
     - Добавить валидацию параметров IPC запросов (key, value)
     - Добавить таймауты для IPC операций (10 секунд по умолчанию)
@@ -164,7 +200,7 @@
     - Добавить комментарии с требованиями к каждому методу
     - _Requirements: clerkly.1.4, clerkly.2.5, clerkly.2.9, clerkly.nfr.2.3_
   
-  - [x] 4.6 Написать модульные тесты для "IPC Handlers"
+  - [x] 5.6 Написать модульные тесты для "IPC Handlers"
     - Тест регистрации и удаления handlers (ipcMain.handle, ipcMain.removeHandler)
     - Тест обработки save-data запроса (валидация, вызов DataManager.saveData)
     - Тест обработки load-data запроса (валидация, вызов DataManager.loadData)
@@ -175,7 +211,7 @@
     - Все тесты должны иметь структурированные комментарии
     - _Requirements: clerkly.2.1, clerkly.2.3, clerkly.2.8, clerkly.nfr.2.3, clerkly.nfr.4.1, clerkly.nfr.4.2_
   
-  - [x] 4.7 Написать property-based тест для IPC таймаутов
+  - [x] 5.7 Написать property-based тест для IPC таймаутов
     - **Property 4: IPC Timeout Enforcement**
     - Создать mock DataManager с искусственной задержкой > timeout (например, 11 секунд)
     - Проверять, что IPC операции (save-data, load-data, delete-data) возвращают ошибку timeout
@@ -185,7 +221,7 @@
     - **Validates: Requirements clerkly.1.4, clerkly.nfr.2.3**
     - _Requirements: clerkly.1.4, clerkly.nfr.2.3, clerkly.2.6, clerkly.2.8, clerkly.nfr.4.4_
 
-- [x] 5. Checkpoint - Проверка Main Process компонентов
+- [x] 6. Checkpoint - Проверка Main Process компонентов
   - Убедиться, что все тесты Main Process компонентов проходят
   - Проверить покрытие кода (должно быть 100% для критических компонентов: "Data Manager", "Lifecycle Manager", "IPC Handlers")
   - Проверить, что все тесты имеют структурированные комментарии
@@ -193,8 +229,8 @@
   - Спросить пользователя, если возникли вопросы
   - _Requirements: clerkly.2.7, clerkly.2.8, clerkly.2.9_
 
-- [x] 6. Реализация Renderer Process компонентов
-  - [x] 6.1 Создать "State Controller"
+- [x] 7. Реализация Renderer Process компонентов
+  - [x] 7.1 Создать "State Controller"
     - Реализовать класс StateController с методами: setState(), getState(), resetState(), getStateProperty(), setStateProperty(), removeStateProperty(), hasStateProperty(), getStateHistory(), clearStateHistory(), getStateKeys(), getStateSize(), isStateEmpty()
     - Добавить shallow merge для обновления состояния
     - Добавить историю изменений состояния (max 10 записей)
@@ -202,7 +238,7 @@
     - Добавить комментарии с требованиями к каждому методу
     - _Requirements: clerkly.1.3, clerkly.2.1, clerkly.2.9_
   
-  - [x] 6.2 Написать модульные тесты для "State Controller"
+  - [x] 7.2 Написать модульные тесты для "State Controller"
     - Тест установки состояния (shallow merge, сохранение в историю)
     - Тест получения состояния (immutable copy - изменения не влияют на внутреннее состояние)
     - Тест сброса состояния (resetState)
@@ -213,7 +249,7 @@
     - Все тесты должны иметь структурированные комментарии
     - _Requirements: clerkly.2.1, clerkly.2.8, clerkly.nfr.4.1_
   
-  - [x] 6.3 Написать property-based тест для "State Controller"
+  - [x] 7.3 Написать property-based тест для "State Controller"
     - **Property 3: State Immutability**
     - Генерировать случайные состояния (объекты с различными свойствами)
     - Проверять, что getState() возвращает копию, и изменения возвращенного объекта не влияют на внутреннее состояние
@@ -223,7 +259,7 @@
     - **Validates: Requirements clerkly.1.3, clerkly.2.6**
     - _Requirements: clerkly.1.3, clerkly.2.6, clerkly.2.8, clerkly.nfr.4.4_
   
-  - [x] 6.4 Создать "UI Controller"
+  - [x] 7.4 Создать "UI Controller"
     - Реализовать класс UIController с методами: render(), updateView(), showLoading(), hideLoading(), withLoading(), createHeader(), createContent(), createFooter(), createDataDisplay(), clearAllLoading(), getContainer(), setContainer()
     - Добавить мониторинг производительности (< 100ms для render/updateView, логирование предупреждений)
     - Добавить автоматические индикаторы загрузки для операций > 200ms (withLoading)
@@ -231,7 +267,7 @@
     - Добавить комментарии с требованиями к каждому методу
     - _Requirements: clerkly.1.3, clerkly.2.1, clerkly.2.9, clerkly.nfr.1.2, clerkly.nfr.1.3_
   
-  - [x] 6.5 Написать модульные тесты для "UI Controller"
+  - [x] 7.5 Написать модульные тесты для "UI Controller"
     - Тест отрисовки UI (header, content, footer создаются и добавляются в container)
     - Тест обновления view с новыми данными (эффективное обновление без полной перерисовки)
     - Тест показа/скрытия индикаторов загрузки (showLoading, hideLoading)
@@ -242,7 +278,7 @@
     - Все тесты должны иметь структурированные комментарии
     - _Requirements: clerkly.2.1, clerkly.2.8, clerkly.nfr.1.2, clerkly.nfr.1.3, clerkly.nfr.4.1_
   
-  - [x] 6.6 Написать property-based тест для "UI Controller"
+  - [x] 7.6 Написать property-based тест для "UI Controller"
     - **Property 6: Performance Threshold Monitoring**
     - Выполнять операции render/updateView с различным временем выполнения (< 100ms и > 100ms)
     - Проверять, что performanceWarning корректно устанавливается (true для > 100ms, false для < 100ms)
@@ -252,7 +288,7 @@
     - **Validates: Requirements clerkly.nfr.1.2, clerkly.nfr.1.3**
     - _Requirements: clerkly.nfr.1.2, clerkly.nfr.1.3, clerkly.2.6, clerkly.2.8, clerkly.nfr.4.4_
   
-  - [x] 6.7 Создать Preload Script
+  - [x] 7.7 Создать Preload Script
     - Реализовать preload script с contextBridge для безопасной IPC коммуникации
     - Экспонировать API через contextBridge.exposeInMainWorld: saveData(), loadData(), deleteData()
     - Каждый метод вызывает ipcRenderer.invoke с соответствующим каналом ('save-data', 'load-data', 'delete-data')
@@ -260,7 +296,7 @@
     - Добавить комментарии с требованиями
     - _Requirements: clerkly.1.4, clerkly.2.5, clerkly.2.9_
   
-  - [x] 6.8 Написать модульные тесты для Preload Script
+  - [x] 7.8 Написать модульные тесты для Preload Script
     - Тест экспонирования API через contextBridge (window.api существует)
     - Тест вызова saveData через ipcRenderer.invoke('save-data', key, value)
     - Тест вызова loadData через ipcRenderer.invoke('load-data', key)
@@ -269,7 +305,7 @@
     - Все тесты должны иметь структурированные комментарии
     - _Requirements: clerkly.2.1, clerkly.2.8, clerkly.nfr.4.1, clerkly.nfr.4.2_
 
-- [x] 7. Checkpoint - Проверка Renderer Process компонентов
+- [x] 8. Checkpoint - Проверка Renderer Process компонентов
   - Убедиться, что все тесты Renderer Process компонентов проходят
   - Проверить покрытие кода (должно быть 80%+ для бизнес-логики, 100% для Preload Script)
   - Проверить, что все тесты имеют структурированные комментарии
@@ -277,64 +313,64 @@
   - Спросить пользователя, если возникли вопросы
   - _Requirements: clerkly.2.7, clerkly.2.8, clerkly.2.9_
 
-- [x] 8. Интеграция компонентов и создание главного приложения
-  - [x] 8.1 Создать главный файл Main Process (src/main/index.ts)
+- [x] 9. Интеграция компонентов и создание главного приложения
+  - [x] 9.1 Создать главный файл Main Process (src/main/index.ts)
     - Инициализировать все компоненты ("Window Manager", "Lifecycle Manager", "Data Manager", "IPC Handlers")
     - Настроить обработчики событий Electron (ready, activate, window-all-closed, before-quit)
     - Добавить обработку ошибок запуска (логирование, системные уведомления)
     - Добавить комментарии с требованиями к каждой секции кода
     - _Requirements: clerkly.1.1, clerkly.1.2, clerkly.1.3, clerkly.1.4, clerkly.2.9_
   
-  - [x] 8.2 Создать главный файл Renderer Process (src/renderer/index.ts)
+  - [x] 9.2 Создать главный файл Renderer Process (src/renderer/index.ts)
     - Инициализировать "UI Controller" и "State Controller"
     - Настроить обработчики событий UI (клики, ввод данных)
     - Добавить демонстрационный функционал (сохранение/загрузка данных через window.api)
     - Добавить комментарии с требованиями
     - _Requirements: clerkly.1.3, clerkly.1.4, clerkly.2.9_
   
-  - [x] 8.3 Создать HTML файл для Renderer Process (src/renderer/index.html)
+  - [x] 9.3 Создать HTML файл для Renderer Process (src/renderer/index.html)
     - Создать базовую структуру HTML с контейнером для UI (div#app)
     - Подключить renderer script (index.ts)
     - Добавить базовые стили для Mac OS X нативного вида (system fonts, vibrancy support)
     - _Requirements: clerkly.1.3, clerkly.nfr.3.2_
   
-  - [x] 8.4 Создать Application Configuration
+  - [x] 9.4 Создать Application Configuration
     - Реализовать класс AppConfig с настройками приложения
     - Определить настройки окна (width: 800, height: 600, titleBarStyle: 'hiddenInset', vibrancy: 'under-window')
     - Определить версию приложения (1.0.0) и минимальную версию OS (Mac OS X 10.13)
     - Добавить комментарии с требованиями
     - _Requirements: clerkly.1.2, clerkly.1.3, clerkly.2.9, clerkly.nfr.3.1, clerkly.nfr.3.2_
 
-- [x] 9. Функциональные тесты интеграции (запускаются ТОЛЬКО при явной просьбе пользователя)
-  - [x] 9.1 Написать функциональный тест жизненного цикла приложения
+- [x] 10. Функциональные тесты интеграции (запускаются ТОЛЬКО при явной просьбе пользователя)
+  - [x] 10.1 Написать функциональный тест жизненного цикла приложения
     - Тест запуска приложения → создание окна → инициализация хранилища → запуск миграций
     - Тест закрытия окна → корректное завершение → сохранение данных
     - Проверка, что все компоненты корректно инициализированы и завершены
     - Тест должен иметь структурированный комментарий (Preconditions, Action, Assertions, Requirements)
     - _Requirements: clerkly.2.2, clerkly.2.4, clerkly.2.8_
   
-  - [x] 9.2 Написать функциональный тест персистентности данных
+  - [x] 10.2 Написать функциональный тест персистентности данных
     - Тест сохранения данных → перезапуск приложения → загрузка данных
     - Проверка, что данные сохраняются между запусками (SQLite файл персистентен)
     - Проверка, что все типы данных корректно сохраняются и загружаются
     - Тест должен иметь структурированный комментарий (Preconditions, Action, Assertions, Requirements)
     - _Requirements: clerkly.2.2, clerkly.2.4, clerkly.2.8_
   
-  - [x] 9.3 Написать функциональный тест IPC коммуникации
+  - [x] 10.3 Написать функциональный тест IPC коммуникации
     - Тест Renderer process → IPC запрос через preload (window.api) → Main process → "Data Manager" → ответ
     - Тест обработки ошибок через IPC (невалидные параметры, timeout)
     - Проверка, что contextBridge корректно изолирует процессы
     - Тест должен иметь структурированный комментарий (Preconditions, Action, Assertions, Requirements)
     - _Requirements: clerkly.2.2, clerkly.2.4, clerkly.2.8_
   
-  - [x] 9.4 Написать функциональный тест системы миграций
+  - [x] 10.4 Написать функциональный тест системы миграций
     - Тест первого запуска → создание схемы через миграции (001_initial_schema.sql)
     - Тест обновления схемы → запуск новых миграций (добавление новых файлов миграций)
     - Проверка, что schema_migrations таблица корректно отслеживает примененные миграции
     - Тест должен иметь структурированный комментарий (Preconditions, Action, Assertions, Requirements)
     - _Requirements: clerkly.2.2, clerkly.2.4, clerkly.2.8_
   
-  - [x] 9.5 Написать property-based тест для системы миграций
+  - [x] 10.5 Написать property-based тест для системы миграций
     - **Property 5: Migration Idempotence**
     - Применять набор миграций, затем пытаться применить их снова
     - Проверять, что версия схемы и состояние базы данных не изменились
@@ -344,7 +380,7 @@
     - **Validates: Requirements clerkly.1.4, clerkly.nfr.2.1**
     - _Requirements: clerkly.1.4, clerkly.nfr.2.1, clerkly.2.6, clerkly.2.8, clerkly.nfr.4.4_
   
-  - [x] 9.6 Написать property-based тест для производительности запуска
+  - [x] 10.6 Написать property-based тест для производительности запуска
     - **Property 7: Application Startup Performance**
     - Запускать приложение и измерять время от app.whenReady() до готовности окна
     - Проверять, что время запуска < 3000ms на современных Mac системах
@@ -354,7 +390,7 @@
     - **Validates: Requirements clerkly.nfr.1.1**
     - _Requirements: clerkly.nfr.1.1, clerkly.2.6, clerkly.2.8, clerkly.nfr.4.4_
   
-  - [x] 9.7 Написать property-based тест для производительности операций с данными
+  - [x] 10.7 Написать property-based тест для производительности операций с данными
     - **Property 8: Data Operations Performance**
     - Генерировать случайные небольшие объекты данных (< 1KB)
     - Выполнять операции saveData, loadData, deleteData и измерять время
@@ -364,7 +400,7 @@
     - **Validates: Requirements clerkly.nfr.1.4**
     - _Requirements: clerkly.nfr.1.4, clerkly.2.6, clerkly.2.8, clerkly.nfr.4.4_
   
-  - [x] 9.8 Написать property-based тест для персистентности данных при завершении
+  - [x] 10.8 Написать property-based тест для персистентности данных при завершении
     - **Property 9: Graceful Shutdown Data Persistence**
     - Запускать приложение, сохранять случайные данные, корректно завершать через handleQuit(), перезапускать
     - Проверять, что все данные доступны после перезапуска и эквивалентны сохраненным (deep equality)
@@ -374,7 +410,7 @@
     - **Validates: Requirements clerkly.nfr.2.2**
     - _Requirements: clerkly.nfr.2.2, clerkly.2.6, clerkly.2.8, clerkly.nfr.4.4_
   
-  - [x] 9.9 Написать property-based тест для восстановления поврежденной базы данных
+  - [x] 10.9 Написать property-based тест для восстановления поврежденной базы данных
     - **Property 10: Database Corruption Recovery**
     - Создавать поврежденную базу данных (невалидный SQLite файл)
     - Запускать инициализацию "Data Manager"
@@ -386,7 +422,7 @@
     - **Validates: Requirements clerkly.nfr.2.4**
     - _Requirements: clerkly.nfr.2.4, clerkly.2.6, clerkly.2.8, clerkly.nfr.4.4_
 
-- [x] 10. Checkpoint - Проверка интеграции и функциональных тестов
+- [x] 11. Checkpoint - Проверка интеграции и функциональных тестов
   - Убедиться, что все функциональные тесты проходят (если были запущены)
   - Проверить общее покрытие кода (80%+ для бизнес-логики, 100% для критических компонентов)
   - Проверить, что все тесты имеют структурированные комментарии
@@ -395,8 +431,8 @@
   - Спросить пользователя, если возникли вопросы
   - _Requirements: clerkly.2.7, clerkly.2.8, clerkly.2.9_
 
-- [x] 11. Настройка сборки и упаковки приложения
-  - [x] 11.1 Настроить Electron Builder
+- [x] 12. Настройка сборки и упаковки приложения
+  - [x] 12.1 Настроить Electron Builder
     - Создать конфигурацию electron-builder.json для Mac OS X
     - Настроить сборку для Mac OS X (DMG, ZIP форматы)
     - Настроить иконку приложения (icon.icns)
@@ -404,14 +440,14 @@
     - Настроить минимальную версию Mac OS X (10.13+)
     - _Requirements: clerkly.1.1, clerkly.1.2, clerkly.nfr.3.1_
   
-  - [x] 11.2 Создать скрипты сборки
+  - [x] 12.2 Создать скрипты сборки
     - Добавить npm скрипты для сборки (build, build:main, build:renderer, build:preload)
     - Добавить npm скрипт для упаковки (package, package:mac)
     - Добавить npm скрипт для разработки (dev с hot reload)
     - Добавить npm скрипт для очистки (clean)
     - _Requirements: clerkly.1.1, clerkly.2.5_
   
-  - [x] 11.3 Создать документацию по сборке
+  - [x] 12.3 Создать документацию по сборке
     - Создать README.md с инструкциями по сборке и запуску
     - Документировать требования к системе (Node.js 18+, Mac OS X 10.13+)
     - Документировать команды для разработки (npm run dev, npm test, npm run validate)
@@ -420,28 +456,28 @@
     - Добавить информацию о структуре проекта
     - _Requirements: clerkly.1.1, clerkly.1.2, clerkly.1.5_
 
-- [x] 12. Финальная валидация и проверка покрытия
-  - [x] 12.1 Запустить полную валидацию
+- [x] 13. Финальная валидация и проверка покрытия
+  - [x] 13.1 Запустить полную валидацию
     - Выполнить npm run validate (TypeScript компиляция, ESLint, Prettier, все модульные тесты)
     - Проверить, что все проверки проходят без ошибок
     - Исправить все найденные проблемы
     - _Requirements: clerkly.2.5, clerkly.2.7, clerkly.nfr.4.3_
   
-  - [x] 12.2 Проверить покрытие кода тестами
+  - [x] 13.2 Проверить покрытие кода тестами
     - Выполнить npm run test:coverage
     - Проверить, что покрытие >= 80% для бизнес-логики
     - Проверить, что покрытие = 100% для критических компонентов ("Data Manager", "Lifecycle Manager", "IPC Handlers")
     - Проверить отчет о покрытии (coverage/lcov-report/index.html)
     - _Requirements: clerkly.2.7, clerkly.nfr.4.3_
   
-  - [x] 12.3 Проверить покрытие требований тестами
+  - [x] 13.3 Проверить покрытие требований тестами
     - Убедиться, что все требования покрыты тестами (см. таблицу в design.md)
     - Убедиться, что все тесты имеют структурированные комментарии (Preconditions, Action, Assertions, Requirements)
     - Убедиться, что весь код имеет комментарии с требованиями (формат: `// Requirements: clerkly.1.4`)
     - Проверить трассировку требований к тестам в tasks.md
     - _Requirements: clerkly.2.8, clerkly.2.9_
   
-  - [x] 12.4 Проверить property-based тесты
+  - [x] 13.4 Проверить property-based тесты
     - Убедиться, что все 10 свойств корректности реализованы как property-based тесты
     - Убедиться, что каждый property тест имеет минимум 100 итераций (numRuns: 100)
     - Убедиться, что каждый property тест имеет тег "Feature: clerkly, Property N: {property_text}"
@@ -450,23 +486,23 @@
       - ✅ Property 2: Invalid Key Rejection (обязательный)
       - ✅ Property 3: State Immutability
       - ✅ Property 4: IPC Timeout Enforcement
-      - ⏳ Property 5: Migration Idempotence (задача 9.5)
+      - ⏳ Property 5: Migration Idempotence (задача 10.5)
       - ✅ Property 6: Performance Threshold Monitoring
-      - ⏳ Property 7: Application Startup Performance (задача 9.6)
-      - ⏳ Property 8: Data Operations Performance (задача 9.7)
-      - ⏳ Property 9: Graceful Shutdown Data Persistence (задача 9.8)
-      - ⏳ Property 10: Database Corruption Recovery (задача 9.9)
+      - ⏳ Property 7: Application Startup Performance (задача 10.6)
+      - ⏳ Property 8: Data Operations Performance (задача 10.7)
+      - ⏳ Property 9: Graceful Shutdown Data Persistence (задача 10.8)
+      - ⏳ Property 10: Database Corruption Recovery (задача 10.9)
     - _Requirements: clerkly.2.6, clerkly.nfr.4.4_
 
-- [x] 13. Финальный checkpoint - Завершение реализации
-  - Убедиться, что все обязательные задачи выполнены (задачи 1-8, 12)
+- [x] 14. Финальный checkpoint - Завершение реализации
+  - Убедиться, что все задачи выполнены (задачи 1-9, 13)
   - Убедиться, что все модульные тесты проходят
   - Убедиться, что все обязательные property-based тесты проходят (Property 1-4, 6)
   - Убедиться, что покрытие кода соответствует требованиям (80%+ для бизнес-логики, 100% для критических компонентов)
   - Убедиться, что все тесты имеют структурированные комментарии
   - Убедиться, что весь код имеет комментарии с требованиями
   - Убедиться, что приложение собирается без ошибок (TypeScript, ESLint, Prettier)
-  - Спросить пользователя о готовности к следующему этапу (сборка и упаковка - задача 11)
+  - Спросить пользователя о готовности к следующему этапу (сборка и упаковка - задача 12)
   - _Requirements: clerkly.2.5, clerkly.2.7, clerkly.2.8, clerkly.2.9_
 
 ## Примечания
@@ -576,6 +612,16 @@ test('Property 1: saving then loading data returns equivalent value', async () =
 | clerkly.2.7 | ✓ | - | - |
 | clerkly.2.8 | ✓ | - | - |
 | clerkly.2.9 | ✓ | - | - |
+| clerkly.3.1 | ✓ | - | - |
+| clerkly.3.2 | ✓ | - | - |
+| clerkly.3.3 | ✓ | - | - |
+| clerkly.3.4 | ✓ | - | - |
+| clerkly.3.5 | ✓ | - | - |
+| clerkly.3.6 | ✓ | - | - |
+| clerkly.3.7 | ✓ | - | - |
+| clerkly.3.8 | ✓ | - | - |
+| clerkly.3.9 | ✓ | - | - |
+| clerkly.3.10 | ✓ | - | - |
 | clerkly.nfr.1.1 | ✓ | ✓* | ✓* |
 | clerkly.nfr.1.2 | ✓ | ✓ | - |
 | clerkly.nfr.1.3 | ✓ | ✓ | - |
@@ -704,18 +750,18 @@ test('Property 1: saving then loading data returns equivalent value', async () =
 
 ### Для завершения реализации:
 
-1. ⏳ Все функциональные тесты завершены (задачи 9.1-9.4)
-2. ⏳ Все property-based тесты завершены (Property 5, 7-10 - задачи 9.5-9.9)
+1. ⏳ Все функциональные тесты завершены (задачи 10.1-10.4)
+2. ⏳ Все property-based тесты завершены (Property 5, 7-10 - задачи 10.5-10.9)
 3. ✅ Покрытие кода превышает требования (95%+ vs 80% требуемых)
 4. ✅ Все тесты имеют структурированные комментарии
 5. ✅ Весь код имеет комментарии с требованиями
-6. ⏳ Задача 11: Настройка сборки и упаковки (осталось)
+6. ⏳ Задача 12: Настройка сборки и упаковки (осталось)
 
 ### Для завершения реализации:
 
-1. ⏳ Функциональные тесты интеграции (задача 9.1-9.4)
-2. ⏳ Property-based тесты производительности (Property 5, 7, 8, 9, 10 - задачи 9.5-9.9)
-3. ⏳ Настройка сборки и упаковки (задача 11)
+1. ⏳ Функциональные тесты интеграции (задача 10.1-10.4)
+2. ⏳ Property-based тесты производительности (Property 5, 7, 8, 9, 10 - задачи 10.5-10.9)
+3. ⏳ Настройка сборки и упаковки (задача 12)
 
 ### Команды для проверки:
 
@@ -746,7 +792,7 @@ npm run test:functional
 - ✅ TypeScript компилируется без ошибок
 - ✅ ESLint проходит без замечаний
 - ✅ Prettier форматирование корректно
-- ⏳ Все функциональные тесты проходят (задачи 9.1-9.4)
-- ⏳ Приложение собирается и запускается на Mac OS X (задача 11)
+- ⏳ Все функциональные тесты проходят (задачи 10.1-10.4)
+- ⏳ Приложение собирается и запускается на Mac OS X (задача 12)
 
-**Текущий статус:** Осталось выполнить задачи 9 (функциональные и property-based тесты) и 11 (сборка и упаковка)
+**Текущий статус:** Осталось выполнить задачи 10 (функциональные и property-based тесты) и 12 (сборка и упаковка)

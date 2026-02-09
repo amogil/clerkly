@@ -60,12 +60,14 @@ graph TB
             DM[Data Manager]
             IPC[IPC Handlers]
             MR[Migration Runner]
+            LOG[Logger]
         end
         
         subgraph "Renderer Process Components"
             UI[UI Controller]
             SC[State Controller]
             PL[Preload Script]
+            RLOG[Logger]
         end
         
         subgraph "Data Storage"
@@ -77,14 +79,23 @@ graph TB
         MP --> LC
         MP --> DM
         MP --> IPC
+        MP --> LOG
         DM --> MR
         RP --> UI
         RP --> SC
         RP --> PL
+        RP --> RLOG
         PL -->|Secure IPC| MP
         DS --> LD
         DS --> MG
         MR --> MG
+        WM --> LOG
+        LC --> LOG
+        DM --> LOG
+        IPC --> LOG
+        MR --> LOG
+        UI --> RLOG
+        SC --> RLOG
     end
 ```
 
@@ -109,6 +120,110 @@ graph TB
 ## Компоненты и интерфейсы
 
 ### Компоненты Main Process
+
+#### Logger
+Централизованный компонент для логирования во всем приложении с фиксированным форматом временных меток.
+
+```typescript
+// Requirements: clerkly.3.1, clerkly.3.2, clerkly.3.3, clerkly.3.4, clerkly.3.5
+import { DateTimeFormatter } from './utils/DateTimeFormatter';
+
+type LogLevel = 'debug' | 'info' | 'warn' | 'error';
+
+interface LogEntry {
+  timestamp: string;
+  level: LogLevel;
+  context: string;
+  message: string;
+}
+
+class Logger {
+  private context: string;
+  private dateTimeFormatter: DateTimeFormatter;
+  
+  constructor(context: string) {
+    this.context = context;
+    this.dateTimeFormatter = new DateTimeFormatter();
+  }
+  
+  /**
+   * Логирует debug сообщение
+   * @param {string} message - Сообщение для логирования
+   */
+  debug(message: string): void {
+    this.log('debug', message);
+  }
+  
+  /**
+   * Логирует info сообщение
+   * @param {string} message - Сообщение для логирования
+   */
+  info(message: string): void {
+    this.log('info', message);
+  }
+  
+  /**
+   * Логирует warning сообщение
+   * @param {string} message - Сообщение для логирования
+   */
+  warn(message: string): void {
+    this.log('warn', message);
+  }
+  
+  /**
+   * Логирует error сообщение
+   * @param {string} message - Сообщение для логирования
+   */
+  error(message: string): void {
+    this.log('error', message);
+  }
+  
+  /**
+   * Внутренний метод для логирования с форматированием
+   * @param {LogLevel} level - Уровень логирования
+   * @param {string} message - Сообщение для логирования
+   */
+  private log(level: LogLevel, message: string): void {
+    // Requirements: clerkly.3.2, clerkly.3.3
+    const timestamp = this.dateTimeFormatter.formatLogTimestamp(new Date());
+    const logEntry: LogEntry = {
+      timestamp,
+      level,
+      context: this.context,
+      message
+    };
+    
+    // Requirements: clerkly.3.5
+    const formattedMessage = `[${timestamp}] [${level.toUpperCase()}] [${this.context}] ${message}`;
+    
+    // Используем console.* только внутри Logger класса
+    // Requirements: clerkly.3.8
+    switch (level) {
+      case 'debug':
+        console.debug(formattedMessage);
+        break;
+      case 'info':
+        console.info(formattedMessage);
+        break;
+      case 'warn':
+        console.warn(formattedMessage);
+        break;
+      case 'error':
+        console.error(formattedMessage);
+        break;
+    }
+  }
+  
+  /**
+   * Создает новый Logger с указанным контекстом
+   * @param {string} context - Контекст (имя компонента)
+   * @returns {Logger}
+   */
+  static create(context: string): Logger {
+    return new Logger(context);
+  }
+}
+```
 
 #### Window Manager
 Управляет созданием и конфигурацией окна приложения с нативным Mac OS X интерфейсом.
@@ -1572,20 +1687,27 @@ it("should perform expected behavior", () => {
 
 **Компоненты для модульного тестирования:**
 
-1. **Window Manager**
+1. **Logger**
+   - Создание Logger с контекстом
+   - Логирование на разных уровнях (debug, info, warn, error)
+   - Форматирование сообщений с timestamp, level, context
+   - Использование DateTimeFormatter.formatLogTimestamp()
+   - Проверка формата timestamp (YYYY-MM-DD HH:MM:SS±HH:MM)
+
+2. **Window Manager**
    - Создание окна с корректными параметрами (Mac OS X специфика)
    - Конфигурация окна (размеры, заголовок, resizable, fullscreen)
    - Закрытие окна с очисткой listeners
    - Проверка состояния окна (isWindowCreated)
 
-2. **Lifecycle Manager**
+3. **Lifecycle Manager**
    - Инициализация приложения (< 3 секунды)
    - Обработка активации (Mac OS X специфика - пересоздание окна)
    - Корректное завершение (сохранение данных, закрытие соединений)
    - Обработка закрытия окон (Mac OS X поведение)
    - Мониторинг времени запуска
 
-3. **Data Manager**
+4. **Data Manager**
    - Инициализация хранилища (создание директорий, миграции)
    - Сохранение данных (успешные случаи, различные типы данных)
    - Загрузка данных (успешные случаи, десериализация)
@@ -1597,27 +1719,27 @@ it("should perform expected behavior", () => {
      - Поврежденная база данных (backup и пересоздание)
      - SQLite ошибки (SQLITE_FULL, SQLITE_BUSY, SQLITE_LOCKED, SQLITE_READONLY)
 
-4. **Migration Runner**
+5. **Migration Runner**
    - Запуск миграций (создание таблицы migrations, выполнение pending миграций)
    - Получение текущей версии схемы
    - Получение списка pending миграций
    - Обработка ошибок миграций
 
-5. **IPC Handlers**
+6. **IPC Handlers**
    - Регистрация и удаление handlers
    - Корректная передача сообщений между процессами
    - Обработка таймаутов (10 секунд)
    - Валидация параметров (key, value)
-   - Логирование ошибок
+   - Логирование ошибок через Logger
 
-6. **UI Controller**
+7. **UI Controller**
    - Отрисовка UI (header, content, footer)
    - Обновление view с новыми данными
    - Показ/скрытие индикаторов загрузки
    - Выполнение операций с автоматическим loading (> 200ms)
    - Мониторинг производительности (< 100ms)
 
-7. **State Controller**
+8. **State Controller**
    - Установка состояния (shallow merge)
    - Получение состояния (immutable copy)
    - Сброс состояния
@@ -1628,6 +1750,69 @@ it("should perform expected behavior", () => {
 **Примеры модульных тестов:**
 
 ```typescript
+/* Preconditions: Logger created with context "TestComponent"
+   Action: call logger.info("test message")
+   Assertions: console.info called with formatted message containing timestamp, level, context, message
+   Requirements: clerkly.3.1, clerkly.3.4, clerkly.3.5 */
+test('should log info message with correct format', () => {
+  const logger = new Logger('TestComponent');
+  const consoleSpy = jest.spyOn(console, 'info');
+  
+  logger.info('test message');
+  
+  expect(consoleSpy).toHaveBeenCalledWith(
+    expect.stringMatching(/^\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}\] \[INFO\] \[TestComponent\] test message$/)
+  );
+  
+  consoleSpy.mockRestore();
+});
+
+/* Preconditions: Logger created with context
+   Action: call logger.error("error message")
+   Assertions: timestamp format is YYYY-MM-DD HH:MM:SS±HH:MM (with timezone)
+   Requirements: clerkly.3.2, clerkly.3.3 */
+test('should use fixed format with timezone for log timestamps', () => {
+  const logger = new Logger('TestComponent');
+  const consoleSpy = jest.spyOn(console, 'error');
+  
+  logger.error('error message');
+  
+  const loggedMessage = consoleSpy.mock.calls[0][0];
+  const timestampMatch = loggedMessage.match(/^\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2})\]/);
+  
+  expect(timestampMatch).not.toBeNull();
+  expect(timestampMatch[1]).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}$/);
+  
+  consoleSpy.mockRestore();
+});
+
+/* Preconditions: Logger created
+   Action: call all log level methods (debug, info, warn, error)
+   Assertions: each method calls corresponding console method with correct level in message
+   Requirements: clerkly.3.4 */
+test('should support all log levels', () => {
+  const logger = new Logger('TestComponent');
+  const debugSpy = jest.spyOn(console, 'debug');
+  const infoSpy = jest.spyOn(console, 'info');
+  const warnSpy = jest.spyOn(console, 'warn');
+  const errorSpy = jest.spyOn(console, 'error');
+  
+  logger.debug('debug message');
+  logger.info('info message');
+  logger.warn('warn message');
+  logger.error('error message');
+  
+  expect(debugSpy).toHaveBeenCalledWith(expect.stringContaining('[DEBUG]'));
+  expect(infoSpy).toHaveBeenCalledWith(expect.stringContaining('[INFO]'));
+  expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('[WARN]'));
+  expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('[ERROR]'));
+  
+  debugSpy.mockRestore();
+  infoSpy.mockRestore();
+  warnSpy.mockRestore();
+  errorSpy.mockRestore();
+});
+
 /* Preconditions: DataManager initialized with test storage path, database is empty
    Action: save string data with valid key, then load it back
    Assertions: save returns success true, load returns success true with same data
@@ -2196,6 +2381,16 @@ test('UI should render within 100ms', () => {
 | clerkly.2.7 | ✓ | - | - |
 | clerkly.2.8 | ✓ | - | - |
 | clerkly.2.9 | ✓ | - | - |
+| clerkly.3.1 | ✓ | - | - |
+| clerkly.3.2 | ✓ | - | - |
+| clerkly.3.3 | ✓ | - | - |
+| clerkly.3.4 | ✓ | - | - |
+| clerkly.3.5 | ✓ | - | - |
+| clerkly.3.6 | ✓ | - | - |
+| clerkly.3.7 | ✓ | - | - |
+| clerkly.3.8 | ✓ | - | - |
+| clerkly.3.9 | ✓ | - | - |
+| clerkly.3.10 | ✓ | - | - |
 | clerkly.nfr.1.1 | ✓ | ✓ | ✓ |
 | clerkly.nfr.1.2 | ✓ | ✓ | - |
 | clerkly.nfr.1.3 | ✓ | ✓ | - |
@@ -2305,6 +2500,57 @@ test('UI should render within 100ms', () => {
 - Реализовано: Все функции, классы, методы содержат ссылки на требования
 - Формат: // Requirements: requirement-id.1.1, requirement-id.1.2
 - Примеры: Все примеры кода в разделе "Компоненты и интерфейсы"
+
+**Требование 3.1 (Централизованный Logger класс):**
+- Реализовано: Logger класс для всего логирования в приложении
+- Компоненты: "Logger" (Main Process и Renderer Process)
+- Тестирование: Модульные тесты Logger класса
+- Использование: Все компоненты используют Logger вместо console.*
+
+**Требование 3.2 (Logger использует DateTimeFormatter):**
+- Реализовано: Logger.log() вызывает DateTimeFormatter.formatLogTimestamp()
+- Компоненты: "Logger", "DateTimeFormatter"
+- Тестирование: Модульные тесты проверяют формат временных меток
+
+**Требование 3.3 (Фиксированный формат временных меток):**
+- Реализовано: DateTimeFormatter.formatLogTimestamp() возвращает YYYY-MM-DD HH:MM:SS±HH:MM
+- Компоненты: "DateTimeFormatter"
+- Тестирование: Модульные тесты проверяют формат с часовым поясом
+
+**Требование 3.4 (Уровни логирования):**
+- Реализовано: Logger.debug(), Logger.info(), Logger.warn(), Logger.error()
+- Компоненты: "Logger"
+- Тестирование: Модульные тесты для каждого уровня
+
+**Требование 3.5 (Контекст в логах):**
+- Реализовано: Logger принимает context в конструкторе, добавляет в каждое сообщение
+- Компоненты: "Logger"
+- Тестирование: Модульные тесты проверяют наличие контекста
+
+**Требование 3.6 (Все компоненты используют Logger):**
+- Реализовано: Все компоненты приложения создают Logger и используют его
+- Компоненты: Все компоненты Main и Renderer процессов
+- Тестирование: Code review, статический анализ
+
+**Требование 3.7 (Все тесты используют Logger):**
+- Реализовано: Все тесты используют Logger вместо console.*
+- Компоненты: Все тестовые файлы
+- Тестирование: Code review, статический анализ
+
+**Требование 3.8 (Запрет прямых console.* вызовов):**
+- Реализовано: Только Logger класс использует console.* внутри
+- Компоненты: Все компоненты (кроме Logger)
+- Тестирование: ESLint правило no-console, code review
+
+**Требование 3.9 (Logger в Main и Renderer процессах):**
+- Реализовано: Logger класс доступен в обоих процессах
+- Компоненты: "Logger" (Main Process), "Logger" (Renderer Process)
+- Тестирование: Модульные тесты для обоих процессов
+
+**Требование 3.10 (Logger в тестовой среде):**
+- Реализовано: Logger класс доступен в тестах
+- Компоненты: "Logger" (Test Environment)
+- Тестирование: Модульные тесты используют Logger
 
 ### Нефункциональные требования
 

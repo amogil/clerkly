@@ -169,7 +169,7 @@
 2. ЕСЛИ сетевой запрос к Google API не удается, ТО "OAuth Client" ДОЛЖЕН вернуть ошибку "network_error" с деталями
 3. ЕСЛИ Google возвращает ошибку, ТО "OAuth Client" ДОЛЖЕН вернуть код ошибки и описание от Google
 4. ЕСЛИ state параметр не совпадает, ТО "OAuth Client" ДОЛЖЕН вернуть ошибку "csrf_attack_detected"
-5. ВСЕ ошибки ДОЛЖНЫ логироваться в консоль с достаточным контекстом для отладки
+5. ВСЕ ошибки ДОЛЖНЫ логироваться через централизованный "Logger" класс (см. clerkly.3) с достаточным контекстом для отладки
 6. ДЛЯ распространенных ошибок "OAuth Client" ДОЛЖЕН предоставлять человекочитаемые тексты:
    - "popup_closed_by_user": заголовок "Sign in cancelled", сообщение "You closed the sign-in window before completing authentication.", предложение "Please try again and complete the sign-in process."
    - "access_denied": заголовок "Access denied", сообщение "You denied access to your Google account.", предложение "Clerkly needs access to your Google account to function properly."

@@ -998,10 +998,13 @@ interface ErrorResponse {
 
 ### Logging Strategy
 
-Все ошибки логируются с контекстом:
+Все ошибки логируются с контекстом через централизованный Logger класс (clerkly.3):
 
 ```typescript
-console.error(`[OAuth] ${operation} failed: ${error.message}`, {
+// Requirements: clerkly.3.1, clerkly.3.5, clerkly.3.6
+const logger = Logger.create('OAuth');
+
+logger.error(`${operation} failed: ${error.message}`, {
   errorCode: error.code,
   timestamp: Date.now(),
   context: additionalContext
