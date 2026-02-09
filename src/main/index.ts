@@ -128,7 +128,7 @@ oauthClient.setProfileManager(profileManager);
 
 // Requirements: clerkly.1.2, clerkly.1.3, ui.5
 // Initialize Window Manager
-const windowManager = new WindowManager(dataManager);
+const windowManager = new WindowManager(dataManager, profileManager);
 
 // Requirements: google-oauth-auth.14.1
 // Initialize Auth Window Manager

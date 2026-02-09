@@ -3,6 +3,7 @@
 import { BrowserWindow, BrowserWindowConstructorOptions } from 'electron';
 import * as path from 'path';
 import { DataManager } from './DataManager';
+import type { UserProfileManager } from './auth/UserProfileManager';
 import { WindowStateManager } from './WindowStateManager';
 import { Logger } from './Logger';
 
@@ -124,9 +125,9 @@ class WindowManager {
    * const window = windowManager.createWindow();
    * ```
    */
-  constructor(dataManager: DataManager) {
+  constructor(dataManager: DataManager, userProfileManager?: UserProfileManager) {
     // Requirements: ui.5
-    this.windowStateManager = new WindowStateManager(dataManager);
+    this.windowStateManager = new WindowStateManager(dataManager, userProfileManager);
   }
 
   /**
