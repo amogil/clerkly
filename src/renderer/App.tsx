@@ -129,7 +129,7 @@ function AppContent() {
         // Requirements: ui.8.1, ui.8.3 - Initialize navigation after auth check
         await navigationManager.initialize();
       } catch (error) {
-        logger.error('[App] Failed to check auth status:', error);
+        logger.error(`Failed to check auth status: ${error}`);
         setIsAuthorized(false);
       }
     };
@@ -139,7 +139,7 @@ function AppContent() {
     // Requirements: google-oauth-auth.8.4, ui.8.3, ui.6.4
     // Listen for auth success events and redirect to dashboard
     const unsubscribeAuthSuccess = window.api.auth.onAuthSuccess(() => {
-      logger.info('[App] Auth success event received');
+      logger.info('Auth success event received');
       // Requirements: ui.6.4 - Show loader during synchronous profile fetch
       // The profile is fetched synchronously in Main Process before this event is emitted
       // So by the time we receive this event, the profile is already loaded
@@ -154,20 +154,20 @@ function AppContent() {
     // Listen for auth error events
     const unsubscribeAuthError = window.api.auth.onAuthError(
       (error: string, errorCode?: string) => {
-        logger.error('[App] Auth error event received:', { error, errorCode });
-        logger.info('[App] Setting authError state and isAuthorized=false');
+        logger.error(`Auth error event received: ${JSON.stringify({ error, errorCode })}`);
+        logger.info('Setting authError state and isAuthorized=false');
         // Requirements: ui.6.4 - Hide loader on error
         setIsLoadingProfile(false);
         setAuthError({ message: error, code: errorCode });
         setIsAuthorized(false);
-        logger.info('[App] State updated, should trigger re-render');
+        logger.info('State updated, should trigger re-render');
       }
     );
 
     // Requirements: ui.6.8, ui.8.4
     // Listen for logout events and redirect to login
     const unsubscribeLogout = window.api.auth.onLogout(() => {
-      logger.info('[App] Logout event received');
+      logger.info('Logout event received');
       setIsAuthorized(false);
       setAuthError(null);
       // Requirements: ui.8.4 - Redirect to login after logout
@@ -223,7 +223,7 @@ function AppContent() {
       }
       // Note: If success, loader will be hidden by auth:success or auth:error event
     } catch (error) {
-      logger.error('[App] Login failed:', error);
+      logger.error(`Login failed: ${error}`);
       setIsLoadingProfile(false);
       setAuthError({ message: 'Failed to start login' });
     }
@@ -236,7 +236,7 @@ function AppContent() {
       setIsAuthorized(false);
       setAuthError(null);
     } catch (error) {
-      logger.error('[App] Logout failed:', error);
+      logger.error(`Logout failed: ${error}`);
     }
   };
 

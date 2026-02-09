@@ -234,7 +234,7 @@ class WindowManager {
 
       // Log console messages from renderer
       this.mainWindow.webContents.on('console-message', (_event, _level, message) => {
-        this.logger.info(`[Renderer] ${message}`);
+        this.logger.info(`${message}`);
       });
 
       // Clean up reference when window is closed

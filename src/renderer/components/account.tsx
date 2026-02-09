@@ -59,7 +59,7 @@ export function Account({ className = '', onSignOut }: AccountProps) {
         }
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-        logger.error('[Account] Failed to load profile:', errorMessage);
+        logger.error(`Failed to load profile: ${errorMessage}`);
         setError(errorMessage);
       } finally {
         setLoading(false);
@@ -75,7 +75,7 @@ export function Account({ className = '', onSignOut }: AccountProps) {
    */
   useEffect(() => {
     const handleAuthSuccess = async () => {
-      logger.info('[Account] Auth success event received, reloading profile');
+      logger.info('Auth success event received, reloading profile');
       try {
         const result = await window.api.auth.getProfile();
         if (result.success) {
@@ -84,7 +84,7 @@ export function Account({ className = '', onSignOut }: AccountProps) {
         }
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-        logger.error('[Account] Failed to reload profile after auth:', errorMessage);
+        logger.error(`Failed to reload profile after auth: ${errorMessage}`);
       }
     };
 
@@ -100,7 +100,7 @@ export function Account({ className = '', onSignOut }: AccountProps) {
    */
   useEffect(() => {
     const handleLogout = () => {
-      logger.info('[Account] Logout event received, clearing profile');
+      logger.info('Logout event received, clearing profile');
       setProfile(null);
       setError(null);
     };
@@ -117,7 +117,7 @@ export function Account({ className = '', onSignOut }: AccountProps) {
    */
   useEffect(() => {
     const handleProfileUpdated = (updatedProfile: UserProfile | null) => {
-      logger.info('[Account] Profile updated event received, updating UI');
+      logger.info('Profile updated event received, updating UI');
       setProfile(updatedProfile);
       setError(null);
     };

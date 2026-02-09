@@ -60,10 +60,7 @@ export class AuthWindowManager {
       try {
         await this.showLoginWindow();
       } catch (loginError) {
-        Logger.error(
-          'AuthWindowManager',
-          `[AuthWindowManager] Failed to show login window after error: ${loginError}`
-        );
+        Logger.error('AuthWindowManager', `Failed to show login window after error: ${loginError}`);
         throw loginError;
       }
     }
@@ -93,10 +90,7 @@ export class AuthWindowManager {
       // Login screen is just content displayed in the main window
       // The actual routing will be handled by the renderer process
     } catch (error) {
-      Logger.error(
-        'AuthWindowManager',
-        `[AuthWindowManager] Failed to show login window: ${error}`
-      );
+      Logger.error('AuthWindowManager', `Failed to show login window: ${error}`);
       throw error;
     }
   }
@@ -167,16 +161,10 @@ export class AuthWindowManager {
    */
   private async handleAuthSuccess(): Promise<void> {
     try {
-      Logger.info(
-        'AuthWindowManager',
-        '[AuthWindowManager] Authentication successful, showing main window'
-      );
+      Logger.info('AuthWindowManager', 'Authentication successful, showing main window');
       await this.showMainWindow();
     } catch (error) {
-      Logger.error(
-        'AuthWindowManager',
-        `[AuthWindowManager] Failed to handle auth success: ${error}`
-      );
+      Logger.error('AuthWindowManager', `Failed to handle auth success: ${error}`);
       throw error;
     }
   }
@@ -240,10 +228,7 @@ export class AuthWindowManager {
       this.logger.info('Retrying authentication');
       await this.showLoginWindow();
     } catch (error) {
-      Logger.error(
-        'AuthWindowManager',
-        `[AuthWindowManager] Failed to retry authentication: ${error}`
-      );
+      Logger.error('AuthWindowManager', `Failed to retry authentication: ${error}`);
       throw error;
     }
   }

@@ -53,10 +53,7 @@ if (!gotTheLock) {
   // Check if this instance was launched with a deep link
   const launchUrl = process.argv.find((arg) => arg.startsWith(protocolScheme));
   if (launchUrl) {
-    Logger.info(
-      'Main',
-      `[Main] This instance has deep link, will pass to primary instance: ${launchUrl}`
-    );
+    logger.info(`This instance has deep link, will pass to primary instance: ${launchUrl}`);
     // The deep link will be passed to the primary instance via second-instance event
   }
 
@@ -82,10 +79,7 @@ if (!gotTheLock) {
       // In dev mode, we need to register with the full path to the entry point
       // Get the absolute path to the main file
       const mainPath = path.resolve(__dirname, 'index.js');
-      Logger.info(
-        'Main',
-        `Registering protocol in dev mode: ${JSON.stringify({ execPath, mainPath })}`
-      );
+      logger.info(`Registering protocol in dev mode: ${JSON.stringify({ execPath, mainPath })}`);
       app.setAsDefaultProtocolClient(protocolScheme, execPath, [mainPath]);
     }
   } else {
@@ -326,10 +320,7 @@ if (process.env.NODE_ENV === 'test') {
         // Send error notification to renderer process using AuthIPCHandlers
         // This simulates what happens when Main Process encounters an error
         authIPCHandlers.sendErrorNotification(data.message, data.context);
-        Logger.info(
-          'Main',
-          `Sent error notification via AuthIPCHandlers: ${JSON.stringify(data)}`
-        );
+        logger.info(`Sent error notification via AuthIPCHandlers: ${JSON.stringify(data)}`);
         return { success: true };
       } catch (error: unknown) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -456,10 +447,7 @@ async function handleDeepLinkUrl(url: string): Promise<void> {
       // Requirements: google-oauth-auth.3.6, google-oauth-auth.3.7, google-oauth-auth.3.8
       // Profile is already fetched synchronously inside handleDeepLink()
       if (authStatus.authorized) {
-        Logger.info(
-          'Main',
-          'Authorization successful, profile already fetched, sending auth success'
-        );
+        logger.info('Authorization successful, profile already fetched, sending auth success');
         authIPCHandlers.sendAuthSuccess();
       } else if (authStatus.error) {
         logger.info(`Sending auth error event: ${authStatus.error}`);

@@ -126,9 +126,9 @@ test('should log errors to console', async () => {
   // Check that error was logged
   // Logger automatically adds [App] context and formats the message
   const hasErrorLog = consoleMessages.some(
-    (msg) => 
-      msg.includes('[App]') && 
-      msg.includes('Error notification received') && 
+    (msg) =>
+      msg.includes('[App]') &&
+      msg.includes('Error notification received') &&
       msg.includes('Test error logging') &&
       msg.includes('Test Context')
   );

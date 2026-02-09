@@ -132,14 +132,8 @@ export class UserProfileManager {
         ? `${googleApiBaseUrl}/userinfo` // Mock server uses /userinfo
         : `${googleApiBaseUrl}/oauth2/v1/userinfo`; // Google uses /oauth2/v1/userinfo
 
-      Logger.info(
-        'UserProfileManager',
-        '[UserProfileManager] Fetching profile from Google UserInfo API'
-      );
-      Logger.info(
-        'UserProfileManager',
-        `[UserProfileManager] About to call handleAPIRequest with URL: ${userInfoUrl}`
-      );
+      Logger.info('UserProfileManager', 'Fetching profile from Google UserInfo API');
+      Logger.info('UserProfileManager', `About to call handleAPIRequest with URL: ${userInfoUrl}`);
 
       // Requirements: ui.9.3, ui.9.4 - Use centralized handler for automatic 401 detection
       const response = await handleAPIRequest(
@@ -169,30 +163,21 @@ export class UserProfileManager {
       // Requirements: ui.12.15 - Cache email in memory for data isolation
       this.currentUserEmail = profile.email;
 
-      Logger.info(
-        'UserProfileManager',
-        '[UserProfileManager] Profile fetched and saved successfully'
-      );
+      Logger.info('UserProfileManager', 'Profile fetched and saved successfully');
       return profile;
     } catch (error) {
       // Requirements: ui.9.3 - If it's a 401 error, tokens are already cleared by handleAPIRequest
       // Just return null to indicate no profile available
       const errorMessage = error instanceof Error ? error.message : String(error);
       if (errorMessage.includes('Authorization failed') || errorMessage.includes('401')) {
-        Logger.info(
-          'UserProfileManager',
-          '[UserProfileManager] Session expired (401), returning null'
-        );
+        Logger.info('UserProfileManager', 'Session expired (401), returning null');
         return null;
       }
 
       this.logger.error(`Failed to fetch profile: ${error}`);
 
       // Requirements: ui.6.7 - Return cached profile on other errors (network, timeout, etc.)
-      Logger.info(
-        'UserProfileManager',
-        '[UserProfileManager] Returning cached profile due to API error'
-      );
+      Logger.info('UserProfileManager', 'Returning cached profile due to API error');
       const cachedProfile = await this.loadProfile();
 
       // Requirements: ui.7.1 - Notify user about the error
@@ -337,10 +322,7 @@ export class UserProfileManager {
       // Get access token from token storage
       const tokens = await this.tokenStorage.loadTokens();
       if (!tokens || !tokens.accessToken) {
-        Logger.error(
-          'UserProfileManager',
-          '[UserProfileManager] No access token available for synchronous fetch'
-        );
+        Logger.error('UserProfileManager', 'No access token available for synchronous fetch');
         // Clear tokens since authorization is incomplete
         await this.tokenStorage.deleteTokens();
         return { success: false, error: 'profile_fetch_failed' };
@@ -352,10 +334,7 @@ export class UserProfileManager {
         ? `${googleApiBaseUrl}/userinfo`
         : `${googleApiBaseUrl}/oauth2/v1/userinfo`;
 
-      Logger.info(
-        'UserProfileManager',
-        '[UserProfileManager] Fetching profile synchronously during authorization'
-      );
+      Logger.info('UserProfileManager', 'Fetching profile synchronously during authorization');
 
       // Make API request (with timeout to prevent blocking indefinitely)
       const controller = new AbortController();
@@ -392,16 +371,10 @@ export class UserProfileManager {
       // Requirements: ui.12.15 - Cache email in memory for data isolation
       this.currentUserEmail = profile.email;
 
-      Logger.info(
-        'UserProfileManager',
-        '[UserProfileManager] Profile fetched and saved synchronously'
-      );
+      Logger.info('UserProfileManager', 'Profile fetched and saved synchronously');
       return { success: true, profile };
     } catch (error) {
-      Logger.error(
-        'UserProfileManager',
-        `[UserProfileManager] Failed to fetch profile synchronously: ${error}`
-      );
+      Logger.error('UserProfileManager', `Failed to fetch profile synchronously: ${error}`);
 
       // Requirements: google-oauth-auth.3.7 - Clear tokens on any error
       try {
