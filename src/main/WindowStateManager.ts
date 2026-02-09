@@ -80,6 +80,8 @@ export interface WindowState {
  * ```
  */
 export class WindowStateManager {
+  // Requirements: clerkly.3.5, clerkly.3.7
+  private logger = Logger.create('WindowStateManager');
   private dataManager: DataManager;
   private readonly stateKey = 'window_state';
 
@@ -149,7 +151,7 @@ export class WindowStateManager {
         }
       }
     } catch (error) {
-      Logger.error('WindowStateManager', `Failed to load window state: ${error}`);
+      this.logger.error(`Failed to load window state: ${error}`);
     }
 
     // Requirements: ui.5.5
@@ -219,7 +221,7 @@ export class WindowStateManager {
       const stateJson = JSON.stringify(state);
       this.dataManager.saveData(this.stateKey, stateJson);
     } catch (error) {
-      Logger.error('WindowStateManager', `Failed to save window state: ${error}`);
+      this.logger.error(`Failed to save window state: ${error}`);
     }
   }
 

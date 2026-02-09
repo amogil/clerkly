@@ -8,6 +8,8 @@ import { Logger } from '../Logger';
  * Requirements: ui.8.1, ui.8.3, ui.8.4
  */
 export class NavigationManager {
+  // Requirements: clerkly.3.5, clerkly.3.7
+  private logger = Logger.create('NavigationManager');
   private router: Router;
 
   /**
@@ -41,7 +43,7 @@ export class NavigationManager {
    * Requirements: ui.8.1, ui.8.4
    */
   redirectToLogin(): void {
-    Logger.info('NavigationManager', '[NavigationManager] Redirecting to login');
+    this.logger.info('Redirecting to login');
     this.router.navigate('/login');
   }
 
@@ -50,7 +52,7 @@ export class NavigationManager {
    * Requirements: ui.8.3
    */
   redirectToDashboard(): void {
-    Logger.info('NavigationManager', '[NavigationManager] Redirecting to dashboard');
+    this.logger.info('Redirecting to dashboard');
     this.router.navigate('/dashboard');
   }
 

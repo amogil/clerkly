@@ -3,6 +3,9 @@
 import { BrowserWindow } from 'electron';
 import { Logger } from './Logger';
 
+// Requirements: clerkly.3.5, clerkly.3.7 - Create parameterized logger for ErrorHandler module
+const logger = Logger.create('ErrorHandler');
+
 // Requirements: clerkly.3.8 - Use centralized Logger instead of console.*
 /**
  * Handle background errors and notify renderer processes
@@ -26,11 +29,11 @@ import { Logger } from './Logger';
 export function handleBackgroundError(error: unknown, context: string): void {
   // Requirements: ui.7.4 - Log error to console with context
   const errorMessage = error instanceof Error ? error.message : String(error);
-  Logger.error('ErrorHandler', `[${context}] Error: ${errorMessage}`);
+  logger.error(`[${context}] Error: ${errorMessage}`);
 
   // Log stack trace if available for debugging
   if (error instanceof Error && error.stack) {
-    Logger.error('ErrorHandler', `[${context}] Stack trace: ${error.stack}`);
+    logger.error(`[${context}] Stack trace: ${error.stack}`);
   }
 
   // Requirements: ui.7.1 - Send error notification to all renderer processes

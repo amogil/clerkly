@@ -45,6 +45,8 @@ interface PKCEStorage {
  * Requirements: google-oauth-auth.1, google-oauth-auth.2, google-oauth-auth.3, google-oauth-auth.5, google-oauth-auth.6, google-oauth-auth.7, ui.6.5, ui.9.1, ui.9.2, ui.9.3, ui.9.4
  */
 export class OAuthClientManager {
+  // Requirements: clerkly.3.5, clerkly.3.7
+  private logger = Logger.create('OAuthClientManager');
   private config: OAuthConfig;
   private tokenStorage: TokenStorageManager;
   private pkceStorage: PKCEStorage | null = null;
@@ -544,7 +546,7 @@ export class OAuthClientManager {
           });
         } catch (revokeError) {
           // Continue even if revoke fails
-          Logger.warn('OAuthClientManager', 'Token revoke failed, continuing with local cleanup');
+          this.logger.warn('Token revoke failed, continuing with local cleanup');
         }
       }
 

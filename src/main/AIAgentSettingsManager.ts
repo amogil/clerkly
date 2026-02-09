@@ -13,6 +13,8 @@ import { Logger } from './Logger';
  * Requirements: ui.10.9, ui.10.10, ui.10.11, ui.10.14, ui.10.15, ui.10.22
  */
 export class AIAgentSettingsManager {
+  // Requirements: clerkly.3.5, clerkly.3.7
+  private logger = Logger.create('AIAgentSettingsManager');
   private dataManager: DataManager;
 
   constructor(dataManager: DataManager) {

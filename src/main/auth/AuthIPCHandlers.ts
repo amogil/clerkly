@@ -23,6 +23,8 @@ interface IPCResult {
  * Requirements: google-oauth-auth.8, ui.6.2, ui.6.7
  */
 export class AuthIPCHandlers {
+  // Requirements: clerkly.3.5, clerkly.3.7
+  private logger = Logger.create('AuthIPCHandlers');
   private oauthClient: OAuthClientManager;
   private profileManager: UserProfileManager | null = null;
   private handlersRegistered: boolean = false;
@@ -38,7 +40,7 @@ export class AuthIPCHandlers {
    */
   setProfileManager(profileManager: UserProfileManager): void {
     this.profileManager = profileManager;
-    Logger.info('AuthIPCHandlers', '[AuthIPCHandlers] Profile manager set');
+    this.logger.info('Profile manager set');
   }
 
   /**
@@ -47,7 +49,7 @@ export class AuthIPCHandlers {
    */
   registerHandlers(): void {
     if (this.handlersRegistered) {
-      Logger.warn('AuthIPCHandlers', '[AuthIPCHandlers] Handlers already registered');
+      this.logger.warn('Handlers already registered');
       return;
     }
 
@@ -58,7 +60,7 @@ export class AuthIPCHandlers {
     ipcMain.handle('auth:refresh-profile', this.handleRefreshProfile.bind(this));
 
     this.handlersRegistered = true;
-    Logger.info('AuthIPCHandlers', '[AuthIPCHandlers] Handlers registered');
+    this.logger.info('Handlers registered');
   }
 
   /**
@@ -77,7 +79,7 @@ export class AuthIPCHandlers {
     ipcMain.removeHandler('auth:refresh-profile');
 
     this.handlersRegistered = false;
-    Logger.info('AuthIPCHandlers', '[AuthIPCHandlers] Handlers unregistered');
+    this.logger.info('Handlers unregistered');
   }
 
   /**
@@ -88,7 +90,7 @@ export class AuthIPCHandlers {
    */
   private async handleStartLogin(_event: IpcMainInvokeEvent): Promise<IPCResult> {
     try {
-      Logger.info('AuthIPCHandlers', '[AuthIPCHandlers] Starting login flow');
+      this.logger.info('Starting login flow');
       await this.oauthClient.startAuthFlow();
 
       return {
@@ -96,7 +98,7 @@ export class AuthIPCHandlers {
       };
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      Logger.error('AuthIPCHandlers', `[AuthIPCHandlers] Start login error: ${errorMessage}`);
+      this.logger.error(`Start login error: ${errorMessage}`);
       return {
         success: false,
         error: errorMessage || 'Failed to start login',
@@ -112,7 +114,7 @@ export class AuthIPCHandlers {
    */
   private async handleGetStatus(_event: IpcMainInvokeEvent): Promise<IPCResult> {
     try {
-      Logger.info('AuthIPCHandlers', '[AuthIPCHandlers] Getting auth status');
+      this.logger.info('Getting auth status');
       const authStatus = await this.oauthClient.getAuthStatus();
 
       return {
@@ -122,7 +124,7 @@ export class AuthIPCHandlers {
       };
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      Logger.error('AuthIPCHandlers', `[AuthIPCHandlers] Get status error: ${errorMessage}`);
+      this.logger.error(`Get status error: ${errorMessage}`);
       return {
         success: false,
         authorized: false,
@@ -139,7 +141,7 @@ export class AuthIPCHandlers {
    */
   private async handleLogout(_event: IpcMainInvokeEvent): Promise<IPCResult> {
     try {
-      Logger.info('AuthIPCHandlers', '[AuthIPCHandlers] Logging out');
+      this.logger.info('Logging out');
       await this.oauthClient.logout();
 
       // Send event to all renderer processes
@@ -150,7 +152,7 @@ export class AuthIPCHandlers {
       };
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      Logger.error('AuthIPCHandlers', `[AuthIPCHandlers] Logout error: ${errorMessage}`);
+      this.logger.error(`Logout error: ${errorMessage}`);
       return {
         success: false,
         error: errorMessage || 'Failed to logout',
@@ -169,14 +171,14 @@ export class AuthIPCHandlers {
     try {
       // Requirements: ui.6.2, ui.6.7
       if (!this.profileManager) {
-        Logger.warn('AuthIPCHandlers', '[AuthIPCHandlers] Profile manager not set');
+        this.logger.warn('Profile manager not set');
         return {
           success: true,
           profile: null,
         };
       }
 
-      Logger.info('AuthIPCHandlers', '[AuthIPCHandlers] Getting profile');
+      this.logger.info('Getting profile');
       const profile = await this.profileManager.loadProfile();
 
       return {
@@ -185,7 +187,7 @@ export class AuthIPCHandlers {
       };
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      Logger.error('AuthIPCHandlers', `[AuthIPCHandlers] Failed to get profile: ${errorMessage}`);
+      this.logger.error(`Failed to get profile: ${errorMessage}`);
       return {
         success: false,
         error: errorMessage || 'Failed to get profile',
@@ -203,11 +205,11 @@ export class AuthIPCHandlers {
    */
   private async handleRefreshProfile(_event: IpcMainInvokeEvent): Promise<IPCResult> {
     try {
-      Logger.info('AuthIPCHandlers', '[AuthIPCHandlers] ===== handleRefreshProfile called =====');
+      this.logger.info('===== handleRefreshProfile called =====');
 
       // Requirements: ui.6.5
       if (!this.profileManager) {
-        Logger.warn('AuthIPCHandlers', '[AuthIPCHandlers] Profile manager not set');
+        this.logger.warn('Profile manager not set');
         return {
           success: false,
           error: 'Profile manager not initialized',
@@ -215,7 +217,7 @@ export class AuthIPCHandlers {
         };
       }
 
-      Logger.info('AuthIPCHandlers', '[AuthIPCHandlers] Refreshing profile');
+      this.logger.info('Refreshing profile');
       const profile = await this.profileManager.fetchProfile();
       Logger.info(
         'AuthIPCHandlers',
@@ -286,7 +288,7 @@ export class AuthIPCHandlers {
    */
   sendErrorNotification(message: string, context: string): void {
     // Requirements: ui.7.4 - Log to console
-    Logger.error('AuthIPCHandlers', `[${context}] Error: ${message}`);
+    this.logger.error(`[${context}] Error: ${message}`);
 
     // Requirements: ui.7.1 - Notify renderer
     const windows = BrowserWindow.getAllWindows();

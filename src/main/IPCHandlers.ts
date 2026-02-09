@@ -18,6 +18,8 @@ export interface IPCResult {
  * Manages IPC communication between Main and Renderer processes
  */
 export class IPCHandlers {
+  // Requirements: clerkly.3.5, clerkly.3.7
+  private logger = Logger.create('IPCHandlers');
   private dataManager: DataManager;
   private timeout: number = 10000; // 10 seconds
   private registeredChannels: string[] = [];
@@ -69,13 +71,13 @@ export class IPCHandlers {
       // Валидация параметров
       if (key === undefined || key === null) {
         const error = 'Invalid parameters: key is required';
-        Logger.error('IPCHandlers', `[IPC] save-data failed: ${error}`);
+        this.logger.error(`[IPC] save-data failed: ${error}`);
         return { success: false, error };
       }
 
       if (value === undefined) {
         const error = 'Invalid parameters: value is required';
-        Logger.error('IPCHandlers', `[IPC] save-data failed: ${error}`);
+        this.logger.error(`[IPC] save-data failed: ${error}`);
         return { success: false, error };
       }
 
@@ -88,13 +90,13 @@ export class IPCHandlers {
 
       // Логирование ошибок
       if (!result.success) {
-        Logger.error('IPCHandlers', `[IPC] save-data failed for key "${key}": ${result.error}`);
+        this.logger.error(`[IPC] save-data failed for key "${key}": ${result.error}`);
       }
 
       return result;
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      Logger.error('IPCHandlers', `[IPC] save-data exception: ${errorMessage}`);
+      this.logger.error(`[IPC] save-data exception: ${errorMessage}`);
       return { success: false, error: errorMessage };
     }
   }
@@ -113,7 +115,7 @@ export class IPCHandlers {
       // Валидация параметров
       if (key === undefined || key === null) {
         const error = 'Invalid parameters: key is required';
-        Logger.error('IPCHandlers', `[IPC] load-data failed: ${error}`);
+        this.logger.error(`[IPC] load-data failed: ${error}`);
         return { success: false, error };
       }
 
@@ -126,13 +128,13 @@ export class IPCHandlers {
 
       // Логирование ошибок
       if (!result.success) {
-        Logger.error('IPCHandlers', `[IPC] load-data failed for key "${key}": ${result.error}`);
+        this.logger.error(`[IPC] load-data failed for key "${key}": ${result.error}`);
       }
 
       return result;
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      Logger.error('IPCHandlers', `[IPC] load-data exception: ${errorMessage}`);
+      this.logger.error(`[IPC] load-data exception: ${errorMessage}`);
       return { success: false, error: errorMessage };
     }
   }
@@ -151,7 +153,7 @@ export class IPCHandlers {
       // Валидация параметров
       if (key === undefined || key === null) {
         const error = 'Invalid parameters: key is required';
-        Logger.error('IPCHandlers', `[IPC] delete-data failed: ${error}`);
+        this.logger.error(`[IPC] delete-data failed: ${error}`);
         return { success: false, error };
       }
 
@@ -164,13 +166,13 @@ export class IPCHandlers {
 
       // Логирование ошибок
       if (!result.success) {
-        Logger.error('IPCHandlers', `[IPC] delete-data failed for key "${key}": ${result.error}`);
+        this.logger.error(`[IPC] delete-data failed for key "${key}": ${result.error}`);
       }
 
       return result;
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      Logger.error('IPCHandlers', `[IPC] delete-data exception: ${errorMessage}`);
+      this.logger.error(`[IPC] delete-data exception: ${errorMessage}`);
       return { success: false, error: errorMessage };
     }
   }

@@ -59,6 +59,8 @@ export class DataManager {
   private migrationRunner: MigrationRunner | null = null;
   // Requirements: ui.12.10 - Reference to UserProfileManager for getting current user email
   private userProfileManager: UserProfileManager | null = null;
+  // Requirements: clerkly.3.5, clerkly.3.7
+  private logger = Logger.create('DataManager');
 
   constructor(storagePath: string) {
     this.storagePath = storagePath;
@@ -75,7 +77,7 @@ export class DataManager {
    */
   setUserProfileManager(profileManager: UserProfileManager): void {
     this.userProfileManager = profileManager;
-    Logger.info('DataManager', '[DataManager] UserProfileManager set for data isolation');
+    this.logger.info('UserProfileManager set for data isolation');
   }
 
   /**
@@ -100,7 +102,7 @@ export class DataManager {
         const errorObj = dirError as { code?: string };
         // Обработка ошибок прав доступа - fallback на temp directory
         if (errorObj.code === 'EACCES' || errorObj.code === 'EPERM') {
-          Logger.warn('DataManager', 'Permission denied, using temp directory');
+          this.logger.warn('Permission denied, using temp directory');
           this.storagePath = path.join(os.tmpdir(), 'clerkly-fallback');
           usedFallback = true;
           fallbackPath = this.storagePath;
@@ -123,7 +125,7 @@ export class DataManager {
           testDb.prepare('SELECT 1').get();
           testDb.close();
         } catch {
-          Logger.warn('DataManager', 'Database corrupted, creating backup');
+          this.logger.warn('Database corrupted, creating backup');
           const backupPath = path.join(this.storagePath, `clerkly.db.backup-${Date.now()}`);
           fs.copyFileSync(dbPath, backupPath);
           fs.unlinkSync(dbPath);

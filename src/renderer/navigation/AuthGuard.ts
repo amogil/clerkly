@@ -8,6 +8,8 @@ import { Logger } from '../Logger';
  * Requirements: ui.8.2
  */
 export class AuthGuard {
+  // Requirements: clerkly.3.5, clerkly.3.7
+  private logger = Logger.create('AuthGuard');
   private navigationManager: NavigationManager;
   private protectedRoutes: string[] = [
     '/dashboard',
@@ -41,7 +43,7 @@ export class AuthGuard {
     const isAuthenticated = await this.navigationManager.checkAuthStatus();
 
     if (!isAuthenticated) {
-      Logger.info('AuthGuard', `[AuthGuard] Access denied to protected route: ${route}`);
+      this.logger.info(`Access denied to protected route: ${route}`);
       this.navigationManager.redirectToLogin();
       return false;
     }

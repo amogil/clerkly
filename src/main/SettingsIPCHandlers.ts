@@ -21,6 +21,8 @@ interface IPCResult {
  * Requirements: ui.10.9, ui.10.26
  */
 export class SettingsIPCHandlers {
+  // Requirements: clerkly.3.5, clerkly.3.7
+  private logger = Logger.create('SettingsIPCHandlers');
   private aiAgentSettingsManager: AIAgentSettingsManager;
   private handlersRegistered: boolean = false;
 
@@ -34,7 +36,7 @@ export class SettingsIPCHandlers {
    */
   registerHandlers(): void {
     if (this.handlersRegistered) {
-      Logger.warn('SettingsIPCHandlers', '[SettingsIPCHandlers] Handlers already registered');
+      this.logger.warn('Handlers already registered');
       return;
     }
 
@@ -45,7 +47,7 @@ export class SettingsIPCHandlers {
     ipcMain.handle('settings:delete-api-key', this.handleDeleteAPIKey.bind(this));
 
     this.handlersRegistered = true;
-    Logger.info('SettingsIPCHandlers', '[SettingsIPCHandlers] Handlers registered');
+    this.logger.info('Handlers registered');
   }
 
   /**
@@ -64,7 +66,7 @@ export class SettingsIPCHandlers {
     ipcMain.removeHandler('settings:delete-api-key');
 
     this.handlersRegistered = false;
-    Logger.info('SettingsIPCHandlers', '[SettingsIPCHandlers] Handlers unregistered');
+    this.logger.info('Handlers unregistered');
   }
 
   /**
@@ -79,7 +81,7 @@ export class SettingsIPCHandlers {
     provider: 'openai' | 'anthropic' | 'google'
   ): Promise<IPCResult> {
     try {
-      Logger.info('SettingsIPCHandlers', `[SettingsIPCHandlers] Saving LLM provider: ${provider}`);
+      this.logger.info(`Saving LLM provider: ${provider}`);
 
       // Requirements: ui.10.9 - Save LLM provider through AIAgentSettingsManager
       await this.aiAgentSettingsManager.saveLLMProvider(provider);
@@ -110,7 +112,7 @@ export class SettingsIPCHandlers {
    */
   private async handleLoadLLMProvider(_event: IpcMainInvokeEvent): Promise<IPCResult> {
     try {
-      Logger.info('SettingsIPCHandlers', '[SettingsIPCHandlers] Loading LLM provider');
+      this.logger.info('Loading LLM provider');
 
       // Requirements: ui.10.20, ui.10.21 - Load LLM provider, return 'openai' as default
       const provider = await this.aiAgentSettingsManager.loadLLMProvider();

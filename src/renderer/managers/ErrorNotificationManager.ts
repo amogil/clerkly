@@ -30,7 +30,7 @@ import { Logger } from '../Logger';
  *
  * // Subscribe to changes
  * const unsubscribe = manager.subscribe((notifications) => {
- *   Logger.info('ErrorNotificationManager', `Active notifications: ${notifications}`);
+ *   this.logger.info(`Active notifications: ${notifications}`);
  * });
  *
  * // Manually dismiss
@@ -41,6 +41,8 @@ import { Logger } from '../Logger';
  * ```
  */
 export class ErrorNotificationManager {
+  // Requirements: clerkly.3.5, clerkly.3.7
+  private logger = Logger.create('ErrorNotificationManager');
   private notifications: ErrorNotification[] = [];
   private listeners: ((notifications: ErrorNotification[]) => void)[] = [];
   private readonly AUTO_DISMISS_DELAY = 15000; // 15 seconds
@@ -136,7 +138,7 @@ export class ErrorNotificationManager {
    * @example
    * ```typescript
    * const unsubscribe = manager.subscribe((notifications) => {
-   *   Logger.info('ErrorNotificationManager', `Current notifications: ${notifications}`);
+   *   this.logger.info(`Current notifications: ${notifications}`);
    * });
    *
    * // Later, cleanup

@@ -16,6 +16,8 @@ import { Logger } from '../Logger';
  *               google-oauth-auth.14.4, google-oauth-auth.14.5, google-oauth-auth.14.6
  */
 export class AuthWindowManager {
+  // Requirements: clerkly.3.5, clerkly.3.7
+  private logger = Logger.create('AuthWindowManager');
   private windowManager: WindowManager;
   private oauthClient: OAuthClientManager;
   private currentWindow: BrowserWindow | null = null;
@@ -53,7 +55,7 @@ export class AuthWindowManager {
         await this.showLoginWindow();
       }
     } catch (error) {
-      Logger.error('AuthWindowManager', `[AuthWindowManager] Failed to initialize app: ${error}`);
+      this.logger.error(`Failed to initialize app: ${error}`);
       // Try to show login window on error, but don't retry if it fails
       try {
         await this.showLoginWindow();
@@ -122,7 +124,7 @@ export class AuthWindowManager {
       // Note: Window uses default configuration from WindowManager
       // Main content will be loaded by renderer process
     } catch (error) {
-      Logger.error('AuthWindowManager', `[AuthWindowManager] Failed to show main window: ${error}`);
+      this.logger.error(`Failed to show main window: ${error}`);
       throw error;
     }
   }
@@ -151,7 +153,7 @@ export class AuthWindowManager {
         await this.showLoginWindow();
       }
     } catch (err) {
-      Logger.error('AuthWindowManager', `[AuthWindowManager] Failed to show login error: ${err}`);
+      this.logger.error(`Failed to show login error: ${err}`);
       throw err;
     }
   }
@@ -197,7 +199,7 @@ export class AuthWindowManager {
       // Requirements: google-oauth-auth.14.5
       await this.showLoginError(error, errorCode);
     } catch (err) {
-      Logger.error('AuthWindowManager', `[AuthWindowManager] Failed to handle auth error: ${err}`);
+      this.logger.error(`Failed to handle auth error: ${err}`);
       throw err;
     }
   }
@@ -235,7 +237,7 @@ export class AuthWindowManager {
    */
   async onRetry(): Promise<void> {
     try {
-      Logger.info('AuthWindowManager', '[AuthWindowManager] Retrying authentication');
+      this.logger.info('Retrying authentication');
       await this.showLoginWindow();
     } catch (error) {
       Logger.error(

@@ -67,6 +67,8 @@ export interface UserProfile {
  * Requirements: ui.6.2, ui.6.5, ui.6.6, ui.6.7, ui.6.8, ui.12.14, ui.12.15, ui.12.16, ui.12.17, ui.12.18
  */
 export class UserProfileManager {
+  // Requirements: clerkly.3.5, clerkly.3.7
+  private logger = Logger.create('UserProfileManager');
   private dataManager: DataManager;
   private oauthClient: OAuthClientManager;
   private tokenStorage: TokenStorageManager;
@@ -119,7 +121,7 @@ export class UserProfileManager {
       // Get access token from token storage
       const tokens = await this.tokenStorage.loadTokens();
       if (!tokens || !tokens.accessToken) {
-        Logger.info('UserProfileManager', '[UserProfileManager] No access token available');
+        this.logger.info('No access token available');
         return null;
       }
 
@@ -184,7 +186,7 @@ export class UserProfileManager {
         return null;
       }
 
-      Logger.error('UserProfileManager', `[UserProfileManager] Failed to fetch profile: ${error}`);
+      this.logger.error(`Failed to fetch profile: ${error}`);
 
       // Requirements: ui.6.7 - Return cached profile on other errors (network, timeout, etc.)
       Logger.info(
@@ -221,9 +223,9 @@ export class UserProfileManager {
       if (!result.success) {
         throw new Error(result.error || 'Failed to save profile');
       }
-      Logger.info('UserProfileManager', '[UserProfileManager] Profile saved to local storage');
+      this.logger.info('Profile saved to local storage');
     } catch (error) {
-      Logger.error('UserProfileManager', `[UserProfileManager] Failed to save profile: ${error}`);
+      this.logger.error(`Failed to save profile: ${error}`);
       throw error;
     }
   }
@@ -247,13 +249,13 @@ export class UserProfileManager {
         // Requirements: ui.12.17 - Set currentUserEmail from loaded profile
         this.currentUserEmail = profile.email;
 
-        Logger.info('UserProfileManager', '[UserProfileManager] Profile loaded from local storage');
+        this.logger.info('Profile loaded from local storage');
         return profile;
       }
-      Logger.info('UserProfileManager', '[UserProfileManager] No profile found in local storage');
+      this.logger.info('No profile found in local storage');
       return null;
     } catch (error) {
-      Logger.error('UserProfileManager', `[UserProfileManager] Failed to load profile: ${error}`);
+      this.logger.error(`Failed to load profile: ${error}`);
       return null;
     }
   }
@@ -276,9 +278,9 @@ export class UserProfileManager {
       // Requirements: ui.12.18 - Clear cached email
       this.currentUserEmail = null;
 
-      Logger.info('UserProfileManager', '[UserProfileManager] Profile cleared from local storage');
+      this.logger.info('Profile cleared from local storage');
     } catch (error) {
-      Logger.error('UserProfileManager', `[UserProfileManager] Failed to clear profile: ${error}`);
+      this.logger.error(`Failed to clear profile: ${error}`);
       throw error;
     }
   }
@@ -293,7 +295,7 @@ export class UserProfileManager {
    * Also updates cached email if profile changed.
    */
   async updateProfileAfterTokenRefresh(): Promise<void> {
-    Logger.info('UserProfileManager', '[UserProfileManager] Updating profile after token refresh');
+    this.logger.info('Updating profile after token refresh');
     await this.fetchProfile();
   }
 

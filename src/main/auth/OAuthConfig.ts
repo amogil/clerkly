@@ -2,6 +2,9 @@
 
 import { Logger } from '../Logger';
 
+// Requirements: clerkly.3.5, clerkly.3.7 - Create parameterized logger for OAuthConfig module
+const logger = Logger.create('OAuthConfig');
+
 // Requirements: clerkly.3.8 - Use centralized Logger instead of console.*
 /**
  * OAuth configuration interface
@@ -94,10 +97,7 @@ function getGoogleOAuthEndpoints() {
  */
 function getOAuthConfigConstants() {
   const isTest = process.env.NODE_ENV === 'test';
-  Logger.info(
-    'OAuthConfig',
-    `[OAuthConfig] NODE_ENV: ${(process.env.NODE_ENV, 'isTest:', isTest)}`
-  );
+  logger.info(`NODE_ENV: ${(process.env.NODE_ENV, 'isTest:', isTest)}`);
 
   return {
     clientId: isTest

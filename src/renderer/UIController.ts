@@ -25,6 +25,8 @@ export interface LoadingResult {
 }
 
 export class UIController {
+  // Requirements: clerkly.3.5, clerkly.3.7
+  private logger = Logger.create('UIController');
   private container: HTMLElement;
   private loadingIndicators: Map<string, { element: HTMLElement; startTime: number }>;
   private performanceThreshold: number = 100; // ms
@@ -79,7 +81,7 @@ export class UIController {
       return { success: true, renderTime, performanceWarning };
     } catch (error: unknown) {
       const renderTime = performance.now() - startTime;
-      Logger.error('UIController', `Failed to render UI: ${error}`);
+      this.logger.error(`Failed to render UI: ${error}`);
       return {
         success: false,
         renderTime,
@@ -125,7 +127,7 @@ export class UIController {
       return { success: true, updateTime, performanceWarning };
     } catch (error: unknown) {
       const updateTime = performance.now() - startTime;
-      Logger.error('UIController', `Failed to update view: ${error}`);
+      this.logger.error(`Failed to update view: ${error}`);
       return {
         success: false,
         updateTime,
@@ -165,7 +167,7 @@ export class UIController {
       return { success: true };
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      Logger.error('UIController', `Failed to show loading indicator: ${error}`);
+      this.logger.error(`Failed to show loading indicator: ${error}`);
       return { success: false, error: errorMessage };
     }
   }
@@ -195,7 +197,7 @@ export class UIController {
       return { success: true, duration };
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      Logger.error('UIController', `Failed to hide loading indicator: ${error}`);
+      this.logger.error(`Failed to hide loading indicator: ${error}`);
       return { success: false, error: errorMessage };
     }
   }

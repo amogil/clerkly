@@ -41,6 +41,8 @@ export interface Migration {
  * Manages database schema migrations
  */
 export class MigrationRunner {
+  // Requirements: clerkly.3.5, clerkly.3.7
+  private logger = Logger.create('MigrationRunner');
   private db: Database.Database;
   private migrationsPath: string;
 
@@ -133,7 +135,7 @@ export class MigrationRunner {
         // Парсим имя файла: 001_initial_schema.sql
         const match = file.match(/^(\d+)_(.+)\.sql$/);
         if (!match) {
-          Logger.warn('MigrationRunner', `Skipping invalid migration file: ${file}`);
+          this.logger.warn(`Skipping invalid migration file: ${file}`);
           continue;
         }
 

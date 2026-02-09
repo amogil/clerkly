@@ -27,6 +27,8 @@ export class LifecycleManager {
   private profileManager: UserProfileManager;
   private startTime: number | null = null;
   private initialized: boolean = false;
+  // Requirements: clerkly.3.5, clerkly.3.7
+  private logger = Logger.create('LifecycleManager');
 
   constructor(
     windowManager: WindowManager,
@@ -61,10 +63,10 @@ export class LifecycleManager {
       // Requirements: ui.6.5 - Fetch profile on startup if authenticated
       const authStatus = await this.oauthClient.getAuthStatus();
       if (authStatus.authorized) {
-        Logger.info('LifecycleManager', 'User authenticated, fetching profile');
+        this.logger.info('User authenticated, fetching profile');
         await this.profileManager.fetchProfile();
       } else {
-        Logger.info('LifecycleManager', 'User not authenticated, skipping profile fetch');
+        this.logger.info('User not authenticated, skipping profile fetch');
       }
 
       this.initialized = true;
@@ -73,7 +75,7 @@ export class LifecycleManager {
 
       // Предупреждение о медленном запуске (> 3 секунды)
       if (loadTime > 3000) {
-        Logger.warn('LifecycleManager', `Slow startup: ${loadTime}ms (target: <3000ms)`);
+        this.logger.warn(`Slow startup: ${loadTime}ms (target: <3000ms)`);
       }
 
       return {
@@ -82,7 +84,7 @@ export class LifecycleManager {
       };
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      Logger.error('LifecycleManager', `Failed to initialize application: ${errorMessage}`);
+      this.logger.error(`Failed to initialize application: ${errorMessage}`);
       throw new Error(`Application initialization failed: ${errorMessage}`);
     }
   }
@@ -99,7 +101,7 @@ export class LifecycleManager {
       }
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      Logger.error('LifecycleManager', `Failed to handle activation: ${errorMessage}`);
+      this.logger.error(`Failed to handle activation: ${errorMessage}`);
     }
   }
 
@@ -127,7 +129,7 @@ export class LifecycleManager {
       }
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      Logger.error('LifecycleManager', `Error during shutdown: ${errorMessage}`);
+      this.logger.error(`Error during shutdown: ${errorMessage}`);
       // Продолжаем завершение даже при ошибках
     }
   }
