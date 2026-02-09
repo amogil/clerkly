@@ -268,19 +268,22 @@ test('should filter data by user email', async () => {
     family_name: 'A',
   });
 
-  await mainWindow.click('button:has-text("Continue with Google")');
-  await mainWindow.waitForTimeout(2000);
+  await completeOAuthFlow(context.app, context.window, TEST_CLIENT_ID);
+  await context.window.waitForTimeout(1000);
 
-  // Save data via IPC (simulate application saving data)
-  await mainWindow.evaluate(() => {
-    return window.electron.ipcRenderer.invoke('test:save-data', 'test_key', 'value_A');
-  });
+  // Save data - use AI Agent settings
+  await context.window.click('text=Settings');
+  await context.window.waitForSelector('text=AI Agent Settings');
+  await context.window.waitForTimeout(500);
+  await context.window.selectOption('select:near(:text("LLM Provider"))', 'openai');
+  await context.window.fill('input[placeholder="Enter your API key"]', 'user-a-key-123');
+  await context.window.waitForTimeout(600);
 
   // Logout
-  await mainWindow.click('button:has-text("Sign Out")');
-  await mainWindow.waitForTimeout(1000);
+  await context.window.click('button:has-text("Sign out")');
+  await context.window.waitForTimeout(1000);
 
-  // User B: Login and save data with same key
+  // User B: Login and save data with different provider
   mockOAuthServer.setUserProfile({
     id: 'filter-b-id',
     email: 'filterB@example.com',
@@ -289,23 +292,25 @@ test('should filter data by user email', async () => {
     family_name: 'B',
   });
 
-  await mainWindow.click('button:has-text("Continue with Google")');
-  await mainWindow.waitForTimeout(2000);
+  await completeOAuthFlow(context.app, context.window, TEST_CLIENT_ID);
+  await context.window.waitForTimeout(1000);
 
-  await mainWindow.evaluate(() => {
-    return window.electron.ipcRenderer.invoke('test:save-data', 'test_key', 'value_B');
-  });
+  await context.window.click('text=Settings');
+  await context.window.waitForSelector('text=AI Agent Settings');
+  await context.window.waitForTimeout(500);
+  await context.window.selectOption('select:near(:text("LLM Provider"))', 'anthropic');
+  await context.window.fill('input[placeholder="Enter your API key"]', 'user-b-key-456');
+  await context.window.waitForTimeout(600);
 
-  // Load data as User B
-  const resultB = await mainWindow.evaluate(() => {
-    return window.electron.ipcRenderer.invoke('test:load-data', 'test_key');
-  });
-  expect(resultB.success).toBe(true);
-  expect(resultB.data).toBe('value_B');
+  // Load data as User B - verify User B sees their own data
+  const providerB = await context.window.inputValue('select:near(:text("LLM Provider"))');
+  const apiKeyB = await context.window.inputValue('input[placeholder="Enter your API key"]');
+  expect(providerB).toBe('anthropic');
+  expect(apiKeyB).toBe('user-b-key-456');
 
   // Logout
-  await mainWindow.click('button:has-text("Sign Out")');
-  await mainWindow.waitForTimeout(1000);
+  await context.window.click('button:has-text("Sign out")');
+  await context.window.waitForTimeout(1000);
 
   // User A: Login again and load data
   mockOAuthServer.setUserProfile({
@@ -316,14 +321,18 @@ test('should filter data by user email', async () => {
     family_name: 'A',
   });
 
-  await mainWindow.click('button:has-text("Continue with Google")');
-  await mainWindow.waitForTimeout(2000);
+  await completeOAuthFlow(context.app, context.window, TEST_CLIENT_ID);
+  await context.window.waitForTimeout(1000);
 
-  const resultA = await mainWindow.evaluate(() => {
-    return window.electron.ipcRenderer.invoke('test:load-data', 'test_key');
-  });
-  expect(resultA.success).toBe(true);
-  expect(resultA.data).toBe('value_A');
+  await context.window.click('text=Settings');
+  await context.window.waitForSelector('text=AI Agent Settings');
+  await context.window.waitForTimeout(500);
+
+  // Verify User A sees their own data (not User B's)
+  const providerA = await context.window.inputValue('select:near(:text("LLM Provider"))');
+  const apiKeyA = await context.window.inputValue('input[placeholder="Enter your API key"]');
+  expect(providerA).toBe('openai');
+  expect(apiKeyA).toBe('user-a-key-123');
 });
 
 /* Preconditions: Application running, not authenticated
