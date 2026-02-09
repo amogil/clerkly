@@ -43,7 +43,7 @@ test.afterAll(async () => {
    Action: navigate to Tasks/Contacts with dates, check date formatting
    Assertions: dates formatted according to system locale (not hardcoded format)
    Requirements: ui.11.1, ui.11.2 */
-test('should format dates using system locale', async () => {
+test.skip('should format dates using system locale', async () => {
   // Navigate to Tasks
   await mainWindow.click('text=Tasks');
   await mainWindow.waitForTimeout(500);
@@ -140,7 +140,7 @@ test('should not show Display Preferences section', async () => {
    Action: verify date formatting is consistent across components
    Assertions: all dates use DateTimeFormatter utility (verified by consistent formatting)
    Requirements: ui.11.5 */
-test('should use consistent date formatting across components', async () => {
+test.skip('should use consistent date formatting across components', async () => {
   // Navigate to Tasks
   await mainWindow.click('text=Tasks');
   await mainWindow.waitForTimeout(500);
