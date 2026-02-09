@@ -219,7 +219,7 @@ export class OAuthClientManager {
       if (this.profileManager) {
         Logger.info(
           'OAuthClientManager',
-          '[OAuthClientManager] Fetching profile synchronously before saving tokens'
+          'Fetching profile synchronously before saving tokens'
         );
 
         // Temporarily store tokens in memory for profile fetch
@@ -232,7 +232,7 @@ export class OAuthClientManager {
           // Requirements: google-oauth-auth.3.7 - Profile fetch failed, don't save tokens
           Logger.error(
             'OAuthClientManager',
-            '[OAuthClientManager] Profile fetch failed, authorization incomplete'
+            'Profile fetch failed, authorization incomplete'
           );
           // Clear PKCE storage
           this.pkceStorage = null;
@@ -245,7 +245,7 @@ export class OAuthClientManager {
         // Requirements: google-oauth-auth.3.8 - Profile fetched successfully
         Logger.info(
           'OAuthClientManager',
-          '[OAuthClientManager] Profile fetched successfully, now saving tokens'
+          'Profile fetched successfully, now saving tokens'
         );
 
         // Now save tokens to database (profile manager has email set)

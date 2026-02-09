@@ -176,7 +176,7 @@ function AppContent() {
 
     // Requirements: ui.7.1 - Listen for error notification events from Main Process
     const unsubscribeErrorNotify = window.api.error.onNotify((message: string, context: string) => {
-      logger.info('[App] Error notification received:', { message, context });
+      logger.info(`Error notification received: ${JSON.stringify({ message, context })}`);
       showError(`${context}: ${message}`);
     });
 

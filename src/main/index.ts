@@ -217,7 +217,7 @@ if (process.env.NODE_ENV === 'test') {
       return { success: true };
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      logger.error(`[TEST] Failed to fetch profile: ${errorMessage}`);
+      logger.error(`Failed to fetch profile: ${errorMessage}`);
       return { success: false, error: errorMessage };
     }
   });
@@ -295,23 +295,23 @@ if (process.env.NODE_ENV === 'test') {
       throw new Error('test:handle-deep-link can only be used in test environment');
     }
     try {
-      logger.info(`[TEST] Handling deep link: ${url}`);
+      logger.info(`Handling deep link: ${url}`);
       const authStatus = await oauthClient.handleDeepLink(url);
-      logger.info(`[TEST] Deep link auth status: ${JSON.stringify(authStatus)}`);
+      logger.info(`Deep link auth status: ${JSON.stringify(authStatus)}`);
 
       // Send auth events to renderer (same as handleDeepLinkUrl does)
       if (authStatus.authorized) {
-        logger.info('[TEST] Authorization successful, sending auth success');
+        logger.info('Authorization successful, sending auth success');
         authIPCHandlers.sendAuthSuccess();
       } else if (authStatus.error) {
-        logger.info(`[TEST] Authorization failed, sending auth error: ${authStatus.error}`);
+        logger.info(`Authorization failed, sending auth error: ${authStatus.error}`);
         authIPCHandlers.sendAuthError(authStatus.error, authStatus.error);
       }
 
       return authStatus;
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      logger.error(`[TEST] Deep link handling error: ${errorMessage}`);
+      logger.error(`Deep link handling error: ${errorMessage}`);
       return { authorized: false, error: errorMessage };
     }
   });
@@ -328,18 +328,18 @@ if (process.env.NODE_ENV === 'test') {
         authIPCHandlers.sendErrorNotification(data.message, data.context);
         Logger.info(
           'Main',
-          `[TEST] Sent error notification via AuthIPCHandlers: ${JSON.stringify(data)}`
+          `Sent error notification via AuthIPCHandlers: ${JSON.stringify(data)}`
         );
         return { success: true };
       } catch (error: unknown) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        logger.error(`[TEST] Error sending notification: ${errorMessage}`);
+        logger.error(`Error sending notification: ${errorMessage}`);
         return { success: false, error: errorMessage };
       }
     }
   );
 
-  logger.info('[TEST] Test IPC handlers registered');
+  logger.info('Test IPC handlers registered');
 }
 
 // Requirements: clerkly.1.1, clerkly.1.2
