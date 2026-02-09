@@ -1294,8 +1294,20 @@ test.describe('Account Profile', () => {
 
     // Verify tokens are saved
     // Requirements: google-oauth-auth.3.8 - Tokens should remain after successful auth
-    const tokensCheck = await context.window.evaluate(async () => {
-      return await (window as any).electron.ipcRenderer.invoke('test:get-token-status');
+    // Check directly through app context (not through IPC which was removed)
+    const tokensCheck = await context.app.evaluate(async () => {
+      const { tokenStorage } = (global as any).testContext || {};
+      if (!tokenStorage) {
+        throw new Error('Token storage not found in test context');
+      }
+      try {
+        const tokens = await tokenStorage.loadTokens();
+        return { hasTokens: tokens !== null };
+      } catch (error: unknown) {
+        // If loadTokens throws error about no user logged in, no tokens
+        const errorMessage = error instanceof Error ? error.message : '';
+        return { hasTokens: !errorMessage.includes('No user logged in') };
+      }
     });
 
     console.log('[TEST] Tokens in storage:', tokensCheck.hasTokens ? 'YES' : 'NO');
@@ -1358,8 +1370,35 @@ test.describe('Account Profile', () => {
       '[TEST] Application launched, simulating authentication with profile fetch error...'
     );
 
-    // Complete OAuth flow (will fail at profile fetch step)
-    await completeOAuthFlow(context.app, context.window);
+    // Manually trigger OAuth flow (will fail at profile fetch step)
+    // Start OAuth flow to generate PKCE parameters
+    await context.window.evaluate(async () => {
+      await (window as any).electron.ipcRenderer.invoke('auth:start-login');
+    });
+
+    // Wait for OAuth flow to initialize
+    await context.window.waitForTimeout(2000);
+
+    // Get PKCE state from OAuthClientManager
+    const pkceState = await context.app.evaluate(async () => {
+      const { oauthClient } = (global as any).testContext || {};
+      if (!oauthClient || !oauthClient.pkceStorage) {
+        throw new Error('PKCE storage not found');
+      }
+      return oauthClient.pkceStorage.state;
+    });
+
+    // Generate authorization code
+    const authCode = `test_auth_code_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+
+    // Construct deep link URL
+    const redirectUri = 'com.googleusercontent.apps.test-client-id-12345:/oauth2redirect';
+    const deepLinkUrl = `${redirectUri}?code=${authCode}&state=${pkceState}`;
+
+    // Trigger deep link handling (this will fail at profile fetch)
+    await context.window.evaluate(async (url) => {
+      return await (window as any).electron.ipcRenderer.invoke('test:handle-deep-link', url);
+    }, deepLinkUrl);
 
     console.log('[TEST] Authentication attempted with profile fetch error');
 
@@ -1442,8 +1481,35 @@ test.describe('Account Profile', () => {
     await loginButton.waitFor({ state: 'visible', timeout: 5000 });
     console.log('[TEST] Login screen confirmed');
 
-    // Complete OAuth flow (will fail at profile fetch step)
-    await completeOAuthFlow(context.app, context.window);
+    // Manually trigger OAuth flow (will fail at profile fetch step)
+    // Start OAuth flow to generate PKCE parameters
+    await context.window.evaluate(async () => {
+      await (window as any).electron.ipcRenderer.invoke('auth:start-login');
+    });
+
+    // Wait for OAuth flow to initialize
+    await context.window.waitForTimeout(2000);
+
+    // Get PKCE state from OAuthClientManager
+    const pkceState = await context.app.evaluate(async () => {
+      const { oauthClient } = (global as any).testContext || {};
+      if (!oauthClient || !oauthClient.pkceStorage) {
+        throw new Error('PKCE storage not found');
+      }
+      return oauthClient.pkceStorage.state;
+    });
+
+    // Generate authorization code
+    const authCode = `test_auth_code_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+
+    // Construct deep link URL
+    const redirectUri = 'com.googleusercontent.apps.test-client-id-12345:/oauth2redirect';
+    const deepLinkUrl = `${redirectUri}?code=${authCode}&state=${pkceState}`;
+
+    // Trigger deep link handling (this will fail at profile fetch)
+    await context.window.evaluate(async (url) => {
+      return await (window as any).electron.ipcRenderer.invoke('test:handle-deep-link', url);
+    }, deepLinkUrl);
 
     console.log('[TEST] Authentication attempted with profile fetch error');
 
@@ -1922,8 +1988,20 @@ test.describe('Account Profile', () => {
     // Verify tokens are cleared
     // Requirements: ui.8.4, Property 19 - UI should be cleared after logout
     // Note: We can't navigate to Settings without authentication, so we verify tokens are cleared
-    const tokensCheck = await context.window.evaluate(async () => {
-      return await (window as any).electron.ipcRenderer.invoke('test:get-token-status');
+    // Check directly through app context (not through IPC which was removed)
+    const tokensCheck = await context.app.evaluate(async () => {
+      const { tokenStorage } = (global as any).testContext || {};
+      if (!tokenStorage) {
+        throw new Error('Token storage not found in test context');
+      }
+      try {
+        const tokens = await tokenStorage.loadTokens();
+        return { hasTokens: tokens !== null };
+      } catch (error: unknown) {
+        // If loadTokens throws error about no user logged in, no tokens
+        const errorMessage = error instanceof Error ? error.message : '';
+        return { hasTokens: !errorMessage.includes('No user logged in') };
+      }
     });
 
     console.log('[TEST] Tokens in storage after logout:', tokensCheck.hasTokens ? 'YES' : 'NO');

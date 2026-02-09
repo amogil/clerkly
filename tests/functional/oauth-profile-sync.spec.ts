@@ -132,8 +132,20 @@ test.describe('OAuth Profile Synchronous Fetch', () => {
     await context.window.waitForTimeout(2000);
 
     // Verify tokens are saved
-    const tokenStatus = await context.window.evaluate(async () => {
-      return await (window as any).electron.ipcRenderer.invoke('test:get-token-status');
+    // Check directly through app context (not through IPC which was removed)
+    const tokenStatus = await context.app.evaluate(async () => {
+      const { tokenStorage } = (global as any).testContext || {};
+      if (!tokenStorage) {
+        throw new Error('Token storage not found in test context');
+      }
+      try {
+        const tokens = await tokenStorage.loadTokens();
+        return { hasTokens: tokens !== null };
+      } catch (error: unknown) {
+        // If loadTokens throws error about no user logged in, no tokens
+        const errorMessage = error instanceof Error ? error.message : '';
+        return { hasTokens: !errorMessage.includes('No user logged in') };
+      }
     });
 
     console.log('[TEST] Token status:', tokenStatus);
