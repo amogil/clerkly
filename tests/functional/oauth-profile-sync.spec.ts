@@ -140,11 +140,19 @@ test.describe('OAuth Profile Synchronous Fetch', () => {
       }
       try {
         const tokens = await tokenStorage.loadTokens();
-        return { hasTokens: tokens !== null };
+        return {
+          hasTokens: tokens !== null,
+          accessToken: tokens?.accessToken,
+          refreshToken: tokens?.refreshToken,
+        };
       } catch (error: unknown) {
         // If loadTokens throws error about no user logged in, no tokens
         const errorMessage = error instanceof Error ? error.message : '';
-        return { hasTokens: !errorMessage.includes('No user logged in') };
+        return {
+          hasTokens: !errorMessage.includes('No user logged in'),
+          accessToken: undefined,
+          refreshToken: undefined,
+        };
       }
     });
 
