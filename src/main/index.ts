@@ -229,6 +229,22 @@ if (process.env.NODE_ENV === 'test') {
     }
   });
 
+  ipcMain.handle('test:get-profile-by-email', async (_event: any, email: string) => {
+    if (!isTestEnvironment()) {
+      throw new Error('test:get-profile-by-email can only be used in test environment');
+    }
+    if (!email || typeof email !== 'string') {
+      return { success: false, error: 'Email parameter is required', profile: null };
+    }
+    try {
+      const profile = await profileManager.loadProfileByEmail(email);
+      return { success: true, profile };
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      return { success: false, error: errorMessage, profile: null };
+    }
+  });
+
   ipcMain.handle('test:setup-profile', async (_event: any, profileData: any) => {
     if (!isTestEnvironment()) {
       throw new Error('test:setup-profile can only be used in test environment');

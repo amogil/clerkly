@@ -1862,7 +1862,10 @@ test.describe('Account Profile', () => {
     // Verify data is PRESERVED in database (not deleted)
     // Requirements: ui.8.4 - Profile data should be preserved after logout
     const profileCheck = await context.window.evaluate(async () => {
-      return await (window as any).electron.ipcRenderer.invoke('test:get-profile');
+      return await (window as any).electron.ipcRenderer.invoke(
+        'test:get-profile-by-email',
+        'logout.test@example.com'
+      );
     });
 
     console.log('[TEST] Profile in database after logout:', profileCheck.profile ? 'YES' : 'NO');
@@ -2015,7 +2018,10 @@ test.describe('Account Profile', () => {
     // Verify profile data is PRESERVED in database (not deleted)
     // Requirements: ui.8.4, Architectural Principles - Profile data should be preserved
     const profileCheck = await context.window.evaluate(async () => {
-      return await (window as any).electron.ipcRenderer.invoke('test:get-profile');
+      return await (window as any).electron.ipcRenderer.invoke(
+        'test:get-profile-by-email',
+        'logout.ui.test@example.com'
+      );
     });
 
     console.log('[TEST] Profile in database after logout:', profileCheck.profile ? 'YES' : 'NO');

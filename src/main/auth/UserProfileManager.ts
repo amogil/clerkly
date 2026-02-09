@@ -252,6 +252,43 @@ export class UserProfileManager {
   }
 
   /**
+   * Load user profile by email (for testing purposes)
+   * Requirements: testing.3.1, testing.3.2
+   *
+   * Loads profile data directly from database by email without requiring currentUserEmail.
+   * This method bypasses the normal data isolation check and should ONLY be used in tests.
+   * Used to verify that profile data is preserved in database after logout.
+   *
+   * @param email User email to load profile for
+   * @returns User profile data or null if not found
+   */
+  async loadProfileByEmail(email: string): Promise<UserProfile | null> {
+    try {
+      // Temporarily set currentUserEmail to allow DataManager to load data
+      const originalEmail = this.currentUserEmail;
+      this.currentUserEmail = email;
+
+      const result = this.dataManager.loadData(this.profileKey);
+
+      // Restore original email
+      this.currentUserEmail = originalEmail;
+
+      if (result.success && result.data) {
+        const profile = result.data as UserProfile;
+        this.logger.info(`Profile loaded by email for testing: ${email}`);
+        return profile;
+      }
+
+      this.logger.info(`No profile found for email: ${email}`);
+      return null;
+    } catch (error) {
+      this.logger.error(`Failed to load profile by email: ${error}`);
+      return null;
+    }
+  }
+
+
+  /**
    * Clear user profile from local storage
    * Requirements: ui.6.8, ui.12.18
    *
