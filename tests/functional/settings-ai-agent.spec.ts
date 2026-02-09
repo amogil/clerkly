@@ -276,10 +276,86 @@ test('53.5: should toggle API key visibility', async () => {
    Assertions: Error notification is shown
    Requirements: ui.10.13 */
 test('53.6: should show error notification on save failure', async () => {
-  // This test would require mocking DataManager to fail
-  // For now, we'll skip the actual implementation as it requires
-  // more complex setup with IPC mocking
-  test.skip();
+  // Set user profile data for this test
+  mockServer.setUserProfile({
+    id: '999888777',
+    email: 'error.test@example.com',
+    name: 'Error Test User',
+    given_name: 'Error',
+    family_name: 'Test User',
+  });
+
+  // Launch the application with clean database and environment variable
+  // Requirements: testing.3.1, testing.3.2 - Real Electron, no mocks
+  context = await launchElectron(undefined, {
+    CLERKLY_GOOGLE_API_URL: mockServer.getBaseUrl(),
+    CLERKLY_OAUTH_CLIENT_ID: 'test-client-id-12345',
+    CLERKLY_OAUTH_CLIENT_SECRET: 'test-client-secret-67890',
+  });
+
+  await context.window.waitForLoadState('domcontentloaded');
+
+  // Complete OAuth flow
+  await completeOAuthFlow(context.app, context.window);
+
+  console.log('[TEST] Profile should be loaded');
+
+  // Wait for UI to update
+  await context.window.waitForTimeout(2000);
+
+  // Navigate to Settings
+  const settingsNav = context.window.locator('text=/settings/i');
+  await settingsNav.waitFor({ state: 'visible', timeout: 5000 });
+  await settingsNav.click();
+  await context.window.waitForTimeout(500);
+
+  // Find AI Agent Settings section
+  const aiAgentHeading = context.window.locator('text=/^AI Agent Settings$/i');
+  await aiAgentHeading.waitFor({ state: 'visible', timeout: 5000 });
+
+  console.log('[TEST] AI Agent Settings section visible');
+
+  // Simulate save error for next operation
+  await context.window.evaluate(async () => {
+    if ((window as any).api.test) {
+      await (window as any).api.test.simulateDataError(
+        'saveData',
+        'Database write failed: disk full'
+      );
+    }
+  });
+
+  console.log('[TEST] Error simulation configured');
+
+  // Try to save API key
+  const apiKeyInput = context.window.locator('#ai-agent-api-key');
+  await apiKeyInput.waitFor({ state: 'visible', timeout: 5000 });
+  await apiKeyInput.scrollIntoViewIfNeeded();
+  await apiKeyInput.fill('test-api-key-that-will-fail');
+
+  console.log('[TEST] API key entered, waiting for debounce and save attempt');
+
+  // Wait for debounce and save attempt
+  await context.window.waitForTimeout(1500);
+
+  // Check that error toast is displayed
+  // Sonner toast library uses .sonner-toast class
+  const errorToast = context.window
+    .locator('[data-sonner-toast]')
+    .filter({ hasText: /Failed to save API key/i });
+  await errorToast.waitFor({ state: 'visible', timeout: 5000 });
+  expect(await errorToast.isVisible()).toBe(true);
+
+  console.log('✓ Error notification displayed on save failure');
+
+  // Clean up
+  await context.window.evaluate(async () => {
+    if ((window as any).api.test) {
+      await (window as any).api.test.clearDataErrors();
+    }
+  });
+
+  console.log('✓ Error simulations cleared');
 });
 
 /* Preconditions: App is launched

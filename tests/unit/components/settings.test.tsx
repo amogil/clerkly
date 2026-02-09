@@ -39,6 +39,27 @@ import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { Settings } from '../../../src/renderer/components/settings';
+import { ErrorProvider } from '../../../src/renderer/contexts/error-context';
+
+// Mock sonner toast
+jest.mock('sonner', () => ({
+  toast: {
+    success: jest.fn(),
+    error: jest.fn(),
+    warning: jest.fn(),
+    info: jest.fn(),
+  },
+  Toaster: () => <div data-testid="toaster">Toaster</div>,
+}));
+
+// Helper to render Settings with ErrorProvider
+const renderSettings = (props = {}) => {
+  return render(
+    <ErrorProvider>
+      <Settings {...props} />
+    </ErrorProvider>
+  );
+};
 
 describe('Settings Component - AI Agent Settings', () => {
   beforeEach(() => {
@@ -71,7 +92,7 @@ describe('Settings Component - AI Agent Settings', () => {
      Assertions: LLM Provider dropdown, API Key field, toggle button, and info text are present
      Requirements: ui.10.1, ui.10.2, ui.10.3 */
   test('51.1: should display AI Agent Settings section', async () => {
-    render(<Settings />);
+    renderSettings();
 
     await waitFor(() => {
       expect(mockLoadLLMProvider).toHaveBeenCalled();
@@ -113,7 +134,7 @@ describe('Settings Component - AI Agent Settings', () => {
       apiKey: 'test-key-123',
     });
 
-    render(<Settings />);
+    renderSettings();
 
     await waitFor(() => {
       expect(mockLoadLLMProvider).toHaveBeenCalled();
@@ -132,7 +153,7 @@ describe('Settings Component - AI Agent Settings', () => {
     mockSaveLLMProvider.mockResolvedValue({ success: true });
     mockLoadAPIKey.mockResolvedValue({ success: true, apiKey: '' });
 
-    render(<Settings />);
+    renderSettings();
 
     await waitFor(() => {
       expect(mockLoadLLMProvider).toHaveBeenCalled();
@@ -167,7 +188,7 @@ describe('Settings Component - AI Agent Settings', () => {
   test('51.4: should save API key with debounce', async () => {
     mockSaveAPIKey.mockResolvedValue({ success: true });
 
-    render(<Settings />);
+    renderSettings();
 
     await waitFor(() => {
       expect(mockLoadLLMProvider).toHaveBeenCalled();
@@ -204,7 +225,7 @@ describe('Settings Component - AI Agent Settings', () => {
     });
     mockDeleteAPIKey.mockResolvedValue({ success: true });
 
-    render(<Settings />);
+    renderSettings();
 
     await waitFor(() => {
       expect(mockLoadLLMProvider).toHaveBeenCalled();
@@ -229,7 +250,7 @@ describe('Settings Component - AI Agent Settings', () => {
      Assertions: Input type changes between password and text, icon changes
      Requirements: ui.10.3, ui.10.4, ui.10.5 */
   test('51.6: should toggle API key visibility', async () => {
-    render(<Settings />);
+    renderSettings();
 
     await waitFor(() => {
       expect(mockLoadLLMProvider).toHaveBeenCalled();
@@ -277,7 +298,7 @@ describe('Settings Component - AI Agent Settings', () => {
   test('51.7: should not trigger save when toggling visibility', async () => {
     mockSaveAPIKey.mockResolvedValue({ success: true });
 
-    render(<Settings />);
+    renderSettings();
 
     await waitFor(() => {
       expect(mockLoadLLMProvider).toHaveBeenCalled();
@@ -303,7 +324,7 @@ describe('Settings Component - AI Agent Settings', () => {
      Assertions: Visibility state resets to hidden (password type)
      Requirements: ui.10.8 */
   test('51.8: should not persist visibility state between sessions', async () => {
-    const { unmount } = render(<Settings />);
+    const { unmount } = renderSettings();
 
     await waitFor(() => {
       expect(mockLoadLLMProvider).toHaveBeenCalled();
@@ -328,7 +349,7 @@ describe('Settings Component - AI Agent Settings', () => {
     unmount();
 
     // Remount
-    render(<Settings />);
+    renderSettings();
 
     await waitFor(() => {
       expect(mockLoadLLMProvider).toHaveBeenCalled();
@@ -347,7 +368,7 @@ describe('Settings Component - AI Agent Settings', () => {
     const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
     mockSaveAPIKey.mockRejectedValue(new Error('Save failed'));
 
-    render(<Settings />);
+    renderSettings();
 
     await waitFor(() => {
       expect(mockLoadLLMProvider).toHaveBeenCalled();

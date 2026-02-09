@@ -94,6 +94,20 @@ const userDataPath = app.getPath('userData');
 const storagePath = path.join(userDataPath, 'storage');
 const dataManager = new DataManager(storagePath);
 
+// Requirements: testing.3.1, testing.3.2
+// Helper function to check if we're in test environment
+const isTestEnvironment = () => {
+  return process.env.NODE_ENV === 'test' || process.env.PLAYWRIGHT_TEST === '1';
+};
+
+// Create TestDataManager wrapper in test environment
+import { TestDataManager } from './TestDataManager';
+let testDataManager: TestDataManager | null = null;
+if (isTestEnvironment()) {
+  testDataManager = new TestDataManager(dataManager);
+  logger.info('TestDataManager created for test environment');
+}
+
 // Check if app was launched with a deep link
 const launchUrl = process.argv.find((arg) => arg.startsWith(protocolScheme));
 if (launchUrl) {
@@ -156,7 +170,10 @@ authIPCHandlers.setProfileManager(profileManager);
 
 // Requirements: ui.10.9, ui.10.26
 // Initialize AI Agent Settings Manager
-const aiAgentSettingsManager = new AIAgentSettingsManager(dataManager);
+// Use TestDataManager in test environment for error simulation
+const aiAgentSettingsManager = new AIAgentSettingsManager(
+  isTestEnvironment() && testDataManager ? testDataManager : dataManager
+);
 
 // Requirements: ui.10.9, ui.10.26
 // Initialize Settings IPC Handlers
@@ -177,11 +194,6 @@ if (process.env.NODE_ENV === 'test') {
   // Register test IPC handlers inline to avoid import issues
   // Requirements: testing.3.1.2 - Test IPC handlers for functional tests
   const { ipcMain } = require('electron');
-
-  // Helper function to check if we're in test environment
-  const isTestEnvironment = () => {
-    return process.env.NODE_ENV === 'test' || process.env.PLAYWRIGHT_TEST === '1';
-  };
 
   ipcMain.handle('test:clear-tokens', async () => {
     if (!isTestEnvironment()) {
@@ -406,6 +418,39 @@ if (process.env.NODE_ENV === 'test') {
       logger.error(`Failed to get tokens: ${errorMessage}`);
       return { success: false, error: errorMessage };
     }
+  });
+
+  // Requirements: testing.3.1, testing.3.2 - Test helper to simulate data errors
+  ipcMain.handle(
+    'test:simulate-data-error',
+    async (
+      _event: any,
+      operation: 'saveData' | 'loadData' | 'deleteData',
+      errorMessage: string
+    ) => {
+      if (!isTestEnvironment()) {
+        throw new Error('test:simulate-data-error can only be used in test environment');
+      }
+      if (!testDataManager) {
+        return { success: false, error: 'TestDataManager not initialized' };
+      }
+
+      testDataManager.simulateError(operation, errorMessage);
+      return { success: true };
+    }
+  );
+
+  // Requirements: testing.3.1, testing.3.2 - Test helper to clear error simulations
+  ipcMain.handle('test:clear-data-errors', async () => {
+    if (!isTestEnvironment()) {
+      throw new Error('test:clear-data-errors can only be used in test environment');
+    }
+    if (!testDataManager) {
+      return { success: false, error: 'TestDataManager not initialized' };
+    }
+
+    testDataManager.clearErrorSimulations();
+    return { success: true };
   });
 
   logger.info('Test IPC handlers registered');

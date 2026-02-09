@@ -287,7 +287,6 @@ export class UserProfileManager {
     }
   }
 
-
   /**
    * Clear user profile from local storage
    * Requirements: ui.6.8, ui.12.18

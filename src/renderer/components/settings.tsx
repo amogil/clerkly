@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Cpu, Eye, EyeOff, User, LogOut, AlertCircle } from 'lucide-react';
 import { Logger } from '../Logger';
+import { useError } from '../contexts/error-context';
 
 // Requirements: clerkly.3.5, clerkly.3.7
 const logger = Logger.create('Settings');
@@ -11,6 +12,7 @@ interface SettingsProps {
 }
 
 export function Settings({ onSignOut, onNavigate }: SettingsProps) {
+  const { showError } = useError();
   const [llmProvider, setLlmProvider] = useState<'openai' | 'anthropic' | 'google'>('openai');
   const [apiKey, setApiKey] = useState('');
   const [showApiKey, setShowApiKey] = useState(false);
@@ -157,7 +159,7 @@ export function Settings({ onSignOut, onNavigate }: SettingsProps) {
           if (!saveResult.success) {
             logger.error(`Failed to save API key: ${saveResult.error}`);
             // Requirements: ui.10.13 - Show error notification on save failure
-            // Note: Error notification will be handled by task 48.8
+            showError(`Failed to save API key: ${saveResult.error || 'Unknown error'}`);
           }
           // Requirements: ui.10.12 - No visual indicator for saving (silent save)
         }
@@ -168,7 +170,7 @@ export function Settings({ onSignOut, onNavigate }: SettingsProps) {
 
     // Cleanup: cancel previous timeout
     return () => clearTimeout(timeoutId);
-  }, [apiKey, llmProvider]);
+  }, [apiKey, llmProvider, showError]);
 
   return (
     <div className="p-8">
@@ -267,6 +269,8 @@ export function Settings({ onSignOut, onNavigate }: SettingsProps) {
                 <label className="block text-sm font-medium text-foreground mb-2">API Key</label>
                 <div className="relative">
                   <input
+                    id="ai-agent-api-key"
+                    data-testid="ai-agent-api-key"
                     type={showApiKey ? 'text' : 'password'}
                     value={apiKey}
                     onChange={(e) => setApiKey(e.target.value)}

@@ -50,10 +50,23 @@ export interface DeleteDataResult {
 }
 
 /**
+ * Interface for data storage operations
+ * Allows dependency injection and testing with mock implementations
+ */
+export interface IDataManager {
+  initialize(dbPath: string): InitializeResult;
+  close(): void;
+  saveData(key: string, value: unknown): SaveDataResult;
+  loadData(key: string): LoadDataResult;
+  deleteData(key: string): DeleteDataResult;
+  setUserProfileManager(profileManager: UserProfileManager): void;
+}
+
+/**
  * Manages local data storage using SQLite
  * Requirements: ui.12.10 - Supports user data isolation via UserProfileManager
  */
-export class DataManager {
+export class DataManager implements IDataManager {
   private storagePath: string;
   private db: Database.Database | null = null;
   private migrationRunner: MigrationRunner | null = null;

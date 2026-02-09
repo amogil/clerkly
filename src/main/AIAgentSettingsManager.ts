@@ -1,6 +1,6 @@
 // Requirements: ui.10.9, ui.10.10, ui.10.11, ui.10.14, ui.10.15, ui.10.22
 
-import { DataManager } from './DataManager';
+import type { IDataManager } from './DataManager';
 import { safeStorage } from 'electron';
 import { Logger } from './Logger';
 
@@ -15,9 +15,9 @@ import { Logger } from './Logger';
 export class AIAgentSettingsManager {
   // Requirements: clerkly.3.5, clerkly.3.7
   private logger = Logger.create('AIAgentSettingsManager');
-  private dataManager: DataManager;
+  private dataManager: IDataManager;
 
-  constructor(dataManager: DataManager) {
+  constructor(dataManager: IDataManager) {
     this.dataManager = dataManager;
   }
 
