@@ -11,6 +11,10 @@ import {
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { DateTimeFormatter } from '../utils/DateTimeFormatter';
+import { Logger } from '../Logger';
+
+// Requirements: clerkly.3.5, clerkly.3.7
+const logger = Logger.create('TasksNew');
 
 interface Project {
   id: string;
@@ -203,14 +207,14 @@ export function TasksNew({ triggerAction }: TasksNewProps) {
           </div>
           <div className="flex gap-3">
             <button
-              onClick={() => console.log('New project')}
+              onClick={() => logger.info('New project')}
               className="flex items-center gap-2 px-4 py-2 bg-secondary text-foreground rounded-lg hover:bg-secondary/80 transition-colors"
             >
               <Plus className="w-4 h-4" />
               New Project
             </button>
             <button
-              onClick={() => console.log('New task')}
+              onClick={() => logger.info('New task')}
               className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
             >
               <Plus className="w-4 h-4" />
@@ -246,7 +250,7 @@ export function TasksNew({ triggerAction }: TasksNewProps) {
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            console.log('Edit project');
+                            logger.info('Edit project');
                           }}
                           className="p-1 hover:bg-secondary rounded"
                         >
@@ -353,7 +357,7 @@ export function TasksNew({ triggerAction }: TasksNewProps) {
 
                         <div className="flex gap-1">
                           <button
-                            onClick={() => console.log('Edit task')}
+                            onClick={() => logger.info('Edit task')}
                             className="p-2 hover:bg-secondary rounded-lg transition-colors"
                           >
                             <Edit2 className="w-4 h-4 text-muted-foreground" />
@@ -375,7 +379,7 @@ export function TasksNew({ triggerAction }: TasksNewProps) {
                     <div className="p-12 text-center">
                       <p className="text-muted-foreground">No tasks in this project</p>
                       <button
-                        onClick={() => console.log('Create task')}
+                        onClick={() => logger.info('Create task')}
                         className="mt-4 text-sm text-primary hover:underline"
                       >
                         Create your first task

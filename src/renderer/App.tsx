@@ -17,6 +17,10 @@ import { LoginScreen } from './components/auth/LoginScreen';
 import { LoginError } from './components/auth/LoginError';
 import { parseCommand } from './utils/command-parser';
 import { SimpleRouter, NavigationManager, AuthGuard } from './navigation';
+import { Logger } from './Logger';
+
+// Requirements: clerkly.3.5, clerkly.3.7
+const logger = Logger.create('App');
 
 // Requirements: clerkly.1, google-oauth-auth.12.1, google-oauth-auth.12.2, ui.8.1, ui.8.3, ui.8.4, ui.7.1
 export default function App() {
@@ -125,7 +129,7 @@ function AppContent() {
         // Requirements: ui.8.1, ui.8.3 - Initialize navigation after auth check
         await navigationManager.initialize();
       } catch (error) {
-        console.error('[App] Failed to check auth status:', error);
+        logger.error('[App] Failed to check auth status:', error);
         setIsAuthorized(false);
       }
     };
@@ -135,7 +139,7 @@ function AppContent() {
     // Requirements: google-oauth-auth.8.4, ui.8.3, ui.6.4
     // Listen for auth success events and redirect to dashboard
     const unsubscribeAuthSuccess = window.api.auth.onAuthSuccess(() => {
-      console.log('[App] Auth success event received');
+      logger.info('[App] Auth success event received');
       // Requirements: ui.6.4 - Show loader during synchronous profile fetch
       // The profile is fetched synchronously in Main Process before this event is emitted
       // So by the time we receive this event, the profile is already loaded
@@ -150,20 +154,20 @@ function AppContent() {
     // Listen for auth error events
     const unsubscribeAuthError = window.api.auth.onAuthError(
       (error: string, errorCode?: string) => {
-        console.error('[App] Auth error event received:', { error, errorCode });
-        console.log('[App] Setting authError state and isAuthorized=false');
+        logger.error('[App] Auth error event received:', { error, errorCode });
+        logger.info('[App] Setting authError state and isAuthorized=false');
         // Requirements: ui.6.4 - Hide loader on error
         setIsLoadingProfile(false);
         setAuthError({ message: error, code: errorCode });
         setIsAuthorized(false);
-        console.log('[App] State updated, should trigger re-render');
+        logger.info('[App] State updated, should trigger re-render');
       }
     );
 
     // Requirements: ui.6.8, ui.8.4
     // Listen for logout events and redirect to login
     const unsubscribeLogout = window.api.auth.onLogout(() => {
-      console.log('[App] Logout event received');
+      logger.info('[App] Logout event received');
       setIsAuthorized(false);
       setAuthError(null);
       // Requirements: ui.8.4 - Redirect to login after logout
@@ -172,7 +176,7 @@ function AppContent() {
 
     // Requirements: ui.7.1 - Listen for error notification events from Main Process
     const unsubscribeErrorNotify = window.api.error.onNotify((message: string, context: string) => {
-      console.log('[App] Error notification received:', { message, context });
+      logger.info('[App] Error notification received:', { message, context });
       showError(`${context}: ${message}`);
     });
 
@@ -219,7 +223,7 @@ function AppContent() {
       }
       // Note: If success, loader will be hidden by auth:success or auth:error event
     } catch (error) {
-      console.error('[App] Login failed:', error);
+      logger.error('[App] Login failed:', error);
       setIsLoadingProfile(false);
       setAuthError({ message: 'Failed to start login' });
     }
@@ -232,7 +236,7 @@ function AppContent() {
       setIsAuthorized(false);
       setAuthError(null);
     } catch (error) {
-      console.error('[App] Logout failed:', error);
+      logger.error('[App] Logout failed:', error);
     }
   };
 

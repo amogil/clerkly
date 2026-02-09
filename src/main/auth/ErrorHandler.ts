@@ -2,6 +2,9 @@
 
 import { Logger } from '../Logger';
 
+// Requirements: clerkly.3.5, clerkly.3.7 - Create parameterized logger for OAuth ErrorHandler
+const logger = Logger.create('OAuth');
+
 // Requirements: clerkly.3.8 - Use centralized Logger instead of console.*
 /**
  * Error details interface
@@ -102,7 +105,7 @@ export function getErrorDetails(errorCode?: string, errorMessage?: string): Erro
 
 /**
  * Log error with context
- * Requirements: google-oauth-auth.9.5
+ * Requirements: google-oauth-auth.9.5, clerkly.3.5, clerkly.3.7
  * @param operation Operation that failed
  * @param error Error object or message
  * @param context Additional context for debugging
@@ -116,8 +119,7 @@ export function logError(
   const errorMessage = errorObj?.message || String(error) || 'Unknown error';
   const errorCode = errorObj?.code || errorObj?.error || 'unknown';
 
-  Logger.error(
-    'OAuth',
+  logger.error(
     `${operation} failed: ${errorMessage} ${JSON.stringify({
       errorCode,
       timestamp: Date.now(),

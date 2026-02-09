@@ -310,7 +310,7 @@
 - [x] Создать файл `src/main/auth/ErrorHandler.ts`
 - [x] Реализовать функцию `getErrorDetails(errorCode?: string, errorMessage?: string): ErrorDetails`
 - [x] Добавить маппинг для всех типов ошибок (popup_closed_by_user, access_denied, network_error, invalid_grant, invalid_request, server_error, temporarily_unavailable, csrf_attack_detected, database_error, profile_fetch_failed)
-- [ ] Реализовать функцию логирования ошибок с контекстом через Logger класс (clerkly.3)
+- [x] Реализовать функцию логирования ошибок с контекстом через Logger класс (clerkly.3)
 - [x] Добавить интерфейсы `ErrorDetails` и `ErrorResponse`
 - **Requirements:** google-oauth-auth.9.1, google-oauth-auth.9.2, google-oauth-auth.9.3, google-oauth-auth.9.4, google-oauth-auth.9.5, google-oauth-auth.9.6
 - **Примечание:** Задача зависит от clerkly.3.1 (создание Logger класса)
@@ -321,7 +321,7 @@
 - [x] Тест: возврат default ошибки для неизвестного кода
 - [x] Тест: использование errorMessage для default ошибки
 - [x] Тест: структура ErrorResponse
-- [ ] Тест: логирование ошибок с контекстом через Logger класс
+- [x] Тест: логирование ошибок с контекстом через Logger класс
 - **Requirements:** google-oauth-auth.9.1, google-oauth-auth.9.2, google-oauth-auth.9.3, google-oauth-auth.9.4, google-oauth-auth.9.5, google-oauth-auth.9.6
 - **Примечание:** Задача зависит от clerkly.3.1 и clerkly.3.2 (создание Logger класса и тестов)
 

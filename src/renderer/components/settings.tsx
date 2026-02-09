@@ -1,5 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Cpu, Eye, EyeOff, User, LogOut, AlertCircle } from 'lucide-react';
+import { Logger } from '../Logger';
+
+// Requirements: clerkly.3.5, clerkly.3.7
+const logger = Logger.create('Settings');
 
 interface SettingsProps {
   onSignOut?: () => void;
@@ -42,7 +46,7 @@ export function Settings({ onSignOut, onNavigate }: SettingsProps) {
           });
         }
       } catch (error) {
-        console.error('Failed to load profile:', error);
+        logger.error('Failed to load profile:', error);
         setProfile({
           name: '',
           email: '',
@@ -55,7 +59,7 @@ export function Settings({ onSignOut, onNavigate }: SettingsProps) {
 
     // Listen for profile updates
     const handleProfileUpdate = () => {
-      console.log('[Settings] Profile updated, reloading...');
+      logger.info('[Settings] Profile updated, reloading...');
       loadProfile();
     };
 
@@ -90,7 +94,7 @@ export function Settings({ onSignOut, onNavigate }: SettingsProps) {
           setApiKey('');
         }
       } catch (error) {
-        console.error('Failed to load AI Agent settings:', error);
+        logger.error('Failed to load AI Agent settings:', error);
         // Use default values on error
         setLlmProvider('openai');
         setApiKey('');
@@ -113,7 +117,7 @@ export function Settings({ onSignOut, onNavigate }: SettingsProps) {
         // Save provider immediately (no debounce)
         const saveResult = await window.api.settings.saveLLMProvider(llmProvider);
         if (!saveResult.success) {
-          console.error('Failed to save LLM provider:', saveResult.error);
+          logger.error('Failed to save LLM provider:', saveResult.error);
           // Requirements: ui.10.13 - Show error notification on save failure
           // Note: Error notification will be handled by task 48.8
         }
@@ -127,7 +131,7 @@ export function Settings({ onSignOut, onNavigate }: SettingsProps) {
           setApiKey('');
         }
       } catch (error) {
-        console.error('Failed to save provider or load API key:', error);
+        logger.error('Failed to save provider or load API key:', error);
       }
     };
 
@@ -143,7 +147,7 @@ export function Settings({ onSignOut, onNavigate }: SettingsProps) {
           // Requirements: ui.10.11 - Delete API key when field is cleared
           const deleteResult = await window.api.settings.deleteAPIKey(llmProvider);
           if (!deleteResult.success) {
-            console.error('Failed to delete API key:', deleteResult.error);
+            logger.error('Failed to delete API key:', deleteResult.error);
             // Requirements: ui.10.13 - Show error notification on save failure
             // Note: Error notification will be handled by task 48.8
           }
@@ -151,14 +155,14 @@ export function Settings({ onSignOut, onNavigate }: SettingsProps) {
           // Save API key with debounce
           const saveResult = await window.api.settings.saveAPIKey(llmProvider, apiKey);
           if (!saveResult.success) {
-            console.error('Failed to save API key:', saveResult.error);
+            logger.error('Failed to save API key:', saveResult.error);
             // Requirements: ui.10.13 - Show error notification on save failure
             // Note: Error notification will be handled by task 48.8
           }
           // Requirements: ui.10.12 - No visual indicator for saving (silent save)
         }
       } catch (error) {
-        console.error('Failed to save/delete API key:', error);
+        logger.error('Failed to save/delete API key:', error);
       }
     }, 500);
 
@@ -184,7 +188,7 @@ export function Settings({ onSignOut, onNavigate }: SettingsProps) {
                 </div>
                 <button
                   onClick={() => {
-                    console.log('Logging out...');
+                    logger.info('Logging out...');
                     if (onSignOut) {
                       onSignOut();
                     }

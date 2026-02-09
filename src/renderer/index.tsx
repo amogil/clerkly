@@ -8,13 +8,17 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import './styles/index.css';
+import { Logger } from './Logger';
+
+// Requirements: clerkly.3.5, clerkly.3.7
+const logger = Logger.create('Index');
 
 // Requirements: clerkly.1
 /**
  * Инициализирует renderer process с React
  */
 async function initializeRenderer(): Promise<void> {
-  console.log('Clerkly - Initializing Renderer Process');
+  logger.info('Clerkly - Initializing Renderer Process');
 
   try {
     // Получаем root контейнер
@@ -32,9 +36,9 @@ async function initializeRenderer(): Promise<void> {
       </React.StrictMode>
     );
 
-    console.log('Renderer Process initialized successfully');
+    logger.info('Renderer Process initialized successfully');
   } catch (error: unknown) {
-    console.error('Failed to initialize Renderer Process:', error);
+    logger.error('Failed to initialize Renderer Process:', error);
     // Показываем ошибку пользователю
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     document.body.innerHTML = `

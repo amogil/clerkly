@@ -1,5 +1,9 @@
 // Requirements: ui.6.1, ui.6.2, ui.6.3, ui.6.4, ui.6.8
 import React, { useState, useEffect } from 'react';
+import { Logger } from '../Logger';
+
+// Requirements: clerkly.3.5, clerkly.3.7
+const logger = Logger.create('Account');
 
 /**
  * User profile data from Google UserInfo API
@@ -55,7 +59,7 @@ export function Account({ className = '', onSignOut }: AccountProps) {
         }
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-        console.error('[Account] Failed to load profile:', errorMessage);
+        logger.error('[Account] Failed to load profile:', errorMessage);
         setError(errorMessage);
       } finally {
         setLoading(false);
@@ -71,7 +75,7 @@ export function Account({ className = '', onSignOut }: AccountProps) {
    */
   useEffect(() => {
     const handleAuthSuccess = async () => {
-      console.log('[Account] Auth success event received, reloading profile');
+      logger.info('[Account] Auth success event received, reloading profile');
       try {
         const result = await window.api.auth.getProfile();
         if (result.success) {
@@ -80,7 +84,7 @@ export function Account({ className = '', onSignOut }: AccountProps) {
         }
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-        console.error('[Account] Failed to reload profile after auth:', errorMessage);
+        logger.error('[Account] Failed to reload profile after auth:', errorMessage);
       }
     };
 
@@ -96,7 +100,7 @@ export function Account({ className = '', onSignOut }: AccountProps) {
    */
   useEffect(() => {
     const handleLogout = () => {
-      console.log('[Account] Logout event received, clearing profile');
+      logger.info('[Account] Logout event received, clearing profile');
       setProfile(null);
       setError(null);
     };
@@ -113,7 +117,7 @@ export function Account({ className = '', onSignOut }: AccountProps) {
    */
   useEffect(() => {
     const handleProfileUpdated = (updatedProfile: UserProfile | null) => {
-      console.log('[Account] Profile updated event received, updating UI');
+      logger.info('[Account] Profile updated event received, updating UI');
       setProfile(updatedProfile);
       setError(null);
     };

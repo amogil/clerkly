@@ -193,9 +193,9 @@ describe('ErrorHandler', () => {
 
     /* Preconditions: Error object with message and code
        Action: Call logError with operation name and error
-       Assertions: Error is logged with operation, message, code, and timestamp
-       Requirements: google-oauth-auth.9.5 */
-    it('should log error with context', () => {
+       Assertions: Error is logged via Logger with operation, message, code, and timestamp
+       Requirements: google-oauth-auth.9.5, clerkly.3.5, clerkly.3.7 */
+    it('should log error with context using Logger', () => {
       const operation = 'token_exchange';
       const error = { message: 'Token exchange failed', code: 'invalid_grant' };
       const context = { userId: '123' };
@@ -209,9 +209,9 @@ describe('ErrorHandler', () => {
 
     /* Preconditions: Error is a string
        Action: Call logError with string error
-       Assertions: Error is logged with string converted to message
-       Requirements: google-oauth-auth.9.5 */
-    it('should handle string errors', () => {
+       Assertions: Error is logged via Logger with string converted to message
+       Requirements: google-oauth-auth.9.5, clerkly.3.5, clerkly.3.7 */
+    it('should handle string errors using Logger', () => {
       const operation = 'auth_flow';
       const error = 'Network connection failed';
 
@@ -224,9 +224,9 @@ describe('ErrorHandler', () => {
 
     /* Preconditions: Error object without message
        Action: Call logError with error object that has no message
-       Assertions: Error is logged with 'Unknown error' message
-       Requirements: google-oauth-auth.9.5 */
-    it('should handle errors without message', () => {
+       Assertions: Error is logged via Logger with 'Unknown error' message
+       Requirements: google-oauth-auth.9.5, clerkly.3.5, clerkly.3.7 */
+    it('should handle errors without message using Logger', () => {
       const operation = 'logout';
       const error = { code: 'revoke_failed' };
 
@@ -239,9 +239,9 @@ describe('ErrorHandler', () => {
 
     /* Preconditions: No context provided
        Action: Call logError without context parameter
-       Assertions: Error is logged with empty context object
-       Requirements: google-oauth-auth.9.5 */
-    it('should log error without context', () => {
+       Assertions: Error is logged via Logger with empty context object
+       Requirements: google-oauth-auth.9.5, clerkly.3.5, clerkly.3.7 */
+    it('should log error without context using Logger', () => {
       const operation = 'refresh_token';
       const error = new Error('Refresh failed');
 
