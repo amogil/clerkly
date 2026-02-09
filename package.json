@@ -25,6 +25,8 @@
     "test:property": "jest --config jest.property.config.js",
     "test:functional": "npm run rebuild:electron && npm run build && playwright test",
     "test:functional:verbose": "npm run rebuild:electron && npm run build && playwright test --reporter=list",
+    "test:functional:debug": "npm run rebuild:electron && npm run build && playwright test --reporter=list --max-failures=1",
+    "test:functional:single": "npm run rebuild:electron && npm run build && playwright test --reporter=list",
     "test:coverage": "jest --config jest.combined.config.js --coverage",
     "test:coverage:separate": "jest --config jest.unit.config.js --coverage --coverageDirectory=coverage/unit && jest --config jest.property.config.js --coverage --coverageDirectory=coverage/property",
     "test:watch": "jest --watch",

@@ -158,6 +158,104 @@ npm run rebuild:node && npm run test:property
 npm run rebuild:node && npm run test:functional
 ```
 
+### Команды для Запуска Тестов
+
+#### Модульные и Property-Based Тесты
+
+```bash
+# Запустить все модульные и property-based тесты
+npm test
+
+# Запустить только модульные тесты
+npm run test:unit
+
+# Запустить только property-based тесты
+npm run test:property
+
+# Запустить тесты с покрытием кода
+npm run test:coverage
+```
+
+**КРИТИЧЕСКИ ВАЖНО**: При падении тестов запускать ТОЛЬКО упавшие тесты для отладки, а не все тесты заново. Используйте команды для запуска конкретных тестов (см. примеры ниже).
+
+#### Функциональные Тесты
+
+**ВАЖНО**: Функциональные тесты показывают реальные окна Electron на экране!
+
+```bash
+# Запустить все функциональные тесты (краткий вывод)
+npm run test:functional
+
+# Запустить все функциональные тесты (подробный вывод)
+npm run test:functional:verbose
+
+# Запустить с остановкой на первой ошибке (для отладки)
+npm run test:functional:debug
+
+# Запустить конкретный тест
+npm run test:functional:single -- navigation.spec.ts
+
+# Запустить несколько конкретных тестов
+npm run test:functional:single -- "navigation.spec.ts|token-management.spec.ts"
+
+# Запустить тест по названию (grep)
+npm run test:functional:single -- --grep "should show login screen"
+```
+
+**Примеры запуска отдельных тестов:**
+
+```bash
+# Запустить только тесты навигации
+npm run test:functional:single -- navigation.spec.ts
+
+# Запустить только тесты профиля аккаунта
+npm run test:functional:single -- account-profile.spec.ts
+
+# Запустить только тесты OAuth
+npm run test:functional:single -- "oauth-*.spec.ts"
+
+# Запустить конкретный тест по названию
+npm run test:functional:single -- --grep "should redirect to dashboard"
+```
+
+**Отладка упавших тестов:**
+
+```bash
+# Запустить с остановкой на первой ошибке
+npm run test:functional:debug -- account-profile.spec.ts
+
+# Посмотреть HTML отчет после запуска
+npx playwright show-report
+
+# Запустить в headed режиме (видеть браузер)
+npm run test:functional:single -- --headed navigation.spec.ts
+```
+
+### Подготовка к Запуску Тестов
+
+**КРИТИЧЕСКИ ВАЖНО**: Перед запуском тестов НЕОБХОДИМО перебилдить нативные модули для текущей версии Node.js.
+
+```bash
+# Перебилдить better-sqlite3 для текущей версии Node.js
+npm run rebuild:node
+```
+
+**Когда нужно запускать rebuild:**
+- После переключения версии Node.js
+- После установки/обновления зависимостей (`npm install`)
+- При ошибках типа `ERR_DLOPEN_FAILED` или `MODULE_NOT_FOUND`
+- Перед первым запуском тестов после клонирования репозитория
+
+**Автоматический rebuild:**
+Команда `npm test` автоматически выполняет `npm run rebuild:node`.
+
+Для отдельных типов тестов rebuild нужно запускать вручную:
+```bash
+npm run rebuild:node && npm run test:unit
+npm run rebuild:node && npm run test:property
+npm run rebuild:node && npm run test:functional
+```
+
 ### Запуск Функциональных Тестов
 
 **КРИТИЧЕСКИ ВАЖНО**: Функциональные тесты используют реальный Electron и показывают окна на экране.
