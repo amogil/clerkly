@@ -75,26 +75,29 @@ test('53.1: should save and load LLM provider selection', async () => {
   // Select Anthropic
   await context.window.selectOption('select:near(:text("LLM Provider"))', 'anthropic');
 
-  // Wait for save
-  await context.window.waitForTimeout(100);
+  // Wait for save and data to flush to disk
+  await context.window.waitForTimeout(1000);
 
-  // Close and reopen app
+  // Close and reopen app (keep data for persistence test)
   const testDataPath = context.testDataPath;
-  await closeElectron(context);
+  await closeElectron(context, false); // Don't cleanup data
 
   // Relaunch with same data path
   context = await launchElectron(testDataPath, {
     CLERKLY_GOOGLE_API_URL: mockServer.getBaseUrl(),
   });
   await context.window.waitForLoadState('domcontentloaded');
-  await context.window.waitForTimeout(2000);
+
+  // Re-authenticate after restart
+  await completeOAuthFlow(context.app, context.window, TEST_CLIENT_ID);
+  await context.window.waitForTimeout(1000);
 
   // Navigate to Settings
   await context.window.click('text=Settings');
   await context.window.waitForSelector('text=AI Agent Settings');
 
   // Check that Anthropic is selected
-  const selectedValue = context.window.inputValue('select:near(:text("LLM Provider"))');
+  const selectedValue = await context.window.inputValue('select:near(:text("LLM Provider"))');
   expect(selectedValue).toBe('anthropic');
 });
 
@@ -113,19 +116,22 @@ test('53.2: should save and load API key with encryption', async () => {
   const apiKeyInput = context.window.locator('input[placeholder="Enter your API key"]');
   await apiKeyInput.fill(testApiKey);
 
-  // Wait for debounce (500ms)
-  await context.window.waitForTimeout(600);
+  // Wait for debounce and data to flush to disk
+  await context.window.waitForTimeout(1000);
 
-  // Close and reopen app
+  // Close and reopen app (keep data for persistence test)
   const testDataPath = context.testDataPath;
-  await closeElectron(context);
+  await closeElectron(context, false); // Don't cleanup data
 
   // Relaunch with same data path
   context = await launchElectron(testDataPath, {
     CLERKLY_GOOGLE_API_URL: mockServer.getBaseUrl(),
   });
   await context.window.waitForLoadState('domcontentloaded');
-  await context.window.waitForTimeout(2000);
+
+  // Re-authenticate after restart
+  await completeOAuthFlow(context.app, context.window, TEST_CLIENT_ID);
+  await context.window.waitForTimeout(1000);
 
   // Navigate to Settings
   await context.window.click('text=Settings');
@@ -169,16 +175,19 @@ test('53.3: should delete API key when field is cleared', async () => {
   await apiKeyInput.fill('');
   await context.window.waitForTimeout(600);
 
-  // Close and reopen app
+  // Close and reopen app (keep data for persistence test)
   const testDataPath = context.testDataPath;
-  await closeElectron(context);
+  await closeElectron(context, false); // Don't cleanup data
 
   // Relaunch with same data path
   context = await launchElectron(testDataPath, {
     CLERKLY_GOOGLE_API_URL: mockServer.getBaseUrl(),
   });
   await context.window.waitForLoadState('domcontentloaded');
-  await context.window.waitForTimeout(2000);
+
+  // Re-authenticate after restart
+  await completeOAuthFlow(context.app, context.window, TEST_CLIENT_ID);
+  await context.window.waitForTimeout(1000);
 
   // Navigate to Settings
   await context.window.click('text=Settings');

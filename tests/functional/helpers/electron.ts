@@ -73,14 +73,15 @@ export async function launchElectron(
  * Close Electron application and cleanup
  *
  * @param context - Electron test context
+ * @param cleanup - Whether to delete test data directory (default: true)
  */
-export async function closeElectron(context: ElectronTestContext): Promise<void> {
+export async function closeElectron(context: ElectronTestContext, cleanup: boolean = true): Promise<void> {
   // Close the application
   await context.app.close();
 
   // Cleanup test data directory
   // Requirements: testing.3.7
-  if (fs.existsSync(context.testDataPath)) {
+  if (cleanup && fs.existsSync(context.testDataPath)) {
     try {
       fs.rmSync(context.testDataPath, { recursive: true, force: true });
     } catch (error) {
