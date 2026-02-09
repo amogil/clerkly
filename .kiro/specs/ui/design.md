@@ -1668,7 +1668,7 @@ describe('Window UI Functional Tests', () => {
 | ui.12.5 | ✓ | - | ✓ |
 | ui.12.6 | ✓ | - | ✓ |
 | ui.12.7 | ✓ | ✓ | ✓ |
-| ui.12.8 | ✓ | - | - |
+| ui.12.8 | ✓ | - | ✓ |
 | ui.12.9 | ✓ | - | - |
 | ui.12.10 | ✓ | - | - |
 | ui.12.11 | ✓ | ✓ | ✓ |
@@ -2024,14 +2024,6 @@ describe('AI Agent Settings Functional Tests', () => {
      Requirements: ui.10.9, ui.10.10, ui.10.14 */
   it('should persist AI Agent settings across restarts', async () => {
     // Тест персистентности настроек
-  });
-
-  /* Preconditions: user A logged in, settings saved
-     Action: logout user A, login user B, check settings
-     Assertions: user B sees empty/default settings, not user A's settings
-     Requirements: ui.12.8 */
-  it('should isolate settings between users', async () => {
-    // Тест изоляции настроек между пользователями (покрывается через ui.12)
   });
 
   /* Preconditions: API keys saved for all providers

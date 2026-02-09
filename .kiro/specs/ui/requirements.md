@@ -468,7 +468,6 @@ Token Expiring → OAuthClientManager.refreshAccessToken() → Update Tokens in 
 - `tests/functional/settings-ai-agent.spec.ts` - "should toggle API key visibility"
 - `tests/functional/settings-ai-agent.spec.ts` - "should show error notification on save failure"
 - `tests/functional/settings-ai-agent.spec.ts` - "should persist settings after logout and restore on re-login"
-- `tests/functional/settings-ai-agent.spec.ts` - "should isolate settings between different users"
 - `tests/functional/settings-ai-agent.spec.ts` - "should preserve API keys when switching providers"
 - `tests/functional/settings-ai-agent.spec.ts` - "should load correct API key when switching back to provider"
 

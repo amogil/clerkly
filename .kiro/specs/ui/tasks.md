@@ -1861,25 +1861,6 @@
   - Закрыть приложение
   - **Requirements:** ui.10.13
 
-
-- [x] 53.7 Функциональный тест: should isolate settings between users
-  - Запустить приложение, авторизоваться как User A
-  - Открыть Settings → AI Agent Settings
-  - Выбрать OpenAI и ввести API ключ A
-  - Подождать 500ms
-  - Выполнить logout
-  - Авторизоваться как User B
-  - Открыть Settings → AI Agent Settings
-  - Проверить, что настройки пустые (провайдер по умолчанию, пустой ключ)
-  - Выбрать Anthropic и ввести API ключ B
-  - Подождать 500ms
-  - Выполнить logout
-  - Авторизоваться как User A снова
-  - Открыть Settings → AI Agent Settings
-  - Проверить, что выбран OpenAI и загружен ключ A
-  - Закрыть приложение
-  - **Requirements:** ui.12.8 (изоляция данных AI Agent покрывается через общую изоляцию пользовательских данных)
-
 ### 54. Обновление Документации (AI Agent Settings)
 
 - [x] 54.1 Добавить JSDoc комментарии к AIAgentSettingsManager

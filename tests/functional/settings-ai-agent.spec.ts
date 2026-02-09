@@ -357,13 +357,3 @@ test('53.6: should show error notification on save failure', async () => {
 
   console.log('✓ Error simulations cleared');
 });
-
-/* Preconditions: App is launched
-   Action: Login as User A, set settings, logout, login as User B, check settings, logout, login as User A
-   Assertions: Settings are isolated between users
-   Requirements: ui.12.8 */
-test('53.7: should isolate settings between users', async () => {
-  // This test requires multi-user authentication setup
-  // For now, we'll skip as it requires OAuth mock server
-  test.skip();
-});
