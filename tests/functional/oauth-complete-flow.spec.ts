@@ -74,8 +74,10 @@ test.describe('Complete OAuth Flow', () => {
      Assertions: Authorization code is generated, exchanged for tokens, tokens are stored
      Requirements: google-oauth-auth.1.1, google-oauth-auth.1.2, google-oauth-auth.1.3, google-oauth-auth.1.4, google-oauth-auth.1.5 */
   test('should complete full OAuth flow with authorization code exchange', async () => {
-    // Launch the application
-    context = await launchElectron();
+    // Launch the application with mock OAuth server URL
+    context = await launchElectron(undefined, {
+      CLERKLY_GOOGLE_API_URL: mockServer.getBaseUrl(),
+    });
     await context.window.waitForLoadState('domcontentloaded');
 
     // Clear any existing tokens
@@ -126,8 +128,10 @@ test.describe('Complete OAuth Flow', () => {
      Assertions: Tokens are stored and app transitions to authorized state
      Requirements: google-oauth-auth.3.1, google-oauth-auth.3.2, google-oauth-auth.3.3, google-oauth-auth.3.5 */
   test('should simulate token exchange and storage', async () => {
-    // Launch the application
-    context = await launchElectron();
+    // Launch the application with mock OAuth server URL
+    context = await launchElectron(undefined, {
+      CLERKLY_GOOGLE_API_URL: mockServer.getBaseUrl(),
+    });
     await context.window.waitForLoadState('domcontentloaded');
 
     // Clear any existing tokens
@@ -167,8 +171,10 @@ test.describe('Complete OAuth Flow', () => {
      Assertions: App handles errors gracefully
      Requirements: google-oauth-auth.3.4 */
   test('should handle OAuth errors gracefully', async () => {
-    // Launch the application
-    context = await launchElectron();
+    // Launch the application with mock OAuth server URL
+    context = await launchElectron(undefined, {
+      CLERKLY_GOOGLE_API_URL: mockServer.getBaseUrl(),
+    });
     await context.window.waitForLoadState('domcontentloaded');
 
     // Clear any existing tokens
