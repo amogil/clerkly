@@ -1,13 +1,46 @@
-// Requirements: ui.6.1, testing.3.1, testing.3.2, testing.3.6
-
 import { test, expect } from '@playwright/test';
-import {
-  launchElectron,
-  closeElectron,
-  ElectronTestContext,
-  setupTestTokens,
-} from './helpers/electron';
+import { launchElectron, closeElectron, ElectronTestContext } from './helpers/electron';
 import { MockOAuthServer } from './helpers/mock-oauth-server';
+
+/**
+ * Helper function to complete OAuth flow with deep link
+ */
+async function completeOAuthFlow(
+  context: ElectronTestContext,
+  _mockServer: MockOAuthServer
+): Promise<void> {
+  // Start OAuth flow to generate PKCE parameters
+  await context.window.evaluate(async () => {
+    await (window as any).electron.ipcRenderer.invoke('auth:start-login');
+  });
+
+  // Wait for OAuth flow to initialize
+  await context.window.waitForTimeout(2000);
+
+  // Get PKCE state from OAuthClientManager
+  const pkceState = await context.app.evaluate(async () => {
+    const { oauthClient } = (global as any).testContext || {};
+    if (!oauthClient || !oauthClient.pkceStorage) {
+      throw new Error('PKCE storage not found');
+    }
+    return oauthClient.pkceStorage.state;
+  });
+
+  // Generate authorization code
+  const authCode = `test_auth_code_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+
+  // Construct deep link URL
+  const redirectUri = 'com.googleusercontent.apps.test-client-id-12345:/oauth2redirect';
+  const deepLinkUrl = `${redirectUri}?code=${authCode}&state=${pkceState}`;
+
+  // Trigger deep link handling
+  await context.window.evaluate(async (url) => {
+    return await (window as any).electron.ipcRenderer.invoke('test:handle-deep-link', url);
+  }, deepLinkUrl);
+
+  // Wait for profile to be fetched and saved
+  await context.window.waitForTimeout(2000);
+}
 
 /**
  * Functional tests for Account Profile component
@@ -111,34 +144,52 @@ test.describe('Account Profile', () => {
     // Requirements: testing.3.1, testing.3.2 - Real Electron, no mocks
     context = await launchElectron(undefined, {
       CLERKLY_GOOGLE_API_URL: mockServer.getBaseUrl(),
+      CLERKLY_OAUTH_CLIENT_ID: 'test-client-id-12345',
+      CLERKLY_OAUTH_CLIENT_SECRET: 'test-client-secret-67890',
     });
 
     // Wait for content to load
     await context.window.waitForLoadState('domcontentloaded');
 
-    // Setup test tokens to simulate successful OAuth
-    // Requirements: ui.6.2 - Profile should load after OAuth
-    // Note: CLERKLY_GOOGLE_API_URL environment variable is set in beforeAll
-    // to redirect API calls to mock server
-    await setupTestTokens(context.window, {
-      accessToken: 'test_access_token_oauth_flow',
-      refreshToken: 'test_refresh_token_oauth_flow',
-      expiresIn: 3600,
-      tokenType: 'Bearer',
-    });
-
-    console.log('[TEST] Tokens setup, waiting for profile to load...');
-
-    // Trigger profile fetch and auth:success event
-    // This simulates what happens after successful OAuth flow
+    // Start OAuth flow to generate PKCE parameters
     await context.window.evaluate(async () => {
-      await (window as any).electron.ipcRenderer.invoke('test:trigger-auth-success');
+      await (window as any).electron.ipcRenderer.invoke('auth:start-login');
     });
 
-    console.log('[TEST] Auth success triggered, profile should be loaded');
+    // Wait for OAuth flow to initialize
+    await context.window.waitForTimeout(2000);
 
-    // Wait longer for profile to be fetched, saved, and UI to update
-    await context.window.waitForTimeout(3000);
+    console.log('[TEST] OAuth flow started, getting PKCE state...');
+
+    // Get PKCE state from OAuthClientManager
+    const pkceState = await context.app.evaluate(async () => {
+      const { oauthClient } = (global as any).testContext || {};
+      if (!oauthClient || !oauthClient.pkceStorage) {
+        throw new Error('PKCE storage not found');
+      }
+      return oauthClient.pkceStorage.state;
+    });
+
+    console.log('[TEST] PKCE state retrieved:', pkceState);
+
+    // Generate authorization code
+    const authCode = `test_auth_code_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+
+    // Construct deep link URL
+    const redirectUri = 'com.googleusercontent.apps.test-client-id-12345:/oauth2redirect';
+    const deepLinkUrl = `${redirectUri}?code=${authCode}&state=${pkceState}`;
+
+    console.log('[TEST] Deep link URL:', deepLinkUrl);
+
+    // Trigger deep link handling
+    await context.window.evaluate(async (url) => {
+      return await (window as any).electron.ipcRenderer.invoke('test:handle-deep-link', url);
+    }, deepLinkUrl);
+
+    console.log('[TEST] Deep link handled, profile should be loaded');
+
+    // Wait for profile to be fetched, saved, and UI to update
+    await context.window.waitForTimeout(2000);
 
     // Verify profile is in database
     const profileCheck = await context.window.evaluate(async () => {
@@ -259,33 +310,43 @@ test.describe('Account Profile', () => {
     // Requirements: testing.3.1, testing.3.2 - Real Electron, no mocks
     context = await launchElectron(undefined, {
       CLERKLY_GOOGLE_API_URL: mockServer.getBaseUrl(),
+      CLERKLY_OAUTH_CLIENT_ID: 'test-client-id-12345',
+      CLERKLY_OAUTH_CLIENT_SECRET: 'test-client-secret-67890',
     });
 
     // Wait for content to load
     await context.window.waitForLoadState('domcontentloaded');
 
-    // Setup test tokens to simulate successful OAuth
-    // Requirements: ui.6.4 - Need authenticated state to see profile fields
-    // Note: CLERKLY_GOOGLE_API_URL environment variable is set in beforeAll
-    // to redirect API calls to mock server
-    await setupTestTokens(context.window, {
-      accessToken: 'test_access_token_readonly',
-      refreshToken: 'test_refresh_token_readonly',
-      expiresIn: 3600,
-      tokenType: 'Bearer',
-    });
-
-    console.log('[TEST] Tokens setup, waiting for profile to load...');
-
-    // Trigger profile fetch and auth:success event
+    // Start OAuth flow
     await context.window.evaluate(async () => {
-      await (window as any).electron.ipcRenderer.invoke('test:trigger-auth-success');
+      await (window as any).electron.ipcRenderer.invoke('auth:start-login');
     });
+
+    await context.window.waitForTimeout(2000);
+
+    // Get PKCE state
+    const pkceState = await context.app.evaluate(async () => {
+      const { oauthClient } = (global as any).testContext || {};
+      if (!oauthClient || !oauthClient.pkceStorage) {
+        throw new Error('PKCE storage not found');
+      }
+      return oauthClient.pkceStorage.state;
+    });
+
+    // Generate authorization code and deep link
+    const authCode = `test_auth_code_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+    const redirectUri = 'com.googleusercontent.apps.test-client-id-12345:/oauth2redirect';
+    const deepLinkUrl = `${redirectUri}?code=${authCode}&state=${pkceState}`;
+
+    // Trigger deep link handling
+    await context.window.evaluate(async (url) => {
+      return await (window as any).electron.ipcRenderer.invoke('test:handle-deep-link', url);
+    }, deepLinkUrl);
 
     console.log('[TEST] Auth success triggered, profile should be loaded');
 
     // Wait for UI to update (profile fetch + UI render)
-    await context.window.waitForTimeout(3000);
+    await context.window.waitForTimeout(2000);
 
     // Verify profile is in database
     const profileCheck = await context.window.evaluate(async () => {
@@ -465,28 +526,17 @@ test.describe('Account Profile', () => {
     // Requirements: testing.3.1, testing.3.2 - Real Electron, no mocks
     context = await launchElectron(undefined, {
       CLERKLY_GOOGLE_API_URL: mockServer.getBaseUrl(),
+      CLERKLY_OAUTH_CLIENT_ID: 'test-client-id-12345',
+      CLERKLY_OAUTH_CLIENT_SECRET: 'test-client-secret-67890',
     });
 
     // Wait for content to load
     await context.window.waitForLoadState('domcontentloaded');
 
-    // Setup test tokens to simulate successful OAuth
-    // Requirements: ui.6.5 - Need authenticated state with profile
-    await setupTestTokens(context.window, {
-      accessToken: 'test_access_token_update_profile',
-      refreshToken: 'test_refresh_token_update_profile',
-      expiresIn: 3600,
-      tokenType: 'Bearer',
-    });
+    // Complete OAuth flow with initial profile
+    await completeOAuthFlow(context, mockServer);
 
-    console.log('[TEST] Tokens setup, waiting for initial profile to load...');
-
-    // Trigger profile fetch and auth:success event
-    await context.window.evaluate(async () => {
-      await (window as any).electron.ipcRenderer.invoke('test:trigger-auth-success');
-    });
-
-    console.log('[TEST] Auth success triggered, initial profile should be loaded');
+    console.log('[TEST] Initial profile should be loaded');
 
     // Wait for UI to update
     await context.window.waitForTimeout(2000);
@@ -540,7 +590,7 @@ test.describe('Account Profile', () => {
     // Requirements: ui.6.5 - Simulate profile change in Google
     mockServer.setUserProfile({
       id: '111222333', // Same ID
-      email: 'jane@example.com', // Updated email
+      email: 'john@example.com', // Same email (email is primary key, cannot change)
       name: 'Jane Smith', // Updated name
       given_name: 'Jane',
       family_name: 'Smith',
@@ -567,18 +617,17 @@ test.describe('Account Profile', () => {
 
     console.log(`[TEST] Updated profile: name="${updatedNameValue}", email="${updatedEmailValue}"`);
 
-    // Check that data has changed to new values
+    // Check that name has changed to new value
     // Requirements: ui.6.5 - Verify profile update
     expect(updatedNameValue).toBe('Jane Smith');
-    expect(updatedEmailValue).toBe('jane@example.com');
+    expect(updatedEmailValue).toBe('john@example.com'); // Email stays the same
 
-    // Verify that data is different from initial values
+    // Verify that name is different from initial value
     expect(updatedNameValue).not.toBe(initialNameValue);
-    expect(updatedEmailValue).not.toBe(initialEmailValue);
 
     console.log('✓ Profile data updated successfully');
     console.log(`✓ Name changed from "${initialNameValue}" to "${updatedNameValue}"`);
-    console.log(`✓ Email changed from "${initialEmailValue}" to "${updatedEmailValue}"`);
+    console.log(`✓ Email remained: "${updatedEmailValue}"`);
 
     // Take screenshot of updated state
     await context.window.screenshot({
@@ -610,27 +659,15 @@ test.describe('Account Profile', () => {
     // Requirements: testing.3.1, testing.3.2 - Real Electron, no mocks
     context = await launchElectron(undefined, {
       CLERKLY_GOOGLE_API_URL: mockServer.getBaseUrl(),
+      CLERKLY_OAUTH_CLIENT_ID: 'test-client-id-12345',
+      CLERKLY_OAUTH_CLIENT_SECRET: 'test-client-secret-67890',
     });
 
     // Wait for content to load
     await context.window.waitForLoadState('domcontentloaded');
 
-    // Setup test tokens to simulate successful OAuth
-    // Requirements: ui.6.3, ui.8.3 - Profile should load in background after OAuth
-    await setupTestTokens(context.window, {
-      accessToken: 'test_access_token_background',
-      refreshToken: 'test_refresh_token_background',
-      expiresIn: 3600,
-      tokenType: 'Bearer',
-    });
-
-    console.log('[TEST] Tokens setup, triggering auth success...');
-
-    // Trigger profile fetch and auth:success event
-    // This simulates what happens after successful OAuth flow
-    await context.window.evaluate(async () => {
-      await (window as any).electron.ipcRenderer.invoke('test:trigger-auth-success');
-    });
+    // Complete OAuth flow
+    await completeOAuthFlow(context, mockServer);
 
     console.log('[TEST] Auth success triggered');
 
@@ -758,6 +795,8 @@ test.describe('Account Profile', () => {
     // Requirements: testing.3.1, testing.3.2 - Real Electron, no mocks
     context = await launchElectron(undefined, {
       CLERKLY_GOOGLE_API_URL: mockServer.getBaseUrl(),
+      CLERKLY_OAUTH_CLIENT_ID: 'test-client-id-12345',
+      CLERKLY_OAUTH_CLIENT_SECRET: 'test-client-secret-67890',
     });
 
     // Wait for content to load
@@ -781,22 +820,8 @@ test.describe('Account Profile', () => {
       console.log('[TEST] Cached profile data:', cachedCheck.profile);
     }
 
-    // Setup test tokens to simulate successful OAuth
-    // Requirements: ui.6.1 - Need authenticated state to access Account block
-    await setupTestTokens(context.window, {
-      accessToken: 'test_access_token_cached',
-      refreshToken: 'test_refresh_token_cached',
-      expiresIn: 3600,
-      tokenType: 'Bearer',
-    });
-
-    console.log('[TEST] Tokens setup, triggering auth success...');
-
-    // Trigger profile fetch and auth:success event
-    // This will start loading fresh profile from API in background
-    await context.window.evaluate(async () => {
-      await (window as any).electron.ipcRenderer.invoke('test:trigger-auth-success');
-    });
+    // Complete OAuth flow (this will fetch fresh profile from API)
+    await completeOAuthFlow(context, mockServer);
 
     console.log('[TEST] Auth success triggered, profile fetch started in background');
 
@@ -922,6 +947,8 @@ test.describe('Account Profile', () => {
     // Requirements: testing.3.1, testing.3.2 - Real Electron, no mocks
     context = await launchElectron(undefined, {
       CLERKLY_GOOGLE_API_URL: mockServer.getBaseUrl(),
+      CLERKLY_OAUTH_CLIENT_ID: 'test-client-id-12345',
+      CLERKLY_OAUTH_CLIENT_SECRET: 'test-client-secret-67890',
     });
 
     // Wait for content to load
@@ -937,22 +964,8 @@ test.describe('Account Profile', () => {
     expect(initialCheck.profile).toBeNull();
     console.log('✓ Database confirmed clean (no cached profile)');
 
-    // Setup test tokens to simulate successful OAuth
-    // Requirements: ui.6.1 - Need authenticated state to access Account block
-    await setupTestTokens(context.window, {
-      accessToken: 'test_access_token_first_auth',
-      refreshToken: 'test_refresh_token_first_auth',
-      expiresIn: 3600,
-      tokenType: 'Bearer',
-    });
-
-    console.log('[TEST] Tokens setup, triggering auth success...');
-
-    // Trigger profile fetch and auth:success event
-    // This will start loading profile from API in background
-    await context.window.evaluate(async () => {
-      await (window as any).electron.ipcRenderer.invoke('test:trigger-auth-success');
-    });
+    // Complete OAuth flow
+    await completeOAuthFlow(context, mockServer);
 
     console.log('[TEST] Auth success triggered, profile fetch started in background');
 
@@ -1103,34 +1116,21 @@ test.describe('Account Profile', () => {
     // Requirements: testing.3.1, testing.3.2 - Real Electron, no mocks
     context = await launchElectron(undefined, {
       CLERKLY_GOOGLE_API_URL: mockServer.getBaseUrl(),
+      CLERKLY_OAUTH_CLIENT_ID: 'test-client-id-12345',
+      CLERKLY_OAUTH_CLIENT_SECRET: 'test-client-secret-67890',
     });
 
     // Wait for content to load
     await context.window.waitForLoadState('domcontentloaded');
 
-    // Setup test tokens to simulate successful OAuth
-    // Requirements: ui.6.1, ui.6.2 - Need authenticated state to access Account block
-    await setupTestTokens(context.window, {
-      accessToken: 'test_access_token_fetch_success',
-      refreshToken: 'test_refresh_token_fetch_success',
-      expiresIn: 3600,
-      tokenType: 'Bearer',
-    });
-
-    console.log('[TEST] Tokens setup, triggering auth success...');
-
-    // Trigger profile fetch and auth:success event
-    // This simulates what happens after successful OAuth flow
-    // Requirements: ui.6.2 - Profile should be fetched from Google UserInfo API
-    await context.window.evaluate(async () => {
-      await (window as any).electron.ipcRenderer.invoke('test:trigger-auth-success');
-    });
+    // Complete OAuth flow
+    await completeOAuthFlow(context, mockServer);
 
     console.log('[TEST] Auth success triggered, profile fetch started');
 
     // Wait for profile to be fetched and saved
     // Property 12, 13 - Profile data should be fetched and saved
-    await context.window.waitForTimeout(2000);
+    // (Already done in completeOAuthFlow)
 
     // Navigate to Settings to see Account block
     const loginButton = context.window.locator('text=/continue with google/i');
@@ -1240,6 +1240,8 @@ test.describe('Account Profile', () => {
     // Requirements: testing.3.1, testing.3.2 - Real Electron, no mocks
     context = await launchElectron(undefined, {
       CLERKLY_GOOGLE_API_URL: mockServer.getBaseUrl(),
+      CLERKLY_OAUTH_CLIENT_ID: 'test-client-id-12345',
+      CLERKLY_OAUTH_CLIENT_SECRET: 'test-client-secret-67890',
     });
 
     // Wait for content to load
@@ -1252,33 +1254,10 @@ test.describe('Account Profile', () => {
     await loginButton.waitFor({ state: 'visible', timeout: 5000 });
     console.log('[TEST] Login screen confirmed');
 
-    // Simulate successful authentication
-    // Requirements: ui.6.4 - Test loader display
-    await context.window.evaluate(async () => {
-      // Setup test profile FIRST (required for token storage)
-      await (window as any).electron.ipcRenderer.invoke('test:setup-profile', {
-        id: '222333444555',
-        email: 'loader.test@example.com',
-        name: 'Loader Test User',
-        given_name: 'Loader',
-        family_name: 'Test User',
-        verified_email: true,
-        picture: '',
-        locale: 'en',
-      });
+    // Complete OAuth flow
+    await completeOAuthFlow(context, mockServer);
 
-      // Setup test tokens AFTER profile
-      await (window as any).electron.ipcRenderer.invoke('test:setup-tokens', {
-        accessToken: 'test_access_token_loader',
-        refreshToken: 'test_refresh_token_loader',
-        expiresIn: 3600,
-        tokenType: 'Bearer',
-      });
-
-      await (window as any).electron.ipcRenderer.invoke('test:trigger-auth-success');
-    });
-
-    console.log('[TEST] Authentication simulated');
+    console.log('[TEST] Authentication completed');
 
     // Wait for UI to update
     await context.window.waitForTimeout(2000);
@@ -1331,6 +1310,8 @@ test.describe('Account Profile', () => {
     // Requirements: testing.3.1, testing.3.2 - Real Electron, no mocks
     context = await launchElectron(undefined, {
       CLERKLY_GOOGLE_API_URL: mockServer.getBaseUrl(),
+      CLERKLY_OAUTH_CLIENT_ID: 'test-client-id-12345',
+      CLERKLY_OAUTH_CLIENT_SECRET: 'test-client-secret-67890',
     });
 
     // Wait for content to load
@@ -1338,35 +1319,10 @@ test.describe('Account Profile', () => {
 
     console.log('[TEST] Application launched, simulating successful authentication...');
 
-    // Simulate successful authentication by setting up test tokens and profile
-    // This simulates what happens after successful OAuth flow
-    // Requirements: google-oauth-auth.3.6, google-oauth-auth.3.8
-    await context.window.evaluate(async () => {
-      // Setup test profile FIRST (required for token storage)
-      await (window as any).electron.ipcRenderer.invoke('test:setup-profile', {
-        id: '111222333444',
-        email: 'sync.success@example.com',
-        name: 'Sync Success User',
-        given_name: 'Sync',
-        family_name: 'Success User',
-        verified_email: true,
-        picture: '',
-        locale: 'en',
-      });
+    // Complete OAuth flow
+    await completeOAuthFlow(context, mockServer);
 
-      // Setup test tokens AFTER profile
-      await (window as any).electron.ipcRenderer.invoke('test:setup-tokens', {
-        accessToken: 'test_access_token_sync_success',
-        refreshToken: 'test_refresh_token_sync_success',
-        expiresIn: 3600,
-        tokenType: 'Bearer',
-      });
-
-      // Trigger auth success event
-      await (window as any).electron.ipcRenderer.invoke('test:trigger-auth-success');
-    });
-
-    console.log('[TEST] Authentication simulated, verifying results...');
+    console.log('[TEST] Authentication completed, verifying results...');
 
     // Wait for UI to update
     await context.window.waitForTimeout(2000);
@@ -1426,6 +1382,8 @@ test.describe('Account Profile', () => {
     // Requirements: testing.3.1, testing.3.2 - Real Electron, no mocks
     context = await launchElectron(undefined, {
       CLERKLY_GOOGLE_API_URL: mockServer.getBaseUrl(),
+      CLERKLY_OAUTH_CLIENT_ID: 'test-client-id-12345',
+      CLERKLY_OAUTH_CLIENT_SECRET: 'test-client-secret-67890',
     });
 
     // Wait for content to load
@@ -1435,46 +1393,34 @@ test.describe('Account Profile', () => {
       '[TEST] Application launched, simulating authentication with profile fetch error...'
     );
 
-    // Simulate authentication with profile fetch error
-    // This simulates what happens when OAuth succeeds but profile fetch fails
-    // Requirements: google-oauth-auth.3.7
-    await context.window.evaluate(async () => {
-      // Setup test profile FIRST (required for token storage)
-      await (window as any).electron.ipcRenderer.invoke('test:setup-profile', {
-        id: 'temp_id',
-        email: 'temp@example.com',
-        name: 'Temp User',
-        verified_email: true,
-        picture: '',
-        locale: 'en',
-      });
+    // Complete OAuth flow (will fail at profile fetch step)
+    await completeOAuthFlow(context, mockServer);
 
-      // Setup test tokens AFTER profile (simulates successful OAuth)
-      await (window as any).electron.ipcRenderer.invoke('test:setup-tokens', {
-        accessToken: 'test_access_token_sync_error',
-        refreshToken: 'test_refresh_token_sync_error',
-        expiresIn: 3600,
-        tokenType: 'Bearer',
-      });
-
-      // Trigger auth success which will attempt to fetch profile
-      // Profile fetch will fail due to mock server error
-      await (window as any).electron.ipcRenderer.invoke('test:trigger-auth-success');
-    });
-
-    console.log('[TEST] Authentication simulated with profile fetch error');
+    console.log('[TEST] Authentication attempted with profile fetch error');
 
     // Wait for error handling
     await context.window.waitForTimeout(2000);
 
     // Verify tokens are cleared after profile fetch error
     // Requirements: google-oauth-auth.3.7, ui.6.5 - Tokens should be cleared on error
-    const tokensCheck = await context.window.evaluate(async () => {
-      return await (window as any).electron.ipcRenderer.invoke('test:get-token-status');
+    // Check directly through app context (not through IPC which requires email)
+    const tokensCleared = await context.app.evaluate(async () => {
+      const { tokenStorage } = (global as any).testContext || {};
+      if (!tokenStorage) {
+        throw new Error('Token storage not found in test context');
+      }
+      try {
+        const tokens = await tokenStorage.loadTokens();
+        return tokens === null;
+      } catch (error: unknown) {
+        // If loadTokens throws error about no user logged in, tokens are cleared
+        const errorMessage = error instanceof Error ? error.message : '';
+        return errorMessage.includes('No user logged in');
+      }
     });
 
-    console.log('[TEST] Tokens in storage after error:', tokensCheck.hasTokens ? 'YES' : 'NO');
-    expect(tokensCheck.hasTokens).toBe(false);
+    console.log('[TEST] Tokens cleared after failed profile fetch:', tokensCleared);
+    expect(tokensCleared).toBe(true);
 
     console.log('✓ Tokens cleared from storage after profile fetch error');
 
@@ -1517,6 +1463,8 @@ test.describe('Account Profile', () => {
     // Requirements: testing.3.1, testing.3.2 - Real Electron, no mocks
     context = await launchElectron(undefined, {
       CLERKLY_GOOGLE_API_URL: mockServer.getBaseUrl(),
+      CLERKLY_OAUTH_CLIENT_ID: 'test-client-id-12345',
+      CLERKLY_OAUTH_CLIENT_SECRET: 'test-client-secret-67890',
     });
 
     // Wait for content to load
@@ -1529,31 +1477,10 @@ test.describe('Account Profile', () => {
     await loginButton.waitFor({ state: 'visible', timeout: 5000 });
     console.log('[TEST] Login screen confirmed');
 
-    // Simulate authentication with profile fetch error
-    // Requirements: google-oauth-auth.3.7, ui.6.4
-    await context.window.evaluate(async () => {
-      // Setup test profile FIRST (required for token storage)
-      await (window as any).electron.ipcRenderer.invoke('test:setup-profile', {
-        id: 'temp_id',
-        email: 'temp@example.com',
-        name: 'Temp User',
-        verified_email: true,
-        picture: '',
-        locale: 'en',
-      });
+    // Complete OAuth flow (will fail at profile fetch step)
+    await completeOAuthFlow(context, mockServer);
 
-      // Setup test tokens AFTER profile
-      await (window as any).electron.ipcRenderer.invoke('test:setup-tokens', {
-        accessToken: 'test_access_token_login_error',
-        refreshToken: 'test_refresh_token_login_error',
-        expiresIn: 3600,
-        tokenType: 'Bearer',
-      });
-
-      await (window as any).electron.ipcRenderer.invoke('test:trigger-auth-success');
-    });
-
-    console.log('[TEST] Authentication simulated with profile fetch error');
+    console.log('[TEST] Authentication attempted with profile fetch error');
 
     // Wait for error handling
     await context.window.waitForTimeout(2000);
@@ -1588,12 +1515,24 @@ test.describe('Account Profile', () => {
 
     // Verify tokens are cleared
     // Requirements: google-oauth-auth.3.7, ui.6.5
-    const tokensCheck = await context.window.evaluate(async () => {
-      return await (window as any).electron.ipcRenderer.invoke('test:get-token-status');
+    // Check directly through app context (not through IPC which requires email)
+    const tokensCleared = await context.app.evaluate(async () => {
+      const { tokenStorage } = (global as any).testContext || {};
+      if (!tokenStorage) {
+        throw new Error('Token storage not found in test context');
+      }
+      try {
+        const tokens = await tokenStorage.loadTokens();
+        return tokens === null;
+      } catch (error: unknown) {
+        // If loadTokens throws error about no user logged in, tokens are cleared
+        const errorMessage = error instanceof Error ? error.message : '';
+        return errorMessage.includes('No user logged in');
+      }
     });
 
-    console.log('[TEST] Tokens in storage after error:', tokensCheck.hasTokens ? 'YES' : 'NO');
-    expect(tokensCheck.hasTokens).toBe(false);
+    console.log('[TEST] Tokens in storage after error:', tokensCleared ? 'NO' : 'YES');
+    expect(tokensCleared).toBe(true);
 
     console.log('✓ Tokens cleared from storage');
 
@@ -1632,29 +1571,24 @@ test.describe('Account Profile', () => {
       lastUpdated: Date.now() - 86400000, // 1 day ago
     };
 
-    // Configure mock server to return error for UserInfo API
-    // Requirements: ui.6.1 - Test error handling when fetch fails
-    // Property 14 - Error should not clear cached data
-    mockServer.setUserInfoError(500, 'Internal Server Error');
-    console.log('[TEST] Mock server configured to return 500 error for UserInfo API');
+    // Configure mock server to return cached profile first (for initial OAuth)
+    mockServer.setUserProfile(cachedProfile);
 
     // Launch the application with clean database and environment variable
     // Requirements: testing.3.1, testing.3.2 - Real Electron, no mocks
     context = await launchElectron(undefined, {
       CLERKLY_GOOGLE_API_URL: mockServer.getBaseUrl(),
+      CLERKLY_OAUTH_CLIENT_ID: 'test-client-id-12345',
+      CLERKLY_OAUTH_CLIENT_SECRET: 'test-client-secret-67890',
     });
 
     // Wait for content to load
     await context.window.waitForLoadState('domcontentloaded');
 
-    // Pre-populate database with cached profile data (simulating previous session)
-    // Requirements: ui.6.1 - Profile data should be preserved when fetch fails
-    console.log('[TEST] Pre-populating database with cached profile...');
-    await context.window.evaluate(async (profile) => {
-      await (window as any).electron.ipcRenderer.invoke('test:setup-profile', profile);
-    }, cachedProfile);
+    // Complete OAuth flow to save initial profile
+    await completeOAuthFlow(context, mockServer);
 
-    console.log('[TEST] Cached profile saved to database');
+    console.log('[TEST] Initial profile saved to database');
 
     // Verify cached profile is in database
     const cachedCheck = await context.window.evaluate(async () => {
@@ -1666,25 +1600,19 @@ test.describe('Account Profile', () => {
     }
     expect(cachedCheck.profile).not.toBeNull();
 
-    // Setup test tokens to simulate successful OAuth
-    // Requirements: ui.6.1 - Need authenticated state to access Account block
-    await setupTestTokens(context.window, {
-      accessToken: 'test_access_token_error_fetch',
-      refreshToken: 'test_refresh_token_error_fetch',
-      expiresIn: 3600,
-      tokenType: 'Bearer',
-    });
+    // Now configure mock server to return error for subsequent profile fetches
+    // Requirements: ui.6.1 - Test error handling when fetch fails
+    // Property 14 - Error should not clear cached data
+    mockServer.setUserInfoError(500, 'Internal Server Error');
+    console.log('[TEST] Mock server configured to return 500 error for UserInfo API');
 
-    console.log('[TEST] Tokens setup, triggering auth success...');
-
-    // Trigger profile fetch and auth:success event
-    // This will attempt to fetch profile from API, but API will return error
+    // Trigger manual profile refresh (this will fail)
     // Requirements: ui.6.1, Property 14 - Fetch fails, cached data should be preserved
-    await context.window.evaluate(async () => {
-      await (window as any).electron.ipcRenderer.invoke('test:trigger-auth-success');
+    const refreshResult = await context.window.evaluate(async () => {
+      return await (window as any).electron.ipcRenderer.invoke('auth:refresh-profile');
     });
 
-    console.log('[TEST] Auth success triggered, profile fetch will fail with 500 error');
+    console.log('[TEST] Profile refresh attempted, result:', refreshResult);
 
     // Wait for fetch attempt to complete (and fail)
     await context.window.waitForTimeout(2000);
@@ -1811,28 +1739,17 @@ test.describe('Account Profile', () => {
     // Requirements: testing.3.1, testing.3.2 - Real Electron, no mocks
     context = await launchElectron(undefined, {
       CLERKLY_GOOGLE_API_URL: mockServer.getBaseUrl(),
+      CLERKLY_OAUTH_CLIENT_ID: 'test-client-id-12345',
+      CLERKLY_OAUTH_CLIENT_SECRET: 'test-client-secret-67890',
     });
 
     // Wait for content to load
     await context.window.waitForLoadState('domcontentloaded');
 
-    // Setup test tokens to simulate successful OAuth
-    // Requirements: ui.6.8 - Need authenticated state with profile
-    await setupTestTokens(context.window, {
-      accessToken: 'test_access_token_logout',
-      refreshToken: 'test_refresh_token_logout',
-      expiresIn: 3600,
-      tokenType: 'Bearer',
-    });
+    // Complete OAuth flow
+    await completeOAuthFlow(context, mockServer);
 
-    console.log('[TEST] Tokens setup, waiting for profile to load...');
-
-    // Trigger profile fetch and auth:success event
-    await context.window.evaluate(async () => {
-      await (window as any).electron.ipcRenderer.invoke('test:trigger-auth-success');
-    });
-
-    console.log('[TEST] Auth success triggered, profile should be loaded');
+    console.log('[TEST] Profile should be loaded');
 
     // Wait for UI to update
     await context.window.waitForTimeout(2000);
@@ -1950,28 +1867,17 @@ test.describe('Account Profile', () => {
     // Requirements: testing.3.1, testing.3.2 - Real Electron, no mocks
     context = await launchElectron(undefined, {
       CLERKLY_GOOGLE_API_URL: mockServer.getBaseUrl(),
+      CLERKLY_OAUTH_CLIENT_ID: 'test-client-id-12345',
+      CLERKLY_OAUTH_CLIENT_SECRET: 'test-client-secret-67890',
     });
 
     // Wait for content to load
     await context.window.waitForLoadState('domcontentloaded');
 
-    // Setup test tokens to simulate successful OAuth
-    // Requirements: ui.8.4 - Need authenticated state with profile
-    await setupTestTokens(context.window, {
-      accessToken: 'test_access_token_logout_ui',
-      refreshToken: 'test_refresh_token_logout_ui',
-      expiresIn: 3600,
-      tokenType: 'Bearer',
-    });
+    // Complete OAuth flow
+    await completeOAuthFlow(context, mockServer);
 
-    console.log('[TEST] Tokens setup, waiting for profile to load...');
-
-    // Trigger profile fetch and auth:success event
-    await context.window.evaluate(async () => {
-      await (window as any).electron.ipcRenderer.invoke('test:trigger-auth-success');
-    });
-
-    console.log('[TEST] Auth success triggered, profile should be loaded');
+    console.log('[TEST] Profile should be loaded');
 
     // Wait for UI to update
     await context.window.waitForTimeout(2000);
