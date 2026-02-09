@@ -5,7 +5,9 @@ import { OAuthClientManager } from './OAuthClientManager';
 import { TokenStorageManager } from './TokenStorageManager';
 import { handleBackgroundError } from '../ErrorHandler';
 import { handleAPIRequest } from './APIRequestHandler';
+import { Logger } from '../Logger';
 
+// Requirements: clerkly.3.8 - Use centralized Logger instead of console.*
 /**
  * User profile data from Google OAuth
  * Requirements: ui.6.2, ui.6.3
@@ -117,7 +119,7 @@ export class UserProfileManager {
       // Get access token from token storage
       const tokens = await this.tokenStorage.loadTokens();
       if (!tokens || !tokens.accessToken) {
-        console.log('[UserProfileManager] No access token available');
+        Logger.info('UserProfileManager', '[UserProfileManager] No access token available');
         return null;
       }
 
@@ -128,8 +130,14 @@ export class UserProfileManager {
         ? `${googleApiBaseUrl}/userinfo` // Mock server uses /userinfo
         : `${googleApiBaseUrl}/oauth2/v1/userinfo`; // Google uses /oauth2/v1/userinfo
 
-      console.log('[UserProfileManager] Fetching profile from Google UserInfo API');
-      console.log('[UserProfileManager] About to call handleAPIRequest with URL:', userInfoUrl);
+      Logger.info(
+        'UserProfileManager',
+        '[UserProfileManager] Fetching profile from Google UserInfo API'
+      );
+      Logger.info(
+        'UserProfileManager',
+        `[UserProfileManager] About to call handleAPIRequest with URL: ${userInfoUrl}`
+      );
 
       // Requirements: ui.9.3, ui.9.4 - Use centralized handler for automatic 401 detection
       const response = await handleAPIRequest(
@@ -159,21 +167,30 @@ export class UserProfileManager {
       // Requirements: ui.12.15 - Cache email in memory for data isolation
       this.currentUserEmail = profile.email;
 
-      console.log('[UserProfileManager] Profile fetched and saved successfully');
+      Logger.info(
+        'UserProfileManager',
+        '[UserProfileManager] Profile fetched and saved successfully'
+      );
       return profile;
     } catch (error) {
       // Requirements: ui.9.3 - If it's a 401 error, tokens are already cleared by handleAPIRequest
       // Just return null to indicate no profile available
       const errorMessage = error instanceof Error ? error.message : String(error);
       if (errorMessage.includes('Authorization failed') || errorMessage.includes('401')) {
-        console.log('[UserProfileManager] Session expired (401), returning null');
+        Logger.info(
+          'UserProfileManager',
+          '[UserProfileManager] Session expired (401), returning null'
+        );
         return null;
       }
 
-      console.error('[UserProfileManager] Failed to fetch profile:', error);
+      Logger.error('UserProfileManager', `[UserProfileManager] Failed to fetch profile: ${error}`);
 
       // Requirements: ui.6.7 - Return cached profile on other errors (network, timeout, etc.)
-      console.log('[UserProfileManager] Returning cached profile due to API error');
+      Logger.info(
+        'UserProfileManager',
+        '[UserProfileManager] Returning cached profile due to API error'
+      );
       const cachedProfile = await this.loadProfile();
 
       // Requirements: ui.7.1 - Notify user about the error
@@ -204,9 +221,9 @@ export class UserProfileManager {
       if (!result.success) {
         throw new Error(result.error || 'Failed to save profile');
       }
-      console.log('[UserProfileManager] Profile saved to local storage');
+      Logger.info('UserProfileManager', '[UserProfileManager] Profile saved to local storage');
     } catch (error) {
-      console.error('[UserProfileManager] Failed to save profile:', error);
+      Logger.error('UserProfileManager', `[UserProfileManager] Failed to save profile: ${error}`);
       throw error;
     }
   }
@@ -230,13 +247,13 @@ export class UserProfileManager {
         // Requirements: ui.12.17 - Set currentUserEmail from loaded profile
         this.currentUserEmail = profile.email;
 
-        console.log('[UserProfileManager] Profile loaded from local storage');
+        Logger.info('UserProfileManager', '[UserProfileManager] Profile loaded from local storage');
         return profile;
       }
-      console.log('[UserProfileManager] No profile found in local storage');
+      Logger.info('UserProfileManager', '[UserProfileManager] No profile found in local storage');
       return null;
     } catch (error) {
-      console.error('[UserProfileManager] Failed to load profile:', error);
+      Logger.error('UserProfileManager', `[UserProfileManager] Failed to load profile: ${error}`);
       return null;
     }
   }
@@ -259,9 +276,9 @@ export class UserProfileManager {
       // Requirements: ui.12.18 - Clear cached email
       this.currentUserEmail = null;
 
-      console.log('[UserProfileManager] Profile cleared from local storage');
+      Logger.info('UserProfileManager', '[UserProfileManager] Profile cleared from local storage');
     } catch (error) {
-      console.error('[UserProfileManager] Failed to clear profile:', error);
+      Logger.error('UserProfileManager', `[UserProfileManager] Failed to clear profile: ${error}`);
       throw error;
     }
   }
@@ -276,7 +293,7 @@ export class UserProfileManager {
    * Also updates cached email if profile changed.
    */
   async updateProfileAfterTokenRefresh(): Promise<void> {
-    console.log('[UserProfileManager] Updating profile after token refresh');
+    Logger.info('UserProfileManager', '[UserProfileManager] Updating profile after token refresh');
     await this.fetchProfile();
   }
 
@@ -318,7 +335,10 @@ export class UserProfileManager {
       // Get access token from token storage
       const tokens = await this.tokenStorage.loadTokens();
       if (!tokens || !tokens.accessToken) {
-        console.error('[UserProfileManager] No access token available for synchronous fetch');
+        Logger.error(
+          'UserProfileManager',
+          '[UserProfileManager] No access token available for synchronous fetch'
+        );
         // Clear tokens since authorization is incomplete
         await this.tokenStorage.deleteTokens();
         return { success: false, error: 'profile_fetch_failed' };
@@ -330,7 +350,10 @@ export class UserProfileManager {
         ? `${googleApiBaseUrl}/userinfo`
         : `${googleApiBaseUrl}/oauth2/v1/userinfo`;
 
-      console.log('[UserProfileManager] Fetching profile synchronously during authorization');
+      Logger.info(
+        'UserProfileManager',
+        '[UserProfileManager] Fetching profile synchronously during authorization'
+      );
 
       // Make API request (with timeout to prevent blocking indefinitely)
       const controller = new AbortController();
@@ -346,8 +369,9 @@ export class UserProfileManager {
       clearTimeout(timeoutId);
 
       if (!response.ok) {
-        console.error(
-          `[UserProfileManager] UserInfo API error during sync fetch: ${response.status}`
+        Logger.error(
+          'UserProfileManager',
+          `UserInfo API error during sync fetch: ${response.status}`
         );
         // Requirements: google-oauth-auth.3.7 - Clear tokens on profile fetch failure
         await this.tokenStorage.deleteTokens();
@@ -366,18 +390,24 @@ export class UserProfileManager {
       // Requirements: ui.12.15 - Cache email in memory for data isolation
       this.currentUserEmail = profile.email;
 
-      console.log('[UserProfileManager] Profile fetched and saved synchronously');
+      Logger.info(
+        'UserProfileManager',
+        '[UserProfileManager] Profile fetched and saved synchronously'
+      );
       return { success: true, profile };
     } catch (error) {
-      console.error('[UserProfileManager] Failed to fetch profile synchronously:', error);
+      Logger.error(
+        'UserProfileManager',
+        `[UserProfileManager] Failed to fetch profile synchronously: ${error}`
+      );
 
       // Requirements: google-oauth-auth.3.7 - Clear tokens on any error
       try {
         await this.tokenStorage.deleteTokens();
       } catch (clearError) {
-        console.error(
-          '[UserProfileManager] Failed to clear tokens after profile error:',
-          clearError
+        Logger.error(
+          'UserProfileManager',
+          `Failed to clear tokens after profile error: ${clearError}`
         );
       }
 

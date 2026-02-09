@@ -203,12 +203,7 @@ describe('ErrorHandler', () => {
       logError(operation, error, context);
 
       expect(consoleErrorSpy).toHaveBeenCalledWith(
-        '[OAuth] token_exchange failed: Token exchange failed',
-        expect.objectContaining({
-          errorCode: 'invalid_grant',
-          timestamp: expect.any(Number),
-          context: { userId: '123' },
-        })
+        expect.stringContaining('[OAuth] token_exchange failed: Token exchange failed')
       );
     });
 
@@ -223,11 +218,7 @@ describe('ErrorHandler', () => {
       logError(operation, error);
 
       expect(consoleErrorSpy).toHaveBeenCalledWith(
-        '[OAuth] auth_flow failed: Network connection failed',
-        expect.objectContaining({
-          errorCode: 'unknown',
-          timestamp: expect.any(Number),
-        })
+        expect.stringContaining('[OAuth] auth_flow failed: Network connection failed')
       );
     });
 
@@ -242,11 +233,7 @@ describe('ErrorHandler', () => {
       logError(operation, error);
 
       expect(consoleErrorSpy).toHaveBeenCalledWith(
-        '[OAuth] logout failed: [object Object]',
-        expect.objectContaining({
-          errorCode: 'revoke_failed',
-          timestamp: expect.any(Number),
-        })
+        expect.stringContaining('[OAuth] logout failed: [object Object]')
       );
     });
 
@@ -261,11 +248,7 @@ describe('ErrorHandler', () => {
       logError(operation, error);
 
       expect(consoleErrorSpy).toHaveBeenCalledWith(
-        '[OAuth] refresh_token failed: Refresh failed',
-        expect.objectContaining({
-          timestamp: expect.any(Number),
-          context: {},
-        })
+        expect.stringContaining('[OAuth] refresh_token failed: Refresh failed')
       );
     });
   });

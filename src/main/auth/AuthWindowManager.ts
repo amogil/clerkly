@@ -3,7 +3,9 @@
 import { BrowserWindow } from 'electron';
 import WindowManager from '../WindowManager';
 import { OAuthClientManager } from './OAuthClientManager';
+import { Logger } from '../Logger';
 
+// Requirements: clerkly.3.8 - Use centralized Logger instead of console.*
 /**
  * Auth Window Manager
  *
@@ -51,12 +53,15 @@ export class AuthWindowManager {
         await this.showLoginWindow();
       }
     } catch (error) {
-      console.error('[AuthWindowManager] Failed to initialize app:', error);
+      Logger.error('AuthWindowManager', `[AuthWindowManager] Failed to initialize app: ${error}`);
       // Try to show login window on error, but don't retry if it fails
       try {
         await this.showLoginWindow();
       } catch (loginError) {
-        console.error('[AuthWindowManager] Failed to show login window after error:', loginError);
+        Logger.error(
+          'AuthWindowManager',
+          `[AuthWindowManager] Failed to show login window after error: ${loginError}`
+        );
         throw loginError;
       }
     }
@@ -86,7 +91,10 @@ export class AuthWindowManager {
       // Login screen is just content displayed in the main window
       // The actual routing will be handled by the renderer process
     } catch (error) {
-      console.error('[AuthWindowManager] Failed to show login window:', error);
+      Logger.error(
+        'AuthWindowManager',
+        `[AuthWindowManager] Failed to show login window: ${error}`
+      );
       throw error;
     }
   }
@@ -114,7 +122,7 @@ export class AuthWindowManager {
       // Note: Window uses default configuration from WindowManager
       // Main content will be loaded by renderer process
     } catch (error) {
-      console.error('[AuthWindowManager] Failed to show main window:', error);
+      Logger.error('AuthWindowManager', `[AuthWindowManager] Failed to show main window: ${error}`);
       throw error;
     }
   }
@@ -133,14 +141,17 @@ export class AuthWindowManager {
       // Update window content to show error
       // The actual error display will be handled by the renderer process
       // through IPC events
-      console.log('[AuthWindowManager] Showing login error:', { error, errorCode });
+      Logger.info(
+        'AuthWindowManager',
+        `Showing login error: ${JSON.stringify({ error, errorCode })}`
+      );
 
       // Window should already exist from login screen
       if (!this.currentWindow) {
         await this.showLoginWindow();
       }
     } catch (err) {
-      console.error('[AuthWindowManager] Failed to show login error:', err);
+      Logger.error('AuthWindowManager', `[AuthWindowManager] Failed to show login error: ${err}`);
       throw err;
     }
   }
@@ -154,10 +165,16 @@ export class AuthWindowManager {
    */
   private async handleAuthSuccess(): Promise<void> {
     try {
-      console.log('[AuthWindowManager] Authentication successful, showing main window');
+      Logger.info(
+        'AuthWindowManager',
+        '[AuthWindowManager] Authentication successful, showing main window'
+      );
       await this.showMainWindow();
     } catch (error) {
-      console.error('[AuthWindowManager] Failed to handle auth success:', error);
+      Logger.error(
+        'AuthWindowManager',
+        `[AuthWindowManager] Failed to handle auth success: ${error}`
+      );
       throw error;
     }
   }
@@ -173,11 +190,14 @@ export class AuthWindowManager {
    */
   private async handleAuthError(error: string, errorCode?: string): Promise<void> {
     try {
-      console.log('[AuthWindowManager] Authentication failed:', { error, errorCode });
+      Logger.info(
+        'AuthWindowManager',
+        `Authentication failed: ${JSON.stringify({ error, errorCode })}`
+      );
       // Requirements: google-oauth-auth.14.5
       await this.showLoginError(error, errorCode);
     } catch (err) {
-      console.error('[AuthWindowManager] Failed to handle auth error:', err);
+      Logger.error('AuthWindowManager', `[AuthWindowManager] Failed to handle auth error: ${err}`);
       throw err;
     }
   }
@@ -215,10 +235,13 @@ export class AuthWindowManager {
    */
   async onRetry(): Promise<void> {
     try {
-      console.log('[AuthWindowManager] Retrying authentication');
+      Logger.info('AuthWindowManager', '[AuthWindowManager] Retrying authentication');
       await this.showLoginWindow();
     } catch (error) {
-      console.error('[AuthWindowManager] Failed to retry authentication:', error);
+      Logger.error(
+        'AuthWindowManager',
+        `[AuthWindowManager] Failed to retry authentication: ${error}`
+      );
       throw error;
     }
   }

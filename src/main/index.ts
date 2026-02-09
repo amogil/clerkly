@@ -19,6 +19,7 @@ import { AuthIPCHandlers } from './auth/AuthIPCHandlers';
 import { AIAgentSettingsManager } from './AIAgentSettingsManager';
 import { SettingsIPCHandlers } from './SettingsIPCHandlers';
 
+// Requirements: clerkly.3.8 - Use centralized Logger instead of console.*
 // Set app name for single instance lock
 // This helps macOS identify the app correctly
 app.setName('Clerkly');
@@ -29,33 +30,36 @@ app.setName('Clerkly');
 // Skip single instance lock in test environment to allow multiple test instances
 const gotTheLock = process.env.NODE_ENV === 'test' ? true : app.requestSingleInstanceLock();
 
-console.log('[Main] Single instance lock:', gotTheLock ? 'ACQUIRED' : 'FAILED');
-console.log('[Main] Process args:', process.argv);
-console.log('[Main] Process defaultApp:', process.defaultApp);
+Logger.info('Main', `[Main] Single instance lock: ${gotTheLock ? 'ACQUIRED' : 'FAILED'}`);
+Logger.info('Main', `[Main] Process args: ${JSON.stringify(process.argv)}`);
+Logger.info('Main', `[Main] Process defaultApp: ${process.defaultApp}`);
 
 // Requirements: google-oauth-auth.2.1
 // Extract protocol scheme from redirect URI for deep link handling
 const protocolScheme = OAUTH_CONFIG.redirectUri.split(':')[0];
-console.log('[Main] Protocol scheme:', protocolScheme);
+Logger.info('Main', `[Main] Protocol scheme: ${protocolScheme}`);
 
 // Track application initialization state
 let isAppInitialized = false;
 let pendingDeepLink: string | null = null;
 
 if (!gotTheLock) {
-  console.log('[Main] Another instance is already running');
+  Logger.info('Main', '[Main] Another instance is already running');
 
   // Check if this instance was launched with a deep link
   const launchUrl = process.argv.find((arg) => arg.startsWith(protocolScheme));
   if (launchUrl) {
-    console.log('[Main] This instance has deep link, will pass to primary instance:', launchUrl);
+    Logger.info(
+      'Main',
+      `[Main] This instance has deep link, will pass to primary instance: ${launchUrl}`
+    );
     // The deep link will be passed to the primary instance via second-instance event
   }
 
-  console.log('[Main] Quitting secondary instance...');
+  Logger.info('Main', '[Main] Quitting secondary instance...');
   app.quit();
 } else {
-  console.log('[Main] This is the primary instance');
+  Logger.info('Main', '[Main] This is the primary instance');
 
   // Handle custom user data directory for functional tests
   // Check for --user-data-dir argument
@@ -63,7 +67,7 @@ if (!gotTheLock) {
   if (userDataDirIndex !== -1 && process.argv[userDataDirIndex + 1]) {
     const customUserDataPath = process.argv[userDataDirIndex + 1];
     app.setPath('userData', customUserDataPath);
-    console.log('[Main] Using custom user data path:', customUserDataPath);
+    Logger.info('Main', `[Main] Using custom user data path: ${customUserDataPath}`);
   }
 
   // Register custom protocol for deep link handling
@@ -74,11 +78,14 @@ if (!gotTheLock) {
       // In dev mode, we need to register with the full path to the entry point
       // Get the absolute path to the main file
       const mainPath = path.resolve(__dirname, 'index.js');
-      console.log('[Main] Registering protocol in dev mode:', { execPath, mainPath });
+      Logger.info(
+        'Main',
+        `Registering protocol in dev mode: ${JSON.stringify({ execPath, mainPath })}`
+      );
       app.setAsDefaultProtocolClient(protocolScheme, execPath, [mainPath]);
     }
   } else {
-    console.log('[Main] Registering protocol in production mode');
+    Logger.info('Main', '[Main] Registering protocol in production mode');
     app.setAsDefaultProtocolClient(protocolScheme);
   }
 }
@@ -92,7 +99,7 @@ const dataManager = new DataManager(storagePath);
 // Check if app was launched with a deep link
 const launchUrl = process.argv.find((arg) => arg.startsWith(protocolScheme));
 if (launchUrl) {
-  console.log('[Main] App launched with deep link:', launchUrl);
+  Logger.info('Main', `[Main] App launched with deep link: ${launchUrl}`);
   pendingDeepLink = launchUrl;
 }
 
@@ -128,6 +135,7 @@ const windowManager = new WindowManager(dataManager);
 // Requirements: google-oauth-auth.14.1
 // Initialize Auth Window Manager
 import { AuthWindowManager } from './auth/AuthWindowManager';
+import { Logger } from './Logger';
 const authWindowManager = new AuthWindowManager(windowManager, oauthClient);
 
 // Requirements: clerkly.1.2, clerkly.1.3, clerkly.1.4, ui.6.5
@@ -206,7 +214,7 @@ if (process.env.NODE_ENV === 'test') {
       return { success: true };
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      console.error('[TEST] Failed to fetch profile:', errorMessage);
+      Logger.error('Main', `[TEST] Failed to fetch profile: ${errorMessage}`);
       return { success: false, error: errorMessage };
     }
   });
@@ -284,23 +292,23 @@ if (process.env.NODE_ENV === 'test') {
       throw new Error('test:handle-deep-link can only be used in test environment');
     }
     try {
-      console.log('[TEST] Handling deep link:', url);
+      Logger.info('Main', `[TEST] Handling deep link: ${url}`);
       const authStatus = await oauthClient.handleDeepLink(url);
-      console.log('[TEST] Deep link auth status:', authStatus);
+      Logger.info('Main', `[TEST] Deep link auth status: ${JSON.stringify(authStatus)}`);
 
       // Send auth events to renderer (same as handleDeepLinkUrl does)
       if (authStatus.authorized) {
-        console.log('[TEST] Authorization successful, sending auth success');
+        Logger.info('Main', '[TEST] Authorization successful, sending auth success');
         authIPCHandlers.sendAuthSuccess();
       } else if (authStatus.error) {
-        console.log('[TEST] Authorization failed, sending auth error:', authStatus.error);
+        Logger.info('Main', `[TEST] Authorization failed, sending auth error: ${authStatus.error}`);
         authIPCHandlers.sendAuthError(authStatus.error, authStatus.error);
       }
 
       return authStatus;
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      console.error('[TEST] Deep link handling error:', errorMessage);
+      Logger.error('Main', `[TEST] Deep link handling error: ${errorMessage}`);
       return { authorized: false, error: errorMessage };
     }
   });
@@ -315,24 +323,27 @@ if (process.env.NODE_ENV === 'test') {
         // Send error notification to renderer process using AuthIPCHandlers
         // This simulates what happens when Main Process encounters an error
         authIPCHandlers.sendErrorNotification(data.message, data.context);
-        console.log('[TEST] Sent error notification via AuthIPCHandlers:', data);
+        Logger.info(
+          'Main',
+          `[TEST] Sent error notification via AuthIPCHandlers: ${JSON.stringify(data)}`
+        );
         return { success: true };
       } catch (error: unknown) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        console.error('[TEST] Error sending notification:', errorMessage);
+        Logger.error('Main', `[TEST] Error sending notification: ${errorMessage}`);
         return { success: false, error: errorMessage };
       }
     }
   );
 
-  console.log('[TEST] Test IPC handlers registered');
+  Logger.info('Main', '[TEST] Test IPC handlers registered');
 }
 
 // Requirements: clerkly.1.1, clerkly.1.2
 // Handle application ready event
 app.whenReady().then(async () => {
   try {
-    console.log('[Main] Application starting...');
+    Logger.info('Main', '[Main] Application starting...');
     const startTime = Date.now();
 
     // Requirements: clerkly.1.2, clerkly.1.3, clerkly.1.4
@@ -340,54 +351,54 @@ app.whenReady().then(async () => {
     const initResult = await lifecycleManager.initialize();
 
     if (!initResult.success) {
-      console.error('[Main] Application initialization failed');
+      Logger.error('Main', '[Main] Application initialization failed');
       app.quit();
       return;
     }
 
     const loadTime = Date.now() - startTime;
-    console.log(`[Main] Application started successfully in ${loadTime}ms`);
+    Logger.info('Main', `[Main] Application started successfully in ${loadTime}ms`);
 
     // Requirements: clerkly.nfr.1.1
     // Warn if startup time exceeds 3 seconds
     if (loadTime > 3000) {
-      console.warn(`[Main] Slow startup detected: ${loadTime}ms (target: <3000ms)`);
+      Logger.warn('Main', `[Main] Slow startup detected: ${loadTime}ms (target: <3000ms)`);
     }
 
     // Requirements: clerkly.1.4, clerkly.2.5
     // Register IPC handlers
     ipcHandlers.registerHandlers();
-    console.log('[Main] IPC handlers registered');
+    Logger.info('Main', '[Main] IPC handlers registered');
 
     // Requirements: google-oauth-auth.8.1
     // Register Auth IPC handlers
     authIPCHandlers.registerHandlers();
-    console.log('[Main] Auth IPC handlers registered');
+    Logger.info('Main', '[Main] Auth IPC handlers registered');
 
     // Requirements: ui.10.9, ui.10.26
     // Register Settings IPC handlers
     settingsIPCHandlers.registerHandlers();
-    console.log('[Main] Settings IPC handlers registered');
+    Logger.info('Main', '[Main] Settings IPC handlers registered');
 
     // Requirements: google-oauth-auth.14.1
     // Initialize Auth Window Manager to check auth status and show appropriate window
     await authWindowManager.initializeApp();
-    console.log('[Main] Auth Window Manager initialized');
+    Logger.info('Main', '[Main] Auth Window Manager initialized');
 
-    console.log('[Main] Main window created and loaded');
+    Logger.info('Main', '[Main] Main window created and loaded');
 
     // Mark app as initialized
     isAppInitialized = true;
 
     // Process pending deep link if any
     if (pendingDeepLink) {
-      console.log('[Main] Processing pending deep link:', pendingDeepLink);
+      Logger.info('Main', `[Main] Processing pending deep link: ${pendingDeepLink}`);
       await handleDeepLinkUrl(pendingDeepLink);
       pendingDeepLink = null;
     }
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    console.error('[Main] Startup error:', errorMessage);
+    Logger.error('Main', `[Main] Startup error: ${errorMessage}`);
     app.quit();
   }
 });
@@ -395,14 +406,14 @@ app.whenReady().then(async () => {
 // Requirements: clerkly.1.2, clerkly.1.3
 // Handle activate event (Mac OS X specific)
 app.on('activate', () => {
-  console.log('[Main] Application activated');
+  Logger.info('Main', '[Main] Application activated');
   lifecycleManager.handleActivation();
 });
 
 // Requirements: clerkly.1.2
 // Handle window-all-closed event
 app.on('window-all-closed', () => {
-  console.log('[Main] All windows closed');
+  Logger.info('Main', '[Main] All windows closed');
   // On macOS, keep app running even when all windows are closed
   // This allows deep link handling to work properly
   if (process.platform !== 'darwin') {
@@ -413,7 +424,7 @@ app.on('window-all-closed', () => {
 // Requirements: clerkly.1.2
 // Handle before-quit event
 app.on('before-quit', () => {
-  console.log('[Main] Application quitting...');
+  Logger.info('Main', '[Main] Application quitting...');
   lifecycleManager.handleWindowClose();
 });
 
@@ -428,11 +439,11 @@ async function handleDeepLinkUrl(url: string): Promise<void> {
   }
 
   try {
-    console.log('[Main] Handling deep link:', url);
+    Logger.info('Main', `[Main] Handling deep link: ${url}`);
 
     // Handle deep link first
     const authStatus = await oauthClient.handleDeepLink(url);
-    console.log('[Main] Deep link auth status:', authStatus);
+    Logger.info('Main', `[Main] Deep link auth status: ${JSON.stringify(authStatus)}`);
 
     // Get main window
     const mainWindow = BrowserWindow.getAllWindows()[0];
@@ -442,12 +453,13 @@ async function handleDeepLinkUrl(url: string): Promise<void> {
       // Requirements: google-oauth-auth.3.6, google-oauth-auth.3.7, google-oauth-auth.3.8
       // Profile is already fetched synchronously inside handleDeepLink()
       if (authStatus.authorized) {
-        console.log(
-          '[Main] Authorization successful, profile already fetched, sending auth success'
+        Logger.info(
+          'Main',
+          'Authorization successful, profile already fetched, sending auth success'
         );
         authIPCHandlers.sendAuthSuccess();
       } else if (authStatus.error) {
-        console.log('[Main] Sending auth error event:', authStatus.error);
+        Logger.info('Main', `[Main] Sending auth error event: ${authStatus.error}`);
         authIPCHandlers.sendAuthError(authStatus.error, authStatus.error);
       }
 
@@ -458,11 +470,11 @@ async function handleDeepLinkUrl(url: string): Promise<void> {
       mainWindow.focus();
       mainWindow.show();
     } else {
-      console.warn('[Main] No window available to send auth event');
+      Logger.warn('Main', '[Main] No window available to send auth event');
     }
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    console.error('[Main] Deep link handling error:', errorMessage);
+    Logger.error('Main', `[Main] Deep link handling error: ${errorMessage}`);
 
     // Try to send error to window if available
     const mainWindow = BrowserWindow.getAllWindows()[0];
@@ -476,7 +488,7 @@ async function handleDeepLinkUrl(url: string): Promise<void> {
 // Handle deep link on macOS (open-url event)
 app.on('open-url', async (event, url) => {
   event.preventDefault();
-  console.log('[Main] open-url event received:', url);
+  Logger.info('Main', `[Main] open-url event received: ${url}`);
 
   if (!url.startsWith(protocolScheme)) {
     return;
@@ -484,7 +496,7 @@ app.on('open-url', async (event, url) => {
 
   // If app is not initialized yet, store the deep link for later processing
   if (!isAppInitialized) {
-    console.log('[Main] App not initialized yet, storing deep link for later');
+    Logger.info('Main', '[Main] App not initialized yet, storing deep link for later');
     pendingDeepLink = url;
     return;
   }
@@ -497,24 +509,24 @@ app.on('open-url', async (event, url) => {
 // Handle deep link on Windows/Linux (second-instance event)
 // Single instance lock is already requested at the top of the file
 app.on('second-instance', async (_event, commandLine, _workingDirectory) => {
-  console.log('[Main] second-instance event received');
-  console.log('[Main] Command line args:', commandLine);
+  Logger.info('Main', '[Main] second-instance event received');
+  Logger.info('Main', `[Main] Command line args: ${JSON.stringify(commandLine)}`);
 
   // Find deep link URL in command line arguments
   const url = commandLine.find((arg) => arg.startsWith(protocolScheme));
   if (url) {
-    console.log('[Main] Deep link found in second-instance:', url);
+    Logger.info('Main', `[Main] Deep link found in second-instance: ${url}`);
 
     // If app is not initialized yet, store the deep link for later processing
     if (!isAppInitialized) {
-      console.log('[Main] App not initialized yet, storing deep link for later');
+      Logger.info('Main', '[Main] App not initialized yet, storing deep link for later');
       pendingDeepLink = url;
     } else {
       // Process deep link immediately if app is initialized
       await handleDeepLinkUrl(url);
     }
   } else {
-    console.log('[Main] No deep link in command line, just activating window');
+    Logger.info('Main', '[Main] No deep link in command line, just activating window');
     // No deep link, just activate the window
     const mainWindow = BrowserWindow.getAllWindows()[0];
     if (mainWindow) {

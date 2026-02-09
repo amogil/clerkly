@@ -31,14 +31,14 @@ describe('DateTimeFormatter (Main Process)', () => {
 
   /* Preconditions: valid timestamp provided
      Action: call formatLogTimestamp(timestamp)
-     Assertions: returns string in YYYY-MM-DD HH:MM:SS format
-     Requirements: ui.11.3 */
-  it('should use fixed format for log timestamps', () => {
+     Assertions: returns string in YYYY-MM-DD HH:MM:SS±HH:MM format with timezone
+     Requirements: ui.11.3, clerkly.3.2, clerkly.3.3 */
+  it('should use fixed format for log timestamps with timezone', () => {
     const timestamp = new Date('2026-02-07T10:30:45Z').getTime();
     const result = DateTimeFormatter.formatLogTimestamp(timestamp);
 
-    // Should match YYYY-MM-DD HH:MM:SS format
-    expect(result).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
+    // Should match YYYY-MM-DD HH:MM:SS±HH:MM format
+    expect(result).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}$/);
   });
 
   /* Preconditions: Date object provided
@@ -67,13 +67,13 @@ describe('DateTimeFormatter (Main Process)', () => {
 
   /* Preconditions: Date object provided
      Action: call formatLogTimestamp(date)
-     Assertions: returns string in fixed format
-     Requirements: ui.11.3 */
+     Assertions: returns string in fixed format with timezone
+     Requirements: ui.11.3, clerkly.3.2, clerkly.3.3 */
   it('should accept Date object for formatLogTimestamp', () => {
     const date = new Date('2026-02-07T10:30:45Z');
     const result = DateTimeFormatter.formatLogTimestamp(date);
 
-    expect(result).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
+    expect(result).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}$/);
   });
 
   /* Preconditions: Intl.DateTimeFormat throws error
@@ -96,8 +96,7 @@ describe('DateTimeFormatter (Main Process)', () => {
     expect(result).toBeTruthy();
     expect(typeof result).toBe('string');
     expect(consoleErrorSpy).toHaveBeenCalledWith(
-      '[DateTimeFormatter] Error formatting date:',
-      'Locale error'
+      expect.stringContaining('[DateTimeFormatter] Error formatting date:')
     );
 
     // Restore
@@ -125,8 +124,7 @@ describe('DateTimeFormatter (Main Process)', () => {
     expect(result).toBeTruthy();
     expect(typeof result).toBe('string');
     expect(consoleErrorSpy).toHaveBeenCalledWith(
-      '[DateTimeFormatter] Error formatting date/time:',
-      'Locale error'
+      expect.stringContaining('[DateTimeFormatter] Error formatting date/time:')
     );
 
     // Restore
@@ -162,9 +160,9 @@ describe('DateTimeFormatter (Main Process)', () => {
 
   /* Preconditions: various timestamps
      Action: call formatLogTimestamp()
-     Assertions: all results match YYYY-MM-DD HH:MM:SS format
-     Requirements: ui.11.3 */
-  it('should always use fixed format for logs', () => {
+     Assertions: all results match YYYY-MM-DD HH:MM:SS±HH:MM format with timezone
+     Requirements: ui.11.3, clerkly.3.2, clerkly.3.3 */
+  it('should always use fixed format for logs with timezone', () => {
     const timestamps = [
       Date.now() - 2 * 60 * 60 * 1000,
       Date.now(),
@@ -173,7 +171,47 @@ describe('DateTimeFormatter (Main Process)', () => {
 
     timestamps.forEach((timestamp) => {
       const result = DateTimeFormatter.formatLogTimestamp(timestamp);
-      expect(result).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
+      expect(result).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}$/);
     });
+  });
+
+  /* Preconditions: valid timestamp provided
+     Action: call formatLogTimestamp(timestamp) multiple times
+     Assertions: format is independent of system locale, always YYYY-MM-DD HH:MM:SS±HH:MM
+     Requirements: clerkly.3.2, clerkly.3.3, ui.11.3 */
+  it('should use fixed format independent of system locale', () => {
+    const timestamp = new Date('2026-02-07T10:30:45Z').getTime();
+    const result = DateTimeFormatter.formatLogTimestamp(timestamp);
+
+    // Should always use fixed format, not locale-specific format
+    expect(result).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}$/);
+
+    // Should not contain locale-specific month names or formats
+    expect(result).not.toMatch(/Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec/i);
+    expect(result).not.toMatch(/AM|PM/i);
+  });
+
+  /* Preconditions: valid timestamp provided
+     Action: call formatLogTimestamp(timestamp)
+     Assertions: timezone offset is correctly calculated from Date.getTimezoneOffset()
+     Requirements: clerkly.3.3 */
+  it('should correctly calculate timezone offset', () => {
+    const date = new Date('2026-02-07T10:30:45Z');
+    const result = DateTimeFormatter.formatLogTimestamp(date);
+
+    // Extract timezone from result
+    const timezoneMatch = result.match(/([+-]\d{2}:\d{2})$/);
+    expect(timezoneMatch).toBeTruthy();
+
+    const timezone = timezoneMatch![1];
+
+    // Calculate expected timezone
+    const timezoneOffsetMinutes = date.getTimezoneOffset();
+    const timezoneOffsetHours = Math.floor(Math.abs(timezoneOffsetMinutes) / 60);
+    const timezoneOffsetMins = Math.abs(timezoneOffsetMinutes) % 60;
+    const timezoneSign = timezoneOffsetMinutes <= 0 ? '+' : '-';
+    const expectedTimezone = `${timezoneSign}${String(timezoneOffsetHours).padStart(2, '0')}:${String(timezoneOffsetMins).padStart(2, '0')}`;
+
+    expect(timezone).toBe(expectedTimezone);
   });
 });

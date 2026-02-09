@@ -2,7 +2,9 @@
 
 import { DataManager } from './DataManager';
 import { safeStorage } from 'electron';
+import { Logger } from './Logger';
 
+// Requirements: clerkly.3.8 - Use centralized Logger instead of console.*
 /**
  * Manages AI Agent settings including LLM provider selection and API key storage
  * Handles encryption/decryption of API keys using Electron's safeStorage
@@ -34,10 +36,16 @@ export class AIAgentSettingsManager {
         throw new Error(result.error || 'Failed to save LLM provider');
       }
 
-      console.log('[AIAgentSettingsManager] LLM provider saved:', provider);
+      Logger.info(
+        'AIAgentSettingsManager',
+        `[AIAgentSettingsManager] LLM provider saved: ${provider}`
+      );
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      console.error('[AIAgentSettingsManager] Failed to save LLM provider:', errorMessage);
+      Logger.error(
+        'AIAgentSettingsManager',
+        `[AIAgentSettingsManager] Failed to save LLM provider: ${errorMessage}`
+      );
       throw error;
     }
   }
@@ -55,16 +63,25 @@ export class AIAgentSettingsManager {
       const result = this.dataManager.loadData('ai_agent_llm_provider');
 
       if (!result.success || !result.data) {
-        console.log('[AIAgentSettingsManager] No LLM provider found, using default: openai');
+        Logger.info(
+          'AIAgentSettingsManager',
+          '[AIAgentSettingsManager] No LLM provider found, using default: openai'
+        );
         return 'openai';
       }
 
       const provider = result.data as 'openai' | 'anthropic' | 'google';
-      console.log('[AIAgentSettingsManager] LLM provider loaded:', provider);
+      Logger.info(
+        'AIAgentSettingsManager',
+        `[AIAgentSettingsManager] LLM provider loaded: ${provider}`
+      );
       return provider;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      console.error('[AIAgentSettingsManager] Failed to load LLM provider:', errorMessage);
+      Logger.error(
+        'AIAgentSettingsManager',
+        `[AIAgentSettingsManager] Failed to load LLM provider: ${errorMessage}`
+      );
       return 'openai';
     }
   }
@@ -91,12 +108,16 @@ export class AIAgentSettingsManager {
         const buffer = safeStorage.encryptString(apiKey);
         storedKey = buffer.toString('base64');
         isEncrypted = true;
-        console.log(`[AIAgentSettingsManager] API key encrypted for ${provider}`);
+        Logger.info(
+          'AIAgentSettingsManager',
+          `[AIAgentSettingsManager] API key encrypted for ${provider}`
+        );
       } else {
         storedKey = apiKey;
         isEncrypted = false;
-        console.log(
-          `[AIAgentSettingsManager] Encryption unavailable, storing plain text for ${provider}`
+        Logger.info(
+          'AIAgentSettingsManager',
+          `Encryption unavailable, storing plain text for ${provider}`
         );
       }
 
@@ -115,12 +136,15 @@ export class AIAgentSettingsManager {
         throw new Error(flagResult.error || 'Failed to save encryption flag');
       }
 
-      console.log(`[AIAgentSettingsManager] API key saved for ${provider}`);
+      Logger.info(
+        'AIAgentSettingsManager',
+        `[AIAgentSettingsManager] API key saved for ${provider}`
+      );
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      console.error(
-        `[AIAgentSettingsManager] Failed to save API key for ${provider}:`,
-        errorMessage
+      Logger.error(
+        'AIAgentSettingsManager',
+        `Failed to save API key for ${provider}: ${errorMessage}`
       );
       throw error;
     }
@@ -142,7 +166,10 @@ export class AIAgentSettingsManager {
       const encryptedResult = this.dataManager.loadData(`ai_agent_api_key_${provider}_encrypted`);
 
       if (!keyResult.success || !keyResult.data) {
-        console.log(`[AIAgentSettingsManager] No API key found for ${provider}`);
+        Logger.info(
+          'AIAgentSettingsManager',
+          `[AIAgentSettingsManager] No API key found for ${provider}`
+        );
         return null;
       }
 
@@ -153,17 +180,23 @@ export class AIAgentSettingsManager {
       if (isEncrypted) {
         const buffer = Buffer.from(storedKey, 'base64');
         const decryptedKey = safeStorage.decryptString(buffer);
-        console.log(`[AIAgentSettingsManager] API key decrypted for ${provider}`);
+        Logger.info(
+          'AIAgentSettingsManager',
+          `[AIAgentSettingsManager] API key decrypted for ${provider}`
+        );
         return decryptedKey;
       }
 
-      console.log(`[AIAgentSettingsManager] API key loaded (plain text) for ${provider}`);
+      Logger.info(
+        'AIAgentSettingsManager',
+        `[AIAgentSettingsManager] API key loaded (plain text) for ${provider}`
+      );
       return storedKey;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      console.error(
-        `[AIAgentSettingsManager] Failed to load API key for ${provider}:`,
-        errorMessage
+      Logger.error(
+        'AIAgentSettingsManager',
+        `Failed to load API key for ${provider}: ${errorMessage}`
       );
       return null;
     }
@@ -190,12 +223,15 @@ export class AIAgentSettingsManager {
         throw new Error(keyResult.error || 'Failed to delete API key');
       }
 
-      console.log(`[AIAgentSettingsManager] API key deleted for ${provider}`);
+      Logger.info(
+        'AIAgentSettingsManager',
+        `[AIAgentSettingsManager] API key deleted for ${provider}`
+      );
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      console.error(
-        `[AIAgentSettingsManager] Failed to delete API key for ${provider}:`,
-        errorMessage
+      Logger.error(
+        'AIAgentSettingsManager',
+        `Failed to delete API key for ${provider}: ${errorMessage}`
       );
       throw error;
     }

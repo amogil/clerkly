@@ -108,23 +108,30 @@ Clerkly - это Electron-приложение для Mac OS X, представ
 
 3.1. Clerkly ДОЛЖНО иметь централизованный класс "Logger" для всего логирования в приложении
 
-3.2. "Logger" ДОЛЖЕН использовать "DateTimeFormatter.formatLogTimestamp()" для форматирования timestamp в логах
+3.2. "Logger" ДОЛЖЕН использовать "DateTimeFormatter.formatLogTimestamp()" для автоматического форматирования timestamp в логах
 
 3.3. Все логи ДОЛЖНЫ использовать фиксированный формат timestamp: YYYY-MM-DD HH:MM:SS±HH:MM (с указанием часового пояса, независимо от системной локали)
 
 3.4. "Logger" ДОЛЖЕН поддерживать уровни логирования: debug, info, warn, error
 
-3.5. "Logger" ДОЛЖЕН добавлять контекст (имя компонента) к каждому сообщению лога
+3.5. "Logger" ДОЛЖЕН принимать следующие параметры при логировании:
+   - context (обязательный): строка с именем компонента
+   - message (обязательный): строка с сообщением лога
+   - level (опциональный, по умолчанию 'info'): уровень логирования (debug, info, warn, error)
 
-3.6. ВСЕ компоненты приложения ДОЛЖНЫ использовать "Logger" вместо прямых вызовов console.log/console.error/console.warn/console.debug
+3.6. "Logger" ДОЛЖЕН автоматически добавлять timestamp к каждому сообщению лога (вызывающий код НЕ передает timestamp)
 
-3.7. ВСЕ тесты (модульные, property-based, функциональные) ДОЛЖНЫ использовать "Logger" для логирования вместо прямых вызовов console.*
+3.7. ВСЕ компоненты приложения ДОЛЖНЫ использовать "Logger" вместо прямых вызовов console.log/console.error/console.warn/console.debug
 
-3.8. Прямые вызовы console.log/console.error/console.warn/console.debug ЗАПРЕЩЕНЫ в production коде и тестах (за исключением самого класса "Logger")
+3.8. ВСЕ тесты (модульные, property-based, функциональные) ДОЛЖНЫ использовать "Logger" для логирования вместо прямых вызовов console.*
 
-3.9. "Logger" ДОЛЖЕН быть доступен как в "Main Process", так и в "Renderer Process"
+3.9. Прямые вызовы console.log/console.error/console.warn/console.debug ЗАПРЕЩЕНЫ в production коде и тестах (за исключением самого класса "Logger" и "DateTimeFormatter")
 
-3.10. "Logger" ДОЛЖЕН быть доступен в тестовом окружении (модульные, property-based, функциональные тесты)
+3.10. "Logger" ДОЛЖЕН быть доступен как в "Main Process", так и в "Renderer Process"
+
+3.11. "Logger" ДОЛЖЕН быть доступен в тестовом окружении (модульные, property-based, функциональные тесты)
+
+3.12. "DateTimeFormatter" НЕ ДОЛЖЕН использовать "Logger" для избежания циклической зависимости (Logger → DateTimeFormatter для форматирования timestamp, поэтому DateTimeFormatter не может использовать Logger)
 
 **Тестируемость:** Да - через модульные тесты "Logger" класса, проверку формата timestamp, property-based тесты для различных входных данных, функциональные тесты генерации логов при навигации
 

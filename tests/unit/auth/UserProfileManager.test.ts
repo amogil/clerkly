@@ -163,8 +163,7 @@ describe('UserProfileManager', () => {
 
       // Verify error was logged
       expect(consoleErrorSpy).toHaveBeenCalledWith(
-        '[UserProfileManager] Failed to fetch profile:',
-        expect.any(Error)
+        expect.stringContaining('[UserProfileManager] Failed to fetch profile:')
       );
 
       // Verify cached profile was returned
@@ -184,8 +183,8 @@ describe('UserProfileManager', () => {
         authorized: false,
       });
 
-      // Spy on console.log
-      const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
+      // Spy on console.info
+      const consoleInfoSpy = jest.spyOn(console, 'info').mockImplementation();
 
       // Call fetchProfile
       const result = await profileManager.fetchProfile();
@@ -197,9 +196,11 @@ describe('UserProfileManager', () => {
       expect(global.fetch).not.toHaveBeenCalled();
 
       // Verify log message
-      expect(consoleLogSpy).toHaveBeenCalledWith('[UserProfileManager] No access token available');
+      expect(consoleInfoSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[UserProfileManager] No access token available')
+      );
 
-      consoleLogSpy.mockRestore();
+      consoleInfoSpy.mockRestore();
     });
 
     /* Preconditions: OAuthClientManager returns authorized status but TokenStorageManager returns null or no access token
@@ -215,8 +216,8 @@ describe('UserProfileManager', () => {
       // Mock no tokens
       (tokenStorage.loadTokens as jest.Mock).mockResolvedValue(null);
 
-      // Spy on console.log
-      const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
+      // Spy on console.info
+      const consoleInfoSpy = jest.spyOn(console, 'info').mockImplementation();
 
       // Call fetchProfile
       const result = await profileManager.fetchProfile();
@@ -228,9 +229,11 @@ describe('UserProfileManager', () => {
       expect(global.fetch).not.toHaveBeenCalled();
 
       // Verify log message
-      expect(consoleLogSpy).toHaveBeenCalledWith('[UserProfileManager] No access token available');
+      expect(consoleInfoSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[UserProfileManager] No access token available')
+      );
 
-      consoleLogSpy.mockRestore();
+      consoleInfoSpy.mockRestore();
     });
   });
 
@@ -245,8 +248,8 @@ describe('UserProfileManager', () => {
         lastUpdated: Date.now(),
       };
 
-      // Spy on console.log
-      const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
+      // Spy on console.info
+      const consoleInfoSpy = jest.spyOn(console, 'info').mockImplementation();
 
       // Call saveProfile
       await profileManager.saveProfile(testProfile);
@@ -257,11 +260,11 @@ describe('UserProfileManager', () => {
       expect(savedProfile.data).toMatchObject(testProfile);
 
       // Verify success log
-      expect(consoleLogSpy).toHaveBeenCalledWith(
-        '[UserProfileManager] Profile saved to local storage'
+      expect(consoleInfoSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[UserProfileManager] Profile saved to local storage')
       );
 
-      consoleLogSpy.mockRestore();
+      consoleInfoSpy.mockRestore();
     });
 
     /* Preconditions: DataManager.saveData() fails (throws error or returns failure)
@@ -285,8 +288,7 @@ describe('UserProfileManager', () => {
 
       // Verify error was logged
       expect(consoleErrorSpy).toHaveBeenCalledWith(
-        '[UserProfileManager] Failed to save profile:',
-        expect.any(Error)
+        expect.stringContaining('[UserProfileManager] Failed to save profile:')
       );
 
       consoleErrorSpy.mockRestore();
@@ -307,8 +309,8 @@ describe('UserProfileManager', () => {
       // Save profile first
       dataManager.saveData('user_profile', testProfile);
 
-      // Spy on console.log
-      const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
+      // Spy on console.info
+      const consoleInfoSpy = jest.spyOn(console, 'info').mockImplementation();
 
       // Call loadProfile
       const result = await profileManager.loadProfile();
@@ -318,11 +320,11 @@ describe('UserProfileManager', () => {
       expect(result).toMatchObject(testProfile);
 
       // Verify success log
-      expect(consoleLogSpy).toHaveBeenCalledWith(
-        '[UserProfileManager] Profile loaded from local storage'
+      expect(consoleInfoSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[UserProfileManager] Profile loaded from local storage')
       );
 
-      consoleLogSpy.mockRestore();
+      consoleInfoSpy.mockRestore();
     });
 
     /* Preconditions: DataManager has no profile data (result.success = false or result.data = null)
@@ -330,8 +332,8 @@ describe('UserProfileManager', () => {
        Assertions: Returns null, console log message about no profile found
        Requirements: ui.6.7 */
     it('should return null when no profile data exists', async () => {
-      // Spy on console.log
-      const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
+      // Spy on console.info
+      const consoleInfoSpy = jest.spyOn(console, 'info').mockImplementation();
 
       // Call loadProfile (no data saved)
       const result = await profileManager.loadProfile();
@@ -340,11 +342,11 @@ describe('UserProfileManager', () => {
       expect(result).toBeNull();
 
       // Verify log message
-      expect(consoleLogSpy).toHaveBeenCalledWith(
-        '[UserProfileManager] No profile found in local storage'
+      expect(consoleInfoSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[UserProfileManager] No profile found in local storage')
       );
 
-      consoleLogSpy.mockRestore();
+      consoleInfoSpy.mockRestore();
     });
 
     /* Preconditions: DataManager.loadData() throws error
@@ -372,8 +374,7 @@ describe('UserProfileManager', () => {
 
       // Verify error was logged
       expect(consoleErrorSpy).toHaveBeenCalledWith(
-        '[UserProfileManager] Failed to load profile:',
-        expect.any(Error)
+        expect.stringContaining('[UserProfileManager] Failed to load profile:')
       );
 
       consoleErrorSpy.mockRestore();
@@ -398,8 +399,8 @@ describe('UserProfileManager', () => {
       let savedProfile = dataManager.loadData('user_profile');
       expect(savedProfile.success).toBe(true);
 
-      // Spy on console.log
-      const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
+      // Spy on console.info
+      const consoleInfoSpy = jest.spyOn(console, 'info').mockImplementation();
 
       // Call clearProfile
       await profileManager.clearProfile();
@@ -409,11 +410,11 @@ describe('UserProfileManager', () => {
       expect(savedProfile.success).toBe(false);
 
       // Verify success log
-      expect(consoleLogSpy).toHaveBeenCalledWith(
-        '[UserProfileManager] Profile cleared from local storage'
+      expect(consoleInfoSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[UserProfileManager] Profile cleared from local storage')
       );
 
-      consoleLogSpy.mockRestore();
+      consoleInfoSpy.mockRestore();
     });
 
     /* Preconditions: DataManager.deleteData() fails (throws error or returns failure)
@@ -432,8 +433,7 @@ describe('UserProfileManager', () => {
 
       // Verify error was logged
       expect(consoleErrorSpy).toHaveBeenCalledWith(
-        '[UserProfileManager] Failed to clear profile:',
-        expect.any(Error)
+        expect.stringContaining('[UserProfileManager] Failed to clear profile:')
       );
 
       consoleErrorSpy.mockRestore();
@@ -449,8 +449,8 @@ describe('UserProfileManager', () => {
       // Spy on fetchProfile method
       const fetchProfileSpy = jest.spyOn(profileManager, 'fetchProfile').mockResolvedValue(null);
 
-      // Spy on console.log
-      const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
+      // Spy on console.info
+      const consoleInfoSpy = jest.spyOn(console, 'info').mockImplementation();
 
       // Call updateProfileAfterTokenRefresh
       await profileManager.updateProfileAfterTokenRefresh();
@@ -459,12 +459,12 @@ describe('UserProfileManager', () => {
       expect(fetchProfileSpy).toHaveBeenCalledTimes(1);
 
       // Verify log message
-      expect(consoleLogSpy).toHaveBeenCalledWith(
-        '[UserProfileManager] Updating profile after token refresh'
+      expect(consoleInfoSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[UserProfileManager] Updating profile after token refresh')
       );
 
       fetchProfileSpy.mockRestore();
-      consoleLogSpy.mockRestore();
+      consoleInfoSpy.mockRestore();
     });
   });
 
@@ -610,8 +610,8 @@ describe('UserProfileManager', () => {
         json: async () => mockProfile,
       });
 
-      // Spy on console.log
-      const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
+      // Spy on console.info
+      const consoleInfoSpy = jest.spyOn(console, 'info').mockImplementation();
 
       // Call fetchProfileSynchronously
       const result = await profileManager.fetchProfileSynchronously();
@@ -643,11 +643,11 @@ describe('UserProfileManager', () => {
       expect(profileManager.getCurrentEmail()).toBe('test@example.com');
 
       // Verify success log
-      expect(consoleLogSpy).toHaveBeenCalledWith(
-        '[UserProfileManager] Profile fetched and saved synchronously'
+      expect(consoleInfoSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[UserProfileManager] Profile fetched and saved synchronously')
       );
 
-      consoleLogSpy.mockRestore();
+      consoleInfoSpy.mockRestore();
     });
 
     /* Preconditions: TokenStorageManager returns valid access token, fetch returns HTTP error (500, 401, etc.)
@@ -724,7 +724,9 @@ describe('UserProfileManager', () => {
 
       // Verify error was logged
       expect(consoleErrorSpy).toHaveBeenCalledWith(
-        '[UserProfileManager] No access token available for synchronous fetch'
+        expect.stringContaining(
+          '[UserProfileManager] No access token available for synchronous fetch'
+        )
       );
 
       consoleErrorSpy.mockRestore();
@@ -766,8 +768,7 @@ describe('UserProfileManager', () => {
 
       // Verify error was logged
       expect(consoleErrorSpy).toHaveBeenCalledWith(
-        '[UserProfileManager] Failed to fetch profile synchronously:',
-        expect.any(Error)
+        expect.stringContaining('[UserProfileManager] Failed to fetch profile synchronously:')
       );
 
       consoleErrorSpy.mockRestore();

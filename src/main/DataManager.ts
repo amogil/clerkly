@@ -7,7 +7,9 @@ import * as os from 'os';
 import { MigrationRunner } from './MigrationRunner';
 import { handleBackgroundError } from './ErrorHandler';
 import type { UserProfileManager } from './auth/UserProfileManager';
+import { Logger } from './Logger';
 
+// Requirements: clerkly.3.8 - Use centralized Logger instead of console.*
 /**
  * Initialize result
  */
@@ -73,7 +75,7 @@ export class DataManager {
    */
   setUserProfileManager(profileManager: UserProfileManager): void {
     this.userProfileManager = profileManager;
-    console.log('[DataManager] UserProfileManager set for data isolation');
+    Logger.info('DataManager', '[DataManager] UserProfileManager set for data isolation');
   }
 
   /**
@@ -98,7 +100,7 @@ export class DataManager {
         const errorObj = dirError as { code?: string };
         // Обработка ошибок прав доступа - fallback на temp directory
         if (errorObj.code === 'EACCES' || errorObj.code === 'EPERM') {
-          console.warn('Permission denied, using temp directory');
+          Logger.warn('DataManager', 'Permission denied, using temp directory');
           this.storagePath = path.join(os.tmpdir(), 'clerkly-fallback');
           usedFallback = true;
           fallbackPath = this.storagePath;
@@ -121,7 +123,7 @@ export class DataManager {
           testDb.prepare('SELECT 1').get();
           testDb.close();
         } catch {
-          console.warn('Database corrupted, creating backup');
+          Logger.warn('DataManager', 'Database corrupted, creating backup');
           const backupPath = path.join(this.storagePath, `clerkly.db.backup-${Date.now()}`);
           fs.copyFileSync(dbPath, backupPath);
           fs.unlinkSync(dbPath);

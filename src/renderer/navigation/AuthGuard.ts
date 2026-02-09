@@ -1,6 +1,8 @@
 // Requirements: ui.8.2
 import type { NavigationManager } from './NavigationManager';
+import { Logger } from '../Logger';
 
+// Requirements: clerkly.3.8 - Use centralized Logger instead of console.*
 /**
  * AuthGuard protects routes from unauthorized access
  * Requirements: ui.8.2
@@ -39,7 +41,7 @@ export class AuthGuard {
     const isAuthenticated = await this.navigationManager.checkAuthStatus();
 
     if (!isAuthenticated) {
-      console.log('[AuthGuard] Access denied to protected route:', route);
+      Logger.info('AuthGuard', `[AuthGuard] Access denied to protected route: ${route}`);
       this.navigationManager.redirectToLogin();
       return false;
     }

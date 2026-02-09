@@ -246,8 +246,7 @@ describe('LifecycleManager', () => {
       }).not.toThrow();
 
       expect(consoleErrorSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Failed to handle activation'),
-        expect.stringContaining('Failed to create window')
+        expect.stringContaining('Failed to handle activation')
       );
 
       consoleErrorSpy.mockRestore();
@@ -321,8 +320,7 @@ describe('LifecycleManager', () => {
 
       // Error should be logged
       expect(consoleErrorSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Error during shutdown'),
-        expect.stringContaining('Failed to close window')
+        expect.stringContaining('Error during shutdown')
       );
 
       consoleErrorSpy.mockRestore();

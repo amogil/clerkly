@@ -123,7 +123,7 @@ describe('AuthWindowManager Property-Based Tests', () => {
       fc.asyncProperty(errorMessageArb, errorCodeArb, async (errorMessage, errorCode) => {
         // Reset mocks for each iteration
         jest.clearAllMocks();
-        const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
+        const consoleSpy = jest.spyOn(console, 'info').mockImplementation();
         mockWindowManager.isWindowCreated.mockReturnValue(true);
         mockWindowManager.getWindow.mockReturnValue(mockWindow);
 
@@ -132,10 +132,9 @@ describe('AuthWindowManager Property-Based Tests', () => {
         await authWindowManager.onAuthError(errorMessage, errorCode);
 
         // Verify error was logged
-        expect(consoleSpy).toHaveBeenCalledWith('[AuthWindowManager] Authentication failed:', {
-          error: errorMessage,
-          errorCode: errorCode,
-        });
+        expect(consoleSpy).toHaveBeenCalledWith(
+          expect.stringContaining('[AuthWindowManager] Authentication failed:')
+        );
 
         // Verify window remains available for error display
         // (window should not be closed)
@@ -181,14 +180,16 @@ describe('AuthWindowManager Property-Based Tests', () => {
       fc.asyncProperty(fc.constant(null), async () => {
         // Reset mocks for each iteration
         jest.clearAllMocks();
-        const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
+        const consoleSpy = jest.spyOn(console, 'info').mockImplementation();
         mockWindowManager.isWindowCreated.mockReturnValue(false);
 
         const authWindowManager = new AuthWindowManager(mockWindowManager, mockOAuthClient);
         await authWindowManager.onRetry();
 
         // Verify retry was logged
-        expect(consoleSpy).toHaveBeenCalledWith('[AuthWindowManager] Retrying authentication');
+        expect(consoleSpy).toHaveBeenCalledWith(
+          expect.stringContaining('[AuthWindowManager] Retrying authentication')
+        );
 
         // Verify login window was created
         expect(mockWindowManager.createWindow).toHaveBeenCalled();

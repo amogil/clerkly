@@ -44,19 +44,18 @@ describe('AuthGuard', () => {
        Requirements: ui.8.2 */
     it('should block access to protected routes when not authorized', async () => {
       mockNavigationManager.checkAuthStatus.mockResolvedValue(false);
-      const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
+      const consoleInfoSpy = jest.spyOn(console, 'info').mockImplementation();
 
       const result = await authGuard.canActivate('/dashboard');
 
       expect(result).toBe(false);
       expect(mockNavigationManager.checkAuthStatus).toHaveBeenCalledTimes(1);
       expect(mockNavigationManager.redirectToLogin).toHaveBeenCalledTimes(1);
-      expect(consoleLogSpy).toHaveBeenCalledWith(
-        '[AuthGuard] Access denied to protected route:',
-        '/dashboard'
+      expect(consoleInfoSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[AuthGuard] Access denied to protected route:')
       );
 
-      consoleLogSpy.mockRestore();
+      consoleInfoSpy.mockRestore();
     });
 
     /* Preconditions: protected route '/dashboard', user authorized

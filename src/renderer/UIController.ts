@@ -1,8 +1,11 @@
-// Requirements: clerkly.1, clerkly.2, clerkly.nfr.1
+// Requirements: clerkly.1, clerkly.2, clerkly.nfr.1, clerkly.3.8
 /**
  * UI Controller - manages user interface rendering and performance monitoring
  */
 
+import { Logger } from './Logger';
+
+// Requirements: clerkly.3.8 - Use centralized Logger instead of console.*
 export interface RenderResult {
   success: boolean;
   renderTime: number;
@@ -67,7 +70,8 @@ export class UIController {
       const performanceWarning = renderTime > this.performanceThreshold;
 
       if (performanceWarning) {
-        console.warn(
+        Logger.warn(
+          'UIController',
           `Slow UI render: ${renderTime.toFixed(2)}ms (target: <${this.performanceThreshold}ms)`
         );
       }
@@ -75,7 +79,7 @@ export class UIController {
       return { success: true, renderTime, performanceWarning };
     } catch (error: unknown) {
       const renderTime = performance.now() - startTime;
-      console.error('Failed to render UI:', error);
+      Logger.error('UIController', `Failed to render UI: ${error}`);
       return {
         success: false,
         renderTime,
@@ -112,7 +116,8 @@ export class UIController {
       const performanceWarning = updateTime > this.performanceThreshold;
 
       if (performanceWarning) {
-        console.warn(
+        Logger.warn(
+          'UIController',
           `Slow UI update: ${updateTime.toFixed(2)}ms (target: <${this.performanceThreshold}ms)`
         );
       }
@@ -120,7 +125,7 @@ export class UIController {
       return { success: true, updateTime, performanceWarning };
     } catch (error: unknown) {
       const updateTime = performance.now() - startTime;
-      console.error('Failed to update view:', error);
+      Logger.error('UIController', `Failed to update view: ${error}`);
       return {
         success: false,
         updateTime,
@@ -160,7 +165,7 @@ export class UIController {
       return { success: true };
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      console.error('Failed to show loading indicator:', error);
+      Logger.error('UIController', `Failed to show loading indicator: ${error}`);
       return { success: false, error: errorMessage };
     }
   }
@@ -190,7 +195,7 @@ export class UIController {
       return { success: true, duration };
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      console.error('Failed to hide loading indicator:', error);
+      Logger.error('UIController', `Failed to hide loading indicator: ${error}`);
       return { success: false, error: errorMessage };
     }
   }

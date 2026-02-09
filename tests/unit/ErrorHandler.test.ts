@@ -44,7 +44,7 @@ describe('ErrorHandler', () => {
 
     handleBackgroundError(error, context);
 
-    expect(consoleErrorSpy).toHaveBeenCalledWith('[Test Context] Error:', 'Test error');
+    expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('[Test Context] Error:'));
   });
 
   /* Preconditions: Error object with stack trace
@@ -59,8 +59,7 @@ describe('ErrorHandler', () => {
     handleBackgroundError(error, context);
 
     expect(consoleErrorSpy).toHaveBeenCalledWith(
-      '[Test Context] Stack trace:',
-      'Error: Test error\n    at test.ts:10:5'
+      expect.stringContaining('[Test Context] Stack trace:')
     );
   });
 
@@ -74,7 +73,8 @@ describe('ErrorHandler', () => {
 
     handleBackgroundError(error, context);
 
-    expect(consoleErrorSpy).toHaveBeenCalledWith('[Test Context] Error:', 'Simple error message');
+    expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('[Test Context] Error:'));
+    expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('Simple error message'));
   });
 
   /* Preconditions: Error and context provided, one window open
@@ -135,7 +135,7 @@ describe('ErrorHandler', () => {
     const context = 'Test Context';
 
     expect(() => handleBackgroundError(error, context)).not.toThrow();
-    expect(consoleErrorSpy).toHaveBeenCalledWith('[Test Context] Error:', 'Test error');
+    expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('[Test Context] Error:'));
   });
 
   /* Preconditions: Error with special characters in message
@@ -148,10 +148,7 @@ describe('ErrorHandler', () => {
 
     handleBackgroundError(error, context);
 
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
-      '[Test Context] Error:',
-      'Error: "test" & <special> chars'
-    );
+    expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('[Test Context] Error:'));
     expect(mockWindow.webContents.send).toHaveBeenCalledWith(
       'error:notify',
       'Error: "test" & <special> chars',

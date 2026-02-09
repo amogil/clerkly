@@ -125,79 +125,29 @@ graph TB
 Централизованный компонент для логирования во всем приложении с фиксированным форматом временных меток.
 
 ```typescript
-// Requirements: clerkly.3.1, clerkly.3.2, clerkly.3.3, clerkly.3.4, clerkly.3.5
+// Requirements: clerkly.3.1, clerkly.3.2, clerkly.3.3, clerkly.3.4, clerkly.3.5, clerkly.3.6
 import { DateTimeFormatter } from './utils/DateTimeFormatter';
 
 type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
-interface LogEntry {
-  timestamp: string;
-  level: LogLevel;
-  context: string;
-  message: string;
-}
-
 class Logger {
-  private context: string;
-  private dateTimeFormatter: DateTimeFormatter;
-  
-  constructor(context: string) {
-    this.context = context;
-    this.dateTimeFormatter = new DateTimeFormatter();
-  }
-  
   /**
-   * Логирует debug сообщение
-   * @param {string} message - Сообщение для логирования
+   * Логирует сообщение с указанным уровнем
+   * Requirements: clerkly.3.5, clerkly.3.6
+   * 
+   * @param {string} context - Контекст (имя компонента), обязательный
+   * @param {string} message - Сообщение для логирования, обязательное
+   * @param {LogLevel} level - Уровень логирования, опциональный (по умолчанию 'info')
    */
-  debug(message: string): void {
-    this.log('debug', message);
-  }
-  
-  /**
-   * Логирует info сообщение
-   * @param {string} message - Сообщение для логирования
-   */
-  info(message: string): void {
-    this.log('info', message);
-  }
-  
-  /**
-   * Логирует warning сообщение
-   * @param {string} message - Сообщение для логирования
-   */
-  warn(message: string): void {
-    this.log('warn', message);
-  }
-  
-  /**
-   * Логирует error сообщение
-   * @param {string} message - Сообщение для логирования
-   */
-  error(message: string): void {
-    this.log('error', message);
-  }
-  
-  /**
-   * Внутренний метод для логирования с форматированием
-   * @param {LogLevel} level - Уровень логирования
-   * @param {string} message - Сообщение для логирования
-   */
-  private log(level: LogLevel, message: string): void {
-    // Requirements: clerkly.3.2, clerkly.3.3
-    const timestamp = this.dateTimeFormatter.formatLogTimestamp(new Date());
-    const logEntry: LogEntry = {
-      timestamp,
-      level,
-      context: this.context,
-      message
-    };
+  static log(context: string, message: string, level: LogLevel = 'info'): void {
+    // Requirements: clerkly.3.2, clerkly.3.3, clerkly.3.6
+    const timestamp = DateTimeFormatter.formatLogTimestamp(new Date());
     
     // Requirements: clerkly.3.5
-    const formattedMessage = `[${timestamp}] [${level.toUpperCase()}] [${this.context}] ${message}`;
+    const formattedMessage = `[${timestamp}] [${level.toUpperCase()}] [${context}] ${message}`;
     
     // Используем console.* только внутри Logger класса
-    // Requirements: clerkly.3.8
+    // Requirements: clerkly.3.9
     switch (level) {
       case 'debug':
         console.debug(formattedMessage);
@@ -215,14 +165,70 @@ class Logger {
   }
   
   /**
-   * Создает новый Logger с указанным контекстом
+   * Логирует debug сообщение
+   * Requirements: clerkly.3.4, clerkly.3.5
+   * 
    * @param {string} context - Контекст (имя компонента)
-   * @returns {Logger}
+   * @param {string} message - Сообщение для логирования
    */
-  static create(context: string): Logger {
-    return new Logger(context);
+  static debug(context: string, message: string): void {
+    Logger.log(context, message, 'debug');
+  }
+  
+  /**
+   * Логирует info сообщение
+   * Requirements: clerkly.3.4, clerkly.3.5
+   * 
+   * @param {string} context - Контекст (имя компонента)
+   * @param {string} message - Сообщение для логирования
+   */
+  static info(context: string, message: string): void {
+    Logger.log(context, message, 'info');
+  }
+  
+  /**
+   * Логирует warning сообщение
+   * Requirements: clerkly.3.4, clerkly.3.5
+   * 
+   * @param {string} context - Контекст (имя компонента)
+   * @param {string} message - Сообщение для логирования
+   */
+  static warn(context: string, message: string): void {
+    Logger.log(context, message, 'warn');
+  }
+  
+  /**
+   * Логирует error сообщение
+   * Requirements: clerkly.3.4, clerkly.3.5
+   * 
+   * @param {string} context - Контекст (имя компонента)
+   * @param {string} message - Сообщение для логирования
+   */
+  static error(context: string, message: string): void {
+    Logger.log(context, message, 'error');
   }
 }
+
+**Примеры использования:**
+
+```typescript
+// Requirements: clerkly.3.7
+// В компонентах приложения
+Logger.info('WindowManager', 'Window created successfully');
+Logger.error('DataManager', 'Failed to save data');
+Logger.debug('LifecycleManager', 'Application initialized');
+
+// С уровнем по умолчанию (info)
+Logger.log('Component', 'Some message'); // level = 'info'
+
+// С явным указанием уровня
+Logger.log('Component', 'Debug message', 'debug');
+```
+
+**Важно:** 
+- Requirements: clerkly.3.2, clerkly.3.6 - Logger автоматически форматирует timestamp через DateTimeFormatter.formatLogTimestamp()
+- Requirements: clerkly.3.12 - "DateTimeFormatter" НЕ использует "Logger" для избежания циклической зависимости (Logger → DateTimeFormatter)
+- Requirements: clerkly.3.9 - Прямые вызовы console.* разрешены только в "Logger" и "DateTimeFormatter"
 ```
 
 #### Window Manager

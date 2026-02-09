@@ -1,7 +1,9 @@
 // Requirements: ui.7.1, ui.7.4
 
 import { BrowserWindow } from 'electron';
+import { Logger } from './Logger';
 
+// Requirements: clerkly.3.8 - Use centralized Logger instead of console.*
 /**
  * Handle background errors and notify renderer processes
  * Requirements: ui.7.1, ui.7.4
@@ -24,11 +26,11 @@ import { BrowserWindow } from 'electron';
 export function handleBackgroundError(error: unknown, context: string): void {
   // Requirements: ui.7.4 - Log error to console with context
   const errorMessage = error instanceof Error ? error.message : String(error);
-  console.error(`[${context}] Error:`, errorMessage);
+  Logger.error('ErrorHandler', `[${context}] Error: ${errorMessage}`);
 
   // Log stack trace if available for debugging
   if (error instanceof Error && error.stack) {
-    console.error(`[${context}] Stack trace:`, error.stack);
+    Logger.error('ErrorHandler', `[${context}] Stack trace: ${error.stack}`);
   }
 
   // Requirements: ui.7.1 - Send error notification to all renderer processes

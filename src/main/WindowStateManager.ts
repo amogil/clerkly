@@ -2,7 +2,9 @@
 
 import { screen } from 'electron';
 import { DataManager } from './DataManager';
+import { Logger } from './Logger';
 
+// Requirements: clerkly.3.8 - Use centralized Logger instead of console.*
 /**
  * Represents the state of the application window
  */
@@ -121,7 +123,7 @@ export class WindowStateManager {
    *
    * // Load state (returns saved state or default on first launch)
    * const state = stateManager.loadState();
-   * console.log(state);
+   * logger.info(state);
    * // Output: { x: 100, y: 100, width: 1200, height: 800, isMaximized: false }
    *
    * // Use state to create window
@@ -147,7 +149,7 @@ export class WindowStateManager {
         }
       }
     } catch (error) {
-      console.error('Failed to load window state:', error);
+      Logger.error('WindowStateManager', `Failed to load window state: ${error}`);
     }
 
     // Requirements: ui.5.5
@@ -217,7 +219,7 @@ export class WindowStateManager {
       const stateJson = JSON.stringify(state);
       this.dataManager.saveData(this.stateKey, stateJson);
     } catch (error) {
-      console.error('Failed to save window state:', error);
+      Logger.error('WindowStateManager', `Failed to save window state: ${error}`);
     }
   }
 

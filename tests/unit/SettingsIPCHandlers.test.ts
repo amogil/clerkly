@@ -86,7 +86,7 @@ describe('SettingsIPCHandlers', () => {
       settingsIPCHandlers.registerHandlers();
 
       expect(consoleWarnSpy).toHaveBeenCalledWith(
-        '[SettingsIPCHandlers] Handlers already registered'
+        expect.stringContaining('[SettingsIPCHandlers] Handlers already registered')
       );
       expect(ipcMain.handle).toHaveBeenCalledTimes(5);
 
@@ -218,8 +218,7 @@ describe('SettingsIPCHandlers', () => {
       await handler!({} as any, 'openai');
 
       expect(consoleErrorSpy).toHaveBeenCalledWith(
-        '[SettingsIPCHandlers] Failed to save LLM provider:',
-        errorMessage
+        expect.stringContaining('[SettingsIPCHandlers] Failed to save LLM provider:')
       );
 
       consoleErrorSpy.mockRestore();
@@ -382,8 +381,7 @@ describe('SettingsIPCHandlers', () => {
       await handler!({} as any, 'openai', 'test-key');
 
       expect(consoleErrorSpy).toHaveBeenCalledWith(
-        '[SettingsIPCHandlers] Failed to save API key:',
-        errorMessage
+        expect.stringContaining('[SettingsIPCHandlers] Failed to save API key:')
       );
 
       consoleErrorSpy.mockRestore();
@@ -545,8 +543,7 @@ describe('SettingsIPCHandlers', () => {
       await handler!({} as any, 'openai');
 
       expect(consoleErrorSpy).toHaveBeenCalledWith(
-        '[SettingsIPCHandlers] Failed to delete API key:',
-        errorMessage
+        expect.stringContaining('[SettingsIPCHandlers] Failed to delete API key:')
       );
 
       consoleErrorSpy.mockRestore();

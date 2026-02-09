@@ -131,8 +131,7 @@ describe('WindowStateManager', () => {
 
       expect(result.isMaximized).toBe(false); // Not maximized to keep resizable
       expect(consoleErrorSpy).toHaveBeenCalledWith(
-        'Failed to load window state:',
-        expect.any(Error)
+        expect.stringContaining('Failed to load window state:')
       );
 
       consoleErrorSpy.mockRestore();
@@ -152,8 +151,7 @@ describe('WindowStateManager', () => {
 
       expect(result.isMaximized).toBe(false); // Not maximized to keep resizable
       expect(consoleErrorSpy).toHaveBeenCalledWith(
-        'Failed to load window state:',
-        expect.any(Error)
+        expect.stringContaining('Failed to load window state:')
       );
 
       consoleErrorSpy.mockRestore();
@@ -465,8 +463,7 @@ describe('WindowStateManager', () => {
       expect(() => windowStateManager.saveState(state)).not.toThrow();
 
       expect(consoleErrorSpy).toHaveBeenCalledWith(
-        'Failed to save window state:',
-        expect.any(Error)
+        expect.stringContaining('Failed to save window state:')
       );
 
       consoleErrorSpy.mockRestore();

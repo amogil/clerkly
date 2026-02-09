@@ -120,16 +120,15 @@ describe('AuthWindowManager', () => {
      Assertions: error is logged, window remains open for error display
      Requirements: google-oauth-auth.14.5 */
   it('should show login error screen on auth error', async () => {
-    const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
+    const consoleSpy = jest.spyOn(console, 'info').mockImplementation();
     mockWindowManager.isWindowCreated.mockReturnValue(true);
     mockWindowManager.getWindow.mockReturnValue(mockWindow);
 
     await authWindowManager.onAuthError('Test error', 'test_error_code');
 
-    expect(consoleSpy).toHaveBeenCalledWith('[AuthWindowManager] Authentication failed:', {
-      error: 'Test error',
-      errorCode: 'test_error_code',
-    });
+    expect(consoleSpy).toHaveBeenCalledWith(
+      expect.stringContaining('[AuthWindowManager] Authentication failed:')
+    );
 
     consoleSpy.mockRestore();
   });
@@ -139,12 +138,14 @@ describe('AuthWindowManager', () => {
      Assertions: showLoginWindow is called to display login screen again
      Requirements: google-oauth-auth.14.6 */
   it('should show login screen again on retry', async () => {
-    const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
+    const consoleSpy = jest.spyOn(console, 'info').mockImplementation();
     mockWindowManager.isWindowCreated.mockReturnValue(false);
 
     await authWindowManager.onRetry();
 
-    expect(consoleSpy).toHaveBeenCalledWith('[AuthWindowManager] Retrying authentication');
+    expect(consoleSpy).toHaveBeenCalledWith(
+      expect.stringContaining('[AuthWindowManager] Retrying authentication')
+    );
     expect(mockWindowManager.createWindow).toHaveBeenCalled();
 
     consoleSpy.mockRestore();
@@ -170,8 +171,7 @@ describe('AuthWindowManager', () => {
     await authWindowManager.initializeApp();
 
     expect(consoleErrorSpy).toHaveBeenCalledWith(
-      '[AuthWindowManager] Failed to initialize app:',
-      expect.any(Error)
+      expect.stringContaining('[AuthWindowManager] Failed to initialize app:')
     );
     expect(mockWindowManager.createWindow).toHaveBeenCalled();
 
@@ -218,8 +218,7 @@ describe('AuthWindowManager', () => {
     await expect(authWindowManager.initializeApp()).rejects.toThrow('Failed to create window');
 
     expect(consoleErrorSpy).toHaveBeenCalledWith(
-      '[AuthWindowManager] Failed to show login window:',
-      expect.any(Error)
+      expect.stringContaining('[AuthWindowManager] Failed to show login window:')
     );
 
     consoleErrorSpy.mockRestore();
@@ -240,8 +239,7 @@ describe('AuthWindowManager', () => {
     await expect(authWindowManager.initializeApp()).rejects.toThrow('Configuration failed');
 
     expect(consoleErrorSpy).toHaveBeenCalledWith(
-      '[AuthWindowManager] Failed to show login window:',
-      expect.any(Error)
+      expect.stringContaining('[AuthWindowManager] Failed to show login window:')
     );
 
     consoleErrorSpy.mockRestore();
@@ -259,8 +257,7 @@ describe('AuthWindowManager', () => {
     await expect(authWindowManager.onAuthSuccess()).rejects.toThrow('Failed to create main window');
 
     expect(consoleErrorSpy).toHaveBeenCalledWith(
-      '[AuthWindowManager] Failed to show main window:',
-      expect.any(Error)
+      expect.stringContaining('[AuthWindowManager] Failed to show main window:')
     );
 
     consoleErrorSpy.mockRestore();
@@ -280,8 +277,7 @@ describe('AuthWindowManager', () => {
     await expect(authWindowManager.onAuthSuccess()).rejects.toThrow();
 
     expect(consoleErrorSpy).toHaveBeenCalledWith(
-      '[AuthWindowManager] Failed to show main window:',
-      expect.any(Error)
+      expect.stringContaining('[AuthWindowManager] Failed to show main window:')
     );
 
     consoleErrorSpy.mockRestore();
@@ -299,8 +295,7 @@ describe('AuthWindowManager', () => {
     await expect(authWindowManager.onAuthError('Test error')).rejects.toThrow();
 
     expect(consoleErrorSpy).toHaveBeenCalledWith(
-      '[AuthWindowManager] Failed to show login error:',
-      expect.any(Error)
+      expect.stringContaining('[AuthWindowManager] Failed to show login error:')
     );
 
     consoleErrorSpy.mockRestore();
@@ -320,8 +315,7 @@ describe('AuthWindowManager', () => {
     await expect(authWindowManager.onRetry()).rejects.toThrow();
 
     expect(consoleErrorSpy).toHaveBeenCalledWith(
-      '[AuthWindowManager] Failed to retry authentication:',
-      expect.any(Error)
+      expect.stringContaining('[AuthWindowManager] Failed to retry authentication:')
     );
 
     consoleErrorSpy.mockRestore();

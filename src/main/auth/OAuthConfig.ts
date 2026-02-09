@@ -1,5 +1,8 @@
-// Requirements: google-oauth-auth.10.1, google-oauth-auth.10.2, google-oauth-auth.10.3, google-oauth-auth.10.4, google-oauth-auth.10.5, google-oauth-auth.10.6
+// Requirements: google-oauth-auth.10.1, google-oauth-auth.10.2, google-oauth-auth.10.3, google-oauth-auth.10.4, google-oauth-auth.10.5, google-oauth-auth.10.6, clerkly.3.8
 
+import { Logger } from '../Logger';
+
+// Requirements: clerkly.3.8 - Use centralized Logger instead of console.*
 /**
  * OAuth configuration interface
  * Requirements: google-oauth-auth.10.1, google-oauth-auth.10.2, google-oauth-auth.10.3
@@ -91,7 +94,10 @@ function getGoogleOAuthEndpoints() {
  */
 function getOAuthConfigConstants() {
   const isTest = process.env.NODE_ENV === 'test';
-  console.log('[OAuthConfig] NODE_ENV:', process.env.NODE_ENV, 'isTest:', isTest);
+  Logger.info(
+    'OAuthConfig',
+    `[OAuthConfig] NODE_ENV: ${(process.env.NODE_ENV, 'isTest:', isTest)}`
+  );
 
   return {
     clientId: isTest

@@ -1,6 +1,8 @@
 // Requirements: ui.7.1, ui.7.2, ui.7.3
 import type { ErrorNotification } from '../types/error-notification';
+import { Logger } from '../Logger';
 
+// Requirements: clerkly.3.8 - Use centralized Logger instead of console.*
 /**
  * ErrorNotificationManager manages error notifications in the application
  *
@@ -28,7 +30,7 @@ import type { ErrorNotification } from '../types/error-notification';
  *
  * // Subscribe to changes
  * const unsubscribe = manager.subscribe((notifications) => {
- *   console.log('Active notifications:', notifications);
+ *   Logger.info('ErrorNotificationManager', `Active notifications: ${notifications}`);
  * });
  *
  * // Manually dismiss
@@ -84,7 +86,10 @@ export class ErrorNotificationManager {
     }, this.AUTO_DISMISS_DELAY);
 
     // Requirements: ui.7.4 - Log errors for debugging
-    console.log('[ErrorNotificationManager] Notification shown:', notification);
+    Logger.info(
+      'ErrorNotificationManager',
+      `[ErrorNotificationManager] Notification shown: ${notification}`
+    );
 
     return notification.id;
   }
@@ -112,7 +117,10 @@ export class ErrorNotificationManager {
     if (index !== -1) {
       this.notifications.splice(index, 1);
       this.notifyListeners();
-      console.log('[ErrorNotificationManager] Notification dismissed:', id);
+      Logger.info(
+        'ErrorNotificationManager',
+        `[ErrorNotificationManager] Notification dismissed: ${id}`
+      );
     }
   }
 
@@ -128,7 +136,7 @@ export class ErrorNotificationManager {
    * @example
    * ```typescript
    * const unsubscribe = manager.subscribe((notifications) => {
-   *   console.log('Current notifications:', notifications);
+   *   Logger.info('ErrorNotificationManager', `Current notifications: ${notifications}`);
    * });
    *
    * // Later, cleanup

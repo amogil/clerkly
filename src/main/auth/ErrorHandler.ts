@@ -1,5 +1,8 @@
-// Requirements: google-oauth-auth.9.1, google-oauth-auth.9.2, google-oauth-auth.9.3, google-oauth-auth.9.4, google-oauth-auth.9.5, google-oauth-auth.9.6
+// Requirements: google-oauth-auth.9.1, google-oauth-auth.9.2, google-oauth-auth.9.3, google-oauth-auth.9.4, google-oauth-auth.9.5, google-oauth-auth.9.6, clerkly.3.8
 
+import { Logger } from '../Logger';
+
+// Requirements: clerkly.3.8 - Use centralized Logger instead of console.*
 /**
  * Error details interface
  * Requirements: google-oauth-auth.9.6
@@ -113,11 +116,14 @@ export function logError(
   const errorMessage = errorObj?.message || String(error) || 'Unknown error';
   const errorCode = errorObj?.code || errorObj?.error || 'unknown';
 
-  console.error(`[OAuth] ${operation} failed: ${errorMessage}`, {
-    errorCode,
-    timestamp: Date.now(),
-    context: context || {},
-  });
+  Logger.error(
+    'OAuth',
+    `${operation} failed: ${errorMessage} ${JSON.stringify({
+      errorCode,
+      timestamp: Date.now(),
+      context: context || {},
+    })}`
+  );
 }
 
 /**

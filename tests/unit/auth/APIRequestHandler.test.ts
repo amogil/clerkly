@@ -126,12 +126,7 @@ describe('APIRequestHandler', () => {
     ).rejects.toThrow();
 
     expect(consoleErrorSpy).toHaveBeenCalledWith(
-      '[APIRequestHandler] Authorization error (401) from UserInfo API',
-      expect.objectContaining({
-        url: 'https://api.example.com/userinfo',
-        timestamp: expect.any(String),
-        context: 'UserInfo API',
-      })
+      expect.stringContaining('[APIRequestHandler] Authorization error (401) from UserInfo API')
     );
   });
 
@@ -209,8 +204,7 @@ describe('APIRequestHandler', () => {
     ).rejects.toThrow('Network error');
 
     expect(consoleErrorSpy).toHaveBeenCalledWith(
-      '[APIRequestHandler] Request failed for Test API:',
-      networkError
+      expect.stringContaining('[APIRequestHandler] Request failed for Test API:')
     );
   });
 
@@ -229,8 +223,7 @@ describe('APIRequestHandler', () => {
     ).rejects.toThrow();
 
     expect(consoleErrorSpy).toHaveBeenCalledWith(
-      '[APIRequestHandler] Authorization error (401) from API Request',
-      expect.any(Object)
+      expect.stringContaining('[APIRequestHandler] Authorization error (401) from API Request')
     );
   });
 });

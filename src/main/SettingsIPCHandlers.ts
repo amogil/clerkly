@@ -2,7 +2,9 @@
 
 import { ipcMain, IpcMainInvokeEvent } from 'electron';
 import { AIAgentSettingsManager } from './AIAgentSettingsManager';
+import { Logger } from './Logger';
 
+// Requirements: clerkly.3.8 - Use centralized Logger instead of console.*
 /**
  * IPC result interface
  * Requirements: ui.10.9, ui.10.26
@@ -32,7 +34,7 @@ export class SettingsIPCHandlers {
    */
   registerHandlers(): void {
     if (this.handlersRegistered) {
-      console.warn('[SettingsIPCHandlers] Handlers already registered');
+      Logger.warn('SettingsIPCHandlers', '[SettingsIPCHandlers] Handlers already registered');
       return;
     }
 
@@ -43,7 +45,7 @@ export class SettingsIPCHandlers {
     ipcMain.handle('settings:delete-api-key', this.handleDeleteAPIKey.bind(this));
 
     this.handlersRegistered = true;
-    console.log('[SettingsIPCHandlers] Handlers registered');
+    Logger.info('SettingsIPCHandlers', '[SettingsIPCHandlers] Handlers registered');
   }
 
   /**
@@ -62,7 +64,7 @@ export class SettingsIPCHandlers {
     ipcMain.removeHandler('settings:delete-api-key');
 
     this.handlersRegistered = false;
-    console.log('[SettingsIPCHandlers] Handlers unregistered');
+    Logger.info('SettingsIPCHandlers', '[SettingsIPCHandlers] Handlers unregistered');
   }
 
   /**
@@ -77,7 +79,7 @@ export class SettingsIPCHandlers {
     provider: 'openai' | 'anthropic' | 'google'
   ): Promise<IPCResult> {
     try {
-      console.log('[SettingsIPCHandlers] Saving LLM provider:', provider);
+      Logger.info('SettingsIPCHandlers', `[SettingsIPCHandlers] Saving LLM provider: ${provider}`);
 
       // Requirements: ui.10.9 - Save LLM provider through AIAgentSettingsManager
       await this.aiAgentSettingsManager.saveLLMProvider(provider);
@@ -87,7 +89,10 @@ export class SettingsIPCHandlers {
       };
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      console.error('[SettingsIPCHandlers] Failed to save LLM provider:', errorMessage);
+      Logger.error(
+        'SettingsIPCHandlers',
+        `[SettingsIPCHandlers] Failed to save LLM provider: ${errorMessage}`
+      );
 
       // Requirements: ui.10.9 - Return structured error response
       return {
@@ -105,7 +110,7 @@ export class SettingsIPCHandlers {
    */
   private async handleLoadLLMProvider(_event: IpcMainInvokeEvent): Promise<IPCResult> {
     try {
-      console.log('[SettingsIPCHandlers] Loading LLM provider');
+      Logger.info('SettingsIPCHandlers', '[SettingsIPCHandlers] Loading LLM provider');
 
       // Requirements: ui.10.20, ui.10.21 - Load LLM provider, return 'openai' as default
       const provider = await this.aiAgentSettingsManager.loadLLMProvider();
@@ -116,7 +121,10 @@ export class SettingsIPCHandlers {
       };
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      console.error('[SettingsIPCHandlers] Failed to load LLM provider:', errorMessage);
+      Logger.error(
+        'SettingsIPCHandlers',
+        `[SettingsIPCHandlers] Failed to load LLM provider: ${errorMessage}`
+      );
 
       // Requirements: ui.10.21 - Return default provider on error
       return {
@@ -140,7 +148,10 @@ export class SettingsIPCHandlers {
     apiKey: string
   ): Promise<IPCResult> {
     try {
-      console.log('[SettingsIPCHandlers] Saving API key for provider:', provider);
+      Logger.info(
+        'SettingsIPCHandlers',
+        `[SettingsIPCHandlers] Saving API key for provider: ${provider}`
+      );
 
       // Requirements: ui.10.9 - Save API key through AIAgentSettingsManager
       await this.aiAgentSettingsManager.saveAPIKey(provider, apiKey);
@@ -150,7 +161,10 @@ export class SettingsIPCHandlers {
       };
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      console.error('[SettingsIPCHandlers] Failed to save API key:', errorMessage);
+      Logger.error(
+        'SettingsIPCHandlers',
+        `[SettingsIPCHandlers] Failed to save API key: ${errorMessage}`
+      );
 
       // Requirements: ui.10.13 - Return structured error response
       return {
@@ -172,7 +186,10 @@ export class SettingsIPCHandlers {
     provider: 'openai' | 'anthropic' | 'google'
   ): Promise<IPCResult> {
     try {
-      console.log('[SettingsIPCHandlers] Loading API key for provider:', provider);
+      Logger.info(
+        'SettingsIPCHandlers',
+        `[SettingsIPCHandlers] Loading API key for provider: ${provider}`
+      );
 
       // Requirements: ui.10.20, ui.10.22 - Load API key, decrypt if encrypted
       const apiKey = await this.aiAgentSettingsManager.loadAPIKey(provider);
@@ -183,7 +200,10 @@ export class SettingsIPCHandlers {
       };
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      console.error('[SettingsIPCHandlers] Failed to load API key:', errorMessage);
+      Logger.error(
+        'SettingsIPCHandlers',
+        `[SettingsIPCHandlers] Failed to load API key: ${errorMessage}`
+      );
 
       return {
         success: false,
@@ -204,7 +224,10 @@ export class SettingsIPCHandlers {
     provider: 'openai' | 'anthropic' | 'google'
   ): Promise<IPCResult> {
     try {
-      console.log('[SettingsIPCHandlers] Deleting API key for provider:', provider);
+      Logger.info(
+        'SettingsIPCHandlers',
+        `[SettingsIPCHandlers] Deleting API key for provider: ${provider}`
+      );
 
       // Requirements: ui.10.11 - Delete API key through AIAgentSettingsManager
       await this.aiAgentSettingsManager.deleteAPIKey(provider);
@@ -214,7 +237,10 @@ export class SettingsIPCHandlers {
       };
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      console.error('[SettingsIPCHandlers] Failed to delete API key:', errorMessage);
+      Logger.error(
+        'SettingsIPCHandlers',
+        `[SettingsIPCHandlers] Failed to delete API key: ${errorMessage}`
+      );
 
       return {
         success: false,

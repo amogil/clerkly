@@ -112,43 +112,44 @@
     - Определить таблицу schema_migrations для отслеживания миграций (version INTEGER PRIMARY KEY, name TEXT, applied_at INTEGER)
     - _Requirements: clerkly.1.4_
 
-- [ ] 3. Реализация централизованного Logger класса
-  - [ ] 3.1 Создать "Logger" класс
-    - Реализовать класс Logger с методами: debug(), info(), warn(), error(), log() (private), create() (static)
-    - Добавить поддержку контекста (имя компонента) в конструкторе
-    - Интегрировать DateTimeFormatter.formatLogTimestamp() для форматирования timestamp
+- [x] 3. Реализация централизованного Logger класса
+  - [x] 3.1 Создать "Logger" класс
+    - Реализовать класс Logger со статическими методами: log(context, message, level='info'), debug(context, message), info(context, message), warn(context, message), error(context, message)
+    - Метод log() принимает обязательные параметры context (строка) и message (строка), опциональный параметр level (по умолчанию 'info')
+    - Logger автоматически форматирует timestamp через DateTimeFormatter.formatLogTimestamp() (вызывающий код НЕ передает timestamp)
     - Добавить форматирование сообщений: `[timestamp] [LEVEL] [context] message`
     - Использовать console.* методы только внутри Logger класса (debug → console.debug, info → console.info, warn → console.warn, error → console.error)
     - Добавить комментарии с требованиями к каждому методу (формат: `// Requirements: clerkly.3.1`)
-    - _Requirements: clerkly.3.1, clerkly.3.2, clerkly.3.3, clerkly.3.4, clerkly.3.5, clerkly.3.8, clerkly.3.9, clerkly.2.9_
+    - _Requirements: clerkly.3.1, clerkly.3.2, clerkly.3.3, clerkly.3.4, clerkly.3.5, clerkly.3.6, clerkly.3.7, clerkly.3.9, clerkly.2.9_
   
-  - [ ] 3.2 Написать модульные тесты для "Logger"
-    - Тест создания Logger с контекстом (Logger.create('TestComponent'))
+  - [x] 3.2 Написать модульные тесты для "Logger"
     - Тест логирования на уровне debug (вызов console.debug с правильным форматом)
     - Тест логирования на уровне info (вызов console.info с правильным форматом)
     - Тест логирования на уровне warn (вызов console.warn с правильным форматом)
     - Тест логирования на уровне error (вызов console.error с правильным форматом)
+    - Тест метода log() с уровнем по умолчанию (info)
+    - Тест метода log() с явным указанием уровня
     - Тест формата timestamp (YYYY-MM-DD HH:MM:SS±HH:MM с часовым поясом)
     - Тест наличия контекста в каждом сообщении ([context])
     - Тест наличия уровня логирования в каждом сообщении ([DEBUG], [INFO], [WARN], [ERROR])
     - Все тесты должны иметь структурированные комментарии (Preconditions, Action, Assertions, Requirements)
-    - _Requirements: clerkly.3.1, clerkly.3.2, clerkly.3.3, clerkly.3.4, clerkly.3.5, clerkly.2.1, clerkly.2.8_
+    - _Requirements: clerkly.3.1, clerkly.3.2, clerkly.3.3, clerkly.3.4, clerkly.3.5, clerkly.3.6, clerkly.2.1, clerkly.2.8_
   
-  - [ ] 3.3 Обновить DateTimeFormatter для поддержки часового пояса
+  - [x] 3.3 Обновить DateTimeFormatter для поддержки часового пояса
     - Обновить метод formatLogTimestamp() для включения часового пояса в формат ±HH:MM
     - Формат: YYYY-MM-DD HH:MM:SS±HH:MM (например, 2024-01-15 10:30:45+03:00)
     - Вычислить timezone offset из Date.getTimezoneOffset()
     - Добавить комментарии с требованиями
     - _Requirements: clerkly.3.2, clerkly.3.3, ui.11.3, clerkly.2.9_
   
-  - [ ] 3.4 Написать модульные тесты для DateTimeFormatter.formatLogTimestamp()
+  - [x] 3.4 Написать модульные тесты для DateTimeFormatter.formatLogTimestamp()
     - Тест формата timestamp с часовым поясом (regex: /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}$/)
     - Тест независимости от системной локали (фиксированный формат)
     - Тест корректности вычисления timezone offset
     - Все тесты должны иметь структурированные комментарии
     - _Requirements: clerkly.3.2, clerkly.3.3, ui.11.3, clerkly.2.1, clerkly.2.8_
 
-- [ ] 4. Checkpoint - Проверка Logger и DateTimeFormatter
+- [x] 4. Checkpoint - Проверка Logger и DateTimeFormatter
   - Убедиться, что все тесты Logger и DateTimeFormatter проходят
   - Проверить покрытие кода (должно быть 100% для Logger как критического компонента)
   - Проверить, что все тесты имеют структурированные комментарии (Preconditions, Action, Assertions, Requirements)
@@ -622,6 +623,8 @@ test('Property 1: saving then loading data returns equivalent value', async () =
 | clerkly.3.8 | ✓ | - | - |
 | clerkly.3.9 | ✓ | - | - |
 | clerkly.3.10 | ✓ | - | - |
+| clerkly.3.11 | ✓ | - | - |
+| clerkly.3.12 | ✓ | - | - |
 | clerkly.nfr.1.1 | ✓ | ✓* | ✓* |
 | clerkly.nfr.1.2 | ✓ | ✓ | - |
 | clerkly.nfr.1.3 | ✓ | ✓ | - |
