@@ -5,18 +5,58 @@
 
 import { test, expect, _electron as electron, ElectronApplication, Page } from '@playwright/test';
 import path from 'path';
+import { MockOAuthServer } from './helpers/mock-oauth-server';
+import { completeOAuthFlow } from './helpers/electron';
 
 let electronApp: ElectronApplication;
 let window: Page;
+let mockServer: MockOAuthServer;
+
+test.beforeAll(async () => {
+  // Start mock OAuth server for all tests
+  mockServer = new MockOAuthServer({
+    port: 8892,
+    clientId: 'test-client-id-12345',
+    clientSecret: 'test-client-secret-67890',
+  });
+
+  await mockServer.start();
+  console.log(`[TEST] Mock OAuth server started at ${mockServer.getBaseUrl()}`);
+});
+
+test.afterAll(async () => {
+  // Stop mock server after all tests
+  if (mockServer) {
+    await mockServer.stop();
+    console.log('[TEST] Mock OAuth server stopped');
+  }
+});
 
 test.beforeEach(async () => {
+  // Set user profile data for tests
+  mockServer.setUserProfile({
+    id: '123456789',
+    email: 'navigation.test@example.com',
+    name: 'Navigation Test User',
+    given_name: 'Navigation',
+    family_name: 'Test User',
+  });
+
+  // Create unique temp directory for this test
+  const testDataPath = path.join(
+    require('os').tmpdir(),
+    `clerkly-nav-test-${Date.now()}-${Math.random().toString(36).substring(7)}`
+  );
+
   // Launch Electron app with clean state (no authentication)
   electronApp = await electron.launch({
-    args: [path.join(__dirname, '../../dist/main/index.js')],
+    args: [path.join(__dirname, '../../dist/main/index.js'), '--user-data-dir', testDataPath],
     env: {
       ...process.env,
       NODE_ENV: 'test',
-      TEST_CLEAN_DB: 'true', // Ensure clean database
+      CLERKLY_GOOGLE_API_URL: mockServer.getBaseUrl(),
+      CLERKLY_OAUTH_CLIENT_ID: 'test-client-id-12345',
+      CLERKLY_OAUTH_CLIENT_SECRET: 'test-client-secret-67890',
     },
   });
 
@@ -133,32 +173,15 @@ test('should redirect to dashboard after successful authentication', async () =>
     .or(window.locator('text=Welcome'));
   await expect(loginScreen).toBeVisible({ timeout: 10000 });
 
-  // Simulate successful authentication by setting tokens directly
-  await window.evaluate(async () => {
-    // Mock successful authentication using test IPC handler
-    await (window as any).electron.ipcRenderer.invoke('test:setup-tokens', {
-      accessToken: 'mock_access_token_' + Date.now(),
-      refreshToken: 'mock_refresh_token_' + Date.now(),
-      expiresIn: 3600,
-      tokenType: 'Bearer',
-    });
+  // Complete OAuth flow
+  await completeOAuthFlow(electronApp, window);
 
-    // Trigger auth success event
-    await (window as any).electron.ipcRenderer.invoke('test:trigger-auth-success');
-  });
+  // Verify we're no longer on login screen (navigated away from login)
+  await expect(loginScreen).not.toBeVisible({ timeout: 10000 });
 
-  // Wait for navigation to dashboard
-  await window.waitForTimeout(2000);
-
-  // Verify dashboard is visible or we're no longer on login screen
-  const dashboard = window
-    .locator('[data-testid="dashboard"]')
-    .or(window.locator('text=Dashboard'));
-  const isOnDashboard = await dashboard.isVisible().catch(() => false);
-  const isOnLogin = await loginScreen.isVisible().catch(() => false);
-
-  // Either dashboard is visible OR login screen is not visible (navigated away)
-  expect(isOnDashboard || !isOnLogin).toBe(true);
+  // Verify we can see main app content (Settings button indicates we're authenticated)
+  const settingsButton = window.locator('button:has-text("Settings")');
+  await expect(settingsButton).toBeVisible({ timeout: 5000 });
 });
 
 /* Preconditions: User is authenticated and on dashboard
@@ -168,19 +191,10 @@ test('should redirect to dashboard after successful authentication', async () =>
    Property: 27 */
 test('should redirect to login screen after logout', async () => {
   // Setup: Authenticate user first
-  await window.evaluate(async () => {
-    await (window as any).electron.ipcRenderer.invoke('test:setup-tokens', {
-      accessToken: 'mock_access_token_' + Date.now(),
-      refreshToken: 'mock_refresh_token_' + Date.now(),
-      expiresIn: 3600,
-      tokenType: 'Bearer',
-    });
-
-    await (window as any).electron.ipcRenderer.invoke('test:trigger-auth-success');
-  });
+  await completeOAuthFlow(electronApp, window);
 
   // Wait for authentication to complete
-  await window.waitForTimeout(2000);
+  await window.waitForTimeout(1000);
 
   // Perform logout
   await window.evaluate(async () => {

@@ -1,46 +1,11 @@
 import { test, expect } from '@playwright/test';
-import { launchElectron, closeElectron, ElectronTestContext } from './helpers/electron';
+import {
+  launchElectron,
+  closeElectron,
+  ElectronTestContext,
+  completeOAuthFlow,
+} from './helpers/electron';
 import { MockOAuthServer } from './helpers/mock-oauth-server';
-
-/**
- * Helper function to complete OAuth flow with deep link
- */
-async function completeOAuthFlow(
-  context: ElectronTestContext,
-  _mockServer: MockOAuthServer
-): Promise<void> {
-  // Start OAuth flow to generate PKCE parameters
-  await context.window.evaluate(async () => {
-    await (window as any).electron.ipcRenderer.invoke('auth:start-login');
-  });
-
-  // Wait for OAuth flow to initialize
-  await context.window.waitForTimeout(2000);
-
-  // Get PKCE state from OAuthClientManager
-  const pkceState = await context.app.evaluate(async () => {
-    const { oauthClient } = (global as any).testContext || {};
-    if (!oauthClient || !oauthClient.pkceStorage) {
-      throw new Error('PKCE storage not found');
-    }
-    return oauthClient.pkceStorage.state;
-  });
-
-  // Generate authorization code
-  const authCode = `test_auth_code_${Date.now()}_${Math.random().toString(36).substring(7)}`;
-
-  // Construct deep link URL
-  const redirectUri = 'com.googleusercontent.apps.test-client-id-12345:/oauth2redirect';
-  const deepLinkUrl = `${redirectUri}?code=${authCode}&state=${pkceState}`;
-
-  // Trigger deep link handling
-  await context.window.evaluate(async (url) => {
-    return await (window as any).electron.ipcRenderer.invoke('test:handle-deep-link', url);
-  }, deepLinkUrl);
-
-  // Wait for profile to be fetched and saved
-  await context.window.waitForTimeout(2000);
-}
 
 /**
  * Functional tests for Account Profile component
@@ -534,7 +499,7 @@ test.describe('Account Profile', () => {
     await context.window.waitForLoadState('domcontentloaded');
 
     // Complete OAuth flow with initial profile
-    await completeOAuthFlow(context, mockServer);
+    await completeOAuthFlow(context.app, context.window);
 
     console.log('[TEST] Initial profile should be loaded');
 
@@ -667,7 +632,7 @@ test.describe('Account Profile', () => {
     await context.window.waitForLoadState('domcontentloaded');
 
     // Complete OAuth flow
-    await completeOAuthFlow(context, mockServer);
+    await completeOAuthFlow(context.app, context.window);
 
     console.log('[TEST] Auth success triggered');
 
@@ -821,7 +786,7 @@ test.describe('Account Profile', () => {
     }
 
     // Complete OAuth flow (this will fetch fresh profile from API)
-    await completeOAuthFlow(context, mockServer);
+    await completeOAuthFlow(context.app, context.window);
 
     console.log('[TEST] Auth success triggered, profile fetch started in background');
 
@@ -965,7 +930,7 @@ test.describe('Account Profile', () => {
     console.log('✓ Database confirmed clean (no cached profile)');
 
     // Complete OAuth flow
-    await completeOAuthFlow(context, mockServer);
+    await completeOAuthFlow(context.app, context.window);
 
     console.log('[TEST] Auth success triggered, profile fetch started in background');
 
@@ -1124,7 +1089,7 @@ test.describe('Account Profile', () => {
     await context.window.waitForLoadState('domcontentloaded');
 
     // Complete OAuth flow
-    await completeOAuthFlow(context, mockServer);
+    await completeOAuthFlow(context.app, context.window);
 
     console.log('[TEST] Auth success triggered, profile fetch started');
 
@@ -1255,7 +1220,7 @@ test.describe('Account Profile', () => {
     console.log('[TEST] Login screen confirmed');
 
     // Complete OAuth flow
-    await completeOAuthFlow(context, mockServer);
+    await completeOAuthFlow(context.app, context.window);
 
     console.log('[TEST] Authentication completed');
 
@@ -1320,7 +1285,7 @@ test.describe('Account Profile', () => {
     console.log('[TEST] Application launched, simulating successful authentication...');
 
     // Complete OAuth flow
-    await completeOAuthFlow(context, mockServer);
+    await completeOAuthFlow(context.app, context.window);
 
     console.log('[TEST] Authentication completed, verifying results...');
 
@@ -1394,7 +1359,7 @@ test.describe('Account Profile', () => {
     );
 
     // Complete OAuth flow (will fail at profile fetch step)
-    await completeOAuthFlow(context, mockServer);
+    await completeOAuthFlow(context.app, context.window);
 
     console.log('[TEST] Authentication attempted with profile fetch error');
 
@@ -1478,7 +1443,7 @@ test.describe('Account Profile', () => {
     console.log('[TEST] Login screen confirmed');
 
     // Complete OAuth flow (will fail at profile fetch step)
-    await completeOAuthFlow(context, mockServer);
+    await completeOAuthFlow(context.app, context.window);
 
     console.log('[TEST] Authentication attempted with profile fetch error');
 
@@ -1586,7 +1551,7 @@ test.describe('Account Profile', () => {
     await context.window.waitForLoadState('domcontentloaded');
 
     // Complete OAuth flow to save initial profile
-    await completeOAuthFlow(context, mockServer);
+    await completeOAuthFlow(context.app, context.window);
 
     console.log('[TEST] Initial profile saved to database');
 
@@ -1747,7 +1712,7 @@ test.describe('Account Profile', () => {
     await context.window.waitForLoadState('domcontentloaded');
 
     // Complete OAuth flow
-    await completeOAuthFlow(context, mockServer);
+    await completeOAuthFlow(context.app, context.window);
 
     console.log('[TEST] Profile should be loaded');
 
@@ -1875,7 +1840,7 @@ test.describe('Account Profile', () => {
     await context.window.waitForLoadState('domcontentloaded');
 
     // Complete OAuth flow
-    await completeOAuthFlow(context, mockServer);
+    await completeOAuthFlow(context.app, context.window);
 
     console.log('[TEST] Profile should be loaded');
 

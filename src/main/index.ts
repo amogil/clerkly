@@ -170,40 +170,35 @@ if (process.env.NODE_ENV === 'test') {
   };
 
   // Register test IPC handlers inline to avoid import issues
+  // Requirements: testing.3.1.2 - Test IPC handlers for functional tests
   const { ipcMain } = require('electron');
 
-  ipcMain.handle('test:setup-tokens', async (_event: any, tokens: any) => {
-    await tokenStorage.saveTokens({
-      accessToken: tokens.accessToken,
-      refreshToken: tokens.refreshToken,
-      expiresAt: Date.now() + tokens.expiresIn * 1000,
-      tokenType: tokens.tokenType || 'Bearer',
-    });
-    return { success: true };
-  });
+  // Helper function to check if we're in test environment
+  const isTestEnvironment = () => {
+    return process.env.NODE_ENV === 'test' || process.env.PLAYWRIGHT_TEST === '1';
+  };
 
   ipcMain.handle('test:clear-tokens', async () => {
+    if (!isTestEnvironment()) {
+      throw new Error('test:clear-tokens can only be used in test environment');
+    }
     await tokenStorage.deleteTokens();
     return { success: true };
   });
 
-  ipcMain.handle('test:get-token-status', async () => {
-    const tokens = await tokenStorage.loadTokens();
-    return {
-      hasTokens: !!tokens,
-      accessToken: tokens?.accessToken ? '***' : null,
-      refreshToken: tokens?.refreshToken ? '***' : null,
-      expiresAt: tokens?.expiresAt || null,
-    };
-  });
-
   ipcMain.handle('test:clear-data', async () => {
+    if (!isTestEnvironment()) {
+      throw new Error('test:clear-data can only be used in test environment');
+    }
     const db = (dataManager as any).db;
     db.prepare('DELETE FROM user_data').run();
     return { success: true };
   });
 
   ipcMain.handle('test:trigger-auth-success', async () => {
+    if (!isTestEnvironment()) {
+      throw new Error('test:trigger-auth-success can only be used in test environment');
+    }
     // Fetch profile after auth success
     try {
       await profileManager.fetchProfile();
@@ -217,6 +212,9 @@ if (process.env.NODE_ENV === 'test') {
   });
 
   ipcMain.handle('test:get-profile', async () => {
+    if (!isTestEnvironment()) {
+      throw new Error('test:get-profile can only be used in test environment');
+    }
     try {
       const profile = await profileManager.loadProfile();
       return { success: true, profile };
@@ -227,6 +225,9 @@ if (process.env.NODE_ENV === 'test') {
   });
 
   ipcMain.handle('test:setup-profile', async (_event: any, profileData: any) => {
+    if (!isTestEnvironment()) {
+      throw new Error('test:setup-profile can only be used in test environment');
+    }
     try {
       await profileManager.saveProfile(profileData);
       return { success: true };
@@ -239,6 +240,9 @@ if (process.env.NODE_ENV === 'test') {
   // Requirements: ui.12.3, ui.12.4, ui.12.13
   // Test handlers for data isolation testing
   ipcMain.handle('test:save-data', async (_event: any, key: string, value: string) => {
+    if (!isTestEnvironment()) {
+      throw new Error('test:save-data can only be used in test environment');
+    }
     try {
       await dataManager.saveData(key, value);
       return { success: true };
@@ -249,6 +253,9 @@ if (process.env.NODE_ENV === 'test') {
   });
 
   ipcMain.handle('test:load-data', async (_event: any, key: string) => {
+    if (!isTestEnvironment()) {
+      throw new Error('test:load-data can only be used in test environment');
+    }
     try {
       const result = await dataManager.loadData(key);
       return result;
@@ -259,6 +266,9 @@ if (process.env.NODE_ENV === 'test') {
   });
 
   ipcMain.handle('test:delete-data', async (_event: any, key: string) => {
+    if (!isTestEnvironment()) {
+      throw new Error('test:delete-data can only be used in test environment');
+    }
     try {
       await dataManager.deleteData(key);
       return { success: true };
@@ -270,6 +280,9 @@ if (process.env.NODE_ENV === 'test') {
 
   // Test handler for triggering deep link handling
   ipcMain.handle('test:handle-deep-link', async (_event: any, url: string) => {
+    if (!isTestEnvironment()) {
+      throw new Error('test:handle-deep-link can only be used in test environment');
+    }
     try {
       console.log('[TEST] Handling deep link:', url);
       const authStatus = await oauthClient.handleDeepLink(url);
@@ -295,6 +308,9 @@ if (process.env.NODE_ENV === 'test') {
   ipcMain.handle(
     'test:trigger-error-notification',
     async (event: any, data: { message: string; context: string }) => {
+      if (!isTestEnvironment()) {
+        throw new Error('test:trigger-error-notification can only be used in test environment');
+      }
       try {
         // Send error notification to renderer process using AuthIPCHandlers
         // This simulates what happens when Main Process encounters an error

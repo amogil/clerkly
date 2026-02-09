@@ -1,7 +1,13 @@
 // Requirements: google-oauth-auth.11.1, google-oauth-auth.14.1, google-oauth-auth.14.2, testing.3.1, testing.3.2, testing.3.6
 
 import { test, expect } from '@playwright/test';
-import { launchElectron, closeElectron, ElectronTestContext } from './helpers/electron';
+import {
+  launchElectron,
+  closeElectron,
+  ElectronTestContext,
+  completeOAuthFlow,
+} from './helpers/electron';
+import { MockOAuthServer } from './helpers/mock-oauth-server';
 
 /**
  * Functional tests for OAuth authentication flow
@@ -19,9 +25,28 @@ import { launchElectron, closeElectron, ElectronTestContext } from './helpers/el
 
 test.describe('Authentication Flow', () => {
   let context: ElectronTestContext;
+  let mockServer: MockOAuthServer;
 
   test.beforeAll(async () => {
     console.log('\n⚠️  WARNING: These tests will show real Electron windows on your screen!\n');
+
+    // Start mock OAuth server for all tests
+    mockServer = new MockOAuthServer({
+      port: 8891,
+      clientId: 'test-client-id-12345',
+      clientSecret: 'test-client-secret-67890',
+    });
+
+    await mockServer.start();
+    console.log(`[TEST] Mock OAuth server started at ${mockServer.getBaseUrl()}`);
+  });
+
+  test.afterAll(async () => {
+    // Stop mock server after all tests
+    if (mockServer) {
+      await mockServer.stop();
+      console.log('[TEST] Mock OAuth server stopped');
+    }
   });
 
   test.afterEach(async () => {
@@ -164,8 +189,21 @@ test.describe('Authentication Flow', () => {
      Requirements: ui.8.3
      Property: 9, 26 */
   test('should show dashboard after successful authentication', async () => {
+    // Set user profile data for this test
+    mockServer.setUserProfile({
+      id: '123456789',
+      email: 'dashboard.test@example.com',
+      name: 'Dashboard Test User',
+      given_name: 'Dashboard',
+      family_name: 'Test User',
+    });
+
     // Launch the application
-    context = await launchElectron();
+    context = await launchElectron(undefined, {
+      CLERKLY_GOOGLE_API_URL: mockServer.getBaseUrl(),
+      CLERKLY_OAUTH_CLIENT_ID: 'test-client-id-12345',
+      CLERKLY_OAUTH_CLIENT_SECRET: 'test-client-secret-67890',
+    });
     await context.window.waitForLoadState('domcontentloaded');
 
     // Verify login screen is displayed initially
@@ -175,25 +213,11 @@ test.describe('Authentication Flow', () => {
 
     console.log('[TEST] Login screen displayed, simulating OAuth flow...');
 
-    // Simulate successful authentication by setting up test tokens
-    // This simulates what happens after successful OAuth flow
-    // Requirements: ui.8.3
-    await context.window.evaluate(async () => {
-      // Setup test tokens directly through test IPC handler
-      await (window as any).electron.ipcRenderer.invoke('test:setup-tokens', {
-        accessToken: 'test_access_token_dashboard',
-        refreshToken: 'test_refresh_token_dashboard',
-        expiresIn: 3600,
-        tokenType: 'Bearer',
-      });
-
-      // Trigger auth success event to update UI
-      // This simulates what happens after successful OAuth
-      await (window as any).electron.ipcRenderer.invoke('test:trigger-auth-success');
-    });
+    // Complete OAuth flow
+    await completeOAuthFlow(context.app, context.window);
 
     // Wait for UI to update after authentication
-    await context.window.waitForTimeout(2000);
+    await context.window.waitForTimeout(1000);
 
     console.log('[TEST] Authentication completed, checking for Dashboard...');
 
