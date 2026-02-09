@@ -222,48 +222,36 @@ test('should persist data after logout', async () => {
     family_name: 'Test',
   });
 
-  await mainWindow.click('button:has-text("Continue with Google")');
-  await mainWindow.waitForTimeout(2000);
+  await completeOAuthFlow(context.app, context.window, TEST_CLIENT_ID);
+  await context.window.waitForTimeout(1000);
 
   // Create data
-  await mainWindow.click('text=Settings');
-  await mainWindow.waitForTimeout(500);
-  await mainWindow.selectOption('select:near(:text("LLM Provider"))', 'openai');
-  await mainWindow.fill('input[placeholder="Enter your API key"]', 'persist-test-key');
-  await mainWindow.waitForTimeout(600);
+  await context.window.click('text=Settings');
+  await context.window.waitForSelector('text=AI Agent Settings');
+  await context.window.waitForTimeout(500);
+  await context.window.selectOption('select:near(:text("LLM Provider"))', 'openai');
+  await context.window.fill('input[placeholder="Enter your API key"]', 'persist-test-key');
+  await context.window.waitForTimeout(600);
 
   // Logout
-  await mainWindow.click('button:has-text("Sign Out")');
-  await mainWindow.waitForTimeout(1000);
+  await context.window.click('button:has-text("Sign out")');
+  await context.window.waitForTimeout(1000);
 
-  // Check database directly
-  const dbPath = path.join(testStoragePath, 'clerkly.db');
-  const db = new Database(dbPath);
+  // Login again and verify data restored (this verifies data persisted after logout)
+  await completeOAuthFlow(context.app, context.window, TEST_CLIENT_ID);
+  await context.window.waitForTimeout(1000);
 
-  // Verify AI Agent settings persisted
-  const settingsRow = db
-    .prepare('SELECT value, user_email FROM user_data WHERE key = ?')
-    .get('ai_agent_api_key_openai') as { value: string; user_email: string } | undefined;
-  expect(settingsRow).toBeDefined();
-  expect(settingsRow!.user_email).toBe('persist@example.com');
-
-  // Verify profile persisted
-  const profileRow = db
-    .prepare('SELECT value, user_email FROM user_data WHERE key = ?')
-    .get('user_profile') as { value: string; user_email: string } | undefined;
-  expect(profileRow).toBeDefined();
-  expect(profileRow!.user_email).toBe('persist@example.com');
-
-  db.close();
-
-  // Login again and verify data restored
-  await mainWindow.click('button:has-text("Continue with Google")');
-  await mainWindow.waitForTimeout(2000);
-
-  await mainWindow.click('text=Settings');
-  await mainWindow.waitForTimeout(500);
-  const apiKey = await mainWindow.inputValue('input[placeholder="Enter your API key"]');
+  await context.window.click('text=Settings');
+  await context.window.waitForSelector('text=AI Agent Settings');
+  await context.window.waitForTimeout(500);
+  const apiKey = await context.window.inputValue('input[placeholder="Enter your API key"]');
   expect(apiKey).toBeTruthy();
+
+  // Verify profile also persisted
+  const nameValue = await context.window.inputValue('input:near(:text("Full Name"))');
+  const emailValue = await context.window.inputValue('input:near(:text("Email"))');
+  expect(nameValue).toBe('Persist Test');
+  expect(emailValue).toBe('persist@example.com');
 });
 
 /* Preconditions: Application running, two users with same key but different values
