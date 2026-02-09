@@ -14,13 +14,14 @@ import {
 let context: ElectronTestContext;
 let mockOAuthServer: MockOAuthServer;
 const TEST_CLIENT_ID = 'test-client-id-12345'; // Use same as completeOAuthFlow default
+const TEST_CLIENT_SECRET = 'test-client-secret-67890'; // Use same as OAuthConfig
 
 test.beforeEach(async () => {
   // Start mock OAuth server
   mockOAuthServer = new MockOAuthServer({
     port: 3333,
     clientId: TEST_CLIENT_ID,
-    clientSecret: 'test-client-secret',
+    clientSecret: TEST_CLIENT_SECRET,
   });
   await mockOAuthServer.start();
 
@@ -388,12 +389,12 @@ test('should handle "No user logged in" error gracefully', async () => {
   await expect(context.window.locator('button:has-text("Continue with Google")')).toBeVisible();
 });
 
-/* Preconditions: Application running, authenticated, session expires
-   Action: Session expires (mock), attempt to save data, system refreshes token, retry
-   Assertions: Operation succeeds after token refresh
+/* Preconditions: Application running, authenticated, token expires
+   Action: Token expires, attempt to refresh profile (API request), system refreshes token automatically, operation succeeds
+   Assertions: Profile refresh succeeds after automatic token refresh, /userinfo uses refreshed token
    Requirements: ui.12.20 */
 test('should retry operation after token refresh', async () => {
-  // Login
+  // 1) Login
   mockOAuthServer.setUserProfile({
     id: 'refresh-test-id',
     email: 'refresh@example.com',
@@ -402,28 +403,54 @@ test('should retry operation after token refresh', async () => {
     family_name: 'Test',
   });
 
-  await mainWindow.click('button:has-text("Continue with Google")');
-  await mainWindow.waitForTimeout(2000);
+  await completeOAuthFlow(context.app, context.window, TEST_CLIENT_ID);
+  await context.window.waitForTimeout(1000);
 
-  // Mock session expiry (simulate getCurrentEmail returning null temporarily)
-  // Then mock successful token refresh
-  // This is a simplified test - in real scenario, the application would:
-  // 1. Catch "No user logged in" error
-  // 2. Call refreshAccessToken()
-  // 3. Retry the operation
-
-  // For this test, we'll verify the application can recover from temporary session issues
-  const result = await mainWindow.evaluate(() => {
-    return window.electron.ipcRenderer.invoke('test:save-data', 'refresh_key', 'refresh_value');
+  // 2) Get initial access token
+  const initialTokensResult = await context.window.evaluate(() => {
+    return (window as any).electron.ipcRenderer.invoke('test:get-tokens');
   });
 
-  expect(result.success).toBe(true);
+  expect(initialTokensResult.success).toBe(true);
+  const initialAccessToken = initialTokensResult.tokens.accessToken;
+  console.log('[TEST] Initial access token:', initialAccessToken);
 
-  // Verify data was saved
-  const loadResult = await mainWindow.evaluate(() => {
-    return window.electron.ipcRenderer.invoke('test:load-data', 'refresh_key');
+  // 3) Reset mock server tracking
+  mockOAuthServer.resetLastUserInfoAccessToken();
+
+  // 4) Expire the token to simulate token expiration
+  const expireResult = await context.window.evaluate(() => {
+    return (window as any).electron.ipcRenderer.invoke('test:expire-token');
   });
 
-  expect(loadResult.success).toBe(true);
-  expect(loadResult.data).toBe('refresh_value');
+  expect(expireResult.success).toBe(true);
+
+  // 5) Try to refresh profile - this makes an API request to Google UserInfo API
+  // System should automatically detect expired token, refresh it, and retry the request
+  const refreshResult = await context.window.evaluate(() => {
+    return (window as any).electron.ipcRenderer.invoke('auth:refresh-profile');
+  });
+
+  // 6) Verify profile refresh succeeded (token was automatically refreshed)
+  expect(refreshResult.success).toBe(true);
+  expect(refreshResult.profile).toBeTruthy();
+  expect(refreshResult.profile.email).toBe('refresh@example.com');
+
+  // 7) Get new access token after refresh
+  const newTokensResult = await context.window.evaluate(() => {
+    return (window as any).electron.ipcRenderer.invoke('test:get-tokens');
+  });
+
+  expect(newTokensResult.success).toBe(true);
+  const newAccessToken = newTokensResult.tokens.accessToken;
+  console.log('[TEST] New access token:', newAccessToken);
+
+  // 8) Verify token changed
+  expect(newAccessToken).not.toBe(initialAccessToken);
+  expect(newAccessToken).toContain('refreshed'); // Refreshed tokens have 'refreshed' in them
+
+  // 9) Verify /userinfo request used the refreshed token
+  const lastUserInfoToken = mockOAuthServer.getLastUserInfoAccessToken();
+  console.log('[TEST] Last UserInfo access token:', lastUserInfoToken);
+  expect(lastUserInfoToken).toBe(newAccessToken);
 });

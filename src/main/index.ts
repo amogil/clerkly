@@ -336,6 +336,62 @@ if (process.env.NODE_ENV === 'test') {
     }
   );
 
+  // Test handler for expiring tokens (to test automatic token refresh)
+  ipcMain.handle('test:expire-token', async () => {
+    if (!isTestEnvironment()) {
+      throw new Error('test:expire-token can only be used in test environment');
+    }
+    try {
+      // Load current tokens
+      const tokens = await tokenStorage.loadTokens();
+      if (!tokens) {
+        return { success: false, error: 'No tokens found' };
+      }
+
+      // Set expiresAt to past (1 second ago) to simulate expired token
+      const expiredTokens = {
+        ...tokens,
+        expiresAt: Date.now() - 1000,
+      };
+
+      // Save expired tokens
+      await tokenStorage.saveTokens(expiredTokens);
+      logger.info('Token expiration simulated for testing');
+
+      return { success: true };
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      logger.error(`Failed to expire token: ${errorMessage}`);
+      return { success: false, error: errorMessage };
+    }
+  });
+
+  // Requirements: testing.3.9 - Test helper to get current tokens
+  ipcMain.handle('test:get-tokens', async () => {
+    if (!isTestEnvironment()) {
+      throw new Error('test:get-tokens can only be used in test environment');
+    }
+    try {
+      const tokens = await tokenStorage.loadTokens();
+      if (!tokens) {
+        return { success: false, error: 'No tokens found' };
+      }
+
+      return {
+        success: true,
+        tokens: {
+          accessToken: tokens.accessToken,
+          refreshToken: tokens.refreshToken,
+          expiresAt: tokens.expiresAt,
+        },
+      };
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      logger.error(`Failed to get tokens: ${errorMessage}`);
+      return { success: false, error: errorMessage };
+    }
+  });
+
   logger.info('Test IPC handlers registered');
 }
 

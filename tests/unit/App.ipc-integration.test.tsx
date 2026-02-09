@@ -227,7 +227,7 @@ describe('App IPC Integration with Error Notification System', () => {
 
     // Verify all events were logged with new Logger format
     await waitFor(() => {
-      errors.forEach((error) => {
+      errors.forEach((_error) => {
         expect(consoleInfoSpy).toHaveBeenCalledWith(
           expect.stringContaining('[INFO] [App] Error notification received:')
         );

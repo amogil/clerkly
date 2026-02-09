@@ -75,8 +75,13 @@ export async function handleAPIRequest(
             const newTokens = await tokenStorage.loadTokens();
             if (newTokens && options.headers) {
               // Update Authorization header with new token
-              (options.headers as Record<string, string>)['Authorization'] =
-                `Bearer ${newTokens.accessToken}`;
+              // Handle both plain objects and Headers instances
+              if (options.headers instanceof Headers) {
+                options.headers.set('Authorization', `Bearer ${newTokens.accessToken}`);
+              } else {
+                (options.headers as Record<string, string>)['Authorization'] =
+                  `Bearer ${newTokens.accessToken}`;
+              }
             }
           } else {
             logger.info('Token refresh failed, continuing with expired token');

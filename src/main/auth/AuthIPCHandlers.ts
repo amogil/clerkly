@@ -205,8 +205,6 @@ export class AuthIPCHandlers {
    */
   private async handleRefreshProfile(_event: IpcMainInvokeEvent): Promise<IPCResult> {
     try {
-      this.logger.info('===== handleRefreshProfile called =====');
-
       // Requirements: ui.6.5
       if (!this.profileManager) {
         this.logger.warn('Profile manager not set');
