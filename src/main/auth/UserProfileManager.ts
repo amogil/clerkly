@@ -75,6 +75,8 @@ export class UserProfileManager {
   private readonly profileKey = 'user_profile';
   // Requirements: ui.12.14 - Cache current user email for data isolation
   private currentUserEmail: string | null = null;
+  // Flag to prevent profile loading after logout
+  private isLoggedOut: boolean = false;
 
   /**
    * Create a new UserProfileManager
@@ -162,6 +164,7 @@ export class UserProfileManager {
 
       // Requirements: ui.12.15 - Cache email in memory for data isolation
       this.currentUserEmail = profile.email;
+      this.isLoggedOut = false; // Reset logout flag on successful login
 
       Logger.info('UserProfileManager', 'Profile fetched and saved successfully');
       return profile;
@@ -220,7 +223,7 @@ export class UserProfileManager {
    * Requirements: ui.6.7, ui.12.17
    *
    * Loads cached profile data from DataManager.
-   * Sets currentUserEmail from loaded profile for data isolation.
+   * Sets currentUserEmail from loaded profile for data isolation (ONLY if not logged out).
    * Returns null if no profile data exists or on error.
    *
    * @returns User profile data or null if not found
@@ -232,7 +235,10 @@ export class UserProfileManager {
         const profile = result.data as UserProfile;
 
         // Requirements: ui.12.17 - Set currentUserEmail from loaded profile
-        this.currentUserEmail = profile.email;
+        // BUT only if user is not logged out (to prevent restoring email after logout)
+        if (!this.isLoggedOut) {
+          this.currentUserEmail = profile.email;
+        }
 
         this.logger.info('Profile loaded from local storage');
         return profile;
@@ -268,6 +274,17 @@ export class UserProfileManager {
       this.logger.error(`Failed to clear profile: ${error}`);
       throw error;
     }
+  }
+
+  /**
+   * Clear current user email from memory without deleting profile from database
+   * Used during logout to prevent data operations while preserving profile for next login
+   * Requirements: ui.8.4, ui.12.18
+   */
+  clearCurrentEmail(): void {
+    this.currentUserEmail = null;
+    this.isLoggedOut = true; // Prevent loadProfile from restoring email
+    this.logger.info('Current user email cleared from memory');
   }
 
   /**
@@ -370,6 +387,7 @@ export class UserProfileManager {
 
       // Requirements: ui.12.15 - Cache email in memory for data isolation
       this.currentUserEmail = profile.email;
+      this.isLoggedOut = false; // Reset logout flag on successful login
 
       Logger.info('UserProfileManager', 'Profile fetched and saved synchronously');
       return { success: true, profile };

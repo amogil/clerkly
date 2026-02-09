@@ -518,6 +518,12 @@ export class OAuthClientManager {
       // Requirements: ui.8.4 - Only tokens are cleared, profile data is preserved
       await this.tokenStorage.deleteTokens();
 
+      // Clear current user email from memory to prevent data operations after logout
+      // Requirements: ui.8.4, ui.12.18
+      if (this.profileManager) {
+        this.profileManager.clearCurrentEmail();
+      }
+
       // Note: Profile data is NOT deleted - it's preserved in database for next login
       // This follows the architectural principle: database is single source of truth
       // Requirements: ui.8.4, Architectural Principles

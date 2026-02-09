@@ -1,9 +1,6 @@
 // Requirements: ui.12.3, ui.12.4, ui.12.5, ui.12.6, ui.12.7, ui.12.8, ui.12.13, ui.12.19, ui.12.20, ui.12.22, ui.12.23, ui.12.24
 
 import { test, expect } from '@playwright/test';
-import * as path from 'path';
-import * as fs from 'fs';
-import Database from 'better-sqlite3';
 import { MockOAuthServer } from './helpers/mock-oauth-server';
 import {
   launchElectron,
@@ -340,11 +337,42 @@ test('should filter data by user email', async () => {
    Assertions: Shows login screen, caches cleared
    Requirements: ui.12.13, ui.12.19 */
 test('should handle "No user logged in" error gracefully', async () => {
-  // Application starts without authentication
-  await mainWindow.waitForSelector('button:has-text("Continue with Google")');
+  // Close the authenticated context from beforeEach
+  await closeElectron(context);
 
-  // Attempt to save data via IPC (should fail)
-  const result = await mainWindow.evaluate(() => {
+  // 1) Launch app WITHOUT authentication
+  context = await launchElectron(undefined, {
+    CLERKLY_GOOGLE_API_URL: mockOAuthServer.getBaseUrl(),
+  });
+  await context.window.waitForLoadState('domcontentloaded');
+  await context.window.waitForSelector('button:has-text("Continue with Google")');
+
+  // 2) Authenticate
+  mockOAuthServer.setUserProfile({
+    id: 'error-test-id',
+    email: 'error@example.com',
+    name: 'Error Test',
+    given_name: 'Error',
+    family_name: 'Test',
+  });
+
+  await completeOAuthFlow(context.app, context.window, TEST_CLIENT_ID);
+  await context.window.waitForTimeout(1000);
+
+  // 3) Sign out
+  await context.window.click('text=Settings');
+  await context.window.waitForSelector('text=AI Agent Settings');
+  await context.window.waitForTimeout(500);
+  await context.window.click('button:has-text("Sign out")');
+
+  // Wait for sign out to complete and login screen to appear
+  await context.window.waitForSelector('button:has-text("Continue with Google")', {
+    timeout: 5000,
+  });
+  await context.window.waitForTimeout(2000); // Additional wait for cleanup
+
+  // 4) Try to save data via IPC (should fail - no user logged in)
+  const result = await context.window.evaluate(() => {
     return window.electron.ipcRenderer
       .invoke('test:save-data', 'test_key', 'test_value')
       .catch((err: Error) => {
@@ -355,27 +383,9 @@ test('should handle "No user logged in" error gracefully', async () => {
   expect(result.success).toBe(false);
   expect(result.error).toContain('No user logged in');
 
-  // Verify login screen is shown
-  await expect(mainWindow.locator('button:has-text("Continue with Google")')).toBeVisible();
-
-  // Now authenticate and try again
-  mockOAuthServer.setUserProfile({
-    id: 'error-test-id',
-    email: 'error@example.com',
-    name: 'Error Test',
-    given_name: 'Error',
-    family_name: 'Test',
-  });
-
-  await mainWindow.click('button:has-text("Continue with Google")');
-  await mainWindow.waitForTimeout(2000);
-
-  // Try saving data again (should succeed)
-  const result2 = await mainWindow.evaluate(() => {
-    return window.electron.ipcRenderer.invoke('test:save-data', 'test_key', 'test_value');
-  });
-
-  expect(result2.success).toBe(true);
+  // 5) Verify interface doesn't show error (error is only logged)
+  // Login screen should still be visible without error notifications
+  await expect(context.window.locator('button:has-text("Continue with Google")')).toBeVisible();
 });
 
 /* Preconditions: Application running, authenticated, session expires

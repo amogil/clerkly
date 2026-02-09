@@ -75,7 +75,10 @@ export async function launchElectron(
  * @param context - Electron test context
  * @param cleanup - Whether to delete test data directory (default: true)
  */
-export async function closeElectron(context: ElectronTestContext, cleanup: boolean = true): Promise<void> {
+export async function closeElectron(
+  context: ElectronTestContext,
+  cleanup: boolean = true
+): Promise<void> {
   // Close the application
   await context.app.close();
 

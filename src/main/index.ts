@@ -249,7 +249,13 @@ if (process.env.NODE_ENV === 'test') {
       throw new Error('test:save-data can only be used in test environment');
     }
     try {
-      await dataManager.saveData(key, value);
+      const result = dataManager.saveData(key, value);
+
+      // Check if result indicates error
+      if (!result.success) {
+        return result; // Return the error result
+      }
+
       return { success: true };
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
