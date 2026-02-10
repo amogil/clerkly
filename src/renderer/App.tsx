@@ -223,22 +223,21 @@ function AppContent() {
     navigateToScreen('tasks');
   };
 
-  // Requirements: clerkly.1, google-oauth-auth.12.3, ui.6.4, google-oauth-auth.15.7
+  // Requirements: clerkly.1, google-oauth-auth.12.3, ui.6.4, google-oauth-auth.15.1, google-oauth-auth.15.7
   const handleLogin = async () => {
     try {
       // Requirements: google-oauth-auth.15.7 - Don't clear error immediately on retry
       // Keep error visible during retry - it will be cleared on success or replaced on failure
-      // Requirements: ui.6.4 - Show loader during authorization and profile fetch
-      setIsLoadingProfile(true);
+      // Requirements: google-oauth-auth.15.1 - Loader is controlled by Main Process events (auth:show-loader)
+      // Loader shows AFTER deep link is received, not immediately on button click
       const result = await window.api.auth.startLogin();
       if (!result.success) {
-        setIsLoadingProfile(false);
+        // Only set error, don't touch loader state
         setAuthError({ message: result.error || 'Failed to start login' });
       }
-      // Note: If success, loader will be hidden by auth:success or auth:error event
+      // Note: Loader will be shown/hidden by auth:show-loader and auth:hide-loader events from Main Process
     } catch (error) {
       logger.error(`Login failed: ${error}`);
-      setIsLoadingProfile(false);
       setAuthError({ message: 'Failed to start login' });
     }
   };

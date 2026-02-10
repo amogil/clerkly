@@ -97,7 +97,7 @@
      │    - code_challenge_method=S256                             │
      │    - state                                                  │
      │    - access_type=offline                                    │
-     │    - prompt=consent                                         │
+     │    - prompt=consent select_account                          │
      │────────────────────────────────────────────────────────────▶│
      │                                                              │
      │                    User authenticates                        │
@@ -902,9 +902,9 @@ export const OAUTH_CONFIG = {
 
 ### Property 19: Loader Display During Authorization
 
-*For any* authorization flow where authorization code is received, the loader must be displayed on Login Screen with disabled login button until token exchange and profile fetch complete (success or error).
+*For any* authorization flow where authorization code is received, the loader must be displayed on Login Screen with disabled login button until token exchange and profile fetch complete (success or error). Loader must NOT be displayed immediately on button click - only after deep link is received.
 
-**Validates: Requirements 15.1, 15.2, 15.4**
+**Validates: Requirements 15.1, 15.2, 15.4, 15.9**
 
 
 ## Обработка Ошибок
@@ -1196,6 +1196,7 @@ it('should preserve token data through save/load cycle', () => {
 5. Проверка logout flow с очисткой токенов
 6. **Проверка отображения loader НА странице логина (не отдельная страница)** - `tests/functional/auth-flow.spec.ts` - "should show loader ON login screen, not as separate page"
 7. **Проверка отображения loader НА странице ошибки при повторной попытке (не отдельная страница)** - `tests/functional/auth-flow.spec.ts` - "should show loader ON error screen during retry, not as separate page"
+8. **Проверка таймингов loader: НЕ показывается сразу при клике, показывается только после deep link** - `tests/functional/auth-flow.spec.ts` - "should NOT show loader immediately after login click, only after deep link"
 
 **Инструменты:**
 - Playwright для Electron
@@ -1295,8 +1296,8 @@ it('should preserve token data through save/load cycle', () => {
 | google-oauth-auth.15.5 | ✓ | - | ✓ |
 | google-oauth-auth.15.6 | ✓ | - | ✓ |
 | google-oauth-auth.15.7 | ✓ | - | ✓ |
-| google-oauth-auth.15.7 | ✓ | - | ✓ |
 | google-oauth-auth.15.8 | ✓ | - | ✓ |
+| google-oauth-auth.15.9 | - | - | ✓ |
 
 ### Критерии Успеха
 

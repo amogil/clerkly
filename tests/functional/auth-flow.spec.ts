@@ -368,6 +368,94 @@ test('should show loader ON login screen, not as separate page', async () => {
   }
 });
 
+/* Preconditions: User on login screen
+   Action: Click "Continue with Google" button and wait before deep link
+   Assertions: Loader should NOT show immediately after click (only after deep link)
+   Requirements: google-oauth-auth.15.1, google-oauth-auth.15.8 */
+test('should NOT show loader immediately after login click, only after deep link', async () => {
+  let context: ElectronTestContext | undefined;
+  let mockServer: MockOAuthServer | undefined;
+
+  try {
+    // Start mock OAuth server
+    mockServer = new MockOAuthServer({
+      port: 8894,
+      clientId: 'test-client-id-12345',
+      clientSecret: 'test-client-secret-67890',
+    });
+
+    await mockServer.start();
+    console.log(`[TEST] Mock OAuth server started at ${mockServer.getBaseUrl()}`);
+
+    // Set user profile data
+    mockServer.setUserProfile({
+      id: '123456789',
+      email: 'timing.test@example.com',
+      name: 'Timing Test User',
+      given_name: 'Timing',
+      family_name: 'Test User',
+    });
+
+    // Launch the application
+    context = await launchElectron(undefined, {
+      CLERKLY_GOOGLE_API_URL: mockServer.getBaseUrl(),
+      CLERKLY_OAUTH_CLIENT_ID: 'test-client-id-12345',
+      CLERKLY_OAUTH_CLIENT_SECRET: 'test-client-secret-67890',
+    });
+    await context.window.waitForLoadState('domcontentloaded');
+
+    // Verify login screen is displayed
+    const loginButton = context.window.locator('text=/continue with google/i');
+    await loginButton.waitFor({ state: 'visible', timeout: 5000 });
+    expect(await loginButton.isVisible()).toBe(true);
+
+    console.log('[TEST] Login screen displayed');
+
+    // Click login button
+    await loginButton.click();
+
+    console.log('[TEST] Clicked login button');
+
+    // Wait 1 second (simulating time before user completes auth in browser)
+    await context.window.waitForTimeout(1000);
+
+    console.log('[TEST] Checking that loader is NOT visible yet...');
+
+    // CRITICAL CHECK: Loader should NOT be visible yet
+    // Requirements: google-oauth-auth.15.1 - Loader shows AFTER deep link, not on button click
+    const loader = context.window.locator('.animate-spin');
+    const loaderText = context.window.locator('text=/signing in/i');
+
+    const isLoaderVisible = await loader.isVisible().catch(() => false);
+    const isLoaderTextVisible = await loaderText.isVisible().catch(() => false);
+
+    // THIS IS THE KEY TEST: Loader should NOT be visible immediately after click
+    expect(isLoaderVisible).toBe(false);
+    expect(isLoaderTextVisible).toBe(false);
+
+    console.log('[TEST] ✓ Loader is NOT visible immediately after click (correct behavior)');
+    console.log(
+      '[TEST] ✓ This confirms loader is controlled by Main Process events, not by button click'
+    );
+
+    // Take screenshot
+    await context.window.screenshot({
+      path: 'playwright-report/loader-timing-correct.png',
+    });
+
+    console.log('[TEST] ✓ Test passed: Loader does NOT show immediately on button click');
+  } finally {
+    // Clean up
+    if (context) {
+      await closeElectron(context);
+    }
+    if (mockServer) {
+      await mockServer.stop();
+      console.log('[TEST] Mock OAuth server stopped');
+    }
+  }
+});
+
 /* Preconditions: User on error screen after failed auth
    Action: Click "Continue with Google" button to retry
    Assertions: Loader is shown ON the error screen (all error screen elements remain visible)

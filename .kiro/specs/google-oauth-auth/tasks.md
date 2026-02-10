@@ -556,8 +556,11 @@
 **Важно:** Функциональные тесты используют реальный Electron и показывают окна на экране. Они запускаются ТОЛЬКО при явной просьбе пользователя.
 
 **Осталось реализовать:**
-1. Добавить props `isLoading` и `isDisabled` в LoginScreen и LoginError компоненты
-2. Реализовать отображение loader (spinner) в LoginScreen и LoginError
-3. Добавить методы `showLoader()` и `hideLoader()` в AuthWindowManager
-4. Обновить модульные тесты для проверки loader функциональности
-5. Функциональные тесты для loader уже существуют в `tests/functional/auth-flow.spec.ts`
+1. ~~Добавить props `isLoading` и `isDisabled` в LoginScreen и LoginError компоненты~~ ✅
+2. ~~Реализовать отображение loader (spinner) в LoginScreen и LoginError~~ ✅
+3. ~~Добавить методы `showLoader()` и `hideLoader()` в AuthWindowManager~~ ✅
+4. ~~Обновить модульные тесты для проверки loader функциональности~~ ✅
+5. ~~Функциональные тесты для loader уже существуют в `tests/functional/auth-flow.spec.ts`~~ ✅
+6. ~~Исправить таймингов loader: убрать `setIsLoadingProfile()` из `handleLogin()` в App.tsx~~ ✅
+7. ~~Добавить `prompt=select_account` в authorization URL для показа выбора аккаунта~~ ✅
+8. ~~Добавить функциональный тест для проверки таймингов loader~~ ✅ - `tests/functional/auth-flow.spec.ts` - "should NOT show loader immediately after login click, only after deep link"

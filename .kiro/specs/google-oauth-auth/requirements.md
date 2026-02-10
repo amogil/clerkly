@@ -31,7 +31,8 @@
 2. КОГДА Code Verifier сгенерирован, ТО "OAuth Client" ДОЛЖЕН вычислить Code Challenge используя SHA-256 хеширование
 3. КОГДА Code Challenge вычислен, ТО "OAuth Client" ДОЛЖЕН сгенерировать случайный state параметр для защиты от CSRF атак
 4. КОГДА все параметры подготовлены, ТО "OAuth Client" ДОЛЖЕН сохранить Code Verifier и state во временном хранилище
-5. КОГДА параметры сохранены, ТО "OAuth Client" ДОЛЖЕН открыть системный браузер с authorization URL содержащим client_id, redirect_uri, code_challenge, code_challenge_method=S256, state и scope
+5. КОГДА параметры сохранены, ТО "OAuth Client" ДОЛЖЕН открыть системный браузер с authorization URL содержащим client_id, redirect_uri, code_challenge, code_challenge_method=S256, state, scope, access_type=offline, и prompt=consent select_account
+6. КОГДА браузер открывается, ТО пользователь ДОЛЖЕН видеть экран выбора Google аккаунта (благодаря параметру prompt=select_account)
 
 #### Функциональные Тесты
 
@@ -299,6 +300,7 @@
 6. КОГДА происходит ошибка (обмен токенов ИЛИ загрузка профиля), ТО loader ДОЛЖЕН исчезнуть И приложение ДОЛЖНО показать "Login Error Screen" с описанием ошибки
 7. Loader ДОЛЖЕН использовать стандартный компонент загрузки (spinner) с текстом "Signing in..."
 8. ЕСЛИ пользователь закрывает браузер до завершения авторизации (не получен authorization code), ТО loader НЕ ДОЛЖЕН отображаться
+9. КОГДА пользователь кликает кнопку "Continue with Google", ТО loader НЕ ДОЛЖЕН показываться сразу - loader показывается ТОЛЬКО после получения deep link от Google
 
 #### Функциональные Тесты
 
@@ -309,4 +311,5 @@
 - `tests/functional/auth-flow.spec.ts` - "should hide loader and show error on failure"
 - `tests/functional/auth-flow.spec.ts` - "should show loader ON login screen, not as separate page"
 - `tests/functional/auth-flow.spec.ts` - "should show loader ON error screen during retry, not as separate page"
+- `tests/functional/auth-flow.spec.ts` - "should NOT show loader immediately after login click, only after deep link"
 
