@@ -498,6 +498,18 @@ export const OAUTH_CONFIG = {
 } as const;
 ```
 
+**Важно:** При формировании `redirect_uri` из Client ID, функция `getOAuthConfig()` автоматически удаляет суффикс `.apps.googleusercontent.com` если он присутствует в Client ID, чтобы избежать дублирования в итоговом URL:
+
+```typescript
+// Пример:
+// Client ID: 100365225505-xxx.apps.googleusercontent.com
+// Redirect URI: com.googleusercontent.apps.100365225505-xxx:/oauth2redirect
+// (без дублирования .apps.googleusercontent.com)
+
+const clientIdWithoutSuffix = effectiveClientId.replace('.apps.googleusercontent.com', '');
+const effectiveRedirectUri = `com.googleusercontent.apps.${clientIdWithoutSuffix}:/oauth2redirect`;
+```
+
 
 ## Свойства Корректности
 

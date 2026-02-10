@@ -19,6 +19,8 @@
 - [x] Тест: проверка наличия всех обязательных полей конфигурации
 - [x] Тест: проверка корректности формата redirect_uri
 - [x] Тест: проверка наличия всех необходимых scopes
+- [x] Тест: проверка удаления дублирующегося суффикса `.apps.googleusercontent.com` из redirect_uri
+- [x] Тест: проверка обработки различных форматов Client ID (с суффиксом и без)
 - **Requirements:** google-oauth-auth.10.1, google-oauth-auth.10.2, google-oauth-auth.10.3
 
 ### 1.3 Создать property-based тесты для конфигурации OAuth
