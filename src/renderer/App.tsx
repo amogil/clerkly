@@ -223,10 +223,11 @@ function AppContent() {
     navigateToScreen('tasks');
   };
 
-  // Requirements: clerkly.1, google-oauth-auth.12.3, ui.6.4
+  // Requirements: clerkly.1, google-oauth-auth.12.3, ui.6.4, google-oauth-auth.15.7
   const handleLogin = async () => {
     try {
-      setAuthError(null);
+      // Requirements: google-oauth-auth.15.7 - Don't clear error immediately on retry
+      // Keep error visible during retry - it will be cleared on success or replaced on failure
       // Requirements: ui.6.4 - Show loader during authorization and profile fetch
       setIsLoadingProfile(true);
       const result = await window.api.auth.startLogin();
@@ -300,7 +301,8 @@ function AppContent() {
         errorMessage={authError.message}
         errorCode={authError.code}
         onRetry={() => {
-          setAuthError(null);
+          // Don't clear error immediately - keep it visible during retry
+          // Error will be cleared on success or replaced on failure
           handleLogin();
         }}
         isLoading={isLoadingProfile}

@@ -6,6 +6,7 @@ import {
   closeElectron,
   ElectronTestContext,
   completeOAuthFlow,
+  completeOAuthFlowWithError,
 } from './helpers/electron';
 import { MockOAuthServer } from './helpers/mock-oauth-server';
 
@@ -410,30 +411,20 @@ test('should show loader ON error screen during retry, not as separate page', as
 
     console.log('[TEST] Login screen displayed');
 
-    // Simulate OAuth flow that fails during profile fetch
-    // We'll manually trigger an error by calling the error handler
-    await context.app.evaluate(async () => {
-      // Simulate profile fetch failure
-      const event = new CustomEvent('auth:error', {
-        detail: {
-          message: 'Unable to load your Google profile information.',
-          code: 'profile_fetch_failed',
-        },
-      });
-      window.dispatchEvent(event);
-    });
+    // Configure mock server to fail UserInfo on first OAuth flow
+    mockServer.setUserInfoError(500, 'Internal Server Error');
 
-    // Wait for error screen to appear
-    await context.window.waitForTimeout(1000);
+    // Complete OAuth flow (will fail at profile fetch)
+    await completeOAuthFlowWithError(context.app, context.window);
 
     console.log('[TEST] Checking for error screen...');
 
-    // Verify error screen is displayed
+    // Verify error screen is displayed with profile fetch error
     const errorMessage = context.window.locator('text=/unable to load your google profile/i');
     await errorMessage.waitFor({ state: 'visible', timeout: 5000 });
     expect(await errorMessage.isVisible()).toBe(true);
 
-    console.log('[TEST] ✓ Error screen displayed');
+    console.log('[TEST] ✓ Error screen displayed with profile fetch error');
 
     // Check for error screen elements BEFORE clicking retry
     const clerklyLogo = context.window.locator('text=/clerkly/i').first();
@@ -445,6 +436,9 @@ test('should show loader ON error screen during retry, not as separate page', as
     expect(await errorBlock.isVisible()).toBe(true);
 
     console.log('[TEST] Error screen elements visible before clicking retry');
+
+    // Clear the error for retry to succeed
+    mockServer.clearUserInfoError();
 
     // Find retry button (same "Continue with Google" button)
     const retryButton = context.window.locator('text=/continue with google/i');
@@ -460,7 +454,8 @@ test('should show loader ON error screen during retry, not as separate page', as
 
     // Check that loader is visible
     const loader = context.window.locator('.animate-spin');
-    const loaderText = context.window.locator('text=/signing in/i');
+    // Use more specific locator - look for "Signing in..." text inside button
+    const loaderText = context.window.locator('button:has-text("Signing in...")');
 
     // Loader should be visible
     expect(await loader.isVisible()).toBe(true);

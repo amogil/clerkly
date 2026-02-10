@@ -277,6 +277,77 @@ export async function completeOAuthFlow(
 }
 
 /**
+ * Complete OAuth flow that results in an error
+ * This simulates OAuth flow that fails during profile fetch
+ *
+ * @param electronApp - Electron application instance
+ * @param window - Playwright Page object
+ * @param clientId - Optional client ID (defaults to test-client-id-12345)
+ * @throws Error if not in test environment or if error screen is not shown
+ */
+export async function completeOAuthFlowWithError(
+  electronApp: ElectronApplication,
+  window: Page,
+  clientId: string = 'test-client-id-12345'
+): Promise<void> {
+  // Verify we're in test environment
+  const isTest = process.env.NODE_ENV === 'test' || process.env.PLAYWRIGHT_TEST === '1';
+  if (!isTest) {
+    throw new Error(
+      'completeOAuthFlowWithError() can only be used in test environment. Set NODE_ENV=test or PLAYWRIGHT_TEST=1'
+    );
+  }
+
+  // Start OAuth flow to generate PKCE parameters
+  await window.evaluate(async () => {
+    await (window as any).electron.ipcRenderer.invoke('auth:start-login');
+  });
+
+  // Wait for OAuth flow to initialize
+  await window.waitForTimeout(2000);
+
+  // Get PKCE state from OAuthClientManager
+  const pkceState = await electronApp.evaluate(async () => {
+    const { oauthClient } = (global as any).testContext || {};
+    if (!oauthClient || !oauthClient.pkceStorage) {
+      throw new Error('PKCE storage not found');
+    }
+    return oauthClient.pkceStorage.state;
+  });
+
+  // Generate authorization code
+  const authCode = `test_auth_code_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+
+  // Construct deep link URL
+  const redirectUri = `com.googleusercontent.apps.${clientId}:/oauth2redirect`;
+  const deepLinkUrl = `${redirectUri}?code=${authCode}&state=${pkceState}`;
+
+  // Trigger deep link handling (this will fail during profile fetch due to mock server error)
+  await window.evaluate(async (url) => {
+    return await (window as any).electron.ipcRenderer.invoke('test:handle-deep-link', url);
+  }, deepLinkUrl);
+
+  // Wait for error to be processed and error screen to appear
+  await window.waitForTimeout(5000);
+
+  // Check if error screen is displayed
+  const errorMessage = window.locator('text=/unable to load your google profile/i');
+  const hasErrorScreen = await errorMessage.isVisible().catch(() => false);
+
+  if (!hasErrorScreen) {
+    // Try reloading to see if error screen appears
+    await window.reload();
+    await window.waitForLoadState('domcontentloaded');
+    await window.waitForTimeout(2000);
+
+    const hasErrorScreenAfterReload = await errorMessage.isVisible().catch(() => false);
+    if (!hasErrorScreenAfterReload) {
+      throw new Error('Failed to complete OAuth flow with error: error screen not displayed');
+    }
+  }
+}
+
+/**
  * Clear all tokens using IPC handler
  *
  * @param window - Playwright Page object
