@@ -25,6 +25,7 @@ jest.mock('electron', () => ({
         },
       },
       on: jest.fn(),
+      send: jest.fn(),
     },
   })),
 }));
@@ -53,6 +54,7 @@ describe('AuthWindowManager', () => {
           },
         },
         on: jest.fn(),
+        send: jest.fn(),
       },
     };
 
@@ -351,5 +353,78 @@ describe('AuthWindowManager', () => {
     expect(consoleErrorSpy).toHaveBeenCalled();
 
     consoleErrorSpy.mockRestore();
+  });
+
+  describe('Loader functionality', () => {
+    /* Preconditions: AuthWindowManager is instantiated, window exists
+       Action: call onShowLoader
+       Assertions: IPC event 'auth:show-loader' is sent to renderer
+       Requirements: google-oauth-auth.15.1, google-oauth-auth.15.5 */
+    it('should send IPC event to show loader', async () => {
+      // Create window first
+      mockWindowManager.isWindowCreated.mockReturnValue(false);
+      mockOAuthClient.getAuthStatus.mockResolvedValue({ authorized: false });
+      await authWindowManager.initializeApp();
+
+      // Get the window and spy on webContents.send
+      const window = authWindowManager.getWindow();
+      const sendSpy = jest.spyOn(window!.webContents, 'send');
+
+      // Call showLoader
+      await authWindowManager.onShowLoader();
+
+      // Verify IPC event was sent
+      expect(sendSpy).toHaveBeenCalledWith('auth:show-loader');
+    });
+
+    /* Preconditions: AuthWindowManager is instantiated, loader is visible
+       Action: call onHideLoader
+       Assertions: IPC event 'auth:hide-loader' is sent to renderer
+       Requirements: google-oauth-auth.15.2, google-oauth-auth.15.6 */
+    it('should send IPC event to hide loader', async () => {
+      // Create window first
+      mockWindowManager.isWindowCreated.mockReturnValue(false);
+      mockOAuthClient.getAuthStatus.mockResolvedValue({ authorized: false });
+      await authWindowManager.initializeApp();
+
+      // Show loader first
+      const window = authWindowManager.getWindow();
+      const sendSpy = jest.spyOn(window!.webContents, 'send');
+      await authWindowManager.onShowLoader();
+
+      // Clear previous calls
+      sendSpy.mockClear();
+
+      // Call hideLoader
+      await authWindowManager.onHideLoader();
+
+      // Verify IPC event was sent
+      expect(sendSpy).toHaveBeenCalledWith('auth:hide-loader');
+    });
+
+    /* Preconditions: AuthWindowManager is instantiated, loader is visible
+       Action: call onAuthSuccess
+       Assertions: hideLoader is called before showing main window
+       Requirements: google-oauth-auth.15.6 */
+    it('should hide loader on successful authentication', async () => {
+      // Create window first
+      mockWindowManager.isWindowCreated.mockReturnValue(false);
+      mockOAuthClient.getAuthStatus.mockResolvedValue({ authorized: false });
+      await authWindowManager.initializeApp();
+
+      // Show loader first
+      const window = authWindowManager.getWindow();
+      const sendSpy = jest.spyOn(window!.webContents, 'send');
+      await authWindowManager.onShowLoader();
+
+      // Clear previous calls
+      sendSpy.mockClear();
+
+      // Call onAuthSuccess
+      await authWindowManager.onAuthSuccess();
+
+      // Verify hideLoader was called (IPC event sent)
+      expect(sendSpy).toHaveBeenCalledWith('auth:hide-loader');
+    });
   });
 });

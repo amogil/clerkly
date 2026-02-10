@@ -208,7 +208,7 @@
 **Задача:** OAuth 6.3 (2 подзадачи)
 **Время:** ~20 минут
 **Файл:** `tests/unit/auth/LoginError.test.tsx`
-**Статус:** ⏭️ СЛЕДУЮЩИЙ ШАГ
+**Статус:** ✅ ЗАВЕРШЕНО
 
 **Тесты:**
 1. should show loader when isLoading=true
@@ -222,7 +222,7 @@
 **Задача:** OAuth 7.2 (3 подзадачи)
 **Время:** ~30 минут
 **Файл:** `tests/unit/auth/AuthWindowManager.test.ts`
-**Статус:** ⏭️ ОЖИДАЕТ
+**Статус:** ✅ ЗАВЕРШЕНО
 
 **Тесты:**
 1. should call showLoader() when authorization code received
@@ -237,6 +237,8 @@
 - Убедиться, что все тесты проходят
 - Проверить TypeScript компиляцию
 - Проверить ESLint/Prettier
+
+**Статус:** ⏭️ СЛЕДУЮЩИЙ ШАГ
 
 ---
 

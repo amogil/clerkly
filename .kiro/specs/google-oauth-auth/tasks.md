@@ -270,8 +270,8 @@
 - [x] Тест: отображение блока ошибки
 - [x] Тест: корректный маппинг для каждого типа ошибки
 - [x] Тест: клик на retry вызывает onRetry
-- [ ] Тест: отображение loader когда isLoading=true (LoginError)
-- [ ] Тест: деактивация кнопки когда isDisabled=true (LoginError)
+- [x] Тест: отображение loader когда isLoading=true (LoginError)
+- [x] Тест: деактивация кнопки когда isDisabled=true (LoginError)
 - **Requirements:** google-oauth-auth.12.1, google-oauth-auth.12.2, google-oauth-auth.12.3, google-oauth-auth.12.4, google-oauth-auth.13.1, google-oauth-auth.13.2, google-oauth-auth.13.3, google-oauth-auth.13.4, google-oauth-auth.13.5, google-oauth-auth.13.6, google-oauth-auth.15.1, google-oauth-auth.15.2, google-oauth-auth.15.3
 
 ### 6.4 Добавить кнопку Sign Out в Settings
@@ -310,9 +310,9 @@
 - [x] Тест: закрытие Login Window и открытие Main Window при успешной авторизации
 - [x] Тест: обновление содержимого окна на Login Error Screen при ошибке
 - [x] Тест: обновление содержимого окна на Login Screen при retry
-- [ ] Тест: вызов showLoader() при получении authorization code
-- [ ] Тест: вызов hideLoader() при успешной авторизации
-- [ ] Тест: вызов hideLoader() при ошибке авторизации
+- [x] Тест: вызов showLoader() при получении authorization code
+- [x] Тест: вызов hideLoader() при успешной авторизации
+- [x] Тест: вызов hideLoader() при ошибке авторизации
 - **Requirements:** google-oauth-auth.11.1, google-oauth-auth.11.4, google-oauth-auth.11.5, google-oauth-auth.15.1, google-oauth-auth.15.2, google-oauth-auth.15.5, google-oauth-auth.15.6
 
 ### 7.3 Создать property-based тесты для Auth Window Manager
