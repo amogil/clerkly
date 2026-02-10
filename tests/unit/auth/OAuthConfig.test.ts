@@ -21,7 +21,8 @@ describe('OAuthConfig', () => {
        Assertions: Redirect URI does not contain duplicate suffix
        Requirements: google-oauth-auth.10.2 */
     it('should remove .apps.googleusercontent.com suffix from redirect URI', () => {
-      const clientIdWithSuffix = '100365225505-a9mp4sll4948tafotr1va0fvnl5hrpoa.apps.googleusercontent.com';
+      const clientIdWithSuffix =
+        '100365225505-a9mp4sll4948tafotr1va0fvnl5hrpoa.apps.googleusercontent.com';
       const config = getOAuthConfig(clientIdWithSuffix);
 
       // Client ID should be preserved as-is
@@ -33,7 +34,9 @@ describe('OAuthConfig', () => {
       );
 
       // Should not contain duplicate suffix
-      expect(config.redirectUri).not.toContain('.apps.googleusercontent.com.apps.googleusercontent.com');
+      expect(config.redirectUri).not.toContain(
+        '.apps.googleusercontent.com.apps.googleusercontent.com'
+      );
     });
 
     /* Preconditions: Client ID without .apps.googleusercontent.com suffix
@@ -77,7 +80,9 @@ describe('OAuthConfig', () => {
       testCases.forEach(({ input, expected }) => {
         const config = getOAuthConfig(input);
         expect(config.redirectUri).toBe(expected);
-        expect(config.redirectUri).not.toContain('.apps.googleusercontent.com.apps.googleusercontent.com');
+        expect(config.redirectUri).not.toContain(
+          '.apps.googleusercontent.com.apps.googleusercontent.com'
+        );
       });
     });
 
@@ -93,7 +98,9 @@ describe('OAuthConfig', () => {
 
       expect(config.clientId).toBe('test-client-id-12345');
       expect(config.clientSecret).toBe('test-client-secret-67890');
-      expect(config.redirectUri).toBe('com.googleusercontent.apps.test-client-id-12345:/oauth2redirect');
+      expect(config.redirectUri).toBe(
+        'com.googleusercontent.apps.test-client-id-12345:/oauth2redirect'
+      );
 
       process.env.NODE_ENV = originalEnv;
     });
@@ -107,7 +114,9 @@ describe('OAuthConfig', () => {
       const config = getOAuthConfig(customClientId);
 
       expect(config.clientId).toBe(customClientId);
-      expect(config.redirectUri).toBe('com.googleusercontent.apps.custom-client-id-67890:/oauth2redirect');
+      expect(config.redirectUri).toBe(
+        'com.googleusercontent.apps.custom-client-id-67890:/oauth2redirect'
+      );
     });
   });
 });

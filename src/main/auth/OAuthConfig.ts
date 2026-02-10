@@ -134,7 +134,7 @@ export function getOAuthConfig(clientId?: string): OAuthConfig {
   // iOS Client ID format: 100365225505-9039l9g72mja9onmlkoupkphbns6lrg2.apps.googleusercontent.com
   // We need: com.googleusercontent.apps.100365225505-9039l9g72mja9onmlkoupkphbns6lrg2
   const clientIdWithoutSuffix = effectiveClientId.replace('.apps.googleusercontent.com', '');
-  
+
   // Construct redirectUri based on clientId
   const effectiveRedirectUri = `com.googleusercontent.apps.${clientIdWithoutSuffix}:/oauth2redirect`;
 
