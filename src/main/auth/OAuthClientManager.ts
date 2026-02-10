@@ -156,7 +156,7 @@ export class OAuthClientManager {
       authUrl.searchParams.set('code_challenge_method', 'S256');
       authUrl.searchParams.set('state', pkceParams.state);
       authUrl.searchParams.set('access_type', 'offline'); // Required for refresh token
-      authUrl.searchParams.set('prompt', 'consent select_account'); // Force consent screen to get refresh token
+      authUrl.searchParams.set('prompt', 'consent'); // Force consent screen to get refresh token
 
       // Open system browser with authorization URL
       await shell.openExternal(authUrl.toString());

@@ -104,9 +104,10 @@ function getOAuthConfigConstants() {
       ? 'test-client-id-12345'
       : '100365225505-a9mp4sll4948tafotr1va0fvnl5hrpoa.apps.googleusercontent.com',
     clientSecret: isTest ? 'test-client-secret-67890' : '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',
+    // iOS OAuth clients use URL scheme format
     redirectUri: isTest
       ? 'com.googleusercontent.apps.test-client-id-12345:/oauth2redirect'
-      : 'com.googleusercontent.apps.100365225505-a9mp4sll4948tafotr1va0fvnl5hrpoa:/oauth2redirect',
+      : 'com.googleusercontent.apps.100365225505-a9mp4sll4948tafotr1va0fvnl5hrpoa:/oauth2callback',
     scopes: ['openid', 'email', 'profile'],
   };
 }
@@ -129,8 +130,13 @@ export function getOAuthConfig(clientId?: string): OAuthConfig {
   const effectiveClientId = clientId || process.env.CLERKLY_OAUTH_CLIENT_ID || config.clientId;
   const effectiveClientSecret = process.env.CLERKLY_OAUTH_CLIENT_SECRET || config.clientSecret;
 
+  // Extract the numeric part from Client ID (remove .apps.googleusercontent.com suffix if present)
+  // iOS Client ID format: 100365225505-9039l9g72mja9onmlkoupkphbns6lrg2.apps.googleusercontent.com
+  // We need: com.googleusercontent.apps.100365225505-9039l9g72mja9onmlkoupkphbns6lrg2
+  const clientIdWithoutSuffix = effectiveClientId.replace('.apps.googleusercontent.com', '');
+  
   // Construct redirectUri based on clientId
-  const effectiveRedirectUri = `com.googleusercontent.apps.${effectiveClientId}:/oauth2redirect`;
+  const effectiveRedirectUri = `com.googleusercontent.apps.${clientIdWithoutSuffix}:/oauth2redirect`;
 
   return {
     clientId: effectiveClientId,
