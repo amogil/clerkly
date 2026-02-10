@@ -3,7 +3,12 @@
 import { TokenStorageManager } from './TokenStorageManager';
 import { BrowserWindow } from 'electron';
 import { DateTimeFormatter } from '../utils/DateTimeFormatter';
+import { Logger } from '../Logger';
 
+// Requirements: clerkly.3.5, clerkly.3.7 - Create parameterized logger for APIRequestHandler module
+const logger = Logger.create('APIRequestHandler');
+
+// Requirements: clerkly.3.8 - Use centralized Logger instead of console.*
 /**
  * Flag to prevent multiple simultaneous token clearances
  * Requirements: ui.9.4 - Prevent race conditions
@@ -50,7 +55,7 @@ export async function handleAPIRequest(
   tokenStorage: TokenStorageManager,
   context?: string
 ): Promise<Response> {
-  console.log('[APIRequestHandler] Making API request:', { url, context });
+  logger.info(`Making API request: ${JSON.stringify({ url, context })}`);
 
   try {
     // Requirements: ui.9.1, ui.9.2 - Check if access token is expired and refresh if needed
@@ -61,20 +66,25 @@ export async function handleAPIRequest(
         const isExpired = tokens.expiresAt <= now;
 
         if (isExpired) {
-          console.log('[APIRequestHandler] Access token expired, refreshing automatically');
+          logger.info('Access token expired, refreshing automatically');
           const refreshed = await oauthClientManager.refreshAccessToken();
 
           if (refreshed) {
-            console.log('[APIRequestHandler] Token refreshed successfully');
+            logger.info('Token refreshed successfully');
             // Reload tokens to get the new access token
             const newTokens = await tokenStorage.loadTokens();
             if (newTokens && options.headers) {
               // Update Authorization header with new token
-              (options.headers as Record<string, string>)['Authorization'] =
-                `Bearer ${newTokens.accessToken}`;
+              // Handle both plain objects and Headers instances
+              if (options.headers instanceof Headers) {
+                options.headers.set('Authorization', `Bearer ${newTokens.accessToken}`);
+              } else {
+                (options.headers as Record<string, string>)['Authorization'] =
+                  `Bearer ${newTokens.accessToken}`;
+              }
             }
           } else {
-            console.log('[APIRequestHandler] Token refresh failed, continuing with expired token');
+            logger.info('Token refresh failed, continuing with expired token');
           }
         }
       }
@@ -82,7 +92,7 @@ export async function handleAPIRequest(
 
     // Requirements: ui.9.4 - Make the API request
     const response = await fetch(url, options);
-    console.log('[APIRequestHandler] Response received:', { status: response.status, url });
+    logger.info(`Response received: ${JSON.stringify({ status: response.status, url })}`);
 
     // Requirements: ui.9.3, ui.9.4 - Check for authorization error
     if (response.status === 401) {
@@ -95,32 +105,34 @@ export async function handleAPIRequest(
           const logContext = context || 'API Request';
           // Requirements: ui.9.5 - Log authorization errors with context
           // Requirements: ui.11.3 - Use fixed format for log timestamps
-          console.error(`[APIRequestHandler] Authorization error (401) from ${logContext}`, {
-            url,
-            timestamp: DateTimeFormatter.formatLogTimestamp(Date.now()),
-            context: logContext,
-          });
+          logger.error(
+            `Authorization error (401) from ${logContext}: ${JSON.stringify({
+              url,
+              timestamp: DateTimeFormatter.formatLogTimestamp(Date.now()),
+              context: logContext,
+            })}`
+          );
 
           // Requirements: ui.9.3 - Clear all tokens from storage
-          console.log('[APIRequestHandler] Clearing all tokens due to 401 error');
+          logger.info('Clearing all tokens due to 401 error');
           await tokenStorage.deleteTokens();
 
           // Requirements: ui.9.3 - Emit auth error event to show LoginError component
           // The event will be handled by the renderer process to show LoginError with errorCode 'invalid_grant'
           const allWindows = BrowserWindow.getAllWindows();
-          console.log('[APIRequestHandler] Total windows:', allWindows.length);
+          logger.info(`Total windows: ${allWindows.length}`);
           const mainWindow = allWindows[0];
-          console.log('[APIRequestHandler] Main window found:', !!mainWindow);
+          logger.info(`Main window found: ${!!mainWindow}`);
           if (mainWindow) {
-            console.log('[APIRequestHandler] Main window ID:', mainWindow.id);
-            console.log('[APIRequestHandler] Sending auth:error event to renderer');
+            logger.info(`Main window ID: ${mainWindow.id}`);
+            logger.info('Sending auth:error event to renderer');
             mainWindow.webContents.send('auth:error', {
               error: 'Session expired',
               errorCode: 'invalid_grant',
             });
-            console.log('[APIRequestHandler] auth:error event sent successfully');
+            logger.info('auth:error event sent successfully');
           } else {
-            console.error('[APIRequestHandler] No main window found, cannot send auth:error event');
+            logger.error('No main window found, cannot send auth:error event');
           }
         } finally {
           // Reset flag after a short delay to allow other requests to see the cleared state
@@ -138,7 +150,9 @@ export async function handleAPIRequest(
   } catch (error) {
     // Requirements: ui.9.5 - Log all errors with context
     const logContext = context || 'API Request';
-    console.error(`[APIRequestHandler] Request failed for ${logContext}:`, error);
+    logger.error(
+      `Request failed for ${logContext}: ${error instanceof Error ? error.message : String(error)}`
+    );
 
     // Re-throw the error for caller to handle
     throw error;

@@ -3,7 +3,9 @@
 import { ipcMain, IpcMainInvokeEvent, BrowserWindow } from 'electron';
 import { OAuthClientManager } from './OAuthClientManager';
 import { UserProfileManager, UserProfile } from './UserProfileManager';
+import { Logger } from '../Logger';
 
+// Requirements: clerkly.3.8 - Use centralized Logger instead of console.*
 /**
  * IPC result interface
  * Requirements: google-oauth-auth.8.5, ui.6.2, ui.6.7
@@ -21,6 +23,8 @@ interface IPCResult {
  * Requirements: google-oauth-auth.8, ui.6.2, ui.6.7
  */
 export class AuthIPCHandlers {
+  // Requirements: clerkly.3.5, clerkly.3.7
+  private logger = Logger.create('AuthIPCHandlers');
   private oauthClient: OAuthClientManager;
   private profileManager: UserProfileManager | null = null;
   private handlersRegistered: boolean = false;
@@ -36,7 +40,7 @@ export class AuthIPCHandlers {
    */
   setProfileManager(profileManager: UserProfileManager): void {
     this.profileManager = profileManager;
-    console.log('[AuthIPCHandlers] Profile manager set');
+    this.logger.info('Profile manager set');
   }
 
   /**
@@ -45,7 +49,7 @@ export class AuthIPCHandlers {
    */
   registerHandlers(): void {
     if (this.handlersRegistered) {
-      console.warn('[AuthIPCHandlers] Handlers already registered');
+      this.logger.warn('Handlers already registered');
       return;
     }
 
@@ -56,7 +60,7 @@ export class AuthIPCHandlers {
     ipcMain.handle('auth:refresh-profile', this.handleRefreshProfile.bind(this));
 
     this.handlersRegistered = true;
-    console.log('[AuthIPCHandlers] Handlers registered');
+    this.logger.info('Handlers registered');
   }
 
   /**
@@ -75,7 +79,7 @@ export class AuthIPCHandlers {
     ipcMain.removeHandler('auth:refresh-profile');
 
     this.handlersRegistered = false;
-    console.log('[AuthIPCHandlers] Handlers unregistered');
+    this.logger.info('Handlers unregistered');
   }
 
   /**
@@ -86,7 +90,7 @@ export class AuthIPCHandlers {
    */
   private async handleStartLogin(_event: IpcMainInvokeEvent): Promise<IPCResult> {
     try {
-      console.log('[AuthIPCHandlers] Starting login flow');
+      this.logger.info('Starting login flow');
       await this.oauthClient.startAuthFlow();
 
       return {
@@ -94,7 +98,7 @@ export class AuthIPCHandlers {
       };
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      console.error('[AuthIPCHandlers] Start login error:', errorMessage);
+      this.logger.error(`Start login error: ${errorMessage}`);
       return {
         success: false,
         error: errorMessage || 'Failed to start login',
@@ -110,7 +114,7 @@ export class AuthIPCHandlers {
    */
   private async handleGetStatus(_event: IpcMainInvokeEvent): Promise<IPCResult> {
     try {
-      console.log('[AuthIPCHandlers] Getting auth status');
+      this.logger.info('Getting auth status');
       const authStatus = await this.oauthClient.getAuthStatus();
 
       return {
@@ -120,7 +124,7 @@ export class AuthIPCHandlers {
       };
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      console.error('[AuthIPCHandlers] Get status error:', errorMessage);
+      this.logger.error(`Get status error: ${errorMessage}`);
       return {
         success: false,
         authorized: false,
@@ -137,7 +141,7 @@ export class AuthIPCHandlers {
    */
   private async handleLogout(_event: IpcMainInvokeEvent): Promise<IPCResult> {
     try {
-      console.log('[AuthIPCHandlers] Logging out');
+      this.logger.info('Logging out');
       await this.oauthClient.logout();
 
       // Send event to all renderer processes
@@ -148,7 +152,7 @@ export class AuthIPCHandlers {
       };
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      console.error('[AuthIPCHandlers] Logout error:', errorMessage);
+      this.logger.error(`Logout error: ${errorMessage}`);
       return {
         success: false,
         error: errorMessage || 'Failed to logout',
@@ -167,14 +171,14 @@ export class AuthIPCHandlers {
     try {
       // Requirements: ui.6.2, ui.6.7
       if (!this.profileManager) {
-        console.warn('[AuthIPCHandlers] Profile manager not set');
+        this.logger.warn('Profile manager not set');
         return {
           success: true,
           profile: null,
         };
       }
 
-      console.log('[AuthIPCHandlers] Getting profile');
+      this.logger.info('Getting profile');
       const profile = await this.profileManager.loadProfile();
 
       return {
@@ -183,7 +187,7 @@ export class AuthIPCHandlers {
       };
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      console.error('[AuthIPCHandlers] Failed to get profile:', errorMessage);
+      this.logger.error(`Failed to get profile: ${errorMessage}`);
       return {
         success: false,
         error: errorMessage || 'Failed to get profile',
@@ -201,11 +205,9 @@ export class AuthIPCHandlers {
    */
   private async handleRefreshProfile(_event: IpcMainInvokeEvent): Promise<IPCResult> {
     try {
-      console.log('[AuthIPCHandlers] ===== handleRefreshProfile called =====');
-
       // Requirements: ui.6.5
       if (!this.profileManager) {
-        console.warn('[AuthIPCHandlers] Profile manager not set');
+        this.logger.warn('Profile manager not set');
         return {
           success: false,
           error: 'Profile manager not initialized',
@@ -213,11 +215,11 @@ export class AuthIPCHandlers {
         };
       }
 
-      console.log('[AuthIPCHandlers] Refreshing profile');
+      this.logger.info('Refreshing profile');
       const profile = await this.profileManager.fetchProfile();
-      console.log(
-        '[AuthIPCHandlers] Profile refresh completed, result:',
-        profile ? 'success' : 'null'
+      Logger.info(
+        'AuthIPCHandlers',
+        `Profile refresh completed, result: ${profile ? 'success' : 'null'}`
       );
 
       // Broadcast profile update event to all windows
@@ -233,7 +235,10 @@ export class AuthIPCHandlers {
       };
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      console.error('[AuthIPCHandlers] Failed to refresh profile:', errorMessage);
+      Logger.error(
+        'AuthIPCHandlers',
+        `[AuthIPCHandlers] Failed to refresh profile: ${errorMessage}`
+      );
       return {
         success: false,
         error: errorMessage || 'Failed to refresh profile',
@@ -281,7 +286,7 @@ export class AuthIPCHandlers {
    */
   sendErrorNotification(message: string, context: string): void {
     // Requirements: ui.7.4 - Log to console
-    console.error(`[${context}] Error:`, message);
+    this.logger.error(`[${context}] Error: ${message}`);
 
     // Requirements: ui.7.1 - Notify renderer
     const windows = BrowserWindow.getAllWindows();

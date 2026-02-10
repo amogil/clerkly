@@ -3,8 +3,11 @@
 import { BrowserWindow, BrowserWindowConstructorOptions } from 'electron';
 import * as path from 'path';
 import { DataManager } from './DataManager';
+import type { UserProfileManager } from './auth/UserProfileManager';
 import { WindowStateManager } from './WindowStateManager';
+import { Logger } from './Logger';
 
+// Requirements: clerkly.3.8 - Use centralized Logger instead of console.*
 /**
  * Configuration options for window customization
  *
@@ -96,6 +99,8 @@ class WindowManager {
   private mainWindow: BrowserWindow | null = null;
   // Requirements: ui.5
   private windowStateManager: WindowStateManager;
+  // Requirements: clerkly.3.5, clerkly.3.7
+  private logger = Logger.create('WindowManager');
 
   /**
    * Creates a new WindowManager instance
@@ -120,9 +125,9 @@ class WindowManager {
    * const window = windowManager.createWindow();
    * ```
    */
-  constructor(dataManager: DataManager) {
+  constructor(dataManager: DataManager, userProfileManager?: UserProfileManager) {
     // Requirements: ui.5
-    this.windowStateManager = new WindowStateManager(dataManager);
+    this.windowStateManager = new WindowStateManager(dataManager, userProfileManager);
   }
 
   /**
@@ -225,12 +230,12 @@ class WindowManager {
       // Load the renderer HTML file
       const htmlPath = path.join(__dirname, '../renderer/index.html');
       this.mainWindow.loadFile(htmlPath).catch((error) => {
-        console.error('Failed to load HTML file:', error);
+        this.logger.error(`Failed to load HTML file: ${error}`);
       });
 
       // Log console messages from renderer
       this.mainWindow.webContents.on('console-message', (_event, _level, message) => {
-        console.log(`[Renderer] ${message}`);
+        this.logger.info(`${message}`);
       });
 
       // Clean up reference when window is closed
@@ -244,7 +249,7 @@ class WindowManager {
       return this.mainWindow;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      console.error('Failed to create window:', errorMessage);
+      this.logger.error(`Failed to create window: ${errorMessage}`);
       throw new Error(`Window creation failed: ${errorMessage}`);
     }
   }
@@ -291,7 +296,7 @@ class WindowManager {
    */
   configureWindow(options: WindowOptions): void {
     if (!this.mainWindow) {
-      console.warn('Cannot configure window: window not created');
+      this.logger.warn('Cannot configure window: window not created');
       return;
     }
 
@@ -314,7 +319,7 @@ class WindowManager {
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      console.error('Failed to configure window:', errorMessage);
+      this.logger.error(`Failed to configure window: ${errorMessage}`);
     }
   }
 
@@ -450,7 +455,7 @@ class WindowManager {
       this.mainWindow = null;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      console.error('Failed to close window:', errorMessage);
+      this.logger.error(`Failed to close window: ${errorMessage}`);
       // Ensure reference is cleared even if close fails
       this.mainWindow = null;
     }
@@ -481,7 +486,7 @@ class WindowManager {
    *   window.focus();
    * } else {
    *   // Window not created or already closed
-   *   console.log('No window available');
+   *   this.logger.info('No window available');
    * }
    * ```
    */

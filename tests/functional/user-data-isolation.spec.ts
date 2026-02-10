@@ -1,55 +1,44 @@
 // Requirements: ui.12.3, ui.12.4, ui.12.5, ui.12.6, ui.12.7, ui.12.8, ui.12.13, ui.12.19, ui.12.20, ui.12.22, ui.12.23, ui.12.24
 
-import { test, expect, _electron as electron, ElectronApplication, Page } from '@playwright/test';
-import * as path from 'path';
-import * as fs from 'fs';
-import * as os from 'os';
-import Database from 'better-sqlite3';
+import { test, expect } from '@playwright/test';
 import { MockOAuthServer } from './helpers/mock-oauth-server';
+import {
+  launchElectron,
+  closeElectron,
+  completeOAuthFlow,
+  clearTestTokens,
+  ElectronTestContext,
+  getWindowBounds,
+} from './helpers/electron';
 
-let electronApp: ElectronApplication;
-let mainWindow: Page;
+let context: ElectronTestContext;
 let mockOAuthServer: MockOAuthServer;
-let testStoragePath: string;
+const TEST_CLIENT_ID = 'test-client-id-12345'; // Use same as completeOAuthFlow default
+const TEST_CLIENT_SECRET = 'test-client-secret-67890'; // Use same as OAuthConfig
 
 test.beforeEach(async () => {
-  // Create temporary storage directory for test
-  testStoragePath = fs.mkdtempSync(path.join(os.tmpdir(), 'clerkly-isolation-test-'));
-
   // Start mock OAuth server
   mockOAuthServer = new MockOAuthServer({
     port: 3333,
-    clientId: 'test-client-id',
-    clientSecret: 'test-client-secret',
+    clientId: TEST_CLIENT_ID,
+    clientSecret: TEST_CLIENT_SECRET,
   });
   await mockOAuthServer.start();
 
-  // Launch Electron app with test storage path
-  electronApp = await electron.launch({
-    args: [path.join(__dirname, '../../dist/main/index.js'), `--user-data-dir=${testStoragePath}`],
-    env: {
-      ...process.env,
-      NODE_ENV: 'test',
-      STORAGE_PATH: testStoragePath,
-    },
+  // Launch Electron app with mock OAuth server
+  context = await launchElectron(undefined, {
+    CLERKLY_GOOGLE_API_URL: mockOAuthServer.getBaseUrl(),
   });
-
-  mainWindow = await electronApp.firstWindow();
-  await mainWindow.waitForLoadState('domcontentloaded');
+  await context.window.waitForLoadState('domcontentloaded');
 });
 
 test.afterEach(async () => {
-  if (electronApp) {
-    await electronApp.close();
+  if (context) {
+    await closeElectron(context);
   }
 
   if (mockOAuthServer) {
     await mockOAuthServer.stop();
-  }
-
-  // Clean up test storage
-  if (fs.existsSync(testStoragePath)) {
-    fs.rmSync(testStoragePath, { recursive: true, force: true });
   }
 });
 
@@ -67,31 +56,30 @@ test('should isolate data between different users', async () => {
     family_name: 'A',
   });
 
-  // Perform OAuth flow for User A
-  await mainWindow.click('button:has-text("Continue with Google")');
-  await mainWindow.waitForTimeout(2000);
+  // Complete OAuth flow for User A
+  await completeOAuthFlow(context.app, context.window, TEST_CLIENT_ID);
+  await context.window.waitForTimeout(1000);
 
   // Navigate to Settings and set AI Agent settings
-  await mainWindow.click('[data-testid="settings-link"]');
-  await mainWindow.waitForTimeout(500);
+  await context.window.click('text=Settings');
+  await context.window.waitForSelector('text=AI Agent Settings');
+  await context.window.waitForTimeout(500);
 
   // Select OpenAI and enter API key for User A
-  await mainWindow.selectOption('select[data-testid="llm-provider"]', 'openai');
-  await mainWindow.fill('input[data-testid="api-key"]', 'user-a-api-key-12345');
-  await mainWindow.waitForTimeout(600); // Wait for debounce
+  await context.window.selectOption('select:near(:text("LLM Provider"))', 'openai');
+  await context.window.fill('input[placeholder="Enter your API key"]', 'user-a-api-key-12345');
+  await context.window.waitForTimeout(600); // Wait for debounce
 
-  // Verify data saved
-  const dbPath = path.join(testStoragePath, 'clerkly.db');
-  let db = new Database(dbPath);
-  let row = db
-    .prepare('SELECT value FROM user_data WHERE key = ? AND user_email = ?')
-    .get('ai_agent_api_key_openai', 'userA@example.com') as { value: string } | undefined;
-  expect(row).toBeDefined();
-  db.close();
+  // Logout User A - clear tokens and restart
+  await clearTestTokens(context.window);
+  const testDataPath = context.testDataPath;
+  await closeElectron(context, false); // Keep data
 
-  // Logout User A
-  await mainWindow.click('button:has-text("Sign Out")');
-  await mainWindow.waitForTimeout(1000);
+  // Relaunch app
+  context = await launchElectron(testDataPath, {
+    CLERKLY_GOOGLE_API_URL: mockOAuthServer.getBaseUrl(),
+  });
+  await context.window.waitForLoadState('domcontentloaded');
 
   // User B: Login and create data
   mockOAuthServer.setUserProfile({
@@ -102,35 +90,34 @@ test('should isolate data between different users', async () => {
     family_name: 'B',
   });
 
-  await mainWindow.click('button:has-text("Continue with Google")');
-  await mainWindow.waitForTimeout(2000);
+  await completeOAuthFlow(context.app, context.window, TEST_CLIENT_ID);
+  await context.window.waitForTimeout(1000);
 
   // Navigate to Settings
-  await mainWindow.click('[data-testid="settings-link"]');
-  await mainWindow.waitForTimeout(500);
+  await context.window.click('text=Settings');
+  await context.window.waitForSelector('text=AI Agent Settings');
+  await context.window.waitForTimeout(500);
 
   // Verify User B sees empty settings (not User A's data)
-  const providerValue = await mainWindow.inputValue('select[data-testid="llm-provider"]');
-  const apiKeyValue = await mainWindow.inputValue('input[data-testid="api-key"]');
+  const providerValue = await context.window.inputValue('select:near(:text("LLM Provider"))');
+  const apiKeyValue = await context.window.inputValue('input[placeholder="Enter your API key"]');
   expect(providerValue).toBe('openai'); // Default value
   expect(apiKeyValue).toBe(''); // Empty, not User A's key
 
   // Select Anthropic and enter API key for User B
-  await mainWindow.selectOption('select[data-testid="llm-provider"]', 'anthropic');
-  await mainWindow.fill('input[data-testid="api-key"]', 'user-b-api-key-67890');
-  await mainWindow.waitForTimeout(600);
+  await context.window.selectOption('select:near(:text("LLM Provider"))', 'anthropic');
+  await context.window.fill('input[placeholder="Enter your API key"]', 'user-b-api-key-67890');
+  await context.window.waitForTimeout(600);
 
-  // Verify User B's data saved
-  db = new Database(dbPath);
-  row = db
-    .prepare('SELECT value FROM user_data WHERE key = ? AND user_email = ?')
-    .get('ai_agent_api_key_anthropic', 'userB@example.com') as { value: string } | undefined;
-  expect(row).toBeDefined();
-  db.close();
+  // Logout User B - clear tokens and restart
+  await clearTestTokens(context.window);
+  await closeElectron(context, false); // Keep data
 
-  // Logout User B
-  await mainWindow.click('button:has-text("Sign Out")');
-  await mainWindow.waitForTimeout(1000);
+  // Relaunch app
+  context = await launchElectron(testDataPath, {
+    CLERKLY_GOOGLE_API_URL: mockOAuthServer.getBaseUrl(),
+  });
+  await context.window.waitForLoadState('domcontentloaded');
 
   // User A: Login again and verify data restored
   mockOAuthServer.setUserProfile({
@@ -141,23 +128,24 @@ test('should isolate data between different users', async () => {
     family_name: 'A',
   });
 
-  await mainWindow.click('button:has-text("Continue with Google")');
-  await mainWindow.waitForTimeout(2000);
+  await completeOAuthFlow(context.app, context.window, TEST_CLIENT_ID);
+  await context.window.waitForTimeout(1000);
 
   // Navigate to Settings
-  await mainWindow.click('[data-testid="settings-link"]');
-  await mainWindow.waitForTimeout(500);
+  await context.window.click('text=Settings');
+  await context.window.waitForSelector('text=AI Agent Settings');
+  await context.window.waitForTimeout(500);
 
   // Verify User A's data restored
-  const restoredProvider = await mainWindow.inputValue('select[data-testid="llm-provider"]');
-  const restoredApiKey = await mainWindow.inputValue('input[data-testid="api-key"]');
+  const restoredProvider = await context.window.inputValue('select:near(:text("LLM Provider"))');
+  const restoredApiKey = await context.window.inputValue('input[placeholder="Enter your API key"]');
   expect(restoredProvider).toBe('openai');
   expect(restoredApiKey).toBeTruthy(); // Should have User A's key
 
   // Verify User B's data NOT visible
-  await mainWindow.selectOption('select[data-testid="llm-provider"]', 'anthropic');
-  await mainWindow.waitForTimeout(500);
-  const anthropicKey = await mainWindow.inputValue('input[data-testid="api-key"]');
+  await context.window.selectOption('select:near(:text("LLM Provider"))', 'anthropic');
+  await context.window.waitForTimeout(500);
+  const anthropicKey = await context.window.inputValue('input[placeholder="Enter your API key"]');
   expect(anthropicKey).toBe(''); // Empty, not User B's key
 });
 
@@ -175,49 +163,45 @@ test('should restore user data after re-login', async () => {
     family_name: 'User',
   });
 
-  await mainWindow.click('button:has-text("Continue with Google")');
-  await mainWindow.waitForTimeout(2000);
+  await completeOAuthFlow(context.app, context.window, TEST_CLIENT_ID);
+  await context.window.waitForTimeout(1000);
 
   // Create AI Agent settings
-  await mainWindow.click('[data-testid="settings-link"]');
-  await mainWindow.waitForTimeout(500);
-  await mainWindow.selectOption('select[data-testid="llm-provider"]', 'google');
-  await mainWindow.fill('input[data-testid="api-key"]', 'test-api-key-xyz');
-  await mainWindow.waitForTimeout(600);
+  await context.window.click('text=Settings');
+  await context.window.waitForSelector('text=AI Agent Settings');
+  await context.window.waitForTimeout(500);
+  await context.window.selectOption('select:near(:text("LLM Provider"))', 'google');
+  await context.window.fill('input[placeholder="Enter your API key"]', 'test-api-key-xyz');
+  await context.window.waitForTimeout(600);
 
   // Get window state
-  const initialBounds = await mainWindow.evaluate(() => {
-    return window.electron.ipcRenderer.invoke('window:get-bounds');
-  });
+  const initialBounds = await getWindowBounds(context.app);
 
   // Logout
-  await mainWindow.click('button:has-text("Sign Out")');
-  await mainWindow.waitForTimeout(1000);
+  await context.window.click('button:has-text("Sign out")');
+  await context.window.waitForTimeout(1000);
 
   // Login again
-  await mainWindow.click('button:has-text("Continue with Google")');
-  await mainWindow.waitForTimeout(2000);
+  await completeOAuthFlow(context.app, context.window, TEST_CLIENT_ID);
+  await context.window.waitForTimeout(1000);
 
   // Verify AI Agent settings restored
-  await mainWindow.click('[data-testid="settings-link"]');
-  await mainWindow.waitForTimeout(500);
-  const provider = await mainWindow.inputValue('select[data-testid="llm-provider"]');
-  const apiKey = await mainWindow.inputValue('input[data-testid="api-key"]');
+  await context.window.click('text=Settings');
+  await context.window.waitForSelector('text=AI Agent Settings');
+  await context.window.waitForTimeout(500);
+  const provider = await context.window.inputValue('select:near(:text("LLM Provider"))');
+  const apiKey = await context.window.inputValue('input[placeholder="Enter your API key"]');
   expect(provider).toBe('google');
   expect(apiKey).toBeTruthy();
 
-  // Verify profile restored
-  await mainWindow.click('[data-testid="account-link"]');
-  await mainWindow.waitForTimeout(500);
-  const nameValue = await mainWindow.inputValue('input[data-testid="profile-name"]');
-  const emailValue = await mainWindow.inputValue('input[data-testid="profile-email"]');
+  // Verify profile restored (Account section is on Settings page)
+  const nameValue = await context.window.inputValue('input:near(:text("Full Name"))');
+  const emailValue = await context.window.inputValue('input:near(:text("Email"))');
   expect(nameValue).toBe('Test User');
   expect(emailValue).toBe('test@example.com');
 
   // Verify window state restored (approximately)
-  const restoredBounds = await mainWindow.evaluate(() => {
-    return window.electron.ipcRenderer.invoke('window:get-bounds');
-  });
+  const restoredBounds = await getWindowBounds(context.app);
   expect(restoredBounds.width).toBeCloseTo(initialBounds.width, -1);
   expect(restoredBounds.height).toBeCloseTo(initialBounds.height, -1);
 });
@@ -236,48 +220,36 @@ test('should persist data after logout', async () => {
     family_name: 'Test',
   });
 
-  await mainWindow.click('button:has-text("Continue with Google")');
-  await mainWindow.waitForTimeout(2000);
+  await completeOAuthFlow(context.app, context.window, TEST_CLIENT_ID);
+  await context.window.waitForTimeout(1000);
 
   // Create data
-  await mainWindow.click('[data-testid="settings-link"]');
-  await mainWindow.waitForTimeout(500);
-  await mainWindow.selectOption('select[data-testid="llm-provider"]', 'openai');
-  await mainWindow.fill('input[data-testid="api-key"]', 'persist-test-key');
-  await mainWindow.waitForTimeout(600);
+  await context.window.click('text=Settings');
+  await context.window.waitForSelector('text=AI Agent Settings');
+  await context.window.waitForTimeout(500);
+  await context.window.selectOption('select:near(:text("LLM Provider"))', 'openai');
+  await context.window.fill('input[placeholder="Enter your API key"]', 'persist-test-key');
+  await context.window.waitForTimeout(600);
 
   // Logout
-  await mainWindow.click('button:has-text("Sign Out")');
-  await mainWindow.waitForTimeout(1000);
+  await context.window.click('button:has-text("Sign out")');
+  await context.window.waitForTimeout(1000);
 
-  // Check database directly
-  const dbPath = path.join(testStoragePath, 'clerkly.db');
-  const db = new Database(dbPath);
+  // Login again and verify data restored (this verifies data persisted after logout)
+  await completeOAuthFlow(context.app, context.window, TEST_CLIENT_ID);
+  await context.window.waitForTimeout(1000);
 
-  // Verify AI Agent settings persisted
-  const settingsRow = db
-    .prepare('SELECT value, user_email FROM user_data WHERE key = ?')
-    .get('ai_agent_api_key_openai') as { value: string; user_email: string } | undefined;
-  expect(settingsRow).toBeDefined();
-  expect(settingsRow!.user_email).toBe('persist@example.com');
-
-  // Verify profile persisted
-  const profileRow = db
-    .prepare('SELECT value, user_email FROM user_data WHERE key = ?')
-    .get('user_profile') as { value: string; user_email: string } | undefined;
-  expect(profileRow).toBeDefined();
-  expect(profileRow!.user_email).toBe('persist@example.com');
-
-  db.close();
-
-  // Login again and verify data restored
-  await mainWindow.click('button:has-text("Continue with Google")');
-  await mainWindow.waitForTimeout(2000);
-
-  await mainWindow.click('[data-testid="settings-link"]');
-  await mainWindow.waitForTimeout(500);
-  const apiKey = await mainWindow.inputValue('input[data-testid="api-key"]');
+  await context.window.click('text=Settings');
+  await context.window.waitForSelector('text=AI Agent Settings');
+  await context.window.waitForTimeout(500);
+  const apiKey = await context.window.inputValue('input[placeholder="Enter your API key"]');
   expect(apiKey).toBeTruthy();
+
+  // Verify profile also persisted
+  const nameValue = await context.window.inputValue('input:near(:text("Full Name"))');
+  const emailValue = await context.window.inputValue('input:near(:text("Email"))');
+  expect(nameValue).toBe('Persist Test');
+  expect(emailValue).toBe('persist@example.com');
 });
 
 /* Preconditions: Application running, two users with same key but different values
@@ -294,19 +266,22 @@ test('should filter data by user email', async () => {
     family_name: 'A',
   });
 
-  await mainWindow.click('button:has-text("Continue with Google")');
-  await mainWindow.waitForTimeout(2000);
+  await completeOAuthFlow(context.app, context.window, TEST_CLIENT_ID);
+  await context.window.waitForTimeout(1000);
 
-  // Save data via IPC (simulate application saving data)
-  await mainWindow.evaluate(() => {
-    return window.electron.ipcRenderer.invoke('test:save-data', 'test_key', 'value_A');
-  });
+  // Save data - use AI Agent settings
+  await context.window.click('text=Settings');
+  await context.window.waitForSelector('text=AI Agent Settings');
+  await context.window.waitForTimeout(500);
+  await context.window.selectOption('select:near(:text("LLM Provider"))', 'openai');
+  await context.window.fill('input[placeholder="Enter your API key"]', 'user-a-key-123');
+  await context.window.waitForTimeout(600);
 
   // Logout
-  await mainWindow.click('button:has-text("Sign Out")');
-  await mainWindow.waitForTimeout(1000);
+  await context.window.click('button:has-text("Sign out")');
+  await context.window.waitForTimeout(1000);
 
-  // User B: Login and save data with same key
+  // User B: Login and save data with different provider
   mockOAuthServer.setUserProfile({
     id: 'filter-b-id',
     email: 'filterB@example.com',
@@ -315,23 +290,25 @@ test('should filter data by user email', async () => {
     family_name: 'B',
   });
 
-  await mainWindow.click('button:has-text("Continue with Google")');
-  await mainWindow.waitForTimeout(2000);
+  await completeOAuthFlow(context.app, context.window, TEST_CLIENT_ID);
+  await context.window.waitForTimeout(1000);
 
-  await mainWindow.evaluate(() => {
-    return window.electron.ipcRenderer.invoke('test:save-data', 'test_key', 'value_B');
-  });
+  await context.window.click('text=Settings');
+  await context.window.waitForSelector('text=AI Agent Settings');
+  await context.window.waitForTimeout(500);
+  await context.window.selectOption('select:near(:text("LLM Provider"))', 'anthropic');
+  await context.window.fill('input[placeholder="Enter your API key"]', 'user-b-key-456');
+  await context.window.waitForTimeout(600);
 
-  // Load data as User B
-  const resultB = await mainWindow.evaluate(() => {
-    return window.electron.ipcRenderer.invoke('test:load-data', 'test_key');
-  });
-  expect(resultB.success).toBe(true);
-  expect(resultB.data).toBe('value_B');
+  // Load data as User B - verify User B sees their own data
+  const providerB = await context.window.inputValue('select:near(:text("LLM Provider"))');
+  const apiKeyB = await context.window.inputValue('input[placeholder="Enter your API key"]');
+  expect(providerB).toBe('anthropic');
+  expect(apiKeyB).toBe('user-b-key-456');
 
   // Logout
-  await mainWindow.click('button:has-text("Sign Out")');
-  await mainWindow.waitForTimeout(1000);
+  await context.window.click('button:has-text("Sign out")');
+  await context.window.waitForTimeout(1000);
 
   // User A: Login again and load data
   mockOAuthServer.setUserProfile({
@@ -342,14 +319,18 @@ test('should filter data by user email', async () => {
     family_name: 'A',
   });
 
-  await mainWindow.click('button:has-text("Continue with Google")');
-  await mainWindow.waitForTimeout(2000);
+  await completeOAuthFlow(context.app, context.window, TEST_CLIENT_ID);
+  await context.window.waitForTimeout(1000);
 
-  const resultA = await mainWindow.evaluate(() => {
-    return window.electron.ipcRenderer.invoke('test:load-data', 'test_key');
-  });
-  expect(resultA.success).toBe(true);
-  expect(resultA.data).toBe('value_A');
+  await context.window.click('text=Settings');
+  await context.window.waitForSelector('text=AI Agent Settings');
+  await context.window.waitForTimeout(500);
+
+  // Verify User A sees their own data (not User B's)
+  const providerA = await context.window.inputValue('select:near(:text("LLM Provider"))');
+  const apiKeyA = await context.window.inputValue('input[placeholder="Enter your API key"]');
+  expect(providerA).toBe('openai');
+  expect(apiKeyA).toBe('user-a-key-123');
 });
 
 /* Preconditions: Application running, not authenticated
@@ -357,11 +338,42 @@ test('should filter data by user email', async () => {
    Assertions: Shows login screen, caches cleared
    Requirements: ui.12.13, ui.12.19 */
 test('should handle "No user logged in" error gracefully', async () => {
-  // Application starts without authentication
-  await mainWindow.waitForSelector('button:has-text("Continue with Google")');
+  // Close the authenticated context from beforeEach
+  await closeElectron(context);
 
-  // Attempt to save data via IPC (should fail)
-  const result = await mainWindow.evaluate(() => {
+  // 1) Launch app WITHOUT authentication
+  context = await launchElectron(undefined, {
+    CLERKLY_GOOGLE_API_URL: mockOAuthServer.getBaseUrl(),
+  });
+  await context.window.waitForLoadState('domcontentloaded');
+  await context.window.waitForSelector('button:has-text("Continue with Google")');
+
+  // 2) Authenticate
+  mockOAuthServer.setUserProfile({
+    id: 'error-test-id',
+    email: 'error@example.com',
+    name: 'Error Test',
+    given_name: 'Error',
+    family_name: 'Test',
+  });
+
+  await completeOAuthFlow(context.app, context.window, TEST_CLIENT_ID);
+  await context.window.waitForTimeout(1000);
+
+  // 3) Sign out
+  await context.window.click('text=Settings');
+  await context.window.waitForSelector('text=AI Agent Settings');
+  await context.window.waitForTimeout(500);
+  await context.window.click('button:has-text("Sign out")');
+
+  // Wait for sign out to complete and login screen to appear
+  await context.window.waitForSelector('button:has-text("Continue with Google")', {
+    timeout: 5000,
+  });
+  await context.window.waitForTimeout(2000); // Additional wait for cleanup
+
+  // 4) Try to save data via IPC (should fail - no user logged in)
+  const result = await context.window.evaluate(() => {
     return window.electron.ipcRenderer
       .invoke('test:save-data', 'test_key', 'test_value')
       .catch((err: Error) => {
@@ -372,35 +384,17 @@ test('should handle "No user logged in" error gracefully', async () => {
   expect(result.success).toBe(false);
   expect(result.error).toContain('No user logged in');
 
-  // Verify login screen is shown
-  await expect(mainWindow.locator('button:has-text("Continue with Google")')).toBeVisible();
-
-  // Now authenticate and try again
-  mockOAuthServer.setUserProfile({
-    id: 'error-test-id',
-    email: 'error@example.com',
-    name: 'Error Test',
-    given_name: 'Error',
-    family_name: 'Test',
-  });
-
-  await mainWindow.click('button:has-text("Continue with Google")');
-  await mainWindow.waitForTimeout(2000);
-
-  // Try saving data again (should succeed)
-  const result2 = await mainWindow.evaluate(() => {
-    return window.electron.ipcRenderer.invoke('test:save-data', 'test_key', 'test_value');
-  });
-
-  expect(result2.success).toBe(true);
+  // 5) Verify interface doesn't show error (error is only logged)
+  // Login screen should still be visible without error notifications
+  await expect(context.window.locator('button:has-text("Continue with Google")')).toBeVisible();
 });
 
-/* Preconditions: Application running, authenticated, session expires
-   Action: Session expires (mock), attempt to save data, system refreshes token, retry
-   Assertions: Operation succeeds after token refresh
+/* Preconditions: Application running, authenticated, token expires
+   Action: Token expires, attempt to refresh profile (API request), system refreshes token automatically, operation succeeds
+   Assertions: Profile refresh succeeds after automatic token refresh, /userinfo uses refreshed token
    Requirements: ui.12.20 */
 test('should retry operation after token refresh', async () => {
-  // Login
+  // 1) Login
   mockOAuthServer.setUserProfile({
     id: 'refresh-test-id',
     email: 'refresh@example.com',
@@ -409,28 +403,54 @@ test('should retry operation after token refresh', async () => {
     family_name: 'Test',
   });
 
-  await mainWindow.click('button:has-text("Continue with Google")');
-  await mainWindow.waitForTimeout(2000);
+  await completeOAuthFlow(context.app, context.window, TEST_CLIENT_ID);
+  await context.window.waitForTimeout(1000);
 
-  // Mock session expiry (simulate getCurrentEmail returning null temporarily)
-  // Then mock successful token refresh
-  // This is a simplified test - in real scenario, the application would:
-  // 1. Catch "No user logged in" error
-  // 2. Call refreshAccessToken()
-  // 3. Retry the operation
-
-  // For this test, we'll verify the application can recover from temporary session issues
-  const result = await mainWindow.evaluate(() => {
-    return window.electron.ipcRenderer.invoke('test:save-data', 'refresh_key', 'refresh_value');
+  // 2) Get initial access token
+  const initialTokensResult = await context.window.evaluate(() => {
+    return (window as any).electron.ipcRenderer.invoke('test:get-tokens');
   });
 
-  expect(result.success).toBe(true);
+  expect(initialTokensResult.success).toBe(true);
+  const initialAccessToken = initialTokensResult.tokens.accessToken;
+  console.log('[TEST] Initial access token:', initialAccessToken);
 
-  // Verify data was saved
-  const loadResult = await mainWindow.evaluate(() => {
-    return window.electron.ipcRenderer.invoke('test:load-data', 'refresh_key');
+  // 3) Reset mock server tracking
+  mockOAuthServer.resetLastUserInfoAccessToken();
+
+  // 4) Expire the token to simulate token expiration
+  const expireResult = await context.window.evaluate(() => {
+    return (window as any).electron.ipcRenderer.invoke('test:expire-token');
   });
 
-  expect(loadResult.success).toBe(true);
-  expect(loadResult.data).toBe('refresh_value');
+  expect(expireResult.success).toBe(true);
+
+  // 5) Try to refresh profile - this makes an API request to Google UserInfo API
+  // System should automatically detect expired token, refresh it, and retry the request
+  const refreshResult = await context.window.evaluate(() => {
+    return (window as any).electron.ipcRenderer.invoke('auth:refresh-profile');
+  });
+
+  // 6) Verify profile refresh succeeded (token was automatically refreshed)
+  expect(refreshResult.success).toBe(true);
+  expect(refreshResult.profile).toBeTruthy();
+  expect(refreshResult.profile.email).toBe('refresh@example.com');
+
+  // 7) Get new access token after refresh
+  const newTokensResult = await context.window.evaluate(() => {
+    return (window as any).electron.ipcRenderer.invoke('test:get-tokens');
+  });
+
+  expect(newTokensResult.success).toBe(true);
+  const newAccessToken = newTokensResult.tokens.accessToken;
+  console.log('[TEST] New access token:', newAccessToken);
+
+  // 8) Verify token changed
+  expect(newAccessToken).not.toBe(initialAccessToken);
+  expect(newAccessToken).toContain('refreshed'); // Refreshed tokens have 'refreshed' in them
+
+  // 9) Verify /userinfo request used the refreshed token
+  const lastUserInfoToken = mockOAuthServer.getLastUserInfoAccessToken();
+  console.log('[TEST] Last UserInfo access token:', lastUserInfoToken);
+  expect(lastUserInfoToken).toBe(newAccessToken);
 });

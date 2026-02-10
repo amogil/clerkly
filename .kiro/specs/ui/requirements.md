@@ -103,7 +103,7 @@
 
 3. **Централизованная обработка**: Все API запросы должны проходить через централизованный обработчик ошибок, который проверяет статус авторизации (HTTP 401) и выполняет необходимые действия при ошибках авторизации.
 
-4. **Логирование**: Все ошибки авторизации должны логироваться с контекстом (какой API запрос вызвал ошибку), но пользователю показываются только понятные сообщения без технических деталей.
+4. **Логирование**: Все ошибки авторизации должны логироваться через централизованный "Logger" класс (см. clerkly.3) с контекстом (какой API запрос вызвал ошибку), но пользователю показываются только понятные сообщения без технических деталей.
 
 **Поток обработки ошибки авторизации:**
 ```
@@ -260,7 +260,7 @@ Token Expiring → OAuthClientManager.refreshAccessToken() → Update Tokens in 
 6.2. "Account Block" ДОЛЖЕН НЕ позволять пользователю редактировать поля профиля (read-only)
 
 6.3. Система ДОЛЖНА загружать данные профиля из Google UserInfo API:
-   - **Синхронно** во время успешной авторизации (после обмена authorization code на токены)
+   - **Синхронно** во время успешной авторизации (после обмена authorization code на токены, во время отображения loader - см. google-oauth-auth.15)
    - При запуске приложения (если пользователь авторизован)
    - При обновлении access token (refresh)
 
@@ -297,7 +297,7 @@ Token Expiring → OAuthClientManager.refreshAccessToken() → Update Tokens in 
 
 7.3. Уведомление об ошибке ДОЛЖНО автоматически исчезать через 15 секунд ИЛИ при клике пользователя
 
-7.4. Приложение ДОЛЖНО логировать все ошибки в консоль для отладки
+7.4. Приложение ДОЛЖНО логировать все ошибки через централизованный "Logger" класс (см. clerkly.3) для отладки
 
 #### Функциональные Тесты
 
@@ -312,7 +312,7 @@ Token Expiring → OAuthClientManager.refreshAccessToken() → Update Tokens in 
 
 **User Story:** Как пользователь, я хочу чтобы приложение автоматически направляло меня на нужный экран в зависимости от статуса авторизации, чтобы не видеть функции, которые мне недоступны.
 
-**Зависимости:** google-oauth-auth.3
+**Зависимости:** google-oauth-auth.3, google-oauth-auth.11, google-oauth-auth.15
 
 #### Критерии Приемки
 
@@ -320,9 +320,21 @@ Token Expiring → OAuthClientManager.refreshAccessToken() → Update Tokens in 
 
 8.2. КОГДА пользователь не авторизован, ТО пользователь НЕ МОЖЕТ получить доступ к защищенным экранам (Dashboard, Settings, Tasks, Calendar, Contacts)
 
-8.3. КОГДА пользователь успешно авторизуется через Google OAuth, ТО приложение ДОЛЖНО автоматически перенаправить пользователя на Dashboard (главный экран приложения)
+8.3. КОГДА пользователь нажимает кнопку "Continue with Google", ТО приложение ДОЛЖНО открыть системный браузер для авторизации
 
-8.4. КОГДА пользователь выходит из системы (logout), ТО приложение ДОЛЖНО очистить все токены авторизации (см. google-oauth-auth.7) И автоматически перенаправить пользователя на экран логина
+8.4. КОГДА браузер открыт, ТО кнопка "Continue with Google" ДОЛЖНА оставаться активной (пользователь может открыть несколько вкладок браузера)
+
+8.5. КОГДА пользователь завершает авторизацию в браузере И authorization code получен, ТО приложение ДОЛЖНО показать loader с текстом "Signing in..."
+
+8.6. КОГДА loader отображается, ТО приложение ДОЛЖНО выполнить следующие операции:
+   - Обменять authorization code на токены
+   - Загрузить профиль пользователя из Google UserInfo API (синхронно)
+
+8.7. КОГДА пользователь успешно авторизуется через Google OAuth И профиль загружен, ТО приложение ДОЛЖНО автоматически перенаправить пользователя на Dashboard (главный экран приложения)
+
+8.8. КОГДА происходит ошибка авторизации (обмен токенов ИЛИ загрузка профиля), ТО приложение ДОЛЖНО показать LoginError компонент с описанием ошибки
+
+8.9. КОГДА пользователь выходит из системы (logout), ТО приложение ДОЛЖНО очистить все токены авторизации (см. google-oauth-auth.7) И автоматически перенаправить пользователя на экран логина
 
 #### Функциональные Тесты
 
@@ -330,6 +342,8 @@ Token Expiring → OAuthClientManager.refreshAccessToken() → Update Tokens in 
 - `tests/functional/navigation.spec.ts` - "should block access to protected screens without authentication"
 - `tests/functional/navigation.spec.ts` - "should redirect to dashboard after successful authentication"
 - `tests/functional/navigation.spec.ts` - "should redirect to login screen after logout"
+- `tests/functional/navigation.spec.ts` - "should show loader during authorization"
+- `tests/functional/navigation.spec.ts` - "should allow multiple login attempts before authorization completes"
 
 ### 9. Управление Токенами и Обработка Ошибок Авторизации
 
@@ -353,7 +367,7 @@ Token Expiring → OAuthClientManager.refreshAccessToken() → Update Tokens in 
 
 9.4. Система ДОЛЖНА использовать централизованный обработчик для всех API запросов, который проверяет статус авторизации (HTTP 401)
 
-9.5. КОГДА происходит ошибка авторизации (401), ТО система ДОЛЖНА логировать событие с контекстом (какой API запрос вызвал ошибку)
+9.5. КОГДА происходит ошибка авторизации (401), ТО система ДОЛЖНА логировать событие с контекстом через "Logger" класс (см. clerkly.3)
 
 9.6. Система ДОЛЖНА показывать пользователю понятное сообщение об истечении сессии на английском языке (errorCode 'invalid_grant' в LoginError компоненте)
 
@@ -468,7 +482,6 @@ Token Expiring → OAuthClientManager.refreshAccessToken() → Update Tokens in 
 - `tests/functional/settings-ai-agent.spec.ts` - "should toggle API key visibility"
 - `tests/functional/settings-ai-agent.spec.ts` - "should show error notification on save failure"
 - `tests/functional/settings-ai-agent.spec.ts` - "should persist settings after logout and restore on re-login"
-- `tests/functional/settings-ai-agent.spec.ts` - "should isolate settings between different users"
 - `tests/functional/settings-ai-agent.spec.ts` - "should preserve API keys when switching providers"
 - `tests/functional/settings-ai-agent.spec.ts` - "should load correct API key when switching back to provider"
 
@@ -490,7 +503,7 @@ Token Expiring → OAuthClientManager.refreshAccessToken() → Update Tokens in 
    - Контакты (Contacts)
    - История изменений
 
-11.3. Форматирование НЕ ДОЛЖНО применяться к логам - логи ДОЛЖНЫ использовать фиксированный формат `YYYY-MM-DD HH:MM:SS`
+11.3. Форматирование НЕ ДОЛЖНО применяться к логам - логи ДОЛЖНЫ использовать централизованный "Logger" класс (см. clerkly.3)
 
 11.4. Приложение НЕ ДОЛЖНО отображать относительные форматы времени (например, "2 hours ago", "yesterday")
 
@@ -564,7 +577,7 @@ Token Expiring → OAuthClientManager.refreshAccessToken() → Update Tokens in 
 
 12.20. КОГДА DataManager возвращает ошибку "No user logged in" И сессия истекла во время работы, ТО система ДОЛЖНА применить процедуру восстановления сессии (см. ui.9.1, ui.9.3) И при успешном восстановлении повторить операцию с данными без уведомления пользователю
 
-12.21. КОГДА DataManager возвращает ошибку "No user logged in" во время logout (race condition), ТО система ДОЛЖНА молча игнорировать ошибку (логировать в консоль для отладки)
+12.21. КОГДА DataManager возвращает ошибку "No user logged in" во время logout (race condition), ТО система ДОЛЖНА молча игнорировать ошибку (логировать через "Logger" класс для отладки, см. clerkly.3)
 
 12.22. Профиль пользователя (ключ `user_profile`) ДОЛЖЕН быть изолирован по email (каждый пользователь имеет свой профиль в базе данных)
 

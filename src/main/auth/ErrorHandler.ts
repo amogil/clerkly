@@ -1,5 +1,11 @@
-// Requirements: google-oauth-auth.9.1, google-oauth-auth.9.2, google-oauth-auth.9.3, google-oauth-auth.9.4, google-oauth-auth.9.5, google-oauth-auth.9.6
+// Requirements: google-oauth-auth.9.1, google-oauth-auth.9.2, google-oauth-auth.9.3, google-oauth-auth.9.4, google-oauth-auth.9.5, google-oauth-auth.9.6, clerkly.3.8
 
+import { Logger } from '../Logger';
+
+// Requirements: clerkly.3.5, clerkly.3.7 - Create parameterized logger for OAuth ErrorHandler
+const logger = Logger.create('OAuth');
+
+// Requirements: clerkly.3.8 - Use centralized Logger instead of console.*
 /**
  * Error details interface
  * Requirements: google-oauth-auth.9.6
@@ -71,6 +77,11 @@ const ERROR_MAP: Record<string, ErrorDetails> = {
     message: 'Unable to save authentication data.',
     suggestion: 'Please check application permissions and try again.',
   },
+  profile_fetch_failed: {
+    title: 'Profile loading failed',
+    message: 'Unable to load your Google profile information.',
+    suggestion: 'Please check your internet connection and try signing in again.',
+  },
 };
 
 /**
@@ -94,7 +105,7 @@ export function getErrorDetails(errorCode?: string, errorMessage?: string): Erro
 
 /**
  * Log error with context
- * Requirements: google-oauth-auth.9.5
+ * Requirements: google-oauth-auth.9.5, clerkly.3.5, clerkly.3.7
  * @param operation Operation that failed
  * @param error Error object or message
  * @param context Additional context for debugging
@@ -108,11 +119,13 @@ export function logError(
   const errorMessage = errorObj?.message || String(error) || 'Unknown error';
   const errorCode = errorObj?.code || errorObj?.error || 'unknown';
 
-  console.error(`[OAuth] ${operation} failed: ${errorMessage}`, {
-    errorCode,
-    timestamp: Date.now(),
-    context: context || {},
-  });
+  logger.error(
+    `${operation} failed: ${errorMessage} ${JSON.stringify({
+      errorCode,
+      timestamp: Date.now(),
+      context: context || {},
+    })}`
+  );
 }
 
 /**

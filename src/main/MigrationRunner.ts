@@ -3,7 +3,9 @@
 import Database from 'better-sqlite3';
 import * as fs from 'fs';
 import * as path from 'path';
+import { Logger } from './Logger';
 
+// Requirements: clerkly.3.8 - Use centralized Logger instead of console.*
 /**
  * Migration result
  */
@@ -39,6 +41,8 @@ export interface Migration {
  * Manages database schema migrations
  */
 export class MigrationRunner {
+  // Requirements: clerkly.3.5, clerkly.3.7
+  private logger = Logger.create('MigrationRunner');
   private db: Database.Database;
   private migrationsPath: string;
 
@@ -131,7 +135,7 @@ export class MigrationRunner {
         // Парсим имя файла: 001_initial_schema.sql
         const match = file.match(/^(\d+)_(.+)\.sql$/);
         if (!match) {
-          console.warn(`Skipping invalid migration file: ${file}`);
+          this.logger.warn(`Skipping invalid migration file: ${file}`);
           continue;
         }
 
@@ -237,7 +241,10 @@ export class MigrationRunner {
           applyMigration();
           appliedCount++;
 
-          console.log(`Applied migration ${migration.version}_${migration.name}`);
+          Logger.info(
+            'MigrationRunner',
+            `Applied migration ${migration.version}_${migration.name}`
+          );
         } catch (migrationError: unknown) {
           const errorMessage =
             migrationError instanceof Error ? migrationError.message : 'Unknown error';
@@ -325,7 +332,10 @@ export class MigrationRunner {
 
         rollback();
 
-        console.log(`Rolled back migration ${migration.version}_${migration.name}`);
+        Logger.info(
+          'MigrationRunner',
+          `Rolled back migration ${migration.version}_${migration.name}`
+        );
 
         return {
           success: true,

@@ -32,7 +32,7 @@ External API → Main Process → Database → IPC Event → Renderer → UI Upd
 
 **Ключевые правила:**
 
-1. **Синхронная загрузка профиля при авторизации**: Когда пользователь успешно авторизуется через Google OAuth (после обмена authorization code на токены), система должна синхронно загрузить данные профиля из Google UserInfo API перед показом Dashboard. Во время загрузки показывается loader. При успехе - показывается Dashboard. При ошибке - токены очищаются и показывается LoginError компонент с errorCode 'profile_fetch_failed'. Это гарантирует, что пользователь всегда видит актуальные данные профиля сразу после авторизации.
+1. **Синхронная загрузка профиля при авторизации**: Когда пользователь успешно авторизуется через Google OAuth (после обмена authorization code на токены), система должна синхронно загрузить данные профиля из Google UserInfo API перед показом Dashboard. Во время загрузки показывается loader (см. google-oauth-auth.15). При успехе - показывается Dashboard. При ошибке - токены очищаются и показывается LoginError компонент с errorCode 'profile_fetch_failed'. Это гарантирует, что пользователь всегда видит актуальные данные профиля сразу после авторизации.
 
 2. **Автоматическое обновление токенов**: Когда access token истекает (expires_in), система автоматически обновляет его через refresh token без участия пользователя. Это происходит в фоновом режиме через `OAuthClientManager.refreshAccessToken()`.
 
@@ -51,7 +51,7 @@ API Request → HTTP 401 → Clear Tokens → Show LoginError Component → Redi
 
 **Поток синхронной загрузки профиля при авторизации:**
 ```
-OAuth Success → Exchange Code for Tokens → Fetch Profile (Synchronous) → Success: Show Dashboard | Error: Clear Tokens + Show LoginError
+OAuth Success → Show Loader ("Signing in...") → Exchange Code for Tokens → Fetch Profile (Synchronous) → Success: Hide Loader + Show Dashboard | Error: Hide Loader + Clear Tokens + Show LoginError
 ```
 
 **Поток автоматического обновления токена:**
@@ -489,143 +489,173 @@ interface WindowState {
 
 **Validates: Requirements ui.8.1, ui.8.2**
 
-### Property 9: Показ Dashboard после успешной авторизации
+### Property 9: Открытие системного браузера для авторизации
 
-*Для любого* пользователя, успешно авторизовавшегося через Google OAuth, приложение должно показывать Dashboard (главный экран), а не Account Block или Settings.
+*Для любого* пользователя, нажимающего кнопку "Continue with Google", приложение должно открыть системный браузер для авторизации через Google OAuth.
 
 **Validates: Requirements ui.8.3**
 
-### Property 10: Синхронная загрузка профиля при авторизации
+### Property 10: Кнопка авторизации остается активной
+
+*Для любого* пользователя, открывшего браузер для авторизации, кнопка "Continue with Google" должна оставаться активной, позволяя открыть несколько вкладок браузера.
+
+**Validates: Requirements ui.8.4**
+
+### Property 11: Показ loader при получении authorization code
+
+*Для любого* пользователя, завершившего авторизацию в браузере, когда authorization code получен, приложение должно показать loader с текстом "Signing in...".
+
+**Validates: Requirements ui.8.5**
+
+### Property 12: Синхронный обмен кода и загрузка профиля
+
+*Для любого* пользователя, для которого отображается loader, приложение должно синхронно выполнить обмен authorization code на токены И загрузить профиль пользователя из Google UserInfo API.
+
+**Validates: Requirements ui.8.6**
+
+### Property 13: Показ Dashboard после успешной авторизации и загрузки профиля
+
+*Для любого* пользователя, успешно авторизовавшегося через Google OAuth И для которого профиль успешно загружен, приложение должно показывать Dashboard (главный экран), а не Account Block или Settings.
+
+**Validates: Requirements ui.8.7**
+
+### Property 14: Показ LoginError при ошибке авторизации
+
+*Для любого* пользователя, для которого произошла ошибка авторизации (обмен токенов ИЛИ загрузка профиля), приложение должно показать LoginError компонент с описанием ошибки.
+
+**Validates: Requirements ui.8.8**
+
+### Property 15: Синхронная загрузка профиля при авторизации
 
 *Для любого* пользователя, успешно авторизовавшегося через Google OAuth, система должна синхронно загрузить данные профиля из Google UserInfo API перед показом Dashboard. При ошибке загрузки профиля авторизация должна считаться неуспешной.
 
 **Validates: Requirements ui.6.4, ui.6.5**
 
-### Property 11: Показ loader при синхронной загрузке профиля
+### Property 16: Показ loader при синхронной загрузке профиля
 
 *Для любого* пользователя, авторизующегося через Google OAuth, во время синхронной загрузки профиля система должна показывать loader, а не Dashboard или Account Block.
 
 **Validates: Requirements ui.6.4**
 
-### Property 12: Показ Dashboard после успешной загрузки профиля
+### Property 17: Показ Dashboard после успешной загрузки профиля
 
 *Для любого* пользователя, для которого профиль успешно загружен синхронно во время авторизации, система должна показать Dashboard (главный экран приложения).
 
 **Validates: Requirements ui.6.4**
 
-### Property 13: Показ LoginError при ошибке загрузки профиля
+### Property 18: Показ LoginError при ошибке загрузки профиля
 
 *Для любого* пользователя, для которого загрузка профиля не удалась синхронно во время авторизации, система должна очистить токены И показать LoginError компонент с errorCode 'profile_fetch_failed'.
 
 **Validates: Requirements ui.6.4, ui.6.5**
 
-### Property 14: Сохранение данных профиля при успешной загрузке
+### Property 19: Сохранение данных профиля при успешной загрузке
 
 *Для любого* успешного запроса к UserInfo API (синхронного или фонового), полученные данные профиля должны быть сохранены в локальную базу данных (SQLite через DataManager).
 
 **Validates: Requirements ui.6.3**
 
-### Property 15: Отображение обязательных полей профиля
+### Property 20: Отображение обязательных полей профиля
 
 *Для любого* профиля пользователя, Account Block должен отображать поля "Name" (имя пользователя) и "Email" (email адрес).
 
 **Validates: Requirements ui.6.1**
 
-### Property 16: Read-only поля профиля
+### Property 21: Read-only поля профиля
 
 *Для любого* отображаемого профиля, все поля в Account Block должны иметь атрибут `readOnly` и не позволять пользователю редактировать данные.
 
 **Validates: Requirements ui.6.2**
 
-### Property 17: Автоматическое обновление при refresh token
+### Property 22: Автоматическое обновление при refresh token
 
 *Для любого* авторизованного пользователя, при каждом успешном обновлении access token (refresh token operation), система должна автоматически запрашивать актуальные данные профиля из Google UserInfo API в фоновом режиме и обновлять отображение в Account Block.
 
 **Validates: Requirements ui.6.3**
 
-### Property 18: Автоматическое обновление при запуске приложения
+### Property 23: Автоматическое обновление при запуске приложения
 
 *Для любого* авторизованного пользователя, при запуске приложения система должна автоматически запрашивать актуальные данные профиля из Google UserInfo API в фоновом режиме и отображать их в Account Block.
 
 **Validates: Requirements ui.6.3**
 
-### Property 19: Очистка токенов и показ экрана логина при logout
+### Property 24: Очистка токенов и показ экрана логина при logout
 
 *Для любого* авторизованного пользователя, при выходе из системы (logout) приложение должно показать экран логина, очистить все данные профиля из памяти (UI state), и очистить все токены авторизации. Данные профиля в базе данных сохраняются для отображения при следующей авторизации.
 
-**Validates: Requirements ui.8.4, google-oauth-auth.15**
+**Validates: Requirements ui.8.9, google-oauth-auth.14**
 
-### Property 20: Показ уведомления при ошибке фонового процесса
+### Property 25: Показ уведомления при ошибке фонового процесса
 
 *Для любой* ошибки, возникающей в фоновом процессе (загрузка данных, синхронизация, API запрос), приложение должно показать уведомление об ошибке пользователю.
 
 **Validates: Requirements ui.7.1**
 
-### Property 21: Содержимое уведомления об ошибке
+### Property 26: Содержимое уведомления об ошибке
 
 *Для любого* уведомления об ошибке, оно должно содержать краткое описание проблемы И контекст операции (что пыталось выполниться).
 
 **Validates: Requirements ui.7.2**
 
-### Property 22: Автоматическое исчезновение уведомления
+### Property 27: Автоматическое исчезновение уведомления
 
 *Для любого* показанного уведомления об ошибке, оно должно автоматически исчезнуть через 15 секунд ИЛИ при клике пользователя на уведомление.
 
 **Validates: Requirements ui.7.3**
 
-### Property 23: Логирование ошибок в консоль
+### Property 28: Логирование ошибок в консоль
 
-*Для любой* ошибки в приложении, она должна быть залогирована в консоль с достаточным контекстом для отладки.
+*Для любой* ошибки в приложении, она должна быть залогирована в консоль с достаточным контекстом для отладки через централизованный Logger класс.
 
-**Validates: Requirements ui.7.4**
+**Validates: Requirements ui.7.4, clerkly.3.1, clerkly.3.6**
 
-### Property 24: Показ экрана логина для неавторизованных пользователей
+### Property 29: Показ экрана логина для неавторизованных пользователей
 
 *Для любого* пользователя, который не авторизован, приложение должно показывать экран логина при запуске или при попытке доступа к приложению.
 
 **Validates: Requirements ui.8.1**
 
-### Property 25: Блокировка доступа к защищенным экранам
+### Property 30: Блокировка доступа к защищенным экранам
 
 *Для любого* неавторизованного пользователя, попытка доступа к защищенным экранам (Dashboard, Settings, Tasks, Calendar, Contacts) должна быть заблокирована, и пользователь должен быть перенаправлен на экран логина.
 
 **Validates: Requirements ui.8.2**
 
-### Property 26: Перенаправление на Dashboard после успешной авторизации
+### Property 31: Перенаправление на Dashboard после успешной авторизации
 
 *Для любого* пользователя, успешно авторизовавшегося через Google OAuth, приложение должно автоматически перенаправить пользователя на Dashboard (главный экран приложения).
 
-**Validates: Requirements ui.8.3**
+**Validates: Requirements ui.8.7**
 
-### Property 27: Перенаправление на Login после logout
+### Property 32: Перенаправление на Login после logout
 
 *Для любого* авторизованного пользователя, при выходе из системы (logout) приложение должно автоматически перенаправить пользователя на экран логина.
 
-**Validates: Requirements ui.8.4**
+**Validates: Requirements ui.8.9**
 
-### Property 28: Автоматическое обновление токена при истечении
+### Property 33: Автоматическое обновление токена при истечении
 
 *Для любого* access token, который истекает (expires_in), система должна автоматически обновить его через refresh token в фоновом режиме без участия пользователя, и пользователь должен продолжать работу без прерываний.
 
 **Validates: Requirements ui.9.1, ui.9.2**
 
-### Property 29: Очистка токенов при ошибке авторизации
+### Property 34: Очистка токенов при ошибке авторизации
 
 *Для любого* API запроса, который возвращает HTTP 401 Unauthorized, система должна немедленно очистить все токены из хранилища и показать экран логина (LoginError компонент с errorCode 'invalid_grant'). Данные пользователя в базе данных НЕ очищаются и сохраняются для отображения при следующей авторизации.
 
 **Validates: Requirements ui.9.3**
 
-### Property 30: Централизованная обработка ошибок авторизации
+### Property 35: Централизованная обработка ошибок авторизации
 
 *Для любого* API запроса к внешним сервисам (Google UserInfo, Calendar, Tasks и т.д.), запрос должен проходить через централизованный обработчик, который проверяет статус HTTP 401 и выполняет необходимые действия по очистке сессии.
 
 **Validates: Requirements ui.9.4**
 
-### Property 31: Логирование ошибок авторизации с контекстом
+### Property 36: Логирование ошибок авторизации с контекстом
 
-*Для любой* ошибки авторизации (HTTP 401), система должна залогировать событие с контекстом (какой API запрос вызвал ошибку, timestamp, URL), но показать пользователю только понятное сообщение без технических деталей.
+*Для любой* ошибки авторизации (HTTP 401), система должна залогировать событие с контекстом (какой API запрос вызвал ошибку, timestamp, URL) через централизованный Logger класс, но показать пользователю только понятное сообщение без технических деталей.
 
-**Validates: Requirements ui.9.5, ui.9.6**
+**Validates: Requirements ui.9.5, ui.9.6, clerkly.3.1, clerkly.3.5, clerkly.3.6**
 
 ### Edge Cases
 
@@ -639,13 +669,19 @@ interface WindowState {
 
 4. **Не авторизован (ui.8.1, ui.8.2)**: Когда пользователь не авторизован, приложение показывает экран логина, и пользователь НЕ МОЖЕТ попасть в Settings (где находится Account Block). Это не edge case для Account компонента, так как компонент не должен быть доступен неавторизованным пользователям.
 
-5. **Синхронная загрузка профиля при авторизации (ui.6.4, ui.6.5)**: Когда пользователь авторизуется через Google OAuth, система должна синхронно загрузить профиль перед показом Dashboard. Во время загрузки показывается loader. При успехе - показывается Dashboard. При ошибке - токены очищаются и показывается LoginError компонент с errorCode 'profile_fetch_failed'.
+5. **Синхронная загрузка профиля при авторизации (ui.6.4, ui.6.5, ui.8.5, ui.8.6, ui.8.7, ui.8.8)**: Когда пользователь авторизуется через Google OAuth, система должна:
+   - Показать loader с текстом "Signing in..." после получения authorization code (ui.8.5)
+   - Синхронно обменять код на токены И загрузить профиль во время отображения loader (ui.8.6)
+   - При успехе: показать Dashboard с заполненным Account Block (ui.8.7)
+   - При ошибке обмена токенов ИЛИ загрузки профиля: очистить токены и показать LoginError компонент с errorCode 'profile_fetch_failed' (ui.8.8)
 
-6. **Первая авторизация (ui.6.1, ui.6.3)**: Когда пользователь авторизуется впервые и в локальной базе данных нет данных профиля, система синхронно загружает профиль во время авторизации. После успешной загрузки показывается Dashboard с заполненным Account Block.
+6. **Множественные попытки авторизации (ui.8.3, ui.8.4)**: Когда пользователь нажимает кнопку "Continue with Google", браузер открывается для авторизации, но кнопка остается активной. Пользователь может открыть несколько вкладок браузера для авторизации. Система корректно обрабатывает только первый успешный authorization code.
 
-7. **Ошибка загрузки профиля в фоновом режиме (ui.6.1, ui.6.3)**: Когда загрузка данных профиля не удается в фоновом режиме (при запуске приложения или refresh token), Account Block должен показать сообщение об ошибке и сохранить данные из локальной базы данных (предыдущие значения или пустые поля), НЕ очищая существующие данные.
+7. **Первая авторизация (ui.6.1, ui.6.3)**: Когда пользователь авторизуется впервые и в локальной базе данных нет данных профиля, система синхронно загружает профиль во время авторизации. После успешной загрузки показывается Dashboard с заполненным Account Block.
 
-8. **Повторная авторизация с сохраненными данными (ui.6.1, ui.6.3)**: Когда пользователь авторизуется повторно и в локальной базе данных есть данные профиля, система синхронно загружает свежие данные профиля во время авторизации. После успешной загрузки показывается Dashboard с обновленными данными в Account Block.
+8. **Ошибка загрузки профиля в фоновом режиме (ui.6.1, ui.6.3)**: Когда загрузка данных профиля не удается в фоновом режиме (при запуске приложения или refresh token), Account Block должен показать сообщение об ошибке и сохранить данные из локальной базы данных (предыдущие значения или пустые поля), НЕ очищая существующие данные.
+
+9. **Повторная авторизация с сохраненными данными (ui.6.1, ui.6.3)**: Когда пользователь авторизуется повторно и в локальной базе данных есть данные профиля, система синхронно загружает свежие данные профиля во время авторизации. После успешной загрузки показывается Dashboard с обновленными данными в Account Block.
 
 8. **Истечение access token (ui.9.1, ui.9.2)**: Когда access token истекает во время работы приложения, система должна автоматически обновить его через refresh token в фоновом режиме. Пользователь продолжает работу без прерываний, уведомлений или видимых изменений в UI.
 
@@ -771,45 +807,52 @@ createWindow(): BrowserWindow {
 
 **Обработка:**
 
-**Случай 1: Синхронная загрузка профиля во время авторизации (ui.6.4, ui.6.5)**
+**Случай 1: Синхронная загрузка профиля во время авторизации (ui.6.4, ui.6.5, ui.8.5, ui.8.6, ui.8.7, ui.8.8)**
 
 Когда профиль загружается синхронно во время авторизации (после обмена authorization code на токены), ошибка получения профиля должна привести к неуспешной авторизации:
 
 ```typescript
-// Requirements: ui.6.4, ui.6.5
+// Requirements: ui.6.4, ui.6.5, ui.8.5, ui.8.6, ui.8.7, ui.8.8
 async handleAuthorizationCallback(code: string): Promise<void> {
   try {
-    // Exchange code for tokens
+    // Requirements: ui.8.5 - Show loader when authorization code received
+    this.showLoader('Signing in...');
+    
+    // Requirements: ui.8.6 - Exchange code for tokens
     const tokens = await this.exchangeCodeForTokens(code);
     await this.tokenStorage.saveTokens(tokens);
     
-    // Requirements: ui.6.4 - Synchronous profile fetch during authorization
+    // Requirements: ui.8.6, ui.6.4 - Synchronous profile fetch during authorization
     try {
       const profile = await this.userProfileManager.fetchProfile();
       if (!profile) {
         throw new Error('Profile fetch returned null');
       }
       
-      // Success: show Dashboard
+      // Requirements: ui.8.7 - Success: show Dashboard
+      this.hideLoader();
       this.navigationManager.redirectToDashboard();
     } catch (profileError) {
-      // Requirements: ui.6.4, ui.6.5 - Profile fetch failed during authorization
+      // Requirements: ui.8.8, ui.6.4, ui.6.5 - Profile fetch failed during authorization
       console.error('[Auth] Profile fetch failed during authorization:', profileError);
       
       // Clear tokens - authorization is considered unsuccessful
       await this.tokenStorage.clearTokens();
       
-      // Show LoginError with profile_fetch_failed error code
+      // Hide loader and show LoginError with profile_fetch_failed error code
+      this.hideLoader();
       this.showLoginError('Unable to load your Google profile information.', 'profile_fetch_failed');
     }
   } catch (error) {
+    // Requirements: ui.8.8 - Token exchange failed
     console.error('[Auth] Authorization failed:', error);
+    this.hideLoader();
     this.showLoginError('Authorization failed', 'unknown_error');
   }
 }
 ```
 
-**Результат:** Токены очищаются, пользователь видит LoginError компонент с сообщением:
+**Результат:** Токены очищаются, loader скрывается, пользователь видит LoginError компонент с сообщением:
 - **Title**: "Profile loading failed"
 - **Message**: "Unable to load your Google profile information."
 - **Suggestion**: "Please check your internet connection and try signing in again."
@@ -1139,7 +1182,7 @@ async function handleLogout() {
 
 ### Логирование
 
-Все ошибки должны логироваться с достаточным контекстом для диагностики:
+Все ошибки должны логироваться с достаточным контекстом для диагностики через централизованный Logger класс (clerkly.3):
 
 ```typescript
 // Window management errors
@@ -1622,6 +1665,11 @@ describe('Window UI Functional Tests', () => {
 | ui.8.2 | ✓ | - | ✓ |
 | ui.8.3 | ✓ | - | ✓ |
 | ui.8.4 | ✓ | - | ✓ |
+| ui.8.5 | ✓ | - | ✓ |
+| ui.8.6 | ✓ | - | ✓ |
+| ui.8.7 | ✓ | - | ✓ |
+| ui.8.8 | ✓ | - | ✓ |
+| ui.8.9 | ✓ | - | ✓ |
 | ui.9.1 | ✓ | - | ✓ |
 | ui.9.2 | ✓ | - | ✓ |
 | ui.9.3 | ✓ | - | ✓ |
@@ -1668,7 +1716,7 @@ describe('Window UI Functional Tests', () => {
 | ui.12.5 | ✓ | - | ✓ |
 | ui.12.6 | ✓ | - | ✓ |
 | ui.12.7 | ✓ | ✓ | ✓ |
-| ui.12.8 | ✓ | - | - |
+| ui.12.8 | ✓ | - | ✓ |
 | ui.12.9 | ✓ | - | - |
 | ui.12.10 | ✓ | - | - |
 | ui.12.11 | ✓ | ✓ | ✓ |
@@ -1829,7 +1877,7 @@ describe('Account Component', () => {
   /* Preconditions: Account component with profile data, logout triggered
      Action: trigger logout event
      Assertions: component returns to empty state (UI state cleared), profile data in database persists
-     Requirements: ui.8.4, google-oauth-auth.15 */
+     Requirements: ui.8.9, google-oauth-auth.14 */
   it('should clear profile from UI on logout', () => {
     // Тест очистки профиля из UI при logout
   });
@@ -1913,7 +1961,7 @@ describe('Account Functional Tests', () => {
   /* Preconditions: authenticated user with profile displayed
      Action: perform logout
      Assertions: Account block cleared from UI, returns to empty state, profile data in database persists
-     Requirements: ui.8.4, google-oauth-auth.15 */
+     Requirements: ui.8.9, google-oauth-auth.14 */
   it('should clear profile from UI on logout', async () => {
     // Функциональный тест очистки UI при logout
   });
@@ -2026,14 +2074,6 @@ describe('AI Agent Settings Functional Tests', () => {
     // Тест персистентности настроек
   });
 
-  /* Preconditions: user A logged in, settings saved
-     Action: logout user A, login user B, check settings
-     Assertions: user B sees empty/default settings, not user A's settings
-     Requirements: ui.12.8 */
-  it('should isolate settings between users', async () => {
-    // Тест изоляции настроек между пользователями (покрывается через ui.12)
-  });
-
   /* Preconditions: API keys saved for all providers
      Action: switch between providers
      Assertions: correct API key loaded for each provider
@@ -2060,10 +2100,14 @@ describe('DateTimeFormatter', () => {
 
   /* Preconditions: valid timestamp
      Action: call formatLogTimestamp()
-     Assertions: returns format YYYY-MM-DD HH:MM:SS, independent of locale
-     Requirements: ui.11.3 */
-  it('should use fixed format for log timestamps', () => {
-    // Тест фиксированного формата для логов
+     Assertions: returns format YYYY-MM-DD HH:MM:SS±HH:MM (with timezone), independent of locale
+     Requirements: ui.11.3, clerkly.3.2, clerkly.3.3 */
+  it('should use fixed format with timezone for log timestamps', () => {
+    const timestamp = new Date('2024-01-15T10:30:45Z').getTime();
+    const formatted = DateTimeFormatter.formatLogTimestamp(timestamp);
+    
+    // Проверяем формат YYYY-MM-DD HH:MM:SS±HH:MM
+    expect(formatted).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}$/);
   });
 
   /* Preconditions: Intl.DateTimeFormat throws error
@@ -2076,6 +2120,8 @@ describe('DateTimeFormatter', () => {
 });
 ```
 
+**Примечание:** Тест "should use fixed format for logs" перенесен в модульные тесты Logger класса (см. clerkly дизайн), так как логирование теперь выполняется через централизованный Logger, а не напрямую через DateTimeFormatter.
+
 #### Функциональные Тесты (Date/Time Formatting)
 
 ```typescript
@@ -2086,14 +2132,6 @@ describe('Date/Time Formatting Functional Tests', () => {
      Requirements: ui.11.1, ui.11.2 */
   it('should format dates using system locale', async () => {
     // Тест форматирования по системной локали
-  });
-
-  /* Preconditions: app running, logs generated
-     Action: check log output
-     Assertions: all log timestamps in YYYY-MM-DD HH:MM:SS format
-     Requirements: ui.11.3 */
-  it('should use fixed format for logs', async () => {
-    // Тест фиксированного формата логов
   });
 
   /* Preconditions: system locale changed
@@ -2412,7 +2450,7 @@ describe('User Data Isolation Functional Tests', () => {
 - Легко тестировать (один обработчик вместо множества)
 - Упрощает добавление новых API endpoints
 - Предотвращает race conditions при множественных одновременных 401 ошибках
-- Централизованное логирование всех ошибок авторизации (ui.9.5)
+- Централизованное логирование всех ошибок авторизации через Logger класс (ui.9.5, clerkly.3.1, clerkly.3.6)
 
 ### Решение 15: Автоматическое Обновление Токенов
 
@@ -2628,7 +2666,7 @@ describe('User Data Isolation Functional Tests', () => {
 Класс для управления навигацией и перенаправлениями.
 
 ```typescript
-// Requirements: ui.8.1, ui.8.3, ui.8.4
+// Requirements: ui.8.1, ui.8.7, ui.8.9
 
 class NavigationManager {
   private router: Router;
@@ -2653,7 +2691,7 @@ class NavigationManager {
 
   /**
    * Redirect to login screen
-   * Requirements: ui.8.1, ui.8.4
+   * Requirements: ui.8.1, ui.8.9
    */
   redirectToLogin(): void {
     console.log('[NavigationManager] Redirecting to login');
@@ -2662,7 +2700,7 @@ class NavigationManager {
 
   /**
    * Redirect to dashboard
-   * Requirements: ui.8.3
+   * Requirements: ui.8.7
    */
   redirectToDashboard(): void {
     console.log('[NavigationManager] Redirecting to dashboard');
@@ -2671,7 +2709,7 @@ class NavigationManager {
 
   /**
    * Initialize navigation on app start
-   * Requirements: ui.8.1, ui.8.3
+   * Requirements: ui.8.1, ui.8.7
    */
   async initialize(): Promise<void> {
     const isAuthenticated = await this.checkAuthStatus();
@@ -2743,17 +2781,17 @@ class AuthGuard {
 #### Интеграция с OAuth Events
 
 ```typescript
-// Requirements: ui.8.3, ui.8.4
+// Requirements: ui.8.7, ui.8.9
 
 // In App.tsx or main application component
 useEffect(() => {
-  // Requirements: ui.8.3 - Redirect to dashboard after successful auth
+  // Requirements: ui.8.7 - Redirect to dashboard after successful auth
   const unsubscribeAuthSuccess = window.api.auth.onAuthSuccess(() => {
     console.log('[App] Auth success event received, redirecting to dashboard');
     navigationManager.redirectToDashboard();
   });
 
-  // Requirements: ui.8.4 - Redirect to login after logout
+  // Requirements: ui.8.9 - Redirect to login after logout
   const unsubscribeLogout = window.api.auth.onLogout(() => {
     console.log('[App] Logout event received, redirecting to login');
     navigationManager.redirectToLogin();
@@ -3563,7 +3601,7 @@ export function Account({ className }: AccountProps) {
       loadProfile();
     });
 
-    // Requirements: ui.8.4, google-oauth-auth.15 - Listen for logout to clear profile from UI
+    // Requirements: ui.8.9, google-oauth-auth.14 - Listen for logout to clear profile from UI
     const unsubscribeLogout = window.api.auth.onLogout(() => {
       console.log('[Account] Logout event received, clearing profile from UI');
       setProfile(null);
@@ -4390,8 +4428,8 @@ class DateTimeFormatter {
   }
 
   /**
-   * Format timestamp for logs (fixed format)
-   * Requirements: ui.11.3
+   * Format timestamp for logs (fixed format with timezone)
+   * Requirements: ui.11.3, clerkly.3.2, clerkly.3.3
    */
   static formatLogTimestamp(timestamp: number): string {
     const date = new Date(timestamp);
@@ -4402,8 +4440,15 @@ class DateTimeFormatter {
     const minutes = String(date.getMinutes()).padStart(2, '0');
     const seconds = String(date.getSeconds()).padStart(2, '0');
     
-    // Requirements: ui.11.3 - Fixed format YYYY-MM-DD HH:MM:SS
-    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+    // Get timezone offset in format ±HH:MM
+    const timezoneOffset = -date.getTimezoneOffset(); // in minutes
+    const offsetHours = Math.floor(Math.abs(timezoneOffset) / 60);
+    const offsetMinutes = Math.abs(timezoneOffset) % 60;
+    const offsetSign = timezoneOffset >= 0 ? '+' : '-';
+    const timezone = `${offsetSign}${String(offsetHours).padStart(2, '0')}:${String(offsetMinutes).padStart(2, '0')}`;
+    
+    // Requirements: ui.11.3, clerkly.3.3 - Fixed format YYYY-MM-DD HH:MM:SS±HH:MM
+    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}${timezone}`;
   }
 }
 ```
@@ -4440,11 +4485,11 @@ console.log(`[${DateTimeFormatter.formatLogTimestamp(Date.now())}] Operation com
 
 **Validates: Requirements ui.11.1**
 
-#### Property 42: Фиксированный формат для логов
+#### Property 42: Фиксированный формат для логов с часовым поясом
 
-*Для любого* timestamp в логах, форматирование должно использовать фиксированный формат `YYYY-MM-DD HH:MM:SS`, независимо от системной локали.
+*Для любого* timestamp в логах, форматирование должно использовать фиксированный формат `YYYY-MM-DD HH:MM:SS±HH:MM` (с указанием часового пояса), независимо от системной локали.
 
-**Validates: Requirements ui.11.3**
+**Validates: Requirements ui.11.3, clerkly.3.2, clerkly.3.3**
 
 #### Property 43: Отсутствие относительных форматов
 

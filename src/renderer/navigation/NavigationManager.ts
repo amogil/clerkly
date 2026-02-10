@@ -1,11 +1,15 @@
 // Requirements: ui.8.1, ui.8.3, ui.8.4
 import type { Router } from './Router';
+import { Logger } from '../Logger';
 
+// Requirements: clerkly.3.8 - Use centralized Logger instead of console.*
 /**
  * NavigationManager handles navigation and redirects based on authentication status
  * Requirements: ui.8.1, ui.8.3, ui.8.4
  */
 export class NavigationManager {
+  // Requirements: clerkly.3.5, clerkly.3.7
+  private logger = Logger.create('NavigationManager');
   private router: Router;
 
   /**
@@ -26,7 +30,10 @@ export class NavigationManager {
       const result = await window.api.auth.getStatus();
       return result.authorized;
     } catch (error) {
-      console.error('[NavigationManager] Failed to check auth status:', error);
+      Logger.error(
+        'NavigationManager',
+        `[NavigationManager] Failed to check auth status: ${error}`
+      );
       return false;
     }
   }
@@ -36,7 +43,7 @@ export class NavigationManager {
    * Requirements: ui.8.1, ui.8.4
    */
   redirectToLogin(): void {
-    console.log('[NavigationManager] Redirecting to login');
+    this.logger.info('Redirecting to login');
     this.router.navigate('/login');
   }
 
@@ -45,7 +52,7 @@ export class NavigationManager {
    * Requirements: ui.8.3
    */
   redirectToDashboard(): void {
-    console.log('[NavigationManager] Redirecting to dashboard');
+    this.logger.info('Redirecting to dashboard');
     this.router.navigate('/dashboard');
   }
 

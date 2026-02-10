@@ -53,6 +53,7 @@ export class MockOAuthServer {
   private userInfoReturn401: boolean = false;
   private calendarReturn401: boolean = false;
   private tasksReturn401: boolean = false;
+  private lastUserInfoAccessToken: string | null = null;
 
   constructor(config: MockOAuthServerConfig) {
     this.config = config;
@@ -148,6 +149,23 @@ export class MockOAuthServer {
   setTasksReturn401(return401: boolean): void {
     this.tasksReturn401 = return401;
     console.log(`[MOCK OAUTH] Tasks return 401 set to: ${return401}`);
+  }
+
+  /**
+   * Get the last access token used in UserInfo request
+   * Requirements: testing.3.9
+   */
+  getLastUserInfoAccessToken(): string | null {
+    return this.lastUserInfoAccessToken;
+  }
+
+  /**
+   * Reset the last UserInfo access token
+   * Requirements: testing.3.9
+   */
+  resetLastUserInfoAccessToken(): void {
+    this.lastUserInfoAccessToken = null;
+    console.log('[MOCK OAUTH] Last UserInfo access token reset');
   }
 
   /**
@@ -513,6 +531,9 @@ export class MockOAuthServer {
     }
 
     const accessToken = authHeader.substring(7); // Remove "Bearer " prefix
+
+    // Track the access token used in this request
+    this.lastUserInfoAccessToken = accessToken;
 
     // Validate access token (simple check for test tokens)
     if (!accessToken.startsWith('test_access_token')) {

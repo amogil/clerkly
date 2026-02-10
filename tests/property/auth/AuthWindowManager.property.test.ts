@@ -123,7 +123,7 @@ describe('AuthWindowManager Property-Based Tests', () => {
       fc.asyncProperty(errorMessageArb, errorCodeArb, async (errorMessage, errorCode) => {
         // Reset mocks for each iteration
         jest.clearAllMocks();
-        const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
+        const consoleSpy = jest.spyOn(console, 'info').mockImplementation();
         mockWindowManager.isWindowCreated.mockReturnValue(true);
         mockWindowManager.getWindow.mockReturnValue(mockWindow);
 
@@ -132,10 +132,9 @@ describe('AuthWindowManager Property-Based Tests', () => {
         await authWindowManager.onAuthError(errorMessage, errorCode);
 
         // Verify error was logged
-        expect(consoleSpy).toHaveBeenCalledWith('[AuthWindowManager] Authentication failed:', {
-          error: errorMessage,
-          errorCode: errorCode,
-        });
+        expect(consoleSpy).toHaveBeenCalledWith(
+          expect.stringContaining('[AuthWindowManager] Authentication failed:')
+        );
 
         // Verify window remains available for error display
         // (window should not be closed)
@@ -150,7 +149,7 @@ describe('AuthWindowManager Property-Based Tests', () => {
   /* Preconditions: user successfully authenticated
      Action: call onAuthSuccess() to transition window content
      Assertions: window content transitions to main application
-     Requirements: google-oauth-auth.14.4 */
+     Requirements: google-oauth-auth.11.4 */
   // Feature: google-oauth-auth, Property: Window Transition on Success
   it('Property: should transition from login to main window on success', async () => {
     await fc.assert(
@@ -174,21 +173,23 @@ describe('AuthWindowManager Property-Based Tests', () => {
   /* Preconditions: authentication error occurred, user clicks retry
      Action: call onRetry() to show login screen again
      Assertions: login screen displayed, retry logged
-     Requirements: google-oauth-auth.14.6 */
+     Requirements: google-oauth-auth.11.6 */
   // Feature: google-oauth-auth, Property: Retry Shows Login Screen
   it('Property: should show login screen on retry', async () => {
     await fc.assert(
       fc.asyncProperty(fc.constant(null), async () => {
         // Reset mocks for each iteration
         jest.clearAllMocks();
-        const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
+        const consoleSpy = jest.spyOn(console, 'info').mockImplementation();
         mockWindowManager.isWindowCreated.mockReturnValue(false);
 
         const authWindowManager = new AuthWindowManager(mockWindowManager, mockOAuthClient);
         await authWindowManager.onRetry();
 
         // Verify retry was logged
-        expect(consoleSpy).toHaveBeenCalledWith('[AuthWindowManager] Retrying authentication');
+        expect(consoleSpy).toHaveBeenCalledWith(
+          expect.stringContaining('[AuthWindowManager] Retrying authentication')
+        );
 
         // Verify login window was created
         expect(mockWindowManager.createWindow).toHaveBeenCalled();

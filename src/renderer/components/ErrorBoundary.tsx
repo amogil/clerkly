@@ -1,5 +1,9 @@
 import React, { Component, ReactNode } from 'react';
 import { AlertTriangle } from 'lucide-react';
+import { Logger } from '../Logger';
+
+// Requirements: clerkly.3.5, clerkly.3.7
+const logger = Logger.create('Errorboundary');
 
 interface Props {
   children: ReactNode;
@@ -21,7 +25,7 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: unknown) {
-    console.error('Error caught by boundary:', error, errorInfo);
+    logger.error('Error caught by boundary:', error, errorInfo);
   }
 
   render() {

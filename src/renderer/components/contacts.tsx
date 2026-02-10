@@ -1,5 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Mail, Phone, Building, Calendar, Edit2, Trash2, Search } from 'lucide-react';
+import { Logger } from '../Logger';
+
+// Requirements: clerkly.3.5, clerkly.3.7
+const logger = Logger.create('Contacts');
 
 // Google Contacts API structure
 interface Contact {
@@ -150,7 +154,7 @@ export function Contacts({ triggerAction }: ContactsProps) {
     if (!triggerAction) return;
 
     if (triggerAction.action === 'create' && triggerAction.params.entity === 'contact') {
-      console.log('Create contact:', triggerAction.params);
+      logger.info('Create contact:', triggerAction.params);
     }
   }, [triggerAction]);
 
@@ -265,7 +269,7 @@ export function Contacts({ triggerAction }: ContactsProps) {
                         <Edit2 className="w-4 h-4 text-muted-foreground" />
                       </button>
                       <button
-                        onClick={() => console.log('Delete contact:', contact.resourceName)}
+                        onClick={() => logger.info('Delete contact:', contact.resourceName)}
                         className="p-2 hover:bg-secondary rounded-lg transition-colors"
                       >
                         <Trash2 className="w-4 h-4 text-muted-foreground" />

@@ -1,11 +1,13 @@
-// Requirements: clerkly.1, clerkly.nfr.1, clerkly.nfr.2, ui.6.5
+// Requirements: clerkly.1, clerkly.nfr.1, clerkly.nfr.2, ui.6.5, clerkly.3.8
 
 import WindowManager from './WindowManager';
 import { DataManager } from './DataManager';
 import { OAuthClientManager } from './auth/OAuthClientManager';
 import { UserProfileManager } from './auth/UserProfileManager';
 import { TokenStorageManager } from './auth/TokenStorageManager';
+import { Logger } from './Logger';
 
+// Requirements: clerkly.3.8 - Use centralized Logger instead of console.*
 /**
  * Initialize result
  */
@@ -25,6 +27,8 @@ export class LifecycleManager {
   private profileManager: UserProfileManager;
   private startTime: number | null = null;
   private initialized: boolean = false;
+  // Requirements: clerkly.3.5, clerkly.3.7
+  private logger = Logger.create('LifecycleManager');
 
   constructor(
     windowManager: WindowManager,
@@ -59,10 +63,10 @@ export class LifecycleManager {
       // Requirements: ui.6.5 - Fetch profile on startup if authenticated
       const authStatus = await this.oauthClient.getAuthStatus();
       if (authStatus.authorized) {
-        console.log('[LifecycleManager] User authenticated, fetching profile');
+        this.logger.info('User authenticated, fetching profile');
         await this.profileManager.fetchProfile();
       } else {
-        console.log('[LifecycleManager] User not authenticated, skipping profile fetch');
+        this.logger.info('User not authenticated, skipping profile fetch');
       }
 
       this.initialized = true;
@@ -71,7 +75,7 @@ export class LifecycleManager {
 
       // Предупреждение о медленном запуске (> 3 секунды)
       if (loadTime > 3000) {
-        console.warn(`Slow startup: ${loadTime}ms (target: <3000ms)`);
+        this.logger.warn(`Slow startup: ${loadTime}ms (target: <3000ms)`);
       }
 
       return {
@@ -80,7 +84,7 @@ export class LifecycleManager {
       };
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      console.error('Failed to initialize application:', errorMessage);
+      this.logger.error(`Failed to initialize application: ${errorMessage}`);
       throw new Error(`Application initialization failed: ${errorMessage}`);
     }
   }
@@ -97,7 +101,7 @@ export class LifecycleManager {
       }
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      console.error('Failed to handle activation:', errorMessage);
+      this.logger.error(`Failed to handle activation: ${errorMessage}`);
     }
   }
 
@@ -125,7 +129,7 @@ export class LifecycleManager {
       }
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      console.error('Error during shutdown:', errorMessage);
+      this.logger.error(`Error during shutdown: ${errorMessage}`);
       // Продолжаем завершение даже при ошибках
     }
   }

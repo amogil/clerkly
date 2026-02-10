@@ -17,6 +17,10 @@ import { LoginScreen } from './components/auth/LoginScreen';
 import { LoginError } from './components/auth/LoginError';
 import { parseCommand } from './utils/command-parser';
 import { SimpleRouter, NavigationManager, AuthGuard } from './navigation';
+import { Logger } from './Logger';
+
+// Requirements: clerkly.3.5, clerkly.3.7
+const logger = Logger.create('App');
 
 // Requirements: clerkly.1, google-oauth-auth.12.1, google-oauth-auth.12.2, ui.8.1, ui.8.3, ui.8.4, ui.7.1
 export default function App() {
@@ -125,7 +129,7 @@ function AppContent() {
         // Requirements: ui.8.1, ui.8.3 - Initialize navigation after auth check
         await navigationManager.initialize();
       } catch (error) {
-        console.error('[App] Failed to check auth status:', error);
+        logger.error(`Failed to check auth status: ${error}`);
         setIsAuthorized(false);
       }
     };
@@ -135,7 +139,7 @@ function AppContent() {
     // Requirements: google-oauth-auth.8.4, ui.8.3, ui.6.4
     // Listen for auth success events and redirect to dashboard
     const unsubscribeAuthSuccess = window.api.auth.onAuthSuccess(() => {
-      console.log('[App] Auth success event received');
+      logger.info('Auth success event received');
       // Requirements: ui.6.4 - Show loader during synchronous profile fetch
       // The profile is fetched synchronously in Main Process before this event is emitted
       // So by the time we receive this event, the profile is already loaded
@@ -150,20 +154,20 @@ function AppContent() {
     // Listen for auth error events
     const unsubscribeAuthError = window.api.auth.onAuthError(
       (error: string, errorCode?: string) => {
-        console.error('[App] Auth error event received:', { error, errorCode });
-        console.log('[App] Setting authError state and isAuthorized=false');
+        logger.error(`Auth error event received: ${JSON.stringify({ error, errorCode })}`);
+        logger.info('Setting authError state and isAuthorized=false');
         // Requirements: ui.6.4 - Hide loader on error
         setIsLoadingProfile(false);
         setAuthError({ message: error, code: errorCode });
         setIsAuthorized(false);
-        console.log('[App] State updated, should trigger re-render');
+        logger.info('State updated, should trigger re-render');
       }
     );
 
     // Requirements: ui.6.8, ui.8.4
     // Listen for logout events and redirect to login
     const unsubscribeLogout = window.api.auth.onLogout(() => {
-      console.log('[App] Logout event received');
+      logger.info('Logout event received');
       setIsAuthorized(false);
       setAuthError(null);
       // Requirements: ui.8.4 - Redirect to login after logout
@@ -172,8 +176,19 @@ function AppContent() {
 
     // Requirements: ui.7.1 - Listen for error notification events from Main Process
     const unsubscribeErrorNotify = window.api.error.onNotify((message: string, context: string) => {
-      console.log('[App] Error notification received:', { message, context });
+      logger.info(`Error notification received: ${JSON.stringify({ message, context })}`);
       showError(`${context}: ${message}`);
+    });
+
+    // Requirements: google-oauth-auth.7.1 - Listen for loader show/hide events
+    const unsubscribeShowLoader = window.api.auth.onShowLoader(() => {
+      logger.info('Show loader event received');
+      setIsLoadingProfile(true);
+    });
+
+    const unsubscribeHideLoader = window.api.auth.onHideLoader(() => {
+      logger.info('Hide loader event received');
+      setIsLoadingProfile(false);
     });
 
     return () => {
@@ -181,6 +196,8 @@ function AppContent() {
       unsubscribeAuthError();
       unsubscribeLogout();
       unsubscribeErrorNotify();
+      unsubscribeShowLoader();
+      unsubscribeHideLoader();
     };
   }, [navigationManager, showError]);
 
@@ -206,21 +223,21 @@ function AppContent() {
     navigateToScreen('tasks');
   };
 
-  // Requirements: clerkly.1, google-oauth-auth.12.3, ui.6.4
+  // Requirements: clerkly.1, google-oauth-auth.12.3, ui.6.4, google-oauth-auth.15.1, google-oauth-auth.15.7
   const handleLogin = async () => {
     try {
-      setAuthError(null);
-      // Requirements: ui.6.4 - Show loader during authorization and profile fetch
-      setIsLoadingProfile(true);
+      // Requirements: google-oauth-auth.15.7 - Don't clear error immediately on retry
+      // Keep error visible during retry - it will be cleared on success or replaced on failure
+      // Requirements: google-oauth-auth.15.1 - Loader is controlled by Main Process events (auth:show-loader)
+      // Loader shows AFTER deep link is received, not immediately on button click
       const result = await window.api.auth.startLogin();
       if (!result.success) {
-        setIsLoadingProfile(false);
+        // Only set error, don't touch loader state
         setAuthError({ message: result.error || 'Failed to start login' });
       }
-      // Note: If success, loader will be hidden by auth:success or auth:error event
+      // Note: Loader will be shown/hidden by auth:show-loader and auth:hide-loader events from Main Process
     } catch (error) {
-      console.error('[App] Login failed:', error);
-      setIsLoadingProfile(false);
+      logger.error(`Login failed: ${error}`);
       setAuthError({ message: 'Failed to start login' });
     }
   };
@@ -232,7 +249,7 @@ function AppContent() {
       setIsAuthorized(false);
       setAuthError(null);
     } catch (error) {
-      console.error('[App] Logout failed:', error);
+      logger.error(`Logout failed: ${error}`);
     }
   };
 
@@ -275,19 +292,6 @@ function AppContent() {
     );
   }
 
-  // Requirements: ui.6.4 - Show loader during synchronous profile fetch
-  // This loader is shown after OAuth success but before profile is loaded
-  if (isLoadingProfile) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading your profile...</p>
-        </div>
-      </div>
-    );
-  }
-
   // Requirements: google-oauth-auth.12.5, ui.6.4
   // Show error screen if authentication failed (including profile fetch failure)
   if (authError) {
@@ -296,17 +300,27 @@ function AppContent() {
         errorMessage={authError.message}
         errorCode={authError.code}
         onRetry={() => {
-          setAuthError(null);
+          // Don't clear error immediately - keep it visible during retry
+          // Error will be cleared on success or replaced on failure
           handleLogin();
         }}
+        isLoading={isLoadingProfile}
+        isDisabled={isLoadingProfile}
       />
     );
   }
 
-  // Requirements: google-oauth-auth.12.2
+  // Requirements: google-oauth-auth.12.2, google-oauth-auth.15.7
   // Show login screen if not authorized
+  // Loader is shown ON the login screen, not as a separate page
   if (!isAuthorized) {
-    return <LoginScreen onLogin={handleLogin} />;
+    return (
+      <LoginScreen
+        onLogin={handleLogin}
+        isLoading={isLoadingProfile}
+        isDisabled={isLoadingProfile}
+      />
+    );
   }
 
   // Requirements: clerkly.1

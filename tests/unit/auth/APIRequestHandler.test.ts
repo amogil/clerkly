@@ -126,12 +126,7 @@ describe('APIRequestHandler', () => {
     ).rejects.toThrow();
 
     expect(consoleErrorSpy).toHaveBeenCalledWith(
-      '[APIRequestHandler] Authorization error (401) from UserInfo API',
-      expect.objectContaining({
-        url: 'https://api.example.com/userinfo',
-        timestamp: expect.any(String),
-        context: 'UserInfo API',
-      })
+      expect.stringContaining('[APIRequestHandler] Authorization error (401) from UserInfo API')
     );
   });
 
@@ -209,8 +204,7 @@ describe('APIRequestHandler', () => {
     ).rejects.toThrow('Network error');
 
     expect(consoleErrorSpy).toHaveBeenCalledWith(
-      '[APIRequestHandler] Request failed for Test API:',
-      networkError
+      expect.stringContaining('[APIRequestHandler] Request failed for Test API:')
     );
   });
 
@@ -229,8 +223,173 @@ describe('APIRequestHandler', () => {
     ).rejects.toThrow();
 
     expect(consoleErrorSpy).toHaveBeenCalledWith(
-      '[APIRequestHandler] Authorization error (401) from API Request',
-      expect.any(Object)
+      expect.stringContaining('[APIRequestHandler] Authorization error (401) from API Request')
     );
+  });
+
+  describe('Automatic Token Refresh', () => {
+    let mockOAuthClient: any;
+
+    beforeEach(() => {
+      // Import and mock setOAuthClientManager
+      const { setOAuthClientManager } = require('../../../src/main/auth/APIRequestHandler');
+
+      mockOAuthClient = {
+        refreshAccessToken: jest.fn(),
+      };
+
+      setOAuthClientManager(mockOAuthClient);
+    });
+
+    /* Preconditions: token is expired, oauthClientManager is set
+       Action: call handleAPIRequest
+       Assertions: refreshAccessToken called, Authorization header updated
+       Requirements: ui.9.1, ui.9.2 */
+    it('should automatically refresh expired token before request', async () => {
+      const expiredTokens = {
+        accessToken: 'old_token',
+        refreshToken: 'refresh_token',
+        expiresAt: Date.now() - 1000, // Expired 1 second ago
+      };
+
+      const newTokens = {
+        accessToken: 'new_token',
+        refreshToken: 'refresh_token',
+        expiresAt: Date.now() + 3600000,
+      };
+
+      mockTokenStorage.loadTokens = jest
+        .fn()
+        .mockResolvedValueOnce(expiredTokens)
+        .mockResolvedValueOnce(newTokens);
+
+      mockOAuthClient.refreshAccessToken.mockResolvedValue(true);
+
+      const mockResponse = new Response(JSON.stringify({ data: 'test' }), { status: 200 });
+      mockFetch.mockResolvedValue(mockResponse);
+
+      const headers = { Authorization: 'Bearer old_token' };
+      await handleAPIRequest(
+        'https://api.example.com/data',
+        { method: 'GET', headers },
+        mockTokenStorage,
+        'Test API'
+      );
+
+      expect(mockOAuthClient.refreshAccessToken).toHaveBeenCalledTimes(1);
+      expect(headers.Authorization).toBe('Bearer new_token');
+    });
+
+    /* Preconditions: token is expired, refresh fails
+       Action: call handleAPIRequest
+       Assertions: continues with expired token
+       Requirements: ui.9.1, ui.9.2 */
+    it('should continue with expired token if refresh fails', async () => {
+      const expiredTokens = {
+        accessToken: 'old_token',
+        refreshToken: 'refresh_token',
+        expiresAt: Date.now() - 1000,
+      };
+
+      mockTokenStorage.loadTokens = jest.fn().mockResolvedValue(expiredTokens);
+      mockOAuthClient.refreshAccessToken.mockResolvedValue(false);
+
+      const mockResponse = new Response(JSON.stringify({ data: 'test' }), { status: 200 });
+      mockFetch.mockResolvedValue(mockResponse);
+
+      const result = await handleAPIRequest(
+        'https://api.example.com/data',
+        { method: 'GET', headers: { Authorization: 'Bearer old_token' } },
+        mockTokenStorage,
+        'Test API'
+      );
+
+      expect(mockOAuthClient.refreshAccessToken).toHaveBeenCalledTimes(1);
+      expect(result.status).toBe(200);
+    });
+
+    /* Preconditions: token is not expired
+       Action: call handleAPIRequest
+       Assertions: refreshAccessToken NOT called
+       Requirements: ui.9.1, ui.9.2 */
+    it('should not refresh token if not expired', async () => {
+      const validTokens = {
+        accessToken: 'valid_token',
+        refreshToken: 'refresh_token',
+        expiresAt: Date.now() + 3600000, // Expires in 1 hour
+      };
+
+      mockTokenStorage.loadTokens = jest.fn().mockResolvedValue(validTokens);
+
+      const mockResponse = new Response(JSON.stringify({ data: 'test' }), { status: 200 });
+      mockFetch.mockResolvedValue(mockResponse);
+
+      await handleAPIRequest(
+        'https://api.example.com/data',
+        { method: 'GET', headers: { Authorization: 'Bearer valid_token' } },
+        mockTokenStorage,
+        'Test API'
+      );
+
+      expect(mockOAuthClient.refreshAccessToken).not.toHaveBeenCalled();
+    });
+
+    /* Preconditions: no tokens available
+       Action: call handleAPIRequest
+       Assertions: refreshAccessToken NOT called, request proceeds
+       Requirements: ui.9.1, ui.9.2 */
+    it('should not refresh if no tokens available', async () => {
+      mockTokenStorage.loadTokens = jest.fn().mockResolvedValue(null);
+
+      const mockResponse = new Response(JSON.stringify({ data: 'test' }), { status: 200 });
+      mockFetch.mockResolvedValue(mockResponse);
+
+      await handleAPIRequest(
+        'https://api.example.com/data',
+        { method: 'GET' },
+        mockTokenStorage,
+        'Test API'
+      );
+
+      expect(mockOAuthClient.refreshAccessToken).not.toHaveBeenCalled();
+    });
+
+    /* Preconditions: token expired, headers is Headers instance
+       Action: call handleAPIRequest
+       Assertions: Headers instance updated correctly
+       Requirements: ui.9.1, ui.9.2 */
+    it('should update Headers instance with new token', async () => {
+      const expiredTokens = {
+        accessToken: 'old_token',
+        refreshToken: 'refresh_token',
+        expiresAt: Date.now() - 1000,
+      };
+
+      const newTokens = {
+        accessToken: 'new_token',
+        refreshToken: 'refresh_token',
+        expiresAt: Date.now() + 3600000,
+      };
+
+      mockTokenStorage.loadTokens = jest
+        .fn()
+        .mockResolvedValueOnce(expiredTokens)
+        .mockResolvedValueOnce(newTokens);
+
+      mockOAuthClient.refreshAccessToken.mockResolvedValue(true);
+
+      const mockResponse = new Response(JSON.stringify({ data: 'test' }), { status: 200 });
+      mockFetch.mockResolvedValue(mockResponse);
+
+      const headers = new Headers({ Authorization: 'Bearer old_token' });
+      await handleAPIRequest(
+        'https://api.example.com/data',
+        { method: 'GET', headers },
+        mockTokenStorage,
+        'Test API'
+      );
+
+      expect(headers.get('Authorization')).toBe('Bearer new_token');
+    });
   });
 });

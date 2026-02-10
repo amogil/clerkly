@@ -174,6 +174,8 @@ export interface API {
     onAuthError: (callback: (error: string, errorCode?: string) => void) => () => void;
     onLogout: (callback: () => void) => () => void;
     onProfileUpdated: (callback: (profile: UserProfile | null) => void) => () => void;
+    onShowLoader: (callback: () => void) => () => void;
+    onHideLoader: (callback: () => void) => () => void;
   };
   // Requirements: ui.7.1
   error: {

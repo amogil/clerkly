@@ -76,7 +76,9 @@ describe('AuthIPCHandlers', () => {
       const secondCallCount = (ipcMain.handle as jest.Mock).mock.calls.length;
 
       expect(secondCallCount).toBe(firstCallCount);
-      expect(consoleWarnSpy).toHaveBeenCalledWith('[AuthIPCHandlers] Handlers already registered');
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[AuthIPCHandlers] Handlers already registered')
+      );
 
       consoleWarnSpy.mockRestore();
     });
@@ -326,7 +328,9 @@ describe('AuthIPCHandlers', () => {
 
       const result = await handler({});
 
-      expect(consoleWarnSpy).toHaveBeenCalledWith('[AuthIPCHandlers] Profile manager not set');
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[AuthIPCHandlers] Profile manager not set')
+      );
       expect(result).toEqual({
         success: true,
         profile: null,
@@ -429,7 +433,9 @@ describe('AuthIPCHandlers', () => {
 
       const result = await handler({});
 
-      expect(consoleWarnSpy).toHaveBeenCalledWith('[AuthIPCHandlers] Profile manager not set');
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[AuthIPCHandlers] Profile manager not set')
+      );
       expect(result).toEqual({
         success: false,
         error: 'Profile manager not initialized',

@@ -95,6 +95,8 @@ describe('App IPC Integration with Error Notification System', () => {
           onAuthSuccess: jest.fn(() => jest.fn()), // Return unsubscribe function
           onAuthError: jest.fn(() => jest.fn()), // Return unsubscribe function
           onLogout: jest.fn(() => jest.fn()), // Return unsubscribe function
+          onShowLoader: jest.fn(() => jest.fn()), // Return unsubscribe function
+          onHideLoader: jest.fn(() => jest.fn()), // Return unsubscribe function
         },
         error: {
           onNotify: mockOnNotify,
@@ -130,8 +132,8 @@ describe('App IPC Integration with Error Notification System', () => {
      Assertions: toast.error is called with correct message
      Requirements: ui.7.1 */
   it('should call toast.error when error:notify event is received', async () => {
-    // Spy on console.log to verify notification logging
-    const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
+    // Spy on console.info to verify notification logging (Logger uses console.info for info level)
+    const consoleInfoSpy = jest.spyOn(console, 'info').mockImplementation();
 
     render(<App />);
 
@@ -148,12 +150,11 @@ describe('App IPC Integration with Error Notification System', () => {
       errorNotifyCallback(testMessage, testContext);
     }
 
-    // Verify the event was logged
+    // Verify the event was logged with new Logger format: [timestamp] [INFO] [App] message
     await waitFor(() => {
-      expect(consoleLogSpy).toHaveBeenCalledWith('[App] Error notification received:', {
-        message: testMessage,
-        context: testContext,
-      });
+      expect(consoleInfoSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[INFO] [App] Error notification received:')
+      );
     });
 
     // Verify toast.error was called
@@ -161,7 +162,7 @@ describe('App IPC Integration with Error Notification System', () => {
       expect(toast.error).toHaveBeenCalledWith(`${testContext}: ${testMessage}`);
     });
 
-    consoleLogSpy.mockRestore();
+    consoleInfoSpy.mockRestore();
   });
 
   /* Preconditions: App component is mounted
@@ -204,7 +205,7 @@ describe('App IPC Integration with Error Notification System', () => {
      Assertions: Each event triggers toast.error
      Requirements: ui.7.1 */
   it('should handle multiple error:notify events', async () => {
-    const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
+    const consoleInfoSpy = jest.spyOn(console, 'info').mockImplementation();
 
     render(<App />);
 
@@ -226,13 +227,12 @@ describe('App IPC Integration with Error Notification System', () => {
       }
     }
 
-    // Verify all events were logged
+    // Verify all events were logged with new Logger format
     await waitFor(() => {
-      errors.forEach((error) => {
-        expect(consoleLogSpy).toHaveBeenCalledWith('[App] Error notification received:', {
-          message: error.message,
-          context: error.context,
-        });
+      errors.forEach((_error) => {
+        expect(consoleInfoSpy).toHaveBeenCalledWith(
+          expect.stringContaining('[INFO] [App] Error notification received:')
+        );
       });
     });
 
@@ -243,6 +243,6 @@ describe('App IPC Integration with Error Notification System', () => {
       });
     });
 
-    consoleLogSpy.mockRestore();
+    consoleInfoSpy.mockRestore();
   });
 });

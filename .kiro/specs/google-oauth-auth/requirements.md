@@ -31,7 +31,8 @@
 2. КОГДА Code Verifier сгенерирован, ТО "OAuth Client" ДОЛЖЕН вычислить Code Challenge используя SHA-256 хеширование
 3. КОГДА Code Challenge вычислен, ТО "OAuth Client" ДОЛЖЕН сгенерировать случайный state параметр для защиты от CSRF атак
 4. КОГДА все параметры подготовлены, ТО "OAuth Client" ДОЛЖЕН сохранить Code Verifier и state во временном хранилище
-5. КОГДА параметры сохранены, ТО "OAuth Client" ДОЛЖЕН открыть системный браузер с authorization URL содержащим client_id, redirect_uri, code_challenge, code_challenge_method=S256, state и scope
+5. КОГДА параметры сохранены, ТО "OAuth Client" ДОЛЖЕН открыть системный браузер с authorization URL содержащим client_id, redirect_uri, code_challenge, code_challenge_method=S256, state, scope, access_type=offline, и prompt=consent select_account
+6. КОГДА браузер открывается, ТО пользователь ДОЛЖЕН видеть экран выбора Google аккаунта (благодаря параметру prompt=select_account)
 
 #### Функциональные Тесты
 
@@ -75,7 +76,7 @@
 3. ЕСЛИ Google возвращает успешный ответ, ТО "OAuth Client" ДОЛЖЕН извлечь access_token, refresh_token, expires_in и token_type
 4. ЕСЛИ Google возвращает ошибку, ТО "OAuth Client" ДОЛЖЕН вернуть описательное сообщение об ошибке
 5. КОГДА токены получены, ТО "OAuth Client" ДОЛЖЕН вычислить время истечения access token (текущее время + expires_in)
-6. КОГДА токены сохранены, ТО система ДОЛЖНА **синхронно** получить профиль пользователя из Google UserInfo API
+6. КОГДА токены сохранены, ТО система ДОЛЖНА **синхронно** получить профиль пользователя из Google UserInfo API (во время отображения loader, см. требование 15)
 7. ЕСЛИ получение профиля не удается, ТО система ДОЛЖНА очистить токены И показать LoginError компонент с errorCode 'profile_fetch_failed'
 8. ЕСЛИ получение профиля успешно, ТО система ДОЛЖНА показать главный интерфейс приложения (Dashboard)
 
@@ -169,7 +170,7 @@
 2. ЕСЛИ сетевой запрос к Google API не удается, ТО "OAuth Client" ДОЛЖЕН вернуть ошибку "network_error" с деталями
 3. ЕСЛИ Google возвращает ошибку, ТО "OAuth Client" ДОЛЖЕН вернуть код ошибки и описание от Google
 4. ЕСЛИ state параметр не совпадает, ТО "OAuth Client" ДОЛЖЕН вернуть ошибку "csrf_attack_detected"
-5. ВСЕ ошибки ДОЛЖНЫ логироваться в консоль с достаточным контекстом для отладки
+5. ВСЕ ошибки ДОЛЖНЫ логироваться через централизованный "Logger" класс (см. clerkly.3) с достаточным контекстом для отладки
 6. ДЛЯ распространенных ошибок "OAuth Client" ДОЛЖЕН предоставлять человекочитаемые тексты:
    - "popup_closed_by_user": заголовок "Sign in cancelled", сообщение "You closed the sign-in window before completing authentication.", предложение "Please try again and complete the sign-in process."
    - "access_denied": заголовок "Access denied", сообщение "You denied access to your Google account.", предложение "Clerkly needs access to your Google account to function properly."
@@ -188,12 +189,16 @@
 #### Критерии Приемки
 
 1. "OAuth Client" ДОЛЖЕН хранить client_id и client_secret как константы в конфигурационном файле кода
-2. "OAuth Client" ДОЛЖЕН использовать redirect_uri в формате "com.googleusercontent.apps.CLIENT_ID:/oauth2redirect" (reverse client ID format)
+2. "OAuth Client" ДОЛЖЕН использовать redirect_uri в формате "com.googleusercontent.apps.CLIENT_ID:/oauth2redirect" (reverse client ID format), где CLIENT_ID - это числовая часть Client ID без суффикса ".apps.googleusercontent.com"
 3. "OAuth Client" ДОЛЖЕН запрашивать следующие scopes: "openid", "email", "profile"
 4. "OAuth Client" ДОЛЖЕН использовать authorization endpoint: "https://accounts.google.com/o/oauth2/v2/auth"
 5. "OAuth Client" ДОЛЖЕН использовать token endpoint: "https://oauth2.googleapis.com/token"
 6. "OAuth Client" ДОЛЖЕН использовать revoke endpoint: "https://oauth2.googleapis.com/revoke"
 7. "OAuth Client" ДОЛЖЕН включать параметры access_type=offline и prompt=consent для получения refresh token
+
+**Примечание:** При формировании redirect_uri из Client ID, необходимо удалить суффикс ".apps.googleusercontent.com" если он присутствует, чтобы избежать дублирования в итоговом URL. Например:
+- Client ID: `100365225505-xxx.apps.googleusercontent.com`
+- Redirect URI: `com.googleusercontent.apps.100365225505-xxx:/oauth2redirect` (без дублирования суффикса)
 
 #### Функциональные Тесты
 
@@ -207,16 +212,20 @@
 
 1. КОГДА приложение запускается и пользователь не авторизован, ТО "Window Manager" ДОЛЖЕН открыть окно с "Login Screen"
 2. КОГДА "Login Screen" отображается, ТО пользователь ДОЛЖЕН видеть кнопку "Continue with Google" и описание функций приложения
-3. КОГДА пользователь нажимает кнопку "Continue with Google", ТО "OAuth Client" ДОЛЖЕН инициировать OAuth flow
-4. ЕСЛИ авторизация успешна, ТО "Window Manager" ДОЛЖЕН закрыть "Login Screen" и открыть главное окно приложения
-5. ЕСЛИ авторизация неуспешна, ТО "Window Manager" ДОЛЖЕН показать "Login Error Screen" с описанием ошибки и кнопкой повтора
+3. КОГДА пользователь нажимает кнопку "Continue with Google", ТО "OAuth Client" ДОЛЖЕН инициировать OAuth flow И открыть системный браузер
+4. КОГДА браузер открыт, ТО кнопка "Continue with Google" ДОЛЖНА оставаться активной (пользователь может нажать повторно)
+5. КОГДА пользователь нажимает кнопку "Continue with Google" повторно ДО завершения авторизации, ТО ДОЛЖНА открыться еще одна вкладка браузера с OAuth страницей
+6. КОГДА пользователь завершает авторизацию в браузере И deep link получен (authorization code), ТО приложение ДОЛЖНО показать loader (см. требование 15)
+7. КОГДА loader отображается, ТО кнопка "Continue with Google" ДОЛЖНА быть неактивной (disabled)
+8. ЕСЛИ авторизация успешна (токены получены И профиль загружен), ТО "Window Manager" ДОЛЖЕН закрыть "Login Screen" и открыть главное окно приложения (Dashboard)
+9. ЕСЛИ авторизация неуспешна (ошибка обмена токенов ИЛИ ошибка загрузки профиля), ТО "Window Manager" ДОЛЖЕН показать "Login Error Screen" с описанием ошибки и той же кнопкой "Continue with Google" для повторной попытки
 
 #### Функциональные Тесты
 
 - `tests/functional/auth-flow.spec.ts` - "should show login screen on first launch"
 - `tests/functional/auth-flow.spec.ts` - "should show main app when already authorized"
 - `tests/functional/auth-flow.spec.ts` - "should show main app after successful authentication"
-- `tests/functional/login-ui.spec.ts` - "should maintain all Login Screen elements in error state"
+- `tests/functional/auth-flow.spec.ts` - "should allow multiple login button clicks before authorization completes"
 
 ### Требование 12: Login Screen Компонент
 
@@ -252,12 +261,14 @@
 5. КОГДА ошибка "network_error", ТО "Login Error Screen" ДОЛЖЕН показать заголовок "Network error" и текст "Unable to connect to Google authentication servers." с предложением "Please check your internet connection and try again."
 6. КОГДА ошибка неизвестна, ТО "Login Error Screen" ДОЛЖЕН показать заголовок "Authentication failed" и переданное сообщение об ошибке с предложением "Please try signing in again or contact support if the problem persists."
 7. "Login Error Screen" ДОЛЖЕН использовать дизайн из прототипа `figma/src/app/components/login-error.tsx`
+8. КОГДА пользователь нажимает кнопку "Continue with Google" на "Login Error Screen", ТО приложение ДОЛЖНО повторить попытку авторизации (вызвать onRetry callback)
 
 #### Функциональные Тесты
 
+- `tests/functional/login-ui.spec.ts` - "should display error block with correct styling"
 - `tests/functional/login-ui.spec.ts` - "should maintain all Login Screen elements in error state"
 
-### Требование 15: Sign Out Flow
+### Требование 14: Sign Out Flow
 
 **User Story:** Как пользователь, я хочу выйти из приложения через кнопку Sign Out, чтобы завершить сессию и вернуться к экрану входа.
 
@@ -277,8 +288,30 @@
 - `tests/functional/sign-out-flow.spec.ts` - "should clear tokens after sign out"
 - `tests/functional/sign-out-flow.spec.ts` - "should handle sign out when revoke fails"
 
+### Требование 15: Loader во Время Авторизации
+
+**User Story:** Как пользователь, я хочу видеть индикатор загрузки во время процесса авторизации, чтобы понимать что приложение обрабатывает мой запрос.
+
+#### Критерии Приемки
+
+1. КОГДА deep link получен (authorization code получен от Google), ТО приложение ДОЛЖНО показать loader на "Login Screen"
+2. КОГДА loader отображается, ТО кнопка "Continue with Google" ДОЛЖНА быть неактивной (disabled)
+3. КОГДА loader отображается, ТО все элементы "Login Screen" (логотип, заголовок, описание, превью функций) ДОЛЖНЫ оставаться видимыми
+4. Loader ДОЛЖЕН отображаться во время следующих операций:
+   - Обмен authorization code на токены (POST запрос к Google token endpoint)
+   - Загрузка профиля пользователя из Google UserInfo API (синхронный запрос)
+5. КОГДА токены получены И профиль загружен успешно, ТО loader ДОЛЖЕН исчезнуть И приложение ДОЛЖНО показать Dashboard
+6. КОГДА происходит ошибка (обмен токенов ИЛИ загрузка профиля), ТО loader ДОЛЖЕН исчезнуть И приложение ДОЛЖНО показать "Login Error Screen" с описанием ошибки
+7. Loader ДОЛЖЕН использовать стандартный компонент загрузки (spinner) с текстом "Signing in..."
+8. ЕСЛИ пользователь закрывает браузер до завершения авторизации (не получен authorization code), ТО loader НЕ ДОЛЖЕН отображаться
+9. КОГДА пользователь кликает кнопку "Continue with Google", ТО loader НЕ ДОЛЖЕН показываться сразу - loader показывается ТОЛЬКО после получения deep link от Google
+
 #### Функциональные Тесты
 
-- `tests/functional/login-ui.spec.ts` - "should display error block with correct styling"
-- `tests/functional/login-ui.spec.ts` - "should maintain all Login Screen elements in error state"
+- `tests/functional/auth-flow.spec.ts` - "should show loader after receiving authorization code"
+- `tests/functional/auth-flow.spec.ts` - "should show loader during token exchange and profile fetch"
+- `tests/functional/auth-flow.spec.ts` - "should disable login button when loader is shown"
+- `tests/functional/auth-flow.spec.ts` - "should hide loader and show dashboard on success"
+- `tests/functional/auth-flow.spec.ts` - "should hide loader and show error on failure"
+- `tests/functional/auth-flow.spec.ts` - "should NOT show loader immediately after login click, only after deep link"
 

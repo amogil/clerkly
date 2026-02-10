@@ -3,40 +3,63 @@
    Assertions: Verify save/load, encryption, deletion, provider switching, visibility toggle, error handling, and user isolation
    Requirements: ui.10.3, ui.10.4, ui.10.5, ui.10.6, ui.10.9, ui.10.11, ui.10.13, ui.10.14, ui.10.15, ui.10.17, ui.12.8 */
 
-import { test, expect, _electron as electron, ElectronApplication, Page } from '@playwright/test';
-import path from 'path';
-import fs from 'fs';
-import os from 'os';
+import { test, expect } from '@playwright/test';
+import {
+  launchElectron,
+  closeElectron,
+  ElectronTestContext,
+  completeOAuthFlow,
+} from './helpers/electron';
+import { MockOAuthServer } from './helpers/mock-oauth-server';
 
-let electronApp: ElectronApplication;
-let window: Page;
-let testDbPath: string;
+let context: ElectronTestContext;
+let mockServer: MockOAuthServer;
+const TEST_CLIENT_ID = 'test-client-id-12345';
 
 test.beforeAll(async () => {
-  // Create temporary database for testing
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'clerkly-test-'));
-  testDbPath = path.join(tempDir, 'test.db');
-
-  // Launch Electron app
-  electronApp = await electron.launch({
-    args: [path.join(__dirname, '../../dist/main/index.js')],
-    env: {
-      ...process.env,
-      NODE_ENV: 'test',
-      TEST_DB_PATH: testDbPath,
-    },
+  // Start mock OAuth server
+  mockServer = new MockOAuthServer({
+    port: 8891,
+    clientId: TEST_CLIENT_ID,
+    clientSecret: 'test-client-secret-67890',
   });
 
-  window = await electronApp.firstWindow();
-  await window.waitForLoadState('domcontentloaded');
+  await mockServer.start();
+
+  // Set user profile data for mock OAuth server
+  mockServer.setUserProfile({
+    id: 'test-user-id',
+    email: 'test@example.com',
+    name: 'Test User',
+    given_name: 'Test',
+    family_name: 'User',
+  });
 });
 
 test.afterAll(async () => {
-  await electronApp.close();
+  // Stop mock OAuth server
+  if (mockServer) {
+    await mockServer.stop();
+  }
+});
 
-  // Cleanup test database
-  if (testDbPath && fs.existsSync(testDbPath)) {
-    fs.unlinkSync(testDbPath);
+test.beforeEach(async () => {
+  // Launch Electron app with mock OAuth server
+  context = await launchElectron(undefined, {
+    CLERKLY_GOOGLE_API_URL: mockServer.getBaseUrl(),
+  });
+  await context.window.waitForLoadState('domcontentloaded');
+
+  // Complete OAuth flow to authenticate
+  await completeOAuthFlow(context.app, context.window, TEST_CLIENT_ID);
+
+  // Wait for main app to load
+  await context.window.waitForTimeout(1000);
+});
+
+test.afterEach(async () => {
+  if (context) {
+    await closeElectron(context);
   }
 });
 
@@ -46,36 +69,35 @@ test.afterAll(async () => {
    Requirements: ui.10.4, ui.10.15 */
 test('53.1: should save and load LLM provider selection', async () => {
   // Navigate to Settings
-  await window.click('text=Settings');
-  await window.waitForSelector('text=AI Agent Settings');
+  await context.window.click('text=Settings');
+  await context.window.waitForSelector('text=AI Agent Settings');
 
   // Select Anthropic
-  await window.selectOption('select:near(:text("LLM Provider"))', 'anthropic');
+  await context.window.selectOption('select:near(:text("LLM Provider"))', 'anthropic');
 
-  // Wait for save
-  await window.waitForTimeout(100);
+  // Wait for save and data to flush to disk
+  await context.window.waitForTimeout(1000);
 
-  // Close and reopen app
-  await electronApp.close();
+  // Close and reopen app (keep data for persistence test)
+  const testDataPath = context.testDataPath;
+  await closeElectron(context, false); // Don't cleanup data
 
-  electronApp = await electron.launch({
-    args: [path.join(__dirname, '../../dist/main/index.js')],
-    env: {
-      ...process.env,
-      NODE_ENV: 'test',
-      TEST_DB_PATH: testDbPath,
-    },
+  // Relaunch with same data path
+  context = await launchElectron(testDataPath, {
+    CLERKLY_GOOGLE_API_URL: mockServer.getBaseUrl(),
   });
+  await context.window.waitForLoadState('domcontentloaded');
 
-  window = await electronApp.firstWindow();
-  await window.waitForLoadState('domcontentloaded');
+  // Re-authenticate after restart
+  await completeOAuthFlow(context.app, context.window, TEST_CLIENT_ID);
+  await context.window.waitForTimeout(1000);
 
   // Navigate to Settings
-  await window.click('text=Settings');
-  await window.waitForSelector('text=AI Agent Settings');
+  await context.window.click('text=Settings');
+  await context.window.waitForSelector('text=AI Agent Settings');
 
   // Check that Anthropic is selected
-  const selectedValue = await window.inputValue('select:near(:text("LLM Provider"))');
+  const selectedValue = await context.window.inputValue('select:near(:text("LLM Provider"))');
   expect(selectedValue).toBe('anthropic');
 });
 
@@ -87,37 +109,36 @@ test('53.2: should save and load API key with encryption', async () => {
   const testApiKey = 'sk-test-key-12345678901234567890';
 
   // Navigate to Settings
-  await window.click('text=Settings');
-  await window.waitForSelector('text=AI Agent Settings');
+  await context.window.click('text=Settings');
+  await context.window.waitForSelector('text=AI Agent Settings');
 
   // Enter API key
-  const apiKeyInput = await window.locator('input[placeholder="Enter your API key"]');
+  const apiKeyInput = context.window.locator('input[placeholder="Enter your API key"]');
   await apiKeyInput.fill(testApiKey);
 
-  // Wait for debounce (500ms)
-  await window.waitForTimeout(600);
+  // Wait for debounce and data to flush to disk
+  await context.window.waitForTimeout(1000);
 
-  // Close and reopen app
-  await electronApp.close();
+  // Close and reopen app (keep data for persistence test)
+  const testDataPath = context.testDataPath;
+  await closeElectron(context, false); // Don't cleanup data
 
-  electronApp = await electron.launch({
-    args: [path.join(__dirname, '../../dist/main/index.js')],
-    env: {
-      ...process.env,
-      NODE_ENV: 'test',
-      TEST_DB_PATH: testDbPath,
-    },
+  // Relaunch with same data path
+  context = await launchElectron(testDataPath, {
+    CLERKLY_GOOGLE_API_URL: mockServer.getBaseUrl(),
   });
+  await context.window.waitForLoadState('domcontentloaded');
 
-  window = await electronApp.firstWindow();
-  await window.waitForLoadState('domcontentloaded');
+  // Re-authenticate after restart
+  await completeOAuthFlow(context.app, context.window, TEST_CLIENT_ID);
+  await context.window.waitForTimeout(1000);
 
   // Navigate to Settings
-  await window.click('text=Settings');
-  await window.waitForSelector('text=AI Agent Settings');
+  await context.window.click('text=Settings');
+  await context.window.waitForSelector('text=AI Agent Settings');
 
   // Check that API key field is filled (but hidden)
-  const apiKeyInput2 = await window.locator('input[placeholder="Enter your API key"]');
+  const apiKeyInput2 = context.window.locator('input[placeholder="Enter your API key"]');
   const inputType = await apiKeyInput2.getAttribute('type');
   expect(inputType).toBe('password');
 
@@ -125,7 +146,7 @@ test('53.2: should save and load API key with encryption', async () => {
   expect(inputValue).toBeTruthy();
 
   // Toggle visibility
-  const toggleButton = await window.locator('button:has(svg):near(:text("API Key"))');
+  const toggleButton = context.window.locator('button:has(svg):near(:text("API Key"))');
   await toggleButton.click();
 
   // Check that key is visible and correct
@@ -142,39 +163,38 @@ test('53.2: should save and load API key with encryption', async () => {
    Requirements: ui.10.6 */
 test('53.3: should delete API key when field is cleared', async () => {
   // Navigate to Settings
-  await window.click('text=Settings');
-  await window.waitForSelector('text=AI Agent Settings');
+  await context.window.click('text=Settings');
+  await context.window.waitForSelector('text=AI Agent Settings');
 
   // Enter API key first
-  const apiKeyInput = await window.locator('input[placeholder="Enter your API key"]');
+  const apiKeyInput = context.window.locator('input[placeholder="Enter your API key"]');
   await apiKeyInput.fill('test-key-to-delete');
-  await window.waitForTimeout(600);
+  await context.window.waitForTimeout(600);
 
   // Clear the field
   await apiKeyInput.fill('');
-  await window.waitForTimeout(600);
+  await context.window.waitForTimeout(600);
 
-  // Close and reopen app
-  await electronApp.close();
+  // Close and reopen app (keep data for persistence test)
+  const testDataPath = context.testDataPath;
+  await closeElectron(context, false); // Don't cleanup data
 
-  electronApp = await electron.launch({
-    args: [path.join(__dirname, '../../dist/main/index.js')],
-    env: {
-      ...process.env,
-      NODE_ENV: 'test',
-      TEST_DB_PATH: testDbPath,
-    },
+  // Relaunch with same data path
+  context = await launchElectron(testDataPath, {
+    CLERKLY_GOOGLE_API_URL: mockServer.getBaseUrl(),
   });
+  await context.window.waitForLoadState('domcontentloaded');
 
-  window = await electronApp.firstWindow();
-  await window.waitForLoadState('domcontentloaded');
+  // Re-authenticate after restart
+  await completeOAuthFlow(context.app, context.window, TEST_CLIENT_ID);
+  await context.window.waitForTimeout(1000);
 
   // Navigate to Settings
-  await window.click('text=Settings');
-  await window.waitForSelector('text=AI Agent Settings');
+  await context.window.click('text=Settings');
+  await context.window.waitForSelector('text=AI Agent Settings');
 
   // Check that API key field is empty
-  const apiKeyInput2 = await window.locator('input[placeholder="Enter your API key"]');
+  const apiKeyInput2 = context.window.locator('input[placeholder="Enter your API key"]');
   const inputValue = await apiKeyInput2.inputValue();
   expect(inputValue).toBe('');
 });
@@ -188,32 +208,32 @@ test('53.4: should preserve API keys when switching providers', async () => {
   const anthropicKey = 'sk-anthropic-key-456';
 
   // Navigate to Settings
-  await window.click('text=Settings');
-  await window.waitForSelector('text=AI Agent Settings');
+  await context.window.click('text=Settings');
+  await context.window.waitForSelector('text=AI Agent Settings');
 
   // Enter OpenAI key
-  await window.selectOption('select:near(:text("LLM Provider"))', 'openai');
-  const apiKeyInput = await window.locator('input[placeholder="Enter your API key"]');
+  await context.window.selectOption('select:near(:text("LLM Provider"))', 'openai');
+  const apiKeyInput = context.window.locator('input[placeholder="Enter your API key"]');
   await apiKeyInput.fill(openaiKey);
-  await window.waitForTimeout(600);
+  await context.window.waitForTimeout(600);
 
   // Switch to Anthropic and enter key
-  await window.selectOption('select:near(:text("LLM Provider"))', 'anthropic');
-  await window.waitForTimeout(200); // Wait for key to load
+  await context.window.selectOption('select:near(:text("LLM Provider"))', 'anthropic');
+  await context.window.waitForTimeout(200); // Wait for key to load
   await apiKeyInput.fill(anthropicKey);
-  await window.waitForTimeout(600);
+  await context.window.waitForTimeout(600);
 
   // Switch back to OpenAI
-  await window.selectOption('select:near(:text("LLM Provider"))', 'openai');
-  await window.waitForTimeout(200);
+  await context.window.selectOption('select:near(:text("LLM Provider"))', 'openai');
+  await context.window.waitForTimeout(200);
 
   // Check that OpenAI key is loaded
   let inputValue = await apiKeyInput.inputValue();
   expect(inputValue).toBe(openaiKey);
 
   // Switch to Anthropic
-  await window.selectOption('select:near(:text("LLM Provider"))', 'anthropic');
-  await window.waitForTimeout(200);
+  await context.window.selectOption('select:near(:text("LLM Provider"))', 'anthropic');
+  await context.window.waitForTimeout(200);
 
   // Check that Anthropic key is loaded
   inputValue = await apiKeyInput.inputValue();
@@ -226,11 +246,11 @@ test('53.4: should preserve API keys when switching providers', async () => {
    Requirements: ui.10.3, ui.10.4, ui.10.5 */
 test('53.5: should toggle API key visibility', async () => {
   // Navigate to Settings
-  await window.click('text=Settings');
-  await window.waitForSelector('text=AI Agent Settings');
+  await context.window.click('text=Settings');
+  await context.window.waitForSelector('text=AI Agent Settings');
 
   // Enter API key
-  const apiKeyInput = await window.locator('input[placeholder="Enter your API key"]');
+  const apiKeyInput = context.window.locator('input[placeholder="Enter your API key"]');
   await apiKeyInput.fill('test-visibility-key');
 
   // Check initial state (password)
@@ -238,7 +258,7 @@ test('53.5: should toggle API key visibility', async () => {
   expect(inputType).toBe('password');
 
   // Find toggle button
-  const toggleButton = await window.locator('button:has(svg):near(:text("API Key"))');
+  const toggleButton = context.window.locator('button:has(svg):near(:text("API Key"))');
 
   // Click to show
   await toggleButton.click();
@@ -256,18 +276,84 @@ test('53.5: should toggle API key visibility', async () => {
    Assertions: Error notification is shown
    Requirements: ui.10.13 */
 test('53.6: should show error notification on save failure', async () => {
-  // This test would require mocking DataManager to fail
-  // For now, we'll skip the actual implementation as it requires
-  // more complex setup with IPC mocking
-  test.skip();
-});
+  // Set user profile data for this test
+  mockServer.setUserProfile({
+    id: '999888777',
+    email: 'error.test@example.com',
+    name: 'Error Test User',
+    given_name: 'Error',
+    family_name: 'Test User',
+  });
 
-/* Preconditions: App is launched
-   Action: Login as User A, set settings, logout, login as User B, check settings, logout, login as User A
-   Assertions: Settings are isolated between users
-   Requirements: ui.12.8 */
-test('53.7: should isolate settings between users', async () => {
-  // This test requires multi-user authentication setup
-  // For now, we'll skip as it requires OAuth mock server
-  test.skip();
+  // Launch the application with clean database and environment variable
+  // Requirements: testing.3.1, testing.3.2 - Real Electron, no mocks
+  context = await launchElectron(undefined, {
+    CLERKLY_GOOGLE_API_URL: mockServer.getBaseUrl(),
+    CLERKLY_OAUTH_CLIENT_ID: 'test-client-id-12345',
+    CLERKLY_OAUTH_CLIENT_SECRET: 'test-client-secret-67890',
+  });
+
+  await context.window.waitForLoadState('domcontentloaded');
+
+  // Complete OAuth flow
+  await completeOAuthFlow(context.app, context.window);
+
+  console.log('[TEST] Profile should be loaded');
+
+  // Wait for UI to update
+  await context.window.waitForTimeout(2000);
+
+  // Navigate to Settings
+  const settingsNav = context.window.locator('text=/settings/i');
+  await settingsNav.waitFor({ state: 'visible', timeout: 5000 });
+  await settingsNav.click();
+  await context.window.waitForTimeout(500);
+
+  // Find AI Agent Settings section
+  const aiAgentHeading = context.window.locator('text=/^AI Agent Settings$/i');
+  await aiAgentHeading.waitFor({ state: 'visible', timeout: 5000 });
+
+  console.log('[TEST] AI Agent Settings section visible');
+
+  // Simulate save error for next operation
+  await context.window.evaluate(async () => {
+    if ((window as any).api.test) {
+      await (window as any).api.test.simulateDataError(
+        'saveData',
+        'Database write failed: disk full'
+      );
+    }
+  });
+
+  console.log('[TEST] Error simulation configured');
+
+  // Try to save API key
+  const apiKeyInput = context.window.locator('#ai-agent-api-key');
+  await apiKeyInput.waitFor({ state: 'visible', timeout: 5000 });
+  await apiKeyInput.scrollIntoViewIfNeeded();
+  await apiKeyInput.fill('test-api-key-that-will-fail');
+
+  console.log('[TEST] API key entered, waiting for debounce and save attempt');
+
+  // Wait for debounce and save attempt
+  await context.window.waitForTimeout(1500);
+
+  // Check that error toast is displayed
+  // Sonner toast library uses .sonner-toast class
+  const errorToast = context.window
+    .locator('[data-sonner-toast]')
+    .filter({ hasText: /Failed to save API key/i });
+  await errorToast.waitFor({ state: 'visible', timeout: 5000 });
+  expect(await errorToast.isVisible()).toBe(true);
+
+  console.log('✓ Error notification displayed on save failure');
+
+  // Clean up
+  await context.window.evaluate(async () => {
+    if ((window as any).api.test) {
+      await (window as any).api.test.clearDataErrors();
+    }
+  });
+
+  console.log('✓ Error simulations cleared');
 });

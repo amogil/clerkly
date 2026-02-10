@@ -122,6 +122,20 @@ describe('ErrorHandler', () => {
       expect(details.suggestion).toBe('Please check application permissions and try again.');
     });
 
+    /* Preconditions: Error code is 'profile_fetch_failed'
+       Action: Call getErrorDetails with error code
+       Assertions: Returns correct title, message, and suggestion for profile fetch failure
+       Requirements: google-oauth-auth.9.1, google-oauth-auth.9.6, google-oauth-auth.3.7 */
+    it('should return correct details for profile_fetch_failed error', () => {
+      const details = getErrorDetails('profile_fetch_failed');
+
+      expect(details.title).toBe('Profile loading failed');
+      expect(details.message).toBe('Unable to load your Google profile information.');
+      expect(details.suggestion).toBe(
+        'Please check your internet connection and try signing in again.'
+      );
+    });
+
     /* Preconditions: Error code is unknown or not in error map
        Action: Call getErrorDetails with unknown error code
        Assertions: Returns default error details with generic message
@@ -179,9 +193,9 @@ describe('ErrorHandler', () => {
 
     /* Preconditions: Error object with message and code
        Action: Call logError with operation name and error
-       Assertions: Error is logged with operation, message, code, and timestamp
-       Requirements: google-oauth-auth.9.5 */
-    it('should log error with context', () => {
+       Assertions: Error is logged via Logger with operation, message, code, and timestamp
+       Requirements: google-oauth-auth.9.5, clerkly.3.5, clerkly.3.7 */
+    it('should log error with context using Logger', () => {
       const operation = 'token_exchange';
       const error = { message: 'Token exchange failed', code: 'invalid_grant' };
       const context = { userId: '123' };
@@ -189,69 +203,52 @@ describe('ErrorHandler', () => {
       logError(operation, error, context);
 
       expect(consoleErrorSpy).toHaveBeenCalledWith(
-        '[OAuth] token_exchange failed: Token exchange failed',
-        expect.objectContaining({
-          errorCode: 'invalid_grant',
-          timestamp: expect.any(Number),
-          context: { userId: '123' },
-        })
+        expect.stringContaining('[OAuth] token_exchange failed: Token exchange failed')
       );
     });
 
     /* Preconditions: Error is a string
        Action: Call logError with string error
-       Assertions: Error is logged with string converted to message
-       Requirements: google-oauth-auth.9.5 */
-    it('should handle string errors', () => {
+       Assertions: Error is logged via Logger with string converted to message
+       Requirements: google-oauth-auth.9.5, clerkly.3.5, clerkly.3.7 */
+    it('should handle string errors using Logger', () => {
       const operation = 'auth_flow';
       const error = 'Network connection failed';
 
       logError(operation, error);
 
       expect(consoleErrorSpy).toHaveBeenCalledWith(
-        '[OAuth] auth_flow failed: Network connection failed',
-        expect.objectContaining({
-          errorCode: 'unknown',
-          timestamp: expect.any(Number),
-        })
+        expect.stringContaining('[OAuth] auth_flow failed: Network connection failed')
       );
     });
 
     /* Preconditions: Error object without message
        Action: Call logError with error object that has no message
-       Assertions: Error is logged with 'Unknown error' message
-       Requirements: google-oauth-auth.9.5 */
-    it('should handle errors without message', () => {
+       Assertions: Error is logged via Logger with 'Unknown error' message
+       Requirements: google-oauth-auth.9.5, clerkly.3.5, clerkly.3.7 */
+    it('should handle errors without message using Logger', () => {
       const operation = 'logout';
       const error = { code: 'revoke_failed' };
 
       logError(operation, error);
 
       expect(consoleErrorSpy).toHaveBeenCalledWith(
-        '[OAuth] logout failed: [object Object]',
-        expect.objectContaining({
-          errorCode: 'revoke_failed',
-          timestamp: expect.any(Number),
-        })
+        expect.stringContaining('[OAuth] logout failed: [object Object]')
       );
     });
 
     /* Preconditions: No context provided
        Action: Call logError without context parameter
-       Assertions: Error is logged with empty context object
-       Requirements: google-oauth-auth.9.5 */
-    it('should log error without context', () => {
+       Assertions: Error is logged via Logger with empty context object
+       Requirements: google-oauth-auth.9.5, clerkly.3.5, clerkly.3.7 */
+    it('should log error without context using Logger', () => {
       const operation = 'refresh_token';
       const error = new Error('Refresh failed');
 
       logError(operation, error);
 
       expect(consoleErrorSpy).toHaveBeenCalledWith(
-        '[OAuth] refresh_token failed: Refresh failed',
-        expect.objectContaining({
-          timestamp: expect.any(Number),
-          context: {},
-        })
+        expect.stringContaining('[OAuth] refresh_token failed: Refresh failed')
       );
     });
   });

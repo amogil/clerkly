@@ -8,6 +8,10 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import { DateTimeFormatter } from '../utils/DateTimeFormatter';
+import { Logger } from '../Logger';
+
+// Requirements: clerkly.3.5, clerkly.3.7
+const logger = Logger.create('CalendarView');
 
 interface CalendarViewProps {
   onNavigateToMeeting: (meetingId: string) => void;
@@ -274,7 +278,7 @@ export function CalendarView({ onNavigateToMeeting }: CalendarViewProps) {
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            console.log('Start recording:', meeting.id);
+                            logger.info('Start recording:', meeting.id);
                           }}
                           className="flex-1 px-4 py-2.5 bg-primary text-primary-foreground text-sm rounded-lg hover:bg-primary/90 transition-colors flex items-center justify-center gap-2"
                         >

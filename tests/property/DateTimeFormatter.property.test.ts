@@ -31,8 +31,8 @@ describe('DateTimeFormatter Property-Based Tests', () => {
 
   /* Preconditions: various random timestamps generated
      Action: call formatLogTimestamp() for each timestamp
-     Assertions: result matches YYYY-MM-DD HH:MM:SS format
-     Requirements: ui.11.3 */
+     Assertions: result matches YYYY-MM-DD HH:MM:SS±HH:MM format with timezone
+     Requirements: ui.11.3, clerkly.3.2, clerkly.3.3 */
   it('should always use fixed format for log timestamps', () => {
     fc.assert(
       fc.property(
@@ -40,8 +40,8 @@ describe('DateTimeFormatter Property-Based Tests', () => {
         (timestamp) => {
           const result = DateTimeFormatter.formatLogTimestamp(timestamp);
 
-          // Must match YYYY-MM-DD HH:MM:SS format
-          expect(result).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
+          // Must match YYYY-MM-DD HH:MM:SS±HH:MM format with timezone
+          expect(result).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}$/);
         }
       ),
       { numRuns: 100 }
@@ -78,7 +78,7 @@ describe('DateTimeFormatter Property-Based Tests', () => {
   /* Preconditions: Date objects created from various timestamps
      Action: call all formatting methods with Date objects
      Assertions: all methods accept Date objects and return valid results
-     Requirements: ui.11.1, ui.11.3 */
+     Requirements: ui.11.1, ui.11.3, clerkly.3.2, clerkly.3.3 */
   it('should accept both timestamps and Date objects', () => {
     fc.assert(
       fc.property(
@@ -92,7 +92,7 @@ describe('DateTimeFormatter Property-Based Tests', () => {
 
           expect(dateResult).toBeTruthy();
           expect(dateTimeResult).toBeTruthy();
-          expect(logResult).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
+          expect(logResult).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}$/);
         }
       ),
       { numRuns: 100 }
@@ -101,8 +101,8 @@ describe('DateTimeFormatter Property-Based Tests', () => {
 
   /* Preconditions: various timestamps with different time components
      Action: call formatLogTimestamp()
-     Assertions: format is consistent and parseable
-     Requirements: ui.11.3 */
+     Assertions: format is consistent and parseable with timezone
+     Requirements: ui.11.3, clerkly.3.2, clerkly.3.3 */
   it('should produce parseable log timestamps', () => {
     fc.assert(
       fc.property(
@@ -110,12 +110,14 @@ describe('DateTimeFormatter Property-Based Tests', () => {
         (timestamp) => {
           const result = DateTimeFormatter.formatLogTimestamp(timestamp);
 
-          // Parse the result
-          const match = result.match(/^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/);
+          // Parse the result with timezone
+          const match = result.match(
+            /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})([+-]\d{2}:\d{2})$/
+          );
           expect(match).not.toBeNull();
 
           if (match) {
-            const [, year, month, day, hours, minutes, seconds] = match;
+            const [, year, month, day, hours, minutes, seconds, timezone] = match;
 
             // Validate ranges
             expect(parseInt(year)).toBeGreaterThanOrEqual(1970);
@@ -129,6 +131,9 @@ describe('DateTimeFormatter Property-Based Tests', () => {
             expect(parseInt(minutes)).toBeLessThanOrEqual(59);
             expect(parseInt(seconds)).toBeGreaterThanOrEqual(0);
             expect(parseInt(seconds)).toBeLessThanOrEqual(59);
+
+            // Validate timezone format
+            expect(timezone).toMatch(/^[+-]\d{2}:\d{2}$/);
           }
         }
       ),

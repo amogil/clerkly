@@ -82,7 +82,9 @@ describe('ErrorHandler Property Tests', () => {
           handleBackgroundError(error, context);
 
           // Verify console logging
-          expect(consoleErrorSpy).toHaveBeenCalledWith(`[${context}] Error:`, errorMessage);
+          expect(consoleErrorSpy).toHaveBeenCalledWith(
+            expect.stringContaining(`[${context}] Error:`)
+          );
         }
       ),
       { numRuns: 100 }

@@ -5,7 +5,9 @@ import { shell } from 'electron';
 import { OAuthConfig, PKCEParams, TokenResponse, TokenData, AuthStatus } from './OAuthConfig';
 import { TokenStorageManager } from './TokenStorageManager';
 import { handleBackgroundError } from '../ErrorHandler';
+import { Logger } from '../Logger';
 
+// Requirements: clerkly.3.8 - Use centralized Logger instead of console.*
 /**
  * PKCE storage for temporary state during OAuth flow
  */
@@ -43,10 +45,13 @@ interface PKCEStorage {
  * Requirements: google-oauth-auth.1, google-oauth-auth.2, google-oauth-auth.3, google-oauth-auth.5, google-oauth-auth.6, google-oauth-auth.7, ui.6.5, ui.9.1, ui.9.2, ui.9.3, ui.9.4
  */
 export class OAuthClientManager {
+  // Requirements: clerkly.3.5, clerkly.3.7
+  private logger = Logger.create('OAuthClientManager');
   private config: OAuthConfig;
   private tokenStorage: TokenStorageManager;
   private pkceStorage: PKCEStorage | null = null;
   private profileManager: any | null = null; // Using any to avoid circular dependency
+  private authWindowManager: any | null = null; // Using any to avoid circular dependency
 
   constructor(config: OAuthConfig, tokenStorage: TokenStorageManager) {
     this.config = config;
@@ -61,7 +66,18 @@ export class OAuthClientManager {
    */
   setProfileManager(profileManager: any): void {
     this.profileManager = profileManager;
-    console.log('[OAuthClientManager] Profile manager set for automatic updates');
+    Logger.info('OAuthClientManager', 'Profile manager set for automatic updates');
+  }
+
+  /**
+   * Set auth window manager for loader display
+   * Requirements: google-oauth-auth.7.1
+   * Should be called during initialization to enable loader display during auth
+   * @param authWindowManager AuthWindowManager instance
+   */
+  setAuthWindowManager(authWindowManager: any): void {
+    this.authWindowManager = authWindowManager;
+    Logger.info('OAuthClientManager', 'Auth window manager set for loader display');
   }
 
   /**
@@ -188,6 +204,12 @@ export class OAuthClientManager {
         };
       }
 
+      // Requirements: google-oauth-auth.7.1 - Show loader during token exchange and profile fetch
+      if (this.authWindowManager) {
+        Logger.info('OAuthClientManager', 'Showing loader for token exchange and profile fetch');
+        this.authWindowManager.onShowLoader();
+      }
+
       // Exchange code for tokens
       const tokenResponse = await this.exchangeCodeForTokens(code, this.pkceStorage.codeVerifier);
 
@@ -210,7 +232,7 @@ export class OAuthClientManager {
       // Synchronously fetch user profile BEFORE saving tokens
       // This ensures we have user email for database isolation
       if (this.profileManager) {
-        console.log('[OAuthClientManager] Fetching profile synchronously before saving tokens');
+        Logger.info('OAuthClientManager', 'Fetching profile synchronously before saving tokens');
 
         // Temporarily store tokens in memory for profile fetch
         const tempTokens = tokenData;
@@ -220,7 +242,11 @@ export class OAuthClientManager {
 
         if (!profileResult.success) {
           // Requirements: google-oauth-auth.3.7 - Profile fetch failed, don't save tokens
-          console.error('[OAuthClientManager] Profile fetch failed, authorization incomplete');
+          Logger.error('OAuthClientManager', 'Profile fetch failed, authorization incomplete');
+          // Requirements: google-oauth-auth.7.1 - Hide loader on error
+          if (this.authWindowManager) {
+            this.authWindowManager.onHideLoader();
+          }
           // Clear PKCE storage
           this.pkceStorage = null;
           return {
@@ -230,12 +256,17 @@ export class OAuthClientManager {
         }
 
         // Requirements: google-oauth-auth.3.8 - Profile fetched successfully
-        console.log('[OAuthClientManager] Profile fetched successfully, now saving tokens');
+        Logger.info('OAuthClientManager', 'Profile fetched successfully, now saving tokens');
 
         // Now save tokens to database (profile manager has email set)
         await this.tokenStorage.saveTokens(tokenData);
+
+        // Requirements: google-oauth-auth.7.1 - Hide loader on success
+        if (this.authWindowManager) {
+          this.authWindowManager.onHideLoader();
+        }
       } else {
-        console.warn('[OAuthClientManager] Profile manager not set, saving tokens without profile');
+        Logger.warn('OAuthClientManager', 'Profile manager not set, saving tokens without profile');
         // Fallback: save tokens without profile (will fail if DataManager requires email)
         await this.tokenStorage.saveTokens(tokenData);
       }
@@ -247,6 +278,10 @@ export class OAuthClientManager {
         authorized: true,
       };
     } catch (error: unknown) {
+      // Requirements: google-oauth-auth.7.1 - Hide loader on error
+      if (this.authWindowManager) {
+        this.authWindowManager.onHideLoader();
+      }
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       return {
         authorized: false,
@@ -266,10 +301,10 @@ export class OAuthClientManager {
     tokens: TokenData
   ): Promise<{ success: boolean; profile?: any; error?: string }> {
     try {
-      console.log('[OAuthClientManager] fetchProfileWithTokens: Starting profile fetch');
+      Logger.info('OAuthClientManager', 'fetchProfileWithTokens: Starting profile fetch');
 
       if (!this.profileManager) {
-        console.error('[OAuthClientManager] fetchProfileWithTokens: Profile manager not set');
+        Logger.error('OAuthClientManager', 'fetchProfileWithTokens: Profile manager not set');
         return { success: false, error: 'Profile manager not set' };
       }
 
@@ -280,7 +315,7 @@ export class OAuthClientManager {
         ? `${googleApiBaseUrl}/oauth2/v2/userinfo` // Mock server uses /oauth2/v2/userinfo
         : `${googleApiBaseUrl}/oauth2/v2/userinfo`; // Google uses /oauth2/v2/userinfo
 
-      console.log('[OAuthClientManager] fetchProfileWithTokens: Fetching from', userInfoUrl);
+      Logger.info('OAuthClientManager', `fetchProfileWithTokens: Fetching from: ${userInfoUrl}`);
 
       const response = await fetch(userInfoUrl, {
         method: 'GET',
@@ -290,17 +325,17 @@ export class OAuthClientManager {
       });
 
       if (!response.ok) {
-        console.error(
-          '[OAuthClientManager] fetchProfileWithTokens: UserInfo API error:',
-          response.status
+        Logger.error(
+          'OAuthClientManager',
+          `fetchProfileWithTokens: UserInfo API error: ${response.status}`
         );
         return { success: false, error: `UserInfo API returned ${response.status}` };
       }
 
       const profileData = (await response.json()) as { email: string; [key: string]: any };
-      console.log(
-        '[OAuthClientManager] fetchProfileWithTokens: Profile fetched:',
-        profileData.email
+      Logger.info(
+        'OAuthClientManager',
+        `fetchProfileWithTokens: Profile fetched: ${profileData.email}`
       );
 
       // Add lastUpdated timestamp
@@ -311,20 +346,20 @@ export class OAuthClientManager {
 
       // CRITICAL: Set email in ProfileManager BEFORE saving to database
       // This is required because DataManager.saveData() needs getCurrentEmail()
-      console.log('[OAuthClientManager] fetchProfileWithTokens: Setting email in ProfileManager');
+      Logger.info('OAuthClientManager', 'fetchProfileWithTokens: Setting email in ProfileManager');
       (this.profileManager as any).currentUserEmail = profile.email;
 
       // Save profile to database
-      console.log('[OAuthClientManager] fetchProfileWithTokens: Saving profile to database');
+      Logger.info('OAuthClientManager', 'fetchProfileWithTokens: Saving profile to database');
       await this.profileManager.saveProfile(profile);
-      console.log('[OAuthClientManager] fetchProfileWithTokens: Profile saved successfully');
+      Logger.info('OAuthClientManager', 'fetchProfileWithTokens: Profile saved successfully');
 
       return { success: true, profile };
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      console.error(
-        '[OAuthClientManager] fetchProfileWithTokens: Failed to fetch profile:',
-        errorMessage
+      Logger.error(
+        'OAuthClientManager',
+        `fetchProfileWithTokens: Failed to fetch profile: ${errorMessage}`
       );
       return { success: false, error: errorMessage };
     }
@@ -467,7 +502,7 @@ export class OAuthClientManager {
 
       // Requirements: ui.6.5 - Automatically update profile after token refresh
       if (this.profileManager) {
-        console.log('[OAuthClientManager] Triggering profile update after token refresh');
+        Logger.info('OAuthClientManager', 'Triggering profile update after token refresh');
         await this.profileManager.updateProfileAfterTokenRefresh();
       }
 
@@ -506,7 +541,7 @@ export class OAuthClientManager {
           });
         } catch (revokeError) {
           // Continue even if revoke fails
-          console.warn('Token revoke failed, continuing with local cleanup');
+          this.logger.warn('Token revoke failed, continuing with local cleanup');
         }
       }
 
@@ -514,10 +549,16 @@ export class OAuthClientManager {
       // Requirements: ui.8.4 - Only tokens are cleared, profile data is preserved
       await this.tokenStorage.deleteTokens();
 
+      // Clear current user email from memory to prevent data operations after logout
+      // Requirements: ui.8.4, ui.12.18
+      if (this.profileManager) {
+        this.profileManager.clearCurrentEmail();
+      }
+
       // Note: Profile data is NOT deleted - it's preserved in database for next login
       // This follows the architectural principle: database is single source of truth
       // Requirements: ui.8.4, Architectural Principles
-      console.log('[OAuthClientManager] Tokens cleared, profile data preserved in database');
+      Logger.info('OAuthClientManager', 'Tokens cleared, profile data preserved in database');
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       // Ensure tokens are deleted even if there's an error

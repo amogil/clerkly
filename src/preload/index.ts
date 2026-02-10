@@ -25,6 +25,8 @@ interface API {
     onAuthError: (callback: (error: string, errorCode?: string) => void) => () => void;
     onLogout: (callback: () => void) => () => void;
     onProfileUpdated: (callback: (profile: any) => void) => () => void;
+    onShowLoader: (callback: () => void) => () => void;
+    onHideLoader: (callback: () => void) => () => void;
   };
   // Requirements: ui.7.1
   error: {
@@ -50,6 +52,14 @@ interface API {
     deleteAPIKey: (
       provider: 'openai' | 'anthropic' | 'google'
     ) => Promise<{ success: boolean; error?: string }>;
+  };
+  // Requirements: testing.3.1, testing.3.2 - Test API methods (only available in test environment)
+  test?: {
+    simulateDataError: (
+      operation: 'saveData' | 'loadData' | 'deleteData',
+      errorMessage: string
+    ) => Promise<{ success: boolean; error?: string }>;
+    clearDataErrors: () => Promise<{ success: boolean; error?: string }>;
   };
   // Requirements: testing.3.8 - Test IPC methods (only available in test environment)
   ipcRenderer?: {
@@ -208,6 +218,38 @@ const api: API = {
         ipcRenderer.removeListener('auth:profile-updated', listener);
       };
     },
+
+    /**
+     * Listen for loader show events
+     * Requirements: google-oauth-auth.7.1
+     * @param {Function} callback - Callback function to execute when loader should be shown
+     * @returns {Function} Unsubscribe function to remove the listener
+     */
+    onShowLoader(callback: () => void): () => void {
+      const listener = () => {
+        callback();
+      };
+      ipcRenderer.on('auth:show-loader', listener);
+      return () => {
+        ipcRenderer.removeListener('auth:show-loader', listener);
+      };
+    },
+
+    /**
+     * Listen for loader hide events
+     * Requirements: google-oauth-auth.7.1
+     * @param {Function} callback - Callback function to execute when loader should be hidden
+     * @returns {Function} Unsubscribe function to remove the listener
+     */
+    onHideLoader(callback: () => void): () => void {
+      const listener = () => {
+        callback();
+      };
+      ipcRenderer.on('auth:hide-loader', listener);
+      return () => {
+        ipcRenderer.removeListener('auth:hide-loader', listener);
+      };
+    },
   },
 
   // Requirements: ui.7.1
@@ -310,6 +352,31 @@ const api: API = {
 // Requirements: testing.3.8
 // Expose ipcRenderer in test environment for test IPC handlers
 if (process.env.NODE_ENV === 'test') {
+  api.test = {
+    /**
+     * Simulate data error for next operation
+     * Requirements: testing.3.1, testing.3.2
+     * @param {string} operation - Operation to simulate error for ('saveData', 'loadData', 'deleteData')
+     * @param {string} errorMessage - Error message to return
+     * @returns {Promise<{success: boolean, error?: string}>}
+     */
+    async simulateDataError(
+      operation: 'saveData' | 'loadData' | 'deleteData',
+      errorMessage: string
+    ): Promise<{ success: boolean; error?: string }> {
+      return await ipcRenderer.invoke('test:simulate-data-error', operation, errorMessage);
+    },
+
+    /**
+     * Clear all error simulations
+     * Requirements: testing.3.1, testing.3.2
+     * @returns {Promise<{success: boolean, error?: string}>}
+     */
+    async clearDataErrors(): Promise<{ success: boolean; error?: string }> {
+      return await ipcRenderer.invoke('test:clear-data-errors');
+    },
+  };
+
   api.ipcRenderer = {
     invoke: (channel: string, ...args: any[]) => ipcRenderer.invoke(channel, ...args),
   };

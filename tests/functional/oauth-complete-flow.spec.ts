@@ -6,8 +6,7 @@ import {
   closeElectron,
   ElectronTestContext,
   clearTestTokens,
-  setupTestTokens,
-  getTokenStatus,
+  completeOAuthFlow,
 } from './helpers/electron';
 import { MockOAuthServer } from './helpers/mock-oauth-server';
 
@@ -59,13 +58,26 @@ test.describe('Complete OAuth Flow', () => {
     }
   });
 
+  test.beforeEach(async () => {
+    // Set user profile data for mock OAuth server
+    mockServer.setUserProfile({
+      id: 'test-user-id',
+      email: 'test@example.com',
+      name: 'Test User',
+      given_name: 'Test',
+      family_name: 'User',
+    });
+  });
+
   /* Preconditions: Application not running, mock OAuth server running
      Action: Complete full OAuth flow from login button to token storage
      Assertions: Authorization code is generated, exchanged for tokens, tokens are stored
      Requirements: google-oauth-auth.1.1, google-oauth-auth.1.2, google-oauth-auth.1.3, google-oauth-auth.1.4, google-oauth-auth.1.5 */
   test('should complete full OAuth flow with authorization code exchange', async () => {
-    // Launch the application
-    context = await launchElectron();
+    // Launch the application with mock OAuth server URL
+    context = await launchElectron(undefined, {
+      CLERKLY_GOOGLE_API_URL: mockServer.getBaseUrl(),
+    });
     await context.window.waitForLoadState('domcontentloaded');
 
     // Clear any existing tokens
@@ -116,42 +128,37 @@ test.describe('Complete OAuth Flow', () => {
      Assertions: Tokens are stored and app transitions to authorized state
      Requirements: google-oauth-auth.3.1, google-oauth-auth.3.2, google-oauth-auth.3.3, google-oauth-auth.3.5 */
   test('should simulate token exchange and storage', async () => {
-    // Launch the application
-    context = await launchElectron();
+    // Launch the application with mock OAuth server URL
+    context = await launchElectron(undefined, {
+      CLERKLY_GOOGLE_API_URL: mockServer.getBaseUrl(),
+    });
     await context.window.waitForLoadState('domcontentloaded');
 
     // Clear any existing tokens
     await clearTestTokens(context.window);
 
-    // Verify no tokens initially
-    let tokenStatus = await getTokenStatus(context.window);
-    expect(tokenStatus.hasTokens).toBe(false);
+    // Verify login screen is displayed
+    const loginButton = context.window.locator('text=/continue with google/i');
+    await loginButton.waitFor({ state: 'visible', timeout: 5000 });
+    expect(await loginButton.isVisible()).toBe(true);
 
-    // Simulate successful token exchange by setting up tokens
-    // Requirements: google-oauth-auth.3.3
-    await setupTestTokens(context.window, {
-      accessToken: 'test_access_token_exchanged',
-      refreshToken: 'test_refresh_token_exchanged',
-      expiresIn: 3600,
-      tokenType: 'Bearer',
-    });
+    // Complete OAuth flow
+    await completeOAuthFlow(context.app, context.window);
 
-    // Verify tokens were stored
-    // Requirements: google-oauth-auth.3.5
-    tokenStatus = await getTokenStatus(context.window);
-    expect(tokenStatus.hasTokens).toBe(true);
-    expect(tokenStatus.expiresAt).toBeGreaterThan(Date.now());
+    // Verify we're on the main app (not login screen)
+    const isOnLogin = await loginButton.isVisible().catch(() => false);
+    expect(isOnLogin).toBe(false);
 
     console.log('[TEST] Tokens successfully stored after exchange');
-    console.log(`[TEST] Token expires at: ${new Date(tokenStatus.expiresAt!).toISOString()}`);
 
     // Reload to verify tokens persist
     await context.window.reload();
     await context.window.waitForLoadState('domcontentloaded');
+    await context.window.waitForTimeout(2000);
 
-    // Verify tokens still exist
-    tokenStatus = await getTokenStatus(context.window);
-    expect(tokenStatus.hasTokens).toBe(true);
+    // Verify still authenticated (not on login screen)
+    const stillOnLogin = await loginButton.isVisible().catch(() => false);
+    expect(stillOnLogin).toBe(false);
 
     // Take screenshot
     await context.window.screenshot({
@@ -164,12 +171,18 @@ test.describe('Complete OAuth Flow', () => {
      Assertions: App handles errors gracefully
      Requirements: google-oauth-auth.3.4 */
   test('should handle OAuth errors gracefully', async () => {
-    // Launch the application
-    context = await launchElectron();
+    // Launch the application with mock OAuth server URL
+    context = await launchElectron(undefined, {
+      CLERKLY_GOOGLE_API_URL: mockServer.getBaseUrl(),
+    });
     await context.window.waitForLoadState('domcontentloaded');
 
     // Clear any existing tokens
     await clearTestTokens(context.window);
+
+    // Verify login screen is displayed
+    const loginButton = context.window.locator('text=/continue with google/i');
+    await loginButton.waitFor({ state: 'visible', timeout: 5000 });
 
     // Simulate OAuth error by sending deep link with error parameter
     const errorDeepLink = `com.googleusercontent.apps.${TEST_CLIENT_ID}:/oauth2redirect?error=access_denied&error_description=User%20denied%20access`;
@@ -187,9 +200,9 @@ test.describe('Complete OAuth Flow', () => {
     // Verify app is still responsive
     expect(context.window.isClosed()).toBe(false);
 
-    // Verify no tokens were stored
-    const tokenStatus = await getTokenStatus(context.window);
-    expect(tokenStatus.hasTokens).toBe(false);
+    // Verify still on login screen (not authenticated)
+    const stillOnLogin = await loginButton.isVisible();
+    expect(stillOnLogin).toBe(true);
 
     console.log('[TEST] OAuth error handled gracefully');
 

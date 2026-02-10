@@ -124,8 +124,13 @@ test('should log errors to console', async () => {
   await context.window.waitForTimeout(1000);
 
   // Check that error was logged
+  // Logger automatically adds [App] context and formats the message
   const hasErrorLog = consoleMessages.some(
-    (msg) => msg.includes('[App] Error notification received') && msg.includes('Test error logging')
+    (msg) =>
+      msg.includes('[App]') &&
+      msg.includes('Error notification received') &&
+      msg.includes('Test error logging') &&
+      msg.includes('Test Context')
   );
 
   expect(hasErrorLog).toBe(true);

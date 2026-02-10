@@ -1,4 +1,4 @@
-// Requirements: google-oauth-auth.15.1, google-oauth-auth.15.2, google-oauth-auth.15.3, google-oauth-auth.15.4, google-oauth-auth.15.5, google-oauth-auth.15.6, google-oauth-auth.15.7
+// Requirements: google-oauth-auth.14.1, google-oauth-auth.14.2, google-oauth-auth.14.3, google-oauth-auth.14.4, google-oauth-auth.14.5, google-oauth-auth.14.6, google-oauth-auth.14.7
 
 /**
  * Functional tests for Sign Out flow
@@ -7,17 +7,57 @@
 
 import { test, expect, _electron as electron, ElectronApplication, Page } from '@playwright/test';
 import * as path from 'path';
+import { MockOAuthServer } from './helpers/mock-oauth-server';
+import { completeOAuthFlow } from './helpers/electron';
 
 let electronApp: ElectronApplication;
 let window: Page;
+let mockServer: MockOAuthServer;
 
 test.beforeAll(async () => {
-  // Launch Electron app
+  // Start mock OAuth server
+  mockServer = new MockOAuthServer({
+    port: 8893,
+    clientId: 'test-client-id-12345',
+    clientSecret: 'test-client-secret-67890',
+  });
+
+  await mockServer.start();
+  console.log(`[TEST] Mock OAuth server started at ${mockServer.getBaseUrl()}`);
+});
+
+test.afterAll(async () => {
+  if (mockServer) {
+    await mockServer.stop();
+    console.log('[TEST] Mock OAuth server stopped');
+  }
+});
+
+test.beforeEach(async () => {
+  // Set user profile data for each test
+  mockServer.setUserProfile({
+    id: '123456789',
+    email: 'signout.test@example.com',
+    name: 'SignOut Test User',
+    given_name: 'SignOut',
+    family_name: 'Test User',
+  });
+
+  // Create unique temp directory for this test
+  const testDataPath = path.join(
+    require('os').tmpdir(),
+    `clerkly-signout-test-${Date.now()}-${Math.random().toString(36).substring(7)}`
+  );
+
+  // Launch Electron app for each test
   electronApp = await electron.launch({
-    args: [path.join(__dirname, '../../dist/main/index.js')],
+    args: [path.join(__dirname, '../../dist/main/index.js'), '--user-data-dir', testDataPath],
     env: {
       ...process.env,
       NODE_ENV: 'test',
+      CLERKLY_GOOGLE_API_URL: mockServer.getBaseUrl(),
+      CLERKLY_OAUTH_CLIENT_ID: 'test-client-id-12345',
+      CLERKLY_OAUTH_CLIENT_SECRET: 'test-client-secret-67890',
     },
   });
 
@@ -29,41 +69,27 @@ test.beforeAll(async () => {
   await window.waitForTimeout(2000);
 });
 
-test.afterAll(async () => {
-  await electronApp.close();
+test.afterEach(async () => {
+  if (electronApp) {
+    await electronApp.close();
+  }
 });
 
 /* Preconditions: User is logged in with valid tokens
    Action: Click Sign Out button in settings
    Assertions: Login Screen is shown, tokens are cleared from database
-   Requirements: google-oauth-auth.15.1, google-oauth-auth.15.2, google-oauth-auth.15.3, google-oauth-auth.15.4, google-oauth-auth.15.5, google-oauth-auth.15.6 */
+   Requirements: google-oauth-auth.14.1, google-oauth-auth.14.2, google-oauth-auth.14.3, google-oauth-auth.14.4, google-oauth-auth.14.5, google-oauth-auth.14.6 */
 test('should show login screen after sign out', async () => {
-  // Setup: Create valid tokens and profile
-  await window.evaluate(async () => {
-    await window.electron.ipcRenderer.invoke('test:setup-tokens', {
-      accessToken: 'test_access_token',
-      refreshToken: 'test_refresh_token',
-      expiresIn: 3600,
-      tokenType: 'Bearer',
-    });
+  // Setup: Complete OAuth flow to authenticate
+  await completeOAuthFlow(electronApp, window);
 
-    // Setup profile data
-    await window.electron.ipcRenderer.invoke('test:setup-profile', {
-      id: '123456789',
-      email: 'test@example.com',
-      verified_email: true,
-      name: 'Test User',
-      given_name: 'Test',
-      family_name: 'User',
-      locale: 'en',
-      lastUpdated: Date.now(),
-    });
-  });
+  // Wait for authentication to complete and UI to update
+  await window.waitForTimeout(2000);
 
-  // Reload to show main app
+  // Reload to ensure UI is updated
   await window.reload();
   await window.waitForLoadState('domcontentloaded');
-  await window.waitForTimeout(2000);
+  await window.waitForTimeout(1000);
 
   // Verify main app is shown (not login screen)
   const loginButton = await window.locator('button:has-text("Continue with Google")').count();
@@ -84,33 +110,45 @@ test('should show login screen after sign out', async () => {
   const loginButtonAfter = await window.locator('button:has-text("Continue with Google")');
   await expect(loginButtonAfter).toBeVisible();
 
-  // Verify tokens are cleared
-  const tokenStatus = await window.evaluate(async () => {
-    return await window.electron.ipcRenderer.invoke('test:get-token-status');
+  // Verify tokens are cleared (check through app context)
+  const tokensCleared = await electronApp.evaluate(async () => {
+    const { tokenStorage } = (global as any).testContext || {};
+    if (!tokenStorage) {
+      throw new Error('Token storage not found in test context');
+    }
+    try {
+      const tokens = await tokenStorage.loadTokens();
+      return tokens === null;
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : '';
+      return errorMessage.includes('No user logged in');
+    }
   });
-  expect(tokenStatus.hasTokens).toBe(false);
+  expect(tokensCleared).toBe(true);
 });
 
 /* Preconditions: User is logged in with valid tokens
    Action: Call logout through IPC
    Assertions: Tokens are deleted from database
-   Requirements: google-oauth-auth.15.3, google-oauth-auth.15.4 */
+   Requirements: google-oauth-auth.14.3, google-oauth-auth.14.4 */
 test('should clear tokens after sign out', async () => {
-  // Setup: Create valid tokens
-  await window.evaluate(async () => {
-    await window.electron.ipcRenderer.invoke('test:setup-tokens', {
-      accessToken: 'test_access_token_2',
-      refreshToken: 'test_refresh_token_2',
-      expiresIn: 3600,
-      tokenType: 'Bearer',
-    });
-  });
+  // Setup: Complete OAuth flow to authenticate
+  await completeOAuthFlow(electronApp, window);
 
-  // Verify tokens exist
-  let tokenStatus = await window.evaluate(async () => {
-    return await window.electron.ipcRenderer.invoke('test:get-token-status');
+  // Verify tokens exist (check through app context)
+  const tokensExist = await electronApp.evaluate(async () => {
+    const { tokenStorage } = (global as any).testContext || {};
+    if (!tokenStorage) {
+      throw new Error('Token storage not found in test context');
+    }
+    try {
+      const tokens = await tokenStorage.loadTokens();
+      return tokens !== null;
+    } catch (error: unknown) {
+      return false;
+    }
   });
-  expect(tokenStatus.hasTokens).toBe(true);
+  expect(tokensExist).toBe(true);
 
   // Call logout via IPC
   await window.evaluate(async () => {
@@ -120,26 +158,29 @@ test('should clear tokens after sign out', async () => {
   await window.waitForTimeout(500);
 
   // Verify tokens are cleared
-  tokenStatus = await window.evaluate(async () => {
-    return await window.electron.ipcRenderer.invoke('test:get-token-status');
+  const tokensCleared = await electronApp.evaluate(async () => {
+    const { tokenStorage } = (global as any).testContext || {};
+    if (!tokenStorage) {
+      throw new Error('Token storage not found in test context');
+    }
+    try {
+      const tokens = await tokenStorage.loadTokens();
+      return tokens === null;
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : '';
+      return errorMessage.includes('No user logged in');
+    }
   });
-  expect(tokenStatus.hasTokens).toBe(false);
+  expect(tokensCleared).toBe(true);
 });
 
 /* Preconditions: User is logged in, Google revoke endpoint fails
    Action: Call logout when revoke fails
    Assertions: Local tokens are still deleted, Login Screen is shown
-   Requirements: google-oauth-auth.15.7 */
+   Requirements: google-oauth-auth.14.7 */
 test('should handle sign out when revoke fails', async () => {
-  // Setup: Create valid tokens
-  await window.evaluate(async () => {
-    await window.electron.ipcRenderer.invoke('test:setup-tokens', {
-      accessToken: 'test_access_token_3',
-      refreshToken: 'test_refresh_token_3',
-      expiresIn: 3600,
-      tokenType: 'Bearer',
-    });
-  });
+  // Setup: Complete OAuth flow to authenticate
+  await completeOAuthFlow(electronApp, window);
 
   // Mock fetch to simulate revoke failure
   await window.evaluate(() => {
@@ -163,10 +204,20 @@ test('should handle sign out when revoke fails', async () => {
   await window.waitForTimeout(500);
 
   // Verify tokens are cleared despite revoke failure
-  const tokenStatus = await window.evaluate(async () => {
-    return await window.electron.ipcRenderer.invoke('test:get-token-status');
+  const tokensCleared = await electronApp.evaluate(async () => {
+    const { tokenStorage } = (global as any).testContext || {};
+    if (!tokenStorage) {
+      throw new Error('Token storage not found in test context');
+    }
+    try {
+      const tokens = await tokenStorage.loadTokens();
+      return tokens === null;
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : '';
+      return errorMessage.includes('No user logged in');
+    }
   });
-  expect(tokenStatus.hasTokens).toBe(false);
+  expect(tokensCleared).toBe(true);
 
   // Reload to verify Login Screen is shown
   await window.reload();

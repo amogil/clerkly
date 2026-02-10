@@ -2,7 +2,7 @@
 
 ## Обзор
 
-Данный документ содержит план реализации системы авторизации через Google OAuth для Electron приложения Clerkly. Система включает 18 свойств корректности, которые проверяются через property-based тесты, а также полный набор модульных и функциональных тестов.
+Данный документ содержит план реализации системы авторизации через Google OAuth для Electron приложения Clerkly. Система включает 19 свойств корректности, которые проверяются через property-based тесты, а также полный набор модульных и функциональных тестов.
 
 ## 1. Настройка Инфраструктуры OAuth
 
@@ -19,6 +19,8 @@
 - [x] Тест: проверка наличия всех обязательных полей конфигурации
 - [x] Тест: проверка корректности формата redirect_uri
 - [x] Тест: проверка наличия всех необходимых scopes
+- [x] Тест: проверка удаления дублирующегося суффикса `.apps.googleusercontent.com` из redirect_uri
+- [x] Тест: проверка обработки различных форматов Client ID (с суффиксом и без)
 - **Requirements:** google-oauth-auth.10.1, google-oauth-auth.10.2, google-oauth-auth.10.3
 
 ### 1.3 Создать property-based тесты для конфигурации OAuth
@@ -239,7 +241,11 @@
 - [x] Добавить превью функций (4 колонки): Listen & Transcribe, Extract Tasks, Automate Actions, Auto-Sync
 - [x] Добавить текст "By continuing, you agree to Clerkly's Terms of Service and Privacy Policy"
 - [x] Добавить обработчик клика на кнопку (вызов IPC auth:start-login)
-- **Requirements:** google-oauth-auth.12.1, google-oauth-auth.12.2, google-oauth-auth.12.3, google-oauth-auth.12.4, google-oauth-auth.12.5, google-oauth-auth.12.6
+- [x] Добавить props `isLoading` и `isDisabled` в интерфейс LoginScreenProps
+- [x] Добавить loader (spinner) с текстом "Signing in..." когда isLoading=true
+- [x] Деактивировать кнопку "Continue with Google" когда isDisabled=true
+- [x] Обеспечить видимость всех элементов Login Screen во время отображения loader
+- **Requirements:** google-oauth-auth.12.1, google-oauth-auth.12.2, google-oauth-auth.12.3, google-oauth-auth.12.4, google-oauth-auth.12.5, google-oauth-auth.12.6, google-oauth-auth.15.1, google-oauth-auth.15.2, google-oauth-auth.15.3, google-oauth-auth.15.7
 
 ### 6.2 Создать Login Error Component
 - [x] Создать файл `src/renderer/components/auth/LoginError.tsx`
@@ -248,19 +254,28 @@
 - [x] Реализовать функцию `getErrorDetails(errorCode, errorMessage)` для маппинга ошибок
 - [x] Добавить маппинг для всех типов ошибок (popup_closed_by_user, access_denied, network_error, и т.д.)
 - [x] Отображать заголовок, сообщение и предложение из маппинга
-- [x] Добавить обработчик retry (вызов onRetry prop)
-- **Requirements:** google-oauth-auth.13.1, google-oauth-auth.13.2, google-oauth-auth.13.3, google-oauth-auth.13.4, google-oauth-auth.13.5, google-oauth-auth.13.6, google-oauth-auth.13.7, google-oauth-auth.9.6
+- [x] Добавить обработчик retry (вызов onRetry prop при клике на кнопку "Continue with Google")
+- [x] Добавить props `isLoading` и `isDisabled` в интерфейс LoginErrorProps
+- [x] Деактивировать кнопку "Continue with Google" когда isDisabled=true
+- [x] Отображать loader когда isLoading=true
+- **Примечание:** LoginError использует ту же кнопку "Continue with Google", что и LoginScreen, для повторной попытки авторизации
+- **Requirements:** google-oauth-auth.13.1, google-oauth-auth.13.2, google-oauth-auth.13.3, google-oauth-auth.13.4, google-oauth-auth.13.5, google-oauth-auth.13.6, google-oauth-auth.13.7, google-oauth-auth.13.8, google-oauth-auth.9.6, google-oauth-auth.15.1, google-oauth-auth.15.2
 
 ### 6.3 Создать модульные тесты для UI Components
 - [x] Создать файл `tests/unit/auth/LoginScreen.test.tsx`
 - [x] Тест: отображение всех элементов Login Screen
 - [x] Тест: клик на кнопку "Continue with Google" вызывает onLogin
+- [x] Тест: отображение loader когда isLoading=true
+- [x] Тест: деактивация кнопки когда isDisabled=true
+- [x] Тест: видимость всех элементов во время отображения loader
 - [x] Создать файл `tests/unit/auth/LoginError.test.tsx`
 - [x] Тест: отображение всех элементов Login Screen
 - [x] Тест: отображение блока ошибки
 - [x] Тест: корректный маппинг для каждого типа ошибки
 - [x] Тест: клик на retry вызывает onRetry
-- **Requirements:** google-oauth-auth.12.1, google-oauth-auth.12.2, google-oauth-auth.12.3, google-oauth-auth.12.4, google-oauth-auth.13.1, google-oauth-auth.13.2, google-oauth-auth.13.3, google-oauth-auth.13.4, google-oauth-auth.13.5, google-oauth-auth.13.6
+- [x] Тест: отображение loader когда isLoading=true (LoginError)
+- [x] Тест: деактивация кнопки когда isDisabled=true (LoginError)
+- **Requirements:** google-oauth-auth.12.1, google-oauth-auth.12.2, google-oauth-auth.12.3, google-oauth-auth.12.4, google-oauth-auth.13.1, google-oauth-auth.13.2, google-oauth-auth.13.3, google-oauth-auth.13.4, google-oauth-auth.13.5, google-oauth-auth.13.6, google-oauth-auth.15.1, google-oauth-auth.15.2, google-oauth-auth.15.3
 
 ### 6.4 Добавить кнопку Sign Out в Settings
 - [x] Обновить `src/renderer/components/settings.tsx` для добавления кнопки Sign Out
@@ -270,7 +285,7 @@
 - [x] Обновить `src/renderer/App.tsx` для добавления handleSignOut функции
 - [x] handleSignOut вызывает window.api.auth.logout()
 - [x] Передать handleSignOut в Settings компонент через prop onSignOut
-- **Requirements:** google-oauth-auth.15.1
+- **Requirements:** google-oauth-auth.14.1
 
 ## 7. Реализация Auth Window Manager
 
@@ -284,7 +299,11 @@
 - [x] Реализовать приватный метод `handleAuthSuccess(): Promise<void>`
 - [x] Реализовать приватный метод `handleAuthError(error: string, errorCode?: string): Promise<void>`
 - [x] Интегрировать с существующим WindowManager
-- **Requirements:** google-oauth-auth.11.1, google-oauth-auth.11.4, google-oauth-auth.11.5
+- [x] Реализовать приватный метод `showLoader(): Promise<void>` для отображения loader на Login Screen
+- [x] Реализовать приватный метод `hideLoader(): Promise<void>` для скрытия loader
+- [x] Обновить `handleAuthSuccess()` для вызова hideLoader() перед показом Dashboard
+- [x] Обновить `handleAuthError()` для вызова hideLoader() перед показом Login Error Screen
+- **Requirements:** google-oauth-auth.11.1, google-oauth-auth.11.4, google-oauth-auth.11.5, google-oauth-auth.11.8, google-oauth-auth.11.9, google-oauth-auth.15.1, google-oauth-auth.15.2, google-oauth-auth.15.5, google-oauth-auth.15.6
 
 ### 7.2 Создать модульные тесты для Auth Window Manager
 - [x] Создать файл `tests/unit/auth/AuthWindowManager.test.ts`
@@ -294,7 +313,10 @@
 - [x] Тест: закрытие Login Window и открытие Main Window при успешной авторизации
 - [x] Тест: обновление содержимого окна на Login Error Screen при ошибке
 - [x] Тест: обновление содержимого окна на Login Screen при retry
-- **Requirements:** google-oauth-auth.11.1, google-oauth-auth.11.4, google-oauth-auth.11.5
+- [x] Тест: вызов showLoader() при получении authorization code
+- [x] Тест: вызов hideLoader() при успешной авторизации
+- [x] Тест: вызов hideLoader() при ошибке авторизации
+- **Requirements:** google-oauth-auth.11.1, google-oauth-auth.11.4, google-oauth-auth.11.5, google-oauth-auth.15.1, google-oauth-auth.15.2, google-oauth-auth.15.5, google-oauth-auth.15.6
 
 ### 7.3 Создать property-based тесты для Auth Window Manager
 - [x] Создать файл `tests/property/auth/AuthWindowManager.property.test.ts`
@@ -302,17 +324,20 @@
   - *For any* application startup, correct window must be shown based on auth status
 - [x] Property тест: **Property 18 - Error Screen Display**
   - *For any* authentication error, error screen must display with correct mapping
-- **Requirements:** google-oauth-auth.11.1, google-oauth-auth.11.5
+- [x] Property тест: **Property 19 - Loader Display During Authorization**
+  - *For any* authorization flow where authorization code is received, loader must be displayed on Login Screen with disabled login button until token exchange and profile fetch complete
+- **Requirements:** google-oauth-auth.11.1, google-oauth-auth.11.5, google-oauth-auth.15.1, google-oauth-auth.15.2, google-oauth-auth.15.4
 
 ## 8. Обработка Ошибок
 
 ### 8.1 Реализовать централизованную обработку ошибок
 - [x] Создать файл `src/main/auth/ErrorHandler.ts`
 - [x] Реализовать функцию `getErrorDetails(errorCode?: string, errorMessage?: string): ErrorDetails`
-- [ ] Добавить маппинг для всех типов ошибок (popup_closed_by_user, access_denied, network_error, invalid_grant, invalid_request, server_error, temporarily_unavailable, csrf_attack_detected, database_error, profile_fetch_failed)
-- [x] Реализовать функцию логирования ошибок с контекстом
+- [x] Добавить маппинг для всех типов ошибок (popup_closed_by_user, access_denied, network_error, invalid_grant, invalid_request, server_error, temporarily_unavailable, csrf_attack_detected, database_error, profile_fetch_failed)
+- [x] Реализовать функцию логирования ошибок с контекстом через Logger класс (clerkly.3)
 - [x] Добавить интерфейсы `ErrorDetails` и `ErrorResponse`
 - **Requirements:** google-oauth-auth.9.1, google-oauth-auth.9.2, google-oauth-auth.9.3, google-oauth-auth.9.4, google-oauth-auth.9.5, google-oauth-auth.9.6
+- **Примечание:** Задача зависит от clerkly.3.1 (создание Logger класса)
 
 ### 8.2 Создать модульные тесты для обработки ошибок
 - [x] Создать файл `tests/unit/auth/ErrorHandler.test.ts`
@@ -320,14 +345,26 @@
 - [x] Тест: возврат default ошибки для неизвестного кода
 - [x] Тест: использование errorMessage для default ошибки
 - [x] Тест: структура ErrorResponse
-- [x] Тест: логирование ошибок с контекстом
+- [x] Тест: логирование ошибок с контекстом через Logger класс
 - **Requirements:** google-oauth-auth.9.1, google-oauth-auth.9.2, google-oauth-auth.9.3, google-oauth-auth.9.4, google-oauth-auth.9.5, google-oauth-auth.9.6
+- **Примечание:** Задача зависит от clerkly.3.1 и clerkly.3.2 (создание Logger класса и тестов)
 
 ### 8.3 Создать property-based тесты для обработки ошибок
 - [x] Создать файл `tests/property/auth/ErrorHandler.property.test.ts`
 - [x] Property тест: **Property 16 - Error Propagation** (дубликат из 3.9, проверка централизованной обработки)
   - *For any* error code, error details must be correctly mapped
 - **Requirements:** google-oauth-auth.9.3
+
+### 8.4 Создать property-based тесты для Loader Functionality
+- [x] Создать файл `tests/property/auth/LoaderState.property.test.tsx`
+- [x] Property тест: **Property 20 - Loader State Consistency**
+  - *For any* combination of isLoading and isDisabled, button state and loader visibility must be consistent
+- [x] Property тест: **Property 21 - Loader Visibility Invariant**
+  - *For any* sequence of show/hide actions, isLoaderVisible should match the last action
+- [x] Property тест: **Property 22 - Button State Invariant**
+  - *For any* combination of isLoading and isDisabled, button disabled state should be (isLoading || isDisabled)
+- **Requirements:** google-oauth-auth.15.1, google-oauth-auth.15.2, google-oauth-auth.15.3, google-oauth-auth.15.5, google-oauth-auth.15.6
+- **Примечание:** Опциональные тесты для дополнительной проверки инвариантов loader functionality. Эти тесты не являются обязательными для завершения задачи, но рекомендуются для повышения уверенности в корректности реализации.
 
 ## 9. Интеграция с Существующей Системой
 
@@ -370,7 +407,15 @@
 - [x] Тест: показ Main App при наличии авторизации
 - [x] Тест: инициация OAuth flow при клике на кнопку login
 - [x] Тест: показ Main App после успешной авторизации
-- **Requirements:** google-oauth-auth.11.1, google-oauth-auth.11.2, google-oauth-auth.11.3, google-oauth-auth.11.4
+- [x] Тест: разрешение множественных кликов на кнопку login до завершения авторизации
+- [x] Тест: показ loader после получения authorization code
+- [x] Тест: показ loader во время обмена токенов и загрузки профиля
+- [x] Тест: деактивация кнопки login когда loader отображается
+- [x] Тест: скрытие loader и показ dashboard при успехе
+- [x] Тест: скрытие loader и показ ошибки при неудаче
+- [x] **Тест: loader показывается НА странице логина (не отдельная страница)** - проверка видимости всех элементов Login Screen во время отображения loader
+- [x] **Тест: loader показывается НА странице ошибки при повторной попытке (не отдельная страница)** - проверка видимости всех элементов Login Error Screen во время отображения loader при retry (кнопка "Continue with Google")
+- **Requirements:** google-oauth-auth.11.1, google-oauth-auth.11.2, google-oauth-auth.11.3, google-oauth-auth.11.4, google-oauth-auth.11.5, google-oauth-auth.13.8, google-oauth-auth.15.1, google-oauth-auth.15.2, google-oauth-auth.15.4, google-oauth-auth.15.5, google-oauth-auth.15.6, google-oauth-auth.15.7
 
 ### 10.3 Создать функциональные тесты для Login UI
 - [x] Создать файл `tests/functional/login-ui.spec.ts`
@@ -410,7 +455,7 @@
 - [x] Тест: показ Login Screen после Sign Out
 - [x] Тест: очистка токенов после Sign Out
 - [x] Тест: обработка Sign Out когда revoke не удается
-- **Requirements:** google-oauth-auth.15.1, google-oauth-auth.15.2, google-oauth-auth.15.3, google-oauth-auth.15.4, google-oauth-auth.15.5, google-oauth-auth.15.6, google-oauth-auth.15.7
+- **Requirements:** google-oauth-auth.14.1, google-oauth-auth.14.2, google-oauth-auth.14.3, google-oauth-auth.14.4, google-oauth-auth.14.5, google-oauth-auth.14.6, google-oauth-auth.14.7
 
 ## 11. Документация и Финализация
 
@@ -442,7 +487,7 @@
 
 ### Свойства Корректности (Property-Based Tests)
 
-Все 18 свойств корректности покрыты property-based тестами:
+Все 22 свойства корректности покрыты property-based тестами:
 
 1. **Property 1**: PKCE Parameters Generation - `tests/property/auth/OAuthClientManager.property.test.ts`
 2. **Property 2**: PKCE Parameters Persistence - `tests/property/auth/OAuthClientManager.property.test.ts`
@@ -462,6 +507,10 @@
 16. **Property 16**: Error Propagation - `tests/property/auth/ErrorHandler.property.test.ts`
 17. **Property 17**: Window State Based on Auth Status - `tests/property/auth/AuthWindowManager.property.test.ts`
 18. **Property 18**: Error Screen Display - `tests/property/auth/AuthWindowManager.property.test.ts`
+19. **Property 19**: Loader Display During Authorization - `tests/property/auth/AuthWindowManager.property.test.ts`
+20. **Property 20**: Loader State Consistency - `tests/property/auth/LoaderState.property.test.tsx`
+21. **Property 21**: Loader Visibility Invariant - `tests/property/auth/LoaderState.property.test.tsx`
+22. **Property 22**: Button State Invariant - `tests/property/auth/LoaderState.property.test.tsx`
 
 ### Функциональные Тесты (End-to-End)
 
@@ -477,7 +526,8 @@
 - **Требование 11**: UI Flow - `tests/functional/auth-flow.spec.ts`
 - **Требование 12**: Login Screen - `tests/functional/login-ui.spec.ts`
 - **Требование 13**: Login Error Screen - `tests/functional/login-ui.spec.ts`
-- **Требование 15**: Sign Out Flow - `tests/functional/sign-out-flow.spec.ts`
+- **Требование 14**: Sign Out Flow - `tests/functional/sign-out-flow.spec.ts`
+- **Требование 15**: Loader During Authorization - `tests/functional/auth-flow.spec.ts`
 
 ### Модульные Тесты
 
@@ -496,8 +546,8 @@
 
 ## Примечания
 
-- ✅ Все задачи выполнены
-- ✅ Все 18 свойств корректности покрыты property-based тестами
+- ⚠️ **Не все задачи выполнены** - требуется реализация loader функциональности
+- ✅ Все 19 свойств корректности покрыты property-based тестами
 - ✅ Все пользовательские сценарии покрыты функциональными тестами
 - ✅ Все компоненты имеют модульные тесты
 - ✅ Все компоненты имеют комментарии с ссылками на требования
@@ -506,3 +556,13 @@
 - ✅ Все проверки TypeScript, ESLint, Prettier проходят
 
 **Важно:** Функциональные тесты используют реальный Electron и показывают окна на экране. Они запускаются ТОЛЬКО при явной просьбе пользователя.
+
+**Осталось реализовать:**
+1. ~~Добавить props `isLoading` и `isDisabled` в LoginScreen и LoginError компоненты~~ ✅
+2. ~~Реализовать отображение loader (spinner) в LoginScreen и LoginError~~ ✅
+3. ~~Добавить методы `showLoader()` и `hideLoader()` в AuthWindowManager~~ ✅
+4. ~~Обновить модульные тесты для проверки loader функциональности~~ ✅
+5. ~~Функциональные тесты для loader уже существуют в `tests/functional/auth-flow.spec.ts`~~ ✅
+6. ~~Исправить таймингов loader: убрать `setIsLoadingProfile()` из `handleLogin()` в App.tsx~~ ✅
+7. ~~Добавить `prompt=select_account` в authorization URL для показа выбора аккаунта~~ ✅
+8. ~~Добавить функциональный тест для проверки таймингов loader~~ ✅ - `tests/functional/auth-flow.spec.ts` - "should NOT show loader immediately after login click, only after deep link"

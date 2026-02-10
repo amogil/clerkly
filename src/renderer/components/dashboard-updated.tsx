@@ -1,4 +1,8 @@
 import { Clock, PlayCircle, Play } from 'lucide-react';
+import { Logger } from '../Logger';
+
+// Requirements: clerkly.3.5, clerkly.3.7
+const logger = Logger.create('DashboardUpdated');
 
 interface DashboardProps {
   onNavigateToMeeting: (meetingId: string) => void;
@@ -92,7 +96,7 @@ export function DashboardUpdated({
   ];
 
   const handleStartRecording = (meetingId: string) => {
-    console.log('Starting recording for meeting:', meetingId);
+    logger.info('Starting recording for meeting:', meetingId);
   };
 
   return (
@@ -199,7 +203,7 @@ export function DashboardUpdated({
                 <div
                   key={task.id}
                   className="p-6 hover:bg-secondary/30 transition-colors cursor-pointer"
-                  onClick={() => console.log('Open task:', task.id)}
+                  onClick={() => logger.info('Open task:', task.id)}
                 >
                   <div className="flex items-start gap-3">
                     <input
@@ -207,7 +211,7 @@ export function DashboardUpdated({
                       checked={task.status === 'completed'}
                       onChange={(e) => {
                         e.stopPropagation();
-                        console.log('Toggle task:', task.id);
+                        logger.info('Toggle task:', task.id);
                       }}
                       className="mt-1 w-4 h-4 rounded border-border text-primary focus:ring-primary"
                     />
