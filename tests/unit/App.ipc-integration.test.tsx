@@ -95,6 +95,8 @@ describe('App IPC Integration with Error Notification System', () => {
           onAuthSuccess: jest.fn(() => jest.fn()), // Return unsubscribe function
           onAuthError: jest.fn(() => jest.fn()), // Return unsubscribe function
           onLogout: jest.fn(() => jest.fn()), // Return unsubscribe function
+          onShowLoader: jest.fn(() => jest.fn()), // Return unsubscribe function
+          onHideLoader: jest.fn(() => jest.fn()), // Return unsubscribe function
         },
         error: {
           onNotify: mockOnNotify,

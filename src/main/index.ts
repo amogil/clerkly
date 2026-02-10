@@ -149,6 +149,10 @@ const windowManager = new WindowManager(dataManager, profileManager);
 import { AuthWindowManager } from './auth/AuthWindowManager';
 const authWindowManager = new AuthWindowManager(windowManager, oauthClient);
 
+// Requirements: google-oauth-auth.7.1
+// Connect auth window manager to oauth client for loader display
+oauthClient.setAuthWindowManager(authWindowManager);
+
 // Requirements: clerkly.1.2, clerkly.1.3, clerkly.1.4, ui.6.5
 // Initialize Lifecycle Manager
 const lifecycleManager = new LifecycleManager(

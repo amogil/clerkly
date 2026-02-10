@@ -180,11 +180,24 @@ function AppContent() {
       showError(`${context}: ${message}`);
     });
 
+    // Requirements: google-oauth-auth.7.1 - Listen for loader show/hide events
+    const unsubscribeShowLoader = window.api.auth.onShowLoader(() => {
+      logger.info('Show loader event received');
+      setIsLoadingProfile(true);
+    });
+
+    const unsubscribeHideLoader = window.api.auth.onHideLoader(() => {
+      logger.info('Hide loader event received');
+      setIsLoadingProfile(false);
+    });
+
     return () => {
       unsubscribeAuthSuccess();
       unsubscribeAuthError();
       unsubscribeLogout();
       unsubscribeErrorNotify();
+      unsubscribeShowLoader();
+      unsubscribeHideLoader();
     };
   }, [navigationManager, showError]);
 

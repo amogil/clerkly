@@ -25,6 +25,8 @@ interface API {
     onAuthError: (callback: (error: string, errorCode?: string) => void) => () => void;
     onLogout: (callback: () => void) => () => void;
     onProfileUpdated: (callback: (profile: any) => void) => () => void;
+    onShowLoader: (callback: () => void) => () => void;
+    onHideLoader: (callback: () => void) => () => void;
   };
   // Requirements: ui.7.1
   error: {
@@ -214,6 +216,38 @@ const api: API = {
       ipcRenderer.on('auth:profile-updated', listener);
       return () => {
         ipcRenderer.removeListener('auth:profile-updated', listener);
+      };
+    },
+
+    /**
+     * Listen for loader show events
+     * Requirements: google-oauth-auth.7.1
+     * @param {Function} callback - Callback function to execute when loader should be shown
+     * @returns {Function} Unsubscribe function to remove the listener
+     */
+    onShowLoader(callback: () => void): () => void {
+      const listener = () => {
+        callback();
+      };
+      ipcRenderer.on('auth:show-loader', listener);
+      return () => {
+        ipcRenderer.removeListener('auth:show-loader', listener);
+      };
+    },
+
+    /**
+     * Listen for loader hide events
+     * Requirements: google-oauth-auth.7.1
+     * @param {Function} callback - Callback function to execute when loader should be hidden
+     * @returns {Function} Unsubscribe function to remove the listener
+     */
+    onHideLoader(callback: () => void): () => void {
+      const listener = () => {
+        callback();
+      };
+      ipcRenderer.on('auth:hide-loader', listener);
+      return () => {
+        ipcRenderer.removeListener('auth:hide-loader', listener);
       };
     },
   },

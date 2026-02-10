@@ -239,10 +239,10 @@
 - [x] Добавить превью функций (4 колонки): Listen & Transcribe, Extract Tasks, Automate Actions, Auto-Sync
 - [x] Добавить текст "By continuing, you agree to Clerkly's Terms of Service and Privacy Policy"
 - [x] Добавить обработчик клика на кнопку (вызов IPC auth:start-login)
-- [ ] Добавить props `isLoading` и `isDisabled` в интерфейс LoginScreenProps
-- [ ] Добавить loader (spinner) с текстом "Signing in..." когда isLoading=true
-- [ ] Деактивировать кнопку "Continue with Google" когда isDisabled=true
-- [ ] Обеспечить видимость всех элементов Login Screen во время отображения loader
+- [x] Добавить props `isLoading` и `isDisabled` в интерфейс LoginScreenProps
+- [x] Добавить loader (spinner) с текстом "Signing in..." когда isLoading=true
+- [x] Деактивировать кнопку "Continue with Google" когда isDisabled=true
+- [x] Обеспечить видимость всех элементов Login Screen во время отображения loader
 - **Requirements:** google-oauth-auth.12.1, google-oauth-auth.12.2, google-oauth-auth.12.3, google-oauth-auth.12.4, google-oauth-auth.12.5, google-oauth-auth.12.6, google-oauth-auth.15.1, google-oauth-auth.15.2, google-oauth-auth.15.3, google-oauth-auth.15.7
 
 ### 6.2 Создать Login Error Component
@@ -253,9 +253,9 @@
 - [x] Добавить маппинг для всех типов ошибок (popup_closed_by_user, access_denied, network_error, и т.д.)
 - [x] Отображать заголовок, сообщение и предложение из маппинга
 - [x] Добавить обработчик retry (вызов onRetry prop)
-- [ ] Добавить props `isLoading` и `isDisabled` в интерфейс LoginErrorProps
-- [ ] Деактивировать кнопку "Continue with Google" когда isDisabled=true
-- [ ] Отображать loader когда isLoading=true
+- [x] Добавить props `isLoading` и `isDisabled` в интерфейс LoginErrorProps
+- [x] Деактивировать кнопку "Continue with Google" когда isDisabled=true
+- [x] Отображать loader когда isLoading=true
 - **Requirements:** google-oauth-auth.13.1, google-oauth-auth.13.2, google-oauth-auth.13.3, google-oauth-auth.13.4, google-oauth-auth.13.5, google-oauth-auth.13.6, google-oauth-auth.13.7, google-oauth-auth.9.6, google-oauth-auth.15.1, google-oauth-auth.15.2
 
 ### 6.3 Создать модульные тесты для UI Components
@@ -296,10 +296,10 @@
 - [x] Реализовать приватный метод `handleAuthSuccess(): Promise<void>`
 - [x] Реализовать приватный метод `handleAuthError(error: string, errorCode?: string): Promise<void>`
 - [x] Интегрировать с существующим WindowManager
-- [ ] Реализовать приватный метод `showLoader(): Promise<void>` для отображения loader на Login Screen
-- [ ] Реализовать приватный метод `hideLoader(): Promise<void>` для скрытия loader
-- [ ] Обновить `handleAuthSuccess()` для вызова hideLoader() перед показом Dashboard
-- [ ] Обновить `handleAuthError()` для вызова hideLoader() перед показом Login Error Screen
+- [x] Реализовать приватный метод `showLoader(): Promise<void>` для отображения loader на Login Screen
+- [x] Реализовать приватный метод `hideLoader(): Promise<void>` для скрытия loader
+- [x] Обновить `handleAuthSuccess()` для вызова hideLoader() перед показом Dashboard
+- [x] Обновить `handleAuthError()` для вызова hideLoader() перед показом Login Error Screen
 - **Requirements:** google-oauth-auth.11.1, google-oauth-auth.11.4, google-oauth-auth.11.5, google-oauth-auth.11.8, google-oauth-auth.11.9, google-oauth-auth.15.1, google-oauth-auth.15.2, google-oauth-auth.15.5, google-oauth-auth.15.6
 
 ### 7.2 Создать модульные тесты для Auth Window Manager
@@ -310,9 +310,9 @@
 - [x] Тест: закрытие Login Window и открытие Main Window при успешной авторизации
 - [x] Тест: обновление содержимого окна на Login Error Screen при ошибке
 - [x] Тест: обновление содержимого окна на Login Screen при retry
-- [ ] Тест: вызов showLoader() при получении authorization code
-- [ ] Тест: вызов hideLoader() при успешной авторизации
-- [ ] Тест: вызов hideLoader() при ошибке авторизации
+- [x] Тест: вызов showLoader() при получении authorization code
+- [x] Тест: вызов hideLoader() при успешной авторизации
+- [x] Тест: вызов hideLoader() при ошибке авторизации
 - **Requirements:** google-oauth-auth.11.1, google-oauth-auth.11.4, google-oauth-auth.11.5, google-oauth-auth.15.1, google-oauth-auth.15.5, google-oauth-auth.15.6
 
 ### 7.3 Создать property-based тесты для Auth Window Manager

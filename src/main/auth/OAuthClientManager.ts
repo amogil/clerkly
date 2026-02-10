@@ -51,6 +51,7 @@ export class OAuthClientManager {
   private tokenStorage: TokenStorageManager;
   private pkceStorage: PKCEStorage | null = null;
   private profileManager: any | null = null; // Using any to avoid circular dependency
+  private authWindowManager: any | null = null; // Using any to avoid circular dependency
 
   constructor(config: OAuthConfig, tokenStorage: TokenStorageManager) {
     this.config = config;
@@ -66,6 +67,17 @@ export class OAuthClientManager {
   setProfileManager(profileManager: any): void {
     this.profileManager = profileManager;
     Logger.info('OAuthClientManager', 'Profile manager set for automatic updates');
+  }
+
+  /**
+   * Set auth window manager for loader display
+   * Requirements: google-oauth-auth.7.1
+   * Should be called during initialization to enable loader display during auth
+   * @param authWindowManager AuthWindowManager instance
+   */
+  setAuthWindowManager(authWindowManager: any): void {
+    this.authWindowManager = authWindowManager;
+    Logger.info('OAuthClientManager', 'Auth window manager set for loader display');
   }
 
   /**
@@ -192,6 +204,12 @@ export class OAuthClientManager {
         };
       }
 
+      // Requirements: google-oauth-auth.7.1 - Show loader during token exchange and profile fetch
+      if (this.authWindowManager) {
+        Logger.info('OAuthClientManager', 'Showing loader for token exchange and profile fetch');
+        this.authWindowManager.onShowLoader();
+      }
+
       // Exchange code for tokens
       const tokenResponse = await this.exchangeCodeForTokens(code, this.pkceStorage.codeVerifier);
 
@@ -225,6 +243,10 @@ export class OAuthClientManager {
         if (!profileResult.success) {
           // Requirements: google-oauth-auth.3.7 - Profile fetch failed, don't save tokens
           Logger.error('OAuthClientManager', 'Profile fetch failed, authorization incomplete');
+          // Requirements: google-oauth-auth.7.1 - Hide loader on error
+          if (this.authWindowManager) {
+            this.authWindowManager.onHideLoader();
+          }
           // Clear PKCE storage
           this.pkceStorage = null;
           return {
@@ -238,6 +260,11 @@ export class OAuthClientManager {
 
         // Now save tokens to database (profile manager has email set)
         await this.tokenStorage.saveTokens(tokenData);
+
+        // Requirements: google-oauth-auth.7.1 - Hide loader on success
+        if (this.authWindowManager) {
+          this.authWindowManager.onHideLoader();
+        }
       } else {
         Logger.warn('OAuthClientManager', 'Profile manager not set, saving tokens without profile');
         // Fallback: save tokens without profile (will fail if DataManager requires email)
@@ -251,6 +278,10 @@ export class OAuthClientManager {
         authorized: true,
       };
     } catch (error: unknown) {
+      // Requirements: google-oauth-auth.7.1 - Hide loader on error
+      if (this.authWindowManager) {
+        this.authWindowManager.onHideLoader();
+      }
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       return {
         authorized: false,
