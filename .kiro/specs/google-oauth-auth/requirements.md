@@ -313,7 +313,5 @@
 - `tests/functional/auth-flow.spec.ts` - "should disable login button when loader is shown"
 - `tests/functional/auth-flow.spec.ts` - "should hide loader and show dashboard on success"
 - `tests/functional/auth-flow.spec.ts` - "should hide loader and show error on failure"
-- `tests/functional/auth-flow.spec.ts` - "should show loader ON login screen, not as separate page"
-- `tests/functional/auth-flow.spec.ts` - "should show loader ON error screen during retry, not as separate page"
 - `tests/functional/auth-flow.spec.ts` - "should NOT show loader immediately after login click, only after deep link"
 

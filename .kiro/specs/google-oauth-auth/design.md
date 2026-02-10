@@ -1206,9 +1206,7 @@ it('should preserve token data through save/load cycle', () => {
 3. Проверка отображения Main App при наличии валидных токенов
 4. Проверка отображения Login Error Screen при ошибке авторизации
 5. Проверка logout flow с очисткой токенов
-6. **Проверка отображения loader НА странице логина (не отдельная страница)** - `tests/functional/auth-flow.spec.ts` - "should show loader ON login screen, not as separate page"
-7. **Проверка отображения loader НА странице ошибки при повторной попытке (не отдельная страница)** - `tests/functional/auth-flow.spec.ts` - "should show loader ON error screen during retry, not as separate page"
-8. **Проверка таймингов loader: НЕ показывается сразу при клике, показывается только после deep link** - `tests/functional/auth-flow.spec.ts` - "should NOT show loader immediately after login click, only after deep link"
+6. **Проверка таймингов loader: НЕ показывается сразу при клике, показывается только после deep link** - `tests/functional/auth-flow.spec.ts` - "should NOT show loader immediately after login click, only after deep link"
 
 **Инструменты:**
 - Playwright для Electron
