@@ -79,91 +79,90 @@ describe('DateTimeFormatter (Renderer Process)', () => {
   });
 });
 
-
-  describe('Error Handling', () => {
-    /* Preconditions: invalid timestamp causes Intl.DateTimeFormat to throw
+describe('Error Handling', () => {
+  /* Preconditions: invalid timestamp causes Intl.DateTimeFormat to throw
        Action: call formatDate with invalid timestamp
        Assertions: falls back to toLocaleDateString, logs error
        Requirements: ui.11.1 */
-    it('should fallback to toLocaleDateString on formatDate error', () => {
-      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
-      
-      // Create an invalid Date object
-      const invalidDate = new Date('invalid');
-      const result = DateTimeFormatter.formatDate(invalidDate);
+  it('should fallback to toLocaleDateString on formatDate error', () => {
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
 
-      // Should still return a string (fallback)
-      expect(typeof result).toBe('string');
-      
-      consoleErrorSpy.mockRestore();
-    });
+    // Create an invalid Date object
+    const invalidDate = new Date('invalid');
+    const result = DateTimeFormatter.formatDate(invalidDate);
 
-    /* Preconditions: invalid timestamp causes Intl.DateTimeFormat to throw
+    // Should still return a string (fallback)
+    expect(typeof result).toBe('string');
+
+    consoleErrorSpy.mockRestore();
+  });
+
+  /* Preconditions: invalid timestamp causes Intl.DateTimeFormat to throw
        Action: call formatDateTime with invalid timestamp
        Assertions: falls back to toLocaleString, logs error
        Requirements: ui.11.1 */
-    it('should fallback to toLocaleString on formatDateTime error', () => {
-      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
-      
-      // Create an invalid Date object
-      const invalidDate = new Date('invalid');
-      const result = DateTimeFormatter.formatDateTime(invalidDate);
+  it('should fallback to toLocaleString on formatDateTime error', () => {
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
 
-      // Should still return a string (fallback)
-      expect(typeof result).toBe('string');
-      
-      consoleErrorSpy.mockRestore();
-    });
+    // Create an invalid Date object
+    const invalidDate = new Date('invalid');
+    const result = DateTimeFormatter.formatDateTime(invalidDate);
 
-    /* Preconditions: invalid timestamp causes date methods to throw
+    // Should still return a string (fallback)
+    expect(typeof result).toBe('string');
+
+    consoleErrorSpy.mockRestore();
+  });
+
+  /* Preconditions: invalid timestamp causes date methods to throw
        Action: call formatLogTimestamp with invalid timestamp
        Assertions: falls back to toISOString, logs error
        Requirements: ui.11.3 */
-    it('should fallback to toISOString on formatLogTimestamp error', () => {
-      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
-      
-      // Create an invalid Date object
-      const invalidDate = new Date('invalid');
-      const result = DateTimeFormatter.formatLogTimestamp(invalidDate);
+  it('should fallback to toISOString on formatLogTimestamp error', () => {
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
 
-      // Should still return a string (fallback)
-      expect(typeof result).toBe('string');
-      
-      consoleErrorSpy.mockRestore();
-    });
+    // Create an invalid Date object
+    const invalidDate = new Date('invalid');
+    const result = DateTimeFormatter.formatLogTimestamp(invalidDate);
 
-    /* Preconditions: Date object provided instead of timestamp
+    // Should still return a string (fallback)
+    expect(typeof result).toBe('string');
+
+    consoleErrorSpy.mockRestore();
+  });
+
+  /* Preconditions: Date object provided instead of timestamp
        Action: call formatDate with Date object
        Assertions: handles Date object correctly
        Requirements: ui.11.1 */
-    it('should handle Date object in formatDate', () => {
-      const date = new Date('2026-02-07T10:30:00Z');
-      const result = DateTimeFormatter.formatDate(date);
+  it('should handle Date object in formatDate', () => {
+    const date = new Date('2026-02-07T10:30:00Z');
+    const result = DateTimeFormatter.formatDate(date);
 
-      expect(result).toBeTruthy();
-      expect(typeof result).toBe('string');
-    });
+    expect(result).toBeTruthy();
+    expect(typeof result).toBe('string');
+  });
 
-    /* Preconditions: Date object provided instead of timestamp
+  /* Preconditions: Date object provided instead of timestamp
        Action: call formatDateTime with Date object
        Assertions: handles Date object correctly
        Requirements: ui.11.1 */
-    it('should handle Date object in formatDateTime', () => {
-      const date = new Date('2026-02-07T10:30:00Z');
-      const result = DateTimeFormatter.formatDateTime(date);
+  it('should handle Date object in formatDateTime', () => {
+    const date = new Date('2026-02-07T10:30:00Z');
+    const result = DateTimeFormatter.formatDateTime(date);
 
-      expect(result).toBeTruthy();
-      expect(typeof result).toBe('string');
-    });
+    expect(result).toBeTruthy();
+    expect(typeof result).toBe('string');
+  });
 
-    /* Preconditions: Date object provided instead of timestamp
+  /* Preconditions: Date object provided instead of timestamp
        Action: call formatLogTimestamp with Date object
        Assertions: handles Date object correctly
        Requirements: ui.11.3 */
-    it('should handle Date object in formatLogTimestamp', () => {
-      const date = new Date('2026-02-07T10:30:45Z');
-      const result = DateTimeFormatter.formatLogTimestamp(date);
+  it('should handle Date object in formatLogTimestamp', () => {
+    const date = new Date('2026-02-07T10:30:45Z');
+    const result = DateTimeFormatter.formatLogTimestamp(date);
 
-      expect(result).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}$/);
-    });
+    expect(result).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}$/);
   });
+});

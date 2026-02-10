@@ -233,11 +233,11 @@ describe('APIRequestHandler', () => {
     beforeEach(() => {
       // Import and mock setOAuthClientManager
       const { setOAuthClientManager } = require('../../../src/main/auth/APIRequestHandler');
-      
+
       mockOAuthClient = {
         refreshAccessToken: jest.fn(),
       };
-      
+
       setOAuthClientManager(mockOAuthClient);
     });
 

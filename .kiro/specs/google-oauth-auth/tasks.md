@@ -353,12 +353,12 @@
 - **Requirements:** google-oauth-auth.9.3
 
 ### 8.4 Создать property-based тесты для Loader Functionality
-- [ ] Создать файл `tests/property/auth/LoaderState.property.test.ts`
-- [ ] Property тест: **Property 20 - Loader State Consistency**
+- [x] Создать файл `tests/property/auth/LoaderState.property.test.tsx`
+- [x] Property тест: **Property 20 - Loader State Consistency**
   - *For any* combination of isLoading and isDisabled, button state and loader visibility must be consistent
-- [ ] Property тест: **Property 21 - Loader Visibility Invariant**
+- [x] Property тест: **Property 21 - Loader Visibility Invariant**
   - *For any* sequence of show/hide actions, isLoaderVisible should match the last action
-- [ ] Property тест: **Property 22 - Button State Invariant**
+- [x] Property тест: **Property 22 - Button State Invariant**
   - *For any* combination of isLoading and isDisabled, button disabled state should be (isLoading || isDisabled)
 - **Requirements:** google-oauth-auth.15.1, google-oauth-auth.15.2, google-oauth-auth.15.3, google-oauth-auth.15.5, google-oauth-auth.15.6
 - **Примечание:** Опциональные тесты для дополнительной проверки инвариантов loader functionality. Эти тесты не являются обязательными для завершения задачи, но рекомендуются для повышения уверенности в корректности реализации.
@@ -482,7 +482,7 @@
 
 ### Свойства Корректности (Property-Based Tests)
 
-Все 19 свойств корректности покрыты property-based тестами:
+Все 22 свойства корректности покрыты property-based тестами:
 
 1. **Property 1**: PKCE Parameters Generation - `tests/property/auth/OAuthClientManager.property.test.ts`
 2. **Property 2**: PKCE Parameters Persistence - `tests/property/auth/OAuthClientManager.property.test.ts`
@@ -503,6 +503,9 @@
 17. **Property 17**: Window State Based on Auth Status - `tests/property/auth/AuthWindowManager.property.test.ts`
 18. **Property 18**: Error Screen Display - `tests/property/auth/AuthWindowManager.property.test.ts`
 19. **Property 19**: Loader Display During Authorization - `tests/property/auth/AuthWindowManager.property.test.ts`
+20. **Property 20**: Loader State Consistency - `tests/property/auth/LoaderState.property.test.tsx`
+21. **Property 21**: Loader Visibility Invariant - `tests/property/auth/LoaderState.property.test.tsx`
+22. **Property 22**: Button State Invariant - `tests/property/auth/LoaderState.property.test.tsx`
 
 ### Функциональные Тесты (End-to-End)
 
