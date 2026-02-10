@@ -292,19 +292,6 @@ function AppContent() {
     );
   }
 
-  // Requirements: ui.6.4 - Show loader during synchronous profile fetch
-  // This loader is shown after OAuth success but before profile is loaded
-  if (isLoadingProfile) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading your profile...</p>
-        </div>
-      </div>
-    );
-  }
-
   // Requirements: google-oauth-auth.12.5, ui.6.4
   // Show error screen if authentication failed (including profile fetch failure)
   if (authError) {
@@ -316,14 +303,23 @@ function AppContent() {
           setAuthError(null);
           handleLogin();
         }}
+        isLoading={isLoadingProfile}
+        isDisabled={isLoadingProfile}
       />
     );
   }
 
-  // Requirements: google-oauth-auth.12.2
+  // Requirements: google-oauth-auth.12.2, google-oauth-auth.15.7
   // Show login screen if not authorized
+  // Loader is shown ON the login screen, not as a separate page
   if (!isAuthorized) {
-    return <LoginScreen onLogin={handleLogin} />;
+    return (
+      <LoginScreen
+        onLogin={handleLogin}
+        isLoading={isLoadingProfile}
+        isDisabled={isLoadingProfile}
+      />
+    );
   }
 
   // Requirements: clerkly.1

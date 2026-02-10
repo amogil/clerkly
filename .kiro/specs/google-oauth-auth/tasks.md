@@ -252,11 +252,12 @@
 - [x] Реализовать функцию `getErrorDetails(errorCode, errorMessage)` для маппинга ошибок
 - [x] Добавить маппинг для всех типов ошибок (popup_closed_by_user, access_denied, network_error, и т.д.)
 - [x] Отображать заголовок, сообщение и предложение из маппинга
-- [x] Добавить обработчик retry (вызов onRetry prop)
+- [x] Добавить обработчик retry (вызов onRetry prop при клике на кнопку "Continue with Google")
 - [x] Добавить props `isLoading` и `isDisabled` в интерфейс LoginErrorProps
 - [x] Деактивировать кнопку "Continue with Google" когда isDisabled=true
 - [x] Отображать loader когда isLoading=true
-- **Requirements:** google-oauth-auth.13.1, google-oauth-auth.13.2, google-oauth-auth.13.3, google-oauth-auth.13.4, google-oauth-auth.13.5, google-oauth-auth.13.6, google-oauth-auth.13.7, google-oauth-auth.9.6, google-oauth-auth.15.1, google-oauth-auth.15.2
+- **Примечание:** LoginError использует ту же кнопку "Continue with Google", что и LoginScreen, для повторной попытки авторизации
+- **Requirements:** google-oauth-auth.13.1, google-oauth-auth.13.2, google-oauth-auth.13.3, google-oauth-auth.13.4, google-oauth-auth.13.5, google-oauth-auth.13.6, google-oauth-auth.13.7, google-oauth-auth.13.8, google-oauth-auth.9.6, google-oauth-auth.15.1, google-oauth-auth.15.2
 
 ### 6.3 Создать модульные тесты для UI Components
 - [x] Создать файл `tests/unit/auth/LoginScreen.test.tsx`
@@ -410,7 +411,9 @@
 - [x] Тест: деактивация кнопки login когда loader отображается
 - [x] Тест: скрытие loader и показ dashboard при успехе
 - [x] Тест: скрытие loader и показ ошибки при неудаче
-- **Requirements:** google-oauth-auth.11.1, google-oauth-auth.11.2, google-oauth-auth.11.3, google-oauth-auth.11.4, google-oauth-auth.11.5, google-oauth-auth.15.1, google-oauth-auth.15.2, google-oauth-auth.15.4, google-oauth-auth.15.5, google-oauth-auth.15.6
+- [x] **Тест: loader показывается НА странице логина (не отдельная страница)** - проверка видимости всех элементов Login Screen во время отображения loader
+- [x] **Тест: loader показывается НА странице ошибки при повторной попытке (не отдельная страница)** - проверка видимости всех элементов Login Error Screen во время отображения loader при retry (кнопка "Continue with Google")
+- **Requirements:** google-oauth-auth.11.1, google-oauth-auth.11.2, google-oauth-auth.11.3, google-oauth-auth.11.4, google-oauth-auth.11.5, google-oauth-auth.13.8, google-oauth-auth.15.1, google-oauth-auth.15.2, google-oauth-auth.15.4, google-oauth-auth.15.5, google-oauth-auth.15.6, google-oauth-auth.15.7
 
 ### 10.3 Создать функциональные тесты для Login UI
 - [x] Создать файл `tests/functional/login-ui.spec.ts`

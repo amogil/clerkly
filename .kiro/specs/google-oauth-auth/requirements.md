@@ -213,7 +213,7 @@
 6. КОГДА пользователь завершает авторизацию в браузере И deep link получен (authorization code), ТО приложение ДОЛЖНО показать loader (см. требование 15)
 7. КОГДА loader отображается, ТО кнопка "Continue with Google" ДОЛЖНА быть неактивной (disabled)
 8. ЕСЛИ авторизация успешна (токены получены И профиль загружен), ТО "Window Manager" ДОЛЖЕН закрыть "Login Screen" и открыть главное окно приложения (Dashboard)
-9. ЕСЛИ авторизация неуспешна (ошибка обмена токенов ИЛИ ошибка загрузки профиля), ТО "Window Manager" ДОЛЖЕН показать "Login Error Screen" с описанием ошибки и кнопкой повтора
+9. ЕСЛИ авторизация неуспешна (ошибка обмена токенов ИЛИ ошибка загрузки профиля), ТО "Window Manager" ДОЛЖЕН показать "Login Error Screen" с описанием ошибки и той же кнопкой "Continue with Google" для повторной попытки
 
 #### Функциональные Тесты
 
@@ -256,6 +256,7 @@
 5. КОГДА ошибка "network_error", ТО "Login Error Screen" ДОЛЖЕН показать заголовок "Network error" и текст "Unable to connect to Google authentication servers." с предложением "Please check your internet connection and try again."
 6. КОГДА ошибка неизвестна, ТО "Login Error Screen" ДОЛЖЕН показать заголовок "Authentication failed" и переданное сообщение об ошибке с предложением "Please try signing in again or contact support if the problem persists."
 7. "Login Error Screen" ДОЛЖЕН использовать дизайн из прототипа `figma/src/app/components/login-error.tsx`
+8. КОГДА пользователь нажимает кнопку "Continue with Google" на "Login Error Screen", ТО приложение ДОЛЖНО повторить попытку авторизации (вызвать onRetry callback)
 
 #### Функциональные Тесты
 
@@ -306,4 +307,6 @@
 - `tests/functional/auth-flow.spec.ts` - "should disable login button when loader is shown"
 - `tests/functional/auth-flow.spec.ts` - "should hide loader and show dashboard on success"
 - `tests/functional/auth-flow.spec.ts` - "should hide loader and show error on failure"
+- `tests/functional/auth-flow.spec.ts` - "should show loader ON login screen, not as separate page"
+- `tests/functional/auth-flow.spec.ts` - "should show loader ON error screen during retry, not as separate page"
 

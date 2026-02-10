@@ -721,6 +721,10 @@ export const OAUTH_CONFIG = {
   Мысли: Это консистентность дизайна. Это не функциональное требование.
   Тестируемость: нет
 
+13.8 Повторная попытка через кнопку "Continue with Google"
+  Мысли: Login Error Screen использует ту же кнопку "Continue with Google", что и Login Screen, для повторной попытки авторизации. Это логично и консистентно с UX.
+  Тестируемость: да - example
+
 **Требование 14: Sign Out Flow**
 
 14.1-14.7 Sign Out Flow
@@ -1190,10 +1194,12 @@ it('should preserve token data through save/load cycle', () => {
 3. Проверка отображения Main App при наличии валидных токенов
 4. Проверка отображения Login Error Screen при ошибке авторизации
 5. Проверка logout flow с очисткой токенов
+6. **Проверка отображения loader НА странице логина (не отдельная страница)** - `tests/functional/auth-flow.spec.ts` - "should show loader ON login screen, not as separate page"
+7. **Проверка отображения loader НА странице ошибки при повторной попытке (не отдельная страница)** - `tests/functional/auth-flow.spec.ts` - "should show loader ON error screen during retry, not as separate page"
 
 **Инструменты:**
-- Spectron или Playwright для Electron
-- Моки для Google OAuth API endpoints
+- Playwright для Electron
+- Mock OAuth server для симуляции Google OAuth API
 
 ### Покрытие Требований
 
@@ -1274,6 +1280,7 @@ it('should preserve token data through save/load cycle', () => {
 | google-oauth-auth.13.5 | ✓ | - | ✓ |
 | google-oauth-auth.13.6 | ✓ | - | ✓ |
 | google-oauth-auth.13.7 | ✓ | - | ✓ |
+| google-oauth-auth.13.8 | ✓ | - | ✓ |
 | google-oauth-auth.14.1 | ✓ | - | ✓ |
 | google-oauth-auth.14.2 | ✓ | - | ✓ |
 | google-oauth-auth.14.3 | ✓ | - | ✓ |
@@ -1287,6 +1294,7 @@ it('should preserve token data through save/load cycle', () => {
 | google-oauth-auth.15.4 | ✓ | ✓ | ✓ |
 | google-oauth-auth.15.5 | ✓ | - | ✓ |
 | google-oauth-auth.15.6 | ✓ | - | ✓ |
+| google-oauth-auth.15.7 | ✓ | - | ✓ |
 | google-oauth-auth.15.7 | ✓ | - | ✓ |
 | google-oauth-auth.15.8 | ✓ | - | ✓ |
 

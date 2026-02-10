@@ -263,3 +263,243 @@ test.describe('Authentication Flow', () => {
     console.log('[TEST] ✓ Dashboard displayed successfully after authentication');
   });
 });
+
+/* Preconditions: User on login screen, clicks login button
+     Action: Click login button and check loader visibility
+     Assertions: Loader is shown ON the login screen (all login elements remain visible)
+     Requirements: google-oauth-auth.15.1, google-oauth-auth.15.7 */
+test('should show loader ON login screen, not as separate page', async () => {
+  let context: ElectronTestContext | undefined;
+  let mockServer: MockOAuthServer | undefined;
+
+  try {
+    // Start mock OAuth server for this test
+    mockServer = new MockOAuthServer({
+      port: 8893,
+      clientId: 'test-client-id-12345',
+      clientSecret: 'test-client-secret-67890',
+    });
+
+    await mockServer.start();
+    console.log(`[TEST] Mock OAuth server started at ${mockServer.getBaseUrl()}`);
+
+    // Set user profile data for this test
+    mockServer.setUserProfile({
+      id: '123456789',
+      email: 'loader.test@example.com',
+      name: 'Loader Test User',
+      given_name: 'Loader',
+      family_name: 'Test User',
+    });
+
+    // Launch the application
+    context = await launchElectron(undefined, {
+      CLERKLY_GOOGLE_API_URL: mockServer.getBaseUrl(),
+      CLERKLY_OAUTH_CLIENT_ID: 'test-client-id-12345',
+      CLERKLY_OAUTH_CLIENT_SECRET: 'test-client-secret-67890',
+    });
+    await context.window.waitForLoadState('domcontentloaded');
+
+    // Verify login screen is displayed initially
+    const loginButton = context.window.locator('text=/continue with google/i');
+    await loginButton.waitFor({ state: 'visible', timeout: 5000 });
+    expect(await loginButton.isVisible()).toBe(true);
+
+    console.log('[TEST] Login screen displayed');
+
+    // Check for login screen elements BEFORE clicking
+    const clerklyLogo = context.window.locator('text=/clerkly/i').first();
+    const welcomeText = context.window.locator('text=/welcome/i');
+
+    expect(await clerklyLogo.isVisible()).toBe(true);
+    expect(await welcomeText.isVisible()).toBe(true);
+
+    console.log('[TEST] Login screen elements visible before clicking');
+
+    // Click login button
+    await loginButton.click();
+
+    // Wait a moment for loader to appear
+    await context.window.waitForTimeout(500);
+
+    console.log('[TEST] Clicked login button, checking for loader...');
+
+    // Check that loader is visible
+    const loader = context.window.locator('.animate-spin');
+    const loaderText = context.window.locator('text=/signing in/i');
+
+    // Loader should be visible
+    expect(await loader.isVisible()).toBe(true);
+    expect(await loaderText.isVisible()).toBe(true);
+
+    console.log('[TEST] ✓ Loader is visible');
+
+    // CRITICAL: Check that login screen elements are STILL visible
+    // Requirements: google-oauth-auth.15.7 - All Login Screen elements must remain visible
+    expect(await clerklyLogo.isVisible()).toBe(true);
+    expect(await welcomeText.isVisible()).toBe(true);
+
+    console.log('[TEST] ✓ Login screen elements STILL visible (loader shown ON login screen)');
+
+    // Check that we're NOT on a separate loader page
+    // A separate loader page would show ONLY "Loading your profile..." text
+    const separateLoaderText = context.window.locator('text=/loading your profile/i');
+    const isSeparateLoaderVisible = await separateLoaderText.isVisible().catch(() => false);
+    expect(isSeparateLoaderVisible).toBe(false);
+
+    console.log('[TEST] ✓ Confirmed: NOT showing separate loader page');
+
+    // Take screenshot showing loader ON login screen
+    await context.window.screenshot({
+      path: 'playwright-report/loader-on-login-screen.png',
+    });
+
+    console.log('[TEST] ✓ Loader correctly shown ON login screen, not as separate page');
+  } finally {
+    // Clean up
+    if (context) {
+      await closeElectron(context);
+    }
+    if (mockServer) {
+      await mockServer.stop();
+      console.log('[TEST] Mock OAuth server stopped');
+    }
+  }
+});
+
+/* Preconditions: User on error screen after failed auth
+   Action: Click "Continue with Google" button to retry
+   Assertions: Loader is shown ON the error screen (all error screen elements remain visible)
+   Requirements: google-oauth-auth.15.1, google-oauth-auth.15.2, google-oauth-auth.15.7 */
+test('should show loader ON error screen during retry, not as separate page', async () => {
+  let context: ElectronTestContext | undefined;
+  let mockServer: MockOAuthServer | undefined;
+
+  try {
+    // Start mock OAuth server that will fail first, then succeed
+    mockServer = new MockOAuthServer({
+      port: 8892,
+      clientId: 'test-client-id-12345',
+      clientSecret: 'test-client-secret-67890',
+    });
+
+    await mockServer.start();
+    console.log(`[TEST] Mock OAuth server started at ${mockServer.getBaseUrl()}`);
+
+    // Set user profile for successful retry
+    mockServer.setUserProfile({
+      id: '123456789',
+      email: 'error.retry.test@example.com',
+      name: 'Error Retry Test User',
+      given_name: 'Error',
+      family_name: 'Retry Test User',
+    });
+
+    // Launch the application
+    context = await launchElectron(undefined, {
+      CLERKLY_GOOGLE_API_URL: mockServer.getBaseUrl(),
+      CLERKLY_OAUTH_CLIENT_ID: 'test-client-id-12345',
+      CLERKLY_OAUTH_CLIENT_SECRET: 'test-client-secret-67890',
+    });
+    await context.window.waitForLoadState('domcontentloaded');
+
+    // Verify login screen is displayed initially
+    const loginButton = context.window.locator('text=/continue with google/i');
+    await loginButton.waitFor({ state: 'visible', timeout: 5000 });
+    expect(await loginButton.isVisible()).toBe(true);
+
+    console.log('[TEST] Login screen displayed');
+
+    // Simulate OAuth flow that fails during profile fetch
+    // We'll manually trigger an error by calling the error handler
+    await context.app.evaluate(async () => {
+      // Simulate profile fetch failure
+      const event = new CustomEvent('auth:error', {
+        detail: {
+          message: 'Unable to load your Google profile information.',
+          code: 'profile_fetch_failed',
+        },
+      });
+      window.dispatchEvent(event);
+    });
+
+    // Wait for error screen to appear
+    await context.window.waitForTimeout(1000);
+
+    console.log('[TEST] Checking for error screen...');
+
+    // Verify error screen is displayed
+    const errorMessage = context.window.locator('text=/unable to load your google profile/i');
+    await errorMessage.waitFor({ state: 'visible', timeout: 5000 });
+    expect(await errorMessage.isVisible()).toBe(true);
+
+    console.log('[TEST] ✓ Error screen displayed');
+
+    // Check for error screen elements BEFORE clicking retry
+    const clerklyLogo = context.window.locator('text=/clerkly/i').first();
+    const welcomeText = context.window.locator('text=/welcome/i');
+    const errorBlock = context.window.locator('[class*="bg-red"]');
+
+    expect(await clerklyLogo.isVisible()).toBe(true);
+    expect(await welcomeText.isVisible()).toBe(true);
+    expect(await errorBlock.isVisible()).toBe(true);
+
+    console.log('[TEST] Error screen elements visible before clicking retry');
+
+    // Find retry button (same "Continue with Google" button)
+    const retryButton = context.window.locator('text=/continue with google/i');
+    expect(await retryButton.isVisible()).toBe(true);
+
+    // Click retry button
+    await retryButton.click();
+
+    // Wait a moment for loader to appear
+    await context.window.waitForTimeout(500);
+
+    console.log('[TEST] Clicked retry button, checking for loader...');
+
+    // Check that loader is visible
+    const loader = context.window.locator('.animate-spin');
+    const loaderText = context.window.locator('text=/signing in/i');
+
+    // Loader should be visible
+    expect(await loader.isVisible()).toBe(true);
+    expect(await loaderText.isVisible()).toBe(true);
+
+    console.log('[TEST] ✓ Loader is visible');
+
+    // CRITICAL: Check that error screen elements are STILL visible
+    // Requirements: google-oauth-auth.15.7 - All Login Error Screen elements must remain visible
+    expect(await clerklyLogo.isVisible()).toBe(true);
+    expect(await welcomeText.isVisible()).toBe(true);
+    expect(await errorBlock.isVisible()).toBe(true);
+
+    console.log('[TEST] ✓ Error screen elements STILL visible (loader shown ON error screen)');
+
+    // Check that we're NOT on a separate loader page
+    // A separate loader page would show ONLY "Loading your profile..." text
+    const separateLoaderText = context.window.locator('text=/loading your profile/i');
+    const isSeparateLoaderVisible = await separateLoaderText.isVisible().catch(() => false);
+    expect(isSeparateLoaderVisible).toBe(false);
+
+    console.log('[TEST] ✓ Confirmed: NOT showing separate loader page');
+
+    // Take screenshot showing loader ON error screen
+    await context.window.screenshot({
+      path: 'playwright-report/loader-on-error-screen.png',
+    });
+
+    console.log(
+      '[TEST] ✓ Loader correctly shown ON error screen during retry, not as separate page'
+    );
+  } finally {
+    // Clean up
+    if (context) {
+      await closeElectron(context);
+    }
+    if (mockServer) {
+      await mockServer.stop();
+      console.log('[TEST] Mock OAuth server stopped');
+    }
+  }
+});
