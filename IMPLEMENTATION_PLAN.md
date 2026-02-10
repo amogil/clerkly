@@ -267,19 +267,20 @@
 
 ### Фаза 2: Централизованная Обработка API (Приоритет: СРЕДНИЙ)
 
+**СТАТУС: ✅ ЗАВЕРШЕНО** - Все задачи уже были реализованы ранее
+
 #### Шаг 8: Создать handleAPIRequest()
 **Задача:** UI 37.1
 **Время:** ~45 минут
-**Файл:** `src/renderer/utils/api-request-handler.ts` (новый)
+**Файл:** `src/main/auth/APIRequestHandler.ts`
+**Статус:** ✅ ЗАВЕРШЕНО (уже реализовано)
 
 **Реализация:**
-```typescript
-// Создать новый файл с функцией handleAPIRequest()
-// 1. Обертка над fetch()
-// 2. Проверка HTTP 401
-// 3. При 401: clearTokens() + показать LoginError
-// 4. Логирование с контекстом
-```
+- ✅ Обертка над fetch()
+- ✅ Проверка HTTP 401
+- ✅ При 401: clearTokens() + показать LoginError
+- ✅ Логирование с контекстом
+- ✅ Автоматическое обновление токенов перед запросом
 
 **Зависимости:** Нет
 
@@ -288,20 +289,12 @@
 #### Шаг 9: Добавить защиту от race conditions
 **Задача:** UI 39.1
 **Время:** ~20 минут
-**Файл:** `src/renderer/utils/api-request-handler.ts`
+**Файл:** `src/main/auth/APIRequestHandler.ts`
+**Статус:** ✅ ЗАВЕРШЕНО (уже реализовано)
 
 **Изменения:**
-```typescript
-// Добавить флаг isClearing401 для предотвращения множественных очисток
-let isClearing401 = false;
-
-// В handleAPIRequest():
-if (response.status === 401 && !isClearing401) {
-  isClearing401 = true;
-  await clearTokens();
-  isClearing401 = false;
-}
-```
+- ✅ Флаг `isClearing401` для предотвращения множественных очисток
+- ✅ Защита от race conditions при множественных 401
 
 **Зависимости:** Шаг 8
 
@@ -311,12 +304,11 @@ if (response.status === 401 && !isClearing401) {
 **Задача:** UI 37.2
 **Время:** ~30 минут
 **Файл:** `src/main/auth/UserProfileManager.ts`
+**Статус:** ✅ ЗАВЕРШЕНО (уже реализовано)
 
 **Изменения:**
-```typescript
-// Заменить прямые вызовы fetch() на handleAPIRequest()
-// В методах: fetchProfile(), fetchProfileSynchronously()
-```
+- ✅ `fetchProfile()` использует `handleAPIRequest()`
+- ✅ Корректная обработка ошибок 401
 
 **Зависимости:** Шаги 8-9
 
@@ -326,28 +318,29 @@ if (response.status === 401 && !isClearing401) {
 **Задача:** UI 37.3
 **Время:** ~40 минут (зависит от количества клиентов)
 **Файлы:** Все API клиенты в проекте
+**Статус:** ✅ ЗАВЕРШЕНО (других API клиентов нет)
 
 **Действия:**
-1. Найти все файлы с fetch() к Google APIs
-2. Заменить на handleAPIRequest()
-3. Проверить обработку ошибок
+- ✅ Других API клиентов не существует
+- ✅ OAuth endpoints (token exchange, refresh, revoke) не используют handleAPIRequest, так как они сами управляют токенами
 
 **Зависимости:** Шаги 8-9
 
 ---
 
 #### Шаг 12: Тесты для handleAPIRequest()
-**Задача:** UI 39.2
+**Задача:** UI 39.2, 40.x
 **Время:** ~40 минут
-**Файл:** `tests/unit/utils/api-request-handler.test.ts` (новый)
+**Файл:** `tests/unit/auth/APIRequestHandler.test.ts`
+**Статус:** ✅ ЗАВЕРШЕНО (уже реализовано)
 
 **Тесты:**
-1. should return response on success
-2. should clear tokens on 401
-3. should show LoginError on 401
-4. should log error with context
-5. should not clear tokens on other errors
-6. should handle multiple simultaneous 401 (race condition)
+- ✅ should return response on success
+- ✅ should clear tokens on 401
+- ✅ should show LoginError on 401
+- ✅ should log error with context
+- ✅ should not clear tokens on other errors
+- ✅ should handle multiple simultaneous 401 (race condition)
 
 **Зависимости:** Шаги 8-9
 
@@ -355,20 +348,25 @@ if (response.status === 401 && !isClearing401) {
 
 **Checkpoint 2:** Запустить `npm run validate`
 
+**Статус:** ⏭️ СЛЕДУЮЩИЙ ШАГ
+
 ---
 
 ### Фаза 3: Автоматическое Обновление Токенов (Приоритет: НИЗКИЙ)
 
+**СТАТУС: ✅ ЗАВЕРШЕНО** - Все задачи уже были реализованы ранее
+
 #### Шаг 13: Проверить refreshAccessToken()
 **Задача:** UI 38.1
 **Время:** ~30 минут
-**Файл:** `src/main/auth/OAuthClientManager.ts`
+**Файл:** `src/main/auth/OAuthClientManager.ts`, `src/main/auth/APIRequestHandler.ts`
+**Статус:** ✅ ЗАВЕРШЕНО (уже реализовано)
 
 **Действия:**
-1. Прочитать существующую реализацию
-2. Проверить фоновую работу
-3. Убедиться в отсутствии уведомлений
-4. Добавить улучшения если нужно
+- ✅ Метод работает в фоновом режиме
+- ✅ Пользователь не видит прерываний
+- ✅ Нет уведомлений пользователю при успешном refresh
+- ✅ Автоматическое обновление реализовано в handleAPIRequest()
 
 **Зависимости:** Нет
 
@@ -377,13 +375,14 @@ if (response.status === 401 && !isClearing401) {
 #### Шаг 14: Автоматический триггер refresh
 **Задача:** UI 38.2
 **Время:** ~30 минут
-**Файл:** `src/main/auth/OAuthClientManager.ts`
+**Файл:** `src/main/auth/APIRequestHandler.ts`
+**Статус:** ✅ ЗАВЕРШЕНО (уже реализовано)
 
 **Действия:**
-1. Проверить getAuthStatus()
-2. Убедиться в автоматическом refresh при истечении
-3. Проверить обновление профиля после refresh
-4. Добавить улучшения если нужно
+- ✅ handleAPIRequest() автоматически проверяет срок действия токена
+- ✅ Если токен истек, автоматически вызывается refreshAccessToken()
+- ✅ Обновление происходит прозрачно для пользователя
+- ✅ Authorization header обновляется с новым токеном
 
 **Зависимости:** Шаг 13
 
@@ -391,18 +390,20 @@ if (response.status === 401 && !isClearing401) {
 
 **Checkpoint 3:** Запустить `npm run validate` - финальная проверка
 
+**Статус:** ⏭️ СЛЕДУЮЩИЙ ШАГ
+
 ---
 
 ## Оценка Времени
 
 | Фаза | Задач | Время |
 |------|-------|-------|
-| Фаза 1: UI Components - Loader Support | 7 | ~2.5 часа |
-| Фаза 2: Централизованная Обработка API | 4 | ~2.5 часа |
-| Фаза 3: Автоматическое Обновление Токенов | 2 | ~1 час |
-| **ИТОГО** | **13** | **~6 часов** |
+| Фаза 1: UI Components - Loader Support | 7 | ✅ ~2.5 часа (завершено) |
+| Фаза 2: Централизованная Обработка API | 4 | ✅ ~0 часов (уже было реализовано) |
+| Фаза 3: Автоматическое Обновление Токенов | 2 | ✅ ~0 часов (уже было реализовано) |
+| **ИТОГО** | **13** | **~2.5 часа** |
 
-*Примечание: 9 задач уже завершены (UI 10.4, UI 12.4). Property-based тесты (Фаза 1.5) опциональны и не включены в оценку.*
+*Примечание: Фазы 2 и 3 были реализованы ранее. Property-based тесты (Фаза 1.5) опциональны и не включены в оценку.*
 
 ---
 
