@@ -340,23 +340,29 @@ class AuthIPCHandlers {
 class AuthWindowManager {
   constructor(windowManager: WindowManager, oauthClient: OAuthClientManager);
 
-  // Requirements: google-oauth-auth.11.1, google-oauth-auth.11.4
+  // Requirements: google-oauth-auth.11.1, google-oauth-auth.11.8
   async initializeApp(): Promise<void>;
   
   // Requirements: google-oauth-auth.11.1
   private async showLoginWindow(): Promise<void>;
   
-  // Requirements: google-oauth-auth.11.4
+  // Requirements: google-oauth-auth.11.8
   private async showMainWindow(): Promise<void>;
   
-  // Requirements: google-oauth-auth.11.5
+  // Requirements: google-oauth-auth.11.9
   private async showLoginError(error: string, errorCode?: string): Promise<void>;
   
-  // Requirements: google-oauth-auth.11.4
+  // Requirements: google-oauth-auth.11.8, google-oauth-auth.15.5
   private async handleAuthSuccess(): Promise<void>;
   
-  // Requirements: google-oauth-auth.11.5
+  // Requirements: google-oauth-auth.11.9, google-oauth-auth.15.6
   private async handleAuthError(error: string, errorCode?: string): Promise<void>;
+  
+  // Requirements: google-oauth-auth.15.1, google-oauth-auth.15.2
+  private async showLoader(): Promise<void>;
+  
+  // Requirements: google-oauth-auth.15.5, google-oauth-auth.15.6
+  private async hideLoader(): Promise<void>;
 }
 ```
 
@@ -367,12 +373,14 @@ React компоненты для отображения экранов авто
 **Login Screen Component:**
 
 ```typescript
-// Requirements: google-oauth-auth.12
+// Requirements: google-oauth-auth.12, google-oauth-auth.15
 interface LoginScreenProps {
   onLogin: () => void;
+  isLoading?: boolean;
+  isDisabled?: boolean;
 }
 
-export function LoginScreen({ onLogin }: LoginScreenProps): JSX.Element;
+export function LoginScreen({ onLogin, isLoading, isDisabled }: LoginScreenProps): JSX.Element;
 
 // Содержимое компонента:
 // - Логотип Clerkly (Logo component, size="lg", showText=false)
@@ -380,28 +388,36 @@ export function LoginScreen({ onLogin }: LoginScreenProps): JSX.Element;
 // - Карта с заголовком "Welcome" (text-2xl font-semibold)
 // - Описание "Your autonomous AI agent that listens, organizes, and acts"
 // - Кнопка "Continue with Google" с иконкой Google
+//   * Кнопка активна по умолчанию (google-oauth-auth.11.4)
+//   * Кнопка неактивна (disabled) когда isDisabled=true (google-oauth-auth.11.7, google-oauth-auth.15.2)
+// - Loader (spinner) с текстом "Signing in..." когда isLoading=true (google-oauth-auth.15.1, google-oauth-auth.15.7)
 // - Превью функций (4 колонки):
 //   * "Listen & Transcribe" с иконкой микрофона
 //   * "Extract Tasks" с иконкой чеклиста
 //   * "Automate Actions" с иконкой обновления
 //   * "Auto-Sync" с иконкой молнии
 // - Текст "By continuing, you agree to Clerkly's Terms of Service and Privacy Policy"
+// - Все элементы остаются видимыми во время отображения loader (google-oauth-auth.15.3)
 ```
 
 **Login Error Component:**
 
 ```typescript
-// Requirements: google-oauth-auth.13
+// Requirements: google-oauth-auth.13, google-oauth-auth.15
 interface LoginErrorProps {
   errorMessage?: string;
   errorCode?: string;
   onRetry: () => void;
+  isLoading?: boolean;
+  isDisabled?: boolean;
 }
 
 export function LoginError({ 
   errorMessage, 
   errorCode, 
-  onRetry 
+  onRetry,
+  isLoading,
+  isDisabled
 }: LoginErrorProps): JSX.Element;
 
 // Содержимое компонента:
@@ -419,12 +435,14 @@ export function LoginError({
 //   * database_error: "Storage error" + детали
 //   * profile_fetch_failed: "Profile loading failed" + детали (ui.6.4, ui.6.5)
 //   * default: "Authentication failed" + errorMessage
+// - Кнопка "Continue with Google" неактивна (disabled) когда isDisabled=true (google-oauth-auth.15.2)
+// - Loader отображается когда isLoading=true (google-oauth-auth.15.1)
 ```
 
 **Settings Component with Sign Out:**
 
 ```typescript
-// Requirements: google-oauth-auth.15.1
+// Requirements: google-oauth-auth.14.1
 interface SettingsProps {
   onSignOut?: () => void;
 }
@@ -703,6 +721,46 @@ export const OAUTH_CONFIG = {
   Мысли: Это консистентность дизайна. Это не функциональное требование.
   Тестируемость: нет
 
+**Требование 14: Sign Out Flow**
+
+14.1-14.7 Sign Out Flow
+  Мысли: Это конкретные UI сценарии и переходы для выхода из системы.
+  Тестируемость: да - example
+
+**Требование 15: Loader во Время Авторизации**
+
+15.1 Отображение loader при получении authorization code
+  Мысли: Это UI состояние на основе события (получение deep link). Можно тестировать триггерингом получения authorization code и проверкой отображения loader.
+  Тестируемость: да - property
+
+15.2 Деактивация кнопки во время loader
+  Мысли: Это UI состояние. Можно тестировать проверкой disabled состояния кнопки когда loader отображается.
+  Тестируемость: да - property
+
+15.3 Видимость элементов во время loader
+  Мысли: Это UI требование. Можно тестировать проверкой видимости всех элементов Login Screen во время отображения loader.
+  Тестируемость: да - example
+
+15.4 Операции во время loader
+  Мысли: Это временной интервал отображения loader. Можно тестировать проверкой отображения loader во время обмена токенов и загрузки профиля.
+  Тестируемость: да - property
+
+15.5 Скрытие loader при успехе
+  Мысли: Это переход состояния UI. Можно тестировать успешным завершением авторизации и проверкой скрытия loader и отображения Dashboard.
+  Тестируемость: да - example
+
+15.6 Скрытие loader при ошибке
+  Мысли: Это переход состояния UI при ошибке. Можно тестировать триггерингом ошибки и проверкой скрытия loader и отображения Login Error Screen.
+  Тестируемость: да - example
+
+15.7 Внешний вид loader
+  Мысли: Это UI детали (spinner, текст). Это функциональный тестовый сценарий.
+  Тестируемость: да - example
+
+15.8 Отсутствие loader при закрытии браузера
+  Мысли: Это негативный случай (loader НЕ должен отображаться). Можно тестировать закрытием браузера до получения authorization code и проверкой отсутствия loader.
+  Тестируемость: да - example
+
 ### Рефлексия Свойств
 
 После анализа критериев приемки необходимо проверить свойства на избыточность:
@@ -720,7 +778,7 @@ export const OAUTH_CONFIG = {
 9. **Свойство 16** (Error propagation) - Уникально
 10. **Свойства 17-18** (Window state, error screen) - Уникальны
 
-**Вывод:** Все 18 свойств уникальны и предоставляют различную валидационную ценность. Избыточности не обнаружено. Свойства хорошо спроектированы и комплексны.
+**Вывод:** Все 19 свойств уникальны и предоставляют различную валидационную ценность. Избыточности не обнаружено. Свойства хорошо спроектированы и комплексны.
 
 ### Property 1: PKCE Parameters Generation
 
@@ -836,7 +894,13 @@ export const OAUTH_CONFIG = {
 
 *For any* authentication error, the login error screen must be displayed with the error message and appropriate error code mapping.
 
-**Validates: Requirements 11.5**
+**Validates: Requirements 11.9**
+
+### Property 19: Loader Display During Authorization
+
+*For any* authorization flow where authorization code is received, the loader must be displayed on Login Screen with disabled login button until token exchange and profile fetch complete (success or error).
+
+**Validates: Requirements 15.1, 15.2, 15.4**
 
 
 ## Обработка Ошибок
@@ -1022,6 +1086,8 @@ logger.error(`${operation} failed: ${error.message}`, {
 
 Оба типа тестов дополняют друг друга и необходимы для комплексного покрытия.
 
+Всего определено **19 свойств корректности**, которые проверяются через property-based тесты.
+
 ### Модульные Тесты
 
 **Фокус модульных тестов:**
@@ -1190,7 +1256,11 @@ it('should preserve token data through save/load cycle', () => {
 | google-oauth-auth.11.2 | ✓ | - | ✓ |
 | google-oauth-auth.11.3 | ✓ | - | ✓ |
 | google-oauth-auth.11.4 | ✓ | - | ✓ |
-| google-oauth-auth.11.5 | ✓ | ✓ | ✓ |
+| google-oauth-auth.11.5 | ✓ | - | ✓ |
+| google-oauth-auth.11.6 | ✓ | - | ✓ |
+| google-oauth-auth.11.7 | ✓ | - | ✓ |
+| google-oauth-auth.11.8 | ✓ | - | ✓ |
+| google-oauth-auth.11.9 | ✓ | ✓ | ✓ |
 | google-oauth-auth.12.1 | ✓ | - | ✓ |
 | google-oauth-auth.12.2 | ✓ | - | ✓ |
 | google-oauth-auth.12.3 | ✓ | - | ✓ |
@@ -1204,19 +1274,27 @@ it('should preserve token data through save/load cycle', () => {
 | google-oauth-auth.13.5 | ✓ | - | ✓ |
 | google-oauth-auth.13.6 | ✓ | - | ✓ |
 | google-oauth-auth.13.7 | ✓ | - | ✓ |
-| google-oauth-auth.15.1 | ✓ | - | ✓ |
-| google-oauth-auth.15.2 | ✓ | - | ✓ |
+| google-oauth-auth.14.1 | ✓ | - | ✓ |
+| google-oauth-auth.14.2 | ✓ | - | ✓ |
+| google-oauth-auth.14.3 | ✓ | - | ✓ |
+| google-oauth-auth.14.4 | ✓ | - | ✓ |
+| google-oauth-auth.14.5 | ✓ | - | ✓ |
+| google-oauth-auth.14.6 | ✓ | - | ✓ |
+| google-oauth-auth.14.7 | ✓ | - | ✓ |
+| google-oauth-auth.15.1 | ✓ | ✓ | ✓ |
+| google-oauth-auth.15.2 | ✓ | ✓ | ✓ |
 | google-oauth-auth.15.3 | ✓ | - | ✓ |
-| google-oauth-auth.15.4 | ✓ | - | ✓ |
+| google-oauth-auth.15.4 | ✓ | ✓ | ✓ |
 | google-oauth-auth.15.5 | ✓ | - | ✓ |
 | google-oauth-auth.15.6 | ✓ | - | ✓ |
 | google-oauth-auth.15.7 | ✓ | - | ✓ |
+| google-oauth-auth.15.8 | ✓ | - | ✓ |
 
 ### Критерии Успеха
 
 Реализация считается успешной когда:
 - ✅ Все модульные тесты проходят
-- ✅ Все property-based тесты проходят (минимум 100 итераций каждый)
+- ✅ Все property-based тесты проходят (минимум 100 итераций каждый, всего 19 свойств)
 - ✅ Все функциональные тесты проходят
 - ✅ Покрытие кода минимум 85%
 - ✅ Все требования покрыты тестами

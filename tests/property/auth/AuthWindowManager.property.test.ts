@@ -149,7 +149,7 @@ describe('AuthWindowManager Property-Based Tests', () => {
   /* Preconditions: user successfully authenticated
      Action: call onAuthSuccess() to transition window content
      Assertions: window content transitions to main application
-     Requirements: google-oauth-auth.14.4 */
+     Requirements: google-oauth-auth.11.4 */
   // Feature: google-oauth-auth, Property: Window Transition on Success
   it('Property: should transition from login to main window on success', async () => {
     await fc.assert(
@@ -173,7 +173,7 @@ describe('AuthWindowManager Property-Based Tests', () => {
   /* Preconditions: authentication error occurred, user clicks retry
      Action: call onRetry() to show login screen again
      Assertions: login screen displayed, retry logged
-     Requirements: google-oauth-auth.14.6 */
+     Requirements: google-oauth-auth.11.6 */
   // Feature: google-oauth-auth, Property: Retry Shows Login Screen
   it('Property: should show login screen on retry', async () => {
     await fc.assert(

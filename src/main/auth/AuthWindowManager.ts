@@ -1,4 +1,4 @@
-// Requirements: google-oauth-auth.14.1, google-oauth-auth.14.2, google-oauth-auth.14.3, google-oauth-auth.14.4, google-oauth-auth.14.5, google-oauth-auth.14.6
+// Requirements: google-oauth-auth.11.1, google-oauth-auth.11.2, google-oauth-auth.11.3, google-oauth-auth.11.4, google-oauth-auth.11.5, google-oauth-auth.11.6
 
 import { BrowserWindow } from 'electron';
 import WindowManager from '../WindowManager';
@@ -12,8 +12,8 @@ import { Logger } from '../Logger';
  * Manages window transitions during the OAuth authentication flow.
  * Handles showing login screen, main window, and error states.
  *
- * Requirements: google-oauth-auth.14.1, google-oauth-auth.14.2, google-oauth-auth.14.3,
- *               google-oauth-auth.14.4, google-oauth-auth.14.5, google-oauth-auth.14.6
+ * Requirements: google-oauth-auth.11.1, google-oauth-auth.11.2, google-oauth-auth.11.3,
+ *               google-oauth-auth.11.4, google-oauth-auth.11.5, google-oauth-auth.11.6
  */
 export class AuthWindowManager {
   // Requirements: clerkly.3.5, clerkly.3.7
@@ -25,7 +25,7 @@ export class AuthWindowManager {
   /**
    * Creates a new AuthWindowManager instance
    *
-   * Requirements: google-oauth-auth.14.1
+   * Requirements: google-oauth-auth.11.1
    *
    * @param windowManager - WindowManager instance for window operations
    * @param oauthClient - OAuthClientManager instance for auth status checks
@@ -38,20 +38,20 @@ export class AuthWindowManager {
   /**
    * Initializes the application by checking auth status and showing appropriate window
    *
-   * Requirements: google-oauth-auth.14.1, google-oauth-auth.14.2, google-oauth-auth.14.3
+   * Requirements: google-oauth-auth.11.1, google-oauth-auth.11.2, google-oauth-auth.11.3
    *
    * @returns Promise that resolves when initialization is complete
    */
   async initializeApp(): Promise<void> {
     try {
-      // Requirements: google-oauth-auth.14.1
+      // Requirements: google-oauth-auth.11.1
       const authStatus = await this.oauthClient.getAuthStatus();
 
       if (authStatus.authorized) {
-        // Requirements: google-oauth-auth.14.3
+        // Requirements: google-oauth-auth.11.3
         await this.showMainWindow();
       } else {
-        // Requirements: google-oauth-auth.14.2
+        // Requirements: google-oauth-auth.11.2
         await this.showLoginWindow();
       }
     } catch (error) {
@@ -69,7 +69,7 @@ export class AuthWindowManager {
   /**
    * Shows the login window with authentication screen
    *
-   * Requirements: google-oauth-auth.14.2
+   * Requirements: google-oauth-auth.11.2
    *
    * @returns Promise that resolves when window is shown
    */
@@ -98,7 +98,7 @@ export class AuthWindowManager {
   /**
    * Shows the main application window
    *
-   * Requirements: google-oauth-auth.14.3
+   * Requirements: google-oauth-auth.11.3
    *
    * @returns Promise that resolves when window is shown
    */
@@ -126,7 +126,7 @@ export class AuthWindowManager {
   /**
    * Shows the login error screen with error details
    *
-   * Requirements: google-oauth-auth.14.5
+   * Requirements: google-oauth-auth.11.5
    *
    * @param error - Error message to display
    * @param errorCode - Optional error code for specific error handling
@@ -155,7 +155,7 @@ export class AuthWindowManager {
   /**
    * Handles successful authentication
    *
-   * Requirements: google-oauth-auth.14.4
+   * Requirements: google-oauth-auth.11.4
    *
    * @returns Promise that resolves when main window is shown
    */
@@ -172,7 +172,7 @@ export class AuthWindowManager {
   /**
    * Handles authentication error
    *
-   * Requirements: google-oauth-auth.14.5, google-oauth-auth.14.6
+   * Requirements: google-oauth-auth.11.5, google-oauth-auth.11.6
    *
    * @param error - Error message
    * @param errorCode - Optional error code
@@ -184,7 +184,7 @@ export class AuthWindowManager {
         'AuthWindowManager',
         `Authentication failed: ${JSON.stringify({ error, errorCode })}`
       );
-      // Requirements: google-oauth-auth.14.5
+      // Requirements: google-oauth-auth.11.5
       await this.showLoginError(error, errorCode);
     } catch (err) {
       this.logger.error(`Failed to handle auth error: ${err}`);
@@ -195,7 +195,7 @@ export class AuthWindowManager {
   /**
    * Public method to handle authentication success (called from IPC handlers)
    *
-   * Requirements: google-oauth-auth.14.4
+   * Requirements: google-oauth-auth.11.4
    *
    * @returns Promise that resolves when main window is shown
    */
@@ -206,7 +206,7 @@ export class AuthWindowManager {
   /**
    * Public method to handle authentication error (called from IPC handlers)
    *
-   * Requirements: google-oauth-auth.14.5
+   * Requirements: google-oauth-auth.11.5
    *
    * @param error - Error message
    * @param errorCode - Optional error code
@@ -219,7 +219,7 @@ export class AuthWindowManager {
   /**
    * Public method to retry authentication (show login screen again)
    *
-   * Requirements: google-oauth-auth.14.6
+   * Requirements: google-oauth-auth.11.6
    *
    * @returns Promise that resolves when login window is shown
    */

@@ -144,7 +144,7 @@ oauthClient.setProfileManager(profileManager);
 // Initialize Window Manager
 const windowManager = new WindowManager(dataManager, profileManager);
 
-// Requirements: google-oauth-auth.14.1
+// Requirements: google-oauth-auth.11.1
 // Initialize Auth Window Manager
 import { AuthWindowManager } from './auth/AuthWindowManager';
 const authWindowManager = new AuthWindowManager(windowManager, oauthClient);
@@ -497,7 +497,7 @@ app.whenReady().then(async () => {
     settingsIPCHandlers.registerHandlers();
     logger.info('Settings IPC handlers registered');
 
-    // Requirements: google-oauth-auth.14.1
+    // Requirements: google-oauth-auth.11.1
     // Initialize Auth Window Manager to check auth status and show appropriate window
     await authWindowManager.initializeApp();
     logger.info('Auth Window Manager initialized');

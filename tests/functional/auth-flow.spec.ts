@@ -1,4 +1,4 @@
-// Requirements: google-oauth-auth.11.1, google-oauth-auth.14.1, google-oauth-auth.14.2, testing.3.1, testing.3.2, testing.3.6
+// Requirements: google-oauth-auth.11.1, google-oauth-auth.11.1, google-oauth-auth.11.2, testing.3.1, testing.3.2, testing.3.6
 
 import { test, expect } from '@playwright/test';
 import {
@@ -58,7 +58,7 @@ test.describe('Authentication Flow', () => {
   /* Preconditions: First launch, no saved tokens
      Action: Launch application
      Assertions: Login screen is displayed
-     Requirements: google-oauth-auth.14.1, google-oauth-auth.14.2 */
+     Requirements: google-oauth-auth.11.1, google-oauth-auth.11.2 */
   test('should show login screen on first launch', async () => {
     // Launch the application
     // Requirements: testing.3.1, testing.3.2 - Real Electron, no mocks
@@ -117,7 +117,7 @@ test.describe('Authentication Flow', () => {
   /* Preconditions: Application has valid tokens saved
      Action: Launch application
      Assertions: Main application screen is displayed (not login screen)
-     Requirements: google-oauth-auth.14.1, google-oauth-auth.14.3 */
+     Requirements: google-oauth-auth.11.1, google-oauth-auth.11.3 */
   test('should show main app when already authorized', async () => {
     // This test verifies that when tokens exist, the app shows main screen
     // We can't easily setup tokens without better-sqlite3 version conflicts
@@ -143,7 +143,7 @@ test.describe('Authentication Flow', () => {
   /* Preconditions: User completes OAuth flow successfully
      Action: Simulate successful OAuth callback with deep link
      Assertions: Main application screen is displayed, tokens are saved
-     Requirements: google-oauth-auth.11.4, google-oauth-auth.14.4 */
+     Requirements: google-oauth-auth.11.4, google-oauth-auth.11.4 */
   test('should show main app after successful authentication', async () => {
     // Launch the application
     context = await launchElectron();

@@ -1,4 +1,4 @@
-// Requirements: google-oauth-auth.11, google-oauth-auth.14, testing.3.1, testing.3.2, testing.3.6, testing.3.8, testing.3.9
+// Requirements: google-oauth-auth.11, google-oauth-auth.11, testing.3.1, testing.3.2, testing.3.6, testing.3.8, testing.3.9
 
 import { test, expect } from '@playwright/test';
 import {
@@ -70,7 +70,7 @@ test.describe('Full OAuth Flow', () => {
   /* Preconditions: Application has valid tokens saved
      Action: Launch application
      Assertions: Main application screen is displayed (not login screen)
-     Requirements: google-oauth-auth.14.1, google-oauth-auth.14.3 */
+     Requirements: google-oauth-auth.11.1, google-oauth-auth.11.3 */
   test('should show main app when valid tokens exist', async () => {
     // Launch the application with mock OAuth server URL
     context = await launchElectron(undefined, {
@@ -95,7 +95,7 @@ test.describe('Full OAuth Flow', () => {
   /* Preconditions: Application running with login screen
      Action: Complete OAuth flow
      Assertions: App transitions from login to main screen
-     Requirements: google-oauth-auth.11.4, google-oauth-auth.14.4 */
+     Requirements: google-oauth-auth.11.4, google-oauth-auth.11.4 */
   test('should transition from login to main app after token setup', async () => {
     // Launch the application with mock OAuth server URL
     context = await launchElectron(undefined, {
@@ -122,7 +122,7 @@ test.describe('Full OAuth Flow', () => {
   /* Preconditions: Application running with valid tokens
      Action: Clear tokens via IPC, reload app
      Assertions: App transitions from main screen to login
-     Requirements: google-oauth-auth.7.2, google-oauth-auth.14.1 */
+     Requirements: google-oauth-auth.7.2, google-oauth-auth.11.1 */
   test('should transition from main app to login after logout', async () => {
     // Launch the application with mock OAuth server URL
     context = await launchElectron(undefined, {
@@ -156,7 +156,7 @@ test.describe('Full OAuth Flow', () => {
   /* Preconditions: Application running, tokens exist
      Action: Verify token persistence across app restarts
      Assertions: Tokens survive app restart
-     Requirements: google-oauth-auth.4.3, google-oauth-auth.14.3 */
+     Requirements: google-oauth-auth.4.3, google-oauth-auth.11.3 */
   test('should persist tokens across app restarts', async () => {
     // First launch with mock OAuth server URL
     context = await launchElectron(undefined, {

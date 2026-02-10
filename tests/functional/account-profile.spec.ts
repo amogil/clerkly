@@ -1755,7 +1755,7 @@ test.describe('Account Profile', () => {
   /* Preconditions: Application running with authentication, profile data loaded and displayed
      Action: Verify profile is displayed, save values, execute logout via IPC, wait for completion
      Assertions: Login screen is shown, profile data PRESERVED in database (not deleted)
-     Requirements: ui.8.4, google-oauth-auth.15 */
+     Requirements: ui.8.4, google-oauth-auth.14 */
   test('should preserve profile data on logout', async () => {
     // Set user profile data for this test
     mockServer.setUserProfile({
@@ -1885,7 +1885,7 @@ test.describe('Account Profile', () => {
   /* Preconditions: Application running with authentication, Account block displayed with profile data
      Action: Navigate to Account block, verify profile displayed, execute logout, verify UI cleared and login screen shown
      Assertions: Login screen shown, UI cleared (Account component shows empty state), tokens deleted, profile data PRESERVED in database
-     Requirements: ui.8.4, google-oauth-auth.15
+     Requirements: ui.8.4, google-oauth-auth.14
      Property: 19, 27 */
   test('should show login screen and clear UI on logout', async () => {
     // Set user profile data for this test
@@ -2010,7 +2010,7 @@ test.describe('Account Profile', () => {
     console.log('[TEST] Tokens in storage after logout:', tokensCheck.hasTokens ? 'YES' : 'NO');
 
     // Tokens should be cleared after logout
-    // Requirements: ui.8.4, google-oauth-auth.15 - Tokens must be cleared
+    // Requirements: ui.8.4, google-oauth-auth.14 - Tokens must be cleared
     expect(tokensCheck.hasTokens).toBe(false);
 
     console.log('✓ Tokens deleted from storage');

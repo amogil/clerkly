@@ -1,4 +1,4 @@
-// Requirements: google-oauth-auth.15.1, google-oauth-auth.15.2, google-oauth-auth.15.3, google-oauth-auth.15.4, google-oauth-auth.15.5, google-oauth-auth.15.6, google-oauth-auth.15.7
+// Requirements: google-oauth-auth.14.1, google-oauth-auth.14.2, google-oauth-auth.14.3, google-oauth-auth.14.4, google-oauth-auth.14.5, google-oauth-auth.14.6, google-oauth-auth.14.7
 
 /**
  * Functional tests for Sign Out flow
@@ -78,7 +78,7 @@ test.afterEach(async () => {
 /* Preconditions: User is logged in with valid tokens
    Action: Click Sign Out button in settings
    Assertions: Login Screen is shown, tokens are cleared from database
-   Requirements: google-oauth-auth.15.1, google-oauth-auth.15.2, google-oauth-auth.15.3, google-oauth-auth.15.4, google-oauth-auth.15.5, google-oauth-auth.15.6 */
+   Requirements: google-oauth-auth.14.1, google-oauth-auth.14.2, google-oauth-auth.14.3, google-oauth-auth.14.4, google-oauth-auth.14.5, google-oauth-auth.14.6 */
 test('should show login screen after sign out', async () => {
   // Setup: Complete OAuth flow to authenticate
   await completeOAuthFlow(electronApp, window);
@@ -130,7 +130,7 @@ test('should show login screen after sign out', async () => {
 /* Preconditions: User is logged in with valid tokens
    Action: Call logout through IPC
    Assertions: Tokens are deleted from database
-   Requirements: google-oauth-auth.15.3, google-oauth-auth.15.4 */
+   Requirements: google-oauth-auth.14.3, google-oauth-auth.14.4 */
 test('should clear tokens after sign out', async () => {
   // Setup: Complete OAuth flow to authenticate
   await completeOAuthFlow(electronApp, window);
@@ -177,7 +177,7 @@ test('should clear tokens after sign out', async () => {
 /* Preconditions: User is logged in, Google revoke endpoint fails
    Action: Call logout when revoke fails
    Assertions: Local tokens are still deleted, Login Screen is shown
-   Requirements: google-oauth-auth.15.7 */
+   Requirements: google-oauth-auth.14.7 */
 test('should handle sign out when revoke fails', async () => {
   // Setup: Complete OAuth flow to authenticate
   await completeOAuthFlow(electronApp, window);
