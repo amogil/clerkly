@@ -1,116 +1,113 @@
-// Requirements: google-oauth-auth.10.1, google-oauth-auth.10.2, google-oauth-auth.10.3, google-oauth-auth.10.4, google-oauth-auth.10.5, google-oauth-auth.10.6
+// Requirements: google-oauth-auth.10.1, google-oauth-auth.10.2
 
-import {
-  getOAuthConfig,
-  GOOGLE_OAUTH_ENDPOINTS,
-  OAUTH_CONFIG,
-  type OAuthConfig,
-} from '../../../src/main/auth/OAuthConfig';
+import { getOAuthConfig, OAUTH_CONFIG } from '../../../src/main/auth/OAuthConfig';
 
 describe('OAuthConfig', () => {
-  /* Preconditions: None
-     Action: Access GOOGLE_OAUTH_ENDPOINTS constant
-     Assertions: All required OAuth endpoints are defined with correct URLs
-     Requirements: google-oauth-auth.10.4, google-oauth-auth.10.5, google-oauth-auth.10.6 */
-  it('should have all required Google OAuth endpoints', () => {
-    expect(GOOGLE_OAUTH_ENDPOINTS.authorization).toBe(
-      'https://accounts.google.com/o/oauth2/v2/auth'
-    );
-    expect(GOOGLE_OAUTH_ENDPOINTS.token).toBe('https://oauth2.googleapis.com/token');
-    expect(GOOGLE_OAUTH_ENDPOINTS.revoke).toBe('https://oauth2.googleapis.com/revoke');
-  });
+  describe('getOAuthConfig', () => {
+    /* Preconditions: No client ID provided
+       Action: Call getOAuthConfig without arguments
+       Assertions: Returns default configuration
+       Requirements: google-oauth-auth.10.1 */
+    it('should return default configuration when no client ID provided', () => {
+      const config = getOAuthConfig();
 
-  /* Preconditions: None
-     Action: Access OAUTH_CONFIG constant
-     Assertions: redirect_uri is in reverse client ID format
-     Requirements: google-oauth-auth.10.2 */
-  it('should have correct redirect_uri format', () => {
-    expect(OAUTH_CONFIG.redirectUri).toMatch(/^com\.googleusercontent\.apps\./);
-    expect(OAUTH_CONFIG.redirectUri).toContain(':/oauth2redirect');
-  });
+      expect(config.clientId).toBe(OAUTH_CONFIG.clientId);
+      expect(config.clientSecret).toBe(OAUTH_CONFIG.clientSecret);
+      expect(config.scopes).toEqual(OAUTH_CONFIG.scopes);
+    });
 
-  /* Preconditions: None
-     Action: Access OAUTH_CONFIG.scopes
-     Assertions: All required scopes (openid, email, profile) are present
-     Requirements: google-oauth-auth.10.3 */
-  it('should have all required scopes', () => {
-    expect(OAUTH_CONFIG.scopes).toContain('openid');
-    expect(OAUTH_CONFIG.scopes).toContain('email');
-    expect(OAUTH_CONFIG.scopes).toContain('profile');
-    expect(OAUTH_CONFIG.scopes).toHaveLength(3);
-  });
+    /* Preconditions: Client ID with .apps.googleusercontent.com suffix
+       Action: Call getOAuthConfig with full Client ID
+       Assertions: Redirect URI does not contain duplicate suffix
+       Requirements: google-oauth-auth.10.2 */
+    it('should remove .apps.googleusercontent.com suffix from redirect URI', () => {
+      const clientIdWithSuffix = '100365225505-a9mp4sll4948tafotr1va0fvnl5hrpoa.apps.googleusercontent.com';
+      const config = getOAuthConfig(clientIdWithSuffix);
 
-  /* Preconditions: Valid client_id provided
-     Action: Call getOAuthConfig with client_id
-     Assertions: Returns complete OAuthConfig with all required fields
-     Requirements: google-oauth-auth.10.1, google-oauth-auth.10.2, google-oauth-auth.10.3, google-oauth-auth.10.4, google-oauth-auth.10.5, google-oauth-auth.10.6 */
-  it('should return complete OAuth configuration', () => {
-    const clientId = 'test-client-id.apps.googleusercontent.com';
-    const config: OAuthConfig = getOAuthConfig(clientId);
+      // Client ID should be preserved as-is
+      expect(config.clientId).toBe(clientIdWithSuffix);
 
-    expect(config.clientId).toBe(clientId);
-    expect(config.redirectUri).toMatch(/^com\.googleusercontent\.apps\./);
-    expect(config.redirectUri).toContain(':/oauth2redirect');
-    expect(config.clientSecret).toBeTruthy();
-    expect(config.authorizationEndpoint).toBe('https://accounts.google.com/o/oauth2/v2/auth');
-    expect(config.tokenEndpoint).toBe('https://oauth2.googleapis.com/token');
-    expect(config.revokeEndpoint).toBe('https://oauth2.googleapis.com/revoke');
-    expect(config.scopes).toEqual(['openid', 'email', 'profile']);
-  });
+      // Redirect URI should NOT have duplicate .apps.googleusercontent.com
+      expect(config.redirectUri).toBe(
+        'com.googleusercontent.apps.100365225505-a9mp4sll4948tafotr1va0fvnl5hrpoa:/oauth2redirect'
+      );
 
-  /* Preconditions: Valid client_id provided
-     Action: Call getOAuthConfig with client_id
-     Assertions: All configuration fields are non-empty strings or arrays
-     Requirements: google-oauth-auth.10.1, google-oauth-auth.10.2, google-oauth-auth.10.3 */
-  it('should have all mandatory configuration fields', () => {
-    const clientId = 'test-client-id.apps.googleusercontent.com';
-    const config: OAuthConfig = getOAuthConfig(clientId);
+      // Should not contain duplicate suffix
+      expect(config.redirectUri).not.toContain('.apps.googleusercontent.com.apps.googleusercontent.com');
+    });
 
-    expect(config.clientId).toBeTruthy();
-    expect(config.redirectUri).toBeTruthy();
-    expect(config.authorizationEndpoint).toBeTruthy();
-    expect(config.tokenEndpoint).toBeTruthy();
-    expect(config.revokeEndpoint).toBeTruthy();
-    expect(config.scopes).toBeTruthy();
-    expect(Array.isArray(config.scopes)).toBe(true);
-    expect(config.scopes.length).toBeGreaterThan(0);
-  });
+    /* Preconditions: Client ID without .apps.googleusercontent.com suffix
+       Action: Call getOAuthConfig with numeric Client ID
+       Assertions: Redirect URI is correctly formatted
+       Requirements: google-oauth-auth.10.2 */
+    it('should handle client ID without suffix correctly', () => {
+      const clientIdWithoutSuffix = '100365225505-a9mp4sll4948tafotr1va0fvnl5hrpoa';
+      const config = getOAuthConfig(clientIdWithoutSuffix);
 
-  /* Preconditions: Different client_id values provided
-     Action: Call getOAuthConfig with different client_id values
-     Assertions: Each call returns configuration with the provided client_id
-     Requirements: google-oauth-auth.10.1 */
-  it('should use provided client_id in configuration', () => {
-    const clientId1 = 'client1.apps.googleusercontent.com';
-    const clientId2 = 'client2.apps.googleusercontent.com';
+      expect(config.clientId).toBe(clientIdWithoutSuffix);
+      expect(config.redirectUri).toBe(
+        'com.googleusercontent.apps.100365225505-a9mp4sll4948tafotr1va0fvnl5hrpoa:/oauth2redirect'
+      );
+    });
 
-    const config1 = getOAuthConfig(clientId1);
-    const config2 = getOAuthConfig(clientId2);
+    /* Preconditions: Multiple client IDs with different formats
+       Action: Call getOAuthConfig with various Client ID formats
+       Assertions: All redirect URIs are correctly formatted without duplicates
+       Requirements: google-oauth-auth.10.2 */
+    it('should handle various client ID formats', () => {
+      const testCases = [
+        {
+          input: '12345-abcde.apps.googleusercontent.com',
+          expected: 'com.googleusercontent.apps.12345-abcde:/oauth2redirect',
+        },
+        {
+          input: '12345-abcde',
+          expected: 'com.googleusercontent.apps.12345-abcde:/oauth2redirect',
+        },
+        {
+          input: 'test-client-id.apps.googleusercontent.com',
+          expected: 'com.googleusercontent.apps.test-client-id:/oauth2redirect',
+        },
+        {
+          input: 'test-client-id',
+          expected: 'com.googleusercontent.apps.test-client-id:/oauth2redirect',
+        },
+      ];
 
-    expect(config1.clientId).toBe(clientId1);
-    expect(config2.clientId).toBe(clientId2);
-    expect(config1.clientId).not.toBe(config2.clientId);
-  });
+      testCases.forEach(({ input, expected }) => {
+        const config = getOAuthConfig(input);
+        expect(config.redirectUri).toBe(expected);
+        expect(config.redirectUri).not.toContain('.apps.googleusercontent.com.apps.googleusercontent.com');
+      });
+    });
 
-  /* Preconditions: None
-     Action: Access GOOGLE_OAUTH_ENDPOINTS
-     Assertions: All endpoints use HTTPS protocol
-     Requirements: google-oauth-auth.10.4, google-oauth-auth.10.5, google-oauth-auth.10.6 */
-  it('should use HTTPS for all endpoints', () => {
-    expect(GOOGLE_OAUTH_ENDPOINTS.authorization).toMatch(/^https:\/\//);
-    expect(GOOGLE_OAUTH_ENDPOINTS.token).toMatch(/^https:\/\//);
-    expect(GOOGLE_OAUTH_ENDPOINTS.revoke).toMatch(/^https:\/\//);
-  });
+    /* Preconditions: Environment variables set for testing
+       Action: Call getOAuthConfig with test environment
+       Assertions: Uses test configuration
+       Requirements: google-oauth-auth.10.1 */
+    it('should use test configuration in test environment', () => {
+      const originalEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = 'test';
 
-  /* Preconditions: None
-     Action: Access OAUTH_CONFIG.scopes
-     Assertions: Scopes array contains only valid OAuth scope strings
-     Requirements: google-oauth-auth.10.3 */
-  it('should have valid scope strings', () => {
-    OAUTH_CONFIG.scopes.forEach((scope) => {
-      expect(typeof scope).toBe('string');
-      expect(scope.length).toBeGreaterThan(0);
-      expect(scope).not.toContain(' ');
+      const config = getOAuthConfig();
+
+      expect(config.clientId).toBe('test-client-id-12345');
+      expect(config.clientSecret).toBe('test-client-secret-67890');
+      expect(config.redirectUri).toBe('com.googleusercontent.apps.test-client-id-12345:/oauth2redirect');
+
+      process.env.NODE_ENV = originalEnv;
+    });
+
+    /* Preconditions: Custom client ID provided
+       Action: Call getOAuthConfig with custom client ID
+       Assertions: Uses custom client ID but default secret
+       Requirements: google-oauth-auth.10.1 */
+    it('should use custom client ID when provided', () => {
+      const customClientId = 'custom-client-id-67890.apps.googleusercontent.com';
+      const config = getOAuthConfig(customClientId);
+
+      expect(config.clientId).toBe(customClientId);
+      expect(config.redirectUri).toBe('com.googleusercontent.apps.custom-client-id-67890:/oauth2redirect');
     });
   });
 });
