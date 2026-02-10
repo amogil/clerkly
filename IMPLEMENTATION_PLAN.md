@@ -193,6 +193,7 @@
 **Задача:** OAuth 6.3 (3 подзадачи)
 **Время:** ~30 минут
 **Файл:** `tests/unit/auth/LoginScreen.test.tsx`
+**Статус:** ✅ ЗАВЕРШЕНО
 
 **Тесты:**
 1. should show loader when isLoading=true
@@ -207,6 +208,7 @@
 **Задача:** OAuth 6.3 (2 подзадачи)
 **Время:** ~20 минут
 **Файл:** `tests/unit/auth/LoginError.test.tsx`
+**Статус:** ⏭️ СЛЕДУЮЩИЙ ШАГ
 
 **Тесты:**
 1. should show loader when isLoading=true
@@ -220,6 +222,7 @@
 **Задача:** OAuth 7.2 (3 подзадачи)
 **Время:** ~30 минут
 **Файл:** `tests/unit/auth/AuthWindowManager.test.ts`
+**Статус:** ⏭️ ОЖИДАЕТ
 
 **Тесты:**
 1. should call showLoader() when authorization code received
@@ -234,6 +237,29 @@
 - Убедиться, что все тесты проходят
 - Проверить TypeScript компиляцию
 - Проверить ESLint/Prettier
+
+---
+
+### Фаза 1.5: Property-Based Тесты для Loader (Приоритет: НИЗКИЙ, ОПЦИОНАЛЬНО)
+
+#### Шаг 7.5: Property-based тесты для loader
+**Задача:** OAuth 8.4 (3 property теста)
+**Время:** ~1 час
+**Файл:** `tests/property/auth/LoaderState.property.test.ts` (новый)
+**Статус:** ⏭️ ОПЦИОНАЛЬНО
+
+**Property тесты:**
+1. Property 20: Loader State Consistency - button state and loader visibility must be consistent
+2. Property 21: Loader Visibility Invariant - isLoaderVisible should match the last action
+3. Property 22: Button State Invariant - button disabled state should be (isLoading || isDisabled)
+
+**Примечание:** Эти тесты не являются обязательными для завершения задачи. Они рекомендуются для повышения уверенности в корректности реализации, но могут быть пропущены если времени недостаточно.
+
+**Зависимости:** Шаги 5-7 (все модульные тесты завершены)
+
+---
+
+**Checkpoint 1.5:** Запустить `npm run test:property` (если property тесты добавлены)
 
 ---
 
@@ -369,12 +395,12 @@ if (response.status === 401 && !isClearing401) {
 
 | Фаза | Задач | Время |
 |------|-------|-------|
-| Фаза 1: UI Components - Loader Support | 7 | ~3.5 часа |
+| Фаза 1: UI Components - Loader Support | 7 | ~2.5 часа |
 | Фаза 2: Централизованная Обработка API | 4 | ~2.5 часа |
 | Фаза 3: Автоматическое Обновление Токенов | 2 | ~1 час |
-| **ИТОГО** | **13** | **~7 часов** |
+| **ИТОГО** | **13** | **~6 часов** |
 
-*Примечание: 9 задач уже завершены (UI 10.4, UI 12.4)*
+*Примечание: 9 задач уже завершены (UI 10.4, UI 12.4). Property-based тесты (Фаза 1.5) опциональны и не включены в оценку.*
 
 ---
 

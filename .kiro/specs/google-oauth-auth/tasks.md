@@ -262,16 +262,16 @@
 - [x] Создать файл `tests/unit/auth/LoginScreen.test.tsx`
 - [x] Тест: отображение всех элементов Login Screen
 - [x] Тест: клик на кнопку "Continue with Google" вызывает onLogin
-- [ ] Тест: отображение loader когда isLoading=true
-- [ ] Тест: деактивация кнопки когда isDisabled=true
-- [ ] Тест: видимость всех элементов во время отображения loader
+- [x] Тест: отображение loader когда isLoading=true
+- [x] Тест: деактивация кнопки когда isDisabled=true
+- [x] Тест: видимость всех элементов во время отображения loader
 - [x] Создать файл `tests/unit/auth/LoginError.test.tsx`
 - [x] Тест: отображение всех элементов Login Screen
 - [x] Тест: отображение блока ошибки
 - [x] Тест: корректный маппинг для каждого типа ошибки
 - [x] Тест: клик на retry вызывает onRetry
-- [ ] Тест: отображение loader когда isLoading=true
-- [ ] Тест: деактивация кнопки когда isDisabled=true
+- [ ] Тест: отображение loader когда isLoading=true (LoginError)
+- [ ] Тест: деактивация кнопки когда isDisabled=true (LoginError)
 - **Requirements:** google-oauth-auth.12.1, google-oauth-auth.12.2, google-oauth-auth.12.3, google-oauth-auth.12.4, google-oauth-auth.13.1, google-oauth-auth.13.2, google-oauth-auth.13.3, google-oauth-auth.13.4, google-oauth-auth.13.5, google-oauth-auth.13.6, google-oauth-auth.15.1, google-oauth-auth.15.2, google-oauth-auth.15.3
 
 ### 6.4 Добавить кнопку Sign Out в Settings
@@ -310,10 +310,10 @@
 - [x] Тест: закрытие Login Window и открытие Main Window при успешной авторизации
 - [x] Тест: обновление содержимого окна на Login Error Screen при ошибке
 - [x] Тест: обновление содержимого окна на Login Screen при retry
-- [x] Тест: вызов showLoader() при получении authorization code
-- [x] Тест: вызов hideLoader() при успешной авторизации
-- [x] Тест: вызов hideLoader() при ошибке авторизации
-- **Requirements:** google-oauth-auth.11.1, google-oauth-auth.11.4, google-oauth-auth.11.5, google-oauth-auth.15.1, google-oauth-auth.15.5, google-oauth-auth.15.6
+- [ ] Тест: вызов showLoader() при получении authorization code
+- [ ] Тест: вызов hideLoader() при успешной авторизации
+- [ ] Тест: вызов hideLoader() при ошибке авторизации
+- **Requirements:** google-oauth-auth.11.1, google-oauth-auth.11.4, google-oauth-auth.11.5, google-oauth-auth.15.1, google-oauth-auth.15.2, google-oauth-auth.15.5, google-oauth-auth.15.6
 
 ### 7.3 Создать property-based тесты для Auth Window Manager
 - [x] Создать файл `tests/property/auth/AuthWindowManager.property.test.ts`
@@ -351,6 +351,17 @@
 - [x] Property тест: **Property 16 - Error Propagation** (дубликат из 3.9, проверка централизованной обработки)
   - *For any* error code, error details must be correctly mapped
 - **Requirements:** google-oauth-auth.9.3
+
+### 8.4 Создать property-based тесты для Loader Functionality
+- [ ] Создать файл `tests/property/auth/LoaderState.property.test.ts`
+- [ ] Property тест: **Property 20 - Loader State Consistency**
+  - *For any* combination of isLoading and isDisabled, button state and loader visibility must be consistent
+- [ ] Property тест: **Property 21 - Loader Visibility Invariant**
+  - *For any* sequence of show/hide actions, isLoaderVisible should match the last action
+- [ ] Property тест: **Property 22 - Button State Invariant**
+  - *For any* combination of isLoading and isDisabled, button disabled state should be (isLoading || isDisabled)
+- **Requirements:** google-oauth-auth.15.1, google-oauth-auth.15.2, google-oauth-auth.15.3, google-oauth-auth.15.5, google-oauth-auth.15.6
+- **Примечание:** Опциональные тесты для дополнительной проверки инвариантов loader functionality. Эти тесты не являются обязательными для завершения задачи, но рекомендуются для повышения уверенности в корректности реализации.
 
 ## 9. Интеграция с Существующей Системой
 
