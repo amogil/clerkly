@@ -56,10 +56,13 @@ External API → Main Process → Database → IPC Event → Renderer → UI Upd
 │  │ OAuthClientManager   │                                    │
 │  │                      │                                    │
 │  │ - getAuthStatus()    │                                    │
+│  │ - exchangeCode()     │                                    │
+│  │ - fetchProfile()     │                                    │
 │  └──────────────────────┘                                    │
 │           │                                                   │
 └───────────┼───────────────────────────────────────────────────┘
-            │ IPC: auth:status
+            │ IPC: auth:status, auth:code-received,
+            │      auth:success, auth:error, auth:logout
             ▼
    ┌─────────────────────────────────────────────┐
    │          Renderer Process                   │
@@ -78,6 +81,17 @@ External API → Main Process → Database → IPC Event → Renderer → UI Upd
    │  │                                │         │
    │  │  - canActivate()               │         │
    │  │  - protectedRoutes[]           │         │
+   │  └────────────────────────────────┘         │
+   │           │                                  │
+   │           ▼                                  │
+   │  ┌────────────────────────────────┐         │
+   │  │      LoaderState               │         │
+   │  │                                │         │
+   │  │  - isLoading: boolean          │         │
+   │  │  - message: string             │         │
+   │  │  - onAuthCodeReceived()        │         │
+   │  │  - onAuthSuccess()             │         │
+   │  │  - onAuthError()               │         │
    │  └────────────────────────────────┘         │
    │           │                                  │
    │           ▼                                  │
@@ -107,9 +121,13 @@ External API → Main Process → Database → IPC Event → Renderer → UI Upd
    - Если не авторизован → блокирует доступ и перенаправляет на `/login`
    - Если авторизован → разрешает доступ
 
-3. **Успешная авторизация**:
-   - OAuth система генерирует событие `auth:success`
-   - `NavigationManager` слушает событие и перенаправляет на `/dashboard`
+3. **Успешная авторизация с Loader**:
+   - Пользователь нажимает "Continue with Google" → браузер открывается
+   - Authorization code получен → событие `auth:code-received` → Loader показывается
+   - OAuth система обменивает код на токены (синхронно)
+   - OAuth система загружает профиль пользователя (синхронно)
+   - Если успешно → событие `auth:success` → Loader скрывается → перенаправление на `/dashboard`
+   - Если ошибка → событие `auth:error` → Loader скрывается → токены очищаются → показ LoginError
 
 4. **Выход из системы**:
    - OAuth система генерирует событие `auth:logout`
@@ -277,6 +295,67 @@ useEffect(() => {
 - `auth:success`: Генерируется при успешной авторизации → перенаправление на Dashboard
 - `auth:logout`: Генерируется при выходе из системы → перенаправление на Login
 
+### Loader State Management
+
+Компонент для управления состоянием загрузки во время авторизации.
+
+```typescript
+// Requirements: navigation.1.5, navigation.1.6, navigation.1.7, navigation.1.8
+
+interface LoaderState {
+  isLoading: boolean;
+  message: string;
+}
+
+// In LoginScreen component
+const [loaderState, setLoaderState] = useState<LoaderState>({
+  isLoading: false,
+  message: ''
+});
+
+useEffect(() => {
+  // Requirements: navigation.1.5 - Show loader when authorization code received
+  const unsubscribeAuthCodeReceived = window.api.auth.onAuthCodeReceived(() => {
+    console.log('[LoginScreen] Authorization code received, showing loader');
+    setLoaderState({
+      isLoading: true,
+      message: 'Signing in...'
+    });
+  });
+
+  // Requirements: navigation.1.7 - Hide loader on success
+  const unsubscribeAuthSuccess = window.api.auth.onAuthSuccess(() => {
+    console.log('[LoginScreen] Auth success, hiding loader');
+    setLoaderState({
+      isLoading: false,
+      message: ''
+    });
+  });
+
+  // Requirements: navigation.1.8 - Hide loader on error
+  const unsubscribeAuthError = window.api.auth.onAuthError(() => {
+    console.log('[LoginScreen] Auth error, hiding loader');
+    setLoaderState({
+      isLoading: false,
+      message: ''
+    });
+  });
+
+  return () => {
+    unsubscribeAuthCodeReceived();
+    unsubscribeAuthSuccess();
+    unsubscribeAuthError();
+  };
+}, []);
+```
+
+**Ключевые особенности:**
+- Loader показывается ТОЛЬКО после получения authorization code (не при клике на кнопку)
+- Во время отображения Loader кнопка "Continue with Google" неактивна (disabled)
+- Loader отображается во время обмена токенов И загрузки профиля (синхронные операции)
+- Loader скрывается при успехе (перенаправление на Dashboard) или ошибке (показ LoginError)
+- Все элементы LoginScreen остаются видимыми во время отображения Loader
+
 
 ## Потоки Навигации
 
@@ -293,7 +372,7 @@ App Start → NavigationManager.initialize() → checkAuthStatus() → not autho
 4. Статус: не авторизован
 5. `redirectToLogin()` перенаправляет на `/login`
 
-**Результат:** Пользователь видит экран логина
+**Результат:** Пользователь видит экран логина (LoginScreen компонент)
 
 ### 2. Запуск приложения (авторизованный пользователь)
 
@@ -311,19 +390,34 @@ App Start → NavigationManager.initialize() → checkAuthStatus() → authorize
 
 **Результат:** Пользователь видит Dashboard или последний открытый экран
 
-### 3. Успешная авторизация
+### 3. Успешная авторизация с загрузкой профиля
 
 ```
-OAuth Success → auth:success event → onAuthSuccess() → redirectToDashboard()
+User clicks "Continue with Google" → Browser opens → Authorization code received → 
+Show Loader ("Signing in...") → Exchange code for tokens → Fetch profile (synchronous) → 
+auth:success event → onAuthSuccess() → redirectToDashboard()
 ```
 
 **Шаги:**
-1. Пользователь успешно авторизуется через Google OAuth
-2. OAuth система генерирует событие `auth:success`
-3. `onAuthSuccess()` обработчик получает событие
-4. `redirectToDashboard()` перенаправляет на `/dashboard`
+1. Пользователь нажимает кнопку "Continue with Google" на LoginScreen
+2. Системный браузер открывается для авторизации через Google OAuth
+3. Пользователь завершает авторизацию в браузере
+4. Authorization code получен через deep link
+5. LoginScreen показывает Loader с текстом "Signing in..." (кнопка становится неактивной)
+6. OAuth система обменивает authorization code на токены
+7. OAuth система синхронно загружает профиль пользователя из Google UserInfo API
+8. Если успешно: OAuth система генерирует событие `auth:success`
+9. `onAuthSuccess()` обработчик получает событие
+10. Loader исчезает, `redirectToDashboard()` перенаправляет на `/dashboard`
 
-**Результат:** Пользователь автоматически перенаправляется на Dashboard
+**Результат:** Пользователь видит Loader во время обработки, затем автоматически перенаправляется на Dashboard
+
+**Обработка ошибок:**
+- Если обмен токенов не удается ИЛИ загрузка профиля не удается:
+  - Loader исчезает
+  - Токены очищаются (если были получены)
+  - Показывается LoginError компонент с errorCode 'profile_fetch_failed'
+  - Пользователь может повторить попытку через кнопку "Continue with Google"
 
 ### 4. Попытка доступа к защищенному маршруту
 
@@ -384,27 +478,27 @@ Logout → auth:logout event → onLogout() → redirectToLogin()
 
 **Validates: Requirements navigation.1.4**
 
-### Property 5: Показ loader при получении authorization code
+### Property 5: Показ Loader при получении authorization code
 
-*Для любого* пользователя, завершившего авторизацию в браузере, когда authorization code получен, приложение должно показать loader с текстом "Signing in...".
+*Для любого* пользователя, завершившего авторизацию в браузере, когда authorization code получен, приложение должно показать Loader с текстом "Signing in..." на LoginScreen, и кнопка "Continue with Google" должна стать неактивной.
 
 **Validates: Requirements navigation.1.5**
 
 ### Property 6: Синхронный обмен кода и загрузка профиля
 
-*Для любого* пользователя, для которого отображается loader, приложение должно синхронно выполнить обмен authorization code на токены И загрузить профиль пользователя из Google UserInfo API.
+*Для любого* пользователя, для которого отображается Loader, приложение должно синхронно выполнить обмен authorization code на токены И загрузить профиль пользователя из Google UserInfo API перед перенаправлением на Dashboard.
 
 **Validates: Requirements navigation.1.6**
 
 ### Property 7: Показ Dashboard после успешной авторизации и загрузки профиля
 
-*Для любого* пользователя, успешно авторизовавшегося через Google OAuth И для которого профиль успешно загружен, приложение должно показывать Dashboard (главный экран), а не Account Block или Settings.
+*Для любого* пользователя, успешно авторизовавшегося через Google OAuth И для которого профиль успешно загружен, приложение должно скрыть Loader и показывать Dashboard (главный экран), а не Account Block или Settings.
 
 **Validates: Requirements navigation.1.7**
 
-### Property 8: Показ LoginError при ошибке авторизации
+### Property 8: Показ LoginError при ошибке авторизации или загрузки профиля
 
-*Для любого* пользователя, для которого произошла ошибка авторизации (обмен токенов ИЛИ загрузка профиля), приложение должно показать LoginError компонент с описанием ошибки.
+*Для любого* пользователя, для которого произошла ошибка авторизации (обмен токенов ИЛИ загрузка профиля), приложение должно скрыть Loader, очистить токены (если были получены), и показать LoginError компонент с описанием ошибки.
 
 **Validates: Requirements navigation.1.8**
 
@@ -426,13 +520,15 @@ Logout → auth:logout event → onLogout() → redirectToLogin()
 
 1. **Не авторизован (navigation.1.1, navigation.1.2)**: Когда пользователь не авторизован, приложение показывает экран логина, и пользователь НЕ МОЖЕТ попасть в Settings (где находится Account Block). Это не edge case для Account компонента, так как компонент не должен быть доступен неавторизованным пользователям.
 
-2. **Множественные попытки авторизации (navigation.1.3, navigation.1.4)**: Когда пользователь нажимает кнопку "Continue with Google", браузер открывается для авторизации, но кнопка остается активной. Пользователь может открыть несколько вкладок браузера для авторизации. Система корректно обрабатывает только первый успешный authorization code.
+2. **Множественные попытки авторизации (navigation.1.3, navigation.1.4)**: Когда пользователь нажимает кнопку "Continue with Google", браузер открывается для авторизации, но кнопка остается активной. Пользователь может открыть несколько вкладок браузера для авторизации. Система корректно обрабатывает только первый успешный authorization code. После получения authorization code кнопка становится неактивной (disabled) и показывается Loader.
 
 3. **Синхронная загрузка профиля при авторизации (navigation.1.5, navigation.1.6, navigation.1.7, navigation.1.8)**: Когда пользователь авторизуется через Google OAuth, система должна:
-   - Показать loader с текстом "Signing in..." после получения authorization code (navigation.1.5)
-   - Синхронно обменять код на токены И загрузить профиль во время отображения loader (navigation.1.6)
-   - При успехе: показать Dashboard с заполненным Account Block (navigation.1.7)
-   - При ошибке обмена токенов ИЛИ загрузки профиля: очистить токены и показать LoginError компонент с errorCode 'profile_fetch_failed' (navigation.1.8)
+   - Показать Loader с текстом "Signing in..." после получения authorization code (navigation.1.5)
+   - Синхронно обменять код на токены И загрузить профиль во время отображения Loader (navigation.1.6)
+   - При успехе: скрыть Loader и показать Dashboard с заполненным Account Block (navigation.1.7)
+   - При ошибке обмена токенов ИЛИ загрузки профиля: скрыть Loader, очистить токены и показать LoginError компонент с errorCode 'profile_fetch_failed' (navigation.1.8)
+
+4. **Loader не показывается при клике на кнопку (navigation.1.5)**: Когда пользователь кликает кнопку "Continue with Google", Loader НЕ показывается сразу. Loader показывается ТОЛЬКО после получения deep link от Google (authorization code). Это предотвращает показ Loader если пользователь закрывает браузер до завершения авторизации.
 
 
 ## Обработка Ошибок
@@ -737,6 +833,76 @@ describe('OAuth Events Integration', () => {
 });
 ```
 
+#### Loader State Tests
+
+```typescript
+describe('Loader State Management', () => {
+  /* Preconditions: LoginScreen displayed, not loading
+     Action: auth code received event triggered
+     Assertions: loader shown with "Signing in..." message, button disabled
+     Requirements: navigation.1.5 */
+  it('should show loader when authorization code is received', () => {
+    // Тест показа loader при получении authorization code
+  });
+
+  /* Preconditions: loader displayed
+     Action: auth success event triggered
+     Assertions: loader hidden
+     Requirements: navigation.1.7 */
+  it('should hide loader on auth success', () => {
+    // Тест скрытия loader при успешной авторизации
+  });
+
+  /* Preconditions: loader displayed
+     Action: auth error event triggered
+     Assertions: loader hidden
+     Requirements: navigation.1.8 */
+  it('should hide loader on auth error', () => {
+    // Тест скрытия loader при ошибке авторизации
+  });
+
+  /* Preconditions: LoginScreen displayed
+     Action: user clicks "Continue with Google"
+     Assertions: loader NOT shown (only shown after auth code received)
+     Requirements: navigation.1.5 */
+  it('should NOT show loader immediately on button click', () => {
+    // Тест что loader не показывается сразу при клике
+  });
+
+  /* Preconditions: loader displayed
+     Action: check button state
+     Assertions: button is disabled
+     Requirements: navigation.1.5 */
+  it('should disable login button when loader is shown', () => {
+    // Тест что кнопка неактивна во время загрузки
+  });
+
+  /* Preconditions: loader displayed
+     Action: check LoginScreen elements
+     Assertions: all elements remain visible
+     Requirements: navigation.1.5 */
+  it('should keep all LoginScreen elements visible during loading', () => {
+    // Тест что все элементы остаются видимыми
+  });
+
+  /* Preconditions: loader displayed, token exchange in progress
+     Action: check operation sequence
+     Assertions: token exchange completes before profile fetch
+     Requirements: navigation.1.6 */
+  it('should complete token exchange before profile fetch', async () => {
+    // Тест последовательности операций
+  });
+
+  /* Preconditions: loader displayed, profile fetch fails
+     Action: error occurs during profile fetch
+     Assertions: loader hidden, tokens cleared, LoginError shown
+     Requirements: navigation.1.8 */
+  it('should clear tokens and show error if profile fetch fails', async () => {
+    // Тест очистки токенов при ошибке загрузки профиля
+  });
+});
+```
+
 ### Property-Based Тесты
 
 ```typescript
@@ -793,6 +959,131 @@ describe('NavigationManager Property Tests', () => {
           } else {
             expect(canAccess).toBe(true);
           }
+        }
+      ),
+      { numRuns: 100 }
+    );
+  });
+
+  /* Feature: navigation, Property 5: Показ Loader при получении authorization code
+     Preconditions: various auth code received states
+     Action: trigger auth code received event
+     Assertions: loader shown with correct message, button disabled
+     Requirements: navigation.1.5 */
+  it('should show loader when authorization code is received', () => {
+    fc.assert(
+      fc.property(
+        fc.string(),
+        (authCode) => {
+          // Trigger auth code received event
+          triggerAuthCodeReceived(authCode);
+
+          // Verify loader state
+          expect(getLoaderState()).toEqual({
+            isLoading: true,
+            message: 'Signing in...'
+          });
+          expect(getLoginButtonState()).toBe('disabled');
+        }
+      ),
+      { numRuns: 100 }
+    );
+  });
+
+  /* Feature: navigation, Property 6: Синхронный обмен кода и загрузка профиля
+     Preconditions: loader displayed, various auth codes
+     Action: exchange code and fetch profile
+     Assertions: operations complete before redirect
+     Requirements: navigation.1.6 */
+  it('should complete token exchange and profile fetch before redirect', () => {
+    fc.assert(
+      fc.property(
+        fc.string(),
+        fc.record({
+          email: fc.emailAddress(),
+          name: fc.string(),
+          picture: fc.webUrl()
+        }),
+        async (authCode, profile) => {
+          // Mock successful token exchange and profile fetch
+          mockTokenExchange(authCode, { success: true });
+          mockProfileFetch({ success: true, profile });
+
+          // Trigger auth code received
+          await processAuthCode(authCode);
+
+          // Verify operations completed in order
+          expect(getOperationLog()).toEqual([
+            'token_exchange_start',
+            'token_exchange_complete',
+            'profile_fetch_start',
+            'profile_fetch_complete',
+            'redirect_to_dashboard'
+          ]);
+        }
+      ),
+      { numRuns: 100 }
+    );
+  });
+
+  /* Feature: navigation, Property 7: Показ Dashboard после успешной авторизации
+     Preconditions: various successful auth and profile fetch scenarios
+     Action: complete auth flow
+     Assertions: loader hidden, redirected to dashboard
+     Requirements: navigation.1.7 */
+  it('should hide loader and redirect to dashboard on success', () => {
+    fc.assert(
+      fc.property(
+        fc.string(),
+        fc.record({
+          email: fc.emailAddress(),
+          name: fc.string(),
+          picture: fc.webUrl()
+        }),
+        async (authCode, profile) => {
+          // Mock successful flow
+          mockTokenExchange(authCode, { success: true });
+          mockProfileFetch({ success: true, profile });
+
+          // Process auth code
+          await processAuthCode(authCode);
+
+          // Verify final state
+          expect(getLoaderState().isLoading).toBe(false);
+          expect(getCurrentRoute()).toBe('/dashboard');
+        }
+      ),
+      { numRuns: 100 }
+    );
+  });
+
+  /* Feature: navigation, Property 8: Показ LoginError при ошибке
+     Preconditions: various error scenarios (token exchange or profile fetch)
+     Action: trigger error during auth flow
+     Assertions: loader hidden, tokens cleared, error shown
+     Requirements: navigation.1.8 */
+  it('should hide loader and show error on auth failure', () => {
+    fc.assert(
+      fc.property(
+        fc.string(),
+        fc.constantFrom('token_exchange_error', 'profile_fetch_error'),
+        async (authCode, errorType) => {
+          // Mock error scenario
+          if (errorType === 'token_exchange_error') {
+            mockTokenExchange(authCode, { success: false, error: 'invalid_grant' });
+          } else {
+            mockTokenExchange(authCode, { success: true });
+            mockProfileFetch({ success: false, error: 'network_error' });
+          }
+
+          // Process auth code
+          await processAuthCode(authCode);
+
+          // Verify error handling
+          expect(getLoaderState().isLoading).toBe(false);
+          expect(getTokensCleared()).toBe(true);
+          expect(getLoginErrorShown()).toBe(true);
+          expect(getLoginErrorCode()).toBe('profile_fetch_failed');
         }
       ),
       { numRuns: 100 }
@@ -924,8 +1215,16 @@ describe('Navigation Functional Tests', () => {
 - `tests/functional/navigation.spec.ts` - "should show login screen on first launch"
 - `tests/functional/navigation.spec.ts` - "should redirect to dashboard after successful login"
 - `tests/functional/navigation.spec.ts` - "should block access to protected routes when not authenticated"
+- `tests/functional/navigation.spec.ts` - "should show loader during authorization"
+- `tests/functional/navigation.spec.ts` - "should allow multiple login attempts before authorization completes"
 - `tests/functional/auth-flow.spec.ts` - "should complete full authentication flow"
 - `tests/functional/auth-flow.spec.ts` - "should redirect to login after logout"
+- `tests/functional/auth-flow.spec.ts` - "should show loader after receiving authorization code"
+- `tests/functional/auth-flow.spec.ts` - "should show loader during token exchange and profile fetch"
+- `tests/functional/auth-flow.spec.ts` - "should disable login button when loader is shown"
+- `tests/functional/auth-flow.spec.ts` - "should hide loader and show dashboard on success"
+- `tests/functional/auth-flow.spec.ts` - "should hide loader and show error on failure"
+- `tests/functional/auth-flow.spec.ts` - "should NOT show loader immediately after login click, only after deep link"
 
 
 ### Покрытие Требований
@@ -936,10 +1235,10 @@ describe('Navigation Functional Tests', () => {
 | navigation.1.2 | ✓ | ✓ | ✓ |
 | navigation.1.3 | ✓ | - | ✓ |
 | navigation.1.4 | ✓ | - | ✓ |
-| navigation.1.5 | ✓ | - | ✓ |
-| navigation.1.6 | ✓ | - | ✓ |
-| navigation.1.7 | ✓ | - | ✓ |
-| navigation.1.8 | ✓ | - | ✓ |
+| navigation.1.5 | ✓ | ✓ | ✓ |
+| navigation.1.6 | ✓ | ✓ | ✓ |
+| navigation.1.7 | ✓ | ✓ | ✓ |
+| navigation.1.8 | ✓ | ✓ | ✓ |
 | navigation.1.9 | ✓ | - | ✓ |
 
 ### Критерии Успеха

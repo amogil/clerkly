@@ -109,6 +109,12 @@ describe('TokenStorageManager Property-Based Tests', () => {
         tokenDataArb,
         tokenDataArb,
         async (tokens1: TokenData, tokens2: TokenData) => {
+          // Skip if tokens are identical (edge case where generator produces same values)
+          fc.pre(
+            tokens1.accessToken !== tokens2.accessToken ||
+              tokens1.refreshToken !== tokens2.refreshToken
+          );
+
           // Save first set of tokens
           await tokenStorage.saveTokens(tokens1);
 
@@ -125,9 +131,13 @@ describe('TokenStorageManager Property-Based Tests', () => {
           expect(loaded?.expiresAt).toBe(tokens2.expiresAt);
           expect(loaded?.tokenType).toBe(tokens2.tokenType);
 
-          // Verify no traces of first set
-          expect(loaded?.accessToken).not.toBe(tokens1.accessToken);
-          expect(loaded?.refreshToken).not.toBe(tokens1.refreshToken);
+          // Verify no traces of first set (only check if tokens are actually different)
+          if (tokens1.accessToken !== tokens2.accessToken) {
+            expect(loaded?.accessToken).not.toBe(tokens1.accessToken);
+          }
+          if (tokens1.refreshToken !== tokens2.refreshToken) {
+            expect(loaded?.refreshToken).not.toBe(tokens1.refreshToken);
+          }
 
           // Clean up
           await tokenStorage.deleteTokens();
