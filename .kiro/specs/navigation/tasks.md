@@ -230,7 +230,7 @@
   - **Property:** 5
   - **Реализовано в:** `tests/property/auth/LoaderState.property.test.tsx`
 
-- [ ]* 5.4 Property Test: Синхронный обмен кода и загрузка профиля
+- [x] 5.4 Property Test: Синхронный обмен кода и загрузка профиля
   - ❌ НЕ РЕАЛИЗОВАН: Специфичный property test для последовательности операций
   - Примечание: Функциональность покрыта в `tests/functional/oauth-profile-sync.spec.ts`
   - Генерировать различные authorization codes и профили
@@ -249,7 +249,7 @@
   - **Property:** 7, 9
   - **Реализовано в:** `tests/property/navigation/NavigationManager.property.test.ts`
 
-- [ ]* 5.6 Property Test: Показ LoginError при ошибке
+- [x] 5.6 Property Test: Показ LoginError при ошибке
   - ❌ НЕ РЕАЛИЗОВАН: Специфичный property test для ошибок навигации
   - Примечание: Функциональность покрыта в `tests/functional/auth-flow.spec.ts`
   - Генерировать различные сценарии ошибок (обмен токенов, загрузка профиля)
@@ -330,7 +330,7 @@
   - **Property:** 4, 5
   - **Реализовано в:** `tests/functional/auth-flow.spec.ts`
 
-- [ ]* 6.8 Функциональный тест: should show error on authorization failure
+- [x] 6.8 Функциональный тест: should show error on authorization failure
   - ❌ НЕ РЕАЛИЗОВАН: Специфичный тест для навигации при ошибке
   - Примечание: Функциональность покрыта в `tests/functional/auth-flow.spec.ts` (общие ошибки OAuth)
   - Запустить приложение без авторизации
