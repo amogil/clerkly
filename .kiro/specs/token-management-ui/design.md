@@ -89,11 +89,12 @@ Token Expiring → OAuthClientManager.refreshAccessToken() → Update Tokens in 
 │                      Main Process                            │
 │                                                               │
 │  ┌──────────────────────┐                                    │
-│  │  APIRequestHandler   │                                    │
+│  │  handleAPIRequest()  │                                    │
 │  │                      │                                    │
-│  │  - handleRequest()   │                                    │
-│  │  - checkAuth()       │                                    │
-│  │  - clearSession()    │                                    │
+│  │  - Auto token refresh│                                    │
+│  │  - Check 401 status  │                                    │
+│  │  - Clear tokens      │                                    │
+│  │  - Send IPC event    │                                    │
 │  └──────────────────────┘                                    │
 │           │                                                   │
 │           ▼                                                   │
@@ -125,115 +126,159 @@ Token Expiring → OAuthClientManager.refreshAccessToken() → Update Tokens in 
 
 2. **Обработка ошибки авторизации (HTTP 401)**:
    - API запрос возвращает HTTP 401 Unauthorized
-   - `APIRequestHandler` перехватывает ошибку
-   - Вызывается `handleAuthError()` для очистки токенов
-   - `TokenStorageManager` удаляет все токены
+   - `handleAPIRequest()` перехватывает ошибку
+   - Проверяется флаг `isClearing401` для предотвращения race conditions
+   - Вызывается `tokenStorage.deleteTokens()` для очистки токенов
    - IPC событие `auth:error` отправляется в renderer
    - `LoginError` компонент отображается с errorCode 'invalid_grant'
    - Пользователь может повторно авторизоваться
 
 3. **Множественные одновременные ошибки 401**:
    - Несколько API запросов одновременно получают HTTP 401
-   - `APIRequestHandler` использует флаг `clearingSession` для предотвращения race conditions
+   - `handleAPIRequest()` использует флаг `isClearing401` для предотвращения race conditions
    - Очистка токенов выполняется только один раз
    - Все запросы получают одинаковую ошибку
 
 ## Компоненты и Интерфейсы
 
-### APIRequestHandler
+### handleAPIRequest Function
 
-Класс для централизованной обработки API запросов с автоматической проверкой ошибок авторизации.
+Функция для централизованной обработки API запросов с автоматической проверкой ошибок авторизации и автоматическим обновлением токенов.
 
 ```typescript
-// Requirements: token-management-ui.1.3, token-management-ui.1.4, token-management-ui.1.5
+// Requirements: token-management-ui.1.1, token-management-ui.1.2, token-management-ui.1.3, token-management-ui.1.4, token-management-ui.1.5
 
-class APIRequestHandler {
-  private tokenStorageManager: TokenStorageManager;
-  private windowManager: WindowManager;
-  private clearingSession: boolean = false;
+/**
+ * Centralized API Request Handler
+ * Handles all API requests with automatic HTTP 401 detection and token management
+ * 
+ * This handler wraps fetch() to provide:
+ * - Automatic token refresh when access token is expired (token-management-ui.1.1, token-management-ui.1.2)
+ * - Automatic detection of HTTP 401 Unauthorized errors
+ * - Centralized token clearing on authorization failures
+ * - Protection against race conditions when multiple requests fail simultaneously
+ * - Consistent error logging with context
+ *
+ * @param url API endpoint URL
+ * @param options Fetch options (headers, method, body, etc.)
+ * @param tokenStorage TokenStorageManager instance for clearing tokens
+ * @param context Optional context string for logging (e.g., "UserInfo API", "Calendar API")
+ * @returns Response from the API
+ * @throws Error if request fails or authorization error occurs
+ */
+async function handleAPIRequest(
+  url: string,
+  options: RequestInit,
+  tokenStorage: TokenStorageManager,
+  context?: string
+): Promise<Response> {
+  logger.info(`Making API request: ${JSON.stringify({ url, context })}`);
 
-  constructor(
-    tokenStorageManager: TokenStorageManager,
-    windowManager: WindowManager
-  ) {
-    this.tokenStorageManager = tokenStorageManager;
-    this.windowManager = windowManager;
-  }
+  try {
+    // Requirements: token-management-ui.1.1, token-management-ui.1.2 - Check if access token is expired and refresh if needed
+    if (oauthClientManager) {
+      const tokens = await tokenStorage.loadTokens();
+      if (tokens && tokens.expiresAt) {
+        const now = Date.now();
+        const isExpired = tokens.expiresAt <= now;
 
-  /**
-   * Handle API request with automatic 401 checking
-   * Requirements: token-management-ui.1.3, token-management-ui.1.4
-   */
-  async handleRequest(url: string, options: RequestInit): Promise<Response> {
-    try {
-      const response = await fetch(url, options);
+        if (isExpired) {
+          logger.info('Access token expired, refreshing automatically');
+          const refreshed = await oauthClientManager.refreshAccessToken();
 
-      // Requirements: token-management-ui.1.3, token-management-ui.1.4 - Check for authorization error
-      if (response.status === 401) {
-        await this.handleAuthError(url);
-        throw new Error('Authorization failed: Session expired');
+          if (refreshed) {
+            logger.info('Token refreshed successfully');
+            // Reload tokens to get the new access token
+            const newTokens = await tokenStorage.loadTokens();
+            if (newTokens && options.headers) {
+              // Update Authorization header with new token
+              if (options.headers instanceof Headers) {
+                options.headers.set('Authorization', `Bearer ${newTokens.accessToken}`);
+              } else {
+                (options.headers as Record<string, string>)['Authorization'] =
+                  `Bearer ${newTokens.accessToken}`;
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // Requirements: token-management-ui.1.4 - Make the API request
+    const response = await fetch(url, options);
+    logger.info(`Response received: ${JSON.stringify({ status: response.status, url })}`);
+
+    // Requirements: token-management-ui.1.3, token-management-ui.1.4 - Check for authorization error
+    if (response.status === 401) {
+      // Requirements: token-management-ui.1.4 - Prevent race conditions with multiple simultaneous 401 errors
+      if (!isClearing401) {
+        isClearing401 = true;
+
+        try {
+          // Requirements: token-management-ui.1.5 - Log error with context
+          const logContext = context || 'API Request';
+          logger.error(
+            `Authorization error (401) from ${logContext}: ${JSON.stringify({
+              url,
+              timestamp: DateTimeFormatter.formatLogTimestamp(Date.now()),
+              context: logContext,
+            })}`
+          );
+
+          // Requirements: token-management-ui.1.3 - Clear all tokens from storage
+          logger.info('Clearing all tokens due to 401 error');
+          await tokenStorage.deleteTokens();
+
+          // Requirements: token-management-ui.1.3 - Emit auth error event to show LoginError component
+          const allWindows = BrowserWindow.getAllWindows();
+          const mainWindow = allWindows[0];
+          if (mainWindow) {
+            logger.info('Sending auth:error event to renderer');
+            mainWindow.webContents.send('auth:error', {
+              error: 'Session expired',
+              errorCode: 'invalid_grant',
+            });
+          }
+        } finally {
+          // Reset flag after a short delay to allow other requests to see the cleared state
+          setTimeout(() => {
+            isClearing401 = false;
+          }, 100);
+        }
       }
 
-      return response;
-    } catch (error) {
-      // Requirements: token-management-ui.1.5 - Log with context
-      console.error('[APIRequestHandler] Request failed:', {
-        url,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        timestamp: new Date().toISOString()
-      });
-      throw error;
+      // Requirements: token-management-ui.1.3, token-management-ui.1.6 - Throw error with user-friendly message
+      throw new Error('Your session has expired. Please sign in again.');
     }
+
+    return response;
+  } catch (error) {
+    // Requirements: token-management-ui.1.5 - Log all errors with context
+    const logContext = context || 'API Request';
+    logger.error(
+      `Request failed for ${logContext}: ${error instanceof Error ? error.message : String(error)}`
+    );
+
+    // Re-throw the error for caller to handle
+    throw error;
   }
+}
 
-  /**
-   * Handle authorization error (HTTP 401)
-   * Requirements: token-management-ui.1.3
-   */
-  private async handleAuthError(url: string): Promise<void> {
-    // Prevent multiple simultaneous session clears
-    if (this.clearingSession) {
-      console.log('[APIRequestHandler] Session clear already in progress, skipping');
-      return;
-    }
-
-    this.clearingSession = true;
-
-    try {
-      // Requirements: token-management-ui.1.5 - Log with context
-      console.error('[APIRequestHandler] Authorization error (401):', {
-        url,
-        action: 'clearing tokens and showing login',
-        timestamp: new Date().toISOString()
-      });
-
-      // Requirements: token-management-ui.1.3 - Clear all tokens
-      await this.tokenStorageManager.clearTokens();
-
-      // Requirements: token-management-ui.1.3 - Show LoginError component
-      const mainWindow = this.windowManager.getWindow();
-      if (mainWindow) {
-        mainWindow.webContents.send('auth:error', {
-          message: 'Session expired',
-          errorCode: 'invalid_grant'
-        });
-      }
-    } finally {
-      // Reset flag after a short delay to allow event propagation
-      setTimeout(() => {
-        this.clearingSession = false;
-      }, 1000);
-    }
-  }
+/**
+ * Set the OAuth Client Manager instance for automatic token refresh
+ * Requirements: token-management-ui.1.1, token-management-ui.1.2
+ */
+function setOAuthClientManager(manager: OAuthClientManager): void {
+  oauthClientManager = manager;
 }
 ```
 
 **Ключевые особенности:**
-- Централизованная обработка всех API запросов
-- Автоматическая проверка HTTP 401 статуса
-- Предотвращение race conditions при множественных одновременных ошибках 401
-- Логирование с контекстом для отладки
-- Интеграция с существующими компонентами (TokenStorageManager, WindowManager)
+- **Автоматическое обновление токенов**: Проверяет `expiresAt` перед каждым запросом и автоматически обновляет токен если он истек
+- **Централизованная обработка**: Единая точка для всех API запросов с автоматической проверкой HTTP 401
+- **Предотвращение race conditions**: Использует флаг `isClearing401` для предотвращения множественных одновременных очисток токенов
+- **Логирование с контекстом**: Все события логируются через централизованный Logger с контекстом (url, timestamp, action)
+- **Интеграция с OAuthClientManager**: Использует `setOAuthClientManager()` для получения доступа к методу `refreshAccessToken()`
 
 ### Использование в Других Компонентах
 
@@ -241,6 +286,8 @@ class APIRequestHandler {
 // Requirements: token-management-ui.1.4
 
 // In UserProfileManager
+import { handleAPIRequest } from './APIRequestHandler';
+
 async fetchProfile(): Promise<UserProfile | null> {
   try {
     const authStatus = await this.oauthClient.getAuthStatus();
@@ -248,12 +295,14 @@ async fetchProfile(): Promise<UserProfile | null> {
       return null;
     }
 
-    // Use centralized handler that checks for 401
-    const response = await this.apiRequestHandler.handleRequest(
+    // Use centralized handler that checks for 401 and auto-refreshes tokens
+    const response = await handleAPIRequest(
       'https://www.googleapis.com/oauth2/v1/userinfo',
       {
         headers: { 'Authorization': `Bearer ${authStatus.tokens.accessToken}` }
-      }
+      },
+      this.tokenStorage,
+      'UserInfo API'  // Context for logging
     );
 
     const profile = await response.json();
@@ -262,7 +311,7 @@ async fetchProfile(): Promise<UserProfile | null> {
   } catch (error) {
     // If it's an auth error, tokens are already cleared
     // Return cached profile for other errors
-    if (error.message?.includes('Authorization failed')) {
+    if (error.message?.includes('session has expired')) {
       return null;
     }
     return await this.loadProfile();
@@ -270,6 +319,8 @@ async fetchProfile(): Promise<UserProfile | null> {
 }
 
 // In CalendarManager (example)
+import { handleAPIRequest } from './auth/APIRequestHandler';
+
 async fetchCalendarEvents(): Promise<CalendarEvent[]> {
   try {
     const authStatus = await this.oauthClient.getAuthStatus();
@@ -278,17 +329,19 @@ async fetchCalendarEvents(): Promise<CalendarEvent[]> {
     }
 
     // Use centralized handler
-    const response = await this.apiRequestHandler.handleRequest(
+    const response = await handleAPIRequest(
       'https://www.googleapis.com/calendar/v3/calendars/primary/events',
       {
         headers: { 'Authorization': `Bearer ${authStatus.tokens.accessToken}` }
-      }
+      },
+      this.tokenStorage,
+      'Calendar API'  // Context for logging
     );
 
     const data = await response.json();
     return data.items || [];
   } catch (error) {
-    if (error.message?.includes('Authorization failed')) {
+    if (error.message?.includes('session has expired')) {
       return [];
     }
     throw error;
@@ -303,53 +356,129 @@ React компонент для отображения ошибок автори
 ```typescript
 // Requirements: token-management-ui.1.3, token-management-ui.1.6
 
-import { useState, useEffect } from 'react';
+import React from 'react';
+import { AlertCircle, Loader2 } from 'lucide-react';
 
 interface LoginErrorProps {
-  errorCode: string;
-  message?: string;
+  errorMessage?: string;
+  errorCode?: string;
+  onRetry: () => void;
+  isLoading?: boolean;
+  isDisabled?: boolean;
 }
 
-export function LoginError({ errorCode, message }: LoginErrorProps) {
-  const [isLoading, setIsLoading] = useState(false);
+interface ErrorDetails {
+  title: string;
+  message: string;
+  suggestion: string;
+}
 
-  const handleRetry = async () => {
-    setIsLoading(true);
-    try {
-      // Requirements: token-management-ui.1.3 - Trigger OAuth flow
-      await window.api.auth.startOAuthFlow();
-    } catch (error) {
-      console.error('[LoginError] Failed to start OAuth flow:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+/**
+ * Maps error codes to user-friendly error messages
+ * Requirements: token-management-ui.1.6
+ */
+function getErrorDetails(errorCode?: string, errorMessage?: string): ErrorDetails {
+  // Requirements: token-management-ui.1.6 - Session expired
+  if (errorCode === 'invalid_grant') {
+    return {
+      title: 'Session expired',
+      message: 'Your authentication session has expired.',
+      suggestion: 'Please sign in again to continue.',
+    };
+  }
 
-  // Requirements: token-management-ui.1.6 - Display user-friendly message
-  const getErrorMessage = () => {
-    if (errorCode === 'invalid_grant') {
-      return 'Your session has expired. Please sign in again to continue.';
-    }
-    return message || 'An error occurred during authentication. Please try again.';
+  // Other error codes...
+  
+  // Default error
+  return {
+    title: 'Authentication failed',
+    message: errorMessage || 'An unexpected error occurred during authentication.',
+    suggestion: 'Please try signing in again or contact support if the problem persists.',
   };
+}
+
+/**
+ * Login Error Component
+ * 
+ * Displays the authentication error screen with detailed error information
+ * and retry option. Shows all elements from LoginScreen plus error message.
+ * Supports loading state with spinner during retry.
+ * 
+ * Requirements: token-management-ui.1.3, token-management-ui.1.6
+ */
+export function LoginError({
+  errorMessage,
+  errorCode,
+  onRetry,
+  isLoading = false,
+  isDisabled = false,
+}: LoginErrorProps) {
+  const errorDetails = getErrorDetails(errorCode, errorMessage);
 
   return (
-    <div className="login-error">
-      <div className="error-content">
-        <h2>Authentication Required</h2>
-        <p className="error-message">{getErrorMessage()}</p>
-        <button
-          className="retry-button"
-          onClick={handleRetry}
-          disabled={isLoading}
-        >
-          {isLoading ? 'Signing in...' : 'Continue with Google'}
-        </button>
+    <div className="min-h-screen bg-background flex items-center justify-center p-6">
+      <div className="w-full max-w-md">
+        {/* Logo and Header */}
+        <div className="text-center mb-12">
+          <div className="flex justify-center mb-6">
+            <Logo size="lg" showText={false} />
+          </div>
+          <h1 className="text-4xl font-semibold text-foreground mb-3">Clerkly</h1>
+        </div>
+
+        {/* Login Card */}
+        <div className="bg-card rounded-2xl border border-border shadow-sm p-8">
+          <div className="text-center mb-8">
+            <h2 className="text-2xl font-semibold text-foreground mb-2">Welcome</h2>
+            <p className="text-sm text-muted-foreground">
+              Your autonomous AI agent that listens, organizes, and acts
+            </p>
+          </div>
+
+          {/* Error Message - Requirements: token-management-ui.1.6 */}
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-red-900 mb-1">{errorDetails.message}</p>
+                <p className="text-xs text-red-700">{errorDetails.suggestion}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Google Sign In Button - Requirements: token-management-ui.1.3 */}
+          <button
+            onClick={onRetry}
+            disabled={isDisabled || isLoading}
+            className="w-full flex items-center justify-center gap-3 bg-white hover:bg-gray-50 text-gray-800 font-medium py-3.5 px-6 rounded-lg border border-gray-300 shadow-sm transition-all"
+          >
+            {isLoading ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin" />
+                <span>Signing in...</span>
+              </>
+            ) : (
+              <>
+                {/* Google Icon */}
+                <svg width="20" height="20" viewBox="0 0 24 24">
+                  {/* Google logo paths */}
+                </svg>
+                <span>Continue with Google</span>
+              </>
+            )}
+          </button>
+        </div>
       </div>
     </div>
   );
 }
 ```
+
+**Ключевые особенности:**
+- **Понятные сообщения**: Отображает user-friendly сообщения без технических деталей (token-management-ui.1.6)
+- **Поддержка различных ошибок**: Обрабатывает различные errorCode (invalid_grant, network_error, и т.д.)
+- **Состояние загрузки**: Показывает spinner во время повторной авторизации
+- **Retry функциональность**: Кнопка "Continue with Google" для повторной авторизации (token-management-ui.1.3)
 
 ### Loader Component
 
@@ -445,6 +574,8 @@ interface AuthError {
 
 *Для любого* access token, который истекает (expires_in), система должна автоматически обновить его через refresh token в фоновом режиме без участия пользователя, и пользователь должен продолжать работу без прерываний.
 
+**Реализация:** `handleAPIRequest()` проверяет `tokens.expiresAt` перед каждым запросом. Если токен истек, автоматически вызывается `oauthClientManager.refreshAccessToken()`, и Authorization header обновляется с новым токеном. Весь процесс происходит прозрачно для пользователя.
+
 **Validates: Requirements token-management-ui.1.1, token-management-ui.1.2**
 
 ### Property 2: Очистка токенов при ошибке авторизации
@@ -495,35 +626,34 @@ interface AuthError {
 **Обработка:**
 ```typescript
 // Requirements: token-management-ui.1.1, token-management-ui.1.3
-async refreshAccessToken(): Promise<boolean> {
-  try {
-    // Attempt to refresh token
-    const newTokens = await this.oauthClient.refreshAccessToken();
-    if (newTokens) {
-      await this.tokenStorageManager.saveTokens(newTokens);
-      return true;
+
+// In handleAPIRequest()
+if (oauthClientManager) {
+  const tokens = await tokenStorage.loadTokens();
+  if (tokens && tokens.expiresAt) {
+    const isExpired = tokens.expiresAt <= Date.now();
+
+    if (isExpired) {
+      logger.info('Access token expired, refreshing automatically');
+      const refreshed = await oauthClientManager.refreshAccessToken();
+
+      if (refreshed) {
+        logger.info('Token refreshed successfully');
+        // Update Authorization header with new token
+        const newTokens = await tokenStorage.loadTokens();
+        if (newTokens && options.headers) {
+          // Update header with new token
+        }
+      } else {
+        logger.info('Token refresh failed, continuing with expired token');
+        // Request will likely return 401, which will be handled below
+      }
     }
-    return false;
-  } catch (error) {
-    console.error('[TokenRefresh] Failed to refresh access token:', error);
-    
-    // If refresh fails, clear all tokens and show login
-    await this.tokenStorageManager.clearTokens();
-    
-    const mainWindow = this.windowManager.getWindow();
-    if (mainWindow) {
-      mainWindow.webContents.send('auth:error', {
-        message: 'Session expired',
-        errorCode: 'invalid_grant'
-      });
-    }
-    
-    return false;
   }
 }
 ```
 
-**Результат:** Токены очищены, пользователь видит LoginError компонент с возможностью повторной авторизации.
+**Результат:** Если refresh не удался, запрос продолжается с истекшим токеном. API вернет 401, что будет обработано централизованным обработчиком (очистка токенов, показ LoginError).
 
 #### 2. Ошибка API запроса (HTTP 401)
 
@@ -535,24 +665,48 @@ async refreshAccessToken(): Promise<boolean> {
 **Обработка:**
 ```typescript
 // Requirements: token-management-ui.1.3, token-management-ui.1.4, token-management-ui.1.5
-async handleRequest(url: string, options: RequestInit): Promise<Response> {
-  try {
-    const response = await fetch(url, options);
-    
-    if (response.status === 401) {
-      await this.handleAuthError(url);
-      throw new Error('Authorization failed: Session expired');
+
+// In handleAPIRequest()
+const response = await fetch(url, options);
+
+if (response.status === 401) {
+  // Requirements: token-management-ui.1.4 - Prevent race conditions
+  if (!isClearing401) {
+    isClearing401 = true;
+
+    try {
+      // Requirements: token-management-ui.1.5 - Log error with context
+      const logContext = context || 'API Request';
+      logger.error(
+        `Authorization error (401) from ${logContext}: ${JSON.stringify({
+          url,
+          timestamp: DateTimeFormatter.formatLogTimestamp(Date.now()),
+          context: logContext,
+        })}`
+      );
+
+      // Requirements: token-management-ui.1.3 - Clear all tokens
+      logger.info('Clearing all tokens due to 401 error');
+      await tokenStorage.deleteTokens();
+
+      // Requirements: token-management-ui.1.3 - Emit auth error event
+      const allWindows = BrowserWindow.getAllWindows();
+      const mainWindow = allWindows[0];
+      if (mainWindow) {
+        mainWindow.webContents.send('auth:error', {
+          error: 'Session expired',
+          errorCode: 'invalid_grant',
+        });
+      }
+    } finally {
+      setTimeout(() => {
+        isClearing401 = false;
+      }, 100);
     }
-    
-    return response;
-  } catch (error) {
-    console.error('[APIRequestHandler] Request failed:', {
-      url,
-      error: error instanceof Error ? error.message : 'Unknown error',
-      timestamp: new Date().toISOString()
-    });
-    throw error;
   }
+
+  // Requirements: token-management-ui.1.3, token-management-ui.1.6 - Throw user-friendly error
+  throw new Error('Your session has expired. Please sign in again.');
 }
 ```
 
@@ -567,38 +721,39 @@ async handleRequest(url: string, options: RequestInit): Promise<Response> {
 **Обработка:**
 ```typescript
 // Requirements: token-management-ui.1.4
-private clearingSession: boolean = false;
 
-private async handleAuthError(url: string): Promise<void> {
+// Global flag to prevent race conditions
+let isClearing401 = false;
+
+// In handleAPIRequest()
+if (response.status === 401) {
   // Prevent multiple simultaneous session clears
-  if (this.clearingSession) {
-    console.log('[APIRequestHandler] Session clear already in progress, skipping');
-    return;
-  }
+  if (!isClearing401) {
+    isClearing401 = true;
 
-  this.clearingSession = true;
+    try {
+      logger.error(`Authorization error (401) from ${context}`);
+      
+      // Clear tokens only once
+      await tokenStorage.deleteTokens();
 
-  try {
-    console.error('[APIRequestHandler] Authorization error (401):', {
-      url,
-      action: 'clearing tokens and showing login',
-      timestamp: new Date().toISOString()
-    });
-
-    await this.tokenStorageManager.clearTokens();
-
-    const mainWindow = this.windowManager.getWindow();
-    if (mainWindow) {
-      mainWindow.webContents.send('auth:error', {
-        message: 'Session expired',
-        errorCode: 'invalid_grant'
-      });
+      // Send auth:error event only once
+      const mainWindow = BrowserWindow.getAllWindows()[0];
+      if (mainWindow) {
+        mainWindow.webContents.send('auth:error', {
+          error: 'Session expired',
+          errorCode: 'invalid_grant',
+        });
+      }
+    } finally {
+      // Reset flag after a short delay
+      setTimeout(() => {
+        isClearing401 = false;
+      }, 100);
     }
-  } finally {
-    setTimeout(() => {
-      this.clearingSession = false;
-    }, 1000);
   }
+
+  throw new Error('Your session has expired. Please sign in again.');
 }
 ```
 
@@ -611,29 +766,34 @@ private async handleAuthError(url: string): Promise<void> {
 ```typescript
 // Requirements: token-management-ui.1.5
 
-// Authorization errors
-console.error('[APIRequestHandler] Authorization error (401):', {
-  url,
-  action: 'clearing tokens and showing login',
-  timestamp: new Date().toISOString()
-});
+// Create parameterized logger for APIRequestHandler module
+const logger = Logger.create('APIRequestHandler');
 
-// Token refresh errors
-console.error('[TokenRefresh] Failed to refresh access token:', error);
+// Authorization errors
+logger.error(
+  `Authorization error (401) from ${logContext}: ${JSON.stringify({
+    url,
+    timestamp: DateTimeFormatter.formatLogTimestamp(Date.now()),
+    context: logContext,
+  })}`
+);
+
+// Token refresh events
+logger.info('Access token expired, refreshing automatically');
+logger.info('Token refreshed successfully');
 
 // API request errors
-console.error('[APIRequestHandler] Request failed:', {
-  url,
-  error: error instanceof Error ? error.message : 'Unknown error',
-  timestamp: new Date().toISOString()
-});
+logger.error(
+  `Request failed for ${logContext}: ${error instanceof Error ? error.message : String(error)}`
+);
 ```
 
 **Формат логов:**
-- Префикс с именем компонента в квадратных скобках
+- Использование централизованного Logger класса (см. clerkly.3)
+- Параметризованный logger с модулем 'APIRequestHandler'
 - Описательное сообщение об ошибке
-- Объект с контекстом (url, timestamp, action)
-- Объект ошибки для stack trace (когда доступен)
+- JSON объект с контекстом (url, timestamp, context)
+- Фиксированный формат timestamp через DateTimeFormatter (см. settings.2.3)
 
 ## Стратегия Тестирования
 
@@ -646,36 +806,44 @@ console.error('[APIRequestHandler] Request failed:', {
 
 ### Модульные Тесты
 
-#### APIRequestHandler Tests
+#### handleAPIRequest Tests
 
 ```typescript
-describe('APIRequestHandler', () => {
-  /* Preconditions: APIRequestHandler created with mocked TokenStorageManager and WindowManager
-     Action: call handleRequest() with URL that returns 401
-     Assertions: clearTokens called, auth:error event sent, error thrown
+describe('handleAPIRequest', () => {
+  /* Preconditions: handleAPIRequest called with URL that returns 401
+     Action: call handleAPIRequest() with mocked 401 response
+     Assertions: deleteTokens called, auth:error event sent, error thrown
      Requirements: token-management-ui.1.3, token-management-ui.1.4 */
   it('should clear tokens and show login on 401 error', async () => {
     // Test handling of HTTP 401 error
   });
 
   /* Preconditions: multiple simultaneous requests return 401
-     Action: call handleRequest() multiple times concurrently
-     Assertions: clearTokens called only once, no race conditions
+     Action: call handleAPIRequest() multiple times concurrently
+     Assertions: deleteTokens called only once, no race conditions
      Requirements: token-management-ui.1.4 */
   it('should handle multiple simultaneous 401 errors without race conditions', async () => {
     // Test race condition prevention
   });
 
   /* Preconditions: API request succeeds with 200
-     Action: call handleRequest()
+     Action: call handleAPIRequest()
      Assertions: response returned, no tokens cleared
      Requirements: token-management-ui.1.4 */
   it('should pass through successful requests without interference', async () => {
     // Test normal operation
   });
 
+  /* Preconditions: access token expired, OAuthClientManager set
+     Action: call handleAPIRequest() with expired token
+     Assertions: refreshAccessToken called, Authorization header updated
+     Requirements: token-management-ui.1.1, token-management-ui.1.2 */
+  it('should automatically refresh expired access token', async () => {
+    // Test automatic token refresh
+  });
+
   /* Preconditions: API request fails with network error
-     Action: call handleRequest()
+     Action: call handleAPIRequest()
      Assertions: error logged with context, error thrown
      Requirements: token-management-ui.1.5 */
   it('should log errors with context', async () => {
@@ -796,33 +964,60 @@ describe('Token Management UI Functional Tests', () => {
 
 #### OAuthClientManager
 
-Существующий класс `OAuthClientManager` (из спецификации google-oauth-auth) уже реализует автоматическое обновление токенов. Интеграция с UI требует только добавления IPC событий для уведомления renderer процесса.
+Существующий класс `OAuthClientManager` (из спецификации google-oauth-auth) уже реализует автоматическое обновление токенов. Интеграция с `handleAPIRequest()` выполняется через функцию `setOAuthClientManager()`.
 
 ```typescript
 // Requirements: token-management-ui.1.1, token-management-ui.1.2
 
-// In OAuthClientManager
-async refreshAccessToken(): Promise<boolean> {
-  console.log('[OAuthClientManager] Refreshing access token');
-  
-  // Notify renderer about token refresh start (optional)
-  const mainWindow = this.windowManager.getWindow();
-  if (mainWindow) {
-    mainWindow.webContents.send('auth:token-refresh', { isRefreshing: true });
-  }
-  
-  // ... existing token refresh logic ...
-  
-  if (refreshed) {
-    console.log('[OAuthClientManager] Token refreshed successfully');
-    
-    // Notify renderer about token refresh completion (optional)
-    if (mainWindow) {
-      mainWindow.webContents.send('auth:token-refresh', { isRefreshing: false });
+// In main/index.ts - Initialize OAuth Client Manager
+import { setOAuthClientManager } from './auth/APIRequestHandler';
+
+const oauthClient = new OAuthClientManager(
+  tokenStorage,
+  windowManager,
+  dataManager
+);
+
+// Set OAuth Client Manager for automatic token refresh in API requests
+setOAuthClientManager(oauthClient);
+```
+
+**Как работает автоматическое обновление:**
+
+1. **Проверка истечения токена**: `handleAPIRequest()` проверяет `tokens.expiresAt` перед каждым запросом
+2. **Автоматический refresh**: Если токен истек, вызывается `oauthClientManager.refreshAccessToken()`
+3. **Обновление заголовка**: После успешного refresh, Authorization header обновляется с новым токеном
+4. **Прозрачность для пользователя**: Весь процесс происходит в фоне, пользователь не видит никаких изменений
+
+```typescript
+// In handleAPIRequest()
+if (oauthClientManager) {
+  const tokens = await tokenStorage.loadTokens();
+  if (tokens && tokens.expiresAt) {
+    const now = Date.now();
+    const isExpired = tokens.expiresAt <= now;
+
+    if (isExpired) {
+      logger.info('Access token expired, refreshing automatically');
+      const refreshed = await oauthClientManager.refreshAccessToken();
+
+      if (refreshed) {
+        logger.info('Token refreshed successfully');
+        // Update Authorization header with new token
+        const newTokens = await tokenStorage.loadTokens();
+        if (newTokens && options.headers) {
+          if (options.headers instanceof Headers) {
+            options.headers.set('Authorization', `Bearer ${newTokens.accessToken}`);
+          } else {
+            (options.headers as Record<string, string>)['Authorization'] =
+              `Bearer ${newTokens.accessToken}`;
+          }
+        }
+      }
     }
   }
-  
-  return refreshed;
+}
+```ed;
 }
 ```
 
@@ -932,10 +1127,10 @@ export function App() {
 ### Ключевые Архитектурные Решения
 
 **Централизованная Обработка API Запросов:**
-`APIRequestHandler` обеспечивает единую точку обработки всех внешних API запросов с автоматической проверкой HTTP 401 статуса. Это гарантирует консистентное поведение при истечении сессии во всем приложении.
+`handleAPIRequest()` обеспечивает единую точку обработки всех внешних API запросов с автоматической проверкой HTTP 401 статуса и автоматическим обновлением истекших токенов. Это гарантирует консистентное поведение при истечении сессии во всем приложении.
 
 **Предотвращение Race Conditions:**
-Использование флага `clearingSession` предотвращает множественные одновременные очистки токенов при получении нескольких ошибок 401, обеспечивая стабильность системы.
+Использование флага `isClearing401` предотвращает множественные одновременные очистки токенов при получении нескольких ошибок 401, обеспечивая стабильность системы.
 
 **Понятная Обратная Связь:**
 `LoginError` компонент предоставляет пользователю понятное сообщение о необходимости повторной авторизации без технических деталей, улучшая пользовательский опыт.
@@ -979,16 +1174,25 @@ export function App() {
 
 - **google-oauth-auth**: Спецификация, реализующая backend логику управления токенами OAuth (OAuthClientManager, TokenStorageManager)
 
-### Следующие Шаги
+### Статус Реализации
 
-1. **Создать tasks.md** с задачами для реализации
-2. **Реализовать APIRequestHandler** с централизованной обработкой ошибок
-3. **Реализовать LoginError компонент** для отображения ошибок авторизации
-4. **Интегрировать с App компонентом** для обработки auth:error событий
-5. **Написать модульные тесты** для APIRequestHandler и LoginError
-6. **Написать функциональные тесты** для end-to-end сценариев
-7. **Обновить существующие компоненты** для использования APIRequestHandler
-8. **Валидировать** через `npm run validate`
+Все компоненты системы управления токенами в UI уже реализованы:
+
+1. ✅ **handleAPIRequest функция** - Реализована с централизованной обработкой ошибок и автоматическим обновлением токенов
+2. ✅ **LoginError компонент** - Реализован для отображения ошибок авторизации с понятными сообщениями
+3. ✅ **Интеграция с App компонентом** - Реализована обработка auth:error событий
+4. ✅ **Модульные тесты** - Написаны для handleAPIRequest и LoginError
+5. ✅ **Функциональные тесты** - Написаны для end-to-end сценариев
+6. ✅ **Интеграция с OAuthClientManager** - Реализована через setOAuthClientManager()
+7. ✅ **Валидация** - Все тесты проходят успешно
+
+### Ключевые Файлы Реализации
+
+- `src/main/auth/APIRequestHandler.ts` - Централизованный обработчик API запросов
+- `src/renderer/components/auth/LoginError.tsx` - Компонент отображения ошибок
+- `tests/unit/auth/APIRequestHandler.test.ts` - Модульные тесты
+- `tests/unit/auth/LoginError.test.tsx` - Модульные тесты компонента
+- `tests/functional/token-management.spec.ts` - Функциональные тесты
 
 ### Заключительные Замечания
 
