@@ -2,7 +2,9 @@
 
 ## Обзор
 
-Данный документ содержит список задач для реализации инфраструктуры тестирования приложения Clerkly согласно требованиям и дизайну.
+Данный документ содержит список задач для реализации инфраструктуры тестирования приложения Clerkly согласно требованиям и дизайну. Все задачи в этой спецификации выполнены.
+
+**Последнее обновление:** 2026-02-11
 
 ## Статус Задач
 
@@ -15,34 +17,33 @@
 
 ## 1. Настройка Конфигурации Тестирования
 
-### 1.1 Обновить Jest конфигурацию для разделения типов тестов
+### 1.1 Настроить Jest конфигурации для модульных и property-based тестов
 
-**Requirements:** testing.1, testing.2, testing.3, testing.4
+**Requirements:** testing.1, testing.2
 
-**Описание:** Настроить Jest для поддержки различных типов тестов с правильными стратегиями мокирования.
+**Описание:** Настроить Jest для поддержки модульных и property-based тестов с правильными стратегиями мокирования.
 
 **Детали:**
-- Создать отдельные конфигурации для unit, property, integration, functional тестов
-- Настроить моки для unit и property тестов
-- Отключить моки для integration и functional тестов
+- Создать отдельные конфигурации для unit и property тестов
+- Настроить моки для всех внешних зависимостей
 - Настроить testMatch паттерны для каждого типа тестов
+- Настроить покрытие кода
 
 **Файлы:**
-- `jest.config.js` - основная конфигурация
+- `jest.config.js` - базовая конфигурация
 - `jest.unit.config.js` - конфигурация для модульных тестов
 - `jest.property.config.js` - конфигурация для property-based тестов
-- `jest.integration.config.js` - конфигурация для интеграционных тестов
-- `jest.functional.config.js` - конфигурация для функциональных тестов
+- `jest.combined.config.js` - конфигурация для покрытия кода
 
 - [x] 1.1.1 Создать jest.unit.config.js с полным мокированием
 
 **Requirements:** testing.1.2, testing.1.3
 
 **Детали:**
-- Настроить automock для Electron API
+- Настроить моки для Electron API
 - Настроить моки для fs, path, crypto, better-sqlite3
 - Установить testTimeout: 10000 (10 секунд)
-- Настроить testMatch: `**/tests/unit/**/*.test.ts`
+- Настроить testMatch: `**/tests/unit/**/*.test.ts`, `**/tests/unit/**/*.test.tsx`
 
 - [x] 1.1.2 Создать jest.property.config.js с полным мокированием
 
@@ -51,55 +52,78 @@
 **Детали:**
 - Использовать ту же стратегию мокирования что и в unit тестах
 - Установить testTimeout: 30000 (30 секунд для 100+ итераций)
-- Настроить testMatch: `**/tests/property/**/*.property.test.ts`
+- Настроить testMatch: `**/tests/property/**/*.property.test.ts`, `**/tests/property/**/*.property.test.tsx`
 
-- [x] 1.1.3 Создать jest.integration.config.js БЕЗ мокирования Electron
+- [x] 1.1.3 Создать jest.combined.config.js для покрытия кода
 
-**Requirements:** testing.3.1, testing.3.2, testing.3.3
-
-**Детали:**
-- НЕ мокировать Electron API
-- Использовать реальный Electron через @electron/remote или spectron
-- Установить testTimeout: 60000 (60 секунд)
-- Настроить testMatch: `**/tests/integration/**/*.integration.test.ts`
-- Настроить testEnvironment: 'node'
-
-- [x] 1.1.4 Создать jest.functional.config.js БЕЗ мокирования Electron
-
-**Requirements:** testing.4.1, testing.4.2, testing.4.3
+**Requirements:** testing.4.1
 
 **Детали:**
-- НЕ мокировать Electron API
-- Использовать реальный Electron
-- Установить testTimeout: 120000 (120 секунд)
-- Настроить testMatch: `**/tests/functional/**/*.functional.test.ts`
-- Настроить testEnvironment: 'node'
+- Объединить unit и property тесты для расчета покрытия
+- Настроить collectCoverageFrom для исключения figma/
+- Установить coverageThreshold: 80% для всех метрик
 
-### 1.2 Обновить package.json скрипты
+### 1.2 Настроить Playwright для функциональных тестов
 
-**Requirements:** testing.5.1, testing.6.1, testing.6.2
+**Requirements:** testing.3, testing.3.1, testing.3.9
+
+**Описание:** Настроить Playwright для запуска функциональных тестов с реальным Electron.
+
+**Детали:**
+- Создать playwright.config.ts
+- Настроить testDir: './tests/functional'
+- Настроить timeout: 60000 (60 секунд)
+- Настроить workers: 1 (последовательное выполнение)
+- Настроить reporters: list и html
+- Настроить trace, screenshot, video для отладки
+
+**Файлы:**
+- `playwright.config.ts` - конфигурация Playwright
+
+- [x] 1.2.1 Создать playwright.config.ts
+
+**Requirements:** testing.3.1, testing.3.2, testing.3.9
+
+**Детали:**
+- Настроить testDir: './tests/functional'
+- Настроить timeout: 60000
+- Настроить fullyParallel: false
+- Настроить workers: 1
+- Настроить trace: 'on-first-retry'
+- Настроить screenshot: 'only-on-failure'
+- Настроить video: 'retain-on-failure'
+
+### 1.3 Обновить package.json скрипты
+
+**Requirements:** testing.4.1, testing.5.1, testing.5.4
 
 **Описание:** Добавить команды для запуска различных типов тестов.
 
 **Детали:**
 - Создать отдельные команды для каждого типа тестов
 - Настроить команду validate для быстрой проверки
-- Добавить предупреждения для integration/functional тестов
+- Добавить предупреждения для функциональных тестов
+- Добавить команды для rebuild нативных модулей
 
-- [x] 1.2.1 Добавить команды для запуска тестов
+- [x] 1.3.1 Добавить команды для запуска тестов
 
-**Requirements:** testing.5.1, testing.6.1, testing.6.2
+**Requirements:** testing.4.1, testing.5.1, testing.5.4
 
 **Детали:**
 ```json
 {
   "scripts": {
+    "rebuild:electron": "electron-rebuild -f -w better-sqlite3",
+    "rebuild:node": "npm rebuild better-sqlite3",
+    "test": "npm run rebuild:node && npm run test:unit && npm run test:property",
     "test:unit": "jest --config jest.unit.config.js",
     "test:property": "jest --config jest.property.config.js",
-    "test:integration": "echo '⚠️  Integration tests use real Electron and may show windows' && jest --config jest.integration.config.js",
-    "test:functional": "echo '⚠️  Functional tests use real Electron and WILL show windows on screen' && jest --config jest.functional.config.js",
-    "test:coverage": "jest --config jest.unit.config.js --coverage && jest --config jest.property.config.js --coverage",
-    "test": "npm run test:unit && npm run test:property && npm run test:integration && npm run test:functional"
+    "test:functional": "npm run rebuild:electron && npm run build && playwright test",
+    "test:functional:verbose": "npm run rebuild:electron && npm run build && playwright test --reporter=list",
+    "test:functional:debug": "npm run rebuild:electron && npm run build && playwright test --reporter=list --max-failures=1",
+    "test:functional:single": "npm run rebuild:electron && npm run build && playwright test --reporter=list",
+    "test:coverage": "jest --config jest.combined.config.js --coverage",
+    "validate": "bash scripts/validate.sh"
   }
 }
 ```
@@ -110,9 +134,9 @@
 
 ### 2.1 Создать scripts/validate.sh
 
-**Requirements:** testing.5.1, testing.5.2, testing.5.3, testing.5.4, testing.5.5
+**Requirements:** testing.4.1, testing.4.2, testing.4.3, testing.4.4
 
-**Описание:** Создать скрипт для быстрой валидации кода без запуска integration/functional тестов.
+**Описание:** Создать скрипт для быстрой валидации кода без запуска функциональных тестов.
 
 **Детали:**
 - Выполнять TypeScript компиляцию
@@ -121,10 +145,11 @@
 - Запускать unit и property тесты
 - Проверять покрытие кода
 - Возвращать ненулевой код при ошибках
+- НЕ запускать функциональные тесты
 
 - [x] 2.1.1 Реализовать scripts/validate.sh
 
-**Requirements:** testing.5.1, testing.5.4, testing.5.5
+**Requirements:** testing.4.1, testing.4.3, testing.4.4
 
 **Детали:**
 ```bash
@@ -134,13 +159,13 @@ set -e
 echo "🔍 Running validation..."
 
 echo "📦 TypeScript compilation..."
-npm run build
+npm run typecheck
 
 echo "🔧 ESLint check..."
-npm run lint || npm run lint:fix
+npm run lint:fix
 
 echo "💅 Prettier check..."
-npm run format:check || npm run format
+npm run format
 
 echo "🧪 Unit tests..."
 npm run test:unit
@@ -156,13 +181,14 @@ echo "✅ Validation complete!"
 
 - [x] 2.1.2 Добавить команду validate в package.json
 
-**Requirements:** testing.5.1
+**Requirements:** testing.4.1
 
 **Детали:**
 ```json
 {
   "scripts": {
-    "validate": "bash scripts/validate.sh"
+    "validate": "bash scripts/validate.sh",
+    "validate:verbose": "bash scripts/validate.sh --verbose"
   }
 }
 ```
@@ -237,139 +263,157 @@ echo "✅ Validation complete!"
 
 ---
 
-## 5. Обновление Существующих Интеграционных Тестов
+## 5. Создание Функциональных Тестов с Playwright
 
-### 5.1 Удалить моки Electron из интеграционных тестов
+### 5.1 Создать helper утилиты для функциональных тестов
 
-**Requirements:** testing.3.2
+**Requirements:** testing.3.1, testing.3.2, testing.3.6
 
-**Описание:** КРИТИЧЕСКИ ВАЖНО - интеграционные тесты НЕ должны мокировать Electron API.
+**Описание:** Создать утилиты для запуска и взаимодействия с Electron приложением через Playwright.
 
 **Детали:**
-- Удалить все `jest.mock('electron')` из интеграционных тестов
-- Использовать реальный Electron
+- Создать функцию launchElectron для запуска приложения
+- Создать функцию closeElectron для закрытия и очистки
+- Использовать реальный Electron (НЕ мокировать)
 - Настроить временные директории для данных
 
-- [x] 5.1.1 Аудит интеграционных тестов на наличие моков Electron
+**Файлы:**
+- `tests/functional/helpers/electron.ts` - утилиты для Electron
 
-**Requirements:** testing.3.2
+- [x] 5.1.1 Создать tests/functional/helpers/electron.ts
 
-**Детали:**
-- Проверить все файлы в `tests/integration/**/*.integration.test.ts`
-- Найти все `jest.mock('electron')`
-- Создать список тестов требующих исправления
-
-- [x] 5.1.2 Удалить моки Electron из интеграционных тестов
-
-**Requirements:** testing.3.1, testing.3.2, testing.3.3
-
-**Детали:**
-- Удалить `jest.mock('electron')`
-- Импортировать реальный Electron: `import { BrowserWindow, app } from 'electron'`
-- Использовать реальные классы приложения
-- Настроить beforeEach/afterEach для создания/очистки временных директорий
-
-- [x] 5.1.3 Настроить временные директории для интеграционных тестов
-
-**Requirements:** testing.3.4, testing.3.5, testing.3.6
+**Requirements:** testing.3.1, testing.3.2, testing.3.6, testing.3.7
 
 **Детали:**
 ```typescript
-import * as os from 'os';
-import * as path from 'path';
-import * as fs from 'fs';
+interface ElectronTestContext {
+  app: ElectronApplication;
+  window: Page;
+  testDataPath: string;
+}
 
-let testDbPath: string;
+async function launchElectron(
+  testDataPath?: string,
+  env?: Record<string, string>
+): Promise<ElectronTestContext>;
 
-beforeEach(() => {
-  testDbPath = path.join(os.tmpdir(), `clerkly-test-${Date.now()}`);
-  fs.mkdirSync(testDbPath, { recursive: true });
-});
+async function closeElectron(
+  context: ElectronTestContext,
+  cleanup?: boolean
+): Promise<void>;
+```
 
-afterEach(() => {
-  if (fs.existsSync(testDbPath)) {
-    fs.rmSync(testDbPath, { recursive: true, force: true });
-  }
-});
+### 5.2 Создать Test IPC Handlers
+
+**Requirements:** testing.3.1
+
+**Описание:** Создать специальные IPC handlers для управления состоянием приложения из тестов.
+
+**Детали:**
+- Регистрировать handlers только в тестовом режиме (NODE_ENV=test)
+- Предоставить методы для управления токенами и данными
+- Использовать реальные классы приложения
+
+**Файлы:**
+- `src/main/index.ts` - регистрация test IPC handlers
+
+- [x] 5.2.1 Добавить test IPC handlers в src/main/index.ts
+
+**Requirements:** testing.3.1.1, testing.3.1.2, testing.3.1.3, testing.3.1.4
+
+**Детали:**
+```typescript
+if (process.env.NODE_ENV === 'test') {
+  ipcMain.handle('test:setup-tokens', async (event, tokens) => {
+    await tokenStorageManager.saveTokens(tokens);
+  });
+
+  ipcMain.handle('test:clear-tokens', async () => {
+    await tokenStorageManager.clearTokens();
+  });
+
+  ipcMain.handle('test:get-token-status', async () => {
+    return await tokenStorageManager.getTokenStatus();
+  });
+
+  ipcMain.handle('test:clear-data', async () => {
+    await dataManager.clearAllData();
+  });
+
+  ipcMain.handle('test:handle-deep-link', async (event, url) => {
+    await handleDeepLink(url);
+  });
+}
+```
+
+### 5.3 Создать Mock OAuth Server
+
+**Requirements:** testing.3.2
+
+**Описание:** Создать mock OAuth server для тестирования OAuth flow без реальных Google credentials.
+
+**Детали:**
+- Эмулировать Google OAuth endpoints
+- Генерировать тестовые токены
+- Поддерживать CORS
+- Валидировать client_id и client_secret
+
+**Файлы:**
+- `tests/functional/helpers/mock-oauth-server.ts` - mock OAuth server
+
+- [x] 5.3.1 Создать tests/functional/helpers/mock-oauth-server.ts
+
+**Requirements:** testing.3.2.1, testing.3.2.2, testing.3.2.3, testing.3.2.4, testing.3.2.5
+
+**Детали:**
+```typescript
+class MockOAuthServer {
+  constructor(config: MockOAuthServerConfig);
+  
+  async start(): Promise<void>;
+  async stop(): Promise<void>;
+  
+  setUserProfile(profile: MockUserProfile): void;
+  setUserInfoError(status: number, message: string): void;
+  setTokenExpired(expired: boolean): void;
+  setRefreshTokenValid(valid: boolean): void;
+  clearUserInfoError(): void;
+}
+```
+
+### 5.4 Добавить completeOAuthFlow helper
+
+**Requirements:** testing.3.1.2, testing.3.2
+
+**Описание:** Создать helper функцию для завершения OAuth flow в тестах.
+
+**Детали:**
+- Использовать test IPC handlers для симуляции OAuth callback
+- Генерировать тестовые authorization codes
+- Обрабатывать deep links через test:handle-deep-link
+
+- [x] 5.4.1 Добавить completeOAuthFlow в tests/functional/helpers/electron.ts
+
+**Requirements:** testing.3.1.2, testing.3.2
+
+**Детали:**
+```typescript
+async function completeOAuthFlow(
+  app: ElectronApplication,
+  window: Page,
+  clientId?: string
+): Promise<void>;
 ```
 
 ---
 
-## 6. Обновление Существующих Функциональных Тестов
+## 6. Добавление Проверки Окружения
 
-### 6.1 Удалить моки Electron из функциональных тестов
+### 6.1 Создать утилиту для проверки графической среды
 
-**Requirements:** testing.4.2
+**Requirements:** testing.6.1, testing.6.2, testing.6.3, testing.6.4
 
-**Описание:** КРИТИЧЕСКИ ВАЖНО - функциональные тесты НЕ должны мокировать Electron API.
-
-**Детали:**
-- Удалить все `jest.mock('electron')` из функциональных тестов
-- Использовать реальный Electron
-- Настроить временные директории для данных
-- Убедиться что тесты показывают реальные окна
-
-- [x] 6.1.1 Аудит функциональных тестов на наличие моков Electron
-
-**Requirements:** testing.4.2
-
-**Детали:**
-- Проверить все файлы в `tests/functional/**/*.functional.test.ts`
-- Найти все `jest.mock('electron')`
-- Создать список тестов требующих исправления
-
-- [x] 6.1.2 Удалить моки Electron из функциональных тестов
-
-**Requirements:** testing.4.1, testing.4.2, testing.4.3
-
-**Детали:**
-- Удалить `jest.mock('electron')`
-- Импортировать реальный Electron: `import { app, BrowserWindow } from 'electron'`
-- Использовать реальные классы приложения
-- Настроить beforeEach/afterEach для создания/очистки временных директорий
-
-- [x] 6.1.3 Настроить временные директории для функциональных тестов
-
-**Requirements:** testing.4.4, testing.4.5, testing.4.7
-
-**Детали:**
-```typescript
-import * as os from 'os';
-import * as path from 'path';
-import * as fs from 'fs';
-
-let testStoragePath: string;
-
-beforeEach(() => {
-  testStoragePath = path.join(os.tmpdir(), `clerkly-test-${Date.now()}`);
-  fs.mkdirSync(testStoragePath, { recursive: true });
-});
-
-afterEach(() => {
-  if (fs.existsSync(testStoragePath)) {
-    fs.rmSync(testStoragePath, { recursive: true, force: true });
-  }
-});
-```
-
-- [x] 6.1.4 Убедиться что функциональные тесты показывают окна
-
-**Requirements:** testing.4.6
-
-**Детали:**
-- Проверить что BrowserWindow создаются с `show: true` или вызывается `.show()`
-- Добавить комментарии о том что тесты показывают окна на экране
-- Убедиться что окна закрываются после тестов
-
----
-
-## 7. Добавление Проверки Окружения
-
-### 7.1 Создать утилиту для проверки графической среды
-
-**Requirements:** testing.7.1, testing.7.2, testing.7.3, testing.7.4
-
-**Описание:** Создать утилиту для проверки доступности графической среды перед запуском integration/functional тестов.
+**Описание:** Создать утилиту для проверки доступности графической среды перед запуском функциональных тестов.
 
 **Детали:**
 - Проверять наличие DISPLAY на Linux
@@ -377,9 +421,9 @@ afterEach(() => {
 - Проверять графическую среду на Windows
 - Пропускать тесты с предупреждением если среда недоступна
 
-- [x] 7.1.1 Создать tests/utils/checkGraphicalEnvironment.ts
+- [x] 6.1.1 Создать tests/utils/checkGraphicalEnvironment.ts
 
-**Requirements:** testing.7.1, testing.7.2, testing.7.3, testing.7.4
+**Requirements:** testing.6.1, testing.6.2, testing.6.3, testing.6.4
 
 **Детали:**
 ```typescript
@@ -391,50 +435,40 @@ export function checkGraphicalEnvironment(): boolean {
   }
   
   if (platform === 'darwin') {
-    // macOS всегда имеет графическую среду если не headless
-    return true;
+    return true; // macOS always has graphical environment
   }
   
   if (platform === 'win32') {
-    // Windows всегда имеет графическую среду
-    return true;
+    return true; // Windows always has graphical environment
   }
   
   return false;
 }
-
-export function skipIfNoGraphicalEnvironment(testName: string): void {
-  if (!checkGraphicalEnvironment()) {
-    console.warn(`⚠️  Skipping ${testName}: No graphical environment available`);
-    return;
-  }
-}
 ```
 
-- [x] 7.1.2 Добавить проверку окружения в integration/functional тесты
+- [x] 6.1.2 Добавить проверку окружения в функциональные тесты
 
-**Requirements:** testing.7.4
+**Requirements:** testing.6.4
 
 **Детали:**
 ```typescript
-import { skipIfNoGraphicalEnvironment } from '../utils/checkGraphicalEnvironment';
+import { checkGraphicalEnvironment } from '../utils/checkGraphicalEnvironment';
 
-describe('Integration Tests', () => {
-  beforeAll(() => {
-    skipIfNoGraphicalEnvironment('Integration Tests');
-  });
-  
-  // тесты...
+beforeAll(() => {
+  if (!checkGraphicalEnvironment()) {
+    console.warn('⚠️  Graphical environment not available, skipping functional tests');
+    return;
+  }
 });
 ```
 
 ---
 
-## 8. Обновление Документации
+## 7. Обновление Документации
 
-### 8.1 Обновить README.md
+### 7.1 Обновить README.md
 
-**Requirements:** testing.6.3, testing.6.5
+**Requirements:** testing.5.4, testing.8.3
 
 **Описание:** Добавить документацию о различных типах тестов и как их запускать.
 
@@ -442,11 +476,11 @@ describe('Integration Tests', () => {
 - Описать типы тестов
 - Объяснить стратегию мокирования
 - Добавить примеры команд
-- Предупредить о показе окон в functional тестах
+- Предупредить о показе окон в функциональных тестах
 
-- [x] 8.1.1 Добавить секцию "Testing" в README.md
+- [x] 7.1.1 Добавить секцию "Testing" в README.md
 
-**Requirements:** testing.6.5
+**Requirements:** testing.5.4
 
 **Детали:**
 ```markdown
@@ -456,8 +490,7 @@ describe('Integration Tests', () => {
 
 - **Unit Tests** (`tests/unit/**/*.test.ts`) - Fast, isolated tests with all dependencies mocked
 - **Property-Based Tests** (`tests/property/**/*.property.test.ts`) - Tests that verify invariants across many inputs
-- **Integration Tests** (`tests/integration/**/*.integration.test.ts`) - Tests using real Electron (no mocks)
-- **Functional Tests** (`tests/functional/**/*.functional.test.ts`) - End-to-end tests with real Electron showing windows
+- **Functional Tests** (`tests/functional/**/*.spec.ts`) - End-to-end tests with real Electron showing windows
 
 ### Running Tests
 
@@ -468,8 +501,7 @@ npm run validate
 # Individual test types
 npm run test:unit
 npm run test:property
-npm run test:integration  # ⚠️ Uses real Electron, may show windows
-npm run test:functional   # ⚠️ Uses real Electron, WILL show windows
+npm run test:functional  # ⚠️ Uses real Electron, WILL show windows
 
 # All tests
 npm test
@@ -477,18 +509,18 @@ npm test
 
 ### Important Notes
 
-- Integration and functional tests use **real Electron** and may show windows on your screen
+- Functional tests use **real Electron** and WILL show windows on your screen
 - These tests are NOT included in `npm run validate` for faster feedback
-- Run integration/functional tests explicitly when needed
+- Run functional tests explicitly when needed
 ```
 
 ---
 
-## 9. Валидация и Тестирование
+## 8. Валидация и Тестирование
 
-### 9.1 Запустить валидацию
+### 8.1 Запустить валидацию
 
-**Requirements:** testing.5.1, testing.5.4
+**Requirements:** testing.4.1, testing.4.3
 
 **Описание:** Убедиться что все изменения проходят валидацию.
 
@@ -497,9 +529,9 @@ npm test
 - Проверить что все проверки проходят
 - Исправить найденные проблемы
 
-- [x] 9.1.1 Запустить npm run validate
+- [x] 8.1.1 Запустить npm run validate
 
-**Requirements:** testing.5.1, testing.5.4, testing.5.5
+**Requirements:** testing.4.1, testing.4.3, testing.4.4
 
 **Детали:**
 - Выполнить `npm run validate`
@@ -508,60 +540,36 @@ npm test
 - Убедиться что Prettier проходит
 - Убедиться что unit тесты проходят
 - Убедиться что property тесты проходят
-- Убедиться что покрытие >= 85%
+- Убедиться что покрытие >= 80%
 
-### 9.2 Запустить integration тесты (по запросу пользователя)
+### 8.2 Запустить функциональные тесты (по запросу пользователя)
 
-**Requirements:** testing.6.1, testing.6.3
+**Requirements:** testing.5.1, testing.5.4
 
-**Описание:** Запустить integration тесты с реальным Electron.
+**Описание:** Запустить функциональные тесты с реальным Electron.
 
 **Детали:**
 - Запускать ТОЛЬКО по явному запросу пользователя
 - Предупредить о показе окон
 - Проверить что тесты используют реальный Electron
 
-- [x] 9.2.1 Запустить npm run test:integration (ТОЛЬКО по запросу)
+- [x] 8.2.1 Запустить npm run test:functional (ТОЛЬКО по запросу)
 
-**Requirements:** testing.6.1, testing.6.3, testing.6.5
-
-**Детали:**
-- Предупредить пользователя: "Integration tests will use real Electron and may show windows. Continue?"
-- Выполнить `npm run test:integration`
-- Проверить что все тесты проходят
-- Проверить что НЕ используются моки Electron
-
-**Статус:** Готово к запуску. Интеграционные тесты переписаны для использования реального Electron.
-
-### 9.3 Запустить functional тесты (по запросу пользователя)
-
-**Requirements:** testing.6.2, testing.6.3
-
-**Описание:** Запустить functional тесты с реальным Electron.
+**Requirements:** testing.5.1, testing.5.4
 
 **Детали:**
-- Запускать ТОЛЬКО по явному запросу пользователя
-- Предупредить о показе окон на экране
-- Проверить что тесты используют реальный Electron
-
-- [x] 9.3.1 Запустить npm run test:functional (ТОЛЬКО по запросу)
-
-**Requirements:** testing.6.2, testing.6.3, testing.6.5
-
-**Детали:**
-- Предупредить пользователя: "Functional tests WILL show windows on your screen. Continue?"
+- Предупредить пользователя: "Functional tests will use real Electron and WILL show windows. Continue?"
 - Выполнить `npm run test:functional`
 - Проверить что все тесты проходят
-- Проверить что окна показываются на экране
 - Проверить что НЕ используются моки Electron
 
-**Статус:** Готово к запуску. Функциональные тесты переписаны для использования реального Electron и показа реальных окон.
+**Статус:** Готово к запуску. Функциональные тесты используют реальный Electron через Playwright.
 
 ---
 
-## 10. Development Mode с Поддержкой Deep Links
+## 9. Development Mode с Поддержкой Deep Links
 
-### 10.1 Добавить npm скрипт для dev mode с deep links
+### 9.1 Добавить npm скрипт для dev mode с deep links
 
 **Requirements:** testing.9.1, testing.9.2, testing.9.3, testing.9.4
 
@@ -573,7 +581,7 @@ npm test
 - Автоматически открывать приложение после сборки
 - Обеспечить правильную регистрацию custom protocol handler
 
-- [x] 10.1.1 Добавить команду dev:app в package.json
+- [x] 9.1.1 Добавить команду dev:app в package.json
 
 **Requirements:** testing.9.1, testing.9.4, testing.9.7
 
@@ -581,12 +589,13 @@ npm test
 ```json
 {
   "scripts": {
+    "dev": "npm run build && electron .",
     "dev:app": "npm run build && npx electron-builder --mac --dir && open release/mac-arm64/Clerkly.app"
   }
 }
 ```
 
-- [x] 10.1.2 Добавить protocols конфигурацию в package.json
+- [x] 9.1.2 Добавить protocols конфигурацию в package.json
 
 **Requirements:** testing.9.2
 
@@ -598,7 +607,7 @@ npm test
       {
         "name": "Clerkly OAuth",
         "schemes": [
-          "com.googleusercontent.apps.100365225505-a9mp4sll4948tafotr1va0fvnl5hrpoa"
+          "com.googleusercontent.apps.100365225505-9039l9g72mja9onmlkoupkphbns6lrg2"
         ]
       }
     ]
@@ -606,18 +615,18 @@ npm test
 }
 ```
 
-### 10.2 Обновить документацию
+### 9.2 Обновить документацию
 
 **Requirements:** testing.9.5, testing.9.9, testing.9.10
 
-**Описание:** Добавить документацию о новом dev mode в README.md и OAUTH_SETUP.md.
+**Описание:** Добавить документацию о новом dev mode в README.md.
 
 **Детали:**
 - Объяснить разницу между `npm run dev` и `npm run dev:app`
 - Указать время выполнения каждой команды
 - Добавить рекомендации по использованию
 
-- [x] 10.2.1 Обновить README.md
+- [x] 9.2.1 Обновить README.md
 
 **Requirements:** testing.9.5, testing.9.10
 
@@ -638,126 +647,22 @@ npm run typecheck        # Проверка типов
 - `npm start` - для финального тестирования перед релизом (медленно)
 ```
 
-- [x] 10.2.2 Обновить OAUTH_SETUP.md
-
-**Requirements:** testing.9.8, testing.9.9
-
-**Детали:**
-```markdown
-### 8. Запустите приложение
-
-```bash
-# Production build с DMG (медленно, 60-90 сек)
-npm start
-
-# Dev mode с deep links (быстро, 20-30 сек) - РЕКОМЕНДУЕТСЯ для разработки
-npm run dev:app
-
-# Dev mode без deep links (очень быстро, 10-15 сек) - для UI разработки
-npm run dev
-```
-
-**Рекомендация**: Используйте `npm run dev:app` для разработки с OAuth - это создает unpacked .app bundle с правильной регистрацией protocol handler, но без создания DMG.
-```
-
-- [x] 10.2.3 Добавить troubleshooting секцию в OAUTH_SETUP.md
-
-**Requirements:** testing.9.8
-
-**Детали:**
-```markdown
-### Deep Links не работают в dev mode (`npm run dev`)
-
-**Проблема**: При запуске через `electron .` приложение не регистрируется как обработчик custom protocol в macOS.
-
-**Решение**: Используйте `npm run dev:app` вместо `npm run dev` для тестирования OAuth flow.
-
-**Почему**: macOS требует `.app` bundle с Info.plist, содержащим CFBundleURLTypes.
-```
-
-### 10.3 Обновить спецификации
-
-**Requirements:** testing.9
-
-**Описание:** Добавить требование testing.9 в requirements.md и дизайн в design.md.
-
-**Детали:**
-- Добавить новое требование testing.9 в requirements.md
-- Добавить секцию "Development Mode с Поддержкой Deep Links" в design.md
-- Объяснить проблему и решение
-
-- [x] 10.3.1 Добавить требование testing.9 в requirements.md
-
-**Requirements:** testing.9
-
-**Детали:**
-```markdown
-### 9. Development Mode с Поддержкой Deep Links
-
-**ID:** testing.9
-
-**User Story:** Как разработчик, я хочу иметь быстрый dev mode с поддержкой OAuth deep links, чтобы тестировать полный OAuth flow без создания production build.
-
-**Зависимости:** Нет
-
-#### Критерии Приемки
-
-9.1. THE команда `npm run dev:app` SHALL создавать unpacked .app bundle с помощью electron-builder
-9.2. THE unpacked .app bundle SHALL корректно регистрировать custom protocol handler для deep links
-9.3. THE dev mode SHALL НЕ создавать DMG или ZIP архивы
-9.4. THE dev mode SHALL использовать флаг `--dir` для electron-builder
-9.5. THE dev mode SHALL быть быстрее чем полный production build (target: <30 секунд)
-9.6. THE unpacked .app bundle SHALL быть расположен в `release/mac-arm64/Clerkly.app`
-9.7. THE команда `npm run dev:app` SHALL автоматически открывать приложение после сборки
-9.8. WHEN OAuth callback происходит, THE deep link SHALL корректно обрабатываться приложением
-9.9. THE dev mode SHALL поддерживать hot reload через пересборку и перезапуск
-9.10. THE команда `npm run dev` (без :app) SHALL оставаться для быстрой разработки без deep links
-```
-
-- [x] 10.3.2 Добавить секцию в design.md
-
-**Requirements:** testing.9
-
-**Детали:**
-```markdown
-## Development Mode с Поддержкой Deep Links
-
-**Requirements**: testing.9
-
-### Проблема
-
-В обычном dev mode (`npm run dev`) приложение запускается через `electron .`, что не создает `.app` bundle. Это приводит к проблемам:
-
-1. **Deep links не работают**: macOS не может зарегистрировать custom protocol handler без `.app` bundle с Info.plist
-2. **OAuth callback не работает**: Google OAuth redirect на `clerkly://oauth/callback` не обрабатывается
-3. **Невозможно тестировать OAuth flow**: Приходится использовать полный production build (`npm run start`), который занимает 60-90 секунд
-
-### Решение: Unpacked .app Bundle
-
-Используем `electron-builder --dir` для создания unpacked `.app` bundle без DMG/ZIP архивов.
-
-### Преимущества
-
-1. **Быстрее production build**: ~20-30 секунд vs 60-90 секунд
-2. **Deep links работают**: `.app` bundle корректно регистрирует protocol handler
-3. **OAuth flow работает**: Можно тестировать полный OAuth flow с Google
-4. **Автоматический запуск**: Приложение открывается автоматически после сборки
-```
-
 ---
 
 ## Критерии Завершения
 
 Все задачи считаются завершенными когда:
 
-- ✅ Jest конфигурации созданы для всех типов тестов
+- ✅ Jest конфигурации созданы для unit и property тестов
+- ✅ Playwright конфигурация создана для функциональных тестов
 - ✅ Package.json содержит все необходимые команды
 - ✅ Скрипт validate работает корректно
 - ✅ Модульные тесты правильно мокируют зависимости
 - ✅ Property-based тесты правильно мокируют зависимости
-- ✅ Интеграционные тесты НЕ мокируют Electron
-- ✅ Функциональные тесты НЕ мокируют Electron
-- ✅ Временные директории настроены для integration/functional тестов
+- ✅ Функциональные тесты используют реальный Electron через Playwright
+- ✅ Test IPC Handlers реализованы для управления состоянием в тестах
+- ✅ Mock OAuth Server реализован для тестирования OAuth flow
+- ✅ Временные директории настроены для функциональных тестов
 - ✅ Проверка графической среды реализована
 - ✅ Документация обновлена
 - ✅ `npm run validate` проходит успешно
