@@ -207,65 +207,65 @@
   - Таблица покрытия требований
 
 ### 2.8 Создать коммит для Этапа 2
-- [ ] Коммит: "feat: create design documents for split UI specifications (Этап 2)"
+- [x] Коммит: "feat: create design documents for split UI specifications (Этап 2)"
 
 ---
 
 ## Этап 3: Создание Tasks для Новых Спецификаций
 
 ### 3.1 Создать window-management/tasks.md
-- [ ] Извлечь соответствующие задачи из `ui/tasks.md`
-- [ ] Создать `window-management/tasks.md` с задачами для:
+- [x] Извлечь соответствующие задачи из `ui/tasks.md`
+- [x] Создать `window-management/tasks.md` с задачами для:
   - WindowManager расширение
   - WindowStateManager реализация
   - Тесты (модульные, property-based, функциональные)
 
 ### 3.2 Создать navigation/tasks.md
-- [ ] Извлечь соответствующие задачи из `ui/tasks.md`
-- [ ] Создать `navigation/tasks.md` с задачами для:
+- [x] Извлечь соответствующие задачи из `ui/tasks.md`
+- [x] Создать `navigation/tasks.md` с задачами для:
   - Router реализация
   - AuthGuard реализация
   - Тесты
 
 ### 3.3 Создать account-profile/tasks.md
-- [ ] Извлечь соответствующие задачи из `ui/tasks.md`
-- [ ] Создать `account-profile/tasks.md` с задачами для:
+- [x] Извлечь соответствующие задачи из `ui/tasks.md`
+- [x] Создать `account-profile/tasks.md` с задачами для:
   - Account компонент
   - Интеграция с UserProfileManager
   - Тесты
 
 ### 3.4 Создать error-notifications/tasks.md
-- [ ] Извлечь соответствующие задачи из `ui/tasks.md`
-- [ ] Создать `error-notifications/tasks.md` с задачами для:
+- [x] Извлечь соответствующие задачи из `ui/tasks.md`
+- [x] Создать `error-notifications/tasks.md` с задачами для:
   - ErrorNotification компонент
   - IPC события для ошибок
   - Тесты
 
 ### 3.5 Создать token-management-ui/tasks.md
-- [ ] Извлечь соответствующие задачи из `ui/tasks.md`
-- [ ] Создать `token-management-ui/tasks.md` с задачами для:
+- [x] Извлечь соответствующие задачи из `ui/tasks.md`
+- [x] Создать `token-management-ui/tasks.md` с задачами для:
   - Автоматический refresh токенов
   - Обработка 401 ошибок
   - Тесты
 
 ### 3.6 Создать settings/tasks.md
-- [ ] Извлечь соответствующие задачи из `ui/tasks.md`
-- [ ] Создать `settings/tasks.md` с задачами для:
+- [x] Извлечь соответствующие задачи из `ui/tasks.md`
+- [x] Создать `settings/tasks.md` с задачами для:
   - Settings компонент
   - AIAgentSettings
   - DateTimeFormatter
   - Тесты
 
 ### 3.7 Создать user-data-isolation/tasks.md
-- [ ] Извлечь соответствующие задачи из `ui/tasks.md`
-- [ ] Создать `user-data-isolation/tasks.md` с задачами для:
+- [x] Извлечь соответствующие задачи из `ui/tasks.md`
+- [x] Создать `user-data-isolation/tasks.md` с задачами для:
   - DataManager обновление
   - UserProfileManager обновление
   - Миграция БД
   - Тесты
 
 ### 3.8 Создать коммит для Этапа 3
-- [ ] Коммит: "feat: create task lists for split UI specifications (Этап 3)"
+- [x] Коммит: "feat: create task lists for split UI specifications (Этап 3)"
 
 ---
 
@@ -398,14 +398,14 @@
 ## Прогресс
 
 **Этап 1:** ✅ 9/9 задач
-**Этап 2:** ⬜ 8/8 задач
-**Этап 3:** ⬜ 0/8 задач
+**Этап 2:** ✅ 8/8 задач
+**Этап 3:** ✅ 8/8 задач
 **Этап 4:** ⬜ 0/7 задач
 **Этап 5:** ⬜ 0/3 задач
 **Этап 6:** ⬜ 0/3 задач
 **Этап 7:** ⬜ 0/5 задач
 
-**Общий прогресс:** 10/43 задач (23%)
+**Общий прогресс:** 25/43 задач (58%)
 
 ---
 
