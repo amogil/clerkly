@@ -80,19 +80,41 @@ export function NotificationUI({ manager, className = '' }: NotificationUIProps)
     <div className={`notification-container ${className}`}>
       <div className="notification-list">
         {notifications.map((notification) => (
-          <div key={notification.id} className="notification-item">
+          <div
+            key={notification.id}
+            className="notification-item"
+            data-sonner-toast=""
+            data-notification-id={notification.id}
+            onClick={() => handleDismiss(notification.id)}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                handleDismiss(notification.id);
+              }
+            }}
+          >
             {/* Requirements: error-notifications.1.2 - Display context and message */}
             {/* Property: 21 */}
             <div className="notification-content">
-              <div className="notification-context">{notification.context}</div>
-              <div className="notification-message">{notification.message}</div>
+              <div className="notification-context" data-notification-context="">
+                {notification.context}
+              </div>
+              <div className="notification-message" data-notification-message="">
+                {notification.message}
+              </div>
             </div>
 
             {/* Requirements: error-notifications.1.3 - Close button for dismissal */}
             {/* Property: 22 */}
             <button
               className="notification-close"
-              onClick={() => handleDismiss(notification.id)}
+              data-close-button=""
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDismiss(notification.id);
+              }}
               aria-label="Dismiss notification"
             >
               <svg
@@ -158,6 +180,18 @@ export function NotificationUI({ manager, className = '' }: NotificationUIProps)
           box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
           animation: slideIn 0.3s ease-out;
           backdrop-filter: blur(8px);
+          cursor: pointer;
+          transition: background-color 0.2s, border-color 0.2s;
+        }
+
+        .notification-item:hover {
+          background: hsl(var(--destructive) / 0.15);
+          border-color: hsl(var(--destructive) / 0.4);
+        }
+
+        .notification-item:focus {
+          outline: none;
+          box-shadow: 0 0 0 2px hsl(var(--destructive) / 0.3), 0 4px 6px -1px rgba(0, 0, 0, 0.1);
         }
 
         @keyframes slideIn {

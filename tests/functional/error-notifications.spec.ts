@@ -42,8 +42,12 @@ test('should show error notification on background process failure', async () =>
   const toast = context.window.locator('[data-sonner-toast]');
   await expect(toast).toBeVisible({ timeout: 10000 });
 
-  // Check that toast contains the full message (context + message)
-  await expect(toast).toContainText('Profile Loading: Failed to load user profile');
+  // Check that toast contains the context and message separately
+  const contextElement = toast.locator('[data-notification-context]');
+  const messageElement = toast.locator('[data-notification-message]');
+
+  await expect(contextElement).toContainText('Profile Loading');
+  await expect(messageElement).toContainText('Failed to load user profile');
 });
 
 /* Preconditions: Error notification displayed

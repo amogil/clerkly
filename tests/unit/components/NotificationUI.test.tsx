@@ -170,6 +170,77 @@ describe('NotificationUI Component', () => {
     dismissSpy.mockRestore();
   });
 
+  /* Preconditions: NotificationUI component is rendered with notification
+     Action: Verify data attributes for testing
+     Assertions: Component has correct data attributes for Playwright tests
+     Requirements: error-notifications.1.1, error-notifications.1.2 */
+  it('should have data attributes for testing', async () => {
+    // Render component
+    const { container } = render(<NotificationUI manager={manager} />);
+
+    // Show notification
+    manager.showNotification('Test error', 'Test Context');
+
+    // Wait for notification to appear
+    await waitFor(() => {
+      expect(screen.getByText('Test error')).toBeInTheDocument();
+    });
+
+    // Verify data-sonner-toast attribute (for Playwright compatibility)
+    const notificationItem = container.querySelector('[data-sonner-toast]');
+    expect(notificationItem).not.toBeNull();
+    expect(notificationItem).toHaveAttribute('data-sonner-toast');
+
+    // Verify data-notification-id attribute
+    expect(notificationItem).toHaveAttribute('data-notification-id');
+
+    // Verify data-notification-context attribute
+    const contextElement = container.querySelector('[data-notification-context]');
+    expect(contextElement).not.toBeNull();
+    expect(contextElement).toHaveTextContent('Test Context');
+
+    // Verify data-notification-message attribute
+    const messageElement = container.querySelector('[data-notification-message]');
+    expect(messageElement).not.toBeNull();
+    expect(messageElement).toHaveTextContent('Test error');
+
+    // Verify data-close-button attribute
+    const closeButton = container.querySelector('[data-close-button]');
+    expect(closeButton).not.toBeNull();
+    expect(closeButton).toHaveAttribute('data-close-button');
+  });
+
+  /* Preconditions: NotificationUI component is rendered with notification
+     Action: Click on notification item
+     Assertions: Notification is dismissed through manager
+     Requirements: error-notifications.1.3 */
+  it('should dismiss notification when notification item is clicked', async () => {
+    // Spy on dismissNotification
+    const dismissSpy = jest.spyOn(manager, 'dismissNotification');
+
+    // Render component
+    render(<NotificationUI manager={manager} />);
+
+    // Show notification
+    manager.showNotification('Test error', 'Test Context');
+
+    // Wait for notification to appear
+    await waitFor(() => {
+      expect(screen.getByText('Test error')).toBeInTheDocument();
+    });
+
+    // Find and click notification item
+    const notificationItem = screen.getByText('Test error').closest('.notification-item');
+    expect(notificationItem).not.toBeNull();
+    fireEvent.click(notificationItem!);
+
+    // Verify dismissNotification was called
+    expect(dismissSpy).toHaveBeenCalledTimes(1);
+    expect(dismissSpy).toHaveBeenCalledWith(expect.any(String));
+
+    dismissSpy.mockRestore();
+  });
+
   /* Preconditions: NotificationUI component is rendered without notifications
      Action: Render component with empty notifications
      Assertions: Component renders nothing (returns null)
