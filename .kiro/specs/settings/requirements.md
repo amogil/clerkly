@@ -106,13 +106,17 @@
    - Если `true`: расшифровать используя `safeStorage.decryptString()`
    - Если `false`: использовать как plain text
 
-1.23. Система НЕ ДОЛЖНА выполнять валидацию формата API ключа
+1.23. API ключ ДОЛЖЕН иметь максимальную длину 1000 символов
 
-1.24. UI ДОЛЖЕН отображать текст: "Your API key is stored securely. It will only be used to communicate with your selected LLM provider."
+1.24. Система НЕ ДОЛЖНА выполнять валидацию формата API ключа (валидация произойдет автоматически при первом запросе к провайдеру)
 
-1.25. Кнопка "Test Connection" ДОЛЖНА присутствовать в UI, но НЕ ДОЛЖНА быть функциональной (placeholder для будущей функциональности)
+1.25. UI ДОЛЖЕН отображать текст: "Your API key is stored securely. It will only be used to communicate with your selected LLM provider."
 
-1.26. Система ДОЛЖНА использовать существующие IPC каналы для работы с настройками:
+1.25. UI ДОЛЖЕН отображать текст: "Your API key is stored securely. It will only be used to communicate with your selected LLM provider."
+
+1.26. Кнопка "Test Connection" ДОЛЖНА присутствовать в UI, но НЕ ДОЛЖНА быть функциональной (placeholder для будущей функциональности)
+
+1.27. Система ДОЛЖНА использовать существующие IPC каналы для работы с настройками:
    - `save-data` для сохранения LLM провайдера и API ключей
    - `load-data` для загрузки настроек
    - `delete-data` для удаления API ключей
