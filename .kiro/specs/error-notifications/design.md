@@ -294,11 +294,42 @@ useEffect(() => {
 Централизованный обработчик ошибок в Main Process.
 
 ```typescript
-// Requirements: error-notifications.1.1, error-notifications.1.4
+// Requirements: error-notifications.1.1, error-notifications.1.4, error-notifications.1.5
+
+/**
+ * Check if error should be filtered (not shown to user)
+ * Requirements: error-notifications.1.5, user-data-isolation.1.21
+ */
+function shouldFilterError(error: Error, context: string): boolean {
+  const message = error.message.toLowerCase();
+  
+  // Filter "No user logged in" during logout (race condition)
+  if (message.includes('no user logged in') && context.toLowerCase().includes('logout')) {
+    return true;
+  }
+  
+  // Filter cancelled operations
+  if (message.includes('cancelled') || message.includes('aborted')) {
+    return true;
+  }
+  
+  // Filter race condition errors
+  if (message.includes('race condition') || message.includes('concurrent operation')) {
+    return true;
+  }
+  
+  return false;
+}
 
 function handleBackgroundError(error: Error, context: string): void {
-  // Requirements: error-notifications.1.4, clerkly.3.1, clerkly.3.6 - Log to console
+  // Requirements: error-notifications.1.4, clerkly.3.1, clerkly.3.6 - Always log errors
   console.error(`[${context}] Error:`, error);
+  
+  // Requirements: error-notifications.1.5 - Filter race condition errors
+  if (shouldFilterError(error, context)) {
+    console.log(`[${context}] Error filtered (race condition), not showing notification`);
+    return;
+  }
   
   // Requirements: error-notifications.1.1 - Notify renderer
   const mainWindow = windowManager.getWindow();
@@ -310,6 +341,7 @@ function handleBackgroundError(error: Error, context: string): void {
 
 **Ключевые особенности:**
 - Логирование через централизованный Logger класс (clerkly.3)
+- Фильтрация race condition ошибок перед отправкой уведомления
 - Отправка уведомления в Renderer через IPC
 - Проверка наличия главного окна перед отправкой
 
@@ -377,6 +409,12 @@ interface ErrorNotification {
 
 **Validates: Requirements error-notifications.1.4, clerkly.3.1, clerkly.3.6**
 
+### Property 5: Фильтрация race condition ошибок
+
+*Для любой* ошибки, возникшей из-за race condition (например, "No user logged in" во время logout, отмененные операции, одновременные конфликтующие операции), система НЕ должна показывать уведомление пользователю, но ДОЛЖНА логировать ошибку для отладки.
+
+**Validates: Requirements error-notifications.1.5, user-data-isolation.1.21**
+
 ### Edge Cases
 
 Следующие граничные случаи должны быть обработаны корректно:
@@ -388,6 +426,8 @@ interface ErrorNotification {
 3. **Очень длинное сообщение об ошибке**: Когда сообщение об ошибке очень длинное, оно должно быть обрезано или отображено с прокруткой для сохранения читаемости UI.
 
 4. **Быстрое закрытие уведомления**: Когда пользователь кликает на уведомление до истечения 15 секунд, таймер должен быть отменен и уведомление закрыто немедленно.
+
+5. **Race condition ошибки**: Когда ошибка возникает из-за race condition (например, "No user logged in" во время logout), она должна быть залогирована, но уведомление НЕ должно показываться пользователю.
 
 
 ## Обработка Ошибок
@@ -499,6 +539,57 @@ export function NotificationUI({ notificationManager }: NotificationUIProps) {
 
 **Результат:** Ошибка логируется, компонент не рендерится, но приложение продолжает работу.
 
+#### 4. Race Condition Ошибки
+
+**Причины:**
+- "No user logged in" во время logout (одновременные операции)
+- Отмененные операции
+- Конфликтующие одновременные операции
+
+**Обработка:**
+```typescript
+// Requirements: error-notifications.1.5, user-data-isolation.1.21
+function shouldFilterError(error: Error, context: string): boolean {
+  const message = error.message.toLowerCase();
+  
+  // Filter "No user logged in" during logout (race condition)
+  if (message.includes('no user logged in') && context.toLowerCase().includes('logout')) {
+    return true;
+  }
+  
+  // Filter cancelled operations
+  if (message.includes('cancelled') || message.includes('aborted')) {
+    return true;
+  }
+  
+  // Filter race condition errors
+  if (message.includes('race condition') || message.includes('concurrent operation')) {
+    return true;
+  }
+  
+  return false;
+}
+
+function handleBackgroundError(error: Error, context: string): void {
+  // Always log the error
+  console.error(`[${context}] Error:`, error);
+  
+  // Filter race condition errors
+  if (shouldFilterError(error, context)) {
+    console.log(`[${context}] Error filtered (race condition), not showing notification`);
+    return;
+  }
+  
+  // Send notification to renderer
+  const mainWindow = windowManager.getWindow();
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('error:notify', error.message, context);
+  }
+}
+```
+
+**Результат:** Ошибка логируется, но уведомление НЕ показывается пользователю. Приложение продолжает работу.
+
 ### Логирование
 
 Все ошибки должны логироваться с достаточным контекстом для диагностики через централизованный Logger класс (clerkly.3):
@@ -514,12 +605,19 @@ console.error('[NotificationUI] Render error:', error);
 console.error('[Profile Loading] Error:', error);
 console.error('[Data Synchronization] Error:', error);
 console.error('[API Request] Error:', error);
+
+// Race condition errors (filtered, not shown to user)
+console.error('[Logout] Error:', error);
+console.log('[Logout] Error filtered (race condition), not showing notification');
+console.error('[Data Sync] Error:', error);
+console.log('[Data Sync] Error filtered (race condition), not showing notification');
 ```
 
 **Формат логов:**
 - Префикс с именем компонента в квадратных скобках
 - Описательное сообщение об ошибке
 - Объект ошибки для stack trace
+- Для race condition: дополнительное сообщение о фильтрации
 
 ## Примеры Использования
 
@@ -568,6 +666,20 @@ try {
 } catch (error) {
   handleBackgroundError(error, 'Token Refresh');
   // User sees: "Token Refresh: Failed to refresh access token"
+}
+```
+
+### 5. Race Condition во время Logout (фильтруется)
+
+```typescript
+// Requirements: error-notifications.1.5, user-data-isolation.1.21
+try {
+  await clearUserData();
+} catch (error) {
+  handleBackgroundError(error, 'Logout');
+  // Error logged, but NO notification shown to user
+  // Console: "[Logout] Error: No user logged in"
+  // Console: "[Logout] Error filtered (race condition), not showing notification"
 }
 ```
 
@@ -729,6 +841,63 @@ describe('Error Handler', () => {
     expect(console.error).toHaveBeenCalledWith('[Test context] Error:', expect.any(Error));
     expect(console.warn).toHaveBeenCalledWith('[ErrorHandler] Cannot send notification: window not available');
   });
+
+  /* Preconditions: error is "No user logged in" during logout
+     Action: call handleBackgroundError()
+     Assertions: error logged, no IPC event sent (filtered)
+     Requirements: error-notifications.1.5, user-data-isolation.1.21 */
+  it('should filter "No user logged in" error during logout', () => {
+    const mockWindow = {
+      webContents: {
+        send: jest.fn()
+      },
+      isDestroyed: () => false
+    };
+    
+    handleBackgroundError(new Error('No user logged in'), 'Logout');
+    
+    expect(console.error).toHaveBeenCalledWith('[Logout] Error:', expect.any(Error));
+    expect(console.log).toHaveBeenCalledWith('[Logout] Error filtered (race condition), not showing notification');
+    expect(mockWindow.webContents.send).not.toHaveBeenCalled();
+  });
+
+  /* Preconditions: error is cancelled operation
+     Action: call handleBackgroundError()
+     Assertions: error logged, no IPC event sent (filtered)
+     Requirements: error-notifications.1.5 */
+  it('should filter cancelled operation errors', () => {
+    const mockWindow = {
+      webContents: {
+        send: jest.fn()
+      },
+      isDestroyed: () => false
+    };
+    
+    handleBackgroundError(new Error('Operation cancelled'), 'Data Sync');
+    
+    expect(console.error).toHaveBeenCalledWith('[Data Sync] Error:', expect.any(Error));
+    expect(console.log).toHaveBeenCalledWith('[Data Sync] Error filtered (race condition), not showing notification');
+    expect(mockWindow.webContents.send).not.toHaveBeenCalled();
+  });
+
+  /* Preconditions: error is race condition
+     Action: call handleBackgroundError()
+     Assertions: error logged, no IPC event sent (filtered)
+     Requirements: error-notifications.1.5 */
+  it('should filter race condition errors', () => {
+    const mockWindow = {
+      webContents: {
+        send: jest.fn()
+      },
+      isDestroyed: () => false
+    };
+    
+    handleBackgroundError(new Error('Race condition detected'), 'Background Process');
+    
+    expect(console.error).toHaveBeenCalledWith('[Background Process] Error:', expect.any(Error));
+    expect(console.log).toHaveBeenCalledWith('[Background Process] Error filtered (race condition), not showing notification');
+    expect(mockWindow.webContents.send).not.toHaveBeenCalled();
+  });
 });
 ```
 
@@ -831,6 +1000,34 @@ describe('Error Notifications Functional Tests', () => {
     // Verify error was logged
     expect(consoleLogs.some(log => log.includes('Test context'))).toBe(true);
   });
+
+  /* Preconditions: application running, user logging out
+     Action: trigger "No user logged in" error during logout
+     Assertions: error logged, no notification shown (filtered)
+     Requirements: error-notifications.1.5, user-data-isolation.1.21 */
+  it('should filter race condition errors during logout', async () => {
+    const { app, page } = await launchApp();
+    
+    const consoleLogs: string[] = [];
+    page.on('console', msg => {
+      consoleLogs.push(msg.text());
+    });
+    
+    // Trigger race condition error during logout
+    await app.evaluate(({ ipcMain }) => {
+      // Simulate "No user logged in" error during logout
+      handleBackgroundError(new Error('No user logged in'), 'Logout');
+    });
+    
+    // Verify error was logged
+    expect(consoleLogs.some(log => log.includes('Logout') && log.includes('Error'))).toBe(true);
+    
+    // Verify notification was NOT shown
+    await expect(page.locator('.error-notification')).not.toBeVisible();
+    
+    // Verify filter message was logged
+    expect(consoleLogs.some(log => log.includes('Error filtered (race condition)'))).toBe(true);
+  });
 });
 ```
 
@@ -842,6 +1039,7 @@ describe('Error Notifications Functional Tests', () => {
 | error-notifications.1.2 | ✓ | - | ✓ |
 | error-notifications.1.3 | ✓ | - | ✓ |
 | error-notifications.1.4 | ✓ | - | ✓ |
+| error-notifications.1.5 | ✓ | - | ✓ |
 
 ## Технические Решения
 
@@ -921,13 +1119,14 @@ describe('Error Notifications Functional Tests', () => {
 ## Заключение
 
 Данный дизайн обеспечивает:
-- ✅ Полное покрытие всех требований (error-notifications.1.1 - error-notifications.1.4)
+- ✅ Полное покрытие всех требований (error-notifications.1.1 - error-notifications.1.5)
 - ✅ Четкую архитектуру с разделением ответственности
 - ✅ Комплексную стратегию тестирования
 - ✅ Обработку всех граничных случаев и ошибок
 - ✅ Интеграцию с централизованным Logger классом (clerkly.3)
 - ✅ Понятную обратную связь пользователю
 - ✅ Минимальное отвлечение через автоматическое закрытие
+- ✅ Фильтрацию race condition ошибок для улучшения UX
 
 Дизайн готов к реализации.
 
