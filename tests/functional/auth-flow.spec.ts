@@ -6,7 +6,6 @@ import {
   closeElectron,
   ElectronTestContext,
   completeOAuthFlow,
-  completeOAuthFlowWithError,
 } from './helpers/electron';
 import { MockOAuthServer } from './helpers/mock-oauth-server';
 
@@ -264,7 +263,6 @@ test.describe('Authentication Flow', () => {
     console.log('[TEST] ✓ Dashboard displayed successfully after authentication');
   });
 });
-
 
 /* Preconditions: User on login screen
    Action: Click "Continue with Google" button and wait before deep link
