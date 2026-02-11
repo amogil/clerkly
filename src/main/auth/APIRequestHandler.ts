@@ -1,4 +1,4 @@
-// Requirements: ui.9.1, ui.9.2, ui.9.3, ui.9.4, ui.9.5, ui.9.6
+// Requirements: token-management-ui.1.1, token-management-ui.1.2, token-management-ui.1.3, token-management-ui.1.4, token-management-ui.1.5, token-management-ui.1.6
 
 import { TokenStorageManager } from './TokenStorageManager';
 import { BrowserWindow } from 'electron';
@@ -11,7 +11,7 @@ const logger = Logger.create('APIRequestHandler');
 // Requirements: clerkly.3.8 - Use centralized Logger instead of console.*
 /**
  * Flag to prevent multiple simultaneous token clearances
- * Requirements: ui.9.4 - Prevent race conditions
+ * Requirements: token-management-ui.1.4 - Prevent race conditions
  */
 let isClearing401 = false;
 
@@ -23,7 +23,7 @@ let oauthClientManager: any = null;
 
 /**
  * Set the OAuth Client Manager instance
- * Requirements: ui.9.1, ui.9.2 - Enable automatic token refresh
+ * Requirements: token-management-ui.1.1, token-management-ui.1.2 - Enable automatic token refresh
  * @param manager OAuthClientManager instance
  */
 export function setOAuthClientManager(manager: any): void {
@@ -33,10 +33,10 @@ export function setOAuthClientManager(manager: any): void {
 /**
  * Centralized API Request Handler
  * Handles all API requests with automatic HTTP 401 detection and token management
- * Requirements: ui.9.1, ui.9.2, ui.9.3, ui.9.4, ui.9.5
+ * Requirements: token-management-ui.1.1, token-management-ui.1.2, token-management-ui.1.3, token-management-ui.1.4, token-management-ui.1.5
  *
  * This handler wraps fetch() to provide:
- * - Automatic token refresh when access token is expired (ui.9.1, ui.9.2)
+ * - Automatic token refresh when access token is expired (token-management-ui.1.1, token-management-ui.1.2)
  * - Automatic detection of HTTP 401 Unauthorized errors
  * - Centralized token clearing on authorization failures
  * - Protection against race conditions when multiple requests fail simultaneously
@@ -58,7 +58,7 @@ export async function handleAPIRequest(
   logger.info(`Making API request: ${JSON.stringify({ url, context })}`);
 
   try {
-    // Requirements: ui.9.1, ui.9.2 - Check if access token is expired and refresh if needed
+    // Requirements: token-management-ui.1.1, token-management-ui.1.2 - Check if access token is expired and refresh if needed
     if (oauthClientManager) {
       const tokens = await tokenStorage.loadTokens();
       if (tokens && tokens.expiresAt) {
@@ -90,21 +90,21 @@ export async function handleAPIRequest(
       }
     }
 
-    // Requirements: ui.9.4 - Make the API request
+    // Requirements: token-management-ui.1.4 - Make the API request
     const response = await fetch(url, options);
     logger.info(`Response received: ${JSON.stringify({ status: response.status, url })}`);
 
-    // Requirements: ui.9.3, ui.9.4 - Check for authorization error
+    // Requirements: token-management-ui.1.3, token-management-ui.1.4 - Check for authorization error
     if (response.status === 401) {
-      // Requirements: ui.9.4 - Prevent race conditions with multiple simultaneous 401 errors
+      // Requirements: token-management-ui.1.4 - Prevent race conditions with multiple simultaneous 401 errors
       if (!isClearing401) {
         isClearing401 = true;
 
         try {
-          // Requirements: ui.9.5 - Log error with context
+          // Requirements: token-management-ui.1.5 - Log error with context
           const logContext = context || 'API Request';
-          // Requirements: ui.9.5 - Log authorization errors with context
-          // Requirements: ui.11.3 - Use fixed format for log timestamps
+          // Requirements: token-management-ui.1.5 - Log authorization errors with context
+          // Requirements: settings.2.3 - Use fixed format for log timestamps
           logger.error(
             `Authorization error (401) from ${logContext}: ${JSON.stringify({
               url,
@@ -113,11 +113,11 @@ export async function handleAPIRequest(
             })}`
           );
 
-          // Requirements: ui.9.3 - Clear all tokens from storage
+          // Requirements: token-management-ui.1.3 - Clear all tokens from storage
           logger.info('Clearing all tokens due to 401 error');
           await tokenStorage.deleteTokens();
 
-          // Requirements: ui.9.3 - Emit auth error event to show LoginError component
+          // Requirements: token-management-ui.1.3 - Emit auth error event to show LoginError component
           // The event will be handled by the renderer process to show LoginError with errorCode 'invalid_grant'
           const allWindows = BrowserWindow.getAllWindows();
           logger.info(`Total windows: ${allWindows.length}`);
@@ -142,13 +142,13 @@ export async function handleAPIRequest(
         }
       }
 
-      // Requirements: ui.9.3 - Throw error to inform caller
+      // Requirements: token-management-ui.1.3 - Throw error to inform caller
       throw new Error('Authorization failed: Session expired (HTTP 401)');
     }
 
     return response;
   } catch (error) {
-    // Requirements: ui.9.5 - Log all errors with context
+    // Requirements: token-management-ui.1.5 - Log all errors with context
     const logContext = context || 'API Request';
     logger.error(
       `Request failed for ${logContext}: ${error instanceof Error ? error.message : String(error)}`

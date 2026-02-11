@@ -272,63 +272,63 @@
 ## Этап 4: Обновление Ссылок в Коде и Тестах
 
 ### 4.1 Найти все ссылки на ui требования
-- [ ] Выполнить: `grep -r "ui\.[0-9]" src/ tests/ --include="*.ts" --include="*.tsx" > ui_references.txt`
-- [ ] Проанализировать файл с ссылками
+- [x] Выполнить: `grep -r "ui\.[0-9]" src/ tests/ --include="*.ts" --include="*.tsx" > ui_references.txt`
+- [x] Проанализировать файл с ссылками
 
 ### 4.2 Обновить ссылки в src/
-- [ ] Обновить `src/renderer/App.tsx`:
+- [x] Обновить `src/renderer/App.tsx`:
   - ui.6 → account-profile.1
   - ui.7 → error-notifications.1
   - ui.8 → navigation.1
   - ui.9 → token-management-ui.1
-- [ ] Обновить `src/main/WindowManager.ts`:
+- [x] Обновить `src/main/WindowManager.ts`:
   - ui.1-5 → window-management.1-5
-- [ ] Обновить `src/main/WindowStateManager.ts`:
+- [x] Обновить `src/main/WindowStateManager.ts`:
   - ui.5 → window-management.5
-- [ ] Обновить `src/main/DataManager.ts`:
+- [x] Обновить `src/main/DataManager.ts`:
   - ui.12 → user-data-isolation.1
-- [ ] Обновить `src/main/auth/UserProfileManager.ts`:
+- [x] Обновить `src/main/auth/UserProfileManager.ts`:
   - ui.6, ui.12 → account-profile.1, user-data-isolation.1
-- [ ] Обновить `src/renderer/components/auth/*`:
+- [x] Обновить `src/renderer/components/auth/*`:
   - ui.8 → navigation.1
-- [ ] Обновить `src/renderer/components/settings/*`:
+- [x] Обновить `src/renderer/components/settings/*`:
   - ui.10, ui.11 → settings.1, settings.2
 
 ### 4.3 Обновить ссылки в tests/unit/
-- [ ] Найти все тесты со ссылками на ui
-- [ ] Обновить комментарии Requirements в тестах
+- [x] Найти все тесты со ссылками на ui
+- [x] Обновить комментарии Requirements в тестах
 
 ### 4.4 Обновить ссылки в tests/property/
-- [ ] Найти все property-based тесты со ссылками на ui
-- [ ] Обновить комментарии Requirements в тестах
+- [x] Найти все property-based тесты со ссылками на ui
+- [x] Обновить комментарии Requirements в тестах
 
 ### 4.5 Обновить ссылки в tests/functional/
-- [ ] Обновить `tests/functional/window-state-persistence.spec.ts`:
+- [x] Обновить `tests/functional/window-state-persistence.spec.ts`:
   - ui.1-5 → window-management.1-5
-- [ ] Обновить `tests/functional/navigation.spec.ts`:
+- [x] Обновить `tests/functional/navigation.spec.ts`:
   - ui.8 → navigation.1
-- [ ] Обновить `tests/functional/account-profile.spec.ts`:
+- [x] Обновить `tests/functional/account-profile.spec.ts`:
   - ui.6 → account-profile.1
-- [ ] Обновить `tests/functional/error-notifications.spec.ts`:
+- [x] Обновить `tests/functional/error-notifications.spec.ts`:
   - ui.7 → error-notifications.1
-- [ ] Обновить `tests/functional/token-management.spec.ts`:
+- [x] Обновить `tests/functional/token-management.spec.ts`:
   - ui.9 → token-management-ui.1
-- [ ] Обновить `tests/functional/settings-ai-agent.spec.ts`:
+- [x] Обновить `tests/functional/settings-ai-agent.spec.ts`:
   - ui.10 → settings.1
-- [ ] Обновить `tests/functional/date-time-formatting.spec.ts`:
+- [x] Обновить `tests/functional/date-time-formatting.spec.ts`:
   - ui.11 → settings.2
-- [ ] Обновить `tests/functional/user-data-isolation.spec.ts`:
+- [x] Обновить `tests/functional/user-data-isolation.spec.ts`:
   - ui.12 → user-data-isolation.1
 
 ### 4.6 Обновить ссылки в других спецификациях
-- [ ] Проверить `google-oauth-auth/requirements.md` на ссылки на ui
-- [ ] Проверить `google-oauth-auth/design.md` на ссылки на ui
-- [ ] Проверить `clerkly/requirements.md` на ссылки на ui
-- [ ] Проверить `clerkly/design.md` на ссылки на ui
-- [ ] Обновить все найденные ссылки
+- [x] Проверить `google-oauth-auth/requirements.md` на ссылки на ui
+- [x] Проверить `google-oauth-auth/design.md` на ссылки на ui
+- [x] Проверить `clerkly/requirements.md` на ссылки на ui
+- [x] Проверить `clerkly/design.md` на ссылки на ui
+- [x] Обновить все найденные ссылки
 
 ### 4.7 Создать коммит для Этапа 4
-- [ ] Коммит: "refactor: update requirement references from ui.X to new spec IDs (Этап 4)"
+- [x] Коммит: "refactor: update requirement references from ui.X to new spec IDs (Этап 4)"
 
 ---
 
@@ -400,12 +400,12 @@
 **Этап 1:** ✅ 9/9 задач
 **Этап 2:** ✅ 8/8 задач
 **Этап 3:** ✅ 8/8 задач
-**Этап 4:** ⬜ 0/7 задач
+**Этап 4:** ✅ 7/7 задач
 **Этап 5:** ⬜ 0/3 задач
 **Этап 6:** ⬜ 0/3 задач
 **Этап 7:** ⬜ 0/5 задач
 
-**Общий прогресс:** 25/43 задач (58%)
+**Общий прогресс:** 32/43 задач (74%)
 
 ---
 

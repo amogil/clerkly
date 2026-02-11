@@ -1,7 +1,7 @@
 /* Preconditions: Application running without authentication
    Action: Attempt to access protected screens (Dashboard, Settings, Tasks, Calendar, Contacts)
    Assertions: Access is blocked, user is redirected to login screen
-   Requirements: ui.8.1, ui.8.2, ui.8.3, ui.8.4 */
+   Requirements: navigation.1.1, navigation.1.2, navigation.1.3, navigation.1.4 */
 
 import { test, expect, _electron as electron, ElectronApplication, Page } from '@playwright/test';
 import path from 'path';
@@ -71,7 +71,7 @@ test.afterEach(async () => {
 /* Preconditions: Application launched without authentication
    Action: Check initial screen
    Assertions: Login screen is displayed
-   Requirements: ui.8.1
+   Requirements: navigation.1.1
    Property: 24 */
 test('should show login screen when not authenticated', async () => {
   // Wait for the login screen to be visible
@@ -92,7 +92,7 @@ test('should show login screen when not authenticated', async () => {
 /* Preconditions: Application running without authentication
    Action: Attempt to navigate to protected screens via URL or direct access
    Assertions: Access is blocked, redirected to login screen
-   Requirements: ui.8.2
+   Requirements: navigation.1.2
    Property: 25 */
 test('should block access to protected screens without authentication', async () => {
   // Verify login screen is shown initially
@@ -164,7 +164,7 @@ test('should block access to protected screens without authentication', async ()
 /* Preconditions: User successfully authenticated
    Action: Complete OAuth flow
    Assertions: User is redirected to Dashboard
-   Requirements: ui.8.3
+   Requirements: navigation.1.3
    Property: 26 */
 test('should redirect to dashboard after successful authentication', async () => {
   // Wait for login screen
@@ -187,7 +187,7 @@ test('should redirect to dashboard after successful authentication', async () =>
 /* Preconditions: User is authenticated and on dashboard
    Action: User logs out
    Assertions: User is redirected to login screen
-   Requirements: ui.8.4
+   Requirements: navigation.1.4
    Property: 27 */
 test('should redirect to login screen after logout', async () => {
   // Setup: Authenticate user first

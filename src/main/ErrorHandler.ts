@@ -1,4 +1,4 @@
-// Requirements: ui.7.1, ui.7.4
+// Requirements: error-notifications.1.1, error-notifications.1.4
 
 import { BrowserWindow } from 'electron';
 import { Logger } from './Logger';
@@ -9,7 +9,7 @@ const logger = Logger.create('ErrorHandler');
 // Requirements: clerkly.3.8 - Use centralized Logger instead of console.*
 /**
  * Handle background errors and notify renderer processes
- * Requirements: ui.7.1, ui.7.4
+ * Requirements: error-notifications.1.1, error-notifications.1.4
  *
  * This function provides centralized error handling for background processes.
  * It logs errors to console with context and sends notifications to all renderer processes.
@@ -27,7 +27,7 @@ const logger = Logger.create('ErrorHandler');
  * ```
  */
 export function handleBackgroundError(error: unknown, context: string): void {
-  // Requirements: ui.7.4 - Log error to console with context
+  // Requirements: error-notifications.1.4 - Log error to console with context
   const errorMessage = error instanceof Error ? error.message : String(error);
   logger.error(`[${context}] Error: ${errorMessage}`);
 
@@ -36,7 +36,7 @@ export function handleBackgroundError(error: unknown, context: string): void {
     logger.error(`[${context}] Stack trace: ${error.stack}`);
   }
 
-  // Requirements: ui.7.1 - Send error notification to all renderer processes
+  // Requirements: error-notifications.1.1 - Send error notification to all renderer processes
   const windows = BrowserWindow.getAllWindows();
   windows.forEach((window) => {
     window.webContents.send('error:notify', errorMessage, context);

@@ -68,7 +68,7 @@ describe('Property Tests - Graceful Shutdown Data Persistence', () => {
     const dataManager = new DataManager(storagePath);
     dataManager.initialize();
 
-    // Requirements: ui.12.10 - Mock UserProfileManager for data isolation
+    // Requirements: user-data-isolation.1.10 - Mock UserProfileManager for data isolation
     const mockProfileManager = {
       getCurrentEmail: jest.fn().mockReturnValue('test@example.com'),
     } as any;

@@ -182,7 +182,7 @@ export function TasksNew({ triggerAction }: TasksNewProps) {
         projectId: targetProjectId,
         title: triggerAction.params.name || 'Untitled Task',
         description: '',
-        // Requirements: ui.11.2, ui.11.5 - Use DateTimeFormatter for system locale formatting
+        // Requirements: settings.2.2, settings.2.5 - Use DateTimeFormatter for system locale formatting
         deadline: DateTimeFormatter.formatDate(Date.now() + 7 * 24 * 60 * 60 * 1000),
         responsible: 'Unassigned',
         relatedContacts: [],

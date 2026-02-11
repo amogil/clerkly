@@ -1,4 +1,4 @@
-// Requirements: ui.1.2, ui.1.3, ui.2.1, ui.3.1
+// Requirements: window-management.1.2, window-management.1.3, window-management.2.1, window-management.3.1
 
 import * as fc from 'fast-check';
 import WindowManager from '../../src/main/WindowManager';
@@ -75,7 +75,7 @@ describe('Property Tests - WindowManager', () => {
   /* Preconditions: WindowManager initialized, window created with any screen size
      Action: create window, check fullscreen state
      Assertions: for all window creations, window is NOT in fullscreen mode
-     Requirements: ui.1.2 */
+     Requirements: window-management.1.2 */
   // Feature: ui, Property 11: Window NOT in Fullscreen Mode
   test('Property 11: Window NOT in Fullscreen - window never opens in fullscreen mode', async () => {
     await fc.assert(
@@ -114,7 +114,7 @@ describe('Property Tests - WindowManager', () => {
   /* Preconditions: WindowManager initialized, window created
      Action: create window, check resizable state
      Assertions: for all window creations, window is resizable
-     Requirements: ui.1.3 */
+     Requirements: window-management.1.3 */
   // Feature: ui, Property 12: Window Resizable
   test('Property 12: Window Resizable - window is always resizable', async () => {
     await fc.assert(
@@ -144,7 +144,7 @@ describe('Property Tests - WindowManager', () => {
   /* Preconditions: WindowManager initialized, window created
      Action: create window, check window title
      Assertions: for all window creations, window title is empty string
-     Requirements: ui.2.1 */
+     Requirements: window-management.2.1 */
   // Feature: ui, Property 13: Empty Window Title
   test('Property 13: Empty Window Title - window title is always empty', async () => {
     await fc.assert(
@@ -174,7 +174,7 @@ describe('Property Tests - WindowManager', () => {
   /* Preconditions: WindowManager initialized, window created
      Action: create window, check native Mac OS X elements
      Assertions: for all window creations, window uses native titleBarStyle
-     Requirements: ui.3.1 */
+     Requirements: window-management.3.1 */
   // Feature: ui, Property 14: Native Mac OS X Elements
   test('Property 14: Native Mac OS X Elements - window uses native titleBarStyle', async () => {
     await fc.assert(
@@ -204,8 +204,8 @@ describe('Property Tests - WindowManager', () => {
 
   /* Preconditions: WindowManager initialized, window created with various screen sizes
      Action: create window, verify it's not maximized initially
-     Assertions: for all screen sizes, window opens NOT maximized (ui.1.1)
-     Requirements: ui.1.1 */
+     Assertions: for all screen sizes, window opens NOT maximized (window-management.1.1)
+     Requirements: window-management.1.1 */
   // Feature: ui, Property 15: Window NOT Maximized Initially
   test('Property 15: Window NOT Maximized - window never opens maximized', async () => {
     await fc.assert(
@@ -244,7 +244,7 @@ describe('Property Tests - WindowManager', () => {
   /* Preconditions: WindowManager initialized, window created
      Action: create window, verify system elements visibility
      Assertions: window preserves Mac OS X system elements (menu, dock)
-     Requirements: ui.1.4 */
+     Requirements: window-management.1.4 */
   // Feature: ui, Property 16: System Elements Visibility
   test('Property 16: System Elements Visibility - window preserves Mac OS X system elements', async () => {
     await fc.assert(
@@ -272,7 +272,7 @@ describe('Property Tests - WindowManager', () => {
   /* Preconditions: WindowManager initialized, multiple windows created in sequence
      Action: create multiple windows, verify each has correct properties
      Assertions: all windows maintain consistent properties
-     Requirements: ui.1.2, ui.1.3, ui.2.1 */
+     Requirements: window-management.1.2, window-management.1.3, window-management.2.1 */
   // Feature: ui, Property 17: Consistent Window Properties
   test('Property 17: Consistent Window Properties - all windows have consistent properties', async () => {
     await fc.assert(

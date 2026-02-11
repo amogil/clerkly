@@ -1,4 +1,4 @@
-// Requirements: ui.11.1, ui.11.3, ui.11.4
+// Requirements: settings.2.1, settings.2.3, settings.2.4
 
 import * as fc from 'fast-check';
 import { DateTimeFormatter } from '../../src/utils/DateTimeFormatter';
@@ -7,7 +7,7 @@ describe('DateTimeFormatter Property-Based Tests', () => {
   /* Preconditions: various random timestamps generated
      Action: call formatDate() and formatDateTime() for each timestamp
      Assertions: results are non-empty strings, do not throw errors
-     Requirements: ui.11.1 */
+     Requirements: settings.2.1 */
   it('should format any valid timestamp without errors', () => {
     fc.assert(
       fc.property(
@@ -32,7 +32,7 @@ describe('DateTimeFormatter Property-Based Tests', () => {
   /* Preconditions: various random timestamps generated
      Action: call formatLogTimestamp() for each timestamp
      Assertions: result matches YYYY-MM-DD HH:MM:SS±HH:MM format with timezone
-     Requirements: ui.11.3, clerkly.3.2, clerkly.3.3 */
+     Requirements: settings.2.3, clerkly.3.2, clerkly.3.3 */
   it('should always use fixed format for log timestamps', () => {
     fc.assert(
       fc.property(
@@ -51,7 +51,7 @@ describe('DateTimeFormatter Property-Based Tests', () => {
   /* Preconditions: various random timestamps (past, present, future)
      Action: call formatDate() and formatDateTime()
      Assertions: results do NOT contain relative format words
-     Requirements: ui.11.4 */
+     Requirements: settings.2.4 */
   it('should never use relative time formats', () => {
     const relativeWords = ['ago', 'yesterday', 'tomorrow', 'hours', 'minutes', 'seconds', 'days'];
 
@@ -78,7 +78,7 @@ describe('DateTimeFormatter Property-Based Tests', () => {
   /* Preconditions: Date objects created from various timestamps
      Action: call all formatting methods with Date objects
      Assertions: all methods accept Date objects and return valid results
-     Requirements: ui.11.1, ui.11.3, clerkly.3.2, clerkly.3.3 */
+     Requirements: settings.2.1, settings.2.3, clerkly.3.2, clerkly.3.3 */
   it('should accept both timestamps and Date objects', () => {
     fc.assert(
       fc.property(
@@ -102,7 +102,7 @@ describe('DateTimeFormatter Property-Based Tests', () => {
   /* Preconditions: various timestamps with different time components
      Action: call formatLogTimestamp()
      Assertions: format is consistent and parseable with timezone
-     Requirements: ui.11.3, clerkly.3.2, clerkly.3.3 */
+     Requirements: settings.2.3, clerkly.3.2, clerkly.3.3 */
   it('should produce parseable log timestamps', () => {
     fc.assert(
       fc.property(

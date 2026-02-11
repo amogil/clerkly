@@ -292,7 +292,7 @@ export function Triggers() {
     setNewTriggerPrompt('');
   };
 
-  // Requirements: ui.11.2, ui.11.5 - Use DateTimeFormatter for system locale formatting
+  // Requirements: settings.2.2, settings.2.5 - Use DateTimeFormatter for system locale formatting
   const formatDate = (date: Date) => {
     return DateTimeFormatter.formatDate(date.getTime());
   };

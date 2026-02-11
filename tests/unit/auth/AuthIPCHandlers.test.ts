@@ -1,4 +1,4 @@
-// Requirements: google-oauth-auth.8.1, google-oauth-auth.8.2, google-oauth-auth.8.3, google-oauth-auth.8.4, google-oauth-auth.8.5, ui.6.2, ui.6.7
+// Requirements: google-oauth-auth.8.1, google-oauth-auth.8.2, google-oauth-auth.8.3, google-oauth-auth.8.4, google-oauth-auth.8.5, account-profile.1.2, account-profile.1.7
 
 import { ipcMain, BrowserWindow } from 'electron';
 import { AuthIPCHandlers } from '../../../src/main/auth/AuthIPCHandlers';
@@ -51,7 +51,7 @@ describe('AuthIPCHandlers', () => {
     /* Preconditions: AuthIPCHandlers instance created, handlers not yet registered
        Action: Call registerHandlers()
        Assertions: All five IPC handlers are registered (auth:start-login, auth:get-status, auth:logout, auth:get-profile, auth:refresh-profile)
-       Requirements: google-oauth-auth.8.1, ui.6.2, ui.6.5 */
+       Requirements: google-oauth-auth.8.1, account-profile.1.2, account-profile.1.5 */
     it('should register all IPC handlers', () => {
       authIPCHandlers.registerHandlers();
 
@@ -86,7 +86,7 @@ describe('AuthIPCHandlers', () => {
     /* Preconditions: Handlers registered
        Action: Call unregisterHandlers()
        Assertions: All five IPC handlers are removed
-       Requirements: google-oauth-auth.8.1, ui.6.2, ui.6.5 */
+       Requirements: google-oauth-auth.8.1, account-profile.1.2, account-profile.1.5 */
     it('should unregister all IPC handlers', () => {
       authIPCHandlers.registerHandlers();
       authIPCHandlers.unregisterHandlers();
@@ -262,7 +262,7 @@ describe('AuthIPCHandlers', () => {
     /* Preconditions: UserProfileManager set, profile exists in cache
        Action: Call auth:get-profile handler
        Assertions: Returns success: true with profile data
-       Requirements: ui.6.2, ui.6.7 */
+       Requirements: account-profile.1.2, account-profile.1.7 */
     it('should return profile when profile manager is set and profile exists', async () => {
       const mockProfile: UserProfile = {
         id: '123',
@@ -295,7 +295,7 @@ describe('AuthIPCHandlers', () => {
     /* Preconditions: UserProfileManager set, no profile in cache
        Action: Call auth:get-profile handler
        Assertions: Returns success: true with profile: null
-       Requirements: ui.6.2, ui.6.7 */
+       Requirements: account-profile.1.2, account-profile.1.7 */
     it('should return null profile when no profile exists in cache', async () => {
       authIPCHandlers.setProfileManager(mockProfileManager);
       mockProfileManager.loadProfile.mockResolvedValue(null);
@@ -317,7 +317,7 @@ describe('AuthIPCHandlers', () => {
     /* Preconditions: UserProfileManager not set
        Action: Call auth:get-profile handler
        Assertions: Returns success: true with profile: null, warning logged
-       Requirements: ui.6.2 */
+       Requirements: account-profile.1.2 */
     it('should return null when profile manager is not set', async () => {
       const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation();
 
@@ -342,7 +342,7 @@ describe('AuthIPCHandlers', () => {
     /* Preconditions: UserProfileManager throws error during loadProfile
        Action: Call auth:get-profile handler
        Assertions: Returns success: false with error message
-       Requirements: ui.6.7 */
+       Requirements: account-profile.1.7 */
     it('should handle profile loading error', async () => {
       const errorMessage = 'Database error';
       authIPCHandlers.setProfileManager(mockProfileManager);
@@ -367,7 +367,7 @@ describe('AuthIPCHandlers', () => {
     /* Preconditions: UserProfileManager set, user authenticated, Google API available
        Action: Call auth:refresh-profile handler
        Assertions: fetchProfile() called, returns success: true with fresh profile data
-       Requirements: ui.6.5 */
+       Requirements: account-profile.1.5 */
     it('should refresh profile successfully', async () => {
       const mockProfile: UserProfile = {
         id: '123',
@@ -400,7 +400,7 @@ describe('AuthIPCHandlers', () => {
     /* Preconditions: UserProfileManager set, user not authenticated
        Action: Call auth:refresh-profile handler
        Assertions: fetchProfile() called, returns success: true with profile: null
-       Requirements: ui.6.5 */
+       Requirements: account-profile.1.5 */
     it('should return null when user is not authenticated', async () => {
       authIPCHandlers.setProfileManager(mockProfileManager);
       mockProfileManager.fetchProfile.mockResolvedValue(null);
@@ -422,7 +422,7 @@ describe('AuthIPCHandlers', () => {
     /* Preconditions: UserProfileManager not set
        Action: Call auth:refresh-profile handler
        Assertions: Returns success: false with error message, warning logged
-       Requirements: ui.6.5 */
+       Requirements: account-profile.1.5 */
     it('should return error when profile manager is not set', async () => {
       const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation();
 
@@ -448,7 +448,7 @@ describe('AuthIPCHandlers', () => {
     /* Preconditions: UserProfileManager throws error during fetchProfile
        Action: Call auth:refresh-profile handler
        Assertions: Returns success: false with error message
-       Requirements: ui.6.5 */
+       Requirements: account-profile.1.5 */
     it('should handle profile refresh error', async () => {
       const errorMessage = 'Network error';
       authIPCHandlers.setProfileManager(mockProfileManager);

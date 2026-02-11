@@ -1,4 +1,4 @@
-// Requirements: ui.7.1, ui.7.2, ui.7.3
+// Requirements: error-notifications.1.1, error-notifications.1.2, error-notifications.1.3
 import type { ErrorNotification } from '../types/error-notification';
 import { Logger } from '../Logger';
 
@@ -15,7 +15,7 @@ import { Logger } from '../Logger';
  * - Manual dismissal of notifications
  * - Subscribe to notification changes for reactive UI updates
  *
- * Requirements: ui.7.1, ui.7.2, ui.7.3
+ * Requirements: error-notifications.1.1, error-notifications.1.2, error-notifications.1.3
  * Properties: 20, 21, 22
  *
  * @example
@@ -53,7 +53,7 @@ export class ErrorNotificationManager {
    * Creates a new error notification and adds it to the active notifications list.
    * The notification will automatically dismiss after 15 seconds.
    *
-   * Requirements: ui.7.1, ui.7.2
+   * Requirements: error-notifications.1.1, error-notifications.1.2
    * Property: 20, 21
    *
    * @param message - Brief description of the problem
@@ -69,7 +69,7 @@ export class ErrorNotificationManager {
    * ```
    */
   showNotification(message: string, context: string): string {
-    // Requirements: ui.7.2 - Notification must contain message and context
+    // Requirements: error-notifications.1.2 - Notification must contain message and context
     const notification: ErrorNotification = {
       id: `error-${Date.now()}-${Math.random()}`,
       message,
@@ -77,17 +77,17 @@ export class ErrorNotificationManager {
       timestamp: Date.now(),
     };
 
-    // Requirements: ui.7.1 - Show notification to user
+    // Requirements: error-notifications.1.1 - Show notification to user
     this.notifications.push(notification);
     this.notifyListeners();
 
-    // Requirements: ui.7.3 - Auto-dismiss after 15 seconds
+    // Requirements: error-notifications.1.3 - Auto-dismiss after 15 seconds
     // Property: 22
     setTimeout(() => {
       this.dismissNotification(notification.id);
     }, this.AUTO_DISMISS_DELAY);
 
-    // Requirements: ui.7.4 - Log errors for debugging
+    // Requirements: error-notifications.1.4 - Log errors for debugging
     Logger.info(
       'ErrorNotificationManager',
       `[ErrorNotificationManager] Notification shown: ${notification}`
@@ -103,7 +103,7 @@ export class ErrorNotificationManager {
    * This can be called manually by the user clicking on the notification or automatically
    * after the auto-dismiss timeout.
    *
-   * Requirements: ui.7.3
+   * Requirements: error-notifications.1.3
    * Property: 22
    *
    * @param id - The unique ID of the notification to dismiss

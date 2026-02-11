@@ -68,7 +68,7 @@ describe('Property Tests - Application Startup Performance', () => {
     const dataManager = new DataManager(storagePath);
     dataManager.initialize();
 
-    // Requirements: ui.12.10 - Mock UserProfileManager for data isolation
+    // Requirements: user-data-isolation.1.10 - Mock UserProfileManager for data isolation
     const mockProfileManager = {
       getCurrentEmail: jest.fn().mockReturnValue('test@example.com'),
     } as any;
@@ -119,7 +119,7 @@ describe('Property Tests - Application Startup Performance', () => {
         fc.constant(null), // No input needed - we're testing startup performance
         async () => {
           // Create fresh components for each iteration
-          // Requirements: ui.5
+          // Requirements: window-management.5
           const dataManager = createDataManagerWithMockUser(testStoragePath);
           const windowManager = new WindowManager(dataManager);
           const { tokenStorage, oauthClient } = createMockOAuthComponents(dataManager);
@@ -174,7 +174,7 @@ describe('Property Tests - Application Startup Performance', () => {
       fs.rmSync(testStoragePath, { recursive: true, force: true });
     }
 
-    // Requirements: ui.5
+    // Requirements: window-management.5
     const dataManager = createDataManagerWithMockUser(testStoragePath);
     const windowManager = new WindowManager(dataManager);
     const { tokenStorage, oauthClient } = createMockOAuthComponents(dataManager);
@@ -216,7 +216,7 @@ describe('Property Tests - Application Startup Performance', () => {
   // Feature: clerkly, Property 7: Application Startup Performance
   test('Property 7 edge case: subsequent startups with existing database complete within 3 seconds', async () => {
     // First startup to create database
-    // Requirements: ui.5
+    // Requirements: window-management.5
     const dataManager1 = createDataManagerWithMockUser(testStoragePath);
     const windowManager1 = new WindowManager(dataManager1);
     const { tokenStorage: tokenStorage1, oauthClient: oauthClient1 } =
@@ -236,7 +236,7 @@ describe('Property Tests - Application Startup Performance', () => {
     jest.clearAllMocks();
 
     // Second startup - should be fast since database exists
-    // Requirements: ui.5
+    // Requirements: window-management.5
     const dataManager2 = createDataManagerWithMockUser(testStoragePath);
     const windowManager2 = new WindowManager(dataManager2);
     const { tokenStorage: tokenStorage2, oauthClient: oauthClient2 } =
@@ -269,7 +269,7 @@ describe('Property Tests - Application Startup Performance', () => {
   // Feature: clerkly, Property 7: Application Startup Performance
   test('Property 7 edge case: startup with large database completes within 3 seconds', async () => {
     // First startup to create database
-    // Requirements: ui.5
+    // Requirements: window-management.5
     const dataManager1 = createDataManagerWithMockUser(testStoragePath);
     const windowManager1 = new WindowManager(dataManager1);
     const { tokenStorage: tokenStorage1, oauthClient: oauthClient1 } =
@@ -305,7 +305,7 @@ describe('Property Tests - Application Startup Performance', () => {
     jest.clearAllMocks();
 
     // Second startup with large database
-    // Requirements: ui.5
+    // Requirements: window-management.5
     const dataManager2 = createDataManagerWithMockUser(testStoragePath);
     const windowManager2 = new WindowManager(dataManager2);
     const { tokenStorage: tokenStorage2, oauthClient: oauthClient2 } =
@@ -348,7 +348,7 @@ describe('Property Tests - Application Startup Performance', () => {
       // Clear mocks for each iteration
       jest.clearAllMocks();
 
-      // Requirements: ui.5
+      // Requirements: window-management.5
       const dataManager = createDataManagerWithMockUser(testStoragePath);
       const windowManager = new WindowManager(dataManager);
       const { tokenStorage, oauthClient } = createMockOAuthComponents(dataManager);
@@ -389,7 +389,7 @@ describe('Property Tests - Application Startup Performance', () => {
      Requirements: clerkly.nfr.1.1, clerkly.2.6, clerkly.2.8, clerkly.nfr.4.4 */
   // Feature: clerkly, Property 7: Application Startup Performance
   test('Property 7 edge case: startup time is measured and reported correctly', async () => {
-    // Requirements: ui.5
+    // Requirements: window-management.5
     const dataManager = createDataManagerWithMockUser(testStoragePath);
     const windowManager = new WindowManager(dataManager);
     const { tokenStorage, oauthClient } = createMockOAuthComponents(dataManager);
@@ -434,7 +434,7 @@ describe('Property Tests - Application Startup Performance', () => {
       warnings.push(message);
     });
 
-    // Requirements: ui.5
+    // Requirements: window-management.5
     const dataManager = createDataManagerWithMockUser(testStoragePath);
     const windowManager = new WindowManager(dataManager);
     const { tokenStorage, oauthClient } = createMockOAuthComponents(dataManager);
@@ -472,7 +472,7 @@ describe('Property Tests - Application Startup Performance', () => {
      Requirements: clerkly.nfr.1.1, clerkly.2.6, clerkly.2.8, clerkly.nfr.4.4 */
   // Feature: clerkly, Property 7: Application Startup Performance
   test('Property 7 edge case: all components initialize within 3 seconds', async () => {
-    // Requirements: ui.5
+    // Requirements: window-management.5
     const dataManager = createDataManagerWithMockUser(testStoragePath);
     const windowManager = new WindowManager(dataManager);
     const { tokenStorage, oauthClient } = createMockOAuthComponents(dataManager);

@@ -1,7 +1,7 @@
 /* Preconditions: Mock fetch, TokenStorageManager, and BrowserWindow
    Action: Test handleAPIRequest with various scenarios
    Assertions: Correct behavior for success, 401 errors, and race conditions
-   Requirements: ui.9.3, ui.9.4, ui.9.5 */
+   Requirements: token-management-ui.1.3, token-management-ui.1.4, token-management-ui.1.5 */
 
 import { handleAPIRequest, resetClearingFlag } from '../../../src/main/auth/APIRequestHandler';
 import { TokenStorageManager } from '../../../src/main/auth/TokenStorageManager';
@@ -62,7 +62,7 @@ describe('APIRequestHandler', () => {
   /* Preconditions: fetch returns successful response (200)
      Action: call handleAPIRequest
      Assertions: returns response, clearTokens NOT called
-     Requirements: ui.9.4 */
+     Requirements: token-management-ui.1.4 */
   it('should return response for successful API request', async () => {
     const mockResponse = new Response(JSON.stringify({ data: 'test' }), {
       status: 200,
@@ -85,7 +85,7 @@ describe('APIRequestHandler', () => {
   /* Preconditions: fetch returns HTTP 401
      Action: call handleAPIRequest
      Assertions: clearTokens called, auth:error event emitted, error thrown
-     Requirements: ui.9.3, ui.9.4 */
+     Requirements: token-management-ui.1.3, token-management-ui.1.4 */
   it('should clear tokens and emit error on HTTP 401', async () => {
     const mockResponse = new Response(null, { status: 401 });
     mockFetch.mockResolvedValue(mockResponse);
@@ -109,7 +109,7 @@ describe('APIRequestHandler', () => {
   /* Preconditions: fetch returns HTTP 401
      Action: call handleAPIRequest
      Assertions: error logged with context (URL, timestamp)
-     Requirements: ui.9.5 */
+     Requirements: token-management-ui.1.5 */
   it('should log authorization error with context', async () => {
     const mockResponse = new Response(null, { status: 401 });
     mockFetch.mockResolvedValue(mockResponse);
@@ -133,7 +133,7 @@ describe('APIRequestHandler', () => {
   /* Preconditions: fetch returns HTTP 500
      Action: call handleAPIRequest
      Assertions: clearTokens NOT called, error thrown
-     Requirements: ui.9.4 */
+     Requirements: token-management-ui.1.4 */
   it('should not clear tokens for other HTTP errors', async () => {
     const mockResponse = new Response(null, { status: 500 });
     mockFetch.mockResolvedValue(mockResponse);
@@ -153,7 +153,7 @@ describe('APIRequestHandler', () => {
   /* Preconditions: multiple simultaneous requests return HTTP 401
      Action: call handleAPIRequest multiple times concurrently
      Assertions: clearTokens called only once, no race conditions
-     Requirements: ui.9.4 */
+     Requirements: token-management-ui.1.4 */
   it('should handle multiple simultaneous 401 errors without race conditions', async () => {
     const mockResponse = new Response(null, { status: 401 });
     mockFetch.mockResolvedValue(mockResponse);
@@ -187,7 +187,7 @@ describe('APIRequestHandler', () => {
   /* Preconditions: fetch throws network error
      Action: call handleAPIRequest
      Assertions: error logged and re-thrown
-     Requirements: ui.9.5 */
+     Requirements: token-management-ui.1.5 */
   it('should log and re-throw network errors', async () => {
     const networkError = new Error('Network error');
     mockFetch.mockRejectedValue(networkError);
@@ -211,7 +211,7 @@ describe('APIRequestHandler', () => {
   /* Preconditions: no context provided
      Action: call handleAPIRequest without context parameter
      Assertions: uses default context "API Request" in logs
-     Requirements: ui.9.5 */
+     Requirements: token-management-ui.1.5 */
   it('should use default context when not provided', async () => {
     const mockResponse = new Response(null, { status: 401 });
     mockFetch.mockResolvedValue(mockResponse);
@@ -244,7 +244,7 @@ describe('APIRequestHandler', () => {
     /* Preconditions: token is expired, oauthClientManager is set
        Action: call handleAPIRequest
        Assertions: refreshAccessToken called, Authorization header updated
-       Requirements: ui.9.1, ui.9.2 */
+       Requirements: token-management-ui.1.1, token-management-ui.1.2 */
     it('should automatically refresh expired token before request', async () => {
       const expiredTokens = {
         accessToken: 'old_token',
@@ -283,7 +283,7 @@ describe('APIRequestHandler', () => {
     /* Preconditions: token is expired, refresh fails
        Action: call handleAPIRequest
        Assertions: continues with expired token
-       Requirements: ui.9.1, ui.9.2 */
+       Requirements: token-management-ui.1.1, token-management-ui.1.2 */
     it('should continue with expired token if refresh fails', async () => {
       const expiredTokens = {
         accessToken: 'old_token',
@@ -311,7 +311,7 @@ describe('APIRequestHandler', () => {
     /* Preconditions: token is not expired
        Action: call handleAPIRequest
        Assertions: refreshAccessToken NOT called
-       Requirements: ui.9.1, ui.9.2 */
+       Requirements: token-management-ui.1.1, token-management-ui.1.2 */
     it('should not refresh token if not expired', async () => {
       const validTokens = {
         accessToken: 'valid_token',
@@ -337,7 +337,7 @@ describe('APIRequestHandler', () => {
     /* Preconditions: no tokens available
        Action: call handleAPIRequest
        Assertions: refreshAccessToken NOT called, request proceeds
-       Requirements: ui.9.1, ui.9.2 */
+       Requirements: token-management-ui.1.1, token-management-ui.1.2 */
     it('should not refresh if no tokens available', async () => {
       mockTokenStorage.loadTokens = jest.fn().mockResolvedValue(null);
 
@@ -357,7 +357,7 @@ describe('APIRequestHandler', () => {
     /* Preconditions: token expired, headers is Headers instance
        Action: call handleAPIRequest
        Assertions: Headers instance updated correctly
-       Requirements: ui.9.1, ui.9.2 */
+       Requirements: token-management-ui.1.1, token-management-ui.1.2 */
     it('should update Headers instance with new token', async () => {
       const expiredTokens = {
         accessToken: 'old_token',

@@ -187,7 +187,7 @@ test.describe('Authentication Flow', () => {
   /* Preconditions: Application not running, mock OAuth server available
      Action: Complete OAuth flow and verify Dashboard is shown
      Assertions: Dashboard is displayed (not Settings or Account Block)
-     Requirements: ui.8.3
+     Requirements: navigation.1.3
      Property: 9, 26 */
   test('should show dashboard after successful authentication', async () => {
     // Set user profile data for this test
@@ -224,7 +224,7 @@ test.describe('Authentication Flow', () => {
 
     // Verify Dashboard is displayed (not login screen)
     // Dashboard should have specific elements that identify it
-    // Requirements: ui.8.3 - Dashboard should be shown after successful authentication
+    // Requirements: navigation.1.3 - Dashboard should be shown after successful authentication
     // Property 9, 26 - Show Dashboard after successful authorization
 
     // Check that login button is no longer visible

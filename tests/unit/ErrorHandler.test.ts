@@ -1,4 +1,4 @@
-// Requirements: ui.7.1, ui.7.4
+// Requirements: error-notifications.1.1, error-notifications.1.4
 
 import { BrowserWindow } from 'electron';
 import { handleBackgroundError } from '../../src/main/ErrorHandler';
@@ -37,7 +37,7 @@ describe('ErrorHandler', () => {
   /* Preconditions: Error object and context provided
      Action: call handleBackgroundError()
      Assertions: error logged to console with context
-     Requirements: ui.7.4 */
+     Requirements: error-notifications.1.4 */
   it('should log error to console with context', () => {
     const error = new Error('Test error');
     const context = 'Test Context';
@@ -50,7 +50,7 @@ describe('ErrorHandler', () => {
   /* Preconditions: Error object with stack trace
      Action: call handleBackgroundError()
      Assertions: stack trace logged to console
-     Requirements: ui.7.4 */
+     Requirements: error-notifications.1.4 */
   it('should log stack trace if available', () => {
     const error = new Error('Test error');
     error.stack = 'Error: Test error\n    at test.ts:10:5';
@@ -66,7 +66,7 @@ describe('ErrorHandler', () => {
   /* Preconditions: String error message
      Action: call handleBackgroundError()
      Assertions: string logged to console
-     Requirements: ui.7.4 */
+     Requirements: error-notifications.1.4 */
   it('should handle string error messages', () => {
     const error = 'Simple error message';
     const context = 'Test Context';
@@ -80,7 +80,7 @@ describe('ErrorHandler', () => {
   /* Preconditions: Error and context provided, one window open
      Action: call handleBackgroundError()
      Assertions: error:notify event sent to window
-     Requirements: ui.7.1 */
+     Requirements: error-notifications.1.1 */
   it('should send error notification to renderer process', () => {
     const error = new Error('Test error');
     const context = 'Test Context';
@@ -97,7 +97,7 @@ describe('ErrorHandler', () => {
   /* Preconditions: Multiple windows open
      Action: call handleBackgroundError()
      Assertions: error:notify event sent to all windows
-     Requirements: ui.7.1 */
+     Requirements: error-notifications.1.1 */
   it('should send error notification to all renderer processes', () => {
     const mockWindow2 = {
       webContents: {
@@ -127,7 +127,7 @@ describe('ErrorHandler', () => {
   /* Preconditions: No windows open
      Action: call handleBackgroundError()
      Assertions: no errors thrown, error still logged
-     Requirements: ui.7.1, ui.7.4 */
+     Requirements: error-notifications.1.1, error-notifications.1.4 */
   it('should handle case when no windows are open', () => {
     (BrowserWindow.getAllWindows as jest.Mock).mockReturnValue([]);
 
@@ -141,7 +141,7 @@ describe('ErrorHandler', () => {
   /* Preconditions: Error with special characters in message
      Action: call handleBackgroundError()
      Assertions: message properly logged and sent
-     Requirements: ui.7.1, ui.7.4 */
+     Requirements: error-notifications.1.1, error-notifications.1.4 */
   it('should handle errors with special characters', () => {
     const error = new Error('Error: "test" & <special> chars');
     const context = 'Test Context';

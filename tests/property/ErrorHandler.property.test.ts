@@ -1,4 +1,4 @@
-// Requirements: ui.7.1, ui.7.4
+// Requirements: error-notifications.1.1, error-notifications.1.4
 
 import fc from 'fast-check';
 import { BrowserWindow } from 'electron';
@@ -39,7 +39,7 @@ describe('ErrorHandler Property Tests', () => {
      Preconditions: various error messages and contexts
      Action: call handleBackgroundError() with different inputs
      Assertions: error notification sent to renderer for all inputs
-     Requirements: ui.7.1 */
+     Requirements: error-notifications.1.1 */
   it('should send error notification for any background error', () => {
     fc.assert(
       fc.property(
@@ -68,7 +68,7 @@ describe('ErrorHandler Property Tests', () => {
      Preconditions: various error messages and contexts
      Action: call handleBackgroundError() with different inputs
      Assertions: error logged to console with context for all inputs
-     Requirements: ui.7.4 */
+     Requirements: error-notifications.1.4 */
   it('should log all errors to console with context', () => {
     fc.assert(
       fc.property(
@@ -95,7 +95,7 @@ describe('ErrorHandler Property Tests', () => {
      Preconditions: various numbers of windows (0-5)
      Action: call handleBackgroundError()
      Assertions: notification sent to all windows
-     Requirements: ui.7.1 */
+     Requirements: error-notifications.1.1 */
   it('should send notification to all open windows', () => {
     fc.assert(
       fc.property(
@@ -133,7 +133,7 @@ describe('ErrorHandler Property Tests', () => {
      Preconditions: various error types (Error, string, object)
      Action: call handleBackgroundError()
      Assertions: all error types handled correctly
-     Requirements: ui.7.4 */
+     Requirements: error-notifications.1.4 */
   it('should handle different error types', () => {
     fc.assert(
       fc.property(

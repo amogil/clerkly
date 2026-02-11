@@ -1,4 +1,4 @@
-// Requirements: clerkly.1, ui.5
+// Requirements: clerkly.1, window-management.5
 
 import { BrowserWindow, BrowserWindowConstructorOptions } from 'electron';
 import * as path from 'path';
@@ -31,19 +31,19 @@ interface WindowOptions {
 
   /**
    * Window title text
-   * @remarks Default is empty string for minimalist interface (ui.2.1)
+   * @remarks Default is empty string for minimalist interface (window-management.2.1)
    */
   title?: string;
 
   /**
    * Whether the window can be resized by the user
-   * @remarks Default is true to allow user customization (ui.1.3)
+   * @remarks Default is true to allow user customization (window-management.1.3)
    */
   resizable?: boolean;
 
   /**
    * Whether the window is in fullscreen mode
-   * @remarks Default is false to preserve macOS system elements (ui.1.2)
+   * @remarks Default is false to preserve macOS system elements (window-management.1.2)
    */
   fullscreen?: boolean;
 }
@@ -59,21 +59,21 @@ interface WindowOptions {
  * - Adapting window size to different screen configurations
  * - Handling window lifecycle (creation, configuration, closing)
  *
- * Requirements: clerkly.1, ui.1, ui.2, ui.3, ui.4, ui.5
+ * Requirements: clerkly.1, window-management.1, window-management.2, window-management.3, window-management.4, window-management.5
  *
  * @remarks
  * Window Features:
- * - Native macOS window controls and title bar (ui.3.1)
- * - Empty title for minimalist interface (ui.2.1)
- * - Maximized by default on first launch (ui.1.1)
- * - Not fullscreen - preserves system elements (ui.1.2)
- * - Resizable by user (ui.1.3)
- * - Screen-adaptive sizing (ui.4.1, ui.4.2)
+ * - Native macOS window controls and title bar (window-management.3.1)
+ * - Empty title for minimalist interface (window-management.2.1)
+ * - Maximized by default on first launch (window-management.1.1)
+ * - Not fullscreen - preserves system elements (window-management.1.2)
+ * - Resizable by user (window-management.1.3)
+ * - Screen-adaptive sizing (window-management.4.1, window-management.4.2)
  *
  * State Persistence:
- * - Automatically saves window state on resize, move, maximize (ui.5.1, ui.5.2, ui.5.3)
- * - Restores saved state on application restart (ui.5.4)
- * - Falls back to defaults if no saved state or invalid position (ui.5.5, ui.5.6)
+ * - Automatically saves window state on resize, move, maximize (window-management.5.1, window-management.5.2, window-management.5.3)
+ * - Restores saved state on application restart (window-management.5.4)
+ * - Falls back to defaults if no saved state or invalid position (window-management.5.5, window-management.5.6)
  * - Uses SQLite database via DataManager for persistence
  *
  * @example
@@ -97,7 +97,7 @@ interface WindowOptions {
  */
 class WindowManager {
   private mainWindow: BrowserWindow | null = null;
-  // Requirements: ui.5
+  // Requirements: window-management.5
   private windowStateManager: WindowStateManager;
   // Requirements: clerkly.3.5, clerkly.3.7
   private logger = Logger.create('WindowManager');
@@ -109,7 +109,7 @@ class WindowManager {
    * persistence. The WindowStateManager is created internally to handle loading
    * and saving of window state (position, size, maximized state).
    *
-   * Requirements: ui.5
+   * Requirements: window-management.5
    *
    * @param dataManager - DataManager instance for window state persistence
    *
@@ -126,7 +126,7 @@ class WindowManager {
    * ```
    */
   constructor(dataManager: DataManager, userProfileManager?: UserProfileManager) {
-    // Requirements: ui.5
+    // Requirements: window-management.5
     this.windowStateManager = new WindowStateManager(dataManager, userProfileManager);
   }
 
@@ -142,25 +142,25 @@ class WindowManager {
    * - Automatically tracks and saves state changes
    * - Validates saved position is within available screens
    *
-   * Requirements: ui.1.1, ui.1.2, ui.2.1, ui.3.1, ui.4.1, ui.4.2, ui.5.4, ui.5.5
+   * Requirements: window-management.1.1, window-management.1.2, window-management.2.1, window-management.3.1, window-management.4.1, window-management.4.2, window-management.5.4, window-management.5.5
    *
    * @returns {BrowserWindow} The created browser window instance
    * @throws {Error} If window creation fails
    *
    * @remarks
    * Window Configuration:
-   * - title: '' - Empty title for clean interface (ui.2.1)
-   * - titleBarStyle: 'default' - Native macOS controls (ui.3.1)
-   * - Position and size from saved state or screen-based defaults (ui.4.1, ui.4.2, ui.5.4, ui.5.5)
-   * - Maximized by default on first launch (ui.1.1)
-   * - Not fullscreen - preserves macOS system elements (ui.1.2)
-   * - Resizable - user can adjust window size (ui.1.3)
+   * - title: '' - Empty title for clean interface (window-management.2.1)
+   * - titleBarStyle: 'default' - Native macOS controls (window-management.3.1)
+   * - Position and size from saved state or screen-based defaults (window-management.4.1, window-management.4.2, window-management.5.4, window-management.5.5)
+   * - Maximized by default on first launch (window-management.1.1)
+   * - Not fullscreen - preserves macOS system elements (window-management.1.2)
+   * - Resizable - user can adjust window size (window-management.1.3)
    *
    * State Persistence:
-   * - Loads state via WindowStateManager.loadState() (ui.5.4)
-   * - Falls back to default state if no saved state exists (ui.5.5)
-   * - Falls back to default state if saved position is invalid (ui.5.6)
-   * - Sets up automatic state tracking on resize/move/maximize events (ui.5.1, ui.5.2, ui.5.3)
+   * - Loads state via WindowStateManager.loadState() (window-management.5.4)
+   * - Falls back to default state if no saved state exists (window-management.5.5)
+   * - Falls back to default state if saved position is invalid (window-management.5.6)
+   * - Sets up automatic state tracking on resize/move/maximize events (window-management.5.1, window-management.5.2, window-management.5.3)
    *
    * Security:
    * - Context isolation enabled
@@ -178,19 +178,19 @@ class WindowManager {
    */
   createWindow(): BrowserWindow {
     try {
-      // Requirements: ui.5.4, ui.5.5
+      // Requirements: window-management.5.4, window-management.5.5
       const windowState = this.windowStateManager.loadState();
 
-      // Requirements: ui.1.2, ui.1.3, ui.2.1, ui.3.1, ui.4.1, ui.4.2
+      // Requirements: window-management.1.2, window-management.1.3, window-management.2.1, window-management.3.1, window-management.4.1, window-management.4.2
       const windowConfig: BrowserWindowConstructorOptions = {
         x: windowState.x,
         y: windowState.y,
         width: windowState.width,
         height: windowState.height,
-        title: '', // Requirements: ui.2.1
+        title: '', // Requirements: window-management.2.1
         show: false,
-        resizable: true, // Requirements: ui.1.3
-        titleBarStyle: 'default', // Requirements: ui.3.1
+        resizable: true, // Requirements: window-management.1.3
+        titleBarStyle: 'default', // Requirements: window-management.3.1
         webPreferences: {
           preload: path.join(__dirname, '../preload/index.js'),
           contextIsolation: true,
@@ -202,10 +202,10 @@ class WindowManager {
 
       this.mainWindow = new BrowserWindow(windowConfig);
 
-      // Requirements: ui.1.1, ui.1.3
+      // Requirements: window-management.1.1, window-management.1.3
       // On first launch, the window opens with workAreaSize dimensions but is NOT maximized.
-      // This ensures the window is immediately resizable by the user (ui.1.3).
-      // If the user previously maximized the window and we saved that state (ui.5.3, ui.5.4),
+      // This ensures the window is immediately resizable by the user (window-management.1.3).
+      // If the user previously maximized the window and we saved that state (window-management.5.3, window-management.5.4),
       // we restore the maximized state here.
       if (windowState.isMaximized) {
         this.mainWindow.maximize();
@@ -243,7 +243,7 @@ class WindowManager {
         this.mainWindow = null;
       });
 
-      // Requirements: ui.5.1, ui.5.2, ui.5.3
+      // Requirements: window-management.5.1, window-management.5.2, window-management.5.3
       this.setupStateTracking();
 
       return this.mainWindow;
@@ -331,15 +331,15 @@ class WindowManager {
    * This ensures that user preferences for window size, position, and maximized
    * state are preserved across application restarts.
    *
-   * Requirements: ui.5.1, ui.5.2, ui.5.3
+   * Requirements: window-management.5.1, window-management.5.2, window-management.5.3
    *
    * @private
    * @returns {void}
    *
    * @remarks
-   * - Tracks resize events to save window dimensions (ui.5.1)
-   * - Tracks move events to save window position (ui.5.2)
-   * - Tracks maximize/unmaximize events to save maximized state (ui.5.3)
+   * - Tracks resize events to save window dimensions (window-management.5.1)
+   * - Tracks move events to save window position (window-management.5.2)
+   * - Tracks maximize/unmaximize events to save maximized state (window-management.5.3)
    * - Saves final state before window closes to ensure no data loss
    * - Does nothing if mainWindow is not initialized
    *
@@ -350,17 +350,17 @@ class WindowManager {
    * // Now window state changes are automatically persisted
    * ```
    */
-  // Requirements: ui.5.1, ui.5.2, ui.5.3
+  // Requirements: window-management.5.1, window-management.5.2, window-management.5.3
   private setupStateTracking(): void {
     if (!this.mainWindow) {
       return;
     }
 
-    // Requirements: ui.5.1
+    // Requirements: window-management.5.1
     this.mainWindow.on('resize', () => this.saveCurrentState());
-    // Requirements: ui.5.2
+    // Requirements: window-management.5.2
     this.mainWindow.on('move', () => this.saveCurrentState());
-    // Requirements: ui.5.3
+    // Requirements: window-management.5.3
     this.mainWindow.on('maximize', () => this.saveCurrentState());
     this.mainWindow.on('unmaximize', () => this.saveCurrentState());
     // Save final state before closing
@@ -375,15 +375,15 @@ class WindowManager {
    * is called automatically whenever the window state changes (resize, move,
    * maximize, unmaximize, close events).
    *
-   * Requirements: ui.5.1, ui.5.2, ui.5.3
+   * Requirements: window-management.5.1, window-management.5.2, window-management.5.3
    *
    * @private
    * @returns {void}
    *
    * @remarks
-   * - Saves window dimensions (width, height) when resized (ui.5.1)
-   * - Saves window position (x, y) when moved (ui.5.2)
-   * - Saves maximized state when window is maximized/unmaximized (ui.5.3)
+   * - Saves window dimensions (width, height) when resized (window-management.5.1)
+   * - Saves window position (x, y) when moved (window-management.5.2)
+   * - Saves maximized state when window is maximized/unmaximized (window-management.5.3)
    * - Does nothing if mainWindow is not initialized
    * - State is persisted to SQLite database via WindowStateManager
    * - Errors during save are handled gracefully by WindowStateManager
@@ -397,7 +397,7 @@ class WindowManager {
    * // { x: 100, y: 100, width: 1200, height: 800, isMaximized: false }
    * ```
    */
-  // Requirements: ui.5.1, ui.5.2, ui.5.3
+  // Requirements: window-management.5.1, window-management.5.2, window-management.5.3
   private saveCurrentState(): void {
     if (!this.mainWindow) {
       return;

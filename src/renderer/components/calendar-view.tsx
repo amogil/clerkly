@@ -250,7 +250,7 @@ export function CalendarView({ onNavigateToMeeting }: CalendarViewProps) {
           {/* Selected Day Meetings */}
           <div className="bg-card rounded-xl border border-border shadow-sm p-6">
             <h3 className="text-lg font-semibold text-foreground mb-4">
-              {/* Requirements: ui.11.2, ui.11.5 - Use DateTimeFormatter for system locale formatting */}
+              {/* Requirements: settings.2.2, settings.2.5 - Use DateTimeFormatter for system locale formatting */}
               {selectedDate === '2026-01-28'
                 ? 'Today'
                 : DateTimeFormatter.formatDate(new Date(selectedDate).getTime())}

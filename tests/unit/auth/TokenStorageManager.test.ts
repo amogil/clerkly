@@ -24,7 +24,7 @@ describe('TokenStorageManager', () => {
       fs.mkdirSync(migrationsPath, { recursive: true });
     }
 
-    // Requirements: ui.12.10 - Mock UserProfileManager for data isolation
+    // Requirements: user-data-isolation.1.10 - Mock UserProfileManager for data isolation
     mockProfileManager = {
       getCurrentEmail: jest.fn().mockReturnValue('test@example.com'),
     } as unknown as jest.Mocked<UserProfileManager>;

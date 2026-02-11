@@ -1,4 +1,4 @@
-// Requirements: ui.8.1, ui.8.2, ui.8.3, ui.8.4
+// Requirements: navigation.1.1, navigation.1.2, navigation.1.3, navigation.1.4
 
 /**
  * Router interface for navigation management
@@ -20,7 +20,7 @@ export interface Router {
 
 /**
  * Simple router implementation using state-based navigation
- * Requirements: ui.8.1, ui.8.2, ui.8.3, ui.8.4
+ * Requirements: navigation.1.1, navigation.1.2, navigation.1.3, navigation.1.4
  */
 export class SimpleRouter implements Router {
   private _currentRoute: string;
@@ -38,7 +38,7 @@ export class SimpleRouter implements Router {
 
   /**
    * Navigate to a specific route
-   * Requirements: ui.8.1, ui.8.3, ui.8.4
+   * Requirements: navigation.1.1, navigation.1.3, navigation.1.4
    */
   navigate(route: string): void {
     this._currentRoute = route;
@@ -47,7 +47,7 @@ export class SimpleRouter implements Router {
 
   /**
    * Get the current route
-   * Requirements: ui.8.1, ui.8.2
+   * Requirements: navigation.1.1, navigation.1.2
    */
   get currentRoute(): string {
     return this._currentRoute;

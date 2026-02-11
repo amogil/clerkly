@@ -519,7 +519,7 @@ export function AIAgentPanel({ onCommand }: AIAgentPanelProps) {
                       <div className="text-muted-foreground">
                         <span>·</span>
                         <span className="ml-1.5">
-                          {/* Requirements: ui.11.2, ui.11.5 - Use DateTimeFormatter for system locale formatting */}
+                          {/* Requirements: settings.2.2, settings.2.5 - Use DateTimeFormatter for system locale formatting */}
                           {DateTimeFormatter.formatDateTime(task.createdAt.getTime())}
                         </span>
                       </div>
@@ -586,7 +586,7 @@ export function AIAgentPanel({ onCommand }: AIAgentPanelProps) {
             <span className={`${style.text}`}>{getStatusText(selectedTask.status)}</span>
             <span className="text-muted-foreground">·</span>
             <span className="text-muted-foreground">
-              {/* Requirements: ui.11.2, ui.11.5 - Use DateTimeFormatter for system locale formatting */}
+              {/* Requirements: settings.2.2, settings.2.5 - Use DateTimeFormatter for system locale formatting */}
               {DateTimeFormatter.formatDateTime(selectedTask.createdAt.getTime())}
             </span>
           </div>

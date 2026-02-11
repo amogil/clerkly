@@ -1,4 +1,4 @@
-// Requirements: ui.7.2
+// Requirements: error-notifications.1.2
 
 /**
  * Error notification interface for displaying error messages to users

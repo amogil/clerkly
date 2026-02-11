@@ -5,7 +5,7 @@
 /* Preconditions: Settings component is rendered with mocked window.api
    Action: Test AI Agent Settings section rendering and functionality
    Assertions: Verify UI elements, loading, saving, and error handling
-   Requirements: ui.10.1, ui.10.2, ui.10.3, ui.10.4, ui.10.5, ui.10.7, ui.10.8, ui.10.9, ui.10.10, ui.10.11, ui.10.12, ui.10.13, ui.10.15 */
+   Requirements: settings.1.1, settings.1.2, settings.1.3, settings.1.4, settings.1.5, settings.1.7, settings.1.8, settings.1.9, settings.1.10, settings.1.11, settings.1.12, settings.1.13, settings.1.15 */
 
 // Mock window.api BEFORE any imports
 const mockGetProfile = jest.fn();
@@ -90,7 +90,7 @@ describe('Settings Component - AI Agent Settings', () => {
   /* Preconditions: Settings component is rendered
      Action: Check for AI Agent Settings section elements
      Assertions: LLM Provider dropdown, API Key field, toggle button, and info text are present
-     Requirements: ui.10.1, ui.10.2, ui.10.3 */
+     Requirements: settings.1.1, settings.1.2, settings.1.3 */
   test('51.1: should display AI Agent Settings section', async () => {
     renderSettings();
 
@@ -123,7 +123,7 @@ describe('Settings Component - AI Agent Settings', () => {
   /* Preconditions: Settings component is mounted
      Action: Component loads settings from API
      Assertions: loadLLMProvider and loadAPIKey are called
-     Requirements: ui.10.15 */
+     Requirements: settings.1.15 */
   test('51.2: should load settings on mount', async () => {
     mockLoadLLMProvider.mockResolvedValue({
       success: true,
@@ -148,7 +148,7 @@ describe('Settings Component - AI Agent Settings', () => {
   /* Preconditions: Settings component is rendered with openai provider
      Action: Change LLM Provider to anthropic
      Assertions: saveLLMProvider called immediately, loadAPIKey called for new provider
-     Requirements: ui.10.10, ui.10.19 */
+     Requirements: settings.1.10, settings.1.19 */
   test('51.3: should save provider immediately when changed', async () => {
     mockSaveLLMProvider.mockResolvedValue({ success: true });
     mockLoadAPIKey.mockResolvedValue({ success: true, apiKey: '' });
@@ -184,7 +184,7 @@ describe('Settings Component - AI Agent Settings', () => {
   /* Preconditions: Settings component is rendered
      Action: Change API Key multiple times quickly
      Assertions: saveAPIKey called once after 500ms with last value
-     Requirements: ui.10.9, ui.10.12 */
+     Requirements: settings.1.9, settings.1.12 */
   test('51.4: should save API key with debounce', async () => {
     mockSaveAPIKey.mockResolvedValue({ success: true });
 
@@ -217,7 +217,7 @@ describe('Settings Component - AI Agent Settings', () => {
   /* Preconditions: Settings component is rendered with API key filled
      Action: Clear API Key field (empty string)
      Assertions: deleteAPIKey called after 500ms
-     Requirements: ui.10.11 */
+     Requirements: settings.1.11 */
   test('51.5: should delete API key when field is cleared', async () => {
     mockLoadAPIKey.mockResolvedValue({
       success: true,
@@ -248,7 +248,7 @@ describe('Settings Component - AI Agent Settings', () => {
   /* Preconditions: Settings component is rendered
      Action: Click toggle visibility button
      Assertions: Input type changes between password and text, icon changes
-     Requirements: ui.10.3, ui.10.4, ui.10.5 */
+     Requirements: settings.1.3, settings.1.4, settings.1.5 */
   test('51.6: should toggle API key visibility', async () => {
     renderSettings();
 
@@ -294,7 +294,7 @@ describe('Settings Component - AI Agent Settings', () => {
   /* Preconditions: Settings component is rendered
      Action: Click toggle visibility button
      Assertions: saveAPIKey is NOT called
-     Requirements: ui.10.7 */
+     Requirements: settings.1.7 */
   test('51.7: should not trigger save when toggling visibility', async () => {
     mockSaveAPIKey.mockResolvedValue({ success: true });
 
@@ -322,7 +322,7 @@ describe('Settings Component - AI Agent Settings', () => {
   /* Preconditions: Settings component is rendered and visibility toggled
      Action: Unmount and remount component
      Assertions: Visibility state resets to hidden (password type)
-     Requirements: ui.10.8 */
+     Requirements: settings.1.8 */
   test('51.8: should not persist visibility state between sessions', async () => {
     const { unmount } = renderSettings();
 
@@ -363,7 +363,7 @@ describe('Settings Component - AI Agent Settings', () => {
   /* Preconditions: Settings component is rendered, saveAPIKey throws error
      Action: Change API Key
      Assertions: Error is logged (no notification manager in this test)
-     Requirements: ui.10.13 */
+     Requirements: settings.1.13 */
   test('51.9: should handle save errors gracefully', async () => {
     const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
     mockSaveAPIKey.mockRejectedValue(new Error('Save failed'));

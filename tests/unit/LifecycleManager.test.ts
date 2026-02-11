@@ -1,4 +1,4 @@
-// Requirements: clerkly.2, ui.5, ui.6.5
+// Requirements: clerkly.2, window-management.5, account-profile.1.5
 
 import { LifecycleManager } from '../../src/main/LifecycleManager';
 import WindowManager from '../../src/main/WindowManager';
@@ -30,7 +30,7 @@ describe('LifecycleManager', () => {
     jest.clearAllMocks();
 
     // Create mock instances
-    // Requirements: ui.5
+    // Requirements: window-management.5
     mockDataManager = new DataManager('/tmp/test') as jest.Mocked<DataManager>;
     mockWindowManager = new WindowManager(mockDataManager) as jest.Mocked<WindowManager>;
     mockTokenStorage = new TokenStorageManager(mockDataManager) as jest.Mocked<TokenStorageManager>;
@@ -139,7 +139,7 @@ describe('LifecycleManager', () => {
     /* Preconditions: LifecycleManager created, user is authenticated
        Action: call initialize()
        Assertions: profile is fetched automatically
-       Requirements: ui.6.5*/
+       Requirements: account-profile.1.5*/
     it('should fetch profile on startup when user is authenticated', async () => {
       // Mock authenticated user
       mockOAuthClient.getAuthStatus = jest.fn().mockResolvedValue({ authorized: true });
@@ -156,7 +156,7 @@ describe('LifecycleManager', () => {
     /* Preconditions: LifecycleManager created, user is not authenticated
        Action: call initialize()
        Assertions: profile is not fetched
-       Requirements: ui.6.5*/
+       Requirements: account-profile.1.5*/
     it('should not fetch profile on startup when user is not authenticated', async () => {
       // Mock unauthenticated user (default)
       mockOAuthClient.getAuthStatus = jest.fn().mockResolvedValue({ authorized: false });

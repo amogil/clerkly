@@ -1,4 +1,4 @@
-// Requirements: google-oauth-auth.3.6, google-oauth-auth.3.7, google-oauth-auth.3.8, ui.6.3, ui.6.4, ui.6.5, testing.3.1, testing.3.2, testing.3.6
+// Requirements: google-oauth-auth.3.6, google-oauth-auth.3.7, google-oauth-auth.3.8, account-profile.1.3, account-profile.1.4, account-profile.1.5, testing.3.1, testing.3.2, testing.3.6
 
 import { test, expect } from '@playwright/test';
 import { launchElectron, closeElectron, ElectronTestContext } from './helpers/electron';
@@ -54,7 +54,7 @@ test.describe('OAuth Profile Synchronous Fetch', () => {
   /* Preconditions: Application not running, clean database, mock OAuth server running
      Action: Emulate deep link callback with authorization code, complete token exchange, fetch profile synchronously
      Assertions: Tokens saved, profile fetched and saved, Dashboard shown (not loading screen)
-     Requirements: google-oauth-auth.3.6, google-oauth-auth.3.8, ui.6.3, ui.6.4 */
+     Requirements: google-oauth-auth.3.6, google-oauth-auth.3.8, account-profile.1.3, account-profile.1.4 */
   test('should synchronously fetch profile during authorization (success)', async () => {
     // Set custom user profile data for this test
     mockServer.setUserProfile({
@@ -128,7 +128,7 @@ test.describe('OAuth Profile Synchronous Fetch', () => {
     console.log('[TEST] Deep link handled, auth status:', authStatus);
 
     // Wait for OAuth flow to complete (token exchange + profile fetch)
-    // Requirements: google-oauth-auth.3.8, ui.6.4 - Profile should be fetched synchronously
+    // Requirements: google-oauth-auth.3.8, account-profile.1.4 - Profile should be fetched synchronously
     await context.window.waitForTimeout(2000);
 
     // Verify tokens are saved
@@ -177,7 +177,7 @@ test.describe('OAuth Profile Synchronous Fetch', () => {
     expect(profileCheck.profile.name).toBe('Sync Success User');
 
     // Verify Dashboard is shown (not login screen or loading screen)
-    // Requirements: ui.6.4 - Dashboard should be shown after successful profile fetch
+    // Requirements: account-profile.1.4 - Dashboard should be shown after successful profile fetch
     const loginButtonAfterAuth = context.window.locator('text=/continue with google/i');
     const isLoginVisible = await loginButtonAfterAuth.isVisible().catch(() => false);
     expect(isLoginVisible).toBe(false);
@@ -200,7 +200,7 @@ test.describe('OAuth Profile Synchronous Fetch', () => {
   /* Preconditions: Application not running, clean database, mock OAuth server configured to return error on UserInfo API
      Action: Emulate deep link callback, complete token exchange, profile fetch fails
      Assertions: Tokens cleared, LoginError shown with errorCode 'profile_fetch_failed'
-     Requirements: google-oauth-auth.3.7, ui.6.4, ui.6.5 */
+     Requirements: google-oauth-auth.3.7, account-profile.1.4, account-profile.1.5 */
   test('should synchronously fetch profile during authorization (error)', async () => {
     // Configure mock server to return error on UserInfo API
     mockServer.setUserInfoError(500, 'Internal Server Error');
@@ -291,7 +291,7 @@ test.describe('OAuth Profile Synchronous Fetch', () => {
     expect(tokensCleared).toBe(true);
 
     // Verify LoginError is shown
-    // Requirements: ui.6.4 - LoginError should be shown with errorCode 'profile_fetch_failed'
+    // Requirements: account-profile.1.4 - LoginError should be shown with errorCode 'profile_fetch_failed'
     const loginError = context.window.locator('[data-testid="login-error"]');
     await loginError.waitFor({ state: 'visible', timeout: 5000 });
     expect(await loginError.isVisible()).toBe(true);
@@ -321,7 +321,7 @@ test.describe('OAuth Profile Synchronous Fetch', () => {
   /* Preconditions: Application not running, clean database, mock OAuth server running
      Action: Emulate deep link callback, monitor UI during token exchange and profile fetch
      Assertions: Loader shown during profile fetch, Dashboard NOT shown until profile loaded
-     Requirements: ui.6.4 */
+     Requirements: account-profile.1.4 */
   test('should show loader during synchronous profile fetch', async () => {
     // Set custom user profile data for this test
     mockServer.setUserProfile({
@@ -386,7 +386,7 @@ test.describe('OAuth Profile Synchronous Fetch', () => {
     await context.window.waitForTimeout(500);
 
     // Check if loader is shown during profile fetch
-    // Requirements: ui.6.4 - Loader should be shown during synchronous profile fetch
+    // Requirements: account-profile.1.4 - Loader should be shown during synchronous profile fetch
     const loader = context.window.locator('.loading, .loader, text=/loading/i');
     const hasLoader = await loader.isVisible().catch(() => false);
 
@@ -409,7 +409,7 @@ test.describe('OAuth Profile Synchronous Fetch', () => {
     await context.window.waitForTimeout(2000);
 
     // Verify Dashboard is shown after profile fetch completes
-    // Requirements: ui.6.4 - Dashboard should be shown after profile is loaded
+    // Requirements: account-profile.1.4 - Dashboard should be shown after profile is loaded
     await dashboardHeading.waitFor({ state: 'visible', timeout: 5000 });
     expect(await dashboardHeading.isVisible()).toBe(true);
 
@@ -430,7 +430,7 @@ test.describe('OAuth Profile Synchronous Fetch', () => {
   /* Preconditions: Application not running, clean database, mock OAuth server configured to return error on UserInfo API
      Action: Emulate deep link callback, profile fetch fails, verify LoginError shown
      Assertions: Loader hidden, LoginError shown with correct message and retry button
-     Requirements: google-oauth-auth.3.7, ui.6.4, ui.6.5 */
+     Requirements: google-oauth-auth.3.7, account-profile.1.4, account-profile.1.5 */
   test('should show LoginError when profile fetch fails', async () => {
     // Configure mock server to return network error on UserInfo API
     mockServer.setUserInfoError(503, 'Service Unavailable');
@@ -492,7 +492,7 @@ test.describe('OAuth Profile Synchronous Fetch', () => {
     await context.window.waitForTimeout(1000);
 
     // Verify loader is hidden after profile fetch fails
-    // Requirements: ui.6.4 - Loader should be hidden when error occurs
+    // Requirements: account-profile.1.4 - Loader should be hidden when error occurs
     const loader = context.window.locator('.loading, .loader, text=/loading/i');
     const isLoaderVisible = await loader.isVisible().catch(() => false);
 
@@ -500,7 +500,7 @@ test.describe('OAuth Profile Synchronous Fetch', () => {
     expect(isLoaderVisible).toBe(false);
 
     // Verify LoginError is shown
-    // Requirements: ui.6.4, ui.6.5 - LoginError should be shown with errorCode 'profile_fetch_failed'
+    // Requirements: account-profile.1.4, account-profile.1.5 - LoginError should be shown with errorCode 'profile_fetch_failed'
     const loginError = context.window.locator('[data-testid="login-error"]');
     await loginError.waitFor({ state: 'visible', timeout: 5000 });
     expect(await loginError.isVisible()).toBe(true);
@@ -514,7 +514,7 @@ test.describe('OAuth Profile Synchronous Fetch', () => {
     expect(errorMessage).toContain('Please check your internet connection');
 
     // Verify "Continue with Google" button is shown for retry
-    // Requirements: ui.6.5 - User should be able to retry authentication
+    // Requirements: account-profile.1.5 - User should be able to retry authentication
     const retryButton = context.window.locator('text=/continue with google/i');
     await retryButton.waitFor({ state: 'visible', timeout: 5000 });
     expect(await retryButton.isVisible()).toBe(true);

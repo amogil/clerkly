@@ -1,4 +1,4 @@
-// Requirements: ui.7.1, ui.7.2, ui.7.3
+// Requirements: error-notifications.1.1, error-notifications.1.2, error-notifications.1.3
 import { ErrorNotificationManager } from '../../../src/renderer/managers/ErrorNotificationManager';
 import type { ErrorNotification } from '../../../src/renderer/types/error-notification';
 
@@ -17,7 +17,7 @@ describe('ErrorNotificationManager', () => {
   /* Preconditions: ErrorNotificationManager instance created
      Action: call showNotification() with message and context
      Assertions: notification created with correct data (id, message, context, timestamp)
-     Requirements: ui.7.1, ui.7.2 */
+     Requirements: error-notifications.1.1, error-notifications.1.2 */
   it('should create notification with correct data', () => {
     const message = 'Failed to load user profile';
     const context = 'Loading profile data';
@@ -31,7 +31,7 @@ describe('ErrorNotificationManager', () => {
   /* Preconditions: ErrorNotificationManager with active notification
      Action: call dismissNotification() with notification id
      Assertions: notification removed from active notifications
-     Requirements: ui.7.3 */
+     Requirements: error-notifications.1.3 */
   it('should dismiss notification by id', () => {
     const id = manager.showNotification('Error message', 'Error context');
 
@@ -47,7 +47,7 @@ describe('ErrorNotificationManager', () => {
   /* Preconditions: ErrorNotificationManager with active notification
      Action: wait 15 seconds
      Assertions: notification automatically dismissed
-     Requirements: ui.7.3 */
+     Requirements: error-notifications.1.3 */
   it('should auto-dismiss notification after 15 seconds', () => {
     manager.showNotification('Error message', 'Error context');
 
@@ -64,7 +64,7 @@ describe('ErrorNotificationManager', () => {
   /* Preconditions: ErrorNotificationManager instance created
      Action: subscribe to notifications, show notification
      Assertions: listener called with notification array
-     Requirements: ui.7.1 */
+     Requirements: error-notifications.1.1 */
   it('should notify listeners when notification is shown', () => {
     const listener = jest.fn();
     manager.subscribe(listener);
@@ -87,7 +87,7 @@ describe('ErrorNotificationManager', () => {
   /* Preconditions: ErrorNotificationManager with subscribed listener
      Action: show notification, then dismiss it
      Assertions: listener called twice (show and dismiss)
-     Requirements: ui.7.3 */
+     Requirements: error-notifications.1.3 */
   it('should notify listeners when notification is dismissed', () => {
     const listener = jest.fn();
     manager.subscribe(listener);
@@ -103,7 +103,7 @@ describe('ErrorNotificationManager', () => {
   /* Preconditions: ErrorNotificationManager with multiple notifications
      Action: show multiple notifications
      Assertions: all notifications tracked in array
-     Requirements: ui.7.1 */
+     Requirements: error-notifications.1.1 */
   it('should manage multiple notifications', () => {
     const listener = jest.fn();
     manager.subscribe(listener);
@@ -124,7 +124,7 @@ describe('ErrorNotificationManager', () => {
   /* Preconditions: ErrorNotificationManager with subscribed listener
      Action: call unsubscribe function
      Assertions: listener no longer called on changes
-     Requirements: ui.7.1 */
+     Requirements: error-notifications.1.1 */
   it('should unsubscribe listener', () => {
     const listener = jest.fn();
     const unsubscribe = manager.subscribe(listener);
@@ -142,7 +142,7 @@ describe('ErrorNotificationManager', () => {
   /* Preconditions: ErrorNotificationManager with multiple notifications
      Action: dismiss one notification
      Assertions: only specified notification removed, others remain
-     Requirements: ui.7.3 */
+     Requirements: error-notifications.1.3 */
   it('should dismiss only specified notification', () => {
     const listener = jest.fn();
     manager.subscribe(listener);
@@ -161,7 +161,7 @@ describe('ErrorNotificationManager', () => {
   /* Preconditions: ErrorNotificationManager instance
      Action: dismiss non-existent notification id
      Assertions: no error thrown, no changes to notifications
-     Requirements: ui.7.3 */
+     Requirements: error-notifications.1.3 */
   it('should handle dismissing non-existent notification gracefully', () => {
     const listener = jest.fn();
     manager.subscribe(listener);
@@ -179,7 +179,7 @@ describe('ErrorNotificationManager', () => {
   /* Preconditions: ErrorNotificationManager with notification
      Action: check notification structure
      Assertions: notification has all required fields (id, message, context, timestamp)
-     Requirements: ui.7.2 */
+     Requirements: error-notifications.1.2 */
   it('should create notification with all required fields', () => {
     const listener = jest.fn();
     manager.subscribe(listener);
@@ -205,7 +205,7 @@ describe('ErrorNotificationManager', () => {
   /* Preconditions: ErrorNotificationManager with multiple listeners
      Action: show notification
      Assertions: all listeners notified
-     Requirements: ui.7.1 */
+     Requirements: error-notifications.1.1 */
   it('should notify all subscribed listeners', () => {
     const listener1 = jest.fn();
     const listener2 = jest.fn();
@@ -225,7 +225,7 @@ describe('ErrorNotificationManager', () => {
   /* Preconditions: ErrorNotificationManager with notification
      Action: receive notifications array from listener
      Assertions: array is a copy, modifications don't affect internal state
-     Requirements: ui.7.1 */
+     Requirements: error-notifications.1.1 */
   it('should provide copy of notifications array to listeners', () => {
     const listener = jest.fn();
     manager.subscribe(listener);

@@ -1,7 +1,7 @@
 /* Preconditions: NavigationManager created with mocked Router and window.api.auth
    Action: call checkAuthStatus(), redirectToLogin(), redirectToDashboard(), initialize()
    Assertions: correct behavior for each method based on auth status
-   Requirements: ui.8.1, ui.8.3, ui.8.4 */
+   Requirements: navigation.1.1, navigation.1.3, navigation.1.4 */
 
 import { NavigationManager } from '../../../src/renderer/navigation/NavigationManager';
 import type { Router } from '../../../src/renderer/navigation/Router';
@@ -37,7 +37,7 @@ describe('NavigationManager', () => {
     /* Preconditions: window.api.auth.getStatus() returns authorized: true
        Action: call checkAuthStatus()
        Assertions: returns true
-       Requirements: ui.8.1 */
+       Requirements: navigation.1.1 */
     it('should return true when user is authorized', async () => {
       mockGetStatus.mockResolvedValue({ authorized: true });
 
@@ -50,7 +50,7 @@ describe('NavigationManager', () => {
     /* Preconditions: window.api.auth.getStatus() returns authorized: false
        Action: call checkAuthStatus()
        Assertions: returns false
-       Requirements: ui.8.1 */
+       Requirements: navigation.1.1 */
     it('should return false when user is not authorized', async () => {
       mockGetStatus.mockResolvedValue({ authorized: false });
 
@@ -63,7 +63,7 @@ describe('NavigationManager', () => {
     /* Preconditions: window.api.auth.getStatus() throws error
        Action: call checkAuthStatus()
        Assertions: returns false, error logged
-       Requirements: ui.8.1 */
+       Requirements: navigation.1.1 */
     it('should return false and log error when getStatus fails', async () => {
       const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
       mockGetStatus.mockRejectedValue(new Error('Auth check failed'));
@@ -83,7 +83,7 @@ describe('NavigationManager', () => {
     /* Preconditions: NavigationManager created
        Action: call redirectToLogin()
        Assertions: router.navigate() called with '/login', message logged
-       Requirements: ui.8.1, ui.8.4 */
+       Requirements: navigation.1.1, navigation.1.4 */
     it('should navigate to login route', () => {
       const consoleInfoSpy = jest.spyOn(console, 'info').mockImplementation();
 
@@ -103,7 +103,7 @@ describe('NavigationManager', () => {
     /* Preconditions: NavigationManager created
        Action: call redirectToDashboard()
        Assertions: router.navigate() called with '/dashboard', message logged
-       Requirements: ui.8.3 */
+       Requirements: navigation.1.3 */
     it('should navigate to dashboard route', () => {
       const consoleInfoSpy = jest.spyOn(console, 'info').mockImplementation();
 
@@ -123,7 +123,7 @@ describe('NavigationManager', () => {
     /* Preconditions: user not authorized, current route is '/dashboard'
        Action: call initialize()
        Assertions: redirectToLogin() called
-       Requirements: ui.8.1 */
+       Requirements: navigation.1.1 */
     it('should redirect to login when user is not authorized', async () => {
       mockGetStatus.mockResolvedValue({ authorized: false });
       const consoleInfoSpy = jest.spyOn(console, 'info').mockImplementation();
@@ -142,7 +142,7 @@ describe('NavigationManager', () => {
     /* Preconditions: user authorized, current route is '/login'
        Action: call initialize()
        Assertions: redirectToDashboard() called
-       Requirements: ui.8.3 */
+       Requirements: navigation.1.3 */
     it('should redirect to dashboard when user is authorized and on login screen', async () => {
       mockGetStatus.mockResolvedValue({ authorized: true });
       Object.defineProperty(mockRouter, 'currentRoute', {
@@ -165,7 +165,7 @@ describe('NavigationManager', () => {
     /* Preconditions: user authorized, current route is '/dashboard'
        Action: call initialize()
        Assertions: no navigation occurs (stays on dashboard)
-       Requirements: ui.8.1, ui.8.3 */
+       Requirements: navigation.1.1, navigation.1.3 */
     it('should not redirect when user is authorized and not on login screen', async () => {
       mockGetStatus.mockResolvedValue({ authorized: true });
       Object.defineProperty(mockRouter, 'currentRoute', {
@@ -182,7 +182,7 @@ describe('NavigationManager', () => {
     /* Preconditions: user authorized, current route is '/settings'
        Action: call initialize()
        Assertions: no navigation occurs (stays on settings)
-       Requirements: ui.8.1, ui.8.3 */
+       Requirements: navigation.1.1, navigation.1.3 */
     it('should not redirect when user is authorized and on other protected route', async () => {
       mockGetStatus.mockResolvedValue({ authorized: true });
       Object.defineProperty(mockRouter, 'currentRoute', {
@@ -199,7 +199,7 @@ describe('NavigationManager', () => {
     /* Preconditions: auth check fails (throws error)
        Action: call initialize()
        Assertions: redirectToLogin() called (treats as not authorized)
-       Requirements: ui.8.1 */
+       Requirements: navigation.1.1 */
     it('should redirect to login when auth check fails', async () => {
       const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
       const consoleInfoSpy = jest.spyOn(console, 'info').mockImplementation();

@@ -7,7 +7,7 @@
 /* Preconditions: App component with ErrorProvider and useError hook integrated
    Action: Test IPC event listener setup and notification display
    Assertions: Component listens to error:notify events and shows notifications via toast
-   Requirements: ui.7.1 */
+   Requirements: error-notifications.1.1 */
 
 import React from 'react';
 import { render, waitFor } from '@testing-library/react';
@@ -114,7 +114,7 @@ describe('App IPC Integration with Error Notification System', () => {
   /* Preconditions: App component is mounted
      Action: Render App component
      Assertions: window.api.error.onNotify is called to set up listener
-     Requirements: ui.7.1 */
+     Requirements: error-notifications.1.1 */
   it('should set up error:notify IPC listener on mount', async () => {
     render(<App />);
 
@@ -130,7 +130,7 @@ describe('App IPC Integration with Error Notification System', () => {
   /* Preconditions: App component is mounted and IPC listener is set up
      Action: Trigger error:notify event through callback
      Assertions: toast.error is called with correct message
-     Requirements: ui.7.1 */
+     Requirements: error-notifications.1.1 */
   it('should call toast.error when error:notify event is received', async () => {
     // Spy on console.info to verify notification logging (Logger uses console.info for info level)
     const consoleInfoSpy = jest.spyOn(console, 'info').mockImplementation();
@@ -168,7 +168,7 @@ describe('App IPC Integration with Error Notification System', () => {
   /* Preconditions: App component is mounted
      Action: Unmount App component
      Assertions: Unsubscribe function is called to clean up listener
-     Requirements: ui.7.1 */
+     Requirements: error-notifications.1.1 */
   it('should clean up error:notify listener on unmount', async () => {
     const { unmount } = render(<App />);
 
@@ -189,7 +189,7 @@ describe('App IPC Integration with Error Notification System', () => {
   /* Preconditions: App component is mounted
      Action: Render App component
      Assertions: Toaster component is rendered
-     Requirements: ui.7.1 */
+     Requirements: error-notifications.1.1 */
   it('should render Toaster component', async () => {
     const { getByTestId } = render(<App />);
 
@@ -203,7 +203,7 @@ describe('App IPC Integration with Error Notification System', () => {
   /* Preconditions: App component is mounted and multiple error events are received
      Action: Trigger multiple error:notify events
      Assertions: Each event triggers toast.error
-     Requirements: ui.7.1 */
+     Requirements: error-notifications.1.1 */
   it('should handle multiple error:notify events', async () => {
     const consoleInfoSpy = jest.spyOn(console, 'info').mockImplementation();
 

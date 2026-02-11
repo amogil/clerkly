@@ -153,13 +153,13 @@ export interface AppConfig {
 
 /**
  * API exposed to renderer process via contextBridge
- * Requirements: clerkly.1, google-oauth-auth.8, ui.6.2, ui.6.5, ui.7.1, ui.10.26
+ * Requirements: clerkly.1, google-oauth-auth.8, account-profile.1.2, account-profile.1.5, error-notifications.1.1, settings.1.26
  */
 export interface API {
   saveData: (key: string, value: any) => Promise<{ success: boolean; error?: string }>;
   loadData: (key: string) => Promise<{ success: boolean; data?: any; error?: string }>;
   deleteData: (key: string) => Promise<{ success: boolean; error?: string }>;
-  // Requirements: google-oauth-auth.8.1, google-oauth-auth.8.2, google-oauth-auth.8.3, ui.6.2, ui.6.5
+  // Requirements: google-oauth-auth.8.1, google-oauth-auth.8.2, google-oauth-auth.8.3, account-profile.1.2, account-profile.1.5
   auth: {
     startLogin: () => Promise<{ success: boolean; error?: string }>;
     getStatus: () => Promise<{ authorized: boolean; error?: string }>;
@@ -177,11 +177,11 @@ export interface API {
     onShowLoader: (callback: () => void) => () => void;
     onHideLoader: (callback: () => void) => () => void;
   };
-  // Requirements: ui.7.1
+  // Requirements: error-notifications.1.1
   error: {
     onNotify: (callback: (message: string, context: string) => void) => () => void;
   };
-  // Requirements: ui.10.26
+  // Requirements: settings.1.26
   settings: {
     saveLLMProvider: (
       provider: 'openai' | 'anthropic' | 'google'
@@ -206,7 +206,7 @@ export interface API {
 
 /**
  * User profile data from Google UserInfo API
- * Requirements: ui.6.2, ui.6.3
+ * Requirements: account-profile.1.2, account-profile.1.3
  */
 export interface UserProfile {
   /**
@@ -258,13 +258,13 @@ export interface UserProfile {
 
 /**
  * AI Agent Settings configuration
- * Requirements: ui.10.1, ui.10.16
+ * Requirements: settings.1.1, settings.1.16
  */
 export interface AIAgentSettings {
   /**
    * Selected LLM provider for AI agent operations
    * Supported providers: OpenAI (GPT), Anthropic (Claude), Google (Gemini)
-   * Requirements: ui.10.1
+   * Requirements: settings.1.1
    */
   llmProvider: 'openai' | 'anthropic' | 'google';
 
@@ -272,7 +272,7 @@ export interface AIAgentSettings {
    * API keys for each LLM provider
    * Each provider has separate storage for its API key
    * Keys are stored encrypted when safeStorage is available
-   * Requirements: ui.10.16
+   * Requirements: settings.1.16
    */
   apiKeys: {
     /**
@@ -295,7 +295,7 @@ export interface AIAgentSettings {
    * Encryption status for each provider's API key
    * true: key is encrypted using safeStorage
    * false: key is stored as plain text (fallback when encryption unavailable)
-   * Requirements: ui.10.14, ui.10.15, ui.10.17
+   * Requirements: settings.1.14, settings.1.15, settings.1.17
    */
   encryptionStatus: {
     /**

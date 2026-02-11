@@ -1,4 +1,4 @@
-// Requirements: ui.12.13, ui.12.19, ui.12.20, ui.12.21
+// Requirements: user-data-isolation.1.13, user-data-isolation.1.19, user-data-isolation.1.20, user-data-isolation.1.21
 
 import { DataManager } from '../../src/main/DataManager';
 import type { UserProfileManager } from '../../src/main/auth/UserProfileManager';
@@ -62,7 +62,7 @@ describe('DataManager Error Handling - "No user logged in"', () => {
   /* Preconditions: getCurrentEmail returns null, user is not authenticated
      Action: Trigger "No user logged in" error from saveData
      Assertions: Returns error result with message containing "No user logged in"
-     Requirements: ui.12.19
+     Requirements: user-data-isolation.1.19
      Note: Application code should handle this by redirecting to login and clearing caches */
   it('should return error when user is not authenticated', () => {
     mockProfileManager.getCurrentEmail.mockReturnValue(null);
@@ -76,7 +76,7 @@ describe('DataManager Error Handling - "No user logged in"', () => {
   /* Preconditions: getCurrentEmail returns null during operation, user was authenticated
      Action: Trigger "No user logged in" error
      Assertions: Returns error result, application code should retry after token refresh
-     Requirements: ui.12.20
+     Requirements: user-data-isolation.1.20
      Note: This test verifies the error is returned. Application code should:
      1. Check the error
      2. Call refreshAccessToken()
@@ -104,7 +104,7 @@ describe('DataManager Error Handling - "No user logged in"', () => {
   /* Preconditions: getCurrentEmail returns null during logout
      Action: Trigger "No user logged in" error during logout
      Assertions: Returns error result
-     Requirements: ui.12.21
+     Requirements: user-data-isolation.1.21
      Note: Application code should silently ignore this error during logout and log it for debugging */
   it('should return error during logout (race condition)', () => {
     // User was authenticated
@@ -129,7 +129,7 @@ describe('DataManager Error Handling - "No user logged in"', () => {
   /* Preconditions: getCurrentEmail returns null
      Action: Attempt to load data
      Assertions: Returns error result with message containing "No user logged in"
-     Requirements: ui.12.13 */
+     Requirements: user-data-isolation.1.13 */
   it('should return error on loadData when no user logged in', () => {
     mockProfileManager.getCurrentEmail.mockReturnValue(null);
 
@@ -142,7 +142,7 @@ describe('DataManager Error Handling - "No user logged in"', () => {
   /* Preconditions: getCurrentEmail returns null
      Action: Attempt to delete data
      Assertions: Returns error result with message containing "No user logged in"
-     Requirements: ui.12.13 */
+     Requirements: user-data-isolation.1.13 */
   it('should return error on deleteData when no user logged in', () => {
     mockProfileManager.getCurrentEmail.mockReturnValue(null);
 
@@ -155,7 +155,7 @@ describe('DataManager Error Handling - "No user logged in"', () => {
   /* Preconditions: User authenticated, data saved
      Action: Session expires, attempt to load data
      Assertions: Returns error, data remains in database
-     Requirements: ui.12.20 */
+     Requirements: user-data-isolation.1.20 */
   it('should preserve data when session expires during load', () => {
     // Save data while authenticated
     mockProfileManager.getCurrentEmail.mockReturnValue('user@example.com');

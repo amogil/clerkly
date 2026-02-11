@@ -1,4 +1,4 @@
-// Requirements: google-oauth-auth.8.1, google-oauth-auth.8.2, google-oauth-auth.8.3, google-oauth-auth.8.4, google-oauth-auth.8.5, ui.6.2, ui.6.7
+// Requirements: google-oauth-auth.8.1, google-oauth-auth.8.2, google-oauth-auth.8.3, google-oauth-auth.8.4, google-oauth-auth.8.5, account-profile.1.2, account-profile.1.7
 
 import { ipcMain, IpcMainInvokeEvent, BrowserWindow } from 'electron';
 import { OAuthClientManager } from './OAuthClientManager';
@@ -8,7 +8,7 @@ import { Logger } from '../Logger';
 // Requirements: clerkly.3.8 - Use centralized Logger instead of console.*
 /**
  * IPC result interface
- * Requirements: google-oauth-auth.8.5, ui.6.2, ui.6.7
+ * Requirements: google-oauth-auth.8.5, account-profile.1.2, account-profile.1.7
  */
 interface IPCResult {
   success: boolean;
@@ -20,7 +20,7 @@ interface IPCResult {
 /**
  * Auth IPC Handlers
  * Manages IPC communication between renderer and main processes for OAuth authentication
- * Requirements: google-oauth-auth.8, ui.6.2, ui.6.7
+ * Requirements: google-oauth-auth.8, account-profile.1.2, account-profile.1.7
  */
 export class AuthIPCHandlers {
   // Requirements: clerkly.3.5, clerkly.3.7
@@ -35,7 +35,7 @@ export class AuthIPCHandlers {
 
   /**
    * Set profile manager for profile-related IPC handlers
-   * Requirements: ui.6.2
+   * Requirements: account-profile.1.2
    * @param profileManager UserProfileManager instance
    */
   setProfileManager(profileManager: UserProfileManager): void {
@@ -45,7 +45,7 @@ export class AuthIPCHandlers {
 
   /**
    * Register all auth IPC handlers
-   * Requirements: google-oauth-auth.8.1, ui.6.2, ui.6.5
+   * Requirements: google-oauth-auth.8.1, account-profile.1.2, account-profile.1.5
    */
   registerHandlers(): void {
     if (this.handlersRegistered) {
@@ -65,7 +65,7 @@ export class AuthIPCHandlers {
 
   /**
    * Unregister all auth IPC handlers
-   * Requirements: google-oauth-auth.8.1, ui.6.2, ui.6.5
+   * Requirements: google-oauth-auth.8.1, account-profile.1.2, account-profile.1.5
    */
   unregisterHandlers(): void {
     if (!this.handlersRegistered) {
@@ -163,13 +163,13 @@ export class AuthIPCHandlers {
   /**
    * Handle get profile request
    * Returns cached profile from local storage
-   * Requirements: ui.6.2, ui.6.7
+   * Requirements: account-profile.1.2, account-profile.1.7
    * @param event IPC event
    * @returns IPC result with profile data or null
    */
   private async handleGetProfile(_event: IpcMainInvokeEvent): Promise<IPCResult> {
     try {
-      // Requirements: ui.6.2, ui.6.7
+      // Requirements: account-profile.1.2, account-profile.1.7
       if (!this.profileManager) {
         this.logger.warn('Profile manager not set');
         return {
@@ -199,13 +199,13 @@ export class AuthIPCHandlers {
   /**
    * Handle refresh profile request
    * Fetches fresh profile data from Google API
-   * Requirements: ui.6.5
+   * Requirements: account-profile.1.5
    * @param event IPC event
    * @returns IPC result with fresh profile data or null
    */
   private async handleRefreshProfile(_event: IpcMainInvokeEvent): Promise<IPCResult> {
     try {
-      // Requirements: ui.6.5
+      // Requirements: account-profile.1.5
       if (!this.profileManager) {
         this.logger.warn('Profile manager not set');
         return {
@@ -223,7 +223,7 @@ export class AuthIPCHandlers {
       );
 
       // Broadcast profile update event to all windows
-      // Requirements: ui.6.5 - Notify UI about profile updates
+      // Requirements: account-profile.1.5 - Notify UI about profile updates
       const windows = BrowserWindow.getAllWindows();
       windows.forEach((window) => {
         window.webContents.send('auth:profile-updated', profile);
@@ -280,15 +280,15 @@ export class AuthIPCHandlers {
 
   /**
    * Send error notification to all renderer processes
-   * Requirements: ui.7.1, ui.7.4
+   * Requirements: error-notifications.1.1, error-notifications.1.4
    * @param message Error message
    * @param context Context of the operation that failed
    */
   sendErrorNotification(message: string, context: string): void {
-    // Requirements: ui.7.4 - Log to console
+    // Requirements: error-notifications.1.4 - Log to console
     this.logger.error(`[${context}] Error: ${message}`);
 
-    // Requirements: ui.7.1 - Notify renderer
+    // Requirements: error-notifications.1.1 - Notify renderer
     const windows = BrowserWindow.getAllWindows();
     windows.forEach((window) => {
       window.webContents.send('error:notify', message, context);

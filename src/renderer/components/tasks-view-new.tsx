@@ -146,7 +146,7 @@ export function TasksViewNew() {
       return `${diffDays}d`;
     }
 
-    // Requirements: ui.11.2, ui.11.5 - Use DateTimeFormatter for system locale formatting
+    // Requirements: settings.2.2, settings.2.5 - Use DateTimeFormatter for system locale formatting
     return DateTimeFormatter.formatDate(date.getTime());
   };
 

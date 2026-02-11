@@ -1,7 +1,7 @@
 /* Preconditions: SettingsIPCHandlers is initialized with AIAgentSettingsManager
    Action: Test IPC handlers for AI Agent settings
    Assertions: Handlers correctly save LLM provider and handle errors
-   Requirements: ui.10.9, ui.10.26 */
+   Requirements: settings.1.9, settings.1.26 */
 
 import { SettingsIPCHandlers } from '../../src/main/SettingsIPCHandlers';
 import { AIAgentSettingsManager } from '../../src/main/AIAgentSettingsManager';
@@ -58,7 +58,7 @@ describe('SettingsIPCHandlers', () => {
     /* Preconditions: SettingsIPCHandlers is created
        Action: Call registerHandlers()
        Assertions: IPC handlers are registered
-       Requirements: ui.10.26 */
+       Requirements: settings.1.26 */
     it('should register settings IPC handlers', () => {
       settingsIPCHandlers.registerHandlers();
 
@@ -78,7 +78,7 @@ describe('SettingsIPCHandlers', () => {
     /* Preconditions: Handlers are already registered
        Action: Call registerHandlers() again
        Assertions: Warning is logged, handlers not registered twice
-       Requirements: ui.10.26 */
+       Requirements: settings.1.26 */
     it('should not register handlers twice', () => {
       const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation();
 
@@ -98,7 +98,7 @@ describe('SettingsIPCHandlers', () => {
     /* Preconditions: Handlers are registered
        Action: Call unregisterHandlers()
        Assertions: IPC handlers are unregistered
-       Requirements: ui.10.26 */
+       Requirements: settings.1.26 */
     it('should unregister settings IPC handlers', () => {
       settingsIPCHandlers.registerHandlers();
       settingsIPCHandlers.unregisterHandlers();
@@ -113,7 +113,7 @@ describe('SettingsIPCHandlers', () => {
     /* Preconditions: Handlers are not registered
        Action: Call unregisterHandlers()
        Assertions: No error, removeHandler not called
-       Requirements: ui.10.26 */
+       Requirements: settings.1.26 */
     it('should handle unregister when handlers not registered', () => {
       settingsIPCHandlers.unregisterHandlers();
 
@@ -129,7 +129,7 @@ describe('SettingsIPCHandlers', () => {
     /* Preconditions: Handler is registered, AIAgentSettingsManager.saveLLMProvider succeeds
        Action: Call handler with 'openai' provider
        Assertions: saveLLMProvider is called, success response returned
-       Requirements: ui.10.9, ui.10.26 */
+       Requirements: settings.1.9, settings.1.26 */
     it('should save LLM provider successfully', async () => {
       mockAIAgentSettingsManager.saveLLMProvider.mockResolvedValue();
 
@@ -147,7 +147,7 @@ describe('SettingsIPCHandlers', () => {
     /* Preconditions: Handler is registered, AIAgentSettingsManager.saveLLMProvider succeeds
        Action: Call handler with 'anthropic' provider
        Assertions: saveLLMProvider is called with correct provider
-       Requirements: ui.10.9, ui.10.26 */
+       Requirements: settings.1.9, settings.1.26 */
     it('should save anthropic provider', async () => {
       mockAIAgentSettingsManager.saveLLMProvider.mockResolvedValue();
 
@@ -161,7 +161,7 @@ describe('SettingsIPCHandlers', () => {
     /* Preconditions: Handler is registered, AIAgentSettingsManager.saveLLMProvider succeeds
        Action: Call handler with 'google' provider
        Assertions: saveLLMProvider is called with correct provider
-       Requirements: ui.10.9, ui.10.26 */
+       Requirements: settings.1.9, settings.1.26 */
     it('should save google provider', async () => {
       mockAIAgentSettingsManager.saveLLMProvider.mockResolvedValue();
 
@@ -175,7 +175,7 @@ describe('SettingsIPCHandlers', () => {
     /* Preconditions: Handler is registered, AIAgentSettingsManager.saveLLMProvider throws error
        Action: Call handler with 'openai' provider
        Assertions: Error is caught, structured error response returned
-       Requirements: ui.10.9, ui.10.26 */
+       Requirements: settings.1.9, settings.1.26 */
     it('should handle save errors and return structured response', async () => {
       const errorMessage = 'Database error';
       mockAIAgentSettingsManager.saveLLMProvider.mockRejectedValue(new Error(errorMessage));
@@ -192,7 +192,7 @@ describe('SettingsIPCHandlers', () => {
     /* Preconditions: Handler is registered, AIAgentSettingsManager.saveLLMProvider throws non-Error
        Action: Call handler with 'openai' provider
        Assertions: Unknown error is handled, structured error response returned
-       Requirements: ui.10.9, ui.10.26 */
+       Requirements: settings.1.9, settings.1.26 */
     it('should handle unknown errors', async () => {
       mockAIAgentSettingsManager.saveLLMProvider.mockRejectedValue('Unknown error');
 
@@ -208,7 +208,7 @@ describe('SettingsIPCHandlers', () => {
     /* Preconditions: Handler is registered, AIAgentSettingsManager.saveLLMProvider throws error
        Action: Call handler with 'openai' provider
        Assertions: Error is logged to console
-       Requirements: ui.10.9, ui.10.26 */
+       Requirements: settings.1.9, settings.1.26 */
     it('should log errors to console', async () => {
       const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
       const errorMessage = 'Database error';
@@ -233,7 +233,7 @@ describe('SettingsIPCHandlers', () => {
     /* Preconditions: Handler is registered, AIAgentSettingsManager.loadLLMProvider returns 'openai'
        Action: Call handler
        Assertions: loadLLMProvider is called, provider returned
-       Requirements: ui.10.20, ui.10.21, ui.10.26 */
+       Requirements: settings.1.20, settings.1.21, settings.1.26 */
     it('should load LLM provider successfully', async () => {
       mockAIAgentSettingsManager.loadLLMProvider.mockResolvedValue('openai');
 
@@ -252,7 +252,7 @@ describe('SettingsIPCHandlers', () => {
     /* Preconditions: Handler is registered, AIAgentSettingsManager.loadLLMProvider returns 'anthropic'
        Action: Call handler
        Assertions: Correct provider returned
-       Requirements: ui.10.20, ui.10.26 */
+       Requirements: settings.1.20, settings.1.26 */
     it('should load anthropic provider', async () => {
       mockAIAgentSettingsManager.loadLLMProvider.mockResolvedValue('anthropic');
 
@@ -266,7 +266,7 @@ describe('SettingsIPCHandlers', () => {
     /* Preconditions: Handler is registered, AIAgentSettingsManager.loadLLMProvider returns 'google'
        Action: Call handler
        Assertions: Correct provider returned
-       Requirements: ui.10.20, ui.10.26 */
+       Requirements: settings.1.20, settings.1.26 */
     it('should load google provider', async () => {
       mockAIAgentSettingsManager.loadLLMProvider.mockResolvedValue('google');
 
@@ -280,7 +280,7 @@ describe('SettingsIPCHandlers', () => {
     /* Preconditions: Handler is registered, AIAgentSettingsManager.loadLLMProvider throws error
        Action: Call handler
        Assertions: Default provider 'openai' returned
-       Requirements: ui.10.21, ui.10.26 */
+       Requirements: settings.1.21, settings.1.26 */
     it('should return default provider on error', async () => {
       mockAIAgentSettingsManager.loadLLMProvider.mockRejectedValue(new Error('Database error'));
 
@@ -302,7 +302,7 @@ describe('SettingsIPCHandlers', () => {
     /* Preconditions: Handler is registered, AIAgentSettingsManager.saveAPIKey succeeds
        Action: Call handler with provider and API key
        Assertions: saveAPIKey is called, success response returned
-       Requirements: ui.10.9, ui.10.26 */
+       Requirements: settings.1.9, settings.1.26 */
     it('should save API key successfully', async () => {
       mockAIAgentSettingsManager.saveAPIKey.mockResolvedValue();
 
@@ -323,7 +323,7 @@ describe('SettingsIPCHandlers', () => {
     /* Preconditions: Handler is registered, AIAgentSettingsManager.saveAPIKey succeeds
        Action: Call handler with anthropic provider
        Assertions: saveAPIKey called with correct provider
-       Requirements: ui.10.9, ui.10.26 */
+       Requirements: settings.1.9, settings.1.26 */
     it('should save API key for anthropic provider', async () => {
       mockAIAgentSettingsManager.saveAPIKey.mockResolvedValue();
 
@@ -340,7 +340,7 @@ describe('SettingsIPCHandlers', () => {
     /* Preconditions: Handler is registered, AIAgentSettingsManager.saveAPIKey succeeds
        Action: Call handler with google provider
        Assertions: saveAPIKey called with correct provider
-       Requirements: ui.10.9, ui.10.26 */
+       Requirements: settings.1.9, settings.1.26 */
     it('should save API key for google provider', async () => {
       mockAIAgentSettingsManager.saveAPIKey.mockResolvedValue();
 
@@ -354,7 +354,7 @@ describe('SettingsIPCHandlers', () => {
     /* Preconditions: Handler is registered, AIAgentSettingsManager.saveAPIKey throws error
        Action: Call handler with provider and API key
        Assertions: Error is caught, structured error response returned
-       Requirements: ui.10.13, ui.10.26 */
+       Requirements: settings.1.13, settings.1.26 */
     it('should handle save errors and return structured response', async () => {
       const errorMessage = 'Encryption failed';
       mockAIAgentSettingsManager.saveAPIKey.mockRejectedValue(new Error(errorMessage));
@@ -371,7 +371,7 @@ describe('SettingsIPCHandlers', () => {
     /* Preconditions: Handler is registered, AIAgentSettingsManager.saveAPIKey throws error
        Action: Call handler
        Assertions: Error is logged to console
-       Requirements: ui.10.13, ui.10.26 */
+       Requirements: settings.1.13, settings.1.26 */
     it('should log errors to console', async () => {
       const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
       const errorMessage = 'Encryption failed';
@@ -396,7 +396,7 @@ describe('SettingsIPCHandlers', () => {
     /* Preconditions: Handler is registered, AIAgentSettingsManager.loadAPIKey returns key
        Action: Call handler with provider
        Assertions: loadAPIKey is called, API key returned
-       Requirements: ui.10.20, ui.10.22, ui.10.26 */
+       Requirements: settings.1.20, settings.1.22, settings.1.26 */
     it('should load API key successfully', async () => {
       mockAIAgentSettingsManager.loadAPIKey.mockResolvedValue('decrypted-api-key');
 
@@ -415,7 +415,7 @@ describe('SettingsIPCHandlers', () => {
     /* Preconditions: Handler is registered, AIAgentSettingsManager.loadAPIKey returns null
        Action: Call handler with provider
        Assertions: null returned when key not found
-       Requirements: ui.10.20, ui.10.26 */
+       Requirements: settings.1.20, settings.1.26 */
     it('should return null when API key not found', async () => {
       mockAIAgentSettingsManager.loadAPIKey.mockResolvedValue(null);
 
@@ -432,7 +432,7 @@ describe('SettingsIPCHandlers', () => {
     /* Preconditions: Handler is registered, AIAgentSettingsManager.loadAPIKey succeeds
        Action: Call handler with google provider
        Assertions: loadAPIKey called with correct provider
-       Requirements: ui.10.20, ui.10.22, ui.10.26 */
+       Requirements: settings.1.20, settings.1.22, settings.1.26 */
     it('should load API key for google provider', async () => {
       mockAIAgentSettingsManager.loadAPIKey.mockResolvedValue('google-api-key');
 
@@ -447,7 +447,7 @@ describe('SettingsIPCHandlers', () => {
     /* Preconditions: Handler is registered, AIAgentSettingsManager.loadAPIKey throws error
        Action: Call handler with provider
        Assertions: Error is caught, structured error response returned
-       Requirements: ui.10.20, ui.10.26 */
+       Requirements: settings.1.20, settings.1.26 */
     it('should handle load errors and return structured response', async () => {
       const errorMessage = 'Decryption failed';
       mockAIAgentSettingsManager.loadAPIKey.mockRejectedValue(new Error(errorMessage));
@@ -470,7 +470,7 @@ describe('SettingsIPCHandlers', () => {
     /* Preconditions: Handler is registered, AIAgentSettingsManager.deleteAPIKey succeeds
        Action: Call handler with provider
        Assertions: deleteAPIKey is called, success response returned
-       Requirements: ui.10.11, ui.10.26 */
+       Requirements: settings.1.11, settings.1.26 */
     it('should delete API key successfully', async () => {
       mockAIAgentSettingsManager.deleteAPIKey.mockResolvedValue();
 
@@ -488,7 +488,7 @@ describe('SettingsIPCHandlers', () => {
     /* Preconditions: Handler is registered, AIAgentSettingsManager.deleteAPIKey succeeds
        Action: Call handler with anthropic provider
        Assertions: deleteAPIKey called with correct provider
-       Requirements: ui.10.11, ui.10.26 */
+       Requirements: settings.1.11, settings.1.26 */
     it('should delete API key for anthropic provider', async () => {
       mockAIAgentSettingsManager.deleteAPIKey.mockResolvedValue();
 
@@ -502,7 +502,7 @@ describe('SettingsIPCHandlers', () => {
     /* Preconditions: Handler is registered, AIAgentSettingsManager.deleteAPIKey succeeds
        Action: Call handler with google provider
        Assertions: deleteAPIKey called with correct provider
-       Requirements: ui.10.11, ui.10.26 */
+       Requirements: settings.1.11, settings.1.26 */
     it('should delete API key for google provider', async () => {
       mockAIAgentSettingsManager.deleteAPIKey.mockResolvedValue();
 
@@ -516,7 +516,7 @@ describe('SettingsIPCHandlers', () => {
     /* Preconditions: Handler is registered, AIAgentSettingsManager.deleteAPIKey throws error
        Action: Call handler with provider
        Assertions: Error is caught, structured error response returned
-       Requirements: ui.10.11, ui.10.26 */
+       Requirements: settings.1.11, settings.1.26 */
     it('should handle delete errors and return structured response', async () => {
       const errorMessage = 'Database error';
       mockAIAgentSettingsManager.deleteAPIKey.mockRejectedValue(new Error(errorMessage));
@@ -533,7 +533,7 @@ describe('SettingsIPCHandlers', () => {
     /* Preconditions: Handler is registered, AIAgentSettingsManager.deleteAPIKey throws error
        Action: Call handler
        Assertions: Error is logged to console
-       Requirements: ui.10.11, ui.10.26 */
+       Requirements: settings.1.11, settings.1.26 */
     it('should log errors to console', async () => {
       const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
       const errorMessage = 'Database error';

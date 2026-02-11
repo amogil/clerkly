@@ -7,7 +7,7 @@
  * IMPORTANT: These tests use real Electron and show windows on screen.
  * They should ONLY be run when explicitly requested by the user.
  *
- * Requirements: ui.9.1, ui.9.2, ui.9.3, ui.9.4, ui.9.5, ui.9.6
+ * Requirements: token-management-ui.1.1, token-management-ui.1.2, token-management-ui.1.3, token-management-ui.1.4, token-management-ui.1.5, token-management-ui.1.6
  * Properties: 28, 29, 30, 31
  */
 
@@ -88,7 +88,7 @@ test.afterEach(async () => {
 /* Preconditions: Application running with authentication, access token expired
    Action: Trigger API request that requires token, wait for automatic refresh
    Assertions: Token automatically refreshed, user continues without interruption, no login screen shown
-   Requirements: ui.9.1, ui.9.2
+   Requirements: token-management-ui.1.1, token-management-ui.1.2
    Property: 28 */
 test('42.1 should automatically refresh expired access token', async () => {
   // Setup: Complete OAuth flow to authenticate
@@ -117,7 +117,7 @@ test('42.1 should automatically refresh expired access token', async () => {
 /* Preconditions: Application running with authentication, API returns HTTP 401
    Action: Trigger API request that returns 401
    Assertions: All tokens cleared, LoginError shown with 'invalid_grant', profile data persists in database
-   Requirements: ui.9.3
+   Requirements: token-management-ui.1.3
    Property: 29 */
 test('42.2 should clear session and show login on 401 error', async () => {
   // Setup: Complete OAuth flow to authenticate
@@ -149,7 +149,7 @@ test('42.2 should clear session and show login on 401 error', async () => {
 /* Preconditions: Application running with authentication, multiple API endpoints return 401
    Action: Trigger requests to UserInfo, Calendar, Tasks APIs that all return 401
    Assertions: Consistent handling across all APIs, tokens cleared once, LoginError shown once
-   Requirements: ui.9.3, ui.9.4
+   Requirements: token-management-ui.1.3, token-management-ui.1.4
    Properties: 29, 30 */
 test('42.3 should handle 401 from any API endpoint consistently', async () => {
   // Setup: Complete OAuth flow to authenticate
@@ -181,7 +181,7 @@ test('42.3 should handle 401 from any API endpoint consistently', async () => {
 /* Preconditions: Application running with console access, API returns 401
    Action: Trigger API request that returns 401
    Assertions: Error logged to console with context (URL, timestamp), user sees friendly message only
-   Requirements: ui.9.5, ui.9.6
+   Requirements: token-management-ui.1.5, token-management-ui.1.6
    Property: 31 */
 test('42.4 should log authorization errors with context', async () => {
   // Setup: Complete OAuth flow to authenticate
@@ -216,7 +216,7 @@ test('42.4 should log authorization errors with context', async () => {
 /* Preconditions: Application running with authentication, API returns 401
    Action: Trigger API request that returns 401
    Assertions: LoginError shown with user-friendly English message, no technical details
-   Requirements: ui.9.6
+   Requirements: token-management-ui.1.6
    Property: 31 */
 test('42.5 should show user-friendly error message on session expiry', async () => {
   // Setup: Complete OAuth flow to authenticate
@@ -254,7 +254,7 @@ test('42.5 should show user-friendly error message on session expiry', async () 
 /* Preconditions: Application running with authentication, multiple APIs return 401 simultaneously
    Action: Trigger multiple simultaneous API requests that all return 401
    Assertions: clearTokens() called once, LoginError shown once, no race conditions
-   Requirements: ui.9.4
+   Requirements: token-management-ui.1.4
    Property: 30 */
 test('42.6 should handle multiple simultaneous 401 errors', async () => {
   // Setup: Complete OAuth flow to authenticate

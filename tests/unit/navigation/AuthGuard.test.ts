@@ -1,7 +1,7 @@
 /* Preconditions: AuthGuard created with mocked NavigationManager
    Action: call canActivate() with various routes
    Assertions: correct access control based on auth status and route type
-   Requirements: ui.8.2 */
+   Requirements: navigation.1.2 */
 
 import { AuthGuard } from '../../../src/renderer/navigation/AuthGuard';
 import { NavigationManager } from '../../../src/renderer/navigation/NavigationManager';
@@ -29,7 +29,7 @@ describe('AuthGuard', () => {
     /* Preconditions: public route '/login'
        Action: call canActivate('/login')
        Assertions: returns true without checking auth
-       Requirements: ui.8.1 */
+       Requirements: navigation.1.1 */
     it('should allow access to public routes without auth check', async () => {
       const result = await authGuard.canActivate('/login');
 
@@ -41,7 +41,7 @@ describe('AuthGuard', () => {
     /* Preconditions: protected route '/dashboard', user not authorized
        Action: call canActivate('/dashboard')
        Assertions: returns false, redirects to login
-       Requirements: ui.8.2 */
+       Requirements: navigation.1.2 */
     it('should block access to protected routes when not authorized', async () => {
       mockNavigationManager.checkAuthStatus.mockResolvedValue(false);
       const consoleInfoSpy = jest.spyOn(console, 'info').mockImplementation();
@@ -61,7 +61,7 @@ describe('AuthGuard', () => {
     /* Preconditions: protected route '/dashboard', user authorized
        Action: call canActivate('/dashboard')
        Assertions: returns true, no redirect
-       Requirements: ui.8.2 */
+       Requirements: navigation.1.2 */
     it('should allow access to protected routes when authorized', async () => {
       mockNavigationManager.checkAuthStatus.mockResolvedValue(true);
 
@@ -75,7 +75,7 @@ describe('AuthGuard', () => {
     /* Preconditions: various protected routes
        Action: call canActivate() for each route
        Assertions: all protected routes are correctly identified
-       Requirements: ui.8.2 */
+       Requirements: navigation.1.2 */
     it('should correctly identify all protected routes', async () => {
       mockNavigationManager.checkAuthStatus.mockResolvedValue(true);
 
@@ -92,7 +92,7 @@ describe('AuthGuard', () => {
     /* Preconditions: route with protected prefix
        Action: call canActivate('/dashboard/sub-route')
        Assertions: treated as protected route
-       Requirements: ui.8.2 */
+       Requirements: navigation.1.2 */
     it('should treat routes starting with protected prefix as protected', async () => {
       mockNavigationManager.checkAuthStatus.mockResolvedValue(false);
 
@@ -106,7 +106,7 @@ describe('AuthGuard', () => {
     /* Preconditions: non-protected route
        Action: call canActivate('/unknown')
        Assertions: treated as public route
-       Requirements: ui.8.1 */
+       Requirements: navigation.1.1 */
     it('should treat unknown routes as public', async () => {
       const result = await authGuard.canActivate('/unknown');
 

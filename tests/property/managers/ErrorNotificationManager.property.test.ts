@@ -1,4 +1,4 @@
-// Requirements: ui.7.1, ui.7.2, ui.7.3
+// Requirements: error-notifications.1.1, error-notifications.1.2, error-notifications.1.3
 import fc from 'fast-check';
 import { ErrorNotificationManager } from '../../../src/renderer/managers/ErrorNotificationManager';
 import type { ErrorNotification } from '../../../src/renderer/types/error-notification';
@@ -8,7 +8,7 @@ describe('ErrorNotificationManager Property Tests', () => {
      Preconditions: ErrorNotificationManager instance, various error messages and contexts
      Action: call showNotification() with generated message and context
      Assertions: notification created and added to active notifications
-     Requirements: ui.7.1 */
+     Requirements: error-notifications.1.1 */
   it('should show notification for any error in background process', () => {
     fc.assert(
       fc.property(
@@ -43,7 +43,7 @@ describe('ErrorNotificationManager Property Tests', () => {
      Preconditions: ErrorNotificationManager instance, various messages and contexts
      Action: create notification with message and context
      Assertions: notification contains both message AND context
-     Requirements: ui.7.2 */
+     Requirements: error-notifications.1.2 */
   it('should include both message and context in notification', () => {
     fc.assert(
       fc.property(
@@ -76,7 +76,7 @@ describe('ErrorNotificationManager Property Tests', () => {
      Preconditions: ErrorNotificationManager with notification, time passes
      Action: show notification, advance time by 15 seconds
      Assertions: notification automatically dismissed after 15 seconds OR on user click
-     Requirements: ui.7.3 */
+     Requirements: error-notifications.1.3 */
   it('should auto-dismiss notification after 15 seconds', () => {
     jest.useFakeTimers();
 
@@ -114,7 +114,7 @@ describe('ErrorNotificationManager Property Tests', () => {
      Preconditions: ErrorNotificationManager with notification
      Action: show notification, manually dismiss
      Assertions: notification dismissed immediately on user action
-     Requirements: ui.7.3 */
+     Requirements: error-notifications.1.3 */
   it('should dismiss notification on user click', () => {
     fc.assert(
       fc.property(
@@ -147,7 +147,7 @@ describe('ErrorNotificationManager Property Tests', () => {
      Preconditions: ErrorNotificationManager instance
      Action: show multiple notifications with various messages and contexts
      Assertions: all notifications tracked, each has unique id, all auto-dismiss
-     Requirements: ui.7.1, ui.7.2, ui.7.3 */
+     Requirements: error-notifications.1.1, error-notifications.1.2, error-notifications.1.3 */
   it('should manage multiple notifications independently', () => {
     jest.useFakeTimers();
 
@@ -202,7 +202,7 @@ describe('ErrorNotificationManager Property Tests', () => {
      Preconditions: ErrorNotificationManager instance
      Action: show many notifications rapidly
      Assertions: all notification IDs are unique
-     Requirements: ui.7.1 */
+     Requirements: error-notifications.1.1 */
   it('should generate unique IDs for all notifications', () => {
     fc.assert(
       fc.property(
@@ -241,7 +241,7 @@ describe('ErrorNotificationManager Property Tests', () => {
      Preconditions: ErrorNotificationManager instance
      Action: show notification
      Assertions: timestamp is accurate (within reasonable bounds)
-     Requirements: ui.7.2 */
+     Requirements: error-notifications.1.2 */
   it('should set accurate timestamp for notifications', () => {
     fc.assert(
       fc.property(

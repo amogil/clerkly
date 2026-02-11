@@ -1,4 +1,4 @@
-// Requirements: clerkly.1, google-oauth-auth.12.1, google-oauth-auth.12.2, ui.8.1, ui.8.2, ui.8.3, ui.8.4, ui.7.1
+// Requirements: clerkly.1, google-oauth-auth.12.1, google-oauth-auth.12.2, navigation.1.1, navigation.1.2, navigation.1.3, navigation.1.4, error-notifications.1.1
 import React, { useState, useEffect, useMemo } from 'react';
 import { Toaster } from 'sonner';
 import { ErrorBoundary } from './components/ErrorBoundary';
@@ -22,7 +22,7 @@ import { Logger } from './Logger';
 // Requirements: clerkly.3.5, clerkly.3.7
 const logger = Logger.create('App');
 
-// Requirements: clerkly.1, google-oauth-auth.12.1, google-oauth-auth.12.2, ui.8.1, ui.8.3, ui.8.4, ui.7.1
+// Requirements: clerkly.1, google-oauth-auth.12.1, google-oauth-auth.12.2, navigation.1.1, navigation.1.3, navigation.1.4, error-notifications.1.1
 export default function App() {
   return (
     <ErrorProvider>
@@ -38,16 +38,16 @@ function AppContent() {
   // Requirements: google-oauth-auth.12.1, google-oauth-auth.12.2
   const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null);
   const [authError, setAuthError] = useState<{ message: string; code?: string } | null>(null);
-  // Requirements: ui.6.4 - State for synchronous profile loading during authorization
+  // Requirements: account-profile.1.4 - State for synchronous profile loading during authorization
   const [isLoadingProfile, setIsLoadingProfile] = useState<boolean>(false);
 
   const [currentScreen, setCurrentScreen] = useState<string>('dashboard');
   const [selectedMeetingId, setSelectedMeetingId] = useState<string | null>(null);
 
-  // Requirements: ui.7.1 - Use new error notification system
+  // Requirements: error-notifications.1.1 - Use new error notification system
   const { showError } = useError();
 
-  // Requirements: ui.8.1, ui.8.2, ui.8.3, ui.8.4
+  // Requirements: navigation.1.1, navigation.1.2, navigation.1.3, navigation.1.4
   // Create router, navigation manager, and auth guard
   const router = useMemo(() => {
     return new SimpleRouter(currentScreen, (route: string) => {
@@ -72,7 +72,7 @@ function AppContent() {
     return new NavigationManager(router);
   }, [router]);
 
-  // Requirements: ui.8.2 - Create AuthGuard to protect routes
+  // Requirements: navigation.1.2 - Create AuthGuard to protect routes
   const authGuard = useMemo(() => {
     return new AuthGuard(navigationManager);
   }, [navigationManager]);
@@ -93,7 +93,7 @@ function AppContent() {
     router.updateCurrentRoute(route);
   }, [currentScreen, router]);
 
-  // Requirements: ui.8.2 - Protected navigation function that checks access via AuthGuard
+  // Requirements: navigation.1.2 - Protected navigation function that checks access via AuthGuard
   const navigateToScreen = async (screen: string) => {
     // Map screen names to routes
     const routeMap: Record<string, string> = {
@@ -118,7 +118,7 @@ function AppContent() {
     // If canAccess === false, AuthGuard already redirected to login
   };
 
-  // Requirements: google-oauth-auth.12.1, google-oauth-auth.12.2, ui.8.1, ui.8.3
+  // Requirements: google-oauth-auth.12.1, google-oauth-auth.12.2, navigation.1.1, navigation.1.3
   // Check authentication status on mount and initialize navigation
   useEffect(() => {
     const checkAuthStatus = async () => {
@@ -126,7 +126,7 @@ function AppContent() {
         const status = await window.api.auth.getStatus();
         setIsAuthorized(status.authorized);
 
-        // Requirements: ui.8.1, ui.8.3 - Initialize navigation after auth check
+        // Requirements: navigation.1.1, navigation.1.3 - Initialize navigation after auth check
         await navigationManager.initialize();
       } catch (error) {
         logger.error(`Failed to check auth status: ${error}`);
@@ -136,27 +136,27 @@ function AppContent() {
 
     checkAuthStatus();
 
-    // Requirements: google-oauth-auth.8.4, ui.8.3, ui.6.4
+    // Requirements: google-oauth-auth.8.4, navigation.1.3, account-profile.1.4
     // Listen for auth success events and redirect to dashboard
     const unsubscribeAuthSuccess = window.api.auth.onAuthSuccess(() => {
       logger.info('Auth success event received');
-      // Requirements: ui.6.4 - Show loader during synchronous profile fetch
+      // Requirements: account-profile.1.4 - Show loader during synchronous profile fetch
       // The profile is fetched synchronously in Main Process before this event is emitted
       // So by the time we receive this event, the profile is already loaded
       setIsLoadingProfile(false);
       setIsAuthorized(true);
       setAuthError(null);
-      // Requirements: ui.8.3 - Redirect to dashboard after successful authentication
+      // Requirements: navigation.1.3 - Redirect to dashboard after successful authentication
       navigationManager.redirectToDashboard();
     });
 
-    // Requirements: google-oauth-auth.8.4, ui.6.4
+    // Requirements: google-oauth-auth.8.4, account-profile.1.4
     // Listen for auth error events
     const unsubscribeAuthError = window.api.auth.onAuthError(
       (error: string, errorCode?: string) => {
         logger.error(`Auth error event received: ${JSON.stringify({ error, errorCode })}`);
         logger.info('Setting authError state and isAuthorized=false');
-        // Requirements: ui.6.4 - Hide loader on error
+        // Requirements: account-profile.1.4 - Hide loader on error
         setIsLoadingProfile(false);
         setAuthError({ message: error, code: errorCode });
         setIsAuthorized(false);
@@ -164,17 +164,17 @@ function AppContent() {
       }
     );
 
-    // Requirements: ui.6.8, ui.8.4
+    // Requirements: account-profile.1.8, navigation.1.4
     // Listen for logout events and redirect to login
     const unsubscribeLogout = window.api.auth.onLogout(() => {
       logger.info('Logout event received');
       setIsAuthorized(false);
       setAuthError(null);
-      // Requirements: ui.8.4 - Redirect to login after logout
+      // Requirements: navigation.1.4 - Redirect to login after logout
       navigationManager.redirectToLogin();
     });
 
-    // Requirements: ui.7.1 - Listen for error notification events from Main Process
+    // Requirements: error-notifications.1.1 - Listen for error notification events from Main Process
     const unsubscribeErrorNotify = window.api.error.onNotify((message: string, context: string) => {
       logger.info(`Error notification received: ${JSON.stringify({ message, context })}`);
       showError(`${context}: ${message}`);
@@ -223,7 +223,7 @@ function AppContent() {
     navigateToScreen('tasks');
   };
 
-  // Requirements: clerkly.1, google-oauth-auth.12.3, ui.6.4, google-oauth-auth.15.1, google-oauth-auth.15.7
+  // Requirements: clerkly.1, google-oauth-auth.12.3, account-profile.1.4, google-oauth-auth.15.1, google-oauth-auth.15.7
   const handleLogin = async () => {
     try {
       // Requirements: google-oauth-auth.15.7 - Don't clear error immediately on retry
@@ -292,7 +292,7 @@ function AppContent() {
     );
   }
 
-  // Requirements: google-oauth-auth.12.5, ui.6.4
+  // Requirements: google-oauth-auth.12.5, account-profile.1.4
   // Show error screen if authentication failed (including profile fetch failure)
   if (authError) {
     return (
