@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Toaster } from 'sonner';
 import { ErrorBoundary } from './components/ErrorBoundary';
-import { ErrorProvider, useError } from './contexts/error-context';
+import { ErrorProvider } from './contexts/error-context';
 import { TopNavigation } from './components/top-navigation';
 import { AIAgentPanel } from './components/ai-agent-panel';
 import { DashboardUpdated } from './components/dashboard-updated';
@@ -18,9 +18,14 @@ import { LoginError } from './components/auth/LoginError';
 import { parseCommand } from './utils/command-parser';
 import { SimpleRouter, NavigationManager, AuthGuard } from './navigation';
 import { Logger } from './Logger';
+import { ErrorNotificationManager } from './managers/ErrorNotificationManager';
+import { NotificationUI } from './components/NotificationUI';
 
 // Requirements: clerkly.3.5, clerkly.3.7
 const logger = Logger.create('App');
+
+// Requirements: error-notifications.1.1 - Create ErrorNotificationManager instance
+const errorNotificationManager = new ErrorNotificationManager();
 
 // Requirements: clerkly.1, google-oauth-auth.12.1, google-oauth-auth.12.2, navigation.1.1, navigation.1.3, navigation.1.4, error-notifications.1.1
 export default function App() {
@@ -28,6 +33,8 @@ export default function App() {
     <ErrorProvider>
       <ErrorBoundary>
         <Toaster position="top-right" richColors closeButton duration={15000} />
+        {/* Requirements: error-notifications.1.1 - Add NotificationUI component */}
+        <NotificationUI manager={errorNotificationManager} />
         <AppContent />
       </ErrorBoundary>
     </ErrorProvider>
@@ -43,9 +50,6 @@ function AppContent() {
 
   const [currentScreen, setCurrentScreen] = useState<string>('dashboard');
   const [selectedMeetingId, setSelectedMeetingId] = useState<string | null>(null);
-
-  // Requirements: error-notifications.1.1 - Use new error notification system
-  const { showError } = useError();
 
   // Requirements: navigation.1.1, navigation.1.2, navigation.1.3, navigation.1.4
   // Create router, navigation manager, and auth guard
@@ -177,7 +181,8 @@ function AppContent() {
     // Requirements: error-notifications.1.1 - Listen for error notification events from Main Process
     const unsubscribeErrorNotify = window.api.error.onNotify((message: string, context: string) => {
       logger.info(`Error notification received: ${JSON.stringify({ message, context })}`);
-      showError(`${context}: ${message}`);
+      // Requirements: error-notifications.1.1 - Show notification using ErrorNotificationManager
+      errorNotificationManager.showNotification(message, context);
     });
 
     // Requirements: google-oauth-auth.7.1 - Listen for loader show/hide events
@@ -199,7 +204,7 @@ function AppContent() {
       unsubscribeShowLoader();
       unsubscribeHideLoader();
     };
-  }, [navigationManager, showError]);
+  }, [navigationManager]);
 
   // Requirements: clerkly.1
   const handleNavigateToMeeting = (meetingId: string) => {

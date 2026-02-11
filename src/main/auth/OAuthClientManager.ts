@@ -161,6 +161,8 @@ export class OAuthClientManager {
       // Open system browser with authorization URL
       await shell.openExternal(authUrl.toString());
     } catch (error: unknown) {
+      // Requirements: error-notifications.1.1, error-notifications.1.4
+      handleBackgroundError(error, 'OAuth Flow');
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new Error(`Failed to start auth flow: ${errorMessage}`);
     }
@@ -278,6 +280,9 @@ export class OAuthClientManager {
         authorized: true,
       };
     } catch (error: unknown) {
+      // Requirements: error-notifications.1.1, error-notifications.1.4
+      handleBackgroundError(error, 'OAuth Flow');
+
       // Requirements: google-oauth-auth.7.1 - Hide loader on error
       if (this.authWindowManager) {
         this.authWindowManager.onHideLoader();
@@ -400,10 +405,14 @@ export class OAuthClientManager {
       const tokenResponse = (await response.json()) as TokenResponse;
       return tokenResponse;
     } catch (error: unknown) {
+      // Requirements: error-notifications.1.1, error-notifications.1.4
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       if (errorMessage && errorMessage.includes('fetch')) {
-        throw new Error('network_error');
+        const networkError = new Error('network_error');
+        handleBackgroundError(networkError, 'Token Exchange');
+        throw networkError;
       }
+      handleBackgroundError(error, 'Token Exchange');
       throw error;
     }
   }
@@ -560,6 +569,11 @@ export class OAuthClientManager {
       // Requirements: navigation.1.4, Architectural Principles
       Logger.info('OAuthClientManager', 'Tokens cleared, profile data preserved in database');
     } catch (error: unknown) {
+      // Requirements: error-notifications.1.1, error-notifications.1.4
+      // Note: Logout errors may include race conditions (e.g., "No user logged in")
+      // These will be filtered by shouldFilterError() in handleBackgroundError
+      handleBackgroundError(error, 'Logout');
+
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       // Ensure tokens are deleted even if there's an error
       await this.tokenStorage.deleteTokens();

@@ -183,14 +183,8 @@ export class UserProfileManager {
       Logger.info('UserProfileManager', 'Returning cached profile due to API error');
       const cachedProfile = await this.loadProfile();
 
-      // Requirements: error-notifications.1.1 - Notify user about the error
-      if (cachedProfile) {
-        // Graceful degradation: show warning that using cached data
-        handleBackgroundError(error, 'Profile Fetch (using cached data)');
-      } else {
-        // Critical error: no cached data available
-        handleBackgroundError(error, 'Profile Fetch (no cached data available)');
-      }
+      // Requirements: error-notifications.1.1, error-notifications.1.4 - Notify user about the error
+      handleBackgroundError(error, 'Profile Loading');
 
       return cachedProfile;
     }

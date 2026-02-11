@@ -163,7 +163,10 @@ export class WindowStateManager {
         }
       }
     } catch (error) {
+      // Requirements: error-notifications.1.4 - Log error
       this.logger.error(`Failed to load window state: ${error}`);
+      // Note: Not using handleBackgroundError here as window state loading failure
+      // is not critical - we fall back to default state gracefully
     } finally {
       // Restore original email
       if (this.userProfileManager) {
@@ -244,7 +247,10 @@ export class WindowStateManager {
       const stateJson = JSON.stringify(state);
       this.dataManager.saveData(this.stateKey, stateJson);
     } catch (error) {
+      // Requirements: error-notifications.1.4 - Log error
       this.logger.error(`Failed to save window state: ${error}`);
+      // Note: Not using handleBackgroundError here as window state saving failure
+      // is not critical - user can continue working normally
     } finally {
       // Restore original email
       if (this.userProfileManager) {
