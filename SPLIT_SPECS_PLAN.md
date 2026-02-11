@@ -159,8 +159,8 @@
 - [x] Коммит: "feat: create navigation design"
 
 ### 2.3 Создать account-profile/design.md
-- [ ] Извлечь соответствующие секции из `ui/design.md`
-- [ ] Создать `account-profile/design.md` с:
+- [x] Извлечь соответствующие секции из `ui/design.md`
+- [x] Создать `account-profile/design.md` с:
   - Обзор
   - Архитектура (Account компонент)
   - Компоненты и интерфейсы
@@ -168,11 +168,11 @@
   - Свойства корректности (Properties 15-20)
   - Стратегия тестирования
   - Таблица покрытия требований
-- [ ] Коммит: "feat: create account-profile design"
+- [x] Коммит: "feat: create account-profile design"
 
 ### 2.4 Создать error-notifications/design.md
-- [ ] Извлечь соответствующие секции из `ui/design.md`
-- [ ] Создать `error-notifications/design.md` с:
+- [x] Извлечь соответствующие секции из `ui/design.md`
+- [x] Создать `error-notifications/design.md` с:
   - Обзор
   - Архитектура (ErrorNotification компонент)
   - Компоненты и интерфейсы
@@ -180,7 +180,7 @@
   - Свойства корректности (Properties 25-28)
   - Стратегия тестирования
   - Таблица покрытия требований
-- [ ] Коммит: "feat: create error-notifications design"
+- [x] Коммит: "feat: create error-notifications design"
 
 ### 2.5 Создать token-management-ui/design.md
 - [ ] Извлечь соответствующие секции из `ui/design.md`
@@ -412,14 +412,14 @@
 ## Прогресс
 
 **Этап 1:** ✅ 8/8 задач
-**Этап 2:** ⬜ 2/7 задач
+**Этап 2:** ⬜ 4/7 задач
 **Этап 3:** ⬜ 0/7 задач
 **Этап 4:** ⬜ 0/6 задач
 **Этап 5:** ⬜ 0/2 задач
 **Этап 6:** ⬜ 0/2 задач
 **Этап 7:** ⬜ 0/5 задач
 
-**Общий прогресс:** 10/37 задач (27%)
+**Общий прогресс:** 12/37 задач (32%)
 
 ---
 
