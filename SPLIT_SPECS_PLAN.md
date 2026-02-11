@@ -37,7 +37,6 @@
 - [x] Добавить секцию "Архитектурные Принципы"
 - [x] Добавить "Принцип Единого Источника Истины (Single Source of Truth)"
 - [x] Указать применение принципа ко всем спецификациям
-- [x] Коммит: включено в общий коммит Этапа 1
 
 ### 1.1 Создать window-management/requirements.md
 - [x] Создать директорию `.kiro/specs/window-management/`
@@ -49,7 +48,6 @@
   - Требования window-management.1-5 (переименованные из ui.1-5)
   - Функциональные тесты
   - Вне области применения
-- [x] Коммит: "feat: create window-management requirements"
 
 ### 1.2 Создать navigation/requirements.md
 - [x] Создать директорию `.kiro/specs/navigation/`
@@ -63,7 +61,6 @@
   - Функциональные тесты
   - Вне области применения
 - [x] Исправлено: убран "Принцип Управления Токенами" (он относится к google-oauth-auth)
-- [x] Коммит: "feat: create navigation requirements"
 
 ### 1.3 Создать account-profile/requirements.md
 - [x] Создать директорию `.kiro/specs/account-profile/`
@@ -76,7 +73,6 @@
   - Зависимости на google-oauth-auth
   - Функциональные тесты
   - Вне области применения
-- [x] Коммит: "feat: create account-profile requirements"
 
 ### 1.4 Создать error-notifications/requirements.md
 - [x] Создать директорию `.kiro/specs/error-notifications/`
@@ -88,7 +84,6 @@
   - Зависимости на clerkly.3 (Logger)
   - Функциональные тесты
   - Вне области применения
-- [x] Коммит: "feat: create error-notifications requirements"
 
 ### 1.5 Создать token-management-ui/requirements.md
 - [x] Создать директорию `.kiro/specs/token-management-ui/`
@@ -102,7 +97,6 @@
   - Функциональные тесты
   - Вне области применения
 - [x] Исправлено: убран "Архитектурный Принцип Управления Токенами" (он относится к google-oauth-auth)
-- [x] Коммит: "feat: create token-management-ui requirements"
 
 ### 1.6 Создать settings/requirements.md
 - [x] Создать директорию `.kiro/specs/settings/`
@@ -115,7 +109,6 @@
   - Зависимости на user-data-isolation
   - Функциональные тесты
   - Вне области применения
-- [x] Коммит: "feat: create settings requirements"
 
 ### 1.7 Создать user-data-isolation/requirements.md
 - [x] Создать директорию `.kiro/specs/user-data-isolation/`
@@ -128,7 +121,9 @@
   - Зависимости на google-oauth-auth
   - Функциональные тесты
   - Вне области применения
-- [x] Коммит: "feat: create user-data-isolation requirements"
+
+### 1.8 Создать коммит для Этапа 1
+- [x] Коммит: "feat: create requirements for split UI specifications (Этап 1)"
 
 ---
 
@@ -144,7 +139,6 @@
   - Свойства корректности (Properties 1-7)
   - Стратегия тестирования
   - Таблица покрытия требований
-- [x] Коммит: "feat: create window-management design"
 
 ### 2.2 Создать navigation/design.md
 - [x] Извлечь соответствующие секции из `ui/design.md`
@@ -156,7 +150,6 @@
   - Свойства корректности (Properties 29-33)
   - Стратегия тестирования
   - Таблица покрытия требований
-- [x] Коммит: "feat: create navigation design"
 
 ### 2.3 Создать account-profile/design.md
 - [x] Извлечь соответствующие секции из `ui/design.md`
@@ -168,7 +161,6 @@
   - Свойства корректности (Properties 15-20)
   - Стратегия тестирования
   - Таблица покрытия требований
-- [x] Коммит: "feat: create account-profile design"
 
 ### 2.4 Создать error-notifications/design.md
 - [x] Извлечь соответствующие секции из `ui/design.md`
@@ -180,7 +172,6 @@
   - Свойства корректности (Properties 25-28)
   - Стратегия тестирования
   - Таблица покрытия требований
-- [x] Коммит: "feat: create error-notifications design"
 
 ### 2.5 Создать token-management-ui/design.md
 - [x] Извлечь соответствующие секции из `ui/design.md`
@@ -192,7 +183,6 @@
   - Свойства корректности (Properties 22-24)
   - Стратегия тестирования
   - Таблица покрытия требований
-- [x] Коммит: "feat: create token-management-ui design"
 
 ### 2.6 Создать settings/design.md
 - [x] Извлечь соответствующие секции из `ui/design.md`
@@ -204,7 +194,6 @@
   - Свойства корректности
   - Стратегия тестирования
   - Таблица покрытия требований
-- [x] Коммит: "feat: create settings design"
 
 ### 2.7 Создать user-data-isolation/design.md
 - [ ] Извлечь соответствующие секции из `ui/design.md`
@@ -216,7 +205,9 @@
   - Свойства корректности
   - Стратегия тестирования
   - Таблица покрытия требований
-- [ ] Коммит: "feat: create user-data-isolation design"
+
+### 2.8 Создать коммит для Этапа 2
+- [ ] Коммит: "feat: create design documents for split UI specifications (Этап 2)"
 
 ---
 
@@ -228,7 +219,6 @@
   - WindowManager расширение
   - WindowStateManager реализация
   - Тесты (модульные, property-based, функциональные)
-- [ ] Коммит: "feat: create window-management tasks"
 
 ### 3.2 Создать navigation/tasks.md
 - [ ] Извлечь соответствующие задачи из `ui/tasks.md`
@@ -236,7 +226,6 @@
   - Router реализация
   - AuthGuard реализация
   - Тесты
-- [ ] Коммит: "feat: create navigation tasks"
 
 ### 3.3 Создать account-profile/tasks.md
 - [ ] Извлечь соответствующие задачи из `ui/tasks.md`
@@ -244,7 +233,6 @@
   - Account компонент
   - Интеграция с UserProfileManager
   - Тесты
-- [ ] Коммит: "feat: create account-profile tasks"
 
 ### 3.4 Создать error-notifications/tasks.md
 - [ ] Извлечь соответствующие задачи из `ui/tasks.md`
@@ -252,7 +240,6 @@
   - ErrorNotification компонент
   - IPC события для ошибок
   - Тесты
-- [ ] Коммит: "feat: create error-notifications tasks"
 
 ### 3.5 Создать token-management-ui/tasks.md
 - [ ] Извлечь соответствующие задачи из `ui/tasks.md`
@@ -260,7 +247,6 @@
   - Автоматический refresh токенов
   - Обработка 401 ошибок
   - Тесты
-- [ ] Коммит: "feat: create token-management-ui tasks"
 
 ### 3.6 Создать settings/tasks.md
 - [ ] Извлечь соответствующие задачи из `ui/tasks.md`
@@ -269,7 +255,6 @@
   - AIAgentSettings
   - DateTimeFormatter
   - Тесты
-- [ ] Коммит: "feat: create settings tasks"
 
 ### 3.7 Создать user-data-isolation/tasks.md
 - [ ] Извлечь соответствующие задачи из `ui/tasks.md`
@@ -278,7 +263,9 @@
   - UserProfileManager обновление
   - Миграция БД
   - Тесты
-- [ ] Коммит: "feat: create user-data-isolation tasks"
+
+### 3.8 Создать коммит для Этапа 3
+- [ ] Коммит: "feat: create task lists for split UI specifications (Этап 3)"
 
 ---
 
@@ -306,17 +293,14 @@
   - ui.8 → navigation.1
 - [ ] Обновить `src/renderer/components/settings/*`:
   - ui.10, ui.11 → settings.1, settings.2
-- [ ] Коммит: "refactor: update requirement references in src/"
 
 ### 4.3 Обновить ссылки в tests/unit/
 - [ ] Найти все тесты со ссылками на ui
 - [ ] Обновить комментарии Requirements в тестах
-- [ ] Коммит: "refactor: update requirement references in tests/unit/"
 
 ### 4.4 Обновить ссылки в tests/property/
 - [ ] Найти все property-based тесты со ссылками на ui
 - [ ] Обновить комментарии Requirements в тестах
-- [ ] Коммит: "refactor: update requirement references in tests/property/"
 
 ### 4.5 Обновить ссылки в tests/functional/
 - [ ] Обновить `tests/functional/window-state-persistence.spec.ts`:
@@ -335,7 +319,6 @@
   - ui.11 → settings.2
 - [ ] Обновить `tests/functional/user-data-isolation.spec.ts`:
   - ui.12 → user-data-isolation.1
-- [ ] Коммит: "refactor: update requirement references in tests/functional/"
 
 ### 4.6 Обновить ссылки в других спецификациях
 - [ ] Проверить `google-oauth-auth/requirements.md` на ссылки на ui
@@ -343,7 +326,9 @@
 - [ ] Проверить `clerkly/requirements.md` на ссылки на ui
 - [ ] Проверить `clerkly/design.md` на ссылки на ui
 - [ ] Обновить все найденные ссылки
-- [ ] Коммит: "refactor: update ui references in other specs"
+
+### 4.7 Создать коммит для Этапа 4
+- [ ] Коммит: "refactor: update requirement references from ui.X to new spec IDs (Этап 4)"
 
 ---
 
@@ -352,11 +337,12 @@
 ### 5.1 Создать архивную копию
 - [ ] Создать директорию `.kiro/specs/_archive/`
 - [ ] Переместить `ui/` в `.kiro/specs/_archive/ui/`
-- [ ] Коммит: "chore: archive old ui specification"
 
 ### 5.2 Удалить архивную копию (опционально)
 - [ ] Удалить `.kiro/specs/_archive/ui/` если не нужна
-- [ ] Коммит: "chore: remove archived ui specification"
+
+### 5.3 Создать коммит для Этапа 5
+- [ ] Коммит: "chore: archive old ui specification (Этап 5)"
 
 ---
 
@@ -367,7 +353,6 @@
 - [ ] Вынести детали тестирования в testing-infrastructure
 - [ ] Оставить только высокоуровневую архитектуру
 - [ ] Цель: < 1000 строк
-- [ ] Коммит: "refactor: optimize clerkly design document"
 
 ### 6.2 Оптимизировать google-oauth-auth/design.md (1323 строки)
 - [ ] Проанализировать возможность разбиения на:
@@ -376,7 +361,9 @@
 - [ ] Если разбиение целесообразно - создать новые спецификации
 - [ ] Если нет - оптимизировать текущую
 - [ ] Цель: < 1000 строк на документ
-- [ ] Коммит: "refactor: optimize google-oauth-auth design"
+
+### 6.3 Создать коммит для Этапа 6
+- [ ] Коммит: "refactor: optimize large specification documents (Этап 6)"
 
 ---
 
@@ -401,9 +388,8 @@
 
 ### 7.4 Обновить README.md
 - [ ] Обновить секцию "Документация" с новыми спецификациями
-- [ ] Коммит: "docs: update README with new spec structure"
 
-### 7.5 Финальный коммит
+### 7.5 Создать коммит для Этапа 7
 - [ ] Коммит: "feat: complete spec splitting - closes #9"
 - [ ] Push в remote: `git push origin feature/9-split-large-specs`
 
@@ -411,22 +397,22 @@
 
 ## Прогресс
 
-**Этап 1:** ✅ 8/8 задач
-**Этап 2:** ⬜ 6/7 задач
-**Этап 3:** ⬜ 0/7 задач
-**Этап 4:** ⬜ 0/6 задач
-**Этап 5:** ⬜ 0/2 задач
-**Этап 6:** ⬜ 0/2 задач
+**Этап 1:** ✅ 9/9 задач
+**Этап 2:** ⬜ 7/8 задач
+**Этап 3:** ⬜ 0/8 задач
+**Этап 4:** ⬜ 0/7 задач
+**Этап 5:** ⬜ 0/3 задач
+**Этап 6:** ⬜ 0/3 задач
 **Этап 7:** ⬜ 0/5 задач
 
-**Общий прогресс:** 14/37 задач (38%)
+**Общий прогресс:** 9/43 задач (21%)
 
 ---
 
 ## Примечания
 
 - Каждый этап требует подтверждения пользователя перед началом
-- После каждого подэтапа делается коммит
+- Коммит создается по завершению каждого этапа (не после каждой задачи)
 - Все ссылки на требования должны быть обновлены
 - Валидация должна проходить без ошибок
 - Функциональные тесты запускаются только с явного разрешения пользователя
