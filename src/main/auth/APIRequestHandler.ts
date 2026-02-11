@@ -1,9 +1,10 @@
-// Requirements: token-management-ui.1.1, token-management-ui.1.2, token-management-ui.1.3, token-management-ui.1.4, token-management-ui.1.5, token-management-ui.1.6
+// Requirements: token-management-ui.1.1, token-management-ui.1.2, token-management-ui.1.3, token-management-ui.1.4, token-management-ui.1.5, token-management-ui.1.6, error-notifications.1.1, error-notifications.1.4
 
 import { TokenStorageManager } from './TokenStorageManager';
 import { BrowserWindow } from 'electron';
 import { DateTimeFormatter } from '../utils/DateTimeFormatter';
 import { Logger } from '../Logger';
+import { handleBackgroundError } from '../ErrorHandler';
 
 // Requirements: clerkly.3.5, clerkly.3.7 - Create parameterized logger for APIRequestHandler module
 const logger = Logger.create('APIRequestHandler');
@@ -142,17 +143,20 @@ export async function handleAPIRequest(
         }
       }
 
-      // Requirements: token-management-ui.1.3 - Throw error to inform caller
-      throw new Error('Authorization failed: Session expired (HTTP 401)');
+      // Requirements: token-management-ui.1.3, token-management-ui.1.6 - Throw error with user-friendly message
+      throw new Error('Your session has expired. Please sign in again.');
     }
 
     return response;
   } catch (error) {
-    // Requirements: token-management-ui.1.5 - Log all errors with context
+    // Requirements: token-management-ui.1.5, error-notifications.1.1, error-notifications.1.4 - Log all errors with context and notify user
     const logContext = context || 'API Request';
     logger.error(
       `Request failed for ${logContext}: ${error instanceof Error ? error.message : String(error)}`
     );
+
+    // Requirements: error-notifications.1.1, error-notifications.1.4 - Notify user about API request failures
+    handleBackgroundError(error, logContext);
 
     // Re-throw the error for caller to handle
     throw error;

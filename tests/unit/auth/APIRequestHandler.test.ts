@@ -84,8 +84,8 @@ describe('APIRequestHandler', () => {
 
   /* Preconditions: fetch returns HTTP 401
      Action: call handleAPIRequest
-     Assertions: clearTokens called, auth:error event emitted, error thrown
-     Requirements: token-management-ui.1.3, token-management-ui.1.4 */
+     Assertions: clearTokens called, auth:error event emitted, error thrown with user-friendly message
+     Requirements: token-management-ui.1.3, token-management-ui.1.4, token-management-ui.1.6 */
   it('should clear tokens and emit error on HTTP 401', async () => {
     const mockResponse = new Response(null, { status: 401 });
     mockFetch.mockResolvedValue(mockResponse);
@@ -97,7 +97,7 @@ describe('APIRequestHandler', () => {
         mockTokenStorage,
         'Test API'
       )
-    ).rejects.toThrow('Authorization failed: Session expired (HTTP 401)');
+    ).rejects.toThrow('Your session has expired. Please sign in again.');
 
     expect(mockTokenStorage.deleteTokens).toHaveBeenCalledTimes(1);
     expect(mockBrowserWindow.webContents.send).toHaveBeenCalledWith('auth:error', {
@@ -180,8 +180,11 @@ describe('APIRequestHandler', () => {
     // clearTokens should be called only once despite multiple 401 errors
     expect(mockTokenStorage.deleteTokens).toHaveBeenCalledTimes(1);
 
-    // auth:error event should be emitted only once
-    expect(mockBrowserWindow.webContents.send).toHaveBeenCalledTimes(1);
+    // auth:error event should be emitted only once (check specifically for auth:error, not all send calls)
+    const authErrorCalls = (mockBrowserWindow.webContents.send as jest.Mock).mock.calls.filter(
+      (call) => call[0] === 'auth:error'
+    );
+    expect(authErrorCalls.length).toBe(1);
   });
 
   /* Preconditions: fetch throws network error
