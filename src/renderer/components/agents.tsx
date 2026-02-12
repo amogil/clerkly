@@ -1,18 +1,15 @@
 import { useState, useRef, useEffect } from 'react';
 import {
   Send,
-  Loader2,
   AlertCircle,
   Check,
   X,
   HelpCircle,
   ArrowLeft,
-  CheckSquare,
   Plus,
   FileText,
   Calendar,
   Video,
-  User,
 } from 'lucide-react';
 import { Logo } from './logo';
 import type { AgentTask } from '../types/agent-task';
@@ -233,29 +230,6 @@ export function Agents() {
     setTaskInput('');
   };
 
-  const formatTime = (date: Date) => {
-    return date.toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
-    });
-  };
-
-  const getStatusIcon = (status: AgentTask['status']) => {
-    switch (status) {
-      case 'new':
-        return <Plus className="w-3.5 h-3.5 text-sky-500" />;
-      case 'in-progress':
-        return <Loader2 className="w-3.5 h-3.5 text-blue-500 animate-spin" />;
-      case 'awaiting-user':
-        return <HelpCircle className="w-3.5 h-3.5 text-amber-500" />;
-      case 'error':
-        return <AlertCircle className="w-3.5 h-3.5 text-red-500" />;
-      case 'completed':
-        return <CheckSquare className="w-3.5 h-3.5 text-green-500" />;
-    }
-  };
-
   const getStatusText = (status: AgentTask['status']) => {
     switch (status) {
       case 'new':
@@ -402,7 +376,7 @@ export function Agents() {
                 </li>
               </ul>
               <p className="text-sm text-muted-foreground mt-3">
-                All data is encrypted at rest and in transit. We're SOC 2 Type II and GDPR
+                All data is encrypted at rest and in transit. We&apos;re SOC 2 Type II and GDPR
                 compliant.
               </p>
             </div>
@@ -433,7 +407,9 @@ export function Agents() {
           type: 'agent',
           content: (
             <div className="space-y-2">
-              <p>I'll prepare a customized proposal for you. I'll need a few more details:</p>
+              <p>
+                I&apos;ll prepare a customized proposal for you. I&apos;ll need a few more details:
+              </p>
               <ul className="space-y-1.5 mt-2 text-sm list-disc list-inside text-muted-foreground">
                 <li>Company name and industry</li>
                 <li>Estimated number of users (you mentioned 500)</li>
@@ -461,7 +437,7 @@ export function Agents() {
           content: (
             <div className="space-y-3">
               <p>
-                Perfect! Thank you for the details. I'm creating a proposal for TechCorp
+                Perfect! Thank you for the details. I&apos;m creating a proposal for TechCorp
                 International with the following specifications:
               </p>
               <div className="p-3 bg-secondary/50 rounded-lg border border-border space-y-2 text-sm">
@@ -491,9 +467,9 @@ export function Agents() {
                 </div>
               </div>
               <p>
-                I'll have a detailed proposal with pricing, implementation timeline, and compliance
-                documentation sent to you within 24 hours. Is there anything else you'd like me to
-                include?
+                I&apos;ll have a detailed proposal with pricing, implementation timeline, and
+                compliance documentation sent to you within 24 hours. Is there anything else
+                you&apos;d like me to include?
               </p>
             </div>
           ),
@@ -540,7 +516,8 @@ export function Agents() {
           content: (
             <div className="space-y-2">
               <p>
-                I've identified <strong>8 action items</strong> so far from the first 15 minutes:
+                I&apos;ve identified <strong>8 action items</strong> so far from the first 15
+                minutes:
               </p>
               <div className="mt-3 space-y-2 pl-3 border-l-2 border-primary/30">
                 <div className="text-sm">

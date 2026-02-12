@@ -23,6 +23,10 @@ global.window = {
 } as any;
 
 describe('NavigationManager Property Tests', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
   /* Feature: ui, Property 8, 24: Показ экрана логина для неавторизованных пользователей
      Preconditions: user not authorized, various initial routes
      Action: call initialize()
@@ -60,7 +64,7 @@ describe('NavigationManager Property Tests', () => {
   /* Feature: ui, Property 9, 26: Показ Dashboard после успешной авторизации
      Preconditions: user authorized, currently on login screen
      Action: call initialize()
-     Assertions: always redirects to dashboard
+     Assertions: always redirects to agents screen
      Requirements: navigation.1.3 */
   it('should always redirect to dashboard when authorized and on login screen', async () => {
     await fc.assert(
@@ -81,7 +85,7 @@ describe('NavigationManager Property Tests', () => {
         await navigationManager.initialize();
 
         // Assertions
-        expect(navigateMock).toHaveBeenCalledWith('/dashboard');
+        expect(navigateMock).toHaveBeenCalledWith('/agents');
         expect(navigateMock).toHaveBeenCalledTimes(1);
 
         // Cleanup
@@ -157,7 +161,7 @@ describe('NavigationManager Property Tests', () => {
   /* Feature: ui, Property 26: Перенаправление на Dashboard после успешной авторизации
      Preconditions: various current routes
      Action: call redirectToDashboard()
-     Assertions: always navigates to /dashboard
+     Assertions: always navigates to /agents
      Requirements: navigation.1.3 */
   it('should always redirect to dashboard regardless of current route', () => {
     fc.assert(
@@ -176,7 +180,7 @@ describe('NavigationManager Property Tests', () => {
           navigationManager.redirectToDashboard();
 
           // Assertions
-          expect(navigateMock).toHaveBeenCalledWith('/dashboard');
+          expect(navigateMock).toHaveBeenCalledWith('/agents');
           expect(navigateMock).toHaveBeenCalledTimes(1);
 
           // Cleanup
@@ -216,8 +220,8 @@ describe('NavigationManager Property Tests', () => {
             expect(navigateMock).toHaveBeenCalledWith('/login');
             expect(navigateMock).toHaveBeenCalledTimes(1);
           } else if (currentRoute === '/login') {
-            // Property 9, 26: Authorized and on login -> redirect to dashboard
-            expect(navigateMock).toHaveBeenCalledWith('/dashboard');
+            // Property 9, 26: Authorized and on login -> redirect to agents
+            expect(navigateMock).toHaveBeenCalledWith('/agents');
             expect(navigateMock).toHaveBeenCalledTimes(1);
           } else {
             // Authorized and not on login -> no redirect
