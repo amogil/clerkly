@@ -12,10 +12,11 @@ interface SettingsProps {
 }
 
 export function Settings({ onSignOut, onNavigate }: SettingsProps) {
-  const { showError } = useError();
+  const { showError, showSuccess } = useError();
   const [llmProvider, setLlmProvider] = useState<'openai' | 'anthropic' | 'google'>('openai');
   const [apiKey, setApiKey] = useState('');
   const [showApiKey, setShowApiKey] = useState(false);
+  const [testingConnection, setTestingConnection] = useState(false);
   const [profile, setProfile] = useState<{
     name: string;
     email: string;
@@ -172,6 +173,32 @@ export function Settings({ onSignOut, onNavigate }: SettingsProps) {
     return () => clearTimeout(timeoutId);
   }, [apiKey, llmProvider, showError]);
 
+  // Requirements: settings.3.4 - Handle test connection
+  const handleTestConnection = async () => {
+    // Requirements: settings.3.4 - Set testing state
+    setTestingConnection(true);
+    try {
+      logger.info(`Testing connection to ${llmProvider}...`);
+      const result = await window.api.llm.testConnection(llmProvider, apiKey);
+
+      if (result.success) {
+        // Requirements: settings.3.7 - Show success notification
+        showSuccess('Connection successful! Your API key is valid.');
+        logger.info(`Connection test successful for ${llmProvider}`);
+      } else {
+        // Requirements: settings.3.8 - Show error notification
+        showError(result.error || 'Connection failed: Unknown error');
+        logger.warn(`Connection test failed for ${llmProvider}: ${result.error}`);
+      }
+    } catch (error) {
+      logger.error(`Connection test error: ${error}`);
+      showError(`Connection failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      // Requirements: settings.3.7, settings.3.8 - Reset button state
+      setTestingConnection(false);
+    }
+  };
+
   return (
     <div className="p-8">
       <div className="max-w-4xl mx-auto">
@@ -297,10 +324,11 @@ export function Settings({ onSignOut, onNavigate }: SettingsProps) {
 
               <div className="pt-4 border-t border-border">
                 <button
-                  disabled
+                  onClick={handleTestConnection}
+                  disabled={testingConnection || apiKey.trim() === ''}
                   className="text-sm px-4 py-2.5 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Test Connection
+                  {testingConnection ? 'Testing...' : 'Test Connection'}
                 </button>
               </div>
             </div>

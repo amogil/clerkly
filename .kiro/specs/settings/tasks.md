@@ -134,7 +134,7 @@
   - Обновить типы в `src/types/index.ts`
   - **Requirements:** settings.3
 
-- [ ] 4.8 Обновить Settings Component
+- [x] 4.8 Обновить Settings Component
   - Добавить состояние `testingConnection`
   - Реализовать обработчик `handleTestConnection()`
   - Обновить кнопку "Test Connection" (убрать disabled, добавить onClick)
