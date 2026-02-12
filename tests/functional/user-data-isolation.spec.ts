@@ -60,9 +60,9 @@ test('should isolate data between different users', async () => {
   await completeOAuthFlow(context.app, context.window, TEST_CLIENT_ID);
   await context.window.waitForTimeout(1000);
 
-  // Navigate to Settings and set AI Agent settings
+  // Navigate to Settings and set LLM Provider settings
   await context.window.click('text=Settings');
-  await context.window.waitForSelector('text=AI Agent Settings');
+  await context.window.waitForSelector('text=LLM Provider');
   await context.window.waitForTimeout(500);
 
   // Select OpenAI and enter API key for User A
@@ -95,7 +95,7 @@ test('should isolate data between different users', async () => {
 
   // Navigate to Settings
   await context.window.click('text=Settings');
-  await context.window.waitForSelector('text=AI Agent Settings');
+  await context.window.waitForSelector('text=LLM Provider');
   await context.window.waitForTimeout(500);
 
   // Verify User B sees empty settings (not User A's data)
@@ -133,7 +133,7 @@ test('should isolate data between different users', async () => {
 
   // Navigate to Settings
   await context.window.click('text=Settings');
-  await context.window.waitForSelector('text=AI Agent Settings');
+  await context.window.waitForSelector('text=LLM Provider');
   await context.window.waitForTimeout(500);
 
   // Verify User A's data restored
@@ -150,7 +150,7 @@ test('should isolate data between different users', async () => {
 });
 
 /* Preconditions: Application running, user authenticated
-   Action: Login, create data (AI Agent settings, window state, profile), logout, login again
+   Action: Login, create data (LLM Provider settings, window state, profile), logout, login again
    Assertions: All data restored (settings, window state, profile)
    Requirements: user-data-isolation.1.7, user-data-isolation.1.22, user-data-isolation.1.23, user-data-isolation.1.24 */
 test('should restore user data after re-login', async () => {
@@ -166,9 +166,9 @@ test('should restore user data after re-login', async () => {
   await completeOAuthFlow(context.app, context.window, TEST_CLIENT_ID);
   await context.window.waitForTimeout(1000);
 
-  // Create AI Agent settings
+  // Create LLM Provider settings
   await context.window.click('text=Settings');
-  await context.window.waitForSelector('text=AI Agent Settings');
+  await context.window.waitForSelector('text=LLM Provider');
   await context.window.waitForTimeout(500);
   await context.window.selectOption('select:near(:text("LLM Provider"))', 'google');
   await context.window.fill('input[placeholder="Enter your API key"]', 'test-api-key-xyz');
@@ -185,9 +185,9 @@ test('should restore user data after re-login', async () => {
   await completeOAuthFlow(context.app, context.window, TEST_CLIENT_ID);
   await context.window.waitForTimeout(1000);
 
-  // Verify AI Agent settings restored
+  // Verify LLM Provider settings restored
   await context.window.click('text=Settings');
-  await context.window.waitForSelector('text=AI Agent Settings');
+  await context.window.waitForSelector('text=LLM Provider');
   await context.window.waitForTimeout(500);
   const provider = await context.window.inputValue('select:near(:text("LLM Provider"))');
   const apiKey = await context.window.inputValue('input[placeholder="Enter your API key"]');
@@ -225,7 +225,7 @@ test('should persist data after logout', async () => {
 
   // Create data
   await context.window.click('text=Settings');
-  await context.window.waitForSelector('text=AI Agent Settings');
+  await context.window.waitForSelector('text=LLM Provider');
   await context.window.waitForTimeout(500);
   await context.window.selectOption('select:near(:text("LLM Provider"))', 'openai');
   await context.window.fill('input[placeholder="Enter your API key"]', 'persist-test-key');
@@ -240,7 +240,7 @@ test('should persist data after logout', async () => {
   await context.window.waitForTimeout(1000);
 
   await context.window.click('text=Settings');
-  await context.window.waitForSelector('text=AI Agent Settings');
+  await context.window.waitForSelector('text=LLM Provider');
   await context.window.waitForTimeout(500);
   const apiKey = await context.window.inputValue('input[placeholder="Enter your API key"]');
   expect(apiKey).toBeTruthy();
@@ -269,9 +269,9 @@ test('should filter data by user email', async () => {
   await completeOAuthFlow(context.app, context.window, TEST_CLIENT_ID);
   await context.window.waitForTimeout(1000);
 
-  // Save data - use AI Agent settings
+  // Save data - use LLM Provider settings
   await context.window.click('text=Settings');
-  await context.window.waitForSelector('text=AI Agent Settings');
+  await context.window.waitForSelector('text=LLM Provider');
   await context.window.waitForTimeout(500);
   await context.window.selectOption('select:near(:text("LLM Provider"))', 'openai');
   await context.window.fill('input[placeholder="Enter your API key"]', 'user-a-key-123');
@@ -294,7 +294,7 @@ test('should filter data by user email', async () => {
   await context.window.waitForTimeout(1000);
 
   await context.window.click('text=Settings');
-  await context.window.waitForSelector('text=AI Agent Settings');
+  await context.window.waitForSelector('text=LLM Provider');
   await context.window.waitForTimeout(500);
   await context.window.selectOption('select:near(:text("LLM Provider"))', 'anthropic');
   await context.window.fill('input[placeholder="Enter your API key"]', 'user-b-key-456');
@@ -323,7 +323,7 @@ test('should filter data by user email', async () => {
   await context.window.waitForTimeout(1000);
 
   await context.window.click('text=Settings');
-  await context.window.waitForSelector('text=AI Agent Settings');
+  await context.window.waitForSelector('text=LLM Provider');
   await context.window.waitForTimeout(500);
 
   // Verify User A sees their own data (not User B's)
@@ -362,7 +362,7 @@ test('should handle "No user logged in" error gracefully', async () => {
 
   // 3) Sign out
   await context.window.click('text=Settings');
-  await context.window.waitForSelector('text=AI Agent Settings');
+  await context.window.waitForSelector('text=LLM Provider');
   await context.window.waitForTimeout(500);
   await context.window.click('button:has-text("Sign out")');
 
