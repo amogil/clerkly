@@ -1,5 +1,5 @@
 /* Preconditions: Electron app is launched with authentication
-   Action: Test AI Agent Settings functionality end-to-end
+   Action: Test LLM Provider settings functionality end-to-end
    Assertions: Verify save/load, encryption, deletion, provider switching, visibility toggle, error handling, and user isolation
    Requirements: settings.1.3, settings.1.4, settings.1.5, settings.1.6, settings.1.9, settings.1.11, settings.1.13, settings.1.14, settings.1.15, settings.1.17, user-data-isolation.1.8 */
 
@@ -70,7 +70,7 @@ test.afterEach(async () => {
 test('53.1: should save and load LLM provider selection', async () => {
   // Navigate to Settings
   await context.window.click('text=Settings');
-  await context.window.waitForSelector('text=AI Agent Settings');
+  await context.window.waitForSelector('text=LLM Provider');
 
   // Select Anthropic
   await context.window.selectOption('select:near(:text("LLM Provider"))', 'anthropic');
@@ -94,7 +94,7 @@ test('53.1: should save and load LLM provider selection', async () => {
 
   // Navigate to Settings
   await context.window.click('text=Settings');
-  await context.window.waitForSelector('text=AI Agent Settings');
+  await context.window.waitForSelector('text=LLM Provider');
 
   // Check that Anthropic is selected
   const selectedValue = await context.window.inputValue('select:near(:text("LLM Provider"))');
@@ -110,7 +110,7 @@ test('53.2: should save and load API key with encryption', async () => {
 
   // Navigate to Settings
   await context.window.click('text=Settings');
-  await context.window.waitForSelector('text=AI Agent Settings');
+  await context.window.waitForSelector('text=LLM Provider');
 
   // Enter API key
   const apiKeyInput = context.window.locator('input[placeholder="Enter your API key"]');
@@ -135,7 +135,7 @@ test('53.2: should save and load API key with encryption', async () => {
 
   // Navigate to Settings
   await context.window.click('text=Settings');
-  await context.window.waitForSelector('text=AI Agent Settings');
+  await context.window.waitForSelector('text=LLM Provider');
 
   // Check that API key field is filled (but hidden)
   const apiKeyInput2 = context.window.locator('input[placeholder="Enter your API key"]');
@@ -164,7 +164,7 @@ test('53.2: should save and load API key with encryption', async () => {
 test('53.3: should delete API key when field is cleared', async () => {
   // Navigate to Settings
   await context.window.click('text=Settings');
-  await context.window.waitForSelector('text=AI Agent Settings');
+  await context.window.waitForSelector('text=LLM Provider');
 
   // Enter API key first
   const apiKeyInput = context.window.locator('input[placeholder="Enter your API key"]');
@@ -191,7 +191,7 @@ test('53.3: should delete API key when field is cleared', async () => {
 
   // Navigate to Settings
   await context.window.click('text=Settings');
-  await context.window.waitForSelector('text=AI Agent Settings');
+  await context.window.waitForSelector('text=LLM Provider');
 
   // Check that API key field is empty
   const apiKeyInput2 = context.window.locator('input[placeholder="Enter your API key"]');
@@ -209,7 +209,7 @@ test('53.4: should preserve API keys when switching providers', async () => {
 
   // Navigate to Settings
   await context.window.click('text=Settings');
-  await context.window.waitForSelector('text=AI Agent Settings');
+  await context.window.waitForSelector('text=LLM Provider');
 
   // Enter OpenAI key
   await context.window.selectOption('select:near(:text("LLM Provider"))', 'openai');
@@ -247,7 +247,7 @@ test('53.4: should preserve API keys when switching providers', async () => {
 test('53.5: should toggle API key visibility', async () => {
   // Navigate to Settings
   await context.window.click('text=Settings');
-  await context.window.waitForSelector('text=AI Agent Settings');
+  await context.window.waitForSelector('text=LLM Provider');
 
   // Enter API key
   const apiKeyInput = context.window.locator('input[placeholder="Enter your API key"]');
@@ -309,11 +309,11 @@ test('53.6: should show error notification on save failure', async () => {
   await settingsNav.click();
   await context.window.waitForTimeout(500);
 
-  // Find AI Agent Settings section
-  const aiAgentHeading = context.window.locator('text=/^AI Agent Settings$/i');
-  await aiAgentHeading.waitFor({ state: 'visible', timeout: 5000 });
+  // Find LLM Provider section (use more specific selector to avoid ambiguity)
+  const llmProviderHeading = context.window.locator('h2:has-text("LLM Provider")');
+  await llmProviderHeading.waitFor({ state: 'visible', timeout: 5000 });
 
-  console.log('[TEST] AI Agent Settings section visible');
+  console.log('[TEST] LLM Provider section visible');
 
   // Simulate save error for next operation
   await context.window.evaluate(async () => {

@@ -3,7 +3,7 @@
  */
 
 /* Preconditions: Settings component is rendered with mocked window.api
-   Action: Test AI Agent Settings section rendering and functionality
+   Action: Test LLM Provider section rendering and functionality
    Assertions: Verify UI elements, loading, saving, and error handling
    Requirements: settings.1.1, settings.1.2, settings.1.3, settings.1.4, settings.1.5, settings.1.7, settings.1.8, settings.1.9, settings.1.10, settings.1.11, settings.1.12, settings.1.13, settings.1.15 */
 
@@ -61,7 +61,7 @@ const renderSettings = (props = {}) => {
   );
 };
 
-describe('Settings Component - AI Agent Settings', () => {
+describe('Settings Component - LLM Provider', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.useFakeTimers();
@@ -88,21 +88,21 @@ describe('Settings Component - AI Agent Settings', () => {
   });
 
   /* Preconditions: Settings component is rendered
-     Action: Check for AI Agent Settings section elements
+     Action: Check for LLM Provider section elements
      Assertions: LLM Provider dropdown, API Key field, toggle button, and info text are present
      Requirements: settings.1.1, settings.1.2, settings.1.3 */
-  test('51.1: should display AI Agent Settings section', async () => {
+  test('51.1: should display LLM Provider section', async () => {
     renderSettings();
 
     await waitFor(() => {
       expect(mockLoadLLMProvider).toHaveBeenCalled();
     });
 
-    // Check for section heading
-    expect(screen.getByText('AI Agent Settings')).toBeInTheDocument();
+    // Check for LLM Provider text (appears as both heading and label)
+    const llmProviderTexts = screen.getAllByText('LLM Provider');
+    expect(llmProviderTexts.length).toBeGreaterThan(0);
 
     // Check for LLM Provider dropdown
-    expect(screen.getByText('LLM Provider')).toBeInTheDocument();
     const providerSelects = screen.getAllByRole('combobox');
     expect(providerSelects.length).toBeGreaterThan(0);
 

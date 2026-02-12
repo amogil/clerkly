@@ -239,12 +239,12 @@ export function Settings({ onSignOut, onNavigate }: SettingsProps) {
             </div>
           </div>
 
-          {/* AI Agent Settings */}
+          {/* LLM Provider */}
           <div className="bg-card rounded-xl border border-border shadow-sm">
             <div className="p-6 border-b border-border">
               <div className="flex items-center gap-3">
                 <Cpu className="w-5 h-5 text-primary" />
-                <h2 className="font-semibold text-foreground">AI Agent Settings</h2>
+                <h2 className="font-semibold text-foreground">LLM Provider</h2>
               </div>
             </div>
             <div className="p-6 space-y-4">

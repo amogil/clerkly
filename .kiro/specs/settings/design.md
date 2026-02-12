@@ -2,7 +2,7 @@
 
 ## Обзор
 
-Данный документ описывает архитектуру и дизайн страницы настроек приложения Clerkly, включая настройки AI Agent (LLM провайдер и API ключ) и форматирование дат и времени из системных настроек.
+Данный документ описывает архитектуру и дизайн страницы настроек приложения Clerkly, включая настройки LLM Provider (провайдер и API ключ) и форматирование дат и времени из системных настроек.
 
 ### Архитектурный Принцип: База Данных как Единственный Источник Истины
 
@@ -28,7 +28,7 @@ External API → Main Process → Database → IPC Event → Renderer → UI Upd
 
 ### Цели Дизайна
 
-- Обеспечить простую настройку AI агента для работы с задачами
+- Обеспечить простую настройку провайдера LLM для работы с задачами
 - Автоматически использовать системные настройки локали для форматирования дат
 - Безопасно хранить API ключи с шифрованием (когда доступно)
 - Изолировать настройки между пользователями
@@ -75,7 +75,7 @@ External API → Main Process → Database → IPC Event → Renderer → UI Upd
    │                                              │
    │  ┌────────────────────────────────┐         │
    │  │  Settings Component            │         │
-   │  │  (AI Agent Section)            │         │
+   │  │  (LLM Provider Section)        │         │
    │  │                                │         │
    │  │  - LLM Provider dropdown       │         │
    │  │  - API Key input (password)    │         │
@@ -391,7 +391,7 @@ class DateTimeFormatter {
 
 ### Settings Component (Renderer)
 
-React компонент для страницы настроек с секцией AI Agent.
+React компонент для страницы настроек с секцией LLM Provider.
 
 ```typescript
 // Requirements: settings.1
@@ -495,8 +495,8 @@ export function AIAgentSettings() {
   }
 
   return (
-    <div className="ai-agent-settings">
-      <h3>AI Agent Settings</h3>
+    <div className="llm-provider-settings">
+      <h3>LLM Provider</h3>
       
       {/* Requirements: settings.1.1 - LLM Provider dropdown */}
       <div className="setting-field">

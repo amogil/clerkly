@@ -2,7 +2,7 @@
 
 ## Обзор
 
-Данный документ содержит список задач для реализации настроек приложения Clerkly, включая настройки AI Agent (LLM провайдер и API ключ с шифрованием) и форматирование даты/времени из системных настроек.
+Данный документ содержит список задач для реализации настроек приложения Clerkly, включая настройки LLM Provider (провайдер и API ключ с шифрованием) и форматирование даты/времени из системных настроек.
 
 ## Задачи
 
@@ -47,9 +47,9 @@
 
 ### 3. Создание Settings Component
 
-- [x] 3.1 Создать React компонент AIAgentSettings
+- [x] 3.1 Создать React компонент LLMProviderSettings
   - Создать файл `src/renderer/components/Settings.tsx`
-  - Реализовать секцию AI Agent Settings
+  - Реализовать секцию LLM Provider
   - Dropdown для выбора LLM провайдера (OpenAI, Anthropic, Google)
   - **Requirements:** settings.1.1
 
@@ -128,8 +128,8 @@
 
 ### 6. Функциональные Тесты
 
-- [x] 6.1 Функциональный тест: AI Agent Settings
-  - Тест: should save and persist AI Agent settings
+- [x] 6.1 Функциональный тест: LLM Provider Settings
+  - Тест: should save and persist LLM Provider settings
   - Тест: should toggle API key visibility
   - Тест: should load correct API key when switching providers
   - Тест: should encrypt API key when safeStorage available
