@@ -101,9 +101,6 @@ External API → Main Process → Database → IPC Event → Renderer → UI Upd
    │  │  - /login                      │         │
    │  │  - /agents (protected)      │         │
    │  │  - /settings (protected)       │         │
-   │  │  - /tasks (protected)          │         │
-   │  │  - /calendar (protected)       │         │
-   │  │  - /contacts (protected)       │         │
    │  └────────────────────────────────┘         │
    └─────────────────────────────────────────────┘
 ```
@@ -219,10 +216,7 @@ class AuthGuard {
   private navigationManager: NavigationManager;
   private protectedRoutes: string[] = [
     '/agents',
-    '/settings',
-    '/tasks',
-    '/calendar',
-    '/contacts'
+    '/settings'
   ];
 
   constructor(navigationManager: NavigationManager) {
@@ -261,7 +255,7 @@ class AuthGuard {
 ```
 
 **Ключевые особенности:**
-- Список защищенных маршрутов: `/agents`, `/settings`, `/tasks`, `/calendar`, `/contacts`
+- Список защищенных маршрутов: `/agents`, `/settings`
 - Публичные маршруты (например, `/login`) доступны всем
 - Автоматическое перенаправление на логин при попытке доступа к защищенному маршруту
 
@@ -462,7 +456,7 @@ Logout → auth:logout event → onLogout() → redirectToLogin()
 
 ### Property 2: Блокировка доступа к защищенным экранам
 
-*Для любого* неавторизованного пользователя, попытка доступа к защищенным экранам (Agents, Settings, Tasks, Calendar, Contacts) должна быть заблокирована, и пользователь должен быть перенаправлен на экран логина.
+*Для любого* неавторизованного пользователя, попытка доступа к защищенным экранам (Agents, Settings и другим защищенным маршрутам) должна быть заблокирована, и пользователь должен быть перенаправлен на экран логина.
 
 **Validates: Requirements navigation.1.2**
 
@@ -943,7 +937,7 @@ describe('NavigationManager Property Tests', () => {
   it('should block access to protected routes when not authorized', () => {
     fc.assert(
       fc.property(
-        fc.constantFrom('/agents', '/settings', '/tasks', '/calendar', '/contacts'),
+        fc.constantFrom('/agents', '/settings'),
         fc.boolean(),
         async (route, isAuthorized) => {
           // Mock auth status
@@ -1129,7 +1123,7 @@ describe('Navigation Functional Tests', () => {
     const app = await launchApp({ authorized: true });
     
     // Проверить доступ к защищенным маршрутам
-    const protectedRoutes = ['/agents', '/settings', '/tasks', '/calendar', '/contacts'];
+    const protectedRoutes = ['/agents', '/settings'];
     
     for (const route of protectedRoutes) {
       await app.navigate(route);
@@ -1196,7 +1190,7 @@ describe('Navigation Functional Tests', () => {
     const app = await launchApp({ authorized: false });
     
     // Попытаться получить доступ к каждому защищенному маршруту
-    const protectedRoutes = ['/agents', '/settings', '/tasks', '/calendar', '/contacts'];
+    const protectedRoutes = ['/agents', '/settings'];
     
     for (const route of protectedRoutes) {
       await app.navigate(route);
@@ -1336,9 +1330,6 @@ describe('Navigation Functional Tests', () => {
 - `/login` - Публичный маршрут (экран логина)
 - `/agents` - Защищенный маршрут (главный экран)
 - `/settings` - Защищенный маршрут (настройки)
-- `/tasks` - Защищенный маршрут (задачи)
-- `/calendar` - Защищенный маршрут (календарь)
-- `/contacts` - Защищенный маршрут (контакты)
 
 **Интеграция:**
 - AuthGuard проверяет доступ перед активацией маршрута

@@ -19,7 +19,7 @@
 
 - [x] 1.2 Создать класс AuthGuard
   - Реализовать метод `canActivate()` для проверки доступа к маршруту
-  - Определить список защищенных маршрутов (dashboard, settings, tasks, calendar, contacts)
+  - Определить список защищенных маршрутов (agents, settings)
   - Реализовать метод `isProtectedRoute()` для проверки типа маршрута
   - Добавить зависимость от NavigationManager
   - **Requirements:** navigation.1.2
@@ -37,7 +37,7 @@
 
 - [x] 2.1 Настроить маршруты приложения
   - Определить публичный маршрут `/login`
-  - Определить защищенные маршруты: `/agents`, `/settings`, `/tasks`, `/calendar`, `/contacts`
+  - Определить защищенные маршруты: `/agents`, `/settings`
   - Интегрировать AuthGuard для защиты маршрутов
   - **Requirements:** navigation.1.1, navigation.1.2
   - **Property:** 1, 2
@@ -153,7 +153,6 @@
   - Проверить, что isProtectedRoute('/login') возвращает false
   - Проверить, что isProtectedRoute('/agents') возвращает true
   - Проверить, что isProtectedRoute('/settings') возвращает true
-  - Проверить, что isProtectedRoute('/tasks') возвращает true
   - **Requirements:** navigation.1.2
   - **Property:** 2
 

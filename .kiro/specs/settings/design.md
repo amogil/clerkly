@@ -1145,7 +1145,7 @@ describe('Settings Functional Tests', () => {
   });
 
   /* Preconditions: application launched with system locale en-US
-     Action: view dates in Tasks, Calendar, Contacts
+     Action: view dates in application components
      Assertions: all dates formatted in en-US format
      Requirements: settings.2.1, settings.2.2 */
   it('should format dates using system locale', async () => {
