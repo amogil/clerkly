@@ -283,13 +283,10 @@ describe('TokenStorageManager', () => {
     };
 
     // Mock saveData to succeed for access token, fail for refresh token
-    jest
-      .spyOn(dataManager, 'saveData')
-      .mockReturnValueOnce({ success: true })
-      .mockReturnValueOnce({
-        success: false,
-        error: 'Database locked',
-      });
+    jest.spyOn(dataManager, 'saveData').mockReturnValueOnce({ success: true }).mockReturnValueOnce({
+      success: false,
+      error: 'Database locked',
+    });
 
     await expect(tokenStorage.saveTokens(tokens)).rejects.toThrow(
       'Failed to save tokens: Failed to save refresh token: Database locked'
@@ -308,13 +305,10 @@ describe('TokenStorageManager', () => {
     };
 
     // Mock saveData to succeed for access token, fail for expires_at
-    jest
-      .spyOn(dataManager, 'saveData')
-      .mockReturnValueOnce({ success: true })
-      .mockReturnValueOnce({
-        success: false,
-        error: 'Disk full',
-      });
+    jest.spyOn(dataManager, 'saveData').mockReturnValueOnce({ success: true }).mockReturnValueOnce({
+      success: false,
+      error: 'Disk full',
+    });
 
     await expect(tokenStorage.saveTokens(tokens)).rejects.toThrow(
       'Failed to save tokens: Failed to save expires_at: Disk full'
