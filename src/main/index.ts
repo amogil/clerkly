@@ -467,6 +467,10 @@ app.whenReady().then(async () => {
     logger.info('Application starting...');
     const startTime = Date.now();
 
+    // Requirements: user-data-isolation.1.17 - Initialize profile manager to restore email from database
+    await profileManager.initialize();
+    logger.info('UserProfileManager initialized');
+
     // Requirements: clerkly.1.2, clerkly.1.3, clerkly.1.4
     // Initialize application
     const initResult = await lifecycleManager.initialize();

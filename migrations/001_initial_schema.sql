@@ -5,11 +5,11 @@
 CREATE TABLE user_data (
   key TEXT NOT NULL,
   value TEXT NOT NULL,
-  user_email TEXT,
+  user_email TEXT NOT NULL,
   timestamp INTEGER NOT NULL,
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL,
-  UNIQUE(key, user_email)
+  PRIMARY KEY (key, user_email)
 );
 
 CREATE INDEX idx_timestamp ON user_data(timestamp);

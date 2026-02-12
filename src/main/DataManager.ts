@@ -245,6 +245,9 @@ export class DataManager implements IDataManager {
 
       stmt.run(key, serializedValue, userEmail, timestamp, timestamp, timestamp);
 
+      // Requirements: user-data-isolation.1.14 - Log successful save with user_email
+      this.logger.info(`Data saved for user ${userEmail}, key: ${key}`);
+
       return { success: true };
     } catch (writeError: unknown) {
       const errorObj = writeError as { code?: string; message?: string };

@@ -71,10 +71,10 @@ class DataManager {
 
   /**
    * Save data with automatic user_email filtering
-   * Requirements: user-data-isolation.1.3, user-data-isolation.1.11
+   * Requirements: user-data-isolation.1.3, user-data-isolation.1.11, user-data-isolation.1.12
    */
   async saveData(key: string, value: any): Promise<void> {
-    // Requirements: user-data-isolation.1.13 - Check if user is logged in
+    // Requirements: user-data-isolation.1.14 - Check if user is logged in
     const userEmail = this.userProfileManager.getCurrentEmail();
     if (!userEmail) {
       console.error('[DataManager] No user logged in');
@@ -99,10 +99,10 @@ class DataManager {
 
   /**
    * Load data with automatic user_email filtering
-   * Requirements: user-data-isolation.1.4, user-data-isolation.1.12
+   * Requirements: user-data-isolation.1.4, user-data-isolation.1.13
    */
   async loadData(key: string): Promise<{ success: boolean; data?: any; error?: string }> {
-    // Requirements: user-data-isolation.1.13 - Check if user is logged in
+    // Requirements: user-data-isolation.1.14 - Check if user is logged in
     const userEmail = this.userProfileManager.getCurrentEmail();
     if (!userEmail) {
       return {
@@ -136,7 +136,7 @@ class DataManager {
    * Requirements: user-data-isolation.1.4
    */
   async deleteData(key: string): Promise<void> {
-    // Requirements: user-data-isolation.1.13 - Check if user is logged in
+    // Requirements: user-data-isolation.1.14 - Check if user is logged in
     const userEmail = this.userProfileManager.getCurrentEmail();
     if (!userEmail) {
       console.error('[DataManager] No user logged in');
@@ -163,11 +163,11 @@ class DataManager {
 
 ```typescript
 class UserProfileManager {
-  private currentUserEmail: string | null = null; // Requirements: user-data-isolation.1.14
+  private currentUserEmail: string | null = null; // Requirements: user-data-isolation.1.15
 
   /**
    * Get current user email
-   * Requirements: user-data-isolation.1.10, user-data-isolation.1.14
+   * Requirements: user-data-isolation.1.11, user-data-isolation.1.15
    */
   getCurrentEmail(): string | null {
     return this.currentUserEmail;
@@ -175,7 +175,7 @@ class UserProfileManager {
 
   /**
    * Fetch profile from Google API and cache email
-   * Requirements: user-data-isolation.1.15
+   * Requirements: user-data-isolation.1.16
    */
   async fetchProfile(): Promise<UserProfile | null> {
     try {
@@ -194,7 +194,7 @@ class UserProfileManager {
 
       const profile = await response.json();
       
-      // Requirements: user-data-isolation.1.15 - Cache email
+      // Requirements: user-data-isolation.1.16 - Cache email
       this.currentUserEmail = profile.email;
       
       await this.saveProfile(profile);
@@ -268,60 +268,49 @@ interface UserProfile {
 
 ## Свойства Корректности
 
+*Свойство (property) — это характеристика или поведение, которое должно выполняться для всех допустимых выполнений системы. По сути, это формальное утверждение о том, что система должна делать. Свойства служат мостом между человекочитаемыми спецификациями и машинно-проверяемыми гарантиями корректности.*
+
 ### Property 44: Автоматическое добавление user_email при сохранении
 
-*Для любого* вызова `saveData()`, система должна автоматически добавить `user_email` текущего авторизованного пользователя к сохраняемым данным без явного параметра в методе.
+*Для любого* вызова `saveData(key, value)`, система должна автоматически добавить `user_email` текущего авторизованного пользователя к сохраняемым данным без явного параметра в методе.
 
-**Формальное определение:**
-```
-∀ key, value: saveData(key, value) → 
-  ∃ userEmail: userEmail = getCurrentEmail() ∧ 
-  DB.insert(key, value, userEmail)
-```
-
-**Тестирование:** Property-based тест с генерацией различных ключей и значений, проверка что все записи в БД содержат `user_email`.
+**Validates: Requirements 1.3, 1.11, 1.12**
 
 ### Property 45: Автоматическая фильтрация по user_email при загрузке
 
-*Для любого* вызова `loadData()`, система должна автоматически фильтровать данные по `user_email` текущего авторизованного пользователя без явного параметра в методе.
+*Для любого* вызова `loadData(key)`, система должна автоматически фильтровать данные по `user_email` текущего авторизованного пользователя без явного параметра в методе.
 
-**Формальное определение:**
-```
-∀ key: loadData(key) → 
-  ∃ userEmail: userEmail = getCurrentEmail() ∧ 
-  result = DB.select(key WHERE user_email = userEmail)
-```
-
-**Тестирование:** Property-based тест с несколькими пользователями, проверка что каждый пользователь видит только свои данные.
+**Validates: Requirements 1.4, 1.13**
 
 ### Property 46: Изоляция данных между пользователями
 
-*Для любых* двух пользователей A и B, данные пользователя A не должны быть доступны пользователю B.
+*Для любых* двух пользователей A и B с разными email адресами, данные сохраненные пользователем A не должны быть доступны пользователю B при загрузке.
 
-**Формальное определение:**
-```
-∀ userA, userB, key: userA ≠ userB ∧ 
-  saveData(key, valueA) with userA ∧
-  loadData(key) with userB → 
-  result = null
-```
-
-**Тестирование:** Property-based тест с генерацией пар пользователей, проверка изоляции данных.
+**Validates: Requirements 1.6, 1.8**
 
 ### Property 47: Восстановление данных при повторном входе
 
-*Для любого* пользователя, после logout и повторного login, все данные должны быть восстановлены.
+*Для любого* пользователя, после logout и повторного login с тем же email, все ранее сохраненные данные должны быть восстановлены в неизменном виде.
 
-**Формальное определение:**
-```
-∀ user, key, value: 
-  saveData(key, value) with user ∧
-  logout() ∧
-  login(user) →
-  loadData(key) = value
-```
+**Validates: Requirements 1.5, 1.7**
 
-**Тестирование:** Property-based тест с циклами logout/login, проверка сохранности данных.
+### Property 48: Определение пользователя по OAuth email
+
+*Для любого* успешного OAuth профиля, система должна корректно извлечь email и использовать его для идентификации пользователя.
+
+**Validates: Requirements 1.1, 1.16**
+
+### Property 49: Очистка email при logout
+
+*Для любого* авторизованного пользователя, после выполнения logout операции, `currentUserEmail` должен быть установлен в `null`.
+
+**Validates: Requirements 1.18**
+
+### Property 50: Изоляция применяется ко всем типам данных
+
+*Для любого* типа пользовательских данных (настройки, профиль, токены, задачи, контакты, календарь), изоляция по `user_email` должна применяться автоматически.
+
+**Validates: Requirements 1.8**
 
 ## Обработка Ошибок
 
@@ -353,7 +342,7 @@ describe('DataManager - User Data Isolation', () => {
   /* Preconditions: UserProfileManager returns valid email
      Action: call saveData('key', 'value')
      Assertions: SQL query includes user_email in WHERE clause
-     Requirements: user-data-isolation.1.3, user-data-isolation.1.11 */
+     Requirements: user-data-isolation.1.3, user-data-isolation.1.11, user-data-isolation.1.12 */
   it('should automatically add user_email when saving', async () => {
     // Тест автоматического добавления email
   });
@@ -361,7 +350,7 @@ describe('DataManager - User Data Isolation', () => {
   /* Preconditions: UserProfileManager returns valid email
      Action: call loadData('key')
      Assertions: SQL query filters by user_email
-     Requirements: user-data-isolation.1.4, user-data-isolation.1.12 */
+     Requirements: user-data-isolation.1.4, user-data-isolation.1.13 */
   it('should automatically filter by user_email when loading', async () => {
     // Тест автоматической фильтрации
   });
@@ -369,7 +358,7 @@ describe('DataManager - User Data Isolation', () => {
   /* Preconditions: UserProfileManager returns null
      Action: call saveData('key', 'value')
      Assertions: throws Error('No user logged in')
-     Requirements: user-data-isolation.1.13 */
+     Requirements: user-data-isolation.1.14 */
   it('should throw error when no user logged in', async () => {
     // Тест ошибки при отсутствии пользователя
   });
@@ -383,7 +372,7 @@ describe('UserProfileManager - Email Caching', () => {
   /* Preconditions: successful OAuth login
      Action: call fetchProfile()
      Assertions: currentUserEmail is set to profile.email
-     Requirements: user-data-isolation.1.15 */
+     Requirements: user-data-isolation.1.16 */
   it('should cache email after successful login', async () => {
     // Тест кэширования email
   });
@@ -488,7 +477,7 @@ describe('User Data Isolation Functional Tests', () => {
   /* Preconditions: user A logged in, data saved
      Action: logout user A, login user B, check data
      Assertions: user B cannot see user A's data
-     Requirements: user-data-isolation.1.5, user-data-isolation.1.6 */
+     Requirements: user-data-isolation.1.5, user-data-isolation.1.6, user-data-isolation.1.8 */
   it('should isolate data between different users', async () => {
     // Тест изоляции данных
   });
@@ -496,7 +485,7 @@ describe('User Data Isolation Functional Tests', () => {
   /* Preconditions: user A logged in, data saved, logout
      Action: login user A again, load data
      Assertions: all data is restored
-     Requirements: user-data-isolation.1.7 */
+     Requirements: user-data-isolation.1.7, user-data-isolation.1.17 */
   it('should restore user data after re-login', async () => {
     // Тест восстановления данных
   });
@@ -504,7 +493,7 @@ describe('User Data Isolation Functional Tests', () => {
   /* Preconditions: user A logged in, data saved
      Action: logout user A
      Assertions: data remains in database
-     Requirements: user-data-isolation.1.5 */
+     Requirements: user-data-isolation.1.5, user-data-isolation.1.8 */
   it('should persist data after logout', async () => {
     // Тест сохранности данных
   });
@@ -512,9 +501,25 @@ describe('User Data Isolation Functional Tests', () => {
   /* Preconditions: multiple users with data
      Action: login as each user, load data
      Assertions: each user sees only their own data
-     Requirements: user-data-isolation.1.8 */
+     Requirements: user-data-isolation.1.4, user-data-isolation.1.6 */
   it('should filter data by user email', async () => {
     // Тест фильтрации по email
+  });
+
+  /* Preconditions: not authenticated
+     Action: attempt to save data
+     Assertions: redirects to login screen, caches cleared
+     Requirements: user-data-isolation.1.14, user-data-isolation.1.19 */
+  it('should handle "No user logged in" error gracefully', async () => {
+    // Тест обработки ошибки отсутствия пользователя
+  });
+
+  /* Preconditions: authenticated, token expires
+     Action: token expires, attempt API request, system refreshes token
+     Assertions: operation succeeds after automatic token refresh
+     Requirements: user-data-isolation.1.20 */
+  it('should retry operation after token refresh', async () => {
+    // Тест повторной попытки после обновления токена
   });
 });
 ```
@@ -523,30 +528,27 @@ describe('User Data Isolation Functional Tests', () => {
 
 | Требование | Модульные Тесты | Property-Based Тесты | Функциональные Тесты |
 |------------|-----------------|----------------------|----------------------|
-| user-data-isolation.1.1 | - | - | ✓ |
-| user-data-isolation.1.2 | - | - | ✓ |
-| user-data-isolation.1.3 | ✓ | ✓ | - |
-| user-data-isolation.1.4 | ✓ | ✓ | - |
-| user-data-isolation.1.5 | - | - | ✓ |
-| user-data-isolation.1.6 | - | - | ✓ |
+| user-data-isolation.1.1 | - | ✓ | ✓ |
+| user-data-isolation.1.2 | ✓ | - | - |
+| user-data-isolation.1.3 | ✓ | ✓ | ✓ |
+| user-data-isolation.1.4 | ✓ | ✓ | ✓ |
+| user-data-isolation.1.5 | - | ✓ | ✓ |
+| user-data-isolation.1.6 | - | ✓ | ✓ |
 | user-data-isolation.1.7 | - | ✓ | ✓ |
-| user-data-isolation.1.8 | - | - | ✓ |
-| user-data-isolation.1.9 | - | - | - |
-| user-data-isolation.1.10 | ✓ | - | - |
+| user-data-isolation.1.8 | - | ✓ | ✓ |
+| user-data-isolation.1.9 | - | - | ✓ |
+| user-data-isolation.1.10 | - | - | - |
 | user-data-isolation.1.11 | ✓ | ✓ | - |
 | user-data-isolation.1.12 | ✓ | ✓ | - |
-| user-data-isolation.1.13 | ✓ | - | - |
-| user-data-isolation.1.14 | ✓ | - | - |
+| user-data-isolation.1.13 | ✓ | ✓ | - |
+| user-data-isolation.1.14 | ✓ | - | ✓ |
 | user-data-isolation.1.15 | ✓ | - | - |
-| user-data-isolation.1.16 | ✓ | - | - |
-| user-data-isolation.1.17 | ✓ | - | - |
-| user-data-isolation.1.18 | ✓ | - | - |
+| user-data-isolation.1.16 | ✓ | ✓ | ✓ |
+| user-data-isolation.1.17 | ✓ | - | ✓ |
+| user-data-isolation.1.18 | ✓ | ✓ | ✓ |
 | user-data-isolation.1.19 | - | - | ✓ |
 | user-data-isolation.1.20 | - | - | ✓ |
-| user-data-isolation.1.21 | ✓ | - | - |
-| user-data-isolation.1.22 | - | - | ✓ |
-| user-data-isolation.1.23 | - | - | ✓ |
-| user-data-isolation.1.24 | - | - | ✓ |
+| user-data-isolation.1.21 | ✓ | - | ✓ |
 
 ## Технические Решения
 
@@ -564,7 +566,7 @@ describe('User Data Isolation Functional Tests', () => {
 - Использовать отдельные таблицы для каждого пользователя (отклонено: усложняет миграции)
 - Использовать отдельные базы данных для каждого пользователя (отклонено: избыточная сложность)
 
-**Requirements:** user-data-isolation.1.11, user-data-isolation.1.12
+**Requirements:** user-data-isolation.1.11, user-data-isolation.1.12, user-data-isolation.1.13
 
 ### Решение 23: Кэширование Email в UserProfileManager
 
@@ -579,4 +581,4 @@ describe('User Data Isolation Functional Tests', () => {
 - Запрашивать email из БД при каждой операции (отклонено: медленно)
 - Хранить email в глобальной переменной (отклонено: нарушает инкапсуляцию)
 
-**Requirements:** user-data-isolation.1.14, user-data-isolation.1.15, user-data-isolation.1.17, user-data-isolation.1.18
+**Requirements:** user-data-isolation.1.15, user-data-isolation.1.16, user-data-isolation.1.17, user-data-isolation.1.18

@@ -162,9 +162,10 @@ export class UserProfileManager {
       // Requirements: account-profile.1.2 - Save to local storage
       await this.saveProfile(profile);
 
-      // Requirements: user-data-isolation.1.15 - Cache email in memory for data isolation
+      // Requirements: user-data-isolation.1.16 - Cache email in memory for data isolation
       this.currentUserEmail = profile.email;
       this.isLoggedOut = false; // Reset logout flag on successful login
+      Logger.info('UserProfileManager', `Email cached for data isolation: ${profile.email}`);
 
       Logger.info('UserProfileManager', 'Profile fetched and saved successfully');
       return profile;
@@ -246,6 +247,27 @@ export class UserProfileManager {
   }
 
   /**
+   * Initialize profile on app startup
+   * Requirements: user-data-isolation.1.17
+   *
+   * Loads cached profile from database and restores currentUserEmail.
+   * This ensures that data isolation works immediately after app restart
+   * without requiring the user to log in again.
+   * Called during app initialization in main process.
+   */
+  async initialize(): Promise<void> {
+    try {
+      const profile = await this.loadProfile();
+      if (profile) {
+        // currentUserEmail is already set by loadProfile()
+        this.logger.info(`Email cached from stored profile: ${profile.email}`);
+      }
+    } catch (error) {
+      this.logger.error(`Failed to initialize: ${error}`);
+    }
+  }
+
+  /**
    * Load user profile by email (for testing purposes)
    * Requirements: testing.3.1, testing.3.2
    *
@@ -315,6 +337,21 @@ export class UserProfileManager {
     this.currentUserEmail = null;
     this.isLoggedOut = true; // Prevent loadProfile from restoring email
     this.logger.info('Current user email cleared from memory');
+  }
+
+  /**
+   * Clear session on logout
+   * Requirements: user-data-isolation.1.18
+   *
+   * Clears the current user email from memory and sets logout flag.
+   * Called during logout to prevent data operations while preserving profile in database.
+   * Profile data remains in database for restoration on next login.
+   */
+  clearSession(): void {
+    // Requirements: user-data-isolation.1.18 - Clear currentUserEmail on logout
+    this.currentUserEmail = null;
+    this.isLoggedOut = true;
+    this.logger.info('User session cleared (email cleared from memory)');
   }
 
   /**

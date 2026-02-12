@@ -519,11 +519,11 @@ describe('UserProfileManager', () => {
       expect(email).toBe('test@example.com');
     });
 
-    /* Preconditions: clearProfile() was called
+    /* Preconditions: clearSession() was called
        Action: Call getCurrentEmail()
        Assertions: Returns null
        Requirements: user-data-isolation.1.10, user-data-isolation.1.18 */
-    it('should return null after clearProfile()', async () => {
+    it('should return null after clearSession()', async () => {
       // First set email by fetching profile
       (oauthClient.getAuthStatus as jest.Mock).mockResolvedValue({
         authorized: true,
@@ -539,8 +539,8 @@ describe('UserProfileManager', () => {
       await profileManager.fetchProfile();
       expect(profileManager.getCurrentEmail()).toBe('test@example.com');
 
-      // Clear profile
-      await profileManager.clearProfile();
+      // Clear session
+      profileManager.clearSession();
 
       // Get current email
       const email = profileManager.getCurrentEmail();
@@ -588,6 +588,133 @@ describe('UserProfileManager', () => {
       const email = profileManager.getCurrentEmail();
 
       expect(email).toBe('updated@example.com');
+    });
+  });
+
+  describe('clearSession', () => {
+    /* Preconditions: User logged in with email cached
+       Action: Call clearSession()
+       Assertions: currentUserEmail is null, isLoggedOut flag is set, success logged to console
+       Requirements: user-data-isolation.1.18 */
+    it('should clear email on logout', () => {
+      // First set email by creating a profile manager with cached email
+      const testProfile: UserProfile = {
+        ...mockProfile,
+        lastUpdated: Date.now(),
+      };
+      dataManager.saveData('user_profile', testProfile);
+
+      // Load profile to cache email
+      profileManager.loadProfile();
+      expect(profileManager.getCurrentEmail()).toBe('test@example.com');
+
+      // Spy on console.info
+      const consoleInfoSpy = jest.spyOn(console, 'info').mockImplementation();
+
+      // Call clearSession
+      profileManager.clearSession();
+
+      // Verify currentUserEmail was cleared
+      const email = profileManager.getCurrentEmail();
+      expect(email).toBeNull();
+
+      // Verify success log
+      expect(consoleInfoSpy).toHaveBeenCalledWith(
+        expect.stringContaining(
+          '[UserProfileManager] User session cleared (email cleared from memory)'
+        )
+      );
+
+      consoleInfoSpy.mockRestore();
+    });
+  });
+
+  describe('initialize', () => {
+    /* Preconditions: DataManager has saved profile data with email
+       Action: Call initialize()
+       Assertions: currentUserEmail is set from loaded profile, success logged to console
+       Requirements: user-data-isolation.1.17 */
+    it('should restore email from database on app startup', async () => {
+      const testProfile: UserProfile = {
+        ...mockProfile,
+        email: 'restored@example.com',
+        lastUpdated: Date.now(),
+      };
+
+      // Save profile first
+      dataManager.saveData('user_profile', testProfile);
+
+      // Spy on console.info
+      const consoleInfoSpy = jest.spyOn(console, 'info').mockImplementation();
+
+      // Call initialize
+      await profileManager.initialize();
+
+      // Verify currentUserEmail was set
+      const email = profileManager.getCurrentEmail();
+      expect(email).toBe('restored@example.com');
+
+      // Verify success log
+      expect(consoleInfoSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[UserProfileManager] Email cached from stored profile:')
+      );
+
+      consoleInfoSpy.mockRestore();
+    });
+
+    /* Preconditions: DataManager has no profile data
+       Action: Call initialize()
+       Assertions: currentUserEmail remains null, no error thrown
+       Requirements: user-data-isolation.1.17 */
+    it('should handle missing profile gracefully', async () => {
+      // Spy on console.info
+      const consoleInfoSpy = jest.spyOn(console, 'info').mockImplementation();
+
+      // Call initialize (no data saved)
+      await profileManager.initialize();
+
+      // Verify currentUserEmail is still null
+      const email = profileManager.getCurrentEmail();
+      expect(email).toBeNull();
+
+      // Verify log message about no profile
+      expect(consoleInfoSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[UserProfileManager] No profile found in local storage')
+      );
+
+      consoleInfoSpy.mockRestore();
+    });
+
+    /* Preconditions: DataManager.loadData() throws error
+       Action: Call initialize()
+       Assertions: Error logged, currentUserEmail remains null, no exception thrown
+       Requirements: user-data-isolation.1.17 */
+    it('should handle load errors gracefully', async () => {
+      // Create a new profile manager with a mock DataManager that throws
+      const mockDataManager = {
+        loadData: jest.fn().mockImplementation(() => {
+          throw new Error('Database error');
+        }),
+      } as unknown as DataManager;
+
+      const testProfileManager = new UserProfileManager(mockDataManager, oauthClient, tokenStorage);
+
+      // Spy on console.error
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+
+      // Call initialize
+      await testProfileManager.initialize();
+
+      // Verify currentUserEmail is null
+      const email = testProfileManager.getCurrentEmail();
+      expect(email).toBeNull();
+
+      // Verify error was logged (error comes from loadProfile, not initialize)
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[UserProfileManager] Failed to load profile:')
+      );
+
+      consoleErrorSpy.mockRestore();
     });
   });
 
