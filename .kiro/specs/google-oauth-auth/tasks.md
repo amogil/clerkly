@@ -305,7 +305,7 @@
 - [x] Интегрировать с существующим WindowManager
 - [x] Реализовать приватный метод `showLoader(): Promise<void>` для отображения loader на Login Screen
 - [x] Реализовать приватный метод `hideLoader(): Promise<void>` для скрытия loader
-- [x] Обновить `handleAuthSuccess()` для вызова hideLoader() перед показом Dashboard
+- [x] Обновить `handleAuthSuccess()` для вызова hideLoader() перед показом Agents
 - [x] Обновить `handleAuthError()` для вызова hideLoader() перед показом Login Error Screen
 - **Requirements:** google-oauth-auth.11.1, google-oauth-auth.11.4, google-oauth-auth.11.5, google-oauth-auth.11.8, google-oauth-auth.11.9, google-oauth-auth.15.1, google-oauth-auth.15.2, google-oauth-auth.15.5, google-oauth-auth.15.6
 
@@ -415,7 +415,7 @@
 - [x] Тест: показ loader после получения authorization code
 - [x] Тест: показ loader во время обмена токенов и загрузки профиля
 - [x] Тест: деактивация кнопки login когда loader отображается
-- [x] Тест: скрытие loader и показ dashboard при успехе
+- [x] Тест: скрытие loader и показ agents при успехе
 - [x] Тест: скрытие loader и показ ошибки при неудаче
 - [x] **Тест: loader показывается НА странице логина (не отдельная страница)** - проверка видимости всех элементов Login Screen во время отображения loader
 - [x] **Тест: loader показывается НА странице ошибки при повторной попытке (не отдельная страница)** - проверка видимости всех элементов Login Error Screen во время отображения loader при retry (кнопка "Continue with Google")

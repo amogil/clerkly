@@ -38,8 +38,8 @@ test.describe('Window State Persistence', () => {
 
   /* Preconditions: Application not running, no saved window state
      Action: Launch application, check initial window size
-     Assertions: Window opens at workAreaSize (full screen minus system elements)
-     Requirements: window-management.1.1, window-management.4.1 */
+     Assertions: Window opens with compact size min(600, screenWidth) x min(400, screenHeight), centered, not maximized
+     Requirements: window-management.1.1, window-management.4.1, window-management.4.2, window-management.4.4 */
   test('should open at default size on first launch', async () => {
     // Launch the application with a fresh data directory
     context = await launchElectron();
@@ -50,19 +50,24 @@ test.describe('Window State Persistence', () => {
     // Get window bounds
     const bounds = await getWindowBounds(context.app);
 
-    // Get screen size to verify window opened at workAreaSize
+    // Get screen size to verify window opened with compact size
     const screenSize = await context.app.evaluate(({ screen }) => {
       const primaryDisplay = screen.getPrimaryDisplay();
       return primaryDisplay.workAreaSize;
     });
 
-    // Verify window has workAreaSize (full screen minus system elements)
-    // Requirements: window-management.1.1, window-management.4.1
-    expect(bounds.width).toBe(screenSize.width);
-    expect(bounds.height).toBe(screenSize.height);
+    // Calculate expected compact size: min(600, screenWidth) x min(400, screenHeight)
+    const expectedWidth = Math.min(600, screenSize.width);
+    const expectedHeight = Math.min(400, screenSize.height);
+
+    // Verify window has compact size (not full screen)
+    // Requirements: window-management.1.1, window-management.4.1, window-management.4.2
+    expect(bounds.width).toBe(expectedWidth);
+    expect(bounds.height).toBe(expectedHeight);
 
     console.log(`Window opened at: ${bounds.width}x${bounds.height}`);
     console.log(`Screen workAreaSize: ${screenSize.width}x${screenSize.height}`);
+    console.log(`Expected compact size: ${expectedWidth}x${expectedHeight}`);
 
     // Take screenshot
     await context.window.screenshot({ path: 'playwright-report/window-default-size.png' });

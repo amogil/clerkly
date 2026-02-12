@@ -607,10 +607,10 @@ test.describe('Account Profile', () => {
      Assertions: Account block cleared, "Not signed in" displayed, profile fields removed, data deleted from database
      Requirements: account-profile.1.8 */
   /* Preconditions: Application not running, clean database, mock OAuth server running
-     Action: Complete OAuth flow, verify Dashboard is shown immediately (not loading screen), check UserInfo API was called, verify profile saved to database
-     Assertions: Dashboard shown immediately after auth (not loading screen), UserInfo API request made in background, profile data saved to database
+     Action: Complete OAuth flow, verify main app (Agents) is shown immediately (not loading screen), check UserInfo API was called synchronously, verify profile saved to database
+     Assertions: Main app (Agents) shown immediately after auth (not loading screen), UserInfo API request made synchronously during OAuth flow, profile data saved to database
      Requirements: account-profile.1.3, navigation.1.3 */
-  test('should load profile in background after authentication', async () => {
+  test('should show main app immediately after authentication with profile already loaded', async () => {
     // Set custom user profile data for this test
     mockServer.setUserProfile({
       id: '444555666',
@@ -631,7 +631,7 @@ test.describe('Account Profile', () => {
     // Wait for content to load
     await context.window.waitForLoadState('domcontentloaded');
 
-    // Complete OAuth flow
+    // Complete OAuth flow (includes synchronous profile fetch)
     await completeOAuthFlow(context.app, context.window);
 
     console.log('[TEST] Auth success triggered');
@@ -639,7 +639,7 @@ test.describe('Account Profile', () => {
     // Wait a short moment for navigation to occur
     await context.window.waitForTimeout(500);
 
-    // Requirements: navigation.1.3 - After successful authentication, user should see Dashboard
+    // Requirements: navigation.1.3 - After successful authentication, user should see main app
     // NOT a loading screen or login screen
     const loginButton = context.window.locator('text=/continue with google/i');
     const hasLoginScreen = await loginButton.isVisible().catch(() => false);
@@ -654,27 +654,25 @@ test.describe('Account Profile', () => {
     console.log('[TEST] Is on loading screen:', hasLoadingScreen);
     expect(hasLoadingScreen).toBe(false);
 
-    // Verify Dashboard is shown
-    // Look for Dashboard-specific elements (tasks, calendar, etc.)
-    // Requirements: navigation.1.3 - Dashboard should be shown immediately
-    const dashboardElement = context.window.locator('text=/Dashboard|Tasks|Calendar/i').first();
-    await dashboardElement.waitFor({ state: 'visible', timeout: 5000 });
-    expect(await dashboardElement.isVisible()).toBe(true);
+    // Verify main app (Agents screen) is shown
+    // Requirements: navigation.1.3 - Main app should be shown immediately after authentication
+    // Profile was already loaded synchronously during OAuth flow
+    const mainAppElement = context.window.locator('[data-testid="agents"]').first();
+    await mainAppElement.waitFor({ state: 'visible', timeout: 5000 });
+    expect(await mainAppElement.isVisible()).toBe(true);
 
-    console.log('✓ Dashboard is shown immediately after authentication (not loading screen)');
+    console.log(
+      '✓ Main app (Agents) is shown immediately after authentication (not loading screen)'
+    );
 
-    // Take screenshot of Dashboard
+    // Take screenshot of main app
     await context.window.screenshot({
-      path: 'playwright-report/account-profile-dashboard-after-auth.png',
+      path: 'playwright-report/account-profile-main-app-after-auth.png',
     });
 
-    // Wait for profile to be fetched in background
-    // Requirements: account-profile.1.3 - Profile should be loaded in background
-    await context.window.waitForTimeout(2000);
-
-    // Verify UserInfo API request was made in background
-    // Requirements: account-profile.1.3 - System should automatically fetch profile from Google UserInfo API
-    // Check if profile is now in database (indicates API was called)
+    // Verify profile was already loaded synchronously during OAuth flow
+    // Requirements: account-profile.1.4 - Profile should be loaded synchronously during authorization
+    // Check if profile is in database (was saved during OAuth flow)
     const profileCheck = await context.window.evaluate(async () => {
       return await (window as any).electron.ipcRenderer.invoke('test:get-profile');
     });
@@ -689,11 +687,11 @@ test.describe('Account Profile', () => {
     expect(profileCheck.profile.email).toBe('background.test@example.com');
     expect(profileCheck.profile.name).toBe('Background Test User');
 
-    console.log('✓ UserInfo API request was made in background');
+    console.log('✓ Profile was loaded synchronously during OAuth flow');
     console.log('✓ Profile data saved to database');
 
     // Verify user can navigate to Settings and see profile
-    // This confirms the background loading worked correctly
+    // This confirms the synchronous profile loading during OAuth worked correctly
     const settingsNav = context.window.locator('text=/settings/i');
     await settingsNav.waitFor({ state: 'visible', timeout: 5000 });
     await settingsNav.click();
@@ -703,7 +701,7 @@ test.describe('Account Profile', () => {
     const accountHeading = context.window.locator('text=/^Account$/i');
     await accountHeading.waitFor({ state: 'visible', timeout: 5000 });
 
-    // Verify profile fields are populated with background-loaded data
+    // Verify profile fields are populated with synchronously-loaded data
     const nameInput = context.window.locator('#profile-name');
     const emailInput = context.window.locator('#profile-email');
 
@@ -716,15 +714,15 @@ test.describe('Account Profile', () => {
     expect(nameValue).toBe('Background Test User');
     expect(emailValue).toBe('background.test@example.com');
 
-    console.log('✓ Profile data is displayed in Account block (loaded in background)');
+    console.log('✓ Profile data is displayed in Account block (loaded synchronously during OAuth)');
 
-    // Take screenshot of Account block with background-loaded data
+    // Take screenshot of Account block with synchronously-loaded data
     await context.window.screenshot({
-      path: 'playwright-report/account-profile-background-loaded.png',
+      path: 'playwright-report/account-profile-sync-loaded.png',
     });
 
-    console.log('✓ Profile loaded in background after authentication');
-    console.log('✓ Dashboard shown immediately, profile fetched asynchronously');
+    console.log('✓ Profile was already loaded synchronously during OAuth flow');
+    console.log('✓ Main app (Agents) shown immediately with profile data available');
   });
 
   /* Preconditions: Application not running, database with pre-saved profile data, mock OAuth server running
@@ -788,7 +786,7 @@ test.describe('Account Profile', () => {
     // Complete OAuth flow (this will fetch fresh profile from API)
     await completeOAuthFlow(context.app, context.window);
 
-    console.log('[TEST] Auth success triggered, profile fetch started in background');
+    console.log('[TEST] Auth success triggered, profile loaded synchronously during OAuth');
 
     // Wait a short moment for navigation
     await context.window.waitForTimeout(500);
@@ -932,7 +930,7 @@ test.describe('Account Profile', () => {
     // Complete OAuth flow
     await completeOAuthFlow(context.app, context.window);
 
-    console.log('[TEST] Auth success triggered, profile fetch started in background');
+    console.log('[TEST] Auth success triggered, profile loaded synchronously during OAuth');
 
     // Wait a short moment for navigation
     await context.window.waitForTimeout(500);
@@ -1186,10 +1184,10 @@ test.describe('Account Profile', () => {
     console.log('✓ Profile fetch succeeded: data displayed in UI and saved to database');
   });
 
-  /* Preconditions: Application not running, clean database, mock OAuth server running
-     Action: Simulate authentication, verify loader shown during profile fetch (if visible), verify Dashboard shown after
-     Assertions: Dashboard shown after authentication (loader may not be visible in fast test environment)
-     Requirements: account-profile.1.4
+  /* Preconditions: Application not running, clean database, mock OAuth server running with delayed UserInfo response
+     Action: Subscribe to show-loader event, trigger OAuth flow, verify loader shown when event fires, verify Agents shown after
+     Assertions: Loader shown after deep link (spinner + "Signing in..." + disabled button), Agents shown after profile loaded, profile saved to database
+     Requirements: account-profile.1.4, google-oauth-auth.15.1, google-oauth-auth.15.2, google-oauth-auth.15.4, google-oauth-auth.15.7
      Property: 10, 11, 12 */
   test('should show loader during synchronous profile fetch', async () => {
     // Set user profile data for this test
@@ -1200,6 +1198,9 @@ test.describe('Account Profile', () => {
       given_name: 'Loader',
       family_name: 'Test User',
     });
+
+    // Requirements: testing.3.9 - Set delay for UserInfo API to make loader visible
+    mockServer.setUserInfoDelay(3000);
 
     // Launch the application with clean database and environment variable
     // Requirements: testing.3.1, testing.3.2 - Real Electron, no mocks
@@ -1219,42 +1220,147 @@ test.describe('Account Profile', () => {
     await loginButton.waitFor({ state: 'visible', timeout: 5000 });
     console.log('[TEST] Login screen confirmed');
 
-    // Complete OAuth flow
-    await completeOAuthFlow(context.app, context.window);
+    // Subscribe to auth:show-loader event and set up MutationObserver
+    await context.window.evaluate(() => {
+      (window as any).__loaderEventReceived = false;
+      (window as any).__loaderState = {
+        wasVisible: false,
+        buttonDisabled: false,
+        hasSpinner: false,
+        hasSigningInText: false,
+      };
 
-    console.log('[TEST] Authentication completed');
+      // Set up MutationObserver to watch for loader appearing
+      const observer = new MutationObserver(() => {
+        const button = document.querySelector('button') as HTMLButtonElement;
+        const spinner = document.querySelector('button svg.animate-spin');
+        const signingInText = document.body.textContent?.includes('Signing in');
 
-    // Wait for UI to update
+        // Check if ALL loader indicators are present
+        const allIndicatorsPresent = button?.disabled && spinner && signingInText;
+
+        if (allIndicatorsPresent) {
+          console.log('[RENDERER] Loader detected by MutationObserver!', {
+            buttonDisabled: button?.disabled,
+            hasSpinner: !!spinner,
+            hasSigningInText: !!signingInText,
+          });
+          (window as any).__loaderState = {
+            wasVisible: true,
+            buttonDisabled: true,
+            hasSpinner: true,
+            hasSigningInText: true,
+          };
+        }
+      });
+
+      // Start observing
+      observer.observe(document.body, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['disabled', 'class'],
+        characterData: true,
+      });
+
+      (window as any).api.auth.onShowLoader(() => {
+        console.log('[RENDERER] Received auth:show-loader event');
+        (window as any).__loaderEventReceived = true;
+      });
+    });
+
+    // Complete OAuth flow (this will trigger show-loader event)
+    const oauthPromise = completeOAuthFlow(context.app, context.window);
+
+    // Wait for loader event to fire
+    console.log('[TEST] Waiting for loader event...');
+    await context.window.waitForFunction(
+      () => {
+        return (window as any).__loaderEventReceived === true;
+      },
+      { timeout: 10000 }
+    );
+
+    // Wait for OAuth flow to complete (this gives MutationObserver time to detect loader)
+    console.log('[TEST] Waiting for OAuth flow to complete...');
+    await oauthPromise.catch(() => {
+      console.log('[TEST] OAuth promise rejected (window may have closed)');
+    });
+
+    // Check if loader was visible at any point
+    const loaderState = await context.window
+      .evaluate(() => {
+        return (window as any).__loaderState;
+      })
+      .catch(() => ({
+        wasVisible: false,
+        buttonDisabled: false,
+        hasSpinner: false,
+        hasSigningInText: false,
+      }));
+
+    console.log('[TEST] Loader state:', loaderState);
+    console.log('[TEST] - Button disabled:', loaderState.buttonDisabled);
+    console.log('[TEST] - Spinner visible:', loaderState.hasSpinner);
+    console.log('[TEST] - "Signing in..." text visible:', loaderState.hasSigningInText);
+
+    // Requirements: google-oauth-auth.15.2, google-oauth-auth.15.7 - Verify ALL loader indicators were shown
+    expect(loaderState.wasVisible).toBe(true);
+    expect(loaderState.buttonDisabled).toBe(true);
+    expect(loaderState.hasSpinner).toBe(true);
+    expect(loaderState.hasSigningInText).toBe(true);
+
+    console.log('✓ Loader shown during synchronous profile fetch');
+
+    // Take screenshot of loader
+    await context.window
+      .screenshot({
+        path: 'playwright-report/account-profile-loader-visible.png',
+      })
+      .catch(() => {
+        console.log('[TEST] Failed to take screenshot (window may have closed)');
+      });
+
+    // Wait for OAuth flow to complete
+    console.log('[TEST] Waiting for OAuth flow to complete...');
+    await oauthPromise.catch(() => {
+      console.log('[TEST] OAuth promise rejected (window may have closed)');
+    });
+
+    // Wait for new window (main app) to open
     await context.window.waitForTimeout(2000);
 
-    // Verify Dashboard is shown after authentication
-    // Requirements: account-profile.1.4, Property 12 - Dashboard should be shown after profile loaded
-    const dashboardElement = context.window.locator('text=/Dashboard|Tasks|Calendar/i').first();
-    await dashboardElement.waitFor({ state: 'visible', timeout: 5000 });
-    const hasDashboard = await dashboardElement.isVisible();
+    // Get all windows
+    const windows = context.app.windows();
+    console.log('[TEST] Number of windows:', windows.length);
 
-    console.log('[TEST] Dashboard visible:', hasDashboard);
-    expect(hasDashboard).toBe(true);
+    // Find the main window (should be the newest one)
+    const mainWindow = windows[windows.length - 1];
 
-    console.log('✓ Dashboard shown after authentication');
+    // Requirements: account-profile.1.4, navigation.1.3 - Verify Agents is shown after authentication
+    const agentsElement = mainWindow.locator('[data-testid="agents"]').first();
+    await agentsElement.waitFor({ state: 'visible', timeout: 5000 });
+    const hasAgents = await agentsElement.isVisible();
 
-    // Note: Loader may not be visible in test environment due to fast execution
-    // This is acceptable - the important part is that Dashboard is shown after auth
+    console.log('[TEST] Agents visible:', hasAgents);
+    expect(hasAgents).toBe(true);
+
+    console.log('✓ Agents shown after authentication');
 
     // Take screenshot
-    await context.window.screenshot({
-      path: 'playwright-report/account-profile-loader-dashboard.png',
+    await mainWindow.screenshot({
+      path: 'playwright-report/account-profile-loader-agents.png',
     });
 
     // Verify profile is saved
-    const profileCheck = await context.window.evaluate(async () => {
+    const profileCheck = await mainWindow.evaluate(async () => {
       return await (window as any).electron.ipcRenderer.invoke('test:get-profile');
     });
 
     expect(profileCheck.profile).not.toBeNull();
     expect(profileCheck.profile.email).toBe('loader.test@example.com');
 
-    console.log('✓ Profile saved and Dashboard displayed');
+    console.log('✓ Profile saved and Agents displayed');
   });
 
   /* Preconditions: Application not running, clean database, mock OAuth server running

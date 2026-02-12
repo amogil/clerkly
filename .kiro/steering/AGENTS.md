@@ -269,7 +269,7 @@ npm run test:functional:single -- account-profile.spec.ts
 npm run test:functional:single -- "oauth-*.spec.ts"
 
 # Запустить конкретный тест по названию
-npm run test:functional:single -- --grep "should redirect to dashboard"
+npm run test:functional:single -- --grep "should redirect to agents"
 ```
 
 **Отладка упавших тестов:**

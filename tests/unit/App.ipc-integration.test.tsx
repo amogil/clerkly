@@ -30,32 +30,24 @@ jest.mock('../../src/renderer/components/top-navigation', () => ({
   TopNavigation: () => <div data-testid="top-navigation">TopNavigation</div>,
 }));
 
-jest.mock('../../src/renderer/components/ai-agent-panel', () => ({
-  AIAgentPanel: () => <div data-testid="ai-agent-panel">AIAgentPanel</div>,
+jest.mock('../../src/renderer/components/agents', () => ({
+  Agents: () => <div data-testid="agents">Agents</div>,
 }));
 
-jest.mock('../../src/renderer/components/dashboard-updated', () => ({
-  DashboardUpdated: () => <div data-testid="dashboard">Dashboard</div>,
+jest.mock('../../src/renderer/components/settings', () => ({
+  Settings: () => <div data-testid="settings">Settings</div>,
 }));
 
-jest.mock('../../src/renderer/components/calendar-view', () => ({
-  CalendarView: () => <div data-testid="calendar">Calendar</div>,
+jest.mock('../../src/renderer/components/error-demo-page', () => ({
+  ErrorDemoPage: () => <div data-testid="error-demo">ErrorDemo</div>,
 }));
 
-jest.mock('../../src/renderer/components/meeting-detail', () => ({
-  MeetingDetail: () => <div data-testid="meeting-detail">MeetingDetail</div>,
+jest.mock('../../src/renderer/components/auth/LoginScreen', () => ({
+  LoginScreen: () => <div data-testid="login-screen">LoginScreen</div>,
 }));
 
-jest.mock('../../src/renderer/components/tasks-view-new', () => ({
-  TasksViewNew: () => <div data-testid="tasks">Tasks</div>,
-}));
-
-jest.mock('../../src/renderer/components/contacts', () => ({
-  Contacts: () => <div data-testid="contacts">Contacts</div>,
-}));
-
-jest.mock('../../src/renderer/components/triggers', () => ({
-  Triggers: () => <div data-testid="triggers">Triggers</div>,
+jest.mock('../../src/renderer/components/auth/LoginError', () => ({
+  LoginError: () => <div data-testid="login-error">LoginError</div>,
 }));
 
 jest.mock('../../src/renderer/components/error-demo-page', () => ({

@@ -160,11 +160,7 @@
 
 2.1. Приложение ДОЛЖНО использовать системные настройки локали для форматирования дат и времени (через `Intl.DateTimeFormat` с системной локалью)
 
-2.2. Форматирование ДОЛЖНО применяться ко всем timestamp в следующих местах:
-   - Задачи (Tasks)
-   - Календарь (Calendar)
-   - Контакты (Contacts)
-   - История изменений
+2.2. Форматирование ДОЛЖНО применяться ко всем timestamp в приложении (например, история изменений, логи активности)
 
 2.3. Форматирование НЕ ДОЛЖНО применяться к логам - логи ДОЛЖНЫ использовать централизованный "Logger" класс (см. clerkly.3)
 
@@ -180,10 +176,7 @@
 
 #### Функциональные Тесты
 
-- `tests/functional/date-time-formatting.spec.ts` - "should format dates using system locale"
-- `tests/functional/date-time-formatting.spec.ts` - "should format times using system locale"
-- `tests/functional/date-time-formatting.spec.ts` - "should use fixed format for logs"
-- `tests/functional/date-time-formatting.spec.ts` - "should not display relative time formats"
+- Функциональные тесты для форматирования дат будут добавлены при реализации компонентов, отображающих timestamp
 
 ## Вне Области Применения
 

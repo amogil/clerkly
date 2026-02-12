@@ -131,7 +131,7 @@
      │ 14. Fetch user profile from Google UserInfo API (synchronous)│
      │     - If profile fetch fails: clear tokens, show LoginError │
      │     - If profile fetch succeeds: save profile to database   │
-     │ 15. Open main application window (Dashboard)                │
+     │ 15. Open main application window (Agents)                │
      │                                                              │
 ```
 
@@ -769,7 +769,7 @@ const effectiveRedirectUri = `com.googleusercontent.apps.${clientIdWithoutSuffix
   Тестируемость: да - property
 
 15.5 Скрытие loader при успехе
-  Мысли: Это переход состояния UI. Можно тестировать успешным завершением авторизации и проверкой скрытия loader и отображения Dashboard.
+  Мысли: Это переход состояния UI. Можно тестировать успешным завершением авторизации и проверкой скрытия loader и отображения Agents.
   Тестируемость: да - example
 
 15.6 Скрытие loader при ошибке

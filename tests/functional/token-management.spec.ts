@@ -98,7 +98,7 @@ test('42.1 should automatically refresh expired access token', async () => {
   await mainWindow.waitForTimeout(1000);
 
   // Verify we're on dashboard (not login screen)
-  const dashboardHeading = await mainWindow.locator('h1:has-text("Dashboard")').count();
+  const dashboardHeading = await mainWindow.locator('[data-testid="agents"]').count();
   expect(dashboardHeading).toBeGreaterThan(0);
 
   // Note: Automatic token refresh is tested in property-based tests
@@ -127,7 +127,7 @@ test('42.2 should clear session and show login on 401 error', async () => {
   await mainWindow.waitForTimeout(1000);
 
   // Verify we're on dashboard
-  const dashboardHeading = await mainWindow.locator('h1:has-text("Dashboard")').count();
+  const dashboardHeading = await mainWindow.locator('[data-testid="agents"]').count();
   expect(dashboardHeading).toBeGreaterThan(0);
 
   // Setup: Mock API to return 401
@@ -159,7 +159,7 @@ test('42.3 should handle 401 from any API endpoint consistently', async () => {
   await mainWindow.waitForTimeout(1000);
 
   // Verify we're on dashboard
-  const dashboardHeading = await mainWindow.locator('h1:has-text("Dashboard")').count();
+  const dashboardHeading = await mainWindow.locator('[data-testid="agents"]').count();
   expect(dashboardHeading).toBeGreaterThan(0);
 
   // Setup: Mock UserInfo API to return 401
@@ -191,7 +191,7 @@ test('42.4 should log authorization errors with context', async () => {
   await mainWindow.waitForTimeout(1000);
 
   // Verify we're on dashboard
-  const dashboardHeading = await mainWindow.locator('h1:has-text("Dashboard")').count();
+  const dashboardHeading = await mainWindow.locator('[data-testid="agents"]').count();
   expect(dashboardHeading).toBeGreaterThan(0);
 
   // Setup: Mock API to return 401
@@ -226,7 +226,7 @@ test('42.5 should show user-friendly error message on session expiry', async () 
   await mainWindow.waitForTimeout(1000);
 
   // Verify we're on dashboard
-  const dashboardHeading = await mainWindow.locator('h1:has-text("Dashboard")').count();
+  const dashboardHeading = await mainWindow.locator('[data-testid="agents"]').count();
   expect(dashboardHeading).toBeGreaterThan(0);
 
   // Setup: Mock API to return 401
@@ -264,7 +264,7 @@ test('42.6 should handle multiple simultaneous 401 errors', async () => {
   await mainWindow.waitForTimeout(1000);
 
   // Verify we're on dashboard
-  const dashboardHeading = await mainWindow.locator('h1:has-text("Dashboard")').count();
+  const dashboardHeading = await mainWindow.locator('[data-testid="agents"]').count();
   expect(dashboardHeading).toBeGreaterThan(0);
 
   // Setup: Mock multiple APIs to return 401

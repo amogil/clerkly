@@ -102,17 +102,17 @@ describe('NavigationManager', () => {
   describe('redirectToDashboard', () => {
     /* Preconditions: NavigationManager created
        Action: call redirectToDashboard()
-       Assertions: router.navigate() called with '/dashboard', message logged
+       Assertions: router.navigate() called with '/agents', message logged
        Requirements: navigation.1.3 */
-    it('should navigate to dashboard route', () => {
+    it('should navigate to agents route', () => {
       const consoleInfoSpy = jest.spyOn(console, 'info').mockImplementation();
 
       navigationManager.redirectToDashboard();
 
-      expect(mockRouter.navigate).toHaveBeenCalledWith('/dashboard');
+      expect(mockRouter.navigate).toHaveBeenCalledWith('/agents');
       expect(mockRouter.navigate).toHaveBeenCalledTimes(1);
       expect(consoleInfoSpy).toHaveBeenCalledWith(
-        expect.stringContaining('[NavigationManager] Redirecting to dashboard')
+        expect.stringContaining('[NavigationManager] Redirecting to agents')
       );
 
       consoleInfoSpy.mockRestore();
@@ -143,7 +143,7 @@ describe('NavigationManager', () => {
        Action: call initialize()
        Assertions: redirectToDashboard() called
        Requirements: navigation.1.3 */
-    it('should redirect to dashboard when user is authorized and on login screen', async () => {
+    it('should redirect to agents when user is authorized and on login screen', async () => {
       mockGetStatus.mockResolvedValue({ authorized: true });
       Object.defineProperty(mockRouter, 'currentRoute', {
         get: () => '/login',
@@ -154,22 +154,22 @@ describe('NavigationManager', () => {
       await navigationManager.initialize();
 
       expect(mockGetStatus).toHaveBeenCalledTimes(1);
-      expect(mockRouter.navigate).toHaveBeenCalledWith('/dashboard');
+      expect(mockRouter.navigate).toHaveBeenCalledWith('/agents');
       expect(consoleInfoSpy).toHaveBeenCalledWith(
-        expect.stringContaining('[NavigationManager] Redirecting to dashboard')
+        expect.stringContaining('[NavigationManager] Redirecting to agents')
       );
 
       consoleInfoSpy.mockRestore();
     });
 
-    /* Preconditions: user authorized, current route is '/dashboard'
+    /* Preconditions: user authorized, current route is '/agents'
        Action: call initialize()
-       Assertions: no navigation occurs (stays on dashboard)
+       Assertions: no navigation occurs (stays on agents)
        Requirements: navigation.1.1, navigation.1.3 */
     it('should not redirect when user is authorized and not on login screen', async () => {
       mockGetStatus.mockResolvedValue({ authorized: true });
       Object.defineProperty(mockRouter, 'currentRoute', {
-        get: () => '/dashboard',
+        get: () => '/agents',
         configurable: true,
       });
 

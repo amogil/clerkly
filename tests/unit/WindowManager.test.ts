@@ -121,18 +121,18 @@ describe('WindowManager', () => {
 
     /* Preconditions: WindowManager created, no saved state exists
        Action: call createWindow()
-       Assertions: window created with default state dimensions equal to workAreaSize
-       Requirements: window-management.1.1, window-management.4.1, window-management.4.2, window-management.5.5 */
+       Assertions: window created with compact default state min(600, screenWidth) x min(400, screenHeight), centered
+       Requirements: window-management.1.1, window-management.4.1, window-management.4.2, window-management.4.4, window-management.5.5 */
     it('should create window with default state when no saved state exists', () => {
       windowManager.createWindow();
 
-      // Default state should be full workAreaSize (1920x1080)
+      // Default state should be compact size 600x400, centered on 1920x1080 screen
       expect(BrowserWindow).toHaveBeenCalledWith(
         expect.objectContaining({
-          x: 0,
-          y: 0,
-          width: 1920,
-          height: 1080,
+          x: 660, // (1920 - 600) / 2
+          y: 340, // (1080 - 400) / 2
+          width: 600, // min(600, 1920)
+          height: 400, // min(400, 1080)
         })
       );
     });

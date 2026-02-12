@@ -35,7 +35,7 @@
   - Интегрировать вызов `fetchProfileSynchronously()` в метод `handleAuthorizationCode()` OAuthClientManager после успешного обмена code на токены
   - При успешной загрузке профиля: сохранить профиль в базу данных И вернуть success
   - При ошибке загрузки профиля: очистить токены через TokenStorageManager И вернуть ошибку с errorCode 'profile_fetch_failed'
-  - Обеспечить, что процесс блокирующий (await) - Dashboard показывается только после успешной загрузки профиля
+  - Обеспечить, что процесс блокирующий (await) - Agents показывается только после успешной загрузки профиля
   - **Requirements:** google-oauth-auth.3.6, google-oauth-auth.3.7, google-oauth-auth.3.8, account-profile.1.3, account-profile.1.4, account-profile.1.5
   - **Property:** 15, 16, 17, 18
 
@@ -77,7 +77,7 @@
 - [x] 3.3 Добавить loader для синхронной загрузки профиля при авторизации
   - Создать состояние loading в компоненте авторизации (или использовать существующий loader)
   - Показывать loader во время синхронной загрузки профиля (после обмена code на токены)
-  - При успехе: скрыть loader И показать Dashboard
+  - При успехе: скрыть loader И показать Agents
   - При ошибке: скрыть loader И показать LoginError компонент с errorCode 'profile_fetch_failed'
   - **Requirements:** account-profile.1.4
   - **Property:** 16, 17, 18
@@ -149,8 +149,8 @@
 - [x] 8.5 Тест: синхронная загрузка профиля при авторизации (успех)
 - [x] 8.6 Тест: синхронная загрузка профиля при авторизации (ошибка)
 - [x] 8.7 Тест: should show login screen when not authenticated
-- [x] 8.8 Тест: should show dashboard after successful authentication
-- [x] 8.9 Тест: should load profile in background after authentication
+- [x] 8.8 Тест: should show agents after successful authentication
+- [x] 8.9 Тест: should show main app immediately after authentication with profile already loaded
 - [x] 8.10 Тест: should show cached data while loading profile
 - [x] 8.11 Тест: should show empty fields on first authentication
 - [x] 8.12 Тест: should populate profile data when fetch succeeds

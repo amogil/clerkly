@@ -1,5 +1,5 @@
 /* Preconditions: Application running without authentication
-   Action: Attempt to access protected screens (Dashboard, Settings, Tasks, Calendar, Contacts)
+   Action: Attempt to access protected screens (Agents, Settings, Tasks, Calendar, Contacts)
    Assertions: Access is blocked, user is redirected to login screen
    Requirements: navigation.1.1, navigation.1.2, navigation.1.3, navigation.1.4 */
 
@@ -101,7 +101,7 @@ test('should block access to protected screens without authentication', async ()
     .or(window.locator('text=Welcome'));
   await expect(loginScreen).toBeVisible({ timeout: 10000 });
 
-  // Try to access Dashboard via evaluate (simulating direct navigation)
+  // Try to access Agents via evaluate (simulating direct navigation)
   await window.evaluate(() => {
     // Attempt to trigger navigation to dashboard
     const event = new CustomEvent('navigate', { detail: { route: '/dashboard' } });
@@ -163,10 +163,10 @@ test('should block access to protected screens without authentication', async ()
 
 /* Preconditions: User successfully authenticated
    Action: Complete OAuth flow
-   Assertions: User is redirected to Dashboard
-   Requirements: navigation.1.3
+   Assertions: User is redirected to Agents
+   Requirements: navigation.1.7
    Property: 26 */
-test('should redirect to dashboard after successful authentication', async () => {
+test('should redirect to agents after successful authentication', async () => {
   // Wait for login screen
   const loginScreen = window
     .locator('[data-testid="login-screen"]')
@@ -309,7 +309,7 @@ test('should show error on authorization failure', async () => {
   const dashboard = window.locator('[data-testid="dashboard"]');
   await expect(dashboard).not.toBeVisible();
 
-  console.log('[TEST] ✓ Dashboard not visible (tokens cleared)');
+  console.log('[TEST] ✓ Agents not visible (tokens cleared)');
 
   // Take screenshot of error state
   await window.screenshot({

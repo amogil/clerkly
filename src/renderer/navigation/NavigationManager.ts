@@ -48,12 +48,12 @@ export class NavigationManager {
   }
 
   /**
-   * Redirect to dashboard
+   * Redirect to main screen (agents)
    * Requirements: navigation.1.3
    */
   redirectToDashboard(): void {
-    this.logger.info('Redirecting to dashboard');
-    this.router.navigate('/dashboard');
+    this.logger.info('Redirecting to agents');
+    this.router.navigate('/agents');
   }
 
   /**

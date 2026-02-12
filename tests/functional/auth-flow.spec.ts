@@ -184,11 +184,11 @@ test.describe('Authentication Flow', () => {
   });
 
   /* Preconditions: Application not running, mock OAuth server available
-     Action: Complete OAuth flow and verify Dashboard is shown
-     Assertions: Dashboard is displayed (not Settings or Account Block)
-     Requirements: navigation.1.3
+     Action: Complete OAuth flow and verify Agents (main app) is shown
+     Assertions: Agents is displayed (not Settings or Login screen)
+     Requirements: navigation.1.7
      Property: 9, 26 */
-  test('should show dashboard after successful authentication', async () => {
+  test('should show agents after successful authentication', async () => {
     // Set user profile data for this test
     mockServer.setUserProfile({
       id: '123456789',
@@ -219,48 +219,40 @@ test.describe('Authentication Flow', () => {
     // Wait for UI to update after authentication
     await context.window.waitForTimeout(1000);
 
-    console.log('[TEST] Authentication completed, checking for Dashboard...');
+    console.log('[TEST] Authentication completed, checking for Agents...');
 
-    // Verify Dashboard is displayed (not login screen)
-    // Dashboard should have specific elements that identify it
-    // Requirements: navigation.1.3 - Dashboard should be shown after successful authentication
-    // Property 9, 26 - Show Dashboard after successful authorization
+    // Verify Agents is displayed (not login screen)
+    // Agents should have specific elements that identify it
+    // Requirements: navigation.1.7 - Agents should be shown after successful authentication
+    // Property 9, 26 - Show Agents after successful authorization
 
     // Check that login button is no longer visible
     const loginButtonAfterAuth = context.window.locator('text=/continue with google/i');
     const isLoginVisible = await loginButtonAfterAuth.isVisible().catch(() => false);
     expect(isLoginVisible).toBe(false);
 
-    // Check for Dashboard-specific heading
-    // Dashboard has a heading "Dashboard" at the top of the page
-    const dashboardHeading = context.window.locator('h1:has-text("Dashboard")');
-    await dashboardHeading.waitFor({ state: 'visible', timeout: 5000 });
-    expect(await dashboardHeading.isVisible()).toBe(true);
+    // Check for Agents screen using data-testid
+    const agentsScreen = context.window.locator('[data-testid="agents"]');
+    await agentsScreen.waitFor({ state: 'visible', timeout: 5000 });
+    expect(await agentsScreen.isVisible()).toBe(true);
 
-    console.log('[TEST] ✓ Dashboard heading found');
-
-    // Verify Dashboard-specific content is visible
-    // Dashboard shows "Today's Schedule" section
-    const todaysSchedule = context.window.locator('h2:has-text("Today\'s Schedule")');
-    expect(await todaysSchedule.isVisible()).toBe(true);
-
-    console.log("[TEST] ✓ Today's Schedule section found");
+    console.log('[TEST] ✓ Agents screen found');
 
     // Verify we're NOT on Settings page
     // Settings page would have "Account" heading or "Profile" section
-    // Dashboard does NOT have these elements
+    // Agents does NOT have these elements
     const accountHeading = context.window.locator('h2:has-text("Account")');
     const isAccountVisible = await accountHeading.isVisible().catch(() => false);
     expect(isAccountVisible).toBe(false);
 
-    console.log('[TEST] ✓ Verified: Dashboard is shown, not Settings or Account Block');
+    console.log('[TEST] ✓ Verified: Agents is shown, not Settings or Account Block');
 
-    // Take screenshot of Dashboard
+    // Take screenshot of Agents
     await context.window.screenshot({
-      path: 'playwright-report/dashboard-after-auth.png',
+      path: 'playwright-report/agents-after-auth.png',
     });
 
-    console.log('[TEST] ✓ Dashboard displayed successfully after authentication');
+    console.log('[TEST] ✓ Agents displayed successfully after authentication');
   });
 });
 

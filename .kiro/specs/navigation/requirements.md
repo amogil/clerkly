@@ -9,7 +9,7 @@
 - **Protected Routes** - Защищенные маршруты, доступные только авторизованным пользователям
 - **Auth Guard** - Компонент, проверяющий авторизацию перед доступом к защищенным маршрутам
 - **Login Screen** - Экран авторизации через Google OAuth
-- **Dashboard** - Главный экран приложения после авторизации
+- **Agents** - Главный экран приложения после авторизации
 - **Loader** - Индикатор загрузки, отображаемый во время асинхронных операций
 - **Authorization Code** - Код авторизации, полученный от Google OAuth после успешной авторизации пользователя
 - **LoginError Component** - Компонент для отображения ошибок авторизации
@@ -38,7 +38,7 @@
 
 1.1. КОГДА пользователь не авторизован, ТО приложение ДОЛЖНО показывать экран логина
 
-1.2. КОГДА пользователь не авторизован, ТО пользователь НЕ МОЖЕТ получить доступ к защищенным экранам (Dashboard, Settings, Tasks, Calendar, Contacts)
+1.2. КОГДА пользователь не авторизован, ТО пользователь НЕ МОЖЕТ получить доступ к защищенным экранам (Agents, Settings и другим защищенным маршрутам)
 
 1.3. КОГДА пользователь нажимает кнопку "Continue with Google", ТО приложение ДОЛЖНО открыть системный браузер для авторизации
 
@@ -50,7 +50,7 @@
    - Обменять authorization code на токены
    - Загрузить профиль пользователя из Google UserInfo API (синхронно)
 
-1.7. КОГДА пользователь успешно авторизуется через Google OAuth И профиль загружен, ТО приложение ДОЛЖНО автоматически перенаправить пользователя на Dashboard (главный экран приложения)
+1.7. КОГДА пользователь успешно авторизуется через Google OAuth И профиль загружен, ТО приложение ДОЛЖНО автоматически перенаправить пользователя на Agents (главный экран приложения)
 
 1.8. КОГДА происходит ошибка авторизации (обмен токенов ИЛИ загрузка профиля), ТО приложение ДОЛЖНО показать LoginError компонент с описанием ошибки
 
@@ -60,7 +60,7 @@
 
 - `tests/functional/navigation.spec.ts` - "should show login screen when not authenticated"
 - `tests/functional/navigation.spec.ts` - "should block access to protected screens without authentication"
-- `tests/functional/navigation.spec.ts` - "should redirect to dashboard after successful authentication"
+- `tests/functional/navigation.spec.ts` - "should redirect to agents after successful authentication"
 - `tests/functional/navigation.spec.ts` - "should redirect to login screen after logout"
 - `tests/functional/navigation.spec.ts` - "should show loader during authorization"
 - `tests/functional/navigation.spec.ts` - "should allow multiple login attempts before authorization completes"

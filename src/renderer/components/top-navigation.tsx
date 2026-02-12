@@ -1,5 +1,4 @@
-import { LayoutDashboard, Calendar, CheckSquare, Users, Settings, Zap } from 'lucide-react';
-import { Logo } from './logo';
+import { Zap, Settings } from 'lucide-react';
 
 interface TopNavigationProps {
   currentScreen: string;
@@ -8,23 +7,13 @@ interface TopNavigationProps {
 
 export function TopNavigation({ currentScreen, onNavigate }: TopNavigationProps) {
   const navItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'calendar', label: 'Calendar', icon: Calendar },
-    { id: 'tasks', label: 'Tasks', icon: CheckSquare },
-    { id: 'contacts', label: 'Contacts', icon: Users },
-    { id: 'triggers', label: 'Triggers', icon: Zap },
+    { id: 'agents', label: 'Agents', icon: Zap },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
 
   return (
-    <nav className="fixed top-0 left-0 right-[33.333333%] h-16 bg-card border-b border-border flex items-center px-6 z-50">
-      {/* Logo and Brand */}
-      <div className="flex items-center gap-3 mr-8">
-        <Logo showText={false} />
-        <span className="text-xl font-semibold text-foreground">Clerkly</span>
-      </div>
-
-      {/* Navigation Items */}
+    <nav className="fixed top-0 left-0 right-0 h-16 bg-card border-b border-border flex items-center justify-center px-6 z-50">
+      {/* Navigation Items - centered */}
       <div className="flex items-center gap-2">
         {navItems.map((item) => {
           const Icon = item.icon;
