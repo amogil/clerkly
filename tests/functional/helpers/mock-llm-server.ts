@@ -31,6 +31,7 @@ export class MockLLMServer {
   private errorStatus: number = 401;
   private errorMessage: string = 'Invalid API key';
   private requestLogs: RequestLog[] = [];
+  private responseDelay: number = 0; // Delay in milliseconds
 
   constructor(config: MockLLMServerConfig) {
     this.port = config.port;
@@ -103,60 +104,84 @@ export class MockLLMServer {
   private handleOpenAI(res: http.ServerResponse): void {
     console.log('[MOCK LLM] OpenAI request received');
 
-    if (this.shouldSucceed) {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(
-        JSON.stringify({
-          choices: [{ message: { content: 'test' } }],
-        })
-      );
+    const sendResponse = () => {
+      if (this.shouldSucceed) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(
+          JSON.stringify({
+            choices: [{ message: { content: 'test' } }],
+          })
+        );
+      } else {
+        res.writeHead(this.errorStatus, { 'Content-Type': 'application/json' });
+        res.end(
+          JSON.stringify({
+            error: { message: this.errorMessage },
+          })
+        );
+      }
+    };
+
+    if (this.responseDelay > 0) {
+      setTimeout(sendResponse, this.responseDelay);
     } else {
-      res.writeHead(this.errorStatus, { 'Content-Type': 'application/json' });
-      res.end(
-        JSON.stringify({
-          error: { message: this.errorMessage },
-        })
-      );
+      sendResponse();
     }
   }
 
   private handleAnthropic(res: http.ServerResponse): void {
     console.log('[MOCK LLM] Anthropic request received');
 
-    if (this.shouldSucceed) {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(
-        JSON.stringify({
-          content: [{ text: 'test' }],
-        })
-      );
+    const sendResponse = () => {
+      if (this.shouldSucceed) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(
+          JSON.stringify({
+            content: [{ text: 'test' }],
+          })
+        );
+      } else {
+        res.writeHead(this.errorStatus, { 'Content-Type': 'application/json' });
+        res.end(
+          JSON.stringify({
+            error: { message: this.errorMessage },
+          })
+        );
+      }
+    };
+
+    if (this.responseDelay > 0) {
+      setTimeout(sendResponse, this.responseDelay);
     } else {
-      res.writeHead(this.errorStatus, { 'Content-Type': 'application/json' });
-      res.end(
-        JSON.stringify({
-          error: { message: this.errorMessage },
-        })
-      );
+      sendResponse();
     }
   }
 
   private handleGoogle(res: http.ServerResponse): void {
     console.log('[MOCK LLM] Google request received');
 
-    if (this.shouldSucceed) {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(
-        JSON.stringify({
-          candidates: [{ content: { parts: [{ text: 'test' }] } }],
-        })
-      );
+    const sendResponse = () => {
+      if (this.shouldSucceed) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(
+          JSON.stringify({
+            candidates: [{ content: { parts: [{ text: 'test' }] } }],
+          })
+        );
+      } else {
+        res.writeHead(this.errorStatus, { 'Content-Type': 'application/json' });
+        res.end(
+          JSON.stringify({
+            error: { message: this.errorMessage },
+          })
+        );
+      }
+    };
+
+    if (this.responseDelay > 0) {
+      setTimeout(sendResponse, this.responseDelay);
     } else {
-      res.writeHead(this.errorStatus, { 'Content-Type': 'application/json' });
-      res.end(
-        JSON.stringify({
-          error: { message: this.errorMessage },
-        })
-      );
+      sendResponse();
     }
   }
 
@@ -197,6 +222,11 @@ export class MockLLMServer {
   setError(status: number, message: string) {
     this.errorStatus = status;
     this.errorMessage = message;
+  }
+
+  setDelay(delayMs: number) {
+    this.responseDelay = delayMs;
+    console.log(`[MOCK LLM] Response delay set to: ${delayMs}ms`);
   }
 
   getBaseUrl(): string {

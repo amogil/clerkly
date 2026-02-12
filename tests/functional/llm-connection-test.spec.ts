@@ -59,6 +59,7 @@ test.beforeEach(async () => {
   // Clear request logs
   mockLLMServer.clearRequestLogs();
   mockLLMServer.setSuccess(true);
+  mockLLMServer.setDelay(0); // Reset delay
 
   // Launch Electron app with mock servers
   const mockLLMBaseUrl = mockLLMServer.getBaseUrl();
@@ -260,10 +261,13 @@ test('54.6: should test connection for all providers', async () => {
 });
 
 /* Preconditions: App is launched and authenticated, API key is filled
-   Action: Click Test Connection button, verify button behavior
-   Assertions: Button shows "Testing..." text during test, then returns to "Test Connection"
+   Action: Click Test Connection button, verify button shows "Testing..." during request
+   Assertions: Button text changes to "Testing..." and button is disabled during test
    Requirements: settings.3.2, settings.3.3 */
 test('54.7: should show Testing text during connection test', async () => {
+  // Set delay to make "Testing..." state visible
+  mockLLMServer.setDelay(2000);
+
   // Enter API key
   const apiKeyInput = context.window.locator('input[placeholder="Enter your API key"]');
   await apiKeyInput.fill('test-api-key-12345');
@@ -273,18 +277,33 @@ test('54.7: should show Testing text during connection test', async () => {
   const testButton = context.window.locator('button:has-text("Test Connection")');
   await testButton.click();
 
-  // Wait for test to complete and check for success toast
-  await context.window.waitForTimeout(1500);
+  // Wait for "Testing..." button to appear
+  const testingButton = context.window.locator('button:has-text("Testing...")');
+  await testingButton.waitFor({ state: 'visible', timeout: 1000 });
 
-  // Check that success toast appeared (which means test completed)
-  const successToast = context.window
-    .locator('[data-sonner-toast]')
-    .filter({ hasText: /Connection successful/i })
-    .first();
-  await successToast.waitFor({ state: 'visible', timeout: 5000 });
-  expect(await successToast.isVisible()).toBe(true);
+  // Verify "Testing..." button is visible and disabled
+  const isTestingVisible = await testingButton.isVisible();
+  const isTestingDisabled = await testingButton.isDisabled();
 
-  // Button should be enabled again with "Test Connection" text
-  const afterDisabled = await testButton.isDisabled();
-  expect(afterDisabled).toBe(false);
+  console.log('[TEST] Testing button state:', {
+    visible: isTestingVisible,
+    disabled: isTestingDisabled,
+  });
+
+  expect(isTestingVisible).toBe(true);
+  expect(isTestingDisabled).toBe(true);
+
+  // Wait for test to complete
+  await context.window.waitForTimeout(2500);
+
+  // Verify button returns to normal state
+  const finalButton = context.window.locator('button:has-text("Test Connection")');
+  await finalButton.waitFor({ state: 'visible', timeout: 2000 });
+  const isFinalDisabled = await finalButton.isDisabled();
+  expect(isFinalDisabled).toBe(false);
+
+  console.log('[TEST] ✓ Button returned to normal state');
+
+  // Reset delay for other tests
+  mockLLMServer.setDelay(0);
 });
