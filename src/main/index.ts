@@ -18,6 +18,7 @@ import { getOAuthConfig, OAUTH_CONFIG } from './auth/OAuthConfig';
 import { AuthIPCHandlers } from './auth/AuthIPCHandlers';
 import { AIAgentSettingsManager } from './AIAgentSettingsManager';
 import { SettingsIPCHandlers } from './SettingsIPCHandlers';
+import { registerLLMIPCHandlers } from './llm/LLMIPCHandlers';
 import { Logger } from './Logger';
 
 // Requirements: clerkly.3.5, clerkly.3.7 - Create parameterized logger for Main module
@@ -504,6 +505,11 @@ app.whenReady().then(async () => {
     // Register Settings IPC handlers
     settingsIPCHandlers.registerHandlers();
     logger.info('Settings IPC handlers registered');
+
+    // Requirements: settings.3.4, settings.3.9
+    // Register LLM IPC handlers
+    registerLLMIPCHandlers();
+    logger.info('LLM IPC handlers registered');
 
     // Requirements: google-oauth-auth.11.1
     // Initialize Auth Window Manager to check auth status and show appropriate window

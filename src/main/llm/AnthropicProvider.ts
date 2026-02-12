@@ -1,29 +1,32 @@
 // Requirements: settings.3.5, settings.3.6, settings.3.7, settings.3.8
 
 import { ILLMProvider, TestConnectionResult } from './ILLMProvider';
+import { LLM_PROVIDERS, ERROR_MESSAGES } from './LLMConfig';
 
 /**
  * Anthropic LLM provider implementation
  * 
- * Tests connection to Anthropic API using claude-haiku-4-5 model
+ * Tests connection to Anthropic API using configured model
  */
 export class AnthropicProvider implements ILLMProvider {
+  private config = LLM_PROVIDERS.anthropic;
+
   getProviderName(): string {
-    return 'Anthropic';
+    return this.config.name;
   }
 
   /**
    * Test connection to Anthropic API
    * 
-   * Requirements: settings.3.5 - Use minimal test request with claude-haiku-4-5
-   * Requirements: settings.3.6 - 10 second timeout
+   * Requirements: settings.3.5 - Use minimal test request with configured model
+   * Requirements: settings.3.6 - Configured timeout
    * Requirements: settings.3.7 - Return success on HTTP 200
    * Requirements: settings.3.8 - Map errors to user-friendly messages
    */
   async testConnection(apiKey: string): Promise<TestConnectionResult> {
     try {
       // Requirements: settings.3.5 - Minimal test request
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
+      const response = await fetch(this.config.apiUrl, {
         method: 'POST',
         headers: {
           'x-api-key': apiKey,
@@ -31,11 +34,11 @@ export class AnthropicProvider implements ILLMProvider {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'claude-haiku-4-5',
+          model: this.config.testModel,
           messages: [{ role: 'user', content: 'test' }],
-          max_tokens: 5,
+          max_tokens: this.config.maxTokens,
         }),
-        signal: AbortSignal.timeout(10000), // Requirements: settings.3.6 - 10 second timeout
+        signal: AbortSignal.timeout(this.config.timeout), // Requirements: settings.3.6 - Configured timeout
       });
 
       // Requirements: settings.3.7 - Success on HTTP 200
@@ -64,20 +67,11 @@ export class AnthropicProvider implements ILLMProvider {
    * Requirements: settings.3.8 - Error messages for different HTTP statuses
    */
   private mapErrorToMessage(status: number, errorData: any): string {
-    switch (status) {
-      case 401:
-        return 'Invalid API key. Please check your key and try again.';
-      case 403:
-        return 'Access forbidden. Please check your API key permissions.';
-      case 429:
-        return 'Rate limit exceeded. Please try again later.';
-      case 500:
-      case 502:
-      case 503:
-        return 'Provider service unavailable. Please try again later.';
-      default:
-        return `Connection failed: ${errorData.error?.message || 'Unknown error'}`;
+    const message = ERROR_MESSAGES[status as keyof typeof ERROR_MESSAGES];
+    if (message) {
+      return message;
     }
+    return `Connection failed: ${errorData.error?.message || ERROR_MESSAGES.unknown}`;
   }
 
   /**
@@ -87,8 +81,8 @@ export class AnthropicProvider implements ILLMProvider {
    */
   private mapExceptionToMessage(error: any): string {
     if (error.name === 'AbortError' || error.name === 'TimeoutError') {
-      return 'Connection timeout. Please check your internet connection.';
+      return ERROR_MESSAGES.timeout;
     }
-    return 'Network error. Please check your internet connection.';
+    return ERROR_MESSAGES.network;
   }
 }

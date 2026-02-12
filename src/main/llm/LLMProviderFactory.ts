@@ -1,6 +1,7 @@
 // Requirements: settings.3
 
 import { ILLMProvider } from './ILLMProvider';
+import { LLMProviderType } from './LLMConfig';
 import { OpenAIProvider } from './OpenAIProvider';
 import { AnthropicProvider } from './AnthropicProvider';
 import { GoogleProvider } from './GoogleProvider';
@@ -15,11 +16,11 @@ export class LLMProviderFactory {
   /**
    * Create an LLM provider instance
    * 
-   * @param type - Provider type ('openai', 'anthropic', or 'google')
+   * @param type - Provider type
    * @returns Provider instance
    * @throws Error if provider type is unknown
    */
-  static createProvider(type: 'openai' | 'anthropic' | 'google'): ILLMProvider {
+  static createProvider(type: LLMProviderType): ILLMProvider {
     switch (type) {
       case 'openai':
         return new OpenAIProvider();
