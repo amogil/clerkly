@@ -246,4 +246,164 @@ describe('TokenStorageManager', () => {
     expect(loaded?.accessToken).toBe(longToken);
     expect(loaded?.refreshToken).toBe(longToken);
   });
+
+  /* Preconditions: DataManager.saveData fails for access token
+     Action: Call saveTokens
+     Assertions: Throws error with descriptive message
+     Requirements: google-oauth-auth.4.1 */
+  it('should throw error when access token save fails', async () => {
+    const tokens: TokenData = {
+      accessToken: 'test-access-token',
+      refreshToken: 'test-refresh-token',
+      expiresAt: Date.now() + 3600000,
+      tokenType: 'Bearer',
+    };
+
+    // Mock saveData to fail for access token
+    jest.spyOn(dataManager, 'saveData').mockReturnValueOnce({
+      success: false,
+      error: 'Database error',
+    });
+
+    await expect(tokenStorage.saveTokens(tokens)).rejects.toThrow(
+      'Failed to save tokens: Failed to save access token: Database error'
+    );
+  });
+
+  /* Preconditions: DataManager.saveData fails for refresh token
+     Action: Call saveTokens with refresh token
+     Assertions: Throws error with descriptive message
+     Requirements: google-oauth-auth.4.1 */
+  it('should throw error when refresh token save fails', async () => {
+    const tokens: TokenData = {
+      accessToken: 'test-access-token',
+      refreshToken: 'test-refresh-token',
+      expiresAt: Date.now() + 3600000,
+      tokenType: 'Bearer',
+    };
+
+    // Mock saveData to succeed for access token, fail for refresh token
+    jest
+      .spyOn(dataManager, 'saveData')
+      .mockReturnValueOnce({ success: true })
+      .mockReturnValueOnce({
+        success: false,
+        error: 'Database locked',
+      });
+
+    await expect(tokenStorage.saveTokens(tokens)).rejects.toThrow(
+      'Failed to save tokens: Failed to save refresh token: Database locked'
+    );
+  });
+
+  /* Preconditions: DataManager.saveData fails for expires_at
+     Action: Call saveTokens
+     Assertions: Throws error with descriptive message
+     Requirements: google-oauth-auth.4.1 */
+  it('should throw error when expires_at save fails', async () => {
+    const tokens: TokenData = {
+      accessToken: 'test-access-token',
+      expiresAt: Date.now() + 3600000,
+      tokenType: 'Bearer',
+    };
+
+    // Mock saveData to succeed for access token, fail for expires_at
+    jest
+      .spyOn(dataManager, 'saveData')
+      .mockReturnValueOnce({ success: true })
+      .mockReturnValueOnce({
+        success: false,
+        error: 'Disk full',
+      });
+
+    await expect(tokenStorage.saveTokens(tokens)).rejects.toThrow(
+      'Failed to save tokens: Failed to save expires_at: Disk full'
+    );
+  });
+
+  /* Preconditions: DataManager.saveData fails for token_type
+     Action: Call saveTokens
+     Assertions: Throws error with descriptive message
+     Requirements: google-oauth-auth.4.1 */
+  it('should throw error when token_type save fails', async () => {
+    const tokens: TokenData = {
+      accessToken: 'test-access-token',
+      expiresAt: Date.now() + 3600000,
+      tokenType: 'Bearer',
+    };
+
+    // Mock saveData to succeed for access token and expires_at, fail for token_type
+    jest
+      .spyOn(dataManager, 'saveData')
+      .mockReturnValueOnce({ success: true })
+      .mockReturnValueOnce({ success: true })
+      .mockReturnValueOnce({
+        success: false,
+        error: 'Permission denied',
+      });
+
+    await expect(tokenStorage.saveTokens(tokens)).rejects.toThrow(
+      'Failed to save tokens: Failed to save token type: Permission denied'
+    );
+  });
+
+  /* Preconditions: DataManager.loadData returns database error (not "Key not found")
+     Action: Call loadTokens
+     Assertions: Throws error with database error message
+     Requirements: google-oauth-auth.4.3 */
+  it('should throw error when loadData returns database error', async () => {
+    // Mock loadData to return database error
+    jest.spyOn(dataManager, 'loadData').mockReturnValueOnce({
+      success: false,
+      error: 'Database corrupted',
+    });
+
+    await expect(tokenStorage.loadTokens()).rejects.toThrow(
+      'Failed to load tokens: Database corrupted'
+    );
+  });
+
+  /* Preconditions: DataManager.loadData returns "Key not found" for all keys
+     Action: Call loadTokens
+     Assertions: Returns null (not an error)
+     Requirements: google-oauth-auth.4.3 */
+  it('should return null when all keys not found (not an error)', async () => {
+    // Mock loadData to return "Key not found" for all keys
+    jest.spyOn(dataManager, 'loadData').mockReturnValue({
+      success: false,
+      error: 'Key not found',
+    });
+
+    const loaded = await tokenStorage.loadTokens();
+
+    expect(loaded).toBeNull();
+  });
+
+  /* Preconditions: DataManager.deleteData throws error
+     Action: Call deleteTokens
+     Assertions: Throws error with descriptive message
+     Requirements: google-oauth-auth.4.4 */
+  it('should throw error when deleteData fails', async () => {
+    // Mock deleteData to throw error
+    jest.spyOn(dataManager, 'deleteData').mockImplementation(() => {
+      throw new Error('Database locked');
+    });
+
+    await expect(tokenStorage.deleteTokens()).rejects.toThrow(
+      'Failed to delete tokens: Database locked'
+    );
+  });
+
+  /* Preconditions: loadTokens throws error
+     Action: Call hasValidTokens
+     Assertions: Returns false (treats error as invalid tokens)
+     Requirements: google-oauth-auth.5.1, google-oauth-auth.5.2 */
+  it('should return false when loadTokens throws error', async () => {
+    // Mock loadTokens to throw error
+    jest.spyOn(tokenStorage, 'loadTokens').mockRejectedValue(new Error('Database error'));
+
+    const hasValid = await tokenStorage.hasValidTokens();
+
+    expect(hasValid).toBe(false);
+  });
 });
