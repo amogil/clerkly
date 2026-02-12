@@ -552,4 +552,242 @@ describe('AuthIPCHandlers', () => {
       expect(typeof result.error).toBe('string');
     });
   });
+
+  describe('Error Notification', () => {
+    /* Preconditions: Multiple windows open, error occurs
+       Action: Call sendErrorNotification()
+       Assertions: Error logged to console, error:notify event sent to all windows
+       Requirements: error-notifications.1.1, error-notifications.1.4 */
+    it('should send error notification to all windows and log to console', () => {
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+      const mockWindow1 = { webContents: { send: jest.fn() } };
+      const mockWindow2 = { webContents: { send: jest.fn() } };
+      (BrowserWindow.getAllWindows as jest.Mock).mockReturnValue([mockWindow1, mockWindow2]);
+
+      const errorMessage = 'Failed to save data';
+      const context = 'DataManager';
+      authIPCHandlers.sendErrorNotification(errorMessage, context);
+
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining(`[${context}] Error: ${errorMessage}`)
+      );
+      expect(mockWindow1.webContents.send).toHaveBeenCalledWith(
+        'error:notify',
+        errorMessage,
+        context
+      );
+      expect(mockWindow2.webContents.send).toHaveBeenCalledWith(
+        'error:notify',
+        errorMessage,
+        context
+      );
+
+      consoleErrorSpy.mockRestore();
+    });
+
+    /* Preconditions: No windows open, error occurs
+       Action: Call sendErrorNotification()
+       Assertions: Error logged to console, no crash
+       Requirements: error-notifications.1.4 */
+    it('should handle error notification when no windows exist', () => {
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+      (BrowserWindow.getAllWindows as jest.Mock).mockReturnValue([]);
+
+      const errorMessage = 'Failed to save data';
+      const context = 'DataManager';
+
+      expect(() => {
+        authIPCHandlers.sendErrorNotification(errorMessage, context);
+      }).not.toThrow();
+
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining(`[${context}] Error: ${errorMessage}`)
+      );
+
+      consoleErrorSpy.mockRestore();
+    });
+  });
+
+  describe('Profile Update Broadcasting', () => {
+    /* Preconditions: Multiple windows open, profile refreshed successfully
+       Action: Call auth:refresh-profile handler
+       Assertions: auth:profile-updated event sent to all windows with profile data
+       Requirements: account-profile.1.5 */
+    it('should broadcast profile update to all windows after refresh', async () => {
+      const mockProfile: UserProfile = {
+        id: '123',
+        email: 'test@example.com',
+        verified_email: true,
+        name: 'Test User',
+        given_name: 'Test',
+        family_name: 'User',
+        locale: 'en',
+        lastUpdated: Date.now(),
+      };
+
+      const mockWindow1 = { webContents: { send: jest.fn() } };
+      const mockWindow2 = { webContents: { send: jest.fn() } };
+      (BrowserWindow.getAllWindows as jest.Mock).mockReturnValue([mockWindow1, mockWindow2]);
+
+      authIPCHandlers.setProfileManager(mockProfileManager);
+      mockProfileManager.fetchProfile.mockResolvedValue(mockProfile);
+
+      authIPCHandlers.registerHandlers();
+      const handler = (ipcMain.handle as jest.Mock).mock.calls.find(
+        (call) => call[0] === 'auth:refresh-profile'
+      )?.[1];
+
+      await handler({});
+
+      expect(mockWindow1.webContents.send).toHaveBeenCalledWith(
+        'auth:profile-updated',
+        mockProfile
+      );
+      expect(mockWindow2.webContents.send).toHaveBeenCalledWith(
+        'auth:profile-updated',
+        mockProfile
+      );
+    });
+
+    /* Preconditions: No windows open, profile refreshed successfully
+       Action: Call auth:refresh-profile handler
+       Assertions: No crash, profile returned successfully
+       Requirements: account-profile.1.5 */
+    it('should handle profile refresh when no windows exist', async () => {
+      const mockProfile: UserProfile = {
+        id: '123',
+        email: 'test@example.com',
+        verified_email: true,
+        name: 'Test User',
+        given_name: 'Test',
+        family_name: 'User',
+        locale: 'en',
+        lastUpdated: Date.now(),
+      };
+
+      (BrowserWindow.getAllWindows as jest.Mock).mockReturnValue([]);
+
+      authIPCHandlers.setProfileManager(mockProfileManager);
+      mockProfileManager.fetchProfile.mockResolvedValue(mockProfile);
+
+      authIPCHandlers.registerHandlers();
+      const handler = (ipcMain.handle as jest.Mock).mock.calls.find(
+        (call) => call[0] === 'auth:refresh-profile'
+      )?.[1];
+
+      const result = await handler({});
+
+      expect(result).toEqual({
+        success: true,
+        profile: mockProfile,
+      });
+    });
+  });
+
+  describe('Error Handling Edge Cases', () => {
+    /* Preconditions: Handler throws non-Error object
+       Action: Call auth:start-login handler with non-Error rejection
+       Assertions: Returns success: false with 'Unknown error' message
+       Requirements: google-oauth-auth.8.5 */
+    it('should handle non-Error exceptions in start login', async () => {
+      mockOAuthClient.startAuthFlow.mockRejectedValue('String error');
+
+      authIPCHandlers.registerHandlers();
+      const handler = (ipcMain.handle as jest.Mock).mock.calls.find(
+        (call) => call[0] === 'auth:start-login'
+      )?.[1];
+
+      const result = await handler({});
+
+      expect(result).toEqual({
+        success: false,
+        error: 'Unknown error',
+      });
+    });
+
+    /* Preconditions: Handler throws non-Error object
+       Action: Call auth:get-status handler with non-Error rejection
+       Assertions: Returns success: false with 'Unknown error' message
+       Requirements: google-oauth-auth.8.5 */
+    it('should handle non-Error exceptions in get status', async () => {
+      mockOAuthClient.getAuthStatus.mockRejectedValue('String error');
+
+      authIPCHandlers.registerHandlers();
+      const handler = (ipcMain.handle as jest.Mock).mock.calls.find(
+        (call) => call[0] === 'auth:get-status'
+      )?.[1];
+
+      const result = await handler({});
+
+      expect(result).toEqual({
+        success: false,
+        authorized: false,
+        error: 'Unknown error',
+      });
+    });
+
+    /* Preconditions: Handler throws non-Error object
+       Action: Call auth:logout handler with non-Error rejection
+       Assertions: Returns success: false with 'Unknown error' message
+       Requirements: google-oauth-auth.8.5 */
+    it('should handle non-Error exceptions in logout', async () => {
+      mockOAuthClient.logout.mockRejectedValue('String error');
+
+      authIPCHandlers.registerHandlers();
+      const handler = (ipcMain.handle as jest.Mock).mock.calls.find(
+        (call) => call[0] === 'auth:logout'
+      )?.[1];
+
+      const result = await handler({});
+
+      expect(result).toEqual({
+        success: false,
+        error: 'Unknown error',
+      });
+    });
+
+    /* Preconditions: Handler throws non-Error object
+       Action: Call auth:get-profile handler with non-Error rejection
+       Assertions: Returns success: false with 'Unknown error' message
+       Requirements: account-profile.1.7 */
+    it('should handle non-Error exceptions in get profile', async () => {
+      authIPCHandlers.setProfileManager(mockProfileManager);
+      mockProfileManager.loadProfile.mockRejectedValue('String error');
+
+      authIPCHandlers.registerHandlers();
+      const handler = (ipcMain.handle as jest.Mock).mock.calls.find(
+        (call) => call[0] === 'auth:get-profile'
+      )?.[1];
+
+      const result = await handler({});
+
+      expect(result).toEqual({
+        success: false,
+        error: 'Unknown error',
+        profile: null,
+      });
+    });
+
+    /* Preconditions: Handler throws non-Error object
+       Action: Call auth:refresh-profile handler with non-Error rejection
+       Assertions: Returns success: false with 'Unknown error' message
+       Requirements: account-profile.1.5 */
+    it('should handle non-Error exceptions in refresh profile', async () => {
+      authIPCHandlers.setProfileManager(mockProfileManager);
+      mockProfileManager.fetchProfile.mockRejectedValue('String error');
+
+      authIPCHandlers.registerHandlers();
+      const handler = (ipcMain.handle as jest.Mock).mock.calls.find(
+        (call) => call[0] === 'auth:refresh-profile'
+      )?.[1];
+
+      const result = await handler({});
+
+      expect(result).toEqual({
+        success: false,
+        error: 'Unknown error',
+        profile: null,
+      });
+    });
+  });
 });

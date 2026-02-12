@@ -53,6 +53,13 @@ interface API {
       provider: 'openai' | 'anthropic' | 'google'
     ) => Promise<{ success: boolean; error?: string }>;
   };
+  // Requirements: settings.3
+  llm: {
+    testConnection: (
+      provider: 'openai' | 'anthropic' | 'google',
+      apiKey: string
+    ) => Promise<{ success: boolean; error?: string }>;
+  };
   // Requirements: testing.3.1, testing.3.2 - Test API methods (only available in test environment)
   test?: {
     simulateDataError: (
@@ -345,6 +352,27 @@ const api: API = {
       provider: 'openai' | 'anthropic' | 'google'
     ): Promise<{ success: boolean; error?: string }> {
       return await ipcRenderer.invoke('settings:delete-api-key', provider);
+    },
+  },
+
+  // Requirements: settings.3
+  /**
+   * LLM API
+   * Provides methods for testing LLM provider connections
+   */
+  llm: {
+    /**
+     * Test connection to LLM provider
+     * Requirements: settings.3.4, settings.3.7, settings.3.8
+     * @param {string} provider - LLM provider ('openai', 'anthropic', or 'google')
+     * @param {string} apiKey - API key to test
+     * @returns {Promise<{success: boolean, error?: string}>}
+     */
+    async testConnection(
+      provider: 'openai' | 'anthropic' | 'google',
+      apiKey: string
+    ): Promise<{ success: boolean; error?: string }> {
+      return await ipcRenderer.invoke('llm:test-connection', { provider, apiKey });
     },
   },
 };

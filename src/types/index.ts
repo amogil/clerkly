@@ -202,6 +202,13 @@ export interface API {
       provider: 'openai' | 'anthropic' | 'google'
     ) => Promise<{ success: boolean; error?: string }>;
   };
+  // Requirements: settings.3
+  llm: {
+    testConnection: (
+      provider: 'openai' | 'anthropic' | 'google',
+      apiKey: string
+    ) => Promise<{ success: boolean; error?: string }>;
+  };
 }
 
 /**

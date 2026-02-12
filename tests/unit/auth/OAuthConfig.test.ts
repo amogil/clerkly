@@ -118,5 +118,87 @@ describe('OAuthConfig', () => {
         'com.googleusercontent.apps.custom-client-id-67890:/oauth2redirect'
       );
     });
+
+    /* Preconditions: CLERKLY_OAUTH_CLIENT_ID environment variable set
+       Action: Call getOAuthConfig without arguments
+       Assertions: Uses environment variable client ID
+       Requirements: google-oauth-auth.10.1 */
+    it('should use CLERKLY_OAUTH_CLIENT_ID environment variable when set', () => {
+      const originalClientId = process.env.CLERKLY_OAUTH_CLIENT_ID;
+      process.env.CLERKLY_OAUTH_CLIENT_ID = 'env-client-id-12345';
+
+      const config = getOAuthConfig();
+
+      expect(config.clientId).toBe('env-client-id-12345');
+      expect(config.redirectUri).toBe(
+        'com.googleusercontent.apps.env-client-id-12345:/oauth2redirect'
+      );
+
+      if (originalClientId) {
+        process.env.CLERKLY_OAUTH_CLIENT_ID = originalClientId;
+      } else {
+        delete process.env.CLERKLY_OAUTH_CLIENT_ID;
+      }
+    });
+
+    /* Preconditions: CLERKLY_OAUTH_CLIENT_SECRET environment variable set
+       Action: Call getOAuthConfig without arguments
+       Assertions: Uses environment variable client secret
+       Requirements: google-oauth-auth.10.1 */
+    it('should use CLERKLY_OAUTH_CLIENT_SECRET environment variable when set', () => {
+      const originalClientSecret = process.env.CLERKLY_OAUTH_CLIENT_SECRET;
+      process.env.CLERKLY_OAUTH_CLIENT_SECRET = 'env-client-secret-67890';
+
+      const config = getOAuthConfig();
+
+      expect(config.clientSecret).toBe('env-client-secret-67890');
+
+      if (originalClientSecret) {
+        process.env.CLERKLY_OAUTH_CLIENT_SECRET = originalClientSecret;
+      } else {
+        delete process.env.CLERKLY_OAUTH_CLIENT_SECRET;
+      }
+    });
+
+    /* Preconditions: CLERKLY_GOOGLE_API_URL environment variable set
+       Action: Call getOAuthConfig without arguments
+       Assertions: Uses environment variable for OAuth endpoints
+       Requirements: google-oauth-auth.10.4, google-oauth-auth.10.5, google-oauth-auth.10.6 */
+    it('should use CLERKLY_GOOGLE_API_URL environment variable for endpoints when set', () => {
+      const originalApiUrl = process.env.CLERKLY_GOOGLE_API_URL;
+      process.env.CLERKLY_GOOGLE_API_URL = 'http://localhost:3000';
+
+      const config = getOAuthConfig();
+
+      expect(config.authorizationEndpoint).toBe('http://localhost:3000/auth');
+      expect(config.tokenEndpoint).toBe('http://localhost:3000/token');
+      expect(config.revokeEndpoint).toBe('http://localhost:3000/revoke');
+
+      if (originalApiUrl) {
+        process.env.CLERKLY_GOOGLE_API_URL = originalApiUrl;
+      } else {
+        delete process.env.CLERKLY_GOOGLE_API_URL;
+      }
+    });
+
+    /* Preconditions: Custom client ID provided, CLERKLY_OAUTH_CLIENT_ID also set
+       Action: Call getOAuthConfig with custom client ID
+       Assertions: Custom client ID takes precedence over environment variable
+       Requirements: google-oauth-auth.10.1 */
+    it('should prioritize custom client ID over environment variable', () => {
+      const originalClientId = process.env.CLERKLY_OAUTH_CLIENT_ID;
+      process.env.CLERKLY_OAUTH_CLIENT_ID = 'env-client-id-12345';
+
+      const customClientId = 'custom-client-id-67890';
+      const config = getOAuthConfig(customClientId);
+
+      expect(config.clientId).toBe(customClientId);
+
+      if (originalClientId) {
+        process.env.CLERKLY_OAUTH_CLIENT_ID = originalClientId;
+      } else {
+        delete process.env.CLERKLY_OAUTH_CLIENT_ID;
+      }
+    });
   });
 });

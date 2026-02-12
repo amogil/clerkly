@@ -579,5 +579,80 @@ describe('LifecycleManager', () => {
 
       expect(mockWindowManager.createWindow).toHaveBeenCalledTimes(4); // 1 from init + 3 from activations
     });
+
+    /* Preconditions: LifecycleManager created, initialization takes > 3000ms
+       Action: call initialize() with slow operations
+       Assertions: warning logged about slow startup
+       Requirements: clerkly.nfr.1 */
+    it('should log warning when startup exceeds 3 seconds', async () => {
+      const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation();
+
+      // Mock slow initialization
+      mockDataManager.initialize = jest.fn().mockImplementation(() => {
+        // Simulate slow operation
+        const start = Date.now();
+        while (Date.now() - start < 3100) {
+          // Busy wait
+        }
+        return {
+          success: true,
+          migrations: { success: true, appliedCount: 0, message: 'No migrations' },
+        };
+      });
+
+      const result = await lifecycleManager.initialize();
+
+      expect(result.success).toBe(true);
+      expect(result.loadTime).toBeGreaterThan(3000);
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[LifecycleManager] Slow startup:')
+      );
+      expect(consoleWarnSpy).toHaveBeenCalledWith(expect.stringContaining('target: <3000ms'));
+
+      consoleWarnSpy.mockRestore();
+    });
+
+    /* Preconditions: LifecycleManager created, user authenticated, profile fetch fails
+       Action: call initialize()
+       Assertions: initialization succeeds despite profile fetch failure
+       Requirements: clerkly.1, account-profile.1.5 */
+    it('should handle profile fetch failure during initialization', async () => {
+      mockOAuthClient.getAuthStatus = jest.fn().mockResolvedValue({ authorized: true });
+
+      // Mock profileManager.fetchProfile to throw error
+      const fetchProfileSpy = jest
+        .spyOn(lifecycleManager['profileManager'], 'fetchProfile')
+        .mockRejectedValue(new Error('Network error'));
+
+      await expect(lifecycleManager.initialize()).rejects.toThrow(
+        'Application initialization failed: Network error'
+      );
+
+      expect(fetchProfileSpy).toHaveBeenCalled();
+    });
+
+    /* Preconditions: LifecycleManager created, handleActivation throws error
+       Action: call handleActivation() when createWindow throws
+       Assertions: error logged, no crash
+       Requirements: clerkly.1, clerkly.nfr.3 */
+    it('should handle errors in handleActivation gracefully', () => {
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+
+      mockWindowManager.isWindowCreated = jest.fn().mockReturnValue(false);
+      mockWindowManager.createWindow = jest.fn().mockImplementation(() => {
+        throw new Error('Window creation failed');
+      });
+
+      expect(() => lifecycleManager.handleActivation()).not.toThrow();
+
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[LifecycleManager] Failed to handle activation:')
+      );
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Window creation failed')
+      );
+
+      consoleErrorSpy.mockRestore();
+    });
   });
 });
