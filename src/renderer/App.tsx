@@ -4,13 +4,7 @@ import { Toaster } from 'sonner';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { ErrorProvider } from './contexts/error-context';
 import { TopNavigation } from './components/top-navigation';
-import { AIAgentPanel } from './components/ai-agent-panel';
-import { DashboardUpdated } from './components/dashboard-updated';
-import { CalendarView } from './components/calendar-view';
-import { MeetingDetail } from './components/meeting-detail';
-import { TasksViewNew } from './components/tasks-view-new';
-import { Contacts } from './components/contacts';
-import { Triggers } from './components/triggers';
+import { Agents } from './components/agents';
 import { Settings } from './components/settings';
 import { ErrorDemoPage } from './components/error-demo-page';
 import { LoginScreen } from './components/auth/LoginScreen';
@@ -48,8 +42,7 @@ function AppContent() {
   // Requirements: account-profile.1.4 - State for synchronous profile loading during authorization
   const [isLoadingProfile, setIsLoadingProfile] = useState<boolean>(false);
 
-  const [currentScreen, setCurrentScreen] = useState<string>('dashboard');
-  const [selectedMeetingId, setSelectedMeetingId] = useState<string | null>(null);
+  const [currentScreen, setCurrentScreen] = useState<string>('agents');
 
   // Requirements: navigation.1.1, navigation.1.2, navigation.1.3, navigation.1.4
   // Create router, navigation manager, and auth guard
@@ -58,15 +51,11 @@ function AppContent() {
       // Map routes to screen names
       const screenMap: Record<string, string> = {
         '/login': 'login',
-        '/dashboard': 'dashboard',
-        '/calendar': 'calendar',
-        '/tasks': 'tasks',
-        '/contacts': 'contacts',
+        '/agents': 'agents',
         '/settings': 'settings',
-        '/triggers': 'triggers',
         '/error-demo': 'error-demo',
       };
-      const screen = screenMap[route] || 'dashboard';
+      const screen = screenMap[route] || 'agents';
       setCurrentScreen(screen);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -85,15 +74,11 @@ function AppContent() {
   useEffect(() => {
     const routeMap: Record<string, string> = {
       login: '/login',
-      dashboard: '/dashboard',
-      calendar: '/calendar',
-      tasks: '/tasks',
-      contacts: '/contacts',
+      agents: '/agents',
       settings: '/settings',
-      triggers: '/triggers',
       'error-demo': '/error-demo',
     };
-    const route = routeMap[currentScreen] || '/dashboard';
+    const route = routeMap[currentScreen] || '/agents';
     router.updateCurrentRoute(route);
   }, [currentScreen, router]);
 
@@ -102,16 +87,11 @@ function AppContent() {
     // Map screen names to routes
     const routeMap: Record<string, string> = {
       login: '/login',
-      dashboard: '/dashboard',
-      calendar: '/calendar',
-      tasks: '/tasks',
-      contacts: '/contacts',
+      agents: '/agents',
       settings: '/settings',
-      triggers: '/triggers',
       'error-demo': '/error-demo',
-      'meeting-detail': '/dashboard', // Meeting detail is part of dashboard
     };
-    const route = routeMap[screen] || '/dashboard';
+    const route = routeMap[screen] || '/agents';
 
     // Check access through AuthGuard
     const canAccess = await authGuard.canActivate(route);
@@ -206,28 +186,6 @@ function AppContent() {
     };
   }, [navigationManager]);
 
-  // Requirements: clerkly.1
-  const handleNavigateToMeeting = (meetingId: string) => {
-    setSelectedMeetingId(meetingId);
-    navigateToScreen('meeting-detail');
-  };
-
-  // Requirements: clerkly.1
-  const handleBackToDashboard = () => {
-    setSelectedMeetingId(null);
-    navigateToScreen('dashboard');
-  };
-
-  // Requirements: clerkly.1
-  const handleNavigateToCalendar = () => {
-    navigateToScreen('calendar');
-  };
-
-  // Requirements: clerkly.1
-  const handleNavigateToTasks = () => {
-    navigateToScreen('tasks');
-  };
-
   // Requirements: clerkly.1, google-oauth-auth.12.3, account-profile.1.4, google-oauth-auth.15.1, google-oauth-auth.15.7
   const handleLogin = async () => {
     try {
@@ -265,22 +223,6 @@ function AppContent() {
     // Handle navigation
     if (parsed.action === 'navigate' && parsed.entity === 'screen') {
       navigateToScreen(parsed.params.screen as string);
-    }
-
-    // Handle entity creation/manipulation
-    if (parsed.action === 'create') {
-      if (parsed.entity === 'project' || parsed.entity === 'task') {
-        navigateToScreen('tasks');
-      } else if (parsed.entity === 'contact') {
-        navigateToScreen('contacts');
-      }
-    }
-
-    // Handle show commands
-    if (parsed.action === 'show') {
-      if (parsed.entity === 'task') {
-        navigateToScreen('tasks');
-      }
     }
   };
 
@@ -331,46 +273,21 @@ function AppContent() {
   // Requirements: clerkly.1
   const renderScreen = () => {
     switch (currentScreen) {
-      case 'dashboard':
-        return (
-          <DashboardUpdated
-            onNavigateToMeeting={handleNavigateToMeeting}
-            onNavigateToCalendar={handleNavigateToCalendar}
-            onNavigateToTasks={handleNavigateToTasks}
-          />
-        );
-      case 'calendar':
-        return <CalendarView onNavigateToMeeting={handleNavigateToMeeting} />;
-      case 'meeting-detail':
-        return (
-          <MeetingDetail meetingId={selectedMeetingId || '1'} onBack={handleBackToDashboard} />
-        );
-      case 'tasks':
-        return <TasksViewNew />;
-      case 'contacts':
-        return <Contacts />;
-      case 'triggers':
-        return <Triggers />;
+      case 'agents':
+        return <Agents />;
       case 'settings':
         return <Settings onSignOut={handleSignOut} onNavigate={navigateToScreen} />;
       case 'error-demo':
         return <ErrorDemoPage onBack={() => navigateToScreen('settings')} />;
       default:
-        return (
-          <DashboardUpdated
-            onNavigateToMeeting={handleNavigateToMeeting}
-            onNavigateToCalendar={handleNavigateToCalendar}
-            onNavigateToTasks={handleNavigateToTasks}
-          />
-        );
+        return <Agents />;
     }
   };
 
   return (
     <div className="min-h-screen bg-background">
       <TopNavigation currentScreen={currentScreen} onNavigate={navigateToScreen} />
-      <AIAgentPanel onCommand={handleCommand} />
-      <div className="pt-16 pr-[33.333333%]">{renderScreen()}</div>
+      <div className="pt-16">{renderScreen()}</div>
     </div>
   );
 }

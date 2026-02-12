@@ -7,20 +7,20 @@ import { ContactsProvider } from './contexts/contacts-context';
 import { ErrorBoundary } from './components/error-boundary';
 import { ErrorDemoPage } from './components/error-demo-page';
 import { TopNavigation } from './components/top-navigation';
-import { AIAgentPanel } from './components/ai-agent-panel';
 import { DashboardUpdated } from './components/dashboard-updated';
 import { CalendarView } from './components/calendar-view';
 import { MeetingDetail } from './components/meeting-detail';
 import { TasksViewNew } from './components/tasks-view-new';
 import { Contacts } from './components/contacts';
 import { Triggers } from './components/triggers';
+import { Agents } from './components/agents';
 import { Settings } from './components/settings';
 import { AuthDemo } from './components/auth-demo';
 import { parseCommand } from './utils/command-parser';
 
 function MainApp() {
   const [showAuthDemo, setShowAuthDemo] = useState(false);
-  const [currentScreen, setCurrentScreen] = useState<string>('dashboard');
+  const [currentScreen, setCurrentScreen] = useState<string>('agents');
   const [selectedMeetingId, setSelectedMeetingId] = useState<string | null>(null);
   const [triggerAction, setTriggerAction] = useState<{ action: string; params: any } | null>(null);
 
@@ -100,24 +100,19 @@ function MainApp() {
         return <Contacts triggerAction={triggerAction} />;
       case 'triggers':
         return <Triggers />;
+      case 'agents':
+        return <Agents />;
       case 'settings':
         return <Settings onSignOut={handleSignOut} />;
       default:
-        return (
-          <DashboardUpdated
-            onNavigateToMeeting={handleNavigateToMeeting}
-            onNavigateToCalendar={handleNavigateToCalendar}
-            onNavigateToTasks={handleNavigateToTasks}
-          />
-        );
+        return <Agents />;
     }
   };
 
   return (
     <div className="min-h-screen bg-background">
       <TopNavigation currentScreen={currentScreen} onNavigate={setCurrentScreen} />
-      <AIAgentPanel onCommand={handleCommand} />
-      <div className="pt-16 pr-[33.333333%]">{renderScreen()}</div>
+      <div className="pt-16">{renderScreen()}</div>
     </div>
   );
 }
