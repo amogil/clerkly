@@ -1,4 +1,4 @@
-import { Bot, Settings } from 'lucide-react';
+import { Zap, Settings } from 'lucide-react';
 import { Logo } from './logo';
 
 interface TopNavigationProps {
@@ -8,7 +8,7 @@ interface TopNavigationProps {
 
 export function TopNavigation({ currentScreen, onNavigate }: TopNavigationProps) {
   const navItems = [
-    { id: 'agents', label: 'Agents', icon: Bot },
+    { id: 'agents', label: 'Agents', icon: Zap },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
 

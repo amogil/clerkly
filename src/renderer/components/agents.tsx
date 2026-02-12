@@ -1,5 +1,19 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, Loader2, AlertCircle, Check, X, HelpCircle, ArrowLeft, CheckSquare, Plus, FileText, Calendar, Video, User } from 'lucide-react';
+import {
+  Send,
+  Loader2,
+  AlertCircle,
+  Check,
+  X,
+  HelpCircle,
+  ArrowLeft,
+  CheckSquare,
+  Plus,
+  FileText,
+  Calendar,
+  Video,
+  User,
+} from 'lucide-react';
 import { Logo } from './logo';
 import type { AgentTask } from '../types/agent-task';
 
@@ -15,7 +29,7 @@ export function Agents() {
   const [taskInput, setTaskInput] = useState('');
   const [visibleChatsCount, setVisibleChatsCount] = useState(5);
   const chatListRef = useRef<HTMLDivElement>(null);
-  
+
   // Agent tasks data - examples of all statuses
   const [agentTasks, setAgentTasks] = useState<AgentTask[]>([
     {
@@ -191,7 +205,7 @@ export function Agents() {
   useEffect(() => {
     const calculateVisibleChats = () => {
       if (!chatListRef.current) return;
-      
+
       const containerWidth = chatListRef.current.offsetWidth;
       // Each chat icon is 32px (w-8) + 8px gap = 40px
       // New chat button is also 40px
@@ -200,30 +214,30 @@ export function Agents() {
       const availableWidth = containerWidth - 80;
       const chatWidth = 40; // 32px icon + 8px gap
       const maxChats = Math.floor(availableWidth / chatWidth);
-      
+
       // Show at least 1, no maximum limit
       setVisibleChatsCount(Math.max(1, maxChats));
     };
 
     calculateVisibleChats();
     window.addEventListener('resize', calculateVisibleChats);
-    
+
     return () => window.removeEventListener('resize', calculateVisibleChats);
   }, []);
 
   const handleSend = () => {
     if (!taskInput.trim()) return;
-    
+
     // Handle sending message for current task
     console.log('Command:', taskInput);
     setTaskInput('');
   };
 
   const formatTime = (date: Date) => {
-    return date.toLocaleTimeString('en-US', { 
-      hour: 'numeric', 
+    return date.toLocaleTimeString('en-US', {
+      hour: 'numeric',
       minute: '2-digit',
-      hour12: true 
+      hour12: true,
     });
   };
 
@@ -270,7 +284,8 @@ export function Agents() {
         {
           id: 't1-2',
           type: 'agent',
-          content: 'I can help you with pricing information for enterprise customers. Let me pull up the current pricing tiers.',
+          content:
+            'I can help you with pricing information for enterprise customers. Let me pull up the current pricing tiers.',
           timestamp: new Date('2026-02-02T15:00:15'),
         },
         {
@@ -352,7 +367,8 @@ export function Agents() {
         {
           id: 't1-7',
           type: 'agent',
-          content: 'Absolutely! For 500 users, we typically offer significant volume discounts. The exact pricing would be customized based on your needs, but you can expect 20-35% off the standard per-user rate.',
+          content:
+            'Absolutely! For 500 users, we typically offer significant volume discounts. The exact pricing would be customized based on your needs, but you can expect 20-35% off the standard per-user rate.',
           timestamp: new Date('2026-02-02T15:02:15'),
         },
         {
@@ -385,7 +401,10 @@ export function Agents() {
                   <span>UK (London)</span>
                 </li>
               </ul>
-              <p className="text-sm text-muted-foreground mt-3">All data is encrypted at rest and in transit. We're SOC 2 Type II and GDPR compliant.</p>
+              <p className="text-sm text-muted-foreground mt-3">
+                All data is encrypted at rest and in transit. We're SOC 2 Type II and GDPR
+                compliant.
+              </p>
             </div>
           ),
           timestamp: new Date('2026-02-02T15:03:00'),
@@ -399,7 +418,8 @@ export function Agents() {
         {
           id: 't1-11',
           type: 'agent',
-          content: 'For a 500-user enterprise deployment, typical implementation timeline is 2-4 weeks, depending on integration complexity. This includes SSO setup, custom integrations, team training, and onboarding support.',
+          content:
+            'For a 500-user enterprise deployment, typical implementation timeline is 2-4 weeks, depending on integration complexity. This includes SSO setup, custom integrations, team training, and onboarding support.',
           timestamp: new Date('2026-02-02T15:03:45'),
         },
         {
@@ -421,7 +441,9 @@ export function Agents() {
                 <li>Key integrations needed (Jira, Slack, etc.)</li>
                 <li>Any specific compliance requirements</li>
               </ul>
-              <p className="mt-3">Once I have these details, I can send you a comprehensive proposal within 24 hours.</p>
+              <p className="mt-3">
+                Once I have these details, I can send you a comprehensive proposal within 24 hours.
+              </p>
             </div>
           ),
           timestamp: new Date('2026-02-02T15:04:30'),
@@ -429,7 +451,8 @@ export function Agents() {
         {
           id: 't1-14',
           type: 'user',
-          content: 'Company: TechCorp International, Fintech industry, 500 users, EU data residency, need Jira and Slack integrations, ISO 27001 compliance required',
+          content:
+            'Company: TechCorp International, Fintech industry, 500 users, EU data residency, need Jira and Slack integrations, ISO 27001 compliance required',
           timestamp: new Date('2026-02-02T15:05:00'),
         },
         {
@@ -437,7 +460,10 @@ export function Agents() {
           type: 'agent',
           content: (
             <div className="space-y-3">
-              <p>Perfect! Thank you for the details. I'm creating a proposal for TechCorp International with the following specifications:</p>
+              <p>
+                Perfect! Thank you for the details. I'm creating a proposal for TechCorp
+                International with the following specifications:
+              </p>
               <div className="p-3 bg-secondary/50 rounded-lg border border-border space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Company:</span>
@@ -464,7 +490,11 @@ export function Agents() {
                   <span className="font-medium">ISO 27001</span>
                 </div>
               </div>
-              <p>I'll have a detailed proposal with pricing, implementation timeline, and compliance documentation sent to you within 24 hours. Is there anything else you'd like me to include?</p>
+              <p>
+                I'll have a detailed proposal with pricing, implementation timeline, and compliance
+                documentation sent to you within 24 hours. Is there anything else you'd like me to
+                include?
+              </p>
             </div>
           ),
           timestamp: new Date('2026-02-02T15:05:30'),
@@ -489,7 +519,9 @@ export function Agents() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-sm">Product Roadmap Review</p>
-                  <p className="text-xs text-muted-foreground">Audio duration: 45 minutes · 6 participants</p>
+                  <p className="text-xs text-muted-foreground">
+                    Audio duration: 45 minutes · 6 participants
+                  </p>
                 </div>
               </div>
             </div>
@@ -507,7 +539,9 @@ export function Agents() {
           type: 'agent',
           content: (
             <div className="space-y-2">
-              <p>I've identified <strong>8 action items</strong> so far from the first 15 minutes:</p>
+              <p>
+                I've identified <strong>8 action items</strong> so far from the first 15 minutes:
+              </p>
               <div className="mt-3 space-y-2 pl-3 border-l-2 border-primary/30">
                 <div className="text-sm">
                   <p className="text-muted-foreground text-xs mb-1">Sarah Chen</p>
@@ -521,7 +555,9 @@ export function Agents() {
                   <p className="text-muted-foreground text-xs mb-1">Maria Santos</p>
                   <p>Update Jira roadmap with Q2 priorities</p>
                 </div>
-                <p className="text-xs text-muted-foreground mt-2">+ 5 more items being processed...</p>
+                <p className="text-xs text-muted-foreground mt-2">
+                  + 5 more items being processed...
+                </p>
               </div>
             </div>
           ),
@@ -605,7 +641,9 @@ export function Agents() {
                 <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
                 <div className="flex-1">
                   <p className="text-sm font-medium text-red-600 mb-1">Connection Error</p>
-                  <p className="text-xs text-red-600/80">Failed to connect to email server. Connection timeout after 30 seconds.</p>
+                  <p className="text-xs text-red-600/80">
+                    Failed to connect to email server. Connection timeout after 30 seconds.
+                  </p>
                 </div>
               </div>
             </div>
@@ -682,7 +720,9 @@ export function Agents() {
             <div className="p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
               <div className="flex items-center gap-2">
                 <Check className="w-4 h-4 text-green-600" />
-                <span className="text-sm font-medium text-green-600">Summary sent to team@company.com</span>
+                <span className="text-sm font-medium text-green-600">
+                  Summary sent to team@company.com
+                </span>
               </div>
             </div>
           ),
@@ -740,7 +780,9 @@ export function Agents() {
             <div className="p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
               <div className="flex items-center gap-2">
                 <Check className="w-4 h-4 text-green-600" />
-                <span className="text-sm font-medium text-green-600">Action items extracted successfully</span>
+                <span className="text-sm font-medium text-green-600">
+                  Action items extracted successfully
+                </span>
               </div>
             </div>
           ),
@@ -767,13 +809,13 @@ export function Agents() {
       createdAt: now,
       updatedAt: now,
     };
-    
+
     // Add new task to the beginning of the list
     setAgentTasks([newTask, ...agentTasks]);
-    
+
     // Select the new task
     setSelectedTask(newTask);
-    
+
     // Close all tasks page if open
     setShowAllTasksPage(false);
   };
@@ -803,8 +845,8 @@ export function Agents() {
   // Render task history page
   if (showAllTasksPage) {
     // Filter out empty "New conversation" tasks from history
-    const historyTasks = displayTasks.filter(task => 
-      !(task.title === 'New conversation' && task.status === 'new')
+    const historyTasks = displayTasks.filter(
+      (task) => !(task.title === 'New conversation' && task.status === 'new')
     );
 
     return (
@@ -837,7 +879,9 @@ export function Agents() {
               >
                 <div className="flex items-start gap-3">
                   {/* Task icon */}
-                  <div className={`relative flex-shrink-0 w-10 h-10 rounded-full ${style.bg} flex items-center justify-center`}>
+                  <div
+                    className={`relative flex-shrink-0 w-10 h-10 rounded-full ${style.bg} flex items-center justify-center`}
+                  >
                     {task.status === 'completed' ? (
                       <Check className="w-5 h-5 text-white" />
                     ) : task.status === 'error' ? (
@@ -845,20 +889,24 @@ export function Agents() {
                     ) : task.status === 'awaiting-user' ? (
                       <>
                         <span className="text-white text-sm font-semibold">{letter}</span>
-                        <div className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full ${style.bg} border-2 border-card flex items-center justify-center`}>
+                        <div
+                          className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full ${style.bg} border-2 border-card flex items-center justify-center`}
+                        >
                           <HelpCircle className="w-2.5 h-2.5 text-white" />
                         </div>
                       </>
                     ) : (
                       <span className="text-white text-sm font-semibold">{letter}</span>
                     )}
-                    
+
                     {task.status === 'in-progress' && (
                       <div className="absolute inset-0 rounded-full border-2 border-white border-t-transparent animate-spin" />
                     )}
-                    
+
                     {task.status === 'awaiting-user' && (
-                      <div className={`absolute -inset-1 rounded-full ring-2 ${style.ring} animate-pulse`} />
+                      <div
+                        className={`absolute -inset-1 rounded-full ring-2 ${style.ring} animate-pulse`}
+                      />
                     )}
                   </div>
 
@@ -866,7 +914,7 @@ export function Agents() {
                   <div className="flex-1 min-w-0">
                     <h4 className="font-medium text-foreground mb-1">{task.title}</h4>
                     <p className="text-sm text-muted-foreground mb-2">{task.description}</p>
-                    
+
                     {/* Status and time */}
                     <div className="flex items-center gap-3 text-xs">
                       <div className={`${style.text}`}>
@@ -875,11 +923,11 @@ export function Agents() {
                       <div className="text-muted-foreground">
                         <span>·</span>
                         <span className="ml-1.5">
-                          {task.createdAt.toLocaleDateString('en-US', { 
-                            month: 'short', 
+                          {task.createdAt.toLocaleDateString('en-US', {
+                            month: 'short',
                             day: 'numeric',
                             hour: 'numeric',
-                            minute: '2-digit'
+                            minute: '2-digit',
                           })}
                         </span>
                       </div>
@@ -906,13 +954,15 @@ export function Agents() {
   const style = getStatusStyles(selectedTask.status);
 
   return (
-    <div className="h-[calc(100vh-4rem)] bg-card flex flex-col">
+    <div data-testid="agents" className="h-[calc(100vh-4rem)] bg-card flex flex-col">
       {/* Combined Header with Chat List */}
       <div className="h-16 px-6 border-b border-border flex items-center gap-6 flex-shrink-0">
         {/* Left: Task Title - 50% */}
         <div className="flex-1 flex items-center gap-3 min-w-0">
           {/* Task icon */}
-          <div className={`relative flex-shrink-0 w-10 h-10 rounded-full ${style.bg} flex items-center justify-center`}>
+          <div
+            className={`relative flex-shrink-0 w-10 h-10 rounded-full ${style.bg} flex items-center justify-center`}
+          >
             {selectedTask.status === 'completed' ? (
               <Check className="w-5 h-5 text-white" />
             ) : selectedTask.status === 'error' ? (
@@ -920,20 +970,24 @@ export function Agents() {
             ) : selectedTask.status === 'awaiting-user' ? (
               <>
                 <span className="text-white text-sm font-semibold">{letter}</span>
-                <div className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full ${style.bg} border-2 border-card flex items-center justify-center`}>
+                <div
+                  className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full ${style.bg} border-2 border-card flex items-center justify-center`}
+                >
                   <HelpCircle className="w-2.5 h-2.5 text-white" />
                 </div>
               </>
             ) : (
               <span className="text-white text-sm font-semibold">{letter}</span>
             )}
-            
+
             {selectedTask.status === 'in-progress' && (
               <div className="absolute inset-0 rounded-full border-2 border-white border-t-transparent animate-spin" />
             )}
-            
+
             {selectedTask.status === 'awaiting-user' && (
-              <div className={`absolute -inset-1 rounded-full ring-2 ${style.ring} animate-pulse`} />
+              <div
+                className={`absolute -inset-1 rounded-full ring-2 ${style.ring} animate-pulse`}
+              />
             )}
           </div>
 
@@ -944,11 +998,11 @@ export function Agents() {
               <span className={`${style.text}`}>{getStatusText(selectedTask.status)}</span>
               <span className="text-muted-foreground">·</span>
               <span className="text-muted-foreground truncate">
-                {selectedTask.createdAt.toLocaleDateString('en-US', { 
-                  month: 'short', 
+                {selectedTask.createdAt.toLocaleDateString('en-US', {
+                  month: 'short',
                   day: 'numeric',
                   hour: 'numeric',
-                  minute: '2-digit'
+                  minute: '2-digit',
                 })}
               </span>
             </div>
@@ -965,7 +1019,7 @@ export function Agents() {
           >
             <Plus className="w-4 h-4 text-white" />
           </div>
-          
+
           {/* Show dynamic number of tasks based on available space */}
           {displayTasks.slice(0, visibleChatsCount).map((task) => {
             const taskLetter = task.title.charAt(0).toUpperCase();
@@ -986,22 +1040,26 @@ export function Agents() {
                 ) : task.status === 'awaiting-user' ? (
                   <>
                     <span className="text-white text-xs font-semibold">{taskLetter}</span>
-                    <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full ${taskStyle.bg} border-2 border-card flex items-center justify-center`}>
+                    <div
+                      className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full ${taskStyle.bg} border-2 border-card flex items-center justify-center`}
+                    >
                       <HelpCircle className="w-2 h-2 text-white" />
                     </div>
                   </>
                 ) : (
                   <span className="text-white text-xs font-semibold">{taskLetter}</span>
                 )}
-                
+
                 {task.status === 'in-progress' && (
                   <div className="absolute inset-0 rounded-full border-2 border-white border-t-transparent animate-spin" />
                 )}
-                
+
                 {task.status === 'awaiting-user' && (
-                  <div className={`absolute -inset-1 rounded-full ring-2 ${taskStyle.ring} animate-pulse`} />
+                  <div
+                    className={`absolute -inset-1 rounded-full ring-2 ${taskStyle.ring} animate-pulse`}
+                  />
                 )}
-                
+
                 {/* Tooltip on hover */}
                 <div className="absolute top-full right-0 mt-2 w-64 bg-gray-900 text-white text-xs rounded-lg p-3 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 shadow-lg">
                   <p className="font-semibold mb-1">{task.title}</p>
@@ -1012,7 +1070,7 @@ export function Agents() {
               </div>
             );
           })}
-          
+
           {displayTasks.length > visibleChatsCount && (
             <div
               onClick={() => setShowAllTasksPage(true)}
@@ -1029,14 +1087,17 @@ export function Agents() {
         {currentMessages.map((message, index) => {
           // Check if we should show the agent avatar
           // Show it only if this is the first message or the previous message was from user
-          const showAvatar = message.type === 'agent' && (index === 0 || currentMessages[index - 1].type === 'user');
-          
+          const showAvatar =
+            message.type === 'agent' && (index === 0 || currentMessages[index - 1].type === 'user');
+
           return (
             <div key={message.id}>
               {message.type === 'user' ? (
                 <div className="flex justify-end">
                   <div className="rounded-lg border-2 border-primary bg-primary/5 px-4 py-3">
-                    <p className="text-sm leading-relaxed text-foreground text-right">{message.content}</p>
+                    <p className="text-sm leading-relaxed text-foreground text-right">
+                      {message.content}
+                    </p>
                   </div>
                 </div>
               ) : (
@@ -1044,7 +1105,11 @@ export function Agents() {
                   {/* Agent avatar above first message in sequence */}
                   {showAvatar && (
                     <div className="mb-2">
-                      <Logo size="sm" showText={false} animated={selectedTask.status === 'in-progress'} />
+                      <Logo
+                        size="sm"
+                        showText={false}
+                        animated={selectedTask.status === 'in-progress'}
+                      />
                     </div>
                   )}
                   {/* Agent message content */}
@@ -1083,9 +1148,7 @@ export function Agents() {
             <Send className="w-4 h-4" />
           </button>
         </div>
-        <p className="text-xs text-muted-foreground mt-1.5 px-0.5">
-          Press Enter to send
-        </p>
+        <p className="text-xs text-muted-foreground mt-1.5 px-0.5">Press Enter to send</p>
       </div>
     </div>
   );

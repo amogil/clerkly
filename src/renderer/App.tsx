@@ -9,7 +9,6 @@ import { Settings } from './components/settings';
 import { ErrorDemoPage } from './components/error-demo-page';
 import { LoginScreen } from './components/auth/LoginScreen';
 import { LoginError } from './components/auth/LoginError';
-import { parseCommand } from './utils/command-parser';
 import { SimpleRouter, NavigationManager, AuthGuard } from './navigation';
 import { Logger } from './Logger';
 import { ErrorNotificationManager } from './managers/ErrorNotificationManager';
@@ -213,16 +212,6 @@ function AppContent() {
       setAuthError(null);
     } catch (error) {
       logger.error(`Logout failed: ${error}`);
-    }
-  };
-
-  // Requirements: clerkly.1
-  const handleCommand = (command: string) => {
-    const parsed = parseCommand(command);
-
-    // Handle navigation
-    if (parsed.action === 'navigate' && parsed.entity === 'screen') {
-      navigateToScreen(parsed.params.screen as string);
     }
   };
 
