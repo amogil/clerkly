@@ -6,282 +6,137 @@
 
 ## Задачи
 
-### 1. Создание WindowStateManager
+- [x] 1. Создать WindowStateManager и интегрировать с WindowManager
+  - [x] 1.1 Создать интерфейс WindowState и класс WindowStateManager
+    - Определить типы для x, y, width, height, isMaximized
+    - Реализовать конструктор с зависимостью от DataManager
+    - Добавить JSDoc комментарии
+    - _Requirements: window-management.5_
 
-- [x] 1.1 Создать интерфейс WindowState
-  - Определить типы для x, y, width, height, isMaximized
-  - Добавить JSDoc комментарии для каждого поля
-  - **Requirements:** window-management.5
+  - [x] 1.2 Реализовать методы управления состоянием
+    - Реализовать loadState() с валидацией позиции
+    - Реализовать saveState() с обработкой ошибок
+    - Реализовать getDefaultState() на основе workAreaSize
+    - Реализовать isPositionValid() для проверки позиции
+    - _Requirements: window-management.1.1, window-management.4.1, window-management.5.1, window-management.5.2, window-management.5.3, window-management.5.4, window-management.5.5, window-management.5.6_
 
-- [x] 1.2 Создать класс WindowStateManager
-  - Реализовать конструктор с зависимостью от DataManager
-  - Определить константу stateKey = 'window_state'
-  - **Requirements:** window-management.5
+  - [x] 1.3 Расширить WindowManager для использования WindowStateManager
+    - Добавить зависимость от WindowStateManager
+    - Обновить createWindow() для загрузки и применения состояния
+    - Установить title: '', titleBarStyle: 'default', resizable: true
+    - Реализовать setupStateTracking() для отслеживания событий
+    - Реализовать saveCurrentState() для автосохранения
+    - _Requirements: window-management.1.1, window-management.1.2, window-management.1.3, window-management.2.1, window-management.3.1, window-management.5_
 
-- [x] 1.3 Реализовать метод loadState()
-  - Загружать состояние из DataManager
-  - Парсить JSON в объект WindowState
-  - Валидировать позицию через isPositionValid()
-  - Возвращать getDefaultState() при ошибках или невалидной позиции
-  - Логировать ошибки
-  - **Requirements:** window-management.5.4, window-management.5.5, window-management.5.6
+  - [x] 1.4 Написать модульные тесты для WindowStateManager
+    - Тест: should return default state when no saved state exists
+    - Тест: should load saved state from database
+    - Тест: should return default state for invalid position
+    - Тест: should save state to database
+    - Тест: should handle save errors gracefully
+    - Тест: should handle corrupted state data
+    - _Requirements: window-management.1.1, window-management.4.1, window-management.5_
 
-- [x] 1.4 Реализовать метод saveState()
-  - Сериализовать WindowState в JSON
-  - Сохранять через DataManager.set()
-  - Обрабатывать ошибки gracefully
-  - Логировать ошибки
-  - **Requirements:** window-management.5.1, window-management.5.2, window-management.5.3
+  - [x] 1.5 Написать модульные тесты для WindowManager
+    - Тест: should create window with correct initial configuration
+    - Тест: should save state when window is resized
+    - Тест: should save maximized state
+    - Тест: should handle window creation errors
+    - _Requirements: window-management.1, window-management.2, window-management.3, window-management.5_
 
-- [x] 1.5 Реализовать метод getDefaultState()
-  - Получать размер экрана через screen.getPrimaryDisplay()
-  - Использовать workAreaSize (полный размер доступного экрана)
-  - Устанавливать isMaximized: false (окно не максимизировано, но занимает весь экран)
-  - Устанавливать позицию x: 0, y: 0
-  - **Requirements:** window-management.1.1, window-management.1.3, window-management.4.1, window-management.4.2, window-management.4.3
+- [x] 2. Написать property-based тесты для WindowStateManager
+  - [x] 2.1 Property test: should generate default state based on screen size
+    - Использовать fast-check для генерации различных размеров экрана
+    - Проверить, что размеры пропорциональны размеру экрана
+    - Проверить, что размеры не хардкожены
+    - Минимум 100 итераций
+    - **Property 5: Размер окна основан на размере экрана**
+    - _Requirements: window-management.4.1, window-management.4.3_
 
-- [x] 1.6 Реализовать метод isPositionValid()
-  - Получать список всех дисплеев через screen.getAllDisplays()
-  - Проверять, находится ли позиция в пределах хотя бы одного дисплея
-  - Возвращать boolean результат
-  - **Requirements:** window-management.5.6
+  - [x] 2.2 Property test: should preserve state through save/load cycle
+    - Использовать fast-check для генерации различных WindowState
+    - Проверить round-trip: save → load → verify equivalence
+    - Минимум 100 итераций
+    - **Property 7: Round-trip сохранения и загрузки состояния**
+    - _Requirements: window-management.5.4_
 
-### 2. Расширение WindowManager
+  - [x] 2.3 Property test: should save state on any window state change
+    - Использовать fast-check для генерации различных WindowState
+    - Проверить, что все изменения состояния сохраняются
+    - Минимум 100 итераций
+    - **Property 6: Изменения состояния окна сохраняются**
+    - _Requirements: window-management.5.1, window-management.5.2, window-management.5.3_
 
-- [x] 2.1 Добавить зависимость от WindowStateManager
-  - Добавить приватное поле windowStateManager
-  - Инициализировать в конструкторе с DataManager
-  - **Requirements:** window-management.5
+- [x] 3. Написать функциональные тесты для window state persistence
+  - [x] 3.1 Функциональный тест: should open at default size on first launch
+    - Запустить приложение с чистой базой данных
+    - Проверить, что окно открывается размером workAreaSize
+    - Проверить, что окно НЕ в maximized состоянии
+    - _Requirements: window-management.1.1, window-management.4.1_
 
-- [x] 2.2 Обновить метод createWindow()
-  - Загружать состояние через windowStateManager.loadState()
-  - Устанавливать title: '' в конфигурации
-  - Устанавливать titleBarStyle: 'default'
-  - Устанавливать resizable: true
-  - Применять загруженные x, y, width, height
-  - Вызывать maximize() ТОЛЬКО если isMaximized === true (восстановление сохраненного состояния)
-  - НЕ вызывать maximize() при первом запуске (isMaximized: false по умолчанию)
-  - Вызывать setupStateTracking() после создания окна
-  - **Requirements:** window-management.1.1, window-management.1.2, window-management.1.3, window-management.2.1, window-management.3.1, window-management.4.1, window-management.4.2, window-management.5.4, window-management.5.5
+  - [x] 3.2 Функциональный тест: should persist window size across restarts
+    - Изменить размер окна
+    - Перезапустить приложение
+    - Проверить, что размер восстановлен
+    - _Requirements: window-management.5.1, window-management.5.4_
 
-- [x] 2.3 Реализовать метод setupStateTracking()
-  - Подписаться на событие 'resize'
-  - Подписаться на событие 'move'
-  - Подписаться на событие 'maximize'
-  - Подписаться на событие 'unmaximize'
-  - Подписаться на событие 'close'
-  - Вызывать saveCurrentState() для каждого события
-  - **Requirements:** window-management.5.1, window-management.5.2, window-management.5.3
+  - [x] 3.3 Функциональный тест: should persist window position across restarts
+    - Переместить окно
+    - Перезапустить приложение
+    - Проверить, что позиция восстановлена
+    - _Requirements: window-management.5.2, window-management.5.4_
 
-- [x] 2.4 Реализовать метод saveCurrentState()
-  - Получать текущие bounds через getBounds()
-  - Получать состояние maximized через isMaximized()
-  - Формировать объект WindowState
-  - Вызывать windowStateManager.saveState()
-  - **Requirements:** window-management.5.1, window-management.5.2, window-management.5.3
+  - [x] 3.4 Функциональный тест: should persist maximized state across restarts
+    - Развернуть окно (maximize)
+    - Перезапустить приложение
+    - Проверить, что окно в maximized состоянии
+    - _Requirements: window-management.5.3, window-management.5.4_
 
-### 3. Модульные Тесты для WindowStateManager
+  - [x] 3.5 Функциональный тест: should have empty window title
+    - Запустить приложение
+    - Проверить, что title пустой
+    - _Requirements: window-management.2.1, window-management.2.2_
 
-- [x] 3.1 Написать тест: should return default state when no saved state exists
-  - Mock DataManager.get() возвращает undefined
-  - Вызвать loadState()
-  - Проверить, что возвращается состояние по умолчанию
-  - Проверить isMaximized: false (не максимизировано по умолчанию)
-  - Проверить, что размеры равны workAreaSize
-  - **Requirements:** window-management.1.1, window-management.1.3, window-management.4.1, window-management.5.5
+  - [x] 3.6 Функциональный тест: should have native Mac OS X window controls
+    - Запустить приложение
+    - Проверить наличие стандартных элементов управления macOS
+    - Проверить, что окно closable, minimizable, maximizable, resizable
+    - _Requirements: window-management.3.1, window-management.3.2_
 
-- [x] 3.2 Написать тест: should load saved state from database
-  - Mock DataManager.get() возвращает валидный JSON
-  - Mock screen API для валидации позиции
-  - Вызвать loadState()
-  - Проверить, что возвращается сохраненное состояние
-  - **Requirements:** window-management.5.4
+  - [x] 3.7 Функциональный тест: should follow Mac OS X window close conventions
+    - Закрыть окно
+    - Проверить поведение приложения согласно конвенциям macOS
+    - _Requirements: window-management.3.3_
 
-- [x] 3.3 Написать тест: should return default state for invalid position
-  - Mock DataManager.get() возвращает состояние с невалидной позицией
-  - Mock screen API возвращает дисплеи, не содержащие позицию
-  - Вызвать loadState()
-  - Проверить, что возвращается состояние по умолчанию
-  - **Requirements:** window-management.5.6
+  - [x] 3.8 Функциональный тест: should integrate with Mac OS X dock
+    - Проверить интеграцию с dock
+    - Проверить активацию приложения
+    - _Requirements: window-management.3.5_
 
-- [x] 3.4 Написать тест: should save state to database
-  - Создать валидный объект WindowState
-  - Вызвать saveState()
-  - Проверить, что DataManager.set() вызван с правильными параметрами
-  - Проверить, что значение является валидным JSON
-  - **Requirements:** window-management.5.1, window-management.5.2, window-management.5.3
+- [x] 4. Обновить документацию и провести валидацию
+  - [x] 4.1 Добавить JSDoc комментарии
+    - Документировать все публичные методы WindowStateManager
+    - Обновить документацию WindowManager
+    - Указать ссылки на требования в комментариях
+    - _Requirements: window-management.1, window-management.2, window-management.3, window-management.4, window-management.5_
 
-- [x] 3.5 Написать тест: should handle save errors gracefully
-  - Mock DataManager.set() выбрасывает ошибку
-  - Вызвать saveState()
-  - Проверить, что ошибка не пробрасывается
-  - Проверить, что ошибка залогирована
-  - **Requirements:** window-management.5
+  - [x] 4.2 Запустить автоматическую валидацию
+    - Выполнить `npm run validate`
+    - Исправить все ошибки TypeScript, ESLint, Prettier
+    - Убедиться, что все модульные и property-based тесты проходят
+    - _Requirements: Все_
 
-- [x] 3.6 Написать тест: should handle corrupted state data
-  - Mock DataManager.get() возвращает невалидный JSON
-  - Вызвать loadState()
-  - Проверить, что возвращается состояние по умолчанию
-  - Проверить, что ошибка залогирована
-  - **Requirements:** window-management.5
-
-### 4. Модульные Тесты для WindowManager
-
-- [x] 4.1 Написать тест: should create window with correct initial configuration
-  - Mock WindowStateManager.loadState()
-  - Вызвать createWindow()
-  - Проверить, что BrowserWindow создан с title: ''
-  - Проверить titleBarStyle: 'default'
-  - Проверить, что fullscreen не установлен
-  - **Requirements:** window-management.1, window-management.2, window-management.3
-
-- [x] 4.2 Написать тест: should save state when window is resized
-  - Создать окно
-  - Mock DataManager.set()
-  - Эмитировать событие 'resize'
-  - Проверить, что saveState() вызван
-  - **Requirements:** window-management.5.1
-
-- [x] 4.3 Написать тест: should save maximized state
-  - Создать окно
-  - Mock DataManager.set()
-  - Эмитировать событие 'maximize'
-  - Проверить, что saveState() вызван с isMaximized: true
-  - **Requirements:** window-management.5.3
-
-- [x] 4.4 Написать тест: should handle window creation errors
-  - Mock BrowserWindow конструктор выбрасывает ошибку
-  - Вызвать createWindow()
-  - Проверить, что ошибка пробрасывается с описательным сообщением
-  - **Requirements:** window-management.1
-
-### 5. Property-Based Тесты
-
-- [x] 5.1 Написать property-based тест: should generate default state based on screen size
-  - Использовать fast-check для генерации различных размеров экрана
-  - Mock screen API с сгенерированными размерами
-  - Вызвать getDefaultState()
-  - Проверить, что размеры пропорциональны размеру экрана
-  - Проверить, что размеры не хардкожены (не 1920x1080)
-  - Минимум 100 итераций
-  - **Property 5**
-  - **Requirements:** window-management.4.1, window-management.4.3
-
-- [x] 5.2 Написать property-based тест: should preserve state through save/load cycle
-  - Использовать fast-check для генерации различных WindowState
-  - Mock screen API для валидации позиций
-  - Сохранить состояние через saveState()
-  - Загрузить состояние через loadState()
-  - Проверить эквивалентность состояний
-  - Минимум 100 итераций
-  - **Property 7**
-  - **Requirements:** window-management.5.4
-
-- [x] 5.3 Написать property-based тест: should save state on any window state change
-  - Использовать fast-check для генерации различных WindowState
-  - Создать окно
-  - Изменить состояние окна (bounds, maximize)
-  - Эмитировать события resize/move/maximize
-  - Проверить, что DataManager.set() вызван с обновленным состоянием
-  - Минимум 100 итераций
-  - **Property 6**
-  - **Requirements:** window-management.5.1, window-management.5.2, window-management.5.3
-
-### 6. Функциональные Тесты (Window State)
-
-- [x] 6.1 Написать функциональный тест: should persist and restore window state across restarts
-  - Создать WindowManager с реальным DataManager
-  - Создать окно
-  - Изменить размер и позицию окна
-  - Закрыть окно
-  - Создать новый WindowManager
-  - Создать новое окно
-  - Проверить, что состояние восстановлено
-  - **Requirements:** window-management.1, window-management.4, window-management.5
-
-### 7. Функциональные Тесты
-
-- [x] 7.1 Написать функциональный тест: should open application with correct initial window state
-  - Запустить приложение с чистой базой данных
-  - Получить главное окно
-  - Проверить, что окно НЕ в состоянии maximized (isMaximized: false)
-  - Проверить, что окно занимает весь экран (размер = workAreaSize)
-  - Проверить, что окно resizable (можно изменять размер)
-  - Проверить, что title пустой
-  - Проверить, что не в fullscreen режиме
-  - Закрыть приложение
-  - **Requirements:** window-management.1.1, window-management.1.2, window-management.1.3, window-management.2.1, window-management.3.1
-
-- [x] 7.2 Написать функциональный тест: should persist window state across restarts
-  - Запустить приложение
-  - Изменить размер и позицию окна
-  - Подождать сохранения
-  - Закрыть приложение
-  - Запустить приложение снова
-  - Проверить, что размер и позиция восстановлены
-  - Закрыть приложение
-  - **Requirements:** window-management.5.1, window-management.5.2, window-management.5.4
-
-- [x] 7.3 Написать функциональный тест: should persist maximized state across restarts
-  - Запустить приложение
-  - Свернуть окно (unmaximize)
-  - Развернуть окно (maximize)
-  - Подождать сохранения
-  - Закрыть приложение
-  - Запустить приложение снова
-  - Проверить, что окно в состоянии maximized
-  - Закрыть приложение
-  - **Requirements:** window-management.5.3, window-management.5.4
-
-- [x] 7.4 Написать функциональный тест: should adapt window size to small screens
-  - Эмулировать маленький экран (1366x768)
-  - Запустить приложение
-  - Получить размеры окна
-  - Проверить, что окно не превышает размер экрана
-  - Проверить, что размеры не хардкожены (не 1920x1080)
-  - Закрыть приложение
-  - **Requirements:** window-management.4.1, window-management.4.4
-
-### 8. Обновление Документации
-
-- [x] 8.1 Добавить JSDoc комментарии к WindowStateManager
-  - Документировать все публичные методы
-  - Добавить примеры использования
-  - Указать ссылки на требования в комментариях
-  - **Requirements:** window-management.5
-
-- [x] 8.2 Добавить JSDoc комментарии к расширениям WindowManager
-  - Документировать новые методы
-  - Обновить существующую документацию
-  - Указать ссылки на требования в комментариях
-  - **Requirements:** window-management.1, window-management.2, window-management.3, window-management.4, window-management.5
-
-### 9. Валидация и Финализация
-
-- [x] 9.1 Запустить автоматическую валидацию
-  - Выполнить `npm run validate`
-  - Исправить все ошибки TypeScript
-  - Исправить все ошибки ESLint
-  - Исправить форматирование Prettier
-  - **Requirements:** Все
-
-- [x] 9.2 Проверить покрытие тестами
-  - Убедиться, что покрытие >= 85%
-  - Убедиться, что все требования покрыты тестами
-  - Проверить таблицу покрытия в design.md
-  - **Requirements:** Все
-
-- [x] 9.3 Проверить комментарии с требованиями
-  - Убедиться, что все функции имеют комментарии // Requirements:
-  - Убедиться, что все тесты имеют структурированные комментарии
-  - Проверить корректность ссылок на требования
-  - **Requirements:** Все
+  - [x] 4.3 Проверить покрытие тестами
+    - Убедиться, что покрытие >= 85%
+    - Убедиться, что все требования покрыты тестами
+    - Обновить таблицу покрытия в design.md при необходимости
+    - _Requirements: Все_
 
 ## Примечания
 
-- Все задачи должны выполняться последовательно в указанном порядке
-- Каждая задача должна быть завершена и протестирована перед переходом к следующей
-- Функциональные тесты (раздел 7) запускаются ТОЛЬКО при явной просьбе пользователя
-- Автоматическая валидация (задача 9.1) НЕ включает функциональные тесты
+- Задачи, помеченные `*`, являются опциональными (тесты) и могут быть пропущены для быстрого MVP
+- Каждая задача ссылается на конкретные требования для трассируемости
+- Функциональные тесты (раздел 3) запускаются ТОЛЬКО при явной просьбе пользователя
+- Автоматическая валидация (задача 4.2) НЕ включает функциональные тесты
 - Все комментарии в коде должны быть на английском языке
 - Все названия компонентов должны быть на английском языке

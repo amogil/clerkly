@@ -217,6 +217,8 @@ class WindowManager {
 
 Новый класс для управления состоянием окна и его персистентностью.
 
+**Важно:** Состояние окна является глобальным и не изолируется по пользователям (window-management.5.7). Это отличается от других данных приложения (настройки, профиль, токены), которые изолированы по пользователям. Причина: состояние окна - это свойство физического приложения на устройстве, а не данные конкретного пользователя. Окно должно открываться в том же месте и размере независимо от того, какой пользователь вошел в систему.
+
 ```typescript
 interface WindowState {
   x: number;
@@ -229,6 +231,7 @@ interface WindowState {
 // Requirements: window-management.5
 class WindowStateManager {
   private dataManager: DataManager;
+  // Requirements: window-management.5.7 - Global state key (not user-specific)
   private readonly stateKey = 'window_state';
 
   constructor(dataManager: DataManager) {

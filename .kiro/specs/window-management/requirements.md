@@ -14,6 +14,9 @@
 - **Window Bounds** - Границы окна (x, y, width, height)
 - **Database** - Локальная база данных SQLite, управляемая через DataManager
 - **workAreaSize** - Размер рабочей области экрана (весь экран минус системные элементы macOS)
+- **WindowManager** - Компонент для управления жизненным циклом главного окна
+- **WindowStateManager** - Компонент для управления персистентностью состояния окна
+- **DataManager** - Существующий компонент для работы с базой данных SQLite
 
 ## Архитектурный Принцип
 
@@ -49,6 +52,7 @@
 #### Функциональные Тесты
 
 - `tests/functional/window-state-persistence.spec.ts` - "should open at default size on first launch"
+- `tests/functional/window-state-persistence.spec.ts` - "should open application with correct initial window state"
 
 ### 2. Заголовок Главного Окна
 
@@ -117,6 +121,7 @@
 #### Функциональные Тесты
 
 - `tests/functional/window-state-persistence.spec.ts` - "should open at default size on first launch"
+- `tests/functional/window-state-persistence.spec.ts` - "should adapt window size to small screens"
 
 ### 5. Сохранение Состояния Окна
 
@@ -147,6 +152,8 @@
 #### Функциональные Тесты
 
 - `tests/functional/window-state-persistence.spec.ts` - "should persist window size across restarts"
+- `tests/functional/window-state-persistence.spec.ts` - "should persist window state across restarts"
+- `tests/functional/window-state-persistence.spec.ts` - "should persist maximized state across restarts"
 
 ## Вне Области Применения
 
@@ -157,3 +164,12 @@
 - Сохранение состояния содержимого окна (только геометрия окна)
 - Управление несколькими окнами приложения
 - Полноэкранный режим (fullscreen mode)
+
+## Технические Ограничения
+
+- **Платформа**: Только macOS (использование нативных элементов управления macOS)
+- **Electron API**: Использование BrowserWindow и screen API
+- **База данных**: SQLite через существующий DataManager
+- **Формат хранения**: JSON для сериализации состояния окна
+- **Минимальный размер окна**: Не определен (окно может быть любого размера)
+- **Максимальный размер окна**: Ограничен размером экрана (workAreaSize)
