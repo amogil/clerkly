@@ -72,7 +72,7 @@ External API → Main Process → Database → IPC Event → Renderer → UI Upd
    │  │                                │         │
    │  │  - checkAuthStatus()           │         │
    │  │  - redirectToLogin()           │         │
-   │  │  - redirectToDashboard()       │         │
+   │  │  - redirectToAgents()       │         │
    │  └────────────────────────────────┘         │
    │           │                                  │
    │           ▼                                  │
@@ -99,7 +99,7 @@ External API → Main Process → Database → IPC Event → Renderer → UI Upd
    │  │         Router                 │         │
    │  │                                │         │
    │  │  - /login                      │         │
-   │  │  - /dashboard (protected)      │         │
+   │  │  - /agents (protected)      │         │
    │  │  - /settings (protected)       │         │
    │  │  - /tasks (protected)          │         │
    │  │  - /calendar (protected)       │         │
@@ -113,7 +113,7 @@ External API → Main Process → Database → IPC Event → Renderer → UI Upd
 1. **Запуск приложения**:
    - `NavigationManager` проверяет статус авторизации через IPC
    - Если пользователь не авторизован → перенаправление на `/login`
-   - Если пользователь авторизован → остается на текущем маршруте или перенаправляется на `/dashboard`
+   - Если пользователь авторизован → остается на текущем маршруте или перенаправляется на `/agents`
 
 2. **Попытка доступа к защищенному маршруту**:
    - `AuthGuard` проверяет, является ли маршрут защищенным
@@ -126,7 +126,7 @@ External API → Main Process → Database → IPC Event → Renderer → UI Upd
    - Authorization code получен → событие `auth:code-received` → Loader показывается
    - OAuth система обменивает код на токены (синхронно)
    - OAuth система загружает профиль пользователя (синхронно)
-   - Если успешно → событие `auth:success` → Loader скрывается → перенаправление на `/dashboard`
+   - Если успешно → событие `auth:success` → Loader скрывается → перенаправление на `/agents`
    - Если ошибка → событие `auth:error` → Loader скрывается → токены очищаются → показ LoginError
 
 4. **Выход из системы**:
@@ -177,9 +177,9 @@ class NavigationManager {
    * Redirect to dashboard
    * Requirements: navigation.1.7
    */
-  redirectToDashboard(): void {
+  redirectToAgents(): void {
     console.log('[NavigationManager] Redirecting to dashboard');
-    this.router.navigate('/dashboard');
+    this.router.navigate('/agents');
   }
 
   /**
@@ -194,7 +194,7 @@ class NavigationManager {
     } else {
       // If already on login screen, redirect to dashboard
       if (this.router.currentRoute === '/login') {
-        this.redirectToDashboard();
+        this.redirectToAgents();
       }
     }
   }
@@ -204,7 +204,7 @@ class NavigationManager {
 **Ключевые методы:**
 - `checkAuthStatus()`: Проверяет статус авторизации через IPC
 - `redirectToLogin()`: Перенаправляет на экран логина
-- `redirectToDashboard()`: Перенаправляет на главный экран
+- `redirectToAgents()`: Перенаправляет на главный экран
 - `initialize()`: Инициализирует навигацию при запуске приложения
 
 
@@ -218,7 +218,7 @@ class NavigationManager {
 class AuthGuard {
   private navigationManager: NavigationManager;
   private protectedRoutes: string[] = [
-    '/dashboard',
+    '/agents',
     '/settings',
     '/tasks',
     '/calendar',
@@ -261,7 +261,7 @@ class AuthGuard {
 ```
 
 **Ключевые особенности:**
-- Список защищенных маршрутов: `/dashboard`, `/settings`, `/tasks`, `/calendar`, `/contacts`
+- Список защищенных маршрутов: `/agents`, `/settings`, `/tasks`, `/calendar`, `/contacts`
 - Публичные маршруты (например, `/login`) доступны всем
 - Автоматическое перенаправление на логин при попытке доступа к защищенному маршруту
 
@@ -275,7 +275,7 @@ useEffect(() => {
   // Requirements: navigation.1.7 - Redirect to dashboard after successful auth
   const unsubscribeAuthSuccess = window.api.auth.onAuthSuccess(() => {
     console.log('[App] Auth success event received, redirecting to dashboard');
-    navigationManager.redirectToDashboard();
+    navigationManager.redirectToAgents();
   });
 
   // Requirements: navigation.1.9 - Redirect to login after logout
@@ -292,7 +292,7 @@ useEffect(() => {
 ```
 
 **События OAuth:**
-- `auth:success`: Генерируется при успешной авторизации → перенаправление на Dashboard
+- `auth:success`: Генерируется при успешной авторизации → перенаправление на Agents
 - `auth:logout`: Генерируется при выходе из системы → перенаправление на Login
 
 ### Loader State Management
@@ -353,7 +353,7 @@ useEffect(() => {
 - Loader показывается ТОЛЬКО после получения authorization code (не при клике на кнопку)
 - Во время отображения Loader кнопка "Continue with Google" неактивна (disabled)
 - Loader отображается во время обмена токенов И загрузки профиля (синхронные операции)
-- Loader скрывается при успехе (перенаправление на Dashboard) или ошибке (показ LoginError)
+- Loader скрывается при успехе (перенаправление на Agents) или ошибке (показ LoginError)
 - Все элементы LoginScreen остаются видимыми во время отображения Loader
 
 
@@ -377,7 +377,7 @@ App Start → NavigationManager.initialize() → checkAuthStatus() → not autho
 ### 2. Запуск приложения (авторизованный пользователь)
 
 ```
-App Start → NavigationManager.initialize() → checkAuthStatus() → authorized → stay on current route or redirectToDashboard()
+App Start → NavigationManager.initialize() → checkAuthStatus() → authorized → stay on current route or redirectToAgents()
 ```
 
 **Шаги:**
@@ -385,17 +385,17 @@ App Start → NavigationManager.initialize() → checkAuthStatus() → authorize
 2. `NavigationManager.initialize()` вызывается
 3. `checkAuthStatus()` проверяет статус авторизации через IPC
 4. Статус: авторизован
-5. Если текущий маршрут `/login` → `redirectToDashboard()`
+5. Если текущий маршрут `/login` → `redirectToAgents()`
 6. Иначе → остается на текущем маршруте
 
-**Результат:** Пользователь видит Dashboard или последний открытый экран
+**Результат:** Пользователь видит Agents или последний открытый экран
 
 ### 3. Успешная авторизация с загрузкой профиля
 
 ```
 User clicks "Continue with Google" → Browser opens → Authorization code received → 
 Show Loader ("Signing in...") → Exchange code for tokens → Fetch profile (synchronous) → 
-auth:success event → onAuthSuccess() → redirectToDashboard()
+auth:success event → onAuthSuccess() → redirectToAgents()
 ```
 
 **Шаги:**
@@ -408,9 +408,9 @@ auth:success event → onAuthSuccess() → redirectToDashboard()
 7. OAuth система синхронно загружает профиль пользователя из Google UserInfo API
 8. Если успешно: OAuth система генерирует событие `auth:success`
 9. `onAuthSuccess()` обработчик получает событие
-10. Loader исчезает, `redirectToDashboard()` перенаправляет на `/dashboard`
+10. Loader исчезает, `redirectToAgents()` перенаправляет на `/agents`
 
-**Результат:** Пользователь видит Loader во время обработки, затем автоматически перенаправляется на Dashboard
+**Результат:** Пользователь видит Loader во время обработки, затем автоматически перенаправляется на Agents
 
 **Обработка ошибок:**
 - Если обмен токенов не удается ИЛИ загрузка профиля не удается:
@@ -462,7 +462,7 @@ Logout → auth:logout event → onLogout() → redirectToLogin()
 
 ### Property 2: Блокировка доступа к защищенным экранам
 
-*Для любого* неавторизованного пользователя, попытка доступа к защищенным экранам (Dashboard, Settings, Tasks, Calendar, Contacts) должна быть заблокирована, и пользователь должен быть перенаправлен на экран логина.
+*Для любого* неавторизованного пользователя, попытка доступа к защищенным экранам (Agents, Settings, Tasks, Calendar, Contacts) должна быть заблокирована, и пользователь должен быть перенаправлен на экран логина.
 
 **Validates: Requirements navigation.1.2**
 
@@ -486,13 +486,13 @@ Logout → auth:logout event → onLogout() → redirectToLogin()
 
 ### Property 6: Синхронный обмен кода и загрузка профиля
 
-*Для любого* пользователя, для которого отображается Loader, приложение должно синхронно выполнить обмен authorization code на токены И загрузить профиль пользователя из Google UserInfo API перед перенаправлением на Dashboard.
+*Для любого* пользователя, для которого отображается Loader, приложение должно синхронно выполнить обмен authorization code на токены И загрузить профиль пользователя из Google UserInfo API перед перенаправлением на Agents.
 
 **Validates: Requirements navigation.1.6**
 
-### Property 7: Показ Dashboard после успешной авторизации и загрузки профиля
+### Property 7: Показ Agents после успешной авторизации и загрузки профиля
 
-*Для любого* пользователя, успешно авторизовавшегося через Google OAuth И для которого профиль успешно загружен, приложение должно скрыть Loader и показывать Dashboard (главный экран), а не Account Block или Settings.
+*Для любого* пользователя, успешно авторизовавшегося через Google OAuth И для которого профиль успешно загружен, приложение должно скрыть Loader и показывать Agents (главный экран), а не Account Block или Settings.
 
 **Validates: Requirements navigation.1.7**
 
@@ -502,9 +502,9 @@ Logout → auth:logout event → onLogout() → redirectToLogin()
 
 **Validates: Requirements navigation.1.8**
 
-### Property 9: Перенаправление на Dashboard после успешной авторизации
+### Property 9: Перенаправление на Agents после успешной авторизации
 
-*Для любого* пользователя, успешно авторизовавшегося через Google OAuth, приложение должно автоматически перенаправить пользователя на Dashboard (главный экран приложения).
+*Для любого* пользователя, успешно авторизовавшегося через Google OAuth, приложение должно автоматически перенаправить пользователя на Agents (главный экран приложения).
 
 **Validates: Requirements navigation.1.7**
 
@@ -525,7 +525,7 @@ Logout → auth:logout event → onLogout() → redirectToLogin()
 3. **Синхронная загрузка профиля при авторизации (navigation.1.5, navigation.1.6, navigation.1.7, navigation.1.8)**: Когда пользователь авторизуется через Google OAuth, система должна:
    - Показать Loader с текстом "Signing in..." после получения authorization code (navigation.1.5)
    - Синхронно обменять код на токены И загрузить профиль во время отображения Loader (navigation.1.6)
-   - При успехе: скрыть Loader и показать Dashboard с заполненным Account Block (navigation.1.7)
+   - При успехе: скрыть Loader и показать Agents с заполненным Account Block (navigation.1.7)
    - При ошибке обмена токенов ИЛИ загрузки профиля: скрыть Loader, очистить токены и показать LoginError компонент с errorCode 'profile_fetch_failed' (navigation.1.8)
 
 4. **Loader не показывается при клике на кнопку (navigation.1.5)**: Когда пользователь кликает кнопку "Continue with Google", Loader НЕ показывается сразу. Loader показывается ТОЛЬКО после получения deep link от Google (authorization code). Это предотвращает показ Loader если пользователь закрывает браузер до завершения авторизации.
@@ -715,8 +715,8 @@ describe('NavigationManager', () => {
   });
 
   /* Preconditions: NavigationManager initialized
-     Action: call redirectToDashboard()
-     Assertions: router.navigate called with '/dashboard'
+     Action: call redirectToAgents()
+     Assertions: router.navigate called with '/agents'
      Requirements: navigation.1.7 */
   it('should redirect to dashboard', () => {
     // Тест перенаправления на dashboard
@@ -732,7 +732,7 @@ describe('NavigationManager', () => {
 
   /* Preconditions: user authorized, current route is /login
      Action: call initialize()
-     Assertions: redirectToDashboard called
+     Assertions: redirectToAgents called
      Requirements: navigation.1.7 */
   it('should redirect to dashboard on app start when authorized and on login screen', async () => {
     // Тест инициализации для авторизованного пользователя на экране логина
@@ -761,16 +761,16 @@ describe('AuthGuard', () => {
     // Тест доступа к публичным маршрутам
   });
 
-  /* Preconditions: route is /dashboard (protected), user authorized
-     Action: call canActivate('/dashboard')
+  /* Preconditions: route is /agents (protected), user authorized
+     Action: call canActivate('/agents')
      Assertions: returns true
      Requirements: navigation.1.2 */
   it('should allow access to protected routes when authorized', async () => {
     // Тест доступа к защищенным маршрутам для авторизованного пользователя
   });
 
-  /* Preconditions: route is /dashboard (protected), user not authorized
-     Action: call canActivate('/dashboard')
+  /* Preconditions: route is /agents (protected), user not authorized
+     Action: call canActivate('/agents')
      Assertions: returns false, redirectToLogin called
      Requirements: navigation.1.2 */
   it('should deny access to protected routes when not authorized', async () => {
@@ -786,7 +786,7 @@ describe('AuthGuard', () => {
   });
 
   /* Preconditions: checkAuthStatus throws error, route is protected
-     Action: call canActivate('/dashboard')
+     Action: call canActivate('/agents')
      Assertions: returns false, redirectToLogin called, error logged
      Requirements: navigation.1.2 */
   it('should deny access on auth check error', async () => {
@@ -809,7 +809,7 @@ describe('AuthGuard', () => {
 describe('OAuth Events Integration', () => {
   /* Preconditions: auth:success event emitted
      Action: event handler triggered
-     Assertions: redirectToDashboard called
+     Assertions: redirectToAgents called
      Requirements: navigation.1.7 */
   it('should redirect to dashboard on auth success event', () => {
     // Тест перенаправления после успешной авторизации
@@ -943,7 +943,7 @@ describe('NavigationManager Property Tests', () => {
   it('should block access to protected routes when not authorized', () => {
     fc.assert(
       fc.property(
-        fc.constantFrom('/dashboard', '/settings', '/tasks', '/calendar', '/contacts'),
+        fc.constantFrom('/agents', '/settings', '/tasks', '/calendar', '/contacts'),
         fc.boolean(),
         async (route, isAuthorized) => {
           // Mock auth status
@@ -1026,7 +1026,7 @@ describe('NavigationManager Property Tests', () => {
     );
   });
 
-  /* Feature: navigation, Property 7: Показ Dashboard после успешной авторизации
+  /* Feature: navigation, Property 7: Показ Agents после успешной авторизации
      Preconditions: various successful auth and profile fetch scenarios
      Action: complete auth flow
      Assertions: loader hidden, redirected to dashboard
@@ -1050,7 +1050,7 @@ describe('NavigationManager Property Tests', () => {
 
           // Verify final state
           expect(getLoaderState().isLoading).toBe(false);
-          expect(getCurrentRoute()).toBe('/dashboard');
+          expect(getCurrentRoute()).toBe('/agents');
         }
       ),
       { numRuns: 100 }
@@ -1129,7 +1129,7 @@ describe('Navigation Functional Tests', () => {
     const app = await launchApp({ authorized: true });
     
     // Проверить доступ к защищенным маршрутам
-    const protectedRoutes = ['/dashboard', '/settings', '/tasks', '/calendar', '/contacts'];
+    const protectedRoutes = ['/agents', '/settings', '/tasks', '/calendar', '/contacts'];
     
     for (const route of protectedRoutes) {
       await app.navigate(route);
@@ -1156,7 +1156,7 @@ describe('Navigation Functional Tests', () => {
     
     // Проверить перенаправление на dashboard
     await app.waitForNavigation();
-    expect(await app.getCurrentRoute()).toBe('/dashboard');
+    expect(await app.getCurrentRoute()).toBe('/agents');
     
     await app.close();
   });
@@ -1170,8 +1170,8 @@ describe('Navigation Functional Tests', () => {
     const app = await launchApp({ authorized: true });
     
     // Перейти на dashboard
-    await app.navigate('/dashboard');
-    expect(await app.getCurrentRoute()).toBe('/dashboard');
+    await app.navigate('/agents');
+    expect(await app.getCurrentRoute()).toBe('/agents');
     
     // Выполнить logout
     await app.clickButton('[data-testid="logout-button"]');
@@ -1196,7 +1196,7 @@ describe('Navigation Functional Tests', () => {
     const app = await launchApp({ authorized: false });
     
     // Попытаться получить доступ к каждому защищенному маршруту
-    const protectedRoutes = ['/dashboard', '/settings', '/tasks', '/calendar', '/contacts'];
+    const protectedRoutes = ['/agents', '/settings', '/tasks', '/calendar', '/contacts'];
     
     for (const route of protectedRoutes) {
       await app.navigate(route);
@@ -1318,7 +1318,7 @@ describe('Navigation Functional Tests', () => {
 Система навигации тесно интегрирована с OAuth системой авторизации:
 
 **События:**
-- `auth:success`: Генерируется при успешной авторизации → перенаправление на Dashboard
+- `auth:success`: Генерируется при успешной авторизации → перенаправление на Agents
 - `auth:logout`: Генерируется при выходе из системы → перенаправление на Login
 
 **IPC Методы:**
@@ -1334,7 +1334,7 @@ describe('Navigation Functional Tests', () => {
 
 **Маршруты:**
 - `/login` - Публичный маршрут (экран логина)
-- `/dashboard` - Защищенный маршрут (главный экран)
+- `/agents` - Защищенный маршрут (главный экран)
 - `/settings` - Защищенный маршрут (настройки)
 - `/tasks` - Защищенный маршрут (задачи)
 - `/calendar` - Защищенный маршрут (календарь)

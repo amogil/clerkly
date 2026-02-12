@@ -114,7 +114,7 @@ Token Expiring → OAuthClientManager.refreshAccessToken() → Update Tokens in 
 5. КОГДА токены получены, ТО "OAuth Client" ДОЛЖЕН вычислить время истечения access token (текущее время + expires_in)
 6. КОГДА токены сохранены, ТО система ДОЛЖНА синхронно получить профиль пользователя из Google UserInfo API (во время отображения loader, см. требование 15)
 7. ЕСЛИ получение профиля не удается, ТО система ДОЛЖНА очистить токены И показать LoginError компонент с errorCode 'profile_fetch_failed'
-8. ЕСЛИ получение профиля успешно, ТО система ДОЛЖНА показать главный интерфейс приложения (Dashboard)
+8. ЕСЛИ получение профиля успешно, ТО система ДОЛЖНА показать главный интерфейс приложения (Agents)
 
 #### Функциональные Тесты
 
@@ -256,7 +256,7 @@ Token Expiring → OAuthClientManager.refreshAccessToken() → Update Tokens in 
 5. КОГДА пользователь нажимает кнопку "Continue with Google" повторно ДО завершения авторизации, ТО ДОЛЖНА открыться еще одна вкладка браузера с OAuth страницей
 6. КОГДА пользователь завершает авторизацию в браузере И deep link получен (authorization code), ТО приложение ДОЛЖНО показать loader (см. требование 15)
 7. КОГДА loader отображается, ТО кнопка "Continue with Google" ДОЛЖНА быть неактивной (disabled)
-8. ЕСЛИ авторизация успешна (токены получены И профиль загружен), ТО "Window Manager" ДОЛЖЕН закрыть "Login Screen" и открыть главное окно приложения (Dashboard)
+8. ЕСЛИ авторизация успешна (токены получены И профиль загружен), ТО "Window Manager" ДОЛЖЕН закрыть "Login Screen" и открыть главное окно приложения (Agents)
 9. ЕСЛИ авторизация неуспешна (ошибка обмена токенов ИЛИ ошибка загрузки профиля), ТО "Window Manager" ДОЛЖЕН показать "Login Error Screen" с описанием ошибки и той же кнопкой "Continue with Google" для повторной попытки
 
 #### Функциональные Тесты
@@ -339,7 +339,7 @@ Token Expiring → OAuthClientManager.refreshAccessToken() → Update Tokens in 
 4. Loader ДОЛЖЕН отображаться во время следующих операций:
    - Обмен authorization code на токены (POST запрос к Google token endpoint)
    - Загрузка профиля пользователя из Google UserInfo API (синхронный запрос)
-5. КОГДА токены получены И профиль загружен успешно, ТО loader ДОЛЖЕН исчезнуть И приложение ДОЛЖНО показать Dashboard
+5. КОГДА токены получены И профиль загружен успешно, ТО loader ДОЛЖЕН исчезнуть И приложение ДОЛЖНО показать Agents
 6. КОГДА происходит ошибка (обмен токенов ИЛИ загрузка профиля), ТО loader ДОЛЖЕН исчезнуть И приложение ДОЛЖНО показать "Login Error Screen" с описанием ошибки
 7. Loader ДОЛЖЕН использовать стандартный компонент загрузки (spinner) с текстом "Signing in..."
 8. ЕСЛИ пользователь закрывает браузер до завершения авторизации (не получен authorization code), ТО loader НЕ ДОЛЖЕН отображаться
@@ -350,7 +350,7 @@ Token Expiring → OAuthClientManager.refreshAccessToken() → Update Tokens in 
 - `tests/functional/auth-flow.spec.ts` - "should show loader after receiving authorization code"
 - `tests/functional/auth-flow.spec.ts` - "should show loader during token exchange and profile fetch"
 - `tests/functional/auth-flow.spec.ts` - "should disable login button when loader is shown"
-- `tests/functional/auth-flow.spec.ts` - "should hide loader and show dashboard on success"
+- `tests/functional/auth-flow.spec.ts` - "should hide loader and show agents on success"
 - `tests/functional/auth-flow.spec.ts` - "should hide loader and show error on failure"
 - `tests/functional/auth-flow.spec.ts` - "should NOT show loader immediately after login click, only after deep link"
 

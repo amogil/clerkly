@@ -11,7 +11,7 @@
 - [x] 1.1 Создать класс NavigationManager
   - Реализовать метод `checkAuthStatus()` для проверки статуса авторизации
   - Реализовать метод `redirectToLogin()` для перенаправления на экран логина
-  - Реализовать метод `redirectToDashboard()` для перенаправления на Dashboard
+  - Реализовать метод `redirectToAgents()` для перенаправления на Agents
   - Реализовать метод `initialize()` для инициализации навигации при запуске
   - Добавить зависимость от Router
   - **Requirements:** navigation.1.1, navigation.1.7, navigation.1.9
@@ -26,7 +26,7 @@
   - **Property:** 2
 
 - [x] 1.3 Интегрировать NavigationManager с OAuth events
-  - Добавить слушатель события `auth:success` для перенаправления на Dashboard
+  - Добавить слушатель события `auth:success` для перенаправления на Agents
   - Добавить слушатель события `auth:logout` для перенаправления на Login
   - Реализовать в App.tsx или главном компоненте приложения
   - Обеспечить очистку подписок при размонтировании
@@ -37,7 +37,7 @@
 
 - [x] 2.1 Настроить маршруты приложения
   - Определить публичный маршрут `/login`
-  - Определить защищенные маршруты: `/dashboard`, `/settings`, `/tasks`, `/calendar`, `/contacts`
+  - Определить защищенные маршруты: `/agents`, `/settings`, `/tasks`, `/calendar`, `/contacts`
   - Интегрировать AuthGuard для защиты маршрутов
   - **Requirements:** navigation.1.1, navigation.1.2
   - **Property:** 1, 2
@@ -103,10 +103,10 @@
   - **Requirements:** navigation.1.1, navigation.1.9
   - **Property:** 1, 10
 
-- [x] 3.3 Тест: redirectToDashboard() перенаправляет на /dashboard
+- [x] 3.3 Тест: redirectToAgents() перенаправляет на /agents
   - Создать mock Router
-  - Вызвать redirectToDashboard()
-  - Проверить, что router.navigate() вызван с '/dashboard'
+  - Вызвать redirectToAgents()
+  - Проверить, что router.navigate() вызван с '/agents'
   - **Requirements:** navigation.1.7
   - **Property:** 9
 
@@ -119,7 +119,7 @@
 
 - [x] 3.5 Тест: initialize() не перенаправляет авторизованного пользователя
   - Мокировать checkAuthStatus() для возврата true
-  - Мокировать router.currentRoute = '/dashboard'
+  - Мокировать router.currentRoute = '/agents'
   - Вызвать initialize()
   - Проверить, что redirectToLogin() НЕ был вызван
   - **Requirements:** navigation.1.1
@@ -135,7 +135,7 @@
 
 - [x] 4.2 Тест: canActivate() блокирует доступ к защищенным маршрутам без авторизации
   - Мокировать navigationManager.checkAuthStatus() для возврата false
-  - Вызвать canActivate('/dashboard')
+  - Вызвать canActivate('/agents')
   - Проверить, что возвращается false
   - Проверить, что navigationManager.redirectToLogin() был вызван
   - **Requirements:** navigation.1.2
@@ -143,7 +143,7 @@
 
 - [x] 4.3 Тест: canActivate() разрешает доступ к защищенным маршрутам с авторизацией
   - Мокировать navigationManager.checkAuthStatus() для возврата true
-  - Вызвать canActivate('/dashboard')
+  - Вызвать canActivate('/agents')
   - Проверить, что возвращается true
   - Проверить, что redirectToLogin() НЕ был вызван
   - **Requirements:** navigation.1.2
@@ -151,7 +151,7 @@
 
 - [x] 4.4 Тест: isProtectedRoute() корректно определяет защищенные маршруты
   - Проверить, что isProtectedRoute('/login') возвращает false
-  - Проверить, что isProtectedRoute('/dashboard') возвращает true
+  - Проверить, что isProtectedRoute('/agents') возвращает true
   - Проверить, что isProtectedRoute('/settings') возвращает true
   - Проверить, что isProtectedRoute('/tasks') возвращает true
   - **Requirements:** navigation.1.2
@@ -241,9 +241,9 @@
   - **Requirements:** navigation.1.6
   - **Property:** 6
 
-- [x] 5.5 Property Test: Показ Dashboard после успешной авторизации
+- [x] 5.5 Property Test: Показ Agents после успешной авторизации
   - ✅ Генерирует различные успешные сценарии авторизации
-  - ✅ Проверяет перенаправление на /dashboard
+  - ✅ Проверяет перенаправление на /agents
   - ✅ Минимум 100 итераций
   - **Requirements:** navigation.1.7
   - **Property:** 7, 9
@@ -260,9 +260,9 @@
   - **Requirements:** navigation.1.8
   - **Property:** 8
 
-- [x] 5.7 Property Test: Перенаправление на Dashboard после авторизации
+- [x] 5.7 Property Test: Перенаправление на Agents после авторизации
   - ✅ Генерирует различные успешные сценарии OAuth
-  - ✅ Проверяет автоматическое перенаправление на /dashboard
+  - ✅ Проверяет автоматическое перенаправление на /agents
   - ✅ Минимум 100 итераций
   - **Requirements:** navigation.1.7
   - **Property:** 9
@@ -288,7 +288,7 @@
 
 - [x] 6.2 Функциональный тест: should redirect to dashboard after successful authentication
   - ✅ Выполняет полный OAuth flow
-  - ✅ Проверяет автоматическое перенаправление на /dashboard
+  - ✅ Проверяет автоматическое перенаправление на /agents
   - **Requirements:** navigation.1.7
   - **Property:** 7, 9
   - **Реализовано в:** `tests/functional/navigation.spec.ts`
@@ -318,7 +318,7 @@
   - ✅ Проверяет, что Loader НЕ показывается сразу при клике
   - ✅ Проверяет, что Loader показывается после получения authorization code
   - ✅ Проверяет, что кнопка disabled во время загрузки
-  - ✅ Проверяет скрытие Loader и перенаправление на /dashboard
+  - ✅ Проверяет скрытие Loader и перенаправление на /agents
   - **Requirements:** navigation.1.5, navigation.1.6, navigation.1.7
   - **Property:** 5, 6, 7
   - **Реализовано в:** `tests/functional/oauth-profile-sync.spec.ts`, `tests/functional/account-profile.spec.ts`
@@ -431,9 +431,9 @@
 - ✅ 5.2 Блокировка защищенных маршрутов (реализован)
 - ✅ 5.3 Показ Loader (реализован)
 - ❌ 5.4 Синхронный обмен кода (НЕ реализован как property test, покрыто функциональными тестами)
-- ✅ 5.5 Показ Dashboard (реализован)
+- ✅ 5.5 Показ Agents (реализован)
 - ❌ 5.6 Показ LoginError (НЕ реализован как property test, покрыто функциональными тестами)
-- ✅ 5.7 Перенаправление на Dashboard (реализован)
+- ✅ 5.7 Перенаправление на Agents (реализован)
 - ✅ 5.8 Перенаправление на Login (реализован)
 
 **Статус:** 6 из 8 property-based тестов реализованы (75%)

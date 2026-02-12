@@ -53,7 +53,7 @@ test.describe('OAuth Profile Synchronous Fetch', () => {
 
   /* Preconditions: Application not running, clean database, mock OAuth server running
      Action: Emulate deep link callback with authorization code, complete token exchange, fetch profile synchronously
-     Assertions: Tokens saved, profile fetched and saved, Dashboard shown (not loading screen)
+     Assertions: Tokens saved, profile fetched and saved, Agents shown (not loading screen)
      Requirements: google-oauth-auth.3.6, google-oauth-auth.3.8, account-profile.1.3, account-profile.1.4 */
   test('should synchronously fetch profile during authorization (success)', async () => {
     // Set custom user profile data for this test
@@ -176,18 +176,18 @@ test.describe('OAuth Profile Synchronous Fetch', () => {
     expect(profileCheck.profile.email).toBe('sync.success@example.com');
     expect(profileCheck.profile.name).toBe('Sync Success User');
 
-    // Verify Dashboard is shown (not login screen or loading screen)
-    // Requirements: account-profile.1.4 - Dashboard should be shown after successful profile fetch
+    // Verify Agents is shown (not login screen or loading screen)
+    // Requirements: account-profile.1.4 - Agents should be shown after successful profile fetch
     const loginButtonAfterAuth = context.window.locator('text=/continue with google/i');
     const isLoginVisible = await loginButtonAfterAuth.isVisible().catch(() => false);
     expect(isLoginVisible).toBe(false);
 
-    // Check for Dashboard-specific heading
-    const dashboardHeading = context.window.locator('h1:has-text("Dashboard")');
+    // Check for Agents-specific heading
+    const dashboardHeading = context.window.locator('[data-testid="agents"]');
     await dashboardHeading.waitFor({ state: 'visible', timeout: 5000 });
     expect(await dashboardHeading.isVisible()).toBe(true);
 
-    console.log('[TEST] ✓ Dashboard displayed after successful OAuth flow');
+    console.log('[TEST] ✓ Agents displayed after successful OAuth flow');
 
     // Take screenshot
     await context.window.screenshot({
@@ -320,7 +320,7 @@ test.describe('OAuth Profile Synchronous Fetch', () => {
 
   /* Preconditions: Application not running, clean database, mock OAuth server running
      Action: Emulate deep link callback, monitor UI during token exchange and profile fetch
-     Assertions: Loader shown during profile fetch, Dashboard NOT shown until profile loaded
+     Assertions: Loader shown during profile fetch, Agents NOT shown until profile loaded
      Requirements: account-profile.1.4 */
   test('should show loader during synchronous profile fetch', async () => {
     // Set custom user profile data for this test
@@ -393,27 +393,27 @@ test.describe('OAuth Profile Synchronous Fetch', () => {
     console.log('[TEST] Loader visible during profile fetch:', hasLoader);
 
     // Note: Loader might be very brief if mock server responds quickly
-    // The important part is that Dashboard is NOT shown immediately
+    // The important part is that Agents is NOT shown immediately
 
-    // Verify Dashboard is NOT shown yet (during profile fetch)
-    const dashboardHeading = context.window.locator('h1:has-text("Dashboard")');
-    const isDashboardVisible = await dashboardHeading.isVisible().catch(() => false);
+    // Verify Agents is NOT shown yet (during profile fetch)
+    const dashboardHeading = context.window.locator('[data-testid="agents"]');
+    const isAgentsVisible = await dashboardHeading.isVisible().catch(() => false);
 
-    console.log('[TEST] Dashboard visible during profile fetch:', isDashboardVisible);
+    console.log('[TEST] Agents visible during profile fetch:', isAgentsVisible);
 
-    // Dashboard should NOT be visible immediately after deep link
+    // Agents should NOT be visible immediately after deep link
     // It should only appear after profile is fetched
     // Note: This check might be timing-sensitive with fast mock server
 
     // Wait for profile fetch to complete
     await context.window.waitForTimeout(2000);
 
-    // Verify Dashboard is shown after profile fetch completes
-    // Requirements: account-profile.1.4 - Dashboard should be shown after profile is loaded
+    // Verify Agents is shown after profile fetch completes
+    // Requirements: account-profile.1.4 - Agents should be shown after profile is loaded
     await dashboardHeading.waitFor({ state: 'visible', timeout: 5000 });
     expect(await dashboardHeading.isVisible()).toBe(true);
 
-    console.log('[TEST] ✓ Dashboard displayed after profile fetch completed');
+    console.log('[TEST] ✓ Agents displayed after profile fetch completed');
 
     // Verify loader is hidden after profile fetch
     const isLoaderVisible = await loader.isVisible().catch(() => false);
