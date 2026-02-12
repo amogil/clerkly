@@ -263,14 +263,14 @@ export class WindowStateManager {
    * Gets the default window state based on primary display size.
    *
    * This private method calculates the default window state when no saved state
-   * exists or when the saved state is invalid. The window size is set to fill
-   * the entire work area (screen size minus system UI elements like menu bar
-   * and dock), positioned at (0, 0).
+   * exists or when the saved state is invalid. The window opens with a compact
+   * size of min(600, screenWidth) x min(400, screenHeight), centered on the screen.
+   * This provides a focused interface for agent chats while allowing immediate resizing.
    *
    * The default state has isMaximized set to false, ensuring the window
-   * opens in a large size but remains resizable by the user.
+   * opens in a compact size but remains resizable by the user.
    *
-   * Requirements: window-management.1.1, window-management.1.3, window-management.4.1, window-management.4.2, window-management.4.3
+   * Requirements: window-management.1.1, window-management.1.3, window-management.4.1, window-management.4.2, window-management.4.4
    *
    * @returns Default WindowState object with position, size, and maximized status
    *          calculated based on the primary display's dimensions.
@@ -279,34 +279,53 @@ export class WindowStateManager {
    * ```typescript
    * // For a 1920x1080 display with workAreaSize 1920x1055 (25px menu bar):
    * // Returns: {
-   * //   x: 0,
-   * //   y: 0,
-   * //   width: 1920,
-   * //   height: 1055,
+   * //   x: 660,
+   * //   y: 327,
+   * //   width: 600,
+   * //   height: 400,
    * //   isMaximized: false
    * // }
    *
    * // For a smaller 1366x768 display with workAreaSize 1366x743:
    * // Returns: {
-   * //   x: 0,
-   * //   y: 0,
-   * //   width: 1366,
-   * //   height: 743,
+   * //   x: 383,
+   * //   y: 171,
+   * //   width: 600,
+   * //   height: 400,
+   * //   isMaximized: false
+   * // }
+   *
+   * // For a very small 800x600 display:
+   * // Returns: {
+   * //   x: 100,
+   * //   y: 100,
+   * //   width: 600,
+   * //   height: 400,
    * //   isMaximized: false
    * // }
    * ```
    */
   private getDefaultState(): WindowState {
     const primaryDisplay = screen.getPrimaryDisplay();
-    const { width, height } = primaryDisplay.workAreaSize;
+    const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
 
-    // Requirements: window-management.1.1, window-management.1.3, window-management.4.1, window-management.4.2, window-management.4.3
+    // Requirements: window-management.1.1, window-management.4.2, window-management.4.4
+    // Window opens with size min(600, screenWidth) x min(400, screenHeight) on first launch
+    // This provides a focused interface for agent chats while allowing immediate resizing
+    const width = Math.min(600, screenWidth);
+    const height = Math.min(400, screenHeight);
+
+    // Requirements: window-management.4.4 - Center window on screen
+    const x = Math.floor((screenWidth - width) / 2);
+    const y = Math.floor((screenHeight - height) / 2);
+
+    // Requirements: window-management.1.1, window-management.1.3 - NOT maximized, window is resizable from the start
     return {
-      x: 0,
-      y: 0,
+      x: x,
+      y: y,
       width: width,
       height: height,
-      isMaximized: false, // Requirements: window-management.1.1, window-management.1.3 - large window but not maximized, so it's resizable
+      isMaximized: false,
     };
   }
 

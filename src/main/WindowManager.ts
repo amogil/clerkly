@@ -135,7 +135,7 @@ class WindowManager {
    *
    * Creates the main application window with the following characteristics:
    * - Loads saved window state (position, size, maximized) from database
-   * - Opens in maximized state by default (first launch or no saved state)
+   * - Opens with compact size min(600, screenWidth) x min(400, screenHeight) by default (first launch or no saved state)
    * - Uses native macOS window controls and title bar style
    * - Has empty title for minimalist interface
    * - Adapts to screen size (no hardcoded dimensions)
@@ -152,7 +152,8 @@ class WindowManager {
    * - title: '' - Empty title for clean interface (window-management.2.1)
    * - titleBarStyle: 'default' - Native macOS controls (window-management.3.1)
    * - Position and size from saved state or screen-based defaults (window-management.4.1, window-management.4.2, window-management.5.4, window-management.5.5)
-   * - Maximized by default on first launch (window-management.1.1)
+   * - Compact size min(600, screenWidth) x min(400, screenHeight) on first launch (window-management.1.1, window-management.4.2)
+   * - NOT maximized by default - window is resizable from the start (window-management.1.1, window-management.1.3)
    * - Not fullscreen - preserves macOS system elements (window-management.1.2)
    * - Resizable - user can adjust window size (window-management.1.3)
    *
@@ -172,7 +173,7 @@ class WindowManager {
    * ```typescript
    * const windowManager = new WindowManager(dataManager);
    * const mainWindow = windowManager.createWindow();
-   * // Window opens maximized with saved state or defaults
+   * // Window opens with compact 600x400 size (or saved state) and is resizable
    * // State changes are automatically persisted
    * ```
    */
@@ -202,8 +203,8 @@ class WindowManager {
 
       this.mainWindow = new BrowserWindow(windowConfig);
 
-      // Requirements: window-management.1.1, window-management.1.3
-      // On first launch, the window opens with workAreaSize dimensions but is NOT maximized.
+      // Requirements: window-management.1.1, window-management.1.3, window-management.5.3, window-management.5.4
+      // On first launch, the window opens with compact size min(600, screenWidth) x min(400, screenHeight) and is NOT maximized.
       // This ensures the window is immediately resizable by the user (window-management.1.3).
       // If the user previously maximized the window and we saved that state (window-management.5.3, window-management.5.4),
       // we restore the maximized state here.
