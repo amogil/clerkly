@@ -50,7 +50,7 @@ export const LLM_PROVIDERS: Record<LLMProviderType, LLMProviderConfig> = {
   openai: {
     id: 'openai',
     name: 'OpenAI',
-    apiUrl: 'https://api.openai.com/v1/chat/completions',
+    apiUrl: process.env.CLERKLY_OPENAI_API_URL || 'https://api.openai.com/v1/chat/completions',
     testModel: 'gpt-4o-mini',
     maxTokens: 5,
     timeout: 10000, // 10 seconds
@@ -58,7 +58,7 @@ export const LLM_PROVIDERS: Record<LLMProviderType, LLMProviderConfig> = {
   anthropic: {
     id: 'anthropic',
     name: 'Anthropic',
-    apiUrl: 'https://api.anthropic.com/v1/messages',
+    apiUrl: process.env.CLERKLY_ANTHROPIC_API_URL || 'https://api.anthropic.com/v1/messages',
     testModel: 'claude-haiku-4-5',
     maxTokens: 5,
     timeout: 10000, // 10 seconds
@@ -67,6 +67,7 @@ export const LLM_PROVIDERS: Record<LLMProviderType, LLMProviderConfig> = {
     id: 'google',
     name: 'Google',
     apiUrl:
+      process.env.CLERKLY_GOOGLE_LLM_API_URL ||
       'https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash:generateContent',
     testModel: 'gemini-3-flash',
     maxTokens: 5,
