@@ -183,7 +183,7 @@ Clerkly - это Electron-приложение для Mac OS X, представ
 
 #### Функциональные Тесты
 
-- `tests/functional/date-time-formatting.spec.ts` - "should use fixed format for logs"
+- Тесты удалены после упрощения UI
 
 ## Нефункциональные требования
 

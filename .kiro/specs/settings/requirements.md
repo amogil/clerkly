@@ -180,10 +180,7 @@
 
 #### Функциональные Тесты
 
-- `tests/functional/date-time-formatting.spec.ts` - "should format dates using system locale"
-- `tests/functional/date-time-formatting.spec.ts` - "should format times using system locale"
-- `tests/functional/date-time-formatting.spec.ts` - "should use fixed format for logs"
-- `tests/functional/date-time-formatting.spec.ts` - "should not display relative time formats"
+- Тесты удалены после упрощения UI (Tasks, Contacts, Calendar больше не существуют)
 
 ## Вне Области Применения
 
