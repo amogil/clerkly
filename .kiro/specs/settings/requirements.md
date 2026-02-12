@@ -123,7 +123,7 @@
 
 1.25. UI ДОЛЖЕН отображать текст: "Your API key is stored securely. It will only be used to communicate with your selected LLM provider."
 
-1.26. Кнопка "Test Connection" ДОЛЖНА присутствовать в UI, но НЕ ДОЛЖНА быть функциональной (placeholder для будущей функциональности)
+1.26. Кнопка "Test Connection" ДОЛЖНА присутствовать в UI для тестирования подключения к LLM Provider (см. settings.3)
 
 1.27. Система ДОЛЖНА использовать существующие IPC каналы для работы с настройками:
    - `save-data` для сохранения LLM провайдера и API ключей
@@ -148,7 +148,72 @@
 - `tests/functional/settings-ai-agent.spec.ts` - "should preserve API keys when switching providers"
 - `tests/functional/settings-ai-agent.spec.ts` - "should load correct API key when switching back to provider"
 
-### Требование 2: Форматирование Дат и Времени из Системных Настроек
+### Требование 2: Тестирование Подключения к LLM Provider
+
+**ID:** settings.2
+
+**User Story:** Как пользователь, я хочу протестировать подключение к выбранному LLM провайдеру с моим API ключом, чтобы убедиться, что ключ валиден и провайдер доступен, перед началом работы с агентом.
+
+**Зависимости:** settings.1 (настройки LLM Provider)
+
+#### Критерии Приемки
+
+3.1. Кнопка "Test Connection" ДОЛЖНА быть расположена под полем API Key в отдельной секции с верхней границей (border-top)
+
+3.2. Кнопка "Test Connection" ДОЛЖНА быть disabled КОГДА:
+   - Поле API Key пустое
+   - Тестирование уже выполняется (состояние loading)
+
+3.3. Кнопка "Test Connection" ДОЛЖНА быть enabled КОГДА:
+   - Поле API Key содержит хотя бы один символ
+   - Тестирование не выполняется
+
+3.4. КОГДА пользователь кликает "Test Connection", ТО:
+   - Кнопка ДОЛЖНА изменить текст на "Testing..."
+   - Кнопка ДОЛЖНА стать disabled
+   - Система ДОЛЖНА отправить тестовый запрос к выбранному LLM провайдеру
+
+3.5. Тестовый запрос ДОЛЖЕН использовать минимальные параметры:
+   - OpenAI: `POST https://api.openai.com/v1/chat/completions` с моделью `gpt-4o-mini`, сообщением "test", max_tokens: 5
+   - Anthropic: `POST https://api.anthropic.com/v1/messages` с моделью `claude-haiku-4-5`, сообщением "test", max_tokens: 5
+   - Google: `POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash:generateContent?key={apiKey}` с содержимым "test"
+
+3.6. Тестовый запрос ДОЛЖЕН иметь timeout 10 секунд
+
+3.7. КОГДА тестовый запрос успешен (HTTP 200), ТО:
+   - Система ДОЛЖНА уведомить пользователя об успешном подключении с сообщением "Connection successful! Your API key is valid."
+   - Кнопка ДОЛЖНА вернуться в состояние "Test Connection" и стать enabled
+
+3.8. КОГДА тестовый запрос неуспешен, ТО:
+   - Система ДОЛЖНА показать уведомление об ошибке через стандартный механизм обработки ошибок (см. error-notifications.1) с описанием проблемы:
+     - HTTP 401: "Invalid API key. Please check your key and try again."
+     - HTTP 403: "Access forbidden. Please check your API key permissions."
+     - HTTP 429: "Rate limit exceeded. Please try again later."
+     - HTTP 500/502/503: "Provider service unavailable. Please try again later."
+     - Timeout: "Connection timeout. Please check your internet connection."
+     - Network error: "Network error. Please check your internet connection."
+     - Другие ошибки: "Connection failed: {error message}"
+   - Кнопка ДОЛЖНА вернуться в состояние "Test Connection" и стать enabled
+
+3.9. Система ДОЛЖНА логировать попытки тестирования подключения:
+   - Логировать начало тестирования с провайдером и первыми 4 символами ключа
+   - Логировать результат (success/failure) с кодом ответа
+   - НЕ логировать полный API ключ
+
+3.10. Тестирование подключения НЕ ДОЛЖНО сохранять результат в базу данных (только временная проверка)
+
+**Тестируемость:** Да - через модульные тесты провайдеров и IPC handlers, property-based тесты для различных ответов API, функциональные тесты UI взаимодействия
+
+#### Функциональные Тесты
+
+- `tests/functional/llm-connection-test.spec.ts` - "should disable Test Connection button when API key is empty"
+- `tests/functional/llm-connection-test.spec.ts` - "should enable Test Connection button when API key is filled"
+- `tests/functional/llm-connection-test.spec.ts` - "should show Testing... during connection test"
+- `tests/functional/llm-connection-test.spec.ts` - "should show success notification on valid API key"
+- `tests/functional/llm-connection-test.spec.ts` - "should show error notification on invalid API key"
+- `tests/functional/llm-connection-test.spec.ts` - "should test connection for each provider (OpenAI, Anthropic, Google)"
+
+### Требование 3: Форматирование Дат и Времени из Системных Настроек
 
 **ID:** settings.2
 
@@ -182,12 +247,13 @@
 
 Следующие элементы явно исключены из данной спецификации:
 
-- Функциональность кнопки "Test Connection" для AI Agent (placeholder для будущей реализации)
 - Ручная настройка формата даты и времени (используются системные настройки)
 - Валидация формата API ключей
 - Множественные API ключи для одного провайдера
 - Экспорт/импорт настроек
 - Синхронизация настроек между устройствами
+- Автоматическое тестирование подключения при вводе API ключа
+- Сохранение результатов тестирования подключения в базу данных
 
 ## Ограничения
 
@@ -198,10 +264,11 @@
 - Форматирование дат зависит от системной локали и не может быть настроено вручную
 
 ### Функциональные ограничения
-- Кнопка "Test Connection" является placeholder и не функциональна в текущей версии
-- Валидация API ключей происходит только при первом запросе к провайдеру LLM
+- Валидация API ключей происходит только при тестировании подключения или первом запросе к провайдеру LLM
 - Поддерживается только один активный провайдер LLM одновременно
 - Относительные форматы времени ("2 hours ago") не поддерживаются
+- Тестирование подключения имеет timeout 10 секунд
+- Результаты тестирования подключения не сохраняются в базу данных
 
 ## Допущения
 

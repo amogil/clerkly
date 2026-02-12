@@ -42,6 +42,440 @@ External API → Main Process → Database → IPC Event → Renderer → UI Upd
 - **safeStorage API**: Electron API для безопасного хранения чувствительных данных
 - **Intl.DateTimeFormat**: JavaScript API для форматирования дат по системной локали
 
+## Архитектура Тестирования Подключения к LLM Provider
+
+### Обзор
+
+Система тестирования подключения позволяет пользователям проверить валидность API ключа и доступность выбранного LLM провайдера перед началом работы с агентом.
+
+### Компоненты Системы Тестирования
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                      Main Process                            │
+│                                                               │
+│  ┌──────────────────────┐       ┌─────────────────────┐     │
+│  │ LLMProviderFactory   │──────▶│   ILLMProvider      │     │
+│  │                      │       │   (Interface)       │     │
+│  │ - createProvider()   │       │  - testConnection() │     │
+│  └──────────────────────┘       │  - getProviderName()│     │
+│           │                      └─────────────────────┘     │
+│           ▼                               │                  │
+│  ┌──────────────────────┐                │                  │
+│  │  OpenAIProvider      │◀───────────────┘                  │
+│  │  AnthropicProvider   │                                    │
+│  │  GoogleProvider      │                                    │
+│  └──────────────────────┘                                    │
+│           │                                                   │
+│           ▼                                                   │
+│  ┌──────────────────────┐                                    │
+│  │  LLMIPCHandlers      │                                    │
+│  │  - llm:test-connection│                                   │
+│  └──────────────────────┘                                    │
+│           │                                                   │
+└───────────┼───────────────────────────────────────────────────┘
+            │ IPC
+            ▼
+   ┌─────────────────────────────────────────────┐
+   │          Renderer Process                   │
+   │                                              │
+   │  ┌────────────────────────────────┐         │
+   │  │  Settings Component            │         │
+   │  │                                │         │
+   │  │  - Test Connection button      │         │
+   │  │  - testingConnection state     │         │
+   │  │  - handleTestConnection()      │         │
+   │  └────────────────────────────────┘         │
+   │           │                                  │
+   │           ▼                                  │
+   │  ┌────────────────────────────────┐         │
+   │  │  Error Context                 │         │
+   │  │  - showSuccess()               │         │
+   │  │  - showError()                 │         │
+   │  └────────────────────────────────┘         │
+   └─────────────────────────────────────────────┘
+```
+
+### Поток Тестирования Подключения
+
+1. **Инициация тестирования**:
+   - Пользователь кликает кнопку "Test Connection"
+   - Кнопка становится disabled, текст меняется на "Testing..."
+   - UI отправляет IPC запрос `llm:test-connection` с провайдером и API ключом
+
+2. **Обработка в Main Process**:
+   - `LLMIPCHandlers` получает запрос
+   - Создает экземпляр провайдера через `LLMProviderFactory`
+   - Вызывает `testConnection()` с API ключом
+   - Провайдер отправляет минимальный тестовый запрос к API
+   - Обрабатывает ответ (success/error)
+
+3. **Возврат результата**:
+   - Результат возвращается в Renderer Process
+   - При успехе: показывается уведомление об успехе
+   - При ошибке: показывается уведомление об ошибке через error-notifications.1
+   - Кнопка возвращается в состояние "Test Connection" и становится enabled
+
+### Интерфейс ILLMProvider
+
+```typescript
+// Requirements: settings.3
+
+interface TestConnectionResult {
+  success: boolean;
+  error?: string;
+}
+
+interface ILLMProvider {
+  /**
+   * Test connection to LLM provider
+   * Requirements: settings.3.5, settings.3.6, settings.3.7, settings.3.8
+   */
+  testConnection(apiKey: string): Promise<TestConnectionResult>;
+
+  /**
+   * Get provider name
+   */
+  getProviderName(): string;
+}
+```
+
+### Реализации Провайдеров
+
+#### OpenAIProvider
+
+```typescript
+// Requirements: settings.3.5
+
+class OpenAIProvider implements ILLMProvider {
+  getProviderName(): string {
+    return 'OpenAI';
+  }
+
+  async testConnection(apiKey: string): Promise<TestConnectionResult> {
+    try {
+      // Requirements: settings.3.5 - Minimal test request
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          messages: [{ role: 'user', content: 'test' }],
+          max_tokens: 5
+        }),
+        signal: AbortSignal.timeout(10000) // Requirements: settings.3.6 - 10 second timeout
+      });
+
+      // Requirements: settings.3.7, settings.3.8 - Handle response
+      if (response.ok) {
+        return { success: true };
+      }
+
+      const errorData = await response.json().catch(() => ({}));
+      return {
+        success: false,
+        error: this.mapErrorToMessage(response.status, errorData)
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: this.mapExceptionToMessage(error)
+      };
+    }
+  }
+
+  private mapErrorToMessage(status: number, errorData: any): string {
+    // Requirements: settings.3.8 - Error messages
+    switch (status) {
+      case 401:
+        return 'Invalid API key. Please check your key and try again.';
+      case 403:
+        return 'Access forbidden. Please check your API key permissions.';
+      case 429:
+        return 'Rate limit exceeded. Please try again later.';
+      case 500:
+      case 502:
+      case 503:
+        return 'Provider service unavailable. Please try again later.';
+      default:
+        return `Connection failed: ${errorData.error?.message || 'Unknown error'}`;
+    }
+  }
+
+  private mapExceptionToMessage(error: any): string {
+    // Requirements: settings.3.8 - Network errors
+    if (error.name === 'AbortError') {
+      return 'Connection timeout. Please check your internet connection.';
+    }
+    return 'Network error. Please check your internet connection.';
+  }
+}
+```
+
+#### AnthropicProvider
+
+```typescript
+// Requirements: settings.3.5
+
+class AnthropicProvider implements ILLMProvider {
+  getProviderName(): string {
+    return 'Anthropic';
+  }
+
+  async testConnection(apiKey: string): Promise<TestConnectionResult> {
+    try {
+      // Requirements: settings.3.5 - Minimal test request
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: 'claude-haiku-4-5',
+          messages: [{ role: 'user', content: 'test' }],
+          max_tokens: 5
+        }),
+        signal: AbortSignal.timeout(10000) // Requirements: settings.3.6
+      });
+
+      if (response.ok) {
+        return { success: true };
+      }
+
+      const errorData = await response.json().catch(() => ({}));
+      return {
+        success: false,
+        error: this.mapErrorToMessage(response.status, errorData)
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: this.mapExceptionToMessage(error)
+      };
+    }
+  }
+
+  private mapErrorToMessage(status: number, errorData: any): string {
+    // Same mapping as OpenAI
+    switch (status) {
+      case 401:
+        return 'Invalid API key. Please check your key and try again.';
+      case 403:
+        return 'Access forbidden. Please check your API key permissions.';
+      case 429:
+        return 'Rate limit exceeded. Please try again later.';
+      case 500:
+      case 502:
+      case 503:
+        return 'Provider service unavailable. Please try again later.';
+      default:
+        return `Connection failed: ${errorData.error?.message || 'Unknown error'}`;
+    }
+  }
+
+  private mapExceptionToMessage(error: any): string {
+    if (error.name === 'AbortError') {
+      return 'Connection timeout. Please check your internet connection.';
+    }
+    return 'Network error. Please check your internet connection.';
+  }
+}
+```
+
+#### GoogleProvider
+
+```typescript
+// Requirements: settings.3.5
+
+class GoogleProvider implements ILLMProvider {
+  getProviderName(): string {
+    return 'Google';
+  }
+
+  async testConnection(apiKey: string): Promise<TestConnectionResult> {
+    try {
+      // Requirements: settings.3.5 - Minimal test request
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: 'test' }] }]
+          }),
+          signal: AbortSignal.timeout(10000) // Requirements: settings.3.6
+        }
+      );
+
+      if (response.ok) {
+        return { success: true };
+      }
+
+      const errorData = await response.json().catch(() => ({}));
+      return {
+        success: false,
+        error: this.mapErrorToMessage(response.status, errorData)
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: this.mapExceptionToMessage(error)
+      };
+    }
+  }
+
+  private mapErrorToMessage(status: number, errorData: any): string {
+    // Same mapping as OpenAI
+    switch (status) {
+      case 401:
+        return 'Invalid API key. Please check your key and try again.';
+      case 403:
+        return 'Access forbidden. Please check your API key permissions.';
+      case 429:
+        return 'Rate limit exceeded. Please try again later.';
+      case 500:
+      case 502:
+      case 503:
+        return 'Provider service unavailable. Please try again later.';
+      default:
+        return `Connection failed: ${errorData.error?.message || 'Unknown error'}`;
+    }
+  }
+
+  private mapExceptionToMessage(error: any): string {
+    if (error.name === 'AbortError') {
+      return 'Connection timeout. Please check your internet connection.';
+    }
+    return 'Network error. Please check your internet connection.';
+  }
+}
+```
+
+### LLMProviderFactory
+
+```typescript
+// Requirements: settings.3
+
+class LLMProviderFactory {
+  static createProvider(type: 'openai' | 'anthropic' | 'google'): ILLMProvider {
+    switch (type) {
+      case 'openai':
+        return new OpenAIProvider();
+      case 'anthropic':
+        return new AnthropicProvider();
+      case 'google':
+        return new GoogleProvider();
+      default:
+        throw new Error(`Unknown provider: ${type}`);
+    }
+  }
+}
+```
+
+### IPC Handlers
+
+```typescript
+// Requirements: settings.3.4, settings.3.9
+
+import { ipcMain } from 'electron';
+import { Logger } from './Logger';
+
+const logger = Logger.create('LLMIPCHandlers');
+
+ipcMain.handle('llm:test-connection', async (event, { provider, apiKey }) => {
+  try {
+    // Requirements: settings.3.9 - Log attempt (only first 4 chars of key)
+    logger.info(`Testing connection to ${provider} (key: ${apiKey.substring(0, 4)}...)`);
+
+    const llmProvider = LLMProviderFactory.createProvider(provider);
+    const result = await llmProvider.testConnection(apiKey);
+
+    // Requirements: settings.3.9 - Log result
+    if (result.success) {
+      logger.info(`Connection test successful for ${provider}`);
+    } else {
+      logger.warn(`Connection test failed for ${provider}: ${result.error}`);
+    }
+
+    return result;
+  } catch (error) {
+    logger.error(`Test connection failed: ${error}`);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    };
+  }
+});
+```
+
+### UI Component Updates
+
+```typescript
+// Requirements: settings.3.1, settings.3.2, settings.3.3, settings.3.4
+
+export function Settings() {
+  const { showSuccess, showError } = useError();
+  const [testingConnection, setTestingConnection] = useState(false);
+  const [apiKey, setApiKey] = useState('');
+  const [llmProvider, setLlmProvider] = useState<'openai' | 'anthropic' | 'google'>('openai');
+
+  // Requirements: settings.3.4 - Handle test connection
+  const handleTestConnection = async () => {
+    setTestingConnection(true);
+    try {
+      const result = await window.api.llm.testConnection(llmProvider, apiKey);
+      
+      if (result.success) {
+        // Requirements: settings.3.7 - Show success notification
+        showSuccess('Connection successful! Your API key is valid.');
+      } else {
+        // Requirements: settings.3.8 - Show error notification
+        showError(result.error || 'Connection failed: Unknown error');
+      }
+    } catch (error) {
+      showError(`Connection failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      // Requirements: settings.3.7, settings.3.8 - Reset button state
+      setTestingConnection(false);
+    }
+  };
+
+  return (
+    <div className="pt-4 border-t border-border">
+      {/* Requirements: settings.3.1, settings.3.2, settings.3.3 */}
+      <button
+        onClick={handleTestConnection}
+        disabled={testingConnection || apiKey.trim() === ''}
+        className="text-sm px-4 py-2.5 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        {testingConnection ? 'Testing...' : 'Test Connection'}
+      </button>
+    </div>
+  );
+}
+```
+
+### Preload API
+
+```typescript
+// Requirements: settings.3
+
+contextBridge.exposeInMainWorld('api', {
+  // ... existing API
+  llm: {
+    testConnection: (provider: string, apiKey: string) =>
+      ipcRenderer.invoke('llm:test-connection', { provider, apiKey })
+  }
+});
+```
+
 ## Архитектура
 
 ### Компоненты Системы
@@ -1183,8 +1617,19 @@ describe('Settings Functional Tests', () => {
 | settings.1.22 | ✓ | ✓ | ✓ |
 | settings.1.23 | ✓ | - | - |
 | settings.1.24 | ✓ | - | - |
-| settings.1.25 | ✓ | - | - |
-| settings.1.26 | ✓ | - | - |
+| settings.1.25 | - | - | - |
+| settings.1.26 | ✓ | - | ✓ |
+| settings.1.27 | ✓ | - | - |
+| settings.3.1 | - | - | ✓ |
+| settings.3.2 | ✓ | - | ✓ |
+| settings.3.3 | ✓ | - | ✓ |
+| settings.3.4 | ✓ | - | ✓ |
+| settings.3.5 | ✓ | ✓ | ✓ |
+| settings.3.6 | ✓ | - | ✓ |
+| settings.3.7 | ✓ | - | ✓ |
+| settings.3.8 | ✓ | ✓ | ✓ |
+| settings.3.9 | ✓ | - | - |
+| settings.3.10 | ✓ | - | - |
 | settings.2.1 | ✓ | ✓ | ✓ |
 | settings.2.2 | ✓ | ✓ | ✓ |
 | settings.2.3 | ✓ | - | - |
