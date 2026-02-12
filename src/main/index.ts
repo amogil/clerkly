@@ -541,15 +541,14 @@ app.on('activate', () => {
   lifecycleManager.handleActivation();
 });
 
-// Requirements: clerkly.1.2
+// Requirements: clerkly.1.2, window-management.6.1, window-management.6.2
 // Handle window-all-closed event
 app.on('window-all-closed', () => {
   logger.info('All windows closed');
-  // On macOS, keep app running even when all windows are closed
-  // This allows deep link handling to work properly
-  if (process.platform !== 'darwin') {
-    app.quit();
-  }
+  // Requirements: window-management.6.1, window-management.6.2
+  // Quit application when all windows are closed on all platforms
+  // This ensures no background processes remain after user closes the window
+  app.quit();
 });
 
 // Requirements: clerkly.1.2

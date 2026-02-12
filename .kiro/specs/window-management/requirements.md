@@ -88,16 +88,13 @@
 
 3.2. "Main Window" ДОЛЖНО использовать стандартные Mac OS X элементы интерфейса (кнопки, меню, диалоги)
 
-3.3. "Main Window" ДОЛЖНО следовать Mac OS X конвенциям поведения окна при закрытии
+3.3. "Main Window" ДОЛЖНО следовать стандартным конвенциям активации приложения
 
-3.4. "Main Window" ДОЛЖНО следовать Mac OS X конвенциям активации приложения
-
-3.5. "Main Window" ДОЛЖНО интегрироваться с системным dock macOS
+3.4. "Main Window" ДОЛЖНО интегрироваться с системным dock macOS
 
 #### Функциональные Тесты
 
 - `tests/functional/window-state-persistence.spec.ts` - "should have native Mac OS X window controls"
-- `tests/functional/window-state-persistence.spec.ts` - "should follow Mac OS X window close conventions"
 - `tests/functional/window-state-persistence.spec.ts` - "should integrate with Mac OS X dock"
 
 ### 4. Адаптация Размера Окна к Экрану
@@ -154,6 +151,26 @@
 - `tests/functional/window-state-persistence.spec.ts` - "should persist window size across restarts"
 - `tests/functional/window-state-persistence.spec.ts` - "should persist window state across restarts"
 - `tests/functional/window-state-persistence.spec.ts` - "should persist maximized state across restarts"
+
+### 6. Завершение Приложения при Закрытии Окна
+
+**ID:** window-management.6
+
+**User Story:** Как пользователь, я хочу чтобы приложение завершалось при закрытии главного окна, чтобы не оставлять фоновые процессы работающими после того, как я закрыл окно.
+
+**Зависимости:** Нет
+
+#### Критерии Приемки
+
+6.1. КОГДА пользователь закрывает главное окно, ТО приложение ДОЛЖНО полностью завершиться
+
+6.2. КОГДА все окна закрыты, ТО приложение ДОЛЖНО завершить работу независимо от платформы (macOS, Windows, Linux)
+
+6.3. КОГДА приложение завершается, ТО все данные ДОЛЖНЫ быть корректно сохранены перед выходом
+
+#### Функциональные Тесты
+
+- `tests/functional/window-state-persistence.spec.ts` - "should quit application when main window is closed"
 
 #### Нефункциональные Требования
 
