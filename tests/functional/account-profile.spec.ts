@@ -661,7 +661,9 @@ test.describe('Account Profile', () => {
     await mainAppElement.waitFor({ state: 'visible', timeout: 5000 });
     expect(await mainAppElement.isVisible()).toBe(true);
 
-    console.log('✓ Main app (Agents) is shown immediately after authentication (not loading screen)');
+    console.log(
+      '✓ Main app (Agents) is shown immediately after authentication (not loading screen)'
+    );
 
     // Take screenshot of main app
     await context.window.screenshot({
@@ -1227,16 +1229,16 @@ test.describe('Account Profile', () => {
         hasSpinner: false,
         hasSigningInText: false,
       };
-      
+
       // Set up MutationObserver to watch for loader appearing
       const observer = new MutationObserver(() => {
         const button = document.querySelector('button') as HTMLButtonElement;
         const spinner = document.querySelector('button svg.animate-spin');
         const signingInText = document.body.textContent?.includes('Signing in');
-        
+
         // Check if ALL loader indicators are present
         const allIndicatorsPresent = button?.disabled && spinner && signingInText;
-        
+
         if (allIndicatorsPresent) {
           console.log('[RENDERER] Loader detected by MutationObserver!', {
             buttonDisabled: button?.disabled,
@@ -1251,7 +1253,7 @@ test.describe('Account Profile', () => {
           };
         }
       });
-      
+
       // Start observing
       observer.observe(document.body, {
         childList: true,
@@ -1260,7 +1262,7 @@ test.describe('Account Profile', () => {
         attributeFilter: ['disabled', 'class'],
         characterData: true,
       });
-      
+
       (window as any).api.auth.onShowLoader(() => {
         console.log('[RENDERER] Received auth:show-loader event');
         (window as any).__loaderEventReceived = true;
@@ -1286,9 +1288,16 @@ test.describe('Account Profile', () => {
     });
 
     // Check if loader was visible at any point
-    const loaderState = await context.window.evaluate(() => {
-      return (window as any).__loaderState;
-    }).catch(() => ({ wasVisible: false, buttonDisabled: false, hasSpinner: false, hasSigningInText: false }));
+    const loaderState = await context.window
+      .evaluate(() => {
+        return (window as any).__loaderState;
+      })
+      .catch(() => ({
+        wasVisible: false,
+        buttonDisabled: false,
+        hasSpinner: false,
+        hasSigningInText: false,
+      }));
 
     console.log('[TEST] Loader state:', loaderState);
     console.log('[TEST] - Button disabled:', loaderState.buttonDisabled);
@@ -1304,11 +1313,13 @@ test.describe('Account Profile', () => {
     console.log('✓ Loader shown during synchronous profile fetch');
 
     // Take screenshot of loader
-    await context.window.screenshot({
-      path: 'playwright-report/account-profile-loader-visible.png',
-    }).catch(() => {
-      console.log('[TEST] Failed to take screenshot (window may have closed)');
-    });
+    await context.window
+      .screenshot({
+        path: 'playwright-report/account-profile-loader-visible.png',
+      })
+      .catch(() => {
+        console.log('[TEST] Failed to take screenshot (window may have closed)');
+      });
 
     // Wait for OAuth flow to complete
     console.log('[TEST] Waiting for OAuth flow to complete...');
