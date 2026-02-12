@@ -129,9 +129,9 @@
   - Регистрация в `src/main/index.ts`
   - **Requirements:** settings.3.4, settings.3.9
 
-- [ ] 4.7 Обновить preload API
+- [x] 4.7 Обновить preload API
   - Добавить `llm.testConnection()` в `src/preload/index.ts`
-  - Обновить типы в `src/preload/window.d.ts` (если существует)
+  - Обновить типы в `src/types/index.ts`
   - **Requirements:** settings.3
 
 - [ ] 4.8 Обновить Settings Component
