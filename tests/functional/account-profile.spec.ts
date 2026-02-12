@@ -1182,10 +1182,10 @@ test.describe('Account Profile', () => {
     console.log('✓ Profile fetch succeeded: data displayed in UI and saved to database');
   });
 
-  /* Preconditions: Application not running, clean database, mock OAuth server running
-     Action: Simulate authentication, verify loader shown during profile fetch (if visible), verify Dashboard shown after
-     Assertions: Dashboard shown after authentication (loader may not be visible in fast test environment)
-     Requirements: account-profile.1.4
+  /* Preconditions: Application not running, clean database, mock OAuth server running with delayed UserInfo response
+     Action: Subscribe to show-loader event, trigger OAuth flow, verify loader shown when event fires, verify Agents shown after
+     Assertions: Loader shown after deep link (spinner + "Signing in..." + disabled button), Agents shown after profile loaded, profile saved to database
+     Requirements: account-profile.1.4, google-oauth-auth.15.1, google-oauth-auth.15.2, google-oauth-auth.15.4, google-oauth-auth.15.7
      Property: 10, 11, 12 */
   test('should show loader during synchronous profile fetch', async () => {
     // Set user profile data for this test
@@ -1196,6 +1196,9 @@ test.describe('Account Profile', () => {
       given_name: 'Loader',
       family_name: 'Test User',
     });
+
+    // Requirements: testing.3.9 - Set delay for UserInfo API to make loader visible
+    mockServer.setUserInfoDelay(3000);
 
     // Launch the application with clean database and environment variable
     // Requirements: testing.3.1, testing.3.2 - Real Electron, no mocks
@@ -1215,42 +1218,138 @@ test.describe('Account Profile', () => {
     await loginButton.waitFor({ state: 'visible', timeout: 5000 });
     console.log('[TEST] Login screen confirmed');
 
-    // Complete OAuth flow
-    await completeOAuthFlow(context.app, context.window);
+    // Subscribe to auth:show-loader event and set up MutationObserver
+    await context.window.evaluate(() => {
+      (window as any).__loaderEventReceived = false;
+      (window as any).__loaderState = {
+        wasVisible: false,
+        buttonDisabled: false,
+        hasSpinner: false,
+        hasSigningInText: false,
+      };
+      
+      // Set up MutationObserver to watch for loader appearing
+      const observer = new MutationObserver(() => {
+        const button = document.querySelector('button') as HTMLButtonElement;
+        const spinner = document.querySelector('button svg.animate-spin');
+        const signingInText = document.body.textContent?.includes('Signing in');
+        
+        // Check if ALL loader indicators are present
+        const allIndicatorsPresent = button?.disabled && spinner && signingInText;
+        
+        if (allIndicatorsPresent) {
+          console.log('[RENDERER] Loader detected by MutationObserver!', {
+            buttonDisabled: button?.disabled,
+            hasSpinner: !!spinner,
+            hasSigningInText: !!signingInText,
+          });
+          (window as any).__loaderState = {
+            wasVisible: true,
+            buttonDisabled: true,
+            hasSpinner: true,
+            hasSigningInText: true,
+          };
+        }
+      });
+      
+      // Start observing
+      observer.observe(document.body, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['disabled', 'class'],
+        characterData: true,
+      });
+      
+      (window as any).api.auth.onShowLoader(() => {
+        console.log('[RENDERER] Received auth:show-loader event');
+        (window as any).__loaderEventReceived = true;
+      });
+    });
 
-    console.log('[TEST] Authentication completed');
+    // Complete OAuth flow (this will trigger show-loader event)
+    const oauthPromise = completeOAuthFlow(context.app, context.window);
 
-    // Wait for UI to update
+    // Wait for loader event to fire
+    console.log('[TEST] Waiting for loader event...');
+    await context.window.waitForFunction(
+      () => {
+        return (window as any).__loaderEventReceived === true;
+      },
+      { timeout: 10000 }
+    );
+
+    // Wait for OAuth flow to complete (this gives MutationObserver time to detect loader)
+    console.log('[TEST] Waiting for OAuth flow to complete...');
+    await oauthPromise.catch(() => {
+      console.log('[TEST] OAuth promise rejected (window may have closed)');
+    });
+
+    // Check if loader was visible at any point
+    const loaderState = await context.window.evaluate(() => {
+      return (window as any).__loaderState;
+    }).catch(() => ({ wasVisible: false, buttonDisabled: false, hasSpinner: false, hasSigningInText: false }));
+
+    console.log('[TEST] Loader state:', loaderState);
+    console.log('[TEST] - Button disabled:', loaderState.buttonDisabled);
+    console.log('[TEST] - Spinner visible:', loaderState.hasSpinner);
+    console.log('[TEST] - "Signing in..." text visible:', loaderState.hasSigningInText);
+
+    // Requirements: google-oauth-auth.15.2, google-oauth-auth.15.7 - Verify ALL loader indicators were shown
+    expect(loaderState.wasVisible).toBe(true);
+    expect(loaderState.buttonDisabled).toBe(true);
+    expect(loaderState.hasSpinner).toBe(true);
+    expect(loaderState.hasSigningInText).toBe(true);
+
+    console.log('✓ Loader shown during synchronous profile fetch');
+
+    // Take screenshot of loader
+    await context.window.screenshot({
+      path: 'playwright-report/account-profile-loader-visible.png',
+    }).catch(() => {
+      console.log('[TEST] Failed to take screenshot (window may have closed)');
+    });
+
+    // Wait for OAuth flow to complete
+    console.log('[TEST] Waiting for OAuth flow to complete...');
+    await oauthPromise.catch(() => {
+      console.log('[TEST] OAuth promise rejected (window may have closed)');
+    });
+
+    // Wait for new window (main app) to open
     await context.window.waitForTimeout(2000);
 
-    // Verify Dashboard is shown after authentication
-    // Requirements: account-profile.1.4, Property 12 - Dashboard should be shown after profile loaded
-    const dashboardElement = context.window.locator('text=/Dashboard|Tasks|Calendar/i').first();
-    await dashboardElement.waitFor({ state: 'visible', timeout: 5000 });
-    const hasDashboard = await dashboardElement.isVisible();
+    // Get all windows
+    const windows = context.app.windows();
+    console.log('[TEST] Number of windows:', windows.length);
 
-    console.log('[TEST] Dashboard visible:', hasDashboard);
-    expect(hasDashboard).toBe(true);
+    // Find the main window (should be the newest one)
+    const mainWindow = windows[windows.length - 1];
 
-    console.log('✓ Dashboard shown after authentication');
+    // Requirements: account-profile.1.4, navigation.1.3 - Verify Agents is shown after authentication
+    const agentsElement = mainWindow.locator('[data-testid="agents"]').first();
+    await agentsElement.waitFor({ state: 'visible', timeout: 5000 });
+    const hasAgents = await agentsElement.isVisible();
 
-    // Note: Loader may not be visible in test environment due to fast execution
-    // This is acceptable - the important part is that Dashboard is shown after auth
+    console.log('[TEST] Agents visible:', hasAgents);
+    expect(hasAgents).toBe(true);
+
+    console.log('✓ Agents shown after authentication');
 
     // Take screenshot
-    await context.window.screenshot({
-      path: 'playwright-report/account-profile-loader-dashboard.png',
+    await mainWindow.screenshot({
+      path: 'playwright-report/account-profile-loader-agents.png',
     });
 
     // Verify profile is saved
-    const profileCheck = await context.window.evaluate(async () => {
+    const profileCheck = await mainWindow.evaluate(async () => {
       return await (window as any).electron.ipcRenderer.invoke('test:get-profile');
     });
 
     expect(profileCheck.profile).not.toBeNull();
     expect(profileCheck.profile.email).toBe('loader.test@example.com');
 
-    console.log('✓ Profile saved and Dashboard displayed');
+    console.log('✓ Profile saved and Agents displayed');
   });
 
   /* Preconditions: Application not running, clean database, mock OAuth server running

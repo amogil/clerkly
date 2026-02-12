@@ -54,6 +54,7 @@ export class MockOAuthServer {
   private calendarReturn401: boolean = false;
   private tasksReturn401: boolean = false;
   private lastUserInfoAccessToken: string | null = null;
+  private userInfoDelay: number = 0; // Delay in milliseconds for UserInfo API response
 
   constructor(config: MockOAuthServerConfig) {
     this.config = config;
@@ -169,6 +170,16 @@ export class MockOAuthServer {
   }
 
   /**
+   * Set delay for UserInfo API response (for testing loader visibility)
+   * Requirements: testing.3.9
+   * @param delayMs Delay in milliseconds (0 = no delay)
+   */
+  setUserInfoDelay(delayMs: number): void {
+    this.userInfoDelay = delayMs;
+    console.log(`[MOCK OAUTH] UserInfo API delay set to: ${delayMs}ms`);
+  }
+
+  /**
    * Start the mock OAuth server
    */
   async start(): Promise<void> {
@@ -242,7 +253,12 @@ export class MockOAuthServer {
       (pathname === '/oauth2/v2/userinfo' || pathname === '/userinfo') &&
       req.method === 'GET'
     ) {
-      this.handleUserInfoRequest(req, res);
+      // Handle async UserInfo request
+      this.handleUserInfoRequest(req, res).catch((error) => {
+        console.error('[MOCK OAUTH] UserInfo request error:', error);
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'internal_server_error' }));
+      });
     } else {
       res.writeHead(404, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Not found' }));
@@ -502,7 +518,16 @@ export class MockOAuthServer {
    * Handle user info request (GET /oauth2/v2/userinfo)
    * Requirements: testing.3.9
    */
-  private handleUserInfoRequest(req: http.IncomingMessage, res: http.ServerResponse): void {
+  private async handleUserInfoRequest(
+    req: http.IncomingMessage,
+    res: http.ServerResponse
+  ): Promise<void> {
+    // Apply delay if configured (for testing loader visibility)
+    if (this.userInfoDelay > 0) {
+      console.log(`[MOCK OAUTH] Delaying UserInfo response by ${this.userInfoDelay}ms`);
+      await new Promise((resolve) => setTimeout(resolve, this.userInfoDelay));
+    }
+
     // Check if 401 mode is enabled
     if (this.userInfoReturn401) {
       console.log('[MOCK OAUTH] Returning UserInfo 401 error');
