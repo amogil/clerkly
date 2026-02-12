@@ -74,7 +74,7 @@ export function Settings({ onSignOut, onNavigate }: SettingsProps) {
     };
   }, []);
 
-  // Requirements: ui.10.20, ui.10.21 - Load AI Agent settings on mount
+  // Requirements: settings.1.20, settings.1.21 - Load AI Agent settings on mount
   useEffect(() => {
     const loadAIAgentSettings = async () => {
       try {
@@ -106,7 +106,7 @@ export function Settings({ onSignOut, onNavigate }: SettingsProps) {
     loadAIAgentSettings();
   }, []);
 
-  // Requirements: ui.10.10, ui.10.19 - Save provider immediately and load API key for new provider
+  // Requirements: settings.1.10, settings.1.19 - Save provider immediately and load API key for new provider
   useEffect(() => {
     // Skip on initial mount (initial load is handled by the load effect above)
     if (isFirstRender.current) {
@@ -120,7 +120,7 @@ export function Settings({ onSignOut, onNavigate }: SettingsProps) {
         const saveResult = await window.api.settings.saveLLMProvider(llmProvider);
         if (!saveResult.success) {
           logger.error(`Failed to save LLM provider: ${saveResult.error}`);
-          // Requirements: ui.10.13 - Show error notification on save failure
+          // Requirements: settings.1.13 - Show error notification on save failure
           // Note: Error notification will be handled by task 48.8
         }
 
@@ -140,17 +140,17 @@ export function Settings({ onSignOut, onNavigate }: SettingsProps) {
     saveProviderAndLoadKey();
   }, [llmProvider]);
 
-  // Requirements: ui.10.9, ui.10.11, ui.10.12 - Debounced save for API key (500ms)
+  // Requirements: settings.1.9, settings.1.11, settings.1.12 - Debounced save for API key (500ms)
   useEffect(() => {
     // Debounce API key save
     const timeoutId = setTimeout(async () => {
       try {
         if (apiKey.trim() === '') {
-          // Requirements: ui.10.11 - Delete API key when field is cleared
+          // Requirements: settings.1.11 - Delete API key when field is cleared
           const deleteResult = await window.api.settings.deleteAPIKey(llmProvider);
           if (!deleteResult.success) {
             logger.error(`Failed to delete API key: ${deleteResult.error}`);
-            // Requirements: ui.10.13 - Show error notification on save failure
+            // Requirements: settings.1.13 - Show error notification on save failure
             // Note: Error notification will be handled by task 48.8
           }
         } else {
@@ -158,10 +158,10 @@ export function Settings({ onSignOut, onNavigate }: SettingsProps) {
           const saveResult = await window.api.settings.saveAPIKey(llmProvider, apiKey);
           if (!saveResult.success) {
             logger.error(`Failed to save API key: ${saveResult.error}`);
-            // Requirements: ui.10.13 - Show error notification on save failure
+            // Requirements: settings.1.13 - Show error notification on save failure
             showError(`Failed to save API key: ${saveResult.error || 'Unknown error'}`);
           }
-          // Requirements: ui.10.12 - No visual indicator for saving (silent save)
+          // Requirements: settings.1.12 - No visual indicator for saving (silent save)
         }
       } catch (error) {
         logger.error(`Failed to save/delete API key: ${error}`);

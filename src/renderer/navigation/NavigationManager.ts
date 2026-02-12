@@ -1,11 +1,11 @@
-// Requirements: ui.8.1, ui.8.3, ui.8.4
+// Requirements: navigation.1.1, navigation.1.3, navigation.1.4
 import type { Router } from './Router';
 import { Logger } from '../Logger';
 
 // Requirements: clerkly.3.8 - Use centralized Logger instead of console.*
 /**
  * NavigationManager handles navigation and redirects based on authentication status
- * Requirements: ui.8.1, ui.8.3, ui.8.4
+ * Requirements: navigation.1.1, navigation.1.3, navigation.1.4
  */
 export class NavigationManager {
   // Requirements: clerkly.3.5, clerkly.3.7
@@ -22,7 +22,7 @@ export class NavigationManager {
 
   /**
    * Check authentication status
-   * Requirements: ui.8.1
+   * Requirements: navigation.1.1
    * @returns Promise<boolean> - true if user is authenticated, false otherwise
    */
   async checkAuthStatus(): Promise<boolean> {
@@ -40,7 +40,7 @@ export class NavigationManager {
 
   /**
    * Redirect to login screen
-   * Requirements: ui.8.1, ui.8.4
+   * Requirements: navigation.1.1, navigation.1.4
    */
   redirectToLogin(): void {
     this.logger.info('Redirecting to login');
@@ -49,7 +49,7 @@ export class NavigationManager {
 
   /**
    * Redirect to dashboard
-   * Requirements: ui.8.3
+   * Requirements: navigation.1.3
    */
   redirectToDashboard(): void {
     this.logger.info('Redirecting to dashboard');
@@ -59,16 +59,16 @@ export class NavigationManager {
   /**
    * Initialize navigation on app startup
    * Checks authentication status and redirects accordingly
-   * Requirements: ui.8.1, ui.8.3
+   * Requirements: navigation.1.1, navigation.1.3
    */
   async initialize(): Promise<void> {
     const isAuthenticated = await this.checkAuthStatus();
 
     if (!isAuthenticated) {
-      // Requirements: ui.8.1 - Show login screen when not authenticated
+      // Requirements: navigation.1.1 - Show login screen when not authenticated
       this.redirectToLogin();
     } else {
-      // Requirements: ui.8.3 - If already on login screen, redirect to dashboard
+      // Requirements: navigation.1.3 - If already on login screen, redirect to dashboard
       if (this.router.currentRoute === '/login') {
         this.redirectToDashboard();
       }

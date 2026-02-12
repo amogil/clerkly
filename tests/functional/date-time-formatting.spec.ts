@@ -1,4 +1,4 @@
-// Requirements: ui.11.1, ui.11.2, ui.11.3, ui.11.4, ui.11.6, ui.11.7
+// Requirements: settings.2.1, settings.2.2, settings.2.3, settings.2.4, settings.2.6, settings.2.7
 
 import { test, expect } from '@playwright/test';
 import {
@@ -61,7 +61,7 @@ test.afterEach(async () => {
 /* Preconditions: app launched, system locale set
    Action: navigate to Tasks/Contacts with dates, check date formatting
    Assertions: dates formatted according to system locale (not hardcoded format)
-   Requirements: ui.11.1, ui.11.2 */
+   Requirements: settings.2.1, settings.2.2 */
 test.skip('should format dates using system locale', async () => {
   // Navigate to Tasks
   await context.window.click('text=Tasks');
@@ -85,7 +85,7 @@ test.skip('should format dates using system locale', async () => {
 /* Preconditions: app running, various dates displayed
    Action: check all date displays in Tasks, Calendar, Contacts
    Assertions: no relative formats like "2 hours ago", "yesterday", "tomorrow"
-   Requirements: ui.11.4 */
+   Requirements: settings.2.4 */
 test('should not display relative time formats', async () => {
   // Navigate to Tasks
   await context.window.click('text=Tasks');
@@ -117,7 +117,7 @@ test('should not display relative time formats', async () => {
 /* Preconditions: app running, user authenticated
    Action: navigate to Settings
    Assertions: "Display Preferences" section does not exist, no date/time format settings
-   Requirements: ui.11.7 */
+   Requirements: settings.2.7 */
 test('should not show Display Preferences section', async () => {
   // Navigate to Settings
   await context.window.click('text=Settings');
@@ -137,7 +137,7 @@ test('should not show Display Preferences section', async () => {
 /* Preconditions: app running with various dates
    Action: verify date formatting is consistent across components
    Assertions: all dates use DateTimeFormatter utility (verified by consistent formatting)
-   Requirements: ui.11.5 */
+   Requirements: settings.2.5 */
 test.skip('should use consistent date formatting across components', async () => {
   // Navigate to Tasks
   await context.window.click('text=Tasks');

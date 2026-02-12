@@ -1,7 +1,7 @@
 /* Preconditions: SimpleRouter created with initial route and callback
    Action: call navigate() with different routes
    Assertions: currentRoute updated, callback invoked with correct route
-   Requirements: ui.8.1, ui.8.3, ui.8.4 */
+   Requirements: navigation.1.1, navigation.1.3, navigation.1.4 */
 
 import { SimpleRouter } from '../../../src/renderer/navigation/Router';
 
@@ -9,7 +9,7 @@ describe('SimpleRouter', () => {
   /* Preconditions: SimpleRouter created with initial route '/dashboard'
      Action: get currentRoute property
      Assertions: returns '/dashboard'
-     Requirements: ui.8.1 */
+     Requirements: navigation.1.1 */
   it('should return initial route', () => {
     const onNavigate = jest.fn();
     const router = new SimpleRouter('/dashboard', onNavigate);
@@ -21,7 +21,7 @@ describe('SimpleRouter', () => {
   /* Preconditions: SimpleRouter created
      Action: call navigate('/login')
      Assertions: currentRoute updated to '/login', callback invoked with '/login'
-     Requirements: ui.8.1, ui.8.4 */
+     Requirements: navigation.1.1, navigation.1.4 */
   it('should navigate to login route', () => {
     const onNavigate = jest.fn();
     const router = new SimpleRouter('/dashboard', onNavigate);
@@ -36,7 +36,7 @@ describe('SimpleRouter', () => {
   /* Preconditions: SimpleRouter created
      Action: call navigate('/dashboard')
      Assertions: currentRoute updated to '/dashboard', callback invoked with '/dashboard'
-     Requirements: ui.8.3 */
+     Requirements: navigation.1.3 */
   it('should navigate to dashboard route', () => {
     const onNavigate = jest.fn();
     const router = new SimpleRouter('/login', onNavigate);
@@ -51,7 +51,7 @@ describe('SimpleRouter', () => {
   /* Preconditions: SimpleRouter created
      Action: call navigate() multiple times with different routes
      Assertions: currentRoute always reflects last navigation, callback invoked for each navigation
-     Requirements: ui.8.1, ui.8.3, ui.8.4 */
+     Requirements: navigation.1.1, navigation.1.3, navigation.1.4 */
   it('should handle multiple navigations', () => {
     const onNavigate = jest.fn();
     const router = new SimpleRouter('/dashboard', onNavigate);
@@ -74,7 +74,7 @@ describe('SimpleRouter', () => {
   /* Preconditions: SimpleRouter created
      Action: call updateCurrentRoute() with new route
      Assertions: currentRoute updated, callback NOT invoked
-     Requirements: ui.8.1 */
+     Requirements: navigation.1.1 */
   it('should update current route without triggering callback', () => {
     const onNavigate = jest.fn();
     const router = new SimpleRouter('/dashboard', onNavigate);
@@ -88,7 +88,7 @@ describe('SimpleRouter', () => {
   /* Preconditions: SimpleRouter created
      Action: call navigate() with same route multiple times
      Assertions: callback invoked each time, currentRoute remains same
-     Requirements: ui.8.1 */
+     Requirements: navigation.1.1 */
   it('should allow navigating to same route multiple times', () => {
     const onNavigate = jest.fn();
     const router = new SimpleRouter('/dashboard', onNavigate);

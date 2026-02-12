@@ -128,7 +128,10 @@
      │◀────────────────────────────────────────────────────────────│
      │                                                              │
      │ 13. Save tokens to SQLite                                   │
-     │ 14. Open main application window                            │
+     │ 14. Fetch user profile from Google UserInfo API (synchronous)│
+     │     - If profile fetch fails: clear tokens, show LoginError │
+     │     - If profile fetch succeeds: save profile to database   │
+     │ 15. Open main application window (Dashboard)                │
      │                                                              │
 ```
 
@@ -231,6 +234,10 @@ class OAuthClientManager {
   
   // Requirements: google-oauth-auth.3
   private async exchangeCodeForTokens(code: string, codeVerifier: string): Promise<TokenResponse>;
+  
+  // Requirements: google-oauth-auth.3.6, google-oauth-auth.3.7, google-oauth-auth.3.8
+  // Note: Integrates with UserProfileManager (account-profile spec) for synchronous profile fetch
+  private async handleAuthorizationCode(code: string): Promise<AuthStatus>;
   
   // Requirements: google-oauth-auth.5
   async getAuthStatus(): Promise<AuthStatus>;
@@ -918,6 +925,33 @@ const effectiveRedirectUri = `com.googleusercontent.apps.${clientIdWithoutSuffix
 
 **Validates: Requirements 15.1, 15.2, 15.4, 15.9**
 
+### Property 20: Loader State Consistency (Optional)
+
+*For any* combination of isLoading and isDisabled props, the button state and loader visibility must be consistent:
+- When isLoading=true: loader is visible AND button is disabled
+- When isDisabled=true: button is disabled (regardless of loader state)
+- When both false: button is enabled AND loader is hidden
+
+**Validates: Requirements 15.1, 15.2, 15.3**
+
+**Note:** This is an optional property test for additional validation of loader functionality invariants.
+
+### Property 21: Loader Visibility Invariant (Optional)
+
+*For any* sequence of show/hide loader actions, the isLoaderVisible state should match the last action performed (show → true, hide → false).
+
+**Validates: Requirements 15.5, 15.6**
+
+**Note:** This is an optional property test for additional validation of loader state management.
+
+### Property 22: Button State Invariant (Optional)
+
+*For any* combination of isLoading and isDisabled states, the button disabled state should equal (isLoading || isDisabled).
+
+**Validates: Requirements 15.1, 15.2**
+
+**Note:** This is an optional property test for additional validation of button state logic.
+
 
 ## Обработка Ошибок
 
@@ -986,7 +1020,14 @@ const effectiveRedirectUri = `com.googleusercontent.apps.${clientIdWithoutSuffix
 - Предложение: "Please check application permissions and try again."
 - Обработка: Логировать ошибку, вернуть структурированный ответ
 
-**10. Unknown Errors:**
+**10. Profile Fetch Failed Errors:**
+- Код: `profile_fetch_failed`
+- Заголовок: "Profile loading failed"
+- Сообщение: "Unable to load your Google profile information."
+- Предложение: "Please check your internet connection and try signing in again."
+- Обработка: Очистить токены, показать Login Error Screen
+
+**11. Unknown Errors:**
 - Код: любой другой или отсутствует
 - Заголовок: "Authentication failed"
 - Сообщение: значение из errorMessage или "An unexpected error occurred during authentication."
@@ -1048,6 +1089,11 @@ function getErrorDetails(errorCode?: string, errorMessage?: string): ErrorDetail
       title: 'Storage error',
       message: 'Unable to save authentication data.',
       suggestion: 'Please check application permissions and try again.'
+    },
+    profile_fetch_failed: {
+      title: 'Profile loading failed',
+      message: 'Unable to load your Google profile information.',
+      suggestion: 'Please check your internet connection and try signing in again.'
     }
   };
 
@@ -1102,7 +1148,7 @@ logger.error(`${operation} failed: ${error.message}`, {
 
 Оба типа тестов дополняют друг друга и необходимы для комплексного покрытия.
 
-Всего определено **19 свойств корректности**, которые проверяются через property-based тесты.
+Всего определено **22 свойства корректности** (19 обязательных + 3 опциональных), которые проверяются через property-based тесты.
 
 ### Модульные Тесты
 
@@ -1313,7 +1359,7 @@ it('should preserve token data through save/load cycle', () => {
 
 Реализация считается успешной когда:
 - ✅ Все модульные тесты проходят
-- ✅ Все property-based тесты проходят (минимум 100 итераций каждый, всего 19 свойств)
+- ✅ Все property-based тесты проходят (минимум 100 итераций каждый, всего 22 свойства: 19 обязательных + 3 опциональных)
 - ✅ Все функциональные тесты проходят
 - ✅ Покрытие кода минимум 85%
 - ✅ Все требования покрыты тестами

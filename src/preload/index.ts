@@ -14,7 +14,7 @@ interface API {
   saveData: (key: string, value: unknown) => Promise<{ success: boolean; error?: string }>;
   loadData: (key: string) => Promise<{ success: boolean; data?: unknown; error?: string }>;
   deleteData: (key: string) => Promise<{ success: boolean; error?: string }>;
-  // Requirements: google-oauth-auth.8.1, google-oauth-auth.8.2, google-oauth-auth.8.3, ui.6.2, ui.6.5
+  // Requirements: google-oauth-auth.8.1, google-oauth-auth.8.2, google-oauth-auth.8.3, account-profile.1.2, account-profile.1.5
   auth: {
     startLogin: () => Promise<{ success: boolean; error?: string }>;
     getStatus: () => Promise<{ authorized: boolean; error?: string }>;
@@ -28,11 +28,11 @@ interface API {
     onShowLoader: (callback: () => void) => () => void;
     onHideLoader: (callback: () => void) => () => void;
   };
-  // Requirements: ui.7.1
+  // Requirements: error-notifications.1.1
   error: {
     onNotify: (callback: (message: string, context: string) => void) => () => void;
   };
-  // Requirements: ui.10.26
+  // Requirements: settings.1.26
   settings: {
     saveLLMProvider: (
       provider: 'openai' | 'anthropic' | 'google'
@@ -102,7 +102,7 @@ const api: API = {
     return await ipcRenderer.invoke('delete-data', key);
   },
 
-  // Requirements: google-oauth-auth.8.1, google-oauth-auth.8.2, google-oauth-auth.8.3, ui.6.2, ui.6.5
+  // Requirements: google-oauth-auth.8.1, google-oauth-auth.8.2, google-oauth-auth.8.3, account-profile.1.2, account-profile.1.5
   /**
    * Authentication API
    * Provides methods for OAuth authentication flow
@@ -138,7 +138,7 @@ const api: API = {
     /**
      * Get user profile from local cache
      * Returns cached profile data from DataManager
-     * Requirements: ui.6.2
+     * Requirements: account-profile.1.2
      * @returns {Promise<{success: boolean, profile?: any, error?: string}>}
      */
     async getProfile(): Promise<{ success: boolean; profile?: any; error?: string }> {
@@ -148,7 +148,7 @@ const api: API = {
     /**
      * Refresh user profile from Google API
      * Fetches fresh profile data from Google UserInfo API
-     * Requirements: ui.6.5
+     * Requirements: account-profile.1.5
      * @returns {Promise<{success: boolean, profile?: any, error?: string}>}
      */
     async refreshProfile(): Promise<{ success: boolean; profile?: any; error?: string }> {
@@ -189,7 +189,7 @@ const api: API = {
 
     /**
      * Listen for logout events
-     * Requirements: ui.6.8
+     * Requirements: account-profile.1.8
      * @param {Function} callback - Callback function to execute on logout
      * @returns {Function} Unsubscribe function to remove the listener
      */
@@ -205,7 +205,7 @@ const api: API = {
 
     /**
      * Listen for profile update events
-     * Requirements: ui.6.5
+     * Requirements: account-profile.1.5
      * @param {Function} callback - Callback function to execute when profile is updated
      * @returns {Function} Unsubscribe function to remove the listener
      */
@@ -252,7 +252,7 @@ const api: API = {
     },
   },
 
-  // Requirements: ui.7.1
+  // Requirements: error-notifications.1.1
   /**
    * Error notification API
    * Provides methods for receiving error notifications from main process
@@ -260,7 +260,7 @@ const api: API = {
   error: {
     /**
      * Listen for error notification events
-     * Requirements: ui.7.1, ui.7.2
+     * Requirements: error-notifications.1.1, error-notifications.1.2
      * @param {Function} callback - Callback function to execute when error notification is received
      * @returns {Function} Unsubscribe function to remove the listener
      */
@@ -275,7 +275,7 @@ const api: API = {
     },
   },
 
-  // Requirements: ui.10.26
+  // Requirements: settings.1.26
   /**
    * Settings API
    * Provides methods for managing application settings including AI Agent configuration
@@ -283,7 +283,7 @@ const api: API = {
   settings: {
     /**
      * Save LLM provider selection
-     * Requirements: ui.10.9, ui.10.26
+     * Requirements: settings.1.9, settings.1.26
      * @param {string} provider - LLM provider ('openai', 'anthropic', or 'google')
      * @returns {Promise<{success: boolean, error?: string}>}
      */
@@ -296,7 +296,7 @@ const api: API = {
     /**
      * Load LLM provider selection
      * Returns 'openai' as default if not found
-     * Requirements: ui.10.20, ui.10.21, ui.10.26
+     * Requirements: settings.1.20, settings.1.21, settings.1.26
      * @returns {Promise<{success: boolean, provider?: string, error?: string}>}
      */
     async loadLLMProvider(): Promise<{
@@ -310,7 +310,7 @@ const api: API = {
     /**
      * Save API key for specific provider
      * Key is encrypted when safeStorage is available
-     * Requirements: ui.10.9, ui.10.13, ui.10.26
+     * Requirements: settings.1.9, settings.1.13, settings.1.26
      * @param {string} provider - LLM provider ('openai', 'anthropic', or 'google')
      * @param {string} apiKey - API key to save
      * @returns {Promise<{success: boolean, error?: string}>}
@@ -325,7 +325,7 @@ const api: API = {
     /**
      * Load API key for specific provider
      * Decrypts key if it was encrypted
-     * Requirements: ui.10.20, ui.10.22, ui.10.26
+     * Requirements: settings.1.20, settings.1.22, settings.1.26
      * @param {string} provider - LLM provider ('openai', 'anthropic', or 'google')
      * @returns {Promise<{success: boolean, apiKey?: string | null, error?: string}>}
      */
@@ -337,7 +337,7 @@ const api: API = {
 
     /**
      * Delete API key for specific provider
-     * Requirements: ui.10.11, ui.10.26
+     * Requirements: settings.1.11, settings.1.26
      * @param {string} provider - LLM provider ('openai', 'anthropic', or 'google')
      * @returns {Promise<{success: boolean, error?: string}>}
      */

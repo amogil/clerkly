@@ -45,7 +45,7 @@ describe('OAuthClientManager', () => {
     dataManager = new DataManager(testDbPath);
     dataManager.initialize();
 
-    // Requirements: ui.12.10 - Mock UserProfileManager for data isolation
+    // Requirements: user-data-isolation.1.10 - Mock UserProfileManager for data isolation
     mockProfileManager = {
       getCurrentEmail: jest.fn().mockReturnValue('test@example.com'),
     };
@@ -466,7 +466,7 @@ describe('OAuthClientManager', () => {
     /* Preconditions: Profile manager is set, refresh token succeeds
        Action: Refresh access token
        Assertions: Profile manager's updateProfileAfterTokenRefresh is called
-       Requirements: ui.6.5 */
+       Requirements: account-profile.1.5 */
     it('should trigger profile update after successful token refresh', async () => {
       await tokenStorage.saveTokens({
         accessToken: 'old-access-token',
@@ -502,7 +502,7 @@ describe('OAuthClientManager', () => {
     /* Preconditions: Profile manager is not set, refresh token succeeds
        Action: Refresh access token
        Assertions: No error thrown, refresh succeeds
-       Requirements: ui.6.5 */
+       Requirements: account-profile.1.5 */
     it('should not fail when profile manager is not set', async () => {
       await tokenStorage.saveTokens({
         accessToken: 'old-access-token',

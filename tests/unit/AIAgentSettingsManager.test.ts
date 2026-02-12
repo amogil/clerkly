@@ -1,7 +1,7 @@
 /* Preconditions: Mock DataManager and Electron safeStorage
    Action: Test AIAgentSettingsManager methods for saving, loading, and deleting settings
    Assertions: Verify correct behavior with encryption, plain text fallback, and error handling
-   Requirements: ui.10.9, ui.10.10, ui.10.11, ui.10.14, ui.10.15, ui.10.22 */
+   Requirements: settings.1.9, settings.1.10, settings.1.11, settings.1.14, settings.1.15, settings.1.22 */
 
 import { AIAgentSettingsManager } from '../../src/main/AIAgentSettingsManager';
 import { DataManager } from '../../src/main/DataManager';
@@ -47,7 +47,7 @@ describe('AIAgentSettingsManager', () => {
     /* Preconditions: DataManager is mocked to return success
        Action: Call saveLLMProvider with a valid provider
        Assertions: Verify DataManager.saveData is called with correct key and value
-       Requirements: ui.10.10 */
+       Requirements: settings.1.10 */
     it('should save LLM provider successfully', async () => {
       mockDataManager.saveData.mockReturnValue({ success: true });
 
@@ -59,7 +59,7 @@ describe('AIAgentSettingsManager', () => {
     /* Preconditions: DataManager is mocked to return success
        Action: Call saveLLMProvider with each valid provider
        Assertions: Verify all providers can be saved
-       Requirements: ui.10.10 */
+       Requirements: settings.1.10 */
     it('should save all provider types', async () => {
       mockDataManager.saveData.mockReturnValue({ success: true });
 
@@ -88,7 +88,7 @@ describe('AIAgentSettingsManager', () => {
     /* Preconditions: DataManager is mocked to return failure
        Action: Call saveLLMProvider
        Assertions: Verify error is thrown
-       Requirements: ui.10.10 */
+       Requirements: settings.1.10 */
     it('should throw error when save fails', async () => {
       mockDataManager.saveData.mockReturnValue({ success: false, error: 'Database error' });
 
@@ -100,7 +100,7 @@ describe('AIAgentSettingsManager', () => {
     /* Preconditions: DataManager is mocked to return saved provider
        Action: Call loadLLMProvider
        Assertions: Verify correct provider is returned
-       Requirements: ui.10.10 */
+       Requirements: settings.1.10 */
     it('should load saved LLM provider', async () => {
       mockDataManager.loadData.mockReturnValue({ success: true, data: 'anthropic' });
 
@@ -113,7 +113,7 @@ describe('AIAgentSettingsManager', () => {
     /* Preconditions: DataManager is mocked to return no data
        Action: Call loadLLMProvider
        Assertions: Verify default 'openai' is returned
-       Requirements: ui.10.10 */
+       Requirements: settings.1.10 */
     it('should return default openai when no provider is saved', async () => {
       mockDataManager.loadData.mockReturnValue({ success: false, error: 'Key not found' });
 
@@ -125,7 +125,7 @@ describe('AIAgentSettingsManager', () => {
     /* Preconditions: DataManager throws an error
        Action: Call loadLLMProvider
        Assertions: Verify default 'openai' is returned and error is logged
-       Requirements: ui.10.10 */
+       Requirements: settings.1.10 */
     it('should return default openai on error', async () => {
       mockDataManager.loadData.mockImplementation(() => {
         throw new Error('Database error');
@@ -141,7 +141,7 @@ describe('AIAgentSettingsManager', () => {
     /* Preconditions: safeStorage encryption is available, DataManager returns success
        Action: Call saveAPIKey with a test key
        Assertions: Verify key is encrypted and saved with encryption flag
-       Requirements: ui.10.9, ui.10.14 */
+       Requirements: settings.1.9, settings.1.14 */
     it('should encrypt and save API key when encryption is available', async () => {
       const testKey = 'test-api-key-123';
       const encryptedBuffer = Buffer.from('encrypted-data');
@@ -167,7 +167,7 @@ describe('AIAgentSettingsManager', () => {
     /* Preconditions: safeStorage encryption is NOT available, DataManager returns success
        Action: Call saveAPIKey with a test key
        Assertions: Verify key is saved as plain text with encryption flag set to false
-       Requirements: ui.10.15 */
+       Requirements: settings.1.15 */
     it('should save API key as plain text when encryption is unavailable', async () => {
       const testKey = 'test-api-key-456';
 
@@ -188,7 +188,7 @@ describe('AIAgentSettingsManager', () => {
     /* Preconditions: DataManager returns failure for key save
        Action: Call saveAPIKey
        Assertions: Verify error is thrown
-       Requirements: ui.10.9 */
+       Requirements: settings.1.9 */
     it('should throw error when key save fails', async () => {
       mockSafeStorage.isEncryptionAvailable.mockReturnValue(false);
       mockDataManager.saveData.mockReturnValueOnce({ success: false, error: 'Database full' });
@@ -199,7 +199,7 @@ describe('AIAgentSettingsManager', () => {
     /* Preconditions: DataManager returns failure for encryption flag save
        Action: Call saveAPIKey
        Assertions: Verify error is thrown
-       Requirements: ui.10.9 */
+       Requirements: settings.1.9 */
     it('should throw error when encryption flag save fails', async () => {
       mockSafeStorage.isEncryptionAvailable.mockReturnValue(false);
       mockDataManager.saveData
@@ -212,7 +212,7 @@ describe('AIAgentSettingsManager', () => {
     /* Preconditions: safeStorage encryption is available
        Action: Call saveAPIKey for each provider
        Assertions: Verify provider-specific keys are used
-       Requirements: ui.10.9 */
+       Requirements: settings.1.9 */
     it('should use provider-specific keys for storage', async () => {
       const encryptedBuffer = Buffer.from('encrypted');
       mockSafeStorage.isEncryptionAvailable.mockReturnValue(true);
@@ -242,7 +242,7 @@ describe('AIAgentSettingsManager', () => {
     /* Preconditions: Encrypted key is stored in DataManager
        Action: Call loadAPIKey
        Assertions: Verify key is decrypted and returned
-       Requirements: ui.10.22 */
+       Requirements: settings.1.22 */
     it('should decrypt and load encrypted API key', async () => {
       const encryptedKey = Buffer.from('encrypted-data').toString('base64');
       const decryptedKey = 'decrypted-api-key';
@@ -265,7 +265,7 @@ describe('AIAgentSettingsManager', () => {
     /* Preconditions: Plain text key is stored in DataManager
        Action: Call loadAPIKey
        Assertions: Verify key is returned without decryption
-       Requirements: ui.10.22 */
+       Requirements: settings.1.22 */
     it('should load plain text API key without decryption', async () => {
       const plainKey = 'plain-text-key';
 
@@ -282,7 +282,7 @@ describe('AIAgentSettingsManager', () => {
     /* Preconditions: No key is stored in DataManager
        Action: Call loadAPIKey
        Assertions: Verify null is returned
-       Requirements: ui.10.22 */
+       Requirements: settings.1.22 */
     it('should return null when no API key is found', async () => {
       mockDataManager.loadData.mockReturnValue({ success: false, error: 'Key not found' });
 
@@ -294,7 +294,7 @@ describe('AIAgentSettingsManager', () => {
     /* Preconditions: DataManager throws an error
        Action: Call loadAPIKey
        Assertions: Verify null is returned and error is logged
-       Requirements: ui.10.22 */
+       Requirements: settings.1.22 */
     it('should return null on error', async () => {
       mockDataManager.loadData.mockImplementation(() => {
         throw new Error('Database error');
@@ -308,7 +308,7 @@ describe('AIAgentSettingsManager', () => {
     /* Preconditions: Encrypted key is stored but decryption fails
        Action: Call loadAPIKey
        Assertions: Verify null is returned and error is logged
-       Requirements: ui.10.22 */
+       Requirements: settings.1.22 */
     it('should return null when decryption fails', async () => {
       const encryptedKey = Buffer.from('encrypted-data').toString('base64');
 
@@ -327,7 +327,7 @@ describe('AIAgentSettingsManager', () => {
     /* Preconditions: Encrypted flag is missing but key exists
        Action: Call loadAPIKey
        Assertions: Verify key is treated as plain text
-       Requirements: ui.10.22 */
+       Requirements: settings.1.22 */
     it('should treat key as plain text when encryption flag is missing', async () => {
       const plainKey = 'some-key';
 
@@ -346,7 +346,7 @@ describe('AIAgentSettingsManager', () => {
     /* Preconditions: API key exists in DataManager
        Action: Call deleteAPIKey
        Assertions: Verify both key and encryption flag are deleted
-       Requirements: ui.10.11 */
+       Requirements: settings.1.11 */
     it('should delete API key and encryption flag', async () => {
       mockDataManager.deleteData.mockReturnValue({ success: true });
 
@@ -359,7 +359,7 @@ describe('AIAgentSettingsManager', () => {
     /* Preconditions: API key does not exist
        Action: Call deleteAPIKey
        Assertions: Verify no error is thrown (graceful handling)
-       Requirements: ui.10.11 */
+       Requirements: settings.1.11 */
     it('should not throw error when key does not exist', async () => {
       mockDataManager.deleteData.mockReturnValue({ success: false, error: 'Key not found' });
 
@@ -369,7 +369,7 @@ describe('AIAgentSettingsManager', () => {
     /* Preconditions: DataManager returns database error
        Action: Call deleteAPIKey
        Assertions: Verify error is thrown
-       Requirements: ui.10.11 */
+       Requirements: settings.1.11 */
     it('should throw error on database failure', async () => {
       mockDataManager.deleteData.mockReturnValue({ success: false, error: 'Database locked' });
 
@@ -379,7 +379,7 @@ describe('AIAgentSettingsManager', () => {
     /* Preconditions: Multiple providers have keys
        Action: Call deleteAPIKey for each provider
        Assertions: Verify provider-specific keys are deleted
-       Requirements: ui.10.11 */
+       Requirements: settings.1.11 */
     it('should delete provider-specific keys', async () => {
       mockDataManager.deleteData.mockReturnValue({ success: true });
 
@@ -397,7 +397,7 @@ describe('AIAgentSettingsManager', () => {
     /* Preconditions: Multiple providers with different API keys
        Action: Save and load keys for all three providers
        Assertions: Verify each provider has separate storage and correct keys are returned
-       Requirements: ui.10.16, ui.10.19 */
+       Requirements: settings.1.16, settings.1.19 */
     it('should maintain separate storage for each provider', async () => {
       const openaiKey = 'openai-key-123';
       const anthropicKey = 'anthropic-key-456';

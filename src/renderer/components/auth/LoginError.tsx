@@ -106,7 +106,7 @@ function getErrorDetails(errorCode?: string, errorMessage?: string): ErrorDetail
     };
   }
 
-  // Requirements: ui.6.4, ui.6.5
+  // Requirements: account-profile.1.4, account-profile.1.5
   if (errorCode === 'profile_fetch_failed') {
     return {
       title: 'Profile loading failed',

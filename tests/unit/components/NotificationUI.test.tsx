@@ -5,7 +5,7 @@
 /* Preconditions: NotificationUI component and ErrorNotificationManager are implemented
    Action: Test NotificationUI component integration with ErrorNotificationManager
    Assertions: Component subscribes to manager, updates on changes, and cleans up properly
-   Requirements: ui.7.1, ui.7.2, ui.7.3 */
+   Requirements: error-notifications.1.1, error-notifications.1.2, error-notifications.1.3 */
 
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
@@ -29,7 +29,7 @@ describe('NotificationUI Component', () => {
   /* Preconditions: NotificationUI component is rendered with ErrorNotificationManager
      Action: Render component and check if subscribe is called
      Assertions: Component subscribes to manager on mount
-     Requirements: ui.7.1 */
+     Requirements: error-notifications.1.1 */
   it('should subscribe to manager on mount', () => {
     // Spy on subscribe method
     const subscribeSpy = jest.spyOn(manager, 'subscribe');
@@ -47,7 +47,7 @@ describe('NotificationUI Component', () => {
   /* Preconditions: NotificationUI component is rendered with ErrorNotificationManager
      Action: Show notification through manager and trigger callback
      Assertions: Component updates and displays new notifications
-     Requirements: ui.7.1, ui.7.2 */
+     Requirements: error-notifications.1.1, error-notifications.1.2 */
   it('should update when notifications change', async () => {
     // Render component
     render(<NotificationUI manager={manager} />);
@@ -68,7 +68,7 @@ describe('NotificationUI Component', () => {
   /* Preconditions: NotificationUI component is rendered and subscribed
      Action: Unmount component
      Assertions: Subscription is cleaned up (unsubscribe is called)
-     Requirements: ui.7.1 */
+     Requirements: error-notifications.1.1 */
   it('should cleanup subscription on unmount', () => {
     // Create a mock unsubscribe function
     const unsubscribeMock = jest.fn();
@@ -94,7 +94,7 @@ describe('NotificationUI Component', () => {
   /* Preconditions: NotificationUI component is rendered with multiple notifications
      Action: Manager updates notifications list
      Assertions: Component displays all updated notifications correctly
-     Requirements: ui.7.1, ui.7.2 */
+     Requirements: error-notifications.1.1, error-notifications.1.2 */
   it('should display multiple notifications correctly', async () => {
     // Render component
     render(<NotificationUI manager={manager} />);
@@ -118,7 +118,7 @@ describe('NotificationUI Component', () => {
   /* Preconditions: NotificationUI component is rendered with notifications
      Action: Dismiss notification through manager
      Assertions: Component updates and removes dismissed notification
-     Requirements: ui.7.1, ui.7.3 */
+     Requirements: error-notifications.1.1, error-notifications.1.3 */
   it('should update when notification is dismissed', async () => {
     // Render component
     render(<NotificationUI manager={manager} />);
@@ -143,7 +143,7 @@ describe('NotificationUI Component', () => {
   /* Preconditions: NotificationUI component is rendered with notification
      Action: Click dismiss button
      Assertions: Notification is dismissed through manager
-     Requirements: ui.7.3 */
+     Requirements: error-notifications.1.3 */
   it('should dismiss notification when close button is clicked', async () => {
     // Spy on dismissNotification
     const dismissSpy = jest.spyOn(manager, 'dismissNotification');
@@ -170,10 +170,81 @@ describe('NotificationUI Component', () => {
     dismissSpy.mockRestore();
   });
 
+  /* Preconditions: NotificationUI component is rendered with notification
+     Action: Verify data attributes for testing
+     Assertions: Component has correct data attributes for Playwright tests
+     Requirements: error-notifications.1.1, error-notifications.1.2 */
+  it('should have data attributes for testing', async () => {
+    // Render component
+    const { container } = render(<NotificationUI manager={manager} />);
+
+    // Show notification
+    manager.showNotification('Test error', 'Test Context');
+
+    // Wait for notification to appear
+    await waitFor(() => {
+      expect(screen.getByText('Test error')).toBeInTheDocument();
+    });
+
+    // Verify data-sonner-toast attribute (for Playwright compatibility)
+    const notificationItem = container.querySelector('[data-sonner-toast]');
+    expect(notificationItem).not.toBeNull();
+    expect(notificationItem).toHaveAttribute('data-sonner-toast');
+
+    // Verify data-notification-id attribute
+    expect(notificationItem).toHaveAttribute('data-notification-id');
+
+    // Verify data-notification-context attribute
+    const contextElement = container.querySelector('[data-notification-context]');
+    expect(contextElement).not.toBeNull();
+    expect(contextElement).toHaveTextContent('Test Context');
+
+    // Verify data-notification-message attribute
+    const messageElement = container.querySelector('[data-notification-message]');
+    expect(messageElement).not.toBeNull();
+    expect(messageElement).toHaveTextContent('Test error');
+
+    // Verify data-close-button attribute
+    const closeButton = container.querySelector('[data-close-button]');
+    expect(closeButton).not.toBeNull();
+    expect(closeButton).toHaveAttribute('data-close-button');
+  });
+
+  /* Preconditions: NotificationUI component is rendered with notification
+     Action: Click on notification item
+     Assertions: Notification is dismissed through manager
+     Requirements: error-notifications.1.3 */
+  it('should dismiss notification when notification item is clicked', async () => {
+    // Spy on dismissNotification
+    const dismissSpy = jest.spyOn(manager, 'dismissNotification');
+
+    // Render component
+    render(<NotificationUI manager={manager} />);
+
+    // Show notification
+    manager.showNotification('Test error', 'Test Context');
+
+    // Wait for notification to appear
+    await waitFor(() => {
+      expect(screen.getByText('Test error')).toBeInTheDocument();
+    });
+
+    // Find and click notification item
+    const notificationItem = screen.getByText('Test error').closest('.notification-item');
+    expect(notificationItem).not.toBeNull();
+    fireEvent.click(notificationItem!);
+
+    // Verify dismissNotification was called
+    expect(dismissSpy).toHaveBeenCalledTimes(1);
+    expect(dismissSpy).toHaveBeenCalledWith(expect.any(String));
+
+    dismissSpy.mockRestore();
+  });
+
   /* Preconditions: NotificationUI component is rendered without notifications
      Action: Render component with empty notifications
      Assertions: Component renders nothing (returns null)
-     Requirements: ui.7.1 */
+     Requirements: error-notifications.1.1 */
   it('should render nothing when there are no notifications', () => {
     // Render component
     const { container } = render(<NotificationUI manager={manager} />);
@@ -185,7 +256,7 @@ describe('NotificationUI Component', () => {
   /* Preconditions: NotificationUI component is rendered with notification
      Action: Wait for auto-dismiss timeout (15 seconds)
      Assertions: Notification is automatically dismissed
-     Requirements: ui.7.3 */
+     Requirements: error-notifications.1.3 */
   it('should auto-dismiss notification after 15 seconds', async () => {
     // Render component
     render(<NotificationUI manager={manager} />);
@@ -210,7 +281,7 @@ describe('NotificationUI Component', () => {
   /* Preconditions: NotificationUI component is rendered with custom className
      Action: Render component with className prop
      Assertions: Custom className is applied to container
-     Requirements: ui.7.1 */
+     Requirements: error-notifications.1.1 */
   it('should apply custom className to container', async () => {
     // Render component with custom className
     const { container } = render(<NotificationUI manager={manager} className="custom-class" />);
@@ -229,7 +300,7 @@ describe('NotificationUI Component', () => {
   /* Preconditions: NotificationUI component is rendered with notifications
      Action: Show and dismiss multiple notifications in sequence
      Assertions: Component correctly handles rapid changes
-     Requirements: ui.7.1, ui.7.3 */
+     Requirements: error-notifications.1.1, error-notifications.1.3 */
   it('should handle rapid notification changes', async () => {
     // Render component
     render(<NotificationUI manager={manager} />);

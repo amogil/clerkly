@@ -1,4 +1,4 @@
-// Requirements: ui.10.9, ui.10.10, ui.10.11, ui.10.14, ui.10.15, ui.10.22
+// Requirements: settings.1.9, settings.1.10, settings.1.11, settings.1.14, settings.1.15, settings.1.22
 
 import type { IDataManager } from './DataManager';
 import { safeStorage } from 'electron';
@@ -10,7 +10,7 @@ import { Logger } from './Logger';
  * Handles encryption/decryption of API keys using Electron's safeStorage
  * Falls back to plain text storage when encryption is unavailable
  *
- * Requirements: ui.10.9, ui.10.10, ui.10.11, ui.10.14, ui.10.15, ui.10.22
+ * Requirements: settings.1.9, settings.1.10, settings.1.11, settings.1.14, settings.1.15, settings.1.22
  */
 export class AIAgentSettingsManager {
   // Requirements: clerkly.3.5, clerkly.3.7
@@ -25,7 +25,7 @@ export class AIAgentSettingsManager {
    * Save LLM provider selection
    * Saves immediately without debounce
    *
-   * Requirements: ui.10.10
+   * Requirements: settings.1.10
    *
    * @param provider - The LLM provider to save ('openai', 'anthropic', or 'google')
    * @throws Error if save operation fails
@@ -56,7 +56,7 @@ export class AIAgentSettingsManager {
    * Load LLM provider selection
    * Returns 'openai' as default if not found
    *
-   * Requirements: ui.10.10
+   * Requirements: settings.1.10
    *
    * @returns The saved LLM provider or 'openai' as default
    */
@@ -94,7 +94,7 @@ export class AIAgentSettingsManager {
    * Falls back to plain text if encryption is unavailable
    * Stores encryption status flag separately
    *
-   * Requirements: ui.10.9, ui.10.14, ui.10.15
+   * Requirements: settings.1.9, settings.1.14, settings.1.15
    *
    * @param provider - The LLM provider ('openai', 'anthropic', or 'google')
    * @param apiKey - The API key to save
@@ -105,7 +105,7 @@ export class AIAgentSettingsManager {
       let storedKey: string;
       let isEncrypted: boolean;
 
-      // Requirements: ui.10.14, ui.10.15 - Try to encrypt, fallback to plain text
+      // Requirements: settings.1.14, settings.1.15 - Try to encrypt, fallback to plain text
       if (safeStorage.isEncryptionAvailable()) {
         const buffer = safeStorage.encryptString(apiKey);
         storedKey = buffer.toString('base64');
@@ -157,7 +157,7 @@ export class AIAgentSettingsManager {
    * Decrypts using safeStorage.decryptString() if key was encrypted
    * Returns plain text if key was stored without encryption
    *
-   * Requirements: ui.10.22
+   * Requirements: settings.1.22
    *
    * @param provider - The LLM provider ('openai', 'anthropic', or 'google')
    * @returns The API key or null if not found
@@ -178,7 +178,7 @@ export class AIAgentSettingsManager {
       const storedKey = keyResult.data as string;
       const isEncrypted = encryptedResult.success && encryptedResult.data === true;
 
-      // Requirements: ui.10.22 - Decrypt if encrypted
+      // Requirements: settings.1.22 - Decrypt if encrypted
       if (isEncrypted) {
         const buffer = Buffer.from(storedKey, 'base64');
         const decryptedKey = safeStorage.decryptString(buffer);
@@ -208,7 +208,7 @@ export class AIAgentSettingsManager {
    * Delete API key for specific provider
    * Removes both the key and encryption status flag
    *
-   * Requirements: ui.10.11
+   * Requirements: settings.1.11
    *
    * @param provider - The LLM provider ('openai', 'anthropic', or 'google')
    * @throws Error if delete operation fails

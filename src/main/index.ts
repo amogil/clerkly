@@ -124,23 +124,23 @@ const tokenStorage = new TokenStorageManager(dataManager);
 const oauthConfig = getOAuthConfig();
 const oauthClient = new OAuthClientManager(oauthConfig, tokenStorage);
 
-// Requirements: ui.9.1, ui.9.2
+// Requirements: token-management-ui.1.1, token-management-ui.1.2
 // Set OAuth Client Manager for automatic token refresh in API requests
 import { setOAuthClientManager } from './auth/APIRequestHandler';
 setOAuthClientManager(oauthClient);
 
-// Requirements: ui.6.5
+// Requirements: account-profile.1.5
 // Initialize User Profile Manager
 const profileManager = new UserProfileManager(dataManager, oauthClient, tokenStorage);
 
-// Requirements: ui.12.10 - Set UserProfileManager in DataManager for data isolation
+// Requirements: user-data-isolation.1.10 - Set UserProfileManager in DataManager for data isolation
 dataManager.setUserProfileManager(profileManager);
 
-// Requirements: ui.6.5
+// Requirements: account-profile.1.5
 // Connect profile manager to oauth client for automatic updates
 oauthClient.setProfileManager(profileManager);
 
-// Requirements: clerkly.1.2, clerkly.1.3, ui.5
+// Requirements: clerkly.1.2, clerkly.1.3, window-management.5
 // Initialize Window Manager
 const windowManager = new WindowManager(dataManager, profileManager);
 
@@ -153,7 +153,7 @@ const authWindowManager = new AuthWindowManager(windowManager, oauthClient);
 // Connect auth window manager to oauth client for loader display
 oauthClient.setAuthWindowManager(authWindowManager);
 
-// Requirements: clerkly.1.2, clerkly.1.3, clerkly.1.4, ui.6.5
+// Requirements: clerkly.1.2, clerkly.1.3, clerkly.1.4, account-profile.1.5
 // Initialize Lifecycle Manager
 const lifecycleManager = new LifecycleManager(
   windowManager,
@@ -166,20 +166,20 @@ const lifecycleManager = new LifecycleManager(
 // Initialize IPC Handlers
 const ipcHandlers = new IPCHandlers(dataManager);
 
-// Requirements: google-oauth-auth.8.1, ui.6.2
+// Requirements: google-oauth-auth.8.1, account-profile.1.2
 // Initialize Auth IPC Handlers
 const authIPCHandlers = new AuthIPCHandlers(oauthClient);
-// Requirements: ui.6.2 - Connect profile manager to auth IPC handlers
+// Requirements: account-profile.1.2 - Connect profile manager to auth IPC handlers
 authIPCHandlers.setProfileManager(profileManager);
 
-// Requirements: ui.10.9, ui.10.26
+// Requirements: settings.1.9, settings.1.26
 // Initialize AI Agent Settings Manager
 // Use TestDataManager in test environment for error simulation
 const aiAgentSettingsManager = new AIAgentSettingsManager(
   isTestEnvironment() && testDataManager ? testDataManager : dataManager
 );
 
-// Requirements: ui.10.9, ui.10.26
+// Requirements: settings.1.9, settings.1.26
 // Initialize Settings IPC Handlers
 const settingsIPCHandlers = new SettingsIPCHandlers(aiAgentSettingsManager);
 
@@ -274,7 +274,7 @@ if (process.env.NODE_ENV === 'test') {
     }
   });
 
-  // Requirements: ui.12.3, ui.12.4, ui.12.13
+  // Requirements: user-data-isolation.1.3, user-data-isolation.1.4, user-data-isolation.1.13
   // Test handlers for data isolation testing
   ipcMain.handle('test:save-data', async (_event: any, key: string, value: string) => {
     if (!isTestEnvironment()) {
@@ -467,6 +467,10 @@ app.whenReady().then(async () => {
     logger.info('Application starting...');
     const startTime = Date.now();
 
+    // Requirements: user-data-isolation.1.17 - Initialize profile manager to restore email from database
+    await profileManager.initialize();
+    logger.info('UserProfileManager initialized');
+
     // Requirements: clerkly.1.2, clerkly.1.3, clerkly.1.4
     // Initialize application
     const initResult = await lifecycleManager.initialize();
@@ -496,7 +500,7 @@ app.whenReady().then(async () => {
     authIPCHandlers.registerHandlers();
     logger.info('Auth IPC handlers registered');
 
-    // Requirements: ui.10.9, ui.10.26
+    // Requirements: settings.1.9, settings.1.26
     // Register Settings IPC handlers
     settingsIPCHandlers.registerHandlers();
     logger.info('Settings IPC handlers registered');
@@ -551,7 +555,7 @@ app.on('before-quit', () => {
 
 /**
  * Handle deep link URL processing
- * Requirements: google-oauth-auth.2.2, google-oauth-auth.2.5, ui.6.2, ui.6.3
+ * Requirements: google-oauth-auth.2.2, google-oauth-auth.2.5, account-profile.1.2, account-profile.1.3
  * @param url Deep link URL to process
  */
 async function handleDeepLinkUrl(url: string): Promise<void> {

@@ -1,4 +1,4 @@
-// Requirements: ui.5
+// Requirements: window-management.5
 
 import { screen } from 'electron';
 import { DataManager } from './DataManager';
@@ -44,7 +44,7 @@ export interface WindowState {
  * that the window opens in the same state as when it was last closed, and handles
  * edge cases such as invalid positions (e.g., when a monitor is disconnected).
  *
- * Requirements: ui.5
+ * Requirements: window-management.5
  *
  * @example
  * ```typescript
@@ -92,7 +92,7 @@ export class WindowStateManager {
   /**
    * Creates a new WindowStateManager instance.
    *
-   * Requirements: ui.5
+   * Requirements: window-management.5
    *
    * @param dataManager - DataManager instance for state persistence. This is used
    *                      to save and load window state from the SQLite database.
@@ -117,13 +117,13 @@ export class WindowStateManager {
    * (e.g., monitor was disconnected), it returns a default state based on the
    * primary display's size.
    *
-   * Requirements: ui.5.4, ui.5.5, ui.5.6
+   * Requirements: window-management.5.4, window-management.5.5, window-management.5.6
    *
    * @returns WindowState object containing the window's position, size, and maximized status.
    *          Returns default state if:
-   *          - No saved state exists (first launch) - ui.5.5
+   *          - No saved state exists (first launch) - window-management.5.5
    *          - Saved state is corrupted or invalid
-   *          - Saved position is outside available display bounds - ui.5.6
+   *          - Saved position is outside available display bounds - window-management.5.6
    *
    * @example
    * ```typescript
@@ -151,19 +151,22 @@ export class WindowStateManager {
     }
 
     try {
-      // Requirements: ui.5.4
+      // Requirements: window-management.5.4
       const result = this.dataManager.loadData(this.stateKey);
 
       if (result.success && result.data) {
         const state = typeof result.data === 'string' ? JSON.parse(result.data) : result.data;
 
-        // Requirements: ui.5.6
+        // Requirements: window-management.5.6
         if (this.isPositionValid(state.x, state.y)) {
           return state;
         }
       }
     } catch (error) {
+      // Requirements: error-notifications.1.4 - Log error
       this.logger.error(`Failed to load window state: ${error}`);
+      // Note: Not using handleBackgroundError here as window state loading failure
+      // is not critical - we fall back to default state gracefully
     } finally {
       // Restore original email
       if (this.userProfileManager) {
@@ -171,7 +174,7 @@ export class WindowStateManager {
       }
     }
 
-    // Requirements: ui.5.5
+    // Requirements: window-management.5.5
     return this.getDefaultState();
   }
 
@@ -186,7 +189,7 @@ export class WindowStateManager {
    * If saving fails (e.g., database error, disk full), the error is logged but
    * not thrown, ensuring the application continues to function normally.
    *
-   * Requirements: ui.5.1, ui.5.2, ui.5.3
+   * Requirements: window-management.5.1, window-management.5.2, window-management.5.3
    *
    * @param state - WindowState object to save. Must contain valid x, y, width,
    *                height, and isMaximized properties.
@@ -196,7 +199,7 @@ export class WindowStateManager {
    * const stateManager = new WindowStateManager(dataManager);
    * const window = new BrowserWindow({ width: 800, height: 600 });
    *
-   * // Save state when window is resized (ui.5.1)
+   * // Save state when window is resized (window-management.5.1)
    * window.on('resize', () => {
    *   const bounds = window.getBounds();
    *   stateManager.saveState({
@@ -208,7 +211,7 @@ export class WindowStateManager {
    *   });
    * });
    *
-   * // Save state when window is moved (ui.5.2)
+   * // Save state when window is moved (window-management.5.2)
    * window.on('move', () => {
    *   const bounds = window.getBounds();
    *   stateManager.saveState({
@@ -220,7 +223,7 @@ export class WindowStateManager {
    *   });
    * });
    *
-   * // Save state when window is maximized/unmaximized (ui.5.3)
+   * // Save state when window is maximized/unmaximized (window-management.5.3)
    * window.on('maximize', () => {
    *   const bounds = window.getBounds();
    *   stateManager.saveState({
@@ -244,7 +247,10 @@ export class WindowStateManager {
       const stateJson = JSON.stringify(state);
       this.dataManager.saveData(this.stateKey, stateJson);
     } catch (error) {
+      // Requirements: error-notifications.1.4 - Log error
       this.logger.error(`Failed to save window state: ${error}`);
+      // Note: Not using handleBackgroundError here as window state saving failure
+      // is not critical - user can continue working normally
     } finally {
       // Restore original email
       if (this.userProfileManager) {
@@ -264,7 +270,7 @@ export class WindowStateManager {
    * The default state has isMaximized set to false, ensuring the window
    * opens in a large size but remains resizable by the user.
    *
-   * Requirements: ui.1.1, ui.1.3, ui.4.1, ui.4.2, ui.4.3
+   * Requirements: window-management.1.1, window-management.1.3, window-management.4.1, window-management.4.2, window-management.4.3
    *
    * @returns Default WindowState object with position, size, and maximized status
    *          calculated based on the primary display's dimensions.
@@ -294,13 +300,13 @@ export class WindowStateManager {
     const primaryDisplay = screen.getPrimaryDisplay();
     const { width, height } = primaryDisplay.workAreaSize;
 
-    // Requirements: ui.1.1, ui.1.3, ui.4.1, ui.4.2, ui.4.3
+    // Requirements: window-management.1.1, window-management.1.3, window-management.4.1, window-management.4.2, window-management.4.3
     return {
       x: 0,
       y: 0,
       width: width,
       height: height,
-      isMaximized: false, // Requirements: ui.1.1, ui.1.3 - large window but not maximized, so it's resizable
+      isMaximized: false, // Requirements: window-management.1.1, window-management.1.3 - large window but not maximized, so it's resizable
     };
   }
 
@@ -315,7 +321,7 @@ export class WindowStateManager {
    * The method iterates through all available displays and checks if the given
    * position falls within any of their bounds.
    *
-   * Requirements: ui.5.6
+   * Requirements: window-management.5.6
    *
    * @param x - X coordinate to validate (horizontal position in pixels)
    * @param y - Y coordinate to validate (vertical position in pixels)

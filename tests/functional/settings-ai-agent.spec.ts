@@ -1,7 +1,7 @@
 /* Preconditions: Electron app is launched with authentication
    Action: Test AI Agent Settings functionality end-to-end
    Assertions: Verify save/load, encryption, deletion, provider switching, visibility toggle, error handling, and user isolation
-   Requirements: ui.10.3, ui.10.4, ui.10.5, ui.10.6, ui.10.9, ui.10.11, ui.10.13, ui.10.14, ui.10.15, ui.10.17, ui.12.8 */
+   Requirements: settings.1.3, settings.1.4, settings.1.5, settings.1.6, settings.1.9, settings.1.11, settings.1.13, settings.1.14, settings.1.15, settings.1.17, user-data-isolation.1.8 */
 
 import { test, expect } from '@playwright/test';
 import {
@@ -66,7 +66,7 @@ test.afterEach(async () => {
 /* Preconditions: App is launched and authenticated
    Action: Select LLM provider, close and reopen app
    Assertions: Provider selection is persisted
-   Requirements: ui.10.4, ui.10.15 */
+   Requirements: settings.1.4, settings.1.15 */
 test('53.1: should save and load LLM provider selection', async () => {
   // Navigate to Settings
   await context.window.click('text=Settings');
@@ -104,7 +104,7 @@ test('53.1: should save and load LLM provider selection', async () => {
 /* Preconditions: App is launched and authenticated
    Action: Enter API key, close and reopen app, toggle visibility
    Assertions: API key is persisted and encrypted, displays correctly
-   Requirements: ui.10.4, ui.10.9, ui.10.15, ui.10.17 */
+   Requirements: settings.1.4, settings.1.9, settings.1.15, settings.1.17 */
 test('53.2: should save and load API key with encryption', async () => {
   const testApiKey = 'sk-test-key-12345678901234567890';
 
@@ -160,7 +160,7 @@ test('53.2: should save and load API key with encryption', async () => {
 /* Preconditions: App is launched and authenticated with API key saved
    Action: Clear API key field, close and reopen app
    Assertions: API key is deleted from database
-   Requirements: ui.10.6 */
+   Requirements: settings.1.6 */
 test('53.3: should delete API key when field is cleared', async () => {
   // Navigate to Settings
   await context.window.click('text=Settings');
@@ -202,7 +202,7 @@ test('53.3: should delete API key when field is cleared', async () => {
 /* Preconditions: App is launched and authenticated
    Action: Enter keys for multiple providers, switch between them
    Assertions: Each provider preserves its own key
-   Requirements: ui.10.11, ui.10.14 */
+   Requirements: settings.1.11, settings.1.14 */
 test('53.4: should preserve API keys when switching providers', async () => {
   const openaiKey = 'sk-openai-key-123';
   const anthropicKey = 'sk-anthropic-key-456';
@@ -243,7 +243,7 @@ test('53.4: should preserve API keys when switching providers', async () => {
 /* Preconditions: App is launched and authenticated
    Action: Enter API key, toggle visibility multiple times
    Assertions: Input type changes, icons change
-   Requirements: ui.10.3, ui.10.4, ui.10.5 */
+   Requirements: settings.1.3, settings.1.4, settings.1.5 */
 test('53.5: should toggle API key visibility', async () => {
   // Navigate to Settings
   await context.window.click('text=Settings');
@@ -274,7 +274,7 @@ test('53.5: should toggle API key visibility', async () => {
 /* Preconditions: App is launched and authenticated, DataManager mocked to fail
    Action: Enter API key
    Assertions: Error notification is shown
-   Requirements: ui.10.13 */
+   Requirements: settings.1.13 */
 test('53.6: should show error notification on save failure', async () => {
   // Set user profile data for this test
   mockServer.setUserProfile({

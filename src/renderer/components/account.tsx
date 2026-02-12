@@ -1,4 +1,4 @@
-// Requirements: ui.6.1, ui.6.2, ui.6.3, ui.6.4, ui.6.8
+// Requirements: account-profile.1.1, account-profile.1.2, account-profile.1.3, account-profile.1.4, account-profile.1.8
 import React, { useState, useEffect } from 'react';
 import { Logger } from '../Logger';
 
@@ -7,7 +7,7 @@ const logger = Logger.create('Account');
 
 /**
  * User profile data from Google UserInfo API
- * Requirements: ui.6.2, ui.6.3
+ * Requirements: account-profile.1.2, account-profile.1.3
  */
 interface UserProfile {
   id: string;
@@ -33,17 +33,17 @@ interface AccountProps {
  * Account component displays user profile information
  * Shows empty state when not authenticated, profile data when authenticated
  * All profile fields are read-only
- * Requirements: ui.6.1, ui.6.2, ui.6.3, ui.6.4, ui.6.8
+ * Requirements: account-profile.1.1, account-profile.1.2, account-profile.1.3, account-profile.1.4, account-profile.1.8
  */
 export function Account({ className = '', onSignOut }: AccountProps) {
-  // Requirements: ui.6.1, ui.6.2
+  // Requirements: account-profile.1.1, account-profile.1.2
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
   /**
    * Load profile data from cache on component mount
-   * Requirements: ui.6.2, ui.6.7
+   * Requirements: account-profile.1.2, account-profile.1.7
    */
   useEffect(() => {
     const loadProfile = async () => {
@@ -71,7 +71,7 @@ export function Account({ className = '', onSignOut }: AccountProps) {
 
   /**
    * Listen for auth success events and reload profile
-   * Requirements: ui.6.2
+   * Requirements: account-profile.1.2
    */
   useEffect(() => {
     const handleAuthSuccess = async () => {
@@ -96,7 +96,7 @@ export function Account({ className = '', onSignOut }: AccountProps) {
 
   /**
    * Listen for logout events and clear profile
-   * Requirements: ui.6.8
+   * Requirements: account-profile.1.8
    */
   useEffect(() => {
     const handleLogout = () => {
@@ -113,7 +113,7 @@ export function Account({ className = '', onSignOut }: AccountProps) {
 
   /**
    * Listen for profile update events and reload profile
-   * Requirements: ui.6.5
+   * Requirements: account-profile.1.5
    */
   useEffect(() => {
     const handleProfileUpdated = (updatedProfile: UserProfile | null) => {
@@ -128,7 +128,7 @@ export function Account({ className = '', onSignOut }: AccountProps) {
     // The listener will be cleaned up when the window is closed
   }, []);
 
-  // Requirements: ui.6.2
+  // Requirements: account-profile.1.2
   // Show loading state
   if (loading) {
     return (
@@ -144,7 +144,7 @@ export function Account({ className = '', onSignOut }: AccountProps) {
     );
   }
 
-  // Requirements: ui.6.7
+  // Requirements: account-profile.1.7
   // Show error state
   if (error) {
     return (
@@ -159,9 +159,9 @@ export function Account({ className = '', onSignOut }: AccountProps) {
     );
   }
 
-  // Requirements: ui.6.1
+  // Requirements: account-profile.1.1
   // If no profile, show loading state (user should not be in Settings if not authenticated)
-  // According to ui.6.1: "пользователь не может попасть в Settings без авторизации"
+  // According to account-profile.1.1: "пользователь не может попасть в Settings без авторизации"
   if (!profile) {
     return (
       <div className={`account-container ${className}`}>
@@ -176,7 +176,7 @@ export function Account({ className = '', onSignOut }: AccountProps) {
     );
   }
 
-  // Requirements: ui.6.2, ui.6.3, ui.6.4
+  // Requirements: account-profile.1.2, account-profile.1.3, account-profile.1.4
   // Show profile data with read-only fields
   return (
     <div className={`account-container ${className}`}>
@@ -190,7 +190,7 @@ export function Account({ className = '', onSignOut }: AccountProps) {
           )}
         </div>
         <div className="account-profile">
-          {/* Requirements: ui.6.3 - Display name field */}
+          {/* Requirements: account-profile.1.3 - Display name field */}
           <div className="profile-field">
             <label htmlFor="profile-name" className="profile-label">
               Name
@@ -205,7 +205,7 @@ export function Account({ className = '', onSignOut }: AccountProps) {
             />
           </div>
 
-          {/* Requirements: ui.6.3 - Display email field */}
+          {/* Requirements: account-profile.1.3 - Display email field */}
           <div className="profile-field">
             <label htmlFor="profile-email" className="profile-label">
               Email

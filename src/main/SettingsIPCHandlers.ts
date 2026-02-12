@@ -1,4 +1,4 @@
-// Requirements: ui.10.9, ui.10.26
+// Requirements: settings.1.9, settings.1.26
 
 import { ipcMain, IpcMainInvokeEvent } from 'electron';
 import { AIAgentSettingsManager } from './AIAgentSettingsManager';
@@ -7,7 +7,7 @@ import { Logger } from './Logger';
 // Requirements: clerkly.3.8 - Use centralized Logger instead of console.*
 /**
  * IPC result interface
- * Requirements: ui.10.9, ui.10.26
+ * Requirements: settings.1.9, settings.1.26
  */
 interface IPCResult {
   success: boolean;
@@ -18,7 +18,7 @@ interface IPCResult {
 /**
  * Settings IPC Handlers
  * Manages IPC communication between renderer and main processes for application settings
- * Requirements: ui.10.9, ui.10.26
+ * Requirements: settings.1.9, settings.1.26
  */
 export class SettingsIPCHandlers {
   // Requirements: clerkly.3.5, clerkly.3.7
@@ -32,7 +32,7 @@ export class SettingsIPCHandlers {
 
   /**
    * Register all settings IPC handlers
-   * Requirements: ui.10.26
+   * Requirements: settings.1.26
    */
   registerHandlers(): void {
     if (this.handlersRegistered) {
@@ -52,7 +52,7 @@ export class SettingsIPCHandlers {
 
   /**
    * Unregister all settings IPC handlers
-   * Requirements: ui.10.26
+   * Requirements: settings.1.26
    */
   unregisterHandlers(): void {
     if (!this.handlersRegistered) {
@@ -71,7 +71,7 @@ export class SettingsIPCHandlers {
 
   /**
    * Handle save LLM provider request
-   * Requirements: ui.10.9, ui.10.26
+   * Requirements: settings.1.9, settings.1.26
    * @param event IPC event
    * @param provider LLM provider to save ('openai', 'anthropic', or 'google')
    * @returns IPC result with success status
@@ -83,7 +83,7 @@ export class SettingsIPCHandlers {
     try {
       this.logger.info(`Saving LLM provider: ${provider}`);
 
-      // Requirements: ui.10.9 - Save LLM provider through AIAgentSettingsManager
+      // Requirements: settings.1.9 - Save LLM provider through AIAgentSettingsManager
       await this.aiAgentSettingsManager.saveLLMProvider(provider);
 
       return {
@@ -96,7 +96,7 @@ export class SettingsIPCHandlers {
         `[SettingsIPCHandlers] Failed to save LLM provider: ${errorMessage}`
       );
 
-      // Requirements: ui.10.9 - Return structured error response
+      // Requirements: settings.1.9 - Return structured error response
       return {
         success: false,
         error: errorMessage || 'Failed to save LLM provider',
@@ -106,7 +106,7 @@ export class SettingsIPCHandlers {
 
   /**
    * Handle load LLM provider request
-   * Requirements: ui.10.20, ui.10.21, ui.10.26
+   * Requirements: settings.1.20, settings.1.21, settings.1.26
    * @param event IPC event
    * @returns IPC result with provider or default value
    */
@@ -114,7 +114,7 @@ export class SettingsIPCHandlers {
     try {
       this.logger.info('Loading LLM provider');
 
-      // Requirements: ui.10.20, ui.10.21 - Load LLM provider, return 'openai' as default
+      // Requirements: settings.1.20, settings.1.21 - Load LLM provider, return 'openai' as default
       const provider = await this.aiAgentSettingsManager.loadLLMProvider();
 
       return {
@@ -128,7 +128,7 @@ export class SettingsIPCHandlers {
         `[SettingsIPCHandlers] Failed to load LLM provider: ${errorMessage}`
       );
 
-      // Requirements: ui.10.21 - Return default provider on error
+      // Requirements: settings.1.21 - Return default provider on error
       return {
         success: true,
         provider: 'openai',
@@ -138,7 +138,7 @@ export class SettingsIPCHandlers {
 
   /**
    * Handle save API key request
-   * Requirements: ui.10.9, ui.10.13, ui.10.26
+   * Requirements: settings.1.9, settings.1.13, settings.1.26
    * @param event IPC event
    * @param provider LLM provider ('openai', 'anthropic', or 'google')
    * @param apiKey API key to save
@@ -155,7 +155,7 @@ export class SettingsIPCHandlers {
         `[SettingsIPCHandlers] Saving API key for provider: ${provider}`
       );
 
-      // Requirements: ui.10.9 - Save API key through AIAgentSettingsManager
+      // Requirements: settings.1.9 - Save API key through AIAgentSettingsManager
       await this.aiAgentSettingsManager.saveAPIKey(provider, apiKey);
 
       return {
@@ -168,7 +168,7 @@ export class SettingsIPCHandlers {
         `[SettingsIPCHandlers] Failed to save API key: ${errorMessage}`
       );
 
-      // Requirements: ui.10.13 - Return structured error response
+      // Requirements: settings.1.13 - Return structured error response
       return {
         success: false,
         error: errorMessage || 'Failed to save API key',
@@ -178,7 +178,7 @@ export class SettingsIPCHandlers {
 
   /**
    * Handle load API key request
-   * Requirements: ui.10.20, ui.10.22, ui.10.26
+   * Requirements: settings.1.20, settings.1.22, settings.1.26
    * @param event IPC event
    * @param provider LLM provider ('openai', 'anthropic', or 'google')
    * @returns IPC result with API key or null
@@ -193,7 +193,7 @@ export class SettingsIPCHandlers {
         `[SettingsIPCHandlers] Loading API key for provider: ${provider}`
       );
 
-      // Requirements: ui.10.20, ui.10.22 - Load API key, decrypt if encrypted
+      // Requirements: settings.1.20, settings.1.22 - Load API key, decrypt if encrypted
       const apiKey = await this.aiAgentSettingsManager.loadAPIKey(provider);
 
       return {
@@ -216,7 +216,7 @@ export class SettingsIPCHandlers {
 
   /**
    * Handle delete API key request
-   * Requirements: ui.10.11, ui.10.26
+   * Requirements: settings.1.11, settings.1.26
    * @param event IPC event
    * @param provider LLM provider ('openai', 'anthropic', or 'google')
    * @returns IPC result with success status
@@ -231,7 +231,7 @@ export class SettingsIPCHandlers {
         `[SettingsIPCHandlers] Deleting API key for provider: ${provider}`
       );
 
-      // Requirements: ui.10.11 - Delete API key through AIAgentSettingsManager
+      // Requirements: settings.1.11 - Delete API key through AIAgentSettingsManager
       await this.aiAgentSettingsManager.deleteAPIKey(provider);
 
       return {

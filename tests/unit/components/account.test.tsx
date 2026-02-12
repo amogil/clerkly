@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 
-// Requirements: ui.6.1, ui.6.2, ui.6.3, ui.6.4, ui.6.8
+// Requirements: account-profile.1.1, account-profile.1.2, account-profile.1.3, account-profile.1.4, account-profile.1.8
 
 // Mock window.api BEFORE any imports
 const mockGetProfile = jest.fn();
@@ -56,7 +56,7 @@ describe('Account Component', () => {
   /* Preconditions: window.api.auth.getProfile() mocked to return { success: true, profile: null }
      Action: render Account component with React Testing Library
      Assertions: displays loading state (not "Not signed in"), no profile fields
-     Requirements: ui.6.1 - User cannot access Settings without authentication, so Account should show loading if no profile */
+     Requirements: account-profile.1.1 - User cannot access Settings without authentication, so Account should show loading if no profile */
   it('should display loading state when profile is not available', async () => {
     // Mock getProfile to return no profile (user not authenticated or profile not loaded yet)
     mockGetProfile.mockResolvedValue({
@@ -68,7 +68,7 @@ describe('Account Component', () => {
     render(<Account />);
 
     // Wait for loading to complete and check for loading state (not "Not signed in")
-    // Requirements: ui.6.1 - According to requirements, user should not be in Settings if not authenticated
+    // Requirements: account-profile.1.1 - According to requirements, user should not be in Settings if not authenticated
     // So if Account component is rendered without profile, it should show loading state
     await waitFor(() => {
       expect(screen.getByText('Loading profile...')).toBeInTheDocument();
@@ -87,7 +87,7 @@ describe('Account Component', () => {
   /* Preconditions: test UserProfile object created with data (name: "John Doe", email: "john@example.com"), window.api.auth.getProfile() mocked to return { success: true, profile: testProfile }
      Action: render Account component with React Testing Library
      Assertions: displays name in input field with id="profile-name", displays email in input field with id="profile-email", both fields contain correct values
-     Requirements: ui.6.2, ui.6.3 */
+     Requirements: account-profile.1.2, account-profile.1.3 */
   it('should display profile data after authentication', async () => {
     // Create test UserProfile object with data
     const testProfile = {
@@ -139,7 +139,7 @@ describe('Account Component', () => {
   /* Preconditions: test profile created and getProfile() mocked, Account component rendered with profile data
      Action: get input elements for name and email (by id), check readOnly attribute, attempt to change values via fireEvent.change()
      Assertions: both input fields have readOnly attribute (element.readOnly === true), field values do not change after fireEvent.change()
-     Requirements: ui.6.4 */
+     Requirements: account-profile.1.4 */
   it('should have read-only profile fields', async () => {
     // Create test UserProfile object with data
     const testProfile = {
@@ -209,7 +209,7 @@ describe('Account Component', () => {
   /* Preconditions: window.api.auth.onAuthSuccess() mocked to return cleanup function, window.api.auth.getProfile() mocked to track calls
      Action: render Account component, verify getProfile() called on mount (1 time), get callback from onAuthSuccess mock, invoke callback to simulate auth:success event
      Assertions: getProfile() called on mount (1 time), getProfile() called again after auth:success event (2 times total), UI updated with new profile data
-     Requirements: ui.6.2 */
+     Requirements: account-profile.1.2 */
   it('should reload profile when auth:success event is received', async () => {
     // Create initial test profile
     const initialProfile = {
@@ -302,7 +302,7 @@ describe('Account Component', () => {
   /* Preconditions: test profile created and getProfile() mocked to return it, window.api.auth.onLogout() mocked to return cleanup function
      Action: render Account component with profile data, verify profile is displayed (name and email visible), get callback from onLogout mock, invoke callback to simulate logout event
      Assertions: component returns to empty state (displays "Not signed in"), profile fields are no longer displayed
-     Requirements: ui.6.8 */
+     Requirements: account-profile.1.8 */
   it('should clear profile on logout', async () => {
     // Create test UserProfile object with data
     const testProfile = {
@@ -356,7 +356,7 @@ describe('Account Component', () => {
     }
 
     // Wait for component to update and return to loading state (no profile)
-    // Requirements: ui.6.1 - User should not be in Settings if not authenticated
+    // Requirements: account-profile.1.1 - User should not be in Settings if not authenticated
     // After logout, component shows loading state (not "Not signed in")
     await waitFor(() => {
       expect(screen.getByText('Loading profile...')).toBeInTheDocument();

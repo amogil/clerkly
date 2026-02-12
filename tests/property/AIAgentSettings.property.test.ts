@@ -1,7 +1,7 @@
 /* Preconditions: AIAgentSettingsManager is initialized with mocked DataManager and safeStorage
    Action: Test property-based scenarios for AI Agent Settings
    Assertions: Verify round-trip save/load, encryption, and provider switching
-   Requirements: ui.10.4, ui.10.9, ui.10.11, ui.10.14, ui.10.17 */
+   Requirements: settings.1.4, settings.1.9, settings.1.11, settings.1.14, settings.1.17 */
 
 import * as fc from 'fast-check';
 import { AIAgentSettingsManager } from '../../src/main/AIAgentSettingsManager';
@@ -53,7 +53,7 @@ describe('AIAgentSettings Property-Based Tests', () => {
   /* Preconditions: AIAgentSettingsManager is initialized
      Action: Generate random API keys, save and load for each provider
      Assertions: Loaded key equals saved key (round-trip)
-     Requirements: ui.10.4, ui.10.17 */
+     Requirements: settings.1.4, settings.1.17 */
   test('52.1: should preserve API key through save/load cycle', async () => {
     // Mock encryption as unavailable for simplicity
     (safeStorage.isEncryptionAvailable as jest.Mock).mockReturnValue(false);
@@ -79,7 +79,7 @@ describe('AIAgentSettings Property-Based Tests', () => {
   /* Preconditions: AIAgentSettingsManager is initialized with encryption available
      Action: Generate random API keys, save with encryption, load and decrypt
      Assertions: Decrypted key equals original key
-     Requirements: ui.10.9, ui.10.17 */
+     Requirements: settings.1.9, settings.1.17 */
   test('52.2: should preserve data through encryption/decryption', async () => {
     // Mock encryption as available
     (safeStorage.isEncryptionAvailable as jest.Mock).mockReturnValue(true);
@@ -113,7 +113,7 @@ describe('AIAgentSettings Property-Based Tests', () => {
   /* Preconditions: AIAgentSettingsManager is initialized
      Action: Generate keys for all providers, save them, switch between providers randomly
      Assertions: Each provider returns its own key
-     Requirements: ui.10.11, ui.10.14 */
+     Requirements: settings.1.11, settings.1.14 */
   test('52.3: should preserve keys when switching between providers', async () => {
     // Mock encryption as unavailable for simplicity
     (safeStorage.isEncryptionAvailable as jest.Mock).mockReturnValue(false);

@@ -134,12 +134,23 @@ npm run package
 ## Документация
 
 Полная документация в `.kiro/specs/`:
-- `clerkly/requirements.md` - Требования
-- `clerkly/design.md` - Дизайн и архитектура
-- `clerkly/tasks.md` - План реализации
+
+**Основные спецификации:**
+- `clerkly/` - Общие требования и архитектура приложения
 - `testing-infrastructure/` - Стратегия тестирования
-- `ui/` - Требования к UI
-- `google-oauth-auth/` - OAuth авторизация
+- `visual-design/` - Визуальный дизайн и UI/UX
+
+**Авторизация:**
+- `google-oauth-auth/` - OAuth авторизация через Google
+
+**UI компоненты:**
+- `window-management/` - Управление окнами приложения
+- `navigation/` - Навигация и роутинг
+- `account-profile/` - Профиль пользователя
+- `error-notifications/` - Обработка и отображение ошибок
+- `token-management-ui/` - UI управления токенами
+- `settings/` - Настройки приложения
+- `user-data-isolation/` - Изоляция данных пользователей
 
 ## Устранение неполадок
 

@@ -1,4 +1,4 @@
-// Requirements: clerkly.2, ui.5
+// Requirements: clerkly.2, window-management.5
 
 import { BrowserWindow } from 'electron';
 import WindowManager from '../../src/main/WindowManager';
@@ -58,7 +58,7 @@ describe('WindowManager', () => {
     } as any;
 
     // Create new WindowManager instance with mock DataManager
-    // Requirements: ui.5
+    // Requirements: window-management.5
     windowManager = new WindowManager(mockDataManager);
   });
 
@@ -81,17 +81,17 @@ describe('WindowManager', () => {
     /* Preconditions: WindowManager created, no window exists yet
        Action: call createWindow()
        Assertions: BrowserWindow created with correct Mac OS X parameters (titleBarStyle), returns BrowserWindow instance
-       Requirements: ui.1.1, ui.1.2, ui.1.3, ui.2.1, ui.3.1, ui.4.1, ui.4.2, ui.5.4, ui.5.5 */
+       Requirements: window-management.1.1, window-management.1.2, window-management.1.3, window-management.2.1, window-management.3.1, window-management.4.1, window-management.4.2, window-management.5.4, window-management.5.5 */
     it('should create window with native Mac OS X interface', () => {
       const window = windowManager.createWindow();
 
       expect(BrowserWindow).toHaveBeenCalledTimes(1);
       expect(BrowserWindow).toHaveBeenCalledWith(
         expect.objectContaining({
-          title: '', // Requirements: ui.2.1
+          title: '', // Requirements: window-management.2.1
           show: false,
-          resizable: true, // Requirements: ui.1.3
-          titleBarStyle: 'default', // Requirements: ui.3.1
+          resizable: true, // Requirements: window-management.1.3
+          titleBarStyle: 'default', // Requirements: window-management.3.1
           webPreferences: expect.objectContaining({
             contextIsolation: true,
             nodeIntegration: false,
@@ -108,7 +108,7 @@ describe('WindowManager', () => {
     /* Preconditions: WindowManager created
        Action: call createWindow()
        Assertions: window created with resizable: true
-       Requirements: ui.1.3 */
+       Requirements: window-management.1.3 */
     it('should create resizable window', () => {
       windowManager.createWindow();
 
@@ -122,7 +122,7 @@ describe('WindowManager', () => {
     /* Preconditions: WindowManager created, no saved state exists
        Action: call createWindow()
        Assertions: window created with default state dimensions equal to workAreaSize
-       Requirements: ui.1.1, ui.4.1, ui.4.2, ui.5.5 */
+       Requirements: window-management.1.1, window-management.4.1, window-management.4.2, window-management.5.5 */
     it('should create window with default state when no saved state exists', () => {
       windowManager.createWindow();
 
@@ -140,7 +140,7 @@ describe('WindowManager', () => {
     /* Preconditions: WindowManager created, saved state exists
        Action: call createWindow()
        Assertions: window created with saved state dimensions
-       Requirements: ui.5.4 */
+       Requirements: window-management.5.4 */
     it('should create window with saved state when it exists', () => {
       // Mock saved state
       mockDataManager.loadData.mockReturnValue({
@@ -169,7 +169,7 @@ describe('WindowManager', () => {
     /* Preconditions: WindowManager created, saved state has isMaximized: true
        Action: call createWindow()
        Assertions: maximize() IS called to restore saved maximized state
-       Requirements: ui.1.1, ui.1.3, ui.5.3, ui.5.4 */
+       Requirements: window-management.1.1, window-management.1.3, window-management.5.3, window-management.5.4 */
     it('should maximize window when saved state has isMaximized: true', () => {
       // Mock saved state with isMaximized: true
       mockDataManager.loadData.mockReturnValue({
@@ -186,15 +186,15 @@ describe('WindowManager', () => {
       windowManager.createWindow();
       const mockWindow = getMockWindow();
 
-      // Window SHOULD be maximized to restore saved state (ui.5.3, ui.5.4)
-      // Maximized windows are still resizable on macOS when resizable: true (ui.1.3)
+      // Window SHOULD be maximized to restore saved state (window-management.5.3, window-management.5.4)
+      // Maximized windows are still resizable on macOS when resizable: true (window-management.1.3)
       expect(mockWindow.maximize).toHaveBeenCalled();
     });
 
     /* Preconditions: WindowManager created, saved state has isMaximized: false
        Action: call createWindow()
        Assertions: maximize() not called on window
-       Requirements: ui.1.1, ui.1.3 */
+       Requirements: window-management.1.1, window-management.1.3 */
     it('should not maximize window when saved state has isMaximized: false', () => {
       // Mock saved state with isMaximized: false
       mockDataManager.loadData.mockReturnValue({
@@ -217,7 +217,7 @@ describe('WindowManager', () => {
     /* Preconditions: WindowManager created
        Action: call createWindow()
        Assertions: setupStateTracking called, event listeners registered
-       Requirements: ui.5.1, ui.5.2, ui.5.3 */
+       Requirements: window-management.5.1, window-management.5.2, window-management.5.3 */
     it('should setup state tracking after creating window', () => {
       windowManager.createWindow();
       const mockWindow = getMockWindow();
@@ -389,7 +389,7 @@ describe('WindowManager', () => {
        Assertions: no error thrown, warning logged, no methods called
        Requirements: clerkly.1, clerkly.2*/
     it('should handle configuration when window not created', () => {
-      // Requirements: ui.5
+      // Requirements: window-management.5
       const newWindowManager = new WindowManager(mockDataManager);
 
       // Should not throw
@@ -440,7 +440,7 @@ describe('WindowManager', () => {
        Assertions: no error thrown, no methods called
        Requirements: clerkly.1, clerkly.2*/
     it('should handle close when window not created', () => {
-      // Requirements: ui.5
+      // Requirements: window-management.5
       const newWindowManager = new WindowManager(mockDataManager);
 
       expect(() => {

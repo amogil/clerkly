@@ -1,4 +1,4 @@
-// Requirements: clerkly.1, clerkly.nfr.1, clerkly.nfr.2, ui.6.5, clerkly.3.8
+// Requirements: clerkly.1, clerkly.nfr.1, clerkly.nfr.2, account-profile.1.5, clerkly.3.8
 
 import WindowManager from './WindowManager';
 import { DataManager } from './DataManager';
@@ -18,7 +18,7 @@ export interface InitializeResult {
 
 /**
  * Manages application lifecycle including startup, activation, and shutdown
- * Requirements: clerkly.1, clerkly.nfr.1, clerkly.nfr.2, ui.6.5
+ * Requirements: clerkly.1, clerkly.nfr.1, clerkly.nfr.2, account-profile.1.5
  */
 export class LifecycleManager {
   private windowManager: WindowManager;
@@ -39,14 +39,14 @@ export class LifecycleManager {
     this.windowManager = windowManager;
     this.dataManager = dataManager;
     this.oauthClient = oauthClient;
-    // Requirements: ui.6.5 - Initialize UserProfileManager
+    // Requirements: account-profile.1.5 - Initialize UserProfileManager
     this.profileManager = new UserProfileManager(dataManager, oauthClient, tokenStorage);
   }
 
   /**
    * Инициализирует приложение
    * Обеспечивает запуск менее чем за 3 секунды
-   * Requirements: clerkly.1, clerkly.nfr.1, ui.6.5
+   * Requirements: clerkly.1, clerkly.nfr.1, account-profile.1.5
    * @returns {Promise<InitializeResult>}
    */
   async initialize(): Promise<InitializeResult> {
@@ -60,7 +60,7 @@ export class LifecycleManager {
       // Создание окна приложения
       this.windowManager.createWindow();
 
-      // Requirements: ui.6.5 - Fetch profile on startup if authenticated
+      // Requirements: account-profile.1.5 - Fetch profile on startup if authenticated
       const authStatus = await this.oauthClient.getAuthStatus();
       if (authStatus.authorized) {
         this.logger.info('User authenticated, fetching profile');

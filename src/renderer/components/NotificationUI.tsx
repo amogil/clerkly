@@ -1,4 +1,4 @@
-// Requirements: ui.7.1, ui.7.2, ui.7.3
+// Requirements: error-notifications.1.1, error-notifications.1.2, error-notifications.1.3
 import React, { useState, useEffect } from 'react';
 import { ErrorNotificationManager } from '../managers/ErrorNotificationManager';
 import type { ErrorNotification } from '../types/error-notification';
@@ -30,7 +30,7 @@ interface NotificationUIProps {
  * Notifications automatically dismiss after 15 seconds (handled by manager)
  * or can be manually dismissed by clicking the close button.
  *
- * Requirements: ui.7.1, ui.7.2, ui.7.3
+ * Requirements: error-notifications.1.1, error-notifications.1.2, error-notifications.1.3
  * Properties: 20, 21, 22
  *
  * @example
@@ -40,13 +40,13 @@ interface NotificationUIProps {
  * ```
  */
 export function NotificationUI({ manager, className = '' }: NotificationUIProps) {
-  // Requirements: ui.7.1 - Display error notifications
+  // Requirements: error-notifications.1.1 - Display error notifications
   // Property: 20
   const [notifications, setNotifications] = useState<ErrorNotification[]>([]);
 
   /**
    * Subscribe to notification changes from ErrorNotificationManager
-   * Requirements: ui.7.1
+   * Requirements: error-notifications.1.1
    */
   useEffect(() => {
     // Subscribe to notification updates
@@ -62,7 +62,7 @@ export function NotificationUI({ manager, className = '' }: NotificationUIProps)
 
   /**
    * Handle notification dismissal
-   * Requirements: ui.7.3
+   * Requirements: error-notifications.1.3
    * Property: 22
    */
   const handleDismiss = (id: string) => {
@@ -74,25 +74,47 @@ export function NotificationUI({ manager, className = '' }: NotificationUIProps)
     return null;
   }
 
-  // Requirements: ui.7.1, ui.7.2, ui.7.3
+  // Requirements: error-notifications.1.1, error-notifications.1.2, error-notifications.1.3
   // Property: 20, 21, 22
   return (
     <div className={`notification-container ${className}`}>
       <div className="notification-list">
         {notifications.map((notification) => (
-          <div key={notification.id} className="notification-item">
-            {/* Requirements: ui.7.2 - Display context and message */}
+          <div
+            key={notification.id}
+            className="notification-item"
+            data-sonner-toast=""
+            data-notification-id={notification.id}
+            onClick={() => handleDismiss(notification.id)}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                handleDismiss(notification.id);
+              }
+            }}
+          >
+            {/* Requirements: error-notifications.1.2 - Display context and message */}
             {/* Property: 21 */}
             <div className="notification-content">
-              <div className="notification-context">{notification.context}</div>
-              <div className="notification-message">{notification.message}</div>
+              <div className="notification-context" data-notification-context="">
+                {notification.context}
+              </div>
+              <div className="notification-message" data-notification-message="">
+                {notification.message}
+              </div>
             </div>
 
-            {/* Requirements: ui.7.3 - Close button for dismissal */}
+            {/* Requirements: error-notifications.1.3 - Close button for dismissal */}
             {/* Property: 22 */}
             <button
               className="notification-close"
-              onClick={() => handleDismiss(notification.id)}
+              data-close-button=""
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDismiss(notification.id);
+              }}
               aria-label="Dismiss notification"
             >
               <svg
@@ -116,7 +138,7 @@ export function NotificationUI({ manager, className = '' }: NotificationUIProps)
       </div>
 
       {/* Inline styles for NotificationUI component */}
-      {/* Requirements: ui.7.2 - Styles integrated with application theme */}
+      {/* Requirements: error-notifications.1.2 - Styles integrated with application theme */}
       <style>{`
         .notification-container {
           position: fixed;
@@ -128,7 +150,7 @@ export function NotificationUI({ manager, className = '' }: NotificationUIProps)
           pointer-events: none;
         }
 
-        /* Requirements: ui.7.2 - Responsive design for different screen sizes */
+        /* Requirements: error-notifications.1.2 - Responsive design for different screen sizes */
         @media (max-width: 640px) {
           .notification-container {
             top: 0.5rem;
@@ -146,7 +168,7 @@ export function NotificationUI({ manager, className = '' }: NotificationUIProps)
           pointer-events: auto;
         }
 
-        /* Requirements: ui.7.2 - Notification item using theme colors */
+        /* Requirements: error-notifications.1.2 - Notification item using theme colors */
         .notification-item {
           display: flex;
           align-items: flex-start;
@@ -158,6 +180,18 @@ export function NotificationUI({ manager, className = '' }: NotificationUIProps)
           box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
           animation: slideIn 0.3s ease-out;
           backdrop-filter: blur(8px);
+          cursor: pointer;
+          transition: background-color 0.2s, border-color 0.2s;
+        }
+
+        .notification-item:hover {
+          background: hsl(var(--destructive) / 0.15);
+          border-color: hsl(var(--destructive) / 0.4);
+        }
+
+        .notification-item:focus {
+          outline: none;
+          box-shadow: 0 0 0 2px hsl(var(--destructive) / 0.3), 0 4px 6px -1px rgba(0, 0, 0, 0.1);
         }
 
         @keyframes slideIn {
@@ -171,7 +205,7 @@ export function NotificationUI({ manager, className = '' }: NotificationUIProps)
           }
         }
 
-        /* Requirements: ui.7.2 - Responsive padding for mobile */
+        /* Requirements: error-notifications.1.2 - Responsive padding for mobile */
         @media (max-width: 640px) {
           .notification-item {
             padding: 0.875rem;
@@ -187,7 +221,7 @@ export function NotificationUI({ manager, className = '' }: NotificationUIProps)
           min-width: 0;
         }
 
-        /* Requirements: ui.7.2 - Context label using theme colors */
+        /* Requirements: error-notifications.1.2 - Context label using theme colors */
         .notification-context {
           font-size: 0.75rem;
           font-weight: 600;
@@ -199,7 +233,7 @@ export function NotificationUI({ manager, className = '' }: NotificationUIProps)
           white-space: nowrap;
         }
 
-        /* Requirements: ui.7.2 - Message text using theme colors */
+        /* Requirements: error-notifications.1.2 - Message text using theme colors */
         .notification-message {
           font-size: 0.875rem;
           color: hsl(var(--foreground));
@@ -208,7 +242,7 @@ export function NotificationUI({ manager, className = '' }: NotificationUIProps)
           overflow-wrap: break-word;
         }
 
-        /* Requirements: ui.7.2 - Responsive font sizes for mobile */
+        /* Requirements: error-notifications.1.2 - Responsive font sizes for mobile */
         @media (max-width: 640px) {
           .notification-context {
             font-size: 0.6875rem;
@@ -219,7 +253,7 @@ export function NotificationUI({ manager, className = '' }: NotificationUIProps)
           }
         }
 
-        /* Requirements: ui.7.2 - Close button using theme colors */
+        /* Requirements: error-notifications.1.2 - Close button using theme colors */
         .notification-close {
           flex-shrink: 0;
           width: 1.5rem;
@@ -250,7 +284,7 @@ export function NotificationUI({ manager, className = '' }: NotificationUIProps)
           transform: scale(0.95);
         }
 
-        /* Requirements: ui.7.2 - Responsive close button for mobile */
+        /* Requirements: error-notifications.1.2 - Responsive close button for mobile */
         @media (max-width: 640px) {
           .notification-close {
             width: 2rem;

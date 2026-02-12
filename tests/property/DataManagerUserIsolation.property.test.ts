@@ -1,4 +1,4 @@
-// Requirements: ui.12.3, ui.12.4, ui.12.5, ui.12.6, ui.12.7
+// Requirements: user-data-isolation.1.3, user-data-isolation.1.4, user-data-isolation.1.5, user-data-isolation.1.6, user-data-isolation.1.7
 
 import * as fc from 'fast-check';
 import Database from 'better-sqlite3';
@@ -51,7 +51,7 @@ describe('DataManager User Isolation - Property-Based Tests', () => {
   /* Preconditions: Multiple users with different emails, each saves data
      Action: For each user: save data, then load data
      Assertions: Each user sees only their own data, data of other users not visible
-     Requirements: ui.12.3, ui.12.4, ui.12.6
+     Requirements: user-data-isolation.1.3, user-data-isolation.1.4, user-data-isolation.1.6
      Property: Data isolation between users */
   it('should isolate data between different users (property-based)', () => {
     fc.assert(
@@ -120,7 +120,7 @@ describe('DataManager User Isolation - Property-Based Tests', () => {
   /* Preconditions: Multiple users, each saves and loads data (round-trip)
      Action: For each user: save data, then load data
      Assertions: Loaded data equals saved data, data of other users not affected
-     Requirements: ui.12.3, ui.12.4, ui.12.7
+     Requirements: user-data-isolation.1.3, user-data-isolation.1.4, user-data-isolation.1.7
      Property: Save/load round-trip with isolation */
   it('should preserve data through save/load cycle with isolation (property-based)', () => {
     fc.assert(
@@ -177,7 +177,7 @@ describe('DataManager User Isolation - Property-Based Tests', () => {
   /* Preconditions: Multiple users, each saves data, then "logout" (clear email), then "login" again
      Action: Save data, simulate logout, simulate login, load data
      Assertions: Data persists after logout, restored on login
-     Requirements: ui.12.5, ui.12.7
+     Requirements: user-data-isolation.1.5, user-data-isolation.1.7
      Property: Logout preserves user data */
   it('should persist user data after logout and restore on re-login (property-based)', () => {
     fc.assert(

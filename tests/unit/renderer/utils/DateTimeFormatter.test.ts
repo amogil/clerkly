@@ -1,4 +1,4 @@
-// Requirements: ui.11.1, ui.11.3, ui.11.4
+// Requirements: settings.2.1, settings.2.3, settings.2.4
 
 import { DateTimeFormatter } from '../../../../src/renderer/utils/DateTimeFormatter';
 
@@ -6,7 +6,7 @@ describe('DateTimeFormatter (Renderer Process)', () => {
   /* Preconditions: valid timestamp provided
      Action: call formatDate(timestamp)
      Assertions: returns non-empty string formatted with system locale
-     Requirements: ui.11.1 */
+     Requirements: settings.2.1 */
   it('should use system locale for date formatting', () => {
     const timestamp = new Date('2026-02-07T10:30:00Z').getTime();
     const result = DateTimeFormatter.formatDate(timestamp);
@@ -18,7 +18,7 @@ describe('DateTimeFormatter (Renderer Process)', () => {
   /* Preconditions: valid timestamp provided
      Action: call formatDateTime(timestamp)
      Assertions: returns non-empty string formatted with system locale
-     Requirements: ui.11.1 */
+     Requirements: settings.2.1 */
   it('should use system locale for date/time formatting', () => {
     const timestamp = new Date('2026-02-07T10:30:00Z').getTime();
     const result = DateTimeFormatter.formatDateTime(timestamp);
@@ -30,7 +30,7 @@ describe('DateTimeFormatter (Renderer Process)', () => {
   /* Preconditions: valid timestamp provided
      Action: call formatLogTimestamp(timestamp)
      Assertions: returns string in YYYY-MM-DD HH:MM:SS±HH:MM format with timezone
-     Requirements: ui.11.3, clerkly.3.2, clerkly.3.3 */
+     Requirements: settings.2.3, clerkly.3.2, clerkly.3.3 */
   it('should use fixed format for log timestamps with timezone', () => {
     const timestamp = new Date('2026-02-07T10:30:45Z').getTime();
     const result = DateTimeFormatter.formatLogTimestamp(timestamp);
@@ -41,7 +41,7 @@ describe('DateTimeFormatter (Renderer Process)', () => {
   /* Preconditions: valid timestamp provided
      Action: call formatLogTimestamp(timestamp) multiple times
      Assertions: format is independent of system locale, always YYYY-MM-DD HH:MM:SS±HH:MM
-     Requirements: clerkly.3.2, clerkly.3.3, ui.11.3 */
+     Requirements: clerkly.3.2, clerkly.3.3, settings.2.3 */
   it('should use fixed format independent of system locale', () => {
     const timestamp = new Date('2026-02-07T10:30:45Z').getTime();
     const result = DateTimeFormatter.formatLogTimestamp(timestamp);
@@ -83,7 +83,7 @@ describe('Error Handling', () => {
   /* Preconditions: invalid timestamp causes Intl.DateTimeFormat to throw
        Action: call formatDate with invalid timestamp
        Assertions: falls back to toLocaleDateString, logs error
-       Requirements: ui.11.1 */
+       Requirements: settings.2.1 */
   it('should fallback to toLocaleDateString on formatDate error', () => {
     const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
 
@@ -100,7 +100,7 @@ describe('Error Handling', () => {
   /* Preconditions: invalid timestamp causes Intl.DateTimeFormat to throw
        Action: call formatDateTime with invalid timestamp
        Assertions: falls back to toLocaleString, logs error
-       Requirements: ui.11.1 */
+       Requirements: settings.2.1 */
   it('should fallback to toLocaleString on formatDateTime error', () => {
     const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
 
@@ -117,7 +117,7 @@ describe('Error Handling', () => {
   /* Preconditions: invalid timestamp causes date methods to throw
        Action: call formatLogTimestamp with invalid timestamp
        Assertions: falls back to toISOString, logs error
-       Requirements: ui.11.3 */
+       Requirements: settings.2.3 */
   it('should fallback to toISOString on formatLogTimestamp error', () => {
     const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
 
@@ -134,7 +134,7 @@ describe('Error Handling', () => {
   /* Preconditions: Date object provided instead of timestamp
        Action: call formatDate with Date object
        Assertions: handles Date object correctly
-       Requirements: ui.11.1 */
+       Requirements: settings.2.1 */
   it('should handle Date object in formatDate', () => {
     const date = new Date('2026-02-07T10:30:00Z');
     const result = DateTimeFormatter.formatDate(date);
@@ -146,7 +146,7 @@ describe('Error Handling', () => {
   /* Preconditions: Date object provided instead of timestamp
        Action: call formatDateTime with Date object
        Assertions: handles Date object correctly
-       Requirements: ui.11.1 */
+       Requirements: settings.2.1 */
   it('should handle Date object in formatDateTime', () => {
     const date = new Date('2026-02-07T10:30:00Z');
     const result = DateTimeFormatter.formatDateTime(date);
@@ -158,7 +158,7 @@ describe('Error Handling', () => {
   /* Preconditions: Date object provided instead of timestamp
        Action: call formatLogTimestamp with Date object
        Assertions: handles Date object correctly
-       Requirements: ui.11.3 */
+       Requirements: settings.2.3 */
   it('should handle Date object in formatLogTimestamp', () => {
     const date = new Date('2026-02-07T10:30:45Z');
     const result = DateTimeFormatter.formatLogTimestamp(date);

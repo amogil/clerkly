@@ -1,4 +1,4 @@
-// Requirements: ui.6.1, ui.6.2, ui.6.5, ui.6.6, ui.6.7, ui.6.8
+// Requirements: account-profile.1.1, account-profile.1.2, account-profile.1.5, account-profile.1.6, account-profile.1.7, account-profile.1.8
 
 import { UserProfileManager, UserProfile } from '../../../src/main/auth/UserProfileManager';
 import { DataManager } from '../../../src/main/DataManager';
@@ -50,7 +50,7 @@ describe('UserProfileManager', () => {
     dataManager = new DataManager(testDbPath);
     dataManager.initialize();
 
-    // Requirements: ui.12.10 - Mock UserProfileManager for data isolation
+    // Requirements: user-data-isolation.1.10 - Mock UserProfileManager for data isolation
     // Note: We need to mock it BEFORE creating the real profileManager
     mockSelfProfileManager = {
       getCurrentEmail: jest.fn().mockReturnValue('test@example.com'),
@@ -85,7 +85,7 @@ describe('UserProfileManager', () => {
     /* Preconditions: OAuthClientManager returns authorized status with valid access token, fetch returns successful response from Google UserInfo API
        Action: Call fetchProfile()
        Assertions: HTTP request made to correct endpoint with Bearer token, profile saved via DataManager.saveData() with key 'user_profile', returned profile has correct structure with lastUpdated timestamp
-       Requirements: ui.6.2, ui.6.6 */
+       Requirements: account-profile.1.2, account-profile.1.6 */
     it('should successfully fetch profile data from Google API', async () => {
       // Mock authorized status
       (oauthClient.getAuthStatus as jest.Mock).mockResolvedValue({
@@ -131,7 +131,7 @@ describe('UserProfileManager', () => {
     /* Preconditions: OAuthClientManager returns authorized status, fetch throws network error, DataManager has cached profile data
        Action: Call fetchProfile()
        Assertions: Error logged to console, cached profile returned from loadProfile(), no exception thrown (graceful error handling)
-       Requirements: ui.6.7 */
+       Requirements: account-profile.1.7 */
     it('should return cached profile data when API request fails', async () => {
       // Save cached profile first
       const cachedProfile: UserProfile = {
@@ -176,7 +176,7 @@ describe('UserProfileManager', () => {
     /* Preconditions: OAuthClientManager returns unauthorized status (authorized: false) or no access token available
        Action: Call fetchProfile()
        Assertions: Method returns null, fetch not called, console log message about not authenticated
-       Requirements: ui.6.1 */
+       Requirements: account-profile.1.1 */
     it('should return null when user is not authenticated', async () => {
       // Mock unauthorized status
       (oauthClient.getAuthStatus as jest.Mock).mockResolvedValue({
@@ -206,7 +206,7 @@ describe('UserProfileManager', () => {
     /* Preconditions: OAuthClientManager returns authorized status but TokenStorageManager returns null or no access token
        Action: Call fetchProfile()
        Assertions: Method returns null, fetch not called, console log message about no access token
-       Requirements: ui.6.1 */
+       Requirements: account-profile.1.1 */
     it('should return null when no access token is available', async () => {
       // Mock authorized status
       (oauthClient.getAuthStatus as jest.Mock).mockResolvedValue({
@@ -241,7 +241,7 @@ describe('UserProfileManager', () => {
     /* Preconditions: Valid UserProfile object with all required fields
        Action: Call saveProfile(testProfile)
        Assertions: DataManager.saveData() called with key 'user_profile' and profile object, success logged to console
-       Requirements: ui.6.2 */
+       Requirements: account-profile.1.2 */
     it('should correctly save profile data to DataManager', async () => {
       const testProfile: UserProfile = {
         ...mockProfile,
@@ -270,7 +270,7 @@ describe('UserProfileManager', () => {
     /* Preconditions: DataManager.saveData() fails (throws error or returns failure)
        Action: Call saveProfile(testProfile)
        Assertions: Error logged to console, exception thrown to caller
-       Requirements: ui.6.2 */
+       Requirements: account-profile.1.2 */
     it('should handle save errors and throw exception', async () => {
       const testProfile: UserProfile = {
         ...mockProfile,
@@ -299,7 +299,7 @@ describe('UserProfileManager', () => {
     /* Preconditions: DataManager has saved profile data with key 'user_profile'
        Action: Call loadProfile()
        Assertions: Returns UserProfile object with correct structure, success logged to console
-       Requirements: ui.6.7 */
+       Requirements: account-profile.1.7 */
     it('should correctly load profile data from DataManager', async () => {
       const testProfile: UserProfile = {
         ...mockProfile,
@@ -330,7 +330,7 @@ describe('UserProfileManager', () => {
     /* Preconditions: DataManager has no profile data (result.success = false or result.data = null)
        Action: Call loadProfile()
        Assertions: Returns null, console log message about no profile found
-       Requirements: ui.6.7 */
+       Requirements: account-profile.1.7 */
     it('should return null when no profile data exists', async () => {
       // Spy on console.info
       const consoleInfoSpy = jest.spyOn(console, 'info').mockImplementation();
@@ -352,7 +352,7 @@ describe('UserProfileManager', () => {
     /* Preconditions: DataManager.loadData() throws error
        Action: Call loadProfile()
        Assertions: Returns null instead of throwing, error logged to console
-       Requirements: ui.6.7 */
+       Requirements: account-profile.1.7 */
     it('should handle load errors gracefully and return null', async () => {
       // Create a new profile manager with a mock DataManager that throws
       const mockDataManager = {
@@ -385,7 +385,7 @@ describe('UserProfileManager', () => {
     /* Preconditions: DataManager has saved profile data
        Action: Call clearProfile()
        Assertions: DataManager.deleteData() called with key 'user_profile', profile removed from database, success logged to console
-       Requirements: ui.6.8 */
+       Requirements: account-profile.1.8 */
     it('should delete profile data from DataManager', async () => {
       const testProfile: UserProfile = {
         ...mockProfile,
@@ -420,7 +420,7 @@ describe('UserProfileManager', () => {
     /* Preconditions: DataManager.deleteData() fails (throws error or returns failure)
        Action: Call clearProfile()
        Assertions: Error logged to console, exception thrown to caller
-       Requirements: ui.6.8 */
+       Requirements: account-profile.1.8 */
     it('should handle delete errors and throw exception', async () => {
       // Close database to cause delete error
       dataManager.close();
@@ -444,7 +444,7 @@ describe('UserProfileManager', () => {
     /* Preconditions: UserProfileManager instance created
        Action: Call updateProfileAfterTokenRefresh()
        Assertions: fetchProfile() method called exactly once, console log message about updating profile after token refresh
-       Requirements: ui.6.5 */
+       Requirements: account-profile.1.5 */
     it('should call fetchProfile() when invoked', async () => {
       // Spy on fetchProfile method
       const fetchProfileSpy = jest.spyOn(profileManager, 'fetchProfile').mockResolvedValue(null);
@@ -472,7 +472,7 @@ describe('UserProfileManager', () => {
     /* Preconditions: fetchProfile() successfully fetched profile with email
        Action: Call getCurrentEmail()
        Assertions: Returns the email from the fetched profile
-       Requirements: ui.12.10, ui.12.15 */
+       Requirements: user-data-isolation.1.10, user-data-isolation.1.15 */
     it('should return current email after fetchProfile()', async () => {
       // Mock authorized status and tokens
       (oauthClient.getAuthStatus as jest.Mock).mockResolvedValue({
@@ -500,7 +500,7 @@ describe('UserProfileManager', () => {
     /* Preconditions: loadProfile() successfully loaded profile with email
        Action: Call getCurrentEmail()
        Assertions: Returns the email from the loaded profile
-       Requirements: ui.12.10, ui.12.17 */
+       Requirements: user-data-isolation.1.10, user-data-isolation.1.17 */
     it('should return current email after loadProfile()', async () => {
       const testProfile: UserProfile = {
         ...mockProfile,
@@ -519,11 +519,11 @@ describe('UserProfileManager', () => {
       expect(email).toBe('test@example.com');
     });
 
-    /* Preconditions: clearProfile() was called
+    /* Preconditions: clearSession() was called
        Action: Call getCurrentEmail()
        Assertions: Returns null
-       Requirements: ui.12.10, ui.12.18 */
-    it('should return null after clearProfile()', async () => {
+       Requirements: user-data-isolation.1.10, user-data-isolation.1.18 */
+    it('should return null after clearSession()', async () => {
       // First set email by fetching profile
       (oauthClient.getAuthStatus as jest.Mock).mockResolvedValue({
         authorized: true,
@@ -539,8 +539,8 @@ describe('UserProfileManager', () => {
       await profileManager.fetchProfile();
       expect(profileManager.getCurrentEmail()).toBe('test@example.com');
 
-      // Clear profile
-      await profileManager.clearProfile();
+      // Clear session
+      profileManager.clearSession();
 
       // Get current email
       const email = profileManager.getCurrentEmail();
@@ -551,7 +551,7 @@ describe('UserProfileManager', () => {
     /* Preconditions: No profile fetched or loaded
        Action: Call getCurrentEmail()
        Assertions: Returns null
-       Requirements: ui.12.10 */
+       Requirements: user-data-isolation.1.10 */
     it('should return null when no profile exists', () => {
       const email = profileManager.getCurrentEmail();
 
@@ -561,7 +561,7 @@ describe('UserProfileManager', () => {
     /* Preconditions: updateProfileAfterTokenRefresh() successfully updated profile
        Action: Call getCurrentEmail()
        Assertions: Returns the updated email
-       Requirements: ui.12.10, ui.12.16 */
+       Requirements: user-data-isolation.1.10, user-data-isolation.1.16 */
     it('should return updated email after updateProfileAfterTokenRefresh()', async () => {
       // Mock authorized status and tokens
       (oauthClient.getAuthStatus as jest.Mock).mockResolvedValue({
@@ -591,11 +591,138 @@ describe('UserProfileManager', () => {
     });
   });
 
+  describe('clearSession', () => {
+    /* Preconditions: User logged in with email cached
+       Action: Call clearSession()
+       Assertions: currentUserEmail is null, isLoggedOut flag is set, success logged to console
+       Requirements: user-data-isolation.1.18 */
+    it('should clear email on logout', () => {
+      // First set email by creating a profile manager with cached email
+      const testProfile: UserProfile = {
+        ...mockProfile,
+        lastUpdated: Date.now(),
+      };
+      dataManager.saveData('user_profile', testProfile);
+
+      // Load profile to cache email
+      profileManager.loadProfile();
+      expect(profileManager.getCurrentEmail()).toBe('test@example.com');
+
+      // Spy on console.info
+      const consoleInfoSpy = jest.spyOn(console, 'info').mockImplementation();
+
+      // Call clearSession
+      profileManager.clearSession();
+
+      // Verify currentUserEmail was cleared
+      const email = profileManager.getCurrentEmail();
+      expect(email).toBeNull();
+
+      // Verify success log
+      expect(consoleInfoSpy).toHaveBeenCalledWith(
+        expect.stringContaining(
+          '[UserProfileManager] User session cleared (email cleared from memory)'
+        )
+      );
+
+      consoleInfoSpy.mockRestore();
+    });
+  });
+
+  describe('initialize', () => {
+    /* Preconditions: DataManager has saved profile data with email
+       Action: Call initialize()
+       Assertions: currentUserEmail is set from loaded profile, success logged to console
+       Requirements: user-data-isolation.1.17 */
+    it('should restore email from database on app startup', async () => {
+      const testProfile: UserProfile = {
+        ...mockProfile,
+        email: 'restored@example.com',
+        lastUpdated: Date.now(),
+      };
+
+      // Save profile first
+      dataManager.saveData('user_profile', testProfile);
+
+      // Spy on console.info
+      const consoleInfoSpy = jest.spyOn(console, 'info').mockImplementation();
+
+      // Call initialize
+      await profileManager.initialize();
+
+      // Verify currentUserEmail was set
+      const email = profileManager.getCurrentEmail();
+      expect(email).toBe('restored@example.com');
+
+      // Verify success log
+      expect(consoleInfoSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[UserProfileManager] Email cached from stored profile:')
+      );
+
+      consoleInfoSpy.mockRestore();
+    });
+
+    /* Preconditions: DataManager has no profile data
+       Action: Call initialize()
+       Assertions: currentUserEmail remains null, no error thrown
+       Requirements: user-data-isolation.1.17 */
+    it('should handle missing profile gracefully', async () => {
+      // Spy on console.info
+      const consoleInfoSpy = jest.spyOn(console, 'info').mockImplementation();
+
+      // Call initialize (no data saved)
+      await profileManager.initialize();
+
+      // Verify currentUserEmail is still null
+      const email = profileManager.getCurrentEmail();
+      expect(email).toBeNull();
+
+      // Verify log message about no profile
+      expect(consoleInfoSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[UserProfileManager] No profile found in local storage')
+      );
+
+      consoleInfoSpy.mockRestore();
+    });
+
+    /* Preconditions: DataManager.loadData() throws error
+       Action: Call initialize()
+       Assertions: Error logged, currentUserEmail remains null, no exception thrown
+       Requirements: user-data-isolation.1.17 */
+    it('should handle load errors gracefully', async () => {
+      // Create a new profile manager with a mock DataManager that throws
+      const mockDataManager = {
+        loadData: jest.fn().mockImplementation(() => {
+          throw new Error('Database error');
+        }),
+      } as unknown as DataManager;
+
+      const testProfileManager = new UserProfileManager(mockDataManager, oauthClient, tokenStorage);
+
+      // Spy on console.error
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+
+      // Call initialize
+      await testProfileManager.initialize();
+
+      // Verify currentUserEmail is null
+      const email = testProfileManager.getCurrentEmail();
+      expect(email).toBeNull();
+
+      // Verify error was logged (error comes from loadProfile, not initialize)
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[UserProfileManager] Failed to load profile:')
+      );
+
+      consoleErrorSpy.mockRestore();
+    });
+  });
+
   describe('fetchProfileSynchronously', () => {
     /* Preconditions: TokenStorageManager returns valid access token, fetch returns successful response from Google UserInfo API
        Action: Call fetchProfileSynchronously()
        Assertions: Profile fetched from API, profile saved via DataManager.saveData(), method returns { success: true, profile: {...} }, currentUserEmail cached
-       Requirements: google-oauth-auth.3.6, google-oauth-auth.3.8, ui.6.3, ui.6.4 */
+       Requirements: google-oauth-auth.3.6, google-oauth-auth.3.8, account-profile.1.3, account-profile.1.4 */
     it('should successfully fetch and save profile synchronously', async () => {
       // Mock valid tokens
       (tokenStorage.loadTokens as jest.Mock).mockResolvedValue({
@@ -653,7 +780,7 @@ describe('UserProfileManager', () => {
     /* Preconditions: TokenStorageManager returns valid access token, fetch returns HTTP error (500, 401, etc.)
        Action: Call fetchProfileSynchronously()
        Assertions: TokenStorageManager.deleteTokens() called, method returns { success: false, error: 'profile_fetch_failed' }, error logged
-       Requirements: google-oauth-auth.3.7, ui.6.4, ui.6.5 */
+       Requirements: google-oauth-auth.3.7, account-profile.1.4, account-profile.1.5 */
     it('should clear tokens and return error when API request fails', async () => {
       // Mock valid tokens
       (tokenStorage.loadTokens as jest.Mock).mockResolvedValue({
@@ -698,7 +825,7 @@ describe('UserProfileManager', () => {
     /* Preconditions: TokenStorageManager returns null or no access token
        Action: Call fetchProfileSynchronously()
        Assertions: TokenStorageManager.deleteTokens() called, method returns { success: false, error: 'profile_fetch_failed' }, error logged
-       Requirements: google-oauth-auth.3.7, ui.6.4 */
+       Requirements: google-oauth-auth.3.7, account-profile.1.4 */
     it('should clear tokens and return error when no access token available', async () => {
       // Mock no tokens
       (tokenStorage.loadTokens as jest.Mock).mockResolvedValue(null);
@@ -735,7 +862,7 @@ describe('UserProfileManager', () => {
     /* Preconditions: TokenStorageManager returns valid access token, fetch throws network error
        Action: Call fetchProfileSynchronously()
        Assertions: TokenStorageManager.deleteTokens() called, method returns { success: false, error: 'profile_fetch_failed' }, error logged
-       Requirements: google-oauth-auth.3.7, ui.6.4, ui.6.5 */
+       Requirements: google-oauth-auth.3.7, account-profile.1.4, account-profile.1.5 */
     it('should clear tokens and return error when network error occurs', async () => {
       // Mock valid tokens
       (tokenStorage.loadTokens as jest.Mock).mockResolvedValue({
@@ -777,7 +904,7 @@ describe('UserProfileManager', () => {
     /* Preconditions: TokenStorageManager returns valid access token, fetch times out after 10 seconds
        Action: Call fetchProfileSynchronously()
        Assertions: TokenStorageManager.deleteTokens() called, method returns { success: false, error: 'profile_fetch_failed' }, timeout handled gracefully
-       Requirements: google-oauth-auth.3.7, ui.6.4 */
+       Requirements: google-oauth-auth.3.7, account-profile.1.4 */
     it('should handle timeout and clear tokens', async () => {
       // Mock valid tokens
       (tokenStorage.loadTokens as jest.Mock).mockResolvedValue({

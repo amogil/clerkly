@@ -1,4 +1,4 @@
-// Requirements: ui.2, ui.3, ui.5, testing.3.1, testing.3.2, testing.3.6
+// Requirements: window-management.2, window-management.3, window-management.5, testing.3.1, testing.3.2, testing.3.6
 
 import { test, expect } from '@playwright/test';
 import {
@@ -39,7 +39,7 @@ test.describe('Window State Persistence', () => {
   /* Preconditions: Application not running, no saved window state
      Action: Launch application, check initial window size
      Assertions: Window opens at workAreaSize (full screen minus system elements)
-     Requirements: ui.1.1, ui.4.1 */
+     Requirements: window-management.1.1, window-management.4.1 */
   test('should open at default size on first launch', async () => {
     // Launch the application with a fresh data directory
     context = await launchElectron();
@@ -57,7 +57,7 @@ test.describe('Window State Persistence', () => {
     });
 
     // Verify window has workAreaSize (full screen minus system elements)
-    // Requirements: ui.1.1, ui.4.1
+    // Requirements: window-management.1.1, window-management.4.1
     expect(bounds.width).toBe(screenSize.width);
     expect(bounds.height).toBe(screenSize.height);
 
@@ -71,7 +71,7 @@ test.describe('Window State Persistence', () => {
   /* Preconditions: Application running with default window size
      Action: Resize window using Electron API, close app, relaunch app
      Assertions: Window opens at the saved size
-     Requirements: ui.5.1, ui.5.4 */
+     Requirements: window-management.5.1, window-management.5.4 */
   test('should persist window size across restarts', async () => {
     // First launch
     context = await launchElectron();
@@ -132,7 +132,7 @@ test.describe('Window State Persistence', () => {
   /* Preconditions: Application running
      Action: Move window to new position, close app, relaunch app
      Assertions: Window opens at the saved position
-     Requirements: ui.5.2, ui.5.4 */
+     Requirements: window-management.5.2, window-management.5.4 */
   test('should persist window position across restarts', async () => {
     // First launch
     context = await launchElectron();
@@ -207,7 +207,7 @@ test.describe('Window State Persistence', () => {
   /* Preconditions: Application running in normal state
      Action: Maximize window, close app, relaunch app
      Assertions: Window opens in maximized state
-     Requirements: ui.5.3, ui.5.4 */
+     Requirements: window-management.5.3, window-management.5.4 */
   test('should persist maximized state across restarts', async () => {
     // First launch
     context = await launchElectron();
@@ -262,7 +262,7 @@ test.describe('Window State Persistence', () => {
   /* Preconditions: Application not running
      Action: Launch application and check window title
      Assertions: Window title is empty string
-     Requirements: ui.2.1, ui.2.2 */
+     Requirements: window-management.2.1, window-management.2.2 */
   test('should have empty window title', async () => {
     // Launch the application
     context = await launchElectron();
@@ -272,7 +272,7 @@ test.describe('Window State Persistence', () => {
     const title = await context.window.title();
 
     // Verify title is empty
-    // Requirements: ui.2.1
+    // Requirements: window-management.2.1
     expect(title).toBe('');
 
     // Also verify through Electron API
@@ -281,7 +281,7 @@ test.describe('Window State Persistence', () => {
       return window ? window.getTitle() : null;
     });
 
-    // Requirements: ui.2.2 - Should NOT display application name
+    // Requirements: window-management.2.2 - Should NOT display application name
     expect(electronTitle).toBe('');
 
     console.log(`Window title: "${title}"`);
@@ -293,14 +293,14 @@ test.describe('Window State Persistence', () => {
   /* Preconditions: Application not running
      Action: Launch application and verify native Mac OS X elements
      Assertions: Window has standard Mac control buttons and integrates with system
-     Requirements: ui.3.1, ui.3.2, ui.3.3, ui.3.4, ui.3.5 */
+     Requirements: window-management.3.1, window-management.3.2, window-management.3.3, window-management.3.4, window-management.3.5 */
   test('should have native Mac OS X window controls', async () => {
     // Launch the application
     context = await launchElectron();
     await context.window.waitForLoadState('domcontentloaded');
 
     // Verify window has native Mac controls
-    // Requirements: ui.3.1
+    // Requirements: window-management.3.1
     const windowInfo = await context.app.evaluate(({ BrowserWindow }) => {
       const window = BrowserWindow.getAllWindows()[0];
       if (!window) return null;
@@ -324,7 +324,7 @@ test.describe('Window State Persistence', () => {
     expect(windowInfo).not.toBeNull();
 
     // Verify standard Mac window controls are present
-    // Requirements: ui.3.1, ui.3.2
+    // Requirements: window-management.3.1, window-management.3.2
     expect(windowInfo!.isClosable).toBe(true);
     expect(windowInfo!.isMinimizable).toBe(true);
     expect(windowInfo!.isMaximizable).toBe(true);
@@ -341,7 +341,7 @@ test.describe('Window State Persistence', () => {
   /* Preconditions: Application running
      Action: Close window and verify Mac OS X close behavior
      Assertions: Window closes but app may stay running (Mac convention)
-     Requirements: ui.3.3 */
+     Requirements: window-management.3.3 */
   test('should follow Mac OS X window close conventions', async () => {
     // Launch the application
     context = await launchElectron();
@@ -372,21 +372,21 @@ test.describe('Window State Persistence', () => {
     expect(context.window.isClosed()).toBe(true);
 
     // On macOS, app may stay running even when all windows are closed
-    // Requirements: ui.3.3
+    // Requirements: window-management.3.3
     console.log('[TEST] Window closed following Mac OS X conventions');
   });
 
   /* Preconditions: Application not running
      Action: Launch application and verify dock integration
      Assertions: Application appears in dock and responds to activation
-     Requirements: ui.3.5 */
+     Requirements: window-management.3.5 */
   test('should integrate with Mac OS X dock', async () => {
     // Launch the application
     context = await launchElectron();
     await context.window.waitForLoadState('domcontentloaded');
 
     // Verify app is visible and can be activated
-    // Requirements: ui.3.5
+    // Requirements: window-management.3.5
     const appInfo = await context.app.evaluate(({ BrowserWindow }) => {
       const window = BrowserWindow.getAllWindows()[0];
 

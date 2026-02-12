@@ -6,7 +6,7 @@
    Preconditions: NavigationManager with various auth states and routes
    Action: call initialize(), redirectToLogin(), redirectToDashboard()
    Assertions: correct navigation behavior based on auth status
-   Requirements: ui.8.1, ui.8.3, ui.8.4 */
+   Requirements: navigation.1.1, navigation.1.3, navigation.1.4 */
 
 import fc from 'fast-check';
 import { NavigationManager } from '../../../src/renderer/navigation/NavigationManager';
@@ -27,7 +27,7 @@ describe('NavigationManager Property Tests', () => {
      Preconditions: user not authorized, various initial routes
      Action: call initialize()
      Assertions: always redirects to login
-     Requirements: ui.8.1 */
+     Requirements: navigation.1.1 */
   it('should always redirect to login when not authorized', async () => {
     await fc.assert(
       fc.asyncProperty(
@@ -61,7 +61,7 @@ describe('NavigationManager Property Tests', () => {
      Preconditions: user authorized, currently on login screen
      Action: call initialize()
      Assertions: always redirects to dashboard
-     Requirements: ui.8.3 */
+     Requirements: navigation.1.3 */
   it('should always redirect to dashboard when authorized and on login screen', async () => {
     await fc.assert(
       fc.asyncProperty(fc.boolean(), async (authorizedValue) => {
@@ -95,7 +95,7 @@ describe('NavigationManager Property Tests', () => {
      Preconditions: various auth states
      Action: call checkAuthStatus()
      Assertions: returns correct boolean based on auth state
-     Requirements: ui.8.1 */
+     Requirements: navigation.1.1 */
   it('should correctly check auth status for any auth state', async () => {
     await fc.assert(
       fc.asyncProperty(fc.boolean(), async (isAuthorized) => {
@@ -125,7 +125,7 @@ describe('NavigationManager Property Tests', () => {
      Preconditions: various current routes
      Action: call redirectToLogin()
      Assertions: always navigates to /login
-     Requirements: ui.8.1, ui.8.4 */
+     Requirements: navigation.1.1, navigation.1.4 */
   it('should always redirect to login regardless of current route', () => {
     fc.assert(
       fc.property(
@@ -158,7 +158,7 @@ describe('NavigationManager Property Tests', () => {
      Preconditions: various current routes
      Action: call redirectToDashboard()
      Assertions: always navigates to /dashboard
-     Requirements: ui.8.3 */
+     Requirements: navigation.1.3 */
   it('should always redirect to dashboard regardless of current route', () => {
     fc.assert(
       fc.property(
@@ -191,7 +191,7 @@ describe('NavigationManager Property Tests', () => {
      Preconditions: various combinations of auth status and current route
      Action: call initialize()
      Assertions: correct navigation based on auth status and route
-     Requirements: ui.8.1, ui.8.3 */
+     Requirements: navigation.1.1, navigation.1.3 */
   it('should handle all combinations of auth status and routes correctly', async () => {
     await fc.assert(
       fc.asyncProperty(

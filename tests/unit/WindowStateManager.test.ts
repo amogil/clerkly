@@ -1,4 +1,4 @@
-// Requirements: ui.5
+// Requirements: window-management.5
 
 import { WindowStateManager, WindowState } from '../../src/main/WindowStateManager';
 import { DataManager } from '../../src/main/DataManager';
@@ -50,7 +50,7 @@ describe('WindowStateManager', () => {
     /* Preconditions: no saved state in database
        Action: call loadState()
        Assertions: returns default state with isMaximized: false, dimensions equal to workAreaSize
-       Requirements: ui.1.1, ui.4.1, ui.5.5 */
+       Requirements: window-management.1.1, window-management.4.1, window-management.5.5 */
     it('should return default state when no saved state exists', () => {
       mockDataManager.loadData.mockReturnValue({ success: false });
 
@@ -67,7 +67,7 @@ describe('WindowStateManager', () => {
     /* Preconditions: valid state saved in database
        Action: call loadState()
        Assertions: returns saved state
-       Requirements: ui.5.4 */
+       Requirements: window-management.5.4 */
     it('should load saved state from database', () => {
       const savedState: WindowState = {
         x: 100,
@@ -91,7 +91,7 @@ describe('WindowStateManager', () => {
     /* Preconditions: saved state with position outside screen bounds
        Action: call loadState()
        Assertions: returns default state on primary screen
-       Requirements: ui.5.6 */
+       Requirements: window-management.5.6 */
     it('should return default state for invalid position', () => {
       const invalidState: WindowState = {
         x: 5000, // Outside screen bounds
@@ -119,7 +119,7 @@ describe('WindowStateManager', () => {
     /* Preconditions: corrupted JSON in database
        Action: call loadState()
        Assertions: returns default state, error logged
-       Requirements: ui.5 */
+       Requirements: window-management.5 */
     it('should handle corrupted state data', () => {
       const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
       mockDataManager.loadData.mockReturnValue({
@@ -140,7 +140,7 @@ describe('WindowStateManager', () => {
     /* Preconditions: DataManager.loadData throws error
        Action: call loadState()
        Assertions: returns default state, error logged
-       Requirements: ui.5 */
+       Requirements: window-management.5 */
     it('should handle database read errors', () => {
       const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
       mockDataManager.loadData.mockImplementation(() => {
@@ -160,7 +160,7 @@ describe('WindowStateManager', () => {
     /* Preconditions: saved state with position on secondary display
        Action: call loadState()
        Assertions: returns saved state (position is valid)
-       Requirements: ui.5.4, ui.5.6 */
+       Requirements: window-management.5.4, window-management.5.6 */
     it('should accept position on secondary display', () => {
       const savedState: WindowState = {
         x: 2000, // On secondary display
@@ -189,7 +189,7 @@ describe('WindowStateManager', () => {
     /* Preconditions: saved state with position at edge of display
        Action: call loadState()
        Assertions: returns saved state (boundary test)
-       Requirements: ui.5.4, ui.5.6 */
+       Requirements: window-management.5.4, window-management.5.6 */
     it('should accept position at display edge', () => {
       const savedState: WindowState = {
         x: 1919, // At right edge of display
@@ -212,7 +212,7 @@ describe('WindowStateManager', () => {
     /* Preconditions: saved state with negative position (multi-monitor setup)
        Action: call loadState()
        Assertions: returns saved state if position is valid on any display
-       Requirements: ui.5.4, ui.5.6 */
+       Requirements: window-management.5.4, window-management.5.6 */
     it('should accept negative position on valid display', () => {
       const savedState: WindowState = {
         x: -1000, // On display to the left
@@ -243,7 +243,7 @@ describe('WindowStateManager', () => {
     /* Preconditions: screen size is 1920x1080
        Action: call getDefaultState()
        Assertions: returns state with full workAreaSize, not maximized
-       Requirements: ui.1.1, ui.1.3, ui.4.1, ui.4.2, ui.4.3 */
+       Requirements: window-management.1.1, window-management.1.3, window-management.4.1, window-management.4.2, window-management.4.3 */
     it('should generate default state based on screen size', () => {
       mockScreen.getPrimaryDisplay.mockReturnValue({
         workAreaSize: { width: 1920, height: 1080 },
@@ -261,7 +261,7 @@ describe('WindowStateManager', () => {
     /* Preconditions: small screen size (1366x768)
        Action: call getDefaultState()
        Assertions: returns state adapted to small screen
-       Requirements: ui.4.1, ui.4.4 */
+       Requirements: window-management.4.1, window-management.4.4 */
     it('should adapt to small screen size', () => {
       mockScreen.getPrimaryDisplay.mockReturnValue({
         workAreaSize: { width: 1366, height: 768 },
@@ -279,7 +279,7 @@ describe('WindowStateManager', () => {
     /* Preconditions: large screen size (3840x2160)
        Action: call getDefaultState()
        Assertions: returns state adapted to large screen
-       Requirements: ui.4.1, ui.4.2 */
+       Requirements: window-management.4.1, window-management.4.2 */
     it('should adapt to large screen size', () => {
       mockScreen.getPrimaryDisplay.mockReturnValue({
         workAreaSize: { width: 3840, height: 2160 },
@@ -297,7 +297,7 @@ describe('WindowStateManager', () => {
     /* Preconditions: various screen sizes
        Action: call getDefaultState() with different screen sizes
        Assertions: dimensions are never hardcoded to 1920x1080
-       Requirements: ui.4.3 */
+       Requirements: window-management.4.3 */
     it('should not use hardcoded dimensions', () => {
       const screenSizes = [
         { width: 1366, height: 768 },
@@ -326,7 +326,7 @@ describe('WindowStateManager', () => {
     /* Preconditions: position is within primary display bounds
        Action: call isPositionValid() with valid position
        Assertions: returns true
-       Requirements: ui.5.6 */
+       Requirements: window-management.5.6 */
     it('should return true for position within display bounds', () => {
       mockScreen.getAllDisplays.mockReturnValue([
         { bounds: { x: 0, y: 0, width: 1920, height: 1080 } },
@@ -340,7 +340,7 @@ describe('WindowStateManager', () => {
     /* Preconditions: position is outside all display bounds
        Action: call isPositionValid() with invalid position
        Assertions: returns false
-       Requirements: ui.5.6 */
+       Requirements: window-management.5.6 */
     it('should return false for position outside display bounds', () => {
       mockScreen.getAllDisplays.mockReturnValue([
         { bounds: { x: 0, y: 0, width: 1920, height: 1080 } },
@@ -354,7 +354,7 @@ describe('WindowStateManager', () => {
     /* Preconditions: position is on secondary display
        Action: call isPositionValid() with position on secondary display
        Assertions: returns true
-       Requirements: ui.5.6 */
+       Requirements: window-management.5.6 */
     it('should return true for position on secondary display', () => {
       mockScreen.getAllDisplays.mockReturnValue([
         { bounds: { x: 0, y: 0, width: 1920, height: 1080 } },
@@ -369,7 +369,7 @@ describe('WindowStateManager', () => {
     /* Preconditions: position is at display edge (boundary test)
        Action: call isPositionValid() with position at edge
        Assertions: returns true
-       Requirements: ui.5.6 */
+       Requirements: window-management.5.6 */
     it('should return true for position at display edge', () => {
       mockScreen.getAllDisplays.mockReturnValue([
         { bounds: { x: 0, y: 0, width: 1920, height: 1080 } },
@@ -383,7 +383,7 @@ describe('WindowStateManager', () => {
     /* Preconditions: position is exactly at display boundary
        Action: call isPositionValid() with position at boundary
        Assertions: returns false (boundary is exclusive)
-       Requirements: ui.5.6 */
+       Requirements: window-management.5.6 */
     it('should return false for position at display boundary', () => {
       mockScreen.getAllDisplays.mockReturnValue([
         { bounds: { x: 0, y: 0, width: 1920, height: 1080 } },
@@ -397,7 +397,7 @@ describe('WindowStateManager', () => {
     /* Preconditions: negative position on display to the left
        Action: call isPositionValid() with negative position
        Assertions: returns true if display exists at that position
-       Requirements: ui.5.6 */
+       Requirements: window-management.5.6 */
     it('should handle negative positions correctly', () => {
       mockScreen.getAllDisplays.mockReturnValue([
         { bounds: { x: 0, y: 0, width: 1920, height: 1080 } },
@@ -412,7 +412,7 @@ describe('WindowStateManager', () => {
     /* Preconditions: no displays available (edge case)
        Action: call isPositionValid() with empty display list
        Assertions: returns false
-       Requirements: ui.5.6 */
+       Requirements: window-management.5.6 */
     it('should return false when no displays available', () => {
       mockScreen.getAllDisplays.mockReturnValue([]);
 
@@ -426,7 +426,7 @@ describe('WindowStateManager', () => {
     /* Preconditions: valid window state
        Action: call saveState()
        Assertions: state saved to database as JSON
-       Requirements: ui.5.1, ui.5.2, ui.5.3 */
+       Requirements: window-management.5.1, window-management.5.2, window-management.5.3 */
     it('should save state to database', () => {
       const state: WindowState = {
         x: 100,
@@ -444,7 +444,7 @@ describe('WindowStateManager', () => {
     /* Preconditions: database write fails
        Action: call saveState()
        Assertions: error logged, no exception thrown
-       Requirements: ui.5 */
+       Requirements: window-management.5 */
     it('should handle save errors gracefully', () => {
       const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
       mockDataManager.saveData.mockImplementation(() => {
@@ -472,7 +472,7 @@ describe('WindowStateManager', () => {
     /* Preconditions: state with maximized flag
        Action: call saveState() with isMaximized: true
        Assertions: maximized state saved correctly
-       Requirements: ui.5.3 */
+       Requirements: window-management.5.3 */
     it('should save maximized state correctly', () => {
       const state: WindowState = {
         x: 100,
@@ -493,7 +493,7 @@ describe('WindowStateManager', () => {
     /* Preconditions: state with various dimensions
        Action: call saveState() with different dimensions
        Assertions: all dimensions saved correctly
-       Requirements: ui.5.1, ui.5.2 */
+       Requirements: window-management.5.1, window-management.5.2 */
     it('should save all state properties correctly', () => {
       const state: WindowState = {
         x: 250,
@@ -514,7 +514,7 @@ describe('WindowStateManager', () => {
     /* Preconditions: state with negative coordinates (multi-monitor)
        Action: call saveState() with negative coordinates
        Assertions: negative coordinates saved correctly
-       Requirements: ui.5.2 */
+       Requirements: window-management.5.2 */
     it('should save negative coordinates correctly', () => {
       const state: WindowState = {
         x: -1000,
@@ -536,7 +536,7 @@ describe('WindowStateManager', () => {
     /* Preconditions: state with large dimensions
        Action: call saveState() with large dimensions
        Assertions: large dimensions saved correctly
-       Requirements: ui.5.1 */
+       Requirements: window-management.5.1 */
     it('should save large dimensions correctly', () => {
       const state: WindowState = {
         x: 0,

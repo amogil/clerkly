@@ -64,7 +64,7 @@ test.describe('Account Profile', () => {
   /* Preconditions: Application not running, clean database, no tokens
      Action: Launch application
      Assertions: Login screen is displayed (user cannot access Settings without authentication)
-     Requirements: ui.6.1 */
+     Requirements: account-profile.1.1 */
   test('should show login screen when not authenticated', async () => {
     // Launch the application with clean database
     // Requirements: testing.3.1, testing.3.2 - Real Electron, no mocks
@@ -76,14 +76,14 @@ test.describe('Account Profile', () => {
     // Wait a moment for React components to render
     await context.window.waitForTimeout(1000);
 
-    // Requirements: ui.6.1 - When user is not authenticated, app shows login screen
+    // Requirements: account-profile.1.1 - When user is not authenticated, app shows login screen
     // User cannot access Settings (and Account block) without authentication
     const loginButton = context.window.locator('text=/continue with google/i');
     await loginButton.waitFor({ state: 'visible', timeout: 5000 });
     expect(await loginButton.isVisible()).toBe(true);
 
     console.log('✓ Login screen is shown (user not authenticated)');
-    console.log('✓ User cannot access Settings without authentication (per ui.6.1)');
+    console.log('✓ User cannot access Settings without authentication (per account-profile.1.1)');
 
     // Take screenshot of login screen
     await context.window.screenshot({
@@ -94,7 +94,7 @@ test.describe('Account Profile', () => {
   /* Preconditions: Application not running, clean database, mock OAuth server running
      Action: Complete OAuth flow, wait for profile to load, navigate to Settings, check Account block
      Assertions: Account block is populated with profile data (name, email) from mock UserInfo API
-     Requirements: ui.6.2, ui.6.3 */
+     Requirements: account-profile.1.2, account-profile.1.3 */
   test('should populate profile data after Google OAuth login', async () => {
     // Set custom user profile data for this test
     mockServer.setUserProfile({
@@ -196,7 +196,7 @@ test.describe('Account Profile', () => {
     await context.window.waitForTimeout(500);
 
     // Find Account block by looking for the "Account" heading
-    // Requirements: ui.6.2, ui.6.3
+    // Requirements: account-profile.1.2, account-profile.1.3
     const accountHeading = context.window.locator('text=/^Account$/i');
     console.log('[TEST] Looking for Account heading...');
     await accountHeading.waitFor({ state: 'visible', timeout: 5000 });
@@ -229,7 +229,7 @@ test.describe('Account Profile', () => {
     console.log('[TEST] Screenshot saved');
 
     // Verify profile fields are populated
-    // Requirements: ui.6.3 - Display name and email fields
+    // Requirements: account-profile.1.3 - Display name and email fields
     const nameInput = context.window.locator('#profile-name');
     const emailInput = context.window.locator('#profile-email');
 
@@ -243,7 +243,7 @@ test.describe('Account Profile', () => {
     const emailValue = await emailInput.inputValue();
 
     // Verify values match mock data
-    // Requirements: ui.6.2 - Profile data should match UserInfo API response
+    // Requirements: account-profile.1.2 - Profile data should match UserInfo API response
     expect(nameValue).toBe('OAuth Test User');
     expect(emailValue).toBe('oauth.test@example.com');
 
@@ -260,7 +260,7 @@ test.describe('Account Profile', () => {
   /* Preconditions: Application running with authentication, tokens saved, profile loaded
      Action: Locate profile input fields, check readOnly attribute, attempt to edit fields
      Assertions: Both fields have readOnly attribute, values don't change on input attempt, cursor doesn't activate fields
-     Requirements: ui.6.4 */
+     Requirements: account-profile.1.4 */
   test('should not allow editing profile fields', async () => {
     // Set custom user profile data for this test
     mockServer.setUserProfile({
@@ -354,7 +354,7 @@ test.describe('Account Profile', () => {
     });
 
     // Wait for profile to load - check if profile fields appear
-    // Requirements: ui.6.4 - Profile should be loaded and displayed
+    // Requirements: account-profile.1.4 - Profile should be loaded and displayed
     const nameInput = context.window.locator('#profile-name');
 
     // Wait for name input to appear (this means profile is loaded)
@@ -390,7 +390,7 @@ test.describe('Account Profile', () => {
     console.log(`[TEST] Initial values: name="${initialNameValue}", email="${initialEmailValue}"`);
 
     // Verify both fields have readOnly attribute
-    // Requirements: ui.6.4 - Fields must have readOnly attribute
+    // Requirements: account-profile.1.4 - Fields must have readOnly attribute
     const nameReadOnly = await nameInput.getAttribute('readonly');
     const emailReadOnly = await emailInput.getAttribute('readonly');
 
@@ -400,7 +400,7 @@ test.describe('Account Profile', () => {
     console.log('✓ Both fields have readOnly attribute');
 
     // Attempt to click and type in name field
-    // Requirements: ui.6.4 - Fields should not allow editing
+    // Requirements: account-profile.1.4 - Fields should not allow editing
     await nameInput.click();
     await context.window.waitForTimeout(200);
 
@@ -441,7 +441,7 @@ test.describe('Account Profile', () => {
     }
 
     // Verify values haven't changed
-    // Requirements: ui.6.4 - Values must remain unchanged
+    // Requirements: account-profile.1.4 - Values must remain unchanged
     const finalNameValue = await nameInput.inputValue();
     const finalEmailValue = await emailInput.inputValue();
 
@@ -451,7 +451,7 @@ test.describe('Account Profile', () => {
     console.log('✓ Field values remained unchanged after edit attempts');
 
     // Verify fields are not editable by checking DOM properties
-    // Requirements: ui.6.4 - Fields should not activate for editing
+    // Requirements: account-profile.1.4 - Fields should not activate for editing
     const nameIsEditable = await nameInput.evaluate((el: HTMLInputElement) => {
       return !el.readOnly && !el.disabled;
     });
@@ -476,7 +476,7 @@ test.describe('Account Profile', () => {
   /* Preconditions: Application running with authentication, initial profile data (name: "John Doe", email: "john@example.com")
      Action: Update mock UserInfo API to return new data, trigger manual refresh via IPC, wait for UI update
      Assertions: Account block displays updated data (name: "Jane Smith", email: "jane@example.com")
-     Requirements: ui.6.5 */
+     Requirements: account-profile.1.5 */
   test('should update profile data when changed in Google', async () => {
     // Set initial user profile data
     mockServer.setUserProfile({
@@ -535,7 +535,7 @@ test.describe('Account Profile', () => {
     await emailInput.waitFor({ state: 'visible', timeout: 5000 });
 
     // Verify initial profile data
-    // Requirements: ui.6.5 - Check initial state before update
+    // Requirements: account-profile.1.5 - Check initial state before update
     const initialNameValue = await nameInput.inputValue();
     const initialEmailValue = await emailInput.inputValue();
 
@@ -552,7 +552,7 @@ test.describe('Account Profile', () => {
     });
 
     // Update mock UserInfo API to return new profile data
-    // Requirements: ui.6.5 - Simulate profile change in Google
+    // Requirements: account-profile.1.5 - Simulate profile change in Google
     mockServer.setUserProfile({
       id: '111222333', // Same ID
       email: 'john@example.com', // Same email (email is primary key, cannot change)
@@ -564,7 +564,7 @@ test.describe('Account Profile', () => {
     console.log('[TEST] Mock UserInfo API updated with new profile data');
 
     // Trigger manual profile refresh via IPC (Variant B)
-    // Requirements: ui.6.5 - Manual refresh to trigger profile update
+    // Requirements: account-profile.1.5 - Manual refresh to trigger profile update
     const refreshResult = await context.window.evaluate(async () => {
       return await (window as any).electron.ipcRenderer.invoke('auth:refresh-profile');
     });
@@ -572,18 +572,18 @@ test.describe('Account Profile', () => {
     console.log('[TEST] Profile refresh triggered, result:', refreshResult);
 
     // Wait for UI to update (profile fetch + UI render)
-    // Requirements: ui.6.5 - Allow time for profile update to propagate to UI
+    // Requirements: account-profile.1.5 - Allow time for profile update to propagate to UI
     await context.window.waitForTimeout(2000);
 
     // Verify updated profile data
-    // Requirements: ui.6.5 - Profile should be updated in UI
+    // Requirements: account-profile.1.5 - Profile should be updated in UI
     const updatedNameValue = await nameInput.inputValue();
     const updatedEmailValue = await emailInput.inputValue();
 
     console.log(`[TEST] Updated profile: name="${updatedNameValue}", email="${updatedEmailValue}"`);
 
     // Check that name has changed to new value
-    // Requirements: ui.6.5 - Verify profile update
+    // Requirements: account-profile.1.5 - Verify profile update
     expect(updatedNameValue).toBe('Jane Smith');
     expect(updatedEmailValue).toBe('john@example.com'); // Email stays the same
 
@@ -605,11 +605,11 @@ test.describe('Account Profile', () => {
   /* Preconditions: Application running with authentication, profile data loaded and displayed
      Action: Verify profile is displayed, save values, execute logout via IPC, wait for completion
      Assertions: Account block cleared, "Not signed in" displayed, profile fields removed, data deleted from database
-     Requirements: ui.6.8 */
+     Requirements: account-profile.1.8 */
   /* Preconditions: Application not running, clean database, mock OAuth server running
      Action: Complete OAuth flow, verify Dashboard is shown immediately (not loading screen), check UserInfo API was called, verify profile saved to database
      Assertions: Dashboard shown immediately after auth (not loading screen), UserInfo API request made in background, profile data saved to database
-     Requirements: ui.6.3, ui.8.3 */
+     Requirements: account-profile.1.3, navigation.1.3 */
   test('should load profile in background after authentication', async () => {
     // Set custom user profile data for this test
     mockServer.setUserProfile({
@@ -639,7 +639,7 @@ test.describe('Account Profile', () => {
     // Wait a short moment for navigation to occur
     await context.window.waitForTimeout(500);
 
-    // Requirements: ui.8.3 - After successful authentication, user should see Dashboard
+    // Requirements: navigation.1.3 - After successful authentication, user should see Dashboard
     // NOT a loading screen or login screen
     const loginButton = context.window.locator('text=/continue with google/i');
     const hasLoginScreen = await loginButton.isVisible().catch(() => false);
@@ -656,7 +656,7 @@ test.describe('Account Profile', () => {
 
     // Verify Dashboard is shown
     // Look for Dashboard-specific elements (tasks, calendar, etc.)
-    // Requirements: ui.8.3 - Dashboard should be shown immediately
+    // Requirements: navigation.1.3 - Dashboard should be shown immediately
     const dashboardElement = context.window.locator('text=/Dashboard|Tasks|Calendar/i').first();
     await dashboardElement.waitFor({ state: 'visible', timeout: 5000 });
     expect(await dashboardElement.isVisible()).toBe(true);
@@ -669,11 +669,11 @@ test.describe('Account Profile', () => {
     });
 
     // Wait for profile to be fetched in background
-    // Requirements: ui.6.3 - Profile should be loaded in background
+    // Requirements: account-profile.1.3 - Profile should be loaded in background
     await context.window.waitForTimeout(2000);
 
     // Verify UserInfo API request was made in background
-    // Requirements: ui.6.3 - System should automatically fetch profile from Google UserInfo API
+    // Requirements: account-profile.1.3 - System should automatically fetch profile from Google UserInfo API
     // Check if profile is now in database (indicates API was called)
     const profileCheck = await context.window.evaluate(async () => {
       return await (window as any).electron.ipcRenderer.invoke('test:get-profile');
@@ -684,7 +684,7 @@ test.describe('Account Profile', () => {
       console.log('[TEST] Profile data:', profileCheck.profile);
     }
 
-    // Requirements: ui.6.3 - Profile data should be saved to database
+    // Requirements: account-profile.1.3 - Profile data should be saved to database
     expect(profileCheck.profile).not.toBeNull();
     expect(profileCheck.profile.email).toBe('background.test@example.com');
     expect(profileCheck.profile.name).toBe('Background Test User');
@@ -730,7 +730,7 @@ test.describe('Account Profile', () => {
   /* Preconditions: Application not running, database with pre-saved profile data, mock OAuth server running
      Action: Pre-populate database with cached profile, launch app, authenticate, navigate to Account block, verify cached data shown, wait for API load, verify data updated
      Assertions: Cached profile data (from previous session) displayed immediately, after API completes data updates to new values from API
-     Requirements: ui.6.1
+     Requirements: account-profile.1.1
      Property: 11 */
   test('should show cached data while loading profile', async () => {
     // Set initial cached profile data (from "previous session")
@@ -768,7 +768,7 @@ test.describe('Account Profile', () => {
     await context.window.waitForLoadState('domcontentloaded');
 
     // Pre-populate database with cached profile data (simulating previous session)
-    // Requirements: ui.6.1 - Profile data should be displayed from cache while loading
+    // Requirements: account-profile.1.1 - Profile data should be displayed from cache while loading
     console.log('[TEST] Pre-populating database with cached profile...');
     await context.window.evaluate(async (profile) => {
       await (window as any).electron.ipcRenderer.invoke('test:setup-profile', profile);
@@ -820,7 +820,7 @@ test.describe('Account Profile', () => {
     console.log('[TEST] Account heading found');
 
     // Wait for profile fields to appear
-    // Requirements: ui.6.1 - Profile fields should show cached data immediately
+    // Requirements: account-profile.1.1 - Profile fields should show cached data immediately
     const nameInput = context.window.locator('#profile-name');
     const emailInput = context.window.locator('#profile-email');
 
@@ -829,7 +829,7 @@ test.describe('Account Profile', () => {
     await emailInput.waitFor({ state: 'visible', timeout: 5000 });
 
     // Get initial values (should be cached data from previous session OR updated data if API was fast)
-    // Requirements: ui.6.1, Property 11 - Cached data should be displayed while loading
+    // Requirements: account-profile.1.1, Property 11 - Cached data should be displayed while loading
     const initialNameValue = await nameInput.inputValue();
     const initialEmailValue = await emailInput.inputValue();
 
@@ -854,7 +854,7 @@ test.describe('Account Profile', () => {
     });
 
     // Wait for API request to complete and UI to update (if not already updated)
-    // Requirements: ui.6.1, Property 11 - After API completes, data should update
+    // Requirements: account-profile.1.1, Property 11 - After API completes, data should update
     console.log('[TEST] Waiting for API to complete and UI to update...');
     await context.window.waitForTimeout(3000);
 
@@ -867,7 +867,7 @@ test.describe('Account Profile', () => {
     );
 
     // Verify data matches API response
-    // Requirements: ui.6.1, Property 11 - Data should match API after completion
+    // Requirements: account-profile.1.1, Property 11 - Data should match API after completion
     expect(updatedNameValue).toBe('Updated User Name');
     expect(updatedEmailValue).toBe('updated.user@example.com');
 
@@ -896,7 +896,7 @@ test.describe('Account Profile', () => {
   /* Preconditions: Application not running, clean database (no cached profile), mock OAuth server running
      Action: Launch app, authenticate, navigate to Account block, verify empty/loading state, wait for API load, verify data populated
      Assertions: Empty fields or loading indicator shown initially (first auth), after API completes fields populated with Google data
-     Requirements: ui.6.1
+     Requirements: account-profile.1.1
      Property: 11 */
   test('should show empty fields on first authentication', async () => {
     // Set user profile data that API will return
@@ -920,7 +920,7 @@ test.describe('Account Profile', () => {
     await context.window.waitForLoadState('domcontentloaded');
 
     // Verify database has NO profile data (first authentication scenario)
-    // Requirements: ui.6.1, Property 11 - First auth means no cached data
+    // Requirements: account-profile.1.1, Property 11 - First auth means no cached data
     console.log('[TEST] Verifying database has no cached profile...');
     const initialCheck = await context.window.evaluate(async () => {
       return await (window as any).electron.ipcRenderer.invoke('test:get-profile');
@@ -964,7 +964,7 @@ test.describe('Account Profile', () => {
     console.log('[TEST] Account heading found');
 
     // Check initial state - should show empty fields or loading indicator
-    // Requirements: ui.6.1, Property 11 - First auth shows empty fields while loading
+    // Requirements: account-profile.1.1, Property 11 - First auth shows empty fields while loading
     console.log('[TEST] Checking initial state (should be empty or loading)...');
 
     // Check if loading indicator is shown
@@ -1017,7 +1017,7 @@ test.describe('Account Profile', () => {
     });
 
     // Wait for API request to complete and UI to update
-    // Requirements: ui.6.1, Property 11 - After API completes, fields should be populated
+    // Requirements: account-profile.1.1, Property 11 - After API completes, fields should be populated
     console.log('[TEST] Waiting for API to complete and UI to update...');
     await context.window.waitForTimeout(3000);
 
@@ -1035,7 +1035,7 @@ test.describe('Account Profile', () => {
     );
 
     // Verify data has been populated with values from Google API
-    // Requirements: ui.6.1, Property 11 - Fields should be populated after API completes
+    // Requirements: account-profile.1.1, Property 11 - Fields should be populated after API completes
     expect(finalNameValue).toBe('First Auth User');
     expect(finalEmailValue).toBe('firstauth.test@example.com');
 
@@ -1064,11 +1064,11 @@ test.describe('Account Profile', () => {
   /* Preconditions: Application not running, clean database, mock OAuth server running with test profile data
      Action: Launch app with authentication, mock UserInfo API to return test data, navigate to Settings → Account Block, wait for load completion
      Assertions: Account Block populated with profile data (name, email match mock data), data saved to database
-     Requirements: ui.6.1, ui.6.2
+     Requirements: account-profile.1.1, account-profile.1.2
      Property: 12, 13, 15 */
   test('should populate profile data when fetch succeeds', async () => {
     // Set custom user profile data for this test
-    // Requirements: ui.6.1, ui.6.2 - Mock UserInfo API to return test data
+    // Requirements: account-profile.1.1, account-profile.1.2 - Mock UserInfo API to return test data
     mockServer.setUserProfile({
       id: '123123123',
       email: 'fetch.success@example.com',
@@ -1110,7 +1110,7 @@ test.describe('Account Profile', () => {
     }
 
     // Navigate to Settings
-    // Requirements: ui.6.1 - Account block is in Settings
+    // Requirements: account-profile.1.1 - Account block is in Settings
     const settingsNav = context.window.locator('text=/settings/i');
     console.log('[TEST] Looking for Settings button...');
     await settingsNav.waitFor({ state: 'visible', timeout: 5000 });
@@ -1125,7 +1125,7 @@ test.describe('Account Profile', () => {
     console.log('[TEST] Account heading found');
 
     // Wait for profile fields to appear
-    // Requirements: ui.6.1 - Account block should display profile fields
+    // Requirements: account-profile.1.1 - Account block should display profile fields
     const nameInput = context.window.locator('#profile-name');
     const emailInput = context.window.locator('#profile-email');
 
@@ -1141,7 +1141,7 @@ test.describe('Account Profile', () => {
     console.log(`[TEST] Profile values: name="${nameValue}", email="${emailValue}"`);
 
     // Verify profile data matches mock UserInfo API response
-    // Requirements: ui.6.1, ui.6.2 - Profile should display name and email from API
+    // Requirements: account-profile.1.1, account-profile.1.2 - Profile should display name and email from API
     // Property 12 - Successful fetch should populate profile data
     // Property 15 - Name and email fields should be displayed
     expect(nameValue).toBe('Fetch Success User');
@@ -1189,7 +1189,7 @@ test.describe('Account Profile', () => {
   /* Preconditions: Application not running, clean database, mock OAuth server running
      Action: Simulate authentication, verify loader shown during profile fetch (if visible), verify Dashboard shown after
      Assertions: Dashboard shown after authentication (loader may not be visible in fast test environment)
-     Requirements: ui.6.4
+     Requirements: account-profile.1.4
      Property: 10, 11, 12 */
   test('should show loader during synchronous profile fetch', async () => {
     // Set user profile data for this test
@@ -1228,7 +1228,7 @@ test.describe('Account Profile', () => {
     await context.window.waitForTimeout(2000);
 
     // Verify Dashboard is shown after authentication
-    // Requirements: ui.6.4, Property 12 - Dashboard should be shown after profile loaded
+    // Requirements: account-profile.1.4, Property 12 - Dashboard should be shown after profile loaded
     const dashboardElement = context.window.locator('text=/Dashboard|Tasks|Calendar/i').first();
     await dashboardElement.waitFor({ state: 'visible', timeout: 5000 });
     const hasDashboard = await dashboardElement.isVisible();
@@ -1260,7 +1260,7 @@ test.describe('Account Profile', () => {
   /* Preconditions: Application not running, clean database, mock OAuth server running
      Action: Simulate successful authentication, verify profile fetched and saved
      Assertions: Profile fetched after auth success, profile saved to database, tokens remain in storage
-     Requirements: google-oauth-auth.3.6, google-oauth-auth.3.8, ui.6.3, ui.6.4 */
+     Requirements: google-oauth-auth.3.6, google-oauth-auth.3.8, account-profile.1.3, account-profile.1.4 */
   test('should synchronously fetch profile during authorization (success)', async () => {
     // Set user profile data for this test
     mockServer.setUserProfile({
@@ -1316,7 +1316,7 @@ test.describe('Account Profile', () => {
     console.log('✓ Tokens saved in storage');
 
     // Verify profile is saved to database
-    // Requirements: google-oauth-auth.3.8, ui.6.3 - Profile should be saved
+    // Requirements: google-oauth-auth.3.8, account-profile.1.3 - Profile should be saved
     const profileCheck = await context.window.evaluate(async () => {
       return await (window as any).electron.ipcRenderer.invoke('test:get-profile');
     });
@@ -1326,7 +1326,7 @@ test.describe('Account Profile', () => {
 
     if (profileCheck.profile) {
       // Verify profile data
-      // Requirements: google-oauth-auth.3.8, ui.6.3
+      // Requirements: google-oauth-auth.3.8, account-profile.1.3
       expect(profileCheck.profile.id).toBe('111222333444');
       expect(profileCheck.profile.email).toBe('sync.success@example.com');
       expect(profileCheck.profile.name).toBe('Sync Success User');
@@ -1348,7 +1348,7 @@ test.describe('Account Profile', () => {
   /* Preconditions: Application not running, clean database, mock OAuth server configured to return error
      Action: Simulate authentication with profile fetch error, verify tokens cleared
      Assertions: Profile fetch fails, tokens cleared from storage, profile NOT saved
-     Requirements: google-oauth-auth.3.7, ui.6.4, ui.6.5 */
+     Requirements: google-oauth-auth.3.7, account-profile.1.4, account-profile.1.5 */
   test('should synchronously fetch profile during authorization (error)', async () => {
     // Configure mock server to return error for UserInfo API
     // Requirements: google-oauth-auth.3.7 - Test error handling
@@ -1406,7 +1406,7 @@ test.describe('Account Profile', () => {
     await context.window.waitForTimeout(2000);
 
     // Verify tokens are cleared after profile fetch error
-    // Requirements: google-oauth-auth.3.7, ui.6.5 - Tokens should be cleared on error
+    // Requirements: google-oauth-auth.3.7, account-profile.1.5 - Tokens should be cleared on error
     // Check directly through app context (not through IPC which requires email)
     const tokensCleared = await context.app.evaluate(async () => {
       const { tokenStorage } = (global as any).testContext || {};
@@ -1455,11 +1455,11 @@ test.describe('Account Profile', () => {
   /* Preconditions: Application not running, clean database, mock OAuth server configured to return error
      Action: Simulate authentication with profile fetch error, verify LoginError shown
      Assertions: LoginError shown with error message, tokens cleared, "Continue with Google" button available
-     Requirements: google-oauth-auth.3.7, ui.6.4, ui.6.5
+     Requirements: google-oauth-auth.3.7, account-profile.1.4, account-profile.1.5
      Property: 13 */
   test('should show LoginError when profile fetch fails', async () => {
     // Configure mock server to return error for UserInfo API
-    // Requirements: google-oauth-auth.3.7, ui.6.4 - Test LoginError display
+    // Requirements: google-oauth-auth.3.7, account-profile.1.4 - Test LoginError display
     mockServer.setUserInfoError(500, 'Internal Server Error');
     console.log('[TEST] Mock server configured to return 500 error for UserInfo API');
 
@@ -1517,7 +1517,7 @@ test.describe('Account Profile', () => {
     await context.window.waitForTimeout(2000);
 
     // Verify LoginError is shown
-    // Requirements: google-oauth-auth.3.7, ui.6.4, Property 13
+    // Requirements: google-oauth-auth.3.7, account-profile.1.4, Property 13
     const loginErrorMessage = context.window.locator(
       'text=/Failed to load your profile|profile.*failed|error/i'
     );
@@ -1530,7 +1530,7 @@ test.describe('Account Profile', () => {
     // The important part is that tokens are cleared and user can retry
 
     // Verify "Continue with Google" button is available
-    // Requirements: ui.6.5 - User should be able to retry
+    // Requirements: account-profile.1.5 - User should be able to retry
     const retryButton = context.window.locator('text=/continue with google/i');
     const hasRetryButton = await retryButton.isVisible();
 
@@ -1545,7 +1545,7 @@ test.describe('Account Profile', () => {
     });
 
     // Verify tokens are cleared
-    // Requirements: google-oauth-auth.3.7, ui.6.5
+    // Requirements: google-oauth-auth.3.7, account-profile.1.5
     // Check directly through app context (not through IPC which requires email)
     const tokensCleared = await context.app.evaluate(async () => {
       const { tokenStorage } = (global as any).testContext || {};
@@ -1586,7 +1586,7 @@ test.describe('Account Profile', () => {
   /* Preconditions: Application running with pre-saved profile data in database, mock OAuth server configured to return error
      Action: Launch app with cached profile, authenticate, mock UserInfo API to return 500 error, navigate to Settings → Account Block
      Assertions: Error message displayed, cached profile data still shown (name, email from previous session), data NOT cleared from database
-     Requirements: ui.6.1
+     Requirements: account-profile.1.1
      Property: 14 */
   test('should show error and keep cached data when fetch fails', async () => {
     // Set cached profile data (from "previous session")
@@ -1632,13 +1632,13 @@ test.describe('Account Profile', () => {
     expect(cachedCheck.profile).not.toBeNull();
 
     // Now configure mock server to return error for subsequent profile fetches
-    // Requirements: ui.6.1 - Test error handling when fetch fails
+    // Requirements: account-profile.1.1 - Test error handling when fetch fails
     // Property 14 - Error should not clear cached data
     mockServer.setUserInfoError(500, 'Internal Server Error');
     console.log('[TEST] Mock server configured to return 500 error for UserInfo API');
 
     // Trigger manual profile refresh (this will fail)
-    // Requirements: ui.6.1, Property 14 - Fetch fails, cached data should be preserved
+    // Requirements: account-profile.1.1, Property 14 - Fetch fails, cached data should be preserved
     const refreshResult = await context.window.evaluate(async () => {
       return await (window as any).electron.ipcRenderer.invoke('auth:refresh-profile');
     });
@@ -1675,7 +1675,7 @@ test.describe('Account Profile', () => {
     console.log('[TEST] Account heading found');
 
     // Check if error message is displayed
-    // Requirements: ui.6.1, Property 14 - Error should be shown when fetch fails
+    // Requirements: account-profile.1.1, Property 14 - Error should be shown when fetch fails
     const errorElement = context.window.locator('.account-error');
     console.log('[TEST] Looking for error message...');
 
@@ -1695,7 +1695,7 @@ test.describe('Account Profile', () => {
     }
 
     // Verify cached profile data is still displayed
-    // Requirements: ui.6.1, Property 14 - Cached data should remain when fetch fails
+    // Requirements: account-profile.1.1, Property 14 - Cached data should remain when fetch fails
     const nameInput = context.window.locator('#profile-name');
     const emailInput = context.window.locator('#profile-email');
 
@@ -1710,7 +1710,7 @@ test.describe('Account Profile', () => {
     console.log(`[TEST] Displayed profile: name="${displayedName}", email="${displayedEmail}"`);
 
     // Verify cached data is still shown (not cleared)
-    // Requirements: ui.6.1, Property 14 - Cached profile data should be preserved
+    // Requirements: account-profile.1.1, Property 14 - Cached profile data should be preserved
     expect(displayedName).toBe('Cached Error User');
     expect(displayedEmail).toBe('cached.error@example.com');
 
@@ -1722,7 +1722,7 @@ test.describe('Account Profile', () => {
     });
 
     // Verify data is NOT cleared from database
-    // Requirements: ui.6.1, Property 14 - Database should still contain cached profile
+    // Requirements: account-profile.1.1, Property 14 - Database should still contain cached profile
     const finalCheck = await context.window.evaluate(async () => {
       return await (window as any).electron.ipcRenderer.invoke('test:get-profile');
     });
@@ -1755,7 +1755,7 @@ test.describe('Account Profile', () => {
   /* Preconditions: Application running with authentication, profile data loaded and displayed
      Action: Verify profile is displayed, save values, execute logout via IPC, wait for completion
      Assertions: Login screen is shown, profile data PRESERVED in database (not deleted)
-     Requirements: ui.8.4, google-oauth-auth.14 */
+     Requirements: navigation.1.4, google-oauth-auth.14 */
   test('should preserve profile data on logout', async () => {
     // Set user profile data for this test
     mockServer.setUserProfile({
@@ -1807,7 +1807,7 @@ test.describe('Account Profile', () => {
     await accountHeading.waitFor({ state: 'visible', timeout: 5000 });
 
     // Wait for profile fields to appear
-    // Requirements: ui.6.8 - Verify profile is displayed before logout
+    // Requirements: account-profile.1.8 - Verify profile is displayed before logout
     const nameInput = context.window.locator('#profile-name');
     const emailInput = context.window.locator('#profile-email');
 
@@ -1815,7 +1815,7 @@ test.describe('Account Profile', () => {
     await emailInput.waitFor({ state: 'visible', timeout: 5000 });
 
     // Save displayed values for verification
-    // Requirements: ui.6.8 - Check that profile data is present before logout
+    // Requirements: account-profile.1.8 - Check that profile data is present before logout
     const displayedName = await nameInput.inputValue();
     const displayedEmail = await emailInput.inputValue();
 
@@ -1832,7 +1832,7 @@ test.describe('Account Profile', () => {
     });
 
     // Execute logout via IPC call (more reliable for testing)
-    // Requirements: ui.6.8 - Perform logout operation
+    // Requirements: account-profile.1.8 - Perform logout operation
     console.log('[TEST] Executing logout...');
 
     const logoutResult = await context.window.evaluate(async () => {
@@ -1843,11 +1843,11 @@ test.describe('Account Profile', () => {
     expect(logoutResult.success).toBe(true);
 
     // Wait for logout to complete and UI to update
-    // Requirements: ui.6.8 - Allow time for logout operation to complete
+    // Requirements: account-profile.1.8 - Allow time for logout operation to complete
     await context.window.waitForTimeout(2000);
 
     // Verify login screen is shown after logout
-    // Requirements: ui.6.1, ui.6.8 - After logout, user should see login screen
+    // Requirements: account-profile.1.1, account-profile.1.8 - After logout, user should see login screen
     const loginButtonAfterLogout = context.window.locator('text=/continue with google/i');
     await loginButtonAfterLogout.waitFor({ state: 'visible', timeout: 5000 });
     expect(await loginButtonAfterLogout.isVisible()).toBe(true);
@@ -1860,7 +1860,7 @@ test.describe('Account Profile', () => {
     });
 
     // Verify data is PRESERVED in database (not deleted)
-    // Requirements: ui.8.4 - Profile data should be preserved after logout
+    // Requirements: navigation.1.4 - Profile data should be preserved after logout
     const profileCheck = await context.window.evaluate(async () => {
       return await (window as any).electron.ipcRenderer.invoke(
         'test:get-profile-by-email',
@@ -1871,7 +1871,7 @@ test.describe('Account Profile', () => {
     console.log('[TEST] Profile in database after logout:', profileCheck.profile ? 'YES' : 'NO');
 
     // Profile should still exist after logout (only tokens are cleared)
-    // Requirements: ui.8.4, Architectural Principles
+    // Requirements: navigation.1.4, Architectural Principles
     expect(profileCheck.profile).not.toBeNull();
     expect(profileCheck.profile.email).toBe('logout.test@example.com');
     expect(profileCheck.profile.name).toBe('Logout Test User');
@@ -1885,7 +1885,7 @@ test.describe('Account Profile', () => {
   /* Preconditions: Application running with authentication, Account block displayed with profile data
      Action: Navigate to Account block, verify profile displayed, execute logout, verify UI cleared and login screen shown
      Assertions: Login screen shown, UI cleared (Account component shows empty state), tokens deleted, profile data PRESERVED in database
-     Requirements: ui.8.4, google-oauth-auth.14
+     Requirements: navigation.1.4, google-oauth-auth.14
      Property: 19, 27 */
   test('should show login screen and clear UI on logout', async () => {
     // Set user profile data for this test
@@ -1938,7 +1938,7 @@ test.describe('Account Profile', () => {
     await accountHeading.waitFor({ state: 'visible', timeout: 5000 });
 
     // Wait for profile fields to appear
-    // Requirements: ui.8.4, Property 19 - Verify profile is displayed before logout
+    // Requirements: navigation.1.4, Property 19 - Verify profile is displayed before logout
     const nameInput = context.window.locator('#profile-name');
     const emailInput = context.window.locator('#profile-email');
 
@@ -1962,7 +1962,7 @@ test.describe('Account Profile', () => {
     });
 
     // Execute logout via IPC call
-    // Requirements: ui.8.4, Property 27 - Perform logout operation
+    // Requirements: navigation.1.4, Property 27 - Perform logout operation
     console.log('[TEST] Executing logout...');
 
     const logoutResult = await context.window.evaluate(async () => {
@@ -1976,7 +1976,7 @@ test.describe('Account Profile', () => {
     await context.window.waitForTimeout(2000);
 
     // Verify login screen is shown after logout
-    // Requirements: ui.8.4, Property 27 - After logout, user should see login screen
+    // Requirements: navigation.1.4, Property 27 - After logout, user should see login screen
     const loginButtonAfterLogout = context.window.locator('text=/continue with google/i');
     await loginButtonAfterLogout.waitFor({ state: 'visible', timeout: 5000 });
     expect(await loginButtonAfterLogout.isVisible()).toBe(true);
@@ -1989,7 +1989,7 @@ test.describe('Account Profile', () => {
     });
 
     // Verify tokens are cleared
-    // Requirements: ui.8.4, Property 19 - UI should be cleared after logout
+    // Requirements: navigation.1.4, Property 19 - UI should be cleared after logout
     // Note: We can't navigate to Settings without authentication, so we verify tokens are cleared
     // Check directly through app context (not through IPC which was removed)
     const tokensCheck = await context.app.evaluate(async () => {
@@ -2010,13 +2010,13 @@ test.describe('Account Profile', () => {
     console.log('[TEST] Tokens in storage after logout:', tokensCheck.hasTokens ? 'YES' : 'NO');
 
     // Tokens should be cleared after logout
-    // Requirements: ui.8.4, google-oauth-auth.14 - Tokens must be cleared
+    // Requirements: navigation.1.4, google-oauth-auth.14 - Tokens must be cleared
     expect(tokensCheck.hasTokens).toBe(false);
 
     console.log('✓ Tokens deleted from storage');
 
     // Verify profile data is PRESERVED in database (not deleted)
-    // Requirements: ui.8.4, Architectural Principles - Profile data should be preserved
+    // Requirements: navigation.1.4, Architectural Principles - Profile data should be preserved
     const profileCheck = await context.window.evaluate(async () => {
       return await (window as any).electron.ipcRenderer.invoke(
         'test:get-profile-by-email',
@@ -2027,7 +2027,7 @@ test.describe('Account Profile', () => {
     console.log('[TEST] Profile in database after logout:', profileCheck.profile ? 'YES' : 'NO');
 
     // Profile should still exist after logout (only tokens are cleared)
-    // Requirements: ui.8.4, Property 19 - Profile data preserved for next login
+    // Requirements: navigation.1.4, Property 19 - Profile data preserved for next login
     expect(profileCheck.profile).not.toBeNull();
     expect(profileCheck.profile.email).toBe('logout.ui.test@example.com');
     expect(profileCheck.profile.name).toBe('Logout UI Test User');

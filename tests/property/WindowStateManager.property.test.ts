@@ -1,4 +1,4 @@
-// Requirements: ui.4.1, ui.4.3
+// Requirements: window-management.4.1, window-management.4.3
 
 import * as fc from 'fast-check';
 import { WindowStateManager } from '../../src/main/WindowStateManager';
@@ -72,7 +72,7 @@ describe('Property Tests - WindowStateManager', () => {
   /* Preconditions: screen API returns various screen sizes
      Action: call getDefaultState() with different screen sizes
      Assertions: returned dimensions are proportional to screen size, not hardcoded
-     Requirements: ui.4.1, ui.4.3 */
+     Requirements: window-management.4.1, window-management.4.3 */
   // Feature: ui, Property 5: Размер окна основан на размере экрана
   test('Property 5: Default State Screen Adaptation - window size is based on screen size, not hardcoded', async () => {
     await fc.assert(
@@ -115,7 +115,7 @@ describe('Property Tests - WindowStateManager', () => {
             expect(state.height).toBe(screenSize.height);
           }
 
-          // Verify default state is NOT maximized (ui.1.1)
+          // Verify default state is NOT maximized (window-management.1.1)
           expect(state.isMaximized).toBe(false);
         }
       ),
@@ -126,7 +126,7 @@ describe('Property Tests - WindowStateManager', () => {
   /* Preconditions: small screen size (800x600)
      Action: call getDefaultState()
      Assertions: window adapts to small screen, does not exceed bounds
-     Requirements: ui.4.1, ui.4.3 */
+     Requirements: window-management.4.1, window-management.4.3 */
   // Feature: ui, Property 5
   test('Property 5 edge case: small screen adaptation', () => {
     const smallScreen = { width: 800, height: 600 };
@@ -149,7 +149,7 @@ describe('Property Tests - WindowStateManager', () => {
   /* Preconditions: large 4K screen size (3840x2160)
      Action: call getDefaultState()
      Assertions: window adapts to large screen, dimensions are proportional
-     Requirements: ui.4.1, ui.4.3 */
+     Requirements: window-management.4.1, window-management.4.3 */
   // Feature: ui, Property 5
   test('Property 5 edge case: large 4K screen adaptation', () => {
     const largeScreen = { width: 3840, height: 2160 };
@@ -172,7 +172,7 @@ describe('Property Tests - WindowStateManager', () => {
   /* Preconditions: ultrawide screen size (2560x1080)
      Action: call getDefaultState()
      Assertions: window adapts to ultrawide aspect ratio
-     Requirements: ui.4.1, ui.4.3 */
+     Requirements: window-management.4.1, window-management.4.3 */
   // Feature: ui, Property 5
   test('Property 5 edge case: ultrawide screen adaptation', () => {
     const ultrawideScreen = { width: 2560, height: 1080 };
@@ -195,7 +195,7 @@ describe('Property Tests - WindowStateManager', () => {
   /* Preconditions: portrait orientation screen (1080x1920)
      Action: call getDefaultState()
      Assertions: window adapts to portrait orientation
-     Requirements: ui.4.1, ui.4.3 */
+     Requirements: window-management.4.1, window-management.4.3 */
   // Feature: ui, Property 5
   test('Property 5 edge case: portrait orientation adaptation', () => {
     const portraitScreen = { width: 1080, height: 1920 };
@@ -218,7 +218,7 @@ describe('Property Tests - WindowStateManager', () => {
   /* Preconditions: minimum viable screen size (800x600)
      Action: call getDefaultState()
      Assertions: window dimensions are positive and within bounds
-     Requirements: ui.4.1, ui.4.3 */
+     Requirements: window-management.4.1, window-management.4.3 */
   // Feature: ui, Property 5
   test('Property 5 edge case: minimum screen size boundary', () => {
     const minScreen = { width: 800, height: 600 };
@@ -245,7 +245,7 @@ describe('Property Tests - WindowStateManager', () => {
   /* Preconditions: maximum screen size (3840x2160)
      Action: call getDefaultState()
      Assertions: window dimensions are positive and within bounds
-     Requirements: ui.4.1, ui.4.3 */
+     Requirements: window-management.4.1, window-management.4.3 */
   // Feature: ui, Property 5
   test('Property 5 edge case: maximum screen size boundary', () => {
     const maxScreen = { width: 3840, height: 2160 };
@@ -272,7 +272,7 @@ describe('Property Tests - WindowStateManager', () => {
   /* Preconditions: various common screen resolutions
      Action: call getDefaultState() for each resolution
      Assertions: dimensions are never hardcoded, always proportional
-     Requirements: ui.4.1, ui.4.3 */
+     Requirements: window-management.4.1, window-management.4.3 */
   // Feature: ui, Property 5
   test('Property 5 edge case: common screen resolutions', () => {
     const commonResolutions = [
@@ -313,7 +313,7 @@ describe('Property Tests - WindowStateManager', () => {
   /* Preconditions: screen size with odd dimensions
      Action: call getDefaultState()
      Assertions: Math.floor correctly handles fractional calculations
-     Requirements: ui.4.1, ui.4.3 */
+     Requirements: window-management.4.1, window-management.4.3 */
   // Feature: ui, Property 5
   test('Property 5 edge case: odd screen dimensions', () => {
     const oddScreen = { width: 1367, height: 769 };
@@ -342,7 +342,7 @@ describe('Property Tests - WindowStateManager', () => {
   /* Preconditions: multiple calls with same screen size
      Action: call getDefaultState() multiple times
      Assertions: returns consistent results (deterministic)
-     Requirements: ui.4.1, ui.4.3 */
+     Requirements: window-management.4.1, window-management.4.3 */
   // Feature: ui, Property 5
   test('Property 5 edge case: consistent results for same screen size', () => {
     const screenSize = { width: 1920, height: 1080 };
@@ -366,7 +366,7 @@ describe('Property Tests - WindowStateManager', () => {
   /* Preconditions: screen size changes between calls
      Action: call getDefaultState() with different screen sizes
      Assertions: each call returns dimensions based on current screen size
-     Requirements: ui.4.1, ui.4.3 */
+     Requirements: window-management.4.1, window-management.4.3 */
   // Feature: ui, Property 5
   test('Property 5 edge case: adapts to screen size changes', () => {
     // First screen size
@@ -397,7 +397,7 @@ describe('Property Tests - WindowStateManager', () => {
   /* Preconditions: valid window state with various values
      Action: save state then load state
      Assertions: loaded state equals saved state (for valid positions)
-     Requirements: ui.5.4 */
+     Requirements: window-management.5.4 */
   // Feature: ui, Property 7: Round-trip сохранения и загрузки состояния
   test('Property 7: State Persistence Round-trip - state is preserved through save/load cycle', async () => {
     await fc.assert(
@@ -457,7 +457,7 @@ describe('Property Tests - WindowStateManager', () => {
   /* Preconditions: state with position outside screen bounds
      Action: save state then load state
      Assertions: loaded state is default state (invalid position rejected)
-     Requirements: ui.5.4, ui.5.6 */
+     Requirements: window-management.5.4, window-management.5.6 */
   // Feature: ui, Property 7
   test('Property 7 edge case: invalid position returns default state', () => {
     const invalidState = {
@@ -501,7 +501,7 @@ describe('Property Tests - WindowStateManager', () => {
   /* Preconditions: state with negative coordinates
      Action: save state then load state
      Assertions: handles negative coordinates correctly (multi-monitor setup)
-     Requirements: ui.5.4 */
+     Requirements: window-management.5.4 */
   // Feature: ui, Property 7
   test('Property 7 edge case: negative coordinates for multi-monitor setup', () => {
     const stateWithNegativeCoords = {
@@ -542,7 +542,7 @@ describe('Property Tests - WindowStateManager', () => {
   /* Preconditions: state with boundary coordinates
      Action: save state then load state
      Assertions: boundary coordinates are preserved correctly
-     Requirements: ui.5.4 */
+     Requirements: window-management.5.4 */
   // Feature: ui, Property 7
   test('Property 7 edge case: boundary coordinates', () => {
     const boundaryState = {
@@ -583,7 +583,7 @@ describe('Property Tests - WindowStateManager', () => {
   /* Preconditions: state with maximum dimensions
      Action: save state then load state
      Assertions: large dimensions are preserved correctly
-     Requirements: ui.5.4 */
+     Requirements: window-management.5.4 */
   // Feature: ui, Property 7
   test('Property 7 edge case: maximum dimensions', () => {
     const maxState = {
@@ -622,7 +622,7 @@ describe('Property Tests - WindowStateManager', () => {
   /* Preconditions: multiple save/load cycles
      Action: save, load, save again, load again
      Assertions: state remains consistent across multiple cycles
-     Requirements: ui.5.4 */
+     Requirements: window-management.5.4 */
   // Feature: ui, Property 7
   test('Property 7 edge case: multiple save/load cycles', () => {
     const originalState = {
@@ -671,7 +671,7 @@ describe('Property Tests - WindowStateManager', () => {
   /* Preconditions: state with isMaximized true and false
      Action: save and load both states
      Assertions: isMaximized flag is preserved correctly
-     Requirements: ui.5.4 */
+     Requirements: window-management.5.4 */
   // Feature: ui, Property 7
   test('Property 7 edge case: isMaximized flag preservation', () => {
     const maximizedState = {
@@ -719,7 +719,7 @@ describe('Property Tests - WindowStateManager', () => {
   /* Preconditions: corrupted JSON data in storage
      Action: attempt to load corrupted state
      Assertions: returns default state gracefully
-     Requirements: ui.5.4, ui.5.5 */
+     Requirements: window-management.5.4, window-management.5.5 */
   // Feature: ui, Property 7
   test('Property 7 edge case: corrupted data returns default state', () => {
     // Mock corrupted JSON
@@ -744,7 +744,7 @@ describe('Property Tests - WindowStateManager', () => {
   /* Preconditions: empty data in storage
      Action: attempt to load empty state
      Assertions: returns default state
-     Requirements: ui.5.4, ui.5.5 */
+     Requirements: window-management.5.4, window-management.5.5 */
   // Feature: ui, Property 7
   test('Property 7 edge case: empty data returns default state', () => {
     // Mock empty data
@@ -769,7 +769,7 @@ describe('Property Tests - WindowStateManager', () => {
   /* Preconditions: loadData returns success: false
      Action: attempt to load state
      Assertions: returns default state
-     Requirements: ui.5.4, ui.5.5 */
+     Requirements: window-management.5.4, window-management.5.5 */
   // Feature: ui, Property 7
   test('Property 7 edge case: failed load returns default state', () => {
     // Mock failed load
@@ -829,7 +829,7 @@ describe('Property Tests - WindowManager State Changes', () => {
   /* Preconditions: window created with various initial states
      Action: trigger resize/move/maximize events
      Assertions: DataManager.saveData called with updated state
-     Requirements: ui.5.1, ui.5.2, ui.5.3 */
+     Requirements: window-management.5.1, window-management.5.2, window-management.5.3 */
   // Feature: ui, Property 6: Изменения состояния окна сохраняются
   test('Property 6: Window State Persistence - state is saved on any window state change', async () => {
     // Import WindowManager here to use the mocked electron
@@ -947,7 +947,7 @@ describe('Property Tests - WindowManager State Changes', () => {
   /* Preconditions: window created, bounds change
      Action: trigger resize event
      Assertions: saveData called with updated bounds
-     Requirements: ui.5.1 */
+     Requirements: window-management.5.1 */
   // Feature: ui, Property 6
   test('Property 6 edge case: resize event saves updated bounds', () => {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -998,7 +998,7 @@ describe('Property Tests - WindowManager State Changes', () => {
   /* Preconditions: window created, position changes
      Action: trigger move event
      Assertions: saveData called with updated position
-     Requirements: ui.5.2 */
+     Requirements: window-management.5.2 */
   // Feature: ui, Property 6
   test('Property 6 edge case: move event saves updated position', () => {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -1049,7 +1049,7 @@ describe('Property Tests - WindowManager State Changes', () => {
   /* Preconditions: window created, window maximized
      Action: trigger maximize event
      Assertions: saveData called with isMaximized: true
-     Requirements: ui.5.3 */
+     Requirements: window-management.5.3 */
   // Feature: ui, Property 6
   test('Property 6 edge case: maximize event saves maximized state', () => {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -1098,7 +1098,7 @@ describe('Property Tests - WindowManager State Changes', () => {
   /* Preconditions: window created and maximized, window unmaximized
      Action: trigger unmaximize event
      Assertions: saveData called with isMaximized: false
-     Requirements: ui.5.3 */
+     Requirements: window-management.5.3 */
   // Feature: ui, Property 6
   test('Property 6 edge case: unmaximize event saves normal state', () => {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -1147,7 +1147,7 @@ describe('Property Tests - WindowManager State Changes', () => {
   /* Preconditions: window created, multiple state changes occur
      Action: trigger multiple events in sequence
      Assertions: saveData called for each event with correct state
-     Requirements: ui.5.1, ui.5.2, ui.5.3 */
+     Requirements: window-management.5.1, window-management.5.2, window-management.5.3 */
   // Feature: ui, Property 6
   test('Property 6 edge case: multiple state changes save correctly', () => {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -1194,7 +1194,7 @@ describe('Property Tests - WindowManager State Changes', () => {
   /* Preconditions: window created, window closed
      Action: trigger close event
      Assertions: saveData called with final state
-     Requirements: ui.5.1, ui.5.2, ui.5.3 */
+     Requirements: window-management.5.1, window-management.5.2, window-management.5.3 */
   // Feature: ui, Property 6
   test('Property 6 edge case: close event saves final state', () => {
     // eslint-disable-next-line @typescript-eslint/no-var-requires

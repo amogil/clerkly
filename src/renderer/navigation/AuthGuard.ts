@@ -1,11 +1,11 @@
-// Requirements: ui.8.2
+// Requirements: navigation.1.2
 import type { NavigationManager } from './NavigationManager';
 import { Logger } from '../Logger';
 
 // Requirements: clerkly.3.8 - Use centralized Logger instead of console.*
 /**
  * AuthGuard protects routes from unauthorized access
- * Requirements: ui.8.2
+ * Requirements: navigation.1.2
  */
 export class AuthGuard {
   // Requirements: clerkly.3.5, clerkly.3.7
@@ -29,7 +29,7 @@ export class AuthGuard {
 
   /**
    * Check if route can be activated
-   * Requirements: ui.8.2
+   * Requirements: navigation.1.2
    * @param route - The route path to check (e.g., '/dashboard', '/login')
    * @returns Promise<boolean> - true if route can be accessed, false otherwise
    */

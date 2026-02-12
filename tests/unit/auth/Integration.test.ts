@@ -141,7 +141,7 @@ describe('OAuth Integration', () => {
   });
 });
 
-// Requirements: ui.6.2, ui.6.5, ui.6.6, ui.6.7
+// Requirements: account-profile.1.2, account-profile.1.5, account-profile.1.6, account-profile.1.7
 
 /**
  * Integration tests for profile functionality
@@ -243,7 +243,7 @@ describe('Profile Integration', () => {
   /* Preconditions: real OAuthClientManager and UserProfileManager, mocked Google APIs
      Action: perform OAuth login, wait for profile fetch
      Assertions: profile automatically loaded, data saved to DataManager
-     Requirements: ui.6.2, ui.6.6 */
+     Requirements: account-profile.1.2, account-profile.1.6 */
   it('should load profile after OAuth login', async () => {
     // Simulate OAuth login by setting authorized status
     mockOAuthClient.getAuthStatus.mockResolvedValue({ authorized: true });
@@ -280,7 +280,7 @@ describe('Profile Integration', () => {
   /* Preconditions: expired access token, valid refresh token
      Action: trigger token refresh
      Assertions: profile automatically updated after refresh
-     Requirements: ui.6.5 */
+     Requirements: account-profile.1.5 */
   it('should update profile after token refresh', async () => {
     // Set profile manager on OAuth client
     mockOAuthClient.setProfileManager(profileManager);
@@ -317,7 +317,7 @@ describe('Profile Integration', () => {
   /* Preconditions: authenticated user, LifecycleManager initialized
      Action: call LifecycleManager.initialize()
      Assertions: profile automatically fetched on startup
-     Requirements: ui.6.5 */
+     Requirements: account-profile.1.5 */
   it('should fetch profile on app startup', async () => {
     // Set authenticated status
     mockOAuthClient.getAuthStatus.mockResolvedValue({ authorized: true });
@@ -357,7 +357,7 @@ describe('Profile Integration', () => {
   /* Preconditions: cached profile in DataManager, Google API returns error
      Action: call fetchProfile()
      Assertions: returns cached data, no exception thrown
-     Requirements: ui.6.7 */
+     Requirements: account-profile.1.7 */
   it('should use cached profile on API error', async () => {
     // Set up cached profile in DataManager
     const cachedProfile: UserProfile = {
@@ -397,7 +397,7 @@ describe('Profile Integration', () => {
   /* Preconditions: not authenticated
      Action: call LifecycleManager.initialize()
      Assertions: profile fetch is skipped
-     Requirements: ui.6.1, ui.6.5 */
+     Requirements: account-profile.1.1, account-profile.1.5 */
   it('should skip profile fetch on startup when not authenticated', async () => {
     // Set not authenticated status
     mockOAuthClient.getAuthStatus.mockResolvedValue({ authorized: false });

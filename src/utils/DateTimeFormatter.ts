@@ -1,11 +1,11 @@
-// Requirements: ui.11.1, ui.11.3, clerkly.3.8
+// Requirements: settings.2.1, settings.2.3, clerkly.3.8
 
 /**
  * DateTimeFormatter utility class for formatting dates and times
  * Uses system locale (Intl.DateTimeFormat) for user-facing dates
  * Uses fixed format (YYYY-MM-DD HH:MM:SS) for logs
  *
- * Requirements: ui.11.1, ui.11.3
+ * Requirements: settings.2.1, settings.2.3
  *
  * Note: This utility does NOT use Logger to avoid circular dependency
  * (Logger depends on DateTimeFormatter for timestamp formatting)
@@ -15,7 +15,7 @@ export class DateTimeFormatter {
    * Format date only (no time) using system locale
    * Falls back to toLocaleDateString() on error
    *
-   * Requirements: ui.11.1
+   * Requirements: settings.2.1
    *
    * @param timestamp - Unix timestamp in milliseconds or Date object
    * @returns Formatted date string
@@ -46,7 +46,7 @@ export class DateTimeFormatter {
    * Format date and time using system locale
    * Falls back to toLocaleString() on error
    *
-   * Requirements: ui.11.1
+   * Requirements: settings.2.1
    *
    * @param timestamp - Unix timestamp in milliseconds or Date object
    * @returns Formatted date and time string
@@ -80,7 +80,7 @@ export class DateTimeFormatter {
    * Does NOT use system locale - always uses fixed format
    * Includes timezone offset for consistency across different locales
    *
-   * Requirements: ui.11.3, clerkly.3.2, clerkly.3.3
+   * Requirements: settings.2.3, clerkly.3.2, clerkly.3.3
    *
    * @param timestamp - Unix timestamp in milliseconds or Date object
    * @returns Formatted timestamp string in YYYY-MM-DD HH:MM:SS±HH:MM format

@@ -1,4 +1,4 @@
-// Requirements: google-oauth-auth.1.1, google-oauth-auth.1.2, google-oauth-auth.1.3, google-oauth-auth.1.4, google-oauth-auth.1.5, google-oauth-auth.2.2, google-oauth-auth.2.3, google-oauth-auth.2.4, google-oauth-auth.3.1, google-oauth-auth.3.2, google-oauth-auth.3.3, google-oauth-auth.3.4, google-oauth-auth.3.5, google-oauth-auth.5.1, google-oauth-auth.5.2, google-oauth-auth.5.3, google-oauth-auth.5.4, google-oauth-auth.5.5, google-oauth-auth.5.6, google-oauth-auth.6.1, google-oauth-auth.6.2, google-oauth-auth.6.3, google-oauth-auth.6.4, google-oauth-auth.6.5, google-oauth-auth.7.1, google-oauth-auth.7.2, google-oauth-auth.7.3, google-oauth-auth.7.4, ui.7.1
+// Requirements: google-oauth-auth.1.1, google-oauth-auth.1.2, google-oauth-auth.1.3, google-oauth-auth.1.4, google-oauth-auth.1.5, google-oauth-auth.2.2, google-oauth-auth.2.3, google-oauth-auth.2.4, google-oauth-auth.3.1, google-oauth-auth.3.2, google-oauth-auth.3.3, google-oauth-auth.3.4, google-oauth-auth.3.5, google-oauth-auth.5.1, google-oauth-auth.5.2, google-oauth-auth.5.3, google-oauth-auth.5.4, google-oauth-auth.5.5, google-oauth-auth.5.6, google-oauth-auth.6.1, google-oauth-auth.6.2, google-oauth-auth.6.3, google-oauth-auth.6.4, google-oauth-auth.6.5, google-oauth-auth.7.1, google-oauth-auth.7.2, google-oauth-auth.7.3, google-oauth-auth.7.4, error-notifications.1.1
 
 import * as crypto from 'crypto';
 import { shell } from 'electron';
@@ -22,27 +22,27 @@ interface PKCEStorage {
  * Manages the complete OAuth PKCE flow for Google authentication
  *
  * Token Management Strategy:
- * - Automatic token refresh: When access token expires, automatically refreshes using refresh token (ui.9.1, ui.9.2)
+ * - Automatic token refresh: When access token expires, automatically refreshes using refresh token (token-management-ui.1.1, token-management-ui.1.2)
  * - Transparent to user: Token refresh happens in background without user interaction
- * - Profile updates: Automatically updates user profile after successful token refresh (ui.6.5)
- * - Error handling: On refresh failure (invalid_grant), clears tokens and notifies user (ui.9.3)
- * - Session preservation: Profile data persists in database even after logout/401 errors (ui.8.4)
+ * - Profile updates: Automatically updates user profile after successful token refresh (account-profile.1.5)
+ * - Error handling: On refresh failure (invalid_grant), clears tokens and notifies user (token-management-ui.1.3)
+ * - Session preservation: Profile data persists in database even after logout/401 errors (navigation.1.4)
  *
  * Authorization Error Handling:
- * - HTTP 401 errors are handled by centralized handleAPIRequest() function (ui.9.4)
- * - On 401: All tokens cleared, LoginError shown, profile data preserved (ui.9.3)
- * - Consistent handling across all API endpoints (ui.9.4)
- * - Errors logged with context for debugging (ui.9.5)
- * - User sees friendly messages without technical details (ui.9.6)
+ * - HTTP 401 errors are handled by centralized handleAPIRequest() function (token-management-ui.1.4)
+ * - On 401: All tokens cleared, LoginError shown, profile data preserved (token-management-ui.1.3)
+ * - Consistent handling across all API endpoints (token-management-ui.1.4)
+ * - Errors logged with context for debugging (token-management-ui.1.5)
+ * - User sees friendly messages without technical details (token-management-ui.1.6)
  *
  * Synchronous Profile Fetch During Authorization:
  * - After successful token exchange, profile is fetched synchronously (google-oauth-auth.3.6)
- * - UI shows loader during profile fetch (ui.6.4)
+ * - UI shows loader during profile fetch (account-profile.1.4)
  * - On success: Dashboard is shown with profile data (google-oauth-auth.3.8)
  * - On error: Tokens are cleared and LoginError is shown (google-oauth-auth.3.7)
  * - This ensures user always has valid profile data when entering the app
  *
- * Requirements: google-oauth-auth.1, google-oauth-auth.2, google-oauth-auth.3, google-oauth-auth.5, google-oauth-auth.6, google-oauth-auth.7, ui.6.5, ui.9.1, ui.9.2, ui.9.3, ui.9.4
+ * Requirements: google-oauth-auth.1, google-oauth-auth.2, google-oauth-auth.3, google-oauth-auth.5, google-oauth-auth.6, google-oauth-auth.7, account-profile.1.5, token-management-ui.1.1, token-management-ui.1.2, token-management-ui.1.3, token-management-ui.1.4
  */
 export class OAuthClientManager {
   // Requirements: clerkly.3.5, clerkly.3.7
@@ -60,7 +60,7 @@ export class OAuthClientManager {
 
   /**
    * Set profile manager for automatic profile updates
-   * Requirements: ui.6.5
+   * Requirements: account-profile.1.5
    * Should be called during initialization to enable automatic profile updates
    * @param profileManager UserProfileManager instance
    */
@@ -161,6 +161,8 @@ export class OAuthClientManager {
       // Open system browser with authorization URL
       await shell.openExternal(authUrl.toString());
     } catch (error: unknown) {
+      // Requirements: error-notifications.1.1, error-notifications.1.4
+      handleBackgroundError(error, 'OAuth Flow');
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new Error(`Failed to start auth flow: ${errorMessage}`);
     }
@@ -278,6 +280,9 @@ export class OAuthClientManager {
         authorized: true,
       };
     } catch (error: unknown) {
+      // Requirements: error-notifications.1.1, error-notifications.1.4
+      handleBackgroundError(error, 'OAuth Flow');
+
       // Requirements: google-oauth-auth.7.1 - Hide loader on error
       if (this.authWindowManager) {
         this.authWindowManager.onHideLoader();
@@ -400,10 +405,14 @@ export class OAuthClientManager {
       const tokenResponse = (await response.json()) as TokenResponse;
       return tokenResponse;
     } catch (error: unknown) {
+      // Requirements: error-notifications.1.1, error-notifications.1.4
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       if (errorMessage && errorMessage.includes('fetch')) {
-        throw new Error('network_error');
+        const networkError = new Error('network_error');
+        handleBackgroundError(networkError, 'Token Exchange');
+        throw networkError;
       }
+      handleBackgroundError(error, 'Token Exchange');
       throw error;
     }
   }
@@ -445,7 +454,7 @@ export class OAuthClientManager {
 
   /**
    * Refresh access token using refresh token
-   * Requirements: google-oauth-auth.6.1, google-oauth-auth.6.2, google-oauth-auth.6.3, google-oauth-auth.6.4, google-oauth-auth.6.5, ui.6.5, ui.7.1
+   * Requirements: google-oauth-auth.6.1, google-oauth-auth.6.2, google-oauth-auth.6.3, google-oauth-auth.6.4, google-oauth-auth.6.5, account-profile.1.5, error-notifications.1.1
    * @returns True if refresh successful, false otherwise
    */
   async refreshAccessToken(): Promise<boolean> {
@@ -474,7 +483,7 @@ export class OAuthClientManager {
           // Refresh token is invalid, clear all tokens
           await this.tokenStorage.deleteTokens();
 
-          // Requirements: ui.7.1 - Notify user about critical error
+          // Requirements: error-notifications.1.1 - Notify user about critical error
           handleBackgroundError(
             new Error('Refresh token invalid or expired'),
             'Token Refresh (session expired)'
@@ -500,7 +509,7 @@ export class OAuthClientManager {
 
       await this.tokenStorage.saveTokens(updatedTokens);
 
-      // Requirements: ui.6.5 - Automatically update profile after token refresh
+      // Requirements: account-profile.1.5 - Automatically update profile after token refresh
       if (this.profileManager) {
         Logger.info('OAuthClientManager', 'Triggering profile update after token refresh');
         await this.profileManager.updateProfileAfterTokenRefresh();
@@ -508,7 +517,7 @@ export class OAuthClientManager {
 
       return true;
     } catch (error: unknown) {
-      // Requirements: ui.7.1 - Notify user about token refresh errors
+      // Requirements: error-notifications.1.1 - Notify user about token refresh errors
       // Only notify for unexpected errors, not for invalid_grant (already handled above)
       const errorMessage = error instanceof Error ? error.message : String(error);
       if (!errorMessage.includes('invalid_grant') && !errorMessage.includes('session expired')) {
@@ -546,20 +555,25 @@ export class OAuthClientManager {
       }
 
       // Always delete local tokens regardless of revoke result
-      // Requirements: ui.8.4 - Only tokens are cleared, profile data is preserved
+      // Requirements: navigation.1.4 - Only tokens are cleared, profile data is preserved
       await this.tokenStorage.deleteTokens();
 
       // Clear current user email from memory to prevent data operations after logout
-      // Requirements: ui.8.4, ui.12.18
+      // Requirements: navigation.1.4, user-data-isolation.1.18
       if (this.profileManager) {
         this.profileManager.clearCurrentEmail();
       }
 
       // Note: Profile data is NOT deleted - it's preserved in database for next login
       // This follows the architectural principle: database is single source of truth
-      // Requirements: ui.8.4, Architectural Principles
+      // Requirements: navigation.1.4, Architectural Principles
       Logger.info('OAuthClientManager', 'Tokens cleared, profile data preserved in database');
     } catch (error: unknown) {
+      // Requirements: error-notifications.1.1, error-notifications.1.4
+      // Note: Logout errors may include race conditions (e.g., "No user logged in")
+      // These will be filtered by shouldFilterError() in handleBackgroundError
+      handleBackgroundError(error, 'Logout');
+
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       // Ensure tokens are deleted even if there's an error
       await this.tokenStorage.deleteTokens();
