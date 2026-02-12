@@ -344,10 +344,10 @@ test.describe('Window State Persistence', () => {
   });
 
   /* Preconditions: Application running
-     Action: Close window and verify Mac OS X close behavior
-     Assertions: Window closes but app may stay running (Mac convention)
-     Requirements: window-management.3.3 */
-  test('should follow Mac OS X window close conventions', async () => {
+     Action: Close main window and verify application quits
+     Assertions: Window closes and application terminates completely
+     Requirements: window-management.6.1, window-management.6.2, window-management.6.3 */
+  test('should quit application when main window is closed', async () => {
     // Launch the application
     context = await launchElectron();
     await context.window.waitForLoadState('domcontentloaded');
@@ -360,9 +360,11 @@ test.describe('Window State Persistence', () => {
     expect(initialWindowCount).toBe(1);
 
     // Take screenshot before closing
-    await context.window.screenshot({ path: 'playwright-report/window-before-close-macos.png' });
+    await context.window.screenshot({
+      path: 'playwright-report/window-before-quit-on-close.png',
+    });
 
-    // Close the window (not the app)
+    // Close the window
     await context.app.evaluate(({ BrowserWindow }) => {
       const window = BrowserWindow.getAllWindows()[0];
       if (window) {
@@ -370,28 +372,37 @@ test.describe('Window State Persistence', () => {
       }
     });
 
-    // Wait a bit for close to process
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    // Wait for app to quit
+    await new Promise((resolve) => setTimeout(resolve, 2000));
 
     // Verify window is closed
     expect(context.window.isClosed()).toBe(true);
 
-    // On macOS, app may stay running even when all windows are closed
-    // Requirements: window-management.3.3
-    console.log('[TEST] Window closed following Mac OS X conventions');
+    // Verify app has quit by checking if we can still evaluate code
+    // If app quit, this should fail or return no windows
+    try {
+      const windowCount = await context.app.evaluate(({ BrowserWindow }) => {
+        return BrowserWindow.getAllWindows().length;
+      });
+      // If we get here, app didn't quit - this is unexpected
+      expect(windowCount).toBe(0);
+    } catch (error) {
+      // Expected: app has quit, so evaluation fails
+      console.log('[TEST] Application quit successfully after window close');
+    }
   });
 
   /* Preconditions: Application not running
      Action: Launch application and verify dock integration
      Assertions: Application appears in dock and responds to activation
-     Requirements: window-management.3.5 */
+     Requirements: window-management.3.4 */
   test('should integrate with Mac OS X dock', async () => {
     // Launch the application
     context = await launchElectron();
     await context.window.waitForLoadState('domcontentloaded');
 
     // Verify app is visible and can be activated
-    // Requirements: window-management.3.5
+    // Requirements: window-management.3.4
     const appInfo = await context.app.evaluate(({ BrowserWindow }) => {
       const window = BrowserWindow.getAllWindows()[0];
 

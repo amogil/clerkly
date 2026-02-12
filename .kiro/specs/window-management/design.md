@@ -968,7 +968,6 @@ describe('Window Management Functional Tests', () => {
 | window-management.3.2 | ✓ | - | - |
 | window-management.3.3 | ✓ | - | - |
 | window-management.3.4 | ✓ | - | - |
-| window-management.3.5 | ✓ | - | - |
 | window-management.4.1 | ✓ | ✓ | ✓ |
 | window-management.4.2 | ✓ | - | - |
 | window-management.4.3 | - | ✓ | - |
@@ -980,6 +979,9 @@ describe('Window Management Functional Tests', () => {
 | window-management.5.5 | ✓ | - | - |
 | window-management.5.6 | ✓ | - | - |
 | window-management.5.7 | ✓ | - | - |
+| window-management.6.1 | - | - | ✓ |
+| window-management.6.2 | - | - | ✓ |
+| window-management.6.3 | - | - | ✓ |
 
 ### Критерии Успеха
 
@@ -1078,3 +1080,18 @@ describe('Window Management Functional Tests', () => {
 - Обрабатывает все типы изменений состояния (window-management.5.1, window-management.5.2, window-management.5.3)
 - Эффективно - сохранение только при изменениях
 - Использует нативные события Electron
+
+### Решение 7: Завершение Приложения при Закрытии Окна
+
+**Решение:** Приложение завершается при закрытии всех окон независимо от платформы (macOS, Windows, Linux).
+
+**Альтернативы:**
+- Следовать стандартной конвенции macOS (приложение остается активным при закрытии окна)
+- Добавить настройку для выбора поведения
+
+**Обоснование:**
+- Упрощает UX - пользователь ожидает, что закрытие окна завершает приложение (window-management.6.1)
+- Предотвращает фоновые процессы после закрытия окна (window-management.6.2)
+- Обеспечивает консистентное поведение на всех платформах
+- Соответствует ожиданиям пользователей для однооконных приложений
+- Гарантирует корректное сохранение данных перед выходом (window-management.6.3)
