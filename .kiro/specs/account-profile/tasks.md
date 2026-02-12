@@ -150,7 +150,7 @@
 - [x] 8.6 Тест: синхронная загрузка профиля при авторизации (ошибка)
 - [x] 8.7 Тест: should show login screen when not authenticated
 - [x] 8.8 Тест: should show dashboard after successful authentication
-- [x] 8.9 Тест: should load profile in background after authentication
+- [x] 8.9 Тест: should show main app immediately after authentication with profile already loaded
 - [x] 8.10 Тест: should show cached data while loading profile
 - [x] 8.11 Тест: should show empty fields on first authentication
 - [x] 8.12 Тест: should populate profile data when fetch succeeds
