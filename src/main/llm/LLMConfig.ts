@@ -42,7 +42,7 @@ export interface LLMProviderConfig {
 
 /**
  * Configuration for all LLM providers
- * 
+ *
  * Requirements: settings.3.5 - Model identifiers and API endpoints
  * Requirements: settings.3.6 - Timeout configuration
  */
@@ -66,7 +66,8 @@ export const LLM_PROVIDERS: Record<LLMProviderType, LLMProviderConfig> = {
   google: {
     id: 'google',
     name: 'Google',
-    apiUrl: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash:generateContent',
+    apiUrl:
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash:generateContent',
     testModel: 'gemini-3-flash',
     maxTokens: 5,
     timeout: 10000, // 10 seconds
@@ -80,7 +81,7 @@ export const PROVIDER_TYPES: LLMProviderType[] = Object.keys(LLM_PROVIDERS) as L
 
 /**
  * Error messages for different HTTP status codes
- * 
+ *
  * Requirements: settings.3.8 - User-friendly error messages
  */
 export const ERROR_MESSAGES = {

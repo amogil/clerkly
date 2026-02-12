@@ -5,7 +5,7 @@ import { LLM_PROVIDERS, ERROR_MESSAGES } from './LLMConfig';
 
 /**
  * Anthropic LLM provider implementation
- * 
+ *
  * Tests connection to Anthropic API using configured model
  */
 export class AnthropicProvider implements ILLMProvider {
@@ -17,7 +17,7 @@ export class AnthropicProvider implements ILLMProvider {
 
   /**
    * Test connection to Anthropic API
-   * 
+   *
    * Requirements: settings.3.5 - Use minimal test request with configured model
    * Requirements: settings.3.6 - Configured timeout
    * Requirements: settings.3.7 - Return success on HTTP 200
@@ -63,7 +63,7 @@ export class AnthropicProvider implements ILLMProvider {
 
   /**
    * Map HTTP status code to user-friendly error message
-   * 
+   *
    * Requirements: settings.3.8 - Error messages for different HTTP statuses
    */
   private mapErrorToMessage(status: number, errorData: any): string {
@@ -76,7 +76,7 @@ export class AnthropicProvider implements ILLMProvider {
 
   /**
    * Map exception to user-friendly error message
-   * 
+   *
    * Requirements: settings.3.8 - Handle timeout and network errors
    */
   private mapExceptionToMessage(error: any): string {

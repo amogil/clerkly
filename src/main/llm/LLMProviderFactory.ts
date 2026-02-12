@@ -8,14 +8,14 @@ import { GoogleProvider } from './GoogleProvider';
 
 /**
  * Factory for creating LLM provider instances
- * 
+ *
  * Provides a centralized way to create provider instances
  * based on provider type.
  */
 export class LLMProviderFactory {
   /**
    * Create an LLM provider instance
-   * 
+   *
    * @param type - Provider type
    * @returns Provider instance
    * @throws Error if provider type is unknown

@@ -194,7 +194,7 @@
   - Тест: should save API key with debounce
   - **Requirements:** settings.1.1, settings.1.3, settings.1.9, settings.1.10
 
-- [ ] 5.4 Тесты LLM Providers
+- [x] 5.4 Тесты LLM Providers
   - Создать файл `tests/unit/llm/OpenAIProvider.test.ts`
   - Тест: should return success on valid API key (HTTP 200)
   - Тест: should return error on invalid API key (HTTP 401)
@@ -204,7 +204,7 @@
   - Повторить для AnthropicProvider и GoogleProvider
   - **Requirements:** settings.3.5, settings.3.6, settings.3.7, settings.3.8
 
-- [ ] 5.5 Тесты LLMProviderFactory
+- [x] 5.5 Тесты LLMProviderFactory
   - Создать файл `tests/unit/llm/LLMProviderFactory.test.ts`
   - Тест: should create OpenAI provider
   - Тест: should create Anthropic provider
@@ -212,7 +212,7 @@
   - Тест: should throw error for unknown provider
   - **Requirements:** settings.3
 
-- [ ] 5.6 Тесты LLM IPC Handlers
+- [x] 5.6 Тесты LLM IPC Handlers
   - Создать файл `tests/unit/llm/LLMIPCHandlers.test.ts`
   - Тест: should handle successful test connection
   - Тест: should handle failed test connection
@@ -220,7 +220,7 @@
   - Тест: should log test results
   - **Requirements:** settings.3.4, settings.3.9
 
-- [ ] 5.7 Тесты Settings Component (Test Connection)
+- [x] 5.7 Тесты Settings Component (Test Connection)
   - Обновить файл `tests/unit/components/Settings.test.tsx`
   - Тест: should disable Test Connection button when API key is empty
   - Тест: should enable Test Connection button when API key is filled
@@ -250,7 +250,7 @@
   - **Validates:** Property 10
   - **Requirements:** settings.2.1
 
-- [ ] 6.4 Property Test: Обработка различных ответов API
+- [x] 6.4 Property Test: Обработка различных ответов API
   - Создать файл `tests/property/llm/LLMProviderResponses.property.test.ts`
   - Проверить корректную обработку различных HTTP статусов
   - Проверить корректную обработку различных форматов ошибок
@@ -276,7 +276,7 @@
   - Тест: should not display relative time formats
   - **Requirements:** settings.2.1, settings.2.2, settings.2.3, settings.2.4
 
-- [ ] 7.3 Функциональный тест: LLM Connection Test
+- [x] 7.3 Функциональный тест: LLM Connection Test
   - Создать файл `tests/functional/llm-connection-test.spec.ts`
   - Тест: should disable Test Connection button when API key is empty
   - Тест: should enable Test Connection button when API key is filled
@@ -289,19 +289,19 @@
 
 ### 8. Валидация и Финализация
 
-- [ ] 8.1 Запустить автоматическую валидацию
+- [x] 8.1 Запустить автоматическую валидацию
   - TypeScript компиляция
   - ESLint проверка
   - Prettier форматирование
   - Модульные тесты
   - Property-based тесты
 
-- [ ] 8.2 Проверить покрытие тестами
+- [x] 8.2 Проверить покрытие тестами
   - Минимум 85% покрытие строк кода
   - Все требования покрыты тестами
   - Таблица покрытия требований актуальна
 
-- [ ] 8.3 Проверить комментарии с требованиями
+- [x] 8.3 Проверить комментарии с требованиями
   - Все функции имеют комментарии Requirements
   - Все тесты имеют структуру Preconditions/Action/Assertions/Requirements
 
@@ -312,10 +312,10 @@
 
 ## Статус
 
-🔄 В процессе выполнения
+✅ Выполнено (кроме задачи 8.4)
 
-Выполнено: Задачи 1-3, 5.1-5.3, 6.1-6.3, 7.1-7.2
-Осталось: Задачи 4 (Тестирование подключения), 5.4-5.7, 6.4, 7.3, 8
+Выполнено: Задачи 1-8.3
+Осталось: Задача 8.4 (функциональные тесты - запускаются только при явной просьбе пользователя)
 
 ## Примечания
 
