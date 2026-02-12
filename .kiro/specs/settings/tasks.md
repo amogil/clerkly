@@ -83,13 +83,13 @@
 
 ### 4. Реализация Тестирования Подключения к LLM Provider
 
-- [ ] 4.1 Создать интерфейс ILLMProvider
+- [x] 4.1 Создать интерфейс ILLMProvider
   - Создать файл `src/main/llm/ILLMProvider.ts`
   - Определить интерфейс с методами `testConnection()` и `getProviderName()`
   - Определить интерфейс `TestConnectionResult`
   - **Requirements:** settings.3.5
 
-- [ ] 4.2 Реализовать OpenAIProvider
+- [x] 4.2 Реализовать OpenAIProvider
   - Создать файл `src/main/llm/OpenAIProvider.ts`
   - Реализовать метод `testConnection()` с минимальным запросом к OpenAI API
   - Использовать модель `gpt-4o-mini`, max_tokens: 5
@@ -98,7 +98,7 @@
   - Обработка сетевых ошибок и timeout
   - **Requirements:** settings.3.5, settings.3.6, settings.3.7, settings.3.8
 
-- [ ] 4.3 Реализовать AnthropicProvider
+- [x] 4.3 Реализовать AnthropicProvider
   - Создать файл `src/main/llm/AnthropicProvider.ts`
   - Реализовать метод `testConnection()` с минимальным запросом к Anthropic API
   - Использовать модель `claude-haiku-4-5`, max_tokens: 5
@@ -106,7 +106,7 @@
   - Обработка HTTP статусов и ошибок
   - **Requirements:** settings.3.5, settings.3.6, settings.3.7, settings.3.8
 
-- [ ] 4.4 Реализовать GoogleProvider
+- [x] 4.4 Реализовать GoogleProvider
   - Создать файл `src/main/llm/GoogleProvider.ts`
   - Реализовать метод `testConnection()` с минимальным запросом к Google API
   - Использовать модель `gemini-3-flash`
@@ -114,7 +114,7 @@
   - Обработка HTTP статусов и ошибок
   - **Requirements:** settings.3.5, settings.3.6, settings.3.7, settings.3.8
 
-- [ ] 4.5 Создать LLMProviderFactory
+- [x] 4.5 Создать LLMProviderFactory
   - Создать файл `src/main/llm/LLMProviderFactory.ts`
   - Реализовать метод `createProvider()` для создания экземпляров провайдеров
   - Обработка неизвестных провайдеров
