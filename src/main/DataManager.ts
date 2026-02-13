@@ -6,7 +6,7 @@ import * as path from 'path';
 import * as os from 'os';
 import { MigrationRunner } from './MigrationRunner';
 import { handleBackgroundError } from './ErrorHandler';
-import type { UserProfileManager } from './auth/UserProfileManager';
+import type { UserManager } from './auth/UserManager';
 import { Logger } from './Logger';
 
 // Requirements: clerkly.3.8 - Use centralized Logger instead of console.*
@@ -59,20 +59,20 @@ export interface IDataManager {
   saveData(key: string, value: unknown): SaveDataResult;
   loadData(key: string): LoadDataResult;
   deleteData(key: string): DeleteDataResult;
-  setUserProfileManager(profileManager: UserProfileManager): void;
+  setUserManager(userManager: UserManager): void;
   getDatabase(): Database.Database | null;
 }
 
 /**
  * Manages local data storage using SQLite
- * Requirements: user-data-isolation.3.1 - Supports user data isolation via UserProfileManager
+ * Requirements: user-data-isolation.3.1 - Supports user data isolation via UserManager
  */
 export class DataManager implements IDataManager {
   private storagePath: string;
   private db: Database.Database | null = null;
   private migrationRunner: MigrationRunner | null = null;
-  // Requirements: user-data-isolation.3.1 - Reference to UserProfileManager for getting current user_id
-  private userProfileManager: UserProfileManager | null = null;
+  // Requirements: user-data-isolation.3.1 - Reference to UserManager for getting current user_id
+  private userManager: UserManager | null = null;
   // Requirements: clerkly.3.5, clerkly.3.7
   private logger = Logger.create('DataManager');
 
@@ -81,17 +81,17 @@ export class DataManager implements IDataManager {
   }
 
   /**
-   * Set UserProfileManager for user data isolation
+   * Set UserManager for user data isolation
    * Requirements: user-data-isolation.3.1
    *
    * Must be called after DataManager initialization to enable user data isolation.
-   * This avoids circular dependency between DataManager and UserProfileManager.
+   * This avoids circular dependency between DataManager and UserManager.
    *
-   * @param profileManager UserProfileManager instance
+   * @param userManager UserManager instance
    */
-  setUserProfileManager(profileManager: UserProfileManager): void {
-    this.userProfileManager = profileManager;
-    this.logger.info('UserProfileManager set for data isolation');
+  setUserManager(userManager: UserManager): void {
+    this.userManager = userManager;
+    this.logger.info('UserManager set for data isolation');
   }
 
   /**
@@ -226,10 +226,10 @@ export class DataManager implements IDataManager {
       }
 
       // Requirements: user-data-isolation.3.1, user-data-isolation.3.2 - Get current user_id for data isolation
-      const userId = this.userProfileManager?.getCurrentUserId();
+      const userId = this.userManager?.getCurrentUserId();
 
       if (!userId) {
-        throw new Error('No user logged in: UserProfileManager not set or user not authenticated');
+        throw new Error('No user logged in: UserManager not set or user not authenticated');
       }
 
       const now = Date.now();
@@ -301,10 +301,10 @@ export class DataManager implements IDataManager {
       }
 
       // Requirements: user-data-isolation.3.1, user-data-isolation.3.2 - Get current user_id for data isolation
-      const userId = this.userProfileManager?.getCurrentUserId();
+      const userId = this.userManager?.getCurrentUserId();
 
       if (!userId) {
-        throw new Error('No user logged in: UserProfileManager not set or user not authenticated');
+        throw new Error('No user logged in: UserManager not set or user not authenticated');
       }
 
       // Requirements: user-data-isolation.2.5 - Query with user_id filter for data isolation
@@ -369,10 +369,10 @@ export class DataManager implements IDataManager {
       }
 
       // Requirements: user-data-isolation.3.1, user-data-isolation.3.2 - Get current user_id for data isolation
-      const userId = this.userProfileManager?.getCurrentUserId();
+      const userId = this.userManager?.getCurrentUserId();
 
       if (!userId) {
-        throw new Error('No user logged in: UserProfileManager not set or user not authenticated');
+        throw new Error('No user logged in: UserManager not set or user not authenticated');
       }
 
       // Requirements: user-data-isolation.2.6 - Delete with user_id filter for data isolation

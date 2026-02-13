@@ -3,6 +3,7 @@
 import type { IDataManager } from './DataManager';
 import { safeStorage } from 'electron';
 import { Logger } from './Logger';
+import type { LLMProvider } from '../types';
 
 // Requirements: clerkly.3.8 - Use centralized Logger instead of console.*
 /**
@@ -30,7 +31,7 @@ export class AIAgentSettingsManager {
    * @param provider - The LLM provider to save ('openai', 'anthropic', or 'google')
    * @throws Error if save operation fails
    */
-  async saveLLMProvider(provider: 'openai' | 'anthropic' | 'google'): Promise<void> {
+  async saveLLMProvider(provider: LLMProvider): Promise<void> {
     try {
       const result = this.dataManager.saveData('ai_agent_llm_provider', provider);
 
@@ -38,16 +39,10 @@ export class AIAgentSettingsManager {
         throw new Error(result.error || 'Failed to save LLM provider');
       }
 
-      Logger.info(
-        'AIAgentSettingsManager',
-        `[AIAgentSettingsManager] LLM provider saved: ${provider}`
-      );
+      this.logger.info(`LLM provider saved: ${provider}`);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      Logger.error(
-        'AIAgentSettingsManager',
-        `[AIAgentSettingsManager] Failed to save LLM provider: ${errorMessage}`
-      );
+      this.logger.error(`Failed to save LLM provider: ${errorMessage}`);
       throw error;
     }
   }
@@ -60,30 +55,21 @@ export class AIAgentSettingsManager {
    *
    * @returns The saved LLM provider or 'openai' as default
    */
-  async loadLLMProvider(): Promise<'openai' | 'anthropic' | 'google'> {
+  async loadLLMProvider(): Promise<LLMProvider> {
     try {
       const result = this.dataManager.loadData('ai_agent_llm_provider');
 
       if (!result.success || !result.data) {
-        Logger.info(
-          'AIAgentSettingsManager',
-          '[AIAgentSettingsManager] No LLM provider found, using default: openai'
-        );
+        this.logger.info('No LLM provider found, using default: openai');
         return 'openai';
       }
 
-      const provider = result.data as 'openai' | 'anthropic' | 'google';
-      Logger.info(
-        'AIAgentSettingsManager',
-        `[AIAgentSettingsManager] LLM provider loaded: ${provider}`
-      );
+      const provider = result.data as LLMProvider;
+      this.logger.info(`LLM provider loaded: ${provider}`);
       return provider;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      Logger.error(
-        'AIAgentSettingsManager',
-        `[AIAgentSettingsManager] Failed to load LLM provider: ${errorMessage}`
-      );
+      this.logger.error(`Failed to load LLM provider: ${errorMessage}`);
       return 'openai';
     }
   }
@@ -100,7 +86,7 @@ export class AIAgentSettingsManager {
    * @param apiKey - The API key to save
    * @throws Error if save operation fails
    */
-  async saveAPIKey(provider: 'openai' | 'anthropic' | 'google', apiKey: string): Promise<void> {
+  async saveAPIKey(provider: LLMProvider, apiKey: string): Promise<void> {
     try {
       let storedKey: string;
       let isEncrypted: boolean;
@@ -110,17 +96,11 @@ export class AIAgentSettingsManager {
         const buffer = safeStorage.encryptString(apiKey);
         storedKey = buffer.toString('base64');
         isEncrypted = true;
-        Logger.info(
-          'AIAgentSettingsManager',
-          `[AIAgentSettingsManager] API key encrypted for ${provider}`
-        );
+        this.logger.info(`API key encrypted for ${provider}`);
       } else {
         storedKey = apiKey;
         isEncrypted = false;
-        Logger.info(
-          'AIAgentSettingsManager',
-          `Encryption unavailable, storing plain text for ${provider}`
-        );
+        this.logger.info(`Encryption unavailable, storing plain text for ${provider}`);
       }
 
       // Save the key
@@ -138,16 +118,10 @@ export class AIAgentSettingsManager {
         throw new Error(flagResult.error || 'Failed to save encryption flag');
       }
 
-      Logger.info(
-        'AIAgentSettingsManager',
-        `[AIAgentSettingsManager] API key saved for ${provider}`
-      );
+      this.logger.info(`API key saved for ${provider}`);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      Logger.error(
-        'AIAgentSettingsManager',
-        `Failed to save API key for ${provider}: ${errorMessage}`
-      );
+      this.logger.error(`Failed to save API key for ${provider}: ${errorMessage}`);
       throw error;
     }
   }
@@ -162,16 +136,13 @@ export class AIAgentSettingsManager {
    * @param provider - The LLM provider ('openai', 'anthropic', or 'google')
    * @returns The API key or null if not found
    */
-  async loadAPIKey(provider: 'openai' | 'anthropic' | 'google'): Promise<string | null> {
+  async loadAPIKey(provider: LLMProvider): Promise<string | null> {
     try {
       const keyResult = this.dataManager.loadData(`ai_agent_api_key_${provider}`);
       const encryptedResult = this.dataManager.loadData(`ai_agent_api_key_${provider}_encrypted`);
 
       if (!keyResult.success || !keyResult.data) {
-        Logger.info(
-          'AIAgentSettingsManager',
-          `[AIAgentSettingsManager] No API key found for ${provider}`
-        );
+        this.logger.info(`No API key found for ${provider}`);
         return null;
       }
 
@@ -182,24 +153,15 @@ export class AIAgentSettingsManager {
       if (isEncrypted) {
         const buffer = Buffer.from(storedKey, 'base64');
         const decryptedKey = safeStorage.decryptString(buffer);
-        Logger.info(
-          'AIAgentSettingsManager',
-          `[AIAgentSettingsManager] API key decrypted for ${provider}`
-        );
+        this.logger.info(`API key decrypted for ${provider}`);
         return decryptedKey;
       }
 
-      Logger.info(
-        'AIAgentSettingsManager',
-        `[AIAgentSettingsManager] API key loaded (plain text) for ${provider}`
-      );
+      this.logger.info(`API key loaded (plain text) for ${provider}`);
       return storedKey;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      Logger.error(
-        'AIAgentSettingsManager',
-        `Failed to load API key for ${provider}: ${errorMessage}`
-      );
+      this.logger.error(`Failed to load API key for ${provider}: ${errorMessage}`);
       return null;
     }
   }
@@ -213,7 +175,7 @@ export class AIAgentSettingsManager {
    * @param provider - The LLM provider ('openai', 'anthropic', or 'google')
    * @throws Error if delete operation fails
    */
-  async deleteAPIKey(provider: 'openai' | 'anthropic' | 'google'): Promise<void> {
+  async deleteAPIKey(provider: LLMProvider): Promise<void> {
     try {
       // Delete the key
       const keyResult = this.dataManager.deleteData(`ai_agent_api_key_${provider}`);
@@ -225,16 +187,10 @@ export class AIAgentSettingsManager {
         throw new Error(keyResult.error || 'Failed to delete API key');
       }
 
-      Logger.info(
-        'AIAgentSettingsManager',
-        `[AIAgentSettingsManager] API key deleted for ${provider}`
-      );
+      this.logger.info(`API key deleted for ${provider}`);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      Logger.error(
-        'AIAgentSettingsManager',
-        `Failed to delete API key for ${provider}: ${errorMessage}`
-      );
+      this.logger.error(`Failed to delete API key for ${provider}: ${errorMessage}`);
       throw error;
     }
   }
