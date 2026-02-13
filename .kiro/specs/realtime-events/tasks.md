@@ -8,22 +8,22 @@
 
 ### 1. Установка зависимостей и типы
 
-- [ ] 1.1 Установить mitt
+- [x] 1.1 Установить mitt
   - Выполнить `npm install mitt`
   - **Requirements:** -
 
-- [ ] 1.2 Создать типы событий
+- [x] 1.2 Создать типы событий
   - Создать файл `src/shared/events/types.ts`
   - Определить BaseEvent, ClerklyEvents, EventType, EventPayload
   - Определить payload типы для agent, message, user событий
   - **Requirements:** realtime-events.1.2, realtime-events.3, realtime-events.8
 
-- [ ] 1.3 Создать константы
+- [x] 1.3 Создать константы
   - Создать файл `src/shared/events/constants.ts`
   - Определить IPC channel names
   - **Requirements:** realtime-events.4.5
 
-- [ ] 1.4 Написать модульные тесты для типов
+- [x] 1.4 Написать модульные тесты для типов
   - Создать файл `tests/unit/events/EventTypes.test.ts`
   - Тест: should emit entity.created with full data
   - Тест: should emit entity.updated with changedFields
@@ -32,7 +32,7 @@
   - Тест: should include timestamp in all events
   - **Requirements:** realtime-events.3.2, realtime-events.3.3, realtime-events.3.4, realtime-events.3.5, realtime-events.3.6
 
-- [ ] 1.5 **Checkpoint: Фаза 1**
+- [x] 1.5 **Checkpoint: Фаза 1** ✅
   - Запустить `npm run validate`
   - Дать резюме выполненной работы
   - Запросить ревью от пользователя
@@ -40,39 +40,39 @@
 
 ### 2. MainEventBus
 
-- [ ] 2.1 Создать MainEventBus класс
+- [x] 2.1 Создать MainEventBus класс
   - Создать файл `src/main/events/MainEventBus.ts`
   - Реализовать singleton с mitt
   - Реализовать методы publish/subscribe/subscribeAll/clear/destroy/resetInstance
   - **Requirements:** realtime-events.1.1, realtime-events.1.3, realtime-events.1.5, realtime-events.1.6
 
-- [ ] 2.2 Реализовать timestamp-based deduplication
+- [x] 2.2 Реализовать timestamp-based deduplication
   - Добавить Map для хранения последних timestamp по entity key
   - Игнорировать события с более старым timestamp
   - **Requirements:** realtime-events.5.5
 
-- [ ] 2.3 Реализовать очистку timestamp cache
+- [x] 2.3 Реализовать очистку timestamp cache
   - Очистка при entity.deleted событии
   - Периодическая очистка stale записей (раз в минуту, старше 6 часов)
   - **Requirements:** realtime-events.6.5
 
-- [ ] 2.4 Реализовать batching
+- [x] 2.4 Реализовать batching
   - Объединение событий одной сущности в пределах одного tick (queueMicrotask)
   - **Requirements:** realtime-events.6.3
 
-- [ ] 2.5 Реализовать изоляцию ошибок
+- [x] 2.5 Реализовать изоляцию ошибок
   - try-catch вокруг callback вызовов
   - **Requirements:** realtime-events.2.7
 
-- [ ] 2.6 Реализовать broadcast в renderer
+- [x] 2.6 Реализовать broadcast в renderer
   - Отправка событий во все BrowserWindow через IPC
   - **Requirements:** realtime-events.4.1
 
-- [ ] 2.7 Добавить логирование
+- [x] 2.7 Добавить логирование
   - Logger.debug для всех событий
   - **Requirements:** Нефункциональные (отладка)
 
-- [ ] 2.8 Написать модульные тесты для MainEventBus
+- [x] 2.8 Написать модульные тесты для MainEventBus
   - Создать файл `tests/unit/events/MainEventBus.test.ts`
   - Тест: should be singleton
   - Тест: should publish event with type and payload
@@ -94,7 +94,7 @@
   - Тест: should reset instance for testing (resetInstance)
   - **Requirements:** realtime-events.1, realtime-events.2, realtime-events.6.3, realtime-events.6.5
 
-- [ ] 2.9 **Checkpoint: Фаза 2**
+- [x] 2.9 **Checkpoint: Фаза 2** ✅
   - Запустить `npm run validate`
   - Дать резюме выполненной работы
   - Запросить ревью от пользователя
@@ -102,20 +102,20 @@
 
 ### 3. RendererEventBus
 
-- [ ] 3.1 Создать RendererEventBus класс
+- [x] 3.1 Создать RendererEventBus класс
   - Создать файл `src/renderer/events/RendererEventBus.ts`
   - Реализовать singleton с mitt, аналогичный MainEventBus
   - **Requirements:** realtime-events.1.1, realtime-events.1.3, realtime-events.1.5, realtime-events.1.6
 
-- [ ] 3.2 Реализовать IPC listener
+- [x] 3.2 Реализовать IPC listener
   - Подписка на события из main через window.api.events.onEvent
   - **Requirements:** realtime-events.2.9
 
-- [ ] 3.3 Реализовать отправку в main
+- [x] 3.3 Реализовать отправку в main
   - Отправка событий в main через window.api.events.sendEvent
   - **Requirements:** realtime-events.4.2
 
-- [ ] 3.4 Написать модульные тесты для RendererEventBus
+- [x] 3.4 Написать модульные тесты для RendererEventBus
   - Создать файл `tests/unit/events/RendererEventBus.test.ts`
   - Тест: should be singleton
   - Тест: should publish event with type and payload
@@ -134,7 +134,7 @@
   - Тест: should reset instance for testing (resetInstance)
   - **Requirements:** realtime-events.1, realtime-events.2, realtime-events.4.7
 
-- [ ] 3.5 **Checkpoint: Фаза 3**
+- [x] 3.5 **Checkpoint: Фаза 3** ✅
   - Запустить `npm run validate`
   - Дать резюме выполненной работы
   - Запросить ревью от пользователя
@@ -142,23 +142,23 @@
 
 ### 4. IPC интеграция
 
-- [ ] 4.1 Создать EventIPCHandlers
+- [x] 4.1 Создать EventIPCHandlers
   - Создать файл `src/main/events/EventIPCHandlers.ts`
   - Реализовать IPC handler для получения событий из renderer
   - **Requirements:** realtime-events.4.1, realtime-events.4.2
 
-- [ ] 4.2 Обновить preload script
+- [x] 4.2 Обновить preload script
   - Добавить секцию `events` в существующий объект `api` в `src/preload/index.ts`
   - Реализовать onEvent (возвращает unsubscribe) и sendEvent
   - **Requirements:** realtime-events.4.5, realtime-events.4.6, realtime-events.4.7
 
-- [ ] 4.3 Зарегистрировать IPC handlers и инициализировать EventBus в main
+- [x] 4.3 Зарегистрировать IPC handlers и инициализировать EventBus в main
   - Обновить `src/main/index.ts`
   - Вызвать `registerEventIPCHandlers()` до создания BrowserWindow
   - Вызвать `MainEventBus.getInstance()` для инициализации при старте
   - **Requirements:** realtime-events.4.1
 
-- [ ] 4.4 Написать модульные тесты для IPC handlers
+- [x] 4.4 Написать модульные тесты для IPC handlers
   - Создать файл `tests/unit/events/EventIPCHandlers.test.ts`
   - Тест: should register IPC handler for events from renderer
   - Тест: should forward event to MainEventBus with local option
@@ -166,7 +166,7 @@
   - Тест: should handle malformed events gracefully
   - **Requirements:** realtime-events.4
 
-- [ ] 4.5 **Checkpoint: Фаза 4**
+- [x] 4.5 **Checkpoint: Фаза 4** ✅
   - Запустить `npm run validate`
   - Дать резюме выполненной работы
   - Запросить ревью от пользователя
@@ -174,20 +174,20 @@
 
 ### 5. React Hook
 
-- [ ] 5.1 Создать useEventSubscription hook
+- [x] 5.1 Создать useEventSubscription hook
   - Создать файл `src/renderer/events/useEventSubscription.ts`
   - Реализовать hook с автоматической отпиской при unmount
   - **Requirements:** realtime-events.7.1, realtime-events.7.2
 
-- [ ] 5.2 Создать useEventSubscriptionMultiple hook
+- [x] 5.2 Создать useEventSubscriptionMultiple hook
   - Реализовать hook для подписки на несколько типов событий
   - **Requirements:** realtime-events.7.3
 
-- [ ] 5.3 Создать useEventSubscriptionAll hook
+- [x] 5.3 Создать useEventSubscriptionAll hook
   - Реализовать hook для wildcard подписки
   - **Requirements:** realtime-events.7.4
 
-- [ ] 5.4 Написать модульные тесты для hooks
+- [x] 5.4 Написать модульные тесты для hooks
   - Создать файл `tests/unit/hooks/useEventSubscription.test.ts`
   - Тест: should subscribe to event on mount
   - Тест: should unsubscribe on component unmount
@@ -199,7 +199,7 @@
   - Тест: should handle errors in callback gracefully
   - **Requirements:** realtime-events.7
 
-- [ ] 5.5 **Checkpoint: Фаза 5**
+- [x] 5.5 **Checkpoint: Фаза 5** ✅
   - Запустить `npm run validate`
   - Дать резюме выполненной работы
   - Запросить ревью от пользователя
@@ -207,8 +207,8 @@
 
 ### 6. Property-Based тесты
 
-- [ ] 6.1 Написать property-based тесты для EventBus
-  - Создать файл `tests/property/events/EventBus.property.test.ts`
+- [x] 6.1 Написать property-based тесты для EventBus
+  - Создать файл `tests/property/events/EventTypes.property.test.ts`
   - Тест: subscribe always returns unsubscribe function (for any event type)
   - Тест: events are delivered in order by timestamp
   - Тест: no memory leaks after subscribe/unsubscribe cycles
@@ -218,7 +218,7 @@
   - Тест: timestamp cache is cleaned up on entity.deleted
   - **Requirements:** realtime-events.2.4, realtime-events.3.6, realtime-events.6.3, realtime-events.6.5
 
-- [ ] 6.2 **Checkpoint: Фаза 6**
+- [x] 6.2 **Checkpoint: Фаза 6** ✅
   - Запустить `npm run validate`
   - Дать резюме выполненной работы
   - Запросить ревью от пользователя
@@ -250,16 +250,16 @@
 
 ### 8. Интеграция и экспорт
 
-- [ ] 8.1 Экспортировать API
+- [x] 8.1 Экспортировать API
   - Создать `src/main/events/index.ts`
   - Создать `src/renderer/events/index.ts`
   - **Requirements:** -
 
-- [ ] 8.2 Добавить типы в window
+- [x] 8.2 Добавить типы в window
   - Обновить interface API в `src/preload/index.ts` для events секции
   - **Requirements:** realtime-events.8
 
-- [ ] 8.3 **Checkpoint: Фаза 8**
+- [x] 8.3 **Checkpoint: Фаза 8** ✅
   - Запустить `npm run validate`
   - Дать резюме выполненной работы
   - Запросить ревью от пользователя
@@ -267,14 +267,14 @@
 
 ### 9. Валидация и финализация
 
-- [ ] 9.1 Запустить автоматическую валидацию
+- [x] 9.1 Запустить автоматическую валидацию
   - TypeScript компиляция
   - ESLint проверка
   - Prettier форматирование
   - Модульные тесты
   - Property-based тесты
 
-- [ ] 9.2 Проверить покрытие тестами
+- [x] 9.2 Проверить покрытие тестами
   - Минимум 85% покрытие строк кода
   - Все требования покрыты тестами
 
@@ -308,7 +308,7 @@
 
 - ✅ Все модульные тесты проходят
 - ✅ Все property-based тесты проходят
-- ✅ Все функциональные тесты проходят
+- ⏳ Все функциональные тесты проходят (ожидает запуска)
 - ✅ Покрытие кода ≥ 85%
 - ✅ TypeScript компилируется без ошибок
 - ✅ События передаются между main и renderer
@@ -317,7 +317,7 @@
 
 ## Статус
 
-Not Started
+In Progress - Фазы 1-6 и 8 выполнены. Фаза 7 (функциональные тесты) ожидает запуска по запросу пользователя.
 
 ## Примечания
 
