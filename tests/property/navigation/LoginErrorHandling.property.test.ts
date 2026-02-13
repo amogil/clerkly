@@ -86,7 +86,7 @@ describe('Login Error Handling Property Tests', () => {
           expect(loginErrorIndex).toBeGreaterThan(errorIndex);
 
           // Property 5: No redirect should happen
-          expect(operations).not.toContain('redirect_to_dashboard');
+          expect(operations).not.toContain('redirect_to_agents');
 
           // Property 6: Profile fetch should NOT happen after token exchange error
           expect(operations).not.toContain('profile_fetch_start');
@@ -184,7 +184,7 @@ describe('Login Error Handling Property Tests', () => {
           expect(loginErrorIndex).toBeGreaterThan(profileFetchErrorIndex);
 
           // Property 5: No redirect should happen
-          expect(operations).not.toContain('redirect_to_dashboard');
+          expect(operations).not.toContain('redirect_to_agents');
 
           // Property 6: Tokens were created but must be cleared
           expect(tokens.accessToken).toBeTruthy();
@@ -255,7 +255,7 @@ describe('Login Error Handling Property Tests', () => {
           expect(operations).toContain('login_error_shown');
 
           // Property 2: No redirect should happen in either case
-          expect(operations).not.toContain('redirect_to_dashboard');
+          expect(operations).not.toContain('redirect_to_agents');
 
           // Property 3: Error handling must happen after the error
           const errorIndex = operations.findIndex((op) => op.includes('_error'));
@@ -330,7 +330,7 @@ describe('Login Error Handling Property Tests', () => {
             expect(operations).toContain('loader_hidden');
             expect(operations).toContain('tokens_cleared');
             expect(operations).toContain('login_error_shown');
-            expect(operations).not.toContain('redirect_to_dashboard');
+            expect(operations).not.toContain('redirect_to_agents');
 
             // Property: Auth code must be valid
             expect(attempt.authCode).toBeTruthy();

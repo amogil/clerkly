@@ -1275,13 +1275,13 @@ test.describe('Account Profile', () => {
       const button = document.querySelector('button') as HTMLButtonElement;
       const spinner = document.querySelector('button svg.animate-spin');
       const signingInText = document.body.textContent?.includes('Signing in');
-      
+
       console.log('[RENDERER] Checking loader state:', {
         buttonDisabled: button?.disabled,
         hasSpinner: !!spinner,
         hasSigningInText: !!signingInText,
       });
-      
+
       return button?.disabled && spinner && signingInText;
     });
 

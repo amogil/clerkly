@@ -121,7 +121,7 @@ describe('OAuth Profile Sync Property Tests', () => {
           const profileFetchCompleteLog = operationLog.find(
             (log) => log.operation === 'profile_fetch_complete'
           );
-          const redirectLog = operationLog.find((log) => log.operation === 'redirect_to_dashboard');
+          const redirectLog = operationLog.find((log) => log.operation === 'redirect_to_agents');
           expect(profileFetchCompleteLog).toBeDefined();
           expect(redirectLog).toBeDefined();
           expect(profileFetchCompleteLog!.timestamp).toBeLessThanOrEqual(redirectLog!.timestamp);
@@ -177,7 +177,7 @@ describe('OAuth Profile Sync Property Tests', () => {
           const operations = operationLog.map((log) => log.operation);
 
           // Property 1: Redirect should NOT be in operation log
-          expect(operations).not.toContain('redirect_to_dashboard');
+          expect(operations).not.toContain('redirect_to_agents');
 
           // Property 2: Tokens should be cleared after profile fetch error
           expect(operations).toContain('tokens_cleared');
@@ -231,7 +231,7 @@ describe('OAuth Profile Sync Property Tests', () => {
           expect(operations).not.toContain('profile_fetch_complete');
 
           // Property 2: Redirect should NOT be in operation log
-          expect(operations).not.toContain('redirect_to_dashboard');
+          expect(operations).not.toContain('redirect_to_agents');
 
           // Property 3: Only token exchange operations should be present
           expect(operations).toEqual(['token_exchange_start', 'token_exchange_error']);
@@ -261,7 +261,7 @@ describe('OAuth Profile Sync Property Tests', () => {
             operationLog.push({ operation: 'token_exchange_complete', timestamp: Date.now() });
             operationLog.push({ operation: 'profile_fetch_start', timestamp: Date.now() });
             operationLog.push({ operation: 'profile_fetch_complete', timestamp: Date.now() });
-            operationLog.push({ operation: 'redirect_to_dashboard', timestamp: Date.now() });
+            operationLog.push({ operation: 'redirect_to_agents', timestamp: Date.now() });
 
             const operations = operationLog.map((log) => log.operation);
 
@@ -271,7 +271,7 @@ describe('OAuth Profile Sync Property Tests', () => {
               'token_exchange_complete',
               'profile_fetch_start',
               'profile_fetch_complete',
-              'redirect_to_dashboard',
+              'redirect_to_agents',
             ]);
 
             // Property: Timestamps must be monotonically increasing
@@ -379,7 +379,7 @@ describe('OAuth Profile Sync Property Tests', () => {
             operationLog.push({ operation: 'token_exchange_complete', timestamp: Date.now() });
             operationLog.push({ operation: 'profile_fetch_start', timestamp: Date.now() });
             operationLog.push({ operation: 'profile_fetch_complete', timestamp: Date.now() });
-            operationLog.push({ operation: 'redirect_to_dashboard', timestamp: Date.now() });
+            operationLog.push({ operation: 'redirect_to_agents', timestamp: Date.now() });
 
             // Property: Tokens must contain the auth code (even if it's unusual)
             expect(tokens.accessToken).toContain(authCode);
@@ -392,7 +392,7 @@ describe('OAuth Profile Sync Property Tests', () => {
               'token_exchange_complete',
               'profile_fetch_start',
               'profile_fetch_complete',
-              'redirect_to_dashboard',
+              'redirect_to_agents',
             ]);
           } else {
             // Empty or whitespace-only auth code should fail
