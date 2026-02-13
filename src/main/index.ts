@@ -134,18 +134,18 @@ setOAuthClientManager(oauthClient);
 
 // Requirements: account-profile.1.5
 // Initialize User Manager
-const profileManager = new UserManager(dataManager, tokenStorage);
+const userManager = new UserManager(dataManager, tokenStorage);
 
 // Requirements: user-data-isolation.1.10 - Set UserManager in DataManager for data isolation
-dataManager.setUserManager(profileManager);
+dataManager.setUserManager(userManager);
 
 // Requirements: account-profile.1.5
 // Connect profile manager to oauth client for automatic updates
-oauthClient.setProfileManager(profileManager);
+oauthClient.setUserManager(userManager);
 
 // Requirements: clerkly.1.2, clerkly.1.3, window-management.5
 // Initialize Window Manager
-const windowManager = new WindowManager(dataManager, profileManager);
+const windowManager = new WindowManager(dataManager, userManager);
 
 // Requirements: google-oauth-auth.11.1
 // Initialize Auth Window Manager
@@ -173,7 +173,7 @@ const ipcHandlers = new IPCHandlers(dataManager);
 // Initialize Auth IPC Handlers
 const authIPCHandlers = new AuthIPCHandlers(oauthClient);
 // Requirements: account-profile.1.2 - Connect profile manager to auth IPC handlers
-authIPCHandlers.setProfileManager(profileManager);
+authIPCHandlers.setUserManager(userManager);
 
 // Requirements: settings.1.9, settings.1.26
 // Initialize AI Agent Settings Manager
@@ -194,7 +194,7 @@ if (process.env.NODE_ENV === 'test') {
   (global as any).testContext = {
     oauthClient,
     tokenStorage,
-    profileManager,
+    userManager,
     dataManager,
   };
 
@@ -225,8 +225,8 @@ if (process.env.NODE_ENV === 'test') {
     }
     // Fetch profile after auth success
     try {
-      await profileManager.fetchProfile();
-      const userId = profileManager.getCurrentUserId();
+      await userManager.fetchProfile();
+      const userId = userManager.getCurrentUserId();
       if (userId) {
         authIPCHandlers.sendAuthSuccess(userId);
       }
@@ -243,7 +243,7 @@ if (process.env.NODE_ENV === 'test') {
       throw new Error('test:get-profile can only be used in test environment');
     }
     try {
-      const user = profileManager.getCurrentUser();
+      const user = userManager.getCurrentUser();
       return { success: true, profile: user };
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -259,7 +259,7 @@ if (process.env.NODE_ENV === 'test') {
       return { success: false, error: 'Email parameter is required', profile: null };
     }
     try {
-      const user = profileManager.loadUserByEmail(email);
+      const user = userManager.loadUserByEmail(email);
       return { success: true, profile: user };
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -282,7 +282,7 @@ if (process.env.NODE_ENV === 'test') {
         family_name: profileData.family_name || 'User',
         locale: profileData.locale || 'en',
       };
-      profileManager.findOrCreateUser(googleProfile);
+      userManager.findOrCreateUser(googleProfile);
       return { success: true };
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -350,7 +350,7 @@ if (process.env.NODE_ENV === 'test') {
       // Send auth events to renderer (same as handleDeepLinkUrl does)
       if (authStatus.authorized) {
         logger.info('Authorization successful, sending auth success');
-        const userId = profileManager.getCurrentUserId();
+        const userId = userManager.getCurrentUserId();
         if (userId) {
           authIPCHandlers.sendAuthSuccess(userId);
         }
@@ -487,7 +487,7 @@ app.whenReady().then(async () => {
     const startTime = Date.now();
 
     // Requirements: user-data-isolation.1.17 - Initialize profile manager to restore email from database
-    await profileManager.initialize();
+    await userManager.initialize();
     logger.info('UserManager initialized');
 
     // Requirements: clerkly.1.2, clerkly.1.3, clerkly.1.4
@@ -612,7 +612,7 @@ async function handleDeepLinkUrl(url: string): Promise<void> {
       // Profile is already fetched synchronously inside handleDeepLink()
       if (authStatus.authorized) {
         logger.info('Authorization successful, profile already fetched, sending auth success');
-        const userId = profileManager.getCurrentUserId();
+        const userId = userManager.getCurrentUserId();
         if (userId) {
           authIPCHandlers.sendAuthSuccess(userId);
         }

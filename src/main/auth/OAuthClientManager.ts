@@ -52,7 +52,7 @@ export class OAuthClientManager {
   private config: OAuthConfig;
   private tokenStorage: TokenStorageManager;
   private pkceStorage: PKCEStorage | null = null;
-  private profileManager: any | null = null; // Using any to avoid circular dependency
+  private userManager: any | null = null; // Using any to avoid circular dependency
   private authWindowManager: any | null = null; // Using any to avoid circular dependency
 
   constructor(config: OAuthConfig, tokenStorage: TokenStorageManager) {
@@ -64,11 +64,11 @@ export class OAuthClientManager {
    * Set profile manager for automatic profile updates
    * Requirements: account-profile.1.5
    * Should be called during initialization to enable automatic profile updates
-   * @param profileManager UserManager instance
+   * @param userManager UserManager instance
    */
-  setProfileManager(profileManager: any): void {
-    this.profileManager = profileManager;
-    Logger.info('OAuthClientManager', 'Profile manager set for automatic updates');
+  setUserManager(userManager: any): void {
+    this.userManager = userManager;
+    Logger.info('OAuthClientManager', 'User manager set for automatic updates');
   }
 
   /**
@@ -232,7 +232,7 @@ export class OAuthClientManager {
       // Requirements: google-oauth-auth.3.6, google-oauth-auth.3.7, google-oauth-auth.3.8
       // Synchronously fetch user profile BEFORE saving tokens
       // This ensures we have user email for database isolation
-      if (this.profileManager) {
+      if (this.userManager) {
         Logger.info('OAuthClientManager', 'Fetching profile synchronously before saving tokens');
 
         // Temporarily store tokens in memory for profile fetch
@@ -273,7 +273,7 @@ export class OAuthClientManager {
           eventBus.publish(new ProfileSyncedEvent(profileResult.profile));
         }
       } else {
-        Logger.warn('OAuthClientManager', 'Profile manager not set, saving tokens without profile');
+        Logger.warn('OAuthClientManager', 'User manager not set, saving tokens without profile');
         // Fallback: save tokens without profile (will fail if DataManager requires email)
         await this.tokenStorage.saveTokens(tokenData);
       }
@@ -313,9 +313,9 @@ export class OAuthClientManager {
     try {
       Logger.info('OAuthClientManager', 'fetchProfileWithTokens: Starting profile fetch');
 
-      if (!this.profileManager) {
-        Logger.error('OAuthClientManager', 'fetchProfileWithTokens: Profile manager not set');
-        return { success: false, error: 'Profile manager not set' };
+      if (!this.userManager) {
+        Logger.error('OAuthClientManager', 'fetchProfileWithTokens: User manager not set');
+        return { success: false, error: 'User manager not set' };
       }
 
       // Fetch profile from Google UserInfo API
@@ -362,13 +362,13 @@ export class OAuthClientManager {
       // This is required because DataManager.saveData() needs getCurrentUserId()
       // Requirements: user-data-isolation.1.2 - Find or create user by email
       Logger.info('OAuthClientManager', 'fetchProfileWithTokens: Finding or creating user');
-      const user = this.profileManager.findOrCreateUser(profile.email, profile.name || null);
-      (this.profileManager as any).currentUserId = user.user_id;
+      const user = this.userManager.findOrCreateUser(profile.email, profile.name || null);
+      (this.userManager as any).currentUserId = user.user_id;
       Logger.info('OAuthClientManager', `fetchProfileWithTokens: User ID set: ${user.user_id}`);
 
       // Save profile to database
       Logger.info('OAuthClientManager', 'fetchProfileWithTokens: Saving profile to database');
-      await this.profileManager.saveProfile(profile);
+      await this.userManager.saveProfile(profile);
       Logger.info('OAuthClientManager', 'fetchProfileWithTokens: Profile saved successfully');
 
       return { success: true, profile };
@@ -522,9 +522,9 @@ export class OAuthClientManager {
       await this.tokenStorage.saveTokens(updatedTokens);
 
       // Requirements: account-profile.1.5 - Automatically update profile after token refresh
-      if (this.profileManager) {
+      if (this.userManager) {
         Logger.info('OAuthClientManager', 'Triggering profile update after token refresh');
-        await this.profileManager.updateProfileAfterTokenRefresh();
+        await this.userManager.updateProfileAfterTokenRefresh();
       }
 
       return true;
@@ -572,8 +572,8 @@ export class OAuthClientManager {
 
       // Clear current user_id from memory to prevent data operations after logout
       // Requirements: navigation.1.4, user-data-isolation.1.4
-      if (this.profileManager) {
-        this.profileManager.clearSession();
+      if (this.userManager) {
+        this.userManager.clearSession();
       }
 
       // Note: Profile data is NOT deleted - it's preserved in database for next login

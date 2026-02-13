@@ -11,9 +11,10 @@ const EVENT_TYPE_USER_LOGOUT = 'user.logout';
 const EVENT_TYPE_AUTH_FAILED = 'auth.failed';
 const EVENT_TYPE_AUTH_SUCCEEDED = 'auth.succeeded';
 const EVENT_TYPE_PROFILE_SYNCED = 'profile.synced';
-const EVENT_TYPE_LOADER_SHOW = 'loader.show';
-const EVENT_TYPE_LOADER_HIDE = 'loader.hide';
 const EVENT_TYPE_ERROR_CREATED = 'error.created';
+
+// LLM Provider type (duplicated from types/index.ts due to rootDir restriction)
+type LLMProvider = 'openai' | 'anthropic' | 'google';
 
 /**
  * API interface for secure IPC communication
@@ -33,14 +34,12 @@ interface API {
     startLogin: () => Promise<{ success: boolean; error?: string }>;
     getStatus: () => Promise<{ authorized: boolean; error?: string }>;
     logout: () => Promise<{ success: boolean; error?: string }>;
-    getProfile: () => Promise<{ success: boolean; profile?: any; error?: string }>;
-    refreshProfile: () => Promise<{ success: boolean; profile?: any; error?: string }>;
+    getUser: () => Promise<{ success: boolean; user?: any; error?: string }>;
+    refreshUser: () => Promise<{ success: boolean; user?: any; error?: string }>;
     onAuthSuccess: (callback: () => void) => () => void;
     onAuthError: (callback: (error: string, errorCode?: string) => void) => () => void;
     onLogout: (callback: () => void) => () => void;
-    onProfileUpdated: (callback: (profile: any) => void) => () => void;
-    onShowLoader: (callback: () => void) => () => void;
-    onHideLoader: (callback: () => void) => () => void;
+    onUserUpdated: (callback: (user: any) => void) => () => void;
   };
   // Requirements: error-notifications.1.1
   error: {
@@ -48,29 +47,25 @@ interface API {
   };
   // Requirements: settings.1.26
   settings: {
-    saveLLMProvider: (
-      provider: 'openai' | 'anthropic' | 'google'
-    ) => Promise<{ success: boolean; error?: string }>;
+    saveLLMProvider: (provider: LLMProvider) => Promise<{ success: boolean; error?: string }>;
     loadLLMProvider: () => Promise<{
       success: boolean;
-      provider?: 'openai' | 'anthropic' | 'google';
+      provider?: LLMProvider;
       error?: string;
     }>;
     saveAPIKey: (
-      provider: 'openai' | 'anthropic' | 'google',
+      provider: LLMProvider,
       apiKey: string
     ) => Promise<{ success: boolean; error?: string }>;
     loadAPIKey: (
-      provider: 'openai' | 'anthropic' | 'google'
+      provider: LLMProvider
     ) => Promise<{ success: boolean; apiKey?: string | null; error?: string }>;
-    deleteAPIKey: (
-      provider: 'openai' | 'anthropic' | 'google'
-    ) => Promise<{ success: boolean; error?: string }>;
+    deleteAPIKey: (provider: LLMProvider) => Promise<{ success: boolean; error?: string }>;
   };
   // Requirements: settings.3
   llm: {
     testConnection: (
-      provider: 'openai' | 'anthropic' | 'google',
+      provider: LLMProvider,
       apiKey: string
     ) => Promise<{ success: boolean; error?: string }>;
   };
@@ -190,23 +185,23 @@ const api: API = {
     },
 
     /**
-     * Get user profile from local cache
-     * Returns cached profile data from DataManager
+     * Get current user from database
+     * Returns user data from users table
      * Requirements: account-profile.1.2
-     * @returns {Promise<{success: boolean, profile?: any, error?: string}>}
+     * @returns {Promise<{success: boolean, user?: any, error?: string}>}
      */
-    async getProfile(): Promise<{ success: boolean; profile?: any; error?: string }> {
-      return await ipcRenderer.invoke('auth:get-profile');
+    async getUser(): Promise<{ success: boolean; user?: any; error?: string }> {
+      return await ipcRenderer.invoke('auth:get-user');
     },
 
     /**
      * Refresh user profile from Google API
      * Fetches fresh profile data from Google UserInfo API
      * Requirements: account-profile.1.5
-     * @returns {Promise<{success: boolean, profile?: any, error?: string}>}
+     * @returns {Promise<{success: boolean, user?: any, error?: string}>}
      */
-    async refreshProfile(): Promise<{ success: boolean; profile?: any; error?: string }> {
-      return await ipcRenderer.invoke('auth:refresh-profile');
+    async refreshUser(): Promise<{ success: boolean; user?: any; error?: string }> {
+      return await ipcRenderer.invoke('auth:refresh-user');
     },
 
     /**
@@ -256,47 +251,17 @@ const api: API = {
     },
 
     /**
-     * Listen for profile update events via EventBus
+     * Listen for user update events via EventBus
      * Requirements: account-profile.1.5
-     * @param {Function} callback - Callback function to execute when profile is updated
+     * @param {Function} callback - Callback function to execute when user is updated
      * @returns {Function} Unsubscribe function to remove the listener
      */
-    onProfileUpdated(callback: (profile: any) => void): () => void {
+    onUserUpdated(callback: (user: any) => void): () => void {
       // Use the events API to listen for profile.synced events
       return api.events!.onEvent((type: string, payload: unknown) => {
         if (type === EVENT_TYPE_PROFILE_SYNCED) {
-          const data = payload as { profile: any };
-          callback(data.profile);
-        }
-      });
-    },
-
-    /**
-     * Listen for loader show events via EventBus
-     * Requirements: google-oauth-auth.7.1
-     * @param {Function} callback - Callback function to execute when loader should be shown
-     * @returns {Function} Unsubscribe function to remove the listener
-     */
-    onShowLoader(callback: () => void): () => void {
-      // Use the events API to listen for loader.show events
-      return api.events!.onEvent((type: string) => {
-        if (type === EVENT_TYPE_LOADER_SHOW) {
-          callback();
-        }
-      });
-    },
-
-    /**
-     * Listen for loader hide events via EventBus
-     * Requirements: google-oauth-auth.7.1
-     * @param {Function} callback - Callback function to execute when loader should be hidden
-     * @returns {Function} Unsubscribe function to remove the listener
-     */
-    onHideLoader(callback: () => void): () => void {
-      // Use the events API to listen for loader.hide events
-      return api.events!.onEvent((type: string) => {
-        if (type === EVENT_TYPE_LOADER_HIDE) {
-          callback();
+          const data = payload as { user: any };
+          callback(data.user);
         }
       });
     },

@@ -6,7 +6,7 @@
 
 import { MainEventBus } from './MainEventBus';
 import { Logger } from '../Logger';
-import { EventType, ClerklyEvents } from '../../shared/events/types';
+import { EventType, ClerklyEvents, BaseEvent, getEntityId } from '../../shared/events/types';
 import { Unsubscribe } from '../../shared/events/types';
 
 /**
@@ -76,37 +76,44 @@ export class EventLogger {
   }
 
   /**
-   * Format event for logging
+   * Format event for logging - generic approach extracting key fields from payload
    */
   private formatEventLog<T extends EventType>(type: T, payload: ClerklyEvents[T]): string {
-    // Extract relevant info based on event type
-    switch (type) {
-      case 'auth.succeeded':
-        return `Event: ${type} (userId: ${(payload as ClerklyEvents['auth.succeeded']).userId})`;
-      case 'auth.failed':
-        return `Event: ${type} (error: ${(payload as ClerklyEvents['auth.failed']).error}, code: ${(payload as ClerklyEvents['auth.failed']).errorCode || 'none'})`;
-      case 'profile.synced':
-        return `Event: ${type} (email: ${(payload as ClerklyEvents['profile.synced']).user.email})`;
-      case 'error.created':
-        return `Event: ${type} (context: ${(payload as ClerklyEvents['error.created']).context}, message: ${(payload as ClerklyEvents['error.created']).message})`;
-      case 'user.login':
-        return `Event: ${type} (userId: ${(payload as ClerklyEvents['user.login']).userId})`;
-      case 'user.logout':
-        return `Event: ${type}`;
-      case 'agent.created':
-        return `Event: ${type} (id: ${(payload as ClerklyEvents['agent.created']).data.id})`;
-      case 'agent.updated':
-        return `Event: ${type} (id: ${(payload as ClerklyEvents['agent.updated']).id})`;
-      case 'agent.deleted':
-        return `Event: ${type} (id: ${(payload as ClerklyEvents['agent.deleted']).id})`;
-      case 'message.created':
-        return `Event: ${type} (id: ${(payload as ClerklyEvents['message.created']).data.id})`;
-      case 'message.updated':
-        return `Event: ${type} (id: ${(payload as ClerklyEvents['message.updated']).id})`;
-      case 'user.profile.updated':
-        return `Event: ${type} (id: ${(payload as ClerklyEvents['user.profile.updated']).id})`;
-      default:
-        return `Event: ${type}`;
+    const details: string[] = [];
+
+    // Extract entity id if available
+    const entityId = getEntityId(payload as BaseEvent & { id?: string; data?: { id?: string } });
+    if (entityId) {
+      details.push(`id: ${entityId}`);
     }
+
+    // Extract common fields from payload
+    const p = payload as unknown as Record<string, unknown>;
+    if ('userId' in p && p.userId) {
+      details.push(`userId: ${p.userId}`);
+    }
+    if ('email' in p && p.email) {
+      details.push(`email: ${p.email}`);
+    }
+    if ('user' in p && typeof p.user === 'object' && p.user && 'email' in (p.user as object)) {
+      details.push(`email: ${(p.user as { email: string }).email}`);
+    }
+    if ('error' in p && p.error) {
+      details.push(`error: ${p.error}`);
+    }
+    if ('errorCode' in p && p.errorCode) {
+      details.push(`code: ${p.errorCode}`);
+    }
+    if ('context' in p && p.context) {
+      details.push(`context: ${p.context}`);
+    }
+    if ('message' in p && p.message && !('error' in p)) {
+      details.push(`message: ${p.message}`);
+    }
+
+    if (details.length > 0) {
+      return `Event: ${type} (${details.join(', ')})`;
+    }
+    return `Event: ${type}`;
   }
 }

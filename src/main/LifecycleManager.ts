@@ -24,7 +24,7 @@ export class LifecycleManager {
   private windowManager: WindowManager;
   private dataManager: DataManager;
   private oauthClient: OAuthClientManager;
-  private profileManager: UserManager;
+  private userManager: UserManager;
   private startTime: number | null = null;
   private initialized: boolean = false;
   // Requirements: clerkly.3.5, clerkly.3.7
@@ -40,7 +40,7 @@ export class LifecycleManager {
     this.dataManager = dataManager;
     this.oauthClient = oauthClient;
     // Requirements: account-profile.1.5 - Initialize UserManager
-    this.profileManager = new UserManager(dataManager, tokenStorage);
+    this.userManager = new UserManager(dataManager, tokenStorage);
   }
 
   /**
@@ -64,7 +64,7 @@ export class LifecycleManager {
       const authStatus = await this.oauthClient.getAuthStatus();
       if (authStatus.authorized) {
         this.logger.info('User authenticated, fetching profile');
-        await this.profileManager.fetchProfile();
+        await this.userManager.fetchProfile();
       } else {
         this.logger.info('User not authenticated, skipping profile fetch');
       }

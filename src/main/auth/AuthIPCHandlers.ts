@@ -35,7 +35,7 @@ export class AuthIPCHandlers {
   // Requirements: clerkly.3.5, clerkly.3.7
   private logger = Logger.create('AuthIPCHandlers');
   private oauthClient: OAuthClientManager;
-  private profileManager: UserManager | null = null;
+  private userManager: UserManager | null = null;
   private handlersRegistered: boolean = false;
 
   constructor(oauthClient: OAuthClientManager) {
@@ -45,11 +45,11 @@ export class AuthIPCHandlers {
   /**
    * Set profile manager for profile-related IPC handlers
    * Requirements: account-profile.1.2
-   * @param profileManager UserManager instance
+   * @param userManager UserManager instance
    */
-  setProfileManager(profileManager: UserManager): void {
-    this.profileManager = profileManager;
-    this.logger.info('Profile manager set');
+  setUserManager(userManager: UserManager): void {
+    this.userManager = userManager;
+    this.logger.info('User manager set');
   }
 
   /**
@@ -66,7 +66,7 @@ export class AuthIPCHandlers {
     ipcMain.handle('auth:get-status', this.handleGetStatus.bind(this));
     ipcMain.handle('auth:logout', this.handleLogout.bind(this));
     ipcMain.handle('auth:get-user', this.handleGetUser.bind(this));
-    ipcMain.handle('auth:refresh-profile', this.handleRefreshProfile.bind(this));
+    ipcMain.handle('auth:refresh-user', this.handleRefreshProfile.bind(this));
 
     this.handlersRegistered = true;
     this.logger.info('Handlers registered');
@@ -85,7 +85,7 @@ export class AuthIPCHandlers {
     ipcMain.removeHandler('auth:get-status');
     ipcMain.removeHandler('auth:logout');
     ipcMain.removeHandler('auth:get-user');
-    ipcMain.removeHandler('auth:refresh-profile');
+    ipcMain.removeHandler('auth:refresh-user');
 
     this.handlersRegistered = false;
     this.logger.info('Handlers unregistered');
@@ -180,8 +180,8 @@ export class AuthIPCHandlers {
   private async handleGetUser(_event: IpcMainInvokeEvent): Promise<IPCResult> {
     try {
       // Requirements: account-profile.1.2, account-profile.1.7
-      if (!this.profileManager) {
-        this.logger.warn('Profile manager not set');
+      if (!this.userManager) {
+        this.logger.warn('User manager not set');
         return {
           success: true,
           user: null,
@@ -189,7 +189,7 @@ export class AuthIPCHandlers {
       }
 
       this.logger.info('Getting user');
-      const user = this.profileManager.getCurrentUser();
+      const user = this.userManager.getCurrentUser();
 
       return {
         success: true,
@@ -216,17 +216,17 @@ export class AuthIPCHandlers {
   private async handleRefreshProfile(_event: IpcMainInvokeEvent): Promise<IPCResult> {
     try {
       // Requirements: account-profile.1.5
-      if (!this.profileManager) {
-        this.logger.warn('Profile manager not set');
+      if (!this.userManager) {
+        this.logger.warn('User manager not set');
         return {
           success: false,
-          error: 'Profile manager not initialized',
+          error: 'User manager not initialized',
           user: null,
         };
       }
 
       this.logger.info('Refreshing profile');
-      const user = await this.profileManager.fetchProfile();
+      const user = await this.userManager.fetchProfile();
       Logger.info(
         'AuthIPCHandlers',
         `Profile refresh completed, result: ${user ? 'success' : 'null'}`
@@ -244,10 +244,7 @@ export class AuthIPCHandlers {
       };
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      Logger.error(
-        'AuthIPCHandlers',
-        `[AuthIPCHandlers] Failed to refresh profile: ${errorMessage}`
-      );
+      Logger.error('AuthIPCHandlers', `Failed to refresh user: ${errorMessage}`);
       return {
         success: false,
         error: errorMessage || 'Failed to refresh profile',

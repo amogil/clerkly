@@ -4,6 +4,8 @@ import { Logger } from '../Logger';
 import { useError } from '../contexts/error-context';
 import { useEventSubscription } from '../events/useEventSubscription';
 import type { ProfileSyncedPayload } from '../../shared/events/types';
+import { EVENT_TYPES } from '../../shared/events/constants';
+import type { LLMProvider } from '../../types';
 
 // Requirements: clerkly.3.5, clerkly.3.7
 const logger = Logger.create('Settings');
@@ -15,7 +17,7 @@ interface SettingsProps {
 
 export function Settings({ onSignOut, onNavigate }: SettingsProps) {
   const { showError, showSuccess } = useError();
-  const [llmProvider, setLlmProvider] = useState<'openai' | 'anthropic' | 'google'>('openai');
+  const [llmProvider, setLlmProvider] = useState<LLMProvider>('openai');
   const [apiKey, setApiKey] = useState('');
   const [showApiKey, setShowApiKey] = useState(false);
   const [testingConnection, setTestingConnection] = useState(false);
@@ -35,11 +37,11 @@ export function Settings({ onSignOut, onNavigate }: SettingsProps) {
   // Load profile data
   const loadProfile = useCallback(async () => {
     try {
-      const result = await window.api.auth.getProfile();
-      if (result.success && result.profile) {
+      const result = await window.api.auth.getUser();
+      if (result.success && result.user) {
         setProfile({
-          name: result.profile.name || '',
-          email: result.profile.email || '',
+          name: result.user.name || '',
+          email: result.user.email || '',
           loading: false,
         });
       } else {
@@ -74,7 +76,7 @@ export function Settings({ onSignOut, onNavigate }: SettingsProps) {
     [loadProfile]
   );
 
-  useEventSubscription('profile.synced', handleProfileSynced);
+  useEventSubscription(EVENT_TYPES.PROFILE_SYNCED, handleProfileSynced);
 
   // Requirements: settings.1.20, settings.1.21 - Load AI Agent settings on mount
   useEffect(() => {
@@ -282,9 +284,7 @@ export function Settings({ onSignOut, onNavigate }: SettingsProps) {
                 </label>
                 <select
                   value={llmProvider}
-                  onChange={(e) =>
-                    setLlmProvider(e.target.value as 'openai' | 'anthropic' | 'google')
-                  }
+                  onChange={(e) => setLlmProvider(e.target.value as LLMProvider)}
                   className="w-full px-4 py-2 bg-input-background border border-border rounded-lg text-foreground"
                 >
                   <option value="openai">OpenAI (GPT)</option>

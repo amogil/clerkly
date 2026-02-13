@@ -89,12 +89,12 @@ export interface Message {
 }
 
 /**
- * User profile
+ * User profile for events (minimal fields needed for UI)
  */
-export interface UserProfile {
-  id: string;
+export interface EventUser {
+  user_id: string;
   email: string;
-  name?: string;
+  name: string | null;
 }
 
 // ============================================================================
@@ -113,7 +113,7 @@ export type MessageUpdatedPayload = EntityUpdatedEvent<Message>;
 // User events
 export type UserLoginPayload = BaseEvent & { userId: string };
 export type UserLogoutPayload = BaseEvent;
-export type UserProfileUpdatedPayload = EntityUpdatedEvent<UserProfile>;
+export type UserProfileUpdatedPayload = EntityUpdatedEvent<EventUser>;
 
 // ============================================================================
 // Auth Events
@@ -144,8 +144,8 @@ export interface AuthFailedPayload extends BaseEvent {
  * Emitted when user profile is synchronized (fetched and saved)
  */
 export interface ProfileSyncedPayload extends BaseEvent {
-  /** User profile data */
-  profile: UserProfile;
+  /** User data */
+  user: EventUser;
 }
 
 // ============================================================================
@@ -162,22 +162,6 @@ export interface ErrorCreatedPayload extends BaseEvent {
   /** Context of the operation that failed */
   context: string;
 }
-
-// ============================================================================
-// UI Events
-// ============================================================================
-
-/**
- * Loader show event payload
- * Emitted when loader should be shown on login screen
- */
-export type LoaderShowPayload = BaseEvent;
-
-/**
- * Loader hide event payload
- * Emitted when loader should be hidden
- */
-export type LoaderHidePayload = BaseEvent;
 
 // ============================================================================
 // Event Map
@@ -206,10 +190,6 @@ export interface ClerklyEvents {
   'auth.succeeded': AuthSucceededPayload;
   'auth.failed': AuthFailedPayload;
   'profile.synced': ProfileSyncedPayload;
-
-  // UI events
-  'loader.show': LoaderShowPayload;
-  'loader.hide': LoaderHidePayload;
 
   // Error events
   'error.created': ErrorCreatedPayload;
@@ -338,12 +318,12 @@ export class AuthFailedEvent extends TypedEventClass<'auth.failed'> {
 export class ProfileSyncedEvent extends TypedEventClass<'profile.synced'> {
   readonly type = 'profile.synced' as const;
 
-  constructor(public readonly profile: UserProfile) {
+  constructor(public readonly user: EventUser) {
     super();
   }
 
   toPayload(): EventPayloadWithoutTimestamp<'profile.synced'> {
-    return { profile: this.profile };
+    return { user: this.user };
   }
 }
 
@@ -363,38 +343,6 @@ export class ErrorCreatedEvent extends TypedEventClass<'error.created'> {
 
   toPayload(): EventPayloadWithoutTimestamp<'error.created'> {
     return { message: this.message, context: this.context };
-  }
-}
-
-/**
- * Loader show event
- * Emitted when loader should be shown on login screen
- */
-export class LoaderShowEvent extends TypedEventClass<'loader.show'> {
-  readonly type = 'loader.show' as const;
-
-  constructor() {
-    super();
-  }
-
-  toPayload(): EventPayloadWithoutTimestamp<'loader.show'> {
-    return {};
-  }
-}
-
-/**
- * Loader hide event
- * Emitted when loader should be hidden
- */
-export class LoaderHideEvent extends TypedEventClass<'loader.hide'> {
-  readonly type = 'loader.hide' as const;
-
-  constructor() {
-    super();
-  }
-
-  toPayload(): EventPayloadWithoutTimestamp<'loader.hide'> {
-    return {};
   }
 }
 
@@ -517,7 +465,7 @@ export class UserProfileUpdatedEvent extends TypedEventClass<'user.profile.updat
 
   constructor(
     public readonly id: string,
-    public readonly changedFields: Partial<UserProfile>
+    public readonly changedFields: Partial<EventUser>
   ) {
     super();
   }
