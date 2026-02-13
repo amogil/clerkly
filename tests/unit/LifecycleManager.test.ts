@@ -654,5 +654,62 @@ describe('LifecycleManager', () => {
 
       consoleErrorSpy.mockRestore();
     });
+
+    /* Preconditions: LifecycleManager created, initialization throws non-Error object
+       Action: call initialize() when DataManager throws string
+       Assertions: error message is 'Unknown error'
+       Requirements: clerkly.1 */
+    it('should handle non-Error exception during initialization', async () => {
+      mockDataManager.initialize = jest.fn().mockImplementation(() => {
+        throw 'String error'; // Non-Error object
+      });
+
+      await expect(lifecycleManager.initialize()).rejects.toThrow(
+        'Application initialization failed: Unknown error'
+      );
+    });
+
+    /* Preconditions: LifecycleManager created, handleActivation throws non-Error object
+       Action: call handleActivation() when createWindow throws string
+       Assertions: error logged with 'Unknown error', no crash
+       Requirements: clerkly.1, clerkly.nfr.3 */
+    it('should handle non-Error exception in handleActivation', () => {
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+
+      mockWindowManager.isWindowCreated = jest.fn().mockReturnValue(false);
+      mockWindowManager.createWindow = jest.fn().mockImplementation(() => {
+        throw 'String error'; // Non-Error object
+      });
+
+      expect(() => lifecycleManager.handleActivation()).not.toThrow();
+
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[LifecycleManager] Failed to handle activation: Unknown error')
+      );
+
+      consoleErrorSpy.mockRestore();
+    });
+
+    /* Preconditions: LifecycleManager initialized, handleQuit throws non-Error object
+       Action: call handleQuit() when closeWindow throws string
+       Assertions: error logged with 'Unknown error', no crash
+       Requirements: clerkly.1, clerkly.nfr.2 */
+    it('should handle non-Error exception during shutdown', async () => {
+      await lifecycleManager.initialize();
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+
+      mockWindowManager.isWindowCreated = jest.fn().mockReturnValue(true);
+      mockWindowManager.closeWindow = jest.fn().mockImplementation(() => {
+        throw 'String error'; // Non-Error object
+      });
+
+      await expect(lifecycleManager.handleQuit()).resolves.not.toThrow();
+
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[LifecycleManager] Error during shutdown: Unknown error')
+      );
+
+      consoleErrorSpy.mockRestore();
+    });
   });
 });

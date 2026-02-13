@@ -137,6 +137,18 @@ describe('OAuthClientManager', () => {
       expect(calledUrl).toContain('access_type=offline');
       expect(calledUrl).toContain('prompt=consent');
     });
+
+    /* Preconditions: OAuth client configured, shell.openExternal throws error
+       Action: Call startAuthFlow
+       Assertions: Throws error with descriptive message
+       Requirements: google-oauth-auth.1.5 */
+    it('should handle error when opening browser fails', async () => {
+      (shell.openExternal as jest.Mock).mockRejectedValueOnce(new Error('Browser not available'));
+
+      await expect(oauthClient.startAuthFlow()).rejects.toThrow(
+        'Failed to start auth flow: Browser not available'
+      );
+    });
   });
 
   describe('Deep Link Handling', () => {

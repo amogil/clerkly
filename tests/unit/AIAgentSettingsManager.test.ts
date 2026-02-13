@@ -94,6 +94,18 @@ describe('AIAgentSettingsManager', () => {
 
       await expect(manager.saveLLMProvider('openai')).rejects.toThrow('Database error');
     });
+
+    /* Preconditions: DataManager is mocked to return failure without error message
+       Action: Call saveLLMProvider
+       Assertions: Verify fallback error message is used
+       Requirements: settings.1.10 */
+    it('should use fallback error message when error is empty', async () => {
+      mockDataManager.saveData.mockReturnValue({ success: false });
+
+      await expect(manager.saveLLMProvider('openai')).rejects.toThrow(
+        'Failed to save LLM provider'
+      );
+    });
   });
 
   describe('loadLLMProvider', () => {
@@ -196,6 +208,19 @@ describe('AIAgentSettingsManager', () => {
       await expect(manager.saveAPIKey('google', 'test-key')).rejects.toThrow('Database full');
     });
 
+    /* Preconditions: DataManager returns failure for key save without error message
+       Action: Call saveAPIKey
+       Assertions: Verify fallback error message is used
+       Requirements: settings.1.9 */
+    it('should use fallback error message when key save error is empty', async () => {
+      mockSafeStorage.isEncryptionAvailable.mockReturnValue(false);
+      mockDataManager.saveData.mockReturnValueOnce({ success: false });
+
+      await expect(manager.saveAPIKey('google', 'test-key')).rejects.toThrow(
+        'Failed to save API key'
+      );
+    });
+
     /* Preconditions: DataManager returns failure for encryption flag save
        Action: Call saveAPIKey
        Assertions: Verify error is thrown
@@ -207,6 +232,21 @@ describe('AIAgentSettingsManager', () => {
         .mockReturnValueOnce({ success: false, error: 'Database error' });
 
       await expect(manager.saveAPIKey('openai', 'test-key')).rejects.toThrow('Database error');
+    });
+
+    /* Preconditions: DataManager returns failure for encryption flag save without error message
+       Action: Call saveAPIKey
+       Assertions: Verify fallback error message is used
+       Requirements: settings.1.9 */
+    it('should use fallback error message when encryption flag save error is empty', async () => {
+      mockSafeStorage.isEncryptionAvailable.mockReturnValue(false);
+      mockDataManager.saveData
+        .mockReturnValueOnce({ success: true })
+        .mockReturnValueOnce({ success: false });
+
+      await expect(manager.saveAPIKey('openai', 'test-key')).rejects.toThrow(
+        'Failed to save encryption flag'
+      );
     });
 
     /* Preconditions: safeStorage encryption is available

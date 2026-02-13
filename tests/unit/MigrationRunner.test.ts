@@ -777,3 +777,69 @@ DROP TABLE users;`
     });
   });
 });
+
+describe('Error Handling', () => {
+  let errorDb: Database.Database;
+  let errorMigrationRunner: MigrationRunner;
+  let errorTestDbPath: string;
+  let errorTestMigrationsPath: string;
+
+  beforeEach(() => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'migration-error-test-'));
+    errorTestDbPath = path.join(tempDir, 'test.db');
+    errorTestMigrationsPath = path.join(tempDir, 'migrations');
+    fs.mkdirSync(errorTestMigrationsPath, { recursive: true });
+    errorDb = new Database(errorTestDbPath);
+    errorMigrationRunner = new MigrationRunner(errorDb, errorTestMigrationsPath);
+  });
+
+  afterEach(() => {
+    if (errorDb && errorDb.open) {
+      errorDb.close();
+    }
+    if (errorTestDbPath && fs.existsSync(errorTestDbPath)) {
+      fs.unlinkSync(errorTestDbPath);
+    }
+    if (errorTestMigrationsPath && fs.existsSync(errorTestMigrationsPath)) {
+      fs.rmSync(errorTestMigrationsPath, { recursive: true });
+    }
+  });
+
+  /* Preconditions: Database is closed
+       Action: Call initializeMigrationTable()
+       Assertions: Throws error with descriptive message
+       Requirements: clerkly.2 */
+  it('should throw error when database is closed during initializeMigrationTable', () => {
+    errorDb.close();
+
+    expect(() => {
+      errorMigrationRunner.initializeMigrationTable();
+    }).toThrow('Failed to initialize migration table');
+  });
+
+  /* Preconditions: Database is closed
+       Action: Call getCurrentVersion()
+       Assertions: Throws error with descriptive message
+       Requirements: clerkly.2 */
+  it('should throw error when database is closed during getCurrentVersion', () => {
+    errorMigrationRunner.initializeMigrationTable();
+    errorDb.close();
+
+    expect(() => {
+      errorMigrationRunner.getCurrentVersion();
+    }).toThrow('Failed to get current version');
+  });
+
+  /* Preconditions: Database is closed
+       Action: Call getAppliedMigrations()
+       Assertions: Throws error with descriptive message
+       Requirements: clerkly.2 */
+  it('should throw error when database is closed during getAppliedMigrations', () => {
+    errorMigrationRunner.initializeMigrationTable();
+    errorDb.close();
+
+    expect(() => {
+      errorMigrationRunner.getAppliedMigrations();
+    }).toThrow('Failed to get applied migrations');
+  });
+});

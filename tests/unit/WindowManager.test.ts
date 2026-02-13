@@ -299,6 +299,21 @@ describe('WindowManager', () => {
         windowManager.createWindow();
       }).toThrow('Window creation failed');
     });
+
+    /* Preconditions: WindowManager created, BrowserWindow constructor throws non-Error object
+       Action: call createWindow()
+       Assertions: throws error with 'Unknown error' message
+       Requirements: clerkly.1, clerkly.2*/
+    it('should handle non-Error exception during window creation', () => {
+      // Mock BrowserWindow to throw non-Error object
+      (BrowserWindow as jest.MockedClass<typeof BrowserWindow>).mockImplementationOnce(() => {
+        throw 'String error'; // Non-Error object
+      });
+
+      expect(() => {
+        windowManager.createWindow();
+      }).toThrow('Window creation failed: Unknown error');
+    });
   });
 
   describe('configureWindow', () => {
@@ -409,6 +424,22 @@ describe('WindowManager', () => {
       const mockWindow = getMockWindow();
       mockWindow.setSize.mockImplementation(() => {
         throw new Error('Failed to set size');
+      });
+
+      // Should not throw
+      expect(() => {
+        windowManager.configureWindow({ width: 1024, height: 768 });
+      }).not.toThrow();
+    });
+
+    /* Preconditions: window created, setSize throws non-Error object
+       Action: call configureWindow with size
+       Assertions: error caught with 'Unknown error', no exception thrown
+       Requirements: clerkly.1, clerkly.2*/
+    it('should handle non-Error exception during configuration', () => {
+      const mockWindow = getMockWindow();
+      mockWindow.setSize.mockImplementation(() => {
+        throw 'String error'; // Non-Error object
       });
 
       // Should not throw
