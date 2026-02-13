@@ -12,7 +12,7 @@ Agents List - это основной интерфейс для взаимоде
 
 ```sql
 CREATE TABLE users (
-  user_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id TEXT PRIMARY KEY,
   name TEXT,
   email TEXT NOT NULL UNIQUE
 );
@@ -21,7 +21,7 @@ CREATE INDEX idx_users_email ON users(email);
 ```
 
 **Поля:**
-- `user_id` - уникальный идентификатор пользователя
+- `user_id` - уникальный идентификатор пользователя (случайная строка 10 символов)
 - `name` - имя пользователя из Google OAuth профиля
 - `email` - email пользователя из Google OAuth профиля (уникальный)
 
@@ -30,7 +30,7 @@ CREATE INDEX idx_users_email ON users(email);
 ```sql
 CREATE TABLE agents (
   agent_id INTEGER PRIMARY KEY AUTOINCREMENT,
-  user_id INTEGER NOT NULL,
+  user_id TEXT NOT NULL,
   name TEXT NULL,
   created_at TIMESTAMP NOT NULL,
   updated_at TIMESTAMP NOT NULL,
@@ -44,7 +44,7 @@ CREATE INDEX idx_agents_user_archived_updated
 
 **Поля:**
 - `agent_id` - уникальный идентификатор агента
-- `user_id` - идентификатор пользователя-владельца (FK на users.user_id)
+- `user_id` - идентификатор пользователя-владельца (FK на users.user_id, TEXT 10 символов)
 - `name` - название агента (может быть NULL для новых агентов)
 - `created_at` - время создания (ISO 8601 с timezone offset)
 - `updated_at` - время последнего обновления

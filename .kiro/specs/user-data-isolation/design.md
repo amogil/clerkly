@@ -66,7 +66,7 @@
 
 ```sql
 CREATE TABLE IF NOT EXISTS users (
-  user_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id TEXT PRIMARY KEY,
   name TEXT,
   email TEXT NOT NULL UNIQUE
 );
@@ -74,13 +74,15 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 ```
 
+**Примечание:** user_id генерируется как случайная alphanumeric строка длиной 10 символов при создании пользователя.
+
 ### user_data Table Schema
 
 ```sql
 CREATE TABLE IF NOT EXISTS user_data (
   key TEXT NOT NULL,
   value TEXT NOT NULL,
-  user_id INTEGER NOT NULL,
+  user_id TEXT NOT NULL,
   PRIMARY KEY (key, user_id),
   FOREIGN KEY (user_id) REFERENCES users(user_id)
 );
@@ -103,7 +105,7 @@ interface UserProfile {
 }
 
 interface User {
-  user_id: number;
+  user_id: string;  // 10-character alphanumeric string
   name: string | null;
   email: string;
 }
@@ -115,6 +117,18 @@ interface User {
 
 ```typescript
 class UserManager {
+  /**
+   * Generate random user_id (10 alphanumeric characters)
+   */
+  private generateUserId(): string {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    let result = '';
+    for (let i = 0; i < 10; i++) {
+      result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result;
+  }
+
   /**
    * Find or create user by email
    * Requirements: user-data-isolation.0.2, user-data-isolation.0.3, user-data-isolation.0.4
@@ -135,13 +149,14 @@ class UserManager {
       return existingUser;
     }
 
-    // Create new user
-    const result = this.db.prepare(
-      'INSERT INTO users (name, email) VALUES (?, ?)'
-    ).run(name, email);
+    // Create new user with random user_id
+    const userId = this.generateUserId();
+    this.db.prepare(
+      'INSERT INTO users (user_id, name, email) VALUES (?, ?, ?)'
+    ).run(userId, name, email);
 
     return {
-      user_id: result.lastInsertRowid as number,
+      user_id: userId,
       name,
       email
     };
@@ -253,14 +268,14 @@ class DataManager {
 
 ```typescript
 class UserProfileManager {
-  private currentUserId: number | null = null; // Requirements: user-data-isolation.1.15
+  private currentUserId: string | null = null; // Requirements: user-data-isolation.1.15
   private userManager: UserManager;
 
   /**
    * Get current user ID
    * Requirements: user-data-isolation.1.11, user-data-isolation.1.15
    */
-  getCurrentUserId(): number | null {
+  getCurrentUserId(): string | null {
     return this.currentUserId;
   }
 
@@ -496,7 +511,7 @@ describe('User Data Isolation - Property Tests', () => {
       fc.property(
         fc.string(), // key
         fc.anything(), // value
-        fc.integer({ min: 1 }), // userId
+        fc.stringOf(fc.constantFrom(...'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'), { minLength: 10, maxLength: 10 }), // userId
         async (key, value, userId) => {
           // Setup: mock getCurrentUserId() to return userId
           // Action: saveData(key, value)
@@ -512,7 +527,7 @@ describe('User Data Isolation - Property Tests', () => {
     fc.assert(
       fc.property(
         fc.string(), // key
-        fc.integer({ min: 1 }), // userId
+        fc.stringOf(fc.constantFrom(...'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'), { minLength: 10, maxLength: 10 }), // userId
         async (key, userId) => {
           // Setup: save data for multiple users
           // Action: loadData(key) with specific user
@@ -529,8 +544,8 @@ describe('User Data Isolation - Property Tests', () => {
       fc.property(
         fc.string(), // key
         fc.anything(), // value
-        fc.integer({ min: 1 }), // userIdA
-        fc.integer({ min: 1 }), // userIdB
+        fc.stringOf(fc.constantFrom(...'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'), { minLength: 10, maxLength: 10 }), // userIdA
+        fc.stringOf(fc.constantFrom(...'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'), { minLength: 10, maxLength: 10 }), // userIdB
         async (key, value, userIdA, userIdB) => {
           fc.pre(userIdA !== userIdB); // Ensure different users
           // Setup: save data as userA
