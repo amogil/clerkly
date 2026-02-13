@@ -2,18 +2,48 @@
 
 ## Обзор
 
-Данный документ содержит список задач для обновления системы изоляции данных пользователей. Основное изменение: переход с `user_email` на `user_id` (10-символьная случайная строка) с введением таблицы `users` и класса `UserManager`.
+Данный документ содержит список задач для обновления системы изоляции данных пользователей. Основное изменение: переход с `user_email` на `user_id` (10-символьная случайная alphanumeric строка) с введением таблицы `users`.
 
 **Статус:** Требуется обновление существующей реализации
 
-**Оценка времени:** 8-10 дней
+**Оценка времени:** 6-8 дней
 
 ---
 
-## Фаза 1: Создание Таблицы Users и UserManager (2-3 дня)
+## Анализ Текущего Состояния
+
+### Текущая Реализация (что есть сейчас):
+
+**UserProfileManager (`src/main/auth/UserProfileManager.ts`):**
+- ❌ Использует `currentUserEmail: string | null` (нужно `currentUserId`)
+- ❌ Метод `getCurrentEmail()` (нужно `getCurrentUserId()`)
+- ❌ Нет таблицы `users`
+- ❌ Нет метода `generateUserId()`
+- ❌ Нет метода `findOrCreateUser()`
+- ❌ Ссылается на старые требования (user-data-isolation.1.14-1.18)
+
+**DataManager (`src/main/DataManager.ts`):**
+- ❌ Использует `user_email` для изоляции (нужно `user_id`)
+- ❌ Вызывает `getCurrentEmail()` (нужно `getCurrentUserId()`)
+- ❌ SQL запросы используют `user_email` (нужно `user_id`)
+- ❌ Ссылается на старые требования
+
+**Миграции (`migrations/001_initial_schema.sql`):**
+- ❌ Нет таблицы `users`
+- ❌ Таблица `user_data` использует `user_email` (нужно `user_id`)
+- ❌ Таблица `user_data` имеет колонку `timestamp` (нужно удалить)
+
+**Тесты:**
+- ❌ Тесты UserProfileManager используют `getCurrentEmail()`
+- ❌ Тесты DataManager используют `user_email`
+- ❌ Нет тестов для `generateUserId()`, `findOrCreateUser()`
+
+---
+
+## Фаза 1: Создание Таблицы Users (1-2 дня)
 
 ### 1.1. Создать миграцию для таблицы users
-- [ ] Создать файл миграции `XXX_create_users_table.sql` в `migrations/`
+- [ ] Создать файл миграции `002_create_users_table.sql` в `migrations/`
 - [ ] Добавить UP секцию:
   ```sql
   CREATE TABLE IF NOT EXISTS users (
@@ -25,10 +55,24 @@
   ```
 - [ ] Добавить DOWN секцию для отката
 - [ ] Запустить миграцию и проверить создание таблицы
-- _Requirements: user-data-isolation.0.1, user-data-isolation.0.6_
+- _Requirements: user-data-isolation.0.1, user-data-isolation.0.5_
 
-### 1.2. Создать интерфейс User
-- [ ] Добавить интерфейс `User` в `src/main/auth/UserManager.ts`:
+### 1.2. Написать модульные тесты для миграции
+- [ ] Тест: таблица `users` создается с правильной структурой
+- [ ] Тест: индекс `idx_users_email` создается
+- [ ] Тест: DOWN миграция удаляет таблицу и индекс
+- _Requirements: user-data-isolation.0.1, user-data-isolation.0.5_
+
+### 1.3. Запустить валидацию Фазы 1
+- [ ] Выполнить `npm run validate`
+- [ ] Убедиться, что миграция применяется корректно
+
+---
+
+## Фаза 2: Расширение UserProfileManager (2 дня)
+
+### 2.1. Добавить интерфейс User
+- [ ] Добавить интерфейс `User` в `src/main/auth/UserProfileManager.ts`:
   ```typescript
   interface User {
     user_id: string;
@@ -36,178 +80,167 @@
     email: string;
   }
   ```
-- [ ] Экспортировать интерфейс для использования в других модулях
+- [ ] Экспортировать интерфейс
+- _Requirements: user-data-isolation.1_
+
+### 2.2. Добавить метод generateUserId
+- [ ] Реализовать приватный метод `generateUserId(): string`:
+  - Набор символов: A-Z, a-z, 0-9 (62 символа)
+  - Длина: 10 символов
+  - Использовать `Math.random()` для выбора символов
+- [ ] Добавить комментарий с Requirements
+- _Requirements: user-data-isolation.0.2, user-data-isolation.1.1_
+
+### 2.3. Добавить метод findOrCreateUser
+- [ ] Реализовать метод `findOrCreateUser(email: string, name: string | null): User`:
+  - Искать пользователя по email: `SELECT user_id, name, email FROM users WHERE email = ?`
+  - Если найден: обновить name при необходимости, вернуть существующего
+  - Если не найден: вызвать `generateUserId()`, создать запись, вернуть нового
+- [ ] Добавить логирование через Logger
+- [ ] Добавить комментарий с Requirements
+- _Requirements: user-data-isolation.0.3, user-data-isolation.0.4, user-data-isolation.1.2_
+
+### 2.4. Заменить currentUserEmail на currentUserId
+- [ ] Заменить `private currentUserEmail: string | null` на `private currentUserId: string | null`
+- [ ] Заменить метод `getCurrentEmail()` на `getCurrentUserId()`
+- [ ] Заменить метод `clearCurrentEmail()` на `clearSession()` (уже есть, проверить)
+- [ ] Обновить все внутренние ссылки
+- _Requirements: user-data-isolation.1.1, user-data-isolation.1.4, user-data-isolation.1.5_
+
+### 2.5. Обновить метод fetchProfile
+- [ ] После получения профиля вызвать `findOrCreateUser(profile.email, profile.name)`
+- [ ] Установить `this.currentUserId = user.user_id`
+- [ ] Использовать `ErrorHandler.handleBackgroundError()` для ошибок
+- [ ] Обновить логирование
+- _Requirements: user-data-isolation.1.2, error-notifications.1.4_
+
+### 2.6. Обновить метод fetchProfileSynchronously
+- [ ] После получения профиля вызвать `findOrCreateUser(profile.email, profile.name)`
+- [ ] Установить `this.currentUserId = user.user_id`
+- [ ] Обновить логирование
+- _Requirements: user-data-isolation.1.2_
+
+### 2.7. Обновить метод initialize
+- [ ] Загрузить профиль из базы данных
+- [ ] Вызвать `findOrCreateUser(profile.email, profile.name)`
+- [ ] Установить `this.currentUserId = user.user_id`
+- [ ] Использовать `ErrorHandler.handleBackgroundError()` для ошибок
+- [ ] Обновить логирование
+- _Requirements: user-data-isolation.1.3_
+
+### 2.8. Обновить метод loadProfile
+- [ ] После загрузки профиля вызвать `findOrCreateUser(profile.email, profile.name)`
+- [ ] Установить `this.currentUserId = user.user_id` (если не logout)
+- _Requirements: user-data-isolation.1.3_
+
+### 2.9. Обновить метод clearSession
+- [ ] Установить `this.currentUserId = null`
+- [ ] Обновить логирование
 - _Requirements: user-data-isolation.1.4_
 
-### 1.3. Создать класс UserManager
-- [ ] Создать файл `src/main/auth/UserManager.ts`
-- [ ] Реализовать конструктор с зависимостями (db: Database, logger: Logger)
-- [ ] Реализовать приватный метод `generateUserId(): string`:
-  - Генерировать 10-символьную alphanumeric строку (A-Z, a-z, 0-9)
-  - Использовать `Math.random()` для генерации
-- [ ] Реализовать публичный метод `findOrCreateUser(email: string, name: string | null): User`:
-  - Искать пользователя по email в таблице `users`
-  - Если найден - вернуть (обновив name при необходимости)
-  - Если не найден - создать с новым user_id
-- [ ] Добавить комментарии с Requirements к каждому методу
-- _Requirements: user-data-isolation.1.1, user-data-isolation.1.2, user-data-isolation.1.3, user-data-isolation.1.5_
+### 2.10. Удалить устаревшие методы
+- [ ] Удалить `getCurrentEmail()` (заменен на `getCurrentUserId()`)
+- [ ] Удалить `clearCurrentEmail()` (заменен на `clearSession()`)
+- [ ] Обновить все вызовы в других файлах
 
-### 1.4. Написать модульные тесты для UserManager
-- [ ] Создать файл `tests/unit/auth/UserManager.test.ts`
+### 2.11. Обновить комментарии Requirements
+- [ ] Заменить старые ID требований (user-data-isolation.1.14-1.18) на новые (user-data-isolation.0-5)
+- [ ] Добавить ссылки на error-notifications.1.4 где используется ErrorHandler
+
+### 2.12. Написать/обновить модульные тесты UserProfileManager
 - [ ] Тест: `should generate valid 10-character alphanumeric user_id`
-  - Preconditions: нет
-  - Action: вызвать generateUserId() 100 раз
-  - Assertions: все ID имеют длину 10, содержат только alphanumeric
-  - _Requirements: user-data-isolation.0.2, user-data-isolation.1.2_
 - [ ] Тест: `should create new user on first login`
-  - Preconditions: пустая таблица users
-  - Action: вызвать findOrCreateUser('test@example.com', 'Test User')
-  - Assertions: создан пользователь с 10-символьным user_id
-  - _Requirements: user-data-isolation.0.3, user-data-isolation.1.3_
 - [ ] Тест: `should find existing user on re-login`
-  - Preconditions: пользователь существует в таблице users
-  - Action: вызвать findOrCreateUser с тем же email
-  - Assertions: возвращается существующий user_id
-  - _Requirements: user-data-isolation.0.4, user-data-isolation.1.3_
 - [ ] Тест: `should update user name if changed`
-  - Preconditions: пользователь существует с именем 'Old Name'
-  - Action: вызвать findOrCreateUser с тем же email, но именем 'New Name'
-  - Assertions: имя обновлено в базе данных
-  - _Requirements: user-data-isolation.0.5, user-data-isolation.1.3_
 - [ ] Тест: `should not update name if null passed`
-  - Preconditions: пользователь существует с именем 'Test'
-  - Action: вызвать findOrCreateUser с тем же email, но name = null
-  - Assertions: имя не изменилось
-  - _Requirements: user-data-isolation.1.3_
+- [ ] Тест: `should cache user_id after successful login`
+- [ ] Тест: `should clear user_id on logout`
+- [ ] Тест: `getCurrentUserId returns correct user_id`
+- [ ] Тест: `should call ErrorHandler.handleBackgroundError on fetchProfile failure`
+- [ ] Тест: `should call ErrorHandler.handleBackgroundError on initialize failure`
+- _Requirements: user-data-isolation.0.2, user-data-isolation.0.3, user-data-isolation.0.4, user-data-isolation.1.1-1.5, error-notifications.1.4_
 
-### 1.5. Запустить валидацию Фазы 1
+### 2.13. Запустить валидацию Фазы 2
 - [ ] Выполнить `npm run validate`
 - [ ] Убедиться, что все тесты проходят
-- [ ] Проверить покрытие кода UserManager (минимум 85%)
+- [ ] Проверить покрытие кода UserProfileManager (минимум 85%)
 
 ---
 
-## Фаза 2: Миграция user_data (2-3 дня)
+## Фаза 3: Миграция user_data и обновление DataManager (2 дня)
 
-### 2.1. Создать миграцию для изменения user_data
-- [ ] Создать файл миграции `XXX_migrate_user_data_to_user_id.sql`
+### 3.1. Создать миграцию для изменения user_data
+- [ ] Создать файл миграции `003_migrate_user_data_to_user_id.ts` в `migrations/` (код на TypeScript)
+- [ ] Реализовать функцию `generateUserId()` - та же логика что в UserProfileManager:
+  - Набор символов: A-Z, a-z, 0-9 (62 символа)
+  - Длина: 10 символов
 - [ ] Добавить UP секцию:
-  - Создать записи в `users` для всех уникальных email из `user_data`
-  - Создать новую таблицу `user_data_new` с `user_id` вместо `user_email`
-  - Скопировать данные с преобразованием email → user_id
+  - Получить все уникальные email из `user_data`
+  - Создать записи в `users` с случайным alphanumeric user_id для каждого email
+  - Создать новую таблицу `user_data_new` с `user_id` вместо `user_email` (без колонки `timestamp`)
+  - Скопировать данные с преобразованием email → user_id через JOIN
   - Удалить старую таблицу, переименовать новую
   - Создать индекс `idx_user_id`
 - [ ] Добавить DOWN секцию для отката
 - [ ] Протестировать миграцию на тестовой базе
-- _Requirements: user-data-isolation.6.1, user-data-isolation.6.2, user-data-isolation.6.3, user-data-isolation.6.4, user-data-isolation.6.5_
+- _Requirements: user-data-isolation.5.1, user-data-isolation.5.2, user-data-isolation.5.3, user-data-isolation.5.4_
 
-### 2.2. Написать тесты для миграции
-- [ ] Тест: миграция создает записи в users для всех email
-- [ ] Тест: миграция корректно связывает данные с user_id
-- [ ] Тест: миграция идемпотентна (повторный запуск безопасен)
-- [ ] Тест: DOWN миграция откатывает изменения
-- _Requirements: user-data-isolation.6.4, user-data-isolation.6.5_
+### 3.2. Удалить колонку timestamp из user_data
+- [ ] Убедиться, что новая схема user_data НЕ содержит колонку `timestamp`
+- [ ] Обновить все SQL запросы, использующие `timestamp`
+- [ ] Использовать только `created_at` и `updated_at`
+- _Requirements: user-data-isolation.2.1, user-data-isolation.2.2_
 
-### 2.3. Обновить DataManager для использования user_id
+### 3.3. Обновить DataManager для использования user_id
 - [ ] Изменить метод `saveData`:
+  - Заменить `getCurrentEmail()` на `getCurrentUserId()`
   - Заменить `user_email` на `user_id` в SQL запросе
+  - Удалить `timestamp` из INSERT
   - Обновить логирование
 - [ ] Изменить метод `loadData`:
+  - Заменить `getCurrentEmail()` на `getCurrentUserId()`
   - Заменить `user_email` на `user_id` в SQL запросе
   - Обновить логирование
 - [ ] Изменить метод `deleteData`:
+  - Заменить `getCurrentEmail()` на `getCurrentUserId()`
   - Заменить `user_email` на `user_id` в SQL запросе
   - Обновить логирование
-- [ ] Обновить комментарии с Requirements
-- _Requirements: user-data-isolation.2.5, user-data-isolation.2.6, user-data-isolation.2.7_
+- [ ] Обновить комментарии с Requirements (заменить старые ID на новые)
+- _Requirements: user-data-isolation.2.4, user-data-isolation.2.5, user-data-isolation.2.6, user-data-isolation.3.1, user-data-isolation.3.2_
 
-### 2.4. Обновить модульные тесты DataManager
+### 3.4. Обновить модульные тесты DataManager
 - [ ] Обновить тест: `should automatically add user_id when saving`
 - [ ] Обновить тест: `should automatically filter by user_id when loading`
 - [ ] Обновить тест: `should automatically filter by user_id when deleting`
 - [ ] Обновить тест: `should throw error when no user logged in`
-- [ ] Обновить все моки для использования user_id вместо email
-- _Requirements: user-data-isolation.2.5, user-data-isolation.2.6, user-data-isolation.2.7, user-data-isolation.4.3_
+- [ ] Обновить все моки для использования `getCurrentUserId()` вместо `getCurrentEmail()`
+- [ ] Удалить тесты, связанные с `timestamp`
+- _Requirements: user-data-isolation.2.4, user-data-isolation.2.5, user-data-isolation.2.6, user-data-isolation.3.2_
 
-### 2.5. Запустить валидацию Фазы 2
-- [ ] Выполнить `npm run validate`
-- [ ] Убедиться, что все тесты проходят
-- [ ] Проверить покрытие кода DataManager
+### 3.5. Написать тесты для миграции данных
+- [ ] Тест: существующие данные с user_email мигрируются на user_id
+- [ ] Тест: создаются записи в таблице users для каждого уникального email
+- [ ] Тест: колонка timestamp удаляется
+- [ ] Тест: DOWN миграция восстанавливает user_email
+- _Requirements: user-data-isolation.5.1, user-data-isolation.5.2, user-data-isolation.5.3, user-data-isolation.5.4_
 
----
-
-## Фаза 3: Интеграция UserProfileManager (1-2 дня)
-
-### 3.1. Добавить зависимость на UserManager
-- [ ] Добавить `userManager: UserManager` в конструктор UserProfileManager
-- [ ] Обновить инициализацию в main process
-- _Requirements: user-data-isolation.3.1_
-
-### 3.2. Заменить currentUserEmail на currentUserId
-- [ ] Заменить `private currentUserEmail: string | null` на `private currentUserId: string | null`
-- [ ] Заменить метод `getCurrentEmail()` на `getCurrentUserId()`
-- [ ] Обновить все внутренние ссылки
-- _Requirements: user-data-isolation.3.2, user-data-isolation.3.3_
-
-### 3.3. Обновить метод fetchProfile
-- [ ] После получения профиля вызвать `userManager.findOrCreateUser(profile.email, profile.name)`
-- [ ] Установить `this.currentUserId = user.user_id`
-- [ ] Обновить логирование
-- _Requirements: user-data-isolation.3.4_
-
-### 3.4. Обновить метод initialize
-- [ ] Загрузить профиль из базы данных
-- [ ] Вызвать `userManager.findOrCreateUser(profile.email, profile.name)`
-- [ ] Установить `this.currentUserId = user.user_id`
-- [ ] Обновить логирование
-- _Requirements: user-data-isolation.3.5_
-
-### 3.5. Обновить метод clearSession
-- [ ] Установить `this.currentUserId = null`
-- [ ] Обновить логирование
-- _Requirements: user-data-isolation.3.6_
-
-### 3.6. Обновить модульные тесты UserProfileManager
-- [ ] Обновить тест: `should cache user_id after successful login`
-- [ ] Обновить тест: `should restore user_id from database on startup`
-- [ ] Обновить тест: `should clear user_id on logout`
-- [ ] Обновить тест: `getCurrentUserId returns correct user_id`
-- [ ] Обновить все моки для использования user_id
-- _Requirements: user-data-isolation.3.2, user-data-isolation.3.3, user-data-isolation.3.4, user-data-isolation.3.5, user-data-isolation.3.6_
-
-### 3.7. Запустить валидацию Фазы 3
+### 3.6. Запустить валидацию Фазы 3
 - [ ] Выполнить `npm run validate`
 - [ ] Убедиться, что все тесты проходят
 
 ---
 
-## Фаза 4: Property-Based Тесты (1 день)
+## Фаза 4: Property-Based и Функциональные Тесты (1-2 дня)
 
-### 4.1. Создать property тесты для UserManager
-- [ ] Создать файл `tests/property/auth/UserManager.property.test.ts`
-- [ ] Property: `generateUserId always produces 10-char alphanumeric string`
-- [ ] Property: `findOrCreateUser is idempotent for same email`
-- [ ] Property: `different emails always get different user_ids`
-- _Requirements: user-data-isolation.0.2, user-data-isolation.0.4, user-data-isolation.1.2_
-
-### 4.2. Обновить property тесты DataManager
-- [ ] Обновить файл `tests/property/DataManagerUserIsolation.property.test.ts`
-- [ ] Заменить email на user_id во всех тестах
-- [ ] Property: `should always add user_id when saving data`
-- [ ] Property: `should always filter by user_id when loading data`
+### 4.1. Обновить/создать property тесты
+- [ ] Создать/обновить файл `tests/property/auth/UserDataIsolation.property.test.ts`
+- [ ] Property: `should generate valid 10-character alphanumeric user_id` (100+ итераций)
+- [ ] Property: `should return same user_id for same email on repeated findOrCreateUser calls`
 - [ ] Property: `should isolate data between different users`
-- [ ] Property: `should restore data after logout and re-login`
-- _Requirements: user-data-isolation.2.5, user-data-isolation.2.6, user-data-isolation.5.4_
+- [ ] Property: `should restore data after logout and re-login with same email`
+- _Requirements: user-data-isolation.0.2, user-data-isolation.0.3, user-data-isolation.4.4_
 
-### 4.3. Запустить валидацию Фазы 4
-- [ ] Выполнить `npm run test:property`
-- [ ] Убедиться, что все property тесты проходят
-
----
-
-## Фаза 5: Функциональные Тесты (1-2 дня)
-
-### 5.1. Обновить существующие функциональные тесты
+### 4.2. Обновить функциональные тесты
 - [ ] Обновить `tests/functional/user-data-isolation.spec.ts`
 - [ ] Тест: `should create user record on first login`
 - [ ] Тест: `should find existing user on re-login`
@@ -216,34 +249,49 @@
 - [ ] Тест: `should persist data after logout`
 - [ ] Тест: `should restore user data after re-login`
 - [ ] Тест: `should filter data by user_id`
-- _Requirements: user-data-isolation.0.3, user-data-isolation.0.4, user-data-isolation.0.5, user-data-isolation.2.5, user-data-isolation.2.6_
-
-### 5.2. Добавить тесты обработки ошибок
 - [ ] Тест: `should handle No user logged in error`
-- [ ] Тест: `should retry operation after token refresh`
-- _Requirements: user-data-isolation.5.1, user-data-isolation.5.2_
+- _Requirements: user-data-isolation.0.3, user-data-isolation.0.4, user-data-isolation.2.4, user-data-isolation.2.5, user-data-isolation.4.1_
+
+### 4.3. Запустить валидацию Фазы 4
+- [ ] Выполнить `npm run test:property`
+- [ ] Убедиться, что все property тесты проходят
 
 ---
 
-## Фаза 6: Интеграция и Финализация (1 день)
+## Фаза 5: Обновление Связанных Компонентов (1 день)
 
-### 6.1. Обновить инициализацию в main process
-- [ ] Создать экземпляр UserManager
-- [ ] Передать UserManager в UserProfileManager
-- [ ] Обновить порядок инициализации:
-  1. Database
-  2. MigrationRunner (запуск миграций)
-  3. UserManager
-  4. UserProfileManager
-  5. DataManager
-- _Requirements: user-data-isolation.3.1, user-data-isolation.4.1_
+### 5.1. Обновить AuthIPCHandlers
+- [ ] Найти все использования `getCurrentEmail()`
+- [ ] Заменить на `getCurrentUserId()`
+- [ ] Обновить тесты
 
-### 6.2. Обновить процедуру logout
-- [ ] Убедиться, что clearSession очищает currentUserId
-- [ ] Обработать race conditions (логировать, не выбрасывать ошибку)
-- _Requirements: user-data-isolation.3.6, user-data-isolation.5.3_
+### 5.2. Обновить другие компоненты, использующие UserProfileManager
+- [ ] Поиск: `grep -r "getCurrentEmail" src/`
+- [ ] Поиск: `grep -r "currentUserEmail" src/`
+- [ ] Заменить все вхождения на `getCurrentUserId()` / `currentUserId`
+- [ ] Обновить соответствующие тесты
 
-### 6.3. Запустить полную валидацию
+### 5.3. Обновить связанные спецификации
+- [ ] Обновить `.kiro/specs/settings/requirements.md`:
+  - Заменить упоминания `user_email` на `user_id`
+  - Обновить ссылки на требования user-data-isolation
+- [ ] Обновить `.kiro/specs/google-oauth-auth/requirements.md`:
+  - Обновить ссылки на требования user-data-isolation
+- [ ] Проверить другие спецификации на упоминания `user_email`
+- _Requirements: документация_
+
+### 5.4. Обновить существующие тесты
+- [ ] Найти все тесты, использующие `getCurrentEmail()`
+- [ ] Заменить на `getCurrentUserId()`
+- [ ] Обновить моки для использования user_id вместо email
+- [ ] Обновить тестовые данные (email → user_id)
+- _Requirements: user-data-isolation.1.4, user-data-isolation.1.5_
+
+---
+
+## Фаза 6: Финализация (0.5 дня)
+
+### 6.1. Запустить полную валидацию
 - [ ] Выполнить `npm run validate`
 - [ ] Убедиться, что все проверки проходят:
   - ✅ TypeScript компиляция
@@ -253,10 +301,13 @@
   - ✅ Property-based тесты
   - ✅ Покрытие кода (минимум 85%)
 
-### 6.4. Обновить документацию
+### 6.2. Обновить документацию
 - [ ] Проверить комментарии с Requirements в коде
 - [ ] Обновить таблицу покрытия требований в design.md
 - [ ] Убедиться, что все тесты имеют структуру (Preconditions, Action, Assertions, Requirements)
+
+### 6.3. Запросить функциональные тесты
+- [ ] Спросить пользователя: "Запустить функциональные тесты? (они покажут окна на экране)"
 
 ---
 
@@ -267,6 +318,8 @@
 - Все комментарии в коде на английском языке
 - Функциональные тесты запускаются ТОЛЬКО при явной просьбе пользователя
 - Каждая фаза должна быть провалидирована перед переходом к следующей
+- FOREIGN KEY не используется - целостность поддерживается логикой приложения
+- DataManager НЕ вызывает ErrorHandler напрямую - ошибки обрабатываются вызывающим кодом
 
 ## Риски
 
@@ -278,3 +331,6 @@
 
 3. **Производительность** - дополнительный JOIN при миграции
    - Митигация: индексы на email и user_id
+
+4. **Circular dependency** - UserProfileManager и DataManager зависят друг от друга
+   - Митигация: использовать `setUserProfileManager()` после инициализации (уже реализовано)
