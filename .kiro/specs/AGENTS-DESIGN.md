@@ -1,5 +1,7 @@
 Design: Isolated JS Agents in Electron (no external runtime)
 
+> **📚 РЕФЕРЕНС-ДОКУМЕНТАЦИЯ**: Это справочный документ, описывающий архитектуру системы агентов. По данному документу не нужно реализовывать код напрямую — он служит источником истины для схемы БД и архитектурных решений.
+
 Scope
 
 Cross-platform Electron app (Windows/macOS/Linux) running LLM-driven agents that can generate and execute JS in a sandbox, call a small set of tools, and persist full chat history in SQL.
