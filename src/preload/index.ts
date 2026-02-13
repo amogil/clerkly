@@ -13,6 +13,7 @@ const EVENT_TYPE_AUTH_SUCCEEDED = 'auth.succeeded';
 const EVENT_TYPE_PROFILE_SYNCED = 'profile.synced';
 const EVENT_TYPE_LOADER_SHOW = 'loader.show';
 const EVENT_TYPE_LOADER_HIDE = 'loader.hide';
+const EVENT_TYPE_ERROR_CREATED = 'error.created';
 
 /**
  * API interface for secure IPC communication
@@ -308,19 +309,19 @@ const api: API = {
    */
   error: {
     /**
-     * Listen for error notification events
+     * Listen for error notification events via EventBus
      * Requirements: error-notifications.1.1, error-notifications.1.2
      * @param {Function} callback - Callback function to execute when error notification is received
      * @returns {Function} Unsubscribe function to remove the listener
      */
     onNotify(callback: (message: string, context: string) => void): () => void {
-      const listener = (_event: any, message: string, context: string) => {
-        callback(message, context);
-      };
-      ipcRenderer.on('error:notify', listener);
-      return () => {
-        ipcRenderer.removeListener('error:notify', listener);
-      };
+      // Use the events API to listen for error.created events
+      return api.events!.onEvent((type: string, payload: unknown) => {
+        if (type === EVENT_TYPE_ERROR_CREATED) {
+          const data = payload as { message: string; context: string };
+          callback(data.message, data.context);
+        }
+      });
     },
   },
 
