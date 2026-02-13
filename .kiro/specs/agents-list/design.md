@@ -29,7 +29,7 @@ CREATE INDEX idx_users_email ON users(email);
 
 ```sql
 CREATE TABLE agents (
-  agent_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  agent_id TEXT PRIMARY KEY,
   user_id TEXT NOT NULL,
   name TEXT NULL,
   created_at TIMESTAMP NOT NULL,
@@ -43,19 +43,33 @@ CREATE INDEX idx_agents_user_archived_updated
 ```
 
 **Поля:**
-- `agent_id` - уникальный идентификатор агента
+- `agent_id` - уникальный идентификатор агента (случайная строка 10 символов)
 - `user_id` - идентификатор пользователя-владельца (FK на users.user_id, TEXT 10 символов)
 - `name` - название агента (может быть NULL для новых агентов)
 - `created_at` - время создания (ISO 8601 с timezone offset)
 - `updated_at` - время последнего обновления
 - `archived_at` - время архивирования (NULL = не архивирован)
 
+**Генерация agent_id:**
+
+```typescript
+// Requirements: agents-list.2
+function generateAgentId(): string {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let result = '';
+  for (let i = 0; i < 10; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+}
+```
+
 ### Таблица messages
 
 ```sql
 CREATE TABLE messages (
   id INTEGER PRIMARY KEY,
-  agent_id INTEGER NOT NULL,
+  agent_id TEXT NOT NULL,
   timestamp TIMESTAMP NOT NULL,
   payload_json TEXT NOT NULL
 );

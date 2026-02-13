@@ -119,7 +119,7 @@ Timeouts/crash handling.
 ⸻
 
 1.3 Naming conventions
-	•	agent_id: INTEGER (autoincrement)
+	•	agent_id: TEXT (10-character alphanumeric string)
 	•	user_id: TEXT (10-character alphanumeric string, FK to users.user_id)
 	•	message_id: INTEGER (messages.id)
 	•	tool_call_id: TEXT derived from tool_name + timestamp (with optional random suffix)
@@ -172,7 +172,7 @@ Note: user_id is a randomly generated 10-character alphanumeric string.
 2.1 Table: agents
 
 CREATE TABLE agents (
-  agent_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  agent_id TEXT PRIMARY KEY,
   user_id TEXT NOT NULL,
   name TEXT NULL,
   created_at TIMESTAMP NOT NULL,
@@ -188,7 +188,7 @@ CREATE INDEX idx_agents_user_archived_updated
 
 CREATE TABLE messages (
   id INTEGER PRIMARY KEY,
-  agent_id INTEGER NOT NULL,
+  agent_id TEXT NOT NULL,
   timestamp TIMESTAMP NOT NULL, -- ISO 8601 with offset in user's timezone
   payload_json TEXT NOT NULL
 );
