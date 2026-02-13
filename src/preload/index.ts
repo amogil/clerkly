@@ -14,6 +14,11 @@ interface API {
   saveData: (key: string, value: unknown) => Promise<{ success: boolean; error?: string }>;
   loadData: (key: string) => Promise<{ success: boolean; data?: unknown; error?: string }>;
   deleteData: (key: string) => Promise<{ success: boolean; error?: string }>;
+  // Requirements: realtime-events.4.5, realtime-events.4.6, realtime-events.4.7
+  events?: {
+    onEvent: (callback: (type: string, payload: unknown) => void) => () => void;
+    sendEvent: (type: string, payload: unknown) => void;
+  };
   // Requirements: google-oauth-auth.8.1, google-oauth-auth.8.2, google-oauth-auth.8.3, account-profile.1.2, account-profile.1.5
   auth: {
     startLogin: () => Promise<{ success: boolean; error?: string }>;
@@ -107,6 +112,39 @@ const api: API = {
    */
   async deleteData(key: string): Promise<{ success: boolean; error?: string }> {
     return await ipcRenderer.invoke('delete-data', key);
+  },
+
+  // Requirements: realtime-events.4.5, realtime-events.4.6, realtime-events.4.7
+  /**
+   * Events API
+   * Provides methods for real-time event communication between main and renderer
+   */
+  events: {
+    /**
+     * Listen for events from main process
+     * Requirements: realtime-events.4.5
+     * @param {Function} callback - Callback function to execute when event is received
+     * @returns {Function} Unsubscribe function to remove the listener
+     */
+    onEvent(callback: (type: string, payload: unknown) => void): () => void {
+      const listener = (_event: Electron.IpcRendererEvent, type: string, payload: unknown) => {
+        callback(type, payload);
+      };
+      ipcRenderer.on('events:from-main', listener);
+      return () => {
+        ipcRenderer.removeListener('events:from-main', listener);
+      };
+    },
+
+    /**
+     * Send event to main process
+     * Requirements: realtime-events.4.6
+     * @param {string} type - Event type
+     * @param {unknown} payload - Event payload
+     */
+    sendEvent(type: string, payload: unknown): void {
+      ipcRenderer.send('events:from-renderer', type, payload);
+    },
   },
 
   // Requirements: google-oauth-auth.8.1, google-oauth-auth.8.2, google-oauth-auth.8.3, account-profile.1.2, account-profile.1.5
