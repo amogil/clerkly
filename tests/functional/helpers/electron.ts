@@ -45,7 +45,7 @@ export async function launchElectron(
 
   // Path to the built Electron app
   const electronPath = require('electron') as unknown as string;
-  const appPath = path.join(__dirname, '../../../dist/main/index.js');
+  const appPath = path.join(__dirname, '../../../dist/main/main/index.js');
 
   // Launch Electron
   // Requirements: testing.3.1, testing.3.2

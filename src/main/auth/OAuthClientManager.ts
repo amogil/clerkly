@@ -343,35 +343,32 @@ export class OAuthClientManager {
       }
 
       const profileData = (await response.json()) as {
+        id: string;
         email: string;
-        name?: string;
-        [key: string]: any;
+        name: string;
+        given_name?: string;
+        family_name?: string;
+        locale?: string;
+        verified_email?: boolean;
       };
       Logger.info(
         'OAuthClientManager',
         `fetchProfileWithTokens: Profile fetched: ${profileData.email}`
       );
 
-      // Add lastUpdated timestamp
-      const profile = {
-        ...profileData,
-        lastUpdated: Date.now(),
-      };
-
       // CRITICAL: Find or create user and set user_id in ProfileManager BEFORE saving to database
       // This is required because DataManager.saveData() needs getCurrentUserId()
       // Requirements: user-data-isolation.1.2 - Find or create user by email
       Logger.info('OAuthClientManager', 'fetchProfileWithTokens: Finding or creating user');
-      const user = this.userManager.findOrCreateUser(profile.email, profile.name || null);
+      const user = this.userManager.findOrCreateUser(profileData);
       (this.userManager as any).currentUserId = user.user_id;
+      (this.userManager as any).currentUser = user;
       Logger.info('OAuthClientManager', `fetchProfileWithTokens: User ID set: ${user.user_id}`);
 
-      // Save profile to database
-      Logger.info('OAuthClientManager', 'fetchProfileWithTokens: Saving profile to database');
-      await this.userManager.saveProfile(profile);
-      Logger.info('OAuthClientManager', 'fetchProfileWithTokens: Profile saved successfully');
+      // User is already saved to database by findOrCreateUser
+      Logger.info('OAuthClientManager', 'fetchProfileWithTokens: User saved successfully');
 
-      return { success: true, profile };
+      return { success: true, profile: user };
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       Logger.error(

@@ -32,6 +32,8 @@ export interface MockUserProfile {
   name: string;
   given_name?: string;
   family_name?: string;
+  verified_email?: boolean;
+  locale?: string;
 }
 
 export class MockOAuthServer {
@@ -44,6 +46,8 @@ export class MockOAuthServer {
     name: 'Test User',
     given_name: 'Test',
     family_name: 'User',
+    verified_email: true,
+    locale: 'en',
   };
   private userInfoError: { statusCode: number; message: string } | null = null;
   private tokenExpired: boolean = false;

@@ -14,11 +14,11 @@ import { Logger } from '../Logger';
 interface GoogleUserInfoResponse {
   id: string;
   email: string;
-  verified_email: boolean;
+  verified_email?: boolean;
   name: string;
-  given_name: string;
-  family_name: string;
-  locale: string;
+  given_name?: string;
+  family_name?: string;
+  locale?: string;
 }
 
 /**
@@ -126,9 +126,9 @@ export class UserManager {
         updates.push('google_id = ?');
         values.push(googleProfile.id);
       }
-      if (googleProfile.locale !== existingUser.locale) {
+      if ((googleProfile.locale || null) !== existingUser.locale) {
         updates.push('locale = ?');
-        values.push(googleProfile.locale);
+        values.push(googleProfile.locale || null);
       }
       updates.push('last_synced = ?');
       values.push(now);
@@ -144,7 +144,7 @@ export class UserManager {
         name: googleProfile.name,
         email: googleProfile.email,
         google_id: googleProfile.id,
-        locale: googleProfile.locale,
+        locale: googleProfile.locale || null,
         last_synced: now,
       };
     }
@@ -158,7 +158,7 @@ export class UserManager {
       googleProfile.name,
       googleProfile.email,
       googleProfile.id,
-      googleProfile.locale,
+      googleProfile.locale || null,
       now
     );
 
@@ -168,7 +168,7 @@ export class UserManager {
       name: googleProfile.name,
       email: googleProfile.email,
       google_id: googleProfile.id,
-      locale: googleProfile.locale,
+      locale: googleProfile.locale || null,
       last_synced: now,
     };
   }

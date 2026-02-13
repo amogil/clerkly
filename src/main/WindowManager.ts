@@ -193,7 +193,7 @@ class WindowManager {
         resizable: true, // Requirements: window-management.1.3
         titleBarStyle: 'default', // Requirements: window-management.3.1
         webPreferences: {
-          preload: path.join(__dirname, '../preload/index.js'),
+          preload: path.join(__dirname, '../../preload/index.js'),
           contextIsolation: true,
           nodeIntegration: false,
           sandbox: false,
@@ -229,7 +229,7 @@ class WindowManager {
       });
 
       // Load the renderer HTML file
-      const htmlPath = path.join(__dirname, '../renderer/index.html');
+      const htmlPath = path.join(__dirname, '../../renderer/index.html');
       this.mainWindow.loadFile(htmlPath).catch((error) => {
         this.logger.error(`Failed to load HTML file: ${error}`);
       });

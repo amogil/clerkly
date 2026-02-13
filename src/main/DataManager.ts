@@ -150,7 +150,7 @@ export class DataManager implements IDataManager {
       this.db = new Database(dbPath);
 
       // Запускаем миграции
-      const migrationsPath = path.join(__dirname, '..', '..', 'migrations');
+      const migrationsPath = path.join(__dirname, '..', '..', '..', 'migrations');
       this.migrationRunner = new MigrationRunner(this.db, migrationsPath);
 
       const migrationResult = this.migrationRunner.runMigrations();
@@ -423,7 +423,7 @@ export class DataManager implements IDataManager {
       throw new Error('Database not initialized');
     }
 
-    const migrationsPath = path.join(__dirname, '..', '..', 'migrations');
+    const migrationsPath = path.join(__dirname, '..', '..', '..', 'migrations');
     return new MigrationRunner(this.db, migrationsPath);
   }
 
