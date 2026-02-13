@@ -1,4 +1,4 @@
-// Requirements: clerkly.1, clerkly.2, error-notifications.1.1, user-data-isolation.1.10, user-data-isolation.1.11, user-data-isolation.1.12, user-data-isolation.1.13
+// Requirements: clerkly.1, clerkly.2, error-notifications.1.1, user-data-isolation.1.5, user-data-isolation.2.4, user-data-isolation.2.5, user-data-isolation.2.6, user-data-isolation.3.1
 
 import Database from 'better-sqlite3';
 import * as fs from 'fs';
@@ -60,6 +60,7 @@ export interface IDataManager {
   loadData(key: string): LoadDataResult;
   deleteData(key: string): DeleteDataResult;
   setUserProfileManager(profileManager: UserProfileManager): void;
+  getDatabase(): Database.Database | null;
 }
 
 /**
@@ -224,16 +225,16 @@ export class DataManager implements IDataManager {
         return { success: false, error: 'Value too large: exceeds 10MB limit' };
       }
 
-      // Requirements: user-data-isolation.1.11, user-data-isolation.1.13 - Get current user email for data isolation
-      const userEmail = this.userProfileManager?.getCurrentEmail();
+      // Requirements: user-data-isolation.1.5, user-data-isolation.3.1 - Get current user_id for data isolation
+      const userId = this.userProfileManager?.getCurrentUserId();
 
-      if (!userEmail) {
+      if (!userId) {
         throw new Error('No user logged in: UserProfileManager not set or user not authenticated');
       }
 
       const timestamp = Date.now();
 
-      // Requirements: user-data-isolation.1.3 - Save with user_email for data isolation
+      // Requirements: user-data-isolation.2.4 - Save with user_id for data isolation
       const stmt = this.db.prepare(`
         INSERT INTO user_data (key, value, user_email, timestamp, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?)
@@ -243,10 +244,10 @@ export class DataManager implements IDataManager {
           updated_at = excluded.updated_at
       `);
 
-      stmt.run(key, serializedValue, userEmail, timestamp, timestamp, timestamp);
+      stmt.run(key, serializedValue, userId, timestamp, timestamp, timestamp);
 
-      // Requirements: user-data-isolation.1.14 - Log successful save with user_email
-      this.logger.info(`Data saved for user ${userEmail}, key: ${key}`);
+      // Requirements: user-data-isolation.2.4 - Log successful save with user_id
+      this.logger.info(`Data saved for user ${userId}, key: ${key}`);
 
       return { success: true };
     } catch (writeError: unknown) {
@@ -300,17 +301,17 @@ export class DataManager implements IDataManager {
         return { success: false, error: 'Database not initialized or closed' };
       }
 
-      // Requirements: user-data-isolation.1.12, user-data-isolation.1.13 - Get current user email for data isolation
-      const userEmail = this.userProfileManager?.getCurrentEmail();
+      // Requirements: user-data-isolation.1.5, user-data-isolation.3.1 - Get current user_id for data isolation
+      const userId = this.userProfileManager?.getCurrentUserId();
 
-      if (!userEmail) {
+      if (!userId) {
         throw new Error('No user logged in: UserProfileManager not set or user not authenticated');
       }
 
-      // Requirements: user-data-isolation.1.4 - Query with user_email filter for data isolation
+      // Requirements: user-data-isolation.2.5 - Query with user_id filter for data isolation
       const row = this.db
         .prepare('SELECT value FROM user_data WHERE key = ? AND user_email = ?')
-        .get(key, userEmail) as { value: string } | undefined;
+        .get(key, userId) as { value: string } | undefined;
 
       if (!row) {
         return { success: false, error: 'Key not found' };
@@ -368,16 +369,16 @@ export class DataManager implements IDataManager {
         return { success: false, error: 'Database not initialized or closed' };
       }
 
-      // Requirements: user-data-isolation.1.12, user-data-isolation.1.13 - Get current user email for data isolation
-      const userEmail = this.userProfileManager?.getCurrentEmail();
+      // Requirements: user-data-isolation.1.5, user-data-isolation.3.1 - Get current user_id for data isolation
+      const userId = this.userProfileManager?.getCurrentUserId();
 
-      if (!userEmail) {
+      if (!userId) {
         throw new Error('No user logged in: UserProfileManager not set or user not authenticated');
       }
 
-      // Requirements: user-data-isolation.1.12 - Delete with user_email filter for data isolation
+      // Requirements: user-data-isolation.2.6 - Delete with user_id filter for data isolation
       const stmt = this.db.prepare('DELETE FROM user_data WHERE key = ? AND user_email = ?');
-      const result = stmt.run(key, userEmail);
+      const result = stmt.run(key, userId);
 
       if (result.changes === 0) {
         return { success: false, error: 'Key not found' };
@@ -425,5 +426,18 @@ export class DataManager implements IDataManager {
 
     const migrationsPath = path.join(__dirname, '..', '..', 'migrations');
     return new MigrationRunner(this.db, migrationsPath);
+  }
+
+  /**
+   * Returns the database instance for direct access
+   * Requirements: user-data-isolation.0.3, user-data-isolation.1.2
+   *
+   * Used by UserProfileManager to access the users table directly.
+   * This avoids circular dependency issues while allowing user management.
+   *
+   * @returns Database instance or null if not initialized
+   */
+  getDatabase(): Database.Database | null {
+    return this.db;
   }
 }

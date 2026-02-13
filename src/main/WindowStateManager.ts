@@ -144,10 +144,11 @@ export class WindowStateManager {
    * ```
    */
   loadState(): WindowState {
-    // Temporarily set system email for loading window state
-    const originalEmail = this.userProfileManager?.getCurrentEmail() || null;
+    // Temporarily set system user_id for loading window state
+    // Requirements: user-data-isolation.2.8 - Window state is global, not tied to any user
+    const originalUserId = this.userProfileManager?.getCurrentUserId() || null;
     if (this.userProfileManager) {
-      (this.userProfileManager as any).currentUserEmail = this.systemEmail;
+      (this.userProfileManager as any).currentUserId = this.systemEmail;
     }
 
     try {
@@ -168,9 +169,9 @@ export class WindowStateManager {
       // Note: Not using handleBackgroundError here as window state loading failure
       // is not critical - we fall back to default state gracefully
     } finally {
-      // Restore original email
+      // Restore original user_id
       if (this.userProfileManager) {
-        (this.userProfileManager as any).currentUserEmail = originalEmail;
+        (this.userProfileManager as any).currentUserId = originalUserId;
       }
     }
 
@@ -237,10 +238,11 @@ export class WindowStateManager {
    * ```
    */
   saveState(state: WindowState): void {
-    // Temporarily set system email for saving window state
-    const originalEmail = this.userProfileManager?.getCurrentEmail() || null;
+    // Temporarily set system user_id for saving window state
+    // Requirements: user-data-isolation.2.8 - Window state is global, not tied to any user
+    const originalUserId = this.userProfileManager?.getCurrentUserId() || null;
     if (this.userProfileManager) {
-      (this.userProfileManager as any).currentUserEmail = this.systemEmail;
+      (this.userProfileManager as any).currentUserId = this.systemEmail;
     }
 
     try {
@@ -252,9 +254,9 @@ export class WindowStateManager {
       // Note: Not using handleBackgroundError here as window state saving failure
       // is not critical - user can continue working normally
     } finally {
-      // Restore original email
+      // Restore original user_id
       if (this.userProfileManager) {
-        (this.userProfileManager as any).currentUserEmail = originalEmail;
+        (this.userProfileManager as any).currentUserId = originalUserId;
       }
     }
   }

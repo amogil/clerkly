@@ -1,4 +1,4 @@
-// Requirements: account-profile.1.1, account-profile.1.2, account-profile.1.5, account-profile.1.6, account-profile.1.7, account-profile.1.8
+// Requirements: account-profile.1.1, account-profile.1.2, account-profile.1.5, account-profile.1.6, account-profile.1.7, account-profile.1.8, user-data-isolation.0.2, user-data-isolation.0.3, user-data-isolation.0.4, user-data-isolation.1.1, user-data-isolation.1.2, user-data-isolation.1.3, user-data-isolation.1.4, user-data-isolation.1.5
 
 import { UserProfileManager, UserProfile } from '../../../src/main/auth/UserProfileManager';
 import { DataManager } from '../../../src/main/DataManager';
@@ -50,10 +50,13 @@ describe('UserProfileManager', () => {
     dataManager = new DataManager(testDbPath);
     dataManager.initialize();
 
-    // Requirements: user-data-isolation.1.10 - Mock UserProfileManager for data isolation
+    // Requirements: user-data-isolation.1.5 - Mock UserProfileManager for data isolation
     // Note: We need to mock it BEFORE creating the real profileManager
     mockSelfProfileManager = {
-      getCurrentEmail: jest.fn().mockReturnValue('test@example.com'),
+      getCurrentUserId: jest.fn().mockReturnValue('testUserId1'),
+      findOrCreateUser: jest
+        .fn()
+        .mockReturnValue({ user_id: 'testUserId1', name: 'Test User', email: 'test@example.com' }),
     } as unknown as jest.Mocked<UserProfileManager>;
 
     dataManager.setUserProfileManager(mockSelfProfileManager);
@@ -79,6 +82,112 @@ describe('UserProfileManager', () => {
     if (fs.existsSync(testDbPath)) {
       fs.rmSync(testDbPath, { recursive: true, force: true });
     }
+  });
+
+  describe('generateUserId', () => {
+    /* Preconditions: none
+       Action: Call generateUserId() 100 times
+       Assertions: All IDs have length 10, contain only alphanumeric characters (A-Z, a-z, 0-9)
+       Requirements: user-data-isolation.0.2, user-data-isolation.1.1 */
+    it('should generate valid 10-character alphanumeric user_id', () => {
+      const alphanumericRegex = /^[A-Za-z0-9]{10}$/;
+
+      for (let i = 0; i < 100; i++) {
+        const userId = (profileManager as any).generateUserId();
+        expect(userId).toMatch(alphanumericRegex);
+        expect(userId.length).toBe(10);
+      }
+    });
+
+    /* Preconditions: none
+       Action: Call generateUserId() multiple times
+       Assertions: Generated IDs are unique (high probability)
+       Requirements: user-data-isolation.0.2 */
+    it('should generate unique user_ids', () => {
+      const ids = new Set<string>();
+      for (let i = 0; i < 100; i++) {
+        ids.add((profileManager as any).generateUserId());
+      }
+      // With 62^10 possible combinations, 100 IDs should all be unique
+      expect(ids.size).toBe(100);
+    });
+  });
+
+  describe('findOrCreateUser', () => {
+    /* Preconditions: Empty users table
+       Action: Call findOrCreateUser('test@example.com', 'Test User')
+       Assertions: New user created with 10-character user_id
+       Requirements: user-data-isolation.0.3, user-data-isolation.1.2 */
+    it('should create new user on first login', () => {
+      const user = profileManager.findOrCreateUser('newuser@example.com', 'New User');
+
+      expect(user.user_id).toMatch(/^[A-Za-z0-9]{10}$/);
+      expect(user.email).toBe('newuser@example.com');
+      expect(user.name).toBe('New User');
+    });
+
+    /* Preconditions: User exists in users table
+       Action: Call findOrCreateUser with same email
+       Assertions: Returns existing user_id
+       Requirements: user-data-isolation.0.3, user-data-isolation.1.2 */
+    it('should find existing user on re-login', () => {
+      // Create user first
+      const user1 = profileManager.findOrCreateUser('existing@example.com', 'Existing User');
+
+      // Find same user
+      const user2 = profileManager.findOrCreateUser('existing@example.com', 'Existing User');
+
+      expect(user2.user_id).toBe(user1.user_id);
+      expect(user2.email).toBe('existing@example.com');
+    });
+
+    /* Preconditions: User exists with name 'Old Name'
+       Action: Call findOrCreateUser with same email but name 'New Name'
+       Assertions: Name updated in database
+       Requirements: user-data-isolation.0.4, user-data-isolation.1.2 */
+    it('should update user name if changed', () => {
+      // Create user with old name
+      const user1 = profileManager.findOrCreateUser('update@example.com', 'Old Name');
+
+      // Update with new name
+      const user2 = profileManager.findOrCreateUser('update@example.com', 'New Name');
+
+      expect(user2.user_id).toBe(user1.user_id);
+      expect(user2.name).toBe('New Name');
+
+      // Verify in database
+      const db = dataManager.getDatabase();
+      const dbUser = db?.prepare('SELECT name FROM users WHERE user_id = ?').get(user1.user_id) as {
+        name: string;
+      };
+      expect(dbUser.name).toBe('New Name');
+    });
+
+    /* Preconditions: User exists with name 'Existing Name'
+       Action: Call findOrCreateUser with same email but null name
+       Assertions: Name NOT updated (null is ignored)
+       Requirements: user-data-isolation.0.4 */
+    it('should not update name if null passed', () => {
+      // Create user with name
+      const user1 = profileManager.findOrCreateUser('keepname@example.com', 'Keep This Name');
+
+      // Call with null name
+      const user2 = profileManager.findOrCreateUser('keepname@example.com', null);
+
+      expect(user2.user_id).toBe(user1.user_id);
+      expect(user2.name).toBe('Keep This Name');
+    });
+  });
+
+  describe('getCurrentUserId', () => {
+    /* Preconditions: No profile fetched or loaded
+       Action: Call getCurrentUserId()
+       Assertions: Returns null
+       Requirements: user-data-isolation.1.5 */
+    it('should return null when no profile exists', () => {
+      const userId = profileManager.getCurrentUserId();
+      expect(userId).toBeNull();
+    });
   });
 
   describe('fetchProfile', () => {
@@ -468,12 +577,12 @@ describe('UserProfileManager', () => {
     });
   });
 
-  describe('getCurrentEmail', () => {
+  describe('getCurrentUserId', () => {
     /* Preconditions: fetchProfile() successfully fetched profile with email
-       Action: Call getCurrentEmail()
-       Assertions: Returns the email from the fetched profile
-       Requirements: user-data-isolation.1.10, user-data-isolation.1.15 */
-    it('should return current email after fetchProfile()', async () => {
+       Action: Call getCurrentUserId()
+       Assertions: Returns the user_id from findOrCreateUser
+       Requirements: user-data-isolation.1.2, user-data-isolation.1.5 */
+    it('should return current user_id after fetchProfile()', async () => {
       // Mock authorized status and tokens
       (oauthClient.getAuthStatus as jest.Mock).mockResolvedValue({
         authorized: true,
@@ -491,17 +600,21 @@ describe('UserProfileManager', () => {
       // Fetch profile
       await profileManager.fetchProfile();
 
-      // Get current email
-      const email = profileManager.getCurrentEmail();
+      // Get current user_id
+      const userId = profileManager.getCurrentUserId();
 
-      expect(email).toBe('test@example.com');
+      expect(userId).toMatch(/^[A-Za-z0-9]{10}$/);
     });
 
     /* Preconditions: loadProfile() successfully loaded profile with email
-       Action: Call getCurrentEmail()
-       Assertions: Returns the email from the loaded profile
-       Requirements: user-data-isolation.1.10, user-data-isolation.1.17 */
-    it('should return current email after loadProfile()', async () => {
+       Action: Call getCurrentUserId()
+       Assertions: Returns the user_id (must be set before loadProfile)
+       Requirements: user-data-isolation.1.3, user-data-isolation.1.5 */
+    it('should return current user_id after loadProfile()', async () => {
+      // First create a user and set currentUserId
+      const user = profileManager.findOrCreateUser('test@example.com', 'Test User');
+      (profileManager as any).currentUserId = user.user_id;
+
       const testProfile: UserProfile = {
         ...mockProfile,
         lastUpdated: Date.now(),
@@ -513,18 +626,18 @@ describe('UserProfileManager', () => {
       // Load profile
       await profileManager.loadProfile();
 
-      // Get current email
-      const email = profileManager.getCurrentEmail();
+      // Get current user_id
+      const userId = profileManager.getCurrentUserId();
 
-      expect(email).toBe('test@example.com');
+      expect(userId).toBe(user.user_id);
     });
 
     /* Preconditions: clearSession() was called
-       Action: Call getCurrentEmail()
+       Action: Call getCurrentUserId()
        Assertions: Returns null
-       Requirements: user-data-isolation.1.10, user-data-isolation.1.18 */
+       Requirements: user-data-isolation.1.4, user-data-isolation.1.5 */
     it('should return null after clearSession()', async () => {
-      // First set email by fetching profile
+      // First set user_id by fetching profile
       (oauthClient.getAuthStatus as jest.Mock).mockResolvedValue({
         authorized: true,
       });
@@ -537,32 +650,32 @@ describe('UserProfileManager', () => {
       });
 
       await profileManager.fetchProfile();
-      expect(profileManager.getCurrentEmail()).toBe('test@example.com');
+      expect(profileManager.getCurrentUserId()).toMatch(/^[A-Za-z0-9]{10}$/);
 
       // Clear session
       profileManager.clearSession();
 
-      // Get current email
-      const email = profileManager.getCurrentEmail();
+      // Get current user_id
+      const userId = profileManager.getCurrentUserId();
 
-      expect(email).toBeNull();
+      expect(userId).toBeNull();
     });
 
     /* Preconditions: No profile fetched or loaded
-       Action: Call getCurrentEmail()
+       Action: Call getCurrentUserId()
        Assertions: Returns null
-       Requirements: user-data-isolation.1.10 */
+       Requirements: user-data-isolation.1.5 */
     it('should return null when no profile exists', () => {
-      const email = profileManager.getCurrentEmail();
+      const userId = profileManager.getCurrentUserId();
 
-      expect(email).toBeNull();
+      expect(userId).toBeNull();
     });
 
     /* Preconditions: updateProfileAfterTokenRefresh() successfully updated profile
-       Action: Call getCurrentEmail()
-       Assertions: Returns the updated email
-       Requirements: user-data-isolation.1.10, user-data-isolation.1.16 */
-    it('should return updated email after updateProfileAfterTokenRefresh()', async () => {
+       Action: Call getCurrentUserId()
+       Assertions: Returns the user_id (same as before since email didn't change)
+       Requirements: user-data-isolation.1.2, user-data-isolation.1.5 */
+    it('should return user_id after updateProfileAfterTokenRefresh()', async () => {
       // Mock authorized status and tokens
       (oauthClient.getAuthStatus as jest.Mock).mockResolvedValue({
         authorized: true,
@@ -571,42 +684,42 @@ describe('UserProfileManager', () => {
         accessToken: 'test-access-token',
       });
 
-      // Mock fetch to return profile with new email
-      const updatedProfile = {
-        ...mockProfile,
-        email: 'updated@example.com',
-      };
+      // Mock fetch to return profile
       (global.fetch as jest.Mock).mockResolvedValue({
         ok: true,
-        json: async () => updatedProfile,
+        json: async () => mockProfile,
       });
 
       // Update profile after token refresh
       await profileManager.updateProfileAfterTokenRefresh();
 
-      // Get current email
-      const email = profileManager.getCurrentEmail();
+      // Get current user_id
+      const userId = profileManager.getCurrentUserId();
 
-      expect(email).toBe('updated@example.com');
+      expect(userId).toMatch(/^[A-Za-z0-9]{10}$/);
     });
   });
 
   describe('clearSession', () => {
-    /* Preconditions: User logged in with email cached
+    /* Preconditions: User logged in with user_id cached
        Action: Call clearSession()
-       Assertions: currentUserEmail is null, isLoggedOut flag is set, success logged to console
-       Requirements: user-data-isolation.1.18 */
-    it('should clear email on logout', () => {
-      // First set email by creating a profile manager with cached email
-      const testProfile: UserProfile = {
-        ...mockProfile,
-        lastUpdated: Date.now(),
-      };
-      dataManager.saveData('user_profile', testProfile);
+       Assertions: currentUserId is null, isLoggedOut flag is set, success logged to console
+       Requirements: user-data-isolation.1.4 */
+    it('should clear user_id on logout', async () => {
+      // First set user_id by fetching profile
+      (oauthClient.getAuthStatus as jest.Mock).mockResolvedValue({
+        authorized: true,
+      });
+      (tokenStorage.loadTokens as jest.Mock).mockResolvedValue({
+        accessToken: 'test-access-token',
+      });
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => mockProfile,
+      });
 
-      // Load profile to cache email
-      profileManager.loadProfile();
-      expect(profileManager.getCurrentEmail()).toBe('test@example.com');
+      await profileManager.fetchProfile();
+      expect(profileManager.getCurrentUserId()).toMatch(/^[A-Za-z0-9]{10}$/);
 
       // Spy on console.info
       const consoleInfoSpy = jest.spyOn(console, 'info').mockImplementation();
@@ -614,14 +727,14 @@ describe('UserProfileManager', () => {
       // Call clearSession
       profileManager.clearSession();
 
-      // Verify currentUserEmail was cleared
-      const email = profileManager.getCurrentEmail();
-      expect(email).toBeNull();
+      // Verify currentUserId was cleared
+      const userId = profileManager.getCurrentUserId();
+      expect(userId).toBeNull();
 
       // Verify success log
       expect(consoleInfoSpy).toHaveBeenCalledWith(
         expect.stringContaining(
-          '[UserProfileManager] User session cleared (email cleared from memory)'
+          '[UserProfileManager] User session cleared (user_id cleared from memory)'
         )
       );
 
@@ -630,19 +743,26 @@ describe('UserProfileManager', () => {
   });
 
   describe('initialize', () => {
-    /* Preconditions: DataManager has saved profile data with email
+    /* Preconditions: TokenStorageManager has valid tokens, fetch returns profile
        Action: Call initialize()
-       Assertions: currentUserEmail is set from loaded profile, success logged to console
-       Requirements: user-data-isolation.1.17 */
-    it('should restore email from database on app startup', async () => {
-      const testProfile: UserProfile = {
-        ...mockProfile,
-        email: 'restored@example.com',
-        lastUpdated: Date.now(),
-      };
+       Assertions: currentUserId is set from fetched profile via findOrCreateUser, success logged to console
+       Requirements: user-data-isolation.1.3 */
+    it('should restore user_id from API on app startup', async () => {
+      // Mock valid tokens
+      (tokenStorage.loadTokens as jest.Mock).mockResolvedValue({
+        accessToken: 'test-access-token',
+        refreshToken: 'test-refresh-token',
+        expiresAt: Date.now() + 3600000,
+      });
 
-      // Save profile first
-      dataManager.saveData('user_profile', testProfile);
+      // Mock successful API response
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          ...mockProfile,
+          email: 'restored@example.com',
+        }),
+      });
 
       // Spy on console.info
       const consoleInfoSpy = jest.spyOn(console, 'info').mockImplementation();
@@ -650,68 +770,65 @@ describe('UserProfileManager', () => {
       // Call initialize
       await profileManager.initialize();
 
-      // Verify currentUserEmail was set
-      const email = profileManager.getCurrentEmail();
-      expect(email).toBe('restored@example.com');
+      // Verify currentUserId was set
+      const userId = profileManager.getCurrentUserId();
+      expect(userId).toMatch(/^[A-Za-z0-9]{10}$/);
 
       // Verify success log
       expect(consoleInfoSpy).toHaveBeenCalledWith(
-        expect.stringContaining('[UserProfileManager] Email cached from stored profile:')
+        expect.stringContaining('[UserProfileManager] User ID cached from stored profile:')
       );
 
       consoleInfoSpy.mockRestore();
     });
 
-    /* Preconditions: DataManager has no profile data
+    /* Preconditions: No tokens available
        Action: Call initialize()
-       Assertions: currentUserEmail remains null, no error thrown
-       Requirements: user-data-isolation.1.17 */
-    it('should handle missing profile gracefully', async () => {
+       Assertions: currentUserId remains null, no error thrown
+       Requirements: user-data-isolation.1.3 */
+    it('should handle missing tokens gracefully', async () => {
+      // Mock no tokens
+      (tokenStorage.loadTokens as jest.Mock).mockResolvedValue(null);
+
       // Spy on console.info
       const consoleInfoSpy = jest.spyOn(console, 'info').mockImplementation();
 
-      // Call initialize (no data saved)
+      // Call initialize (no tokens)
       await profileManager.initialize();
 
-      // Verify currentUserEmail is still null
-      const email = profileManager.getCurrentEmail();
-      expect(email).toBeNull();
+      // Verify currentUserId is still null
+      const userId = profileManager.getCurrentUserId();
+      expect(userId).toBeNull();
 
-      // Verify log message about no profile
+      // Verify log message about no tokens
       expect(consoleInfoSpy).toHaveBeenCalledWith(
-        expect.stringContaining('[UserProfileManager] No profile found in local storage')
+        expect.stringContaining('[UserProfileManager] No tokens available, user not logged in')
       );
 
       consoleInfoSpy.mockRestore();
     });
 
-    /* Preconditions: DataManager.loadData() throws error
+    /* Preconditions: TokenStorageManager.loadTokens() throws error
        Action: Call initialize()
-       Assertions: Error logged, currentUserEmail remains null, no exception thrown
-       Requirements: user-data-isolation.1.17 */
+       Assertions: Error logged, currentUserId remains null, no exception thrown
+       Requirements: user-data-isolation.1.3 */
     it('should handle load errors gracefully', async () => {
-      // Create a new profile manager with a mock DataManager that throws
-      const mockDataManager = {
-        loadData: jest.fn().mockImplementation(() => {
-          throw new Error('Database error');
-        }),
-      } as unknown as DataManager;
-
-      const testProfileManager = new UserProfileManager(mockDataManager, oauthClient, tokenStorage);
+      // Mock loadTokens to throw
+      (tokenStorage.loadTokens as jest.Mock).mockRejectedValue(new Error('Token storage error'));
 
       // Spy on console.error
       const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
 
       // Call initialize
-      await testProfileManager.initialize();
+      await profileManager.initialize();
 
-      // Verify currentUserEmail is null
-      const email = testProfileManager.getCurrentEmail();
-      expect(email).toBeNull();
+      // Verify currentUserId is null
+      const userId = profileManager.getCurrentUserId();
+      expect(userId).toBeNull();
 
-      // Verify error was logged (error comes from loadProfile, not initialize)
+      // Verify error was logged
       expect(consoleErrorSpy).toHaveBeenCalledWith(
-        expect.stringContaining('[UserProfileManager] Failed to load profile:')
+        expect.stringContaining('[UserProfileManager] Failed to initialize:')
       );
 
       consoleErrorSpy.mockRestore();
@@ -721,8 +838,8 @@ describe('UserProfileManager', () => {
   describe('fetchProfileSynchronously', () => {
     /* Preconditions: TokenStorageManager returns valid access token, fetch returns successful response from Google UserInfo API
        Action: Call fetchProfileSynchronously()
-       Assertions: Profile fetched from API, profile saved via DataManager.saveData(), method returns { success: true, profile: {...} }, currentUserEmail cached
-       Requirements: google-oauth-auth.3.6, google-oauth-auth.3.8, account-profile.1.3, account-profile.1.4 */
+       Assertions: Profile fetched from API, profile saved via DataManager.saveData(), method returns { success: true, profile: {...} }, currentUserId cached
+       Requirements: google-oauth-auth.3.6, google-oauth-auth.3.8, account-profile.1.3, account-profile.1.4, user-data-isolation.1.2 */
     it('should successfully fetch and save profile synchronously', async () => {
       // Mock valid tokens
       (tokenStorage.loadTokens as jest.Mock).mockResolvedValue({
@@ -766,8 +883,8 @@ describe('UserProfileManager', () => {
       expect(savedProfile.success).toBe(true);
       expect(savedProfile.data).toMatchObject(mockProfile);
 
-      // Verify currentUserEmail was cached
-      expect(profileManager.getCurrentEmail()).toBe('test@example.com');
+      // Verify currentUserId was cached
+      expect(profileManager.getCurrentUserId()).toMatch(/^[A-Za-z0-9]{10}$/);
 
       // Verify success log
       expect(consoleInfoSpy).toHaveBeenCalledWith(

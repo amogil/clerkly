@@ -22,7 +22,7 @@ describe('Property Tests - Data Manager', () => {
 
     // Requirements: user-data-isolation.1.10 - Mock UserProfileManager for data isolation
     const mockProfileManager = {
-      getCurrentEmail: jest.fn().mockReturnValue('test@example.com'),
+      getCurrentUserId: jest.fn().mockReturnValue('test@example.com'),
     } as any;
 
     dataManager.setUserProfileManager(mockProfileManager);

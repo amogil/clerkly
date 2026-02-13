@@ -75,20 +75,20 @@ describe('DataManager User Isolation - Property-Based Tests', () => {
 
           // Create mock profile manager for each user
           const mockProfileManager = {
-            getCurrentEmail: jest.fn(),
+            getCurrentUserId: jest.fn(),
           } as unknown as jest.Mocked<UserProfileManager>;
 
           dataManager.setUserProfileManager(mockProfileManager);
 
           // Save data for each user
           users.forEach((user) => {
-            mockProfileManager.getCurrentEmail.mockReturnValue(user.email);
+            mockProfileManager.getCurrentUserId.mockReturnValue(user.email);
             dataManager.saveData(user.key, user.value);
           });
 
           // Verify each user can only see their own data
           users.forEach((user) => {
-            mockProfileManager.getCurrentEmail.mockReturnValue(user.email);
+            mockProfileManager.getCurrentUserId.mockReturnValue(user.email);
             const result = dataManager.loadData(user.key);
 
             expect(result.success).toBe(true);
@@ -100,7 +100,7 @@ describe('DataManager User Isolation - Property-Based Tests', () => {
             for (let j = 0; j < users.length; j++) {
               if (i !== j && users[i].key === users[j].key) {
                 // Same key, different users
-                mockProfileManager.getCurrentEmail.mockReturnValue(users[i].email);
+                mockProfileManager.getCurrentUserId.mockReturnValue(users[i].email);
                 const result = dataManager.loadData(users[j].key);
 
                 // Should get user i's data, not user j's data
@@ -143,14 +143,14 @@ describe('DataManager User Isolation - Property-Based Tests', () => {
           dataManager.initialize();
 
           const mockProfileManager = {
-            getCurrentEmail: jest.fn(),
+            getCurrentUserId: jest.fn(),
           } as unknown as jest.Mocked<UserProfileManager>;
 
           dataManager.setUserProfileManager(mockProfileManager);
 
           // Save and immediately load for each user
           users.forEach((user) => {
-            mockProfileManager.getCurrentEmail.mockReturnValue(user.email);
+            mockProfileManager.getCurrentUserId.mockReturnValue(user.email);
             const saveResult = dataManager.saveData(user.key, user.value);
             expect(saveResult.success).toBe(true);
 
@@ -161,7 +161,7 @@ describe('DataManager User Isolation - Property-Based Tests', () => {
 
           // Verify all users' data is still intact
           users.forEach((user) => {
-            mockProfileManager.getCurrentEmail.mockReturnValue(user.email);
+            mockProfileManager.getCurrentUserId.mockReturnValue(user.email);
             const result = dataManager.loadData(user.key);
             expect(result.success).toBe(true);
             expect(result.data).toEqual(user.value);
@@ -195,19 +195,19 @@ describe('DataManager User Isolation - Property-Based Tests', () => {
           dataManager.initialize();
 
           const mockProfileManager = {
-            getCurrentEmail: jest.fn(),
+            getCurrentUserId: jest.fn(),
           } as unknown as jest.Mocked<UserProfileManager>;
 
           dataManager.setUserProfileManager(mockProfileManager);
 
           // Save data for each user
           users.forEach((user) => {
-            mockProfileManager.getCurrentEmail.mockReturnValue(user.email);
+            mockProfileManager.getCurrentUserId.mockReturnValue(user.email);
             dataManager.saveData(user.key, user.value);
           });
 
-          // Simulate logout (getCurrentEmail returns null)
-          mockProfileManager.getCurrentEmail.mockReturnValue(null);
+          // Simulate logout (getCurrentUserId returns null)
+          mockProfileManager.getCurrentUserId.mockReturnValue(null);
 
           // Verify data is still in database (check directly)
           const db = new Database(testDbPath);
@@ -223,7 +223,7 @@ describe('DataManager User Isolation - Property-Based Tests', () => {
 
           // Simulate re-login and verify data is restored
           users.forEach((user) => {
-            mockProfileManager.getCurrentEmail.mockReturnValue(user.email);
+            mockProfileManager.getCurrentUserId.mockReturnValue(user.email);
             const result = dataManager.loadData(user.key);
             expect(result.success).toBe(true);
             expect(result.data).toEqual(user.value);

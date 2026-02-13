@@ -337,7 +337,11 @@ export class OAuthClientManager {
         return { success: false, error: `UserInfo API returned ${response.status}` };
       }
 
-      const profileData = (await response.json()) as { email: string; [key: string]: any };
+      const profileData = (await response.json()) as {
+        email: string;
+        name?: string;
+        [key: string]: any;
+      };
       Logger.info(
         'OAuthClientManager',
         `fetchProfileWithTokens: Profile fetched: ${profileData.email}`
@@ -349,10 +353,13 @@ export class OAuthClientManager {
         lastUpdated: Date.now(),
       };
 
-      // CRITICAL: Set email in ProfileManager BEFORE saving to database
-      // This is required because DataManager.saveData() needs getCurrentEmail()
-      Logger.info('OAuthClientManager', 'fetchProfileWithTokens: Setting email in ProfileManager');
-      (this.profileManager as any).currentUserEmail = profile.email;
+      // CRITICAL: Find or create user and set user_id in ProfileManager BEFORE saving to database
+      // This is required because DataManager.saveData() needs getCurrentUserId()
+      // Requirements: user-data-isolation.1.2 - Find or create user by email
+      Logger.info('OAuthClientManager', 'fetchProfileWithTokens: Finding or creating user');
+      const user = this.profileManager.findOrCreateUser(profile.email, profile.name || null);
+      (this.profileManager as any).currentUserId = user.user_id;
+      Logger.info('OAuthClientManager', `fetchProfileWithTokens: User ID set: ${user.user_id}`);
 
       // Save profile to database
       Logger.info('OAuthClientManager', 'fetchProfileWithTokens: Saving profile to database');
@@ -558,10 +565,10 @@ export class OAuthClientManager {
       // Requirements: navigation.1.4 - Only tokens are cleared, profile data is preserved
       await this.tokenStorage.deleteTokens();
 
-      // Clear current user email from memory to prevent data operations after logout
-      // Requirements: navigation.1.4, user-data-isolation.1.18
+      // Clear current user_id from memory to prevent data operations after logout
+      // Requirements: navigation.1.4, user-data-isolation.1.4
       if (this.profileManager) {
-        this.profileManager.clearCurrentEmail();
+        this.profileManager.clearSession();
       }
 
       // Note: Profile data is NOT deleted - it's preserved in database for next login

@@ -33,7 +33,7 @@ describe('DataManager', () => {
 
     // Requirements: user-data-isolation.1.10 - Mock UserProfileManager for data isolation tests
     mockProfileManager = {
-      getCurrentEmail: jest.fn().mockReturnValue('test@example.com'),
+      getCurrentUserId: jest.fn().mockReturnValue('test@example.com'),
     } as unknown as jest.Mocked<UserProfileManager>;
   });
 
@@ -1022,7 +1022,7 @@ describe('DataManager', () => {
   });
 
   describe('User Data Isolation - Additional Tests', () => {
-    /* Preconditions: UserProfileManager returns null for getCurrentEmail
+    /* Preconditions: UserProfileManager returns null for getCurrentUserId
        Action: call loadData('test_key')
        Assertions: returns error result with message containing "No user logged in"
        Requirements: user-data-isolation.1.13 */
@@ -1030,8 +1030,8 @@ describe('DataManager', () => {
       const { dataManager: dm } = initializeDataManagerWithoutUser();
       dataManager = dm;
 
-      // Mock getCurrentEmail to return null
-      mockProfileManager.getCurrentEmail.mockReturnValue(null);
+      // Mock getCurrentUserId to return null
+      mockProfileManager.getCurrentUserId.mockReturnValue(null);
       dataManager.setUserProfileManager(mockProfileManager);
 
       const result = dataManager.loadData('test_key');
@@ -1039,7 +1039,7 @@ describe('DataManager', () => {
       expect(result.error).toContain('No user logged in');
     });
 
-    /* Preconditions: UserProfileManager returns null for getCurrentEmail
+    /* Preconditions: UserProfileManager returns null for getCurrentUserId
        Action: call deleteData('test_key')
        Assertions: returns error result with message containing "No user logged in"
        Requirements: user-data-isolation.1.13 */
@@ -1047,8 +1047,8 @@ describe('DataManager', () => {
       const { dataManager: dm } = initializeDataManagerWithoutUser();
       dataManager = dm;
 
-      // Mock getCurrentEmail to return null
-      mockProfileManager.getCurrentEmail.mockReturnValue(null);
+      // Mock getCurrentUserId to return null
+      mockProfileManager.getCurrentUserId.mockReturnValue(null);
       dataManager.setUserProfileManager(mockProfileManager);
 
       const result = dataManager.deleteData('test_key');
@@ -1065,21 +1065,21 @@ describe('DataManager', () => {
       dataManager = dm;
 
       // Save data as user A
-      mockProfileManager.getCurrentEmail.mockReturnValue('userA@example.com');
+      mockProfileManager.getCurrentUserId.mockReturnValue('userA@example.com');
       dataManager.saveData('test_key', 'value_A');
 
       // Save data as user B
-      mockProfileManager.getCurrentEmail.mockReturnValue('userB@example.com');
+      mockProfileManager.getCurrentUserId.mockReturnValue('userB@example.com');
       dataManager.saveData('test_key', 'value_B');
 
       // Load as user A
-      mockProfileManager.getCurrentEmail.mockReturnValue('userA@example.com');
+      mockProfileManager.getCurrentUserId.mockReturnValue('userA@example.com');
       const resultA = dataManager.loadData('test_key');
       expect(resultA.success).toBe(true);
       expect(resultA.data).toBe('value_A');
 
       // Load as user B
-      mockProfileManager.getCurrentEmail.mockReturnValue('userB@example.com');
+      mockProfileManager.getCurrentUserId.mockReturnValue('userB@example.com');
       const resultB = dataManager.loadData('test_key');
       expect(resultB.success).toBe(true);
       expect(resultB.data).toBe('value_B');

@@ -178,6 +178,14 @@ describe('Profile Integration', () => {
   beforeEach(() => {
     jest.clearAllMocks();
 
+    // Create mock database for users table
+    const mockDb = {
+      prepare: jest.fn().mockReturnValue({
+        get: jest.fn().mockReturnValue(undefined),
+        run: jest.fn(),
+      }),
+    };
+
     // Create mock instances
     mockDataManager = {
       initialize: jest.fn(),
@@ -185,6 +193,7 @@ describe('Profile Integration', () => {
       saveData: jest.fn().mockReturnValue({ success: true }),
       loadData: jest.fn().mockReturnValue({ success: false, data: null }),
       deleteData: jest.fn().mockReturnValue({ success: true }),
+      getDatabase: jest.fn().mockReturnValue(mockDb),
     } as any;
 
     mockTokenStorage = {

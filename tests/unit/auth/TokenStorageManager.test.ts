@@ -26,7 +26,7 @@ describe('TokenStorageManager', () => {
 
     // Requirements: user-data-isolation.1.10 - Mock UserProfileManager for data isolation
     mockProfileManager = {
-      getCurrentEmail: jest.fn().mockReturnValue('test@example.com'),
+      getCurrentUserId: jest.fn().mockReturnValue('test@example.com'),
     } as unknown as jest.Mocked<UserProfileManager>;
 
     dataManager = new DataManager(testDbPath);

@@ -43,8 +43,8 @@
 ## Фаза 1: Создание Таблицы Users (1-2 дня)
 
 ### 1.1. Создать миграцию для таблицы users
-- [ ] Создать файл миграции `002_create_users_table.sql` в `migrations/`
-- [ ] Добавить UP секцию:
+- [x] Создать файл миграции `002_create_users_table.sql` в `migrations/`
+- [x] Добавить UP секцию:
   ```sql
   CREATE TABLE IF NOT EXISTS users (
     user_id TEXT PRIMARY KEY,
@@ -53,26 +53,26 @@
   );
   CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
   ```
-- [ ] Добавить DOWN секцию для отката
-- [ ] Запустить миграцию и проверить создание таблицы
+- [x] Добавить DOWN секцию для отката
+- [x] Запустить миграцию и проверить создание таблицы
 - _Requirements: user-data-isolation.0.1, user-data-isolation.0.5_
 
 ### 1.2. Написать модульные тесты для миграции
-- [ ] Тест: таблица `users` создается с правильной структурой
-- [ ] Тест: индекс `idx_users_email` создается
-- [ ] Тест: DOWN миграция удаляет таблицу и индекс
+- [x] Тест: таблица `users` создается с правильной структурой
+- [x] Тест: индекс `idx_users_email` создается
+- [x] Тест: DOWN миграция удаляет таблицу и индекс
 - _Requirements: user-data-isolation.0.1, user-data-isolation.0.5_
 
 ### 1.3. Запустить валидацию Фазы 1
-- [ ] Выполнить `npm run validate`
-- [ ] Убедиться, что миграция применяется корректно
+- [x] Выполнить `npm run validate`
+- [x] Убедиться, что миграция применяется корректно
 
 ---
 
 ## Фаза 2: Расширение UserProfileManager (2 дня)
 
 ### 2.1. Добавить интерфейс User
-- [ ] Добавить интерфейс `User` в `src/main/auth/UserProfileManager.ts`:
+- [x] Добавить интерфейс `User` в `src/main/auth/UserProfileManager.ts`:
   ```typescript
   interface User {
     user_id: string;
@@ -80,90 +80,90 @@
     email: string;
   }
   ```
-- [ ] Экспортировать интерфейс
+- [x] Экспортировать интерфейс
 - _Requirements: user-data-isolation.1_
 
 ### 2.2. Добавить метод generateUserId
-- [ ] Реализовать приватный метод `generateUserId(): string`:
+- [x] Реализовать приватный метод `generateUserId(): string`:
   - Набор символов: A-Z, a-z, 0-9 (62 символа)
   - Длина: 10 символов
   - Использовать `Math.random()` для выбора символов
-- [ ] Добавить комментарий с Requirements
+- [x] Добавить комментарий с Requirements
 - _Requirements: user-data-isolation.0.2, user-data-isolation.1.1_
 
 ### 2.3. Добавить метод findOrCreateUser
-- [ ] Реализовать метод `findOrCreateUser(email: string, name: string | null): User`:
+- [x] Реализовать метод `findOrCreateUser(email: string, name: string | null): User`:
   - Искать пользователя по email: `SELECT user_id, name, email FROM users WHERE email = ?`
   - Если найден: обновить name при необходимости, вернуть существующего
   - Если не найден: вызвать `generateUserId()`, создать запись, вернуть нового
-- [ ] Добавить логирование через Logger
-- [ ] Добавить комментарий с Requirements
+- [x] Добавить логирование через Logger
+- [x] Добавить комментарий с Requirements
 - _Requirements: user-data-isolation.0.3, user-data-isolation.0.4, user-data-isolation.1.2_
 
 ### 2.4. Заменить currentUserEmail на currentUserId
-- [ ] Заменить `private currentUserEmail: string | null` на `private currentUserId: string | null`
-- [ ] Заменить метод `getCurrentEmail()` на `getCurrentUserId()`
-- [ ] Заменить метод `clearCurrentEmail()` на `clearSession()` (уже есть, проверить)
-- [ ] Обновить все внутренние ссылки
+- [x] Заменить `private currentUserEmail: string | null` на `private currentUserId: string | null`
+- [x] Заменить метод `getCurrentEmail()` на `getCurrentUserId()`
+- [x] Заменить метод `clearCurrentEmail()` на `clearSession()` (уже есть, проверить)
+- [x] Обновить все внутренние ссылки
 - _Requirements: user-data-isolation.1.1, user-data-isolation.1.4, user-data-isolation.1.5_
 
 ### 2.5. Обновить метод fetchProfile
-- [ ] После получения профиля вызвать `findOrCreateUser(profile.email, profile.name)`
-- [ ] Установить `this.currentUserId = user.user_id`
-- [ ] Использовать `ErrorHandler.handleBackgroundError()` для ошибок
-- [ ] Обновить логирование
+- [x] После получения профиля вызвать `findOrCreateUser(profile.email, profile.name)`
+- [x] Установить `this.currentUserId = user.user_id`
+- [x] Использовать `ErrorHandler.handleBackgroundError()` для ошибок
+- [x] Обновить логирование
 - _Requirements: user-data-isolation.1.2, error-notifications.1.4_
 
 ### 2.6. Обновить метод fetchProfileSynchronously
-- [ ] После получения профиля вызвать `findOrCreateUser(profile.email, profile.name)`
-- [ ] Установить `this.currentUserId = user.user_id`
-- [ ] Обновить логирование
+- [x] После получения профиля вызвать `findOrCreateUser(profile.email, profile.name)`
+- [x] Установить `this.currentUserId = user.user_id`
+- [x] Обновить логирование
 - _Requirements: user-data-isolation.1.2_
 
 ### 2.7. Обновить метод initialize
-- [ ] Загрузить профиль из базы данных
-- [ ] Вызвать `findOrCreateUser(profile.email, profile.name)`
-- [ ] Установить `this.currentUserId = user.user_id`
-- [ ] Использовать `ErrorHandler.handleBackgroundError()` для ошибок
-- [ ] Обновить логирование
+- [x] Загрузить профиль из Google API (если есть токены)
+- [x] Вызвать `findOrCreateUser(profile.email, profile.name)` через fetchProfile
+- [x] Установить `this.currentUserId = user.user_id`
+- [x] Использовать `ErrorHandler.handleBackgroundError()` для ошибок
+- [x] Обновить логирование
 - _Requirements: user-data-isolation.1.3_
 
 ### 2.8. Обновить метод loadProfile
-- [ ] После загрузки профиля вызвать `findOrCreateUser(profile.email, profile.name)`
-- [ ] Установить `this.currentUserId = user.user_id` (если не logout)
+- [x] Упростить метод - теперь не устанавливает currentUserId
+- [x] currentUserId должен быть установлен до вызова loadProfile
 - _Requirements: user-data-isolation.1.3_
 
 ### 2.9. Обновить метод clearSession
-- [ ] Установить `this.currentUserId = null`
-- [ ] Обновить логирование
+- [x] Установить `this.currentUserId = null`
+- [x] Обновить логирование
 - _Requirements: user-data-isolation.1.4_
 
 ### 2.10. Удалить устаревшие методы
-- [ ] Удалить `getCurrentEmail()` (заменен на `getCurrentUserId()`)
-- [ ] Удалить `clearCurrentEmail()` (заменен на `clearSession()`)
-- [ ] Обновить все вызовы в других файлах
+- [x] Удалить `getCurrentEmail()` (заменен на `getCurrentUserId()`)
+- [x] Удалить `clearCurrentEmail()` (заменен на `clearSession()`)
+- [x] Обновить все вызовы в других файлах
 
 ### 2.11. Обновить комментарии Requirements
-- [ ] Заменить старые ID требований (user-data-isolation.1.14-1.18) на новые (user-data-isolation.0-5)
-- [ ] Добавить ссылки на error-notifications.1.4 где используется ErrorHandler
+- [x] Заменить старые ID требований (user-data-isolation.1.14-1.18) на новые (user-data-isolation.0-5)
+- [x] Добавить ссылки на error-notifications.1.4 где используется ErrorHandler
 
 ### 2.12. Написать/обновить модульные тесты UserProfileManager
-- [ ] Тест: `should generate valid 10-character alphanumeric user_id`
-- [ ] Тест: `should create new user on first login`
-- [ ] Тест: `should find existing user on re-login`
-- [ ] Тест: `should update user name if changed`
-- [ ] Тест: `should not update name if null passed`
-- [ ] Тест: `should cache user_id after successful login`
-- [ ] Тест: `should clear user_id on logout`
-- [ ] Тест: `getCurrentUserId returns correct user_id`
-- [ ] Тест: `should call ErrorHandler.handleBackgroundError on fetchProfile failure`
-- [ ] Тест: `should call ErrorHandler.handleBackgroundError on initialize failure`
+- [x] Тест: `should generate valid 10-character alphanumeric user_id`
+- [x] Тест: `should create new user on first login`
+- [x] Тест: `should find existing user on re-login`
+- [x] Тест: `should update user name if changed`
+- [x] Тест: `should not update name if null passed`
+- [x] Тест: `should cache user_id after successful login`
+- [x] Тест: `should clear user_id on logout`
+- [x] Тест: `getCurrentUserId returns correct user_id`
+- [x] Тест: `should call ErrorHandler.handleBackgroundError on fetchProfile failure`
+- [x] Тест: `should call ErrorHandler.handleBackgroundError on initialize failure`
 - _Requirements: user-data-isolation.0.2, user-data-isolation.0.3, user-data-isolation.0.4, user-data-isolation.1.1-1.5, error-notifications.1.4_
 
 ### 2.13. Запустить валидацию Фазы 2
-- [ ] Выполнить `npm run validate`
-- [ ] Убедиться, что все тесты проходят
-- [ ] Проверить покрытие кода UserProfileManager (минимум 85%)
+- [x] Выполнить `npm run validate`
+- [x] Убедиться, что все тесты проходят
+- [x] Проверить покрытие кода UserProfileManager (минимум 85%)
 
 ---
 

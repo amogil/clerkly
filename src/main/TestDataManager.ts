@@ -1,5 +1,6 @@
 // Requirements: testing.3.1, testing.3.2
 
+import Database from 'better-sqlite3';
 import type {
   IDataManager,
   InitializeResult,
@@ -106,5 +107,13 @@ export class TestDataManager implements IDataManager {
 
   setUserProfileManager(profileManager: UserProfileManager): void {
     return this.dataManager.setUserProfileManager(profileManager);
+  }
+
+  /**
+   * Get database instance from underlying DataManager
+   * Requirements: user-data-isolation.0.3, user-data-isolation.1.2
+   */
+  getDatabase(): Database.Database | null {
+    return this.dataManager.getDatabase();
   }
 }
