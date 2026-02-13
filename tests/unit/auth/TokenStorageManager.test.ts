@@ -3,7 +3,7 @@
 import { TokenStorageManager } from '../../../src/main/auth/TokenStorageManager';
 import { DataManager } from '../../../src/main/DataManager';
 import { TokenData } from '../../../src/main/auth/OAuthConfig';
-import type { UserProfileManager } from '../../../src/main/auth/UserProfileManager';
+import type { UserManager } from '../../../src/main/auth/UserManager';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
@@ -12,7 +12,7 @@ describe('TokenStorageManager', () => {
   let dataManager: DataManager;
   let tokenStorage: TokenStorageManager;
   let testDbPath: string;
-  let mockProfileManager: jest.Mocked<UserProfileManager>;
+  let mockProfileManager: jest.Mocked<UserManager>;
 
   beforeEach(() => {
     // Create a temporary directory for test database
@@ -24,14 +24,14 @@ describe('TokenStorageManager', () => {
       fs.mkdirSync(migrationsPath, { recursive: true });
     }
 
-    // Requirements: user-data-isolation.1.10 - Mock UserProfileManager for data isolation
+    // Requirements: user-data-isolation.1.10 - Mock UserManager for data isolation
     mockProfileManager = {
       getCurrentUserId: jest.fn().mockReturnValue('test@example.com'),
-    } as unknown as jest.Mocked<UserProfileManager>;
+    } as unknown as jest.Mocked<UserManager>;
 
     dataManager = new DataManager(testDbPath);
     dataManager.initialize();
-    dataManager.setUserProfileManager(mockProfileManager);
+    dataManager.setUserManager(mockProfileManager);
     tokenStorage = new TokenStorageManager(dataManager);
   });
 

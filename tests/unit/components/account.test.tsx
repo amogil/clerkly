@@ -5,11 +5,11 @@
 // Requirements: account-profile.1.1, account-profile.1.2, account-profile.1.3, account-profile.1.4, account-profile.1.8
 
 // Mock window.api BEFORE any imports
-const mockGetProfile = jest.fn();
+const mockGetUser = jest.fn();
 const mockOnAuthSuccess = jest.fn();
 const mockOnLogout = jest.fn();
 const mockOnAuthError = jest.fn();
-const mockOnProfileUpdated = jest.fn();
+const mockOnUserUpdated = jest.fn();
 const mockLoadLLMProvider = jest.fn();
 const mockLoadAPIKey = jest.fn();
 const mockSaveLLMProvider = jest.fn();
@@ -22,11 +22,11 @@ Object.defineProperty(window, 'api', {
   configurable: true,
   value: {
     auth: {
-      getProfile: mockGetProfile,
+      getUser: mockGetUser,
       onAuthSuccess: mockOnAuthSuccess,
       onLogout: mockOnLogout,
       onAuthError: mockOnAuthError,
-      onProfileUpdated: mockOnProfileUpdated,
+      onUserUpdated: mockOnUserUpdated,
     },
     settings: {
       loadLLMProvider: mockLoadLLMProvider,
@@ -161,7 +161,7 @@ beforeEach(() => {
   mockOnAuthSuccess.mockImplementation(() => {});
   mockOnLogout.mockImplementation(() => {});
   mockOnAuthError.mockImplementation(() => {});
-  mockOnProfileUpdated.mockImplementation(() => {});
+  mockOnUserUpdated.mockImplementation(() => {});
 
   // Default settings mocks
   mockLoadLLMProvider.mockResolvedValue({
@@ -175,15 +175,15 @@ beforeEach(() => {
 });
 
 describe('Settings Component - Account Profile Section', () => {
-  /* Preconditions: window.api.auth.getProfile() mocked to return { success: true, profile: null }
+  /* Preconditions: window.api.auth.getUser() mocked to return { success: true, user: null }
      Action: render Settings component with React Testing Library
      Assertions: displays loading state in profile fields, Account section is present
      Requirements: account-profile.1.1 - User cannot access Settings without authentication, so profile should show loading if not available */
   it('should display loading state when profile is not available', async () => {
-    // Mock getProfile to return no profile (user not authenticated or profile not loaded yet)
-    mockGetProfile.mockResolvedValue({
+    // Mock getUser to return no user (user not authenticated or profile not loaded yet)
+    mockGetUser.mockResolvedValue({
       success: true,
-      profile: null,
+      user: null,
     });
 
     // Render the Settings component
@@ -191,15 +191,15 @@ describe('Settings Component - Account Profile Section', () => {
 
     // Wait for loading to complete and check for loading state in profile fields
     // Requirements: account-profile.1.1 - According to requirements, user should not be in Settings if not authenticated
-    // So if Settings component is rendered without profile, it should show loading state
+    // So if Settings component is rendered without user, it should show loading state
     await waitFor(() => {
-      expect(mockGetProfile).toHaveBeenCalled();
+      expect(mockGetUser).toHaveBeenCalled();
     });
 
     // Verify the Account heading is present
     expect(screen.getByText('Account')).toBeInTheDocument();
 
-    // Verify profile fields show "Not available" when no profile
+    // Verify profile fields show "Not available" when no user
     const nameInput = screen.getByLabelText('Full Name') as HTMLInputElement;
     const emailInput = screen.getByLabelText('Email') as HTMLInputElement;
     expect(nameInput).toBeInTheDocument();
@@ -208,33 +208,31 @@ describe('Settings Component - Account Profile Section', () => {
     expect(emailInput.value).toBe('Not available');
   });
 
-  /* Preconditions: test UserProfile object created with data (name: "John Doe", email: "john@example.com"), window.api.auth.getProfile() mocked to return { success: true, profile: testProfile }
+  /* Preconditions: test User object created with data (name: "John Doe", email: "john@example.com"), window.api.auth.getUser() mocked to return { success: true, user: testUser }
      Action: render Settings component with React Testing Library
      Assertions: displays name in input field with id="profile-name", displays email in input field with id="profile-email", both fields contain correct values
      Requirements: account-profile.1.2, account-profile.1.3 */
   it('should display profile data after authentication', async () => {
-    // Create test UserProfile object with data
-    const testProfile = {
-      id: '123456789',
+    // Create test User object with data
+    const testUser = {
+      user_id: 'abc1234567',
       email: 'john@example.com',
-      verified_email: true,
       name: 'John Doe',
-      given_name: 'John',
-      family_name: 'Doe',
+      google_id: '123456789',
       locale: 'en',
-      lastUpdated: Date.now(),
+      last_synced: Date.now(),
     };
 
-    // Mock getProfile to return test profile (user authenticated)
-    mockGetProfile.mockResolvedValue({
+    // Mock getUser to return test user (user authenticated)
+    mockGetUser.mockResolvedValue({
       success: true,
-      profile: testProfile,
+      user: testUser,
     });
 
     // Render the Settings component
     renderSettings();
 
-    // Wait for loading to complete and profile to be displayed
+    // Wait for loading to complete and user to be displayed
     await waitFor(() => {
       const nameInput = screen.getByLabelText('Full Name') as HTMLInputElement;
       expect(nameInput).toBeInTheDocument();
@@ -261,33 +259,31 @@ describe('Settings Component - Account Profile Section', () => {
     expect(screen.getByText('Account')).toBeInTheDocument();
   });
 
-  /* Preconditions: test profile created and getProfile() mocked, Settings component rendered with profile data
+  /* Preconditions: test user created and getUser() mocked, Settings component rendered with user data
      Action: get input elements for name and email (by id), check readOnly attribute, attempt to change values via fireEvent.change()
      Assertions: both input fields have readOnly attribute (element.readOnly === true), field values do not change after fireEvent.change()
      Requirements: account-profile.1.4 */
   it('should have read-only profile fields', async () => {
-    // Create test UserProfile object with data
-    const testProfile = {
-      id: '123456789',
+    // Create test User object with data
+    const testUser = {
+      user_id: 'abc1234567',
       email: 'john@example.com',
-      verified_email: true,
       name: 'John Doe',
-      given_name: 'John',
-      family_name: 'Doe',
+      google_id: '123456789',
       locale: 'en',
-      lastUpdated: Date.now(),
+      last_synced: Date.now(),
     };
 
-    // Mock getProfile to return test profile (user authenticated)
-    mockGetProfile.mockResolvedValue({
+    // Mock getUser to return test user (user authenticated)
+    mockGetUser.mockResolvedValue({
       success: true,
-      profile: testProfile,
+      user: testUser,
     });
 
     // Render the Settings component
     renderSettings();
 
-    // Wait for loading to complete and profile to be displayed
+    // Wait for loading to complete and user to be displayed
     await waitFor(() => {
       const nameInput = screen.getByLabelText('Full Name') as HTMLInputElement;
       expect(nameInput).toBeInTheDocument();
@@ -310,7 +306,7 @@ describe('Settings Component - Account Profile Section', () => {
     const originalName = nameInput.value;
     const originalEmail = emailInput.value;
 
-    // Verify original values match test profile
+    // Verify original values match test user
     expect(originalName).toBe('John Doe');
     expect(originalEmail).toBe('john@example.com');
 
@@ -327,65 +323,61 @@ describe('Settings Component - Account Profile Section', () => {
     expect(nameInput.value).toBe(originalName);
     expect(emailInput.value).toBe(originalEmail);
 
-    // Verify values still match original test profile
+    // Verify values still match original test user
     expect(nameInput.value).toBe('John Doe');
     expect(emailInput.value).toBe('john@example.com');
   });
 
-  /* Preconditions: RendererEventBus mocked to capture event handlers, window.api.auth.getProfile() mocked to track calls
-     Action: render Settings component, verify getProfile() called on mount (1 time), emit profile.synced event via EventBus
-     Assertions: getProfile() called on mount (1 time), getProfile() called again after profile.synced event (2 times total), UI updated with new profile data
+  /* Preconditions: RendererEventBus mocked to capture event handlers, window.api.auth.getUser() mocked to track calls
+     Action: render Settings component, verify getUser() called on mount (1 time), emit profile.synced event via EventBus
+     Assertions: getUser() called on mount (1 time), getUser() called again after profile.synced event (2 times total), UI updated with new user data
      Requirements: account-profile.1.2 */
   it('should reload profile when profile is updated', async () => {
-    // Create initial test profile
-    const initialProfile = {
-      id: '123456789',
+    // Create initial test user
+    const initialUser = {
+      user_id: 'abc1234567',
       email: 'john@example.com',
-      verified_email: true,
       name: 'John Doe',
-      given_name: 'John',
-      family_name: 'Doe',
+      google_id: '123456789',
       locale: 'en',
-      lastUpdated: Date.now(),
+      last_synced: Date.now(),
     };
 
-    // Create updated test profile (simulating profile change after re-authentication)
-    const updatedProfile = {
-      id: '123456789',
+    // Create updated test user (simulating profile change after re-authentication)
+    const updatedUser = {
+      user_id: 'abc1234567',
       email: 'john.doe@example.com',
-      verified_email: true,
       name: 'John Updated Doe',
-      given_name: 'John',
-      family_name: 'Doe',
+      google_id: '123456789',
       locale: 'en',
-      lastUpdated: Date.now(),
+      last_synced: Date.now(),
     };
 
-    // Mock getProfile to return initial profile on first call, updated profile on second call
-    mockGetProfile
+    // Mock getUser to return initial user on first call, updated user on second call
+    mockGetUser
       .mockResolvedValueOnce({
         success: true,
-        profile: initialProfile,
+        user: initialUser,
       })
       .mockResolvedValueOnce({
         success: true,
-        profile: updatedProfile,
+        user: updatedUser,
       });
 
     // Render the Settings component
     renderSettings();
 
-    // Wait for initial loading to complete and verify initial profile is displayed
+    // Wait for initial loading to complete and verify initial user is displayed
     await waitFor(() => {
       const nameInput = screen.getByLabelText('Full Name') as HTMLInputElement;
       expect(nameInput).toBeInTheDocument();
       expect(nameInput.value).toBe('John Doe');
     });
 
-    // Verify getProfile was called once during component mount
-    expect(mockGetProfile).toHaveBeenCalledTimes(1);
+    // Verify getUser was called once during component mount
+    expect(mockGetUser).toHaveBeenCalledTimes(1);
 
-    // Verify initial profile data is displayed
+    // Verify initial user data is displayed
     const nameInputInitial = screen.getByLabelText('Full Name') as HTMLInputElement;
     const emailInputInitial = screen.getByLabelText('Email') as HTMLInputElement;
     expect(nameInputInitial.value).toBe('John Doe');
@@ -396,64 +388,62 @@ describe('Settings Component - Account Profile Section', () => {
 
     // Simulate profile.synced event via EventBus
     emitEvent('profile.synced', {
-      profile: {
-        id: updatedProfile.id,
-        email: updatedProfile.email,
-        name: updatedProfile.name,
+      user: {
+        user_id: updatedUser.user_id,
+        email: updatedUser.email,
+        name: updatedUser.name,
       },
       timestamp: Date.now(),
     });
 
-    // Wait for profile to be reloaded and UI to update with new data
+    // Wait for user to be reloaded and UI to update with new data
     await waitFor(() => {
       const nameInput = screen.getByLabelText('Full Name') as HTMLInputElement;
       expect(nameInput.value).toBe('John Updated Doe');
     });
 
-    // Verify getProfile was called a second time (2 times total)
-    expect(mockGetProfile).toHaveBeenCalledTimes(2);
+    // Verify getUser was called a second time (2 times total)
+    expect(mockGetUser).toHaveBeenCalledTimes(2);
 
-    // Verify updated profile data is displayed in UI
+    // Verify updated user data is displayed in UI
     const nameInputUpdated = screen.getByLabelText('Full Name') as HTMLInputElement;
     const emailInputUpdated = screen.getByLabelText('Email') as HTMLInputElement;
     expect(nameInputUpdated.value).toBe('John Updated Doe');
     expect(emailInputUpdated.value).toBe('john.doe@example.com');
   });
 
-  /* Preconditions: test profile created and getProfile() mocked to return it, Settings component rendered with profile data
-     Action: render Settings component with profile data, verify profile is displayed (name and email visible), unmount component to simulate logout
+  /* Preconditions: test user created and getUser() mocked to return it, Settings component rendered with user data
+     Action: render Settings component with user data, verify user is displayed (name and email visible), unmount component to simulate logout
      Assertions: component cleans up properly on unmount, EventBus subscription is cleaned up
      Requirements: account-profile.1.8 */
   it('should handle component unmount properly', async () => {
-    // Create test UserProfile object with data
-    const testProfile = {
-      id: '123456789',
+    // Create test User object with data
+    const testUser = {
+      user_id: 'abc1234567',
       email: 'john@example.com',
-      verified_email: true,
       name: 'John Doe',
-      given_name: 'John',
-      family_name: 'Doe',
+      google_id: '123456789',
       locale: 'en',
-      lastUpdated: Date.now(),
+      last_synced: Date.now(),
     };
 
-    // Mock getProfile to return test profile (user authenticated)
-    mockGetProfile.mockResolvedValue({
+    // Mock getUser to return test user (user authenticated)
+    mockGetUser.mockResolvedValue({
       success: true,
-      profile: testProfile,
+      user: testUser,
     });
 
     // Render the Settings component
     const { unmount } = renderSettings();
 
-    // Wait for loading to complete and verify profile is displayed
+    // Wait for loading to complete and verify user is displayed
     await waitFor(() => {
       const nameInput = screen.getByLabelText('Full Name') as HTMLInputElement;
       expect(nameInput).toBeInTheDocument();
       expect(nameInput.value).toBe('John Doe');
     });
 
-    // Verify profile data is displayed
+    // Verify user data is displayed
     const nameInputBefore = screen.getByLabelText('Full Name') as HTMLInputElement;
     const emailInputBefore = screen.getByLabelText('Email') as HTMLInputElement;
     expect(nameInputBefore.value).toBe('John Doe');

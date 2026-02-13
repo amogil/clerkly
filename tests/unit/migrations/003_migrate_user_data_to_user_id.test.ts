@@ -327,18 +327,20 @@ describe('Migration 003_migrate_user_data_to_user_id', () => {
       expect(result.success).toBe(true);
 
       // Insert test data in new schema
-      db.prepare('INSERT INTO users (user_id, name, email) VALUES (?, ?, ?)').run(
-        'ABCDEF1234',
-        'Test User',
-        'test@example.com'
-      );
+      db.prepare(
+        'INSERT INTO users (user_id, name, email, google_id, locale, last_synced) VALUES (?, ?, ?, ?, ?, ?)'
+      ).run('ABCDEF1234', 'Test User', 'test@example.com', 'google123', 'en', Date.now());
       const now = Date.now();
       db.prepare(
         'INSERT INTO user_data (key, value, user_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?)'
       ).run('test_key', '"test_value"', 'ABCDEF1234', now, now);
 
+      // Rollback migration 004 first
+      let rollbackResult = migrationRunner.rollbackLastMigration();
+      expect(rollbackResult.success).toBe(true);
+
       // Rollback migration 003
-      const rollbackResult = migrationRunner.rollbackLastMigration();
+      rollbackResult = migrationRunner.rollbackLastMigration();
       expect(rollbackResult.success).toBe(true);
 
       // Verify user_email column is restored
@@ -358,18 +360,20 @@ describe('Migration 003_migrate_user_data_to_user_id', () => {
       expect(result.success).toBe(true);
 
       // Insert test data in new schema
-      db.prepare('INSERT INTO users (user_id, name, email) VALUES (?, ?, ?)').run(
-        'ABCDEF1234',
-        'Test User',
-        'test@example.com'
-      );
+      db.prepare(
+        'INSERT INTO users (user_id, name, email, google_id, locale, last_synced) VALUES (?, ?, ?, ?, ?, ?)'
+      ).run('ABCDEF1234', 'Test User', 'test@example.com', 'google123', 'en', Date.now());
       const now = Date.now();
       db.prepare(
         'INSERT INTO user_data (key, value, user_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?)'
       ).run('test_key', '"test_value"', 'ABCDEF1234', now, now);
 
+      // Rollback migration 004 first
+      let rollbackResult = migrationRunner.rollbackLastMigration();
+      expect(rollbackResult.success).toBe(true);
+
       // Rollback migration 003
-      const rollbackResult = migrationRunner.rollbackLastMigration();
+      rollbackResult = migrationRunner.rollbackLastMigration();
       expect(rollbackResult.success).toBe(true);
 
       // Verify data is preserved with user_email
@@ -396,8 +400,12 @@ describe('Migration 003_migrate_user_data_to_user_id', () => {
       const result = migrationRunner.runMigrations();
       expect(result.success).toBe(true);
 
+      // Rollback migration 004 first
+      let rollbackResult = migrationRunner.rollbackLastMigration();
+      expect(rollbackResult.success).toBe(true);
+
       // Rollback migration 003
-      const rollbackResult = migrationRunner.rollbackLastMigration();
+      rollbackResult = migrationRunner.rollbackLastMigration();
       expect(rollbackResult.success).toBe(true);
 
       // Verify old indexes are restored

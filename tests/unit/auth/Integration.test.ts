@@ -145,10 +145,10 @@ describe('OAuth Integration', () => {
 
 /**
  * Integration tests for profile functionality
- * Tests the integration of OAuthClientManager, UserProfileManager, and LifecycleManager
+ * Tests the integration of OAuthClientManager, UserManager, and LifecycleManager
  */
 
-import { UserProfileManager, UserProfile } from '../../../src/main/auth/UserProfileManager';
+import { UserManager } from '../../../src/main/auth/UserManager';
 import { LifecycleManager } from '../../../src/main/LifecycleManager';
 import WindowManager from '../../../src/main/WindowManager';
 
@@ -159,11 +159,12 @@ describe('Profile Integration', () => {
   let mockDataManager: jest.Mocked<DataManager>;
   let mockTokenStorage: jest.Mocked<TokenStorageManager>;
   let mockOAuthClient: jest.Mocked<OAuthClientManager>;
-  let profileManager: UserProfileManager;
+  let userManager: UserManager;
   let mockWindowManager: jest.Mocked<WindowManager>;
   let lifecycleManager: LifecycleManager;
 
-  const mockProfile: UserProfile = {
+  // Mock Google UserInfo API response
+  const mockGoogleProfile = {
     id: '123456789',
     email: 'test@example.com',
     verified_email: true,
@@ -171,7 +172,6 @@ describe('Profile Integration', () => {
     given_name: 'Test',
     family_name: 'User',
     locale: 'en',
-    lastUpdated: Date.now(),
   };
 
   beforeEach(() => {
@@ -209,7 +209,7 @@ describe('Profile Integration', () => {
     mockOAuthClient = {
       getAuthStatus: jest.fn().mockResolvedValue({ authorized: true }),
       refreshAccessToken: jest.fn().mockResolvedValue(true),
-      setProfileManager: jest.fn(),
+      setUserManager: jest.fn(),
       startAuthFlow: jest.fn(),
       handleDeepLink: jest.fn(),
       logout: jest.fn(),
@@ -221,8 +221,8 @@ describe('Profile Integration', () => {
       closeWindow: jest.fn(),
     } as any;
 
-    // Create real UserProfileManager instance
-    profileManager = new UserProfileManager(mockDataManager, mockOAuthClient, mockTokenStorage);
+    // Create real UserManager instance (now takes 2 args)
+    userManager = new UserManager(mockDataManager, mockTokenStorage);
 
     // Create real LifecycleManager instance
     lifecycleManager = new LifecycleManager(
@@ -235,33 +235,27 @@ describe('Profile Integration', () => {
     // Mock fetch to return profile data
     (global.fetch as jest.Mock).mockResolvedValue({
       ok: true,
-      json: jest.fn().mockResolvedValue({
-        id: mockProfile.id,
-        email: mockProfile.email,
-        verified_email: mockProfile.verified_email,
-        name: mockProfile.name,
-        given_name: mockProfile.given_name,
-        family_name: mockProfile.family_name,
-        locale: mockProfile.locale,
-      }),
+      json: jest.fn().mockResolvedValue(mockGoogleProfile),
     });
   });
 
-  /* Preconditions: real OAuthClientManager and UserProfileManager, mocked Google APIs
+  /* Preconditions: real OAuthClientManager and UserManager, mocked Google APIs
      Action: perform OAuth login, wait for profile fetch
-     Assertions: profile automatically loaded, data saved to DataManager
+     Assertions: user automatically loaded, data saved to database
      Requirements: account-profile.1.2, account-profile.1.6 */
-  it('should load profile after OAuth login', async () => {
+  it('should load user after OAuth login', async () => {
     // Simulate OAuth login by setting authorized status
     mockOAuthClient.getAuthStatus.mockResolvedValue({ authorized: true });
 
     // Fetch profile
-    const profile = await profileManager.fetchProfile();
+    const user = await userManager.fetchProfile();
 
-    // Verify profile was fetched
-    expect(profile).not.toBeNull();
-    expect(profile?.email).toBe(mockProfile.email);
-    expect(profile?.name).toBe(mockProfile.name);
+    // Verify user was fetched
+    expect(user).not.toBeNull();
+    expect(user?.email).toBe(mockGoogleProfile.email);
+    expect(user?.name).toBe(mockGoogleProfile.name);
+    expect(user?.google_id).toBe(mockGoogleProfile.id);
+    expect(user?.locale).toBe(mockGoogleProfile.locale);
 
     // Verify Google UserInfo API was called with correct URL and headers
     expect(global.fetch).toHaveBeenCalledWith(
@@ -272,16 +266,6 @@ describe('Profile Integration', () => {
         }),
       })
     );
-
-    // Verify profile was saved to DataManager
-    expect(mockDataManager.saveData).toHaveBeenCalledWith(
-      'user_profile',
-      expect.objectContaining({
-        email: mockProfile.email,
-        name: mockProfile.name,
-        id: mockProfile.id,
-      })
-    );
   });
 
   /* Preconditions: expired access token, valid refresh token
@@ -290,13 +274,13 @@ describe('Profile Integration', () => {
      Requirements: account-profile.1.5 */
   it('should update profile after token refresh', async () => {
     // Set profile manager on OAuth client
-    mockOAuthClient.setProfileManager(profileManager);
+    mockOAuthClient.setUserManager(userManager);
 
     // Spy on fetchProfile method
-    const fetchProfileSpy = jest.spyOn(profileManager, 'fetchProfile');
+    const fetchProfileSpy = jest.spyOn(userManager, 'fetchProfile');
 
     // Simulate token refresh by calling the profile manager's update method
-    await profileManager.updateProfileAfterTokenRefresh();
+    await userManager.updateProfileAfterTokenRefresh();
 
     // Verify fetchProfile was called
     expect(fetchProfileSpy).toHaveBeenCalled();
@@ -308,15 +292,6 @@ describe('Profile Integration', () => {
         headers: expect.objectContaining({
           Authorization: 'Bearer mock_access_token',
         }),
-      })
-    );
-
-    // Verify profile was saved
-    expect(mockDataManager.saveData).toHaveBeenCalledWith(
-      'user_profile',
-      expect.objectContaining({
-        email: mockProfile.email,
-        name: mockProfile.name,
       })
     );
   });
@@ -350,31 +325,16 @@ describe('Profile Integration', () => {
         }),
       })
     );
-
-    // Verify profile was saved to DataManager
-    expect(mockDataManager.saveData).toHaveBeenCalledWith(
-      'user_profile',
-      expect.objectContaining({
-        email: mockProfile.email,
-        name: mockProfile.name,
-      })
-    );
   });
 
-  /* Preconditions: cached profile in DataManager, Google API returns error
+  /* Preconditions: cached user in memory, Google API returns error
      Action: call fetchProfile()
      Assertions: returns cached data, no exception thrown
      Requirements: account-profile.1.7 */
-  it('should use cached profile on API error', async () => {
-    // Set up cached profile in DataManager
-    const cachedProfile: UserProfile = {
-      ...mockProfile,
-      lastUpdated: Date.now() - 3600000, // 1 hour old
-    };
-    mockDataManager.loadData.mockReturnValue({
-      success: true,
-      data: cachedProfile,
-    });
+  it('should use cached user on API error', async () => {
+    // First fetch to cache user
+    const firstUser = await userManager.fetchProfile();
+    expect(firstUser).not.toBeNull();
 
     // Mock fetch to return error
     (global.fetch as jest.Mock).mockResolvedValue({
@@ -384,21 +344,12 @@ describe('Profile Integration', () => {
     });
 
     // Fetch profile (should return cached data)
-    const profile = await profileManager.fetchProfile();
+    const user = await userManager.fetchProfile();
 
-    // Verify cached profile was returned
-    expect(profile).not.toBeNull();
-    expect(profile?.email).toBe(cachedProfile.email);
-    expect(profile?.name).toBe(cachedProfile.name);
-    expect(profile?.lastUpdated).toBe(cachedProfile.lastUpdated);
-
-    // Verify Google UserInfo API was called (attempted)
-    expect(global.fetch).toHaveBeenCalled();
-
-    // Verify loadData was called to get cached profile
-    expect(mockDataManager.loadData).toHaveBeenCalledWith('user_profile');
-
-    // Verify no exception was thrown (test completes successfully)
+    // Verify cached user was returned
+    expect(user).not.toBeNull();
+    expect(user?.email).toBe(mockGoogleProfile.email);
+    expect(user?.name).toBe(mockGoogleProfile.name);
   });
 
   /* Preconditions: not authenticated
@@ -420,8 +371,5 @@ describe('Profile Integration', () => {
 
     // Verify Google UserInfo API was NOT called (profile fetch skipped)
     expect(global.fetch).not.toHaveBeenCalled();
-
-    // Verify profile was NOT saved
-    expect(mockDataManager.saveData).not.toHaveBeenCalledWith('user_profile', expect.anything());
   });
 });

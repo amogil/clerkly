@@ -29,7 +29,7 @@ describe('OAuthClientManager', () => {
   let oauthClient: OAuthClientManager;
   let testDbPath: string;
   let testConfig: ReturnType<typeof getOAuthConfig>;
-  let mockProfileManager: jest.Mocked<any>;
+  let mockUserManager: jest.Mocked<any>;
   const testClientId = 'test-client-id.apps.googleusercontent.com';
 
   beforeEach(() => {
@@ -45,12 +45,12 @@ describe('OAuthClientManager', () => {
     dataManager = new DataManager(testDbPath);
     dataManager.initialize();
 
-    // Requirements: user-data-isolation.1.10 - Mock UserProfileManager for data isolation
-    mockProfileManager = {
+    // Requirements: user-data-isolation.1.10 - Mock UserManager for data isolation
+    mockUserManager = {
       getCurrentUserId: jest.fn().mockReturnValue('test@example.com'),
     };
 
-    dataManager.setUserProfileManager(mockProfileManager);
+    dataManager.setUserManager(mockUserManager);
     tokenStorage = new TokenStorageManager(dataManager);
 
     // Create OAuth client
@@ -485,18 +485,18 @@ describe('OAuthClientManager', () => {
       });
 
       // Create mock profile manager
-      const mockProfileManager = {
+      const mockUserManager = {
         updateProfileAfterTokenRefresh: jest.fn().mockResolvedValue(undefined),
       };
 
       // Set profile manager
-      oauthClient.setProfileManager(mockProfileManager);
+      oauthClient.setUserManager(mockUserManager);
 
       // Refresh token
       const result = await oauthClient.refreshAccessToken();
 
       expect(result).toBe(true);
-      expect(mockProfileManager.updateProfileAfterTokenRefresh).toHaveBeenCalledTimes(1);
+      expect(mockUserManager.updateProfileAfterTokenRefresh).toHaveBeenCalledTimes(1);
     });
 
     /* Preconditions: Profile manager is not set, refresh token succeeds

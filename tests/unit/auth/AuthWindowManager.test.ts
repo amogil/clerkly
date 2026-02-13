@@ -3,23 +3,12 @@
 import { AuthWindowManager } from '../../../src/main/auth/AuthWindowManager';
 import WindowManager from '../../../src/main/WindowManager';
 import { OAuthClientManager } from '../../../src/main/auth/OAuthClientManager';
-import { LoaderShowEvent, LoaderHideEvent } from '../../../src/shared/events/types';
 
 // Mock WindowManager
 jest.mock('../../../src/main/WindowManager');
 
 // Mock OAuthClientManager
 jest.mock('../../../src/main/auth/OAuthClientManager');
-
-// Mock MainEventBus
-const mockPublish = jest.fn();
-jest.mock('../../../src/main/events/MainEventBus', () => ({
-  MainEventBus: {
-    getInstance: jest.fn(() => ({
-      publish: mockPublish,
-    })),
-  },
-}));
 
 // Mock Electron's BrowserWindow
 jest.mock('electron', () => ({
@@ -366,72 +355,75 @@ describe('AuthWindowManager', () => {
     consoleErrorSpy.mockRestore();
   });
 
-  describe('Loader functionality', () => {
-    beforeEach(() => {
-      mockPublish.mockClear();
+  describe('Auth flow state management', () => {
+    /* Preconditions: AuthWindowManager is instantiated, window exists
+       Action: call onAuthSuccess
+       Assertions: main window is shown after successful authentication
+       Requirements: google-oauth-auth.11.4, google-oauth-auth.15.6 */
+    it('should show main window on successful authentication', async () => {
+      // Create window first
+      mockWindowManager.isWindowCreated.mockReturnValue(false);
+      mockOAuthClient.getAuthStatus.mockResolvedValue({ authorized: false });
+      await authWindowManager.initializeApp();
+
+      // Verify window was created
+      expect(mockWindowManager.createWindow).toHaveBeenCalled();
+
+      // Now simulate auth success
+      mockWindowManager.isWindowCreated.mockReturnValue(true);
+      await authWindowManager.onAuthSuccess();
+
+      // Window should still exist (not recreated)
+      expect(mockWindowManager.getWindow).toHaveBeenCalled();
     });
 
     /* Preconditions: AuthWindowManager is instantiated, window exists
-       Action: call onShowLoader
-       Assertions: LoaderShowEvent is published via EventBus
-       Requirements: google-oauth-auth.15.1, google-oauth-auth.15.5 */
-    it('should publish LoaderShowEvent via EventBus', async () => {
+       Action: call onAuthError
+       Assertions: error screen is shown with error details
+       Requirements: google-oauth-auth.11.5, google-oauth-auth.15.6 */
+    it('should show error screen on authentication failure', async () => {
+      const consoleInfoSpy = jest.spyOn(console, 'info').mockImplementation();
+
       // Create window first
       mockWindowManager.isWindowCreated.mockReturnValue(false);
       mockOAuthClient.getAuthStatus.mockResolvedValue({ authorized: false });
       await authWindowManager.initializeApp();
 
-      // Call showLoader
-      await authWindowManager.onShowLoader();
+      // Now simulate auth error
+      mockWindowManager.isWindowCreated.mockReturnValue(true);
+      await authWindowManager.onAuthError('Invalid credentials', 'invalid_grant');
 
-      // Verify LoaderShowEvent was published
-      expect(mockPublish).toHaveBeenCalledWith(expect.any(LoaderShowEvent));
+      // Verify error was logged
+      expect(consoleInfoSpy).toHaveBeenCalledWith(expect.stringContaining('Authentication failed'));
+
+      consoleInfoSpy.mockRestore();
     });
 
-    /* Preconditions: AuthWindowManager is instantiated, loader is visible
-       Action: call onHideLoader
-       Assertions: LoaderHideEvent is published via EventBus
-       Requirements: google-oauth-auth.15.2, google-oauth-auth.15.6 */
-    it('should publish LoaderHideEvent via EventBus', async () => {
+    /* Preconditions: AuthWindowManager is instantiated, auth error occurred
+       Action: call onRetry
+       Assertions: login window is shown again for retry
+       Requirements: google-oauth-auth.11.6, google-oauth-auth.15.7 */
+    it('should show login window on retry after error', async () => {
+      const consoleInfoSpy = jest.spyOn(console, 'info').mockImplementation();
+
       // Create window first
       mockWindowManager.isWindowCreated.mockReturnValue(false);
       mockOAuthClient.getAuthStatus.mockResolvedValue({ authorized: false });
       await authWindowManager.initializeApp();
 
-      // Show loader first
-      await authWindowManager.onShowLoader();
+      // Simulate auth error
+      mockWindowManager.isWindowCreated.mockReturnValue(true);
+      await authWindowManager.onAuthError('Invalid credentials', 'invalid_grant');
 
-      // Clear previous calls
-      mockPublish.mockClear();
+      // Now retry
+      await authWindowManager.onRetry();
 
-      // Call hideLoader
-      await authWindowManager.onHideLoader();
+      // Verify retry was logged
+      expect(consoleInfoSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Retrying authentication')
+      );
 
-      // Verify LoaderHideEvent was published
-      expect(mockPublish).toHaveBeenCalledWith(expect.any(LoaderHideEvent));
-    });
-
-    /* Preconditions: AuthWindowManager is instantiated, loader is visible
-       Action: call onAuthSuccess
-       Assertions: hideLoader is called before showing main window
-       Requirements: google-oauth-auth.15.6 */
-    it('should hide loader on successful authentication', async () => {
-      // Create window first
-      mockWindowManager.isWindowCreated.mockReturnValue(false);
-      mockOAuthClient.getAuthStatus.mockResolvedValue({ authorized: false });
-      await authWindowManager.initializeApp();
-
-      // Show loader first
-      await authWindowManager.onShowLoader();
-
-      // Clear previous calls
-      mockPublish.mockClear();
-
-      // Call onAuthSuccess
-      await authWindowManager.onAuthSuccess();
-
-      // Verify LoaderHideEvent was published
-      expect(mockPublish).toHaveBeenCalledWith(expect.any(LoaderHideEvent));
+      consoleInfoSpy.mockRestore();
     });
   });
 });

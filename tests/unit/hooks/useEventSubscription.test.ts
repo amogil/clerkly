@@ -15,6 +15,7 @@ import {
 } from '../../../src/renderer/events/useEventSubscription';
 import { RendererEventBus } from '../../../src/renderer/events/RendererEventBus';
 import { AgentCreatedEvent, AgentCreatedPayload } from '../../../src/shared/events/types';
+import { EVENT_TYPES } from '../../../src/shared/events/constants';
 
 // Mock RendererEventBus
 jest.mock('../../../src/renderer/events/RendererEventBus', () => {
@@ -58,9 +59,9 @@ describe('useEventSubscription hooks', () => {
     it('should subscribe to event on mount', () => {
       const callback = jest.fn();
 
-      renderHook(() => useEventSubscription('agent.created', callback));
+      renderHook(() => useEventSubscription(EVENT_TYPES.AGENT_CREATED, callback));
 
-      expect(mockSubscribe).toHaveBeenCalledWith('agent.created', expect.any(Function));
+      expect(mockSubscribe).toHaveBeenCalledWith(EVENT_TYPES.AGENT_CREATED, expect.any(Function));
     });
 
     /* Preconditions: Component is mounted
@@ -70,7 +71,9 @@ describe('useEventSubscription hooks', () => {
     it('should unsubscribe on component unmount', () => {
       const callback = jest.fn();
 
-      const { unmount } = renderHook(() => useEventSubscription('agent.created', callback));
+      const { unmount } = renderHook(() =>
+        useEventSubscription(EVENT_TYPES.AGENT_CREATED, callback)
+      );
 
       expect(mockUnsubscribe).not.toHaveBeenCalled();
 
@@ -92,7 +95,7 @@ describe('useEventSubscription hooks', () => {
         return mockUnsubscribe;
       });
 
-      renderHook(() => useEventSubscription('agent.created', callback));
+      renderHook(() => useEventSubscription(EVENT_TYPES.AGENT_CREATED, callback));
 
       const payload: AgentCreatedPayload = {
         timestamp: Date.now(),
@@ -114,9 +117,12 @@ describe('useEventSubscription hooks', () => {
       const callback1 = jest.fn();
       const callback2 = jest.fn();
 
-      const { rerender } = renderHook(({ cb }) => useEventSubscription('agent.created', cb), {
-        initialProps: { cb: callback1 },
-      });
+      const { rerender } = renderHook(
+        ({ cb }) => useEventSubscription(EVENT_TYPES.AGENT_CREATED, cb),
+        {
+          initialProps: { cb: callback1 },
+        }
+      );
 
       expect(mockSubscribe).toHaveBeenCalledTimes(1);
 
@@ -134,7 +140,9 @@ describe('useEventSubscription hooks', () => {
       const callback = jest.fn();
 
       // Simulate Strict Mode behavior
-      const { unmount } = renderHook(() => useEventSubscription('agent.created', callback));
+      const { unmount } = renderHook(() =>
+        useEventSubscription(EVENT_TYPES.AGENT_CREATED, callback)
+      );
 
       // First mount
       expect(mockSubscribe).toHaveBeenCalledTimes(1);
@@ -144,7 +152,7 @@ describe('useEventSubscription hooks', () => {
       expect(mockUnsubscribe).toHaveBeenCalledTimes(1);
 
       // Remount
-      renderHook(() => useEventSubscription('agent.created', callback));
+      renderHook(() => useEventSubscription(EVENT_TYPES.AGENT_CREATED, callback));
       expect(mockSubscribe).toHaveBeenCalledTimes(2);
     });
 
@@ -163,7 +171,7 @@ describe('useEventSubscription hooks', () => {
         return mockUnsubscribe;
       });
 
-      renderHook(() => useEventSubscription('agent.created', errorCallback));
+      renderHook(() => useEventSubscription(EVENT_TYPES.AGENT_CREATED, errorCallback));
 
       const payload: AgentCreatedPayload = {
         timestamp: Date.now(),
@@ -189,10 +197,12 @@ describe('useEventSubscription hooks', () => {
     it('should support multiple event types', () => {
       const callback = jest.fn();
 
-      renderHook(() => useEventSubscriptionMultiple(['agent.created', 'agent.deleted'], callback));
+      renderHook(() =>
+        useEventSubscriptionMultiple([EVENT_TYPES.AGENT_CREATED, 'agent.deleted'], callback)
+      );
 
       expect(mockSubscribe).toHaveBeenCalledTimes(2);
-      expect(mockSubscribe).toHaveBeenCalledWith('agent.created', expect.any(Function));
+      expect(mockSubscribe).toHaveBeenCalledWith(EVENT_TYPES.AGENT_CREATED, expect.any(Function));
       expect(mockSubscribe).toHaveBeenCalledWith('agent.deleted', expect.any(Function));
     });
 
@@ -208,7 +218,7 @@ describe('useEventSubscription hooks', () => {
       mockSubscribe.mockReturnValueOnce(unsubscribe1).mockReturnValueOnce(unsubscribe2);
 
       const { unmount } = renderHook(() =>
-        useEventSubscriptionMultiple(['agent.created', 'agent.deleted'], callback)
+        useEventSubscriptionMultiple([EVENT_TYPES.AGENT_CREATED, 'agent.deleted'], callback)
       );
 
       unmount();
@@ -226,13 +236,15 @@ describe('useEventSubscription hooks', () => {
       let capturedHandler: (payload: AgentCreatedPayload) => void;
 
       mockSubscribe.mockImplementation((type, handler) => {
-        if (type === 'agent.created') {
+        if (type === EVENT_TYPES.AGENT_CREATED) {
           capturedHandler = handler;
         }
         return mockUnsubscribe;
       });
 
-      renderHook(() => useEventSubscriptionMultiple(['agent.created', 'agent.deleted'], callback));
+      renderHook(() =>
+        useEventSubscriptionMultiple([EVENT_TYPES.AGENT_CREATED, 'agent.deleted'], callback)
+      );
 
       const payload: AgentCreatedPayload = {
         timestamp: Date.now(),
@@ -243,7 +255,7 @@ describe('useEventSubscription hooks', () => {
         capturedHandler(payload);
       });
 
-      expect(callback).toHaveBeenCalledWith('agent.created', payload);
+      expect(callback).toHaveBeenCalledWith(EVENT_TYPES.AGENT_CREATED, payload);
     });
   });
 
@@ -295,10 +307,10 @@ describe('useEventSubscription hooks', () => {
       };
 
       act(() => {
-        capturedHandler('agent.created', payload);
+        capturedHandler(EVENT_TYPES.AGENT_CREATED, payload);
       });
 
-      expect(callback).toHaveBeenCalledWith('agent.created', payload);
+      expect(callback).toHaveBeenCalledWith(EVENT_TYPES.AGENT_CREATED, payload);
     });
   });
 

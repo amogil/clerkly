@@ -66,7 +66,7 @@ describe('Migration 002_create_users_table', () => {
       expect(tableExists).toBeDefined();
       expect(tableExists).toHaveProperty('name', 'users');
 
-      // Verify table structure
+      // Verify table structure - check minimum required columns
       const columns = db.prepare('PRAGMA table_info(users)').all() as Array<{
         cid: number;
         name: string;
@@ -76,7 +76,8 @@ describe('Migration 002_create_users_table', () => {
         pk: number;
       }>;
 
-      expect(columns).toHaveLength(3);
+      // At least 3 columns from migration 002 (may have more from later migrations)
+      expect(columns.length).toBeGreaterThanOrEqual(3);
 
       // Check user_id column
       const userIdCol = columns.find((c) => c.name === 'user_id');
@@ -191,8 +192,10 @@ describe('Migration 002_create_users_table', () => {
         .get();
       expect(tableExists).toBeDefined();
 
-      // Rollback migration 003 first (if applied)
-      let rollbackResult = migrationRunner.rollbackLastMigration();
+      // Rollback all migrations after 002 (004, 003)
+      let rollbackResult = migrationRunner.rollbackLastMigration(); // 004
+      expect(rollbackResult.success).toBe(true);
+      rollbackResult = migrationRunner.rollbackLastMigration(); // 003
       expect(rollbackResult.success).toBe(true);
 
       // Rollback migration 002
@@ -221,8 +224,10 @@ describe('Migration 002_create_users_table', () => {
         .get();
       expect(indexExists).toBeDefined();
 
-      // Rollback migration 003 first (if applied)
-      let rollbackResult = migrationRunner.rollbackLastMigration();
+      // Rollback all migrations after 002 (004, 003)
+      let rollbackResult = migrationRunner.rollbackLastMigration(); // 004
+      expect(rollbackResult.success).toBe(true);
+      rollbackResult = migrationRunner.rollbackLastMigration(); // 003
       expect(rollbackResult.success).toBe(true);
 
       // Rollback migration 002
