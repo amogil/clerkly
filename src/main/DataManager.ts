@@ -431,7 +431,7 @@ export class DataManager implements IDataManager {
    * Returns the database instance for direct access
    * Requirements: user-data-isolation.0.3, user-data-isolation.1.2
    *
-   * Used by UserProfileManager to access the users table directly.
+   * Used by UserManager to access the users table directly.
    * This avoids circular dependency issues while allowing user management.
    *
    * @returns Database instance or null if not initialized

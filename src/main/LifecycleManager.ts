@@ -3,7 +3,7 @@
 import WindowManager from './WindowManager';
 import { DataManager } from './DataManager';
 import { OAuthClientManager } from './auth/OAuthClientManager';
-import { UserProfileManager } from './auth/UserProfileManager';
+import { UserManager } from './auth/UserManager';
 import { TokenStorageManager } from './auth/TokenStorageManager';
 import { Logger } from './Logger';
 
@@ -24,7 +24,7 @@ export class LifecycleManager {
   private windowManager: WindowManager;
   private dataManager: DataManager;
   private oauthClient: OAuthClientManager;
-  private profileManager: UserProfileManager;
+  private profileManager: UserManager;
   private startTime: number | null = null;
   private initialized: boolean = false;
   // Requirements: clerkly.3.5, clerkly.3.7
@@ -39,8 +39,8 @@ export class LifecycleManager {
     this.windowManager = windowManager;
     this.dataManager = dataManager;
     this.oauthClient = oauthClient;
-    // Requirements: account-profile.1.5 - Initialize UserProfileManager
-    this.profileManager = new UserProfileManager(dataManager, oauthClient, tokenStorage);
+    // Requirements: account-profile.1.5 - Initialize UserManager
+    this.profileManager = new UserManager(dataManager, tokenStorage);
   }
 
   /**

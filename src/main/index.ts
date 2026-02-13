@@ -13,7 +13,7 @@ import { DataManager } from './DataManager';
 import { IPCHandlers } from './IPCHandlers';
 import { OAuthClientManager } from './auth/OAuthClientManager';
 import { TokenStorageManager } from './auth/TokenStorageManager';
-import { UserProfileManager } from './auth/UserProfileManager';
+import { UserManager } from './auth/UserManager';
 import { getOAuthConfig, OAUTH_CONFIG } from './auth/OAuthConfig';
 import { AuthIPCHandlers } from './auth/AuthIPCHandlers';
 import { AIAgentSettingsManager } from './AIAgentSettingsManager';
@@ -133,11 +133,11 @@ import { setOAuthClientManager } from './auth/APIRequestHandler';
 setOAuthClientManager(oauthClient);
 
 // Requirements: account-profile.1.5
-// Initialize User Profile Manager
-const profileManager = new UserProfileManager(dataManager, oauthClient, tokenStorage);
+// Initialize User Manager
+const profileManager = new UserManager(dataManager, tokenStorage);
 
-// Requirements: user-data-isolation.1.10 - Set UserProfileManager in DataManager for data isolation
-dataManager.setUserProfileManager(profileManager);
+// Requirements: user-data-isolation.1.10 - Set UserManager in DataManager for data isolation
+dataManager.setUserManager(profileManager);
 
 // Requirements: account-profile.1.5
 // Connect profile manager to oauth client for automatic updates
@@ -243,8 +243,8 @@ if (process.env.NODE_ENV === 'test') {
       throw new Error('test:get-profile can only be used in test environment');
     }
     try {
-      const profile = await profileManager.loadProfile();
-      return { success: true, profile };
+      const user = profileManager.getCurrentUser();
+      return { success: true, profile: user };
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       return { success: false, error: errorMessage, profile: null };
@@ -259,8 +259,8 @@ if (process.env.NODE_ENV === 'test') {
       return { success: false, error: 'Email parameter is required', profile: null };
     }
     try {
-      const profile = await profileManager.loadProfileByEmail(email);
-      return { success: true, profile };
+      const user = profileManager.loadUserByEmail(email);
+      return { success: true, profile: user };
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       return { success: false, error: errorMessage, profile: null };
@@ -272,7 +272,17 @@ if (process.env.NODE_ENV === 'test') {
       throw new Error('test:setup-profile can only be used in test environment');
     }
     try {
-      await profileManager.saveProfile(profileData);
+      // Create user via findOrCreateUser instead of saveProfile
+      const googleProfile = {
+        id: profileData.id || 'test-google-id',
+        email: profileData.email,
+        verified_email: true,
+        name: profileData.name || 'Test User',
+        given_name: profileData.given_name || 'Test',
+        family_name: profileData.family_name || 'User',
+        locale: profileData.locale || 'en',
+      };
+      profileManager.findOrCreateUser(googleProfile);
       return { success: true };
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -478,7 +488,7 @@ app.whenReady().then(async () => {
 
     // Requirements: user-data-isolation.1.17 - Initialize profile manager to restore email from database
     await profileManager.initialize();
-    logger.info('UserProfileManager initialized');
+    logger.info('UserManager initialized');
 
     // Requirements: clerkly.1.2, clerkly.1.3, clerkly.1.4
     // Initialize application
