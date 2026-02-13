@@ -170,63 +170,61 @@
 ## Фаза 3: Миграция user_data и обновление DataManager (2 дня)
 
 ### 3.1. Создать миграцию для изменения user_data
-- [ ] Создать файл миграции `003_migrate_user_data_to_user_id.ts` в `migrations/` (код на TypeScript)
-- [ ] Реализовать функцию `generateUserId()` - та же логика что в UserProfileManager:
-  - Набор символов: A-Z, a-z, 0-9 (62 символа)
-  - Длина: 10 символов
-- [ ] Добавить UP секцию:
+- [x] Создать файл миграции `003_migrate_user_data_to_user_id.sql` в `migrations/`
+- [x] Использовать SQL функцию `hex(randomblob(5))` для генерации 10-символьного hex ID
+- [x] Добавить UP секцию:
   - Получить все уникальные email из `user_data`
-  - Создать записи в `users` с случайным alphanumeric user_id для каждого email
+  - Создать записи в `users` с hex user_id для каждого email
   - Создать новую таблицу `user_data_new` с `user_id` вместо `user_email` (без колонки `timestamp`)
   - Скопировать данные с преобразованием email → user_id через JOIN
   - Удалить старую таблицу, переименовать новую
   - Создать индекс `idx_user_id`
-- [ ] Добавить DOWN секцию для отката
-- [ ] Протестировать миграцию на тестовой базе
+- [x] Добавить DOWN секцию для отката
+- [x] Протестировать миграцию на тестовой базе
 - _Requirements: user-data-isolation.5.1, user-data-isolation.5.2, user-data-isolation.5.3, user-data-isolation.5.4_
 
 ### 3.2. Удалить колонку timestamp из user_data
-- [ ] Убедиться, что новая схема user_data НЕ содержит колонку `timestamp`
-- [ ] Обновить все SQL запросы, использующие `timestamp`
-- [ ] Использовать только `created_at` и `updated_at`
+- [x] Убедиться, что новая схема user_data НЕ содержит колонку `timestamp`
+- [x] Обновить все SQL запросы, использующие `timestamp`
+- [x] Использовать только `created_at` и `updated_at`
 - _Requirements: user-data-isolation.2.1, user-data-isolation.2.2_
 
 ### 3.3. Обновить DataManager для использования user_id
-- [ ] Изменить метод `saveData`:
+- [x] Изменить метод `saveData`:
   - Заменить `getCurrentEmail()` на `getCurrentUserId()`
   - Заменить `user_email` на `user_id` в SQL запросе
   - Удалить `timestamp` из INSERT
   - Обновить логирование
-- [ ] Изменить метод `loadData`:
+- [x] Изменить метод `loadData`:
   - Заменить `getCurrentEmail()` на `getCurrentUserId()`
   - Заменить `user_email` на `user_id` в SQL запросе
   - Обновить логирование
-- [ ] Изменить метод `deleteData`:
+- [x] Изменить метод `deleteData`:
   - Заменить `getCurrentEmail()` на `getCurrentUserId()`
   - Заменить `user_email` на `user_id` в SQL запросе
   - Обновить логирование
-- [ ] Обновить комментарии с Requirements (заменить старые ID на новые)
+- [x] Обновить комментарии с Requirements (заменить старые ID на новые)
 - _Requirements: user-data-isolation.2.4, user-data-isolation.2.5, user-data-isolation.2.6, user-data-isolation.3.1, user-data-isolation.3.2_
 
 ### 3.4. Обновить модульные тесты DataManager
-- [ ] Обновить тест: `should automatically add user_id when saving`
-- [ ] Обновить тест: `should automatically filter by user_id when loading`
-- [ ] Обновить тест: `should automatically filter by user_id when deleting`
-- [ ] Обновить тест: `should throw error when no user logged in`
-- [ ] Обновить все моки для использования `getCurrentUserId()` вместо `getCurrentEmail()`
-- [ ] Удалить тесты, связанные с `timestamp`
+- [x] Обновить тест: `should automatically add user_id when saving`
+- [x] Обновить тест: `should automatically filter by user_id when loading`
+- [x] Обновить тест: `should automatically filter by user_id when deleting`
+- [x] Обновить тест: `should throw error when no user logged in`
+- [x] Обновить все моки для использования `getCurrentUserId()` вместо `getCurrentEmail()`
+- [x] Удалить тесты, связанные с `timestamp`
 - _Requirements: user-data-isolation.2.4, user-data-isolation.2.5, user-data-isolation.2.6, user-data-isolation.3.2_
 
 ### 3.5. Написать тесты для миграции данных
-- [ ] Тест: существующие данные с user_email мигрируются на user_id
-- [ ] Тест: создаются записи в таблице users для каждого уникального email
-- [ ] Тест: колонка timestamp удаляется
-- [ ] Тест: DOWN миграция восстанавливает user_email
+- [x] Тест: существующие данные с user_email мигрируются на user_id
+- [x] Тест: создаются записи в таблице users для каждого уникального email
+- [x] Тест: колонка timestamp удаляется
+- [x] Тест: DOWN миграция восстанавливает user_email
 - _Requirements: user-data-isolation.5.1, user-data-isolation.5.2, user-data-isolation.5.3, user-data-isolation.5.4_
 
 ### 3.6. Запустить валидацию Фазы 3
-- [ ] Выполнить `npm run validate`
-- [ ] Убедиться, что все тесты проходят
+- [x] Выполнить `npm run validate`
+- [x] Убедиться, что все тесты проходят
 
 ---
 

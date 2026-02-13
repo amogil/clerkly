@@ -191,8 +191,12 @@ describe('Migration 002_create_users_table', () => {
         .get();
       expect(tableExists).toBeDefined();
 
-      // Rollback migration 002 (need to rollback to version 1)
-      const rollbackResult = migrationRunner.rollbackLastMigration();
+      // Rollback migration 003 first (if applied)
+      let rollbackResult = migrationRunner.rollbackLastMigration();
+      expect(rollbackResult.success).toBe(true);
+
+      // Rollback migration 002
+      rollbackResult = migrationRunner.rollbackLastMigration();
       expect(rollbackResult.success).toBe(true);
 
       // Verify table is dropped
@@ -217,8 +221,12 @@ describe('Migration 002_create_users_table', () => {
         .get();
       expect(indexExists).toBeDefined();
 
+      // Rollback migration 003 first (if applied)
+      let rollbackResult = migrationRunner.rollbackLastMigration();
+      expect(rollbackResult.success).toBe(true);
+
       // Rollback migration 002
-      const rollbackResult = migrationRunner.rollbackLastMigration();
+      rollbackResult = migrationRunner.rollbackLastMigration();
       expect(rollbackResult.success).toBe(true);
 
       // Verify index is dropped

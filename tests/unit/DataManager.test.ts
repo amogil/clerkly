@@ -1,4 +1,4 @@
-// Requirements: clerkly.2, user-data-isolation.1.10
+// Requirements: clerkly.2, user-data-isolation.3.1, user-data-isolation.3.2
 
 import Database from 'better-sqlite3';
 import * as fs from 'fs';
@@ -31,9 +31,9 @@ describe('DataManager', () => {
       fs.mkdirSync(migrationsPath, { recursive: true });
     }
 
-    // Requirements: user-data-isolation.1.10 - Mock UserProfileManager for data isolation tests
+    // Requirements: user-data-isolation.3.1, user-data-isolation.3.2 - Mock UserProfileManager for data isolation tests
     mockProfileManager = {
-      getCurrentUserId: jest.fn().mockReturnValue('test@example.com'),
+      getCurrentUserId: jest.fn().mockReturnValue('testUserId1'),
     } as unknown as jest.Mocked<UserProfileManager>;
   });
 
@@ -423,7 +423,7 @@ describe('DataManager', () => {
     /* Preconditions: DataManager initialized but UserProfileManager not set
        Action: attempt to save data without user logged in
        Assertions: returns success false, error about no user logged in
-       Requirements: user-data-isolation.1.11, user-data-isolation.1.13*/
+       Requirements: user-data-isolation.3.2*/
     it('should reject save when no user logged in', () => {
       const { dataManager: dm } = initializeDataManagerWithoutUser();
       dataManager = dm;
@@ -577,7 +577,7 @@ describe('DataManager', () => {
     /* Preconditions: DataManager initialized but UserProfileManager not set
        Action: attempt to load data without user logged in
        Assertions: returns success false, error about no user logged in
-       Requirements: user-data-isolation.1.12, user-data-isolation.1.13*/
+       Requirements: user-data-isolation.3.2*/
     it('should reject load when no user logged in', () => {
       const { dataManager: dm } = initializeDataManagerWithoutUser();
       dataManager = dm;
@@ -591,24 +591,17 @@ describe('DataManager', () => {
     /* Preconditions: DataManager initialized, database contains corrupted JSON data
        Action: manually insert invalid JSON, then attempt to load
        Assertions: returns success true, data returned as plain string (fallback)
-       Requirements: clerkly.1, clerkly.2, user-data-isolation.1.10*/
+       Requirements: clerkly.1, clerkly.2, user-data-isolation.3.1*/
     it('should handle corrupted JSON data with fallback to plain string', () => {
-      // Manually insert invalid JSON into database with user_email
+      // Manually insert invalid JSON into database with user_id
       const db = new Database(testDbPath);
       const timestamp = Date.now();
       db.prepare(
         `
-        INSERT INTO user_data (key, value, timestamp, user_email, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO user_data (key, value, user_id, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?)
       `
-      ).run(
-        'corrupted-key',
-        'not valid json {[',
-        timestamp,
-        'test@example.com',
-        timestamp,
-        timestamp
-      );
+      ).run('corrupted-key', 'not valid json {[', 'testUserId1', timestamp, timestamp);
       db.close();
 
       // Reinitialize DataManager
@@ -718,7 +711,7 @@ describe('DataManager', () => {
     /* Preconditions: DataManager initialized but UserProfileManager not set
        Action: attempt to delete data without user logged in
        Assertions: returns success false, error about no user logged in
-       Requirements: user-data-isolation.1.12, user-data-isolation.1.13*/
+       Requirements: user-data-isolation.3.2*/
     it('should reject delete when no user logged in', () => {
       const { dataManager: dm } = initializeDataManagerWithoutUser();
       dataManager = dm;
@@ -1025,7 +1018,7 @@ describe('DataManager', () => {
     /* Preconditions: UserProfileManager returns null for getCurrentUserId
        Action: call loadData('test_key')
        Assertions: returns error result with message containing "No user logged in"
-       Requirements: user-data-isolation.1.13 */
+       Requirements: user-data-isolation.3.2 */
     it('should reject load when no user logged in', () => {
       const { dataManager: dm } = initializeDataManagerWithoutUser();
       dataManager = dm;
@@ -1042,7 +1035,7 @@ describe('DataManager', () => {
     /* Preconditions: UserProfileManager returns null for getCurrentUserId
        Action: call deleteData('test_key')
        Assertions: returns error result with message containing "No user logged in"
-       Requirements: user-data-isolation.1.13 */
+       Requirements: user-data-isolation.3.2 */
     it('should reject delete when no user logged in', () => {
       const { dataManager: dm } = initializeDataManagerWithoutUser();
       dataManager = dm;
@@ -1056,30 +1049,30 @@ describe('DataManager', () => {
       expect(result.error).toContain('No user logged in');
     });
 
-    /* Preconditions: Two users with different emails, each saves data with same key
+    /* Preconditions: Two users with different user_ids, each saves data with same key
        Action: save data for user A, save data for user B, load as user A, load as user B
        Assertions: each user sees only their own data
-       Requirements: user-data-isolation.1.3, user-data-isolation.1.4, user-data-isolation.1.6 */
+       Requirements: user-data-isolation.2.4, user-data-isolation.2.5, user-data-isolation.3.1 */
     it('should isolate data between different users', () => {
       const { dataManager: dm } = initializeDataManager();
       dataManager = dm;
 
       // Save data as user A
-      mockProfileManager.getCurrentUserId.mockReturnValue('userA@example.com');
+      mockProfileManager.getCurrentUserId.mockReturnValue('userIdAAAAA');
       dataManager.saveData('test_key', 'value_A');
 
       // Save data as user B
-      mockProfileManager.getCurrentUserId.mockReturnValue('userB@example.com');
+      mockProfileManager.getCurrentUserId.mockReturnValue('userIdBBBBB');
       dataManager.saveData('test_key', 'value_B');
 
       // Load as user A
-      mockProfileManager.getCurrentUserId.mockReturnValue('userA@example.com');
+      mockProfileManager.getCurrentUserId.mockReturnValue('userIdAAAAA');
       const resultA = dataManager.loadData('test_key');
       expect(resultA.success).toBe(true);
       expect(resultA.data).toBe('value_A');
 
       // Load as user B
-      mockProfileManager.getCurrentUserId.mockReturnValue('userB@example.com');
+      mockProfileManager.getCurrentUserId.mockReturnValue('userIdBBBBB');
       const resultB = dataManager.loadData('test_key');
       expect(resultB.success).toBe(true);
       expect(resultB.data).toBe('value_B');

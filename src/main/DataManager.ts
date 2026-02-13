@@ -1,4 +1,4 @@
-// Requirements: clerkly.1, clerkly.2, error-notifications.1.1, user-data-isolation.1.5, user-data-isolation.2.4, user-data-isolation.2.5, user-data-isolation.2.6, user-data-isolation.3.1
+// Requirements: clerkly.1, clerkly.2, error-notifications.1.1, user-data-isolation.2.4, user-data-isolation.2.5, user-data-isolation.2.6, user-data-isolation.3.1, user-data-isolation.3.2
 
 import Database from 'better-sqlite3';
 import * as fs from 'fs';
@@ -65,13 +65,13 @@ export interface IDataManager {
 
 /**
  * Manages local data storage using SQLite
- * Requirements: user-data-isolation.1.10 - Supports user data isolation via UserProfileManager
+ * Requirements: user-data-isolation.3.1 - Supports user data isolation via UserProfileManager
  */
 export class DataManager implements IDataManager {
   private storagePath: string;
   private db: Database.Database | null = null;
   private migrationRunner: MigrationRunner | null = null;
-  // Requirements: user-data-isolation.1.10 - Reference to UserProfileManager for getting current user email
+  // Requirements: user-data-isolation.3.1 - Reference to UserProfileManager for getting current user_id
   private userProfileManager: UserProfileManager | null = null;
   // Requirements: clerkly.3.5, clerkly.3.7
   private logger = Logger.create('DataManager');
@@ -82,7 +82,7 @@ export class DataManager implements IDataManager {
 
   /**
    * Set UserProfileManager for user data isolation
-   * Requirements: user-data-isolation.1.10
+   * Requirements: user-data-isolation.3.1
    *
    * Must be called after DataManager initialization to enable user data isolation.
    * This avoids circular dependency between DataManager and UserProfileManager.
@@ -182,7 +182,7 @@ export class DataManager implements IDataManager {
    * Сериализует value в JSON
    * Проверяет размер (max 10MB)
    * Обрабатывает ошибки (SQLITE_FULL, SQLITE_BUSY, SQLITE_LOCKED, SQLITE_READONLY)
-   * Requirements: clerkly.1, error-notifications.1.1, user-data-isolation.1.3, user-data-isolation.1.11, user-data-isolation.1.13
+   * Requirements: clerkly.1, error-notifications.1.1, user-data-isolation.2.4, user-data-isolation.3.1, user-data-isolation.3.2
    *
    * @param {string} key
    * @param {unknown} value
@@ -225,26 +225,25 @@ export class DataManager implements IDataManager {
         return { success: false, error: 'Value too large: exceeds 10MB limit' };
       }
 
-      // Requirements: user-data-isolation.1.5, user-data-isolation.3.1 - Get current user_id for data isolation
+      // Requirements: user-data-isolation.3.1, user-data-isolation.3.2 - Get current user_id for data isolation
       const userId = this.userProfileManager?.getCurrentUserId();
 
       if (!userId) {
         throw new Error('No user logged in: UserProfileManager not set or user not authenticated');
       }
 
-      const timestamp = Date.now();
+      const now = Date.now();
 
       // Requirements: user-data-isolation.2.4 - Save with user_id for data isolation
       const stmt = this.db.prepare(`
-        INSERT INTO user_data (key, value, user_email, timestamp, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?)
-        ON CONFLICT(key, user_email) DO UPDATE SET
+        INSERT INTO user_data (key, value, user_id, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT(key, user_id) DO UPDATE SET
           value = excluded.value,
-          timestamp = excluded.timestamp,
           updated_at = excluded.updated_at
       `);
 
-      stmt.run(key, serializedValue, userId, timestamp, timestamp, timestamp);
+      stmt.run(key, serializedValue, userId, now, now);
 
       // Requirements: user-data-isolation.2.4 - Log successful save with user_id
       this.logger.info(`Data saved for user ${userId}, key: ${key}`);
@@ -280,7 +279,7 @@ export class DataManager implements IDataManager {
    * Валидирует key
    * Десериализует JSON
    * Обрабатывает ошибки (SQLITE_BUSY, SQLITE_LOCKED)
-   * Requirements: clerkly.1, user-data-isolation.1.4, user-data-isolation.1.12, user-data-isolation.1.13
+   * Requirements: clerkly.1, user-data-isolation.2.5, user-data-isolation.3.1, user-data-isolation.3.2
    *
    * @param {string} key
    * @returns {LoadDataResult}
@@ -301,7 +300,7 @@ export class DataManager implements IDataManager {
         return { success: false, error: 'Database not initialized or closed' };
       }
 
-      // Requirements: user-data-isolation.1.5, user-data-isolation.3.1 - Get current user_id for data isolation
+      // Requirements: user-data-isolation.3.1, user-data-isolation.3.2 - Get current user_id for data isolation
       const userId = this.userProfileManager?.getCurrentUserId();
 
       if (!userId) {
@@ -310,7 +309,7 @@ export class DataManager implements IDataManager {
 
       // Requirements: user-data-isolation.2.5 - Query with user_id filter for data isolation
       const row = this.db
-        .prepare('SELECT value FROM user_data WHERE key = ? AND user_email = ?')
+        .prepare('SELECT value FROM user_data WHERE key = ? AND user_id = ?')
         .get(key, userId) as { value: string } | undefined;
 
       if (!row) {
@@ -348,7 +347,7 @@ export class DataManager implements IDataManager {
    * Удаляет данные из локального хранилища
    * Валидирует key
    * Обрабатывает ошибки
-   * Requirements: clerkly.1, user-data-isolation.1.12, user-data-isolation.1.13
+   * Requirements: clerkly.1, user-data-isolation.2.6, user-data-isolation.3.1, user-data-isolation.3.2
    *
    * @param {string} key
    * @returns {DeleteDataResult}
@@ -369,7 +368,7 @@ export class DataManager implements IDataManager {
         return { success: false, error: 'Database not initialized or closed' };
       }
 
-      // Requirements: user-data-isolation.1.5, user-data-isolation.3.1 - Get current user_id for data isolation
+      // Requirements: user-data-isolation.3.1, user-data-isolation.3.2 - Get current user_id for data isolation
       const userId = this.userProfileManager?.getCurrentUserId();
 
       if (!userId) {
@@ -377,7 +376,7 @@ export class DataManager implements IDataManager {
       }
 
       // Requirements: user-data-isolation.2.6 - Delete with user_id filter for data isolation
-      const stmt = this.db.prepare('DELETE FROM user_data WHERE key = ? AND user_email = ?');
+      const stmt = this.db.prepare('DELETE FROM user_data WHERE key = ? AND user_id = ?');
       const result = stmt.run(key, userId);
 
       if (result.changes === 0) {

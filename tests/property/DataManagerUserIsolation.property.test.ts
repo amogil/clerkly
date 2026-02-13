@@ -1,4 +1,4 @@
-// Requirements: user-data-isolation.1.3, user-data-isolation.1.4, user-data-isolation.1.5, user-data-isolation.1.6, user-data-isolation.1.7
+// Requirements: user-data-isolation.2.4, user-data-isolation.2.5, user-data-isolation.3.1, user-data-isolation.3.2, user-data-isolation.4.4
 
 import * as fc from 'fast-check';
 import Database from 'better-sqlite3';
@@ -48,17 +48,19 @@ describe('DataManager User Isolation - Property-Based Tests', () => {
     }
   });
 
-  /* Preconditions: Multiple users with different emails, each saves data
+  /* Preconditions: Multiple users with different user_ids, each saves data
      Action: For each user: save data, then load data
      Assertions: Each user sees only their own data, data of other users not visible
-     Requirements: user-data-isolation.1.3, user-data-isolation.1.4, user-data-isolation.1.6
+     Requirements: user-data-isolation.2.4, user-data-isolation.2.5, user-data-isolation.4.4
      Property: Data isolation between users */
   it('should isolate data between different users (property-based)', () => {
     fc.assert(
       fc.property(
         fc.array(
           fc.record({
-            email: fc.emailAddress(),
+            userId: fc
+              .string({ minLength: 10, maxLength: 10 })
+              .filter((s) => /^[A-Za-z0-9]+$/.test(s)),
             key: fc.string({ minLength: 1, maxLength: 50 }),
             value: fc.oneof(
               fc.string(),
@@ -82,13 +84,13 @@ describe('DataManager User Isolation - Property-Based Tests', () => {
 
           // Save data for each user
           users.forEach((user) => {
-            mockProfileManager.getCurrentUserId.mockReturnValue(user.email);
+            mockProfileManager.getCurrentUserId.mockReturnValue(user.userId);
             dataManager.saveData(user.key, user.value);
           });
 
           // Verify each user can only see their own data
           users.forEach((user) => {
-            mockProfileManager.getCurrentUserId.mockReturnValue(user.email);
+            mockProfileManager.getCurrentUserId.mockReturnValue(user.userId);
             const result = dataManager.loadData(user.key);
 
             expect(result.success).toBe(true);
@@ -98,14 +100,13 @@ describe('DataManager User Isolation - Property-Based Tests', () => {
           // Verify users cannot see other users' data
           for (let i = 0; i < users.length; i++) {
             for (let j = 0; j < users.length; j++) {
-              if (i !== j && users[i].key === users[j].key) {
+              if (i !== j && users[i].key === users[j].key && users[i].userId !== users[j].userId) {
                 // Same key, different users
-                mockProfileManager.getCurrentUserId.mockReturnValue(users[i].email);
+                mockProfileManager.getCurrentUserId.mockReturnValue(users[i].userId);
                 const result = dataManager.loadData(users[j].key);
 
                 // Should get user i's data, not user j's data
                 expect(result.data).toEqual(users[i].value);
-                expect(result.data).not.toEqual(users[j].value);
               }
             }
           }
@@ -120,14 +121,16 @@ describe('DataManager User Isolation - Property-Based Tests', () => {
   /* Preconditions: Multiple users, each saves and loads data (round-trip)
      Action: For each user: save data, then load data
      Assertions: Loaded data equals saved data, data of other users not affected
-     Requirements: user-data-isolation.1.3, user-data-isolation.1.4, user-data-isolation.1.7
+     Requirements: user-data-isolation.2.4, user-data-isolation.2.5, user-data-isolation.3.1
      Property: Save/load round-trip with isolation */
   it('should preserve data through save/load cycle with isolation (property-based)', () => {
     fc.assert(
       fc.property(
         fc.array(
           fc.record({
-            email: fc.emailAddress(),
+            userId: fc
+              .string({ minLength: 10, maxLength: 10 })
+              .filter((s) => /^[A-Za-z0-9]+$/.test(s)),
             key: fc.string({ minLength: 1, maxLength: 50 }),
             value: fc.oneof(
               fc.string(),
@@ -150,7 +153,7 @@ describe('DataManager User Isolation - Property-Based Tests', () => {
 
           // Save and immediately load for each user
           users.forEach((user) => {
-            mockProfileManager.getCurrentUserId.mockReturnValue(user.email);
+            mockProfileManager.getCurrentUserId.mockReturnValue(user.userId);
             const saveResult = dataManager.saveData(user.key, user.value);
             expect(saveResult.success).toBe(true);
 
@@ -161,7 +164,7 @@ describe('DataManager User Isolation - Property-Based Tests', () => {
 
           // Verify all users' data is still intact
           users.forEach((user) => {
-            mockProfileManager.getCurrentUserId.mockReturnValue(user.email);
+            mockProfileManager.getCurrentUserId.mockReturnValue(user.userId);
             const result = dataManager.loadData(user.key);
             expect(result.success).toBe(true);
             expect(result.data).toEqual(user.value);
@@ -174,17 +177,19 @@ describe('DataManager User Isolation - Property-Based Tests', () => {
     );
   });
 
-  /* Preconditions: Multiple users, each saves data, then "logout" (clear email), then "login" again
+  /* Preconditions: Multiple users, each saves data, then "logout" (clear user_id), then "login" again
      Action: Save data, simulate logout, simulate login, load data
      Assertions: Data persists after logout, restored on login
-     Requirements: user-data-isolation.1.5, user-data-isolation.1.7
+     Requirements: user-data-isolation.3.2, user-data-isolation.4.4
      Property: Logout preserves user data */
   it('should persist user data after logout and restore on re-login (property-based)', () => {
     fc.assert(
       fc.property(
         fc.array(
           fc.record({
-            email: fc.emailAddress(),
+            userId: fc
+              .string({ minLength: 10, maxLength: 10 })
+              .filter((s) => /^[A-Za-z0-9]+$/.test(s)),
             key: fc.string({ minLength: 1, maxLength: 50 }),
             value: fc.oneof(fc.string(), fc.integer(), fc.record({ data: fc.string() })),
           }),
@@ -202,7 +207,7 @@ describe('DataManager User Isolation - Property-Based Tests', () => {
 
           // Save data for each user
           users.forEach((user) => {
-            mockProfileManager.getCurrentUserId.mockReturnValue(user.email);
+            mockProfileManager.getCurrentUserId.mockReturnValue(user.userId);
             dataManager.saveData(user.key, user.value);
           });
 
@@ -213,8 +218,8 @@ describe('DataManager User Isolation - Property-Based Tests', () => {
           const db = new Database(testDbPath);
           users.forEach((user) => {
             const row = db
-              .prepare('SELECT value FROM user_data WHERE key = ? AND user_email = ?')
-              .get(user.key, user.email) as { value: string } | undefined;
+              .prepare('SELECT value FROM user_data WHERE key = ? AND user_id = ?')
+              .get(user.key, user.userId) as { value: string } | undefined;
 
             expect(row).toBeDefined();
             expect(JSON.parse(row!.value)).toEqual(user.value);
@@ -223,7 +228,7 @@ describe('DataManager User Isolation - Property-Based Tests', () => {
 
           // Simulate re-login and verify data is restored
           users.forEach((user) => {
-            mockProfileManager.getCurrentUserId.mockReturnValue(user.email);
+            mockProfileManager.getCurrentUserId.mockReturnValue(user.userId);
             const result = dataManager.loadData(user.key);
             expect(result.success).toBe(true);
             expect(result.data).toEqual(user.value);
