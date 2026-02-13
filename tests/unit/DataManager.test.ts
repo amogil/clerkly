@@ -1078,4 +1078,141 @@ describe('DataManager', () => {
       expect(resultB.data).toBe('value_B');
     });
   });
+
+  describe('Permission and SQLite Error Handling', () => {
+    // Note: Permission error tests (EACCES/EPERM fallback) are in DataManager.permission.test.ts
+    // because they require jest.mock for fs module which cannot be done with jest.spyOn
+
+    /* Preconditions: DataManager initialized, database query throws SQLITE_BUSY
+       Action: mock db.prepare to throw SQLITE_BUSY, call loadData
+       Assertions: returns success false with error about database locked
+       Requirements: clerkly.1, clerkly.2 */
+    it('should handle SQLITE_BUSY error on loadData query', () => {
+      const { dataManager: dm } = initializeDataManager();
+      dataManager = dm;
+
+      // Save data first
+      dataManager.saveData('busy-test-key', 'test-value');
+
+      // Mock database prepare to throw SQLITE_BUSY
+      const db = (dataManager as any).db;
+      const originalPrepare = db.prepare.bind(db);
+
+      db.prepare = jest.fn().mockImplementation((sql: string) => {
+        if (sql.includes('SELECT')) {
+          const error: any = new Error('Database is busy');
+          error.code = 'SQLITE_BUSY';
+          throw error;
+        }
+        return originalPrepare(sql);
+      });
+
+      const result = dataManager.loadData('busy-test-key');
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('Database is locked');
+
+      // Restore original prepare
+      db.prepare = originalPrepare;
+    });
+
+    /* Preconditions: DataManager initialized, database query throws SQLITE_LOCKED
+       Action: mock db.prepare to throw SQLITE_LOCKED, call loadData
+       Assertions: returns success false with error about database locked
+       Requirements: clerkly.1, clerkly.2 */
+    it('should handle SQLITE_LOCKED error on loadData query', () => {
+      const { dataManager: dm } = initializeDataManager();
+      dataManager = dm;
+
+      // Save data first
+      dataManager.saveData('locked-test-key', 'test-value');
+
+      // Mock database prepare to throw SQLITE_LOCKED
+      const db = (dataManager as any).db;
+      const originalPrepare = db.prepare.bind(db);
+
+      db.prepare = jest.fn().mockImplementation((sql: string) => {
+        if (sql.includes('SELECT')) {
+          const error: any = new Error('Database is locked');
+          error.code = 'SQLITE_LOCKED';
+          throw error;
+        }
+        return originalPrepare(sql);
+      });
+
+      const result = dataManager.loadData('locked-test-key');
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('Database is locked');
+
+      // Restore original prepare
+      db.prepare = originalPrepare;
+    });
+
+    /* Preconditions: DataManager initialized, database delete throws SQLITE_BUSY
+       Action: mock db.prepare to throw SQLITE_BUSY on DELETE, call deleteData
+       Assertions: returns success false with error about database locked
+       Requirements: clerkly.1, clerkly.2 */
+    it('should handle SQLITE_BUSY error on deleteData', () => {
+      const { dataManager: dm } = initializeDataManager();
+      dataManager = dm;
+
+      // Save data first
+      dataManager.saveData('delete-busy-key', 'test-value');
+
+      // Mock database prepare to throw SQLITE_BUSY on DELETE
+      const db = (dataManager as any).db;
+      const originalPrepare = db.prepare.bind(db);
+
+      db.prepare = jest.fn().mockImplementation((sql: string) => {
+        if (sql.includes('DELETE')) {
+          const error: any = new Error('Database is busy');
+          error.code = 'SQLITE_BUSY';
+          throw error;
+        }
+        return originalPrepare(sql);
+      });
+
+      const result = dataManager.deleteData('delete-busy-key');
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('Database is locked');
+
+      // Restore original prepare
+      db.prepare = originalPrepare;
+    });
+
+    /* Preconditions: DataManager initialized, database delete throws SQLITE_LOCKED
+       Action: mock db.prepare to throw SQLITE_LOCKED on DELETE, call deleteData
+       Assertions: returns success false with error about database locked
+       Requirements: clerkly.1, clerkly.2 */
+    it('should handle SQLITE_LOCKED error on deleteData', () => {
+      const { dataManager: dm } = initializeDataManager();
+      dataManager = dm;
+
+      // Save data first
+      dataManager.saveData('delete-locked-key', 'test-value');
+
+      // Mock database prepare to throw SQLITE_LOCKED on DELETE
+      const db = (dataManager as any).db;
+      const originalPrepare = db.prepare.bind(db);
+
+      db.prepare = jest.fn().mockImplementation((sql: string) => {
+        if (sql.includes('DELETE')) {
+          const error: any = new Error('Database is locked');
+          error.code = 'SQLITE_LOCKED';
+          throw error;
+        }
+        return originalPrepare(sql);
+      });
+
+      const result = dataManager.deleteData('delete-locked-key');
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('Database is locked');
+
+      // Restore original prepare
+      db.prepare = originalPrepare;
+    });
+  });
 });
