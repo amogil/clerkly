@@ -48,7 +48,7 @@
   - **Requirements:** account-profile.1.2, account-profile.1.7
 
 - [x] 2.2 Добавить IPC handler для обновления профиля
-  - Реализовать `auth:refresh-profile` handler в AuthIPCHandlers
+  - Реализовать `auth:refresh-user` handler в AuthIPCHandlers
   - Вызывать `fetchProfile()` для получения свежих данных из Google API
   - Обрабатывать ошибки и возвращать структурированный ответ
   - **Requirements:** account-profile.1.5
@@ -130,7 +130,7 @@
 
 - [x] 6.1 Тест: auth:get-profile возвращает профиль
 - [x] 6.2 Тест: auth:get-profile обрабатывает ошибки
-- [x] 6.3 Тест: auth:refresh-profile обновляет профиль
+- [x] 6.3 Тест: auth:refresh-user обновляет профиль
 
 ### 7. Модульные Тесты для Account Component
 

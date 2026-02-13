@@ -272,7 +272,7 @@ class AuthIPCHandlers {
    */
   registerProfileHandlers(): void {
     ipcMain.handle('auth:get-profile', this.handleGetProfile.bind(this));
-    ipcMain.handle('auth:refresh-profile', this.handleRefreshProfile.bind(this));
+    ipcMain.handle('auth:refresh-user', this.handleRefreshProfile.bind(this));
     console.log('[AuthIPCHandlers] Profile handlers registered');
   }
 
@@ -901,7 +901,7 @@ describe('AuthIPCHandlers - Profile', () => {
   });
 
   /* Preconditions: UserProfileManager.fetchProfile() returns updated profile
-     Action: invoke 'auth:refresh-profile' handler
+     Action: invoke 'auth:refresh-user' handler
      Assertions: returns success response with fresh profile data
      Requirements: account-profile.1.3 */
   it('should handle refresh-profile request', async () => {
