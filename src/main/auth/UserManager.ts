@@ -1,7 +1,6 @@
 // Requirements: account-profile.1.2, account-profile.1.5, account-profile.1.6, account-profile.1.7, account-profile.1.8, error-notifications.1.1, token-management-ui.1.3, token-management-ui.1.4, user-data-isolation.0.2, user-data-isolation.0.3, user-data-isolation.0.4, user-data-isolation.1.1, user-data-isolation.1.2, user-data-isolation.1.3, user-data-isolation.1.4, user-data-isolation.1.5
 
 import { DataManager } from '../DataManager';
-import { OAuthClientManager } from './OAuthClientManager';
 import { TokenStorageManager } from './TokenStorageManager';
 import { handleBackgroundError } from '../ErrorHandler';
 import { handleAPIRequest } from './APIRequestHandler';
@@ -10,59 +9,35 @@ import { Logger } from '../Logger';
 // Requirements: clerkly.3.8 - Use centralized Logger instead of console.*
 
 /**
+ * Raw response from Google UserInfo API
+ */
+interface GoogleUserInfoResponse {
+  id: string;
+  email: string;
+  verified_email: boolean;
+  name: string;
+  given_name: string;
+  family_name: string;
+  locale: string;
+}
+
+/**
  * User record from users table
- * Requirements: user-data-isolation.1
+ * Requirements: user-data-isolation.1, account-profile.1.2
  */
 export interface User {
+  /** Internal user ID for data isolation (10-char alphanumeric) */
   user_id: string;
+  /** User's display name */
   name: string | null;
+  /** User's email address (unique) */
   email: string;
-}
-/**
- * User profile data from Google OAuth
- * Requirements: account-profile.1.2, account-profile.1.3
- */
-export interface UserProfile {
-  /**
-   * Google user ID
-   */
-  id: string;
-
-  /**
-   * User email address
-   */
-  email: string;
-
-  /**
-   * Email verification status from Google
-   */
-  verified_email: boolean;
-
-  /**
-   * Full name of the user
-   */
-  name: string;
-
-  /**
-   * First name (given name)
-   */
-  given_name: string;
-
-  /**
-   * Last name (family name)
-   */
-  family_name: string;
-
-  /**
-   * User locale (e.g., "en", "ru")
-   */
-  locale: string;
-
-  /**
-   * Unix timestamp of last profile update
-   * Used to track when the profile data was last fetched from Google
-   */
-  lastUpdated: number;
+  /** Google user ID from OAuth */
+  google_id: string | null;
+  /** User's locale from Google (e.g., "en", "ru") */
+  locale: string | null;
+  /** Unix timestamp of last profile sync */
+  last_synced: number | null;
 }
 
 /**
@@ -71,31 +46,23 @@ export interface UserProfile {
  * Handles fetching, caching, and updating profile information
  * Requirements: account-profile.1.2, account-profile.1.5, account-profile.1.6, account-profile.1.7, account-profile.1.8, user-data-isolation.0.2, user-data-isolation.0.3, user-data-isolation.0.4, user-data-isolation.1.1, user-data-isolation.1.2, user-data-isolation.1.3, user-data-isolation.1.4, user-data-isolation.1.5
  */
-export class UserProfileManager {
+export class UserManager {
   // Requirements: clerkly.3.5, clerkly.3.7
-  private logger = Logger.create('UserProfileManager');
+  private logger = Logger.create('UserManager');
   private dataManager: DataManager;
-  private oauthClient: OAuthClientManager;
   private tokenStorage: TokenStorageManager;
-  private readonly profileKey = 'user_profile';
   // Requirements: user-data-isolation.1.1, user-data-isolation.1.5 - Cache current user_id for data isolation
   private currentUserId: string | null = null;
-  // Flag to prevent profile loading after logout
-  private isLoggedOut: boolean = false;
+  // Cache current user for quick access
+  private currentUser: User | null = null;
 
   /**
-   * Create a new UserProfileManager
+   * Create a new UserManager
    * @param dataManager DataManager instance for local storage
-   * @param oauthClient OAuthClientManager instance for authentication
    * @param tokenStorage TokenStorageManager instance for accessing tokens
    */
-  constructor(
-    dataManager: DataManager,
-    oauthClient: OAuthClientManager,
-    tokenStorage: TokenStorageManager
-  ) {
+  constructor(dataManager: DataManager, tokenStorage: TokenStorageManager) {
     this.dataManager = dataManager;
-    this.oauthClient = oauthClient;
     this.tokenStorage = tokenStorage;
   }
 
@@ -125,45 +92,85 @@ export class UserProfileManager {
    *
    * Algorithm:
    * 1. Search for user by email in users table
-   * 2. If found: update name if changed, return existing user_id
-   * 3. If not found: generate random user_id, create record, return new user_id
+   * 2. If found: update fields if changed, return existing user
+   * 3. If not found: generate random user_id, create record, return new user
    *
-   * @param email User email from Google OAuth profile
-   * @param name User name from Google OAuth profile (can be null)
-   * @returns User record with user_id, name, and email
+   * @param googleProfile Raw profile data from Google UserInfo API
+   * @returns User record with all fields
    */
-  findOrCreateUser(email: string, name: string | null): User {
+  findOrCreateUser(googleProfile: GoogleUserInfoResponse): User {
     const db = this.dataManager.getDatabase();
     if (!db) {
       throw new Error('Database not initialized');
     }
 
+    const now = Date.now();
+
     // Try to find existing user
     const existingUser = db
-      .prepare('SELECT user_id, name, email FROM users WHERE email = ?')
-      .get(email) as User | undefined;
+      .prepare(
+        'SELECT user_id, name, email, google_id, locale, last_synced FROM users WHERE email = ?'
+      )
+      .get(googleProfile.email) as User | undefined;
 
     if (existingUser) {
-      // Requirements: user-data-isolation.0.4 - Update name if changed
-      if (name !== null && existingUser.name !== name) {
-        db.prepare('UPDATE users SET name = ? WHERE user_id = ?').run(name, existingUser.user_id);
-        this.logger.info(`Updated name for user ${existingUser.user_id}`);
-        return { ...existingUser, name };
+      // Requirements: user-data-isolation.0.4 - Update fields if changed
+      const updates: string[] = [];
+      const values: (string | number | null)[] = [];
+
+      if (googleProfile.name !== existingUser.name) {
+        updates.push('name = ?');
+        values.push(googleProfile.name);
       }
-      this.logger.info(`Found existing user ${existingUser.user_id}`);
-      return existingUser;
+      if (googleProfile.id !== existingUser.google_id) {
+        updates.push('google_id = ?');
+        values.push(googleProfile.id);
+      }
+      if (googleProfile.locale !== existingUser.locale) {
+        updates.push('locale = ?');
+        values.push(googleProfile.locale);
+      }
+      updates.push('last_synced = ?');
+      values.push(now);
+
+      if (updates.length > 0) {
+        values.push(existingUser.user_id);
+        db.prepare(`UPDATE users SET ${updates.join(', ')} WHERE user_id = ?`).run(...values);
+        this.logger.info(`Updated user ${existingUser.user_id}`);
+      }
+
+      return {
+        user_id: existingUser.user_id,
+        name: googleProfile.name,
+        email: googleProfile.email,
+        google_id: googleProfile.id,
+        locale: googleProfile.locale,
+        last_synced: now,
+      };
     }
 
     // Create new user with random user_id
     const userId = this.generateUserId();
-    db.prepare('INSERT INTO users (user_id, name, email) VALUES (?, ?, ?)').run(
+    db.prepare(
+      'INSERT INTO users (user_id, name, email, google_id, locale, last_synced) VALUES (?, ?, ?, ?, ?, ?)'
+    ).run(
       userId,
-      name,
-      email
+      googleProfile.name,
+      googleProfile.email,
+      googleProfile.id,
+      googleProfile.locale,
+      now
     );
 
-    this.logger.info(`Created new user ${userId} for ${email}`);
-    return { user_id: userId, name, email };
+    this.logger.info(`Created new user ${userId} for ${googleProfile.email}`);
+    return {
+      user_id: userId,
+      name: googleProfile.name,
+      email: googleProfile.email,
+      google_id: googleProfile.id,
+      locale: googleProfile.locale,
+      last_synced: now,
+    };
   }
 
   /**
@@ -180,17 +187,27 @@ export class UserProfileManager {
   }
 
   /**
+   * Get current user
+   * Returns the cached User object of the currently logged in user.
+   *
+   * @returns Current User or null if not logged in
+   */
+  getCurrentUser(): User | null {
+    return this.currentUser;
+  }
+
+  /**
    * Fetch user profile from Google UserInfo API
    * Requirements: account-profile.1.2, account-profile.1.6, error-notifications.1.1, token-management-ui.1.3, token-management-ui.1.4, user-data-isolation.1.2
    *
    * Fetches fresh profile data from Google's UserInfo API endpoint.
-   * On success, saves the profile to local storage and caches user_id.
-   * On error, returns cached profile data (graceful error handling).
+   * On success, saves the user to database and caches user_id.
+   * On error, returns cached user data (graceful error handling).
    * Uses centralized API request handler for automatic HTTP 401 detection.
    *
-   * @returns User profile data or null if not authenticated
+   * @returns User data or null if not authenticated
    */
-  async fetchProfile(): Promise<UserProfile | null> {
+  async fetchProfile(): Promise<User | null> {
     try {
       // Get access token from token storage
       const tokens = await this.tokenStorage.loadTokens();
@@ -206,8 +223,7 @@ export class UserProfileManager {
         ? `${googleApiBaseUrl}/userinfo` // Mock server uses /userinfo
         : `${googleApiBaseUrl}/oauth2/v1/userinfo`; // Google uses /oauth2/v1/userinfo
 
-      Logger.info('UserProfileManager', 'Fetching profile from Google UserInfo API');
-      Logger.info('UserProfileManager', `About to call handleAPIRequest with URL: ${userInfoUrl}`);
+      Logger.info('UserManager', 'Fetching profile from Google UserInfo API');
 
       // Requirements: token-management-ui.1.3, token-management-ui.1.4 - Use centralized handler for automatic 401 detection
       const response = await handleAPIRequest(
@@ -225,89 +241,69 @@ export class UserProfileManager {
         throw new Error(`UserInfo API error: ${response.status} ${response.statusText}`);
       }
 
-      const profileData = (await response.json()) as Omit<UserProfile, 'lastUpdated'>;
-      const profile: UserProfile = {
-        ...profileData,
-        lastUpdated: Date.now(),
-      };
+      const googleProfile = (await response.json()) as GoogleUserInfoResponse;
 
       // Requirements: user-data-isolation.1.2 - Find or create user and cache user_id
-      const user = this.findOrCreateUser(profile.email, profile.name);
+      const user = this.findOrCreateUser(googleProfile);
       this.currentUserId = user.user_id;
-      this.isLoggedOut = false; // Reset logout flag on successful login
-      Logger.info('UserProfileManager', `User ID set: ${user.user_id}`);
+      this.currentUser = user;
+      Logger.info('UserManager', `User ID set: ${user.user_id}`);
 
-      // Requirements: account-profile.1.2 - Save to local storage
-      await this.saveProfile(profile);
-
-      Logger.info('UserProfileManager', 'Profile fetched and saved successfully');
-      return profile;
+      Logger.info('UserManager', 'Profile fetched and saved successfully');
+      return user;
     } catch (error) {
       // Requirements: token-management-ui.1.3 - If it's a 401 error, tokens are already cleared by handleAPIRequest
       // Just return null to indicate no profile available
       const errorMessage = error instanceof Error ? error.message : String(error);
       if (errorMessage.includes('Authorization failed') || errorMessage.includes('401')) {
-        Logger.info('UserProfileManager', 'Session expired (401), returning null');
+        Logger.info('UserManager', 'Session expired (401), returning null');
         return null;
       }
 
       this.logger.error(`Failed to fetch profile: ${error}`);
 
-      // Requirements: account-profile.1.7 - Return cached profile on other errors (network, timeout, etc.)
-      Logger.info('UserProfileManager', 'Returning cached profile due to API error');
-      const cachedProfile = await this.loadProfile();
+      // Requirements: account-profile.1.7 - Return cached user on other errors (network, timeout, etc.)
+      Logger.info('UserManager', 'Returning cached user due to API error');
 
       // Requirements: error-notifications.1.1, error-notifications.1.4 - Notify user about the error
       handleBackgroundError(error, 'Profile Loading');
 
-      return cachedProfile;
+      return this.currentUser;
     }
   }
 
   /**
-   * Save user profile to local storage
-   * Requirements: account-profile.1.2
-   *
-   * Saves the profile data to DataManager with key 'user_profile'.
-   * Throws error if save operation fails.
-   *
-   * @param profile User profile data to save
-   */
-  async saveProfile(profile: UserProfile): Promise<void> {
-    try {
-      const result = this.dataManager.saveData(this.profileKey, profile);
-      if (!result.success) {
-        throw new Error(result.error || 'Failed to save profile');
-      }
-      this.logger.info('Profile saved to local storage');
-    } catch (error) {
-      this.logger.error(`Failed to save profile: ${error}`);
-      throw error;
-    }
-  }
-
-  /**
-   * Load user profile from local storage
+   * Load user from database by email
    * Requirements: account-profile.1.7
    *
-   * Loads cached profile data from DataManager.
-   * Note: currentUserId must be set before calling this method.
-   * Returns null if no profile data exists or on error.
+   * Loads user data from users table.
+   * Returns null if no user exists or on error.
    *
-   * @returns User profile data or null if not found
+   * @param email User email to load
+   * @returns User data or null if not found
    */
-  async loadProfile(): Promise<UserProfile | null> {
+  loadUserByEmail(email: string): User | null {
     try {
-      const result = this.dataManager.loadData(this.profileKey);
-      if (result.success && result.data) {
-        const profile = result.data as UserProfile;
-        this.logger.info('Profile loaded from local storage');
-        return profile;
+      const db = this.dataManager.getDatabase();
+      if (!db) {
+        return null;
       }
-      this.logger.info('No profile found in local storage');
+
+      const user = db
+        .prepare(
+          'SELECT user_id, name, email, google_id, locale, last_synced FROM users WHERE email = ?'
+        )
+        .get(email) as User | undefined;
+
+      if (user) {
+        this.logger.info(`User loaded from database: ${email}`);
+        return user;
+      }
+
+      this.logger.info(`No user found for email: ${email}`);
       return null;
     } catch (error) {
-      this.logger.error(`Failed to load profile: ${error}`);
+      this.logger.error(`Failed to load user: ${error}`);
       return null;
     }
   }
@@ -328,8 +324,8 @@ export class UserProfileManager {
       const tokens = await this.tokenStorage.loadTokens();
       if (tokens && tokens.accessToken) {
         // Fetch profile from API to restore currentUserId
-        const profile = await this.fetchProfile();
-        if (profile) {
+        const user = await this.fetchProfile();
+        if (user) {
           // currentUserId is already set by fetchProfile() via findOrCreateUser()
           this.logger.info(`User ID cached from stored profile: ${this.currentUserId}`);
         }
@@ -342,81 +338,17 @@ export class UserProfileManager {
   }
 
   /**
-   * Load user profile by email (for testing purposes)
-   * Requirements: testing.3.1, testing.3.2
-   *
-   * Loads profile data directly from database by email without requiring currentUserId.
-   * This method bypasses the normal data isolation check and should ONLY be used in tests.
-   * Used to verify that profile data is preserved in database after logout.
-   *
-   * @param email User email to load profile for
-   * @returns User profile data or null if not found
-   */
-  async loadProfileByEmail(email: string): Promise<UserProfile | null> {
-    try {
-      // Find user by email to get user_id
-      const user = this.findOrCreateUser(email, null);
-
-      // Temporarily set currentUserId to allow DataManager to load data
-      const originalUserId = this.currentUserId;
-      this.currentUserId = user.user_id;
-
-      const result = this.dataManager.loadData(this.profileKey);
-
-      // Restore original user_id
-      this.currentUserId = originalUserId;
-
-      if (result.success && result.data) {
-        const profile = result.data as UserProfile;
-        this.logger.info(`Profile loaded by email for testing: ${email}`);
-        return profile;
-      }
-
-      this.logger.info(`No profile found for email: ${email}`);
-      return null;
-    } catch (error) {
-      this.logger.error(`Failed to load profile by email: ${error}`);
-      return null;
-    }
-  }
-
-  /**
-   * Clear user profile from local storage
-   * Requirements: account-profile.1.8, user-data-isolation.1.4
-   *
-   * Deletes profile data from DataManager and clears cached user_id.
-   * Called during logout to remove all user data.
-   * Throws error if delete operation fails.
-   */
-  async clearProfile(): Promise<void> {
-    try {
-      const result = this.dataManager.deleteData(this.profileKey);
-      if (!result.success) {
-        throw new Error(result.error || 'Failed to clear profile');
-      }
-
-      // Requirements: user-data-isolation.1.4 - Clear cached user_id
-      this.currentUserId = null;
-
-      this.logger.info('Profile cleared from local storage');
-    } catch (error) {
-      this.logger.error(`Failed to clear profile: ${error}`);
-      throw error;
-    }
-  }
-
-  /**
    * Clear session on logout
    * Requirements: user-data-isolation.1.4
    *
-   * Clears the current user_id from memory and sets logout flag.
-   * Called during logout to prevent data operations while preserving profile in database.
-   * Profile data remains in database for restoration on next login.
+   * Clears the current user_id from memory.
+   * Called during logout to prevent data operations.
+   * User data remains in database for restoration on next login.
    */
   clearSession(): void {
     // Requirements: user-data-isolation.1.4 - Clear currentUserId on logout
     this.currentUserId = null;
-    this.isLoggedOut = true;
+    this.currentUser = null;
     this.logger.info('User session cleared (user_id cleared from memory)');
   }
 
@@ -435,15 +367,6 @@ export class UserProfileManager {
   }
 
   /**
-   * Delete profile data from DataManager
-   * Alias for clearProfile() for consistency with other delete methods
-   * Requirements: account-profile.1.8
-   */
-  async deleteProfile(): Promise<void> {
-    return await this.clearProfile();
-  }
-
-  /**
    * Fetch user profile synchronously during authorization
    * Requirements: google-oauth-auth.3.6, google-oauth-auth.3.7, google-oauth-auth.3.8, account-profile.1.3, account-profile.1.4, account-profile.1.5, user-data-isolation.1.2
    *
@@ -452,9 +375,9 @@ export class UserProfileManager {
    * profile is loaded before showing the Dashboard.
    *
    * On success:
-   * - Saves profile to database
+   * - Saves user to database
    * - Caches user_id for data isolation
-   * - Returns { success: true, profile: UserProfile }
+   * - Returns { success: true, user: User }
    *
    * On error:
    * - Clears all tokens (authorization is considered failed)
@@ -463,16 +386,16 @@ export class UserProfileManager {
    *
    * This is a blocking operation - the UI will show a loader until it completes.
    *
-   * @returns Result object with success status, profile data, or error code
+   * @returns Result object with success status, user data, or error code
    */
   async fetchProfileSynchronously(): Promise<
-    { success: true; profile: UserProfile } | { success: false; error: string }
+    { success: true; user: User } | { success: false; error: string }
   > {
     try {
       // Get access token from token storage
       const tokens = await this.tokenStorage.loadTokens();
       if (!tokens || !tokens.accessToken) {
-        Logger.error('UserProfileManager', 'No access token available for synchronous fetch');
+        Logger.error('UserManager', 'No access token available for synchronous fetch');
         // Clear tokens since authorization is incomplete
         await this.tokenStorage.deleteTokens();
         return { success: false, error: 'profile_fetch_failed' };
@@ -484,7 +407,7 @@ export class UserProfileManager {
         ? `${googleApiBaseUrl}/userinfo`
         : `${googleApiBaseUrl}/oauth2/v1/userinfo`;
 
-      Logger.info('UserProfileManager', 'Fetching profile synchronously during authorization');
+      Logger.info('UserManager', 'Fetching profile synchronously during authorization');
 
       // Make API request (with timeout to prevent blocking indefinitely)
       const controller = new AbortController();
@@ -509,27 +432,20 @@ export class UserProfileManager {
         return { success: false, error: 'profile_fetch_failed' };
       }
 
-      const profileData = (await response.json()) as Omit<UserProfile, 'lastUpdated'>;
-      const profile: UserProfile = {
-        ...profileData,
-        lastUpdated: Date.now(),
-      };
+      const googleProfile = (await response.json()) as GoogleUserInfoResponse;
 
       // Requirements: user-data-isolation.1.2 - Find or create user and cache user_id
-      const user = this.findOrCreateUser(profile.email, profile.name);
+      const user = this.findOrCreateUser(googleProfile);
       this.currentUserId = user.user_id;
-      this.isLoggedOut = false; // Reset logout flag on successful login
-
-      // Requirements: google-oauth-auth.3.6, google-oauth-auth.3.8 - Save profile to database
-      await this.saveProfile(profile);
+      this.currentUser = user;
 
       Logger.info(
         'UserProfileManager',
         `Profile fetched and saved synchronously, user_id: ${user.user_id}`
       );
-      return { success: true, profile };
+      return { success: true, user };
     } catch (error) {
-      Logger.error('UserProfileManager', `Failed to fetch profile synchronously: ${error}`);
+      Logger.error('UserManager', `Failed to fetch profile synchronously: ${error}`);
 
       // Requirements: google-oauth-auth.3.7 - Clear tokens on any error
       try {

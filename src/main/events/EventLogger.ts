@@ -86,7 +86,7 @@ export class EventLogger {
       case 'auth.failed':
         return `Event: ${type} (error: ${(payload as ClerklyEvents['auth.failed']).error}, code: ${(payload as ClerklyEvents['auth.failed']).errorCode || 'none'})`;
       case 'profile.synced':
-        return `Event: ${type} (email: ${(payload as ClerklyEvents['profile.synced']).profile.email})`;
+        return `Event: ${type} (email: ${(payload as ClerklyEvents['profile.synced']).user.email})`;
       case 'error.created':
         return `Event: ${type} (context: ${(payload as ClerklyEvents['error.created']).context}, message: ${(payload as ClerklyEvents['error.created']).message})`;
       case 'user.login':

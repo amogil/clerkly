@@ -64,7 +64,7 @@ export class OAuthClientManager {
    * Set profile manager for automatic profile updates
    * Requirements: account-profile.1.5
    * Should be called during initialization to enable automatic profile updates
-   * @param profileManager UserProfileManager instance
+   * @param profileManager UserManager instance
    */
   setProfileManager(profileManager: any): void {
     this.profileManager = profileManager;
@@ -319,7 +319,7 @@ export class OAuthClientManager {
       }
 
       // Fetch profile from Google UserInfo API
-      // Use same URL format as UserProfileManager for consistency
+      // Use same URL format as UserManager for consistency
       const googleApiBaseUrl = process.env.CLERKLY_GOOGLE_API_URL || 'https://www.googleapis.com';
       const userInfoUrl = process.env.CLERKLY_GOOGLE_API_URL
         ? `${googleApiBaseUrl}/oauth2/v2/userinfo` // Mock server uses /oauth2/v2/userinfo

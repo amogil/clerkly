@@ -1,9 +1,6 @@
 // Requirements: settings.3
 
-/**
- * LLM Provider type
- */
-export type LLMProviderType = 'openai' | 'anthropic' | 'google';
+import type { LLMProvider } from '../../types';
 
 /**
  * Configuration for a single LLM provider
@@ -12,7 +9,7 @@ export interface LLMProviderConfig {
   /**
    * Provider identifier
    */
-  id: LLMProviderType;
+  id: LLMProvider;
 
   /**
    * Human-readable provider name
@@ -46,7 +43,7 @@ export interface LLMProviderConfig {
  * Requirements: settings.3.5 - Model identifiers and API endpoints
  * Requirements: settings.3.6 - Timeout configuration
  */
-export const LLM_PROVIDERS: Record<LLMProviderType, LLMProviderConfig> = {
+export const LLM_PROVIDERS: Record<LLMProvider, LLMProviderConfig> = {
   openai: {
     id: 'openai',
     name: 'OpenAI',
@@ -78,7 +75,7 @@ export const LLM_PROVIDERS: Record<LLMProviderType, LLMProviderConfig> = {
 /**
  * Get list of all provider types
  */
-export const PROVIDER_TYPES: LLMProviderType[] = Object.keys(LLM_PROVIDERS) as LLMProviderType[];
+export const PROVIDER_TYPES: LLMProvider[] = Object.keys(LLM_PROVIDERS) as LLMProvider[];
 
 /**
  * Error messages for different HTTP status codes

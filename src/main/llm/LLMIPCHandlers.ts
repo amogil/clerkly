@@ -3,7 +3,7 @@
 import { ipcMain } from 'electron';
 import { Logger } from '../Logger';
 import { LLMProviderFactory } from './LLMProviderFactory';
-import { LLMProviderType } from './LLMConfig';
+import type { LLMProvider } from '../../types';
 
 // Requirements: clerkly.3.5, clerkly.3.7
 const logger = Logger.create('LLMIPCHandlers');
@@ -18,7 +18,7 @@ export function registerLLMIPCHandlers(): void {
   // Requirements: settings.3.4 - Test connection handler
   ipcMain.handle(
     'llm:test-connection',
-    async (event, { provider, apiKey }: { provider: LLMProviderType; apiKey: string }) => {
+    async (event, { provider, apiKey }: { provider: LLMProvider; apiKey: string }) => {
       try {
         // Requirements: settings.3.9 - Log attempt (only first 4 chars of key)
         logger.info(`Testing connection to ${provider} (key: ${apiKey.substring(0, 4)}...)`);
