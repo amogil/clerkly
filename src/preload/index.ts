@@ -10,6 +10,7 @@ import { contextBridge, ipcRenderer } from 'electron';
 const EVENT_TYPE_USER_LOGOUT = 'user.logout';
 const EVENT_TYPE_AUTH_FAILED = 'auth.failed';
 const EVENT_TYPE_AUTH_SUCCEEDED = 'auth.succeeded';
+const EVENT_TYPE_PROFILE_SYNCED = 'profile.synced';
 
 /**
  * API interface for secure IPC communication
@@ -252,19 +253,19 @@ const api: API = {
     },
 
     /**
-     * Listen for profile update events
+     * Listen for profile update events via EventBus
      * Requirements: account-profile.1.5
      * @param {Function} callback - Callback function to execute when profile is updated
      * @returns {Function} Unsubscribe function to remove the listener
      */
     onProfileUpdated(callback: (profile: any) => void): () => void {
-      const listener = (_event: any, profile: any) => {
-        callback(profile);
-      };
-      ipcRenderer.on('auth:profile-updated', listener);
-      return () => {
-        ipcRenderer.removeListener('auth:profile-updated', listener);
-      };
+      // Use the events API to listen for profile.synced events
+      return api.events!.onEvent((type: string, payload: unknown) => {
+        if (type === EVENT_TYPE_PROFILE_SYNCED) {
+          const data = payload as { profile: any };
+          callback(data.profile);
+        }
+      });
     },
 
     /**
