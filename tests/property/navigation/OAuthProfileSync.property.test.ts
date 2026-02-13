@@ -19,13 +19,13 @@ interface TokenData {
   tokenType: string;
 }
 
-interface UserProfile {
-  id: string;
+interface User {
+  user_id: string;
   email: string;
-  name: string;
-  given_name?: string;
-  family_name?: string;
-  lastUpdated: number;
+  name: string | null;
+  google_id: string | null;
+  locale: string | null;
+  last_synced: number | null;
 }
 
 interface OperationLog {
@@ -44,15 +44,15 @@ describe('OAuth Profile Sync Property Tests', () => {
       fc.property(
         // Generate random authorization code
         fc.string({ minLength: 20, maxLength: 100 }),
-        // Generate random user profile
+        // Generate random user data
         fc.record({
-          id: fc.string({ minLength: 10, maxLength: 30 }),
+          user_id: fc.string({ minLength: 10, maxLength: 10 }),
           email: fc.emailAddress(),
           name: fc.string({ minLength: 3, maxLength: 50 }),
-          given_name: fc.option(fc.string({ minLength: 2, maxLength: 30 }), { nil: undefined }),
-          family_name: fc.option(fc.string({ minLength: 2, maxLength: 30 }), { nil: undefined }),
+          google_id: fc.option(fc.string({ minLength: 10, maxLength: 30 }), { nil: null }),
+          locale: fc.option(fc.string({ minLength: 2, maxLength: 5 }), { nil: null }),
         }),
-        (authCode, profileData) => {
+        (authCode, userData) => {
           // Operation log to track sequence
           const operationLog: OperationLog[] = [];
 
@@ -78,10 +78,10 @@ describe('OAuth Profile Sync Property Tests', () => {
           const profileFetchStart = Date.now();
           operationLog.push({ operation: 'profile_fetch_start', timestamp: profileFetchStart });
 
-          // Mock profile response
-          const profile: UserProfile = {
-            ...profileData,
-            lastUpdated: Date.now(),
+          // Mock user response
+          const user: User = {
+            ...userData,
+            last_synced: Date.now(),
           };
 
           const profileFetchComplete = Date.now();
@@ -131,14 +131,13 @@ describe('OAuth Profile Sync Property Tests', () => {
           expect(tokens.accessToken).toContain(authCode);
           expect(tokens.expiresAt).toBeGreaterThan(Date.now());
 
-          // Property 5: Profile must contain required fields
-          expect(profile.id).toBeTruthy();
-          expect(profile.email).toBeTruthy();
-          expect(profile.name).toBeTruthy();
-          expect(profile.lastUpdated).toBeGreaterThan(0);
+          // Property 5: User must contain required fields
+          expect(user.user_id).toBeTruthy();
+          expect(user.email).toBeTruthy();
+          expect(user.last_synced).toBeGreaterThan(0);
 
-          // Property 6: Profile email must be valid email format
-          expect(profile.email).toMatch(/^[^\s@]+@[^\s@]+\.[^\s@]+$/);
+          // Property 6: User email must be valid email format
+          expect(user.email).toMatch(/^[^\s@]+@[^\s@]+\.[^\s@]+$/);
         }
       ),
       { numRuns: 100 }
@@ -301,13 +300,13 @@ describe('OAuth Profile Sync Property Tests', () => {
       fc.property(
         fc.string({ minLength: 20, maxLength: 100 }),
         fc.record({
-          id: fc.string({ minLength: 10, maxLength: 30 }),
+          user_id: fc.string({ minLength: 10, maxLength: 10 }),
           email: fc.emailAddress(),
           name: fc.string({ minLength: 3, maxLength: 50 }),
-          given_name: fc.option(fc.string({ minLength: 2, maxLength: 30 }), { nil: undefined }),
-          family_name: fc.option(fc.string({ minLength: 2, maxLength: 30 }), { nil: undefined }),
+          google_id: fc.option(fc.string({ minLength: 10, maxLength: 30 }), { nil: null }),
+          locale: fc.option(fc.string({ minLength: 2, maxLength: 5 }), { nil: null }),
         }),
-        (authCode, profileData) => {
+        (authCode, userData) => {
           // Simulate full flow
           const tokens: TokenData = {
             accessToken: `access_token_${authCode}`,
@@ -316,27 +315,27 @@ describe('OAuth Profile Sync Property Tests', () => {
             tokenType: 'Bearer',
           };
 
-          const profile: UserProfile = {
-            ...profileData,
-            lastUpdated: Date.now(),
+          const user: User = {
+            ...userData,
+            last_synced: Date.now(),
           };
 
-          // Property 1: Profile data must match input
-          expect(profile.id).toBe(profileData.id);
-          expect(profile.email).toBe(profileData.email);
-          expect(profile.name).toBe(profileData.name);
+          // Property 1: User data must match input
+          expect(user.user_id).toBe(userData.user_id);
+          expect(user.email).toBe(userData.email);
+          expect(user.name).toBe(userData.name);
 
           // Property 2: Optional fields must be preserved
-          if (profileData.given_name !== undefined) {
-            expect(profile.given_name).toBe(profileData.given_name);
+          if (userData.google_id !== null) {
+            expect(user.google_id).toBe(userData.google_id);
           }
-          if (profileData.family_name !== undefined) {
-            expect(profile.family_name).toBe(profileData.family_name);
+          if (userData.locale !== null) {
+            expect(user.locale).toBe(userData.locale);
           }
 
-          // Property 3: lastUpdated must be set
-          expect(profile.lastUpdated).toBeGreaterThan(0);
-          expect(profile.lastUpdated).toBeLessThanOrEqual(Date.now());
+          // Property 3: last_synced must be set
+          expect(user.last_synced).toBeGreaterThan(0);
+          expect(user.last_synced).toBeLessThanOrEqual(Date.now());
 
           // Property 4: Tokens must reference the auth code
           expect(tokens.accessToken).toContain(authCode);

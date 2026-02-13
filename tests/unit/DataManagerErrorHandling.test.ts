@@ -1,7 +1,7 @@
 // Requirements: user-data-isolation.1.13, user-data-isolation.1.19, user-data-isolation.1.20, user-data-isolation.1.21
 
 import { DataManager } from '../../src/main/DataManager';
-import type { UserProfileManager } from '../../src/main/auth/UserProfileManager';
+import type { UserManager } from '../../src/main/auth/UserManager';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
@@ -17,7 +17,7 @@ describe('DataManager Error Handling - "No user logged in"', () => {
   let dataManager: DataManager;
   let testStoragePath: string;
   let testDbPath: string;
-  let mockProfileManager: jest.Mocked<UserProfileManager>;
+  let mockProfileManager: jest.Mocked<UserManager>;
 
   beforeEach(() => {
     testStoragePath = fs.mkdtempSync(path.join(os.tmpdir(), 'datamanager-error-test-'));
@@ -31,11 +31,11 @@ describe('DataManager Error Handling - "No user logged in"', () => {
 
     mockProfileManager = {
       getCurrentUserId: jest.fn(),
-    } as unknown as jest.Mocked<UserProfileManager>;
+    } as unknown as jest.Mocked<UserManager>;
 
     dataManager = new DataManager(testStoragePath);
     dataManager.initialize();
-    dataManager.setUserProfileManager(mockProfileManager);
+    dataManager.setUserManager(mockProfileManager);
   });
 
   afterEach(() => {

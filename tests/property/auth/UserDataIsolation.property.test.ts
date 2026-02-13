@@ -5,8 +5,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { DataManager } from '../../../src/main/DataManager';
-import { UserProfileManager } from '../../../src/main/auth/UserProfileManager';
-import { OAuthClientManager } from '../../../src/main/auth/OAuthClientManager';
+import { UserManager } from '../../../src/main/auth/UserManager';
 import { TokenStorageManager } from '../../../src/main/auth/TokenStorageManager';
 
 // Mock electron BrowserWindow for error notifications
@@ -19,8 +18,7 @@ jest.mock('electron', () => ({
 describe('User Data Isolation - Property-Based Tests', () => {
   let testStoragePath: string;
   let dataManager: DataManager;
-  let profileManager: UserProfileManager;
-  let mockOAuthClient: jest.Mocked<OAuthClientManager>;
+  let profileManager: UserManager;
   let mockTokenStorage: jest.Mocked<TokenStorageManager>;
 
   beforeEach(() => {
@@ -38,19 +36,16 @@ describe('User Data Isolation - Property-Based Tests', () => {
     dataManager.initialize();
 
     // Create mock dependencies
-    mockOAuthClient = {
-      getAuthStatus: jest.fn(),
-    } as unknown as jest.Mocked<OAuthClientManager>;
-
     mockTokenStorage = {
       loadTokens: jest.fn(),
+      deleteTokens: jest.fn().mockResolvedValue(undefined),
     } as unknown as jest.Mocked<TokenStorageManager>;
 
-    // Create UserProfileManager
-    profileManager = new UserProfileManager(dataManager, mockOAuthClient, mockTokenStorage);
+    // Create UserManager (now takes only 2 args)
+    profileManager = new UserManager(dataManager, mockTokenStorage);
 
     // Set up circular dependency
-    dataManager.setUserProfileManager(profileManager);
+    dataManager.setUserManager(profileManager);
   });
 
   afterEach(() => {
@@ -70,7 +65,7 @@ describe('User Data Isolation - Property-Based Tests', () => {
     }
   });
 
-  /* Preconditions: UserProfileManager instance created
+  /* Preconditions: UserManager instance created
      Action: Call generateUserId() 100+ times
      Assertions: All IDs have length 10, contain only alphanumeric characters (A-Z, a-z, 0-9)
      Requirements: user-data-isolation.0.2, user-data-isolation.1.1
@@ -100,7 +95,7 @@ describe('User Data Isolation - Property-Based Tests', () => {
     );
   });
 
-  /* Preconditions: UserProfileManager with database access
+  /* Preconditions: UserManager with database access
      Action: Call findOrCreateUser with same email multiple times
      Assertions: Returns same user_id for same email every time
      Requirements: user-data-isolation.0.3, user-data-isolation.1.2
@@ -112,14 +107,25 @@ describe('User Data Isolation - Property-Based Tests', () => {
         fc.string({ minLength: 1, maxLength: 50 }),
         fc.integer({ min: 2, max: 10 }),
         (email, name, repeatCount) => {
+          // Create GoogleUserInfoResponse object
+          const googleProfile = {
+            id: `google_${email}`,
+            email,
+            verified_email: true,
+            name,
+            given_name: name.split(' ')[0] || name,
+            family_name: name.split(' ')[1] || '',
+            locale: 'en',
+          };
+
           // First call - creates user
-          const firstUser = profileManager.findOrCreateUser(email, name);
+          const firstUser = profileManager.findOrCreateUser(googleProfile);
           expect(firstUser.user_id).toMatch(/^[A-Za-z0-9]{10}$/);
           expect(firstUser.email).toBe(email);
 
           // Repeated calls - should return same user_id
           for (let i = 0; i < repeatCount; i++) {
-            const user = profileManager.findOrCreateUser(email, name);
+            const user = profileManager.findOrCreateUser(googleProfile);
             expect(user.user_id).toBe(firstUser.user_id);
             expect(user.email).toBe(email);
           }
@@ -150,7 +156,17 @@ describe('User Data Isolation - Property-Based Tests', () => {
 
           // Create users and save UNIQUE data for each (using email as unique identifier)
           users.forEach((userData, index) => {
-            const user = profileManager.findOrCreateUser(userData.email, userData.name);
+            const googleProfile = {
+              id: `google_${userData.email}_${index}`,
+              email: userData.email,
+              verified_email: true,
+              name: userData.name,
+              given_name: userData.name.split(' ')[0] || userData.name,
+              family_name: userData.name.split(' ')[1] || '',
+              locale: 'en',
+            };
+
+            const user = profileManager.findOrCreateUser(googleProfile);
             // Use email + index as unique value to ensure different values per user
             const uniqueValue = `data_for_${userData.email}_${index}`;
             userRecords.push({ user, value: uniqueValue, email: userData.email });
@@ -207,8 +223,18 @@ describe('User Data Isolation - Property-Based Tests', () => {
           fc.record({ nested: fc.string(), value: fc.integer() })
         ),
         (email, name, key, value) => {
+          const googleProfile = {
+            id: `google_${email}`,
+            email,
+            verified_email: true,
+            name,
+            given_name: name.split(' ')[0] || name,
+            family_name: name.split(' ')[1] || '',
+            locale: 'en',
+          };
+
           // Login - create user and save data
-          const user1 = profileManager.findOrCreateUser(email, name);
+          const user1 = profileManager.findOrCreateUser(googleProfile);
           (profileManager as any).currentUserId = user1.user_id;
 
           const saveResult = dataManager.saveData(key, value);
@@ -224,7 +250,7 @@ describe('User Data Isolation - Property-Based Tests', () => {
           expect(profileManager.getCurrentUserId()).toBeNull();
 
           // Re-login with same email
-          const user2 = profileManager.findOrCreateUser(email, name);
+          const user2 = profileManager.findOrCreateUser(googleProfile);
           (profileManager as any).currentUserId = user2.user_id;
 
           // Verify same user_id
@@ -255,12 +281,23 @@ describe('User Data Isolation - Property-Based Tests', () => {
           // Skip if names are the same
           fc.pre(oldName !== newName);
 
+          const oldProfile = {
+            id: `google_${email}`,
+            email,
+            verified_email: true,
+            name: oldName,
+            given_name: oldName.split(' ')[0] || oldName,
+            family_name: oldName.split(' ')[1] || '',
+            locale: 'en',
+          };
+
           // Create user with old name
-          const user1 = profileManager.findOrCreateUser(email, oldName);
+          const user1 = profileManager.findOrCreateUser(oldProfile);
           expect(user1.name).toBe(oldName);
 
           // Update with new name
-          const user2 = profileManager.findOrCreateUser(email, newName);
+          const newProfile = { ...oldProfile, name: newName };
+          const user2 = profileManager.findOrCreateUser(newProfile);
           expect(user2.user_id).toBe(user1.user_id);
           expect(user2.name).toBe(newName);
 
@@ -272,34 +309,6 @@ describe('User Data Isolation - Property-Based Tests', () => {
           expect(dbUser.name).toBe(newName);
         }
       ),
-      { numRuns: 100 }
-    );
-  });
-
-  /* Preconditions: User exists with name
-     Action: Call findOrCreateUser with same email but null name
-     Assertions: Name is NOT updated (null is ignored)
-     Requirements: user-data-isolation.0.4
-     **Validates: Requirements user-data-isolation.0.4** */
-  it('should not update name when null is passed', () => {
-    fc.assert(
-      fc.property(fc.emailAddress(), fc.string({ minLength: 1, maxLength: 30 }), (email, name) => {
-        // Create user with name
-        const user1 = profileManager.findOrCreateUser(email, name);
-        expect(user1.name).toBe(name);
-
-        // Call with null name
-        const user2 = profileManager.findOrCreateUser(email, null);
-        expect(user2.user_id).toBe(user1.user_id);
-        expect(user2.name).toBe(name); // Name should NOT change
-
-        // Verify in database
-        const db = dataManager.getDatabase();
-        const dbUser = db
-          ?.prepare('SELECT name FROM users WHERE user_id = ?')
-          .get(user1.user_id) as { name: string } | undefined;
-        expect(dbUser?.name).toBe(name);
-      }),
       { numRuns: 100 }
     );
   });

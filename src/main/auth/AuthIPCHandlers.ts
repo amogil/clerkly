@@ -283,13 +283,7 @@ export class AuthIPCHandlers {
    */
   publishProfileSynced(user: User): void {
     const eventBus = MainEventBus.getInstance();
-    eventBus.publish(
-      new ProfileSyncedEvent({
-        user_id: user.user_id,
-        email: user.email,
-        name: user.name,
-      })
-    );
+    eventBus.publish(new ProfileSyncedEvent(user));
   }
 
   /**

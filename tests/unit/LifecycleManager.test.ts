@@ -144,8 +144,8 @@ describe('LifecycleManager', () => {
       // Mock authenticated user
       mockOAuthClient.getAuthStatus = jest.fn().mockResolvedValue({ authorized: true });
 
-      // Spy on UserProfileManager.fetchProfile
-      const fetchProfileSpy = jest.spyOn((lifecycleManager as any).profileManager, 'fetchProfile');
+      // Spy on UserManager.fetchProfile
+      const fetchProfileSpy = jest.spyOn((lifecycleManager as any).userManager, 'fetchProfile');
 
       await lifecycleManager.initialize();
 
@@ -161,8 +161,8 @@ describe('LifecycleManager', () => {
       // Mock unauthenticated user (default)
       mockOAuthClient.getAuthStatus = jest.fn().mockResolvedValue({ authorized: false });
 
-      // Spy on UserProfileManager.fetchProfile
-      const fetchProfileSpy = jest.spyOn((lifecycleManager as any).profileManager, 'fetchProfile');
+      // Spy on UserManager.fetchProfile
+      const fetchProfileSpy = jest.spyOn((lifecycleManager as any).userManager, 'fetchProfile');
 
       await lifecycleManager.initialize();
 
@@ -619,9 +619,9 @@ describe('LifecycleManager', () => {
     it('should handle profile fetch failure during initialization', async () => {
       mockOAuthClient.getAuthStatus = jest.fn().mockResolvedValue({ authorized: true });
 
-      // Mock profileManager.fetchProfile to throw error
+      // Mock userManager.fetchProfile to throw error
       const fetchProfileSpy = jest
-        .spyOn(lifecycleManager['profileManager'], 'fetchProfile')
+        .spyOn(lifecycleManager['userManager'], 'fetchProfile')
         .mockRejectedValue(new Error('Network error'));
 
       await expect(lifecycleManager.initialize()).rejects.toThrow(

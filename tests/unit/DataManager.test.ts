@@ -5,7 +5,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { DataManager } from '../../src/main/DataManager';
-import type { UserProfileManager } from '../../src/main/auth/UserProfileManager';
+import type { UserManager } from '../../src/main/auth/UserManager';
 
 // Mock electron BrowserWindow for error notifications
 jest.mock('electron', () => ({
@@ -18,7 +18,7 @@ describe('DataManager', () => {
   let dataManager: DataManager;
   let testStoragePath: string;
   let testDbPath: string;
-  let mockProfileManager: jest.Mocked<UserProfileManager>;
+  let mockUserManager: jest.Mocked<UserManager>;
 
   beforeEach(() => {
     // Create temporary storage directory
@@ -31,17 +31,17 @@ describe('DataManager', () => {
       fs.mkdirSync(migrationsPath, { recursive: true });
     }
 
-    // Requirements: user-data-isolation.3.1, user-data-isolation.3.2 - Mock UserProfileManager for data isolation tests
-    mockProfileManager = {
+    // Requirements: user-data-isolation.3.1, user-data-isolation.3.2 - Mock UserManager for data isolation tests
+    mockUserManager = {
       getCurrentUserId: jest.fn().mockReturnValue('testUserId1'),
-    } as unknown as jest.Mocked<UserProfileManager>;
+    } as unknown as jest.Mocked<UserManager>;
   });
 
   // Helper function to initialize DataManager with mock profile manager
   const initializeDataManager = () => {
     const dm = new DataManager(testStoragePath);
     const result = dm.initialize();
-    dm.setUserProfileManager(mockProfileManager);
+    dm.setUserManager(mockUserManager);
     return { dataManager: dm, result };
   };
 
@@ -49,7 +49,7 @@ describe('DataManager', () => {
   const initializeDataManagerWithoutUser = () => {
     const dm = new DataManager(testStoragePath);
     const result = dm.initialize();
-    // Do NOT set UserProfileManager
+    // Do NOT set UserManager
     return { dataManager: dm, result };
   };
 
@@ -420,7 +420,7 @@ describe('DataManager', () => {
       expect(result.error).toContain('Database not initialized or closed');
     });
 
-    /* Preconditions: DataManager initialized but UserProfileManager not set
+    /* Preconditions: DataManager initialized but UserManager not set
        Action: attempt to save data without user logged in
        Assertions: returns success false, error about no user logged in
        Requirements: user-data-isolation.3.2*/
@@ -574,7 +574,7 @@ describe('DataManager', () => {
       expect(result.error).toContain('Database not initialized or closed');
     });
 
-    /* Preconditions: DataManager initialized but UserProfileManager not set
+    /* Preconditions: DataManager initialized but UserManager not set
        Action: attempt to load data without user logged in
        Assertions: returns success false, error about no user logged in
        Requirements: user-data-isolation.3.2*/
@@ -708,7 +708,7 @@ describe('DataManager', () => {
       expect(result.error).toContain('Database not initialized or closed');
     });
 
-    /* Preconditions: DataManager initialized but UserProfileManager not set
+    /* Preconditions: DataManager initialized but UserManager not set
        Action: attempt to delete data without user logged in
        Assertions: returns success false, error about no user logged in
        Requirements: user-data-isolation.3.2*/
@@ -1015,7 +1015,7 @@ describe('DataManager', () => {
   });
 
   describe('User Data Isolation - Additional Tests', () => {
-    /* Preconditions: UserProfileManager returns null for getCurrentUserId
+    /* Preconditions: UserManager returns null for getCurrentUserId
        Action: call loadData('test_key')
        Assertions: returns error result with message containing "No user logged in"
        Requirements: user-data-isolation.3.2 */
@@ -1024,15 +1024,15 @@ describe('DataManager', () => {
       dataManager = dm;
 
       // Mock getCurrentUserId to return null
-      mockProfileManager.getCurrentUserId.mockReturnValue(null);
-      dataManager.setUserProfileManager(mockProfileManager);
+      mockUserManager.getCurrentUserId.mockReturnValue(null);
+      dataManager.setUserManager(mockUserManager);
 
       const result = dataManager.loadData('test_key');
       expect(result.success).toBe(false);
       expect(result.error).toContain('No user logged in');
     });
 
-    /* Preconditions: UserProfileManager returns null for getCurrentUserId
+    /* Preconditions: UserManager returns null for getCurrentUserId
        Action: call deleteData('test_key')
        Assertions: returns error result with message containing "No user logged in"
        Requirements: user-data-isolation.3.2 */
@@ -1041,8 +1041,8 @@ describe('DataManager', () => {
       dataManager = dm;
 
       // Mock getCurrentUserId to return null
-      mockProfileManager.getCurrentUserId.mockReturnValue(null);
-      dataManager.setUserProfileManager(mockProfileManager);
+      mockUserManager.getCurrentUserId.mockReturnValue(null);
+      dataManager.setUserManager(mockUserManager);
 
       const result = dataManager.deleteData('test_key');
       expect(result.success).toBe(false);
@@ -1058,21 +1058,21 @@ describe('DataManager', () => {
       dataManager = dm;
 
       // Save data as user A
-      mockProfileManager.getCurrentUserId.mockReturnValue('userIdAAAAA');
+      mockUserManager.getCurrentUserId.mockReturnValue('userIdAAAAA');
       dataManager.saveData('test_key', 'value_A');
 
       // Save data as user B
-      mockProfileManager.getCurrentUserId.mockReturnValue('userIdBBBBB');
+      mockUserManager.getCurrentUserId.mockReturnValue('userIdBBBBB');
       dataManager.saveData('test_key', 'value_B');
 
       // Load as user A
-      mockProfileManager.getCurrentUserId.mockReturnValue('userIdAAAAA');
+      mockUserManager.getCurrentUserId.mockReturnValue('userIdAAAAA');
       const resultA = dataManager.loadData('test_key');
       expect(resultA.success).toBe(true);
       expect(resultA.data).toBe('value_A');
 
       // Load as user B
-      mockProfileManager.getCurrentUserId.mockReturnValue('userIdBBBBB');
+      mockUserManager.getCurrentUserId.mockReturnValue('userIdBBBBB');
       const resultB = dataManager.loadData('test_key');
       expect(resultB.success).toBe(true);
       expect(resultB.data).toBe('value_B');
