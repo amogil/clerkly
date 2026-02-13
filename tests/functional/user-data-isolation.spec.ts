@@ -1,4 +1,4 @@
-// Requirements: user-data-isolation.1.3, user-data-isolation.1.4, user-data-isolation.1.5, user-data-isolation.1.6, user-data-isolation.1.7, user-data-isolation.1.8, user-data-isolation.1.13, user-data-isolation.1.19, user-data-isolation.1.20, user-data-isolation.1.22, user-data-isolation.1.23, user-data-isolation.1.24
+// Requirements: user-data-isolation.0.3, user-data-isolation.1.2, user-data-isolation.1.3, user-data-isolation.1.4, user-data-isolation.2.4, user-data-isolation.2.5, user-data-isolation.4.1, user-data-isolation.4.4
 
 import { test, expect } from '@playwright/test';
 import { MockOAuthServer } from './helpers/mock-oauth-server';
@@ -45,7 +45,7 @@ test.afterEach(async () => {
 /* Preconditions: Application running, two different users
    Action: Login as User A, create data, logout, login as User B, create data, logout, login as User A
    Assertions: User A sees only their data, User B sees only their data, data persists after logout
-   Requirements: user-data-isolation.1.3, user-data-isolation.1.4, user-data-isolation.1.5, user-data-isolation.1.6, user-data-isolation.1.7 */
+   Requirements: user-data-isolation.2.4, user-data-isolation.2.5, user-data-isolation.4.4 */
 test('should isolate data between different users', async () => {
   // User A: Login and create data
   mockOAuthServer.setUserProfile({
@@ -152,7 +152,7 @@ test('should isolate data between different users', async () => {
 /* Preconditions: Application running, user authenticated
    Action: Login, create data (LLM Provider settings, window state, profile), logout, login again
    Assertions: All data restored (settings, window state, profile)
-   Requirements: user-data-isolation.1.7, user-data-isolation.1.22, user-data-isolation.1.23, user-data-isolation.1.24 */
+   Requirements: user-data-isolation.0.3, user-data-isolation.1.3 */
 test('should restore user data after re-login', async () => {
   // Login
   mockOAuthServer.setUserProfile({
@@ -208,8 +208,8 @@ test('should restore user data after re-login', async () => {
 
 /* Preconditions: Application running, user authenticated
    Action: Login, create data, logout, check database directly
-   Assertions: Data persists in database with user_email
-   Requirements: user-data-isolation.1.5, user-data-isolation.1.8 */
+   Assertions: Data persists in database with user_id
+   Requirements: user-data-isolation.1.4, user-data-isolation.2.4 */
 test('should persist data after logout', async () => {
   // Login
   mockOAuthServer.setUserProfile({
@@ -255,8 +255,8 @@ test('should persist data after logout', async () => {
 /* Preconditions: Application running, two users with same key but different values
    Action: User A saves 'test_key' = 'value_A', User B saves 'test_key' = 'value_B', load as each user
    Assertions: User A gets 'value_A', User B gets 'value_B'
-   Requirements: user-data-isolation.1.4, user-data-isolation.1.6 */
-test('should filter data by user email', async () => {
+   Requirements: user-data-isolation.2.4, user-data-isolation.2.5, user-data-isolation.4.4 */
+test('should filter data by user_id', async () => {
   // User A: Login and save data
   mockOAuthServer.setUserProfile({
     id: 'filter-a-id',
@@ -336,7 +336,7 @@ test('should filter data by user email', async () => {
 /* Preconditions: Application running, not authenticated
    Action: Attempt to save data without authentication
    Assertions: Shows login screen, caches cleared
-   Requirements: user-data-isolation.1.13, user-data-isolation.1.19 */
+   Requirements: user-data-isolation.3.2, user-data-isolation.4.1 */
 test('should handle "No user logged in" error gracefully', async () => {
   // Close the authenticated context from beforeEach
   await closeElectron(context);
@@ -392,7 +392,7 @@ test('should handle "No user logged in" error gracefully', async () => {
 /* Preconditions: Application running, authenticated, token expires
    Action: Token expires, attempt to refresh profile (API request), system refreshes token automatically, operation succeeds
    Assertions: Profile refresh succeeds after automatic token refresh, /userinfo uses refreshed token
-   Requirements: user-data-isolation.1.20 */
+   Requirements: user-data-isolation.4.2 */
 test('should retry operation after token refresh', async () => {
   // 1) Login
   mockOAuthServer.setUserProfile({

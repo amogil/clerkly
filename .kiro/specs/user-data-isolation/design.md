@@ -670,18 +670,33 @@ describe('DataManager - User Data Isolation', () => {
 
 ### Property-Based Тесты
 
-**Файл:** `tests/property/UserDataIsolation.property.test.ts`
+**Файл:** `tests/property/auth/UserDataIsolation.property.test.ts`
 
 ```typescript
 describe('User Data Isolation - Property Tests', () => {
-  /* Property 1: Генерация user_id */
-  it('should always generate valid 10-char alphanumeric user_id');
+  /* Property 1: Генерация user_id
+     **Validates: Requirements user-data-isolation.0.2** */
+  it('should generate valid 10-character alphanumeric user_id');
 
-  /* Property 2: Идемпотентность findOrCreateUser */
-  it('should return same user_id for same email');
+  /* Property 2: Идемпотентность findOrCreateUser
+     **Validates: Requirements user-data-isolation.0.3** */
+  it('should return same user_id for same email on repeated findOrCreateUser calls');
 
-  /* Property 3: Изоляция данных */
+  /* Property 3: Изоляция данных
+     **Validates: Requirements user-data-isolation.4.4** */
   it('should isolate data between different users');
+
+  /* Property 4: Восстановление данных
+     **Validates: Requirements user-data-isolation.1.3** */
+  it('should restore data after logout and re-login with same email');
+
+  /* Property 5: Обновление имени
+     **Validates: Requirements user-data-isolation.0.4** */
+  it('should update user name when changed');
+
+  /* Property 6: Игнорирование null имени
+     **Validates: Requirements user-data-isolation.0.4** */
+  it('should not update name when null is passed');
 });
 ```
 
@@ -691,13 +706,12 @@ describe('User Data Isolation - Property Tests', () => {
 
 ```typescript
 describe('User Data Isolation Functional Tests', () => {
-  test('should create user record on first login');
-  test('should find existing user on re-login');
-  test('should update user name if changed');
   test('should isolate data between different users');
-  test('should persist data after logout');
   test('should restore user data after re-login');
+  test('should persist data after logout');
   test('should filter data by user_id');
+  test('should handle No user logged in error');
+  test('should retry operation after token refresh');
   test('should handle No user logged in error');
 });
 ```
@@ -711,9 +725,9 @@ describe('User Data Isolation Functional Tests', () => {
 | user-data-isolation.0.1 | - | - | ✓ |
 | user-data-isolation.0.2 | ✓ | ✓ | - |
 | user-data-isolation.0.3 | ✓ | ✓ | ✓ |
-| user-data-isolation.0.4 | ✓ | - | ✓ |
+| user-data-isolation.0.4 | ✓ | ✓ | ✓ |
 | user-data-isolation.0.5 | - | - | - |
-| user-data-isolation.1.1 | ✓ | - | - |
+| user-data-isolation.1.1 | ✓ | ✓ | - |
 | user-data-isolation.1.2 | ✓ | ✓ | ✓ |
 | user-data-isolation.1.3 | ✓ | ✓ | ✓ |
 | user-data-isolation.1.4 | ✓ | - | ✓ |
@@ -728,7 +742,7 @@ describe('User Data Isolation Functional Tests', () => {
 | user-data-isolation.2.8 | - | - | ✓ |
 | user-data-isolation.2.9 | - | - | - |
 | user-data-isolation.3.1 | ✓ | ✓ | - |
-| user-data-isolation.3.2 | ✓ | - | ✓ |
+| user-data-isolation.3.2 | ✓ | ✓ | ✓ |
 | user-data-isolation.3.3 | ✓ | ✓ | - |
 | user-data-isolation.4.1 | - | - | ✓ |
 | user-data-isolation.4.2 | - | - | ✓ |

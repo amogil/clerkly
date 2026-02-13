@@ -1040,36 +1040,36 @@ interface AIAgentSettings {
 -- LLM Provider
 key: 'ai_agent_llm_provider'
 value: 'openai' | 'anthropic' | 'google'
-user_email: 'user@example.com'
+user_id: 'aB3xK9mNpQ'
 
 -- API Keys (раздельное хранилище для каждого провайдера)
 key: 'ai_agent_api_key_openai'
 value: 'encrypted_or_plain_text_key'
-user_email: 'user@example.com'
+user_id: 'aB3xK9mNpQ'
 
 key: 'ai_agent_api_key_openai_encrypted'
 value: true | false
-user_email: 'user@example.com'
+user_id: 'aB3xK9mNpQ'
 
 key: 'ai_agent_api_key_anthropic'
 value: 'encrypted_or_plain_text_key'
-user_email: 'user@example.com'
+user_id: 'aB3xK9mNpQ'
 
 key: 'ai_agent_api_key_anthropic_encrypted'
 value: true | false
-user_email: 'user@example.com'
+user_id: 'aB3xK9mNpQ'
 
 key: 'ai_agent_api_key_google'
 value: 'encrypted_or_plain_text_key'
-user_email: 'user@example.com'
+user_id: 'aB3xK9mNpQ'
 
 key: 'ai_agent_api_key_google_encrypted'
 value: true | false
-user_email: 'user@example.com'
+user_id: 'aB3xK9mNpQ'
 ```
 
 **Преимущества:**
-- Изоляция данных по пользователям через `user_email`
+- Изоляция данных по пользователям через `user_id`
 - Раздельное хранилище для каждого провайдера
 - Метаданные о шифровании для каждого ключа
 - Использует существующую инфраструктуру `DataManager`
@@ -1727,15 +1727,15 @@ describe('Settings Functional Tests', () => {
 
 ### Решение 6: Изоляция Данных через DataManager
 
-**Решение:** Использовать существующий механизм изоляции данных в `DataManager` (колонка `user_email`) для автоматической изоляции настроек по пользователям.
+**Решение:** Использовать существующий механизм изоляции данных в `DataManager` (колонка `user_id`) для автоматической изоляции настроек по пользователям.
 
 **Альтернативы:**
 - Реализовать отдельную логику изоляции для настроек
 - Использовать отдельные таблицы для каждого пользователя
-- Передавать user_email явно в каждый метод
+- Передавать user_id явно в каждый метод
 
 **Обоснование:**
-- Соответствует требованию settings.1.20 (через user-data-isolation.1)
+- Соответствует требованию settings.1.20 (через user-data-isolation.2)
 - Использует существующую инфраструктуру
 - Автоматическая изоляция без дополнительного кода
 - Консистентность с остальными данными приложения
