@@ -14,6 +14,33 @@ export const IPC_CHANNELS = {
 } as const;
 
 /**
+ * Event type constants for type-safe event handling
+ */
+export const EVENT_TYPES = {
+  // Auth events
+  AUTH_SUCCEEDED: 'auth.succeeded',
+  AUTH_FAILED: 'auth.failed',
+  PROFILE_SYNCED: 'profile.synced',
+
+  // User events
+  USER_LOGIN: 'user.login',
+  USER_LOGOUT: 'user.logout',
+  USER_PROFILE_UPDATED: 'user.profile.updated',
+
+  // Agent events
+  AGENT_CREATED: 'agent.created',
+  AGENT_UPDATED: 'agent.updated',
+  AGENT_DELETED: 'agent.deleted',
+
+  // Message events
+  MESSAGE_CREATED: 'message.created',
+  MESSAGE_UPDATED: 'message.updated',
+
+  // Error events
+  ERROR_CREATED: 'error.created',
+} as const;
+
+/**
  * Configuration constants
  */
 export const EVENT_CONFIG = {

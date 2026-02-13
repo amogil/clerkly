@@ -6,6 +6,9 @@
 
 import { contextBridge, ipcRenderer } from 'electron';
 
+// Event type constant (duplicated from shared/events/constants.ts due to rootDir restriction)
+const EVENT_TYPE_USER_LOGOUT = 'user.logout';
+
 /**
  * API interface for secure IPC communication
  * Exposed to renderer process via contextBridge
@@ -241,7 +244,7 @@ const api: API = {
     onLogout(callback: () => void): () => void {
       // Use the events API to listen for user.logout events
       return api.events!.onEvent((type: string) => {
-        if (type === 'user.logout') {
+        if (type === EVENT_TYPE_USER_LOGOUT) {
           callback();
         }
       });
