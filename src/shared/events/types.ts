@@ -4,6 +4,8 @@
  * Source of truth for all event type definitions in Clerkly
  */
 
+import { User } from '../../types';
+
 // ============================================================================
 // Base Event Types
 // ============================================================================
@@ -88,14 +90,7 @@ export interface Message {
   createdAt: number;
 }
 
-/**
- * User profile for events (minimal fields needed for UI)
- */
-export interface EventUser {
-  user_id: string;
-  email: string;
-  name: string | null;
-}
+
 
 // ============================================================================
 // Event Payloads
@@ -113,7 +108,7 @@ export type MessageUpdatedPayload = EntityUpdatedEvent<Message>;
 // User events
 export type UserLoginPayload = BaseEvent & { userId: string };
 export type UserLogoutPayload = BaseEvent;
-export type UserProfileUpdatedPayload = EntityUpdatedEvent<EventUser>;
+export type UserProfileUpdatedPayload = EntityUpdatedEvent<User>;
 
 // ============================================================================
 // Auth Events
@@ -145,7 +140,7 @@ export interface AuthFailedPayload extends BaseEvent {
  */
 export interface ProfileSyncedPayload extends BaseEvent {
   /** User data */
-  user: EventUser;
+  user: User;
 }
 
 // ============================================================================
@@ -318,7 +313,7 @@ export class AuthFailedEvent extends TypedEventClass<'auth.failed'> {
 export class ProfileSyncedEvent extends TypedEventClass<'profile.synced'> {
   readonly type = 'profile.synced' as const;
 
-  constructor(public readonly user: EventUser) {
+  constructor(public readonly user: User) {
     super();
   }
 
@@ -465,7 +460,7 @@ export class UserProfileUpdatedEvent extends TypedEventClass<'user.profile.updat
 
   constructor(
     public readonly id: string,
-    public readonly changedFields: Partial<EventUser>
+    public readonly changedFields: Partial<User>
   ) {
     super();
   }

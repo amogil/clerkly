@@ -20,12 +20,12 @@ describe('Property Tests - Data Manager', () => {
     dataManager = new DataManager(testStoragePath);
     dataManager.initialize();
 
-    // Requirements: user-data-isolation.1.10 - Mock UserProfileManager for data isolation
+    // Requirements: user-data-isolation.1.10 - Mock UserManager for data isolation
     const mockProfileManager = {
       getCurrentUserId: jest.fn().mockReturnValue('test@example.com'),
     } as any;
 
-    dataManager.setUserProfileManager(mockProfileManager);
+    dataManager.setUserManager(mockProfileManager);
   });
 
   afterEach(() => {

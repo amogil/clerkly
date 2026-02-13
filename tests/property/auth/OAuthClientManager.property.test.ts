@@ -38,12 +38,12 @@ describe('OAuthClientManager Property-Based Tests', () => {
     dataManager = new DataManager(testDbPath);
     dataManager.initialize();
 
-    // Requirements: user-data-isolation.1.10 - Mock UserProfileManager for data isolation
+    // Requirements: user-data-isolation.1.10 - Mock UserManager for data isolation
     const mockProfileManager = {
       getCurrentUserId: jest.fn().mockReturnValue('test@example.com'),
     } as any;
 
-    dataManager.setUserProfileManager(mockProfileManager);
+    dataManager.setUserManager(mockProfileManager);
     tokenStorage = new TokenStorageManager(dataManager);
 
     testConfig = getOAuthConfig(testClientId);
@@ -295,26 +295,26 @@ describe('OAuthClientManager Property-Based Tests', () => {
 
     // Test with valid tokens (future expiration)
     await fc.assert(
-      fc.asyncProperty(
-        fc.integer({ min: Date.now() + 1000, max: Date.now() + 7200000 }),
-        async (expiresAt) => {
-          // Clean state before test
-          await tokenStorage.deleteTokens();
+      fc.asyncProperty(fc.integer({ min: 1000, max: 7200000 }), async (offsetMs) => {
+        // Clean state before test
+        await tokenStorage.deleteTokens();
 
-          await tokenStorage.saveTokens({
-            accessToken: 'valid-token',
-            refreshToken: 'valid-refresh',
-            expiresAt,
-            tokenType: 'Bearer',
-          });
+        // Calculate expiresAt relative to current time at test execution
+        const expiresAt = Date.now() + offsetMs;
 
-          const status = await oauthClient.getAuthStatus();
-          expect(status.authorized).toBe(true);
+        await tokenStorage.saveTokens({
+          accessToken: 'valid-token',
+          refreshToken: 'valid-refresh',
+          expiresAt,
+          tokenType: 'Bearer',
+        });
 
-          // Clean up after test
-          await tokenStorage.deleteTokens();
-        }
-      ),
+        const status = await oauthClient.getAuthStatus();
+        expect(status.authorized).toBe(true);
+
+        // Clean up after test
+        await tokenStorage.deleteTokens();
+      }),
       { numRuns: 50 }
     );
 

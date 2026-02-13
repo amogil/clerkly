@@ -19,12 +19,12 @@ describe('TokenStorageManager Property-Based Tests', () => {
     dataManager = new DataManager(testDbPath);
     dataManager.initialize();
 
-    // Requirements: user-data-isolation.1.10 - Mock UserProfileManager for data isolation
+    // Requirements: user-data-isolation.1.10 - Mock UserManager for data isolation
     const mockProfileManager = {
       getCurrentUserId: jest.fn().mockReturnValue('test@example.com'),
     } as any;
 
-    dataManager.setUserProfileManager(mockProfileManager);
+    dataManager.setUserManager(mockProfileManager);
     tokenStorage = new TokenStorageManager(dataManager);
   });
 

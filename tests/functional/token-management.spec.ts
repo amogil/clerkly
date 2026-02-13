@@ -135,7 +135,7 @@ test('42.2 should clear session and show login on 401 error', async () => {
 
   // Trigger API request by refreshing profile
   await mainWindow.evaluate(async () => {
-    await (window as any).api.auth.refreshProfile();
+    await (window as any).api.auth.refreshUser();
   });
 
   // Wait for 401 error to be processed and login screen to appear
@@ -167,7 +167,7 @@ test('42.3 should handle 401 from any API endpoint consistently', async () => {
 
   // Trigger UserInfo API request
   await mainWindow.evaluate(async () => {
-    await (window as any).api.auth.refreshProfile();
+    await (window as any).api.auth.refreshUser();
   });
 
   // Wait for 401 error to be processed
@@ -199,7 +199,7 @@ test('42.4 should log authorization errors with context', async () => {
 
   // Trigger API request
   await mainWindow.evaluate(async () => {
-    await (window as any).api.auth.refreshProfile();
+    await (window as any).api.auth.refreshUser();
   });
 
   // Wait for 401 error to be processed
@@ -234,7 +234,7 @@ test('42.5 should show user-friendly error message on session expiry', async () 
 
   // Trigger API request
   await mainWindow.evaluate(async () => {
-    await (window as any).api.auth.refreshProfile();
+    await (window as any).api.auth.refreshUser();
   });
 
   // Wait for 401 error to be processed
@@ -278,9 +278,9 @@ test('42.6 should handle multiple simultaneous 401 errors', async () => {
   await mainWindow.evaluate(async () => {
     // Trigger multiple API calls simultaneously
     await Promise.all([
-      (window as any).api.auth.refreshProfile().catch(() => {}),
-      (window as any).api.auth.refreshProfile().catch(() => {}),
-      (window as any).api.auth.refreshProfile().catch(() => {}),
+      (window as any).api.auth.refreshUser().catch(() => {}),
+      (window as any).api.auth.refreshUser().catch(() => {}),
+      (window as any).api.auth.refreshUser().catch(() => {}),
     ]);
   });
 

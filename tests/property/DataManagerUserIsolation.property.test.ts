@@ -6,7 +6,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { DataManager } from '../../src/main/DataManager';
-import type { UserProfileManager } from '../../src/main/auth/UserProfileManager';
+import type { UserManager } from '../../src/main/auth/UserManager';
 
 // Mock electron BrowserWindow for error notifications
 jest.mock('electron', () => ({
@@ -78,9 +78,9 @@ describe('DataManager User Isolation - Property-Based Tests', () => {
           // Create mock profile manager for each user
           const mockProfileManager = {
             getCurrentUserId: jest.fn(),
-          } as unknown as jest.Mocked<UserProfileManager>;
+          } as unknown as jest.Mocked<UserManager>;
 
-          dataManager.setUserProfileManager(mockProfileManager);
+          dataManager.setUserManager(mockProfileManager);
 
           // Save data for each user
           users.forEach((user) => {
@@ -147,9 +147,9 @@ describe('DataManager User Isolation - Property-Based Tests', () => {
 
           const mockProfileManager = {
             getCurrentUserId: jest.fn(),
-          } as unknown as jest.Mocked<UserProfileManager>;
+          } as unknown as jest.Mocked<UserManager>;
 
-          dataManager.setUserProfileManager(mockProfileManager);
+          dataManager.setUserManager(mockProfileManager);
 
           // Save and immediately load for each user
           users.forEach((user) => {
@@ -201,9 +201,9 @@ describe('DataManager User Isolation - Property-Based Tests', () => {
 
           const mockProfileManager = {
             getCurrentUserId: jest.fn(),
-          } as unknown as jest.Mocked<UserProfileManager>;
+          } as unknown as jest.Mocked<UserManager>;
 
-          dataManager.setUserProfileManager(mockProfileManager);
+          dataManager.setUserManager(mockProfileManager);
 
           // Save data for each user
           users.forEach((user) => {

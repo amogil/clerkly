@@ -566,7 +566,7 @@ test.describe('Account Profile', () => {
     // Trigger manual profile refresh via IPC (Variant B)
     // Requirements: account-profile.1.5 - Manual refresh to trigger profile update
     const refreshResult = await context.window.evaluate(async () => {
-      return await (window as any).electron.ipcRenderer.invoke('auth:refresh-profile');
+      return await (window as any).electron.ipcRenderer.invoke('auth:refresh-user');
     });
 
     console.log('[TEST] Profile refresh triggered, result:', refreshResult);
@@ -1744,7 +1744,7 @@ test.describe('Account Profile', () => {
     // Trigger manual profile refresh (this will fail)
     // Requirements: account-profile.1.1, Property 14 - Fetch fails, cached data should be preserved
     const refreshResult = await context.window.evaluate(async () => {
-      return await (window as any).electron.ipcRenderer.invoke('auth:refresh-profile');
+      return await (window as any).electron.ipcRenderer.invoke('auth:refresh-user');
     });
 
     console.log('[TEST] Profile refresh attempted, result:', refreshResult);

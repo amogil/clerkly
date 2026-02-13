@@ -13,17 +13,17 @@ import { DataManager } from '../../src/main/DataManager';
 describe('Property Tests - Database Corruption Recovery', () => {
   let testStoragePath: string;
 
-  // Helper function to create DataManager with mock UserProfileManager
+  // Helper function to create DataManager with mock UserManager
   const createDataManagerWithMockUser = (storagePath: string) => {
     const dataManager = new DataManager(storagePath);
     dataManager.initialize();
 
-    // Requirements: user-data-isolation.1.10 - Mock UserProfileManager for data isolation
+    // Requirements: user-data-isolation.1.10 - Mock UserManager for data isolation
     const mockProfileManager = {
       getCurrentUserId: jest.fn().mockReturnValue('test@example.com'),
     } as any;
 
-    dataManager.setUserProfileManager(mockProfileManager);
+    dataManager.setUserManager(mockProfileManager);
     return dataManager;
   };
 

@@ -428,7 +428,7 @@ test('should retry operation after token refresh', async () => {
   // 5) Try to refresh profile - this makes an API request to Google UserInfo API
   // System should automatically detect expired token, refresh it, and retry the request
   const refreshResult = await context.window.evaluate(() => {
-    return (window as any).electron.ipcRenderer.invoke('auth:refresh-profile');
+    return (window as any).electron.ipcRenderer.invoke('auth:refresh-user');
   });
 
   // 6) Verify profile refresh succeeded (token was automatically refreshed)
