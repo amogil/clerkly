@@ -566,6 +566,70 @@ npm run test:property -- tests/property/auth/OAuthConfig.property.test.ts -t "sp
 
 ## Правила Написания Кода
 
+### Логирование и Обработка Ошибок
+
+**КРИТИЧЕСКИ ВАЖНО**: В проекте используется централизованная система логирования и обработки ошибок.
+
+#### Logger
+
+**Спецификация:** `.kiro/specs/clerkly/requirements.md` (clerkly.3)
+
+**Правила использования:**
+- Каждый класс создает свой экземпляр Logger с именем класса: `new Logger('ClassName')`
+- Logger автоматически добавляет имя класса к сообщениям
+- НЕ добавлять `[ClassName]` в сообщения вручную - это дублирование
+
+**Пример:**
+```typescript
+// ✅ ПРАВИЛЬНО
+this.logger = new Logger('UserProfileManager');
+this.logger.info('User ID set: abc123');
+// Вывод: [UserProfileManager] User ID set: abc123
+
+// ❌ НЕПРАВИЛЬНО
+this.logger.info('[UserProfileManager] User ID set: abc123');
+// Вывод: [UserProfileManager] [UserProfileManager] User ID set: abc123
+```
+
+#### ErrorHandler
+
+**Спецификация:** `.kiro/specs/error-notifications/requirements.md` (error-notifications.1)
+**Дизайн:** `.kiro/specs/error-notifications/design.md`
+
+**Правила использования:**
+- Для ошибок в фоновых процессах использовать `ErrorHandler.handleBackgroundError(error, context)`
+- ErrorHandler автоматически логирует ошибку и отправляет уведомление пользователю
+- ErrorHandler автоматически фильтрует race condition ошибки (не показывает пользователю)
+
+**Пример:**
+```typescript
+// ✅ ПРАВИЛЬНО - использовать ErrorHandler
+async fetchProfile(): Promise<UserProfile | null> {
+  try {
+    // ... код ...
+  } catch (error) {
+    ErrorHandler.handleBackgroundError(error, 'Profile Loading');
+    return null;
+  }
+}
+
+// ❌ НЕПРАВИЛЬНО - локальное логирование ошибок
+async fetchProfile(): Promise<UserProfile | null> {
+  try {
+    // ... код ...
+  } catch (error) {
+    this.logger.error('Failed to fetch profile:', error);
+    return null;
+  }
+}
+```
+
+**Фильтрация ошибок (error-notifications.1.5):**
+- "No user logged in" во время logout - НЕ показывается пользователю
+- Отмененные операции (cancelled, aborted) - НЕ показываются пользователю
+- Race condition ошибки - НЕ показываются пользователю
+- Все ошибки ВСЕГДА логируются для отладки
+
 ### Комментарии с Требованиями
 
 **КРИТИЧЕСКИ ВАЖНО**: Каждый фрагмент кода ДОЛЖЕН содержать комментарии со ссылками на требования.
