@@ -344,6 +344,55 @@ describe('AuthIPCHandlers', () => {
 
       consoleWarnSpy.mockRestore();
     });
+
+    /* Preconditions: UserManager throws error during getCurrentUser
+       Action: Call auth:get-user handler
+       Assertions: Returns success: false with error message
+       Requirements: account-profile.1.2 */
+    it('should handle user loading error', async () => {
+      const errorMessage = 'Database error';
+      authIPCHandlers.setUserManager(mockProfileManager);
+      mockProfileManager.getCurrentUser.mockImplementation(() => {
+        throw new Error(errorMessage);
+      });
+
+      authIPCHandlers.registerHandlers();
+      const handler = (ipcMain.handle as jest.Mock).mock.calls.find(
+        (call) => call[0] === 'auth:get-user'
+      )?.[1];
+
+      const result = await handler({});
+
+      expect(result).toEqual({
+        success: false,
+        error: errorMessage,
+        user: null,
+      });
+    });
+
+    /* Preconditions: UserManager throws non-Error object
+       Action: Call auth:get-user handler
+       Assertions: Returns success: false with 'Unknown error' message
+       Requirements: account-profile.1.2 */
+    it('should handle non-Error exceptions in get user', async () => {
+      authIPCHandlers.setUserManager(mockProfileManager);
+      mockProfileManager.getCurrentUser.mockImplementation(() => {
+        throw 'String error';
+      });
+
+      authIPCHandlers.registerHandlers();
+      const handler = (ipcMain.handle as jest.Mock).mock.calls.find(
+        (call) => call[0] === 'auth:get-user'
+      )?.[1];
+
+      const result = await handler({});
+
+      expect(result).toEqual({
+        success: false,
+        error: 'Unknown error',
+        user: null,
+      });
+    });
   });
 
   describe('auth:refresh-user Handler', () => {
@@ -553,6 +602,27 @@ describe('AuthIPCHandlers', () => {
       expect(publishedEvent.type).toBe('error.created');
       expect(publishedEvent.message).toBe(errorMessage);
       expect(publishedEvent.context).toBe(context);
+
+      consoleErrorSpy.mockRestore();
+    });
+
+    /* Preconditions: Error notification called
+       Action: Call sendErrorNotification()
+       Assertions: Method does not throw, error is logged
+       Requirements: error-notifications.1.1 */
+    it('should handle error notification gracefully', () => {
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+
+      const errorMessage = 'Failed to save data';
+      const context = 'DataManager';
+
+      expect(() => {
+        authIPCHandlers.sendErrorNotification(errorMessage, context);
+      }).not.toThrow();
+
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining(`[${context}] Error: ${errorMessage}`)
+      );
 
       consoleErrorSpy.mockRestore();
     });
