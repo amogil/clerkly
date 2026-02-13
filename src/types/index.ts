@@ -153,7 +153,7 @@ export interface AppConfig {
 
 /**
  * API exposed to renderer process via contextBridge
- * Requirements: clerkly.1, google-oauth-auth.8, account-profile.1.2, account-profile.1.5, error-notifications.1.1, settings.1.26
+ * Requirements: clerkly.1, google-oauth-auth.8, account-profile.1.2, account-profile.1.5, error-notifications.1.1, settings.1.26, realtime-events.4.5
  */
 export interface API {
   saveData: (key: string, value: any) => Promise<{ success: boolean; error?: string }>;
@@ -208,6 +208,11 @@ export interface API {
       provider: 'openai' | 'anthropic' | 'google',
       apiKey: string
     ) => Promise<{ success: boolean; error?: string }>;
+  };
+  // Requirements: realtime-events.4.5, realtime-events.4.6, realtime-events.4.7
+  events?: {
+    onEvent: (callback: (type: string, payload: any) => void) => () => void;
+    sendEvent: (type: string, payload: any) => void;
   };
 }
 
