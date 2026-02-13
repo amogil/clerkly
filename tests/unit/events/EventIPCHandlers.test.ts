@@ -35,20 +35,20 @@ jest.mock('../../../src/main/Logger', () => ({
 jest.mock('../../../src/main/events/MainEventBus', () => ({
   MainEventBus: {
     getInstance: jest.fn(() => ({
-      publish: jest.fn(),
+      deliverFromIPC: jest.fn(),
     })),
   },
 }));
 
 describe('EventIPCHandlers', () => {
-  let mockPublish: jest.Mock;
+  let mockDeliverFromIPC: jest.Mock;
   let ipcHandler: (event: IpcMainEvent, type: string, payload: unknown) => void;
 
   beforeEach(() => {
     jest.clearAllMocks();
-    mockPublish = jest.fn();
+    mockDeliverFromIPC = jest.fn();
     (MainEventBus.getInstance as jest.Mock).mockReturnValue({
-      publish: mockPublish,
+      deliverFromIPC: mockDeliverFromIPC,
     });
 
     // Capture the IPC handler when registered
@@ -85,7 +85,7 @@ describe('EventIPCHandlers', () => {
 
       ipcHandler(mockEvent, 'agent.created', payload);
 
-      expect(mockPublish).toHaveBeenCalledWith('agent.created', payload, { localOnly: true });
+      expect(mockDeliverFromIPC).toHaveBeenCalledWith('agent.created', payload);
     });
 
     /* Preconditions: IPC handler registered
@@ -99,7 +99,7 @@ describe('EventIPCHandlers', () => {
       ipcHandler(mockEvent, 'agent.updated', payload);
 
       // Verify localOnly is true to prevent sending back to renderer
-      expect(mockPublish).toHaveBeenCalledWith('agent.updated', payload, { localOnly: true });
+      expect(mockDeliverFromIPC).toHaveBeenCalledWith('agent.updated', payload);
     });
   });
 
@@ -115,7 +115,7 @@ describe('EventIPCHandlers', () => {
         ipcHandler(mockEvent, '', { timestamp: Date.now() });
       }).not.toThrow();
 
-      expect(mockPublish).not.toHaveBeenCalled();
+      expect(mockDeliverFromIPC).not.toHaveBeenCalled();
     });
 
     /* Preconditions: IPC handler registered
@@ -129,7 +129,7 @@ describe('EventIPCHandlers', () => {
         ipcHandler(mockEvent, null as any, { timestamp: Date.now() });
       }).not.toThrow();
 
-      expect(mockPublish).not.toHaveBeenCalled();
+      expect(mockDeliverFromIPC).not.toHaveBeenCalled();
     });
 
     /* Preconditions: IPC handler registered
@@ -143,7 +143,7 @@ describe('EventIPCHandlers', () => {
         ipcHandler(mockEvent, 'agent.created', null);
       }).not.toThrow();
 
-      expect(mockPublish).not.toHaveBeenCalled();
+      expect(mockDeliverFromIPC).not.toHaveBeenCalled();
     });
 
     /* Preconditions: IPC handler registered
@@ -157,7 +157,7 @@ describe('EventIPCHandlers', () => {
         ipcHandler(mockEvent, 'agent.created', { data: { id: 'agent-1' } });
       }).not.toThrow();
 
-      expect(mockPublish).not.toHaveBeenCalled();
+      expect(mockDeliverFromIPC).not.toHaveBeenCalled();
     });
 
     /* Preconditions: IPC handler registered, MainEventBus.publish throws
@@ -166,7 +166,7 @@ describe('EventIPCHandlers', () => {
        Requirements: realtime-events.4.4 */
     it('should handle MainEventBus errors gracefully', () => {
       const mockEvent = {} as IpcMainEvent;
-      mockPublish.mockImplementationOnce(() => {
+      mockDeliverFromIPC.mockImplementationOnce(() => {
         throw new Error('EventBus error');
       });
 
@@ -193,7 +193,7 @@ describe('EventIPCHandlers', () => {
 
       ipcHandler(mockEvent, 'agent.created', payload);
 
-      expect(mockPublish).toHaveBeenCalledWith('agent.created', payload, { localOnly: true });
+      expect(mockDeliverFromIPC).toHaveBeenCalledWith('agent.created', payload);
     });
 
     /* Preconditions: IPC handler registered
@@ -210,7 +210,7 @@ describe('EventIPCHandlers', () => {
 
       ipcHandler(mockEvent, 'agent.updated', payload);
 
-      expect(mockPublish).toHaveBeenCalledWith('agent.updated', payload, { localOnly: true });
+      expect(mockDeliverFromIPC).toHaveBeenCalledWith('agent.updated', payload);
     });
 
     /* Preconditions: IPC handler registered
@@ -226,7 +226,7 @@ describe('EventIPCHandlers', () => {
 
       ipcHandler(mockEvent, 'agent.deleted', payload);
 
-      expect(mockPublish).toHaveBeenCalledWith('agent.deleted', payload, { localOnly: true });
+      expect(mockDeliverFromIPC).toHaveBeenCalledWith('agent.deleted', payload);
     });
 
     /* Preconditions: IPC handler registered
@@ -242,7 +242,7 @@ describe('EventIPCHandlers', () => {
 
       ipcHandler(mockEvent, 'user.login', payload);
 
-      expect(mockPublish).toHaveBeenCalledWith('user.login', payload, { localOnly: true });
+      expect(mockDeliverFromIPC).toHaveBeenCalledWith('user.login', payload);
     });
   });
 });

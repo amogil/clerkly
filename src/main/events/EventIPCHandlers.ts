@@ -20,7 +20,7 @@ export function registerEventIPCHandlers(): void {
   // Requirements: realtime-events.4.2
   ipcMain.on(
     IPC_CHANNELS.EVENT_FROM_RENDERER,
-    (event: IpcMainEvent, type: string, payload: unknown) => {
+    (_event: IpcMainEvent, type: string, payload: unknown) => {
       logger.debug(`Received event from renderer: ${type}`);
 
       // Validate event type
@@ -44,11 +44,9 @@ export function registerEventIPCHandlers(): void {
 
       try {
         const eventBus = MainEventBus.getInstance();
-        // Publish locally only to avoid sending back to renderer (prevents duplication)
+        // Deliver locally only (event came from renderer, don't send back)
         // Requirements: realtime-events.4.3
-        eventBus.publish(type as EventType, payload as ClerklyEvents[EventType], {
-          localOnly: true,
-        });
+        eventBus.deliverFromIPC(type as EventType, payload as ClerklyEvents[EventType]);
       } catch (error) {
         logger.error(`Error processing event from renderer: ${error}`);
       }

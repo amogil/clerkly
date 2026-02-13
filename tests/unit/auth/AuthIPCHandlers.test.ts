@@ -1,6 +1,6 @@
 // Requirements: google-oauth-auth.8.1, google-oauth-auth.8.2, google-oauth-auth.8.3, google-oauth-auth.8.4, google-oauth-auth.8.5, account-profile.1.2, account-profile.1.7
 
-import { ipcMain, BrowserWindow } from 'electron';
+import { ipcMain } from 'electron';
 import { AuthIPCHandlers } from '../../../src/main/auth/AuthIPCHandlers';
 import { OAuthClientManager } from '../../../src/main/auth/OAuthClientManager';
 import { UserProfileManager, UserProfile } from '../../../src/main/auth/UserProfileManager';
@@ -11,8 +11,20 @@ jest.mock('electron', () => ({
     handle: jest.fn(),
     removeHandler: jest.fn(),
   },
-  BrowserWindow: {
-    getAllWindows: jest.fn(() => []),
+}));
+
+// Mock MainEventBus
+const mockPublish = jest.fn();
+jest.mock('../../../src/main/events/MainEventBus', () => ({
+  MainEventBus: {
+    getInstance: jest.fn(() => ({
+      publish: mockPublish,
+      subscribe: jest.fn(),
+      subscribeAll: jest.fn(),
+      clear: jest.fn(),
+      destroy: jest.fn(),
+    })),
+    resetInstance: jest.fn(),
   },
 }));
 
@@ -208,18 +220,15 @@ describe('AuthIPCHandlers', () => {
   });
 
   describe('auth:logout Handler', () => {
+    beforeEach(() => {
+      mockPublish.mockClear();
+    });
+
     /* Preconditions: User is logged in, logout initiated
        Action: Call auth:logout handler
-       Assertions: OAuthClientManager.logout is called, returns success: true, sends auth:logout-complete event
+       Assertions: OAuthClientManager.logout is called, returns success: true, publishes user.logout event via EventBus
        Requirements: google-oauth-auth.8.3, google-oauth-auth.8.4, google-oauth-auth.8.5 */
     it('should handle logout request successfully', async () => {
-      const mockWindow = {
-        webContents: {
-          send: jest.fn(),
-        },
-      };
-      (BrowserWindow.getAllWindows as jest.Mock).mockReturnValue([mockWindow]);
-
       mockOAuthClient.logout.mockResolvedValue(undefined);
 
       authIPCHandlers.registerHandlers();
@@ -231,9 +240,10 @@ describe('AuthIPCHandlers', () => {
 
       expect(mockOAuthClient.logout).toHaveBeenCalled();
       expect(result).toEqual({ success: true });
-      expect(mockWindow.webContents.send).toHaveBeenCalledWith('auth:logout-complete', {
-        success: true,
-      });
+      // Verify user.logout event was published via EventBus
+      expect(mockPublish).toHaveBeenCalledTimes(1);
+      const publishedEvent = mockPublish.mock.calls[0][0];
+      expect(publishedEvent.type).toBe('user.logout');
     });
 
     /* Preconditions: OAuth client throws error during logout
@@ -470,46 +480,37 @@ describe('AuthIPCHandlers', () => {
   });
 
   describe('Event Broadcasting', () => {
-    /* Preconditions: Multiple windows open, auth success event triggered
-       Action: Call sendAuthSuccess()
-       Assertions: auth:success event sent to all windows
-       Requirements: google-oauth-auth.8.4 */
-    it('should send auth success event to all windows', () => {
-      const mockWindow1 = { webContents: { send: jest.fn() } };
-      const mockWindow2 = { webContents: { send: jest.fn() } };
-      (BrowserWindow.getAllWindows as jest.Mock).mockReturnValue([mockWindow1, mockWindow2]);
-
-      authIPCHandlers.sendAuthSuccess();
-
-      expect(mockWindow1.webContents.send).toHaveBeenCalledWith('auth:success', {
-        authorized: true,
-      });
-      expect(mockWindow2.webContents.send).toHaveBeenCalledWith('auth:success', {
-        authorized: true,
-      });
+    beforeEach(() => {
+      mockPublish.mockClear();
     });
 
-    /* Preconditions: Multiple windows open, auth error event triggered
-       Action: Call sendAuthError()
-       Assertions: auth:error event sent to all windows with error details
+    /* Preconditions: Auth success event triggered
+       Action: Call sendAuthSuccess()
+       Assertions: auth.succeeded event published via EventBus
        Requirements: google-oauth-auth.8.4 */
-    it('should send auth error event to all windows', () => {
-      const mockWindow1 = { webContents: { send: jest.fn() } };
-      const mockWindow2 = { webContents: { send: jest.fn() } };
-      (BrowserWindow.getAllWindows as jest.Mock).mockReturnValue([mockWindow1, mockWindow2]);
+    it('should publish auth.succeeded event via EventBus', () => {
+      authIPCHandlers.sendAuthSuccess('user-123');
 
+      expect(mockPublish).toHaveBeenCalledTimes(1);
+      const publishedEvent = mockPublish.mock.calls[0][0];
+      expect(publishedEvent.type).toBe('auth.succeeded');
+      expect(publishedEvent.userId).toBe('user-123');
+    });
+
+    /* Preconditions: Auth error event triggered
+       Action: Call sendAuthError()
+       Assertions: auth.failed event published via EventBus with error details
+       Requirements: google-oauth-auth.8.4 */
+    it('should publish auth.failed event via EventBus', () => {
       const errorMessage = 'Authentication failed';
       const errorCode = 'access_denied';
       authIPCHandlers.sendAuthError(errorMessage, errorCode);
 
-      expect(mockWindow1.webContents.send).toHaveBeenCalledWith('auth:error', {
-        error: errorMessage,
-        errorCode: errorCode,
-      });
-      expect(mockWindow2.webContents.send).toHaveBeenCalledWith('auth:error', {
-        error: errorMessage,
-        errorCode: errorCode,
-      });
+      expect(mockPublish).toHaveBeenCalledTimes(1);
+      const publishedEvent = mockPublish.mock.calls[0][0];
+      expect(publishedEvent.type).toBe('auth.failed');
+      expect(publishedEvent.error).toBe(errorMessage);
+      expect(publishedEvent.errorCode).toBe(errorCode);
     });
   });
 
@@ -554,15 +555,16 @@ describe('AuthIPCHandlers', () => {
   });
 
   describe('Error Notification', () => {
-    /* Preconditions: Multiple windows open, error occurs
+    beforeEach(() => {
+      mockPublish.mockClear();
+    });
+
+    /* Preconditions: Error occurs
        Action: Call sendErrorNotification()
-       Assertions: Error logged to console, error:notify event sent to all windows
+       Assertions: Error logged to console, error.created event published via EventBus
        Requirements: error-notifications.1.1, error-notifications.1.4 */
-    it('should send error notification to all windows and log to console', () => {
+    it('should publish error.created event via EventBus and log to console', () => {
       const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
-      const mockWindow1 = { webContents: { send: jest.fn() } };
-      const mockWindow2 = { webContents: { send: jest.fn() } };
-      (BrowserWindow.getAllWindows as jest.Mock).mockReturnValue([mockWindow1, mockWindow2]);
 
       const errorMessage = 'Failed to save data';
       const context = 'DataManager';
@@ -571,27 +573,21 @@ describe('AuthIPCHandlers', () => {
       expect(consoleErrorSpy).toHaveBeenCalledWith(
         expect.stringContaining(`[${context}] Error: ${errorMessage}`)
       );
-      expect(mockWindow1.webContents.send).toHaveBeenCalledWith(
-        'error:notify',
-        errorMessage,
-        context
-      );
-      expect(mockWindow2.webContents.send).toHaveBeenCalledWith(
-        'error:notify',
-        errorMessage,
-        context
-      );
+      expect(mockPublish).toHaveBeenCalledTimes(1);
+      const publishedEvent = mockPublish.mock.calls[0][0];
+      expect(publishedEvent.type).toBe('error.created');
+      expect(publishedEvent.message).toBe(errorMessage);
+      expect(publishedEvent.context).toBe(context);
 
       consoleErrorSpy.mockRestore();
     });
 
-    /* Preconditions: No windows open, error occurs
+    /* Preconditions: Error occurs
        Action: Call sendErrorNotification()
        Assertions: Error logged to console, no crash
        Requirements: error-notifications.1.4 */
-    it('should handle error notification when no windows exist', () => {
+    it('should handle error notification gracefully', () => {
       const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
-      (BrowserWindow.getAllWindows as jest.Mock).mockReturnValue([]);
 
       const errorMessage = 'Failed to save data';
       const context = 'DataManager';
@@ -609,11 +605,15 @@ describe('AuthIPCHandlers', () => {
   });
 
   describe('Profile Update Broadcasting', () => {
-    /* Preconditions: Multiple windows open, profile refreshed successfully
+    beforeEach(() => {
+      mockPublish.mockClear();
+    });
+
+    /* Preconditions: Profile refreshed successfully
        Action: Call auth:refresh-profile handler
-       Assertions: auth:profile-updated event sent to all windows with profile data
+       Assertions: profile.synced event published via EventBus
        Requirements: account-profile.1.5 */
-    it('should broadcast profile update to all windows after refresh', async () => {
+    it('should publish profile.synced event via EventBus after refresh', async () => {
       const mockProfile: UserProfile = {
         id: '123',
         email: 'test@example.com',
@@ -624,10 +624,6 @@ describe('AuthIPCHandlers', () => {
         locale: 'en',
         lastUpdated: Date.now(),
       };
-
-      const mockWindow1 = { webContents: { send: jest.fn() } };
-      const mockWindow2 = { webContents: { send: jest.fn() } };
-      (BrowserWindow.getAllWindows as jest.Mock).mockReturnValue([mockWindow1, mockWindow2]);
 
       authIPCHandlers.setProfileManager(mockProfileManager);
       mockProfileManager.fetchProfile.mockResolvedValue(mockProfile);
@@ -639,21 +635,20 @@ describe('AuthIPCHandlers', () => {
 
       await handler({});
 
-      expect(mockWindow1.webContents.send).toHaveBeenCalledWith(
-        'auth:profile-updated',
-        mockProfile
-      );
-      expect(mockWindow2.webContents.send).toHaveBeenCalledWith(
-        'auth:profile-updated',
-        mockProfile
-      );
+      expect(mockPublish).toHaveBeenCalledTimes(1);
+      const publishedEvent = mockPublish.mock.calls[0][0];
+      expect(publishedEvent.type).toBe('profile.synced');
+      // Profile is passed directly without filtering fields
+      expect(publishedEvent.profile.id).toBe(mockProfile.id);
+      expect(publishedEvent.profile.email).toBe(mockProfile.email);
+      expect(publishedEvent.profile.name).toBe(mockProfile.name);
     });
 
-    /* Preconditions: No windows open, profile refreshed successfully
+    /* Preconditions: Profile refreshed successfully
        Action: Call auth:refresh-profile handler
-       Assertions: No crash, profile returned successfully
+       Assertions: Profile returned successfully
        Requirements: account-profile.1.5 */
-    it('should handle profile refresh when no windows exist', async () => {
+    it('should handle profile refresh and return profile', async () => {
       const mockProfile: UserProfile = {
         id: '123',
         email: 'test@example.com',
@@ -664,8 +659,6 @@ describe('AuthIPCHandlers', () => {
         locale: 'en',
         lastUpdated: Date.now(),
       };
-
-      (BrowserWindow.getAllWindows as jest.Mock).mockReturnValue([]);
 
       authIPCHandlers.setProfileManager(mockProfileManager);
       mockProfileManager.fetchProfile.mockResolvedValue(mockProfile);

@@ -25,7 +25,6 @@ interface UserProfile {
   name: string;
   given_name?: string;
   family_name?: string;
-  picture?: string;
   lastUpdated: number;
 }
 
@@ -52,7 +51,6 @@ describe('OAuth Profile Sync Property Tests', () => {
           name: fc.string({ minLength: 3, maxLength: 50 }),
           given_name: fc.option(fc.string({ minLength: 2, maxLength: 30 }), { nil: undefined }),
           family_name: fc.option(fc.string({ minLength: 2, maxLength: 30 }), { nil: undefined }),
-          picture: fc.option(fc.webUrl(), { nil: undefined }),
         }),
         (authCode, profileData) => {
           // Operation log to track sequence
@@ -308,7 +306,6 @@ describe('OAuth Profile Sync Property Tests', () => {
           name: fc.string({ minLength: 3, maxLength: 50 }),
           given_name: fc.option(fc.string({ minLength: 2, maxLength: 30 }), { nil: undefined }),
           family_name: fc.option(fc.string({ minLength: 2, maxLength: 30 }), { nil: undefined }),
-          picture: fc.option(fc.webUrl(), { nil: undefined }),
         }),
         (authCode, profileData) => {
           // Simulate full flow
@@ -335,9 +332,6 @@ describe('OAuth Profile Sync Property Tests', () => {
           }
           if (profileData.family_name !== undefined) {
             expect(profile.family_name).toBe(profileData.family_name);
-          }
-          if (profileData.picture !== undefined) {
-            expect(profile.picture).toBe(profileData.picture);
           }
 
           // Property 3: lastUpdated must be set

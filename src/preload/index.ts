@@ -233,19 +233,18 @@ const api: API = {
     },
 
     /**
-     * Listen for logout events
+     * Listen for logout events via EventBus
      * Requirements: account-profile.1.8
      * @param {Function} callback - Callback function to execute on logout
      * @returns {Function} Unsubscribe function to remove the listener
      */
     onLogout(callback: () => void): () => void {
-      const listener = () => {
-        callback();
-      };
-      ipcRenderer.on('auth:logout-complete', listener);
-      return () => {
-        ipcRenderer.removeListener('auth:logout-complete', listener);
-      };
+      // Use the events API to listen for user.logout events
+      return api.events!.onEvent((type: string) => {
+        if (type === 'user.logout') {
+          callback();
+        }
+      });
     },
 
     /**

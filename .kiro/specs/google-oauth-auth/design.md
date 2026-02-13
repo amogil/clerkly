@@ -155,7 +155,7 @@ User                    Renderer Process         Main Process          Google OA
  │                            │                        │ 5. Delete tokens     │
  │                            │                        │    from SQLite       │
  │                            │                        │                      │
- │                            │ 6. Event: auth:logout-complete                │
+ │                            │ 6. Event: user.logout (EventBus)            │
  │                            │◀───────────────────────│                      │
  │                            │                        │                      │
  │                            │ 7. Update state:       │                      │

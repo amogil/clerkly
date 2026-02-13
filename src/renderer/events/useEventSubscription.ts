@@ -11,6 +11,7 @@ import {
   EventPayload,
   EventHandler,
   WildcardEventHandler,
+  TypedEventClass,
 } from '../../shared/events/types';
 
 /**
@@ -111,13 +112,13 @@ export function useEventSubscriptionAll(callback: WildcardEventHandler): void {
 
 /**
  * Hook for publishing events
- * Returns a memoized publish function
+ * Returns a memoized publish function that accepts TypedEventClass instances
  *
  * @returns publish function
  */
 export function useEventPublish() {
-  return useCallback(<T extends EventType>(type: T, payload: EventPayload<T>) => {
+  return useCallback(<T extends EventType>(event: TypedEventClass<T>) => {
     const eventBus = RendererEventBus.getInstance();
-    eventBus.publish(type, payload);
+    eventBus.publish(event);
   }, []);
 }

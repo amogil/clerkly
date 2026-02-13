@@ -14,7 +14,7 @@ import {
   useEventPublish,
 } from '../../../src/renderer/events/useEventSubscription';
 import { RendererEventBus } from '../../../src/renderer/events/RendererEventBus';
-import { AgentCreatedPayload } from '../../../src/shared/events/types';
+import { AgentCreatedEvent, AgentCreatedPayload } from '../../../src/shared/events/types';
 
 // Mock RendererEventBus
 jest.mock('../../../src/renderer/events/RendererEventBus', () => {
@@ -314,22 +314,24 @@ describe('useEventSubscription hooks', () => {
     });
 
     /* Preconditions: Component is mounted
-       Action: Call publish function
-       Assertions: EventBus.publish is called
+       Action: Call publish function with typed event
+       Assertions: EventBus.publish is called with the event
        Requirements: realtime-events.7 */
-    it('should call EventBus.publish when invoked', () => {
+    it('should call EventBus.publish when invoked with typed event', () => {
       const { result } = renderHook(() => useEventPublish());
 
-      const payload: AgentCreatedPayload = {
-        timestamp: Date.now(),
-        data: { id: 'agent-1', name: 'Test', createdAt: Date.now(), updatedAt: Date.now() },
-      };
-
-      act(() => {
-        result.current('agent.created', payload);
+      const event = new AgentCreatedEvent({
+        id: 'agent-1',
+        name: 'Test',
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
       });
 
-      expect(mockPublish).toHaveBeenCalledWith('agent.created', payload);
+      act(() => {
+        result.current(event);
+      });
+
+      expect(mockPublish).toHaveBeenCalledWith(event);
     });
 
     /* Preconditions: Component is mounted

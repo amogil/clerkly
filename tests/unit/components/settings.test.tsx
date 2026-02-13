@@ -52,6 +52,7 @@ jest.mock('../../../src/renderer/contexts/error-context', () => ({
 jest.mock('../../../src/renderer/Logger', () => ({
   Logger: {
     create: () => ({
+      debug: jest.fn(),
       info: jest.fn(),
       warn: jest.fn(),
       error: jest.fn(),

@@ -1,7 +1,8 @@
 // Requirements: error-notifications.1.1, error-notifications.1.4, error-notifications.1.5
 
-import { BrowserWindow } from 'electron';
 import { Logger } from './Logger';
+import { MainEventBus } from './events/MainEventBus';
+import { ErrorCreatedEvent } from '../shared/events/types';
 
 // Requirements: clerkly.3.5, clerkly.3.7 - Create parameterized logger for ErrorHandler module
 const logger = Logger.create('ErrorHandler');
@@ -19,14 +20,6 @@ const logger = Logger.create('ErrorHandler');
  * @param error Error object or error message
  * @param context Context of the operation that failed
  * @returns true if error should be filtered (not shown), false otherwise
- *
- * @example
- * ```typescript
- * if (shouldFilterError(error, 'Logout')) {
- *   logger.info('Error filtered (race condition)');
- *   return;
- * }
- * ```
  */
 export function shouldFilterError(error: unknown, context: string): boolean {
   const errorMessage =
@@ -53,44 +46,35 @@ export function shouldFilterError(error: unknown, context: string): boolean {
 
 // Requirements: clerkly.3.8 - Use centralized Logger instead of console.*
 /**
- * Handle background errors and notify renderer processes
+ * Handle background errors and notify renderer processes via EventBus
  * Requirements: error-notifications.1.1, error-notifications.1.4, error-notifications.1.5
  *
  * This function provides centralized error handling for background processes.
- * It logs errors to console with context and sends notifications to all renderer processes.
+ * It logs errors to console with context and publishes error.created event
+ * which is broadcast to all renderer processes via EventBus.
  * Race condition errors are filtered and logged but not shown to users.
  *
  * @param error Error object or error message
  * @param context Context of the operation that failed (e.g., "Profile Fetch", "Token Refresh")
- *
- * @example
- * ```typescript
- * try {
- *   await fetchProfile();
- * } catch (error) {
- *   handleBackgroundError(error, 'Profile Fetch');
- * }
- * ```
  */
 export function handleBackgroundError(error: unknown, context: string): void {
   // Requirements: error-notifications.1.4 - Log error to console with context
   const errorMessage = error instanceof Error ? error.message : String(error);
-  logger.error(`[${context}] Error: ${errorMessage}`);
+  logger.error('[' + context + '] Error: ' + errorMessage);
 
   // Log stack trace if available for debugging
   if (error instanceof Error && error.stack) {
-    logger.error(`[${context}] Stack trace: ${error.stack}`);
+    logger.error('[' + context + '] Stack trace: ' + error.stack);
   }
 
   // Requirements: error-notifications.1.5 - Filter race condition errors
   if (shouldFilterError(error, context)) {
-    logger.info(`[${context}] Error filtered (race condition), not showing notification`);
+    logger.info('[' + context + '] Error filtered (race condition), not showing notification');
     return;
   }
 
-  // Requirements: error-notifications.1.1 - Send error notification to all renderer processes
-  const windows = BrowserWindow.getAllWindows();
-  windows.forEach((window) => {
-    window.webContents.send('error:notify', errorMessage, context);
-  });
+  // Requirements: error-notifications.1.1 - Publish error.created event via EventBus
+  // EventBus automatically broadcasts to all renderer processes
+  const eventBus = MainEventBus.getInstance();
+  eventBus.publish(new ErrorCreatedEvent(errorMessage, context));
 }

@@ -1,10 +1,11 @@
 // Requirements: token-management-ui.1.1, token-management-ui.1.2, token-management-ui.1.3, token-management-ui.1.4, token-management-ui.1.5, token-management-ui.1.6, error-notifications.1.1, error-notifications.1.4
 
 import { TokenStorageManager } from './TokenStorageManager';
-import { BrowserWindow } from 'electron';
 import { DateTimeFormatter } from '../utils/DateTimeFormatter';
 import { Logger } from '../Logger';
 import { handleBackgroundError } from '../ErrorHandler';
+import { MainEventBus } from '../events/MainEventBus';
+import { AuthFailedEvent } from '../../shared/events/types';
 
 // Requirements: clerkly.3.5, clerkly.3.7 - Create parameterized logger for APIRequestHandler module
 const logger = Logger.create('APIRequestHandler');
@@ -118,23 +119,10 @@ export async function handleAPIRequest(
           logger.info('Clearing all tokens due to 401 error');
           await tokenStorage.deleteTokens();
 
-          // Requirements: token-management-ui.1.3 - Emit auth error event to show LoginError component
+          // Requirements: token-management-ui.1.3 - Emit auth.failed event via EventBus
           // The event will be handled by the renderer process to show LoginError with errorCode 'invalid_grant'
-          const allWindows = BrowserWindow.getAllWindows();
-          logger.info(`Total windows: ${allWindows.length}`);
-          const mainWindow = allWindows[0];
-          logger.info(`Main window found: ${!!mainWindow}`);
-          if (mainWindow) {
-            logger.info(`Main window ID: ${mainWindow.id}`);
-            logger.info('Sending auth:error event to renderer');
-            mainWindow.webContents.send('auth:error', {
-              error: 'Session expired',
-              errorCode: 'invalid_grant',
-            });
-            logger.info('auth:error event sent successfully');
-          } else {
-            logger.error('No main window found, cannot send auth:error event');
-          }
+          const eventBus = MainEventBus.getInstance();
+          eventBus.publish(new AuthFailedEvent('Session expired', 'invalid_grant'));
         } finally {
           // Reset flag after a short delay to allow other requests to see the cleared state
           setTimeout(() => {

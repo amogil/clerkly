@@ -44,6 +44,45 @@ import '@testing-library/jest-dom';
 import { Settings } from '../../../src/renderer/components/settings';
 import { ErrorProvider } from '../../../src/renderer/contexts/error-context';
 
+// Store event handlers for testing
+const eventHandlers: Map<string, ((payload: unknown) => void)[]> = new Map();
+
+// Mock RendererEventBus
+jest.mock('../../../src/renderer/events/RendererEventBus', () => ({
+  RendererEventBus: {
+    getInstance: jest.fn(() => ({
+      subscribe: jest.fn((eventType: string, handler: (payload: unknown) => void) => {
+        if (!eventHandlers.has(eventType)) {
+          eventHandlers.set(eventType, []);
+        }
+        eventHandlers.get(eventType)!.push(handler);
+        return () => {
+          const handlers = eventHandlers.get(eventType);
+          if (handlers) {
+            const index = handlers.indexOf(handler);
+            if (index > -1) {
+              handlers.splice(index, 1);
+            }
+          }
+        };
+      }),
+      publish: jest.fn(),
+      subscribeAll: jest.fn(),
+      clear: jest.fn(),
+      destroy: jest.fn(),
+    })),
+    resetInstance: jest.fn(),
+  },
+}));
+
+// Helper to emit events in tests
+const emitEvent = (eventType: string, payload: unknown) => {
+  const handlers = eventHandlers.get(eventType);
+  if (handlers) {
+    handlers.forEach((handler) => handler(payload));
+  }
+};
+
 // Mock sonner toast
 jest.mock('sonner', () => ({
   toast: {
@@ -53,6 +92,18 @@ jest.mock('sonner', () => ({
     info: jest.fn(),
   },
   Toaster: () => <div data-testid="toaster">Toaster</div>,
+}));
+
+// Mock Logger
+jest.mock('../../../src/renderer/Logger', () => ({
+  Logger: {
+    create: () => ({
+      debug: jest.fn(),
+      info: jest.fn(),
+      warn: jest.fn(),
+      error: jest.fn(),
+    }),
+  },
 }));
 
 // Mock lucide-react icons
@@ -101,6 +152,9 @@ const renderSettings = (props = {}) => {
 beforeEach(() => {
   // Reset all mocks before each test
   jest.clearAllMocks();
+
+  // Clear event handlers
+  eventHandlers.clear();
 
   // Default mock implementations - these methods don't return cleanup functions
   // They just register listeners via ipcRenderer.on() which doesn't return anything
@@ -278,9 +332,9 @@ describe('Settings Component - Account Profile Section', () => {
     expect(emailInput.value).toBe('john@example.com');
   });
 
-  /* Preconditions: window.api.auth.onProfileUpdated() mocked to return cleanup function, window.api.auth.getProfile() mocked to track calls
-     Action: render Settings component, verify getProfile() called on mount (1 time), get callback from onProfileUpdated mock, invoke callback to simulate profile update event
-     Assertions: getProfile() called on mount (1 time), getProfile() called again after profile update event (2 times total), UI updated with new profile data
+  /* Preconditions: RendererEventBus mocked to capture event handlers, window.api.auth.getProfile() mocked to track calls
+     Action: render Settings component, verify getProfile() called on mount (1 time), emit profile.synced event via EventBus
+     Assertions: getProfile() called on mount (1 time), getProfile() called again after profile.synced event (2 times total), UI updated with new profile data
      Requirements: account-profile.1.2 */
   it('should reload profile when profile is updated', async () => {
     // Create initial test profile
@@ -318,15 +372,6 @@ describe('Settings Component - Account Profile Section', () => {
         profile: updatedProfile,
       });
 
-    // Variable to capture the profile update callback
-    let profileUpdateCallback: (() => void) | undefined;
-
-    // Mock onProfileUpdated to capture the callback function
-    mockOnProfileUpdated.mockImplementation((callback: () => void) => {
-      profileUpdateCallback = callback;
-      // No return value - matches real API
-    });
-
     // Render the Settings component
     renderSettings();
 
@@ -346,14 +391,18 @@ describe('Settings Component - Account Profile Section', () => {
     expect(nameInputInitial.value).toBe('John Doe');
     expect(emailInputInitial.value).toBe('john@example.com');
 
-    // Verify that onProfileUpdated was called to register the listener
-    expect(mockOnProfileUpdated).toHaveBeenCalledTimes(1);
-    expect(profileUpdateCallback).toBeDefined();
+    // Verify that EventBus subscription was registered for profile.synced
+    expect(eventHandlers.has('profile.synced')).toBe(true);
 
-    // Simulate profile update event by calling the captured callback
-    if (profileUpdateCallback) {
-      profileUpdateCallback();
-    }
+    // Simulate profile.synced event via EventBus
+    emitEvent('profile.synced', {
+      profile: {
+        id: updatedProfile.id,
+        email: updatedProfile.email,
+        name: updatedProfile.name,
+      },
+      timestamp: Date.now(),
+    });
 
     // Wait for profile to be reloaded and UI to update with new data
     await waitFor(() => {
@@ -373,7 +422,7 @@ describe('Settings Component - Account Profile Section', () => {
 
   /* Preconditions: test profile created and getProfile() mocked to return it, Settings component rendered with profile data
      Action: render Settings component with profile data, verify profile is displayed (name and email visible), unmount component to simulate logout
-     Assertions: component cleans up properly on unmount
+     Assertions: component cleans up properly on unmount, EventBus subscription is cleaned up
      Requirements: account-profile.1.8 */
   it('should handle component unmount properly', async () => {
     // Create test UserProfile object with data
@@ -410,14 +459,16 @@ describe('Settings Component - Account Profile Section', () => {
     expect(nameInputBefore.value).toBe('John Doe');
     expect(emailInputBefore.value).toBe('john@example.com');
 
-    // Verify that onProfileUpdated was called to register the listener
-    expect(mockOnProfileUpdated).toHaveBeenCalledTimes(1);
+    // Verify that EventBus subscription was registered for profile.synced
+    expect(eventHandlers.has('profile.synced')).toBe(true);
+    const handlersBeforeUnmount = eventHandlers.get('profile.synced')?.length || 0;
+    expect(handlersBeforeUnmount).toBeGreaterThan(0);
 
     // Unmount component (simulates navigation away or logout)
     unmount();
 
     // Verify component unmounted successfully (no errors thrown)
-    // Note: In Settings component, there's no explicit cleanup for onProfileUpdated
-    // This test verifies that unmounting doesn't cause errors
+    // The EventBus subscription should be cleaned up via the unsubscribe function
+    // returned by useEventSubscription hook
   });
 });

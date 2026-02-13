@@ -14,6 +14,7 @@ import {
   Unsubscribe,
   PublishOptions,
   getEventKey,
+  TypedEventClass,
 } from '../../shared/events/types';
 import { Logger } from '../Logger';
 
@@ -79,36 +80,46 @@ export class RendererEventBus {
   }
 
   /**
-   * Publish an event
+   * Publish an event (timestamp is added automatically)
+   * Only accepts TypedEventClass instances
    * Requirements: realtime-events.1.3, realtime-events.4.2
+   *
+   * @example
+   * eventBus.publish(new AuthSucceededEvent('user-123'));
+   * eventBus.publish(new ProfileSyncedEvent({ id: '1', email: 'test@example.com' }));
    */
-  public publish<T extends EventType>(
-    type: T,
-    payload: EventPayload<T>,
-    options?: PublishOptions
-  ): void {
-    const eventKey = getEventKey(type, payload);
+  public publish<T extends EventType>(event: TypedEventClass<T>, options?: PublishOptions): void {
+    const type = event.type as T;
+    const eventPayload = event.toPayload();
+
+    // Add timestamp automatically
+    const payloadWithTimestamp = {
+      ...eventPayload,
+      timestamp: Date.now(),
+    } as EventPayload<T>;
+
+    const eventKey = getEventKey(type, payloadWithTimestamp);
 
     // Timestamp-based deduplication
     // Requirements: realtime-events.5.5
     const lastTimestamp = this.lastEventTimestamps.get(eventKey);
-    if (lastTimestamp !== undefined && payload.timestamp <= lastTimestamp) {
+    if (lastTimestamp !== undefined && payloadWithTimestamp.timestamp <= lastTimestamp) {
       this.logger.debug(
-        `Ignoring outdated event: ${type} (${payload.timestamp} <= ${lastTimestamp})`
+        `Ignoring outdated event: ${type} (${payloadWithTimestamp.timestamp} <= ${lastTimestamp})`
       );
       return;
     }
-    this.lastEventTimestamps.set(eventKey, payload.timestamp);
+    this.lastEventTimestamps.set(eventKey, payloadWithTimestamp.timestamp);
 
     this.logger.debug(`Publishing event: ${type}`);
 
     // Emit locally with error isolation
-    this.deliverLocally(type, payload);
+    this.deliverLocally(type, payloadWithTimestamp);
 
     // Send to main process unless localOnly
     // Requirements: realtime-events.4.2
     if (!options?.localOnly) {
-      this.sendToMain(type, payload);
+      this.sendToMain(type, payloadWithTimestamp);
     }
   }
 

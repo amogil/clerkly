@@ -1,7 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Cpu, Eye, EyeOff, User, LogOut, AlertCircle } from 'lucide-react';
 import { Logger } from '../Logger';
 import { useError } from '../contexts/error-context';
+import { useEventSubscription } from '../events/useEventSubscription';
+import type { ProfileSyncedPayload } from '../../shared/events/types';
 
 // Requirements: clerkly.3.5, clerkly.3.7
 const logger = Logger.create('Settings');
@@ -30,50 +32,49 @@ export function Settings({ onSignOut, onNavigate }: SettingsProps) {
   // Track if this is the first render to avoid saving on initial mount
   const isFirstRender = useRef(true);
 
-  // Load profile data on mount
-  useEffect(() => {
-    const loadProfile = async () => {
-      try {
-        const result = await window.api.auth.getProfile();
-        if (result.success && result.profile) {
-          setProfile({
-            name: result.profile.name || '',
-            email: result.profile.email || '',
-            loading: false,
-          });
-        } else {
-          setProfile({
-            name: '',
-            email: '',
-            loading: false,
-          });
-        }
-      } catch (error) {
-        logger.error(`Failed to load profile: ${error}`);
+  // Load profile data
+  const loadProfile = useCallback(async () => {
+    try {
+      const result = await window.api.auth.getProfile();
+      if (result.success && result.profile) {
+        setProfile({
+          name: result.profile.name || '',
+          email: result.profile.email || '',
+          loading: false,
+        });
+      } else {
         setProfile({
           name: '',
           email: '',
           loading: false,
         });
       }
-    };
-
-    loadProfile();
-
-    // Listen for profile updates
-    const handleProfileUpdate = () => {
-      logger.info('Profile updated, reloading...');
-      loadProfile();
-    };
-
-    window.api.auth.onProfileUpdated(handleProfileUpdate);
-
-    // Cleanup
-    return () => {
-      // Note: There's no removeListener for onProfileUpdated in the current API
-      // If needed, this should be added to the preload API
-    };
+    } catch (error) {
+      logger.error(`Failed to load profile: ${error}`);
+      setProfile({
+        name: '',
+        email: '',
+        loading: false,
+      });
+    }
   }, []);
+
+  // Load profile data on mount
+  useEffect(() => {
+    loadProfile();
+  }, [loadProfile]);
+
+  // Listen for profile.synced events via EventBus
+  const handleProfileSynced = useCallback(
+    (payload: ProfileSyncedPayload) => {
+      logger.info(`Profile synced event received: ${JSON.stringify(payload)}`);
+      // Reload profile from database to get full data
+      loadProfile();
+    },
+    [loadProfile]
+  );
+
+  useEventSubscription('profile.synced', handleProfileSynced);
 
   // Requirements: settings.1.20, settings.1.21 - Load AI Agent settings on mount
   useEffect(() => {

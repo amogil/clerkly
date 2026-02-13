@@ -34,7 +34,6 @@ describe('UserProfileManager', () => {
     given_name: 'Test',
     family_name: 'User',
     locale: 'en',
-    picture: 'https://example.com/photo.jpg',
   };
 
   beforeEach(() => {

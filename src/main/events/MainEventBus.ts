@@ -10,12 +10,14 @@ import {
   ClerklyEvents,
   EventType,
   EventPayload,
+  EventPayloadWithoutTimestamp,
   EventHandler,
   WildcardEventHandler,
   Unsubscribe,
   PublishOptions,
   BaseEvent,
   getEventKey,
+  TypedEventClass,
 } from '../../shared/events/types';
 import { IPC_CHANNELS, EVENT_CONFIG } from '../../shared/events/constants';
 import { Logger } from '../Logger';
@@ -72,19 +74,47 @@ export class MainEventBus {
   }
 
   /**
-   * Publish an event
+   * Publish an event (timestamp is added automatically)
+   * Only accepts TypedEventClass instances
    * Requirements: realtime-events.1.3, realtime-events.5.5, realtime-events.6.3
+   *
+   * @example
+   * eventBus.publish(new AuthSucceededEvent('user-123'));
+   * eventBus.publish(new ProfileSyncedEvent({ id: '1', email: 'test@example.com' }));
    */
-  public publish<T extends EventType>(
-    type: T,
-    payload: EventPayload<T>,
-    options?: PublishOptions
-  ): void {
-    const eventKey = getEventKey(type, payload);
+  public publish<T extends EventType>(event: TypedEventClass<T>, options?: PublishOptions): void {
+    const type = event.type as T;
+    const eventPayload = event.toPayload() as EventPayloadWithoutTimestamp<T>;
+
+    // Add timestamp automatically
+    const payloadWithTimestamp = {
+      ...eventPayload,
+      timestamp: Date.now(),
+    } as EventPayload<T>;
+
+    const eventKey = getEventKey(type, payloadWithTimestamp);
 
     // Add to batch for same-tick batching
     // Requirements: realtime-events.6.3
-    this.pendingBatch.set(eventKey, { type, payload, options });
+    this.pendingBatch.set(eventKey, { type, payload: payloadWithTimestamp, options });
+
+    if (!this.batchScheduled) {
+      this.batchScheduled = true;
+      queueMicrotask(() => this.flushBatch());
+    }
+  }
+
+  /**
+   * Deliver event received from renderer via IPC
+   * Used when receiving events that already have timestamp
+   * Delivers locally only (no broadcast back to renderer)
+   * Requirements: realtime-events.4.3
+   */
+  public deliverFromIPC<T extends EventType>(type: T, payload: EventPayload<T>): void {
+    const eventKey = getEventKey(type, payload);
+
+    // Add to batch for same-tick batching, always localOnly
+    this.pendingBatch.set(eventKey, { type, payload, options: { localOnly: true } });
 
     if (!this.batchScheduled) {
       this.batchScheduled = true;

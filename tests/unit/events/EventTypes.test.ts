@@ -122,13 +122,13 @@ describe('EventTypes', () => {
         id: 'user-789',
         changedFields: {
           name: 'New Name',
-          picture: 'https://example.com/avatar.jpg',
+          email: 'new@example.com',
         },
       };
 
       expect(event.id).toBe('user-789');
       expect(event.changedFields.name).toBe('New Name');
-      expect(event.changedFields.picture).toBe('https://example.com/avatar.jpg');
+      expect(event.changedFields.email).toBe('new@example.com');
       expect(event.timestamp).toBeGreaterThan(0);
     });
   });

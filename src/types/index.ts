@@ -257,11 +257,6 @@ export interface UserProfile {
   locale: string;
 
   /**
-   * URL to user's profile picture (optional)
-   */
-  picture?: string;
-
-  /**
    * Unix timestamp of when the profile was last updated
    * Used for tracking profile freshness
    */

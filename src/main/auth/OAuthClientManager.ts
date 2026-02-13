@@ -6,6 +6,8 @@ import { OAuthConfig, PKCEParams, TokenResponse, TokenData, AuthStatus } from '.
 import { TokenStorageManager } from './TokenStorageManager';
 import { handleBackgroundError } from '../ErrorHandler';
 import { Logger } from '../Logger';
+import { MainEventBus } from '../events/MainEventBus';
+import { AuthSucceededEvent, AuthFailedEvent, ProfileSyncedEvent } from '../../shared/events/types';
 
 // Requirements: clerkly.3.8 - Use centralized Logger instead of console.*
 /**
@@ -206,11 +208,8 @@ export class OAuthClientManager {
         };
       }
 
-      // Requirements: google-oauth-auth.7.1 - Show loader during token exchange and profile fetch
-      if (this.authWindowManager) {
-        Logger.info('OAuthClientManager', 'Showing loader for token exchange and profile fetch');
-        this.authWindowManager.onShowLoader();
-      }
+      // Requirements: google-oauth-auth.7.1 - Loader is now managed by renderer based on events
+      // No need to call onShowLoader here - renderer shows loader on button click
 
       // Exchange code for tokens
       const tokenResponse = await this.exchangeCodeForTokens(code, this.pkceStorage.codeVerifier);
@@ -245,10 +244,9 @@ export class OAuthClientManager {
         if (!profileResult.success) {
           // Requirements: google-oauth-auth.3.7 - Profile fetch failed, don't save tokens
           Logger.error('OAuthClientManager', 'Profile fetch failed, authorization incomplete');
-          // Requirements: google-oauth-auth.7.1 - Hide loader on error
-          if (this.authWindowManager) {
-            this.authWindowManager.onHideLoader();
-          }
+          // Publish auth.failed event
+          const eventBus = MainEventBus.getInstance();
+          eventBus.publish(new AuthFailedEvent('Profile fetch failed', 'profile_fetch_failed'));
           // Clear PKCE storage
           this.pkceStorage = null;
           return {
@@ -263,9 +261,16 @@ export class OAuthClientManager {
         // Now save tokens to database (profile manager has email set)
         await this.tokenStorage.saveTokens(tokenData);
 
-        // Requirements: google-oauth-auth.7.1 - Hide loader on success
-        if (this.authWindowManager) {
-          this.authWindowManager.onHideLoader();
+        // Publish auth.succeeded event - renderer will show loader until profile.synced
+        const eventBus = MainEventBus.getInstance();
+        const profileId = profileResult.profile?.id;
+        if (profileId) {
+          eventBus.publish(new AuthSucceededEvent(profileId));
+        }
+
+        // Publish profile.synced event - renderer will navigate to agents
+        if (profileResult.profile) {
+          eventBus.publish(new ProfileSyncedEvent(profileResult.profile));
         }
       } else {
         Logger.warn('OAuthClientManager', 'Profile manager not set, saving tokens without profile');
@@ -283,11 +288,11 @@ export class OAuthClientManager {
       // Requirements: error-notifications.1.1, error-notifications.1.4
       handleBackgroundError(error, 'OAuth Flow');
 
-      // Requirements: google-oauth-auth.7.1 - Hide loader on error
-      if (this.authWindowManager) {
-        this.authWindowManager.onHideLoader();
-      }
+      // Publish auth.failed event
+      const eventBus = MainEventBus.getInstance();
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      eventBus.publish(new AuthFailedEvent(errorMessage || 'unknown_error', 'oauth_error'));
+
       return {
         authorized: false,
         error: errorMessage || 'unknown_error',

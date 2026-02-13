@@ -5,9 +5,9 @@
 
 import { RendererEventBus } from '../../../src/renderer/events/RendererEventBus';
 import {
-  AgentCreatedPayload,
-  AgentUpdatedPayload,
-  AgentDeletedPayload,
+  AgentCreatedEvent,
+  AgentUpdatedEvent,
+  AgentDeletedEvent,
 } from '../../../src/shared/events/types';
 
 // Mock Logger
@@ -80,40 +80,50 @@ describe('RendererEventBus', () => {
 
   describe('publish and subscribe', () => {
     /* Preconditions: EventBus instance exists
-       Action: Publish event with type and payload
-       Assertions: Event is delivered to subscriber
+       Action: Publish event with typed event class
+       Assertions: Event is delivered to subscriber with auto-added timestamp
        Requirements: realtime-events.1.3 */
-    it('should publish event with type and payload', () => {
+    it('should publish event with typed event class', () => {
       const bus = RendererEventBus.getInstance();
       const handler = jest.fn();
-      const payload: AgentCreatedPayload = {
-        timestamp: Date.now(),
-        data: { id: 'agent-1', name: 'Test Agent', createdAt: Date.now(), updatedAt: Date.now() },
-      };
+      const now = Date.now();
 
       bus.subscribe('agent.created', handler);
-      bus.publish('agent.created', payload);
+      bus.publish(
+        new AgentCreatedEvent({ id: 'agent-1', name: 'Test Agent', createdAt: now, updatedAt: now })
+      );
 
-      expect(handler).toHaveBeenCalledWith(payload);
+      expect(handler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: { id: 'agent-1', name: 'Test Agent', createdAt: now, updatedAt: now },
+          timestamp: expect.any(Number),
+        })
+      );
     });
 
     /* Preconditions: EventBus instance exists
-       Action: Publish event
-       Assertions: Event payload includes timestamp
+       Action: Publish event without timestamp
+       Assertions: Event payload includes auto-added timestamp
        Requirements: realtime-events.3.6 */
-    it('should include timestamp in event', () => {
+    it('should auto-add timestamp to event', () => {
       const bus = RendererEventBus.getInstance();
       const handler = jest.fn();
-      const timestamp = Date.now();
-      const payload: AgentCreatedPayload = {
-        timestamp,
-        data: { id: 'agent-1', name: 'Test', createdAt: timestamp, updatedAt: timestamp },
-      };
+      const now = Date.now();
 
       bus.subscribe('agent.created', handler);
-      bus.publish('agent.created', payload);
+      bus.publish(
+        new AgentCreatedEvent({ id: 'agent-1', name: 'Test', createdAt: now, updatedAt: now })
+      );
 
-      expect(handler).toHaveBeenCalledWith(expect.objectContaining({ timestamp }));
+      expect(handler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          timestamp: expect.any(Number),
+        })
+      );
+      // Timestamp should be recent
+      const receivedTimestamp = handler.mock.calls[0][0].timestamp;
+      expect(receivedTimestamp).toBeGreaterThanOrEqual(now);
+      expect(receivedTimestamp).toBeLessThanOrEqual(now + 1000);
     });
 
     /* Preconditions: EventBus instance exists with subscriber
@@ -123,13 +133,12 @@ describe('RendererEventBus', () => {
     it('should deliver event locally within same process', () => {
       const bus = RendererEventBus.getInstance();
       const handler = jest.fn();
-      const payload: AgentCreatedPayload = {
-        timestamp: Date.now(),
-        data: { id: 'agent-1', name: 'Test', createdAt: Date.now(), updatedAt: Date.now() },
-      };
+      const now = Date.now();
 
       bus.subscribe('agent.created', handler);
-      bus.publish('agent.created', payload);
+      bus.publish(
+        new AgentCreatedEvent({ id: 'agent-1', name: 'Test', createdAt: now, updatedAt: now })
+      );
 
       expect(handler).toHaveBeenCalledTimes(1);
     });
@@ -144,14 +153,15 @@ describe('RendererEventBus', () => {
 
       bus.subscribe('agent.updated', handler);
 
-      const payload: AgentUpdatedPayload = {
-        timestamp: Date.now(),
-        id: 'agent-1',
-        changedFields: { name: 'Updated Name' },
-      };
-      bus.publish('agent.updated', payload);
+      bus.publish(new AgentUpdatedEvent('agent-1', { name: 'Updated Name' }));
 
-      expect(handler).toHaveBeenCalledWith(payload);
+      expect(handler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: 'agent-1',
+          changedFields: { name: 'Updated Name' },
+          timestamp: expect.any(Number),
+        })
+      );
     });
   });
 
@@ -163,24 +173,28 @@ describe('RendererEventBus', () => {
     it('should support wildcard subscription', () => {
       const bus = RendererEventBus.getInstance();
       const handler = jest.fn();
+      const now = Date.now();
 
       bus.subscribeAll(handler);
 
-      const payload1: AgentCreatedPayload = {
-        timestamp: Date.now(),
-        data: { id: 'agent-1', name: 'Test', createdAt: Date.now(), updatedAt: Date.now() },
-      };
-      const payload2: AgentDeletedPayload = {
-        timestamp: Date.now() + 1,
-        id: 'agent-2',
-      };
-
-      bus.publish('agent.created', payload1);
-      bus.publish('agent.deleted', payload2);
+      bus.publish(
+        new AgentCreatedEvent({ id: 'agent-1', name: 'Test', createdAt: now, updatedAt: now })
+      );
+      bus.publish(new AgentDeletedEvent('agent-2'));
 
       expect(handler).toHaveBeenCalledTimes(2);
-      expect(handler).toHaveBeenCalledWith('agent.created', payload1);
-      expect(handler).toHaveBeenCalledWith('agent.deleted', payload2);
+      expect(handler).toHaveBeenCalledWith(
+        'agent.created',
+        expect.objectContaining({
+          data: { id: 'agent-1', name: 'Test', createdAt: now, updatedAt: now },
+        })
+      );
+      expect(handler).toHaveBeenCalledWith(
+        'agent.deleted',
+        expect.objectContaining({
+          id: 'agent-2',
+        })
+      );
     });
   });
 
@@ -192,24 +206,21 @@ describe('RendererEventBus', () => {
     it('should return unsubscribe function', () => {
       const bus = RendererEventBus.getInstance();
       const handler = jest.fn();
+      const now = Date.now();
 
       const unsubscribe = bus.subscribe('agent.created', handler);
 
-      const payload: AgentCreatedPayload = {
-        timestamp: Date.now(),
-        data: { id: 'agent-1', name: 'Test', createdAt: Date.now(), updatedAt: Date.now() },
-      };
-      bus.publish('agent.created', payload);
+      bus.publish(
+        new AgentCreatedEvent({ id: 'agent-1', name: 'Test', createdAt: now, updatedAt: now })
+      );
 
       expect(handler).toHaveBeenCalledTimes(1);
 
       unsubscribe();
 
-      const payload2: AgentCreatedPayload = {
-        timestamp: Date.now() + 1000,
-        data: { id: 'agent-2', name: 'Test 2', createdAt: Date.now(), updatedAt: Date.now() },
-      };
-      bus.publish('agent.created', payload2);
+      bus.publish(
+        new AgentCreatedEvent({ id: 'agent-2', name: 'Test 2', createdAt: now, updatedAt: now })
+      );
 
       expect(handler).toHaveBeenCalledTimes(1);
     });
@@ -225,7 +236,7 @@ describe('RendererEventBus', () => {
       const unsubscribe = bus.subscribe('agent.deleted', handler);
       unsubscribe();
 
-      bus.publish('agent.deleted', { timestamp: Date.now(), id: 'agent-1' });
+      bus.publish(new AgentDeletedEvent('agent-1'));
 
       expect(handler).not.toHaveBeenCalled();
     });
@@ -242,15 +253,14 @@ describe('RendererEventBus', () => {
         throw new Error('Handler error');
       });
       const successHandler = jest.fn();
+      const now = Date.now();
 
       bus.subscribe('agent.created', errorHandler);
       bus.subscribe('agent.created', successHandler);
 
-      const payload: AgentCreatedPayload = {
-        timestamp: Date.now(),
-        data: { id: 'agent-1', name: 'Test', createdAt: Date.now(), updatedAt: Date.now() },
-      };
-      bus.publish('agent.created', payload);
+      bus.publish(
+        new AgentCreatedEvent({ id: 'agent-1', name: 'Test', createdAt: now, updatedAt: now })
+      );
 
       expect(errorHandler).toHaveBeenCalled();
       expect(successHandler).toHaveBeenCalled();
@@ -259,30 +269,16 @@ describe('RendererEventBus', () => {
 
   describe('timestamp deduplication', () => {
     /* Preconditions: EventBus instance exists
-       Action: Publish events with older timestamp
-       Assertions: Older events are ignored
+       Action: Publish event
+       Assertions: Event is delivered
        Requirements: realtime-events.5.5 */
-    it('should ignore outdated events based on timestamp', () => {
+    it('should deliver events with auto-timestamp', () => {
       const bus = RendererEventBus.getInstance();
       const handler = jest.fn();
 
       bus.subscribe('agent.updated', handler);
 
-      const now = Date.now();
-
-      // First event
-      bus.publish('agent.updated', {
-        timestamp: now + 1000,
-        id: 'agent-1',
-        changedFields: { name: 'New Name' },
-      });
-
-      // Older event (should be ignored)
-      bus.publish('agent.updated', {
-        timestamp: now,
-        id: 'agent-1',
-        changedFields: { name: 'Old Name' },
-      });
+      bus.publish(new AgentUpdatedEvent('agent-1', { name: 'New Name' }));
 
       expect(handler).toHaveBeenCalledTimes(1);
       expect(handler).toHaveBeenCalledWith(
@@ -304,18 +300,23 @@ describe('RendererEventBus', () => {
 
     /* Preconditions: EventBus instance exists
        Action: Publish event
-       Assertions: Event is sent to main via IPC
+       Assertions: Event is sent to main via IPC with auto-added timestamp
        Requirements: realtime-events.4.2 */
     it('should send events to main via IPC', () => {
       const bus = RendererEventBus.getInstance();
-      const payload: AgentCreatedPayload = {
-        timestamp: Date.now(),
-        data: { id: 'agent-1', name: 'Test', createdAt: Date.now(), updatedAt: Date.now() },
-      };
+      const now = Date.now();
 
-      bus.publish('agent.created', payload);
+      bus.publish(
+        new AgentCreatedEvent({ id: 'agent-1', name: 'Test', createdAt: now, updatedAt: now })
+      );
 
-      expect(mockSendEvent).toHaveBeenCalledWith('agent.created', payload);
+      expect(mockSendEvent).toHaveBeenCalledWith(
+        'agent.created',
+        expect.objectContaining({
+          data: { id: 'agent-1', name: 'Test', createdAt: now, updatedAt: now },
+          timestamp: expect.any(Number),
+        })
+      );
     });
 
     /* Preconditions: EventBus instance exists
@@ -336,13 +337,12 @@ describe('RendererEventBus', () => {
     it('should not send to main when localOnly is true', () => {
       const bus = RendererEventBus.getInstance();
       mockSendEvent.mockClear();
+      const now = Date.now();
 
-      const payload: AgentCreatedPayload = {
-        timestamp: Date.now(),
-        data: { id: 'agent-1', name: 'Test', createdAt: Date.now(), updatedAt: Date.now() },
-      };
-
-      bus.publish('agent.created', payload, { localOnly: true });
+      bus.publish(
+        new AgentCreatedEvent({ id: 'agent-1', name: 'Test', createdAt: now, updatedAt: now }),
+        { localOnly: true }
+      );
 
       expect(mockSendEvent).not.toHaveBeenCalled();
     });
@@ -354,14 +354,15 @@ describe('RendererEventBus', () => {
     it('should receive events from main and deliver locally', () => {
       const bus = RendererEventBus.getInstance();
       const handler = jest.fn();
+      const now = Date.now();
 
       bus.subscribe('agent.created', handler);
 
-      // Simulate receiving event from main
+      // Simulate receiving event from main (with timestamp already added)
       const ipcCallback = mockOnEvent.mock.calls[0][0];
-      const payload: AgentCreatedPayload = {
-        timestamp: Date.now(),
-        data: { id: 'agent-1', name: 'Test', createdAt: Date.now(), updatedAt: Date.now() },
+      const payload = {
+        timestamp: now,
+        data: { id: 'agent-1', name: 'Test', createdAt: now, updatedAt: now },
       };
 
       ipcCallback('agent.created', payload);
@@ -378,14 +379,14 @@ describe('RendererEventBus', () => {
     it('should cleanup subscriptions on clear()', () => {
       const bus = RendererEventBus.getInstance();
       const handler = jest.fn();
+      const now = Date.now();
 
       bus.subscribe('agent.created', handler);
       bus.clear();
 
-      bus.publish('agent.created', {
-        timestamp: Date.now(),
-        data: { id: 'agent-1', name: 'Test', createdAt: Date.now(), updatedAt: Date.now() },
-      });
+      bus.publish(
+        new AgentCreatedEvent({ id: 'agent-1', name: 'Test', createdAt: now, updatedAt: now })
+      );
 
       expect(handler).not.toHaveBeenCalled();
     });
@@ -402,14 +403,14 @@ describe('RendererEventBus', () => {
         throw new Error('Wildcard error');
       });
       const successHandler = jest.fn();
+      const now = Date.now();
 
       bus.subscribeAll(errorHandler);
       bus.subscribe('agent.created', successHandler);
 
-      bus.publish('agent.created', {
-        timestamp: Date.now(),
-        data: { id: 'agent-1', name: 'Test', createdAt: Date.now(), updatedAt: Date.now() },
-      });
+      bus.publish(
+        new AgentCreatedEvent({ id: 'agent-1', name: 'Test', createdAt: now, updatedAt: now })
+      );
 
       expect(errorHandler).toHaveBeenCalled();
       expect(successHandler).toHaveBeenCalled();
@@ -425,12 +426,12 @@ describe('RendererEventBus', () => {
       });
 
       const bus = RendererEventBus.getInstance();
+      const now = Date.now();
 
       expect(() => {
-        bus.publish('agent.created', {
-          timestamp: Date.now(),
-          data: { id: 'agent-1', name: 'Test', createdAt: Date.now(), updatedAt: Date.now() },
-        });
+        bus.publish(
+          new AgentCreatedEvent({ id: 'agent-1', name: 'Test', createdAt: now, updatedAt: now })
+        );
       }).not.toThrow();
     });
 
@@ -440,11 +441,11 @@ describe('RendererEventBus', () => {
        Requirements: realtime-events.1.6 */
     it('should clear timestamp cache on destroy', () => {
       const bus = RendererEventBus.getInstance();
+      const now = Date.now();
 
-      bus.publish('agent.created', {
-        timestamp: Date.now(),
-        data: { id: 'agent-1', name: 'Test', createdAt: Date.now(), updatedAt: Date.now() },
-      });
+      bus.publish(
+        new AgentCreatedEvent({ id: 'agent-1', name: 'Test', createdAt: now, updatedAt: now })
+      );
 
       expect(bus.getTimestampCacheSize()).toBeGreaterThan(0);
 

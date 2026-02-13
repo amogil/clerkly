@@ -316,7 +316,7 @@ Token Expiring → OAuthClientManager.refreshAccessToken() → Update Tokens in 
 1. КОГДА пользователь нажимает кнопку "Sign Out" в настройках, ТО приложение ДОЛЖНО вызвать метод logout через IPC
 2. КОГДА logout вызван, ТО "OAuth Client" ДОЛЖЕН отозвать токены через Google revoke endpoint
 3. КОГДА токены отозваны, ТО "Token Storage" ДОЛЖЕН удалить все токены из базы данных
-4. КОГДА токены удалены, ТО "Main Process" ДОЛЖЕН отправить событие "auth:logout-complete" в "Renderer Process"
+4. КОГДА токены удалены, ТО "Main Process" ДОЛЖЕН опубликовать событие "user.logout" через EventBus
 5. КОГДА "Renderer Process" получает событие logout, ТО приложение ДОЛЖНО обновить состояние авторизации на "не авторизован"
 6. КОГДА состояние обновлено, ТО приложение ДОЛЖНО показать "Login Screen" вместо главного интерфейса
 7. ЕСЛИ отзыв токенов через Google API не удается, ТО приложение ВСЕ РАВНО ДОЛЖНО удалить локальные токены и показать "Login Screen"

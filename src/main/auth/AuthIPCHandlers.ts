@@ -1,9 +1,17 @@
 // Requirements: google-oauth-auth.8.1, google-oauth-auth.8.2, google-oauth-auth.8.3, google-oauth-auth.8.4, google-oauth-auth.8.5, account-profile.1.2, account-profile.1.7
 
-import { ipcMain, IpcMainInvokeEvent, BrowserWindow } from 'electron';
+import { ipcMain, IpcMainInvokeEvent } from 'electron';
 import { OAuthClientManager } from './OAuthClientManager';
 import { UserProfileManager, UserProfile } from './UserProfileManager';
 import { Logger } from '../Logger';
+import { MainEventBus } from '../events/MainEventBus';
+import {
+  AuthSucceededEvent,
+  AuthFailedEvent,
+  ProfileSyncedEvent,
+  ErrorCreatedEvent,
+  UserLogoutEvent,
+} from '../../shared/events/types';
 
 // Requirements: clerkly.3.8 - Use centralized Logger instead of console.*
 /**
@@ -20,6 +28,7 @@ interface IPCResult {
 /**
  * Auth IPC Handlers
  * Manages IPC communication between renderer and main processes for OAuth authentication
+ * Uses EventBus for auth events (auth.succeeded, auth.failed, profile.synced)
  * Requirements: google-oauth-auth.8, account-profile.1.2, account-profile.1.7
  */
 export class AuthIPCHandlers {
@@ -144,8 +153,9 @@ export class AuthIPCHandlers {
       this.logger.info('Logging out');
       await this.oauthClient.logout();
 
-      // Send event to all renderer processes
-      this.sendAuthEvent('auth:logout-complete', { success: true });
+      // Publish user.logout event via EventBus
+      const eventBus = MainEventBus.getInstance();
+      eventBus.publish(new UserLogoutEvent());
 
       return {
         success: true,
@@ -198,7 +208,7 @@ export class AuthIPCHandlers {
 
   /**
    * Handle refresh profile request
-   * Fetches fresh profile data from Google API
+   * Fetches fresh profile data from Google API and publishes profile.synced event
    * Requirements: account-profile.1.5
    * @param event IPC event
    * @returns IPC result with fresh profile data or null
@@ -222,12 +232,11 @@ export class AuthIPCHandlers {
         `Profile refresh completed, result: ${profile ? 'success' : 'null'}`
       );
 
-      // Broadcast profile update event to all windows
+      // Publish profile.synced event via EventBus
       // Requirements: account-profile.1.5 - Notify UI about profile updates
-      const windows = BrowserWindow.getAllWindows();
-      windows.forEach((window) => {
-        window.webContents.send('auth:profile-updated', profile);
-      });
+      if (profile) {
+        this.publishProfileSynced(profile);
+      }
 
       return {
         success: true,
@@ -248,38 +257,40 @@ export class AuthIPCHandlers {
   }
 
   /**
-   * Send auth event to all renderer processes
+   * Publish auth.succeeded event via EventBus
+   * Called after successful OAuth flow and profile fetch
    * Requirements: google-oauth-auth.8.4
-   * @param channel Event channel
-   * @param data Event data
+   * @param userId User ID from profile (required)
    */
-  private sendAuthEvent(channel: string, data: Record<string, unknown>): void {
-    const windows = BrowserWindow.getAllWindows();
-    windows.forEach((window) => {
-      window.webContents.send(channel, data);
-    });
+  sendAuthSuccess(userId: string): void {
+    const eventBus = MainEventBus.getInstance();
+    eventBus.publish(new AuthSucceededEvent(userId));
   }
 
   /**
-   * Send auth success event to all renderer processes
-   * Requirements: google-oauth-auth.8.4
-   */
-  sendAuthSuccess(): void {
-    this.sendAuthEvent('auth:success', { authorized: true });
-  }
-
-  /**
-   * Send auth error event to all renderer processes
+   * Publish auth.failed event via EventBus
+   * Called when OAuth flow fails
    * Requirements: google-oauth-auth.8.4
    * @param error Error message
    * @param errorCode Error code
    */
   sendAuthError(error: string, errorCode?: string): void {
-    this.sendAuthEvent('auth:error', { error, errorCode });
+    const eventBus = MainEventBus.getInstance();
+    eventBus.publish(new AuthFailedEvent(error, errorCode));
   }
 
   /**
-   * Send error notification to all renderer processes
+   * Publish profile.synced event via EventBus
+   * Called when profile is fetched and saved
+   * @param profile User profile data
+   */
+  publishProfileSynced(profile: UserProfile): void {
+    const eventBus = MainEventBus.getInstance();
+    eventBus.publish(new ProfileSyncedEvent(profile));
+  }
+
+  /**
+   * Send error notification via EventBus
    * Requirements: error-notifications.1.1, error-notifications.1.4
    * @param message Error message
    * @param context Context of the operation that failed
@@ -288,10 +299,8 @@ export class AuthIPCHandlers {
     // Requirements: error-notifications.1.4 - Log to console
     this.logger.error(`[${context}] Error: ${message}`);
 
-    // Requirements: error-notifications.1.1 - Notify renderer
-    const windows = BrowserWindow.getAllWindows();
-    windows.forEach((window) => {
-      window.webContents.send('error:notify', message, context);
-    });
+    // Requirements: error-notifications.1.1 - Publish error.created event
+    const eventBus = MainEventBus.getInstance();
+    eventBus.publish(new ErrorCreatedEvent(message, context));
   }
 }

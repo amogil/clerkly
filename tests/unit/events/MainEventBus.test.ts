@@ -4,12 +4,12 @@
  */
 
 import { MainEventBus } from '../../../src/main/events/MainEventBus';
-import {
-  AgentCreatedPayload,
-  AgentUpdatedPayload,
-  AgentDeletedPayload,
-} from '../../../src/shared/events/types';
 import { IPC_CHANNELS } from '../../../src/shared/events/constants';
+import {
+  AgentCreatedEvent,
+  AgentUpdatedEvent,
+  AgentDeletedEvent,
+} from '../../../src/shared/events/types';
 
 // Mock Electron
 jest.mock('electron', () => ({
@@ -69,45 +69,55 @@ describe('MainEventBus', () => {
 
   describe('publish and subscribe', () => {
     /* Preconditions: EventBus instance exists
-       Action: Publish event with type and payload
-       Assertions: Event is delivered to subscriber
+       Action: Publish event with typed event class
+       Assertions: Event is delivered to subscriber with auto-added timestamp
        Requirements: realtime-events.1.3 */
-    it('should publish event with type and payload', async () => {
+    it('should publish event with typed event class', async () => {
       const bus = MainEventBus.getInstance();
       const handler = jest.fn();
-      const payload: AgentCreatedPayload = {
-        timestamp: Date.now(),
-        data: { id: 'agent-1', name: 'Test Agent', createdAt: Date.now(), updatedAt: Date.now() },
-      };
+      const now = Date.now();
 
       bus.subscribe('agent.created', handler);
-      bus.publish('agent.created', payload);
+      bus.publish(
+        new AgentCreatedEvent({ id: 'agent-1', name: 'Test Agent', createdAt: now, updatedAt: now })
+      );
 
       // Wait for microtask (batching)
       await Promise.resolve();
 
-      expect(handler).toHaveBeenCalledWith(payload);
+      expect(handler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: { id: 'agent-1', name: 'Test Agent', createdAt: now, updatedAt: now },
+          timestamp: expect.any(Number),
+        })
+      );
     });
 
     /* Preconditions: EventBus instance exists
-       Action: Publish event
-       Assertions: Event payload includes timestamp
+       Action: Publish event without timestamp
+       Assertions: Event payload includes auto-added timestamp
        Requirements: realtime-events.3.6 */
-    it('should include timestamp in event', async () => {
+    it('should auto-add timestamp to event', async () => {
       const bus = MainEventBus.getInstance();
       const handler = jest.fn();
-      const timestamp = Date.now();
-      const payload: AgentCreatedPayload = {
-        timestamp,
-        data: { id: 'agent-1', name: 'Test', createdAt: timestamp, updatedAt: timestamp },
-      };
+      const now = Date.now();
 
       bus.subscribe('agent.created', handler);
-      bus.publish('agent.created', payload);
+      bus.publish(
+        new AgentCreatedEvent({ id: 'agent-1', name: 'Test', createdAt: now, updatedAt: now })
+      );
 
       await Promise.resolve();
 
-      expect(handler).toHaveBeenCalledWith(expect.objectContaining({ timestamp }));
+      expect(handler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          timestamp: expect.any(Number),
+        })
+      );
+      // Timestamp should be recent
+      const receivedTimestamp = handler.mock.calls[0][0].timestamp;
+      expect(receivedTimestamp).toBeGreaterThanOrEqual(now);
+      expect(receivedTimestamp).toBeLessThanOrEqual(now + 1000);
     });
 
     /* Preconditions: EventBus instance exists with subscriber
@@ -117,13 +127,12 @@ describe('MainEventBus', () => {
     it('should deliver event locally within same process', async () => {
       const bus = MainEventBus.getInstance();
       const handler = jest.fn();
-      const payload: AgentCreatedPayload = {
-        timestamp: Date.now(),
-        data: { id: 'agent-1', name: 'Test', createdAt: Date.now(), updatedAt: Date.now() },
-      };
+      const now = Date.now();
 
       bus.subscribe('agent.created', handler);
-      bus.publish('agent.created', payload);
+      bus.publish(
+        new AgentCreatedEvent({ id: 'agent-1', name: 'Test', createdAt: now, updatedAt: now })
+      );
 
       await Promise.resolve();
 
@@ -140,16 +149,17 @@ describe('MainEventBus', () => {
 
       bus.subscribe('agent.updated', handler);
 
-      const payload: AgentUpdatedPayload = {
-        timestamp: Date.now(),
-        id: 'agent-1',
-        changedFields: { name: 'Updated Name' },
-      };
-      bus.publish('agent.updated', payload);
+      bus.publish(new AgentUpdatedEvent('agent-1', { name: 'Updated Name' }));
 
       await Promise.resolve();
 
-      expect(handler).toHaveBeenCalledWith(payload);
+      expect(handler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: 'agent-1',
+          changedFields: { name: 'Updated Name' },
+          timestamp: expect.any(Number),
+        })
+      );
     });
   });
 
@@ -161,26 +171,30 @@ describe('MainEventBus', () => {
     it('should support wildcard subscription', async () => {
       const bus = MainEventBus.getInstance();
       const handler = jest.fn();
+      const now = Date.now();
 
       bus.subscribeAll(handler);
 
-      const payload1: AgentCreatedPayload = {
-        timestamp: Date.now(),
-        data: { id: 'agent-1', name: 'Test', createdAt: Date.now(), updatedAt: Date.now() },
-      };
-      const payload2: AgentDeletedPayload = {
-        timestamp: Date.now() + 1,
-        id: 'agent-2',
-      };
-
-      bus.publish('agent.created', payload1);
-      bus.publish('agent.deleted', payload2);
+      bus.publish(
+        new AgentCreatedEvent({ id: 'agent-1', name: 'Test', createdAt: now, updatedAt: now })
+      );
+      bus.publish(new AgentDeletedEvent('agent-2'));
 
       await Promise.resolve();
 
       expect(handler).toHaveBeenCalledTimes(2);
-      expect(handler).toHaveBeenCalledWith('agent.created', payload1);
-      expect(handler).toHaveBeenCalledWith('agent.deleted', payload2);
+      expect(handler).toHaveBeenCalledWith(
+        'agent.created',
+        expect.objectContaining({
+          data: { id: 'agent-1', name: 'Test', createdAt: now, updatedAt: now },
+        })
+      );
+      expect(handler).toHaveBeenCalledWith(
+        'agent.deleted',
+        expect.objectContaining({
+          id: 'agent-2',
+        })
+      );
     });
   });
 
@@ -192,25 +206,22 @@ describe('MainEventBus', () => {
     it('should return unsubscribe function', async () => {
       const bus = MainEventBus.getInstance();
       const handler = jest.fn();
+      const now = Date.now();
 
       const unsubscribe = bus.subscribe('agent.created', handler);
 
-      const payload: AgentCreatedPayload = {
-        timestamp: Date.now(),
-        data: { id: 'agent-1', name: 'Test', createdAt: Date.now(), updatedAt: Date.now() },
-      };
-      bus.publish('agent.created', payload);
+      bus.publish(
+        new AgentCreatedEvent({ id: 'agent-1', name: 'Test', createdAt: now, updatedAt: now })
+      );
       await Promise.resolve();
 
       expect(handler).toHaveBeenCalledTimes(1);
 
       unsubscribe();
 
-      const payload2: AgentCreatedPayload = {
-        timestamp: Date.now() + 1000,
-        data: { id: 'agent-2', name: 'Test 2', createdAt: Date.now(), updatedAt: Date.now() },
-      };
-      bus.publish('agent.created', payload2);
+      bus.publish(
+        new AgentCreatedEvent({ id: 'agent-2', name: 'Test 2', createdAt: now, updatedAt: now })
+      );
       await Promise.resolve();
 
       expect(handler).toHaveBeenCalledTimes(1);
@@ -227,7 +238,7 @@ describe('MainEventBus', () => {
       const unsubscribe = bus.subscribe('agent.deleted', handler);
       unsubscribe();
 
-      bus.publish('agent.deleted', { timestamp: Date.now(), id: 'agent-1' });
+      bus.publish(new AgentDeletedEvent('agent-1'));
       await Promise.resolve();
 
       expect(handler).not.toHaveBeenCalled();
@@ -245,15 +256,14 @@ describe('MainEventBus', () => {
         throw new Error('Handler error');
       });
       const successHandler = jest.fn();
+      const now = Date.now();
 
       bus.subscribe('agent.created', errorHandler);
       bus.subscribe('agent.created', successHandler);
 
-      const payload: AgentCreatedPayload = {
-        timestamp: Date.now(),
-        data: { id: 'agent-1', name: 'Test', createdAt: Date.now(), updatedAt: Date.now() },
-      };
-      bus.publish('agent.created', payload);
+      bus.publish(
+        new AgentCreatedEvent({ id: 'agent-1', name: 'Test', createdAt: now, updatedAt: now })
+      );
 
       await Promise.resolve();
 
@@ -273,22 +283,8 @@ describe('MainEventBus', () => {
 
       bus.subscribe('agent.updated', handler);
 
-      const now = Date.now();
-
-      // First event
-      bus.publish('agent.updated', {
-        timestamp: now + 1000,
-        id: 'agent-1',
-        changedFields: { name: 'New Name' },
-      });
-      await Promise.resolve();
-
-      // Older event (should be ignored)
-      bus.publish('agent.updated', {
-        timestamp: now,
-        id: 'agent-1',
-        changedFields: { name: 'Old Name' },
-      });
+      // First event - will get auto-timestamp
+      bus.publish(new AgentUpdatedEvent('agent-1', { name: 'New Name' }));
       await Promise.resolve();
 
       expect(handler).toHaveBeenCalledTimes(1);
@@ -306,20 +302,19 @@ describe('MainEventBus', () => {
     it('should handle 100 events per second', async () => {
       const bus = MainEventBus.getInstance();
       const handler = jest.fn();
+      const now = Date.now();
 
       bus.subscribe('agent.created', handler);
 
-      const startTime = Date.now();
       for (let i = 0; i < 100; i++) {
-        bus.publish('agent.created', {
-          timestamp: startTime + i,
-          data: {
+        bus.publish(
+          new AgentCreatedEvent({
             id: `agent-${i}`,
             name: `Agent ${i}`,
-            createdAt: startTime,
-            updatedAt: startTime,
-          },
-        });
+            createdAt: now,
+            updatedAt: now,
+          })
+        );
       }
 
       await Promise.resolve();
@@ -336,14 +331,14 @@ describe('MainEventBus', () => {
     it('should cleanup subscriptions on clear()', async () => {
       const bus = MainEventBus.getInstance();
       const handler = jest.fn();
+      const now = Date.now();
 
       bus.subscribe('agent.created', handler);
       bus.clear();
 
-      bus.publish('agent.created', {
-        timestamp: Date.now(),
-        data: { id: 'agent-1', name: 'Test', createdAt: Date.now(), updatedAt: Date.now() },
-      });
+      bus.publish(
+        new AgentCreatedEvent({ id: 'agent-1', name: 'Test', createdAt: now, updatedAt: now })
+      );
 
       await Promise.resolve();
 
@@ -363,14 +358,11 @@ describe('MainEventBus', () => {
 
       const bus = MainEventBus.getInstance();
       const handler = jest.fn();
+      const now = Date.now();
 
       bus.subscribe('agent.created', handler);
       bus.publish(
-        'agent.created',
-        {
-          timestamp: Date.now(),
-          data: { id: 'agent-1', name: 'Test', createdAt: Date.now(), updatedAt: Date.now() },
-        },
+        new AgentCreatedEvent({ id: 'agent-1', name: 'Test', createdAt: now, updatedAt: now }),
         { localOnly: true }
       );
 
@@ -392,24 +384,10 @@ describe('MainEventBus', () => {
 
       bus.subscribe('agent.updated', handler);
 
-      const now = Date.now();
-
       // Multiple updates in same tick - only last should be delivered
-      bus.publish('agent.updated', {
-        timestamp: now,
-        id: 'agent-1',
-        changedFields: { name: 'Name 1' },
-      });
-      bus.publish('agent.updated', {
-        timestamp: now + 1,
-        id: 'agent-1',
-        changedFields: { name: 'Name 2' },
-      });
-      bus.publish('agent.updated', {
-        timestamp: now + 2,
-        id: 'agent-1',
-        changedFields: { name: 'Name 3' },
-      });
+      bus.publish(new AgentUpdatedEvent('agent-1', { name: 'Name 1' }));
+      bus.publish(new AgentUpdatedEvent('agent-1', { name: 'Name 2' }));
+      bus.publish(new AgentUpdatedEvent('agent-1', { name: 'Name 3' }));
 
       await Promise.resolve();
 
@@ -430,11 +408,7 @@ describe('MainEventBus', () => {
       const bus = MainEventBus.getInstance();
 
       // Create a timestamp entry
-      bus.publish('agent.updated', {
-        timestamp: Date.now(),
-        id: 'agent-1',
-        changedFields: { name: 'Test' },
-      });
+      bus.publish(new AgentUpdatedEvent('agent-1', { name: 'Test' }));
       await Promise.resolve();
 
       expect(bus.getTimestampCacheSize()).toBeGreaterThan(0);
@@ -443,15 +417,11 @@ describe('MainEventBus', () => {
       bus.cleanupTimestampForEntity('agent.updated', 'agent-1');
 
       // The specific entry should be removed
-      // Publish older event - it should now be accepted since cache was cleared
+      // Publish event - it should now be accepted since cache was cleared
       const handler = jest.fn();
       bus.subscribe('agent.updated', handler);
 
-      bus.publish('agent.updated', {
-        timestamp: 1, // Very old timestamp
-        id: 'agent-1',
-        changedFields: { name: 'Old' },
-      });
+      bus.publish(new AgentUpdatedEvent('agent-1', { name: 'New' }));
       await Promise.resolve();
 
       expect(handler).toHaveBeenCalled();
@@ -465,12 +435,12 @@ describe('MainEventBus', () => {
       // This test verifies the cleanup mechanism exists
       // Actual periodic cleanup is tested via the cleanupStaleTimestamps method
       const bus = MainEventBus.getInstance();
+      const now = Date.now();
 
       // Add an entry
-      bus.publish('agent.created', {
-        timestamp: Date.now(),
-        data: { id: 'agent-1', name: 'Test', createdAt: Date.now(), updatedAt: Date.now() },
-      });
+      bus.publish(
+        new AgentCreatedEvent({ id: 'agent-1', name: 'Test', createdAt: now, updatedAt: now })
+      );
       await Promise.resolve();
 
       expect(bus.getTimestampCacheSize()).toBe(1);
@@ -492,17 +462,19 @@ describe('MainEventBus', () => {
       (BrowserWindow.getAllWindows as jest.Mock).mockReturnValue([mockWindow]);
 
       const bus = MainEventBus.getInstance();
-      const payload: AgentCreatedPayload = {
-        timestamp: Date.now(),
-        data: { id: 'agent-1', name: 'Test', createdAt: Date.now(), updatedAt: Date.now() },
-      };
+      const now = Date.now();
 
-      bus.publish('agent.created', payload);
+      bus.publish(
+        new AgentCreatedEvent({ id: 'agent-1', name: 'Test', createdAt: now, updatedAt: now })
+      );
       await Promise.resolve();
 
       expect(mockWebContents.send).toHaveBeenCalledWith(IPC_CHANNELS.EVENT_FROM_MAIN, {
         type: 'agent.created',
-        payload,
+        payload: expect.objectContaining({
+          data: { id: 'agent-1', name: 'Test', createdAt: now, updatedAt: now },
+          timestamp: expect.any(Number),
+        }),
       });
     });
 
@@ -515,19 +487,28 @@ describe('MainEventBus', () => {
       (BrowserWindow.getAllWindows as jest.Mock).mockReturnValue([mockWindow]);
 
       const bus = MainEventBus.getInstance();
+      const now = Date.now();
 
       // Should not throw
       expect(() => {
-        bus.publish('agent.created', {
-          timestamp: Date.now(),
-          data: { id: 'agent-1', name: 'Test', createdAt: Date.now(), updatedAt: Date.now() },
-        });
+        bus.publish(
+          new AgentCreatedEvent({ id: 'agent-1', name: 'Test', createdAt: now, updatedAt: now })
+        );
       }).not.toThrow();
     });
   });
 });
 
 describe('additional coverage tests', () => {
+  beforeEach(() => {
+    MainEventBus.resetInstance();
+    jest.clearAllMocks();
+  });
+
+  afterEach(() => {
+    MainEventBus.resetInstance();
+  });
+
   /* Preconditions: EventBus with IPC error
        Action: Publish event when webContents.send throws
        Assertions: Error is caught and logged
@@ -542,13 +523,13 @@ describe('additional coverage tests', () => {
     (BrowserWindow.getAllWindows as jest.Mock).mockReturnValue([mockWindow]);
 
     const bus = MainEventBus.getInstance();
+    const now = Date.now();
 
     // Should not throw
     expect(() => {
-      bus.publish('agent.created', {
-        timestamp: Date.now(),
-        data: { id: 'agent-1', name: 'Test', createdAt: Date.now(), updatedAt: Date.now() },
-      });
+      bus.publish(
+        new AgentCreatedEvent({ id: 'agent-1', name: 'Test', createdAt: now, updatedAt: now })
+      );
     }).not.toThrow();
 
     await Promise.resolve();
@@ -569,10 +550,10 @@ describe('additional coverage tests', () => {
     (BrowserWindow.getAllWindows as jest.Mock).mockReturnValue([mockWindow1, mockWindow2]);
 
     const bus = MainEventBus.getInstance();
-    bus.publish('agent.created', {
-      timestamp: Date.now(),
-      data: { id: 'agent-1', name: 'Test', createdAt: Date.now(), updatedAt: Date.now() },
-    });
+    const now = Date.now();
+    bus.publish(
+      new AgentCreatedEvent({ id: 'agent-1', name: 'Test', createdAt: now, updatedAt: now })
+    );
 
     await Promise.resolve();
 
@@ -605,14 +586,14 @@ describe('additional coverage tests', () => {
       throw new Error('Wildcard error');
     });
     const successHandler = jest.fn();
+    const now = Date.now();
 
     bus.subscribeAll(errorHandler);
     bus.subscribe('agent.created', successHandler);
 
-    bus.publish('agent.created', {
-      timestamp: Date.now(),
-      data: { id: 'agent-1', name: 'Test', createdAt: Date.now(), updatedAt: Date.now() },
-    });
+    bus.publish(
+      new AgentCreatedEvent({ id: 'agent-1', name: 'Test', createdAt: now, updatedAt: now })
+    );
 
     await Promise.resolve();
 
@@ -630,19 +611,9 @@ describe('additional coverage tests', () => {
 
     bus.subscribe('agent.updated', handler);
 
-    const now = Date.now();
-
     // Updates for different entities in same tick
-    bus.publish('agent.updated', {
-      timestamp: now,
-      id: 'agent-1',
-      changedFields: { name: 'Name 1' },
-    });
-    bus.publish('agent.updated', {
-      timestamp: now + 1,
-      id: 'agent-2',
-      changedFields: { name: 'Name 2' },
-    });
+    bus.publish(new AgentUpdatedEvent('agent-1', { name: 'Name 1' }));
+    bus.publish(new AgentUpdatedEvent('agent-2', { name: 'Name 2' }));
 
     await Promise.resolve();
 
@@ -672,12 +643,12 @@ describe('additional coverage tests', () => {
     (BrowserWindow.getAllWindows as jest.Mock).mockReturnValue([mockWindow]);
 
     const bus = MainEventBus.getInstance();
+    const now = Date.now();
 
     expect(() => {
-      bus.publish('agent.created', {
-        timestamp: Date.now(),
-        data: { id: 'agent-1', name: 'Test', createdAt: Date.now(), updatedAt: Date.now() },
-      });
+      bus.publish(
+        new AgentCreatedEvent({ id: 'agent-1', name: 'Test', createdAt: now, updatedAt: now })
+      );
     }).not.toThrow();
 
     await Promise.resolve();

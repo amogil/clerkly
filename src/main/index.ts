@@ -20,6 +20,7 @@ import { AIAgentSettingsManager } from './AIAgentSettingsManager';
 import { SettingsIPCHandlers } from './SettingsIPCHandlers';
 import { registerLLMIPCHandlers } from './llm/LLMIPCHandlers';
 import { registerEventIPCHandlers } from './events/EventIPCHandlers';
+import { EventLogger } from './events/EventLogger';
 import { Logger } from './Logger';
 
 // Requirements: clerkly.3.5, clerkly.3.7 - Create parameterized logger for Main module
@@ -225,7 +226,10 @@ if (process.env.NODE_ENV === 'test') {
     // Fetch profile after auth success
     try {
       await profileManager.fetchProfile();
-      authIPCHandlers.sendAuthSuccess();
+      const userId = profileManager.getCurrentUserId();
+      if (userId) {
+        authIPCHandlers.sendAuthSuccess(userId);
+      }
       return { success: true };
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -336,7 +340,10 @@ if (process.env.NODE_ENV === 'test') {
       // Send auth events to renderer (same as handleDeepLinkUrl does)
       if (authStatus.authorized) {
         logger.info('Authorization successful, sending auth success');
-        authIPCHandlers.sendAuthSuccess();
+        const userId = profileManager.getCurrentUserId();
+        if (userId) {
+          authIPCHandlers.sendAuthSuccess(userId);
+        }
       } else if (authStatus.error) {
         logger.info(`Authorization failed, sending auth error: ${authStatus.error}`);
         authIPCHandlers.sendAuthError(authStatus.error, authStatus.error);
@@ -517,6 +524,11 @@ app.whenReady().then(async () => {
     registerEventIPCHandlers();
     logger.info('Event IPC handlers registered');
 
+    // Requirements: realtime-events.1.3, clerkly.3
+    // Start EventLogger to log all events
+    EventLogger.getInstance().start();
+    logger.info('EventLogger started');
+
     // Requirements: google-oauth-auth.11.1
     // Initialize Auth Window Manager to check auth status and show appropriate window
     await authWindowManager.initializeApp();
@@ -590,7 +602,10 @@ async function handleDeepLinkUrl(url: string): Promise<void> {
       // Profile is already fetched synchronously inside handleDeepLink()
       if (authStatus.authorized) {
         logger.info('Authorization successful, profile already fetched, sending auth success');
-        authIPCHandlers.sendAuthSuccess();
+        const userId = profileManager.getCurrentUserId();
+        if (userId) {
+          authIPCHandlers.sendAuthSuccess(userId);
+        }
       } else if (authStatus.error) {
         logger.info(`Sending auth error event: ${authStatus.error}`);
         authIPCHandlers.sendAuthError(authStatus.error, authStatus.error);

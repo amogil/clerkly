@@ -18,6 +18,21 @@ export interface BaseEvent {
 }
 
 /**
+ * Base class for all typed events
+ * Requirements: realtime-events.3.6
+ */
+export abstract class TypedEventClass<T extends EventType = EventType> {
+  /** Event type identifier */
+  abstract readonly type: T;
+
+  /** Get payload without timestamp (timestamp is added by EventBus) */
+  abstract toPayload(): EventPayloadWithoutTimestamp<T>;
+
+  /** Protected constructor to ensure proper initialization */
+  protected constructor() {}
+}
+
+/**
  * Event for entity creation
  * Requirements: realtime-events.3.2
  */
@@ -80,7 +95,6 @@ export interface UserProfile {
   id: string;
   email: string;
   name?: string;
-  picture?: string;
 }
 
 // ============================================================================
@@ -100,6 +114,54 @@ export type MessageUpdatedPayload = EntityUpdatedEvent<Message>;
 export type UserLoginPayload = BaseEvent & { userId: string };
 export type UserLogoutPayload = BaseEvent;
 export type UserProfileUpdatedPayload = EntityUpdatedEvent<UserProfile>;
+
+// ============================================================================
+// Auth Events
+// ============================================================================
+
+/**
+ * Auth success event payload
+ * Emitted when OAuth flow completes successfully
+ */
+export interface AuthSucceededPayload extends BaseEvent {
+  /** User ID from OAuth provider */
+  userId: string;
+}
+
+/**
+ * Auth failed event payload
+ * Emitted when OAuth flow fails
+ */
+export interface AuthFailedPayload extends BaseEvent {
+  /** Error message */
+  error: string;
+  /** Error code (e.g., 'invalid_grant', 'access_denied') */
+  errorCode?: string;
+}
+
+/**
+ * Profile synced event payload
+ * Emitted when user profile is synchronized (fetched and saved)
+ */
+export interface ProfileSyncedPayload extends BaseEvent {
+  /** User profile data */
+  profile: UserProfile;
+}
+
+// ============================================================================
+// Error Events
+// ============================================================================
+
+/**
+ * Error notification event payload
+ * Emitted when a background error occurs that should be shown to user
+ */
+export interface ErrorCreatedPayload extends BaseEvent {
+  /** Error message */
+  message: string;
+  /** Context of the operation that failed */
+  context: string;
+}
 
 // ============================================================================
 // Event Map
@@ -123,6 +185,14 @@ export interface ClerklyEvents {
   'user.login': UserLoginPayload;
   'user.logout': UserLogoutPayload;
   'user.profile.updated': UserProfileUpdatedPayload;
+
+  // Auth events
+  'auth.succeeded': AuthSucceededPayload;
+  'auth.failed': AuthFailedPayload;
+  'profile.synced': ProfileSyncedPayload;
+
+  // Error events
+  'error.created': ErrorCreatedPayload;
 }
 
 /**
@@ -171,6 +241,12 @@ export interface PublishOptions {
 }
 
 /**
+ * Payload type without timestamp (for publish method)
+ * Timestamp is added automatically by EventBus
+ */
+export type EventPayloadWithoutTimestamp<T extends EventType> = Omit<ClerklyEvents[T], 'timestamp'>;
+
+/**
  * Extract entity ID from event payload
  */
 export function getEntityId(
@@ -191,4 +267,217 @@ export function getEntityId(
 export function getEventKey(type: EventType, payload: BaseEvent): string {
   const entityId = getEntityId(payload as BaseEvent & { id?: string; data?: { id?: string } });
   return entityId ? `${type}:${entityId}` : type;
+}
+
+// ============================================================================
+// Event Classes
+// ============================================================================
+
+/**
+ * Auth succeeded event
+ * Emitted when OAuth flow completes successfully
+ */
+export class AuthSucceededEvent extends TypedEventClass<'auth.succeeded'> {
+  readonly type = 'auth.succeeded' as const;
+
+  constructor(public readonly userId: string) {
+    super();
+    if (!userId) {
+      throw new Error('AuthSucceededEvent requires a non-empty userId');
+    }
+  }
+
+  toPayload(): EventPayloadWithoutTimestamp<'auth.succeeded'> {
+    return { userId: this.userId };
+  }
+}
+
+/**
+ * Auth failed event
+ * Emitted when OAuth flow fails
+ */
+export class AuthFailedEvent extends TypedEventClass<'auth.failed'> {
+  readonly type = 'auth.failed' as const;
+
+  constructor(
+    public readonly error: string,
+    public readonly errorCode?: string
+  ) {
+    super();
+  }
+
+  toPayload(): EventPayloadWithoutTimestamp<'auth.failed'> {
+    return { error: this.error, errorCode: this.errorCode };
+  }
+}
+
+/**
+ * Profile synced event
+ * Emitted when user profile is synchronized
+ */
+export class ProfileSyncedEvent extends TypedEventClass<'profile.synced'> {
+  readonly type = 'profile.synced' as const;
+
+  constructor(public readonly profile: UserProfile) {
+    super();
+  }
+
+  toPayload(): EventPayloadWithoutTimestamp<'profile.synced'> {
+    return { profile: this.profile };
+  }
+}
+
+/**
+ * Error created event
+ * Emitted when a background error occurs
+ */
+export class ErrorCreatedEvent extends TypedEventClass<'error.created'> {
+  readonly type = 'error.created' as const;
+
+  constructor(
+    public readonly message: string,
+    public readonly context: string
+  ) {
+    super();
+  }
+
+  toPayload(): EventPayloadWithoutTimestamp<'error.created'> {
+    return { message: this.message, context: this.context };
+  }
+}
+
+/**
+ * User login event
+ */
+export class UserLoginEvent extends TypedEventClass<'user.login'> {
+  readonly type = 'user.login' as const;
+
+  constructor(public readonly userId: string) {
+    super();
+  }
+
+  toPayload(): EventPayloadWithoutTimestamp<'user.login'> {
+    return { userId: this.userId };
+  }
+}
+
+/**
+ * User logout event
+ */
+export class UserLogoutEvent extends TypedEventClass<'user.logout'> {
+  readonly type = 'user.logout' as const;
+
+  constructor() {
+    super();
+  }
+
+  toPayload(): EventPayloadWithoutTimestamp<'user.logout'> {
+    return {};
+  }
+}
+
+/**
+ * Agent created event
+ */
+export class AgentCreatedEvent extends TypedEventClass<'agent.created'> {
+  readonly type = 'agent.created' as const;
+
+  constructor(public readonly data: Agent) {
+    super();
+  }
+
+  toPayload(): EventPayloadWithoutTimestamp<'agent.created'> {
+    return { data: this.data };
+  }
+}
+
+/**
+ * Agent updated event
+ */
+export class AgentUpdatedEvent extends TypedEventClass<'agent.updated'> {
+  readonly type = 'agent.updated' as const;
+
+  constructor(
+    public readonly id: string,
+    public readonly changedFields: Partial<Agent>
+  ) {
+    super();
+  }
+
+  toPayload(): EventPayloadWithoutTimestamp<'agent.updated'> {
+    return { id: this.id, changedFields: this.changedFields };
+  }
+}
+
+/**
+ * Agent deleted event
+ */
+export class AgentDeletedEvent extends TypedEventClass<'agent.deleted'> {
+  readonly type = 'agent.deleted' as const;
+
+  constructor(public readonly id: string) {
+    super();
+  }
+
+  toPayload(): EventPayloadWithoutTimestamp<'agent.deleted'> {
+    return { id: this.id };
+  }
+}
+
+/**
+ * Message created event
+ */
+export class MessageCreatedEvent extends TypedEventClass<'message.created'> {
+  readonly type = 'message.created' as const;
+
+  constructor(public readonly data: Message) {
+    super();
+  }
+
+  toPayload(): EventPayloadWithoutTimestamp<'message.created'> {
+    return { data: this.data };
+  }
+}
+
+/**
+ * Message updated event
+ */
+export class MessageUpdatedEvent extends TypedEventClass<'message.updated'> {
+  readonly type = 'message.updated' as const;
+
+  constructor(
+    public readonly id: string,
+    public readonly changedFields: Partial<Message>
+  ) {
+    super();
+  }
+
+  toPayload(): EventPayloadWithoutTimestamp<'message.updated'> {
+    return { id: this.id, changedFields: this.changedFields };
+  }
+}
+
+/**
+ * User profile updated event
+ */
+export class UserProfileUpdatedEvent extends TypedEventClass<'user.profile.updated'> {
+  readonly type = 'user.profile.updated' as const;
+
+  constructor(
+    public readonly id: string,
+    public readonly changedFields: Partial<UserProfile>
+  ) {
+    super();
+  }
+
+  toPayload(): EventPayloadWithoutTimestamp<'user.profile.updated'> {
+    return { id: this.id, changedFields: this.changedFields };
+  }
+}
+
+/**
+ * Type guard to check if value is a TypedEventClass instance
+ */
+export function isTypedEvent(value: unknown): value is TypedEventClass {
+  return value instanceof TypedEventClass;
 }

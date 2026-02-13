@@ -738,7 +738,6 @@ test.describe('Account Profile', () => {
       name: 'Cached User Name',
       given_name: 'Cached',
       family_name: 'User Name',
-      picture: '',
       locale: 'en',
       lastUpdated: Date.now() - 86400000, // 1 day ago
     };
@@ -1703,7 +1702,6 @@ test.describe('Account Profile', () => {
       given_name: 'Cached',
       family_name: 'Error User',
       verified_email: true,
-      picture: '',
       locale: 'en',
       lastUpdated: Date.now() - 86400000, // 1 day ago
     };

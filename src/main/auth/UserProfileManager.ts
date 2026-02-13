@@ -59,11 +59,6 @@ export interface UserProfile {
   locale: string;
 
   /**
-   * Optional URL to user's profile picture
-   */
-  picture?: string;
-
-  /**
    * Unix timestamp of last profile update
    * Used to track when the profile data was last fetched from Google
    */

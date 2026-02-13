@@ -171,7 +171,6 @@ describe('Profile Integration', () => {
     given_name: 'Test',
     family_name: 'User',
     locale: 'en',
-    picture: 'https://example.com/photo.jpg',
     lastUpdated: Date.now(),
   };
 
@@ -244,7 +243,6 @@ describe('Profile Integration', () => {
         given_name: mockProfile.given_name,
         family_name: mockProfile.family_name,
         locale: mockProfile.locale,
-        picture: mockProfile.picture,
       }),
     });
   });
