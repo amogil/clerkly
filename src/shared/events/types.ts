@@ -164,6 +164,22 @@ export interface ErrorCreatedPayload extends BaseEvent {
 }
 
 // ============================================================================
+// UI Events
+// ============================================================================
+
+/**
+ * Loader show event payload
+ * Emitted when loader should be shown on login screen
+ */
+export type LoaderShowPayload = BaseEvent;
+
+/**
+ * Loader hide event payload
+ * Emitted when loader should be hidden
+ */
+export type LoaderHidePayload = BaseEvent;
+
+// ============================================================================
 // Event Map
 // ============================================================================
 
@@ -190,6 +206,10 @@ export interface ClerklyEvents {
   'auth.succeeded': AuthSucceededPayload;
   'auth.failed': AuthFailedPayload;
   'profile.synced': ProfileSyncedPayload;
+
+  // UI events
+  'loader.show': LoaderShowPayload;
+  'loader.hide': LoaderHidePayload;
 
   // Error events
   'error.created': ErrorCreatedPayload;
@@ -343,6 +363,38 @@ export class ErrorCreatedEvent extends TypedEventClass<'error.created'> {
 
   toPayload(): EventPayloadWithoutTimestamp<'error.created'> {
     return { message: this.message, context: this.context };
+  }
+}
+
+/**
+ * Loader show event
+ * Emitted when loader should be shown on login screen
+ */
+export class LoaderShowEvent extends TypedEventClass<'loader.show'> {
+  readonly type = 'loader.show' as const;
+
+  constructor() {
+    super();
+  }
+
+  toPayload(): EventPayloadWithoutTimestamp<'loader.show'> {
+    return {};
+  }
+}
+
+/**
+ * Loader hide event
+ * Emitted when loader should be hidden
+ */
+export class LoaderHideEvent extends TypedEventClass<'loader.hide'> {
+  readonly type = 'loader.hide' as const;
+
+  constructor() {
+    super();
+  }
+
+  toPayload(): EventPayloadWithoutTimestamp<'loader.hide'> {
+    return {};
   }
 }
 

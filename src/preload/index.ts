@@ -11,6 +11,8 @@ const EVENT_TYPE_USER_LOGOUT = 'user.logout';
 const EVENT_TYPE_AUTH_FAILED = 'auth.failed';
 const EVENT_TYPE_AUTH_SUCCEEDED = 'auth.succeeded';
 const EVENT_TYPE_PROFILE_SYNCED = 'profile.synced';
+const EVENT_TYPE_LOADER_SHOW = 'loader.show';
+const EVENT_TYPE_LOADER_HIDE = 'loader.hide';
 
 /**
  * API interface for secure IPC communication
@@ -269,35 +271,33 @@ const api: API = {
     },
 
     /**
-     * Listen for loader show events
+     * Listen for loader show events via EventBus
      * Requirements: google-oauth-auth.7.1
      * @param {Function} callback - Callback function to execute when loader should be shown
      * @returns {Function} Unsubscribe function to remove the listener
      */
     onShowLoader(callback: () => void): () => void {
-      const listener = () => {
-        callback();
-      };
-      ipcRenderer.on('auth:show-loader', listener);
-      return () => {
-        ipcRenderer.removeListener('auth:show-loader', listener);
-      };
+      // Use the events API to listen for loader.show events
+      return api.events!.onEvent((type: string) => {
+        if (type === EVENT_TYPE_LOADER_SHOW) {
+          callback();
+        }
+      });
     },
 
     /**
-     * Listen for loader hide events
+     * Listen for loader hide events via EventBus
      * Requirements: google-oauth-auth.7.1
      * @param {Function} callback - Callback function to execute when loader should be hidden
      * @returns {Function} Unsubscribe function to remove the listener
      */
     onHideLoader(callback: () => void): () => void {
-      const listener = () => {
-        callback();
-      };
-      ipcRenderer.on('auth:hide-loader', listener);
-      return () => {
-        ipcRenderer.removeListener('auth:hide-loader', listener);
-      };
+      // Use the events API to listen for loader.hide events
+      return api.events!.onEvent((type: string) => {
+        if (type === EVENT_TYPE_LOADER_HIDE) {
+          callback();
+        }
+      });
     },
   },
 

@@ -36,6 +36,10 @@ export const EVENT_TYPES = {
   MESSAGE_CREATED: 'message.created',
   MESSAGE_UPDATED: 'message.updated',
 
+  // UI events
+  LOADER_SHOW: 'loader.show',
+  LOADER_HIDE: 'loader.hide',
+
   // Error events
   ERROR_CREATED: 'error.created',
 } as const;

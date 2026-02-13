@@ -3,12 +3,23 @@
 import { AuthWindowManager } from '../../../src/main/auth/AuthWindowManager';
 import WindowManager from '../../../src/main/WindowManager';
 import { OAuthClientManager } from '../../../src/main/auth/OAuthClientManager';
+import { LoaderShowEvent, LoaderHideEvent } from '../../../src/shared/events/types';
 
 // Mock WindowManager
 jest.mock('../../../src/main/WindowManager');
 
 // Mock OAuthClientManager
 jest.mock('../../../src/main/auth/OAuthClientManager');
+
+// Mock MainEventBus
+const mockPublish = jest.fn();
+jest.mock('../../../src/main/events/MainEventBus', () => ({
+  MainEventBus: {
+    getInstance: jest.fn(() => ({
+      publish: mockPublish,
+    })),
+  },
+}));
 
 // Mock Electron's BrowserWindow
 jest.mock('electron', () => ({
@@ -356,50 +367,48 @@ describe('AuthWindowManager', () => {
   });
 
   describe('Loader functionality', () => {
+    beforeEach(() => {
+      mockPublish.mockClear();
+    });
+
     /* Preconditions: AuthWindowManager is instantiated, window exists
        Action: call onShowLoader
-       Assertions: IPC event 'auth:show-loader' is sent to renderer
+       Assertions: LoaderShowEvent is published via EventBus
        Requirements: google-oauth-auth.15.1, google-oauth-auth.15.5 */
-    it('should send IPC event to show loader', async () => {
+    it('should publish LoaderShowEvent via EventBus', async () => {
       // Create window first
       mockWindowManager.isWindowCreated.mockReturnValue(false);
       mockOAuthClient.getAuthStatus.mockResolvedValue({ authorized: false });
       await authWindowManager.initializeApp();
 
-      // Get the window and spy on webContents.send
-      const window = authWindowManager.getWindow();
-      const sendSpy = jest.spyOn(window!.webContents, 'send');
-
       // Call showLoader
       await authWindowManager.onShowLoader();
 
-      // Verify IPC event was sent
-      expect(sendSpy).toHaveBeenCalledWith('auth:show-loader');
+      // Verify LoaderShowEvent was published
+      expect(mockPublish).toHaveBeenCalledWith(expect.any(LoaderShowEvent));
     });
 
     /* Preconditions: AuthWindowManager is instantiated, loader is visible
        Action: call onHideLoader
-       Assertions: IPC event 'auth:hide-loader' is sent to renderer
+       Assertions: LoaderHideEvent is published via EventBus
        Requirements: google-oauth-auth.15.2, google-oauth-auth.15.6 */
-    it('should send IPC event to hide loader', async () => {
+    it('should publish LoaderHideEvent via EventBus', async () => {
       // Create window first
       mockWindowManager.isWindowCreated.mockReturnValue(false);
       mockOAuthClient.getAuthStatus.mockResolvedValue({ authorized: false });
       await authWindowManager.initializeApp();
 
       // Show loader first
-      const window = authWindowManager.getWindow();
-      const sendSpy = jest.spyOn(window!.webContents, 'send');
       await authWindowManager.onShowLoader();
 
       // Clear previous calls
-      sendSpy.mockClear();
+      mockPublish.mockClear();
 
       // Call hideLoader
       await authWindowManager.onHideLoader();
 
-      // Verify IPC event was sent
-      expect(sendSpy).toHaveBeenCalledWith('auth:hide-loader');
+      // Verify LoaderHideEvent was published
+      expect(mockPublish).toHaveBeenCalledWith(expect.any(LoaderHideEvent));
     });
 
     /* Preconditions: AuthWindowManager is instantiated, loader is visible
@@ -413,18 +422,16 @@ describe('AuthWindowManager', () => {
       await authWindowManager.initializeApp();
 
       // Show loader first
-      const window = authWindowManager.getWindow();
-      const sendSpy = jest.spyOn(window!.webContents, 'send');
       await authWindowManager.onShowLoader();
 
       // Clear previous calls
-      sendSpy.mockClear();
+      mockPublish.mockClear();
 
       // Call onAuthSuccess
       await authWindowManager.onAuthSuccess();
 
-      // Verify hideLoader was called (IPC event sent)
-      expect(sendSpy).toHaveBeenCalledWith('auth:hide-loader');
+      // Verify LoaderHideEvent was published
+      expect(mockPublish).toHaveBeenCalledWith(expect.any(LoaderHideEvent));
     });
   });
 });

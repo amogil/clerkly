@@ -4,6 +4,8 @@ import { BrowserWindow } from 'electron';
 import WindowManager from '../WindowManager';
 import { OAuthClientManager } from './OAuthClientManager';
 import { Logger } from '../Logger';
+import { MainEventBus } from '../events/MainEventBus';
+import { LoaderShowEvent, LoaderHideEvent } from '../../shared/events/types';
 
 // Requirements: clerkly.3.8 - Use centralized Logger instead of console.*
 /**
@@ -175,8 +177,9 @@ export class AuthWindowManager {
       return;
     }
 
-    // Send IPC event to renderer to show loader on login screen
-    this.currentWindow.webContents.send('auth:show-loader');
+    // Publish loader.show event via EventBus
+    const eventBus = MainEventBus.getInstance();
+    eventBus.publish(new LoaderShowEvent());
     this.logger.info('Showing loader on login screen');
   }
 
@@ -198,8 +201,9 @@ export class AuthWindowManager {
       return;
     }
 
-    // Send IPC event to renderer to hide loader
-    this.currentWindow.webContents.send('auth:hide-loader');
+    // Publish loader.hide event via EventBus
+    const eventBus = MainEventBus.getInstance();
+    eventBus.publish(new LoaderHideEvent());
     this.logger.info('Hiding loader');
   }
 
