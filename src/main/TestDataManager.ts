@@ -8,7 +8,7 @@ import type {
   LoadDataResult,
   DeleteDataResult,
 } from './DataManager';
-import type { UserProfileManager } from './auth/UserProfileManager';
+import type { UserManager } from './auth/UserManager';
 import { Logger } from './Logger';
 
 /**
@@ -105,8 +105,8 @@ export class TestDataManager implements IDataManager {
     return this.dataManager.close();
   }
 
-  setUserProfileManager(profileManager: UserProfileManager): void {
-    return this.dataManager.setUserProfileManager(profileManager);
+  setUserManager(userManager: UserManager): void {
+    return this.dataManager.setUserManager(userManager);
   }
 
   /**
