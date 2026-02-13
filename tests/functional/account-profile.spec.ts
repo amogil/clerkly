@@ -1168,15 +1168,14 @@ test.describe('Account Profile', () => {
 
       // Verify database contains correct profile data
       // Property 13 - Profile data in database should match API response
-      expect(profileCheck.profile.id).toBe('123123123');
+      // Note: DB schema uses google_id (not id), and doesn't store given_name/family_name
+      expect(profileCheck.profile.google_id).toBe('123123123');
       expect(profileCheck.profile.email).toBe('fetch.success@example.com');
       expect(profileCheck.profile.name).toBe('Fetch Success User');
-      expect(profileCheck.profile.given_name).toBe('Fetch');
-      expect(profileCheck.profile.family_name).toBe('Success User');
 
       console.log('✓ Profile data correctly saved to database');
       console.log(
-        `✓ Database contains: id="${profileCheck.profile.id}", email="${profileCheck.profile.email}", name="${profileCheck.profile.name}"`
+        `✓ Database contains: google_id="${profileCheck.profile.google_id}", email="${profileCheck.profile.email}", name="${profileCheck.profile.name}"`
       );
     }
 
