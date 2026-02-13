@@ -183,7 +183,7 @@ export class MainEventBus {
     for (const win of windows) {
       if (!win.isDestroyed() && win.webContents) {
         try {
-          win.webContents.send(IPC_CHANNELS.EVENT_FROM_MAIN, { type, payload });
+          win.webContents.send(IPC_CHANNELS.EVENT_FROM_MAIN, type, payload);
         } catch (error) {
           this.logger.error(`Error broadcasting to window: ${error}`);
         }

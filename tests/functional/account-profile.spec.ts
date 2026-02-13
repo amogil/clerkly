@@ -1264,7 +1264,6 @@ test.describe('Account Profile', () => {
     });
 
     // Click login button to start OAuth flow (this will show loader)
-    const loginButton = context.window.locator('text=/continue with google/i');
     await loginButton.click();
     console.log('[TEST] Clicked login button');
 
