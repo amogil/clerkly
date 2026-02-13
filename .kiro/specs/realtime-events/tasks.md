@@ -226,7 +226,7 @@
 
 ### 7. Функциональные тесты
 
-- [ ] 7.1 Написать функциональные тесты для IPC
+- [x] 7.1 Написать функциональные тесты для IPC
   - Создать файл `tests/functional/realtime-events.spec.ts`
   - Тест: should deliver event from main to renderer via IPC
   - Тест: should deliver event from renderer to main via IPC
@@ -235,14 +235,14 @@
   - Тест: should receive events across IPC boundary
   - **Requirements:** realtime-events.1.4, realtime-events.4, realtime-events.2.9, realtime-events.2.10
 
-- [ ] 7.2 Написать функциональные тесты для UI
+- [x] 7.2 Написать функциональные тесты для UI
   - Тест: should update UI on entity.created
   - Тест: should update UI on entity.updated
   - Тест: should remove from UI on entity.deleted
   - Тест: should update UI smoothly without flickering
   - **Requirements:** realtime-events.5.1, realtime-events.5.2, realtime-events.5.3, realtime-events.5.4
 
-- [ ] 7.3 **Checkpoint: Фаза 7** (запускается при явной просьбе пользователя)
+- [x] 7.3 **Checkpoint: Фаза 7** ✅ (запускается при явной просьбе пользователя)
   - Запустить `npm run test:functional` (предупредить: покажет окна на экране)
   - Дать резюме выполненной работы
   - Запросить ревью от пользователя
@@ -278,7 +278,7 @@
   - Минимум 85% покрытие строк кода
   - Все требования покрыты тестами
 
-- [ ] 9.3 Запустить функциональные тесты (при явной просьбе пользователя)
+- [x] 9.3 Запустить функциональные тесты (при явной просьбе пользователя)
   - Запустить `npm run test:functional`
   - Проверить все функциональные тесты проходят
 
@@ -308,7 +308,7 @@
 
 - ✅ Все модульные тесты проходят
 - ✅ Все property-based тесты проходят
-- ⏳ Все функциональные тесты проходят (ожидает запуска)
+- ✅ Все функциональные тесты проходят
 - ✅ Покрытие кода ≥ 85%
 - ✅ TypeScript компилируется без ошибок
 - ✅ События передаются между main и renderer
@@ -317,7 +317,7 @@
 
 ## Статус
 
-In Progress - Фазы 1-6 и 8 выполнены. Фаза 7 (функциональные тесты) ожидает запуска по запросу пользователя.
+✅ Completed - Все фазы выполнены. Система событий реального времени полностью реализована.
 
 ## Примечания
 
