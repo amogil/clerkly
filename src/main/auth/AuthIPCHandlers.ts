@@ -2,7 +2,7 @@
 
 import { ipcMain, IpcMainInvokeEvent } from 'electron';
 import { OAuthClientManager } from './OAuthClientManager';
-import { UserProfileManager, UserProfile } from './UserProfileManager';
+import { UserManager, User } from './UserManager';
 import { Logger } from '../Logger';
 import { MainEventBus } from '../events/MainEventBus';
 import {
@@ -21,7 +21,7 @@ import {
 interface IPCResult {
   success: boolean;
   error?: string;
-  profile?: UserProfile | null;
+  user?: User | null;
   [key: string]: unknown;
 }
 
@@ -35,7 +35,7 @@ export class AuthIPCHandlers {
   // Requirements: clerkly.3.5, clerkly.3.7
   private logger = Logger.create('AuthIPCHandlers');
   private oauthClient: OAuthClientManager;
-  private profileManager: UserProfileManager | null = null;
+  private profileManager: UserManager | null = null;
   private handlersRegistered: boolean = false;
 
   constructor(oauthClient: OAuthClientManager) {
@@ -45,9 +45,9 @@ export class AuthIPCHandlers {
   /**
    * Set profile manager for profile-related IPC handlers
    * Requirements: account-profile.1.2
-   * @param profileManager UserProfileManager instance
+   * @param profileManager UserManager instance
    */
-  setProfileManager(profileManager: UserProfileManager): void {
+  setProfileManager(profileManager: UserManager): void {
     this.profileManager = profileManager;
     this.logger.info('Profile manager set');
   }
@@ -65,7 +65,7 @@ export class AuthIPCHandlers {
     ipcMain.handle('auth:start-login', this.handleStartLogin.bind(this));
     ipcMain.handle('auth:get-status', this.handleGetStatus.bind(this));
     ipcMain.handle('auth:logout', this.handleLogout.bind(this));
-    ipcMain.handle('auth:get-profile', this.handleGetProfile.bind(this));
+    ipcMain.handle('auth:get-user', this.handleGetUser.bind(this));
     ipcMain.handle('auth:refresh-profile', this.handleRefreshProfile.bind(this));
 
     this.handlersRegistered = true;
@@ -84,7 +84,7 @@ export class AuthIPCHandlers {
     ipcMain.removeHandler('auth:start-login');
     ipcMain.removeHandler('auth:get-status');
     ipcMain.removeHandler('auth:logout');
-    ipcMain.removeHandler('auth:get-profile');
+    ipcMain.removeHandler('auth:get-user');
     ipcMain.removeHandler('auth:refresh-profile');
 
     this.handlersRegistered = false;
@@ -171,37 +171,37 @@ export class AuthIPCHandlers {
   }
 
   /**
-   * Handle get profile request
-   * Returns cached profile from local storage
+   * Handle get user request
+   * Returns current user from database
    * Requirements: account-profile.1.2, account-profile.1.7
    * @param event IPC event
-   * @returns IPC result with profile data or null
+   * @returns IPC result with user data or null
    */
-  private async handleGetProfile(_event: IpcMainInvokeEvent): Promise<IPCResult> {
+  private async handleGetUser(_event: IpcMainInvokeEvent): Promise<IPCResult> {
     try {
       // Requirements: account-profile.1.2, account-profile.1.7
       if (!this.profileManager) {
         this.logger.warn('Profile manager not set');
         return {
           success: true,
-          profile: null,
+          user: null,
         };
       }
 
-      this.logger.info('Getting profile');
-      const profile = await this.profileManager.loadProfile();
+      this.logger.info('Getting user');
+      const user = this.profileManager.getCurrentUser();
 
       return {
         success: true,
-        profile: profile,
+        user: user,
       };
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      this.logger.error(`Failed to get profile: ${errorMessage}`);
+      this.logger.error(`Failed to get user: ${errorMessage}`);
       return {
         success: false,
-        error: errorMessage || 'Failed to get profile',
-        profile: null,
+        error: errorMessage || 'Failed to get user',
+        user: null,
       };
     }
   }
@@ -211,7 +211,7 @@ export class AuthIPCHandlers {
    * Fetches fresh profile data from Google API and publishes profile.synced event
    * Requirements: account-profile.1.5
    * @param event IPC event
-   * @returns IPC result with fresh profile data or null
+   * @returns IPC result with fresh user data or null
    */
   private async handleRefreshProfile(_event: IpcMainInvokeEvent): Promise<IPCResult> {
     try {
@@ -221,26 +221,26 @@ export class AuthIPCHandlers {
         return {
           success: false,
           error: 'Profile manager not initialized',
-          profile: null,
+          user: null,
         };
       }
 
       this.logger.info('Refreshing profile');
-      const profile = await this.profileManager.fetchProfile();
+      const user = await this.profileManager.fetchProfile();
       Logger.info(
         'AuthIPCHandlers',
-        `Profile refresh completed, result: ${profile ? 'success' : 'null'}`
+        `Profile refresh completed, result: ${user ? 'success' : 'null'}`
       );
 
       // Publish profile.synced event via EventBus
       // Requirements: account-profile.1.5 - Notify UI about profile updates
-      if (profile) {
-        this.publishProfileSynced(profile);
+      if (user) {
+        this.publishProfileSynced(user);
       }
 
       return {
         success: true,
-        profile: profile,
+        user: user,
       };
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -281,12 +281,18 @@ export class AuthIPCHandlers {
 
   /**
    * Publish profile.synced event via EventBus
-   * Called when profile is fetched and saved
-   * @param profile User profile data
+   * Called when user is fetched and saved
+   * @param user User data from database
    */
-  publishProfileSynced(profile: UserProfile): void {
+  publishProfileSynced(user: User): void {
     const eventBus = MainEventBus.getInstance();
-    eventBus.publish(new ProfileSyncedEvent(profile));
+    eventBus.publish(
+      new ProfileSyncedEvent({
+        user_id: user.user_id,
+        email: user.email,
+        name: user.name,
+      })
+    );
   }
 
   /**

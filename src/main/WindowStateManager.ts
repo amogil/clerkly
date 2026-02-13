@@ -2,7 +2,7 @@
 
 import { screen } from 'electron';
 import { DataManager } from './DataManager';
-import type { UserProfileManager } from './auth/UserProfileManager';
+import type { UserManager } from './auth/UserManager';
 import { Logger } from './Logger';
 
 // Requirements: clerkly.3.8 - Use centralized Logger instead of console.*
@@ -84,7 +84,7 @@ export class WindowStateManager {
   // Requirements: clerkly.3.5, clerkly.3.7
   private logger = Logger.create('WindowStateManager');
   private dataManager: DataManager;
-  private userProfileManager: UserProfileManager | null;
+  private userManager: UserManager | null;
   private readonly stateKey = 'window_state';
   // System email for window state - not tied to any user
   private readonly systemEmail = '__system__';
@@ -96,7 +96,7 @@ export class WindowStateManager {
    *
    * @param dataManager - DataManager instance for state persistence. This is used
    *                      to save and load window state from the SQLite database.
-   * @param userProfileManager - Optional UserProfileManager for temporarily setting system email
+   * @param userManager - Optional UserManager for temporarily setting system email
    *
    * @example
    * ```typescript
@@ -104,9 +104,9 @@ export class WindowStateManager {
    * const stateManager = new WindowStateManager(dataManager);
    * ```
    */
-  constructor(dataManager: DataManager, userProfileManager?: UserProfileManager) {
+  constructor(dataManager: DataManager, userManager?: UserManager) {
     this.dataManager = dataManager;
-    this.userProfileManager = userProfileManager || null;
+    this.userManager = userManager || null;
   }
 
   /**
@@ -146,9 +146,9 @@ export class WindowStateManager {
   loadState(): WindowState {
     // Temporarily set system user_id for loading window state
     // Requirements: user-data-isolation.2.8 - Window state is global, not tied to any user
-    const originalUserId = this.userProfileManager?.getCurrentUserId() || null;
-    if (this.userProfileManager) {
-      (this.userProfileManager as any).currentUserId = this.systemEmail;
+    const originalUserId = this.userManager?.getCurrentUserId() || null;
+    if (this.userManager) {
+      (this.userManager as any).currentUserId = this.systemEmail;
     }
 
     try {
@@ -170,8 +170,8 @@ export class WindowStateManager {
       // is not critical - we fall back to default state gracefully
     } finally {
       // Restore original user_id
-      if (this.userProfileManager) {
-        (this.userProfileManager as any).currentUserId = originalUserId;
+      if (this.userManager) {
+        (this.userManager as any).currentUserId = originalUserId;
       }
     }
 
@@ -240,9 +240,9 @@ export class WindowStateManager {
   saveState(state: WindowState): void {
     // Temporarily set system user_id for saving window state
     // Requirements: user-data-isolation.2.8 - Window state is global, not tied to any user
-    const originalUserId = this.userProfileManager?.getCurrentUserId() || null;
-    if (this.userProfileManager) {
-      (this.userProfileManager as any).currentUserId = this.systemEmail;
+    const originalUserId = this.userManager?.getCurrentUserId() || null;
+    if (this.userManager) {
+      (this.userManager as any).currentUserId = this.systemEmail;
     }
 
     try {
@@ -255,8 +255,8 @@ export class WindowStateManager {
       // is not critical - user can continue working normally
     } finally {
       // Restore original user_id
-      if (this.userProfileManager) {
-        (this.userProfileManager as any).currentUserId = originalUserId;
+      if (this.userManager) {
+        (this.userManager as any).currentUserId = originalUserId;
       }
     }
   }
