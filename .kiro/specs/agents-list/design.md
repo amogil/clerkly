@@ -4,6 +4,157 @@
 
 Agents List - это основной интерфейс для взаимодействия с AI-агентами в приложении Clerkly. Компонент предоставляет список агентов, интерфейс чата и навигацию между агентами.
 
+## Схема Базы Данных
+
+Структура данных основана на спецификации AGENTS-DESIGN.md.
+
+### Таблица users
+
+```sql
+CREATE TABLE users (
+  user_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT,
+  email TEXT NOT NULL UNIQUE
+);
+
+CREATE INDEX idx_users_email ON users(email);
+```
+
+**Поля:**
+- `user_id` - уникальный идентификатор пользователя
+- `name` - имя пользователя из Google OAuth профиля
+- `email` - email пользователя из Google OAuth профиля (уникальный)
+
+### Таблица agents
+
+```sql
+CREATE TABLE agents (
+  agent_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  name TEXT NULL,
+  created_at TIMESTAMP NOT NULL,
+  updated_at TIMESTAMP NOT NULL,
+  archived_at TIMESTAMP NULL,
+  FOREIGN KEY (user_id) REFERENCES users(user_id)
+);
+
+CREATE INDEX idx_agents_user_archived_updated
+  ON agents(user_id, archived_at, updated_at DESC);
+```
+
+**Поля:**
+- `agent_id` - уникальный идентификатор агента
+- `user_id` - идентификатор пользователя-владельца (FK на users.user_id)
+- `name` - название агента (может быть NULL для новых агентов)
+- `created_at` - время создания (ISO 8601 с timezone offset)
+- `updated_at` - время последнего обновления
+- `archived_at` - время архивирования (NULL = не архивирован)
+
+### Таблица messages
+
+```sql
+CREATE TABLE messages (
+  id INTEGER PRIMARY KEY,
+  agent_id INTEGER NOT NULL,
+  timestamp TIMESTAMP NOT NULL,
+  payload_json TEXT NOT NULL
+);
+
+CREATE INDEX idx_messages_agent_id ON messages(agent_id);
+CREATE INDEX idx_messages_agent_timestamp ON messages(agent_id, timestamp);
+```
+
+**Поля:**
+- `id` - уникальный идентификатор сообщения
+- `agent_id` - ID агента
+- `timestamp` - время сообщения (ISO 8601 с timezone offset в часовом поясе пользователя)
+- `payload_json` - JSON с данными сообщения
+
+### Формат payload_json
+
+Базовая структура:
+
+```json
+{
+  "kind": "user | llm | tool_call | code_exec | final_answer | request_scope | artifact",
+  "timing": { "started_at": "ISO+offset", "finished_at": "ISO+offset" },
+  "data": {}
+}
+```
+
+**Примечание:** `timing` обязателен только для: tool_call, code_exec, request_scope
+
+### Message Kinds для UI
+
+Для отображения в чате используются следующие kinds:
+
+**user** - сообщение пользователя:
+```json
+{ "kind": "user", "data": { "reply_to_message_id": null, "text": "string" } }
+```
+
+**llm** - ответ LLM (показывается как текст агента):
+```json
+{
+  "kind": "llm",
+  "data": {
+    "reply_to_message_id": 123,
+    "action": {
+      "type": "text | final_answer | request_scope | code_exec",
+      "content": "string"
+    }
+  }
+}
+```
+
+**final_answer** - финальный ответ агента:
+```json
+{ "kind": "final_answer", "data": { "reply_to_message_id": 123, "text": "string", "format": "markdown|text" } }
+```
+
+### Определение статуса агента
+
+Статус агента вычисляется из последних сообщений:
+
+```typescript
+function getAgentStatus(messages: Message[]): AgentStatus {
+  if (messages.length === 0) return 'new';
+  
+  const lastMessage = messages[messages.length - 1];
+  const payload = JSON.parse(lastMessage.payload_json);
+  
+  // Проверка на running операции
+  if (payload.kind === 'tool_call' || payload.kind === 'code_exec') {
+    if (payload.data?.result?.status === 'running') return 'in-progress';
+  }
+  
+  // Проверка на ошибки
+  if (payload.data?.result?.status === 'error' || 
+      payload.data?.result?.status === 'crash' ||
+      payload.data?.result?.status === 'timeout') {
+    return 'error';
+  }
+  
+  // Проверка на завершение
+  if (payload.kind === 'final_answer') return 'completed';
+  
+  // Проверка на ожидание пользователя
+  if (payload.kind === 'llm' && payload.data?.action?.type === 'text') {
+    return 'awaiting-user';
+  }
+  
+  return 'new';
+}
+```
+
+### Timestamp нормализация
+
+Все timestamps ДОЛЖНЫ:
+- Включать timezone offset (ISO 8601)
+- Храниться в часовом поясе пользователя
+
+Пример: `2026-02-13T18:42:11+01:00`
+
 ## Архитектура Компонента
 
 ```

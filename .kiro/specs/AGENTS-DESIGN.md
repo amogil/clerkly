@@ -120,7 +120,7 @@ Timeouts/crash handling.
 
 1.3 Naming conventions
 	•	agent_id: INTEGER (autoincrement)
-	•	user_id: TEXT (owner)
+	•	user_id: INTEGER (FK to users.user_id)
 	•	message_id: INTEGER (messages.id)
 	•	tool_call_id: TEXT derived from tool_name + timestamp (with optional random suffix)
 
@@ -157,15 +157,26 @@ Rationale:
 
 2. Storage Model
 
+2.0 Table: users
+
+CREATE TABLE users (
+  user_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT,
+  email TEXT NOT NULL UNIQUE
+);
+
+CREATE INDEX idx_users_email ON users(email);
+
 2.1 Table: agents
 
 CREATE TABLE agents (
   agent_id INTEGER PRIMARY KEY AUTOINCREMENT,
-  user_id TEXT NOT NULL,
+  user_id INTEGER NOT NULL,
   name TEXT NULL,
   created_at TIMESTAMP NOT NULL,
   updated_at TIMESTAMP NOT NULL,
-  archived_at TIMESTAMP NULL
+  archived_at TIMESTAMP NULL,
+  FOREIGN KEY (user_id) REFERENCES users(user_id)
 );
 
 CREATE INDEX idx_agents_user_archived_updated

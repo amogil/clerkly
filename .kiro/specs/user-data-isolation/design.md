@@ -2,7 +2,7 @@
 
 ## Обзор
 
-Данный документ описывает дизайн системы изоляции данных пользователей в приложении Clerkly. Система обеспечивает автоматическую фильтрацию данных по email пользователя, полученному из Google OAuth профиля, позволяя нескольким пользователям безопасно использовать одно приложение на одном устройстве.
+Данный документ описывает дизайн системы изоляции данных пользователей в приложении Clerkly. Система обеспечивает автоматическую фильтрацию данных по user_id пользователя, позволяя нескольким пользователям безопасно использовать одно приложение на одном устройстве.
 
 **Архитектурный Принцип:** Следует принципу **Единого Источника Истины (Single Source of Truth)**, где база данных является единственным источником истины для всех пользовательских данных. При смене пользователя данные предыдущего пользователя остаются в базе и автоматически восстанавливаются при повторном входе.
 
@@ -18,17 +18,18 @@
 │  ┌──────────────────────┐       ┌─────────────────────┐     │
 │  │ UserProfileManager   │──────▶│ DataManager         │     │
 │  │                      │       │                     │     │
-│  │ - currentUserEmail   │       │ - saveData()        │     │
+│  │ - currentUserId      │       │ - saveData()        │     │
 │  │ - fetchProfile()     │       │ - loadData()        │     │
-│  │ - getCurrentEmail()  │       │ - deleteData()      │     │
-│  └──────────────────────┘       │ + user_email filter │     │
+│  │ - getCurrentUserId() │       │ - deleteData()      │     │
+│  └──────────────────────┘       │ + user_id filter    │     │
 │           │                      └─────────────────────┘     │
 │           │                                │                 │
 │           ▼                                ▼                 │
 │  ┌──────────────────────┐       ┌─────────────────────┐     │
 │  │ Google OAuth         │       │    SQLite DB        │     │
-│  │ (email from profile) │       │  user_data table    │     │
-│  └──────────────────────┘       │  + user_email col   │     │
+│  │ (email from profile) │       │  users table        │     │
+│  └──────────────────────┘       │  user_data table    │     │
+│                                  │  + user_id col      │     │
 │                                  └─────────────────────┘     │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -38,26 +39,115 @@
 1. **Авторизация:**
    - Пользователь авторизуется через Google OAuth
    - UserProfileManager получает email из профиля
-   - Email кэшируется в `currentUserEmail`
+   - Система находит или создает запись в таблице `users` по email
+   - user_id кэшируется в `currentUserId`
 
 2. **Сохранение Данных:**
    - Приложение вызывает `DataManager.saveData(key, value)`
-   - DataManager автоматически получает email через `getCurrentEmail()`
-   - Данные сохраняются с привязкой к `user_email`
+   - DataManager автоматически получает user_id через `getCurrentUserId()`
+   - Данные сохраняются с привязкой к `user_id`
 
 3. **Загрузка Данных:**
    - Приложение вызывает `DataManager.loadData(key)`
-   - DataManager автоматически фильтрует по `user_email`
+   - DataManager автоматически фильтрует по `user_id`
    - Возвращаются только данные текущего пользователя
 
 4. **Смена Пользователя:**
    - Пользователь A выходит (logout)
-   - `currentUserEmail` очищается
+   - `currentUserId` очищается
    - Пользователь B авторизуется
-   - `currentUserEmail` устанавливается на email пользователя B
-   - Все операции с данными автоматически фильтруются по новому email
+   - Система находит/создает user_id для пользователя B
+   - `currentUserId` устанавливается на user_id пользователя B
+   - Все операции с данными автоматически фильтруются по новому user_id
+
+## Модели Данных
+
+### users Table Schema
+
+```sql
+CREATE TABLE IF NOT EXISTS users (
+  user_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT,
+  email TEXT NOT NULL UNIQUE
+);
+
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+```
+
+### user_data Table Schema
+
+```sql
+CREATE TABLE IF NOT EXISTS user_data (
+  key TEXT NOT NULL,
+  value TEXT NOT NULL,
+  user_id INTEGER NOT NULL,
+  PRIMARY KEY (key, user_id),
+  FOREIGN KEY (user_id) REFERENCES users(user_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_id ON user_data(user_id);
+```
+
+### UserProfile Interface
+
+```typescript
+interface UserProfile {
+  id: string;
+  email: string;
+  name: string;
+  given_name?: string;
+  family_name?: string;
+  picture?: string;
+  locale?: string;
+  lastUpdated: number;
+}
+
+interface User {
+  user_id: number;
+  name: string | null;
+  email: string;
+}
+```
 
 ## Компоненты и Интерфейсы
+
+### UserManager
+
+```typescript
+class UserManager {
+  /**
+   * Find or create user by email
+   * Requirements: user-data-isolation.0.2, user-data-isolation.0.3, user-data-isolation.0.4
+   */
+  async findOrCreateUser(email: string, name: string | null): Promise<User> {
+    // Try to find existing user
+    const existingUser = this.db.prepare(
+      'SELECT user_id, name, email FROM users WHERE email = ?'
+    ).get(email) as User | undefined;
+
+    if (existingUser) {
+      // Update name if changed
+      if (name && existingUser.name !== name) {
+        this.db.prepare('UPDATE users SET name = ? WHERE user_id = ?')
+          .run(name, existingUser.user_id);
+        existingUser.name = name;
+      }
+      return existingUser;
+    }
+
+    // Create new user
+    const result = this.db.prepare(
+      'INSERT INTO users (name, email) VALUES (?, ?)'
+    ).run(name, email);
+
+    return {
+      user_id: result.lastInsertRowid as number,
+      name,
+      email
+    };
+  }
+}
+```
 
 ### DataManager (Extended)
 
@@ -70,13 +160,13 @@ class DataManager {
   }
 
   /**
-   * Save data with automatic user_email filtering
+   * Save data with automatic user_id filtering
    * Requirements: user-data-isolation.1.3, user-data-isolation.1.11, user-data-isolation.1.12
    */
   async saveData(key: string, value: any): Promise<void> {
     // Requirements: user-data-isolation.1.14 - Check if user is logged in
-    const userEmail = this.userProfileManager.getCurrentEmail();
-    if (!userEmail) {
+    const userId = this.userProfileManager.getCurrentUserId();
+    if (!userId) {
       console.error('[DataManager] No user logged in');
       throw new Error('No user logged in');
     }
@@ -84,13 +174,13 @@ class DataManager {
     try {
       const valueJson = JSON.stringify(value);
       
-      // Requirements: user-data-isolation.1.3 - Automatically add user_email
+      // Requirements: user-data-isolation.1.3 - Automatically add user_id
       await this.db.run(
-        `INSERT OR REPLACE INTO user_data (key, value, user_email) VALUES (?, ?, ?)`,
-        [key, valueJson, userEmail]
+        `INSERT OR REPLACE INTO user_data (key, value, user_id) VALUES (?, ?, ?)`,
+        [key, valueJson, userId]
       );
       
-      console.log(`[DataManager] Data saved for user ${userEmail}, key: ${key}`);
+      console.log(`[DataManager] Data saved for user ${userId}, key: ${key}`);
     } catch (error) {
       console.error('[DataManager] Failed to save data:', error);
       throw error;
@@ -98,13 +188,13 @@ class DataManager {
   }
 
   /**
-   * Load data with automatic user_email filtering
+   * Load data with automatic user_id filtering
    * Requirements: user-data-isolation.1.4, user-data-isolation.1.13
    */
   async loadData(key: string): Promise<{ success: boolean; data?: any; error?: string }> {
     // Requirements: user-data-isolation.1.14 - Check if user is logged in
-    const userEmail = this.userProfileManager.getCurrentEmail();
-    if (!userEmail) {
+    const userId = this.userProfileManager.getCurrentUserId();
+    if (!userId) {
       return {
         success: false,
         error: 'No user logged in'
@@ -112,15 +202,15 @@ class DataManager {
     }
 
     try {
-      // Requirements: user-data-isolation.1.4 - Filter by user_email
+      // Requirements: user-data-isolation.1.4 - Filter by user_id
       const row = await this.db.get(
-        `SELECT value FROM user_data WHERE key = ? AND user_email = ?`,
-        [key, userEmail]
+        `SELECT value FROM user_data WHERE key = ? AND user_id = ?`,
+        [key, userId]
       );
 
       if (row) {
         const data = JSON.parse(row.value);
-        console.log(`[DataManager] Data loaded for user ${userEmail}, key: ${key}`);
+        console.log(`[DataManager] Data loaded for user ${userId}, key: ${key}`);
         return { success: true, data };
       }
 
@@ -132,25 +222,25 @@ class DataManager {
   }
 
   /**
-   * Delete data with automatic user_email filtering
+   * Delete data with automatic user_id filtering
    * Requirements: user-data-isolation.1.4
    */
   async deleteData(key: string): Promise<void> {
     // Requirements: user-data-isolation.1.14 - Check if user is logged in
-    const userEmail = this.userProfileManager.getCurrentEmail();
-    if (!userEmail) {
+    const userId = this.userProfileManager.getCurrentUserId();
+    if (!userId) {
       console.error('[DataManager] No user logged in');
       throw new Error('No user logged in');
     }
 
     try {
-      // Requirements: user-data-isolation.1.4 - Filter by user_email
+      // Requirements: user-data-isolation.1.4 - Filter by user_id
       await this.db.run(
-        `DELETE FROM user_data WHERE key = ? AND user_email = ?`,
-        [key, userEmail]
+        `DELETE FROM user_data WHERE key = ? AND user_id = ?`,
+        [key, userId]
       );
       
-      console.log(`[DataManager] Data deleted for user ${userEmail}, key: ${key}`);
+      console.log(`[DataManager] Data deleted for user ${userId}, key: ${key}`);
     } catch (error) {
       console.error('[DataManager] Failed to delete data:', error);
       throw error;
@@ -163,18 +253,19 @@ class DataManager {
 
 ```typescript
 class UserProfileManager {
-  private currentUserEmail: string | null = null; // Requirements: user-data-isolation.1.15
+  private currentUserId: number | null = null; // Requirements: user-data-isolation.1.15
+  private userManager: UserManager;
 
   /**
-   * Get current user email
+   * Get current user ID
    * Requirements: user-data-isolation.1.11, user-data-isolation.1.15
    */
-  getCurrentEmail(): string | null {
-    return this.currentUserEmail;
+  getCurrentUserId(): number | null {
+    return this.currentUserId;
   }
 
   /**
-   * Fetch profile from Google API and cache email
+   * Fetch profile from Google API and set user_id
    * Requirements: user-data-isolation.1.16
    */
   async fetchProfile(): Promise<UserProfile | null> {
@@ -194,8 +285,9 @@ class UserProfileManager {
 
       const profile = await response.json();
       
-      // Requirements: user-data-isolation.1.16 - Cache email
-      this.currentUserEmail = profile.email;
+      // Requirements: user-data-isolation.1.16 - Find or create user and cache user_id
+      const user = await this.userManager.findOrCreateUser(profile.email, profile.name);
+      this.currentUserId = user.user_id;
       
       await this.saveProfile(profile);
       return profile;
@@ -213,9 +305,10 @@ class UserProfileManager {
     try {
       const profile = await this.loadProfile();
       if (profile) {
-        // Requirements: user-data-isolation.1.17 - Set currentUserEmail from cached profile
-        this.currentUserEmail = profile.email;
-        console.log('[UserProfileManager] Email cached from stored profile:', profile.email);
+        // Requirements: user-data-isolation.1.17 - Find user and set currentUserId
+        const user = await this.userManager.findOrCreateUser(profile.email, profile.name);
+        this.currentUserId = user.user_id;
+        console.log('[UserProfileManager] User ID cached from stored profile:', user.user_id);
       }
     } catch (error) {
       console.error('[UserProfileManager] Failed to initialize:', error);
@@ -227,42 +320,10 @@ class UserProfileManager {
    * Requirements: user-data-isolation.1.18
    */
   async clearSession(): Promise<void> {
-    // Requirements: user-data-isolation.1.18 - Clear currentUserEmail
-    this.currentUserEmail = null;
-    console.log('[UserProfileManager] User email cleared');
+    // Requirements: user-data-isolation.1.18 - Clear currentUserId
+    this.currentUserId = null;
+    console.log('[UserProfileManager] User ID cleared');
   }
-}
-```
-
-## Модели Данных
-
-### user_data Table Schema
-
-```sql
-CREATE TABLE IF NOT EXISTS user_data (
-  key TEXT NOT NULL,
-  value TEXT NOT NULL,
-  user_email TEXT NOT NULL,
-  PRIMARY KEY (key, user_email)
-);
-
-CREATE INDEX IF NOT EXISTS idx_user_email ON user_data(user_email);
-```
-
-**Примечание:** Миграция выполняется вручную разработчиком (пересоздание базы данных).
-
-### UserProfile Interface
-
-```typescript
-interface UserProfile {
-  id: string;
-  email: string;  // Used for data isolation
-  name: string;
-  given_name?: string;
-  family_name?: string;
-  picture?: string;
-  locale?: string;
-  lastUpdated: number;
 }
 ```
 
@@ -270,45 +331,45 @@ interface UserProfile {
 
 *Свойство (property) — это характеристика или поведение, которое должно выполняться для всех допустимых выполнений системы. По сути, это формальное утверждение о том, что система должна делать. Свойства служат мостом между человекочитаемыми спецификациями и машинно-проверяемыми гарантиями корректности.*
 
-### Property 44: Автоматическое добавление user_email при сохранении
+### Property 44: Автоматическое добавление user_id при сохранении
 
-*Для любого* вызова `saveData(key, value)`, система должна автоматически добавить `user_email` текущего авторизованного пользователя к сохраняемым данным без явного параметра в методе.
+*Для любого* вызова `saveData(key, value)`, система должна автоматически добавить `user_id` текущего авторизованного пользователя к сохраняемым данным без явного параметра в методе.
 
 **Validates: Requirements 1.3, 1.11, 1.12**
 
-### Property 45: Автоматическая фильтрация по user_email при загрузке
+### Property 45: Автоматическая фильтрация по user_id при загрузке
 
-*Для любого* вызова `loadData(key)`, система должна автоматически фильтровать данные по `user_email` текущего авторизованного пользователя без явного параметра в методе.
+*Для любого* вызова `loadData(key)`, система должна автоматически фильтровать данные по `user_id` текущего авторизованного пользователя без явного параметра в методе.
 
 **Validates: Requirements 1.4, 1.13**
 
 ### Property 46: Изоляция данных между пользователями
 
-*Для любых* двух пользователей A и B с разными email адресами, данные сохраненные пользователем A не должны быть доступны пользователю B при загрузке.
+*Для любых* двух пользователей A и B с разными user_id, данные сохраненные пользователем A не должны быть доступны пользователю B при загрузке.
 
 **Validates: Requirements 1.6, 1.8**
 
 ### Property 47: Восстановление данных при повторном входе
 
-*Для любого* пользователя, после logout и повторного login с тем же email, все ранее сохраненные данные должны быть восстановлены в неизменном виде.
+*Для любого* пользователя, после logout и повторного login с тем же email, все ранее сохраненные данные должны быть восстановлены в неизменном виде (user_id остается тем же).
 
 **Validates: Requirements 1.5, 1.7**
 
 ### Property 48: Определение пользователя по OAuth email
 
-*Для любого* успешного OAuth профиля, система должна корректно извлечь email и использовать его для идентификации пользователя.
+*Для любого* успешного OAuth профиля, система должна корректно извлечь email, найти или создать запись в таблице users, и использовать user_id для идентификации пользователя.
 
-**Validates: Requirements 1.1, 1.16**
+**Validates: Requirements 0.2, 0.3, 1.1, 1.16**
 
-### Property 49: Очистка email при logout
+### Property 49: Очистка user_id при logout
 
-*Для любого* авторизованного пользователя, после выполнения logout операции, `currentUserEmail` должен быть установлен в `null`.
+*Для любого* авторизованного пользователя, после выполнения logout операции, `currentUserId` должен быть установлен в `null`.
 
 **Validates: Requirements 1.18**
 
 ### Property 50: Изоляция применяется ко всем типам данных
 
-*Для любого* типа пользовательских данных (настройки, профиль, токены, задачи, контакты, календарь), изоляция по `user_email` должна применяться автоматически.
+*Для любого* типа пользовательских данных (настройки, профиль, токены, агенты, задачи, контакты, календарь), изоляция по `user_id` должна применяться автоматически.
 
 **Validates: Requirements 1.8**
 
@@ -335,23 +396,53 @@ interface UserProfile {
 
 ### Модульные Тесты
 
+#### UserManager
+
+```typescript
+describe('UserManager', () => {
+  /* Preconditions: empty users table
+     Action: call findOrCreateUser('test@example.com', 'Test User')
+     Assertions: new user created with auto-generated user_id
+     Requirements: user-data-isolation.0.2 */
+  it('should create new user on first login', async () => {
+    // Тест создания нового пользователя
+  });
+
+  /* Preconditions: user exists in users table
+     Action: call findOrCreateUser with same email
+     Assertions: returns existing user_id
+     Requirements: user-data-isolation.0.3 */
+  it('should find existing user on re-login', async () => {
+    // Тест поиска существующего пользователя
+  });
+
+  /* Preconditions: user exists with name 'Old Name'
+     Action: call findOrCreateUser with same email but name 'New Name'
+     Assertions: name is updated in database
+     Requirements: user-data-isolation.0.4 */
+  it('should update user name if changed', async () => {
+    // Тест обновления имени
+  });
+});
+```
+
 #### DataManager (Extended)
 
 ```typescript
 describe('DataManager - User Data Isolation', () => {
-  /* Preconditions: UserProfileManager returns valid email
+  /* Preconditions: UserProfileManager returns valid user_id
      Action: call saveData('key', 'value')
-     Assertions: SQL query includes user_email in WHERE clause
+     Assertions: SQL query includes user_id in WHERE clause
      Requirements: user-data-isolation.1.3, user-data-isolation.1.11, user-data-isolation.1.12 */
-  it('should automatically add user_email when saving', async () => {
-    // Тест автоматического добавления email
+  it('should automatically add user_id when saving', async () => {
+    // Тест автоматического добавления user_id
   });
 
-  /* Preconditions: UserProfileManager returns valid email
+  /* Preconditions: UserProfileManager returns valid user_id
      Action: call loadData('key')
-     Assertions: SQL query filters by user_email
+     Assertions: SQL query filters by user_id
      Requirements: user-data-isolation.1.4, user-data-isolation.1.13 */
-  it('should automatically filter by user_email when loading', async () => {
+  it('should automatically filter by user_id when loading', async () => {
     // Тест автоматической фильтрации
   });
 
@@ -368,29 +459,29 @@ describe('DataManager - User Data Isolation', () => {
 #### UserProfileManager (Extended)
 
 ```typescript
-describe('UserProfileManager - Email Caching', () => {
+describe('UserProfileManager - User ID Caching', () => {
   /* Preconditions: successful OAuth login
      Action: call fetchProfile()
-     Assertions: currentUserEmail is set to profile.email
+     Assertions: currentUserId is set from users table
      Requirements: user-data-isolation.1.16 */
-  it('should cache email after successful login', async () => {
-    // Тест кэширования email
+  it('should cache user_id after successful login', async () => {
+    // Тест кэширования user_id
   });
 
   /* Preconditions: app startup with valid tokens
      Action: call initialize()
-     Assertions: currentUserEmail is loaded from database
+     Assertions: currentUserId is loaded from database
      Requirements: user-data-isolation.1.17 */
-  it('should restore email from database on startup', async () => {
-    // Тест восстановления email
+  it('should restore user_id from database on startup', async () => {
+    // Тест восстановления user_id
   });
 
   /* Preconditions: user logged in
      Action: call clearSession()
-     Assertions: currentUserEmail is null
+     Assertions: currentUserId is null
      Requirements: user-data-isolation.1.18 */
-  it('should clear email on logout', async () => {
-    // Тест очистки email
+  it('should clear user_id on logout', async () => {
+    // Тест очистки user_id
   });
 });
 ```
@@ -399,30 +490,30 @@ describe('UserProfileManager - Email Caching', () => {
 
 ```typescript
 describe('User Data Isolation - Property Tests', () => {
-  /* Property 44: Автоматическое добавление user_email */
-  it('should always add user_email when saving data', () => {
+  /* Property 44: Автоматическое добавление user_id */
+  it('should always add user_id when saving data', () => {
     fc.assert(
       fc.property(
         fc.string(), // key
         fc.anything(), // value
-        fc.emailAddress(), // userEmail
-        async (key, value, email) => {
-          // Setup: mock getCurrentEmail() to return email
+        fc.integer({ min: 1 }), // userId
+        async (key, value, userId) => {
+          // Setup: mock getCurrentUserId() to return userId
           // Action: saveData(key, value)
-          // Assert: DB contains record with user_email = email
+          // Assert: DB contains record with user_id = userId
         }
       ),
       { numRuns: 100 }
     );
   });
 
-  /* Property 45: Автоматическая фильтрация по user_email */
-  it('should always filter by user_email when loading data', () => {
+  /* Property 45: Автоматическая фильтрация по user_id */
+  it('should always filter by user_id when loading data', () => {
     fc.assert(
       fc.property(
         fc.string(), // key
-        fc.emailAddress(), // userEmail
-        async (key, email) => {
+        fc.integer({ min: 1 }), // userId
+        async (key, userId) => {
           // Setup: save data for multiple users
           // Action: loadData(key) with specific user
           // Assert: returns only data for that user
@@ -438,10 +529,10 @@ describe('User Data Isolation - Property Tests', () => {
       fc.property(
         fc.string(), // key
         fc.anything(), // value
-        fc.emailAddress(), // userA
-        fc.emailAddress(), // userB
-        async (key, value, emailA, emailB) => {
-          fc.pre(emailA !== emailB); // Ensure different users
+        fc.integer({ min: 1 }), // userIdA
+        fc.integer({ min: 1 }), // userIdB
+        async (key, value, userIdA, userIdB) => {
+          fc.pre(userIdA !== userIdB); // Ensure different users
           // Setup: save data as userA
           // Action: load data as userB
           // Assert: userB cannot see userA's data
@@ -459,9 +550,9 @@ describe('User Data Isolation - Property Tests', () => {
         fc.anything(), // value
         fc.emailAddress(), // userEmail
         async (key, value, email) => {
-          // Setup: save data, logout, login again
+          // Setup: save data, logout, login again with same email
           // Action: load data after re-login
-          // Assert: data is restored
+          // Assert: data is restored (same user_id)
         }
       ),
       { numRuns: 100 }
@@ -502,8 +593,8 @@ describe('User Data Isolation Functional Tests', () => {
      Action: login as each user, load data
      Assertions: each user sees only their own data
      Requirements: user-data-isolation.1.4, user-data-isolation.1.6 */
-  it('should filter data by user email', async () => {
-    // Тест фильтрации по email
+  it('should filter data by user_id', async () => {
+    // Тест фильтрации по user_id
   });
 
   /* Preconditions: not authenticated
@@ -528,6 +619,11 @@ describe('User Data Isolation Functional Tests', () => {
 
 | Требование | Модульные Тесты | Property-Based Тесты | Функциональные Тесты |
 |------------|-----------------|----------------------|----------------------|
+| user-data-isolation.0.1 | ✓ | - | - |
+| user-data-isolation.0.2 | ✓ | - | ✓ |
+| user-data-isolation.0.3 | ✓ | - | ✓ |
+| user-data-isolation.0.4 | ✓ | - | ✓ |
+| user-data-isolation.0.5 | - | - | - |
 | user-data-isolation.1.1 | - | ✓ | ✓ |
 | user-data-isolation.1.2 | ✓ | - | - |
 | user-data-isolation.1.3 | ✓ | ✓ | ✓ |
@@ -552,25 +648,41 @@ describe('User Data Isolation Functional Tests', () => {
 
 ## Технические Решения
 
-### Решение 22: Автоматическая Изоляция Данных по Email
+### Решение 22: Таблица Users для Изоляции Данных
 
-**Решение:** Автоматически добавлять `user_email` при сохранении и фильтровать по `user_email` при загрузке данных без явных параметров в методах DataManager.
+**Решение:** Использовать отдельную таблицу `users` с числовым `user_id` вместо хранения email напрямую в таблицах данных.
 
 **Обоснование:**
-- Упрощает API - не нужно передавать email в каждый метод
+- Числовой ID эффективнее для индексов и JOIN операций
+- Email может измениться (хотя редко), user_id остается постоянным
+- Нормализация данных - email хранится в одном месте
+- Возможность хранить дополнительную информацию о пользователе
+
+**Альтернативы:**
+- Использовать email напрямую как ключ (отклонено: менее эффективно, денормализация)
+- Использовать UUID (отклонено: избыточно для локального приложения)
+
+**Requirements:** user-data-isolation.0.1, user-data-isolation.0.2, user-data-isolation.0.3
+
+### Решение 23: Автоматическая Изоляция Данных по user_id
+
+**Решение:** Автоматически добавлять `user_id` при сохранении и фильтровать по `user_id` при загрузке данных без явных параметров в методах DataManager.
+
+**Обоснование:**
+- Упрощает API - не нужно передавать user_id в каждый метод
 - Снижает риск ошибок - невозможно забыть добавить фильтр
 - Централизованная логика изоляции в одном месте
 
 **Альтернативы:**
-- Требовать явную передачу user_email в каждый метод (отклонено: увеличивает сложность API)
+- Требовать явную передачу user_id в каждый метод (отклонено: увеличивает сложность API)
 - Использовать отдельные таблицы для каждого пользователя (отклонено: усложняет миграции)
 - Использовать отдельные базы данных для каждого пользователя (отклонено: избыточная сложность)
 
 **Requirements:** user-data-isolation.1.11, user-data-isolation.1.12, user-data-isolation.1.13
 
-### Решение 23: Кэширование Email в UserProfileManager
+### Решение 24: Кэширование user_id в UserProfileManager
 
-**Решение:** Хранить `currentUserEmail` в памяти в UserProfileManager и обновлять при авторизации/logout.
+**Решение:** Хранить `currentUserId` в памяти в UserProfileManager и обновлять при авторизации/logout.
 
 **Обоснование:**
 - Быстрый доступ без запросов к БД
@@ -578,7 +690,7 @@ describe('User Data Isolation Functional Tests', () => {
 - Автоматическое обновление при смене пользователя
 
 **Альтернативы:**
-- Запрашивать email из БД при каждой операции (отклонено: медленно)
-- Хранить email в глобальной переменной (отклонено: нарушает инкапсуляцию)
+- Запрашивать user_id из БД при каждой операции (отклонено: медленно)
+- Хранить user_id в глобальной переменной (отклонено: нарушает инкапсуляцию)
 
 **Requirements:** user-data-isolation.1.15, user-data-isolation.1.16, user-data-isolation.1.17, user-data-isolation.1.18
