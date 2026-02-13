@@ -9,6 +9,7 @@ import { contextBridge, ipcRenderer } from 'electron';
 // Event type constants (duplicated from shared/events/constants.ts due to rootDir restriction)
 const EVENT_TYPE_USER_LOGOUT = 'user.logout';
 const EVENT_TYPE_AUTH_FAILED = 'auth.failed';
+const EVENT_TYPE_AUTH_SUCCEEDED = 'auth.succeeded';
 
 /**
  * API interface for secure IPC communication
@@ -205,19 +206,18 @@ const api: API = {
     },
 
     /**
-     * Listen for authentication success events
+     * Listen for authentication success events via EventBus
      * Requirements: google-oauth-auth.8.4
      * @param {Function} callback - Callback function to execute on success
      * @returns {Function} Unsubscribe function to remove the listener
      */
     onAuthSuccess(callback: () => void): () => void {
-      const listener = () => {
-        callback();
-      };
-      ipcRenderer.on('auth:success', listener);
-      return () => {
-        ipcRenderer.removeListener('auth:success', listener);
-      };
+      // Use the events API to listen for auth.succeeded events
+      return api.events!.onEvent((type: string) => {
+        if (type === EVENT_TYPE_AUTH_SUCCEEDED) {
+          callback();
+        }
+      });
     },
 
     /**
