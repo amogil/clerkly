@@ -1,5 +1,5 @@
 /* Preconditions: NavigationManager created with mocked Router and window.api.auth
-   Action: call checkAuthStatus(), redirectToLogin(), redirectToDashboard(), initialize()
+   Action: call checkAuthStatus(), redirectToLogin(), redirectToAgents(), initialize()
    Assertions: correct behavior for each method based on auth status
    Requirements: navigation.1.1, navigation.1.3, navigation.1.4 */
 
@@ -99,15 +99,15 @@ describe('NavigationManager', () => {
     });
   });
 
-  describe('redirectToDashboard', () => {
+  describe('redirectToAgents', () => {
     /* Preconditions: NavigationManager created
-       Action: call redirectToDashboard()
+       Action: call redirectToAgents()
        Assertions: router.navigate() called with '/agents', message logged
        Requirements: navigation.1.3 */
     it('should navigate to agents route', () => {
       const consoleInfoSpy = jest.spyOn(console, 'info').mockImplementation();
 
-      navigationManager.redirectToDashboard();
+      navigationManager.redirectToAgents();
 
       expect(mockRouter.navigate).toHaveBeenCalledWith('/agents');
       expect(mockRouter.navigate).toHaveBeenCalledTimes(1);
@@ -141,7 +141,7 @@ describe('NavigationManager', () => {
 
     /* Preconditions: user authorized, current route is '/login'
        Action: call initialize()
-       Assertions: redirectToDashboard() called
+       Assertions: redirectToAgents() called
        Requirements: navigation.1.3 */
     it('should redirect to agents when user is authorized and on login screen', async () => {
       mockGetStatus.mockResolvedValue({ authorized: true });

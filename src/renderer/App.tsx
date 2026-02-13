@@ -107,10 +107,14 @@ function AppContent() {
       setIsLoading(false);
       setIsWaitingForProfile(false);
       setAuthError(null);
-      setIsAuthorized(true);
-      navigationManager.redirectToDashboard();
+      // Only redirect to agents if user was not already authorized
+      // This prevents redirecting away from Settings when profile is refreshed
+      if (!isAuthorized) {
+        setIsAuthorized(true);
+        navigationManager.redirectToAgents();
+      }
     },
-    [navigationManager]
+    [navigationManager, isAuthorized]
   );
 
   const handleErrorCreated = useCallback((payload: ErrorCreatedPayload) => {

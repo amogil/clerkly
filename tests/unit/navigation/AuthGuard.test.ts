@@ -15,7 +15,7 @@ describe('AuthGuard', () => {
     mockNavigationManager = {
       checkAuthStatus: jest.fn(),
       redirectToLogin: jest.fn(),
-      redirectToDashboard: jest.fn(),
+      redirectToAgents: jest.fn(),
       initialize: jest.fn(),
     } as any;
 

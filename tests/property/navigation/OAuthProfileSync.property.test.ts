@@ -90,9 +90,9 @@ describe('OAuth Profile Sync Property Tests', () => {
             timestamp: profileFetchComplete,
           });
 
-          // Simulate redirect to dashboard (happens after both operations complete)
-          const redirectToDashboard = Date.now();
-          operationLog.push({ operation: 'redirect_to_dashboard', timestamp: redirectToDashboard });
+          // Simulate redirect to agents (happens after both operations complete)
+          const redirectToAgents = Date.now();
+          operationLog.push({ operation: 'redirect_to_agents', timestamp: redirectToAgents });
 
           // Property 1: Operations must be in correct order
           const operations = operationLog.map((log) => log.operation);
@@ -101,7 +101,7 @@ describe('OAuth Profile Sync Property Tests', () => {
             'token_exchange_complete',
             'profile_fetch_start',
             'profile_fetch_complete',
-            'redirect_to_dashboard',
+            'redirect_to_agents',
           ]);
 
           // Property 2: Token exchange must complete before profile fetch starts
