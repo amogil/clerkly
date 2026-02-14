@@ -40,18 +40,20 @@ describe('Property Tests - WindowStateManager', () => {
   let mockScreen: any;
 
   beforeEach(() => {
-    // Create mock DatabaseManager (IDatabaseManager interface)
-    // Requirements: database-refactoring.3.6 - WindowStateManager uses DatabaseManager
+    // Create mock DatabaseManager with global query methods
+    // Requirements: database-refactoring.3.6, user-data-isolation.6.10 - WindowStateManager uses global methods
     mockDbManager = {
-      getDatabase: jest.fn().mockReturnValue({
-        open: true,
-        prepare: jest.fn().mockReturnValue({
-          get: jest.fn().mockReturnValue(undefined),
-          run: jest.fn(),
-        }),
-      }),
+      getDatabase: jest.fn(),
       getCurrentUserId: jest.fn().mockReturnValue(null),
       setUserManager: jest.fn(),
+      // Global query methods (used by WindowStateManager)
+      runQuery: jest.fn(),
+      getRow: jest.fn().mockReturnValue(undefined), // Default: no saved state
+      getRows: jest.fn(),
+      // User query methods (not used by WindowStateManager)
+      runUserQuery: jest.fn(),
+      getUserRow: jest.fn(),
+      getUserRows: jest.fn(),
     } as any;
 
     // Get mocked electron screen
@@ -95,16 +97,8 @@ describe('Property Tests - WindowStateManager', () => {
             workAreaSize: screenSize,
           });
 
-          // Mock no saved state to trigger default state generation
-          // Database returns undefined (no saved state)
-          const mockDb = {
-            open: true,
-            prepare: jest.fn().mockReturnValue({
-              get: jest.fn().mockReturnValue(undefined),
-              run: jest.fn(),
-            }),
-          };
-          mockDbManager.getDatabase.mockReturnValue(mockDb as any);
+          // Mock no saved state - getRow returns undefined
+          mockDbManager.getRow.mockReturnValue(undefined);
 
           // Call loadState which internally calls getDefaultState
           const state = windowStateManager.loadState();
@@ -156,15 +150,8 @@ describe('Property Tests - WindowStateManager', () => {
       workAreaSize: smallScreen,
     });
 
-    // Mock no saved state
-    const mockDb = {
-      open: true,
-      prepare: jest.fn().mockReturnValue({
-        get: jest.fn().mockReturnValue(undefined),
-        run: jest.fn(),
-      }),
-    };
-    mockDbManager.getDatabase.mockReturnValue(mockDb as any);
+    // Mock no saved state - getRow returns undefined
+    mockDbManager.getRow.mockReturnValue(undefined);
 
     const state = windowStateManager.loadState();
 
@@ -187,15 +174,8 @@ describe('Property Tests - WindowStateManager', () => {
       workAreaSize: largeScreen,
     });
 
-    // Mock no saved state
-    const mockDb = {
-      open: true,
-      prepare: jest.fn().mockReturnValue({
-        get: jest.fn().mockReturnValue(undefined),
-        run: jest.fn(),
-      }),
-    };
-    mockDbManager.getDatabase.mockReturnValue(mockDb as any);
+    // Mock no saved state - getRow returns undefined
+    mockDbManager.getRow.mockReturnValue(undefined);
 
     const state = windowStateManager.loadState();
 
@@ -218,15 +198,8 @@ describe('Property Tests - WindowStateManager', () => {
       workAreaSize: ultrawideScreen,
     });
 
-    // Mock no saved state
-    const mockDb = {
-      open: true,
-      prepare: jest.fn().mockReturnValue({
-        get: jest.fn().mockReturnValue(undefined),
-        run: jest.fn(),
-      }),
-    };
-    mockDbManager.getDatabase.mockReturnValue(mockDb as any);
+    // Mock no saved state - getRow returns undefined
+    mockDbManager.getRow.mockReturnValue(undefined);
 
     const state = windowStateManager.loadState();
 
@@ -249,15 +222,8 @@ describe('Property Tests - WindowStateManager', () => {
       workAreaSize: portraitScreen,
     });
 
-    // Mock no saved state
-    const mockDb = {
-      open: true,
-      prepare: jest.fn().mockReturnValue({
-        get: jest.fn().mockReturnValue(undefined),
-        run: jest.fn(),
-      }),
-    };
-    mockDbManager.getDatabase.mockReturnValue(mockDb as any);
+    // Mock no saved state - getRow returns undefined
+    mockDbManager.getRow.mockReturnValue(undefined);
 
     const state = windowStateManager.loadState();
 
@@ -280,15 +246,8 @@ describe('Property Tests - WindowStateManager', () => {
       workAreaSize: minScreen,
     });
 
-    // Mock no saved state
-    const mockDb = {
-      open: true,
-      prepare: jest.fn().mockReturnValue({
-        get: jest.fn().mockReturnValue(undefined),
-        run: jest.fn(),
-      }),
-    };
-    mockDbManager.getDatabase.mockReturnValue(mockDb as any);
+    // Mock no saved state - getRow returns undefined
+    mockDbManager.getRow.mockReturnValue(undefined);
 
     const state = windowStateManager.loadState();
 
@@ -315,15 +274,8 @@ describe('Property Tests - WindowStateManager', () => {
       workAreaSize: maxScreen,
     });
 
-    // Mock no saved state
-    const mockDb = {
-      open: true,
-      prepare: jest.fn().mockReturnValue({
-        get: jest.fn().mockReturnValue(undefined),
-        run: jest.fn(),
-      }),
-    };
-    mockDbManager.getDatabase.mockReturnValue(mockDb as any);
+    // Mock no saved state - getRow returns undefined
+    mockDbManager.getRow.mockReturnValue(undefined);
 
     const state = windowStateManager.loadState();
 
@@ -359,15 +311,8 @@ describe('Property Tests - WindowStateManager', () => {
         workAreaSize: resolution,
       });
 
-      // Mock no saved state
-      const mockDb = {
-        open: true,
-        prepare: jest.fn().mockReturnValue({
-          get: jest.fn().mockReturnValue(undefined),
-          run: jest.fn(),
-        }),
-      };
-      mockDbManager.getDatabase.mockReturnValue(mockDb as any);
+      // Mock no saved state - getRow returns undefined
+      mockDbManager.getRow.mockReturnValue(undefined);
 
       const state = windowStateManager.loadState();
 
@@ -399,15 +344,8 @@ describe('Property Tests - WindowStateManager', () => {
       workAreaSize: oddScreen,
     });
 
-    // Mock no saved state
-    const mockDb = {
-      open: true,
-      prepare: jest.fn().mockReturnValue({
-        get: jest.fn().mockReturnValue(undefined),
-        run: jest.fn(),
-      }),
-    };
-    mockDbManager.getDatabase.mockReturnValue(mockDb as any);
+    // Mock no saved state - getRow returns undefined
+    mockDbManager.getRow.mockReturnValue(undefined);
 
     const state = windowStateManager.loadState();
 
@@ -436,15 +374,8 @@ describe('Property Tests - WindowStateManager', () => {
       workAreaSize: screenSize,
     });
 
-    // Mock no saved state
-    const mockDb = {
-      open: true,
-      prepare: jest.fn().mockReturnValue({
-        get: jest.fn().mockReturnValue(undefined),
-        run: jest.fn(),
-      }),
-    };
-    mockDbManager.getDatabase.mockReturnValue(mockDb as any);
+    // Mock no saved state - getRow returns undefined
+    mockDbManager.getRow.mockReturnValue(undefined);
 
     // Call multiple times
     const state1 = windowStateManager.loadState();
@@ -467,15 +398,8 @@ describe('Property Tests - WindowStateManager', () => {
       workAreaSize: { width: 1920, height: 1080 },
     });
 
-    // Mock no saved state
-    const mockDb = {
-      open: true,
-      prepare: jest.fn().mockReturnValue({
-        get: jest.fn().mockReturnValue(undefined),
-        run: jest.fn(),
-      }),
-    };
-    mockDbManager.getDatabase.mockReturnValue(mockDb as any);
+    // Mock no saved state - getRow returns undefined
+    mockDbManager.getRow.mockReturnValue(undefined);
 
     const state1 = windowStateManager.loadState();
     expect(state1.width).toBe(600); // min(600, 1920)
@@ -524,27 +448,15 @@ describe('Property Tests - WindowStateManager', () => {
             },
           ]);
 
-          // Create a mock database that stores the saved state
+          // Create mock for save/load cycle using runQuery and getRow
           let savedValue: string | undefined;
-          const mockDb = {
-            open: true,
-            prepare: jest.fn().mockImplementation((sql: string) => {
-              if (sql.includes('INSERT')) {
-                return {
-                  run: jest.fn().mockImplementation((...args: any[]) => {
-                    savedValue = args[1]; // value is second argument
-                  }),
-                };
-              } else {
-                return {
-                  get: jest.fn().mockImplementation(() => {
-                    return savedValue ? { value: savedValue } : undefined;
-                  }),
-                };
-              }
-            }),
-          };
-          mockDbManager.getDatabase.mockReturnValue(mockDb as any);
+          mockDbManager.runQuery.mockImplementation((...args: unknown[]) => {
+            savedValue = (args[1] as unknown[])[1] as string; // value is at index 1 of params array
+            return { changes: 1, lastInsertRowid: 1 };
+          });
+          mockDbManager.getRow.mockImplementation(() => {
+            return savedValue ? { value: savedValue } : undefined;
+          });
 
           // Save the state
           windowStateManager.saveState(state);
@@ -590,15 +502,8 @@ describe('Property Tests - WindowStateManager', () => {
       workAreaSize: { width: 1920, height: 1080 },
     });
 
-    // Mock database to return the invalid state
-    const mockDb = {
-      open: true,
-      prepare: jest.fn().mockReturnValue({
-        get: jest.fn().mockReturnValue({ value: JSON.stringify(invalidState) }),
-        run: jest.fn(),
-      }),
-    };
-    mockDbManager.getDatabase.mockReturnValue(mockDb as any);
+    // Mock database to return the invalid state via getRow
+    mockDbManager.getRow.mockReturnValue({ value: JSON.stringify(invalidState) });
 
     // Load the state
     const loadedState = windowStateManager.loadState();
@@ -634,15 +539,8 @@ describe('Property Tests - WindowStateManager', () => {
       },
     ]);
 
-    // Mock database to return the state with negative coords
-    const mockDb = {
-      open: true,
-      prepare: jest.fn().mockReturnValue({
-        get: jest.fn().mockReturnValue({ value: JSON.stringify(stateWithNegativeCoords) }),
-        run: jest.fn(),
-      }),
-    };
-    mockDbManager.getDatabase.mockReturnValue(mockDb as any);
+    // Mock database to return the state with negative coords via getRow
+    mockDbManager.getRow.mockReturnValue({ value: JSON.stringify(stateWithNegativeCoords) });
 
     // Load the state
     const loadedState = windowStateManager.loadState();
@@ -673,15 +571,8 @@ describe('Property Tests - WindowStateManager', () => {
       },
     ]);
 
-    // Mock database to return the boundary state
-    const mockDb = {
-      open: true,
-      prepare: jest.fn().mockReturnValue({
-        get: jest.fn().mockReturnValue({ value: JSON.stringify(boundaryState) }),
-        run: jest.fn(),
-      }),
-    };
-    mockDbManager.getDatabase.mockReturnValue(mockDb as any);
+    // Mock database to return the boundary state via getRow
+    mockDbManager.getRow.mockReturnValue({ value: JSON.stringify(boundaryState) });
 
     // Load the state
     const loadedState = windowStateManager.loadState();
@@ -715,15 +606,8 @@ describe('Property Tests - WindowStateManager', () => {
       },
     ]);
 
-    // Mock database to return the max state
-    const mockDb = {
-      open: true,
-      prepare: jest.fn().mockReturnValue({
-        get: jest.fn().mockReturnValue({ value: JSON.stringify(maxState) }),
-        run: jest.fn(),
-      }),
-    };
-    mockDbManager.getDatabase.mockReturnValue(mockDb as any);
+    // Mock database to return the max state via getRow
+    mockDbManager.getRow.mockReturnValue({ value: JSON.stringify(maxState) });
 
     // Load the state
     const loadedState = windowStateManager.loadState();
@@ -755,27 +639,15 @@ describe('Property Tests - WindowStateManager', () => {
       },
     ]);
 
-    // Create a mock database that stores the saved state
+    // Create mock for save/load cycle using runQuery and getRow
     let savedValue: string | undefined;
-    const mockDb = {
-      open: true,
-      prepare: jest.fn().mockImplementation((sql: string) => {
-        if (sql.includes('INSERT')) {
-          return {
-            run: jest.fn().mockImplementation((...args: any[]) => {
-              savedValue = args[1]; // value is second argument
-            }),
-          };
-        } else {
-          return {
-            get: jest.fn().mockImplementation(() => {
-              return savedValue ? { value: savedValue } : undefined;
-            }),
-          };
-        }
-      }),
-    };
-    mockDbManager.getDatabase.mockReturnValue(mockDb as any);
+    mockDbManager.runQuery.mockImplementation((...args: unknown[]) => {
+      savedValue = (args[1] as unknown[])[1] as string; // value is at index 1 of params array
+      return { changes: 1, lastInsertRowid: 1 };
+    });
+    mockDbManager.getRow.mockImplementation(() => {
+      return savedValue ? { value: savedValue } : undefined;
+    });
 
     // First cycle: save and load
     windowStateManager.saveState(originalState);
@@ -822,27 +694,15 @@ describe('Property Tests - WindowStateManager', () => {
       },
     ]);
 
-    // Create a mock database that stores the saved state
+    // Create mock for save/load cycle using runQuery and getRow
     let savedValue: string | undefined;
-    const mockDb = {
-      open: true,
-      prepare: jest.fn().mockImplementation((sql: string) => {
-        if (sql.includes('INSERT')) {
-          return {
-            run: jest.fn().mockImplementation((...args: any[]) => {
-              savedValue = args[1]; // value is second argument
-            }),
-          };
-        } else {
-          return {
-            get: jest.fn().mockImplementation(() => {
-              return savedValue ? { value: savedValue } : undefined;
-            }),
-          };
-        }
-      }),
-    };
-    mockDbManager.getDatabase.mockReturnValue(mockDb as any);
+    mockDbManager.runQuery.mockImplementation((...args: unknown[]) => {
+      savedValue = (args[1] as unknown[])[1] as string; // value is at index 1 of params array
+      return { changes: 1, lastInsertRowid: 1 };
+    });
+    mockDbManager.getRow.mockImplementation(() => {
+      return savedValue ? { value: savedValue } : undefined;
+    });
 
     // Test maximized state
     windowStateManager.saveState(maximizedState);
@@ -861,15 +721,8 @@ describe('Property Tests - WindowStateManager', () => {
      Requirements: window-management.5.4, window-management.5.5 */
   // Feature: ui, Property 7
   test('Property 7 edge case: corrupted data returns default state', () => {
-    // Mock corrupted JSON in database
-    const mockDb = {
-      open: true,
-      prepare: jest.fn().mockReturnValue({
-        get: jest.fn().mockReturnValue({ value: '{invalid json}' }),
-        run: jest.fn(),
-      }),
-    };
-    mockDbManager.getDatabase.mockReturnValue(mockDb as any);
+    // Mock corrupted JSON via getRow
+    mockDbManager.getRow.mockReturnValue({ value: '{invalid json}' });
 
     mockScreen.getPrimaryDisplay.mockReturnValue({
       workAreaSize: { width: 1920, height: 1080 },
@@ -890,15 +743,8 @@ describe('Property Tests - WindowStateManager', () => {
      Requirements: window-management.5.4, window-management.5.5 */
   // Feature: ui, Property 7
   test('Property 7 edge case: empty data returns default state', () => {
-    // Mock empty data in database
-    const mockDb = {
-      open: true,
-      prepare: jest.fn().mockReturnValue({
-        get: jest.fn().mockReturnValue({ value: '' }),
-        run: jest.fn(),
-      }),
-    };
-    mockDbManager.getDatabase.mockReturnValue(mockDb as any);
+    // Mock empty data via getRow
+    mockDbManager.getRow.mockReturnValue({ value: '' });
 
     mockScreen.getPrimaryDisplay.mockReturnValue({
       workAreaSize: { width: 1920, height: 1080 },
@@ -919,15 +765,8 @@ describe('Property Tests - WindowStateManager', () => {
      Requirements: window-management.5.4, window-management.5.5 */
   // Feature: ui, Property 7
   test('Property 7 edge case: failed load returns default state', () => {
-    // Mock no data in database (returns undefined)
-    const mockDb = {
-      open: true,
-      prepare: jest.fn().mockReturnValue({
-        get: jest.fn().mockReturnValue(undefined),
-        run: jest.fn(),
-      }),
-    };
-    mockDbManager.getDatabase.mockReturnValue(mockDb as any);
+    // Mock no data in database via getRow
+    mockDbManager.getRow.mockReturnValue(undefined);
 
     mockScreen.getPrimaryDisplay.mockReturnValue({
       workAreaSize: { width: 1920, height: 1080 },
@@ -952,30 +791,26 @@ describe('Property Tests - WindowManager State Changes', () => {
     // Clear all mocks
     jest.clearAllMocks();
 
-    // Create mock DatabaseManager (IDatabaseManager interface)
-    // Requirements: database-refactoring.3.6 - WindowManager uses DatabaseManager
+    // Create mock DatabaseManager with global query methods
+    // Requirements: database-refactoring.3.6, user-data-isolation.6.10 - WindowManager uses global methods
     let savedValue: string | undefined;
     mockDbManager = {
-      getDatabase: jest.fn().mockReturnValue({
-        open: true,
-        prepare: jest.fn().mockImplementation((sql: string) => {
-          if (sql.includes('INSERT')) {
-            return {
-              run: jest.fn().mockImplementation((...args: any[]) => {
-                savedValue = args[1]; // value is second argument
-              }),
-            };
-          } else {
-            return {
-              get: jest.fn().mockImplementation(() => {
-                return savedValue ? { value: savedValue } : undefined;
-              }),
-            };
-          }
-        }),
-      }),
+      getDatabase: jest.fn(),
       getCurrentUserId: jest.fn().mockReturnValue(null),
       setUserManager: jest.fn(),
+      // Global query methods (used by WindowStateManager)
+      runQuery: jest.fn().mockImplementation((...args: unknown[]) => {
+        savedValue = (args[1] as unknown[])[1] as string; // value is at index 1 of params array
+        return { changes: 1, lastInsertRowid: 1 };
+      }),
+      getRow: jest.fn().mockImplementation(() => {
+        return savedValue ? { value: savedValue } : undefined;
+      }),
+      getRows: jest.fn(),
+      // User query methods (not used by WindowStateManager)
+      runUserQuery: jest.fn(),
+      getUserRow: jest.fn(),
+      getUserRows: jest.fn(),
     } as any;
 
     // Get mocked electron screen
@@ -1023,25 +858,13 @@ describe('Property Tests - WindowManager State Changes', () => {
           // Clear mocks for this iteration
           jest.clearAllMocks();
 
-          // Track saved values
+          // Track saved values using runQuery mock
           let lastSavedState: any = null;
-          const mockDb = {
-            open: true,
-            prepare: jest.fn().mockImplementation((sql: string) => {
-              if (sql.includes('INSERT')) {
-                return {
-                  run: jest.fn().mockImplementation((...args: any[]) => {
-                    lastSavedState = JSON.parse(args[1]);
-                  }),
-                };
-              } else {
-                return {
-                  get: jest.fn().mockReturnValue(undefined),
-                };
-              }
-            }),
-          };
-          mockDbManager.getDatabase.mockReturnValue(mockDb as any);
+          mockDbManager.runQuery.mockImplementation((...args: unknown[]) => {
+            lastSavedState = JSON.parse((args[1] as unknown[])[1] as string);
+            return { changes: 1, lastInsertRowid: 1 };
+          });
+          mockDbManager.getRow.mockReturnValue(undefined);
 
           // Create WindowManager instance
           const windowManager = new WindowManager(mockDbManager);
@@ -1134,25 +957,13 @@ describe('Property Tests - WindowManager State Changes', () => {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { BrowserWindow } = require('electron');
 
-    // Track saved values
+    // Track saved values using runQuery mock
     let lastSavedState: any = null;
-    const mockDb = {
-      open: true,
-      prepare: jest.fn().mockImplementation((sql: string) => {
-        if (sql.includes('INSERT')) {
-          return {
-            run: jest.fn().mockImplementation((...args: any[]) => {
-              lastSavedState = JSON.parse(args[1]);
-            }),
-          };
-        } else {
-          return {
-            get: jest.fn().mockReturnValue(undefined),
-          };
-        }
-      }),
-    };
-    mockDbManager.getDatabase.mockReturnValue(mockDb as any);
+    mockDbManager.runQuery.mockImplementation((...args: unknown[]) => {
+      lastSavedState = JSON.parse((args[1] as unknown[])[1] as string);
+      return { changes: 1, lastInsertRowid: 1 };
+    });
+    mockDbManager.getRow.mockReturnValue(undefined);
 
     const windowManager = new WindowManager(mockDbManager);
     windowManager.createWindow();
@@ -1200,25 +1011,13 @@ describe('Property Tests - WindowManager State Changes', () => {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { BrowserWindow } = require('electron');
 
-    // Track saved values
+    // Track saved values using runQuery mock
     let lastSavedState: any = null;
-    const mockDb = {
-      open: true,
-      prepare: jest.fn().mockImplementation((sql: string) => {
-        if (sql.includes('INSERT')) {
-          return {
-            run: jest.fn().mockImplementation((...args: any[]) => {
-              lastSavedState = JSON.parse(args[1]);
-            }),
-          };
-        } else {
-          return {
-            get: jest.fn().mockReturnValue(undefined),
-          };
-        }
-      }),
-    };
-    mockDbManager.getDatabase.mockReturnValue(mockDb as any);
+    mockDbManager.runQuery.mockImplementation((...args: unknown[]) => {
+      lastSavedState = JSON.parse((args[1] as unknown[])[1] as string);
+      return { changes: 1, lastInsertRowid: 1 };
+    });
+    mockDbManager.getRow.mockReturnValue(undefined);
 
     const windowManager = new WindowManager(mockDbManager);
     windowManager.createWindow();
@@ -1266,25 +1065,13 @@ describe('Property Tests - WindowManager State Changes', () => {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { BrowserWindow } = require('electron');
 
-    // Track saved values
+    // Track saved values using runQuery mock
     let lastSavedState: any = null;
-    const mockDb = {
-      open: true,
-      prepare: jest.fn().mockImplementation((sql: string) => {
-        if (sql.includes('INSERT')) {
-          return {
-            run: jest.fn().mockImplementation((...args: any[]) => {
-              lastSavedState = JSON.parse(args[1]);
-            }),
-          };
-        } else {
-          return {
-            get: jest.fn().mockReturnValue(undefined),
-          };
-        }
-      }),
-    };
-    mockDbManager.getDatabase.mockReturnValue(mockDb as any);
+    mockDbManager.runQuery.mockImplementation((...args: unknown[]) => {
+      lastSavedState = JSON.parse((args[1] as unknown[])[1] as string);
+      return { changes: 1, lastInsertRowid: 1 };
+    });
+    mockDbManager.getRow.mockReturnValue(undefined);
 
     const windowManager = new WindowManager(mockDbManager);
     windowManager.createWindow();
@@ -1333,25 +1120,13 @@ describe('Property Tests - WindowManager State Changes', () => {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { BrowserWindow } = require('electron');
 
-    // Track saved values
+    // Track saved values using runQuery mock
     let lastSavedState: any = null;
-    const mockDb = {
-      open: true,
-      prepare: jest.fn().mockImplementation((sql: string) => {
-        if (sql.includes('INSERT')) {
-          return {
-            run: jest.fn().mockImplementation((...args: any[]) => {
-              lastSavedState = JSON.parse(args[1]);
-            }),
-          };
-        } else {
-          return {
-            get: jest.fn().mockReturnValue(undefined),
-          };
-        }
-      }),
-    };
-    mockDbManager.getDatabase.mockReturnValue(mockDb as any);
+    mockDbManager.runQuery.mockImplementation((...args: unknown[]) => {
+      lastSavedState = JSON.parse((args[1] as unknown[])[1] as string);
+      return { changes: 1, lastInsertRowid: 1 };
+    });
+    mockDbManager.getRow.mockReturnValue(undefined);
 
     const windowManager = new WindowManager(mockDbManager);
     windowManager.createWindow();
@@ -1400,25 +1175,13 @@ describe('Property Tests - WindowManager State Changes', () => {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { BrowserWindow } = require('electron');
 
-    // Track saved values
+    // Track saved values using runQuery mock
     let saveCount = 0;
-    const mockDb = {
-      open: true,
-      prepare: jest.fn().mockImplementation((sql: string) => {
-        if (sql.includes('INSERT')) {
-          return {
-            run: jest.fn().mockImplementation(() => {
-              saveCount++;
-            }),
-          };
-        } else {
-          return {
-            get: jest.fn().mockReturnValue(undefined),
-          };
-        }
-      }),
-    };
-    mockDbManager.getDatabase.mockReturnValue(mockDb as any);
+    mockDbManager.runQuery.mockImplementation(() => {
+      saveCount++;
+      return { changes: 1, lastInsertRowid: 1 };
+    });
+    mockDbManager.getRow.mockReturnValue(undefined);
 
     const windowManager = new WindowManager(mockDbManager);
     windowManager.createWindow();
@@ -1467,25 +1230,13 @@ describe('Property Tests - WindowManager State Changes', () => {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { BrowserWindow } = require('electron');
 
-    // Track saved values
+    // Track saved values using runQuery mock
     let lastSavedState: any = null;
-    const mockDb = {
-      open: true,
-      prepare: jest.fn().mockImplementation((sql: string) => {
-        if (sql.includes('INSERT')) {
-          return {
-            run: jest.fn().mockImplementation((...args: any[]) => {
-              lastSavedState = JSON.parse(args[1]);
-            }),
-          };
-        } else {
-          return {
-            get: jest.fn().mockReturnValue(undefined),
-          };
-        }
-      }),
-    };
-    mockDbManager.getDatabase.mockReturnValue(mockDb as any);
+    mockDbManager.runQuery.mockImplementation((...args: unknown[]) => {
+      lastSavedState = JSON.parse((args[1] as unknown[])[1] as string);
+      return { changes: 1, lastInsertRowid: 1 };
+    });
+    mockDbManager.getRow.mockReturnValue(undefined);
 
     const windowManager = new WindowManager(mockDbManager);
     windowManager.createWindow();

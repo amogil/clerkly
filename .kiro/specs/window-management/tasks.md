@@ -229,8 +229,8 @@
 ### 9.1 Обновить WindowStateManager
 - [x] Обновить `src/main/WindowStateManager.ts`:
   - Заменить `DataManager` на `DatabaseManager` в конструкторе
-  - Использовать `dbManager.getDatabase()` напрямую для доступа к БД
-  - НЕ использовать `dbManager.getCurrentUserId()` — состояние окна глобальное
+  - Использовать `dbManager.getRow()` и `dbManager.runQuery()` для глобальных запросов
+  - НЕ использовать методы с user_id — состояние окна глобальное
   - Обновить импорты
   - Обновить комментарии с Requirements
 - _Requirements: window-management.5.7, user-data-isolation.6.8_
@@ -257,8 +257,8 @@
 
 ### Примечания
 
-- WindowStateManager использует DatabaseManager ТОЛЬКО для доступа к БД (`getDatabase()`)
-- WindowStateManager НЕ использует `getCurrentUserId()` — состояние окна глобальное
+- WindowStateManager использует глобальные методы DatabaseManager (`getRow()`, `runQuery()`)
+- WindowStateManager НЕ использует методы с user_id — состояние окна глобальное
 - Состояние окна (размер, позиция, maximized) одинаково для всех пользователей на устройстве
 - При смене пользователя окно сохраняет свое положение
 

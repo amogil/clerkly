@@ -236,24 +236,37 @@
 
 6.1. Система ДОЛЖНА иметь класс DatabaseManager как единую точку входа для:
    - Инициализации базы данных и миграций
-   - Доступа к SQLite database instance
-   - Получения текущего user_id
+   - Выполнения SQL-запросов к базе данных
+   - Автоматической подстановки user_id в запросы
 
-6.2. DatabaseManager ДОЛЖЕН предоставлять метод `getDatabase()` для доступа к SQLite
+6.2. ВСЕ SQL-запросы к базе данных ДОЛЖНЫ выполняться через методы DatabaseManager. Прямой доступ к SQLite instance (`getDatabase()`) ЗАПРЕЩЁН для менеджеров данных.
 
-6.3. DatabaseManager ДОЛЖЕН предоставлять метод `getCurrentUserId()` для получения user_id текущего пользователя
+6.3. DatabaseManager ДОЛЖЕН предоставлять методы для выполнения запросов с автоматической подстановкой user_id:
+   - `runUserQuery(sql, params?)` — выполняет INSERT/UPDATE/DELETE с автоматической подстановкой user_id
+   - `getUserRow<T>(sql, params?)` — возвращает одну строку с автоматической подстановкой user_id
+   - `getUserRows<T>(sql, params?)` — возвращает все строки с автоматической подстановкой user_id
 
-6.4. КОГДА текущий пользователь не определён, метод `getCurrentUserId()` ДОЛЖЕН выбрасывать ошибку "No user logged in"
+6.4. DatabaseManager ДОЛЖЕН предоставлять методы для выполнения глобальных запросов (без user_id):
+   - `runQuery(sql, params?)` — выполняет INSERT/UPDATE/DELETE без user_id
+   - `getRow<T>(sql, params?)` — возвращает одну строку без user_id
+   - `getRows<T>(sql, params?)` — возвращает все строки без user_id
 
-6.5. Все менеджеры данных (UserSettingsManager, AgentManager, MessageManager и др.) ДОЛЖНЫ использовать DatabaseManager для:
-   - Доступа к базе данных
-   - Получения текущего user_id для фильтрации
+6.5. Методы `*UserQuery` и `*UserRow(s)` ДОЛЖНЫ автоматически добавлять user_id текущего пользователя как ПЕРВЫЙ параметр в массив params
 
-6.6. Менеджеры данных НЕ ДОЛЖНЫ требовать явной передачи user_id в публичных методах — user_id получается автоматически из DatabaseManager
+6.6. КОГДА текущий пользователь не определён, методы `*UserQuery` и `*UserRow(s)` ДОЛЖНЫ выбрасывать ошибку "No user logged in"
 
-6.7. DatabaseManager ДОЛЖЕН инициализироваться при старте приложения до создания других менеджеров
+6.7. Все менеджеры данных (UserSettingsManager, AgentManager, MessageManager и др.) ДОЛЖНЫ использовать методы DatabaseManager для выполнения запросов
 
-6.8. WindowStateManager является ИСКЛЮЧЕНИЕМ из правила 6.5 — он работает с глобальными данными (не изолированными по user_id) и использует DatabaseManager только для доступа к БД, без фильтрации по user_id (см. window-management.5.7)
+6.8. Менеджеры данных НЕ ДОЛЖНЫ требовать явной передачи user_id в публичных методах — user_id подставляется автоматически через DatabaseManager
+
+6.9. DatabaseManager ДОЛЖЕН инициализироваться при старте приложения до создания других менеджеров
+
+6.10. WindowStateManager является ИСКЛЮЧЕНИЕМ — он работает с глобальными данными и использует методы без user_id (`runQuery`, `getRow`, `getRows`)
+
+6.11. DatabaseManager МОЖЕТ предоставлять метод `getDatabase()` для низкоуровневого доступа, но его использование ДОЛЖНО быть ограничено:
+   - Миграциями
+   - Тестами
+   - WindowStateManager (глобальные данные)
 
 **Тестируемость:** Да - через модульные тесты DatabaseManager
 
@@ -261,6 +274,7 @@
 
 - `tests/functional/user-data-isolation.spec.ts` - "should provide database access through DatabaseManager"
 - `tests/functional/user-data-isolation.spec.ts` - "should provide current userId through DatabaseManager"
+- `tests/functional/user-data-isolation.spec.ts` - "should auto-inject userId in user queries"
 
 ---
 

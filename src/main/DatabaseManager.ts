@@ -26,12 +26,25 @@ export interface DatabaseInitializeResult {
 /**
  * Interface for database management operations
  * Allows dependency injection and testing with mock implementations
- * Requirements: user-data-isolation.6.1, user-data-isolation.6.2, user-data-isolation.6.3
+ * Requirements: user-data-isolation.6.1, user-data-isolation.6.2, user-data-isolation.6.3, user-data-isolation.6.4
  */
 export interface IDatabaseManager {
   setUserManager(userManager: UserManager): void;
   getDatabase(): Database.Database | null;
   getCurrentUserId(): string | null;
+  getCurrentUserIdStrict(): string;
+
+  // Methods for queries with automatic user_id injection
+  // Requirements: user-data-isolation.6.3, user-data-isolation.6.5, user-data-isolation.6.6
+  runUserQuery(sql: string, params?: unknown[]): Database.RunResult;
+  getUserRow<T>(sql: string, params?: unknown[]): T | undefined;
+  getUserRows<T>(sql: string, params?: unknown[]): T[];
+
+  // Methods for global queries (without user_id)
+  // Requirements: user-data-isolation.6.4, user-data-isolation.6.10
+  runQuery(sql: string, params?: unknown[]): Database.RunResult;
+  getRow<T>(sql: string, params?: unknown[]): T | undefined;
+  getRows<T>(sql: string, params?: unknown[]): T[];
 }
 
 /**
@@ -188,7 +201,16 @@ export class DatabaseManager implements IDatabaseManager {
    * Get SQLite database instance
    * Returns null if database not initialized (legacy behavior for backward compatibility)
    *
-   * Requirements: database-refactoring.1.1, user-data-isolation.6.2
+   * IMPORTANT: Direct database access is RESTRICTED to:
+   * - Migrations (MigrationRunner)
+   * - Tests (unit tests, property tests)
+   * - WindowStateManager (global data without user_id)
+   *
+   * For user-specific data operations, use:
+   * - runUserQuery(), getUserRow(), getUserRows() - with automatic user_id injection
+   * - runQuery(), getRow(), getRows() - for global data without user_id
+   *
+   * Requirements: database-refactoring.1.1, user-data-isolation.6.2, user-data-isolation.6.11
    *
    * @returns Database instance or null if not initialized
    */
@@ -252,6 +274,118 @@ export class DatabaseManager implements IDatabaseManager {
       this.db = null;
       this.logger.info('Database closed');
     }
+  }
+
+  // ============================================
+  // Methods for queries with automatic user_id injection
+  // Requirements: user-data-isolation.6.3, user-data-isolation.6.5, user-data-isolation.6.6
+  // ============================================
+
+  /**
+   * Execute INSERT/UPDATE/DELETE with automatic user_id injection
+   * user_id is prepended to params array as FIRST parameter
+   *
+   * Requirements: user-data-isolation.6.3, user-data-isolation.6.5, user-data-isolation.6.6
+   *
+   * @param sql - SQL query with placeholder for user_id as first parameter
+   * @param params - Additional parameters (user_id will be prepended)
+   * @returns Database.RunResult
+   * @throws Error if no user logged in
+   */
+  runUserQuery(sql: string, params: unknown[] = []): Database.RunResult {
+    const userId = this.getCurrentUserIdStrict();
+    return this.getDatabaseStrict()
+      .prepare(sql)
+      .run(userId, ...params);
+  }
+
+  /**
+   * Get single row with automatic user_id injection
+   * user_id is prepended to params array as FIRST parameter
+   *
+   * Requirements: user-data-isolation.6.3, user-data-isolation.6.5, user-data-isolation.6.6
+   *
+   * @param sql - SQL query with placeholder for user_id as first parameter
+   * @param params - Additional parameters (user_id will be prepended)
+   * @returns Single row or undefined if not found
+   * @throws Error if no user logged in
+   */
+  getUserRow<T>(sql: string, params: unknown[] = []): T | undefined {
+    const userId = this.getCurrentUserIdStrict();
+    return this.getDatabaseStrict()
+      .prepare(sql)
+      .get(userId, ...params) as T | undefined;
+  }
+
+  /**
+   * Get all rows with automatic user_id injection
+   * user_id is prepended to params array as FIRST parameter
+   *
+   * Requirements: user-data-isolation.6.3, user-data-isolation.6.5, user-data-isolation.6.6
+   *
+   * @param sql - SQL query with placeholder for user_id as first parameter
+   * @param params - Additional parameters (user_id will be prepended)
+   * @returns Array of rows (empty array if no matches)
+   * @throws Error if no user logged in
+   */
+  getUserRows<T>(sql: string, params: unknown[] = []): T[] {
+    const userId = this.getCurrentUserIdStrict();
+    return this.getDatabaseStrict()
+      .prepare(sql)
+      .all(userId, ...params) as T[];
+  }
+
+  // ============================================
+  // Methods for global queries (without user_id)
+  // Requirements: user-data-isolation.6.4, user-data-isolation.6.10
+  // ============================================
+
+  /**
+   * Execute INSERT/UPDATE/DELETE without user_id
+   * For global data (WindowStateManager, migrations)
+   *
+   * Requirements: user-data-isolation.6.4, user-data-isolation.6.10
+   *
+   * @param sql - SQL query
+   * @param params - Query parameters
+   * @returns Database.RunResult
+   */
+  runQuery(sql: string, params: unknown[] = []): Database.RunResult {
+    return this.getDatabaseStrict()
+      .prepare(sql)
+      .run(...params);
+  }
+
+  /**
+   * Get single row without user_id
+   * For global data (WindowStateManager, migrations)
+   *
+   * Requirements: user-data-isolation.6.4, user-data-isolation.6.10
+   *
+   * @param sql - SQL query
+   * @param params - Query parameters
+   * @returns Single row or undefined if not found
+   */
+  getRow<T>(sql: string, params: unknown[] = []): T | undefined {
+    return this.getDatabaseStrict()
+      .prepare(sql)
+      .get(...params) as T | undefined;
+  }
+
+  /**
+   * Get all rows without user_id
+   * For global data (WindowStateManager, migrations)
+   *
+   * Requirements: user-data-isolation.6.4, user-data-isolation.6.10
+   *
+   * @param sql - SQL query
+   * @param params - Query parameters
+   * @returns Array of rows (empty array if no matches)
+   */
+  getRows<T>(sql: string, params: unknown[] = []): T[] {
+    return this.getDatabaseStrict()
+      .prepare(sql)
+      .all(...params) as T[];
   }
 
   /**

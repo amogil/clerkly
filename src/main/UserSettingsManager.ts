@@ -1,6 +1,5 @@
-// Requirements: clerkly.1, clerkly.2, error-notifications.1.1, user-data-isolation.2.4, user-data-isolation.2.5, user-data-isolation.2.6, user-data-isolation.3.1, user-data-isolation.3.2, database-refactoring.2
+// Requirements: clerkly.1, clerkly.2, error-notifications.1.1, user-data-isolation.2.4, user-data-isolation.2.5, user-data-isolation.2.6, user-data-isolation.3.1, user-data-isolation.3.2, user-data-isolation.6.7, user-data-isolation.6.8
 
-import Database from 'better-sqlite3';
 import { handleBackgroundError } from './ErrorHandler';
 import type { IDatabaseManager } from './DatabaseManager';
 import { Logger } from './Logger';
@@ -45,7 +44,8 @@ export interface IUserSettingsManager {
 /**
  * Manages user settings storage using SQLite
  * Requirements: user-data-isolation.3.1 - Supports user data isolation via DatabaseManager
- * Requirements: database-refactoring.2.4 - Accepts DatabaseManager in constructor
+ * Requirements: user-data-isolation.6.7 - Uses DatabaseManager methods for queries
+ * Requirements: user-data-isolation.6.8 - Does not require explicit user_id in public methods
  */
 export class UserSettingsManager implements IUserSettingsManager {
   private dbManager: IDatabaseManager;
@@ -54,35 +54,11 @@ export class UserSettingsManager implements IUserSettingsManager {
 
   /**
    * Constructor - accepts DatabaseManager for database access
-   * Requirements: database-refactoring.2.4
+   * Requirements: user-data-isolation.6.7
    * @param dbManager DatabaseManager instance for database access and user_id
    */
   constructor(dbManager: IDatabaseManager) {
     this.dbManager = dbManager;
-  }
-
-  /**
-   * Get database instance from DatabaseManager
-   * Requirements: database-refactoring.2.4
-   */
-  private get db(): Database.Database {
-    const db = this.dbManager.getDatabase();
-    if (!db) {
-      throw new Error('Database not initialized');
-    }
-    return db;
-  }
-
-  /**
-   * Get current user ID from DatabaseManager
-   * Requirements: database-refactoring.2.4, user-data-isolation.3.1
-   */
-  private get userId(): string {
-    const userId = this.dbManager.getCurrentUserId();
-    if (!userId) {
-      throw new Error('No user logged in');
-    }
-    return userId;
   }
 
   /**
@@ -91,7 +67,7 @@ export class UserSettingsManager implements IUserSettingsManager {
    * Serializes value to JSON
    * Checks size (max 10MB)
    * Handles errors (SQLITE_FULL, SQLITE_BUSY, SQLITE_LOCKED, SQLITE_READONLY)
-   * Requirements: clerkly.1, error-notifications.1.1, user-data-isolation.2.4, user-data-isolation.3.1, user-data-isolation.3.2
+   * Requirements: clerkly.1, error-notifications.1.1, user-data-isolation.2.4, user-data-isolation.3.1, user-data-isolation.6.7, user-data-isolation.6.8
    *
    * @param {string} key
    * @param {unknown} value
@@ -135,24 +111,23 @@ export class UserSettingsManager implements IUserSettingsManager {
         return { success: false, error: 'Value too large: exceeds 10MB limit' };
       }
 
-      // Requirements: user-data-isolation.3.1, user-data-isolation.3.2 - Get current user_id for data isolation
-      const currentUserId = this.userId;
-
       const now = Date.now();
 
-      // Requirements: user-data-isolation.2.4 - Save with user_id for data isolation
-      const stmt = db.prepare(`
-        INSERT INTO user_data (key, value, user_id, created_at, updated_at)
+      // Requirements: user-data-isolation.2.4, user-data-isolation.6.7, user-data-isolation.6.8
+      // Use runUserQuery - user_id is automatically prepended as FIRST parameter
+      // SQL placeholders: user_id (auto), key, value, created_at, updated_at
+      this.dbManager.runUserQuery(
+        `
+        INSERT INTO user_data (user_id, key, value, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
         ON CONFLICT(key, user_id) DO UPDATE SET
           value = excluded.value,
           updated_at = excluded.updated_at
-      `);
+      `,
+        [key, serializedValue, now, now]
+      );
 
-      stmt.run(key, serializedValue, currentUserId, now, now);
-
-      // Requirements: user-data-isolation.2.4 - Log successful save with user_id
-      this.logger.info(`Data saved for user ${currentUserId}, key: ${key}`);
+      this.logger.info(`Data saved, key: ${key}`);
 
       return { success: true };
     } catch (writeError: unknown) {
@@ -175,6 +150,10 @@ export class UserSettingsManager implements IUserSettingsManager {
         );
         return { success: false, error: 'Database is read-only: check permissions' };
       }
+      // Handle "No user logged in" error
+      if (errorObj.message === 'No user logged in') {
+        return { success: false, error: 'No user logged in' };
+      }
       const errorMessage = errorObj.message || 'Unknown error';
       return { success: false, error: `Database write failed: ${errorMessage}` };
     }
@@ -185,7 +164,7 @@ export class UserSettingsManager implements IUserSettingsManager {
    * Validates key
    * Deserializes JSON
    * Handles errors (SQLITE_BUSY, SQLITE_LOCKED)
-   * Requirements: clerkly.1, user-data-isolation.2.5, user-data-isolation.3.1, user-data-isolation.3.2
+   * Requirements: clerkly.1, user-data-isolation.2.5, user-data-isolation.3.1, user-data-isolation.6.7, user-data-isolation.6.8
    *
    * @param {string} key
    * @returns {LoadDataResult}
@@ -207,13 +186,13 @@ export class UserSettingsManager implements IUserSettingsManager {
         return { success: false, error: 'Database not initialized or closed' };
       }
 
-      // Requirements: user-data-isolation.3.1, user-data-isolation.3.2 - Get current user_id for data isolation
-      const currentUserId = this.userId;
-
-      // Requirements: user-data-isolation.2.5 - Query with user_id filter for data isolation
-      const row = db
-        .prepare('SELECT value FROM user_data WHERE key = ? AND user_id = ?')
-        .get(key, currentUserId) as { value: string } | undefined;
+      // Requirements: user-data-isolation.2.5, user-data-isolation.6.7, user-data-isolation.6.8
+      // Use getUserRow - user_id is automatically prepended as FIRST parameter
+      // SQL placeholders: user_id (auto), key
+      const row = this.dbManager.getUserRow<{ value: string }>(
+        'SELECT value FROM user_data WHERE user_id = ? AND key = ?',
+        [key]
+      );
 
       if (!row) {
         return { success: false, error: 'Key not found' };
@@ -241,6 +220,10 @@ export class UserSettingsManager implements IUserSettingsManager {
       if (errorObj.code === 'SQLITE_BUSY' || errorObj.code === 'SQLITE_LOCKED') {
         return { success: false, error: 'Database is locked: try again later' };
       }
+      // Handle "No user logged in" error
+      if (errorObj.message === 'No user logged in') {
+        return { success: false, error: 'No user logged in' };
+      }
       const errorMessage = errorObj.message || 'Unknown error';
       return { success: false, error: `Database query failed: ${errorMessage}` };
     }
@@ -250,7 +233,7 @@ export class UserSettingsManager implements IUserSettingsManager {
    * Deletes data from local storage
    * Validates key
    * Handles errors
-   * Requirements: clerkly.1, user-data-isolation.2.6, user-data-isolation.3.1, user-data-isolation.3.2
+   * Requirements: clerkly.1, user-data-isolation.2.6, user-data-isolation.3.1, user-data-isolation.6.7, user-data-isolation.6.8
    *
    * @param {string} key
    * @returns {DeleteDataResult}
@@ -272,12 +255,13 @@ export class UserSettingsManager implements IUserSettingsManager {
         return { success: false, error: 'Database not initialized or closed' };
       }
 
-      // Requirements: user-data-isolation.3.1, user-data-isolation.3.2 - Get current user_id for data isolation
-      const currentUserId = this.userId;
-
-      // Requirements: user-data-isolation.2.6 - Delete with user_id filter for data isolation
-      const stmt = db.prepare('DELETE FROM user_data WHERE key = ? AND user_id = ?');
-      const result = stmt.run(key, currentUserId);
+      // Requirements: user-data-isolation.2.6, user-data-isolation.6.7, user-data-isolation.6.8
+      // Use runUserQuery - user_id is automatically prepended as FIRST parameter
+      // SQL placeholders: user_id (auto), key
+      const result = this.dbManager.runUserQuery(
+        'DELETE FROM user_data WHERE user_id = ? AND key = ?',
+        [key]
+      );
 
       if (result.changes === 0) {
         return { success: false, error: 'Key not found' };
@@ -290,6 +274,10 @@ export class UserSettingsManager implements IUserSettingsManager {
         return { success: false, error: 'Database is locked: try again later' };
       } else if (errorObj.code === 'SQLITE_READONLY') {
         return { success: false, error: 'Database is read-only: check permissions' };
+      }
+      // Handle "No user logged in" error
+      if (errorObj.message === 'No user logged in') {
+        return { success: false, error: 'No user logged in' };
       }
       const errorMessage = errorObj.message || 'Unknown error';
       return { success: false, error: `Database delete failed: ${errorMessage}` };

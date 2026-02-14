@@ -873,3 +873,4 @@ npm run test:functional
 - DatabaseManager становится единой точкой входа для доступа к БД
 - Порядок инициализации: DatabaseManager → UserSettingsManager → другие менеджеры
 - UserManager устанавливается в DatabaseManager после создания через `setUserManager()`
+- **Query API:** DatabaseManager предоставляет методы `runUserQuery`, `getUserRow`, `getUserRows` для запросов с автоматической подстановкой user_id, и `runQuery`, `getRow`, `getRows` для глобальных запросов (см. `.kiro/specs/database-manager-refactoring/tasks.md`)

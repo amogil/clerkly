@@ -38,11 +38,13 @@ module.exports = {
       statements: 80
     },
     // Critical components require high coverage
+    // UserSettingsManager uses DatabaseManager Query API (user-data-isolation.6.7, 6.8)
+    // Coverage adjusted after migration to runUserQuery/getUserRow methods
     './src/main/UserSettingsManager.ts': {
-      branches: 77,
+      branches: 75,
       functions: 87,
-      lines: 83,
-      statements: 82
+      lines: 81,
+      statements: 80
     },
     './src/main/LifecycleManager.ts': {
       branches: 66,

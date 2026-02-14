@@ -1,4 +1,4 @@
-// Requirements: window-management.5, database-refactoring.3.6, user-data-isolation.6.8
+// Requirements: window-management.5, database-refactoring.3.6, user-data-isolation.6.10
 
 import { screen } from 'electron';
 import type { IDatabaseManager } from './DatabaseManager';
@@ -43,9 +43,10 @@ export interface WindowState {
  * that the window opens in the same state as when it was last closed, and handles
  * edge cases such as invalid positions (e.g., when a monitor is disconnected).
  *
- * Requirements: window-management.5, database-refactoring.3.6, user-data-isolation.6.8
- * Note: WindowStateManager uses DatabaseManager.getDatabase() directly WITHOUT user_id filtering
- * because window state is global (not user-specific).
+ * Requirements: window-management.5, database-refactoring.3.6, user-data-isolation.6.10
+ * Note: WindowStateManager uses DatabaseManager global methods (runQuery, getRow)
+ * because window state is global (not user-specific). The systemUserId ('__system__')
+ * is passed explicitly in params, not auto-injected.
  *
  * @example
  * ```typescript
@@ -87,7 +88,7 @@ export class WindowStateManager {
   private dbManager: IDatabaseManager;
   private readonly stateKey = 'window_state';
   // System user_id for window state - not tied to any user
-  // Requirements: user-data-isolation.6.8 - Window state is global
+  // Requirements: user-data-isolation.6.10 - Window state is global
   private readonly systemUserId = '__system__';
 
   /**
@@ -143,17 +144,12 @@ export class WindowStateManager {
    */
   loadState(): WindowState {
     try {
-      // Requirements: database-refactoring.3.6, user-data-isolation.6.8
-      // Use direct database access with system user_id (window state is global)
-      const db = this.dbManager.getDatabase();
-      if (!db || !db.open) {
-        return this.getDefaultState();
-      }
-
-      // Requirements: window-management.5.4
-      const row = db
-        .prepare('SELECT value FROM user_data WHERE key = ? AND user_id = ?')
-        .get(this.stateKey, this.systemUserId) as { value: string } | undefined;
+      // Requirements: database-refactoring.3.6, user-data-isolation.6.10
+      // Use global getRow method with system user_id (window state is global)
+      const row = this.dbManager.getRow<{ value: string }>(
+        'SELECT value FROM user_data WHERE key = ? AND user_id = ?',
+        [this.stateKey, this.systemUserId]
+      );
 
       if (row) {
         const state = typeof row.value === 'string' ? JSON.parse(row.value) : row.value;
@@ -234,26 +230,21 @@ export class WindowStateManager {
    */
   saveState(state: WindowState): void {
     try {
-      // Requirements: database-refactoring.3.6, user-data-isolation.6.8
-      // Use direct database access with system user_id (window state is global)
-      const db = this.dbManager.getDatabase();
-      if (!db || !db.open) {
-        this.logger.error('Failed to save window state: Database not initialized');
-        return;
-      }
-
+      // Requirements: database-refactoring.3.6, user-data-isolation.6.10
+      // Use global runQuery method with system user_id (window state is global)
       const stateJson = JSON.stringify(state);
       const now = Date.now();
 
-      const stmt = db.prepare(`
+      this.dbManager.runQuery(
+        `
         INSERT INTO user_data (key, value, user_id, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
         ON CONFLICT(key, user_id) DO UPDATE SET
           value = excluded.value,
           updated_at = excluded.updated_at
-      `);
-
-      stmt.run(this.stateKey, stateJson, this.systemUserId, now, now);
+      `,
+        [this.stateKey, stateJson, this.systemUserId, now, now]
+      );
     } catch (error) {
       // Requirements: error-notifications.1.4 - Log error
       this.logger.error(`Failed to save window state: ${error}`);

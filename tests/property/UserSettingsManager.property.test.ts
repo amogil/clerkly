@@ -1,4 +1,4 @@
-// Requirements: clerkly.1, clerkly.2
+// Requirements: clerkly.1, clerkly.2, user-data-isolation.6.7, user-data-isolation.6.8
 
 import * as fc from 'fast-check';
 import * as fs from 'fs';
@@ -19,13 +19,13 @@ describe('Property Tests - Data Manager', () => {
     testDbPath = path.join(testStoragePath, 'clerkly.db');
 
     // Initialize DatabaseManager first, then UserSettingsManager
-    // Requirements: database-refactoring.1, database-refactoring.2
+    // Requirements: user-data-isolation.6.7
     dbManager = new DatabaseManager();
     dbManager.initialize(testStoragePath);
 
-    // Requirements: user-data-isolation.1.10 - Mock UserManager for data isolation
+    // Requirements: user-data-isolation.6.7, user-data-isolation.6.8 - Mock UserManager for data isolation
     const mockProfileManager = {
-      getCurrentUserId: jest.fn().mockReturnValue('test@example.com'),
+      getCurrentUserId: jest.fn().mockReturnValue('test-user-id'),
     } as any;
 
     dbManager.setUserManager(mockProfileManager);

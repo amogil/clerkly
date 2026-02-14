@@ -53,10 +53,11 @@
 - **Оценка:** 1 день
 - **Требования:** agents.2, agents.10, user-data-isolation.6.5, user-data-isolation.6.6
 - **Файл:** `src/main/agents/AgentManager.ts`
+- **Зависимость:** DatabaseManager Query API (`.kiro/specs/database-manager-refactoring/tasks.md`)
 - **Описание:**
   - Реализовать методы: `create()`, `list()`, `get()`, `update()`, `archive()`, `touch()`
-  - Использовать `DatabaseManager` для доступа к БД
-  - Автоматическая изоляция по `userId` через `DatabaseManager.getCurrentUserId()`
+  - Использовать методы `DatabaseManager` для запросов (`runUserQuery`, `getUserRow`, `getUserRows`)
+  - Автоматическая изоляция по `userId` через методы DatabaseManager
   - Генерация событий через `MainEventBus`
   - Генерация 10-символьного alphanumeric `agentId`
 
@@ -65,8 +66,10 @@
 - **Оценка:** 0.5 дня
 - **Требования:** agents.4, agents.7, user-data-isolation.6.5
 - **Файл:** `src/main/agents/MessageManager.ts`
+- **Зависимость:** DatabaseManager Query API (`.kiro/specs/database-manager-refactoring/tasks.md`)
 - **Описание:**
   - Реализовать методы: `list()`, `create()`, `update()`
+  - Использовать методы `DatabaseManager` для запросов (`runUserQuery`, `getUserRow`, `getUserRows`)
   - Проверка доступа к агенту через `checkAccess()`
   - Обновление `updated_at` агента при создании сообщения
   - Генерация событий через `MainEventBus`

@@ -242,10 +242,12 @@ class WindowStateManager {
   // Requirements: window-management.1.1, window-management.4.1, window-management.4.2, window-management.5.4, window-management.5.5, window-management.5.6
   loadState(): WindowState {
     try {
-      // Requirements: window-management.5.4
-      const savedState = this.dbManager.getDatabase().prepare(
-        'SELECT value FROM window_state WHERE key = ?'
-      ).get(this.stateKey) as { value: string } | undefined;
+      // Requirements: window-management.5.4, user-data-isolation.6.10
+      // Использует глобальный запрос (без user_id) — состояние окна глобальное
+      const savedState = this.dbManager.getRow<{ value: string }>(
+        'SELECT value FROM window_state WHERE key = ?',
+        [this.stateKey]
+      );
       
       if (savedState) {
         const state = JSON.parse(savedState.value) as WindowState;
@@ -267,10 +269,12 @@ class WindowStateManager {
   saveState(state: WindowState): void {
     try {
       const stateJson = JSON.stringify(state);
-      this.dbManager.getDatabase().prepare(`
+      // Requirements: user-data-isolation.6.10
+      // Использует глобальный запрос (без user_id) — состояние окна глобальное
+      this.dbManager.runQuery(`
         INSERT OR REPLACE INTO window_state (key, value)
         VALUES (?, ?)
-      `).run(this.stateKey, stateJson);
+      `, [this.stateKey, stateJson]);
     } catch (error) {
       console.error('Failed to save window state:', error);
     }
@@ -484,12 +488,14 @@ interface WindowState {
 
 **Обработка:**
 ```typescript
-// Requirements: window-management.5.4, window-management.5.5, window-management.5.6
+// Requirements: window-management.5.4, window-management.5.5, window-management.5.6, user-data-isolation.6.10
 loadState(): WindowState {
   try {
-    const savedState = this.dbManager.getDatabase().prepare(
-      'SELECT value FROM window_state WHERE key = ?'
-    ).get(this.stateKey) as { value: string } | undefined;
+    // Использует глобальный запрос (без user_id) — состояние окна глобальное
+    const savedState = this.dbManager.getRow<{ value: string }>(
+      'SELECT value FROM window_state WHERE key = ?',
+      [this.stateKey]
+    );
     if (savedState) {
       const state = JSON.parse(savedState.value) as WindowState;
       if (this.isPositionValid(state.x, state.y)) {
@@ -514,14 +520,15 @@ loadState(): WindowState {
 
 **Обработка:**
 ```typescript
-// Requirements: window-management.5.1, window-management.5.2, window-management.5.3
+// Requirements: window-management.5.1, window-management.5.2, window-management.5.3, user-data-isolation.6.10
 saveState(state: WindowState): void {
   try {
     const stateJson = JSON.stringify(state);
-    this.dbManager.getDatabase().prepare(`
+    // Использует глобальный запрос (без user_id) — состояние окна глобальное
+    this.dbManager.runQuery(`
       INSERT OR REPLACE INTO window_state (key, value)
       VALUES (?, ?)
-    `).run(this.stateKey, stateJson);
+    `, [this.stateKey, stateJson]);
   } catch (error) {
     console.error('Failed to save window state:', error);
   }

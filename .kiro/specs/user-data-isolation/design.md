@@ -66,11 +66,25 @@
 │  │                                                           │   │
 │  │  - db: Database | null                                   │   │
 │  │  - userManager: UserManager | null                       │   │
+│  │                                                           │   │
+│  │  // Инициализация                                        │   │
 │  │  - initialize(storagePath): void                         │   │
 │  │  - setUserManager(userManager): void                     │   │
-│  │  - getDatabase(): Database                               │   │
-│  │  - getCurrentUserId(): string                            │   │
 │  │  - close(): void                                         │   │
+│  │                                                           │   │
+│  │  // Запросы с автоматическим user_id                     │   │
+│  │  - runUserQuery(sql, params?): RunResult                 │   │
+│  │  - getUserRow<T>(sql, params?): T | undefined            │   │
+│  │  - getUserRows<T>(sql, params?): T[]                     │   │
+│  │                                                           │   │
+│  │  // Глобальные запросы (без user_id)                     │   │
+│  │  - runQuery(sql, params?): RunResult                     │   │
+│  │  - getRow<T>(sql, params?): T | undefined                │   │
+│  │  - getRows<T>(sql, params?): T[]                         │   │
+│  │                                                           │   │
+│  │  // Ограниченный доступ (миграции, тесты)                │   │
+│  │  - getDatabase(): Database                               │   │
+│  │  - getCurrentUserIdStrict(): string                      │   │
 │  └────────────────────────┬─────────────────────────────────┘   │
 │                           │                                      │
 │           ┌───────────────┼───────────────┐                     │
@@ -82,8 +96,19 @@
 │  │- saveData()    │ │- create()      │ │- list()            │   │
 │  │- loadData()    │ │- list()        │ │- create()          │   │
 │  │- deleteData()  │ │- get()         │ │- update()          │   │
-│  │+ auto user_id  │ │+ auto user_id  │ │+ auto user_id      │   │
+│  │                │ │- update()      │ │                    │   │
+│  │ Uses:          │ │- archive()     │ │ Uses:              │   │
+│  │ runUserQuery   │ │                │ │ getUserRow         │   │
+│  │ getUserRow     │ │ Uses:          │ │ getRows            │   │
+│  │                │ │ runUserQuery   │ │ runQuery           │   │
+│  │                │ │ getUserRow(s)  │ │                    │   │
 │  └────────────────┘ └────────────────┘ └────────────────────┘   │
+│                                                                  │
+│  ┌────────────────────────────────────────────────────────────┐ │
+│  │              WindowStateManager (ИСКЛЮЧЕНИЕ)               │ │
+│  │                                                            │ │
+│  │  Uses: runQuery, getRow (глобальные данные, без user_id)  │ │
+│  └────────────────────────────────────────────────────────────┘ │
 │                           │                                      │
 │                           ▼                                      │
 │  ┌──────────────────────────────────────────────────────────┐   │
@@ -188,7 +213,7 @@ interface User {
 
 **Файл:** `src/main/DatabaseManager.ts`
 
-Единая точка входа для доступа к базе данных, инициализации и получения текущего user_id.
+Единая точка входа для доступа к базе данных. Все SQL-запросы выполняются через методы DatabaseManager.
 
 ```typescript
 // Requirements: user-data-isolation.6
@@ -204,7 +229,7 @@ class DatabaseManager {
   
   /**
    * Initialize database and run migrations
-   * Requirements: user-data-isolation.6.1, user-data-isolation.6.7
+   * Requirements: user-data-isolation.6.1, user-data-isolation.6.9
    */
   initialize(storagePath: string): void {
     this.db = new Database(storagePath);
@@ -218,15 +243,19 @@ class DatabaseManager {
   
   /**
    * Set UserManager for getting current userId
-   * Requirements: user-data-isolation.6.3
    */
   setUserManager(userManager: UserManager): void {
     this.userManager = userManager;
   }
   
   /**
-   * Get SQLite database instance
-   * Requirements: user-data-isolation.6.2
+   * Get SQLite database instance (restricted use)
+   * Requirements: user-data-isolation.6.11
+   * 
+   * ВАЖНО: Использование ограничено:
+   * - Миграциями
+   * - Тестами
+   * - WindowStateManager (глобальные данные)
    */
   getDatabase(): Database.Database {
     if (!this.db) {
@@ -236,15 +265,82 @@ class DatabaseManager {
   }
   
   /**
-   * Get current user ID (automatic isolation)
-   * Requirements: user-data-isolation.6.3, user-data-isolation.6.4
+   * Get current user ID (strict mode)
+   * Requirements: user-data-isolation.6.6
    */
-  getCurrentUserId(): string {
+  getCurrentUserIdStrict(): string {
     const userId = this.userManager?.getCurrentUserId();
     if (!userId) {
       throw new Error('No user logged in');
     }
     return userId;
+  }
+  
+  // ============================================
+  // Методы для запросов с автоматическим user_id
+  // Requirements: user-data-isolation.6.3, user-data-isolation.6.5
+  // ============================================
+  
+  /**
+   * Execute INSERT/UPDATE/DELETE with automatic user_id injection
+   * user_id is prepended to params array
+   * Requirements: user-data-isolation.6.3, user-data-isolation.6.5, user-data-isolation.6.6
+   */
+  runUserQuery(sql: string, params: unknown[] = []): Database.RunResult {
+    const userId = this.getCurrentUserIdStrict();
+    return this.getDatabase().prepare(sql).run(userId, ...params);
+  }
+  
+  /**
+   * Get single row with automatic user_id injection
+   * user_id is prepended to params array
+   * Requirements: user-data-isolation.6.3, user-data-isolation.6.5, user-data-isolation.6.6
+   */
+  getUserRow<T>(sql: string, params: unknown[] = []): T | undefined {
+    const userId = this.getCurrentUserIdStrict();
+    return this.getDatabase().prepare(sql).get(userId, ...params) as T | undefined;
+  }
+  
+  /**
+   * Get all rows with automatic user_id injection
+   * user_id is prepended to params array
+   * Requirements: user-data-isolation.6.3, user-data-isolation.6.5, user-data-isolation.6.6
+   */
+  getUserRows<T>(sql: string, params: unknown[] = []): T[] {
+    const userId = this.getCurrentUserIdStrict();
+    return this.getDatabase().prepare(sql).all(userId, ...params) as T[];
+  }
+  
+  // ============================================
+  // Методы для глобальных запросов (без user_id)
+  // Requirements: user-data-isolation.6.4, user-data-isolation.6.10
+  // ============================================
+  
+  /**
+   * Execute INSERT/UPDATE/DELETE without user_id
+   * For global data (WindowStateManager, migrations)
+   * Requirements: user-data-isolation.6.4, user-data-isolation.6.10
+   */
+  runQuery(sql: string, params: unknown[] = []): Database.RunResult {
+    return this.getDatabase().prepare(sql).run(...params);
+  }
+  
+  /**
+   * Get single row without user_id
+   * For global data (WindowStateManager, migrations)
+   * Requirements: user-data-isolation.6.4, user-data-isolation.6.10
+   */
+  getRow<T>(sql: string, params: unknown[] = []): T | undefined {
+    return this.getDatabase().prepare(sql).get(...params) as T | undefined;
+  }
+  
+  /**
+   * Get all rows without user_id
+   * For global data (WindowStateManager, migrations)
+   * Requirements: user-data-isolation.6.4, user-data-isolation.6.10
+   */
+  getRows<T>(sql: string, params: unknown[] = []): T[] {
+    return this.getDatabase().prepare(sql).all(...params) as T[];
   }
   
   /**
@@ -269,7 +365,7 @@ export const databaseManager = new DatabaseManager();
 Управление пользовательскими настройками (key-value в таблице user_data) с автоматической фильтрацией по user_id.
 
 ```typescript
-// Requirements: user-data-isolation.2, user-data-isolation.3, user-data-isolation.6.5
+// Requirements: user-data-isolation.2, user-data-isolation.3, user-data-isolation.6.7
 import { DatabaseManager } from './DatabaseManager';
 import { Logger } from './Logger';
 
@@ -280,46 +376,41 @@ class UserSettingsManager {
   constructor(dbManager: DatabaseManager) {
     this.dbManager = dbManager;
   }
-  
-  private get db() {
-    return this.dbManager.getDatabase();
-  }
-  
-  private get userId() {
-    return this.dbManager.getCurrentUserId();
-  }
 
   /**
    * Save data with automatic user_id filtering
-   * Requirements: user-data-isolation.2.4, user-data-isolation.3.1, user-data-isolation.6.6
+   * Requirements: user-data-isolation.2.4, user-data-isolation.3.1, user-data-isolation.6.7, user-data-isolation.6.8
    */
   saveData(key: string, value: any): void {
     const now = Date.now();
     const valueJson = JSON.stringify(value);
     
-    this.db.prepare(`
+    // user_id подставляется автоматически как первый параметр
+    this.dbManager.runUserQuery(`
       INSERT INTO user_data (key, value, user_id, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?)
       ON CONFLICT(key, user_id) DO UPDATE SET
         value = excluded.value,
         updated_at = excluded.updated_at
-    `).run(key, valueJson, this.userId, now, now);
+    `, [key, valueJson, now, now]);
     
-    this.logger.info(`Data saved for user ${this.userId}, key: ${key}`);
+    this.logger.info(`Data saved, key: ${key}`);
   }
 
   /**
    * Load data with automatic user_id filtering
-   * Requirements: user-data-isolation.2.5, user-data-isolation.3.1, user-data-isolation.6.6
+   * Requirements: user-data-isolation.2.5, user-data-isolation.3.1, user-data-isolation.6.7, user-data-isolation.6.8
    */
   loadData(key: string): { success: boolean; data?: any; error?: string } {
-    const row = this.db
-      .prepare('SELECT value FROM user_data WHERE key = ? AND user_id = ?')
-      .get(key, this.userId) as { value: string } | undefined;
+    // user_id подставляется автоматически как первый параметр
+    const row = this.dbManager.getUserRow<{ value: string }>(
+      'SELECT value FROM user_data WHERE user_id = ? AND key = ?',
+      [key]
+    );
 
     if (row) {
       const data = JSON.parse(row.value);
-      this.logger.info(`Data loaded for user ${this.userId}, key: ${key}`);
+      this.logger.info(`Data loaded, key: ${key}`);
       return { success: true, data };
     }
 
@@ -328,13 +419,16 @@ class UserSettingsManager {
 
   /**
    * Delete data with automatic user_id filtering
-   * Requirements: user-data-isolation.2.6, user-data-isolation.3.1, user-data-isolation.6.6
+   * Requirements: user-data-isolation.2.6, user-data-isolation.3.1, user-data-isolation.6.7, user-data-isolation.6.8
    */
   deleteData(key: string): void {
-    this.db.prepare('DELETE FROM user_data WHERE key = ? AND user_id = ?')
-      .run(key, this.userId);
+    // user_id подставляется автоматически как первый параметр
+    this.dbManager.runUserQuery(
+      'DELETE FROM user_data WHERE user_id = ? AND key = ?',
+      [key]
+    );
     
-    this.logger.info(`Data deleted for user ${this.userId}, key: ${key}`);
+    this.logger.info(`Data deleted, key: ${key}`);
   }
 }
 ```
@@ -529,13 +623,13 @@ async function handleDataOperation(
 
 ### Глобальные Настройки (Исключения из Изоляции)
 
-**Requirements:** user-data-isolation.2.8, user-data-isolation.6.8
+**Requirements:** user-data-isolation.2.8, user-data-isolation.6.10
 
 Некоторые данные НЕ должны изолироваться по пользователю:
 
 ```typescript
 // Window State - глобальные настройки окна
-// Requirements: window-management.5.7, user-data-isolation.2.8, user-data-isolation.6.8
+// Requirements: window-management.5.7, user-data-isolation.2.8, user-data-isolation.6.10
 
 class WindowStateManager {
   private dbManager: DatabaseManager;
@@ -544,15 +638,24 @@ class WindowStateManager {
     this.dbManager = dbManager;
   }
   
-  // Использует DatabaseManager только для доступа к БД, без user_id фильтрации
+  // Использует глобальные методы DatabaseManager (без user_id)
   // Состояние окна одинаково для всех пользователей на устройстве
   
   saveWindowState(state: WindowState): void {
-    // НЕ использует user_id - глобальное состояние
-    this.dbManager.getDatabase().prepare(`
+    // Использует runQuery (без user_id) - глобальное состояние
+    this.dbManager.runQuery(`
       INSERT OR REPLACE INTO window_state (key, value)
       VALUES ('main_window', ?)
-    `).run(JSON.stringify(state));
+    `, [JSON.stringify(state)]);
+  }
+  
+  loadWindowState(): WindowState | null {
+    // Использует getRow (без user_id) - глобальное состояние
+    const row = this.dbManager.getRow<{ value: string }>(
+      'SELECT value FROM window_state WHERE key = ?',
+      ['main_window']
+    );
+    return row ? JSON.parse(row.value) : null;
   }
 }
 ```
@@ -883,12 +986,15 @@ describe('User Data Isolation Functional Tests', () => {
 | user-data-isolation.5.4 | ✓ | - | - |
 | user-data-isolation.6.1 | ✓ | - | ✓ |
 | user-data-isolation.6.2 | ✓ | - | - |
-| user-data-isolation.6.3 | ✓ | - | ✓ |
-| user-data-isolation.6.4 | ✓ | - | - |
+| user-data-isolation.6.3 | ✓ | ✓ | ✓ |
+| user-data-isolation.6.4 | ✓ | - | ✓ |
 | user-data-isolation.6.5 | ✓ | ✓ | ✓ |
-| user-data-isolation.6.6 | ✓ | ✓ | - |
+| user-data-isolation.6.6 | ✓ | ✓ | ✓ |
 | user-data-isolation.6.7 | ✓ | - | ✓ |
-| user-data-isolation.6.8 | ✓ | - | - |
+| user-data-isolation.6.8 | ✓ | ✓ | - |
+| user-data-isolation.6.9 | ✓ | - | ✓ |
+| user-data-isolation.6.10 | ✓ | - | ✓ |
+| user-data-isolation.6.11 | ✓ | - | - |
 
 ---
 

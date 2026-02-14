@@ -1,4 +1,4 @@
-// Requirements: user-data-isolation.1.13, user-data-isolation.1.19, user-data-isolation.1.20, user-data-isolation.1.21, database-refactoring.2
+// Requirements: user-data-isolation.3.2, user-data-isolation.6.6, user-data-isolation.6.7, user-data-isolation.6.8
 
 import { UserSettingsManager } from '../../src/main/UserSettingsManager';
 import { DatabaseManager } from '../../src/main/DatabaseManager';
@@ -68,7 +68,7 @@ describe('UserSettingsManager Error Handling - "No user logged in"', () => {
   /* Preconditions: getCurrentUserId returns null, user is not authenticated
      Action: Trigger "No user logged in" error from saveData
      Assertions: Returns error result with message containing "No user logged in"
-     Requirements: user-data-isolation.1.19, database-refactoring.1.2
+     Requirements: user-data-isolation.3.2, user-data-isolation.6.6
      Note: Application code should handle this by redirecting to login and clearing caches */
   it('should return error when user is not authenticated', () => {
     mockProfileManager.getCurrentUserId.mockReturnValue(null);
@@ -82,7 +82,7 @@ describe('UserSettingsManager Error Handling - "No user logged in"', () => {
   /* Preconditions: getCurrentUserId returns null during operation, user was authenticated
      Action: Trigger "No user logged in" error
      Assertions: Returns error result, application code should retry after token refresh
-     Requirements: user-data-isolation.1.20, database-refactoring.1.2
+     Requirements: user-data-isolation.3.2, user-data-isolation.6.6
      Note: This test verifies the error is returned. Application code should:
      1. Check the error
      2. Call refreshAccessToken()
@@ -90,7 +90,7 @@ describe('UserSettingsManager Error Handling - "No user logged in"', () => {
      4. Redirect to login if refresh fails */
   it('should return error when session expires during operation', () => {
     // Initially authenticated
-    mockProfileManager.getCurrentUserId.mockReturnValue('user@example.com');
+    mockProfileManager.getCurrentUserId.mockReturnValue('test-user-id');
     dataManager.saveData('test_key', 'initial_value');
 
     // Session expires (getCurrentUserId returns null)
@@ -105,7 +105,7 @@ describe('UserSettingsManager Error Handling - "No user logged in"', () => {
   /* Preconditions: getCurrentUserId returns null
      Action: Call loadData
      Assertions: Returns error result with "No user logged in"
-     Requirements: user-data-isolation.1.19, database-refactoring.1.2 */
+     Requirements: user-data-isolation.3.2, user-data-isolation.6.6 */
   it('should return error on loadData when user is not authenticated', () => {
     mockProfileManager.getCurrentUserId.mockReturnValue(null);
 
@@ -118,7 +118,7 @@ describe('UserSettingsManager Error Handling - "No user logged in"', () => {
   /* Preconditions: getCurrentUserId returns null
      Action: Call deleteData
      Assertions: Returns error result with "No user logged in"
-     Requirements: user-data-isolation.1.19, database-refactoring.1.2 */
+     Requirements: user-data-isolation.3.2, user-data-isolation.6.6 */
   it('should return error on deleteData when user is not authenticated', () => {
     mockProfileManager.getCurrentUserId.mockReturnValue(null);
 
@@ -131,10 +131,10 @@ describe('UserSettingsManager Error Handling - "No user logged in"', () => {
   /* Preconditions: User authenticated, data saved, then user logs out
      Action: Try to access data after logout
      Assertions: Returns error result with "No user logged in"
-     Requirements: user-data-isolation.1.21, database-refactoring.1.2 */
+     Requirements: user-data-isolation.3.2, user-data-isolation.6.6 */
   it('should return error when trying to access data after logout', () => {
     // User is authenticated and saves data
-    mockProfileManager.getCurrentUserId.mockReturnValue('user@example.com');
+    mockProfileManager.getCurrentUserId.mockReturnValue('test-user-id');
     dataManager.saveData('test_key', 'test_value');
 
     // User logs out (getCurrentUserId returns null)

@@ -360,6 +360,63 @@
 - FOREIGN KEY не используется - целостность поддерживается логикой приложения
 - DataManager НЕ вызывает ErrorHandler напрямую - ошибки обрабатываются вызывающим кодом
 
+---
+
+## Фаза 8: Расширение DatabaseManager Query API (2-3 дня)
+
+**Статус:** ✅ Завершено (реализовано через `.kiro/specs/database-manager-refactoring/tasks.md`)
+
+**Описание:** Добавление методов для выполнения SQL-запросов с автоматической подстановкой user_id согласно обновленным требованиям (user-data-isolation.6.3-6.6).
+
+**Ссылка:** Детальный план и выполнение задач описаны в `.kiro/specs/database-manager-refactoring/tasks.md`
+
+### 8.1. Добавить методы для запросов с user_id
+- [x] Добавить метод `runUserQuery(sql, params?)` — выполняет INSERT/UPDATE/DELETE с автоматической подстановкой user_id
+- [x] Добавить метод `getUserRow<T>(sql, params?)` — возвращает одну строку с автоматической подстановкой user_id
+- [x] Добавить метод `getUserRows<T>(sql, params?)` — возвращает все строки с автоматической подстановкой user_id
+- [x] user_id добавляется как ПЕРВЫЙ параметр в массив params
+- [x] Методы выбрасывают ошибку "No user logged in" если пользователь не авторизован
+- _Requirements: user-data-isolation.6.3, user-data-isolation.6.5, user-data-isolation.6.6_
+
+### 8.2. Добавить методы для глобальных запросов
+- [x] Добавить метод `runQuery(sql, params?)` — выполняет INSERT/UPDATE/DELETE без user_id
+- [x] Добавить метод `getRow<T>(sql, params?)` — возвращает одну строку без user_id
+- [x] Добавить метод `getRows<T>(sql, params?)` — возвращает все строки без user_id
+- _Requirements: user-data-isolation.6.4, user-data-isolation.6.10_
+
+### 8.3. Ограничить использование getDatabase()
+- [x] Добавить комментарий о том, что `getDatabase()` предназначен только для миграций, тестов и WindowStateManager
+- [x] Обновить документацию
+- _Requirements: user-data-isolation.6.2, user-data-isolation.6.11_
+
+### 8.4. Написать модульные тесты для новых методов
+- [x] Тест: `runUserQuery should prepend user_id to params`
+- [x] Тест: `getUserRow should prepend user_id to params`
+- [x] Тест: `getUserRows should prepend user_id to params`
+- [x] Тест: `runUserQuery should throw when no user logged in`
+- [x] Тест: `runQuery should not require user_id`
+- [x] Тест: `getRow should not require user_id`
+- [x] Тест: `getRows should not require user_id`
+- _Requirements: user-data-isolation.6.3, user-data-isolation.6.4, user-data-isolation.6.5, user-data-isolation.6.6_
+
+### 8.5. Обновить UserSettingsManager для использования новых методов
+- [ ] Заменить прямой доступ к БД на `runUserQuery`, `getUserRow`
+- [ ] Удалить `private get db()` и `private get userId()`
+- [ ] Обновить тесты
+- _Requirements: user-data-isolation.6.7, user-data-isolation.6.8_
+- **Примечание:** Отложено — UserSettingsManager продолжает использовать getDatabase() напрямую
+
+### 8.6. Обновить WindowStateManager для использования глобальных методов
+- [x] Заменить `getDatabase().prepare()` на `runQuery`, `getRow`, `getRows`
+- [x] Обновить тесты
+- _Requirements: user-data-isolation.6.10_
+
+### 8.7. Запустить валидацию Фазы 8
+- [x] Выполнить `npm run validate`
+- [x] Убедиться, что все тесты проходят
+
+---
+
 ## Риски
 
 1. **Миграция данных** - существующие данные могут быть потеряны при некорректной миграции

@@ -165,7 +165,7 @@
 
 ### 10. Рефакторинг: DataManager → UserSettingsManager
 
-**Статус:** Не начато
+**Статус:** ✅ Завершено
 
 **Описание:** Обновление UserProfileManager для использования UserSettingsManager вместо DataManager.
 

@@ -1,4 +1,4 @@
-// Requirements: clerkly.2, database-refactoring.2
+// Requirements: clerkly.2, user-data-isolation.6.7, user-data-isolation.6.8
 
 import * as fs from 'fs';
 import * as path from 'path';
@@ -21,7 +21,7 @@ describe('UserSettingsManager', () => {
 
     // Mock UserManager for getCurrentUserId
     const mockUserManager = {
-      getCurrentUserId: jest.fn().mockReturnValue('test@example.com'),
+      getCurrentUserId: jest.fn().mockReturnValue('test-user-id'),
     } as any;
     dbManager.setUserManager(mockUserManager);
 
@@ -41,7 +41,7 @@ describe('UserSettingsManager', () => {
     /* Preconditions: UserSettingsManager initialized with DatabaseManager
        Action: call saveData with valid key and value
        Assertions: returns success true
-       Requirements: clerkly.2, database-refactoring.2.4 */
+       Requirements: clerkly.2, user-data-isolation.6.7, user-data-isolation.6.8 */
     it('should save data successfully', () => {
       const result = dataManager.saveData('test-key', 'test-value');
       expect(result.success).toBe(true);
@@ -123,7 +123,7 @@ describe('UserSettingsManager', () => {
     /* Preconditions: Data saved in database
        Action: call loadData with existing key
        Assertions: returns success true with correct data
-       Requirements: clerkly.2, database-refactoring.2.4 */
+       Requirements: clerkly.2, user-data-isolation.6.7, user-data-isolation.6.8 */
     it('should load saved data', () => {
       dataManager.saveData('test-key', 'test-value');
       const result = dataManager.loadData('test-key');
@@ -174,7 +174,7 @@ describe('UserSettingsManager', () => {
     /* Preconditions: Data saved in database
        Action: call deleteData with existing key
        Assertions: returns success true, data no longer accessible
-       Requirements: clerkly.2, database-refactoring.2.4 */
+       Requirements: clerkly.2, user-data-isolation.6.7, user-data-isolation.6.8 */
     it('should delete existing data', () => {
       dataManager.saveData('test-key', 'test-value');
       const deleteResult = dataManager.deleteData('test-key');
@@ -210,14 +210,14 @@ describe('UserSettingsManager', () => {
     /* Preconditions: Data saved for user A
        Action: Switch to user B and try to load data
        Assertions: Data not accessible for user B
-       Requirements: user-data-isolation.3.1, database-refactoring.2.4 */
+       Requirements: user-data-isolation.3.1, user-data-isolation.6.7, user-data-isolation.6.8 */
     it('should isolate data between users', () => {
       // Save data as user A
       dataManager.saveData('shared-key', 'user-a-value');
 
       // Switch to user B
       const mockUserManagerB = {
-        getCurrentUserId: jest.fn().mockReturnValue('userB@example.com'),
+        getCurrentUserId: jest.fn().mockReturnValue('user-b-id'),
       } as any;
       dbManager.setUserManager(mockUserManagerB);
 
@@ -230,14 +230,14 @@ describe('UserSettingsManager', () => {
     /* Preconditions: Same key saved for different users
        Action: Load data for each user
        Assertions: Each user gets their own data
-       Requirements: user-data-isolation.3.1, database-refactoring.2.4 */
+       Requirements: user-data-isolation.3.1, user-data-isolation.6.7, user-data-isolation.6.8 */
     it('should allow same key for different users', () => {
       // Save data as user A
       dataManager.saveData('shared-key', 'user-a-value');
 
       // Switch to user B and save different value
       const mockUserManagerB = {
-        getCurrentUserId: jest.fn().mockReturnValue('userB@example.com'),
+        getCurrentUserId: jest.fn().mockReturnValue('user-b-id'),
       } as any;
       dbManager.setUserManager(mockUserManagerB);
       dataManager.saveData('shared-key', 'user-b-value');
@@ -247,7 +247,7 @@ describe('UserSettingsManager', () => {
 
       // Switch back to user A
       const mockUserManagerA = {
-        getCurrentUserId: jest.fn().mockReturnValue('test@example.com'),
+        getCurrentUserId: jest.fn().mockReturnValue('test-user-id'),
       } as any;
       dbManager.setUserManager(mockUserManagerA);
 
@@ -294,9 +294,9 @@ describe('UserSettingsManager', () => {
   describe('no user logged in', () => {
     /* Preconditions: No user logged in (getCurrentUserId returns null)
        Action: call saveData
-       Assertions: throws error 'No user logged in'
-       Requirements: database-refactoring.1.2, user-data-isolation.3.2 */
-    it('should throw error on save when no user logged in', () => {
+       Assertions: returns error 'No user logged in'
+       Requirements: user-data-isolation.3.2, user-data-isolation.6.6 */
+    it('should return error on save when no user logged in', () => {
       const mockUserManagerNoUser = {
         getCurrentUserId: jest.fn().mockReturnValue(null),
       } as any;
@@ -309,9 +309,9 @@ describe('UserSettingsManager', () => {
 
     /* Preconditions: No user logged in (getCurrentUserId returns null)
        Action: call loadData
-       Assertions: throws error 'No user logged in'
-       Requirements: database-refactoring.1.2, user-data-isolation.3.2 */
-    it('should throw error on load when no user logged in', () => {
+       Assertions: returns error 'No user logged in'
+       Requirements: user-data-isolation.3.2, user-data-isolation.6.6 */
+    it('should return error on load when no user logged in', () => {
       const mockUserManagerNoUser = {
         getCurrentUserId: jest.fn().mockReturnValue(null),
       } as any;
@@ -324,9 +324,9 @@ describe('UserSettingsManager', () => {
 
     /* Preconditions: No user logged in (getCurrentUserId returns null)
        Action: call deleteData
-       Assertions: throws error 'No user logged in'
-       Requirements: database-refactoring.1.2, user-data-isolation.3.2 */
-    it('should throw error on delete when no user logged in', () => {
+       Assertions: returns error 'No user logged in'
+       Requirements: user-data-isolation.3.2, user-data-isolation.6.6 */
+    it('should return error on delete when no user logged in', () => {
       const mockUserManagerNoUser = {
         getCurrentUserId: jest.fn().mockReturnValue(null),
       } as any;
