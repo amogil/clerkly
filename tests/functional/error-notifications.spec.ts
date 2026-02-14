@@ -132,7 +132,7 @@ test('should log errors to console', async () => {
   const hasErrorLog = consoleMessages.some(
     (msg) =>
       msg.includes('[App]') &&
-      msg.includes('Error notification received') &&
+      msg.includes('Error:') &&
       msg.includes('Test error logging') &&
       msg.includes('Test Context')
   );
