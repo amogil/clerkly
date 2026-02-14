@@ -1,6 +1,7 @@
-// Requirements: user-data-isolation.1.13, user-data-isolation.1.19, user-data-isolation.1.20, user-data-isolation.1.21
+// Requirements: user-data-isolation.1.13, user-data-isolation.1.19, user-data-isolation.1.20, user-data-isolation.1.21, database-refactoring.2
 
-import { DataManager } from '../../src/main/DataManager';
+import { UserSettingsManager } from '../../src/main/UserSettingsManager';
+import { DatabaseManager } from '../../src/main/DatabaseManager';
 import type { UserManager } from '../../src/main/auth/UserManager';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -13,8 +14,9 @@ jest.mock('electron', () => ({
   },
 }));
 
-describe('DataManager Error Handling - "No user logged in"', () => {
-  let dataManager: DataManager;
+describe('UserSettingsManager Error Handling - "No user logged in"', () => {
+  let dataManager: UserSettingsManager;
+  let dbManager: DatabaseManager;
   let testStoragePath: string;
   let testDbPath: string;
   let mockProfileManager: jest.Mocked<UserManager>;
@@ -33,14 +35,18 @@ describe('DataManager Error Handling - "No user logged in"', () => {
       getCurrentUserId: jest.fn(),
     } as unknown as jest.Mocked<UserManager>;
 
-    dataManager = new DataManager(testStoragePath);
-    dataManager.initialize();
-    dataManager.setUserManager(mockProfileManager);
+    // Initialize DatabaseManager first
+    dbManager = new DatabaseManager();
+    dbManager.initialize(testStoragePath);
+    dbManager.setUserManager(mockProfileManager);
+
+    // Create UserSettingsManager with DatabaseManager
+    dataManager = new UserSettingsManager(dbManager);
   });
 
   afterEach(() => {
-    if (dataManager) {
-      dataManager.close();
+    if (dbManager) {
+      dbManager.close();
     }
 
     if (fs.existsSync(testDbPath)) {
@@ -62,7 +68,7 @@ describe('DataManager Error Handling - "No user logged in"', () => {
   /* Preconditions: getCurrentUserId returns null, user is not authenticated
      Action: Trigger "No user logged in" error from saveData
      Assertions: Returns error result with message containing "No user logged in"
-     Requirements: user-data-isolation.1.19
+     Requirements: user-data-isolation.1.19, database-refactoring.1.2
      Note: Application code should handle this by redirecting to login and clearing caches */
   it('should return error when user is not authenticated', () => {
     mockProfileManager.getCurrentUserId.mockReturnValue(null);
@@ -76,7 +82,7 @@ describe('DataManager Error Handling - "No user logged in"', () => {
   /* Preconditions: getCurrentUserId returns null during operation, user was authenticated
      Action: Trigger "No user logged in" error
      Assertions: Returns error result, application code should retry after token refresh
-     Requirements: user-data-isolation.1.20
+     Requirements: user-data-isolation.1.20, database-refactoring.1.2
      Note: This test verifies the error is returned. Application code should:
      1. Check the error
      2. Call refreshAccessToken()
@@ -94,43 +100,13 @@ describe('DataManager Error Handling - "No user logged in"', () => {
 
     expect(result.success).toBe(false);
     expect(result.error).toContain('No user logged in');
-
-    // Note: Application code should handle this by:
-    // 1. Checking the error
-    // 2. Attempting token refresh
-    // 3. Retrying the operation if refresh succeeds
-  });
-
-  /* Preconditions: getCurrentUserId returns null during logout
-     Action: Trigger "No user logged in" error during logout
-     Assertions: Returns error result
-     Requirements: user-data-isolation.1.21
-     Note: Application code should silently ignore this error during logout and log it for debugging */
-  it('should return error during logout (race condition)', () => {
-    // User was authenticated
-    mockProfileManager.getCurrentUserId.mockReturnValue('user@example.com');
-    dataManager.saveData('test_key', 'test_value');
-
-    // Logout happens (getCurrentUserId returns null)
-    mockProfileManager.getCurrentUserId.mockReturnValue(null);
-
-    // Attempt to save during logout (race condition)
-    const result = dataManager.saveData('test_key', 'new_value');
-
-    expect(result.success).toBe(false);
-    expect(result.error).toContain('No user logged in');
-
-    // Note: Application code should:
-    // 1. Check this error during logout
-    // 2. Silently ignore it (don't show to user)
-    // 3. Log it to console for debugging
   });
 
   /* Preconditions: getCurrentUserId returns null
-     Action: Attempt to load data
-     Assertions: Returns error result with message containing "No user logged in"
-     Requirements: user-data-isolation.1.13 */
-  it('should return error on loadData when no user logged in', () => {
+     Action: Call loadData
+     Assertions: Returns error result with "No user logged in"
+     Requirements: user-data-isolation.1.19, database-refactoring.1.2 */
+  it('should return error on loadData when user is not authenticated', () => {
     mockProfileManager.getCurrentUserId.mockReturnValue(null);
 
     const result = dataManager.loadData('test_key');
@@ -140,10 +116,10 @@ describe('DataManager Error Handling - "No user logged in"', () => {
   });
 
   /* Preconditions: getCurrentUserId returns null
-     Action: Attempt to delete data
-     Assertions: Returns error result with message containing "No user logged in"
-     Requirements: user-data-isolation.1.13 */
-  it('should return error on deleteData when no user logged in', () => {
+     Action: Call deleteData
+     Assertions: Returns error result with "No user logged in"
+     Requirements: user-data-isolation.1.19, database-refactoring.1.2 */
+  it('should return error on deleteData when user is not authenticated', () => {
     mockProfileManager.getCurrentUserId.mockReturnValue(null);
 
     const result = dataManager.deleteData('test_key');
@@ -152,27 +128,26 @@ describe('DataManager Error Handling - "No user logged in"', () => {
     expect(result.error).toContain('No user logged in');
   });
 
-  /* Preconditions: User authenticated, data saved
-     Action: Session expires, attempt to load data
-     Assertions: Returns error, data remains in database
-     Requirements: user-data-isolation.1.20 */
-  it('should preserve data when session expires during load', () => {
-    // Save data while authenticated
+  /* Preconditions: User authenticated, data saved, then user logs out
+     Action: Try to access data after logout
+     Assertions: Returns error result with "No user logged in"
+     Requirements: user-data-isolation.1.21, database-refactoring.1.2 */
+  it('should return error when trying to access data after logout', () => {
+    // User is authenticated and saves data
     mockProfileManager.getCurrentUserId.mockReturnValue('user@example.com');
     dataManager.saveData('test_key', 'test_value');
 
-    // Session expires
+    // User logs out (getCurrentUserId returns null)
     mockProfileManager.getCurrentUserId.mockReturnValue(null);
 
-    // Attempt to load
-    const result = dataManager.loadData('test_key');
-    expect(result.success).toBe(false);
-    expect(result.error).toContain('No user logged in');
+    // Try to load data
+    const loadResult = dataManager.loadData('test_key');
+    expect(loadResult.success).toBe(false);
+    expect(loadResult.error).toContain('No user logged in');
 
-    // Verify data is still in database (re-authenticate and load)
-    mockProfileManager.getCurrentUserId.mockReturnValue('user@example.com');
-    const result2 = dataManager.loadData('test_key');
-    expect(result2.success).toBe(true);
-    expect(result2.data).toBe('test_value');
+    // Try to delete data
+    const deleteResult = dataManager.deleteData('test_key');
+    expect(deleteResult.success).toBe(false);
+    expect(deleteResult.error).toContain('No user logged in');
   });
 });

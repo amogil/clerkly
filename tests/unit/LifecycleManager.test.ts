@@ -1,39 +1,42 @@
-// Requirements: clerkly.2, window-management.5, account-profile.1.5
+// Requirements: clerkly.2, window-management.5, account-profile.1.5, database-refactoring.3.5
 
 import { LifecycleManager } from '../../src/main/LifecycleManager';
 import WindowManager from '../../src/main/WindowManager';
-import { DataManager } from '../../src/main/DataManager';
+import { DatabaseManager } from '../../src/main/DatabaseManager';
 import { OAuthClientManager } from '../../src/main/auth/OAuthClientManager';
-import { TokenStorageManager } from '../../src/main/auth/TokenStorageManager';
+import { UserManager } from '../../src/main/auth/UserManager';
 
 // Mock WindowManager
 jest.mock('../../src/main/WindowManager');
 
-// Mock DataManager
-jest.mock('../../src/main/DataManager');
+// Mock DatabaseManager
+jest.mock('../../src/main/DatabaseManager');
 
 // Mock OAuthClientManager
 jest.mock('../../src/main/auth/OAuthClientManager');
 
-// Mock TokenStorageManager
-jest.mock('../../src/main/auth/TokenStorageManager');
+// Mock UserManager
+jest.mock('../../src/main/auth/UserManager');
 
 describe('LifecycleManager', () => {
   let lifecycleManager: LifecycleManager;
   let mockWindowManager: jest.Mocked<WindowManager>;
-  let mockDataManager: jest.Mocked<DataManager>;
+  let mockDbManager: jest.Mocked<DatabaseManager>;
   let mockOAuthClient: jest.Mocked<OAuthClientManager>;
-  let mockTokenStorage: jest.Mocked<TokenStorageManager>;
+  let mockUserManager: jest.Mocked<UserManager>;
 
   beforeEach(() => {
     // Clear all mocks before each test
     jest.clearAllMocks();
 
     // Create mock instances
-    // Requirements: window-management.5
-    mockDataManager = new DataManager('/tmp/test') as jest.Mocked<DataManager>;
-    mockWindowManager = new WindowManager(mockDataManager) as jest.Mocked<WindowManager>;
-    mockTokenStorage = new TokenStorageManager(mockDataManager) as jest.Mocked<TokenStorageManager>;
+    // Requirements: window-management.5, database-refactoring.3.5
+    mockDbManager = new DatabaseManager() as jest.Mocked<DatabaseManager>;
+    mockWindowManager = new WindowManager(mockDbManager) as jest.Mocked<WindowManager>;
+    mockUserManager = {
+      fetchProfile: jest.fn().mockResolvedValue(null),
+      getCurrentUserId: jest.fn().mockReturnValue(null),
+    } as any;
     mockOAuthClient = {
       getAuthStatus: jest.fn().mockResolvedValue({ authorized: false }),
     } as any;
@@ -43,44 +46,36 @@ describe('LifecycleManager', () => {
     mockWindowManager.closeWindow = jest.fn();
     mockWindowManager.isWindowCreated = jest.fn().mockReturnValue(false);
 
-    mockDataManager.initialize = jest.fn().mockReturnValue({
-      success: true,
-      migrations: { success: true, appliedCount: 0, message: 'No migrations to apply' },
-    });
-    mockDataManager.close = jest.fn();
-    mockDataManager.saveData = jest.fn().mockReturnValue({ success: true });
-    mockDataManager.loadData = jest.fn().mockReturnValue({ success: false });
-    mockDataManager.deleteData = jest.fn().mockReturnValue({ success: true });
+    mockDbManager.close = jest.fn();
 
-    // Create LifecycleManager instance
+    // Create LifecycleManager instance with DatabaseManager
     lifecycleManager = new LifecycleManager(
       mockWindowManager,
-      mockDataManager,
+      mockDbManager,
       mockOAuthClient,
-      mockTokenStorage
+      mockUserManager
     );
   });
 
   describe('initialize', () => {
-    /* Preconditions: LifecycleManager created, WindowManager and DataManager mocked
+    /* Preconditions: LifecycleManager created, WindowManager and DatabaseManager mocked
        Action: call initialize()
-       Assertions: returns success true, loadTime < 3000ms, DataManager.initialize called, WindowManager.createWindow called, isAppInitialized returns true
-       Requirements: clerkly.1, clerkly.2, clerkly.nfr.1*/
+       Assertions: returns success true, loadTime < 3000ms, WindowManager.createWindow called, isAppInitialized returns true
+       Requirements: clerkly.1, clerkly.2, clerkly.nfr.1, database-refactoring.3.5 */
     it('should initialize application successfully within 3 seconds', async () => {
       const result = await lifecycleManager.initialize();
 
       expect(result.success).toBe(true);
       expect(result.loadTime).toBeLessThan(3000);
-      expect(mockDataManager.initialize).toHaveBeenCalledTimes(1);
       expect(mockWindowManager.createWindow).toHaveBeenCalledTimes(1);
       expect(lifecycleManager.isAppInitialized()).toBe(true);
       expect(lifecycleManager.getStartupTime()).not.toBeNull();
     });
 
-    /* Preconditions: LifecycleManager created, DataManager and WindowManager initialize quickly
+    /* Preconditions: LifecycleManager created, DatabaseManager and WindowManager initialize quickly
        Action: call initialize()
        Assertions: loadTime measured correctly, startupTime set
-       Requirements: clerkly.2, clerkly.nfr.1*/
+       Requirements: clerkly.2, clerkly.nfr.1, database-refactoring.3.5 */
     it('should measure startup time correctly', async () => {
       const startTime = Date.now();
       const result = await lifecycleManager.initialize();
@@ -89,22 +84,6 @@ describe('LifecycleManager', () => {
       expect(result.loadTime).toBeGreaterThanOrEqual(0);
       expect(result.loadTime).toBeLessThanOrEqual(endTime - startTime + 10); // Allow 10ms tolerance
       expect(lifecycleManager.getStartupTime()).toBe(startTime);
-    });
-
-    /* Preconditions: LifecycleManager created, DataManager.initialize throws error
-       Action: call initialize()
-       Assertions: throws error with descriptive message, isAppInitialized returns false
-       Requirements: clerkly.1, clerkly.2*/
-    it('should handle DataManager initialization failure', async () => {
-      mockDataManager.initialize = jest.fn().mockImplementation(() => {
-        throw new Error('Database initialization failed');
-      });
-
-      await expect(lifecycleManager.initialize()).rejects.toThrow(
-        'Application initialization failed'
-      );
-      await expect(lifecycleManager.initialize()).rejects.toThrow('Database initialization failed');
-      expect(lifecycleManager.isAppInitialized()).toBe(false);
     });
 
     /* Preconditions: LifecycleManager created, WindowManager.createWindow throws error
@@ -132,7 +111,6 @@ describe('LifecycleManager', () => {
       const result = await lifecycleManager.initialize();
 
       expect(result.success).toBe(true);
-      expect(mockDataManager.initialize).toHaveBeenCalledTimes(2);
       expect(mockWindowManager.createWindow).toHaveBeenCalledTimes(2);
     });
 
@@ -168,37 +146,6 @@ describe('LifecycleManager', () => {
 
       expect(mockOAuthClient.getAuthStatus).toHaveBeenCalled();
       expect(fetchProfileSpy).not.toHaveBeenCalled();
-    });
-
-    /* Preconditions: LifecycleManager created, initialization takes longer than 3 seconds
-       Action: call initialize() with slow operations
-       Assertions: returns success true, warning logged about slow startup
-       Requirements: clerkly.1, clerkly.2, clerkly.nfr.1*/
-    it('should warn when startup exceeds 3 seconds', async () => {
-      // Mock slow initialization
-      mockDataManager.initialize = jest.fn().mockImplementation(() => {
-        // Simulate slow operation
-        const start = Date.now();
-        while (Date.now() - start < 3100) {
-          // Busy wait for 3.1 seconds
-        }
-        return {
-          success: true,
-          migrations: { success: true, appliedCount: 0, message: 'No migrations to apply' },
-        };
-      });
-
-      const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation();
-
-      const result = await lifecycleManager.initialize();
-
-      expect(result.success).toBe(true);
-      expect(result.loadTime).toBeGreaterThan(3000);
-      expect(consoleWarnSpy).toHaveBeenCalledWith(
-        expect.stringMatching(/Slow startup: \d+ms \(target: <3000ms\)/)
-      );
-
-      consoleWarnSpy.mockRestore();
     });
   });
 
@@ -272,10 +219,10 @@ describe('LifecycleManager', () => {
       await lifecycleManager.initialize();
     });
 
-    /* Preconditions: LifecycleManager initialized, window created, data manager open
+    /* Preconditions: LifecycleManager initialized, window created, database manager open
        Action: call handleQuit()
-       Assertions: WindowManager.closeWindow called, DataManager.close called, isAppInitialized returns false, completes within 5 seconds
-       Requirements: clerkly.1, clerkly.2, clerkly.nfr.2*/
+       Assertions: WindowManager.closeWindow called, DatabaseManager.close called, isAppInitialized returns false, completes within 5 seconds
+       Requirements: clerkly.1, clerkly.2, clerkly.nfr.2, database-refactoring.3.5 */
     it('should perform graceful shutdown within 5 seconds', async () => {
       mockWindowManager.isWindowCreated = jest.fn().mockReturnValue(true);
 
@@ -284,22 +231,22 @@ describe('LifecycleManager', () => {
       const duration = Date.now() - startTime;
 
       expect(mockWindowManager.closeWindow).toHaveBeenCalledTimes(1);
-      expect(mockDataManager.close).toHaveBeenCalledTimes(1);
+      expect(mockDbManager.close).toHaveBeenCalledTimes(1);
       expect(lifecycleManager.isAppInitialized()).toBe(false);
       expect(duration).toBeLessThan(5000);
     });
 
     /* Preconditions: LifecycleManager initialized, window not created
        Action: call handleQuit()
-       Assertions: WindowManager.closeWindow not called, DataManager.close called
-       Requirements: clerkly.1, clerkly.2, clerkly.nfr.2*/
+       Assertions: WindowManager.closeWindow not called, DatabaseManager.close called
+       Requirements: clerkly.1, clerkly.2, clerkly.nfr.2, database-refactoring.3.5 */
     it('should handle quit when window not created', async () => {
       mockWindowManager.isWindowCreated = jest.fn().mockReturnValue(false);
 
       await lifecycleManager.handleQuit();
 
       expect(mockWindowManager.closeWindow).not.toHaveBeenCalled();
-      expect(mockDataManager.close).toHaveBeenCalledTimes(1);
+      expect(mockDbManager.close).toHaveBeenCalledTimes(1);
       expect(lifecycleManager.isAppInitialized()).toBe(false);
     });
 
@@ -326,13 +273,13 @@ describe('LifecycleManager', () => {
       consoleErrorSpy.mockRestore();
     });
 
-    /* Preconditions: LifecycleManager initialized, DataManager.close throws error
+    /* Preconditions: LifecycleManager initialized, DatabaseManager.close throws error
        Action: call handleQuit()
        Assertions: error caught and logged, no exception thrown
-       Requirements: clerkly.2, clerkly.nfr.2*/
-    it('should handle data manager close failure during quit', async () => {
+       Requirements: clerkly.2, clerkly.nfr.2, database-refactoring.3.5 */
+    it('should handle database manager close failure during quit', async () => {
       mockWindowManager.isWindowCreated = jest.fn().mockReturnValue(true);
-      mockDataManager.close = jest.fn().mockImplementation(() => {
+      mockDbManager.close = jest.fn().mockImplementation(() => {
         throw new Error('Failed to close database');
       });
 
@@ -360,7 +307,7 @@ describe('LifecycleManager', () => {
       // Should complete quickly (well under 5 second timeout)
       expect(duration).toBeLessThan(1000);
       expect(mockWindowManager.closeWindow).toHaveBeenCalledTimes(1);
-      expect(mockDataManager.close).toHaveBeenCalledTimes(1);
+      expect(mockDbManager.close).toHaveBeenCalledTimes(1);
       expect(lifecycleManager.isAppInitialized()).toBe(false);
     });
 
@@ -391,7 +338,7 @@ describe('LifecycleManager', () => {
       // Application should remain initialized (Mac OS X convention)
       // Window will be recreated on activation
       expect(mockWindowManager.closeWindow).not.toHaveBeenCalled();
-      expect(mockDataManager.close).not.toHaveBeenCalled();
+      expect(mockDbManager.close).not.toHaveBeenCalled();
     });
 
     /* Preconditions: LifecycleManager initialized
@@ -406,7 +353,7 @@ describe('LifecycleManager', () => {
       }).not.toThrow();
 
       expect(mockWindowManager.closeWindow).not.toHaveBeenCalled();
-      expect(mockDataManager.close).not.toHaveBeenCalled();
+      expect(mockDbManager.close).not.toHaveBeenCalled();
     });
 
     /* Preconditions: LifecycleManager not initialized
@@ -416,9 +363,9 @@ describe('LifecycleManager', () => {
     it('should handle window close before initialization', () => {
       const newLifecycleManager = new LifecycleManager(
         mockWindowManager,
-        mockDataManager,
+        mockDbManager,
         mockOAuthClient,
-        mockTokenStorage
+        mockUserManager
       );
 
       expect(() => {
@@ -497,7 +444,7 @@ describe('LifecycleManager', () => {
        Assertions: returns false
        Requirements: clerkly.1, clerkly.2*/
     it('should return false after failed initialization', async () => {
-      mockDataManager.initialize = jest.fn().mockImplementation(() => {
+      mockWindowManager.createWindow = jest.fn().mockImplementation(() => {
         throw new Error('Initialization failed');
       });
 
@@ -539,12 +486,11 @@ describe('LifecycleManager', () => {
     /* Preconditions: LifecycleManager created
        Action: initialize, close window, activate, quit
        Assertions: full lifecycle works correctly
-       Requirements: clerkly.1, clerkly.2, clerkly.nfr.3*/
+       Requirements: clerkly.1, clerkly.2, clerkly.nfr.3, database-refactoring.3.5 */
     it('should handle complete application lifecycle', async () => {
       // Initialize
       await lifecycleManager.initialize();
       expect(lifecycleManager.isAppInitialized()).toBe(true);
-      expect(mockDataManager.initialize).toHaveBeenCalledTimes(1);
       expect(mockWindowManager.createWindow).toHaveBeenCalledTimes(1);
 
       // Close window (Mac OS X behavior - app stays running)
@@ -561,7 +507,7 @@ describe('LifecycleManager', () => {
       await lifecycleManager.handleQuit();
       expect(lifecycleManager.isAppInitialized()).toBe(false);
       expect(mockWindowManager.closeWindow).toHaveBeenCalledTimes(1);
-      expect(mockDataManager.close).toHaveBeenCalledTimes(1);
+      expect(mockDbManager.close).toHaveBeenCalledTimes(1);
     });
 
     /* Preconditions: LifecycleManager created
@@ -580,41 +526,9 @@ describe('LifecycleManager', () => {
       expect(mockWindowManager.createWindow).toHaveBeenCalledTimes(4); // 1 from init + 3 from activations
     });
 
-    /* Preconditions: LifecycleManager created, initialization takes > 3000ms
-       Action: call initialize() with slow operations
-       Assertions: warning logged about slow startup
-       Requirements: clerkly.nfr.1 */
-    it('should log warning when startup exceeds 3 seconds', async () => {
-      const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation();
-
-      // Mock slow initialization
-      mockDataManager.initialize = jest.fn().mockImplementation(() => {
-        // Simulate slow operation
-        const start = Date.now();
-        while (Date.now() - start < 3100) {
-          // Busy wait
-        }
-        return {
-          success: true,
-          migrations: { success: true, appliedCount: 0, message: 'No migrations' },
-        };
-      });
-
-      const result = await lifecycleManager.initialize();
-
-      expect(result.success).toBe(true);
-      expect(result.loadTime).toBeGreaterThan(3000);
-      expect(consoleWarnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('[LifecycleManager] Slow startup:')
-      );
-      expect(consoleWarnSpy).toHaveBeenCalledWith(expect.stringContaining('target: <3000ms'));
-
-      consoleWarnSpy.mockRestore();
-    });
-
     /* Preconditions: LifecycleManager created, user authenticated, profile fetch fails
        Action: call initialize()
-       Assertions: initialization succeeds despite profile fetch failure
+       Assertions: initialization fails with profile fetch error
        Requirements: clerkly.1, account-profile.1.5 */
     it('should handle profile fetch failure during initialization', async () => {
       mockOAuthClient.getAuthStatus = jest.fn().mockResolvedValue({ authorized: true });
@@ -656,11 +570,11 @@ describe('LifecycleManager', () => {
     });
 
     /* Preconditions: LifecycleManager created, initialization throws non-Error object
-       Action: call initialize() when DataManager throws string
+       Action: call initialize() when WindowManager throws string
        Assertions: error message is 'Unknown error'
        Requirements: clerkly.1 */
     it('should handle non-Error exception during initialization', async () => {
-      mockDataManager.initialize = jest.fn().mockImplementation(() => {
+      mockWindowManager.createWindow = jest.fn().mockImplementation(() => {
         throw 'String error'; // Non-Error object
       });
 

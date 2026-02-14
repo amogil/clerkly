@@ -5,7 +5,8 @@ import Database from 'better-sqlite3';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { DataManager } from '../../src/main/DataManager';
+import { UserSettingsManager } from '../../src/main/UserSettingsManager';
+import { DatabaseManager } from '../../src/main/DatabaseManager';
 import type { UserManager } from '../../src/main/auth/UserManager';
 
 // Mock electron BrowserWindow for error notifications
@@ -15,7 +16,7 @@ jest.mock('electron', () => ({
   },
 }));
 
-describe('DataManager User Isolation - Property-Based Tests', () => {
+describe('UserSettingsManager User Isolation - Property-Based Tests', () => {
   let testStoragePath: string;
   let testDbPath: string;
 
@@ -72,15 +73,19 @@ describe('DataManager User Isolation - Property-Based Tests', () => {
           { minLength: 2, maxLength: 5 }
         ),
         (users) => {
-          const dataManager = new DataManager(testStoragePath);
-          dataManager.initialize();
+          // Initialize DatabaseManager and UserSettingsManager
+          // Requirements: database-refactoring.1, database-refactoring.2
+          const dbManager = new DatabaseManager();
+          dbManager.initialize(testStoragePath);
 
           // Create mock profile manager for each user
           const mockProfileManager = {
             getCurrentUserId: jest.fn(),
           } as unknown as jest.Mocked<UserManager>;
 
-          dataManager.setUserManager(mockProfileManager);
+          dbManager.setUserManager(mockProfileManager);
+
+          const dataManager = new UserSettingsManager(dbManager);
 
           // Save data for each user
           users.forEach((user) => {
@@ -111,7 +116,7 @@ describe('DataManager User Isolation - Property-Based Tests', () => {
             }
           }
 
-          dataManager.close();
+          dbManager.close();
         }
       ),
       { numRuns: 100 }
@@ -142,14 +147,18 @@ describe('DataManager User Isolation - Property-Based Tests', () => {
           { minLength: 1, maxLength: 10 }
         ),
         (users) => {
-          const dataManager = new DataManager(testStoragePath);
-          dataManager.initialize();
+          // Initialize DatabaseManager and UserSettingsManager
+          // Requirements: database-refactoring.1, database-refactoring.2
+          const dbManager = new DatabaseManager();
+          dbManager.initialize(testStoragePath);
 
           const mockProfileManager = {
             getCurrentUserId: jest.fn(),
           } as unknown as jest.Mocked<UserManager>;
 
-          dataManager.setUserManager(mockProfileManager);
+          dbManager.setUserManager(mockProfileManager);
+
+          const dataManager = new UserSettingsManager(dbManager);
 
           // Save and immediately load for each user
           users.forEach((user) => {
@@ -170,7 +179,7 @@ describe('DataManager User Isolation - Property-Based Tests', () => {
             expect(result.data).toEqual(user.value);
           });
 
-          dataManager.close();
+          dbManager.close();
         }
       ),
       { numRuns: 100 }
@@ -196,14 +205,18 @@ describe('DataManager User Isolation - Property-Based Tests', () => {
           { minLength: 1, maxLength: 5 }
         ),
         (users) => {
-          const dataManager = new DataManager(testStoragePath);
-          dataManager.initialize();
+          // Initialize DatabaseManager and UserSettingsManager
+          // Requirements: database-refactoring.1, database-refactoring.2
+          const dbManager = new DatabaseManager();
+          dbManager.initialize(testStoragePath);
 
           const mockProfileManager = {
             getCurrentUserId: jest.fn(),
           } as unknown as jest.Mocked<UserManager>;
 
-          dataManager.setUserManager(mockProfileManager);
+          dbManager.setUserManager(mockProfileManager);
+
+          const dataManager = new UserSettingsManager(dbManager);
 
           // Save data for each user
           users.forEach((user) => {
@@ -234,7 +247,7 @@ describe('DataManager User Isolation - Property-Based Tests', () => {
             expect(result.data).toEqual(user.value);
           });
 
-          dataManager.close();
+          dbManager.close();
         }
       ),
       { numRuns: 100 }

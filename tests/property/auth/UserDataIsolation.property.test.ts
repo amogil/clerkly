@@ -1,10 +1,11 @@
-// Requirements: user-data-isolation.0.2, user-data-isolation.0.3, user-data-isolation.1.2, user-data-isolation.1.3, user-data-isolation.4.4
+// Requirements: user-data-isolation.0.2, user-data-isolation.0.3, user-data-isolation.1.2, user-data-isolation.1.3, user-data-isolation.4.4, account-profile.1.3
 
 import * as fc from 'fast-check';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { DataManager } from '../../../src/main/DataManager';
+import { UserSettingsManager } from '../../../src/main/UserSettingsManager';
+import { DatabaseManager } from '../../../src/main/DatabaseManager';
 import { UserManager } from '../../../src/main/auth/UserManager';
 import { TokenStorageManager } from '../../../src/main/auth/TokenStorageManager';
 
@@ -17,7 +18,8 @@ jest.mock('electron', () => ({
 
 describe('User Data Isolation - Property-Based Tests', () => {
   let testStoragePath: string;
-  let dataManager: DataManager;
+  let dataManager: UserSettingsManager;
+  let dbManager: DatabaseManager;
   let profileManager: UserManager;
   let mockTokenStorage: jest.Mocked<TokenStorageManager>;
 
@@ -31,9 +33,13 @@ describe('User Data Isolation - Property-Based Tests', () => {
       fs.mkdirSync(migrationsPath, { recursive: true });
     }
 
-    // Initialize DataManager
-    dataManager = new DataManager(testStoragePath);
-    dataManager.initialize();
+    // Initialize DatabaseManager first, then UserSettingsManager
+    // Requirements: database-refactoring.1, database-refactoring.2
+    dbManager = new DatabaseManager();
+    dbManager.initialize(testStoragePath);
+
+    // Create UserSettingsManager with DatabaseManager
+    dataManager = new UserSettingsManager(dbManager);
 
     // Create mock dependencies
     mockTokenStorage = {
@@ -41,16 +47,17 @@ describe('User Data Isolation - Property-Based Tests', () => {
       deleteTokens: jest.fn().mockResolvedValue(undefined),
     } as unknown as jest.Mocked<TokenStorageManager>;
 
-    // Create UserManager (now takes only 2 args)
-    profileManager = new UserManager(dataManager, mockTokenStorage);
+    // Create UserManager with DatabaseManager
+    // Requirements: account-profile.1.3
+    profileManager = new UserManager(dbManager, mockTokenStorage);
 
     // Set up circular dependency
-    dataManager.setUserManager(profileManager);
+    dbManager.setUserManager(profileManager);
   });
 
   afterEach(() => {
     // Close database
-    dataManager.close();
+    dbManager.close();
 
     // Clean up test directory
     if (fs.existsSync(testStoragePath)) {
@@ -302,7 +309,7 @@ describe('User Data Isolation - Property-Based Tests', () => {
           expect(user2.name).toBe(newName);
 
           // Verify in database
-          const db = dataManager.getDatabase();
+          const db = dbManager.getDatabase();
           const dbUser = db
             ?.prepare('SELECT name FROM users WHERE user_id = ?')
             .get(user1.user_id) as { name: string };

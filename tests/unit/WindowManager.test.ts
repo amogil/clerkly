@@ -1,11 +1,8 @@
-// Requirements: clerkly.2, window-management.5
+// Requirements: clerkly.2, window-management.5, database-refactoring.3.6
 
 import { BrowserWindow } from 'electron';
 import WindowManager from '../../src/main/WindowManager';
-import { DataManager } from '../../src/main/DataManager';
-
-// Mock DataManager
-jest.mock('../../src/main/DataManager');
+import type { IDatabaseManager } from '../../src/main/DatabaseManager';
 
 // Mock Electron's BrowserWindow
 jest.mock('electron', () => ({
@@ -45,21 +42,32 @@ jest.mock('electron', () => ({
 
 describe('WindowManager', () => {
   let windowManager: WindowManager;
-  let mockDataManager: jest.Mocked<DataManager>;
+  let mockDbManager: jest.Mocked<IDatabaseManager>;
+  let mockDb: any;
 
   beforeEach(() => {
     // Clear all mocks before each test
     jest.clearAllMocks();
 
-    // Create mock DataManager
-    mockDataManager = {
-      loadData: jest.fn().mockReturnValue({ success: false }),
-      saveData: jest.fn(),
+    // Create mock database
+    mockDb = {
+      open: true,
+      prepare: jest.fn().mockReturnValue({
+        get: jest.fn().mockReturnValue(undefined),
+        run: jest.fn(),
+      }),
+    };
+
+    // Create mock DatabaseManager
+    mockDbManager = {
+      getDatabase: jest.fn().mockReturnValue(mockDb),
+      getCurrentUserId: jest.fn().mockReturnValue('test@example.com'),
+      setUserManager: jest.fn(),
     } as any;
 
-    // Create new WindowManager instance with mock DataManager
-    // Requirements: window-management.5
-    windowManager = new WindowManager(mockDataManager);
+    // Create new WindowManager instance with mock DatabaseManager
+    // Requirements: window-management.5, database-refactoring.3.6
+    windowManager = new WindowManager(mockDbManager);
   });
 
   // Helper function to get the most recent mock BrowserWindow instance
@@ -143,14 +151,15 @@ describe('WindowManager', () => {
        Requirements: window-management.5.4 */
     it('should create window with saved state when it exists', () => {
       // Mock saved state
-      mockDataManager.loadData.mockReturnValue({
-        success: true,
-        data: JSON.stringify({
-          x: 200,
-          y: 150,
-          width: 1400,
-          height: 900,
-          isMaximized: false,
+      mockDb.prepare.mockReturnValue({
+        get: jest.fn().mockReturnValue({
+          value: JSON.stringify({
+            x: 200,
+            y: 150,
+            width: 1400,
+            height: 900,
+            isMaximized: false,
+          }),
         }),
       });
 
@@ -172,14 +181,15 @@ describe('WindowManager', () => {
        Requirements: window-management.1.1, window-management.1.3, window-management.5.3, window-management.5.4 */
     it('should maximize window when saved state has isMaximized: true', () => {
       // Mock saved state with isMaximized: true
-      mockDataManager.loadData.mockReturnValue({
-        success: true,
-        data: JSON.stringify({
-          x: 100,
-          y: 100,
-          width: 1200,
-          height: 800,
-          isMaximized: true,
+      mockDb.prepare.mockReturnValue({
+        get: jest.fn().mockReturnValue({
+          value: JSON.stringify({
+            x: 100,
+            y: 100,
+            width: 1200,
+            height: 800,
+            isMaximized: true,
+          }),
         }),
       });
 
@@ -197,14 +207,15 @@ describe('WindowManager', () => {
        Requirements: window-management.1.1, window-management.1.3 */
     it('should not maximize window when saved state has isMaximized: false', () => {
       // Mock saved state with isMaximized: false
-      mockDataManager.loadData.mockReturnValue({
-        success: true,
-        data: JSON.stringify({
-          x: 100,
-          y: 100,
-          width: 1200,
-          height: 800,
-          isMaximized: false,
+      mockDb.prepare.mockReturnValue({
+        get: jest.fn().mockReturnValue({
+          value: JSON.stringify({
+            x: 100,
+            y: 100,
+            width: 1200,
+            height: 800,
+            isMaximized: false,
+          }),
         }),
       });
 
@@ -404,8 +415,8 @@ describe('WindowManager', () => {
        Assertions: no error thrown, warning logged, no methods called
        Requirements: clerkly.1, clerkly.2*/
     it('should handle configuration when window not created', () => {
-      // Requirements: window-management.5
-      const newWindowManager = new WindowManager(mockDataManager);
+      // Requirements: window-management.5, database-refactoring.3.6
+      const newWindowManager = new WindowManager(mockDbManager);
 
       // Should not throw
       expect(() => {
@@ -471,8 +482,8 @@ describe('WindowManager', () => {
        Assertions: no error thrown, no methods called
        Requirements: clerkly.1, clerkly.2*/
     it('should handle close when window not created', () => {
-      // Requirements: window-management.5
-      const newWindowManager = new WindowManager(mockDataManager);
+      // Requirements: window-management.5, database-refactoring.3.6
+      const newWindowManager = new WindowManager(mockDbManager);
 
       expect(() => {
         newWindowManager.closeWindow();

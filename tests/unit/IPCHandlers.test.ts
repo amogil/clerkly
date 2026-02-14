@@ -2,7 +2,7 @@
 
 import { ipcMain, IpcMainInvokeEvent } from 'electron';
 import { IPCHandlers } from '../../src/main/IPCHandlers';
-import { DataManager } from '../../src/main/DataManager';
+import { UserSettingsManager } from '../../src/main/UserSettingsManager';
 
 // Mock electron
 jest.mock('electron', () => ({
@@ -12,20 +12,20 @@ jest.mock('electron', () => ({
   },
 }));
 
-// Mock DataManager
-jest.mock('../../src/main/DataManager');
+// Mock UserSettingsManager
+jest.mock('../../src/main/UserSettingsManager');
 
 describe('IPCHandlers', () => {
   let ipcHandlers: IPCHandlers;
-  let mockDataManager: jest.Mocked<DataManager>;
+  let mockUserSettingsManager: jest.Mocked<UserSettingsManager>;
   let mockEvent: IpcMainInvokeEvent;
 
   beforeEach(() => {
     // Clear all mocks
     jest.clearAllMocks();
 
-    // Create mock DataManager
-    mockDataManager = {
+    // Create mock UserSettingsManager
+    mockUserSettingsManager = {
       saveData: jest.fn(),
       loadData: jest.fn(),
       deleteData: jest.fn(),
@@ -35,7 +35,7 @@ describe('IPCHandlers', () => {
     mockEvent = {} as IpcMainInvokeEvent;
 
     // Create IPCHandlers instance
-    ipcHandlers = new IPCHandlers(mockDataManager);
+    ipcHandlers = new IPCHandlers(mockUserSettingsManager);
   });
 
   describe('registerHandlers', () => {
@@ -80,25 +80,25 @@ describe('IPCHandlers', () => {
   });
 
   describe('handleSaveData', () => {
-    /* Preconditions: DataManager mock configured to return success true
+    /* Preconditions: UserSettingsManager mock configured to return success true
        Action: call handleSaveData with valid key and value
-       Assertions: returns success true, DataManager.saveData called with correct params
+       Assertions: returns success true, UserSettingsManager.saveData called with correct params
        Requirements: clerkly.2*/
     it('should handle valid save-data request', async () => {
-      mockDataManager.saveData.mockReturnValue({ success: true });
+      mockUserSettingsManager.saveData.mockReturnValue({ success: true });
 
       const result = await ipcHandlers.handleSaveData(mockEvent, 'test-key', 'test-value');
 
       expect(result.success).toBe(true);
-      expect(mockDataManager.saveData).toHaveBeenCalledWith('test-key', 'test-value');
+      expect(mockUserSettingsManager.saveData).toHaveBeenCalledWith('test-key', 'test-value');
     });
 
-    /* Preconditions: DataManager mock configured to return success true
+    /* Preconditions: UserSettingsManager mock configured to return success true
        Action: call handleSaveData with various data types (string, number, object, array, boolean)
-       Assertions: all calls succeed, DataManager.saveData called with correct values
+       Assertions: all calls succeed, UserSettingsManager.saveData called with correct values
        Requirements: clerkly.2*/
     it('should handle save-data with different value types', async () => {
-      mockDataManager.saveData.mockReturnValue({ success: true });
+      mockUserSettingsManager.saveData.mockReturnValue({ success: true });
 
       const testCases = [
         { key: 'string-key', value: 'string-value' },
@@ -111,53 +111,53 @@ describe('IPCHandlers', () => {
       for (const testCase of testCases) {
         const result = await ipcHandlers.handleSaveData(mockEvent, testCase.key, testCase.value);
         expect(result.success).toBe(true);
-        expect(mockDataManager.saveData).toHaveBeenCalledWith(testCase.key, testCase.value);
+        expect(mockUserSettingsManager.saveData).toHaveBeenCalledWith(testCase.key, testCase.value);
       }
     });
 
     /* Preconditions: IPCHandlers instance created
        Action: call handleSaveData with undefined key
-       Assertions: returns success false with error about required key, DataManager not called
+       Assertions: returns success false with error about required key, UserSettingsManager not called
        Requirements: clerkly.2*/
     it('should reject save-data with undefined key', async () => {
       const result = await ipcHandlers.handleSaveData(mockEvent, undefined as any, 'value');
 
       expect(result.success).toBe(false);
       expect(result.error).toContain('key is required');
-      expect(mockDataManager.saveData).not.toHaveBeenCalled();
+      expect(mockUserSettingsManager.saveData).not.toHaveBeenCalled();
     });
 
     /* Preconditions: IPCHandlers instance created
        Action: call handleSaveData with null key
-       Assertions: returns success false with error about required key, DataManager not called
+       Assertions: returns success false with error about required key, UserSettingsManager not called
        Requirements: clerkly.2*/
     it('should reject save-data with null key', async () => {
       const result = await ipcHandlers.handleSaveData(mockEvent, null as any, 'value');
 
       expect(result.success).toBe(false);
       expect(result.error).toContain('key is required');
-      expect(mockDataManager.saveData).not.toHaveBeenCalled();
+      expect(mockUserSettingsManager.saveData).not.toHaveBeenCalled();
     });
 
     /* Preconditions: IPCHandlers instance created
        Action: call handleSaveData with valid key but undefined value
-       Assertions: returns success false with error about required value, DataManager not called
+       Assertions: returns success false with error about required value, UserSettingsManager not called
        Requirements: clerkly.2*/
     it('should reject save-data with undefined value', async () => {
       const result = await ipcHandlers.handleSaveData(mockEvent, 'test-key', undefined);
 
       expect(result.success).toBe(false);
       expect(result.error).toContain('value is required');
-      expect(mockDataManager.saveData).not.toHaveBeenCalled();
+      expect(mockUserSettingsManager.saveData).not.toHaveBeenCalled();
     });
 
-    /* Preconditions: DataManager mock configured to return error
+    /* Preconditions: UserSettingsManager mock configured to return error
        Action: call handleSaveData with valid parameters
        Assertions: returns success false with error message, error logged
        Requirements: clerkly.2*/
-    it('should handle DataManager save error', async () => {
+    it('should handle UserSettingsManager save error', async () => {
       const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
-      mockDataManager.saveData.mockReturnValue({ success: false, error: 'Database error' });
+      mockUserSettingsManager.saveData.mockReturnValue({ success: false, error: 'Database error' });
 
       const result = await ipcHandlers.handleSaveData(mockEvent, 'test-key', 'test-value');
 
@@ -168,13 +168,13 @@ describe('IPCHandlers', () => {
       consoleErrorSpy.mockRestore();
     });
 
-    /* Preconditions: DataManager mock configured to throw exception
+    /* Preconditions: UserSettingsManager mock configured to throw exception
        Action: call handleSaveData with valid parameters
        Assertions: returns success false with exception message, exception logged
        Requirements: clerkly.2*/
-    it('should handle DataManager exception', async () => {
+    it('should handle UserSettingsManager exception', async () => {
       const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
-      mockDataManager.saveData.mockImplementation(() => {
+      mockUserSettingsManager.saveData.mockImplementation(() => {
         throw new Error('Unexpected error');
       });
 
@@ -189,21 +189,21 @@ describe('IPCHandlers', () => {
   });
 
   describe('handleLoadData', () => {
-    /* Preconditions: DataManager mock configured to return success true with data
+    /* Preconditions: UserSettingsManager mock configured to return success true with data
        Action: call handleLoadData with valid key
-       Assertions: returns success true with data, DataManager.loadData called with correct key
+       Assertions: returns success true with data, UserSettingsManager.loadData called with correct key
        Requirements: clerkly.2*/
     it('should handle valid load-data request', async () => {
-      mockDataManager.loadData.mockReturnValue({ success: true, data: 'test-value' });
+      mockUserSettingsManager.loadData.mockReturnValue({ success: true, data: 'test-value' });
 
       const result = await ipcHandlers.handleLoadData(mockEvent, 'test-key');
 
       expect(result.success).toBe(true);
       expect(result.data).toBe('test-value');
-      expect(mockDataManager.loadData).toHaveBeenCalledWith('test-key');
+      expect(mockUserSettingsManager.loadData).toHaveBeenCalledWith('test-key');
     });
 
-    /* Preconditions: DataManager mock configured to return various data types
+    /* Preconditions: UserSettingsManager mock configured to return various data types
        Action: call handleLoadData with different keys
        Assertions: all calls succeed, correct data returned for each type
        Requirements: clerkly.2*/
@@ -217,7 +217,7 @@ describe('IPCHandlers', () => {
       ];
 
       for (const testCase of testCases) {
-        mockDataManager.loadData.mockReturnValue({ success: true, data: testCase.data });
+        mockUserSettingsManager.loadData.mockReturnValue({ success: true, data: testCase.data });
         const result = await ipcHandlers.handleLoadData(mockEvent, testCase.key);
         expect(result.success).toBe(true);
         expect(result.data).toEqual(testCase.data);
@@ -226,35 +226,35 @@ describe('IPCHandlers', () => {
 
     /* Preconditions: IPCHandlers instance created
        Action: call handleLoadData with undefined key
-       Assertions: returns success false with error about required key, DataManager not called
+       Assertions: returns success false with error about required key, UserSettingsManager not called
        Requirements: clerkly.2*/
     it('should reject load-data with undefined key', async () => {
       const result = await ipcHandlers.handleLoadData(mockEvent, undefined as any);
 
       expect(result.success).toBe(false);
       expect(result.error).toContain('key is required');
-      expect(mockDataManager.loadData).not.toHaveBeenCalled();
+      expect(mockUserSettingsManager.loadData).not.toHaveBeenCalled();
     });
 
     /* Preconditions: IPCHandlers instance created
        Action: call handleLoadData with null key
-       Assertions: returns success false with error about required key, DataManager not called
+       Assertions: returns success false with error about required key, UserSettingsManager not called
        Requirements: clerkly.2*/
     it('should reject load-data with null key', async () => {
       const result = await ipcHandlers.handleLoadData(mockEvent, null as any);
 
       expect(result.success).toBe(false);
       expect(result.error).toContain('key is required');
-      expect(mockDataManager.loadData).not.toHaveBeenCalled();
+      expect(mockUserSettingsManager.loadData).not.toHaveBeenCalled();
     });
 
-    /* Preconditions: DataManager mock configured to return error (key not found)
+    /* Preconditions: UserSettingsManager mock configured to return error (key not found)
        Action: call handleLoadData with non-existent key
        Assertions: returns success false with error message, error logged
        Requirements: clerkly.2*/
-    it('should handle DataManager load error', async () => {
+    it('should handle UserSettingsManager load error', async () => {
       const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
-      mockDataManager.loadData.mockReturnValue({ success: false, error: 'Key not found' });
+      mockUserSettingsManager.loadData.mockReturnValue({ success: false, error: 'Key not found' });
 
       const result = await ipcHandlers.handleLoadData(mockEvent, 'non-existent-key');
 
@@ -265,13 +265,13 @@ describe('IPCHandlers', () => {
       consoleErrorSpy.mockRestore();
     });
 
-    /* Preconditions: DataManager mock configured to throw exception
+    /* Preconditions: UserSettingsManager mock configured to throw exception
        Action: call handleLoadData with valid key
        Assertions: returns success false with exception message, exception logged
        Requirements: clerkly.2*/
-    it('should handle DataManager exception', async () => {
+    it('should handle UserSettingsManager exception', async () => {
       const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
-      mockDataManager.loadData.mockImplementation(() => {
+      mockUserSettingsManager.loadData.mockImplementation(() => {
         throw new Error('Database connection lost');
       });
 
@@ -286,50 +286,53 @@ describe('IPCHandlers', () => {
   });
 
   describe('handleDeleteData', () => {
-    /* Preconditions: DataManager mock configured to return success true
+    /* Preconditions: UserSettingsManager mock configured to return success true
        Action: call handleDeleteData with valid key
-       Assertions: returns success true, DataManager.deleteData called with correct key
+       Assertions: returns success true, UserSettingsManager.deleteData called with correct key
        Requirements: clerkly.2*/
     it('should handle valid delete-data request', async () => {
-      mockDataManager.deleteData.mockReturnValue({ success: true });
+      mockUserSettingsManager.deleteData.mockReturnValue({ success: true });
 
       const result = await ipcHandlers.handleDeleteData(mockEvent, 'test-key');
 
       expect(result.success).toBe(true);
-      expect(mockDataManager.deleteData).toHaveBeenCalledWith('test-key');
+      expect(mockUserSettingsManager.deleteData).toHaveBeenCalledWith('test-key');
     });
 
     /* Preconditions: IPCHandlers instance created
        Action: call handleDeleteData with undefined key
-       Assertions: returns success false with error about required key, DataManager not called
+       Assertions: returns success false with error about required key, UserSettingsManager not called
        Requirements: clerkly.2*/
     it('should reject delete-data with undefined key', async () => {
       const result = await ipcHandlers.handleDeleteData(mockEvent, undefined as any);
 
       expect(result.success).toBe(false);
       expect(result.error).toContain('key is required');
-      expect(mockDataManager.deleteData).not.toHaveBeenCalled();
+      expect(mockUserSettingsManager.deleteData).not.toHaveBeenCalled();
     });
 
     /* Preconditions: IPCHandlers instance created
        Action: call handleDeleteData with null key
-       Assertions: returns success false with error about required key, DataManager not called
+       Assertions: returns success false with error about required key, UserSettingsManager not called
        Requirements: clerkly.2*/
     it('should reject delete-data with null key', async () => {
       const result = await ipcHandlers.handleDeleteData(mockEvent, null as any);
 
       expect(result.success).toBe(false);
       expect(result.error).toContain('key is required');
-      expect(mockDataManager.deleteData).not.toHaveBeenCalled();
+      expect(mockUserSettingsManager.deleteData).not.toHaveBeenCalled();
     });
 
-    /* Preconditions: DataManager mock configured to return error
+    /* Preconditions: UserSettingsManager mock configured to return error
        Action: call handleDeleteData with valid key
        Assertions: returns success false with error message, error logged
        Requirements: clerkly.2*/
-    it('should handle DataManager delete error', async () => {
+    it('should handle UserSettingsManager delete error', async () => {
       const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
-      mockDataManager.deleteData.mockReturnValue({ success: false, error: 'Key not found' });
+      mockUserSettingsManager.deleteData.mockReturnValue({
+        success: false,
+        error: 'Key not found',
+      });
 
       const result = await ipcHandlers.handleDeleteData(mockEvent, 'test-key');
 
@@ -340,13 +343,13 @@ describe('IPCHandlers', () => {
       consoleErrorSpy.mockRestore();
     });
 
-    /* Preconditions: DataManager mock configured to throw exception
+    /* Preconditions: UserSettingsManager mock configured to throw exception
        Action: call handleDeleteData with valid key
        Assertions: returns success false with exception message, exception logged
        Requirements: clerkly.2*/
-    it('should handle DataManager exception', async () => {
+    it('should handle UserSettingsManager exception', async () => {
       const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
-      mockDataManager.deleteData.mockImplementation(() => {
+      mockUserSettingsManager.deleteData.mockImplementation(() => {
         throw new Error('Database locked');
       });
 
@@ -460,7 +463,7 @@ describe('IPCHandlers', () => {
   });
 
   describe('timeout enforcement in IPC operations', () => {
-    /* Preconditions: IPCHandlers instance created, timeout set to 100ms, DataManager mock with slow operation
+    /* Preconditions: IPCHandlers instance created, timeout set to 100ms, UserSettingsManager mock with slow operation
        Action: call handleSaveData with operation that takes > 100ms
        Assertions: returns success false with timeout error message
        Requirements: clerkly.2, clerkly.nfr.2*/
@@ -470,7 +473,7 @@ describe('IPCHandlers', () => {
       ipcHandlers.setTimeout(100);
 
       // Mock slow operation
-      mockDataManager.saveData.mockImplementation(
+      mockUserSettingsManager.saveData.mockImplementation(
         () =>
           new Promise((resolve) => {
             setTimeout(() => resolve({ success: true }), 500);
@@ -492,7 +495,7 @@ describe('IPCHandlers', () => {
       jest.useRealTimers();
     });
 
-    /* Preconditions: IPCHandlers instance created, timeout set to 100ms, DataManager mock with slow operation
+    /* Preconditions: IPCHandlers instance created, timeout set to 100ms, UserSettingsManager mock with slow operation
        Action: call handleLoadData with operation that takes > 100ms
        Assertions: returns success false with timeout error message
        Requirements: clerkly.2, clerkly.nfr.2*/
@@ -502,7 +505,7 @@ describe('IPCHandlers', () => {
       ipcHandlers.setTimeout(100);
 
       // Mock slow operation
-      mockDataManager.loadData.mockImplementation(
+      mockUserSettingsManager.loadData.mockImplementation(
         () =>
           new Promise((resolve) => {
             setTimeout(() => resolve({ success: true, data: 'value' }), 500);
@@ -524,7 +527,7 @@ describe('IPCHandlers', () => {
       jest.useRealTimers();
     });
 
-    /* Preconditions: IPCHandlers instance created, timeout set to 100ms, DataManager mock with slow operation
+    /* Preconditions: IPCHandlers instance created, timeout set to 100ms, UserSettingsManager mock with slow operation
        Action: call handleDeleteData with operation that takes > 100ms
        Assertions: returns success false with timeout error message
        Requirements: clerkly.2, clerkly.nfr.2*/
@@ -534,7 +537,7 @@ describe('IPCHandlers', () => {
       ipcHandlers.setTimeout(100);
 
       // Mock slow operation
-      mockDataManager.deleteData.mockImplementation(
+      mockUserSettingsManager.deleteData.mockImplementation(
         () =>
           new Promise((resolve) => {
             setTimeout(() => resolve({ success: true }), 500);
@@ -558,7 +561,7 @@ describe('IPCHandlers', () => {
       jest.useRealTimers();
     });
 
-    /* Preconditions: IPCHandlers instance created, timeout set to 200ms, DataManager mock with fast operation
+    /* Preconditions: IPCHandlers instance created, timeout set to 200ms, UserSettingsManager mock with fast operation
        Action: call handleSaveData with operation that completes in 50ms
        Assertions: returns success true, operation completes before timeout
        Requirements: clerkly.2, clerkly.nfr.2*/
@@ -567,7 +570,7 @@ describe('IPCHandlers', () => {
       ipcHandlers.setTimeout(200);
 
       // Mock fast operation
-      mockDataManager.saveData.mockImplementation(
+      mockUserSettingsManager.saveData.mockImplementation(
         () =>
           new Promise((resolve) => {
             setTimeout(() => resolve({ success: true }), 50);
@@ -588,16 +591,16 @@ describe('IPCHandlers', () => {
   });
 
   describe('error logging', () => {
-    /* Preconditions: IPCHandlers instance created, DataManager returns error
+    /* Preconditions: IPCHandlers instance created, UserSettingsManager returns error
        Action: call handleSaveData, handleLoadData, handleDeleteData with errors
        Assertions: console.error called for each operation with appropriate message
        Requirements: clerkly.2*/
     it('should log errors for all failed operations', async () => {
       const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
 
-      mockDataManager.saveData.mockReturnValue({ success: false, error: 'Save error' });
-      mockDataManager.loadData.mockReturnValue({ success: false, error: 'Load error' });
-      mockDataManager.deleteData.mockReturnValue({ success: false, error: 'Delete error' });
+      mockUserSettingsManager.saveData.mockReturnValue({ success: false, error: 'Save error' });
+      mockUserSettingsManager.loadData.mockReturnValue({ success: false, error: 'Load error' });
+      mockUserSettingsManager.deleteData.mockReturnValue({ success: false, error: 'Delete error' });
 
       await ipcHandlers.handleSaveData(mockEvent, 'key', 'value');
       await ipcHandlers.handleLoadData(mockEvent, 'key');

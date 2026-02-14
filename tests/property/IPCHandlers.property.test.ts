@@ -3,16 +3,16 @@
 import * as fc from 'fast-check';
 import { IPCHandlers } from '../../src/main/IPCHandlers';
 import {
-  DataManager,
+  UserSettingsManager,
   SaveDataResult,
   LoadDataResult,
   DeleteDataResult,
-} from '../../src/main/DataManager';
+} from '../../src/main/UserSettingsManager';
 
 /**
- * Mock DataManager with configurable delay for testing timeouts
+ * Mock UserSettingsManager with configurable delay for testing timeouts
  */
-class MockDataManagerWithDelay {
+class MockUserSettingsManagerWithDelay {
   private delay: number;
 
   constructor(delay: number) {
@@ -48,7 +48,7 @@ class MockDataManagerWithDelay {
 }
 
 describe('Property Tests - IPC Handlers', () => {
-  /* Preconditions: IPCHandlers initialized with mock DataManager that has delay > timeout
+  /* Preconditions: IPCHandlers initialized with mock UserSettingsManager that has delay > timeout
      Action: generate random valid keys, call handleSaveData with each key
      Assertions: for all operations, returns success false with timeout error message
      Requirements: clerkly.1, clerkly.2, clerkly.nfr.2*/
@@ -61,13 +61,15 @@ describe('Property Tests - IPC Handlers', () => {
         // Generate any JSON-safe value
         fc.oneof(fc.string(), fc.integer(), fc.boolean(), fc.object()),
         async (key: string, value: any) => {
-          // Create mock DataManager with delay > timeout
+          // Create mock UserSettingsManager with delay > timeout
           const timeout = 50; // 50ms timeout for faster tests
           const delay = 80; // 80ms delay (exceeds timeout)
-          const mockDataManager = new MockDataManagerWithDelay(delay) as unknown as DataManager;
+          const mockUserSettingsManager = new MockUserSettingsManagerWithDelay(
+            delay
+          ) as unknown as UserSettingsManager;
 
           // Create IPC handlers with short timeout
-          const ipcHandlers = new IPCHandlers(mockDataManager);
+          const ipcHandlers = new IPCHandlers(mockUserSettingsManager);
           ipcHandlers.setTimeout(timeout);
 
           // Measure execution time
@@ -93,7 +95,7 @@ describe('Property Tests - IPC Handlers', () => {
     );
   }, 30000); // Increased from 15000 to 30000 for more time
 
-  /* Preconditions: IPCHandlers initialized with mock DataManager that has delay > timeout
+  /* Preconditions: IPCHandlers initialized with mock UserSettingsManager that has delay > timeout
      Action: generate random valid keys, call handleLoadData with each key
      Assertions: for all operations, returns success false with timeout error message
      Requirements: clerkly.1, clerkly.2, clerkly.nfr.2*/
@@ -104,14 +106,16 @@ describe('Property Tests - IPC Handlers', () => {
         // Generate valid keys for testing
         fc.string({ minLength: 1, maxLength: 100 }),
         async (key: string) => {
-          // Create mock DataManager with delay > timeout
+          // Create mock UserSettingsManager with delay > timeout
           // Use larger gap to ensure timeout always occurs
           const timeout = 50; // 50ms timeout for faster tests
           const delay = 150; // 150ms delay (significantly exceeds timeout)
-          const mockDataManager = new MockDataManagerWithDelay(delay) as unknown as DataManager;
+          const mockUserSettingsManager = new MockUserSettingsManagerWithDelay(
+            delay
+          ) as unknown as UserSettingsManager;
 
           // Create IPC handlers with short timeout
-          const ipcHandlers = new IPCHandlers(mockDataManager);
+          const ipcHandlers = new IPCHandlers(mockUserSettingsManager);
           ipcHandlers.setTimeout(timeout);
 
           // Measure execution time
@@ -137,7 +141,7 @@ describe('Property Tests - IPC Handlers', () => {
     );
   }, 15000); // 15 second Jest timeout
 
-  /* Preconditions: IPCHandlers initialized with mock DataManager that has delay > timeout
+  /* Preconditions: IPCHandlers initialized with mock UserSettingsManager that has delay > timeout
      Action: generate random valid keys, call handleDeleteData with each key
      Assertions: for all operations, returns success false with timeout error message
      Requirements: clerkly.1, clerkly.2, clerkly.nfr.2*/
@@ -148,14 +152,16 @@ describe('Property Tests - IPC Handlers', () => {
         // Generate valid keys for testing
         fc.string({ minLength: 1, maxLength: 100 }),
         async (key: string) => {
-          // Create mock DataManager with delay > timeout
+          // Create mock UserSettingsManager with delay > timeout
           // Use larger gap to ensure timeout always occurs
           const timeout = 50; // 50ms timeout for faster tests
           const delay = 150; // 150ms delay (significantly exceeds timeout)
-          const mockDataManager = new MockDataManagerWithDelay(delay) as unknown as DataManager;
+          const mockUserSettingsManager = new MockUserSettingsManagerWithDelay(
+            delay
+          ) as unknown as UserSettingsManager;
 
           // Create IPC handlers with short timeout
-          const ipcHandlers = new IPCHandlers(mockDataManager);
+          const ipcHandlers = new IPCHandlers(mockUserSettingsManager);
           ipcHandlers.setTimeout(timeout);
 
           // Measure execution time
@@ -181,7 +187,7 @@ describe('Property Tests - IPC Handlers', () => {
     );
   }, 15000); // 15 second Jest timeout
 
-  /* Preconditions: IPCHandlers initialized with mock DataManager that has delay < timeout
+  /* Preconditions: IPCHandlers initialized with mock UserSettingsManager that has delay < timeout
      Action: call save-data operation with delay just under timeout
      Assertions: operation succeeds without timeout error
      Requirements: clerkly.1, clerkly.2, clerkly.nfr.2*/
@@ -189,9 +195,11 @@ describe('Property Tests - IPC Handlers', () => {
   test('Property 4 edge case: operations completing just before timeout succeed', async () => {
     const timeout = 100; // 100ms timeout
     const delay = 70; // 70ms delay (under timeout)
-    const mockDataManager = new MockDataManagerWithDelay(delay) as unknown as DataManager;
+    const mockUserSettingsManager = new MockUserSettingsManagerWithDelay(
+      delay
+    ) as unknown as UserSettingsManager;
 
-    const ipcHandlers = new IPCHandlers(mockDataManager);
+    const ipcHandlers = new IPCHandlers(mockUserSettingsManager);
     ipcHandlers.setTimeout(timeout);
 
     // Test save-data
@@ -207,7 +215,7 @@ describe('Property Tests - IPC Handlers', () => {
     expect(deleteResult.success).toBe(true);
   });
 
-  /* Preconditions: IPCHandlers initialized with mock DataManager that has delay >> timeout
+  /* Preconditions: IPCHandlers initialized with mock UserSettingsManager that has delay >> timeout
      Action: call operations with delay significantly exceeding timeout
      Assertions: operations timeout at expected time, not waiting for full delay
      Requirements: clerkly.1, clerkly.2, clerkly.nfr.2*/
@@ -215,9 +223,11 @@ describe('Property Tests - IPC Handlers', () => {
   test('Property 4 edge case: operations with very long delays timeout promptly', async () => {
     const timeout = 50; // 50ms timeout
     const delay = 200; // 200ms delay (much longer than timeout)
-    const mockDataManager = new MockDataManagerWithDelay(delay) as unknown as DataManager;
+    const mockUserSettingsManager = new MockUserSettingsManagerWithDelay(
+      delay
+    ) as unknown as UserSettingsManager;
 
-    const ipcHandlers = new IPCHandlers(mockDataManager);
+    const ipcHandlers = new IPCHandlers(mockUserSettingsManager);
     ipcHandlers.setTimeout(timeout);
 
     // Test save-data
@@ -255,8 +265,10 @@ describe('Property Tests - IPC Handlers', () => {
   // Feature: clerkly, Property 4
   test('Property 4 edge case: different timeout values are respected', async () => {
     const delay = 70; // 70ms delay
-    const mockDataManager = new MockDataManagerWithDelay(delay) as unknown as DataManager;
-    const ipcHandlers = new IPCHandlers(mockDataManager);
+    const mockUserSettingsManager = new MockUserSettingsManagerWithDelay(
+      delay
+    ) as unknown as UserSettingsManager;
+    const ipcHandlers = new IPCHandlers(mockUserSettingsManager);
 
     // Test with short timeout (should timeout)
     ipcHandlers.setTimeout(50);
@@ -273,7 +285,7 @@ describe('Property Tests - IPC Handlers', () => {
     expect(ipcHandlers.getTimeout()).toBe(100);
   });
 
-  /* Preconditions: IPCHandlers initialized with mock DataManager with delay at exact timeout boundary
+  /* Preconditions: IPCHandlers initialized with mock UserSettingsManager with delay at exact timeout boundary
      Action: call operations with delay exactly equal to timeout
      Assertions: operations may succeed or timeout (race condition at boundary)
      Requirements: clerkly.1, clerkly.2, clerkly.nfr.2*/
@@ -281,9 +293,11 @@ describe('Property Tests - IPC Handlers', () => {
   test('Property 4 edge case: operations at exact timeout boundary', async () => {
     const timeout = 70; // 70ms timeout
     const delay = 70; // 70ms delay (exactly at boundary)
-    const mockDataManager = new MockDataManagerWithDelay(delay) as unknown as DataManager;
+    const mockUserSettingsManager = new MockUserSettingsManagerWithDelay(
+      delay
+    ) as unknown as UserSettingsManager;
 
-    const ipcHandlers = new IPCHandlers(mockDataManager);
+    const ipcHandlers = new IPCHandlers(mockUserSettingsManager);
     ipcHandlers.setTimeout(timeout);
 
     // At exact boundary, result is non-deterministic (race condition)
@@ -306,8 +320,10 @@ describe('Property Tests - IPC Handlers', () => {
      Requirements: clerkly.1, clerkly.2, clerkly.nfr.2*/
   // Feature: clerkly, Property 4
   test('Property 4 edge case: default timeout is 10 seconds', () => {
-    const mockDataManager = new MockDataManagerWithDelay(0) as unknown as DataManager;
-    const ipcHandlers = new IPCHandlers(mockDataManager);
+    const mockUserSettingsManager = new MockUserSettingsManagerWithDelay(
+      0
+    ) as unknown as UserSettingsManager;
+    const ipcHandlers = new IPCHandlers(mockUserSettingsManager);
 
     // Verify default timeout
     expect(ipcHandlers.getTimeout()).toBe(10000);

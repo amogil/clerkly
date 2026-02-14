@@ -2,7 +2,7 @@
 
 import * as fc from 'fast-check';
 import WindowManager from '../../src/main/WindowManager';
-import { DataManager } from '../../src/main/DataManager';
+import type { IDatabaseManager } from '../../src/main/DatabaseManager';
 import { BrowserWindow, screen } from 'electron';
 
 // Mock Electron modules
@@ -50,15 +50,24 @@ jest.mock('electron', () => ({
 }));
 
 describe('Property Tests - WindowManager', () => {
-  let mockDataManager: jest.Mocked<DataManager>;
+  let mockDbManager: jest.Mocked<IDatabaseManager>;
   let mockScreen: any;
 
   beforeEach(() => {
     jest.clearAllMocks();
 
-    mockDataManager = {
-      loadData: jest.fn().mockReturnValue({ success: false }),
-      saveData: jest.fn(),
+    // Create mock DatabaseManager (IDatabaseManager interface)
+    // Requirements: database-refactoring.3.6 - WindowManager uses DatabaseManager
+    mockDbManager = {
+      getDatabase: jest.fn().mockReturnValue({
+        open: true,
+        prepare: jest.fn().mockReturnValue({
+          get: jest.fn().mockReturnValue(undefined),
+          run: jest.fn(),
+        }),
+      }),
+      getCurrentUserId: jest.fn().mockReturnValue(null),
+      setUserManager: jest.fn(),
     } as any;
 
     mockScreen = screen;
@@ -90,7 +99,7 @@ describe('Property Tests - WindowManager', () => {
             workAreaSize: screenSize,
           });
 
-          const windowManager = new WindowManager(mockDataManager);
+          const windowManager = new WindowManager(mockDbManager);
           windowManager.createWindow();
 
           const MockedBrowserWindow = BrowserWindow as jest.MockedClass<typeof BrowserWindow>;
@@ -119,7 +128,7 @@ describe('Property Tests - WindowManager', () => {
   test('Property 12: Window Resizable - window is always resizable', async () => {
     await fc.assert(
       fc.asyncProperty(fc.constant(null), async () => {
-        const windowManager = new WindowManager(mockDataManager);
+        const windowManager = new WindowManager(mockDbManager);
         windowManager.createWindow();
 
         const MockedBrowserWindow = BrowserWindow as jest.MockedClass<typeof BrowserWindow>;
@@ -149,7 +158,7 @@ describe('Property Tests - WindowManager', () => {
   test('Property 13: Empty Window Title - window title is always empty', async () => {
     await fc.assert(
       fc.asyncProperty(fc.constant(null), async () => {
-        const windowManager = new WindowManager(mockDataManager);
+        const windowManager = new WindowManager(mockDbManager);
         windowManager.createWindow();
 
         const MockedBrowserWindow = BrowserWindow as jest.MockedClass<typeof BrowserWindow>;
@@ -179,7 +188,7 @@ describe('Property Tests - WindowManager', () => {
   test('Property 14: Native Mac OS X Elements - window uses native titleBarStyle', async () => {
     await fc.assert(
       fc.asyncProperty(fc.constant(null), async () => {
-        const windowManager = new WindowManager(mockDataManager);
+        const windowManager = new WindowManager(mockDbManager);
         windowManager.createWindow();
 
         const MockedBrowserWindow = BrowserWindow as jest.MockedClass<typeof BrowserWindow>;
@@ -220,7 +229,7 @@ describe('Property Tests - WindowManager', () => {
             workAreaSize: screenSize,
           });
 
-          const windowManager = new WindowManager(mockDataManager);
+          const windowManager = new WindowManager(mockDbManager);
           windowManager.createWindow();
 
           const MockedBrowserWindow = BrowserWindow as jest.MockedClass<typeof BrowserWindow>;
@@ -249,7 +258,7 @@ describe('Property Tests - WindowManager', () => {
   test('Property 16: System Elements Visibility - window preserves Mac OS X system elements', async () => {
     await fc.assert(
       fc.asyncProperty(fc.constant(null), async () => {
-        const windowManager = new WindowManager(mockDataManager);
+        const windowManager = new WindowManager(mockDbManager);
         windowManager.createWindow();
 
         const MockedBrowserWindow = BrowserWindow as jest.MockedClass<typeof BrowserWindow>;
@@ -280,7 +289,7 @@ describe('Property Tests - WindowManager', () => {
         const windowManagers: WindowManager[] = [];
 
         for (let i = 0; i < windowCount; i++) {
-          const windowManager = new WindowManager(mockDataManager);
+          const windowManager = new WindowManager(mockDbManager);
           windowManager.createWindow();
           windowManagers.push(windowManager);
 

@@ -1,8 +1,9 @@
-// Requirements: google-oauth-auth.1.1, google-oauth-auth.1.2, google-oauth-auth.1.3, google-oauth-auth.1.5, google-oauth-auth.2.2, google-oauth-auth.2.3, google-oauth-auth.3.1, google-oauth-auth.3.2, google-oauth-auth.3.3, google-oauth-auth.3.5, google-oauth-auth.5.1, google-oauth-auth.5.2, google-oauth-auth.5.3, google-oauth-auth.5.4, google-oauth-auth.6.1, google-oauth-auth.6.2, google-oauth-auth.6.3, google-oauth-auth.6.4, google-oauth-auth.6.5, google-oauth-auth.7.1, google-oauth-auth.7.2, google-oauth-auth.9.2
+// Requirements: google-oauth-auth.1.1, google-oauth-auth.1.2, google-oauth-auth.1.3, google-oauth-auth.1.5, google-oauth-auth.2.2, google-oauth-auth.2.3, google-oauth-auth.3.1, google-oauth-auth.3.2, google-oauth-auth.3.3, google-oauth-auth.3.5, google-oauth-auth.5.1, google-oauth-auth.5.2, google-oauth-auth.5.3, google-oauth-auth.5.4, google-oauth-auth.6.1, google-oauth-auth.6.2, google-oauth-auth.6.3, google-oauth-auth.6.4, google-oauth-auth.6.5, google-oauth-auth.7.1, google-oauth-auth.7.2, google-oauth-auth.9.2, database-refactoring.2
 
 import { OAuthClientManager } from '../../../src/main/auth/OAuthClientManager';
 import { TokenStorageManager } from '../../../src/main/auth/TokenStorageManager';
-import { DataManager } from '../../../src/main/DataManager';
+import { UserSettingsManager } from '../../../src/main/UserSettingsManager';
+import { DatabaseManager } from '../../../src/main/DatabaseManager';
 import { getOAuthConfig } from '../../../src/main/auth/OAuthConfig';
 import { shell } from 'electron';
 import * as crypto from 'crypto';
@@ -24,7 +25,8 @@ jest.mock('electron', () => ({
 global.fetch = jest.fn();
 
 describe('OAuthClientManager', () => {
-  let dataManager: DataManager;
+  let dataManager: UserSettingsManager;
+  let dbManager: DatabaseManager;
   let tokenStorage: TokenStorageManager;
   let oauthClient: OAuthClientManager;
   let testDbPath: string;
@@ -42,15 +44,18 @@ describe('OAuthClientManager', () => {
       fs.mkdirSync(migrationsPath, { recursive: true });
     }
 
-    dataManager = new DataManager(testDbPath);
-    dataManager.initialize();
-
     // Requirements: user-data-isolation.1.10 - Mock UserManager for data isolation
     mockUserManager = {
       getCurrentUserId: jest.fn().mockReturnValue('test@example.com'),
     };
 
-    dataManager.setUserManager(mockUserManager);
+    // Initialize DatabaseManager first
+    dbManager = new DatabaseManager();
+    dbManager.initialize(testDbPath);
+    dbManager.setUserManager(mockUserManager);
+
+    // Create UserSettingsManager with DatabaseManager
+    dataManager = new UserSettingsManager(dbManager);
     tokenStorage = new TokenStorageManager(dataManager);
 
     // Create OAuth client
@@ -62,7 +67,7 @@ describe('OAuthClientManager', () => {
   });
 
   afterEach(() => {
-    dataManager.close();
+    dbManager.close();
     if (fs.existsSync(testDbPath)) {
       fs.rmSync(testDbPath, { recursive: true, force: true });
     }

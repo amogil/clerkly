@@ -1,7 +1,7 @@
-// Requirements: window-management.5
+// Requirements: window-management.5, database-refactoring.3.6
 
 import { WindowStateManager, WindowState } from '../../src/main/WindowStateManager';
-import { DataManager } from '../../src/main/DataManager';
+import type { IDatabaseManager } from '../../src/main/DatabaseManager';
 
 // Mock electron module
 jest.mock('electron', () => ({
@@ -13,14 +13,25 @@ jest.mock('electron', () => ({
 
 describe('WindowStateManager', () => {
   let windowStateManager: WindowStateManager;
-  let mockDataManager: jest.Mocked<DataManager>;
+  let mockDbManager: jest.Mocked<IDatabaseManager>;
   let mockScreen: any;
+  let mockDb: any;
 
   beforeEach(() => {
-    // Create mock DataManager
-    mockDataManager = {
-      loadData: jest.fn(),
-      saveData: jest.fn(),
+    // Create mock database
+    mockDb = {
+      open: true,
+      prepare: jest.fn().mockReturnValue({
+        get: jest.fn(),
+        run: jest.fn(),
+      }),
+    };
+
+    // Create mock DatabaseManager
+    mockDbManager = {
+      getDatabase: jest.fn().mockReturnValue(mockDb),
+      getCurrentUserId: jest.fn().mockReturnValue('test@example.com'),
+      setUserManager: jest.fn(),
     } as any;
 
     // Get mocked electron screen
@@ -39,7 +50,7 @@ describe('WindowStateManager', () => {
     ]);
 
     // Create WindowStateManager instance
-    windowStateManager = new WindowStateManager(mockDataManager);
+    windowStateManager = new WindowStateManager(mockDbManager);
   });
 
   afterEach(() => {
@@ -50,9 +61,11 @@ describe('WindowStateManager', () => {
     /* Preconditions: no saved state in database
        Action: call loadState()
        Assertions: returns default state with isMaximized: false, dimensions min(600, screenWidth) x min(400, screenHeight), centered
-       Requirements: window-management.1.1, window-management.4.1, window-management.4.2, window-management.4.4, window-management.5.5 */
+       Requirements: window-management.1.1, window-management.4.1, window-management.4.2, window-management.4.4, window-management.5.5, database-refactoring.3.6 */
     it('should return default state when no saved state exists', () => {
-      mockDataManager.loadData.mockReturnValue({ success: false });
+      mockDb.prepare.mockReturnValue({
+        get: jest.fn().mockReturnValue(undefined),
+      });
 
       const result = windowStateManager.loadState();
 
@@ -67,7 +80,7 @@ describe('WindowStateManager', () => {
     /* Preconditions: valid state saved in database
        Action: call loadState()
        Assertions: returns saved state
-       Requirements: window-management.5.4 */
+       Requirements: window-management.5.4, database-refactoring.3.6 */
     it('should load saved state from database', () => {
       const savedState: WindowState = {
         x: 100,
@@ -77,21 +90,19 @@ describe('WindowStateManager', () => {
         isMaximized: false,
       };
 
-      mockDataManager.loadData.mockReturnValue({
-        success: true,
-        data: savedState,
+      mockDb.prepare.mockReturnValue({
+        get: jest.fn().mockReturnValue({ value: JSON.stringify(savedState) }),
       });
 
       const result = windowStateManager.loadState();
 
       expect(result).toEqual(savedState);
-      expect(mockDataManager.loadData).toHaveBeenCalledWith('window_state');
     });
 
     /* Preconditions: saved state with position outside screen bounds
        Action: call loadState()
        Assertions: returns default state on primary screen
-       Requirements: window-management.5.6 */
+       Requirements: window-management.5.6, database-refactoring.3.6 */
     it('should return default state for invalid position', () => {
       const invalidState: WindowState = {
         x: 5000, // Outside screen bounds
@@ -101,9 +112,8 @@ describe('WindowStateManager', () => {
         isMaximized: false,
       };
 
-      mockDataManager.loadData.mockReturnValue({
-        success: true,
-        data: invalidState,
+      mockDb.prepare.mockReturnValue({
+        get: jest.fn().mockReturnValue({ value: JSON.stringify(invalidState) }),
       });
 
       const result = windowStateManager.loadState();
@@ -119,12 +129,11 @@ describe('WindowStateManager', () => {
     /* Preconditions: corrupted JSON in database
        Action: call loadState()
        Assertions: returns default state, error logged
-       Requirements: window-management.5 */
+       Requirements: window-management.5, database-refactoring.3.6 */
     it('should handle corrupted state data', () => {
       const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
-      mockDataManager.loadData.mockReturnValue({
-        success: true,
-        data: 'invalid json {[',
+      mockDb.prepare.mockReturnValue({
+        get: jest.fn().mockReturnValue({ value: 'invalid json {[' }),
       });
 
       const result = windowStateManager.loadState();
@@ -137,30 +146,22 @@ describe('WindowStateManager', () => {
       consoleErrorSpy.mockRestore();
     });
 
-    /* Preconditions: DataManager.loadData throws error
+    /* Preconditions: Database not initialized
        Action: call loadState()
-       Assertions: returns default state, error logged
-       Requirements: window-management.5 */
-    it('should handle database read errors', () => {
-      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
-      mockDataManager.loadData.mockImplementation(() => {
-        throw new Error('Database error');
-      });
+       Assertions: returns default state
+       Requirements: window-management.5, database-refactoring.3.6 */
+    it('should handle database not initialized', () => {
+      mockDbManager.getDatabase.mockReturnValue(null);
 
       const result = windowStateManager.loadState();
 
       expect(result.isMaximized).toBe(false); // Not maximized to keep resizable
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Failed to load window state:')
-      );
-
-      consoleErrorSpy.mockRestore();
     });
 
     /* Preconditions: saved state with position on secondary display
        Action: call loadState()
        Assertions: returns saved state (position is valid)
-       Requirements: window-management.5.4, window-management.5.6 */
+       Requirements: window-management.5.4, window-management.5.6, database-refactoring.3.6 */
     it('should accept position on secondary display', () => {
       const savedState: WindowState = {
         x: 2000, // On secondary display
@@ -170,9 +171,8 @@ describe('WindowStateManager', () => {
         isMaximized: false,
       };
 
-      mockDataManager.loadData.mockReturnValue({
-        success: true,
-        data: savedState,
+      mockDb.prepare.mockReturnValue({
+        get: jest.fn().mockReturnValue({ value: JSON.stringify(savedState) }),
       });
 
       // Mock two displays
@@ -189,7 +189,7 @@ describe('WindowStateManager', () => {
     /* Preconditions: saved state with position at edge of display
        Action: call loadState()
        Assertions: returns saved state (boundary test)
-       Requirements: window-management.5.4, window-management.5.6 */
+       Requirements: window-management.5.4, window-management.5.6, database-refactoring.3.6 */
     it('should accept position at display edge', () => {
       const savedState: WindowState = {
         x: 1919, // At right edge of display
@@ -199,9 +199,8 @@ describe('WindowStateManager', () => {
         isMaximized: false,
       };
 
-      mockDataManager.loadData.mockReturnValue({
-        success: true,
-        data: savedState,
+      mockDb.prepare.mockReturnValue({
+        get: jest.fn().mockReturnValue({ value: JSON.stringify(savedState) }),
       });
 
       const result = windowStateManager.loadState();
@@ -212,7 +211,7 @@ describe('WindowStateManager', () => {
     /* Preconditions: saved state with negative position (multi-monitor setup)
        Action: call loadState()
        Assertions: returns saved state if position is valid on any display
-       Requirements: window-management.5.4, window-management.5.6 */
+       Requirements: window-management.5.4, window-management.5.6, database-refactoring.3.6 */
     it('should accept negative position on valid display', () => {
       const savedState: WindowState = {
         x: -1000, // On display to the left
@@ -222,9 +221,8 @@ describe('WindowStateManager', () => {
         isMaximized: false,
       };
 
-      mockDataManager.loadData.mockReturnValue({
-        success: true,
-        data: savedState,
+      mockDb.prepare.mockReturnValue({
+        get: jest.fn().mockReturnValue({ value: JSON.stringify(savedState) }),
       });
 
       // Mock display to the left of primary
@@ -431,8 +429,13 @@ describe('WindowStateManager', () => {
     /* Preconditions: valid window state
        Action: call saveState()
        Assertions: state saved to database as JSON
-       Requirements: window-management.5.1, window-management.5.2, window-management.5.3 */
+       Requirements: window-management.5.1, window-management.5.2, window-management.5.3, database-refactoring.3.6 */
     it('should save state to database', () => {
+      const mockRun = jest.fn();
+      mockDb.prepare.mockReturnValue({
+        run: mockRun,
+      });
+
       const state: WindowState = {
         x: 100,
         y: 100,
@@ -443,16 +446,23 @@ describe('WindowStateManager', () => {
 
       windowStateManager.saveState(state);
 
-      expect(mockDataManager.saveData).toHaveBeenCalledWith('window_state', JSON.stringify(state));
+      expect(mockDb.prepare).toHaveBeenCalled();
+      expect(mockRun).toHaveBeenCalledWith(
+        'window_state',
+        JSON.stringify(state),
+        '__system__',
+        expect.any(Number),
+        expect.any(Number)
+      );
     });
 
     /* Preconditions: database write fails
        Action: call saveState()
        Assertions: error logged, no exception thrown
-       Requirements: window-management.5 */
+       Requirements: window-management.5, database-refactoring.3.6 */
     it('should handle save errors gracefully', () => {
       const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
-      mockDataManager.saveData.mockImplementation(() => {
+      mockDb.prepare.mockImplementation(() => {
         throw new Error('Database write error');
       });
 
@@ -474,11 +484,42 @@ describe('WindowStateManager', () => {
       consoleErrorSpy.mockRestore();
     });
 
+    /* Preconditions: Database not initialized
+       Action: call saveState()
+       Assertions: error logged, no exception thrown
+       Requirements: window-management.5, database-refactoring.3.6 */
+    it('should handle database not initialized', () => {
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+      mockDbManager.getDatabase.mockReturnValue(null);
+
+      const state: WindowState = {
+        x: 100,
+        y: 100,
+        width: 800,
+        height: 600,
+        isMaximized: false,
+      };
+
+      // Should not throw
+      expect(() => windowStateManager.saveState(state)).not.toThrow();
+
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Failed to save window state: Database not initialized')
+      );
+
+      consoleErrorSpy.mockRestore();
+    });
+
     /* Preconditions: state with maximized flag
        Action: call saveState() with isMaximized: true
        Assertions: maximized state saved correctly
-       Requirements: window-management.5.3 */
+       Requirements: window-management.5.3, database-refactoring.3.6 */
     it('should save maximized state correctly', () => {
+      const mockRun = jest.fn();
+      mockDb.prepare.mockReturnValue({
+        run: mockRun,
+      });
+
       const state: WindowState = {
         x: 100,
         y: 100,
@@ -489,7 +530,7 @@ describe('WindowStateManager', () => {
 
       windowStateManager.saveState(state);
 
-      const savedData = mockDataManager.saveData.mock.calls[0][1];
+      const savedData = mockRun.mock.calls[0][1];
       const parsedState = JSON.parse(savedData as string);
 
       expect(parsedState.isMaximized).toBe(true);
@@ -498,8 +539,13 @@ describe('WindowStateManager', () => {
     /* Preconditions: state with various dimensions
        Action: call saveState() with different dimensions
        Assertions: all dimensions saved correctly
-       Requirements: window-management.5.1, window-management.5.2 */
+       Requirements: window-management.5.1, window-management.5.2, database-refactoring.3.6 */
     it('should save all state properties correctly', () => {
+      const mockRun = jest.fn();
+      mockDb.prepare.mockReturnValue({
+        run: mockRun,
+      });
+
       const state: WindowState = {
         x: 250,
         y: 150,
@@ -510,7 +556,7 @@ describe('WindowStateManager', () => {
 
       windowStateManager.saveState(state);
 
-      const savedData = mockDataManager.saveData.mock.calls[0][1];
+      const savedData = mockRun.mock.calls[0][1];
       const parsedState = JSON.parse(savedData as string);
 
       expect(parsedState).toEqual(state);
@@ -519,8 +565,13 @@ describe('WindowStateManager', () => {
     /* Preconditions: state with negative coordinates (multi-monitor)
        Action: call saveState() with negative coordinates
        Assertions: negative coordinates saved correctly
-       Requirements: window-management.5.2 */
+       Requirements: window-management.5.2, database-refactoring.3.6 */
     it('should save negative coordinates correctly', () => {
+      const mockRun = jest.fn();
+      mockDb.prepare.mockReturnValue({
+        run: mockRun,
+      });
+
       const state: WindowState = {
         x: -1000,
         y: -500,
@@ -531,7 +582,7 @@ describe('WindowStateManager', () => {
 
       windowStateManager.saveState(state);
 
-      const savedData = mockDataManager.saveData.mock.calls[0][1];
+      const savedData = mockRun.mock.calls[0][1];
       const parsedState = JSON.parse(savedData as string);
 
       expect(parsedState.x).toBe(-1000);
@@ -541,8 +592,13 @@ describe('WindowStateManager', () => {
     /* Preconditions: state with large dimensions
        Action: call saveState() with large dimensions
        Assertions: large dimensions saved correctly
-       Requirements: window-management.5.1 */
+       Requirements: window-management.5.1, database-refactoring.3.6 */
     it('should save large dimensions correctly', () => {
+      const mockRun = jest.fn();
+      mockDb.prepare.mockReturnValue({
+        run: mockRun,
+      });
+
       const state: WindowState = {
         x: 0,
         y: 0,
@@ -553,7 +609,7 @@ describe('WindowStateManager', () => {
 
       windowStateManager.saveState(state);
 
-      const savedData = mockDataManager.saveData.mock.calls[0][1];
+      const savedData = mockRun.mock.calls[0][1];
       const parsedState = JSON.parse(savedData as string);
 
       expect(parsedState.width).toBe(3840);

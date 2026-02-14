@@ -1,4 +1,4 @@
-// Requirements: clerkly.nfr.2.2, clerkly.2.6, clerkly.2.8, clerkly.nfr.4.4
+// Requirements: clerkly.nfr.2.2, clerkly.2.6, clerkly.2.8, clerkly.nfr.4.4, account-profile.1.3
 /**
  * Property-based tests for graceful shutdown data persistence
  * Tests Property 9: Graceful Shutdown Data Persistence
@@ -11,9 +11,11 @@ import * as fs from 'fs';
 import * as os from 'os';
 import WindowManager from '../../src/main/WindowManager';
 import { LifecycleManager } from '../../src/main/LifecycleManager';
-import { DataManager } from '../../src/main/DataManager';
+import { UserSettingsManager } from '../../src/main/UserSettingsManager';
+import { DatabaseManager } from '../../src/main/DatabaseManager';
 import { OAuthClientManager } from '../../src/main/auth/OAuthClientManager';
 import { TokenStorageManager } from '../../src/main/auth/TokenStorageManager';
+import { UserManager } from '../../src/main/auth/UserManager';
 import { getOAuthConfig } from '../../src/main/auth/OAuthConfig';
 
 // Mock Electron app and BrowserWindow
@@ -63,27 +65,40 @@ jest.mock('electron', () => ({
 describe('Property Tests - Graceful Shutdown Data Persistence', () => {
   let testStoragePath: string;
 
-  // Helper function to create DataManager with mock UserManager
-  const createDataManagerWithMockUser = (storagePath: string) => {
-    const dataManager = new DataManager(storagePath);
-    dataManager.initialize();
+  // Helper function to create DatabaseManager and UserSettingsManager with mock UserManager
+  // Requirements: database-refactoring.1, database-refactoring.2
+  const createUserSettingsManagerWithMockUser = (storagePath: string) => {
+    const dbManager = new DatabaseManager();
+    dbManager.initialize(storagePath);
 
     // Requirements: user-data-isolation.1.10 - Mock UserManager for data isolation
     const mockProfileManager = {
       getCurrentUserId: jest.fn().mockReturnValue('test@example.com'),
     } as any;
 
-    dataManager.setUserManager(mockProfileManager);
-    return dataManager;
+    dbManager.setUserManager(mockProfileManager);
+
+    const dataManager = new UserSettingsManager(dbManager);
+    return { dataManager, dbManager };
   };
 
   // Helper function to create mock OAuth components
-  const createMockOAuthComponents = (dataManager: DataManager) => {
+  const createMockOAuthComponents = (
+    dataManager: UserSettingsManager,
+    _dbManager: DatabaseManager
+  ) => {
     const tokenStorage = new TokenStorageManager(dataManager);
     const oauthClient = new OAuthClientManager(getOAuthConfig(), tokenStorage);
     // Mock getAuthStatus to return not authorized (skip profile fetch in tests)
     jest.spyOn(oauthClient, 'getAuthStatus').mockResolvedValue({ authorized: false });
-    return { tokenStorage, oauthClient };
+
+    // Requirements: account-profile.1.3 - Create mock UserManager for LifecycleManager
+    const userManager = {
+      fetchProfile: jest.fn().mockResolvedValue(null),
+      getCurrentUserId: jest.fn().mockReturnValue(null),
+    } as unknown as UserManager;
+
+    return { tokenStorage, oauthClient, userManager };
   };
 
   beforeEach(() => {
@@ -148,15 +163,16 @@ describe('Property Tests - Graceful Shutdown Data Persistence', () => {
           }
 
           // First startup - save data
-          const dataManager1 = createDataManagerWithMockUser(testStoragePath);
-          const windowManager1 = new WindowManager(dataManager1);
-          const { tokenStorage: tokenStorage1, oauthClient: oauthClient1 } =
-            createMockOAuthComponents(dataManager1);
+          const { dataManager: dataManager1, dbManager: dbManager1 } =
+            createUserSettingsManagerWithMockUser(testStoragePath);
+          const windowManager1 = new WindowManager(dbManager1);
+          const { oauthClient: oauthClient1, userManager: userManager1 } =
+            createMockOAuthComponents(dataManager1, dbManager1);
           const lifecycleManager1 = new LifecycleManager(
             windowManager1,
-            dataManager1,
+            dbManager1,
             oauthClient1,
-            tokenStorage1
+            userManager1
           );
 
           await lifecycleManager1.initialize();
@@ -179,22 +195,23 @@ describe('Property Tests - Graceful Shutdown Data Persistence', () => {
           // Verify shutdown completed within 5 seconds
           expect(shutdownTime).toBeLessThan(5000);
 
-          // Close data manager
-          dataManager1.close();
+          // Close database manager
+          dbManager1.close();
 
           // Clear mocks for restart
           jest.clearAllMocks();
 
           // Second startup - verify data persisted
-          const dataManager2 = createDataManagerWithMockUser(testStoragePath);
-          const windowManager2 = new WindowManager(dataManager2);
-          const { tokenStorage: tokenStorage2, oauthClient: oauthClient2 } =
-            createMockOAuthComponents(dataManager2);
+          const { dataManager: dataManager2, dbManager: dbManager2 } =
+            createUserSettingsManagerWithMockUser(testStoragePath);
+          const windowManager2 = new WindowManager(dbManager2);
+          const { oauthClient: oauthClient2, userManager: userManager2 } =
+            createMockOAuthComponents(dataManager2, dbManager2);
           const lifecycleManager2 = new LifecycleManager(
             windowManager2,
-            dataManager2,
+            dbManager2,
             oauthClient2,
-            tokenStorage2
+            userManager2
           );
 
           await lifecycleManager2.initialize();
@@ -208,7 +225,7 @@ describe('Property Tests - Graceful Shutdown Data Persistence', () => {
 
           // Clean up
           await lifecycleManager2.handleQuit();
-          dataManager2.close();
+          dbManager2.close();
 
           // Clean up storage for next iteration
           if (fs.existsSync(testStoragePath)) {
@@ -232,15 +249,18 @@ describe('Property Tests - Graceful Shutdown Data Persistence', () => {
     }
 
     // First startup - save data
-    const dataManager1 = createDataManagerWithMockUser(testStoragePath);
-    const windowManager1 = new WindowManager(dataManager1);
-    const { tokenStorage: tokenStorage1, oauthClient: oauthClient1 } =
-      createMockOAuthComponents(dataManager1);
+    const { dataManager: dataManager1, dbManager: dbManager1 } =
+      createUserSettingsManagerWithMockUser(testStoragePath);
+    const windowManager1 = new WindowManager(dbManager1);
+    const { oauthClient: oauthClient1, userManager: userManager1 } = createMockOAuthComponents(
+      dataManager1,
+      dbManager1
+    );
     const lifecycleManager1 = new LifecycleManager(
       windowManager1,
-      dataManager1,
+      dbManager1,
       oauthClient1,
-      tokenStorage1
+      userManager1
     );
 
     await lifecycleManager1.initialize();
@@ -258,21 +278,24 @@ describe('Property Tests - Graceful Shutdown Data Persistence', () => {
 
     expect(shutdownTime).toBeLessThan(5000);
 
-    dataManager1.close();
+    dbManager1.close();
 
     // Clear mocks for restart
     jest.clearAllMocks();
 
     // Second startup - verify data persisted
-    const dataManager2 = createDataManagerWithMockUser(testStoragePath);
-    const windowManager2 = new WindowManager(dataManager2);
-    const { tokenStorage: tokenStorage2, oauthClient: oauthClient2 } =
-      createMockOAuthComponents(dataManager2);
+    const { dataManager: dataManager2, dbManager: dbManager2 } =
+      createUserSettingsManagerWithMockUser(testStoragePath);
+    const windowManager2 = new WindowManager(dbManager2);
+    const { oauthClient: oauthClient2, userManager: userManager2 } = createMockOAuthComponents(
+      dataManager2,
+      dbManager2
+    );
     const lifecycleManager2 = new LifecycleManager(
       windowManager2,
-      dataManager2,
+      dbManager2,
       oauthClient2,
-      tokenStorage2
+      userManager2
     );
 
     await lifecycleManager2.initialize();
@@ -283,7 +306,7 @@ describe('Property Tests - Graceful Shutdown Data Persistence', () => {
 
     // Clean up
     await lifecycleManager2.handleQuit();
-    dataManager2.close();
+    dbManager2.close();
   });
 
   /* Preconditions: application not running
@@ -298,15 +321,18 @@ describe('Property Tests - Graceful Shutdown Data Persistence', () => {
     }
 
     // First startup - save data
-    const dataManager1 = createDataManagerWithMockUser(testStoragePath);
-    const windowManager1 = new WindowManager(dataManager1);
-    const { tokenStorage: tokenStorage1, oauthClient: oauthClient1 } =
-      createMockOAuthComponents(dataManager1);
+    const { dataManager: dataManager1, dbManager: dbManager1 } =
+      createUserSettingsManagerWithMockUser(testStoragePath);
+    const windowManager1 = new WindowManager(dbManager1);
+    const { oauthClient: oauthClient1, userManager: userManager1 } = createMockOAuthComponents(
+      dataManager1,
+      dbManager1
+    );
     const lifecycleManager1 = new LifecycleManager(
       windowManager1,
-      dataManager1,
+      dbManager1,
       oauthClient1,
-      tokenStorage1
+      userManager1
     );
 
     await lifecycleManager1.initialize();
@@ -334,21 +360,24 @@ describe('Property Tests - Graceful Shutdown Data Persistence', () => {
 
     expect(shutdownTime).toBeLessThan(5000);
 
-    dataManager1.close();
+    dbManager1.close();
 
     // Clear mocks for restart
     jest.clearAllMocks();
 
     // Second startup - verify all data persisted
-    const dataManager2 = createDataManagerWithMockUser(testStoragePath);
-    const windowManager2 = new WindowManager(dataManager2);
-    const { tokenStorage: tokenStorage2, oauthClient: oauthClient2 } =
-      createMockOAuthComponents(dataManager2);
+    const { dataManager: dataManager2, dbManager: dbManager2 } =
+      createUserSettingsManagerWithMockUser(testStoragePath);
+    const windowManager2 = new WindowManager(dbManager2);
+    const { oauthClient: oauthClient2, userManager: userManager2 } = createMockOAuthComponents(
+      dataManager2,
+      dbManager2
+    );
     const lifecycleManager2 = new LifecycleManager(
       windowManager2,
-      dataManager2,
+      dbManager2,
       oauthClient2,
-      tokenStorage2
+      userManager2
     );
 
     await lifecycleManager2.initialize();
@@ -362,7 +391,7 @@ describe('Property Tests - Graceful Shutdown Data Persistence', () => {
 
     // Clean up
     await lifecycleManager2.handleQuit();
-    dataManager2.close();
+    dbManager2.close();
   });
 
   /* Preconditions: application not running
@@ -377,15 +406,18 @@ describe('Property Tests - Graceful Shutdown Data Persistence', () => {
     }
 
     // First startup - save data
-    const dataManager1 = createDataManagerWithMockUser(testStoragePath);
-    const windowManager1 = new WindowManager(dataManager1);
-    const { tokenStorage: tokenStorage1, oauthClient: oauthClient1 } =
-      createMockOAuthComponents(dataManager1);
+    const { dataManager: dataManager1, dbManager: dbManager1 } =
+      createUserSettingsManagerWithMockUser(testStoragePath);
+    const windowManager1 = new WindowManager(dbManager1);
+    const { oauthClient: oauthClient1, userManager: userManager1 } = createMockOAuthComponents(
+      dataManager1,
+      dbManager1
+    );
     const lifecycleManager1 = new LifecycleManager(
       windowManager1,
-      dataManager1,
+      dbManager1,
       oauthClient1,
-      tokenStorage1
+      userManager1
     );
 
     await lifecycleManager1.initialize();
@@ -417,21 +449,24 @@ describe('Property Tests - Graceful Shutdown Data Persistence', () => {
 
     expect(shutdownTime).toBeLessThan(5000);
 
-    dataManager1.close();
+    dbManager1.close();
 
     // Clear mocks for restart
     jest.clearAllMocks();
 
     // Second startup - verify data persisted
-    const dataManager2 = createDataManagerWithMockUser(testStoragePath);
-    const windowManager2 = new WindowManager(dataManager2);
-    const { tokenStorage: tokenStorage2, oauthClient: oauthClient2 } =
-      createMockOAuthComponents(dataManager2);
+    const { dataManager: dataManager2, dbManager: dbManager2 } =
+      createUserSettingsManagerWithMockUser(testStoragePath);
+    const windowManager2 = new WindowManager(dbManager2);
+    const { oauthClient: oauthClient2, userManager: userManager2 } = createMockOAuthComponents(
+      dataManager2,
+      dbManager2
+    );
     const lifecycleManager2 = new LifecycleManager(
       windowManager2,
-      dataManager2,
+      dbManager2,
       oauthClient2,
-      tokenStorage2
+      userManager2
     );
 
     await lifecycleManager2.initialize();
@@ -442,7 +477,7 @@ describe('Property Tests - Graceful Shutdown Data Persistence', () => {
 
     // Clean up
     await lifecycleManager2.handleQuit();
-    dataManager2.close();
+    dbManager2.close();
   });
 
   /* Preconditions: application not running
@@ -457,15 +492,18 @@ describe('Property Tests - Graceful Shutdown Data Persistence', () => {
     }
 
     // First startup - save and update data
-    const dataManager1 = createDataManagerWithMockUser(testStoragePath);
-    const windowManager1 = new WindowManager(dataManager1);
-    const { tokenStorage: tokenStorage1, oauthClient: oauthClient1 } =
-      createMockOAuthComponents(dataManager1);
+    const { dataManager: dataManager1, dbManager: dbManager1 } =
+      createUserSettingsManagerWithMockUser(testStoragePath);
+    const windowManager1 = new WindowManager(dbManager1);
+    const { oauthClient: oauthClient1, userManager: userManager1 } = createMockOAuthComponents(
+      dataManager1,
+      dbManager1
+    );
     const lifecycleManager1 = new LifecycleManager(
       windowManager1,
-      dataManager1,
+      dbManager1,
       oauthClient1,
-      tokenStorage1
+      userManager1
     );
 
     await lifecycleManager1.initialize();
@@ -488,21 +526,24 @@ describe('Property Tests - Graceful Shutdown Data Persistence', () => {
 
     expect(shutdownTime).toBeLessThan(5000);
 
-    dataManager1.close();
+    dbManager1.close();
 
     // Clear mocks for restart
     jest.clearAllMocks();
 
     // Second startup - verify updated data persisted
-    const dataManager2 = createDataManagerWithMockUser(testStoragePath);
-    const windowManager2 = new WindowManager(dataManager2);
-    const { tokenStorage: tokenStorage2, oauthClient: oauthClient2 } =
-      createMockOAuthComponents(dataManager2);
+    const { dataManager: dataManager2, dbManager: dbManager2 } =
+      createUserSettingsManagerWithMockUser(testStoragePath);
+    const windowManager2 = new WindowManager(dbManager2);
+    const { oauthClient: oauthClient2, userManager: userManager2 } = createMockOAuthComponents(
+      dataManager2,
+      dbManager2
+    );
     const lifecycleManager2 = new LifecycleManager(
       windowManager2,
-      dataManager2,
+      dbManager2,
       oauthClient2,
-      tokenStorage2
+      userManager2
     );
 
     await lifecycleManager2.initialize();
@@ -514,7 +555,7 @@ describe('Property Tests - Graceful Shutdown Data Persistence', () => {
 
     // Clean up
     await lifecycleManager2.handleQuit();
-    dataManager2.close();
+    dbManager2.close();
   });
 
   /* Preconditions: application not running
@@ -529,15 +570,18 @@ describe('Property Tests - Graceful Shutdown Data Persistence', () => {
     }
 
     // First startup - save and delete data
-    const dataManager1 = createDataManagerWithMockUser(testStoragePath);
-    const windowManager1 = new WindowManager(dataManager1);
-    const { tokenStorage: tokenStorage1, oauthClient: oauthClient1 } =
-      createMockOAuthComponents(dataManager1);
+    const { dataManager: dataManager1, dbManager: dbManager1 } =
+      createUserSettingsManagerWithMockUser(testStoragePath);
+    const windowManager1 = new WindowManager(dbManager1);
+    const { oauthClient: oauthClient1, userManager: userManager1 } = createMockOAuthComponents(
+      dataManager1,
+      dbManager1
+    );
     const lifecycleManager1 = new LifecycleManager(
       windowManager1,
-      dataManager1,
+      dbManager1,
       oauthClient1,
-      tokenStorage1
+      userManager1
     );
 
     await lifecycleManager1.initialize();
@@ -562,21 +606,24 @@ describe('Property Tests - Graceful Shutdown Data Persistence', () => {
 
     expect(shutdownTime).toBeLessThan(5000);
 
-    dataManager1.close();
+    dbManager1.close();
 
     // Clear mocks for restart
     jest.clearAllMocks();
 
     // Second startup - verify persistence state
-    const dataManager2 = createDataManagerWithMockUser(testStoragePath);
-    const windowManager2 = new WindowManager(dataManager2);
-    const { tokenStorage: tokenStorage2, oauthClient: oauthClient2 } =
-      createMockOAuthComponents(dataManager2);
+    const { dataManager: dataManager2, dbManager: dbManager2 } =
+      createUserSettingsManagerWithMockUser(testStoragePath);
+    const windowManager2 = new WindowManager(dbManager2);
+    const { oauthClient: oauthClient2, userManager: userManager2 } = createMockOAuthComponents(
+      dataManager2,
+      dbManager2
+    );
     const lifecycleManager2 = new LifecycleManager(
       windowManager2,
-      dataManager2,
+      dbManager2,
       oauthClient2,
-      tokenStorage2
+      userManager2
     );
 
     await lifecycleManager2.initialize();
@@ -593,7 +640,7 @@ describe('Property Tests - Graceful Shutdown Data Persistence', () => {
 
     // Clean up
     await lifecycleManager2.handleQuit();
-    dataManager2.close();
+    dbManager2.close();
   });
 
   /* Preconditions: application not running
@@ -608,15 +655,18 @@ describe('Property Tests - Graceful Shutdown Data Persistence', () => {
     }
 
     // First startup - save data
-    const dataManager1 = createDataManagerWithMockUser(testStoragePath);
-    const windowManager1 = new WindowManager(dataManager1);
-    const { tokenStorage: tokenStorage1, oauthClient: oauthClient1 } =
-      createMockOAuthComponents(dataManager1);
+    const { dataManager: dataManager1, dbManager: dbManager1 } =
+      createUserSettingsManagerWithMockUser(testStoragePath);
+    const windowManager1 = new WindowManager(dbManager1);
+    const { oauthClient: oauthClient1, userManager: userManager1 } = createMockOAuthComponents(
+      dataManager1,
+      dbManager1
+    );
     const lifecycleManager1 = new LifecycleManager(
       windowManager1,
-      dataManager1,
+      dbManager1,
       oauthClient1,
-      tokenStorage1
+      userManager1
     );
 
     await lifecycleManager1.initialize();
@@ -642,21 +692,24 @@ describe('Property Tests - Graceful Shutdown Data Persistence', () => {
 
     expect(shutdownTime).toBeLessThan(5000);
 
-    dataManager1.close();
+    dbManager1.close();
 
     // Clear mocks for restart
     jest.clearAllMocks();
 
     // Second startup - verify all data persisted
-    const dataManager2 = createDataManagerWithMockUser(testStoragePath);
-    const windowManager2 = new WindowManager(dataManager2);
-    const { tokenStorage: tokenStorage2, oauthClient: oauthClient2 } =
-      createMockOAuthComponents(dataManager2);
+    const { dataManager: dataManager2, dbManager: dbManager2 } =
+      createUserSettingsManagerWithMockUser(testStoragePath);
+    const windowManager2 = new WindowManager(dbManager2);
+    const { oauthClient: oauthClient2, userManager: userManager2 } = createMockOAuthComponents(
+      dataManager2,
+      dbManager2
+    );
     const lifecycleManager2 = new LifecycleManager(
       windowManager2,
-      dataManager2,
+      dbManager2,
       oauthClient2,
-      tokenStorage2
+      userManager2
     );
 
     await lifecycleManager2.initialize();
@@ -670,7 +723,7 @@ describe('Property Tests - Graceful Shutdown Data Persistence', () => {
 
     // Clean up
     await lifecycleManager2.handleQuit();
-    dataManager2.close();
+    dbManager2.close();
   });
 
   /* Preconditions: application not running
@@ -692,14 +745,14 @@ describe('Property Tests - Graceful Shutdown Data Persistence', () => {
       // Clear mocks for each cycle
       jest.clearAllMocks();
 
-      const dataManager = createDataManagerWithMockUser(testStoragePath);
-      const windowManager = new WindowManager(dataManager);
-      const { tokenStorage, oauthClient } = createMockOAuthComponents(dataManager);
+      const { dataManager, dbManager } = createUserSettingsManagerWithMockUser(testStoragePath);
+      const windowManager = new WindowManager(dbManager);
+      const { oauthClient, userManager } = createMockOAuthComponents(dataManager, dbManager);
       const lifecycleManager = new LifecycleManager(
         windowManager,
-        dataManager,
+        dbManager,
         oauthClient,
-        tokenStorage
+        userManager
       );
 
       await lifecycleManager.initialize();
@@ -722,20 +775,20 @@ describe('Property Tests - Graceful Shutdown Data Persistence', () => {
 
       expect(shutdownTime).toBeLessThan(5000);
 
-      dataManager.close();
+      dbManager.close();
     }
 
     // Final verification - restart and check data
     jest.clearAllMocks();
 
-    const dataManager = createDataManagerWithMockUser(testStoragePath);
-    const windowManager = new WindowManager(dataManager);
-    const { tokenStorage, oauthClient } = createMockOAuthComponents(dataManager);
+    const { dataManager, dbManager } = createUserSettingsManagerWithMockUser(testStoragePath);
+    const windowManager = new WindowManager(dbManager);
+    const { oauthClient, userManager } = createMockOAuthComponents(dataManager, dbManager);
     const lifecycleManager = new LifecycleManager(
       windowManager,
-      dataManager,
+      dbManager,
       oauthClient,
-      tokenStorage
+      userManager
     );
 
     await lifecycleManager.initialize();
@@ -746,7 +799,7 @@ describe('Property Tests - Graceful Shutdown Data Persistence', () => {
 
     // Clean up
     await lifecycleManager.handleQuit();
-    dataManager.close();
+    dbManager.close();
   });
 
   /* Preconditions: application not running
@@ -761,15 +814,18 @@ describe('Property Tests - Graceful Shutdown Data Persistence', () => {
     }
 
     // First startup - no data saved
-    const dataManager1 = createDataManagerWithMockUser(testStoragePath);
-    const windowManager1 = new WindowManager(dataManager1);
-    const { tokenStorage: tokenStorage1, oauthClient: oauthClient1 } =
-      createMockOAuthComponents(dataManager1);
+    const { dataManager: dataManager1, dbManager: dbManager1 } =
+      createUserSettingsManagerWithMockUser(testStoragePath);
+    const windowManager1 = new WindowManager(dbManager1);
+    const { oauthClient: oauthClient1, userManager: userManager1 } = createMockOAuthComponents(
+      dataManager1,
+      dbManager1
+    );
     const lifecycleManager1 = new LifecycleManager(
       windowManager1,
-      dataManager1,
+      dbManager1,
       oauthClient1,
-      tokenStorage1
+      userManager1
     );
 
     await lifecycleManager1.initialize();
@@ -781,21 +837,24 @@ describe('Property Tests - Graceful Shutdown Data Persistence', () => {
 
     expect(shutdownTime).toBeLessThan(5000);
 
-    dataManager1.close();
+    dbManager1.close();
 
     // Clear mocks for restart
     jest.clearAllMocks();
 
     // Second startup - verify clean state
-    const dataManager2 = createDataManagerWithMockUser(testStoragePath);
-    const windowManager2 = new WindowManager(dataManager2);
-    const { tokenStorage: tokenStorage2, oauthClient: oauthClient2 } =
-      createMockOAuthComponents(dataManager2);
+    const { dataManager: dataManager2, dbManager: dbManager2 } =
+      createUserSettingsManagerWithMockUser(testStoragePath);
+    const windowManager2 = new WindowManager(dbManager2);
+    const { oauthClient: oauthClient2, userManager: userManager2 } = createMockOAuthComponents(
+      dataManager2,
+      dbManager2
+    );
     const lifecycleManager2 = new LifecycleManager(
       windowManager2,
-      dataManager2,
+      dbManager2,
       oauthClient2,
-      tokenStorage2
+      userManager2
     );
 
     await lifecycleManager2.initialize();
@@ -807,7 +866,7 @@ describe('Property Tests - Graceful Shutdown Data Persistence', () => {
 
     // Clean up
     await lifecycleManager2.handleQuit();
-    dataManager2.close();
+    dbManager2.close();
   });
 
   /* Preconditions: application not running
@@ -822,15 +881,18 @@ describe('Property Tests - Graceful Shutdown Data Persistence', () => {
     }
 
     // First startup - save data
-    const dataManager1 = createDataManagerWithMockUser(testStoragePath);
-    const windowManager1 = new WindowManager(dataManager1);
-    const { tokenStorage: tokenStorage1, oauthClient: oauthClient1 } =
-      createMockOAuthComponents(dataManager1);
+    const { dataManager: dataManager1, dbManager: dbManager1 } =
+      createUserSettingsManagerWithMockUser(testStoragePath);
+    const windowManager1 = new WindowManager(dbManager1);
+    const { oauthClient: oauthClient1, userManager: userManager1 } = createMockOAuthComponents(
+      dataManager1,
+      dbManager1
+    );
     const lifecycleManager1 = new LifecycleManager(
       windowManager1,
-      dataManager1,
+      dbManager1,
       oauthClient1,
-      tokenStorage1
+      userManager1
     );
 
     await lifecycleManager1.initialize();
@@ -866,21 +928,24 @@ describe('Property Tests - Graceful Shutdown Data Persistence', () => {
 
     expect(shutdownTime).toBeLessThan(5000);
 
-    dataManager1.close();
+    dbManager1.close();
 
     // Clear mocks for restart
     jest.clearAllMocks();
 
     // Second startup - verify data persisted
-    const dataManager2 = createDataManagerWithMockUser(testStoragePath);
-    const windowManager2 = new WindowManager(dataManager2);
-    const { tokenStorage: tokenStorage2, oauthClient: oauthClient2 } =
-      createMockOAuthComponents(dataManager2);
+    const { dataManager: dataManager2, dbManager: dbManager2 } =
+      createUserSettingsManagerWithMockUser(testStoragePath);
+    const windowManager2 = new WindowManager(dbManager2);
+    const { oauthClient: oauthClient2, userManager: userManager2 } = createMockOAuthComponents(
+      dataManager2,
+      dbManager2
+    );
     const lifecycleManager2 = new LifecycleManager(
       windowManager2,
-      dataManager2,
+      dbManager2,
       oauthClient2,
-      tokenStorage2
+      userManager2
     );
 
     await lifecycleManager2.initialize();
@@ -891,6 +956,6 @@ describe('Property Tests - Graceful Shutdown Data Persistence', () => {
 
     // Clean up
     await lifecycleManager2.handleQuit();
-    dataManager2.close();
+    dbManager2.close();
   });
 });

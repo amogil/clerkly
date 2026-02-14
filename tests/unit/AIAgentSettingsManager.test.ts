@@ -1,10 +1,10 @@
-/* Preconditions: Mock DataManager and Electron safeStorage
+/* Preconditions: Mock UserSettingsManager and Electron safeStorage
    Action: Test AIAgentSettingsManager methods for saving, loading, and deleting settings
    Assertions: Verify correct behavior with encryption, plain text fallback, and error handling
    Requirements: settings.1.9, settings.1.10, settings.1.11, settings.1.14, settings.1.15, settings.1.22 */
 
 import { AIAgentSettingsManager } from '../../src/main/AIAgentSettingsManager';
-import { DataManager } from '../../src/main/DataManager';
+import type { IUserSettingsManager } from '../../src/main/UserSettingsManager';
 
 // Mock Electron
 jest.mock('electron', () => ({
@@ -17,7 +17,7 @@ jest.mock('electron', () => ({
 
 describe('AIAgentSettingsManager', () => {
   let manager: AIAgentSettingsManager;
-  let mockDataManager: jest.Mocked<DataManager>;
+  let mockUserSettingsManager: jest.Mocked<IUserSettingsManager>;
   let mockSafeStorage: {
     isEncryptionAvailable: jest.Mock;
     encryptString: jest.Mock;
@@ -25,12 +25,12 @@ describe('AIAgentSettingsManager', () => {
   };
 
   beforeEach(() => {
-    // Create mock DataManager
-    mockDataManager = {
+    // Create mock UserSettingsManager
+    mockUserSettingsManager = {
       saveData: jest.fn(),
       loadData: jest.fn(),
       deleteData: jest.fn(),
-    } as unknown as jest.Mocked<DataManager>;
+    } as jest.Mocked<IUserSettingsManager>;
 
     // Get mock safeStorage
     const electron = require('electron');
@@ -40,67 +40,70 @@ describe('AIAgentSettingsManager', () => {
     jest.clearAllMocks();
 
     // Create manager instance
-    manager = new AIAgentSettingsManager(mockDataManager);
+    manager = new AIAgentSettingsManager(mockUserSettingsManager);
   });
 
   describe('saveLLMProvider', () => {
-    /* Preconditions: DataManager is mocked to return success
+    /* Preconditions: UserSettingsManager is mocked to return success
        Action: Call saveLLMProvider with a valid provider
-       Assertions: Verify DataManager.saveData is called with correct key and value
+       Assertions: Verify UserSettingsManager.saveData is called with correct key and value
        Requirements: settings.1.10 */
     it('should save LLM provider successfully', async () => {
-      mockDataManager.saveData.mockReturnValue({ success: true });
+      mockUserSettingsManager.saveData.mockReturnValue({ success: true });
 
       await manager.saveLLMProvider('openai');
 
-      expect(mockDataManager.saveData).toHaveBeenCalledWith('ai_agent_llm_provider', 'openai');
+      expect(mockUserSettingsManager.saveData).toHaveBeenCalledWith(
+        'ai_agent_llm_provider',
+        'openai'
+      );
     });
 
-    /* Preconditions: DataManager is mocked to return success
+    /* Preconditions: UserSettingsManager is mocked to return success
        Action: Call saveLLMProvider with each valid provider
        Assertions: Verify all providers can be saved
        Requirements: settings.1.10 */
     it('should save all provider types', async () => {
-      mockDataManager.saveData.mockReturnValue({ success: true });
+      mockUserSettingsManager.saveData.mockReturnValue({ success: true });
 
       await manager.saveLLMProvider('openai');
       await manager.saveLLMProvider('anthropic');
       await manager.saveLLMProvider('google');
 
-      expect(mockDataManager.saveData).toHaveBeenCalledTimes(3);
-      expect(mockDataManager.saveData).toHaveBeenNthCalledWith(
+      expect(mockUserSettingsManager.saveData).toHaveBeenCalledTimes(3);
+      expect(mockUserSettingsManager.saveData).toHaveBeenNthCalledWith(
         1,
         'ai_agent_llm_provider',
         'openai'
       );
-      expect(mockDataManager.saveData).toHaveBeenNthCalledWith(
+      expect(mockUserSettingsManager.saveData).toHaveBeenNthCalledWith(
         2,
         'ai_agent_llm_provider',
         'anthropic'
       );
-      expect(mockDataManager.saveData).toHaveBeenNthCalledWith(
+      expect(mockUserSettingsManager.saveData).toHaveBeenNthCalledWith(
         3,
         'ai_agent_llm_provider',
         'google'
       );
     });
 
-    /* Preconditions: DataManager is mocked to return failure
+    /* Preconditions: UserSettingsManager is mocked to return failure
        Action: Call saveLLMProvider
        Assertions: Verify error is thrown
        Requirements: settings.1.10 */
     it('should throw error when save fails', async () => {
-      mockDataManager.saveData.mockReturnValue({ success: false, error: 'Database error' });
+      mockUserSettingsManager.saveData.mockReturnValue({ success: false, error: 'Database error' });
 
       await expect(manager.saveLLMProvider('openai')).rejects.toThrow('Database error');
     });
 
-    /* Preconditions: DataManager is mocked to return failure without error message
+    /* Preconditions: UserSettingsManager is mocked to return failure without error message
        Action: Call saveLLMProvider
        Assertions: Verify fallback error message is used
        Requirements: settings.1.10 */
     it('should use fallback error message when error is empty', async () => {
-      mockDataManager.saveData.mockReturnValue({ success: false });
+      mockUserSettingsManager.saveData.mockReturnValue({ success: false });
 
       await expect(manager.saveLLMProvider('openai')).rejects.toThrow(
         'Failed to save LLM provider'
@@ -109,37 +112,37 @@ describe('AIAgentSettingsManager', () => {
   });
 
   describe('loadLLMProvider', () => {
-    /* Preconditions: DataManager is mocked to return saved provider
+    /* Preconditions: UserSettingsManager is mocked to return saved provider
        Action: Call loadLLMProvider
        Assertions: Verify correct provider is returned
        Requirements: settings.1.10 */
     it('should load saved LLM provider', async () => {
-      mockDataManager.loadData.mockReturnValue({ success: true, data: 'anthropic' });
+      mockUserSettingsManager.loadData.mockReturnValue({ success: true, data: 'anthropic' });
 
       const result = await manager.loadLLMProvider();
 
-      expect(mockDataManager.loadData).toHaveBeenCalledWith('ai_agent_llm_provider');
+      expect(mockUserSettingsManager.loadData).toHaveBeenCalledWith('ai_agent_llm_provider');
       expect(result).toBe('anthropic');
     });
 
-    /* Preconditions: DataManager is mocked to return no data
+    /* Preconditions: UserSettingsManager is mocked to return no data
        Action: Call loadLLMProvider
        Assertions: Verify default 'openai' is returned
        Requirements: settings.1.10 */
     it('should return default openai when no provider is saved', async () => {
-      mockDataManager.loadData.mockReturnValue({ success: false, error: 'Key not found' });
+      mockUserSettingsManager.loadData.mockReturnValue({ success: false, error: 'Key not found' });
 
       const result = await manager.loadLLMProvider();
 
       expect(result).toBe('openai');
     });
 
-    /* Preconditions: DataManager throws an error
+    /* Preconditions: UserSettingsManager throws an error
        Action: Call loadLLMProvider
        Assertions: Verify default 'openai' is returned and error is logged
        Requirements: settings.1.10 */
     it('should return default openai on error', async () => {
-      mockDataManager.loadData.mockImplementation(() => {
+      mockUserSettingsManager.loadData.mockImplementation(() => {
         throw new Error('Database error');
       });
 
@@ -150,7 +153,7 @@ describe('AIAgentSettingsManager', () => {
   });
 
   describe('saveAPIKey', () => {
-    /* Preconditions: safeStorage encryption is available, DataManager returns success
+    /* Preconditions: safeStorage encryption is available, UserSettingsManager returns success
        Action: Call saveAPIKey with a test key
        Assertions: Verify key is encrypted and saved with encryption flag
        Requirements: settings.1.9, settings.1.14 */
@@ -160,23 +163,23 @@ describe('AIAgentSettingsManager', () => {
 
       mockSafeStorage.isEncryptionAvailable.mockReturnValue(true);
       mockSafeStorage.encryptString.mockReturnValue(encryptedBuffer);
-      mockDataManager.saveData.mockReturnValue({ success: true });
+      mockUserSettingsManager.saveData.mockReturnValue({ success: true });
 
       await manager.saveAPIKey('openai', testKey);
 
       expect(mockSafeStorage.isEncryptionAvailable).toHaveBeenCalled();
       expect(mockSafeStorage.encryptString).toHaveBeenCalledWith(testKey);
-      expect(mockDataManager.saveData).toHaveBeenCalledWith(
+      expect(mockUserSettingsManager.saveData).toHaveBeenCalledWith(
         'ai_agent_api_key_openai',
         encryptedBuffer.toString('base64')
       );
-      expect(mockDataManager.saveData).toHaveBeenCalledWith(
+      expect(mockUserSettingsManager.saveData).toHaveBeenCalledWith(
         'ai_agent_api_key_openai_encrypted',
         true
       );
     });
 
-    /* Preconditions: safeStorage encryption is NOT available, DataManager returns success
+    /* Preconditions: safeStorage encryption is NOT available, UserSettingsManager returns success
        Action: Call saveAPIKey with a test key
        Assertions: Verify key is saved as plain text with encryption flag set to false
        Requirements: settings.1.15 */
@@ -184,63 +187,69 @@ describe('AIAgentSettingsManager', () => {
       const testKey = 'test-api-key-456';
 
       mockSafeStorage.isEncryptionAvailable.mockReturnValue(false);
-      mockDataManager.saveData.mockReturnValue({ success: true });
+      mockUserSettingsManager.saveData.mockReturnValue({ success: true });
 
       await manager.saveAPIKey('anthropic', testKey);
 
       expect(mockSafeStorage.isEncryptionAvailable).toHaveBeenCalled();
       expect(mockSafeStorage.encryptString).not.toHaveBeenCalled();
-      expect(mockDataManager.saveData).toHaveBeenCalledWith('ai_agent_api_key_anthropic', testKey);
-      expect(mockDataManager.saveData).toHaveBeenCalledWith(
+      expect(mockUserSettingsManager.saveData).toHaveBeenCalledWith(
+        'ai_agent_api_key_anthropic',
+        testKey
+      );
+      expect(mockUserSettingsManager.saveData).toHaveBeenCalledWith(
         'ai_agent_api_key_anthropic_encrypted',
         false
       );
     });
 
-    /* Preconditions: DataManager returns failure for key save
+    /* Preconditions: UserSettingsManager returns failure for key save
        Action: Call saveAPIKey
        Assertions: Verify error is thrown
        Requirements: settings.1.9 */
     it('should throw error when key save fails', async () => {
       mockSafeStorage.isEncryptionAvailable.mockReturnValue(false);
-      mockDataManager.saveData.mockReturnValueOnce({ success: false, error: 'Database full' });
+      mockUserSettingsManager.saveData.mockReturnValueOnce({
+        success: false,
+        error: 'Database full',
+      });
 
       await expect(manager.saveAPIKey('google', 'test-key')).rejects.toThrow('Database full');
     });
 
-    /* Preconditions: DataManager returns failure for key save without error message
+    /* Preconditions: UserSettingsManager returns failure for key save without error message
        Action: Call saveAPIKey
        Assertions: Verify fallback error message is used
        Requirements: settings.1.9 */
     it('should use fallback error message when key save error is empty', async () => {
       mockSafeStorage.isEncryptionAvailable.mockReturnValue(false);
-      mockDataManager.saveData.mockReturnValueOnce({ success: false });
+      mockUserSettingsManager.saveData.mockReturnValueOnce({ success: false });
 
       await expect(manager.saveAPIKey('google', 'test-key')).rejects.toThrow(
         'Failed to save API key'
       );
     });
 
-    /* Preconditions: DataManager returns failure for encryption flag save
+    /* Preconditions: UserSettingsManager returns failure for encryption flag save
        Action: Call saveAPIKey
        Assertions: Verify error is thrown
        Requirements: settings.1.9 */
     it('should throw error when encryption flag save fails', async () => {
       mockSafeStorage.isEncryptionAvailable.mockReturnValue(false);
-      mockDataManager.saveData
+      mockUserSettingsManager.saveData
         .mockReturnValueOnce({ success: true })
         .mockReturnValueOnce({ success: false, error: 'Database error' });
 
       await expect(manager.saveAPIKey('openai', 'test-key')).rejects.toThrow('Database error');
     });
 
-    /* Preconditions: DataManager returns failure for encryption flag save without error message
+    /* Preconditions: UserSettingsManager returns failure for encryption flag save without error message
        Action: Call saveAPIKey
        Assertions: Verify fallback error message is used
        Requirements: settings.1.9 */
     it('should use fallback error message when encryption flag save error is empty', async () => {
       mockSafeStorage.isEncryptionAvailable.mockReturnValue(false);
-      mockDataManager.saveData
+      mockUserSettingsManager.saveData
         .mockReturnValueOnce({ success: true })
         .mockReturnValueOnce({ success: false });
 
@@ -257,21 +266,21 @@ describe('AIAgentSettingsManager', () => {
       const encryptedBuffer = Buffer.from('encrypted');
       mockSafeStorage.isEncryptionAvailable.mockReturnValue(true);
       mockSafeStorage.encryptString.mockReturnValue(encryptedBuffer);
-      mockDataManager.saveData.mockReturnValue({ success: true });
+      mockUserSettingsManager.saveData.mockReturnValue({ success: true });
 
       await manager.saveAPIKey('openai', 'key1');
       await manager.saveAPIKey('anthropic', 'key2');
       await manager.saveAPIKey('google', 'key3');
 
-      expect(mockDataManager.saveData).toHaveBeenCalledWith(
+      expect(mockUserSettingsManager.saveData).toHaveBeenCalledWith(
         'ai_agent_api_key_openai',
         expect.any(String)
       );
-      expect(mockDataManager.saveData).toHaveBeenCalledWith(
+      expect(mockUserSettingsManager.saveData).toHaveBeenCalledWith(
         'ai_agent_api_key_anthropic',
         expect.any(String)
       );
-      expect(mockDataManager.saveData).toHaveBeenCalledWith(
+      expect(mockUserSettingsManager.saveData).toHaveBeenCalledWith(
         'ai_agent_api_key_google',
         expect.any(String)
       );
@@ -279,7 +288,7 @@ describe('AIAgentSettingsManager', () => {
   });
 
   describe('loadAPIKey', () => {
-    /* Preconditions: Encrypted key is stored in DataManager
+    /* Preconditions: Encrypted key is stored in UserSettingsManager
        Action: Call loadAPIKey
        Assertions: Verify key is decrypted and returned
        Requirements: settings.1.22 */
@@ -287,29 +296,31 @@ describe('AIAgentSettingsManager', () => {
       const encryptedKey = Buffer.from('encrypted-data').toString('base64');
       const decryptedKey = 'decrypted-api-key';
 
-      mockDataManager.loadData
+      mockUserSettingsManager.loadData
         .mockReturnValueOnce({ success: true, data: encryptedKey })
         .mockReturnValueOnce({ success: true, data: true });
       mockSafeStorage.decryptString.mockReturnValue(decryptedKey);
 
       const result = await manager.loadAPIKey('openai');
 
-      expect(mockDataManager.loadData).toHaveBeenCalledWith('ai_agent_api_key_openai');
-      expect(mockDataManager.loadData).toHaveBeenCalledWith('ai_agent_api_key_openai_encrypted');
+      expect(mockUserSettingsManager.loadData).toHaveBeenCalledWith('ai_agent_api_key_openai');
+      expect(mockUserSettingsManager.loadData).toHaveBeenCalledWith(
+        'ai_agent_api_key_openai_encrypted'
+      );
       expect(mockSafeStorage.decryptString).toHaveBeenCalledWith(
         Buffer.from(encryptedKey, 'base64')
       );
       expect(result).toBe(decryptedKey);
     });
 
-    /* Preconditions: Plain text key is stored in DataManager
+    /* Preconditions: Plain text key is stored in UserSettingsManager
        Action: Call loadAPIKey
        Assertions: Verify key is returned without decryption
        Requirements: settings.1.22 */
     it('should load plain text API key without decryption', async () => {
       const plainKey = 'plain-text-key';
 
-      mockDataManager.loadData
+      mockUserSettingsManager.loadData
         .mockReturnValueOnce({ success: true, data: plainKey })
         .mockReturnValueOnce({ success: true, data: false });
 
@@ -319,24 +330,24 @@ describe('AIAgentSettingsManager', () => {
       expect(result).toBe(plainKey);
     });
 
-    /* Preconditions: No key is stored in DataManager
+    /* Preconditions: No key is stored in UserSettingsManager
        Action: Call loadAPIKey
        Assertions: Verify null is returned
        Requirements: settings.1.22 */
     it('should return null when no API key is found', async () => {
-      mockDataManager.loadData.mockReturnValue({ success: false, error: 'Key not found' });
+      mockUserSettingsManager.loadData.mockReturnValue({ success: false, error: 'Key not found' });
 
       const result = await manager.loadAPIKey('google');
 
       expect(result).toBeNull();
     });
 
-    /* Preconditions: DataManager throws an error
+    /* Preconditions: UserSettingsManager throws an error
        Action: Call loadAPIKey
        Assertions: Verify null is returned and error is logged
        Requirements: settings.1.22 */
     it('should return null on error', async () => {
-      mockDataManager.loadData.mockImplementation(() => {
+      mockUserSettingsManager.loadData.mockImplementation(() => {
         throw new Error('Database error');
       });
 
@@ -352,7 +363,7 @@ describe('AIAgentSettingsManager', () => {
     it('should return null when decryption fails', async () => {
       const encryptedKey = Buffer.from('encrypted-data').toString('base64');
 
-      mockDataManager.loadData
+      mockUserSettingsManager.loadData
         .mockReturnValueOnce({ success: true, data: encryptedKey })
         .mockReturnValueOnce({ success: true, data: true });
       mockSafeStorage.decryptString.mockImplementation(() => {
@@ -371,7 +382,7 @@ describe('AIAgentSettingsManager', () => {
     it('should treat key as plain text when encryption flag is missing', async () => {
       const plainKey = 'some-key';
 
-      mockDataManager.loadData
+      mockUserSettingsManager.loadData
         .mockReturnValueOnce({ success: true, data: plainKey })
         .mockReturnValueOnce({ success: false });
 
@@ -383,17 +394,19 @@ describe('AIAgentSettingsManager', () => {
   });
 
   describe('deleteAPIKey', () => {
-    /* Preconditions: API key exists in DataManager
+    /* Preconditions: API key exists in UserSettingsManager
        Action: Call deleteAPIKey
        Assertions: Verify both key and encryption flag are deleted
        Requirements: settings.1.11 */
     it('should delete API key and encryption flag', async () => {
-      mockDataManager.deleteData.mockReturnValue({ success: true });
+      mockUserSettingsManager.deleteData.mockReturnValue({ success: true });
 
       await manager.deleteAPIKey('openai');
 
-      expect(mockDataManager.deleteData).toHaveBeenCalledWith('ai_agent_api_key_openai');
-      expect(mockDataManager.deleteData).toHaveBeenCalledWith('ai_agent_api_key_openai_encrypted');
+      expect(mockUserSettingsManager.deleteData).toHaveBeenCalledWith('ai_agent_api_key_openai');
+      expect(mockUserSettingsManager.deleteData).toHaveBeenCalledWith(
+        'ai_agent_api_key_openai_encrypted'
+      );
     });
 
     /* Preconditions: API key does not exist
@@ -401,17 +414,23 @@ describe('AIAgentSettingsManager', () => {
        Assertions: Verify no error is thrown (graceful handling)
        Requirements: settings.1.11 */
     it('should not throw error when key does not exist', async () => {
-      mockDataManager.deleteData.mockReturnValue({ success: false, error: 'Key not found' });
+      mockUserSettingsManager.deleteData.mockReturnValue({
+        success: false,
+        error: 'Key not found',
+      });
 
       await expect(manager.deleteAPIKey('anthropic')).resolves.not.toThrow();
     });
 
-    /* Preconditions: DataManager returns database error
+    /* Preconditions: UserSettingsManager returns database error
        Action: Call deleteAPIKey
        Assertions: Verify error is thrown
        Requirements: settings.1.11 */
     it('should throw error on database failure', async () => {
-      mockDataManager.deleteData.mockReturnValue({ success: false, error: 'Database locked' });
+      mockUserSettingsManager.deleteData.mockReturnValue({
+        success: false,
+        error: 'Database locked',
+      });
 
       await expect(manager.deleteAPIKey('google')).rejects.toThrow('Database locked');
     });
@@ -421,15 +440,15 @@ describe('AIAgentSettingsManager', () => {
        Assertions: Verify provider-specific keys are deleted
        Requirements: settings.1.11 */
     it('should delete provider-specific keys', async () => {
-      mockDataManager.deleteData.mockReturnValue({ success: true });
+      mockUserSettingsManager.deleteData.mockReturnValue({ success: true });
 
       await manager.deleteAPIKey('openai');
       await manager.deleteAPIKey('anthropic');
       await manager.deleteAPIKey('google');
 
-      expect(mockDataManager.deleteData).toHaveBeenCalledWith('ai_agent_api_key_openai');
-      expect(mockDataManager.deleteData).toHaveBeenCalledWith('ai_agent_api_key_anthropic');
-      expect(mockDataManager.deleteData).toHaveBeenCalledWith('ai_agent_api_key_google');
+      expect(mockUserSettingsManager.deleteData).toHaveBeenCalledWith('ai_agent_api_key_openai');
+      expect(mockUserSettingsManager.deleteData).toHaveBeenCalledWith('ai_agent_api_key_anthropic');
+      expect(mockUserSettingsManager.deleteData).toHaveBeenCalledWith('ai_agent_api_key_google');
     });
   });
 
@@ -452,7 +471,7 @@ describe('AIAgentSettingsManager', () => {
         const encrypted = buffer.toString();
         return encrypted.replace('encrypted-', '');
       });
-      mockDataManager.saveData.mockReturnValue({ success: true });
+      mockUserSettingsManager.saveData.mockReturnValue({ success: true });
 
       // Save keys for all providers
       await manager.saveAPIKey('openai', openaiKey);
@@ -460,21 +479,21 @@ describe('AIAgentSettingsManager', () => {
       await manager.saveAPIKey('google', googleKey);
 
       // Verify each provider has unique storage keys
-      expect(mockDataManager.saveData).toHaveBeenCalledWith(
+      expect(mockUserSettingsManager.saveData).toHaveBeenCalledWith(
         'ai_agent_api_key_openai',
         expect.any(String)
       );
-      expect(mockDataManager.saveData).toHaveBeenCalledWith(
+      expect(mockUserSettingsManager.saveData).toHaveBeenCalledWith(
         'ai_agent_api_key_anthropic',
         expect.any(String)
       );
-      expect(mockDataManager.saveData).toHaveBeenCalledWith(
+      expect(mockUserSettingsManager.saveData).toHaveBeenCalledWith(
         'ai_agent_api_key_google',
         expect.any(String)
       );
 
       // Setup load mocks for each provider
-      mockDataManager.loadData.mockImplementation((key: string) => {
+      mockUserSettingsManager.loadData.mockImplementation((key: string) => {
         if (key === 'ai_agent_api_key_openai') {
           return { success: true, data: Buffer.from(`encrypted-${openaiKey}`).toString('base64') };
         }

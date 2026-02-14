@@ -3,7 +3,8 @@
 import * as fc from 'fast-check';
 import { OAuthClientManager } from '../../../src/main/auth/OAuthClientManager';
 import { TokenStorageManager } from '../../../src/main/auth/TokenStorageManager';
-import { DataManager } from '../../../src/main/DataManager';
+import { UserSettingsManager } from '../../../src/main/UserSettingsManager';
+import { DatabaseManager } from '../../../src/main/DatabaseManager';
 import { getOAuthConfig } from '../../../src/main/auth/OAuthConfig';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -23,7 +24,8 @@ jest.mock('electron', () => ({
 global.fetch = jest.fn();
 
 describe('Token Refresh Property-Based Tests', () => {
-  let dataManager: DataManager;
+  let dbManager: DatabaseManager;
+  let dataManager: UserSettingsManager;
   let tokenStorage: TokenStorageManager;
   let oauthClient: OAuthClientManager;
   let testDbPath: string;
@@ -33,15 +35,21 @@ describe('Token Refresh Property-Based Tests', () => {
   beforeEach(() => {
     // Use unique database path for each test to avoid state pollution
     testDbPath = path.join(os.tmpdir(), `test-token-refresh-pbt-${Date.now()}-${Math.random()}`);
-    dataManager = new DataManager(testDbPath);
-    dataManager.initialize();
+
+    // Initialize DatabaseManager first, then UserSettingsManager
+    // Requirements: database-refactoring.1, database-refactoring.2
+    dbManager = new DatabaseManager();
+    dbManager.initialize(testDbPath);
 
     // Requirements: user-data-isolation.1.10 - Mock UserManager for data isolation
     const mockProfileManager = {
       getCurrentUserId: jest.fn().mockReturnValue('test@example.com'),
     } as any;
 
-    dataManager.setUserManager(mockProfileManager);
+    dbManager.setUserManager(mockProfileManager);
+
+    // Create UserSettingsManager with DatabaseManager
+    dataManager = new UserSettingsManager(dbManager);
     tokenStorage = new TokenStorageManager(dataManager);
 
     testConfig = getOAuthConfig(testClientId);
@@ -51,7 +59,7 @@ describe('Token Refresh Property-Based Tests', () => {
   });
 
   afterEach(() => {
-    dataManager.close();
+    dbManager.close();
     if (fs.existsSync(testDbPath)) {
       fs.rmSync(testDbPath, { recursive: true, force: true });
     }

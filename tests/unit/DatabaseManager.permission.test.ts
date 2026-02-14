@@ -1,5 +1,5 @@
-// Requirements: clerkly.1, clerkly.2
-// Tests for permission error handling in DataManager
+// Requirements: clerkly.1, clerkly.2, database-refactoring.1
+// Tests for permission error handling in DatabaseManager
 
 import * as path from 'path';
 
@@ -49,10 +49,10 @@ jest.mock('electron', () => ({
 
 // Import after mocking
 import * as fs from 'fs';
-import { DataManager } from '../../src/main/DataManager';
+import { DatabaseManager } from '../../src/main/DatabaseManager';
 
-describe('DataManager Permission Error Handling', () => {
-  let dataManager: DataManager | null = null;
+describe('DatabaseManager Permission Error Handling', () => {
+  let dbManager: DatabaseManager | null = null;
   let fallbackPath: string | undefined;
 
   beforeEach(() => {
@@ -64,14 +64,14 @@ describe('DataManager Permission Error Handling', () => {
   });
 
   afterEach(() => {
-    // Clean up DataManager
-    if (dataManager) {
+    // Clean up DatabaseManager
+    if (dbManager) {
       try {
-        dataManager.close();
+        dbManager.close();
       } catch {
         // Ignore close errors
       }
-      dataManager = null;
+      dbManager = null;
     }
 
     // Clean up fallback directory
@@ -93,15 +93,14 @@ describe('DataManager Permission Error Handling', () => {
   });
 
   /* Preconditions: Storage directory creation fails with EACCES error
-     Action: create DataManager with path that triggers permission error, call initialize()
+     Action: create DatabaseManager and call initialize() with path that triggers permission error
      Assertions: returns success true with warning about temp directory, path points to fallback
-     Requirements: clerkly.1, clerkly.2 */
+     Requirements: clerkly.1, clerkly.2, database-refactoring.1.1 */
   it('should fallback to temp directory on EACCES permission error', () => {
     shouldThrowEACCES = true;
 
-    const dm = new DataManager('/permission-test/eacces-path');
-    const result = dm.initialize();
-    dataManager = dm;
+    dbManager = new DatabaseManager();
+    const result = dbManager.initialize('/permission-test/eacces-path');
     fallbackPath = result.path;
 
     expect(result.success).toBe(true);
@@ -110,15 +109,14 @@ describe('DataManager Permission Error Handling', () => {
   });
 
   /* Preconditions: Storage directory creation fails with EPERM error
-     Action: create DataManager with path that triggers permission error, call initialize()
+     Action: create DatabaseManager and call initialize() with path that triggers permission error
      Assertions: returns success true with warning about temp directory
-     Requirements: clerkly.1, clerkly.2 */
+     Requirements: clerkly.1, clerkly.2, database-refactoring.1.1 */
   it('should fallback to temp directory on EPERM permission error', () => {
     shouldThrowEPERM = true;
 
-    const dm = new DataManager('/eperm-test/path');
-    const result = dm.initialize();
-    dataManager = dm;
+    dbManager = new DatabaseManager();
+    const result = dbManager.initialize('/eperm-test/path');
     fallbackPath = result.path;
 
     expect(result.success).toBe(true);
@@ -127,8 +125,8 @@ describe('DataManager Permission Error Handling', () => {
   });
 });
 
-describe('DataManager Non-Permission Error Handling', () => {
-  let dataManager: DataManager | null = null;
+describe('DatabaseManager Non-Permission Error Handling', () => {
+  let dbManager: DatabaseManager | null = null;
 
   beforeEach(() => {
     // Reset mock state
@@ -139,20 +137,20 @@ describe('DataManager Non-Permission Error Handling', () => {
   });
 
   afterEach(() => {
-    if (dataManager) {
+    if (dbManager) {
       try {
-        dataManager.close();
+        dbManager.close();
       } catch {
         // Ignore close errors
       }
-      dataManager = null;
+      dbManager = null;
     }
   });
 
   /* Preconditions: Storage directory creation fails with non-permission error (e.g., ENOENT)
-     Action: create DataManager with path that triggers non-permission error, call initialize()
+     Action: create DatabaseManager and call initialize() with path that triggers non-permission error
      Assertions: throws error with message about failed initialization
-     Requirements: clerkly.1, clerkly.2 */
+     Requirements: clerkly.1, clerkly.2, database-refactoring.1.1 */
   it('should throw error on non-permission directory creation error', () => {
     // Override the mock to throw a different error
     const mockMkdirSync = fs.mkdirSync as jest.Mock;
@@ -162,8 +160,10 @@ describe('DataManager Non-Permission Error Handling', () => {
       throw error;
     });
 
-    const dm = new DataManager('/non-permission-error-test/path');
+    dbManager = new DatabaseManager();
 
-    expect(() => dm.initialize()).toThrow('Failed to initialize storage');
+    expect(() => dbManager!.initialize('/non-permission-error-test/path')).toThrow(
+      'Failed to initialize storage'
+    );
   });
 });

@@ -2,7 +2,7 @@
 
 import * as fc from 'fast-check';
 import { WindowStateManager } from '../../src/main/WindowStateManager';
-import { DataManager } from '../../src/main/DataManager';
+import type { IDatabaseManager } from '../../src/main/DatabaseManager';
 
 // Mock electron module
 jest.mock('electron', () => ({
@@ -36,14 +36,22 @@ jest.mock('electron', () => ({
 
 describe('Property Tests - WindowStateManager', () => {
   let windowStateManager: WindowStateManager;
-  let mockDataManager: jest.Mocked<DataManager>;
+  let mockDbManager: jest.Mocked<IDatabaseManager>;
   let mockScreen: any;
 
   beforeEach(() => {
-    // Create mock DataManager
-    mockDataManager = {
-      loadData: jest.fn(),
-      saveData: jest.fn(),
+    // Create mock DatabaseManager (IDatabaseManager interface)
+    // Requirements: database-refactoring.3.6 - WindowStateManager uses DatabaseManager
+    mockDbManager = {
+      getDatabase: jest.fn().mockReturnValue({
+        open: true,
+        prepare: jest.fn().mockReturnValue({
+          get: jest.fn().mockReturnValue(undefined),
+          run: jest.fn(),
+        }),
+      }),
+      getCurrentUserId: jest.fn().mockReturnValue(null),
+      setUserManager: jest.fn(),
     } as any;
 
     // Get mocked electron screen
@@ -61,8 +69,8 @@ describe('Property Tests - WindowStateManager', () => {
       },
     ]);
 
-    // Create WindowStateManager instance
-    windowStateManager = new WindowStateManager(mockDataManager);
+    // Create WindowStateManager instance with DatabaseManager
+    windowStateManager = new WindowStateManager(mockDbManager);
   });
 
   afterEach(() => {
@@ -88,7 +96,15 @@ describe('Property Tests - WindowStateManager', () => {
           });
 
           // Mock no saved state to trigger default state generation
-          mockDataManager.loadData.mockReturnValue({ success: false });
+          // Database returns undefined (no saved state)
+          const mockDb = {
+            open: true,
+            prepare: jest.fn().mockReturnValue({
+              get: jest.fn().mockReturnValue(undefined),
+              run: jest.fn(),
+            }),
+          };
+          mockDbManager.getDatabase.mockReturnValue(mockDb as any);
 
           // Call loadState which internally calls getDefaultState
           const state = windowStateManager.loadState();
@@ -140,7 +156,15 @@ describe('Property Tests - WindowStateManager', () => {
       workAreaSize: smallScreen,
     });
 
-    mockDataManager.loadData.mockReturnValue({ success: false });
+    // Mock no saved state
+    const mockDb = {
+      open: true,
+      prepare: jest.fn().mockReturnValue({
+        get: jest.fn().mockReturnValue(undefined),
+        run: jest.fn(),
+      }),
+    };
+    mockDbManager.getDatabase.mockReturnValue(mockDb as any);
 
     const state = windowStateManager.loadState();
 
@@ -163,7 +187,15 @@ describe('Property Tests - WindowStateManager', () => {
       workAreaSize: largeScreen,
     });
 
-    mockDataManager.loadData.mockReturnValue({ success: false });
+    // Mock no saved state
+    const mockDb = {
+      open: true,
+      prepare: jest.fn().mockReturnValue({
+        get: jest.fn().mockReturnValue(undefined),
+        run: jest.fn(),
+      }),
+    };
+    mockDbManager.getDatabase.mockReturnValue(mockDb as any);
 
     const state = windowStateManager.loadState();
 
@@ -186,7 +218,15 @@ describe('Property Tests - WindowStateManager', () => {
       workAreaSize: ultrawideScreen,
     });
 
-    mockDataManager.loadData.mockReturnValue({ success: false });
+    // Mock no saved state
+    const mockDb = {
+      open: true,
+      prepare: jest.fn().mockReturnValue({
+        get: jest.fn().mockReturnValue(undefined),
+        run: jest.fn(),
+      }),
+    };
+    mockDbManager.getDatabase.mockReturnValue(mockDb as any);
 
     const state = windowStateManager.loadState();
 
@@ -209,7 +249,15 @@ describe('Property Tests - WindowStateManager', () => {
       workAreaSize: portraitScreen,
     });
 
-    mockDataManager.loadData.mockReturnValue({ success: false });
+    // Mock no saved state
+    const mockDb = {
+      open: true,
+      prepare: jest.fn().mockReturnValue({
+        get: jest.fn().mockReturnValue(undefined),
+        run: jest.fn(),
+      }),
+    };
+    mockDbManager.getDatabase.mockReturnValue(mockDb as any);
 
     const state = windowStateManager.loadState();
 
@@ -232,7 +280,15 @@ describe('Property Tests - WindowStateManager', () => {
       workAreaSize: minScreen,
     });
 
-    mockDataManager.loadData.mockReturnValue({ success: false });
+    // Mock no saved state
+    const mockDb = {
+      open: true,
+      prepare: jest.fn().mockReturnValue({
+        get: jest.fn().mockReturnValue(undefined),
+        run: jest.fn(),
+      }),
+    };
+    mockDbManager.getDatabase.mockReturnValue(mockDb as any);
 
     const state = windowStateManager.loadState();
 
@@ -259,7 +315,15 @@ describe('Property Tests - WindowStateManager', () => {
       workAreaSize: maxScreen,
     });
 
-    mockDataManager.loadData.mockReturnValue({ success: false });
+    // Mock no saved state
+    const mockDb = {
+      open: true,
+      prepare: jest.fn().mockReturnValue({
+        get: jest.fn().mockReturnValue(undefined),
+        run: jest.fn(),
+      }),
+    };
+    mockDbManager.getDatabase.mockReturnValue(mockDb as any);
 
     const state = windowStateManager.loadState();
 
@@ -295,7 +359,15 @@ describe('Property Tests - WindowStateManager', () => {
         workAreaSize: resolution,
       });
 
-      mockDataManager.loadData.mockReturnValue({ success: false });
+      // Mock no saved state
+      const mockDb = {
+        open: true,
+        prepare: jest.fn().mockReturnValue({
+          get: jest.fn().mockReturnValue(undefined),
+          run: jest.fn(),
+        }),
+      };
+      mockDbManager.getDatabase.mockReturnValue(mockDb as any);
 
       const state = windowStateManager.loadState();
 
@@ -327,7 +399,15 @@ describe('Property Tests - WindowStateManager', () => {
       workAreaSize: oddScreen,
     });
 
-    mockDataManager.loadData.mockReturnValue({ success: false });
+    // Mock no saved state
+    const mockDb = {
+      open: true,
+      prepare: jest.fn().mockReturnValue({
+        get: jest.fn().mockReturnValue(undefined),
+        run: jest.fn(),
+      }),
+    };
+    mockDbManager.getDatabase.mockReturnValue(mockDb as any);
 
     const state = windowStateManager.loadState();
 
@@ -356,7 +436,15 @@ describe('Property Tests - WindowStateManager', () => {
       workAreaSize: screenSize,
     });
 
-    mockDataManager.loadData.mockReturnValue({ success: false });
+    // Mock no saved state
+    const mockDb = {
+      open: true,
+      prepare: jest.fn().mockReturnValue({
+        get: jest.fn().mockReturnValue(undefined),
+        run: jest.fn(),
+      }),
+    };
+    mockDbManager.getDatabase.mockReturnValue(mockDb as any);
 
     // Call multiple times
     const state1 = windowStateManager.loadState();
@@ -379,7 +467,15 @@ describe('Property Tests - WindowStateManager', () => {
       workAreaSize: { width: 1920, height: 1080 },
     });
 
-    mockDataManager.loadData.mockReturnValue({ success: false });
+    // Mock no saved state
+    const mockDb = {
+      open: true,
+      prepare: jest.fn().mockReturnValue({
+        get: jest.fn().mockReturnValue(undefined),
+        run: jest.fn(),
+      }),
+    };
+    mockDbManager.getDatabase.mockReturnValue(mockDb as any);
 
     const state1 = windowStateManager.loadState();
     expect(state1.width).toBe(600); // min(600, 1920)
@@ -428,20 +524,30 @@ describe('Property Tests - WindowStateManager', () => {
             },
           ]);
 
+          // Create a mock database that stores the saved state
+          let savedValue: string | undefined;
+          const mockDb = {
+            open: true,
+            prepare: jest.fn().mockImplementation((sql: string) => {
+              if (sql.includes('INSERT')) {
+                return {
+                  run: jest.fn().mockImplementation((...args: any[]) => {
+                    savedValue = args[1]; // value is second argument
+                  }),
+                };
+              } else {
+                return {
+                  get: jest.fn().mockImplementation(() => {
+                    return savedValue ? { value: savedValue } : undefined;
+                  }),
+                };
+              }
+            }),
+          };
+          mockDbManager.getDatabase.mockReturnValue(mockDb as any);
+
           // Save the state
           windowStateManager.saveState(state);
-
-          // Verify saveData was called with correct parameters
-          expect(mockDataManager.saveData).toHaveBeenCalledWith(
-            'window_state',
-            JSON.stringify(state)
-          );
-
-          // Mock loadData to return the saved state
-          mockDataManager.loadData.mockReturnValue({
-            success: true,
-            data: JSON.stringify(state),
-          });
 
           // Load the state
           const loadedState = windowStateManager.loadState();
@@ -484,14 +590,15 @@ describe('Property Tests - WindowStateManager', () => {
       workAreaSize: { width: 1920, height: 1080 },
     });
 
-    // Save the invalid state
-    windowStateManager.saveState(invalidState);
-
-    // Mock loadData to return the saved state
-    mockDataManager.loadData.mockReturnValue({
-      success: true,
-      data: JSON.stringify(invalidState),
-    });
+    // Mock database to return the invalid state
+    const mockDb = {
+      open: true,
+      prepare: jest.fn().mockReturnValue({
+        get: jest.fn().mockReturnValue({ value: JSON.stringify(invalidState) }),
+        run: jest.fn(),
+      }),
+    };
+    mockDbManager.getDatabase.mockReturnValue(mockDb as any);
 
     // Load the state
     const loadedState = windowStateManager.loadState();
@@ -527,14 +634,15 @@ describe('Property Tests - WindowStateManager', () => {
       },
     ]);
 
-    // Save the state
-    windowStateManager.saveState(stateWithNegativeCoords);
-
-    // Mock loadData to return the saved state
-    mockDataManager.loadData.mockReturnValue({
-      success: true,
-      data: JSON.stringify(stateWithNegativeCoords),
-    });
+    // Mock database to return the state with negative coords
+    const mockDb = {
+      open: true,
+      prepare: jest.fn().mockReturnValue({
+        get: jest.fn().mockReturnValue({ value: JSON.stringify(stateWithNegativeCoords) }),
+        run: jest.fn(),
+      }),
+    };
+    mockDbManager.getDatabase.mockReturnValue(mockDb as any);
 
     // Load the state
     const loadedState = windowStateManager.loadState();
@@ -565,14 +673,15 @@ describe('Property Tests - WindowStateManager', () => {
       },
     ]);
 
-    // Save the state
-    windowStateManager.saveState(boundaryState);
-
-    // Mock loadData to return the saved state
-    mockDataManager.loadData.mockReturnValue({
-      success: true,
-      data: JSON.stringify(boundaryState),
-    });
+    // Mock database to return the boundary state
+    const mockDb = {
+      open: true,
+      prepare: jest.fn().mockReturnValue({
+        get: jest.fn().mockReturnValue({ value: JSON.stringify(boundaryState) }),
+        run: jest.fn(),
+      }),
+    };
+    mockDbManager.getDatabase.mockReturnValue(mockDb as any);
 
     // Load the state
     const loadedState = windowStateManager.loadState();
@@ -606,14 +715,15 @@ describe('Property Tests - WindowStateManager', () => {
       },
     ]);
 
-    // Save the state
-    windowStateManager.saveState(maxState);
-
-    // Mock loadData to return the saved state
-    mockDataManager.loadData.mockReturnValue({
-      success: true,
-      data: JSON.stringify(maxState),
-    });
+    // Mock database to return the max state
+    const mockDb = {
+      open: true,
+      prepare: jest.fn().mockReturnValue({
+        get: jest.fn().mockReturnValue({ value: JSON.stringify(maxState) }),
+        run: jest.fn(),
+      }),
+    };
+    mockDbManager.getDatabase.mockReturnValue(mockDb as any);
 
     // Load the state
     const loadedState = windowStateManager.loadState();
@@ -645,30 +755,40 @@ describe('Property Tests - WindowStateManager', () => {
       },
     ]);
 
+    // Create a mock database that stores the saved state
+    let savedValue: string | undefined;
+    const mockDb = {
+      open: true,
+      prepare: jest.fn().mockImplementation((sql: string) => {
+        if (sql.includes('INSERT')) {
+          return {
+            run: jest.fn().mockImplementation((...args: any[]) => {
+              savedValue = args[1]; // value is second argument
+            }),
+          };
+        } else {
+          return {
+            get: jest.fn().mockImplementation(() => {
+              return savedValue ? { value: savedValue } : undefined;
+            }),
+          };
+        }
+      }),
+    };
+    mockDbManager.getDatabase.mockReturnValue(mockDb as any);
+
     // First cycle: save and load
     windowStateManager.saveState(originalState);
-    mockDataManager.loadData.mockReturnValue({
-      success: true,
-      data: JSON.stringify(originalState),
-    });
     const loadedState1 = windowStateManager.loadState();
     expect(loadedState1).toEqual(originalState);
 
     // Second cycle: save the loaded state and load again
     windowStateManager.saveState(loadedState1);
-    mockDataManager.loadData.mockReturnValue({
-      success: true,
-      data: JSON.stringify(loadedState1),
-    });
     const loadedState2 = windowStateManager.loadState();
     expect(loadedState2).toEqual(originalState);
 
     // Third cycle: verify consistency
     windowStateManager.saveState(loadedState2);
-    mockDataManager.loadData.mockReturnValue({
-      success: true,
-      data: JSON.stringify(loadedState2),
-    });
     const loadedState3 = windowStateManager.loadState();
     expect(loadedState3).toEqual(originalState);
   });
@@ -702,21 +822,35 @@ describe('Property Tests - WindowStateManager', () => {
       },
     ]);
 
+    // Create a mock database that stores the saved state
+    let savedValue: string | undefined;
+    const mockDb = {
+      open: true,
+      prepare: jest.fn().mockImplementation((sql: string) => {
+        if (sql.includes('INSERT')) {
+          return {
+            run: jest.fn().mockImplementation((...args: any[]) => {
+              savedValue = args[1]; // value is second argument
+            }),
+          };
+        } else {
+          return {
+            get: jest.fn().mockImplementation(() => {
+              return savedValue ? { value: savedValue } : undefined;
+            }),
+          };
+        }
+      }),
+    };
+    mockDbManager.getDatabase.mockReturnValue(mockDb as any);
+
     // Test maximized state
     windowStateManager.saveState(maximizedState);
-    mockDataManager.loadData.mockReturnValue({
-      success: true,
-      data: JSON.stringify(maximizedState),
-    });
     const loadedMaximized = windowStateManager.loadState();
     expect(loadedMaximized.isMaximized).toBe(true);
 
     // Test normal state
     windowStateManager.saveState(normalState);
-    mockDataManager.loadData.mockReturnValue({
-      success: true,
-      data: JSON.stringify(normalState),
-    });
     const loadedNormal = windowStateManager.loadState();
     expect(loadedNormal.isMaximized).toBe(false);
   });
@@ -727,11 +861,15 @@ describe('Property Tests - WindowStateManager', () => {
      Requirements: window-management.5.4, window-management.5.5 */
   // Feature: ui, Property 7
   test('Property 7 edge case: corrupted data returns default state', () => {
-    // Mock corrupted JSON
-    mockDataManager.loadData.mockReturnValue({
-      success: true,
-      data: '{invalid json}',
-    });
+    // Mock corrupted JSON in database
+    const mockDb = {
+      open: true,
+      prepare: jest.fn().mockReturnValue({
+        get: jest.fn().mockReturnValue({ value: '{invalid json}' }),
+        run: jest.fn(),
+      }),
+    };
+    mockDbManager.getDatabase.mockReturnValue(mockDb as any);
 
     mockScreen.getPrimaryDisplay.mockReturnValue({
       workAreaSize: { width: 1920, height: 1080 },
@@ -752,11 +890,15 @@ describe('Property Tests - WindowStateManager', () => {
      Requirements: window-management.5.4, window-management.5.5 */
   // Feature: ui, Property 7
   test('Property 7 edge case: empty data returns default state', () => {
-    // Mock empty data
-    mockDataManager.loadData.mockReturnValue({
-      success: true,
-      data: '',
-    });
+    // Mock empty data in database
+    const mockDb = {
+      open: true,
+      prepare: jest.fn().mockReturnValue({
+        get: jest.fn().mockReturnValue({ value: '' }),
+        run: jest.fn(),
+      }),
+    };
+    mockDbManager.getDatabase.mockReturnValue(mockDb as any);
 
     mockScreen.getPrimaryDisplay.mockReturnValue({
       workAreaSize: { width: 1920, height: 1080 },
@@ -777,10 +919,15 @@ describe('Property Tests - WindowStateManager', () => {
      Requirements: window-management.5.4, window-management.5.5 */
   // Feature: ui, Property 7
   test('Property 7 edge case: failed load returns default state', () => {
-    // Mock failed load
-    mockDataManager.loadData.mockReturnValue({
-      success: false,
-    });
+    // Mock no data in database (returns undefined)
+    const mockDb = {
+      open: true,
+      prepare: jest.fn().mockReturnValue({
+        get: jest.fn().mockReturnValue(undefined),
+        run: jest.fn(),
+      }),
+    };
+    mockDbManager.getDatabase.mockReturnValue(mockDb as any);
 
     mockScreen.getPrimaryDisplay.mockReturnValue({
       workAreaSize: { width: 1920, height: 1080 },
@@ -798,17 +945,37 @@ describe('Property Tests - WindowStateManager', () => {
 
 // Additional tests for WindowManager integration with state changes
 describe('Property Tests - WindowManager State Changes', () => {
-  let mockDataManager: jest.Mocked<DataManager>;
+  let mockDbManager: jest.Mocked<IDatabaseManager>;
   let mockScreen: any;
 
   beforeEach(() => {
     // Clear all mocks
     jest.clearAllMocks();
 
-    // Create mock DataManager
-    mockDataManager = {
-      loadData: jest.fn().mockReturnValue({ success: false }),
-      saveData: jest.fn(),
+    // Create mock DatabaseManager (IDatabaseManager interface)
+    // Requirements: database-refactoring.3.6 - WindowManager uses DatabaseManager
+    let savedValue: string | undefined;
+    mockDbManager = {
+      getDatabase: jest.fn().mockReturnValue({
+        open: true,
+        prepare: jest.fn().mockImplementation((sql: string) => {
+          if (sql.includes('INSERT')) {
+            return {
+              run: jest.fn().mockImplementation((...args: any[]) => {
+                savedValue = args[1]; // value is second argument
+              }),
+            };
+          } else {
+            return {
+              get: jest.fn().mockImplementation(() => {
+                return savedValue ? { value: savedValue } : undefined;
+              }),
+            };
+          }
+        }),
+      }),
+      getCurrentUserId: jest.fn().mockReturnValue(null),
+      setUserManager: jest.fn(),
     } as any;
 
     // Get mocked electron screen
@@ -833,7 +1000,7 @@ describe('Property Tests - WindowManager State Changes', () => {
 
   /* Preconditions: window created with various initial states
      Action: trigger resize/move/maximize events
-     Assertions: DataManager.saveData called with updated state
+     Assertions: Database saveState called with updated state
      Requirements: window-management.5.1, window-management.5.2, window-management.5.3 */
   // Feature: ui, Property 6: Изменения состояния окна сохраняются
   test('Property 6: Window State Persistence - state is saved on any window state change', async () => {
@@ -855,10 +1022,29 @@ describe('Property Tests - WindowManager State Changes', () => {
         async (newState) => {
           // Clear mocks for this iteration
           jest.clearAllMocks();
-          mockDataManager.saveData.mockClear();
+
+          // Track saved values
+          let lastSavedState: any = null;
+          const mockDb = {
+            open: true,
+            prepare: jest.fn().mockImplementation((sql: string) => {
+              if (sql.includes('INSERT')) {
+                return {
+                  run: jest.fn().mockImplementation((...args: any[]) => {
+                    lastSavedState = JSON.parse(args[1]);
+                  }),
+                };
+              } else {
+                return {
+                  get: jest.fn().mockReturnValue(undefined),
+                };
+              }
+            }),
+          };
+          mockDbManager.getDatabase.mockReturnValue(mockDb as any);
 
           // Create WindowManager instance
-          const windowManager = new WindowManager(mockDataManager);
+          const windowManager = new WindowManager(mockDbManager);
 
           // Create window
           windowManager.createWindow();
@@ -888,57 +1074,45 @@ describe('Property Tests - WindowManager State Changes', () => {
             (call: any[]) => call[0] === 'maximize'
           )?.[1];
 
-          // Clear saveData calls from window creation
-          mockDataManager.saveData.mockClear();
+          // Clear saved state from window creation
+          lastSavedState = null;
 
           // Trigger resize event
           if (resizeHandler) {
             resizeHandler();
           }
 
-          // Verify saveData was called with the new state
-          expect(mockDataManager.saveData).toHaveBeenCalled();
-          const saveCall = mockDataManager.saveData.mock.calls[0];
-          expect(saveCall[0]).toBe('window_state');
-
-          const savedState = JSON.parse(saveCall[1] as string);
-          expect(savedState.x).toBe(newState.x);
-          expect(savedState.y).toBe(newState.y);
-          expect(savedState.width).toBe(newState.width);
-          expect(savedState.height).toBe(newState.height);
-          expect(savedState.isMaximized).toBe(newState.isMaximized);
+          // Verify state was saved
+          expect(lastSavedState).not.toBeNull();
+          expect(lastSavedState.x).toBe(newState.x);
+          expect(lastSavedState.y).toBe(newState.y);
+          expect(lastSavedState.width).toBe(newState.width);
+          expect(lastSavedState.height).toBe(newState.height);
+          expect(lastSavedState.isMaximized).toBe(newState.isMaximized);
 
           // Clear for next event
-          mockDataManager.saveData.mockClear();
+          lastSavedState = null;
 
           // Trigger move event
           if (moveHandler) {
             moveHandler();
           }
 
-          // Verify saveData was called again
-          expect(mockDataManager.saveData).toHaveBeenCalled();
-          const moveCall = mockDataManager.saveData.mock.calls[0];
-          expect(moveCall[0]).toBe('window_state');
-
-          const movedState = JSON.parse(moveCall[1] as string);
-          expect(movedState.x).toBe(newState.x);
-          expect(movedState.y).toBe(newState.y);
+          // Verify state was saved again
+          expect(lastSavedState).not.toBeNull();
+          expect(lastSavedState.x).toBe(newState.x);
+          expect(lastSavedState.y).toBe(newState.y);
 
           // Clear for next event
-          mockDataManager.saveData.mockClear();
+          lastSavedState = null;
 
           // Trigger maximize event if applicable
           if (maximizeHandler && newState.isMaximized) {
             maximizeHandler();
 
-            // Verify saveData was called
-            expect(mockDataManager.saveData).toHaveBeenCalled();
-            const maxCall = mockDataManager.saveData.mock.calls[0];
-            expect(maxCall[0]).toBe('window_state');
-
-            const maxState = JSON.parse(maxCall[1] as string);
-            expect(maxState.isMaximized).toBe(true);
+            // Verify state was saved
+            expect(lastSavedState).not.toBeNull();
+            expect(lastSavedState.isMaximized).toBe(true);
           }
 
           // Clean up
@@ -951,7 +1125,7 @@ describe('Property Tests - WindowManager State Changes', () => {
 
   /* Preconditions: window created, bounds change
      Action: trigger resize event
-     Assertions: saveData called with updated bounds
+     Assertions: saveState called with updated bounds
      Requirements: window-management.5.1 */
   // Feature: ui, Property 6
   test('Property 6 edge case: resize event saves updated bounds', () => {
@@ -960,7 +1134,27 @@ describe('Property Tests - WindowManager State Changes', () => {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { BrowserWindow } = require('electron');
 
-    const windowManager = new WindowManager(mockDataManager);
+    // Track saved values
+    let lastSavedState: any = null;
+    const mockDb = {
+      open: true,
+      prepare: jest.fn().mockImplementation((sql: string) => {
+        if (sql.includes('INSERT')) {
+          return {
+            run: jest.fn().mockImplementation((...args: any[]) => {
+              lastSavedState = JSON.parse(args[1]);
+            }),
+          };
+        } else {
+          return {
+            get: jest.fn().mockReturnValue(undefined),
+          };
+        }
+      }),
+    };
+    mockDbManager.getDatabase.mockReturnValue(mockDb as any);
+
+    const windowManager = new WindowManager(mockDbManager);
     windowManager.createWindow();
 
     const MockedBrowserWindow = BrowserWindow as jest.MockedClass<typeof BrowserWindow>;
@@ -979,8 +1173,8 @@ describe('Property Tests - WindowManager State Changes', () => {
     // Get resize handler
     const resizeHandler = mockWindow.on.mock.calls.find((call: any[]) => call[0] === 'resize')?.[1];
 
-    // Clear previous calls
-    mockDataManager.saveData.mockClear();
+    // Clear previous saved state
+    lastSavedState = null;
 
     // Trigger resize
     if (resizeHandler) {
@@ -988,21 +1182,16 @@ describe('Property Tests - WindowManager State Changes', () => {
     }
 
     // Verify save was called
-    expect(mockDataManager.saveData).toHaveBeenCalledWith(
-      'window_state',
-      expect.stringContaining('"width":1400')
-    );
-    expect(mockDataManager.saveData).toHaveBeenCalledWith(
-      'window_state',
-      expect.stringContaining('"height":900')
-    );
+    expect(lastSavedState).not.toBeNull();
+    expect(lastSavedState.width).toBe(1400);
+    expect(lastSavedState.height).toBe(900);
 
     windowManager.closeWindow();
   });
 
   /* Preconditions: window created, position changes
      Action: trigger move event
-     Assertions: saveData called with updated position
+     Assertions: saveState called with updated position
      Requirements: window-management.5.2 */
   // Feature: ui, Property 6
   test('Property 6 edge case: move event saves updated position', () => {
@@ -1011,7 +1200,27 @@ describe('Property Tests - WindowManager State Changes', () => {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { BrowserWindow } = require('electron');
 
-    const windowManager = new WindowManager(mockDataManager);
+    // Track saved values
+    let lastSavedState: any = null;
+    const mockDb = {
+      open: true,
+      prepare: jest.fn().mockImplementation((sql: string) => {
+        if (sql.includes('INSERT')) {
+          return {
+            run: jest.fn().mockImplementation((...args: any[]) => {
+              lastSavedState = JSON.parse(args[1]);
+            }),
+          };
+        } else {
+          return {
+            get: jest.fn().mockReturnValue(undefined),
+          };
+        }
+      }),
+    };
+    mockDbManager.getDatabase.mockReturnValue(mockDb as any);
+
+    const windowManager = new WindowManager(mockDbManager);
     windowManager.createWindow();
 
     const MockedBrowserWindow = BrowserWindow as jest.MockedClass<typeof BrowserWindow>;
@@ -1030,8 +1239,8 @@ describe('Property Tests - WindowManager State Changes', () => {
     // Get move handler
     const moveHandler = mockWindow.on.mock.calls.find((call: any[]) => call[0] === 'move')?.[1];
 
-    // Clear previous calls
-    mockDataManager.saveData.mockClear();
+    // Clear previous saved state
+    lastSavedState = null;
 
     // Trigger move
     if (moveHandler) {
@@ -1039,21 +1248,16 @@ describe('Property Tests - WindowManager State Changes', () => {
     }
 
     // Verify save was called
-    expect(mockDataManager.saveData).toHaveBeenCalledWith(
-      'window_state',
-      expect.stringContaining('"x":250')
-    );
-    expect(mockDataManager.saveData).toHaveBeenCalledWith(
-      'window_state',
-      expect.stringContaining('"y":300')
-    );
+    expect(lastSavedState).not.toBeNull();
+    expect(lastSavedState.x).toBe(250);
+    expect(lastSavedState.y).toBe(300);
 
     windowManager.closeWindow();
   });
 
   /* Preconditions: window created, window maximized
      Action: trigger maximize event
-     Assertions: saveData called with isMaximized: true
+     Assertions: saveState called with isMaximized: true
      Requirements: window-management.5.3 */
   // Feature: ui, Property 6
   test('Property 6 edge case: maximize event saves maximized state', () => {
@@ -1062,7 +1266,27 @@ describe('Property Tests - WindowManager State Changes', () => {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { BrowserWindow } = require('electron');
 
-    const windowManager = new WindowManager(mockDataManager);
+    // Track saved values
+    let lastSavedState: any = null;
+    const mockDb = {
+      open: true,
+      prepare: jest.fn().mockImplementation((sql: string) => {
+        if (sql.includes('INSERT')) {
+          return {
+            run: jest.fn().mockImplementation((...args: any[]) => {
+              lastSavedState = JSON.parse(args[1]);
+            }),
+          };
+        } else {
+          return {
+            get: jest.fn().mockReturnValue(undefined),
+          };
+        }
+      }),
+    };
+    mockDbManager.getDatabase.mockReturnValue(mockDb as any);
+
+    const windowManager = new WindowManager(mockDbManager);
     windowManager.createWindow();
 
     const MockedBrowserWindow = BrowserWindow as jest.MockedClass<typeof BrowserWindow>;
@@ -1083,8 +1307,8 @@ describe('Property Tests - WindowManager State Changes', () => {
       (call: any[]) => call[0] === 'maximize'
     )?.[1];
 
-    // Clear previous calls
-    mockDataManager.saveData.mockClear();
+    // Clear previous saved state
+    lastSavedState = null;
 
     // Trigger maximize
     if (maximizeHandler) {
@@ -1092,17 +1316,15 @@ describe('Property Tests - WindowManager State Changes', () => {
     }
 
     // Verify save was called with isMaximized: true
-    expect(mockDataManager.saveData).toHaveBeenCalledWith(
-      'window_state',
-      expect.stringContaining('"isMaximized":true')
-    );
+    expect(lastSavedState).not.toBeNull();
+    expect(lastSavedState.isMaximized).toBe(true);
 
     windowManager.closeWindow();
   });
 
   /* Preconditions: window created and maximized, window unmaximized
      Action: trigger unmaximize event
-     Assertions: saveData called with isMaximized: false
+     Assertions: saveState called with isMaximized: false
      Requirements: window-management.5.3 */
   // Feature: ui, Property 6
   test('Property 6 edge case: unmaximize event saves normal state', () => {
@@ -1111,7 +1333,27 @@ describe('Property Tests - WindowManager State Changes', () => {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { BrowserWindow } = require('electron');
 
-    const windowManager = new WindowManager(mockDataManager);
+    // Track saved values
+    let lastSavedState: any = null;
+    const mockDb = {
+      open: true,
+      prepare: jest.fn().mockImplementation((sql: string) => {
+        if (sql.includes('INSERT')) {
+          return {
+            run: jest.fn().mockImplementation((...args: any[]) => {
+              lastSavedState = JSON.parse(args[1]);
+            }),
+          };
+        } else {
+          return {
+            get: jest.fn().mockReturnValue(undefined),
+          };
+        }
+      }),
+    };
+    mockDbManager.getDatabase.mockReturnValue(mockDb as any);
+
+    const windowManager = new WindowManager(mockDbManager);
     windowManager.createWindow();
 
     const MockedBrowserWindow = BrowserWindow as jest.MockedClass<typeof BrowserWindow>;
@@ -1132,8 +1374,8 @@ describe('Property Tests - WindowManager State Changes', () => {
       (call: any[]) => call[0] === 'unmaximize'
     )?.[1];
 
-    // Clear previous calls
-    mockDataManager.saveData.mockClear();
+    // Clear previous saved state
+    lastSavedState = null;
 
     // Trigger unmaximize
     if (unmaximizeHandler) {
@@ -1141,17 +1383,15 @@ describe('Property Tests - WindowManager State Changes', () => {
     }
 
     // Verify save was called with isMaximized: false
-    expect(mockDataManager.saveData).toHaveBeenCalledWith(
-      'window_state',
-      expect.stringContaining('"isMaximized":false')
-    );
+    expect(lastSavedState).not.toBeNull();
+    expect(lastSavedState.isMaximized).toBe(false);
 
     windowManager.closeWindow();
   });
 
   /* Preconditions: window created, multiple state changes occur
      Action: trigger multiple events in sequence
-     Assertions: saveData called for each event with correct state
+     Assertions: saveState called for each event with correct state
      Requirements: window-management.5.1, window-management.5.2, window-management.5.3 */
   // Feature: ui, Property 6
   test('Property 6 edge case: multiple state changes save correctly', () => {
@@ -1160,7 +1400,27 @@ describe('Property Tests - WindowManager State Changes', () => {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { BrowserWindow } = require('electron');
 
-    const windowManager = new WindowManager(mockDataManager);
+    // Track saved values
+    let saveCount = 0;
+    const mockDb = {
+      open: true,
+      prepare: jest.fn().mockImplementation((sql: string) => {
+        if (sql.includes('INSERT')) {
+          return {
+            run: jest.fn().mockImplementation(() => {
+              saveCount++;
+            }),
+          };
+        } else {
+          return {
+            get: jest.fn().mockReturnValue(undefined),
+          };
+        }
+      }),
+    };
+    mockDbManager.getDatabase.mockReturnValue(mockDb as any);
+
+    const windowManager = new WindowManager(mockDbManager);
     windowManager.createWindow();
 
     const MockedBrowserWindow = BrowserWindow as jest.MockedClass<typeof BrowserWindow>;
@@ -1174,31 +1434,31 @@ describe('Property Tests - WindowManager State Changes', () => {
       (call: any[]) => call[0] === 'maximize'
     )?.[1];
 
-    // Clear previous calls
-    mockDataManager.saveData.mockClear();
+    // Clear previous save count
+    saveCount = 0;
 
     // First change: resize
     mockWindow.getBounds.mockReturnValue({ x: 100, y: 100, width: 1400, height: 900 });
     mockWindow.isMaximized.mockReturnValue(false);
     if (resizeHandler) resizeHandler();
-    expect(mockDataManager.saveData).toHaveBeenCalledTimes(1);
+    expect(saveCount).toBe(1);
 
     // Second change: move
     mockWindow.getBounds.mockReturnValue({ x: 200, y: 150, width: 1400, height: 900 });
     if (moveHandler) moveHandler();
-    expect(mockDataManager.saveData).toHaveBeenCalledTimes(2);
+    expect(saveCount).toBe(2);
 
     // Third change: maximize
     mockWindow.isMaximized.mockReturnValue(true);
     if (maximizeHandler) maximizeHandler();
-    expect(mockDataManager.saveData).toHaveBeenCalledTimes(3);
+    expect(saveCount).toBe(3);
 
     windowManager.closeWindow();
   });
 
   /* Preconditions: window created, window closed
      Action: trigger close event
-     Assertions: saveData called with final state
+     Assertions: saveState called with final state
      Requirements: window-management.5.1, window-management.5.2, window-management.5.3 */
   // Feature: ui, Property 6
   test('Property 6 edge case: close event saves final state', () => {
@@ -1207,7 +1467,27 @@ describe('Property Tests - WindowManager State Changes', () => {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { BrowserWindow } = require('electron');
 
-    const windowManager = new WindowManager(mockDataManager);
+    // Track saved values
+    let lastSavedState: any = null;
+    const mockDb = {
+      open: true,
+      prepare: jest.fn().mockImplementation((sql: string) => {
+        if (sql.includes('INSERT')) {
+          return {
+            run: jest.fn().mockImplementation((...args: any[]) => {
+              lastSavedState = JSON.parse(args[1]);
+            }),
+          };
+        } else {
+          return {
+            get: jest.fn().mockReturnValue(undefined),
+          };
+        }
+      }),
+    };
+    mockDbManager.getDatabase.mockReturnValue(mockDb as any);
+
+    const windowManager = new WindowManager(mockDbManager);
     windowManager.createWindow();
 
     const MockedBrowserWindow = BrowserWindow as jest.MockedClass<typeof BrowserWindow>;
@@ -1226,8 +1506,8 @@ describe('Property Tests - WindowManager State Changes', () => {
     // Get close handler
     const closeHandler = mockWindow.on.mock.calls.find((call: any[]) => call[0] === 'close')?.[1];
 
-    // Clear previous calls
-    mockDataManager.saveData.mockClear();
+    // Clear previous saved state
+    lastSavedState = null;
 
     // Trigger close
     if (closeHandler) {
@@ -1235,14 +1515,12 @@ describe('Property Tests - WindowManager State Changes', () => {
     }
 
     // Verify save was called with final state
-    expect(mockDataManager.saveData).toHaveBeenCalled();
-    const saveCall = mockDataManager.saveData.mock.calls[0];
-    const savedState = JSON.parse(saveCall[1] as string);
-    expect(savedState.x).toBe(300);
-    expect(savedState.y).toBe(200);
-    expect(savedState.width).toBe(1600);
-    expect(savedState.height).toBe(1000);
-    expect(savedState.isMaximized).toBe(true);
+    expect(lastSavedState).not.toBeNull();
+    expect(lastSavedState.x).toBe(300);
+    expect(lastSavedState.y).toBe(200);
+    expect(lastSavedState.width).toBe(1600);
+    expect(lastSavedState.height).toBe(1000);
+    expect(lastSavedState.isMaximized).toBe(true);
 
     windowManager.closeWindow();
   });

@@ -1,11 +1,12 @@
-// Requirements: google-oauth-auth.2.1, google-oauth-auth.8.1
+// Requirements: google-oauth-auth.2.1, google-oauth-auth.8.1, database-refactoring.2
 
 /**
  * Integration tests for OAuth components initialization
  * Tests the integration of all OAuth components in the main process
  */
 
-import { DataManager } from '../../../src/main/DataManager';
+import { UserSettingsManager } from '../../../src/main/UserSettingsManager';
+import { DatabaseManager } from '../../../src/main/DatabaseManager';
 import { TokenStorageManager } from '../../../src/main/auth/TokenStorageManager';
 import { OAuthClientManager } from '../../../src/main/auth/OAuthClientManager';
 import { AuthIPCHandlers } from '../../../src/main/auth/AuthIPCHandlers';
@@ -32,13 +33,15 @@ jest.mock('electron', () => ({
   },
 }));
 
-jest.mock('../../../src/main/DataManager');
+jest.mock('../../../src/main/DatabaseManager');
+jest.mock('../../../src/main/UserSettingsManager');
 jest.mock('../../../src/main/auth/TokenStorageManager');
 jest.mock('../../../src/main/auth/OAuthClientManager');
 jest.mock('../../../src/main/auth/AuthIPCHandlers');
 
 describe('OAuth Integration', () => {
-  let mockDataManager: jest.Mocked<DataManager>;
+  let mockDbManager: jest.Mocked<DatabaseManager>;
+  let mockUserSettingsManager: jest.Mocked<UserSettingsManager>;
   let mockTokenStorage: jest.Mocked<TokenStorageManager>;
   let mockOAuthClient: jest.Mocked<OAuthClientManager>;
   let mockAuthIPCHandlers: jest.Mocked<AuthIPCHandlers>;
@@ -47,8 +50,13 @@ describe('OAuth Integration', () => {
     jest.clearAllMocks();
 
     // Create mock instances
-    mockDataManager = new DataManager('/mock/path') as jest.Mocked<DataManager>;
-    mockTokenStorage = new TokenStorageManager(mockDataManager) as jest.Mocked<TokenStorageManager>;
+    mockDbManager = new DatabaseManager() as jest.Mocked<DatabaseManager>;
+    mockUserSettingsManager = new UserSettingsManager(
+      mockDbManager
+    ) as jest.Mocked<UserSettingsManager>;
+    mockTokenStorage = new TokenStorageManager(
+      mockUserSettingsManager
+    ) as jest.Mocked<TokenStorageManager>;
     mockOAuthClient = new OAuthClientManager(
       getOAuthConfig(),
       mockTokenStorage
@@ -59,14 +67,18 @@ describe('OAuth Integration', () => {
   /* Preconditions: OAuth components are initialized
      Action: verify all OAuth components are created
      Assertions: all components exist and are properly initialized
-     Requirements: google-oauth-auth.2.1, google-oauth-auth.8.1 */
+     Requirements: google-oauth-auth.2.1, google-oauth-auth.8.1, database-refactoring.2 */
   it('should initialize all OAuth components', () => {
-    // Verify DataManager is created
-    expect(DataManager).toHaveBeenCalled();
-    expect(mockDataManager).toBeDefined();
+    // Verify DatabaseManager is created
+    expect(DatabaseManager).toHaveBeenCalled();
+    expect(mockDbManager).toBeDefined();
 
-    // Verify TokenStorageManager is created with DataManager
-    expect(TokenStorageManager).toHaveBeenCalledWith(mockDataManager);
+    // Verify UserSettingsManager is created with DatabaseManager
+    expect(UserSettingsManager).toHaveBeenCalledWith(mockDbManager);
+    expect(mockUserSettingsManager).toBeDefined();
+
+    // Verify TokenStorageManager is created with UserSettingsManager
+    expect(TokenStorageManager).toHaveBeenCalledWith(mockUserSettingsManager);
     expect(mockTokenStorage).toBeDefined();
 
     // Verify OAuthClientManager is created with config and TokenStorage
@@ -108,10 +120,13 @@ describe('OAuth Integration', () => {
   /* Preconditions: OAuth components are initialized
      Action: verify component dependencies
      Assertions: components are properly connected
-     Requirements: google-oauth-auth.2.1, google-oauth-auth.8.1 */
+     Requirements: google-oauth-auth.2.1, google-oauth-auth.8.1, database-refactoring.2 */
   it('should have correct component dependencies', () => {
-    // Verify TokenStorageManager depends on DataManager
-    expect(TokenStorageManager).toHaveBeenCalledWith(mockDataManager);
+    // Verify UserSettingsManager depends on DatabaseManager
+    expect(UserSettingsManager).toHaveBeenCalledWith(mockDbManager);
+
+    // Verify TokenStorageManager depends on UserSettingsManager
+    expect(TokenStorageManager).toHaveBeenCalledWith(mockUserSettingsManager);
 
     // Verify OAuthClientManager depends on TokenStorageManager
     expect(OAuthClientManager).toHaveBeenCalledWith(expect.any(Object), mockTokenStorage);
@@ -141,7 +156,7 @@ describe('OAuth Integration', () => {
   });
 });
 
-// Requirements: account-profile.1.2, account-profile.1.5, account-profile.1.6, account-profile.1.7
+// Requirements: account-profile.1.2, account-profile.1.3, account-profile.1.5, account-profile.1.6, account-profile.1.7, database-refactoring.2, database-refactoring.3.5
 
 /**
  * Integration tests for profile functionality
@@ -156,7 +171,7 @@ import WindowManager from '../../../src/main/WindowManager';
 global.fetch = jest.fn();
 
 describe('Profile Integration', () => {
-  let mockDataManager: jest.Mocked<DataManager>;
+  let mockDbManager: jest.Mocked<DatabaseManager>;
   let mockTokenStorage: jest.Mocked<TokenStorageManager>;
   let mockOAuthClient: jest.Mocked<OAuthClientManager>;
   let userManager: UserManager;
@@ -185,14 +200,12 @@ describe('Profile Integration', () => {
       }),
     };
 
-    // Create mock instances
-    mockDataManager = {
-      initialize: jest.fn(),
-      close: jest.fn(),
-      saveData: jest.fn().mockReturnValue({ success: true }),
-      loadData: jest.fn().mockReturnValue({ success: false, data: null }),
-      deleteData: jest.fn().mockReturnValue({ success: true }),
+    // Requirements: database-refactoring.2 - Create DatabaseManager mock
+    mockDbManager = {
       getDatabase: jest.fn().mockReturnValue(mockDb),
+      setUserManager: jest.fn(),
+      getCurrentUserId: jest.fn().mockReturnValue(null),
+      close: jest.fn(),
     } as any;
 
     mockTokenStorage = {
@@ -221,15 +234,17 @@ describe('Profile Integration', () => {
       closeWindow: jest.fn(),
     } as any;
 
-    // Create real UserManager instance (now takes 2 args)
-    userManager = new UserManager(mockDataManager, mockTokenStorage);
+    // Create real UserManager instance with DatabaseManager
+    // Requirements: account-profile.1.3
+    userManager = new UserManager(mockDbManager, mockTokenStorage);
 
-    // Create real LifecycleManager instance
+    // Create real LifecycleManager instance with DatabaseManager
+    // Requirements: database-refactoring.3.5
     lifecycleManager = new LifecycleManager(
       mockWindowManager,
-      mockDataManager,
+      mockDbManager,
       mockOAuthClient,
-      mockTokenStorage
+      userManager
     );
 
     // Mock fetch to return profile data

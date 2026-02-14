@@ -1,7 +1,7 @@
-// Requirements: account-profile.1.2, account-profile.1.5, account-profile.1.6, account-profile.1.7, account-profile.1.8, user-data-isolation.0.2, user-data-isolation.0.3, user-data-isolation.0.4, user-data-isolation.1.1, user-data-isolation.1.2, user-data-isolation.1.3, user-data-isolation.1.4, user-data-isolation.1.5
+// Requirements: account-profile.1.2, account-profile.1.3, account-profile.1.5, account-profile.1.6, account-profile.1.7, account-profile.1.8, user-data-isolation.0.2, user-data-isolation.0.3, user-data-isolation.0.4, user-data-isolation.1.1, user-data-isolation.1.2, user-data-isolation.1.3, user-data-isolation.1.4, user-data-isolation.1.5, database-refactoring.2
 
 import { UserManager } from '../../../src/main/auth/UserManager';
-import { DataManager } from '../../../src/main/DataManager';
+import { DatabaseManager } from '../../../src/main/DatabaseManager';
 import { TokenStorageManager } from '../../../src/main/auth/TokenStorageManager';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -18,7 +18,7 @@ jest.mock('electron', () => ({
 global.fetch = jest.fn();
 
 describe('UserManager', () => {
-  let dataManager: DataManager;
+  let dbManager: DatabaseManager;
   let tokenStorage: TokenStorageManager;
   let profileManager: UserManager;
   let testDbPath: string;
@@ -45,9 +45,6 @@ describe('UserManager', () => {
       fs.mkdirSync(migrationsPath, { recursive: true });
     }
 
-    dataManager = new DataManager(testDbPath);
-    dataManager.initialize();
-
     // Requirements: user-data-isolation.1.5 - Mock UserManager for data isolation
     mockSelfUserManager = {
       getCurrentUserId: jest.fn().mockReturnValue('testUserId1'),
@@ -61,7 +58,10 @@ describe('UserManager', () => {
       }),
     } as unknown as jest.Mocked<UserManager>;
 
-    dataManager.setUserManager(mockSelfUserManager);
+    // Requirements: database-refactoring.2 - Initialize DatabaseManager first
+    dbManager = new DatabaseManager();
+    dbManager.initialize(testDbPath);
+    dbManager.setUserManager(mockSelfUserManager);
 
     // Create mocked dependencies
     tokenStorage = {
@@ -69,15 +69,16 @@ describe('UserManager', () => {
       deleteTokens: jest.fn().mockResolvedValue(undefined),
     } as unknown as TokenStorageManager;
 
-    // Create profile manager (now takes only 2 args: dataManager, tokenStorage)
-    profileManager = new UserManager(dataManager, tokenStorage);
+    // Create profile manager with DatabaseManager
+    // Requirements: account-profile.1.3
+    profileManager = new UserManager(dbManager, tokenStorage);
 
     // Clear mocks
     jest.clearAllMocks();
   });
 
   afterEach(() => {
-    dataManager.close();
+    dbManager.close();
     if (fs.existsSync(testDbPath)) {
       fs.rmSync(testDbPath, { recursive: true, force: true });
     }
@@ -189,7 +190,7 @@ describe('UserManager', () => {
       expect(user2.name).toBe('New Name');
 
       // Verify in database
-      const db = dataManager.getDatabase();
+      const db = dbManager.getDatabase();
       const dbUser = db?.prepare('SELECT name FROM users WHERE user_id = ?').get(user1.user_id) as {
         name: string;
       };
