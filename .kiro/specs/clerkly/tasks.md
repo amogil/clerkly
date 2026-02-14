@@ -806,3 +806,70 @@ npm run test:functional
 - ⏳ Приложение собирается и запускается на Mac OS X (задача 12)
 
 **Текущий статус:** Осталось выполнить задачи 10 (функциональные и property-based тесты) и 12 (сборка и упаковка)
+
+---
+
+## 15. Рефакторинг: DataManager → DatabaseManager + UserSettingsManager
+
+### Обзор
+
+В рамках рефакторинга системы хранения данных (см. `.kiro/specs/database-refactoring/tasks.md`), необходимо обновить компоненты Clerkly для использования новой архитектуры:
+- **DatabaseManager** — единая точка входа для доступа к БД
+- **UserSettingsManager** — управление пользовательскими настройками (переименован из DataManager)
+
+**Статус:** ✅ Завершено
+
+### 15.1 Обновить IPCHandlers
+- [x] Обновить `src/main/IPCHandlers.ts`:
+  - Заменить `DataManager` на `UserSettingsManager` в конструкторе
+  - Обновить импорты
+  - Обновить комментарии с Requirements
+- [x] Обновить `tests/unit/IPCHandlers.test.ts`:
+  - Заменить моки DataManager на UserSettingsManager
+  - Обновить описания тестов
+- _Requirements: clerkly.1.4, clerkly.2.5, user-data-isolation.6.5_
+
+### 15.2 Обновить LifecycleManager
+- [x] Обновить `src/main/LifecycleManager.ts`:
+  - Заменить `DataManager` на `DatabaseManager` + `UserSettingsManager`
+  - Обновить порядок инициализации:
+    1. Создать DatabaseManager
+    2. Вызвать `dbManager.initialize(storagePath)`
+    3. Создать UserSettingsManager с dbManager
+  - Обновить graceful shutdown для закрытия DatabaseManager
+  - Обновить импорты
+  - Обновить комментарии с Requirements
+- [x] Обновить `tests/unit/LifecycleManager.test.ts`:
+  - Заменить моки DataManager на DatabaseManager + UserSettingsManager
+  - Обновить описания тестов
+- _Requirements: clerkly.1.2, clerkly.1.3, user-data-isolation.6.7_
+
+### 15.3 Обновить main/index.ts
+- [x] Обновить `src/main/index.ts`:
+  - Создать DatabaseManager первым
+  - Вызвать `dbManager.initialize(storagePath)`
+  - Создать UserSettingsManager с dbManager
+  - Передать UserSettingsManager в IPCHandlers
+  - Вызвать `dbManager.setUserManager(userManager)` после создания UserManager
+  - Обновить graceful shutdown
+- _Requirements: clerkly.1.1, user-data-isolation.6.7_
+
+### 15.4 Обновить property-based тесты
+- [x] Обновить `tests/property/DataManager.property.test.ts` → `tests/property/UserSettingsManager.property.test.ts`:
+  - Переименовать файл
+  - Заменить все ссылки на DataManager
+  - Обновить моки для DatabaseManager
+- _Requirements: clerkly.2.6_
+
+### 15.5 Валидация
+- [x] Выполнить `npm run validate`
+- [x] Убедиться, что все тесты проходят
+- [x] Проверить покрытие кода (минимум 85%) — текущее покрытие: 94.15%
+- _Requirements: clerkly.2.7_
+
+### Примечания
+
+- DataManager переименовывается в UserSettingsManager
+- DatabaseManager становится единой точкой входа для доступа к БД
+- Порядок инициализации: DatabaseManager → UserSettingsManager → другие менеджеры
+- UserManager устанавливается в DatabaseManager после создания через `setUserManager()`

@@ -49,8 +49,8 @@
 │  └─────────────────────────┬──────────────────────────┘     │
 │                            │                                 │
 │  ┌─────────────────────────▼──────────────────────────┐     │
-│  │              DataManager                            │     │
-│  │  (Existing SQLite wrapper)                          │     │
+│  │           UserSettingsManager                       │     │
+│  │  (SQLite key-value storage)                         │     │
 │  └─────────────────────────────────────────────────────┘     │
 │                                                              │
 │  ┌──────────────────────────────────────────────────────┐   │
@@ -525,7 +525,7 @@ interface StoredTokens {
 
 ```typescript
 class TokenStorageManager {
-  constructor(dataManager: DataManager);
+  constructor(userSettingsManager: UserSettingsManager);
 
   // Requirements: google-oauth-auth.4
   async saveTokens(tokens: TokenData): Promise<void>;
@@ -711,7 +711,7 @@ export function Settings({ onSignOut }: SettingsProps): JSX.Element;
 
 ### Database Schema
 
-Токены хранятся в существующей SQLite базе данных через DataManager.
+Токены хранятся в существующей SQLite базе данных через UserSettingsManager.
 
 ```sql
 -- Используется существующая таблица key_value_store
@@ -841,7 +841,7 @@ const effectiveRedirectUri = `com.googleusercontent.apps.${clientIdWithoutSuffix
   Мысли: Это персистентность. Можно тестировать round-trip свойством: сохранить токены, загрузить их обратно, проверить совпадение.
   Тестируемость: да - property
 
-4.2 Использование DataManager
+4.2 Использование UserSettingsManager
   Мысли: Это детали реализации (какой компонент использовать). Это не функциональное требование, которое можно тестировать извне.
   Тестируемость: нет
 

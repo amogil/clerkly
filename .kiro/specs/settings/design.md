@@ -6,7 +6,7 @@
 
 ### Архитектурный Принцип: База Данных как Единственный Источник Истины
 
-Приложение построено на фундаментальном архитектурном принципе: **база данных (SQLite через DataManager) является единственным источником истины для всех данных приложения**.
+Приложение построено на фундаментальном архитектурном принципе: **база данных (SQLite через DatabaseManager) является единственным источником истины для всех данных приложения**.
 
 **Ключевые аспекты:**
 
@@ -38,7 +38,7 @@ External API → Main Process → Database → IPC Event → Renderer → UI Upd
 
 - **Electron**: Фреймворк для создания десктопных приложений
 - **TypeScript**: Язык программирования для типобезопасности
-- **SQLite**: База данных для хранения настроек (через существующий DataManager)
+- **SQLite**: База данных для хранения настроек (через DatabaseManager и UserSettingsManager)
 - **safeStorage API**: Electron API для безопасного хранения чувствительных данных
 - **Intl.DateTimeFormat**: JavaScript API для форматирования дат по системной локали
 
@@ -487,12 +487,13 @@ contextBridge.exposeInMainWorld('api', {
 │                      Main Process                            │
 │                                                               │
 │  ┌──────────────────────┐       ┌─────────────────────┐     │
-│  │ AIAgentSettingsManager│──────▶│    DataManager      │     │
+│  │ AIAgentSettingsManager│──────▶│  UserSettingsManager │     │
 │  │                      │       │     (SQLite)        │     │
 │  │ - saveSettings()     │       │  - saveData()       │     │
 │  │ - loadSettings()     │       │  - loadData()       │     │
 │  │ - encryptAPIKey()    │       │  - deleteData()     │     │
 │  │ - decryptAPIKey()    │       └─────────────────────┘     │
+│  └──────────────────────┘                                    │
 │  └──────────────────────┘                                    │
 │           │                                                   │
 │           ▼                                                   │
@@ -532,7 +533,7 @@ contextBridge.exposeInMainWorld('api', {
 
 1. **Загрузка настроек при запуске**:
    - `Settings Component` запрашивает настройки через IPC
-   - `AIAgentSettingsManager` загружает настройки из базы данных через `DataManager`
+   - `AIAgentSettingsManager` загружает настройки из базы данных через `UserSettingsManager`
    - Если настройки отсутствуют, используются значения по умолчанию
    - Настройки отображаются в UI
 
@@ -577,11 +578,11 @@ interface AIAgentSettings {
 }
 
 class AIAgentSettingsManager {
-  private dataManager: DataManager;
+  private userSettingsManager: UserSettingsManager;
   private userProfileManager: UserProfileManager;
   
-  constructor(dataManager: DataManager, userProfileManager: UserProfileManager) {
-    this.dataManager = dataManager;
+  constructor(userSettingsManager: UserSettingsManager, userProfileManager: UserProfileManager) {
+    this.userSettingsManager = userSettingsManager;
     this.userProfileManager = userProfileManager;
   }
 
@@ -591,7 +592,7 @@ class AIAgentSettingsManager {
    */
   async saveLLMProvider(provider: 'openai' | 'anthropic' | 'google'): Promise<void> {
     try {
-      await this.dataManager.saveData('ai_agent_llm_provider', provider);
+      await this.userSettingsManager.saveData('ai_agent_llm_provider', provider);
       console.log('[AIAgentSettingsManager] LLM provider saved:', provider);
     } catch (error) {
       console.error('[AIAgentSettingsManager] Failed to save LLM provider:', error);
@@ -628,8 +629,8 @@ class AIAgentSettingsManager {
       }
 
       // Requirements: settings.1.16, settings.1.17 - Save with provider-specific keys
-      await this.dataManager.saveData(`ai_agent_api_key_${provider}`, encryptedKey);
-      await this.dataManager.saveData(`ai_agent_api_key_${provider}_encrypted`, isEncrypted);
+      await this.userSettingsManager.saveData(`ai_agent_api_key_${provider}`, encryptedKey);
+      await this.userSettingsManager.saveData(`ai_agent_api_key_${provider}_encrypted`, isEncrypted);
       
       console.log(`[AIAgentSettingsManager] API key saved for ${provider}`);
     } catch (error) {
@@ -644,8 +645,8 @@ class AIAgentSettingsManager {
    */
   async loadAPIKey(provider: 'openai' | 'anthropic' | 'google'): Promise<string | null> {
     try {
-      const keyResult = await this.dataManager.loadData(`ai_agent_api_key_${provider}`);
-      const encryptedResult = await this.dataManager.loadData(`ai_agent_api_key_${provider}_encrypted`);
+      const keyResult = await this.userSettingsManager.loadData(`ai_agent_api_key_${provider}`);
+      const encryptedResult = await this.userSettingsManager.loadData(`ai_agent_api_key_${provider}_encrypted`);
 
       if (!keyResult.success || !keyResult.data) {
         return null;
@@ -682,8 +683,8 @@ class AIAgentSettingsManager {
    */
   async deleteAPIKey(provider: 'openai' | 'anthropic' | 'google'): Promise<void> {
     try {
-      await this.dataManager.deleteData(`ai_agent_api_key_${provider}`);
-      await this.dataManager.deleteData(`ai_agent_api_key_${provider}_encrypted`);
+      await this.userSettingsManager.deleteData(`ai_agent_api_key_${provider}`);
+      await this.userSettingsManager.deleteData(`ai_agent_api_key_${provider}_encrypted`);
       console.log(`[AIAgentSettingsManager] API key deleted for ${provider}`);
     } catch (error) {
       console.error(`[AIAgentSettingsManager] Failed to delete API key for ${provider}:`, error);
@@ -697,7 +698,7 @@ class AIAgentSettingsManager {
    */
   async loadSettings(): Promise<AIAgentSettings> {
     try {
-      const providerResult = await this.dataManager.loadData('ai_agent_llm_provider');
+      const providerResult = await this.userSettingsManager.loadData('ai_agent_llm_provider');
       const provider = (providerResult.success && providerResult.data) 
         ? providerResult.data as 'openai' | 'anthropic' | 'google'
         : 'openai'; // Requirements: settings.1.21 - Default to openai
@@ -735,18 +736,18 @@ class AIAgentSettingsManager {
   }
 
   private async isKeyEncrypted(provider: 'openai' | 'anthropic' | 'google'): Promise<boolean> {
-    const result = await this.dataManager.loadData(`ai_agent_api_key_${provider}_encrypted`);
+    const result = await this.userSettingsManager.loadData(`ai_agent_api_key_${provider}_encrypted`);
     return result.success && result.data === true;
   }
 }
 ```
 
 **Ключевые особенности:**
-- Использует `DataManager` для персистентности настроек
+- Использует `UserSettingsManager` для персистентности настроек
 - Автоматическое шифрование API ключей через `safeStorage` (когда доступно)
 - Раздельное хранилище для каждого провайдера
 - Graceful degradation при недоступности шифрования
-- Изоляция данных по пользователям через `DataManager`
+- Изоляция данных по пользователям через `UserSettingsManager`
 
 
 ### DateTimeFormatter (Утилитный Класс)
@@ -1035,7 +1036,7 @@ interface AIAgentSettings {
 
 ```sql
 -- Таблица user_data используется для хранения настроек
--- (через существующий DataManager)
+-- (через UserSettingsManager с автоматической изоляцией по user_id)
 
 -- LLM Provider
 key: 'ai_agent_llm_provider'
@@ -1069,10 +1070,10 @@ user_id: 'aB3xK9mNpQ'
 ```
 
 **Преимущества:**
-- Изоляция данных по пользователям через `user_id`
+- Изоляция данных по пользователям через `user_id` (автоматически через UserSettingsManager)
 - Раздельное хранилище для каждого провайдера
 - Метаданные о шифровании для каждого ключа
-- Использует существующую инфраструктуру `DataManager`
+- Использует существующую инфраструктуру `UserSettingsManager`
 
 ## Свойства Корректности
 
@@ -1206,8 +1207,8 @@ async saveAPIKey(provider: string, apiKey: string): Promise<void> {
       isEncrypted = false;
     }
 
-    await this.dataManager.saveData(`ai_agent_api_key_${provider}`, encryptedKey);
-    await this.dataManager.saveData(`ai_agent_api_key_${provider}_encrypted`, isEncrypted);
+    await this.userSettingsManager.saveData(`ai_agent_api_key_${provider}`, encryptedKey);
+    await this.userSettingsManager.saveData(`ai_agent_api_key_${provider}_encrypted`, isEncrypted);
   } catch (error) {
     console.error(`[AIAgentSettingsManager] Failed to save API key:`, error);
     throw error;
@@ -1229,8 +1230,8 @@ async saveAPIKey(provider: string, apiKey: string): Promise<void> {
 // Requirements: settings.1.22
 async loadAPIKey(provider: string): Promise<string | null> {
   try {
-    const keyResult = await this.dataManager.loadData(`ai_agent_api_key_${provider}`);
-    const encryptedResult = await this.dataManager.loadData(`ai_agent_api_key_${provider}_encrypted`);
+    const keyResult = await this.userSettingsManager.loadData(`ai_agent_api_key_${provider}`);
+    const encryptedResult = await this.userSettingsManager.loadData(`ai_agent_api_key_${provider}_encrypted`);
 
     if (!keyResult.success || !keyResult.data) {
       return null;
@@ -1370,9 +1371,9 @@ console.error('[DateTimeFormatter] Failed to format datetime:', error);
 
 ```typescript
 describe('AIAgentSettingsManager', () => {
-  /* Preconditions: AIAgentSettingsManager created with DataManager mock
+  /* Preconditions: AIAgentSettingsManager created with UserSettingsManager mock
      Action: call saveLLMProvider('anthropic')
-     Assertions: DataManager.saveData called with 'ai_agent_llm_provider' and 'anthropic'
+     Assertions: UserSettingsManager.saveData called with 'ai_agent_llm_provider' and 'anthropic'
      Requirements: settings.1.10 */
   it('should save LLM provider immediately', () => {
     // Тест сохранения провайдера
@@ -1725,9 +1726,9 @@ describe('Settings Functional Tests', () => {
 - Сортируется лексикографически
 - Стандартный формат для логов
 
-### Решение 6: Изоляция Данных через DataManager
+### Решение 6: Изоляция Данных через UserSettingsManager
 
-**Решение:** Использовать существующий механизм изоляции данных в `DataManager` (колонка `user_id`) для автоматической изоляции настроек по пользователям.
+**Решение:** Использовать существующий механизм изоляции данных в `UserSettingsManager` (колонка `user_id`) для автоматической изоляции настроек по пользователям.
 
 **Альтернативы:**
 - Реализовать отдельную логику изоляции для настроек
