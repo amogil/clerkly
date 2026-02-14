@@ -9,7 +9,8 @@ import { app, BrowserWindow } from 'electron';
 import * as path from 'path';
 import WindowManager from './WindowManager';
 import { LifecycleManager } from './LifecycleManager';
-import { DataManager } from './DataManager';
+import { UserSettingsManager } from './UserSettingsManager';
+import { DatabaseManager } from './DatabaseManager';
 import { IPCHandlers } from './IPCHandlers';
 import { OAuthClientManager } from './auth/OAuthClientManager';
 import { TokenStorageManager } from './auth/TokenStorageManager';
@@ -91,11 +92,16 @@ if (!gotTheLock) {
   }
 }
 
-// Requirements: clerkly.1.4
-// Initialize Data Manager with user data path
+// Requirements: clerkly.1.4, database-refactoring.3.7
+// Initialize DatabaseManager first (single point of entry for database)
 const userDataPath = app.getPath('userData');
 const storagePath = path.join(userDataPath, 'storage');
-const dataManager = new DataManager(storagePath);
+const dbManager = new DatabaseManager();
+dbManager.initialize(storagePath);
+
+// Requirements: database-refactoring.2.4
+// Initialize UserSettingsManager with DatabaseManager
+const dataManager = new UserSettingsManager(dbManager);
 
 // Requirements: testing.3.1, testing.3.2
 // Helper function to check if we're in test environment
@@ -132,20 +138,24 @@ const oauthClient = new OAuthClientManager(oauthConfig, tokenStorage);
 import { setOAuthClientManager } from './auth/APIRequestHandler';
 setOAuthClientManager(oauthClient);
 
-// Requirements: account-profile.1.5
-// Initialize User Manager
-const userManager = new UserManager(dataManager, tokenStorage);
+// Requirements: account-profile.1.3, user-data-isolation.6.2
+// DatabaseManager already created above, use it for UserManager
 
-// Requirements: user-data-isolation.1.10 - Set UserManager in DataManager for data isolation
-dataManager.setUserManager(userManager);
+// Requirements: account-profile.1.5
+// Initialize User Manager with DatabaseManager
+const userManager = new UserManager(dbManager, tokenStorage);
+
+// Requirements: user-data-isolation.6.3 - Set UserManager in DatabaseManager for data isolation
+// UserSettingsManager gets user_id from DatabaseManager, so we only need to set it once
+dbManager.setUserManager(userManager);
 
 // Requirements: account-profile.1.5
 // Connect profile manager to oauth client for automatic updates
 oauthClient.setUserManager(userManager);
 
-// Requirements: clerkly.1.2, clerkly.1.3, window-management.5
-// Initialize Window Manager
-const windowManager = new WindowManager(dataManager, userManager);
+// Requirements: clerkly.1.2, clerkly.1.3, window-management.5, database-refactoring.3.6
+// Initialize Window Manager with DatabaseManager
+const windowManager = new WindowManager(dbManager);
 
 // Requirements: google-oauth-auth.11.1
 // Initialize Auth Window Manager
@@ -156,14 +166,9 @@ const authWindowManager = new AuthWindowManager(windowManager, oauthClient);
 // Connect auth window manager to oauth client for loader display
 oauthClient.setAuthWindowManager(authWindowManager);
 
-// Requirements: clerkly.1.2, clerkly.1.3, clerkly.1.4, account-profile.1.5
-// Initialize Lifecycle Manager
-const lifecycleManager = new LifecycleManager(
-  windowManager,
-  dataManager,
-  oauthClient,
-  tokenStorage
-);
+// Requirements: clerkly.1.2, clerkly.1.3, clerkly.1.4, account-profile.1.5, database-refactoring.3.5
+// Initialize Lifecycle Manager with DatabaseManager
+const lifecycleManager = new LifecycleManager(windowManager, dbManager, oauthClient, userManager);
 
 // Requirements: clerkly.1.4, clerkly.2.5
 // Initialize IPC Handlers
@@ -196,6 +201,7 @@ if (process.env.NODE_ENV === 'test') {
     tokenStorage,
     userManager,
     dataManager,
+    dbManager,
   };
 
   // Register test IPC handlers inline to avoid import issues

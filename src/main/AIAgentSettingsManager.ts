@@ -1,6 +1,6 @@
 // Requirements: settings.1.9, settings.1.10, settings.1.11, settings.1.14, settings.1.15, settings.1.22
 
-import type { IDataManager } from './DataManager';
+import type { IUserSettingsManager } from './UserSettingsManager';
 import { safeStorage } from 'electron';
 import { Logger } from './Logger';
 import type { LLMProvider } from '../types';
@@ -16,10 +16,10 @@ import type { LLMProvider } from '../types';
 export class AIAgentSettingsManager {
   // Requirements: clerkly.3.5, clerkly.3.7
   private logger = Logger.create('AIAgentSettingsManager');
-  private dataManager: IDataManager;
+  private userSettingsManager: IUserSettingsManager;
 
-  constructor(dataManager: IDataManager) {
-    this.dataManager = dataManager;
+  constructor(userSettingsManager: IUserSettingsManager) {
+    this.userSettingsManager = userSettingsManager;
   }
 
   /**
@@ -33,7 +33,7 @@ export class AIAgentSettingsManager {
    */
   async saveLLMProvider(provider: LLMProvider): Promise<void> {
     try {
-      const result = this.dataManager.saveData('ai_agent_llm_provider', provider);
+      const result = this.userSettingsManager.saveData('ai_agent_llm_provider', provider);
 
       if (!result.success) {
         throw new Error(result.error || 'Failed to save LLM provider');
@@ -57,7 +57,7 @@ export class AIAgentSettingsManager {
    */
   async loadLLMProvider(): Promise<LLMProvider> {
     try {
-      const result = this.dataManager.loadData('ai_agent_llm_provider');
+      const result = this.userSettingsManager.loadData('ai_agent_llm_provider');
 
       if (!result.success || !result.data) {
         this.logger.info('No LLM provider found, using default: openai');
@@ -104,13 +104,16 @@ export class AIAgentSettingsManager {
       }
 
       // Save the key
-      const keyResult = this.dataManager.saveData(`ai_agent_api_key_${provider}`, storedKey);
+      const keyResult = this.userSettingsManager.saveData(
+        `ai_agent_api_key_${provider}`,
+        storedKey
+      );
       if (!keyResult.success) {
         throw new Error(keyResult.error || 'Failed to save API key');
       }
 
       // Save encryption status flag
-      const flagResult = this.dataManager.saveData(
+      const flagResult = this.userSettingsManager.saveData(
         `ai_agent_api_key_${provider}_encrypted`,
         isEncrypted
       );
@@ -138,8 +141,10 @@ export class AIAgentSettingsManager {
    */
   async loadAPIKey(provider: LLMProvider): Promise<string | null> {
     try {
-      const keyResult = this.dataManager.loadData(`ai_agent_api_key_${provider}`);
-      const encryptedResult = this.dataManager.loadData(`ai_agent_api_key_${provider}_encrypted`);
+      const keyResult = this.userSettingsManager.loadData(`ai_agent_api_key_${provider}`);
+      const encryptedResult = this.userSettingsManager.loadData(
+        `ai_agent_api_key_${provider}_encrypted`
+      );
 
       if (!keyResult.success || !keyResult.data) {
         this.logger.info(`No API key found for ${provider}`);
@@ -178,10 +183,10 @@ export class AIAgentSettingsManager {
   async deleteAPIKey(provider: LLMProvider): Promise<void> {
     try {
       // Delete the key
-      const keyResult = this.dataManager.deleteData(`ai_agent_api_key_${provider}`);
+      const keyResult = this.userSettingsManager.deleteData(`ai_agent_api_key_${provider}`);
 
       // Delete encryption flag (ignore errors if flag doesn't exist)
-      this.dataManager.deleteData(`ai_agent_api_key_${provider}_encrypted`);
+      this.userSettingsManager.deleteData(`ai_agent_api_key_${provider}_encrypted`);
 
       if (!keyResult.success && keyResult.error !== 'Key not found') {
         throw new Error(keyResult.error || 'Failed to delete API key');

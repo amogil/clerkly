@@ -29,7 +29,7 @@
 1.2. THE следующие зависимости SHALL быть замокированы в модульных тестах:
 - Electron API (`BrowserWindow`, `app`, `screen`, `ipcMain`)
 - Внешние модули (`fs`, `path`, `crypto`)
-- Зависимости класса (например, `DataManager`)
+- Зависимости класса (например, `DatabaseManager`, `UserSettingsManager`)
 - Сетевые запросы (`fetch`, `https`)
 - База данных (SQLite)
 
@@ -107,7 +107,7 @@
 
 3.1.3. THE test IPC handlers SHALL быть доступны ТОЛЬКО в тестовом режиме
 
-3.1.4. THE test IPC handlers SHALL использовать реальные классы приложения (TokenStorageManager, DataManager)
+3.1.4. THE test IPC handlers SHALL использовать реальные классы приложения (TokenStorageManager, DatabaseManager, UserSettingsManager)
 
 3.1.5. THE test IPC handlers SHALL быть расположены в `tests/functional/helpers/test-ipc-handlers.ts`
 

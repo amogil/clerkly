@@ -1,7 +1,7 @@
 // Requirements: clerkly.1, clerkly.2, clerkly.nfr.2
 
 import { ipcMain, IpcMainInvokeEvent } from 'electron';
-import { DataManager } from './DataManager';
+import { UserSettingsManager } from './UserSettingsManager';
 import { Logger } from './Logger';
 
 // Requirements: clerkly.3.8 - Use centralized Logger instead of console.*
@@ -20,11 +20,11 @@ export interface IPCResult {
 export class IPCHandlers {
   // Requirements: clerkly.3.5, clerkly.3.7
   private logger = Logger.create('IPCHandlers');
-  private dataManager: DataManager;
+  private dataManager: UserSettingsManager;
   private timeout: number = 10000; // 10 seconds
   private registeredChannels: string[] = [];
 
-  constructor(dataManager: DataManager) {
+  constructor(dataManager: UserSettingsManager) {
     this.dataManager = dataManager;
   }
 

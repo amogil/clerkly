@@ -6,6 +6,11 @@
 
 **Архитектурный Принцип:** Следует принципу **Единого Источника Истины (Single Source of Truth)**, где база данных является единственным источником истины для всех пользовательских данных.
 
+**Ключевые компоненты:**
+- **DatabaseManager** — единая точка входа для доступа к БД, инициализации и получения текущего user_id
+- **UserSettingsManager** — управление пользовательскими настройками (key-value в таблице user_data) с автоматической фильтрацией по user_id
+- **UserProfileManager** — управление профилем пользователя, таблицей users и текущим user_id
+
 ---
 
 ## Алгоритмы
@@ -57,6 +62,31 @@
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                  │
 │  ┌──────────────────────────────────────────────────────────┐   │
+│  │                  DatabaseManager                          │   │
+│  │                                                           │   │
+│  │  - db: Database | null                                   │   │
+│  │  - userManager: UserManager | null                       │   │
+│  │  - initialize(storagePath): void                         │   │
+│  │  - setUserManager(userManager): void                     │   │
+│  │  - getDatabase(): Database                               │   │
+│  │  - getCurrentUserId(): string                            │   │
+│  │  - close(): void                                         │   │
+│  └────────────────────────┬─────────────────────────────────┘   │
+│                           │                                      │
+│           ┌───────────────┼───────────────┐                     │
+│           │               │               │                     │
+│           ▼               ▼               ▼                     │
+│  ┌────────────────┐ ┌────────────────┐ ┌────────────────────┐   │
+│  │UserSettingsManager│ │ AgentManager │ │ MessageManager     │   │
+│  │                │ │                │ │                    │   │
+│  │- saveData()    │ │- create()      │ │- list()            │   │
+│  │- loadData()    │ │- list()        │ │- create()          │   │
+│  │- deleteData()  │ │- get()         │ │- update()          │   │
+│  │+ auto user_id  │ │+ auto user_id  │ │+ auto user_id      │   │
+│  └────────────────┘ └────────────────┘ └────────────────────┘   │
+│                           │                                      │
+│                           ▼                                      │
+│  ┌──────────────────────────────────────────────────────────┐   │
 │  │                  UserProfileManager                       │   │
 │  │                                                           │   │
 │  │  - currentUserId: string | null                          │   │
@@ -65,16 +95,6 @@
 │  │  - getCurrentUserId(): string | null                     │   │
 │  │  - fetchProfile(): Promise<UserProfile>                  │   │
 │  │  - clearSession(): void                                  │   │
-│  └────────────────────────┬─────────────────────────────────┘   │
-│                           │                                      │
-│                           ▼                                      │
-│  ┌──────────────────────────────────────────────────────────┐   │
-│  │                     DataManager                           │   │
-│  │                                                           │   │
-│  │  - saveData(key, value): void                            │   │
-│  │  - loadData(key): { success, data?, error? }             │   │
-│  │  - deleteData(key): void                                 │   │
-│  │  + автоматическая фильтрация по user_id                  │   │
 │  └────────────────────────┬─────────────────────────────────┘   │
 │                           │                                      │
 │                           ▼                                      │
@@ -164,6 +184,161 @@ interface User {
 }
 ```
 
+### DatabaseManager (Новый Компонент)
+
+**Файл:** `src/main/DatabaseManager.ts`
+
+Единая точка входа для доступа к базе данных, инициализации и получения текущего user_id.
+
+```typescript
+// Requirements: user-data-isolation.6
+import Database from 'better-sqlite3';
+import { UserManager } from './auth/UserManager';
+import { MigrationRunner } from './MigrationRunner';
+import { Logger } from './Logger';
+
+class DatabaseManager {
+  private db: Database.Database | null = null;
+  private userManager: UserManager | null = null;
+  private logger = Logger.create('DatabaseManager');
+  
+  /**
+   * Initialize database and run migrations
+   * Requirements: user-data-isolation.6.1, user-data-isolation.6.7
+   */
+  initialize(storagePath: string): void {
+    this.db = new Database(storagePath);
+    
+    // Run migrations
+    const migrationRunner = new MigrationRunner(this.db);
+    migrationRunner.runMigrations();
+    
+    this.logger.info('Database initialized');
+  }
+  
+  /**
+   * Set UserManager for getting current userId
+   * Requirements: user-data-isolation.6.3
+   */
+  setUserManager(userManager: UserManager): void {
+    this.userManager = userManager;
+  }
+  
+  /**
+   * Get SQLite database instance
+   * Requirements: user-data-isolation.6.2
+   */
+  getDatabase(): Database.Database {
+    if (!this.db) {
+      throw new Error('Database not initialized');
+    }
+    return this.db;
+  }
+  
+  /**
+   * Get current user ID (automatic isolation)
+   * Requirements: user-data-isolation.6.3, user-data-isolation.6.4
+   */
+  getCurrentUserId(): string {
+    const userId = this.userManager?.getCurrentUserId();
+    if (!userId) {
+      throw new Error('No user logged in');
+    }
+    return userId;
+  }
+  
+  /**
+   * Close database connection
+   */
+  close(): void {
+    if (this.db) {
+      this.db.close();
+      this.db = null;
+      this.logger.info('Database closed');
+    }
+  }
+}
+
+export const databaseManager = new DatabaseManager();
+```
+
+### UserSettingsManager (Переименован из DataManager)
+
+**Файл:** `src/main/UserSettingsManager.ts`
+
+Управление пользовательскими настройками (key-value в таблице user_data) с автоматической фильтрацией по user_id.
+
+```typescript
+// Requirements: user-data-isolation.2, user-data-isolation.3, user-data-isolation.6.5
+import { DatabaseManager } from './DatabaseManager';
+import { Logger } from './Logger';
+
+class UserSettingsManager {
+  private dbManager: DatabaseManager;
+  private logger = Logger.create('UserSettingsManager');
+
+  constructor(dbManager: DatabaseManager) {
+    this.dbManager = dbManager;
+  }
+  
+  private get db() {
+    return this.dbManager.getDatabase();
+  }
+  
+  private get userId() {
+    return this.dbManager.getCurrentUserId();
+  }
+
+  /**
+   * Save data with automatic user_id filtering
+   * Requirements: user-data-isolation.2.4, user-data-isolation.3.1, user-data-isolation.6.6
+   */
+  saveData(key: string, value: any): void {
+    const now = Date.now();
+    const valueJson = JSON.stringify(value);
+    
+    this.db.prepare(`
+      INSERT INTO user_data (key, value, user_id, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?)
+      ON CONFLICT(key, user_id) DO UPDATE SET
+        value = excluded.value,
+        updated_at = excluded.updated_at
+    `).run(key, valueJson, this.userId, now, now);
+    
+    this.logger.info(`Data saved for user ${this.userId}, key: ${key}`);
+  }
+
+  /**
+   * Load data with automatic user_id filtering
+   * Requirements: user-data-isolation.2.5, user-data-isolation.3.1, user-data-isolation.6.6
+   */
+  loadData(key: string): { success: boolean; data?: any; error?: string } {
+    const row = this.db
+      .prepare('SELECT value FROM user_data WHERE key = ? AND user_id = ?')
+      .get(key, this.userId) as { value: string } | undefined;
+
+    if (row) {
+      const data = JSON.parse(row.value);
+      this.logger.info(`Data loaded for user ${this.userId}, key: ${key}`);
+      return { success: true, data };
+    }
+
+    return { success: true, data: null };
+  }
+
+  /**
+   * Delete data with automatic user_id filtering
+   * Requirements: user-data-isolation.2.6, user-data-isolation.3.1, user-data-isolation.6.6
+   */
+  deleteData(key: string): void {
+    this.db.prepare('DELETE FROM user_data WHERE key = ? AND user_id = ?')
+      .run(key, this.userId);
+    
+    this.logger.info(`Data deleted for user ${this.userId}, key: ${key}`);
+  }
+}
+```
+
 ### UserProfileManager (Extended)
 
 **Файл:** `src/main/auth/UserProfileManager.ts`
@@ -236,7 +411,7 @@ class UserProfileManager {
    * Requirements: user-data-isolation.1.5
    * 
    * Returns the cached user_id of the currently logged in user.
-   * Used by DataManager to filter data by user_id.
+   * Used by UserSettingsManager to filter data by user_id.
    */
   getCurrentUserId(): string | null {
     return this.currentUserId;
@@ -294,84 +469,6 @@ class UserProfileManager {
 }
 ```
 
-### DataManager (Extended)
-
-**Файл:** `src/main/DataManager.ts`
-
-```typescript
-class DataManager {
-  // Requirements: user-data-isolation.3.1
-  private userProfileManager: UserProfileManager;
-
-  constructor(/* ... */, userProfileManager: UserProfileManager) {
-    this.userProfileManager = userProfileManager;
-  }
-
-  /**
-   * Save data with automatic user_id filtering
-   * Requirements: user-data-isolation.2.4, user-data-isolation.3.2, user-data-isolation.3.3
-   */
-  saveData(key: string, value: any): void {
-    const userId = this.userProfileManager.getCurrentUserId();
-    if (!userId) {
-      throw new Error('No user logged in');
-    }
-
-    const now = Date.now();
-    const valueJson = JSON.stringify(value);
-    
-    this.db.prepare(`
-      INSERT INTO user_data (key, value, user_id, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?)
-      ON CONFLICT(key, user_id) DO UPDATE SET
-        value = excluded.value,
-        updated_at = excluded.updated_at
-    `).run(key, valueJson, userId, now, now);
-    
-    this.logger.info(`Data saved for user ${userId}, key: ${key}`);
-  }
-
-  /**
-   * Load data with automatic user_id filtering
-   * Requirements: user-data-isolation.2.5, user-data-isolation.3.2, user-data-isolation.3.3
-   */
-  loadData(key: string): { success: boolean; data?: any; error?: string } {
-    const userId = this.userProfileManager.getCurrentUserId();
-    if (!userId) {
-      return { success: false, error: 'No user logged in' };
-    }
-
-    const row = this.db
-      .prepare('SELECT value FROM user_data WHERE key = ? AND user_id = ?')
-      .get(key, userId) as { value: string } | undefined;
-
-    if (row) {
-      const data = JSON.parse(row.value);
-      this.logger.info(`Data loaded for user ${userId}, key: ${key}`);
-      return { success: true, data };
-    }
-
-    return { success: true, data: null };
-  }
-
-  /**
-   * Delete data with automatic user_id filtering
-   * Requirements: user-data-isolation.2.6, user-data-isolation.3.2, user-data-isolation.3.3
-   */
-  deleteData(key: string): void {
-    const userId = this.userProfileManager.getCurrentUserId();
-    if (!userId) {
-      throw new Error('No user logged in');
-    }
-
-    this.db.prepare('DELETE FROM user_data WHERE key = ? AND user_id = ?')
-      .run(key, userId);
-    
-    this.logger.info(`Data deleted for user ${userId}, key: ${key}`);
-  }
-}
-```
-
 ### Обработка Ошибок Изоляции
 
 **Requirements:** user-data-isolation.4, error-notifications.1
@@ -379,7 +476,7 @@ class DataManager {
 Ошибки изоляции данных обрабатываются на уровне вызывающего кода, который знает контекст операции:
 
 ```typescript
-// В компонентах, использующих DataManager
+// В компонентах, использующих UserSettingsManager
 // Requirements: user-data-isolation.4.1, user-data-isolation.4.2, user-data-isolation.4.3
 // Requirements: error-notifications.1.4, error-notifications.1.5
 
@@ -424,7 +521,7 @@ async function handleDataOperation(
 ```
 
 **Важно:** 
-- DataManager просто бросает ошибку `'No user logged in'` без вызова ErrorHandler
+- UserSettingsManager просто бросает ошибку `'No user logged in'` без вызова ErrorHandler
 - Вызывающий код решает, как обработать ошибку в зависимости от контекста
 - Если контекст содержит "Logout", ErrorHandler автоматически фильтрует ошибку (не показывает пользователю)
 - Все ошибки ВСЕГДА логируются для отладки
@@ -432,21 +529,27 @@ async function handleDataOperation(
 
 ### Глобальные Настройки (Исключения из Изоляции)
 
-**Requirements:** user-data-isolation.2.8
+**Requirements:** user-data-isolation.2.8, user-data-isolation.6.8
 
 Некоторые данные НЕ должны изолироваться по пользователю:
 
 ```typescript
 // Window State - глобальные настройки окна
-// Requirements: window-management.5.7, user-data-isolation.2.8
+// Requirements: window-management.5.7, user-data-isolation.2.8, user-data-isolation.6.8
 
 class WindowStateManager {
-  // Использует отдельную таблицу window_state без user_id
+  private dbManager: DatabaseManager;
+  
+  constructor(dbManager: DatabaseManager) {
+    this.dbManager = dbManager;
+  }
+  
+  // Использует DatabaseManager только для доступа к БД, без user_id фильтрации
   // Состояние окна одинаково для всех пользователей на устройстве
   
   saveWindowState(state: WindowState): void {
     // НЕ использует user_id - глобальное состояние
-    this.db.prepare(`
+    this.dbManager.getDatabase().prepare(`
       INSERT OR REPLACE INTO window_state (key, value)
       VALUES ('main_window', ?)
     `).run(JSON.stringify(state));
@@ -576,9 +679,9 @@ async function rollbackUserDataMigration(db: Database) {
 
 ### Property 4: Автоматическая фильтрация
 
-*Для любого* вызова `saveData(key, value)` или `loadData(key)`, система ДОЛЖНА автоматически использовать `user_id` текущего пользователя без явного параметра.
+*Для любого* вызова `saveData(key, value)` или `loadData(key)` через UserSettingsManager, система ДОЛЖНА автоматически использовать `user_id` текущего пользователя без явного параметра.
 
-**Validates:** user-data-isolation.3.1, user-data-isolation.3.3
+**Validates:** user-data-isolation.3.1, user-data-isolation.6.6
 
 ### Property 5: Восстановление данных
 
@@ -642,29 +745,55 @@ describe('UserProfileManager - User ID Management', () => {
 });
 ```
 
-#### DataManager
+#### UserSettingsManager
 
-**Файл:** `tests/unit/DataManager.test.ts` (extended)
+**Файл:** `tests/unit/UserSettingsManager.test.ts`
 
 ```typescript
-describe('DataManager - User Data Isolation', () => {
-  /* Preconditions: UserProfileManager returns valid user_id
+describe('UserSettingsManager - User Data Isolation', () => {
+  /* Preconditions: DatabaseManager returns valid user_id
      Action: call saveData('key', 'value')
      Assertions: data saved with user_id
-     Requirements: user-data-isolation.2.4, user-data-isolation.3.2 */
+     Requirements: user-data-isolation.2.4, user-data-isolation.6.5 */
   it('should automatically add user_id when saving');
 
-  /* Preconditions: UserProfileManager returns valid user_id
+  /* Preconditions: DatabaseManager returns valid user_id
      Action: call loadData('key')
      Assertions: SQL query filters by user_id
-     Requirements: user-data-isolation.2.5, user-data-isolation.3.2 */
+     Requirements: user-data-isolation.2.5, user-data-isolation.6.5 */
   it('should automatically filter by user_id when loading');
 
-  /* Preconditions: UserProfileManager returns null
+  /* Preconditions: DatabaseManager.getCurrentUserId() throws 'No user logged in'
      Action: call saveData('key', 'value')
      Assertions: throws Error('No user logged in')
-     Requirements: user-data-isolation.3.3 */
+     Requirements: user-data-isolation.6.4 */
   it('should throw error when no user logged in');
+});
+```
+
+#### DatabaseManager
+
+**Файл:** `tests/unit/DatabaseManager.test.ts`
+
+```typescript
+describe('DatabaseManager', () => {
+  /* Preconditions: DatabaseManager not initialized
+     Action: call getDatabase()
+     Assertions: throws Error('Database not initialized')
+     Requirements: user-data-isolation.6.2 */
+  it('should throw error when database not initialized');
+
+  /* Preconditions: DatabaseManager initialized, UserManager not set
+     Action: call getCurrentUserId()
+     Assertions: throws Error('No user logged in')
+     Requirements: user-data-isolation.6.4 */
+  it('should throw error when no user logged in');
+
+  /* Preconditions: DatabaseManager initialized, UserManager set with valid user
+     Action: call getCurrentUserId()
+     Assertions: returns correct user_id
+     Requirements: user-data-isolation.6.3 */
+  it('should return current user_id from UserManager');
 });
 ```
 
@@ -743,7 +872,7 @@ describe('User Data Isolation Functional Tests', () => {
 | user-data-isolation.2.9 | - | - | - |
 | user-data-isolation.3.1 | ✓ | ✓ | - |
 | user-data-isolation.3.2 | ✓ | ✓ | ✓ |
-| user-data-isolation.3.3 | ✓ | ✓ | - |
+| user-data-isolation.3.3 | - | - | - |
 | user-data-isolation.4.1 | - | - | ✓ |
 | user-data-isolation.4.2 | - | - | ✓ |
 | user-data-isolation.4.3 | ✓ | - | - |
@@ -752,6 +881,14 @@ describe('User Data Isolation Functional Tests', () => {
 | user-data-isolation.5.2 | ✓ | - | - |
 | user-data-isolation.5.3 | ✓ | - | - |
 | user-data-isolation.5.4 | ✓ | - | - |
+| user-data-isolation.6.1 | ✓ | - | ✓ |
+| user-data-isolation.6.2 | ✓ | - | - |
+| user-data-isolation.6.3 | ✓ | - | ✓ |
+| user-data-isolation.6.4 | ✓ | - | - |
+| user-data-isolation.6.5 | ✓ | ✓ | ✓ |
+| user-data-isolation.6.6 | ✓ | ✓ | - |
+| user-data-isolation.6.7 | ✓ | - | ✓ |
+| user-data-isolation.6.8 | ✓ | - | - |
 
 ---
 
@@ -792,7 +929,31 @@ describe('User Data Isolation Functional Tests', () => {
 
 **Requirements:** user-data-isolation.2.9
 
-### Решение 4: Расширение UserProfileManager
+### Решение 4: DatabaseManager как единая точка входа
+
+**Решение:** Создать DatabaseManager как единую точку входа для доступа к БД, инициализации и получения текущего user_id.
+
+**Обоснование:**
+- Централизованное управление подключением к БД
+- Единая точка для получения user_id (через UserManager)
+- Все менеджеры данных используют DatabaseManager
+- Упрощает тестирование (один мок вместо нескольких)
+
+**Requirements:** user-data-isolation.6.1, user-data-isolation.6.2, user-data-isolation.6.3
+
+### Решение 5: Переименование DataManager в UserSettingsManager
+
+**Решение:** Переименовать DataManager в UserSettingsManager для более точного отражения его назначения.
+
+**Обоснование:**
+- DataManager работает только с таблицей user_data (key-value storage)
+- Название UserSettingsManager точнее отражает назначение класса
+- DatabaseManager теперь является точкой входа для доступа к БД
+- Разделение ответственности: DatabaseManager — доступ к БД, UserSettingsManager — пользовательские настройки
+
+**Requirements:** user-data-isolation.6.5, user-data-isolation.6.6
+
+### Решение 6: Расширение UserProfileManager
 
 **Решение:** Добавить логику управления таблицей users в существующий UserProfileManager вместо создания отдельного класса.
 

@@ -194,7 +194,7 @@ if (process.env.NODE_ENV === 'test') {
   });
 
   ipcMain.handle('test:clear-data', async () => {
-    await dataManager.clearAllData();
+    await userSettingsManager.clearAllData();
   });
 
   ipcMain.handle('test:handle-deep-link', async (event, url) => {

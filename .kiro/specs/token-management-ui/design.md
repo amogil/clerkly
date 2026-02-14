@@ -6,7 +6,7 @@
 
 ### Архитектурный Принцип: База Данных как Единственный Источник Истины
 
-Приложение построено на фундаментальном архитектурном принципе: **база данных (SQLite через DataManager) является единственным источником истины для всех данных приложения**.
+Приложение построено на фундаментальном архитектурном принципе: **база данных (SQLite через DatabaseManager и UserSettingsManager) является единственным источником истины для всех данных приложения**.
 
 **Ключевые аспекты:**
 
@@ -975,7 +975,7 @@ import { setOAuthClientManager } from './auth/APIRequestHandler';
 const oauthClient = new OAuthClientManager(
   tokenStorage,
   windowManager,
-  dataManager
+  userSettingsManager
 );
 
 // Set OAuth Client Manager for automatic token refresh in API requests
