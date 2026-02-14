@@ -1,10 +1,9 @@
-// Requirements: clerkly.1, clerkly.nfr.1, clerkly.nfr.2, account-profile.1.5, clerkly.3.8
+// Requirements: clerkly.1, clerkly.nfr.1, clerkly.nfr.2, account-profile.1.5, clerkly.3.8, database-refactoring.3.5
 
 import WindowManager from './WindowManager';
-import { DataManager } from './DataManager';
+import { DatabaseManager } from './DatabaseManager';
 import { OAuthClientManager } from './auth/OAuthClientManager';
 import { UserManager } from './auth/UserManager';
-import { TokenStorageManager } from './auth/TokenStorageManager';
 import { Logger } from './Logger';
 
 // Requirements: clerkly.3.8 - Use centralized Logger instead of console.*
@@ -18,11 +17,11 @@ export interface InitializeResult {
 
 /**
  * Manages application lifecycle including startup, activation, and shutdown
- * Requirements: clerkly.1, clerkly.nfr.1, clerkly.nfr.2, account-profile.1.5
+ * Requirements: clerkly.1, clerkly.nfr.1, clerkly.nfr.2, account-profile.1.5, database-refactoring.3.5
  */
 export class LifecycleManager {
   private windowManager: WindowManager;
-  private dataManager: DataManager;
+  private dbManager: DatabaseManager;
   private oauthClient: OAuthClientManager;
   private userManager: UserManager;
   private startTime: number | null = null;
@@ -30,23 +29,27 @@ export class LifecycleManager {
   // Requirements: clerkly.3.5, clerkly.3.7
   private logger = Logger.create('LifecycleManager');
 
+  /**
+   * Constructor
+   * Requirements: database-refactoring.3.5 - Use DatabaseManager for DB lifecycle
+   */
   constructor(
     windowManager: WindowManager,
-    dataManager: DataManager,
+    dbManager: DatabaseManager,
     oauthClient: OAuthClientManager,
-    tokenStorage: TokenStorageManager
+    userManager: UserManager
   ) {
     this.windowManager = windowManager;
-    this.dataManager = dataManager;
+    this.dbManager = dbManager;
     this.oauthClient = oauthClient;
-    // Requirements: account-profile.1.5 - Initialize UserManager
-    this.userManager = new UserManager(dataManager, tokenStorage);
+    // Requirements: account-profile.1.5 - Use provided UserManager
+    this.userManager = userManager;
   }
 
   /**
    * Initializes the application
    * Ensures startup in less than 3 seconds
-   * Requirements: clerkly.1, clerkly.nfr.1, account-profile.1.5
+   * Requirements: clerkly.1, clerkly.nfr.1, account-profile.1.5, database-refactoring.3.5
    * @returns {Promise<InitializeResult>}
    */
   async initialize(): Promise<InitializeResult> {
@@ -54,8 +57,8 @@ export class LifecycleManager {
     this.startTime = startTime;
 
     try {
-      // Initialize data storage
-      this.dataManager.initialize();
+      // Database is already initialized by DatabaseManager before LifecycleManager is created
+      // Requirements: database-refactoring.3.5 - DatabaseManager handles DB initialization
 
       // Create application window
       this.windowManager.createWindow();
@@ -136,7 +139,8 @@ export class LifecycleManager {
 
   /**
    * Performs application shutdown procedure
-   * Requirements: clerkly.nfr.2   * @private
+   * Requirements: clerkly.nfr.2, database-refactoring.3.5
+   * @private
    */
   private async performShutdown(): Promise<void> {
     // Close window
@@ -144,8 +148,9 @@ export class LifecycleManager {
       this.windowManager.closeWindow();
     }
 
-    // Close database connection
-    this.dataManager.close();
+    // Close database connection via DatabaseManager
+    // Requirements: database-refactoring.3.5 - DatabaseManager handles DB lifecycle
+    this.dbManager.close();
 
     this.initialized = false;
   }

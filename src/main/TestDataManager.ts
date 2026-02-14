@@ -1,23 +1,20 @@
 // Requirements: testing.3.1, testing.3.2
 
-import Database from 'better-sqlite3';
 import type {
-  IDataManager,
-  InitializeResult,
+  IUserSettingsManager,
   SaveDataResult,
   LoadDataResult,
   DeleteDataResult,
-} from './DataManager';
-import type { UserManager } from './auth/UserManager';
+} from './UserSettingsManager';
 import { Logger } from './Logger';
 
 /**
- * Test wrapper for DataManager that can simulate errors
+ * Test wrapper for UserSettingsManager that can simulate errors
  * Only available in test environment
  * Requirements: testing.3.1, testing.3.2
  */
-export class TestDataManager implements IDataManager {
-  private dataManager: IDataManager;
+export class TestDataManager implements IUserSettingsManager {
+  private dataManager: IUserSettingsManager;
   private logger = Logger.create('TestDataManager');
   private errorSimulation: {
     saveData?: string;
@@ -25,7 +22,7 @@ export class TestDataManager implements IDataManager {
     deleteData?: string;
   } = {};
 
-  constructor(dataManager: IDataManager) {
+  constructor(dataManager: IUserSettingsManager) {
     if (process.env.NODE_ENV !== 'test') {
       throw new Error('TestDataManager can only be used in test environment');
     }
@@ -94,26 +91,5 @@ export class TestDataManager implements IDataManager {
       return { success: false, error };
     }
     return this.dataManager.deleteData(key);
-  }
-
-  // Delegate other methods to real DataManager
-  initialize(dbPath: string): InitializeResult {
-    return this.dataManager.initialize(dbPath);
-  }
-
-  close(): void {
-    return this.dataManager.close();
-  }
-
-  setUserManager(userManager: UserManager): void {
-    return this.dataManager.setUserManager(userManager);
-  }
-
-  /**
-   * Get database instance from underlying DataManager
-   * Requirements: user-data-isolation.0.3, user-data-isolation.1.2
-   */
-  getDatabase(): Database.Database | null {
-    return this.dataManager.getDatabase();
   }
 }

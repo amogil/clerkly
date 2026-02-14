@@ -1,9 +1,8 @@
-// Requirements: clerkly.1, window-management.5
+// Requirements: clerkly.1, window-management.5, database-refactoring.3.6
 
 import { BrowserWindow, BrowserWindowConstructorOptions } from 'electron';
 import * as path from 'path';
-import { DataManager } from './DataManager';
-import type { UserManager } from './auth/UserManager';
+import type { IDatabaseManager } from './DatabaseManager';
 import { WindowStateManager } from './WindowStateManager';
 import { Logger } from './Logger';
 
@@ -74,12 +73,12 @@ interface WindowOptions {
  * - Automatically saves window state on resize, move, maximize (window-management.5.1, window-management.5.2, window-management.5.3)
  * - Restores saved state on application restart (window-management.5.4)
  * - Falls back to defaults if no saved state or invalid position (window-management.5.5, window-management.5.6)
- * - Uses SQLite database via DataManager for persistence
+ * - Uses SQLite database via UserSettingsManager for persistence
  *
  * @example
  * ```typescript
  * // Create window manager with data persistence
- * const dataManager = new DataManager('./app.db');
+ * const dataManager = new UserSettingsManager('./app.db');
  * const windowManager = new WindowManager(dataManager);
  *
  * // Create main window (loads saved state or uses defaults)
@@ -105,29 +104,29 @@ class WindowManager {
   /**
    * Creates a new WindowManager instance
    *
-   * Initializes the WindowManager with a DataManager dependency for window state
+   * Initializes the WindowManager with a DatabaseManager dependency for window state
    * persistence. The WindowStateManager is created internally to handle loading
    * and saving of window state (position, size, maximized state).
    *
-   * Requirements: window-management.5
+   * Requirements: window-management.5, database-refactoring.3.6
    *
-   * @param dataManager - DataManager instance for window state persistence
+   * @param dbManager - DatabaseManager instance for window state persistence
    *
    * @remarks
-   * - WindowStateManager is initialized with the provided DataManager
-   * - Window state is stored in SQLite database via DataManager
+   * - WindowStateManager is initialized with the provided DatabaseManager
+   * - Window state is stored in SQLite database via DatabaseManager
    * - State includes window position, size, and maximized flag
    *
    * @example
    * ```typescript
-   * const dataManager = new DataManager('./app.db');
-   * const windowManager = new WindowManager(dataManager);
+   * const dbManager = new DatabaseManager();
+   * const windowManager = new WindowManager(dbManager);
    * const window = windowManager.createWindow();
    * ```
    */
-  constructor(dataManager: DataManager, userManager?: UserManager) {
-    // Requirements: window-management.5
-    this.windowStateManager = new WindowStateManager(dataManager, userManager);
+  constructor(dbManager: IDatabaseManager) {
+    // Requirements: window-management.5, database-refactoring.3.6
+    this.windowStateManager = new WindowStateManager(dbManager);
   }
 
   /**

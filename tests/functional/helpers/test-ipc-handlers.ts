@@ -2,7 +2,7 @@
 
 import { ipcMain } from 'electron';
 import { TokenStorageManager } from '../../../src/main/auth/TokenStorageManager';
-import { DataManager } from '../../../src/main/DataManager';
+import { UserSettingsManager } from '../../../src/main/UserSettingsManager';
 
 /**
  * Register test IPC handlers
@@ -12,7 +12,7 @@ import { DataManager } from '../../../src/main/DataManager';
  */
 export function registerTestIPCHandlers(
   tokenStorage: TokenStorageManager,
-  dataManager: DataManager
+  dataManager: UserSettingsManager
 ): void {
   // Test handler for saving data
   ipcMain.handle('test:save-data', async (_event, key: string, value: string) => {

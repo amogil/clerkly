@@ -1,6 +1,6 @@
-// Requirements: account-profile.1.2, account-profile.1.5, account-profile.1.6, account-profile.1.7, account-profile.1.8, error-notifications.1.1, token-management-ui.1.3, token-management-ui.1.4, user-data-isolation.0.2, user-data-isolation.0.3, user-data-isolation.0.4, user-data-isolation.1.1, user-data-isolation.1.2, user-data-isolation.1.3, user-data-isolation.1.4, user-data-isolation.1.5
+// Requirements: account-profile.1.2, account-profile.1.3, account-profile.1.5, account-profile.1.6, account-profile.1.7, account-profile.1.8, error-notifications.1.1, token-management-ui.1.3, token-management-ui.1.4, user-data-isolation.0.2, user-data-isolation.0.3, user-data-isolation.0.4, user-data-isolation.1.1, user-data-isolation.1.2, user-data-isolation.1.3, user-data-isolation.1.4, user-data-isolation.1.5
 
-import { DataManager } from '../DataManager';
+import { DatabaseManager } from '../DatabaseManager';
 import { TokenStorageManager } from './TokenStorageManager';
 import { handleBackgroundError } from '../ErrorHandler';
 import { handleAPIRequest } from './APIRequestHandler';
@@ -47,12 +47,12 @@ export interface User {
  * User Profile Manager
  * Manages user profile data from Google OAuth
  * Handles fetching, caching, and updating profile information
- * Requirements: account-profile.1.2, account-profile.1.5, account-profile.1.6, account-profile.1.7, account-profile.1.8, user-data-isolation.0.2, user-data-isolation.0.3, user-data-isolation.0.4, user-data-isolation.1.1, user-data-isolation.1.2, user-data-isolation.1.3, user-data-isolation.1.4, user-data-isolation.1.5
+ * Requirements: account-profile.1.2, account-profile.1.3, account-profile.1.5, account-profile.1.6, account-profile.1.7, account-profile.1.8, user-data-isolation.0.2, user-data-isolation.0.3, user-data-isolation.0.4, user-data-isolation.1.1, user-data-isolation.1.2, user-data-isolation.1.3, user-data-isolation.1.4, user-data-isolation.1.5
  */
 export class UserManager {
   // Requirements: clerkly.3.5, clerkly.3.7
   private logger = Logger.create('UserManager');
-  private dataManager: DataManager;
+  private dbManager: DatabaseManager;
   private tokenStorage: TokenStorageManager;
   // Requirements: user-data-isolation.1.1, user-data-isolation.1.5 - Cache current user_id for data isolation
   private currentUserId: string | null = null;
@@ -61,11 +61,12 @@ export class UserManager {
 
   /**
    * Create a new UserManager
-   * @param dataManager DataManager instance for local storage
+   * @param dbManager DatabaseManager instance for database access
    * @param tokenStorage TokenStorageManager instance for accessing tokens
+   * Requirements: account-profile.1.3
    */
-  constructor(dataManager: DataManager, tokenStorage: TokenStorageManager) {
-    this.dataManager = dataManager;
+  constructor(dbManager: DatabaseManager, tokenStorage: TokenStorageManager) {
+    this.dbManager = dbManager;
     this.tokenStorage = tokenStorage;
   }
 
@@ -102,7 +103,7 @@ export class UserManager {
    * @returns User record with all fields
    */
   findOrCreateUser(googleProfile: GoogleUserInfoResponse): User {
-    const db = this.dataManager.getDatabase();
+    const db = this.dbManager.getDatabase();
     if (!db) {
       throw new Error('Database not initialized');
     }
@@ -208,7 +209,7 @@ export class UserManager {
    * Requirements: user-data-isolation.1.5
    *
    * Returns the cached user_id of the currently logged in user.
-   * Used by DataManager to filter data by user_id.
+   * Used by DatabaseManager to filter data by user_id.
    *
    * @returns Current user_id or null if not logged in
    */
@@ -312,7 +313,7 @@ export class UserManager {
    */
   loadUserByEmail(email: string): User | null {
     try {
-      const db = this.dataManager.getDatabase();
+      const db = this.dbManager.getDatabase();
       if (!db) {
         return null;
       }
