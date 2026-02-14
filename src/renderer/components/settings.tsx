@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Cpu, Eye, EyeOff, User, LogOut, AlertCircle } from 'lucide-react';
 import { Logger } from '../Logger';
 import { useError } from '../contexts/error-context';
+import { useEventSubscription } from '../events/useEventSubscription';
+import { EVENT_TYPES } from '../../shared/events/constants';
 import type { LLMProvider } from '../../types';
 
 // Requirements: clerkly.3.5, clerkly.3.7
@@ -62,6 +64,13 @@ export function Settings({ onSignOut, onNavigate }: SettingsProps) {
   useEffect(() => {
     loadProfile();
   }, [loadProfile]);
+
+  // Subscribe to profile updates from EventBus
+  // Requirements: realtime-events.3.3, account-profile.1.5
+  useEventSubscription(EVENT_TYPES.USER_PROFILE_UPDATED, () => {
+    logger.info('Profile updated event received, reloading profile');
+    loadProfile();
+  });
 
   // Requirements: settings.1.20, settings.1.21 - Load AI Agent settings on mount
   useEffect(() => {

@@ -6,6 +6,8 @@ import { handleBackgroundError } from '../ErrorHandler';
 import { handleAPIRequest } from './APIRequestHandler';
 import { SessionExpiredError } from './errors';
 import { Logger } from '../Logger';
+import { MainEventBus } from '../events/MainEventBus';
+import { UserProfileUpdatedEvent } from '../../shared/events/types';
 
 // Requirements: clerkly.3.8 - Use centralized Logger instead of console.*
 
@@ -140,7 +142,7 @@ export class UserManager {
         this.logger.info(`Updated user ${existingUser.user_id}`);
       }
 
-      return {
+      const updatedUser: User = {
         user_id: existingUser.user_id,
         name: googleProfile.name,
         email: googleProfile.email,
@@ -148,6 +150,19 @@ export class UserManager {
         locale: googleProfile.locale || null,
         last_synced: now,
       };
+
+      // Publish user.profile.updated event
+      // Requirements: realtime-events.3.3
+      const eventBus = MainEventBus.getInstance();
+      eventBus.publish(
+        new UserProfileUpdatedEvent(updatedUser.user_id, {
+          name: updatedUser.name,
+          email: updatedUser.email,
+          locale: updatedUser.locale,
+        })
+      );
+
+      return updatedUser;
     }
 
     // Create new user with random user_id
@@ -164,7 +179,8 @@ export class UserManager {
     );
 
     this.logger.info(`Created new user ${userId} for ${googleProfile.email}`);
-    return {
+
+    const newUser: User = {
       user_id: userId,
       name: googleProfile.name,
       email: googleProfile.email,
@@ -172,6 +188,19 @@ export class UserManager {
       locale: googleProfile.locale || null,
       last_synced: now,
     };
+
+    // Publish user.profile.updated event for new user
+    // Requirements: realtime-events.3.3
+    const eventBus = MainEventBus.getInstance();
+    eventBus.publish(
+      new UserProfileUpdatedEvent(newUser.user_id, {
+        name: newUser.name,
+        email: newUser.email,
+        locale: newUser.locale,
+      })
+    );
+
+    return newUser;
   }
 
   /**
