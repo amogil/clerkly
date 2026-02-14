@@ -81,14 +81,40 @@ export interface Agent {
 }
 
 /**
+ * Message payload kinds
+ * Requirements: agents.7.2
+ */
+export type MessageKind =
+  | 'user'
+  | 'llm'
+  | 'tool_call'
+  | 'code_exec'
+  | 'final_answer'
+  | 'request_scope'
+  | 'artifact';
+
+/**
+ * Message payload structure
+ * Requirements: agents.7.2
+ */
+export interface MessagePayload {
+  kind: MessageKind;
+  timing?: {
+    started_at: string; // ISO 8601 with timezone offset
+    finished_at: string; // ISO 8601 with timezone offset
+  };
+  data: Record<string, unknown>;
+}
+
+/**
  * Message entity
+ * Requirements: agents.7.1
  */
 export interface Message {
-  id: string;
+  id: number;
   agentId: string;
-  role: 'user' | 'assistant' | 'system';
-  content: string;
-  createdAt: number;
+  timestamp: string; // ISO 8601 with timezone offset
+  payloadJson: string; // JSON string of MessagePayload
 }
 
 // ============================================================================
@@ -547,14 +573,14 @@ export class MessageUpdatedEvent extends TypedEventClass<MessageUpdatedType> {
   readonly type = EVENT_TYPES.MESSAGE_UPDATED;
 
   constructor(
-    public readonly id: string,
+    public readonly id: number,
     public readonly changedFields: Partial<Message>
   ) {
     super();
   }
 
   toPayload(): EventPayloadWithoutTimestamp<MessageUpdatedType> {
-    return { id: this.id, changedFields: this.changedFields };
+    return { id: String(this.id), changedFields: this.changedFields };
   }
 }
 

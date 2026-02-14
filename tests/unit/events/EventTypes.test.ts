@@ -50,14 +50,13 @@ describe('EventTypes', () => {
     /* Preconditions: None
        Action: Create a message.created event with full message data
        Assertions: Event contains full message data and timestamp
-       Requirements: realtime-events.3.2 */
+       Requirements: realtime-events.3.2, agents.7.1 */
     it('should emit message.created with full data', () => {
       const message: Message = {
-        id: 'msg-456',
+        id: 1,
         agentId: 'agent-123',
-        role: 'user',
-        content: 'Hello, world!',
-        createdAt: Date.now(),
+        timestamp: '2024-01-15T10:30:00+03:00',
+        payloadJson: JSON.stringify({ kind: 'user', data: { text: 'Hello, world!' } }),
       };
 
       const event: MessageCreatedPayload = {
@@ -66,8 +65,8 @@ describe('EventTypes', () => {
       };
 
       expect(event.data).toEqual(message);
-      expect(event.data.id).toBe('msg-456');
-      expect(event.data.role).toBe('user');
+      expect(event.data.id).toBe(1);
+      expect(event.data.agentId).toBe('agent-123');
       expect(event.timestamp).toBeGreaterThan(0);
     });
   });
@@ -97,18 +96,18 @@ describe('EventTypes', () => {
     /* Preconditions: None
        Action: Create a message.updated event with changedFields
        Assertions: Event contains id, changedFields, and timestamp
-       Requirements: realtime-events.3.3 */
+       Requirements: realtime-events.3.3, agents.7.1 */
     it('should emit message.updated with changedFields', () => {
       const event: MessageUpdatedPayload = {
         timestamp: Date.now(),
         id: 'msg-456',
         changedFields: {
-          content: 'Updated content',
+          payloadJson: JSON.stringify({ kind: 'user', data: { text: 'Updated content' } }),
         },
       };
 
       expect(event.id).toBe('msg-456');
-      expect(event.changedFields.content).toBe('Updated content');
+      expect(event.changedFields.payloadJson).toContain('Updated content');
       expect(event.timestamp).toBeGreaterThan(0);
     });
 

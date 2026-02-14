@@ -244,17 +244,16 @@ describe('Event Classes', () => {
 
   describe('MessageCreatedEvent', () => {
     const mockMessage: Message = {
-      id: 'msg-1',
+      id: 1,
       agentId: 'agent-1',
-      role: 'user',
-      content: 'Hello',
-      createdAt: Date.now(),
+      timestamp: '2024-01-15T10:30:00+03:00',
+      payloadJson: JSON.stringify({ kind: 'user', data: { text: 'Hello' } }),
     };
 
     /* Preconditions: Message data provided
        Action: Create MessageCreatedEvent
        Assertions: Event has correct type and payload
-       Requirements: realtime-events.3.6 */
+       Requirements: realtime-events.3.6, agents.7.1 */
     it('should create event with message data', () => {
       const event = new MessageCreatedEvent(mockMessage);
 
@@ -268,15 +267,17 @@ describe('Event Classes', () => {
     /* Preconditions: Message id and changed fields provided
        Action: Create MessageUpdatedEvent
        Assertions: Event has correct type and payload
-       Requirements: realtime-events.3.6 */
+       Requirements: realtime-events.3.6, agents.7.1 */
     it('should create event with id and changed fields', () => {
-      const changedFields = { content: 'Updated content' };
-      const event = new MessageUpdatedEvent('msg-1', changedFields);
+      const changedFields = {
+        payloadJson: JSON.stringify({ kind: 'user', data: { text: 'Updated' } }),
+      };
+      const event = new MessageUpdatedEvent(1, changedFields);
 
       expect(event.type).toBe('message.updated');
-      expect(event.id).toBe('msg-1');
+      expect(event.id).toBe(1);
       expect(event.changedFields).toEqual(changedFields);
-      expect(event.toPayload()).toEqual({ id: 'msg-1', changedFields });
+      expect(event.toPayload()).toEqual({ id: '1', changedFields });
     });
   });
 
