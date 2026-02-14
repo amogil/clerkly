@@ -214,6 +214,56 @@
   - Убедиться, что покрытие кода >= 85%
   - Спросить пользователя: "Задача выполнена. Запустить функциональные тесты? (они покажут окна на экране)"
 
+---
+
+## 9. Рефакторинг: DataManager → DatabaseManager
+
+### Обзор
+
+В рамках рефакторинга системы хранения данных (см. `.kiro/specs/database-refactoring/tasks.md`), необходимо обновить WindowStateManager для использования DatabaseManager вместо DataManager.
+
+**ВАЖНО:** WindowStateManager является ИСКЛЮЧЕНИЕМ из правила изоляции данных по user_id. Состояние окна является глобальным для устройства, а не для пользователя.
+
+**Статус:** Требуется реализация
+
+### 9.1 Обновить WindowStateManager
+- [x] Обновить `src/main/WindowStateManager.ts`:
+  - Заменить `DataManager` на `DatabaseManager` в конструкторе
+  - Использовать `dbManager.getDatabase()` напрямую для доступа к БД
+  - НЕ использовать `dbManager.getCurrentUserId()` — состояние окна глобальное
+  - Обновить импорты
+  - Обновить комментарии с Requirements
+- _Requirements: window-management.5.7, user-data-isolation.6.8_
+
+### 9.2 Обновить тесты WindowStateManager
+- [x] Обновить `tests/unit/WindowStateManager.test.ts`:
+  - Заменить моки DataManager на DatabaseManager
+  - Убедиться, что тесты НЕ проверяют user_id фильтрацию
+  - Обновить описания тестов
+- [x] Обновить `tests/property/WindowStateManager.property.test.ts`:
+  - Заменить моки DataManager на DatabaseManager
+- _Requirements: window-management.5, user-data-isolation.6.8_
+
+### 9.3 Обновить WindowManager
+- [x] Обновить `src/main/WindowManager.ts`:
+  - Обновить создание WindowStateManager с DatabaseManager
+  - Обновить импорты
+- _Requirements: window-management.5_
+
+### 9.4 Валидация
+- [x] Выполнить `npm run validate`
+- [x] Убедиться, что все тесты проходят
+- _Requirements: window-management.5_
+
+### Примечания
+
+- WindowStateManager использует DatabaseManager ТОЛЬКО для доступа к БД (`getDatabase()`)
+- WindowStateManager НЕ использует `getCurrentUserId()` — состояние окна глобальное
+- Состояние окна (размер, позиция, maximized) одинаково для всех пользователей на устройстве
+- При смене пользователя окно сохраняет свое положение
+
+---
+
 ## Примечания
 
 - Задачи, помеченные `*`, являются опциональными (тесты) и могут быть пропущены для быстрого MVP

@@ -304,7 +304,51 @@
 - [x] Убедиться, что все тесты имеют структуру (Preconditions, Action, Assertions, Requirements)
 
 ### 6.3. Запросить функциональные тесты
-- [ ] Спросить пользователя: "Запустить функциональные тесты? (они покажут окна на экране)"
+- [x] Спросить пользователя: "Запустить функциональные тесты? (они покажут окна на экране)"
+
+---
+
+## Фаза 7: Рефакторинг DataManager → DatabaseManager + UserSettingsManager (3-4 дня)
+
+**Статус:** ✅ Завершено (реализовано через `.kiro/specs/database-refactoring/tasks.md`)
+
+**Описание:** Разделение DataManager на два компонента согласно обновленному дизайну (user-data-isolation.6).
+
+**Подробные задачи:** См. `.kiro/specs/database-refactoring/tasks.md`
+
+### 7.1. Создать DatabaseManager
+- [x] Создать файл `src/main/DatabaseManager.ts`
+- [x] Реализовать методы: initialize(), setUserManager(), getDatabase(), getCurrentUserId(), close()
+- [x] Перенести логику инициализации БД из DataManager
+- [x] Написать модульные тесты
+- _Requirements: user-data-isolation.6.1, user-data-isolation.6.2, user-data-isolation.6.3, user-data-isolation.6.4, user-data-isolation.6.7_
+
+### 7.2. Переименовать DataManager в UserSettingsManager
+- [x] Переименовать файл и класс
+- [x] Обновить конструктор для принятия DatabaseManager
+- [x] Удалить логику инициализации БД
+- [x] Обновить все импорты в проекте
+- _Requirements: user-data-isolation.6.5, user-data-isolation.6.6_
+
+### 7.3. Обновить зависимые компоненты
+- [x] Обновить IPCHandlers
+- [x] Обновить AIAgentSettingsManager
+- [x] Обновить TokenStorageManager
+- [x] Обновить UserProfileManager
+- [x] Обновить LifecycleManager
+- [x] Обновить WindowStateManager (исключение - без user_id)
+- [x] Обновить main/index.ts
+- _Requirements: user-data-isolation.6.5, user-data-isolation.6.8_
+
+### 7.4. Обновить тесты
+- [x] Переименовать тесты DataManager → UserSettingsManager
+- [x] Обновить property тесты
+- [x] Обновить функциональные тесты
+- _Requirements: user-data-isolation.6_
+
+### 7.5. Запустить валидацию Фазы 7
+- [x] Выполнить `npm run validate`
+- [x] Убедиться, что все тесты проходят
 
 ---
 
