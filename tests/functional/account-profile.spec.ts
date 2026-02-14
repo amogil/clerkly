@@ -1872,13 +1872,13 @@ test.describe('Account Profile', () => {
       console.log('[TEST] Database profile data:', finalCheck.profile);
 
       // Verify database still contains the cached profile (not cleared)
-      expect(finalCheck.profile.id).toBe('888999000');
+      expect(finalCheck.profile.google_id).toBe('888999000');
       expect(finalCheck.profile.email).toBe('cached.error@example.com');
       expect(finalCheck.profile.name).toBe('Cached Error User');
 
       console.log('✓ Profile data NOT cleared from database');
       console.log(
-        `✓ Database still contains: id="${finalCheck.profile.id}", email="${finalCheck.profile.email}", name="${finalCheck.profile.name}"`
+        `✓ Database still contains: google_id="${finalCheck.profile.google_id}", email="${finalCheck.profile.email}", name="${finalCheck.profile.name}"`
       );
     }
 
