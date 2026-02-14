@@ -433,8 +433,8 @@ test('should retry operation after token refresh', async () => {
 
   // 6) Verify profile refresh succeeded (token was automatically refreshed)
   expect(refreshResult.success).toBe(true);
-  expect(refreshResult.profile).toBeTruthy();
-  expect(refreshResult.profile.email).toBe('refresh@example.com');
+  expect(refreshResult.user).toBeTruthy();
+  expect(refreshResult.user.email).toBe('refresh@example.com');
 
   // 7) Get new access token after refresh
   const newTokensResult = await context.window.evaluate(() => {
