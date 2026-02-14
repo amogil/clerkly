@@ -314,8 +314,6 @@
 
 **Описание:** Разделение DataManager на два компонента согласно обновленному дизайну (user-data-isolation.6).
 
-**Подробные задачи:** См. `.kiro/specs/database-refactoring/tasks.md`
-
 ### 7.1. Создать DatabaseManager
 - [x] Создать файл `src/main/DatabaseManager.ts`
 - [x] Реализовать методы: initialize(), setUserManager(), getDatabase(), getCurrentUserId(), close()
