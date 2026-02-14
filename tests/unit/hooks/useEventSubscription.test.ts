@@ -198,12 +198,12 @@ describe('useEventSubscription hooks', () => {
       const callback = jest.fn();
 
       renderHook(() =>
-        useEventSubscriptionMultiple([EVENT_TYPES.AGENT_CREATED, 'agent.deleted'], callback)
+        useEventSubscriptionMultiple([EVENT_TYPES.AGENT_CREATED, 'agent.archived'], callback)
       );
 
       expect(mockSubscribe).toHaveBeenCalledTimes(2);
       expect(mockSubscribe).toHaveBeenCalledWith(EVENT_TYPES.AGENT_CREATED, expect.any(Function));
-      expect(mockSubscribe).toHaveBeenCalledWith('agent.deleted', expect.any(Function));
+      expect(mockSubscribe).toHaveBeenCalledWith('agent.archived', expect.any(Function));
     });
 
     /* Preconditions: Component is mounted with multiple subscriptions
@@ -218,7 +218,7 @@ describe('useEventSubscription hooks', () => {
       mockSubscribe.mockReturnValueOnce(unsubscribe1).mockReturnValueOnce(unsubscribe2);
 
       const { unmount } = renderHook(() =>
-        useEventSubscriptionMultiple([EVENT_TYPES.AGENT_CREATED, 'agent.deleted'], callback)
+        useEventSubscriptionMultiple([EVENT_TYPES.AGENT_CREATED, 'agent.archived'], callback)
       );
 
       unmount();
@@ -243,7 +243,7 @@ describe('useEventSubscription hooks', () => {
       });
 
       renderHook(() =>
-        useEventSubscriptionMultiple([EVENT_TYPES.AGENT_CREATED, 'agent.deleted'], callback)
+        useEventSubscriptionMultiple([EVENT_TYPES.AGENT_CREATED, 'agent.archived'], callback)
       );
 
       const payload: AgentCreatedPayload = {

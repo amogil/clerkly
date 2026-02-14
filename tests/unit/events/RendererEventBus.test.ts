@@ -7,7 +7,7 @@ import { RendererEventBus } from '../../../src/renderer/events/RendererEventBus'
 import {
   AgentCreatedEvent,
   AgentUpdatedEvent,
-  AgentDeletedEvent,
+  AgentArchivedEvent,
 } from '../../../src/shared/events/types';
 
 // Mock Logger
@@ -180,7 +180,7 @@ describe('RendererEventBus', () => {
       bus.publish(
         new AgentCreatedEvent({ id: 'agent-1', name: 'Test', createdAt: now, updatedAt: now })
       );
-      bus.publish(new AgentDeletedEvent('agent-2'));
+      bus.publish(new AgentArchivedEvent('agent-2'));
 
       expect(handler).toHaveBeenCalledTimes(2);
       expect(handler).toHaveBeenCalledWith(
@@ -190,7 +190,7 @@ describe('RendererEventBus', () => {
         })
       );
       expect(handler).toHaveBeenCalledWith(
-        'agent.deleted',
+        'agent.archived',
         expect.objectContaining({
           id: 'agent-2',
         })
@@ -233,10 +233,10 @@ describe('RendererEventBus', () => {
       const bus = RendererEventBus.getInstance();
       const handler = jest.fn();
 
-      const unsubscribe = bus.subscribe('agent.deleted', handler);
+      const unsubscribe = bus.subscribe('agent.archived', handler);
       unsubscribe();
 
-      bus.publish(new AgentDeletedEvent('agent-1'));
+      bus.publish(new AgentArchivedEvent('agent-1'));
 
       expect(handler).not.toHaveBeenCalled();
     });

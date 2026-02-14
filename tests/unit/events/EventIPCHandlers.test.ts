@@ -214,19 +214,19 @@ describe('EventIPCHandlers', () => {
     });
 
     /* Preconditions: IPC handler registered
-       Action: Receive agent.deleted event
+       Action: Receive agent.archived event
        Assertions: Event is forwarded correctly
-       Requirements: realtime-events.4.2 */
-    it('should forward agent.deleted events', () => {
+       Requirements: realtime-events.4.2, agents.12.3 */
+    it('should forward agent.archived events', () => {
       const mockEvent = {} as IpcMainEvent;
       const payload = {
         timestamp: Date.now(),
         id: 'agent-1',
       };
 
-      ipcHandler(mockEvent, 'agent.deleted', payload);
+      ipcHandler(mockEvent, 'agent.archived', payload);
 
-      expect(mockDeliverFromIPC).toHaveBeenCalledWith('agent.deleted', payload);
+      expect(mockDeliverFromIPC).toHaveBeenCalledWith('agent.archived', payload);
     });
 
     /* Preconditions: IPC handler registered

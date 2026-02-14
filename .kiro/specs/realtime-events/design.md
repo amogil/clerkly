@@ -163,7 +163,7 @@ export interface UserProfileUpdatedPayload {
 export type ClerklyEvents = {
   'agent.created': AgentCreatedPayload;
   'agent.updated': AgentUpdatedPayload;
-  'agent.deleted': AgentDeletedPayload;
+  'agent.archived': AgentArchivedPayload;
   'message.created': MessageCreatedPayload;
   'message.updated': MessageUpdatedPayload;
   'user.login': UserLoginPayload;
@@ -899,7 +899,7 @@ function AgentList() {
     setAgents(prev => [...prev, event.payload]);
   });
 
-  useEventSubscription('agent.deleted', (event) => {
+  useEventSubscription('agent.archived', (event) => {
     setAgents(prev => prev.filter(a => a.id !== event.payload.id));
   });
 

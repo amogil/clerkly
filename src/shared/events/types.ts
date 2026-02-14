@@ -98,7 +98,7 @@ export interface Message {
 // Agent events
 export type AgentCreatedPayload = EntityCreatedEvent<Agent>;
 export type AgentUpdatedPayload = EntityUpdatedEvent<Agent>;
-export type AgentDeletedPayload = EntityDeletedEvent;
+export type AgentArchivedPayload = EntityDeletedEvent;
 
 // Message events
 export type MessageCreatedPayload = EntityCreatedEvent<Message>;
@@ -198,7 +198,7 @@ export interface ClerklyEvents {
   // Agent events
   [EVENT_TYPES.AGENT_CREATED]: AgentCreatedPayload;
   [EVENT_TYPES.AGENT_UPDATED]: AgentUpdatedPayload;
-  [EVENT_TYPES.AGENT_DELETED]: AgentDeletedPayload;
+  [EVENT_TYPES.AGENT_ARCHIVED]: AgentArchivedPayload;
 
   // Message events
   [EVENT_TYPES.MESSAGE_CREATED]: MessageCreatedPayload;
@@ -311,7 +311,7 @@ type UserLoginType = typeof EVENT_TYPES.USER_LOGIN;
 type UserLogoutType = typeof EVENT_TYPES.USER_LOGOUT;
 type AgentCreatedType = typeof EVENT_TYPES.AGENT_CREATED;
 type AgentUpdatedType = typeof EVENT_TYPES.AGENT_UPDATED;
-type AgentDeletedType = typeof EVENT_TYPES.AGENT_DELETED;
+type AgentArchivedType = typeof EVENT_TYPES.AGENT_ARCHIVED;
 type MessageCreatedType = typeof EVENT_TYPES.MESSAGE_CREATED;
 type MessageUpdatedType = typeof EVENT_TYPES.MESSAGE_UPDATED;
 type UserProfileUpdatedType = typeof EVENT_TYPES.USER_PROFILE_UPDATED;
@@ -509,16 +509,18 @@ export class AgentUpdatedEvent extends TypedEventClass<AgentUpdatedType> {
 }
 
 /**
- * Agent deleted event
+ * Agent archived event
+ * Used when agent is "deleted" in UI (soft delete via archiving)
+ * Requirements: agents.12.3
  */
-export class AgentDeletedEvent extends TypedEventClass<AgentDeletedType> {
-  readonly type = EVENT_TYPES.AGENT_DELETED;
+export class AgentArchivedEvent extends TypedEventClass<AgentArchivedType> {
+  readonly type = EVENT_TYPES.AGENT_ARCHIVED;
 
   constructor(public readonly id: string) {
     super();
   }
 
-  toPayload(): EventPayloadWithoutTimestamp<AgentDeletedType> {
+  toPayload(): EventPayloadWithoutTimestamp<AgentArchivedType> {
     return { id: this.id };
   }
 }

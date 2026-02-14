@@ -16,7 +16,7 @@ import {
   UserLogoutEvent,
   AgentCreatedEvent,
   AgentUpdatedEvent,
-  AgentDeletedEvent,
+  AgentArchivedEvent,
   MessageCreatedEvent,
   MessageUpdatedEvent,
   UserProfileUpdatedEvent,
@@ -228,15 +228,15 @@ describe('Event Classes', () => {
     });
   });
 
-  describe('AgentDeletedEvent', () => {
+  describe('AgentArchivedEvent', () => {
     /* Preconditions: Agent id provided
-       Action: Create AgentDeletedEvent
+       Action: Create AgentArchivedEvent
        Assertions: Event has correct type and payload
-       Requirements: realtime-events.3.6 */
+       Requirements: realtime-events.3.6, agents.12.3 */
     it('should create event with id', () => {
-      const event = new AgentDeletedEvent('agent-1');
+      const event = new AgentArchivedEvent('agent-1');
 
-      expect(event.type).toBe('agent.deleted');
+      expect(event.type).toBe('agent.archived');
       expect(event.id).toBe('agent-1');
       expect(event.toPayload()).toEqual({ id: 'agent-1' });
     });

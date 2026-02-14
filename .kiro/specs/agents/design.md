@@ -464,10 +464,10 @@ function computeAgentStatus(messages: Message[]): AgentStatus {
 
 ### Типы событий
 
-Нужно добавить `AgentArchivedEvent` в `src/shared/events/types.ts`:
+Событие `AgentArchivedEvent` определено в `src/shared/events/types.ts`:
 
 ```typescript
-// Переименовать AgentDeletedEvent → AgentArchivedEvent
+// Requirements: agents.12.3
 export class AgentArchivedEvent extends TypedEventClass<AgentArchivedType> {
   readonly type = EVENT_TYPES.AGENT_ARCHIVED; // 'agent.archived'
   
@@ -480,6 +480,8 @@ export class AgentArchivedEvent extends TypedEventClass<AgentArchivedType> {
   }
 }
 ```
+
+**Примечание:** В UI архивирование называется "удалением" для простоты понимания пользователем, но технически это soft delete через установку `archived_at`.
 
 ### Генерация событий (Main Process)
 

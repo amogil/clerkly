@@ -7,7 +7,7 @@ import {
   Agent,
   AgentCreatedPayload,
   AgentUpdatedPayload,
-  AgentDeletedPayload,
+  AgentArchivedPayload,
   Message,
   MessageCreatedPayload,
   MessageUpdatedPayload,
@@ -133,13 +133,13 @@ describe('EventTypes', () => {
     });
   });
 
-  describe('entity.deleted events', () => {
+  describe('entity.archived events', () => {
     /* Preconditions: None
-       Action: Create an agent.deleted event with ID only
+       Action: Create an agent.archived event with ID only
        Assertions: Event contains only id and timestamp
-       Requirements: realtime-events.3.4 */
-    it('should emit entity.deleted with ID only', () => {
-      const event: AgentDeletedPayload = {
+       Requirements: realtime-events.3.4, agents.12.3 */
+    it('should emit entity.archived with ID only', () => {
+      const event: AgentArchivedPayload = {
         timestamp: Date.now(),
         id: 'agent-123',
       };
@@ -162,7 +162,7 @@ describe('EventTypes', () => {
       const eventTypes: EventType[] = [
         'agent.created',
         'agent.updated',
-        'agent.deleted',
+        'agent.archived',
         'message.created',
         'message.updated',
         'user.login',
@@ -226,7 +226,7 @@ describe('EventTypes', () => {
         changedFields: { name: 'Updated' },
       };
 
-      const deletedEvent: AgentDeletedPayload = {
+      const archivedEvent: AgentArchivedPayload = {
         timestamp: now + 2000,
         id: '1',
       };
@@ -242,7 +242,7 @@ describe('EventTypes', () => {
 
       expect(createdEvent.timestamp).toBe(now);
       expect(updatedEvent.timestamp).toBe(now + 1000);
-      expect(deletedEvent.timestamp).toBe(now + 2000);
+      expect(archivedEvent.timestamp).toBe(now + 2000);
       expect(loginEvent.timestamp).toBe(now + 3000);
       expect(logoutEvent.timestamp).toBe(now + 4000);
     });

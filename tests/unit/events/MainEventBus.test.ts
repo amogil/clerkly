@@ -8,7 +8,7 @@ import { IPC_CHANNELS } from '../../../src/shared/events/constants';
 import {
   AgentCreatedEvent,
   AgentUpdatedEvent,
-  AgentDeletedEvent,
+  AgentArchivedEvent,
 } from '../../../src/shared/events/types';
 
 // Mock Electron
@@ -178,7 +178,7 @@ describe('MainEventBus', () => {
       bus.publish(
         new AgentCreatedEvent({ id: 'agent-1', name: 'Test', createdAt: now, updatedAt: now })
       );
-      bus.publish(new AgentDeletedEvent('agent-2'));
+      bus.publish(new AgentArchivedEvent('agent-2'));
 
       await Promise.resolve();
 
@@ -190,7 +190,7 @@ describe('MainEventBus', () => {
         })
       );
       expect(handler).toHaveBeenCalledWith(
-        'agent.deleted',
+        'agent.archived',
         expect.objectContaining({
           id: 'agent-2',
         })
@@ -235,10 +235,10 @@ describe('MainEventBus', () => {
       const bus = MainEventBus.getInstance();
       const handler = jest.fn();
 
-      const unsubscribe = bus.subscribe('agent.deleted', handler);
+      const unsubscribe = bus.subscribe('agent.archived', handler);
       unsubscribe();
 
-      bus.publish(new AgentDeletedEvent('agent-1'));
+      bus.publish(new AgentArchivedEvent('agent-1'));
       await Promise.resolve();
 
       expect(handler).not.toHaveBeenCalled();

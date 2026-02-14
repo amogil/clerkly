@@ -33,7 +33,7 @@ export const EVENT_TYPES = {
   // Agent events
   AGENT_CREATED: 'agent.created',
   AGENT_UPDATED: 'agent.updated',
-  AGENT_DELETED: 'agent.deleted',
+  AGENT_ARCHIVED: 'agent.archived',
 
   // Message events
   MESSAGE_CREATED: 'message.created',

@@ -10,7 +10,7 @@ import {
   getEntityId,
   AgentCreatedPayload,
   AgentUpdatedPayload,
-  AgentDeletedPayload,
+  AgentArchivedPayload,
 } from '../../../src/shared/events/types';
 
 describe('Event Types Property-Based Tests', () => {
@@ -125,10 +125,10 @@ describe('Event Types Property-Based Tests', () => {
       );
     });
 
-    it('getEntityId extracts ID from deleted events', () => {
+    it('getEntityId extracts ID from archived events', () => {
       fc.assert(
         fc.property(fc.string({ minLength: 1, maxLength: 50 }), (id) => {
-          const payload: AgentDeletedPayload = {
+          const payload: AgentArchivedPayload = {
             timestamp: Date.now(),
             id,
           };
@@ -159,18 +159,18 @@ describe('Event Types Property-Based Tests', () => {
             id,
             changedFields: { name: 'Updated' },
           };
-          const deletedPayload: AgentDeletedPayload = {
+          const archivedPayload: AgentArchivedPayload = {
             timestamp: Date.now(),
             id,
           };
 
           const createdKey = getEventKey('agent.created', createdPayload);
           const updatedKey = getEventKey('agent.updated', updatedPayload);
-          const deletedKey = getEventKey('agent.deleted', deletedPayload);
+          const archivedKey = getEventKey('agent.archived', archivedPayload);
 
           expect(createdKey).not.toBe(updatedKey);
-          expect(updatedKey).not.toBe(deletedKey);
-          expect(createdKey).not.toBe(deletedKey);
+          expect(updatedKey).not.toBe(archivedKey);
+          expect(createdKey).not.toBe(archivedKey);
         }),
         { numRuns: 100 }
       );
