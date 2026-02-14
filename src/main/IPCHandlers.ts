@@ -29,8 +29,8 @@ export class IPCHandlers {
   }
 
   /**
-   * Регистрирует все IPC handlers
-   * Каналы: 'save-data', 'load-data', 'delete-data'
+   * Registers all IPC handlers
+   * Channels: 'save-data', 'load-data', 'delete-data'
    * Requirements: clerkly.1, clerkly.2   */
   registerHandlers(): void {
     // Register save-data handler
@@ -47,7 +47,7 @@ export class IPCHandlers {
   }
 
   /**
-   * Удаляет все IPC handlers
+   * Removes all IPC handlers
    * Requirements: clerkly.1, clerkly.2   */
   unregisterHandlers(): void {
     for (const channel of this.registeredChannels) {
@@ -57,10 +57,10 @@ export class IPCHandlers {
   }
 
   /**
-   * Обрабатывает save-data запрос
-   * Валидирует параметры
-   * Применяет timeout (10 секунд)
-   * Логирует ошибки
+   * Handles save-data request
+   * Validates parameters
+   * Applies timeout (10 seconds)
+   * Logs errors
    * Requirements: clerkly.1, clerkly.nfr.2   * @param {IpcMainInvokeEvent} event
    * @param {string} key
    * @param {any} value
@@ -68,7 +68,7 @@ export class IPCHandlers {
    */
   async handleSaveData(event: IpcMainInvokeEvent, key: string, value: unknown): Promise<IPCResult> {
     try {
-      // Валидация параметров
+      // Validate parameters
       if (key === undefined || key === null) {
         const error = 'Invalid parameters: key is required';
         this.logger.error(`save-data failed: ${error}`);
@@ -81,14 +81,14 @@ export class IPCHandlers {
         return { success: false, error };
       }
 
-      // Выполнение с timeout
+      // Execute with timeout
       const result = await this.withTimeout(
         Promise.resolve(this.dataManager.saveData(key, value)),
         this.timeout,
         'save-data operation timed out'
       );
 
-      // Логирование ошибок
+      // Log errors
       if (!result.success) {
         this.logger.error(`save-data failed for key "${key}": ${result.error}`);
       }
@@ -102,31 +102,31 @@ export class IPCHandlers {
   }
 
   /**
-   * Обрабатывает load-data запрос
-   * Валидирует параметры
-   * Применяет timeout
-   * Логирует ошибки
+   * Handles load-data request
+   * Validates parameters
+   * Applies timeout
+   * Logs errors
    * Requirements: clerkly.1, clerkly.nfr.2   * @param {IpcMainInvokeEvent} event
    * @param {string} key
    * @returns {Promise<IPCResult>}
    */
   async handleLoadData(event: IpcMainInvokeEvent, key: string): Promise<IPCResult> {
     try {
-      // Валидация параметров
+      // Validate parameters
       if (key === undefined || key === null) {
         const error = 'Invalid parameters: key is required';
         this.logger.error(`load-data failed: ${error}`);
         return { success: false, error };
       }
 
-      // Выполнение с timeout
+      // Execute with timeout
       const result = await this.withTimeout(
         Promise.resolve(this.dataManager.loadData(key)),
         this.timeout,
         'load-data operation timed out'
       );
 
-      // Логирование ошибок
+      // Log errors
       if (!result.success) {
         this.logger.error(`load-data failed for key "${key}": ${result.error}`);
       }
@@ -140,31 +140,31 @@ export class IPCHandlers {
   }
 
   /**
-   * Обрабатывает delete-data запрос
-   * Валидирует параметры
-   * Применяет timeout
-   * Логирует ошибки
+   * Handles delete-data request
+   * Validates parameters
+   * Applies timeout
+   * Logs errors
    * Requirements: clerkly.1, clerkly.nfr.2   * @param {IpcMainInvokeEvent} event
    * @param {string} key
    * @returns {Promise<IPCResult>}
    */
   async handleDeleteData(event: IpcMainInvokeEvent, key: string): Promise<IPCResult> {
     try {
-      // Валидация параметров
+      // Validate parameters
       if (key === undefined || key === null) {
         const error = 'Invalid parameters: key is required';
         this.logger.error(`delete-data failed: ${error}`);
         return { success: false, error };
       }
 
-      // Выполнение с timeout
+      // Execute with timeout
       const result = await this.withTimeout(
         Promise.resolve(this.dataManager.deleteData(key)),
         this.timeout,
         'delete-data operation timed out'
       );
 
-      // Логирование ошибок
+      // Log errors
       if (!result.success) {
         this.logger.error(`delete-data failed for key "${key}": ${result.error}`);
       }
@@ -178,7 +178,7 @@ export class IPCHandlers {
   }
 
   /**
-   * Выполняет promise с timeout
+   * Executes promise with timeout
    * Requirements: clerkly.nfr.2   * @param {Promise<T>} promise
    * @param {number} timeoutMs
    * @param {string} timeoutMessage
@@ -212,7 +212,7 @@ export class IPCHandlers {
   }
 
   /**
-   * Устанавливает timeout для IPC запросов
+   * Sets timeout for IPC requests
    * Requirements: clerkly.nfr.2   * @param {number} timeoutMs
    */
   setTimeout(timeoutMs: number): void {
@@ -220,7 +220,7 @@ export class IPCHandlers {
   }
 
   /**
-   * Возвращает текущий timeout
+   * Returns current timeout
    * Requirements: clerkly.nfr.2   * @returns {number}
    */
   getTimeout(): number {

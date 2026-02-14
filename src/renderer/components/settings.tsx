@@ -2,9 +2,6 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Cpu, Eye, EyeOff, User, LogOut, AlertCircle } from 'lucide-react';
 import { Logger } from '../Logger';
 import { useError } from '../contexts/error-context';
-import { useEventSubscription } from '../events/useEventSubscription';
-import type { ProfileSyncedPayload } from '../../shared/events/types';
-import { EVENT_TYPES } from '../../shared/events/constants';
 import type { LLMProvider } from '../../types';
 
 // Requirements: clerkly.3.5, clerkly.3.7
@@ -65,18 +62,6 @@ export function Settings({ onSignOut, onNavigate }: SettingsProps) {
   useEffect(() => {
     loadProfile();
   }, [loadProfile]);
-
-  // Listen for profile.synced events via EventBus
-  const handleProfileSynced = useCallback(
-    (payload: ProfileSyncedPayload) => {
-      logger.info(`Profile synced event received: ${JSON.stringify(payload)}`);
-      // Reload profile from database to get full data
-      loadProfile();
-    },
-    [loadProfile]
-  );
-
-  useEventSubscription(EVENT_TYPES.PROFILE_SYNCED, handleProfileSynced);
 
   // Requirements: settings.1.20, settings.1.21 - Load AI Agent settings on mount
   useEffect(() => {

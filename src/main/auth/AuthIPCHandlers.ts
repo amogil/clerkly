@@ -6,9 +6,8 @@ import { UserManager, User } from './UserManager';
 import { Logger } from '../Logger';
 import { MainEventBus } from '../events/MainEventBus';
 import {
-  AuthSucceededEvent,
+  AuthCompletedEvent,
   AuthFailedEvent,
-  ProfileSyncedEvent,
   ErrorCreatedEvent,
   UserLogoutEvent,
 } from '../../shared/events/types';
@@ -208,7 +207,7 @@ export class AuthIPCHandlers {
 
   /**
    * Handle refresh profile request
-   * Fetches fresh profile data from Google API and publishes profile.synced event
+   * Fetches fresh profile data from Google API
    * Requirements: account-profile.1.5
    * @param event IPC event
    * @returns IPC result with fresh user data or null
@@ -232,12 +231,6 @@ export class AuthIPCHandlers {
         `Profile refresh completed, result: ${user ? 'success' : 'null'}`
       );
 
-      // Publish profile.synced event via EventBus
-      // Requirements: account-profile.1.5 - Notify UI about profile updates
-      if (user) {
-        this.publishProfileSynced(user);
-      }
-
       return {
         success: true,
         user: user,
@@ -254,36 +247,34 @@ export class AuthIPCHandlers {
   }
 
   /**
-   * Publish auth.succeeded event via EventBus
+   * Publish auth.completed event via EventBus
    * Called after successful OAuth flow and profile fetch
    * Requirements: google-oauth-auth.8.4
    * @param userId User ID from profile (required)
+   * @param profile User profile data
    */
-  sendAuthSuccess(userId: string): void {
+  sendAuthSuccess(userId: string, profile: User): void {
     const eventBus = MainEventBus.getInstance();
-    eventBus.publish(new AuthSucceededEvent(userId));
+    eventBus.publish(
+      new AuthCompletedEvent(userId, {
+        id: profile.user_id,
+        email: profile.email,
+        name: profile.name || '',
+        picture: undefined,
+      })
+    );
   }
 
   /**
    * Publish auth.failed event via EventBus
    * Called when OAuth flow fails
    * Requirements: google-oauth-auth.8.4
-   * @param error Error message
-   * @param errorCode Error code
+   * @param code Error code
+   * @param message Human-readable error message
    */
-  sendAuthError(error: string, errorCode?: string): void {
+  sendAuthError(code: string, message: string): void {
     const eventBus = MainEventBus.getInstance();
-    eventBus.publish(new AuthFailedEvent(error, errorCode));
-  }
-
-  /**
-   * Publish profile.synced event via EventBus
-   * Called when user is fetched and saved
-   * @param user User data from database
-   */
-  publishProfileSynced(user: User): void {
-    const eventBus = MainEventBus.getInstance();
-    eventBus.publish(new ProfileSyncedEvent(user));
+    eventBus.publish(new AuthFailedEvent(code, message));
   }
 
   /**

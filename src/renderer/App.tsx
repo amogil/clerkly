@@ -14,10 +14,14 @@ import { Logger } from './Logger';
 import { ErrorNotificationManager } from './managers/ErrorNotificationManager';
 import { NotificationUI } from './components/NotificationUI';
 import { useEventSubscription } from './events/useEventSubscription';
+import { RendererEventBus } from './events/RendererEventBus';
+import { EVENT_TYPES } from '../shared/events/constants';
+import { AuthStartedEvent } from '../shared/events/types';
 import type {
-  AuthSucceededPayload,
+  AuthCallbackReceivedPayload,
+  AuthCompletedPayload,
   AuthFailedPayload,
-  ProfileSyncedPayload,
+  AuthCancelledPayload,
   ErrorCreatedPayload,
 } from '../shared/events/types';
 
@@ -44,7 +48,6 @@ function AppContent() {
   const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null);
   const [authError, setAuthError] = useState<{ message: string; code?: string } | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [isWaitingForProfile, setIsWaitingForProfile] = useState<boolean>(false);
   const [currentScreen, setCurrentScreen] = useState<string>('agents');
 
   const router = useMemo(() => {
@@ -86,46 +89,57 @@ function AppContent() {
   };
 
   // Event handlers via EventBus
+  // Requirements: google-oauth-auth.8.4
+  const handleAuthCallbackReceived = useCallback((_payload: AuthCallbackReceivedPayload) => {
+    logger.info('Auth callback received - showing loader');
+    setIsLoading(true);
+    setAuthError(null);
+  }, []);
+
+  const handleAuthCompleted = useCallback(
+    (payload: AuthCompletedPayload) => {
+      logger.info('Auth completed: ' + JSON.stringify(payload));
+      setIsLoading(false);
+      setAuthError(null);
+      setIsAuthorized(true);
+      navigationManager.redirectToAgents();
+    },
+    [navigationManager]
+  );
+
   const handleAuthFailed = useCallback((payload: AuthFailedPayload) => {
     logger.error('Auth failed: ' + JSON.stringify(payload));
     setIsLoading(false);
-    setIsWaitingForProfile(false);
-    setAuthError({ message: payload.error, code: payload.errorCode });
+    setAuthError({ message: payload.message, code: payload.code });
     setIsAuthorized(false);
   }, []);
 
-  const handleAuthSucceeded = useCallback((payload: AuthSucceededPayload) => {
-    logger.info('Auth succeeded: ' + JSON.stringify(payload));
-    setAuthError(null);
-    setIsLoading(true);
-    setIsWaitingForProfile(true);
+  const handleAuthCancelled = useCallback((_payload: AuthCancelledPayload) => {
+    logger.info('Auth cancelled by user');
+    setIsLoading(false);
+    setAuthError({ message: 'User cancelled authentication', code: 'access_denied' });
+    setIsAuthorized(false);
   }, []);
 
-  const handleProfileSynced = useCallback(
-    (payload: ProfileSyncedPayload) => {
-      logger.info('Profile synced: ' + JSON.stringify(payload));
-      setIsLoading(false);
-      setIsWaitingForProfile(false);
-      setAuthError(null);
-      // Only redirect to agents if user was not already authorized
-      // This prevents redirecting away from Settings when profile is refreshed
-      if (!isAuthorized) {
-        setIsAuthorized(true);
-        navigationManager.redirectToAgents();
-      }
-    },
-    [navigationManager, isAuthorized]
-  );
+  const handleAuthSignedOut = useCallback(() => {
+    logger.info('User signed out');
+    setIsAuthorized(false);
+    setAuthError(null);
+    setIsLoading(false);
+    navigationManager.redirectToLogin();
+  }, [navigationManager]);
 
   const handleErrorCreated = useCallback((payload: ErrorCreatedPayload) => {
     logger.info('Error: ' + JSON.stringify(payload));
     errorNotificationManager.showNotification(payload.message, payload.context);
   }, []);
 
-  useEventSubscription('auth.failed', handleAuthFailed);
-  useEventSubscription('auth.succeeded', handleAuthSucceeded);
-  useEventSubscription('profile.synced', handleProfileSynced);
-  useEventSubscription('error.created', handleErrorCreated);
+  useEventSubscription(EVENT_TYPES.AUTH_CALLBACK_RECEIVED, handleAuthCallbackReceived);
+  useEventSubscription(EVENT_TYPES.AUTH_COMPLETED, handleAuthCompleted);
+  useEventSubscription(EVENT_TYPES.AUTH_FAILED, handleAuthFailed);
+  useEventSubscription(EVENT_TYPES.AUTH_CANCELLED, handleAuthCancelled);
+  useEventSubscription(EVENT_TYPES.AUTH_SIGNED_OUT, handleAuthSignedOut);
+  useEventSubscription(EVENT_TYPES.ERROR_CREATED, handleErrorCreated);
 
   useEffect(() => {
     const checkAuthStatus = async () => {
@@ -140,12 +154,10 @@ function AppContent() {
     };
     checkAuthStatus();
 
+    // Note: auth.signed-out event is handled by handleAuthSignedOut via useEventSubscription
+    // The onLogout callback is kept for backward compatibility with direct IPC calls
     const unsubscribeLogout = window.api.auth.onLogout(() => {
-      logger.info('Logout event received');
-      setIsAuthorized(false);
-      setAuthError(null);
-      setIsLoading(false);
-      navigationManager.redirectToLogin();
+      logger.info('Logout IPC event received (legacy)');
     });
 
     return () => {
@@ -153,9 +165,13 @@ function AppContent() {
     };
   }, [navigationManager]);
 
-  // Requirements: google-oauth-auth.15.1 - Loader shows AFTER deep link, not on button click
+  // Requirements: google-oauth-auth.8.4
   const handleLogin = async () => {
     try {
+      // Publish auth.started event
+      const eventBus = RendererEventBus.getInstance();
+      eventBus.publish(new AuthStartedEvent());
+
       const result = await window.api.auth.startLogin();
       if (!result.success) {
         setAuthError({ message: result.error || 'Failed to start login' });
@@ -188,7 +204,7 @@ function AppContent() {
     );
   }
 
-  if (authError && !isWaitingForProfile) {
+  if (authError && !isLoading) {
     return (
       <LoginError
         errorMessage={authError.message}

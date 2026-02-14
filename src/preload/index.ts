@@ -7,11 +7,23 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
 // Event type constants (duplicated from shared/events/constants.ts due to rootDir restriction)
-const EVENT_TYPE_USER_LOGOUT = 'user.logout';
-const EVENT_TYPE_AUTH_FAILED = 'auth.failed';
-const EVENT_TYPE_AUTH_SUCCEEDED = 'auth.succeeded';
-const EVENT_TYPE_PROFILE_SYNCED = 'profile.synced';
-const EVENT_TYPE_ERROR_CREATED = 'error.created';
+// IMPORTANT: Keep in sync with src/shared/events/constants.ts
+const EVENT_TYPES = {
+  // Auth events
+  AUTH_STARTED: 'auth.started',
+  AUTH_CALLBACK_RECEIVED: 'auth.callback-received',
+  AUTH_PROFILE_FETCHING: 'auth.profile-fetching',
+  AUTH_COMPLETED: 'auth.completed',
+  AUTH_FAILED: 'auth.failed',
+  AUTH_CANCELLED: 'auth.cancelled',
+  AUTH_SIGNED_OUT: 'auth.signed-out',
+  // User events
+  USER_LOGIN: 'user.login',
+  USER_LOGOUT: 'user.logout',
+  USER_PROFILE_UPDATED: 'user.profile.updated',
+  // Error events
+  ERROR_CREATED: 'error.created',
+} as const;
 
 // LLM Provider type (duplicated from types/index.ts due to rootDir restriction)
 type LLMProvider = 'openai' | 'anthropic' | 'google';
@@ -211,9 +223,9 @@ const api: API = {
      * @returns {Function} Unsubscribe function to remove the listener
      */
     onAuthSuccess(callback: () => void): () => void {
-      // Use the events API to listen for auth.succeeded events
+      // Use the events API to listen for auth.completed events
       return api.events!.onEvent((type: string) => {
-        if (type === EVENT_TYPE_AUTH_SUCCEEDED) {
+        if (type === EVENT_TYPES.AUTH_COMPLETED) {
           callback();
         }
       });
@@ -226,11 +238,13 @@ const api: API = {
      * @returns {Function} Unsubscribe function to remove the listener
      */
     onAuthError(callback: (error: string, errorCode?: string) => void): () => void {
-      // Use the events API to listen for auth.failed events
+      // Use the events API to listen for auth.failed and auth.cancelled events
       return api.events!.onEvent((type: string, payload: unknown) => {
-        if (type === EVENT_TYPE_AUTH_FAILED) {
-          const data = payload as { error: string; errorCode?: string };
-          callback(data.error, data.errorCode);
+        if (type === EVENT_TYPES.AUTH_FAILED) {
+          const data = payload as { code: string; message: string };
+          callback(data.message, data.code);
+        } else if (type === EVENT_TYPES.AUTH_CANCELLED) {
+          callback('User cancelled authentication', 'access_denied');
         }
       });
     },
@@ -242,9 +256,9 @@ const api: API = {
      * @returns {Function} Unsubscribe function to remove the listener
      */
     onLogout(callback: () => void): () => void {
-      // Use the events API to listen for user.logout events
+      // Use the events API to listen for auth.signed-out events
       return api.events!.onEvent((type: string) => {
-        if (type === EVENT_TYPE_USER_LOGOUT) {
+        if (type === EVENT_TYPES.AUTH_SIGNED_OUT || type === EVENT_TYPES.USER_LOGOUT) {
           callback();
         }
       });
@@ -257,11 +271,11 @@ const api: API = {
      * @returns {Function} Unsubscribe function to remove the listener
      */
     onUserUpdated(callback: (user: any) => void): () => void {
-      // Use the events API to listen for profile.synced events
+      // Use the events API to listen for auth.completed events (profile is included)
       return api.events!.onEvent((type: string, payload: unknown) => {
-        if (type === EVENT_TYPE_PROFILE_SYNCED) {
-          const data = payload as { user: any };
-          callback(data.user);
+        if (type === EVENT_TYPES.AUTH_COMPLETED) {
+          const data = payload as { userId: string; profile: any };
+          callback(data.profile);
         }
       });
     },
@@ -282,7 +296,7 @@ const api: API = {
     onNotify(callback: (message: string, context: string) => void): () => void {
       // Use the events API to listen for error.created events
       return api.events!.onEvent((type: string, payload: unknown) => {
-        if (type === EVENT_TYPE_ERROR_CREATED) {
+        if (type === EVENT_TYPES.ERROR_CREATED) {
           const data = payload as { message: string; context: string };
           callback(data.message, data.context);
         }

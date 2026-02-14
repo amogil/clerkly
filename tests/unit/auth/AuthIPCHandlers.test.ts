@@ -504,21 +504,32 @@ describe('AuthIPCHandlers', () => {
   });
 
   describe('Event Broadcasting', () => {
+    const mockUser: User = {
+      user_id: 'abc123xyz0',
+      email: 'test@example.com',
+      name: 'Test User',
+      google_id: '123456789',
+      locale: 'en',
+      last_synced: Date.now(),
+    };
+
     beforeEach(() => {
       mockPublish.mockClear();
     });
 
     /* Preconditions: Auth success event triggered
        Action: Call sendAuthSuccess()
-       Assertions: auth.succeeded event published via EventBus
+       Assertions: auth.completed event published via EventBus
        Requirements: google-oauth-auth.8.4 */
-    it('should publish auth.succeeded event via EventBus', () => {
-      authIPCHandlers.sendAuthSuccess('user-123');
+    it('should publish auth.completed event via EventBus', () => {
+      authIPCHandlers.sendAuthSuccess('user-123', mockUser);
 
       expect(mockPublish).toHaveBeenCalledTimes(1);
       const publishedEvent = mockPublish.mock.calls[0][0];
-      expect(publishedEvent.type).toBe('auth.succeeded');
+      expect(publishedEvent.type).toBe('auth.completed');
       expect(publishedEvent.userId).toBe('user-123');
+      expect(publishedEvent.profile.id).toBe(mockUser.user_id);
+      expect(publishedEvent.profile.email).toBe(mockUser.email);
     });
 
     /* Preconditions: Auth error event triggered
@@ -526,15 +537,15 @@ describe('AuthIPCHandlers', () => {
        Assertions: auth.failed event published via EventBus with error details
        Requirements: google-oauth-auth.8.4 */
     it('should publish auth.failed event via EventBus', () => {
-      const errorMessage = 'Authentication failed';
       const errorCode = 'access_denied';
-      authIPCHandlers.sendAuthError(errorMessage, errorCode);
+      const errorMessage = 'Authentication failed';
+      authIPCHandlers.sendAuthError(errorCode, errorMessage);
 
       expect(mockPublish).toHaveBeenCalledTimes(1);
       const publishedEvent = mockPublish.mock.calls[0][0];
       expect(publishedEvent.type).toBe('auth.failed');
-      expect(publishedEvent.error).toBe(errorMessage);
-      expect(publishedEvent.errorCode).toBe(errorCode);
+      expect(publishedEvent.code).toBe(errorCode);
+      expect(publishedEvent.message).toBe(errorMessage);
     });
   });
 
@@ -625,44 +636,6 @@ describe('AuthIPCHandlers', () => {
       );
 
       consoleErrorSpy.mockRestore();
-    });
-  });
-
-  describe('Profile Update Broadcasting', () => {
-    const mockUser: User = {
-      user_id: 'abc123xyz0',
-      email: 'test@example.com',
-      name: 'Test User',
-      google_id: '123456789',
-      locale: 'en',
-      last_synced: Date.now(),
-    };
-
-    beforeEach(() => {
-      mockPublish.mockClear();
-    });
-
-    /* Preconditions: Profile refreshed successfully
-       Action: Call auth:refresh-user handler
-       Assertions: profile.synced event published via EventBus
-       Requirements: account-profile.1.5 */
-    it('should publish profile.synced event via EventBus after refresh', async () => {
-      authIPCHandlers.setUserManager(mockProfileManager);
-      mockProfileManager.fetchProfile.mockResolvedValue(mockUser);
-
-      authIPCHandlers.registerHandlers();
-      const handler = (ipcMain.handle as jest.Mock).mock.calls.find(
-        (call) => call[0] === 'auth:refresh-user'
-      )?.[1];
-
-      await handler({});
-
-      expect(mockPublish).toHaveBeenCalledTimes(1);
-      const publishedEvent = mockPublish.mock.calls[0][0];
-      expect(publishedEvent.type).toBe('profile.synced');
-      expect(publishedEvent.user.user_id).toBe(mockUser.user_id);
-      expect(publishedEvent.user.email).toBe(mockUser.email);
-      expect(publishedEvent.user.name).toBe(mockUser.name);
     });
   });
 

@@ -7,7 +7,14 @@ import { TokenStorageManager } from './TokenStorageManager';
 import { handleBackgroundError } from '../ErrorHandler';
 import { Logger } from '../Logger';
 import { MainEventBus } from '../events/MainEventBus';
-import { AuthSucceededEvent, AuthFailedEvent, ProfileSyncedEvent } from '../../shared/events/types';
+import {
+  AuthCallbackReceivedEvent,
+  AuthProfileFetchingEvent,
+  AuthCompletedEvent,
+  AuthFailedEvent,
+  AuthCancelledEvent,
+  AuthSignedOutEvent,
+} from '../../shared/events/types';
 
 // Requirements: clerkly.3.8 - Use centralized Logger instead of console.*
 /**
@@ -177,6 +184,8 @@ export class OAuthClientManager {
    * @returns Authorization status
    */
   async handleDeepLink(url: string): Promise<AuthStatus> {
+    const eventBus = MainEventBus.getInstance();
+
     try {
       // Parse URL
       const parsedUrl = new URL(url);
@@ -184,8 +193,21 @@ export class OAuthClientManager {
       const state = parsedUrl.searchParams.get('state');
       const error = parsedUrl.searchParams.get('error');
 
-      // Check for user cancellation or errors
+      // Publish auth.callback-received event - renderer will show loader
+      eventBus.publish(new AuthCallbackReceivedEvent());
+
+      // Check for user cancellation (error=access_denied)
+      if (error === 'access_denied') {
+        eventBus.publish(new AuthCancelledEvent());
+        return {
+          authorized: false,
+          error: 'access_denied',
+        };
+      }
+
+      // Check for other errors from Google
       if (error) {
+        eventBus.publish(new AuthFailedEvent(error, error));
         return {
           authorized: false,
           error: error,
@@ -194,6 +216,7 @@ export class OAuthClientManager {
 
       // Validate required parameters
       if (!code || !state || code.trim() === '' || state.trim() === '') {
+        eventBus.publish(new AuthFailedEvent('invalid_request', 'Invalid authorization request'));
         return {
           authorized: false,
           error: 'invalid_request',
@@ -202,14 +225,12 @@ export class OAuthClientManager {
 
       // Validate state parameter
       if (!this.pkceStorage || state !== this.pkceStorage.state) {
+        eventBus.publish(new AuthFailedEvent('csrf_attack_detected', 'CSRF attack detected'));
         return {
           authorized: false,
           error: 'csrf_attack_detected',
         };
       }
-
-      // Requirements: google-oauth-auth.7.1 - Loader is now managed by renderer based on events
-      // No need to call onShowLoader here - renderer shows loader on button click
 
       // Exchange code for tokens
       const tokenResponse = await this.exchangeCodeForTokens(code, this.pkceStorage.codeVerifier);
@@ -235,6 +256,9 @@ export class OAuthClientManager {
       if (this.userManager) {
         Logger.info('OAuthClientManager', 'Fetching profile synchronously before saving tokens');
 
+        // Publish auth.profile-fetching event
+        eventBus.publish(new AuthProfileFetchingEvent());
+
         // Temporarily store tokens in memory for profile fetch
         const tempTokens = tokenData;
 
@@ -245,8 +269,7 @@ export class OAuthClientManager {
           // Requirements: google-oauth-auth.3.7 - Profile fetch failed, don't save tokens
           Logger.error('OAuthClientManager', 'Profile fetch failed, authorization incomplete');
           // Publish auth.failed event
-          const eventBus = MainEventBus.getInstance();
-          eventBus.publish(new AuthFailedEvent('Profile fetch failed', 'profile_fetch_failed'));
+          eventBus.publish(new AuthFailedEvent('profile_fetch_failed', 'Failed to load profile'));
           // Clear PKCE storage
           this.pkceStorage = null;
           return {
@@ -261,16 +284,16 @@ export class OAuthClientManager {
         // Now save tokens to database (profile manager has email set)
         await this.tokenStorage.saveTokens(tokenData);
 
-        // Publish auth.succeeded event - renderer will show loader until profile.synced
-        const eventBus = MainEventBus.getInstance();
-        const profileId = profileResult.profile?.id;
-        if (profileId) {
-          eventBus.publish(new AuthSucceededEvent(profileId));
-        }
-
-        // Publish profile.synced event - renderer will navigate to agents
+        // Publish auth.completed event with userId and profile
         if (profileResult.profile) {
-          eventBus.publish(new ProfileSyncedEvent(profileResult.profile));
+          eventBus.publish(
+            new AuthCompletedEvent(profileResult.profile.user_id, {
+              id: profileResult.profile.user_id,
+              email: profileResult.profile.email,
+              name: profileResult.profile.name,
+              picture: profileResult.profile.picture,
+            })
+          );
         }
       } else {
         Logger.warn('OAuthClientManager', 'User manager not set, saving tokens without profile');
@@ -289,9 +312,8 @@ export class OAuthClientManager {
       handleBackgroundError(error, 'OAuth Flow');
 
       // Publish auth.failed event
-      const eventBus = MainEventBus.getInstance();
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      eventBus.publish(new AuthFailedEvent(errorMessage || 'unknown_error', 'oauth_error'));
+      eventBus.publish(new AuthFailedEvent(errorMessage || 'unknown_error', 'Authorization error'));
 
       return {
         authorized: false,
@@ -572,6 +594,10 @@ export class OAuthClientManager {
       if (this.userManager) {
         this.userManager.clearSession();
       }
+
+      // Publish auth.signed-out event
+      const eventBus = MainEventBus.getInstance();
+      eventBus.publish(new AuthSignedOutEvent());
 
       // Note: Profile data is NOT deleted - it's preserved in database for next login
       // This follows the architectural principle: database is single source of truth

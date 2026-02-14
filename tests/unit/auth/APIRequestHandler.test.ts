@@ -114,8 +114,8 @@ describe('APIRequestHandler', () => {
     );
     expect(authFailedCalls.length).toBe(1);
     const publishedEvent = authFailedCalls[0][0];
-    expect(publishedEvent.error).toBe('Session expired');
-    expect(publishedEvent.errorCode).toBe('invalid_grant');
+    expect(publishedEvent.code).toBe('invalid_grant');
+    expect(publishedEvent.message).toBe('Session expired');
   });
 
   /* Preconditions: fetch returns HTTP 401

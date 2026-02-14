@@ -75,14 +75,6 @@ jest.mock('../../../src/renderer/events/RendererEventBus', () => ({
   },
 }));
 
-// Helper to emit events in tests
-const emitEvent = (eventType: string, payload: unknown) => {
-  const handlers = eventHandlers.get(eventType);
-  if (handlers) {
-    handlers.forEach((handler) => handler(payload));
-  }
-};
-
 // Mock sonner toast
 jest.mock('sonner', () => ({
   toast: {
@@ -328,93 +320,9 @@ describe('Settings Component - Account Profile Section', () => {
     expect(emailInput.value).toBe('john@example.com');
   });
 
-  /* Preconditions: RendererEventBus mocked to capture event handlers, window.api.auth.getUser() mocked to track calls
-     Action: render Settings component, verify getUser() called on mount (1 time), emit profile.synced event via EventBus
-     Assertions: getUser() called on mount (1 time), getUser() called again after profile.synced event (2 times total), UI updated with new user data
-     Requirements: account-profile.1.2 */
-  it('should reload profile when profile is updated', async () => {
-    // Create initial test user
-    const initialUser = {
-      user_id: 'abc1234567',
-      email: 'john@example.com',
-      name: 'John Doe',
-      google_id: '123456789',
-      locale: 'en',
-      last_synced: Date.now(),
-    };
-
-    // Create updated test user (simulating profile change after re-authentication)
-    const updatedUser = {
-      user_id: 'abc1234567',
-      email: 'john.doe@example.com',
-      name: 'John Updated Doe',
-      google_id: '123456789',
-      locale: 'en',
-      last_synced: Date.now(),
-    };
-
-    // Mock getUser to return initial user on first call, updated user on second call
-    mockGetUser
-      .mockResolvedValueOnce({
-        success: true,
-        user: initialUser,
-      })
-      .mockResolvedValueOnce({
-        success: true,
-        user: updatedUser,
-      });
-
-    // Render the Settings component
-    renderSettings();
-
-    // Wait for initial loading to complete and verify initial user is displayed
-    await waitFor(() => {
-      const nameInput = screen.getByLabelText('Full Name') as HTMLInputElement;
-      expect(nameInput).toBeInTheDocument();
-      expect(nameInput.value).toBe('John Doe');
-    });
-
-    // Verify getUser was called once during component mount
-    expect(mockGetUser).toHaveBeenCalledTimes(1);
-
-    // Verify initial user data is displayed
-    const nameInputInitial = screen.getByLabelText('Full Name') as HTMLInputElement;
-    const emailInputInitial = screen.getByLabelText('Email') as HTMLInputElement;
-    expect(nameInputInitial.value).toBe('John Doe');
-    expect(emailInputInitial.value).toBe('john@example.com');
-
-    // Verify that EventBus subscription was registered for profile.synced
-    expect(eventHandlers.has('profile.synced')).toBe(true);
-
-    // Simulate profile.synced event via EventBus
-    emitEvent('profile.synced', {
-      user: {
-        user_id: updatedUser.user_id,
-        email: updatedUser.email,
-        name: updatedUser.name,
-      },
-      timestamp: Date.now(),
-    });
-
-    // Wait for user to be reloaded and UI to update with new data
-    await waitFor(() => {
-      const nameInput = screen.getByLabelText('Full Name') as HTMLInputElement;
-      expect(nameInput.value).toBe('John Updated Doe');
-    });
-
-    // Verify getUser was called a second time (2 times total)
-    expect(mockGetUser).toHaveBeenCalledTimes(2);
-
-    // Verify updated user data is displayed in UI
-    const nameInputUpdated = screen.getByLabelText('Full Name') as HTMLInputElement;
-    const emailInputUpdated = screen.getByLabelText('Email') as HTMLInputElement;
-    expect(nameInputUpdated.value).toBe('John Updated Doe');
-    expect(emailInputUpdated.value).toBe('john.doe@example.com');
-  });
-
   /* Preconditions: test user created and getUser() mocked to return it, Settings component rendered with user data
      Action: render Settings component with user data, verify user is displayed (name and email visible), unmount component to simulate logout
-     Assertions: component cleans up properly on unmount, EventBus subscription is cleaned up
+     Assertions: component cleans up properly on unmount
      Requirements: account-profile.1.8 */
   it('should handle component unmount properly', async () => {
     // Create test User object with data
@@ -449,16 +357,9 @@ describe('Settings Component - Account Profile Section', () => {
     expect(nameInputBefore.value).toBe('John Doe');
     expect(emailInputBefore.value).toBe('john@example.com');
 
-    // Verify that EventBus subscription was registered for profile.synced
-    expect(eventHandlers.has('profile.synced')).toBe(true);
-    const handlersBeforeUnmount = eventHandlers.get('profile.synced')?.length || 0;
-    expect(handlersBeforeUnmount).toBeGreaterThan(0);
-
     // Unmount component (simulates navigation away or logout)
     unmount();
 
     // Verify component unmounted successfully (no errors thrown)
-    // The EventBus subscription should be cleaned up via the unsubscribe function
-    // returned by useEventSubscription hook
   });
 });

@@ -268,15 +268,17 @@ describe('App IPC Integration with Error Notification System', () => {
   /* Preconditions: App component is mounted
      Action: Render App component
      Assertions: All required event subscriptions are set up
-     Requirements: error-notifications.1.1, google-oauth-auth.12.1, google-oauth-auth.12.2 */
+     Requirements: error-notifications.1.1, google-oauth-auth.8.4 */
   it('should set up all required event subscriptions', async () => {
     render(<App />);
 
     // Wait for all subscriptions to be set up
     await waitFor(() => {
+      expect(eventHandlers.has(EVENT_TYPES.AUTH_CALLBACK_RECEIVED)).toBe(true);
+      expect(eventHandlers.has(EVENT_TYPES.AUTH_COMPLETED)).toBe(true);
       expect(eventHandlers.has(EVENT_TYPES.AUTH_FAILED)).toBe(true);
-      expect(eventHandlers.has(EVENT_TYPES.AUTH_SUCCEEDED)).toBe(true);
-      expect(eventHandlers.has(EVENT_TYPES.PROFILE_SYNCED)).toBe(true);
+      expect(eventHandlers.has(EVENT_TYPES.AUTH_CANCELLED)).toBe(true);
+      expect(eventHandlers.has(EVENT_TYPES.AUTH_SIGNED_OUT)).toBe(true);
       expect(eventHandlers.has(EVENT_TYPES.ERROR_CREATED)).toBe(true);
     });
   });

@@ -17,10 +17,14 @@ export const IPC_CHANNELS = {
  * Event type constants for type-safe event handling
  */
 export const EVENT_TYPES = {
-  // Auth events
-  AUTH_SUCCEEDED: 'auth.succeeded',
+  // Auth events (new event system)
+  AUTH_STARTED: 'auth.started',
+  AUTH_CALLBACK_RECEIVED: 'auth.callback-received',
+  AUTH_PROFILE_FETCHING: 'auth.profile-fetching',
+  AUTH_COMPLETED: 'auth.completed',
   AUTH_FAILED: 'auth.failed',
-  PROFILE_SYNCED: 'profile.synced',
+  AUTH_CANCELLED: 'auth.cancelled',
+  AUTH_SIGNED_OUT: 'auth.signed-out',
 
   // User events
   USER_LOGIN: 'user.login',

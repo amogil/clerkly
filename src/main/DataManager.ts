@@ -95,16 +95,16 @@ export class DataManager implements IDataManager {
   }
 
   /**
-   * Инициализирует локальное хранилище
-   * Создает необходимые директории и файлы
-   * Запускает миграции базы данных
-   * Обрабатывает ошибки прав доступа (fallback на temp directory)
-   * Обрабатывает поврежденные базы данных (backup и пересоздание)
+   * Initializes local storage
+   * Creates necessary directories and files
+   * Runs database migrations
+   * Handles permission errors (fallback to temp directory)
+   * Handles corrupted databases (backup and recreate)
    * Requirements: clerkly.1, clerkly.2   * @returns {InitializeResult}
    */
   initialize(): InitializeResult {
     try {
-      // Создание директории хранилища
+      // Create storage directory
       let usedFallback = false;
       let fallbackPath: string | undefined;
 
@@ -114,14 +114,14 @@ export class DataManager implements IDataManager {
         }
       } catch (dirError: unknown) {
         const errorObj = dirError as { code?: string };
-        // Обработка ошибок прав доступа - fallback на temp directory
+        // Handle permission errors - fallback to temp directory
         if (errorObj.code === 'EACCES' || errorObj.code === 'EPERM') {
           this.logger.warn('Permission denied, using temp directory');
           this.storagePath = path.join(os.tmpdir(), 'clerkly-fallback');
           usedFallback = true;
           fallbackPath = this.storagePath;
 
-          // Создаем fallback директорию
+          // Create fallback directory
           if (!fs.existsSync(this.storagePath)) {
             fs.mkdirSync(this.storagePath, { recursive: true });
           }
@@ -132,7 +132,7 @@ export class DataManager implements IDataManager {
 
       const dbPath = path.join(this.storagePath, 'clerkly.db');
 
-      // Проверка поврежденной базы данных
+      // Check for corrupted database
       if (fs.existsSync(dbPath)) {
         try {
           const testDb = new Database(dbPath);
@@ -146,10 +146,10 @@ export class DataManager implements IDataManager {
         }
       }
 
-      // Открываем базу данных
+      // Open database
       this.db = new Database(dbPath);
 
-      // Запускаем миграции
+      // Run migrations
       // In production (compiled): __dirname = dist/main/main/, so ../../../migrations = migrations/
       // In tests (ts-jest): __dirname = src/main/, so we need to use process.cwd()
       const isCompiledCode = __dirname.includes('dist');
@@ -182,11 +182,11 @@ export class DataManager implements IDataManager {
   }
 
   /**
-   * Сохраняет данные локально
-   * Валидирует key (non-empty string, max 1000 chars)
-   * Сериализует value в JSON
-   * Проверяет размер (max 10MB)
-   * Обрабатывает ошибки (SQLITE_FULL, SQLITE_BUSY, SQLITE_LOCKED, SQLITE_READONLY)
+   * Saves data locally
+   * Validates key (non-empty string, max 1000 chars)
+   * Serializes value to JSON
+   * Checks size (max 10MB)
+   * Handles errors (SQLITE_FULL, SQLITE_BUSY, SQLITE_LOCKED, SQLITE_READONLY)
    * Requirements: clerkly.1, error-notifications.1.1, user-data-isolation.2.4, user-data-isolation.3.1, user-data-isolation.3.2
    *
    * @param {string} key
@@ -195,7 +195,7 @@ export class DataManager implements IDataManager {
    */
   saveData(key: string, value: unknown): SaveDataResult {
     try {
-      // Валидация ключа
+      // Validate key
       if (!key || typeof key !== 'string') {
         return { success: false, error: 'Invalid key: must be non-empty string' };
       }
@@ -204,12 +204,12 @@ export class DataManager implements IDataManager {
         return { success: false, error: 'Invalid key: exceeds maximum length of 1000 characters' };
       }
 
-      // Проверка инициализации базы данных
+      // Check database initialization
       if (!this.db || !this.db.open) {
         return { success: false, error: 'Database not initialized or closed' };
       }
 
-      // Сериализация значения с поддержкой Infinity/-Infinity
+      // Serialize value with Infinity/-Infinity support
       let serializedValue: string;
       try {
         serializedValue = JSON.stringify(value, (key, val) => {
@@ -224,7 +224,7 @@ export class DataManager implements IDataManager {
         return { success: false, error: `Failed to serialize value: ${errorMessage}` };
       }
 
-      // Проверка размера (max 10MB)
+      // Check size (max 10MB)
       const sizeInBytes = Buffer.byteLength(serializedValue, 'utf8');
       if (sizeInBytes > 10 * 1024 * 1024) {
         return { success: false, error: 'Value too large: exceeds 10MB limit' };
@@ -256,7 +256,7 @@ export class DataManager implements IDataManager {
       return { success: true };
     } catch (writeError: unknown) {
       const errorObj = writeError as { code?: string; message?: string };
-      // Обработка специфичных ошибок SQLite
+      // Handle SQLite-specific errors
       if (errorObj.code === 'SQLITE_FULL') {
         // Requirements: error-notifications.1.1 - Notify user about critical database error
         handleBackgroundError(
@@ -280,10 +280,10 @@ export class DataManager implements IDataManager {
   }
 
   /**
-   * Загружает данные из локального хранилища
-   * Валидирует key
-   * Десериализует JSON
-   * Обрабатывает ошибки (SQLITE_BUSY, SQLITE_LOCKED)
+   * Loads data from local storage
+   * Validates key
+   * Deserializes JSON
+   * Handles errors (SQLITE_BUSY, SQLITE_LOCKED)
    * Requirements: clerkly.1, user-data-isolation.2.5, user-data-isolation.3.1, user-data-isolation.3.2
    *
    * @param {string} key
@@ -291,7 +291,7 @@ export class DataManager implements IDataManager {
    */
   loadData(key: string): LoadDataResult {
     try {
-      // Валидация ключа
+      // Validate key
       if (!key || typeof key !== 'string') {
         return { success: false, error: 'Invalid key: must be non-empty string' };
       }
@@ -300,7 +300,7 @@ export class DataManager implements IDataManager {
         return { success: false, error: 'Invalid key: exceeds maximum length of 1000 characters' };
       }
 
-      // Проверка инициализации базы данных
+      // Check database initialization
       if (!this.db || !this.db.open) {
         return { success: false, error: 'Database not initialized or closed' };
       }
@@ -321,7 +321,7 @@ export class DataManager implements IDataManager {
         return { success: false, error: 'Key not found' };
       }
 
-      // Десериализация с поддержкой Infinity/-Infinity
+      // Deserialize with Infinity/-Infinity support
       let data: unknown;
       try {
         data = JSON.parse(row.value, (key, val) => {
@@ -333,7 +333,7 @@ export class DataManager implements IDataManager {
           return val;
         });
       } catch {
-        // Fallback для plain string
+        // Fallback for plain string
         data = row.value;
       }
 
@@ -349,9 +349,9 @@ export class DataManager implements IDataManager {
   }
 
   /**
-   * Удаляет данные из локального хранилища
-   * Валидирует key
-   * Обрабатывает ошибки
+   * Deletes data from local storage
+   * Validates key
+   * Handles errors
    * Requirements: clerkly.1, user-data-isolation.2.6, user-data-isolation.3.1, user-data-isolation.3.2
    *
    * @param {string} key
@@ -359,7 +359,7 @@ export class DataManager implements IDataManager {
    */
   deleteData(key: string): DeleteDataResult {
     try {
-      // Валидация ключа
+      // Validate key
       if (!key || typeof key !== 'string') {
         return { success: false, error: 'Invalid key: must be non-empty string' };
       }
@@ -368,7 +368,7 @@ export class DataManager implements IDataManager {
         return { success: false, error: 'Invalid key: exceeds maximum length of 1000 characters' };
       }
 
-      // Проверка инициализации базы данных
+      // Check database initialization
       if (!this.db || !this.db.open) {
         return { success: false, error: 'Database not initialized or closed' };
       }
@@ -402,7 +402,7 @@ export class DataManager implements IDataManager {
   }
 
   /**
-   * Возвращает путь к локальному хранилищу
+   * Returns path to local storage
    * Requirements: clerkly.1   * @returns {string}
    */
   getStoragePath(): string {
@@ -410,7 +410,7 @@ export class DataManager implements IDataManager {
   }
 
   /**
-   * Закрывает соединение с базой данных
+   * Closes database connection
    * Requirements: clerkly.1   */
   close(): void {
     if (this.db && this.db.open) {
@@ -420,7 +420,7 @@ export class DataManager implements IDataManager {
   }
 
   /**
-   * Возвращает экземпляр Migration Runner
+   * Returns Migration Runner instance
    * Requirements: clerkly.1   * @returns {MigrationRunner}
    */
   getMigrationRunner(): MigrationRunner {

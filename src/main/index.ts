@@ -227,8 +227,9 @@ if (process.env.NODE_ENV === 'test') {
     try {
       await userManager.fetchProfile();
       const userId = userManager.getCurrentUserId();
-      if (userId) {
-        authIPCHandlers.sendAuthSuccess(userId);
+      const user = userManager.getCurrentUser();
+      if (userId && user) {
+        authIPCHandlers.sendAuthSuccess(userId, user);
       }
       return { success: true };
     } catch (error: unknown) {
@@ -347,17 +348,8 @@ if (process.env.NODE_ENV === 'test') {
       const authStatus = await oauthClient.handleDeepLink(url);
       logger.info(`Deep link auth status: ${JSON.stringify(authStatus)}`);
 
-      // Send auth events to renderer (same as handleDeepLinkUrl does)
-      if (authStatus.authorized) {
-        logger.info('Authorization successful, sending auth success');
-        const userId = userManager.getCurrentUserId();
-        if (userId) {
-          authIPCHandlers.sendAuthSuccess(userId);
-        }
-      } else if (authStatus.error) {
-        logger.info(`Authorization failed, sending auth error: ${authStatus.error}`);
-        authIPCHandlers.sendAuthError(authStatus.error, authStatus.error);
-      }
+      // Events are now published directly from OAuthClientManager.handleDeepLink()
+      // No need to send them here - they are already sent
 
       return authStatus;
     } catch (error: unknown) {
@@ -607,19 +599,11 @@ async function handleDeepLinkUrl(url: string): Promise<void> {
     const mainWindow = BrowserWindow.getAllWindows()[0];
 
     if (mainWindow) {
-      // Send auth event to renderer
-      // Requirements: google-oauth-auth.3.6, google-oauth-auth.3.7, google-oauth-auth.3.8
-      // Profile is already fetched synchronously inside handleDeepLink()
-      if (authStatus.authorized) {
-        logger.info('Authorization successful, profile already fetched, sending auth success');
-        const userId = userManager.getCurrentUserId();
-        if (userId) {
-          authIPCHandlers.sendAuthSuccess(userId);
-        }
-      } else if (authStatus.error) {
-        logger.info(`Sending auth error event: ${authStatus.error}`);
-        authIPCHandlers.sendAuthError(authStatus.error, authStatus.error);
-      }
+      // Events are now published directly from OAuthClientManager.handleDeepLink()
+      // No need to send them here - they are already sent
+      logger.info(
+        `Deep link handled, authorized: ${authStatus.authorized}, error: ${authStatus.error || 'none'}`
+      );
 
       // Focus and restore window
       if (mainWindow.isMinimized()) {

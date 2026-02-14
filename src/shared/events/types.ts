@@ -5,6 +5,7 @@
  */
 
 import { User } from '../../types';
+import { EVENT_TYPES } from './constants';
 
 // ============================================================================
 // Base Event Types
@@ -113,33 +114,68 @@ export type UserProfileUpdatedPayload = EntityUpdatedEvent<User>;
 // ============================================================================
 
 /**
- * Auth success event payload
- * Emitted when OAuth flow completes successfully
+ * Auth started event payload
+ * Emitted when user clicks "Continue with Google"
+ * Requirements: google-oauth-auth.8.4
  */
-export interface AuthSucceededPayload extends BaseEvent {
-  /** User ID from OAuth provider */
+export type AuthStartedPayload = BaseEvent;
+
+/**
+ * Auth callback received event payload
+ * Emitted when deep link is received from Google
+ * Requirements: google-oauth-auth.8.4
+ */
+export type AuthCallbackReceivedPayload = BaseEvent;
+
+/**
+ * Auth profile fetching event payload
+ * Emitted when profile fetch starts
+ * Requirements: google-oauth-auth.8.4
+ */
+export type AuthProfileFetchingPayload = BaseEvent;
+
+/**
+ * Auth completed event payload
+ * Emitted when OAuth flow completes successfully
+ * Requirements: google-oauth-auth.8.4
+ */
+export interface AuthCompletedPayload extends BaseEvent {
+  /** User ID */
   userId: string;
+  /** User profile data */
+  profile: {
+    id: string;
+    email: string;
+    name: string;
+    picture?: string;
+  };
 }
 
 /**
  * Auth failed event payload
  * Emitted when OAuth flow fails
+ * Requirements: google-oauth-auth.8.4
  */
 export interface AuthFailedPayload extends BaseEvent {
-  /** Error message */
-  error: string;
-  /** Error code (e.g., 'invalid_grant', 'access_denied') */
-  errorCode?: string;
+  /** Error code (e.g., 'token_exchange_failed', 'profile_fetch_failed') */
+  code: string;
+  /** Human-readable error message */
+  message: string;
 }
 
 /**
- * Profile synced event payload
- * Emitted when user profile is synchronized (fetched and saved)
+ * Auth cancelled event payload
+ * Emitted when user cancels OAuth in Google
+ * Requirements: google-oauth-auth.8.4
  */
-export interface ProfileSyncedPayload extends BaseEvent {
-  /** User data */
-  user: User;
-}
+export type AuthCancelledPayload = BaseEvent;
+
+/**
+ * Auth signed out event payload
+ * Emitted when user signs out
+ * Requirements: google-oauth-auth.8.4
+ */
+export type AuthSignedOutPayload = BaseEvent;
 
 // ============================================================================
 // Error Events
@@ -163,29 +199,34 @@ export interface ErrorCreatedPayload extends BaseEvent {
 /**
  * Map of all event types to their payloads
  * Requirements: realtime-events.3.1
+ * IMPORTANT: Use EVENT_TYPES constants for event type strings
  */
 export interface ClerklyEvents {
   // Agent events
-  'agent.created': AgentCreatedPayload;
-  'agent.updated': AgentUpdatedPayload;
-  'agent.deleted': AgentDeletedPayload;
+  [EVENT_TYPES.AGENT_CREATED]: AgentCreatedPayload;
+  [EVENT_TYPES.AGENT_UPDATED]: AgentUpdatedPayload;
+  [EVENT_TYPES.AGENT_DELETED]: AgentDeletedPayload;
 
   // Message events
-  'message.created': MessageCreatedPayload;
-  'message.updated': MessageUpdatedPayload;
+  [EVENT_TYPES.MESSAGE_CREATED]: MessageCreatedPayload;
+  [EVENT_TYPES.MESSAGE_UPDATED]: MessageUpdatedPayload;
 
   // User events
-  'user.login': UserLoginPayload;
-  'user.logout': UserLogoutPayload;
-  'user.profile.updated': UserProfileUpdatedPayload;
+  [EVENT_TYPES.USER_LOGIN]: UserLoginPayload;
+  [EVENT_TYPES.USER_LOGOUT]: UserLogoutPayload;
+  [EVENT_TYPES.USER_PROFILE_UPDATED]: UserProfileUpdatedPayload;
 
   // Auth events
-  'auth.succeeded': AuthSucceededPayload;
-  'auth.failed': AuthFailedPayload;
-  'profile.synced': ProfileSyncedPayload;
+  [EVENT_TYPES.AUTH_STARTED]: AuthStartedPayload;
+  [EVENT_TYPES.AUTH_CALLBACK_RECEIVED]: AuthCallbackReceivedPayload;
+  [EVENT_TYPES.AUTH_PROFILE_FETCHING]: AuthProfileFetchingPayload;
+  [EVENT_TYPES.AUTH_COMPLETED]: AuthCompletedPayload;
+  [EVENT_TYPES.AUTH_FAILED]: AuthFailedPayload;
+  [EVENT_TYPES.AUTH_CANCELLED]: AuthCancelledPayload;
+  [EVENT_TYPES.AUTH_SIGNED_OUT]: AuthSignedOutPayload;
 
   // Error events
-  'error.created': ErrorCreatedPayload;
+  [EVENT_TYPES.ERROR_CREATED]: ErrorCreatedPayload;
 }
 
 /**
@@ -266,22 +307,96 @@ export function getEventKey(type: EventType, payload: BaseEvent): string {
 // Event Classes
 // ============================================================================
 
+// Type aliases for event type literals (for use in generic constraints)
+type AuthStartedType = typeof EVENT_TYPES.AUTH_STARTED;
+type AuthCallbackReceivedType = typeof EVENT_TYPES.AUTH_CALLBACK_RECEIVED;
+type AuthProfileFetchingType = typeof EVENT_TYPES.AUTH_PROFILE_FETCHING;
+type AuthCompletedType = typeof EVENT_TYPES.AUTH_COMPLETED;
+type AuthFailedType = typeof EVENT_TYPES.AUTH_FAILED;
+type AuthCancelledType = typeof EVENT_TYPES.AUTH_CANCELLED;
+type AuthSignedOutType = typeof EVENT_TYPES.AUTH_SIGNED_OUT;
+type ErrorCreatedType = typeof EVENT_TYPES.ERROR_CREATED;
+type UserLoginType = typeof EVENT_TYPES.USER_LOGIN;
+type UserLogoutType = typeof EVENT_TYPES.USER_LOGOUT;
+type AgentCreatedType = typeof EVENT_TYPES.AGENT_CREATED;
+type AgentUpdatedType = typeof EVENT_TYPES.AGENT_UPDATED;
+type AgentDeletedType = typeof EVENT_TYPES.AGENT_DELETED;
+type MessageCreatedType = typeof EVENT_TYPES.MESSAGE_CREATED;
+type MessageUpdatedType = typeof EVENT_TYPES.MESSAGE_UPDATED;
+type UserProfileUpdatedType = typeof EVENT_TYPES.USER_PROFILE_UPDATED;
+
 /**
- * Auth succeeded event
+ * Auth started event
+ * Emitted when user clicks "Continue with Google"
+ */
+export class AuthStartedEvent extends TypedEventClass<AuthStartedType> {
+  readonly type = EVENT_TYPES.AUTH_STARTED;
+
+  constructor() {
+    super();
+  }
+
+  toPayload(): EventPayloadWithoutTimestamp<AuthStartedType> {
+    return {};
+  }
+}
+
+/**
+ * Auth callback received event
+ * Emitted when deep link is received from Google
+ */
+export class AuthCallbackReceivedEvent extends TypedEventClass<AuthCallbackReceivedType> {
+  readonly type = EVENT_TYPES.AUTH_CALLBACK_RECEIVED;
+
+  constructor() {
+    super();
+  }
+
+  toPayload(): EventPayloadWithoutTimestamp<AuthCallbackReceivedType> {
+    return {};
+  }
+}
+
+/**
+ * Auth profile fetching event
+ * Emitted when profile fetch starts
+ */
+export class AuthProfileFetchingEvent extends TypedEventClass<AuthProfileFetchingType> {
+  readonly type = EVENT_TYPES.AUTH_PROFILE_FETCHING;
+
+  constructor() {
+    super();
+  }
+
+  toPayload(): EventPayloadWithoutTimestamp<AuthProfileFetchingType> {
+    return {};
+  }
+}
+
+/**
+ * Auth completed event
  * Emitted when OAuth flow completes successfully
  */
-export class AuthSucceededEvent extends TypedEventClass<'auth.succeeded'> {
-  readonly type = 'auth.succeeded' as const;
+export class AuthCompletedEvent extends TypedEventClass<AuthCompletedType> {
+  readonly type = EVENT_TYPES.AUTH_COMPLETED;
 
-  constructor(public readonly userId: string) {
+  constructor(
+    public readonly userId: string,
+    public readonly profile: {
+      id: string;
+      email: string;
+      name: string;
+      picture?: string;
+    }
+  ) {
     super();
     if (!userId) {
-      throw new Error('AuthSucceededEvent requires a non-empty userId');
+      throw new Error('AuthCompletedEvent requires a non-empty userId');
     }
   }
 
-  toPayload(): EventPayloadWithoutTimestamp<'auth.succeeded'> {
-    return { userId: this.userId };
+  toPayload(): EventPayloadWithoutTimestamp<AuthCompletedType> {
+    return { userId: this.userId, profile: this.profile };
   }
 }
 
@@ -289,34 +404,50 @@ export class AuthSucceededEvent extends TypedEventClass<'auth.succeeded'> {
  * Auth failed event
  * Emitted when OAuth flow fails
  */
-export class AuthFailedEvent extends TypedEventClass<'auth.failed'> {
-  readonly type = 'auth.failed' as const;
+export class AuthFailedEvent extends TypedEventClass<AuthFailedType> {
+  readonly type = EVENT_TYPES.AUTH_FAILED;
 
   constructor(
-    public readonly error: string,
-    public readonly errorCode?: string
+    public readonly code: string,
+    public readonly message: string
   ) {
     super();
   }
 
-  toPayload(): EventPayloadWithoutTimestamp<'auth.failed'> {
-    return { error: this.error, errorCode: this.errorCode };
+  toPayload(): EventPayloadWithoutTimestamp<AuthFailedType> {
+    return { code: this.code, message: this.message };
   }
 }
 
 /**
- * Profile synced event
- * Emitted when user profile is synchronized
+ * Auth cancelled event
+ * Emitted when user cancels OAuth in Google
  */
-export class ProfileSyncedEvent extends TypedEventClass<'profile.synced'> {
-  readonly type = 'profile.synced' as const;
+export class AuthCancelledEvent extends TypedEventClass<AuthCancelledType> {
+  readonly type = EVENT_TYPES.AUTH_CANCELLED;
 
-  constructor(public readonly user: User) {
+  constructor() {
     super();
   }
 
-  toPayload(): EventPayloadWithoutTimestamp<'profile.synced'> {
-    return { user: this.user };
+  toPayload(): EventPayloadWithoutTimestamp<AuthCancelledType> {
+    return {};
+  }
+}
+
+/**
+ * Auth signed out event
+ * Emitted when user signs out
+ */
+export class AuthSignedOutEvent extends TypedEventClass<AuthSignedOutType> {
+  readonly type = EVENT_TYPES.AUTH_SIGNED_OUT;
+
+  constructor() {
+    super();
+  }
+
+  toPayload(): EventPayloadWithoutTimestamp<AuthSignedOutType> {
+    return {};
   }
 }
 
@@ -324,8 +455,8 @@ export class ProfileSyncedEvent extends TypedEventClass<'profile.synced'> {
  * Error created event
  * Emitted when a background error occurs
  */
-export class ErrorCreatedEvent extends TypedEventClass<'error.created'> {
-  readonly type = 'error.created' as const;
+export class ErrorCreatedEvent extends TypedEventClass<ErrorCreatedType> {
+  readonly type = EVENT_TYPES.ERROR_CREATED;
 
   constructor(
     public readonly message: string,
@@ -334,7 +465,7 @@ export class ErrorCreatedEvent extends TypedEventClass<'error.created'> {
     super();
   }
 
-  toPayload(): EventPayloadWithoutTimestamp<'error.created'> {
+  toPayload(): EventPayloadWithoutTimestamp<ErrorCreatedType> {
     return { message: this.message, context: this.context };
   }
 }
@@ -342,14 +473,14 @@ export class ErrorCreatedEvent extends TypedEventClass<'error.created'> {
 /**
  * User login event
  */
-export class UserLoginEvent extends TypedEventClass<'user.login'> {
-  readonly type = 'user.login' as const;
+export class UserLoginEvent extends TypedEventClass<UserLoginType> {
+  readonly type = EVENT_TYPES.USER_LOGIN;
 
   constructor(public readonly userId: string) {
     super();
   }
 
-  toPayload(): EventPayloadWithoutTimestamp<'user.login'> {
+  toPayload(): EventPayloadWithoutTimestamp<UserLoginType> {
     return { userId: this.userId };
   }
 }
@@ -357,14 +488,14 @@ export class UserLoginEvent extends TypedEventClass<'user.login'> {
 /**
  * User logout event
  */
-export class UserLogoutEvent extends TypedEventClass<'user.logout'> {
-  readonly type = 'user.logout' as const;
+export class UserLogoutEvent extends TypedEventClass<UserLogoutType> {
+  readonly type = EVENT_TYPES.USER_LOGOUT;
 
   constructor() {
     super();
   }
 
-  toPayload(): EventPayloadWithoutTimestamp<'user.logout'> {
+  toPayload(): EventPayloadWithoutTimestamp<UserLogoutType> {
     return {};
   }
 }
@@ -372,14 +503,14 @@ export class UserLogoutEvent extends TypedEventClass<'user.logout'> {
 /**
  * Agent created event
  */
-export class AgentCreatedEvent extends TypedEventClass<'agent.created'> {
-  readonly type = 'agent.created' as const;
+export class AgentCreatedEvent extends TypedEventClass<AgentCreatedType> {
+  readonly type = EVENT_TYPES.AGENT_CREATED;
 
   constructor(public readonly data: Agent) {
     super();
   }
 
-  toPayload(): EventPayloadWithoutTimestamp<'agent.created'> {
+  toPayload(): EventPayloadWithoutTimestamp<AgentCreatedType> {
     return { data: this.data };
   }
 }
@@ -387,8 +518,8 @@ export class AgentCreatedEvent extends TypedEventClass<'agent.created'> {
 /**
  * Agent updated event
  */
-export class AgentUpdatedEvent extends TypedEventClass<'agent.updated'> {
-  readonly type = 'agent.updated' as const;
+export class AgentUpdatedEvent extends TypedEventClass<AgentUpdatedType> {
+  readonly type = EVENT_TYPES.AGENT_UPDATED;
 
   constructor(
     public readonly id: string,
@@ -397,7 +528,7 @@ export class AgentUpdatedEvent extends TypedEventClass<'agent.updated'> {
     super();
   }
 
-  toPayload(): EventPayloadWithoutTimestamp<'agent.updated'> {
+  toPayload(): EventPayloadWithoutTimestamp<AgentUpdatedType> {
     return { id: this.id, changedFields: this.changedFields };
   }
 }
@@ -405,14 +536,14 @@ export class AgentUpdatedEvent extends TypedEventClass<'agent.updated'> {
 /**
  * Agent deleted event
  */
-export class AgentDeletedEvent extends TypedEventClass<'agent.deleted'> {
-  readonly type = 'agent.deleted' as const;
+export class AgentDeletedEvent extends TypedEventClass<AgentDeletedType> {
+  readonly type = EVENT_TYPES.AGENT_DELETED;
 
   constructor(public readonly id: string) {
     super();
   }
 
-  toPayload(): EventPayloadWithoutTimestamp<'agent.deleted'> {
+  toPayload(): EventPayloadWithoutTimestamp<AgentDeletedType> {
     return { id: this.id };
   }
 }
@@ -420,14 +551,14 @@ export class AgentDeletedEvent extends TypedEventClass<'agent.deleted'> {
 /**
  * Message created event
  */
-export class MessageCreatedEvent extends TypedEventClass<'message.created'> {
-  readonly type = 'message.created' as const;
+export class MessageCreatedEvent extends TypedEventClass<MessageCreatedType> {
+  readonly type = EVENT_TYPES.MESSAGE_CREATED;
 
   constructor(public readonly data: Message) {
     super();
   }
 
-  toPayload(): EventPayloadWithoutTimestamp<'message.created'> {
+  toPayload(): EventPayloadWithoutTimestamp<MessageCreatedType> {
     return { data: this.data };
   }
 }
@@ -435,8 +566,8 @@ export class MessageCreatedEvent extends TypedEventClass<'message.created'> {
 /**
  * Message updated event
  */
-export class MessageUpdatedEvent extends TypedEventClass<'message.updated'> {
-  readonly type = 'message.updated' as const;
+export class MessageUpdatedEvent extends TypedEventClass<MessageUpdatedType> {
+  readonly type = EVENT_TYPES.MESSAGE_UPDATED;
 
   constructor(
     public readonly id: string,
@@ -445,7 +576,7 @@ export class MessageUpdatedEvent extends TypedEventClass<'message.updated'> {
     super();
   }
 
-  toPayload(): EventPayloadWithoutTimestamp<'message.updated'> {
+  toPayload(): EventPayloadWithoutTimestamp<MessageUpdatedType> {
     return { id: this.id, changedFields: this.changedFields };
   }
 }
@@ -453,8 +584,8 @@ export class MessageUpdatedEvent extends TypedEventClass<'message.updated'> {
 /**
  * User profile updated event
  */
-export class UserProfileUpdatedEvent extends TypedEventClass<'user.profile.updated'> {
-  readonly type = 'user.profile.updated' as const;
+export class UserProfileUpdatedEvent extends TypedEventClass<UserProfileUpdatedType> {
+  readonly type = EVENT_TYPES.USER_PROFILE_UPDATED;
 
   constructor(
     public readonly id: string,
@@ -463,7 +594,7 @@ export class UserProfileUpdatedEvent extends TypedEventClass<'user.profile.updat
     super();
   }
 
-  toPayload(): EventPayloadWithoutTimestamp<'user.profile.updated'> {
+  toPayload(): EventPayloadWithoutTimestamp<UserProfileUpdatedType> {
     return { id: this.id, changedFields: this.changedFields };
   }
 }

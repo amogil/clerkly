@@ -1,13 +1,17 @@
-// Requirements: realtime-events.3.6
+// Requirements: realtime-events.3.6, google-oauth-auth.8.4
 /**
  * Unit tests for TypedEventClass implementations
  * Tests event class constructors and toPayload methods
  */
 
 import {
-  AuthSucceededEvent,
+  AuthStartedEvent,
+  AuthCallbackReceivedEvent,
+  AuthProfileFetchingEvent,
+  AuthCompletedEvent,
   AuthFailedEvent,
-  ProfileSyncedEvent,
+  AuthCancelledEvent,
+  AuthSignedOutEvent,
   ErrorCreatedEvent,
   UserLoginEvent,
   UserLogoutEvent,
@@ -21,87 +25,136 @@ import {
   Agent,
   Message,
 } from '../../../src/shared/events/types';
-import { User } from '../../../src/types';
 
 describe('Event Classes', () => {
-  describe('AuthSucceededEvent', () => {
-    /* Preconditions: Valid userId provided
-       Action: Create AuthSucceededEvent
-       Assertions: Event has correct type and payload
-       Requirements: realtime-events.3.6 */
-    it('should create event with userId', () => {
-      const event = new AuthSucceededEvent('user-123');
+  describe('AuthStartedEvent', () => {
+    /* Preconditions: None
+       Action: Create AuthStartedEvent
+       Assertions: Event has correct type and empty payload
+       Requirements: google-oauth-auth.8.4 */
+    it('should create event with empty payload', () => {
+      const event = new AuthStartedEvent();
 
-      expect(event.type).toBe('auth.succeeded');
+      expect(event.type).toBe('auth.started');
+      expect(event.toPayload()).toEqual({});
+    });
+  });
+
+  describe('AuthCallbackReceivedEvent', () => {
+    /* Preconditions: None
+       Action: Create AuthCallbackReceivedEvent
+       Assertions: Event has correct type and empty payload
+       Requirements: google-oauth-auth.8.4 */
+    it('should create event with empty payload', () => {
+      const event = new AuthCallbackReceivedEvent();
+
+      expect(event.type).toBe('auth.callback-received');
+      expect(event.toPayload()).toEqual({});
+    });
+  });
+
+  describe('AuthProfileFetchingEvent', () => {
+    /* Preconditions: None
+       Action: Create AuthProfileFetchingEvent
+       Assertions: Event has correct type and empty payload
+       Requirements: google-oauth-auth.8.4 */
+    it('should create event with empty payload', () => {
+      const event = new AuthProfileFetchingEvent();
+
+      expect(event.type).toBe('auth.profile-fetching');
+      expect(event.toPayload()).toEqual({});
+    });
+  });
+
+  describe('AuthCompletedEvent', () => {
+    const mockProfile = {
+      id: 'user-123',
+      email: 'test@example.com',
+      name: 'Test User',
+      picture: 'https://example.com/photo.jpg',
+    };
+
+    /* Preconditions: Valid userId and profile provided
+       Action: Create AuthCompletedEvent
+       Assertions: Event has correct type and payload
+       Requirements: google-oauth-auth.8.4 */
+    it('should create event with userId and profile', () => {
+      const event = new AuthCompletedEvent('user-123', mockProfile);
+
+      expect(event.type).toBe('auth.completed');
       expect(event.userId).toBe('user-123');
-      expect(event.toPayload()).toEqual({ userId: 'user-123' });
+      expect(event.profile).toEqual(mockProfile);
+      expect(event.toPayload()).toEqual({ userId: 'user-123', profile: mockProfile });
     });
 
     /* Preconditions: Empty userId provided
-       Action: Create AuthSucceededEvent
+       Action: Create AuthCompletedEvent
        Assertions: Throws error
-       Requirements: realtime-events.3.6 */
+       Requirements: google-oauth-auth.8.4 */
     it('should throw error for empty userId', () => {
-      expect(() => new AuthSucceededEvent('')).toThrow(
-        'AuthSucceededEvent requires a non-empty userId'
+      expect(() => new AuthCompletedEvent('', mockProfile)).toThrow(
+        'AuthCompletedEvent requires a non-empty userId'
       );
+    });
+
+    /* Preconditions: Profile without picture provided
+       Action: Create AuthCompletedEvent
+       Assertions: Event has correct type and payload without picture
+       Requirements: google-oauth-auth.8.4 */
+    it('should create event with profile without picture', () => {
+      const profileWithoutPicture = {
+        id: 'user-123',
+        email: 'test@example.com',
+        name: 'Test User',
+      };
+      const event = new AuthCompletedEvent('user-123', profileWithoutPicture);
+
+      expect(event.type).toBe('auth.completed');
+      expect(event.profile.picture).toBeUndefined();
     });
   });
 
   describe('AuthFailedEvent', () => {
-    /* Preconditions: Error message provided
+    /* Preconditions: Error code and message provided
        Action: Create AuthFailedEvent
        Assertions: Event has correct type and payload
-       Requirements: realtime-events.3.6 */
-    it('should create event with error message', () => {
-      const event = new AuthFailedEvent('Authentication failed');
+       Requirements: google-oauth-auth.8.4 */
+    it('should create event with code and message', () => {
+      const event = new AuthFailedEvent('token_exchange_failed', 'Ошибка обмена токенов');
 
       expect(event.type).toBe('auth.failed');
-      expect(event.error).toBe('Authentication failed');
-      expect(event.errorCode).toBeUndefined();
+      expect(event.code).toBe('token_exchange_failed');
+      expect(event.message).toBe('Ошибка обмена токенов');
       expect(event.toPayload()).toEqual({
-        error: 'Authentication failed',
-        errorCode: undefined,
-      });
-    });
-
-    /* Preconditions: Error message and code provided
-       Action: Create AuthFailedEvent
-       Assertions: Event has correct type and payload with errorCode
-       Requirements: realtime-events.3.6 */
-    it('should create event with error message and code', () => {
-      const event = new AuthFailedEvent('Access denied', 'access_denied');
-
-      expect(event.type).toBe('auth.failed');
-      expect(event.error).toBe('Access denied');
-      expect(event.errorCode).toBe('access_denied');
-      expect(event.toPayload()).toEqual({
-        error: 'Access denied',
-        errorCode: 'access_denied',
+        code: 'token_exchange_failed',
+        message: 'Ошибка обмена токенов',
       });
     });
   });
 
-  describe('ProfileSyncedEvent', () => {
-    const mockUser: User = {
-      user_id: 'abc123xyz0',
-      email: 'test@example.com',
-      name: 'Test User',
-      google_id: '123456789',
-      locale: 'en',
-      last_synced: Date.now(),
-    };
+  describe('AuthCancelledEvent', () => {
+    /* Preconditions: None
+       Action: Create AuthCancelledEvent
+       Assertions: Event has correct type and empty payload
+       Requirements: google-oauth-auth.8.4 */
+    it('should create event with empty payload', () => {
+      const event = new AuthCancelledEvent();
 
-    /* Preconditions: User object provided
-       Action: Create ProfileSyncedEvent
-       Assertions: Event has correct type and payload
-       Requirements: realtime-events.3.6 */
-    it('should create event with user data', () => {
-      const event = new ProfileSyncedEvent(mockUser);
+      expect(event.type).toBe('auth.cancelled');
+      expect(event.toPayload()).toEqual({});
+    });
+  });
 
-      expect(event.type).toBe('profile.synced');
-      expect(event.user).toEqual(mockUser);
-      expect(event.toPayload()).toEqual({ user: mockUser });
+  describe('AuthSignedOutEvent', () => {
+    /* Preconditions: None
+       Action: Create AuthSignedOutEvent
+       Assertions: Event has correct type and empty payload
+       Requirements: google-oauth-auth.8.4 */
+    it('should create event with empty payload', () => {
+      const event = new AuthSignedOutEvent();
+
+      expect(event.type).toBe('auth.signed-out');
+      expect(event.toPayload()).toEqual({});
     });
   });
 

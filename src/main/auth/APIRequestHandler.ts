@@ -123,7 +123,7 @@ export async function handleAPIRequest(
           // Requirements: token-management-ui.1.3 - Emit auth.failed event via EventBus
           // The event will be handled by the renderer process to show LoginError with errorCode 'invalid_grant'
           const eventBus = MainEventBus.getInstance();
-          eventBus.publish(new AuthFailedEvent('Session expired', 'invalid_grant'));
+          eventBus.publish(new AuthFailedEvent('invalid_grant', 'Session expired'));
         } finally {
           // Reset flag after a short delay to allow other requests to see the cleared state
           setTimeout(() => {
