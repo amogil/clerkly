@@ -253,7 +253,7 @@ export class UserManager {
         ? `${googleApiBaseUrl}/userinfo` // Mock server uses /userinfo
         : `${googleApiBaseUrl}/oauth2/v1/userinfo`; // Google uses /oauth2/v1/userinfo
 
-      Logger.info('UserManager', 'Fetching profile from Google UserInfo API');
+      this.logger.info('Fetching profile from Google UserInfo API');
 
       // Requirements: token-management-ui.1.3, token-management-ui.1.4 - Use centralized handler for automatic 401 detection
       const response = await handleAPIRequest(
@@ -277,22 +277,21 @@ export class UserManager {
       const user = this.findOrCreateUser(googleProfile);
       this.currentUserId = user.user_id;
       this.currentUser = user;
-      Logger.info('UserManager', `User ID set: ${user.user_id}`);
 
-      Logger.info('UserManager', 'Profile fetched and saved successfully');
+      this.logger.info(`Profile fetched successfully for user ${user.user_id}`);
       return user;
     } catch (error) {
       // Requirements: token-management-ui.1.3 - If session expired, tokens are already cleared by handleAPIRequest
       // Return null to indicate no profile available
       if (error instanceof SessionExpiredError) {
-        Logger.info('UserManager', 'Session expired, returning null');
+        this.logger.info('Session expired, returning null');
         return null;
       }
 
       this.logger.error(`Failed to fetch profile: ${error}`);
 
       // Requirements: account-profile.1.7 - Return cached user on other errors (network, timeout, etc.)
-      Logger.info('UserManager', 'Returning cached user due to API error');
+      this.logger.info('Returning cached user due to API error');
 
       // Requirements: error-notifications.1.1, error-notifications.1.4 - Notify user about the error
       handleBackgroundError(error, 'Profile Loading');
@@ -424,7 +423,7 @@ export class UserManager {
       // Get access token from token storage
       const tokens = await this.tokenStorage.loadTokens();
       if (!tokens || !tokens.accessToken) {
-        Logger.error('UserManager', 'No access token available for synchronous fetch');
+        this.logger.error('No access token available for synchronous fetch');
         // Clear tokens since authorization is incomplete
         await this.tokenStorage.deleteTokens();
         return { success: false, error: 'profile_fetch_failed' };
@@ -436,7 +435,7 @@ export class UserManager {
         ? `${googleApiBaseUrl}/userinfo`
         : `${googleApiBaseUrl}/oauth2/v1/userinfo`;
 
-      Logger.info('UserManager', 'Fetching profile synchronously during authorization');
+      this.logger.info('Fetching profile synchronously during authorization');
 
       // Make API request (with timeout to prevent blocking indefinitely)
       const controller = new AbortController();
@@ -452,10 +451,7 @@ export class UserManager {
       clearTimeout(timeoutId);
 
       if (!response.ok) {
-        Logger.error(
-          'UserProfileManager',
-          `UserInfo API error during sync fetch: ${response.status}`
-        );
+        this.logger.error(`UserInfo API error during sync fetch: ${response.status}`);
         // Requirements: google-oauth-auth.3.7 - Clear tokens on profile fetch failure
         await this.tokenStorage.deleteTokens();
         return { success: false, error: 'profile_fetch_failed' };
@@ -468,22 +464,16 @@ export class UserManager {
       this.currentUserId = user.user_id;
       this.currentUser = user;
 
-      Logger.info(
-        'UserProfileManager',
-        `Profile fetched and saved synchronously, user_id: ${user.user_id}`
-      );
+      this.logger.info(`Profile fetched synchronously for user ${user.user_id}`);
       return { success: true, user };
     } catch (error) {
-      Logger.error('UserManager', `Failed to fetch profile synchronously: ${error}`);
+      this.logger.error(`Failed to fetch profile synchronously: ${error}`);
 
       // Requirements: google-oauth-auth.3.7 - Clear tokens on any error
       try {
         await this.tokenStorage.deleteTokens();
       } catch (clearError) {
-        Logger.error(
-          'UserProfileManager',
-          `Failed to clear tokens after profile error: ${clearError}`
-        );
+        this.logger.error(`Failed to clear tokens after profile error: ${clearError}`);
       }
 
       return { success: false, error: 'profile_fetch_failed' };

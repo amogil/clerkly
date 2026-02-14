@@ -179,7 +179,6 @@ User                    Renderer Process         Main Process          Google OA
 |---------|-------------|---------|----------|
 | `auth.started` | Renderer → Main | `{}` | Пользователь нажал "Continue with Google" |
 | `auth.callback-received` | Main → Renderer | `{}` | Получен deep link от Google |
-| `auth.profile-fetching` | Main → Renderer | `{}` | Начинаем загрузку профиля из Google |
 | `auth.completed` | Main → Renderer | `{ userId: string, profile: UserProfile }` | Авторизация успешна |
 | `auth.failed` | Main → Renderer | `{ code: string, message: string }` | Ошибка авторизации |
 | `auth.cancelled` | Main → Renderer | `{}` | Пользователь отменил в Google |
@@ -191,7 +190,6 @@ User                    Renderer Process         Main Process          Google OA
 |-----------|--------|-------|--------|--------|
 | Начальное | Enabled | "Continue with Google" | Нет | Нет |
 | После `auth.callback-received` | Disabled | "Signing in..." | Да | Нет |
-| После `auth.profile-fetching` | Disabled | "Signing in..." | Да | Нет |
 | После `auth.completed` | - | - | - | Redirect to Agents |
 | После `auth.failed` | Enabled | "Continue with Google" | Нет | Да (сообщение) |
 | После `auth.cancelled` | Enabled | "Continue with Google" | Нет | Да ("Аутентификация отменена") |
@@ -335,12 +333,6 @@ class AuthCallbackReceivedEvent extends BaseEvent {
   payload = {};
 }
 
-// Main → Renderer: Начинаем загрузку профиля
-class AuthProfileFetchingEvent extends BaseEvent {
-  type = 'auth.profile-fetching';
-  payload = {};
-}
-
 // Main → Renderer: Авторизация успешна
 interface AuthCompletedPayload {
   userId: string;
@@ -391,7 +383,6 @@ export const EVENT_TYPES = {
   // Auth events
   AUTH_STARTED: 'auth.started',
   AUTH_CALLBACK_RECEIVED: 'auth.callback-received',
-  AUTH_PROFILE_FETCHING: 'auth.profile-fetching',
   AUTH_COMPLETED: 'auth.completed',
   AUTH_FAILED: 'auth.failed',
   AUTH_CANCELLED: 'auth.cancelled',

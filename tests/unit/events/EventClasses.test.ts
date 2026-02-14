@@ -7,7 +7,6 @@
 import {
   AuthStartedEvent,
   AuthCallbackReceivedEvent,
-  AuthProfileFetchingEvent,
   AuthCompletedEvent,
   AuthFailedEvent,
   AuthCancelledEvent,
@@ -49,19 +48,6 @@ describe('Event Classes', () => {
       const event = new AuthCallbackReceivedEvent();
 
       expect(event.type).toBe('auth.callback-received');
-      expect(event.toPayload()).toEqual({});
-    });
-  });
-
-  describe('AuthProfileFetchingEvent', () => {
-    /* Preconditions: None
-       Action: Create AuthProfileFetchingEvent
-       Assertions: Event has correct type and empty payload
-       Requirements: google-oauth-auth.8.4 */
-    it('should create event with empty payload', () => {
-      const event = new AuthProfileFetchingEvent();
-
-      expect(event.type).toBe('auth.profile-fetching');
       expect(event.toPayload()).toEqual({});
     });
   });

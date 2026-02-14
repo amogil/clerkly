@@ -60,7 +60,7 @@ export class AuthWindowManager {
       try {
         await this.showLoginWindow();
       } catch (loginError) {
-        Logger.error('AuthWindowManager', `Failed to show login window after error: ${loginError}`);
+        this.logger.error(`Failed to show login window after error: ${loginError}`);
         throw loginError;
       }
     }
@@ -90,7 +90,7 @@ export class AuthWindowManager {
       // Login screen is just content displayed in the main window
       // The actual routing will be handled by the renderer process
     } catch (error) {
-      Logger.error('AuthWindowManager', `Failed to show login window: ${error}`);
+      this.logger.error(`Failed to show login window: ${error}`);
       throw error;
     }
   }
@@ -137,10 +137,7 @@ export class AuthWindowManager {
       // Update window content to show error
       // The actual error display will be handled by the renderer process
       // through IPC events
-      Logger.info(
-        'AuthWindowManager',
-        `Showing login error: ${JSON.stringify({ error, errorCode })}`
-      );
+      this.logger.info(`Showing login error: ${JSON.stringify({ error, errorCode })}`);
 
       // Window should already exist from login screen
       if (!this.currentWindow) {
@@ -161,10 +158,10 @@ export class AuthWindowManager {
    */
   private async handleAuthSuccess(): Promise<void> {
     try {
-      Logger.info('AuthWindowManager', 'Authentication successful, showing main window');
+      this.logger.info('Authentication successful, showing main window');
       await this.showMainWindow();
     } catch (error) {
-      Logger.error('AuthWindowManager', `Failed to handle auth success: ${error}`);
+      this.logger.error(`Failed to handle auth success: ${error}`);
       throw error;
     }
   }
@@ -180,10 +177,7 @@ export class AuthWindowManager {
    */
   private async handleAuthError(error: string, errorCode?: string): Promise<void> {
     try {
-      Logger.info(
-        'AuthWindowManager',
-        `Authentication failed: ${JSON.stringify({ error, errorCode })}`
-      );
+      this.logger.info(`Authentication failed: ${JSON.stringify({ error, errorCode })}`);
       // Requirements: google-oauth-auth.11.5
       await this.showLoginError(error, errorCode);
     } catch (err) {
@@ -228,7 +222,7 @@ export class AuthWindowManager {
       this.logger.info('Retrying authentication');
       await this.showLoginWindow();
     } catch (error) {
-      Logger.error('AuthWindowManager', `Failed to retry authentication: ${error}`);
+      this.logger.error(`Failed to retry authentication: ${error}`);
       throw error;
     }
   }

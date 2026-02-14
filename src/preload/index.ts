@@ -5,25 +5,7 @@
  */
 
 import { contextBridge, ipcRenderer } from 'electron';
-
-// Event type constants (duplicated from shared/events/constants.ts due to rootDir restriction)
-// IMPORTANT: Keep in sync with src/shared/events/constants.ts
-const EVENT_TYPES = {
-  // Auth events
-  AUTH_STARTED: 'auth.started',
-  AUTH_CALLBACK_RECEIVED: 'auth.callback-received',
-  AUTH_PROFILE_FETCHING: 'auth.profile-fetching',
-  AUTH_COMPLETED: 'auth.completed',
-  AUTH_FAILED: 'auth.failed',
-  AUTH_CANCELLED: 'auth.cancelled',
-  AUTH_SIGNED_OUT: 'auth.signed-out',
-  // User events
-  USER_LOGIN: 'user.login',
-  USER_LOGOUT: 'user.logout',
-  USER_PROFILE_UPDATED: 'user.profile.updated',
-  // Error events
-  ERROR_CREATED: 'error.created',
-} as const;
+import { EVENT_TYPES } from '../shared/events/constants';
 
 // LLM Provider type (duplicated from types/index.ts due to rootDir restriction)
 type LLMProvider = 'openai' | 'anthropic' | 'google';

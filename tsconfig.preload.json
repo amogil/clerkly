@@ -2,9 +2,9 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "outDir": "./dist/preload",
-    "rootDir": "./src/preload",
+    "rootDir": "./src",
     "types": ["node"]
   },
-  "include": ["src/preload/**/*"],
+  "include": ["src/preload/**/*", "src/shared/events/constants.ts"],
   "exclude": ["node_modules", "dist", "tests"]
 }

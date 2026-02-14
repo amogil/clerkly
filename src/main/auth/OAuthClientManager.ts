@@ -9,7 +9,6 @@ import { Logger } from '../Logger';
 import { MainEventBus } from '../events/MainEventBus';
 import {
   AuthCallbackReceivedEvent,
-  AuthProfileFetchingEvent,
   AuthCompletedEvent,
   AuthFailedEvent,
   AuthCancelledEvent,
@@ -75,7 +74,7 @@ export class OAuthClientManager {
    */
   setUserManager(userManager: any): void {
     this.userManager = userManager;
-    Logger.info('OAuthClientManager', 'User manager set for automatic updates');
+    this.logger.info('User manager set for automatic updates');
   }
 
   /**
@@ -86,7 +85,7 @@ export class OAuthClientManager {
    */
   setAuthWindowManager(authWindowManager: any): void {
     this.authWindowManager = authWindowManager;
-    Logger.info('OAuthClientManager', 'Auth window manager set for loader display');
+    this.logger.info('Auth window manager set for loader display');
   }
 
   /**
@@ -254,10 +253,7 @@ export class OAuthClientManager {
       // Synchronously fetch user profile BEFORE saving tokens
       // This ensures we have user email for database isolation
       if (this.userManager) {
-        Logger.info('OAuthClientManager', 'Fetching profile synchronously before saving tokens');
-
-        // Publish auth.profile-fetching event
-        eventBus.publish(new AuthProfileFetchingEvent());
+        this.logger.info('Fetching profile synchronously before saving tokens');
 
         // Temporarily store tokens in memory for profile fetch
         const tempTokens = tokenData;
@@ -267,7 +263,7 @@ export class OAuthClientManager {
 
         if (!profileResult.success) {
           // Requirements: google-oauth-auth.3.7 - Profile fetch failed, don't save tokens
-          Logger.error('OAuthClientManager', 'Profile fetch failed, authorization incomplete');
+          this.logger.error('Profile fetch failed, authorization incomplete');
           // Publish auth.failed event
           eventBus.publish(new AuthFailedEvent('profile_fetch_failed', 'Failed to load profile'));
           // Clear PKCE storage
@@ -279,7 +275,7 @@ export class OAuthClientManager {
         }
 
         // Requirements: google-oauth-auth.3.8 - Profile fetched successfully
-        Logger.info('OAuthClientManager', 'Profile fetched successfully, now saving tokens');
+        this.logger.info('Profile fetched successfully, now saving tokens');
 
         // Now save tokens to database (profile manager has email set)
         await this.tokenStorage.saveTokens(tokenData);
@@ -296,7 +292,7 @@ export class OAuthClientManager {
           );
         }
       } else {
-        Logger.warn('OAuthClientManager', 'User manager not set, saving tokens without profile');
+        this.logger.warn('User manager not set, saving tokens without profile');
         // Fallback: save tokens without profile (will fail if DataManager requires email)
         await this.tokenStorage.saveTokens(tokenData);
       }
@@ -333,10 +329,10 @@ export class OAuthClientManager {
     tokens: TokenData
   ): Promise<{ success: boolean; profile?: any; error?: string }> {
     try {
-      Logger.info('OAuthClientManager', 'fetchProfileWithTokens: Starting profile fetch');
+      this.logger.info('Fetching profile with tokens');
 
       if (!this.userManager) {
-        Logger.error('OAuthClientManager', 'fetchProfileWithTokens: User manager not set');
+        this.logger.error('User manager not set');
         return { success: false, error: 'User manager not set' };
       }
 
@@ -347,8 +343,6 @@ export class OAuthClientManager {
         ? `${googleApiBaseUrl}/oauth2/v2/userinfo` // Mock server uses /oauth2/v2/userinfo
         : `${googleApiBaseUrl}/oauth2/v2/userinfo`; // Google uses /oauth2/v2/userinfo
 
-      Logger.info('OAuthClientManager', `fetchProfileWithTokens: Fetching from: ${userInfoUrl}`);
-
       const response = await fetch(userInfoUrl, {
         method: 'GET',
         headers: {
@@ -357,10 +351,7 @@ export class OAuthClientManager {
       });
 
       if (!response.ok) {
-        Logger.error(
-          'OAuthClientManager',
-          `fetchProfileWithTokens: UserInfo API error: ${response.status}`
-        );
+        this.logger.error(`UserInfo API error: ${response.status}`);
         return { success: false, error: `UserInfo API returned ${response.status}` };
       }
 
@@ -373,30 +364,19 @@ export class OAuthClientManager {
         locale?: string;
         verified_email?: boolean;
       };
-      Logger.info(
-        'OAuthClientManager',
-        `fetchProfileWithTokens: Profile fetched: ${profileData.email}`
-      );
 
       // CRITICAL: Find or create user and set user_id in ProfileManager BEFORE saving to database
       // This is required because DataManager.saveData() needs getCurrentUserId()
       // Requirements: user-data-isolation.1.2 - Find or create user by email
-      Logger.info('OAuthClientManager', 'fetchProfileWithTokens: Finding or creating user');
       const user = this.userManager.findOrCreateUser(profileData);
       (this.userManager as any).currentUserId = user.user_id;
       (this.userManager as any).currentUser = user;
-      Logger.info('OAuthClientManager', `fetchProfileWithTokens: User ID set: ${user.user_id}`);
 
-      // User is already saved to database by findOrCreateUser
-      Logger.info('OAuthClientManager', 'fetchProfileWithTokens: User saved successfully');
-
+      this.logger.info(`Profile fetched successfully for user ${user.user_id}`);
       return { success: true, profile: user };
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      Logger.error(
-        'OAuthClientManager',
-        `fetchProfileWithTokens: Failed to fetch profile: ${errorMessage}`
-      );
+      this.logger.error(`Failed to fetch profile: ${errorMessage}`);
       return { success: false, error: errorMessage };
     }
   }
@@ -542,7 +522,7 @@ export class OAuthClientManager {
 
       // Requirements: account-profile.1.5 - Automatically update profile after token refresh
       if (this.userManager) {
-        Logger.info('OAuthClientManager', 'Triggering profile update after token refresh');
+        this.logger.info('Triggering profile update after token refresh');
         await this.userManager.updateProfileAfterTokenRefresh();
       }
 
@@ -602,7 +582,7 @@ export class OAuthClientManager {
       // Note: Profile data is NOT deleted - it's preserved in database for next login
       // This follows the architectural principle: database is single source of truth
       // Requirements: navigation.1.4, Architectural Principles
-      Logger.info('OAuthClientManager', 'Tokens cleared, profile data preserved in database');
+      this.logger.info('Tokens cleared, profile data preserved in database');
     } catch (error: unknown) {
       // Requirements: error-notifications.1.1, error-notifications.1.4
       // Note: Logout errors may include race conditions (e.g., "No user logged in")

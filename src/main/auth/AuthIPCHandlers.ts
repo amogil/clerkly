@@ -226,10 +226,7 @@ export class AuthIPCHandlers {
 
       this.logger.info('Refreshing profile');
       const user = await this.userManager.fetchProfile();
-      Logger.info(
-        'AuthIPCHandlers',
-        `Profile refresh completed, result: ${user ? 'success' : 'null'}`
-      );
+      this.logger.info(`Profile refresh completed, result: ${user ? 'success' : 'null'}`);
 
       return {
         success: true,
@@ -237,7 +234,7 @@ export class AuthIPCHandlers {
       };
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      Logger.error('AuthIPCHandlers', `Failed to refresh user: ${errorMessage}`);
+      this.logger.error(`Failed to refresh user: ${errorMessage}`);
       return {
         success: false,
         error: errorMessage || 'Failed to refresh profile',

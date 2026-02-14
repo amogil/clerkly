@@ -128,13 +128,6 @@ export type AuthStartedPayload = BaseEvent;
 export type AuthCallbackReceivedPayload = BaseEvent;
 
 /**
- * Auth profile fetching event payload
- * Emitted when profile fetch starts
- * Requirements: google-oauth-auth.8.4
- */
-export type AuthProfileFetchingPayload = BaseEvent;
-
-/**
  * Auth completed event payload
  * Emitted when OAuth flow completes successfully
  * Requirements: google-oauth-auth.8.4
@@ -219,7 +212,6 @@ export interface ClerklyEvents {
   // Auth events
   [EVENT_TYPES.AUTH_STARTED]: AuthStartedPayload;
   [EVENT_TYPES.AUTH_CALLBACK_RECEIVED]: AuthCallbackReceivedPayload;
-  [EVENT_TYPES.AUTH_PROFILE_FETCHING]: AuthProfileFetchingPayload;
   [EVENT_TYPES.AUTH_COMPLETED]: AuthCompletedPayload;
   [EVENT_TYPES.AUTH_FAILED]: AuthFailedPayload;
   [EVENT_TYPES.AUTH_CANCELLED]: AuthCancelledPayload;
@@ -310,7 +302,6 @@ export function getEventKey(type: EventType, payload: BaseEvent): string {
 // Type aliases for event type literals (for use in generic constraints)
 type AuthStartedType = typeof EVENT_TYPES.AUTH_STARTED;
 type AuthCallbackReceivedType = typeof EVENT_TYPES.AUTH_CALLBACK_RECEIVED;
-type AuthProfileFetchingType = typeof EVENT_TYPES.AUTH_PROFILE_FETCHING;
 type AuthCompletedType = typeof EVENT_TYPES.AUTH_COMPLETED;
 type AuthFailedType = typeof EVENT_TYPES.AUTH_FAILED;
 type AuthCancelledType = typeof EVENT_TYPES.AUTH_CANCELLED;
@@ -353,22 +344,6 @@ export class AuthCallbackReceivedEvent extends TypedEventClass<AuthCallbackRecei
   }
 
   toPayload(): EventPayloadWithoutTimestamp<AuthCallbackReceivedType> {
-    return {};
-  }
-}
-
-/**
- * Auth profile fetching event
- * Emitted when profile fetch starts
- */
-export class AuthProfileFetchingEvent extends TypedEventClass<AuthProfileFetchingType> {
-  readonly type = EVENT_TYPES.AUTH_PROFILE_FETCHING;
-
-  constructor() {
-    super();
-  }
-
-  toPayload(): EventPayloadWithoutTimestamp<AuthProfileFetchingType> {
     return {};
   }
 }

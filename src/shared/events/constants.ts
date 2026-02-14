@@ -20,7 +20,6 @@ export const EVENT_TYPES = {
   // Auth events (new event system)
   AUTH_STARTED: 'auth.started',
   AUTH_CALLBACK_RECEIVED: 'auth.callback-received',
-  AUTH_PROFILE_FETCHING: 'auth.profile-fetching',
   AUTH_COMPLETED: 'auth.completed',
   AUTH_FAILED: 'auth.failed',
   AUTH_CANCELLED: 'auth.cancelled',
