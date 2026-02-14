@@ -126,9 +126,9 @@ test('42.2 should clear session and show login on 401 error', async () => {
   // Wait for authentication to complete
   await mainWindow.waitForTimeout(1000);
 
-  // Verify we're on dashboard
-  const dashboardHeading = await mainWindow.locator('[data-testid="agents"]').count();
-  expect(dashboardHeading).toBeGreaterThan(0);
+  // Verify we're on Agents page
+  const agentsElement = await mainWindow.locator('[data-testid="agents"]').count();
+  expect(agentsElement).toBeGreaterThan(0);
 
   // Setup: Mock API to return 401
   mockServer.setUserInfoReturn401(true);

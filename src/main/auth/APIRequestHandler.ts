@@ -6,6 +6,7 @@ import { Logger } from '../Logger';
 import { handleBackgroundError } from '../ErrorHandler';
 import { MainEventBus } from '../events/MainEventBus';
 import { AuthFailedEvent } from '../../shared/events/types';
+import { SessionExpiredError } from './errors';
 
 // Requirements: clerkly.3.5, clerkly.3.7 - Create parameterized logger for APIRequestHandler module
 const logger = Logger.create('APIRequestHandler');
@@ -131,8 +132,8 @@ export async function handleAPIRequest(
         }
       }
 
-      // Requirements: token-management-ui.1.3, token-management-ui.1.6 - Throw error with user-friendly message
-      throw new Error('Your session has expired. Please sign in again.');
+      // Requirements: token-management-ui.1.3, token-management-ui.1.6 - Throw typed error for session expiry
+      throw new SessionExpiredError();
     }
 
     return response;

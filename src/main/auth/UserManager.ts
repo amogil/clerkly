@@ -4,6 +4,7 @@ import { DataManager } from '../DataManager';
 import { TokenStorageManager } from './TokenStorageManager';
 import { handleBackgroundError } from '../ErrorHandler';
 import { handleAPIRequest } from './APIRequestHandler';
+import { SessionExpiredError } from './errors';
 import { Logger } from '../Logger';
 
 // Requirements: clerkly.3.8 - Use centralized Logger instead of console.*
@@ -252,11 +253,10 @@ export class UserManager {
       Logger.info('UserManager', 'Profile fetched and saved successfully');
       return user;
     } catch (error) {
-      // Requirements: token-management-ui.1.3 - If it's a 401 error, tokens are already cleared by handleAPIRequest
-      // Just return null to indicate no profile available
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      if (errorMessage.includes('Authorization failed') || errorMessage.includes('401')) {
-        Logger.info('UserManager', 'Session expired (401), returning null');
+      // Requirements: token-management-ui.1.3 - If session expired, tokens are already cleared by handleAPIRequest
+      // Return null to indicate no profile available
+      if (error instanceof SessionExpiredError) {
+        Logger.info('UserManager', 'Session expired, returning null');
         return null;
       }
 
