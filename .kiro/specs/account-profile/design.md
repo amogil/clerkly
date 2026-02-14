@@ -6,7 +6,7 @@
 
 ### Архитектурный Принцип: База Данных как Единственный Источник Истины
 
-Приложение построено на фундаментальном архитектурном принципе: **база данных (SQLite через DataManager) является единственным источником истины для всех данных приложения**.
+Приложение построено на фундаментальном архитектурном принципе: **база данных (SQLite через DatabaseManager и UserSettingsManager) является единственным источником истины для всех данных приложения**.
 
 **Ключевые аспекты:**
 
@@ -39,7 +39,7 @@ External API → Main Process → Database → IPC Event → Renderer → UI Upd
 - **Electron**: Фреймворк для создания десктопных приложений
 - **TypeScript**: Язык программирования для типобезопасности
 - **Google UserInfo API**: API для получения информации о пользователе
-- **SQLite**: База данных для хранения профиля (через существующий DataManager)
+- **SQLite**: База данных для хранения профиля (через DatabaseManager и UserSettingsManager)
 - **React**: Библиотека для создания UI компонентов
 
 ## Архитектура
@@ -63,8 +63,8 @@ External API → Main Process → Database → IPC Event → Renderer → UI Upd
 │           │                                │                 │
 │           ▼                                ▼                 │
 │  ┌──────────────────────┐       ┌─────────────────────┐     │
-│  │ Google UserInfo API  │       │    DataManager      │     │
-│  │ (HTTPS Request)      │       │     (SQLite)        │     │
+│  │ Google UserInfo API  │       │  UserSettingsManager  │     │
+│  │ (HTTPS Request)      │       │     (SQLite)          │     │
 │  └──────────────────────┘       └─────────────────────┘     │
 │           │                                │                 │
 └───────────┼────────────────────────────────┼─────────────────┘
@@ -88,7 +88,7 @@ External API → Main Process → Database → IPC Event → Renderer → UI Upd
 1. **Авторизация пользователя**:
    - Пользователь авторизуется через Google OAuth
    - `UserProfileManager` синхронно загружает профиль из Google UserInfo API
-   - Профиль сохраняется в базу данных через `DataManager`
+   - Профиль сохраняется в базу данных через `UserSettingsManager`
    - UI отображает данные профиля
 
 2. **Запуск приложения**:
@@ -130,12 +130,12 @@ interface UserProfile {
 }
 
 class UserProfileManager {
-  private dataManager: DataManager;
+  private userSettingsManager: UserSettingsManager;
   private oauthClient: OAuthClientManager;
   private readonly profileKey = 'user_profile';
   
-  constructor(dataManager: DataManager, oauthClient: OAuthClientManager) {
-    this.dataManager = dataManager;
+  constructor(userSettingsManager: UserSettingsManager, oauthClient: OAuthClientManager) {
+    this.userSettingsManager = userSettingsManager;
     this.oauthClient = oauthClient;
   }
 
@@ -187,7 +187,7 @@ class UserProfileManager {
    */
   async saveProfile(profile: UserProfile): Promise<void> {
     try {
-      await this.dataManager.saveData(this.profileKey, profile);
+      await this.userSettingsManager.saveData(this.profileKey, profile);
       console.log('[UserProfileManager] Profile saved to local storage');
     } catch (error) {
       console.error('[UserProfileManager] Failed to save profile:', error);
@@ -201,7 +201,7 @@ class UserProfileManager {
    */
   async loadProfile(): Promise<UserProfile | null> {
     try {
-      const result = await this.dataManager.loadData(this.profileKey);
+      const result = await this.userSettingsManager.loadData(this.profileKey);
       if (result.success && result.data) {
         console.log('[UserProfileManager] Profile loaded from local storage');
         return result.data as UserProfile;
@@ -226,7 +226,7 @@ class UserProfileManager {
    */
   async clearProfile(): Promise<void> {
     try {
-      await this.dataManager.deleteData(this.profileKey);
+      await this.userSettingsManager.deleteData(this.profileKey);
       console.log('[UserProfileManager] Profile cleared from local storage');
     } catch (error) {
       console.error('[UserProfileManager] Failed to clear profile:', error);
@@ -566,7 +566,7 @@ interface UserProfile {
 
 ### Property 5: Сохранение данных профиля при успешной загрузке
 
-*Для любого* успешного запроса к UserInfo API (синхронного или фонового), полученные данные профиля должны быть сохранены в локальную базу данных (SQLite через DataManager).
+*Для любого* успешного запроса к UserInfo API (синхронного или фонового), полученные данные профиля должны быть сохранены в локальную базу данных (SQLite через UserSettingsManager).
 
 **Validates: Requirements account-profile.1.3**
 
@@ -726,7 +726,7 @@ async fetchProfile(): Promise<UserProfile | null> {
 // Requirements: account-profile.1.3
 async saveProfile(profile: UserProfile): Promise<void> {
   try {
-    await this.dataManager.saveData('user_profile', profile);
+    await this.userSettingsManager.saveData('user_profile', profile);
   } catch (error) {
     console.error('[UserProfileManager] Failed to save profile:', error);
     throw error; // Propagate error to caller
@@ -748,7 +748,7 @@ async saveProfile(profile: UserProfile): Promise<void> {
 // Requirements: account-profile.1.1
 async loadProfile(): Promise<UserProfile | null> {
   try {
-    const result = await this.dataManager.loadData('user_profile');
+    const result = await this.userSettingsManager.loadData('user_profile');
     if (result.success && result.data) {
       return result.data as UserProfile;
     }
@@ -824,13 +824,13 @@ console.error('[Account] Failed to load profile:', errorMessage);
 describe('UserProfileManager', () => {
   /* Preconditions: OAuthClientManager returns valid tokens, Google UserInfo API mocked
      Action: call fetchProfile()
-     Assertions: correct API request (URL, headers), profile data saved to DataManager
+     Assertions: correct API request (URL, headers), profile data saved to UserSettingsManager
      Requirements: account-profile.1.2, account-profile.1.3 */
   it('should fetch profile from Google UserInfo API', async () => {
     // Тест успешного получения профиля
   });
 
-  /* Preconditions: Google UserInfo API returns error, cached profile exists in DataManager
+  /* Preconditions: Google UserInfo API returns error, cached profile exists in UserSettingsManager
      Action: call fetchProfile()
      Assertions: returns cached profile data, error logged
      Requirements: account-profile.1.1, account-profile.1.3 */
@@ -848,25 +848,25 @@ describe('UserProfileManager', () => {
 
   /* Preconditions: valid profile object
      Action: call saveProfile()
-     Assertions: DataManager.saveData called with correct key and data
+     Assertions: UserSettingsManager.saveData called with correct key and data
      Requirements: account-profile.1.3 */
-  it('should save profile to DataManager', async () => {
+  it('should save profile to UserSettingsManager', async () => {
     // Тест сохранения профиля
   });
 
-  /* Preconditions: profile exists in DataManager
+  /* Preconditions: profile exists in UserSettingsManager
      Action: call loadProfile()
      Assertions: returns correct profile data
      Requirements: account-profile.1.1 */
-  it('should load profile from DataManager', async () => {
+  it('should load profile from UserSettingsManager', async () => {
     // Тест загрузки профиля
   });
 
-  /* Preconditions: profile exists in DataManager
+  /* Preconditions: profile exists in UserSettingsManager
      Action: call clearProfile()
-     Assertions: DataManager.deleteData called with correct key
+     Assertions: UserSettingsManager.deleteData called with correct key
      Requirements: N/A (method exists but not currently used in application flow) */
-  it('should clear profile from DataManager', async () => {
+  it('should clear profile from UserSettingsManager', async () => {
     // Тест очистки профиля (метод существует, но не используется в текущем flow)
   });
 
@@ -964,7 +964,7 @@ describe('Account Component', () => {
 describe('Account Functional Tests - Profile Integration', () => {
   /* Preconditions: real OAuthClientManager and UserProfileManager, mocked Google APIs
      Action: perform OAuth login, wait for profile fetch
-     Assertions: profile automatically loaded, data saved to DataManager
+     Assertions: profile automatically loaded, data saved to UserSettingsManager
      Requirements: account-profile.1.2, account-profile.1.3 */
   it('should load profile after OAuth login', async () => {
     // Тест полного цикла авторизации и загрузки профиля
@@ -986,7 +986,7 @@ describe('Account Functional Tests - Profile Integration', () => {
     // Тест загрузки профиля при запуске
   });
 
-  /* Preconditions: cached profile in DataManager, Google API returns error
+  /* Preconditions: cached profile in UserSettingsManager, Google API returns error
      Action: call fetchProfile()
      Assertions: returns cached data, no exception thrown
      Requirements: account-profile.1.1, account-profile.1.3 */
@@ -1083,12 +1083,12 @@ class LifecycleManager {
   private oauthClient: OAuthClientManager;
 
   constructor(
-    dataManager: DataManager,
+    userSettingsManager: UserSettingsManager,
     oauthClient: OAuthClientManager,
     // ... other dependencies
   ) {
     this.oauthClient = oauthClient;
-    this.profileManager = new UserProfileManager(dataManager, oauthClient);
+    this.profileManager = new UserProfileManager(userSettingsManager, oauthClient);
     // ... other initializations
   }
 
@@ -1156,15 +1156,19 @@ class OAuthClientManager {
 // In src/main/index.ts
 
 async function initializeApp() {
-  const dataManager = new DataManager(/* ... */);
+  const dbManager = new DatabaseManager();
+  dbManager.initialize(storagePath);
+  
+  const userSettingsManager = new UserSettingsManager(dbManager);
   const oauthClient = new OAuthClientManager(/* ... */);
-  const profileManager = new UserProfileManager(dataManager, oauthClient);
+  const profileManager = new UserProfileManager(userSettingsManager, oauthClient);
   
   // Connect profile manager to oauth client for automatic updates
   oauthClient.setProfileManager(profileManager);
   
   const lifecycleManager = new LifecycleManager(
-    dataManager,
+    dbManager,
+    userSettingsManager,
     oauthClient,
     profileManager,
     // ... other dependencies
@@ -1236,7 +1240,7 @@ const handleRefreshProfile = async () => {
 
 ### Решение 2: Хранение Данных Профиля
 
-**Решение:** Хранить данные профиля в SQLite через существующий DataManager с ключом `user_profile`.
+**Решение:** Хранить данные профиля в SQLite через UserSettingsManager с ключом `user_profile`.
 
 **Обоснование:**
 - Использует существующую инфраструктуру

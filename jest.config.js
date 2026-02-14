@@ -38,11 +38,11 @@ module.exports = {
       statements: 80
     },
     // Critical components require high coverage
-    './src/main/DataManager.ts': {
-      branches: 81,
-      functions: 100,
-      lines: 85,
-      statements: 86
+    './src/main/UserSettingsManager.ts': {
+      branches: 77,
+      functions: 87,
+      lines: 83,
+      statements: 82
     },
     './src/main/LifecycleManager.ts': {
       branches: 66,

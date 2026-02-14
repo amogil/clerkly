@@ -15,8 +15,8 @@
 
 - [x] 1.2 Создать класс UserProfileManager
   - Реализовать метод `fetchProfile()` для запроса данных из Google UserInfo API
-  - Реализовать метод `saveProfile()` для сохранения в DataManager
-  - Реализовать метод `loadProfile()` для загрузки из DataManager
+  - Реализовать метод `saveProfile()` для сохранения в UserSettingsManager
+  - Реализовать метод `loadProfile()` для загрузки из UserSettingsManager
   - Реализовать метод `clearProfile()` для очистки данных
   - Реализовать метод `updateProfileAfterTokenRefresh()` для автоматического обновления
   - **Requirements:** account-profile.1.2, account-profile.1.5, account-profile.1.6, account-profile.1.7, account-profile.1.8
@@ -43,7 +43,7 @@
 
 - [x] 2.1 Добавить IPC handler для получения профиля
   - Реализовать `auth:get-profile` handler
-  - Возвращать кэшированные данные из DataManager
+  - Возвращать кэшированные данные из UserSettingsManager
   - Обрабатывать ошибки и возвращать структурированный ответ
   - **Requirements:** account-profile.1.2, account-profile.1.7
 
@@ -162,6 +162,26 @@
 - [x] 9.1 Запустить автоматическую валидацию
 - [x] 9.2 Проверить покрытие тестами
 - [x] 9.3 Проверить комментарии с требованиями
+
+### 10. Рефакторинг: DataManager → UserSettingsManager
+
+**Статус:** Не начато
+
+**Описание:** Обновление UserProfileManager для использования UserSettingsManager вместо DataManager.
+
+- [x] 10.1 Обновить конструктор UserProfileManager
+  - Заменить `DataManager` на `UserSettingsManager` в параметрах
+  - Обновить импорты
+  - **Requirements:** account-profile.1.3
+
+- [x] 10.2 Обновить тесты UserProfileManager
+  - Обновить моки для UserSettingsManager
+  - Обновить импорты в тестах
+  - **Requirements:** account-profile.1.3
+
+- [x] 10.3 Запустить валидацию
+  - Выполнить `npm run validate`
+  - Убедиться, что все тесты проходят
 
 ## Примечания
 
