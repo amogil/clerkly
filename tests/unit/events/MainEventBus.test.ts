@@ -469,13 +469,14 @@ describe('MainEventBus', () => {
       );
       await Promise.resolve();
 
-      expect(mockWebContents.send).toHaveBeenCalledWith(IPC_CHANNELS.EVENT_FROM_MAIN, {
-        type: 'agent.created',
-        payload: expect.objectContaining({
+      expect(mockWebContents.send).toHaveBeenCalledWith(
+        IPC_CHANNELS.EVENT_FROM_MAIN,
+        'agent.created',
+        expect.objectContaining({
           data: { id: 'agent-1', name: 'Test', createdAt: now, updatedAt: now },
           timestamp: expect.any(Number),
-        }),
-      });
+        })
+      );
     });
 
     /* Preconditions: EventBus with destroyed window

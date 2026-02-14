@@ -150,7 +150,12 @@ export class DataManager implements IDataManager {
       this.db = new Database(dbPath);
 
       // Запускаем миграции
-      const migrationsPath = path.join(__dirname, '..', '..', '..', 'migrations');
+      // In production (compiled): __dirname = dist/main/main/, so ../../../migrations = migrations/
+      // In tests (ts-jest): __dirname = src/main/, so we need to use process.cwd()
+      const isCompiledCode = __dirname.includes('dist');
+      const migrationsPath = isCompiledCode
+        ? path.join(__dirname, '..', '..', '..', 'migrations')
+        : path.join(process.cwd(), 'migrations');
       this.migrationRunner = new MigrationRunner(this.db, migrationsPath);
 
       const migrationResult = this.migrationRunner.runMigrations();
