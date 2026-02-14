@@ -153,17 +153,15 @@ function AppContent() {
     };
   }, [navigationManager]);
 
+  // Requirements: google-oauth-auth.15.1 - Loader shows AFTER deep link, not on button click
   const handleLogin = async () => {
     try {
-      setIsLoading(true);
       const result = await window.api.auth.startLogin();
       if (!result.success) {
-        setIsLoading(false);
         setAuthError({ message: result.error || 'Failed to start login' });
       }
     } catch (error) {
       logger.error('Login failed: ' + error);
-      setIsLoading(false);
       setAuthError({ message: 'Failed to start login' });
     }
   };
