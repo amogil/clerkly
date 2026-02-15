@@ -1,4 +1,4 @@
-// Requirements: window-management.5, database-refactoring.3.6, user-data-isolation.6.10
+// Requirements: window-management.5, database-refactoring.3.6, user-data-isolation.6.8
 
 import { screen } from 'electron';
 import type { IDatabaseManager } from './DatabaseManager';
@@ -36,17 +36,16 @@ export interface WindowState {
 }
 
 /**
- * Manages window state persistence using DatabaseManager.
+ * Manages window state persistence using DatabaseManager global repository.
  *
  * This class is responsible for saving and loading the application window's state
  * (position, size, and maximized status) to/from persistent storage. It ensures
  * that the window opens in the same state as when it was last closed, and handles
  * edge cases such as invalid positions (e.g., when a monitor is disconnected).
  *
- * Requirements: window-management.5, database-refactoring.3.6, user-data-isolation.6.10
- * Note: WindowStateManager uses DatabaseManager global methods (runQuery, getRow)
- * because window state is global (not user-specific). The systemUserId ('__system__')
- * is passed explicitly in params, not auto-injected.
+ * Requirements: window-management.5, user-data-isolation.6.8
+ * Note: WindowStateManager uses dbManager.global.windowState repository
+ * because window state is global (not user-specific).
  *
  * @example
  * ```typescript
@@ -86,15 +85,11 @@ export class WindowStateManager {
   // Requirements: clerkly.3.5, clerkly.3.7
   private logger = Logger.create('WindowStateManager');
   private dbManager: IDatabaseManager;
-  private readonly stateKey = 'window_state';
-  // System user_id for window state - not tied to any user
-  // Requirements: user-data-isolation.6.10 - Window state is global
-  private readonly systemUserId = '__system__';
 
   /**
    * Creates a new WindowStateManager instance.
    *
-   * Requirements: window-management.5, database-refactoring.3.6
+   * Requirements: window-management.5, user-data-isolation.6.8
    *
    * @param dbManager - DatabaseManager instance for database access.
    *
@@ -109,14 +104,14 @@ export class WindowStateManager {
   }
 
   /**
-   * Loads window state from persistent storage.
+   * Loads window state from persistent storage using global repository.
    *
    * This method attempts to load the previously saved window state from the database.
    * If no saved state exists (first launch), or if the saved position is invalid
    * (e.g., monitor was disconnected), it returns a default state based on the
    * primary display's size.
    *
-   * Requirements: window-management.5.4, window-management.5.5, window-management.5.6, database-refactoring.3.6
+   * Requirements: window-management.5.4, window-management.5.5, window-management.5.6, user-data-isolation.6.8
    *
    * @returns WindowState object containing the window's position, size, and maximized status.
    *          Returns default state if:
@@ -144,16 +139,10 @@ export class WindowStateManager {
    */
   loadState(): WindowState {
     try {
-      // Requirements: database-refactoring.3.6, user-data-isolation.6.10
-      // Use global getRow method with system user_id (window state is global)
-      const row = this.dbManager.getRow<{ value: string }>(
-        'SELECT value FROM user_data WHERE key = ? AND user_id = ?',
-        [this.stateKey, this.systemUserId]
-      );
+      // Requirements: user-data-isolation.6.8 - Use dbManager.global.windowState
+      const state = this.dbManager.global.windowState.get();
 
-      if (row) {
-        const state = typeof row.value === 'string' ? JSON.parse(row.value) : row.value;
-
+      if (state) {
         // Requirements: window-management.5.6
         if (this.isPositionValid(state.x, state.y)) {
           return state;
@@ -171,17 +160,17 @@ export class WindowStateManager {
   }
 
   /**
-   * Saves window state to persistent storage.
+   * Saves window state to persistent storage using global repository.
    *
-   * This method serializes the window state to JSON and saves it to the database
-   * using direct database access. The state includes the window's position (x, y), size
-   * (width, height), and maximized status. This method should be called whenever
-   * the window state changes (resize, move, maximize, unmaximize events).
+   * This method saves the window state to the database using the global repository.
+   * The state includes the window's position (x, y), size (width, height), and
+   * maximized status. This method should be called whenever the window state
+   * changes (resize, move, maximize, unmaximize events).
    *
    * If saving fails (e.g., database error, disk full), the error is logged but
    * not thrown, ensuring the application continues to function normally.
    *
-   * Requirements: window-management.5.1, window-management.5.2, window-management.5.3, database-refactoring.3.6
+   * Requirements: window-management.5.1, window-management.5.2, window-management.5.3, user-data-isolation.6.8
    *
    * @param state - WindowState object to save. Must contain valid x, y, width,
    *                height, and isMaximized properties.
@@ -230,21 +219,8 @@ export class WindowStateManager {
    */
   saveState(state: WindowState): void {
     try {
-      // Requirements: database-refactoring.3.6, user-data-isolation.6.10
-      // Use global runQuery method with system user_id (window state is global)
-      const stateJson = JSON.stringify(state);
-      const now = Date.now();
-
-      this.dbManager.runQuery(
-        `
-        INSERT INTO user_data (key, value, user_id, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?)
-        ON CONFLICT(key, user_id) DO UPDATE SET
-          value = excluded.value,
-          updated_at = excluded.updated_at
-      `,
-        [this.stateKey, stateJson, this.systemUserId, now, now]
-      );
+      // Requirements: user-data-isolation.6.8 - Use dbManager.global.windowState
+      this.dbManager.global.windowState.set(state);
     } catch (error) {
       // Requirements: error-notifications.1.4 - Log error
       this.logger.error(`Failed to save window state: ${error}`);

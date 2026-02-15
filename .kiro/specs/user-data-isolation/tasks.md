@@ -417,6 +417,38 @@
 
 ---
 
+## Фаза 9: Миграция на Drizzle ORM (Завершено)
+
+**Статус:** ✅ Завершено
+
+**Описание:** Переход с raw SQL Query API на Drizzle ORM с Repository Pattern.
+
+### 9.1. Создание репозиториев
+- [x] SettingsRepository — для пользовательских настроек
+- [x] AgentsRepository — для агентов
+- [x] MessagesRepository — для сообщений
+- [x] UsersRepository — для пользователей
+- [x] GlobalRepository — для глобальных данных (window state)
+- _Requirements: user-data-isolation.6.2, user-data-isolation.7.6_
+
+### 9.2. Обновление DatabaseManager
+- [x] Добавить Drizzle интеграцию
+- [x] Добавить геттеры репозиториев: settings, agents, messages, users, global
+- [x] Удалить deprecated Query API методы
+- _Requirements: user-data-isolation.6, user-data-isolation.7_
+
+### 9.3. Рефакторинг менеджеров
+- [x] UserSettingsManager — использует `dbManager.settings`
+- [x] WindowStateManager — использует `dbManager.global.windowState`
+- _Requirements: user-data-isolation.6.5, user-data-isolation.6.8_
+
+### 9.4. ESLint enforcement
+- [x] Запретить прямой импорт drizzle-orm вне src/main/db/
+- [x] Запретить прямой импорт better-sqlite3 вне src/main/db/
+- _Requirements: user-data-isolation.8_
+
+---
+
 ## Риски
 
 1. **Миграция данных** - существующие данные могут быть потеряны при некорректной миграции

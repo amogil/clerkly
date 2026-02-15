@@ -229,32 +229,25 @@ interface WindowState {
   isMaximized: boolean;
 }
 
-// Requirements: window-management.5
+// Requirements: window-management.5, drizzle-migration.6
 class WindowStateManager {
   private dbManager: DatabaseManager;
-  // Requirements: window-management.5.7 - Global state key (not user-specific)
-  private readonly stateKey = 'window_state';
 
   constructor(dbManager: DatabaseManager) {
     this.dbManager = dbManager;
   }
 
-  // Requirements: window-management.1.1, window-management.4.1, window-management.4.2, window-management.5.4, window-management.5.5, window-management.5.6
+  // Requirements: window-management.1.1, window-management.4.1, window-management.4.2, window-management.5.4, window-management.5.5, window-management.5.6, drizzle-migration.6.1
   loadState(): WindowState {
     try {
-      // Requirements: window-management.5.4, user-data-isolation.6.10
-      // Использует глобальный запрос (без user_id) — состояние окна глобальное
-      const savedState = this.dbManager.getRow<{ value: string }>(
-        'SELECT value FROM window_state WHERE key = ?',
-        [this.stateKey]
-      );
+      // Requirements: window-management.5.4, user-data-isolation.6.10, drizzle-migration.6.1
+      // Использует глобальный репозиторий (без user_id) — состояние окна глобальное
+      const savedState = this.dbManager.global.windowState.get();
       
       if (savedState) {
-        const state = JSON.parse(savedState.value) as WindowState;
-        
         // Requirements: window-management.5.6
-        if (this.isPositionValid(state.x, state.y)) {
-          return state;
+        if (this.isPositionValid(savedState.x, savedState.y)) {
+          return savedState;
         }
       }
     } catch (error) {
@@ -265,16 +258,12 @@ class WindowStateManager {
     return this.getDefaultState();
   }
 
-  // Requirements: window-management.5.1, window-management.5.2, window-management.5.3
+  // Requirements: window-management.5.1, window-management.5.2, window-management.5.3, drizzle-migration.6.1
   saveState(state: WindowState): void {
     try {
-      const stateJson = JSON.stringify(state);
-      // Requirements: user-data-isolation.6.10
-      // Использует глобальный запрос (без user_id) — состояние окна глобальное
-      this.dbManager.runQuery(`
-        INSERT OR REPLACE INTO window_state (key, value)
-        VALUES (?, ?)
-      `, [this.stateKey, stateJson]);
+      // Requirements: user-data-isolation.6.10, drizzle-migration.6.1
+      // Использует глобальный репозиторий (без user_id) — состояние окна глобальное
+      this.dbManager.global.windowState.set(state);
     } catch (error) {
       console.error('Failed to save window state:', error);
     }
@@ -488,18 +477,14 @@ interface WindowState {
 
 **Обработка:**
 ```typescript
-// Requirements: window-management.5.4, window-management.5.5, window-management.5.6, user-data-isolation.6.10
+// Requirements: window-management.5.4, window-management.5.5, window-management.5.6, user-data-isolation.6.10, drizzle-migration.6.1
 loadState(): WindowState {
   try {
-    // Использует глобальный запрос (без user_id) — состояние окна глобальное
-    const savedState = this.dbManager.getRow<{ value: string }>(
-      'SELECT value FROM window_state WHERE key = ?',
-      [this.stateKey]
-    );
+    // Использует глобальный репозиторий (без user_id) — состояние окна глобальное
+    const savedState = this.dbManager.global.windowState.get();
     if (savedState) {
-      const state = JSON.parse(savedState.value) as WindowState;
-      if (this.isPositionValid(state.x, state.y)) {
-        return state;
+      if (this.isPositionValid(savedState.x, savedState.y)) {
+        return savedState;
       }
     }
   } catch (error) {
@@ -520,15 +505,11 @@ loadState(): WindowState {
 
 **Обработка:**
 ```typescript
-// Requirements: window-management.5.1, window-management.5.2, window-management.5.3, user-data-isolation.6.10
+// Requirements: window-management.5.1, window-management.5.2, window-management.5.3, user-data-isolation.6.10, drizzle-migration.6.1
 saveState(state: WindowState): void {
   try {
-    const stateJson = JSON.stringify(state);
-    // Использует глобальный запрос (без user_id) — состояние окна глобальное
-    this.dbManager.runQuery(`
-      INSERT OR REPLACE INTO window_state (key, value)
-      VALUES (?, ?)
-    `, [this.stateKey, stateJson]);
+    // Использует глобальный репозиторий (без user_id) — состояние окна глобальное
+    this.dbManager.global.windowState.set(state);
   } catch (error) {
     console.error('Failed to save window state:', error);
   }

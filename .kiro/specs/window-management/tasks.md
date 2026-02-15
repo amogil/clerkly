@@ -224,7 +224,7 @@
 
 **ВАЖНО:** WindowStateManager является ИСКЛЮЧЕНИЕМ из правила изоляции данных по user_id. Состояние окна является глобальным для устройства, а не для пользователя.
 
-**Статус:** Требуется реализация
+**Статус:** ✅ Выполнено
 
 ### 9.1 Обновить WindowStateManager
 - [x] Обновить `src/main/WindowStateManager.ts`:
@@ -261,6 +261,49 @@
 - WindowStateManager НЕ использует методы с user_id — состояние окна глобальное
 - Состояние окна (размер, позиция, maximized) одинаково для всех пользователей на устройстве
 - При смене пользователя окно сохраняет свое положение
+
+---
+
+## 10. Рефакторинг: Миграция на Drizzle ORM
+
+### Обзор
+
+В рамках миграции на Drizzle ORM (см. `.kiro/specs/user-data-isolation/requirements.md`), WindowStateManager обновлен для использования репозиториев вместо raw SQL.
+
+**ВАЖНО:** WindowStateManager использует `dbManager.global.windowState` репозиторий для глобальных данных (не изолированных по user_id).
+
+**Статус:** ✅ Выполнено
+
+### 10.1 Обновить WindowStateManager на репозитории
+- [x] Обновить `src/main/WindowStateManager.ts`:
+  - Заменить `dbManager.getRow()` на `dbManager.global.windowState.get()`
+  - Заменить `dbManager.runQuery()` на `dbManager.global.windowState.set()`
+  - Удалить raw SQL запросы
+  - Обновить комментарии с Requirements (добавить user-data-isolation.6.8)
+- _Requirements: user-data-isolation.6.8, user-data-isolation.7.8_
+
+### 10.2 Обновить тесты WindowStateManager
+- [x] Обновить `tests/unit/WindowStateManager.test.ts`:
+  - Заменить моки `mockDbManager.getRow` на `mockGlobalWindowState.get`
+  - Заменить моки `mockDbManager.runQuery` на `mockGlobalWindowState.set`
+  - Добавить `mockGlobalWindowState` в beforeEach
+- [x] Обновить `tests/property/WindowStateManager.property.test.ts`:
+  - Заменить моки на репозиторий API
+  - Обновить оба describe блока
+- _Requirements: user-data-isolation.6.8_
+
+### 10.3 Валидация
+- [x] Выполнить `npm run test:unit -- tests/unit/WindowStateManager.test.ts`
+- [x] Выполнить `npm run test:property -- tests/property/WindowStateManager.property.test.ts`
+- [x] Убедиться, что все тесты проходят
+- _Requirements: user-data-isolation.6.8_
+
+### Примечания
+
+- WindowStateManager теперь использует `dbManager.global.windowState` репозиторий
+- Репозиторий автоматически сериализует/десериализует WindowState объект
+- Нет необходимости в ручном JSON.parse/JSON.stringify
+- Состояние окна остается глобальным (не изолированным по user_id)
 
 ---
 

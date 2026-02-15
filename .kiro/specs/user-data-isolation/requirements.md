@@ -11,8 +11,9 @@
 - **user_id** - Уникальный идентификатор пользователя (TEXT, случайная alphanumeric строка 10 символов)
 - **user_data Table** - Таблица в SQLite для хранения пользовательских настроек (key-value) с привязкой к user_id
 - **Data Isolation** - Механизм изоляции данных между пользователями по user_id
-- **DatabaseManager** - Единая точка входа для доступа к базе данных, инициализации и получения текущего user_id
-- **UserSettingsManager** - Класс для управления пользовательскими настройками (key-value в таблице user_data) с автоматической фильтрацией по user_id
+- **DatabaseManager** - Единая точка входа для доступа к базе данных, инициализации и получения текущего user_id. Предоставляет репозитории для работы с данными.
+- **Repository Pattern** - Паттерн доступа к данным через типизированные репозитории (SettingsRepository, UsersRepository и др.)
+- **UserSettingsManager** - Класс для управления пользовательскими настройками (key-value в таблице user_data) с автоматической фильтрацией по user_id. Использует `dbManager.settings` репозиторий.
 - **UserProfileManager** - Класс для управления профилем пользователя, таблицей users и текущим user_id
 - **currentUserId** - Кэшированный user_id текущего авторизованного пользователя в памяти
 
@@ -236,37 +237,31 @@
 
 6.1. Система ДОЛЖНА иметь класс DatabaseManager как единую точку входа для:
    - Инициализации базы данных и миграций
-   - Выполнения SQL-запросов к базе данных
-   - Автоматической подстановки user_id в запросы
+   - Предоставления типизированных репозиториев для работы с данными
+   - Автоматической подстановки user_id в запросы через репозитории
 
-6.2. ВСЕ SQL-запросы к базе данных ДОЛЖНЫ выполняться через методы DatabaseManager. Прямой доступ к SQLite instance (`getDatabase()`) ЗАПРЕЩЁН для менеджеров данных.
+6.2. ВСЕ операции с данными ДОЛЖНЫ выполняться через репозитории DatabaseManager:
+   - `dbManager.settings` — для пользовательских настроек (key-value)
+   - `dbManager.agents` — для агентов
+   - `dbManager.messages` — для сообщений
+   - `dbManager.users` — для пользователей
+   - `dbManager.global` — для глобальных данных (window state)
 
-6.3. DatabaseManager ДОЛЖЕН предоставлять методы для выполнения запросов с автоматической подстановкой user_id:
-   - `runUserQuery(sql, params?)` — выполняет INSERT/UPDATE/DELETE с автоматической подстановкой user_id
-   - `getUserRow<T>(sql, params?)` — возвращает одну строку с автоматической подстановкой user_id
-   - `getUserRows<T>(sql, params?)` — возвращает все строки с автоматической подстановкой user_id
+6.3. Репозитории ДОЛЖНЫ автоматически добавлять user_id текущего пользователя при операциях с пользовательскими данными
 
-6.4. DatabaseManager ДОЛЖЕН предоставлять методы для выполнения глобальных запросов (без user_id):
-   - `runQuery(sql, params?)` — выполняет INSERT/UPDATE/DELETE без user_id
-   - `getRow<T>(sql, params?)` — возвращает одну строку без user_id
-   - `getRows<T>(sql, params?)` — возвращает все строки без user_id
+6.4. КОГДА текущий пользователь не определён, репозитории ДОЛЖНЫ выбрасывать ошибку "No user logged in"
 
-6.5. Методы `*UserQuery` и `*UserRow(s)` ДОЛЖНЫ автоматически добавлять user_id текущего пользователя как ПЕРВЫЙ параметр в массив params
+6.5. Все менеджеры данных (UserSettingsManager, AgentManager, MessageManager и др.) ДОЛЖНЫ использовать репозитории DatabaseManager для выполнения операций
 
-6.6. КОГДА текущий пользователь не определён, методы `*UserQuery` и `*UserRow(s)` ДОЛЖНЫ выбрасывать ошибку "No user logged in"
+6.6. Менеджеры данных НЕ ДОЛЖНЫ требовать явной передачи user_id в публичных методах — user_id подставляется автоматически через репозитории
 
-6.7. Все менеджеры данных (UserSettingsManager, AgentManager, MessageManager и др.) ДОЛЖНЫ использовать методы DatabaseManager для выполнения запросов
+6.7. DatabaseManager ДОЛЖЕН инициализироваться при старте приложения до создания других менеджеров
 
-6.8. Менеджеры данных НЕ ДОЛЖНЫ требовать явной передачи user_id в публичных методах — user_id подставляется автоматически через DatabaseManager
+6.8. WindowStateManager является ИСКЛЮЧЕНИЕМ — он работает с глобальными данными и использует `dbManager.global.windowState`
 
-6.9. DatabaseManager ДОЛЖЕН инициализироваться при старте приложения до создания других менеджеров
-
-6.10. WindowStateManager является ИСКЛЮЧЕНИЕМ — он работает с глобальными данными и использует методы без user_id (`runQuery`, `getRow`, `getRows`)
-
-6.11. DatabaseManager МОЖЕТ предоставлять метод `getDatabase()` для низкоуровневого доступа, но его использование ДОЛЖНО быть ограничено:
+6.9. DatabaseManager МОЖЕТ предоставлять метод `getDatabase()` для низкоуровневого доступа, но его использование ДОЛЖНО быть ограничено:
    - Миграциями
    - Тестами
-   - WindowStateManager (глобальные данные)
 
 **Тестируемость:** Да - через модульные тесты DatabaseManager
 
@@ -275,6 +270,71 @@
 - `tests/functional/user-data-isolation.spec.ts` - "should provide database access through DatabaseManager"
 - `tests/functional/user-data-isolation.spec.ts` - "should provide current userId through DatabaseManager"
 - `tests/functional/user-data-isolation.spec.ts` - "should auto-inject userId in user queries"
+
+---
+
+### Требование 7: Drizzle ORM и Repository Pattern
+
+**ID:** user-data-isolation.7
+
+**User Story:** Как разработчик, я хочу использовать type-safe ORM с Repository Pattern, чтобы гарантировать изоляцию данных и получить автодополнение в IDE.
+
+**Зависимости:** user-data-isolation.6 (DatabaseManager)
+
+#### Критерии Приемки
+
+7.1. Система ДОЛЖНА использовать Drizzle ORM для работы с базой данных:
+   - `drizzle-orm` — основной ORM
+   - `drizzle-kit` — CLI для миграций (devDependency)
+
+7.2. Drizzle ДОЛЖЕН быть настроен для работы с better-sqlite3 (синхронный режим)
+
+7.3. Схема таблиц ДОЛЖНА находиться в `src/main/db/schema.ts` и описывать:
+   - Таблицу `users` (user_id, name, email, google_id, locale, last_synced)
+   - Таблицу `user_data` (key, user_id, value, created_at, updated_at)
+   - Таблицу `agents` (agent_id, user_id, name, created_at, updated_at, archived_at)
+   - Таблицу `messages` (id, agent_id, timestamp, payload_json)
+
+7.4. Все таблицы ДОЛЖНЫ экспортировать TypeScript типы для использования в коде
+
+7.5. Drizzle instance НЕ ДОЛЖЕН быть доступен снаружи DatabaseManager (приватный)
+
+7.6. Каждый репозиторий ДОЛЖЕН предоставлять типизированные методы для CRUD операций
+
+7.7. Репозиторий `users` ДОЛЖЕН работать без текущего userId (для авторизации):
+   - `users.findByEmail(email)` — поиск пользователя по email
+   - `users.findOrCreate(email, name)` — создание или поиск пользователя
+   - `users.update(userId, data)` — обновление данных пользователя
+
+7.8. Репозиторий `global` ДОЛЖЕН предоставлять доступ к данным без фильтрации по userId:
+   - `global.windowState` — состояние окна
+
+**Тестируемость:** Да - через модульные тесты репозиториев
+
+---
+
+### Требование 8: ESLint Enforcement для Изоляции Данных
+
+**ID:** user-data-isolation.8
+
+**User Story:** Как разработчик, я хочу получать ошибку lint при попытке использовать raw SQL вне DatabaseManager, чтобы гарантировать использование репозиториев.
+
+**Зависимости:** user-data-isolation.7 (Drizzle ORM)
+
+#### Критерии Приемки
+
+8.1. ESLint ДОЛЖЕН запрещать импорт `drizzle-orm` везде кроме `src/main/db/` директории
+
+8.2. ESLint ДОЛЖЕН запрещать использование `better-sqlite3` напрямую везде кроме `DatabaseManager.ts`
+
+8.3. ESLint ДОЛЖЕН запрещать строки содержащие SQL keywords (`SELECT`, `INSERT`, `UPDATE`, `DELETE`) в файлах вне `src/main/db/`
+
+8.4. Исключения ДОЛЖНЫ быть сделаны для:
+   - Тестовых файлов (`tests/**`)
+   - Файлов миграций (`migrations/**`)
+   - DatabaseManager и связанных файлов (`src/main/db/**`, `src/main/DatabaseManager.ts`)
+
+**Тестируемость:** Да - через запуск ESLint
 
 ---
 

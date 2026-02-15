@@ -48,20 +48,28 @@ describe('WindowManager', () => {
     // Clear all mocks before each test
     jest.clearAllMocks();
 
-    // Create mock DatabaseManager with global query methods
-    // Requirements: user-data-isolation.6.10 - WindowStateManager uses global methods
+    // Create mock for global.windowState repository
+    // Requirements: user-data-isolation.6.8 - WindowStateManager uses dbManager.global.windowState
+    const mockGlobalWindowState = {
+      get: jest.fn().mockReturnValue(undefined), // Default: no saved state
+      set: jest.fn(),
+    };
+
+    // Create mock DatabaseManager with repository accessors
+    // Requirements: user-data-isolation.6.10, user-data-isolation.6.8 - WindowStateManager uses global repository
     mockDbManager = {
       getDatabase: jest.fn(),
       getCurrentUserId: jest.fn().mockReturnValue('test@example.com'),
+      getCurrentUserIdStrict: jest.fn().mockReturnValue('test@example.com'),
       setUserManager: jest.fn(),
-      // Global query methods (used by WindowStateManager)
-      runQuery: jest.fn(),
-      getRow: jest.fn().mockReturnValue(undefined), // Default: no saved state
-      getRows: jest.fn(),
-      // User query methods (not used by WindowStateManager)
-      runUserQuery: jest.fn(),
-      getUserRow: jest.fn(),
-      getUserRows: jest.fn(),
+      // Repository accessors
+      settings: {} as any,
+      agents: {} as any,
+      messages: {} as any,
+      users: {} as any,
+      global: {
+        windowState: mockGlobalWindowState,
+      },
     } as any;
 
     // Create new WindowManager instance with mock DatabaseManager
@@ -147,19 +155,19 @@ describe('WindowManager', () => {
     /* Preconditions: WindowManager created, saved state exists
        Action: call createWindow()
        Assertions: window created with saved state dimensions
-       Requirements: window-management.5.4, user-data-isolation.6.10 */
+       Requirements: window-management.5.4, user-data-isolation.6.10, user-data-isolation.6.8 */
     it('should create window with saved state when it exists', () => {
-      // Mock saved state via getRow
-      mockDbManager.getRow.mockReturnValue({
-        value: JSON.stringify({
-          x: 200,
-          y: 150,
-          width: 1400,
-          height: 900,
-          isMaximized: false,
-        }),
+      // Mock saved state via global.windowState.get repository
+      (mockDbManager.global.windowState.get as jest.Mock).mockReturnValue({
+        x: 200,
+        y: 150,
+        width: 1400,
+        height: 900,
+        isMaximized: false,
       });
 
+      // Need to recreate WindowManager to pick up new mock
+      windowManager = new WindowManager(mockDbManager);
       windowManager.createWindow();
 
       expect(BrowserWindow).toHaveBeenCalledWith(
@@ -175,19 +183,19 @@ describe('WindowManager', () => {
     /* Preconditions: WindowManager created, saved state has isMaximized: true
        Action: call createWindow()
        Assertions: maximize() IS called to restore saved maximized state
-       Requirements: window-management.1.1, window-management.1.3, window-management.5.3, window-management.5.4, user-data-isolation.6.10 */
+       Requirements: window-management.1.1, window-management.1.3, window-management.5.3, window-management.5.4, user-data-isolation.6.10, user-data-isolation.6.8 */
     it('should maximize window when saved state has isMaximized: true', () => {
-      // Mock saved state with isMaximized: true via getRow
-      mockDbManager.getRow.mockReturnValue({
-        value: JSON.stringify({
-          x: 100,
-          y: 100,
-          width: 1200,
-          height: 800,
-          isMaximized: true,
-        }),
+      // Mock saved state with isMaximized: true via global.windowState.get repository
+      (mockDbManager.global.windowState.get as jest.Mock).mockReturnValue({
+        x: 100,
+        y: 100,
+        width: 1200,
+        height: 800,
+        isMaximized: true,
       });
 
+      // Need to recreate WindowManager to pick up new mock
+      windowManager = new WindowManager(mockDbManager);
       windowManager.createWindow();
       const mockWindow = getMockWindow();
 
@@ -199,19 +207,19 @@ describe('WindowManager', () => {
     /* Preconditions: WindowManager created, saved state has isMaximized: false
        Action: call createWindow()
        Assertions: maximize() not called on window
-       Requirements: window-management.1.1, window-management.1.3, user-data-isolation.6.10 */
+       Requirements: window-management.1.1, window-management.1.3, user-data-isolation.6.10, user-data-isolation.6.8 */
     it('should not maximize window when saved state has isMaximized: false', () => {
-      // Mock saved state with isMaximized: false via getRow
-      mockDbManager.getRow.mockReturnValue({
-        value: JSON.stringify({
-          x: 100,
-          y: 100,
-          width: 1200,
-          height: 800,
-          isMaximized: false,
-        }),
+      // Mock saved state with isMaximized: false via global.windowState.get repository
+      (mockDbManager.global.windowState.get as jest.Mock).mockReturnValue({
+        x: 100,
+        y: 100,
+        width: 1200,
+        height: 800,
+        isMaximized: false,
       });
 
+      // Need to recreate WindowManager to pick up new mock
+      windowManager = new WindowManager(mockDbManager);
       windowManager.createWindow();
       const mockWindow = getMockWindow();
 

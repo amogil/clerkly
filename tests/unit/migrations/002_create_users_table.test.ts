@@ -192,8 +192,10 @@ describe('Migration 002_create_users_table', () => {
         .get();
       expect(tableExists).toBeDefined();
 
-      // Rollback all migrations after 002 (004, 003)
-      let rollbackResult = migrationRunner.rollbackLastMigration(); // 004
+      // Rollback all migrations after 002 (005, 004, 003)
+      let rollbackResult = migrationRunner.rollbackLastMigration(); // 005
+      expect(rollbackResult.success).toBe(true);
+      rollbackResult = migrationRunner.rollbackLastMigration(); // 004
       expect(rollbackResult.success).toBe(true);
       rollbackResult = migrationRunner.rollbackLastMigration(); // 003
       expect(rollbackResult.success).toBe(true);
@@ -224,8 +226,10 @@ describe('Migration 002_create_users_table', () => {
         .get();
       expect(indexExists).toBeDefined();
 
-      // Rollback all migrations after 002 (004, 003)
-      let rollbackResult = migrationRunner.rollbackLastMigration(); // 004
+      // Rollback all migrations after 002 (005, 004, 003)
+      let rollbackResult = migrationRunner.rollbackLastMigration(); // 005
+      expect(rollbackResult.success).toBe(true);
+      rollbackResult = migrationRunner.rollbackLastMigration(); // 004
       expect(rollbackResult.success).toBe(true);
       rollbackResult = migrationRunner.rollbackLastMigration(); // 003
       expect(rollbackResult.success).toBe(true);

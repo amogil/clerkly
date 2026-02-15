@@ -1,12 +1,19 @@
-// Requirements: database-refactoring.1, user-data-isolation.6.1, user-data-isolation.6.2, user-data-isolation.6.3, user-data-isolation.6.4, user-data-isolation.6.7
+// Requirements: database-refactoring.1, user-data-isolation.6, user-data-isolation.7
 
 import Database from 'better-sqlite3';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
+import { drizzle, BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
+import * as schema from './db/schema';
 import { MigrationRunner } from './MigrationRunner';
 import type { UserManager } from './auth/UserManager';
 import { Logger } from './Logger';
+import { SettingsRepository } from './db/repositories/SettingsRepository';
+import { AgentsRepository } from './db/repositories/AgentsRepository';
+import { MessagesRepository } from './db/repositories/MessagesRepository';
+import { UsersRepository } from './db/repositories/UsersRepository';
+import { GlobalRepository } from './db/repositories/GlobalRepository';
 
 /**
  * Initialize result for DatabaseManager
@@ -26,7 +33,7 @@ export interface DatabaseInitializeResult {
 /**
  * Interface for database management operations
  * Allows dependency injection and testing with mock implementations
- * Requirements: user-data-isolation.6.1, user-data-isolation.6.2, user-data-isolation.6.3, user-data-isolation.6.4
+ * Requirements: user-data-isolation.6.1, user-data-isolation.6.2
  */
 export interface IDatabaseManager {
   setUserManager(userManager: UserManager): void;
@@ -34,32 +41,29 @@ export interface IDatabaseManager {
   getCurrentUserId(): string | null;
   getCurrentUserIdStrict(): string;
 
-  // Methods for queries with automatic user_id injection
-  // Requirements: user-data-isolation.6.3, user-data-isolation.6.5, user-data-isolation.6.6
-  runUserQuery(sql: string, params?: unknown[]): Database.RunResult;
-  getUserRow<T>(sql: string, params?: unknown[]): T | undefined;
-  getUserRows<T>(sql: string, params?: unknown[]): T[];
-
-  // Methods for global queries (without user_id)
-  // Requirements: user-data-isolation.6.4, user-data-isolation.6.10
-  runQuery(sql: string, params?: unknown[]): Database.RunResult;
-  getRow<T>(sql: string, params?: unknown[]): T | undefined;
-  getRows<T>(sql: string, params?: unknown[]): T[];
+  // Repository accessors (Drizzle-based API)
+  // Requirements: user-data-isolation.6.2
+  readonly settings: SettingsRepository;
+  readonly agents: AgentsRepository;
+  readonly messages: MessagesRepository;
+  readonly users: UsersRepository;
+  readonly global: GlobalRepository;
 }
 
 /**
- * DatabaseManager - единая точка входа для доступа к базе данных
+ * DatabaseManager - single entry point for database access
  *
  * Responsibilities:
- * - Инициализация БД и миграций
- * - Доступ к SQLite database instance
- * - Получение текущего user_id через UserManager
+ * - Database initialization and migrations
+ * - SQLite database instance access
+ * - Current user_id retrieval through UserManager
+ * - Typed repositories for data operations
  *
  * Supports two modes:
  * 1. Legacy mode: constructor(db) - for backward compatibility
  * 2. New mode: constructor() + initialize(storagePath) - for full DB management
  *
- * Requirements: database-refactoring.1, user-data-isolation.6.1, user-data-isolation.6.2, user-data-isolation.6.3, user-data-isolation.6.4
+ * Requirements: database-refactoring.1, user-data-isolation.6, user-data-isolation.7
  */
 export class DatabaseManager implements IDatabaseManager {
   private db: Database.Database | null = null;
@@ -68,6 +72,18 @@ export class DatabaseManager implements IDatabaseManager {
   private migrationRunner: MigrationRunner | null = null;
   // Requirements: clerkly.3.5, clerkly.3.7
   private logger = Logger.create('DatabaseManager');
+
+  // Drizzle ORM instance (private - not accessible outside)
+  // Requirements: user-data-isolation.7.5
+  private drizzleDb: BetterSQLite3Database<typeof schema> | null = null;
+
+  // Repository instances (private backing fields)
+  // Requirements: user-data-isolation.6.2
+  private _settings: SettingsRepository | null = null;
+  private _agents: AgentsRepository | null = null;
+  private _messages: MessagesRepository | null = null;
+  private _users: UsersRepository | null = null;
+  private _global: GlobalRepository | null = null;
 
   /**
    * Create a new DatabaseManager
@@ -79,7 +95,84 @@ export class DatabaseManager implements IDatabaseManager {
   constructor(db?: Database.Database | null) {
     if (db) {
       this.db = db;
+      // Initialize Drizzle for legacy mode
+      this.initializeDrizzle();
     }
+  }
+
+  /**
+   * Requires userId - throws error if not logged in
+   * Used by repositories to ensure user isolation
+   * Requirements: user-data-isolation.6.4
+   */
+  private requireUserId = (): string => {
+    const userId = this.userManager?.getCurrentUserId();
+    if (!userId) {
+      throw new Error('No user logged in');
+    }
+    return userId;
+  };
+
+  /**
+   * Initialize Drizzle ORM and repositories
+   * Requirements: user-data-isolation.7.1
+   */
+  private initializeDrizzle(): void {
+    if (!this.db) return;
+
+    this.drizzleDb = drizzle(this.db, { schema });
+
+    // Initialize repositories
+    this._users = new UsersRepository(this.drizzleDb);
+    this._global = new GlobalRepository(this.drizzleDb);
+    this._settings = new SettingsRepository(this.drizzleDb, this.requireUserId);
+    this._agents = new AgentsRepository(this.drizzleDb, this.requireUserId);
+    this._messages = new MessagesRepository(this.drizzleDb, this.requireUserId, this._agents);
+
+    this.logger.info('Drizzle ORM and repositories initialized');
+  }
+
+  // ========== PUBLIC REPOSITORY ACCESSORS ==========
+  // Requirements: user-data-isolation.6.2
+
+  /**
+   * Settings repository for user key-value storage
+   */
+  get settings(): SettingsRepository {
+    if (!this._settings) throw new Error('Database not initialized');
+    return this._settings;
+  }
+
+  /**
+   * Agents repository for managing user agents
+   */
+  get agents(): AgentsRepository {
+    if (!this._agents) throw new Error('Database not initialized');
+    return this._agents;
+  }
+
+  /**
+   * Messages repository for managing agent messages
+   */
+  get messages(): MessagesRepository {
+    if (!this._messages) throw new Error('Database not initialized');
+    return this._messages;
+  }
+
+  /**
+   * Users repository for user management (no userId required)
+   */
+  get users(): UsersRepository {
+    if (!this._users) throw new Error('Database not initialized');
+    return this._users;
+  }
+
+  /**
+   * Global repository for system-wide data (no userId required)
+   */
+  get global(): GlobalRepository {
+    if (!this._global) throw new Error('Database not initialized');
+    return this._global;
   }
 
   /**
@@ -88,6 +181,9 @@ export class DatabaseManager implements IDatabaseManager {
    */
   setDatabase(db: Database.Database | null): void {
     this.db = db;
+    if (db) {
+      this.initializeDrizzle();
+    }
   }
 
   /**
@@ -149,6 +245,10 @@ export class DatabaseManager implements IDatabaseManager {
       // Open database
       this.db = new Database(dbPath);
 
+      // Initialize Drizzle ORM and repositories
+      // Requirements: user-data-isolation.7.1
+      this.initializeDrizzle();
+
       // Run migrations
       // In production (compiled): __dirname = dist/main/main/, so ../../../migrations = migrations/
       // In tests (ts-jest): __dirname = src/main/, so we need to use process.cwd()
@@ -199,18 +299,20 @@ export class DatabaseManager implements IDatabaseManager {
 
   /**
    * Get SQLite database instance
-   * Returns null if database not initialized (legacy behavior for backward compatibility)
+   * Returns null if database not initialized
    *
-   * IMPORTANT: Direct database access is RESTRICTED to:
+   * Note: Direct database access should be limited to:
    * - Migrations (MigrationRunner)
    * - Tests (unit tests, property tests)
-   * - WindowStateManager (global data without user_id)
    *
-   * For user-specific data operations, use:
-   * - runUserQuery(), getUserRow(), getUserRows() - with automatic user_id injection
-   * - runQuery(), getRow(), getRows() - for global data without user_id
+   * For data operations, prefer using repositories:
+   * - dbManager.settings - for user settings
+   * - dbManager.agents - for agents
+   * - dbManager.messages - for messages
+   * - dbManager.users - for user management
+   * - dbManager.global - for global data
    *
-   * Requirements: database-refactoring.1.1, user-data-isolation.6.2, user-data-isolation.6.11
+   * Requirements: database-refactoring.1.1, user-data-isolation.6.9
    *
    * @returns Database instance or null if not initialized
    */
@@ -274,118 +376,6 @@ export class DatabaseManager implements IDatabaseManager {
       this.db = null;
       this.logger.info('Database closed');
     }
-  }
-
-  // ============================================
-  // Methods for queries with automatic user_id injection
-  // Requirements: user-data-isolation.6.3, user-data-isolation.6.5, user-data-isolation.6.6
-  // ============================================
-
-  /**
-   * Execute INSERT/UPDATE/DELETE with automatic user_id injection
-   * user_id is prepended to params array as FIRST parameter
-   *
-   * Requirements: user-data-isolation.6.3, user-data-isolation.6.5, user-data-isolation.6.6
-   *
-   * @param sql - SQL query with placeholder for user_id as first parameter
-   * @param params - Additional parameters (user_id will be prepended)
-   * @returns Database.RunResult
-   * @throws Error if no user logged in
-   */
-  runUserQuery(sql: string, params: unknown[] = []): Database.RunResult {
-    const userId = this.getCurrentUserIdStrict();
-    return this.getDatabaseStrict()
-      .prepare(sql)
-      .run(userId, ...params);
-  }
-
-  /**
-   * Get single row with automatic user_id injection
-   * user_id is prepended to params array as FIRST parameter
-   *
-   * Requirements: user-data-isolation.6.3, user-data-isolation.6.5, user-data-isolation.6.6
-   *
-   * @param sql - SQL query with placeholder for user_id as first parameter
-   * @param params - Additional parameters (user_id will be prepended)
-   * @returns Single row or undefined if not found
-   * @throws Error if no user logged in
-   */
-  getUserRow<T>(sql: string, params: unknown[] = []): T | undefined {
-    const userId = this.getCurrentUserIdStrict();
-    return this.getDatabaseStrict()
-      .prepare(sql)
-      .get(userId, ...params) as T | undefined;
-  }
-
-  /**
-   * Get all rows with automatic user_id injection
-   * user_id is prepended to params array as FIRST parameter
-   *
-   * Requirements: user-data-isolation.6.3, user-data-isolation.6.5, user-data-isolation.6.6
-   *
-   * @param sql - SQL query with placeholder for user_id as first parameter
-   * @param params - Additional parameters (user_id will be prepended)
-   * @returns Array of rows (empty array if no matches)
-   * @throws Error if no user logged in
-   */
-  getUserRows<T>(sql: string, params: unknown[] = []): T[] {
-    const userId = this.getCurrentUserIdStrict();
-    return this.getDatabaseStrict()
-      .prepare(sql)
-      .all(userId, ...params) as T[];
-  }
-
-  // ============================================
-  // Methods for global queries (without user_id)
-  // Requirements: user-data-isolation.6.4, user-data-isolation.6.10
-  // ============================================
-
-  /**
-   * Execute INSERT/UPDATE/DELETE without user_id
-   * For global data (WindowStateManager, migrations)
-   *
-   * Requirements: user-data-isolation.6.4, user-data-isolation.6.10
-   *
-   * @param sql - SQL query
-   * @param params - Query parameters
-   * @returns Database.RunResult
-   */
-  runQuery(sql: string, params: unknown[] = []): Database.RunResult {
-    return this.getDatabaseStrict()
-      .prepare(sql)
-      .run(...params);
-  }
-
-  /**
-   * Get single row without user_id
-   * For global data (WindowStateManager, migrations)
-   *
-   * Requirements: user-data-isolation.6.4, user-data-isolation.6.10
-   *
-   * @param sql - SQL query
-   * @param params - Query parameters
-   * @returns Single row or undefined if not found
-   */
-  getRow<T>(sql: string, params: unknown[] = []): T | undefined {
-    return this.getDatabaseStrict()
-      .prepare(sql)
-      .get(...params) as T | undefined;
-  }
-
-  /**
-   * Get all rows without user_id
-   * For global data (WindowStateManager, migrations)
-   *
-   * Requirements: user-data-isolation.6.4, user-data-isolation.6.10
-   *
-   * @param sql - SQL query
-   * @param params - Query parameters
-   * @returns Array of rows (empty array if no matches)
-   */
-  getRows<T>(sql: string, params: unknown[] = []): T[] {
-    return this.getDatabaseStrict()
-      .prepare(sql)
-      .all(...params) as T[];
   }
 
   /**

@@ -40,19 +40,41 @@
     "@typescript-eslint/no-require-imports": "off",
     "no-console": "off",
     "react/react-in-jsx-scope": "off",
-    "react/prop-types": "off"
+    "react/prop-types": "off",
+    "no-restricted-imports": [
+      "error",
+      {
+        "patterns": [
+          {
+            "group": ["drizzle-orm", "drizzle-orm/*"],
+            "message": "Direct import of drizzle-orm is not allowed. Use DatabaseManager repositories instead (drizzle-migration.10.1)."
+          },
+          {
+            "group": ["better-sqlite3"],
+            "message": "Direct import of better-sqlite3 is not allowed. Use DatabaseManager repositories instead (drizzle-migration.10.2)."
+          }
+        ]
+      }
+    ]
   },
   "overrides": [
     {
       "files": ["tests/**/*.ts", "tests/**/*.tsx"],
       "rules": {
-        "@typescript-eslint/no-explicit-any": "off"
+        "@typescript-eslint/no-explicit-any": "off",
+        "no-restricted-imports": "off"
       }
     },
     {
       "files": ["src/types/**/*.ts", "src/types/**/*.d.ts"],
       "rules": {
         "@typescript-eslint/no-explicit-any": "off"
+      }
+    },
+    {
+      "files": ["src/main/db/**/*.ts", "src/main/DatabaseManager.ts", "src/main/MigrationRunner.ts"],
+      "rules": {
+        "no-restricted-imports": "off"
       }
     }
   ],

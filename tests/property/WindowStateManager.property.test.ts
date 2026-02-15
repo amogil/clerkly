@@ -38,22 +38,31 @@ describe('Property Tests - WindowStateManager', () => {
   let windowStateManager: WindowStateManager;
   let mockDbManager: jest.Mocked<IDatabaseManager>;
   let mockScreen: any;
+  let mockGlobalWindowState: { get: jest.Mock; set: jest.Mock };
 
   beforeEach(() => {
-    // Create mock DatabaseManager with global query methods
-    // Requirements: database-refactoring.3.6, user-data-isolation.6.10 - WindowStateManager uses global methods
+    // Create mock for global.windowState repository
+    // Requirements: user-data-isolation.6.8 - WindowStateManager uses dbManager.global.windowState
+    mockGlobalWindowState = {
+      get: jest.fn().mockReturnValue(undefined), // Default: no saved state
+      set: jest.fn(),
+    };
+
+    // Create mock DatabaseManager with repository accessors
+    // Requirements: database-refactoring.3.6, user-data-isolation.6.10, user-data-isolation.6.8 - WindowStateManager uses global repository
     mockDbManager = {
       getDatabase: jest.fn(),
       getCurrentUserId: jest.fn().mockReturnValue(null),
+      getCurrentUserIdStrict: jest.fn().mockReturnValue(null),
       setUserManager: jest.fn(),
-      // Global query methods (used by WindowStateManager)
-      runQuery: jest.fn(),
-      getRow: jest.fn().mockReturnValue(undefined), // Default: no saved state
-      getRows: jest.fn(),
-      // User query methods (not used by WindowStateManager)
-      runUserQuery: jest.fn(),
-      getUserRow: jest.fn(),
-      getUserRows: jest.fn(),
+      // Repository accessors
+      settings: {} as any,
+      agents: {} as any,
+      messages: {} as any,
+      users: {} as any,
+      global: {
+        windowState: mockGlobalWindowState,
+      },
     } as any;
 
     // Get mocked electron screen
@@ -98,7 +107,7 @@ describe('Property Tests - WindowStateManager', () => {
           });
 
           // Mock no saved state - getRow returns undefined
-          mockDbManager.getRow.mockReturnValue(undefined);
+          mockGlobalWindowState.get.mockReturnValue(undefined);
 
           // Call loadState which internally calls getDefaultState
           const state = windowStateManager.loadState();
@@ -151,7 +160,7 @@ describe('Property Tests - WindowStateManager', () => {
     });
 
     // Mock no saved state - getRow returns undefined
-    mockDbManager.getRow.mockReturnValue(undefined);
+    mockGlobalWindowState.get.mockReturnValue(undefined);
 
     const state = windowStateManager.loadState();
 
@@ -175,7 +184,7 @@ describe('Property Tests - WindowStateManager', () => {
     });
 
     // Mock no saved state - getRow returns undefined
-    mockDbManager.getRow.mockReturnValue(undefined);
+    mockGlobalWindowState.get.mockReturnValue(undefined);
 
     const state = windowStateManager.loadState();
 
@@ -199,7 +208,7 @@ describe('Property Tests - WindowStateManager', () => {
     });
 
     // Mock no saved state - getRow returns undefined
-    mockDbManager.getRow.mockReturnValue(undefined);
+    mockGlobalWindowState.get.mockReturnValue(undefined);
 
     const state = windowStateManager.loadState();
 
@@ -223,7 +232,7 @@ describe('Property Tests - WindowStateManager', () => {
     });
 
     // Mock no saved state - getRow returns undefined
-    mockDbManager.getRow.mockReturnValue(undefined);
+    mockGlobalWindowState.get.mockReturnValue(undefined);
 
     const state = windowStateManager.loadState();
 
@@ -247,7 +256,7 @@ describe('Property Tests - WindowStateManager', () => {
     });
 
     // Mock no saved state - getRow returns undefined
-    mockDbManager.getRow.mockReturnValue(undefined);
+    mockGlobalWindowState.get.mockReturnValue(undefined);
 
     const state = windowStateManager.loadState();
 
@@ -275,7 +284,7 @@ describe('Property Tests - WindowStateManager', () => {
     });
 
     // Mock no saved state - getRow returns undefined
-    mockDbManager.getRow.mockReturnValue(undefined);
+    mockGlobalWindowState.get.mockReturnValue(undefined);
 
     const state = windowStateManager.loadState();
 
@@ -312,7 +321,7 @@ describe('Property Tests - WindowStateManager', () => {
       });
 
       // Mock no saved state - getRow returns undefined
-      mockDbManager.getRow.mockReturnValue(undefined);
+      mockGlobalWindowState.get.mockReturnValue(undefined);
 
       const state = windowStateManager.loadState();
 
@@ -345,7 +354,7 @@ describe('Property Tests - WindowStateManager', () => {
     });
 
     // Mock no saved state - getRow returns undefined
-    mockDbManager.getRow.mockReturnValue(undefined);
+    mockGlobalWindowState.get.mockReturnValue(undefined);
 
     const state = windowStateManager.loadState();
 
@@ -375,7 +384,7 @@ describe('Property Tests - WindowStateManager', () => {
     });
 
     // Mock no saved state - getRow returns undefined
-    mockDbManager.getRow.mockReturnValue(undefined);
+    mockGlobalWindowState.get.mockReturnValue(undefined);
 
     // Call multiple times
     const state1 = windowStateManager.loadState();
@@ -399,7 +408,7 @@ describe('Property Tests - WindowStateManager', () => {
     });
 
     // Mock no saved state - getRow returns undefined
-    mockDbManager.getRow.mockReturnValue(undefined);
+    mockGlobalWindowState.get.mockReturnValue(undefined);
 
     const state1 = windowStateManager.loadState();
     expect(state1.width).toBe(600); // min(600, 1920)
@@ -448,15 +457,12 @@ describe('Property Tests - WindowStateManager', () => {
             },
           ]);
 
-          // Create mock for save/load cycle using runQuery and getRow
-          let savedValue: string | undefined;
-          mockDbManager.runQuery.mockImplementation((...args: unknown[]) => {
-            savedValue = (args[1] as unknown[])[1] as string; // value is at index 1 of params array
-            return { changes: 1, lastInsertRowid: 1 };
+          // Create mock for save/load cycle using mockGlobalWindowState
+          let savedValue: any = undefined;
+          mockGlobalWindowState.set.mockImplementation((value: any) => {
+            savedValue = value;
           });
-          mockDbManager.getRow.mockImplementation(() => {
-            return savedValue ? { value: savedValue } : undefined;
-          });
+          mockGlobalWindowState.get.mockImplementation(() => savedValue);
 
           // Save the state
           windowStateManager.saveState(state);
@@ -503,7 +509,7 @@ describe('Property Tests - WindowStateManager', () => {
     });
 
     // Mock database to return the invalid state via getRow
-    mockDbManager.getRow.mockReturnValue({ value: JSON.stringify(invalidState) });
+    mockGlobalWindowState.get.mockReturnValue(invalidState);
 
     // Load the state
     const loadedState = windowStateManager.loadState();
@@ -540,7 +546,7 @@ describe('Property Tests - WindowStateManager', () => {
     ]);
 
     // Mock database to return the state with negative coords via getRow
-    mockDbManager.getRow.mockReturnValue({ value: JSON.stringify(stateWithNegativeCoords) });
+    mockGlobalWindowState.get.mockReturnValue(stateWithNegativeCoords);
 
     // Load the state
     const loadedState = windowStateManager.loadState();
@@ -572,7 +578,7 @@ describe('Property Tests - WindowStateManager', () => {
     ]);
 
     // Mock database to return the boundary state via getRow
-    mockDbManager.getRow.mockReturnValue({ value: JSON.stringify(boundaryState) });
+    mockGlobalWindowState.get.mockReturnValue(boundaryState);
 
     // Load the state
     const loadedState = windowStateManager.loadState();
@@ -607,7 +613,7 @@ describe('Property Tests - WindowStateManager', () => {
     ]);
 
     // Mock database to return the max state via getRow
-    mockDbManager.getRow.mockReturnValue({ value: JSON.stringify(maxState) });
+    mockGlobalWindowState.get.mockReturnValue(maxState);
 
     // Load the state
     const loadedState = windowStateManager.loadState();
@@ -639,15 +645,12 @@ describe('Property Tests - WindowStateManager', () => {
       },
     ]);
 
-    // Create mock for save/load cycle using runQuery and getRow
-    let savedValue: string | undefined;
-    mockDbManager.runQuery.mockImplementation((...args: unknown[]) => {
-      savedValue = (args[1] as unknown[])[1] as string; // value is at index 1 of params array
-      return { changes: 1, lastInsertRowid: 1 };
+    // Create mock for save/load cycle using mockGlobalWindowState
+    let savedValue: any = undefined;
+    mockGlobalWindowState.set.mockImplementation((value: any) => {
+      savedValue = value;
     });
-    mockDbManager.getRow.mockImplementation(() => {
-      return savedValue ? { value: savedValue } : undefined;
-    });
+    mockGlobalWindowState.get.mockImplementation(() => savedValue);
 
     // First cycle: save and load
     windowStateManager.saveState(originalState);
@@ -694,15 +697,12 @@ describe('Property Tests - WindowStateManager', () => {
       },
     ]);
 
-    // Create mock for save/load cycle using runQuery and getRow
-    let savedValue: string | undefined;
-    mockDbManager.runQuery.mockImplementation((...args: unknown[]) => {
-      savedValue = (args[1] as unknown[])[1] as string; // value is at index 1 of params array
-      return { changes: 1, lastInsertRowid: 1 };
+    // Create mock for save/load cycle using mockGlobalWindowState
+    let savedValue: any = undefined;
+    mockGlobalWindowState.set.mockImplementation((value: any) => {
+      savedValue = value;
     });
-    mockDbManager.getRow.mockImplementation(() => {
-      return savedValue ? { value: savedValue } : undefined;
-    });
+    mockGlobalWindowState.get.mockImplementation(() => savedValue);
 
     // Test maximized state
     windowStateManager.saveState(maximizedState);
@@ -721,8 +721,8 @@ describe('Property Tests - WindowStateManager', () => {
      Requirements: window-management.5.4, window-management.5.5 */
   // Feature: ui, Property 7
   test('Property 7 edge case: corrupted data returns default state', () => {
-    // Mock corrupted JSON via getRow
-    mockDbManager.getRow.mockReturnValue({ value: '{invalid json}' });
+    // Mock corrupted data via mockGlobalWindowState.get - returns invalid object
+    mockGlobalWindowState.get.mockReturnValue({ invalid: 'data' });
 
     mockScreen.getPrimaryDisplay.mockReturnValue({
       workAreaSize: { width: 1920, height: 1080 },
@@ -743,8 +743,8 @@ describe('Property Tests - WindowStateManager', () => {
      Requirements: window-management.5.4, window-management.5.5 */
   // Feature: ui, Property 7
   test('Property 7 edge case: empty data returns default state', () => {
-    // Mock empty data via getRow
-    mockDbManager.getRow.mockReturnValue({ value: '' });
+    // Mock empty data via mockGlobalWindowState.get
+    mockGlobalWindowState.get.mockReturnValue(null);
 
     mockScreen.getPrimaryDisplay.mockReturnValue({
       workAreaSize: { width: 1920, height: 1080 },
@@ -766,7 +766,7 @@ describe('Property Tests - WindowStateManager', () => {
   // Feature: ui, Property 7
   test('Property 7 edge case: failed load returns default state', () => {
     // Mock no data in database via getRow
-    mockDbManager.getRow.mockReturnValue(undefined);
+    mockGlobalWindowState.get.mockReturnValue(undefined);
 
     mockScreen.getPrimaryDisplay.mockReturnValue({
       workAreaSize: { width: 1920, height: 1080 },
@@ -786,31 +786,37 @@ describe('Property Tests - WindowStateManager', () => {
 describe('Property Tests - WindowManager State Changes', () => {
   let mockDbManager: jest.Mocked<IDatabaseManager>;
   let mockScreen: any;
+  let mockGlobalWindowState: { get: jest.Mock; set: jest.Mock };
 
   beforeEach(() => {
     // Clear all mocks
     jest.clearAllMocks();
 
-    // Create mock DatabaseManager with global query methods
-    // Requirements: database-refactoring.3.6, user-data-isolation.6.10 - WindowManager uses global methods
-    let savedValue: string | undefined;
+    // Create mock for global.windowState repository
+    // Requirements: user-data-isolation.6.8 - WindowStateManager uses dbManager.global.windowState
+    let savedValue: any = undefined;
+    mockGlobalWindowState = {
+      get: jest.fn().mockImplementation(() => savedValue),
+      set: jest.fn().mockImplementation((value: any) => {
+        savedValue = value;
+      }),
+    };
+
+    // Create mock DatabaseManager with repository accessors
+    // Requirements: database-refactoring.3.6, user-data-isolation.6.10, user-data-isolation.6.8 - WindowStateManager uses global repository
     mockDbManager = {
       getDatabase: jest.fn(),
       getCurrentUserId: jest.fn().mockReturnValue(null),
+      getCurrentUserIdStrict: jest.fn().mockReturnValue(null),
       setUserManager: jest.fn(),
-      // Global query methods (used by WindowStateManager)
-      runQuery: jest.fn().mockImplementation((...args: unknown[]) => {
-        savedValue = (args[1] as unknown[])[1] as string; // value is at index 1 of params array
-        return { changes: 1, lastInsertRowid: 1 };
-      }),
-      getRow: jest.fn().mockImplementation(() => {
-        return savedValue ? { value: savedValue } : undefined;
-      }),
-      getRows: jest.fn(),
-      // User query methods (not used by WindowStateManager)
-      runUserQuery: jest.fn(),
-      getUserRow: jest.fn(),
-      getUserRows: jest.fn(),
+      // Repository accessors
+      settings: {} as any,
+      agents: {} as any,
+      messages: {} as any,
+      users: {} as any,
+      global: {
+        windowState: mockGlobalWindowState,
+      },
     } as any;
 
     // Get mocked electron screen
@@ -858,13 +864,12 @@ describe('Property Tests - WindowManager State Changes', () => {
           // Clear mocks for this iteration
           jest.clearAllMocks();
 
-          // Track saved values using runQuery mock
+          // Track saved values using mockGlobalWindowState.set
           let lastSavedState: any = null;
-          mockDbManager.runQuery.mockImplementation((...args: unknown[]) => {
-            lastSavedState = JSON.parse((args[1] as unknown[])[1] as string);
-            return { changes: 1, lastInsertRowid: 1 };
+          mockGlobalWindowState.set.mockImplementation((value: any) => {
+            lastSavedState = value;
           });
-          mockDbManager.getRow.mockReturnValue(undefined);
+          mockGlobalWindowState.get.mockReturnValue(undefined);
 
           // Create WindowManager instance
           const windowManager = new WindowManager(mockDbManager);
@@ -957,13 +962,12 @@ describe('Property Tests - WindowManager State Changes', () => {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { BrowserWindow } = require('electron');
 
-    // Track saved values using runQuery mock
+    // Track saved values using mockGlobalWindowState.set
     let lastSavedState: any = null;
-    mockDbManager.runQuery.mockImplementation((...args: unknown[]) => {
-      lastSavedState = JSON.parse((args[1] as unknown[])[1] as string);
-      return { changes: 1, lastInsertRowid: 1 };
+    mockGlobalWindowState.set.mockImplementation((value: any) => {
+      lastSavedState = value;
     });
-    mockDbManager.getRow.mockReturnValue(undefined);
+    mockGlobalWindowState.get.mockReturnValue(undefined);
 
     const windowManager = new WindowManager(mockDbManager);
     windowManager.createWindow();
@@ -1011,13 +1015,12 @@ describe('Property Tests - WindowManager State Changes', () => {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { BrowserWindow } = require('electron');
 
-    // Track saved values using runQuery mock
+    // Track saved values using mockGlobalWindowState.set
     let lastSavedState: any = null;
-    mockDbManager.runQuery.mockImplementation((...args: unknown[]) => {
-      lastSavedState = JSON.parse((args[1] as unknown[])[1] as string);
-      return { changes: 1, lastInsertRowid: 1 };
+    mockGlobalWindowState.set.mockImplementation((value: any) => {
+      lastSavedState = value;
     });
-    mockDbManager.getRow.mockReturnValue(undefined);
+    mockGlobalWindowState.get.mockReturnValue(undefined);
 
     const windowManager = new WindowManager(mockDbManager);
     windowManager.createWindow();
@@ -1065,13 +1068,12 @@ describe('Property Tests - WindowManager State Changes', () => {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { BrowserWindow } = require('electron');
 
-    // Track saved values using runQuery mock
+    // Track saved values using mockGlobalWindowState.set
     let lastSavedState: any = null;
-    mockDbManager.runQuery.mockImplementation((...args: unknown[]) => {
-      lastSavedState = JSON.parse((args[1] as unknown[])[1] as string);
-      return { changes: 1, lastInsertRowid: 1 };
+    mockGlobalWindowState.set.mockImplementation((value: any) => {
+      lastSavedState = value;
     });
-    mockDbManager.getRow.mockReturnValue(undefined);
+    mockGlobalWindowState.get.mockReturnValue(undefined);
 
     const windowManager = new WindowManager(mockDbManager);
     windowManager.createWindow();
@@ -1120,13 +1122,12 @@ describe('Property Tests - WindowManager State Changes', () => {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { BrowserWindow } = require('electron');
 
-    // Track saved values using runQuery mock
+    // Track saved values using mockGlobalWindowState.set
     let lastSavedState: any = null;
-    mockDbManager.runQuery.mockImplementation((...args: unknown[]) => {
-      lastSavedState = JSON.parse((args[1] as unknown[])[1] as string);
-      return { changes: 1, lastInsertRowid: 1 };
+    mockGlobalWindowState.set.mockImplementation((value: any) => {
+      lastSavedState = value;
     });
-    mockDbManager.getRow.mockReturnValue(undefined);
+    mockGlobalWindowState.get.mockReturnValue(undefined);
 
     const windowManager = new WindowManager(mockDbManager);
     windowManager.createWindow();
@@ -1175,13 +1176,12 @@ describe('Property Tests - WindowManager State Changes', () => {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { BrowserWindow } = require('electron');
 
-    // Track saved values using runQuery mock
+    // Track saved values using mockGlobalWindowState.set
     let saveCount = 0;
-    mockDbManager.runQuery.mockImplementation(() => {
+    mockGlobalWindowState.set.mockImplementation(() => {
       saveCount++;
-      return { changes: 1, lastInsertRowid: 1 };
     });
-    mockDbManager.getRow.mockReturnValue(undefined);
+    mockGlobalWindowState.get.mockReturnValue(undefined);
 
     const windowManager = new WindowManager(mockDbManager);
     windowManager.createWindow();
@@ -1230,13 +1230,12 @@ describe('Property Tests - WindowManager State Changes', () => {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { BrowserWindow } = require('electron');
 
-    // Track saved values using runQuery mock
+    // Track saved values using mockGlobalWindowState.set
     let lastSavedState: any = null;
-    mockDbManager.runQuery.mockImplementation((...args: unknown[]) => {
-      lastSavedState = JSON.parse((args[1] as unknown[])[1] as string);
-      return { changes: 1, lastInsertRowid: 1 };
+    mockGlobalWindowState.set.mockImplementation((value: any) => {
+      lastSavedState = value;
     });
-    mockDbManager.getRow.mockReturnValue(undefined);
+    mockGlobalWindowState.get.mockReturnValue(undefined);
 
     const windowManager = new WindowManager(mockDbManager);
     windowManager.createWindow();

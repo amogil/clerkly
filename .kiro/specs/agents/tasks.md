@@ -51,26 +51,26 @@
 #### Задача 2.1: Создать AgentManager
 - **Статус:** ❌ Не начата
 - **Оценка:** 1 день
-- **Требования:** agents.2, agents.10, user-data-isolation.6.5, user-data-isolation.6.6
+- **Требования:** agents.2, agents.10, user-data-isolation.6.5, user-data-isolation.6.3
 - **Файл:** `src/main/agents/AgentManager.ts`
-- **Зависимость:** DatabaseManager Query API (`.kiro/specs/database-manager-refactoring/tasks.md`)
+- **Зависимость:** Drizzle ORM репозитории (`.kiro/specs/user-data-isolation/requirements.md`)
 - **Описание:**
   - Реализовать методы: `create()`, `list()`, `get()`, `update()`, `archive()`, `touch()`
-  - Использовать методы `DatabaseManager` для запросов (`runUserQuery`, `getUserRow`, `getUserRows`)
-  - Автоматическая изоляция по `userId` через методы DatabaseManager
+  - Использовать репозитории `DatabaseManager` (`dbManager.agents`)
+  - Автоматическая изоляция по `userId` через репозитории
   - Генерация событий через `MainEventBus`
-  - Генерация 10-символьного alphanumeric `agentId`
+  - Генерация 10-символьного alphanumeric `agentId` выполняется репозиторием
 
 #### Задача 2.2: Создать MessageManager
 - **Статус:** ❌ Не начата
 - **Оценка:** 0.5 дня
-- **Требования:** agents.4, agents.7, user-data-isolation.6.5
+- **Требования:** agents.4, agents.7, user-data-isolation.6.5, user-data-isolation.7.6
 - **Файл:** `src/main/agents/MessageManager.ts`
-- **Зависимость:** DatabaseManager Query API (`.kiro/specs/database-manager-refactoring/tasks.md`)
+- **Зависимость:** Drizzle ORM репозитории (`.kiro/specs/user-data-isolation/requirements.md`)
 - **Описание:**
   - Реализовать методы: `list()`, `create()`, `update()`
-  - Использовать методы `DatabaseManager` для запросов (`runUserQuery`, `getUserRow`, `getUserRows`)
-  - Проверка доступа к агенту через `checkAccess()`
+  - Использовать репозитории `DatabaseManager` (`dbManager.messages`)
+  - Проверка доступа к агенту выполняется репозиторием автоматически
   - Обновление `updated_at` агента при создании сообщения
   - Генерация событий через `MainEventBus`
 

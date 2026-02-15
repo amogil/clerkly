@@ -365,51 +365,37 @@ export const databaseManager = new DatabaseManager();
 Управление пользовательскими настройками (key-value в таблице user_data) с автоматической фильтрацией по user_id.
 
 ```typescript
-// Requirements: user-data-isolation.2, user-data-isolation.3, user-data-isolation.6.7
-import { DatabaseManager } from './DatabaseManager';
+// Requirements: user-data-isolation.2, user-data-isolation.3, user-data-isolation.6.7, drizzle-migration.5
+import { IDatabaseManager } from './DatabaseManager';
 import { Logger } from './Logger';
 
 class UserSettingsManager {
-  private dbManager: DatabaseManager;
+  private dbManager: IDatabaseManager;
   private logger = Logger.create('UserSettingsManager');
 
-  constructor(dbManager: DatabaseManager) {
+  constructor(dbManager: IDatabaseManager) {
     this.dbManager = dbManager;
   }
 
   /**
    * Save data with automatic user_id filtering
-   * Requirements: user-data-isolation.2.4, user-data-isolation.3.1, user-data-isolation.6.7, user-data-isolation.6.8
+   * Requirements: user-data-isolation.2.4, user-data-isolation.3.1, user-data-isolation.6.7, drizzle-migration.5.1
    */
   saveData(key: string, value: any): void {
-    const now = Date.now();
-    const valueJson = JSON.stringify(value);
-    
-    // user_id подставляется автоматически как первый параметр
-    this.dbManager.runUserQuery(`
-      INSERT INTO user_data (key, value, user_id, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?)
-      ON CONFLICT(key, user_id) DO UPDATE SET
-        value = excluded.value,
-        updated_at = excluded.updated_at
-    `, [key, valueJson, now, now]);
-    
+    // Использует репозиторий settings - user_id подставляется автоматически
+    this.dbManager.settings.set(key, value);
     this.logger.info(`Data saved, key: ${key}`);
   }
 
   /**
    * Load data with automatic user_id filtering
-   * Requirements: user-data-isolation.2.5, user-data-isolation.3.1, user-data-isolation.6.7, user-data-isolation.6.8
+   * Requirements: user-data-isolation.2.5, user-data-isolation.3.1, user-data-isolation.6.7, drizzle-migration.5.1
    */
   loadData(key: string): { success: boolean; data?: any; error?: string } {
-    // user_id подставляется автоматически как первый параметр
-    const row = this.dbManager.getUserRow<{ value: string }>(
-      'SELECT value FROM user_data WHERE user_id = ? AND key = ?',
-      [key]
-    );
-
-    if (row) {
-      const data = JSON.parse(row.value);
+    // Использует репозиторий settings - user_id подставляется автоматически
+    const data = this.dbManager.settings.get(key);
+    
+    if (data !== undefined) {
       this.logger.info(`Data loaded, key: ${key}`);
       return { success: true, data };
     }
@@ -419,15 +405,11 @@ class UserSettingsManager {
 
   /**
    * Delete data with automatic user_id filtering
-   * Requirements: user-data-isolation.2.6, user-data-isolation.3.1, user-data-isolation.6.7, user-data-isolation.6.8
+   * Requirements: user-data-isolation.2.6, user-data-isolation.3.1, user-data-isolation.6.7, drizzle-migration.5.1
    */
   deleteData(key: string): void {
-    // user_id подставляется автоматически как первый параметр
-    this.dbManager.runUserQuery(
-      'DELETE FROM user_data WHERE user_id = ? AND key = ?',
-      [key]
-    );
-    
+    // Использует репозиторий settings - user_id подставляется автоматически
+    this.dbManager.settings.delete(key);
     this.logger.info(`Data deleted, key: ${key}`);
   }
 }
@@ -623,39 +605,36 @@ async function handleDataOperation(
 
 ### Глобальные Настройки (Исключения из Изоляции)
 
-**Requirements:** user-data-isolation.2.8, user-data-isolation.6.10
+**Requirements:** user-data-isolation.2.8, user-data-isolation.6.10, drizzle-migration.6
 
 Некоторые данные НЕ должны изолироваться по пользователю:
 
 ```typescript
 // Window State - глобальные настройки окна
-// Requirements: window-management.5.7, user-data-isolation.2.8, user-data-isolation.6.10
+// Requirements: window-management.5.7, user-data-isolation.2.8, user-data-isolation.6.10, drizzle-migration.6.1
 
 class WindowStateManager {
-  private dbManager: DatabaseManager;
+  private dbManager: IDatabaseManager;
   
-  constructor(dbManager: DatabaseManager) {
+  constructor(dbManager: IDatabaseManager) {
     this.dbManager = dbManager;
   }
   
-  // Использует глобальные методы DatabaseManager (без user_id)
+  // Использует глобальный репозиторий DatabaseManager (без user_id)
   // Состояние окна одинаково для всех пользователей на устройстве
   
-  saveWindowState(state: WindowState): void {
-    // Использует runQuery (без user_id) - глобальное состояние
-    this.dbManager.runQuery(`
-      INSERT OR REPLACE INTO window_state (key, value)
-      VALUES ('main_window', ?)
-    `, [JSON.stringify(state)]);
+  saveState(state: WindowState): void {
+    // Использует dbManager.global.windowState - глобальное состояние
+    this.dbManager.global.windowState.set(state);
   }
   
-  loadWindowState(): WindowState | null {
-    // Использует getRow (без user_id) - глобальное состояние
-    const row = this.dbManager.getRow<{ value: string }>(
-      'SELECT value FROM window_state WHERE key = ?',
-      ['main_window']
-    );
-    return row ? JSON.parse(row.value) : null;
+  loadState(): WindowState {
+    // Использует dbManager.global.windowState - глобальное состояние
+    const state = this.dbManager.global.windowState.get();
+    if (state && this.isPositionValid(state.x, state.y)) {
+      return state;
+    }
+    return this.getDefaultState();
   }
 }
 ```

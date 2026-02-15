@@ -1,4 +1,4 @@
-// Requirements: clerkly.1, clerkly.2, error-notifications.1.1, user-data-isolation.2.4, user-data-isolation.2.5, user-data-isolation.2.6, user-data-isolation.3.1, user-data-isolation.3.2, user-data-isolation.6.7, user-data-isolation.6.8
+// Requirements: clerkly.1, clerkly.2, error-notifications.1.1, user-data-isolation.2.4, user-data-isolation.2.5, user-data-isolation.2.6, user-data-isolation.3.1, user-data-isolation.3.2, user-data-isolation.6.5
 
 import { handleBackgroundError } from './ErrorHandler';
 import type { IDatabaseManager } from './DatabaseManager';
@@ -42,10 +42,10 @@ export interface IUserSettingsManager {
 }
 
 /**
- * Manages user settings storage using SQLite
+ * Manages user settings storage using SQLite via Drizzle repositories
  * Requirements: user-data-isolation.3.1 - Supports user data isolation via DatabaseManager
- * Requirements: user-data-isolation.6.7 - Uses DatabaseManager methods for queries
- * Requirements: user-data-isolation.6.8 - Does not require explicit user_id in public methods
+ * Requirements: user-data-isolation.6.2 - Uses dbManager.settings repository
+ * Requirements: user-data-isolation.6.5 - Delegates to repository methods
  */
 export class UserSettingsManager implements IUserSettingsManager {
   private dbManager: IDatabaseManager;
@@ -54,20 +54,20 @@ export class UserSettingsManager implements IUserSettingsManager {
 
   /**
    * Constructor - accepts DatabaseManager for database access
-   * Requirements: user-data-isolation.6.7
-   * @param dbManager DatabaseManager instance for database access and user_id
+   * Requirements: user-data-isolation.6.2
+   * @param dbManager DatabaseManager instance for database access
    */
   constructor(dbManager: IDatabaseManager) {
     this.dbManager = dbManager;
   }
 
   /**
-   * Saves data locally
+   * Saves data locally using settings repository
    * Validates key (non-empty string, max 1000 chars)
    * Serializes value to JSON
    * Checks size (max 10MB)
    * Handles errors (SQLITE_FULL, SQLITE_BUSY, SQLITE_LOCKED, SQLITE_READONLY)
-   * Requirements: clerkly.1, error-notifications.1.1, user-data-isolation.2.4, user-data-isolation.3.1, user-data-isolation.6.7, user-data-isolation.6.8
+   * Requirements: clerkly.1, error-notifications.1.1, user-data-isolation.2.4, user-data-isolation.6.2, user-data-isolation.6.5
    *
    * @param {string} key
    * @param {unknown} value
@@ -82,12 +82,6 @@ export class UserSettingsManager implements IUserSettingsManager {
 
       if (key.length > 1000) {
         return { success: false, error: 'Invalid key: exceeds maximum length of 1000 characters' };
-      }
-
-      // Check database initialization
-      const db = this.dbManager.getDatabase();
-      if (!db || !db.open) {
-        return { success: false, error: 'Database not initialized or closed' };
       }
 
       // Serialize value with Infinity/-Infinity support
@@ -111,21 +105,9 @@ export class UserSettingsManager implements IUserSettingsManager {
         return { success: false, error: 'Value too large: exceeds 10MB limit' };
       }
 
-      const now = Date.now();
-
-      // Requirements: user-data-isolation.2.4, user-data-isolation.6.7, user-data-isolation.6.8
-      // Use runUserQuery - user_id is automatically prepended as FIRST parameter
-      // SQL placeholders: user_id (auto), key, value, created_at, updated_at
-      this.dbManager.runUserQuery(
-        `
-        INSERT INTO user_data (user_id, key, value, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?)
-        ON CONFLICT(key, user_id) DO UPDATE SET
-          value = excluded.value,
-          updated_at = excluded.updated_at
-      `,
-        [key, serializedValue, now, now]
-      );
+      // Requirements: user-data-isolation.6.2, user-data-isolation.6.5
+      // Delegate to settings repository
+      this.dbManager.settings.set(key, serializedValue);
 
       this.logger.info(`Data saved, key: ${key}`);
 
@@ -154,17 +136,21 @@ export class UserSettingsManager implements IUserSettingsManager {
       if (errorObj.message === 'No user logged in') {
         return { success: false, error: 'No user logged in' };
       }
+      // Handle "Database not initialized" error
+      if (errorObj.message === 'Database not initialized') {
+        return { success: false, error: 'Database not initialized or closed' };
+      }
       const errorMessage = errorObj.message || 'Unknown error';
       return { success: false, error: `Database write failed: ${errorMessage}` };
     }
   }
 
   /**
-   * Loads data from local storage
+   * Loads data from local storage using settings repository
    * Validates key
    * Deserializes JSON
    * Handles errors (SQLITE_BUSY, SQLITE_LOCKED)
-   * Requirements: clerkly.1, user-data-isolation.2.5, user-data-isolation.3.1, user-data-isolation.6.7, user-data-isolation.6.8
+   * Requirements: clerkly.1, user-data-isolation.2.5, user-data-isolation.6.2, user-data-isolation.6.5
    *
    * @param {string} key
    * @returns {LoadDataResult}
@@ -180,19 +166,9 @@ export class UserSettingsManager implements IUserSettingsManager {
         return { success: false, error: 'Invalid key: exceeds maximum length of 1000 characters' };
       }
 
-      // Check database initialization
-      const db = this.dbManager.getDatabase();
-      if (!db || !db.open) {
-        return { success: false, error: 'Database not initialized or closed' };
-      }
-
-      // Requirements: user-data-isolation.2.5, user-data-isolation.6.7, user-data-isolation.6.8
-      // Use getUserRow - user_id is automatically prepended as FIRST parameter
-      // SQL placeholders: user_id (auto), key
-      const row = this.dbManager.getUserRow<{ value: string }>(
-        'SELECT value FROM user_data WHERE user_id = ? AND key = ?',
-        [key]
-      );
+      // Requirements: user-data-isolation.6.2, user-data-isolation.6.5
+      // Delegate to settings repository
+      const row = this.dbManager.settings.get(key);
 
       if (!row) {
         return { success: false, error: 'Key not found' };
@@ -224,16 +200,20 @@ export class UserSettingsManager implements IUserSettingsManager {
       if (errorObj.message === 'No user logged in') {
         return { success: false, error: 'No user logged in' };
       }
+      // Handle "Database not initialized" error
+      if (errorObj.message === 'Database not initialized') {
+        return { success: false, error: 'Database not initialized or closed' };
+      }
       const errorMessage = errorObj.message || 'Unknown error';
       return { success: false, error: `Database query failed: ${errorMessage}` };
     }
   }
 
   /**
-   * Deletes data from local storage
+   * Deletes data from local storage using settings repository
    * Validates key
    * Handles errors
-   * Requirements: clerkly.1, user-data-isolation.2.6, user-data-isolation.3.1, user-data-isolation.6.7, user-data-isolation.6.8
+   * Requirements: clerkly.1, user-data-isolation.2.6, user-data-isolation.6.2, user-data-isolation.6.5
    *
    * @param {string} key
    * @returns {DeleteDataResult}
@@ -249,21 +229,11 @@ export class UserSettingsManager implements IUserSettingsManager {
         return { success: false, error: 'Invalid key: exceeds maximum length of 1000 characters' };
       }
 
-      // Check database initialization
-      const db = this.dbManager.getDatabase();
-      if (!db || !db.open) {
-        return { success: false, error: 'Database not initialized or closed' };
-      }
+      // Requirements: user-data-isolation.6.2, user-data-isolation.6.5
+      // Delegate to settings repository
+      const deleted = this.dbManager.settings.delete(key);
 
-      // Requirements: user-data-isolation.2.6, user-data-isolation.6.7, user-data-isolation.6.8
-      // Use runUserQuery - user_id is automatically prepended as FIRST parameter
-      // SQL placeholders: user_id (auto), key
-      const result = this.dbManager.runUserQuery(
-        'DELETE FROM user_data WHERE user_id = ? AND key = ?',
-        [key]
-      );
-
-      if (result.changes === 0) {
+      if (!deleted) {
         return { success: false, error: 'Key not found' };
       }
 
@@ -278,6 +248,10 @@ export class UserSettingsManager implements IUserSettingsManager {
       // Handle "No user logged in" error
       if (errorObj.message === 'No user logged in') {
         return { success: false, error: 'No user logged in' };
+      }
+      // Handle "Database not initialized" error
+      if (errorObj.message === 'Database not initialized') {
+        return { success: false, error: 'Database not initialized or closed' };
       }
       const errorMessage = errorObj.message || 'Unknown error';
       return { success: false, error: `Database delete failed: ${errorMessage}` };
