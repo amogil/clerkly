@@ -338,7 +338,7 @@
 | # | Задача | Статус | Оценка | Требования |
 |---|--------|--------|--------|------------|
 | 6.1 | AutoExpandingTextarea | ✅ ВЫПОЛНЕНО | 0.25 дня | agents.4.5-4.7 |
-| 6.2 | MessageContent | ❌ | 0.25 дня | agents.7.7 |
+| 6.2 | MarkdownMessage | ✅ ВЫПОЛНЕНО | 0.25 дня | agents.7.7 |
 | 6.3 | EmptyStatePlaceholder | ❌ | 0.25 дня | agents.4 |
 | 6.4 | AllAgents | ❌ | 0.25 дня | agents.5 |
 
@@ -347,9 +347,10 @@
 - **Максимум:** 50% высоты области чата
 - **Enter:** отправка, **Shift+Enter:** новая строка
 
-#### 6.2 MessageContent
-- **Файл:** `src/renderer/components/agents/MessageContent.tsx`
-- **Markdown:** react-markdown
+#### 6.2 MarkdownMessage
+- **Файл:** `src/renderer/components/agents/MarkdownMessage.tsx` ✅
+- **Markdown:** react-markdown ✅
+- **Тесты:** `tests/unit/components/agents/MarkdownMessage.test.tsx` (12 тестов) ✅
 
 #### 6.3 EmptyStatePlaceholder
 - **Файл:** `src/renderer/components/agents/EmptyStatePlaceholder.tsx`

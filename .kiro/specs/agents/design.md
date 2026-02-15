@@ -1046,7 +1046,7 @@ function AutoExpandingTextarea({
 // Requirements: agents.7.7
 import ReactMarkdown from 'react-markdown';
 
-function MessageContent({ content, format }: { content: string; format?: 'markdown' | 'text' }) {
+function MarkdownMessage({ content, format }: { content: string; format?: 'markdown' | 'text' }) {
   if (format === 'markdown') {
     return (
       <ReactMarkdown className="prose prose-sm max-w-none">

@@ -10,6 +10,7 @@ module.exports = {
   testEnvironment: 'jsdom', // React components need jsdom
   setupFilesAfterEnv: ['<rootDir>/tests/setup.ts'],
   moduleNameMapper: {
-    '^electron$': '<rootDir>/tests/__mocks__/electron.ts'
+    '^electron$': '<rootDir>/tests/__mocks__/electron.ts',
+    '^react-markdown$': '<rootDir>/tests/__mocks__/react-markdown.tsx'
   }
 };
