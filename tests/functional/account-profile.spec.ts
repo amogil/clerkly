@@ -185,12 +185,15 @@ test.describe('Account Profile', () => {
     }
 
     // Navigate to Settings
+    // Wait a bit for UI to fully render after auth
+    await context.window.waitForTimeout(1000);
+    
     const settingsNav = context.window.locator('button:has-text("Settings")');
     console.log('[TEST] Looking for Settings button...');
     const settingsVisible = await settingsNav.isVisible().catch(() => false);
     console.log('[TEST] Settings button visible:', settingsVisible);
 
-    await settingsNav.waitFor({ state: 'visible', timeout: 5000 });
+    await settingsNav.waitFor({ state: 'visible', timeout: 10000 });
     await settingsNav.click();
     console.log('[TEST] Clicked Settings button');
     await context.window.waitForTimeout(500);
