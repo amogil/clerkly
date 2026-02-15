@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Send, Check, X, HelpCircle, ArrowLeft, Plus } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { Logo } from './logo';
 import { useAgents } from '../hooks/useAgents';
 import { useMessages } from '../hooks/useMessages';
@@ -87,13 +88,18 @@ export function Agents() {
     return () => window.removeEventListener('resize', calculateVisibleChats);
   }, []);
 
-  const handleSend = async () => {
-    if (!taskInput.trim() || !activeAgent) return;
+  const handleSend = async (text?: string) => {
+    const messageText = text || taskInput;
+    if (!messageText.trim() || !activeAgent) return;
 
-    const success = await sendMessage(taskInput);
+    const success = await sendMessage(messageText);
     if (success) {
       setTaskInput('');
     }
+  };
+
+  const handlePromptClick = async (prompt: string) => {
+    await handleSend(prompt);
   };
 
   const handleAgentClick = (task: DisplayAgentItem) => {
@@ -341,46 +347,55 @@ export function Agents() {
       </div>
 
       {/* Messages Area */}
-      <div ref={messagesAreaRef} className="flex-1 overflow-y-auto p-6 space-y-4">
-        {messages.length === 0 ? (
-          <EmptyStatePlaceholder />
-        ) : (
-          messages.map((message, index) => {
-            const showAvatar =
-              message.payload.kind !== 'user' &&
-              (index === 0 || messages[index - 1].payload.kind === 'user');
+      <div ref={messagesAreaRef} className="flex-1 overflow-y-auto p-6 min-h-0">
+        <div className="min-h-full flex flex-col justify-end space-y-4">
+          {messages.length === 0 ? (
+            <EmptyStatePlaceholder onPromptClick={handlePromptClick} />
+          ) : (
+            messages.map((message, index) => {
+              const showAvatar =
+                message.payload.kind !== 'user' &&
+                (index === 0 || messages[index - 1].payload.kind === 'user');
 
-            return (
-              <div key={message.id}>
-                {message.payload.kind === 'user' ? (
-                  <div className="flex justify-end">
-                    <div className="rounded-lg border-2 border-primary bg-primary/5 px-4 py-3">
-                      <p className="text-sm leading-relaxed text-foreground text-right">
-                        {message.payload.data.text || ''}
-                      </p>
-                    </div>
-                  </div>
-                ) : (
-                  <>
-                    {showAvatar && (
-                      <div className="mb-2">
-                        <Logo
-                          size="sm"
-                          showText={false}
-                          animated={isInProgress(currentAgent.status)}
-                        />
+              return (
+                <motion.div
+                  key={message.id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{
+                    duration: 0.3,
+                    ease: [0.4, 0, 0.2, 1],
+                  }}
+                >
+                  {message.payload.kind === 'user' ? (
+                    <div className="flex justify-end">
+                      <div className="rounded-2xl bg-secondary/70 border border-border px-4 py-3 max-w-[75%]">
+                        <p className="text-sm leading-relaxed text-foreground">
+                          {message.payload.data.text || ''}
+                        </p>
                       </div>
-                    )}
-                    <div className="max-w-[85%] text-sm leading-relaxed text-foreground">
-                      {message.payload.data.text || ''}
                     </div>
-                  </>
-                )}
-              </div>
-            );
-          })
-        )}
-        <div ref={messagesEndRef} />
+                  ) : (
+                    <>
+                      {showAvatar && (
+                        <div className="mb-2">
+                          <Logo
+                            size="sm"
+                            showText={false}
+                            animated={isInProgress(currentAgent.status)}
+                          />
+                        </div>
+                      )}
+                      <div className="max-w-[85%] text-sm leading-relaxed text-foreground">
+                        {message.payload.data.text || ''}
+                      </div>
+                    </>
+                  )}
+                </motion.div>
+              );
+            })
+          )}
+        </div>
       </div>
 
       {/* Input Area */}
@@ -395,7 +410,7 @@ export function Agents() {
             className="flex-1 px-3.5 py-2.5 bg-secondary border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
           />
           <button
-            onClick={handleSend}
+            onClick={() => handleSend()}
             disabled={!taskInput.trim()}
             className="px-3.5 py-2.5 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
           >

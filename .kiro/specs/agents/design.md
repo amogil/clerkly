@@ -1038,6 +1038,142 @@ function AutoExpandingTextarea({
 }
 ```
 
+### EmptyStatePlaceholder
+
+Компонент пустого стейта для нового агента без сообщений.
+
+```typescript
+// Requirements: agents.4.14-4.18
+import { motion } from 'framer-motion';
+import { Video, CheckSquare, FileText, Calendar } from 'lucide-react';
+import { Logo } from '../logo';
+
+interface EmptyStatePlaceholderProps {
+  onPromptClick?: (prompt: string) => void;
+}
+
+function EmptyStatePlaceholder({ onPromptClick }: EmptyStatePlaceholderProps) {
+  const prompts = [
+    { icon: <Video className="w-4 h-4" />, prompt: 'Transcribe my latest meeting' },
+    { icon: <CheckSquare className="w-4 h-4" />, prompt: "Extract action items from today's standup" },
+    { icon: <FileText className="w-4 h-4" />, prompt: 'Create Jira tickets from meeting notes' },
+    { icon: <Calendar className="w-4 h-4" />, prompt: 'Send summary to the team' },
+  ];
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
+      className="flex flex-col items-center justify-center space-y-8 py-12"
+    >
+      {/* Logo and title */}
+      <div className="text-center space-y-3">
+        <div className="flex justify-center">
+          <Logo size="lg" animated={true} />
+        </div>
+        <div>
+          <h2 className="text-xl font-semibold text-foreground mb-1">
+            Assign a task to the agent
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            Transcribes meetings, extracts tasks, creates Jira tickets
+          </p>
+        </div>
+      </div>
+
+      {/* Prompt suggestions grid */}
+      <div className="w-full max-w-2xl grid grid-cols-1 md:grid-cols-2 gap-3">
+        {prompts.map((item, index) => (
+          <motion.button
+            key={index}
+            onClick={() => onPromptClick?.(item.prompt)}
+            className="group flex items-center gap-3 p-4 bg-secondary/50 hover:bg-secondary border border-border hover:border-primary/50 rounded-xl transition-all text-left"
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            transition={{ duration: 0.15 }}
+          >
+            <div className="flex-shrink-0 w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+              {item.icon}
+            </div>
+            <span className="text-sm font-medium text-foreground group-hover:text-primary transition-colors">
+              {item.prompt}
+            </span>
+          </motion.button>
+        ))}
+      </div>
+    </motion.div>
+  );
+}
+```
+
+**Особенности:**
+- Анимированный логотип с улучшенной анимацией узлов и линий (см. ниже)
+- Плавное появление с motion.div (fade in + slide up, 500ms)
+- Адаптивная сетка (1 колонка на mobile, 2 на desktop)
+- Анимация кнопок при hover (scale 1.02) и tap (scale 0.98)
+- Изменение цвета иконки при hover (primary → primary-foreground)
+- Автоматическая отправка сообщения при клике на промпт
+- Выравнивание по нижнему краю области сообщений (justify-end)
+
+**Анимация логотипа:**
+
+Логотип использует 4 типа анимаций пульсации для узлов:
+- `pulse-subtle` (3.2s): Легкая пульсация для верхнего левого узла
+- `pulse-medium` (2.4s-3s): Средняя пульсация для боковых узлов
+- `pulse-strong` (2.6s): Сильная пульсация для верхнего правого узла
+- `pulse-center` (2.88s): Сложная пульсация для центрального узла (3 фазы)
+
+Анимация линий связей:
+- `flow-fast` (2s): Быстрое движение для линий 1 и 3
+- `flow-slow` (2.6s-2.8s): Медленное движение для линий 2 и 4
+- Изменение opacity во время анимации (0.3-0.8)
+
+Каждый узел и линия имеют индивидуальные задержки (0s-2.2s) для создания органичного эффекта.
+
+### Стилизация Сообщений
+
+**Сообщения пользователя:**
+```tsx
+// Requirements: agents.4.9
+<div className="flex justify-end">
+  <div className="rounded-2xl bg-secondary/70 border border-border px-4 py-3 max-w-[75%]">
+    <p className="text-sm leading-relaxed text-foreground">
+      {message.content}
+    </p>
+  </div>
+</div>
+```
+
+**Особенности:**
+- `rounded-2xl` (16px) - более скругленные углы для мягкого вида
+- `bg-secondary/70` - серый полупрозрачный фон (70% opacity)
+- `border border-border` - тонкая серая рамка (1px)
+- `max-w-[75%]` - максимальная ширина 75% для длинных сообщений
+- Выравнивание справа через `justify-end`
+- Текст выравнен слева внутри баллона (без `text-right`)
+
+**Сообщения агента:**
+```tsx
+// Requirements: agents.4.10
+<>
+  {showAvatar && (
+    <div className="mb-2">
+      <Logo size="sm" showText={false} animated={isInProgress} />
+    </div>
+  )}
+  <div className="max-w-[85%] text-sm leading-relaxed text-foreground">
+    {message.content}
+  </div>
+</>
+```
+
+**Особенности:**
+- Без фона и рамки - чистый текст
+- Аватар показывается только для первого сообщения в последовательности
+- `max-w-[85%]` - немного шире чем сообщения пользователя
+- Анимированный логотип при статусе `in-progress`
+
 ## Markdown рендеринг
 
 Для первой версии — простой рендеринг без подсветки синтаксиса:

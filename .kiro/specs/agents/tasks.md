@@ -355,8 +355,20 @@
 #### 6.3 EmptyStatePlaceholder
 - **Файл:** `src/renderer/components/agents/EmptyStatePlaceholder.tsx` ✅
 - **Интеграция:** `src/renderer/components/agents.tsx` (показывается когда messages.length === 0) ✅
+- **Дизайн:** Анимированный логотип + 4 промпт-кнопки с иконками ✅
+- **Промпты:** 
+  - "Transcribe my latest meeting" (Video icon)
+  - "Extract action items from today's standup" (CheckSquare icon)
+  - "Create Jira tickets from meeting notes" (FileText icon)
+  - "Send summary to the team" (Calendar icon)
+- **Анимации:** framer-motion (fade in, scale on hover/tap) ✅
 - **Модульные тесты:** `tests/unit/components/agents/EmptyStatePlaceholder.test.tsx` (10 тестов) ✅
-- **Функциональные тесты:** `tests/functional/empty-state-placeholder.spec.ts` (5 тестов) ✅
+- **Функциональные тесты:** `tests/functional/empty-state-placeholder.spec.ts` (7 тестов) ✅
+- **Стилизация сообщений пользователя:** ✅
+  - `rounded-2xl` (16px скругленные углы)
+  - `bg-secondary/70` (серый полупрозрачный фон)
+  - `border border-border` (тонкая серая рамка)
+  - `max-w-[75%]` (максимальная ширина 75%)
 
 #### 6.4 AllAgents
 - **Файл:** `src/renderer/components/agents/AllAgents.tsx`

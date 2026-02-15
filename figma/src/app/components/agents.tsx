@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Send, Loader2, AlertCircle, Check, X, HelpCircle, ArrowLeft, CheckSquare, Plus, FileText, Calendar, Video, User } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 import { Logo } from './logo';
 import type { AgentTask } from '@/app/types/agent-task';
 
@@ -14,7 +15,65 @@ export function Agents() {
   const [showAllTasksPage, setShowAllTasksPage] = useState(false);
   const [taskInput, setTaskInput] = useState('');
   const [visibleChatsCount, setVisibleChatsCount] = useState(5);
+  const [isAgentTyping, setIsAgentTyping] = useState(false);
   const chatListRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  
+  // Store messages for each task
+  const [taskMessagesMap, setTaskMessagesMap] = useState<Record<string, Message[]>>({
+    'task-1': [
+      {
+        id: 'msg-task-1-1',
+        type: 'agent',
+        content: 'Hi! I noticed you have a question about pricing. How can I help you?',
+        timestamp: new Date('2026-02-12T15:00:00'),
+      }
+    ],
+    'task-2': [
+      {
+        id: 'msg-task-2-1',
+        type: 'agent',
+        content: 'I\'m currently transcribing your meeting audio. This usually takes a few minutes depending on the length...',
+        timestamp: new Date('2026-02-12T14:30:00'),
+      }
+    ],
+    'task-3': [
+      {
+        id: 'msg-task-3-1',
+        type: 'agent',
+        content: 'I found 5 action items from your meeting. Which Jira project should I create these tasks in?',
+        timestamp: new Date('2026-02-12T11:20:00'),
+      },
+      {
+        id: 'msg-task-3-2',
+        type: 'agent',
+        content: 'Available projects:\n• PROD - Product Development\n• ENG - Engineering\n• DESIGN - Design Team',
+        timestamp: new Date('2026-02-12T11:21:00'),
+      }
+    ],
+    'task-4': [
+      {
+        id: 'msg-task-4-1',
+        type: 'agent',
+        content: 'I tried to send your weekly report via email but the connection timed out.',
+        timestamp: new Date('2026-02-12T08:00:00'),
+      },
+      {
+        id: 'msg-task-4-2',
+        type: 'agent',
+        content: 'Error: Connection timeout after 30 seconds. Would you like me to try again?',
+        timestamp: new Date('2026-02-12T08:05:00'),
+      }
+    ],
+    'task-5': [
+      {
+        id: 'msg-task-5-1',
+        type: 'agent',
+        content: 'I\'ve successfully sent the meeting summary to all participants. The summary includes key discussion points and 3 action items.',
+        timestamp: new Date('2026-02-12T09:15:00'),
+      }
+    ],
+  });
   
   // Agent tasks data - examples of all statuses
   const [agentTasks, setAgentTasks] = useState<AgentTask[]>([
@@ -177,15 +236,15 @@ export function Agents() {
   const [selectedTask, setSelectedTask] = useState<AgentTask>(agentTasks[0]);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  // Get messages for specific task
+  const getTaskMessages = (taskId: string): Message[] => {
+    return taskMessagesMap[taskId] || [];
   };
 
-  // Scroll to bottom when task changes
-  useEffect(() => {
-    scrollToBottom();
-  }, [selectedTask]);
+  // Get current messages for the selected task
+  const currentMessages = getTaskMessages(selectedTask.id);
 
   // Calculate visible chats based on container width
   useEffect(() => {
@@ -211,12 +270,85 @@ export function Agents() {
     return () => window.removeEventListener('resize', calculateVisibleChats);
   }, []);
 
+  // Simulate agent updates to demonstrate animation
+  useEffect(() => {
+    const interval = setInterval(() => {
+      // Pick a random task that's not the first one
+      const tasksToUpdate = agentTasks.slice(1);
+      if (tasksToUpdate.length === 0) return;
+      
+      const randomTask = tasksToUpdate[Math.floor(Math.random() * tasksToUpdate.length)];
+      
+      // Update the task's updatedAt to move it to the front
+      setAgentTasks(prev => 
+        prev.map(task => 
+          task.id === randomTask.id 
+            ? { ...task, updatedAt: new Date() }
+            : task
+        )
+      );
+    }, 8000); // Every 8 seconds
+
+    return () => clearInterval(interval);
+  }, [agentTasks]);
+
   const handleSend = () => {
     if (!taskInput.trim()) return;
     
-    // Handle sending message for current task
-    console.log('Command:', taskInput);
+    // Create new user message
+    const newMessage: Message = {
+      id: `msg-${Date.now()}`,
+      type: 'user',
+      content: taskInput,
+      timestamp: new Date(),
+    };
+    
+    // Add message to current task's messages
+    setTaskMessagesMap(prev => ({
+      ...prev,
+      [selectedTask.id]: [...(prev[selectedTask.id] || []), newMessage],
+    }));
+    
+    // Clear input
     setTaskInput('');
+    
+    // Show typing indicator
+    setIsAgentTyping(true);
+    
+    // Simulate agent response after 2 seconds
+    setTimeout(() => {
+      setIsAgentTyping(false);
+      
+      // Add mock agent response
+      const agentResponse: Message = {
+        id: `msg-agent-${Date.now()}`,
+        type: 'agent',
+        content: 'Got it! I\'m processing your request...',
+        timestamp: new Date(),
+      };
+      
+      setTaskMessagesMap(prev => ({
+        ...prev,
+        [selectedTask.id]: [...(prev[selectedTask.id] || []), agentResponse],
+      }));
+      
+      // Update the task's updatedAt to move it to the front
+      setAgentTasks(prev =>
+        prev.map(task =>
+          task.id === selectedTask.id
+            ? { ...task, updatedAt: new Date() }
+            : task
+        )
+      );
+    }, 2000);
+  };
+
+  const handlePromptClick = (prompt: string) => {
+    setTaskInput(prompt);
+    // Small delay to show the input before sending
+    setTimeout(() => {
+      handleSend();
+    }, 100);
   };
 
   const formatTime = (date: Date) => {
@@ -257,500 +389,6 @@ export function Agents() {
     }
   };
 
-  // Get messages for specific task
-  const getTaskMessages = (taskId: string): Message[] => {
-    const taskMessagesMap: Record<string, Message[]> = {
-      'task-1': [
-        {
-          id: 't1-1',
-          type: 'user',
-          content: 'What are the pricing options for enterprise customers?',
-          timestamp: new Date('2026-02-02T15:00:00'),
-        },
-        {
-          id: 't1-2',
-          type: 'agent',
-          content: 'I can help you with pricing information for enterprise customers. Let me pull up the current pricing tiers.',
-          timestamp: new Date('2026-02-02T15:00:15'),
-        },
-        {
-          id: 't1-3',
-          type: 'agent',
-          content: (
-            <div className="space-y-3">
-              <p>Here are our enterprise pricing options:</p>
-              <div className="space-y-2">
-                <div className="p-3 bg-secondary/50 rounded-lg border border-border">
-                  <p className="font-medium text-sm mb-1">Professional Plan</p>
-                  <p className="text-xs text-muted-foreground">$99/user/month - Up to 50 users</p>
-                </div>
-                <div className="p-3 bg-secondary/50 rounded-lg border border-border">
-                  <p className="font-medium text-sm mb-1">Business Plan</p>
-                  <p className="text-xs text-muted-foreground">$149/user/month - 51-200 users</p>
-                </div>
-                <div className="p-3 bg-secondary/50 rounded-lg border border-border">
-                  <p className="font-medium text-sm mb-1">Enterprise Plan</p>
-                  <p className="text-xs text-muted-foreground">Custom pricing - 200+ users</p>
-                </div>
-              </div>
-            </div>
-          ),
-          timestamp: new Date('2026-02-02T15:00:30'),
-        },
-        {
-          id: 't1-4',
-          type: 'user',
-          content: 'What features are included in the Enterprise plan?',
-          timestamp: new Date('2026-02-02T15:01:00'),
-        },
-        {
-          id: 't1-5',
-          type: 'agent',
-          content: (
-            <div className="space-y-2">
-              <p>The Enterprise plan includes all features from lower tiers, plus:</p>
-              <ul className="space-y-1.5 mt-2 text-sm">
-                <li className="flex items-start gap-2">
-                  <Check className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
-                  <span>Unlimited meeting transcriptions</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <Check className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
-                  <span>Advanced AI task extraction and categorization</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <Check className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
-                  <span>Custom integrations (Jira, Asana, Linear, Monday.com)</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <Check className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
-                  <span>SSO and advanced security features</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <Check className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
-                  <span>Dedicated account manager</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <Check className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
-                  <span>24/7 priority support</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <Check className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
-                  <span>Custom SLA agreements</span>
-                </li>
-              </ul>
-            </div>
-          ),
-          timestamp: new Date('2026-02-02T15:01:20'),
-        },
-        {
-          id: 't1-6',
-          type: 'user',
-          content: 'Can we get a volume discount for 500 users?',
-          timestamp: new Date('2026-02-02T15:02:00'),
-        },
-        {
-          id: 't1-7',
-          type: 'agent',
-          content: 'Absolutely! For 500 users, we typically offer significant volume discounts. The exact pricing would be customized based on your needs, but you can expect 20-35% off the standard per-user rate.',
-          timestamp: new Date('2026-02-02T15:02:15'),
-        },
-        {
-          id: 't1-8',
-          type: 'user',
-          content: 'What about data residency options?',
-          timestamp: new Date('2026-02-02T15:02:45'),
-        },
-        {
-          id: 't1-9',
-          type: 'agent',
-          content: (
-            <div className="space-y-2">
-              <p>We offer flexible data residency options for Enterprise customers:</p>
-              <ul className="space-y-1.5 mt-2 text-sm">
-                <li className="flex items-start gap-2">
-                  <Check className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
-                  <span>US (East & West regions)</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <Check className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
-                  <span>EU (Frankfurt, Ireland)</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <Check className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
-                  <span>Asia Pacific (Singapore, Sydney)</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <Check className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
-                  <span>UK (London)</span>
-                </li>
-              </ul>
-              <p className="text-sm text-muted-foreground mt-3">All data is encrypted at rest and in transit. We're SOC 2 Type II and GDPR compliant.</p>
-            </div>
-          ),
-          timestamp: new Date('2026-02-02T15:03:00'),
-        },
-        {
-          id: 't1-10',
-          type: 'user',
-          content: 'How long does implementation typically take?',
-          timestamp: new Date('2026-02-02T15:03:30'),
-        },
-        {
-          id: 't1-11',
-          type: 'agent',
-          content: 'For a 500-user enterprise deployment, typical implementation timeline is 2-4 weeks, depending on integration complexity. This includes SSO setup, custom integrations, team training, and onboarding support.',
-          timestamp: new Date('2026-02-02T15:03:45'),
-        },
-        {
-          id: 't1-12',
-          type: 'user',
-          content: 'Can you send me a detailed proposal?',
-          timestamp: new Date('2026-02-02T15:04:15'),
-        },
-        {
-          id: 't1-13',
-          type: 'agent',
-          content: (
-            <div className="space-y-2">
-              <p>I'll prepare a customized proposal for you. I'll need a few more details:</p>
-              <ul className="space-y-1.5 mt-2 text-sm list-disc list-inside text-muted-foreground">
-                <li>Company name and industry</li>
-                <li>Estimated number of users (you mentioned 500)</li>
-                <li>Preferred data residency region</li>
-                <li>Key integrations needed (Jira, Slack, etc.)</li>
-                <li>Any specific compliance requirements</li>
-              </ul>
-              <p className="mt-3">Once I have these details, I can send you a comprehensive proposal within 24 hours.</p>
-            </div>
-          ),
-          timestamp: new Date('2026-02-02T15:04:30'),
-        },
-        {
-          id: 't1-14',
-          type: 'user',
-          content: 'Company: TechCorp International, Fintech industry, 500 users, EU data residency, need Jira and Slack integrations, ISO 27001 compliance required',
-          timestamp: new Date('2026-02-02T15:05:00'),
-        },
-        {
-          id: 't1-15',
-          type: 'agent',
-          content: (
-            <div className="space-y-3">
-              <p>Perfect! Thank you for the details. I'm creating a proposal for TechCorp International with the following specifications:</p>
-              <div className="p-3 bg-secondary/50 rounded-lg border border-border space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Company:</span>
-                  <span className="font-medium">TechCorp International</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Industry:</span>
-                  <span className="font-medium">Fintech</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Users:</span>
-                  <span className="font-medium">500</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Data Region:</span>
-                  <span className="font-medium">EU (Frankfurt/Ireland)</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Integrations:</span>
-                  <span className="font-medium">Jira, Slack</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Compliance:</span>
-                  <span className="font-medium">ISO 27001</span>
-                </div>
-              </div>
-              <p>I'll have a detailed proposal with pricing, implementation timeline, and compliance documentation sent to you within 24 hours. Is there anything else you'd like me to include?</p>
-            </div>
-          ),
-          timestamp: new Date('2026-02-02T15:05:30'),
-        },
-      ],
-      'task-2': [
-        {
-          id: 't2-1',
-          type: 'user',
-          content: 'Transcribe the Product Roadmap Review meeting and extract all action items',
-          timestamp: new Date('2026-02-02T14:29:00'),
-        },
-        {
-          id: 't2-2',
-          type: 'agent',
-          content: (
-            <div className="space-y-2">
-              <p>Started transcribing the Product Roadmap Review meeting.</p>
-              <div className="flex items-center gap-3 p-3 bg-secondary/50 rounded-lg border border-border">
-                <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center flex-shrink-0">
-                  <Video className="w-5 h-5 text-blue-500" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-sm">Product Roadmap Review</p>
-                  <p className="text-xs text-muted-foreground">Audio duration: 45 minutes · 6 participants</p>
-                </div>
-              </div>
-            </div>
-          ),
-          timestamp: new Date('2026-02-02T14:30:00'),
-        },
-        {
-          id: 't2-3',
-          type: 'user',
-          content: 'How many action items have you found so far?',
-          timestamp: new Date('2026-02-02T14:33:00'),
-        },
-        {
-          id: 't2-4',
-          type: 'agent',
-          content: (
-            <div className="space-y-2">
-              <p>I've identified <strong>8 action items</strong> so far from the first 15 minutes:</p>
-              <div className="mt-3 space-y-2 pl-3 border-l-2 border-primary/30">
-                <div className="text-sm">
-                  <p className="text-muted-foreground text-xs mb-1">Sarah Chen</p>
-                  <p>Review API authentication flow by Friday</p>
-                </div>
-                <div className="text-sm">
-                  <p className="text-muted-foreground text-xs mb-1">Alex Kumar</p>
-                  <p>Schedule design critique for mobile redesign</p>
-                </div>
-                <div className="text-sm">
-                  <p className="text-muted-foreground text-xs mb-1">Maria Santos</p>
-                  <p>Update Jira roadmap with Q2 priorities</p>
-                </div>
-                <p className="text-xs text-muted-foreground mt-2">+ 5 more items being processed...</p>
-              </div>
-            </div>
-          ),
-          timestamp: new Date('2026-02-02T14:33:30'),
-        },
-        {
-          id: 't2-5',
-          type: 'agent',
-          content: 'Still processing the meeting audio and analyzing context...',
-          timestamp: new Date('2026-02-02T14:35:00'),
-        },
-      ],
-      'task-3': [
-        {
-          id: 't3-1',
-          type: 'agent',
-          content: 'I found 5 tasks from the Design Sync meeting. Which Jira project should I use?',
-          timestamp: new Date('2026-02-02T11:20:00'),
-        },
-        {
-          id: 't3-2',
-          type: 'agent',
-          content: (
-            <div className="space-y-2">
-              <p className="mb-3">Available projects:</p>
-              <div className="space-y-2">
-                <button className="w-full p-3 bg-secondary/50 hover:bg-secondary rounded-lg border border-border hover:border-primary/50 transition-colors text-left">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded bg-purple-500/10 flex items-center justify-center">
-                      <span className="text-sm font-semibold text-purple-600">D</span>
-                    </div>
-                    <div>
-                      <p className="font-medium text-sm">DESIGN</p>
-                      <p className="text-xs text-muted-foreground">Design Team</p>
-                    </div>
-                  </div>
-                </button>
-                <button className="w-full p-3 bg-secondary/50 hover:bg-secondary rounded-lg border border-border hover:border-primary/50 transition-colors text-left">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded bg-blue-500/10 flex items-center justify-center">
-                      <span className="text-sm font-semibold text-blue-600">P</span>
-                    </div>
-                    <div>
-                      <p className="font-medium text-sm">PROD</p>
-                      <p className="text-xs text-muted-foreground">Product Development</p>
-                    </div>
-                  </div>
-                </button>
-              </div>
-            </div>
-          ),
-          timestamp: new Date('2026-02-02T11:21:00'),
-        },
-      ],
-      'task-4': [
-        {
-          id: 't4-1',
-          type: 'agent',
-          content: (
-            <div className="space-y-2">
-              <p>Preparing weekly report for stakeholders...</p>
-              <div className="flex items-center gap-3 p-3 bg-secondary/50 rounded-lg border border-border">
-                <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center flex-shrink-0">
-                  <FileText className="w-5 h-5 text-blue-500" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-sm">Weekly Report</p>
-                  <p className="text-xs text-muted-foreground">Week of Jan 27 - Feb 2</p>
-                </div>
-              </div>
-            </div>
-          ),
-          timestamp: new Date('2026-02-02T08:00:00'),
-        },
-        {
-          id: 't4-2',
-          type: 'agent',
-          content: (
-            <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
-              <div className="flex items-start gap-2">
-                <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-red-600 mb-1">Connection Error</p>
-                  <p className="text-xs text-red-600/80">Failed to connect to email server. Connection timeout after 30 seconds.</p>
-                </div>
-              </div>
-            </div>
-          ),
-          timestamp: new Date('2026-02-02T08:05:00'),
-        },
-        {
-          id: 't4-3',
-          type: 'agent',
-          content: (
-            <div className="space-y-2">
-              <p className="mb-3">Would you like me to:</p>
-              <div className="space-y-2">
-                <button className="w-full p-3 bg-secondary/50 hover:bg-secondary rounded-lg border border-border hover:border-primary/50 transition-colors text-left text-sm">
-                  1. Retry sending
-                </button>
-                <button className="w-full p-3 bg-secondary/50 hover:bg-secondary rounded-lg border border-border hover:border-primary/50 transition-colors text-left text-sm">
-                  2. Save report as PDF
-                </button>
-              </div>
-            </div>
-          ),
-          timestamp: new Date('2026-02-02T08:05:30'),
-        },
-      ],
-      'task-5': [
-        {
-          id: 't5-1',
-          type: 'agent',
-          content: (
-            <div className="space-y-2">
-              <p>Generated summary for Team Standup meeting.</p>
-              <div className="flex items-center gap-3 p-3 bg-secondary/50 rounded-lg border border-border">
-                <div className="w-10 h-10 rounded-lg bg-purple-500/10 flex items-center justify-center flex-shrink-0">
-                  <Calendar className="w-5 h-5 text-purple-500" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-sm">Team Standup</p>
-                  <p className="text-xs text-muted-foreground">Feb 2, 2026 at 9:00 AM</p>
-                </div>
-              </div>
-            </div>
-          ),
-          timestamp: new Date('2026-02-02T09:00:00'),
-        },
-        {
-          id: 't5-2',
-          type: 'agent',
-          content: (
-            <div className="space-y-2">
-              <p className="mb-3">Summary includes:</p>
-              <div className="grid grid-cols-3 gap-2">
-                <div className="p-3 bg-red-500/10 rounded-lg border border-red-500/20">
-                  <div className="text-2xl font-bold text-red-600">3</div>
-                  <div className="text-xs text-muted-foreground">Blockers</div>
-                </div>
-                <div className="p-3 bg-green-500/10 rounded-lg border border-green-500/20">
-                  <div className="text-2xl font-bold text-green-600">7</div>
-                  <div className="text-xs text-muted-foreground">Completed</div>
-                </div>
-                <div className="p-3 bg-blue-500/10 rounded-lg border border-blue-500/20">
-                  <div className="text-2xl font-bold text-blue-600">5</div>
-                  <div className="text-xs text-muted-foreground">In Progress</div>
-                </div>
-              </div>
-            </div>
-          ),
-          timestamp: new Date('2026-02-02T09:10:00'),
-        },
-        {
-          id: 't5-3',
-          type: 'agent',
-          content: (
-            <div className="p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
-              <div className="flex items-center gap-2">
-                <Check className="w-4 h-4 text-green-600" />
-                <span className="text-sm font-medium text-green-600">Summary sent to team@company.com</span>
-              </div>
-            </div>
-          ),
-          timestamp: new Date('2026-02-02T09:15:00'),
-        },
-      ],
-      'task-6': [
-        {
-          id: 't6-1',
-          type: 'agent',
-          content: (
-            <div className="space-y-2">
-              <p>Extracted action items from the meeting transcript.</p>
-              <div className="flex items-center gap-3 p-3 bg-secondary/50 rounded-lg border border-border">
-                <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center flex-shrink-0">
-                  <FileText className="w-5 h-5 text-blue-500" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-sm">Meeting Transcript</p>
-                  <p className="text-xs text-muted-foreground">Week of Jan 27 - Feb 2</p>
-                </div>
-              </div>
-            </div>
-          ),
-          timestamp: new Date('2026-02-01T16:00:00'),
-        },
-        {
-          id: 't6-2',
-          type: 'agent',
-          content: (
-            <div className="space-y-2">
-              <p className="mb-3">Action items:</p>
-              <div className="grid grid-cols-3 gap-2">
-                <div className="p-3 bg-red-500/10 rounded-lg border border-red-500/20">
-                  <div className="text-2xl font-bold text-red-600">3</div>
-                  <div className="text-xs text-muted-foreground">Blockers</div>
-                </div>
-                <div className="p-3 bg-green-500/10 rounded-lg border border-green-500/20">
-                  <div className="text-2xl font-bold text-green-600">7</div>
-                  <div className="text-xs text-muted-foreground">Completed</div>
-                </div>
-                <div className="p-3 bg-blue-500/10 rounded-lg border border-blue-500/20">
-                  <div className="text-2xl font-bold text-blue-600">5</div>
-                  <div className="text-xs text-muted-foreground">In Progress</div>
-                </div>
-              </div>
-            </div>
-          ),
-          timestamp: new Date('2026-02-01T16:05:00'),
-        },
-        {
-          id: 't6-3',
-          type: 'agent',
-          content: (
-            <div className="p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
-              <div className="flex items-center gap-2">
-                <Check className="w-4 h-4 text-green-600" />
-                <span className="text-sm font-medium text-green-600">Action items extracted successfully</span>
-              </div>
-            </div>
-          ),
-          timestamp: new Date('2026-02-01T16:10:00'),
-        },
-      ],
-    };
-    return taskMessagesMap[taskId] || [];
-  };
-
   const handleTaskClick = (task: AgentTask) => {
     setSelectedTask(task);
     setShowAllTasksPage(false);
@@ -779,10 +417,7 @@ export function Agents() {
   };
 
   // Show all tasks
-  const displayTasks = agentTasks;
-
-  // Get current messages for the selected task
-  const currentMessages = getTaskMessages(selectedTask.id);
+  const displayTasks = [...agentTasks].sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
 
   // Get status styles
   const getStatusStyles = (status: AgentTask['status']) => {
@@ -967,51 +602,67 @@ export function Agents() {
           </div>
           
           {/* Show dynamic number of tasks based on available space */}
-          {displayTasks.slice(0, visibleChatsCount).map((task) => {
-            const taskLetter = task.title.charAt(0).toUpperCase();
-            const taskStyle = getStatusStyles(task.status);
-            const isSelected = task.id === selectedTask.id;
+          <AnimatePresence mode="popLayout">
+            {displayTasks.slice(0, visibleChatsCount).map((task) => {
+              const taskLetter = task.title.charAt(0).toUpperCase();
+              const taskStyle = getStatusStyles(task.status);
+              const isSelected = task.id === selectedTask.id;
 
-            return (
-              <div
-                key={task.id}
-                onClick={() => handleTaskClick(task)}
-                className={`relative w-8 h-8 rounded-full ${taskStyle.bg} flex items-center justify-center cursor-pointer hover:scale-110 transition-transform group ${isSelected ? 'ring-2 ring-primary ring-offset-2' : ''}`}
-                title={task.title}
-              >
-                {task.status === 'completed' ? (
-                  <Check className="w-4 h-4 text-white" />
-                ) : task.status === 'error' ? (
-                  <X className="w-4 h-4 text-white" />
-                ) : task.status === 'awaiting-user' ? (
-                  <>
+              return (
+                <motion.div
+                  key={task.id}
+                  layout
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.8 }}
+                  transition={{
+                    layout: {
+                      type: "spring",
+                      stiffness: 400,
+                      damping: 30,
+                      mass: 0.8
+                    },
+                    opacity: { duration: 0.2 },
+                    scale: { duration: 0.2 }
+                  }}
+                  onClick={() => handleTaskClick(task)}
+                  className={`relative w-8 h-8 rounded-full ${taskStyle.bg} flex items-center justify-center cursor-pointer hover:scale-110 transition-transform group ${isSelected ? 'ring-2 ring-primary ring-offset-2' : ''}`}
+                  title={task.title}
+                >
+                  {task.status === 'completed' ? (
+                    <Check className="w-4 h-4 text-white" />
+                  ) : task.status === 'error' ? (
+                    <X className="w-4 h-4 text-white" />
+                  ) : task.status === 'awaiting-user' ? (
+                    <>
+                      <span className="text-white text-xs font-semibold">{taskLetter}</span>
+                      <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full ${taskStyle.bg} border-2 border-card flex items-center justify-center`}>
+                        <HelpCircle className="w-2 h-2 text-white" />
+                      </div>
+                    </>
+                  ) : (
                     <span className="text-white text-xs font-semibold">{taskLetter}</span>
-                    <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full ${taskStyle.bg} border-2 border-card flex items-center justify-center`}>
-                      <HelpCircle className="w-2 h-2 text-white" />
+                  )}
+                  
+                  {task.status === 'in-progress' && (
+                    <div className="absolute inset-0 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                  )}
+                  
+                  {task.status === 'awaiting-user' && (
+                    <div className={`absolute -inset-1 rounded-full ring-2 ${taskStyle.ring} animate-pulse`} />
+                  )}
+                  
+                  {/* Tooltip on hover */}
+                  <div className="absolute top-full right-0 mt-2 w-64 bg-gray-900 text-white text-xs rounded-lg p-3 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 shadow-lg">
+                    <p className="font-semibold mb-1">{task.title}</p>
+                    <div className="flex items-center gap-1.5 text-xs text-gray-300">
+                      <span>{getStatusText(task.status)}</span>
                     </div>
-                  </>
-                ) : (
-                  <span className="text-white text-xs font-semibold">{taskLetter}</span>
-                )}
-                
-                {task.status === 'in-progress' && (
-                  <div className="absolute inset-0 rounded-full border-2 border-white border-t-transparent animate-spin" />
-                )}
-                
-                {task.status === 'awaiting-user' && (
-                  <div className={`absolute -inset-1 rounded-full ring-2 ${taskStyle.ring} animate-pulse`} />
-                )}
-                
-                {/* Tooltip on hover */}
-                <div className="absolute top-full right-0 mt-2 w-64 bg-gray-900 text-white text-xs rounded-lg p-3 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 shadow-lg">
-                  <p className="font-semibold mb-1">{task.title}</p>
-                  <div className="flex items-center gap-1.5 text-xs text-gray-300">
-                    <span>{getStatusText(task.status)}</span>
                   </div>
-                </div>
-              </div>
-            );
-          })}
+                </motion.div>
+              );
+            })}
+          </AnimatePresence>
           
           {displayTasks.length > visibleChatsCount && (
             <div
@@ -1025,45 +676,132 @@ export function Agents() {
       </div>
 
       {/* Messages Area - always shows current task messages */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-4">
-        {currentMessages.map((message, index) => {
-          // Check if we should show the agent avatar
-          // Show it only if this is the first message or the previous message was from user
-          const showAvatar = message.type === 'agent' && (index === 0 || currentMessages[index - 1].type === 'user');
-          
-          return (
-            <div key={message.id}>
-              {message.type === 'user' ? (
-                <div className="flex justify-end">
-                  <div className="rounded-lg border-2 border-primary bg-primary/5 px-4 py-3">
-                    <p className="text-sm leading-relaxed text-foreground text-right">{message.content}</p>
-                  </div>
+      <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-6 min-h-0">
+        <div className="min-h-full flex flex-col justify-end space-y-4">
+          {/* Empty state with prompt suggestions */}
+          {currentMessages.length === 0 && !isAgentTyping && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
+              className="flex flex-col items-center justify-center space-y-8 py-12"
+            >
+              {/* Logo and title */}
+              <div className="text-center space-y-3">
+                <div className="flex justify-center">
+                  <Logo size="lg" animated={true} />
                 </div>
-              ) : (
-                <>
-                  {/* Agent avatar above first message in sequence */}
-                  {showAvatar && (
-                    <div className="mb-2">
-                      <Logo size="sm" showText={false} animated={selectedTask.status === 'in-progress'} />
+                <div>
+                  <h2 className="text-xl font-semibold text-foreground mb-1">
+                    Поручите что-нибудь агенту
+                  </h2>
+                  <p className="text-sm text-muted-foreground">
+                    Транскрибирует встречи, извлекает задачи, создает тикеты в Jira
+                  </p>
+                </div>
+              </div>
+
+              {/* Prompt suggestions grid */}
+              <div className="w-full max-w-2xl grid grid-cols-1 md:grid-cols-2 gap-3">
+                {[
+                  {
+                    icon: <Video className="w-4 h-4" />,
+                    prompt: "Transcribe my latest meeting"
+                  },
+                  {
+                    icon: <CheckSquare className="w-4 h-4" />,
+                    prompt: "Extract action items from today's standup"
+                  },
+                  {
+                    icon: <FileText className="w-4 h-4" />,
+                    prompt: "Create Jira tickets from meeting notes"
+                  },
+                  {
+                    icon: <Calendar className="w-4 h-4" />,
+                    prompt: "Send summary to the team"
+                  }
+                ].map((item, index) => (
+                  <motion.button
+                    key={index}
+                    onClick={() => handlePromptClick(item.prompt)}
+                    className="group flex items-center gap-3 p-4 bg-secondary/50 hover:bg-secondary border border-border hover:border-primary/50 rounded-xl transition-all text-left"
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    transition={{ duration: 0.15 }}
+                  >
+                    <div className="flex-shrink-0 w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+                      {item.icon}
                     </div>
-                  )}
-                  {/* Agent message content */}
-                  <div className="max-w-[85%] text-sm leading-relaxed text-foreground">
-                    {message.content}
+                    <span className="text-sm font-medium text-foreground group-hover:text-primary transition-colors">
+                      {item.prompt}
+                    </span>
+                  </motion.button>
+                ))}
+              </div>
+            </motion.div>
+          )}
+
+          {currentMessages.map((message, index) => {
+            // Check if we should show the agent avatar
+            // Show it only if this is the first message or the previous message was from user
+            const showAvatar = message.type === 'agent' && (index === 0 || currentMessages[index - 1].type === 'user');
+            
+            return (
+              <motion.div 
+                key={message.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ 
+                  duration: 0.3,
+                  ease: [0.4, 0, 0.2, 1]
+                }}
+              >
+                {message.type === 'user' ? (
+                  <div className="flex justify-end">
+                    <div className="rounded-2xl bg-secondary/70 border border-border px-4 py-3 max-w-[75%]">
+                      <p className="text-sm leading-relaxed text-foreground">{message.content}</p>
+                    </div>
                   </div>
-                </>
-              )}
-            </div>
-          );
-        })}
-        <div ref={messagesEndRef} />
+                ) : (
+                  <>
+                    {/* Agent avatar above first message in sequence */}
+                    {showAvatar && (
+                      <div className="mb-2">
+                        <Logo size="sm" showText={false} animated={selectedTask.status === 'in-progress'} />
+                      </div>
+                    )}
+                    {/* Agent message content */}
+                    <div className="max-w-[85%] text-sm leading-relaxed text-foreground">
+                      {message.content}
+                    </div>
+                  </>
+                )}
+              </motion.div>
+            );
+          })}
+          
+          {/* Typing indicator */}
+          {isAgentTyping && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.3 }}
+            >
+              <div className="flex items-center gap-3">
+                <Logo size="sm" showText={false} animated={true} />
+              </div>
+            </motion.div>
+          )}
+        </div>
       </div>
 
       {/* Input Area - always for current task */}
       <div className="p-4 border-t border-border bg-card flex-shrink-0">
-        <div className="flex gap-2">
-          <input
-            type="text"
+        <div className="flex gap-2 items-end">
+          <textarea
+            ref={textareaRef}
+            rows={1}
             value={taskInput}
             onChange={(e) => setTaskInput(e.target.value)}
             onKeyPress={(e) => {
@@ -1073,15 +811,18 @@ export function Agents() {
               }
             }}
             placeholder="Ask, reply, or give command..."
-            className="flex-1 px-3.5 py-2.5 bg-secondary border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+            className="flex-1 px-3.5 py-2.5 bg-secondary border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none overflow-y-auto max-h-[120px]"
+            style={{ height: 'auto', minHeight: '42px' }}
           />
-          <button
+          <motion.button
             onClick={handleSend}
             disabled={!taskInput.trim()}
-            className="px-3.5 py-2.5 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-3.5 py-2.5 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
+            whileTap={{ scale: 0.95 }}
+            transition={{ duration: 0.1 }}
           >
             <Send className="w-4 h-4" />
-          </button>
+          </motion.button>
         </div>
         <p className="text-xs text-muted-foreground mt-1.5 px-0.5">
           Press Enter to send

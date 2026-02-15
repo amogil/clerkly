@@ -141,7 +141,7 @@
 
 4.8. Сообщения ДОЛЖНЫ отображаться в хронологическом порядке
 
-4.9. Сообщения пользователя ДОЛЖНЫ отображаться справа с синей рамкой (border-2 border-primary)
+4.9. Сообщения пользователя ДОЛЖНЫ отображаться справа с серым полупрозрачным фоном (bg-secondary/70), тонкой серой рамкой (border border-border) и скругленными углами (rounded-2xl)
 
 4.10. Сообщения агента ДОЛЖНЫ отображаться слева без рамки
 
@@ -151,12 +151,57 @@
 
 4.13. ДОЛЖЕН выполняться автоскролл к последнему сообщению при добавлении нового сообщения
 
+4.14. КОГДА у агента нет сообщений (новый агент), ТО ДОЛЖЕН отображаться пустой стейт с промпт-подсказками
+
+4.15. Пустой стейт ДОЛЖЕН содержать:
+   - Анимированный логотип (размер lg, animated=true)
+   - Заголовок "Assign a task to the agent"
+   - Подзаголовок "Transcribes meetings, extracts tasks, creates Jira tickets"
+   - Сетку из 4 промпт-кнопок (2 колонки на desktop, 1 на mobile)
+
+4.16. Каждая промпт-кнопка ДОЛЖНА содержать:
+   - Иконку (Video, CheckSquare, FileText, Calendar)
+   - Текст промпта
+   - Анимацию при hover (scale 1.02) и tap (scale 0.98)
+   - Изменение цвета иконки при hover (primary → primary-foreground)
+
+4.17. Промпты ДОЛЖНЫ быть:
+   - "Transcribe my latest meeting"
+   - "Extract action items from today's standup"
+   - "Create Jira tickets from meeting notes"
+   - "Send summary to the team"
+
+4.18. КОГДА пользователь кликает на промпт-кнопку, ТО:
+   - Текст промпта ДОЛЖЕН вставляться в поле ввода
+   - Сообщение ДОЛЖНО автоматически отправляться через 100ms
+   - Пустой стейт ДОЛЖЕН исчезать
+
+4.19. Пустой стейт ДОЛЖЕН быть выровнен по нижнему краю области сообщений:
+   - Контейнер сообщений ДОЛЖЕН иметь `min-h-full flex flex-col justify-end`
+   - Пустой стейт ДОЛЖЕН прижиматься к нижней части, над полем ввода
+   - При появлении первого сообщения выравнивание ДОЛЖНО сохраняться
+
+4.20. Анимации пустого стейта ДОЛЖНЫ быть плавными:
+   - Появление: fade in (opacity 0→1) + slide up (y: 20→0) за 500ms
+   - Easing: cubic-bezier(0.4, 0, 0.2, 1)
+   - Промпт-кнопки: scale 1.02 при hover, scale 0.98 при tap
+   - Длительность анимации кнопок: 150ms
+
+4.21. Сообщения ДОЛЖНЫ анимироваться при появлении:
+   - Fade in (opacity 0→1) + slide up (y: 10→0) за 300ms
+   - Easing: cubic-bezier(0.4, 0, 0.2, 1)
+   - Каждое новое сообщение анимируется независимо
+
 #### Функциональные Тесты
 
 - `tests/functional/agents.spec.ts` - "should send message on Enter key"
 - `tests/functional/agents.spec.ts` - "should add new line on Shift+Enter"
 - `tests/functional/agents.spec.ts` - "should display messages in chronological order"
 - `tests/functional/agents.spec.ts` - "should autoscroll to last message"
+- `tests/functional/empty-state-placeholder.spec.ts` - "should display empty state for new agent"
+- `tests/functional/empty-state-placeholder.spec.ts` - "should show 4 prompt suggestions"
+- `tests/functional/empty-state-placeholder.spec.ts` - "should send message on prompt click"
+- `tests/functional/empty-state-placeholder.spec.ts` - "should center EmptyStatePlaceholder in messages area"
 
 ### 5. Просмотр всех агентов
 
@@ -270,7 +315,7 @@
    ```
 
 7.3. В UI чата ДОЛЖНЫ отображаться следующие kinds:
-   - `user` - сообщение пользователя (справа, с синей рамкой)
+   - `user` - сообщение пользователя (справа, серый полупрозрачный фон, тонкая серая рамка, скругленные углы)
    - `llm` с `action.type = "text"` - текстовый ответ агента (слева)
    - `final_answer` - финальный ответ агента (слева, с особым оформлением)
 

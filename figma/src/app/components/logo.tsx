@@ -75,67 +75,135 @@ export function Logo({ size = 'md', showText = true, animated = false }: LogoPro
       {/* CSS for animations */}
       {animated && (
         <style>{`
-          @keyframes pulse-node {
+          @keyframes pulse-subtle {
             0%, 100% {
-              opacity: 0.9;
+              opacity: 0.6;
+              r: 1.8;
+            }
+            50% {
+              opacity: 0.95;
+              r: 2.3;
+            }
+          }
+          
+          @keyframes pulse-medium {
+            0%, 100% {
+              opacity: 0.7;
               r: 2;
             }
             50% {
               opacity: 1;
-              r: 2.5;
+              r: 2.6;
+            }
+          }
+          
+          @keyframes pulse-strong {
+            0%, 100% {
+              opacity: 0.85;
+              r: 2.2;
+            }
+            50% {
+              opacity: 1;
+              r: 2.8;
             }
           }
           
           @keyframes pulse-center {
             0%, 100% {
-              opacity: 1;
+              opacity: 0.95;
               r: 2.5;
             }
-            50% {
+            25% {
               opacity: 1;
-              r: 3;
+              r: 3.2;
+            }
+            75% {
+              opacity: 1;
+              r: 2.8;
             }
           }
           
-          @keyframes flow {
+          @keyframes flow-fast {
             0% {
               stroke-dashoffset: 20;
+              opacity: 0.4;
+            }
+            50% {
+              opacity: 0.8;
             }
             100% {
               stroke-dashoffset: 0;
+              opacity: 0.4;
             }
           }
           
-          .logo-animated .nodes circle:nth-child(1),
-          .logo-animated .nodes circle:nth-child(2),
-          .logo-animated .nodes circle:nth-child(4),
-          .logo-animated .nodes circle:nth-child(5) {
-            animation: pulse-node 2s ease-in-out infinite;
+          @keyframes flow-slow {
+            0% {
+              stroke-dashoffset: 20;
+              opacity: 0.3;
+            }
+            50% {
+              opacity: 0.7;
+            }
+            100% {
+              stroke-dashoffset: 0;
+              opacity: 0.3;
+            }
           }
           
+          /* Top-left node - subtle pulse */
           .logo-animated .nodes circle:nth-child(1) {
+            animation: pulse-subtle 3.2s ease-in-out infinite;
             animation-delay: 0s;
           }
           
+          /* Bottom-left node - medium pulse */
           .logo-animated .nodes circle:nth-child(2) {
-            animation-delay: 0.5s;
+            animation: pulse-medium 2.4s ease-in-out infinite;
+            animation-delay: 0.8s;
           }
           
-          .logo-animated .nodes circle:nth-child(4) {
-            animation-delay: 1s;
-          }
-          
-          .logo-animated .nodes circle:nth-child(5) {
-            animation-delay: 1.5s;
-          }
-          
+          /* Center node - complex pulse */
           .logo-animated .nodes circle:nth-child(3) {
-            animation: pulse-center 2s ease-in-out infinite;
+            animation: pulse-center 2.88s ease-in-out infinite;
+            animation-delay: 0.4s;
           }
           
-          .logo-animated .connections line {
+          /* Top-right node - strong pulse */
+          .logo-animated .nodes circle:nth-child(4) {
+            animation: pulse-strong 2.6s ease-in-out infinite;
+            animation-delay: 1.6s;
+          }
+          
+          /* Bottom-right node - medium pulse */
+          .logo-animated .nodes circle:nth-child(5) {
+            animation: pulse-medium 3s ease-in-out infinite;
+            animation-delay: 2.2s;
+          }
+          
+          /* Connection lines - varied flow speeds */
+          .logo-animated .connections line:nth-child(1) {
             stroke-dasharray: 5 5;
-            animation: flow 1.5s linear infinite;
+            animation: flow-fast 2s linear infinite;
+            animation-delay: 0s;
+          }
+          
+          .logo-animated .connections line:nth-child(2) {
+            stroke-dasharray: 5 5;
+            animation: flow-slow 2.8s linear infinite;
+            animation-delay: 0.7s;
+          }
+          
+          .logo-animated .connections line:nth-child(3) {
+            stroke-dasharray: 5 5;
+            animation: flow-fast 2.2s linear infinite;
+            animation-delay: 1.4s;
+          }
+          
+          .logo-animated .connections line:nth-child(4) {
+            stroke-dasharray: 5 5;
+            animation: flow-slow 2.6s linear infinite;
+            animation-delay: 2.1s;
           }
         `}</style>
       )}
