@@ -4,7 +4,9 @@
 
 Этот документ содержит список задач для реализации компонента Agents — основного интерфейса для взаимодействия с AI-агентами (чат).
 
-**Общая оценка:** 10-12 дней (без учёта выполненной Фазы 1)
+**Общая оценка:** 10-12 дней (без учёта выполненной Фазы 1-5)
+
+**Текущий статус:** Фаза 5.1 (Инвариант "Всегда Хотя Бы Один Агент") ⏳ В ПРОЦЕССЕ
 
 ---
 
@@ -51,6 +53,15 @@
 - ✅ UI типы (Agent, Message)
 - ✅ Хуки (useAgents, useMessages)
 - ✅ Интеграция хуков в agents.tsx
+- ✅ Инвариант "Всегда хотя бы один агент" (agents.2.7-2.11):
+  - ✅ Auto-create при пустом списке (loadAgents)
+  - ✅ Auto-create при архивировании последнего (archiveAgent)
+  - ✅ Удаление empty state UI
+  - ✅ Модульные тесты инварианта (2 новых теста)
+  - ✅ Property-based тесты инварианта (3 теста, 50+30+20 итераций)
+
+### В процессе (Фаза 5.1)
+- ⏳ Валидация и тестирование инварианта
 
 ### Не выполнено
 - ❌ UI компоненты (AgentIcon, MessageList, AutoExpandingTextarea, HistoryPage)
@@ -208,6 +219,98 @@
 
 ---
 
+### Фаза 5.1: Инвариант "Всегда Хотя Бы Один Агент" ⏳ В ПРОЦЕССЕ
+
+**Зависимости:** Фаза 5 ✅
+
+**⚠️ КРИТИЧЕСКИ ВАЖНО:** Реализация инварианта agents.2.7-2.11
+
+| # | Задача | Статус | Оценка | Требования |
+|---|--------|--------|--------|------------|
+| 5.1.1 | Обновить useAgents.loadAgents | ✅ | 0.25 дня | agents.2.7, agents.2.8 |
+| 5.1.2 | Обновить useAgents.archiveAgent | ✅ | 0.25 дня | agents.2.9, agents.2.10 |
+| 5.1.3 | Убрать empty state UI | ✅ | 0.1 дня | agents.2.11 |
+| 5.1.4 | Модульные тесты инварианта | ✅ | 0.25 дня | agents.2.7-2.11 |
+| 5.1.5 | Property-based тесты инварианта | ✅ | 0.25 дня | agents.2.7-2.11 |
+| 5.1.6 | Валидация и тестирование | ⏳ | 0.1 дня | agents.2.7-2.11 |
+
+#### 5.1.1 Обновить useAgents.loadAgents
+- **Файл:** `src/renderer/hooks/useAgents.ts` ✅
+- **Изменение:** Добавлен auto-create при пустом списке ✅
+- **Логика:**
+  ```typescript
+  if (agentList.length === 0) {
+    const firstAgent = await window.api.agents.create('New Agent');
+    setAgents([firstAgent]);
+    setActiveAgentId(firstAgent.agentId);
+    return;
+  }
+  ```
+
+#### 5.1.2 Обновить useAgents.archiveAgent
+- **Файл:** `src/renderer/hooks/useAgents.ts` ✅
+- **Изменение:** Добавлен auto-create при архивировании последнего агента ✅
+- **Логика:**
+  ```typescript
+  const isLastAgent = agents.length === 1;
+  // ... archive logic ...
+  if (isLastAgent) {
+    const newAgent = await window.api.agents.create('New Agent');
+    setActiveAgentId(newAgent.agentId);
+  }
+  ```
+
+#### 5.1.3 Убрать empty state UI
+- **Файл:** `src/renderer/components/agents.tsx` ✅
+- **Изменение:** Заменен "No agents yet" на "Loading..." ✅
+- **Обоснование:** Empty state никогда не должен показываться из-за инварианта
+
+#### 5.1.4 Модульные тесты инварианта
+- **Файл:** `tests/unit/hooks/useAgents.test.ts` ✅
+- **Новые тесты:** ✅
+  - `should auto-create agent when list is empty on mount`
+  - `should auto-create agent when archiving last agent`
+
+#### 5.1.5 Property-based тесты инварианта
+- **Файл:** `tests/property/hooks/useAgents.property.test.ts` (новый) ✅
+- **Тесты:** ✅
+  - `INVARIANT: user always has at least one agent after load`
+  - `INVARIANT: user always has at least one agent after archiving`
+  - `PROPERTY: auto-created agent has correct properties`
+
+#### 5.1.6 Валидация и тестирование
+- **Действия:** ⏳
+  - Запустить `npm run validate`
+  - Убедиться что все тесты проходят
+  - Проверить что инвариант работает корректно
+
+**Чек-лист Фазы 5.1:**
+
+- [x] Код написан согласно требованиям agents.2.7-2.11
+- [x] useAgents.loadAgents обновлен (auto-create при пустом списке)
+- [x] useAgents.archiveAgent обновлен (auto-create при архивировании последнего)
+- [x] Empty state UI удален из agents.tsx
+- [x] Модульные тесты написаны (2 новых теста)
+- [x] Property-based тесты написаны (3 теста)
+- [x] Спецификации обновлены (requirements.md, design.md, tasks.md)
+- [ ] `npm run validate` проходит без ошибок
+- [ ] Все модульные тесты проходят
+- [ ] Все property-based тесты проходят
+- [ ] Инвариант работает корректно (проверено вручную)
+- [ ] Получено подтверждение от пользователя
+- [ ] Изменения закоммичены
+
+**После завершения Фазы 5.1:**
+
+Когда все пункты чек-листа выполнены:
+1. `git commit -m "feat(agents): implement always-at-least-one-agent invariant"`
+2. Обновить статус в tasks.md: Фаза 5.1 ✅ ВЫПОЛНЕНА
+3. Перейти к Фазе 6
+
+**Текущий прогресс:** 7/13 пунктов чек-листа (54%)
+
+---
+
 ### Фаза 6: UI Компоненты — Ввод и История (1 день)
 
 **Зависимости:** Фаза 5
@@ -309,10 +412,12 @@
     │
     ├──► Фаза 2 ──► Фаза 3 ──┐
     │                        │
-    └──► Фаза 4 ─────────────┼──► Фаза 5 ──► Фаза 6 ──► Фаза 7 ──► Фаза 8
-                             │
-                             └──────────────────────────────────────────►
+    └──► Фаза 4 ─────────────┼──► Фаза 5 ──► Фаза 5.1 ──► Фаза 6 ──► Фаза 7 ──► Фаза 8
+                             │                   ⏳
+                             └──────────────────────────────────────────────────────►
 ```
+
+**Текущая фаза:** Фаза 5.1 (Инвариант "Всегда Хотя Бы Один Агент") ⏳
 
 ---
 

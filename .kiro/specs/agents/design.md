@@ -458,6 +458,122 @@ function computeAgentStatus(messages: Message[]): AgentStatus {
   
   return 'new';
 }
+
+## Инвариант: Всегда Хотя Бы Один Агент
+
+**Requirements:** agents.2.7-2.11
+
+### Принцип
+
+Пользователь ВСЕГДА должен иметь хотя бы одного агента. Это фундаментальный инвариант системы.
+
+### Реализация
+
+Инвариант обеспечивается на уровне UI (renderer process) в хуке \`useAgents\`:
+
+1. **При первой загрузке** (пользователь впервые вошел в систему):
+   - \`useAgents.loadAgents()\` получает пустой список от API
+   - Автоматически создается новый агент с именем "New Agent"
+   - Новый агент становится активным
+
+2. **При архивировании последнего агента**:
+   - \`useAgents.archiveAgent()\` проверяет \`agents.length === 1\`
+   - Если это последний агент, автоматически создается новый агент
+   - Новый агент становится активным
+
+3. **Empty state UI никогда не показывается**:
+   - Компонент \`agents.tsx\` не имеет UI для пустого состояния
+   - Если \`agents.length === 0\`, это означает загрузку или ошибку
+   - Показывается "Loading..." вместо "No agents yet"
+
+### Почему на уровне UI, а не Main Process?
+
+**Решение:** Инвариант обеспечивается в renderer process (useAgents hook), а НЕ в main process (AgentManager).
+
+**Причины:**
+
+1. **Разделение ответственности:**
+   - Main process отвечает за бизнес-логику и данные
+   - Renderer process отвечает за UX и пользовательские инварианты
+
+2. **Гибкость:**
+   - В будущем могут появиться другие UI (мобильное приложение, web)
+   - Каждый UI может иметь свои правила отображения
+
+3. **Простота тестирования:**
+   - Main process остается простым и предсказуемым
+   - UI тесты проверяют инвариант в контексте пользовательского опыта
+
+4. **Избежание race conditions:**
+   - Если Main process проверяет инвариант, возможны race conditions между процессами
+   - UI контролирует инвариант синхронно в одном потоке
+
+### Код реализации
+
+\`\`\`typescript
+// src/renderer/hooks/useAgents.ts
+// Requirements: agents.2.7, agents.2.8
+
+const loadAgents = useCallback(async () => {
+  try {
+    setIsLoading(true);
+    const result = await window.api.agents.list();
+    
+    if (result.success && result.data) {
+      const agentList = result.data as Agent[];
+      
+      // ИНВАРИАНТ: Если список пуст, создать первого агента
+      if (agentList.length === 0) {
+        const firstAgentResult = await window.api.agents.create('New Agent');
+        if (firstAgentResult.success && firstAgentResult.data) {
+          const firstAgent = firstAgentResult.data as Agent;
+          setAgents([firstAgent]);
+          setActiveAgentId(firstAgent.agentId);
+          return;
+        }
+      }
+      
+      setAgents(agentList);
+      if (!activeAgentId && agentList.length > 0) {
+        setActiveAgentId(agentList[0].agentId);
+      }
+    }
+  } finally {
+    setIsLoading(false);
+  }
+}, [activeAgentId]);
+
+const archiveAgent = useCallback(async (agentId: string): Promise<boolean> => {
+  try {
+    // ИНВАРИАНТ: Проверить, архивируем ли последнего агента
+    const isLastAgent = agents.length === 1;
+    
+    const result = await window.api.agents.archive(agentId);
+    if (result.success) {
+      // Выбрать следующего агента
+      if (activeAgentId === agentId) {
+        const remaining = agents.filter((a) => a.agentId !== agentId);
+        setActiveAgentId(remaining.length > 0 ? remaining[0].agentId : null);
+      }
+      
+      // ИНВАРИАНТ: Если архивировали последнего, создать нового
+      if (isLastAgent) {
+        const newAgentResult = await window.api.agents.create('New Agent');
+        if (newAgentResult.success && newAgentResult.data) {
+          const newAgent = newAgentResult.data as Agent;
+          setActiveAgentId(newAgent.agentId);
+        }
+      }
+      
+      return true;
+    }
+    return false;
+  } catch (err) {
+    setError(err instanceof Error ? err.message : 'Failed to archive agent');
+    return false;
+  }
+}, [activeAgentId, agents]);
+\`\`\`
 ```
 
 ## Real-time Events
@@ -1023,6 +1139,7 @@ const STATUS_STYLES: Record<AgentStatus, StatusStyle> = {
 |------------|-----------|----------------|----------------|
 | agents.1 | ✓ | - | ✓ |
 | agents.2 | ✓ | ✓ | ✓ |
+| agents.2.7-2.11 (инвариант) | ✓ | ✓ | ✓ |
 | agents.3 | ✓ | - | ✓ |
 | agents.4 | ✓ | - | ✓ |
 | agents.5 | ✓ | - | ✓ |

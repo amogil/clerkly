@@ -77,10 +77,22 @@
 
 2.6. Интерфейс чата ДОЛЖЕН очищаться для нового разговора
 
+2.7. **ИНВАРИАНТ:** У пользователя ВСЕГДА ДОЛЖЕН быть хотя бы один агент
+
+2.8. КОГДА список агентов пуст (первый вход, удаление всех агентов), ТО ДОЛЖЕН автоматически создаваться новый агент с названием "New Agent"
+
+2.9. Автоматически созданный агент ДОЛЖЕН иметь пустую историю сообщений
+
+2.10. Интерфейс Agents ДОЛЖЕН всегда показывать стандартный UI (хедер, список агентов, область чата, поле ввода)
+
+2.11. Empty state ("No agents yet") НЕ ДОЛЖЕН показываться никогда
+
 #### Функциональные Тесты
 
 - `tests/functional/agents.spec.ts` - "should create new agent on new chat button click"
 - `tests/functional/agents.spec.ts` - "should make new agent active automatically"
+- `tests/functional/agents.spec.ts` - "should auto-create agent when list is empty"
+- `tests/functional/agents.spec.ts` - "should always have at least one agent (invariant)"
 
 ### 3. Переключение между агентами
 
