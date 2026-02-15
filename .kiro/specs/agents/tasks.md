@@ -10,7 +10,10 @@
 
 - ✅ Типы событий определены (`AgentCreatedEvent`, `AgentUpdatedEvent`, `AgentArchivedEvent`, `MessageCreatedEvent`, `MessageUpdatedEvent`)
 - ✅ Тип `Message` обновлён согласно спеке (с `payload_json`)
-- ❌ Таблицы `agents` и `messages` не созданы в БД
+- ✅ Таблицы `agents` и `messages` созданы в БД (миграция `005_create_agents_tables.sql`)
+- ✅ Drizzle ORM схема определена (`src/main/db/schema.ts`)
+- ✅ Репозитории реализованы (`AgentsRepository`, `MessagesRepository`)
+- ✅ Модульные тесты для репозиториев написаны
 - ❌ `AgentManager` и `MessageManager` не реализованы
 - ❌ IPC handlers для agents/messages не реализованы
 - ❌ Preload API для agents/messages не реализован
@@ -21,28 +24,42 @@
 ### Фаза 1: База Данных (1 день)
 
 #### Задача 1.1: Создать миграцию для таблиц agents и messages
-- **Статус:** ❌ Не начата
+- **Статус:** ✅ Выполнена
 - **Оценка:** 0.5 дня
 - **Требования:** agents.7.1, agents.10.1
 - **Файл:** `migrations/005_create_agents_tables.sql`
 - **Описание:**
-  - Создать таблицу `agents` с полями: `agent_id`, `user_id`, `name`, `created_at`, `updated_at`, `archived_at`
-  - Создать таблицу `messages` с полями: `id`, `agent_id`, `timestamp`, `payload_json`
-  - Создать индексы:
+  - ✅ Создана таблица `agents` с полями: `agent_id`, `user_id`, `name`, `created_at`, `updated_at`, `archived_at`
+  - ✅ Создана таблица `messages` с полями: `id`, `agent_id`, `timestamp`, `payload_json`
+  - ✅ Созданы индексы:
     - `idx_agents_user_archived` на `(user_id, archived_at)` — для фильтрации
-    - `idx_agents_user_archived_updated` на `(user_id, archived_at, updated_at DESC)` — для сортировки
+    - `idx_agents_user_updated` на `(user_id, archived_at, updated_at)` — для сортировки
     - `idx_messages_agent_id` на `(agent_id)`
     - `idx_messages_agent_timestamp` на `(agent_id, timestamp)`
-  - Добавить DOWN секцию для отката
+  - ✅ Добавлена DOWN секция для отката
 
 #### Задача 1.2: Написать тесты для миграции
-- **Статус:** ❌ Не начата
+- **Статус:** ✅ Выполнена
 - **Оценка:** 0.5 дня
 - **Требования:** agents.7.1
 - **Описание:**
-  - Тест создания таблиц
-  - Тест индексов
-  - Тест отката миграции
+  - ✅ Тесты схемы в `tests/unit/db/schema.test.ts`
+  - ✅ Тесты репозиториев в `tests/unit/db/repositories/`
+
+#### Задача 1.3: Создать Drizzle ORM схему и репозитории
+- **Статус:** ✅ Выполнена
+- **Оценка:** 0.5 дня
+- **Требования:** user-data-isolation.7.3, user-data-isolation.7.6
+- **Файлы:**
+  - `src/main/db/schema.ts` — схема таблиц
+  - `src/main/db/repositories/AgentsRepository.ts` — репозиторий агентов
+  - `src/main/db/repositories/MessagesRepository.ts` — репозиторий сообщений
+- **Описание:**
+  - ✅ Drizzle ORM схема для agents и messages
+  - ✅ AgentsRepository с методами: `list()`, `findById()`, `create()`, `update()`, `archive()`, `touch()`
+  - ✅ MessagesRepository с методами: `listByAgent()`, `create()`, `update()`
+  - ✅ Автоматическая изоляция по userId через репозитории
+  - ✅ Проверка доступа к агенту в MessagesRepository
 
 ---
 
@@ -53,7 +70,7 @@
 - **Оценка:** 1 день
 - **Требования:** agents.2, agents.10, user-data-isolation.6.5, user-data-isolation.6.3
 - **Файл:** `src/main/agents/AgentManager.ts`
-- **Зависимость:** Drizzle ORM репозитории (`.kiro/specs/user-data-isolation/requirements.md`)
+- **Зависимость:** ✅ Drizzle ORM репозитории (реализованы)
 - **Описание:**
   - Реализовать методы: `create()`, `list()`, `get()`, `update()`, `archive()`, `touch()`
   - Использовать репозитории `DatabaseManager` (`dbManager.agents`)
@@ -66,12 +83,12 @@
 - **Оценка:** 0.5 дня
 - **Требования:** agents.4, agents.7, user-data-isolation.6.5, user-data-isolation.7.6
 - **Файл:** `src/main/agents/MessageManager.ts`
-- **Зависимость:** Drizzle ORM репозитории (`.kiro/specs/user-data-isolation/requirements.md`)
+- **Зависимость:** ✅ Drizzle ORM репозитории (реализованы)
 - **Описание:**
   - Реализовать методы: `list()`, `create()`, `update()`
   - Использовать репозитории `DatabaseManager` (`dbManager.messages`)
   - Проверка доступа к агенту выполняется репозиторием автоматически
-  - Обновление `updated_at` агента при создании сообщения
+  - Обновление `updated_at` агента при создании сообщения (выполняется репозиторием)
   - Генерация событий через `MainEventBus`
 
 #### Задача 2.3: Написать модульные тесты для AgentManager
