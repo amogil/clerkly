@@ -75,9 +75,7 @@ test.afterEach(async () => {
    Property: 24 */
 test('should show login screen when not authenticated', async () => {
   // Wait for the login screen to be visible
-  const loginScreen = window
-    .locator('[data-testid="login-screen"]')
-    .or(window.locator('text=Welcome'));
+  const loginScreen = window.locator('[data-testid="login-screen"]');
   await expect(loginScreen).toBeVisible({ timeout: 10000 });
 
   // Verify Google sign-in button is present
@@ -96,9 +94,7 @@ test('should show login screen when not authenticated', async () => {
    Property: 25 */
 test('should block access to protected screens without authentication', async () => {
   // Verify login screen is shown initially
-  const loginScreen = window
-    .locator('[data-testid="login-screen"]')
-    .or(window.locator('text=Welcome'));
+  const loginScreen = window.locator('[data-testid="login-screen"]');
   await expect(loginScreen).toBeVisible({ timeout: 10000 });
 
   // Try to access Agents via evaluate (simulating direct navigation)
@@ -168,9 +164,7 @@ test('should block access to protected screens without authentication', async ()
    Property: 26 */
 test('should redirect to agents after successful authentication', async () => {
   // Wait for login screen
-  const loginScreen = window
-    .locator('[data-testid="login-screen"]')
-    .or(window.locator('text=Welcome'));
+  const loginScreen = window.locator('[data-testid="login-screen"]');
   await expect(loginScreen).toBeVisible({ timeout: 10000 });
 
   // Complete OAuth flow
@@ -216,9 +210,7 @@ test('should redirect to login screen after logout', async () => {
   await window.waitForTimeout(1000);
 
   // Verify login screen is shown
-  const loginScreen = window
-    .locator('[data-testid="login-screen"]')
-    .or(window.locator('text=Welcome'));
+  const loginScreen = window.locator('[data-testid="login-screen"]');
   await expect(loginScreen).toBeVisible({ timeout: 10000 });
 
   // Verify sign-in button is present
@@ -246,9 +238,7 @@ test('should show error on authorization failure', async () => {
   console.log('[TEST] Mock server configured to return profile fetch error');
 
   // Wait for login screen
-  const loginScreen = window
-    .locator('[data-testid="login-screen"]')
-    .or(window.locator('text=Welcome'));
+  const loginScreen = window.locator('[data-testid="login-screen"]');
   await expect(loginScreen).toBeVisible({ timeout: 10000 });
 
   console.log('[TEST] Login screen displayed');
