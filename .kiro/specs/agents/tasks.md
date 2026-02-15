@@ -106,15 +106,15 @@
 
 ---
 
-### Фаза 3: IPC и Preload API (1 день)
+### Фаза 3: IPC и Preload API ✅ ВЫПОЛНЕНА
 
-**Зависимости:** Фаза 2
+**Зависимости:** Фаза 2 ✅
 
 | # | Задача | Статус | Оценка | Требования |
 |---|--------|--------|--------|------------|
-| 3.1 | AgentIPCHandlers | ❌ | 0.25 дня | agents.2, agents.4 |
-| 3.2 | Preload API | ❌ | 0.25 дня | user-data-isolation.6.6 |
-| 3.3 | Тесты IPC handlers | ❌ | 0.5 дня | agents.2, agents.4 |
+| 3.1 | AgentIPCHandlers | ✅ | 0.25 дня | agents.2, agents.4 |
+| 3.2 | Preload API | ✅ | 0.25 дня | user-data-isolation.6.6 |
+| 3.3 | Тесты IPC handlers | ✅ | 0.5 дня | agents.2, agents.4 |
 
 #### 3.1 AgentIPCHandlers
 - **Файл:** `src/main/agents/AgentIPCHandlers.ts`
