@@ -1,0 +1,631 @@
+/**
+ * @jest-environment jsdom
+ */
+// Requirements: agents.4, agents.7, agents.12
+/**
+ * Unit tests for useMessages hook
+ */
+
+import { renderHook, act, waitFor } from '@testing-library/react';
+import { EVENT_TYPES } from '../../../src/shared/events/constants';
+import type { Message } from '../../../src/renderer/types/agent';
+
+// Mock window.api
+const mockMessagesApi = {
+  list: jest.fn(),
+  create: jest.fn(),
+};
+
+// Mock RendererEventBus
+const mockSubscribe = jest.fn();
+const mockUnsubscribe = jest.fn();
+
+jest.mock('../../../src/renderer/events/RendererEventBus', () => ({
+  RendererEventBus: {
+    getInstance: jest.fn(() => ({
+      subscribe: mockSubscribe,
+      subscribeAll: jest.fn(),
+      publish: jest.fn(),
+    })),
+  },
+}));
+
+// Set up window.api
+(window as any).api = {
+  messages: mockMessagesApi,
+};
+
+// Import hook after mocks are set up
+import { useMessages } from '../../../src/renderer/hooks/useMessages';
+
+describe('useMessages hook', () => {
+  const mockMessages: Message[] = [
+    {
+      id: 1,
+      agentId: 'agent-1',
+      timestamp: '2024-01-01T10:00:00Z',
+      payloadJson: JSON.stringify({ kind: 'user', data: { text: 'Hello' } }),
+    },
+    {
+      id: 2,
+      agentId: 'agent-1',
+      timestamp: '2024-01-01T10:01:00Z',
+      payloadJson: JSON.stringify({ kind: 'llm', data: { text: 'Hi there!' } }),
+    },
+  ];
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockSubscribe.mockReturnValue(mockUnsubscribe);
+    mockMessagesApi.list.mockResolvedValue({ success: true, data: [...mockMessages] });
+    mockMessagesApi.create.mockResolvedValue({ success: true, data: mockMessages[0] });
+  });
+
+  describe('initial load', () => {
+    /* Preconditions: Hook mounts with agentId
+       Action: useMessages is called
+       Assertions: Messages are loaded from API
+       Requirements: agents.4.8 */
+    it('should load messages on mount', async () => {
+      const { result } = renderHook(() => useMessages('agent-1'));
+
+      expect(result.current.isLoading).toBe(true);
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      expect(mockMessagesApi.list).toHaveBeenCalledWith('agent-1');
+      expect(result.current.messages).toHaveLength(2);
+    });
+
+    /* Preconditions: Hook mounts with null agentId
+       Action: useMessages is called with null
+       Assertions: No API call, empty messages
+       Requirements: agents.4 */
+    it('should not load messages when agentId is null', async () => {
+      const { result } = renderHook(() => useMessages(null));
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      expect(mockMessagesApi.list).not.toHaveBeenCalled();
+      expect(result.current.messages).toHaveLength(0);
+    });
+
+    /* Preconditions: Hook mounts with messages
+       Action: useMessages is called
+       Assertions: Messages are sorted by timestamp ascending
+       Requirements: agents.4.8 */
+    it('should sort messages by timestamp ascending', async () => {
+      const { result } = renderHook(() => useMessages('agent-1'));
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      expect(result.current.messages[0].id).toBe(1);
+      expect(result.current.messages[1].id).toBe(2);
+    });
+
+    /* Preconditions: Hook mounts with messages
+       Action: useMessages is called
+       Assertions: Messages have parsed payloads
+       Requirements: agents.7.2 */
+    it('should parse message payloads', async () => {
+      const { result } = renderHook(() => useMessages('agent-1'));
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      expect(result.current.messages[0].payload.kind).toBe('user');
+      expect(result.current.messages[0].payload.data.text).toBe('Hello');
+      expect(result.current.messages[1].payload.kind).toBe('llm');
+    });
+
+    /* Preconditions: API returns error
+       Action: useMessages is called
+       Assertions: Error is set
+       Requirements: agents.4 */
+    it('should set error on API failure', async () => {
+      mockMessagesApi.list.mockResolvedValue({ success: false, error: 'Network error' });
+
+      const { result } = renderHook(() => useMessages('agent-1'));
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      expect(result.current.error).toBe('Network error');
+    });
+  });
+
+  describe('agentId change', () => {
+    /* Preconditions: Hook is mounted
+       Action: agentId changes
+       Assertions: Messages are reloaded for new agent
+       Requirements: agents.4.8 */
+    it('should reload messages when agentId changes', async () => {
+      const { result, rerender } = renderHook(({ agentId }) => useMessages(agentId), {
+        initialProps: { agentId: 'agent-1' },
+      });
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      expect(mockMessagesApi.list).toHaveBeenCalledWith('agent-1');
+
+      const newMessages: Message[] = [
+        {
+          id: 3,
+          agentId: 'agent-2',
+          timestamp: '2024-01-02T10:00:00Z',
+          payloadJson: JSON.stringify({ kind: 'user', data: { text: 'Different agent' } }),
+        },
+      ];
+      mockMessagesApi.list.mockResolvedValue({ success: true, data: newMessages });
+
+      rerender({ agentId: 'agent-2' });
+
+      await waitFor(() => {
+        expect(mockMessagesApi.list).toHaveBeenCalledWith('agent-2');
+      });
+    });
+
+    /* Preconditions: Hook is mounted with agentId
+       Action: agentId changes to null
+       Assertions: Messages are cleared
+       Requirements: agents.4 */
+    it('should clear messages when agentId becomes null', async () => {
+      const { result, rerender } = renderHook(({ agentId }) => useMessages(agentId), {
+        initialProps: { agentId: 'agent-1' as string | null },
+      });
+
+      await waitFor(() => {
+        expect(result.current.messages.length).toBe(2);
+      });
+
+      rerender({ agentId: null });
+
+      await waitFor(() => {
+        expect(result.current.messages).toHaveLength(0);
+      });
+    });
+  });
+
+  describe('sendMessage', () => {
+    /* Preconditions: Hook is mounted with agentId
+       Action: sendMessage is called
+       Assertions: API is called with correct payload
+       Requirements: agents.4.3 */
+    it('should send message with correct payload', async () => {
+      const { result } = renderHook(() => useMessages('agent-1'));
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      let success = false;
+      await act(async () => {
+        success = await result.current.sendMessage('Test message');
+      });
+
+      expect(mockMessagesApi.create).toHaveBeenCalledWith('agent-1', {
+        kind: 'user',
+        data: {
+          text: 'Test message',
+          reply_to_message_id: null,
+        },
+      });
+      expect(success).toBe(true);
+    });
+
+    /* Preconditions: Hook is mounted with null agentId
+       Action: sendMessage is called
+       Assertions: Returns false without API call
+       Requirements: agents.4.3 */
+    it('should return false when agentId is null', async () => {
+      const { result } = renderHook(() => useMessages(null));
+
+      let success = true;
+      await act(async () => {
+        success = await result.current.sendMessage('Test message');
+      });
+
+      expect(mockMessagesApi.create).not.toHaveBeenCalled();
+      expect(success).toBe(false);
+    });
+
+    /* Preconditions: Hook is mounted
+       Action: sendMessage is called with empty text
+       Assertions: Returns false without API call
+       Requirements: agents.4.3 */
+    it('should return false for empty message', async () => {
+      const { result } = renderHook(() => useMessages('agent-1'));
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      let success = true;
+      await act(async () => {
+        success = await result.current.sendMessage('   ');
+      });
+
+      expect(mockMessagesApi.create).not.toHaveBeenCalled();
+      expect(success).toBe(false);
+    });
+
+    /* Preconditions: Hook is mounted
+       Action: sendMessage fails
+       Assertions: Error is set
+       Requirements: agents.4 */
+    it('should set error on send failure', async () => {
+      mockMessagesApi.create.mockResolvedValue({ success: false, error: 'Send failed' });
+
+      const { result } = renderHook(() => useMessages('agent-1'));
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      let success = true;
+      await act(async () => {
+        success = await result.current.sendMessage('Test');
+      });
+
+      expect(success).toBe(false);
+      expect(result.current.error).toBe('Send failed');
+    });
+  });
+
+  describe('event subscriptions', () => {
+    /* Preconditions: Hook mounts
+       Action: useMessages is called
+       Assertions: Subscribes to message events
+       Requirements: agents.12.7 */
+    it('should subscribe to message events', async () => {
+      renderHook(() => useMessages('agent-1'));
+
+      await waitFor(() => {
+        expect(mockSubscribe).toHaveBeenCalled();
+      });
+
+      const subscribedEvents = mockSubscribe.mock.calls.map((call) => call[0]);
+      expect(subscribedEvents).toContain(EVENT_TYPES.MESSAGE_CREATED);
+      expect(subscribedEvents).toContain(EVENT_TYPES.MESSAGE_UPDATED);
+    });
+
+    /* Preconditions: Hook is mounted
+       Action: MESSAGE_CREATED event is received for current agent
+       Assertions: New message is added to list
+       Requirements: agents.12.7 */
+    it('should add message on MESSAGE_CREATED event', async () => {
+      let createdHandler: (payload: any) => void;
+      mockSubscribe.mockImplementation((type, handler) => {
+        if (type === EVENT_TYPES.MESSAGE_CREATED) {
+          createdHandler = handler;
+        }
+        return mockUnsubscribe;
+      });
+
+      const { result } = renderHook(() => useMessages('agent-1'));
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      const initialCount = result.current.messages.length;
+
+      act(() => {
+        createdHandler({
+          timestamp: Date.now(),
+          data: {
+            id: 3,
+            agentId: 'agent-1',
+            timestamp: '2024-01-01T10:02:00Z',
+            payloadJson: JSON.stringify({ kind: 'user', data: { text: 'New message' } }),
+          },
+        });
+      });
+
+      expect(result.current.messages.length).toBe(initialCount + 1);
+    });
+
+    /* Preconditions: Hook is mounted
+       Action: MESSAGE_CREATED event is received for different agent
+       Assertions: Message is not added
+       Requirements: agents.12.7 */
+    it('should ignore MESSAGE_CREATED for different agent', async () => {
+      let createdHandler: (payload: any) => void;
+      mockSubscribe.mockImplementation((type, handler) => {
+        if (type === EVENT_TYPES.MESSAGE_CREATED) {
+          createdHandler = handler;
+        }
+        return mockUnsubscribe;
+      });
+
+      const { result } = renderHook(() => useMessages('agent-1'));
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      const initialCount = result.current.messages.length;
+
+      act(() => {
+        createdHandler({
+          timestamp: Date.now(),
+          data: {
+            id: 3,
+            agentId: 'agent-2', // Different agent
+            timestamp: '2024-01-01T10:02:00Z',
+            payloadJson: JSON.stringify({ kind: 'user', data: { text: 'New message' } }),
+          },
+        });
+      });
+
+      expect(result.current.messages.length).toBe(initialCount);
+    });
+
+    /* Preconditions: Hook is mounted with messages
+       Action: MESSAGE_CREATED event with duplicate id
+       Assertions: Message is not duplicated
+       Requirements: agents.12.7 */
+    it('should not duplicate message on repeated event', async () => {
+      let createdHandler: (payload: any) => void;
+      mockSubscribe.mockImplementation((type, handler) => {
+        if (type === EVENT_TYPES.MESSAGE_CREATED) {
+          createdHandler = handler;
+        }
+        return mockUnsubscribe;
+      });
+
+      const { result } = renderHook(() => useMessages('agent-1'));
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      const initialCount = result.current.messages.length;
+
+      // Send same message twice
+      act(() => {
+        createdHandler({
+          timestamp: Date.now(),
+          data: {
+            id: 1, // Same id as existing message
+            agentId: 'agent-1',
+            timestamp: '2024-01-01T10:00:00Z',
+            payloadJson: JSON.stringify({ kind: 'user', data: { text: 'Hello' } }),
+          },
+        });
+      });
+
+      expect(result.current.messages.length).toBe(initialCount);
+    });
+
+    /* Preconditions: Hook is mounted
+       Action: MESSAGE_CREATED event with no data
+       Assertions: No error, messages unchanged
+       Requirements: agents.12.7 */
+    it('should handle MESSAGE_CREATED event with no data', async () => {
+      let createdHandler: (payload: any) => void;
+      mockSubscribe.mockImplementation((type, handler) => {
+        if (type === EVENT_TYPES.MESSAGE_CREATED) {
+          createdHandler = handler;
+        }
+        return mockUnsubscribe;
+      });
+
+      const { result } = renderHook(() => useMessages('agent-1'));
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      const initialCount = result.current.messages.length;
+
+      act(() => {
+        createdHandler({
+          timestamp: Date.now(),
+          data: null,
+        });
+      });
+
+      expect(result.current.messages.length).toBe(initialCount);
+    });
+
+    /* Preconditions: Hook is mounted
+       Action: MESSAGE_UPDATED event is received
+       Assertions: Message payload is updated
+       Requirements: agents.12.7 */
+    it('should update message on MESSAGE_UPDATED event', async () => {
+      let updatedHandler: (payload: any) => void;
+      mockSubscribe.mockImplementation((type, handler) => {
+        if (type === EVENT_TYPES.MESSAGE_UPDATED) {
+          updatedHandler = handler;
+        }
+        return mockUnsubscribe;
+      });
+
+      const { result } = renderHook(() => useMessages('agent-1'));
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      act(() => {
+        updatedHandler({
+          timestamp: Date.now(),
+          id: '1',
+          changedFields: {
+            payloadJson: JSON.stringify({ kind: 'user', data: { text: 'Updated text' } }),
+          },
+        });
+      });
+
+      const updatedMessage = result.current.messages.find((m) => m.id === 1);
+      expect(updatedMessage?.payload.data.text).toBe('Updated text');
+    });
+
+    /* Preconditions: Hook is mounted
+       Action: MESSAGE_UPDATED event with invalid JSON
+       Assertions: Message unchanged
+       Requirements: agents.12.7 */
+    it('should handle MESSAGE_UPDATED event with invalid JSON', async () => {
+      let updatedHandler: (payload: any) => void;
+      mockSubscribe.mockImplementation((type, handler) => {
+        if (type === EVENT_TYPES.MESSAGE_UPDATED) {
+          updatedHandler = handler;
+        }
+        return mockUnsubscribe;
+      });
+
+      const { result } = renderHook(() => useMessages('agent-1'));
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      const originalText = result.current.messages[0].payload.data.text;
+
+      act(() => {
+        updatedHandler({
+          timestamp: Date.now(),
+          id: '1',
+          changedFields: {
+            payloadJson: 'invalid json {{{',
+          },
+        });
+      });
+
+      expect(result.current.messages[0].payload.data.text).toBe(originalText);
+    });
+
+    /* Preconditions: Hook is mounted
+       Action: MESSAGE_UPDATED event with no payloadJson
+       Assertions: Message unchanged
+       Requirements: agents.12.7 */
+    it('should handle MESSAGE_UPDATED event with no payloadJson', async () => {
+      let updatedHandler: (payload: any) => void;
+      mockSubscribe.mockImplementation((type, handler) => {
+        if (type === EVENT_TYPES.MESSAGE_UPDATED) {
+          updatedHandler = handler;
+        }
+        return mockUnsubscribe;
+      });
+
+      const { result } = renderHook(() => useMessages('agent-1'));
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      const originalText = result.current.messages[0].payload.data.text;
+
+      act(() => {
+        updatedHandler({
+          timestamp: Date.now(),
+          id: '1',
+          changedFields: {},
+        });
+      });
+
+      expect(result.current.messages[0].payload.data.text).toBe(originalText);
+    });
+
+    /* Preconditions: Hook is mounted
+       Action: MESSAGE_UPDATED event with invalid id
+       Assertions: No error, messages unchanged
+       Requirements: agents.12.7 */
+    it('should handle MESSAGE_UPDATED event with invalid id', async () => {
+      let updatedHandler: (payload: any) => void;
+      mockSubscribe.mockImplementation((type, handler) => {
+        if (type === EVENT_TYPES.MESSAGE_UPDATED) {
+          updatedHandler = handler;
+        }
+        return mockUnsubscribe;
+      });
+
+      const { result } = renderHook(() => useMessages('agent-1'));
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      const originalText = result.current.messages[0].payload.data.text;
+
+      act(() => {
+        updatedHandler({
+          timestamp: Date.now(),
+          id: 'not-a-number',
+          changedFields: {
+            payloadJson: JSON.stringify({ kind: 'user', data: { text: 'Should not apply' } }),
+          },
+        });
+      });
+
+      expect(result.current.messages[0].payload.data.text).toBe(originalText);
+    });
+  });
+
+  describe('refreshMessages', () => {
+    /* Preconditions: Hook is mounted
+       Action: refreshMessages is called
+       Assertions: Messages are reloaded from API
+       Requirements: agents.4 */
+    it('should reload messages from API', async () => {
+      const { result } = renderHook(() => useMessages('agent-1'));
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      expect(mockMessagesApi.list).toHaveBeenCalledTimes(1);
+
+      await act(async () => {
+        await result.current.refreshMessages();
+      });
+
+      expect(mockMessagesApi.list).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('error handling', () => {
+    /* Preconditions: API throws exception
+       Action: useMessages is called
+       Assertions: Error is caught and set
+       Requirements: agents.4 */
+    it('should handle API exceptions', async () => {
+      mockMessagesApi.list.mockRejectedValue(new Error('Network failure'));
+
+      const { result } = renderHook(() => useMessages('agent-1'));
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      expect(result.current.error).toBe('Network failure');
+    });
+
+    /* Preconditions: API throws non-Error
+       Action: useMessages is called
+       Assertions: Generic error message is set
+       Requirements: agents.4 */
+    it('should handle non-Error exceptions', async () => {
+      mockMessagesApi.list.mockRejectedValue('Unknown error');
+
+      const { result } = renderHook(() => useMessages('agent-1'));
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      expect(result.current.error).toBe('Failed to load messages');
+    });
+  });
+});

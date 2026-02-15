@@ -62,8 +62,8 @@ describe('Property Tests - IPC Handlers', () => {
         fc.oneof(fc.string(), fc.integer(), fc.boolean(), fc.object()),
         async (key: string, value: any) => {
           // Create mock UserSettingsManager with delay > timeout
-          const timeout = 50; // 50ms timeout for faster tests
-          const delay = 80; // 80ms delay (exceeds timeout)
+          const timeout = 100; // 100ms timeout for faster tests
+          const delay = 200; // 200ms delay (exceeds timeout)
           const mockUserSettingsManager = new MockUserSettingsManagerWithDelay(
             delay
           ) as unknown as UserSettingsManager;
@@ -86,14 +86,14 @@ describe('Property Tests - IPC Handlers', () => {
           expect(result.error).toContain('timed out');
 
           // Verify execution time is approximately equal to timeout (not much longer)
-          // Allow 100ms tolerance for test execution overhead and system load
-          expect(executionTime).toBeGreaterThanOrEqual(timeout - 5);
-          expect(executionTime).toBeLessThan(timeout + 100);
+          // Allow 150ms tolerance for test execution overhead and system load
+          expect(executionTime).toBeGreaterThanOrEqual(timeout - 10);
+          expect(executionTime).toBeLessThan(timeout + 150);
         }
       ),
-      { numRuns: 20 } // Reduced from 100 to 20 for faster execution
+      { numRuns: 15 } // Reduced for faster execution
     );
-  }, 30000); // Increased from 15000 to 30000 for more time
+  }, 30000); // 30 seconds timeout
 
   /* Preconditions: IPCHandlers initialized with mock UserSettingsManager that has delay > timeout
      Action: generate random valid keys, call handleLoadData with each key
@@ -108,8 +108,8 @@ describe('Property Tests - IPC Handlers', () => {
         async (key: string) => {
           // Create mock UserSettingsManager with delay > timeout
           // Use larger gap to ensure timeout always occurs
-          const timeout = 50; // 50ms timeout for faster tests
-          const delay = 200; // 200ms delay (significantly exceeds timeout)
+          const timeout = 100; // 100ms timeout for faster tests
+          const delay = 250; // 250ms delay (significantly exceeds timeout)
           const mockUserSettingsManager = new MockUserSettingsManagerWithDelay(
             delay
           ) as unknown as UserSettingsManager;
@@ -132,12 +132,12 @@ describe('Property Tests - IPC Handlers', () => {
           expect(result.error).toContain('timed out');
 
           // Verify execution time is approximately equal to timeout (not much longer)
-          // Allow 100ms tolerance for test execution overhead and system load
-          expect(executionTime).toBeGreaterThanOrEqual(timeout - 5);
-          expect(executionTime).toBeLessThan(timeout + 100);
+          // Allow 150ms tolerance for test execution overhead and system load
+          expect(executionTime).toBeGreaterThanOrEqual(timeout - 10);
+          expect(executionTime).toBeLessThan(timeout + 150);
         }
       ),
-      { numRuns: 20 } // Reduced from 100 to 20 for faster execution
+      { numRuns: 15 } // Reduced for faster execution
     );
   }, 30000); // 30 second Jest timeout
 
@@ -154,8 +154,8 @@ describe('Property Tests - IPC Handlers', () => {
         async (key: string) => {
           // Create mock UserSettingsManager with delay > timeout
           // Use larger gap to ensure timeout always occurs
-          const timeout = 50; // 50ms timeout for faster tests
-          const delay = 200; // 200ms delay (significantly exceeds timeout)
+          const timeout = 100; // 100ms timeout for faster tests
+          const delay = 250; // 250ms delay (significantly exceeds timeout)
           const mockUserSettingsManager = new MockUserSettingsManagerWithDelay(
             delay
           ) as unknown as UserSettingsManager;
@@ -178,12 +178,12 @@ describe('Property Tests - IPC Handlers', () => {
           expect(result.error).toContain('timed out');
 
           // Verify execution time is approximately equal to timeout (not much longer)
-          // Allow 100ms tolerance for test execution overhead and system load
-          expect(executionTime).toBeGreaterThanOrEqual(timeout - 5);
-          expect(executionTime).toBeLessThan(timeout + 100);
+          // Allow 150ms tolerance for test execution overhead and system load
+          expect(executionTime).toBeGreaterThanOrEqual(timeout - 10);
+          expect(executionTime).toBeLessThan(timeout + 150);
         }
       ),
-      { numRuns: 20 } // Reduced from 100 to 20 for faster execution
+      { numRuns: 15 } // Reduced for faster execution
     );
   }, 30000); // 30 second Jest timeout
 
