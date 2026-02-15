@@ -337,10 +337,10 @@
 
 | # | Задача | Статус | Оценка | Требования |
 |---|--------|--------|--------|------------|
-| 6.1 | AutoExpandingTextarea | ❌ | 0.25 дня | agents.4.5-4.7 |
+| 6.1 | AutoExpandingTextarea | ✅ ВЫПОЛНЕНО | 0.25 дня | agents.4.5-4.7 |
 | 6.2 | MessageContent | ❌ | 0.25 дня | agents.7.7 |
 | 6.3 | EmptyStatePlaceholder | ❌ | 0.25 дня | agents.4 |
-| 6.4 | HistoryPage | ❌ | 0.25 дня | agents.5 |
+| 6.4 | AllAgents | ❌ | 0.25 дня | agents.5 |
 
 #### 6.1 AutoExpandingTextarea
 - **Файл:** `src/renderer/components/agents/AutoExpandingTextarea.tsx`
@@ -354,8 +354,8 @@
 #### 6.3 EmptyStatePlaceholder
 - **Файл:** `src/renderer/components/agents/EmptyStatePlaceholder.tsx`
 
-#### 6.4 HistoryPage
-- **Файл:** `src/renderer/components/agents/HistoryPage.tsx`
+#### 6.4 AllAgents
+- **Файл:** `src/renderer/components/agents/AllAgents.tsx`
 
 **После завершения Фазы 6:**
 1. `npm run validate`

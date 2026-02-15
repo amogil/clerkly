@@ -872,18 +872,18 @@ function ActiveAgentInfo({ agent, status }: ActiveAgentInfoProps) {
 }
 ```
 
-#### HistoryPage
+#### AllAgents Component
 
 ```typescript
 // Requirements: agents.5.1-5.5
-interface HistoryPageProps {
+interface AllAgentsProps {
   agents: Agent[];
   messagesMap: Map<string, Message[]>;
   onBack: () => void;
   onAgentClick: (agentId: string) => void;
 }
 
-function HistoryPage({ agents, messagesMap, onBack, onAgentClick }: HistoryPageProps) {
+function AllAgents({ agents, messagesMap, onBack, onAgentClick }: AllAgentsProps) {
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
@@ -892,7 +892,7 @@ function HistoryPage({ agents, messagesMap, onBack, onAgentClick }: HistoryPageP
           <ArrowLeft className="w-5 h-5" />
         </button>
         <div>
-          <h3 className="text-lg font-semibold">Agents History</h3>
+          <h3 className="text-lg font-semibold">All Agents</h3>
           <p className="text-xs text-muted-foreground">{agents.length} agents</p>
         </div>
       </div>

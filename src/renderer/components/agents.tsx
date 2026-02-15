@@ -129,7 +129,7 @@ export function Agents() {
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div>
-            <h3 className="text-lg font-semibold text-foreground">Agent History</h3>
+            <h3 className="text-lg font-semibold text-foreground">All Agents</h3>
             <p className="text-xs text-muted-foreground">{historyAgents.length} total agents</p>
           </div>
         </div>
