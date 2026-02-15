@@ -106,7 +106,7 @@ test.describe('Agents - Auto-create First Agent', () => {
     await expect(agentTitle).toBeVisible({ timeout: 5000 });
 
     // Verify that the input field is enabled (not disabled)
-    const inputField = window.locator('input[placeholder*="Ask"]');
+    const inputField = window.locator('textarea[placeholder*="Ask"]');
     await expect(inputField).toBeEnabled();
   });
 
@@ -148,7 +148,7 @@ test.describe('Agents - Auto-create First Agent', () => {
     await expect(newAgentTitle).toBeVisible({ timeout: 5000 });
 
     // Verify that the input field is still enabled
-    const inputField = window.locator('input[placeholder*="Ask"]');
+    const inputField = window.locator('textarea[placeholder*="Ask"]');
     await expect(inputField).toBeEnabled();
   });
 
@@ -203,7 +203,7 @@ test.describe('Agents - Auto-create First Agent', () => {
     await expect(messagesArea).toBeVisible();
 
     // 5. Input field
-    const inputField = window.locator('input[placeholder*="Ask"]');
+    const inputField = window.locator('textarea[placeholder*="Ask"]');
     await expect(inputField).toBeVisible();
     await expect(inputField).toBeEnabled();
 
