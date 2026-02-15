@@ -1,4 +1,4 @@
-// Requirements: agents.4, agents.7, agents.12
+// Requirements: agents.4, agents.7, agents.12, error-notifications.2
 
 import { useState, useEffect, useCallback } from 'react';
 import { useEventSubscription } from '../events/useEventSubscription';
@@ -10,6 +10,7 @@ import type {
   MessageUpdatedPayload,
   Message as EventMessage,
 } from '../../shared/events/types';
+import { callApi } from '../utils/apiWrapper';
 
 // Access window.api with proper typing
 declare const window: Window & {
@@ -27,7 +28,6 @@ declare const window: Window & {
 interface UseMessagesResult {
   messages: ParsedMessage[];
   isLoading: boolean;
-  error: string | null;
   sendMessage: (text: string) => Promise<boolean>;
   refreshMessages: () => Promise<void>;
 }
@@ -51,34 +51,35 @@ function eventMessageToRendererMessage(eventMessage: EventMessage): Message {
 export function useMessages(agentId: string | null): UseMessagesResult {
   const [messages, setMessages] = useState<ParsedMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   // Load messages for agent
+  // Requirements: error-notifications.2 - Use callApi for automatic error handling
   const loadMessages = useCallback(async () => {
     if (!agentId) {
       setMessages([]);
       return;
     }
 
-    try {
-      setIsLoading(true);
-      setError(null);
+    setIsLoading(true);
 
-      const result = await window.api.messages.list(agentId);
-      if (result.success && result.data) {
-        const messageList = result.data as Message[];
-        // Parse payloads and sort by timestamp
-        const parsed = messageList.map(parseMessagePayload);
-        parsed.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-        setMessages(parsed);
-      } else {
-        setError(result.error || 'Failed to load messages');
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load messages');
-    } finally {
-      setIsLoading(false);
+    const messageList = await callApi<Message[]>(
+      () =>
+        window.api.messages.list(agentId) as Promise<{
+          success: boolean;
+          data?: Message[];
+          error?: string;
+        }>,
+      'Loading messages'
+    );
+
+    if (messageList) {
+      // Parse payloads and sort by timestamp
+      const parsed = messageList.map(parseMessagePayload);
+      parsed.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+      setMessages(parsed);
     }
+
+    setIsLoading(false);
   }, [agentId]);
 
   // Load messages when agentId changes
@@ -87,33 +88,32 @@ export function useMessages(agentId: string | null): UseMessagesResult {
   }, [loadMessages]);
 
   // Send user message
-  // Requirements: agents.4.3
+  // Requirements: agents.4.3, error-notifications.2 - Use callApi for automatic error handling
   const sendMessage = useCallback(
     async (text: string): Promise<boolean> => {
       if (!agentId || !text.trim()) {
         return false;
       }
 
-      try {
-        const payload: MessagePayload = {
-          kind: 'user',
-          data: {
-            text: text.trim(),
-            reply_to_message_id: null,
-          },
-        };
+      const payload: MessagePayload = {
+        kind: 'user',
+        data: {
+          text: text.trim(),
+          reply_to_message_id: null,
+        },
+      };
 
-        const result = await window.api.messages.create(agentId, payload);
-        if (result.success) {
-          // Message will be added via event
-          return true;
-        }
-        setError(result.error || 'Failed to send message');
-        return false;
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to send message');
-        return false;
-      }
+      const result = await callApi<Record<string, never>>(
+        () =>
+          window.api.messages.create(agentId, payload).then((r) => ({
+            ...r,
+            data: r.success ? ({} as Record<string, never>) : undefined,
+          })),
+        'Sending message'
+      );
+
+      // If callApi returns null, it means there was an error (toast already shown)
+      return result !== null;
     },
     [agentId]
   );
@@ -158,7 +158,6 @@ export function useMessages(agentId: string | null): UseMessagesResult {
   return {
     messages,
     isLoading,
-    error,
     sendMessage,
     refreshMessages: loadMessages,
   };

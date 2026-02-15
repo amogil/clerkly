@@ -89,10 +89,10 @@
 
 #### Функциональные Тесты
 
-- `tests/functional/agents.spec.ts` - "should create new agent on new chat button click"
-- `tests/functional/agents.spec.ts` - "should make new agent active automatically"
-- `tests/functional/agents.spec.ts` - "should auto-create agent when list is empty"
-- `tests/functional/agents.spec.ts` - "should always have at least one agent (invariant)"
+- `tests/functional/agents-invariant.spec.ts` - "should auto-create first agent for new user after login"
+- `tests/functional/agents-invariant.spec.ts` - "should auto-create agent when last agent is archived"
+- `tests/functional/agents-invariant.spec.ts` - "should never show empty state UI"
+- `tests/functional/agents-invariant.spec.ts` - "should never show loading state - UI always visible"
 
 ### 3. Переключение между агентами
 

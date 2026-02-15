@@ -4,11 +4,20 @@ import { Logo } from './logo';
 import { useAgents } from '../hooks/useAgents';
 import { useMessages } from '../hooks/useMessages';
 import { computeAgentStatus } from '../../shared/utils/computeAgentStatus';
+import {
+  isInProgress,
+  isAwaitingUser,
+  hasError,
+  isCompleted,
+  getStatusText,
+  getStatusStyles,
+} from '../../shared/utils/agentStatus';
 import type { Agent } from '../types/agent';
+import type { AgentStatus } from '../../shared/utils/agentStatus';
 
 // Map Agent to display format with computed status
 interface DisplayAgent extends Agent {
-  status: 'new' | 'in-progress' | 'awaiting-user' | 'error' | 'completed';
+  status: AgentStatus;
   title: string;
   description: string;
 }
@@ -84,21 +93,6 @@ export function Agents() {
     }
   };
 
-  const getStatusText = (status: DisplayAgent['status']) => {
-    switch (status) {
-      case 'new':
-        return 'New';
-      case 'in-progress':
-        return 'In progress';
-      case 'awaiting-user':
-        return 'Awaiting response';
-      case 'error':
-        return 'Error';
-      case 'completed':
-        return 'Completed';
-    }
-  };
-
   const handleTaskClick = (task: DisplayAgent) => {
     selectAgent(task.agentId);
     setShowAllTasksPage(false);
@@ -113,22 +107,6 @@ export function Agents() {
 
   // Show all tasks
   const displayTasks = agentTasks;
-
-  // Get status styles
-  const getStatusStyles = (status: DisplayAgent['status']) => {
-    switch (status) {
-      case 'new':
-        return { bg: 'bg-sky-400', ring: 'ring-sky-400/30', text: 'text-sky-600' };
-      case 'in-progress':
-        return { bg: 'bg-blue-500', ring: 'ring-blue-500/30', text: 'text-blue-600' };
-      case 'awaiting-user':
-        return { bg: 'bg-amber-500', ring: 'ring-amber-500/30', text: 'text-amber-600' };
-      case 'error':
-        return { bg: 'bg-red-500', ring: 'ring-red-500/30', text: 'text-red-600' };
-      case 'completed':
-        return { bg: 'bg-green-500', ring: 'ring-green-500/30', text: 'text-green-600' };
-    }
-  };
 
   // Render task history page
   if (showAllTasksPage) {
@@ -166,11 +144,11 @@ export function Agents() {
                   <div
                     className={`relative flex-shrink-0 w-10 h-10 rounded-full ${style.bg} flex items-center justify-center`}
                   >
-                    {task.status === 'completed' ? (
+                    {isCompleted(task.status) ? (
                       <Check className="w-5 h-5 text-white" />
-                    ) : task.status === 'error' ? (
+                    ) : hasError(task.status) ? (
                       <X className="w-5 h-5 text-white" />
-                    ) : task.status === 'awaiting-user' ? (
+                    ) : isAwaitingUser(task.status) ? (
                       <>
                         <span className="text-white text-sm font-semibold">{letter}</span>
                         <div
@@ -183,11 +161,11 @@ export function Agents() {
                       <span className="text-white text-sm font-semibold">{letter}</span>
                     )}
 
-                    {task.status === 'in-progress' && (
+                    {isInProgress(task.status) && (
                       <div className="absolute inset-0 rounded-full border-2 border-white border-t-transparent animate-spin" />
                     )}
 
-                    {task.status === 'awaiting-user' && (
+                    {isAwaitingUser(task.status) && (
                       <div
                         className={`absolute -inset-1 rounded-full ring-2 ${style.ring} animate-pulse`}
                       />
@@ -224,25 +202,13 @@ export function Agents() {
     );
   }
 
-  // Regular chat view
-  if (!selectedTask) {
-    return (
-      <div className="h-[calc(100vh-4rem)] bg-card flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-muted-foreground mb-4">No agents yet</p>
-          <button
-            onClick={handleNewChat}
-            className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
-          >
-            Create New Chat
-          </button>
-        </div>
-      </div>
-    );
-  }
+  // Requirements: agents.2.7, agents.2.10, agents.2.11
+  // The invariant ensures there's always at least one agent
+  // If selectedTask is null (impossible after loading due to invariant), use first agent
+  const currentTask = selectedTask || agentTasks[0];
 
-  const letter = selectedTask.title.charAt(0).toUpperCase();
-  const style = getStatusStyles(selectedTask.status);
+  const letter = currentTask.title.charAt(0).toUpperCase();
+  const style = getStatusStyles(currentTask.status);
 
   return (
     <div data-testid="agents" className="h-[calc(100vh-4rem)] bg-card flex flex-col">
@@ -253,11 +219,11 @@ export function Agents() {
           <div
             className={`relative flex-shrink-0 w-10 h-10 rounded-full ${style.bg} flex items-center justify-center`}
           >
-            {selectedTask.status === 'completed' ? (
+            {isCompleted(currentTask.status) ? (
               <Check className="w-5 h-5 text-white" />
-            ) : selectedTask.status === 'error' ? (
+            ) : hasError(currentTask.status) ? (
               <X className="w-5 h-5 text-white" />
-            ) : selectedTask.status === 'awaiting-user' ? (
+            ) : isAwaitingUser(currentTask.status) ? (
               <>
                 <span className="text-white text-sm font-semibold">{letter}</span>
                 <div
@@ -270,11 +236,11 @@ export function Agents() {
               <span className="text-white text-sm font-semibold">{letter}</span>
             )}
 
-            {selectedTask.status === 'in-progress' && (
+            {isInProgress(currentTask.status) && (
               <div className="absolute inset-0 rounded-full border-2 border-white border-t-transparent animate-spin" />
             )}
 
-            {selectedTask.status === 'awaiting-user' && (
+            {isAwaitingUser(currentTask.status) && (
               <div
                 className={`absolute -inset-1 rounded-full ring-2 ${style.ring} animate-pulse`}
               />
@@ -282,12 +248,12 @@ export function Agents() {
           </div>
 
           <div className="flex-1 min-w-0">
-            <h3 className="font-semibold text-foreground truncate">{selectedTask.title}</h3>
+            <h3 className="font-semibold text-foreground truncate">{currentTask.title}</h3>
             <div className="flex items-center gap-2 text-xs">
-              <span className={`${style.text}`}>{getStatusText(selectedTask.status)}</span>
+              <span className={`${style.text}`}>{getStatusText(currentTask.status)}</span>
               <span className="text-muted-foreground">·</span>
               <span className="text-muted-foreground truncate">
-                {new Date(selectedTask.createdAt).toLocaleDateString('en-US', {
+                {new Date(currentTask.createdAt).toLocaleDateString('en-US', {
                   month: 'short',
                   day: 'numeric',
                   hour: 'numeric',
@@ -311,7 +277,7 @@ export function Agents() {
           {displayTasks.slice(0, visibleChatsCount).map((task) => {
             const taskLetter = task.title.charAt(0).toUpperCase();
             const taskStyle = getStatusStyles(task.status);
-            const isSelected = task.agentId === selectedTask.agentId;
+            const isSelected = task.agentId === currentTask.agentId;
 
             return (
               <div
@@ -320,11 +286,11 @@ export function Agents() {
                 className={`relative w-8 h-8 rounded-full ${taskStyle.bg} flex items-center justify-center cursor-pointer hover:scale-110 transition-transform group ${isSelected ? 'ring-2 ring-primary ring-offset-2' : ''}`}
                 title={task.title}
               >
-                {task.status === 'completed' ? (
+                {isCompleted(task.status) ? (
                   <Check className="w-4 h-4 text-white" />
-                ) : task.status === 'error' ? (
+                ) : hasError(task.status) ? (
                   <X className="w-4 h-4 text-white" />
-                ) : task.status === 'awaiting-user' ? (
+                ) : isAwaitingUser(task.status) ? (
                   <>
                     <span className="text-white text-xs font-semibold">{taskLetter}</span>
                     <div
@@ -337,11 +303,11 @@ export function Agents() {
                   <span className="text-white text-xs font-semibold">{taskLetter}</span>
                 )}
 
-                {task.status === 'in-progress' && (
+                {isInProgress(task.status) && (
                   <div className="absolute inset-0 rounded-full border-2 border-white border-t-transparent animate-spin" />
                 )}
 
-                {task.status === 'awaiting-user' && (
+                {isAwaitingUser(task.status) && (
                   <div
                     className={`absolute -inset-1 rounded-full ring-2 ${taskStyle.ring} animate-pulse`}
                   />
@@ -392,7 +358,7 @@ export function Agents() {
                       <Logo
                         size="sm"
                         showText={false}
-                        animated={selectedTask.status === 'in-progress'}
+                        animated={isInProgress(currentTask.status)}
                       />
                     </div>
                   )}

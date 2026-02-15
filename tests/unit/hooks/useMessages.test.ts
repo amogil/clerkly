@@ -1,7 +1,7 @@
 /**
  * @jest-environment jsdom
  */
-// Requirements: agents.4, agents.7, agents.12
+// Requirements: agents.4, agents.7, agents.12, error-notifications.2
 /**
  * Unit tests for useMessages hook
  */
@@ -9,6 +9,13 @@
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { EVENT_TYPES } from '../../../src/shared/events/constants';
 import type { Message } from '../../../src/renderer/types/agent';
+
+// Mock sonner toast
+jest.mock('sonner', () => ({
+  toast: {
+    error: jest.fn(),
+  },
+}));
 
 // Mock window.api
 const mockMessagesApi = {
@@ -127,9 +134,10 @@ describe('useMessages hook', () => {
 
     /* Preconditions: API returns error
        Action: useMessages is called
-       Assertions: Error is set
-       Requirements: agents.4 */
-    it('should set error on API failure', async () => {
+       Assertions: Toast error is shown
+       Requirements: agents.4, error-notifications.2 */
+    it('should show toast on API failure', async () => {
+      const { toast } = require('sonner');
       mockMessagesApi.list.mockResolvedValue({ success: false, error: 'Network error' });
 
       const { result } = renderHook(() => useMessages('agent-1'));
@@ -138,7 +146,7 @@ describe('useMessages hook', () => {
         expect(result.current.isLoading).toBe(false);
       });
 
-      expect(result.current.error).toBe('Network error');
+      expect(toast.error).toHaveBeenCalledWith('Loading messages: Network error');
     });
   });
 
@@ -264,6 +272,7 @@ describe('useMessages hook', () => {
        Assertions: Error is set
        Requirements: agents.4 */
     it('should set error on send failure', async () => {
+      const { toast } = require('sonner');
       mockMessagesApi.create.mockResolvedValue({ success: false, error: 'Send failed' });
 
       const { result } = renderHook(() => useMessages('agent-1'));
@@ -278,7 +287,7 @@ describe('useMessages hook', () => {
       });
 
       expect(success).toBe(false);
-      expect(result.current.error).toBe('Send failed');
+      expect(toast.error).toHaveBeenCalledWith('Sending message: Send failed');
     });
   });
 
@@ -598,9 +607,10 @@ describe('useMessages hook', () => {
   describe('error handling', () => {
     /* Preconditions: API throws exception
        Action: useMessages is called
-       Assertions: Error is caught and set
-       Requirements: agents.4 */
-    it('should handle API exceptions', async () => {
+       Assertions: Toast error is shown
+       Requirements: agents.4, error-notifications.2 */
+    it('should show toast on API exceptions', async () => {
+      const { toast } = require('sonner');
       mockMessagesApi.list.mockRejectedValue(new Error('Network failure'));
 
       const { result } = renderHook(() => useMessages('agent-1'));
@@ -609,14 +619,15 @@ describe('useMessages hook', () => {
         expect(result.current.isLoading).toBe(false);
       });
 
-      expect(result.current.error).toBe('Network failure');
+      expect(toast.error).toHaveBeenCalledWith('Loading messages: Network failure');
     });
 
     /* Preconditions: API throws non-Error
        Action: useMessages is called
-       Assertions: Generic error message is set
-       Requirements: agents.4 */
-    it('should handle non-Error exceptions', async () => {
+       Assertions: Toast error is shown
+       Requirements: agents.4, error-notifications.2 */
+    it('should show toast on non-Error exceptions', async () => {
+      const { toast } = require('sonner');
       mockMessagesApi.list.mockRejectedValue('Unknown error');
 
       const { result } = renderHook(() => useMessages('agent-1'));
@@ -625,7 +636,7 @@ describe('useMessages hook', () => {
         expect(result.current.isLoading).toBe(false);
       });
 
-      expect(result.current.error).toBe('Failed to load messages');
+      expect(toast.error).toHaveBeenCalledWith('Loading messages: Unknown error');
     });
   });
 });

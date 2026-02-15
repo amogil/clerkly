@@ -24,7 +24,10 @@ interface LoginScreenProps {
  */
 export function LoginScreen({ onLogin, isLoading = false, isDisabled = false }: LoginScreenProps) {
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-6">
+    <div
+      data-testid="login-screen"
+      className="min-h-screen bg-background flex items-center justify-center p-6"
+    >
       <div className="w-full max-w-md">
         {/* Logo and Header - Requirements: google-oauth-auth.12.1 */}
         <div className="text-center mb-12">

@@ -1,4 +1,4 @@
-// Requirements: agents.2, agents.3, agents.10, agents.12
+// Requirements: agents.2, agents.3, agents.10, agents.12, error-notifications.2
 
 import { useState, useEffect, useCallback } from 'react';
 import { useEventSubscription } from '../events/useEventSubscription';
@@ -9,6 +9,7 @@ import type {
   AgentUpdatedPayload,
   AgentArchivedPayload,
 } from '../../shared/events/types';
+import { callApi } from '../utils/apiWrapper';
 
 // Access window.api with proper typing
 declare const window: Window & {
@@ -25,7 +26,6 @@ interface UseAgentsResult {
   agents: Agent[];
   activeAgent: Agent | null;
   isLoading: boolean;
-  error: string | null;
   createAgent: (name?: string) => Promise<Agent | null>;
   selectAgent: (agentId: string) => void;
   archiveAgent: (agentId: string) => Promise<boolean>;
@@ -53,55 +53,78 @@ export function useAgents(): UseAgentsResult {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [activeAgentId, setActiveAgentId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
   // Load agents on mount
+  // Requirements: agents.2.7, agents.2.8, agents.2.9, agents.2.10, agents.2.11, error-notifications.2
   const loadAgents = useCallback(async () => {
-    try {
-      setIsLoading(true);
-      setError(null);
+    setIsLoading(true);
 
-      const result = await window.api.agents.list();
-      if (result.success && result.data) {
-        const agentList = result.data as Agent[];
-        // Sort by updatedAt descending (newest first)
-        agentList.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
-        setAgents(agentList);
+    // Requirements: error-notifications.2 - Use callApi for automatic error handling
+    const agentList = await callApi<Agent[]>(
+      () =>
+        window.api.agents.list() as Promise<{ success: boolean; data?: Agent[]; error?: string }>,
+      'Loading agents'
+    );
 
-        // Select first agent if none selected
-        if (!activeAgentId && agentList.length > 0) {
-          setActiveAgentId(agentList[0].agentId);
+    if (agentList) {
+      // Requirements: agents.2.7, agents.2.8 - Auto-create first agent for new user
+      if (agentList.length === 0) {
+        // No agents exist, create first one automatically
+        const firstAgent = await callApi<Agent>(
+          () =>
+            window.api.agents.create('New Agent') as Promise<{
+              success: boolean;
+              data?: Agent;
+              error?: string;
+            }>,
+          'Creating first agent'
+        );
+
+        if (firstAgent) {
+          agentList.push(firstAgent);
         }
-      } else {
-        setError(result.error || 'Failed to load agents');
       }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load agents');
-    } finally {
-      setIsLoading(false);
+
+      // Sort by updatedAt descending (newest first)
+      agentList.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+      setAgents(agentList);
+
+      // Select first agent if none selected
+      setActiveAgentId((currentId) => {
+        if (!currentId && agentList.length > 0) {
+          return agentList[0].agentId;
+        }
+        return currentId;
+      });
     }
-  }, [activeAgentId]);
+
+    setIsLoading(false);
+  }, []);
 
   useEffect(() => {
     loadAgents();
   }, [loadAgents]);
 
   // Create new agent
+  // Requirements: error-notifications.2 - Use callApi for automatic error handling
   const createAgent = useCallback(async (name?: string): Promise<Agent | null> => {
-    try {
-      const result = await window.api.agents.create(name);
-      if (result.success && result.data) {
-        const newAgent = result.data as Agent;
-        // Agent will be added via event, but we select it immediately
-        setActiveAgentId(newAgent.agentId);
-        return newAgent;
-      }
-      setError(result.error || 'Failed to create agent');
-      return null;
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create agent');
-      return null;
+    const newAgent = await callApi<Agent>(
+      () =>
+        window.api.agents.create(name) as Promise<{
+          success: boolean;
+          data?: Agent;
+          error?: string;
+        }>,
+      'Creating agent'
+    );
+
+    if (newAgent) {
+      // Agent will be added via event, but we select it immediately
+      setActiveAgentId(newAgent.agentId);
+      return newAgent;
     }
+
+    return null;
   }, []);
 
   // Select agent
@@ -110,24 +133,53 @@ export function useAgents(): UseAgentsResult {
   }, []);
 
   // Archive agent
+  // Requirements: error-notifications.2 - Use callApi for automatic error handling
   const archiveAgent = useCallback(
     async (agentId: string): Promise<boolean> => {
-      try {
-        const result = await window.api.agents.archive(agentId);
-        if (result.success) {
-          // If archived agent was active, select next one
-          if (activeAgentId === agentId) {
-            const remaining = agents.filter((a) => a.agentId !== agentId);
-            setActiveAgentId(remaining.length > 0 ? remaining[0].agentId : null);
-          }
-          return true;
-        }
-        setError(result.error || 'Failed to archive agent');
-        return false;
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to archive agent');
+      // Requirements: agents.2.9, agents.2.10 - Check if archiving last agent
+      const isLastAgent = agents.length === 1;
+
+      // For void operations, we use a marker object to distinguish success from error
+      const result = await callApi<Record<string, never>>(
+        () =>
+          window.api.agents.archive(agentId).then((r) => ({
+            ...r,
+            data: r.success ? ({} as Record<string, never>) : undefined,
+          })),
+        'Archiving agent'
+      );
+
+      // If callApi returns null, it means there was an error (toast already shown)
+      if (result === null) {
         return false;
       }
+
+      // Success - update local state
+      // If archived agent was active, select next one
+      if (activeAgentId === agentId) {
+        const remaining = agents.filter((a) => a.agentId !== agentId);
+        setActiveAgentId(remaining.length > 0 ? remaining[0].agentId : null);
+      }
+
+      // Requirements: agents.2.7, agents.2.8 - Auto-create if archiving last agent
+      if (isLastAgent) {
+        // Create new agent to maintain invariant
+        const newAgent = await callApi<Agent>(
+          () =>
+            window.api.agents.create('New Agent') as Promise<{
+              success: boolean;
+              data?: Agent;
+              error?: string;
+            }>,
+          'Creating new agent'
+        );
+
+        if (newAgent) {
+          setActiveAgentId(newAgent.agentId);
+        }
+      }
+
+      return true;
     },
     [activeAgentId, agents]
   );
@@ -169,7 +221,31 @@ export function useAgents(): UseAgentsResult {
 
   useEventSubscription(EVENT_TYPES.AGENT_ARCHIVED, (payload: AgentArchivedPayload) => {
     if (payload.id) {
-      setAgents((prev) => prev.filter((agent) => agent.agentId !== payload.id));
+      setAgents((prev) => {
+        const updated = prev.filter((agent) => agent.agentId !== payload.id);
+
+        // Requirements: agents.2.7, agents.2.9, agents.2.10 - Auto-create if last agent archived
+        if (updated.length === 0) {
+          // Last agent was archived, create new one to maintain invariant
+          // Requirements: error-notifications.2 - Use callApi for automatic error handling
+          callApi<Agent>(
+            () =>
+              window.api.agents.create('New Agent') as Promise<{
+                success: boolean;
+                data?: Agent;
+                error?: string;
+              }>,
+            'Creating new agent'
+          ).then((newAgent) => {
+            if (newAgent) {
+              setAgents([newAgent]);
+              setActiveAgentId(newAgent.agentId);
+            }
+          });
+        }
+
+        return updated;
+      });
     }
   });
 
@@ -182,7 +258,6 @@ export function useAgents(): UseAgentsResult {
     agents,
     activeAgent,
     isLoading,
-    error,
     createAgent,
     selectAgent,
     archiveAgent,

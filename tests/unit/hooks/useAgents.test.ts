@@ -1,7 +1,7 @@
 /**
  * @jest-environment jsdom
  */
-// Requirements: agents.2, agents.3, agents.10, agents.12
+// Requirements: agents.2, agents.3, agents.10, agents.12, error-notifications.2
 /**
  * Unit tests for useAgents hook
  */
@@ -9,6 +9,13 @@
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { EVENT_TYPES } from '../../../src/shared/events/constants';
 import type { Agent } from '../../../src/renderer/types/agent';
+
+// Mock sonner toast
+jest.mock('sonner', () => ({
+  toast: {
+    error: jest.fn(),
+  },
+}));
 
 // Mock window.api
 const mockAgentsApi = {
@@ -83,6 +90,35 @@ describe('useAgents hook', () => {
       expect(result.current.agents).toHaveLength(2);
     });
 
+    /* Preconditions: Hook mounts with empty agent list
+       Action: useAgents is called
+       Assertions: New agent is auto-created
+       Requirements: agents.2.7, agents.2.8 */
+    it('should auto-create agent when list is empty on mount', async () => {
+      mockAgentsApi.list.mockResolvedValue({ success: true, data: [] });
+      const newAgent: Agent = {
+        agentId: 'auto-created',
+        userId: 'user-1',
+        name: 'New Agent',
+        createdAt: '2024-01-03T10:00:00Z',
+        updatedAt: '2024-01-03T10:00:00Z',
+      };
+      mockAgentsApi.create.mockResolvedValue({ success: true, data: newAgent });
+
+      const { result } = renderHook(() => useAgents());
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      await waitFor(() => {
+        expect(mockAgentsApi.create).toHaveBeenCalledWith('New Agent');
+      });
+      expect(result.current.agents).toHaveLength(1);
+      expect(result.current.agents[0].agentId).toBe('auto-created');
+      expect(result.current.activeAgent?.agentId).toBe('auto-created');
+    });
+
     /* Preconditions: Hook mounts with agents
        Action: useAgents is called
        Assertions: Agents are sorted by updatedAt descending
@@ -113,12 +149,20 @@ describe('useAgents hook', () => {
       expect(result.current.activeAgent?.agentId).toBe('agent-1');
     });
 
-    /* Preconditions: Hook mounts with no agents
+    /* Preconditions: Hook mounts with empty agent list
        Action: useAgents is called
-       Assertions: activeAgent is null
-       Requirements: agents.3 */
-    it('should have null activeAgent when no agents', async () => {
+       Assertions: New agent is auto-created
+       Requirements: agents.2.7, agents.2.8 */
+    it('should auto-create agent when list is empty on mount', async () => {
       mockAgentsApi.list.mockResolvedValue({ success: true, data: [] });
+      const newAgent: Agent = {
+        agentId: 'auto-created',
+        userId: 'user-1',
+        name: 'New Agent',
+        createdAt: '2024-01-03T10:00:00Z',
+        updatedAt: '2024-01-03T10:00:00Z',
+      };
+      mockAgentsApi.create.mockResolvedValue({ success: true, data: newAgent });
 
       const { result } = renderHook(() => useAgents());
 
@@ -126,14 +170,20 @@ describe('useAgents hook', () => {
         expect(result.current.isLoading).toBe(false);
       });
 
-      expect(result.current.activeAgent).toBeNull();
+      await waitFor(() => {
+        expect(mockAgentsApi.create).toHaveBeenCalledWith('New Agent');
+      });
+      expect(result.current.agents).toHaveLength(1);
+      expect(result.current.agents[0].agentId).toBe('auto-created');
+      expect(result.current.activeAgent?.agentId).toBe('auto-created');
     });
 
     /* Preconditions: API returns error
        Action: useAgents is called
-       Assertions: Error is set
-       Requirements: agents.10 */
-    it('should set error on API failure', async () => {
+       Assertions: Toast error is shown
+       Requirements: agents.10, error-notifications.2 */
+    it('should show toast on API failure', async () => {
+      const { toast } = require('sonner');
       mockAgentsApi.list.mockResolvedValue({ success: false, error: 'Network error' });
 
       const { result } = renderHook(() => useAgents());
@@ -142,7 +192,7 @@ describe('useAgents hook', () => {
         expect(result.current.isLoading).toBe(false);
       });
 
-      expect(result.current.error).toBe('Network error');
+      expect(toast.error).toHaveBeenCalledWith('Loading agents: Network error');
     });
   });
 
@@ -172,7 +222,9 @@ describe('useAgents hook', () => {
         createdAgent = await result.current.createAgent('New Agent');
       });
 
-      expect(mockAgentsApi.create).toHaveBeenCalledWith('New Agent');
+      await waitFor(() => {
+        expect(mockAgentsApi.create).toHaveBeenCalledWith('New Agent');
+      });
       expect(createdAgent).toEqual(newAgent);
     });
 
@@ -181,6 +233,7 @@ describe('useAgents hook', () => {
        Assertions: Error is set and null is returned
        Requirements: agents.2 */
     it('should set error on create failure', async () => {
+      const { toast } = require('sonner');
       mockAgentsApi.create.mockResolvedValue({ success: false, error: 'Create failed' });
 
       const { result } = renderHook(() => useAgents());
@@ -195,7 +248,7 @@ describe('useAgents hook', () => {
       });
 
       expect(createdAgent).toBeNull();
-      expect(result.current.error).toBe('Create failed');
+      expect(toast.error).toHaveBeenCalledWith('Creating agent: Create failed');
     });
   });
 
@@ -264,11 +317,49 @@ describe('useAgents hook', () => {
       expect(result.current.activeAgent?.agentId).toBe('agent-2');
     });
 
+    /* Preconditions: Last agent is archived
+       Action: archiveAgent is called on last agent
+       Assertions: New agent is auto-created and selected
+       Requirements: agents.2.7, agents.2.9, agents.2.10 */
+    it('should auto-create agent when archiving last agent', async () => {
+      // Start with only one agent
+      mockAgentsApi.list.mockResolvedValue({ success: true, data: [mockAgents[0]] });
+      const newAgent: Agent = {
+        agentId: 'auto-created',
+        userId: 'user-1',
+        name: 'New Agent',
+        createdAt: '2024-01-03T10:00:00Z',
+        updatedAt: '2024-01-03T10:00:00Z',
+      };
+      mockAgentsApi.create.mockResolvedValue({ success: true, data: newAgent });
+
+      const { result } = renderHook(() => useAgents());
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      expect(result.current.agents).toHaveLength(1);
+      expect(result.current.activeAgent?.agentId).toBe('agent-1');
+
+      await act(async () => {
+        await result.current.archiveAgent('agent-1');
+      });
+
+      // Should auto-create new agent
+      await waitFor(() => {
+        expect(mockAgentsApi.create).toHaveBeenCalledWith('New Agent');
+      });
+      // Note: activeAgent will be null until AGENT_CREATED event fires
+      // But the activeAgentId is set immediately, so when event fires, it will be selected
+    });
+
     /* Preconditions: Hook is mounted
        Action: archiveAgent fails
-       Assertions: Error is set
-       Requirements: agents.10 */
-    it('should set error on archive failure', async () => {
+       Assertions: Toast error is shown
+       Requirements: agents.10, error-notifications.2 */
+    it('should show toast on archive failure', async () => {
+      const { toast } = require('sonner');
       mockAgentsApi.archive.mockResolvedValue({ success: false, error: 'Archive failed' });
 
       const { result } = renderHook(() => useAgents());
@@ -283,7 +374,7 @@ describe('useAgents hook', () => {
       });
 
       expect(success).toBe(false);
-      expect(result.current.error).toBe('Archive failed');
+      expect(toast.error).toHaveBeenCalledWith('Archiving agent: Archive failed');
     });
   });
 
@@ -543,9 +634,10 @@ describe('useAgents hook', () => {
   describe('error handling', () => {
     /* Preconditions: API throws exception
        Action: useAgents is called
-       Assertions: Error is caught and set
-       Requirements: agents.10 */
-    it('should handle API exceptions on load', async () => {
+       Assertions: Toast error is shown
+       Requirements: agents.10, error-notifications.2 */
+    it('should show toast on API exceptions during load', async () => {
+      const { toast } = require('sonner');
       mockAgentsApi.list.mockRejectedValue(new Error('Network failure'));
 
       const { result } = renderHook(() => useAgents());
@@ -554,14 +646,15 @@ describe('useAgents hook', () => {
         expect(result.current.isLoading).toBe(false);
       });
 
-      expect(result.current.error).toBe('Network failure');
+      expect(toast.error).toHaveBeenCalledWith('Loading agents: Network failure');
     });
 
     /* Preconditions: API throws non-Error
        Action: useAgents is called
-       Assertions: Generic error message is set
-       Requirements: agents.10 */
-    it('should handle non-Error exceptions on load', async () => {
+       Assertions: Toast error is shown
+       Requirements: agents.10, error-notifications.2 */
+    it('should show toast on non-Error exceptions during load', async () => {
+      const { toast } = require('sonner');
       mockAgentsApi.list.mockRejectedValue('Unknown error');
 
       const { result } = renderHook(() => useAgents());
@@ -570,14 +663,15 @@ describe('useAgents hook', () => {
         expect(result.current.isLoading).toBe(false);
       });
 
-      expect(result.current.error).toBe('Failed to load agents');
+      expect(toast.error).toHaveBeenCalledWith('Loading agents: Unknown error');
     });
 
     /* Preconditions: API throws exception on create
        Action: createAgent is called
-       Assertions: Error is caught
-       Requirements: agents.2 */
-    it('should handle API exceptions on create', async () => {
+       Assertions: Toast error is shown
+       Requirements: agents.2, error-notifications.2 */
+    it('should show toast on API exceptions during create', async () => {
+      const { toast } = require('sonner');
       mockAgentsApi.create.mockRejectedValue(new Error('Create network error'));
 
       const { result } = renderHook(() => useAgents());
@@ -592,14 +686,15 @@ describe('useAgents hook', () => {
       });
 
       expect(createdAgent).toBeNull();
-      expect(result.current.error).toBe('Create network error');
+      expect(toast.error).toHaveBeenCalledWith('Creating agent: Create network error');
     });
 
     /* Preconditions: API throws non-Error on create
        Action: createAgent is called
-       Assertions: Generic error message is set
-       Requirements: agents.2 */
-    it('should handle non-Error exceptions on create', async () => {
+       Assertions: Toast error is shown
+       Requirements: agents.2, error-notifications.2 */
+    it('should show toast on non-Error exceptions during create', async () => {
+      const { toast } = require('sonner');
       mockAgentsApi.create.mockRejectedValue('Unknown create error');
 
       const { result } = renderHook(() => useAgents());
@@ -614,14 +709,15 @@ describe('useAgents hook', () => {
       });
 
       expect(createdAgent).toBeNull();
-      expect(result.current.error).toBe('Failed to create agent');
+      expect(toast.error).toHaveBeenCalledWith('Creating agent: Unknown create error');
     });
 
     /* Preconditions: API throws exception on archive
        Action: archiveAgent is called
-       Assertions: Error is caught
-       Requirements: agents.10 */
-    it('should handle API exceptions on archive', async () => {
+       Assertions: Toast error is shown
+       Requirements: agents.10, error-notifications.2 */
+    it('should show toast on API exceptions during archive', async () => {
+      const { toast } = require('sonner');
       mockAgentsApi.archive.mockRejectedValue(new Error('Archive network error'));
 
       const { result } = renderHook(() => useAgents());
@@ -636,14 +732,15 @@ describe('useAgents hook', () => {
       });
 
       expect(success).toBe(false);
-      expect(result.current.error).toBe('Archive network error');
+      expect(toast.error).toHaveBeenCalledWith('Archiving agent: Archive network error');
     });
 
     /* Preconditions: API throws non-Error on archive
        Action: archiveAgent is called
-       Assertions: Generic error message is set
-       Requirements: agents.10 */
-    it('should handle non-Error exceptions on archive', async () => {
+       Assertions: Toast error is shown
+       Requirements: agents.10, error-notifications.2 */
+    it('should show toast on non-Error exceptions during archive', async () => {
+      const { toast } = require('sonner');
       mockAgentsApi.archive.mockRejectedValue('Unknown archive error');
 
       const { result } = renderHook(() => useAgents());
@@ -658,7 +755,7 @@ describe('useAgents hook', () => {
       });
 
       expect(success).toBe(false);
-      expect(result.current.error).toBe('Failed to archive agent');
+      expect(toast.error).toHaveBeenCalledWith('Archiving agent: Unknown archive error');
     });
   });
 
