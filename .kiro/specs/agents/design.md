@@ -1132,6 +1132,9 @@ const STATUS_STYLES: Record<AgentStatus, StatusStyle> = {
 | Файл | Покрытие |
 |------|----------|
 | `tests/functional/agents.spec.ts` | agents.1-12 |
+| `tests/functional/agents-always-one.spec.ts` | agents.2.7-2.11 |
+| `tests/functional/auto-expanding-textarea.spec.ts` | agents.4.3-4.7 |
+| `tests/functional/empty-state-placeholder.spec.ts` | agents.4 |
 
 ### Покрытие требований
 

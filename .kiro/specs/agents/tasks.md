@@ -355,7 +355,8 @@
 #### 6.3 EmptyStatePlaceholder
 - **Файл:** `src/renderer/components/agents/EmptyStatePlaceholder.tsx` ✅
 - **Интеграция:** `src/renderer/components/agents.tsx` (показывается когда messages.length === 0) ✅
-- **Тесты:** `tests/unit/components/agents/EmptyStatePlaceholder.test.tsx` (10 тестов) ✅
+- **Модульные тесты:** `tests/unit/components/agents/EmptyStatePlaceholder.test.tsx` (10 тестов) ✅
+- **Функциональные тесты:** `tests/functional/empty-state-placeholder.spec.ts` (5 тестов) ✅
 
 #### 6.4 AllAgents
 - **Файл:** `src/renderer/components/agents/AllAgents.tsx`
