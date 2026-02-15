@@ -4,6 +4,7 @@ import { Logger } from '../Logger';
 import { useError } from '../contexts/error-context';
 import { useEventSubscription } from '../events/useEventSubscription';
 import { EVENT_TYPES } from '../../shared/events/constants';
+import { callApi } from '../utils/apiWrapper';
 import type { LLMProvider } from '../../types';
 
 // Requirements: clerkly.3.5, clerkly.3.7
@@ -15,7 +16,7 @@ interface SettingsProps {
 }
 
 export function Settings({ onSignOut, onNavigate }: SettingsProps) {
-  const { showError, showSuccess } = useError();
+  const { showSuccess } = useError();
   const [llmProvider, setLlmProvider] = useState<LLMProvider>('openai');
   const [apiKey, setApiKey] = useState('');
   const [showApiKey, setShowApiKey] = useState(false);
@@ -72,30 +73,42 @@ export function Settings({ onSignOut, onNavigate }: SettingsProps) {
     loadProfile();
   });
 
-  // Requirements: settings.1.20, settings.1.21 - Load AI Agent settings on mount
+  // Requirements: settings.1.20, settings.1.21, error-notifications.2.1 - Load AI Agent settings on mount
   useEffect(() => {
     const loadAIAgentSettings = async () => {
-      try {
-        // Load LLM provider
-        const providerResult = await window.api.settings.loadLLMProvider();
-        if (providerResult.success && providerResult.provider) {
-          setLlmProvider(providerResult.provider);
+      // Requirements: error-notifications.2.1 - Use callApi for automatic error handling
+      // Load LLM provider
+      const providerResult = await callApi<{ provider: LLMProvider }>(
+        () =>
+          window.api.settings.loadLLMProvider() as Promise<{
+            success: boolean;
+            data?: { provider: LLMProvider };
+            error?: string;
+          }>,
+        'Loading LLM provider'
+      );
 
-          // Load API key for the loaded provider
-          const keyResult = await window.api.settings.loadAPIKey(providerResult.provider);
-          if (keyResult.success && keyResult.apiKey) {
-            setApiKey(keyResult.apiKey);
-          } else {
-            setApiKey('');
-          }
+      if (providerResult?.provider) {
+        setLlmProvider(providerResult.provider);
+
+        // Load API key for the loaded provider
+        const keyResult = await callApi<{ apiKey: string }>(
+          () =>
+            window.api.settings.loadAPIKey(providerResult.provider) as Promise<{
+              success: boolean;
+              data?: { apiKey: string };
+              error?: string;
+            }>,
+          'Loading API key'
+        );
+
+        if (keyResult?.apiKey) {
+          setApiKey(keyResult.apiKey);
         } else {
-          // Default values: openai provider, empty API key
-          setLlmProvider('openai');
           setApiKey('');
         }
-      } catch (error) {
-        logger.error(`Failed to load AI Agent settings: ${error}`);
-        // Use default values on error
+      } else {
+        // Default values: openai provider, empty API key
         setLlmProvider('openai');
         setApiKey('');
       }
@@ -104,7 +117,7 @@ export function Settings({ onSignOut, onNavigate }: SettingsProps) {
     loadAIAgentSettings();
   }, []);
 
-  // Requirements: settings.1.10, settings.1.19 - Save provider immediately and load API key for new provider
+  // Requirements: settings.1.10, settings.1.19, error-notifications.2.1 - Save provider immediately and load API key for new provider
   useEffect(() => {
     // Skip on initial mount (initial load is handled by the load effect above)
     if (isFirstRender.current) {
@@ -113,87 +126,97 @@ export function Settings({ onSignOut, onNavigate }: SettingsProps) {
     }
 
     const saveProviderAndLoadKey = async () => {
-      try {
-        // Save provider immediately (no debounce)
-        const saveResult = await window.api.settings.saveLLMProvider(llmProvider);
-        if (!saveResult.success) {
-          logger.error(`Failed to save LLM provider: ${saveResult.error}`);
-          // Requirements: settings.1.13 - Show error notification on save failure
-          // Note: Error notification will be handled by task 48.8
-        }
+      // Requirements: error-notifications.2.1 - Use callApi for automatic error handling
+      // Save provider immediately (no debounce)
+      await callApi<Record<string, never>>(
+        () =>
+          window.api.settings.saveLLMProvider(llmProvider).then((r) => ({
+            ...r,
+            data: r.success ? ({} as Record<string, never>) : undefined,
+          })),
+        'Saving LLM provider'
+      );
 
-        // Load API key for the new provider
-        const keyResult = await window.api.settings.loadAPIKey(llmProvider);
-        if (keyResult.success && keyResult.apiKey) {
-          setApiKey(keyResult.apiKey);
-        } else {
-          // If key not found, show empty field with placeholder
-          setApiKey('');
-        }
-      } catch (error) {
-        logger.error(`Failed to save provider or load API key: ${error}`);
+      // Load API key for the new provider
+      const keyResult = await callApi<{ apiKey: string }>(
+        () =>
+          window.api.settings.loadAPIKey(llmProvider) as Promise<{
+            success: boolean;
+            data?: { apiKey: string };
+            error?: string;
+          }>,
+        'Loading API key'
+      );
+
+      if (keyResult?.apiKey) {
+        setApiKey(keyResult.apiKey);
+      } else {
+        // If key not found, show empty field with placeholder
+        setApiKey('');
       }
     };
 
     saveProviderAndLoadKey();
   }, [llmProvider]);
 
-  // Requirements: settings.1.9, settings.1.11, settings.1.12 - Debounced save for API key (500ms)
+  // Requirements: settings.1.9, settings.1.11, settings.1.12, error-notifications.2.1 - Debounced save for API key (500ms)
   useEffect(() => {
     // Debounce API key save
     const timeoutId = setTimeout(async () => {
-      try {
-        if (apiKey.trim() === '') {
-          // Requirements: settings.1.11 - Delete API key when field is cleared
-          const deleteResult = await window.api.settings.deleteAPIKey(llmProvider);
-          if (!deleteResult.success) {
-            logger.error(`Failed to delete API key: ${deleteResult.error}`);
-            // Requirements: settings.1.13 - Show error notification on save failure
-            // Note: Error notification will be handled by task 48.8
-          }
-        } else {
-          // Save API key with debounce
-          const saveResult = await window.api.settings.saveAPIKey(llmProvider, apiKey);
-          if (!saveResult.success) {
-            logger.error(`Failed to save API key: ${saveResult.error}`);
-            // Requirements: settings.1.13 - Show error notification on save failure
-            showError(`Failed to save API key: ${saveResult.error || 'Unknown error'}`);
-          }
-          // Requirements: settings.1.12 - No visual indicator for saving (silent save)
-        }
-      } catch (error) {
-        logger.error(`Failed to save/delete API key: ${error}`);
+      // Requirements: error-notifications.2.1 - Use callApi for automatic error handling
+      if (apiKey.trim() === '') {
+        // Requirements: settings.1.11 - Delete API key when field is cleared
+        await callApi<Record<string, never>>(
+          () =>
+            window.api.settings.deleteAPIKey(llmProvider).then((r) => ({
+              ...r,
+              data: r.success ? ({} as Record<string, never>) : undefined,
+            })),
+          'Deleting API key'
+        );
+      } else {
+        // Save API key with debounce
+        await callApi<Record<string, never>>(
+          () =>
+            window.api.settings.saveAPIKey(llmProvider, apiKey).then((r) => ({
+              ...r,
+              data: r.success ? ({} as Record<string, never>) : undefined,
+            })),
+          'Saving API key'
+        );
+        // Requirements: settings.1.12 - No visual indicator for saving (silent save)
       }
     }, 500);
 
     // Cleanup: cancel previous timeout
     return () => clearTimeout(timeoutId);
-  }, [apiKey, llmProvider, showError]);
+  }, [apiKey, llmProvider]);
 
-  // Requirements: settings.3.4 - Handle test connection
+  // Requirements: settings.3.4, error-notifications.2.1 - Handle test connection
   const handleTestConnection = async () => {
     // Requirements: settings.3.4 - Set testing state
     setTestingConnection(true);
-    try {
-      logger.info(`Testing connection to ${llmProvider}...`);
-      const result = await window.api.llm.testConnection(llmProvider, apiKey);
 
-      if (result.success) {
-        // Requirements: settings.3.7 - Show success notification
-        showSuccess('Connection successful! Your API key is valid.');
-        logger.info(`Connection test successful for ${llmProvider}`);
-      } else {
-        // Requirements: settings.3.8 - Show error notification
-        showError(result.error || 'Connection failed: Unknown error');
-        logger.warn(`Connection test failed for ${llmProvider}: ${result.error}`);
-      }
-    } catch (error) {
-      logger.error(`Connection test error: ${error}`);
-      showError(`Connection failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    } finally {
-      // Requirements: settings.3.7, settings.3.8 - Reset button state
-      setTestingConnection(false);
+    // Requirements: error-notifications.2.1 - Use callApi for automatic error handling
+    const result = await callApi<{ success: boolean }>(
+      () =>
+        window.api.llm.testConnection(llmProvider, apiKey) as Promise<{
+          success: boolean;
+          data?: { success: boolean };
+          error?: string;
+        }>,
+      'Testing connection'
+    );
+
+    // Requirements: settings.3.7, settings.3.8 - Reset button state
+    setTestingConnection(false);
+
+    if (result) {
+      // Requirements: settings.3.7 - Show success notification
+      showSuccess('Connection successful! Your API key is valid.');
+      logger.info(`Connection test successful for ${llmProvider}`);
     }
+    // Note: Error notification is handled automatically by callApi
   };
 
   return (

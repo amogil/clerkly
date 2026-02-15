@@ -192,7 +192,7 @@ class WindowManager {
         resizable: true, // Requirements: window-management.1.3
         titleBarStyle: 'default', // Requirements: window-management.3.1
         webPreferences: {
-          preload: path.join(__dirname, '../../preload/index.js'),
+          preload: path.join(__dirname, '../../preload/preload/index.js'),
           contextIsolation: true,
           nodeIntegration: false,
           sandbox: false,

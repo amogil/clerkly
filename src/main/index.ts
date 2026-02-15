@@ -191,6 +191,16 @@ const aiAgentSettingsManager = new AIAgentSettingsManager(
 // Initialize Settings IPC Handlers
 const settingsIPCHandlers = new SettingsIPCHandlers(aiAgentSettingsManager);
 
+// Requirements: agents.2, agents.4, agents.10
+// Initialize Agent and Message Managers
+import { AgentManager } from './agents/AgentManager';
+import { MessageManager } from './agents/MessageManager';
+import { AgentIPCHandlers } from './agents/AgentIPCHandlers';
+
+const agentManager = new AgentManager(dbManager);
+const messageManager = new MessageManager(dbManager);
+const agentIPCHandlers = new AgentIPCHandlers(agentManager, messageManager);
+
 // Requirements: testing.3.8
 // Initialize Test IPC Handlers (only in test environment)
 if (process.env.NODE_ENV === 'test') {
@@ -531,6 +541,11 @@ app.whenReady().then(async () => {
     // Register Event IPC handlers
     registerEventIPCHandlers();
     logger.info('Event IPC handlers registered');
+
+    // Requirements: agents.2, agents.4, agents.10
+    // Register Agent IPC handlers
+    agentIPCHandlers.registerHandlers();
+    logger.info('Agent IPC handlers registered');
 
     // Requirements: realtime-events.1.3, clerkly.3
     // Start EventLogger to log all events

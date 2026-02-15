@@ -141,6 +141,23 @@ function AppContent() {
   useEventSubscription(EVENT_TYPES.AUTH_SIGNED_OUT, handleAuthSignedOut);
   useEventSubscription(EVENT_TYPES.ERROR_CREATED, handleErrorCreated);
 
+  // Requirements: error-notifications.2.7, error-notifications.2.8 - Global unhandled rejection handler
+  useEffect(() => {
+    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+      logger.error('Unhandled rejection: ' + String(event.reason));
+
+      const message = event.reason instanceof Error ? event.reason.message : String(event.reason);
+
+      errorNotificationManager.showNotification(message, 'Unexpected error');
+    };
+
+    window.addEventListener('unhandledrejection', handleUnhandledRejection);
+
+    return () => {
+      window.removeEventListener('unhandledrejection', handleUnhandledRejection);
+    };
+  }, []);
+
   useEffect(() => {
     const checkAuthStatus = async () => {
       try {
