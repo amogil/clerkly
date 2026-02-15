@@ -45,10 +45,11 @@
 - ✅ Drizzle ORM схема (`src/main/db/schema.ts`)
 - ✅ Репозитории (`AgentsRepository`, `MessagesRepository`)
 - ✅ Модульные тесты репозиториев
+- ✅ AgentManager и MessageManager
+- ✅ IPC handlers и Preload API
+- ✅ computeAgentStatus утилита
 
 ### Не выполнено
-- ❌ AgentManager и MessageManager
-- ❌ IPC handlers и Preload API
 - ❌ UI компоненты (используют моковые данные)
 - ❌ Функциональные тесты
 
@@ -135,14 +136,14 @@
 
 ---
 
-### Фаза 4: Утилиты (0.5 дня)
+### Фаза 4: Утилиты ✅ ВЫПОЛНЕНА
 
 **Зависимости:** Нет (можно выполнять параллельно с Фазой 2-3)
 
 | # | Задача | Статус | Оценка | Требования |
 |---|--------|--------|--------|------------|
-| 4.1 | computeAgentStatus | ❌ | 0.25 дня | agents.9 |
-| 4.2 | Тесты computeAgentStatus | ❌ | 0.25 дня | agents.9 |
+| 4.1 | computeAgentStatus | ✅ | 0.25 дня | agents.9 |
+| 4.2 | Тесты computeAgentStatus | ✅ | 0.25 дня | agents.9 |
 
 #### 4.1 computeAgentStatus
 - **Файл:** `src/shared/utils/computeAgentStatus.ts`

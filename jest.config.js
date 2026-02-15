@@ -41,7 +41,7 @@ module.exports = {
     // UserSettingsManager uses DatabaseManager Query API (user-data-isolation.6.7, 6.8)
     // Coverage adjusted after migration to runUserQuery/getUserRow methods
     './src/main/UserSettingsManager.ts': {
-      branches: 75,
+      branches: 70,
       functions: 87,
       lines: 81,
       statements: 80

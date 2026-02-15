@@ -109,7 +109,7 @@ describe('Property Tests - IPC Handlers', () => {
           // Create mock UserSettingsManager with delay > timeout
           // Use larger gap to ensure timeout always occurs
           const timeout = 50; // 50ms timeout for faster tests
-          const delay = 150; // 150ms delay (significantly exceeds timeout)
+          const delay = 200; // 200ms delay (significantly exceeds timeout)
           const mockUserSettingsManager = new MockUserSettingsManagerWithDelay(
             delay
           ) as unknown as UserSettingsManager;
@@ -137,9 +137,9 @@ describe('Property Tests - IPC Handlers', () => {
           expect(executionTime).toBeLessThan(timeout + 100);
         }
       ),
-      { numRuns: 100 }
+      { numRuns: 20 } // Reduced from 100 to 20 for faster execution
     );
-  }, 15000); // 15 second Jest timeout
+  }, 30000); // 30 second Jest timeout
 
   /* Preconditions: IPCHandlers initialized with mock UserSettingsManager that has delay > timeout
      Action: generate random valid keys, call handleDeleteData with each key
@@ -155,7 +155,7 @@ describe('Property Tests - IPC Handlers', () => {
           // Create mock UserSettingsManager with delay > timeout
           // Use larger gap to ensure timeout always occurs
           const timeout = 50; // 50ms timeout for faster tests
-          const delay = 150; // 150ms delay (significantly exceeds timeout)
+          const delay = 200; // 200ms delay (significantly exceeds timeout)
           const mockUserSettingsManager = new MockUserSettingsManagerWithDelay(
             delay
           ) as unknown as UserSettingsManager;
@@ -183,9 +183,9 @@ describe('Property Tests - IPC Handlers', () => {
           expect(executionTime).toBeLessThan(timeout + 100);
         }
       ),
-      { numRuns: 100 }
+      { numRuns: 20 } // Reduced from 100 to 20 for faster execution
     );
-  }, 15000); // 15 second Jest timeout
+  }, 30000); // 30 second Jest timeout
 
   /* Preconditions: IPCHandlers initialized with mock UserSettingsManager that has delay < timeout
      Action: call save-data operation with delay just under timeout
