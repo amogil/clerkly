@@ -33,7 +33,7 @@ test.afterAll(async () => {
   }
 });
 
-test.describe('Agents Invariant - Always At Least One Agent', () => {
+test.describe('Agents - Auto-create First Agent', () => {
   let electronApp: ElectronApplication;
   let window: Page;
 

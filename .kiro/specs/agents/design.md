@@ -459,17 +459,17 @@ function computeAgentStatus(messages: Message[]): AgentStatus {
   return 'new';
 }
 
-## Инвариант: Всегда Хотя Бы Один Агент
+## Auto-create First Agent
 
 **Requirements:** agents.2.7-2.11
 
 ### Принцип
 
-Пользователь ВСЕГДА должен иметь хотя бы одного агента. Это фундаментальный инвариант системы.
+Пользователь ВСЕГДА должен иметь хотя бы одного агента. Это фундаментальное правило системы.
 
 ### Реализация
 
-Инвариант обеспечивается на уровне UI (renderer process) в хуке \`useAgents\`:
+Auto-create first agent обеспечивается на уровне UI (renderer process) в хуке \`useAgents\`:
 
 1. **При первой загрузке** (пользователь впервые вошел в систему):
    - \`useAgents.loadAgents()\` получает пустой список от API
@@ -488,13 +488,13 @@ function computeAgentStatus(messages: Message[]): AgentStatus {
 
 ### Почему на уровне UI, а не Main Process?
 
-**Решение:** Инвариант обеспечивается в renderer process (useAgents hook), а НЕ в main process (AgentManager).
+**Решение:** Auto-create first agent обеспечивается в renderer process (useAgents hook), а НЕ в main process (AgentManager).
 
 **Причины:**
 
 1. **Разделение ответственности:**
    - Main process отвечает за бизнес-логику и данные
-   - Renderer process отвечает за UX и пользовательские инварианты
+   - Renderer process отвечает за UX и пользовательские правила
 
 2. **Гибкость:**
    - В будущем могут появиться другие UI (мобильное приложение, web)
@@ -502,11 +502,11 @@ function computeAgentStatus(messages: Message[]): AgentStatus {
 
 3. **Простота тестирования:**
    - Main process остается простым и предсказуемым
-   - UI тесты проверяют инвариант в контексте пользовательского опыта
+   - UI тесты проверяют auto-create в контексте пользовательского опыта
 
 4. **Избежание race conditions:**
-   - Если Main process проверяет инвариант, возможны race conditions между процессами
-   - UI контролирует инвариант синхронно в одном потоке
+   - Если Main process проверяет правило, возможны race conditions между процессами
+   - UI контролирует auto-create синхронно в одном потоке
 
 ### Код реализации
 
@@ -522,7 +522,7 @@ const loadAgents = useCallback(async () => {
     if (result.success && result.data) {
       const agentList = result.data as Agent[];
       
-      // ИНВАРИАНТ: Если список пуст, создать первого агента
+      // AUTO-CREATE FIRST AGENT: Если список пуст, создать первого агента
       if (agentList.length === 0) {
         const firstAgentResult = await window.api.agents.create('New Agent');
         if (firstAgentResult.success && firstAgentResult.data) {
@@ -545,7 +545,7 @@ const loadAgents = useCallback(async () => {
 
 const archiveAgent = useCallback(async (agentId: string): Promise<boolean> => {
   try {
-    // ИНВАРИАНТ: Проверить, архивируем ли последнего агента
+    // AUTO-CREATE FIRST AGENT: Проверить, архивируем ли последнего агента
     const isLastAgent = agents.length === 1;
     
     const result = await window.api.agents.archive(agentId);
@@ -556,7 +556,7 @@ const archiveAgent = useCallback(async (agentId: string): Promise<boolean> => {
         setActiveAgentId(remaining.length > 0 ? remaining[0].agentId : null);
       }
       
-      // ИНВАРИАНТ: Если архивировали последнего, создать нового
+      // AUTO-CREATE FIRST AGENT: Если архивировали последнего, создать нового
       if (isLastAgent) {
         const newAgentResult = await window.api.agents.create('New Agent');
         if (newAgentResult.success && newAgentResult.data) {
@@ -1139,7 +1139,7 @@ const STATUS_STYLES: Record<AgentStatus, StatusStyle> = {
 |------------|-----------|----------------|----------------|
 | agents.1 | ✓ | - | ✓ |
 | agents.2 | ✓ | ✓ | ✓ |
-| agents.2.7-2.11 (инвариант) | ✓ | ✓ | ✓ |
+| agents.2.7-2.11 (auto-create) | ✓ | ✓ | ✓ |
 | agents.3 | ✓ | - | ✓ |
 | agents.4 | ✓ | - | ✓ |
 | agents.5 | ✓ | - | ✓ |

@@ -6,7 +6,7 @@
 
 **Общая оценка:** 10-12 дней (без учёта выполненной Фазы 1-5)
 
-**Текущий статус:** Фаза 5.1 (Инвариант "Всегда Хотя Бы Один Агент") ✅ ЗАВЕРШЕНА
+**Текущий статус:** Фаза 5.1 (Auto-create First Agent) ✅ ЗАВЕРШЕНА
 
 ---
 
@@ -53,13 +53,13 @@
 - ✅ UI типы (Agent, Message)
 - ✅ Хуки (useAgents, useMessages)
 - ✅ Интеграция хуков в agents.tsx
-- ✅ Инвариант "Всегда хотя бы один агент" (agents.2.7-2.11):
+- ✅ Auto-create First Agent (agents.2.7-2.11):
   - ✅ Auto-create при пустом списке (loadAgents)
   - ✅ Auto-create при архивировании последнего (archiveAgent + event subscription)
   - ✅ Удаление empty state UI
-  - ✅ Модульные тесты инварианта (2 новых теста)
-  - ✅ Property-based тесты инварианта (3 теста, 50+30+20 итераций)
-  - ✅ Функциональные тесты инварианта (3 теста в agents-invariant.spec.ts)
+  - ✅ Модульные тесты (2 новых теста)
+  - ✅ Property-based тесты (3 теста, 50+30+20 итераций)
+  - ✅ Функциональные тесты (3 теста в agents-always-one.spec.ts)
   - ✅ Исправлен путь к preload script (dist/preload/preload/index.js)
 
 ### В процессе
@@ -221,20 +221,20 @@
 
 ---
 
-### Фаза 5.1: Инвариант "Всегда Хотя Бы Один Агент" ⏳ В ПРОЦЕССЕ
+### Фаза 5.1: Auto-create First Agent ✅ ЗАВЕРШЕНА
 
 **Зависимости:** Фаза 5 ✅
 
-**⚠️ КРИТИЧЕСКИ ВАЖНО:** Реализация инварианта agents.2.7-2.11
+**⚠️ КРИТИЧЕСКИ ВАЖНО:** Реализация auto-create first agent (agents.2.7-2.11)
 
 | # | Задача | Статус | Оценка | Требования |
 |---|--------|--------|--------|------------|
 | 5.1.1 | Обновить useAgents.loadAgents | ✅ | 0.25 дня | agents.2.7, agents.2.8 |
 | 5.1.2 | Обновить useAgents.archiveAgent | ✅ | 0.25 дня | agents.2.9, agents.2.10 |
 | 5.1.3 | Убрать empty state UI | ✅ | 0.1 дня | agents.2.11 |
-| 5.1.4 | Модульные тесты инварианта | ✅ | 0.25 дня | agents.2.7-2.11 |
-| 5.1.5 | Property-based тесты инварианта | ✅ | 0.25 дня | agents.2.7-2.11 |
-| 5.1.6 | Функциональные тесты инварианта | ✅ | 0.25 дня | agents.2.7-2.11 |
+| 5.1.4 | Модульные тесты | ✅ | 0.25 дня | agents.2.7-2.11 |
+| 5.1.5 | Property-based тесты | ✅ | 0.25 дня | agents.2.7-2.11 |
+| 5.1.6 | Функциональные тесты | ✅ | 0.25 дня | agents.2.7-2.11 |
 | 5.1.7 | Исправить infinite loop в useAgents | ✅ | 0.1 дня | agents.2.7-2.11 |
 | 5.1.8 | Зарегистрировать AgentIPCHandlers | ✅ | 0.1 дня | agents.2, agents.4 |
 | 5.1.9 | Валидация и тестирование | ⏳ | 0.1 дня | agents.2.7-2.11 |
@@ -268,23 +268,23 @@
 #### 5.1.3 Убрать empty state UI
 - **Файл:** `src/renderer/components/agents.tsx` ✅
 - **Изменение:** Заменен "No agents yet" на "Loading..." ✅
-- **Обоснование:** Empty state никогда не должен показываться из-за инварианта
+- **Обоснование:** Empty state никогда не должен показываться благодаря auto-create first agent
 
-#### 5.1.4 Модульные тесты инварианта
+#### 5.1.4 Модульные тесты
 - **Файл:** `tests/unit/hooks/useAgents.test.ts` ✅
 - **Новые тесты:** ✅
   - `should auto-create agent when list is empty on mount`
   - `should auto-create agent when archiving last agent`
 
-#### 5.1.5 Property-based тесты инварианта
+#### 5.1.5 Property-based тесты
 - **Файл:** `tests/property/hooks/useAgents.property.test.ts` (новый) ✅
 - **Тесты:** ✅
-  - `INVARIANT: user always has at least one agent after load`
-  - `INVARIANT: user always has at least one agent after archiving`
+  - `AUTO-CREATE: user always has at least one agent after load`
+  - `AUTO-CREATE: user always has at least one agent after archiving`
   - `PROPERTY: auto-created agent has correct properties`
 
-#### 5.1.6 Функциональные тесты инварианта
-- **Файл:** `tests/functional/agents-invariant.spec.ts` (новый) ✅
+#### 5.1.6 Функциональные тесты
+- **Файл:** `tests/functional/agents-always-one.spec.ts` (новый) ✅
 - **Тесты:** ✅
   - `should auto-create first agent for new user after login`
   - `should auto-create agent when last agent is archived`
@@ -302,10 +302,10 @@
 - **Ошибка была:** `Cannot read properties of undefined (reading 'list')` - window.api.agents был undefined
 
 #### 5.1.9 Валидация и тестирование
-- **Действия:** ⏳
+- **Действия:** ✅
   - Запустить `npm run validate`
   - Убедиться что все тесты проходят
-  - Проверить что инвариант работает корректно
+  - Проверить что auto-create first agent работает корректно
 
 **Чек-лист Фазы 5.1:**
 
@@ -325,7 +325,7 @@
 - [x] `npm run validate` проходит без ошибок
 - [x] Все модульные тесты проходят (1144 теста)
 - [x] Все property-based тесты проходят (278 тестов)
-- [x] Все функциональные тесты инварианта проходят (3 теста)
+- [x] Все функциональные тесты auto-create проходят (3 теста)
 
 **Текущий прогресс:** 17/17 пунктов чек-листа (100%) ✅
 
@@ -437,7 +437,7 @@
                                    └──────────────────────────────────────────────────────────►
 ```
 
-**Текущая фаза:** Фаза 5.1 ✅ ЗАВЕРШЕНА
+**Текущая фаза:** Фаза 5.1 (Auto-create First Agent) ✅ ЗАВЕРШЕНА
 
 ---
 

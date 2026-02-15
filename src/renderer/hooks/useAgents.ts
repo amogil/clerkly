@@ -163,7 +163,7 @@ export function useAgents(): UseAgentsResult {
 
       // Requirements: agents.2.7, agents.2.8 - Auto-create if archiving last agent
       if (isLastAgent) {
-        // Create new agent to maintain invariant
+        // Create new agent to maintain auto-create first agent rule
         const newAgent = await callApi<Agent>(
           () =>
             window.api.agents.create('New Agent') as Promise<{

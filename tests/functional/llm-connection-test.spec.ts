@@ -156,7 +156,7 @@ test('54.3: should send request with correct parameters', async () => {
 test('54.4: should show success notification on valid API key', async () => {
   // Wait for any initial error toasts to disappear (from loading settings)
   await context.window.waitForTimeout(2000);
-  
+
   // Close any existing toasts
   const existingToasts = context.window.locator('[data-sonner-toast]');
   const count = await existingToasts.count();

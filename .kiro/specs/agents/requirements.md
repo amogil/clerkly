@@ -77,7 +77,7 @@
 
 2.6. Интерфейс чата ДОЛЖЕН очищаться для нового разговора
 
-2.7. **ИНВАРИАНТ:** У пользователя ВСЕГДА ДОЛЖЕН быть хотя бы один агент
+2.7. **AUTO-CREATE FIRST AGENT:** У пользователя ВСЕГДА ДОЛЖЕН быть хотя бы один агент
 
 2.8. КОГДА список агентов пуст (первый вход, удаление всех агентов), ТО ДОЛЖЕН автоматически создаваться новый агент с названием "New Agent"
 
@@ -89,10 +89,10 @@
 
 #### Функциональные Тесты
 
-- `tests/functional/agents-invariant.spec.ts` - "should auto-create first agent for new user after login"
-- `tests/functional/agents-invariant.spec.ts` - "should auto-create agent when last agent is archived"
-- `tests/functional/agents-invariant.spec.ts` - "should never show empty state UI"
-- `tests/functional/agents-invariant.spec.ts` - "should never show loading state - UI always visible"
+- `tests/functional/agents-always-one.spec.ts` - "should auto-create first agent for new user after login"
+- `tests/functional/agents-always-one.spec.ts` - "should auto-create agent when last agent is archived"
+- `tests/functional/agents-always-one.spec.ts` - "should never show empty state UI"
+- `tests/functional/agents-always-one.spec.ts` - "should never show loading state - UI always visible"
 
 ### 3. Переключение между агентами
 

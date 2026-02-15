@@ -106,7 +106,7 @@ export function Agents() {
   };
 
   // Requirements: agents.2.7 - Prevent crash during initial load
-  // Don't render until we have at least one agent (invariant guarantees this after loading)
+  // Don't render until we have at least one agent (auto-create guarantees this after loading)
   if (isLoading || displayAgents.length === 0) {
     return null;
   }
@@ -206,8 +206,8 @@ export function Agents() {
   }
 
   // Requirements: agents.2.7, agents.2.10, agents.2.11
-  // The invariant ensures there's always at least one agent
-  // If selectedAgent is null (impossible after loading due to invariant), use first agent
+  // Auto-create first agent ensures there's always at least one agent
+  // If selectedAgent is null (impossible after loading due to auto-create), use first agent
   const currentAgent = selectedAgent || displayAgents[0];
 
   const letter = currentAgent.title.charAt(0).toUpperCase();

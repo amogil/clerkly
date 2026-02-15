@@ -3,7 +3,7 @@
  */
 // Requirements: agents.2.7, agents.2.8, agents.2.9, agents.2.10
 /**
- * Property-based tests for useAgents hook invariants
+ * Property-based tests for useAgents hook - auto-create first agent
  */
 
 import * as fc from 'fast-check';
@@ -47,9 +47,9 @@ describe('useAgents hook - Property-based tests', () => {
 
   /* Preconditions: Hook loads with various agent list sizes
      Action: Load agents from API
-     Assertions: User always has at least one agent (invariant)
+     Assertions: User always has at least one agent (auto-create first agent)
      Requirements: agents.2.7, agents.2.8 */
-  it('INVARIANT: user always has at least one agent after load', async () => {
+  it('AUTO-CREATE: user always has at least one agent after load', async () => {
     await fc.assert(
       fc.asyncProperty(
         fc.integer({ min: 0, max: 10 }), // Number of agents to start with
@@ -83,7 +83,7 @@ describe('useAgents hook - Property-based tests', () => {
             expect(result.current.isLoading).toBe(false);
           });
 
-          // INVARIANT: Always at least one agent
+          // AUTO-CREATE FIRST AGENT: Always at least one agent
           expect(result.current.agents.length).toBeGreaterThanOrEqual(1);
 
           // If started with 0, should have auto-created
@@ -100,9 +100,9 @@ describe('useAgents hook - Property-based tests', () => {
 
   /* Preconditions: Hook has various numbers of agents
      Action: Archive agents one by one until only one remains
-     Assertions: User always has at least one agent (invariant)
+     Assertions: User always has at least one agent (auto-create first agent)
      Requirements: agents.2.7, agents.2.9, agents.2.10 */
-  it('INVARIANT: user always has at least one agent after archiving', async () => {
+  it('AUTO-CREATE: user always has at least one agent after archiving', async () => {
     await fc.assert(
       fc.asyncProperty(
         fc.integer({ min: 1, max: 5 }), // Start with 1-5 agents
@@ -146,7 +146,7 @@ describe('useAgents hook - Property-based tests', () => {
               await result.current.archiveAgent(agentToArchive.agentId);
             });
 
-            // INVARIANT: Always at least one agent
+            // AUTO-CREATE FIRST AGENT: Always at least one agent
             // Note: The event-based removal hasn't happened yet, but auto-create should have
             if (currentAgentsCount === 1) {
               // Last agent archived, should have auto-created
