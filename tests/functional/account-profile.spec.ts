@@ -185,7 +185,7 @@ test.describe('Account Profile', () => {
     }
 
     // Navigate to Settings
-    const settingsNav = context.window.locator('text=/settings/i');
+    const settingsNav = context.window.locator('button:has-text("Settings")');
     console.log('[TEST] Looking for Settings button...');
     const settingsVisible = await settingsNav.isVisible().catch(() => false);
     console.log('[TEST] Settings button visible:', settingsVisible);
