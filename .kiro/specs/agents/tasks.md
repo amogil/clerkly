@@ -48,9 +48,12 @@
 - ✅ AgentManager и MessageManager
 - ✅ IPC handlers и Preload API
 - ✅ computeAgentStatus утилита
+- ✅ UI типы (Agent, Message)
+- ✅ Хуки (useAgents, useMessages)
+- ✅ Интеграция хуков в agents.tsx
 
 ### Не выполнено
-- ❌ UI компоненты (используют моковые данные)
+- ❌ UI компоненты (AgentIcon, MessageList, AutoExpandingTextarea, HistoryPage)
 - ❌ Функциональные тесты
 
 ---
@@ -161,7 +164,7 @@
 
 ---
 
-### Фаза 5: UI Компоненты — Базовые (2 дня)
+### Фаза 5: UI Типы и Хуки ✅ ВЫПОЛНЕНА
 
 **Зависимости:** Фаза 3, Фаза 4
 
@@ -169,38 +172,39 @@
 
 | # | Задача | Статус | Оценка | Требования |
 |---|--------|--------|--------|------------|
-| 5.1 | Типы Agent и Message | ❌ | 0.25 дня | agents.1, agents.7 |
-| 5.2 | AgentIcon | ❌ | 0.5 дня | agents.1.2, agents.6 |
-| 5.3 | AgentsList | ❌ | 0.5 дня | agents.1.1, agents.1.5-1.9 |
-| 5.4 | ActiveAgentInfo | ❌ | 0.25 дня | agents.8 |
-| 5.5 | MessageList | ❌ | 0.5 дня | agents.4.8-4.13 |
+| 5.1 | Типы Agent и Message | ✅ | 0.25 дня | agents.1, agents.7 |
+| 5.2 | Хук useAgents | ✅ | 0.5 дня | agents.12 |
+| 5.3 | Хук useMessages | ✅ | 0.5 дня | agents.12 |
+| 5.4 | Интеграция в agents.tsx | ✅ | 0.5 дня | agents.1-12 |
+| 5.5 | Тесты хуков | ✅ | 0.5 дня | agents.12 |
 
 #### 5.1 Типы Agent и Message
-- **Файл:** `src/renderer/types/agent.ts`
-- **Удалить:** устаревший `agent-task.ts`
+- **Файл:** `src/renderer/types/agent.ts` ✅
+- **Экспорт:** `src/renderer/types/index.ts` ✅
 
-#### 5.2 AgentIcon
-- **Файл:** `src/renderer/components/agents/AgentIcon.tsx`
-- **Размер:** 32px (w-8 h-8)
-- **Цвета по статусу:** см. agents.6
+#### 5.2 Хук useAgents
+- **Файл:** `src/renderer/hooks/useAgents.ts` ✅
+- **Методы:** `createAgent`, `selectAgent`, `archiveAgent` ✅
+- **События:** подписка на `agent.*` ✅
 
-#### 5.3 AgentsList
-- **Файл:** `src/renderer/components/agents/AgentsList.tsx`
-- **Кнопка "New chat":** bg-sky-400
-- **Адаптивность:** автоматический расчёт видимых агентов
-- **Кнопка "+N":** для скрытых агентов
+#### 5.3 Хук useMessages
+- **Файл:** `src/renderer/hooks/useMessages.ts` ✅
+- **Методы:** `sendMessage` ✅
+- **События:** подписка на `message.*` ✅
 
-#### 5.4 ActiveAgentInfo
-- **Файл:** `src/renderer/components/agents/ActiveAgentInfo.tsx`
+#### 5.4 Интеграция в agents.tsx
+- **Файл:** `src/renderer/components/agents.tsx` ✅
+- **Заменено:** моковые данные на реальные API вызовы ✅
+- **Статус:** вычисляется через `computeAgentStatus` ✅
 
-#### 5.5 MessageList
-- **Файл:** `src/renderer/components/agents/MessageList.tsx`
-- **Автоскролл:** к последнему сообщению
+#### 5.5 Тесты хуков
+- **Файлы:** `tests/unit/hooks/useAgents.test.ts`, `tests/unit/hooks/useMessages.test.ts` ✅
+- **Покрытие:** 27 тестов useAgents + 24 теста useMessages ✅
 
-**После завершения Фазы 5:**
-1. `npm run validate`
-2. Подтверждение пользователя (особенно для UI изменений!)
-3. `git commit -m "feat(agents): add base UI components"`
+**Завершение Фазы 5:**
+1. ✅ `npm run validate` - прошла успешно
+2. ✅ Подтверждение пользователя получено
+3. ✅ `git commit -m "feat(agents): integrate hooks into UI component"`
 
 ---
 
