@@ -155,7 +155,7 @@ test.describe('Account Profile', () => {
 
     // Wait for profile to be fetched, saved, and UI to update
     await context.window.waitForTimeout(2000);
-    
+
     // Wait for agents page to load (this is where user lands after auth)
     console.log('[TEST] Waiting for agents page to load...');
     const agentsPage = context.window.locator('[data-testid="agents"]');

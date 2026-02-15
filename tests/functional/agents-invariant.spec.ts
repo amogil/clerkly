@@ -186,9 +186,9 @@ test.describe('Agents Invariant - Always At Least One Agent', () => {
     await expect(loadingText).not.toBeVisible({ timeout: 5000 });
 
     // Verify that standard UI elements are ALWAYS present
-    // 1. Header with agent info
-    const header = window.locator('.h-16.border-b');
-    await expect(header).toBeVisible();
+    // 1. Agents container
+    const agentsContainer = window.locator('[data-testid="agents"]');
+    await expect(agentsContainer).toBeVisible();
 
     // 2. Agent avatar in header
     const agentAvatar = window.locator('.rounded-full.bg-sky-400').first();

@@ -29,11 +29,11 @@ export function Agents() {
   const chatListRef = useRef<HTMLDivElement>(null);
 
   // Use real hooks for agents and messages
-  const { agents, activeAgent, createAgent, selectAgent } = useAgents();
+  const { agents, activeAgent, createAgent, selectAgent, isLoading } = useAgents();
   const { messages, sendMessage } = useMessages(activeAgent?.agentId || null);
 
   // Convert agents to display format with computed status
-  const agentTasks: DisplayAgent[] = agents.map((agent) => {
+  const displayAgents: DisplayAgent[] = agents.map((agent) => {
     // Compute status from messages for this agent
     // For now, use 'new' as default since we don't have messages loaded for all agents
     const status =
@@ -50,9 +50,9 @@ export function Agents() {
   });
 
   // Current selected agent
-  const selectedTask = activeAgent
-    ? agentTasks.find((t) => t.agentId === activeAgent.agentId) || agentTasks[0]
-    : agentTasks[0];
+  const selectedAgent = activeAgent
+    ? displayAgents.find((t) => t.agentId === activeAgent.agentId) || displayAgents[0]
+    : displayAgents[0];
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -105,8 +105,14 @@ export function Agents() {
     }
   };
 
+  // Requirements: agents.2.7 - Prevent crash during initial load
+  // Don't render until we have at least one agent (invariant guarantees this after loading)
+  if (isLoading || displayAgents.length === 0) {
+    return null;
+  }
+
   // Show all tasks
-  const displayTasks = agentTasks;
+  const displayTasks = displayAgents;
 
   // Render task history page
   if (showAllTasksPage) {
@@ -205,10 +211,10 @@ export function Agents() {
   // Requirements: agents.2.7, agents.2.10, agents.2.11
   // The invariant ensures there's always at least one agent
   // If selectedTask is null (impossible after loading due to invariant), use first agent
-  const currentTask = selectedTask || agentTasks[0];
+  const currentAgent = selectedAgent || displayAgents[0];
 
-  const letter = currentTask.title.charAt(0).toUpperCase();
-  const style = getStatusStyles(currentTask.status);
+  const letter = currentAgent.title.charAt(0).toUpperCase();
+  const style = getStatusStyles(currentAgent.status);
 
   return (
     <div data-testid="agents" className="h-[calc(100vh-4rem)] bg-card flex flex-col">
@@ -219,11 +225,11 @@ export function Agents() {
           <div
             className={`relative flex-shrink-0 w-10 h-10 rounded-full ${style.bg} flex items-center justify-center`}
           >
-            {isCompleted(currentTask.status) ? (
+            {isCompleted(currentAgent.status) ? (
               <Check className="w-5 h-5 text-white" />
-            ) : hasError(currentTask.status) ? (
+            ) : hasError(currentAgent.status) ? (
               <X className="w-5 h-5 text-white" />
-            ) : isAwaitingUser(currentTask.status) ? (
+            ) : isAwaitingUser(currentAgent.status) ? (
               <>
                 <span className="text-white text-sm font-semibold">{letter}</span>
                 <div
@@ -236,11 +242,11 @@ export function Agents() {
               <span className="text-white text-sm font-semibold">{letter}</span>
             )}
 
-            {isInProgress(currentTask.status) && (
+            {isInProgress(currentAgent.status) && (
               <div className="absolute inset-0 rounded-full border-2 border-white border-t-transparent animate-spin" />
             )}
 
-            {isAwaitingUser(currentTask.status) && (
+            {isAwaitingUser(currentAgent.status) && (
               <div
                 className={`absolute -inset-1 rounded-full ring-2 ${style.ring} animate-pulse`}
               />
@@ -248,12 +254,12 @@ export function Agents() {
           </div>
 
           <div className="flex-1 min-w-0">
-            <h3 className="font-semibold text-foreground truncate">{currentTask.title}</h3>
+            <h3 className="font-semibold text-foreground truncate">{currentAgent.title}</h3>
             <div className="flex items-center gap-2 text-xs">
-              <span className={`${style.text}`}>{getStatusText(currentTask.status)}</span>
+              <span className={`${style.text}`}>{getStatusText(currentAgent.status)}</span>
               <span className="text-muted-foreground">·</span>
               <span className="text-muted-foreground truncate">
-                {new Date(currentTask.createdAt).toLocaleDateString('en-US', {
+                {new Date(currentAgent.createdAt).toLocaleDateString('en-US', {
                   month: 'short',
                   day: 'numeric',
                   hour: 'numeric',
@@ -277,7 +283,7 @@ export function Agents() {
           {displayTasks.slice(0, visibleChatsCount).map((task) => {
             const taskLetter = task.title.charAt(0).toUpperCase();
             const taskStyle = getStatusStyles(task.status);
-            const isSelected = task.agentId === currentTask.agentId;
+            const isSelected = task.agentId === currentAgent.agentId;
 
             return (
               <div
@@ -358,7 +364,7 @@ export function Agents() {
                       <Logo
                         size="sm"
                         showText={false}
-                        animated={isInProgress(currentTask.status)}
+                        animated={isInProgress(currentAgent.status)}
                       />
                     </div>
                   )}
