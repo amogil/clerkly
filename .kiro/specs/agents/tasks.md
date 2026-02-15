@@ -68,16 +68,16 @@
 
 ---
 
-### Фаза 2: Main Process — Бизнес-логика (2 дня)
+### Фаза 2: Main Process — Бизнес-логика ✅ ВЫПОЛНЕНА
 
 **Зависимости:** Фаза 1 ✅
 
 | # | Задача | Статус | Оценка | Требования |
 |---|--------|--------|--------|------------|
-| 2.1 | AgentManager | ❌ | 0.5 дня | agents.2, agents.10 |
-| 2.2 | MessageManager | ❌ | 0.5 дня | agents.4, agents.7 |
-| 2.3 | Тесты AgentManager | ❌ | 0.5 дня | agents.2, agents.10 |
-| 2.4 | Тесты MessageManager | ❌ | 0.5 дня | agents.4, agents.7 |
+| 2.1 | AgentManager | ✅ | 0.5 дня | agents.2, agents.10 |
+| 2.2 | MessageManager | ✅ | 0.5 дня | agents.4, agents.7 |
+| 2.3 | Тесты AgentManager | ✅ | 0.5 дня | agents.2, agents.10 |
+| 2.4 | Тесты MessageManager | ✅ | 0.5 дня | agents.4, agents.7 |
 
 #### 2.1 AgentManager
 - **Файл:** `src/main/agents/AgentManager.ts`
