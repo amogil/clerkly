@@ -1,3 +1,7 @@
+/**
+ * @jest-environment node
+ */
+
 /* Preconditions: NavigationManager created with mocked Router and window.api.auth
    Action: call checkAuthStatus(), redirectToLogin(), redirectToAgents(), initialize()
    Assertions: correct behavior for each method based on auth status

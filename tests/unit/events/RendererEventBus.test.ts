@@ -1,3 +1,7 @@
+/**
+ * @jest-environment node
+ */
+
 // Requirements: realtime-events.1, realtime-events.2, realtime-events.4.7
 /**
  * Unit tests for RendererEventBus

@@ -12,6 +12,7 @@ import {
   getStatusText,
   getStatusStyles,
 } from '../../shared/utils/agentStatus';
+import { AutoExpandingTextarea } from './agents/AutoExpandingTextarea';
 import type { Agent } from '../types/agent';
 import type { AgentStatus } from '../../shared/utils/agentStatus';
 
@@ -27,6 +28,7 @@ export function Agents() {
   const [taskInput, setTaskInput] = useState('');
   const [visibleChatsCount, setVisibleChatsCount] = useState(5);
   const chatListRef = useRef<HTMLDivElement>(null);
+  const messagesAreaRef = useRef<HTMLDivElement>(null);
 
   // Use real hooks for agents and messages
   const { agents, activeAgent, createAgent, selectAgent, isLoading } = useAgents();
@@ -338,7 +340,7 @@ export function Agents() {
       </div>
 
       {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-4">
+      <div ref={messagesAreaRef} className="flex-1 overflow-y-auto p-6 space-y-4">
         {messages.map((message, index) => {
           const showAvatar =
             message.payload.kind !== 'user' &&
@@ -378,29 +380,26 @@ export function Agents() {
 
       {/* Input Area */}
       <div className="p-4 border-t border-border bg-card flex-shrink-0">
-        <div className="flex gap-2">
-          <input
-            type="text"
+        <div className="flex gap-2 items-end">
+          <AutoExpandingTextarea
             value={taskInput}
-            onChange={(e) => setTaskInput(e.target.value)}
-            onKeyPress={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                handleSend();
-              }
-            }}
-            placeholder="Ask, reply, or give command..."
+            onChange={setTaskInput}
+            onSubmit={handleSend}
+            chatAreaRef={messagesAreaRef}
+            disabled={!activeAgent}
             className="flex-1 px-3.5 py-2.5 bg-secondary border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
           />
           <button
             onClick={handleSend}
             disabled={!taskInput.trim()}
-            className="px-3.5 py-2.5 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-3.5 py-2.5 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
           >
             <Send className="w-4 h-4" />
           </button>
         </div>
-        <p className="text-xs text-muted-foreground mt-1.5 px-0.5">Press Enter to send</p>
+        <p className="text-xs text-muted-foreground mt-1.5 px-0.5">
+          Press Enter to send, Shift+Enter for new line
+        </p>
       </div>
     </div>
   );

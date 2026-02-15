@@ -1,3 +1,7 @@
+/**
+ * @jest-environment node
+ */
+
 // Requirements: clerkly.1, clerkly.2, clerkly.nfr.2
 
 import * as fc from 'fast-check';

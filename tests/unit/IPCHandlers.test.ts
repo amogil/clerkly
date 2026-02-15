@@ -1,3 +1,7 @@
+/**
+ * @jest-environment node
+ */
+
 // Requirements: clerkly.2
 
 import { ipcMain, IpcMainInvokeEvent } from 'electron';

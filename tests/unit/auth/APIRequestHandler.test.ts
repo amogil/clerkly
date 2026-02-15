@@ -28,6 +28,31 @@ jest.mock('../../../src/main/events/MainEventBus', () => ({
   },
 }));
 
+// Mock fetch
+global.fetch = jest.fn();
+
+// Mock Response for Node.js environment
+if (typeof Response === 'undefined') {
+  (global as any).Response = class Response {
+    constructor(
+      public body: any,
+      public init?: { status?: number; headers?: any }
+    ) {}
+    get status() {
+      return this.init?.status || 200;
+    }
+    get headers() {
+      return this.init?.headers || {};
+    }
+    async json() {
+      return typeof this.body === 'string' ? JSON.parse(this.body) : this.body;
+    }
+    async text() {
+      return typeof this.body === 'string' ? this.body : JSON.stringify(this.body);
+    }
+  };
+}
+
 // Mock TokenStorageManager
 jest.mock('../../../src/main/auth/TokenStorageManager');
 
@@ -47,8 +72,9 @@ describe('APIRequestHandler', () => {
       deleteTokens: jest.fn().mockResolvedValue(undefined),
     } as any;
 
-    // Mock fetch
-    mockFetch = jest.spyOn(global, 'fetch');
+    // Reset fetch mock
+    mockFetch = global.fetch as jest.Mock;
+    mockFetch.mockClear();
 
     // Mock process.type
     Object.defineProperty(process, 'type', {
