@@ -113,7 +113,7 @@ describe('Property Tests - IPC Handlers', () => {
           // Create mock UserSettingsManager with delay > timeout
           // Use larger gap to ensure timeout always occurs
           const timeout = 100; // 100ms timeout for faster tests
-          const delay = 250; // 250ms delay (significantly exceeds timeout)
+          const delay = 500; // 500ms delay (significantly exceeds timeout to avoid race conditions)
           const mockUserSettingsManager = new MockUserSettingsManagerWithDelay(
             delay
           ) as unknown as UserSettingsManager;
@@ -159,7 +159,7 @@ describe('Property Tests - IPC Handlers', () => {
           // Create mock UserSettingsManager with delay > timeout
           // Use larger gap to ensure timeout always occurs
           const timeout = 100; // 100ms timeout for faster tests
-          const delay = 250; // 250ms delay (significantly exceeds timeout)
+          const delay = 500; // 500ms delay (significantly exceeds timeout to avoid race conditions)
           const mockUserSettingsManager = new MockUserSettingsManagerWithDelay(
             delay
           ) as unknown as UserSettingsManager;
