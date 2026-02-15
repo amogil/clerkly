@@ -16,7 +16,7 @@ import type { Agent } from '../types/agent';
 import type { AgentStatus } from '../../shared/utils/agentStatus';
 
 // Map Agent to display format with computed status
-interface DisplayAgent extends Agent {
+interface DisplayAgentItem extends Agent {
   status: AgentStatus;
   title: string;
   description: string;
@@ -33,7 +33,7 @@ export function Agents() {
   const { messages, sendMessage } = useMessages(activeAgent?.agentId || null);
 
   // Convert agents to display format with computed status
-  const displayAgents: DisplayAgent[] = agents.map((agent) => {
+  const displayAgents: DisplayAgentItem[] = agents.map((agent) => {
     // Compute status from messages for this agent
     // For now, use 'new' as default since we don't have messages loaded for all agents
     const status =
@@ -93,7 +93,7 @@ export function Agents() {
     }
   };
 
-  const handleTaskClick = (task: DisplayAgent) => {
+  const handleAgentClick = (task: DisplayAgentItem) => {
     selectAgent(task.agentId);
     setShowAllTasksPage(false);
   };
@@ -111,13 +111,10 @@ export function Agents() {
     return null;
   }
 
-  // Show all tasks
-  const displayTasks = displayAgents;
-
-  // Render task history page
+  // Render agent history page
   if (showAllTasksPage) {
-    const historyTasks = displayTasks.filter(
-      (task) => !(task.title === 'New conversation' && task.status === 'new')
+    const historyAgents = displayAgents.filter(
+      (agent) => !(agent.title === 'New conversation' && agent.status === 'new')
     );
 
     return (
@@ -130,31 +127,31 @@ export function Agents() {
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div>
-            <h3 className="text-lg font-semibold text-foreground">Task History</h3>
-            <p className="text-xs text-muted-foreground">{historyTasks.length} total tasks</p>
+            <h3 className="text-lg font-semibold text-foreground">Agent History</h3>
+            <p className="text-xs text-muted-foreground">{historyAgents.length} total agents</p>
           </div>
         </div>
 
         <div className="flex-1 overflow-y-auto p-6 space-y-3">
-          {historyTasks.map((task) => {
-            const letter = task.title.charAt(0).toUpperCase();
-            const style = getStatusStyles(task.status);
+          {historyAgents.map((agent) => {
+            const letter = agent.title.charAt(0).toUpperCase();
+            const style = getStatusStyles(agent.status);
 
             return (
               <div
-                key={task.agentId}
-                onClick={() => handleTaskClick(task)}
+                key={agent.agentId}
+                onClick={() => handleAgentClick(agent)}
                 className="p-4 rounded-lg border border-border bg-card hover:border-primary/50 transition-colors cursor-pointer"
               >
                 <div className="flex items-start gap-3">
                   <div
                     className={`relative flex-shrink-0 w-10 h-10 rounded-full ${style.bg} flex items-center justify-center`}
                   >
-                    {isCompleted(task.status) ? (
+                    {isCompleted(agent.status) ? (
                       <Check className="w-5 h-5 text-white" />
-                    ) : hasError(task.status) ? (
+                    ) : hasError(agent.status) ? (
                       <X className="w-5 h-5 text-white" />
-                    ) : isAwaitingUser(task.status) ? (
+                    ) : isAwaitingUser(agent.status) ? (
                       <>
                         <span className="text-white text-sm font-semibold">{letter}</span>
                         <div
@@ -167,11 +164,11 @@ export function Agents() {
                       <span className="text-white text-sm font-semibold">{letter}</span>
                     )}
 
-                    {isInProgress(task.status) && (
+                    {isInProgress(agent.status) && (
                       <div className="absolute inset-0 rounded-full border-2 border-white border-t-transparent animate-spin" />
                     )}
 
-                    {isAwaitingUser(task.status) && (
+                    {isAwaitingUser(agent.status) && (
                       <div
                         className={`absolute -inset-1 rounded-full ring-2 ${style.ring} animate-pulse`}
                       />
@@ -179,17 +176,17 @@ export function Agents() {
                   </div>
 
                   <div className="flex-1 min-w-0">
-                    <h4 className="font-medium text-foreground mb-1">{task.title}</h4>
-                    <p className="text-sm text-muted-foreground mb-2">{task.description}</p>
+                    <h4 className="font-medium text-foreground mb-1">{agent.title}</h4>
+                    <p className="text-sm text-muted-foreground mb-2">{agent.description}</p>
 
                     <div className="flex items-center gap-3 text-xs">
                       <div className={`${style.text}`}>
-                        <span>{getStatusText(task.status)}</span>
+                        <span>{getStatusText(agent.status)}</span>
                       </div>
                       <div className="text-muted-foreground">
                         <span>·</span>
                         <span className="ml-1.5">
-                          {new Date(task.createdAt).toLocaleDateString('en-US', {
+                          {new Date(agent.createdAt).toLocaleDateString('en-US', {
                             month: 'short',
                             day: 'numeric',
                             hour: 'numeric',
@@ -210,7 +207,7 @@ export function Agents() {
 
   // Requirements: agents.2.7, agents.2.10, agents.2.11
   // The invariant ensures there's always at least one agent
-  // If selectedTask is null (impossible after loading due to invariant), use first agent
+  // If selectedAgent is null (impossible after loading due to invariant), use first agent
   const currentAgent = selectedAgent || displayAgents[0];
 
   const letter = currentAgent.title.charAt(0).toUpperCase();
@@ -280,61 +277,61 @@ export function Agents() {
             <Plus className="w-4 h-4 text-white" />
           </div>
 
-          {displayTasks.slice(0, visibleChatsCount).map((task) => {
-            const taskLetter = task.title.charAt(0).toUpperCase();
-            const taskStyle = getStatusStyles(task.status);
-            const isSelected = task.agentId === currentAgent.agentId;
+          {displayAgents.slice(0, visibleChatsCount).map((agent) => {
+            const agentLetter = agent.title.charAt(0).toUpperCase();
+            const agentStyle = getStatusStyles(agent.status);
+            const isSelected = agent.agentId === currentAgent.agentId;
 
             return (
               <div
-                key={task.agentId}
-                onClick={() => handleTaskClick(task)}
-                className={`relative w-8 h-8 rounded-full ${taskStyle.bg} flex items-center justify-center cursor-pointer hover:scale-110 transition-transform group ${isSelected ? 'ring-2 ring-primary ring-offset-2' : ''}`}
-                title={task.title}
+                key={agent.agentId}
+                onClick={() => handleAgentClick(agent)}
+                className={`relative w-8 h-8 rounded-full ${agentStyle.bg} flex items-center justify-center cursor-pointer hover:scale-110 transition-transform group ${isSelected ? 'ring-2 ring-primary ring-offset-2' : ''}`}
+                title={agent.title}
               >
-                {isCompleted(task.status) ? (
+                {isCompleted(agent.status) ? (
                   <Check className="w-4 h-4 text-white" />
-                ) : hasError(task.status) ? (
+                ) : hasError(agent.status) ? (
                   <X className="w-4 h-4 text-white" />
-                ) : isAwaitingUser(task.status) ? (
+                ) : isAwaitingUser(agent.status) ? (
                   <>
-                    <span className="text-white text-xs font-semibold">{taskLetter}</span>
+                    <span className="text-white text-xs font-semibold">{agentLetter}</span>
                     <div
-                      className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full ${taskStyle.bg} border-2 border-card flex items-center justify-center`}
+                      className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full ${agentStyle.bg} border-2 border-card flex items-center justify-center`}
                     >
                       <HelpCircle className="w-2 h-2 text-white" />
                     </div>
                   </>
                 ) : (
-                  <span className="text-white text-xs font-semibold">{taskLetter}</span>
+                  <span className="text-white text-xs font-semibold">{agentLetter}</span>
                 )}
 
-                {isInProgress(task.status) && (
+                {isInProgress(agent.status) && (
                   <div className="absolute inset-0 rounded-full border-2 border-white border-t-transparent animate-spin" />
                 )}
 
-                {isAwaitingUser(task.status) && (
+                {isAwaitingUser(agent.status) && (
                   <div
-                    className={`absolute -inset-1 rounded-full ring-2 ${taskStyle.ring} animate-pulse`}
+                    className={`absolute -inset-1 rounded-full ring-2 ${agentStyle.ring} animate-pulse`}
                   />
                 )}
 
                 <div className="absolute top-full right-0 mt-2 w-64 bg-gray-900 text-white text-xs rounded-lg p-3 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 shadow-lg">
-                  <p className="font-semibold mb-1">{task.title}</p>
+                  <p className="font-semibold mb-1">{agent.title}</p>
                   <div className="flex items-center gap-1.5 text-xs text-gray-300">
-                    <span>{getStatusText(task.status)}</span>
+                    <span>{getStatusText(agent.status)}</span>
                   </div>
                 </div>
               </div>
             );
           })}
 
-          {displayTasks.length > visibleChatsCount && (
+          {displayAgents.length > visibleChatsCount && (
             <div
               onClick={() => setShowAllTasksPage(true)}
               className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-semibold text-muted-foreground cursor-pointer hover:bg-primary/10 hover:text-primary transition-colors"
             >
-              +{displayTasks.length - visibleChatsCount}
+              +{displayAgents.length - visibleChatsCount}
             </div>
           )}
         </div>
