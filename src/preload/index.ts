@@ -10,6 +10,17 @@ import { EVENT_TYPES } from '../shared/events/constants';
 // LLM Provider type (duplicated from types/index.ts due to rootDir restriction)
 type LLMProvider = 'openai' | 'anthropic' | 'google';
 
+// Message payload type for agents API (duplicated due to rootDir restriction)
+// Requirements: agents.7.2
+interface MessagePayloadAPI {
+  kind: 'user' | 'llm' | 'tool_call' | 'code_exec' | 'final_answer' | 'request_scope' | 'artifact';
+  timing?: {
+    started_at: string;
+    finished_at: string;
+  };
+  data: Record<string, unknown>;
+}
+
 /**
  * API interface for secure IPC communication
  * Exposed to renderer process via contextBridge
@@ -61,6 +72,30 @@ interface API {
     testConnection: (
       provider: LLMProvider,
       apiKey: string
+    ) => Promise<{ success: boolean; error?: string }>;
+  };
+  // Requirements: agents.2, agents.4, user-data-isolation.6.6
+  agents: {
+    create: (name?: string) => Promise<{ success: boolean; data?: unknown; error?: string }>;
+    list: () => Promise<{ success: boolean; data?: unknown; error?: string }>;
+    get: (agentId: string) => Promise<{ success: boolean; data?: unknown; error?: string }>;
+    update: (
+      agentId: string,
+      data: { name?: string }
+    ) => Promise<{ success: boolean; error?: string }>;
+    archive: (agentId: string) => Promise<{ success: boolean; error?: string }>;
+  };
+  // Requirements: agents.4, agents.7, user-data-isolation.6.6
+  messages: {
+    list: (agentId: string) => Promise<{ success: boolean; data?: unknown; error?: string }>;
+    create: (
+      agentId: string,
+      payload: MessagePayloadAPI
+    ) => Promise<{ success: boolean; data?: unknown; error?: string }>;
+    update: (
+      messageId: number,
+      agentId: string,
+      payload: MessagePayloadAPI
     ) => Promise<{ success: boolean; error?: string }>;
   };
   // Requirements: testing.3.1, testing.3.2 - Test API methods (only available in test environment)
@@ -377,6 +412,115 @@ const api: API = {
       apiKey: string
     ): Promise<{ success: boolean; error?: string }> {
       return await ipcRenderer.invoke('llm:test-connection', { provider, apiKey });
+    },
+  },
+
+  // Requirements: agents.2, agents.4, user-data-isolation.6.6
+  /**
+   * Agents API
+   * Provides methods for managing AI agents (chats)
+   * userId is automatically injected by main process
+   */
+  agents: {
+    /**
+     * Create a new agent
+     * Requirements: agents.2.3, agents.2.4, agents.2.5
+     * @param {string} name - Optional agent name
+     * @returns {Promise<{success: boolean, data?: Agent, error?: string}>}
+     */
+    async create(name?: string): Promise<{ success: boolean; data?: unknown; error?: string }> {
+      return await ipcRenderer.invoke('agents:create', { name });
+    },
+
+    /**
+     * List all non-archived agents for current user
+     * Requirements: agents.1.3, agents.10.2
+     * @returns {Promise<{success: boolean, data?: Agent[], error?: string}>}
+     */
+    async list(): Promise<{ success: boolean; data?: unknown; error?: string }> {
+      return await ipcRenderer.invoke('agents:list');
+    },
+
+    /**
+     * Get a specific agent by ID
+     * Requirements: agents.3.2, agents.10.4
+     * @param {string} agentId - Agent ID
+     * @returns {Promise<{success: boolean, data?: Agent, error?: string}>}
+     */
+    async get(agentId: string): Promise<{ success: boolean; data?: unknown; error?: string }> {
+      return await ipcRenderer.invoke('agents:get', { agentId });
+    },
+
+    /**
+     * Update an agent's name
+     * Requirements: agents.10.4
+     * @param {string} agentId - Agent ID
+     * @param {object} data - Update data
+     * @returns {Promise<{success: boolean, error?: string}>}
+     */
+    async update(
+      agentId: string,
+      data: { name?: string }
+    ): Promise<{ success: boolean; error?: string }> {
+      return await ipcRenderer.invoke('agents:update', { agentId, ...data });
+    },
+
+    /**
+     * Archive an agent (soft delete)
+     * Requirements: agents.10.4
+     * @param {string} agentId - Agent ID
+     * @returns {Promise<{success: boolean, error?: string}>}
+     */
+    async archive(agentId: string): Promise<{ success: boolean; error?: string }> {
+      return await ipcRenderer.invoke('agents:archive', { agentId });
+    },
+  },
+
+  // Requirements: agents.4, agents.7, user-data-isolation.6.6
+  /**
+   * Messages API
+   * Provides methods for managing agent messages
+   * Access control is handled by main process through AgentsRepository
+   */
+  messages: {
+    /**
+     * List all messages for an agent
+     * Requirements: agents.4.8, user-data-isolation.7.6
+     * @param {string} agentId - Agent ID
+     * @returns {Promise<{success: boolean, data?: Message[], error?: string}>}
+     */
+    async list(agentId: string): Promise<{ success: boolean; data?: unknown; error?: string }> {
+      return await ipcRenderer.invoke('messages:list', { agentId });
+    },
+
+    /**
+     * Create a new message for an agent
+     * Requirements: agents.4.3, agents.7.1, agents.1.4
+     * @param {string} agentId - Agent ID
+     * @param {MessagePayloadAPI} payload - Message payload
+     * @returns {Promise<{success: boolean, data?: Message, error?: string}>}
+     */
+    async create(
+      agentId: string,
+      payload: MessagePayloadAPI
+    ): Promise<{ success: boolean; data?: unknown; error?: string }> {
+      return await ipcRenderer.invoke('messages:create', { agentId, payload });
+    },
+
+    /**
+     * Update a message's payload
+     * Requirements: agents.7.1
+     * @param {number} messageId - Message ID
+     * @param {string} agentId - Agent ID (for access control)
+     * @param {MessagePayloadAPI} payload - New message payload
+     * @returns {Promise<{success: boolean, error?: string}>}
+     */
+    async update(
+      messageId: number,
+      agentId: string,
+      payload: MessagePayloadAPI
+    ): Promise<{ success: boolean; error?: string }> {
+      return await ipcRenderer.invoke('messages:update', { messageId, agentId, payload });
     },
   },
 };

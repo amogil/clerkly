@@ -3,3 +3,4 @@
 
 export { AgentManager } from './AgentManager';
 export { MessageManager, type MessagePayload } from './MessageManager';
+export { AgentIPCHandlers } from './AgentIPCHandlers';
