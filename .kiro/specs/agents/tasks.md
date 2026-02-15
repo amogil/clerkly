@@ -339,7 +339,7 @@
 |---|--------|--------|--------|------------|
 | 6.1 | AutoExpandingTextarea | ✅ ВЫПОЛНЕНО | 0.25 дня | agents.4.5-4.7 |
 | 6.2 | MarkdownMessage | ✅ ВЫПОЛНЕНО | 0.25 дня | agents.7.7 |
-| 6.3 | EmptyStatePlaceholder | ❌ | 0.25 дня | agents.4 |
+| 6.3 | EmptyStatePlaceholder | ✅ ВЫПОЛНЕНО | 0.25 дня | agents.4 |
 | 6.4 | AllAgents | ❌ | 0.25 дня | agents.5 |
 
 #### 6.1 AutoExpandingTextarea
@@ -353,7 +353,9 @@
 - **Тесты:** `tests/unit/components/agents/MarkdownMessage.test.tsx` (12 тестов) ✅
 
 #### 6.3 EmptyStatePlaceholder
-- **Файл:** `src/renderer/components/agents/EmptyStatePlaceholder.tsx`
+- **Файл:** `src/renderer/components/agents/EmptyStatePlaceholder.tsx` ✅
+- **Интеграция:** `src/renderer/components/agents.tsx` (показывается когда messages.length === 0) ✅
+- **Тесты:** `tests/unit/components/agents/EmptyStatePlaceholder.test.tsx` (10 тестов) ✅
 
 #### 6.4 AllAgents
 - **Файл:** `src/renderer/components/agents/AllAgents.tsx`

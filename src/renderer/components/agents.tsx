@@ -13,6 +13,7 @@ import {
   getStatusStyles,
 } from '../../shared/utils/agentStatus';
 import { AutoExpandingTextarea } from './agents/AutoExpandingTextarea';
+import { EmptyStatePlaceholder } from './agents/EmptyStatePlaceholder';
 import type { Agent } from '../types/agent';
 import type { AgentStatus } from '../../shared/utils/agentStatus';
 
@@ -341,40 +342,44 @@ export function Agents() {
 
       {/* Messages Area */}
       <div ref={messagesAreaRef} className="flex-1 overflow-y-auto p-6 space-y-4">
-        {messages.map((message, index) => {
-          const showAvatar =
-            message.payload.kind !== 'user' &&
-            (index === 0 || messages[index - 1].payload.kind === 'user');
+        {messages.length === 0 ? (
+          <EmptyStatePlaceholder />
+        ) : (
+          messages.map((message, index) => {
+            const showAvatar =
+              message.payload.kind !== 'user' &&
+              (index === 0 || messages[index - 1].payload.kind === 'user');
 
-          return (
-            <div key={message.id}>
-              {message.payload.kind === 'user' ? (
-                <div className="flex justify-end">
-                  <div className="rounded-lg border-2 border-primary bg-primary/5 px-4 py-3">
-                    <p className="text-sm leading-relaxed text-foreground text-right">
-                      {message.payload.data.text || ''}
-                    </p>
-                  </div>
-                </div>
-              ) : (
-                <>
-                  {showAvatar && (
-                    <div className="mb-2">
-                      <Logo
-                        size="sm"
-                        showText={false}
-                        animated={isInProgress(currentAgent.status)}
-                      />
+            return (
+              <div key={message.id}>
+                {message.payload.kind === 'user' ? (
+                  <div className="flex justify-end">
+                    <div className="rounded-lg border-2 border-primary bg-primary/5 px-4 py-3">
+                      <p className="text-sm leading-relaxed text-foreground text-right">
+                        {message.payload.data.text || ''}
+                      </p>
                     </div>
-                  )}
-                  <div className="max-w-[85%] text-sm leading-relaxed text-foreground">
-                    {message.payload.data.text || ''}
                   </div>
-                </>
-              )}
-            </div>
-          );
-        })}
+                ) : (
+                  <>
+                    {showAvatar && (
+                      <div className="mb-2">
+                        <Logo
+                          size="sm"
+                          showText={false}
+                          animated={isInProgress(currentAgent.status)}
+                        />
+                      </div>
+                    )}
+                    <div className="max-w-[85%] text-sm leading-relaxed text-foreground">
+                      {message.payload.data.text || ''}
+                    </div>
+                  </>
+                )}
+              </div>
+            );
+          })
+        )}
         <div ref={messagesEndRef} />
       </div>
 
