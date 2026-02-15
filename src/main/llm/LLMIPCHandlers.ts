@@ -33,7 +33,12 @@ export function registerLLMIPCHandlers(): void {
           logger.warn(`Connection test failed for ${provider}: ${result.error}`);
         }
 
-        return result;
+        // Wrap result in data field for callApi compatibility
+        return {
+          success: result.success,
+          data: result.success ? { success: true } : undefined,
+          error: result.error,
+        };
       } catch (error) {
         logger.error(`Test connection failed: ${error}`);
         return {

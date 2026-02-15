@@ -63,7 +63,7 @@ describe('LLMIPCHandlers', () => {
       apiKey: 'sk-test1234567890',
     });
 
-    expect(result).toEqual({ success: true });
+    expect(result).toEqual({ success: true, data: { success: true }, error: undefined });
     expect(LLMProviderFactory.createProvider).toHaveBeenCalledWith('openai');
     expect(mockProvider.testConnection).toHaveBeenCalledWith('sk-test1234567890');
 

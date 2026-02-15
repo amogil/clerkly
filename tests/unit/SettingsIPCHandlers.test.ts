@@ -261,7 +261,7 @@ describe('SettingsIPCHandlers', () => {
       expect(mockAIAgentSettingsManager.loadLLMProvider).toHaveBeenCalled();
       expect(result).toEqual({
         success: true,
-        provider: 'openai',
+        data: { provider: 'openai' },
       });
     });
 
@@ -276,7 +276,7 @@ describe('SettingsIPCHandlers', () => {
       const result = await handler!({} as any);
 
       expect((result as IPCResult).success).toBe(true);
-      expect((result as IPCResult).provider).toBe('anthropic');
+      expect((result as IPCResult).data).toEqual({ provider: 'anthropic' });
     });
 
     /* Preconditions: Handler is registered, AIAgentSettingsManager.loadLLMProvider returns 'google'
@@ -290,7 +290,7 @@ describe('SettingsIPCHandlers', () => {
       const result = await handler!({} as any);
 
       expect((result as IPCResult).success).toBe(true);
-      expect((result as IPCResult).provider).toBe('google');
+      expect((result as IPCResult).data).toEqual({ provider: 'google' });
     });
 
     /* Preconditions: Handler is registered, AIAgentSettingsManager.loadLLMProvider throws error
@@ -305,7 +305,7 @@ describe('SettingsIPCHandlers', () => {
 
       expect(result).toEqual({
         success: true,
-        provider: 'openai',
+        data: { provider: 'openai' },
       });
     });
   });
@@ -440,7 +440,7 @@ describe('SettingsIPCHandlers', () => {
       expect(mockAIAgentSettingsManager.loadAPIKey).toHaveBeenCalledWith('openai');
       expect(result).toEqual({
         success: true,
-        apiKey: 'decrypted-api-key',
+        data: { apiKey: 'decrypted-api-key' },
       });
     });
 
@@ -457,7 +457,7 @@ describe('SettingsIPCHandlers', () => {
       expect(mockAIAgentSettingsManager.loadAPIKey).toHaveBeenCalledWith('anthropic');
       expect(result).toEqual({
         success: true,
-        apiKey: null,
+        data: { apiKey: null },
       });
     });
 
@@ -473,7 +473,7 @@ describe('SettingsIPCHandlers', () => {
 
       expect(mockAIAgentSettingsManager.loadAPIKey).toHaveBeenCalledWith('google');
       expect((result as IPCResult).success).toBe(true);
-      expect((result as IPCResult).apiKey).toBe('google-api-key');
+      expect((result as IPCResult).data).toEqual({ apiKey: 'google-api-key' });
     });
 
     /* Preconditions: Handler is registered, AIAgentSettingsManager.loadAPIKey throws error

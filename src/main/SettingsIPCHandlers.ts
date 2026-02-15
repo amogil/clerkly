@@ -117,7 +117,7 @@ export class SettingsIPCHandlers {
 
       return {
         success: true,
-        provider,
+        data: { provider },
       };
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -126,7 +126,7 @@ export class SettingsIPCHandlers {
       // Requirements: settings.1.21 - Return default provider on error
       return {
         success: true,
-        provider: 'openai',
+        data: { provider: 'openai' as const },
       };
     }
   }
@@ -184,7 +184,7 @@ export class SettingsIPCHandlers {
 
       return {
         success: true,
-        apiKey,
+        data: { apiKey },
       };
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
