@@ -232,9 +232,7 @@ export function Agents() {
                     <p className="text-sm text-muted-foreground mb-2">{agent.description}</p>
 
                     <div className="flex items-center gap-3 text-xs">
-                      <div className={`${style.text}`}>
-                        <span>{getStatusText(agent.status)}</span>
-                      </div>
+                      <span className={style.text}>{getStatusText(agent.status)}</span>
                       <div className="text-muted-foreground">
                         <span>·</span>
                         <span className="ml-1.5">
@@ -312,7 +310,7 @@ export function Agents() {
           <div className="flex-1 min-w-0">
             <h3 className="font-semibold text-foreground truncate">{currentAgent.title}</h3>
             <div className="flex items-center gap-2 text-xs">
-              <span className={`${style.text}`}>{getStatusText(currentAgent.status)}</span>
+              <span className={style.text}>{getStatusText(currentAgent.status)}</span>
               <span className="text-muted-foreground">·</span>
               <span className="text-muted-foreground truncate">
                 {new Date(currentAgent.createdAt).toLocaleDateString('en-US', {
