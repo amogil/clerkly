@@ -98,8 +98,8 @@ test.describe('Agents - Date Update on New Message', () => {
      Requirements: agents.1.4, agents.8.1 (updatedAt updates on new message and displays in header) */
   test('should update agent timestamp when new message is sent', async () => {
     // Wait for agents page to load
-    await window.waitForSelector('[data-testid="agents"]', { timeout: 10000 });
-    await window.waitForTimeout(2000);
+    const agentsPage = window.locator('[data-testid="agents"]');
+    await expect(agentsPage).toBeVisible({ timeout: 10000 });
 
     // Create agent with message from 5 minutes ago using test API
     const result = await window.evaluate(async () => {
@@ -110,35 +110,25 @@ test.describe('Agents - Date Update on New Message', () => {
     console.log('[TEST] Create agent result:', result);
     expect(result.success).toBe(true);
     expect(result.agentId).toBeTruthy();
+    const testAgentId = result.agentId;
 
     // Reload page to see the agent in UI
     await window.reload();
-    await window.waitForSelector('[data-testid="agents"]', { timeout: 10000 });
-    await window.waitForTimeout(2000);
+    await expect(agentsPage).toBeVisible({ timeout: 10000 });
 
-    // Click on the second circle (our agent with old timestamp)
-    const chatCircles = window.locator(
-      '[data-testid="agents"] .w-8.h-8.rounded-full.cursor-pointer'
-    );
-    const circleCount = await chatCircles.count();
-    console.log('[TEST] Number of chat circles:', circleCount);
+    // Find and click on our test agent by data-testid
+    const testAgentIcon = window.locator(`[data-testid="agent-icon-${testAgentId}"]`);
+    await expect(testAgentIcon).toBeVisible({ timeout: 5000 });
+    await testAgentIcon.click();
 
-    if (circleCount >= 2) {
-      await chatCircles.nth(1).click();
-      await window.waitForTimeout(1000);
-    }
-
-    // Step 8: Get initial timestamp from UI (header)
-    // The timestamp is displayed in the left part of header after the status text
-    const headerTimestamp = window.locator(
-      '[data-testid="agents"] .h-16.border-b .flex-1.min-w-0 .text-muted-foreground.truncate'
-    );
+    // Get initial timestamp from UI (header)
+    const headerTimestamp = window.locator('[data-testid="agent-header-timestamp"]');
     await expect(headerTimestamp).toBeVisible({ timeout: 5000 });
     const timestampBefore = await headerTimestamp.textContent();
     console.log('[TEST] Initial timestamp from UI:', timestampBefore);
     expect(timestampBefore).toBeTruthy();
 
-    // Step 9: Send a new message through UI (textarea)
+    // Send a new message through UI (textarea)
     const textarea = window.locator('textarea[placeholder*="Ask"]');
     await expect(textarea).toBeVisible({ timeout: 5000 });
     await textarea.fill('New message to update timestamp');
@@ -148,13 +138,12 @@ test.describe('Agents - Date Update on New Message', () => {
     const messageText = window.locator('text=New message to update timestamp');
     await expect(messageText).toBeVisible({ timeout: 5000 });
 
-    // Step 11: Wait for timestamp to update in UI (with 3 second timeout)
+    // Wait for timestamp to update in UI (with 3 second timeout)
     // The timestamp should change after AGENT_UPDATED event is processed
+    // Requirements: agents.1.4, agents.12.2
     await window.waitForFunction(
       (initialTimestamp) => {
-        const timestampElement = document.querySelector(
-          '[data-testid="agents"] .h-16.border-b .flex-1.min-w-0 .text-muted-foreground.truncate'
-        );
+        const timestampElement = document.querySelector('[data-testid="agent-header-timestamp"]');
         return timestampElement && timestampElement.textContent !== initialTimestamp;
       },
       timestampBefore,
@@ -165,7 +154,7 @@ test.describe('Agents - Date Update on New Message', () => {
     console.log('[TEST] Updated timestamp from UI:', timestampAfter);
     expect(timestampAfter).toBeTruthy();
 
-    // Step 12: Verify timestamps are different
+    // Verify timestamps are different
     expect(timestampAfter).not.toBe(timestampBefore);
     console.log(
       '[TEST] Timestamp updated successfully in UI from',

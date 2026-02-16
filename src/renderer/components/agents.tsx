@@ -314,7 +314,7 @@ export function Agents() {
             <div className="flex items-center gap-2 text-xs">
               <span className={style.text}>{getStatusText(currentAgent.status)}</span>
               <span className="text-muted-foreground">·</span>
-              <span className="text-muted-foreground truncate">
+              <span className="text-muted-foreground truncate" data-testid="agent-header-timestamp">
                 {DateTimeFormatter.formatDateTime(new Date(currentAgent.updatedAt))}
               </span>
             </div>
