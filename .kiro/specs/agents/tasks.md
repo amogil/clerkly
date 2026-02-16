@@ -61,6 +61,13 @@
   - ✅ Property-based тесты (3 теста, 50+30+20 итераций)
   - ✅ Функциональные тесты (3 теста в agents-always-one.spec.ts)
   - ✅ Исправлен путь к preload script (dist/preload/preload/index.js)
+- ✅ Форматирование даты агента (agents.8.1, settings.2.1):
+  - ✅ Использование DateTimeFormatter.formatDateTime() с toLocaleDateString() для соответствия системным настройкам ОС
+  - ✅ Отображение updatedAt вместо createdAt в заголовке и списке агентов
+  - ✅ Обновлены требования agents.8.1, agents.5.3, settings.2.1
+  - ✅ Обновлен дизайн agents (design.md)
+  - ✅ Модульные тесты (4 теста в agents-date-simple.test.tsx)
+  - ✅ Обновлены тесты DateTimeFormatter для нового подхода
 
 ### В процессе
 - Нет активных задач

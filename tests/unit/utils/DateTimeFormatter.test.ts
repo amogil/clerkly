@@ -5,7 +5,7 @@ import { DateTimeFormatter } from '../../../src/utils/DateTimeFormatter';
 describe('DateTimeFormatter', () => {
   /* Preconditions: valid timestamp provided
      Action: call formatDate(timestamp)
-     Assertions: uses Intl.DateTimeFormat with undefined locale (system locale), returns formatted date
+     Assertions: uses OS system settings for date formatting, returns formatted date
      Requirements: settings.2.1 */
   it('should use system locale for date formatting', () => {
     const timestamp = new Date('2026-02-07T10:30:00Z').getTime();
@@ -31,7 +31,7 @@ describe('DateTimeFormatter', () => {
 
   /* Preconditions: valid timestamp provided
      Action: call formatDateTime(timestamp)
-     Assertions: uses Intl.DateTimeFormat with undefined locale and date+time options, returns formatted date and time
+     Assertions: uses OS system settings for date/time formatting, returns formatted date and time
      Requirements: settings.2.1 */
   it('should use system locale for date/time formatting', () => {
     const timestamp = new Date('2026-02-07T10:30:00Z').getTime();
@@ -78,53 +78,48 @@ describe('DateTimeFormatter', () => {
     expect(result).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}$/);
   });
 
-  /* Preconditions: Intl.DateTimeFormat throws error
+  /* Preconditions: Date.prototype.toLocaleDateString throws error
      Action: call formatDate(timestamp)
-     Assertions: falls back to toLocaleDateString(), no exception thrown, error logged
+     Assertions: falls back to ISO date, no exception thrown, error logged
      Requirements: settings.2.1 */
   it('should handle locale errors gracefully in formatDate', () => {
     const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
-    const originalIntl = global.Intl;
+    const originalToLocaleDateString = Date.prototype.toLocaleDateString;
 
-    // Mock Intl.DateTimeFormat to throw error
-    global.Intl = {
-      ...originalIntl,
-      DateTimeFormat: jest.fn(() => {
-        throw new Error('Locale error');
-      }),
-    } as unknown as typeof Intl;
+    // Mock toLocaleDateString to throw error
+    Date.prototype.toLocaleDateString = jest.fn(() => {
+      throw new Error('Locale error');
+    });
 
     const timestamp = new Date('2026-02-07T10:30:00Z').getTime();
     const result = DateTimeFormatter.formatDate(timestamp);
 
-    // Should fallback to toLocaleDateString
+    // Should fallback to ISO date format
     expect(result).toBeTruthy();
     expect(typeof result).toBe('string');
+    expect(result).toBe('2026-02-07'); // ISO date format
     expect(consoleErrorSpy).toHaveBeenCalledWith(
       '[DateTimeFormatter] Error formatting date:',
       'Locale error'
     );
 
     // Restore
-    global.Intl = originalIntl;
+    Date.prototype.toLocaleDateString = originalToLocaleDateString;
     consoleErrorSpy.mockRestore();
   });
 
-  /* Preconditions: Intl.DateTimeFormat throws error
+  /* Preconditions: Date.prototype.toLocaleDateString throws error
      Action: call formatDateTime(timestamp)
      Assertions: falls back to toLocaleString(), no exception thrown, error logged
      Requirements: settings.2.1 */
   it('should handle locale errors gracefully in formatDateTime', () => {
     const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
-    const originalIntl = global.Intl;
+    const originalToLocaleDateString = Date.prototype.toLocaleDateString;
 
-    // Mock Intl.DateTimeFormat to throw error
-    global.Intl = {
-      ...originalIntl,
-      DateTimeFormat: jest.fn(() => {
-        throw new Error('Locale error');
-      }),
-    } as unknown as typeof Intl;
+    // Mock toLocaleDateString to throw error
+    Date.prototype.toLocaleDateString = jest.fn(() => {
+      throw new Error('Locale error');
+    });
 
     const timestamp = new Date('2026-02-07T10:30:00Z').getTime();
     const result = DateTimeFormatter.formatDateTime(timestamp);
@@ -138,7 +133,7 @@ describe('DateTimeFormatter', () => {
     );
 
     // Restore
-    global.Intl = originalIntl;
+    Date.prototype.toLocaleDateString = originalToLocaleDateString;
     consoleErrorSpy.mockRestore();
   });
 

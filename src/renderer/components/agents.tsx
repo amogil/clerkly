@@ -15,6 +15,7 @@ import {
 } from '../../shared/utils/agentStatus';
 import { AutoExpandingTextarea } from './agents/AutoExpandingTextarea';
 import { EmptyStatePlaceholder } from './agents/EmptyStatePlaceholder';
+import { DateTimeFormatter } from '../../utils/DateTimeFormatter';
 import type { Agent } from '../types/agent';
 import type { AgentStatus } from '../../shared/utils/agentStatus';
 
@@ -236,12 +237,7 @@ export function Agents() {
                       <div className="text-muted-foreground">
                         <span>·</span>
                         <span className="ml-1.5">
-                          {new Date(agent.createdAt).toLocaleDateString('en-US', {
-                            month: 'short',
-                            day: 'numeric',
-                            hour: 'numeric',
-                            minute: '2-digit',
-                          })}
+                          {DateTimeFormatter.formatDateTime(new Date(agent.updatedAt))}
                         </span>
                       </div>
                     </div>
@@ -313,12 +309,7 @@ export function Agents() {
               <span className={style.text}>{getStatusText(currentAgent.status)}</span>
               <span className="text-muted-foreground">·</span>
               <span className="text-muted-foreground truncate">
-                {new Date(currentAgent.createdAt).toLocaleDateString('en-US', {
-                  month: 'short',
-                  day: 'numeric',
-                  hour: 'numeric',
-                  minute: '2-digit',
-                })}
+                {DateTimeFormatter.formatDateTime(new Date(currentAgent.updatedAt))}
               </span>
             </div>
           </div>

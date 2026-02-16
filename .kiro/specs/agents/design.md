@@ -918,9 +918,9 @@ function ActiveAgentInfo({ agent, status }: ActiveAgentInfoProps) {
         <h3 className="font-semibold text-sm truncate">{agent.name}</h3>
         {/* Status text */}
         <p className={cn('text-xs', style.textColor)}>{style.label}</p>
-        {/* Created time */}
+        {/* Updated time - Requirements: agents.8.1, settings.2.1 */}
         <p className="text-xs text-muted-foreground">
-          {new Date(agent.createdAt).toLocaleDateString()}
+          {DateTimeFormatter.formatDateTime(agent.updatedAt)}
         </p>
       </div>
     </div>
