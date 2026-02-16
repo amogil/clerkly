@@ -424,7 +424,7 @@ export function Agents() {
                   {message.payload.kind === 'user' ? (
                     <div className="flex justify-end">
                       <div className="rounded-2xl bg-secondary/70 border border-border px-4 py-3 max-w-[75%]">
-                        <p className="text-sm leading-relaxed text-foreground">
+                        <p className="text-sm leading-relaxed text-foreground whitespace-pre-wrap break-words">
                           {message.payload.data.text || ''}
                         </p>
                       </div>
@@ -440,7 +440,7 @@ export function Agents() {
                           />
                         </div>
                       )}
-                      <div className="max-w-[85%] text-sm leading-relaxed text-foreground">
+                      <div className="max-w-[85%] text-sm leading-relaxed text-foreground whitespace-pre-wrap break-words">
                         {message.payload.data.text || ''}
                       </div>
                     </>

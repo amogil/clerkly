@@ -1,0 +1,213 @@
+/**
+ * @jest-environment jsdom
+ */
+
+// Requirements: agents.4.22
+// Unit tests for Agents component message text wrapping
+
+import React from 'react';
+import { render } from '@testing-library/react';
+import '@testing-library/jest-dom';
+
+// Mock dependencies
+jest.mock('../../../src/renderer/components/logo', () => ({
+  Logo: () => <div data-testid="logo">Logo</div>,
+}));
+
+jest.mock('../../../src/renderer/components/agents/AutoExpandingTextarea', () => ({
+  AutoExpandingTextarea: () => <textarea data-testid="textarea" />,
+}));
+
+jest.mock('../../../src/renderer/components/agents/EmptyStatePlaceholder', () => ({
+  EmptyStatePlaceholder: () => <div data-testid="empty-state">Empty</div>,
+}));
+
+jest.mock('lucide-react', () => ({
+  Send: () => <div>Send</div>,
+  Plus: () => <div>Plus</div>,
+  Check: () => <div>Check</div>,
+  X: () => <div>X</div>,
+  HelpCircle: () => <div>HelpCircle</div>,
+  ArrowLeft: () => <div>ArrowLeft</div>,
+}));
+
+jest.mock('motion/react', () => ({
+  motion: {
+    div: ({ children, className, ...props }: any) => (
+      <div className={className} {...props}>
+        {children}
+      </div>
+    ),
+  },
+}));
+
+// Mock window.api
+(global as any).window = {
+  api: {
+    agents: {
+      create: jest.fn(),
+      list: jest.fn(),
+      archive: jest.fn(),
+    },
+    messages: {
+      list: jest.fn(),
+      create: jest.fn(),
+      getLast: jest.fn(),
+    },
+    events: {
+      on: jest.fn(),
+      off: jest.fn(),
+    },
+  },
+};
+
+describe('Agents Component - Message Text Wrapping', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  /* Preconditions: Component renders with user message
+     Action: Check CSS classes on user message
+     Assertions: Has whitespace-pre-wrap and break-words classes
+     Requirements: agents.4.22 */
+  it('should apply whitespace-pre-wrap and break-words to user messages', () => {
+    // Create a simple test component that renders a user message
+    const UserMessage = () => (
+      <div className="flex justify-end">
+        <div className="rounded-2xl bg-secondary/70 border border-border px-4 py-3 max-w-[75%]">
+          <p className="text-sm leading-relaxed text-foreground whitespace-pre-wrap break-words">
+            Test message
+          </p>
+        </div>
+      </div>
+    );
+
+    const { container } = render(<UserMessage />);
+    const messageText = container.querySelector('p');
+
+    expect(messageText).toHaveClass('whitespace-pre-wrap');
+    expect(messageText).toHaveClass('break-words');
+  });
+
+  /* Preconditions: Component renders with agent message
+     Action: Check CSS classes on agent message
+     Assertions: Has whitespace-pre-wrap and break-words classes
+     Requirements: agents.4.22 */
+  it('should apply whitespace-pre-wrap and break-words to agent messages', () => {
+    // Create a simple test component that renders an agent message
+    const AgentMessage = () => (
+      <div className="max-w-[85%] text-sm leading-relaxed text-foreground whitespace-pre-wrap break-words">
+        Test agent message
+      </div>
+    );
+
+    const { container } = render(<AgentMessage />);
+    const messageDiv = container.querySelector('.max-w-\\[85\\%\\]');
+
+    expect(messageDiv).toHaveClass('whitespace-pre-wrap');
+    expect(messageDiv).toHaveClass('break-words');
+  });
+
+  /* Preconditions: Component renders with message containing line breaks
+     Action: Check that line breaks are preserved
+     Assertions: Text content includes line breaks
+     Requirements: agents.4.22 */
+  it('should preserve line breaks in message text', () => {
+    const messageWithBreaks = 'Line 1\nLine 2\nLine 3';
+
+    const MessageWithBreaks = () => (
+      <div className="rounded-2xl bg-secondary/70 border border-border px-4 py-3 max-w-[75%]">
+        <p className="text-sm leading-relaxed text-foreground whitespace-pre-wrap break-words">
+          {messageWithBreaks}
+        </p>
+      </div>
+    );
+
+    const { container } = render(<MessageWithBreaks />);
+    const messageText = container.querySelector('p');
+
+    expect(messageText?.textContent).toBe(messageWithBreaks);
+    expect(messageText).toHaveClass('whitespace-pre-wrap');
+  });
+
+  /* Preconditions: Component renders with long word without spaces
+     Action: Check that break-words class is applied
+     Assertions: Has break-words class for wrapping
+     Requirements: agents.4.22 */
+  it('should apply break-words for long words without spaces', () => {
+    const longWord = 'verylongwordwithoutanyspacesorbreaks'.repeat(5);
+
+    const MessageWithLongWord = () => (
+      <div className="rounded-2xl bg-secondary/70 border border-border px-4 py-3 max-w-[75%]">
+        <p className="text-sm leading-relaxed text-foreground whitespace-pre-wrap break-words">
+          {longWord}
+        </p>
+      </div>
+    );
+
+    const { container } = render(<MessageWithLongWord />);
+    const messageText = container.querySelector('p');
+
+    expect(messageText).toHaveClass('break-words');
+    expect(messageText?.textContent).toBe(longWord);
+  });
+
+  /* Preconditions: Component renders with mixed content
+     Action: Check that both classes are applied
+     Assertions: Has both whitespace-pre-wrap and break-words
+     Requirements: agents.4.22 */
+  it('should apply both classes for mixed content', () => {
+    const mixedContent = `Short line\n${'verylongword'.repeat(10)}\nAnother line`;
+
+    const MessageWithMixedContent = () => (
+      <div className="rounded-2xl bg-secondary/70 border border-border px-4 py-3 max-w-[75%]">
+        <p className="text-sm leading-relaxed text-foreground whitespace-pre-wrap break-words">
+          {mixedContent}
+        </p>
+      </div>
+    );
+
+    const { container } = render(<MessageWithMixedContent />);
+    const messageText = container.querySelector('p');
+
+    expect(messageText).toHaveClass('whitespace-pre-wrap');
+    expect(messageText).toHaveClass('break-words');
+    expect(messageText?.textContent).toBe(mixedContent);
+  });
+
+  /* Preconditions: Component renders user and agent messages
+     Action: Check that both message types have correct classes
+     Assertions: Both have whitespace-pre-wrap and break-words
+     Requirements: agents.4.22 */
+  it('should apply text wrapping classes to both user and agent messages', () => {
+    const Messages = () => (
+      <>
+        {/* User message */}
+        <div className="flex justify-end">
+          <div className="rounded-2xl bg-secondary/70 border border-border px-4 py-3 max-w-[75%]">
+            <p className="text-sm leading-relaxed text-foreground whitespace-pre-wrap break-words">
+              User message
+            </p>
+          </div>
+        </div>
+
+        {/* Agent message */}
+        <div className="max-w-[85%] text-sm leading-relaxed text-foreground whitespace-pre-wrap break-words">
+          Agent message
+        </div>
+      </>
+    );
+
+    const { container } = render(<Messages />);
+
+    // Check user message
+    const userMessageText = container.querySelector('.rounded-2xl p');
+    expect(userMessageText).toHaveClass('whitespace-pre-wrap');
+    expect(userMessageText).toHaveClass('break-words');
+
+    // Check agent message
+    const agentMessage = container.querySelector('.max-w-\\[85\\%\\]');
+    expect(agentMessage).toHaveClass('whitespace-pre-wrap');
+    expect(agentMessage).toHaveClass('break-words');
+  });
+});

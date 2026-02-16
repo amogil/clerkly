@@ -192,6 +192,12 @@
    - Easing: cubic-bezier(0.4, 0, 0.2, 1)
    - Каждое новое сообщение анимируется независимо
 
+4.22. Сообщения ДОЛЖНЫ корректно переноситься по ширине:
+   - Длинные слова и текст без пробелов ДОЛЖНЫ переноситься (word-break: break-word)
+   - Ширина сообщения НЕ ДОЛЖНА превышать ширину области чата
+   - Горизонтальная полоса прокрутки НЕ ДОЛЖНА появляться из-за длинных сообщений
+   - Переносы строк в тексте сообщения ДОЛЖНЫ сохраняться (white-space: pre-wrap)
+
 #### Функциональные Тесты
 
 - `tests/functional/agents.spec.ts` - "should send message on Enter key"
@@ -202,6 +208,11 @@
 - `tests/functional/empty-state-placeholder.spec.ts` - "should show 4 prompt suggestions"
 - `tests/functional/empty-state-placeholder.spec.ts` - "should send message on prompt click"
 - `tests/functional/empty-state-placeholder.spec.ts` - "should center EmptyStatePlaceholder in messages area"
+- `tests/functional/message-text-wrapping.spec.ts` - "should wrap long words without spaces in user messages"
+- `tests/functional/message-text-wrapping.spec.ts` - "should preserve line breaks in user messages"
+- `tests/functional/message-text-wrapping.spec.ts` - "should have correct CSS classes for agent messages"
+- `tests/functional/message-text-wrapping.spec.ts` - "should not exceed chat area width with long content"
+- `tests/functional/message-text-wrapping.spec.ts` - "should handle mixed content with long words and line breaks"
 
 ### 5. Просмотр всех агентов
 

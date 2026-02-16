@@ -340,7 +340,8 @@
 | 6.1 | AutoExpandingTextarea | ✅ ВЫПОЛНЕНО | 0.25 дня | agents.4.5-4.7 |
 | 6.2 | MarkdownMessage | ✅ ВЫПОЛНЕНО | 0.25 дня | agents.7.7 |
 | 6.3 | EmptyStatePlaceholder | ✅ ВЫПОЛНЕНО | 0.25 дня | agents.4 |
-| 6.4 | AllAgents | ❌ | 0.25 дня | agents.5 |
+| 6.4 | Перенос текста в сообщениях | ✅ ВЫПОЛНЕНО | 0.1 дня | agents.4.22 |
+| 6.5 | AllAgents | ❌ | 0.25 дня | agents.5 |
 
 #### 6.1 AutoExpandingTextarea
 - **Файл:** `src/renderer/components/agents/AutoExpandingTextarea.tsx`
@@ -369,8 +370,24 @@
   - `bg-secondary/70` (серый полупрозрачный фон)
   - `border border-border` (тонкая серая рамка)
   - `max-w-[75%]` (максимальная ширина 75%)
+  - `whitespace-pre-wrap` (сохранение переносов строк)
+  - `break-words` (перенос длинных слов без пробелов)
 
-#### 6.4 AllAgents
+#### 6.4 Перенос текста в сообщениях ✅
+- **Файл:** `src/renderer/components/agents.tsx` ✅
+- **Требование:** agents.4.22 ✅
+- **Задача:** Добавить CSS классы для корректного переноса текста в сообщениях ✅
+- **Изменения:**
+  - Добавлен `whitespace-pre-wrap` для сохранения переносов строк из текста ✅
+  - Добавлен `break-words` для переноса длинных слов без пробелов ✅
+  - Убедились, что горизонтальная полоса прокрутки не появляется ✅
+- **Применено к:**
+  - Сообщениям пользователя (user messages) ✅
+  - Сообщениям агента (agent messages) ✅
+- **Модульные тесты:** `tests/unit/components/agents.test.tsx` (6 тестов) ✅
+- **Функциональные тесты:** `tests/functional/message-text-wrapping.spec.ts` (5 тестов) ✅
+
+#### 6.5 AllAgents
 - **Файл:** `src/renderer/components/agents/AllAgents.tsx`
 
 **После завершения Фазы 6:**

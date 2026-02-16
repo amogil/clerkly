@@ -1191,10 +1191,10 @@ function EmptyStatePlaceholder({ onPromptClick }: EmptyStatePlaceholderProps) {
 
 **Сообщения пользователя:**
 ```tsx
-// Requirements: agents.4.9
+// Requirements: agents.4.9, agents.4.22
 <div className="flex justify-end">
   <div className="rounded-2xl bg-secondary/70 border border-border px-4 py-3 max-w-[75%]">
-    <p className="text-sm leading-relaxed text-foreground">
+    <p className="text-sm leading-relaxed text-foreground whitespace-pre-wrap break-words">
       {message.content}
     </p>
   </div>
@@ -1206,19 +1206,21 @@ function EmptyStatePlaceholder({ onPromptClick }: EmptyStatePlaceholderProps) {
 - `bg-secondary/70` - серый полупрозрачный фон (70% opacity)
 - `border border-border` - тонкая серая рамка (1px)
 - `max-w-[75%]` - максимальная ширина 75% для длинных сообщений
+- `whitespace-pre-wrap` - сохранение переносов строк из текста
+- `break-words` - перенос длинных слов без пробелов
 - Выравнивание справа через `justify-end`
 - Текст выравнен слева внутри баллона (без `text-right`)
 
 **Сообщения агента:**
 ```tsx
-// Requirements: agents.4.10
+// Requirements: agents.4.10, agents.4.22
 <>
   {showAvatar && (
     <div className="mb-2">
       <Logo size="sm" showText={false} animated={isInProgress} />
     </div>
   )}
-  <div className="max-w-[85%] text-sm leading-relaxed text-foreground">
+  <div className="max-w-[85%] text-sm leading-relaxed text-foreground whitespace-pre-wrap break-words">
     {message.content}
   </div>
 </>
@@ -1228,6 +1230,8 @@ function EmptyStatePlaceholder({ onPromptClick }: EmptyStatePlaceholderProps) {
 - Без фона и рамки - чистый текст
 - Аватар показывается только для первого сообщения в последовательности
 - `max-w-[85%]` - немного шире чем сообщения пользователя
+- `whitespace-pre-wrap` - сохранение переносов строк из текста
+- `break-words` - перенос длинных слов без пробелов
 - Анимированный логотип при статусе `in-progress`
 
 ## Markdown рендеринг
@@ -1314,6 +1318,7 @@ const STATUS_STYLES: Record<AgentStatus, StatusStyle> = {
 | `tests/unit/agents/computeAgentStatus.test.ts` | agents.9 |
 | `tests/unit/agents/ActivityIndicator.test.tsx` | agents.11 |
 | `tests/unit/agents/AutoExpandingTextarea.test.tsx` | agents.4.5-4.7 |
+| `tests/unit/components/agents.test.tsx` | agents.4.22 |
 
 ### Property-Based тесты
 
@@ -1331,6 +1336,7 @@ const STATUS_STYLES: Record<AgentStatus, StatusStyle> = {
 | `tests/functional/agents-error-messages.spec.ts` | agents.5.5, agents.5.6, agents.5.7 |
 | `tests/functional/auto-expanding-textarea.spec.ts` | agents.4.3-4.7 |
 | `tests/functional/empty-state-placeholder.spec.ts` | agents.4 |
+| `tests/functional/message-text-wrapping.spec.ts` | agents.4.22 |
 
 ### Покрытие требований
 
@@ -1341,6 +1347,7 @@ const STATUS_STYLES: Record<AgentStatus, StatusStyle> = {
 | agents.2.7-2.11 (auto-create) | ✓ | ✓ | ✓ |
 | agents.3 | ✓ | - | ✓ |
 | agents.4 | ✓ | - | ✓ |
+| agents.4.22 (text wrapping) | ✓ | - | ✓ |
 | agents.5 | ✓ | - | ✓ |
 | agents.5.5 (error messages) | ✓ | - | ✓ |
 | agents.5.6 (filter archived) | ✓ | - | ✓ |
