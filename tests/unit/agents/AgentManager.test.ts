@@ -329,9 +329,7 @@ describe('AgentManager', () => {
       const publishedEvent = mockEventBus.publish.mock.calls[0][0];
       expect(publishedEvent).toBeInstanceOf(AgentArchivedEvent);
       expect(publishedEvent.agent.id).toBe('abc123xyz0');
-      expect(publishedEvent.agent.archivedAt).toBe(
-        new Date('2026-02-15T11:00:00.000Z').getTime()
-      );
+      expect(publishedEvent.agent.archivedAt).toBe(new Date('2026-02-15T11:00:00.000Z').getTime());
       expect(typeof publishedEvent.timestamp).toBe('number');
     });
   });

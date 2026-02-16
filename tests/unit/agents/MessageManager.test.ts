@@ -4,10 +4,7 @@
 
 import { MessageManager } from '../../../src/main/agents/MessageManager';
 import { MainEventBus } from '../../../src/main/events/MainEventBus';
-import {
-  MessageCreatedEvent,
-  MessageUpdatedEvent,
-} from '../../../src/shared/events/types';
+import { MessageCreatedEvent, MessageUpdatedEvent } from '../../../src/shared/events/types';
 import type { IDatabaseManager } from '../../../src/main/DatabaseManager';
 import type { Message } from '../../../src/main/db/schema';
 

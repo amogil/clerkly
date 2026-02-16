@@ -4,7 +4,11 @@
 
 import { IDatabaseManager } from '../DatabaseManager';
 import { MainEventBus } from '../events/MainEventBus';
-import { MessageCreatedEvent, MessageUpdatedEvent, MessageSnapshot } from '../../shared/events/types';
+import {
+  MessageCreatedEvent,
+  MessageUpdatedEvent,
+  MessageSnapshot,
+} from '../../shared/events/types';
 import { Logger } from '../Logger';
 import type { Message } from '../db/schema';
 import type { MessagePayload } from '../../shared/utils/agentStatus';
@@ -30,7 +34,7 @@ export class MessageManager {
    * Convert DB Message entity to Event MessageSnapshot
    * @throws Error if payload JSON is invalid
    */
-  private toEventMessage(message: Message): MessageSnapshot {
+  public toEventMessage(message: Message): MessageSnapshot {
     let payload: MessagePayload;
     try {
       payload = JSON.parse(message.payloadJson) as MessagePayload;
@@ -107,8 +111,6 @@ export class MessageManager {
 
     // Publish event for real-time UI updates
     // Requirements: agents.12.5
-    MainEventBus.getInstance().publish(
-      new MessageUpdatedEvent(this.toEventMessage(tempMessage))
-    );
+    MainEventBus.getInstance().publish(new MessageUpdatedEvent(this.toEventMessage(tempMessage)));
   }
 }

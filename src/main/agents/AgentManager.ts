@@ -18,8 +18,6 @@ import type { Agent } from '../db/schema';
 import type { Message } from '../db/schema';
 import type { AgentStatus, MessagePayload } from '../../shared/utils/agentStatus';
 
-
-
 /**
  * AgentManager - business logic for agents
  *
@@ -80,8 +78,9 @@ export class AgentManager {
 
   /**
    * Convert DB Agent entity to Event Agent model with computed status
+   * Requirements: realtime-events.9.5
    */
-  private toEventAgent(agent: Agent): AgentSnapshot {
+  public toEventAgent(agent: Agent): AgentSnapshot {
     // Get last message to compute status
     const lastMessage = this.dbManager.messages.getLastByAgent(agent.agentId);
     const status = this.computeAgentStatus(lastMessage);
@@ -126,9 +125,7 @@ export class AgentManager {
         this.logger.info(`Agent updatedAt updated: ${agentId}`);
 
         // Publish AGENT_UPDATED event for UI with full agent model including status
-        MainEventBus.getInstance().publish(
-          new AgentUpdatedEvent(this.toEventAgent(updatedAgent))
-        );
+        MainEventBus.getInstance().publish(new AgentUpdatedEvent(this.toEventAgent(updatedAgent)));
       }
     } catch (error) {
       // Use ErrorHandler to show error notification to user
@@ -145,7 +142,7 @@ export class AgentManager {
   create(name?: string): Agent {
     // Use default name if not provided
     const agentName = name || 'New Agent';
-    
+
     // Repository automatically generates agentId and injects userId
     const agent = this.dbManager.agents.create(agentName);
 
@@ -190,9 +187,7 @@ export class AgentManager {
     // Requirements: agents.12.2
     const updatedAgent = this.dbManager.agents.findById(agentId);
     if (updatedAgent) {
-      MainEventBus.getInstance().publish(
-        new AgentUpdatedEvent(this.toEventAgent(updatedAgent))
-      );
+      MainEventBus.getInstance().publish(new AgentUpdatedEvent(this.toEventAgent(updatedAgent)));
     }
   }
 
@@ -217,9 +212,7 @@ export class AgentManager {
     if (archivedAgent) {
       // Publish event for real-time UI updates with full agent snapshot
       // Requirements: agents.12.3
-      MainEventBus.getInstance().publish(
-        new AgentArchivedEvent(this.toEventAgent(archivedAgent))
-      );
+      MainEventBus.getInstance().publish(new AgentArchivedEvent(this.toEventAgent(archivedAgent)));
     }
   }
 }

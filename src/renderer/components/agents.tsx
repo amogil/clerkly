@@ -1,10 +1,9 @@
-import { useState, useRef, useEffect, useLayoutEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Send, Check, X, HelpCircle, ArrowLeft, Plus } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Logo } from './logo';
 import { useAgents } from '../hooks/useAgents';
 import { useMessages } from '../hooks/useMessages';
-import { computeAgentStatus } from '../../shared/utils/computeAgentStatus';
 import {
   isInProgress,
   isAwaitingUser,
@@ -16,12 +15,10 @@ import {
 import { AutoExpandingTextarea, AutoExpandingTextareaHandle } from './agents/AutoExpandingTextarea';
 import { EmptyStatePlaceholder } from './agents/EmptyStatePlaceholder';
 import { DateTimeFormatter } from '../../utils/DateTimeFormatter';
-import type { Agent } from '../types/agent';
-import type { AgentStatus } from '../../shared/utils/agentStatus';
+import type { AgentSnapshot } from '../types/agent';
 
-// Map Agent to display format with computed status
-interface DisplayAgentItem extends Agent {
-  status: AgentStatus;
+// Map AgentSnapshot to display format
+interface DisplayAgentItem extends AgentSnapshot {
   title: string;
   description: string;
 }
@@ -39,20 +36,14 @@ export function Agents() {
   const { agents, activeAgent, createAgent, selectAgent, isLoading } = useAgents();
   const { messages, sendMessage } = useMessages(activeAgent?.agentId || null);
 
-  // Convert agents to display format with computed status
+  // Convert agents to display format
+  // Requirements: realtime-events.9 - Status already computed in AgentSnapshot
   const displayAgents: DisplayAgentItem[] = agents.map((agent) => {
-    // Compute status from messages for this agent
-    // For now, use 'new' as default since we don't have messages loaded for all agents
-    const status =
-      activeAgent?.agentId === agent.agentId
-        ? computeAgentStatus(messages.map((m) => ({ payloadJson: m.payloadJson })))
-        : 'new';
-
     return {
       ...agent,
-      status,
       title: agent.name || 'New conversation',
-      description: status === 'new' ? 'Start chatting with the agent' : `Status: ${status}`,
+      description:
+        agent.status === 'new' ? 'Start chatting with the agent' : `Status: ${agent.status}`,
     };
   });
 
@@ -147,19 +138,16 @@ export function Agents() {
     }
   };
 
-  // Helper function to extract error message from a message
-  // Requirements: agents.5.5
-  const getErrorMessage = (payloadJson: string): string => {
-    try {
-      const payload = JSON.parse(payloadJson);
-      return payload.data?.result?.error?.message || 'Unknown error';
-    } catch {
-      return 'Unknown error';
-    }
+  // Helper function to extract error message from a message snapshot
+  // Requirements: agents.5.5, realtime-events.9
+  const getErrorMessage = (message: {
+    payload: { kind: string; data?: { result?: { error?: { message?: string } } } };
+  }): string => {
+    return message.payload.data?.result?.error?.message || 'Unknown error';
   };
 
   // Load error messages for agents with error status when AllAgents page is shown
-  // Requirements: agents.5.5
+  // Requirements: agents.5.5, realtime-events.9
   useEffect(() => {
     if (!showAllTasksPage) {
       return;
@@ -173,8 +161,11 @@ export function Agents() {
           try {
             const response = await window.api.messages.getLast(agent.agentId);
             if (response.success && response.data) {
-              const message = response.data as { payloadJson: string };
-              const errorMsg = getErrorMessage(message.payloadJson);
+              // API returns MessageSnapshot with parsed payload
+              const message = response.data as {
+                payload: { kind: string; data?: { result?: { error?: { message?: string } } } };
+              };
+              const errorMsg = getErrorMessage(message);
               errors.set(agent.agentId, errorMsg);
             }
           } catch (error) {

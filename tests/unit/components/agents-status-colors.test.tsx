@@ -46,12 +46,12 @@ describe('Agents Component - Status Text Colors', () => {
     expect(span?.textContent).toBe('In progress');
   });
 
-  /* Preconditions: Status text element with 'awaiting-user' status
+  /* Preconditions: Status text element with 'awaiting-response' status
      Action: Render status text with getStatusStyles
      Assertions: Has text-amber-600 class
      Requirements: agents.6.3, agents.8.1, agents.5.3 */
-  it('should apply text-amber-600 class for awaiting-user status', () => {
-    const status: AgentStatus = 'awaiting-user';
+  it('should apply text-amber-600 class for awaiting-response status', () => {
+    const status: AgentStatus = 'awaiting-response';
     const styles = getStatusStyles(status);
 
     const StatusText = () => <span className={styles.text}>{getStatusText(status)}</span>;
@@ -150,7 +150,13 @@ describe('Agents Component - Status Text Colors', () => {
      Assertions: Each has unique color class
      Requirements: agents.6, agents.8.1, agents.5.3 */
   it('should render different colors for different statuses', () => {
-    const statuses: AgentStatus[] = ['new', 'in-progress', 'awaiting-user', 'error', 'completed'];
+    const statuses: AgentStatus[] = [
+      'new',
+      'in-progress',
+      'awaiting-response',
+      'error',
+      'completed',
+    ];
 
     const AllStatuses = () => (
       <>
@@ -174,7 +180,7 @@ describe('Agents Component - Status Text Colors', () => {
     const inProgressStatus = container.querySelector('[data-status="in-progress"]');
     expect(inProgressStatus).toHaveClass('text-blue-600');
 
-    const awaitingStatus = container.querySelector('[data-status="awaiting-user"]');
+    const awaitingStatus = container.querySelector('[data-status="awaiting-response"]');
     expect(awaitingStatus).toHaveClass('text-amber-600');
 
     const errorStatus = container.querySelector('[data-status="error"]');
@@ -189,7 +195,7 @@ describe('Agents Component - Status Text Colors', () => {
      Assertions: Color class is preserved alongside other classes
      Requirements: agents.8.1, agents.5.3 */
   it('should preserve color class when combined with other classes', () => {
-    const status: AgentStatus = 'awaiting-user';
+    const status: AgentStatus = 'awaiting-response';
     const styles = getStatusStyles(status);
 
     const StatusWithExtraClasses = () => (
@@ -263,7 +269,7 @@ describe('Agents Component - Status Text Colors', () => {
      Assertions: Ring color class is applied correctly
      Requirements: agents.6 */
   it('should apply correct ring color class for status', () => {
-    const status: AgentStatus = 'awaiting-user';
+    const status: AgentStatus = 'awaiting-response';
     const styles = getStatusStyles(status);
 
     const StatusWithRing = () => (

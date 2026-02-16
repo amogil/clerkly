@@ -5,7 +5,8 @@
 import { ipcMain, IpcMainInvokeEvent } from 'electron';
 import { AgentIPCHandlers } from '../../../src/main/agents/AgentIPCHandlers';
 import { AgentManager } from '../../../src/main/agents/AgentManager';
-import { MessageManager, MessagePayload } from '../../../src/main/agents/MessageManager';
+import { MessageManager } from '../../../src/main/agents/MessageManager';
+import type { MessagePayload } from '../../../src/shared/utils/agentStatus';
 import type { Agent, Message } from '../../../src/main/db/schema';
 
 // Mock electron
@@ -50,6 +51,13 @@ describe('AgentIPCHandlers', () => {
     payloadJson: JSON.stringify({ kind: 'user', data: { text: 'Hello' } }),
   };
 
+  const mockMessageSnapshot = {
+    id: 1,
+    agentId: 'abc123xyz0',
+    timestamp: new Date('2026-02-15T10:00:00.000Z').getTime(),
+    payload: { kind: 'user', data: { text: 'Hello' } },
+  };
+
   const mockEvent = {} as IpcMainInvokeEvent;
 
   beforeEach(() => {
@@ -76,6 +84,7 @@ describe('AgentIPCHandlers', () => {
       create: jest.fn().mockReturnValue(mockMessage),
       update: jest.fn(),
       getLastMessage: jest.fn().mockReturnValue(mockMessage),
+      toEventMessage: jest.fn().mockReturnValue(mockMessageSnapshot),
     } as unknown as jest.Mocked<MessageManager>;
 
     handlers = new AgentIPCHandlers(mockAgentManager, mockMessageManager);
@@ -303,8 +312,8 @@ describe('AgentIPCHandlers', () => {
   describe('messages:list handler', () => {
     /* Preconditions: Handlers registered
        Action: Invoke messages:list with agentId
-       Assertions: MessageManager.list called, messages returned
-       Requirements: agents.4.8, user-data-isolation.7.6 */
+       Assertions: MessageManager.list called, MessageSnapshot[] returned
+       Requirements: agents.4.8, user-data-isolation.7.6, realtime-events.9.8 */
     it('should list messages and return success', async () => {
       handlers.registerHandlers();
       const handler = registeredHandlers.get('messages:list')!;
@@ -312,7 +321,8 @@ describe('AgentIPCHandlers', () => {
       const result = await handler(mockEvent, { agentId: 'abc123xyz0' });
 
       expect(mockMessageManager.list).toHaveBeenCalledWith('abc123xyz0');
-      expect(result).toEqual({ success: true, data: [mockMessage] });
+      expect(mockMessageManager.toEventMessage).toHaveBeenCalledWith(mockMessage);
+      expect(result).toEqual({ success: true, data: [mockMessageSnapshot] });
     });
 
     /* Preconditions: Handlers registered, access denied
@@ -340,8 +350,8 @@ describe('AgentIPCHandlers', () => {
 
     /* Preconditions: Handlers registered
        Action: Invoke messages:create with payload
-       Assertions: MessageManager.create called, message returned
-       Requirements: agents.4.3, agents.7.1 */
+       Assertions: MessageManager.create called, MessageSnapshot returned
+       Requirements: agents.4.3, agents.7.1, realtime-events.9.8 */
     it('should create message and return success', async () => {
       handlers.registerHandlers();
       const handler = registeredHandlers.get('messages:create')!;
@@ -349,7 +359,8 @@ describe('AgentIPCHandlers', () => {
       const result = await handler(mockEvent, { agentId: 'abc123xyz0', payload: userPayload });
 
       expect(mockMessageManager.create).toHaveBeenCalledWith('abc123xyz0', userPayload);
-      expect(result).toEqual({ success: true, data: mockMessage });
+      expect(mockMessageManager.toEventMessage).toHaveBeenCalledWith(mockMessage);
+      expect(result).toEqual({ success: true, data: mockMessageSnapshot });
     });
 
     /* Preconditions: Handlers registered, access denied
@@ -417,8 +428,8 @@ describe('AgentIPCHandlers', () => {
   describe('messages:get-last handler', () => {
     /* Preconditions: Handlers registered
        Action: Invoke messages:get-last with agentId
-       Assertions: MessageManager.getLastMessage called, message returned
-       Requirements: agents.5.5 */
+       Assertions: MessageManager.getLastMessage called, MessageSnapshot returned
+       Requirements: agents.5.5, realtime-events.9.8 */
     it('should get last message and return success', async () => {
       handlers.registerHandlers();
       const handler = registeredHandlers.get('messages:get-last')!;
@@ -426,7 +437,8 @@ describe('AgentIPCHandlers', () => {
       const result = await handler(mockEvent, { agentId: 'abc123xyz0' });
 
       expect(mockMessageManager.getLastMessage).toHaveBeenCalledWith('abc123xyz0');
-      expect(result).toEqual({ success: true, data: mockMessage });
+      expect(mockMessageManager.toEventMessage).toHaveBeenCalledWith(mockMessage);
+      expect(result).toEqual({ success: true, data: mockMessageSnapshot });
     });
 
     /* Preconditions: Handlers registered, no messages

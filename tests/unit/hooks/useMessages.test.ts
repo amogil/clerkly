@@ -1,14 +1,14 @@
 /**
  * @jest-environment jsdom
  */
-// Requirements: agents.4, agents.7, agents.12, error-notifications.2
+// Requirements: agents.4, agents.7, agents.12, error-notifications.2, realtime-events.9
 /**
  * Unit tests for useMessages hook
  */
 
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { EVENT_TYPES } from '../../../src/shared/events/constants';
-import type { Message } from '../../../src/renderer/types/agent';
+import type { MessageSnapshot } from '../../../src/shared/events/types';
 
 // Mock sonner toast
 jest.mock('sonner', () => ({
@@ -46,18 +46,18 @@ jest.mock('../../../src/renderer/events/RendererEventBus', () => ({
 import { useMessages } from '../../../src/renderer/hooks/useMessages';
 
 describe('useMessages hook', () => {
-  const mockMessages: Message[] = [
+  const mockMessages: MessageSnapshot[] = [
     {
       id: 1,
       agentId: 'agent-1',
-      timestamp: '2024-01-01T10:00:00Z',
-      payloadJson: JSON.stringify({ kind: 'user', data: { text: 'Hello' } }),
+      timestamp: new Date('2024-01-01T10:00:00Z').getTime(),
+      payload: { kind: 'user', data: { text: 'Hello' } },
     },
     {
       id: 2,
       agentId: 'agent-1',
-      timestamp: '2024-01-01T10:01:00Z',
-      payloadJson: JSON.stringify({ kind: 'llm', data: { text: 'Hi there!' } }),
+      timestamp: new Date('2024-01-01T10:01:00Z').getTime(),
+      payload: { kind: 'llm', data: { text: 'Hi there!' } },
     },
   ];
 
@@ -311,7 +311,7 @@ describe('useMessages hook', () => {
     /* Preconditions: Hook is mounted
        Action: MESSAGE_CREATED event is received for current agent
        Assertions: New message is added to list
-       Requirements: agents.12.7 */
+       Requirements: agents.12.7, realtime-events.9.4 */
     it('should add message on MESSAGE_CREATED event', async () => {
       let createdHandler: (payload: any) => void;
       mockSubscribe.mockImplementation((type, handler) => {
@@ -332,11 +332,11 @@ describe('useMessages hook', () => {
       act(() => {
         createdHandler({
           timestamp: Date.now(),
-          data: {
+          message: {
             id: 3,
             agentId: 'agent-1',
-            timestamp: '2024-01-01T10:02:00Z',
-            payloadJson: JSON.stringify({ kind: 'user', data: { text: 'New message' } }),
+            timestamp: new Date('2024-01-01T10:02:00Z').getTime(),
+            payload: { kind: 'user', data: { text: 'New message' } },
           },
         });
       });
@@ -347,7 +347,7 @@ describe('useMessages hook', () => {
     /* Preconditions: Hook is mounted
        Action: MESSAGE_CREATED event is received for different agent
        Assertions: Message is not added
-       Requirements: agents.12.7 */
+       Requirements: agents.12.7, realtime-events.9.4 */
     it('should ignore MESSAGE_CREATED for different agent', async () => {
       let createdHandler: (payload: any) => void;
       mockSubscribe.mockImplementation((type, handler) => {
@@ -368,11 +368,11 @@ describe('useMessages hook', () => {
       act(() => {
         createdHandler({
           timestamp: Date.now(),
-          data: {
+          message: {
             id: 3,
             agentId: 'agent-2', // Different agent
-            timestamp: '2024-01-01T10:02:00Z',
-            payloadJson: JSON.stringify({ kind: 'user', data: { text: 'New message' } }),
+            timestamp: new Date('2024-01-01T10:02:00Z').getTime(),
+            payload: { kind: 'user', data: { text: 'New message' } },
           },
         });
       });
@@ -383,7 +383,7 @@ describe('useMessages hook', () => {
     /* Preconditions: Hook is mounted with messages
        Action: MESSAGE_CREATED event with duplicate id
        Assertions: Message is not duplicated
-       Requirements: agents.12.7 */
+       Requirements: agents.12.7, realtime-events.9.4 */
     it('should not duplicate message on repeated event', async () => {
       let createdHandler: (payload: any) => void;
       mockSubscribe.mockImplementation((type, handler) => {
@@ -405,11 +405,11 @@ describe('useMessages hook', () => {
       act(() => {
         createdHandler({
           timestamp: Date.now(),
-          data: {
+          message: {
             id: 1, // Same id as existing message
             agentId: 'agent-1',
-            timestamp: '2024-01-01T10:00:00Z',
-            payloadJson: JSON.stringify({ kind: 'user', data: { text: 'Hello' } }),
+            timestamp: new Date('2024-01-01T10:00:00Z').getTime(),
+            payload: { kind: 'user', data: { text: 'Hello' } },
           },
         });
       });
@@ -418,10 +418,10 @@ describe('useMessages hook', () => {
     });
 
     /* Preconditions: Hook is mounted
-       Action: MESSAGE_CREATED event with no data
+       Action: MESSAGE_CREATED event with no message
        Assertions: No error, messages unchanged
-       Requirements: agents.12.7 */
-    it('should handle MESSAGE_CREATED event with no data', async () => {
+       Requirements: agents.12.7, realtime-events.9.4 */
+    it('should handle MESSAGE_CREATED event with no message', async () => {
       let createdHandler: (payload: any) => void;
       mockSubscribe.mockImplementation((type, handler) => {
         if (type === EVENT_TYPES.MESSAGE_CREATED) {
@@ -441,7 +441,7 @@ describe('useMessages hook', () => {
       act(() => {
         createdHandler({
           timestamp: Date.now(),
-          data: null,
+          message: null,
         });
       });
 
@@ -450,8 +450,8 @@ describe('useMessages hook', () => {
 
     /* Preconditions: Hook is mounted
        Action: MESSAGE_UPDATED event is received
-       Assertions: Message payload is updated
-       Requirements: agents.12.7 */
+       Assertions: Message is replaced with updated snapshot
+       Requirements: agents.12.7, realtime-events.9.5 */
     it('should update message on MESSAGE_UPDATED event', async () => {
       let updatedHandler: (payload: any) => void;
       mockSubscribe.mockImplementation((type, handler) => {
@@ -470,9 +470,11 @@ describe('useMessages hook', () => {
       act(() => {
         updatedHandler({
           timestamp: Date.now(),
-          id: '1',
-          changedFields: {
-            payloadJson: JSON.stringify({ kind: 'user', data: { text: 'Updated text' } }),
+          message: {
+            id: 1,
+            agentId: 'agent-1',
+            timestamp: new Date('2024-01-01T10:00:00Z').getTime(),
+            payload: { kind: 'user', data: { text: 'Updated text' } },
           },
         });
       });
@@ -482,10 +484,10 @@ describe('useMessages hook', () => {
     });
 
     /* Preconditions: Hook is mounted
-       Action: MESSAGE_UPDATED event with invalid JSON
-       Assertions: Message unchanged
-       Requirements: agents.12.7 */
-    it('should handle MESSAGE_UPDATED event with invalid JSON', async () => {
+       Action: MESSAGE_UPDATED event with no message
+       Assertions: Messages unchanged
+       Requirements: agents.12.7, realtime-events.9.5 */
+    it('should handle MESSAGE_UPDATED event with no message', async () => {
       let updatedHandler: (payload: any) => void;
       mockSubscribe.mockImplementation((type, handler) => {
         if (type === EVENT_TYPES.MESSAGE_UPDATED) {
@@ -505,10 +507,7 @@ describe('useMessages hook', () => {
       act(() => {
         updatedHandler({
           timestamp: Date.now(),
-          id: '1',
-          changedFields: {
-            payloadJson: 'invalid json {{{',
-          },
+          message: null,
         });
       });
 
@@ -516,42 +515,10 @@ describe('useMessages hook', () => {
     });
 
     /* Preconditions: Hook is mounted
-       Action: MESSAGE_UPDATED event with no payloadJson
-       Assertions: Message unchanged
-       Requirements: agents.12.7 */
-    it('should handle MESSAGE_UPDATED event with no payloadJson', async () => {
-      let updatedHandler: (payload: any) => void;
-      mockSubscribe.mockImplementation((type, handler) => {
-        if (type === EVENT_TYPES.MESSAGE_UPDATED) {
-          updatedHandler = handler;
-        }
-        return mockUnsubscribe;
-      });
-
-      const { result } = renderHook(() => useMessages('agent-1'));
-
-      await waitFor(() => {
-        expect(result.current.isLoading).toBe(false);
-      });
-
-      const originalText = result.current.messages[0].payload.data.text;
-
-      act(() => {
-        updatedHandler({
-          timestamp: Date.now(),
-          id: '1',
-          changedFields: {},
-        });
-      });
-
-      expect(result.current.messages[0].payload.data.text).toBe(originalText);
-    });
-
-    /* Preconditions: Hook is mounted
-       Action: MESSAGE_UPDATED event with invalid id
+       Action: MESSAGE_UPDATED event for non-existent message
        Assertions: No error, messages unchanged
-       Requirements: agents.12.7 */
-    it('should handle MESSAGE_UPDATED event with invalid id', async () => {
+       Requirements: agents.12.7, realtime-events.9.5 */
+    it('should handle MESSAGE_UPDATED event for non-existent message', async () => {
       let updatedHandler: (payload: any) => void;
       mockSubscribe.mockImplementation((type, handler) => {
         if (type === EVENT_TYPES.MESSAGE_UPDATED) {
@@ -566,19 +533,21 @@ describe('useMessages hook', () => {
         expect(result.current.isLoading).toBe(false);
       });
 
-      const originalText = result.current.messages[0].payload.data.text;
+      const initialCount = result.current.messages.length;
 
       act(() => {
         updatedHandler({
           timestamp: Date.now(),
-          id: 'not-a-number',
-          changedFields: {
-            payloadJson: JSON.stringify({ kind: 'user', data: { text: 'Should not apply' } }),
+          message: {
+            id: 999, // Non-existent message
+            agentId: 'agent-1',
+            timestamp: new Date('2024-01-01T10:00:00Z').getTime(),
+            payload: { kind: 'user', data: { text: 'Should not apply' } },
           },
         });
       });
 
-      expect(result.current.messages[0].payload.data.text).toBe(originalText);
+      expect(result.current.messages.length).toBe(initialCount);
     });
   });
 

@@ -1,14 +1,13 @@
-// Requirements: agents.4, agents.7, agents.12, error-notifications.2
+// Requirements: agents.4, agents.7, agents.12, error-notifications.2, realtime-events.9
 
 import { useState, useEffect, useCallback } from 'react';
 import { useEventSubscription } from '../events/useEventSubscription';
 import { EVENT_TYPES } from '../../shared/events/constants';
-import type { Message, MessagePayload, ParsedMessage } from '../types/agent';
-import { parseMessagePayload } from '../types/agent';
+import type { MessagePayload } from '../../shared/utils/agentStatus';
 import type {
   MessageCreatedPayload,
   MessageUpdatedPayload,
-  Message as EventMessage,
+  MessageSnapshot,
 } from '../../shared/events/types';
 import { callApi } from '../utils/apiWrapper';
 
@@ -26,34 +25,28 @@ declare const window: Window & {
 };
 
 interface UseMessagesResult {
-  messages: ParsedMessage[];
+  messages: MessageSnapshot[];
   isLoading: boolean;
   sendMessage: (text: string) => Promise<boolean>;
   refreshMessages: () => Promise<void>;
 }
 
 /**
- * Convert event Message to renderer Message type
- */
-function eventMessageToRendererMessage(eventMessage: EventMessage): Message {
-  return {
-    id: eventMessage.id,
-    agentId: eventMessage.agentId,
-    timestamp: eventMessage.timestamp,
-    payloadJson: eventMessage.payloadJson,
-  };
-}
-
-/**
  * Hook for managing messages for a specific agent
  * Provides message operations and real-time updates via events
+ *
+ * Architecture: Uses snapshots from API and events (realtime-events.9)
+ * - Initial load: API returns MessageSnapshot[] with parsed payloads
+ * - Live updates: Events contain MessageSnapshot with parsed payloads
+ * - No business logic: Just displays data from snapshots
  */
 export function useMessages(agentId: string | null): UseMessagesResult {
-  const [messages, setMessages] = useState<ParsedMessage[]>([]);
+  const [messages, setMessages] = useState<MessageSnapshot[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
   // Load messages for agent
   // Requirements: error-notifications.2 - Use callApi for automatic error handling
+  // Requirements: realtime-events.9.8 - API returns MessageSnapshot[]
   const loadMessages = useCallback(async () => {
     if (!agentId) {
       setMessages([]);
@@ -62,21 +55,20 @@ export function useMessages(agentId: string | null): UseMessagesResult {
 
     setIsLoading(true);
 
-    const messageList = await callApi<Message[]>(
+    const messageList = await callApi<MessageSnapshot[]>(
       () =>
         window.api.messages.list(agentId) as Promise<{
           success: boolean;
-          data?: Message[];
+          data?: MessageSnapshot[];
           error?: string;
         }>,
       'Loading messages'
     );
 
     if (messageList) {
-      // Parse payloads and sort by timestamp
-      const parsed = messageList.map(parseMessagePayload);
-      parsed.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-      setMessages(parsed);
+      // Sort by timestamp (already Unix timestamp in snapshot)
+      const sorted = [...messageList].sort((a, b) => a.timestamp - b.timestamp);
+      setMessages(sorted);
     }
 
     setIsLoading(false);
@@ -119,38 +111,29 @@ export function useMessages(agentId: string | null): UseMessagesResult {
   );
 
   // Subscribe to message events
-  // Requirements: agents.12.7
+  // Requirements: agents.12.7, realtime-events.9.4
   useEventSubscription(EVENT_TYPES.MESSAGE_CREATED, (payload: MessageCreatedPayload) => {
-    if (payload.data && payload.data.agentId === agentId) {
-      const message = eventMessageToRendererMessage(payload.data);
-      const parsed = parseMessagePayload(message);
+    // Event payload contains MessageSnapshot with parsed payload
+    if (payload.message && payload.message.agentId === agentId) {
       setMessages((prev) => {
         // Add message if not already present
-        if (prev.some((m) => m.id === parsed.id)) {
+        if (prev.some((m) => m.id === payload.message.id)) {
           return prev;
         }
-        const updated = [...prev, parsed];
-        updated.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+        const updated = [...prev, payload.message];
+        // Sort by timestamp (Unix timestamp)
+        updated.sort((a, b) => a.timestamp - b.timestamp);
         return updated;
       });
     }
   });
 
+  // Requirements: realtime-events.9.5
   useEventSubscription(EVENT_TYPES.MESSAGE_UPDATED, (payload: MessageUpdatedPayload) => {
-    const messageId = parseInt(payload.id, 10);
-    if (!isNaN(messageId) && payload.changedFields.payloadJson) {
+    // Event payload contains MessageSnapshot with updated payload
+    if (payload.message) {
       setMessages((prev) =>
-        prev.map((msg) => {
-          if (msg.id === messageId) {
-            try {
-              const newPayload = JSON.parse(payload.changedFields.payloadJson!) as MessagePayload;
-              return { ...msg, payload: newPayload };
-            } catch {
-              return msg;
-            }
-          }
-          return msg;
-        })
+        prev.map((msg) => (msg.id === payload.message.id ? payload.message : msg))
       );
     }
   });

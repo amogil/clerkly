@@ -87,7 +87,7 @@ export class AgentIPCHandlers {
 
   /**
    * Handle agents:create request
-   * Requirements: agents.2.3, agents.2.4, agents.2.5
+   * Requirements: agents.2.3, agents.2.4, agents.2.5, realtime-events.9.8
    */
   private async handleAgentCreate(
     _event: IpcMainInvokeEvent,
@@ -96,7 +96,9 @@ export class AgentIPCHandlers {
     try {
       const agent = this.agentManager.create(args?.name);
       this.logger.info(`Agent created: ${agent.agentId}`);
-      return { success: true, data: agent };
+      // Convert to snapshot with computed status
+      const snapshot = this.agentManager.toEventAgent(agent);
+      return { success: true, data: snapshot };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       this.logger.error(`Failed to create agent: ${errorMessage}`);
@@ -106,12 +108,14 @@ export class AgentIPCHandlers {
 
   /**
    * Handle agents:list request
-   * Requirements: agents.1.3, agents.10.2
+   * Requirements: agents.1.3, agents.10.2, realtime-events.9.8
    */
   private async handleAgentList(_event: IpcMainInvokeEvent): Promise<IPCResult> {
     try {
-      const agents = this.agentManager.list();
-      return { success: true, data: agents };
+      const dbAgents = this.agentManager.list();
+      // Convert to snapshots with computed status
+      const snapshots = dbAgents.map((agent) => this.agentManager.toEventAgent(agent));
+      return { success: true, data: snapshots };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       this.logger.error(`Failed to list agents: ${errorMessage}`);
@@ -121,7 +125,7 @@ export class AgentIPCHandlers {
 
   /**
    * Handle agents:get request
-   * Requirements: agents.3.2, agents.10.4
+   * Requirements: agents.3.2, agents.10.4, realtime-events.9.8
    */
   private async handleAgentGet(
     _event: IpcMainInvokeEvent,
@@ -132,7 +136,9 @@ export class AgentIPCHandlers {
       if (!agent) {
         return { success: false, error: 'Agent not found' };
       }
-      return { success: true, data: agent };
+      // Convert to snapshot with computed status
+      const snapshot = this.agentManager.toEventAgent(agent);
+      return { success: true, data: snapshot };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       this.logger.error(`Failed to get agent: ${errorMessage}`);
@@ -181,15 +187,17 @@ export class AgentIPCHandlers {
 
   /**
    * Handle messages:list request
-   * Requirements: agents.4.8, user-data-isolation.7.6
+   * Requirements: agents.4.8, user-data-isolation.7.6, realtime-events.9.8
    */
   private async handleMessageList(
     _event: IpcMainInvokeEvent,
     args: { agentId: string }
   ): Promise<IPCResult> {
     try {
-      const messages = this.messageManager.list(args.agentId);
-      return { success: true, data: messages };
+      const dbMessages = this.messageManager.list(args.agentId);
+      // Convert to snapshots with parsed payloads
+      const snapshots = dbMessages.map((msg) => this.messageManager.toEventMessage(msg));
+      return { success: true, data: snapshots };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       this.logger.error(`Failed to list messages: ${errorMessage}`);
@@ -200,7 +208,7 @@ export class AgentIPCHandlers {
   /**
    * Handle messages:get-last request
    * Returns the last message for an agent (most recent)
-   * Requirements: agents.5.5
+   * Requirements: agents.5.5, realtime-events.9.8
    */
   private async handleMessageGetLast(
     _event: IpcMainInvokeEvent,
@@ -208,7 +216,12 @@ export class AgentIPCHandlers {
   ): Promise<IPCResult> {
     try {
       const message = this.messageManager.getLastMessage(args.agentId);
-      return { success: true, data: message };
+      if (!message) {
+        return { success: true, data: null };
+      }
+      // Convert to snapshot with parsed payload
+      const snapshot = this.messageManager.toEventMessage(message);
+      return { success: true, data: snapshot };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       this.logger.error(`Failed to get last message: ${errorMessage}`);
@@ -218,7 +231,7 @@ export class AgentIPCHandlers {
 
   /**
    * Handle messages:create request
-   * Requirements: agents.4.3, agents.7.1, agents.1.4
+   * Requirements: agents.4.3, agents.7.1, agents.1.4, realtime-events.9.8
    */
   private async handleMessageCreate(
     _event: IpcMainInvokeEvent,
@@ -227,7 +240,9 @@ export class AgentIPCHandlers {
     try {
       const message = this.messageManager.create(args.agentId, args.payload);
       this.logger.info(`Message created: ${message.id} for agent ${args.agentId}`);
-      return { success: true, data: message };
+      // Convert to snapshot with parsed payload
+      const snapshot = this.messageManager.toEventMessage(message);
+      return { success: true, data: snapshot };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       this.logger.error(`Failed to create message: ${errorMessage}`);
