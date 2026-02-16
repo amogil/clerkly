@@ -1,14 +1,14 @@
 /**
  * @jest-environment jsdom
  */
-// Requirements: agents.2, agents.3, agents.10, agents.12, error-notifications.2
+// Requirements: agents.2, agents.3, agents.10, agents.12, error-notifications.2, realtime-events.9
 /**
  * Unit tests for useAgents hook
  */
 
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { EVENT_TYPES } from '../../../src/shared/events/constants';
-import type { Agent } from '../../../src/renderer/types/agent';
+import type { AgentSnapshot } from '../../../src/renderer/types/agent';
 
 // Mock sonner toast
 jest.mock('sonner', () => ({
@@ -47,27 +47,30 @@ jest.mock('../../../src/renderer/events/RendererEventBus', () => ({
 import { useAgents } from '../../../src/renderer/hooks/useAgents';
 
 describe('useAgents hook', () => {
-  const mockAgents: Agent[] = [
+  const mockAgents: AgentSnapshot[] = [
     {
-      agentId: 'agent-1',
-      userId: 'user-1',
+      id: 'agent-1',
       name: 'Agent 1',
-      createdAt: '2024-01-01T10:00:00Z',
-      updatedAt: '2024-01-02T10:00:00Z',
+      createdAt: new Date('2024-01-01T10:00:00Z').getTime(),
+      updatedAt: new Date('2024-01-02T10:00:00Z').getTime(),
+      archivedAt: null,
+      status: 'new',
     },
     {
-      agentId: 'agent-2',
-      userId: 'user-1',
+      id: 'agent-2',
       name: 'Agent 2',
-      createdAt: '2024-01-01T09:00:00Z',
-      updatedAt: '2024-01-01T09:00:00Z',
+      createdAt: new Date('2024-01-01T09:00:00Z').getTime(),
+      updatedAt: new Date('2024-01-01T09:00:00Z').getTime(),
+      archivedAt: null,
+      status: 'new',
     },
     {
-      agentId: 'agent-3',
-      userId: 'user-1',
+      id: 'agent-3',
       name: 'Agent 3',
-      createdAt: '2024-01-01T08:00:00Z',
-      updatedAt: '2024-01-01T08:00:00Z',
+      createdAt: new Date('2024-01-01T08:00:00Z').getTime(),
+      updatedAt: new Date('2024-01-01T08:00:00Z').getTime(),
+      archivedAt: null,
+      status: 'new',
     },
   ];
 
@@ -103,12 +106,13 @@ describe('useAgents hook', () => {
        Requirements: agents.2.7, agents.2.8 */
     it('should auto-create agent when list is empty on mount', async () => {
       mockAgentsApi.list.mockResolvedValue({ success: true, data: [] });
-      const newAgent: Agent = {
-        agentId: 'auto-created',
-        userId: 'user-1',
+      const newAgent: AgentSnapshot = {
+        id: 'auto-created',
         name: 'New Agent',
-        createdAt: '2024-01-03T10:00:00Z',
-        updatedAt: '2024-01-03T10:00:00Z',
+        createdAt: new Date('2024-01-03T10:00:00Z').getTime(),
+        updatedAt: new Date('2024-01-03T10:00:00Z').getTime(),
+      archivedAt: null,
+      status: 'new' as const,
       };
       mockAgentsApi.create.mockResolvedValue({ success: true, data: newAgent });
 
@@ -122,8 +126,8 @@ describe('useAgents hook', () => {
         expect(mockAgentsApi.create).toHaveBeenCalledWith('New Agent');
       });
       expect(result.current.agents).toHaveLength(1);
-      expect(result.current.agents[0].agentId).toBe('auto-created');
-      expect(result.current.activeAgent?.agentId).toBe('auto-created');
+      expect(result.current.agents[0].id).toBe('auto-created');
+      expect(result.current.activeAgent?.id).toBe('auto-created');
     });
 
     /* Preconditions: Hook mounts with agents
@@ -137,8 +141,8 @@ describe('useAgents hook', () => {
         expect(result.current.isLoading).toBe(false);
       });
 
-      expect(result.current.agents[0].agentId).toBe('agent-1');
-      expect(result.current.agents[1].agentId).toBe('agent-2');
+      expect(result.current.agents[0].id).toBe('agent-1');
+      expect(result.current.agents[1].id).toBe('agent-2');
     });
 
     /* Preconditions: Hook mounts with agents
@@ -153,7 +157,7 @@ describe('useAgents hook', () => {
       });
 
       expect(result.current.activeAgent).not.toBeNull();
-      expect(result.current.activeAgent?.agentId).toBe('agent-1');
+      expect(result.current.activeAgent?.id).toBe('agent-1');
     });
 
     /* Preconditions: Hook mounts with empty agent list
@@ -162,12 +166,13 @@ describe('useAgents hook', () => {
        Requirements: agents.2.7, agents.2.8 */
     it('should auto-create agent when list is empty on mount', async () => {
       mockAgentsApi.list.mockResolvedValue({ success: true, data: [] });
-      const newAgent: Agent = {
-        agentId: 'auto-created',
-        userId: 'user-1',
+      const newAgent: AgentSnapshot = {
+        id: 'auto-created',
         name: 'New Agent',
-        createdAt: '2024-01-03T10:00:00Z',
-        updatedAt: '2024-01-03T10:00:00Z',
+        createdAt: new Date('2024-01-03T10:00:00Z').getTime(),
+        updatedAt: new Date('2024-01-03T10:00:00Z').getTime(),
+      archivedAt: null,
+      status: 'new' as const,
       };
       mockAgentsApi.create.mockResolvedValue({ success: true, data: newAgent });
 
@@ -181,8 +186,8 @@ describe('useAgents hook', () => {
         expect(mockAgentsApi.create).toHaveBeenCalledWith('New Agent');
       });
       expect(result.current.agents).toHaveLength(1);
-      expect(result.current.agents[0].agentId).toBe('auto-created');
-      expect(result.current.activeAgent?.agentId).toBe('auto-created');
+      expect(result.current.agents[0].id).toBe('auto-created');
+      expect(result.current.activeAgent?.id).toBe('auto-created');
     });
 
     /* Preconditions: API returns error
@@ -209,12 +214,13 @@ describe('useAgents hook', () => {
        Assertions: API is called and new agent is selected
        Requirements: agents.2.3, agents.2.4, agents.2.5 */
     it('should create agent and select it', async () => {
-      const newAgent: Agent = {
-        agentId: 'agent-new',
-        userId: 'user-1',
+      const newAgent: AgentSnapshot = {
+        id: 'agent-new',
         name: 'New Agent',
-        createdAt: '2024-01-03T10:00:00Z',
-        updatedAt: '2024-01-03T10:00:00Z',
+        createdAt: new Date('2024-01-03T10:00:00Z').getTime(),
+        updatedAt: new Date('2024-01-03T10:00:00Z').getTime(),
+      archivedAt: null,
+      status: 'new' as const,
       };
       mockAgentsApi.create.mockResolvedValue({ success: true, data: newAgent });
 
@@ -224,7 +230,7 @@ describe('useAgents hook', () => {
         expect(result.current.isLoading).toBe(false);
       });
 
-      let createdAgent: Agent | null = null;
+      let createdAgent: AgentSnapshot | null = null;
       await act(async () => {
         createdAgent = await result.current.createAgent('New Agent');
       });
@@ -249,7 +255,7 @@ describe('useAgents hook', () => {
         expect(result.current.isLoading).toBe(false);
       });
 
-      let createdAgent: Agent | null = null;
+      let createdAgent: AgentSnapshot | null = null;
       await act(async () => {
         createdAgent = await result.current.createAgent();
       });
@@ -271,13 +277,13 @@ describe('useAgents hook', () => {
         expect(result.current.isLoading).toBe(false);
       });
 
-      expect(result.current.activeAgent?.agentId).toBe('agent-1');
+      expect(result.current.activeAgent?.id).toBe('agent-1');
 
       act(() => {
         result.current.selectAgent('agent-2');
       });
 
-      expect(result.current.activeAgent?.agentId).toBe('agent-2');
+      expect(result.current.activeAgent?.id).toBe('agent-2');
     });
   });
 
@@ -313,7 +319,7 @@ describe('useAgents hook', () => {
         expect(result.current.isLoading).toBe(false);
       });
 
-      expect(result.current.activeAgent?.agentId).toBe('agent-1');
+      expect(result.current.activeAgent?.id).toBe('agent-1');
 
       await act(async () => {
         await result.current.archiveAgent('agent-1');
@@ -321,7 +327,7 @@ describe('useAgents hook', () => {
 
       // After archive, the hook should select the next available agent
       // Note: The actual removal happens via event, but selection logic runs immediately
-      expect(result.current.activeAgent?.agentId).toBe('agent-2');
+      expect(result.current.activeAgent?.id).toBe('agent-2');
     });
 
     /* Preconditions: Last agent is archived
@@ -331,12 +337,13 @@ describe('useAgents hook', () => {
     it('should auto-create agent when archiving last agent', async () => {
       // Start with only one agent
       mockAgentsApi.list.mockResolvedValue({ success: true, data: [mockAgents[0]] });
-      const newAgent: Agent = {
-        agentId: 'auto-created',
-        userId: 'user-1',
+      const newAgent: AgentSnapshot = {
+        id: 'auto-created',
         name: 'New Agent',
-        createdAt: '2024-01-03T10:00:00Z',
-        updatedAt: '2024-01-03T10:00:00Z',
+        createdAt: new Date('2024-01-03T10:00:00Z').getTime(),
+        updatedAt: new Date('2024-01-03T10:00:00Z').getTime(),
+      archivedAt: null,
+      status: 'new' as const,
       };
       mockAgentsApi.create.mockResolvedValue({ success: true, data: newAgent });
 
@@ -347,7 +354,7 @@ describe('useAgents hook', () => {
       });
 
       expect(result.current.agents).toHaveLength(1);
-      expect(result.current.activeAgent?.agentId).toBe('agent-1');
+      expect(result.current.activeAgent?.id).toBe('agent-1');
 
       await act(async () => {
         await result.current.archiveAgent('agent-1');
@@ -427,11 +434,13 @@ describe('useAgents hook', () => {
       act(() => {
         createdHandler({
           timestamp: Date.now(),
-          data: {
+          agent: {
             id: 'agent-new',
             name: 'New Agent',
             createdAt: Date.now(),
             updatedAt: Date.now(),
+            archivedAt: null,
+            status: 'new',
           },
         });
       });
@@ -468,7 +477,7 @@ describe('useAgents hook', () => {
       });
 
       expect(result.current.agents.length).toBe(initialCount - 1);
-      expect(result.current.agents.find((a) => a.agentId === 'agent-1')).toBeUndefined();
+      expect(result.current.agents.find((a) => a.id === 'agent-1')).toBeUndefined();
     });
 
     /* Preconditions: Hook is mounted
@@ -501,7 +510,7 @@ describe('useAgents hook', () => {
         });
       });
 
-      const updatedAgent = result.current.agents.find((a) => a.agentId === 'agent-1');
+      const updatedAgent = result.current.agents.find((a) => a.id === 'agent-1');
       expect(updatedAgent?.name).toBe('Updated Name');
     });
 
@@ -525,9 +534,9 @@ describe('useAgents hook', () => {
       });
 
       // Initial order: agent-1 (newest), agent-2, agent-3 (oldest)
-      expect(result.current.agents[0].agentId).toBe('agent-1');
-      expect(result.current.agents[1].agentId).toBe('agent-2');
-      expect(result.current.agents[2].agentId).toBe('agent-3');
+      expect(result.current.agents[0].id).toBe('agent-1');
+      expect(result.current.agents[1].id).toBe('agent-2');
+      expect(result.current.agents[2].id).toBe('agent-3');
 
       // Update agent-3 with new timestamp (making it newest)
       const newTimestamp = new Date('2024-01-04T10:00:00Z').getTime();
@@ -542,9 +551,9 @@ describe('useAgents hook', () => {
       });
 
       // After update: agent-3 should be first (newest)
-      expect(result.current.agents[0].agentId).toBe('agent-3');
-      expect(result.current.agents[1].agentId).toBe('agent-1');
-      expect(result.current.agents[2].agentId).toBe('agent-2');
+      expect(result.current.agents[0].id).toBe('agent-3');
+      expect(result.current.agents[1].id).toBe('agent-1');
+      expect(result.current.agents[2].id).toBe('agent-2');
     });
 
     /* Preconditions: Hook is mounted with multiple agents
@@ -573,11 +582,13 @@ describe('useAgents hook', () => {
           id: 'agent-2',
           changedFields: {
             updatedAt: new Date('2024-01-04T10:00:00Z').getTime(),
+      archivedAt: null,
+      status: 'new' as const,
           },
         });
       });
 
-      expect(result.current.agents[0].agentId).toBe('agent-2');
+      expect(result.current.agents[0].id).toBe('agent-2');
 
       // Update agent-3 (should become first)
       act(() => {
@@ -586,13 +597,15 @@ describe('useAgents hook', () => {
           id: 'agent-3',
           changedFields: {
             updatedAt: new Date('2024-01-04T11:00:00Z').getTime(),
+      archivedAt: null,
+      status: 'new' as const,
           },
         });
       });
 
-      expect(result.current.agents[0].agentId).toBe('agent-3');
-      expect(result.current.agents[1].agentId).toBe('agent-2');
-      expect(result.current.agents[2].agentId).toBe('agent-1');
+      expect(result.current.agents[0].id).toBe('agent-3');
+      expect(result.current.agents[1].id).toBe('agent-2');
+      expect(result.current.agents[2].id).toBe('agent-1');
     });
 
     /* Preconditions: Hook is mounted
@@ -614,7 +627,7 @@ describe('useAgents hook', () => {
         expect(result.current.isLoading).toBe(false);
       });
 
-      const initialOrder = result.current.agents.map((a) => a.agentId);
+      const initialOrder = result.current.agents.map((a) => a.id);
 
       // Update only name, not updatedAt
       act(() => {
@@ -627,7 +640,7 @@ describe('useAgents hook', () => {
         });
       });
 
-      const newOrder = result.current.agents.map((a) => a.agentId);
+      const newOrder = result.current.agents.map((a) => a.id);
       expect(newOrder).toEqual(initialOrder);
     });
 
@@ -651,7 +664,7 @@ describe('useAgents hook', () => {
       });
 
       const originalUpdatedAt = result.current.agents.find(
-        (a) => a.agentId === 'agent-1'
+        (a) => a.id === 'agent-1'
       )?.updatedAt;
 
       act(() => {
@@ -664,7 +677,7 @@ describe('useAgents hook', () => {
         });
       });
 
-      const updatedAgent = result.current.agents.find((a) => a.agentId === 'agent-1');
+      const updatedAgent = result.current.agents.find((a) => a.id === 'agent-1');
       expect(updatedAgent?.name).toBe('Only Name Changed');
       expect(updatedAgent?.updatedAt).toBe(originalUpdatedAt);
     });
@@ -813,7 +826,7 @@ describe('useAgents hook', () => {
         expect(result.current.isLoading).toBe(false);
       });
 
-      let createdAgent: Agent | null = null;
+      let createdAgent: AgentSnapshot | null = null;
       await act(async () => {
         createdAgent = await result.current.createAgent();
       });
@@ -836,7 +849,7 @@ describe('useAgents hook', () => {
         expect(result.current.isLoading).toBe(false);
       });
 
-      let createdAgent: Agent | null = null;
+      let createdAgent: AgentSnapshot | null = null;
       await act(async () => {
         createdAgent = await result.current.createAgent();
       });
