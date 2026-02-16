@@ -1303,6 +1303,50 @@ const STATUS_STYLES: Record<AgentStatus, StatusStyle> = {
 };
 ```
 
+### Использование цветов статуса в UI
+
+**Requirements: agents.6, agents.8.1, agents.5.3**
+
+Цвет текста статуса (`textColor`) используется в следующих местах:
+
+1. **Хедер активного агента** (agents.8.1):
+   ```tsx
+   <span className={`${style.text}`}>{getStatusText(currentAgent.status)}</span>
+   ```
+   - Отображается под названием агента в левой части хедера
+   - Цвет меняется динамически в зависимости от статуса
+
+2. **AllAgents страница** (agents.5.3):
+   ```tsx
+   <div className={`${style.text}`}>
+     <span>{getStatusText(agent.status)}</span>
+   </div>
+   ```
+   - Отображается в карточке каждого агента
+   - Помогает быстро идентифицировать статус агента в списке
+
+3. **Реализация** (`src/shared/utils/agentStatus.ts`):
+   ```typescript
+   export function getStatusStyles(status: AgentStatus): {
+     bg: string;
+     ring: string;
+     text: string;
+   } {
+     switch (status) {
+       case 'new':
+         return { bg: 'bg-sky-400', ring: 'ring-sky-400/30', text: 'text-sky-600' };
+       case 'in-progress':
+         return { bg: 'bg-blue-500', ring: 'ring-blue-500/30', text: 'text-blue-600' };
+       case 'awaiting-user':
+         return { bg: 'bg-amber-500', ring: 'ring-amber-500/30', text: 'text-amber-600' };
+       case 'error':
+         return { bg: 'bg-red-500', ring: 'ring-red-500/30', text: 'text-red-600' };
+       case 'completed':
+         return { bg: 'bg-green-500', ring: 'ring-green-500/30', text: 'text-green-600' };
+     }
+   }
+   ```
+
 ## Стратегия тестирования
 
 ### Модульные тесты
