@@ -228,6 +228,17 @@ export class UserManager {
   }
 
   /**
+   * Set current user (for internal use by OAuthClientManager)
+   * Requirements: user-data-isolation.1.2
+   * @param user User to set as current
+   */
+  setCurrentUser(user: User): void {
+    this.currentUserId = user.user_id;
+    this.currentUser = user;
+    this.logger.info(`Current user set to ${user.user_id}`);
+  }
+
+  /**
    * Fetch user profile from Google UserInfo API
    * Requirements: account-profile.1.2, account-profile.1.6, error-notifications.1.1, token-management-ui.1.3, token-management-ui.1.4, user-data-isolation.1.2
    *

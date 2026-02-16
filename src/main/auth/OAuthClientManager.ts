@@ -17,6 +17,28 @@ import {
 } from '../../shared/events/types';
 
 // Requirements: clerkly.3.8 - Use centralized Logger instead of console.*
+
+/**
+ * Minimal interface for UserManager to avoid circular dependency
+ * Only includes methods used by OAuthClientManager
+ */
+interface IUserManager {
+  fetchProfile(): Promise<User | null>;
+  findOrCreateUser(data: unknown): User;
+  setCurrentUser(user: User): void;
+  updateProfileAfterTokenRefresh(): Promise<void>;
+  clearSession(): void;
+}
+
+/**
+ * Minimal interface for AuthWindowManager to avoid circular dependency
+ * Currently not used, but kept for future use
+ */
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+interface IAuthWindowManager {
+  // Methods will be added when needed
+}
+
 /**
  * PKCE storage for temporary state during OAuth flow
  */
@@ -59,10 +81,8 @@ export class OAuthClientManager {
   private config: OAuthConfig;
   private tokenStorage: TokenStorageManager;
   private pkceStorage: PKCEStorage | null = null;
-  // Using unknown to avoid circular dependency with UserManager
-  private userManager: unknown | null = null;
-  // Using unknown to avoid circular dependency with AuthWindowManager
-  private authWindowManager: unknown | null = null;
+  private userManager: IUserManager | null = null;
+  private authWindowManager: IAuthWindowManager | null = null;
 
   constructor(config: OAuthConfig, tokenStorage: TokenStorageManager) {
     this.config = config;
@@ -75,7 +95,7 @@ export class OAuthClientManager {
    * Should be called during initialization to enable automatic profile updates
    * @param userManager UserManager instance
    */
-  setUserManager(userManager: unknown): void {
+  setUserManager(userManager: IUserManager): void {
     this.userManager = userManager;
     this.logger.info('User manager set for automatic updates');
   }
@@ -86,7 +106,7 @@ export class OAuthClientManager {
    * Should be called during initialization to enable loader display during auth
    * @param authWindowManager AuthWindowManager instance
    */
-  setAuthWindowManager(authWindowManager: unknown): void {
+  setAuthWindowManager(authWindowManager: IAuthWindowManager): void {
     this.authWindowManager = authWindowManager;
     this.logger.info('Auth window manager set for loader display');
   }
@@ -289,8 +309,8 @@ export class OAuthClientManager {
             new AuthCompletedEvent(profileResult.profile.user_id, {
               id: profileResult.profile.user_id,
               email: profileResult.profile.email,
-              name: profileResult.profile.name,
-              picture: profileResult.profile.picture,
+              name: profileResult.profile.name || 'User', // Fallback to 'User' if name is null
+              // picture field is not stored in User type, omit it
             })
           );
         }
@@ -368,12 +388,11 @@ export class OAuthClientManager {
         verified_email?: boolean;
       };
 
-      // CRITICAL: Find or create user and set user_id in ProfileManager BEFORE saving to database
+      // CRITICAL: Find or create user and set user_id in UserManager BEFORE saving to database
       // This is required because DataManager.saveData() needs getCurrentUserId()
       // Requirements: user-data-isolation.1.2 - Find or create user by email
-      const user = (this.userManager as { findOrCreateUser: (data: unknown) => User }).findOrCreateUser(profileData);
-      (this.userManager as unknown as { currentUserId: string; currentUser: User }).currentUserId = user.user_id;
-      (this.userManager as unknown as { currentUserId: string; currentUser: User }).currentUser = user;
+      const user = this.userManager.findOrCreateUser(profileData);
+      this.userManager.setCurrentUser(user);
 
       this.logger.info(`Profile fetched successfully for user ${user.user_id}`);
       return { success: true, profile: user };

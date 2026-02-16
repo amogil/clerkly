@@ -503,7 +503,11 @@ describe('OAuthClientManager', () => {
 
       // Create mock profile manager
       const mockUserManager = {
+        fetchProfile: jest.fn().mockResolvedValue(null),
+        findOrCreateUser: jest.fn(),
+        setCurrentUser: jest.fn(),
         updateProfileAfterTokenRefresh: jest.fn().mockResolvedValue(undefined),
+        clearSession: jest.fn(),
       };
 
       // Set profile manager

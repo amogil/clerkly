@@ -8,7 +8,7 @@
 
 import * as fc from 'fast-check';
 import { renderHook, act, waitFor } from '@testing-library/react';
-import type { Agent } from '../../../src/renderer/types/agent';
+import type { AgentSnapshot } from '../../../src/renderer/types/agent';
 
 // Mock window.api
 const mockAgentsApi = {
@@ -55,24 +55,26 @@ describe('useAgents hook - Property-based tests', () => {
         fc.integer({ min: 0, max: 10 }), // Number of agents to start with
         async (initialAgentCount) => {
           // Generate agents
-          const agents: Agent[] = Array.from({ length: initialAgentCount }, (_, i) => ({
-            agentId: `agent-${i}`,
-            userId: 'user-1',
+          const agents: AgentSnapshot[] = Array.from({ length: initialAgentCount }, (_, i) => ({
+            id: `agent-${i}`,
             name: `Agent ${i}`,
-            createdAt: new Date(Date.now() - i * 1000).toISOString(),
-            updatedAt: new Date(Date.now() - i * 1000).toISOString(),
+            createdAt: Date.now() - i * 1000,
+            updatedAt: Date.now() - i * 1000,
+            archivedAt: null,
+            status: 'new' as const,
           }));
 
           mockAgentsApi.list.mockResolvedValue({ success: true, data: agents });
 
           // If empty, mock auto-create
           if (initialAgentCount === 0) {
-            const newAgent: Agent = {
-              agentId: 'auto-created',
-              userId: 'user-1',
+            const newAgent: AgentSnapshot = {
+              id: 'auto-created',
               name: 'New Agent',
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
+              createdAt: Date.now(),
+              updatedAt: Date.now(),
+              archivedAt: null,
+              status: 'new' as const,
             };
             mockAgentsApi.create.mockResolvedValue({ success: true, data: newAgent });
           }
@@ -108,12 +110,13 @@ describe('useAgents hook - Property-based tests', () => {
         fc.integer({ min: 1, max: 5 }), // Start with 1-5 agents
         async (initialAgentCount) => {
           // Generate agents
-          const agents: Agent[] = Array.from({ length: initialAgentCount }, (_, i) => ({
-            agentId: `agent-${i}`,
-            userId: 'user-1',
+          const agents: AgentSnapshot[] = Array.from({ length: initialAgentCount }, (_, i) => ({
+            id: `agent-${i}`,
             name: `Agent ${i}`,
-            createdAt: new Date(Date.now() - i * 1000).toISOString(),
-            updatedAt: new Date(Date.now() - i * 1000).toISOString(),
+            createdAt: Date.now() - i * 1000,
+            updatedAt: Date.now() - i * 1000,
+            archivedAt: null,
+            status: 'new' as const,
           }));
 
           mockAgentsApi.list.mockResolvedValue({ success: true, data: [...agents] });
@@ -132,18 +135,19 @@ describe('useAgents hook - Property-based tests', () => {
 
             // If archiving last agent, mock auto-create
             if (currentAgentsCount === 1) {
-              const newAgent: Agent = {
-                agentId: `auto-created-${i}`,
-                userId: 'user-1',
+              const newAgent: AgentSnapshot = {
+                id: `auto-created-${i}`,
                 name: 'New Agent',
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
+                createdAt: Date.now(),
+                updatedAt: Date.now(),
+                archivedAt: null,
+                status: 'new' as const,
               };
               mockAgentsApi.create.mockResolvedValue({ success: true, data: newAgent });
             }
 
             await act(async () => {
-              await result.current.archiveAgent(agentToArchive.agentId);
+              await result.current.archiveAgent(agentToArchive.id);
             });
 
             // AUTO-CREATE FIRST AGENT: Always at least one agent
@@ -170,12 +174,13 @@ describe('useAgents hook - Property-based tests', () => {
       fc.asyncProperty(fc.constant(null), async () => {
         mockAgentsApi.list.mockResolvedValue({ success: true, data: [] });
 
-        const newAgent: Agent = {
-          agentId: 'auto-created',
-          userId: 'user-1',
+        const newAgent: AgentSnapshot = {
+          id: 'auto-created',
           name: 'New Agent',
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          archivedAt: null,
+          status: 'new' as const,
         };
         mockAgentsApi.create.mockResolvedValue({ success: true, data: newAgent });
 
@@ -188,10 +193,9 @@ describe('useAgents hook - Property-based tests', () => {
         // Check properties
         expect(result.current.agents).toHaveLength(1);
         expect(result.current.agents[0].name).toBe('New Agent');
-        expect(result.current.agents[0].agentId).toBeTruthy();
-        expect(result.current.agents[0].userId).toBe('user-1');
+        expect(result.current.agents[0].id).toBeTruthy();
         expect(result.current.activeAgent).not.toBeNull();
-        expect(result.current.activeAgent?.agentId).toBe('auto-created');
+        expect(result.current.activeAgent?.id).toBe('auto-created');
 
         unmount();
       }),

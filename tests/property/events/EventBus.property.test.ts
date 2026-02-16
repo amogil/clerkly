@@ -11,7 +11,18 @@ import {
   AgentCreatedPayload,
   AgentUpdatedPayload,
   AgentArchivedPayload,
+  AgentSnapshot,
 } from '../../../src/shared/events/types';
+
+// Helper to create AgentSnapshot
+const createAgentSnapshot = (id: string, name: string = 'Test Agent'): AgentSnapshot => ({
+  id,
+  name,
+  createdAt: Date.now(),
+  updatedAt: Date.now(),
+  archivedAt: null,
+  status: 'new' as const,
+});
 
 describe('EventBus Property-Based Tests', () => {
   describe('Property 1: getEventKey creates unique keys for different entities', () => {
@@ -29,11 +40,11 @@ describe('EventBus Property-Based Tests', () => {
 
             const payload1: AgentCreatedPayload = {
               timestamp: Date.now(),
-              data: { id: id1, name: 'Agent 1', createdAt: Date.now(), updatedAt: Date.now() },
+              agent: createAgentSnapshot(id1, 'Agent 1'),
             };
             const payload2: AgentCreatedPayload = {
               timestamp: Date.now(),
-              data: { id: id2, name: 'Agent 2', createdAt: Date.now(), updatedAt: Date.now() },
+              agent: createAgentSnapshot(id2, 'Agent 2'),
             };
 
             const key1 = getEventKey('agent.created', payload1);
@@ -62,13 +73,11 @@ describe('EventBus Property-Based Tests', () => {
           (id, timestamp1, timestamp2) => {
             const payload1: AgentUpdatedPayload = {
               timestamp: timestamp1,
-              id,
-              changedFields: { name: 'Name 1' },
+              agent: createAgentSnapshot(id, 'Name 1'),
             };
             const payload2: AgentUpdatedPayload = {
               timestamp: timestamp2,
-              id,
-              changedFields: { name: 'Name 2' },
+              agent: createAgentSnapshot(id, 'Name 2'),
             };
 
             const key1 = getEventKey('agent.updated', payload1);
@@ -84,7 +93,7 @@ describe('EventBus Property-Based Tests', () => {
   });
 
   describe('Property 3: getEntityId extracts ID from created events', () => {
-    /* Preconditions: Created event with data.id
+    /* Preconditions: Created event with agent.id
        Action: Extract entity ID
        Assertions: ID is correctly extracted
        Requirements: realtime-events.3.2 */
@@ -93,7 +102,7 @@ describe('EventBus Property-Based Tests', () => {
         fc.property(fc.string({ minLength: 1, maxLength: 50 }), (id) => {
           const payload: AgentCreatedPayload = {
             timestamp: Date.now(),
-            data: { id, name: 'Test', createdAt: Date.now(), updatedAt: Date.now() },
+            agent: createAgentSnapshot(id),
           };
 
           const extractedId = getEntityId(payload);
@@ -107,7 +116,7 @@ describe('EventBus Property-Based Tests', () => {
   });
 
   describe('Property 4: getEntityId extracts ID from updated/deleted events', () => {
-    /* Preconditions: Updated/deleted event with id field
+    /* Preconditions: Updated/deleted event with agent.id field
        Action: Extract entity ID
        Assertions: ID is correctly extracted
        Requirements: realtime-events.3.3, realtime-events.3.4 */
@@ -116,8 +125,7 @@ describe('EventBus Property-Based Tests', () => {
         fc.property(fc.string({ minLength: 1, maxLength: 50 }), (id) => {
           const payload: AgentUpdatedPayload = {
             timestamp: Date.now(),
-            id,
-            changedFields: { name: 'Updated' },
+            agent: createAgentSnapshot(id, 'Updated'),
           };
 
           const extractedId = getEntityId(payload);
@@ -134,7 +142,7 @@ describe('EventBus Property-Based Tests', () => {
         fc.property(fc.string({ minLength: 1, maxLength: 50 }), (id) => {
           const payload: AgentArchivedPayload = {
             timestamp: Date.now(),
-            id,
+            agent: { ...createAgentSnapshot(id), archivedAt: Date.now() },
           };
 
           const extractedId = getEntityId(payload);
@@ -157,16 +165,15 @@ describe('EventBus Property-Based Tests', () => {
         fc.property(fc.string({ minLength: 1, maxLength: 20 }), (id) => {
           const createdPayload: AgentCreatedPayload = {
             timestamp: Date.now(),
-            data: { id, name: 'Test', createdAt: Date.now(), updatedAt: Date.now() },
+            agent: createAgentSnapshot(id),
           };
           const updatedPayload: AgentUpdatedPayload = {
             timestamp: Date.now(),
-            id,
-            changedFields: { name: 'Updated' },
+            agent: createAgentSnapshot(id, 'Updated'),
           };
           const archivedPayload: AgentArchivedPayload = {
             timestamp: Date.now(),
-            id,
+            agent: { ...createAgentSnapshot(id), archivedAt: Date.now() },
           };
 
           const createdKey = getEventKey('agent.created', createdPayload);
@@ -193,7 +200,7 @@ describe('EventBus Property-Based Tests', () => {
         fc.property(fc.nat(), (timestamp) => {
           const payload: AgentCreatedPayload = {
             timestamp,
-            data: { id: 'test', name: 'Test', createdAt: timestamp, updatedAt: timestamp },
+            agent: createAgentSnapshot('test'),
           };
 
           // Property: timestamp should be a non-negative number
@@ -205,29 +212,27 @@ describe('EventBus Property-Based Tests', () => {
     });
   });
 
-  describe('Property 7: changedFields is required for updated events', () => {
-    /* Preconditions: Updated event
-       Action: Create updated event payload
-       Assertions: changedFields is present
+  describe('Property 7: agent snapshot is required for all agent events', () => {
+    /* Preconditions: Agent event
+       Action: Create agent event payload
+       Assertions: agent snapshot is present with all required fields
        Requirements: realtime-events.3.3 */
-    it('changedFields is always present in updated events', () => {
+    it('agent snapshot is always present in agent events', () => {
       fc.assert(
         fc.property(
           fc.string({ minLength: 1, maxLength: 20 }),
-          fc.record({
-            name: fc.option(fc.string(), { nil: undefined }),
-            description: fc.option(fc.string(), { nil: undefined }),
-          }),
-          (id, changes) => {
+          fc.option(fc.string(), { nil: null }),
+          (id, name) => {
             const payload: AgentUpdatedPayload = {
               timestamp: Date.now(),
-              id,
-              changedFields: changes,
+              agent: createAgentSnapshot(id, name || 'Test'),
             };
 
-            // Property: changedFields should always be present
-            expect(payload.changedFields).toBeDefined();
-            expect(typeof payload.changedFields).toBe('object');
+            // Property: agent snapshot should always be present
+            expect(payload.agent).toBeDefined();
+            expect(typeof payload.agent).toBe('object');
+            expect(payload.agent.id).toBe(id);
+            expect(payload.agent.status).toBeDefined();
           }
         ),
         { numRuns: 100 }

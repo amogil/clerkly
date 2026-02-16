@@ -206,7 +206,7 @@ const agentIPCHandlers = new AgentIPCHandlers(agentManager, messageManager);
 if (process.env.NODE_ENV === 'test') {
   // Export test context for functional tests
   // This allows tests to access internal state like PKCE storage
-  (global as any).testContext = {
+  (global as { testContext?: unknown }).testContext = {
     oauthClient,
     tokenStorage,
     userManager,
@@ -230,7 +230,8 @@ if (process.env.NODE_ENV === 'test') {
     if (!isTestEnvironment()) {
       throw new Error('test:clear-data can only be used in test environment');
     }
-    const db = (dataManager as any).db;
+    const db = (dataManager as unknown as { db: { prepare: (sql: string) => { run: () => void } } })
+      .db;
     db.prepare('DELETE FROM user_data').run();
     return { success: true };
   });
@@ -268,118 +269,140 @@ if (process.env.NODE_ENV === 'test') {
     }
   });
 
-  ipcMain.handle('test:get-profile-by-email', async (_event: any, email: string) => {
-    if (!isTestEnvironment()) {
-      throw new Error('test:get-profile-by-email can only be used in test environment');
+  ipcMain.handle(
+    'test:get-profile-by-email',
+    async (_event: Electron.IpcMainInvokeEvent, email: string) => {
+      if (!isTestEnvironment()) {
+        throw new Error('test:get-profile-by-email can only be used in test environment');
+      }
+      if (!email || typeof email !== 'string') {
+        return { success: false, error: 'Email parameter is required', profile: null };
+      }
+      try {
+        const user = userManager.loadUserByEmail(email);
+        return { success: true, profile: user };
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        return { success: false, error: errorMessage, profile: null };
+      }
     }
-    if (!email || typeof email !== 'string') {
-      return { success: false, error: 'Email parameter is required', profile: null };
-    }
-    try {
-      const user = userManager.loadUserByEmail(email);
-      return { success: true, profile: user };
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      return { success: false, error: errorMessage, profile: null };
-    }
-  });
+  );
 
   // Test handler for creating agent with old message timestamp
-  ipcMain.handle('test:create-agent-with-old-message', async (_event: any, minutesAgo: number) => {
-    if (!isTestEnvironment()) {
-      throw new Error('test:create-agent-with-old-message can only be used in test environment');
-    }
-    try {
-      // Get current user ID
-      const userId = userManager.getCurrentUserId();
-      if (!userId) {
-        throw new Error('No user logged in');
+  ipcMain.handle(
+    'test:create-agent-with-old-message',
+    async (_event: Electron.IpcMainInvokeEvent, minutesAgo: number) => {
+      if (!isTestEnvironment()) {
+        throw new Error('test:create-agent-with-old-message can only be used in test environment');
       }
+      try {
+        // Get current user ID
+        const userId = userManager.getCurrentUserId();
+        if (!userId) {
+          throw new Error('No user logged in');
+        }
 
-      // Create a new agent using AgentManager
-      const agent = await agentManager.create(userId);
+        // Create a new agent using AgentManager
+        const agent = await agentManager.create(userId);
 
-      // Create a message with old timestamp using MessageManager
-      const oldTimestamp = new Date(Date.now() - minutesAgo * 60 * 1000).toISOString();
+        // Create a message with old timestamp using MessageManager
+        const oldTimestamp = new Date(Date.now() - minutesAgo * 60 * 1000).toISOString();
 
-      const payload = {
-        kind: 'user' as const,
-        data: { text: 'Test message from the past' },
-      };
+        const payload = {
+          kind: 'user' as const,
+          data: { text: 'Test message from the past' },
+        };
 
-      // Create message through MessageManager (this will call MessagesRepository.create)
-      const message = await messageManager.create(agent.agentId, payload);
+        // Create message through MessageManager (this will call MessagesRepository.create)
+        const message = await messageManager.create(agent.agentId, payload);
 
-      // Now manually update the message timestamp and agent updatedAt to the old time
-      // This is a test-only operation to simulate an old message
-      // Use ORM methods instead of raw SQL
+        // Now manually update the message timestamp and agent updatedAt to the old time
+        // This is a test-only operation to simulate an old message
+        // Use ORM methods instead of raw SQL
 
-      // Get repositories from DatabaseManager
-      const messagesRepo = dbManager.messages;
-      const agentsRepo = dbManager.agents;
+        // Get repositories from DatabaseManager
+        const messagesRepo = dbManager.messages;
+        const agentsRepo = dbManager.agents;
 
-      // Update the message timestamp to old time using ORM
-      messagesRepo.setTimestamp(message.id, agent.agentId, oldTimestamp);
+        // Update the message timestamp to old time using ORM
+        messagesRepo.setTimestamp(message.id, agent.agentId, oldTimestamp);
 
-      // Update agent's updatedAt to match the message timestamp using ORM
-      agentsRepo.setUpdatedAt(agent.agentId, oldTimestamp);
+        // Update agent's updatedAt to match the message timestamp using ORM
+        agentsRepo.setUpdatedAt(agent.agentId, oldTimestamp);
 
-      return {
-        success: true,
-        agentId: agent.agentId,
-        timestamp: oldTimestamp,
-      };
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      return { success: false, error: errorMessage };
+        return {
+          success: true,
+          agentId: agent.agentId,
+          timestamp: oldTimestamp,
+        };
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        return { success: false, error: errorMessage };
+      }
     }
-  });
+  );
 
-  ipcMain.handle('test:setup-profile', async (_event: any, profileData: any) => {
-    if (!isTestEnvironment()) {
-      throw new Error('test:setup-profile can only be used in test environment');
+  ipcMain.handle(
+    'test:setup-profile',
+    async (
+      _event: Electron.IpcMainInvokeEvent,
+      profileData: {
+        id?: string;
+        email: string;
+        name?: string;
+        given_name?: string;
+        family_name?: string;
+        locale?: string;
+      }
+    ) => {
+      if (!isTestEnvironment()) {
+        throw new Error('test:setup-profile can only be used in test environment');
+      }
+      try {
+        // Create user via findOrCreateUser instead of saveProfile
+        const googleProfile = {
+          id: profileData.id || 'test-google-id',
+          email: profileData.email,
+          verified_email: true,
+          name: profileData.name || 'Test User',
+          given_name: profileData.given_name || 'Test',
+          family_name: profileData.family_name || 'User',
+          locale: profileData.locale || 'en',
+        };
+        userManager.findOrCreateUser(googleProfile);
+        return { success: true };
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        return { success: false, error: errorMessage };
+      }
     }
-    try {
-      // Create user via findOrCreateUser instead of saveProfile
-      const googleProfile = {
-        id: profileData.id || 'test-google-id',
-        email: profileData.email,
-        verified_email: true,
-        name: profileData.name || 'Test User',
-        given_name: profileData.given_name || 'Test',
-        family_name: profileData.family_name || 'User',
-        locale: profileData.locale || 'en',
-      };
-      userManager.findOrCreateUser(googleProfile);
-      return { success: true };
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      return { success: false, error: errorMessage };
-    }
-  });
+  );
 
   // Requirements: user-data-isolation.1.3, user-data-isolation.1.4, user-data-isolation.1.13
   // Test handlers for data isolation testing
-  ipcMain.handle('test:save-data', async (_event: any, key: string, value: string) => {
-    if (!isTestEnvironment()) {
-      throw new Error('test:save-data can only be used in test environment');
-    }
-    try {
-      const result = dataManager.saveData(key, value);
-
-      // Check if result indicates error
-      if (!result.success) {
-        return result; // Return the error result
+  ipcMain.handle(
+    'test:save-data',
+    async (_event: Electron.IpcMainInvokeEvent, key: string, value: string) => {
+      if (!isTestEnvironment()) {
+        throw new Error('test:save-data can only be used in test environment');
       }
+      try {
+        const result = dataManager.saveData(key, value);
 
-      return { success: true };
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      return { success: false, error: errorMessage };
+        // Check if result indicates error
+        if (!result.success) {
+          return result; // Return the error result
+        }
+
+        return { success: true };
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        return { success: false, error: errorMessage };
+      }
     }
-  });
+  );
 
-  ipcMain.handle('test:load-data', async (_event: any, key: string) => {
+  ipcMain.handle('test:load-data', async (_event: Electron.IpcMainInvokeEvent, key: string) => {
     if (!isTestEnvironment()) {
       throw new Error('test:load-data can only be used in test environment');
     }
@@ -392,7 +415,7 @@ if (process.env.NODE_ENV === 'test') {
     }
   });
 
-  ipcMain.handle('test:delete-data', async (_event: any, key: string) => {
+  ipcMain.handle('test:delete-data', async (_event: Electron.IpcMainInvokeEvent, key: string) => {
     if (!isTestEnvironment()) {
       throw new Error('test:delete-data can only be used in test environment');
     }
@@ -406,29 +429,32 @@ if (process.env.NODE_ENV === 'test') {
   });
 
   // Test handler for triggering deep link handling
-  ipcMain.handle('test:handle-deep-link', async (_event: any, url: string) => {
-    if (!isTestEnvironment()) {
-      throw new Error('test:handle-deep-link can only be used in test environment');
-    }
-    try {
-      logger.info(`Handling deep link: ${url}`);
-      const authStatus = await oauthClient.handleDeepLink(url);
-      logger.info(`Deep link auth status: ${JSON.stringify(authStatus)}`);
+  ipcMain.handle(
+    'test:handle-deep-link',
+    async (_event: Electron.IpcMainInvokeEvent, url: string) => {
+      if (!isTestEnvironment()) {
+        throw new Error('test:handle-deep-link can only be used in test environment');
+      }
+      try {
+        logger.info(`Handling deep link: ${url}`);
+        const authStatus = await oauthClient.handleDeepLink(url);
+        logger.info(`Deep link auth status: ${JSON.stringify(authStatus)}`);
 
-      // Events are now published directly from OAuthClientManager.handleDeepLink()
-      // No need to send them here - they are already sent
+        // Events are now published directly from OAuthClientManager.handleDeepLink()
+        // No need to send them here - they are already sent
 
-      return authStatus;
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      logger.error(`Deep link handling error: ${errorMessage}`);
-      return { authorized: false, error: errorMessage };
+        return authStatus;
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        logger.error(`Deep link handling error: ${errorMessage}`);
+        return { authorized: false, error: errorMessage };
+      }
     }
-  });
+  );
 
   ipcMain.handle(
     'test:trigger-error-notification',
-    async (event: any, data: { message: string; context: string }) => {
+    async (_event: Electron.IpcMainInvokeEvent, data: { message: string; context: string }) => {
       if (!isTestEnvironment()) {
         throw new Error('test:trigger-error-notification can only be used in test environment');
       }
@@ -506,7 +532,7 @@ if (process.env.NODE_ENV === 'test') {
   ipcMain.handle(
     'test:simulate-data-error',
     async (
-      _event: any,
+      _event: Electron.IpcMainInvokeEvent,
       operation: 'saveData' | 'loadData' | 'deleteData',
       errorMessage: string
     ) => {
