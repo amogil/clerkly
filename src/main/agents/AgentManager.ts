@@ -9,11 +9,16 @@ import {
   AgentUpdatedEvent,
   AgentArchivedEvent,
   MessageCreatedPayload,
+  AgentSnapshot,
 } from '../../shared/events/types';
 import { EVENT_TYPES } from '../../shared/events/constants';
 import { Logger } from '../Logger';
 import { handleBackgroundError } from '../ErrorHandler';
 import type { Agent } from '../db/schema';
+import type { Message } from '../db/schema';
+import type { AgentStatus, MessagePayload } from '../../shared/utils/agentStatus';
+
+
 
 /**
  * AgentManager - business logic for agents
@@ -30,6 +35,65 @@ export class AgentManager {
   constructor(dbManager: IDatabaseManager) {
     this.dbManager = dbManager;
     this.subscribeToEvents();
+  }
+
+  /**
+   * Compute agent status based on the last message
+   * Requirements: agents.5.1, agents.5.2, agents.5.3, agents.5.4, agents.5.5
+   */
+  private computeAgentStatus(message: Message | null): AgentStatus {
+    if (!message) {
+      return 'new';
+    }
+
+    try {
+      const payload: MessagePayload = JSON.parse(message.payloadJson);
+
+      // Check for errors in result.status
+      const resultStatus = payload.data?.result?.status;
+      if (resultStatus === 'error' || resultStatus === 'crash' || resultStatus === 'timeout') {
+        return 'error';
+      }
+
+      // Final answer means completed
+      if (payload.kind === 'final_answer') {
+        return 'completed';
+      }
+
+      // Last message from user means in-progress
+      if (payload.kind === 'user') {
+        return 'in-progress';
+      }
+
+      // Last message from LLM (not final_answer) means awaiting-response
+      if (payload.kind === 'llm') {
+        return 'awaiting-response';
+      }
+
+      // Default to new for other kinds (tool_call, code_exec, etc.)
+      return 'new';
+    } catch (error) {
+      this.logger.error(`Failed to parse message payload: ${error}`);
+      return 'new';
+    }
+  }
+
+  /**
+   * Convert DB Agent entity to Event Agent model with computed status
+   */
+  private toEventAgent(agent: Agent): AgentSnapshot {
+    // Get last message to compute status
+    const lastMessage = this.dbManager.messages.getLastByAgent(agent.agentId);
+    const status = this.computeAgentStatus(lastMessage);
+
+    return {
+      id: agent.agentId,
+      name: agent.name,
+      createdAt: new Date(agent.createdAt).getTime(),
+      updatedAt: new Date(agent.updatedAt).getTime(),
+      archivedAt: agent.archivedAt ? new Date(agent.archivedAt).getTime() : null,
+      status,
+    };
   }
 
   /**
@@ -56,16 +120,14 @@ export class AgentManager {
       // Update agent's updatedAt in database
       this.dbManager.agents.touch(agentId);
 
-      // Get updated agent to publish event with new timestamp
+      // Get updated agent to publish event with new timestamp and status
       const updatedAgent = this.dbManager.agents.findById(agentId);
       if (updatedAgent) {
         this.logger.info(`Agent updatedAt updated: ${agentId}`);
 
-        // Publish AGENT_UPDATED event for UI
+        // Publish AGENT_UPDATED event for UI with full agent model including status
         MainEventBus.getInstance().publish(
-          new AgentUpdatedEvent(agentId, {
-            updatedAt: new Date(updatedAgent.updatedAt).getTime(),
-          })
+          new AgentUpdatedEvent(this.toEventAgent(updatedAgent))
         );
       }
     } catch (error) {
@@ -81,21 +143,17 @@ export class AgentManager {
    * Requirements: agents.2.3, agents.2.4, agents.2.5
    */
   create(name?: string): Agent {
+    // Use default name if not provided
+    const agentName = name || 'New Agent';
+    
     // Repository automatically generates agentId and injects userId
-    const agent = this.dbManager.agents.create(name);
+    const agent = this.dbManager.agents.create(agentName);
 
     this.logger.info(`Agent created: ${agent.agentId}`);
 
-    // Publish event for real-time UI updates
+    // Publish event for real-time UI updates with full agent model
     // Requirements: agents.12.1
-    MainEventBus.getInstance().publish(
-      new AgentCreatedEvent({
-        id: agent.agentId,
-        name: agent.name || 'New Agent',
-        createdAt: Date.parse(agent.createdAt),
-        updatedAt: Date.parse(agent.updatedAt),
-      })
-    );
+    MainEventBus.getInstance().publish(new AgentCreatedEvent(this.toEventAgent(agent)));
 
     return agent;
   }
@@ -128,9 +186,14 @@ export class AgentManager {
 
     this.logger.info(`Agent updated: ${agentId}`);
 
-    // Publish event for real-time UI updates
+    // Get updated agent and publish event with full model
     // Requirements: agents.12.2
-    MainEventBus.getInstance().publish(new AgentUpdatedEvent(agentId, data));
+    const updatedAgent = this.dbManager.agents.findById(agentId);
+    if (updatedAgent) {
+      MainEventBus.getInstance().publish(
+        new AgentUpdatedEvent(this.toEventAgent(updatedAgent))
+      );
+    }
   }
 
   /**

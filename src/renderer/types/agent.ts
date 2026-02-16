@@ -1,9 +1,6 @@
 // Requirements: agents.1, agents.7, agents.9
 
-/**
- * Agent status - computed dynamically from messages
- */
-export type AgentStatus = 'new' | 'in-progress' | 'awaiting-user' | 'error' | 'completed';
+import type { AgentStatus, MessagePayload } from '../../shared/utils/agentStatus';
 
 /**
  * Agent entity from database
@@ -15,28 +12,6 @@ export interface Agent {
   createdAt: string; // ISO 8601
   updatedAt: string; // ISO 8601
   archivedAt?: string | null;
-}
-
-/**
- * Message payload structure
- * Requirements: agents.7.2
- */
-export interface MessagePayload {
-  kind: 'user' | 'llm' | 'tool_call' | 'code_exec' | 'final_answer' | 'request_scope' | 'artifact';
-  timing?: {
-    started_at: string;
-    finished_at: string;
-  };
-  data: {
-    text?: string;
-    format?: 'markdown' | 'text';
-    reply_to_message_id?: number | null;
-    result?: {
-      status?: string;
-      error?: { message?: string };
-    };
-    [key: string]: unknown;
-  };
 }
 
 /**

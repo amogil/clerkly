@@ -6,6 +6,7 @@
 
 import { User } from '../../types';
 import { EVENT_TYPES } from './constants';
+import { AgentStatus, MessagePayload } from '../utils/agentStatus';
 
 // ============================================================================
 // Base Event Types
@@ -69,15 +70,16 @@ export interface EntityDeletedEvent extends BaseEvent {
 // ============================================================================
 
 /**
- * Agent entity
+ * Agent entity for events
+ * Contains all fields from DB plus computed status
  */
-export interface Agent {
+export interface AgentSnapshot {
   id: string;
-  name: string;
-  description?: string;
-  model?: string;
+  name: string | null;
   createdAt: number;
   updatedAt: number;
+  archivedAt: number | null;
+  status: AgentStatus;
 }
 
 /**
@@ -92,19 +94,6 @@ export type MessageKind =
   | 'final_answer'
   | 'request_scope'
   | 'artifact';
-
-/**
- * Message payload structure
- * Requirements: agents.7.2
- */
-export interface MessagePayload {
-  kind: MessageKind;
-  timing?: {
-    started_at: string; // ISO 8601 with timezone offset
-    finished_at: string; // ISO 8601 with timezone offset
-  };
-  data: Record<string, unknown>;
-}
 
 /**
  * Message entity
@@ -122,8 +111,10 @@ export interface Message {
 // ============================================================================
 
 // Agent events
-export type AgentCreatedPayload = EntityCreatedEvent<Agent>;
-export type AgentUpdatedPayload = EntityUpdatedEvent<Agent>;
+export type AgentCreatedPayload = EntityCreatedEvent<AgentSnapshot>;
+export interface AgentUpdatedPayload extends BaseEvent {
+  agent: AgentSnapshot;
+}
 export type AgentArchivedPayload = EntityDeletedEvent;
 
 // Message events
@@ -507,7 +498,7 @@ export class UserLogoutEvent extends TypedEventClass<UserLogoutType> {
 export class AgentCreatedEvent extends TypedEventClass<AgentCreatedType> {
   readonly type = EVENT_TYPES.AGENT_CREATED;
 
-  constructor(public readonly data: Agent) {
+  constructor(public readonly data: AgentSnapshot) {
     super();
   }
 
@@ -522,15 +513,12 @@ export class AgentCreatedEvent extends TypedEventClass<AgentCreatedType> {
 export class AgentUpdatedEvent extends TypedEventClass<AgentUpdatedType> {
   readonly type = EVENT_TYPES.AGENT_UPDATED;
 
-  constructor(
-    public readonly id: string,
-    public readonly changedFields: Partial<Agent>
-  ) {
+  constructor(public readonly agent: AgentSnapshot) {
     super();
   }
 
   toPayload(): EventPayloadWithoutTimestamp<AgentUpdatedType> {
-    return { id: this.id, changedFields: this.changedFields };
+    return { agent: this.agent };
   }
 }
 

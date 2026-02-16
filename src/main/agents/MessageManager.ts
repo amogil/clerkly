@@ -7,19 +7,7 @@ import { MainEventBus } from '../events/MainEventBus';
 import { MessageCreatedEvent, MessageUpdatedEvent } from '../../shared/events/types';
 import { Logger } from '../Logger';
 import type { Message } from '../db/schema';
-
-/**
- * Message payload structure
- * Requirements: agents.7.2
- */
-export interface MessagePayload {
-  kind: 'user' | 'llm' | 'tool_call' | 'code_exec' | 'final_answer' | 'request_scope' | 'artifact';
-  timing?: {
-    started_at: string;
-    finished_at: string;
-  };
-  data: Record<string, unknown>;
-}
+import type { MessagePayload } from '../../shared/utils/agentStatus';
 
 /**
  * MessageManager - business logic for messages
