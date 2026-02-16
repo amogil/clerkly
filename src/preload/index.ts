@@ -97,6 +97,7 @@ interface API {
       agentId: string,
       payload: MessagePayloadAPI
     ) => Promise<{ success: boolean; error?: string }>;
+    getLast: (agentId: string) => Promise<{ success: boolean; data?: unknown; error?: string }>;
   };
   // Requirements: testing.3.1, testing.3.2 - Test API methods (only available in test environment)
   test?: {
@@ -491,6 +492,17 @@ const api: API = {
      */
     async list(agentId: string): Promise<{ success: boolean; data?: unknown; error?: string }> {
       return await ipcRenderer.invoke('messages:list', { agentId });
+    },
+
+    /**
+     * Get the last message for an agent (most recent)
+     * Returns null if no messages exist
+     * Requirements: agents.5.5
+     * @param {string} agentId - Agent ID
+     * @returns {Promise<{success: boolean, data?: Message | null, error?: string}>}
+     */
+    async getLast(agentId: string): Promise<{ success: boolean; data?: unknown; error?: string }> {
+      return await ipcRenderer.invoke('messages:get-last', { agentId });
     },
 
     /**

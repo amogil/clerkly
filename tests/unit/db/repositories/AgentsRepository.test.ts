@@ -66,12 +66,44 @@ describe('AgentsRepository', () => {
     /* Preconditions: Archived agents in database
        Action: Call list()
        Assertions: Archived agents are not returned
-       Requirements: user-data-isolation.7.6 */
+       Requirements: user-data-isolation.7.6, agents.5.6 */
     it('should not return archived agents', () => {
       const agent = repo.create('Agent');
       repo.archive(agent.agentId);
 
       expect(repo.list()).toHaveLength(0);
+    });
+
+    /* Preconditions: Mix of archived and non-archived agents
+       Action: Call list()
+       Assertions: Only non-archived agents returned
+       Requirements: agents.5.6 */
+    it('should filter out archived agents from mixed list', () => {
+      const agent1 = repo.create('Active 1');
+      const agent2 = repo.create('Active 2');
+      const agent3 = repo.create('To Archive');
+
+      repo.archive(agent3.agentId);
+
+      const result = repo.list();
+      expect(result).toHaveLength(2);
+      expect(result.map((a) => a.agentId)).toContain(agent1.agentId);
+      expect(result.map((a) => a.agentId)).toContain(agent2.agentId);
+      expect(result.map((a) => a.agentId)).not.toContain(agent3.agentId);
+    });
+
+    /* Preconditions: All agents archived
+       Action: Call list()
+       Assertions: Returns empty array
+       Requirements: agents.5.6 */
+    it('should return empty array when all agents are archived', () => {
+      const agent1 = repo.create('Agent 1');
+      const agent2 = repo.create('Agent 2');
+
+      repo.archive(agent1.agentId);
+      repo.archive(agent2.agentId);
+
+      expect(repo.list()).toEqual([]);
     });
 
     /* Preconditions: Multiple agents

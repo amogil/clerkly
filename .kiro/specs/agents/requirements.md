@@ -230,13 +230,23 @@
    - Должен происходить автоматический возврат к интерфейсу чата
    - Выбранный агент должен становиться активным
 
-5.5. Агенты со статусом "error" ДОЛЖНЫ показывать сообщение об ошибке (errorMessage)
+5.5. Агенты со статусом "error" ДОЛЖНЫ показывать сообщение об ошибке (errorMessage) из последнего сообщения
+
+5.6. Архивированные агенты НЕ ДОЛЖНЫ отображаться в All Agents
+
+5.7. Агенты ДОЛЖНЫ быть отсортированы по updatedAt (от новых к старым)
+
+5.8. Для получения error message ДОЛЖЕН использоваться оптимизированный SQL запрос с ORDER BY timestamp DESC LIMIT 1
 
 #### Функциональные Тесты
 
 - `tests/functional/agents.spec.ts` - "should open task history on +N button click"
 - `tests/functional/agents.spec.ts` - "should display all agents in history"
 - `tests/functional/agents.spec.ts` - "should open agent chat from history"
+- `tests/functional/agents-error-messages.spec.ts` - "should display error message for agent with error status in AllAgents"
+- `tests/functional/agents-error-messages.spec.ts` - "should not display error messages for archived agents in AllAgents"
+- `tests/functional/agents-error-messages.spec.ts` - "should sort agents by updatedAt in AllAgents"
+- `tests/functional/agents-error-messages.spec.ts` - "should display only the last error message in AllAgents"
 
 ### 6. Визуальные индикаторы статусов
 

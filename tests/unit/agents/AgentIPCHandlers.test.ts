@@ -75,6 +75,7 @@ describe('AgentIPCHandlers', () => {
       list: jest.fn().mockReturnValue([mockMessage]),
       create: jest.fn().mockReturnValue(mockMessage),
       update: jest.fn(),
+      getLastMessage: jest.fn().mockReturnValue(mockMessage),
     } as unknown as jest.Mocked<MessageManager>;
 
     handlers = new AgentIPCHandlers(mockAgentManager, mockMessageManager);
@@ -83,12 +84,12 @@ describe('AgentIPCHandlers', () => {
   describe('registerHandlers', () => {
     /* Preconditions: AgentIPCHandlers initialized
        Action: Call registerHandlers()
-       Assertions: All 8 handlers registered
-       Requirements: agents.2, agents.4 */
+       Assertions: All 9 handlers registered
+       Requirements: agents.2, agents.4, agents.5.5 */
     it('should register all IPC handlers', () => {
       handlers.registerHandlers();
 
-      expect(ipcMain.handle).toHaveBeenCalledTimes(8);
+      expect(ipcMain.handle).toHaveBeenCalledTimes(9);
       expect(ipcMain.handle).toHaveBeenCalledWith('agents:create', expect.any(Function));
       expect(ipcMain.handle).toHaveBeenCalledWith('agents:list', expect.any(Function));
       expect(ipcMain.handle).toHaveBeenCalledWith('agents:get', expect.any(Function));
@@ -97,6 +98,7 @@ describe('AgentIPCHandlers', () => {
       expect(ipcMain.handle).toHaveBeenCalledWith('messages:list', expect.any(Function));
       expect(ipcMain.handle).toHaveBeenCalledWith('messages:create', expect.any(Function));
       expect(ipcMain.handle).toHaveBeenCalledWith('messages:update', expect.any(Function));
+      expect(ipcMain.handle).toHaveBeenCalledWith('messages:get-last', expect.any(Function));
     });
 
     /* Preconditions: Handlers already registered
@@ -107,7 +109,7 @@ describe('AgentIPCHandlers', () => {
       handlers.registerHandlers();
       handlers.registerHandlers();
 
-      expect(ipcMain.handle).toHaveBeenCalledTimes(8);
+      expect(ipcMain.handle).toHaveBeenCalledTimes(9);
     });
   });
 
@@ -120,7 +122,7 @@ describe('AgentIPCHandlers', () => {
       handlers.registerHandlers();
       handlers.unregisterHandlers();
 
-      expect(ipcMain.removeHandler).toHaveBeenCalledTimes(8);
+      expect(ipcMain.removeHandler).toHaveBeenCalledTimes(9);
       expect(ipcMain.removeHandler).toHaveBeenCalledWith('agents:create');
       expect(ipcMain.removeHandler).toHaveBeenCalledWith('agents:list');
       expect(ipcMain.removeHandler).toHaveBeenCalledWith('agents:get');
@@ -129,6 +131,7 @@ describe('AgentIPCHandlers', () => {
       expect(ipcMain.removeHandler).toHaveBeenCalledWith('messages:list');
       expect(ipcMain.removeHandler).toHaveBeenCalledWith('messages:create');
       expect(ipcMain.removeHandler).toHaveBeenCalledWith('messages:update');
+      expect(ipcMain.removeHandler).toHaveBeenCalledWith('messages:get-last');
     });
 
     /* Preconditions: Handlers not registered
@@ -406,6 +409,52 @@ describe('AgentIPCHandlers', () => {
         agentId: 'other-agent',
         payload: updatedPayload,
       });
+
+      expect(result).toEqual({ success: false, error: 'Access denied' });
+    });
+  });
+
+  describe('messages:get-last handler', () => {
+    /* Preconditions: Handlers registered
+       Action: Invoke messages:get-last with agentId
+       Assertions: MessageManager.getLastMessage called, message returned
+       Requirements: agents.5.5 */
+    it('should get last message and return success', async () => {
+      handlers.registerHandlers();
+      const handler = registeredHandlers.get('messages:get-last')!;
+
+      const result = await handler(mockEvent, { agentId: 'abc123xyz0' });
+
+      expect(mockMessageManager.getLastMessage).toHaveBeenCalledWith('abc123xyz0');
+      expect(result).toEqual({ success: true, data: mockMessage });
+    });
+
+    /* Preconditions: Handlers registered, no messages
+       Action: Invoke messages:get-last
+       Assertions: null returned
+       Requirements: agents.5.5 */
+    it('should return null when no messages exist', async () => {
+      mockMessageManager.getLastMessage = jest.fn().mockReturnValue(null);
+      handlers.registerHandlers();
+      const handler = registeredHandlers.get('messages:get-last')!;
+
+      const result = await handler(mockEvent, { agentId: 'abc123xyz0' });
+
+      expect(result).toEqual({ success: true, data: null });
+    });
+
+    /* Preconditions: Handlers registered, access denied
+       Action: Invoke messages:get-last for agent user doesn't own
+       Assertions: Error returned
+       Requirements: user-data-isolation.7.6 */
+    it('should return error when access denied', async () => {
+      mockMessageManager.getLastMessage = jest.fn().mockImplementation(() => {
+        throw new Error('Access denied');
+      });
+      handlers.registerHandlers();
+      const handler = registeredHandlers.get('messages:get-last')!;
+
+      const result = await handler(mockEvent, { agentId: 'other-agent' });
 
       expect(result).toEqual({ success: false, error: 'Access denied' });
     });

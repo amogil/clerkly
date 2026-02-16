@@ -237,80 +237,35 @@ class AgentManager {
 
 ### MessageManager
 
-Бизнес-логика сообщений.
+Бизнес-логика сообщений. Использует MessagesRepository для доступа к БД.
 
 **Файл:** `src/main/agents/MessageManager.ts`
 
 ```typescript
 // Requirements: agents.4, agents.7, user-data-isolation.6.5
 class MessageManager {
-  private dbManager: DatabaseManager;
-  private agentManager: AgentManager;
+  private messagesRepo: MessagesRepository;
   
-  constructor(dbManager: DatabaseManager, agentManager: AgentManager) {
-    this.dbManager = dbManager;
-    this.agentManager = agentManager;
-  }
-  
-  private get db() {
-    return this.dbManager.getDatabase();
-  }
-  
-  private get userId() {
-    return this.dbManager.getCurrentUserId();
-  }
-  
-  // Проверка доступа к агенту
-  private checkAccess(agentId: string): void {
-    const agent = this.db.prepare(
-      'SELECT user_id FROM agents WHERE agent_id = ?'
-    ).get(agentId) as { user_id: string } | undefined;
-    
-    if (!agent || agent.user_id !== this.userId) {
-      throw new Error('Access denied');
-    }
+  constructor(messagesRepo: MessagesRepository) {
+    this.messagesRepo = messagesRepo;
   }
   
   // Список сообщений агента
   async list(agentId: string): Promise<Message[]> {
-    this.checkAccess(agentId);
-    
-    return this.db.prepare(`
-      SELECT id, agent_id as agentId, timestamp, payload_json as payloadJson
-      FROM messages 
-      WHERE agent_id = ?
-      ORDER BY id ASC
-    `).all(agentId) as Message[];
+    return this.messagesRepo.listByAgent(agentId);
   }
   
   // Создание сообщения
   async create(agentId: string, payload: MessagePayload): Promise<Message> {
-    this.checkAccess(agentId);
-    
-    const now = new Date().toISOString();
     const payloadJson = JSON.stringify(payload);
-    
-    const result = this.db.prepare(`
-      INSERT INTO messages (agent_id, timestamp, payload_json)
-      VALUES (?, ?, ?)
-    `).run(agentId, now, payloadJson);
-    
-    // Обновление updated_at агента
-    await this.agentManager.touch(agentId);
-    
-    const message = {
-      id: result.lastInsertRowid as number,
-      agentId,
-      timestamp: now,
-      payloadJson
-    };
+    const message = this.messagesRepo.create(agentId, payloadJson);
     
     MainEventBus.getInstance().publish(new MessageCreatedEvent({
-      id: String(result.lastInsertRowid),
+      id: String(message.id),
       agentId,
       role: payload.kind === 'user' ? 'user' : 'assistant',
       content: (payload.data as { text?: string })?.text || '',
-      createdAt: Date.parse(now)
+      createdAt: Date.parse(message.timestamp)
     }));
     
     return message;
@@ -318,21 +273,114 @@ class MessageManager {
   
   // Обновление сообщения
   async update(messageId: number, agentId: string, payload: MessagePayload): Promise<void> {
-    this.checkAccess(agentId);
-    
     const payloadJson = JSON.stringify(payload);
-    
-    this.db.prepare(`
-      UPDATE messages SET payload_json = ?
-      WHERE id = ? AND agent_id = ?
-    `).run(payloadJson, messageId, agentId);
+    this.messagesRepo.update(messageId, agentId, payloadJson);
     
     MainEventBus.getInstance().publish(new MessageUpdatedEvent(String(messageId), {
       content: (payload.data as { text?: string })?.text || ''
     }));
   }
+  
+  // Получение последнего сообщения агента
+  // Requirements: agents.5.5
+  async getLastMessage(agentId: string): Promise<Message | null> {
+    return this.messagesRepo.getLastByAgent(agentId);
+  }
 }
 ```
+
+### MessagesRepository
+
+Repository для работы с сообщениями через Drizzle ORM. Обеспечивает изоляцию данных и фильтрацию архивированных агентов.
+
+**Файл:** `src/main/db/repositories/MessagesRepository.ts`
+
+```typescript
+// Requirements: user-data-isolation.6.2, user-data-isolation.7.6, agents.5.5
+import { eq, and, asc, desc } from 'drizzle-orm';
+import { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
+import * as schema from '../schema';
+import { messages, Message } from '../schema';
+import { AgentsRepository } from './AgentsRepository';
+
+class MessagesRepository {
+  constructor(
+    private db: BetterSQLite3Database<typeof schema>,
+    private getUserId: () => string,
+    private agentsRepo: AgentsRepository
+  ) {}
+  
+  // Проверка доступа к агенту (принадлежит текущему пользователю)
+  private checkAccess(agentId: string): void {
+    const agent = this.agentsRepo.findById(agentId);
+    if (!agent) {
+      throw new Error('Access denied');
+    }
+  }
+  
+  // Список сообщений агента (сортировка по id ASC)
+  listByAgent(agentId: string): Message[] {
+    this.checkAccess(agentId);
+    return this.db
+      .select()
+      .from(messages)
+      .where(eq(messages.agentId, agentId))
+      .orderBy(asc(messages.id))
+      .all();
+  }
+  
+  // Получение последнего сообщения (сортировка по timestamp DESC, LIMIT 1)
+  // Работает для активных и архивированных агентов (фильтрация на уровне AgentsRepository.list)
+  // Requirements: agents.5.5, agents.5.8
+  getLastByAgent(agentId: string): Message | null {
+    this.checkAccess(agentId);
+    
+    const result = this.db
+      .select()
+      .from(messages)
+      .where(eq(messages.agentId, agentId))
+      .orderBy(desc(messages.timestamp))
+      .limit(1)
+      .all();
+    
+    return result.length > 0 ? result[0] : null;
+  }
+  
+  // Создание сообщения
+  create(agentId: string, payloadJson: string): Message {
+    this.checkAccess(agentId);
+    const now = new Date().toISOString();
+    
+    const message = this.db
+      .insert(messages)
+      .values({ agentId, timestamp: now, payloadJson })
+      .returning()
+      .get();
+    
+    // Обновление updated_at агента
+    this.agentsRepo.touch(agentId);
+    
+    return message;
+  }
+  
+  // Обновление сообщения
+  update(messageId: number, agentId: string, payloadJson: string): void {
+    this.checkAccess(agentId);
+    
+    this.db
+      .update(messages)
+      .set({ payloadJson })
+      .where(and(eq(messages.id, messageId), eq(messages.agentId, agentId)))
+      .run();
+  }
+}
+```
+
+**Важно:** 
+- `getLastByAgent` использует сортировку по `timestamp` (не по `id`), так как timestamp точно отражает время создания сообщения
+- `getLastByAgent` работает для активных и архивированных агентов - фильтрация архивированных происходит на уровне `AgentsRepository.list()`
+- `checkAccess` проверяет только принадлежность агента текущему пользователю
+- Drizzle ORM обеспечивает type-safety и защиту от SQL injection
 
 ### AgentIPCHandlers
 
@@ -377,6 +425,10 @@ class AgentIPCHandlers {
     
     ipcMain.handle('messages:update', (_, { messageId, agentId, payload }) => 
       this.messageManager.update(messageId, agentId, payload));
+    
+    // Requirements: agents.5.5 - Get last message for error display
+    ipcMain.handle('messages:get-last', (_, { agentId }) => 
+      this.messageManager.getLastMessage(agentId));
   }
 }
 ```
@@ -417,7 +469,11 @@ contextBridge.exposeInMainWorld('api', {
       ipcRenderer.invoke('messages:create', { agentId, payload }),
     
     update: (messageId: number, agentId: string, payload: MessagePayload) => 
-      ipcRenderer.invoke('messages:update', { messageId, agentId, payload })
+      ipcRenderer.invoke('messages:update', { messageId, agentId, payload }),
+    
+    // Requirements: agents.5.5 - Get last message for error display
+    getLast: (agentId: string) => 
+      ipcRenderer.invoke('messages:get-last', { agentId })
   }
 });
 ```
@@ -1250,8 +1306,11 @@ const STATUS_STYLES: Record<AgentStatus, StatusStyle> = {
 | Файл | Покрытие |
 |------|----------|
 | `tests/unit/DatabaseManager.test.ts` | user-data-isolation.6 |
+| `tests/unit/db/repositories/AgentsRepository.test.ts` | agents.5.6, user-data-isolation.6.3, user-data-isolation.7.6 |
+| `tests/unit/db/repositories/MessagesRepository.test.ts` | agents.5.5, agents.5.8, user-data-isolation.7.6 |
 | `tests/unit/agents/AgentManager.test.ts` | agents.2, agents.10 |
 | `tests/unit/agents/MessageManager.test.ts` | agents.4, agents.7 |
+| `tests/unit/agents/AgentIPCHandlers.test.ts` | agents.2, agents.4, agents.5.5 |
 | `tests/unit/agents/computeAgentStatus.test.ts` | agents.9 |
 | `tests/unit/agents/ActivityIndicator.test.tsx` | agents.11 |
 | `tests/unit/agents/AutoExpandingTextarea.test.tsx` | agents.4.5-4.7 |
@@ -1269,6 +1328,7 @@ const STATUS_STYLES: Record<AgentStatus, StatusStyle> = {
 |------|----------|
 | `tests/functional/agents.spec.ts` | agents.1-12 |
 | `tests/functional/agents-always-one.spec.ts` | agents.2.7-2.11 |
+| `tests/functional/agents-error-messages.spec.ts` | agents.5.5, agents.5.6, agents.5.7 |
 | `tests/functional/auto-expanding-textarea.spec.ts` | agents.4.3-4.7 |
 | `tests/functional/empty-state-placeholder.spec.ts` | agents.4 |
 
@@ -1282,6 +1342,10 @@ const STATUS_STYLES: Record<AgentStatus, StatusStyle> = {
 | agents.3 | ✓ | - | ✓ |
 | agents.4 | ✓ | - | ✓ |
 | agents.5 | ✓ | - | ✓ |
+| agents.5.5 (error messages) | ✓ | - | ✓ |
+| agents.5.6 (filter archived) | ✓ | - | ✓ |
+| agents.5.7 (sort by updatedAt) | ✓ | - | ✓ |
+| agents.5.8 (optimized SQL) | ✓ | - | - |
 | agents.6 | ✓ | - | ✓ |
 | agents.7 | ✓ | - | ✓ |
 | agents.8 | ✓ | - | ✓ |

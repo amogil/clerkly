@@ -240,6 +240,151 @@ describe('MessagesRepository', () => {
     });
   });
 
+  describe('getLastByAgent', () => {
+    /* Preconditions: Agent with multiple messages
+       Action: Call getLastByAgent(agentId)
+       Assertions: Returns last message by timestamp (not by id)
+       Requirements: agents.5.5 */
+    it('should return last message by timestamp', async () => {
+      const agent = agentsRepo.create('Test');
+
+      // Create messages with specific timestamps (not in order by id)
+      messagesRepo.create(agent.agentId, '{"kind":"user","text":"First"}');
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      messagesRepo.create(agent.agentId, '{"kind":"assistant","text":"Second"}');
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      const msg3 = messagesRepo.create(agent.agentId, '{"kind":"user","text":"Third"}');
+
+      const lastMessage = messagesRepo.getLastByAgent(agent.agentId);
+
+      expect(lastMessage).not.toBeNull();
+      expect(lastMessage!.id).toBe(msg3.id);
+      expect(lastMessage!.payloadJson).toBe('{"kind":"user","text":"Third"}');
+      expect(lastMessage!.timestamp).toBe(msg3.timestamp);
+    });
+
+    /* Preconditions: Agent without messages
+       Action: Call getLastByAgent(agentId)
+       Assertions: Returns null
+       Requirements: agents.5.5 */
+    it('should return null when no messages exist', () => {
+      const agent = agentsRepo.create('Test');
+      const lastMessage = messagesRepo.getLastByAgent(agent.agentId);
+      expect(lastMessage).toBeNull();
+    });
+
+    /* Preconditions: Agent does not exist
+       Action: Call getLastByAgent(agentId)
+       Assertions: Throws "Access denied"
+       Requirements: user-data-isolation.7.6 */
+    it('should throw Access denied for non-existent agent', () => {
+      expect(() => messagesRepo.getLastByAgent('nonexistent')).toThrow('Access denied');
+    });
+
+    /* Preconditions: Agent from another user
+       Action: Call getLastByAgent(agentId)
+       Assertions: Throws "Access denied"
+       Requirements: user-data-isolation.7.6 */
+    it('should throw Access denied for agents of other users', () => {
+      db.insert(agents)
+        .values({
+          agentId: 'other123',
+          userId: 'other_user',
+          name: 'Other',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        })
+        .run();
+
+      expect(() => messagesRepo.getLastByAgent('other123')).toThrow('Access denied');
+    });
+
+    /* Preconditions: Archived agent with messages
+       Action: Call getLastByAgent(agentId)
+       Assertions: Returns last message (archived agents are filtered at list level, not here)
+       Requirements: agents.5.5, agents.5.6 */
+    it('should return last message for archived agent', () => {
+      const agent = agentsRepo.create('Test');
+      const msg = messagesRepo.create(agent.agentId, '{"kind":"user","text":"Message"}');
+
+      // Archive the agent
+      agentsRepo.archive(agent.agentId);
+
+      // Should still return the message (filtering happens at AgentsRepository.list level)
+      const lastMessage = messagesRepo.getLastByAgent(agent.agentId);
+      expect(lastMessage).not.toBeNull();
+      expect(lastMessage!.id).toBe(msg.id);
+    });
+
+    /* Preconditions: Agent with messages in reverse timestamp order
+       Action: Call getLastByAgent(agentId)
+       Assertions: Returns message with latest timestamp (not highest id)
+       Requirements: agents.5.5 */
+    it('should sort by timestamp not by id', async () => {
+      const agent = agentsRepo.create('Test');
+
+      // Create messages
+      const msg1 = messagesRepo.create(agent.agentId, '{"kind":"user","text":"First"}');
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      const msg2 = messagesRepo.create(agent.agentId, '{"kind":"assistant","text":"Second"}');
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      const msg3 = messagesRepo.create(agent.agentId, '{"kind":"user","text":"Third"}');
+
+      // Verify msg3 has highest id and latest timestamp (ISO strings can be compared lexicographically)
+      expect(msg3.id).toBeGreaterThan(msg2.id);
+      expect(msg3.id).toBeGreaterThan(msg1.id);
+      expect(msg3.timestamp > msg2.timestamp).toBe(true);
+      expect(msg3.timestamp > msg1.timestamp).toBe(true);
+
+      const lastMessage = messagesRepo.getLastByAgent(agent.agentId);
+
+      // Should return msg3 (latest by timestamp)
+      expect(lastMessage!.id).toBe(msg3.id);
+      expect(lastMessage!.timestamp).toBe(msg3.timestamp);
+    });
+
+    /* Preconditions: Agent with single message
+       Action: Call getLastByAgent(agentId)
+       Assertions: Returns that single message
+       Requirements: agents.5.5 */
+    it('should return single message when only one exists', () => {
+      const agent = agentsRepo.create('Test');
+      const msg = messagesRepo.create(agent.agentId, '{"kind":"user","text":"Only"}');
+
+      const lastMessage = messagesRepo.getLastByAgent(agent.agentId);
+
+      expect(lastMessage).not.toBeNull();
+      expect(lastMessage!.id).toBe(msg.id);
+      expect(lastMessage!.payloadJson).toBe('{"kind":"user","text":"Only"}');
+    });
+
+    /* Preconditions: Agent with error message as last
+       Action: Call getLastByAgent(agentId)
+       Assertions: Returns error message
+       Requirements: agents.5.5 */
+    it('should return error message when it is the last message', async () => {
+      const agent = agentsRepo.create('Test');
+
+      messagesRepo.create(agent.agentId, '{"kind":"user","text":"Request"}');
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      const errorMsg = messagesRepo.create(
+        agent.agentId,
+        '{"kind":"llm","data":{"result":{"status":"error","error":{"message":"Something went wrong"}}}}'
+      );
+
+      const lastMessage = messagesRepo.getLastByAgent(agent.agentId);
+
+      expect(lastMessage).not.toBeNull();
+      expect(lastMessage!.id).toBe(errorMsg.id);
+      expect(lastMessage!.payloadJson).toContain('error');
+    });
+  });
+
   describe('No user logged in', () => {
     /* Preconditions: userId = null
        Action: Call any method

@@ -15,7 +15,7 @@ export class AgentsRepository {
 
   /**
    * List all non-archived agents for the current user, sorted by updatedAt DESC
-   * Requirements: user-data-isolation.6.3, user-data-isolation.7.6
+   * Requirements: user-data-isolation.6.3, user-data-isolation.7.6, agents.5.6
    */
   list(): Agent[] {
     const userId = this.getUserId();

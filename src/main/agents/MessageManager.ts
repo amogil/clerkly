@@ -48,6 +48,16 @@ export class MessageManager {
   }
 
   /**
+   * Get the last message for an agent (most recent)
+   * Returns null if no messages exist
+   * Requirements: agents.5.5
+   */
+  getLastMessage(agentId: string): Message | null {
+    // Repository automatically checks access through AgentsRepository
+    return this.dbManager.messages.getLastByAgent(agentId);
+  }
+
+  /**
    * Create a new message for an agent
    * Requirements: agents.4.3, agents.7.1, agents.1.4
    */

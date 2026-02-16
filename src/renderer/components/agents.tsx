@@ -29,6 +29,7 @@ export function Agents() {
   const [showAllTasksPage, setShowAllTasksPage] = useState(false);
   const [taskInput, setTaskInput] = useState('');
   const [visibleChatsCount, setVisibleChatsCount] = useState(5);
+  const [errorMessages, setErrorMessages] = useState<Map<string, string>>(new Map());
   const chatListRef = useRef<HTMLDivElement>(null);
   const messagesAreaRef = useRef<HTMLDivElement>(null);
 
@@ -113,6 +114,48 @@ export function Agents() {
       setShowAllTasksPage(false);
     }
   };
+
+  // Helper function to extract error message from a message
+  // Requirements: agents.5.5
+  const getErrorMessage = (payloadJson: string): string => {
+    try {
+      const payload = JSON.parse(payloadJson);
+      return payload.data?.result?.error?.message || 'Unknown error';
+    } catch {
+      return 'Unknown error';
+    }
+  };
+
+  // Load error messages for agents with error status when AllAgents page is shown
+  // Requirements: agents.5.5
+  useEffect(() => {
+    if (!showAllTasksPage) {
+      return;
+    }
+
+    async function loadErrorMessages() {
+      const errors = new Map<string, string>();
+
+      for (const agent of displayAgents) {
+        if (hasError(agent.status)) {
+          try {
+            const response = await window.api.messages.getLast(agent.agentId);
+            if (response.success && response.data) {
+              const message = response.data as { payloadJson: string };
+              const errorMsg = getErrorMessage(message.payloadJson);
+              errors.set(agent.agentId, errorMsg);
+            }
+          } catch (error) {
+            console.error(`Failed to load error message for agent ${agent.agentId}:`, error);
+          }
+        }
+      }
+
+      setErrorMessages(errors);
+    }
+
+    loadErrorMessages();
+  }, [showAllTasksPage, displayAgents]);
 
   // Requirements: agents.2.7 - Prevent crash during initial load
   // Don't render until we have at least one agent (auto-create guarantees this after loading)
@@ -204,6 +247,13 @@ export function Agents() {
                         </span>
                       </div>
                     </div>
+
+                    {/* Requirements: agents.5.5 - Show error message for agents with error status */}
+                    {hasError(agent.status) && errorMessages.has(agent.agentId) && (
+                      <p className="text-xs text-red-500 mt-1">
+                        {errorMessages.get(agent.agentId)}
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>

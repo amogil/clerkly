@@ -54,6 +54,7 @@ export class AgentIPCHandlers {
 
     // Message handlers
     ipcMain.handle('messages:list', this.handleMessageList.bind(this));
+    ipcMain.handle('messages:get-last', this.handleMessageGetLast.bind(this));
     ipcMain.handle('messages:create', this.handleMessageCreate.bind(this));
     ipcMain.handle('messages:update', this.handleMessageUpdate.bind(this));
 
@@ -75,6 +76,7 @@ export class AgentIPCHandlers {
     ipcMain.removeHandler('agents:update');
     ipcMain.removeHandler('agents:archive');
     ipcMain.removeHandler('messages:list');
+    ipcMain.removeHandler('messages:get-last');
     ipcMain.removeHandler('messages:create');
     ipcMain.removeHandler('messages:update');
 
@@ -190,6 +192,25 @@ export class AgentIPCHandlers {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       this.logger.error(`Failed to list messages: ${errorMessage}`);
+      return { success: false, error: errorMessage };
+    }
+  }
+
+  /**
+   * Handle messages:get-last request
+   * Returns the last message for an agent (most recent)
+   * Requirements: agents.5.5
+   */
+  private async handleMessageGetLast(
+    _event: IpcMainInvokeEvent,
+    args: { agentId: string }
+  ): Promise<IPCResult> {
+    try {
+      const message = this.messageManager.getLastMessage(args.agentId);
+      return { success: true, data: message };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Failed to get last message: ${errorMessage}`);
       return { success: false, error: errorMessage };
     }
   }
