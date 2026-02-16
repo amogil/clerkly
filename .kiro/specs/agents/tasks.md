@@ -385,7 +385,18 @@
   - Сообщениям пользователя (user messages) ✅
   - Сообщениям агента (agent messages) ✅
 - **Модульные тесты:** `tests/unit/components/agents.test.tsx` (6 тестов) ✅
-- **Функциональные тесты:** `tests/functional/message-text-wrapping.spec.ts` (5 тестов) ✅
+- **Функциональные тесты:** `tests/functional/message-text-wrapping.spec.ts` (12 тестов) ✅
+  1. "should wrap long words without spaces in user messages"
+  2. "should preserve line breaks in user messages"
+  3. "should have correct CSS classes for agent messages"
+  4. "should not exceed chat area width with long content"
+  5. "should handle mixed content with long words and line breaks"
+  6. "should preserve multiple consecutive line breaks"
+  7. "should wrap long text with spaces naturally"
+  8. "should wrap code-like content without horizontal scroll"
+  9. "should preserve leading and trailing whitespace"
+  10. "should maintain text wrapping after window resize"
+  11. "should handle emoji and Unicode characters correctly"
 
 #### 6.5 AllAgents
 - **Файл:** `src/renderer/components/agents/AllAgents.tsx`

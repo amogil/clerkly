@@ -1329,14 +1329,28 @@ const STATUS_STYLES: Record<AgentStatus, StatusStyle> = {
 
 ### Функциональные тесты
 
-| Файл | Покрытие |
-|------|----------|
-| `tests/functional/agents.spec.ts` | agents.1-12 |
-| `tests/functional/agents-always-one.spec.ts` | agents.2.7-2.11 |
-| `tests/functional/agents-error-messages.spec.ts` | agents.5.5, agents.5.6, agents.5.7 |
-| `tests/functional/auto-expanding-textarea.spec.ts` | agents.4.3-4.7 |
-| `tests/functional/empty-state-placeholder.spec.ts` | agents.4 |
-| `tests/functional/message-text-wrapping.spec.ts` | agents.4.22 |
+| Файл | Покрытие | Тесты |
+|------|----------|-------|
+| `tests/functional/agents.spec.ts` | agents.1-12 | Основные сценарии работы с агентами |
+| `tests/functional/agents-always-one.spec.ts` | agents.2.7-2.11 | Автосоздание первого агента |
+| `tests/functional/agents-error-messages.spec.ts` | agents.5.5, 5.6, 5.7 | Отображение ошибок в AllAgents |
+| `tests/functional/auto-expanding-textarea.spec.ts` | agents.4.3-4.7 | Автоувеличение поля ввода |
+| `tests/functional/empty-state-placeholder.spec.ts` | agents.4 | Пустой стейт с промптами |
+| `tests/functional/message-text-wrapping.spec.ts` | agents.4.22 | 12 тестов переноса текста (см. ниже) |
+
+#### Детальное покрытие agents.4.22 (message-text-wrapping.spec.ts)
+
+1. "should wrap long words without spaces in user messages" - перенос длинных слов без пробелов
+2. "should preserve line breaks in user messages" - сохранение переносов строк
+3. "should have correct CSS classes for agent messages" - проверка CSS классов
+4. "should not exceed chat area width with long content" - ограничение ширины сообщений
+5. "should handle mixed content with long words and line breaks" - смешанный контент
+6. "should preserve multiple consecutive line breaks" - множественные переносы строк
+7. "should wrap long text with spaces naturally" - естественный перенос текста с пробелами
+8. "should wrap code-like content without horizontal scroll" - перенос кода
+9. "should preserve leading and trailing whitespace" - сохранение пробелов в начале/конце
+10. "should maintain text wrapping after window resize" - перенос после изменения размера окна
+11. "should handle emoji and Unicode characters correctly" - поддержка emoji и Unicode
 
 ### Покрытие требований
 

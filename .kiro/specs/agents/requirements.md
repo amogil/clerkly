@@ -213,6 +213,12 @@
 - `tests/functional/message-text-wrapping.spec.ts` - "should have correct CSS classes for agent messages"
 - `tests/functional/message-text-wrapping.spec.ts` - "should not exceed chat area width with long content"
 - `tests/functional/message-text-wrapping.spec.ts` - "should handle mixed content with long words and line breaks"
+- `tests/functional/message-text-wrapping.spec.ts` - "should preserve multiple consecutive line breaks"
+- `tests/functional/message-text-wrapping.spec.ts` - "should wrap long text with spaces naturally"
+- `tests/functional/message-text-wrapping.spec.ts` - "should wrap code-like content without horizontal scroll"
+- `tests/functional/message-text-wrapping.spec.ts` - "should preserve leading and trailing whitespace"
+- `tests/functional/message-text-wrapping.spec.ts` - "should maintain text wrapping after window resize"
+- `tests/functional/message-text-wrapping.spec.ts` - "should handle emoji and Unicode characters correctly"
 
 ### 5. Просмотр всех агентов
 
