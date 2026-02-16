@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { Send, Check, X, HelpCircle, ArrowLeft, Plus } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Logo } from './logo';
@@ -96,11 +96,30 @@ export function Agents() {
       setVisibleChatsCount(Math.max(1, maxChats));
     };
 
-    calculateVisibleChats();
+    // Initial calculation with requestAnimationFrame to ensure grid layout is applied
+    const rafId = requestAnimationFrame(() => {
+      calculateVisibleChats();
+    });
+
     window.addEventListener('resize', calculateVisibleChats);
 
-    return () => window.removeEventListener('resize', calculateVisibleChats);
+    return () => {
+      cancelAnimationFrame(rafId);
+      window.removeEventListener('resize', calculateVisibleChats);
+    };
   }, []);
+
+  // Recalculate when agents list changes
+  useEffect(() => {
+    if (!chatListRef.current) return;
+
+    const containerWidth = chatListRef.current.offsetWidth;
+    const availableWidth = containerWidth - 80;
+    const chatWidth = 40;
+    const maxChats = Math.floor(availableWidth / chatWidth);
+
+    setVisibleChatsCount(Math.max(1, maxChats));
+  }, [displayAgents.length]);
 
   const handleSend = async (text?: string) => {
     const messageText = text || taskInput;
@@ -281,9 +300,9 @@ export function Agents() {
   return (
     <div data-testid="agents" className="h-[calc(100vh-4rem)] bg-card flex flex-col">
       {/* Combined Header with Chat List */}
-      <div className="h-16 px-6 border-b border-border flex items-center gap-6 flex-shrink-0">
-        {/* Left: Task Title - 50% */}
-        <div className="flex-1 flex items-center gap-3 min-w-0">
+      <div className="h-16 px-6 border-b border-border grid grid-cols-2 gap-6 items-center flex-shrink-0">
+        {/* Left: Active Agent Info - 50% */}
+        <div className="flex items-center gap-3 min-w-0">
           <div
             className={`relative flex-shrink-0 w-10 h-10 rounded-full ${style.bg} flex items-center justify-center`}
           >
@@ -328,7 +347,7 @@ export function Agents() {
         </div>
 
         {/* Right: Chat List - 50% */}
-        <div ref={chatListRef} className="flex-1 flex items-center gap-2 justify-end">
+        <div ref={chatListRef} className="flex items-center gap-2 justify-end">
           <div
             onClick={handleNewChat}
             className="w-8 h-8 rounded-full bg-sky-400 flex items-center justify-center cursor-pointer hover:bg-sky-500 transition-colors group"
