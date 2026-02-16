@@ -7,6 +7,7 @@ import { TokenStorageManager } from './TokenStorageManager';
 import { handleBackgroundError } from '../ErrorHandler';
 import { Logger } from '../Logger';
 import { MainEventBus } from '../events/MainEventBus';
+import type { User } from './UserManager';
 import {
   AuthCallbackReceivedEvent,
   AuthCompletedEvent,
@@ -58,8 +59,10 @@ export class OAuthClientManager {
   private config: OAuthConfig;
   private tokenStorage: TokenStorageManager;
   private pkceStorage: PKCEStorage | null = null;
-  private userManager: any | null = null; // Using any to avoid circular dependency
-  private authWindowManager: any | null = null; // Using any to avoid circular dependency
+  // Using unknown to avoid circular dependency with UserManager
+  private userManager: unknown | null = null;
+  // Using unknown to avoid circular dependency with AuthWindowManager
+  private authWindowManager: unknown | null = null;
 
   constructor(config: OAuthConfig, tokenStorage: TokenStorageManager) {
     this.config = config;
@@ -72,7 +75,7 @@ export class OAuthClientManager {
    * Should be called during initialization to enable automatic profile updates
    * @param userManager UserManager instance
    */
-  setUserManager(userManager: any): void {
+  setUserManager(userManager: unknown): void {
     this.userManager = userManager;
     this.logger.info('User manager set for automatic updates');
   }
@@ -83,7 +86,7 @@ export class OAuthClientManager {
    * Should be called during initialization to enable loader display during auth
    * @param authWindowManager AuthWindowManager instance
    */
-  setAuthWindowManager(authWindowManager: any): void {
+  setAuthWindowManager(authWindowManager: unknown): void {
     this.authWindowManager = authWindowManager;
     this.logger.info('Auth window manager set for loader display');
   }
@@ -327,7 +330,7 @@ export class OAuthClientManager {
    */
   private async fetchProfileWithTokens(
     tokens: TokenData
-  ): Promise<{ success: boolean; profile?: any; error?: string }> {
+  ): Promise<{ success: boolean; profile?: User; error?: string }> {
     try {
       this.logger.info('Fetching profile with tokens');
 
@@ -368,9 +371,9 @@ export class OAuthClientManager {
       // CRITICAL: Find or create user and set user_id in ProfileManager BEFORE saving to database
       // This is required because DataManager.saveData() needs getCurrentUserId()
       // Requirements: user-data-isolation.1.2 - Find or create user by email
-      const user = this.userManager.findOrCreateUser(profileData);
-      (this.userManager as any).currentUserId = user.user_id;
-      (this.userManager as any).currentUser = user;
+      const user = (this.userManager as { findOrCreateUser: (data: unknown) => User }).findOrCreateUser(profileData);
+      (this.userManager as unknown as { currentUserId: string; currentUser: User }).currentUserId = user.user_id;
+      (this.userManager as unknown as { currentUserId: string; currentUser: User }).currentUser = user;
 
       this.logger.info(`Profile fetched successfully for user ${user.user_id}`);
       return { success: true, profile: user };
