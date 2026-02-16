@@ -86,28 +86,24 @@ test.describe('Agents Error Messages', () => {
     // Wait for agents page to load
     await expect(window.locator('[data-testid="agents"]')).toBeVisible({ timeout: 5000 });
 
-    // Wait for first agent to be auto-created
-    await window.waitForTimeout(1000);
-
-    // Create 5 more agents (total 6 agents) to make +N button appear
+    // Create 1 more agent (total 2 agents) to make +N button appear
     const newAgentButton = window.locator('div[title="New chat"]');
-    await expect(newAgentButton).toBeVisible({ timeout: 3000 });
+    await expect(newAgentButton).toBeVisible({ timeout: 5000 });
+    await newAgentButton.click();
 
-    for (let i = 0; i < 5; i++) {
-      await newAgentButton.click();
-      await window.waitForTimeout(300);
-    }
+    // Wait for new agent to be created
+    const agentIcons = window.locator('[data-testid^="agent-icon-"]');
+    await expect(agentIcons.nth(1)).toBeVisible({ timeout: 5000 });
 
     // Now create error message for the CURRENT (most recent) agent
-    // This ensures it will be first in AllAgents list
     await window.evaluate(async () => {
       const agents = await window.api.agents.list();
       if (agents.success && agents.data) {
-        const agentList = agents.data as Array<{ agentId: string }>;
+        const agentList = agents.data as Array<{ id: string }>;
         const currentAgent = agentList[0]; // Most recent agent
 
         // Create error message
-        await window.api.messages.create(currentAgent.agentId, {
+        await window.api.messages.create(currentAgent.id, {
           kind: 'llm',
           data: {
             result: {
@@ -121,28 +117,20 @@ test.describe('Agents Error Messages', () => {
       }
     });
 
-    await window.waitForTimeout(500);
-
     // Click on the agent with error to make it active (so status is computed)
-    const agentIcons = window.locator('[data-testid^="agent-icon-"]');
-    await expect(agentIcons.first()).toBeVisible({ timeout: 3000 });
+    await expect(agentIcons.first()).toBeVisible({ timeout: 5000 });
     await agentIcons.first().click();
-    await window.waitForTimeout(500);
 
     // Open AllAgents view by clicking +N button
     const allAgentsButton = window.locator('div.rounded-full.bg-muted:has-text("+")');
-    await expect(allAgentsButton).toBeVisible({ timeout: 3000 });
+    await expect(allAgentsButton).toBeVisible({ timeout: 5000 });
     await allAgentsButton.click();
-    await window.waitForTimeout(500);
 
     // Verify we're in AllAgents view
-    await expect(window.locator('text=All Agents')).toBeVisible();
-
-    // Wait for UI to update (agents list to reload with new status)
-    await window.waitForTimeout(2000);
+    await expect(window.locator('text=All Agents')).toBeVisible({ timeout: 5000 });
 
     // Verify error message is displayed
-    await expect(window.locator('text=Network timeout occurred')).toBeVisible();
+    await expect(window.locator('text=Network timeout occurred')).toBeVisible({ timeout: 5000 });
 
     // Verify error message has red color
     const errorText = window.locator('text=Network timeout occurred');
