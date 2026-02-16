@@ -6,6 +6,7 @@
 
 import { contextBridge, ipcRenderer } from 'electron';
 import { EVENT_TYPES } from '../shared/events/constants';
+import type { User } from '../types';
 
 // LLM Provider type (duplicated from types/index.ts due to rootDir restriction)
 type LLMProvider = 'openai' | 'anthropic' | 'google';
@@ -39,12 +40,12 @@ interface API {
     startLogin: () => Promise<{ success: boolean; error?: string }>;
     getStatus: () => Promise<{ authorized: boolean; error?: string }>;
     logout: () => Promise<{ success: boolean; error?: string }>;
-    getUser: () => Promise<{ success: boolean; user?: any; error?: string }>;
-    refreshUser: () => Promise<{ success: boolean; user?: any; error?: string }>;
+    getUser: () => Promise<{ success: boolean; user?: User; error?: string }>;
+    refreshUser: () => Promise<{ success: boolean; user?: User; error?: string }>;
     onAuthSuccess: (callback: () => void) => () => void;
     onAuthError: (callback: (error: string, errorCode?: string) => void) => () => void;
     onLogout: (callback: () => void) => () => void;
-    onUserUpdated: (callback: (user: any) => void) => () => void;
+    onUserUpdated: (callback: (user: User) => void) => () => void;
   };
   // Requirements: error-notifications.1.1
   error: {
@@ -112,7 +113,7 @@ interface API {
   };
   // Requirements: testing.3.8 - Test IPC methods (only available in test environment)
   ipcRenderer?: {
-    invoke: (channel: string, ...args: any[]) => Promise<any>;
+    invoke: (channel: string, ...args: unknown[]) => Promise<unknown>;
   };
 }
 
@@ -221,9 +222,9 @@ const api: API = {
      * Get current user from database
      * Returns user data from users table
      * Requirements: account-profile.1.2
-     * @returns {Promise<{success: boolean, user?: any, error?: string}>}
+     * @returns {Promise<{success: boolean, user?: User, error?: string}>}
      */
-    async getUser(): Promise<{ success: boolean; user?: any; error?: string }> {
+    async getUser(): Promise<{ success: boolean; user?: User; error?: string }> {
       return await ipcRenderer.invoke('auth:get-user');
     },
 
@@ -231,9 +232,9 @@ const api: API = {
      * Refresh user profile from Google API
      * Fetches fresh profile data from Google UserInfo API
      * Requirements: account-profile.1.5
-     * @returns {Promise<{success: boolean, user?: any, error?: string}>}
+     * @returns {Promise<{success: boolean, user?: User, error?: string}>}
      */
-    async refreshUser(): Promise<{ success: boolean; user?: any; error?: string }> {
+    async refreshUser(): Promise<{ success: boolean; user?: User; error?: string }> {
       return await ipcRenderer.invoke('auth:refresh-user');
     },
 
@@ -291,11 +292,11 @@ const api: API = {
      * @param {Function} callback - Callback function to execute when user is updated
      * @returns {Function} Unsubscribe function to remove the listener
      */
-    onUserUpdated(callback: (user: any) => void): () => void {
+    onUserUpdated(callback: (user: User) => void): () => void {
       // Use the events API to listen for auth.completed events (profile is included)
       return api.events!.onEvent((type: string, payload: unknown) => {
         if (type === EVENT_TYPES.AUTH_COMPLETED) {
-          const data = payload as { userId: string; profile: any };
+          const data = payload as { userId: string; profile: User };
           callback(data.profile);
         }
       });
@@ -581,13 +582,13 @@ if (process.env.NODE_ENV === 'test') {
   };
 
   api.ipcRenderer = {
-    invoke: (channel: string, ...args: any[]) => ipcRenderer.invoke(channel, ...args),
+    invoke: (channel: string, ...args: unknown[]) => ipcRenderer.invoke(channel, ...args),
   };
 }
 
 contextBridge.exposeInMainWorld('api', api);
 contextBridge.exposeInMainWorld('electron', {
   ipcRenderer: {
-    invoke: (channel: string, ...args: any[]) => ipcRenderer.invoke(channel, ...args),
+    invoke: (channel: string, ...args: unknown[]) => ipcRenderer.invoke(channel, ...args),
   },
 });

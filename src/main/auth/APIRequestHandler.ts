@@ -7,6 +7,7 @@ import { handleBackgroundError } from '../ErrorHandler';
 import { MainEventBus } from '../events/MainEventBus';
 import { AuthFailedEvent } from '../../shared/events/types';
 import { SessionExpiredError } from './errors';
+import type { OAuthClientManager } from './OAuthClientManager';
 
 // Requirements: clerkly.3.5, clerkly.3.7 - Create parameterized logger for APIRequestHandler module
 const logger = Logger.create('APIRequestHandler');
@@ -22,14 +23,14 @@ let isClearing401 = false;
  * OAuth Client Manager instance for token refresh
  * Set by the main process during initialization
  */
-let oauthClientManager: any = null;
+let oauthClientManager: OAuthClientManager | null = null;
 
 /**
  * Set the OAuth Client Manager instance
  * Requirements: token-management-ui.1.1, token-management-ui.1.2 - Enable automatic token refresh
  * @param manager OAuthClientManager instance
  */
-export function setOAuthClientManager(manager: any): void {
+export function setOAuthClientManager(manager: OAuthClientManager): void {
   oauthClientManager = manager;
 }
 
