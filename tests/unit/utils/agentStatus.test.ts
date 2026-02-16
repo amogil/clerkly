@@ -28,22 +28,22 @@ describe('agentStatus utilities', () => {
        Requirements: agents.6 */
     it('should return false for other statuses', () => {
       expect(isInProgress('new')).toBe(false);
-      expect(isInProgress('awaiting-user')).toBe(false);
+      expect(isInProgress('awaiting-response')).toBe(false);
       expect(isInProgress('error')).toBe(false);
       expect(isInProgress('completed')).toBe(false);
     });
   });
 
   describe('isAwaitingUser', () => {
-    /* Preconditions: Status is 'awaiting-user'
+    /* Preconditions: Status is 'awaiting-response'
        Action: Call isAwaitingUser
        Assertions: Returns true
        Requirements: agents.6 */
     it('should return true for awaiting-user status', () => {
-      expect(isAwaitingUser('awaiting-user')).toBe(true);
+      expect(isAwaitingUser('awaiting-response')).toBe(true);
     });
 
-    /* Preconditions: Status is not 'awaiting-user'
+    /* Preconditions: Status is not 'awaiting-response'
        Action: Call isAwaitingUser with other statuses
        Assertions: Returns false
        Requirements: agents.6 */
@@ -71,7 +71,7 @@ describe('agentStatus utilities', () => {
     it('should return false for other statuses', () => {
       expect(hasError('new')).toBe(false);
       expect(hasError('in-progress')).toBe(false);
-      expect(hasError('awaiting-user')).toBe(false);
+      expect(hasError('awaiting-response')).toBe(false);
       expect(hasError('completed')).toBe(false);
     });
   });
@@ -92,7 +92,7 @@ describe('agentStatus utilities', () => {
     it('should return false for other statuses', () => {
       expect(isCompleted('new')).toBe(false);
       expect(isCompleted('in-progress')).toBe(false);
-      expect(isCompleted('awaiting-user')).toBe(false);
+      expect(isCompleted('awaiting-response')).toBe(false);
       expect(isCompleted('error')).toBe(false);
     });
   });
@@ -112,7 +112,7 @@ describe('agentStatus utilities', () => {
        Requirements: agents.6 */
     it('should return false for other statuses', () => {
       expect(isNew('in-progress')).toBe(false);
-      expect(isNew('awaiting-user')).toBe(false);
+      expect(isNew('awaiting-response')).toBe(false);
       expect(isNew('error')).toBe(false);
       expect(isNew('completed')).toBe(false);
     });
@@ -135,12 +135,12 @@ describe('agentStatus utilities', () => {
       expect(getStatusText('in-progress')).toBe('In progress');
     });
 
-    /* Preconditions: Status is 'awaiting-user'
+    /* Preconditions: Status is 'awaiting-response'
        Action: Call getStatusText
        Assertions: Returns 'Awaiting response'
        Requirements: agents.6.3 */
     it('should return "Awaiting response" for awaiting-user status', () => {
-      expect(getStatusText('awaiting-user')).toBe('Awaiting response');
+      expect(getStatusText('awaiting-response')).toBe('Awaiting response');
     });
 
     /* Preconditions: Status is 'error'
@@ -189,12 +189,12 @@ describe('agentStatus utilities', () => {
       });
     });
 
-    /* Preconditions: Status is 'awaiting-user'
+    /* Preconditions: Status is 'awaiting-response'
        Action: Call getStatusStyles
        Assertions: Returns correct styles for awaiting-user status
        Requirements: agents.6.3, agents.8.1, agents.5.3 */
     it('should return correct styles for awaiting-user status', () => {
-      const styles = getStatusStyles('awaiting-user');
+      const styles = getStatusStyles('awaiting-response');
 
       expect(styles).toEqual({
         bg: 'bg-amber-500',
@@ -236,7 +236,7 @@ describe('agentStatus utilities', () => {
        Assertions: Each status has unique background color
        Requirements: agents.6 */
     it('should return unique background colors for each status', () => {
-      const statuses: AgentStatus[] = ['new', 'in-progress', 'awaiting-user', 'error', 'completed'];
+      const statuses: AgentStatus[] = ['new', 'in-progress', 'awaiting-response', 'error', 'completed'];
       const bgColors = statuses.map((status) => getStatusStyles(status).bg);
 
       // Check all colors are unique
@@ -249,7 +249,7 @@ describe('agentStatus utilities', () => {
        Assertions: Each status has unique text color
        Requirements: agents.6, agents.8.1, agents.5.3 */
     it('should return unique text colors for each status', () => {
-      const statuses: AgentStatus[] = ['new', 'in-progress', 'awaiting-user', 'error', 'completed'];
+      const statuses: AgentStatus[] = ['new', 'in-progress', 'awaiting-response', 'error', 'completed'];
       const textColors = statuses.map((status) => getStatusStyles(status).text);
 
       // Check all colors are unique
@@ -262,7 +262,7 @@ describe('agentStatus utilities', () => {
        Assertions: Ring color matches background color with /30 opacity
        Requirements: agents.6 */
     it('should have ring color matching background color with /30 opacity', () => {
-      const statuses: AgentStatus[] = ['new', 'in-progress', 'awaiting-user', 'error', 'completed'];
+      const statuses: AgentStatus[] = ['new', 'in-progress', 'awaiting-response', 'error', 'completed'];
 
       statuses.forEach((status) => {
         const styles = getStatusStyles(status);
@@ -278,7 +278,7 @@ describe('agentStatus utilities', () => {
        Assertions: Text color uses same base color as background but with -600 shade
        Requirements: agents.6, agents.8.1, agents.5.3 */
     it('should have text color using same base color as background', () => {
-      const statuses: AgentStatus[] = ['new', 'in-progress', 'awaiting-user', 'error', 'completed'];
+      const statuses: AgentStatus[] = ['new', 'in-progress', 'awaiting-response', 'error', 'completed'];
 
       statuses.forEach((status) => {
         const styles = getStatusStyles(status);
@@ -307,7 +307,7 @@ describe('agentStatus utilities', () => {
        Assertions: Returns object with exactly 3 properties (bg, ring, text)
        Requirements: agents.6 */
     it('should return object with exactly 3 properties', () => {
-      const statuses: AgentStatus[] = ['new', 'in-progress', 'awaiting-user', 'error', 'completed'];
+      const statuses: AgentStatus[] = ['new', 'in-progress', 'awaiting-response', 'error', 'completed'];
 
       statuses.forEach((status) => {
         const styles = getStatusStyles(status);
@@ -325,7 +325,7 @@ describe('agentStatus utilities', () => {
        Assertions: All style values are non-empty strings
        Requirements: agents.6 */
     it('should return non-empty string values for all properties', () => {
-      const statuses: AgentStatus[] = ['new', 'in-progress', 'awaiting-user', 'error', 'completed'];
+      const statuses: AgentStatus[] = ['new', 'in-progress', 'awaiting-response', 'error', 'completed'];
 
       statuses.forEach((status) => {
         const styles = getStatusStyles(status);

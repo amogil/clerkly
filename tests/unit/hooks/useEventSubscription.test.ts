@@ -99,7 +99,7 @@ describe('useEventSubscription hooks', () => {
 
       const payload: AgentCreatedPayload = {
         timestamp: Date.now(),
-        data: { id: 'agent-1', name: 'Test', createdAt: Date.now(), updatedAt: Date.now() },
+        agent: { id: 'agent-1', name: 'Test', createdAt: Date.now(), updatedAt: Date.now(), archivedAt: null, status: 'new' },
       };
 
       act(() => {
@@ -175,7 +175,7 @@ describe('useEventSubscription hooks', () => {
 
       const payload: AgentCreatedPayload = {
         timestamp: Date.now(),
-        data: { id: 'agent-1', name: 'Test', createdAt: Date.now(), updatedAt: Date.now() },
+        agent: { id: 'agent-1', name: 'Test', createdAt: Date.now(), updatedAt: Date.now(), archivedAt: null, status: 'new' },
       };
 
       // Should not throw
@@ -248,7 +248,7 @@ describe('useEventSubscription hooks', () => {
 
       const payload: AgentCreatedPayload = {
         timestamp: Date.now(),
-        data: { id: 'agent-1', name: 'Test', createdAt: Date.now(), updatedAt: Date.now() },
+        agent: { id: 'agent-1', name: 'Test', createdAt: Date.now(), updatedAt: Date.now(), archivedAt: null, status: 'new' },
       };
 
       act(() => {
@@ -303,7 +303,7 @@ describe('useEventSubscription hooks', () => {
 
       const payload: AgentCreatedPayload = {
         timestamp: Date.now(),
-        data: { id: 'agent-1', name: 'Test', createdAt: Date.now(), updatedAt: Date.now() },
+        agent: { id: 'agent-1', name: 'Test', createdAt: Date.now(), updatedAt: Date.now(), archivedAt: null, status: 'new' },
       };
 
       act(() => {
@@ -337,6 +337,8 @@ describe('useEventSubscription hooks', () => {
         name: 'Test',
         createdAt: Date.now(),
         updatedAt: Date.now(),
+        archivedAt: null,
+        status: 'new',
       });
 
       act(() => {
