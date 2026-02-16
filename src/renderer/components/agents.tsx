@@ -347,7 +347,11 @@ export function Agents() {
       </div>
 
       {/* Messages Area */}
-      <div ref={messagesAreaRef} className="flex-1 overflow-y-auto p-6 min-h-0">
+      <div
+        ref={messagesAreaRef}
+        data-testid="messages-area"
+        className="flex-1 overflow-y-auto p-6 min-h-0"
+      >
         <div className="min-h-full flex flex-col justify-end space-y-4">
           {messages.length === 0 ? (
             <EmptyStatePlaceholder onPromptClick={handlePromptClick} />

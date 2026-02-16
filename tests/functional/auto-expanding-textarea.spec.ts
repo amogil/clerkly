@@ -132,7 +132,7 @@ test.describe('AutoExpandingTextarea - Functional Tests', () => {
      Requirements: agents.4.6 */
   test('should cap height at 50% of chat area', async () => {
     const textarea = window.locator('[data-testid="auto-expanding-textarea"]');
-    const messagesArea = window.locator('.flex-1.overflow-y-auto.p-6.space-y-4').first();
+    const messagesArea = window.locator('[data-testid="messages-area"]');
 
     await expect(textarea).toBeVisible();
     await expect(messagesArea).toBeVisible();
