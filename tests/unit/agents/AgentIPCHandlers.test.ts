@@ -58,6 +58,15 @@ describe('AgentIPCHandlers', () => {
     payload: { kind: 'user', data: { text: 'Hello' } },
   };
 
+  const mockAgentSnapshot = {
+    id: 'abc123xyz0',
+    name: 'Test Agent',
+    createdAt: new Date('2026-02-15T10:00:00.000Z').getTime(),
+    updatedAt: new Date('2026-02-15T10:00:00.000Z').getTime(),
+    archivedAt: null,
+    status: 'new' as const,
+  };
+
   const mockEvent = {} as IpcMainInvokeEvent;
 
   beforeEach(() => {
@@ -77,6 +86,7 @@ describe('AgentIPCHandlers', () => {
       get: jest.fn().mockReturnValue(mockAgent),
       update: jest.fn(),
       archive: jest.fn(),
+      toEventAgent: jest.fn().mockReturnValue(mockAgentSnapshot),
     } as unknown as jest.Mocked<AgentManager>;
 
     mockMessageManager = {
@@ -157,8 +167,8 @@ describe('AgentIPCHandlers', () => {
   describe('agents:create handler', () => {
     /* Preconditions: Handlers registered
        Action: Invoke agents:create with name
-       Assertions: AgentManager.create called, success returned
-       Requirements: agents.2.3, agents.2.4 */
+       Assertions: AgentManager.create called, AgentSnapshot returned
+       Requirements: agents.2.3, agents.2.4, realtime-events.9.8 */
     it('should create agent and return success', async () => {
       handlers.registerHandlers();
       const handler = registeredHandlers.get('agents:create')!;
@@ -166,7 +176,8 @@ describe('AgentIPCHandlers', () => {
       const result = await handler(mockEvent, { name: 'My Agent' });
 
       expect(mockAgentManager.create).toHaveBeenCalledWith('My Agent');
-      expect(result).toEqual({ success: true, data: mockAgent });
+      expect(mockAgentManager.toEventAgent).toHaveBeenCalledWith(mockAgent);
+      expect(result).toEqual({ success: true, data: mockAgentSnapshot });
     });
 
     /* Preconditions: Handlers registered
@@ -202,8 +213,8 @@ describe('AgentIPCHandlers', () => {
   describe('agents:list handler', () => {
     /* Preconditions: Handlers registered
        Action: Invoke agents:list
-       Assertions: AgentManager.list called, agents returned
-       Requirements: agents.1.3, agents.10.2 */
+       Assertions: AgentManager.list called, AgentSnapshot[] returned
+       Requirements: agents.1.3, agents.10.2, realtime-events.9.8 */
     it('should list agents and return success', async () => {
       handlers.registerHandlers();
       const handler = registeredHandlers.get('agents:list')!;
@@ -211,7 +222,8 @@ describe('AgentIPCHandlers', () => {
       const result = await handler(mockEvent);
 
       expect(mockAgentManager.list).toHaveBeenCalled();
-      expect(result).toEqual({ success: true, data: [mockAgent] });
+      expect(mockAgentManager.toEventAgent).toHaveBeenCalledWith(mockAgent);
+      expect(result).toEqual({ success: true, data: [mockAgentSnapshot] });
     });
 
     /* Preconditions: Handlers registered, AgentManager throws
@@ -243,7 +255,8 @@ describe('AgentIPCHandlers', () => {
       const result = await handler(mockEvent, { agentId: 'abc123xyz0' });
 
       expect(mockAgentManager.get).toHaveBeenCalledWith('abc123xyz0');
-      expect(result).toEqual({ success: true, data: mockAgent });
+      expect(mockAgentManager.toEventAgent).toHaveBeenCalledWith(mockAgent);
+      expect(result).toEqual({ success: true, data: mockAgentSnapshot });
     });
 
     /* Preconditions: Handlers registered, agent not found
