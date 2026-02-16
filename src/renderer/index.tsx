@@ -38,9 +38,9 @@ async function initializeRenderer(): Promise<void> {
 
     logger.info('Renderer Process initialized successfully');
   } catch (error: unknown) {
-    logger.error('Failed to initialize Renderer Process:', error);
-    // Показываем ошибку пользователю
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    logger.error(`Failed to initialize Renderer Process: ${errorMessage}`);
+    // Показываем ошибку пользователю
     document.body.innerHTML = `
       <div style="padding: 20px; color: red;">
         <h1>Initialization Error</h1>

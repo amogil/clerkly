@@ -16,12 +16,7 @@ testMatch: ['**/tests/property/**/*.property.test.{ts,tsx}'],
     '^.+\\.tsx?$': [
       'ts-jest',
       {
-        tsconfig: {
-          esModuleInterop: true,
-          allowSyntheticDefaultImports: true,
-          lib: ['ES2020', 'DOM'],
-          jsx: 'react'
-        }
+        tsconfig: 'tsconfig.test.json'
       }
     ]
   }

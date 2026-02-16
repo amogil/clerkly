@@ -18,6 +18,10 @@ import { EmptyStatePlaceholder } from './agents/EmptyStatePlaceholder';
 import { DateTimeFormatter } from '../../utils/DateTimeFormatter';
 import type { AgentSnapshot } from '../types/agent';
 
+// Helper function to get agent name with fallback
+// Requirements: agents.2.1 - Display agent name or default
+const getAgentName = (agent: AgentSnapshot): string => agent.name || 'New Agent';
+
 export function Agents() {
   const [showAllTasksPage, setShowAllTasksPage] = useState(false);
   const [taskInput, setTaskInput] = useState('');
@@ -170,7 +174,7 @@ export function Agents() {
 
   // Render agent history page
   if (showAllTasksPage) {
-    const historyAgents = agents.filter((agent) => !(isNew(agent.status) && !agent.name));
+    const historyAgents = agents.filter((agent) => !(!agent.name && isNew(agent.status)));
 
     return (
       <div className="h-[calc(100vh-4rem)] bg-card flex flex-col">
@@ -261,8 +265,8 @@ export function Agents() {
 
   // Requirements: agents.2.7, agents.2.10, agents.2.11
   // Auto-create first agent ensures there's always at least one agent
-  // If selectedAgent is null (impossible after loading due to auto-create), use first agent
-  const currentAgent = selectedAgent || agents[0];
+  // currentAgent is guaranteed to be defined after loading due to auto-create
+  const currentAgent = selectedAgent || agents[0]!;
 
   const currentAgentName = getAgentName(currentAgent);
   const letter = currentAgentName.charAt(0).toUpperCase();
@@ -418,7 +422,7 @@ export function Agents() {
             messages.map((message, index) => {
               const showAvatar =
                 message.payload.kind !== 'user' &&
-                (index === 0 || messages[index - 1].payload.kind === 'user');
+                (index === 0 || messages[index - 1]?.payload.kind === 'user');
 
               return (
                 <motion.div
@@ -434,7 +438,7 @@ export function Agents() {
                     <div className="flex justify-end">
                       <div className="rounded-2xl bg-secondary/70 border border-border px-4 py-3 max-w-[75%]">
                         <p className="text-sm leading-relaxed text-foreground whitespace-pre-wrap break-words">
-                          {message.payload.data.text || ''}
+                          {String(message.payload.data?.text || '')}
                         </p>
                       </div>
                     </div>
@@ -450,7 +454,7 @@ export function Agents() {
                         </div>
                       )}
                       <div className="max-w-[85%] text-sm leading-relaxed text-foreground whitespace-pre-wrap break-words">
-                        {message.payload.data.text || ''}
+                        {String(message.payload.data?.text || '')}
                       </div>
                     </>
                   )}

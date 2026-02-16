@@ -94,7 +94,7 @@ export function useAgents(): UseAgentsResult {
       // Select first agent if none selected
       setActiveAgentId((currentId) => {
         if (!currentId && sorted.length > 0) {
-          return sorted[0].id;
+          return sorted[0]!.id;
         }
         return currentId;
       });
@@ -160,7 +160,7 @@ export function useAgents(): UseAgentsResult {
       // If archived agent was active, select next one
       if (activeAgentId === agentId) {
         const remaining = agents.filter((a) => a.id !== agentId);
-        setActiveAgentId(remaining.length > 0 ? remaining[0].id : null);
+        setActiveAgentId(remaining.length > 0 ? remaining[0]!.id : null);
       }
 
       // Requirements: agents.2.7, agents.2.8 - Auto-create if archiving last agent

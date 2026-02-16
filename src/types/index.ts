@@ -211,6 +211,31 @@ export interface API {
       apiKey: string
     ) => Promise<{ success: boolean; error?: string }>;
   };
+  // Requirements: agents.2, agents.4, user-data-isolation.6.6
+  agents: {
+    create: (name?: string) => Promise<{ success: boolean; data?: any; error?: string }>;
+    list: () => Promise<{ success: boolean; data?: any; error?: string }>;
+    get: (agentId: string) => Promise<{ success: boolean; data?: any; error?: string }>;
+    update: (
+      agentId: string,
+      data: { name?: string }
+    ) => Promise<{ success: boolean; error?: string }>;
+    archive: (agentId: string) => Promise<{ success: boolean; error?: string }>;
+  };
+  // Requirements: agents.4, agents.7, user-data-isolation.6.6
+  messages: {
+    list: (agentId: string) => Promise<{ success: boolean; data?: any; error?: string }>;
+    create: (
+      agentId: string,
+      payload: any
+    ) => Promise<{ success: boolean; data?: any; error?: string }>;
+    update: (
+      messageId: number,
+      agentId: string,
+      payload: any
+    ) => Promise<{ success: boolean; error?: string }>;
+    getLast: (agentId: string) => Promise<{ success: boolean; data?: any; error?: string }>;
+  };
   // Requirements: realtime-events.4.5, realtime-events.4.6, realtime-events.4.7
   events?: {
     onEvent: (callback: (type: string, payload: any) => void) => () => void;

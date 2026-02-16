@@ -26,7 +26,7 @@ interface MessagePayloadAPI {
  * API interface for secure IPC communication
  * Exposed to renderer process via contextBridge
  */
-interface API {
+export interface API {
   saveData: (key: string, value: unknown) => Promise<{ success: boolean; error?: string }>;
   loadData: (key: string) => Promise<{ success: boolean; data?: unknown; error?: string }>;
   deleteData: (key: string) => Promise<{ success: boolean; error?: string }>;

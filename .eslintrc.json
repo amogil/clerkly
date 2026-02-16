@@ -78,5 +78,5 @@
       }
     }
   ],
-  "ignorePatterns": ["dist", "node_modules", "coverage", "release", "figma"]
+  "ignorePatterns": ["dist", "node_modules", "coverage", "release", "figma/**"]
 }

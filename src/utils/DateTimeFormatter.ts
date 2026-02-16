@@ -33,7 +33,7 @@ export class DateTimeFormatter {
       console.error('[DateTimeFormatter] Error formatting date:', errorMessage);
 
       const date = typeof timestamp === 'number' ? new Date(timestamp) : timestamp;
-      return date.toISOString().split('T')[0];
+      return date.toISOString().split('T')[0] || '';
     }
   }
 
