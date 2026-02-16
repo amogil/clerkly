@@ -13,7 +13,7 @@ import {
   getStatusText,
   getStatusStyles,
 } from '../../shared/utils/agentStatus';
-import { AutoExpandingTextarea } from './agents/AutoExpandingTextarea';
+import { AutoExpandingTextarea, AutoExpandingTextareaHandle } from './agents/AutoExpandingTextarea';
 import { EmptyStatePlaceholder } from './agents/EmptyStatePlaceholder';
 import { DateTimeFormatter } from '../../utils/DateTimeFormatter';
 import type { Agent } from '../types/agent';
@@ -33,6 +33,7 @@ export function Agents() {
   const [errorMessages, setErrorMessages] = useState<Map<string, string>>(new Map());
   const chatListRef = useRef<HTMLDivElement>(null);
   const messagesAreaRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<AutoExpandingTextareaHandle>(null);
 
   // Use real hooks for agents and messages
   const { agents, activeAgent, createAgent, selectAgent, isLoading } = useAgents();
@@ -70,6 +71,17 @@ export function Agents() {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // Auto-focus input when active agent changes
+  // Requirements: agents.4.7.1, agents.4.7.2
+  useEffect(() => {
+    if (activeAgent && textareaRef.current && !showAllTasksPage) {
+      // Small delay to ensure DOM is ready
+      setTimeout(() => {
+        textareaRef.current?.focus();
+      }, 100);
+    }
+  }, [activeAgent, showAllTasksPage]);
 
   // Calculate visible chats based on container width
   useEffect(() => {
@@ -445,6 +457,7 @@ export function Agents() {
       <div className="p-4 border-t border-border bg-card flex-shrink-0">
         <div className="flex gap-2 items-end">
           <AutoExpandingTextarea
+            ref={textareaRef}
             value={taskInput}
             onChange={setTaskInput}
             onSubmit={handleSend}

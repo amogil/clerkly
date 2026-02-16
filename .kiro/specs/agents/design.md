@@ -1196,7 +1196,7 @@ function ActivityIndicator({ isActive }: { isActive: boolean }) {
 #### AutoExpandingTextarea
 
 ```typescript
-// Requirements: agents.4.5, agents.4.6, agents.4.7
+// Requirements: agents.4.5, agents.4.6, agents.4.7, agents.4.7.1
 function AutoExpandingTextarea({ 
   value, 
   onChange, 
@@ -1204,6 +1204,13 @@ function AutoExpandingTextarea({
   chatAreaRef 
 }: AutoExpandingTextareaProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  
+  // Expose focus method to parent via ref
+  // Requirements: agents.4.7.1
+  useImperativeHandle(ref, () => ({
+    focus: () => textareaRef.current?.focus(),
+    blur: () => textareaRef.current?.blur(),
+  }));
   
   useEffect(() => {
     const textarea = textareaRef.current;
@@ -1241,6 +1248,35 @@ function AutoExpandingTextarea({
   );
 }
 ```
+
+#### Автофокус на поле ввода
+
+**Requirements:** agents.4.7.1, agents.4.7.2
+
+При активации чата агента фокус автоматически устанавливается на поле ввода для улучшения UX.
+
+**Реализация в Agents компоненте:**
+
+```typescript
+const textareaRef = useRef<AutoExpandingTextareaHandle>(null);
+
+// Auto-focus input when active agent changes
+// Requirements: agents.4.7.1, agents.4.7.2
+useEffect(() => {
+  if (activeAgent && textareaRef.current) {
+    // Small delay to ensure DOM is ready
+    setTimeout(() => {
+      textareaRef.current?.focus();
+    }, 100);
+  }
+}, [activeAgent?.agentId]);
+```
+
+**Сценарии автофокуса:**
+1. Клик на иконку агента в списке → меняется `activeAgent` → срабатывает `useEffect` → фокус
+2. Возврат из AllAgents → меняется `activeAgent` → срабатывает `useEffect` → фокус
+3. Первая загрузка → устанавливается первый агент → срабатывает `useEffect` → фокус
+4. Создание нового агента → новый агент становится активным → срабатывает `useEffect` → фокус
 
 ### EmptyStatePlaceholder
 
@@ -1553,6 +1589,7 @@ const STATUS_STYLES: Record<AgentStatus, StatusStyle> = {
 | agents.2.7-2.11 (auto-create) | ✓ | ✓ | ✓ |
 | agents.3 | ✓ | - | ✓ |
 | agents.4 | ✓ | - | ✓ |
+| agents.4.7.1-4.7.2 (autofocus) | - | - | ✓ |
 | agents.4.22 (text wrapping) | ✓ | - | ✓ |
 | agents.5 | ✓ | - | ✓ |
 | agents.5.5 (error messages) | ✓ | - | ✓ |

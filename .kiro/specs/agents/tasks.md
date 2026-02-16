@@ -70,9 +70,14 @@
   - ✅ Обновлены тесты DateTimeFormatter для нового подхода
   - ✅ Функциональный тест (agent-date-update.spec.ts) - проверка обновления даты при отправке сообщения
   - ✅ MessageManager.create() генерирует событие AGENT_UPDATED с обновленным updatedAt (agents.1.4, agents.12.2)
+- 🔄 Автофокус на поле ввода (agents.4.7.1, agents.4.7.2):
+  - 🔄 Добавлено требование об автофокусе при активации чата
+  - 🔄 Обновлен design.md с деталями реализации
+  - 🔄 Реализация useEffect для автофокуса при смене activeAgent
+  - 🔄 Функциональный тест (input-autofocus.spec.ts)
 
 ### В процессе
-- Нет активных задач
+- Автофокус на поле ввода
 
 ### Не выполнено
 - ❌ UI компоненты (AgentIcon, MessageList, AutoExpandingTextarea, HistoryPage)
