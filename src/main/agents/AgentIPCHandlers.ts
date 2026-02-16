@@ -4,8 +4,9 @@
 
 import { ipcMain, IpcMainInvokeEvent } from 'electron';
 import { AgentManager } from './AgentManager';
-import { MessageManager, MessagePayload } from './MessageManager';
+import { MessageManager } from './MessageManager';
 import { Logger } from '../Logger';
+import type { MessagePayload } from '../../shared/utils/agentStatus';
 
 /**
  * IPC result interface for agents operations

@@ -1,6 +1,4 @@
 // Shared utilities
-export { computeAgentStatus } from './computeAgentStatus';
-export type { AgentStatus, MessagePayload, MessageForStatus } from './computeAgentStatus';
 export {
   isInProgress,
   isAwaitingUser,
@@ -10,4 +8,4 @@ export {
   getStatusText,
   getStatusStyles,
 } from './agentStatus';
-export type { AgentStatus as AgentStatusType } from './agentStatus';
+export type { AgentStatus, MessagePayload } from './agentStatus';

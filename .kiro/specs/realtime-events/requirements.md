@@ -268,6 +268,71 @@
 
 **Тестируемость:** Да - проверяется на этапе компиляции (tsc)
 
+### Требование 9: Снапшоты моделей в событиях
+
+**ID:** realtime-events.9
+
+**User Story:** Как разработчик, я хочу чтобы события содержали полные снапшоты моделей, чтобы UI мог обновляться без дополнительных запросов к БД.
+
+**Зависимости:** Нет
+
+#### Критерии Приемки
+
+9.1. Каждое событие, связанное с моделью ORM, ДОЛЖНО содержать два обязательных поля:
+   - `timestamp: number` - время генерации события (Unix timestamp в миллисекундах)
+   - Ссылка на снапшот модели (например, `agent: AgentSnapshot`, `message: MessageSnapshot`)
+
+9.2. Снапшот модели ДОЛЖЕН содержать:
+   - Все поля модели ORM (минимум)
+   - Опционально: вычисляемые поля (например, `status` для агента)
+
+9.3. Снапшот модели ДОЛЖЕН быть отдельным интерфейсом (например, `AgentSnapshot`, `MessageSnapshot`)
+
+9.4. Снапшот ДОЛЖЕН использовать типы, удобные для передачи через IPC:
+   - Даты как `number` (Unix timestamp в миллисекундах) вместо `string` (ISO 8601)
+   - JSON объекты распарсены (например, `payload: MessagePayload` вместо `payloadJson: string`)
+
+9.5. Менеджер модели ДОЛЖЕН иметь приватный метод `toEventSnapshot()` для конвертации ORM модели в снапшот
+
+9.6. Метод `toEventSnapshot()` ДОЛЖЕН:
+   - Вычислять все вычисляемые поля (например, статус агента)
+   - Парсить JSON поля в объекты
+   - Конвертировать типы данных для IPC
+   - Бросать ошибку если конвертация невозможна (не возвращать null)
+
+9.7. События ДОЛЖНЫ генерироваться с полными снапшотами:
+   - `AgentCreatedEvent` → `{ agent: AgentSnapshot, timestamp: number }`
+   - `AgentUpdatedEvent` → `{ agent: AgentSnapshot, timestamp: number }`
+   - `AgentArchivedEvent` → `{ agent: AgentSnapshot, timestamp: number }`
+   - `MessageCreatedEvent` → `{ message: MessageSnapshot, timestamp: number }`
+   - `MessageUpdatedEvent` → `{ message: MessageSnapshot, timestamp: number }`
+
+9.8. UI ДОЛЖЕН использовать данные из снапшота напрямую без дополнительных запросов
+
+**Примеры снапшотов:**
+
+```typescript
+// AgentSnapshot - содержит все поля Agent + вычисляемое поле status
+interface AgentSnapshot {
+  id: string;
+  name: string;
+  createdAt: number;  // Unix timestamp
+  updatedAt: number;  // Unix timestamp
+  archivedAt: number | null;  // Unix timestamp
+  status: AgentStatus;  // Вычисляемое поле
+}
+
+// MessageSnapshot - содержит все поля Message + распарсенный payload
+interface MessageSnapshot {
+  id: number;
+  agentId: string;
+  timestamp: number;  // Unix timestamp
+  payload: MessagePayload;  // Распарсенный JSON
+}
+```
+
+**Тестируемость:** Да - через модульные тесты менеджеров и событий
+
 ## Нефункциональные Требования
 
 ### Надежность

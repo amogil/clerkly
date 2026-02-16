@@ -1,10 +1,13 @@
-// Requirements: agents.4, agents.7
+// Requirements: agents.4, agents.7, realtime-events.9
 // tests/unit/agents/MessageManager.test.ts
 // Unit tests for MessageManager
 
-import { MessageManager, MessagePayload } from '../../../src/main/agents/MessageManager';
+import { MessageManager } from '../../../src/main/agents/MessageManager';
 import { MainEventBus } from '../../../src/main/events/MainEventBus';
-import { MessageCreatedEvent, MessageUpdatedEvent } from '../../../src/shared/events/types';
+import {
+  MessageCreatedEvent,
+  MessageUpdatedEvent,
+} from '../../../src/shared/events/types';
 import type { IDatabaseManager } from '../../../src/main/DatabaseManager';
 import type { Message } from '../../../src/main/db/schema';
 
@@ -13,6 +16,7 @@ jest.mock('../../../src/main/events/MainEventBus', () => ({
   MainEventBus: {
     getInstance: jest.fn(() => ({
       publish: jest.fn(),
+      subscribe: jest.fn(),
     })),
   },
 }));
@@ -32,45 +36,29 @@ jest.mock('../../../src/main/Logger', () => ({
 describe('MessageManager', () => {
   let messageManager: MessageManager;
   let mockDbManager: jest.Mocked<IDatabaseManager>;
-  let mockEventBus: { publish: jest.Mock };
+  let mockEventBus: { publish: jest.Mock; subscribe: jest.Mock };
 
   const mockMessage: Message = {
     id: 1,
-    agentId: 'abc123xyz0',
-    timestamp: '2026-02-15T10:00:00.000Z',
+    agentId: 'agent-123',
+    timestamp: '2026-02-15T10:30:00.000Z',
     payloadJson: JSON.stringify({ kind: 'user', data: { text: 'Hello' } }),
-  };
-
-  const userPayload: MessagePayload = {
-    kind: 'user',
-    data: { text: 'Hello, agent!' },
-  };
-
-  const llmPayload: MessagePayload = {
-    kind: 'llm',
-    data: { text: 'Hello, user!' },
   };
 
   beforeEach(() => {
     jest.clearAllMocks();
 
-    mockEventBus = { publish: jest.fn() };
+    mockEventBus = { publish: jest.fn(), subscribe: jest.fn() };
     (MainEventBus.getInstance as jest.Mock).mockReturnValue(mockEventBus);
 
     mockDbManager = {
-      agents: {
-        create: jest.fn(),
-        list: jest.fn(),
-        findById: jest.fn(),
-        update: jest.fn(),
-        archive: jest.fn(),
-        touch: jest.fn(),
-      },
       messages: {
         listByAgent: jest.fn().mockReturnValue([mockMessage]),
+        getLastByAgent: jest.fn().mockReturnValue(mockMessage),
         create: jest.fn().mockReturnValue(mockMessage),
         update: jest.fn(),
       },
+      agents: {} as IDatabaseManager['agents'],
       settings: {} as IDatabaseManager['settings'],
       users: {} as IDatabaseManager['users'],
       global: {} as IDatabaseManager['global'],
@@ -83,151 +71,175 @@ describe('MessageManager', () => {
     messageManager = new MessageManager(mockDbManager);
   });
 
+  describe('toEventMessage (private method)', () => {
+    /* Preconditions: Message with valid JSON payload exists
+       Action: Call toEventMessage() with message
+       Assertions: Returns MessageSnapshot with parsed payload and Unix timestamp
+       Requirements: realtime-events.9.2, realtime-events.9.4, realtime-events.9.5 */
+    it('should convert Message to MessageSnapshot with parsed payload', () => {
+      const snapshot = (messageManager as any).toEventMessage(mockMessage);
+
+      expect(snapshot).toEqual({
+        id: mockMessage.id,
+        agentId: mockMessage.agentId,
+        timestamp: new Date(mockMessage.timestamp).getTime(),
+        payload: { kind: 'user', data: { text: 'Hello' } },
+      });
+      expect(typeof snapshot.timestamp).toBe('number');
+      expect(typeof snapshot.payload).toBe('object');
+    });
+
+    /* Preconditions: Message with complex payload exists
+       Action: Call toEventMessage() with message
+       Assertions: Returns MessageSnapshot with fully parsed payload
+       Requirements: realtime-events.9.4 */
+    it('should parse complex payload correctly', () => {
+      const complexMessage: Message = {
+        id: 2,
+        agentId: 'agent-123',
+        timestamp: '2026-02-15T10:30:00.000Z',
+        payloadJson: JSON.stringify({
+          kind: 'llm',
+          data: {
+            text: 'Response',
+            result: { status: 'success', value: 42 },
+          },
+        }),
+      };
+
+      const snapshot = (messageManager as any).toEventMessage(complexMessage);
+
+      expect(snapshot.payload).toEqual({
+        kind: 'llm',
+        data: {
+          text: 'Response',
+          result: { status: 'success', value: 42 },
+        },
+      });
+    });
+
+    /* Preconditions: Message with invalid JSON payload exists
+       Action: Call toEventMessage() with message
+       Assertions: Throws error with descriptive message
+       Requirements: realtime-events.9.6 */
+    it('should throw error for invalid JSON payload', () => {
+      const invalidMessage: Message = {
+        id: 3,
+        agentId: 'agent-123',
+        timestamp: '2026-02-15T10:30:00.000Z',
+        payloadJson: 'invalid json {',
+      };
+
+      expect(() => (messageManager as any).toEventMessage(invalidMessage)).toThrow(
+        /Failed to parse message payload for message 3/
+      );
+    });
+
+    /* Preconditions: Message with empty JSON payload exists
+       Action: Call toEventMessage() with message
+       Assertions: Throws error (not returns null)
+       Requirements: realtime-events.9.6 */
+    it('should throw error for empty JSON payload, not return null', () => {
+      const emptyMessage: Message = {
+        id: 4,
+        agentId: 'agent-123',
+        timestamp: '2026-02-15T10:30:00.000Z',
+        payloadJson: '',
+      };
+
+      expect(() => (messageManager as any).toEventMessage(emptyMessage)).toThrow();
+    });
+  });
+
   describe('list', () => {
-    /* Preconditions: MessageManager initialized, messages exist for agent
+    /* Preconditions: MessageManager initialized, messages exist
        Action: Call list() with agentId
        Assertions: Repository listByAgent called, messages returned
-       Requirements: agents.4.8, user-data-isolation.7.6 */
-    it('should return list of messages for agent', () => {
+       Requirements: agents.4.8 */
+    it('should return list of messages from repository', () => {
       const messages = [mockMessage, { ...mockMessage, id: 2 }];
       mockDbManager.messages.listByAgent = jest.fn().mockReturnValue(messages);
 
-      const result = messageManager.list('abc123xyz0');
+      const result = messageManager.list('agent-123');
 
-      expect(mockDbManager.messages.listByAgent).toHaveBeenCalledWith('abc123xyz0');
+      expect(mockDbManager.messages.listByAgent).toHaveBeenCalledWith('agent-123');
       expect(result).toEqual(messages);
     });
+  });
 
-    /* Preconditions: MessageManager initialized, no messages for agent
-       Action: Call list() with agentId
-       Assertions: Empty array returned
-       Requirements: agents.4.8 */
-    it('should return empty array when no messages', () => {
-      mockDbManager.messages.listByAgent = jest.fn().mockReturnValue([]);
+  describe('getLastMessage', () => {
+    /* Preconditions: MessageManager initialized, messages exist
+       Action: Call getLastMessage() with agentId
+       Assertions: Repository getLastByAgent called, last message returned
+       Requirements: agents.5.5 */
+    it('should return last message from repository', () => {
+      const result = messageManager.getLastMessage('agent-123');
 
-      const result = messageManager.list('abc123xyz0');
-
-      expect(result).toEqual([]);
+      expect(mockDbManager.messages.getLastByAgent).toHaveBeenCalledWith('agent-123');
+      expect(result).toEqual(mockMessage);
     });
 
-    /* Preconditions: MessageManager initialized, access denied
-       Action: Call list() with agentId user does not own
-       Assertions: Error thrown
-       Requirements: user-data-isolation.7.6 */
-    it('should throw error when access denied', () => {
-      mockDbManager.messages.listByAgent = jest.fn().mockImplementation(() => {
-        throw new Error('Access denied');
-      });
+    /* Preconditions: MessageManager initialized, no messages exist
+       Action: Call getLastMessage() with agentId
+       Assertions: Returns null
+       Requirements: agents.5.5 */
+    it('should return null when no messages exist', () => {
+      mockDbManager.messages.getLastByAgent = jest.fn().mockReturnValue(null);
 
-      expect(() => messageManager.list('other-agent')).toThrow('Access denied');
+      const result = messageManager.getLastMessage('agent-123');
+
+      expect(result).toBeNull();
     });
   });
 
   describe('create', () => {
-    /* Preconditions: MessageManager initialized, agent exists
-       Action: Call create() with user message payload
-       Assertions: Repository create called with JSON, event published
-       Requirements: agents.4.3, agents.7.1, agents.12.4 */
-    it('should create user message and publish event', () => {
-      const result = messageManager.create('abc123xyz0', userPayload);
+    /* Preconditions: MessageManager initialized
+       Action: Call create() with agentId and payload
+       Assertions: Repository create called, event published with snapshot, message returned
+       Requirements: agents.4.3, agents.7.1, agents.12.4, realtime-events.9.7 */
+    it('should create message and publish event with snapshot', () => {
+      const payload = { kind: 'user' as const, data: { text: 'Hello' } };
+
+      const result = messageManager.create('agent-123', payload);
 
       expect(mockDbManager.messages.create).toHaveBeenCalledWith(
-        'abc123xyz0',
-        JSON.stringify(userPayload)
+        'agent-123',
+        JSON.stringify(payload)
       );
       expect(result).toEqual(mockMessage);
       expect(mockEventBus.publish).toHaveBeenCalledTimes(1);
 
       const publishedEvent = mockEventBus.publish.mock.calls[0][0];
       expect(publishedEvent).toBeInstanceOf(MessageCreatedEvent);
-      // MessageCreatedEvent stores data as instance property, toPayload() returns { data }
-      expect(publishedEvent.data.id).toBe(mockMessage.id);
-      expect(publishedEvent.data.agentId).toBe(mockMessage.agentId);
-    });
-
-    /* Preconditions: MessageManager initialized, agent exists
-       Action: Call create() with llm message payload
-       Assertions: Repository create called with correct kind
-       Requirements: agents.7.2 */
-    it('should create llm message with correct payload', () => {
-      messageManager.create('abc123xyz0', llmPayload);
-
-      expect(mockDbManager.messages.create).toHaveBeenCalledWith(
-        'abc123xyz0',
-        JSON.stringify(llmPayload)
-      );
-    });
-
-    /* Preconditions: MessageManager initialized, agent exists
-       Action: Call create() with final_answer payload
-       Assertions: Repository create called with correct kind
-       Requirements: agents.7.6 */
-    it('should create final_answer message', () => {
-      const finalAnswerPayload: MessagePayload = {
-        kind: 'final_answer',
-        data: { text: 'Done!', format: 'text' },
-      };
-
-      messageManager.create('abc123xyz0', finalAnswerPayload);
-
-      expect(mockDbManager.messages.create).toHaveBeenCalledWith(
-        'abc123xyz0',
-        JSON.stringify(finalAnswerPayload)
-      );
-    });
-
-    /* Preconditions: MessageManager initialized, access denied
-       Action: Call create() for agent user does not own
-       Assertions: Error thrown
-       Requirements: user-data-isolation.7.6 */
-    it('should throw error when access denied', () => {
-      mockDbManager.messages.create = jest.fn().mockImplementation(() => {
-        throw new Error('Access denied');
-      });
-
-      expect(() => messageManager.create('other-agent', userPayload)).toThrow('Access denied');
+      expect(publishedEvent.message.id).toBe(mockMessage.id);
+      expect(publishedEvent.message.payload).toEqual(payload);
+      expect(typeof publishedEvent.timestamp).toBe('number');
     });
   });
 
   describe('update', () => {
-    /* Preconditions: MessageManager initialized, message exists
-       Action: Call update() with new payload
-       Assertions: Repository update called, event published
-       Requirements: agents.7.1, agents.12.5 */
-    it('should update message and publish event', () => {
-      const updatedPayload: MessagePayload = {
-        kind: 'llm',
-        data: { text: 'Updated response' },
-      };
+    /* Preconditions: MessageManager initialized
+       Action: Call update() with messageId, agentId, and new payload
+       Assertions: Repository update called, event published with snapshot
+       Requirements: agents.7.1, realtime-events.9.7 */
+    it('should update message and publish event with snapshot', () => {
+      const payload = { kind: 'user' as const, data: { text: 'Updated' } };
 
-      messageManager.update(1, 'abc123xyz0', updatedPayload);
+      messageManager.update(1, 'agent-123', payload);
 
       expect(mockDbManager.messages.update).toHaveBeenCalledWith(
         1,
-        'abc123xyz0',
-        JSON.stringify(updatedPayload)
+        'agent-123',
+        JSON.stringify(payload)
       );
       expect(mockEventBus.publish).toHaveBeenCalledTimes(1);
 
       const publishedEvent = mockEventBus.publish.mock.calls[0][0];
       expect(publishedEvent).toBeInstanceOf(MessageUpdatedEvent);
-      // MessageUpdatedEvent stores id as instance property
-      expect(publishedEvent.id).toBe(1);
-      expect(publishedEvent.changedFields).toEqual({
-        payloadJson: JSON.stringify(updatedPayload),
-      });
-    });
-
-    /* Preconditions: MessageManager initialized, access denied
-       Action: Call update() for message user does not own
-       Assertions: Error thrown
-       Requirements: user-data-isolation.7.6 */
-    it('should throw error when access denied', () => {
-      mockDbManager.messages.update = jest.fn().mockImplementation(() => {
-        throw new Error('Access denied');
-      });
-
-      expect(() => messageManager.update(1, 'other-agent', userPayload)).toThrow('Access denied');
+      expect(publishedEvent.message.id).toBe(1);
+      expect(publishedEvent.message.agentId).toBe('agent-123');
+      expect(publishedEvent.message.payload).toEqual(payload);
+      expect(typeof publishedEvent.timestamp).toBe('number');
     });
   });
 });

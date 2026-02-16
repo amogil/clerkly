@@ -101,91 +101,157 @@ src/
 
 **Файл:** `src/shared/events/types.ts`
 
+#### Снапшоты моделей
+
+**Requirements:** realtime-events.9
+
+События, связанные с моделями ORM, используют снапшоты (snapshots) вместо прямых ссылок на модели БД. Снапшот — это иммутабельная копия данных модели, оптимизированная для передачи через IPC.
+
+**Принципы снапшотов:**
+
+1. **Полнота данных**: Снапшот содержит все поля модели ORM
+2. **Вычисляемые поля**: Снапшот может содержать дополнительные вычисляемые поля (например, `status`)
+3. **IPC-совместимость**: Типы данных оптимизированы для сериализации:
+   - Даты как `number` (Unix timestamp) вместо `string` (ISO 8601)
+   - JSON распарсен в объекты (например, `payload: MessagePayload` вместо `payloadJson: string`)
+4. **Отдельные интерфейсы**: Снапшот — это отдельный интерфейс (например, `AgentSnapshot`, `MessageSnapshot`)
+
+**Пример снапшотов:**
+
 ```typescript
-// Requirements: realtime-events.1.2, realtime-events.3, realtime-events.8
-
-// Базовая структура события
-export interface BaseEvent<T extends string, P> {
-  type: T;
-  payload: P;
-  timestamp: number;
-  source: 'main' | 'renderer';
-}
-
-// Типы payload для каждого события
-export interface AgentCreatedPayload {
+// AgentSnapshot - содержит все поля Agent + вычисляемое поле status
+export interface AgentSnapshot {
   id: string;
-  name: string | null;
-  userId: string;
-  createdAt: string;
-  updatedAt: string;
+  name: string;
+  createdAt: number;  // Unix timestamp (было: string ISO 8601)
+  updatedAt: number;  // Unix timestamp (было: string ISO 8601)
+  archivedAt: number | null;  // Unix timestamp (было: string ISO 8601)
+  status: AgentStatus;  // Вычисляемое поле (НЕ в БД)
 }
 
-export interface AgentUpdatedPayload {
-  id: string;
-  name?: string | null;
-  archivedAt?: string | null;
-  updatedAt: string;
-  changedFields: string[];
-}
-
-export interface AgentDeletedPayload {
-  id: string;
-}
-
-export interface MessageCreatedPayload {
+// MessageSnapshot - содержит все поля Message + распарсенный payload
+export interface MessageSnapshot {
   id: number;
   agentId: string;
-  kind: string;
-  timestamp: string;
-}
-
-export interface MessageUpdatedPayload {
-  id: number;
-  agentId: string;
-  changedFields: string[];
-}
-
-export interface UserLoginPayload {
-  userId: string;
-}
-
-export interface UserLogoutPayload {
-  userId: string;
-}
-
-export interface UserProfileUpdatedPayload {
-  userId: string;
-  changedFields: string[];
-}
-
-// Карта всех событий
-export type ClerklyEvents = {
-  'agent.created': AgentCreatedPayload;
-  'agent.updated': AgentUpdatedPayload;
-  'agent.archived': AgentArchivedPayload;
-  'message.created': MessageCreatedPayload;
-  'message.updated': MessageUpdatedPayload;
-  'user.login': UserLoginPayload;
-  'user.logout': UserLogoutPayload;
-  'user.profile.updated': UserProfileUpdatedPayload;
-};
-
-// Типы для EventBus
-export type EventType = keyof ClerklyEvents;
-export type EventPayload<T extends EventType> = ClerklyEvents[T];
-export type Event<T extends EventType> = BaseEvent<T, EventPayload<T>>;
-export type AnyEvent = Event<EventType>;
-
-// Callback типы
-export type EventCallback<T extends EventType> = (event: Event<T>) => void;
-export type WildcardCallback = (type: EventType, event: AnyEvent) => void;
-
-// Опции публикации
-export interface PublishOptions {
-  local?: boolean;  // Только локальная доставка (без IPC)
+  timestamp: number;  // Unix timestamp (было: string ISO 8601)
+  payload: MessagePayload;  // Распарсенный JSON (было: payloadJson: string)
 }
 ```
+
+#### Структура событий с снапшотами
+
+**Requirements:** realtime-events.9.1, realtime-events.9.7
+
+Каждое событие модели содержит два обязательных поля:
+
+```typescript
+// Agent events
+export interface AgentCreatedPayload extends BaseEvent {
+  agent: AgentSnapshot;  // Полный снапшот созданного агента
+  timestamp: number;     // Время генерации события
+}
+
+export interface AgentUpdatedPayload extends BaseEvent {
+  agent: AgentSnapshot;  // Полный снапшот обновленного агента
+  timestamp: number;     // Время генерации события
+}
+
+export interface AgentArchivedPayload extends BaseEvent {
+  agent: AgentSnapshot;  // Полный снапшот архивированного агента
+  timestamp: number;     // Время генерации события
+}
+
+// Message events
+export interface MessageCreatedPayload extends BaseEvent {
+  message: MessageSnapshot;  // Полный снапшот созданного сообщения
+  timestamp: number;         // Время генерации события
+}
+
+export interface MessageUpdatedPayload extends BaseEvent {
+  message: MessageSnapshot;  // Полный снапшот обновленного сообщения
+  timestamp: number;         // Время генерации события
+}
+```
+
+#### Генерация снапшотов
+
+**Requirements:** realtime-events.9.5, realtime-events.9.6
+
+Каждый менеджер модели имеет приватный метод `toEventSnapshot()` для конвертации ORM модели в снапшот:
+
+```typescript
+// В AgentManager
+private toEventAgent(agent: Agent): AgentSnapshot {
+  // Получить последнее сообщение для вычисления статуса
+  const lastMessage = this.dbManager.messages.getLastByAgent(agent.agentId);
+  const status = this.computeAgentStatus(lastMessage);
+
+  return {
+    id: agent.agentId,
+    name: agent.name,
+    createdAt: new Date(agent.createdAt).getTime(),  // ISO 8601 → Unix timestamp
+    updatedAt: new Date(agent.updatedAt).getTime(),
+    archivedAt: agent.archivedAt ? new Date(agent.archivedAt).getTime() : null,
+    status,  // Вычисляемое поле
+  };
+}
+
+// В MessageManager
+private toEventMessage(message: Message): MessageSnapshot {
+  let payload: MessagePayload;
+  try {
+    payload = JSON.parse(message.payloadJson) as MessagePayload;
+  } catch (error) {
+    const errorMsg = `Failed to parse message payload for message ${message.id}: ${error}`;
+    this.logger.error(errorMsg);
+    throw new Error(errorMsg);  // Бросаем ошибку, не возвращаем null
+  }
+
+  return {
+    id: message.id,
+    agentId: message.agentId,
+    timestamp: new Date(message.timestamp).getTime(),  // ISO 8601 → Unix timestamp
+    payload,  // Распарсенный JSON
+  };
+}
+```
+
+**Правила:**
+- Метод ДОЛЖЕН бросать ошибку если конвертация невозможна (не возвращать null)
+- Метод ДОЛЖЕН вычислять все вычисляемые поля
+- Метод ДОЛЖЕН парсить JSON поля в объекты
+- Метод ДОЛЖЕН конвертировать типы данных для IPC (даты → timestamps)
+
+#### Использование снапшотов в UI
+
+**Requirements:** realtime-events.9.8
+
+UI использует данные из снапшота напрямую без дополнительных запросов:
+
+```typescript
+// В useAgents hook
+useEventSubscription(EVENT_TYPES.AGENT_UPDATED, (payload: AgentUpdatedPayload) => {
+  setAgents((prev) =>
+    prev.map((agent) =>
+      agent.agentId === payload.agent.id
+        ? {
+            agentId: payload.agent.id,
+            name: payload.agent.name,
+            createdAt: new Date(payload.agent.createdAt).toISOString(),
+            updatedAt: new Date(payload.agent.updatedAt).toISOString(),
+            // Все данные уже в снапшоте, включая вычисляемые поля
+          }
+        : agent
+    )
+  );
+});
+```
+
+**Преимущества:**
+- Нет дополнительных запросов к БД из UI
+- Вычисляемые поля уже готовы (например, статус агента)
+- JSON уже распарсен (например, payload сообщения)
+- Типы данных оптимизированы для UI (timestamps вместо ISO строк)
 
 ### 2. MainEventBus
 

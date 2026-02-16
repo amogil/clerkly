@@ -1,4 +1,4 @@
-// Requirements: realtime-events.3.6, google-oauth-auth.8.4
+// Requirements: realtime-events.3.6, realtime-events.9, google-oauth-auth.8.4
 /**
  * Unit tests for TypedEventClass implementations
  * Tests event class constructors and toPayload methods
@@ -21,8 +21,8 @@ import {
   MessageUpdatedEvent,
   UserProfileUpdatedEvent,
   isTypedEvent,
-  Agent,
-  Message,
+  AgentSnapshot,
+  MessageSnapshot,
 } from '../../../src/shared/events/types';
 
 describe('Event Classes', () => {
@@ -190,94 +190,136 @@ describe('Event Classes', () => {
   });
 
   describe('AgentCreatedEvent', () => {
-    const mockAgent: Agent = {
+    const mockAgentSnapshot: AgentSnapshot = {
       id: 'agent-1',
       name: 'Test Agent',
-      description: 'A test agent',
-      model: 'gpt-4',
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
+      createdAt: 1705315800000,
+      updatedAt: 1705315800000,
+      archivedAt: null,
+      status: 'new',
     };
 
-    /* Preconditions: Agent data provided
+    /* Preconditions: AgentSnapshot provided
        Action: Create AgentCreatedEvent
-       Assertions: Event has correct type and payload
-       Requirements: realtime-events.3.6 */
-    it('should create event with agent data', () => {
-      const event = new AgentCreatedEvent(mockAgent);
+       Assertions: Event has correct type, timestamp, and payload with snapshot
+       Requirements: realtime-events.3.6, realtime-events.9.1, realtime-events.9.7 */
+    it('should create event with agent snapshot and timestamp', () => {
+      const event = new AgentCreatedEvent(mockAgentSnapshot);
 
       expect(event.type).toBe('agent.created');
-      expect(event.data).toEqual(mockAgent);
-      expect(event.toPayload()).toEqual({ data: mockAgent });
+      expect(event.agent).toEqual(mockAgentSnapshot);
+      expect(event.timestamp).toBeGreaterThan(0);
+      expect(typeof event.timestamp).toBe('number');
+      expect(event.toPayload()).toEqual({ agent: mockAgentSnapshot });
     });
   });
 
   describe('AgentUpdatedEvent', () => {
-    /* Preconditions: Agent id and changed fields provided
+    const mockAgentSnapshot: AgentSnapshot = {
+      id: 'agent-1',
+      name: 'Updated Agent',
+      createdAt: 1705315800000,
+      updatedAt: 1705316000000,
+      archivedAt: null,
+      status: 'in-progress',
+    };
+
+    /* Preconditions: AgentSnapshot provided
        Action: Create AgentUpdatedEvent
-       Assertions: Event has correct type and payload
-       Requirements: realtime-events.3.6 */
-    it('should create event with id and changed fields', () => {
-      const changedFields = { name: 'Updated Agent', model: 'gpt-4-turbo' };
-      const event = new AgentUpdatedEvent('agent-1', changedFields);
+       Assertions: Event has correct type, timestamp, and payload with snapshot
+       Requirements: realtime-events.3.6, realtime-events.9.1, realtime-events.9.7 */
+    it('should create event with agent snapshot and timestamp', () => {
+      const event = new AgentUpdatedEvent(mockAgentSnapshot);
 
       expect(event.type).toBe('agent.updated');
-      expect(event.id).toBe('agent-1');
-      expect(event.changedFields).toEqual(changedFields);
-      expect(event.toPayload()).toEqual({ id: 'agent-1', changedFields });
+      expect(event.agent).toEqual(mockAgentSnapshot);
+      expect(event.timestamp).toBeGreaterThan(0);
+      expect(typeof event.timestamp).toBe('number');
+      expect(event.toPayload()).toEqual({ agent: mockAgentSnapshot });
     });
   });
 
   describe('AgentArchivedEvent', () => {
-    /* Preconditions: Agent id provided
+    const mockArchivedSnapshot: AgentSnapshot = {
+      id: 'agent-1',
+      name: 'Archived Agent',
+      createdAt: 1705315800000,
+      updatedAt: 1705316000000,
+      archivedAt: 1705316200000,
+      status: 'completed',
+    };
+
+    /* Preconditions: AgentSnapshot with archivedAt provided
        Action: Create AgentArchivedEvent
-       Assertions: Event has correct type and payload
-       Requirements: realtime-events.3.6, agents.12.3 */
-    it('should create event with id', () => {
-      const event = new AgentArchivedEvent('agent-1');
+       Assertions: Event has correct type, timestamp, and payload with snapshot
+       Requirements: realtime-events.3.6, realtime-events.9.1, realtime-events.9.7, agents.12.3 */
+    it('should create event with agent snapshot and timestamp', () => {
+      const event = new AgentArchivedEvent(mockArchivedSnapshot);
 
       expect(event.type).toBe('agent.archived');
-      expect(event.id).toBe('agent-1');
-      expect(event.toPayload()).toEqual({ id: 'agent-1' });
+      expect(event.agent).toEqual(mockArchivedSnapshot);
+      expect(event.agent.archivedAt).toBe(1705316200000);
+      expect(event.timestamp).toBeGreaterThan(0);
+      expect(typeof event.timestamp).toBe('number');
+      expect(event.toPayload()).toEqual({ agent: mockArchivedSnapshot });
     });
   });
 
   describe('MessageCreatedEvent', () => {
-    const mockMessage: Message = {
+    const mockMessageSnapshot: MessageSnapshot = {
       id: 1,
       agentId: 'agent-1',
-      timestamp: '2024-01-15T10:30:00+03:00',
-      payloadJson: JSON.stringify({ kind: 'user', data: { text: 'Hello' } }),
+      timestamp: 1705315800000,
+      payload: { kind: 'user', data: { text: 'Hello' } },
     };
 
-    /* Preconditions: Message data provided
+    /* Preconditions: MessageSnapshot provided
        Action: Create MessageCreatedEvent
-       Assertions: Event has correct type and payload
-       Requirements: realtime-events.3.6, agents.7.1 */
-    it('should create event with message data', () => {
-      const event = new MessageCreatedEvent(mockMessage);
+       Assertions: Event has correct type, timestamp, and payload with snapshot
+       Requirements: realtime-events.3.6, realtime-events.9.1, realtime-events.9.7, agents.7.1 */
+    it('should create event with message snapshot and timestamp', () => {
+      const event = new MessageCreatedEvent(mockMessageSnapshot);
 
       expect(event.type).toBe('message.created');
-      expect(event.data).toEqual(mockMessage);
-      expect(event.toPayload()).toEqual({ data: mockMessage });
+      expect(event.message).toEqual(mockMessageSnapshot);
+      expect(event.timestamp).toBeGreaterThan(0);
+      expect(typeof event.timestamp).toBe('number');
+      expect(event.toPayload()).toEqual({ message: mockMessageSnapshot });
+    });
+
+    /* Preconditions: MessageSnapshot with parsed payload provided
+       Action: Create MessageCreatedEvent
+       Assertions: Payload is object, not JSON string
+       Requirements: realtime-events.9.4 */
+    it('should have parsed payload object, not JSON string', () => {
+      const event = new MessageCreatedEvent(mockMessageSnapshot);
+
+      expect(typeof event.message.payload).toBe('object');
+      expect(event.message.payload.kind).toBe('user');
+      expect(event.message.payload.data).toEqual({ text: 'Hello' });
     });
   });
 
   describe('MessageUpdatedEvent', () => {
-    /* Preconditions: Message id and changed fields provided
+    const mockMessageSnapshot: MessageSnapshot = {
+      id: 1,
+      agentId: 'agent-1',
+      timestamp: 1705315800000,
+      payload: { kind: 'user', data: { text: 'Updated' } },
+    };
+
+    /* Preconditions: MessageSnapshot provided
        Action: Create MessageUpdatedEvent
-       Assertions: Event has correct type and payload
-       Requirements: realtime-events.3.6, agents.7.1 */
-    it('should create event with id and changed fields', () => {
-      const changedFields = {
-        payloadJson: JSON.stringify({ kind: 'user', data: { text: 'Updated' } }),
-      };
-      const event = new MessageUpdatedEvent(1, changedFields);
+       Assertions: Event has correct type, timestamp, and payload with snapshot
+       Requirements: realtime-events.3.6, realtime-events.9.1, realtime-events.9.7, agents.7.1 */
+    it('should create event with message snapshot and timestamp', () => {
+      const event = new MessageUpdatedEvent(mockMessageSnapshot);
 
       expect(event.type).toBe('message.updated');
-      expect(event.id).toBe(1);
-      expect(event.changedFields).toEqual(changedFields);
-      expect(event.toPayload()).toEqual({ id: '1', changedFields });
+      expect(event.message).toEqual(mockMessageSnapshot);
+      expect(event.timestamp).toBeGreaterThan(0);
+      expect(typeof event.timestamp).toBe('number');
+      expect(event.toPayload()).toEqual({ message: mockMessageSnapshot });
     });
   });
 
