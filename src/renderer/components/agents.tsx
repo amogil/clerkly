@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Send, Check, X, HelpCircle, ArrowLeft, Plus } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Logo } from './logo';
 import { useAgents } from '../hooks/useAgents';
 import { useMessages } from '../hooks/useMessages';
@@ -337,54 +337,70 @@ export function Agents() {
             <Plus className="w-4 h-4 text-white" />
           </div>
 
-          {displayAgents.slice(0, visibleChatsCount).map((agent) => {
-            const agentLetter = agent.title.charAt(0).toUpperCase();
-            const agentStyle = getStatusStyles(agent.status);
-            const isSelected = agent.agentId === currentAgent.agentId;
+          <AnimatePresence mode="popLayout">
+            {displayAgents.slice(0, visibleChatsCount).map((agent) => {
+              const agentLetter = agent.title.charAt(0).toUpperCase();
+              const agentStyle = getStatusStyles(agent.status);
+              const isSelected = agent.agentId === currentAgent.agentId;
 
-            return (
-              <div
-                key={agent.agentId}
-                onClick={() => handleAgentClick(agent)}
-                className={`relative w-8 h-8 rounded-full ${agentStyle.bg} flex items-center justify-center cursor-pointer hover:scale-110 transition-transform group ${isSelected ? 'ring-2 ring-primary ring-offset-2' : ''}`}
-                title={agent.title}
-              >
-                {isCompleted(agent.status) ? (
-                  <Check className="w-4 h-4 text-white" />
-                ) : hasError(agent.status) ? (
-                  <X className="w-4 h-4 text-white" />
-                ) : isAwaitingUser(agent.status) ? (
-                  <>
+              return (
+                <motion.div
+                  key={agent.agentId}
+                  layout
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.8 }}
+                  transition={{
+                    layout: {
+                      type: 'spring',
+                      stiffness: 400,
+                      damping: 30,
+                      mass: 0.8,
+                    },
+                    opacity: { duration: 0.2 },
+                    scale: { duration: 0.2 },
+                  }}
+                  onClick={() => handleAgentClick(agent)}
+                  className={`relative w-8 h-8 rounded-full ${agentStyle.bg} flex items-center justify-center cursor-pointer hover:scale-110 transition-transform group ${isSelected ? 'ring-2 ring-primary ring-offset-2' : ''}`}
+                  title={agent.title}
+                >
+                  {isCompleted(agent.status) ? (
+                    <Check className="w-4 h-4 text-white" />
+                  ) : hasError(agent.status) ? (
+                    <X className="w-4 h-4 text-white" />
+                  ) : isAwaitingUser(agent.status) ? (
+                    <>
+                      <span className="text-white text-xs font-semibold">{agentLetter}</span>
+                      <div
+                        className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full ${agentStyle.bg} border-2 border-card flex items-center justify-center`}
+                      >
+                        <HelpCircle className="w-2 h-2 text-white" />
+                      </div>
+                    </>
+                  ) : (
                     <span className="text-white text-xs font-semibold">{agentLetter}</span>
+                  )}
+
+                  {isInProgress(agent.status) && (
+                    <div className="absolute inset-0 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                  )}
+
+                  {isAwaitingUser(agent.status) && (
                     <div
-                      className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full ${agentStyle.bg} border-2 border-card flex items-center justify-center`}
-                    >
-                      <HelpCircle className="w-2 h-2 text-white" />
+                      className={`absolute -inset-1 rounded-full ring-2 ${agentStyle.ring} animate-pulse`}
+                    />
+                  )}
+
+                  <div className="absolute top-full right-0 mt-2 w-64 bg-gray-900 text-white text-xs rounded-lg p-3 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 shadow-lg">
+                    <p className="font-semibold mb-1">{agent.title}</p>
+                    <div className="flex items-center gap-1.5 text-xs text-gray-300">
+                      <span>{getStatusText(agent.status)}</span>
                     </div>
-                  </>
-                ) : (
-                  <span className="text-white text-xs font-semibold">{agentLetter}</span>
-                )}
-
-                {isInProgress(agent.status) && (
-                  <div className="absolute inset-0 rounded-full border-2 border-white border-t-transparent animate-spin" />
-                )}
-
-                {isAwaitingUser(agent.status) && (
-                  <div
-                    className={`absolute -inset-1 rounded-full ring-2 ${agentStyle.ring} animate-pulse`}
-                  />
-                )}
-
-                <div className="absolute top-full right-0 mt-2 w-64 bg-gray-900 text-white text-xs rounded-lg p-3 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 shadow-lg">
-                  <p className="font-semibold mb-1">{agent.title}</p>
-                  <div className="flex items-center gap-1.5 text-xs text-gray-300">
-                    <span>{getStatusText(agent.status)}</span>
                   </div>
-                </div>
-              </div>
-            );
-          })}
+                </motion.div>
+              );
+            })}
+          </AnimatePresence>
 
           {displayAgents.length > visibleChatsCount && (
             <div

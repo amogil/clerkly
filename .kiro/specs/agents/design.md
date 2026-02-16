@@ -854,6 +854,21 @@ function AgentsComponent() {
 - Пересортировка происходит в реальном времени при получении события
 - Используется `Array.sort()` с компаратором по `updatedAt` DESC
 
+**Анимация перехода агента (agents.1.4.4):**
+- Используется `framer-motion` с `AnimatePresence` и `motion.div`
+- `AnimatePresence` с `mode="popLayout"` для управления анимацией списка
+- Каждый агент обернут в `motion.div` с `layout` prop для плавного перемещения
+- Spring анимация с параметрами:
+  - `type: 'spring'`
+  - `stiffness: 400` - жесткость пружины
+  - `damping: 30` - затухание
+  - `mass: 0.8` - масса элемента
+- Анимация появления/исчезновения:
+  - `initial={{ opacity: 0, scale: 0.8 }}`
+  - `animate={{ opacity: 1, scale: 1 }}`
+  - `exit={{ opacity: 0, scale: 0.8 }}`
+  - `duration: 0.2` для opacity и scale
+
 **AGENT_ARCHIVED** (agents.12.3, agents.12.6)
 
 *Подписчик: useAgents (Renderer)*
