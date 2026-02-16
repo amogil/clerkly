@@ -96,14 +96,14 @@ export type MessageKind =
   | 'artifact';
 
 /**
- * Message entity
- * Requirements: agents.7.1
+ * Message snapshot for events
+ * Contains parsed payload instead of JSON string
  */
-export interface Message {
+export interface MessageSnapshot {
   id: number;
   agentId: string;
-  timestamp: string; // ISO 8601 with timezone offset
-  payloadJson: string; // JSON string of MessagePayload
+  timestamp: number; // Unix timestamp in milliseconds
+  payload: MessagePayload;
 }
 
 // ============================================================================
@@ -111,15 +111,28 @@ export interface Message {
 // ============================================================================
 
 // Agent events
-export type AgentCreatedPayload = EntityCreatedEvent<AgentSnapshot>;
+export interface AgentCreatedPayload extends BaseEvent {
+  agent: AgentSnapshot;
+  timestamp: number;
+}
 export interface AgentUpdatedPayload extends BaseEvent {
   agent: AgentSnapshot;
+  timestamp: number;
 }
-export type AgentArchivedPayload = EntityDeletedEvent;
+export interface AgentArchivedPayload extends BaseEvent {
+  agent: AgentSnapshot;
+  timestamp: number;
+}
 
 // Message events
-export type MessageCreatedPayload = EntityCreatedEvent<Message>;
-export type MessageUpdatedPayload = EntityUpdatedEvent<Message>;
+export interface MessageCreatedPayload extends BaseEvent {
+  message: MessageSnapshot;
+  timestamp: number;
+}
+export interface MessageUpdatedPayload extends BaseEvent {
+  message: MessageSnapshot;
+  timestamp: number;
+}
 
 // User events
 export type UserLoginPayload = BaseEvent & { userId: string };
@@ -497,13 +510,15 @@ export class UserLogoutEvent extends TypedEventClass<UserLogoutType> {
  */
 export class AgentCreatedEvent extends TypedEventClass<AgentCreatedType> {
   readonly type = EVENT_TYPES.AGENT_CREATED;
+  readonly timestamp: number;
 
-  constructor(public readonly data: AgentSnapshot) {
+  constructor(public readonly agent: AgentSnapshot) {
     super();
+    this.timestamp = Date.now();
   }
 
   toPayload(): EventPayloadWithoutTimestamp<AgentCreatedType> {
-    return { data: this.data };
+    return { agent: this.agent };
   }
 }
 
@@ -512,9 +527,11 @@ export class AgentCreatedEvent extends TypedEventClass<AgentCreatedType> {
  */
 export class AgentUpdatedEvent extends TypedEventClass<AgentUpdatedType> {
   readonly type = EVENT_TYPES.AGENT_UPDATED;
+  readonly timestamp: number;
 
   constructor(public readonly agent: AgentSnapshot) {
     super();
+    this.timestamp = Date.now();
   }
 
   toPayload(): EventPayloadWithoutTimestamp<AgentUpdatedType> {
@@ -529,13 +546,15 @@ export class AgentUpdatedEvent extends TypedEventClass<AgentUpdatedType> {
  */
 export class AgentArchivedEvent extends TypedEventClass<AgentArchivedType> {
   readonly type = EVENT_TYPES.AGENT_ARCHIVED;
+  readonly timestamp: number;
 
-  constructor(public readonly id: string) {
+  constructor(public readonly agent: AgentSnapshot) {
     super();
+    this.timestamp = Date.now();
   }
 
   toPayload(): EventPayloadWithoutTimestamp<AgentArchivedType> {
-    return { id: this.id };
+    return { agent: this.agent };
   }
 }
 
@@ -544,13 +563,15 @@ export class AgentArchivedEvent extends TypedEventClass<AgentArchivedType> {
  */
 export class MessageCreatedEvent extends TypedEventClass<MessageCreatedType> {
   readonly type = EVENT_TYPES.MESSAGE_CREATED;
+  readonly timestamp: number;
 
-  constructor(public readonly data: Message) {
+  constructor(public readonly message: MessageSnapshot) {
     super();
+    this.timestamp = Date.now();
   }
 
   toPayload(): EventPayloadWithoutTimestamp<MessageCreatedType> {
-    return { data: this.data };
+    return { message: this.message };
   }
 }
 
@@ -559,16 +580,15 @@ export class MessageCreatedEvent extends TypedEventClass<MessageCreatedType> {
  */
 export class MessageUpdatedEvent extends TypedEventClass<MessageUpdatedType> {
   readonly type = EVENT_TYPES.MESSAGE_UPDATED;
+  readonly timestamp: number;
 
-  constructor(
-    public readonly id: number,
-    public readonly changedFields: Partial<Message>
-  ) {
+  constructor(public readonly message: MessageSnapshot) {
     super();
+    this.timestamp = Date.now();
   }
 
   toPayload(): EventPayloadWithoutTimestamp<MessageUpdatedType> {
-    return { id: String(this.id), changedFields: this.changedFields };
+    return { message: this.message };
   }
 }
 

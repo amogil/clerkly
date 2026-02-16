@@ -4,7 +4,7 @@
 
 import { IDatabaseManager } from '../DatabaseManager';
 import { MainEventBus } from '../events/MainEventBus';
-import { MessageCreatedEvent, MessageUpdatedEvent } from '../../shared/events/types';
+import { MessageCreatedEvent, MessageUpdatedEvent, MessageSnapshot } from '../../shared/events/types';
 import { Logger } from '../Logger';
 import type { Message } from '../db/schema';
 import type { MessagePayload } from '../../shared/utils/agentStatus';
@@ -24,6 +24,28 @@ export class MessageManager {
 
   constructor(dbManager: IDatabaseManager) {
     this.dbManager = dbManager;
+  }
+
+  /**
+   * Convert DB Message entity to Event MessageSnapshot
+   * @throws Error if payload JSON is invalid
+   */
+  private toEventMessage(message: Message): MessageSnapshot {
+    let payload: MessagePayload;
+    try {
+      payload = JSON.parse(message.payloadJson) as MessagePayload;
+    } catch (error) {
+      const errorMsg = `Failed to parse message payload for message ${message.id}: ${error}`;
+      this.logger.error(errorMsg);
+      throw new Error(errorMsg);
+    }
+
+    return {
+      id: message.id,
+      agentId: message.agentId,
+      timestamp: new Date(message.timestamp).getTime(),
+      payload,
+    };
   }
 
   /**
@@ -58,14 +80,7 @@ export class MessageManager {
 
     // Publish message created event for real-time UI updates
     // Requirements: agents.12.4
-    MainEventBus.getInstance().publish(
-      new MessageCreatedEvent({
-        id: message.id,
-        agentId: message.agentId,
-        timestamp: message.timestamp,
-        payloadJson: message.payloadJson,
-      })
-    );
+    MainEventBus.getInstance().publish(new MessageCreatedEvent(this.toEventMessage(message)));
 
     return message;
   }
@@ -81,12 +96,19 @@ export class MessageManager {
 
     this.logger.info(`Message updated: ${messageId}`);
 
+    // Create snapshot using toEventMessage helper
+    // Note: We create a temporary Message object since we don't fetch from DB
+    const tempMessage: Message = {
+      id: messageId,
+      agentId,
+      timestamp: new Date().toISOString(),
+      payloadJson,
+    };
+
     // Publish event for real-time UI updates
     // Requirements: agents.12.5
     MainEventBus.getInstance().publish(
-      new MessageUpdatedEvent(messageId, {
-        payloadJson,
-      })
+      new MessageUpdatedEvent(this.toEventMessage(tempMessage))
     );
   }
 }

@@ -104,8 +104,8 @@ export class AgentManager {
     MainEventBus.getInstance().subscribe(
       EVENT_TYPES.MESSAGE_CREATED,
       (payload: MessageCreatedPayload) => {
-        if (payload.data) {
-          this.handleMessageCreated(payload.data.agentId);
+        if (payload.message) {
+          this.handleMessageCreated(payload.message.agentId);
         }
       }
     );
@@ -201,13 +201,25 @@ export class AgentManager {
    * Requirements: agents.10.4
    */
   archive(agentId: string): void {
+    // Get agent before archiving to create snapshot
+    const agent = this.dbManager.agents.findById(agentId);
+    if (!agent) {
+      throw new Error('Agent not found');
+    }
+
     // Repository automatically checks ownership
     this.dbManager.agents.archive(agentId);
 
     this.logger.info(`Agent archived: ${agentId}`);
 
-    // Publish event for real-time UI updates
-    // Requirements: agents.12.3
-    MainEventBus.getInstance().publish(new AgentArchivedEvent(agentId));
+    // Get archived agent to create snapshot with archivedAt timestamp
+    const archivedAgent = this.dbManager.agents.findById(agentId);
+    if (archivedAgent) {
+      // Publish event for real-time UI updates with full agent snapshot
+      // Requirements: agents.12.3
+      MainEventBus.getInstance().publish(
+        new AgentArchivedEvent(this.toEventAgent(archivedAgent))
+      );
+    }
   }
 }
