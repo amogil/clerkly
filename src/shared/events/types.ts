@@ -306,13 +306,28 @@ export type EventPayloadWithoutTimestamp<T extends EventType> = Omit<ClerklyEven
  * Extract entity ID from event payload
  */
 export function getEntityId(
-  payload: BaseEvent & { id?: string; data?: { id?: string } }
+  payload: BaseEvent & {
+    id?: string;
+    data?: { id?: string };
+    agent?: { id?: string };
+    message?: { id?: number };
+  }
 ): string | undefined {
+  // Old format: payload.id
   if ('id' in payload && typeof payload.id === 'string') {
     return payload.id;
   }
+  // Old format: payload.data.id
   if ('data' in payload && payload.data && typeof payload.data.id === 'string') {
     return payload.data.id;
+  }
+  // New snapshot format: payload.agent.id (AgentSnapshot)
+  if ('agent' in payload && payload.agent && typeof payload.agent.id === 'string') {
+    return payload.agent.id;
+  }
+  // New snapshot format: payload.message.id (MessageSnapshot)
+  if ('message' in payload && payload.message && typeof payload.message.id === 'number') {
+    return String(payload.message.id);
   }
   return undefined;
 }

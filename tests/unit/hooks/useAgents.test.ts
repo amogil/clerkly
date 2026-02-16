@@ -707,10 +707,11 @@ describe('useAgents hook', () => {
     });
 
     /* Preconditions: Hook is mounted
-       Action: AGENT_CREATED event with no data
-       Assertions: No error, agents unchanged
-       Requirements: agents.12.1 */
-    it('should handle AGENT_CREATED event with no data', async () => {
+       Action: AGENT_CREATED event with null agent
+       Assertions: Toast error is shown, agents unchanged
+       Requirements: agents.12.1, error-notifications.2 */
+    it('should show toast error on AGENT_CREATED event with invalid data', async () => {
+      const { toast } = require('sonner');
       let createdHandler: (payload: any) => void;
       mockSubscribe.mockImplementation((type, handler) => {
         if (type === EVENT_TYPES.AGENT_CREATED) {
@@ -734,14 +735,21 @@ describe('useAgents hook', () => {
         });
       });
 
+      // Should show error toast
+      expect(toast.error).toHaveBeenCalledWith(
+        expect.stringContaining('Invalid AGENT_CREATED event')
+      );
+
+      // Agents list should remain unchanged
       expect(result.current.agents.length).toBe(initialCount);
     });
 
     /* Preconditions: Hook is mounted
-       Action: AGENT_UPDATED event with no id
-       Assertions: No error, agents unchanged
-       Requirements: agents.12.2 */
-    it('should handle AGENT_UPDATED event with no id', async () => {
+       Action: AGENT_UPDATED event with null agent
+       Assertions: Toast error is shown, agents unchanged
+       Requirements: agents.12.2, error-notifications.2 */
+    it('should show toast error on AGENT_UPDATED event with invalid data', async () => {
+      const { toast } = require('sonner');
       let updatedHandler: (payload: any) => void;
       mockSubscribe.mockImplementation((type, handler) => {
         if (type === EVENT_TYPES.AGENT_UPDATED) {
@@ -765,14 +773,21 @@ describe('useAgents hook', () => {
         });
       });
 
+      // Should show error toast
+      expect(toast.error).toHaveBeenCalledWith(
+        expect.stringContaining('Invalid AGENT_UPDATED event')
+      );
+
+      // Agent should remain unchanged
       expect(result.current.agents[0].name).toBe(originalAgent.name);
     });
 
     /* Preconditions: Hook is mounted
-       Action: AGENT_ARCHIVED event with no id
-       Assertions: No error, agents unchanged
-       Requirements: agents.12.3 */
-    it('should handle AGENT_ARCHIVED event with no id', async () => {
+       Action: AGENT_ARCHIVED event with null agent
+       Assertions: Toast error is shown, agents unchanged
+       Requirements: agents.12.3, error-notifications.2 */
+    it('should show toast error on AGENT_ARCHIVED event with invalid data', async () => {
+      const { toast } = require('sonner');
       let archivedHandler: (payload: any) => void;
       mockSubscribe.mockImplementation((type, handler) => {
         if (type === EVENT_TYPES.AGENT_ARCHIVED) {
@@ -796,6 +811,12 @@ describe('useAgents hook', () => {
         });
       });
 
+      // Should show error toast
+      expect(toast.error).toHaveBeenCalledWith(
+        expect.stringContaining('Invalid AGENT_ARCHIVED event')
+      );
+
+      // Agents list should remain unchanged
       expect(result.current.agents.length).toBe(initialCount);
     });
   });

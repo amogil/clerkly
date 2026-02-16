@@ -187,57 +187,90 @@ export function useAgents(): UseAgentsResult {
   );
 
   // Subscribe to agent events
-  // Requirements: agents.12.6, realtime-events.9.8
+  // Requirements: agents.12.6, realtime-events.9.8, error-notifications.2
   useEventSubscription(EVENT_TYPES.AGENT_CREATED, (payload: AgentCreatedPayload) => {
-    // Snapshot already contains all data including computed status
-    const newAgent = payload.agent;
-    setAgents((prev) => {
-      // Add to list, remove duplicates, re-sort
-      const updated = [newAgent, ...prev.filter((a) => a.id !== newAgent.id)];
-      return sortByUpdatedAt(updated);
-    });
+    try {
+      // Snapshot already contains all data including computed status
+      const newAgent = payload.agent;
+      // Validate before using
+      if (!newAgent || !newAgent.id) {
+        throw new Error('Missing agent data in AGENT_CREATED event');
+      }
+      setAgents((prev) => {
+        // Add to list, remove duplicates, re-sort
+        const updated = [newAgent, ...prev.filter((a) => a.id !== newAgent.id)];
+        return sortByUpdatedAt(updated);
+      });
+    } catch (error) {
+      const { toast } = require('sonner');
+      toast.error(
+        `Invalid AGENT_CREATED event: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
   });
 
   useEventSubscription(EVENT_TYPES.AGENT_UPDATED, (payload: AgentUpdatedPayload) => {
-    // Snapshot already contains all updated data including computed status
-    const updatedAgent = payload.agent;
-    setAgents((prev) => {
-      // Replace agent with new snapshot, re-sort
-      const updated = prev.map((agent) => (agent.id === updatedAgent.id ? updatedAgent : agent));
+    try {
+      // Snapshot already contains all updated data including computed status
+      const updatedAgent = payload.agent;
+      // Validate before using
+      if (!updatedAgent || !updatedAgent.id) {
+        throw new Error('Missing agent data in AGENT_UPDATED event');
+      }
+      setAgents((prev) => {
+        // Replace agent with new snapshot, re-sort
+        const updated = prev.map((agent) => (agent.id === updatedAgent.id ? updatedAgent : agent));
 
-      // Requirements: agents.1.3, agents.5.7 - Re-sort by updatedAt after update
-      // This ensures agents move to the top when they receive new messages
-      return sortByUpdatedAt(updated);
-    });
+        // Requirements: agents.1.3, agents.5.7 - Re-sort by updatedAt after update
+        // This ensures agents move to the top when they receive new messages
+        return sortByUpdatedAt(updated);
+      });
+    } catch (error) {
+      const { toast } = require('sonner');
+      toast.error(
+        `Invalid AGENT_UPDATED event: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
   });
 
   useEventSubscription(EVENT_TYPES.AGENT_ARCHIVED, (payload: AgentArchivedPayload) => {
-    const archivedAgentId = payload.agent.id;
-    setAgents((prev) => {
-      const updated = prev.filter((agent) => agent.id !== archivedAgentId);
-
-      // Requirements: agents.2.7, agents.2.9, agents.2.10 - Auto-create if last agent archived
-      if (updated.length === 0) {
-        // Last agent was archived, create new one to maintain invariant
-        // Requirements: error-notifications.2, realtime-events.9.8
-        callApi<AgentSnapshot>(
-          () =>
-            window.api.agents.create('New Agent') as Promise<{
-              success: boolean;
-              data?: AgentSnapshot;
-              error?: string;
-            }>,
-          'Creating new agent'
-        ).then((newAgent) => {
-          if (newAgent) {
-            setAgents([newAgent]);
-            setActiveAgentId(newAgent.id);
-          }
-        });
+    try {
+      // Validate before using
+      if (!payload.agent || !payload.agent.id) {
+        throw new Error('Missing agent data in AGENT_ARCHIVED event');
       }
+      const archivedAgentId = payload.agent.id;
+      setAgents((prev) => {
+        const updated = prev.filter((agent) => agent.id !== archivedAgentId);
 
-      return updated;
-    });
+        // Requirements: agents.2.7, agents.2.9, agents.2.10 - Auto-create if last agent archived
+        if (updated.length === 0) {
+          // Last agent was archived, create new one to maintain invariant
+          // Requirements: error-notifications.2, realtime-events.9.8
+          callApi<AgentSnapshot>(
+            () =>
+              window.api.agents.create('New Agent') as Promise<{
+                success: boolean;
+                data?: AgentSnapshot;
+                error?: string;
+              }>,
+            'Creating new agent'
+          ).then((newAgent) => {
+            if (newAgent) {
+              setAgents([newAgent]);
+              setActiveAgentId(newAgent.id);
+            }
+          });
+        }
+
+        return updated;
+      });
+    } catch (error) {
+      const { toast } = require('sonner');
+      toast.error(
+        `Invalid AGENT_ARCHIVED event: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
   });
 
   // Get active agent object
