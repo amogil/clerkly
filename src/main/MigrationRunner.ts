@@ -139,8 +139,14 @@ export class MigrationRunner {
           continue;
         }
 
-        const version = parseInt(match[1], 10);
+        const versionStr = match[1];
         const name = match[2];
+
+        if (!versionStr || !name) {
+          throw new Error(`Migration file ${file} has invalid format: missing version or name`);
+        }
+
+        const version = parseInt(versionStr, 10);
 
         // Read file content
         const filePath = path.join(this.migrationsPath, file);
@@ -148,8 +154,8 @@ export class MigrationRunner {
 
         // Split into up and down migrations
         const parts = content.split('-- DOWN');
-        const up = parts[0].replace('-- UP', '').trim();
-        const down = parts[1] ? parts[1].trim() : '';
+        const up = parts[0]?.replace('-- UP', '').trim() ?? '';
+        const down = parts[1]?.trim() ?? '';
 
         // Validation: up migration is required
         if (!up) {

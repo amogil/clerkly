@@ -36,7 +36,7 @@ app.setName('Clerkly');
 // Request single instance lock BEFORE registering protocol
 // This ensures that deep links are handled by the existing instance
 // Skip single instance lock in test environment to allow multiple test instances
-const gotTheLock = process.env.NODE_ENV === 'test' ? true : app.requestSingleInstanceLock();
+const gotTheLock = process.env['NODE_ENV'] === 'test' ? true : app.requestSingleInstanceLock();
 
 logger.info(`Single instance lock: ${gotTheLock ? 'ACQUIRED' : 'FAILED'}`);
 logger.info(`Process args: ${JSON.stringify(process.argv)}`);
@@ -44,7 +44,10 @@ logger.info(`Process defaultApp: ${process.defaultApp}`);
 
 // Requirements: google-oauth-auth.2.1
 // Extract protocol scheme from redirect URI for deep link handling
-const protocolScheme = OAUTH_CONFIG.redirectUri.split(':')[0];
+const protocolScheme = OAUTH_CONFIG.redirectUri.split(':')[0] ?? '';
+if (!protocolScheme) {
+  throw new Error('Invalid redirect URI: missing protocol scheme');
+}
 logger.info(`Protocol scheme: ${protocolScheme}`);
 
 // Track application initialization state
@@ -69,10 +72,12 @@ if (!gotTheLock) {
   // Handle custom user data directory for functional tests
   // Check for --user-data-dir argument
   const userDataDirIndex = process.argv.indexOf('--user-data-dir');
-  if (userDataDirIndex !== -1 && process.argv[userDataDirIndex + 1]) {
+  if (userDataDirIndex !== -1) {
     const customUserDataPath = process.argv[userDataDirIndex + 1];
-    app.setPath('userData', customUserDataPath);
-    logger.info(`Using custom user data path: ${customUserDataPath}`);
+    if (customUserDataPath) {
+      app.setPath('userData', customUserDataPath);
+      logger.info(`Using custom user data path: ${customUserDataPath}`);
+    }
   }
 
   // Register custom protocol for deep link handling
@@ -106,7 +111,7 @@ const dataManager = new UserSettingsManager(dbManager);
 // Requirements: testing.3.1, testing.3.2
 // Helper function to check if we're in test environment
 const isTestEnvironment = () => {
-  return process.env.NODE_ENV === 'test' || process.env.PLAYWRIGHT_TEST === '1';
+  return process.env['NODE_ENV'] === 'test' || process.env['PLAYWRIGHT_TEST'] === '1';
 };
 
 // Create TestDataManager wrapper in test environment
@@ -203,7 +208,7 @@ const agentIPCHandlers = new AgentIPCHandlers(agentManager, messageManager);
 
 // Requirements: testing.3.8
 // Initialize Test IPC Handlers (only in test environment)
-if (process.env.NODE_ENV === 'test') {
+if (process.env['NODE_ENV'] === 'test') {
   // Export test context for functional tests
   // This allows tests to access internal state like PKCE storage
   (global as { testContext?: unknown }).testContext = {

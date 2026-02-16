@@ -60,7 +60,8 @@ export class MessagesRepository {
       .limit(1)
       .all();
 
-    return result.length > 0 ? result[0] : null;
+    const message = result[0];
+    return message ?? null;
   }
 
   /**
