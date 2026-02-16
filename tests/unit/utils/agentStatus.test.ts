@@ -236,7 +236,13 @@ describe('agentStatus utilities', () => {
        Assertions: Each status has unique background color
        Requirements: agents.6 */
     it('should return unique background colors for each status', () => {
-      const statuses: AgentStatus[] = ['new', 'in-progress', 'awaiting-response', 'error', 'completed'];
+      const statuses: AgentStatus[] = [
+        'new',
+        'in-progress',
+        'awaiting-response',
+        'error',
+        'completed',
+      ];
       const bgColors = statuses.map((status) => getStatusStyles(status).bg);
 
       // Check all colors are unique
@@ -249,7 +255,13 @@ describe('agentStatus utilities', () => {
        Assertions: Each status has unique text color
        Requirements: agents.6, agents.8.1, agents.5.3 */
     it('should return unique text colors for each status', () => {
-      const statuses: AgentStatus[] = ['new', 'in-progress', 'awaiting-response', 'error', 'completed'];
+      const statuses: AgentStatus[] = [
+        'new',
+        'in-progress',
+        'awaiting-response',
+        'error',
+        'completed',
+      ];
       const textColors = statuses.map((status) => getStatusStyles(status).text);
 
       // Check all colors are unique
@@ -262,7 +274,13 @@ describe('agentStatus utilities', () => {
        Assertions: Ring color matches background color with /30 opacity
        Requirements: agents.6 */
     it('should have ring color matching background color with /30 opacity', () => {
-      const statuses: AgentStatus[] = ['new', 'in-progress', 'awaiting-response', 'error', 'completed'];
+      const statuses: AgentStatus[] = [
+        'new',
+        'in-progress',
+        'awaiting-response',
+        'error',
+        'completed',
+      ];
 
       statuses.forEach((status) => {
         const styles = getStatusStyles(status);
@@ -278,7 +296,13 @@ describe('agentStatus utilities', () => {
        Assertions: Text color uses same base color as background but with -600 shade
        Requirements: agents.6, agents.8.1, agents.5.3 */
     it('should have text color using same base color as background', () => {
-      const statuses: AgentStatus[] = ['new', 'in-progress', 'awaiting-response', 'error', 'completed'];
+      const statuses: AgentStatus[] = [
+        'new',
+        'in-progress',
+        'awaiting-response',
+        'error',
+        'completed',
+      ];
 
       statuses.forEach((status) => {
         const styles = getStatusStyles(status);
@@ -307,7 +331,13 @@ describe('agentStatus utilities', () => {
        Assertions: Returns object with exactly 3 properties (bg, ring, text)
        Requirements: agents.6 */
     it('should return object with exactly 3 properties', () => {
-      const statuses: AgentStatus[] = ['new', 'in-progress', 'awaiting-response', 'error', 'completed'];
+      const statuses: AgentStatus[] = [
+        'new',
+        'in-progress',
+        'awaiting-response',
+        'error',
+        'completed',
+      ];
 
       statuses.forEach((status) => {
         const styles = getStatusStyles(status);
@@ -325,7 +355,13 @@ describe('agentStatus utilities', () => {
        Assertions: All style values are non-empty strings
        Requirements: agents.6 */
     it('should return non-empty string values for all properties', () => {
-      const statuses: AgentStatus[] = ['new', 'in-progress', 'awaiting-response', 'error', 'completed'];
+      const statuses: AgentStatus[] = [
+        'new',
+        'in-progress',
+        'awaiting-response',
+        'error',
+        'completed',
+      ];
 
       statuses.forEach((status) => {
         const styles = getStatusStyles(status);

@@ -111,8 +111,8 @@ describe('useAgents hook', () => {
         name: 'New Agent',
         createdAt: new Date('2024-01-03T10:00:00Z').getTime(),
         updatedAt: new Date('2024-01-03T10:00:00Z').getTime(),
-      archivedAt: null,
-      status: 'new' as const,
+        archivedAt: null,
+        status: 'new' as const,
       };
       mockAgentsApi.create.mockResolvedValue({ success: true, data: newAgent });
 
@@ -171,8 +171,8 @@ describe('useAgents hook', () => {
         name: 'New Agent',
         createdAt: new Date('2024-01-03T10:00:00Z').getTime(),
         updatedAt: new Date('2024-01-03T10:00:00Z').getTime(),
-      archivedAt: null,
-      status: 'new' as const,
+        archivedAt: null,
+        status: 'new' as const,
       };
       mockAgentsApi.create.mockResolvedValue({ success: true, data: newAgent });
 
@@ -219,8 +219,8 @@ describe('useAgents hook', () => {
         name: 'New Agent',
         createdAt: new Date('2024-01-03T10:00:00Z').getTime(),
         updatedAt: new Date('2024-01-03T10:00:00Z').getTime(),
-      archivedAt: null,
-      status: 'new' as const,
+        archivedAt: null,
+        status: 'new' as const,
       };
       mockAgentsApi.create.mockResolvedValue({ success: true, data: newAgent });
 
@@ -342,8 +342,8 @@ describe('useAgents hook', () => {
         name: 'New Agent',
         createdAt: new Date('2024-01-03T10:00:00Z').getTime(),
         updatedAt: new Date('2024-01-03T10:00:00Z').getTime(),
-      archivedAt: null,
-      status: 'new' as const,
+        archivedAt: null,
+        status: 'new' as const,
       };
       mockAgentsApi.create.mockResolvedValue({ success: true, data: newAgent });
 
@@ -472,7 +472,14 @@ describe('useAgents hook', () => {
       act(() => {
         archivedHandler({
           timestamp: Date.now(),
-          id: 'agent-1',
+          agent: {
+            id: 'agent-1',
+            name: 'Agent 1',
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+            archivedAt: Date.now(),
+            status: 'new',
+          },
         });
       });
 
@@ -502,10 +509,13 @@ describe('useAgents hook', () => {
       act(() => {
         updatedHandler({
           timestamp: Date.now(),
-          id: 'agent-1',
-          changedFields: {
+          agent: {
+            id: 'agent-1',
             name: 'Updated Name',
+            createdAt: new Date('2024-01-01T10:00:00Z').getTime(),
             updatedAt: Date.now(),
+            archivedAt: null,
+            status: 'new',
           },
         });
       });
@@ -543,9 +553,13 @@ describe('useAgents hook', () => {
       act(() => {
         updatedHandler({
           timestamp: Date.now(),
-          id: 'agent-3',
-          changedFields: {
+          agent: {
+            id: 'agent-3',
+            name: 'Agent 3',
+            createdAt: new Date('2024-01-01T08:00:00Z').getTime(),
             updatedAt: newTimestamp,
+            archivedAt: null,
+            status: 'new',
           },
         });
       });
@@ -579,11 +593,13 @@ describe('useAgents hook', () => {
       act(() => {
         updatedHandler({
           timestamp: Date.now(),
-          id: 'agent-2',
-          changedFields: {
+          agent: {
+            id: 'agent-2',
+            name: 'Agent 2',
+            createdAt: new Date('2024-01-01T09:00:00Z').getTime(),
             updatedAt: new Date('2024-01-04T10:00:00Z').getTime(),
-      archivedAt: null,
-      status: 'new' as const,
+            archivedAt: null,
+            status: 'new' as const,
           },
         });
       });
@@ -594,11 +610,13 @@ describe('useAgents hook', () => {
       act(() => {
         updatedHandler({
           timestamp: Date.now(),
-          id: 'agent-3',
-          changedFields: {
+          agent: {
+            id: 'agent-3',
+            name: 'Agent 3',
+            createdAt: new Date('2024-01-01T08:00:00Z').getTime(),
             updatedAt: new Date('2024-01-04T11:00:00Z').getTime(),
-      archivedAt: null,
-      status: 'new' as const,
+            archivedAt: null,
+            status: 'new' as const,
           },
         });
       });
@@ -633,9 +651,13 @@ describe('useAgents hook', () => {
       act(() => {
         updatedHandler({
           timestamp: Date.now(),
-          id: 'agent-3',
-          changedFields: {
+          agent: {
+            id: 'agent-3',
             name: 'New Name',
+            createdAt: new Date('2024-01-01T08:00:00Z').getTime(),
+            updatedAt: new Date('2024-01-01T08:00:00Z').getTime(), // Same as original
+            archivedAt: null,
+            status: 'new',
           },
         });
       });
@@ -663,16 +685,18 @@ describe('useAgents hook', () => {
         expect(result.current.isLoading).toBe(false);
       });
 
-      const originalUpdatedAt = result.current.agents.find(
-        (a) => a.id === 'agent-1'
-      )?.updatedAt;
+      const originalUpdatedAt = result.current.agents.find((a) => a.id === 'agent-1')?.updatedAt;
 
       act(() => {
         updatedHandler({
           timestamp: Date.now(),
-          id: 'agent-1',
-          changedFields: {
+          agent: {
+            id: 'agent-1',
             name: 'Only Name Changed',
+            createdAt: new Date('2024-01-01T10:00:00Z').getTime(),
+            updatedAt: originalUpdatedAt!, // Keep original timestamp
+            archivedAt: null,
+            status: 'new',
           },
         });
       });
@@ -706,7 +730,7 @@ describe('useAgents hook', () => {
       act(() => {
         createdHandler({
           timestamp: Date.now(),
-          data: null,
+          agent: null as any,
         });
       });
 
@@ -737,8 +761,7 @@ describe('useAgents hook', () => {
       act(() => {
         updatedHandler({
           timestamp: Date.now(),
-          id: null,
-          changedFields: { name: 'Should not apply' },
+          agent: null as any,
         });
       });
 
@@ -769,7 +792,7 @@ describe('useAgents hook', () => {
       act(() => {
         archivedHandler({
           timestamp: Date.now(),
-          id: null,
+          agent: null as any,
         });
       });
 

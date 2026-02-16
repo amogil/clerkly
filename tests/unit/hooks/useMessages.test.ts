@@ -128,7 +128,7 @@ describe('useMessages hook', () => {
       });
 
       expect(result.current.messages[0].payload.kind).toBe('user');
-      expect(result.current.messages[0].payload.data.text).toBe('Hello');
+      expect(result.current.messages[0].payload.data?.text).toBe('Hello');
       expect(result.current.messages[1].payload.kind).toBe('llm');
     });
 
@@ -166,12 +166,12 @@ describe('useMessages hook', () => {
 
       expect(mockMessagesApi.list).toHaveBeenCalledWith('agent-1');
 
-      const newMessages: Message[] = [
+      const newMessages: MessageSnapshot[] = [
         {
           id: 3,
           agentId: 'agent-2',
-          timestamp: '2024-01-02T10:00:00Z',
-          payloadJson: JSON.stringify({ kind: 'user', data: { text: 'Different agent' } }),
+          timestamp: new Date('2024-01-02T10:00:00Z').getTime(),
+          payload: { kind: 'user', data: { text: 'Different agent' } },
         },
       ];
       mockMessagesApi.list.mockResolvedValue({ success: true, data: newMessages });
@@ -480,7 +480,7 @@ describe('useMessages hook', () => {
       });
 
       const updatedMessage = result.current.messages.find((m) => m.id === 1);
-      expect(updatedMessage?.payload.data.text).toBe('Updated text');
+      expect(updatedMessage?.payload.data?.text).toBe('Updated text');
     });
 
     /* Preconditions: Hook is mounted
@@ -502,7 +502,7 @@ describe('useMessages hook', () => {
         expect(result.current.isLoading).toBe(false);
       });
 
-      const originalText = result.current.messages[0].payload.data.text;
+      const originalText = result.current.messages[0]?.payload.data?.text;
 
       act(() => {
         updatedHandler({
@@ -511,7 +511,7 @@ describe('useMessages hook', () => {
         });
       });
 
-      expect(result.current.messages[0].payload.data.text).toBe(originalText);
+      expect(result.current.messages[0]?.payload.data?.text).toBe(originalText);
     });
 
     /* Preconditions: Hook is mounted

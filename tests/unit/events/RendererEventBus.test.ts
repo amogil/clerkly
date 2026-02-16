@@ -94,12 +94,26 @@ describe('RendererEventBus', () => {
 
       bus.subscribe('agent.created', handler);
       bus.publish(
-        new AgentCreatedEvent({ id: 'agent-1', name: 'Test Agent', createdAt: now, updatedAt: now, archivedAt: null, status: 'new' })
+        new AgentCreatedEvent({
+          id: 'agent-1',
+          name: 'Test Agent',
+          createdAt: now,
+          updatedAt: now,
+          archivedAt: null,
+          status: 'new',
+        })
       );
 
       expect(handler).toHaveBeenCalledWith(
         expect.objectContaining({
-          agent: { id: 'agent-1', name: 'Test Agent', createdAt: now, updatedAt: now, archivedAt: null, status: 'new' },
+          agent: {
+            id: 'agent-1',
+            name: 'Test Agent',
+            createdAt: now,
+            updatedAt: now,
+            archivedAt: null,
+            status: 'new',
+          },
           timestamp: expect.any(Number),
         })
       );
@@ -116,7 +130,14 @@ describe('RendererEventBus', () => {
 
       bus.subscribe('agent.created', handler);
       bus.publish(
-        new AgentCreatedEvent({ id: 'agent-1', name: 'Test', createdAt: now, updatedAt: now, archivedAt: null, status: 'new' })
+        new AgentCreatedEvent({
+          id: 'agent-1',
+          name: 'Test',
+          createdAt: now,
+          updatedAt: now,
+          archivedAt: null,
+          status: 'new',
+        })
       );
 
       expect(handler).toHaveBeenCalledWith(
@@ -141,7 +162,14 @@ describe('RendererEventBus', () => {
 
       bus.subscribe('agent.created', handler);
       bus.publish(
-        new AgentCreatedEvent({ id: 'agent-1', name: 'Test', createdAt: now, updatedAt: now, archivedAt: null, status: 'new' })
+        new AgentCreatedEvent({
+          id: 'agent-1',
+          name: 'Test',
+          createdAt: now,
+          updatedAt: now,
+          archivedAt: null,
+          status: 'new',
+        })
       );
 
       expect(handler).toHaveBeenCalledTimes(1);
@@ -157,7 +185,16 @@ describe('RendererEventBus', () => {
 
       bus.subscribe('agent.updated', handler);
 
-      bus.publish(new AgentUpdatedEvent({ id: 'agent-1', name: 'Updated Name', createdAt: Date.now(), updatedAt: Date.now(), archivedAt: null, status: 'new' }));
+      bus.publish(
+        new AgentUpdatedEvent({
+          id: 'agent-1',
+          name: 'Updated Name',
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          archivedAt: null,
+          status: 'new',
+        })
+      );
 
       expect(handler).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -184,15 +221,38 @@ describe('RendererEventBus', () => {
       bus.subscribeAll(handler);
 
       bus.publish(
-        new AgentCreatedEvent({ id: 'agent-1', name: 'Test', createdAt: now, updatedAt: now, archivedAt: null, status: 'new' })
+        new AgentCreatedEvent({
+          id: 'agent-1',
+          name: 'Test',
+          createdAt: now,
+          updatedAt: now,
+          archivedAt: null,
+          status: 'new',
+        })
       );
-      bus.publish(new AgentArchivedEvent({ id: 'agent-2', name: 'Test', createdAt: Date.now(), updatedAt: Date.now(), archivedAt: Date.now(), status: 'new' }));
+      bus.publish(
+        new AgentArchivedEvent({
+          id: 'agent-2',
+          name: 'Test',
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          archivedAt: Date.now(),
+          status: 'new',
+        })
+      );
 
       expect(handler).toHaveBeenCalledTimes(2);
       expect(handler).toHaveBeenCalledWith(
         'agent.created',
         expect.objectContaining({
-          agent: { id: 'agent-1', name: 'Test', createdAt: now, updatedAt: now, archivedAt: null, status: 'new' },
+          agent: {
+            id: 'agent-1',
+            name: 'Test',
+            createdAt: now,
+            updatedAt: now,
+            archivedAt: null,
+            status: 'new',
+          },
         })
       );
       expect(handler).toHaveBeenCalledWith(
@@ -219,7 +279,14 @@ describe('RendererEventBus', () => {
       const unsubscribe = bus.subscribe('agent.created', handler);
 
       bus.publish(
-        new AgentCreatedEvent({ id: 'agent-1', name: 'Test', createdAt: now, updatedAt: now, archivedAt: null, status: 'new' })
+        new AgentCreatedEvent({
+          id: 'agent-1',
+          name: 'Test',
+          createdAt: now,
+          updatedAt: now,
+          archivedAt: null,
+          status: 'new',
+        })
       );
 
       expect(handler).toHaveBeenCalledTimes(1);
@@ -227,7 +294,14 @@ describe('RendererEventBus', () => {
       unsubscribe();
 
       bus.publish(
-        new AgentCreatedEvent({ id: 'agent-2', name: 'Test 2', createdAt: now, updatedAt: now, archivedAt: null, status: 'new' })
+        new AgentCreatedEvent({
+          id: 'agent-2',
+          name: 'Test 2',
+          createdAt: now,
+          updatedAt: now,
+          archivedAt: null,
+          status: 'new',
+        })
       );
 
       expect(handler).toHaveBeenCalledTimes(1);
@@ -244,7 +318,16 @@ describe('RendererEventBus', () => {
       const unsubscribe = bus.subscribe('agent.archived', handler);
       unsubscribe();
 
-      bus.publish(new AgentArchivedEvent({ id: 'agent-1', name: 'Test', createdAt: Date.now(), updatedAt: Date.now(), archivedAt: Date.now(), status: 'new' }));
+      bus.publish(
+        new AgentArchivedEvent({
+          id: 'agent-1',
+          name: 'Test',
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          archivedAt: Date.now(),
+          status: 'new',
+        })
+      );
 
       expect(handler).not.toHaveBeenCalled();
     });
@@ -267,7 +350,14 @@ describe('RendererEventBus', () => {
       bus.subscribe('agent.created', successHandler);
 
       bus.publish(
-        new AgentCreatedEvent({ id: 'agent-1', name: 'Test', createdAt: now, updatedAt: now, archivedAt: null, status: 'new' })
+        new AgentCreatedEvent({
+          id: 'agent-1',
+          name: 'Test',
+          createdAt: now,
+          updatedAt: now,
+          archivedAt: null,
+          status: 'new',
+        })
       );
 
       expect(errorHandler).toHaveBeenCalled();
@@ -286,12 +376,21 @@ describe('RendererEventBus', () => {
 
       bus.subscribe('agent.updated', handler);
 
-      bus.publish(new AgentUpdatedEvent({ id: 'agent-1', name: 'New Name', createdAt: Date.now(), updatedAt: Date.now(), archivedAt: null, status: 'new' }));
+      bus.publish(
+        new AgentUpdatedEvent({
+          id: 'agent-1',
+          name: 'New Name',
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          archivedAt: null,
+          status: 'new',
+        })
+      );
 
       expect(handler).toHaveBeenCalledTimes(1);
       expect(handler).toHaveBeenCalledWith(
-        expect.objectContaining({ 
-          agent: expect.objectContaining({ name: 'New Name' }) 
+        expect.objectContaining({
+          agent: expect.objectContaining({ name: 'New Name' }),
         })
       );
     });
@@ -317,13 +416,27 @@ describe('RendererEventBus', () => {
       const now = Date.now();
 
       bus.publish(
-        new AgentCreatedEvent({ id: 'agent-1', name: 'Test', createdAt: now, updatedAt: now, archivedAt: null, status: 'new' })
+        new AgentCreatedEvent({
+          id: 'agent-1',
+          name: 'Test',
+          createdAt: now,
+          updatedAt: now,
+          archivedAt: null,
+          status: 'new',
+        })
       );
 
       expect(mockSendEvent).toHaveBeenCalledWith(
         'agent.created',
         expect.objectContaining({
-          agent: { id: 'agent-1', name: 'Test', createdAt: now, updatedAt: now, archivedAt: null, status: 'new' },
+          agent: {
+            id: 'agent-1',
+            name: 'Test',
+            createdAt: now,
+            updatedAt: now,
+            archivedAt: null,
+            status: 'new',
+          },
           timestamp: expect.any(Number),
         })
       );
@@ -350,7 +463,14 @@ describe('RendererEventBus', () => {
       const now = Date.now();
 
       bus.publish(
-        new AgentCreatedEvent({ id: 'agent-1', name: 'Test', createdAt: now, updatedAt: now, archivedAt: null, status: 'new' }),
+        new AgentCreatedEvent({
+          id: 'agent-1',
+          name: 'Test',
+          createdAt: now,
+          updatedAt: now,
+          archivedAt: null,
+          status: 'new',
+        }),
         { localOnly: true }
       );
 
@@ -372,7 +492,14 @@ describe('RendererEventBus', () => {
       const ipcCallback = mockOnEvent.mock.calls[0][0];
       const payload = {
         timestamp: now,
-        agent: { id: 'agent-1', name: 'Test', createdAt: now, updatedAt: now, archivedAt: null, status: 'new' },
+        agent: {
+          id: 'agent-1',
+          name: 'Test',
+          createdAt: now,
+          updatedAt: now,
+          archivedAt: null,
+          status: 'new',
+        },
       };
 
       ipcCallback('agent.created', payload);
@@ -395,7 +522,14 @@ describe('RendererEventBus', () => {
       bus.clear();
 
       bus.publish(
-        new AgentCreatedEvent({ id: 'agent-1', name: 'Test', createdAt: now, updatedAt: now, archivedAt: null, status: 'new' })
+        new AgentCreatedEvent({
+          id: 'agent-1',
+          name: 'Test',
+          createdAt: now,
+          updatedAt: now,
+          archivedAt: null,
+          status: 'new',
+        })
       );
 
       expect(handler).not.toHaveBeenCalled();
@@ -419,7 +553,14 @@ describe('RendererEventBus', () => {
       bus.subscribe('agent.created', successHandler);
 
       bus.publish(
-        new AgentCreatedEvent({ id: 'agent-1', name: 'Test', createdAt: now, updatedAt: now, archivedAt: null, status: 'new' })
+        new AgentCreatedEvent({
+          id: 'agent-1',
+          name: 'Test',
+          createdAt: now,
+          updatedAt: now,
+          archivedAt: null,
+          status: 'new',
+        })
       );
 
       expect(errorHandler).toHaveBeenCalled();
@@ -440,7 +581,14 @@ describe('RendererEventBus', () => {
 
       expect(() => {
         bus.publish(
-          new AgentCreatedEvent({ id: 'agent-1', name: 'Test', createdAt: now, updatedAt: now, archivedAt: null, status: 'new' })
+          new AgentCreatedEvent({
+            id: 'agent-1',
+            name: 'Test',
+            createdAt: now,
+            updatedAt: now,
+            archivedAt: null,
+            status: 'new',
+          })
         );
       }).not.toThrow();
     });
@@ -454,7 +602,14 @@ describe('RendererEventBus', () => {
       const now = Date.now();
 
       bus.publish(
-        new AgentCreatedEvent({ id: 'agent-1', name: 'Test', createdAt: now, updatedAt: now, archivedAt: null, status: 'new' })
+        new AgentCreatedEvent({
+          id: 'agent-1',
+          name: 'Test',
+          createdAt: now,
+          updatedAt: now,
+          archivedAt: null,
+          status: 'new',
+        })
       );
 
       expect(bus.getTimestampCacheSize()).toBeGreaterThan(0);

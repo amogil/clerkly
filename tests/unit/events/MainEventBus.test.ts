@@ -79,7 +79,14 @@ describe('MainEventBus', () => {
 
       bus.subscribe('agent.created', handler);
       bus.publish(
-        new AgentCreatedEvent({ id: 'agent-1', name: 'Test Agent', createdAt: now, updatedAt: now, archivedAt: null, status: 'new' })
+        new AgentCreatedEvent({
+          id: 'agent-1',
+          name: 'Test Agent',
+          createdAt: now,
+          updatedAt: now,
+          archivedAt: null,
+          status: 'new',
+        })
       );
 
       // Wait for microtask (batching)
@@ -87,7 +94,14 @@ describe('MainEventBus', () => {
 
       expect(handler).toHaveBeenCalledWith(
         expect.objectContaining({
-          agent: { id: 'agent-1', name: 'Test Agent', createdAt: now, updatedAt: now, archivedAt: null, status: 'new' },
+          agent: {
+            id: 'agent-1',
+            name: 'Test Agent',
+            createdAt: now,
+            updatedAt: now,
+            archivedAt: null,
+            status: 'new',
+          },
           timestamp: expect.any(Number),
         })
       );
@@ -104,7 +118,14 @@ describe('MainEventBus', () => {
 
       bus.subscribe('agent.created', handler);
       bus.publish(
-        new AgentCreatedEvent({ id: 'agent-1', name: 'Test', createdAt: now, updatedAt: now, archivedAt: null, status: 'new' })
+        new AgentCreatedEvent({
+          id: 'agent-1',
+          name: 'Test',
+          createdAt: now,
+          updatedAt: now,
+          archivedAt: null,
+          status: 'new',
+        })
       );
 
       await Promise.resolve();
@@ -131,7 +152,14 @@ describe('MainEventBus', () => {
 
       bus.subscribe('agent.created', handler);
       bus.publish(
-        new AgentCreatedEvent({ id: 'agent-1', name: 'Test', createdAt: now, updatedAt: now, archivedAt: null, status: 'new' })
+        new AgentCreatedEvent({
+          id: 'agent-1',
+          name: 'Test',
+          createdAt: now,
+          updatedAt: now,
+          archivedAt: null,
+          status: 'new',
+        })
       );
 
       await Promise.resolve();
@@ -149,7 +177,16 @@ describe('MainEventBus', () => {
 
       bus.subscribe('agent.updated', handler);
 
-      bus.publish(new AgentUpdatedEvent({ id: 'agent-1', name: 'Updated Name', createdAt: Date.now(), updatedAt: Date.now(), archivedAt: null, status: 'new' }));
+      bus.publish(
+        new AgentUpdatedEvent({
+          id: 'agent-1',
+          name: 'Updated Name',
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          archivedAt: null,
+          status: 'new',
+        })
+      );
 
       await Promise.resolve();
 
@@ -178,9 +215,25 @@ describe('MainEventBus', () => {
       bus.subscribeAll(handler);
 
       bus.publish(
-        new AgentCreatedEvent({ id: 'agent-1', name: 'Test', createdAt: now, updatedAt: now, archivedAt: null, status: 'new' })
+        new AgentCreatedEvent({
+          id: 'agent-1',
+          name: 'Test',
+          createdAt: now,
+          updatedAt: now,
+          archivedAt: null,
+          status: 'new',
+        })
       );
-      bus.publish(new AgentArchivedEvent({ id: 'agent-2', name: 'Test', createdAt: Date.now(), updatedAt: Date.now(), archivedAt: Date.now(), status: 'new' }));
+      bus.publish(
+        new AgentArchivedEvent({
+          id: 'agent-2',
+          name: 'Test',
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          archivedAt: Date.now(),
+          status: 'new',
+        })
+      );
 
       await Promise.resolve();
 
@@ -188,7 +241,14 @@ describe('MainEventBus', () => {
       expect(handler).toHaveBeenCalledWith(
         'agent.created',
         expect.objectContaining({
-          agent: { id: 'agent-1', name: 'Test', createdAt: now, updatedAt: now, archivedAt: null, status: 'new' },
+          agent: {
+            id: 'agent-1',
+            name: 'Test',
+            createdAt: now,
+            updatedAt: now,
+            archivedAt: null,
+            status: 'new',
+          },
         })
       );
       expect(handler).toHaveBeenCalledWith(
@@ -215,7 +275,14 @@ describe('MainEventBus', () => {
       const unsubscribe = bus.subscribe('agent.created', handler);
 
       bus.publish(
-        new AgentCreatedEvent({ id: 'agent-1', name: 'Test', createdAt: now, updatedAt: now, archivedAt: null, status: 'new' })
+        new AgentCreatedEvent({
+          id: 'agent-1',
+          name: 'Test',
+          createdAt: now,
+          updatedAt: now,
+          archivedAt: null,
+          status: 'new',
+        })
       );
       await Promise.resolve();
 
@@ -224,7 +291,14 @@ describe('MainEventBus', () => {
       unsubscribe();
 
       bus.publish(
-        new AgentCreatedEvent({ id: 'agent-2', name: 'Test 2', createdAt: now, updatedAt: now, archivedAt: null, status: 'new' })
+        new AgentCreatedEvent({
+          id: 'agent-2',
+          name: 'Test 2',
+          createdAt: now,
+          updatedAt: now,
+          archivedAt: null,
+          status: 'new',
+        })
       );
       await Promise.resolve();
 
@@ -242,7 +316,16 @@ describe('MainEventBus', () => {
       const unsubscribe = bus.subscribe('agent.archived', handler);
       unsubscribe();
 
-      bus.publish(new AgentArchivedEvent({ id: 'agent-1', name: 'Test', createdAt: Date.now(), updatedAt: Date.now(), archivedAt: Date.now(), status: 'new' }));
+      bus.publish(
+        new AgentArchivedEvent({
+          id: 'agent-1',
+          name: 'Test',
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          archivedAt: Date.now(),
+          status: 'new',
+        })
+      );
       await Promise.resolve();
 
       expect(handler).not.toHaveBeenCalled();
@@ -266,7 +349,14 @@ describe('MainEventBus', () => {
       bus.subscribe('agent.created', successHandler);
 
       bus.publish(
-        new AgentCreatedEvent({ id: 'agent-1', name: 'Test', createdAt: now, updatedAt: now, archivedAt: null, status: 'new' })
+        new AgentCreatedEvent({
+          id: 'agent-1',
+          name: 'Test',
+          createdAt: now,
+          updatedAt: now,
+          archivedAt: null,
+          status: 'new',
+        })
       );
 
       await Promise.resolve();
@@ -288,13 +378,22 @@ describe('MainEventBus', () => {
       bus.subscribe('agent.updated', handler);
 
       // First event - will get auto-timestamp
-      bus.publish(new AgentUpdatedEvent({ id: 'agent-1', name: 'New Name', createdAt: Date.now(), updatedAt: Date.now(), archivedAt: null, status: 'new' }));
+      bus.publish(
+        new AgentUpdatedEvent({
+          id: 'agent-1',
+          name: 'New Name',
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          archivedAt: null,
+          status: 'new',
+        })
+      );
       await Promise.resolve();
 
       expect(handler).toHaveBeenCalledTimes(1);
       expect(handler).toHaveBeenCalledWith(
-        expect.objectContaining({ 
-          agent: expect.objectContaining({ name: 'New Name' }) 
+        expect.objectContaining({
+          agent: expect.objectContaining({ name: 'New Name' }),
         })
       );
     });
@@ -345,7 +444,14 @@ describe('MainEventBus', () => {
       bus.clear();
 
       bus.publish(
-        new AgentCreatedEvent({ id: 'agent-1', name: 'Test', createdAt: now, updatedAt: now, archivedAt: null, status: 'new' })
+        new AgentCreatedEvent({
+          id: 'agent-1',
+          name: 'Test',
+          createdAt: now,
+          updatedAt: now,
+          archivedAt: null,
+          status: 'new',
+        })
       );
 
       await Promise.resolve();
@@ -370,7 +476,14 @@ describe('MainEventBus', () => {
 
       bus.subscribe('agent.created', handler);
       bus.publish(
-        new AgentCreatedEvent({ id: 'agent-1', name: 'Test', createdAt: now, updatedAt: now, archivedAt: null, status: 'new' }),
+        new AgentCreatedEvent({
+          id: 'agent-1',
+          name: 'Test',
+          createdAt: now,
+          updatedAt: now,
+          archivedAt: null,
+          status: 'new',
+        }),
         { localOnly: true }
       );
 
@@ -393,17 +506,44 @@ describe('MainEventBus', () => {
       bus.subscribe('agent.updated', handler);
 
       // Multiple updates in same tick - only last should be delivered
-      bus.publish(new AgentUpdatedEvent({ id: 'agent-1', name: 'Name 1', createdAt: Date.now(), updatedAt: Date.now(), archivedAt: null, status: 'new' }));
-      bus.publish(new AgentUpdatedEvent({ id: 'agent-1', name: 'Name 2', createdAt: Date.now(), updatedAt: Date.now(), archivedAt: null, status: 'new' }));
-      bus.publish(new AgentUpdatedEvent({ id: 'agent-1', name: 'Name 3', createdAt: Date.now(), updatedAt: Date.now(), archivedAt: null, status: 'new' }));
+      bus.publish(
+        new AgentUpdatedEvent({
+          id: 'agent-1',
+          name: 'Name 1',
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          archivedAt: null,
+          status: 'new',
+        })
+      );
+      bus.publish(
+        new AgentUpdatedEvent({
+          id: 'agent-1',
+          name: 'Name 2',
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          archivedAt: null,
+          status: 'new',
+        })
+      );
+      bus.publish(
+        new AgentUpdatedEvent({
+          id: 'agent-1',
+          name: 'Name 3',
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          archivedAt: null,
+          status: 'new',
+        })
+      );
 
       await Promise.resolve();
 
       // Only the last event should be delivered (batching)
       expect(handler).toHaveBeenCalledTimes(1);
       expect(handler).toHaveBeenCalledWith(
-        expect.objectContaining({ 
-          agent: expect.objectContaining({ name: 'Name 3' }) 
+        expect.objectContaining({
+          agent: expect.objectContaining({ name: 'Name 3' }),
         })
       );
     });
@@ -418,7 +558,16 @@ describe('MainEventBus', () => {
       const bus = MainEventBus.getInstance();
 
       // Create a timestamp entry
-      bus.publish(new AgentUpdatedEvent({ id: 'agent-1', name: 'Test', createdAt: Date.now(), updatedAt: Date.now(), archivedAt: null, status: 'new' }));
+      bus.publish(
+        new AgentUpdatedEvent({
+          id: 'agent-1',
+          name: 'Test',
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          archivedAt: null,
+          status: 'new',
+        })
+      );
       await Promise.resolve();
 
       expect(bus.getTimestampCacheSize()).toBeGreaterThan(0);
@@ -431,7 +580,16 @@ describe('MainEventBus', () => {
       const handler = jest.fn();
       bus.subscribe('agent.updated', handler);
 
-      bus.publish(new AgentUpdatedEvent({ id: 'agent-1', name: 'New', createdAt: Date.now(), updatedAt: Date.now(), archivedAt: null, status: 'new' }));
+      bus.publish(
+        new AgentUpdatedEvent({
+          id: 'agent-1',
+          name: 'New',
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          archivedAt: null,
+          status: 'new',
+        })
+      );
       await Promise.resolve();
 
       expect(handler).toHaveBeenCalled();
@@ -449,7 +607,14 @@ describe('MainEventBus', () => {
 
       // Add an entry
       bus.publish(
-        new AgentCreatedEvent({ id: 'agent-1', name: 'Test', createdAt: now, updatedAt: now, archivedAt: null, status: 'new' })
+        new AgentCreatedEvent({
+          id: 'agent-1',
+          name: 'Test',
+          createdAt: now,
+          updatedAt: now,
+          archivedAt: null,
+          status: 'new',
+        })
       );
       await Promise.resolve();
 
@@ -475,7 +640,14 @@ describe('MainEventBus', () => {
       const now = Date.now();
 
       bus.publish(
-        new AgentCreatedEvent({ id: 'agent-1', name: 'Test', createdAt: now, updatedAt: now, archivedAt: null, status: 'new' })
+        new AgentCreatedEvent({
+          id: 'agent-1',
+          name: 'Test',
+          createdAt: now,
+          updatedAt: now,
+          archivedAt: null,
+          status: 'new',
+        })
       );
       await Promise.resolve();
 
@@ -483,7 +655,14 @@ describe('MainEventBus', () => {
         IPC_CHANNELS.EVENT_FROM_MAIN,
         'agent.created',
         expect.objectContaining({
-          agent: { id: 'agent-1', name: 'Test', createdAt: now, updatedAt: now, archivedAt: null, status: 'new' },
+          agent: {
+            id: 'agent-1',
+            name: 'Test',
+            createdAt: now,
+            updatedAt: now,
+            archivedAt: null,
+            status: 'new',
+          },
           timestamp: expect.any(Number),
         })
       );
@@ -503,7 +682,14 @@ describe('MainEventBus', () => {
       // Should not throw
       expect(() => {
         bus.publish(
-          new AgentCreatedEvent({ id: 'agent-1', name: 'Test', createdAt: now, updatedAt: now, archivedAt: null, status: 'new' })
+          new AgentCreatedEvent({
+            id: 'agent-1',
+            name: 'Test',
+            createdAt: now,
+            updatedAt: now,
+            archivedAt: null,
+            status: 'new',
+          })
         );
       }).not.toThrow();
     });
@@ -539,7 +725,14 @@ describe('additional coverage tests', () => {
     // Should not throw
     expect(() => {
       bus.publish(
-        new AgentCreatedEvent({ id: 'agent-1', name: 'Test', createdAt: now, updatedAt: now, archivedAt: null, status: 'new' })
+        new AgentCreatedEvent({
+          id: 'agent-1',
+          name: 'Test',
+          createdAt: now,
+          updatedAt: now,
+          archivedAt: null,
+          status: 'new',
+        })
       );
     }).not.toThrow();
 
@@ -563,7 +756,14 @@ describe('additional coverage tests', () => {
     const bus = MainEventBus.getInstance();
     const now = Date.now();
     bus.publish(
-      new AgentCreatedEvent({ id: 'agent-1', name: 'Test', createdAt: now, updatedAt: now, archivedAt: null, status: 'new' })
+      new AgentCreatedEvent({
+        id: 'agent-1',
+        name: 'Test',
+        createdAt: now,
+        updatedAt: now,
+        archivedAt: null,
+        status: 'new',
+      })
     );
 
     await Promise.resolve();
@@ -603,7 +803,14 @@ describe('additional coverage tests', () => {
     bus.subscribe('agent.created', successHandler);
 
     bus.publish(
-      new AgentCreatedEvent({ id: 'agent-1', name: 'Test', createdAt: now, updatedAt: now, archivedAt: null, status: 'new' })
+      new AgentCreatedEvent({
+        id: 'agent-1',
+        name: 'Test',
+        createdAt: now,
+        updatedAt: now,
+        archivedAt: null,
+        status: 'new',
+      })
     );
 
     await Promise.resolve();
@@ -624,8 +831,26 @@ describe('additional coverage tests', () => {
 
     // Updates for different entities in same tick
     const now = Date.now();
-    bus.publish(new AgentUpdatedEvent({ id: 'agent-1', name: 'Name 1', createdAt: now, updatedAt: now, archivedAt: null, status: 'new' }));
-    bus.publish(new AgentUpdatedEvent({ id: 'agent-2', name: 'Name 2', createdAt: now, updatedAt: now, archivedAt: null, status: 'new' }));
+    bus.publish(
+      new AgentUpdatedEvent({
+        id: 'agent-1',
+        name: 'Name 1',
+        createdAt: now,
+        updatedAt: now,
+        archivedAt: null,
+        status: 'new',
+      })
+    );
+    bus.publish(
+      new AgentUpdatedEvent({
+        id: 'agent-2',
+        name: 'Name 2',
+        createdAt: now,
+        updatedAt: now,
+        archivedAt: null,
+        status: 'new',
+      })
+    );
 
     await Promise.resolve();
 
@@ -659,7 +884,14 @@ describe('additional coverage tests', () => {
 
     expect(() => {
       bus.publish(
-        new AgentCreatedEvent({ id: 'agent-1', name: 'Test', createdAt: now, updatedAt: now, archivedAt: null, status: 'new' })
+        new AgentCreatedEvent({
+          id: 'agent-1',
+          name: 'Test',
+          createdAt: now,
+          updatedAt: now,
+          archivedAt: null,
+          status: 'new',
+        })
       );
     }).not.toThrow();
 
