@@ -62,6 +62,13 @@ describe('useAgents hook', () => {
       createdAt: '2024-01-01T09:00:00Z',
       updatedAt: '2024-01-01T09:00:00Z',
     },
+    {
+      agentId: 'agent-3',
+      userId: 'user-1',
+      name: 'Agent 3',
+      createdAt: '2024-01-01T08:00:00Z',
+      updatedAt: '2024-01-01T08:00:00Z',
+    },
   ];
 
   beforeEach(() => {
@@ -87,7 +94,7 @@ describe('useAgents hook', () => {
       });
 
       expect(mockAgentsApi.list).toHaveBeenCalled();
-      expect(result.current.agents).toHaveLength(2);
+      expect(result.current.agents).toHaveLength(3);
     });
 
     /* Preconditions: Hook mounts with empty agent list
@@ -496,6 +503,132 @@ describe('useAgents hook', () => {
 
       const updatedAgent = result.current.agents.find((a) => a.agentId === 'agent-1');
       expect(updatedAgent?.name).toBe('Updated Name');
+    });
+
+    /* Preconditions: Hook is mounted with multiple agents
+       Action: AGENT_UPDATED event updates updatedAt of last agent
+       Assertions: Agent moves to first position in list
+       Requirements: agents.1.4.1, agents.1.4.2, agents.12.2 */
+    it('should reorder agents when updatedAt changes', async () => {
+      let updatedHandler: (payload: any) => void;
+      mockSubscribe.mockImplementation((type, handler) => {
+        if (type === EVENT_TYPES.AGENT_UPDATED) {
+          updatedHandler = handler;
+        }
+        return mockUnsubscribe;
+      });
+
+      const { result } = renderHook(() => useAgents());
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      // Initial order: agent-1 (newest), agent-2, agent-3 (oldest)
+      expect(result.current.agents[0].agentId).toBe('agent-1');
+      expect(result.current.agents[1].agentId).toBe('agent-2');
+      expect(result.current.agents[2].agentId).toBe('agent-3');
+
+      // Update agent-3 with new timestamp (making it newest)
+      const newTimestamp = new Date('2024-01-04T10:00:00Z').getTime();
+      act(() => {
+        updatedHandler({
+          timestamp: Date.now(),
+          id: 'agent-3',
+          changedFields: {
+            updatedAt: newTimestamp,
+          },
+        });
+      });
+
+      // After update: agent-3 should be first (newest)
+      expect(result.current.agents[0].agentId).toBe('agent-3');
+      expect(result.current.agents[1].agentId).toBe('agent-1');
+      expect(result.current.agents[2].agentId).toBe('agent-2');
+    });
+
+    /* Preconditions: Hook is mounted with multiple agents
+       Action: Multiple AGENT_UPDATED events in sequence
+       Assertions: Order changes dynamically with each update
+       Requirements: agents.1.4.1, agents.1.4.2, agents.12.2 */
+    it('should maintain correct order with multiple updates', async () => {
+      let updatedHandler: (payload: any) => void;
+      mockSubscribe.mockImplementation((type, handler) => {
+        if (type === EVENT_TYPES.AGENT_UPDATED) {
+          updatedHandler = handler;
+        }
+        return mockUnsubscribe;
+      });
+
+      const { result } = renderHook(() => useAgents());
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      // Update agent-2
+      act(() => {
+        updatedHandler({
+          timestamp: Date.now(),
+          id: 'agent-2',
+          changedFields: {
+            updatedAt: new Date('2024-01-04T10:00:00Z').getTime(),
+          },
+        });
+      });
+
+      expect(result.current.agents[0].agentId).toBe('agent-2');
+
+      // Update agent-3 (should become first)
+      act(() => {
+        updatedHandler({
+          timestamp: Date.now(),
+          id: 'agent-3',
+          changedFields: {
+            updatedAt: new Date('2024-01-04T11:00:00Z').getTime(),
+          },
+        });
+      });
+
+      expect(result.current.agents[0].agentId).toBe('agent-3');
+      expect(result.current.agents[1].agentId).toBe('agent-2');
+      expect(result.current.agents[2].agentId).toBe('agent-1');
+    });
+
+    /* Preconditions: Hook is mounted
+       Action: AGENT_UPDATED event with only name change (no updatedAt)
+       Assertions: Order remains unchanged
+       Requirements: agents.12.2 */
+    it('should not reorder when only name changes', async () => {
+      let updatedHandler: (payload: any) => void;
+      mockSubscribe.mockImplementation((type, handler) => {
+        if (type === EVENT_TYPES.AGENT_UPDATED) {
+          updatedHandler = handler;
+        }
+        return mockUnsubscribe;
+      });
+
+      const { result } = renderHook(() => useAgents());
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      const initialOrder = result.current.agents.map((a) => a.agentId);
+
+      // Update only name, not updatedAt
+      act(() => {
+        updatedHandler({
+          timestamp: Date.now(),
+          id: 'agent-3',
+          changedFields: {
+            name: 'New Name',
+          },
+        });
+      });
+
+      const newOrder = result.current.agents.map((a) => a.agentId);
+      expect(newOrder).toEqual(initialOrder);
     });
 
     /* Preconditions: Hook is mounted

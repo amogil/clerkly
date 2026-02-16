@@ -37,6 +37,12 @@
 
 1.4. updatedAt ДОЛЖЕН обновляться при каждом новом сообщении в чате агента
 
+1.4.1. КОГДА updatedAt агента обновляется, ТО агент ДОЛЖЕН автоматически перемещаться в начало списка
+
+1.4.2. Пересортировка ДОЛЖНА происходить в реальном времени при получении события AGENT_UPDATED
+
+1.4.3. Агент, получивший новое сообщение, ДОЛЖЕН появиться в видимой части хедера (если был скрыт)
+
 1.5. Активный агент ДОЛЖЕН быть визуально выделен кольцом (ring-2 ring-primary)
 
 1.6. Каждая иконка агента ДОЛЖНА иметь размер 32px (w-8 h-8) с расстоянием 8px (gap-2) между иконками
@@ -51,6 +57,10 @@
 
 - `tests/functional/agents.spec.ts` - "should display agents list in header"
 - `tests/functional/agents.spec.ts` - "should sort agents by updatedAt timestamp"
+- `tests/functional/agent-reordering.spec.ts` - "should move agent to top of list after sending message"
+- `tests/functional/agent-reordering.spec.ts` - "should bring hidden agent to header after sending message"
+- `tests/functional/agent-reordering.spec.ts` - "should maintain correct order when multiple agents are updated"
+- `tests/functional/agent-reordering.spec.ts` - "should reorder immediately after message from AllAgents selection"
 - `tests/functional/agents.spec.ts` - "should adapt visible agents count to window width"
 - `tests/functional/agents.spec.ts` - "should show +N button for hidden agents"
 

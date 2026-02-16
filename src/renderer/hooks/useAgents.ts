@@ -200,8 +200,8 @@ export function useAgents(): UseAgentsResult {
 
   useEventSubscription(EVENT_TYPES.AGENT_UPDATED, (payload: AgentUpdatedPayload) => {
     if (payload.id) {
-      setAgents((prev) =>
-        prev.map((agent) => {
+      setAgents((prev) => {
+        const updated = prev.map((agent) => {
           if (agent.agentId === payload.id) {
             // Convert event fields to renderer agent fields
             const updates: Partial<Agent> = {};
@@ -214,8 +214,14 @@ export function useAgents(): UseAgentsResult {
             return { ...agent, ...updates };
           }
           return agent;
-        })
-      );
+        });
+
+        // Requirements: agents.1.3, agents.5.7 - Re-sort by updatedAt after update
+        // This ensures agents move to the top when they receive new messages
+        updated.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+
+        return updated;
+      });
     }
   });
 
