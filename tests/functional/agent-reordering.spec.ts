@@ -248,8 +248,10 @@ test.describe('Agent Reordering', () => {
     // Wait for UI to fully stabilize and animations to complete
     await window.waitForTimeout(1000);
 
-    // Send message to agent 2 (now in middle)
-    await agentIcons.nth(1).click();
+    // Send message to agent 2 (find by ID with proper locator)
+    const agent2Icon = window.locator(`[data-testid="${agent2Id}"]`);
+    await expect(agent2Icon).toBeVisible({ timeout: 3000 });
+    await agent2Icon.click();
     await window.waitForTimeout(500);
 
     await textarea.fill('Message to agent 2');
@@ -272,8 +274,10 @@ test.describe('Agent Reordering', () => {
     // Wait for UI to fully stabilize and animations to complete
     await window.waitForTimeout(1000);
 
-    // Send message to agent 1 (now last)
-    await agentIcons.nth(2).click();
+    // Send message to agent 1 (find by ID with proper locator)
+    const agent1Icon = window.locator(`[data-testid="${agent1Id}"]`);
+    await expect(agent1Icon).toBeVisible({ timeout: 3000 });
+    await agent1Icon.click();
     await window.waitForTimeout(500);
 
     await textarea.fill('Message to agent 1');
@@ -320,36 +324,44 @@ test.describe('Agent Reordering', () => {
     await textarea.press('Enter');
     await window.waitForTimeout(500);
 
-    // Get agent icons
-    const agentIcons = window.locator('[data-testid^="agent-icon-"]');
-    const lastAgentId = await agentIcons.last().getAttribute('data-testid');
-
     // Open AllAgents by clicking +N button
     const allAgentsButton = window.locator('div.rounded-full.bg-muted:has-text("+")');
     await allAgentsButton.click();
     await window.waitForTimeout(500);
 
-    // Click on last agent
+    // Get ID of last agent card in AllAgents (oldest agent)
     const agentCards = window.locator('[data-testid^="agent-card-"]');
-    await agentCards.last().click();
+    const lastCard = agentCards.last();
+    const lastCardTestId = await lastCard.getAttribute('data-testid');
+    // Extract agentId from "agent-card-{agentId}"
+    const selectedAgentId = lastCardTestId?.replace('agent-card-', '') || '';
+    console.log('[TEST] Selected agent from AllAgents:', selectedAgentId);
+
+    // Click on last agent card
+    await lastCard.click();
     await window.waitForTimeout(500);
 
     // Send message immediately
     await textarea.fill('Quick message after selection');
     await textarea.press('Enter');
 
-    // Wait for agent to move to first position (longer timeout)
+    // Wait for agent to move to first position in header (longer timeout)
     await window.waitForFunction(
-      (expectedId) => {
+      (expectedAgentId) => {
         const firstIcon = document.querySelector('[data-testid^="agent-icon-"]');
-        return firstIcon && firstIcon.getAttribute('data-testid') === expectedId;
+        const firstIconTestId = firstIcon?.getAttribute('data-testid');
+        // firstIconTestId is "agent-icon-{agentId}", extract agentId
+        const firstAgentId = firstIconTestId?.replace('agent-icon-', '');
+        return firstAgentId === expectedAgentId;
       },
-      lastAgentId,
+      selectedAgentId,
       { timeout: 10000 }
     );
 
     // Verify agent is now first
-    const firstAgentId = await agentIcons.first().getAttribute('data-testid');
-    expect(firstAgentId).toBe(lastAgentId);
+    const agentIcons = window.locator('[data-testid^="agent-icon-"]');
+    const firstIconTestId = await agentIcons.first().getAttribute('data-testid');
+    const firstAgentId = firstIconTestId?.replace('agent-icon-', '');
+    expect(firstAgentId).toBe(selectedAgentId);
   });
 });
