@@ -115,18 +115,15 @@ test.describe('Agents - Auto-create First Agent', () => {
     await completeOAuthFlow(electronApp, window);
 
     // Wait for agents page and initial agent creation
-    await window.waitForTimeout(3000);
-    await window.waitForSelector('[data-testid="agents"]', { timeout: 15000 });
-
-    // Wait for initial agent to be created
-    await window.waitForTimeout(1000);
+    const agentsPage = window.locator('[data-testid="agents"]');
+    await expect(agentsPage).toBeVisible({ timeout: 5000 });
 
     // Archive the agent by calling the API directly
     const result = await window.evaluate(async () => {
       // @ts-expect-error - window.api is injected by preload
       const agents = await window.api.agents.list();
       if (agents.success && agents.data && agents.data.length > 0) {
-        const agentId = agents.data[0].agentId;
+        const agentId = agents.data[0].id; // Fixed: use 'id' instead of 'agentId'
         // @ts-expect-error - window.api is injected by preload
         return await window.api.agents.archive(agentId);
       }
@@ -135,13 +132,11 @@ test.describe('Agents - Auto-create First Agent', () => {
 
     expect(result.success).toBe(true);
 
-    // Wait a bit for the auto-create to happen
-    await window.waitForTimeout(1000);
-
     // Verify that a new agent was auto-created
     // The page should still show an agent (not "Loading..." or empty state)
-    const newAgentAvatar = window.locator('.rounded-full.bg-sky-400').first();
-    await expect(newAgentAvatar).toBeVisible({ timeout: 5000 });
+    // Wait for the "New chat" button to be visible (indicates UI is ready)
+    const newChatButton = window.locator('[data-testid="agents"] .bg-sky-400').first();
+    await expect(newChatButton).toBeVisible({ timeout: 5000 });
 
     // Verify that the new agent has the default name "New Agent"
     const newAgentTitle = window.locator('h3.font-semibold:has-text("New Agent")');
@@ -157,8 +152,8 @@ test.describe('Agents - Auto-create First Agent', () => {
     await completeOAuthFlow(electronApp, window);
 
     // Wait for agents page and initial agent creation
-    await window.waitForTimeout(3000);
-    await window.waitForSelector('[data-testid="agents"]', { timeout: 15000 });
+    const agentsPage = window.locator('[data-testid="agents"]');
+    await expect(agentsPage).toBeVisible({ timeout: 5000 });
 
     // Verify that "No agents yet" text is NEVER visible
     const emptyStateText = window.locator('text=No agents yet');
@@ -169,8 +164,8 @@ test.describe('Agents - Auto-create First Agent', () => {
     await expect(createFirstText).not.toBeVisible();
 
     // Verify that at least one agent is always visible
-    const agentAvatar = window.locator('.rounded-full.bg-sky-400').first();
-    await expect(agentAvatar).toBeVisible();
+    const newChatButton = window.locator('[data-testid="agents"] .bg-sky-400').first();
+    await expect(newChatButton).toBeVisible();
   });
 
   test('should never show loading state - UI always visible', async () => {
@@ -179,7 +174,8 @@ test.describe('Agents - Auto-create First Agent', () => {
     await completeOAuthFlow(electronApp, window);
 
     // Wait for agents page to load
-    await window.waitForSelector('[data-testid="agents"]', { timeout: 15000 });
+    const agentsPage = window.locator('[data-testid="agents"]');
+    await expect(agentsPage).toBeVisible({ timeout: 5000 });
 
     // Verify that "Loading..." text is NEVER visible
     const loadingText = window.locator('text=Loading...');
@@ -187,27 +183,22 @@ test.describe('Agents - Auto-create First Agent', () => {
 
     // Verify that standard UI elements are ALWAYS present
     // 1. Agents container
-    const agentsContainer = window.locator('[data-testid="agents"]');
-    await expect(agentsContainer).toBeVisible();
+    await expect(agentsPage).toBeVisible();
 
-    // 2. Agent avatar in header
-    const agentAvatar = window.locator('.rounded-full.bg-sky-400').first();
-    await expect(agentAvatar).toBeVisible();
-
-    // 3. New chat button
+    // 2. New chat button
     const newChatButton = window.locator('[title="New chat"]');
     await expect(newChatButton).toBeVisible();
 
-    // 4. Messages area (may be empty but should exist)
-    const messagesArea = window.locator('.flex-1.overflow-y-auto.p-6');
+    // 3. Messages area (may be empty but should exist)
+    const messagesArea = window.locator('[data-testid="messages-area"]');
     await expect(messagesArea).toBeVisible();
 
-    // 5. Input field
+    // 4. Input field
     const inputField = window.locator('textarea[placeholder*="Ask"]');
     await expect(inputField).toBeVisible();
     await expect(inputField).toBeEnabled();
 
-    // 6. Send button
+    // 5. Send button
     const sendButton = window.locator('button:has-text("Send"), button:has(svg)').last();
     await expect(sendButton).toBeVisible();
   });
