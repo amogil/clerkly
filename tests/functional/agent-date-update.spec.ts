@@ -147,9 +147,8 @@ test.describe('Agents - Date Update on New Message', () => {
     // Verify the message appears in UI
     const messageText = window.locator('text=New message to update timestamp');
     await expect(messageText).toBeVisible({ timeout: 5000 });
-    console.log('[TEST] Message appeared in UI');
 
-    // Step 11: Wait for timestamp to update in UI (with 5 second timeout)
+    // Step 11: Wait for timestamp to update in UI (with 3 second timeout)
     // The timestamp should change after AGENT_UPDATED event is processed
     await window.waitForFunction(
       (initialTimestamp) => {
@@ -159,7 +158,7 @@ test.describe('Agents - Date Update on New Message', () => {
         return timestampElement && timestampElement.textContent !== initialTimestamp;
       },
       timestampBefore,
-      { timeout: 5000 }
+      { timeout: 3000 }
     );
 
     const timestampAfter = await headerTimestamp.textContent();

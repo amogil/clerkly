@@ -9,6 +9,7 @@ import {
   isAwaitingUser,
   hasError,
   isCompleted,
+  isNew,
   getStatusText,
   getStatusStyles,
 } from '../../shared/utils/agentStatus';
@@ -16,12 +17,6 @@ import { AutoExpandingTextarea, AutoExpandingTextareaHandle } from './agents/Aut
 import { EmptyStatePlaceholder } from './agents/EmptyStatePlaceholder';
 import { DateTimeFormatter } from '../../utils/DateTimeFormatter';
 import type { AgentSnapshot } from '../types/agent';
-
-// Map AgentSnapshot to display format
-interface DisplayAgentItem extends AgentSnapshot {
-  title: string;
-  description: string;
-}
 
 export function Agents() {
   const [showAllTasksPage, setShowAllTasksPage] = useState(false);
@@ -34,23 +29,10 @@ export function Agents() {
 
   // Use real hooks for agents and messages
   const { agents, activeAgent, createAgent, selectAgent, isLoading } = useAgents();
-  const { messages, sendMessage } = useMessages(activeAgent?.agentId || null);
-
-  // Convert agents to display format
-  // Requirements: realtime-events.9 - Status already computed in AgentSnapshot
-  const displayAgents: DisplayAgentItem[] = agents.map((agent) => {
-    return {
-      ...agent,
-      title: agent.name || 'New conversation',
-      description:
-        agent.status === 'new' ? 'Start chatting with the agent' : `Status: ${agent.status}`,
-    };
-  });
+  const { messages, sendMessage } = useMessages(activeAgent?.id || null);
 
   // Current selected agent
-  const selectedAgent = activeAgent
-    ? displayAgents.find((t) => t.agentId === activeAgent.agentId) || displayAgents[0]
-    : displayAgents[0];
+  const selectedAgent = activeAgent || agents[0];
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -110,7 +92,7 @@ export function Agents() {
     const maxChats = Math.floor(availableWidth / chatWidth);
 
     setVisibleChatsCount(Math.max(1, maxChats));
-  }, [displayAgents.length]);
+  }, [agents.length]);
 
   const handleSend = async (text?: string) => {
     const messageText = text || taskInput;
@@ -126,8 +108,8 @@ export function Agents() {
     await handleSend(prompt);
   };
 
-  const handleAgentClick = (task: DisplayAgentItem) => {
-    selectAgent(task.agentId);
+  const handleAgentClick = (agent: AgentSnapshot) => {
+    selectAgent(agent.id);
     setShowAllTasksPage(false);
   };
 
@@ -156,20 +138,20 @@ export function Agents() {
     async function loadErrorMessages() {
       const errors = new Map<string, string>();
 
-      for (const agent of displayAgents) {
+      for (const agent of agents) {
         if (hasError(agent.status)) {
           try {
-            const response = await window.api.messages.getLast(agent.agentId);
+            const response = await window.api.messages.getLast(agent.id);
             if (response.success && response.data) {
               // API returns MessageSnapshot with parsed payload
               const message = response.data as {
                 payload: { kind: string; data?: { result?: { error?: { message?: string } } } };
               };
               const errorMsg = getErrorMessage(message);
-              errors.set(agent.agentId, errorMsg);
+              errors.set(agent.id, errorMsg);
             }
           } catch (error) {
-            console.error(`Failed to load error message for agent ${agent.agentId}:`, error);
+            console.error(`Failed to load error message for agent ${agent.id}:`, error);
           }
         }
       }
@@ -178,19 +160,17 @@ export function Agents() {
     }
 
     loadErrorMessages();
-  }, [showAllTasksPage, displayAgents]);
+  }, [showAllTasksPage, agents]);
 
   // Requirements: agents.2.7 - Prevent crash during initial load
   // Don't render until we have at least one agent (auto-create guarantees this after loading)
-  if (isLoading || displayAgents.length === 0) {
+  if (isLoading || agents.length === 0) {
     return null;
   }
 
   // Render agent history page
   if (showAllTasksPage) {
-    const historyAgents = displayAgents.filter(
-      (agent) => !(agent.title === 'New conversation' && agent.status === 'new')
-    );
+    const historyAgents = agents.filter((agent) => !(isNew(agent.status) && !agent.name));
 
     return (
       <div className="h-[calc(100vh-4rem)] bg-card flex flex-col">
@@ -209,13 +189,14 @@ export function Agents() {
 
         <div className="flex-1 overflow-y-auto p-6 space-y-3">
           {historyAgents.map((agent) => {
-            const letter = agent.title.charAt(0).toUpperCase();
+            const agentName = getAgentName(agent);
+            const letter = agentName.charAt(0).toUpperCase();
             const style = getStatusStyles(agent.status);
 
             return (
               <div
-                key={agent.agentId}
-                data-testid={`agent-card-${agent.agentId}`}
+                key={agent.id}
+                data-testid={`agent-card-${agent.id}`}
                 onClick={() => handleAgentClick(agent)}
                 className="p-4 rounded-lg border border-border bg-card hover:border-primary/50 transition-colors cursor-pointer"
               >
@@ -252,8 +233,7 @@ export function Agents() {
                   </div>
 
                   <div className="flex-1 min-w-0">
-                    <h4 className="font-medium text-foreground mb-1">{agent.title}</h4>
-                    <p className="text-sm text-muted-foreground mb-2">{agent.description}</p>
+                    <h4 className="font-medium text-foreground mb-1">{agentName}</h4>
 
                     <div className="flex items-center gap-3 text-xs">
                       <span className={style.text}>{getStatusText(agent.status)}</span>
@@ -266,10 +246,8 @@ export function Agents() {
                     </div>
 
                     {/* Requirements: agents.5.5 - Show error message for agents with error status */}
-                    {hasError(agent.status) && errorMessages.has(agent.agentId) && (
-                      <p className="text-xs text-red-500 mt-1">
-                        {errorMessages.get(agent.agentId)}
-                      </p>
+                    {hasError(agent.status) && errorMessages.has(agent.id) && (
+                      <p className="text-xs text-red-500 mt-1">{errorMessages.get(agent.id)}</p>
                     )}
                   </div>
                 </div>
@@ -284,9 +262,10 @@ export function Agents() {
   // Requirements: agents.2.7, agents.2.10, agents.2.11
   // Auto-create first agent ensures there's always at least one agent
   // If selectedAgent is null (impossible after loading due to auto-create), use first agent
-  const currentAgent = selectedAgent || displayAgents[0];
+  const currentAgent = selectedAgent || agents[0];
 
-  const letter = currentAgent.title.charAt(0).toUpperCase();
+  const currentAgentName = getAgentName(currentAgent);
+  const letter = currentAgentName.charAt(0).toUpperCase();
   const style = getStatusStyles(currentAgent.status);
 
   return (
@@ -327,7 +306,7 @@ export function Agents() {
           </div>
 
           <div className="flex-1 min-w-0">
-            <h3 className="font-semibold text-foreground truncate">{currentAgent.title}</h3>
+            <h3 className="font-semibold text-foreground truncate">{currentAgentName}</h3>
             <div className="flex items-center gap-2 text-xs">
               <span className={style.text}>{getStatusText(currentAgent.status)}</span>
               <span className="text-muted-foreground">·</span>
@@ -349,15 +328,16 @@ export function Agents() {
           </div>
 
           <AnimatePresence mode="popLayout">
-            {displayAgents.slice(0, visibleChatsCount).map((agent) => {
-              const agentLetter = agent.title.charAt(0).toUpperCase();
+            {agents.slice(0, visibleChatsCount).map((agent) => {
+              const agentName = getAgentName(agent);
+              const agentLetter = agentName.charAt(0).toUpperCase();
               const agentStyle = getStatusStyles(agent.status);
-              const isSelected = agent.agentId === currentAgent.agentId;
+              const isSelected = agent.id === currentAgent.id;
 
               return (
                 <motion.div
-                  key={agent.agentId}
-                  data-testid={`agent-icon-${agent.agentId}`}
+                  key={agent.id}
+                  data-testid={`agent-icon-${agent.id}`}
                   layout
                   initial={{ opacity: 0, scale: 0.8 }}
                   animate={{ opacity: 1, scale: 1 }}
@@ -374,7 +354,7 @@ export function Agents() {
                   }}
                   onClick={() => handleAgentClick(agent)}
                   className={`relative w-8 h-8 rounded-full ${agentStyle.bg} flex items-center justify-center cursor-pointer hover:scale-110 transition-transform group ${isSelected ? 'ring-2 ring-primary ring-offset-2' : ''}`}
-                  title={agent.title}
+                  title={agentName}
                 >
                   {isCompleted(agent.status) ? (
                     <Check className="w-4 h-4 text-white" />
@@ -404,7 +384,7 @@ export function Agents() {
                   )}
 
                   <div className="absolute top-full right-0 mt-2 w-64 bg-gray-900 text-white text-xs rounded-lg p-3 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 shadow-lg">
-                    <p className="font-semibold mb-1">{agent.title}</p>
+                    <p className="font-semibold mb-1">{agentName}</p>
                     <div className="flex items-center gap-1.5 text-xs text-gray-300">
                       <span>{getStatusText(agent.status)}</span>
                     </div>
@@ -414,12 +394,12 @@ export function Agents() {
             })}
           </AnimatePresence>
 
-          {displayAgents.length > visibleChatsCount && (
+          {agents.length > visibleChatsCount && (
             <div
               onClick={() => setShowAllTasksPage(true)}
               className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-semibold text-muted-foreground cursor-pointer hover:bg-primary/10 hover:text-primary transition-colors"
             >
-              +{displayAgents.length - visibleChatsCount}
+              +{agents.length - visibleChatsCount}
             </div>
           )}
         </div>
