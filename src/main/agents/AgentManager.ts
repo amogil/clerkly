@@ -8,7 +8,9 @@ import {
   AgentCreatedEvent,
   AgentUpdatedEvent,
   AgentArchivedEvent,
+  MessageCreatedPayload,
 } from '../../shared/events/types';
+import { EVENT_TYPES } from '../../shared/events/constants';
 import { Logger } from '../Logger';
 import type { Agent } from '../db/schema';
 
@@ -26,6 +28,48 @@ export class AgentManager {
 
   constructor(dbManager: IDatabaseManager) {
     this.dbManager = dbManager;
+    this.subscribeToEvents();
+  }
+
+  /**
+   * Subscribe to MESSAGE_CREATED events to update agent's updatedAt
+   * Requirements: agents.1.4, agents.12.2
+   */
+  private subscribeToEvents(): void {
+    MainEventBus.getInstance().subscribe(
+      EVENT_TYPES.MESSAGE_CREATED,
+      (payload: MessageCreatedPayload) => {
+        if (payload.data) {
+          this.handleMessageCreated(payload.data.agentId);
+        }
+      }
+    );
+  }
+
+  /**
+   * Handle MESSAGE_CREATED event - update agent's updatedAt
+   * Requirements: agents.1.4, agents.12.2
+   */
+  private handleMessageCreated(agentId: string): void {
+    try {
+      // Update agent's updatedAt in database
+      this.dbManager.agents.touch(agentId);
+
+      // Get updated agent to publish event with new timestamp
+      const updatedAgent = this.dbManager.agents.findById(agentId);
+      if (updatedAgent) {
+        this.logger.info(`Agent updatedAt updated: ${agentId}`);
+
+        // Publish AGENT_UPDATED event for UI
+        MainEventBus.getInstance().publish(
+          new AgentUpdatedEvent(agentId, {
+            updatedAt: new Date(updatedAgent.updatedAt).getTime(),
+          })
+        );
+      }
+    } catch (error) {
+      this.logger.error(`Failed to update agent updatedAt for ${agentId}: ${error}`);
+    }
   }
 
   /**

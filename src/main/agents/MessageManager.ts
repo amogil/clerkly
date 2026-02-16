@@ -59,16 +59,16 @@ export class MessageManager {
 
   /**
    * Create a new message for an agent
-   * Requirements: agents.4.3, agents.7.1, agents.1.4
+   * Requirements: agents.4.3, agents.7.1, agents.12.4
    */
   create(agentId: string, payload: MessagePayload): Message {
-    // Repository automatically checks access and updates agent.updatedAt
+    // Repository automatically checks access
     const payloadJson = JSON.stringify(payload);
     const message = this.dbManager.messages.create(agentId, payloadJson);
 
     this.logger.info(`Message created: ${message.id} for agent ${agentId}`);
 
-    // Publish event for real-time UI updates
+    // Publish message created event for real-time UI updates
     // Requirements: agents.12.4
     MainEventBus.getInstance().publish(
       new MessageCreatedEvent({

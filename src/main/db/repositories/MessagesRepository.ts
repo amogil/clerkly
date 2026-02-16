@@ -65,7 +65,6 @@ export class MessagesRepository {
 
   /**
    * Create a new message for an agent
-   * Also updates the agent's updatedAt timestamp
    * Requirements: user-data-isolation.7.6
    */
   create(agentId: string, payloadJson: string): Message {
@@ -77,9 +76,6 @@ export class MessagesRepository {
       .values({ agentId, timestamp: now, payloadJson })
       .returning()
       .get();
-
-    // Update agent's updatedAt
-    this.agentsRepo.touch(agentId);
 
     return message;
   }
@@ -94,6 +90,25 @@ export class MessagesRepository {
     this.db
       .update(messages)
       .set({ payloadJson })
+      .where(and(eq(messages.id, messageId), eq(messages.agentId, agentId)))
+      .run();
+  }
+
+  /**
+   * Set a specific timestamp for a message (test-only)
+   * Used in tests to simulate messages with old timestamps
+   * Requirements: testing.3.1
+   * @throws {Error} If not in test environment
+   */
+  setTimestamp(messageId: number, agentId: string, timestamp: string): void {
+    if (process.env.NODE_ENV !== 'test') {
+      throw new Error('setTimestamp can only be used in test environment');
+    }
+    this.checkAccess(agentId);
+
+    this.db
+      .update(messages)
+      .set({ timestamp })
       .where(and(eq(messages.id, messageId), eq(messages.agentId, agentId)))
       .run();
   }

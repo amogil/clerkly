@@ -396,6 +396,7 @@
 
 - `tests/functional/agents.spec.ts` - "should display active agent info in header"
 - `tests/functional/agents.spec.ts` - "should truncate long agent names"
+- `tests/functional/agent-date-update.spec.ts` - "should update agent timestamp when new message is sent"
 
 ---
 
@@ -490,16 +491,36 @@
 **События агентов:**
 
 12.1. КОГДА создаётся новый агент, Main процесс ДОЛЖЕН генерировать событие `agent.created`
+   - **Генератор:** `AgentManager.create()`
+   - **Момент:** После создания агента в БД через `AgentsRepository.create()`
+   - **Payload:** `{ data: { id, name, createdAt, updatedAt } }`
 
 12.2. КОГДА обновляется агент (name, updatedAt), Main процесс ДОЛЖЕН генерировать событие `agent.updated`
+   - **Генератор 1:** `AgentManager.update()` - при изменении имени агента
+     - **Момент:** После обновления в БД через `AgentsRepository.update()`
+     - **Payload:** `{ id: agentId, changedFields: { name } }`
+   - **Генератор 2:** `AgentManager.handleMessageCreated()` - при создании сообщения
+     - **Триггер:** Подписка на событие `MESSAGE_CREATED`
+     - **Момент:** После обновления `updatedAt` в БД через `AgentsRepository.touch()`
+     - **Payload:** `{ id: agentId, changedFields: { updatedAt } }`
 
 12.3. КОГДА агент архивируется, Main процесс ДОЛЖЕН генерировать событие `agent.archived`
+   - **Генератор:** `AgentManager.archive()`
+   - **Момент:** После архивирования в БД через `AgentsRepository.archive()`
+   - **Payload:** `{ id: agentId }`
 
 **События сообщений:**
 
 12.4. КОГДА создаётся новое сообщение в чате, Main процесс ДОЛЖЕН генерировать событие `message.created`
+   - **Генератор:** `MessageManager.create()`
+   - **Момент:** После создания сообщения в БД через `MessagesRepository.create()`
+   - **Payload:** `{ data: { id, agentId, timestamp, payloadJson } }`
+   - **Побочный эффект:** Триггерит `AgentManager.handleMessageCreated()` который генерирует `agent.updated`
 
 12.5. КОГДА обновляется сообщение (например, tool_call завершился), Main процесс ДОЛЖЕН генерировать событие `message.updated`
+   - **Генератор:** `MessageManager.update()`
+   - **Момент:** После обновления payload в БД через `MessagesRepository.update()`
+   - **Payload:** `{ id: messageId, changedFields: { payloadJson } }`
 
 **Подписки UI (Renderer):**
 

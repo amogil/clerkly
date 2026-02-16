@@ -68,6 +68,8 @@
   - ✅ Обновлен дизайн agents (design.md)
   - ✅ Модульные тесты (4 теста в agents-date-simple.test.tsx)
   - ✅ Обновлены тесты DateTimeFormatter для нового подхода
+  - ✅ Функциональный тест (agent-date-update.spec.ts) - проверка обновления даты при отправке сообщения
+  - ✅ MessageManager.create() генерирует событие AGENT_UPDATED с обновленным updatedAt (agents.1.4, agents.12.2)
 
 ### В процессе
 - Нет активных задач

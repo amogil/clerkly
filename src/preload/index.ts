@@ -106,6 +106,9 @@ interface API {
       errorMessage: string
     ) => Promise<{ success: boolean; error?: string }>;
     clearDataErrors: () => Promise<{ success: boolean; error?: string }>;
+    createAgentWithOldMessage: (
+      minutesAgo: number
+    ) => Promise<{ success: boolean; agentId?: string; timestamp?: string; error?: string }>;
   };
   // Requirements: testing.3.8 - Test IPC methods (only available in test environment)
   ipcRenderer?: {
@@ -562,6 +565,18 @@ if (process.env.NODE_ENV === 'test') {
      */
     async clearDataErrors(): Promise<{ success: boolean; error?: string }> {
       return await ipcRenderer.invoke('test:clear-data-errors');
+    },
+
+    /**
+     * Create agent with old message timestamp for testing date updates
+     * Requirements: testing.3.1
+     * @param minutesAgo - How many minutes ago the message should be
+     * @returns {Promise<{success: boolean, agentId?: string, timestamp?: string, error?: string}>}
+     */
+    async createAgentWithOldMessage(
+      minutesAgo: number
+    ): Promise<{ success: boolean; agentId?: string; timestamp?: string; error?: string }> {
+      return await ipcRenderer.invoke('test:create-agent-with-old-message', minutesAgo);
     },
   };
 

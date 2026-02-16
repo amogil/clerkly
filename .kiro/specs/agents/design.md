@@ -676,6 +676,71 @@ MainEventBus.getInstance().publish(new MessageCreatedEvent(messageData));
 MainEventBus.getInstance().publish(new MessageUpdatedEvent(messageId, changedFields));
 ```
 
+#### Детальная Спецификация Генераторов
+
+**AGENT_CREATED** (agents.12.1)
+- **Генератор:** `AgentManager.create()`
+- **Файл:** `src/main/agents/AgentManager.ts`
+- **Момент:** После создания агента в БД через `AgentsRepository.create()`
+- **Условие:** Всегда при создании нового агента
+- **Payload:** `{ data: { id, name, createdAt, updatedAt } }`
+
+**AGENT_UPDATED** (agents.12.2)
+- **Генератор 1:** `AgentManager.update()`
+  - **Файл:** `src/main/agents/AgentManager.ts`
+  - **Момент:** После обновления в БД через `AgentsRepository.update()`
+  - **Условие:** При изменении имени агента через API
+  - **Payload:** `{ id: agentId, changedFields: { name } }`
+
+- **Генератор 2:** `AgentManager.handleMessageCreated()`
+  - **Файл:** `src/main/agents/AgentManager.ts`
+  - **Триггер:** Подписка на событие `MESSAGE_CREATED` (в конструкторе)
+  - **Момент:** После обновления `updatedAt` в БД через `AgentsRepository.touch()`
+  - **Условие:** При создании любого сообщения в чате агента
+  - **Payload:** `{ id: agentId, changedFields: { updatedAt } }`
+
+**AGENT_ARCHIVED** (agents.12.3)
+- **Генератор:** `AgentManager.archive()`
+- **Файл:** `src/main/agents/AgentManager.ts`
+- **Момент:** После архивирования в БД через `AgentsRepository.archive()`
+- **Условие:** При архивировании агента через API
+- **Payload:** `{ id: agentId }`
+
+**MESSAGE_CREATED** (agents.12.4)
+- **Генератор:** `MessageManager.create()`
+- **Файл:** `src/main/agents/MessageManager.ts`
+- **Момент:** После создания сообщения в БД через `MessagesRepository.create()`
+- **Условие:** При создании нового сообщения в чате
+- **Payload:** `{ data: { id, agentId, timestamp, payloadJson } }`
+- **Побочный эффект:** Триггерит `AgentManager.handleMessageCreated()` → генерирует `AGENT_UPDATED`
+
+**MESSAGE_UPDATED** (agents.12.5)
+- **Генератор:** `MessageManager.update()`
+- **Файл:** `src/main/agents/MessageManager.ts`
+- **Момент:** После обновления payload в БД через `MessagesRepository.update()`
+- **Условие:** При обновлении содержимого сообщения (например, завершение tool_call)
+- **Payload:** `{ id: messageId, changedFields: { payloadJson } }`
+
+#### Flow Событий: Создание Сообщения
+
+```
+User отправляет сообщение
+    ↓
+MessageManager.create()
+    → Сохраняет в БД (MessagesRepository)
+    → Генерирует MESSAGE_CREATED
+        ↓
+        ├─→ AgentManager.handleMessageCreated() (Main Process)
+        │   → Обновляет agent.updatedAt в БД
+        │   → Генерирует AGENT_UPDATED
+        │       ↓
+        │       └─→ useAgents (Renderer)
+        │           → Обновляет timestamp в UI
+        │
+        └─→ useMessages (Renderer)
+            → Добавляет сообщение в чат
+```
+
 ### Подписка на события (Renderer)
 
 ```typescript
@@ -719,6 +784,89 @@ function AgentsComponent() {
   });
 }
 ```
+
+#### Детальная Спецификация Подписчиков
+
+**MESSAGE_CREATED** (agents.12.4, agents.12.7)
+
+*Подписчик 1: AgentManager (Main Process)*
+- **Файл:** `src/main/agents/AgentManager.ts`
+- **Метод:** `handleMessageCreated()`
+- **Подписка:** В конструкторе через `subscribeToEvents()`
+- **Фильтр:** Нет (обрабатывает все сообщения)
+- **Действия:**
+  1. Обновляет `agent.updatedAt` в БД
+  2. Получает обновленного агента из БД
+  3. Генерирует событие `AGENT_UPDATED`
+
+*Подписчик 2: useMessages (Renderer)*
+- **Файл:** `src/renderer/hooks/useMessages.ts`
+- **Подписка:** `useEventSubscription(MESSAGE_CREATED, handler)`
+- **Фильтр:** `payload.data.agentId === activeAgentId` (только для активного агента)
+- **Действия:**
+  1. Конвертирует event message → renderer message
+  2. Парсит payload
+  3. Добавляет в `messages` state (если еще нет)
+  4. Сортирует по timestamp
+  5. Триггерит React re-render → сообщение появляется в чате
+
+**MESSAGE_UPDATED** (agents.12.5, agents.12.7)
+
+*Подписчик: useMessages (Renderer)*
+- **Файл:** `src/renderer/hooks/useMessages.ts`
+- **Подписка:** `useEventSubscription(MESSAGE_UPDATED, handler)`
+- **Фильтр:** Нет (обрабатывает все обновления)
+- **Действия:**
+  1. Находит сообщение по `id` в state
+  2. Обновляет `payloadJson` из `changedFields`
+  3. Парсит новый payload
+  4. Триггерит React re-render → сообщение обновляется в чате
+
+**AGENT_CREATED** (agents.12.1, agents.12.6)
+
+*Подписчик: useAgents (Renderer)*
+- **Файл:** `src/renderer/hooks/useAgents.ts`
+- **Подписка:** `useEventSubscription(AGENT_CREATED, handler)`
+- **Фильтр:** Нет (обрабатывает все новые агенты)
+- **Действия:**
+  1. Конвертирует event agent → renderer agent
+  2. Добавляет в начало `agents` state
+  3. Пересортировывает по `updatedAt` (DESC)
+  4. Триггерит React re-render → агент появляется в списке
+
+**AGENT_UPDATED** (agents.12.2, agents.12.6)
+
+*Подписчик: useAgents (Renderer)*
+- **Файл:** `src/renderer/hooks/useAgents.ts`
+- **Подписка:** `useEventSubscription(AGENT_UPDATED, handler)`
+- **Фильтр:** `payload.id === agent.agentId`
+- **Действия:**
+  1. Находит агента по `id` в state
+  2. Обновляет `name` (если есть в `changedFields`)
+  3. Обновляет `updatedAt` (если есть в `changedFields`)
+  4. Конвертирует timestamp → ISO string
+  5. Триггерит React re-render → timestamp/name обновляется в UI
+
+**AGENT_ARCHIVED** (agents.12.3, agents.12.6)
+
+*Подписчик: useAgents (Renderer)*
+- **Файл:** `src/renderer/hooks/useAgents.ts`
+- **Подписка:** `useEventSubscription(AGENT_ARCHIVED, handler)`
+- **Фильтр:** Нет (обрабатывает все архивирования)
+- **Действия:**
+  1. Удаляет агента из `agents` state
+  2. Если список пустой → auto-create нового агента (agents.2.7)
+  3. Триггерит React re-render → агент исчезает из списка
+
+#### Справочная Таблица: События
+
+| Событие | Генератор | Подписчики | Файлы |
+|---------|-----------|------------|-------|
+| **MESSAGE_CREATED** | `MessageManager.create()` | 1. `AgentManager` (Main)<br>2. `useMessages` (Renderer) | `src/main/agents/MessageManager.ts`<br>`src/main/agents/AgentManager.ts`<br>`src/renderer/hooks/useMessages.ts` |
+| **MESSAGE_UPDATED** | `MessageManager.update()` | `useMessages` (Renderer) | `src/main/agents/MessageManager.ts`<br>`src/renderer/hooks/useMessages.ts` |
+| **AGENT_CREATED** | `AgentManager.create()` | `useAgents` (Renderer) | `src/main/agents/AgentManager.ts`<br>`src/renderer/hooks/useAgents.ts` |
+| **AGENT_UPDATED** | 1. `AgentManager.update()`<br>2. `AgentManager.handleMessageCreated()` | `useAgents` (Renderer) | `src/main/agents/AgentManager.ts`<br>`src/renderer/hooks/useAgents.ts` |
+| **AGENT_ARCHIVED** | `AgentManager.archive()` | `useAgents` (Renderer) | `src/main/agents/AgentManager.ts`<br>`src/renderer/hooks/useAgents.ts` |
 
 ## Архитектура компонентов
 

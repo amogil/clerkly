@@ -284,6 +284,57 @@ if (process.env.NODE_ENV === 'test') {
     }
   });
 
+  // Test handler for creating agent with old message timestamp
+  ipcMain.handle('test:create-agent-with-old-message', async (_event: any, minutesAgo: number) => {
+    if (!isTestEnvironment()) {
+      throw new Error('test:create-agent-with-old-message can only be used in test environment');
+    }
+    try {
+      // Get current user ID
+      const userId = userManager.getCurrentUserId();
+      if (!userId) {
+        throw new Error('No user logged in');
+      }
+
+      // Create a new agent using AgentManager
+      const agent = await agentManager.create(userId);
+
+      // Create a message with old timestamp using MessageManager
+      const oldTimestamp = new Date(Date.now() - minutesAgo * 60 * 1000).toISOString();
+
+      const payload = {
+        kind: 'user' as const,
+        data: { text: 'Test message from the past' },
+      };
+
+      // Create message through MessageManager (this will call MessagesRepository.create)
+      const message = await messageManager.create(agent.agentId, payload);
+
+      // Now manually update the message timestamp and agent updatedAt to the old time
+      // This is a test-only operation to simulate an old message
+      // Use ORM methods instead of raw SQL
+
+      // Get repositories from DatabaseManager
+      const messagesRepo = dbManager.messages;
+      const agentsRepo = dbManager.agents;
+
+      // Update the message timestamp to old time using ORM
+      messagesRepo.setTimestamp(message.id, agent.agentId, oldTimestamp);
+
+      // Update agent's updatedAt to match the message timestamp using ORM
+      agentsRepo.setUpdatedAt(agent.agentId, oldTimestamp);
+
+      return {
+        success: true,
+        agentId: agent.agentId,
+        timestamp: oldTimestamp,
+      };
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      return { success: false, error: errorMessage };
+    }
+  });
+
   ipcMain.handle('test:setup-profile', async (_event: any, profileData: any) => {
     if (!isTestEnvironment()) {
       throw new Error('test:setup-profile can only be used in test environment');

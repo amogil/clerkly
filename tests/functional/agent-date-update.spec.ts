@@ -1,0 +1,169 @@
+/* Preconditions: User logged in
+   Action: Create agent with old message, send new message
+   Assertions: 
+   - Agent's updatedAt timestamp is old initially
+   - After sending new message, timestamp updates to current time
+   Requirements: agents.8.1, agents.5.3, settings.2.1 */
+
+import { test, expect, _electron as electron, ElectronApplication, Page } from '@playwright/test';
+import path from 'path';
+import { MockOAuthServer } from './helpers/mock-oauth-server';
+import { completeOAuthFlow } from './helpers/electron';
+
+let mockServer: MockOAuthServer;
+
+test.beforeAll(async () => {
+  // Start mock OAuth server for all tests
+  mockServer = new MockOAuthServer({
+    port: 8896,
+    clientId: 'test-client-id-12345',
+    clientSecret: 'test-client-secret-67890',
+  });
+
+  await mockServer.start();
+  console.log(`[TEST] Mock OAuth server started at ${mockServer.getBaseUrl()}`);
+});
+
+test.afterAll(async () => {
+  // Stop mock server after all tests
+  if (mockServer) {
+    await mockServer.stop();
+    console.log('[TEST] Mock OAuth server stopped');
+  }
+});
+
+test.describe('Agents - Date Update on New Message', () => {
+  let electronApp: ElectronApplication;
+  let window: Page;
+
+  test.beforeEach(async () => {
+    // Set user profile data for tests
+    mockServer.setUserProfile({
+      id: '070FF5B781',
+      email: 'date.test@example.com',
+      name: 'Date Test User',
+      given_name: 'Date',
+      family_name: 'Test User',
+    });
+
+    // Create unique temp directory for this test
+    const testDataPath = path.join(
+      require('os').tmpdir(),
+      `clerkly-date-test-${Date.now()}-${Math.random().toString(36).substring(7)}`
+    );
+
+    // Launch Electron app with clean state (no authentication)
+    electronApp = await electron.launch({
+      args: [
+        path.join(__dirname, '../../dist/main/main/index.js'),
+        '--user-data-dir',
+        testDataPath,
+      ],
+      env: {
+        ...process.env,
+        NODE_ENV: 'test',
+        CLERKLY_GOOGLE_API_URL: mockServer.getBaseUrl(),
+        CLERKLY_OAUTH_CLIENT_ID: 'test-client-id-12345',
+        CLERKLY_OAUTH_CLIENT_SECRET: 'test-client-secret-67890',
+      },
+    });
+
+    window = await electronApp.firstWindow();
+    await window.waitForLoadState('domcontentloaded');
+
+    // Wait for login screen
+    const loginScreen = window.locator('[data-testid="login-screen"]');
+    await expect(loginScreen).toBeVisible({ timeout: 10000 });
+
+    // Complete OAuth flow
+    await completeOAuthFlow(electronApp, window);
+
+    // Wait for agents page to load
+    await window.waitForSelector('[data-testid="agents"]', { timeout: 15000 });
+  });
+
+  test.afterEach(async () => {
+    // Close the app
+    if (electronApp) {
+      await electronApp.close();
+    }
+  });
+
+  /* Preconditions: Agent with message from 5 minutes ago exists
+     Action: Send new message to agent via UI
+     Assertions: 
+     - Initial timestamp is displayed in header (old)
+     - After sending message via UI, timestamp in header updates
+     - New timestamp is different from old timestamp
+     Requirements: agents.1.4, agents.8.1 (updatedAt updates on new message and displays in header) */
+  test('should update agent timestamp when new message is sent', async () => {
+    // Wait for agents page to load
+    await window.waitForSelector('[data-testid="agents"]', { timeout: 10000 });
+    await window.waitForTimeout(2000);
+
+    // Create agent with message from 5 minutes ago using test API
+    const result = await window.evaluate(async () => {
+      // @ts-expect-error - window.api is exposed via contextBridge
+      return await window.api.test.createAgentWithOldMessage(5);
+    });
+
+    console.log('[TEST] Create agent result:', result);
+    expect(result.success).toBe(true);
+    expect(result.agentId).toBeTruthy();
+
+    // Reload page to see the agent in UI
+    await window.reload();
+    await window.waitForSelector('[data-testid="agents"]', { timeout: 10000 });
+    await window.waitForTimeout(2000);
+
+    // Click on the second circle (our agent with old timestamp)
+    const chatCircles = window.locator(
+      '[data-testid="agents"] .w-8.h-8.rounded-full.cursor-pointer'
+    );
+    const circleCount = await chatCircles.count();
+    console.log('[TEST] Number of chat circles:', circleCount);
+
+    if (circleCount >= 2) {
+      await chatCircles.nth(1).click();
+      await window.waitForTimeout(1000);
+    }
+
+    // Step 8: Get initial timestamp from UI (header)
+    // The timestamp is displayed in the left part of header after the status text
+    const headerTimestamp = window.locator(
+      '[data-testid="agents"] .h-16.border-b .flex-1.min-w-0 .text-muted-foreground.truncate'
+    );
+    await expect(headerTimestamp).toBeVisible({ timeout: 5000 });
+    const timestampBefore = await headerTimestamp.textContent();
+    console.log('[TEST] Initial timestamp from UI:', timestampBefore);
+    expect(timestampBefore).toBeTruthy();
+
+    // Step 9: Send a new message through UI (textarea)
+    const textarea = window.locator('textarea[placeholder*="Ask"]');
+    await expect(textarea).toBeVisible({ timeout: 5000 });
+    await textarea.fill('New message to update timestamp');
+    await textarea.press('Enter');
+
+    // Wait for message to be sent and UI to update
+    await window.waitForTimeout(2000);
+
+    // Verify the message appears in UI
+    const messageText = window.locator('text=New message to update timestamp');
+    await expect(messageText).toBeVisible({ timeout: 5000 });
+    console.log('[TEST] Message appeared in UI');
+
+    // Step 11: Get updated timestamp from UI (header)
+    const timestampAfter = await headerTimestamp.textContent();
+    console.log('[TEST] Updated timestamp from UI:', timestampAfter);
+    expect(timestampAfter).toBeTruthy();
+
+    // Step 12: Verify timestamps are different
+    expect(timestampAfter).not.toBe(timestampBefore);
+    console.log(
+      '[TEST] Timestamp updated successfully in UI from',
+      timestampBefore,
+      'to',
+      timestampAfter
+    );
+  });
+});

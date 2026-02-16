@@ -97,6 +97,19 @@ export class AgentsRepository {
   }
 
   /**
+   * Set a specific updatedAt timestamp for an agent (test-only)
+   * Used in tests to simulate agents with old timestamps
+   * Requirements: testing.3.1
+   * @throws {Error} If not in test environment
+   */
+  setUpdatedAt(agentId: string, timestamp: string): void {
+    if (process.env.NODE_ENV !== 'test') {
+      throw new Error('setUpdatedAt can only be used in test environment');
+    }
+    this.db.update(agents).set({ updatedAt: timestamp }).where(eq(agents.agentId, agentId)).run();
+  }
+
+  /**
    * Generate a 10-character alphanumeric ID
    */
   private generateId(): string {
