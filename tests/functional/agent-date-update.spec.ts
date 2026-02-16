@@ -144,15 +144,24 @@ test.describe('Agents - Date Update on New Message', () => {
     await textarea.fill('New message to update timestamp');
     await textarea.press('Enter');
 
-    // Wait for message to be sent and UI to update
-    await window.waitForTimeout(2000);
-
     // Verify the message appears in UI
     const messageText = window.locator('text=New message to update timestamp');
     await expect(messageText).toBeVisible({ timeout: 5000 });
     console.log('[TEST] Message appeared in UI');
 
-    // Step 11: Get updated timestamp from UI (header)
+    // Step 11: Wait for timestamp to update in UI (with 5 second timeout)
+    // The timestamp should change after AGENT_UPDATED event is processed
+    await window.waitForFunction(
+      (initialTimestamp) => {
+        const timestampElement = document.querySelector(
+          '[data-testid="agents"] .h-16.border-b .flex-1.min-w-0 .text-muted-foreground.truncate'
+        );
+        return timestampElement && timestampElement.textContent !== initialTimestamp;
+      },
+      timestampBefore,
+      { timeout: 5000 }
+    );
+
     const timestampAfter = await headerTimestamp.textContent();
     console.log('[TEST] Updated timestamp from UI:', timestampAfter);
     expect(timestampAfter).toBeTruthy();

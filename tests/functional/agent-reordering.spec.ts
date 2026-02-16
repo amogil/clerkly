@@ -89,7 +89,7 @@ test.describe('Agent Reordering', () => {
     await window.waitForTimeout(1000);
 
     // Create 3 more agents (total 4 agents)
-    const newAgentButton = window.locator('button:has-text("+")').first();
+    const newAgentButton = window.locator('div[title="New chat"]');
     await expect(newAgentButton).toBeVisible({ timeout: 3000 });
 
     for (let i = 0; i < 3; i++) {
@@ -138,7 +138,7 @@ test.describe('Agent Reordering', () => {
     await window.waitForTimeout(1000);
 
     // Create 6 more agents (total 7 agents, some will be hidden)
-    const newAgentButton = window.locator('button:has-text("+")').first();
+    const newAgentButton = window.locator('div[title="New chat"]');
     await expect(newAgentButton).toBeVisible({ timeout: 3000 });
 
     for (let i = 0; i < 6; i++) {
@@ -153,8 +153,8 @@ test.describe('Agent Reordering', () => {
     await textarea.press('Enter');
     await window.waitForTimeout(500);
 
-    // Open AllAgents page
-    const allAgentsButton = window.locator('button:has-text("All Agents")');
+    // Open AllAgents page by clicking +N button
+    const allAgentsButton = window.locator('div.rounded-full.bg-muted:has-text("+")');
     await allAgentsButton.click();
     await window.waitForTimeout(500);
 
@@ -206,7 +206,7 @@ test.describe('Agent Reordering', () => {
     await window.waitForTimeout(1000);
 
     // Create 2 more agents (total 3 agents)
-    const newAgentButton = window.locator('button:has-text("+")').first();
+    const newAgentButton = window.locator('div[title="New chat"]');
     await expect(newAgentButton).toBeVisible({ timeout: 3000 });
 
     for (let i = 0; i < 2; i++) {
@@ -230,31 +230,64 @@ test.describe('Agent Reordering', () => {
     const textarea = window.locator('textarea[placeholder*="Ask"]');
     await textarea.fill('Message to agent 3');
     await textarea.press('Enter');
-    await window.waitForTimeout(1000);
+
+    // Wait for agent 3 to move to first position
+    await window.waitForFunction(
+      (expectedId) => {
+        const firstIcon = document.querySelector('[data-testid^="agent-icon-"]');
+        return firstIcon && firstIcon.getAttribute('data-testid') === expectedId;
+      },
+      agent3Id,
+      { timeout: 5000 }
+    );
 
     // Agent 3 should now be first
     let currentFirstId = await agentIcons.first().getAttribute('data-testid');
     expect(currentFirstId).toBe(agent3Id);
 
+    // Wait for UI to fully stabilize and animations to complete
+    await window.waitForTimeout(1000);
+
     // Send message to agent 2 (now in middle)
     await agentIcons.nth(1).click();
-    await window.waitForTimeout(300);
+    await window.waitForTimeout(500);
 
     await textarea.fill('Message to agent 2');
     await textarea.press('Enter');
-    await window.waitForTimeout(1000);
+
+    // Wait for agent 2 to move to first position (longer timeout)
+    await window.waitForFunction(
+      (expectedId) => {
+        const firstIcon = document.querySelector('[data-testid^="agent-icon-"]');
+        return firstIcon && firstIcon.getAttribute('data-testid') === expectedId;
+      },
+      agent2Id,
+      { timeout: 10000 }
+    );
 
     // Agent 2 should now be first
     currentFirstId = await agentIcons.first().getAttribute('data-testid');
     expect(currentFirstId).toBe(agent2Id);
 
+    // Wait for UI to fully stabilize and animations to complete
+    await window.waitForTimeout(1000);
+
     // Send message to agent 1 (now last)
     await agentIcons.nth(2).click();
-    await window.waitForTimeout(300);
+    await window.waitForTimeout(500);
 
     await textarea.fill('Message to agent 1');
     await textarea.press('Enter');
-    await window.waitForTimeout(1000);
+
+    // Wait for agent 1 to move to first position (longer timeout)
+    await window.waitForFunction(
+      (expectedId) => {
+        const firstIcon = document.querySelector('[data-testid^="agent-icon-"]');
+        return firstIcon && firstIcon.getAttribute('data-testid') === expectedId;
+      },
+      agent1Id,
+      { timeout: 10000 }
+    );
 
     // Agent 1 should now be first
     currentFirstId = await agentIcons.first().getAttribute('data-testid');
@@ -272,11 +305,11 @@ test.describe('Agent Reordering', () => {
     // Wait for first agent to be auto-created
     await window.waitForTimeout(1000);
 
-    // Create 3 more agents
-    const newAgentButton = window.locator('button:has-text("+")').first();
+    // Create 5 more agents (total 6 agents, so +1 button will appear)
+    const newAgentButton = window.locator('div[title="New chat"]');
     await expect(newAgentButton).toBeVisible({ timeout: 3000 });
 
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 5; i++) {
       await newAgentButton.click();
       await window.waitForTimeout(300);
     }
@@ -291,8 +324,8 @@ test.describe('Agent Reordering', () => {
     const agentIcons = window.locator('[data-testid^="agent-icon-"]');
     const lastAgentId = await agentIcons.last().getAttribute('data-testid');
 
-    // Open AllAgents
-    const allAgentsButton = window.locator('button:has-text("All Agents")');
+    // Open AllAgents by clicking +N button
+    const allAgentsButton = window.locator('div.rounded-full.bg-muted:has-text("+")');
     await allAgentsButton.click();
     await window.waitForTimeout(500);
 
@@ -304,7 +337,16 @@ test.describe('Agent Reordering', () => {
     // Send message immediately
     await textarea.fill('Quick message after selection');
     await textarea.press('Enter');
-    await window.waitForTimeout(1000);
+
+    // Wait for agent to move to first position (longer timeout)
+    await window.waitForFunction(
+      (expectedId) => {
+        const firstIcon = document.querySelector('[data-testid^="agent-icon-"]');
+        return firstIcon && firstIcon.getAttribute('data-testid') === expectedId;
+      },
+      lastAgentId,
+      { timeout: 10000 }
+    );
 
     // Verify agent is now first
     const firstAgentId = await agentIcons.first().getAttribute('data-testid');

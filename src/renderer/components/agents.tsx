@@ -224,6 +224,7 @@ export function Agents() {
             return (
               <div
                 key={agent.agentId}
+                data-testid={`agent-card-${agent.agentId}`}
                 onClick={() => handleAgentClick(agent)}
                 className="p-4 rounded-lg border border-border bg-card hover:border-primary/50 transition-colors cursor-pointer"
               >
@@ -365,6 +366,7 @@ export function Agents() {
               return (
                 <motion.div
                   key={agent.agentId}
+                  data-testid={`agent-icon-${agent.agentId}`}
                   layout
                   initial={{ opacity: 0, scale: 0.8 }}
                   animate={{ opacity: 1, scale: 1 }}
