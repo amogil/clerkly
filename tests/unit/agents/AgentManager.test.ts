@@ -17,6 +17,7 @@ jest.mock('../../../src/main/events/MainEventBus', () => ({
   MainEventBus: {
     getInstance: jest.fn(() => ({
       publish: jest.fn(),
+      subscribe: jest.fn(),
     })),
   },
 }));
@@ -36,7 +37,7 @@ jest.mock('../../../src/main/Logger', () => ({
 describe('AgentManager', () => {
   let agentManager: AgentManager;
   let mockDbManager: jest.Mocked<IDatabaseManager>;
-  let mockEventBus: { publish: jest.Mock };
+  let mockEventBus: { publish: jest.Mock; subscribe: jest.Mock };
 
   const mockAgent: Agent = {
     agentId: 'abc123xyz0',
@@ -50,7 +51,7 @@ describe('AgentManager', () => {
   beforeEach(() => {
     jest.clearAllMocks();
 
-    mockEventBus = { publish: jest.fn() };
+    mockEventBus = { publish: jest.fn(), subscribe: jest.fn() };
     (MainEventBus.getInstance as jest.Mock).mockReturnValue(mockEventBus);
 
     mockDbManager = {
@@ -197,6 +198,82 @@ describe('AgentManager', () => {
       expect(publishedEvent).toBeInstanceOf(AgentArchivedEvent);
       // AgentArchivedEvent stores id as instance property
       expect(publishedEvent.id).toBe('abc123xyz0');
+    });
+  });
+
+  describe('handleMessageCreated (MESSAGE_CREATED event handler)', () => {
+    /* Preconditions: AgentManager initialized, agent exists
+       Action: handleMessageCreated called with agentId
+       Assertions: Agent updatedAt updated, AGENT_UPDATED event published
+       Requirements: agents.1.4, agents.12.2 */
+    it('should update agent updatedAt and publish AGENT_UPDATED event', () => {
+      // Clear publish calls from constructor
+      mockEventBus.publish.mockClear();
+
+      // Call private method through type assertion
+      (agentManager as any).handleMessageCreated('abc123xyz0');
+
+      // Verify agent.touch() was called
+      expect(mockDbManager.agents.touch).toHaveBeenCalledWith('abc123xyz0');
+
+      // Verify agent was fetched
+      expect(mockDbManager.agents.findById).toHaveBeenCalledWith('abc123xyz0');
+
+      // Verify AGENT_UPDATED event was published
+      expect(mockEventBus.publish).toHaveBeenCalledTimes(1);
+      const publishedEvent = mockEventBus.publish.mock.calls[0][0];
+      expect(publishedEvent).toBeInstanceOf(AgentUpdatedEvent);
+      expect(publishedEvent.id).toBe('abc123xyz0');
+      expect(publishedEvent.changedFields.updatedAt).toBeDefined();
+    });
+
+    /* Preconditions: AgentManager initialized, touch() throws error
+       Action: handleMessageCreated called with agentId
+       Assertions: handleBackgroundError called, error re-thrown
+       Requirements: agents.1.4, error-notifications.1 */
+    it('should call handleBackgroundError and re-throw error on failure', () => {
+      // Mock handleBackgroundError function
+      const ErrorHandlerModule = require('../../../src/main/ErrorHandler');
+      const handleBackgroundErrorSpy = jest
+        .spyOn(ErrorHandlerModule, 'handleBackgroundError')
+        .mockImplementation(() => {});
+
+      // Mock touch() to throw error
+      const testError = new Error('Database connection failed');
+      mockDbManager.agents.touch = jest.fn().mockImplementation(() => {
+        throw testError;
+      });
+
+      // Should throw error after calling handleBackgroundError
+      expect(() => (agentManager as any).handleMessageCreated('abc123xyz0')).toThrow(
+        'Database connection failed'
+      );
+
+      // Verify handleBackgroundError was called with error and context
+      expect(handleBackgroundErrorSpy).toHaveBeenCalledWith(testError, 'Agent Update');
+
+      handleBackgroundErrorSpy.mockRestore();
+    });
+
+    /* Preconditions: AgentManager initialized, agent not found after touch
+       Action: handleMessageCreated called with agentId
+       Assertions: No AGENT_UPDATED event published
+       Requirements: agents.1.4, agents.12.2 */
+    it('should not publish AGENT_UPDATED if agent not found', () => {
+      // Clear publish calls from constructor
+      mockEventBus.publish.mockClear();
+
+      // Mock findById to return undefined
+      mockDbManager.agents.findById = jest.fn().mockReturnValue(undefined);
+
+      // Call private method
+      (agentManager as any).handleMessageCreated('abc123xyz0');
+
+      // Verify touch was called
+      expect(mockDbManager.agents.touch).toHaveBeenCalledWith('abc123xyz0');
+
+      // Verify no event was published
+      expect(mockEventBus.publish).not.toHaveBeenCalled();
     });
   });
 });

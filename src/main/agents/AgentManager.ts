@@ -12,6 +12,7 @@ import {
 } from '../../shared/events/types';
 import { EVENT_TYPES } from '../../shared/events/constants';
 import { Logger } from '../Logger';
+import { handleBackgroundError } from '../ErrorHandler';
 import type { Agent } from '../db/schema';
 
 /**
@@ -48,7 +49,7 @@ export class AgentManager {
 
   /**
    * Handle MESSAGE_CREATED event - update agent's updatedAt
-   * Requirements: agents.1.4, agents.12.2
+   * Requirements: agents.1.4, agents.12.2, error-notifications.1
    */
   private handleMessageCreated(agentId: string): void {
     try {
@@ -68,7 +69,10 @@ export class AgentManager {
         );
       }
     } catch (error) {
-      this.logger.error(`Failed to update agent updatedAt for ${agentId}: ${error}`);
+      // Use ErrorHandler to show error notification to user
+      // Requirements: error-notifications.1
+      handleBackgroundError(error, 'Agent Update');
+      throw error; // Re-throw for logging in MainEventBus
     }
   }
 

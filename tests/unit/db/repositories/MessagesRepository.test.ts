@@ -115,28 +115,6 @@ describe('MessagesRepository', () => {
   describe('create', () => {
     /* Preconditions: Agent for current user
        Action: Call create(agentId, payload)
-       Assertions: Message created, agent.updatedAt updated
-       Requirements: user-data-isolation.7.6 */
-    it('should create message and update agent updatedAt', async () => {
-      const agent = agentsRepo.create('Test');
-      const beforeUpdate = agentsRepo.findById(agent.agentId)!.updatedAt;
-
-      // Small delay to ensure updatedAt changes
-      await new Promise((resolve) => setTimeout(resolve, 10));
-
-      const message = messagesRepo.create(agent.agentId, '{"kind":"user","content":"Hello"}');
-
-      expect(message.agentId).toBe(agent.agentId);
-      expect(message.payloadJson).toBe('{"kind":"user","content":"Hello"}');
-      expect(message.id).toBeDefined();
-      expect(message.timestamp).toBeDefined();
-
-      const afterUpdate = agentsRepo.findById(agent.agentId)!.updatedAt;
-      expect(afterUpdate).not.toBe(beforeUpdate);
-    });
-
-    /* Preconditions: Agent for current user
-       Action: Call create(agentId, payload)
        Assertions: Message has auto-incremented id
        Requirements: user-data-isolation.7.6 */
     it('should auto-increment message id', () => {
