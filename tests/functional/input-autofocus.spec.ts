@@ -173,19 +173,20 @@ test('should auto-focus input when creating new agent', async () => {
   // Wait for agents page to load
   await expect(window.locator('[data-testid="agents"]')).toBeVisible({ timeout: 5000 });
 
-  // Wait for first agent to be auto-created
-  await window.waitForTimeout(1000);
+  // Wait for first agent to be auto-created (New chat button appears)
+  const newChatButton = window.locator('div[title="New chat"]');
+  await expect(newChatButton).toBeVisible({ timeout: 5000 });
 
   // Create new agent
-  const newAgentButton = window.locator('button:has-text("+")').first();
-  await expect(newAgentButton).toBeVisible({ timeout: 3000 });
-  await newAgentButton.click();
-  await window.waitForTimeout(500);
+  await newChatButton.click();
+
+  // Wait for second agent icon to appear (confirms agent was created)
+  const agentIcons = window.locator('[data-testid^="agent-icon-"]');
+  await expect(agentIcons.nth(1)).toBeVisible({ timeout: 5000 });
 
   // Check that textarea is focused
   const textarea = window.locator('textarea[placeholder*="Ask"]');
-  const isFocused = await textarea.evaluate((el) => el === document.activeElement);
-  expect(isFocused).toBe(true);
+  await expect(textarea).toBeFocused({ timeout: 5000 });
 });
 
 /* Preconditions: Application with agent, input has focus
