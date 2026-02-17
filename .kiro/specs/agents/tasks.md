@@ -409,7 +409,7 @@
   6. "should preserve multiple consecutive line breaks"
   7. "should wrap long text with spaces naturally"
   8. "should wrap code-like content without horizontal scroll"
-  9. "should preserve leading and trailing whitespace"
+  9. "should preserve internal whitespace and trim leading/trailing"
   10. "should maintain text wrapping after window resize"
   11. "should handle emoji and Unicode characters correctly"
 

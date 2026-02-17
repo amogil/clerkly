@@ -1598,7 +1598,7 @@ const STATUS_STYLES: Record<AgentStatus, StatusStyle> = {
 6. "should preserve multiple consecutive line breaks" - множественные переносы строк
 7. "should wrap long text with spaces naturally" - естественный перенос текста с пробелами
 8. "should wrap code-like content without horizontal scroll" - перенос кода
-9. "should preserve leading and trailing whitespace" - сохранение пробелов в начале/конце
+9. "should preserve internal whitespace and trim leading/trailing" - сохранение внутренних пробелов, удаление внешних
 10. "should maintain text wrapping after window resize" - перенос после изменения размера окна
 11. "should handle emoji and Unicode characters correctly" - поддержка emoji и Unicode
 

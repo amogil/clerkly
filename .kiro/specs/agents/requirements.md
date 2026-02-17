@@ -216,7 +216,9 @@
    - Длинные слова и текст без пробелов ДОЛЖНЫ переноситься (word-break: break-word)
    - Ширина сообщения НЕ ДОЛЖНА превышать ширину области чата
    - Горизонтальная полоса прокрутки НЕ ДОЛЖНА появляться из-за длинных сообщений
-   - Переносы строк в тексте сообщения ДОЛЖНЫ сохраняться (white-space: pre-wrap)
+   - Переносы строк внутри текста сообщения ДОЛЖНЫ сохраняться (white-space: pre-wrap)
+   - Пробелы в начале и конце текста ДОЛЖНЫ удаляться (trim)
+   - Пробелы внутри текста ДОЛЖНЫ сохраняться
 
 #### Функциональные Тесты
 
@@ -236,7 +238,7 @@
 - `tests/functional/message-text-wrapping.spec.ts` - "should preserve multiple consecutive line breaks"
 - `tests/functional/message-text-wrapping.spec.ts` - "should wrap long text with spaces naturally"
 - `tests/functional/message-text-wrapping.spec.ts` - "should wrap code-like content without horizontal scroll"
-- `tests/functional/message-text-wrapping.spec.ts` - "should preserve leading and trailing whitespace"
+- `tests/functional/message-text-wrapping.spec.ts` - "should preserve internal whitespace and trim leading/trailing"
 - `tests/functional/message-text-wrapping.spec.ts` - "should maintain text wrapping after window resize"
 - `tests/functional/message-text-wrapping.spec.ts` - "should handle emoji and Unicode characters correctly"
 

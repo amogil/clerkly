@@ -291,12 +291,15 @@ test.describe('Message Text Wrapping', () => {
   });
 
   /* Preconditions: User is on agents page with active agent
-     Action: Send message with trailing/leading whitespace
-     Assertions: Whitespace is preserved
+     Action: Send message with internal whitespace (spaces and line breaks)
+     Assertions: Internal whitespace is preserved, leading/trailing whitespace is trimmed
      Requirements: agents.4.22 */
-  test('should preserve leading and trailing whitespace', async () => {
-    // Send message with leading and trailing spaces
-    const messageWithSpaces = '   Leading spaces\nTrailing spaces   \n   Both   ';
+  test('should preserve internal whitespace and trim leading/trailing', async () => {
+    // Send message with internal spaces and line breaks
+    // Leading/trailing spaces should be trimmed, but internal preserved
+    const messageWithSpaces = '   Line 1 with  spaces\nLine 2  has   spaces\n   Line 3   ';
+    const expectedText = 'Line 1 with  spaces\nLine 2  has   spaces\n   Line 3';
+    
     const textarea = page.locator('textarea[placeholder*="Ask, reply"]');
     await textarea.fill(messageWithSpaces);
     await textarea.press('Enter');
@@ -312,9 +315,9 @@ test.describe('Message Text Wrapping', () => {
     const messageText = userMessage.locator('p');
     await expect(messageText).toHaveClass(/whitespace-pre-wrap/);
 
-    // Verify whitespace is preserved
+    // Verify internal whitespace is preserved, leading/trailing trimmed
     const textContent = await messageText.textContent();
-    expect(textContent).toBe(messageWithSpaces);
+    expect(textContent).toBe(expectedText);
   });
 
   /* Preconditions: User is on agents page with active agent
