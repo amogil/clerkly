@@ -668,7 +668,6 @@ describe('DatabaseManager Repository Accessors', () => {
       expect(typeof agents.create).toBe('function');
       expect(typeof agents.update).toBe('function');
       expect(typeof agents.archive).toBe('function');
-      expect(typeof agents.touch).toBe('function');
     });
   });
 

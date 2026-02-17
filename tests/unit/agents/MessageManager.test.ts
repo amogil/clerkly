@@ -201,7 +201,8 @@ describe('MessageManager', () => {
 
       expect(mockDbManager.messages.create).toHaveBeenCalledWith(
         'agent-123',
-        JSON.stringify(payload)
+        JSON.stringify(payload),
+        undefined
       );
       expect(result).toEqual(mockMessage);
       expect(mockEventBus.publish).toHaveBeenCalledTimes(1);

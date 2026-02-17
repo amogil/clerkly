@@ -119,7 +119,11 @@ export class AgentManager {
       // Update agent's updatedAt to the message timestamp (not current time)
       // This ensures agent's updatedAt reflects the time of the last message
       const messageTimestampISO = new Date(messageTimestamp).toISOString();
-      this.dbManager.agents.setUpdatedAt(agentId, messageTimestampISO);
+
+      // Update agent's updatedAt using repository method
+      // Note: This bypasses user check since we're updating by agentId directly
+      // The MESSAGE_CREATED event is only published for valid agents, so this is safe
+      this.dbManager.agents.update(agentId, { updatedAt: messageTimestampISO });
 
       // Get updated agent to publish event with new timestamp and status
       const updatedAgent = this.dbManager.agents.findById(agentId);

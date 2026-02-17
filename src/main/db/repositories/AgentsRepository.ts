@@ -60,13 +60,18 @@ export class AgentsRepository {
    * Update an agent's name for the current user
    * Requirements: user-data-isolation.6.3, user-data-isolation.7.6
    */
-  update(agentId: string, data: Partial<Pick<Agent, 'name'>>): void {
+  update(agentId: string, data: Partial<Pick<Agent, 'name' | 'updatedAt'>>): void {
     const userId = this.getUserId();
-    const now = new Date().toISOString();
+
+    // If updatedAt is not provided, set it to current time
+    const updateData = {
+      ...data,
+      updatedAt: data.updatedAt ?? new Date().toISOString(),
+    };
 
     this.db
       .update(agents)
-      .set({ ...data, updatedAt: now })
+      .set(updateData)
       .where(and(eq(agents.userId, userId), eq(agents.agentId, agentId)))
       .run();
   }
@@ -84,29 +89,6 @@ export class AgentsRepository {
       .set({ archivedAt: now })
       .where(and(eq(agents.userId, userId), eq(agents.agentId, agentId)))
       .run();
-  }
-
-  /**
-   * Update the updatedAt timestamp for an agent
-   * Used when messages are added to update the agent's last activity
-   * Requirements: user-data-isolation.7.6
-   */
-  touch(agentId: string): void {
-    const now = new Date().toISOString();
-    this.db.update(agents).set({ updatedAt: now }).where(eq(agents.agentId, agentId)).run();
-  }
-
-  /**
-   * Set a specific updatedAt timestamp for an agent (test-only)
-   * Used in tests to simulate agents with old timestamps
-   * Requirements: testing.3.1
-   * @throws {Error} If not in test environment
-   */
-  setUpdatedAt(agentId: string, timestamp: string): void {
-    if (process.env.NODE_ENV !== 'test') {
-      throw new Error('setUpdatedAt can only be used in test environment');
-    }
-    this.db.update(agents).set({ updatedAt: timestamp }).where(eq(agents.agentId, agentId)).run();
   }
 
   /**

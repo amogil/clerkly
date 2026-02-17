@@ -74,11 +74,12 @@ export class MessageManager {
   /**
    * Create a new message for an agent
    * Requirements: agents.4.3, agents.7.1, agents.12.4
+   * @param timestamp Optional timestamp (ISO string). If not provided, uses current time.
    */
-  create(agentId: string, payload: MessagePayload): Message {
+  create(agentId: string, payload: MessagePayload, timestamp?: string): Message {
     // Repository automatically checks access
     const payloadJson = JSON.stringify(payload);
-    const message = this.dbManager.messages.create(agentId, payloadJson);
+    const message = this.dbManager.messages.create(agentId, payloadJson, timestamp);
 
     this.logger.info(`Message created: ${message.id} for agent ${agentId}`);
 

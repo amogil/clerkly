@@ -138,13 +138,9 @@ export function registerTestIPCHandlers(
           data: { text: 'Test message from the past' },
         };
 
-        const message = messageManager.create(agent.agentId, payload);
-
-        const messagesRepo = dbManager.messages;
-        const agentsRepo = dbManager.agents;
-
-        messagesRepo.setTimestamp(message.id, agent.agentId, oldTimestamp);
-        agentsRepo.setUpdatedAt(agent.agentId, oldTimestamp);
+        // Create message with old timestamp - this will trigger MESSAGE_CREATED event
+        // which will update agent's updatedAt to match the message timestamp
+        messageManager.create(agent.agentId, payload, oldTimestamp);
 
         return {
           success: true,

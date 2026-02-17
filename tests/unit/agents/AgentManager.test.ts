@@ -61,8 +61,6 @@ describe('AgentManager', () => {
         findById: jest.fn().mockReturnValue(mockAgent),
         update: jest.fn(),
         archive: jest.fn(),
-        touch: jest.fn(),
-        setUpdatedAt: jest.fn(),
       },
       messages: {
         listByAgent: jest.fn(),
@@ -352,12 +350,10 @@ describe('AgentManager', () => {
       // Call private method with message timestamp
       (agentManager as any).handleMessageCreated('abc123xyz0', messageTimestamp);
 
-      // Verify setUpdatedAt was called with message timestamp (not touch with current time)
-      expect(mockDbManager.agents.setUpdatedAt).toHaveBeenCalledWith(
-        'abc123xyz0',
-        new Date(messageTimestamp).toISOString()
-      );
-      expect(mockDbManager.agents.touch).not.toHaveBeenCalled();
+      // Verify update was called with message timestamp
+      expect(mockDbManager.agents.update).toHaveBeenCalledWith('abc123xyz0', {
+        updatedAt: new Date(messageTimestamp).toISOString(),
+      });
 
       // Verify agent was fetched
       expect(mockDbManager.agents.findById).toHaveBeenCalledWith('abc123xyz0');
@@ -371,7 +367,7 @@ describe('AgentManager', () => {
       expect(typeof publishedEvent.timestamp).toBe('number');
     });
 
-    /* Preconditions: AgentManager initialized, setUpdatedAt() throws error
+    /* Preconditions: AgentManager initialized, update throws error
        Action: handleMessageCreated called with agentId and timestamp
        Assertions: handleBackgroundError called, error re-thrown
        Requirements: agents.1.4, error-notifications.1 */
@@ -382,18 +378,18 @@ describe('AgentManager', () => {
         .spyOn(ErrorHandlerModule, 'handleBackgroundError')
         .mockImplementation(() => {});
 
-      // Mock setUpdatedAt() to throw error
+      // Mock update to throw error
       const testError = new Error('Database connection failed');
-      mockDbManager.agents.setUpdatedAt = jest.fn().mockImplementation(() => {
+      mockDbManager.agents.update = jest.fn().mockImplementation(() => {
         throw testError;
       });
 
       const messageTimestamp = Date.now();
 
       // Should throw error after calling handleBackgroundError
-      expect(() => (agentManager as any).handleMessageCreated('abc123xyz0', messageTimestamp)).toThrow(
-        'Database connection failed'
-      );
+      expect(() =>
+        (agentManager as any).handleMessageCreated('abc123xyz0', messageTimestamp)
+      ).toThrow('Database connection failed');
 
       // Verify handleBackgroundError was called with error and context
       expect(handleBackgroundErrorSpy).toHaveBeenCalledWith(testError, 'Agent Update');
@@ -401,7 +397,7 @@ describe('AgentManager', () => {
       handleBackgroundErrorSpy.mockRestore();
     });
 
-    /* Preconditions: AgentManager initialized, agent not found after setUpdatedAt
+    /* Preconditions: AgentManager initialized, agent not found after update
        Action: handleMessageCreated called with agentId and timestamp
        Assertions: No AGENT_UPDATED event published
        Requirements: agents.1.4, agents.12.2 */
@@ -417,11 +413,10 @@ describe('AgentManager', () => {
       // Call private method
       (agentManager as any).handleMessageCreated('abc123xyz0', messageTimestamp);
 
-      // Verify setUpdatedAt was called
-      expect(mockDbManager.agents.setUpdatedAt).toHaveBeenCalledWith(
-        'abc123xyz0',
-        new Date(messageTimestamp).toISOString()
-      );
+      // Verify update was called
+      expect(mockDbManager.agents.update).toHaveBeenCalledWith('abc123xyz0', {
+        updatedAt: new Date(messageTimestamp).toISOString(),
+      });
 
       // Verify no event was published
       expect(mockEventBus.publish).not.toHaveBeenCalled();

@@ -110,16 +110,17 @@ describe('AgentsRepository', () => {
        Action: Call list()
        Assertions: Sorted by updatedAt DESC
        Requirements: user-data-isolation.7.6 */
-    it('should return agents sorted by updatedAt DESC', () => {
+    it('should return agents sorted by updatedAt DESC', async () => {
       const agent1 = repo.create('First');
+
+      // Small delay to ensure different timestamp
+      await new Promise((resolve) => setTimeout(resolve, 10));
       const agent2 = repo.create('Second');
 
-      // Touch first agent to update its updatedAt
-      repo.touch(agent1.agentId);
-
       const result = repo.list();
-      expect(result[0].agentId).toBe(agent1.agentId);
-      expect(result[1].agentId).toBe(agent2.agentId);
+      // agent2 was created later, so it should be first
+      expect(result[0].agentId).toBe(agent2.agentId);
+      expect(result[1].agentId).toBe(agent1.agentId);
     });
 
     /* Preconditions: Empty database
@@ -296,25 +297,6 @@ describe('AgentsRepository', () => {
 
       const agent = db.select().from(agents).where(eq(agents.agentId, 'other123')).get();
       expect(agent?.archivedAt).toBeNull();
-    });
-  });
-
-  describe('touch', () => {
-    /* Preconditions: Agent exists
-       Action: Call touch(agentId)
-       Assertions: updatedAt is updated
-       Requirements: user-data-isolation.7.6 */
-    it('should update updatedAt timestamp', async () => {
-      const agent = repo.create('Test');
-      const beforeTouch = agent.updatedAt;
-
-      // Small delay to ensure different timestamp
-      await new Promise((resolve) => setTimeout(resolve, 10));
-      repo.touch(agent.agentId);
-
-      const touched = repo.findById(agent.agentId);
-      expect(touched).toBeDefined();
-      expect(touched!.updatedAt >= beforeTouch).toBe(true);
     });
   });
 

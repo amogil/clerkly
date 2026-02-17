@@ -67,14 +67,22 @@ export class MessagesRepository {
   /**
    * Create a new message for an agent
    * Requirements: user-data-isolation.7.6
+   * @param timestamp Optional timestamp (ISO string). Can only be used in test environment.
+   * @throws {Error} If timestamp is provided outside test environment
    */
-  create(agentId: string, payloadJson: string): Message {
+  create(agentId: string, payloadJson: string, timestamp?: string): Message {
     this.checkAccess(agentId);
-    const now = new Date().toISOString();
+
+    // Validate timestamp parameter is only used in tests
+    if (timestamp && process.env.NODE_ENV !== 'test' && process.env.PLAYWRIGHT_TEST !== '1') {
+      throw new Error('timestamp parameter can only be used in test environment');
+    }
+
+    const messageTimestamp = timestamp ?? new Date().toISOString();
 
     const message = this.db
       .insert(messages)
-      .values({ agentId, timestamp: now, payloadJson })
+      .values({ agentId, timestamp: messageTimestamp, payloadJson })
       .returning()
       .get();
 
@@ -91,25 +99,6 @@ export class MessagesRepository {
     this.db
       .update(messages)
       .set({ payloadJson })
-      .where(and(eq(messages.id, messageId), eq(messages.agentId, agentId)))
-      .run();
-  }
-
-  /**
-   * Set a specific timestamp for a message (test-only)
-   * Used in tests to simulate messages with old timestamps
-   * Requirements: testing.3.1
-   * @throws {Error} If not in test environment
-   */
-  setTimestamp(messageId: number, agentId: string, timestamp: string): void {
-    if (process.env.NODE_ENV !== 'test') {
-      throw new Error('setTimestamp can only be used in test environment');
-    }
-    this.checkAccess(agentId);
-
-    this.db
-      .update(messages)
-      .set({ timestamp })
       .where(and(eq(messages.id, messageId), eq(messages.agentId, agentId)))
       .run();
   }

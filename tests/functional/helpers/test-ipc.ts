@@ -4,7 +4,7 @@ import type { TestIPCHandlers } from '../../../src/types/test-ipc';
 
 /**
  * Type-safe wrapper for test IPC handler invocations
- * 
+ *
  * Usage:
  * ```typescript
  * const result = await testIPC(page, 'test:get-profile');
