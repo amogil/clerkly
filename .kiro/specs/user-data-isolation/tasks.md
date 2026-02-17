@@ -449,6 +449,129 @@
 
 ---
 
+## Фаза 10: Персистентность userId (2-3 дня)
+
+**Статус:** 🔄 В работе
+
+**Описание:** Добавление персистентного хранения userId в глобальное хранилище для восстановления сессии между перезапусками приложения.
+
+### 10.1. Расширить GlobalRepository
+- [ ] Добавить объект `currentUser` с методами:
+  - `getUserId(): string | null` - получить сохраненный userId
+  - `setUserId(userId: string): void` - сохранить userId
+  - `clearUserId(): void` - удалить userId
+- [ ] Использовать тот же паттерн, что и `windowState`:
+  - Ключ: `current_user_id`
+  - userId: `__system__`
+  - Хранится в таблице `user_data`
+- [ ] Написать модульные тесты для GlobalRepository.currentUser
+- _Requirements: user-data-isolation.1.6_
+
+### 10.2. Добавить getById в UsersRepository
+- [ ] Добавить метод `getById(userId: string): User | undefined`
+- [ ] Написать модульный тест
+- _Requirements: user-data-isolation.1.3_
+
+### 10.3. Обновить UserManager.getCurrentUserId()
+- [ ] Добавить поле `private userIdCache: string | null | undefined = undefined`
+- [ ] Реализовать ленивую загрузку:
+  ```typescript
+  getCurrentUserId(): string | null {
+    if (this.userIdCache === undefined) {
+      this.userIdCache = this.dbManager.global.currentUser.getUserId();
+    }
+    return this.userIdCache;
+  }
+  ```
+- [ ] Написать модульные тесты для кэширования
+- _Requirements: user-data-isolation.1.5_
+
+### 10.4. Обновить UserManager.setCurrentUser()
+- [ ] Добавить вызов `this.dbManager.global.currentUser.setUserId(user.user_id)`
+- [ ] Обновить кэш: `this.userIdCache = user.user_id`
+- [ ] Обновить модульные тесты
+- _Requirements: user-data-isolation.1.2, user-data-isolation.1.6_
+
+### 10.5. Обновить UserManager.clearSession()
+- [ ] Добавить вызов `this.dbManager.global.currentUser.clearUserId()`
+- [ ] Сбросить кэш: `this.userIdCache = null`
+- [ ] Обновить модульные тесты
+- _Requirements: user-data-isolation.1.4_
+
+### 10.6. Обновить UserManager.initialize()
+- [ ] Реализовать новый алгоритм:
+  ```typescript
+  async initialize(): Promise<void> {
+    const savedUserId = this.dbManager.global.currentUser.getUserId();
+    
+    if (!savedUserId) {
+      this.logger.info('No saved user_id, user not logged in');
+      return;
+    }
+    
+    this.userIdCache = savedUserId;
+    const user = this.dbManager.users.getById(savedUserId);
+    
+    if (!user) {
+      this.logger.warn(`User not found for saved user_id: ${savedUserId}`);
+      this.dbManager.global.currentUser.clearUserId();
+      this.userIdCache = null;
+      return;
+    }
+    
+    this.currentUser = user;
+    this.logger.info(`User restored: ${user.email}`);
+  }
+  ```
+- [ ] Обновить модульные тесты
+- _Requirements: user-data-isolation.1.3_
+
+### 10.7. Обновить OAuth flow и logout
+- [ ] Убедиться, что `fetchProfileSynchronously()` вызывает `setCurrentUser()`
+- [ ] Проверить порядок операций при авторизации:
+  1. Получить токены
+  2. Загрузить профиль
+  3. Создать/найти пользователя
+  4. Сохранить userId (`setCurrentUser()`)
+  5. Сохранить токены
+- [ ] Обновить `OAuthClientManager.signOut()`:
+  - Обернуть отзыв токенов в try-catch
+  - Логировать ошибки, но НЕ прерывать процесс выхода
+  - Всегда продолжать с удалением локальных токенов и очисткой сессии
+- [ ] Обновить модульные тесты для signOut:
+  - Тест: успешный отзыв токенов
+  - Тест: ошибка отзыва токенов (сеть недоступна) - выход все равно завершается
+- _Requirements: user-data-isolation.1.2, user-data-isolation.1.4_
+
+### 10.8. Написать функциональные тесты
+- [ ] Тест: `should persist userId between app restarts`
+  - Авторизоваться
+  - Закрыть приложение
+  - Открыть приложение
+  - Проверить, что пользователь восстановлен
+- [ ] Тест: `should clear userId on logout`
+  - Авторизоваться
+  - Выйти
+  - Проверить, что userId удален из БД
+- [ ] Тест: `should show Login if userId not found in users table`
+  - Сохранить несуществующий userId
+  - Запустить приложение
+  - Проверить, что показан Login
+- _Requirements: user-data-isolation.1.3, user-data-isolation.1.4_
+
+### 10.9. Обновить спецификации
+- [x] Обновить `.kiro/specs/user-data-isolation/requirements.md` - добавить критерии 1.6
+- [x] Обновить `.kiro/specs/user-data-isolation/design.md` - добавить GlobalRepository.currentUser
+- [x] Обновить `.kiro/specs/user-data-isolation/tasks.md` - добавить Фазу 10
+- _Requirements: документация_
+
+### 10.10. Запустить валидацию Фазы 10
+- [ ] Выполнить `npm run validate`
+- [ ] Убедиться, что все тесты проходят
+- [ ] Проверить покрытие кода
+
+---
+
 ## Риски
 
 1. **Миграция данных** - существующие данные могут быть потеряны при некорректной миграции

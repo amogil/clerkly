@@ -13,6 +13,77 @@
 
 ---
 
+## Сценарии Использования
+
+### Сценарий 1: Первый запуск приложения (нет userId)
+
+**Начальное состояние:**
+- БД пустая или нет сохраненного `userId`
+- Нет токенов
+
+**Поток:**
+1. `UserManager.initialize()` → читает БД → `userId = null`
+2. Показываем экран **Login**
+3. Пользователь нажимает "Sign in with Google"
+4. OAuth flow → получаем токены от Google
+5. Загружаем профиль (используя полученный access token)
+6. Создаем/находим пользователя → получаем `userId`
+7. Сохраняем `userId` в БД (`setCurrentUser()` → `dbManager.global.currentUser.setUserId()`)
+8. Сохраняем токены (теперь есть `userId`)
+9. Показываем экран **Agents**
+
+**Результат:**
+- Пользователь авторизован
+- `userId` сохранен в глобальном хранилище
+- Токены сохранены в БД с привязкой к `userId`
+
+### Сценарий 2: Повторный запуск приложения (есть userId)
+
+**Начальное состояние:**
+- В БД есть пользователь с `user_id = "abc123"`
+- Сохранен `userId = "abc123"` в глобальном хранилище
+- Есть токены в БД (привязаны к `userId = "abc123"`)
+
+**Поток:**
+1. `UserManager.initialize()` → читает БД → `userId = "abc123"`
+2. Кэшируем: `userIdCache = "abc123"`
+3. Загружаем `user = dbManager.users.getById("abc123")`
+4. Если `user` найден → устанавливаем `currentUser = user`, показываем **Agents**
+5. Если `user` НЕ найден → очищаем `userId`, показываем **Login**
+
+**Результат:**
+- Сессия восстановлена без повторной авторизации
+- Пользователь видит свои данные (агенты, сообщения)
+
+### Сценарий 3: Выход из аккаунта (Sign Out)
+
+**Начальное состояние:**
+- Пользователь авторизован
+- `userId = "abc123"` в БД и кэше
+- Токены в БД
+
+**Поток:**
+1. Пользователь нажимает "Sign Out"
+2. `OAuthClientManager.signOut()` вызывается
+3. Попытка отозвать токены в Google:
+   - Если успешно → логируем успех
+   - Если ошибка (нет сети, Google недоступен) → логируем ошибку, НО продолжаем
+4. Удаляем токены из БД: `tokenStorage.deleteTokens()`
+5. Очищаем сессию: `userManager.clearSession()`
+   - Удаляем `userId` из БД: `dbManager.global.currentUser.clearUserId()`
+   - Сбрасываем кэш: `userIdCache = null`
+   - Очищаем память: `currentUser = null`
+6. Показываем экран **Login**
+
+**Результат:**
+- Пользователь вышел из системы
+- Локальные токены удалены
+- Данные пользователя (агенты, сообщения, настройки) остаются в БД для восстановления при следующем входе
+
+**Важно:** Ошибка отзыва токенов в Google НЕ прерывает процесс выхода. Пользователь всегда может выйти из приложения, даже если Google недоступен.
+
+---
+
 ## Алгоритмы
 
 ### Алгоритм генерации user_id
@@ -415,17 +486,15 @@ class UserSettingsManager {
 }
 ```
 
-### UserProfileManager (Extended)
+### UserManager (Extended)
 
-**Файл:** `src/main/auth/UserProfileManager.ts`
+**Файл:** `src/main/auth/UserManager.ts`
 
 ```typescript
-class UserProfileManager {
-  // Requirements: user-data-isolation.1.3
-  private currentUserId: string | null = null;
-  
-  // Flag to prevent profile loading after logout
-  private isLoggedOut: boolean = false;
+class UserManager {
+  // Requirements: user-data-isolation.1.5 - Cache user_id with lazy loading from DB
+  private userIdCache: string | null | undefined = undefined; // undefined = not loaded yet
+  private currentUser: User | null = null;
 
   /**
    * Generate random 10-character alphanumeric user_id
@@ -451,86 +520,92 @@ class UserProfileManager {
    * 
    * Algorithm:
    * 1. Search for user by email in users table
-   * 2. If found: update name if changed, return existing user_id
-   * 3. If not found: generate random user_id, create record, return new user_id
+   * 2. If found: update name if changed, return existing user
+   * 3. If not found: generate random user_id, create record, return new user
    */
-  findOrCreateUser(email: string, name: string | null): User {
-    // Try to find existing user
-    const existingUser = this.db.prepare(
-      'SELECT user_id, name, email FROM users WHERE email = ?'
-    ).get(email) as User | undefined;
-
-    if (existingUser) {
-      // Update name if changed
-      if (name !== null && existingUser.name !== name) {
-        this.db.prepare('UPDATE users SET name = ? WHERE user_id = ?')
-          .run(name, existingUser.user_id);
-        this.logger.info(`Updated name for user ${existingUser.user_id}`);
-        return { ...existingUser, name };
-      }
-      this.logger.info(`Found existing user ${existingUser.user_id}`);
-      return existingUser;
-    }
-
-    // Create new user with random user_id
-    const userId = this.generateUserId();
-    this.db.prepare(
-      'INSERT INTO users (user_id, name, email) VALUES (?, ?, ?)'
-    ).run(userId, name, email);
-
-    this.logger.info(`Created new user ${userId} for ${email}`);
-    return { user_id: userId, name, email };
+  findOrCreateUser(googleProfile: GoogleUserInfoResponse): User {
+    // ... implementation ...
   }
 
   /**
-   * Get current user ID
+   * Get current user ID with caching
    * Requirements: user-data-isolation.1.5
    * 
-   * Returns the cached user_id of the currently logged in user.
-   * Used by UserSettingsManager to filter data by user_id.
+   * Returns the user_id of the currently logged in user.
+   * First call loads from DB, subsequent calls return cached value.
+   * Used by DatabaseManager to filter data by user_id.
    */
   getCurrentUserId(): string | null {
-    return this.currentUserId;
+    if (this.userIdCache === undefined) {
+      // First call - load from DB
+      this.userIdCache = this.dbManager.global.currentUser.getUserId();
+    }
+    return this.userIdCache;
   }
 
   /**
-   * Fetch profile from Google API and set user_id
-   * Requirements: user-data-isolation.1.2, error-notifications.1.4
+   * Set current user and persist userId
+   * Requirements: user-data-isolation.1.2, user-data-isolation.1.6
    */
-  async fetchProfile(): Promise<UserProfile | null> {
+  setCurrentUser(user: User): void {
+    // Save userId to global storage
+    this.dbManager.global.currentUser.setUserId(user.user_id);
+    // Update cache
+    this.userIdCache = user.user_id;
+    this.currentUser = user;
+    this.logger.info(`Current user set to ${user.user_id}`);
+  }
+
+  /**
+   * Fetch profile from Google API during authorization
+   * Requirements: user-data-isolation.1.2
+   */
+  async fetchProfileSynchronously(): Promise<
+    { success: true; user: User } | { success: false; error: string }
+  > {
     try {
       // ... fetch profile from Google API ...
-      const profile = await response.json();
+      const googleProfile = await response.json();
       
-      // Find or create user and cache user_id
-      const user = this.findOrCreateUser(profile.email, profile.name);
-      this.currentUserId = user.user_id;
-      this.isLoggedOut = false;
+      // Find or create user
+      const user = this.findOrCreateUser(googleProfile);
+      // setCurrentUser saves userId to DB and updates cache
+      this.setCurrentUser(user);
       
-      this.logger.info(`User ID set: ${user.user_id}`);
-      await this.saveProfile(profile);
-      return profile;
+      return { success: true, user };
     } catch (error) {
-      ErrorHandler.handleBackgroundError(error, 'Profile Loading');
-      return null;
+      await this.tokenStorage.deleteTokens();
+      return { success: false, error: 'profile_fetch_failed' };
     }
   }
 
   /**
-   * Initialize profile on app startup
-   * Requirements: user-data-isolation.1.3, error-notifications.1.4
+   * Initialize on app startup - restore session from DB
+   * Requirements: user-data-isolation.1.3
    */
   async initialize(): Promise<void> {
-    try {
-      const profile = await this.loadProfile();
-      if (profile && !this.isLoggedOut) {
-        const user = this.findOrCreateUser(profile.email, profile.name);
-        this.currentUserId = user.user_id;
-        this.logger.info(`Initialized with user ID: ${user.user_id}`);
-      }
-    } catch (error) {
-      ErrorHandler.handleBackgroundError(error, 'Profile Initialization');
+    const savedUserId = this.dbManager.global.currentUser.getUserId();
+    
+    if (!savedUserId) {
+      this.logger.info('No saved user_id, user not logged in');
+      return;
     }
+    
+    // Cache the userId
+    this.userIdCache = savedUserId;
+    
+    // Load user from users table
+    const user = this.dbManager.users.getById(savedUserId);
+    
+    if (!user) {
+      this.logger.warn(`User not found for saved user_id: ${savedUserId}`);
+      this.dbManager.global.currentUser.clearUserId();
+      this.userIdCache = null;
+      return;
+    }
+    
+    this.currentUser = user;
+    this.logger.info(`User restored: ${user.email}`);
   }
 
   /**
@@ -538,9 +613,189 @@ class UserProfileManager {
    * Requirements: user-data-isolation.1.4
    */
   clearSession(): void {
-    this.currentUserId = null;
-    this.isLoggedOut = true;
-    this.logger.info('User ID cleared');
+    // Clear from DB
+    this.dbManager.global.currentUser.clearUserId();
+    // Clear cache
+    this.userIdCache = null;
+    this.currentUser = null;
+    this.logger.info('User session cleared');
+  }
+}
+```
+
+### GlobalRepository (Extended)
+
+**Файл:** `src/main/db/repositories/GlobalRepository.ts`
+
+Репозиторий для глобальных данных (без фильтрации по userId). Используется для хранения состояния окна и текущего userId.
+
+```typescript
+// Requirements: user-data-isolation.7.8, user-data-isolation.1.6
+import { eq, and } from 'drizzle-orm';
+import { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
+import * as schema from '../schema';
+import { userData } from '../schema';
+
+const SYSTEM_USER_ID = '__system__';
+
+export interface WindowState {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  isMaximized: boolean;
+}
+
+export class GlobalRepository {
+  constructor(private db: BetterSQLite3Database<typeof schema>) {}
+
+  /**
+   * Window state management
+   * Requirements: user-data-isolation.7.8
+   */
+  windowState = {
+    get: (): WindowState | undefined => {
+      const row = this.db
+        .select()
+        .from(userData)
+        .where(and(eq(userData.key, 'window_state'), eq(userData.userId, SYSTEM_USER_ID)))
+        .get();
+
+      if (row) {
+        return JSON.parse(row.value);
+      }
+      return undefined;
+    },
+
+    set: (state: WindowState): void => {
+      const now = Date.now();
+      const value = JSON.stringify(state);
+
+      this.db
+        .insert(userData)
+        .values({
+          key: 'window_state',
+          userId: SYSTEM_USER_ID,
+          value,
+          createdAt: now,
+          updatedAt: now,
+        })
+        .onConflictDoUpdate({
+          target: [userData.key, userData.userId],
+          set: { value, updatedAt: now },
+        })
+        .run();
+    },
+  };
+
+  /**
+   * Current user management
+   * Requirements: user-data-isolation.1.6
+   */
+  currentUser = {
+    /**
+     * Get saved userId from global storage
+     */
+    getUserId: (): string | null => {
+      const row = this.db
+        .select()
+        .from(userData)
+        .where(and(eq(userData.key, 'current_user_id'), eq(userData.userId, SYSTEM_USER_ID)))
+        .get();
+
+      return row ? row.value : null;
+    },
+
+    /**
+     * Save userId to global storage
+     */
+    setUserId: (userId: string): void => {
+      const now = Date.now();
+
+      this.db
+        .insert(userData)
+        .values({
+          key: 'current_user_id',
+          userId: SYSTEM_USER_ID,
+          value: userId,
+          createdAt: now,
+          updatedAt: now,
+        })
+        .onConflictDoUpdate({
+          target: [userData.key, userData.userId],
+          set: { value: userId, updatedAt: now },
+        })
+        .run();
+    },
+
+    /**
+     * Clear userId from global storage
+     */
+    clearUserId: (): void => {
+      this.db
+        .delete(userData)
+        .where(and(eq(userData.key, 'current_user_id'), eq(userData.userId, SYSTEM_USER_ID)))
+        .run();
+    },
+  };
+}
+```
+
+### UsersRepository (New)
+
+**Файл:** `src/main/db/repositories/UsersRepository.ts`
+
+Репозиторий для работы с таблицей users. Используется для поиска и создания пользователей.
+
+```typescript
+// Requirements: user-data-isolation.7.7
+import { eq } from 'drizzle-orm';
+import { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
+import * as schema from '../schema';
+import { users } from '../schema';
+
+export interface User {
+  user_id: string;
+  name: string | null;
+  email: string;
+  google_id: string | null;
+  locale: string | null;
+  last_synced: number | null;
+}
+
+export class UsersRepository {
+  constructor(private db: BetterSQLite3Database<typeof schema>) {}
+
+  /**
+   * Find user by email
+   * Requirements: user-data-isolation.7.7
+   */
+  findByEmail(email: string): User | undefined {
+    return this.db.select().from(users).where(eq(users.email, email)).get();
+  }
+
+  /**
+   * Get user by userId
+   * Requirements: user-data-isolation.1.3
+   */
+  getById(userId: string): User | undefined {
+    return this.db.select().from(users).where(eq(users.user_id, userId)).get();
+  }
+
+  /**
+   * Create new user
+   * Requirements: user-data-isolation.7.7
+   */
+  create(user: User): void {
+    this.db.insert(users).values(user).run();
+  }
+
+  /**
+   * Update user data
+   * Requirements: user-data-isolation.7.7
+   */
+  update(userId: string, data: Partial<Omit<User, 'user_id'>>): void {
+    this.db.update(users).set(data).where(eq(users.user_id, userId)).run();
   }
 }
 ```
@@ -824,6 +1079,238 @@ describe('UserProfileManager - User ID Management', () => {
      Assertions: returns correct user_id
      Requirements: user-data-isolation.1.5 */
   it('should return current user_id via getCurrentUserId');
+});
+
+describe('UserProfileManager - getCurrentUserId Caching', () => {
+  /* Preconditions: userIdCache = undefined, БД содержит userId = 'abc123'
+     Action: вызвать getCurrentUserId() первый раз
+     Assertions: читает из БД, возвращает 'abc123', кэш = 'abc123'
+     Requirements: user-data-isolation.1.5 */
+  it('should load userId from DB on first call');
+
+  /* Preconditions: userIdCache = 'abc123'
+     Action: вызвать getCurrentUserId() второй раз
+     Assertions: НЕ читает из БД, возвращает 'abc123' из кэша
+     Requirements: user-data-isolation.1.5 */
+  it('should return cached userId on subsequent calls');
+
+  /* Preconditions: userIdCache = undefined, БД НЕ содержит userId
+     Action: вызвать getCurrentUserId()
+     Assertions: возвращает null, кэш = null
+     Requirements: user-data-isolation.1.5 */
+  it('should return null when no userId in DB');
+
+  /* Preconditions: userIdCache = 'old123'
+     Action: вызвать setCurrentUser(user) с user_id = 'new456'
+     Assertions: кэш обновлен на 'new456', БД обновлена
+     Requirements: user-data-isolation.1.2, user-data-isolation.1.5 */
+  it('should update cache when setCurrentUser is called');
+
+  /* Preconditions: userIdCache = 'abc123'
+     Action: вызвать clearSession()
+     Assertions: кэш = null, userId удален из БД
+     Requirements: user-data-isolation.1.4, user-data-isolation.1.5 */
+  it('should clear cache when clearSession is called');
+});
+
+describe('UserProfileManager - setCurrentUser', () => {
+  /* Preconditions: user = { user_id: 'abc123', email: 'test@example.com', ... }
+     Action: вызвать setCurrentUser(user)
+     Assertions: dbManager.global.currentUser.setUserId('abc123') вызван
+     Requirements: user-data-isolation.1.2, user-data-isolation.1.6 */
+  it('should save userId to global storage');
+
+  /* Preconditions: user = { user_id: 'abc123', ... }
+     Action: вызвать setCurrentUser(user)
+     Assertions: userIdCache = 'abc123', currentUser = user
+     Requirements: user-data-isolation.1.2, user-data-isolation.1.5 */
+  it('should update cache and currentUser');
+
+  /* Preconditions: user = { user_id: 'abc123', ... }
+     Action: вызвать setCurrentUser(user)
+     Assertions: логируется "Current user set to abc123"
+     Requirements: user-data-isolation.1.2 */
+  it('should log user_id when set');
+});
+
+describe('UserProfileManager - clearSession', () => {
+  /* Preconditions: userIdCache = 'abc123', currentUser = { ... }
+     Action: вызвать clearSession()
+     Assertions: dbManager.global.currentUser.clearUserId() вызван
+     Requirements: user-data-isolation.1.4, user-data-isolation.1.6 */
+  it('should clear userId from global storage');
+
+  /* Preconditions: userIdCache = 'abc123', currentUser = { ... }
+     Action: вызвать clearSession()
+     Assertions: userIdCache = null, currentUser = null
+     Requirements: user-data-isolation.1.4, user-data-isolation.1.5 */
+  it('should clear cache and currentUser');
+
+  /* Preconditions: userIdCache = 'abc123'
+     Action: вызвать clearSession()
+     Assertions: логируется "User session cleared"
+     Requirements: user-data-isolation.1.4 */
+  it('should log session cleared');
+});
+
+describe('UserProfileManager - initialize', () => {
+  /* Preconditions: БД содержит userId = 'abc123', users содержит user с user_id = 'abc123'
+     Action: вызвать initialize()
+     Assertions: userIdCache = 'abc123', currentUser установлен, логируется "User restored: email"
+     Requirements: user-data-isolation.1.3 */
+  it('should restore user from DB on startup');
+
+  /* Preconditions: БД НЕ содержит userId
+     Action: вызвать initialize()
+     Assertions: userIdCache остается undefined, логируется "No saved user_id"
+     Requirements: user-data-isolation.1.3 */
+  it('should do nothing when no saved userId');
+
+  /* Preconditions: БД содержит userId = 'abc123', users НЕ содержит user с user_id = 'abc123'
+     Action: вызвать initialize()
+     Assertions: userId очищен из БД, userIdCache = null, логируется warning
+     Requirements: user-data-isolation.1.3 */
+  it('should clear userId when user not found in users table');
+
+  /* Preconditions: БД содержит userId = 'abc123', dbManager.users.getById() бросает ошибку
+     Action: вызвать initialize()
+     Assertions: ошибка НЕ прерывает инициализацию, логируется ошибка
+     Requirements: user-data-isolation.1.3 */
+  it('should handle errors gracefully during initialization');
+});
+
+describe('UserProfileManager - fetchProfileSynchronously', () => {
+  /* Preconditions: OAuth flow завершен, получен профиль от Google
+     Action: вызвать fetchProfileSynchronously()
+     Assertions: setCurrentUser() вызван с созданным/найденным пользователем
+     Requirements: user-data-isolation.1.2 */
+  it('should call setCurrentUser after creating/finding user');
+
+  /* Preconditions: OAuth flow завершен, профиль получен
+     Action: вызвать fetchProfileSynchronously()
+     Assertions: userId сохранен в БД через setCurrentUser()
+     Requirements: user-data-isolation.1.2, user-data-isolation.1.6 */
+  it('should persist userId during OAuth flow');
+
+  /* Preconditions: Google API возвращает ошибку
+     Action: вызвать fetchProfileSynchronously()
+     Assertions: токены удалены, userId НЕ сохранен, возвращается { success: false }
+     Requirements: user-data-isolation.1.2 */
+  it('should not persist userId when profile fetch fails');
+});
+```
+
+#### GlobalRepository
+
+**Файл:** `tests/unit/db/repositories/GlobalRepository.test.ts`
+
+```typescript
+describe('GlobalRepository - currentUser', () => {
+  /* Preconditions: БД пустая
+     Action: вызвать currentUser.getUserId()
+     Assertions: возвращает null
+     Requirements: user-data-isolation.1.6 */
+  it('should return null when no userId saved');
+
+  /* Preconditions: БД содержит userId = 'abc123'
+     Action: вызвать currentUser.getUserId()
+     Assertions: возвращает 'abc123'
+     Requirements: user-data-isolation.1.6 */
+  it('should return saved userId');
+
+  /* Preconditions: БД пустая
+     Action: вызвать currentUser.setUserId('abc123')
+     Assertions: userId сохранен с ключом 'current_user_id' и userId = '__system__'
+     Requirements: user-data-isolation.1.6 */
+  it('should save userId to global storage');
+
+  /* Preconditions: БД содержит userId = 'old123'
+     Action: вызвать currentUser.setUserId('new456')
+     Assertions: userId обновлен на 'new456'
+     Requirements: user-data-isolation.1.6 */
+  it('should update existing userId');
+
+  /* Preconditions: БД содержит userId = 'abc123'
+     Action: вызвать currentUser.clearUserId()
+     Assertions: запись удалена из БД
+     Requirements: user-data-isolation.1.6 */
+  it('should delete userId from global storage');
+
+  /* Preconditions: БД НЕ содержит userId
+     Action: вызвать currentUser.clearUserId()
+     Assertions: операция завершается без ошибок
+     Requirements: user-data-isolation.1.6 */
+  it('should handle clearUserId when no userId exists');
+
+  /* Preconditions: БД содержит userId = 'abc123'
+     Action: вызвать currentUser.getUserId() дважды
+     Assertions: оба вызова возвращают 'abc123' (проверка идемпотентности)
+     Requirements: user-data-isolation.1.6 */
+  it('should be idempotent for getUserId');
+});
+```
+
+#### UsersRepository
+
+**Файл:** `tests/unit/db/repositories/UsersRepository.test.ts`
+
+```typescript
+describe('UsersRepository - getById', () => {
+  /* Preconditions: users содержит user с user_id = 'abc123'
+     Action: вызвать getById('abc123')
+     Assertions: возвращает user объект
+     Requirements: user-data-isolation.1.3 */
+  it('should return user by userId');
+
+  /* Preconditions: users НЕ содержит user с user_id = 'xyz789'
+     Action: вызвать getById('xyz789')
+     Assertions: возвращает undefined
+     Requirements: user-data-isolation.1.3 */
+  it('should return undefined when user not found');
+
+  /* Preconditions: users содержит несколько пользователей
+     Action: вызвать getById() с разными userId
+     Assertions: каждый вызов возвращает правильного пользователя
+     Requirements: user-data-isolation.1.3 */
+  it('should return correct user for each userId');
+});
+```
+
+#### OAuthClientManager
+
+**Файл:** `tests/unit/auth/OAuthClientManager.test.ts`
+
+```typescript
+describe('OAuthClientManager - signOut with revoke errors', () => {
+  /* Preconditions: пользователь авторизован, Google API доступен
+     Action: вызвать signOut()
+     Assertions: токены отозваны в Google, локальные токены удалены, userId очищен
+     Requirements: user-data-isolation.1.4 */
+  it('should revoke tokens and clear session on successful signOut');
+
+  /* Preconditions: пользователь авторизован, Google API недоступен (сеть)
+     Action: вызвать signOut()
+     Assertions: ошибка залогирована, локальные токены удалены, userId очищен, процесс НЕ прерван
+     Requirements: user-data-isolation.1.4 */
+  it('should continue signOut when revoke fails due to network error');
+
+  /* Preconditions: пользователь авторизован, Google возвращает 500
+     Action: вызвать signOut()
+     Assertions: ошибка залогирована, локальные токены удалены, userId очищен, процесс НЕ прерван
+     Requirements: user-data-isolation.1.4 */
+  it('should continue signOut when revoke fails due to server error');
+
+  /* Preconditions: пользователь авторизован, Google возвращает 401
+     Action: вызвать signOut()
+     Assertions: ошибка залогирована, локальные токены удалены, userId очищен, процесс НЕ прерван
+     Requirements: user-data-isolation.1.4 */
+  it('should continue signOut when revoke fails due to invalid token');
+
+  /* Preconditions: пользователь авторизован, revoke бросает исключение
+     Action: вызвать signOut()
+     Assertions: исключение поймано, залогировано, локальные токены удалены, userId очищен
+     Requirements: user-data-isolation.1.4 */
+  it('should handle exceptions during revoke gracefully');
 });
 ```
 
