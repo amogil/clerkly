@@ -96,35 +96,27 @@ test('should auto-focus input when switching agents', async () => {
   // Wait for agents page to load
   await expect(window.locator('[data-testid="agents"]')).toBeVisible({ timeout: 5000 });
 
-  // Wait for first agent to be auto-created
-  await window.waitForTimeout(1000);
-
   // Create second agent
-  const newAgentButton = window.locator('button:has-text("+")').first();
-  await expect(newAgentButton).toBeVisible({ timeout: 3000 });
+  const newAgentButton = window.locator('div[title="New chat"]');
+  await expect(newAgentButton).toBeVisible({ timeout: 5000 });
   await newAgentButton.click();
-  await window.waitForTimeout(500);
 
-  // Get agent icons
+  // Wait for second agent icon to appear
   const agentIcons = window.locator('[data-testid^="agent-icon-"]');
-  await expect(agentIcons).toHaveCount(2, { timeout: 3000 });
+  await expect(agentIcons.nth(1)).toBeVisible({ timeout: 5000 });
 
-  // Click on first agent
-  await agentIcons.first().click();
-  await window.waitForTimeout(200);
-
-  // Check that textarea is focused
-  const textarea = window.locator('textarea[placeholder*="Ask"]');
-  let isFocused = await textarea.evaluate((el) => el === document.activeElement);
-  expect(isFocused).toBe(true);
-
-  // Click on second agent
+  // Click on second agent (switch from first to second)
   await agentIcons.nth(1).click();
-  await window.waitForTimeout(200);
 
-  // Check that textarea is still focused
-  isFocused = await textarea.evaluate((el) => el === document.activeElement);
-  expect(isFocused).toBe(true);
+  // Wait for textarea to receive focus (useEffect has 100ms delay)
+  const textarea = window.locator('textarea[placeholder*="Ask"]');
+  await expect(textarea).toBeFocused({ timeout: 5000 });
+
+  // Click on first agent (switch from second to first)
+  await agentIcons.first().click();
+
+  // Wait for textarea to receive focus again
+  await expect(textarea).toBeFocused({ timeout: 5000 });
 });
 
 /* Preconditions: Application with agent, AllAgents page open
