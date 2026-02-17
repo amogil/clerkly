@@ -6,6 +6,7 @@ import {
   completeOAuthFlow,
 } from './helpers/electron';
 import { MockOAuthServer } from './helpers/mock-oauth-server';
+import { testIPC } from './helpers/test-ipc';
 
 /**
  * Functional tests for Account Profile component
@@ -1158,9 +1159,7 @@ test.describe('Account Profile', () => {
     // Verify profile data is saved to database
     // Property 13 - Successful fetch should save profile to database
     console.log('[TEST] Verifying profile saved to database...');
-    const profileCheck = await context.window.evaluate(async () => {
-      return await (window as any).electron.ipcRenderer.invoke('test:get-profile');
-    });
+    const profileCheck = await testIPC(context.window, 'test:get-profile');
 
     console.log('[TEST] Profile in database:', profileCheck.profile ? 'YES' : 'NO');
     expect(profileCheck.profile).not.toBeNull();
@@ -1170,14 +1169,14 @@ test.describe('Account Profile', () => {
 
       // Verify database contains correct profile data
       // Property 13 - Profile data in database should match API response
-      // Note: DB schema uses google_id (not id), and doesn't store given_name/family_name
-      expect(profileCheck.profile.google_id).toBe('123123123');
+      // Note: DB schema uses googleId (camelCase from Drizzle ORM)
+      expect(profileCheck.profile.googleId).toBe('123123123');
       expect(profileCheck.profile.email).toBe('fetch.success@example.com');
       expect(profileCheck.profile.name).toBe('Fetch Success User');
 
       console.log('✓ Profile data correctly saved to database');
       console.log(
-        `✓ Database contains: google_id="${profileCheck.profile.google_id}", email="${profileCheck.profile.email}", name="${profileCheck.profile.name}"`
+        `✓ Database contains: googleId="${profileCheck.profile.googleId}", email="${profileCheck.profile.email}", name="${profileCheck.profile.name}"`
       );
     }
 
@@ -1458,9 +1457,7 @@ test.describe('Account Profile', () => {
 
     // Verify profile is saved to database
     // Requirements: google-oauth-auth.3.8, account-profile.1.3 - Profile should be saved
-    const profileCheck = await context.window.evaluate(async () => {
-      return await (window as any).electron.ipcRenderer.invoke('test:get-profile');
-    });
+    const profileCheck = await testIPC(context.window, 'test:get-profile');
 
     console.log('[TEST] Profile in database:', profileCheck.profile ? 'YES' : 'NO');
     expect(profileCheck.profile).not.toBeNull();
@@ -1468,13 +1465,13 @@ test.describe('Account Profile', () => {
     if (profileCheck.profile) {
       // Verify profile data
       // Requirements: google-oauth-auth.3.8, account-profile.1.3
-      expect(profileCheck.profile.google_id).toBe('111222333');
+      expect(profileCheck.profile.googleId).toBe('111222333');
       expect(profileCheck.profile.email).toBe('sync.success@example.com');
       expect(profileCheck.profile.name).toBe('Sync Success User');
 
       console.log('✓ Profile saved to database with correct data');
       console.log(
-        `✓ Profile: google_id="${profileCheck.profile.google_id}", email="${profileCheck.profile.email}", name="${profileCheck.profile.name}"`
+        `✓ Profile: googleId="${profileCheck.profile.googleId}", email="${profileCheck.profile.email}", name="${profileCheck.profile.name}"`
       );
     }
 
@@ -1863,9 +1860,7 @@ test.describe('Account Profile', () => {
 
     // Verify data is NOT cleared from database
     // Requirements: account-profile.1.1, Property 14 - Database should still contain cached profile
-    const finalCheck = await context.window.evaluate(async () => {
-      return await (window as any).electron.ipcRenderer.invoke('test:get-profile');
-    });
+    const finalCheck = await testIPC(context.window, 'test:get-profile');
 
     console.log('[TEST] Profile in database after error:', finalCheck.profile ? 'YES' : 'NO');
     expect(finalCheck.profile).not.toBeNull();
@@ -1874,13 +1869,13 @@ test.describe('Account Profile', () => {
       console.log('[TEST] Database profile data:', finalCheck.profile);
 
       // Verify database still contains the cached profile (not cleared)
-      expect(finalCheck.profile.google_id).toBe('888999000');
+      expect(finalCheck.profile.googleId).toBe('888999000');
       expect(finalCheck.profile.email).toBe('cached.error@example.com');
       expect(finalCheck.profile.name).toBe('Cached Error User');
 
       console.log('✓ Profile data NOT cleared from database');
       console.log(
-        `✓ Database still contains: google_id="${finalCheck.profile.google_id}", email="${finalCheck.profile.email}", name="${finalCheck.profile.name}"`
+        `✓ Database still contains: googleId="${finalCheck.profile.googleId}", email="${finalCheck.profile.email}", name="${finalCheck.profile.name}"`
       );
     }
 
