@@ -103,16 +103,15 @@ test.describe('Message Text Wrapping', () => {
   test('should preserve line breaks in user messages', async () => {
     // Send message with line breaks
     const messageWithBreaks = 'Line 1\nLine 2\nLine 3';
-    const textarea = page.locator('textarea[placeholder*="Ask, reply"]');
+    const textarea = page.locator('textarea[placeholder*="Ask"]');
     await textarea.fill(messageWithBreaks);
     await textarea.press('Enter');
 
     // Wait for message to appear
-    await page.waitForTimeout(500);
+    await expect(page.locator('.rounded-2xl.bg-secondary\\/70').last()).toBeVisible({ timeout: 5000 });
 
     // Find the user message
     const userMessage = page.locator('.rounded-2xl.bg-secondary\\/70').last();
-    await expect(userMessage).toBeVisible();
 
     // Check that message has whitespace-pre-wrap class
     const messageText = userMessage.locator('p');
