@@ -206,6 +206,26 @@ describe('Profile Integration', () => {
       setUserManager: jest.fn(),
       getCurrentUserId: jest.fn().mockReturnValue(null),
       close: jest.fn(),
+      users: {
+        findOrCreate: jest.fn().mockImplementation((email: string, name: string | null) => ({
+          userId: 'test-user-id-123',
+          email,
+          name,
+          googleId: mockGoogleProfile.id,
+          locale: mockGoogleProfile.locale,
+          lastSynced: Date.now(),
+        })),
+        findById: jest.fn(),
+        findByEmail: jest.fn(),
+        update: jest.fn(),
+      },
+      global: {
+        currentUser: {
+          getUserId: jest.fn().mockReturnValue(null),
+          setUserId: jest.fn(),
+          clearUserId: jest.fn(),
+        },
+      },
     } as any;
 
     mockTokenStorage = {
@@ -269,7 +289,7 @@ describe('Profile Integration', () => {
     expect(user).not.toBeNull();
     expect(user?.email).toBe(mockGoogleProfile.email);
     expect(user?.name).toBe(mockGoogleProfile.name);
-    expect(user?.google_id).toBe(mockGoogleProfile.id);
+    expect(user?.googleId).toBe(mockGoogleProfile.id);
     expect(user?.locale).toBe(mockGoogleProfile.locale);
 
     // Verify Google UserInfo API was called with correct URL and headers

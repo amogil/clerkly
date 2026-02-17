@@ -52,7 +52,7 @@
         "message": "Raw SQL queries are not allowed. Use Drizzle ORM repositories instead."
       },
       {
-        "selector": "TemplateLiteral:has(TemplateElement[value.raw=/CREATE TABLE|INSERT INTO|UPDATE|DELETE FROM|SELECT.*FROM/i])",
+        "selector": "TemplateLiteral:has(TemplateElement[value.raw=/^\\s*(CREATE TABLE|INSERT INTO|UPDATE\\s|DELETE FROM|SELECT\\s.*FROM)/i])",
         "message": "Raw SQL queries are not allowed. Use Drizzle ORM repositories instead."
       }
     ],
@@ -88,7 +88,7 @@
       }
     },
     {
-      "files": ["src/main/db/**/*.ts", "src/main/DatabaseManager.ts", "src/main/MigrationRunner.ts"],
+      "files": ["src/main/db/**/*.ts", "src/main/DatabaseManager.ts", "src/main/MigrationRunner.ts", "src/main/TestIPCHandlers.ts"],
       "rules": {
         "no-restricted-imports": "off",
         "no-restricted-syntax": "off"

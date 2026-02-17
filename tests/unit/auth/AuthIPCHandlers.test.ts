@@ -268,12 +268,12 @@ describe('AuthIPCHandlers', () => {
 
   describe('auth:get-user Handler', () => {
     const mockUser: User = {
-      user_id: 'abc123xyz0',
+      userId: 'abc123xyz0',
       email: 'test@example.com',
       name: 'Test User',
-      google_id: '123456789',
+      googleId: '123456789',
       locale: 'en',
-      last_synced: Date.now(),
+      lastSynced: Date.now(),
     };
 
     /* Preconditions: UserManager set, user exists
@@ -397,12 +397,12 @@ describe('AuthIPCHandlers', () => {
 
   describe('auth:refresh-user Handler', () => {
     const mockUser: User = {
-      user_id: 'abc123xyz0',
+      userId: 'abc123xyz0',
       email: 'test@example.com',
       name: 'Test User Updated',
-      google_id: '123456789',
+      googleId: '123456789',
       locale: 'en',
-      last_synced: Date.now(),
+      lastSynced: Date.now(),
     };
 
     beforeEach(() => {
@@ -505,12 +505,12 @@ describe('AuthIPCHandlers', () => {
 
   describe('Event Broadcasting', () => {
     const mockUser: User = {
-      user_id: 'abc123xyz0',
+      userId: 'abc123xyz0',
       email: 'test@example.com',
       name: 'Test User',
-      google_id: '123456789',
+      googleId: '123456789',
       locale: 'en',
-      last_synced: Date.now(),
+      lastSynced: Date.now(),
     };
 
     beforeEach(() => {
@@ -528,7 +528,7 @@ describe('AuthIPCHandlers', () => {
       const publishedEvent = mockPublish.mock.calls[0][0];
       expect(publishedEvent.type).toBe('auth.completed');
       expect(publishedEvent.userId).toBe('user-123');
-      expect(publishedEvent.profile.id).toBe(mockUser.user_id);
+      expect(publishedEvent.profile.id).toBe(mockUser.userId);
       expect(publishedEvent.profile.email).toBe(mockUser.email);
     });
 

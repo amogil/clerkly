@@ -127,13 +127,13 @@ describe('User Data Isolation - Property-Based Tests', () => {
 
           // First call - creates user
           const firstUser = profileManager.findOrCreateUser(googleProfile);
-          expect(firstUser.user_id).toMatch(/^[A-Za-z0-9]{10}$/);
+          expect(firstUser.userId).toMatch(/^[A-Za-z0-9]{10}$/);
           expect(firstUser.email).toBe(email);
 
           // Repeated calls - should return same user_id
           for (let i = 0; i < repeatCount; i++) {
             const user = profileManager.findOrCreateUser(googleProfile);
-            expect(user.user_id).toBe(firstUser.user_id);
+            expect(user.userId).toBe(firstUser.userId);
             expect(user.email).toBe(email);
           }
         }
@@ -179,13 +179,13 @@ describe('User Data Isolation - Property-Based Tests', () => {
             userRecords.push({ user, value: uniqueValue, email: userData.email });
 
             // Set current user and save data
-            (profileManager as any).currentUserId = user.user_id;
+            profileManager.setCurrentUser(user);
             dataManager.saveData(testKey, uniqueValue);
           });
 
           // Verify each user can only see their own data
           userRecords.forEach(({ user, value }) => {
-            (profileManager as any).currentUserId = user.user_id;
+            profileManager.setCurrentUser(user);
             const result = dataManager.loadData(testKey);
 
             expect(result.success).toBe(true);
@@ -195,9 +195,9 @@ describe('User Data Isolation - Property-Based Tests', () => {
           // Verify cross-user isolation - users with different user_ids should have different data
           for (let i = 0; i < userRecords.length; i++) {
             for (let j = 0; j < userRecords.length; j++) {
-              if (userRecords[i].user.user_id !== userRecords[j].user.user_id) {
+              if (userRecords[i].user.userId !== userRecords[j].user.userId) {
                 // Set as user i
-                (profileManager as any).currentUserId = userRecords[i].user.user_id;
+                profileManager.setCurrentUser(userRecords[i].user);
                 const result = dataManager.loadData(testKey);
 
                 // Should get user i's data, not user j's data
@@ -242,7 +242,7 @@ describe('User Data Isolation - Property-Based Tests', () => {
 
           // Login - create user and save data
           const user1 = profileManager.findOrCreateUser(googleProfile);
-          (profileManager as any).currentUserId = user1.user_id;
+          profileManager.setCurrentUser(user1);
 
           const saveResult = dataManager.saveData(key, value);
           expect(saveResult.success).toBe(true);
@@ -258,10 +258,10 @@ describe('User Data Isolation - Property-Based Tests', () => {
 
           // Re-login with same email
           const user2 = profileManager.findOrCreateUser(googleProfile);
-          (profileManager as any).currentUserId = user2.user_id;
+          profileManager.setCurrentUser(user2);
 
           // Verify same user_id
-          expect(user2.user_id).toBe(user1.user_id);
+          expect(user2.userId).toBe(user1.userId);
 
           // Verify data restored
           const loadResult2 = dataManager.loadData(key);
@@ -305,14 +305,14 @@ describe('User Data Isolation - Property-Based Tests', () => {
           // Update with new name
           const newProfile = { ...oldProfile, name: newName };
           const user2 = profileManager.findOrCreateUser(newProfile);
-          expect(user2.user_id).toBe(user1.user_id);
+          expect(user2.userId).toBe(user1.userId);
           expect(user2.name).toBe(newName);
 
           // Verify in database
           const db = dbManager.getDatabase();
           const dbUser = db
             ?.prepare('SELECT name FROM users WHERE user_id = ?')
-            .get(user1.user_id) as { name: string };
+            .get(user1.userId) as { name: string };
           expect(dbUser.name).toBe(newName);
         }
       ),
