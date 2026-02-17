@@ -17,6 +17,7 @@ import { useEventSubscription } from './events/useEventSubscription';
 import { RendererEventBus } from './events/RendererEventBus';
 import { EVENT_TYPES } from '../shared/events/constants';
 import { AuthStartedEvent } from '../shared/events/types';
+import { ipcWithRetry } from './utils/ipcWithRetry';
 import type {
   AuthCallbackReceivedPayload,
   AuthCompletedPayload,
@@ -161,7 +162,7 @@ function AppContent() {
   useEffect(() => {
     const checkAuthStatus = async () => {
       try {
-        const status = await window.api.auth.getStatus();
+        const status = await ipcWithRetry(() => window.api.auth.getStatus());
         setIsAuthorized(status.authorized);
         await navigationManager.initialize();
       } catch (error) {

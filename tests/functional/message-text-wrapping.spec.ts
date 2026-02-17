@@ -299,7 +299,7 @@ test.describe('Message Text Wrapping', () => {
     // Leading/trailing spaces should be trimmed, but internal preserved
     const messageWithSpaces = '   Line 1 with  spaces\nLine 2  has   spaces\n   Line 3   ';
     const expectedText = 'Line 1 with  spaces\nLine 2  has   spaces\n   Line 3';
-    
+
     const textarea = page.locator('textarea[placeholder*="Ask, reply"]');
     await textarea.fill(messageWithSpaces);
     await textarea.press('Enter');

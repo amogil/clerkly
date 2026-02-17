@@ -234,7 +234,15 @@ nfr.2.3. IPC запросы ДОЛЖНЫ иметь таймаут 10 секун
 
 nfr.2.4. При повреждении базы данных приложение ДОЛЖНО создать backup и новую базу
 
-**Тестируемость:** Да - через модульные тесты обработки ошибок в "DatabaseManager", "UserSettingsManager" и "IPC Handlers", функциональные тесты персистентности данных, тесты graceful shutdown в "Lifecycle Manager"
+nfr.2.5. IPC вызовы при старте приложения ДОЛЖНЫ автоматически повторяться при ошибке "No handler registered"
+
+nfr.2.6. Retry логика ДОЛЖНА использовать exponential backoff: 100ms, 200ms, 400ms, 800ms, 1000ms (максимум 5 попыток)
+
+nfr.2.7. Retry ДОЛЖЕН применяться ТОЛЬКО к ошибкам "No handler registered" (race condition при старте)
+
+nfr.2.8. Другие типы ошибок НЕ ДОЛЖНЫ повторяться автоматически
+
+**Тестируемость:** Да - через модульные тесты обработки ошибок в "DatabaseManager", "UserSettingsManager" и "IPC Handlers", функциональные тесты персистентности данных, тесты graceful shutdown в "Lifecycle Manager", модульные тесты retry логики (ipcWithRetry)
 
 ### Совместимость
 
