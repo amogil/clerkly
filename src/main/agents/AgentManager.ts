@@ -104,25 +104,27 @@ export class AgentManager {
       EVENT_TYPES.MESSAGE_CREATED,
       (payload: MessageCreatedPayload) => {
         if (payload.message) {
-          this.handleMessageCreated(payload.message.agentId);
+          this.handleMessageCreated(payload.message.agentId, payload.message.timestamp);
         }
       }
     );
   }
 
   /**
-   * Handle MESSAGE_CREATED event - update agent's updatedAt
+   * Handle MESSAGE_CREATED event - update agent's updatedAt to message timestamp
    * Requirements: agents.1.4, agents.12.2, error-notifications.1
    */
-  private handleMessageCreated(agentId: string): void {
+  private handleMessageCreated(agentId: string, messageTimestamp: number): void {
     try {
-      // Update agent's updatedAt in database
-      this.dbManager.agents.touch(agentId);
+      // Update agent's updatedAt to the message timestamp (not current time)
+      // This ensures agent's updatedAt reflects the time of the last message
+      const messageTimestampISO = new Date(messageTimestamp).toISOString();
+      this.dbManager.agents.setUpdatedAt(agentId, messageTimestampISO);
 
       // Get updated agent to publish event with new timestamp and status
       const updatedAgent = this.dbManager.agents.findById(agentId);
       if (updatedAgent) {
-        this.logger.info(`Agent updatedAt updated: ${agentId}`);
+        this.logger.info(`Agent updatedAt updated to message timestamp: ${agentId}`);
 
         // Publish AGENT_UPDATED event for UI with full agent model including status
         MainEventBus.getInstance().publish(new AgentUpdatedEvent(this.toEventAgent(updatedAgent)));

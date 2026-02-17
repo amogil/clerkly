@@ -62,6 +62,7 @@ describe('AgentManager', () => {
         update: jest.fn(),
         archive: jest.fn(),
         touch: jest.fn(),
+        setUpdatedAt: jest.fn(),
       },
       messages: {
         listByAgent: jest.fn(),
@@ -335,21 +336,28 @@ describe('AgentManager', () => {
   });
 
   describe('handleMessageCreated (MESSAGE_CREATED event handler)', () => {
-    /* Preconditions: AgentManager initialized, agent exists
-       Action: handleMessageCreated called with agentId
-       Assertions: Agent updatedAt updated, AGENT_UPDATED event published with snapshot
+    /* Preconditions: AgentManager initialized, agent exists, message created with timestamp
+       Action: handleMessageCreated called with agentId and message timestamp
+       Assertions: Agent updatedAt set to message timestamp (not current time), AGENT_UPDATED event published
        Requirements: agents.1.4, agents.12.2, realtime-events.9.7 */
-    it('should update agent updatedAt and publish AGENT_UPDATED event with snapshot', () => {
+    it('should update agent updatedAt to message timestamp and publish AGENT_UPDATED event', () => {
       // Clear publish calls from constructor
       mockEventBus.publish.mockClear();
 
       mockDbManager.messages.getLastByAgent = jest.fn().mockReturnValue(null);
 
-      // Call private method through type assertion
-      (agentManager as any).handleMessageCreated('abc123xyz0');
+      // Message timestamp (5 minutes ago)
+      const messageTimestamp = Date.now() - 5 * 60 * 1000;
 
-      // Verify agent.touch() was called
-      expect(mockDbManager.agents.touch).toHaveBeenCalledWith('abc123xyz0');
+      // Call private method with message timestamp
+      (agentManager as any).handleMessageCreated('abc123xyz0', messageTimestamp);
+
+      // Verify setUpdatedAt was called with message timestamp (not touch with current time)
+      expect(mockDbManager.agents.setUpdatedAt).toHaveBeenCalledWith(
+        'abc123xyz0',
+        new Date(messageTimestamp).toISOString()
+      );
+      expect(mockDbManager.agents.touch).not.toHaveBeenCalled();
 
       // Verify agent was fetched
       expect(mockDbManager.agents.findById).toHaveBeenCalledWith('abc123xyz0');
@@ -363,8 +371,8 @@ describe('AgentManager', () => {
       expect(typeof publishedEvent.timestamp).toBe('number');
     });
 
-    /* Preconditions: AgentManager initialized, touch() throws error
-       Action: handleMessageCreated called with agentId
+    /* Preconditions: AgentManager initialized, setUpdatedAt() throws error
+       Action: handleMessageCreated called with agentId and timestamp
        Assertions: handleBackgroundError called, error re-thrown
        Requirements: agents.1.4, error-notifications.1 */
     it('should call handleBackgroundError and re-throw error on failure', () => {
@@ -374,14 +382,16 @@ describe('AgentManager', () => {
         .spyOn(ErrorHandlerModule, 'handleBackgroundError')
         .mockImplementation(() => {});
 
-      // Mock touch() to throw error
+      // Mock setUpdatedAt() to throw error
       const testError = new Error('Database connection failed');
-      mockDbManager.agents.touch = jest.fn().mockImplementation(() => {
+      mockDbManager.agents.setUpdatedAt = jest.fn().mockImplementation(() => {
         throw testError;
       });
 
+      const messageTimestamp = Date.now();
+
       // Should throw error after calling handleBackgroundError
-      expect(() => (agentManager as any).handleMessageCreated('abc123xyz0')).toThrow(
+      expect(() => (agentManager as any).handleMessageCreated('abc123xyz0', messageTimestamp)).toThrow(
         'Database connection failed'
       );
 
@@ -391,8 +401,8 @@ describe('AgentManager', () => {
       handleBackgroundErrorSpy.mockRestore();
     });
 
-    /* Preconditions: AgentManager initialized, agent not found after touch
-       Action: handleMessageCreated called with agentId
+    /* Preconditions: AgentManager initialized, agent not found after setUpdatedAt
+       Action: handleMessageCreated called with agentId and timestamp
        Assertions: No AGENT_UPDATED event published
        Requirements: agents.1.4, agents.12.2 */
     it('should not publish AGENT_UPDATED if agent not found', () => {
@@ -402,11 +412,16 @@ describe('AgentManager', () => {
       // Mock findById to return undefined
       mockDbManager.agents.findById = jest.fn().mockReturnValue(undefined);
 
-      // Call private method
-      (agentManager as any).handleMessageCreated('abc123xyz0');
+      const messageTimestamp = Date.now();
 
-      // Verify touch was called
-      expect(mockDbManager.agents.touch).toHaveBeenCalledWith('abc123xyz0');
+      // Call private method
+      (agentManager as any).handleMessageCreated('abc123xyz0', messageTimestamp);
+
+      // Verify setUpdatedAt was called
+      expect(mockDbManager.agents.setUpdatedAt).toHaveBeenCalledWith(
+        'abc123xyz0',
+        new Date(messageTimestamp).toISOString()
+      );
 
       // Verify no event was published
       expect(mockEventBus.publish).not.toHaveBeenCalled();
