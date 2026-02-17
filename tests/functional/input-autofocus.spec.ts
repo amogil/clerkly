@@ -127,31 +127,42 @@ test('should auto-focus input when returning from AllAgents', async () => {
   // Wait for agents page to load
   await expect(window.locator('[data-testid="agents"]')).toBeVisible({ timeout: 5000 });
 
+  // Create additional agents to make +N button appear
+  const newChatButton = window.locator('div[title="New chat"]');
+  await expect(newChatButton).toBeVisible({ timeout: 5000 });
+  
+  for (let i = 0; i < 5; i++) {
+    await newChatButton.click();
+    const agentIcons = window.locator('[data-testid^="agent-icon-"]');
+    await expect(agentIcons.nth(i + 1)).toBeVisible({ timeout: 5000 });
+  }
+
   // Send a message to create history (so agent appears in AllAgents)
   const textarea = window.locator('textarea[placeholder*="Ask"]');
   await textarea.fill('Test message');
   await textarea.press('Enter');
-  await window.waitForTimeout(500);
 
-  // Open AllAgents page
-  const allAgentsButton = window.locator('button:has-text("All Agents")');
+  // Wait for message to appear in UI
+  await expect(window.locator('text=Test message')).toBeVisible({ timeout: 5000 });
+
+  // Open AllAgents page via +N button
+  const allAgentsButton = window.locator('div.rounded-full.bg-muted:has-text("+")');
+  await expect(allAgentsButton).toBeVisible({ timeout: 5000 });
   await allAgentsButton.click();
-  await window.waitForTimeout(300);
 
   // Verify AllAgents page is shown
-  await expect(window.locator('text=All Agents')).toBeVisible();
+  await expect(window.locator('text=All Agents')).toBeVisible({ timeout: 5000 });
 
   // Click on the agent in the list
   const agentCard = window.locator('[data-testid^="agent-card-"]').first();
+  await expect(agentCard).toBeVisible({ timeout: 5000 });
   await agentCard.click();
-  await window.waitForTimeout(300);
 
   // Verify we're back to chat view
   await expect(window.locator('text=All Agents')).not.toBeVisible();
 
   // Check that textarea is focused
-  const isFocused = await textarea.evaluate((el) => el === document.activeElement);
-  expect(isFocused).toBe(true);
+  await expect(textarea).toBeFocused({ timeout: 5000 });
 });
 
 /* Preconditions: Application loaded
