@@ -56,6 +56,13 @@ export class UsersRepository {
   ): void {
     this.db.update(users).set(data).where(eq(users.userId, userId)).run();
   }
+  /**
+   * Delete a user by ID
+   * Requirements: user-data-isolation.7.7
+   */
+  delete(userId: string): void {
+    this.db.delete(users).where(eq(users.userId, userId)).run();
+  }
 
   /**
    * Generate a 10-character alphanumeric ID

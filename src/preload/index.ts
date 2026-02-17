@@ -107,6 +107,7 @@ export interface API {
       errorMessage: string
     ) => Promise<{ success: boolean; error?: string }>;
     clearDataErrors: () => Promise<{ success: boolean; error?: string }>;
+    deleteCurrentUser: () => Promise<{ success: boolean; error?: string }>;
     createAgentWithOldMessage: (
       minutesAgo: number
     ) => Promise<{ success: boolean; agentId?: string; timestamp?: string; error?: string }>;
@@ -566,6 +567,15 @@ if (process.env.NODE_ENV === 'test') {
      */
     async clearDataErrors(): Promise<{ success: boolean; error?: string }> {
       return await ipcRenderer.invoke('test:clear-data-errors');
+    },
+
+    /**
+     * Delete current user from database (for testing corrupted state)
+     * Requirements: testing.3.1
+     * @returns {Promise<{success: boolean, error?: string}>}
+     */
+    async deleteCurrentUser(): Promise<{ success: boolean; error?: string }> {
+      return await ipcRenderer.invoke('test:delete-current-user');
     },
 
     /**

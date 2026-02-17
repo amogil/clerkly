@@ -41,6 +41,21 @@
     "no-console": "off",
     "react/react-in-jsx-scope": "off",
     "react/prop-types": "off",
+    "no-restricted-syntax": [
+      "error",
+      {
+        "selector": "CallExpression[callee.property.name='prepare']",
+        "message": "Raw SQL queries are not allowed. Use Drizzle ORM repositories instead."
+      },
+      {
+        "selector": "CallExpression[callee.property.name='exec']",
+        "message": "Raw SQL queries are not allowed. Use Drizzle ORM repositories instead."
+      },
+      {
+        "selector": "TemplateLiteral:has(TemplateElement[value.raw=/CREATE TABLE|INSERT INTO|UPDATE|DELETE FROM|SELECT.*FROM/i])",
+        "message": "Raw SQL queries are not allowed. Use Drizzle ORM repositories instead."
+      }
+    ],
     "no-restricted-imports": [
       "error",
       {
@@ -62,7 +77,8 @@
       "files": ["tests/**/*.ts", "tests/**/*.tsx"],
       "rules": {
         "@typescript-eslint/no-explicit-any": "off",
-        "no-restricted-imports": "off"
+        "no-restricted-imports": "off",
+        "no-restricted-syntax": "off"
       }
     },
     {
@@ -74,7 +90,8 @@
     {
       "files": ["src/main/db/**/*.ts", "src/main/DatabaseManager.ts", "src/main/MigrationRunner.ts"],
       "rules": {
-        "no-restricted-imports": "off"
+        "no-restricted-imports": "off",
+        "no-restricted-syntax": "off"
       }
     }
   ],

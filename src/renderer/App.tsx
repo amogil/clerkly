@@ -251,7 +251,7 @@ function AppContent() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background" data-testid="agents-screen">
       <TopNavigation currentScreen={currentScreen} onNavigate={navigateToScreen} />
       <div className="pt-16">{renderScreen()}</div>
     </div>

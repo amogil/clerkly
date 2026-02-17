@@ -241,6 +241,20 @@ if (process.env['NODE_ENV'] === 'test') {
     return { success: true };
   });
 
+  ipcMain.handle('test:delete-current-user', async () => {
+    if (!isTestEnvironment()) {
+      throw new Error('test:delete-current-user can only be used in test environment');
+    }
+    // Delete current user from users table (but keep userId in global storage)
+    // This simulates corrupted state for testing
+    const userId = userManager.getCurrentUserId();
+    if (userId) {
+      // Use UsersRepository to delete user
+      dbManager.users.delete(userId);
+    }
+    return { success: true };
+  });
+
   ipcMain.handle('test:trigger-auth-success', async () => {
     if (!isTestEnvironment()) {
       throw new Error('test:trigger-auth-success can only be used in test environment');

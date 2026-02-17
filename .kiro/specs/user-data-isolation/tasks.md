@@ -544,19 +544,21 @@
 - _Requirements: user-data-isolation.1.2, user-data-isolation.1.4_
 
 ### 10.8. Написать функциональные тесты
-- [ ] Тест: `should persist userId between app restarts`
+- [x] Тест: `should persist userId between app restarts`
   - Авторизоваться
   - Закрыть приложение
   - Открыть приложение
   - Проверить, что пользователь восстановлен
-- [ ] Тест: `should clear userId on logout`
+- [x] Тест: `should clear userId on logout`
   - Авторизоваться
   - Выйти
   - Проверить, что userId удален из БД
-- [ ] Тест: `should show Login if userId not found in users table`
+- [x] Тест: `should show Login if userId not found in users table`
   - Сохранить несуществующий userId
   - Запустить приложение
   - Проверить, что показан Login
+- [x] Добавить test IDs в App.tsx для тестов
+- [x] Исправить тесты для использования правильного UI flow (Settings → Sign out)
 - _Requirements: user-data-isolation.1.3, user-data-isolation.1.4_
 
 ### 10.9. Обновить спецификации
@@ -566,8 +568,12 @@
 - _Requirements: документация_
 
 ### 10.10. Запустить валидацию Фазы 10
-- [ ] Выполнить `npm run validate`
-- [ ] Убедиться, что все тесты проходят
+- [x] Выполнить `npm run build` - успешно
+- [x] Выполнить функциональные тесты - все 3 теста проходят
+- [ ] Исправить ESLint ошибки (12 ошибок raw SQL в существующем коде)
+  - Эти ошибки не связаны с userId persistence
+  - Требуется отдельная задача для миграции на ORM
+- [ ] Выполнить `npm run validate` - после исправления ESLint
 - [ ] Проверить покрытие кода
 
 ---
