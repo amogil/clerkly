@@ -79,7 +79,9 @@ test.describe('Message Text Wrapping', () => {
     await textarea.press('Enter');
 
     // Wait for message to appear
-    await expect(page.locator('.rounded-2xl.bg-secondary\\/70').last()).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('.rounded-2xl.bg-secondary\\/70').last()).toBeVisible({
+      timeout: 5000,
+    });
 
     // Find the user message
     const userMessage = page.locator('.rounded-2xl.bg-secondary\\/70').last();
@@ -108,7 +110,9 @@ test.describe('Message Text Wrapping', () => {
     await textarea.press('Enter');
 
     // Wait for message to appear
-    await expect(page.locator('.rounded-2xl.bg-secondary\\/70').last()).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('.rounded-2xl.bg-secondary\\/70').last()).toBeVisible({
+      timeout: 5000,
+    });
 
     // Find the user message
     const userMessage = page.locator('.rounded-2xl.bg-secondary\\/70').last();

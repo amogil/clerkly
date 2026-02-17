@@ -306,8 +306,8 @@ export class OAuthClientManager {
         // Publish auth.completed event with userId and profile
         if (profileResult.profile) {
           eventBus.publish(
-            new AuthCompletedEvent(profileResult.profile.user_id, {
-              id: profileResult.profile.user_id,
+            new AuthCompletedEvent(profileResult.profile.userId, {
+              id: profileResult.profile.userId,
               email: profileResult.profile.email,
               name: profileResult.profile.name || 'User', // Fallback to 'User' if name is null
               // picture field is not stored in User type, omit it
@@ -394,7 +394,7 @@ export class OAuthClientManager {
       const user = this.userManager.findOrCreateUser(profileData);
       this.userManager.setCurrentUser(user);
 
-      this.logger.info(`Profile fetched successfully for user ${user.user_id}`);
+      this.logger.info(`Profile fetched successfully for user ${user.userId}`);
       return { success: true, profile: user };
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';

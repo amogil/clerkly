@@ -467,9 +467,9 @@
 - [ ] Написать модульные тесты для GlobalRepository.currentUser
 - _Requirements: user-data-isolation.1.6_
 
-### 10.2. Добавить getById в UsersRepository
-- [ ] Добавить метод `getById(userId: string): User | undefined`
-- [ ] Написать модульный тест
+### 10.2. Использовать findById в UserManager.initialize()
+- [x] Использовать метод `findById(userId: string): User | undefined` из UsersRepository
+- [x] Написать модульный тест
 - _Requirements: user-data-isolation.1.3_
 
 ### 10.3. Обновить UserManager.getCurrentUserId()
@@ -510,7 +510,7 @@
     }
     
     this.userIdCache = savedUserId;
-    const user = this.dbManager.users.getById(savedUserId);
+    const user = this.dbManager.users.findById(savedUserId);
     
     if (!user) {
       this.logger.warn(`User not found for saved user_id: ${savedUserId}`);

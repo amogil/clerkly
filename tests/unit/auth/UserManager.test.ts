@@ -49,12 +49,12 @@ describe('UserManager', () => {
     mockSelfUserManager = {
       getCurrentUserId: jest.fn().mockReturnValue('testUserId1'),
       findOrCreateUser: jest.fn().mockReturnValue({
-        user_id: 'testUserId1',
+        userId: 'testUserId1',
         name: 'Test User',
         email: 'test@example.com',
-        google_id: '123456789',
+        googleId: '123456789',
         locale: 'en',
-        last_synced: Date.now(),
+        lastSynced: Date.now(),
       }),
     } as unknown as jest.Mocked<UserManager>;
 
@@ -116,7 +116,7 @@ describe('UserManager', () => {
   describe('findOrCreateUser', () => {
     /* Preconditions: Empty users table
        Action: Call findOrCreateUser with GoogleUserInfoResponse object
-       Assertions: New user created with 10-character user_id, all fields populated
+       Assertions: New user created with 10-character userId, all fields populated
        Requirements: user-data-isolation.0.3, user-data-isolation.1.2 */
     it('should create new user on first login', () => {
       const googleProfile = {
@@ -131,12 +131,12 @@ describe('UserManager', () => {
 
       const user = profileManager.findOrCreateUser(googleProfile);
 
-      expect(user.user_id).toMatch(/^[A-Za-z0-9]{10}$/);
+      expect(user.userId).toMatch(/^[A-Za-z0-9]{10}$/);
       expect(user.email).toBe('newuser@example.com');
       expect(user.name).toBe('New User');
-      expect(user.google_id).toBe('google123');
+      expect(user.googleId).toBe('google123');
       expect(user.locale).toBe('ru');
-      expect(user.last_synced).toBeGreaterThan(0);
+      expect(user.lastSynced).toBeGreaterThan(0);
     });
 
     /* Preconditions: User exists in users table
@@ -160,7 +160,7 @@ describe('UserManager', () => {
       // Find same user
       const user2 = profileManager.findOrCreateUser(googleProfile);
 
-      expect(user2.user_id).toBe(user1.user_id);
+      expect(user2.userId).toBe(user1.userId);
       expect(user2.email).toBe('existing@example.com');
     });
 
@@ -186,22 +186,22 @@ describe('UserManager', () => {
       const newProfile = { ...oldProfile, name: 'New Name' };
       const user2 = profileManager.findOrCreateUser(newProfile);
 
-      expect(user2.user_id).toBe(user1.user_id);
+      expect(user2.userId).toBe(user1.userId);
       expect(user2.name).toBe('New Name');
 
       // Verify in database
       const db = dbManager.getDatabase();
-      const dbUser = db?.prepare('SELECT name FROM users WHERE user_id = ?').get(user1.user_id) as {
+      const dbUser = db?.prepare('SELECT name FROM users WHERE user_id = ?').get(user1.userId) as {
         name: string;
       };
       expect(dbUser.name).toBe('New Name');
     });
 
-    /* Preconditions: User exists with google_id 'old123'
-       Action: Call findOrCreateUser with same email but different google_id
-       Assertions: google_id updated in database
+    /* Preconditions: User exists with googleId 'old123'
+       Action: Call findOrCreateUser with same email but different googleId
+       Assertions: googleId updated in database
        Requirements: user-data-isolation.0.4 */
-    it('should update google_id if changed', () => {
+    it('should update googleId if changed', () => {
       const oldProfile = {
         id: 'old123',
         email: 'googleid@example.com',
@@ -214,14 +214,14 @@ describe('UserManager', () => {
 
       // Create user
       const user1 = profileManager.findOrCreateUser(oldProfile);
-      expect(user1.google_id).toBe('old123');
+      expect(user1.googleId).toBe('old123');
 
-      // Update with new google_id
+      // Update with new googleId
       const newProfile = { ...oldProfile, id: 'new456' };
       const user2 = profileManager.findOrCreateUser(newProfile);
 
-      expect(user2.user_id).toBe(user1.user_id);
-      expect(user2.google_id).toBe('new456');
+      expect(user2.userId).toBe(user1.userId);
+      expect(user2.googleId).toBe('new456');
     });
 
     /* Preconditions: User exists with locale 'en'
@@ -247,7 +247,7 @@ describe('UserManager', () => {
       const newProfile = { ...oldProfile, locale: 'ru' };
       const user2 = profileManager.findOrCreateUser(newProfile);
 
-      expect(user2.user_id).toBe(user1.user_id);
+      expect(user2.userId).toBe(user1.userId);
       expect(user2.locale).toBe('ru');
     });
   });
@@ -309,12 +309,12 @@ describe('UserManager', () => {
 
       // Verify User structure
       expect(result).not.toBeNull();
-      expect(result?.user_id).toMatch(/^[A-Za-z0-9]{10}$/);
+      expect(result?.userId).toMatch(/^[A-Za-z0-9]{10}$/);
       expect(result?.email).toBe(mockGoogleProfile.email);
       expect(result?.name).toBe(mockGoogleProfile.name);
-      expect(result?.google_id).toBe(mockGoogleProfile.id);
+      expect(result?.googleId).toBe(mockGoogleProfile.id);
       expect(result?.locale).toBe(mockGoogleProfile.locale);
-      expect(result?.last_synced).toBeGreaterThan(0);
+      expect(result?.lastSynced).toBeGreaterThan(0);
     });
 
     /* Preconditions: Valid access token, fetch throws network error, currentUser is cached
@@ -394,7 +394,7 @@ describe('UserManager', () => {
       const loadedUser = profileManager.loadUserByEmail('loadtest@example.com');
 
       expect(loadedUser).not.toBeNull();
-      expect(loadedUser?.user_id).toBe(createdUser.user_id);
+      expect(loadedUser?.userId).toBe(createdUser.userId);
       expect(loadedUser?.email).toBe('loadtest@example.com');
       expect(loadedUser?.name).toBe('Load Test User');
     });
@@ -435,9 +435,9 @@ describe('UserManager', () => {
   describe('getCurrentUserId after operations', () => {
     /* Preconditions: fetchProfile() successfully fetched profile
        Action: Call getCurrentUserId()
-       Assertions: Returns the user_id from findOrCreateUser
+       Assertions: Returns the userId from findOrCreateUser
        Requirements: user-data-isolation.1.2, user-data-isolation.1.5 */
-    it('should return current user_id after fetchProfile()', async () => {
+    it('should return current userId after fetchProfile()', async () => {
       // Mock tokens and fetch
       (tokenStorage.loadTokens as jest.Mock).mockResolvedValue({
         accessToken: 'test-access-token',
@@ -450,7 +450,7 @@ describe('UserManager', () => {
       // Fetch profile
       await profileManager.fetchProfile();
 
-      // Get current user_id
+      // Get current userId
       const userId = profileManager.getCurrentUserId();
       expect(userId).toMatch(/^[A-Za-z0-9]{10}$/);
     });
@@ -475,19 +475,19 @@ describe('UserManager', () => {
       // Clear session
       profileManager.clearSession();
 
-      // Get current user_id
+      // Get current userId
       const userId = profileManager.getCurrentUserId();
       expect(userId).toBeNull();
     });
   });
 
   describe('clearSession', () => {
-    /* Preconditions: User logged in with user_id cached
+    /* Preconditions: User logged in with userId cached
        Action: Call clearSession()
        Assertions: currentUserId is null, currentUser is null
        Requirements: user-data-isolation.1.4 */
-    it('should clear user_id and user on logout', async () => {
-      // First set user_id by fetching profile
+    it('should clear userId and user on logout', async () => {
+      // First set userId by fetching profile
       (tokenStorage.loadTokens as jest.Mock).mockResolvedValue({
         accessToken: 'test-access-token',
       });
@@ -519,25 +519,15 @@ describe('UserManager', () => {
        Action: Call initialize()
        Assertions: currentUserId is set from fetched profile
        Requirements: user-data-isolation.1.3 */
-    it('should restore user_id from API on app startup', async () => {
-      // Mock valid tokens
-      (tokenStorage.loadTokens as jest.Mock).mockResolvedValue({
-        accessToken: 'test-access-token',
-        refreshToken: 'test-refresh-token',
-        expiresAt: Date.now() + 3600000,
+    it('should restore userId from API on app startup', async () => {
+      // Create a user first
+      const user = profileManager.findOrCreateUser({
+        ...mockGoogleProfile,
+        email: 'restored@example.com',
       });
 
-      // Mock successful API response
-      (global.fetch as jest.Mock).mockResolvedValue({
-        ok: true,
-        json: async () => ({
-          ...mockGoogleProfile,
-          email: 'restored@example.com',
-        }),
-      });
-
-      // Spy on console.info
-      const consoleInfoSpy = jest.spyOn(console, 'info').mockImplementation();
+      // Save userId to global storage (simulating previous login)
+      dbManager.global.currentUser.setUserId(user.userId);
 
       // Call initialize
       await profileManager.initialize();
@@ -545,8 +535,7 @@ describe('UserManager', () => {
       // Verify currentUserId was set
       const userId = profileManager.getCurrentUserId();
       expect(userId).toMatch(/^[A-Za-z0-9]{10}$/);
-
-      consoleInfoSpy.mockRestore();
+      expect(userId).toBe(user.userId);
     });
 
     /* Preconditions: No tokens available
@@ -620,10 +609,10 @@ describe('UserManager', () => {
       // Verify success result
       expect(result.success).toBe(true);
       if (result.success) {
-        expect(result.user.user_id).toMatch(/^[A-Za-z0-9]{10}$/);
+        expect(result.user.userId).toMatch(/^[A-Za-z0-9]{10}$/);
         expect(result.user.email).toBe(mockGoogleProfile.email);
         expect(result.user.name).toBe(mockGoogleProfile.name);
-        expect(result.user.google_id).toBe(mockGoogleProfile.id);
+        expect(result.user.googleId).toBe(mockGoogleProfile.id);
         expect(result.user.locale).toBe(mockGoogleProfile.locale);
       }
 

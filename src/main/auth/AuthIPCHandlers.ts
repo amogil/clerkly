@@ -254,7 +254,7 @@ export class AuthIPCHandlers {
     const eventBus = MainEventBus.getInstance();
     eventBus.publish(
       new AuthCompletedEvent(userId, {
-        id: profile.user_id,
+        id: profile.userId,
         email: profile.email,
         name: profile.name || '',
         picture: undefined,

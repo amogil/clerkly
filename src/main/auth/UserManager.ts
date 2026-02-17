@@ -8,6 +8,10 @@ import { SessionExpiredError } from './errors';
 import { Logger } from '../Logger';
 import { MainEventBus } from '../events/MainEventBus';
 import { UserProfileUpdatedEvent } from '../../shared/events/types';
+import { User } from '../db/schema';
+
+// Re-export User for backward compatibility
+export type { User };
 
 // Requirements: clerkly.3.8 - Use centralized Logger instead of console.*
 
@@ -25,25 +29,6 @@ interface GoogleUserInfoResponse {
 }
 
 /**
- * User record from users table
- * Requirements: user-data-isolation.1, account-profile.1.2
- */
-export interface User {
-  /** Internal user ID for data isolation (10-char alphanumeric) */
-  user_id: string;
-  /** User's display name */
-  name: string | null;
-  /** User's email address (unique) */
-  email: string;
-  /** Google user ID from OAuth */
-  google_id: string | null;
-  /** User's locale from Google (e.g., "en", "ru") */
-  locale: string | null;
-  /** Unix timestamp of last profile sync */
-  last_synced: number | null;
-}
-
-/**
  * User Profile Manager
  * Manages user profile data from Google OAuth
  * Handles fetching, caching, and updating profile information
@@ -54,8 +39,9 @@ export class UserManager {
   private logger = Logger.create('UserManager');
   private dbManager: DatabaseManager;
   private tokenStorage: TokenStorageManager;
-  // Requirements: user-data-isolation.1.1, user-data-isolation.1.5 - Cache current user_id for data isolation
-  private currentUserId: string | null = null;
+  // Requirements: user-data-isolation.1.5 - Cache user_id with lazy loading from DB
+  // undefined = not loaded yet, null = no user, string = userId
+  private userIdCache: string | null | undefined = undefined;
   // Cache current user for quick access
   private currentUser: User | null = null;
 
@@ -103,60 +89,44 @@ export class UserManager {
    * @returns User record with all fields
    */
   findOrCreateUser(googleProfile: GoogleUserInfoResponse): User {
-    const db = this.dbManager.getDatabase();
-    if (!db) {
-      throw new Error('Database not initialized');
-    }
-
     const now = Date.now();
 
     // Try to find existing user
-    const existingUser = db
-      .prepare(
-        'SELECT user_id, name, email, google_id, locale, last_synced FROM users WHERE email = ?'
-      )
-      .get(googleProfile.email) as User | undefined;
+    const existingUser = this.dbManager.users.findByEmail(googleProfile.email);
 
     if (existingUser) {
       // Requirements: user-data-isolation.0.4 - Update fields if changed
-      const updates: string[] = [];
-      const values: (string | number | null)[] = [];
+      const updates: Partial<Pick<User, 'name' | 'googleId' | 'locale' | 'lastSynced'>> = {
+        lastSynced: now,
+      };
 
       if (googleProfile.name !== existingUser.name) {
-        updates.push('name = ?');
-        values.push(googleProfile.name);
+        updates.name = googleProfile.name;
       }
-      if (googleProfile.id !== existingUser.google_id) {
-        updates.push('google_id = ?');
-        values.push(googleProfile.id);
+      if (googleProfile.id !== existingUser.googleId) {
+        updates.googleId = googleProfile.id;
       }
       if ((googleProfile.locale || null) !== existingUser.locale) {
-        updates.push('locale = ?');
-        values.push(googleProfile.locale || null);
+        updates.locale = googleProfile.locale || null;
       }
-      updates.push('last_synced = ?');
-      values.push(now);
 
-      if (updates.length > 0) {
-        values.push(existingUser.user_id);
-        db.prepare(`UPDATE users SET ${updates.join(', ')} WHERE user_id = ?`).run(...values);
-        this.logger.info(`Updated user ${existingUser.user_id}`);
-      }
+      this.dbManager.users.update(existingUser.userId, updates);
+      this.logger.info(`Updated user ${existingUser.userId}`);
 
       const updatedUser: User = {
-        user_id: existingUser.user_id,
+        userId: existingUser.userId,
         name: googleProfile.name,
         email: googleProfile.email,
-        google_id: googleProfile.id,
+        googleId: googleProfile.id,
         locale: googleProfile.locale || null,
-        last_synced: now,
+        lastSynced: now,
       };
 
       // Publish user.profile.updated event
       // Requirements: realtime-events.3.3
       const eventBus = MainEventBus.getInstance();
       eventBus.publish(
-        new UserProfileUpdatedEvent(updatedUser.user_id, {
+        new UserProfileUpdatedEvent(updatedUser.userId, {
           name: updatedUser.name,
           email: updatedUser.email,
           locale: updatedUser.locale,
@@ -166,55 +136,57 @@ export class UserManager {
       return updatedUser;
     }
 
-    // Create new user with random user_id
-    const userId = this.generateUserId();
-    db.prepare(
-      'INSERT INTO users (user_id, name, email, google_id, locale, last_synced) VALUES (?, ?, ?, ?, ?, ?)'
-    ).run(
-      userId,
-      googleProfile.name,
-      googleProfile.email,
-      googleProfile.id,
-      googleProfile.locale || null,
-      now
-    );
+    // Create new user
+    const newUser = this.dbManager.users.findOrCreate(googleProfile.email, googleProfile.name);
 
-    this.logger.info(`Created new user ${userId} for ${googleProfile.email}`);
+    // Update additional fields
+    this.dbManager.users.update(newUser.userId, {
+      googleId: googleProfile.id,
+      locale: googleProfile.locale || null,
+      lastSynced: now,
+    });
 
-    const newUser: User = {
-      user_id: userId,
+    this.logger.info(`Created new user ${newUser.userId} for ${googleProfile.email}`);
+
+    const completeUser: User = {
+      userId: newUser.userId,
       name: googleProfile.name,
       email: googleProfile.email,
-      google_id: googleProfile.id,
+      googleId: googleProfile.id,
       locale: googleProfile.locale || null,
-      last_synced: now,
+      lastSynced: now,
     };
 
     // Publish user.profile.updated event for new user
     // Requirements: realtime-events.3.3
     const eventBus = MainEventBus.getInstance();
     eventBus.publish(
-      new UserProfileUpdatedEvent(newUser.user_id, {
-        name: newUser.name,
-        email: newUser.email,
-        locale: newUser.locale,
+      new UserProfileUpdatedEvent(completeUser.userId, {
+        name: completeUser.name,
+        email: completeUser.email,
+        locale: completeUser.locale,
       })
     );
 
-    return newUser;
+    return completeUser;
   }
 
   /**
-   * Get current user ID
+   * Get current user ID with caching
    * Requirements: user-data-isolation.1.5
    *
-   * Returns the cached user_id of the currently logged in user.
+   * Returns the user_id of the currently logged in user.
+   * First call loads from DB, subsequent calls return cached value.
    * Used by DatabaseManager to filter data by user_id.
    *
    * @returns Current user_id or null if not logged in
    */
   getCurrentUserId(): string | null {
-    return this.currentUserId;
+    if (this.userIdCache === undefined) {
+      // First call - load from DB
+      this.userIdCache = this.dbManager.global.currentUser.getUserId();
+    }
+    return this.userIdCache;
   }
 
   /**
@@ -228,14 +200,17 @@ export class UserManager {
   }
 
   /**
-   * Set current user (for internal use by OAuthClientManager)
-   * Requirements: user-data-isolation.1.2
+   * Set current user and persist userId
+   * Requirements: user-data-isolation.1.2, user-data-isolation.1.6
    * @param user User to set as current
    */
   setCurrentUser(user: User): void {
-    this.currentUserId = user.user_id;
+    // Save userId to global storage
+    this.dbManager.global.currentUser.setUserId(user.userId);
+    // Update cache
+    this.userIdCache = user.userId;
     this.currentUser = user;
-    this.logger.info(`Current user set to ${user.user_id}`);
+    this.logger.info(`Current user set to ${user.userId}`);
   }
 
   /**
@@ -285,12 +260,11 @@ export class UserManager {
 
       const googleProfile = (await response.json()) as GoogleUserInfoResponse;
 
-      // Requirements: user-data-isolation.1.2 - Find or create user and cache user_id
+      // Requirements: user-data-isolation.1.2 - Find or create user and save user_id
       const user = this.findOrCreateUser(googleProfile);
-      this.currentUserId = user.user_id;
-      this.currentUser = user;
+      this.setCurrentUser(user);
 
-      this.logger.info(`Profile fetched successfully for user ${user.user_id}`);
+      this.logger.info(`Profile fetched successfully for user ${user.userId}`);
       return user;
     } catch (error) {
       // Requirements: token-management-ui.1.3 - If session expired, tokens are already cleared by handleAPIRequest
@@ -324,17 +298,7 @@ export class UserManager {
    */
   loadUserByEmail(email: string): User | null {
     try {
-      const db = this.dbManager.getDatabase();
-      if (!db) {
-        return null;
-      }
-
-      const user = db
-        .prepare(
-          'SELECT user_id, name, email, google_id, locale, last_synced FROM users WHERE email = ?'
-        )
-        .get(email) as User | undefined;
-
+      const user = this.dbManager.users.findByEmail(email);
       if (user) {
         this.logger.info(`User loaded from database: ${email}`);
         return user;
@@ -349,47 +313,55 @@ export class UserManager {
   }
 
   /**
-   * Initialize profile on app startup
+   * Initialize on app startup - restore session from DB
    * Requirements: user-data-isolation.1.3
    *
    * Attempts to restore user session on app startup.
-   * If valid tokens exist, fetches profile from Google API to restore currentUserId.
+   * Loads saved userId from global storage and restores user from users table.
    * This ensures that data isolation works immediately after app restart
    * without requiring the user to log in again.
    * Called during app initialization in main process.
    */
   async initialize(): Promise<void> {
-    try {
-      // Check if we have valid tokens
-      const tokens = await this.tokenStorage.loadTokens();
-      if (tokens && tokens.accessToken) {
-        // Fetch profile from API to restore currentUserId
-        const user = await this.fetchProfile();
-        if (user) {
-          // currentUserId is already set by fetchProfile() via findOrCreateUser()
-          this.logger.info(`User ID cached from stored profile: ${this.currentUserId}`);
-        }
-      } else {
-        this.logger.info('No tokens available, user not logged in');
-      }
-    } catch (error) {
-      this.logger.error(`Failed to initialize: ${error}`);
+    const savedUserId = this.dbManager.global.currentUser.getUserId();
+
+    if (!savedUserId) {
+      this.logger.info('No saved user_id, user not logged in');
+      return;
     }
+
+    // Cache the userId
+    this.userIdCache = savedUserId;
+
+    // Load user from users table
+    const user = this.dbManager.users.findById(savedUserId);
+
+    if (!user) {
+      this.logger.warn(`User not found for saved user_id: ${savedUserId}`);
+      this.dbManager.global.currentUser.clearUserId();
+      this.userIdCache = null;
+      return;
+    }
+
+    this.currentUser = user;
+    this.logger.info(`User restored: ${user.email}`);
   }
 
   /**
    * Clear session on logout
    * Requirements: user-data-isolation.1.4
    *
-   * Clears the current user_id from memory.
+   * Clears the current user_id from memory and database.
    * Called during logout to prevent data operations.
    * User data remains in database for restoration on next login.
    */
   clearSession(): void {
-    // Requirements: user-data-isolation.1.4 - Clear currentUserId on logout
-    this.currentUserId = null;
+    // Clear from DB
+    this.dbManager.global.currentUser.clearUserId();
+    // Clear cache
+    this.userIdCache = null;
     this.currentUser = null;
-    this.logger.info('User session cleared (user_id cleared from memory)');
+    this.logger.info('User session cleared');
   }
 
   /**
@@ -471,12 +443,11 @@ export class UserManager {
 
       const googleProfile = (await response.json()) as GoogleUserInfoResponse;
 
-      // Requirements: user-data-isolation.1.2 - Find or create user and cache user_id
+      // Requirements: user-data-isolation.1.2 - Find or create user and save user_id
       const user = this.findOrCreateUser(googleProfile);
-      this.currentUserId = user.user_id;
-      this.currentUser = user;
+      this.setCurrentUser(user);
 
-      this.logger.info(`Profile fetched synchronously for user ${user.user_id}`);
+      this.logger.info(`Profile fetched synchronously for user ${user.userId}`);
       return { success: true, user };
     } catch (error) {
       this.logger.error(`Failed to fetch profile synchronously: ${error}`);

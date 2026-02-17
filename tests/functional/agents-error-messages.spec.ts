@@ -127,9 +127,7 @@ test.describe('Agents Error Messages', () => {
     await expect(agentCards).toHaveCount(11);
 
     // Verify archived agent is NOT visible
-    await expect(
-      window.locator(`[data-testid="agent-card-${archivedAgentId}"]`)
-    ).not.toBeVisible();
+    await expect(window.locator(`[data-testid="agent-card-${archivedAgentId}"]`)).not.toBeVisible();
   });
 
   /* Preconditions: User logged in, multiple agents with different timestamps

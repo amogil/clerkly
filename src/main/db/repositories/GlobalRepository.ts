@@ -64,4 +64,55 @@ export class GlobalRepository {
         .run();
     },
   };
+
+  /**
+   * Current user management
+   * Requirements: user-data-isolation.1.6
+   */
+  currentUser = {
+    /**
+     * Get saved userId from global storage
+     */
+    getUserId: (): string | null => {
+      const row = this.db
+        .select()
+        .from(userData)
+        .where(and(eq(userData.key, 'current_user_id'), eq(userData.userId, SYSTEM_USER_ID)))
+        .get();
+
+      return row ? row.value : null;
+    },
+
+    /**
+     * Save userId to global storage
+     */
+    setUserId: (userId: string): void => {
+      const now = Date.now();
+
+      this.db
+        .insert(userData)
+        .values({
+          key: 'current_user_id',
+          userId: SYSTEM_USER_ID,
+          value: userId,
+          createdAt: now,
+          updatedAt: now,
+        })
+        .onConflictDoUpdate({
+          target: [userData.key, userData.userId],
+          set: { value: userId, updatedAt: now },
+        })
+        .run();
+    },
+
+    /**
+     * Clear userId from global storage
+     */
+    clearUserId: (): void => {
+      this.db
+        .delete(userData)
+        .where(and(eq(userData.key, 'current_user_id'), eq(userData.userId, SYSTEM_USER_ID)))
+        .run();
+    },
+  };
 }

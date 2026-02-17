@@ -47,7 +47,7 @@
 **Поток:**
 1. `UserManager.initialize()` → читает БД → `userId = "abc123"`
 2. Кэшируем: `userIdCache = "abc123"`
-3. Загружаем `user = dbManager.users.getById("abc123")`
+3. Загружаем `user = dbManager.users.findById("abc123")`
 4. Если `user` найден → устанавливаем `currentUser = user`, показываем **Agents**
 5. Если `user` НЕ найден → очищаем `userId`, показываем **Login**
 
@@ -595,7 +595,7 @@ class UserManager {
     this.userIdCache = savedUserId;
     
     // Load user from users table
-    const user = this.dbManager.users.getById(savedUserId);
+    const user = this.dbManager.users.findById(savedUserId);
     
     if (!user) {
       this.logger.warn(`User not found for saved user_id: ${savedUserId}`);
@@ -775,10 +775,10 @@ export class UsersRepository {
   }
 
   /**
-   * Get user by userId
+   * Find user by userId
    * Requirements: user-data-isolation.1.3
    */
-  getById(userId: string): User | undefined {
+  findById(userId: string): User | undefined {
     return this.db.select().from(users).where(eq(users.user_id, userId)).get();
   }
 
@@ -1172,7 +1172,7 @@ describe('UserProfileManager - initialize', () => {
      Requirements: user-data-isolation.1.3 */
   it('should clear userId when user not found in users table');
 
-  /* Preconditions: БД содержит userId = 'abc123', dbManager.users.getById() бросает ошибку
+  /* Preconditions: БД содержит userId = 'abc123', dbManager.users.findById() бросает ошибку
      Action: вызвать initialize()
      Assertions: ошибка НЕ прерывает инициализацию, логируется ошибка
      Requirements: user-data-isolation.1.3 */
@@ -1255,21 +1255,21 @@ describe('GlobalRepository - currentUser', () => {
 **Файл:** `tests/unit/db/repositories/UsersRepository.test.ts`
 
 ```typescript
-describe('UsersRepository - getById', () => {
+describe('UsersRepository - findById', () => {
   /* Preconditions: users содержит user с user_id = 'abc123'
-     Action: вызвать getById('abc123')
+     Action: вызвать findById('abc123')
      Assertions: возвращает user объект
      Requirements: user-data-isolation.1.3 */
   it('should return user by userId');
 
   /* Preconditions: users НЕ содержит user с user_id = 'xyz789'
-     Action: вызвать getById('xyz789')
+     Action: вызвать findById('xyz789')
      Assertions: возвращает undefined
      Requirements: user-data-isolation.1.3 */
   it('should return undefined when user not found');
 
   /* Preconditions: users содержит несколько пользователей
-     Action: вызвать getById() с разными userId
+     Action: вызвать findById() с разными userId
      Assertions: каждый вызов возвращает правильного пользователя
      Requirements: user-data-isolation.1.3 */
   it('should return correct user for each userId');

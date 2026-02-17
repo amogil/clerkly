@@ -130,7 +130,7 @@ test('should auto-focus input when returning from AllAgents', async () => {
   // Create additional agents to make +N button appear
   const newChatButton = window.locator('div[title="New chat"]');
   await expect(newChatButton).toBeVisible({ timeout: 5000 });
-  
+
   for (let i = 0; i < 5; i++) {
     await newChatButton.click();
     const agentIcons = window.locator('[data-testid^="agent-icon-"]');
@@ -224,7 +224,7 @@ test('should not auto-focus when AllAgents page is open', async () => {
   // Create additional agents to make +N button appear
   const newChatButton = window.locator('div[title="New chat"]');
   await expect(newChatButton).toBeVisible({ timeout: 5000 });
-  
+
   for (let i = 0; i < 5; i++) {
     await newChatButton.click();
     const agentIcons = window.locator('[data-testid^="agent-icon-"]');
