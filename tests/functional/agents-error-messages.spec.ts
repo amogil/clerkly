@@ -137,76 +137,58 @@ test.describe('Agents Error Messages', () => {
     await expect(errorText).toHaveClass(/text-red-500/);
   });
 
-  /* Preconditions: User logged in, archived agent with error
-     Action: Archive agent with error, open AllAgents
-     Assertions: Archived agent not shown in AllAgents (filtered at list level)
+  /* Preconditions: User logged in, first agent exists
+     Action: Archive first agent, create 2 new agents, open AllAgents
+     Assertions: Only 2 active agents shown, archived agent not visible
      Requirements: agents.5.6 */
   test('should not display archived agents in AllAgents', async () => {
     // Wait for agents page to load
     await expect(window.locator('[data-testid="agents"]')).toBeVisible({ timeout: 5000 });
 
-    // Wait for first agent to be auto-created
-    await window.waitForTimeout(1000);
-
     // Get current agent ID
-    const agentId = await window.evaluate(async () => {
+    const archivedAgentId = await window.evaluate(async () => {
       const agents = await window.api.agents.list();
       if (agents.success && agents.data) {
-        const agentList = agents.data as Array<{ agentId: string }>;
-        return agentList[0].agentId;
+        const agentList = agents.data as Array<{ id: string }>;
+        return agentList[0].id;
       }
       return null;
     });
 
-    expect(agentId).not.toBeNull();
+    expect(archivedAgentId).not.toBeNull();
 
-    // Create error message
-    await window.evaluate(async (id) => {
-      await window.api.messages.create(id!, {
-        kind: 'llm',
-        data: {
-          result: {
-            status: 'error',
-            error: {
-              message: 'This error should not be visible',
-            },
-          },
-        },
-      });
-    }, agentId);
-
-    await window.waitForTimeout(500);
-
-    // Archive the agent
+    // Archive the first agent
     await window.evaluate(async (id) => {
       await window.api.agents.archive(id!);
-    }, agentId);
+    }, archivedAgentId);
 
-    await window.waitForTimeout(500);
-
-    // Auto-create should create a new agent
-    await window.waitForTimeout(500);
-
-    // Create 5 more agents (total 6 agents) to make +N button appear
+    // Wait for auto-created agent to appear (agents.2.7, agents.2.9)
     const newChatButton = window.locator('div[title="New chat"]');
-    await expect(newChatButton).toBeVisible({ timeout: 3000 });
+    await expect(newChatButton).toBeVisible({ timeout: 5000 });
 
-    for (let i = 0; i < 5; i++) {
+    // Create 10 more agents (total 11 active agents) to ensure +N button appears
+    for (let i = 0; i < 10; i++) {
       await newChatButton.click();
-      await window.waitForTimeout(300);
+      const agentIcons = window.locator('[data-testid^="agent-icon-"]');
+      await expect(agentIcons.nth(i + 1)).toBeVisible({ timeout: 5000 });
     }
 
     // Open AllAgents view
     const allAgentsButton = window.locator('div.rounded-full.bg-muted:has-text("+")');
-    await expect(allAgentsButton).toBeVisible({ timeout: 3000 });
+    await expect(allAgentsButton).toBeVisible({ timeout: 5000 });
     await allAgentsButton.click();
-    await window.waitForTimeout(500);
 
     // Verify we're in AllAgents view
-    await expect(window.locator('text=All Agents')).toBeVisible();
+    await expect(window.locator('text=All Agents')).toBeVisible({ timeout: 5000 });
 
-    // Verify archived agent's error message is NOT displayed
-    await expect(window.locator('text=This error should not be visible')).not.toBeVisible();
+    // Verify only 11 active agents are shown (archived agent is filtered out)
+    const agentCards = window.locator('[data-testid^="agent-card-"]');
+    await expect(agentCards).toHaveCount(11);
+
+    // Verify archived agent is NOT visible
+    await expect(
+      window.locator(`[data-testid="agent-card-${archivedAgentId}"]`)
+    ).not.toBeVisible();
   });
 
   /* Preconditions: User logged in, multiple agents with different timestamps
