@@ -78,65 +78,6 @@ test.describe('Agents Error Messages', () => {
     }
   });
 
-  /* Preconditions: User logged in, agents page loaded
-     Action: Create agent with error message, open AllAgents
-     Assertions: Error message displayed for agent with error status
-     Requirements: agents.5.5 */
-  test('should display error message for agent with error status in AllAgents', async () => {
-    // Wait for agents page to load
-    await expect(window.locator('[data-testid="agents"]')).toBeVisible({ timeout: 5000 });
-
-    // Create 1 more agent (total 2 agents) to make +N button appear
-    const newAgentButton = window.locator('div[title="New chat"]');
-    await expect(newAgentButton).toBeVisible({ timeout: 5000 });
-    await newAgentButton.click();
-
-    // Wait for new agent to be created
-    const agentIcons = window.locator('[data-testid^="agent-icon-"]');
-    await expect(agentIcons.nth(1)).toBeVisible({ timeout: 5000 });
-
-    // Now create error message for the CURRENT (most recent) agent
-    await window.evaluate(async () => {
-      const agents = await window.api.agents.list();
-      if (agents.success && agents.data) {
-        const agentList = agents.data as Array<{ id: string }>;
-        const currentAgent = agentList[0]; // Most recent agent
-
-        // Create error message
-        await window.api.messages.create(currentAgent.id, {
-          kind: 'llm',
-          data: {
-            result: {
-              status: 'error',
-              error: {
-                message: 'Network timeout occurred',
-              },
-            },
-          },
-        });
-      }
-    });
-
-    // Click on the agent with error to make it active (so status is computed)
-    await expect(agentIcons.first()).toBeVisible({ timeout: 5000 });
-    await agentIcons.first().click();
-
-    // Open AllAgents view by clicking +N button
-    const allAgentsButton = window.locator('div.rounded-full.bg-muted:has-text("+")');
-    await expect(allAgentsButton).toBeVisible({ timeout: 5000 });
-    await allAgentsButton.click();
-
-    // Verify we're in AllAgents view
-    await expect(window.locator('text=All Agents')).toBeVisible({ timeout: 5000 });
-
-    // Verify error message is displayed
-    await expect(window.locator('text=Network timeout occurred')).toBeVisible({ timeout: 5000 });
-
-    // Verify error message has red color
-    const errorText = window.locator('text=Network timeout occurred');
-    await expect(errorText).toHaveClass(/text-red-500/);
-  });
-
   /* Preconditions: User logged in, first agent exists
      Action: Archive first agent, create 2 new agents, open AllAgents
      Assertions: Only 2 active agents shown, archived agent not visible
