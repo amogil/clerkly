@@ -460,11 +460,11 @@
   - `getUserId(): string | null` - получить сохраненный userId
   - `setUserId(userId: string): void` - сохранить userId
   - `clearUserId(): void` - удалить userId
-- [ ] Использовать тот же паттерн, что и `windowState`:
+- [x] Использовать тот же паттерн, что и `windowState`:
   - Ключ: `current_user_id`
   - userId: `__system__`
   - Хранится в таблице `user_data`
-- [ ] Написать модульные тесты для GlobalRepository.currentUser
+- [x] Написать модульные тесты для GlobalRepository.currentUser
 - _Requirements: user-data-isolation.1.6_
 
 ### 10.2. Использовать findById в UserManager.initialize()
@@ -473,8 +473,8 @@
 - _Requirements: user-data-isolation.1.3_
 
 ### 10.3. Обновить UserManager.getCurrentUserId()
-- [ ] Добавить поле `private userIdCache: string | null | undefined = undefined`
-- [ ] Реализовать ленивую загрузку:
+- [x] Добавить поле `private userIdCache: string | null | undefined = undefined`
+- [x] Реализовать ленивую загрузку:
   ```typescript
   getCurrentUserId(): string | null {
     if (this.userIdCache === undefined) {
@@ -483,23 +483,23 @@
     return this.userIdCache;
   }
   ```
-- [ ] Написать модульные тесты для кэширования
+- [x] Написать модульные тесты для кэширования
 - _Requirements: user-data-isolation.1.5_
 
 ### 10.4. Обновить UserManager.setCurrentUser()
-- [ ] Добавить вызов `this.dbManager.global.currentUser.setUserId(user.user_id)`
-- [ ] Обновить кэш: `this.userIdCache = user.user_id`
-- [ ] Обновить модульные тесты
+- [x] Добавить вызов `this.dbManager.global.currentUser.setUserId(user.userId)`
+- [x] Обновить кэш: `this.userIdCache = user.userId`
+- [x] Обновить модульные тесты
 - _Requirements: user-data-isolation.1.2, user-data-isolation.1.6_
 
 ### 10.5. Обновить UserManager.clearSession()
-- [ ] Добавить вызов `this.dbManager.global.currentUser.clearUserId()`
-- [ ] Сбросить кэш: `this.userIdCache = null`
-- [ ] Обновить модульные тесты
+- [x] Добавить вызов `this.dbManager.global.currentUser.clearUserId()`
+- [x] Сбросить кэш: `this.userIdCache = null`
+- [x] Обновить модульные тесты
 - _Requirements: user-data-isolation.1.4_
 
 ### 10.6. Обновить UserManager.initialize()
-- [ ] Реализовать новый алгоритм:
+- [x] Реализовать новый алгоритм:
   ```typescript
   async initialize(): Promise<void> {
     const savedUserId = this.dbManager.global.currentUser.getUserId();
@@ -523,22 +523,22 @@
     this.logger.info(`User restored: ${user.email}`);
   }
   ```
-- [ ] Обновить модульные тесты
+- [x] Обновить модульные тесты
 - _Requirements: user-data-isolation.1.3_
 
 ### 10.7. Обновить OAuth flow и logout
-- [ ] Убедиться, что `fetchProfileSynchronously()` вызывает `setCurrentUser()`
-- [ ] Проверить порядок операций при авторизации:
+- [x] Убедиться, что `fetchProfileSynchronously()` вызывает `setCurrentUser()`
+- [x] Проверить порядок операций при авторизации:
   1. Получить токены
   2. Загрузить профиль
   3. Создать/найти пользователя
   4. Сохранить userId (`setCurrentUser()`)
   5. Сохранить токены
-- [ ] Обновить `OAuthClientManager.signOut()`:
+- [x] Обновить `OAuthClientManager.signOut()`:
   - Обернуть отзыв токенов в try-catch
   - Логировать ошибки, но НЕ прерывать процесс выхода
   - Всегда продолжать с удалением локальных токенов и очисткой сессии
-- [ ] Обновить модульные тесты для signOut:
+- [x] Обновить модульные тесты для signOut:
   - Тест: успешный отзыв токенов
   - Тест: ошибка отзыва токенов (сеть недоступна) - выход все равно завершается
 - _Requirements: user-data-isolation.1.2, user-data-isolation.1.4_
