@@ -53,9 +53,8 @@ test.beforeAll(async () => {
   // Complete OAuth flow to login
   await completeOAuthFlow(electronApp, page);
 
-  // Navigate to agents
-  await page.click('[data-testid="nav-agents"]');
-  await page.waitForSelector('[data-testid="agents"]');
+  // Wait for agents page to load (automatic redirect after OAuth)
+  await expect(page.locator('[data-testid="agents"]')).toBeVisible({ timeout: 5000 });
 });
 
 test.afterAll(async () => {
@@ -75,16 +74,15 @@ test.describe('Message Text Wrapping', () => {
   test('should wrap long words without spaces in user messages', async () => {
     // Send message with very long word
     const longWord = 'й'.repeat(200); // 200 characters without spaces
-    const textarea = page.locator('textarea[placeholder*="Ask, reply"]');
+    const textarea = page.locator('textarea[placeholder*="Ask"]');
     await textarea.fill(longWord);
     await textarea.press('Enter');
 
     // Wait for message to appear
-    await page.waitForTimeout(500);
+    await expect(page.locator('.rounded-2xl.bg-secondary\\/70').last()).toBeVisible({ timeout: 5000 });
 
     // Find the user message
     const userMessage = page.locator('.rounded-2xl.bg-secondary\\/70').last();
-    await expect(userMessage).toBeVisible();
 
     // Check that message has break-words class
     const messageText = userMessage.locator('p');
