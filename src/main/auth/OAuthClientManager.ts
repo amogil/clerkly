@@ -189,8 +189,15 @@ export class OAuthClientManager {
       authUrl.searchParams.set('access_type', 'offline'); // Required for refresh token
       authUrl.searchParams.set('prompt', 'consent'); // Force consent screen to get refresh token
 
-      // Open system browser with authorization URL
-      await shell.openExternal(authUrl.toString());
+      // Open system browser with authorization URL (skip in test environment)
+      // Requirements: testing.3.9 - In test environment, browser is not needed
+      // Tests use completeOAuthFlow() helper which simulates OAuth callback directly
+      const isTestEnv = process.env.NODE_ENV === 'test' || process.env.PLAYWRIGHT_TEST === '1';
+      if (!isTestEnv) {
+        await shell.openExternal(authUrl.toString());
+      } else {
+        this.logger.info('Test environment detected, skipping browser launch');
+      }
     } catch (error: unknown) {
       // Requirements: error-notifications.1.1, error-notifications.1.4
       handleBackgroundError(error, 'OAuth Flow');
