@@ -336,7 +336,9 @@ export function registerTestIPCHandlers(
       if (!isTestEnvironment()) {
         throw new Error('test:simulate-data-error can only be used in test environment');
       }
-      const testDataManager = (global as Record<string, unknown>).testDataManager;
+      const testDataManager = (global as Record<string, unknown>).testDataManager as unknown as {
+        simulateError: (operation: string, errorMessage: string) => void;
+      };
       if (!testDataManager) {
         return { success: false, error: 'TestDataManager not initialized' };
       }
@@ -350,7 +352,9 @@ export function registerTestIPCHandlers(
     if (!isTestEnvironment()) {
       throw new Error('test:clear-data-errors can only be used in test environment');
     }
-    const testDataManager = (global as Record<string, unknown>).testDataManager;
+    const testDataManager = (global as Record<string, unknown>).testDataManager as unknown as {
+      clearErrorSimulations: () => void;
+    };
     if (!testDataManager) {
       return { success: false, error: 'TestDataManager not initialized' };
     }
