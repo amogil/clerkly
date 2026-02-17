@@ -199,14 +199,11 @@ test.describe('Agents Error Messages', () => {
     // Wait for agents page to load
     await expect(window.locator('[data-testid="agents"]')).toBeVisible({ timeout: 5000 });
 
-    // Wait for first agent to be auto-created
-    await window.waitForTimeout(1000);
-
     const firstAgentId = await window.evaluate(async () => {
       const agents = await window.api.agents.list();
       if (agents.success && agents.data) {
-        const agentList = agents.data as Array<{ agentId: string }>;
-        return agentList[0].agentId;
+        const agentList = agents.data as Array<{ id: string }>;
+        return agentList[0].id;
       }
       return null;
     });
@@ -219,22 +216,22 @@ test.describe('Agents Error Messages', () => {
       });
     }, firstAgentId);
 
-    await window.waitForTimeout(100);
-
     // Create 5 more agents (total 6 agents)
     const newChatButton = window.locator('div[title="New chat"]');
-    await expect(newChatButton).toBeVisible({ timeout: 3000 });
+    await expect(newChatButton).toBeVisible({ timeout: 5000 });
 
     for (let i = 0; i < 5; i++) {
       await newChatButton.click();
-      await window.waitForTimeout(300);
+      // Wait for new agent icon to appear
+      const agentIcons = window.locator('[data-testid^="agent-icon-"]');
+      await expect(agentIcons.nth(i + 1)).toBeVisible({ timeout: 5000 });
     }
 
     const secondAgentId = await window.evaluate(async () => {
       const agents = await window.api.agents.list();
       if (agents.success && agents.data) {
-        const agentList = agents.data as Array<{ agentId: string }>;
-        return agentList[0].agentId; // Most recent is first
+        const agentList = agents.data as Array<{ id: string }>;
+        return agentList[0].id; // Most recent is first
       }
       return null;
     });
@@ -247,16 +244,13 @@ test.describe('Agents Error Messages', () => {
       });
     }, secondAgentId);
 
-    await window.waitForTimeout(500);
-
     // Open AllAgents view
     const allAgentsButton = window.locator('div.rounded-full.bg-muted:has-text("+")');
-    await expect(allAgentsButton).toBeVisible({ timeout: 3000 });
+    await expect(allAgentsButton).toBeVisible({ timeout: 5000 });
     await allAgentsButton.click();
-    await window.waitForTimeout(500);
 
     // Verify we're in AllAgents view
-    await expect(window.locator('text=All Agents')).toBeVisible();
+    await expect(window.locator('text=All Agents')).toBeVisible({ timeout: 5000 });
 
     // Get all agent cards
     const agentCards = window.locator('[data-testid^="agent-card-"]');
