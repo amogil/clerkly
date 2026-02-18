@@ -7,13 +7,38 @@
 ## Глоссарий
 
 - **Agent** - AI-агент, представленный отдельным чатом
-- **Agent Status** - Вычисляемый статус агента (new, in-progress, awaiting-user, error, completed). Определяется динамически из последних сообщений, НЕ хранится в БД
+- **Agent Status** - Вычисляемый статус агента (new, in-progress, awaiting-response, error, completed). Определяется динамически из последних сообщений, НЕ хранится в БД
 - **Active Agent** - Текущий выбранный агент, чат которого отображается
 - **Agents List** - Горизонтальный список иконок агентов в хедере
-- **Task History** - Страница со всеми агентами для просмотра истории
+- **All Agents** - Страница со всеми агентами для просмотра истории
 - **Message** - Сообщение в чате. Хранится в таблице messages с payload_json
 - **updatedAt** - Время последнего обновления агента (последнее сообщение в чате)
 - **agentId** - Уникальный идентификатор агента (TEXT, 10-символьная alphanumeric строка)
+
+### Визуальные Компоненты
+
+Есть два типа анимации:
+1. Само лого анимированное (CSS-анимация узлов и линий)
+2. Анимация JS (spring-анимация перемещения в списке)
+
+**1. Application Logo (Логотип приложения)**
+1. Логотип Clerkly для брендинга
+2. Расположение: страница логина, пустой стейт чата
+3. Варианты: без анимации (логин) / с CSS-анимацией узлов (пустой чат агента)
+
+**2. Active Agent Icon (Иконка активного агента)**
+1. Иконка активного агента в левой части хедера
+2. Визуально дублирует Agent List Icon активного агента
+
+**3. Agent List Icon (Иконка агента в списке)**
+1. Иконка агента в списках
+2. Два контекста: Agents List / All Agents
+3. Сама иконка использует CSS-анимацию
+4. При обновлении порядка в Agents List дополнительно используется JS-анимация
+
+**4. Message Avatar (Аватар агента в чате)**
+- Маленькая иконка слева сверху от сообщений агента
+- CSS-анимированная
 
 ## Архитектурный Принцип
 
@@ -165,7 +190,7 @@
 
 4.10. Сообщения агента ДОЛЖНЫ отображаться слева без рамки
 
-4.11. Аватар агента (Logo компонент) ДОЛЖЕН показываться перед первым сообщением агента в последовательности
+4.11. Message Avatar ДОЛЖЕН показываться перед первым сообщением агента в последовательности
 
 4.12. Сообщения агента ДОЛЖНЫ поддерживать React-компоненты (для rich content)
 
@@ -174,7 +199,7 @@
 4.14. КОГДА у агента нет сообщений (новый агент), ТО ДОЛЖЕН отображаться пустой стейт с промпт-подсказками
 
 4.15. Пустой стейт ДОЛЖЕН содержать:
-   - Анимированный логотип (размер lg, animated=true)
+   - Application Logo (размер lg, animated=true)
    - Заголовок "Assign a task to the agent"
    - Подзаголовок "Transcribes meetings, extracts tasks, creates Jira tickets"
    - Сетку из 4 промпт-кнопок (2 колонки на desktop, 1 на mobile)
@@ -246,7 +271,7 @@
 
 **ID:** agents.5
 
-**User Story:** Как пользователь, я хочу видеть полный список всех агентов, чтобы найти старые разговоры с разными агентами.
+**User Story:** Как пользователь, я хочу видеть полный список агентов в All Agents, чтобы найти старые разговоры с разными агентами.
 
 #### Критерии Приемки
 
@@ -255,7 +280,7 @@
 5.2. Страница All Agents ДОЛЖНА содержать:
    - Кнопку "Back" для возврата к чату
    - Заголовок "All Agents" с количеством агентов
-   - Список всех агентов
+   - Полный список агентов
 
 5.3. Каждый агент в All Agents ДОЛЖЕН показывать:
    - Иконку статуса
@@ -279,7 +304,7 @@
 
 #### Функциональные Тесты
 
-- `tests/functional/agents.spec.ts` - "should open task history on +N button click"
+- `tests/functional/agents.spec.ts` - "should open all agents page on +N button click"
 - `tests/functional/agents.spec.ts` - "should display all agents in history"
 - `tests/functional/agents.spec.ts` - "should open agent chat from history"
 - `tests/functional/agents-error-messages.spec.ts` - "should display error message for agent with error status in AllAgents"
@@ -310,7 +335,7 @@
    - Иконка: первая буква названия агента
    - Текстовое описание: "In progress"
 
-6.3. Статус "awaiting-user" ДОЛЖЕН отображаться:
+6.3. Статус "awaiting-response" ДОЛЖЕН отображаться:
    - Цвет фона: bg-amber-500
    - Цвет кольца: ring-amber-500/30 с пульсацией (animate-pulse)
    - Цвет текста: text-amber-600
@@ -334,11 +359,35 @@
 
 6.6. Все анимации ДОЛЖНЫ быть плавными (60 FPS) и не вызывать задержек в UI
 
+6.7. **Визуальные компоненты и анимации:**
+
+6.7.1. Application Logo:
+   - Без CSS-анимации узлов на странице логина
+   - С CSS-анимацией узлов в пустом стейте чата
+
+6.7.2. Active Agent Icon:
+   - Визуально дублирует Agent List Icon активного агента
+   - CSS-анимация: вращающееся кольцо (in-progress), пульсирующее кольцо (awaiting-response)
+
+6.7.3. Agent List Icon в Agents List (правая часть хедера):
+   - CSS-анимация: вращающееся кольцо (in-progress), пульсирующее кольцо (awaiting-response)
+   - JS-анимация: spring-анимация перемещения при изменении позиции (stiffness: 400, damping: 30, mass: 0.8)
+
+6.7.4. Agent List Icon в All Agents:
+   - CSS-анимация: вращающееся кольцо (in-progress), пульсирующее кольцо (awaiting-response)
+   - БЕЗ JS-анимации перемещения
+
+6.7.5. Message Avatar:
+   - CSS-анимация: собственная анимация
+
 #### Функциональные Тесты
 
 - `tests/functional/agents.spec.ts` - "should display correct visual indicators for each status"
 - `tests/functional/agents.spec.ts` - "should animate in-progress status"
-- `tests/functional/agents.spec.ts` - "should pulse awaiting-user status"
+- `tests/functional/agents.spec.ts` - "should pulse awaiting-response status"
+- `tests/functional/agent-activation-animation.spec.ts` - "should show animation only when switching to different agent"
+- `tests/functional/agent-activation-animation.spec.ts` - "should not show animation when agent status updates without switching"
+- `tests/functional/agent-activation-animation.spec.ts` - "should show animation when switching back to previous agent"
 
 ### 7. Формат сообщений в чате
 
@@ -439,7 +488,7 @@
    - `in-progress` - последнее сообщение от пользователя (kind = `user`)
    - `error` - последнее сообщение содержит `result.status` = `error`, `crash`, или `timeout`
    - `completed` - последнее сообщение `final_answer`
-   - `awaiting-user` - последнее сообщение от LLM (kind = `llm`) и НЕ `final_answer`
+   - `awaiting-response` - последнее сообщение от LLM (kind = `llm`) и НЕ `final_answer`
 
 9.3. Статус ДОЛЖЕН пересчитываться при получении любого нового сообщения в чате агента
 
@@ -588,12 +637,13 @@
 ## Зависимости
 
 ### Внешние компоненты
-- `Logo` - компонент логотипа агента (из `src/renderer/components/logo.tsx`)
+- `Logo` - компонент логотипа Clerkly (из `src/renderer/components/logo.tsx`). Используется для Application Logo в пустом стейте чата
+- `AgentAvatar` - компонент аватара агента (из `src/renderer/components/agents/AgentAvatar.tsx`). Используется для Message Avatar
 - `lucide-react` - библиотека иконок (Send, AlertCircle, Check, X, HelpCircle, ArrowLeft, Plus, FileText, Calendar, Video)
 
 ### Типы
 - `Agent` - тип агента (agentId, userId, name, createdAt, updatedAt, archivedAt)
-- `AgentStatus` - вычисляемый тип статуса агента ('new' | 'in-progress' | 'awaiting-user' | 'error' | 'completed')
+- `AgentStatus` - вычисляемый тип статуса агента ('new' | 'in-progress' | 'awaiting-response' | 'error' | 'completed')
 - `Message` - тип сообщения в чате
 
 ### React хуки

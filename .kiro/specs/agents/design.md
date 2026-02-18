@@ -64,7 +64,7 @@ interface Agent {
 
 ```typescript
 // Requirements: agents.9
-type AgentStatus = 'new' | 'in-progress' | 'awaiting-user' | 'error' | 'completed';
+type AgentStatus = 'new' | 'in-progress' | 'awaiting-response' | 'error' | 'completed';
 ```
 
 **Статус НЕ хранится в БД** — вычисляется из последних сообщений.
@@ -509,7 +509,7 @@ function computeAgentStatus(messages: Message[]): AgentStatus {
   
   // Последнее сообщение от LLM (не final_answer)
   if (payload.kind === 'llm') {
-    return 'awaiting-user';
+    return 'awaiting-response';
   }
   
   return 'new';
@@ -905,7 +905,7 @@ function AgentsComponent() {
 │  └────────────────────────────────────────────────────┘ │
 │                                                          │
 │  ┌────────────────────────────────────────────────────┐ │
-│  │              MessagesArea / HistoryPage            │ │
+│  │              MessagesArea / AllAgentsPage          │ │
 │  │  (flex-1, overflow-y-auto)                         │ │
 │  │                                                    │ │
 │  │  Chat mode:                                        │ │
@@ -913,9 +913,9 @@ function AgentsComponent() {
 │  │  - MessageList                                     │ │
 │  │  - ActivityIndicator (during tool_call/code_exec) │ │
 │  │                                                    │ │
-│  │  History mode (showAllTasksPage):                 │ │
+│  │  All Agents mode (showAllAgentsPage):              │ │
 │  │  - Back button                                     │ │
-│  │  - "Agents History" title                         │ │
+│  │  - "All Agents" title                              │ │
 │  │  - List of all agents                             │ │
 │  └────────────────────────────────────────────────────┘ │
 │                                                          │
@@ -1047,8 +1047,8 @@ function AgentIcon({ agent, status, isActive, onClick }: AgentIconProps) {
         <span className="text-xs font-semibold text-white">{letter}</span>
       )}
       
-      {/* HelpCircle for awaiting-user */}
-      {status === 'awaiting-user' && (
+      {/* HelpCircle for awaiting-response */}
+      {status === 'awaiting-response' && (
         <HelpCircle className="w-3 h-3 text-white absolute -bottom-0.5 -right-0.5" />
       )}
     </button>
@@ -1370,28 +1370,13 @@ function EmptyStatePlaceholder({ onPromptClick }: EmptyStatePlaceholderProps) {
 ```
 
 **Особенности:**
-- Анимированный логотип с улучшенной анимацией узлов и линий (см. ниже)
+- Application Logo с CSS-анимацией узлов (см. раздел "Визуальные Компоненты")
 - Плавное появление с motion.div (fade in + slide up, 500ms)
 - Адаптивная сетка (1 колонка на mobile, 2 на desktop)
 - Анимация кнопок при hover (scale 1.02) и tap (scale 0.98)
 - Изменение цвета иконки при hover (primary → primary-foreground)
 - Автоматическая отправка сообщения при клике на промпт
 - Выравнивание по нижнему краю области сообщений (justify-end)
-
-**Анимация логотипа:**
-
-Логотип использует 4 типа анимаций пульсации для узлов:
-- `pulse-subtle` (3.2s): Легкая пульсация для верхнего левого узла
-- `pulse-medium` (2.4s-3s): Средняя пульсация для боковых узлов
-- `pulse-strong` (2.6s): Сильная пульсация для верхнего правого узла
-- `pulse-center` (2.88s): Сложная пульсация для центрального узла (3 фазы)
-
-Анимация линий связей:
-- `flow-fast` (2s): Быстрое движение для линий 1 и 3
-- `flow-slow` (2.6s-2.8s): Медленное движение для линий 2 и 4
-- Изменение opacity во время анимации (0.3-0.8)
-
-Каждый узел и линия имеют индивидуальные задержки (0s-2.2s) для создания органичного эффекта.
 
 ### Стилизация Сообщений
 
@@ -1434,11 +1419,11 @@ function EmptyStatePlaceholder({ onPromptClick }: EmptyStatePlaceholderProps) {
 
 **Особенности:**
 - Без фона и рамки - чистый текст
-- Аватар показывается только для первого сообщения в последовательности
+- Message Avatar показывается только для первого сообщения в последовательности
 - `max-w-[85%]` - немного шире чем сообщения пользователя
 - `whitespace-pre-wrap` - сохранение переносов строк из текста
 - `break-words` - перенос длинных слов без пробелов
-- Анимированный логотип при статусе `in-progress`
+- Message Avatar с CSS-анимацией
 
 ## Markdown рендеринг
 
@@ -1482,7 +1467,7 @@ const STATUS_STYLES: Record<AgentStatus, StatusStyle> = {
     animation: 'animate-spin',
     label: 'In progress'
   },
-  'awaiting-user': {
+  'awaiting-response': {
     bgColor: 'bg-amber-500',
     ringColor: 'ring-amber-500/30',
     textColor: 'text-amber-600',
@@ -1543,7 +1528,7 @@ const STATUS_STYLES: Record<AgentStatus, StatusStyle> = {
          return { bg: 'bg-sky-400', ring: 'ring-sky-400/30', text: 'text-sky-600' };
        case 'in-progress':
          return { bg: 'bg-blue-500', ring: 'ring-blue-500/30', text: 'text-blue-600' };
-       case 'awaiting-user':
+       case 'awaiting-response':
          return { bg: 'bg-amber-500', ring: 'ring-amber-500/30', text: 'text-amber-600' };
        case 'error':
          return { bg: 'bg-red-500', ring: 'ring-red-500/30', text: 'text-red-600' };
@@ -1552,6 +1537,313 @@ const STATUS_STYLES: Record<AgentStatus, StatusStyle> = {
      }
    }
    ```
+
+## Визуальные Компоненты
+
+Есть два типа анимации:
+1. CSS-анимация узлов и линий (для логотипов)
+2. JS spring-анимация перемещения (для списка агентов)
+
+### 1. Application Logo (компонент Logo)
+
+**Назначение:** Логотип Clerkly для брендинга
+
+**Расположение:** Страница логина, пустой стейт чата
+
+**Варианты:**
+- Страница логина: без анимации
+- Пустой стейт чата: с CSS-анимацией узлов
+
+**Детали CSS-анимации узлов (5 узлов нейронной сети):**
+- `pulse-subtle` (3.2s): верхний левый узел
+  - opacity: 0.6 → 0.95 → 0.6
+  - radius: 1.8 → 2.3 → 1.8
+  - delay: 0s
+- `pulse-medium` (2.4s-3s): боковые узлы (нижний левый, нижний правый)
+  - opacity: 0.7 → 1.0 → 0.7
+  - radius: 2.0 → 2.6 → 2.0
+  - delay: 0.8s, 2.2s
+- `pulse-strong` (2.6s): верхний правый узел
+  - opacity: 0.85 → 1.0 → 0.85
+  - radius: 2.2 → 2.8 → 2.2
+  - delay: 1.6s
+- `pulse-center` (2.88s): центральный узел, 3-фазная пульсация
+  - opacity: 0.95 → 1.0 → 1.0 → 0.95
+  - radius: 2.5 → 3.2 → 2.8 → 2.5
+  - delay: 0.4s
+
+**Детали CSS-анимации линий связей (4 линии):**
+- `flow-fast` (2s-2.2s): линии 1 и 3
+  - stroke-dasharray: 5 5
+  - stroke-dashoffset: 20 → 0
+  - opacity: 0.4 → 0.8 → 0.4
+  - delay: 0s, 1.4s
+- `flow-slow` (2.6s-2.8s): линии 2 и 4
+  - stroke-dasharray: 5 5
+  - stroke-dashoffset: 20 → 0
+  - opacity: 0.3 → 0.7 → 0.3
+  - delay: 0.7s, 2.1s
+
+**Файл:** `src/renderer/components/logo.tsx`
+
+**Test ID:** `data-testid="logo"`
+
+### 2. Active Agent Icon (Logo в хедере)
+
+**Назначение:** Иконка активного агента в левой части хедера
+
+**Визуальное представление:** Идентичен Application Logo (те же узлы и линии)
+
+**Условия показа анимации:**
+- Анимация включается только при перемещении агента на первую позицию
+- Условие: агент был НЕ на первой позиции → получил сообщение → переместился на первую позицию
+- Длительность показа: 3 секунды (затем анимация отключается)
+- НЕ показывается при запуске приложения или переключении между агентами
+
+**Реализация:**
+```typescript
+// Отслеживание изменения позиции агента
+useEffect(() => {
+  const currentPosition = agents.findIndex(a => a.id === currentAgentId);
+  const previousPosition = previousAgentPositionRef.current;
+  const orderChanged = currentAgentsOrder !== previousAgentsOrder;
+  
+  // Показать анимацию если агент переместился на позицию 0
+  if (orderChanged && currentAgentId === previousAgentId && 
+      currentPosition === 0 && previousPosition > 0) {
+    setShowActivationAnimation(true);
+    setTimeout(() => setShowActivationAnimation(false), 3000);
+  }
+}, [activeAgent?.id, agents]);
+```
+
+**CSS-анимация:** Идентична Application Logo (узлы и линии)
+
+**Файл:** `src/renderer/components/agents.tsx`
+
+**Test ID:** `data-testid="agent-header-icon"`
+
+### 3. Agent List Icon в Agents List
+
+**Назначение:** Иконка агента в горизонтальном списке (правая часть хедера)
+
+**CSS-анимация статусов:**
+- `in-progress`: вращающееся белое кольцо
+  - `animate-spin` (Tailwind CSS)
+  - `border-2 border-white border-t-transparent`
+  - Непрерывное вращение, 60 FPS
+- `awaiting-response`: пульсирующее цветное кольцо
+  - `animate-pulse` (Tailwind CSS)
+  - `ring-2` с цветом статуса (ring-amber-500/30)
+  - Плавная пульсация opacity
+
+**JS spring-анимация перемещения (framer-motion):**
+- `layout` prop для автоматической анимации позиции при изменении порядка
+- Параметры spring:
+  - `type: 'spring'`
+  - `stiffness: 400` - жесткость пружины
+  - `damping: 30` - затухание
+  - `mass: 0.8` - масса элемента
+- Анимация появления/исчезновения:
+  - `initial={{ opacity: 0, scale: 0.8 }}`
+  - `animate={{ opacity: 1, scale: 1 }}`
+  - `exit={{ opacity: 0, scale: 0.8 }}`
+  - `duration: 0.2` для opacity и scale
+- `AnimatePresence` с `mode="popLayout"` для управления анимацией списка
+
+**Реализация:**
+```typescript
+<AnimatePresence mode="popLayout">
+  {agents.slice(0, visibleChatsCount).map(agent => (
+    <motion.div
+      key={agent.id}
+      layout
+      initial={{ opacity: 0, scale: 0.8 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.8 }}
+      transition={{
+        layout: { type: 'spring', stiffness: 400, damping: 30, mass: 0.8 },
+        opacity: { duration: 0.2 },
+        scale: { duration: 0.2 }
+      }}
+    >
+      {/* Иконка агента */}
+    </motion.div>
+  ))}
+</AnimatePresence>
+```
+
+**Файл:** `src/renderer/components/agents.tsx`
+
+**Test ID:** `data-testid="agent-icon-{agentId}"`
+
+### 4. Agent List Icon в All Agents
+
+**Назначение:** Иконка агента на странице All Agents
+
+**CSS-анимация статусов:** Идентична Agents List
+- `in-progress`: вращающееся белое кольцо (animate-spin)
+- `awaiting-response`: пульсирующее цветное кольцо (animate-pulse)
+
+**JS-анимация:** БЕЗ spring-анимации перемещения (статичный список)
+
+**Файл:** `src/renderer/components/agents.tsx`
+
+**Test ID:** `data-testid="agent-card-{agentId}"`
+
+### 5. Message Avatar (компонент AgentAvatar)
+
+**Назначение:** Маленькая иконка слева сверху от сообщений агента
+
+**Визуальное представление:** Идентичен Application Logo (те же узлы и линии)
+
+**CSS-анимация:** Идентична Application Logo
+- 5 узлов с pulse-анимациями (subtle, medium, strong, center)
+- 4 линии с flow-анимациями (fast, slow)
+- Индивидуальные задержки для органичного эффекта
+
+**Особенности:**
+- Показывается перед первым сообщением агента в последовательности
+- Всегда анимирован (`animated={true}`)
+
+**Файл:** `src/renderer/components/agents/AgentAvatar.tsx`
+
+**Test ID:** `data-testid="agent-avatar"`
+
+#### Реализация
+
+**Файл:** `src/renderer/components/agents.tsx`
+
+```typescript
+// Requirements: agents.6.7
+const [showActivationAnimation, setShowActivationAnimation] = useState(false);
+const previousActiveAgentIdRef = useRef<string | null>(null);
+const previousAgentPositionRef = useRef<number>(-1);
+const previousAgentsOrderRef = useRef<string>('');
+
+// Track agent position changes and trigger activation animation
+// Requirements: agents.6.7.1, agents.6.7.2, agents.6.7.4, agents.6.7.5
+useEffect(() => {
+  if (!activeAgent) return;
+
+  const currentAgentId = activeAgent.id;
+  const currentPosition = agents.findIndex(a => a.id === currentAgentId);
+  const previousPosition = previousAgentPositionRef.current;
+  const previousAgentId = previousActiveAgentIdRef.current;
+  const currentAgentsOrder = agents.map(a => a.id).join(',');
+  const previousAgentsOrder = previousAgentsOrderRef.current;
+
+  // Initialize on first render (empty previousAgentsOrder)
+  if (previousAgentsOrder === '') {
+    previousActiveAgentIdRef.current = currentAgentId;
+    previousAgentPositionRef.current = currentPosition;
+    previousAgentsOrderRef.current = currentAgentsOrder;
+    return;
+  }
+
+  // Check if order actually changed (not just array reference)
+  const orderChanged = currentAgentsOrder !== previousAgentsOrder;
+
+  // Same agent moved to position 0 from non-zero position AND order changed - show animation
+  if (
+    orderChanged &&
+    currentAgentId === previousAgentId &&
+    currentPosition === 0 &&
+    previousPosition > 0
+  ) {
+    setShowActivationAnimation(true);
+    // Hide animation after 3 seconds
+    const timer = setTimeout(() => {
+      setShowActivationAnimation(false);
+    }, 3000);
+
+    // Update refs
+    previousActiveAgentIdRef.current = currentAgentId;
+    previousAgentPositionRef.current = currentPosition;
+    previousAgentsOrderRef.current = currentAgentsOrder;
+
+    return () => clearTimeout(timer);
+  }
+
+  // Update refs
+  previousActiveAgentIdRef.current = currentAgentId;
+  previousAgentPositionRef.current = currentPosition;
+  previousAgentsOrderRef.current = currentAgentsOrder;
+}, [activeAgent?.id, agents]);
+```
+
+**Ключевые изменения:**
+- Добавлен `previousAgentsOrderRef` для отслеживания порядка агентов
+- Анимация срабатывает ТОЛЬКО когда порядок агентов реально изменился
+- Это предотвращает срабатывание анимации при запуске приложения
+- Refs обновляются ВСЕГДА после проверки условия анимации
+
+#### Использование в UI
+
+**Иконка агента в хедере (с анимацией):**
+#### Использование в UI
+
+**Active Agent Icon в хедере:**
+```tsx
+// Requirements: agents.6.7.2
+<div className="relative flex-shrink-0 w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center">
+  <span className="text-white text-sm font-semibold">A</span>
+  {/* CSS-анимация: вращающееся кольцо для in-progress */}
+  {isInProgress(selectedAgent) && (
+    <div className="absolute inset-0 rounded-full border-2 border-white border-t-transparent animate-spin" />
+  )}
+</div>
+```
+
+**Message Avatar в сообщениях:**
+```tsx
+// Requirements: agents.6.7.5
+import { AgentAvatar } from './agents/AgentAvatar';
+
+{showAvatar && (
+  <div className="mb-2">
+    <AgentAvatar size="sm" animated={true} />
+  </div>
+)}
+```
+
+**Application Logo в пустом стейте:**
+```tsx
+// Requirements: agents.6.7.1, agents.4.15
+import { Logo } from '../logo';
+
+<Logo size="lg" animated={true} />
+```
+
+#### Логика работы
+
+1. **Первый запуск приложения:**
+   - Агент на позиции 0
+   - `previousPosition = -1` (не инициализирован)
+   - Анимация НЕ показывается
+
+2. **Активный агент получает сообщение:**
+   - Агент был на позиции 2
+   - updatedAt обновляется → агент пересортировывается на позицию 0
+   - `currentPosition = 0`, `previousPosition = 2`
+   - `currentAgentId === previousAgentId` → анимация показывается
+
+3. **Агент уже на первой позиции получает сообщение:**
+   - Агент был на позиции 0
+   - updatedAt обновляется → агент остается на позиции 0
+   - `currentPosition = 0`, `previousPosition = 0`
+   - Условие не выполняется → анимация НЕ показывается
+
+4. **Переключение на другого агента:**
+   - `currentAgentId !== previousAgentId`
+   - Условие не выполняется → анимация НЕ показывается
+
+#### Почему отслеживаем позицию, а не клики?
+
+- Анимация показывает **физическое перемещение** агента в списке
+- Это визуальная обратная связь о том, что агент "подпрыгнул" на первое место
+- Связано с spring-анимацией перемещения (agents.1.4.4)
+- Не зависит от способа активации агента (клик, событие, автовыбор)
 
 ## Стратегия тестирования
 
@@ -1587,6 +1879,7 @@ const STATUS_STYLES: Record<AgentStatus, StatusStyle> = {
 | `tests/functional/auto-expanding-textarea.spec.ts` | agents.4.3-4.7 | Автоувеличение поля ввода |
 | `tests/functional/empty-state-placeholder.spec.ts` | agents.4 | Пустой стейт с промптами |
 | `tests/functional/message-text-wrapping.spec.ts` | agents.4.22 | 12 тестов переноса текста (см. ниже) |
+| `tests/functional/agent-activation-animation.spec.ts` | agents.6.7 | Анимация активации агента |
 
 #### Детальное покрытие agents.4.22 (message-text-wrapping.spec.ts)
 
@@ -1619,6 +1912,7 @@ const STATUS_STYLES: Record<AgentStatus, StatusStyle> = {
 | agents.5.7 (sort by updatedAt) | ✓ | - | ✓ |
 | agents.5.8 (optimized SQL) | ✓ | - | - |
 | agents.6 | ✓ | - | ✓ |
+| agents.6.7 (activation animation) | ✓ | - | ✓ |
 | agents.7 | ✓ | - | ✓ |
 | agents.8 | ✓ | - | ✓ |
 | agents.9 | ✓ | ✓ | ✓ |

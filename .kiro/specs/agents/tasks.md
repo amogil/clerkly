@@ -179,7 +179,7 @@
 #### 4.1 computeAgentStatus
 - **Файл:** `src/shared/utils/computeAgentStatus.ts`
 - **Алгоритм:** Определение статуса из последних сообщений
-- **Статусы:** `new`, `in-progress`, `awaiting-user`, `error`, `completed`
+- **Статусы:** `new`, `in-progress`, `awaiting-response`, `error`, `completed`
 
 #### 4.2 Тесты computeAgentStatus
 - **Файл:** `tests/unit/utils/computeAgentStatus.test.ts`
@@ -371,7 +371,7 @@
 #### 6.3 EmptyStatePlaceholder
 - **Файл:** `src/renderer/components/agents/EmptyStatePlaceholder.tsx` ✅
 - **Интеграция:** `src/renderer/components/agents.tsx` (показывается когда messages.length === 0) ✅
-- **Дизайн:** Анимированный логотип + 4 промпт-кнопки с иконками ✅
+- **Дизайн:** Application Logo + 4 промпт-кнопки с иконками ✅
 - **Промпты:** 
   - "Transcribe my latest meeting" (Video icon)
   - "Extract action items from today's standup" (CheckSquare icon)
