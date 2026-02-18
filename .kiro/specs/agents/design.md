@@ -1889,13 +1889,27 @@ import { Logo } from '../logo';
 
 | Файл | Покрытие | Тесты |
 |------|----------|-------|
-| `tests/functional/agents.spec.ts` | agents.1-12 | Основные сценарии работы с агентами |
+| `tests/functional/agent-switching.spec.ts` | agents.3 | Переключение между агентами |
+| `tests/functional/agent-messaging.spec.ts` | agents.4.3, 4.4, 4.8, 4.13 | Отправка сообщений и базовый чат |
+| `tests/functional/all-agents-page.spec.ts` | agents.5 | Страница All Agents |
+| `tests/functional/agent-status-indicators.spec.ts` | agents.6 | Визуальные индикаторы статусов |
+| `tests/functional/message-format.spec.ts` | agents.7 | Формат сообщений |
+| `tests/functional/agent-status-calculation.spec.ts` | agents.9 | Вычисление статуса агента |
+| `tests/functional/agent-data-isolation.spec.ts` | agents.10 | Изоляция данных по пользователю |
+| `tests/functional/agent-activity-indicator.spec.ts` | agents.11 | Индикатор активности |
+| `tests/functional/agent-realtime-events.spec.ts` | agents.12 | Real-time события |
+| `tests/functional/agent-list-responsive.spec.ts` | agents.1.7, 1.8, 1.9 | Адаптивность списка агентов |
 | `tests/functional/agents-always-one.spec.ts` | agents.2.7-2.11 | Автосоздание первого агента |
 | `tests/functional/agents-error-messages.spec.ts` | agents.5.5, 5.6, 5.7 | Отображение ошибок в AllAgents |
-| `tests/functional/auto-expanding-textarea.spec.ts` | agents.4.3-4.7 | Автоувеличение поля ввода |
-| `tests/functional/empty-state-placeholder.spec.ts` | agents.4 | Пустой стейт с промптами |
-| `tests/functional/message-text-wrapping.spec.ts` | agents.4.22 | 12 тестов переноса текста (см. ниже) |
+| `tests/functional/auto-expanding-textarea.spec.ts` | agents.4.5-4.7 | Автоувеличение поля ввода |
+| `tests/functional/empty-state-placeholder.spec.ts` | agents.4.14-4.18 | Пустой стейт с промптами |
+| `tests/functional/message-text-wrapping.spec.ts` | agents.4.22 | 11 тестов переноса текста (см. ниже) |
 | `tests/functional/agent-activation-animation.spec.ts` | agents.6.7 | Анимация активации агента |
+| `tests/functional/agent-list-initial-animation.spec.ts` | agents.1.4.4 | Анимация при загрузке |
+| `tests/functional/agent-reordering.spec.ts` | agents.1.3, 1.4 | Пересортировка агентов |
+| `tests/functional/agent-date-update.spec.ts` | agents.1.4, 8.1 | Обновление timestamp |
+| `tests/functional/input-autofocus.spec.ts` | agents.4.7.1, 4.7.2 | Автофокус поля ввода |
+| `tests/functional/header-layout.spec.ts` | agents.8.3 | Layout хедера |
 
 #### Детальное покрытие agents.4.22 (message-text-wrapping.spec.ts)
 
@@ -1918,6 +1932,16 @@ import { Logo } from '../logo';
 | agents.1 | ✓ | - | ✓ |
 | agents.2 | ✓ | ✓ | ✓ |
 | agents.2.7-2.11 (auto-create) | ✓ | ✓ | ✓ |
+| agents.3 | ✓ | - | ✓ |
+| agents.4 | ✓ | - | ✓ |
+| agents.5 | ✓ | - | ✓ |
+| agents.6 | ✓ | - | ✓ |
+| agents.7 | ✓ | - | ✓ |
+| agents.8 | ✓ | - | ✓ |
+| agents.9 | ✓ | ✓ | ✓ |
+| agents.10 | ✓ | - | ✓ |
+| agents.11 | ✓ | - | ✓ |
+| agents.12 | ✓ | - | ✓ |
 | agents.3 | ✓ | - | ✓ |
 | agents.4 | ✓ | - | ✓ |
 | agents.4.7.1-4.7.2 (autofocus) | - | - | ✓ |
