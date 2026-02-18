@@ -8,23 +8,50 @@
  * 3. Agent icons DO animate with spring motion when reordering
  */
 
-import { test, expect, Page, ElectronApplication } from '@playwright/test';
-import { launchApp, loginAndNavigateToAgents } from './helpers/electron';
+import { test, expect, Page, ElectronApplication, _electron as electron } from '@playwright/test';
+import { completeOAuthFlow, createMockOAuthServer } from './helpers/electron';
+import type { MockOAuthServer } from './helpers/mock-oauth-server';
+
+let mockServer: MockOAuthServer;
+
+test.beforeAll(async () => {
+  mockServer = await createMockOAuthServer(8899);
+});
+
+test.afterAll(async () => {
+  if (mockServer) {
+    await mockServer.stop();
+  }
+});
 
 test.describe('Agent list initial animation', () => {
   let electronApp: ElectronApplication;
   let window: Page;
 
   test.beforeEach(async () => {
-    const app = await launchApp();
-    electronApp = app.electronApp;
-    window = app.window;
+    mockServer.setUserProfile({
+      id: 'animation-test-user',
+      email: 'animation.test@example.com',
+      name: 'Animation Test User',
+      given_name: 'Animation',
+      family_name: 'Test User',
+    });
 
-    // Login and navigate to agents page
-    await loginAndNavigateToAgents(window);
+    electronApp = await electron.launch({
+      args: ['.'],
+      env: {
+        ...process.env,
+        NODE_ENV: 'test',
+        ELECTRON_DISABLE_SECURITY_WARNINGS: 'true',
+        CLERKLY_GOOGLE_API_URL: mockServer.getBaseUrl(),
+      },
+    });
 
-    // Wait for agents to load
-    await window.waitForSelector('[data-testid="agents"]', { timeout: 10000 });
+    window = await electronApp.firstWindow();
+    await window.waitForLoadState('domcontentloaded');
+
+    await completeOAuthFlow(electronApp, window);
+    await expect(window.locator('[data-testid="agents"]')).toBeVisible({ timeout: 10000 });
   });
 
   test.afterEach(async () => {

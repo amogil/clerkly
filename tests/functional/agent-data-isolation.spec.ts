@@ -6,18 +6,39 @@
  */
 
 import { test, expect, _electron as electron, ElectronApplication, Page } from '@playwright/test';
-import { completeOAuthFlow } from './helpers/electron';
+import { completeOAuthFlow, createMockOAuthServer } from './helpers/electron';
+import type { MockOAuthServer } from './helpers/mock-oauth-server';
 
 let electronApp: ElectronApplication;
 let window: Page;
+let mockServer: MockOAuthServer;
+
+test.beforeAll(async () => {
+  mockServer = await createMockOAuthServer(8898);
+});
+
+test.afterAll(async () => {
+  if (mockServer) {
+    await mockServer.stop();
+  }
+});
 
 test.beforeEach(async () => {
+  mockServer.setUserProfile({
+    id: 'isolation-test-user',
+    email: 'isolation.test@example.com',
+    name: 'Isolation Test User',
+    given_name: 'Isolation',
+    family_name: 'Test User',
+  });
+
   electronApp = await electron.launch({
     args: ['.'],
     env: {
       ...process.env,
       NODE_ENV: 'test',
       ELECTRON_DISABLE_SECURITY_WARNINGS: 'true',
+      CLERKLY_GOOGLE_API_URL: mockServer.getBaseUrl(),
     },
   });
 
