@@ -83,19 +83,18 @@ test.describe('Message Format', () => {
       .filter({ hasText: 'User test message' });
     await expect(userMessage).toBeVisible();
 
-    // Check styling
-    const messageContainer = userMessage.locator('..'); // Parent div
-    const classes = await messageContainer.getAttribute('class');
+    // Check container has right alignment
+    const messageContainer = userMessage.locator('div.flex.justify-end');
+    await expect(messageContainer).toBeVisible();
 
-    // Should have right alignment
-    expect(classes).toContain('justify-end');
+    // Check message bubble has styling (rounded, background, border)
+    const messageBubble = messageContainer.locator('div.rounded-2xl');
+    await expect(messageBubble).toBeVisible();
 
-    // Message bubble should have styling
-    const messageBubble = userMessage.locator('..');
     const bubbleClasses = await messageBubble.getAttribute('class');
-
-    // Should have rounded corners, background, and border
-    expect(bubbleClasses).toMatch(/rounded|bg-secondary|border/);
+    expect(bubbleClasses).toContain('rounded-2xl');
+    expect(bubbleClasses).toContain('bg-secondary');
+    expect(bubbleClasses).toContain('border');
   });
 
   /* Preconditions: Agent sends response
