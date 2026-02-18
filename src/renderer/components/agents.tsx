@@ -27,6 +27,7 @@ export function Agents() {
   const [taskInput, setTaskInput] = useState('');
   const [visibleChatsCount, setVisibleChatsCount] = useState(5);
   const [errorMessages, setErrorMessages] = useState<Map<string, string>>(new Map());
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
   const chatListRef = useRef<HTMLDivElement>(null);
   const messagesAreaRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<AutoExpandingTextareaHandle>(null);
@@ -48,6 +49,15 @@ export function Agents() {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // Track initial load completion
+  // Requirements: agents.1.4.4 - Disable initial animation on first load
+  useEffect(() => {
+    if (!isLoading && agents.length > 0 && isInitialLoad) {
+      // Mark initial load as complete after agents are loaded
+      setIsInitialLoad(false);
+    }
+  }, [isLoading, agents.length, isInitialLoad]);
 
   // Auto-focus input when active agent changes
   // Requirements: agents.4.7.1, agents.4.7.2
@@ -343,7 +353,7 @@ export function Agents() {
                   key={agent.id}
                   data-testid={`agent-icon-${agent.id}`}
                   layout
-                  initial={{ opacity: 0, scale: 0.8 }}
+                  initial={isInitialLoad ? false : { opacity: 0, scale: 0.8 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.8 }}
                   transition={{

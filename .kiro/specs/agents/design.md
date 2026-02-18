@@ -1645,11 +1645,27 @@ useEffect(() => {
   - `damping: 30` - затухание
   - `mass: 0.8` - масса элемента
 - Анимация появления/исчезновения:
-  - `initial={{ opacity: 0, scale: 0.8 }}`
+  - `initial={{ opacity: 0, scale: 0.8 }}` - ТОЛЬКО для новых агентов
+  - `initial={false}` - при первой загрузке (отключает анимацию)
   - `animate={{ opacity: 1, scale: 1 }}`
   - `exit={{ opacity: 0, scale: 0.8 }}`
   - `duration: 0.2` для opacity и scale
 - `AnimatePresence` с `mode="popLayout"` для управления анимацией списка
+
+**Логика отключения initial анимации:**
+```typescript
+const [isInitialLoad, setIsInitialLoad] = useState(true);
+
+// Track initial load completion
+useEffect(() => {
+  if (!isLoading && agents.length > 0 && isInitialLoad) {
+    setIsInitialLoad(false);
+  }
+}, [isLoading, agents.length, isInitialLoad]);
+
+// In motion.div
+initial={isInitialLoad ? false : { opacity: 0, scale: 0.8 }}
+```
 
 **Реализация:**
 ```typescript
