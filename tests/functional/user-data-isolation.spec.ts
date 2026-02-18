@@ -15,7 +15,6 @@ import {
 let context: ElectronTestContext;
 let mockOAuthServer: MockOAuthServer;
 const TEST_CLIENT_ID = 'test-client-id-12345'; // Use same as completeOAuthFlow default
-const TEST_CLIENT_SECRET = 'test-client-secret-67890'; // Use same as OAuthConfig
 
 test.beforeEach(async () => {
   mockOAuthServer = await createMockOAuthServer(3333);

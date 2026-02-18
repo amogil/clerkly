@@ -372,7 +372,7 @@ export async function createMockOAuthServer(port: number = 8898): Promise<MockOA
     clientId: 'test-client-id-12345',
     clientSecret: 'test-client-secret-67890',
   });
-  
+
   await mockServer.start();
   return mockServer;
 }

@@ -31,7 +31,6 @@ test.describe('Complete OAuth Flow', () => {
   let context: ElectronTestContext;
   let mockServer: MockOAuthServer;
   const TEST_CLIENT_ID = 'test-client-id-12345';
-  const TEST_CLIENT_SECRET = 'test-client-secret-67890';
 
   test.beforeAll(async () => {
     mockServer = await createMockOAuthServer(8889);
