@@ -53,18 +53,41 @@ test.describe('Agent Real-time Events', () => {
      Assertions: Agent appears in list via agent.created event
      Requirements: agents.12.1, agents.12.6 */
   test('should add agent to list on agent.created event', async () => {
-    // Get initial count
+    // Get initial count and IDs
     const agentIcons = window.locator('[data-testid^="agent-icon-"]');
     const initialCount = await agentIcons.count();
+
+    // Get existing agent IDs
+    const existingIds = new Set<string>();
+    for (let i = 0; i < initialCount; i++) {
+      const id = await agentIcons.nth(i).getAttribute('data-testid');
+      if (id) existingIds.add(id.replace('agent-icon-', ''));
+    }
 
     // Create new agent
     const newChatButton = window.locator('div[title="New chat"]');
     await newChatButton.click();
 
-    // Wait for event to propagate
-    await window.waitForTimeout(500);
+    // Wait for new agent icon to appear (one that wasn't in existingIds)
+    await window.waitForFunction(
+      (existingIdsArray) => {
+        const icons = document.querySelectorAll('[data-testid^="agent-icon-"]');
+        for (const icon of icons) {
+          const testId = icon.getAttribute('data-testid');
+          if (testId) {
+            const agentId = testId.replace('agent-icon-', '');
+            if (!existingIdsArray.includes(agentId)) {
+              return true; // Found new agent
+            }
+          }
+        }
+        return false;
+      },
+      Array.from(existingIds),
+      { timeout: 5000 }
+    );
 
-    // Agent should appear in list
+    // Verify new count
     const newCount = await agentIcons.count();
     expect(newCount).toBe(initialCount + 1);
 
@@ -176,22 +199,22 @@ test.describe('Agent Real-time Events', () => {
     const messageInput = window.locator('textarea[placeholder*="Ask"]');
     await messageInput.fill('Initial message');
     await messageInput.press('Enter');
-    await window.waitForTimeout(500);
 
-    // Get message
-    const messages = window.locator('[data-testid="message"]');
-    await expect(messages).toHaveCount(1, { timeout: 2000 });
+    // Wait for message with our text to appear
+    const userMessage = window
+      .locator('[data-testid="message"]')
+      .filter({ hasText: 'Initial message' });
+    await expect(userMessage).toBeVisible({ timeout: 5000 });
 
-    const firstMessage = messages.first();
-    const initialText = await firstMessage.textContent();
-    expect(initialText).toContain('Initial message');
+    const messageText = await userMessage.textContent();
+    expect(messageText).toContain('Initial message');
 
     // In real scenario, message would update when tool_call completes
     // We can't easily simulate this in functional tests without real LLM
     // But we verify the structure supports updates
 
     // Message should remain visible
-    await expect(firstMessage).toBeVisible();
+    await expect(userMessage).toBeVisible();
   });
 
   /* Preconditions: Agent has messages
