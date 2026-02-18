@@ -6,10 +6,13 @@
  */
 
 import { test, expect, _electron as electron, ElectronApplication, Page } from '@playwright/test';
-import { completeOAuthFlow } from './helpers/electron';
+import path from 'path';
+import { createMockOAuthServer, completeOAuthFlow } from './helpers/electron';
+import type { MockOAuthServer } from './helpers/mock-oauth-server';
 
 let electronApp: ElectronApplication;
 let window: Page;
+let mockOAuthServer: MockOAuthServer;
 
 test.beforeEach(async () => {
   electronApp = await electron.launch({
@@ -81,6 +84,7 @@ test.describe('Agent Status Calculation', () => {
     await window.waitForTimeout(500);
 
     // Status should update (classes might change)
+    const agentIcon = window.locator('[data-testid^="agent-icon-"]').first();
     const updatedClasses = await agentIcon.getAttribute('class');
 
     // Should still have a status color
