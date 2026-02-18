@@ -474,6 +474,7 @@ export function Agents() {
               );
             })
           )}
+          <div ref={messagesEndRef} />
         </div>
       </div>
 

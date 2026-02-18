@@ -164,7 +164,7 @@ test.describe('Agent Messaging', () => {
      Requirements: agents.4.13 */
   test('should autoscroll to last message', async () => {
     const messageInput = window.locator('textarea[placeholder*="Ask"]');
-    const messagesContainer = window.locator('[data-testid="messages-container"]');
+    const messagesContainer = window.locator('[data-testid="messages-area"]');
 
     // Send many messages to create scroll
     for (let i = 1; i <= 10; i++) {
@@ -179,6 +179,16 @@ test.describe('Agent Messaging', () => {
 
     const lastMessageText = await lastMessage.textContent();
     expect(lastMessageText).toContain('Message 10');
+
+    // Wait for scroll to complete
+    await window.waitForFunction(
+      () => {
+        const container = document.querySelector('[data-testid="messages-area"]');
+        if (!container) return false;
+        return Math.abs(container.scrollHeight - container.scrollTop - container.clientHeight) < 50;
+      },
+      { timeout: 5000 }
+    );
 
     // Check scroll position is at bottom
     const scrollTop = await messagesContainer.evaluate((el) => el.scrollTop);
