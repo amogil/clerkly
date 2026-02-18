@@ -60,7 +60,7 @@ test.describe('Agent List Responsive Behavior', () => {
      Requirements: agents.1.7 */
   test('should adapt visible agents count to window width', async () => {
     // Create many agents
-    const newChatButton = window.locator('button[title="New chat"]');
+    const newChatButton = window.locator('div[title="New chat"]');
 
     for (let i = 0; i < 10; i++) {
       await newChatButton.click();
@@ -118,7 +118,7 @@ test.describe('Agent List Responsive Behavior', () => {
      Requirements: agents.1.9 */
   test('should show +N button for hidden agents', async () => {
     // Create many agents to ensure some are hidden
-    const newChatButton = window.locator('button[title="New chat"]');
+    const newChatButton = window.locator('div[title="New chat"]');
 
     for (let i = 0; i < 15; i++) {
       await newChatButton.click();
@@ -160,7 +160,7 @@ test.describe('Agent List Responsive Behavior', () => {
      Requirements: agents.1.9, agents.5.1 */
   test('should open all agents when clicking +N button', async () => {
     // Create many agents
-    const newChatButton = window.locator('button[title="New chat"]');
+    const newChatButton = window.locator('div[title="New chat"]');
 
     for (let i = 0; i < 12; i++) {
       await newChatButton.click();
@@ -198,7 +198,7 @@ test.describe('Agent List Responsive Behavior', () => {
      Requirements: agents.1.7 */
   test('should recalculate visible agents on each resize', async () => {
     // Create agents
-    const newChatButton = window.locator('button[title="New chat"]');
+    const newChatButton = window.locator('div[title="New chat"]');
 
     for (let i = 0; i < 8; i++) {
       await newChatButton.click();

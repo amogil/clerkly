@@ -65,7 +65,7 @@ test.describe('Agent Data Isolation', () => {
     expect(initialCount).toBeGreaterThan(0);
 
     // Create new agent
-    const newChatButton = window.locator('button[title="New chat"]');
+    const newChatButton = window.locator('div[title="New chat"]');
     await newChatButton.click();
     await window.waitForTimeout(500);
 
@@ -95,7 +95,7 @@ test.describe('Agent Data Isolation', () => {
      Requirements: agents.10.3 */
   test('should create agent with current userId', async () => {
     // Create new agent
-    const newChatButton = window.locator('button[title="New chat"]');
+    const newChatButton = window.locator('div[title="New chat"]');
     await newChatButton.click();
     await window.waitForTimeout(500);
 
