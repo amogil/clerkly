@@ -1300,6 +1300,83 @@ useEffect(() => {
 3. Первая загрузка → устанавливается первый агент → срабатывает `useEffect` → фокус
 4. Создание нового агента → новый агент становится активным → срабатывает `useEffect` → фокус
 
+#### Автоскролл к последнему сообщению
+
+**Requirements:** agents.4.13
+
+При создании сообщения пользователя (`kind: 'user'`) чат автоматически прокручивается вниз, чтобы последнее сообщение было видимо.
+
+**Реализация в Agents компоненте:**
+
+```typescript
+// Requirements: agents.4.13.4
+const messagesEndRef = useRef<HTMLDivElement>(null);
+
+// Requirements: agents.4.13.3
+const scrollToBottom = () => {
+  messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+};
+
+// Requirements: agents.4.13.1, agents.4.13.5
+const handleSend = async () => {
+  if (!taskInput.trim() || !activeAgent) return;
+  
+  const userMessage = taskInput.trim();
+  setTaskInput('');
+  
+  // Create message with kind: 'user'
+  await window.api.messages.create(activeAgent.agentId, {
+    kind: 'user',
+    data: { text: userMessage }
+  });
+  
+  // Scroll to bottom ONLY when creating user message
+  scrollToBottom();
+};
+```
+
+**Структура DOM:**
+
+```tsx
+{/* Messages Area */}
+<div
+  ref={messagesAreaRef}
+  data-testid="messages-area"
+  className="flex-1 overflow-y-auto p-6 min-h-0"
+>
+  <div className="min-h-full flex flex-col justify-end space-y-4">
+    {messages.map((message) => (
+      <motion.div key={message.id} data-testid="message">
+        {/* Message content */}
+      </motion.div>
+    ))}
+    {/* Requirements: agents.4.13.4 - Invisible div for autoscroll */}
+    <div ref={messagesEndRef} />
+  </div>
+</div>
+```
+
+**Принцип работы:**
+
+1. **Невидимый маркер** (agents.4.13.4): В конце списка сообщений размещается пустой `<div ref={messagesEndRef} />`. Этот элемент невидим, но служит целью для прокрутки.
+
+2. **Явный вызов** (agents.4.13.1, agents.4.13.5): `scrollToBottom()` вызывается ТОЛЬКО после создания сообщения с `kind: 'user'` в обработчике `handleSend()`.
+
+3. **Плавная прокрутка** (agents.4.13.3): `scrollIntoView({ behavior: 'smooth' })` обеспечивает плавную анимацию прокрутки к элементу.
+
+4. **Полная видимость** (agents.4.13.6): Прокрутка выполняется так, чтобы `messagesEndRef` (и, следовательно, последнее сообщение) был полностью видим в viewport.
+
+**Когда автоскролл срабатывает** (agents.4.13.1):
+- Пользователь вводит текст и нажимает Enter → создается сообщение `kind: 'user'` → `scrollToBottom()` → автоскролл
+- Пользователь вводит текст и кликает кнопку Send → создается сообщение `kind: 'user'` → `scrollToBottom()` → автоскролл
+- Пользователь кликает на промпт в пустом стейте → создается сообщение `kind: 'user'` → `scrollToBottom()` → автоскролл
+
+**Когда автоскролл НЕ срабатывает** (agents.4.13.2):
+- Агент отвечает → создается сообщение `kind: 'llm'` или `kind: 'final_answer'` → автоскролл НЕ срабатывает
+- Агент вызывает инструмент → создается сообщение `kind: 'tool_call'` → автоскролл НЕ срабатывает
+- Обновляется существующее сообщение → автоскролл НЕ срабатывает
+- Переключение на другого агента → загружаются сообщения → автоскролл НЕ срабатывает
+
 ### EmptyStatePlaceholder
 
 Компонент пустого стейта для нового агента без сообщений.
@@ -1877,6 +1954,7 @@ import { Logo } from '../logo';
 | `tests/unit/agents/ActivityIndicator.test.tsx` | agents.11 |
 | `tests/unit/agents/AutoExpandingTextarea.test.tsx` | agents.4.5-4.7 |
 | `tests/unit/components/agents.test.tsx` | agents.4.22 |
+| `tests/unit/components/agents-autoscroll.test.tsx` | agents.4.13 |
 
 ### Property-Based тесты
 
@@ -1945,6 +2023,7 @@ import { Logo } from '../logo';
 | agents.3 | ✓ | - | ✓ |
 | agents.4 | ✓ | - | ✓ |
 | agents.4.7.1-4.7.2 (autofocus) | - | - | ✓ |
+| agents.4.13 (autoscroll) | ✓ | - | ✓ |
 | agents.4.22 (text wrapping) | ✓ | - | ✓ |
 | agents.5 | ✓ | - | ✓ |
 | agents.5.5 (error messages) | ✓ | - | ✓ |

@@ -45,11 +45,6 @@ export function Agents() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  // Scroll to bottom when messages change
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
-
   // Track initial load completion
   // Requirements: agents.1.4.4 - Disable initial animation on first load
   useEffect(() => {
@@ -108,6 +103,7 @@ export function Agents() {
     setVisibleChatsCount(Math.max(1, maxChats));
   }, [agents.length]);
 
+  // Requirements: agents.4.13.1, agents.4.13.5 - Autoscroll only when user sends message
   const handleSend = async (text?: string) => {
     const messageText = text || taskInput;
     if (!messageText.trim() || !activeAgent) return;
@@ -115,6 +111,8 @@ export function Agents() {
     const success = await sendMessage(messageText);
     if (success) {
       setTaskInput('');
+      // Scroll to bottom ONLY when user sends message
+      scrollToBottom();
     }
   };
 
