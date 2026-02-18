@@ -106,23 +106,49 @@ test.describe('Agent list initial animation', () => {
     // Wait for initial load
     await window.waitForSelector('[data-testid^="agent-icon-"]', { timeout: 5000 });
 
-    // Count initial agents
-    const initialCount = await window.locator('[data-testid^="agent-icon-"]').count();
+    // Count initial agents and get their IDs
+    const agentIcons = window.locator('[data-testid^="agent-icon-"]');
+    const initialCount = await agentIcons.count();
+
+    const existingIds = new Set<string>();
+    for (let i = 0; i < initialCount; i++) {
+      const id = await agentIcons.nth(i).getAttribute('data-testid');
+      if (id) existingIds.add(id.replace('agent-icon-', ''));
+    }
 
     // Click "New chat" button
-    await window.click('div.bg-sky-400');
+    const newChatButton = window.locator('div[title="New chat"]');
+    await newChatButton.click();
 
     // Wait for new agent to appear
-    await window.waitForTimeout(100);
+    await window.waitForFunction(
+      (existingIdsArray) => {
+        const icons = document.querySelectorAll('[data-testid^="agent-icon-"]');
+        for (const icon of icons) {
+          const testId = icon.getAttribute('data-testid');
+          if (testId) {
+            const agentId = testId.replace('agent-icon-', '');
+            if (!existingIdsArray.includes(agentId)) {
+              return true;
+            }
+          }
+        }
+        return false;
+      },
+      Array.from(existingIds),
+      { timeout: 5000 }
+    );
 
     // New agent should be added
-    const newCount = await window.locator('[data-testid^="agent-icon-"]').count();
+    const newCount = await agentIcons.count();
     expect(newCount).toBe(initialCount + 1);
 
-    // Note: We can't easily test the animation itself in Playwright,
-    // but we can verify the icon appears and is visible
-    const newAgentIcon = window.locator('[data-testid^="agent-icon-"]').first();
+    // New agent icon should be visible
+    const newAgentIcon = agentIcons.first();
     await expect(newAgentIcon).toBeVisible();
+
+    // Verify the new agent is at first position and visible
+    // (Animation has completed by this point - we verified the agent appeared)
   });
 
   /* Preconditions: Multiple agents exist
@@ -136,19 +162,46 @@ test.describe('Agent list initial animation', () => {
     // Wait for agents to load
     await window.waitForSelector('[data-testid^="agent-icon-"]', { timeout: 5000 });
 
-    // Get initial agent order
-    const initialAgents = await window.locator('[data-testid^="agent-icon-"]').all();
-    if (initialAgents.length < 3) {
-      // Create more agents if needed
-      for (let i = initialAgents.length; i < 3; i++) {
-        await window.click('div.bg-sky-400');
-        await window.waitForTimeout(200);
+    // Get initial agent count
+    const agentIcons = window.locator('[data-testid^="agent-icon-"]');
+    let currentCount = await agentIcons.count();
+
+    // Create more agents if needed (need at least 3)
+    const newChatButton = window.locator('div[title="New chat"]');
+    while (currentCount < 3) {
+      const existingIds = new Set<string>();
+      for (let i = 0; i < currentCount; i++) {
+        const id = await agentIcons.nth(i).getAttribute('data-testid');
+        if (id) existingIds.add(id.replace('agent-icon-', ''));
       }
+
+      await newChatButton.click();
+
+      // Wait for new agent to appear
+      await window.waitForFunction(
+        (existingIdsArray) => {
+          const icons = document.querySelectorAll('[data-testid^="agent-icon-"]');
+          for (const icon of icons) {
+            const testId = icon.getAttribute('data-testid');
+            if (testId) {
+              const agentId = testId.replace('agent-icon-', '');
+              if (!existingIdsArray.includes(agentId)) {
+                return true;
+              }
+            }
+          }
+          return false;
+        },
+        Array.from(existingIds),
+        { timeout: 5000 }
+      );
+
+      currentCount = await agentIcons.count();
     }
 
     // Get agent IDs in order
     const getAgentOrder = async () => {
-      const icons = await window.locator('[data-testid^="agent-icon-"]').all();
+      const icons = await agentIcons.all();
       const ids = [];
       for (const icon of icons) {
         const testId = await icon.getAttribute('data-testid');
@@ -160,8 +213,11 @@ test.describe('Agent list initial animation', () => {
     const initialOrder = await getAgentOrder();
     expect(initialOrder.length).toBeGreaterThanOrEqual(3);
 
+    // Get third agent element before reordering
+    const thirdAgentId = initialOrder[2];
+    const thirdAgent = agentIcons.nth(2);
+
     // Click on third agent (position 2)
-    const thirdAgent = window.locator('[data-testid^="agent-icon-"]').nth(2);
     await thirdAgent.click();
 
     // Wait for agent to become active
@@ -172,8 +228,17 @@ test.describe('Agent list initial animation', () => {
     await textarea.fill('Test message to trigger reordering');
     await textarea.press('Enter');
 
-    // Wait for message to be sent and agent to reorder
-    await window.waitForTimeout(500);
+    // Wait for reordering to complete
+    await window.waitForFunction(
+      (expectedFirstId) => {
+        const icons = document.querySelectorAll('[data-testid^="agent-icon-"]');
+        if (icons.length === 0) return false;
+        const firstId = icons[0].getAttribute('data-testid');
+        return firstId === expectedFirstId;
+      },
+      thirdAgentId,
+      { timeout: 5000 }
+    );
 
     // Get new order
     const newOrder = await getAgentOrder();
@@ -183,6 +248,22 @@ test.describe('Agent list initial animation', () => {
 
     // Verify reordering happened
     expect(newOrder).not.toEqual(initialOrder);
+
+    // Check that layout animation is enabled (Framer Motion layout prop)
+    const firstAgentAfterReorder = agentIcons.first();
+    const hasLayoutAnimation = await firstAgentAfterReorder.evaluate((el) => {
+      // Check if element has layout animation styles
+      const style = window.getComputedStyle(el);
+
+      // Element should have transform or transition properties
+      const hasTransform = style.transform && style.transform !== 'none';
+      const hasTransition =
+        style.transition && style.transition !== 'none' && style.transition.length > 0;
+
+      return hasTransform || hasTransition;
+    });
+
+    expect(hasLayoutAnimation).toBe(true);
   });
 
   /* Preconditions: App just launched
