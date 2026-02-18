@@ -153,7 +153,7 @@ describe('OAuthClientManager Property-Based Tests', () => {
 
         // In test environment, browser is NOT opened
         expect(shell.openExternal).not.toHaveBeenCalled();
-        
+
         // But PKCE parameters are still generated and stored
         const pkceStorage = (oauthClient as any).pkceStorage;
         expect(pkceStorage).toBeDefined();
@@ -201,7 +201,7 @@ describe('OAuthClientManager Property-Based Tests', () => {
       fc.asyncProperty(fc.string({ minLength: 32, maxLength: 128 }), async (wrongState) => {
         // Start auth flow
         await oauthClient.startAuthFlow();
-        
+
         // Read correct state from pkceStorage
         const correctState = (oauthClient as any).pkceStorage.state;
 
@@ -242,7 +242,7 @@ describe('OAuthClientManager Property-Based Tests', () => {
         async ({ code, codeVerifier: _codeVerifier }) => {
           // Start auth flow to set up PKCE storage
           await oauthClient.startAuthFlow();
-          
+
           // Read state from pkceStorage
           const state = (oauthClient as any).pkceStorage.state;
 
@@ -411,7 +411,7 @@ describe('OAuthClientManager Property-Based Tests', () => {
         await tokenStorage.deleteTokens();
 
         await oauthClient.startAuthFlow();
-        
+
         // Read state from pkceStorage
         const state = (oauthClient as any).pkceStorage.state;
 
