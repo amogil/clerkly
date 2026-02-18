@@ -88,6 +88,42 @@ fc.assert(
 - Используют реальную файловую систему (Requirements: testing.3.5)
 - Показывают реальные окна на экране (Requirements: testing.3.6)
 - Проверяют end-to-end пользовательские сценарии (Requirements: testing.3.10)
+- **КРИТИЧЕСКИ ВАЖНО**: Каждый тест ДОЛЖЕН использовать уникальную временную директорию для полной изоляции данных (Requirements: testing.3.11)
+
+**Изоляция данных между тестами**:
+```typescript
+// Requirements: testing.3.11
+// ПРАВИЛЬНО: Каждый тест использует уникальную временную директорию
+test.beforeEach(async () => {
+  const testDataPath = path.join(
+    require('os').tmpdir(),
+    `clerkly-test-${Date.now()}-${Math.random().toString(36).substring(7)}`
+  );
+
+  electronApp = await electron.launch({
+    args: [
+      path.join(__dirname, '../../dist/main/main/index.js'),
+      '--user-data-dir',
+      testDataPath,
+    ],
+    env: {
+      ...process.env,
+      NODE_ENV: 'test',
+    },
+  });
+});
+
+// НЕПРАВИЛЬНО: Использование общей директории
+test.beforeEach(async () => {
+  electronApp = await electron.launch({
+    args: ['.'], // ❌ Все тесты используют одну БД!
+    env: {
+      ...process.env,
+      NODE_ENV: 'test',
+    },
+  });
+});
+```
 
 **Настройка Playwright**:
 ```typescript

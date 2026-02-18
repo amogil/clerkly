@@ -9,6 +9,7 @@
  */
 
 import { test, expect, Page, ElectronApplication, _electron as electron } from '@playwright/test';
+import path from 'path';
 import { completeOAuthFlow, createMockOAuthServer } from './helpers/electron';
 import type { MockOAuthServer } from './helpers/mock-oauth-server';
 
@@ -37,13 +38,25 @@ test.describe('Agent list initial animation', () => {
       family_name: 'Test User',
     });
 
+    // Create unique temp directory for this test
+    const testDataPath = path.join(
+      require('os').tmpdir(),
+      `clerkly-animation-test-${Date.now()}-${Math.random().toString(36).substring(7)}`
+    );
+
     electronApp = await electron.launch({
-      args: ['.'],
+      args: [
+        path.join(__dirname, '../../dist/main/main/index.js'),
+        '--user-data-dir',
+        testDataPath,
+      ],
       env: {
         ...process.env,
         NODE_ENV: 'test',
         ELECTRON_DISABLE_SECURITY_WARNINGS: 'true',
         CLERKLY_GOOGLE_API_URL: mockServer.getBaseUrl(),
+        CLERKLY_OAUTH_CLIENT_ID: 'test-client-id-12345',
+        CLERKLY_OAUTH_CLIENT_SECRET: 'test-client-secret-67890',
       },
     });
 
