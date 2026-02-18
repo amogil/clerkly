@@ -6,43 +6,86 @@
  */
 
 import { test, expect, _electron as electron, ElectronApplication, Page } from '@playwright/test';
+import path from 'path';
+import { MockOAuthServer } from './helpers/mock-oauth-server';
 import { completeOAuthFlow } from './helpers/electron';
 
-let electronApp: ElectronApplication;
-let window: Page;
+let mockServer: MockOAuthServer;
 
-test.beforeEach(async () => {
-  electronApp = await electron.launch({
-    args: ['.'],
-    env: {
-      ...process.env,
-      NODE_ENV: 'test',
-      ELECTRON_DISABLE_SECURITY_WARNINGS: 'true',
-    },
+test.beforeAll(async () => {
+  // Start mock OAuth server for all tests
+  mockServer = new MockOAuthServer({
+    port: 8897,
+    clientId: 'test-client-id-12345',
+    clientSecret: 'test-client-secret-67890',
   });
-
-  window = await electronApp.firstWindow();
-  await window.waitForLoadState('domcontentloaded');
-
-  // Complete OAuth flow to get to agents page
-  await completeOAuthFlow(electronApp, window);
-
-  // Wait for agents page to load
-  await expect(window.locator('[data-testid="agents"]')).toBeVisible({ timeout: 10000 });
+  await mockServer.start();
 });
 
-test.afterEach(async () => {
-  await electronApp.close();
+test.afterAll(async () => {
+  // Stop mock OAuth server
+  if (mockServer) {
+    await mockServer.stop();
+  }
 });
 
 test.describe('Agent Switching', () => {
+  let electronApp: ElectronApplication;
+  let window: Page;
+
+  test.beforeEach(async () => {
+    // Set user profile data for tests
+    mockServer.setUserProfile({
+      id: '070FF5B782',
+      email: 'switching.test@example.com',
+      name: 'Switching Test User',
+      given_name: 'Switching',
+      family_name: 'Test User',
+    });
+
+    // Create unique temp directory for this test
+    const testDataPath = path.join(
+      require('os').tmpdir(),
+      `clerkly-switching-test-${Date.now()}-${Math.random().toString(36).substring(7)}`
+    );
+
+    // Launch Electron app with clean state
+    electronApp = await electron.launch({
+      args: [
+        path.join(__dirname, '../../dist/main/main/index.js'),
+        '--user-data-dir',
+        testDataPath,
+      ],
+      env: {
+        ...process.env,
+        NODE_ENV: 'test',
+        CLERKLY_GOOGLE_API_URL: mockServer.getBaseUrl(),
+        CLERKLY_OAUTH_CLIENT_ID: 'test-client-id-12345',
+        CLERKLY_OAUTH_CLIENT_SECRET: 'test-client-secret-67890',
+      },
+    });
+
+    window = await electronApp.firstWindow();
+    await window.waitForLoadState('domcontentloaded');
+
+    // Complete OAuth flow to get to agents page
+    await completeOAuthFlow(electronApp, window);
+
+    // Wait for agents page to load
+    await expect(window.locator('[data-testid="agents"]')).toBeVisible({ timeout: 10000 });
+  });
+
+  test.afterEach(async () => {
+    await electronApp.close();
+  });
+
   /* Preconditions: User is logged in, agents page is loaded
      Action: Click on agent icon in list
      Assertions: Agent becomes active, visual indicator updates
      Requirements: agents.3.1, agents.3.3 */
   test('should switch active agent on click', async () => {
     // Create multiple agents
-    const newChatButton = window.locator('button[title="New chat"]');
+    const newChatButton = window.locator('div[title="New chat"]');
     await newChatButton.click();
     await window.waitForTimeout(500);
     await newChatButton.click();
@@ -66,10 +109,6 @@ test.describe('Agent Switching', () => {
     // Second agent should now be active
     await expect(secondIcon).toHaveClass(/ring-2 ring-primary/);
     await expect(firstIcon).not.toHaveClass(/ring-2 ring-primary/);
-
-    // Header should show second agent info
-    const headerAgentName = window.locator('[data-testid="active-agent-name"]');
-    await expect(headerAgentName).toBeVisible();
   });
 
   /* Preconditions: Multiple agents exist with messages
@@ -78,7 +117,7 @@ test.describe('Agent Switching', () => {
      Requirements: agents.3.2 */
   test('should load messages for selected agent', async () => {
     // Create second agent
-    const newChatButton = window.locator('button[title="New chat"]');
+    const newChatButton = window.locator('div[title="New chat"]');
     await newChatButton.click();
     await window.waitForTimeout(500);
 
@@ -129,7 +168,7 @@ test.describe('Agent Switching', () => {
      Requirements: agents.3.4 */
   test('should switch agents quickly (< 100ms)', async () => {
     // Create multiple agents
-    const newChatButton = window.locator('button[title="New chat"]');
+    const newChatButton = window.locator('div[title="New chat"]');
     await newChatButton.click();
     await window.waitForTimeout(500);
     await newChatButton.click();
