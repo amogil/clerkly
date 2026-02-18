@@ -14,13 +14,44 @@ let electronApp: ElectronApplication;
 let window: Page;
 let mockOAuthServer: MockOAuthServer;
 
+test.beforeAll(async () => {
+  mockOAuthServer = await createMockOAuthServer(8904);
+});
+
+test.afterAll(async () => {
+  if (mockOAuthServer) {
+    await mockOAuthServer.stop();
+  }
+});
+
 test.beforeEach(async () => {
+  mockOAuthServer.setUserProfile({
+    id: 'test-status-user',
+    email: 'status.test@example.com',
+    name: 'Status Test User',
+    given_name: 'Status',
+    family_name: 'Test User',
+  });
+
+  // Create unique temp directory for this test
+  const testDataPath = path.join(
+    require('os').tmpdir(),
+    `clerkly-test-${Date.now()}-${Math.random().toString(36).substring(7)}`
+  );
+
   electronApp = await electron.launch({
-    args: ['.'],
+    args: [
+      path.join(__dirname, '../../dist/main/main/index.js'),
+      '--user-data-dir',
+      testDataPath,
+    ],
     env: {
       ...process.env,
       NODE_ENV: 'test',
       ELECTRON_DISABLE_SECURITY_WARNINGS: 'true',
+      CLERKLY_GOOGLE_API_URL: mockOAuthServer.getBaseUrl(),
+      CLERKLY_OAUTH_CLIENT_ID: 'test-client-id-12345',
+      CLERKLY_OAUTH_CLIENT_SECRET: 'test-client-secret-67890',
     },
   });
 
