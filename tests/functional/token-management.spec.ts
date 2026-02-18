@@ -13,7 +13,8 @@
 
 import { test, expect, _electron as electron, ElectronApplication, Page } from '@playwright/test';
 import path from 'path';
-import { MockOAuthServer } from './helpers/mock-oauth-server';
+import { createMockOAuthServer } from './helpers/electron';
+import type { MockOAuthServer } from './helpers/mock-oauth-server';
 import { completeOAuthFlow } from './helpers/electron';
 
 let electronApp: ElectronApplication;
@@ -21,19 +22,10 @@ let mainWindow: Page;
 let mockServer: MockOAuthServer;
 
 test.beforeAll(async () => {
-  // Start mock OAuth server
-  mockServer = new MockOAuthServer({
-    port: 8890,
-    clientId: 'test-client-id-token-mgmt',
-    clientSecret: 'test-client-secret-token-mgmt',
-  });
-  await mockServer.start();
-
-  console.log(`[TEST] Mock OAuth server started at ${mockServer.getBaseUrl()}`);
+  mockServer = await createMockOAuthServer(8890);
 });
 
 test.afterAll(async () => {
-  // Stop mock server
   await mockServer.stop();
 });
 

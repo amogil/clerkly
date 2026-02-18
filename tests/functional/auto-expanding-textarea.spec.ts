@@ -1,6 +1,7 @@
 import { test, expect, Page, ElectronApplication, _electron as electron } from '@playwright/test';
 import path from 'path';
-import { MockOAuthServer } from './helpers/mock-oauth-server';
+import { createMockOAuthServer } from './helpers/electron';
+import type { MockOAuthServer } from './helpers/mock-oauth-server';
 import { completeOAuthFlow } from './helpers/electron';
 
 // Requirements: agents.4.3, agents.4.4, agents.4.5, agents.4.6, agents.4.7
@@ -8,21 +9,12 @@ import { completeOAuthFlow } from './helpers/electron';
 let mockServer: MockOAuthServer;
 
 test.beforeAll(async () => {
-  // Start mock OAuth server
-  mockServer = new MockOAuthServer({
-    port: 8896,
-    clientId: 'test-client-id-12345',
-    clientSecret: 'test-client-secret-67890',
-  });
-
-  await mockServer.start();
-  console.log(`[TEST] Mock OAuth server started at ${mockServer.getBaseUrl()}`);
+  mockServer = await createMockOAuthServer(8896);
 });
 
 test.afterAll(async () => {
   if (mockServer) {
     await mockServer.stop();
-    console.log('[TEST] Mock OAuth server stopped');
   }
 });
 

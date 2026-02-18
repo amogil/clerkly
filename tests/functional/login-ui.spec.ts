@@ -19,9 +19,7 @@ import { launchElectron, closeElectron, ElectronTestContext } from './helpers/el
 test.describe('Login UI Components', () => {
   let context: ElectronTestContext;
 
-  test.beforeAll(async () => {
-    console.log('\n⚠️  WARNING: These tests will show real Electron windows on your screen!\n');
-  });
+  test.beforeAll(async () => {});
 
   test.afterEach(async () => {
     if (context) {

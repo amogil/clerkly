@@ -7,23 +7,16 @@
 
 import { test, expect, _electron as electron, ElectronApplication, Page } from '@playwright/test';
 import path from 'path';
-import { MockOAuthServer } from './helpers/mock-oauth-server';
-import { completeOAuthFlow } from './helpers/electron';
+import { createMockOAuthServer, completeOAuthFlow } from './helpers/electron';
+import type { MockOAuthServer } from './helpers/mock-oauth-server';
 
 let mockServer: MockOAuthServer;
 
 test.beforeAll(async () => {
-  // Start mock OAuth server for all tests
-  mockServer = new MockOAuthServer({
-    port: 8897,
-    clientId: 'test-client-id-12345',
-    clientSecret: 'test-client-secret-67890',
-  });
-  await mockServer.start();
+  mockServer = await createMockOAuthServer(8897);
 });
 
 test.afterAll(async () => {
-  // Stop mock OAuth server
   if (mockServer) {
     await mockServer.stop();
   }
@@ -87,10 +80,10 @@ test.describe('Agent Switching', () => {
     // Create multiple agents
     const newChatButton = window.locator('div[title="New chat"]');
     const agentIcons = window.locator('[data-testid^="agent-icon-"]');
-    
+
     await newChatButton.click();
     await expect(agentIcons).toHaveCount(2, { timeout: 5000 });
-    
+
     await newChatButton.click();
     await expect(agentIcons).toHaveCount(3, { timeout: 5000 });
 
@@ -117,37 +110,43 @@ test.describe('Agent Switching', () => {
     // Wait for first agent to be auto-created
     let agentIcons = window.locator('[data-testid^="agent-icon-"]');
     await expect(agentIcons).toHaveCount(1, { timeout: 5000 });
-    
+
     // Save first agent ID
-    const firstAgentId = (await agentIcons.first().getAttribute('data-testid'))?.replace('agent-icon-', '');
+    const firstAgentId = (await agentIcons.first().getAttribute('data-testid'))?.replace(
+      'agent-icon-',
+      ''
+    );
     expect(firstAgentId).toBeTruthy();
-    
+
     // Create second agent
     const newChatButton = window.locator('div[title="New chat"]');
     await newChatButton.click();
-    
+
     // Re-create locator to get fresh list
     agentIcons = window.locator('[data-testid^="agent-icon-"]');
     await expect(agentIcons).toHaveCount(2, { timeout: 5000 });
-    
+
     // Find second agent by ID (not by position)
     // Get all agent IDs and find the one that's different from firstAgentId
-    const allAgentIds = await agentIcons.evaluateAll((elements) => 
-      elements.map(el => el.getAttribute('data-testid')?.replace('agent-icon-', ''))
+    const allAgentIds = await agentIcons.evaluateAll((elements) =>
+      elements.map((el) => el.getAttribute('data-testid')?.replace('agent-icon-', ''))
     );
-    
-    const secondAgentId = allAgentIds.find(id => id && id !== firstAgentId);
+
+    const secondAgentId = allAgentIds.find((id) => id && id !== firstAgentId);
     expect(secondAgentId).toBeTruthy();
 
     // Switch to first agent (second agent is currently active after creation)
     await window.locator(`[data-testid="agent-icon-${firstAgentId}"]`).click();
-    await expect(window.locator(`[data-testid="agent-icon-${firstAgentId}"]`)).toHaveClass(/ring-2 ring-primary/, { timeout: 3000 });
+    await expect(window.locator(`[data-testid="agent-icon-${firstAgentId}"]`)).toHaveClass(
+      /ring-2 ring-primary/,
+      { timeout: 3000 }
+    );
 
     // Send message to first agent (now active)
     const messageInput = window.locator('textarea[placeholder*="Ask"]');
     await messageInput.fill('Message for agent 1');
     await messageInput.press('Enter');
-    
+
     // Wait for message to appear
     await expect(window.locator('text=Message for agent 1')).toBeVisible({ timeout: 5000 });
 
@@ -157,15 +156,18 @@ test.describe('Agent Switching', () => {
     // Send message to second agent (currently active)
     await messageInput.fill('Message for agent 2');
     await messageInput.press('Enter');
-    
+
     // Wait for message to appear
     await expect(window.locator('text=Message for agent 2')).toBeVisible({ timeout: 5000 });
 
     // Switch back to first agent using ID
     await window.locator(`[data-testid="agent-icon-${firstAgentId}"]`).click();
-    
+
     // Wait for agent to become active (ring indicator)
-    await expect(window.locator(`[data-testid="agent-icon-${firstAgentId}"]`)).toHaveClass(/ring-2 ring-primary/, { timeout: 3000 });
+    await expect(window.locator(`[data-testid="agent-icon-${firstAgentId}"]`)).toHaveClass(
+      /ring-2 ring-primary/,
+      { timeout: 3000 }
+    );
 
     // Check that first agent's message is displayed
     await expect(window.locator('text=Message for agent 1')).toBeVisible({ timeout: 5000 });
@@ -173,9 +175,12 @@ test.describe('Agent Switching', () => {
 
     // Switch to second agent using ID
     await window.locator(`[data-testid="agent-icon-${secondAgentId}"]`).click();
-    
+
     // Wait for agent to become active (ring indicator)
-    await expect(window.locator(`[data-testid="agent-icon-${secondAgentId}"]`)).toHaveClass(/ring-2 ring-primary/, { timeout: 3000 });
+    await expect(window.locator(`[data-testid="agent-icon-${secondAgentId}"]`)).toHaveClass(
+      /ring-2 ring-primary/,
+      { timeout: 3000 }
+    );
 
     // Check that second agent's message is displayed
     await expect(window.locator('text=Message for agent 2')).toBeVisible({ timeout: 5000 });
@@ -190,10 +195,10 @@ test.describe('Agent Switching', () => {
     // Create multiple agents
     const newChatButton = window.locator('div[title="New chat"]');
     const agentIcons = window.locator('[data-testid^="agent-icon-"]');
-    
+
     await newChatButton.click();
     await expect(agentIcons).toHaveCount(2, { timeout: 5000 });
-    
+
     await newChatButton.click();
     await expect(agentIcons).toHaveCount(3, { timeout: 5000 });
 

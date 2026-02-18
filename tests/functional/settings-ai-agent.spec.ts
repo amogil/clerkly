@@ -10,21 +10,15 @@ import {
   ElectronTestContext,
   completeOAuthFlow,
 } from './helpers/electron';
-import { MockOAuthServer } from './helpers/mock-oauth-server';
+import { createMockOAuthServer } from './helpers/electron';
+import type { MockOAuthServer } from './helpers/mock-oauth-server';
 
 let context: ElectronTestContext;
 let mockServer: MockOAuthServer;
 const TEST_CLIENT_ID = 'test-client-id-12345';
 
 test.beforeAll(async () => {
-  // Start mock OAuth server
-  mockServer = new MockOAuthServer({
-    port: 8891,
-    clientId: TEST_CLIENT_ID,
-    clientSecret: 'test-client-secret-67890',
-  });
-
-  await mockServer.start();
+  mockServer = await createMockOAuthServer(8891);
 
   // Set user profile data for mock OAuth server
   mockServer.setUserProfile({
@@ -37,7 +31,6 @@ test.beforeAll(async () => {
 });
 
 test.afterAll(async () => {
-  // Stop mock OAuth server
   if (mockServer) {
     await mockServer.stop();
   }

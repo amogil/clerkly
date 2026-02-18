@@ -28,9 +28,7 @@ test.describe('Deep Link Validation', () => {
   const TEST_CLIENT_ID = 'test-client-id-12345';
   const PROTOCOL_SCHEME = `com.googleusercontent.apps.${TEST_CLIENT_ID}`;
 
-  test.beforeAll(async () => {
-    console.log('\n⚠️  WARNING: These tests will show real Electron windows on your screen!\n');
-  });
+  test.beforeAll(async () => {});
 
   test.afterEach(async () => {
     if (context) {

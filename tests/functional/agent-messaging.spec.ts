@@ -6,20 +6,15 @@
  */
 
 import { test, expect, _electron as electron, ElectronApplication, Page } from '@playwright/test';
-import { completeOAuthFlow } from './helpers/electron';
-import { MockOAuthServer } from './helpers/mock-oauth-server';
+import { createMockOAuthServer, completeOAuthFlow } from './helpers/electron';
+import type { MockOAuthServer } from './helpers/mock-oauth-server';
 
 let electronApp: ElectronApplication;
 let window: Page;
 let mockOAuthServer: MockOAuthServer;
 
 test.beforeAll(async () => {
-  mockOAuthServer = new MockOAuthServer({
-    port: 8898,
-    clientId: 'test-client-id-12345',
-    clientSecret: 'test-client-secret-67890',
-  });
-  await mockOAuthServer.start();
+  mockOAuthServer = await createMockOAuthServer(8898);
 });
 
 test.afterAll(async () => {

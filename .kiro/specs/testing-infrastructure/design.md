@@ -1096,3 +1096,197 @@ test('should [expected behavior]', () => {
   // Test implementation
 });
 ```
+
+
+## Helper Функции для Функциональных Тестов
+
+**Requirements**: testing.10
+
+### createMockOAuthServer
+
+Стандартизированная функция для создания Mock OAuth Server в функциональных тестах.
+
+**Расположение**: `tests/functional/helpers/electron.ts`
+
+**Сигнатура**:
+```typescript
+export async function createMockOAuthServer(port: number = 8898): Promise<MockOAuthServer>
+```
+
+**Реализация**:
+```typescript
+import { MockOAuthServer } from './mock-oauth-server';
+
+export async function createMockOAuthServer(port: number = 8898): Promise<MockOAuthServer> {
+  const mockServer = new MockOAuthServer({
+    port,
+    clientId: 'test-client-id-12345',
+    clientSecret: 'test-client-secret-67890',
+  });
+  
+  await mockServer.start();
+  return mockServer;
+}
+```
+
+**Использование**:
+```typescript
+import { createMockOAuthServer } from './helpers/electron';
+import type { MockOAuthServer } from './helpers/mock-oauth-server';
+
+let mockServer: MockOAuthServer;
+
+test.beforeAll(async () => {
+  // Requirements: testing.10.1, testing.10.2
+  mockServer = await createMockOAuthServer(8892);
+});
+
+test.afterAll(async () => {
+  if (mockServer) {
+    await mockServer.stop();
+  }
+});
+```
+
+**Преимущества**:
+- Устраняет дублирование кода (создание MockOAuthServer повторяется в каждом тесте)
+- Стандартизирует credentials для всех тестов
+- Упрощает обновление конфигурации (изменения в одном месте)
+- Автоматически запускает сервер
+
+**Запрещено**:
+```typescript
+// ❌ НЕ создавать MockOAuthServer напрямую
+mockServer = new MockOAuthServer({
+  port: 8892,
+  clientId: 'test-client-id-12345',
+  clientSecret: 'test-client-secret-67890',
+});
+await mockServer.start();
+```
+
+## Правила Ожидания Элементов в Функциональных Тестах
+
+**Requirements**: testing.11
+
+### Проблема с waitForTimeout
+
+Использование `waitForTimeout` создает следующие проблемы:
+- **Нестабильность**: Тесты могут падать на медленных машинах
+- **Медленность**: Тесты ждут фиксированное время, даже если элемент появился раньше
+- **Race Conditions**: Элемент может появиться после таймаута
+
+### Правильные Методы Ожидания
+
+**Requirements**: testing.11.3
+
+#### 1. Ожидание Видимости Элемента
+
+```typescript
+// ❌ НЕПРАВИЛЬНО
+await button.click();
+await window.waitForTimeout(500);
+const element = window.locator('[data-testid="result"]');
+expect(await element.isVisible()).toBe(true);
+
+// ✅ ПРАВИЛЬНО
+await button.click();
+const element = window.locator('[data-testid="result"]');
+await expect(element).toBeVisible({ timeout: 2000 });
+```
+
+#### 2. Ожидание Текста в Элементе
+
+```typescript
+// ❌ НЕПРАВИЛЬНО
+await messageInput.press('Enter');
+await window.waitForTimeout(500);
+const messageText = await messages.first().textContent();
+expect(messageText).toContain('Test message');
+
+// ✅ ПРАВИЛЬНО
+await messageInput.press('Enter');
+const messages = window.locator('[data-testid="message"]');
+await expect(messages.first()).toContainText('Test message');
+```
+
+#### 3. Ожидание Количества Элементов
+
+```typescript
+// ❌ НЕПРАВИЛЬНО
+await createButton.click();
+await window.waitForTimeout(1000);
+const agents = window.locator('[data-testid="agent-icon"]');
+expect(await agents.count()).toBe(2);
+
+// ✅ ПРАВИЛЬНО
+await createButton.click();
+const agents = window.locator('[data-testid="agent-icon"]');
+await expect(agents).toHaveCount(2, { timeout: 2000 });
+```
+
+#### 4. Ожидание Изменения Состояния
+
+```typescript
+// ❌ НЕПРАВИЛЬНО
+await input.fill('value');
+await window.waitForTimeout(300); // debounce
+const savedValue = await getSavedValue();
+expect(savedValue).toBe('value');
+
+// ✅ ПРАВИЛЬНО
+await input.fill('value');
+// Ждем индикатора сохранения
+await expect(window.locator('[data-testid="save-indicator"]')).toBeVisible();
+await expect(window.locator('[data-testid="save-indicator"]')).toBeHidden();
+```
+
+### Исключения
+
+**Requirements**: testing.11.6
+
+В редких случаях `waitForTimeout` допустим:
+
+```typescript
+// ✅ ДОПУСТИМО - ожидание анимации без DOM-индикатора
+await element.click();
+// Анимация длится 200ms и не имеет DOM-индикатора завершения
+await window.waitForTimeout(250);
+await expect(element).toHaveCSS('opacity', '1');
+```
+
+```typescript
+// ✅ ДОПУСТИМО - ожидание debounce с известным таймингом
+await input.fill('search query');
+// Input имеет debounce 300ms
+await window.waitForTimeout(350);
+await expect(results).toBeVisible();
+```
+
+**ВАЖНО**: В таких случаях ОБЯЗАТЕЛЬНО добавить комментарий с объяснением.
+
+### Таймауты в Локаторах
+
+Все методы ожидания поддерживают опцию `timeout`:
+
+```typescript
+// Дефолтный таймаут (обычно 5000ms)
+await expect(element).toBeVisible();
+
+// Кастомный таймаут
+await expect(element).toBeVisible({ timeout: 10000 });
+
+// Короткий таймаут для быстрых операций
+await expect(element).toBeVisible({ timeout: 1000 });
+```
+
+### Чеклист для Code Review
+
+При ревью функциональных тестов проверять:
+
+- [ ] Нет безусловных `waitForTimeout` без комментариев
+- [ ] Используются `await expect(locator).toBeVisible()` вместо `isVisible()`
+- [ ] Используются `await expect(locator).toContainText()` вместо `textContent()` + `expect()`
+- [ ] Используются `await expect(locator).toHaveCount()` вместо `count()` + `expect()`
+- [ ] Если есть `waitForTimeout`, есть комментарий с объяснением
+

@@ -1,7 +1,8 @@
 // Requirements: user-data-isolation.0.3, user-data-isolation.1.2, user-data-isolation.1.3, user-data-isolation.1.4, user-data-isolation.2.4, user-data-isolation.2.5, user-data-isolation.4.1, user-data-isolation.4.4
 
 import { test, expect } from '@playwright/test';
-import { MockOAuthServer } from './helpers/mock-oauth-server';
+import { createMockOAuthServer } from './helpers/electron';
+import type { MockOAuthServer } from './helpers/mock-oauth-server';
 import {
   launchElectron,
   closeElectron,
@@ -17,13 +18,7 @@ const TEST_CLIENT_ID = 'test-client-id-12345'; // Use same as completeOAuthFlow 
 const TEST_CLIENT_SECRET = 'test-client-secret-67890'; // Use same as OAuthConfig
 
 test.beforeEach(async () => {
-  // Start mock OAuth server
-  mockOAuthServer = new MockOAuthServer({
-    port: 3333,
-    clientId: TEST_CLIENT_ID,
-    clientSecret: TEST_CLIENT_SECRET,
-  });
-  await mockOAuthServer.start();
+  mockOAuthServer = await createMockOAuthServer(3333);
 
   // Launch Electron app with mock OAuth server
   context = await launchElectron(undefined, {

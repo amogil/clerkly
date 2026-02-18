@@ -2,7 +2,8 @@
 
 import { test, expect } from '@playwright/test';
 import { launchElectron, closeElectron, ElectronTestContext } from './helpers/electron';
-import { MockOAuthServer } from './helpers/mock-oauth-server';
+import { createMockOAuthServer } from './helpers/electron';
+import type { MockOAuthServer } from './helpers/mock-oauth-server';
 
 /**
  * Functional tests for synchronous profile fetch during OAuth authorization
@@ -24,24 +25,12 @@ test.describe('OAuth Profile Synchronous Fetch', () => {
   let mockServer: MockOAuthServer;
 
   test.beforeAll(async () => {
-    console.log('\n⚠️  WARNING: These tests will show real Electron windows on your screen!\n');
-
-    // Start mock OAuth server for all tests
-    mockServer = new MockOAuthServer({
-      port: 8890,
-      clientId: 'test-client-id-12345',
-      clientSecret: 'test-client-secret-67890',
-    });
-
-    await mockServer.start();
-    console.log(`[TEST] Mock OAuth server started at ${mockServer.getBaseUrl()}`);
+    mockServer = await createMockOAuthServer(8890);
   });
 
   test.afterAll(async () => {
-    // Stop mock server after all tests
     if (mockServer) {
       await mockServer.stop();
-      console.log('[TEST] Mock OAuth server stopped');
     }
   });
 

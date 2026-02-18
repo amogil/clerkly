@@ -3,7 +3,8 @@
 
 import { test, expect, _electron as electron, ElectronApplication, Page } from '@playwright/test';
 import path from 'path';
-import { MockOAuthServer } from './helpers/mock-oauth-server';
+import { createMockOAuthServer } from './helpers/electron';
+import type { MockOAuthServer } from './helpers/mock-oauth-server';
 import { completeOAuthFlow } from './helpers/electron';
 
 let mockServer: MockOAuthServer;
@@ -11,14 +12,7 @@ let electronApp: ElectronApplication;
 let page: Page;
 
 test.beforeAll(async () => {
-  // Start mock OAuth server
-  mockServer = new MockOAuthServer({
-    port: 8896,
-    clientId: 'test-client-id-12345',
-    clientSecret: 'test-client-secret-67890',
-  });
-
-  await mockServer.start();
+  mockServer = await createMockOAuthServer(8896);
 
   // Set user profile
   mockServer.setUserProfile({

@@ -5,7 +5,8 @@ import {
   ElectronTestContext,
   completeOAuthFlow,
 } from './helpers/electron';
-import { MockOAuthServer } from './helpers/mock-oauth-server';
+import { createMockOAuthServer } from './helpers/electron';
+import type { MockOAuthServer } from './helpers/mock-oauth-server';
 import { testIPC } from './helpers/test-ipc';
 
 /**
@@ -28,28 +29,15 @@ test.describe('Account Profile', () => {
   let mockServer: MockOAuthServer;
 
   test.beforeAll(async () => {
-    console.log('\n⚠️  WARNING: These tests will show real Electron windows on your screen!\n');
-
-    // Start mock OAuth server for all tests
-    mockServer = new MockOAuthServer({
-      port: 8889,
-      clientId: 'test-client-id-12345',
-      clientSecret: 'test-client-secret-67890',
-    });
-
-    await mockServer.start();
-    console.log(`[TEST] Mock OAuth server started at ${mockServer.getBaseUrl()}`);
-
+    mockServer = await createMockOAuthServer(8889);
     // Set CLERKLY_GOOGLE_API_URL to point to mock server
     process.env.CLERKLY_GOOGLE_API_URL = mockServer.getBaseUrl();
     console.log(`[TEST] CLERKLY_GOOGLE_API_URL set to ${process.env.CLERKLY_GOOGLE_API_URL}`);
   });
 
   test.afterAll(async () => {
-    // Stop mock server after all tests
     if (mockServer) {
       await mockServer.stop();
-      console.log('[TEST] Mock OAuth server stopped');
     }
 
     // Clean up environment variable
