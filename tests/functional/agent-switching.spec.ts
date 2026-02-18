@@ -116,50 +116,72 @@ test.describe('Agent Switching', () => {
      Assertions: Messages for selected agent are loaded and displayed
      Requirements: agents.3.2 */
   test('should load messages for selected agent', async () => {
+    // Wait for first agent to be auto-created
+    let agentIcons = window.locator('[data-testid^="agent-icon-"]');
+    await expect(agentIcons).toHaveCount(1, { timeout: 5000 });
+    
+    // Save first agent ID
+    const firstAgentId = (await agentIcons.first().getAttribute('data-testid'))?.replace('agent-icon-', '');
+    expect(firstAgentId).toBeTruthy();
+    
     // Create second agent
     const newChatButton = window.locator('div[title="New chat"]');
     await newChatButton.click();
-    await window.waitForTimeout(500);
+    
+    // Re-create locator to get fresh list
+    agentIcons = window.locator('[data-testid^="agent-icon-"]');
+    await expect(agentIcons).toHaveCount(2, { timeout: 5000 });
+    
+    // Find second agent by ID (not by position)
+    // Get all agent IDs and find the one that's different from firstAgentId
+    const allAgentIds = await agentIcons.evaluateAll((elements) => 
+      elements.map(el => el.getAttribute('data-testid')?.replace('agent-icon-', ''))
+    );
+    
+    const secondAgentId = allAgentIds.find(id => id && id !== firstAgentId);
+    expect(secondAgentId).toBeTruthy();
 
-    // Send message to first agent
+    // Switch to first agent (second agent is currently active after creation)
+    await window.locator(`[data-testid="agent-icon-${firstAgentId}"]`).click();
+    await expect(window.locator(`[data-testid="agent-icon-${firstAgentId}"]`)).toHaveClass(/ring-2 ring-primary/, { timeout: 3000 });
+
+    // Send message to first agent (now active)
     const messageInput = window.locator('textarea[placeholder*="Ask"]');
     await messageInput.fill('Message for agent 1');
     await messageInput.press('Enter');
-    await window.waitForTimeout(500);
+    
+    // Wait for message to appear
+    await expect(window.locator('text=Message for agent 1')).toBeVisible({ timeout: 5000 });
 
-    // Get agent icons
-    const agentIcons = window.locator('[data-testid^="agent-icon-"]');
-    const firstIcon = agentIcons.nth(0);
+    // Switch to second agent using ID
+    await window.locator(`[data-testid="agent-icon-${secondAgentId}"]`).click();
 
-    // Switch to second agent
-    const secondIcon = agentIcons.nth(1);
-    await secondIcon.click();
-    await window.waitForTimeout(300);
-
-    // Send message to second agent
+    // Send message to second agent (currently active)
     await messageInput.fill('Message for agent 2');
     await messageInput.press('Enter');
-    await window.waitForTimeout(500);
+    
+    // Wait for message to appear
+    await expect(window.locator('text=Message for agent 2')).toBeVisible({ timeout: 5000 });
 
-    // Switch back to first agent
-    await firstIcon.click();
-    await window.waitForTimeout(300);
+    // Switch back to first agent using ID
+    await window.locator(`[data-testid="agent-icon-${firstAgentId}"]`).click();
+    
+    // Wait for agent to become active (ring indicator)
+    await expect(window.locator(`[data-testid="agent-icon-${firstAgentId}"]`)).toHaveClass(/ring-2 ring-primary/, { timeout: 3000 });
 
     // Check that first agent's message is displayed
-    const messages = window.locator('[data-testid="message"]');
-    const messageTexts = await messages.allTextContents();
-    expect(messageTexts.some((text) => text.includes('Message for agent 1'))).toBe(true);
-    expect(messageTexts.some((text) => text.includes('Message for agent 2'))).toBe(false);
+    await expect(window.locator('text=Message for agent 1')).toBeVisible({ timeout: 5000 });
+    await expect(window.locator('text=Message for agent 2')).not.toBeVisible();
 
-    // Switch to second agent
-    await secondIcon.click();
-    await window.waitForTimeout(300);
+    // Switch to second agent using ID
+    await window.locator(`[data-testid="agent-icon-${secondAgentId}"]`).click();
+    
+    // Wait for agent to become active (ring indicator)
+    await expect(window.locator(`[data-testid="agent-icon-${secondAgentId}"]`)).toHaveClass(/ring-2 ring-primary/, { timeout: 3000 });
 
     // Check that second agent's message is displayed
-    const messages2 = window.locator('[data-testid="message"]');
-    const messageTexts2 = await messages2.allTextContents();
-    expect(messageTexts2.some((text) => text.includes('Message for agent 2'))).toBe(true);
-    expect(messageTexts2.some((text) => text.includes('Message for agent 1'))).toBe(false);
+    await expect(window.locator('text=Message for agent 2')).toBeVisible({ timeout: 5000 });
+    await expect(window.locator('text=Message for agent 1')).not.toBeVisible();
   });
 
   /* Preconditions: Multiple agents exist
