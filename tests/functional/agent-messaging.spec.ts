@@ -7,17 +7,45 @@
 
 import { test, expect, _electron as electron, ElectronApplication, Page } from '@playwright/test';
 import { completeOAuthFlow } from './helpers/electron';
+import { MockOAuthServer } from './helpers/mock-oauth-server';
 
 let electronApp: ElectronApplication;
 let window: Page;
+let mockOAuthServer: MockOAuthServer;
+
+test.beforeAll(async () => {
+  mockOAuthServer = new MockOAuthServer({
+    port: 8898,
+    clientId: 'test-client-id-12345',
+    clientSecret: 'test-client-secret-67890',
+  });
+  await mockOAuthServer.start();
+});
+
+test.afterAll(async () => {
+  if (mockOAuthServer) {
+    await mockOAuthServer.stop();
+  }
+});
 
 test.beforeEach(async () => {
+  mockOAuthServer.setUserProfile({
+    id: 'test-messaging-user',
+    email: 'messaging.test@example.com',
+    name: 'Messaging Test User',
+    given_name: 'Messaging',
+    family_name: 'Test User',
+  });
+
   electronApp = await electron.launch({
     args: ['.'],
     env: {
       ...process.env,
       NODE_ENV: 'test',
       ELECTRON_DISABLE_SECURITY_WARNINGS: 'true',
+      CLERKLY_GOOGLE_API_URL: mockOAuthServer.getBaseUrl(),
+      CLERKLY_OAUTH_CLIENT_ID: 'test-client-id-12345',
+      CLERKLY_OAUTH_CLIENT_SECRET: 'test-client-secret-67890',
     },
   });
 
@@ -46,14 +74,14 @@ test.describe('Agent Messaging', () => {
 
     // Press Enter
     await messageInput.press('Enter');
-    await window.waitForTimeout(500);
 
     // Check message appears in chat
     const messages = window.locator('[data-testid="message"]');
-    await expect(messages).toHaveCount(1, { timeout: 2000 });
+    await expect(messages.first()).toBeVisible({ timeout: 2000 });
+    await expect(messages).toHaveCount(1);
 
-    const messageText = await messages.first().textContent();
-    expect(messageText).toContain('Test message');
+    // Verify message text
+    await expect(messages.first()).toContainText('Test message');
   });
 
   /* Preconditions: Agent is active, input field is visible
