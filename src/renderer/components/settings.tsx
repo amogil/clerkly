@@ -5,6 +5,7 @@ import { useError } from '../contexts/error-context';
 import { useEventSubscription } from '../events/useEventSubscription';
 import { EVENT_TYPES } from '../../shared/events/constants';
 import { callApi } from '../utils/apiWrapper';
+import { toast } from 'sonner';
 import type { LLMProvider } from '../../types';
 
 // Requirements: clerkly.3.5, clerkly.3.7
@@ -197,26 +198,30 @@ export function Settings({ onSignOut, onNavigate }: SettingsProps) {
     // Requirements: settings.3.4 - Set testing state
     setTestingConnection(true);
 
-    // Requirements: error-notifications.2.1 - Use callApi for automatic error handling
-    const result = await callApi<{ success: boolean }>(
-      () =>
-        window.api.llm.testConnection(llmProvider, apiKey) as Promise<{
-          success: boolean;
-          data?: { success: boolean };
-          error?: string;
-        }>,
-      'Testing connection'
-    );
+    // Requirements: error-notifications.2.1 - Handle test connection errors
+    try {
+      const result = await (window.api.llm.testConnection(llmProvider, apiKey) as Promise<{
+        success: boolean;
+        data?: { success: boolean };
+        error?: string;
+      }>);
 
-    // Requirements: settings.3.7, settings.3.8 - Reset button state
-    setTestingConnection(false);
+      // Requirements: settings.3.7, settings.3.8 - Reset button state
+      setTestingConnection(false);
 
-    if (result) {
-      // Requirements: settings.3.7 - Show success notification
-      showSuccess('Connection successful! Your API key is valid.');
-      logger.info(`Connection test successful for ${llmProvider}`);
+      if (result.success) {
+        // Requirements: settings.3.7 - Show success notification
+        showSuccess('Connection successful! Your API key is valid.');
+        logger.info(`Connection test successful for ${llmProvider}`);
+      } else {
+        // Requirements: settings.3.8 - Show error without context prefix
+        toast.error(result.error || 'Connection test failed');
+      }
+    } catch (error) {
+      setTestingConnection(false);
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(message);
     }
-    // Note: Error notification is handled automatically by callApi
   };
 
   return (

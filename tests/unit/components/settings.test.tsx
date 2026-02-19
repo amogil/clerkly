@@ -261,11 +261,10 @@ describe('Settings Component - Test Connection', () => {
     const testButton = screen.getByText('Test Connection');
     fireEvent.click(testButton);
 
-    // Requirements: error-notifications.2.1 - Verify toast.error was called by callApi
-    // Note: callApi formats error as "context: error"
+    // Requirements: error-notifications.2.1 - Verify toast.error was called without context prefix
     await waitFor(() => {
       expect(mockToast.error).toHaveBeenCalledWith(
-        'Testing connection: Invalid API key. Please check your key and try again.'
+        'Invalid API key. Please check your key and try again.'
       );
     });
   });
@@ -292,10 +291,9 @@ describe('Settings Component - Test Connection', () => {
     const testButton = screen.getByText('Test Connection');
     fireEvent.click(testButton);
 
-    // Requirements: error-notifications.2.1 - Verify toast.error was called by callApi
-    // Note: callApi formats error as "context: error"
+    // Requirements: error-notifications.2.1 - Verify toast.error was called without context prefix
     await waitFor(() => {
-      expect(mockToast.error).toHaveBeenCalledWith('Testing connection: Network error');
+      expect(mockToast.error).toHaveBeenCalledWith('Network error');
     });
   });
 
