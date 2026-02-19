@@ -32,11 +32,7 @@ test.beforeEach(async () => {
   );
 
   electronApp = await electron.launch({
-    args: [
-      path.join(__dirname, '../../dist/main/main/index.js'),
-      '--user-data-dir',
-      testDataPath,
-    ],
+    args: [path.join(__dirname, '../../dist/main/main/index.js'), '--user-data-dir', testDataPath],
     env: {
       ...process.env,
       NODE_ENV: 'test',
@@ -236,7 +232,7 @@ test.describe('Agent Real-time Events', () => {
     // Get initial status
     const agentIcon = window.locator('[data-testid^="agent-icon-"]').first();
     let classes = await agentIcon.getAttribute('class');
-    
+
     // Initial status can be "new" (sky-400) or "in-progress" (blue-500)
     const hasInitialStatus = classes?.includes('bg-sky-400') || classes?.includes('bg-blue-500');
     expect(hasInitialStatus).toBe(true);

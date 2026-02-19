@@ -68,9 +68,7 @@ describe('Agents Scroll Position', () => {
     // Simulate scrolling on agent-1
     scrollPositions.set('agent-1', 100);
 
-    // Switch to agent-2
-    const activeAgentId = 'agent-2';
-
+    // Switch to agent-2 (not used in this test, just simulating the switch)
     // agent-1 position should still be saved
     expect(scrollPositions.get('agent-1')).toBe(100);
     expect(scrollPositions.has('agent-2')).toBe(false);
@@ -79,7 +77,7 @@ describe('Agents Scroll Position', () => {
   /* Preconditions: Component with saved scroll position for agent
      Action: Return to agent with saved position
      Assertions: Scroll position is restored from Map
-     Requirements: agents.4.14.3, agents.4.14.6 */
+     Requirements: agents.4.14.3, agents.4.14.7 */
   it('should restore scroll position when returning to agent', async () => {
     const scrollPositions = new Map<string, number>();
     scrollPositions.set('agent-1', 250);
@@ -117,10 +115,81 @@ describe('Agents Scroll Position', () => {
     });
   });
 
+  /* Preconditions: Component with agent that has no saved scroll position
+     Action: Switch to agent for the first time
+     Assertions: Scroll position is set to bottom (scrollIntoView called)
+     Requirements: agents.4.14.4 */
+  it('should scroll to bottom on first visit to agent', async () => {
+    const scrollPositions = new Map<string, number>();
+    let scrollIntoViewCalled = false;
+
+    const TestComponent = ({ agentId }: { agentId: string }) => {
+      const messagesAreaRef = React.useRef<HTMLDivElement>(null);
+      const messagesEndRef = React.useRef<HTMLDivElement>(null);
+
+      const scrollToBottom = () => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        scrollIntoViewCalled = true;
+      };
+
+      React.useEffect(() => {
+        if (!messagesAreaRef.current) return;
+        const savedPosition = scrollPositions.get(agentId);
+        if (savedPosition !== undefined) {
+          messagesAreaRef.current.scrollTop = savedPosition;
+        } else {
+          // First visit - scroll to bottom
+          scrollToBottom();
+        }
+      }, [agentId]);
+
+      return (
+        <div
+          ref={messagesAreaRef}
+          data-testid="messages-area"
+          style={{ height: '200px', overflowY: 'scroll' }}
+        >
+          <div style={{ height: '1000px' }}>Long content</div>
+          <div ref={messagesEndRef} data-testid="messages-end" />
+        </div>
+      );
+    };
+
+    // Mock scrollIntoView
+    Element.prototype.scrollIntoView = jest.fn();
+
+    const { rerender } = render(<TestComponent agentId="agent-1" />);
+
+    // First visit to agent-1 (no saved position)
+    await waitFor(() => {
+      expect(scrollIntoViewCalled).toBe(true);
+    });
+
+    scrollIntoViewCalled = false;
+
+    // Save position for agent-1
+    scrollPositions.set('agent-1', 100);
+
+    // Switch to agent-2 (first visit)
+    rerender(<TestComponent agentId="agent-2" />);
+
+    await waitFor(() => {
+      expect(scrollIntoViewCalled).toBe(true);
+    });
+
+    scrollIntoViewCalled = false;
+
+    // Return to agent-1 (has saved position, should NOT scroll to bottom)
+    rerender(<TestComponent agentId="agent-1" />);
+
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(scrollIntoViewCalled).toBe(false);
+  });
+
   /* Preconditions: Component with saved scroll position
      Action: User sends message
      Assertions: Saved position is cleared from Map
-     Requirements: agents.4.14.5 */
+     Requirements: agents.4.14.6 */
   it('should clear saved position when user sends message', () => {
     const scrollPositions = new Map<string, number>();
     const activeAgentId = 'agent-1';
@@ -215,7 +284,7 @@ describe('Agents Scroll Position', () => {
   /* Preconditions: Component using useRef for storage
      Action: Component re-renders
      Assertions: Scroll positions Map is not lost
-     Requirements: agents.4.14.4 */
+     Requirements: agents.4.14.5 */
   it('should persist scroll positions across re-renders', () => {
     const TestComponent = ({ count }: { count: number }) => {
       const scrollPositions = React.useRef<Map<string, number>>(new Map());

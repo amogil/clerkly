@@ -41,8 +41,27 @@ export function Agents() {
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // Requirements: agents.4.14.5
+  const scrollPositions = useRef<Map<string, number>>(new Map());
+
+  // Requirements: agents.4.13.5
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  // Requirements: agents.4.13.2, agents.4.13.3
+  const isUserAtBottom = (): boolean => {
+    if (!messagesAreaRef.current) return true;
+    const { scrollHeight, scrollTop, clientHeight } = messagesAreaRef.current;
+    const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
+    return distanceFromBottom < clientHeight / 3;
+  };
+
+  // Requirements: agents.4.14.1
+  const handleScroll = () => {
+    if (!messagesAreaRef.current || !activeAgent) return;
+    const scrollTop = messagesAreaRef.current.scrollTop;
+    scrollPositions.current.set(activeAgent.id, scrollTop);
   };
 
   // Track initial load completion
@@ -64,6 +83,30 @@ export function Agents() {
       }, 100);
     }
   }, [activeAgent, showAllTasksPage]);
+
+  // Requirements: agents.4.13.1, agents.4.13.2
+  // Autoscroll when new messages arrive if user is at bottom
+  useEffect(() => {
+    if (messages.length > 0 && isUserAtBottom()) {
+      scrollToBottom();
+    }
+  }, [messages]);
+
+  // Requirements: agents.4.14.2, agents.4.14.3, agents.4.14.4, agents.4.14.7
+  // Restore scroll position when switching agents or scroll to bottom on first visit
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!messagesAreaRef.current || !activeAgent) return;
+
+    const savedPosition = scrollPositions.current.get(activeAgent.id);
+    if (savedPosition !== undefined) {
+      // Restore saved position
+      messagesAreaRef.current.scrollTop = savedPosition;
+    } else {
+      // First visit - scroll to bottom
+      scrollToBottom();
+    }
+  }, [activeAgent?.id, messages]);
 
   // Calculate visible chats based on container width
   useEffect(() => {
@@ -103,7 +146,7 @@ export function Agents() {
     setVisibleChatsCount(Math.max(1, maxChats));
   }, [agents.length]);
 
-  // Requirements: agents.4.13.1, agents.4.13.5 - Autoscroll only when user sends message
+  // Requirements: agents.4.13.4, agents.4.14.6
   const handleSend = async (text?: string) => {
     const messageText = text || taskInput;
     if (!messageText.trim() || !activeAgent) return;
@@ -111,7 +154,8 @@ export function Agents() {
     const success = await sendMessage(messageText);
     if (success) {
       setTaskInput('');
-      // Scroll to bottom ONLY when user sends message
+      // Clear saved position and force scroll to bottom
+      scrollPositions.current.delete(activeAgent.id);
       scrollToBottom();
     }
   };
@@ -422,6 +466,7 @@ export function Agents() {
         ref={messagesAreaRef}
         data-testid="messages-area"
         className="flex-1 overflow-y-auto p-6 min-h-0"
+        onScroll={handleScroll}
       >
         <div className="min-h-full flex flex-col justify-end space-y-4">
           {messages.length === 0 ? (

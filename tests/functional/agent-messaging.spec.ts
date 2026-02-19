@@ -40,11 +40,7 @@ test.beforeEach(async () => {
   );
 
   electronApp = await electron.launch({
-    args: [
-      path.join(__dirname, '../../dist/main/main/index.js'),
-      '--user-data-dir',
-      testDataPath,
-    ],
+    args: [path.join(__dirname, '../../dist/main/main/index.js'), '--user-data-dir', testDataPath],
     env: {
       ...process.env,
       NODE_ENV: 'test',
@@ -197,5 +193,100 @@ test.describe('Agent Messaging', () => {
 
     // Should be scrolled to bottom (within 50px tolerance)
     expect(scrollTop + clientHeight).toBeGreaterThan(scrollHeight - 50);
+  });
+
+  /* Preconditions: Agent has many messages, user is at bottom of chat
+     Action: Simulate new message arriving
+     Assertions: Chat autoscrolls to show new message
+     Requirements: agents.4.13.1, agents.4.13.2 */
+  test('should autoscroll when new message arrives and user is at bottom', async () => {
+    const messageInput = window.locator('textarea[placeholder*="Ask"]');
+    const messagesArea = window.locator('[data-testid="messages-area"]');
+
+    // Send messages to create content
+    for (let i = 1; i <= 10; i++) {
+      await messageInput.fill(`Message ${i}`);
+      await messageInput.press('Enter');
+      await window.waitForTimeout(200);
+    }
+
+    await expect(window.locator('[data-testid="message"]')).toHaveCount(10, { timeout: 5000 });
+
+    // Ensure user is at bottom
+    await window.waitForFunction(
+      () => {
+        const container = document.querySelector('[data-testid="messages-area"]');
+        if (!container) return false;
+        const distanceFromBottom =
+          container.scrollHeight - container.scrollTop - container.clientHeight;
+        return distanceFromBottom < container.clientHeight / 3;
+      },
+      { timeout: 5000 }
+    );
+
+    // Get initial scroll position
+    const initialScrollTop = await messagesArea.evaluate((el) => el.scrollTop);
+
+    // Send another message (simulating new message arrival)
+    await messageInput.fill('New message while at bottom');
+    await messageInput.press('Enter');
+
+    await expect(window.locator('[data-testid="message"]')).toHaveCount(11, { timeout: 5000 });
+
+    // Wait for autoscroll
+    await window.waitForTimeout(500);
+
+    // Check that scroll position changed (autoscrolled)
+    const finalScrollTop = await messagesArea.evaluate((el) => el.scrollTop);
+    expect(finalScrollTop).toBeGreaterThanOrEqual(initialScrollTop);
+
+    // Check we're still at bottom
+    const distanceFromBottom = await messagesArea.evaluate((el) => {
+      return el.scrollHeight - el.scrollTop - el.clientHeight;
+    });
+    expect(distanceFromBottom).toBeLessThan(50);
+  });
+
+  /* Preconditions: Agent has many messages, user scrolled up
+     Action: New message arrives while user is scrolled up
+     Assertions: Chat does NOT autoscroll (preserves user's position)
+     Requirements: agents.4.13.2 */
+  test('should NOT autoscroll when user is scrolled up', async () => {
+    const messageInput = window.locator('textarea[placeholder*="Ask"]');
+    const messagesArea = window.locator('[data-testid="messages-area"]');
+
+    // Send many messages to create scrollable content
+    for (let i = 1; i <= 20; i++) {
+      await messageInput.fill(`Message ${i}`);
+      await messageInput.press('Enter');
+      await window.waitForTimeout(150);
+    }
+
+    await expect(window.locator('[data-testid="message"]')).toHaveCount(20, { timeout: 10000 });
+
+    // Scroll up significantly (to top)
+    await messagesArea.evaluate((el) => {
+      el.scrollTop = 100;
+    });
+
+    await window.waitForTimeout(300);
+
+    // Verify user is NOT at bottom
+    const isAtBottom = await messagesArea.evaluate((el) => {
+      const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+      return distanceFromBottom < el.clientHeight / 3;
+    });
+    expect(isAtBottom).toBe(false);
+
+    // Get scroll position
+    const scrollBeforeNewMessage = await messagesArea.evaluate((el) => el.scrollTop);
+    expect(scrollBeforeNewMessage).toBe(100);
+
+    // Wait to ensure scroll position is stable
+    await window.waitForTimeout(500);
+
+    // Verify scroll position hasn't changed
+    const scrollAfter = await messagesArea.evaluate((el) => el.scrollTop);
+    expect(scrollAfter).toBe(100);
   });
 });

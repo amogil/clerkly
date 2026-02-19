@@ -29,7 +29,7 @@ describe('Agents Autoscroll', () => {
   /* Preconditions: Component with messages and messagesEndRef, user sends message
      Action: Call handleSend function
      Assertions: scrollIntoView is called with smooth behavior
-     Requirements: agents.4.13.1, agents.4.13.3, agents.4.13.5 */
+     Requirements: agents.4.13.4 */
   it('should call scrollIntoView when user sends message', async () => {
     // Create a test component that mimics agents.tsx autoscroll logic
     const TestComponent = ({ onSend }: { onSend: () => void }) => {
@@ -75,39 +75,138 @@ describe('Agents Autoscroll', () => {
     });
   });
 
-  /* Preconditions: Component with messages, messages array changes without user action
-     Action: Update messages array directly (simulate agent response)
-     Assertions: scrollIntoView is NOT called
-     Requirements: agents.4.13.2 */
-  it('should NOT scroll when messages change without user action', async () => {
+  /* Preconditions: Component with messages, new message arrives, user is in bottom third
+     Action: New message is added to messages array
+     Assertions: scrollIntoView is called because user is at bottom
+     Requirements: agents.4.13.1, agents.4.13.2 */
+  it('should scroll when new message arrives and user is in bottom third', async () => {
     const TestComponent = () => {
       const messagesEndRef = React.useRef<HTMLDivElement>(null);
+      const messagesAreaRef = React.useRef<HTMLDivElement>(null);
       const [messages, setMessages] = React.useState<string[]>(['Message 1']);
 
-      // Simulate agent response (no scrollToBottom call)
-      const simulateAgentResponse = () => {
-        setMessages((prev) => [...prev, 'Agent response']);
+      const isUserAtBottom = (): boolean => {
+        if (!messagesAreaRef.current) return false;
+        const { scrollHeight, scrollTop, clientHeight } = messagesAreaRef.current;
+        const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
+        return distanceFromBottom < clientHeight / 3;
+      };
+
+      const scrollToBottom = () => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      };
+
+      // Autoscroll effect
+      React.useEffect(() => {
+        if (messages.length > 0 && isUserAtBottom()) {
+          scrollToBottom();
+        }
+      }, [messages]);
+
+      const addMessage = () => {
+        setMessages((prev) => [...prev, 'New message']);
       };
 
       return (
-        <div>
+        <div
+          ref={messagesAreaRef}
+          data-testid="messages-area"
+          style={{ height: '300px', overflowY: 'auto' }}
+        >
           {messages.map((msg, i) => (
             <div key={i}>{msg}</div>
           ))}
-          <div ref={messagesEndRef} />
-          <button onClick={simulateAgentResponse} data-testid="agent-response">
-            Simulate Agent Response
+          <div ref={messagesEndRef} data-testid="messages-end" />
+          <button onClick={addMessage} data-testid="add-message">
+            Add Message
           </button>
         </div>
       );
     };
 
     const { getByTestId } = render(<TestComponent />);
+    const messagesArea = getByTestId('messages-area') as HTMLDivElement;
+
+    // Mock scrollHeight, scrollTop, clientHeight to simulate user at bottom
+    Object.defineProperty(messagesArea, 'scrollHeight', { value: 1000, configurable: true });
+    Object.defineProperty(messagesArea, 'scrollTop', { value: 700, configurable: true });
+    Object.defineProperty(messagesArea, 'clientHeight', { value: 300, configurable: true });
+    // distanceFromBottom = 1000 - 700 - 300 = 0 < 100 (clientHeight/3) → at bottom
 
     scrollIntoViewMock.mockClear();
 
-    // Simulate agent response
-    const button = getByTestId('agent-response');
+    // Add new message
+    const button = getByTestId('add-message');
+    button.click();
+
+    // Should trigger scroll
+    await waitFor(() => {
+      expect(scrollIntoViewMock).toHaveBeenCalledWith({ behavior: 'smooth' });
+    });
+  });
+
+  /* Preconditions: Component with messages, new message arrives, user scrolled up
+     Action: New message is added to messages array
+     Assertions: scrollIntoView is NOT called because user is not at bottom
+     Requirements: agents.4.13.2 */
+  it('should NOT scroll when new message arrives and user is above bottom third', async () => {
+    const TestComponent = () => {
+      const messagesEndRef = React.useRef<HTMLDivElement>(null);
+      const messagesAreaRef = React.useRef<HTMLDivElement>(null);
+      const [messages, setMessages] = React.useState<string[]>(['Message 1']);
+
+      const isUserAtBottom = (): boolean => {
+        if (!messagesAreaRef.current) return false;
+        const { scrollHeight, scrollTop, clientHeight } = messagesAreaRef.current;
+        const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
+        return distanceFromBottom < clientHeight / 3;
+      };
+
+      const scrollToBottom = () => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      };
+
+      // Autoscroll effect
+      React.useEffect(() => {
+        if (messages.length > 0 && isUserAtBottom()) {
+          scrollToBottom();
+        }
+      }, [messages]);
+
+      const addMessage = () => {
+        setMessages((prev) => [...prev, 'New message']);
+      };
+
+      return (
+        <div
+          ref={messagesAreaRef}
+          data-testid="messages-area"
+          style={{ height: '300px', overflowY: 'auto' }}
+        >
+          {messages.map((msg, i) => (
+            <div key={i}>{msg}</div>
+          ))}
+          <div ref={messagesEndRef} />
+          <button onClick={addMessage} data-testid="add-message">
+            Add Message
+          </button>
+        </div>
+      );
+    };
+
+    const { getByTestId } = render(<TestComponent />);
+    const messagesArea = getByTestId('messages-area') as HTMLDivElement;
+
+    // Mock scrollHeight, scrollTop, clientHeight to simulate user scrolled up
+    Object.defineProperty(messagesArea, 'scrollHeight', { value: 1000, configurable: true });
+    Object.defineProperty(messagesArea, 'scrollTop', { value: 0, configurable: true });
+    Object.defineProperty(messagesArea, 'clientHeight', { value: 300, configurable: true });
+    // distanceFromBottom = 1000 - 0 - 300 = 700 > 100 (clientHeight/3) → NOT at bottom
+
+    scrollIntoViewMock.mockClear();
+
+    // Add new message
+    const button = getByTestId('add-message');
     button.click();
 
     // Wait a bit to ensure no scroll happens
@@ -117,10 +216,137 @@ describe('Agents Autoscroll', () => {
     expect(scrollIntoViewMock).not.toHaveBeenCalled();
   });
 
+  /* Preconditions: messagesAreaRef with various scroll positions
+     Action: Calculate if user is in bottom third
+     Assertions: Formula correctly identifies bottom third position
+     Requirements: agents.4.13.3 */
+  it('should calculate bottom third correctly', async () => {
+    const TestComponent = () => {
+      const messagesAreaRef = React.useRef<HTMLDivElement>(null);
+      const [result, setResult] = React.useState<boolean | null>(null);
+
+      const isUserAtBottom = (): boolean => {
+        if (!messagesAreaRef.current) return false;
+        const { scrollHeight, scrollTop, clientHeight } = messagesAreaRef.current;
+        const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
+        return distanceFromBottom < clientHeight / 3;
+      };
+
+      const checkPosition = () => {
+        setResult(isUserAtBottom());
+      };
+
+      return (
+        <div>
+          <div ref={messagesAreaRef} data-testid="messages-area" />
+          <button onClick={checkPosition} data-testid="check">
+            Check
+          </button>
+          <div data-testid="result">{result !== null ? result.toString() : 'null'}</div>
+        </div>
+      );
+    };
+
+    const { getByTestId } = render(<TestComponent />);
+    const messagesArea = getByTestId('messages-area') as HTMLDivElement;
+    const checkButton = getByTestId('check');
+    const resultDiv = getByTestId('result');
+
+    // Test case 1: scrollTop = 0, clientHeight = 300
+    // distanceFromBottom = 1000 - 0 - 300 = 700 > 100 → NOT at bottom
+    Object.defineProperty(messagesArea, 'scrollHeight', { value: 1000, configurable: true });
+    Object.defineProperty(messagesArea, 'scrollTop', { value: 0, configurable: true });
+    Object.defineProperty(messagesArea, 'clientHeight', { value: 300, configurable: true });
+    checkButton.click();
+    await waitFor(() => {
+      expect(resultDiv.textContent).toBe('false');
+    });
+
+    // Test case 2: scrollTop = 700, clientHeight = 300
+    // distanceFromBottom = 1000 - 700 - 300 = 0 < 100 → at bottom
+    Object.defineProperty(messagesArea, 'scrollTop', { value: 700, configurable: true });
+    checkButton.click();
+    await waitFor(() => {
+      expect(resultDiv.textContent).toBe('true');
+    });
+
+    // Test case 3: scrollTop = 650, clientHeight = 300
+    // distanceFromBottom = 1000 - 650 - 300 = 50 < 100 → at bottom
+    Object.defineProperty(messagesArea, 'scrollTop', { value: 650, configurable: true });
+    checkButton.click();
+    await waitFor(() => {
+      expect(resultDiv.textContent).toBe('true');
+    });
+
+    // Test case 4: scrollTop = 600, clientHeight = 300
+    // distanceFromBottom = 1000 - 600 - 300 = 100 NOT < 100 → NOT at bottom (boundary)
+    Object.defineProperty(messagesArea, 'scrollTop', { value: 600, configurable: true });
+    checkButton.click();
+    await waitFor(() => {
+      expect(resultDiv.textContent).toBe('false');
+    });
+  });
+
+  /* Preconditions: Component with messages, user scrolled up
+     Action: User sends message
+     Assertions: scrollIntoView is called regardless of scroll position
+     Requirements: agents.4.13.4 */
+  it('should always scroll when user sends message regardless of position', async () => {
+    const TestComponent = () => {
+      const messagesEndRef = React.useRef<HTMLDivElement>(null);
+      const messagesAreaRef = React.useRef<HTMLDivElement>(null);
+      const [messages, setMessages] = React.useState<string[]>(['Message 1']);
+
+      const scrollToBottom = () => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      };
+
+      const handleSend = () => {
+        setMessages((prev) => [...prev, 'User message']);
+        scrollToBottom(); // Always scroll on user send
+      };
+
+      return (
+        <div
+          ref={messagesAreaRef}
+          data-testid="messages-area"
+          style={{ height: '300px', overflowY: 'auto' }}
+        >
+          {messages.map((msg, i) => (
+            <div key={i}>{msg}</div>
+          ))}
+          <div ref={messagesEndRef} />
+          <button onClick={handleSend} data-testid="send">
+            Send
+          </button>
+        </div>
+      );
+    };
+
+    const { getByTestId } = render(<TestComponent />);
+    const messagesArea = getByTestId('messages-area') as HTMLDivElement;
+
+    // Mock scroll position: user scrolled up (NOT at bottom)
+    Object.defineProperty(messagesArea, 'scrollHeight', { value: 1000, configurable: true });
+    Object.defineProperty(messagesArea, 'scrollTop', { value: 0, configurable: true });
+    Object.defineProperty(messagesArea, 'clientHeight', { value: 300, configurable: true });
+
+    scrollIntoViewMock.mockClear();
+
+    // User sends message
+    const sendButton = getByTestId('send');
+    sendButton.click();
+
+    // Should trigger scroll even though user is not at bottom
+    await waitFor(() => {
+      expect(scrollIntoViewMock).toHaveBeenCalledWith({ behavior: 'smooth' });
+    });
+  });
+
   /* Preconditions: Component with messagesEndRef attached to DOM
      Action: Render component
      Assertions: messagesEndRef is attached to invisible div element
-     Requirements: agents.4.13.4 */
+     Requirements: agents.4.13.6 */
   it('should have messagesEndRef attached to invisible div', () => {
     const TestComponent = () => {
       const messagesEndRef = React.useRef<HTMLDivElement>(null);
@@ -143,7 +369,7 @@ describe('Agents Autoscroll', () => {
   /* Preconditions: Component with send functionality
      Action: Send multiple messages
      Assertions: scrollIntoView is called each time user sends
-     Requirements: agents.4.13.1, agents.4.13.5 */
+     Requirements: agents.4.13.4, agents.4.13.5 */
   it('should scroll on every user message send', async () => {
     const TestComponent = () => {
       const messagesEndRef = React.useRef<HTMLDivElement>(null);
@@ -200,7 +426,7 @@ describe('Agents Autoscroll', () => {
   /* Preconditions: messagesEndRef is null (not attached)
      Action: Try to scroll
      Assertions: No error is thrown (optional chaining works)
-     Requirements: agents.4.13.3 */
+     Requirements: agents.4.13.5 */
   it('should handle null messagesEndRef gracefully', () => {
     const TestComponent = () => {
       const messagesEndRef = React.useRef<HTMLDivElement>(null);

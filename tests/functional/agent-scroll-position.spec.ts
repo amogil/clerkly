@@ -40,11 +40,7 @@ test.beforeEach(async () => {
   );
 
   electronApp = await electron.launch({
-    args: [
-      path.join(__dirname, '../../dist/main/main/index.js'),
-      '--user-data-dir',
-      testDataPath,
-    ],
+    args: [path.join(__dirname, '../../dist/main/main/index.js'), '--user-data-dir', testDataPath],
     env: {
       ...process.env,
       NODE_ENV: 'test',
@@ -239,5 +235,81 @@ test.describe('Agent Scroll Position', () => {
     await window.waitForTimeout(500);
     const position3 = await messagesArea.evaluate((el) => el.scrollTop);
     expect(position3).toBe(250);
+  });
+
+  /* Preconditions: New agent created with messages
+     Action: Switch to agent for the first time
+     Assertions: Chat scrolls to bottom automatically
+     Requirements: agents.4.14.4 */
+  test('should scroll to bottom on first visit to agent', async () => {
+    const messageInput = window.locator('textarea[placeholder*="Ask"]');
+    const messagesArea = window.locator('[data-testid="messages-area"]');
+    const newChatButton = window.locator('div[title="New chat"]');
+
+    // Create agent-1 with messages
+    for (let i = 1; i <= 15; i++) {
+      await messageInput.fill(`Agent 1 Message ${i}`);
+      await messageInput.press('Enter');
+      await window.waitForTimeout(150);
+    }
+
+    await expect(window.locator('[data-testid="message"]')).toHaveCount(15, { timeout: 5000 });
+
+    // Scroll up in agent-1
+    await messagesArea.evaluate((el) => {
+      el.scrollTop = 100;
+    });
+    await window.waitForTimeout(200);
+
+    // Create agent-2
+    await newChatButton.click();
+    await window.waitForTimeout(300);
+
+    // Send messages to agent-2
+    for (let i = 1; i <= 15; i++) {
+      await messageInput.fill(`Agent 2 Message ${i}`);
+      await messageInput.press('Enter');
+      await window.waitForTimeout(150);
+    }
+
+    await expect(window.locator('[data-testid="message"]')).toHaveCount(15, { timeout: 5000 });
+
+    // Wait for autoscroll to complete (first visit should scroll to bottom)
+    await window.waitForTimeout(500);
+
+    // Check that agent-2 is scrolled to bottom on first visit
+    const distanceFromBottom = await messagesArea.evaluate((el) => {
+      return el.scrollHeight - el.scrollTop - el.clientHeight;
+    });
+    expect(distanceFromBottom).toBeLessThan(50);
+
+    // Now switch back to agent-1 (should restore saved position, not scroll to bottom)
+    const agentIcons = window.locator('[data-testid^="agent-icon-"]');
+    await agentIcons.first().click();
+    await window.waitForTimeout(500);
+
+    // Check that agent-1 position is restored (not at bottom)
+    const agent1Position = await messagesArea.evaluate((el) => el.scrollTop);
+    expect(agent1Position).toBe(100);
+
+    // Create agent-3 (new agent)
+    await newChatButton.click();
+    await window.waitForTimeout(300);
+
+    // Send messages to agent-3
+    for (let i = 1; i <= 15; i++) {
+      await messageInput.fill(`Agent 3 Message ${i}`);
+      await messageInput.press('Enter');
+      await window.waitForTimeout(150);
+    }
+
+    await expect(window.locator('[data-testid="message"]')).toHaveCount(15, { timeout: 5000 });
+    await window.waitForTimeout(500);
+
+    // Check that agent-3 is also scrolled to bottom on first visit
+    const agent3DistanceFromBottom = await messagesArea.evaluate((el) => {
+      return el.scrollHeight - el.scrollTop - el.clientHeight;
+    });
+    expect(agent3DistanceFromBottom).toBeLessThan(50);
   });
 });

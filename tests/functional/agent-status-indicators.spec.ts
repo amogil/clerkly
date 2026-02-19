@@ -32,11 +32,7 @@ test.beforeEach(async () => {
   );
 
   electronApp = await electron.launch({
-    args: [
-      path.join(__dirname, '../../dist/main/main/index.js'),
-      '--user-data-dir',
-      testDataPath,
-    ],
+    args: [path.join(__dirname, '../../dist/main/main/index.js'), '--user-data-dir', testDataPath],
     env: {
       ...process.env,
       NODE_ENV: 'test',
