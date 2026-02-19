@@ -2124,6 +2124,65 @@ import { Logo } from '../logo';
 **agents.4.14.4 - Первый визит к агенту:**
 - "should scroll to bottom on first visit to agent" - автоскролл при первом визите
 
+#### Правила написания функциональных тестов
+
+**КРИТИЧЕСКИ ВАЖНО**: При работе с агентами в функциональных тестах ВСЕГДА использовать ID агентов из HTML атрибутов, а НЕ позиции в списке.
+
+**Проблема:**
+Порядок агентов в списке может меняться:
+- При создании нового агента он становится активным и добавляется в начало списка
+- При переключении между агентами порядок может измениться из-за reordering
+- Позиция агента в DOM не гарантирует его порядок создания
+
+**Правильный подход:**
+
+```typescript
+// ❌ НЕПРАВИЛЬНО - использование позиции
+const agentIcons = window.locator('[data-testid^="agent-icon-"]');
+await agentIcons.nth(0).click(); // Может кликнуть не на того агента!
+
+// ✅ ПРАВИЛЬНО - сохранение ID и использование селектора
+// 1. Сохранить ID первого агента ДО создания других
+let agentIcons = window.locator('[data-testid^="agent-icon-"]');
+await expect(agentIcons).toHaveCount(1, { timeout: 5000 });
+
+const firstAgentId = (await agentIcons.first().getAttribute('data-testid'))?.replace(
+  'agent-icon-',
+  ''
+);
+expect(firstAgentId).toBeTruthy();
+
+// 2. После создания второго агента - найти его ID
+await newChatButton.click();
+agentIcons = window.locator('[data-testid^="agent-icon-"]'); // Re-create locator!
+await expect(agentIcons).toHaveCount(2, { timeout: 5000 });
+
+const allAgentIds = await agentIcons.evaluateAll((elements) =>
+  elements.map((el) => el.getAttribute('data-testid')?.replace('agent-icon-', ''))
+);
+const secondAgentId = allAgentIds.find((id) => id && id !== firstAgentId);
+expect(secondAgentId).toBeTruthy();
+
+// 3. Использовать конкретный ID для клика
+await window.locator(`[data-testid="agent-icon-${firstAgentId}"]`).click();
+```
+
+**Ключевые правила:**
+1. Сохранять ID агента сразу после его создания
+2. Пересоздавать locator (`agentIcons = window.locator(...)`) после изменения списка агентов
+3. Использовать `evaluateAll` для получения всех ID и поиска нужного по разнице
+4. Кликать по агенту через конкретный селектор с ID: `[data-testid="agent-icon-${agentId}"]`
+5. Дожидаться загрузки сообщений по содержимому, а не по таймауту:
+   ```typescript
+   // Дождаться появления конкретного сообщения
+   await expect(window.locator('[data-testid="message"]').first())
+     .toContainText('Agent 1 Message 1', { timeout: 5000 });
+   ```
+
+**Примеры из существующих тестов:**
+- `tests/functional/agent-switching.spec.ts` - правильное использование ID агентов
+- `tests/functional/agent-scroll-position.spec.ts` - правильное ожидание загрузки сообщений
+
 ### Покрытие требований
 
 | Требование | Модульные | Property-Based | Функциональные |

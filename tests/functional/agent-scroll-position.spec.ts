@@ -71,6 +71,17 @@ test.describe('Agent Scroll Position', () => {
     const messageInput = window.locator('textarea[placeholder*="Ask"]');
     const messagesArea = window.locator('[data-testid="messages-area"]');
 
+    // Wait for first agent to be auto-created
+    let agentIcons = window.locator('[data-testid^="agent-icon-"]');
+    await expect(agentIcons).toHaveCount(1, { timeout: 5000 });
+
+    // Save first agent ID
+    const firstAgentId = (await agentIcons.first().getAttribute('data-testid'))?.replace(
+      'agent-icon-',
+      ''
+    );
+    expect(firstAgentId).toBeTruthy();
+
     // Send multiple messages to agent-1 to create scrollable content
     for (let i = 1; i <= 15; i++) {
       await messageInput.fill(`Agent 1 Message ${i}`);
@@ -98,6 +109,18 @@ test.describe('Agent Scroll Position', () => {
     await newChatButton.click();
     await window.waitForTimeout(500);
 
+    // Re-create locator to get fresh list
+    agentIcons = window.locator('[data-testid^="agent-icon-"]');
+    await expect(agentIcons).toHaveCount(2, { timeout: 5000 });
+
+    // Find second agent by ID (not by position)
+    const allAgentIds = await agentIcons.evaluateAll((elements) =>
+      elements.map((el) => el.getAttribute('data-testid')?.replace('agent-icon-', ''))
+    );
+
+    const secondAgentId = allAgentIds.find((id) => id && id !== firstAgentId);
+    expect(secondAgentId).toBeTruthy();
+
     // Send messages to agent-2
     for (let i = 1; i <= 10; i++) {
       await messageInput.fill(`Agent 2 Message ${i}`);
@@ -108,16 +131,17 @@ test.describe('Agent Scroll Position', () => {
     // Wait for agent-2 messages
     await expect(window.locator('[data-testid="message"]')).toHaveCount(10, { timeout: 5000 });
 
-    // Get all agent icons
-    const agentIcons = window.locator('[data-testid^="agent-icon-"]');
-    await expect(agentIcons).toHaveCount(2, { timeout: 2000 });
+    // Switch back to agent-1 using its saved ID
+    await window.locator(`[data-testid="agent-icon-${firstAgentId}"]`).click();
 
-    // Switch back to agent-1 (first icon after "New chat" button)
-    await agentIcons.first().click();
-    await window.waitForTimeout(500);
+    // Wait for agent-1 messages to load by checking for specific content
+    await expect(window.locator('[data-testid="message"]').first()).toContainText(
+      'Agent 1 Message 1',
+      { timeout: 5000 }
+    );
 
     // Check that agent-1 messages are loaded
-    await expect(window.locator('[data-testid="message"]')).toHaveCount(15, { timeout: 5000 });
+    await expect(window.locator('[data-testid="message"]')).toHaveCount(15, { timeout: 2000 });
 
     // Check scroll position is restored
     const restoredPosition = await messagesArea.evaluate((el) => el.scrollTop);
@@ -157,7 +181,9 @@ test.describe('Agent Scroll Position', () => {
 
     // Wait for message and autoscroll
     await expect(window.locator('[data-testid="message"]')).toHaveCount(16, { timeout: 5000 });
-    await window.waitForTimeout(500);
+
+    // Wait longer for smooth scroll animation to complete
+    await window.waitForTimeout(1000);
 
     // Check scroll is at bottom
     const finalPosition = await messagesArea.evaluate((el) => {
@@ -177,6 +203,17 @@ test.describe('Agent Scroll Position', () => {
     const messagesArea = window.locator('[data-testid="messages-area"]');
     const newChatButton = window.locator('div[title="New chat"]');
 
+    // Wait for first agent to be auto-created
+    let agentIcons = window.locator('[data-testid^="agent-icon-"]');
+    await expect(agentIcons).toHaveCount(1, { timeout: 5000 });
+
+    // Save first agent ID
+    const firstAgentId = (await agentIcons.first().getAttribute('data-testid'))?.replace(
+      'agent-icon-',
+      ''
+    );
+    expect(firstAgentId).toBeTruthy();
+
     // Create agent-1 with messages and scroll to position 50
     for (let i = 1; i <= 15; i++) {
       await messageInput.fill(`Agent 1 Message ${i}`);
@@ -191,6 +228,17 @@ test.describe('Agent Scroll Position', () => {
     // Create agent-2 with messages and scroll to position 150
     await newChatButton.click();
     await window.waitForTimeout(300);
+
+    // Re-create locator and get second agent ID
+    agentIcons = window.locator('[data-testid^="agent-icon-"]');
+    await expect(agentIcons).toHaveCount(2, { timeout: 5000 });
+
+    const allAgentIds1 = await agentIcons.evaluateAll((elements) =>
+      elements.map((el) => el.getAttribute('data-testid')?.replace('agent-icon-', ''))
+    );
+    const secondAgentId = allAgentIds1.find((id) => id && id !== firstAgentId);
+    expect(secondAgentId).toBeTruthy();
+
     for (let i = 1; i <= 15; i++) {
       await messageInput.fill(`Agent 2 Message ${i}`);
       await messageInput.press('Enter');
@@ -204,6 +252,19 @@ test.describe('Agent Scroll Position', () => {
     // Create agent-3 with messages and scroll to position 250
     await newChatButton.click();
     await window.waitForTimeout(300);
+
+    // Re-create locator and get third agent ID
+    agentIcons = window.locator('[data-testid^="agent-icon-"]');
+    await expect(agentIcons).toHaveCount(3, { timeout: 5000 });
+
+    const allAgentIds2 = await agentIcons.evaluateAll((elements) =>
+      elements.map((el) => el.getAttribute('data-testid')?.replace('agent-icon-', ''))
+    );
+    const thirdAgentId = allAgentIds2.find(
+      (id) => id && id !== firstAgentId && id !== secondAgentId
+    );
+    expect(thirdAgentId).toBeTruthy();
+
     for (let i = 1; i <= 15; i++) {
       await messageInput.fill(`Agent 3 Message ${i}`);
       await messageInput.press('Enter');
@@ -214,25 +275,30 @@ test.describe('Agent Scroll Position', () => {
     });
     await window.waitForTimeout(200);
 
-    // Get agent icons
-    const agentIcons = window.locator('[data-testid^="agent-icon-"]');
-    await expect(agentIcons).toHaveCount(3, { timeout: 2000 });
-
-    // Switch to agent-1 and verify position
-    await agentIcons.nth(0).click();
-    await window.waitForTimeout(500);
+    // Switch to agent-1 using ID and verify position
+    await window.locator(`[data-testid="agent-icon-${firstAgentId}"]`).click();
+    await expect(window.locator('[data-testid="message"]').first()).toContainText(
+      'Agent 1 Message 1',
+      { timeout: 5000 }
+    );
     const position1 = await messagesArea.evaluate((el) => el.scrollTop);
     expect(position1).toBe(50);
 
-    // Switch to agent-2 and verify position
-    await agentIcons.nth(1).click();
-    await window.waitForTimeout(500);
+    // Switch to agent-2 using ID and verify position
+    await window.locator(`[data-testid="agent-icon-${secondAgentId}"]`).click();
+    await expect(window.locator('[data-testid="message"]').first()).toContainText(
+      'Agent 2 Message 1',
+      { timeout: 5000 }
+    );
     const position2 = await messagesArea.evaluate((el) => el.scrollTop);
     expect(position2).toBe(150);
 
-    // Switch to agent-3 and verify position
-    await agentIcons.nth(2).click();
-    await window.waitForTimeout(500);
+    // Switch to agent-3 using ID and verify position
+    await window.locator(`[data-testid="agent-icon-${thirdAgentId}"]`).click();
+    await expect(window.locator('[data-testid="message"]').first()).toContainText(
+      'Agent 3 Message 1',
+      { timeout: 5000 }
+    );
     const position3 = await messagesArea.evaluate((el) => el.scrollTop);
     expect(position3).toBe(250);
   });
@@ -245,6 +311,17 @@ test.describe('Agent Scroll Position', () => {
     const messageInput = window.locator('textarea[placeholder*="Ask"]');
     const messagesArea = window.locator('[data-testid="messages-area"]');
     const newChatButton = window.locator('div[title="New chat"]');
+
+    // Wait for first agent to be auto-created
+    let agentIcons = window.locator('[data-testid^="agent-icon-"]');
+    await expect(agentIcons).toHaveCount(1, { timeout: 5000 });
+
+    // Save first agent ID
+    const firstAgentId = (await agentIcons.first().getAttribute('data-testid'))?.replace(
+      'agent-icon-',
+      ''
+    );
+    expect(firstAgentId).toBeTruthy();
 
     // Create agent-1 with messages
     for (let i = 1; i <= 15; i++) {
@@ -265,6 +342,16 @@ test.describe('Agent Scroll Position', () => {
     await newChatButton.click();
     await window.waitForTimeout(300);
 
+    // Re-create locator and get second agent ID
+    agentIcons = window.locator('[data-testid^="agent-icon-"]');
+    await expect(agentIcons).toHaveCount(2, { timeout: 5000 });
+
+    const allAgentIds1 = await agentIcons.evaluateAll((elements) =>
+      elements.map((el) => el.getAttribute('data-testid')?.replace('agent-icon-', ''))
+    );
+    const secondAgentId = allAgentIds1.find((id) => id && id !== firstAgentId);
+    expect(secondAgentId).toBeTruthy();
+
     // Send messages to agent-2
     for (let i = 1; i <= 15; i++) {
       await messageInput.fill(`Agent 2 Message ${i}`);
@@ -274,8 +361,8 @@ test.describe('Agent Scroll Position', () => {
 
     await expect(window.locator('[data-testid="message"]')).toHaveCount(15, { timeout: 5000 });
 
-    // Wait for autoscroll to complete (first visit should scroll to bottom)
-    await window.waitForTimeout(500);
+    // Wait longer for autoscroll to complete (first visit should scroll to bottom)
+    await window.waitForTimeout(1000);
 
     // Check that agent-2 is scrolled to bottom on first visit
     const distanceFromBottom = await messagesArea.evaluate((el) => {
@@ -283,10 +370,12 @@ test.describe('Agent Scroll Position', () => {
     });
     expect(distanceFromBottom).toBeLessThan(50);
 
-    // Now switch back to agent-1 (should restore saved position, not scroll to bottom)
-    const agentIcons = window.locator('[data-testid^="agent-icon-"]');
-    await agentIcons.first().click();
-    await window.waitForTimeout(500);
+    // Now switch back to agent-1 using ID (should restore saved position, not scroll to bottom)
+    await window.locator(`[data-testid="agent-icon-${firstAgentId}"]`).click();
+    await expect(window.locator('[data-testid="message"]').first()).toContainText(
+      'Agent 1 Message 1',
+      { timeout: 5000 }
+    );
 
     // Check that agent-1 position is restored (not at bottom)
     const agent1Position = await messagesArea.evaluate((el) => el.scrollTop);
@@ -296,6 +385,18 @@ test.describe('Agent Scroll Position', () => {
     await newChatButton.click();
     await window.waitForTimeout(300);
 
+    // Re-create locator and get third agent ID
+    agentIcons = window.locator('[data-testid^="agent-icon-"]');
+    await expect(agentIcons).toHaveCount(3, { timeout: 5000 });
+
+    const allAgentIds2 = await agentIcons.evaluateAll((elements) =>
+      elements.map((el) => el.getAttribute('data-testid')?.replace('agent-icon-', ''))
+    );
+    const thirdAgentId = allAgentIds2.find(
+      (id) => id && id !== firstAgentId && id !== secondAgentId
+    );
+    expect(thirdAgentId).toBeTruthy();
+
     // Send messages to agent-3
     for (let i = 1; i <= 15; i++) {
       await messageInput.fill(`Agent 3 Message ${i}`);
@@ -304,7 +405,7 @@ test.describe('Agent Scroll Position', () => {
     }
 
     await expect(window.locator('[data-testid="message"]')).toHaveCount(15, { timeout: 5000 });
-    await window.waitForTimeout(500);
+    await window.waitForTimeout(1000);
 
     // Check that agent-3 is also scrolled to bottom on first visit
     const agent3DistanceFromBottom = await messagesArea.evaluate((el) => {
