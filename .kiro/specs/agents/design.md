@@ -1304,20 +1304,35 @@ useEffect(() => {
 
 **Requirements:** agents.4.13
 
-При создании сообщения пользователя (`kind: 'user'`) чат автоматически прокручивается вниз, чтобы последнее сообщение было видимо.
+При появлении новых сообщений чат автоматически прокручивается вниз, если пользователь находится в нижней трети чата.
 
 **Реализация в Agents компоненте:**
 
 ```typescript
-// Requirements: agents.4.13.4
+// Requirements: agents.4.13.6
 const messagesEndRef = useRef<HTMLDivElement>(null);
 
-// Requirements: agents.4.13.3
+// Requirements: agents.4.13.5
 const scrollToBottom = () => {
   messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
 };
 
-// Requirements: agents.4.13.1, agents.4.13.5
+// Requirements: agents.4.13.2, agents.4.13.3
+const isUserAtBottom = (): boolean => {
+  if (!messagesAreaRef.current) return true;
+  const { scrollHeight, scrollTop, clientHeight } = messagesAreaRef.current;
+  const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
+  return distanceFromBottom < clientHeight / 3;
+};
+
+// Requirements: agents.4.13.1, agents.4.13.2
+useEffect(() => {
+  if (messages.length > 0 && isUserAtBottom()) {
+    scrollToBottom();
+  }
+}, [messages]);
+
+// Requirements: agents.4.13.4
 const handleSend = async () => {
   if (!taskInput.trim() || !activeAgent) return;
   
@@ -1330,7 +1345,7 @@ const handleSend = async () => {
     data: { text: userMessage }
   });
   
-  // Scroll to bottom ONLY when creating user message
+  // Always scroll to bottom when user sends message
   scrollToBottom();
 };
 ```
@@ -1350,7 +1365,7 @@ const handleSend = async () => {
         {/* Message content */}
       </motion.div>
     ))}
-    {/* Requirements: agents.4.13.4 - Invisible div for autoscroll */}
+    {/* Requirements: agents.4.13.6 - Invisible div for autoscroll */}
     <div ref={messagesEndRef} />
   </div>
 </div>
@@ -1358,24 +1373,133 @@ const handleSend = async () => {
 
 **Принцип работы:**
 
-1. **Невидимый маркер** (agents.4.13.4): В конце списка сообщений размещается пустой `<div ref={messagesEndRef} />`. Этот элемент невидим, но служит целью для прокрутки.
+1. **Невидимый маркер** (agents.4.13.6): В конце списка сообщений размещается пустой `<div ref={messagesEndRef} />`. Этот элемент невидим, но служит целью для прокрутки.
 
-2. **Явный вызов** (agents.4.13.1, agents.4.13.5): `scrollToBottom()` вызывается ТОЛЬКО после создания сообщения с `kind: 'user'` в обработчике `handleSend()`.
+2. **Проверка позиции** (agents.4.13.2, agents.4.13.3): Функция `isUserAtBottom()` проверяет, находится ли пользователь в нижней трети чата. Формула: `scrollHeight - scrollTop - clientHeight < clientHeight / 3`.
 
-3. **Плавная прокрутка** (agents.4.13.3): `scrollIntoView({ behavior: 'smooth' })` обеспечивает плавную анимацию прокрутки к элементу.
+3. **Автоматический автоскролл** (agents.4.13.1): `useEffect` отслеживает изменения массива `messages`. При появлении нового сообщения проверяется позиция пользователя. Если он в нижней трети → автоскролл.
 
-4. **Полная видимость** (agents.4.13.6): Прокрутка выполняется так, чтобы `messagesEndRef` (и, следовательно, последнее сообщение) был полностью видим в viewport.
+4. **Принудительный автоскролл** (agents.4.13.4): При отправке сообщения пользователем `scrollToBottom()` вызывается ВСЕГДА, независимо от позиции скролла.
 
-**Когда автоскролл срабатывает** (agents.4.13.1):
-- Пользователь вводит текст и нажимает Enter → создается сообщение `kind: 'user'` → `scrollToBottom()` → автоскролл
-- Пользователь вводит текст и кликает кнопку Send → создается сообщение `kind: 'user'` → `scrollToBottom()` → автоскролл
-- Пользователь кликает на промпт в пустом стейте → создается сообщение `kind: 'user'` → `scrollToBottom()` → автоскролл
+5. **Плавная прокрутка** (agents.4.13.5): `scrollIntoView({ behavior: 'smooth' })` обеспечивает плавную анимацию прокрутки к элементу.
+
+6. **Полная видимость** (agents.4.13.7): Прокрутка выполняется так, чтобы `messagesEndRef` (и, следовательно, последнее сообщение) был полностью видим в viewport.
+
+**Когда автоскролл срабатывает** (agents.4.13.1, agents.4.13.2, agents.4.13.4):
+- Пользователь в нижней трети чата → появляется ЛЮБОЕ новое сообщение (user, llm, tool_call, final_answer) → автоскролл
+- Пользователь отправляет сообщение → автоскролл ВСЕГДА (даже если прокручен вверх)
+- Пользователь кликает на промпт в пустом стейте → автоскролл ВСЕГДА
 
 **Когда автоскролл НЕ срабатывает** (agents.4.13.2):
-- Агент отвечает → создается сообщение `kind: 'llm'` или `kind: 'final_answer'` → автоскролл НЕ срабатывает
-- Агент вызывает инструмент → создается сообщение `kind: 'tool_call'` → автоскролл НЕ срабатывает
-- Обновляется существующее сообщение → автоскролл НЕ срабатывает
-- Переключение на другого агента → загружаются сообщения → автоскролл НЕ срабатывает
+- Пользователь прокрутил вверх (выше нижней трети) → агент отвечает → автоскролл НЕ срабатывает
+- Пользователь читает старые сообщения → появляется новое сообщение → автоскролл НЕ срабатывает
+- Обновляется существующее сообщение (без изменения длины массива) → автоскролл НЕ срабатывает
+
+#### Сохранение позиции скролла
+
+**Requirements:** agents.4.14
+
+Позиция скролла сохраняется для каждого агента независимо и восстанавливается при переключении между агентами.
+
+**Реализация в Agents компоненте:**
+
+```typescript
+// Requirements: agents.4.14.5
+const scrollPositions = useRef<Map<string, number>>(new Map());
+
+// Save scroll position when user scrolls
+// Requirements: agents.4.14.1
+const handleScroll = () => {
+  if (!messagesAreaRef.current || !activeAgent) return;
+  const scrollTop = messagesAreaRef.current.scrollTop;
+  scrollPositions.current.set(activeAgent.agentId, scrollTop);
+};
+
+// Restore scroll position when switching agents
+// Requirements: agents.4.14.2, agents.4.14.3, agents.4.14.4, agents.4.14.7
+useEffect(() => {
+  if (!messagesAreaRef.current || !activeAgent) return;
+  
+  const savedPosition = scrollPositions.current.get(activeAgent.agentId);
+  if (savedPosition !== undefined) {
+    // Restore saved position
+    messagesAreaRef.current.scrollTop = savedPosition;
+  } else {
+    // First visit - scroll to bottom
+    scrollToBottom();
+  }
+}, [activeAgent?.agentId, messages]);
+
+// Clear saved position when user sends message
+// Requirements: agents.4.14.6
+const handleSend = async () => {
+  if (!taskInput.trim() || !activeAgent) return;
+  
+  const userMessage = taskInput.trim();
+  setTaskInput('');
+  
+  // Create message with kind: 'user'
+  await window.api.messages.create(activeAgent.agentId, {
+    kind: 'user',
+    data: { text: userMessage }
+  });
+  
+  // Clear saved position and scroll to bottom
+  scrollPositions.current.delete(activeAgent.agentId);
+  scrollToBottom();
+};
+```
+
+**Структура DOM с обработчиком скролла:**
+
+```tsx
+{/* Messages Area */}
+<div
+  ref={messagesAreaRef}
+  data-testid="messages-area"
+  className="flex-1 overflow-y-auto p-6 min-h-0"
+  onScroll={handleScroll}
+>
+  <div className="min-h-full flex flex-col justify-end space-y-4">
+    {messages.map((message) => (
+      <motion.div key={message.id} data-testid="message">
+        {/* Message content */}
+      </motion.div>
+    ))}
+    <div ref={messagesEndRef} />
+  </div>
+</div>
+```
+
+**Принцип работы:**
+
+1. **Сохранение позиции** (agents.4.14.1): При скролле пользователем срабатывает `onScroll` → `handleScroll()` → сохраняет `scrollTop` в `Map<agentId, scrollTop>`
+
+2. **Хранение в памяти** (agents.4.14.5): Используется `useRef<Map>` для хранения позиций - данные НЕ теряются при ре-рендерах, но очищаются при перезагрузке приложения
+
+3. **Восстановление сохраненной позиции** (agents.4.14.3, agents.4.14.7): При переключении агента `useEffect` проверяет наличие сохраненной позиции → если есть, восстанавливает `scrollTop`
+
+4. **Первый визит** (agents.4.14.4): Если сохраненной позиции нет (первый визит к агенту) → автоскролл к последнему сообщению
+
+5. **Сброс при отправке** (agents.4.14.6): При отправке сообщения пользователем сохраненная позиция удаляется из Map → автоскролл к низу
+
+**Сценарии:**
+
+1. **Пользователь читает старые сообщения:**
+   - Прокручивает вверх → позиция сохраняется
+   - Переключается на другого агента → позиция сохранена
+   - Возвращается → позиция восстановлена, пользователь продолжает читать
+
+2. **Пользователь отправляет сообщение:**
+   - Прокручивает вверх → позиция сохраняется
+   - Отправляет сообщение → позиция сбрасывается → автоскролл к низу
+   - Видит свое новое сообщение внизу
+
+3. **Агент отвечает в фоне:**
+   - Пользователь читает старые сообщения (прокручен вверх)
+   - Агент отвечает → сообщение добавляется
+   - Позиция НЕ меняется → пользователь продолжает читать
+   - Переключается на другого агента и возвращается → позиция восстановлена
 
 ### EmptyStatePlaceholder
 
@@ -1955,6 +2079,7 @@ import { Logo } from '../logo';
 | `tests/unit/agents/AutoExpandingTextarea.test.tsx` | agents.4.5-4.7 |
 | `tests/unit/components/agents.test.tsx` | agents.4.22 |
 | `tests/unit/components/agents-autoscroll.test.tsx` | agents.4.13 |
+| `tests/unit/components/agents-scroll-position.test.tsx` | agents.4.14 |
 
 ### Property-Based тесты
 
@@ -1965,43 +2090,39 @@ import { Logo } from '../logo';
 
 ### Функциональные тесты
 
-| Файл | Покрытие | Тесты |
-|------|----------|-------|
-| `tests/functional/agent-switching.spec.ts` | agents.3 | Переключение между агентами |
-| `tests/functional/agent-messaging.spec.ts` | agents.4.3, 4.4, 4.8, 4.13 | Отправка сообщений и базовый чат |
-| `tests/functional/all-agents-page.spec.ts` | agents.5 | Страница All Agents |
-| `tests/functional/agent-status-indicators.spec.ts` | agents.6 | Визуальные индикаторы статусов |
-| `tests/functional/message-format.spec.ts` | agents.7 | Формат сообщений |
-| `tests/functional/agent-status-calculation.spec.ts` | agents.9 | Вычисление статуса агента |
-| `tests/functional/agent-data-isolation.spec.ts` | agents.10 | Изоляция данных по пользователю |
-| `tests/functional/agent-activity-indicator.spec.ts` | agents.11 | Индикатор активности |
-| `tests/functional/agent-realtime-events.spec.ts` | agents.12 | Real-time события |
-| `tests/functional/agent-list-responsive.spec.ts` | agents.1.7, 1.8, 1.9 | Адаптивность списка агентов |
-| `tests/functional/agents-always-one.spec.ts` | agents.2.7-2.11 | Автосоздание первого агента |
-| `tests/functional/agents-error-messages.spec.ts` | agents.5.5, 5.6, 5.7 | Отображение ошибок в AllAgents |
-| `tests/functional/auto-expanding-textarea.spec.ts` | agents.4.5-4.7 | Автоувеличение поля ввода |
-| `tests/functional/empty-state-placeholder.spec.ts` | agents.4.14-4.18 | Пустой стейт с промптами |
-| `tests/functional/message-text-wrapping.spec.ts` | agents.4.22 | 11 тестов переноса текста (см. ниже) |
-| `tests/functional/agent-activation-animation.spec.ts` | agents.6.7 | Анимация активации агента |
-| `tests/functional/agent-list-initial-animation.spec.ts` | agents.1.4.4 | Анимация при загрузке |
-| `tests/functional/agent-reordering.spec.ts` | agents.1.3, 1.4 | Пересортировка агентов |
-| `tests/functional/agent-date-update.spec.ts` | agents.1.4, 8.1 | Обновление timestamp |
-| `tests/functional/input-autofocus.spec.ts` | agents.4.7.1, 4.7.2 | Автофокус поля ввода |
-| `tests/functional/header-layout.spec.ts` | agents.8.3 | Layout хедера |
+| Файл | Покрытие | Недостающие тесты |
+|------|----------|-------------------|
+| `tests/functional/agent-switching.spec.ts` | agents.3 | - |
+| `tests/functional/agent-messaging.spec.ts` | agents.4.3, 4.4, 4.8, 4.13.4 | agents.4.13.1, 4.13.2 (автоскролл при ответе агента) |
+| `tests/functional/agent-scroll-position.spec.ts` | agents.4.14.1-4.14.3, 4.14.6 | agents.4.14.4 (первый визит) |
+| `tests/functional/all-agents-page.spec.ts` | agents.5 | - |
+| `tests/functional/agent-status-indicators.spec.ts` | agents.6 | - |
+| `tests/functional/message-format.spec.ts` | agents.7 | - |
+| `tests/functional/agent-status-calculation.spec.ts` | agents.9 | - |
+| `tests/functional/agent-data-isolation.spec.ts` | agents.10 | - |
+| `tests/functional/agent-activity-indicator.spec.ts` | agents.11 | - |
+| `tests/functional/agent-realtime-events.spec.ts` | agents.12 | - |
+| `tests/functional/agent-list-responsive.spec.ts` | agents.1.7, 1.8, 1.9 | - |
+| `tests/functional/agents-always-one.spec.ts` | agents.2.7-2.11 | - |
+| `tests/functional/agents-error-messages.spec.ts` | agents.5.5, 5.6, 5.7 | - |
+| `tests/functional/auto-expanding-textarea.spec.ts` | agents.4.5-4.7 | - |
+| `tests/functional/empty-state-placeholder.spec.ts` | agents.4.15-4.19 | - |
+| `tests/functional/message-text-wrapping.spec.ts` | agents.4.23 | - |
+| `tests/functional/agent-activation-animation.spec.ts` | agents.6.7 | - |
+| `tests/functional/agent-list-initial-animation.spec.ts` | agents.1.4.4 | - |
+| `tests/functional/agent-reordering.spec.ts` | agents.1.3, 1.4 | - |
+| `tests/functional/agent-date-update.spec.ts` | agents.1.4, 8.1 | - |
+| `tests/functional/input-autofocus.spec.ts` | agents.4.7.1, 4.7.2 | - |
+| `tests/functional/header-layout.spec.ts` | agents.8.3 | - |
 
-#### Детальное покрытие agents.4.22 (message-text-wrapping.spec.ts)
+#### Недостающие функциональные тесты
 
-1. "should wrap long words without spaces in user messages" - перенос длинных слов без пробелов
-2. "should preserve line breaks in user messages" - сохранение переносов строк
-3. "should have correct CSS classes for agent messages" - проверка CSS классов
-4. "should not exceed chat area width with long content" - ограничение ширины сообщений
-5. "should handle mixed content with long words and line breaks" - смешанный контент
-6. "should preserve multiple consecutive line breaks" - множественные переносы строк
-7. "should wrap long text with spaces naturally" - естественный перенос текста с пробелами
-8. "should wrap code-like content without horizontal scroll" - перенос кода
-9. "should preserve internal whitespace and trim leading/trailing" - сохранение внутренних пробелов, удаление внешних
-10. "should maintain text wrapping after window resize" - перенос после изменения размера окна
-11. "should handle emoji and Unicode characters correctly" - поддержка emoji и Unicode
+**agents.4.13.1, 4.13.2 - Автоскролл при ответе агента:**
+- "should autoscroll when agent responds and user is at bottom" - автоскролл если пользователь внизу
+- "should NOT autoscroll when agent responds and user scrolled up" - НЕТ автоскролла если пользователь прокрутил вверх
+
+**agents.4.14.4 - Первый визит к агенту:**
+- "should scroll to bottom on first visit to agent" - автоскролл при первом визите
 
 ### Покрытие требований
 
@@ -2012,19 +2133,10 @@ import { Logo } from '../logo';
 | agents.2.7-2.11 (auto-create) | ✓ | ✓ | ✓ |
 | agents.3 | ✓ | - | ✓ |
 | agents.4 | ✓ | - | ✓ |
-| agents.5 | ✓ | - | ✓ |
-| agents.6 | ✓ | - | ✓ |
-| agents.7 | ✓ | - | ✓ |
-| agents.8 | ✓ | - | ✓ |
-| agents.9 | ✓ | ✓ | ✓ |
-| agents.10 | ✓ | - | ✓ |
-| agents.11 | ✓ | - | ✓ |
-| agents.12 | ✓ | - | ✓ |
-| agents.3 | ✓ | - | ✓ |
-| agents.4 | ✓ | - | ✓ |
 | agents.4.7.1-4.7.2 (autofocus) | - | - | ✓ |
-| agents.4.13 (autoscroll) | ✓ | - | ✓ |
-| agents.4.22 (text wrapping) | ✓ | - | ✓ |
+| agents.4.13.1-4.13.7 (autoscroll) | ✓ | - | ✓ |
+| agents.4.14.1-4.14.7 (scroll position) | ✓ | - | ✓ |
+| agents.4.23 (text wrapping) | ✓ | - | ✓ |
 | agents.5 | ✓ | - | ✓ |
 | agents.5.5 (error messages) | ✓ | - | ✓ |
 | agents.5.6 (filter archived) | ✓ | - | ✓ |
