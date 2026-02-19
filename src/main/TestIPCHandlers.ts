@@ -359,5 +359,36 @@ export function registerTestIPCHandlers(
     return { success: true };
   });
 
+  ipcMain.handle(
+    'test:create-agent-message',
+    async (_event: Electron.IpcMainInvokeEvent, agentId: string, text: string) => {
+      if (!isTestEnvironment()) {
+        throw new Error('test:create-agent-message can only be used in test environment');
+      }
+
+      // Validate parameters
+      if (!agentId || typeof agentId !== 'string') {
+        return { success: false, error: 'agentId parameter is required' };
+      }
+      if (!text || typeof text !== 'string') {
+        return { success: false, error: 'text parameter is required' };
+      }
+
+      try {
+        const payload = {
+          kind: 'llm' as const,
+          data: { text },
+        };
+        messageManager.create(agentId, payload);
+        logger.info(`Test: Created agent message for agent ${agentId}`);
+        return { success: true };
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        logger.error(`Test: Failed to create agent message: ${errorMessage}`);
+        return { success: false, error: errorMessage };
+      }
+    }
+  );
+
   logger.info('Test IPC handlers registered');
 }

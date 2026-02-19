@@ -289,4 +289,124 @@ test.describe('Agent Messaging', () => {
     const scrollAfter = await messagesArea.evaluate((el) => el.scrollTop);
     expect(scrollAfter).toBe(100);
   });
+
+  /* Preconditions: User at bottom of chat
+     Action: Agent sends response
+     Assertions: Chat autoscrolls to show agent response
+     Requirements: agents.4.13.1, agents.4.13.2 */
+  test('should autoscroll when agent responds and user is at bottom', async () => {
+    const messageInput = window.locator('textarea[placeholder*="Ask"]');
+    const messagesArea = window.locator('[data-testid="messages-area"]');
+
+    // Wait for first agent to be auto-created
+    const agentIcons = window.locator('[data-testid^="agent-icon-"]');
+    await expect(agentIcons).toHaveCount(1, { timeout: 5000 });
+
+    // Save first agent ID
+    const firstAgentId = (await agentIcons.first().getAttribute('data-testid'))?.replace(
+      'agent-icon-',
+      ''
+    );
+    expect(firstAgentId).toBeTruthy();
+
+    // Send user message
+    await messageInput.fill('User message');
+    await messageInput.press('Enter');
+
+    // Wait for message to appear
+    await expect(window.locator('[data-testid="message"]')).toHaveCount(1, { timeout: 5000 });
+
+    // Verify user is at bottom
+    const isAtBottom = await messagesArea.evaluate((el) => {
+      const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+      return distanceFromBottom < el.clientHeight / 3;
+    });
+    expect(isAtBottom).toBe(true);
+
+    // Create agent message using test API
+    const result = await window.evaluate(async (agentId) => {
+      // @ts-expect-error - window.api is exposed via contextBridge
+      return await window.api.test.createAgentMessage(agentId, 'Agent response message');
+    }, firstAgentId as string);
+    expect(result.success).toBe(true);
+
+    // Wait for agent message to appear
+    await expect(window.locator('[data-testid="message"]')).toHaveCount(2, { timeout: 5000 });
+
+    // Wait for autoscroll animation to complete
+    await window.waitForTimeout(1000);
+
+    // Verify chat autoscrolled to bottom
+    const distanceFromBottom = await messagesArea.evaluate((el) => {
+      return el.scrollHeight - el.scrollTop - el.clientHeight;
+    });
+    expect(distanceFromBottom).toBeLessThan(50);
+  });
+
+  /* Preconditions: User scrolled up in chat
+     Action: Agent sends response
+     Assertions: Chat does NOT autoscroll, position preserved
+     Requirements: agents.4.13.2 */
+  test('should NOT autoscroll when agent responds and user scrolled up', async () => {
+    const messageInput = window.locator('textarea[placeholder*="Ask"]');
+    const messagesArea = window.locator('[data-testid="messages-area"]');
+
+    // Wait for first agent to be auto-created
+    const agentIcons = window.locator('[data-testid^="agent-icon-"]');
+    await expect(agentIcons).toHaveCount(1, { timeout: 5000 });
+
+    // Save first agent ID
+    const firstAgentId = (await agentIcons.first().getAttribute('data-testid'))?.replace(
+      'agent-icon-',
+      ''
+    );
+    expect(firstAgentId).toBeTruthy();
+
+    // Send many messages to create scrollable content
+    for (let i = 1; i <= 15; i++) {
+      await messageInput.fill(`User message ${i}`);
+      await messageInput.press('Enter');
+      await window.waitForTimeout(150);
+    }
+
+    await expect(window.locator('[data-testid="message"]')).toHaveCount(15, { timeout: 10000 });
+
+    // Scroll up
+    await messagesArea.evaluate((el) => {
+      el.scrollTop = 100;
+    });
+
+    await window.waitForTimeout(300);
+
+    // Verify user is NOT at bottom
+    const isAtBottom = await messagesArea.evaluate((el) => {
+      const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+      return distanceFromBottom < el.clientHeight / 3;
+    });
+    expect(isAtBottom).toBe(false);
+
+    // Get scroll position before agent message
+    const scrollBeforeAgentMessage = await messagesArea.evaluate((el) => el.scrollTop);
+    expect(scrollBeforeAgentMessage).toBe(100);
+
+    // Create agent message using test API
+    const result = await window.evaluate(async (agentId) => {
+      // @ts-expect-error - window.api is exposed via contextBridge
+      return await window.api.test.createAgentMessage(
+        agentId,
+        'Agent response while user scrolled up'
+      );
+    }, firstAgentId as string);
+    expect(result.success).toBe(true);
+
+    // Wait for agent message to appear
+    await expect(window.locator('[data-testid="message"]')).toHaveCount(16, { timeout: 5000 });
+
+    // Wait a bit to ensure no autoscroll happens
+    await window.waitForTimeout(1000);
+
+    // Verify scroll position did NOT change
+    const scrollAfterAgentMessage = await messagesArea.evaluate((el) => el.scrollTop);
+    expect(scrollAfterAgentMessage).toBe(100);
+  });
 });

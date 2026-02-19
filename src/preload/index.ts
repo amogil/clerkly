@@ -589,6 +589,21 @@ if (process.env.NODE_ENV === 'test') {
     ): Promise<{ success: boolean; agentId?: string; timestamp?: string; error?: string }> {
       return await ipcRenderer.invoke('test:create-agent-with-old-message', minutesAgo);
     },
+
+    /**
+     * Create agent message for testing autoscroll behavior
+     * Requirements: testing.3.1
+     * @param agentId - Agent ID to create message for
+     * @param text - Message text
+     * @returns {Promise<{success: boolean, error?: string}>}
+     */
+    // @ts-expect-error - Type will be added to api.test interface
+    async createAgentMessage(
+      agentId: string,
+      text: string
+    ): Promise<{ success: boolean; error?: string }> {
+      return await ipcRenderer.invoke('test:create-agent-message', agentId, text);
+    },
   };
 
   api.ipcRenderer = {

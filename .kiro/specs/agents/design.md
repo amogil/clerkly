@@ -2093,8 +2093,8 @@ import { Logo } from '../logo';
 | Файл | Покрытие | Недостающие тесты |
 |------|----------|-------------------|
 | `tests/functional/agent-switching.spec.ts` | agents.3 | - |
-| `tests/functional/agent-messaging.spec.ts` | agents.4.3, 4.4, 4.8, 4.13.4 | agents.4.13.1, 4.13.2 (автоскролл при ответе агента) |
-| `tests/functional/agent-scroll-position.spec.ts` | agents.4.14.1-4.14.3, 4.14.6 | agents.4.14.4 (первый визит) |
+| `tests/functional/agent-messaging.spec.ts` | agents.4.3, 4.4, 4.8, 4.13.1, 4.13.2, 4.13.4 | - |
+| `tests/functional/agent-scroll-position.spec.ts` | agents.4.14.1-4.14.4, 4.14.6 | - |
 | `tests/functional/all-agents-page.spec.ts` | agents.5 | - |
 | `tests/functional/agent-status-indicators.spec.ts` | agents.6 | - |
 | `tests/functional/message-format.spec.ts` | agents.7 | - |
@@ -2117,12 +2117,7 @@ import { Logo } from '../logo';
 
 #### Недостающие функциональные тесты
 
-**agents.4.13.1, 4.13.2 - Автоскролл при ответе агента:**
-- "should autoscroll when agent responds and user is at bottom" - автоскролл если пользователь внизу
-- "should NOT autoscroll when agent responds and user scrolled up" - НЕТ автоскролла если пользователь прокрутил вверх
-
-**agents.4.14.4 - Первый визит к агенту:**
-- "should scroll to bottom on first visit to agent" - автоскролл при первом визите
+Все функциональные тесты для автоскролла и управления позицией скролла реализованы.
 
 #### Правила написания функциональных тестов
 

@@ -212,9 +212,14 @@ declare global {
           errorMessage: string
         ) => Promise<{ success: boolean; error?: string }>;
         clearDataErrors: () => Promise<{ success: boolean; error?: string }>;
+        deleteCurrentUser: () => Promise<{ success: boolean; error?: string }>;
         createAgentWithOldMessage: (
           minutesAgo: number
         ) => Promise<{ success: boolean; agentId?: string; timestamp?: string; error?: string }>;
+        createAgentMessage: (
+          agentId: string,
+          text: string
+        ) => Promise<{ success: boolean; error?: string }>;
       };
       ipcRenderer?: {
         invoke: (channel: string, ...args: unknown[]) => Promise<unknown>;
