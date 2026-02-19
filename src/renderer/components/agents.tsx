@@ -99,6 +99,7 @@ export function Agents() {
     if (!messagesAreaRef.current || !activeAgent) return;
 
     const savedPosition = scrollPositions.current.get(activeAgent.id);
+
     if (savedPosition !== undefined) {
       // Restore saved position
       messagesAreaRef.current.scrollTop = savedPosition;

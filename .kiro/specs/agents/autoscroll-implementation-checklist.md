@@ -123,10 +123,10 @@
 - [x] Все тесты проходят
 
 ### 4.2. Функциональные тесты
-- [ ] Запустить: `npm run test:functional:single -- agent-messaging.spec.ts`
-- [ ] Все тесты проходят
-- [ ] Запустить: `npm run test:functional:single -- agent-scroll-position.spec.ts`
-- [ ] Все тесты проходят
+- [x] Запустить: `npm run test:functional:single -- agent-messaging.spec.ts`
+- [x] Все тесты проходят
+- [x] Запустить: `npm run test:functional:single -- agent-scroll-position.spec.ts`
+- [x] Все тесты проходят
 
 ### 4.3. Полная валидация
 - [x] Запустить: `npm run validate`
@@ -169,7 +169,7 @@
 - [x] Все тесты имеют структуру (Preconditions, Action, Assertions, Requirements)
 - [x] Нет eslint/prettier ошибок
 - [x] Покрытие кода достаточное
-- [ ] Функциональные тесты проходят (запускаются по запросу пользователя)
+- [x] Функциональные тесты проходят
 
 ---
 
