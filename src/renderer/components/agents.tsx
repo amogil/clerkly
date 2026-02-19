@@ -359,7 +359,7 @@ export function Agents() {
   return (
     <div data-testid="agents" className="h-[calc(100vh-4rem)] bg-card flex flex-col">
       {/* Combined Header with Chat List */}
-      <div className="h-16 px-6 border-b border-border grid grid-cols-2 gap-6 items-center flex-shrink-0">
+      <div className="h-16 px-6 border-b border-border grid grid-cols-2 gap-6 items-center flex-shrink-0 relative z-[100]">
         {/* Left: Active Agent Info - 50% */}
         <div className="flex items-center gap-3 min-w-0">
           <div
@@ -442,7 +442,6 @@ export function Agents() {
                   }}
                   onClick={() => handleAgentClick(agent)}
                   className={`relative w-8 h-8 rounded-full ${agentStyle.bg} flex items-center justify-center cursor-pointer hover:scale-110 transition-transform group ${isSelected ? 'ring-2 ring-primary ring-offset-2' : ''}`}
-                  title={agentName}
                 >
                   {isCompleted(agent.status) ? (
                     <Check className="w-4 h-4 text-white" />
@@ -471,7 +470,7 @@ export function Agents() {
                     />
                   )}
 
-                  <div className="absolute top-full right-0 mt-2 w-64 bg-gray-900 text-white text-xs rounded-lg p-3 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 shadow-lg">
+                  <div className="absolute top-full right-0 mt-2 w-64 bg-gray-900 text-white text-xs rounded-lg p-3 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 delay-0 group-hover:delay-[2000ms] z-[100] shadow-lg pointer-events-none">
                     <p className="font-semibold mb-1">{agentName}</p>
                     <div className="flex items-center gap-1.5 text-xs text-gray-300">
                       <span>{getStatusText(agent.status)}</span>
