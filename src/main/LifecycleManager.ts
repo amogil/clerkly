@@ -1,10 +1,9 @@
-// Requirements: clerkly.1, clerkly.nfr.1, clerkly.nfr.2, account-profile.1.5, clerkly.3.8
+// Requirements: clerkly.1, clerkly.nfr.1, clerkly.nfr.2, account-profile.1.5, clerkly.3.8, database-refactoring.3.5
 
 import WindowManager from './WindowManager';
-import { DataManager } from './DataManager';
+import { DatabaseManager } from './DatabaseManager';
 import { OAuthClientManager } from './auth/OAuthClientManager';
-import { UserProfileManager } from './auth/UserProfileManager';
-import { TokenStorageManager } from './auth/TokenStorageManager';
+import { UserManager } from './auth/UserManager';
 import { Logger } from './Logger';
 
 // Requirements: clerkly.3.8 - Use centralized Logger instead of console.*
@@ -18,35 +17,39 @@ export interface InitializeResult {
 
 /**
  * Manages application lifecycle including startup, activation, and shutdown
- * Requirements: clerkly.1, clerkly.nfr.1, clerkly.nfr.2, account-profile.1.5
+ * Requirements: clerkly.1, clerkly.nfr.1, clerkly.nfr.2, account-profile.1.5, database-refactoring.3.5
  */
 export class LifecycleManager {
   private windowManager: WindowManager;
-  private dataManager: DataManager;
+  private dbManager: DatabaseManager;
   private oauthClient: OAuthClientManager;
-  private profileManager: UserProfileManager;
+  private userManager: UserManager;
   private startTime: number | null = null;
   private initialized: boolean = false;
   // Requirements: clerkly.3.5, clerkly.3.7
   private logger = Logger.create('LifecycleManager');
 
+  /**
+   * Constructor
+   * Requirements: database-refactoring.3.5 - Use DatabaseManager for DB lifecycle
+   */
   constructor(
     windowManager: WindowManager,
-    dataManager: DataManager,
+    dbManager: DatabaseManager,
     oauthClient: OAuthClientManager,
-    tokenStorage: TokenStorageManager
+    userManager: UserManager
   ) {
     this.windowManager = windowManager;
-    this.dataManager = dataManager;
+    this.dbManager = dbManager;
     this.oauthClient = oauthClient;
-    // Requirements: account-profile.1.5 - Initialize UserProfileManager
-    this.profileManager = new UserProfileManager(dataManager, oauthClient, tokenStorage);
+    // Requirements: account-profile.1.5 - Use provided UserManager
+    this.userManager = userManager;
   }
 
   /**
-   * Инициализирует приложение
-   * Обеспечивает запуск менее чем за 3 секунды
-   * Requirements: clerkly.1, clerkly.nfr.1, account-profile.1.5
+   * Initializes the application
+   * Ensures startup in less than 3 seconds
+   * Requirements: clerkly.1, clerkly.nfr.1, account-profile.1.5, database-refactoring.3.5
    * @returns {Promise<InitializeResult>}
    */
   async initialize(): Promise<InitializeResult> {
@@ -54,17 +57,17 @@ export class LifecycleManager {
     this.startTime = startTime;
 
     try {
-      // Инициализация хранилища данных
-      this.dataManager.initialize();
+      // Database is already initialized by DatabaseManager before LifecycleManager is created
+      // Requirements: database-refactoring.3.5 - DatabaseManager handles DB initialization
 
-      // Создание окна приложения
+      // Create application window
       this.windowManager.createWindow();
 
       // Requirements: account-profile.1.5 - Fetch profile on startup if authenticated
       const authStatus = await this.oauthClient.getAuthStatus();
       if (authStatus.authorized) {
         this.logger.info('User authenticated, fetching profile');
-        await this.profileManager.fetchProfile();
+        await this.userManager.fetchProfile();
       } else {
         this.logger.info('User not authenticated, skipping profile fetch');
       }
@@ -73,7 +76,7 @@ export class LifecycleManager {
 
       const loadTime = Date.now() - startTime;
 
-      // Предупреждение о медленном запуске (> 3 секунды)
+      // Warn about slow startup (> 3 seconds)
       if (loadTime > 3000) {
         this.logger.warn(`Slow startup: ${loadTime}ms (target: <3000ms)`);
       }
@@ -90,12 +93,12 @@ export class LifecycleManager {
   }
 
   /**
-   * Обрабатывает активацию приложения (Mac OS X специфика)
-   * Пересоздает окно при клике на dock icon
+   * Handles application activation (Mac OS X specific)
+   * Recreates window when dock icon is clicked
    * Requirements: clerkly.1, clerkly.nfr.3   */
   handleActivation(): void {
     try {
-      // Mac OS X специфика: пересоздать окно при активации если оно закрыто
+      // Mac OS X specific: recreate window on activation if closed
       if (!this.windowManager.isWindowCreated()) {
         this.windowManager.createWindow();
       }
@@ -106,13 +109,13 @@ export class LifecycleManager {
   }
 
   /**
-   * Корректно завершает приложение
-   * Сохраняет все данные перед выходом
+   * Gracefully shuts down the application
+   * Saves all data before exit
    * Requirements: clerkly.1, clerkly.nfr.2   * @returns {Promise<void>}
    */
   async handleQuit(): Promise<void> {
     try {
-      // Таймаут 5 секунд для graceful shutdown
+      // 5 second timeout for graceful shutdown
       const shutdownPromise = this.performShutdown();
 
       let timeoutId: NodeJS.Timeout;
@@ -124,44 +127,46 @@ export class LifecycleManager {
       try {
         await Promise.race([shutdownPromise, timeoutPromise]);
       } finally {
-        // Очищаем таймер, если shutdown завершился первым
+        // Clear timer if shutdown completed first
         clearTimeout(timeoutId!);
       }
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(`Error during shutdown: ${errorMessage}`);
-      // Продолжаем завершение даже при ошибках
+      // Continue shutdown even on errors
     }
   }
 
   /**
-   * Выполняет процедуру завершения приложения
-   * Requirements: clerkly.nfr.2   * @private
+   * Performs application shutdown procedure
+   * Requirements: clerkly.nfr.2, database-refactoring.3.5
+   * @private
    */
   private async performShutdown(): Promise<void> {
-    // Закрываем окно
+    // Close window
     if (this.windowManager.isWindowCreated()) {
       this.windowManager.closeWindow();
     }
 
-    // Закрываем соединение с базой данных
-    this.dataManager.close();
+    // Close database connection via DatabaseManager
+    // Requirements: database-refactoring.3.5 - DatabaseManager handles DB lifecycle
+    this.dbManager.close();
 
     this.initialized = false;
   }
 
   /**
-   * Обрабатывает закрытие всех окон
-   * Mac OS X: приложение остается активным
+   * Handles closing of all windows
+   * Mac OS X: application remains active
    * Requirements: clerkly.1, clerkly.nfr.3   */
   handleWindowClose(): void {
-    // Mac OS X специфика: приложение остается активным при закрытии окна
-    // Не завершаем приложение, только очищаем ссылку на окно
-    // Окно будет пересоздано при активации через handleActivation()
+    // Mac OS X specific: application remains active when window is closed
+    // Don't quit the app, only clear window reference
+    // Window will be recreated on activation via handleActivation()
   }
 
   /**
-   * Возвращает время запуска
+   * Returns startup time
    * Requirements: clerkly.nfr.1   * @returns {number | null}
    */
   getStartupTime(): number | null {
@@ -169,7 +174,7 @@ export class LifecycleManager {
   }
 
   /**
-   * Проверяет, инициализировано ли приложение
+   * Checks if application is initialized
    * Requirements: clerkly.1   * @returns {boolean}
    */
   isAppInitialized(): boolean {

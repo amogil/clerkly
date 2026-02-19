@@ -30,7 +30,7 @@ Clerkly - это Electron-приложение для Mac OS X, предназн
 - **NFR 2.1 - Обработка ошибок инициализации**: Fallback на temp directory при проблемах с правами, backup при повреждении базы данных
 - **NFR 2.2 - Сохранение данных перед завершением**: Graceful shutdown в "Lifecycle Manager" с таймаутом 5 секунд
 - **NFR 2.3 - IPC таймауты**: 10 секунд на операцию в "IPC Handlers", предотвращение зависания
-- **NFR 2.4 - Backup при повреждении**: Автоматическое создание backup и пересоздание базы данных в "Data Manager"
+- **NFR 2.4 - Backup при повреждении**: Автоматическое создание backup и пересоздание базы данных в "DatabaseManager"
 
 **Совместимость (NFR 3):**
 - **NFR 3.1 - Mac OS X 10.13+**: Использование стабильных Electron API, тестирование на разных версиях
@@ -57,7 +57,8 @@ graph TB
         subgraph "Main Process Components"
             WM[Window Manager]
             LC[Lifecycle Manager]
-            DM[Data Manager]
+            DBM[DatabaseManager]
+            USM[UserSettingsManager]
             IPC[IPC Handlers]
             MR[Migration Runner]
             LOG[Logger]
@@ -289,7 +290,7 @@ class Logger {
 // Requirements: clerkly.3.5, clerkly.3.7, clerkly.3.9
 // Способ 1: Статические методы (для разовых вызовов)
 Logger.info('WindowManager', 'Window created successfully');
-Logger.error('DataManager', 'Failed to save data');
+Logger.error('UserSettingsManager', 'Failed to save data');
 Logger.debug('LifecycleManager', 'Application initialized');
 
 // Способ 2: Параметризованный экземпляр (рекомендуется для модулей)
@@ -388,13 +389,13 @@ interface InitializeResult {
 
 class LifecycleManager {
   private windowManager: WindowManager;
-  private dataManager: DataManager;
+  private dbManager: DatabaseManager;
   private startTime: number | null = null;
   private initialized: boolean = false;
   
-  constructor(windowManager: WindowManager, dataManager: DataManager) {
+  constructor(windowManager: WindowManager, dbManager: DatabaseManager) {
     this.windowManager = windowManager;
-    this.dataManager = dataManager;
+    this.dbManager = dbManager;
   }
   
   /**
@@ -449,8 +450,8 @@ class LifecycleManager {
 }
 ```
 
-#### Data Manager
-Управляет локальным хранением данных пользователя с использованием SQLite.
+#### UserSettingsManager
+Управляет пользовательскими настройками (key-value в таблице user_data) с автоматической фильтрацией по user_id. Использует DatabaseManager для доступа к базе данных.
 
 ```typescript
 // Requirements: clerkly.1.4, clerkly.2.7
@@ -481,8 +482,8 @@ interface DeleteDataResult {
   error?: string;
 }
 
-class DataManager {
-  private storagePath: string;
+class UserSettingsManager {
+  private dbManager: DatabaseManager;
   private db: Database | null = null;
   private migrationRunner: MigrationRunner | null = null;
   
@@ -667,11 +668,11 @@ interface IPCResult {
 }
 
 class IPCHandlers {
-  private dataManager: DataManager;
+  private userSettingsManager: UserSettingsManager;
   private timeout: number = 10000; // 10 секунд
   
-  constructor(dataManager: DataManager) {
-    this.dataManager = dataManager;
+  constructor(userSettingsManager: UserSettingsManager) {
+    this.userSettingsManager = userSettingsManager;
   }
   
   /**
@@ -1099,7 +1100,7 @@ declare global {
 ```typescript
 // Requirements: clerkly.1.4, clerkly.2.4, clerkly.2.5
 // Main Process - IPC Handlers
-const ipcHandlers = new IPCHandlers(dataManager);
+const ipcHandlers = new IPCHandlers(userSettingsManager);
 ipcHandlers.registerHandlers();
 
 // Renderer Process - через Preload Script
@@ -1199,8 +1200,8 @@ CREATE TABLE schema_migrations (
 
 **Тестовый сценарий:**
 - Генерируем случайные key-value пары различных типов (строки, числа, объекты, массивы, boolean)
-- Сохраняем каждую пару через DataManager.saveData()
-- Загружаем каждую пару через DataManager.loadData()
+- Сохраняем каждую пару через UserSettingsManager.saveData()
+- Загружаем каждую пару через UserSettingsManager.loadData()
 - Проверяем, что загруженное значение эквивалентно сохраненному (deep equality)
 
 **Edge cases для тестирования:**
@@ -1262,7 +1263,7 @@ CREATE TABLE schema_migrations (
 **Обоснование:** Это свойство проверяет, что IPC коммуникация корректно обрабатывает таймауты, предотвращая зависание приложения при медленных или зависших операциях. Это критически важно для отзывчивости UI и надежности приложения.
 
 **Тестовый сценарий:**
-- Создаем mock DataManager с искусственной задержкой > timeout
+- Создаем mock UserSettingsManager с искусственной задержкой > timeout
 - Выполняем IPC операции через IPCHandlers
 - Проверяем, что операции возвращают ошибку timeout
 - Проверяем, что время выполнения примерно равно timeout (не намного больше)
@@ -1389,7 +1390,7 @@ CREATE TABLE schema_migrations (
 
 **Тестовый сценарий:**
 - Создаем поврежденную базу данных (невалидный SQLite файл)
-- Запускаем инициализацию DataManager
+- Запускаем инициализацию DatabaseManager
 - Проверяем, что создан backup файл с timestamp
 - Проверяем, что создана новая рабочая база данных
 - Проверяем, что новая база данных функциональна (можно сохранять/загружать данные)
@@ -1623,7 +1624,7 @@ class IPCHandlers {
       
       // Выполнение с timeout
       const result = await this.withTimeout(
-        this.dataManager.saveData(key, value),
+        this.userSettingsManager.saveData(key, value),
         this.timeout,
         'save-data operation timed out'
       );
@@ -1726,7 +1727,7 @@ class UIController {
 
 ```javascript
 // Requirements: clerkly.1.4, clerkly.2.7
-class DataManager {
+class UserSettingsManager {
   // Requirements: clerkly.1.4
   initialize() {
     // Инициализирует локальное хранилище
@@ -1798,7 +1799,7 @@ it("should perform expected behavior", () => {
    - Обработка закрытия окон (Mac OS X поведение)
    - Мониторинг времени запуска
 
-4. **Data Manager**
+4. **DatabaseManager и UserSettingsManager**
    - Инициализация хранилища (создание директорий, миграции)
    - Сохранение данных (успешные случаи, различные типы данных)
    - Загрузка данных (успешные случаи, десериализация)
@@ -1904,47 +1905,44 @@ test('should support all log levels', () => {
   errorSpy.mockRestore();
 });
 
-/* Preconditions: DataManager initialized with test storage path, database is empty
+/* Preconditions: UserSettingsManager initialized with test storage path, database is empty
    Action: save string data with valid key, then load it back
    Assertions: save returns success true, load returns success true with same data
    Requirements: clerkly.1.4 */
 test('should save and load string data', async () => {
-  const dataManager = new DataManager('/tmp/test-storage');
-  await dataManager.initialize();
+  const userSettingsManager = new UserSettingsManager(dbManager);
   
   const key = 'test-key';
   const value = 'test-value';
   
-  const saveResult = dataManager.saveData(key, value);
+  const saveResult = userSettingsManager.saveData(key, value);
   expect(saveResult.success).toBe(true);
   
-  const loadResult = dataManager.loadData(key);
+  const loadResult = userSettingsManager.loadData(key);
   expect(loadResult.success).toBe(true);
   expect(loadResult.data).toBe(value);
 });
 
-/* Preconditions: DataManager initialized
+/* Preconditions: UserSettingsManager initialized
    Action: attempt to save data with empty string key
    Assertions: returns success false with error message about invalid key
    Requirements: clerkly.1.4 */
 test('should reject empty string key', () => {
-  const dataManager = new DataManager('/tmp/test-storage');
-  dataManager.initialize();
+  const userSettingsManager = new UserSettingsManager(dbManager);
   
-  const result = dataManager.saveData('', 'value');
+  const result = userSettingsManager.saveData('', 'value');
   expect(result.success).toBe(false);
   expect(result.error).toContain('Invalid key');
 });
 
-/* Preconditions: DataManager initialized, key does not exist in database
+/* Preconditions: UserSettingsManager initialized, key does not exist in database
    Action: attempt to load data with non-existent key
    Assertions: returns success false with "Key not found" error
    Requirements: clerkly.1.4 */
 test('should handle missing key', () => {
-  const dataManager = new DataManager('/tmp/test-storage');
-  dataManager.initialize();
+  const userSettingsManager = new UserSettingsManager(dbManager);
   
-  const result = dataManager.loadData('non-existent-key');
+  const result = userSettingsManager.loadData('non-existent-key');
   expect(result.success).toBe(false);
   expect(result.error).toContain('Key not found');
 });
@@ -1996,18 +1994,20 @@ test('should return immutable copy of state', () => {
 import * as fc from 'fast-check';
 
 describe('Property Tests - Data Storage', () => {
-  let dataManager: DataManager;
+  let userSettingsManager: UserSettingsManager;
+  let dbManager: DatabaseManager;
   
   beforeEach(() => {
-    dataManager = new DataManager('/tmp/test-storage');
-    dataManager.initialize();
+    dbManager = new DatabaseManager();
+    dbManager.initialize('/tmp/test-storage');
+    userSettingsManager = new UserSettingsManager(dbManager);
   });
   
   afterEach(() => {
-    dataManager.close();
+    dbManager.close();
   });
   
-  /* Preconditions: DataManager initialized with clean database
+  /* Preconditions: UserSettingsManager initialized with clean database
      Action: generate random key-value pairs, save each, then load each
      Assertions: for all pairs, loaded value equals saved value (deep equality)
      Requirements: clerkly.1.4 */
@@ -2026,11 +2026,11 @@ describe('Property Tests - Data Storage', () => {
         ), // value
         async (key: string, value: any) => {
           // Save data
-          const saveResult = dataManager.saveData(key, value);
+          const saveResult = userSettingsManager.saveData(key, value);
           expect(saveResult.success).toBe(true);
           
           // Load data
-          const loadResult = dataManager.loadData(key);
+          const loadResult = userSettingsManager.loadData(key);
           expect(loadResult.success).toBe(true);
           
           // Verify equivalence
@@ -2041,7 +2041,7 @@ describe('Property Tests - Data Storage', () => {
     );
   });
   
-  /* Preconditions: DataManager initialized
+  /* Preconditions: UserSettingsManager initialized
      Action: generate random invalid keys (empty, null, undefined, non-strings, too long)
      Assertions: for all invalid keys, saveData/loadData/deleteData return success false
      Requirements: clerkly.1.4 */
@@ -2058,15 +2058,15 @@ describe('Property Tests - Data Storage', () => {
           fc.string({ minLength: 1001 })
         ),
         (invalidKey: any) => {
-          const saveResult = dataManager.saveData(invalidKey, 'value');
+          const saveResult = userSettingsManager.saveData(invalidKey, 'value');
           expect(saveResult.success).toBe(false);
           expect(saveResult.error).toBeTruthy();
           
-          const loadResult = dataManager.loadData(invalidKey);
+          const loadResult = userSettingsManager.loadData(invalidKey);
           expect(loadResult.success).toBe(false);
           expect(loadResult.error).toBeTruthy();
           
-          const deleteResult = dataManager.deleteData(invalidKey);
+          const deleteResult = userSettingsManager.deleteData(invalidKey);
           expect(deleteResult.success).toBe(false);
           expect(deleteResult.error).toBeTruthy();
         }
@@ -2126,7 +2126,7 @@ describe('Property Tests - Data Storage', () => {
     );
   });
   
-  /* Preconditions: DataManager initialized
+  /* Preconditions: UserSettingsManager initialized
      Action: generate random small data objects, perform save/load/delete operations
      Assertions: for all operations, execution time is less than 50ms
      Requirements: clerkly.nfr.1.4 */
@@ -2141,31 +2141,32 @@ describe('Property Tests - Data Storage', () => {
           fc.boolean()
         ), // small value < 1KB
         (key: string, value: any) => {
-          const dataManager = new DataManager('/tmp/test-storage');
-          dataManager.initialize();
+          const testDbManager = new DatabaseManager();
+          testDbManager.initialize('/tmp/test-storage');
+          const testUserSettingsManager = new UserSettingsManager(testDbManager);
           
           // Test saveData performance
           const saveStart = performance.now();
-          const saveResult = dataManager.saveData(key, value);
+          const saveResult = testUserSettingsManager.saveData(key, value);
           const saveTime = performance.now() - saveStart;
           expect(saveResult.success).toBe(true);
           expect(saveTime).toBeLessThan(50);
           
           // Test loadData performance
           const loadStart = performance.now();
-          const loadResult = dataManager.loadData(key);
+          const loadResult = testUserSettingsManager.loadData(key);
           const loadTime = performance.now() - loadStart;
           expect(loadResult.success).toBe(true);
           expect(loadTime).toBeLessThan(50);
           
           // Test deleteData performance
           const deleteStart = performance.now();
-          const deleteResult = dataManager.deleteData(key);
+          const deleteResult = testUserSettingsManager.deleteData(key);
           const deleteTime = performance.now() - deleteStart;
           expect(deleteResult.success).toBe(true);
           expect(deleteTime).toBeLessThan(50);
           
-          dataManager.close();
+          testDbManager.close();
         }
       ),
       { numRuns: 100 }
@@ -2185,8 +2186,8 @@ describe('Property Tests - Data Storage', () => {
         async (key: string, value: any) => {
           // Start application and save data
           const app1 = await startTestApp();
-          const dataManager1 = app1.getDataManager();
-          const saveResult = dataManager1.saveData(key, value);
+          const userSettingsManager1 = app1.getUserSettingsManager();
+          const saveResult = userSettingsManager1.saveData(key, value);
           expect(saveResult.success).toBe(true);
           
           // Gracefully quit application
@@ -2194,8 +2195,8 @@ describe('Property Tests - Data Storage', () => {
           
           // Restart application and load data
           const app2 = await startTestApp();
-          const dataManager2 = app2.getDataManager();
-          const loadResult = dataManager2.loadData(key);
+          const userSettingsManager2 = app2.getUserSettingsManager();
+          const loadResult = userSettingsManager2.loadData(key);
           expect(loadResult.success).toBe(true);
           expect(loadResult.data).toEqual(value);
           
@@ -2211,7 +2212,7 @@ describe('Property Tests - Data Storage', () => {
 **Edge cases для Property тестов:**
 
 ```typescript
-/* Preconditions: DataManager initialized
+/* Preconditions: UserSettingsManager initialized
    Action: save empty string value
    Assertions: save succeeds, load returns same empty string
    Requirements: clerkly.1.4 */
@@ -2219,15 +2220,15 @@ test('Property 1 edge case: empty string values', () => {
   const key = 'test-key';
   const value = '';
   
-  const saveResult = dataManager.saveData(key, value);
+  const saveResult = userSettingsManager.saveData(key, value);
   expect(saveResult.success).toBe(true);
   
-  const loadResult = dataManager.loadData(key);
+  const loadResult = userSettingsManager.loadData(key);
   expect(loadResult.success).toBe(true);
   expect(loadResult.data).toBe(value);
 });
 
-/* Preconditions: DataManager initialized
+/* Preconditions: UserSettingsManager initialized
    Action: save data with keys containing special characters
    Assertions: all saves succeed, all loads return correct values
    Requirements: clerkly.1.4 */
@@ -2236,16 +2237,16 @@ test('Property 1 edge case: special characters in keys', () => {
   
   for (const key of specialKeys) {
     const value = 'test-value';
-    const saveResult = dataManager.saveData(key, value);
+    const saveResult = userSettingsManager.saveData(key, value);
     expect(saveResult.success).toBe(true);
     
-    const loadResult = dataManager.loadData(key);
+    const loadResult = userSettingsManager.loadData(key);
     expect(loadResult.success).toBe(true);
     expect(loadResult.data).toBe(value);
   }
 });
 
-/* Preconditions: DataManager initialized
+/* Preconditions: UserSettingsManager initialized
    Action: save large object (1000 items array)
    Assertions: save succeeds, load returns equivalent object
    Requirements: clerkly.1.4 */
@@ -2255,16 +2256,16 @@ test('Property 1 edge case: large objects', () => {
     data: Array(1000).fill(0).map((_, i) => ({ id: i, value: `item-${i}` }))
   };
   
-  const saveResult = dataManager.saveData(key, value);
+  const saveResult = userSettingsManager.saveData(key, value);
   expect(saveResult.success).toBe(true);
   
-  const loadResult = dataManager.loadData(key);
+  const loadResult = userSettingsManager.loadData(key);
   expect(loadResult.success).toBe(true);
   expect(loadResult.data).toEqual(value);
 });
 
 /* Preconditions: corrupted SQLite database file exists at storage path
-   Action: initialize DataManager
+   Action: initialize DatabaseManager
    Assertions: backup file created, new database created and functional
    Requirements: clerkly.nfr.2.4 */
 test('Property 10: database corruption recovery', () => {
@@ -2275,9 +2276,9 @@ test('Property 10: database corruption recovery', () => {
   fs.mkdirSync(storagePath, { recursive: true });
   fs.writeFileSync(dbPath, 'CORRUPTED DATA NOT VALID SQLITE');
   
-  // Initialize DataManager (should detect corruption and recover)
-  const dataManager = new DataManager(storagePath);
-  const initResult = dataManager.initialize();
+  // Initialize DatabaseManager (should detect corruption and recover)
+  const dbManager = new DatabaseManager();
+  const initResult = dbManager.initialize(storagePath);
   
   expect(initResult.success).toBe(true);
   
@@ -2285,15 +2286,16 @@ test('Property 10: database corruption recovery', () => {
   const backupFiles = fs.readdirSync(storagePath).filter(f => f.startsWith('clerkly.db.backup-'));
   expect(backupFiles.length).toBeGreaterThan(0);
   
-  // Check that new database is functional
-  const saveResult = dataManager.saveData('test-key', 'test-value');
+  // Check that new database is functional via UserSettingsManager
+  const userSettingsManager = new UserSettingsManager(dbManager);
+  const saveResult = userSettingsManager.saveData('test-key', 'test-value');
   expect(saveResult.success).toBe(true);
   
-  const loadResult = dataManager.loadData('test-key');
+  const loadResult = userSettingsManager.loadData('test-key');
   expect(loadResult.success).toBe(true);
   expect(loadResult.data).toBe('test-value');
   
-  dataManager.close();
+  dbManager.close();
 });
 ```
 
@@ -2332,11 +2334,11 @@ test('Property 10: database corruption recovery', () => {
 test('should persist data across application restarts', async () => {
   // Start application
   const app = await startTestApp();
-  const dataManager = app.getDataManager();
+  const userSettingsManager = app.getUserSettingsManager();
   
   // Save data
   const testData = { key: 'test-key', value: { nested: 'test-value', count: 42 } };
-  const saveResult = dataManager.saveData(testData.key, testData.value);
+  const saveResult = userSettingsManager.saveData(testData.key, testData.value);
   expect(saveResult.success).toBe(true);
   
   // Quit application
@@ -2344,10 +2346,10 @@ test('should persist data across application restarts', async () => {
   
   // Restart application
   const newApp = await startTestApp();
-  const newDataManager = newApp.getDataManager();
+  const newUserSettingsManager = newApp.getUserSettingsManager();
   
   // Verify data persisted
-  const loadResult = newDataManager.loadData(testData.key);
+  const loadResult = newUserSettingsManager.loadData(testData.key);
   expect(loadResult.success).toBe(true);
   expect(loadResult.data).toEqual(testData.value);
   

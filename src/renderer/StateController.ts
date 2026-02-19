@@ -1,8 +1,8 @@
 // Requirements: clerkly.1, clerkly.2
 /**
- * State Controller - управляет состоянием приложения в renderer process
- * Обеспечивает immutability состояния через deep copy
- * Поддерживает историю изменений (max 10 записей)
+ * State Controller - manages application state in renderer process
+ * Ensures state immutability through deep copy
+ * Supports change history (max 10 entries)
  */
 
 interface StateResult {
@@ -22,11 +22,12 @@ export class StateController {
   }
 
   /**
-   * Обновляет состояние приложения
-   * Выполняет shallow merge с текущим состоянием
-   * Сохраняет предыдущее состояние в историю (max 10 записей)
-   * Requirements: clerkly.1, clerkly.2   * @param {Record<string, unknown>} newState - новое состояние для merge
-   * @returns {StateResult} результат операции
+   * Updates application state
+   * Performs shallow merge with current state
+   * Saves previous state to history (max 10 entries)
+   * Requirements: clerkly.1, clerkly.2
+   * @param {Record<string, unknown>} newState - new state to merge
+   * @returns {StateResult} operation result
    */
   setState(newState: Record<string, unknown>): StateResult {
     try {
@@ -37,15 +38,15 @@ export class StateController {
         };
       }
 
-      // Сохраняем текущее состояние в историю
+      // Save current state to history
       this.stateHistory.push(this.deepCopy(this.state));
 
-      // Ограничиваем размер истории
+      // Limit history size
       if (this.stateHistory.length > this.maxHistorySize) {
         this.stateHistory.shift();
       }
 
-      // Выполняем shallow merge
+      // Perform shallow merge
       this.state = { ...this.state, ...newState };
 
       return {
@@ -62,19 +63,21 @@ export class StateController {
   }
 
   /**
-   * Возвращает копию текущего состояния
-   * Обеспечивает immutability через deep copy
-   * Requirements: clerkly.1, clerkly.2   * @returns {Record<string, unknown>} deep copy текущего состояния
+   * Returns a copy of current state
+   * Ensures immutability through deep copy
+   * Requirements: clerkly.1, clerkly.2
+   * @returns {Record<string, unknown>} deep copy of current state
    */
   getState(): Record<string, unknown> {
     return this.deepCopy(this.state);
   }
 
   /**
-   * Сбрасывает состояние к новому значению
-   * Сохраняет предыдущее состояние в историю
-   * Requirements: clerkly.1, clerkly.2   * @param {Record<string, unknown>} newState - новое состояние (по умолчанию пустой объект)
-   * @returns {StateResult} результат операции
+   * Resets state to a new value
+   * Saves previous state to history
+   * Requirements: clerkly.1, clerkly.2
+   * @param {Record<string, unknown>} newState - new state (defaults to empty object)
+   * @returns {StateResult} operation result
    */
   resetState(newState: Record<string, unknown> = {}): StateResult {
     try {
@@ -85,15 +88,15 @@ export class StateController {
         };
       }
 
-      // Сохраняем текущее состояние в историю
+      // Save current state to history
       this.stateHistory.push(this.deepCopy(this.state));
 
-      // Ограничиваем размер истории
+      // Limit history size
       if (this.stateHistory.length > this.maxHistorySize) {
         this.stateHistory.shift();
       }
 
-      // Полностью заменяем состояние
+      // Completely replace state
       this.state = this.deepCopy(newState);
 
       return {
@@ -110,13 +113,14 @@ export class StateController {
   }
 
   /**
-   * Возвращает конкретное свойство состояния
-   * Requirements: clerkly.1, clerkly.2   * @param {string} key - ключ свойства
-   * @returns {unknown} значение свойства (deep copy если объект)
+   * Returns a specific state property
+   * Requirements: clerkly.1, clerkly.2
+   * @param {string} key - property key
+   * @returns {unknown} property value (deep copy if object)
    */
   getStateProperty(key: string): unknown {
     const value = this.state[key];
-    // Возвращаем deep copy для объектов и массивов
+    // Return deep copy for objects and arrays
     if (value !== null && typeof value === 'object') {
       return this.deepCopy(value);
     }
@@ -124,63 +128,68 @@ export class StateController {
   }
 
   /**
-   * Устанавливает конкретное свойство состояния
-   * Сохраняет предыдущее состояние в историю
-   * Requirements: clerkly.1, clerkly.2   * @param {string} key - ключ свойства
-   * @param {unknown} value - значение свойства
+   * Sets a specific state property
+   * Saves previous state to history
+   * Requirements: clerkly.1, clerkly.2
+   * @param {string} key - property key
+   * @param {unknown} value - property value
    */
   setStateProperty(key: string, value: unknown): void {
-    // Сохраняем текущее состояние в историю
+    // Save current state to history
     this.stateHistory.push(this.deepCopy(this.state));
 
-    // Ограничиваем размер истории
+    // Limit history size
     if (this.stateHistory.length > this.maxHistorySize) {
       this.stateHistory.shift();
     }
 
-    // Устанавливаем свойство
+    // Set property
     this.state[key] = value;
   }
 
   /**
-   * Удаляет свойство из состояния
-   * Сохраняет предыдущее состояние в историю
-   * Requirements: clerkly.1, clerkly.2   * @param {string} key - ключ свойства для удаления
+   * Removes a property from state
+   * Saves previous state to history
+   * Requirements: clerkly.1, clerkly.2
+   * @param {string} key - property key to remove
    */
   removeStateProperty(key: string): void {
-    // Сохраняем текущее состояние в историю
+    // Save current state to history
     this.stateHistory.push(this.deepCopy(this.state));
 
-    // Ограничиваем размер истории
+    // Limit history size
     if (this.stateHistory.length > this.maxHistorySize) {
       this.stateHistory.shift();
     }
 
-    // Удаляем свойство
+    // Remove property
     delete this.state[key];
   }
 
   /**
-   * Проверяет наличие свойства в состоянии
-   * Requirements: clerkly.1, clerkly.2   * @param {string} key - ключ свойства
-   * @returns {boolean} true если свойство существует
+   * Checks if a property exists in state
+   * Requirements: clerkly.1, clerkly.2
+   * @param {string} key - property key
+   * @returns {boolean} true if property exists
    */
   hasStateProperty(key: string): boolean {
     return key in this.state;
   }
 
   /**
-   * Возвращает историю изменений состояния
-   * Возвращает deep copy для immutability
-   * Requirements: clerkly.1, clerkly.2   * @returns {Array<Record<string, unknown>>} массив предыдущих состояний
+   * Returns state change history
+   * Returns deep copy for immutability
+   * Requirements: clerkly.1, clerkly.2
+   * @returns {Array<Record<string, unknown>>} array of previous states
    */
   getStateHistory(): Array<Record<string, unknown>> {
     return this.stateHistory.map((state) => this.deepCopy(state));
   }
 
   /**
-   * Очищает историю состояний
-   * Requirements: clerkly.1, clerkly.2   * @returns {{success: boolean}} результат операции
+   * Clears state history
+   * Requirements: clerkly.1, clerkly.2
+   * @returns {{success: boolean}} operation result
    */
   clearStateHistory(): { success: boolean } {
     this.stateHistory = [];
@@ -188,34 +197,38 @@ export class StateController {
   }
 
   /**
-   * Возвращает все ключи состояния
-   * Requirements: clerkly.1, clerkly.2   * @returns {string[]} массив ключей состояния
+   * Returns all state keys
+   * Requirements: clerkly.1, clerkly.2
+   * @returns {string[]} array of state keys
    */
   getStateKeys(): string[] {
     return Object.keys(this.state);
   }
 
   /**
-   * Возвращает количество свойств в состоянии
-   * Requirements: clerkly.1, clerkly.2   * @returns {number} количество свойств
+   * Returns number of properties in state
+   * Requirements: clerkly.1, clerkly.2
+   * @returns {number} number of properties
    */
   getStateSize(): number {
     return Object.keys(this.state).length;
   }
 
   /**
-   * Проверяет, пусто ли состояние
-   * Requirements: clerkly.1, clerkly.2   * @returns {boolean} true если состояние пустое
+   * Checks if state is empty
+   * Requirements: clerkly.1, clerkly.2
+   * @returns {boolean} true if state is empty
    */
   isStateEmpty(): boolean {
     return Object.keys(this.state).length === 0;
   }
 
   /**
-   * Создает deep copy объекта
-   * Используется для обеспечения immutability
-   * Requirements: clerkly.1, clerkly.2   * @param {T} obj - объект для копирования
-   * @returns {T} deep copy объекта
+   * Creates deep copy of an object
+   * Used to ensure immutability
+   * Requirements: clerkly.1, clerkly.2
+   * @param {T} obj - object to copy
+   * @returns {T} deep copy of object
    */
   private deepCopy<T>(obj: T): T {
     if (obj === null || typeof obj !== 'object') {

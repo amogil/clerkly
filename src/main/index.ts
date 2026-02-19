@@ -9,17 +9,21 @@ import { app, BrowserWindow } from 'electron';
 import * as path from 'path';
 import WindowManager from './WindowManager';
 import { LifecycleManager } from './LifecycleManager';
-import { DataManager } from './DataManager';
+import { UserSettingsManager } from './UserSettingsManager';
+import { DatabaseManager } from './DatabaseManager';
 import { IPCHandlers } from './IPCHandlers';
 import { OAuthClientManager } from './auth/OAuthClientManager';
 import { TokenStorageManager } from './auth/TokenStorageManager';
-import { UserProfileManager } from './auth/UserProfileManager';
+import { UserManager } from './auth/UserManager';
 import { getOAuthConfig, OAUTH_CONFIG } from './auth/OAuthConfig';
 import { AuthIPCHandlers } from './auth/AuthIPCHandlers';
 import { AIAgentSettingsManager } from './AIAgentSettingsManager';
 import { SettingsIPCHandlers } from './SettingsIPCHandlers';
 import { registerLLMIPCHandlers } from './llm/LLMIPCHandlers';
+import { registerEventIPCHandlers } from './events/EventIPCHandlers';
+import { EventLogger } from './events/EventLogger';
 import { Logger } from './Logger';
+import { registerTestIPCHandlers } from './TestIPCHandlers';
 
 // Requirements: clerkly.3.5, clerkly.3.7 - Create parameterized logger for Main module
 const logger = Logger.create('Main');
@@ -33,7 +37,7 @@ app.setName('Clerkly');
 // Request single instance lock BEFORE registering protocol
 // This ensures that deep links are handled by the existing instance
 // Skip single instance lock in test environment to allow multiple test instances
-const gotTheLock = process.env.NODE_ENV === 'test' ? true : app.requestSingleInstanceLock();
+const gotTheLock = process.env['NODE_ENV'] === 'test' ? true : app.requestSingleInstanceLock();
 
 logger.info(`Single instance lock: ${gotTheLock ? 'ACQUIRED' : 'FAILED'}`);
 logger.info(`Process args: ${JSON.stringify(process.argv)}`);
@@ -41,7 +45,10 @@ logger.info(`Process defaultApp: ${process.defaultApp}`);
 
 // Requirements: google-oauth-auth.2.1
 // Extract protocol scheme from redirect URI for deep link handling
-const protocolScheme = OAUTH_CONFIG.redirectUri.split(':')[0];
+const protocolScheme = OAUTH_CONFIG.redirectUri.split(':')[0] ?? '';
+if (!protocolScheme) {
+  throw new Error('Invalid redirect URI: missing protocol scheme');
+}
 logger.info(`Protocol scheme: ${protocolScheme}`);
 
 // Track application initialization state
@@ -66,10 +73,12 @@ if (!gotTheLock) {
   // Handle custom user data directory for functional tests
   // Check for --user-data-dir argument
   const userDataDirIndex = process.argv.indexOf('--user-data-dir');
-  if (userDataDirIndex !== -1 && process.argv[userDataDirIndex + 1]) {
+  if (userDataDirIndex !== -1) {
     const customUserDataPath = process.argv[userDataDirIndex + 1];
-    app.setPath('userData', customUserDataPath);
-    logger.info(`Using custom user data path: ${customUserDataPath}`);
+    if (customUserDataPath) {
+      app.setPath('userData', customUserDataPath);
+      logger.info(`Using custom user data path: ${customUserDataPath}`);
+    }
   }
 
   // Register custom protocol for deep link handling
@@ -89,16 +98,21 @@ if (!gotTheLock) {
   }
 }
 
-// Requirements: clerkly.1.4
-// Initialize Data Manager with user data path
+// Requirements: clerkly.1.4, database-refactoring.3.7
+// Initialize DatabaseManager first (single point of entry for database)
 const userDataPath = app.getPath('userData');
 const storagePath = path.join(userDataPath, 'storage');
-const dataManager = new DataManager(storagePath);
+const dbManager = new DatabaseManager();
+dbManager.initialize(storagePath);
+
+// Requirements: database-refactoring.2.4
+// Initialize UserSettingsManager with DatabaseManager
+const dataManager = new UserSettingsManager(dbManager);
 
 // Requirements: testing.3.1, testing.3.2
 // Helper function to check if we're in test environment
 const isTestEnvironment = () => {
-  return process.env.NODE_ENV === 'test' || process.env.PLAYWRIGHT_TEST === '1';
+  return process.env['NODE_ENV'] === 'test' || process.env['PLAYWRIGHT_TEST'] === '1';
 };
 
 // Create TestDataManager wrapper in test environment
@@ -130,20 +144,24 @@ const oauthClient = new OAuthClientManager(oauthConfig, tokenStorage);
 import { setOAuthClientManager } from './auth/APIRequestHandler';
 setOAuthClientManager(oauthClient);
 
-// Requirements: account-profile.1.5
-// Initialize User Profile Manager
-const profileManager = new UserProfileManager(dataManager, oauthClient, tokenStorage);
+// Requirements: account-profile.1.3, user-data-isolation.6.2
+// DatabaseManager already created above, use it for UserManager
 
-// Requirements: user-data-isolation.1.10 - Set UserProfileManager in DataManager for data isolation
-dataManager.setUserProfileManager(profileManager);
+// Requirements: account-profile.1.5
+// Initialize User Manager with DatabaseManager
+const userManager = new UserManager(dbManager, tokenStorage);
+
+// Requirements: user-data-isolation.6.3 - Set UserManager in DatabaseManager for data isolation
+// UserSettingsManager gets user_id from DatabaseManager, so we only need to set it once
+dbManager.setUserManager(userManager);
 
 // Requirements: account-profile.1.5
 // Connect profile manager to oauth client for automatic updates
-oauthClient.setProfileManager(profileManager);
+oauthClient.setUserManager(userManager);
 
-// Requirements: clerkly.1.2, clerkly.1.3, window-management.5
-// Initialize Window Manager
-const windowManager = new WindowManager(dataManager, profileManager);
+// Requirements: clerkly.1.2, clerkly.1.3, window-management.5, database-refactoring.3.6
+// Initialize Window Manager with DatabaseManager
+const windowManager = new WindowManager(dbManager);
 
 // Requirements: google-oauth-auth.11.1
 // Initialize Auth Window Manager
@@ -154,14 +172,9 @@ const authWindowManager = new AuthWindowManager(windowManager, oauthClient);
 // Connect auth window manager to oauth client for loader display
 oauthClient.setAuthWindowManager(authWindowManager);
 
-// Requirements: clerkly.1.2, clerkly.1.3, clerkly.1.4, account-profile.1.5
-// Initialize Lifecycle Manager
-const lifecycleManager = new LifecycleManager(
-  windowManager,
-  dataManager,
-  oauthClient,
-  tokenStorage
-);
+// Requirements: clerkly.1.2, clerkly.1.3, clerkly.1.4, account-profile.1.5, database-refactoring.3.5
+// Initialize Lifecycle Manager with DatabaseManager
+const lifecycleManager = new LifecycleManager(windowManager, dbManager, oauthClient, userManager);
 
 // Requirements: clerkly.1.4, clerkly.2.5
 // Initialize IPC Handlers
@@ -171,7 +184,7 @@ const ipcHandlers = new IPCHandlers(dataManager);
 // Initialize Auth IPC Handlers
 const authIPCHandlers = new AuthIPCHandlers(oauthClient);
 // Requirements: account-profile.1.2 - Connect profile manager to auth IPC handlers
-authIPCHandlers.setProfileManager(profileManager);
+authIPCHandlers.setUserManager(userManager);
 
 // Requirements: settings.1.9, settings.1.26
 // Initialize AI Agent Settings Manager
@@ -184,281 +197,46 @@ const aiAgentSettingsManager = new AIAgentSettingsManager(
 // Initialize Settings IPC Handlers
 const settingsIPCHandlers = new SettingsIPCHandlers(aiAgentSettingsManager);
 
+// Requirements: agents.2, agents.4, agents.10
+// Initialize Agent and Message Managers
+import { AgentManager } from './agents/AgentManager';
+import { MessageManager } from './agents/MessageManager';
+import { AgentIPCHandlers } from './agents/AgentIPCHandlers';
+
+const agentManager = new AgentManager(dbManager);
+const messageManager = new MessageManager(dbManager);
+const agentIPCHandlers = new AgentIPCHandlers(agentManager, messageManager);
+
 // Requirements: testing.3.8
 // Initialize Test IPC Handlers (only in test environment)
-if (process.env.NODE_ENV === 'test') {
+if (process.env['NODE_ENV'] === 'test') {
   // Export test context for functional tests
   // This allows tests to access internal state like PKCE storage
-  (global as any).testContext = {
+  (global as { testContext?: unknown }).testContext = {
     oauthClient,
     tokenStorage,
-    profileManager,
+    userManager,
     dataManager,
+    dbManager,
   };
 
-  // Register test IPC handlers inline to avoid import issues
+  // Store testDataManager in global for test handlers
+  if (testDataManager) {
+    (global as { testDataManager?: unknown }).testDataManager = testDataManager;
+  }
+
+  // Register test IPC handlers from separate file
   // Requirements: testing.3.1.2 - Test IPC handlers for functional tests
-  const { ipcMain } = require('electron');
-
-  ipcMain.handle('test:clear-tokens', async () => {
-    if (!isTestEnvironment()) {
-      throw new Error('test:clear-tokens can only be used in test environment');
-    }
-    await tokenStorage.deleteTokens();
-    return { success: true };
-  });
-
-  ipcMain.handle('test:clear-data', async () => {
-    if (!isTestEnvironment()) {
-      throw new Error('test:clear-data can only be used in test environment');
-    }
-    const db = (dataManager as any).db;
-    db.prepare('DELETE FROM user_data').run();
-    return { success: true };
-  });
-
-  ipcMain.handle('test:trigger-auth-success', async () => {
-    if (!isTestEnvironment()) {
-      throw new Error('test:trigger-auth-success can only be used in test environment');
-    }
-    // Fetch profile after auth success
-    try {
-      await profileManager.fetchProfile();
-      authIPCHandlers.sendAuthSuccess();
-      return { success: true };
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      logger.error(`Failed to fetch profile: ${errorMessage}`);
-      return { success: false, error: errorMessage };
-    }
-  });
-
-  ipcMain.handle('test:get-profile', async () => {
-    if (!isTestEnvironment()) {
-      throw new Error('test:get-profile can only be used in test environment');
-    }
-    try {
-      const profile = await profileManager.loadProfile();
-      return { success: true, profile };
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      return { success: false, error: errorMessage, profile: null };
-    }
-  });
-
-  ipcMain.handle('test:get-profile-by-email', async (_event: any, email: string) => {
-    if (!isTestEnvironment()) {
-      throw new Error('test:get-profile-by-email can only be used in test environment');
-    }
-    if (!email || typeof email !== 'string') {
-      return { success: false, error: 'Email parameter is required', profile: null };
-    }
-    try {
-      const profile = await profileManager.loadProfileByEmail(email);
-      return { success: true, profile };
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      return { success: false, error: errorMessage, profile: null };
-    }
-  });
-
-  ipcMain.handle('test:setup-profile', async (_event: any, profileData: any) => {
-    if (!isTestEnvironment()) {
-      throw new Error('test:setup-profile can only be used in test environment');
-    }
-    try {
-      await profileManager.saveProfile(profileData);
-      return { success: true };
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      return { success: false, error: errorMessage };
-    }
-  });
-
-  // Requirements: user-data-isolation.1.3, user-data-isolation.1.4, user-data-isolation.1.13
-  // Test handlers for data isolation testing
-  ipcMain.handle('test:save-data', async (_event: any, key: string, value: string) => {
-    if (!isTestEnvironment()) {
-      throw new Error('test:save-data can only be used in test environment');
-    }
-    try {
-      const result = dataManager.saveData(key, value);
-
-      // Check if result indicates error
-      if (!result.success) {
-        return result; // Return the error result
-      }
-
-      return { success: true };
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      return { success: false, error: errorMessage };
-    }
-  });
-
-  ipcMain.handle('test:load-data', async (_event: any, key: string) => {
-    if (!isTestEnvironment()) {
-      throw new Error('test:load-data can only be used in test environment');
-    }
-    try {
-      const result = await dataManager.loadData(key);
-      return result;
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      return { success: false, error: errorMessage };
-    }
-  });
-
-  ipcMain.handle('test:delete-data', async (_event: any, key: string) => {
-    if (!isTestEnvironment()) {
-      throw new Error('test:delete-data can only be used in test environment');
-    }
-    try {
-      await dataManager.deleteData(key);
-      return { success: true };
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      return { success: false, error: errorMessage };
-    }
-  });
-
-  // Test handler for triggering deep link handling
-  ipcMain.handle('test:handle-deep-link', async (_event: any, url: string) => {
-    if (!isTestEnvironment()) {
-      throw new Error('test:handle-deep-link can only be used in test environment');
-    }
-    try {
-      logger.info(`Handling deep link: ${url}`);
-      const authStatus = await oauthClient.handleDeepLink(url);
-      logger.info(`Deep link auth status: ${JSON.stringify(authStatus)}`);
-
-      // Send auth events to renderer (same as handleDeepLinkUrl does)
-      if (authStatus.authorized) {
-        logger.info('Authorization successful, sending auth success');
-        authIPCHandlers.sendAuthSuccess();
-      } else if (authStatus.error) {
-        logger.info(`Authorization failed, sending auth error: ${authStatus.error}`);
-        authIPCHandlers.sendAuthError(authStatus.error, authStatus.error);
-      }
-
-      return authStatus;
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      logger.error(`Deep link handling error: ${errorMessage}`);
-      return { authorized: false, error: errorMessage };
-    }
-  });
-
-  ipcMain.handle(
-    'test:trigger-error-notification',
-    async (event: any, data: { message: string; context: string }) => {
-      if (!isTestEnvironment()) {
-        throw new Error('test:trigger-error-notification can only be used in test environment');
-      }
-      try {
-        // Send error notification to renderer process using AuthIPCHandlers
-        // This simulates what happens when Main Process encounters an error
-        authIPCHandlers.sendErrorNotification(data.message, data.context);
-        logger.info(`Sent error notification via AuthIPCHandlers: ${JSON.stringify(data)}`);
-        return { success: true };
-      } catch (error: unknown) {
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        logger.error(`Error sending notification: ${errorMessage}`);
-        return { success: false, error: errorMessage };
-      }
-    }
+  registerTestIPCHandlers(
+    tokenStorage,
+    userManager,
+    dbManager,
+    dataManager,
+    agentManager,
+    messageManager,
+    authIPCHandlers,
+    oauthClient
   );
-
-  // Test handler for expiring tokens (to test automatic token refresh)
-  ipcMain.handle('test:expire-token', async () => {
-    if (!isTestEnvironment()) {
-      throw new Error('test:expire-token can only be used in test environment');
-    }
-    try {
-      // Load current tokens
-      const tokens = await tokenStorage.loadTokens();
-      if (!tokens) {
-        return { success: false, error: 'No tokens found' };
-      }
-
-      // Set expiresAt to past (1 second ago) to simulate expired token
-      const expiredTokens = {
-        ...tokens,
-        expiresAt: Date.now() - 1000,
-      };
-
-      // Save expired tokens
-      await tokenStorage.saveTokens(expiredTokens);
-      logger.info('Token expiration simulated for testing');
-
-      return { success: true };
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      logger.error(`Failed to expire token: ${errorMessage}`);
-      return { success: false, error: errorMessage };
-    }
-  });
-
-  // Requirements: testing.3.9 - Test helper to get current tokens
-  ipcMain.handle('test:get-tokens', async () => {
-    if (!isTestEnvironment()) {
-      throw new Error('test:get-tokens can only be used in test environment');
-    }
-    try {
-      const tokens = await tokenStorage.loadTokens();
-      if (!tokens) {
-        return { success: false, error: 'No tokens found' };
-      }
-
-      return {
-        success: true,
-        tokens: {
-          accessToken: tokens.accessToken,
-          refreshToken: tokens.refreshToken,
-          expiresAt: tokens.expiresAt,
-        },
-      };
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      logger.error(`Failed to get tokens: ${errorMessage}`);
-      return { success: false, error: errorMessage };
-    }
-  });
-
-  // Requirements: testing.3.1, testing.3.2 - Test helper to simulate data errors
-  ipcMain.handle(
-    'test:simulate-data-error',
-    async (
-      _event: any,
-      operation: 'saveData' | 'loadData' | 'deleteData',
-      errorMessage: string
-    ) => {
-      if (!isTestEnvironment()) {
-        throw new Error('test:simulate-data-error can only be used in test environment');
-      }
-      if (!testDataManager) {
-        return { success: false, error: 'TestDataManager not initialized' };
-      }
-
-      testDataManager.simulateError(operation, errorMessage);
-      return { success: true };
-    }
-  );
-
-  // Requirements: testing.3.1, testing.3.2 - Test helper to clear error simulations
-  ipcMain.handle('test:clear-data-errors', async () => {
-    if (!isTestEnvironment()) {
-      throw new Error('test:clear-data-errors can only be used in test environment');
-    }
-    if (!testDataManager) {
-      return { success: false, error: 'TestDataManager not initialized' };
-    }
-
-    testDataManager.clearErrorSimulations();
-    return { success: true };
-  });
-
-  logger.info('Test IPC handlers registered');
 }
 
 // Requirements: clerkly.1.1, clerkly.1.2
@@ -469,8 +247,8 @@ app.whenReady().then(async () => {
     const startTime = Date.now();
 
     // Requirements: user-data-isolation.1.17 - Initialize profile manager to restore email from database
-    await profileManager.initialize();
-    logger.info('UserProfileManager initialized');
+    await userManager.initialize();
+    logger.info('UserManager initialized');
 
     // Requirements: clerkly.1.2, clerkly.1.3, clerkly.1.4
     // Initialize application
@@ -510,6 +288,21 @@ app.whenReady().then(async () => {
     // Register LLM IPC handlers
     registerLLMIPCHandlers();
     logger.info('LLM IPC handlers registered');
+
+    // Requirements: realtime-events.4.1
+    // Register Event IPC handlers
+    registerEventIPCHandlers();
+    logger.info('Event IPC handlers registered');
+
+    // Requirements: agents.2, agents.4, agents.10
+    // Register Agent IPC handlers
+    agentIPCHandlers.registerHandlers();
+    logger.info('Agent IPC handlers registered');
+
+    // Requirements: realtime-events.1.3, clerkly.3
+    // Start EventLogger to log all events
+    EventLogger.getInstance().start();
+    logger.info('EventLogger started');
 
     // Requirements: google-oauth-auth.11.1
     // Initialize Auth Window Manager to check auth status and show appropriate window
@@ -579,16 +372,11 @@ async function handleDeepLinkUrl(url: string): Promise<void> {
     const mainWindow = BrowserWindow.getAllWindows()[0];
 
     if (mainWindow) {
-      // Send auth event to renderer
-      // Requirements: google-oauth-auth.3.6, google-oauth-auth.3.7, google-oauth-auth.3.8
-      // Profile is already fetched synchronously inside handleDeepLink()
-      if (authStatus.authorized) {
-        logger.info('Authorization successful, profile already fetched, sending auth success');
-        authIPCHandlers.sendAuthSuccess();
-      } else if (authStatus.error) {
-        logger.info(`Sending auth error event: ${authStatus.error}`);
-        authIPCHandlers.sendAuthError(authStatus.error, authStatus.error);
-      }
+      // Events are now published directly from OAuthClientManager.handleDeepLink()
+      // No need to send them here - they are already sent
+      logger.info(
+        `Deep link handled, authorized: ${authStatus.authorized}, error: ${authStatus.error || 'none'}`
+      );
 
       // Focus and restore window
       if (mainWindow.isMinimized()) {

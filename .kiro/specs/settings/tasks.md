@@ -313,9 +313,27 @@
 
 ## Статус
 
-✅ Выполнено полностью
+✅ Выполнено полностью (задачи 1-9)
 
-Все задачи 1-8.4 выполнены успешно.
+### 9. Рефакторинг: DataManager → UserSettingsManager
+
+**Статус:** ✅ Выполнено
+
+**Описание:** Обновление AIAgentSettingsManager для использования UserSettingsManager вместо DataManager.
+
+- [x] 9.1 Обновить конструктор AIAgentSettingsManager
+  - Заменить `DataManager` на `UserSettingsManager` в параметрах
+  - Обновить импорты
+  - **Requirements:** settings.1
+
+- [x] 9.2 Обновить тесты AIAgentSettingsManager
+  - Обновить моки для UserSettingsManager
+  - Обновить импорты в тестах
+  - **Requirements:** settings.1
+
+- [x] 9.3 Запустить валидацию
+  - Выполнить `npm run validate`
+  - Убедиться, что все тесты проходят
 
 ## Примечания
 

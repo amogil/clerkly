@@ -1,5 +1,5 @@
 import { TokenStorageManager } from '../../../src/main/auth/TokenStorageManager';
-import { DataManager } from '../../../src/main/DataManager';
+import { UserSettingsManager } from '../../../src/main/UserSettingsManager';
 /**
  * Register test IPC handlers
  *
@@ -7,7 +7,7 @@ import { DataManager } from '../../../src/main/DataManager';
  */
 export declare function registerTestIPCHandlers(
   tokenStorage: TokenStorageManager,
-  data: DataManager
+  data: UserSettingsManager
 ): void;
 /**
  * Unregister test IPC handlers

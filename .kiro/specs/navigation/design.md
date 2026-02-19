@@ -6,7 +6,7 @@
 
 ### Архитектурный Принцип: База Данных как Единственный Источник Истины
 
-Приложение построено на фундаментальном архитектурном принципе: **база данных (SQLite через DataManager) является единственным источником истины для всех данных приложения**.
+Приложение построено на фундаментальном архитектурном принципе: **база данных (SQLite через DatabaseManager и UserSettingsManager) является единственным источником истины для всех данных приложения**.
 
 **Ключевые аспекты:**
 
@@ -432,12 +432,12 @@ Navigate to /settings → AuthGuard.canActivate() → checkAuthStatus() → not 
 ### 5. Выход из системы
 
 ```
-Logout → auth:logout event → onLogout() → redirectToLogin()
+Logout → user.logout event (EventBus) → onLogout() → redirectToLogin()
 ```
 
 **Шаги:**
 1. Пользователь нажимает кнопку выхода
-2. OAuth система очищает токены и генерирует событие `auth:logout`
+2. OAuth система очищает токены и публикует событие `user.logout` через EventBus
 3. `onLogout()` обработчик получает событие
 4. `redirectToLogin()` перенаправляет на `/login`
 

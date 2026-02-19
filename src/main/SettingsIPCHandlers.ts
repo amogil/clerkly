@@ -3,6 +3,7 @@
 import { ipcMain, IpcMainInvokeEvent } from 'electron';
 import { AIAgentSettingsManager } from './AIAgentSettingsManager';
 import { Logger } from './Logger';
+import type { LLMProvider } from '../types';
 
 // Requirements: clerkly.3.8 - Use centralized Logger instead of console.*
 /**
@@ -78,7 +79,7 @@ export class SettingsIPCHandlers {
    */
   private async handleSaveLLMProvider(
     _event: IpcMainInvokeEvent,
-    provider: 'openai' | 'anthropic' | 'google'
+    provider: LLMProvider
   ): Promise<IPCResult> {
     try {
       this.logger.info(`Saving LLM provider: ${provider}`);
@@ -91,10 +92,7 @@ export class SettingsIPCHandlers {
       };
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      Logger.error(
-        'SettingsIPCHandlers',
-        `[SettingsIPCHandlers] Failed to save LLM provider: ${errorMessage}`
-      );
+      this.logger.error(`Failed to save LLM provider: ${errorMessage}`);
 
       // Requirements: settings.1.9 - Return structured error response
       return {
@@ -119,19 +117,16 @@ export class SettingsIPCHandlers {
 
       return {
         success: true,
-        provider,
+        data: { provider },
       };
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      Logger.error(
-        'SettingsIPCHandlers',
-        `[SettingsIPCHandlers] Failed to load LLM provider: ${errorMessage}`
-      );
+      this.logger.error(`Failed to load LLM provider: ${errorMessage}`);
 
       // Requirements: settings.1.21 - Return default provider on error
       return {
         success: true,
-        provider: 'openai',
+        data: { provider: 'openai' as const },
       };
     }
   }
@@ -146,14 +141,11 @@ export class SettingsIPCHandlers {
    */
   private async handleSaveAPIKey(
     _event: IpcMainInvokeEvent,
-    provider: 'openai' | 'anthropic' | 'google',
+    provider: LLMProvider,
     apiKey: string
   ): Promise<IPCResult> {
     try {
-      Logger.info(
-        'SettingsIPCHandlers',
-        `[SettingsIPCHandlers] Saving API key for provider: ${provider}`
-      );
+      this.logger.info(`Saving API key for provider: ${provider}`);
 
       // Requirements: settings.1.9 - Save API key through AIAgentSettingsManager
       await this.aiAgentSettingsManager.saveAPIKey(provider, apiKey);
@@ -163,10 +155,7 @@ export class SettingsIPCHandlers {
       };
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      Logger.error(
-        'SettingsIPCHandlers',
-        `[SettingsIPCHandlers] Failed to save API key: ${errorMessage}`
-      );
+      this.logger.error(`Failed to save API key: ${errorMessage}`);
 
       // Requirements: settings.1.13 - Return structured error response
       return {
@@ -185,27 +174,21 @@ export class SettingsIPCHandlers {
    */
   private async handleLoadAPIKey(
     _event: IpcMainInvokeEvent,
-    provider: 'openai' | 'anthropic' | 'google'
+    provider: LLMProvider
   ): Promise<IPCResult> {
     try {
-      Logger.info(
-        'SettingsIPCHandlers',
-        `[SettingsIPCHandlers] Loading API key for provider: ${provider}`
-      );
+      this.logger.info(`Loading API key for provider: ${provider}`);
 
       // Requirements: settings.1.20, settings.1.22 - Load API key, decrypt if encrypted
       const apiKey = await this.aiAgentSettingsManager.loadAPIKey(provider);
 
       return {
         success: true,
-        apiKey,
+        data: { apiKey },
       };
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      Logger.error(
-        'SettingsIPCHandlers',
-        `[SettingsIPCHandlers] Failed to load API key: ${errorMessage}`
-      );
+      this.logger.error(`Failed to load API key: ${errorMessage}`);
 
       return {
         success: false,
@@ -223,13 +206,10 @@ export class SettingsIPCHandlers {
    */
   private async handleDeleteAPIKey(
     _event: IpcMainInvokeEvent,
-    provider: 'openai' | 'anthropic' | 'google'
+    provider: LLMProvider
   ): Promise<IPCResult> {
     try {
-      Logger.info(
-        'SettingsIPCHandlers',
-        `[SettingsIPCHandlers] Deleting API key for provider: ${provider}`
-      );
+      this.logger.info(`Deleting API key for provider: ${provider}`);
 
       // Requirements: settings.1.11 - Delete API key through AIAgentSettingsManager
       await this.aiAgentSettingsManager.deleteAPIKey(provider);
@@ -239,10 +219,7 @@ export class SettingsIPCHandlers {
       };
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      Logger.error(
-        'SettingsIPCHandlers',
-        `[SettingsIPCHandlers] Failed to delete API key: ${errorMessage}`
-      );
+      this.logger.error(`Failed to delete API key: ${errorMessage}`);
 
       return {
         success: false,

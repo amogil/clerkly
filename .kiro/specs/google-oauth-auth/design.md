@@ -49,8 +49,8 @@
 │  └─────────────────────────┬──────────────────────────┘     │
 │                            │                                 │
 │  ┌─────────────────────────▼──────────────────────────┐     │
-│  │              DataManager                            │     │
-│  │  (Existing SQLite wrapper)                          │     │
+│  │           UserSettingsManager                       │     │
+│  │  (SQLite key-value storage)                         │     │
 │  └─────────────────────────────────────────────────────┘     │
 │                                                              │
 │  ┌──────────────────────────────────────────────────────┐   │
@@ -155,7 +155,7 @@ User                    Renderer Process         Main Process          Google OA
  │                            │                        │ 5. Delete tokens     │
  │                            │                        │    from SQLite       │
  │                            │                        │                      │
- │                            │ 6. Event: auth:logout-complete                │
+ │                            │ 6. Event: user.logout (EventBus)            │
  │                            │◀───────────────────────│                      │
  │                            │                        │                      │
  │                            │ 7. Update state:       │                      │
@@ -167,6 +167,249 @@ User                    Renderer Process         Main Process          Google OA
 ```
 
 **Примечание:** Если revoke запрос к Google не удается (шаг 3-4), приложение все равно удаляет локальные токены (шаг 5) и показывает Login Screen (шаг 8).
+
+
+### Система Событий Авторизации
+
+Авторизация использует event-driven архитектуру для коммуникации между Main и Renderer процессами. Все события публикуются через MainEventBus (Main) и RendererEventBus (Renderer).
+
+#### События
+
+| Событие | Направление | Payload | Описание |
+|---------|-------------|---------|----------|
+| `auth.started` | Renderer → Main | `{}` | Пользователь нажал "Continue with Google" |
+| `auth.callback-received` | Main → Renderer | `{}` | Получен deep link от Google |
+| `auth.completed` | Main → Renderer | `{ userId: string, profile: UserProfile }` | Авторизация успешна |
+| `auth.failed` | Main → Renderer | `{ code: string, message: string }` | Ошибка авторизации |
+| `auth.cancelled` | Main → Renderer | `{}` | Пользователь отменил в Google |
+| `auth.signed-out` | Main → Renderer | `{}` | Пользователь вышел из системы |
+
+#### UI Состояния
+
+| Состояние | Кнопка | Текст | Loader | Ошибка |
+|-----------|--------|-------|--------|--------|
+| Начальное | Enabled | "Continue with Google" | Нет | Нет |
+| После `auth.callback-received` | Disabled | "Signing in..." | Да | Нет |
+| После `auth.completed` | - | - | - | Redirect to Agents |
+| После `auth.failed` | Enabled | "Continue with Google" | Нет | Да (сообщение) |
+| После `auth.cancelled` | Enabled | "Continue with Google" | Нет | Да ("Аутентификация отменена") |
+
+#### Диаграмма Последовательности: Успешный Вход
+
+```
+┌──────────┐          ┌──────────┐          ┌──────────┐          ┌──────────┐
+│  User    │          │ Renderer │          │   Main   │          │  Google  │
+└────┬─────┘          └────┬─────┘          └────┬─────┘          └────┬─────┘
+     │                     │                     │                     │
+     │  Click Login        │                     │                     │
+     │────────────────────>│                     │                     │
+     │                     │                     │                     │
+     │                     │  publish            │                     │
+     │                     │  auth.started       │                     │
+     │                     │────────────────────>│                     │
+     │                     │                     │                     │
+     │                     │                     │  Open browser       │
+     │                     │                     │────────────────────>│
+     │                     │                     │                     │
+     │                     │                     │                     │  User logs in
+     │                     │                     │                     │<─ ─ ─ ─ ─ ─ ─
+     │                     │                     │                     │
+     │                     │                     │  Deep link          │
+     │                     │                     │  ?code=XXX&state=YY │
+     │                     │                     │<────────────────────│
+     │                     │                     │                     │
+     │                     │  auth.callback-     │                     │
+     │                     │  received           │                     │
+     │                     │<────────────────────│                     │
+     │                     │                     │                     │
+     │  [Disable button]   │                     │                     │
+     │  [Show loader]      │                     │                     │
+     │  ["Signing in..."]  │                     │                     │
+     │<────────────────────│                     │                     │
+     │                     │                     │                     │
+     │                     │                     │  POST /token        │
+     │                     │                     │────────────────────>│
+     │                     │                     │                     │
+     │                     │                     │  tokens             │
+     │                     │                     │<────────────────────│
+     │                     │                     │                     │
+     │                     │  auth.profile-      │                     │
+     │                     │  fetching           │                     │
+     │                     │<────────────────────│                     │
+     │                     │                     │                     │
+     │                     │                     │  GET /userinfo      │
+     │                     │                     │────────────────────>│
+     │                     │                     │                     │
+     │                     │                     │  profile            │
+     │                     │                     │<────────────────────│
+     │                     │                     │                     │
+     │                     │                     │  Save tokens &      │
+     │                     │                     │  profile            │
+     │                     │                     │─────────┐           │
+     │                     │                     │         │           │
+     │                     │                     │<────────┘           │
+     │                     │                     │                     │
+     │                     │  auth.completed     │                     │
+     │                     │  {userId, profile}  │                     │
+     │                     │<────────────────────│                     │
+     │                     │                     │                     │
+     │  [Hide loader]      │                     │                     │
+     │  [Redirect Agents]  │                     │                     │
+     │<────────────────────│                     │                     │
+     │                     │                     │                     │
+```
+
+#### Диаграмма Последовательности: Ошибка Загрузки Профиля
+
+```
+┌──────────┐          ┌──────────┐          ┌──────────┐          ┌──────────┐
+│  User    │          │ Renderer │          │   Main   │          │  Google  │
+└────┬─────┘          └────┬─────┘          └────┬─────┘          └────┬─────┘
+     │                     │                     │                     │
+     │  ... (same as above until token exchange) │                     │
+     │                     │                     │                     │
+     │                     │  auth.profile-      │                     │
+     │                     │  fetching           │                     │
+     │                     │<────────────────────│                     │
+     │                     │                     │                     │
+     │                     │                     │  GET /userinfo      │
+     │                     │                     │────────────────────>│
+     │                     │                     │                     │
+     │                     │                     │  500 Error          │
+     │                     │                     │<────────────────────│
+     │                     │                     │                     │
+     │                     │  auth.failed        │                     │
+     │                     │  {code, message}    │                     │
+     │                     │<────────────────────│                     │
+     │                     │                     │                     │
+     │  [Hide loader]      │                     │                     │
+     │  [Enable button]    │                     │                     │
+     │  [Show error]       │                     │                     │
+     │<────────────────────│                     │                     │
+     │                     │                     │                     │
+```
+
+#### Диаграмма Последовательности: Отмена Пользователем
+
+```
+┌──────────┐          ┌──────────┐          ┌──────────┐          ┌──────────┐
+│  User    │          │ Renderer │          │   Main   │          │  Google  │
+└────┬─────┘          └────┬─────┘          └────┬─────┘          └────┬─────┘
+     │                     │                     │                     │
+     │  ... (auth.started, browser opens)        │                     │
+     │                     │                     │                     │
+     │                     │                     │                     │  User clicks
+     │                     │                     │                     │  "Cancel"
+     │                     │                     │                     │<─ ─ ─ ─ ─ ─ ─
+     │                     │                     │                     │
+     │                     │                     │  Deep link          │
+     │                     │                     │  ?error=access_     │
+     │                     │                     │  denied             │
+     │                     │                     │<────────────────────│
+     │                     │                     │                     │
+     │                     │  auth.cancelled     │                     │
+     │                     │<────────────────────│                     │
+     │                     │                     │                     │
+     │  [Enable button]    │                     │                     │
+     │  [Show "Cancelled"] │                     │                     │
+     │<────────────────────│                     │                     │
+     │                     │                     │                     │
+```
+
+#### Классы Событий
+
+```typescript
+// src/shared/events/AuthEvents.ts
+
+// Renderer → Main: Пользователь начал авторизацию
+class AuthStartedEvent extends BaseEvent {
+  type = 'auth.started';
+  payload = {};
+}
+
+// Main → Renderer: Получен callback от Google
+class AuthCallbackReceivedEvent extends BaseEvent {
+  type = 'auth.callback-received';
+  payload = {};
+}
+
+// Main → Renderer: Авторизация успешна
+interface AuthCompletedPayload {
+  userId: string;
+  profile: {
+    id: string;
+    email: string;
+    name: string;
+    picture?: string;
+  };
+}
+class AuthCompletedEvent extends BaseEvent {
+  type = 'auth.completed';
+  constructor(public payload: AuthCompletedPayload) { super(); }
+}
+
+// Main → Renderer: Ошибка авторизации
+interface AuthFailedPayload {
+  code: string;   // Код ошибки (token_exchange_failed, profile_fetch_failed, etc.)
+  message: string; // Человекочитаемое сообщение
+}
+class AuthFailedEvent extends BaseEvent {
+  type = 'auth.failed';
+  constructor(public payload: AuthFailedPayload) { super(); }
+}
+
+// Main → Renderer: Пользователь отменил авторизацию
+class AuthCancelledEvent extends BaseEvent {
+  type = 'auth.cancelled';
+  payload = {};
+}
+
+// Main → Renderer: Пользователь вышел из системы
+class AuthSignedOutEvent extends BaseEvent {
+  type = 'auth.signed-out';
+  payload = {};
+}
+```
+
+#### Правила Использования EVENT_TYPES
+
+**КРИТИЧЕСКИ ВАЖНО**: Все идентификаторы событий ДОЛЖНЫ использовать константы из `EVENT_TYPES` вместо захардкоженных строк.
+
+**Источник истины:** `src/shared/events/constants.ts`
+
+```typescript
+// src/shared/events/constants.ts
+export const EVENT_TYPES = {
+  // Auth events
+  AUTH_STARTED: 'auth.started',
+  AUTH_CALLBACK_RECEIVED: 'auth.callback-received',
+  AUTH_COMPLETED: 'auth.completed',
+  AUTH_FAILED: 'auth.failed',
+  AUTH_CANCELLED: 'auth.cancelled',
+  AUTH_SIGNED_OUT: 'auth.signed-out',
+  // ... other events
+} as const;
+```
+
+**Правила:**
+
+1. **Импорт констант**: Всегда импортировать `EVENT_TYPES` из `src/shared/events/constants.ts`
+2. **Подписка на события**: Использовать `EVENT_TYPES.AUTH_COMPLETED` вместо `'auth.completed'`
+3. **Публикация событий**: Классы событий уже используют `EVENT_TYPES` внутри
+4. **Типизация**: `ClerklyEvents` интерфейс использует `EVENT_TYPES` для ключей
+
+**Примеры:**
+
+```typescript
+// ✅ ПРАВИЛЬНО
+import { EVENT_TYPES } from '../shared/events/constants';
+useEventSubscription(EVENT_TYPES.AUTH_COMPLETED, handleAuthCompleted);
+
+// ❌ НЕПРАВИЛЬНО
+useEventSubscription('auth.completed', handleAuthCompleted);
+```
+
+**Исключение:** В `src/preload/index.ts` константы дублируются из-за ограничения `rootDir` в TypeScript конфигурации. При добавлении новых событий необходимо обновить оба файла.
 
 
 ## Компоненты и Интерфейсы
@@ -282,7 +525,7 @@ interface StoredTokens {
 
 ```typescript
 class TokenStorageManager {
-  constructor(dataManager: DataManager);
+  constructor(userSettingsManager: UserSettingsManager);
 
   // Requirements: google-oauth-auth.4
   async saveTokens(tokens: TokenData): Promise<void>;
@@ -468,7 +711,7 @@ export function Settings({ onSignOut }: SettingsProps): JSX.Element;
 
 ### Database Schema
 
-Токены хранятся в существующей SQLite базе данных через DataManager.
+Токены хранятся в существующей SQLite базе данных через UserSettingsManager.
 
 ```sql
 -- Используется существующая таблица key_value_store
@@ -598,7 +841,7 @@ const effectiveRedirectUri = `com.googleusercontent.apps.${clientIdWithoutSuffix
   Мысли: Это персистентность. Можно тестировать round-trip свойством: сохранить токены, загрузить их обратно, проверить совпадение.
   Тестируемость: да - property
 
-4.2 Использование DataManager
+4.2 Использование UserSettingsManager
   Мысли: Это детали реализации (какой компонент использовать). Это не функциональное требование, которое можно тестировать извне.
   Тестируемость: нет
 

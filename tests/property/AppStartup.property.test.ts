@@ -1,4 +1,4 @@
-// Requirements: clerkly.nfr.1.1, clerkly.2.6, clerkly.2.8, clerkly.nfr.4.4
+// Requirements: clerkly.nfr.1.1, clerkly.2.6, clerkly.2.8, clerkly.nfr.4.4, account-profile.1.3
 /**
  * Property-based tests for application startup performance
  * Tests Property 7: Application Startup Performance
@@ -11,9 +11,11 @@ import * as fs from 'fs';
 import * as os from 'os';
 import WindowManager from '../../src/main/WindowManager';
 import { LifecycleManager } from '../../src/main/LifecycleManager';
-import { DataManager } from '../../src/main/DataManager';
+import { UserSettingsManager } from '../../src/main/UserSettingsManager';
+import { DatabaseManager } from '../../src/main/DatabaseManager';
 import { OAuthClientManager } from '../../src/main/auth/OAuthClientManager';
 import { TokenStorageManager } from '../../src/main/auth/TokenStorageManager';
+import { UserManager } from '../../src/main/auth/UserManager';
 import { getOAuthConfig } from '../../src/main/auth/OAuthConfig';
 
 // Mock Electron app and BrowserWindow
@@ -63,27 +65,45 @@ jest.mock('electron', () => ({
 describe('Property Tests - Application Startup Performance', () => {
   let testStoragePath: string;
 
-  // Helper function to create DataManager with mock UserProfileManager
-  const createDataManagerWithMockUser = (storagePath: string) => {
-    const dataManager = new DataManager(storagePath);
-    dataManager.initialize();
+  // Helper function to create DatabaseManager and UserSettingsManager with mock UserManager
+  const createManagersWithMockUser = (storagePath: string) => {
+    const dbManager = new DatabaseManager();
+    dbManager.initialize(storagePath);
 
-    // Requirements: user-data-isolation.1.10 - Mock UserProfileManager for data isolation
-    const mockProfileManager = {
-      getCurrentEmail: jest.fn().mockReturnValue('test@example.com'),
+    const userSettingsManager = new UserSettingsManager(dbManager);
+
+    // Requirements: user-data-isolation.1.10 - Mock UserManager for data isolation
+    const mockUserManager = {
+      getCurrentUserId: jest.fn().mockReturnValue('test@example.com'),
     } as any;
 
-    dataManager.setUserProfileManager(mockProfileManager);
-    return dataManager;
+    dbManager.setUserManager(mockUserManager);
+    return { dbManager, userSettingsManager };
   };
 
   // Helper function to create mock OAuth components
-  const createMockOAuthComponents = (dataManager: DataManager) => {
-    const tokenStorage = new TokenStorageManager(dataManager);
+  // Note: This function does NOT override the mock user manager set by createManagersWithMockUser
+  // to ensure data operations work correctly in tests that need user isolation
+  const createMockOAuthComponents = (
+    dbManager: DatabaseManager,
+    userSettingsManager: UserSettingsManager,
+    options: { overrideUserManager?: boolean } = {}
+  ) => {
+    const tokenStorage = new TokenStorageManager(userSettingsManager);
     const oauthClient = new OAuthClientManager(getOAuthConfig(), tokenStorage);
     // Mock getAuthStatus to return not authorized (skip profile fetch in tests)
     jest.spyOn(oauthClient, 'getAuthStatus').mockResolvedValue({ authorized: false });
-    return { tokenStorage, oauthClient };
+
+    // Requirements: account-profile.1.3 - Create UserManager
+    const userManager = new UserManager(dbManager, tokenStorage);
+
+    // Only override the mock user manager if explicitly requested
+    // By default, keep the mock user manager for data isolation tests
+    if (options.overrideUserManager) {
+      dbManager.setUserManager(userManager);
+    }
+
+    return { tokenStorage, oauthClient, userManager };
   };
 
   beforeEach(() => {
@@ -119,15 +139,18 @@ describe('Property Tests - Application Startup Performance', () => {
         fc.constant(null), // No input needed - we're testing startup performance
         async () => {
           // Create fresh components for each iteration
-          // Requirements: window-management.5
-          const dataManager = createDataManagerWithMockUser(testStoragePath);
-          const windowManager = new WindowManager(dataManager);
-          const { tokenStorage, oauthClient } = createMockOAuthComponents(dataManager);
+          // Requirements: window-management.5, database-refactoring.1
+          const { dbManager, userSettingsManager } = createManagersWithMockUser(testStoragePath);
+          const windowManager = new WindowManager(dbManager);
+          const { oauthClient, userManager } = createMockOAuthComponents(
+            dbManager,
+            userSettingsManager
+          );
           const lifecycleManager = new LifecycleManager(
             windowManager,
-            dataManager,
+            dbManager,
             oauthClient,
-            tokenStorage
+            userManager
           );
 
           // Measure startup time
@@ -151,7 +174,7 @@ describe('Property Tests - Application Startup Performance', () => {
 
           // Clean up
           await lifecycleManager.handleQuit();
-          dataManager.close();
+          dbManager.close();
 
           // Clean up storage for next iteration
           if (fs.existsSync(testStoragePath)) {
@@ -174,15 +197,15 @@ describe('Property Tests - Application Startup Performance', () => {
       fs.rmSync(testStoragePath, { recursive: true, force: true });
     }
 
-    // Requirements: window-management.5
-    const dataManager = createDataManagerWithMockUser(testStoragePath);
-    const windowManager = new WindowManager(dataManager);
-    const { tokenStorage, oauthClient } = createMockOAuthComponents(dataManager);
+    // Requirements: window-management.5, database-refactoring.1
+    const { dbManager, userSettingsManager } = createManagersWithMockUser(testStoragePath);
+    const windowManager = new WindowManager(dbManager);
+    const { oauthClient, userManager } = createMockOAuthComponents(dbManager, userSettingsManager);
     const lifecycleManager = new LifecycleManager(
       windowManager,
-      dataManager,
+      dbManager,
       oauthClient,
-      tokenStorage
+      userManager
     );
 
     // Measure first startup time
@@ -200,13 +223,13 @@ describe('Property Tests - Application Startup Performance', () => {
     expect(fs.existsSync(dbPath)).toBe(true);
 
     // Verify migrations were applied
-    const migrationRunner = dataManager.getMigrationRunner();
+    const migrationRunner = dbManager.getMigrationRunner();
     const currentVersion = migrationRunner.getCurrentVersion();
     expect(currentVersion).toBeGreaterThanOrEqual(0);
 
     // Clean up
     await lifecycleManager.handleQuit();
-    dataManager.close();
+    dbManager.close();
   });
 
   /* Preconditions: application not running, storage exists with data (subsequent startup)
@@ -216,36 +239,42 @@ describe('Property Tests - Application Startup Performance', () => {
   // Feature: clerkly, Property 7: Application Startup Performance
   test('Property 7 edge case: subsequent startups with existing database complete within 3 seconds', async () => {
     // First startup to create database
-    // Requirements: window-management.5
-    const dataManager1 = createDataManagerWithMockUser(testStoragePath);
-    const windowManager1 = new WindowManager(dataManager1);
-    const { tokenStorage: tokenStorage1, oauthClient: oauthClient1 } =
-      createMockOAuthComponents(dataManager1);
+    // Requirements: window-management.5, database-refactoring.1
+    const { dbManager: dbManager1, userSettingsManager: userSettingsManager1 } =
+      createManagersWithMockUser(testStoragePath);
+    const windowManager1 = new WindowManager(dbManager1);
+    const { oauthClient: oauthClient1, userManager: userManager1 } = createMockOAuthComponents(
+      dbManager1,
+      userSettingsManager1
+    );
     const lifecycleManager1 = new LifecycleManager(
       windowManager1,
-      dataManager1,
+      dbManager1,
       oauthClient1,
-      tokenStorage1
+      userManager1
     );
 
     await lifecycleManager1.initialize();
     await lifecycleManager1.handleQuit();
-    dataManager1.close();
+    dbManager1.close();
 
     // Clear mocks for second startup
     jest.clearAllMocks();
 
     // Second startup - should be fast since database exists
-    // Requirements: window-management.5
-    const dataManager2 = createDataManagerWithMockUser(testStoragePath);
-    const windowManager2 = new WindowManager(dataManager2);
-    const { tokenStorage: tokenStorage2, oauthClient: oauthClient2 } =
-      createMockOAuthComponents(dataManager2);
+    // Requirements: window-management.5, database-refactoring.1
+    const { dbManager: dbManager2, userSettingsManager: userSettingsManager2 } =
+      createManagersWithMockUser(testStoragePath);
+    const windowManager2 = new WindowManager(dbManager2);
+    const { oauthClient: oauthClient2, userManager: userManager2 } = createMockOAuthComponents(
+      dbManager2,
+      userSettingsManager2
+    );
     const lifecycleManager2 = new LifecycleManager(
       windowManager2,
-      dataManager2,
+      dbManager2,
       oauthClient2,
-      tokenStorage2
+      userManager2
     );
 
     const startTime = Date.now();
@@ -259,7 +288,7 @@ describe('Property Tests - Application Startup Performance', () => {
 
     // Clean up
     await lifecycleManager2.handleQuit();
-    dataManager2.close();
+    dbManager2.close();
   });
 
   /* Preconditions: application not running, storage exists with large amount of data
@@ -269,16 +298,19 @@ describe('Property Tests - Application Startup Performance', () => {
   // Feature: clerkly, Property 7: Application Startup Performance
   test('Property 7 edge case: startup with large database completes within 3 seconds', async () => {
     // First startup to create database
-    // Requirements: window-management.5
-    const dataManager1 = createDataManagerWithMockUser(testStoragePath);
-    const windowManager1 = new WindowManager(dataManager1);
-    const { tokenStorage: tokenStorage1, oauthClient: oauthClient1 } =
-      createMockOAuthComponents(dataManager1);
+    // Requirements: window-management.5, database-refactoring.1
+    const { dbManager: dbManager1, userSettingsManager: userSettingsManager1 } =
+      createManagersWithMockUser(testStoragePath);
+    const windowManager1 = new WindowManager(dbManager1);
+    const { oauthClient: oauthClient1, userManager: userManager1 } = createMockOAuthComponents(
+      dbManager1,
+      userSettingsManager1
+    );
     const lifecycleManager1 = new LifecycleManager(
       windowManager1,
-      dataManager1,
+      dbManager1,
       oauthClient1,
-      tokenStorage1
+      userManager1
     );
 
     await lifecycleManager1.initialize();
@@ -295,26 +327,29 @@ describe('Property Tests - Application Startup Performance', () => {
           field3: [i, i + 1, i + 2],
         },
       };
-      dataManager1.saveData(key, value);
+      userSettingsManager1.saveData(key, value);
     }
 
     await lifecycleManager1.handleQuit();
-    dataManager1.close();
+    dbManager1.close();
 
     // Clear mocks for second startup
     jest.clearAllMocks();
 
     // Second startup with large database
-    // Requirements: window-management.5
-    const dataManager2 = createDataManagerWithMockUser(testStoragePath);
-    const windowManager2 = new WindowManager(dataManager2);
-    const { tokenStorage: tokenStorage2, oauthClient: oauthClient2 } =
-      createMockOAuthComponents(dataManager2);
+    // Requirements: window-management.5, database-refactoring.1
+    const { dbManager: dbManager2, userSettingsManager: userSettingsManager2 } =
+      createManagersWithMockUser(testStoragePath);
+    const windowManager2 = new WindowManager(dbManager2);
+    const { oauthClient: oauthClient2, userManager: userManager2 } = createMockOAuthComponents(
+      dbManager2,
+      userSettingsManager2
+    );
     const lifecycleManager2 = new LifecycleManager(
       windowManager2,
-      dataManager2,
+      dbManager2,
       oauthClient2,
-      tokenStorage2
+      userManager2
     );
 
     const startTime = Date.now();
@@ -327,12 +362,12 @@ describe('Property Tests - Application Startup Performance', () => {
     expect(result.loadTime).toBeLessThan(3000);
 
     // Verify data is accessible
-    const loadResult = dataManager2.loadData('large-data-key-0');
+    const loadResult = userSettingsManager2.loadData('large-data-key-0');
     expect(loadResult.success).toBe(true);
 
     // Clean up
     await lifecycleManager2.handleQuit();
-    dataManager2.close();
+    dbManager2.close();
   });
 
   /* Preconditions: application not running
@@ -348,15 +383,18 @@ describe('Property Tests - Application Startup Performance', () => {
       // Clear mocks for each iteration
       jest.clearAllMocks();
 
-      // Requirements: window-management.5
-      const dataManager = createDataManagerWithMockUser(testStoragePath);
-      const windowManager = new WindowManager(dataManager);
-      const { tokenStorage, oauthClient } = createMockOAuthComponents(dataManager);
+      // Requirements: window-management.5, database-refactoring.1
+      const { dbManager, userSettingsManager } = createManagersWithMockUser(testStoragePath);
+      const windowManager = new WindowManager(dbManager);
+      const { oauthClient, userManager } = createMockOAuthComponents(
+        dbManager,
+        userSettingsManager
+      );
       const lifecycleManager = new LifecycleManager(
         windowManager,
-        dataManager,
+        dbManager,
         oauthClient,
-        tokenStorage
+        userManager
       );
 
       const startTime = Date.now();
@@ -372,7 +410,7 @@ describe('Property Tests - Application Startup Performance', () => {
 
       // Clean up
       await lifecycleManager.handleQuit();
-      dataManager.close();
+      dbManager.close();
     }
 
     // Verify all startups were within limit
@@ -389,15 +427,15 @@ describe('Property Tests - Application Startup Performance', () => {
      Requirements: clerkly.nfr.1.1, clerkly.2.6, clerkly.2.8, clerkly.nfr.4.4 */
   // Feature: clerkly, Property 7: Application Startup Performance
   test('Property 7 edge case: startup time is measured and reported correctly', async () => {
-    // Requirements: window-management.5
-    const dataManager = createDataManagerWithMockUser(testStoragePath);
-    const windowManager = new WindowManager(dataManager);
-    const { tokenStorage, oauthClient } = createMockOAuthComponents(dataManager);
+    // Requirements: window-management.5, database-refactoring.1
+    const { dbManager, userSettingsManager } = createManagersWithMockUser(testStoragePath);
+    const windowManager = new WindowManager(dbManager);
+    const { oauthClient, userManager } = createMockOAuthComponents(dbManager, userSettingsManager);
     const lifecycleManager = new LifecycleManager(
       windowManager,
-      dataManager,
+      dbManager,
       oauthClient,
-      tokenStorage
+      userManager
     );
 
     const startTime = Date.now();
@@ -418,7 +456,7 @@ describe('Property Tests - Application Startup Performance', () => {
 
     // Clean up
     await lifecycleManager.handleQuit();
-    dataManager.close();
+    dbManager.close();
   });
 
   /* Preconditions: application not running
@@ -434,15 +472,15 @@ describe('Property Tests - Application Startup Performance', () => {
       warnings.push(message);
     });
 
-    // Requirements: window-management.5
-    const dataManager = createDataManagerWithMockUser(testStoragePath);
-    const windowManager = new WindowManager(dataManager);
-    const { tokenStorage, oauthClient } = createMockOAuthComponents(dataManager);
+    // Requirements: window-management.5, database-refactoring.1
+    const { dbManager, userSettingsManager } = createManagersWithMockUser(testStoragePath);
+    const windowManager = new WindowManager(dbManager);
+    const { oauthClient, userManager } = createMockOAuthComponents(dbManager, userSettingsManager);
     const lifecycleManager = new LifecycleManager(
       windowManager,
-      dataManager,
+      dbManager,
       oauthClient,
-      tokenStorage
+      userManager
     );
 
     const startTime = Date.now();
@@ -460,7 +498,7 @@ describe('Property Tests - Application Startup Performance', () => {
 
     // Clean up
     await lifecycleManager.handleQuit();
-    dataManager.close();
+    dbManager.close();
 
     // Restore console.warn
     console.warn = originalWarn;
@@ -472,15 +510,15 @@ describe('Property Tests - Application Startup Performance', () => {
      Requirements: clerkly.nfr.1.1, clerkly.2.6, clerkly.2.8, clerkly.nfr.4.4 */
   // Feature: clerkly, Property 7: Application Startup Performance
   test('Property 7 edge case: all components initialize within 3 seconds', async () => {
-    // Requirements: window-management.5
-    const dataManager = createDataManagerWithMockUser(testStoragePath);
-    const windowManager = new WindowManager(dataManager);
-    const { tokenStorage, oauthClient } = createMockOAuthComponents(dataManager);
+    // Requirements: window-management.5, database-refactoring.1
+    const { dbManager, userSettingsManager } = createManagersWithMockUser(testStoragePath);
+    const windowManager = new WindowManager(dbManager);
+    const { oauthClient, userManager } = createMockOAuthComponents(dbManager, userSettingsManager);
     const lifecycleManager = new LifecycleManager(
       windowManager,
-      dataManager,
+      dbManager,
       oauthClient,
-      tokenStorage
+      userManager
     );
 
     const startTime = Date.now();
@@ -501,16 +539,16 @@ describe('Property Tests - Application Startup Performance', () => {
     expect(fs.existsSync(dbPath)).toBe(true);
 
     // Verify migrations were applied
-    const migrationRunner = dataManager.getMigrationRunner();
+    const migrationRunner = dbManager.getMigrationRunner();
     const currentVersion = migrationRunner.getCurrentVersion();
     expect(currentVersion).toBeGreaterThanOrEqual(0);
 
-    // Verify data manager is functional
-    const saveResult = dataManager.saveData('test-key', 'test-value');
+    // Verify user settings manager is functional
+    const saveResult = userSettingsManager.saveData('test-key', 'test-value');
     expect(saveResult.success).toBe(true);
 
     // Clean up
     await lifecycleManager.handleQuit();
-    dataManager.close();
+    dbManager.close();
   });
 });

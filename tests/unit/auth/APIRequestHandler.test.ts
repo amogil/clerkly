@@ -9,9 +9,49 @@ import { TokenStorageManager } from '../../../src/main/auth/TokenStorageManager'
 // Mock electron
 jest.mock('electron', () => ({
   BrowserWindow: {
-    getAllWindows: jest.fn(),
+    getAllWindows: jest.fn(() => []),
   },
 }));
+
+// Mock MainEventBus
+const mockPublish = jest.fn();
+jest.mock('../../../src/main/events/MainEventBus', () => ({
+  MainEventBus: {
+    getInstance: jest.fn(() => ({
+      publish: mockPublish,
+      subscribe: jest.fn(),
+      subscribeAll: jest.fn(),
+      clear: jest.fn(),
+      destroy: jest.fn(),
+    })),
+    resetInstance: jest.fn(),
+  },
+}));
+
+// Mock fetch
+global.fetch = jest.fn();
+
+// Mock Response for Node.js environment
+if (typeof Response === 'undefined') {
+  (global as any).Response = class Response {
+    constructor(
+      public body: any,
+      public init?: { status?: number; headers?: any }
+    ) {}
+    get status() {
+      return this.init?.status || 200;
+    }
+    get headers() {
+      return this.init?.headers || {};
+    }
+    async json() {
+      return typeof this.body === 'string' ? JSON.parse(this.body) : this.body;
+    }
+    async text() {
+      return typeof this.body === 'string' ? this.body : JSON.stringify(this.body);
+    }
+  };
+}
 
 // Mock TokenStorageManager
 jest.mock('../../../src/main/auth/TokenStorageManager');
@@ -19,28 +59,22 @@ jest.mock('../../../src/main/auth/TokenStorageManager');
 describe('APIRequestHandler', () => {
   let mockTokenStorage: jest.Mocked<TokenStorageManager>;
   let mockFetch: jest.SpyInstance;
-  let mockBrowserWindow: any;
 
   beforeEach(() => {
     // Reset the clearing flag before each test
     resetClearingFlag();
+
+    // Clear mock publish
+    mockPublish.mockClear();
 
     // Create mock token storage
     mockTokenStorage = {
       deleteTokens: jest.fn().mockResolvedValue(undefined),
     } as any;
 
-    // Mock fetch
-    mockFetch = jest.spyOn(global, 'fetch');
-
-    // Mock BrowserWindow
-    mockBrowserWindow = {
-      webContents: {
-        send: jest.fn(),
-      },
-    };
-    const { BrowserWindow } = require('electron');
-    (BrowserWindow.getAllWindows as jest.Mock).mockReturnValue([mockBrowserWindow]);
+    // Reset fetch mock
+    mockFetch = global.fetch as jest.Mock;
+    mockFetch.mockClear();
 
     // Mock process.type
     Object.defineProperty(process, 'type', {
@@ -79,7 +113,7 @@ describe('APIRequestHandler', () => {
 
     expect(result).toBe(mockResponse);
     expect(mockTokenStorage.deleteTokens).not.toHaveBeenCalled();
-    expect(mockBrowserWindow.webContents.send).not.toHaveBeenCalled();
+    expect(mockPublish).not.toHaveBeenCalled();
   });
 
   /* Preconditions: fetch returns HTTP 401
@@ -100,10 +134,14 @@ describe('APIRequestHandler', () => {
     ).rejects.toThrow('Your session has expired. Please sign in again.');
 
     expect(mockTokenStorage.deleteTokens).toHaveBeenCalledTimes(1);
-    expect(mockBrowserWindow.webContents.send).toHaveBeenCalledWith('auth:error', {
-      error: 'Session expired',
-      errorCode: 'invalid_grant',
-    });
+    // Verify AuthFailedEvent was published (may have additional error.created events)
+    const authFailedCalls = mockPublish.mock.calls.filter(
+      (call) => call[0]?.type === 'auth.failed'
+    );
+    expect(authFailedCalls.length).toBe(1);
+    const publishedEvent = authFailedCalls[0][0];
+    expect(publishedEvent.code).toBe('invalid_grant');
+    expect(publishedEvent.message).toBe('Session expired');
   });
 
   /* Preconditions: fetch returns HTTP 401
@@ -147,7 +185,7 @@ describe('APIRequestHandler', () => {
 
     expect(result.status).toBe(500);
     expect(mockTokenStorage.deleteTokens).not.toHaveBeenCalled();
-    expect(mockBrowserWindow.webContents.send).not.toHaveBeenCalled();
+    expect(mockPublish).not.toHaveBeenCalled();
   });
 
   /* Preconditions: multiple simultaneous requests return HTTP 401
@@ -180,11 +218,11 @@ describe('APIRequestHandler', () => {
     // clearTokens should be called only once despite multiple 401 errors
     expect(mockTokenStorage.deleteTokens).toHaveBeenCalledTimes(1);
 
-    // auth:error event should be emitted only once (check specifically for auth:error, not all send calls)
-    const authErrorCalls = (mockBrowserWindow.webContents.send as jest.Mock).mock.calls.filter(
-      (call) => call[0] === 'auth:error'
+    // auth.failed event should be published only once
+    const authFailedCalls = mockPublish.mock.calls.filter(
+      (call) => call[0]?.type === 'auth.failed'
     );
-    expect(authErrorCalls.length).toBe(1);
+    expect(authFailedCalls.length).toBe(1);
   });
 
   /* Preconditions: fetch throws network error

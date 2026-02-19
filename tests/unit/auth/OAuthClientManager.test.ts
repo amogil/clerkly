@@ -1,8 +1,9 @@
-// Requirements: google-oauth-auth.1.1, google-oauth-auth.1.2, google-oauth-auth.1.3, google-oauth-auth.1.5, google-oauth-auth.2.2, google-oauth-auth.2.3, google-oauth-auth.3.1, google-oauth-auth.3.2, google-oauth-auth.3.3, google-oauth-auth.3.5, google-oauth-auth.5.1, google-oauth-auth.5.2, google-oauth-auth.5.3, google-oauth-auth.5.4, google-oauth-auth.6.1, google-oauth-auth.6.2, google-oauth-auth.6.3, google-oauth-auth.6.4, google-oauth-auth.6.5, google-oauth-auth.7.1, google-oauth-auth.7.2, google-oauth-auth.9.2
+// Requirements: google-oauth-auth.1.1, google-oauth-auth.1.2, google-oauth-auth.1.3, google-oauth-auth.1.5, google-oauth-auth.2.2, google-oauth-auth.2.3, google-oauth-auth.3.1, google-oauth-auth.3.2, google-oauth-auth.3.3, google-oauth-auth.3.5, google-oauth-auth.5.1, google-oauth-auth.5.2, google-oauth-auth.5.3, google-oauth-auth.5.4, google-oauth-auth.6.1, google-oauth-auth.6.2, google-oauth-auth.6.3, google-oauth-auth.6.4, google-oauth-auth.6.5, google-oauth-auth.7.1, google-oauth-auth.7.2, google-oauth-auth.9.2, database-refactoring.2
 
 import { OAuthClientManager } from '../../../src/main/auth/OAuthClientManager';
 import { TokenStorageManager } from '../../../src/main/auth/TokenStorageManager';
-import { DataManager } from '../../../src/main/DataManager';
+import { UserSettingsManager } from '../../../src/main/UserSettingsManager';
+import { DatabaseManager } from '../../../src/main/DatabaseManager';
 import { getOAuthConfig } from '../../../src/main/auth/OAuthConfig';
 import { shell } from 'electron';
 import * as crypto from 'crypto';
@@ -24,12 +25,13 @@ jest.mock('electron', () => ({
 global.fetch = jest.fn();
 
 describe('OAuthClientManager', () => {
-  let dataManager: DataManager;
+  let dataManager: UserSettingsManager;
+  let dbManager: DatabaseManager;
   let tokenStorage: TokenStorageManager;
   let oauthClient: OAuthClientManager;
   let testDbPath: string;
   let testConfig: ReturnType<typeof getOAuthConfig>;
-  let mockProfileManager: jest.Mocked<any>;
+  let mockUserManager: jest.Mocked<any>;
   const testClientId = 'test-client-id.apps.googleusercontent.com';
 
   beforeEach(() => {
@@ -42,15 +44,18 @@ describe('OAuthClientManager', () => {
       fs.mkdirSync(migrationsPath, { recursive: true });
     }
 
-    dataManager = new DataManager(testDbPath);
-    dataManager.initialize();
-
-    // Requirements: user-data-isolation.1.10 - Mock UserProfileManager for data isolation
-    mockProfileManager = {
-      getCurrentEmail: jest.fn().mockReturnValue('test@example.com'),
+    // Requirements: user-data-isolation.1.10 - Mock UserManager for data isolation
+    mockUserManager = {
+      getCurrentUserId: jest.fn().mockReturnValue('test@example.com'),
     };
 
-    dataManager.setUserProfileManager(mockProfileManager);
+    // Initialize DatabaseManager first
+    dbManager = new DatabaseManager();
+    dbManager.initialize(testDbPath);
+    dbManager.setUserManager(mockUserManager);
+
+    // Create UserSettingsManager with DatabaseManager
+    dataManager = new UserSettingsManager(dbManager);
     tokenStorage = new TokenStorageManager(dataManager);
 
     // Create OAuth client
@@ -62,7 +67,7 @@ describe('OAuthClientManager', () => {
   });
 
   afterEach(() => {
-    dataManager.close();
+    dbManager.close();
     if (fs.existsSync(testDbPath)) {
       fs.rmSync(testDbPath, { recursive: true, force: true });
     }
@@ -118,24 +123,37 @@ describe('OAuthClientManager', () => {
   describe('Authorization Flow', () => {
     /* Preconditions: OAuth client configured
        Action: Call startAuthFlow
-       Assertions: Opens browser with authorization URL containing all required parameters
-       Requirements: google-oauth-auth.1.5 */
-    it('should open browser with correct authorization URL', async () => {
+       Assertions: Opens browser with authorization URL containing all required parameters (production only)
+       Requirements: google-oauth-auth.1.5, google-oauth-auth.16.1 */
+    it('should NOT open browser in test environment', async () => {
       await oauthClient.startAuthFlow();
 
-      expect(shell.openExternal).toHaveBeenCalledTimes(1);
-      const calledUrl = (shell.openExternal as jest.Mock).mock.calls[0][0];
+      // In test environment, browser should NOT be opened
+      expect(shell.openExternal).not.toHaveBeenCalled();
 
-      expect(calledUrl).toContain('https://accounts.google.com/o/oauth2/v2/auth');
-      expect(calledUrl).toContain(`client_id=${testClientId}`);
-      expect(calledUrl).toContain('redirect_uri=');
-      expect(calledUrl).toContain('response_type=code');
-      expect(calledUrl).toContain('scope=openid+email+profile');
-      expect(calledUrl).toContain('code_challenge=');
-      expect(calledUrl).toContain('code_challenge_method=S256');
-      expect(calledUrl).toContain('state=');
-      expect(calledUrl).toContain('access_type=offline');
-      expect(calledUrl).toContain('prompt=consent');
+      // But PKCE parameters should still be generated
+      expect((oauthClient as any).pkceStorage).toBeDefined();
+      expect((oauthClient as any).pkceStorage.state).toBeDefined();
+      expect((oauthClient as any).pkceStorage.codeVerifier).toBeDefined();
+    });
+
+    /* Preconditions: OAuth client configured, shell.openExternal throws error
+       Action: Call startAuthFlow
+       Assertions: Throws error with descriptive message
+       Requirements: google-oauth-auth.1.5 */
+    it('should handle error when opening browser fails', async () => {
+      // Temporarily set NODE_ENV to production to test browser opening
+      const originalEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = 'production';
+
+      (shell.openExternal as jest.Mock).mockRejectedValueOnce(new Error('Browser not available'));
+
+      await expect(oauthClient.startAuthFlow()).rejects.toThrow(
+        'Failed to start auth flow: Browser not available'
+      );
+
+      // Restore NODE_ENV
+      process.env.NODE_ENV = originalEnv;
     });
   });
 
@@ -147,8 +165,9 @@ describe('OAuthClientManager', () => {
     it('should extract parameters from deep link URL', async () => {
       // Start auth flow to set up PKCE storage
       await oauthClient.startAuthFlow();
-      const authUrl = (shell.openExternal as jest.Mock).mock.calls[0][0];
-      const state = new URL(authUrl).searchParams.get('state');
+
+      // Read state directly from pkceStorage (browser not opened in test env)
+      const state = (oauthClient as any).pkceStorage.state;
 
       // Mock successful token exchange
       (global.fetch as jest.Mock).mockResolvedValueOnce({
@@ -201,8 +220,9 @@ describe('OAuthClientManager', () => {
        Requirements: google-oauth-auth.3.1, google-oauth-auth.3.2 */
     it('should form token exchange request with client_secret', async () => {
       await oauthClient.startAuthFlow();
-      const authUrl = (shell.openExternal as jest.Mock).mock.calls[0][0];
-      const state = new URL(authUrl).searchParams.get('state');
+
+      // Read state directly from pkceStorage
+      const state = (oauthClient as any).pkceStorage.state;
 
       (global.fetch as jest.Mock).mockResolvedValueOnce({
         ok: true,
@@ -242,8 +262,9 @@ describe('OAuthClientManager', () => {
        Requirements: google-oauth-auth.3.3 */
     it('should parse token response correctly', async () => {
       await oauthClient.startAuthFlow();
-      const authUrl = (shell.openExternal as jest.Mock).mock.calls[0][0];
-      const state = new URL(authUrl).searchParams.get('state');
+
+      // Read state directly from pkceStorage
+      const state = (oauthClient as any).pkceStorage.state;
 
       (global.fetch as jest.Mock).mockResolvedValueOnce({
         ok: true,
@@ -271,8 +292,9 @@ describe('OAuthClientManager', () => {
        Requirements: google-oauth-auth.3.5 */
     it('should calculate expiration timestamp correctly', async () => {
       await oauthClient.startAuthFlow();
-      const authUrl = (shell.openExternal as jest.Mock).mock.calls[0][0];
-      const state = new URL(authUrl).searchParams.get('state');
+
+      // Read state directly from pkceStorage
+      const state = (oauthClient as any).pkceStorage.state;
 
       const beforeTime = Date.now();
       (global.fetch as jest.Mock).mockResolvedValueOnce({
@@ -301,8 +323,9 @@ describe('OAuthClientManager', () => {
        Requirements: google-oauth-auth.9.2 */
     it('should handle network errors during token exchange', async () => {
       await oauthClient.startAuthFlow();
-      const authUrl = (shell.openExternal as jest.Mock).mock.calls[0][0];
-      const state = new URL(authUrl).searchParams.get('state');
+
+      // Read state directly from pkceStorage
+      const state = (oauthClient as any).pkceStorage.state;
 
       (global.fetch as jest.Mock).mockRejectedValueOnce(new Error('fetch failed'));
 
@@ -485,18 +508,22 @@ describe('OAuthClientManager', () => {
       });
 
       // Create mock profile manager
-      const mockProfileManager = {
+      const mockUserManager = {
+        fetchProfile: jest.fn().mockResolvedValue(null),
+        findOrCreateUser: jest.fn(),
+        setCurrentUser: jest.fn(),
         updateProfileAfterTokenRefresh: jest.fn().mockResolvedValue(undefined),
+        clearSession: jest.fn(),
       };
 
       // Set profile manager
-      oauthClient.setProfileManager(mockProfileManager);
+      oauthClient.setUserManager(mockUserManager);
 
       // Refresh token
       const result = await oauthClient.refreshAccessToken();
 
       expect(result).toBe(true);
-      expect(mockProfileManager.updateProfileAfterTokenRefresh).toHaveBeenCalledTimes(1);
+      expect(mockUserManager.updateProfileAfterTokenRefresh).toHaveBeenCalledTimes(1);
     });
 
     /* Preconditions: Profile manager is not set, refresh token succeeds

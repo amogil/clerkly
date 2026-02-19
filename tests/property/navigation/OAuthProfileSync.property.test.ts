@@ -19,14 +19,13 @@ interface TokenData {
   tokenType: string;
 }
 
-interface UserProfile {
-  id: string;
+interface User {
+  user_id: string;
   email: string;
-  name: string;
-  given_name?: string;
-  family_name?: string;
-  picture?: string;
-  lastUpdated: number;
+  name: string | null;
+  google_id: string | null;
+  locale: string | null;
+  last_synced: number | null;
 }
 
 interface OperationLog {
@@ -45,16 +44,15 @@ describe('OAuth Profile Sync Property Tests', () => {
       fc.property(
         // Generate random authorization code
         fc.string({ minLength: 20, maxLength: 100 }),
-        // Generate random user profile
+        // Generate random user data
         fc.record({
-          id: fc.string({ minLength: 10, maxLength: 30 }),
+          user_id: fc.string({ minLength: 10, maxLength: 10 }),
           email: fc.emailAddress(),
           name: fc.string({ minLength: 3, maxLength: 50 }),
-          given_name: fc.option(fc.string({ minLength: 2, maxLength: 30 }), { nil: undefined }),
-          family_name: fc.option(fc.string({ minLength: 2, maxLength: 30 }), { nil: undefined }),
-          picture: fc.option(fc.webUrl(), { nil: undefined }),
+          google_id: fc.option(fc.string({ minLength: 10, maxLength: 30 }), { nil: null }),
+          locale: fc.option(fc.string({ minLength: 2, maxLength: 5 }), { nil: null }),
         }),
-        (authCode, profileData) => {
+        (authCode, userData) => {
           // Operation log to track sequence
           const operationLog: OperationLog[] = [];
 
@@ -80,10 +78,10 @@ describe('OAuth Profile Sync Property Tests', () => {
           const profileFetchStart = Date.now();
           operationLog.push({ operation: 'profile_fetch_start', timestamp: profileFetchStart });
 
-          // Mock profile response
-          const profile: UserProfile = {
-            ...profileData,
-            lastUpdated: Date.now(),
+          // Mock user response
+          const user: User = {
+            ...userData,
+            last_synced: Date.now(),
           };
 
           const profileFetchComplete = Date.now();
@@ -92,9 +90,9 @@ describe('OAuth Profile Sync Property Tests', () => {
             timestamp: profileFetchComplete,
           });
 
-          // Simulate redirect to dashboard (happens after both operations complete)
-          const redirectToDashboard = Date.now();
-          operationLog.push({ operation: 'redirect_to_dashboard', timestamp: redirectToDashboard });
+          // Simulate redirect to agents (happens after both operations complete)
+          const redirectToAgents = Date.now();
+          operationLog.push({ operation: 'redirect_to_agents', timestamp: redirectToAgents });
 
           // Property 1: Operations must be in correct order
           const operations = operationLog.map((log) => log.operation);
@@ -103,7 +101,7 @@ describe('OAuth Profile Sync Property Tests', () => {
             'token_exchange_complete',
             'profile_fetch_start',
             'profile_fetch_complete',
-            'redirect_to_dashboard',
+            'redirect_to_agents',
           ]);
 
           // Property 2: Token exchange must complete before profile fetch starts
@@ -123,7 +121,7 @@ describe('OAuth Profile Sync Property Tests', () => {
           const profileFetchCompleteLog = operationLog.find(
             (log) => log.operation === 'profile_fetch_complete'
           );
-          const redirectLog = operationLog.find((log) => log.operation === 'redirect_to_dashboard');
+          const redirectLog = operationLog.find((log) => log.operation === 'redirect_to_agents');
           expect(profileFetchCompleteLog).toBeDefined();
           expect(redirectLog).toBeDefined();
           expect(profileFetchCompleteLog!.timestamp).toBeLessThanOrEqual(redirectLog!.timestamp);
@@ -133,14 +131,13 @@ describe('OAuth Profile Sync Property Tests', () => {
           expect(tokens.accessToken).toContain(authCode);
           expect(tokens.expiresAt).toBeGreaterThan(Date.now());
 
-          // Property 5: Profile must contain required fields
-          expect(profile.id).toBeTruthy();
-          expect(profile.email).toBeTruthy();
-          expect(profile.name).toBeTruthy();
-          expect(profile.lastUpdated).toBeGreaterThan(0);
+          // Property 5: User must contain required fields
+          expect(user.user_id).toBeTruthy();
+          expect(user.email).toBeTruthy();
+          expect(user.last_synced).toBeGreaterThan(0);
 
-          // Property 6: Profile email must be valid email format
-          expect(profile.email).toMatch(/^[^\s@]+@[^\s@]+\.[^\s@]+$/);
+          // Property 6: User email must be valid email format
+          expect(user.email).toMatch(/^[^\s@]+@[^\s@]+\.[^\s@]+$/);
         }
       ),
       { numRuns: 100 }
@@ -180,7 +177,7 @@ describe('OAuth Profile Sync Property Tests', () => {
           const operations = operationLog.map((log) => log.operation);
 
           // Property 1: Redirect should NOT be in operation log
-          expect(operations).not.toContain('redirect_to_dashboard');
+          expect(operations).not.toContain('redirect_to_agents');
 
           // Property 2: Tokens should be cleared after profile fetch error
           expect(operations).toContain('tokens_cleared');
@@ -234,7 +231,7 @@ describe('OAuth Profile Sync Property Tests', () => {
           expect(operations).not.toContain('profile_fetch_complete');
 
           // Property 2: Redirect should NOT be in operation log
-          expect(operations).not.toContain('redirect_to_dashboard');
+          expect(operations).not.toContain('redirect_to_agents');
 
           // Property 3: Only token exchange operations should be present
           expect(operations).toEqual(['token_exchange_start', 'token_exchange_error']);
@@ -264,7 +261,7 @@ describe('OAuth Profile Sync Property Tests', () => {
             operationLog.push({ operation: 'token_exchange_complete', timestamp: Date.now() });
             operationLog.push({ operation: 'profile_fetch_start', timestamp: Date.now() });
             operationLog.push({ operation: 'profile_fetch_complete', timestamp: Date.now() });
-            operationLog.push({ operation: 'redirect_to_dashboard', timestamp: Date.now() });
+            operationLog.push({ operation: 'redirect_to_agents', timestamp: Date.now() });
 
             const operations = operationLog.map((log) => log.operation);
 
@@ -274,7 +271,7 @@ describe('OAuth Profile Sync Property Tests', () => {
               'token_exchange_complete',
               'profile_fetch_start',
               'profile_fetch_complete',
-              'redirect_to_dashboard',
+              'redirect_to_agents',
             ]);
 
             // Property: Timestamps must be monotonically increasing
@@ -303,14 +300,13 @@ describe('OAuth Profile Sync Property Tests', () => {
       fc.property(
         fc.string({ minLength: 20, maxLength: 100 }),
         fc.record({
-          id: fc.string({ minLength: 10, maxLength: 30 }),
+          user_id: fc.string({ minLength: 10, maxLength: 10 }),
           email: fc.emailAddress(),
           name: fc.string({ minLength: 3, maxLength: 50 }),
-          given_name: fc.option(fc.string({ minLength: 2, maxLength: 30 }), { nil: undefined }),
-          family_name: fc.option(fc.string({ minLength: 2, maxLength: 30 }), { nil: undefined }),
-          picture: fc.option(fc.webUrl(), { nil: undefined }),
+          google_id: fc.option(fc.string({ minLength: 10, maxLength: 30 }), { nil: null }),
+          locale: fc.option(fc.string({ minLength: 2, maxLength: 5 }), { nil: null }),
         }),
-        (authCode, profileData) => {
+        (authCode, userData) => {
           // Simulate full flow
           const tokens: TokenData = {
             accessToken: `access_token_${authCode}`,
@@ -319,30 +315,27 @@ describe('OAuth Profile Sync Property Tests', () => {
             tokenType: 'Bearer',
           };
 
-          const profile: UserProfile = {
-            ...profileData,
-            lastUpdated: Date.now(),
+          const user: User = {
+            ...userData,
+            last_synced: Date.now(),
           };
 
-          // Property 1: Profile data must match input
-          expect(profile.id).toBe(profileData.id);
-          expect(profile.email).toBe(profileData.email);
-          expect(profile.name).toBe(profileData.name);
+          // Property 1: User data must match input
+          expect(user.user_id).toBe(userData.user_id);
+          expect(user.email).toBe(userData.email);
+          expect(user.name).toBe(userData.name);
 
           // Property 2: Optional fields must be preserved
-          if (profileData.given_name !== undefined) {
-            expect(profile.given_name).toBe(profileData.given_name);
+          if (userData.google_id !== null) {
+            expect(user.google_id).toBe(userData.google_id);
           }
-          if (profileData.family_name !== undefined) {
-            expect(profile.family_name).toBe(profileData.family_name);
-          }
-          if (profileData.picture !== undefined) {
-            expect(profile.picture).toBe(profileData.picture);
+          if (userData.locale !== null) {
+            expect(user.locale).toBe(userData.locale);
           }
 
-          // Property 3: lastUpdated must be set
-          expect(profile.lastUpdated).toBeGreaterThan(0);
-          expect(profile.lastUpdated).toBeLessThanOrEqual(Date.now());
+          // Property 3: last_synced must be set
+          expect(user.last_synced).toBeGreaterThan(0);
+          expect(user.last_synced).toBeLessThanOrEqual(Date.now());
 
           // Property 4: Tokens must reference the auth code
           expect(tokens.accessToken).toContain(authCode);
@@ -386,7 +379,7 @@ describe('OAuth Profile Sync Property Tests', () => {
             operationLog.push({ operation: 'token_exchange_complete', timestamp: Date.now() });
             operationLog.push({ operation: 'profile_fetch_start', timestamp: Date.now() });
             operationLog.push({ operation: 'profile_fetch_complete', timestamp: Date.now() });
-            operationLog.push({ operation: 'redirect_to_dashboard', timestamp: Date.now() });
+            operationLog.push({ operation: 'redirect_to_agents', timestamp: Date.now() });
 
             // Property: Tokens must contain the auth code (even if it's unusual)
             expect(tokens.accessToken).toContain(authCode);
@@ -399,7 +392,7 @@ describe('OAuth Profile Sync Property Tests', () => {
               'token_exchange_complete',
               'profile_fetch_start',
               'profile_fetch_complete',
-              'redirect_to_dashboard',
+              'redirect_to_agents',
             ]);
           } else {
             // Empty or whitespace-only auth code should fail

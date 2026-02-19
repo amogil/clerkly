@@ -214,4 +214,35 @@ describe('DateTimeFormatter (Main Process)', () => {
 
     expect(timezone).toBe(expectedTimezone);
   });
+
+  /* Preconditions: Date methods throw error
+     Action: call formatLogTimestamp(timestamp)
+     Assertions: falls back to ISO string, logs error
+     Requirements: settings.2.3, clerkly.3.2 */
+  it('should fallback to ISO string on formatLogTimestamp error', () => {
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+
+    // Create a date that will throw when methods are called
+    const badDate = new Date('2026-02-07T10:30:45Z');
+    const originalGetFullYear = badDate.getFullYear;
+    badDate.getFullYear = () => {
+      throw new Error('Date error');
+    };
+
+    const result = DateTimeFormatter.formatLogTimestamp(badDate);
+
+    // Should fallback to ISO string
+    expect(result).toBeTruthy();
+    expect(typeof result).toBe('string');
+    // ISO string format check
+    expect(result).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
+    expect(consoleErrorSpy).toHaveBeenCalled();
+    expect(consoleErrorSpy.mock.calls[0][0]).toContain(
+      '[DateTimeFormatter] Error formatting log timestamp:'
+    );
+
+    // Restore
+    badDate.getFullYear = originalGetFullYear;
+    consoleErrorSpy.mockRestore();
+  });
 });

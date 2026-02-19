@@ -129,13 +129,13 @@ Token Expiring → OAuthClientManager.refreshAccessToken() → Update Tokens in 
 #### Критерии Приемки
 
 1. КОГДА токены получены, ТО "Token Storage" ДОЛЖЕН сохранить access_token, refresh_token, expires_at и token_type в SQLite базе данных
-2. КОГДА токены сохраняются, ТО "Token Storage" ДОЛЖЕН использовать существующий DataManager для работы с базой данных
+2. КОГДА токены сохраняются, ТО "Token Storage" ДОЛЖЕН использовать DatabaseManager для доступа к базе данных
 3. КОГДА токены запрашиваются, ТО "Token Storage" ДОЛЖЕН вернуть все сохраненные токены
 4. КОГДА токены удаляются (logout), ТО "Token Storage" ДОЛЖЕН полностью очистить все данные авторизации из базы
 5. ЕСЛИ база данных недоступна, ТО "Token Storage" ДОЛЖЕН вернуть ошибку с описанием проблемы
-6. OAuth токены ДОЛЖНЫ быть изолированы по пользователям (см. user-data-isolation.1.8) - каждый пользователь имеет свои токены в базе данных
+6. OAuth токены ДОЛЖНЫ быть изолированы по пользователям (см. user-data-isolation.2) - каждый пользователь имеет свои токены в базе данных
 
-**Примечание:** Изоляция токенов обеспечивается автоматически через DataManager, который фильтрует данные по `user_email` текущего авторизованного пользователя.
+**Примечание:** Изоляция токенов обеспечивается автоматически через UserSettingsManager, который фильтрует данные по `user_id` текущего авторизованного пользователя.
 
 #### Функциональные Тесты
 
@@ -316,7 +316,7 @@ Token Expiring → OAuthClientManager.refreshAccessToken() → Update Tokens in 
 1. КОГДА пользователь нажимает кнопку "Sign Out" в настройках, ТО приложение ДОЛЖНО вызвать метод logout через IPC
 2. КОГДА logout вызван, ТО "OAuth Client" ДОЛЖЕН отозвать токены через Google revoke endpoint
 3. КОГДА токены отозваны, ТО "Token Storage" ДОЛЖЕН удалить все токены из базы данных
-4. КОГДА токены удалены, ТО "Main Process" ДОЛЖЕН отправить событие "auth:logout-complete" в "Renderer Process"
+4. КОГДА токены удалены, ТО "Main Process" ДОЛЖЕН опубликовать событие "user.logout" через EventBus
 5. КОГДА "Renderer Process" получает событие logout, ТО приложение ДОЛЖНО обновить состояние авторизации на "не авторизован"
 6. КОГДА состояние обновлено, ТО приложение ДОЛЖНО показать "Login Screen" вместо главного интерфейса
 7. ЕСЛИ отзыв токенов через Google API не удается, ТО приложение ВСЕ РАВНО ДОЛЖНО удалить локальные токены и показать "Login Screen"
@@ -354,3 +354,55 @@ Token Expiring → OAuthClientManager.refreshAccessToken() → Update Tokens in 
 - `tests/functional/auth-flow.spec.ts` - "should hide loader and show error on failure"
 - `tests/functional/auth-flow.spec.ts` - "should NOT show loader immediately after login click, only after deep link"
 
+
+### Требование 16: Тестовое Окружение - Отключение Браузера
+
+**User Story:** Как разработчик, я хочу чтобы функциональные тесты не открывали браузер, чтобы тесты выполнялись быстрее и не мешали работе.
+
+#### Критерии Приемки
+
+1. КОГДА приложение запущено в тестовом окружении (NODE_ENV=test ИЛИ PLAYWRIGHT_TEST=1), ТО "OAuth Client" НЕ ДОЛЖЕН открывать системный браузер при вызове `startAuthFlow()`
+2. КОГДА браузер не открывается, ТО "OAuth Client" ВСЕ РАВНО ДОЛЖЕН сгенерировать PKCE параметры (code_verifier, code_challenge, state)
+3. КОГДА PKCE параметры сгенерированы, ТО они ДОЛЖНЫ быть сохранены в `pkceStorage` для использования в тестах
+4. КОГДА тест вызывает `completeOAuthFlow()` helper, ТО helper ДОЛЖЕН:
+   - Вызвать `auth:start-login` для генерации PKCE параметров
+   - Прочитать `state` из `pkceStorage` напрямую из памяти Main Process
+   - Сгенерировать тестовый authorization code локально
+   - Вызвать `test:handle-deep-link` для симуляции OAuth callback
+5. КОГДА `test:handle-deep-link` вызван, ТО Mock OAuth Server ДОЛЖЕН обработать:
+   - POST запрос к `/token` endpoint для обмена code на tokens
+   - GET запрос к `/oauth2/v2/userinfo` для загрузки профиля
+6. В production окружении (NODE_ENV != test), ТО браузер ДОЛЖЕН открываться как обычно
+7. КОГДА браузер не открывается в тестах, ТО в логах ДОЛЖНО быть сообщение "Test environment detected, skipping browser launch"
+
+#### Функциональные Тесты
+
+- Все существующие функциональные тесты OAuth flow должны продолжать работать без изменений
+- `tests/functional/navigation.spec.ts` - "should redirect to agents after successful authentication"
+- `tests/functional/agent-date-update.spec.ts` - "should update agent timestamp when new message is sent"
+- `tests/functional/auth-flow.spec.ts` - все тесты авторизации
+
+#### Техническая Реализация
+
+**Файл:** `src/main/auth/OAuthClientManager.ts`
+
+**Метод:** `startAuthFlow()`
+
+**Изменение:**
+```typescript
+// Open system browser with authorization URL (skip in test environment)
+// Requirements: google-oauth-auth.16.1, google-oauth-auth.16.7
+const isTestEnv = process.env.NODE_ENV === 'test' || process.env.PLAYWRIGHT_TEST === '1';
+if (!isTestEnv) {
+  await shell.openExternal(authUrl.toString());
+} else {
+  this.logger.info('Test environment detected, skipping browser launch');
+}
+```
+
+**Обоснование:**
+- Функциональные тесты используют Mock OAuth Server через переменную окружения `CLERKLY_GOOGLE_API_URL`
+- Тесты симулируют OAuth callback напрямую через `test:handle-deep-link` IPC handler
+- Браузер не нужен в тестах, т.к. authorization code генерируется локально
+- PKCE параметры все равно генерируются для корректной работы flow
+- В production окружении поведение не меняется

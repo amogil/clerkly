@@ -8,23 +8,26 @@ import * as fc from 'fast-check';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
-import { DataManager } from '../../src/main/DataManager';
+import { UserSettingsManager } from '../../src/main/UserSettingsManager';
+import { DatabaseManager } from '../../src/main/DatabaseManager';
 
 describe('Property Tests - Database Corruption Recovery', () => {
   let testStoragePath: string;
 
-  // Helper function to create DataManager with mock UserProfileManager
-  const createDataManagerWithMockUser = (storagePath: string) => {
-    const dataManager = new DataManager(storagePath);
-    dataManager.initialize();
+  // Helper function to create DatabaseManager and UserSettingsManager with mock UserManager
+  const createManagersWithMockUser = (storagePath: string) => {
+    const dbManager = new DatabaseManager();
+    dbManager.initialize(storagePath);
 
-    // Requirements: user-data-isolation.1.10 - Mock UserProfileManager for data isolation
-    const mockProfileManager = {
-      getCurrentEmail: jest.fn().mockReturnValue('test@example.com'),
+    const userSettingsManager = new UserSettingsManager(dbManager);
+
+    // Requirements: user-data-isolation.1.10 - Mock UserManager for data isolation
+    const mockUserManager = {
+      getCurrentUserId: jest.fn().mockReturnValue('test@example.com'),
     } as any;
 
-    dataManager.setUserProfileManager(mockProfileManager);
-    return dataManager;
+    dbManager.setUserManager(mockUserManager);
+    return { dbManager, userSettingsManager };
   };
 
   beforeEach(() => {
@@ -47,7 +50,7 @@ describe('Property Tests - Database Corruption Recovery', () => {
   });
 
   /* Preconditions: storage directory exists, database file is corrupted (invalid SQLite file)
-     Action: create corrupted database file, initialize DataManager
+     Action: create corrupted database file, initialize DatabaseManager
      Assertions: backup file created with timestamp format (clerkly.db.backup-{timestamp}) OR database initialized successfully, new working database created, new database is functional (can save/load data)
      Requirements: clerkly.nfr.2.4, clerkly.2.6, clerkly.2.8, clerkly.nfr.4.4 */
   // Feature: clerkly, Property 10: Database Corruption Recovery
@@ -102,8 +105,8 @@ describe('Property Tests - Database Corruption Recovery', () => {
           // Verify corrupted file exists
           expect(fs.existsSync(dbPath)).toBe(true);
 
-          // Initialize DataManager (should detect corruption and recover)
-          const dataManager = createDataManagerWithMockUser(testStoragePath);
+          // Initialize DatabaseManager (should detect corruption and recover)
+          const { dbManager, userSettingsManager } = createManagersWithMockUser(testStoragePath);
 
           // Get list of files after initialization
           const filesAfter = fs.readdirSync(testStoragePath);
@@ -129,25 +132,25 @@ describe('Property Tests - Database Corruption Recovery', () => {
           const testKey = 'recovery-test-key';
           const testValue = { recovered: true, data: 'test data', timestamp: Date.now() };
 
-          const saveResult = dataManager.saveData(testKey, testValue);
+          const saveResult = userSettingsManager.saveData(testKey, testValue);
           expect(saveResult.success).toBe(true);
 
           // Verify new database is functional - test load operation
-          const loadResult = dataManager.loadData(testKey);
+          const loadResult = userSettingsManager.loadData(testKey);
           expect(loadResult.success).toBe(true);
           expect(loadResult.data).toEqual(testValue);
 
           // Verify new database is functional - test delete operation
-          const deleteResult = dataManager.deleteData(testKey);
+          const deleteResult = userSettingsManager.deleteData(testKey);
           expect(deleteResult.success).toBe(true);
 
           // Verify deleted data is gone
-          const loadAfterDelete = dataManager.loadData(testKey);
+          const loadAfterDelete = userSettingsManager.loadData(testKey);
           expect(loadAfterDelete.success).toBe(false);
           expect(loadAfterDelete.error).toContain('not found');
 
           // Clean up
-          dataManager.close();
+          dbManager.close();
 
           // Clean up storage for next iteration
           if (fs.existsSync(testStoragePath)) {
@@ -160,7 +163,7 @@ describe('Property Tests - Database Corruption Recovery', () => {
   });
 
   /* Preconditions: storage directory exists, database file contains random binary data
-     Action: create corrupted database with random bytes, initialize DataManager
+     Action: create corrupted database with random bytes, initialize DatabaseManager
      Assertions: backup created, new database functional
      Requirements: clerkly.nfr.2.4, clerkly.2.6, clerkly.2.8, clerkly.nfr.4.4 */
   // Feature: clerkly, Property 10: Database Corruption Recovery
@@ -183,8 +186,8 @@ describe('Property Tests - Database Corruption Recovery', () => {
     );
     fs.writeFileSync(dbPath, randomData);
 
-    // Initialize DataManager
-    const dataManager = createDataManagerWithMockUser(testStoragePath);
+    // Initialize DatabaseManager
+    const { dbManager, userSettingsManager } = createManagersWithMockUser(testStoragePath);
 
     // Verify initialization succeeded
     // Verify backup was created
@@ -193,19 +196,19 @@ describe('Property Tests - Database Corruption Recovery', () => {
     expect(backupFiles.length).toBe(1);
 
     // Verify new database is functional
-    const saveResult = dataManager.saveData('test-key', 'test-value');
+    const saveResult = userSettingsManager.saveData('test-key', 'test-value');
     expect(saveResult.success).toBe(true);
 
-    const loadResult = dataManager.loadData('test-key');
+    const loadResult = userSettingsManager.loadData('test-key');
     expect(loadResult.success).toBe(true);
     expect(loadResult.data).toBe('test-value');
 
     // Clean up
-    dataManager.close();
+    dbManager.close();
   });
 
   /* Preconditions: storage directory exists, database file is empty
-     Action: create empty database file, initialize DataManager
+     Action: create empty database file, initialize DatabaseManager
      Assertions: initialization succeeds (SQLite can handle empty files), database is functional
      Requirements: clerkly.nfr.2.4, clerkly.2.6, clerkly.2.8, clerkly.nfr.4.4 */
   // Feature: clerkly, Property 10: Database Corruption Recovery
@@ -223,8 +226,8 @@ describe('Property Tests - Database Corruption Recovery', () => {
     // Create empty database file
     fs.writeFileSync(dbPath, '');
 
-    // Initialize DataManager
-    const dataManager = createDataManagerWithMockUser(testStoragePath);
+    // Initialize DatabaseManager
+    const { dbManager, userSettingsManager } = createManagersWithMockUser(testStoragePath);
 
     // Verify initialization succeeded (SQLite can handle empty files)
 
@@ -232,19 +235,19 @@ describe('Property Tests - Database Corruption Recovery', () => {
     // The database will be initialized with migrations
 
     // Verify database is functional
-    const saveResult = dataManager.saveData('empty-test', { data: 'works' });
+    const saveResult = userSettingsManager.saveData('empty-test', { data: 'works' });
     expect(saveResult.success).toBe(true);
 
-    const loadResult = dataManager.loadData('empty-test');
+    const loadResult = userSettingsManager.loadData('empty-test');
     expect(loadResult.success).toBe(true);
     expect(loadResult.data).toEqual({ data: 'works' });
 
     // Clean up
-    dataManager.close();
+    dbManager.close();
   });
 
   /* Preconditions: storage directory exists, database file has partial SQLite header
-     Action: create database with partial header, initialize DataManager
+     Action: create database with partial header, initialize DatabaseManager
      Assertions: backup created, new database functional
      Requirements: clerkly.nfr.2.4, clerkly.2.6, clerkly.2.8, clerkly.nfr.4.4 */
   // Feature: clerkly, Property 10: Database Corruption Recovery
@@ -262,8 +265,8 @@ describe('Property Tests - Database Corruption Recovery', () => {
     // Create database with partial SQLite header
     fs.writeFileSync(dbPath, 'SQLite');
 
-    // Initialize DataManager
-    const dataManager = createDataManagerWithMockUser(testStoragePath);
+    // Initialize DatabaseManager
+    const { dbManager, userSettingsManager } = createManagersWithMockUser(testStoragePath);
 
     // Verify initialization succeeded
 
@@ -273,19 +276,19 @@ describe('Property Tests - Database Corruption Recovery', () => {
     expect(backupFiles.length).toBe(1);
 
     // Verify new database is functional
-    const saveResult = dataManager.saveData('header-test', [1, 2, 3]);
+    const saveResult = userSettingsManager.saveData('header-test', [1, 2, 3]);
     expect(saveResult.success).toBe(true);
 
-    const loadResult = dataManager.loadData('header-test');
+    const loadResult = userSettingsManager.loadData('header-test');
     expect(loadResult.success).toBe(true);
     expect(loadResult.data).toEqual([1, 2, 3]);
 
     // Clean up
-    dataManager.close();
+    dbManager.close();
   });
 
   /* Preconditions: storage directory exists, database file contains plain text
-     Action: create database with plain text content, initialize DataManager
+     Action: create database with plain text content, initialize DatabaseManager
      Assertions: backup created, new database functional
      Requirements: clerkly.nfr.2.4, clerkly.2.6, clerkly.2.8, clerkly.nfr.4.4 */
   // Feature: clerkly, Property 10: Database Corruption Recovery
@@ -303,8 +306,8 @@ describe('Property Tests - Database Corruption Recovery', () => {
     // Create database with plain text
     fs.writeFileSync(dbPath, 'This is not a valid SQLite database file. It is just plain text.');
 
-    // Initialize DataManager
-    const dataManager = createDataManagerWithMockUser(testStoragePath);
+    // Initialize DatabaseManager
+    const { dbManager, userSettingsManager } = createManagersWithMockUser(testStoragePath);
 
     // Verify initialization succeeded
 
@@ -314,19 +317,19 @@ describe('Property Tests - Database Corruption Recovery', () => {
     expect(backupFiles.length).toBe(1);
 
     // Verify new database is functional
-    const saveResult = dataManager.saveData('text-test', { recovered: true });
+    const saveResult = userSettingsManager.saveData('text-test', { recovered: true });
     expect(saveResult.success).toBe(true);
 
-    const loadResult = dataManager.loadData('text-test');
+    const loadResult = userSettingsManager.loadData('text-test');
     expect(loadResult.success).toBe(true);
     expect(loadResult.data).toEqual({ recovered: true });
 
     // Clean up
-    dataManager.close();
+    dbManager.close();
   });
 
   /* Preconditions: storage directory exists, database file is truncated
-     Action: create truncated database file, initialize DataManager
+     Action: create truncated database file, initialize DatabaseManager
      Assertions: backup created, new database functional
      Requirements: clerkly.nfr.2.4, clerkly.2.6, clerkly.2.8, clerkly.nfr.4.4 */
   // Feature: clerkly, Property 10: Database Corruption Recovery
@@ -344,8 +347,8 @@ describe('Property Tests - Database Corruption Recovery', () => {
     // Create truncated database (SQLite header but incomplete)
     fs.writeFileSync(dbPath, 'SQLite format 3\0' + '\0'.repeat(200));
 
-    // Initialize DataManager
-    const dataManager = createDataManagerWithMockUser(testStoragePath);
+    // Initialize DatabaseManager
+    const { dbManager, userSettingsManager } = createManagersWithMockUser(testStoragePath);
 
     // Verify initialization succeeded
 
@@ -355,19 +358,19 @@ describe('Property Tests - Database Corruption Recovery', () => {
     expect(backupFiles.length).toBe(1);
 
     // Verify new database is functional
-    const saveResult = dataManager.saveData('truncated-test', { data: 'new data' });
+    const saveResult = userSettingsManager.saveData('truncated-test', { data: 'new data' });
     expect(saveResult.success).toBe(true);
 
-    const loadResult = dataManager.loadData('truncated-test');
+    const loadResult = userSettingsManager.loadData('truncated-test');
     expect(loadResult.success).toBe(true);
     expect(loadResult.data).toEqual({ data: 'new data' });
 
     // Clean up
-    dataManager.close();
+    dbManager.close();
   });
 
   /* Preconditions: storage directory exists, corrupted database file exists
-     Action: initialize DataManager, verify backup timestamp is recent
+     Action: initialize DatabaseManager, verify backup timestamp is recent
      Assertions: backup timestamp is within last few seconds
      Requirements: clerkly.nfr.2.4, clerkly.2.6, clerkly.2.8, clerkly.nfr.4.4 */
   // Feature: clerkly, Property 10: Database Corruption Recovery
@@ -388,8 +391,8 @@ describe('Property Tests - Database Corruption Recovery', () => {
     // Record time before initialization
     const timeBefore = Date.now();
 
-    // Initialize DataManager
-    const dataManager = createDataManagerWithMockUser(testStoragePath);
+    // Initialize DatabaseManager
+    const { dbManager } = createManagersWithMockUser(testStoragePath);
 
     // Record time after initialization
     const timeAfter = Date.now();
@@ -416,11 +419,11 @@ describe('Property Tests - Database Corruption Recovery', () => {
     }
 
     // Clean up
-    dataManager.close();
+    dbManager.close();
   });
 
   /* Preconditions: storage directory exists, corrupted database exists
-     Action: initialize DataManager, save data, close, reinitialize, verify data persists
+     Action: initialize DatabaseManager, save data, close, reinitialize, verify data persists
      Assertions: data saved in recovered database persists across restarts
      Requirements: clerkly.nfr.2.4, clerkly.2.6, clerkly.2.8, clerkly.nfr.4.4 */
   // Feature: clerkly, Property 10: Database Corruption Recovery
@@ -439,30 +442,32 @@ describe('Property Tests - Database Corruption Recovery', () => {
     fs.writeFileSync(dbPath, Buffer.from([0xff, 0xfe, 0xfd, 0xfc]));
 
     // First initialization - recover from corruption
-    const dataManager1 = createDataManagerWithMockUser(testStoragePath);
+    const { dbManager: dbManager1, userSettingsManager: userSettingsManager1 } =
+      createManagersWithMockUser(testStoragePath);
 
     // Save data in recovered database
     const testKey = 'persist-test';
     const testValue = { persisted: true, timestamp: Date.now() };
-    const saveResult = dataManager1.saveData(testKey, testValue);
+    const saveResult = userSettingsManager1.saveData(testKey, testValue);
     expect(saveResult.success).toBe(true);
 
     // Close database
-    dataManager1.close();
+    dbManager1.close();
 
     // Second initialization - verify data persists
-    const dataManager2 = createDataManagerWithMockUser(testStoragePath);
+    const { dbManager: dbManager2, userSettingsManager: userSettingsManager2 } =
+      createManagersWithMockUser(testStoragePath);
 
-    const loadResult = dataManager2.loadData(testKey);
+    const loadResult = userSettingsManager2.loadData(testKey);
     expect(loadResult.success).toBe(true);
     expect(loadResult.data).toEqual(testValue);
 
     // Clean up
-    dataManager2.close();
+    dbManager2.close();
   });
 
   /* Preconditions: storage directory exists, corrupted database exists
-     Action: initialize DataManager, verify migrations run successfully on recovered database
+     Action: initialize DatabaseManager, verify migrations run successfully on recovered database
      Assertions: migrations applied successfully, database schema is correct
      Requirements: clerkly.nfr.2.4, clerkly.2.6, clerkly.2.8, clerkly.nfr.4.4 */
   // Feature: clerkly, Property 10: Database Corruption Recovery
@@ -480,24 +485,24 @@ describe('Property Tests - Database Corruption Recovery', () => {
     // Create corrupted database
     fs.writeFileSync(dbPath, 'invalid database content');
 
-    // Initialize DataManager
-    const dataManager = createDataManagerWithMockUser(testStoragePath);
+    // Initialize DatabaseManager
+    const { dbManager, userSettingsManager } = createManagersWithMockUser(testStoragePath);
 
     // Verify initialization succeeded
 
     // Verify migrations were applied
 
     // Verify migration runner is functional
-    const migrationRunner = dataManager.getMigrationRunner();
+    const migrationRunner = dbManager.getMigrationRunner();
     const currentVersion = migrationRunner.getCurrentVersion();
     expect(currentVersion).toBeGreaterThanOrEqual(0);
 
     // Verify database schema is correct (can perform operations)
-    const saveResult = dataManager.saveData('migration-test', { migrated: true });
+    const saveResult = userSettingsManager.saveData('migration-test', { migrated: true });
     expect(saveResult.success).toBe(true);
 
     // Clean up
-    dataManager.close();
+    dbManager.close();
   });
 
   /* Preconditions: storage directory exists, multiple corrupted databases created sequentially
@@ -518,8 +523,8 @@ describe('Property Tests - Database Corruption Recovery', () => {
 
     // First corruption and recovery
     fs.writeFileSync(dbPath, 'first corruption');
-    const dataManager1 = createDataManagerWithMockUser(testStoragePath);
-    dataManager1.close();
+    const { dbManager: dbManager1 } = createManagersWithMockUser(testStoragePath);
+    dbManager1.close();
 
     // Wait a bit to ensure different timestamps
     const waitTime = 10;
@@ -530,8 +535,8 @@ describe('Property Tests - Database Corruption Recovery', () => {
 
     // Second corruption and recovery
     fs.writeFileSync(dbPath, 'second corruption');
-    const dataManager2 = createDataManagerWithMockUser(testStoragePath);
-    dataManager2.close();
+    const { dbManager: dbManager2 } = createManagersWithMockUser(testStoragePath);
+    dbManager2.close();
 
     // Verify two backup files were created
     const files = fs.readdirSync(testStoragePath);
@@ -568,8 +573,8 @@ describe('Property Tests - Database Corruption Recovery', () => {
     // Create corrupted database
     fs.writeFileSync(dbPath, 'corrupted');
 
-    // Initialize DataManager
-    const dataManager = createDataManagerWithMockUser(testStoragePath);
+    // Initialize DatabaseManager
+    const { dbManager, userSettingsManager } = createManagersWithMockUser(testStoragePath);
 
     // Test various data types
     const testCases = [
@@ -584,23 +589,23 @@ describe('Property Tests - Database Corruption Recovery', () => {
 
     // Save all data types
     for (const testCase of testCases) {
-      const saveResult = dataManager.saveData(testCase.key, testCase.value);
+      const saveResult = userSettingsManager.saveData(testCase.key, testCase.value);
       expect(saveResult.success).toBe(true);
     }
 
     // Load and verify all data types
     for (const testCase of testCases) {
-      const loadResult = dataManager.loadData(testCase.key);
+      const loadResult = userSettingsManager.loadData(testCase.key);
       expect(loadResult.success).toBe(true);
       expect(loadResult.data).toEqual(testCase.value);
     }
 
     // Clean up
-    dataManager.close();
+    dbManager.close();
   });
 
   /* Preconditions: storage directory exists, corrupted database exists
-     Action: initialize DataManager, verify backup file contains original corrupted content
+     Action: initialize DatabaseManager, verify backup file contains original corrupted content
      Assertions: backup file content matches original corrupted content
      Requirements: clerkly.nfr.2.4, clerkly.2.6, clerkly.2.8, clerkly.nfr.4.4 */
   // Feature: clerkly, Property 10: Database Corruption Recovery
@@ -620,8 +625,8 @@ describe('Property Tests - Database Corruption Recovery', () => {
       'This is the original corrupted content that should be preserved in backup';
     fs.writeFileSync(dbPath, corruptedContent);
 
-    // Initialize DataManager
-    const dataManager = createDataManagerWithMockUser(testStoragePath);
+    // Initialize DatabaseManager
+    const { dbManager } = createManagersWithMockUser(testStoragePath);
 
     // Get backup file
     const files = fs.readdirSync(testStoragePath);
@@ -636,6 +641,6 @@ describe('Property Tests - Database Corruption Recovery', () => {
     expect(backupContent).toBe(corruptedContent);
 
     // Clean up
-    dataManager.close();
+    dbManager.close();
   });
 });

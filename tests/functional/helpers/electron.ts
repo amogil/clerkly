@@ -4,6 +4,7 @@ import { _electron as electron, ElectronApplication, Page } from 'playwright';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
+import { MockOAuthServer } from './mock-oauth-server';
 
 /**
  * Electron Test Helper
@@ -45,7 +46,7 @@ export async function launchElectron(
 
   // Path to the built Electron app
   const electronPath = require('electron') as unknown as string;
-  const appPath = path.join(__dirname, '../../../dist/main/index.js');
+  const appPath = path.join(__dirname, '../../../dist/main/main/index.js');
 
   // Launch Electron
   // Requirements: testing.3.1, testing.3.2
@@ -356,4 +357,22 @@ export async function clearTestTokens(window: Page): Promise<void> {
   await window.evaluate(async () => {
     await (window as any).electron.ipcRenderer.invoke('test:clear-tokens');
   });
+}
+/**
+ * Create and start a MockOAuthServer with default test configuration
+ *
+ * @param port - Port number for the mock server (default: 8898)
+ * @returns MockOAuthServer instance (already started)
+ *
+ * Requirements: testing.3.9 - Mock external services in functional tests
+ */
+export async function createMockOAuthServer(port: number = 8898): Promise<MockOAuthServer> {
+  const mockServer = new MockOAuthServer({
+    port,
+    clientId: 'test-client-id-12345',
+    clientSecret: 'test-client-secret-67890',
+  });
+
+  await mockServer.start();
+  return mockServer;
 }

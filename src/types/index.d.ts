@@ -138,32 +138,93 @@ export interface AppConfig {
   windowSettings: WindowSettings;
 }
 /**
- * API exposed to renderer process via contextBridge
- */
-export interface API {
-  saveData: (
-    key: string,
-    value: any
-  ) => Promise<{
-    success: boolean;
-    error?: string;
-  }>;
-  loadData: (key: string) => Promise<{
-    success: boolean;
-    data?: any;
-    error?: string;
-  }>;
-  deleteData: (key: string) => Promise<{
-    success: boolean;
-    error?: string;
-  }>;
-}
-/**
  * Global window interface extension for renderer process
+ * Note: Actual API type is defined in src/types/api.d.ts
  */
 declare global {
   interface Window {
-    api: API;
+    api: {
+      saveData: (key: string, value: unknown) => Promise<{ success: boolean; error?: string }>;
+      loadData: (key: string) => Promise<{ success: boolean; data?: unknown; error?: string }>;
+      deleteData: (key: string) => Promise<{ success: boolean; error?: string }>;
+      events?: {
+        onEvent: (callback: (type: string, payload: unknown) => void) => () => void;
+        sendEvent: (type: string, payload: unknown) => void;
+      };
+      auth: {
+        startLogin: () => Promise<{ success: boolean; error?: string }>;
+        getStatus: () => Promise<{ authorized: boolean; error?: string }>;
+        logout: () => Promise<{ success: boolean; error?: string }>;
+        getUser: () => Promise<{ success: boolean; user?: User; error?: string }>;
+        refreshUser: () => Promise<{ success: boolean; user?: User; error?: string }>;
+        onAuthSuccess: (callback: () => void) => () => void;
+        onAuthError: (callback: (error: string, errorCode?: string) => void) => () => void;
+        onLogout: (callback: () => void) => () => void;
+        onUserUpdated: (callback: (user: User) => void) => () => void;
+      };
+      error: {
+        onNotify: (callback: (message: string, context: string) => void) => () => void;
+      };
+      settings: {
+        saveLLMProvider: (provider: string) => Promise<{ success: boolean; error?: string }>;
+        loadLLMProvider: () => Promise<{ success: boolean; provider?: string; error?: string }>;
+        saveAPIKey: (
+          provider: string,
+          apiKey: string
+        ) => Promise<{ success: boolean; error?: string }>;
+        loadAPIKey: (
+          provider: string
+        ) => Promise<{ success: boolean; apiKey?: string | null; error?: string }>;
+        deleteAPIKey: (provider: string) => Promise<{ success: boolean; error?: string }>;
+      };
+      llm: {
+        testConnection: (
+          provider: string,
+          apiKey: string
+        ) => Promise<{ success: boolean; error?: string }>;
+      };
+      agents: {
+        create: (name?: string) => Promise<{ success: boolean; data?: unknown; error?: string }>;
+        list: () => Promise<{ success: boolean; data?: unknown; error?: string }>;
+        get: (agentId: string) => Promise<{ success: boolean; data?: unknown; error?: string }>;
+        update: (
+          agentId: string,
+          data: { name?: string }
+        ) => Promise<{ success: boolean; error?: string }>;
+        archive: (agentId: string) => Promise<{ success: boolean; error?: string }>;
+      };
+      messages: {
+        list: (agentId: string) => Promise<{ success: boolean; data?: unknown; error?: string }>;
+        create: (
+          agentId: string,
+          payload: unknown
+        ) => Promise<{ success: boolean; data?: unknown; error?: string }>;
+        update: (
+          messageId: number,
+          agentId: string,
+          payload: unknown
+        ) => Promise<{ success: boolean; error?: string }>;
+        getLast: (agentId: string) => Promise<{ success: boolean; data?: unknown; error?: string }>;
+      };
+      test?: {
+        simulateDataError: (
+          operation: string,
+          errorMessage: string
+        ) => Promise<{ success: boolean; error?: string }>;
+        clearDataErrors: () => Promise<{ success: boolean; error?: string }>;
+        deleteCurrentUser: () => Promise<{ success: boolean; error?: string }>;
+        createAgentWithOldMessage: (
+          minutesAgo: number
+        ) => Promise<{ success: boolean; agentId?: string; timestamp?: string; error?: string }>;
+        createAgentMessage: (
+          agentId: string,
+          text: string
+        ) => Promise<{ success: boolean; error?: string }>;
+      };
+      ipcRenderer?: {
+        invoke: (channel: string, ...args: unknown[]) => Promise<unknown>;
+      };
+    };
   }
 }
 //# sourceMappingURL=index.d.ts.map

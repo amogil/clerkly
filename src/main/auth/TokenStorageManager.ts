@@ -1,6 +1,6 @@
 // Requirements: google-oauth-auth.4.1, google-oauth-auth.4.2, google-oauth-auth.4.3, google-oauth-auth.4.4, google-oauth-auth.4.5
 
-import { DataManager } from '../DataManager';
+import { UserSettingsManager } from '../UserSettingsManager';
 import { TokenData } from './OAuthConfig';
 
 /**
@@ -20,7 +20,7 @@ export interface StoredTokens {
  * Requirements: google-oauth-auth.4.1, google-oauth-auth.4.2, google-oauth-auth.4.3, google-oauth-auth.4.4, google-oauth-auth.4.5
  */
 export class TokenStorageManager {
-  private dataManager: DataManager;
+  private dataManager: UserSettingsManager;
   private readonly TOKEN_KEYS = {
     ACCESS_TOKEN: 'oauth_access_token',
     REFRESH_TOKEN: 'oauth_refresh_token',
@@ -28,7 +28,7 @@ export class TokenStorageManager {
     TOKEN_TYPE: 'oauth_token_type',
   } as const;
 
-  constructor(dataManager: DataManager) {
+  constructor(dataManager: UserSettingsManager) {
     this.dataManager = dataManager;
   }
 

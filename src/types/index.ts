@@ -1,4 +1,12 @@
-// Requirements: clerkly.1
+// Requirements: clerkly.1, settings.1.1
+
+/**
+ * LLM Provider type
+ * Supported providers: OpenAI (GPT), Anthropic (Claude), Google (Gemini)
+ * Requirements: settings.1.1
+ */
+export type LLMProvider = 'openai' | 'anthropic' | 'google';
+
 /**
  * Window configuration options
  */
@@ -153,7 +161,7 @@ export interface AppConfig {
 
 /**
  * API exposed to renderer process via contextBridge
- * Requirements: clerkly.1, google-oauth-auth.8, account-profile.1.2, account-profile.1.5, error-notifications.1.1, settings.1.26
+ * Requirements: clerkly.1, google-oauth-auth.8, account-profile.1.2, account-profile.1.5, error-notifications.1.1, settings.1.26, realtime-events.4.5
  */
 export interface API {
   saveData: (key: string, value: any) => Promise<{ success: boolean; error?: string }>;
@@ -164,18 +172,16 @@ export interface API {
     startLogin: () => Promise<{ success: boolean; error?: string }>;
     getStatus: () => Promise<{ authorized: boolean; error?: string }>;
     logout: () => Promise<{ success: boolean; error?: string }>;
-    getProfile: () => Promise<{ success: boolean; profile?: UserProfile | null; error?: string }>;
-    refreshProfile: () => Promise<{
+    getUser: () => Promise<{ success: boolean; user?: User | null; error?: string }>;
+    refreshUser: () => Promise<{
       success: boolean;
-      profile?: UserProfile | null;
+      user?: User | null;
       error?: string;
     }>;
     onAuthSuccess: (callback: () => void) => () => void;
     onAuthError: (callback: (error: string, errorCode?: string) => void) => () => void;
     onLogout: (callback: () => void) => () => void;
-    onProfileUpdated: (callback: (profile: UserProfile | null) => void) => () => void;
-    onShowLoader: (callback: () => void) => () => void;
-    onHideLoader: (callback: () => void) => () => void;
+    onUserUpdated: (callback: (user: User | null) => void) => () => void;
   };
   // Requirements: error-notifications.1.1
   error: {
@@ -183,84 +189,77 @@ export interface API {
   };
   // Requirements: settings.1.26
   settings: {
-    saveLLMProvider: (
-      provider: 'openai' | 'anthropic' | 'google'
-    ) => Promise<{ success: boolean; error?: string }>;
+    saveLLMProvider: (provider: LLMProvider) => Promise<{ success: boolean; error?: string }>;
     loadLLMProvider: () => Promise<{
       success: boolean;
-      provider?: 'openai' | 'anthropic' | 'google';
+      provider?: LLMProvider;
       error?: string;
     }>;
     saveAPIKey: (
-      provider: 'openai' | 'anthropic' | 'google',
+      provider: LLMProvider,
       apiKey: string
     ) => Promise<{ success: boolean; error?: string }>;
     loadAPIKey: (
-      provider: 'openai' | 'anthropic' | 'google'
+      provider: LLMProvider
     ) => Promise<{ success: boolean; apiKey?: string | null; error?: string }>;
-    deleteAPIKey: (
-      provider: 'openai' | 'anthropic' | 'google'
-    ) => Promise<{ success: boolean; error?: string }>;
+    deleteAPIKey: (provider: LLMProvider) => Promise<{ success: boolean; error?: string }>;
   };
   // Requirements: settings.3
   llm: {
     testConnection: (
-      provider: 'openai' | 'anthropic' | 'google',
+      provider: LLMProvider,
       apiKey: string
     ) => Promise<{ success: boolean; error?: string }>;
+  };
+  // Requirements: agents.2, agents.4, user-data-isolation.6.6
+  agents: {
+    create: (name?: string) => Promise<{ success: boolean; data?: any; error?: string }>;
+    list: () => Promise<{ success: boolean; data?: any; error?: string }>;
+    get: (agentId: string) => Promise<{ success: boolean; data?: any; error?: string }>;
+    update: (
+      agentId: string,
+      data: { name?: string }
+    ) => Promise<{ success: boolean; error?: string }>;
+    archive: (agentId: string) => Promise<{ success: boolean; error?: string }>;
+  };
+  // Requirements: agents.4, agents.7, user-data-isolation.6.6
+  messages: {
+    list: (agentId: string) => Promise<{ success: boolean; data?: any; error?: string }>;
+    create: (
+      agentId: string,
+      payload: any
+    ) => Promise<{ success: boolean; data?: any; error?: string }>;
+    update: (
+      messageId: number,
+      agentId: string,
+      payload: any
+    ) => Promise<{ success: boolean; error?: string }>;
+    getLast: (agentId: string) => Promise<{ success: boolean; data?: any; error?: string }>;
+  };
+  // Requirements: realtime-events.4.5, realtime-events.4.6, realtime-events.4.7
+  events?: {
+    onEvent: (callback: (type: string, payload: any) => void) => () => void;
+    sendEvent: (type: string, payload: any) => void;
   };
 }
 
 /**
- * User profile data from Google UserInfo API
- * Requirements: account-profile.1.2, account-profile.1.3
+ * User record from database
+ * Requirements: account-profile.1.2, user-data-isolation.1
  */
-export interface UserProfile {
-  /**
-   * Unique user identifier from Google
-   */
-  id: string;
-
-  /**
-   * User's email address
-   */
+export interface User {
+  /** Internal user ID for data isolation (10-char alphanumeric) */
+  user_id: string;
+  /** User's display name */
+  name: string | null;
+  /** User's email address (unique) */
   email: string;
-
-  /**
-   * Whether the email has been verified
-   */
-  verified_email: boolean;
-
-  /**
-   * User's full name
-   */
-  name: string;
-
-  /**
-   * User's given name (first name)
-   */
-  given_name: string;
-
-  /**
-   * User's family name (last name)
-   */
-  family_name: string;
-
-  /**
-   * User's locale/language preference
-   */
-  locale: string;
-
-  /**
-   * URL to user's profile picture (optional)
-   */
-  picture?: string;
-
-  /**
-   * Unix timestamp of when the profile was last updated
-   * Used for tracking profile freshness
-   */
-  lastUpdated: number;
+  /** Google user ID from OAuth */
+  google_id: string | null;
+  /** User's locale from Google (e.g., "en", "ru") */
+  locale: string | null;
+  /** Unix timestamp of last profile sync */
+  last_synced: number | null;
 }
 
 /**
@@ -273,7 +272,7 @@ export interface AIAgentSettings {
    * Supported providers: OpenAI (GPT), Anthropic (Claude), Google (Gemini)
    * Requirements: settings.1.1
    */
-  llmProvider: 'openai' | 'anthropic' | 'google';
+  llmProvider: LLMProvider;
 
   /**
    * API keys for each LLM provider

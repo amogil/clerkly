@@ -1,18 +1,20 @@
-// Requirements: google-oauth-auth.4.1, google-oauth-auth.4.2, google-oauth-auth.4.3, google-oauth-auth.4.4, google-oauth-auth.4.5
+// Requirements: google-oauth-auth.4.1, google-oauth-auth.4.2, google-oauth-auth.4.3, google-oauth-auth.4.4, google-oauth-auth.4.5, database-refactoring.2
 
 import { TokenStorageManager } from '../../../src/main/auth/TokenStorageManager';
-import { DataManager } from '../../../src/main/DataManager';
+import { UserSettingsManager } from '../../../src/main/UserSettingsManager';
+import { DatabaseManager } from '../../../src/main/DatabaseManager';
 import { TokenData } from '../../../src/main/auth/OAuthConfig';
-import type { UserProfileManager } from '../../../src/main/auth/UserProfileManager';
+import type { UserManager } from '../../../src/main/auth/UserManager';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 
 describe('TokenStorageManager', () => {
-  let dataManager: DataManager;
+  let dataManager: UserSettingsManager;
+  let dbManager: DatabaseManager;
   let tokenStorage: TokenStorageManager;
   let testDbPath: string;
-  let mockProfileManager: jest.Mocked<UserProfileManager>;
+  let mockProfileManager: jest.Mocked<UserManager>;
 
   beforeEach(() => {
     // Create a temporary directory for test database
@@ -24,26 +26,30 @@ describe('TokenStorageManager', () => {
       fs.mkdirSync(migrationsPath, { recursive: true });
     }
 
-    // Requirements: user-data-isolation.1.10 - Mock UserProfileManager for data isolation
+    // Requirements: user-data-isolation.1.10 - Mock UserManager for data isolation
     mockProfileManager = {
-      getCurrentEmail: jest.fn().mockReturnValue('test@example.com'),
-    } as unknown as jest.Mocked<UserProfileManager>;
+      getCurrentUserId: jest.fn().mockReturnValue('test@example.com'),
+    } as unknown as jest.Mocked<UserManager>;
 
-    dataManager = new DataManager(testDbPath);
-    dataManager.initialize();
-    dataManager.setUserProfileManager(mockProfileManager);
+    // Requirements: database-refactoring.2 - Initialize DatabaseManager first
+    dbManager = new DatabaseManager();
+    dbManager.initialize(testDbPath);
+    dbManager.setUserManager(mockProfileManager);
+
+    // Create UserSettingsManager with DatabaseManager
+    dataManager = new UserSettingsManager(dbManager);
     tokenStorage = new TokenStorageManager(dataManager);
   });
 
   afterEach(() => {
     // Clean up
-    dataManager.close();
+    dbManager.close();
     if (fs.existsSync(testDbPath)) {
       fs.rmSync(testDbPath, { recursive: true, force: true });
     }
   });
 
-  /* Preconditions: DataManager initialized, valid token data provided
+  /* Preconditions: UserSettingsManager initialized, valid token data provided
      Action: Call saveTokens with token data
      Assertions: Tokens are saved successfully, no errors thrown
      Requirements: google-oauth-auth.4.1 */
@@ -153,12 +159,12 @@ describe('TokenStorageManager', () => {
     expect(hasValid).toBe(false);
   });
 
-  /* Preconditions: DataManager closed (simulating database error)
+  /* Preconditions: DatabaseManager closed (simulating database error)
      Action: Call saveTokens
      Assertions: Throws error with descriptive message
-     Requirements: google-oauth-auth.4.5 */
+     Requirements: google-oauth-auth.4.5, database-refactoring.2 */
   it('should handle database errors when saving', async () => {
-    dataManager.close();
+    dbManager.close();
 
     const tokens: TokenData = {
       accessToken: 'test-access-token',
@@ -170,12 +176,12 @@ describe('TokenStorageManager', () => {
     await expect(tokenStorage.saveTokens(tokens)).rejects.toThrow('Failed to save tokens');
   });
 
-  /* Preconditions: DataManager closed (simulating database error)
+  /* Preconditions: DatabaseManager closed (simulating database error)
      Action: Call loadTokens
      Assertions: Throws error with descriptive message
-     Requirements: google-oauth-auth.4.5 */
+     Requirements: google-oauth-auth.4.5, database-refactoring.2 */
   it('should handle database errors when loading', async () => {
-    dataManager.close();
+    dbManager.close();
 
     await expect(tokenStorage.loadTokens()).rejects.toThrow('Failed to load tokens');
   });
@@ -247,7 +253,7 @@ describe('TokenStorageManager', () => {
     expect(loaded?.refreshToken).toBe(longToken);
   });
 
-  /* Preconditions: DataManager.saveData fails for access token
+  /* Preconditions: UserSettingsManager.saveData fails for access token
      Action: Call saveTokens
      Assertions: Throws error with descriptive message
      Requirements: google-oauth-auth.4.1 */
@@ -270,7 +276,7 @@ describe('TokenStorageManager', () => {
     );
   });
 
-  /* Preconditions: DataManager.saveData fails for refresh token
+  /* Preconditions: UserSettingsManager.saveData fails for refresh token
      Action: Call saveTokens with refresh token
      Assertions: Throws error with descriptive message
      Requirements: google-oauth-auth.4.1 */
@@ -293,7 +299,7 @@ describe('TokenStorageManager', () => {
     );
   });
 
-  /* Preconditions: DataManager.saveData fails for expires_at
+  /* Preconditions: UserSettingsManager.saveData fails for expires_at
      Action: Call saveTokens
      Assertions: Throws error with descriptive message
      Requirements: google-oauth-auth.4.1 */
@@ -315,7 +321,7 @@ describe('TokenStorageManager', () => {
     );
   });
 
-  /* Preconditions: DataManager.saveData fails for token_type
+  /* Preconditions: UserSettingsManager.saveData fails for token_type
      Action: Call saveTokens
      Assertions: Throws error with descriptive message
      Requirements: google-oauth-auth.4.1 */
@@ -341,7 +347,7 @@ describe('TokenStorageManager', () => {
     );
   });
 
-  /* Preconditions: DataManager.loadData returns database error (not "Key not found")
+  /* Preconditions: UserSettingsManager.loadData returns database error (not "Key not found")
      Action: Call loadTokens
      Assertions: Throws error with database error message
      Requirements: google-oauth-auth.4.3 */
@@ -357,7 +363,7 @@ describe('TokenStorageManager', () => {
     );
   });
 
-  /* Preconditions: DataManager.loadData returns "Key not found" for all keys
+  /* Preconditions: UserSettingsManager.loadData returns "Key not found" for all keys
      Action: Call loadTokens
      Assertions: Returns null (not an error)
      Requirements: google-oauth-auth.4.3 */
@@ -373,7 +379,7 @@ describe('TokenStorageManager', () => {
     expect(loaded).toBeNull();
   });
 
-  /* Preconditions: DataManager.deleteData throws error
+  /* Preconditions: UserSettingsManager.deleteData throws error
      Action: Call deleteTokens
      Assertions: Throws error with descriptive message
      Requirements: google-oauth-auth.4.4 */

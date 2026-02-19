@@ -6,7 +6,7 @@
 
 ### Архитектурный Принцип: База Данных как Единственный Источник Истины
 
-Приложение построено на фундаментальном архитектурном принципе: **база данных (SQLite через DataManager) является единственным источником истины для всех данных приложения**.
+Приложение построено на фундаментальном архитектурном принципе: **база данных (SQLite через DatabaseManager) является единственным источником истины для всех данных приложения**.
 
 **Ключевые аспекты:**
 
@@ -42,7 +42,7 @@ External API → Main Process → Database → IPC Event → Renderer → UI Upd
 - **TypeScript**: Язык программирования для типобезопасности
 - **BrowserWindow API**: Electron API для управления окнами
 - **screen API**: Electron API для получения информации об экранах
-- **SQLite**: База данных для хранения состояния окна (через существующий DataManager)
+- **SQLite**: База данных для хранения состояния окна (через DatabaseManager)
 
 ## Архитектура
 
@@ -65,7 +65,7 @@ External API → Main Process → Database → IPC Event → Renderer → UI Upd
 │           │                              │                   │
 │           ▼                              ▼                   │
 │  ┌──────────────────┐         ┌─────────────────────┐       │
-│  │  BrowserWindow   │         │    DataManager      │       │
+│  │  BrowserWindow   │         │   DatabaseManager   │       │
 │  │   (Electron)     │         │     (SQLite)        │       │
 │  └──────────────────┘         └─────────────────────┘       │
 │           │                                                   │
@@ -81,7 +81,7 @@ External API → Main Process → Database → IPC Event → Renderer → UI Upd
 
 1. **Запуск приложения**:
    - `WindowManager` запрашивает сохраненное состояние у `WindowStateManager`
-   - `WindowStateManager` загружает состояние из базы данных через `DataManager`
+   - `WindowStateManager` загружает состояние из базы данных через `DatabaseManager`
    - Если состояние отсутствует, используются значения по умолчанию
    - `WindowManager` создает `BrowserWindow` с полученной конфигурацией
 
@@ -89,7 +89,7 @@ External API → Main Process → Database → IPC Event → Renderer → UI Upd
    - Пользователь изменяет размер, позицию или состояние окна
    - `BrowserWindow` генерирует события (resize, move, maximize, unmaximize)
    - `WindowStateManager` слушает эти события и сохраняет новое состояние
-   - Состояние записывается в базу данных через `DataManager`
+   - Состояние записывается в базу данных через `DatabaseManager`
 
 3. **Закрытие приложения**:
    - Финальное состояние окна сохраняется перед закрытием
@@ -109,8 +109,8 @@ class WindowManager {
   private mainWindow: BrowserWindow | null = null;
   private windowStateManager: WindowStateManager;
 
-  constructor(dataManager: DataManager) {
-    this.windowStateManager = new WindowStateManager(dataManager);
+  constructor(dbManager: DatabaseManager) {
+    this.windowStateManager = new WindowStateManager(dbManager);
   }
 
   // Requirements: window-management.1.1, window-management.1.2, window-management.2.1, 
@@ -229,28 +229,25 @@ interface WindowState {
   isMaximized: boolean;
 }
 
-// Requirements: window-management.5
+// Requirements: window-management.5, drizzle-migration.6
 class WindowStateManager {
-  private dataManager: DataManager;
-  // Requirements: window-management.5.7 - Global state key (not user-specific)
-  private readonly stateKey = 'window_state';
+  private dbManager: DatabaseManager;
 
-  constructor(dataManager: DataManager) {
-    this.dataManager = dataManager;
+  constructor(dbManager: DatabaseManager) {
+    this.dbManager = dbManager;
   }
 
-  // Requirements: window-management.1.1, window-management.4.1, window-management.4.2, window-management.5.4, window-management.5.5, window-management.5.6
+  // Requirements: window-management.1.1, window-management.4.1, window-management.4.2, window-management.5.4, window-management.5.5, window-management.5.6, drizzle-migration.6.1
   loadState(): WindowState {
     try {
-      // Requirements: window-management.5.4
-      const savedState = this.dataManager.get(this.stateKey);
+      // Requirements: window-management.5.4, user-data-isolation.6.10, drizzle-migration.6.1
+      // Использует глобальный репозиторий (без user_id) — состояние окна глобальное
+      const savedState = this.dbManager.global.windowState.get();
       
       if (savedState) {
-        const state = JSON.parse(savedState) as WindowState;
-        
         // Requirements: window-management.5.6
-        if (this.isPositionValid(state.x, state.y)) {
-          return state;
+        if (this.isPositionValid(savedState.x, savedState.y)) {
+          return savedState;
         }
       }
     } catch (error) {
@@ -261,11 +258,12 @@ class WindowStateManager {
     return this.getDefaultState();
   }
 
-  // Requirements: window-management.5.1, window-management.5.2, window-management.5.3
+  // Requirements: window-management.5.1, window-management.5.2, window-management.5.3, drizzle-migration.6.1
   saveState(state: WindowState): void {
     try {
-      const stateJson = JSON.stringify(state);
-      this.dataManager.set(this.stateKey, stateJson);
+      // Requirements: user-data-isolation.6.10, drizzle-migration.6.1
+      // Использует глобальный репозиторий (без user_id) — состояние окна глобальное
+      this.dbManager.global.windowState.set(state);
     } catch (error) {
       console.error('Failed to save window state:', error);
     }
@@ -310,28 +308,30 @@ class WindowStateManager {
 ```
 
 **Ключевые особенности:**
-- Использует `DataManager` для персистентности состояния
+- Использует `DatabaseManager` для доступа к базе данных (глобальные данные, без user_id фильтрации)
 - Хранит состояние в формате JSON
 - Валидирует позицию окна относительно доступных экранов
 - Возвращает адаптивное состояние по умолчанию на основе размера экрана
 - По умолчанию окно НЕ максимизировано (isMaximized: false)
 
-### Интеграция с DataManager
+### Интеграция с DatabaseManager
 
-`WindowStateManager` использует существующий `DataManager` для хранения состояния окна в SQLite базе данных.
+`WindowStateManager` использует `DatabaseManager` для хранения состояния окна в SQLite базе данных.
+
+**Важно:** WindowStateManager является исключением из правила изоляции данных по user_id (см. user-data-isolation.6.8). Он работает с глобальными данными и использует DatabaseManager только для доступа к БД, без фильтрации по user_id.
 
 **Схема данных:**
 
 ```sql
--- Таблица key_value_store уже существует в DataManager
+-- Таблица window_state для глобального состояния окна (не изолируется по user_id)
 -- Используется ключ 'window_state' для хранения JSON состояния
 
 key: 'window_state'
 value: '{"x":100,"y":100,"width":1200,"height":800,"isMaximized":true}'
 ```
 
-**Преимущества использования DataManager:**
-- Единая точка доступа к данным
+**Преимущества использования DatabaseManager:**
+- Единая точка доступа к базе данных
 - Транзакционность и надежность SQLite
 - Не требуется создание новых таблиц
 - Простая интеграция с существующей инфраструктурой
@@ -440,7 +440,7 @@ interface WindowState {
 
 ### Property 6: Изменения состояния окна сохраняются
 
-*Для любого* изменения состояния окна (размер, позиция, состояние maximized), новое состояние должно быть сохранено в постоянное хранилище через `DataManager`. Если пользователь закрывает окно в maximized состоянии, при следующем запуске окно должно открыться максимизированным.
+*Для любого* изменения состояния окна (размер, позиция, состояние maximized), новое состояние должно быть сохранено в постоянное хранилище через `DatabaseManager`. Если пользователь закрывает окно в maximized состоянии, при следующем запуске окно должно открыться максимизированным.
 
 **Validates: Requirements window-management.5.1, window-management.5.2, window-management.5.3, window-management.5.4**
 
@@ -477,14 +477,14 @@ interface WindowState {
 
 **Обработка:**
 ```typescript
-// Requirements: window-management.5.4, window-management.5.5, window-management.5.6
+// Requirements: window-management.5.4, window-management.5.5, window-management.5.6, user-data-isolation.6.10, drizzle-migration.6.1
 loadState(): WindowState {
   try {
-    const savedState = this.dataManager.get(this.stateKey);
+    // Использует глобальный репозиторий (без user_id) — состояние окна глобальное
+    const savedState = this.dbManager.global.windowState.get();
     if (savedState) {
-      const state = JSON.parse(savedState) as WindowState;
-      if (this.isPositionValid(state.x, state.y)) {
-        return state;
+      if (this.isPositionValid(savedState.x, savedState.y)) {
+        return savedState;
       }
     }
   } catch (error) {
@@ -505,11 +505,11 @@ loadState(): WindowState {
 
 **Обработка:**
 ```typescript
-// Requirements: window-management.5.1, window-management.5.2, window-management.5.3
+// Requirements: window-management.5.1, window-management.5.2, window-management.5.3, user-data-isolation.6.10, drizzle-migration.6.1
 saveState(state: WindowState): void {
   try {
-    const stateJson = JSON.stringify(state);
-    this.dataManager.set(this.stateKey, stateJson);
+    // Использует глобальный репозиторий (без user_id) — состояние окна глобальное
+    this.dbManager.global.windowState.set(state);
   } catch (error) {
     console.error('Failed to save window state:', error);
   }
@@ -617,7 +617,7 @@ console.error('Failed to create window:', errorMessage);
 
 ```typescript
 describe('WindowManager', () => {
-  /* Preconditions: WindowManager created with DataManager mock
+  /* Preconditions: WindowManager created with DatabaseManager mock
      Action: call createWindow()
      Assertions: window created with empty title, default titleBarStyle, not fullscreen
      Requirements: window-management.1, window-management.2, window-management.3 */
@@ -785,7 +785,7 @@ describe('WindowStateManager Property Tests', () => {
   /* Feature: window-management, Property 6: Изменения состояния окна сохраняются
      Preconditions: window created with various initial states
      Action: trigger resize/move/maximize events
-     Assertions: DataManager.set called with updated state
+     Assertions: DatabaseManager.getDatabase().prepare().run() called with updated state
      Requirements: window-management.5.1, window-management.5.2, window-management.5.3 */
   it('should save state on any window state change', () => {
     fc.assert(
@@ -818,10 +818,7 @@ describe('WindowStateManager Property Tests', () => {
           window.emit('move');
 
           // Проверить, что состояние сохранено
-          expect(mockDataManager.set).toHaveBeenCalledWith(
-            'window_state',
-            expect.stringContaining(JSON.stringify(newState))
-          );
+          expect(mockDbManager.getDatabase().prepare).toHaveBeenCalled();
         }
       ),
       { numRuns: 100 }
@@ -993,18 +990,18 @@ describe('Window Management Functional Tests', () => {
 
 ## Технические Решения и Обоснование
 
-### Решение 1: Использование DataManager для Персистентности
+### Решение 1: Использование DatabaseManager для Персистентности
 
-**Решение:** Использовать существующий `DataManager` с key-value хранилищем для сохранения состояния окна.
+**Решение:** Использовать `DatabaseManager` для доступа к базе данных и сохранения состояния окна в отдельной таблице `window_state`.
 
 **Альтернативы:**
-- Создать отдельную таблицу в SQLite
+- Использовать UserSettingsManager (но это для пользовательских данных с изоляцией по user_id)
 - Использовать файловую систему (JSON файл)
 - Использовать Electron's `electron-store`
 
 **Обоснование:**
-- Единая точка доступа к данным
-- Не требуется создание новых таблиц
+- Единая точка доступа к базе данных через DatabaseManager
+- Состояние окна глобальное (не изолируется по user_id) — см. user-data-isolation.6.8
 - Транзакционность и надежность SQLite
 - Простая интеграция с существующей инфраструктурой
 - Меньше зависимостей

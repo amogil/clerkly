@@ -51,7 +51,7 @@ export class NavigationManager {
    * Redirect to main screen (agents)
    * Requirements: navigation.1.3
    */
-  redirectToDashboard(): void {
+  redirectToAgents(): void {
     this.logger.info('Redirecting to agents');
     this.router.navigate('/agents');
   }
@@ -70,7 +70,7 @@ export class NavigationManager {
     } else {
       // Requirements: navigation.1.3 - If already on login screen, redirect to dashboard
       if (this.router.currentRoute === '/login') {
-        this.redirectToDashboard();
+        this.redirectToAgents();
       }
     }
   }

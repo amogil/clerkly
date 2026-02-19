@@ -40,13 +40,45 @@
     "@typescript-eslint/no-require-imports": "off",
     "no-console": "off",
     "react/react-in-jsx-scope": "off",
-    "react/prop-types": "off"
+    "react/prop-types": "off",
+    "no-restricted-syntax": [
+      "error",
+      {
+        "selector": "CallExpression[callee.property.name='prepare']",
+        "message": "Raw SQL queries are not allowed. Use Drizzle ORM repositories instead."
+      },
+      {
+        "selector": "CallExpression[callee.property.name='exec']",
+        "message": "Raw SQL queries are not allowed. Use Drizzle ORM repositories instead."
+      },
+      {
+        "selector": "TemplateLiteral:has(TemplateElement[value.raw=/^\\s*(CREATE TABLE|INSERT INTO|UPDATE\\s|DELETE FROM|SELECT\\s.*FROM)/i])",
+        "message": "Raw SQL queries are not allowed. Use Drizzle ORM repositories instead."
+      }
+    ],
+    "no-restricted-imports": [
+      "error",
+      {
+        "patterns": [
+          {
+            "group": ["drizzle-orm", "drizzle-orm/*"],
+            "message": "Direct import of drizzle-orm is not allowed. Use DatabaseManager repositories instead (drizzle-migration.10.1)."
+          },
+          {
+            "group": ["better-sqlite3"],
+            "message": "Direct import of better-sqlite3 is not allowed. Use DatabaseManager repositories instead (drizzle-migration.10.2)."
+          }
+        ]
+      }
+    ]
   },
   "overrides": [
     {
       "files": ["tests/**/*.ts", "tests/**/*.tsx"],
       "rules": {
-        "@typescript-eslint/no-explicit-any": "off"
+        "@typescript-eslint/no-explicit-any": "off",
+        "no-restricted-imports": "off",
+        "no-restricted-syntax": "off"
       }
     },
     {
@@ -54,7 +86,14 @@
       "rules": {
         "@typescript-eslint/no-explicit-any": "off"
       }
+    },
+    {
+      "files": ["src/main/db/**/*.ts", "src/main/DatabaseManager.ts", "src/main/MigrationRunner.ts", "src/main/TestIPCHandlers.ts"],
+      "rules": {
+        "no-restricted-imports": "off",
+        "no-restricted-syntax": "off"
+      }
     }
   ],
-  "ignorePatterns": ["dist", "node_modules", "coverage", "release", "figma"]
+  "ignorePatterns": ["dist", "node_modules", "coverage", "release", "figma/**"]
 }

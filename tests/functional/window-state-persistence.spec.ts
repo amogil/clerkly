@@ -26,9 +26,7 @@ import {
 test.describe('Window State Persistence', () => {
   let context: ElectronTestContext;
 
-  test.beforeAll(async () => {
-    console.log('\n⚠️  WARNING: These tests will show real Electron windows on your screen!\n');
-  });
+  test.beforeAll(async () => {});
 
   test.afterEach(async () => {
     if (context) {

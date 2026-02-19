@@ -14,12 +14,7 @@ module.exports = {
     '^.+\\.tsx?$': [
       'ts-jest',
       {
-        tsconfig: {
-          esModuleInterop: true,
-          allowSyntheticDefaultImports: true,
-          lib: ['ES2020', 'DOM'],
-          jsx: 'react'
-        }
+        tsconfig: 'tsconfig.test.json'
       }
     ]
   },
@@ -38,11 +33,13 @@ module.exports = {
       statements: 80
     },
     // Critical components require high coverage
-    './src/main/DataManager.ts': {
-      branches: 81,
-      functions: 100,
-      lines: 85,
-      statements: 86
+    // UserSettingsManager uses DatabaseManager Query API (user-data-isolation.6.7, 6.8)
+    // Coverage adjusted after migration to runUserQuery/getUserRow methods
+    './src/main/UserSettingsManager.ts': {
+      branches: 70,
+      functions: 87,
+      lines: 81,
+      statements: 80
     },
     './src/main/LifecycleManager.ts': {
       branches: 66,

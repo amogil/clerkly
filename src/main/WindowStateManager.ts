@@ -1,8 +1,7 @@
-// Requirements: window-management.5
+// Requirements: window-management.5, database-refactoring.3.6, user-data-isolation.6.8
 
 import { screen } from 'electron';
-import { DataManager } from './DataManager';
-import type { UserProfileManager } from './auth/UserProfileManager';
+import type { IDatabaseManager } from './DatabaseManager';
 import { Logger } from './Logger';
 
 // Requirements: clerkly.3.8 - Use centralized Logger instead of console.*
@@ -37,20 +36,22 @@ export interface WindowState {
 }
 
 /**
- * Manages window state persistence using DataManager.
+ * Manages window state persistence using DatabaseManager global repository.
  *
  * This class is responsible for saving and loading the application window's state
  * (position, size, and maximized status) to/from persistent storage. It ensures
  * that the window opens in the same state as when it was last closed, and handles
  * edge cases such as invalid positions (e.g., when a monitor is disconnected).
  *
- * Requirements: window-management.5
+ * Requirements: window-management.5, user-data-isolation.6.8
+ * Note: WindowStateManager uses dbManager.global.windowState repository
+ * because window state is global (not user-specific).
  *
  * @example
  * ```typescript
  * // Create a WindowStateManager instance
- * const dataManager = new DataManager();
- * const stateManager = new WindowStateManager(dataManager);
+ * const dbManager = new DatabaseManager();
+ * const stateManager = new WindowStateManager(dbManager);
  *
  * // Load saved state (or get default state on first launch)
  * const state = stateManager.loadState();
@@ -83,41 +84,34 @@ export interface WindowState {
 export class WindowStateManager {
   // Requirements: clerkly.3.5, clerkly.3.7
   private logger = Logger.create('WindowStateManager');
-  private dataManager: DataManager;
-  private userProfileManager: UserProfileManager | null;
-  private readonly stateKey = 'window_state';
-  // System email for window state - not tied to any user
-  private readonly systemEmail = '__system__';
+  private dbManager: IDatabaseManager;
 
   /**
    * Creates a new WindowStateManager instance.
    *
-   * Requirements: window-management.5
+   * Requirements: window-management.5, user-data-isolation.6.8
    *
-   * @param dataManager - DataManager instance for state persistence. This is used
-   *                      to save and load window state from the SQLite database.
-   * @param userProfileManager - Optional UserProfileManager for temporarily setting system email
+   * @param dbManager - DatabaseManager instance for database access.
    *
    * @example
    * ```typescript
-   * const dataManager = new DataManager();
-   * const stateManager = new WindowStateManager(dataManager);
+   * const dbManager = new DatabaseManager();
+   * const stateManager = new WindowStateManager(dbManager);
    * ```
    */
-  constructor(dataManager: DataManager, userProfileManager?: UserProfileManager) {
-    this.dataManager = dataManager;
-    this.userProfileManager = userProfileManager || null;
+  constructor(dbManager: IDatabaseManager) {
+    this.dbManager = dbManager;
   }
 
   /**
-   * Loads window state from persistent storage.
+   * Loads window state from persistent storage using global repository.
    *
    * This method attempts to load the previously saved window state from the database.
    * If no saved state exists (first launch), or if the saved position is invalid
    * (e.g., monitor was disconnected), it returns a default state based on the
    * primary display's size.
    *
-   * Requirements: window-management.5.4, window-management.5.5, window-management.5.6
+   * Requirements: window-management.5.4, window-management.5.5, window-management.5.6, user-data-isolation.6.8
    *
    * @returns WindowState object containing the window's position, size, and maximized status.
    *          Returns default state if:
@@ -127,7 +121,7 @@ export class WindowStateManager {
    *
    * @example
    * ```typescript
-   * const stateManager = new WindowStateManager(dataManager);
+   * const stateManager = new WindowStateManager(dbManager);
    *
    * // Load state (returns saved state or default on first launch)
    * const state = stateManager.loadState();
@@ -144,19 +138,11 @@ export class WindowStateManager {
    * ```
    */
   loadState(): WindowState {
-    // Temporarily set system email for loading window state
-    const originalEmail = this.userProfileManager?.getCurrentEmail() || null;
-    if (this.userProfileManager) {
-      (this.userProfileManager as any).currentUserEmail = this.systemEmail;
-    }
-
     try {
-      // Requirements: window-management.5.4
-      const result = this.dataManager.loadData(this.stateKey);
+      // Requirements: user-data-isolation.6.8 - Use dbManager.global.windowState
+      const state = this.dbManager.global.windowState.get();
 
-      if (result.success && result.data) {
-        const state = typeof result.data === 'string' ? JSON.parse(result.data) : result.data;
-
+      if (state) {
         // Requirements: window-management.5.6
         if (this.isPositionValid(state.x, state.y)) {
           return state;
@@ -167,11 +153,6 @@ export class WindowStateManager {
       this.logger.error(`Failed to load window state: ${error}`);
       // Note: Not using handleBackgroundError here as window state loading failure
       // is not critical - we fall back to default state gracefully
-    } finally {
-      // Restore original email
-      if (this.userProfileManager) {
-        (this.userProfileManager as any).currentUserEmail = originalEmail;
-      }
     }
 
     // Requirements: window-management.5.5
@@ -179,24 +160,24 @@ export class WindowStateManager {
   }
 
   /**
-   * Saves window state to persistent storage.
+   * Saves window state to persistent storage using global repository.
    *
-   * This method serializes the window state to JSON and saves it to the database
-   * using DataManager. The state includes the window's position (x, y), size
-   * (width, height), and maximized status. This method should be called whenever
-   * the window state changes (resize, move, maximize, unmaximize events).
+   * This method saves the window state to the database using the global repository.
+   * The state includes the window's position (x, y), size (width, height), and
+   * maximized status. This method should be called whenever the window state
+   * changes (resize, move, maximize, unmaximize events).
    *
    * If saving fails (e.g., database error, disk full), the error is logged but
    * not thrown, ensuring the application continues to function normally.
    *
-   * Requirements: window-management.5.1, window-management.5.2, window-management.5.3
+   * Requirements: window-management.5.1, window-management.5.2, window-management.5.3, user-data-isolation.6.8
    *
    * @param state - WindowState object to save. Must contain valid x, y, width,
    *                height, and isMaximized properties.
    *
    * @example
    * ```typescript
-   * const stateManager = new WindowStateManager(dataManager);
+   * const stateManager = new WindowStateManager(dbManager);
    * const window = new BrowserWindow({ width: 800, height: 600 });
    *
    * // Save state when window is resized (window-management.5.1)
@@ -237,25 +218,14 @@ export class WindowStateManager {
    * ```
    */
   saveState(state: WindowState): void {
-    // Temporarily set system email for saving window state
-    const originalEmail = this.userProfileManager?.getCurrentEmail() || null;
-    if (this.userProfileManager) {
-      (this.userProfileManager as any).currentUserEmail = this.systemEmail;
-    }
-
     try {
-      const stateJson = JSON.stringify(state);
-      this.dataManager.saveData(this.stateKey, stateJson);
+      // Requirements: user-data-isolation.6.8 - Use dbManager.global.windowState
+      this.dbManager.global.windowState.set(state);
     } catch (error) {
       // Requirements: error-notifications.1.4 - Log error
       this.logger.error(`Failed to save window state: ${error}`);
       // Note: Not using handleBackgroundError here as window state saving failure
       // is not critical - user can continue working normally
-    } finally {
-      // Restore original email
-      if (this.userProfileManager) {
-        (this.userProfileManager as any).currentUserEmail = originalEmail;
-      }
     }
   }
 

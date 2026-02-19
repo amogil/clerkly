@@ -1,11 +1,11 @@
-/* Preconditions: AIAgentSettingsManager is initialized with mocked DataManager and safeStorage
+/* Preconditions: AIAgentSettingsManager is initialized with mocked UserSettingsManager and safeStorage
    Action: Test property-based scenarios for AI Agent Settings
    Assertions: Verify round-trip save/load, encryption, and provider switching
    Requirements: settings.1.4, settings.1.9, settings.1.11, settings.1.14, settings.1.17 */
 
 import * as fc from 'fast-check';
 import { AIAgentSettingsManager } from '../../src/main/AIAgentSettingsManager';
-import { DataManager } from '../../src/main/DataManager';
+import { UserSettingsManager } from '../../src/main/UserSettingsManager';
 import { safeStorage } from 'electron';
 
 // Mock electron
@@ -18,14 +18,14 @@ jest.mock('electron', () => ({
 }));
 
 describe('AIAgentSettings Property-Based Tests', () => {
-  let dataManager: DataManager;
+  let dataManager: UserSettingsManager;
   let settingsManager: AIAgentSettingsManager;
   let mockStorage: Map<string, any>;
 
   beforeEach(() => {
     mockStorage = new Map();
 
-    // Mock DataManager
+    // Mock UserSettingsManager
     dataManager = {
       saveData: jest.fn((key: string, value: any) => {
         mockStorage.set(key, value);

@@ -51,6 +51,44 @@
 - `tests/functional/error-notifications.spec.ts` - "should auto-dismiss error notification after 15 seconds"
 - `tests/functional/error-notifications.spec.ts` - "should log errors to console"
 
+### 2. Автоматическая обработка IPC ошибок
+
+**ID:** error-notifications.2
+
+**User Story:** Как разработчик, я хочу чтобы ошибки IPC вызовов автоматически показывались пользователю, чтобы не писать обработку ошибок в каждом хуке.
+
+**Зависимости:** error-notifications.1 (обработка ошибок)
+
+#### Критерии Приемки
+
+2.1. Приложение ДОЛЖНО предоставлять wrapper функцию `callApi()` для IPC вызовов, которая автоматически обрабатывает ошибки
+
+2.2. `callApi()` ДОЛЖНА принимать параметры:
+   - `apiCall` - функция IPC вызова
+   - `context` - контекст операции (строка)
+   - `options.silent` - опциональный флаг для отключения toast уведомлений
+
+2.3. КОГДА IPC вызов возвращает `success: false`, ТО `callApi()` ДОЛЖНА показать toast с ошибкой и контекстом
+
+2.4. КОГДА IPC вызов выбрасывает исключение, ТО `callApi()` ДОЛЖНА показать toast с ошибкой и контекстом
+
+2.5. `callApi()` ДОЛЖНА возвращать `data` при успехе или `null` при ошибке
+
+2.6. КОГДА `options.silent = true`, ТО toast уведомления НЕ ДОЛЖНЫ показываться (для специальных случаев)
+
+2.7. Приложение ДОЛЖНО иметь global unhandled rejection handler для необработанных промисов
+
+2.8. Global handler ДОЛЖЕН показывать toast с сообщением "Unexpected error" и логировать ошибку
+
+**Тестируемость:** Да - через модульные тесты `callApi()` функции и интеграционные тесты с хуками
+
+#### Функциональные Тесты
+
+- `tests/unit/utils/apiWrapper.test.ts` - "should show toast on IPC error"
+- `tests/unit/utils/apiWrapper.test.ts` - "should return null on error"
+- `tests/unit/utils/apiWrapper.test.ts` - "should not show toast when silent is true"
+- `tests/unit/utils/apiWrapper.test.ts` - "should return data on success"
+
 ## Вне Области Применения
 
 Следующие элементы явно исключены из данной спецификации:

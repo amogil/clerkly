@@ -355,76 +355,75 @@ describe('AuthWindowManager', () => {
     consoleErrorSpy.mockRestore();
   });
 
-  describe('Loader functionality', () => {
+  describe('Auth flow state management', () => {
     /* Preconditions: AuthWindowManager is instantiated, window exists
-       Action: call onShowLoader
-       Assertions: IPC event 'auth:show-loader' is sent to renderer
-       Requirements: google-oauth-auth.15.1, google-oauth-auth.15.5 */
-    it('should send IPC event to show loader', async () => {
-      // Create window first
-      mockWindowManager.isWindowCreated.mockReturnValue(false);
-      mockOAuthClient.getAuthStatus.mockResolvedValue({ authorized: false });
-      await authWindowManager.initializeApp();
-
-      // Get the window and spy on webContents.send
-      const window = authWindowManager.getWindow();
-      const sendSpy = jest.spyOn(window!.webContents, 'send');
-
-      // Call showLoader
-      await authWindowManager.onShowLoader();
-
-      // Verify IPC event was sent
-      expect(sendSpy).toHaveBeenCalledWith('auth:show-loader');
-    });
-
-    /* Preconditions: AuthWindowManager is instantiated, loader is visible
-       Action: call onHideLoader
-       Assertions: IPC event 'auth:hide-loader' is sent to renderer
-       Requirements: google-oauth-auth.15.2, google-oauth-auth.15.6 */
-    it('should send IPC event to hide loader', async () => {
-      // Create window first
-      mockWindowManager.isWindowCreated.mockReturnValue(false);
-      mockOAuthClient.getAuthStatus.mockResolvedValue({ authorized: false });
-      await authWindowManager.initializeApp();
-
-      // Show loader first
-      const window = authWindowManager.getWindow();
-      const sendSpy = jest.spyOn(window!.webContents, 'send');
-      await authWindowManager.onShowLoader();
-
-      // Clear previous calls
-      sendSpy.mockClear();
-
-      // Call hideLoader
-      await authWindowManager.onHideLoader();
-
-      // Verify IPC event was sent
-      expect(sendSpy).toHaveBeenCalledWith('auth:hide-loader');
-    });
-
-    /* Preconditions: AuthWindowManager is instantiated, loader is visible
        Action: call onAuthSuccess
-       Assertions: hideLoader is called before showing main window
-       Requirements: google-oauth-auth.15.6 */
-    it('should hide loader on successful authentication', async () => {
+       Assertions: main window is shown after successful authentication
+       Requirements: google-oauth-auth.11.4, google-oauth-auth.15.6 */
+    it('should show main window on successful authentication', async () => {
       // Create window first
       mockWindowManager.isWindowCreated.mockReturnValue(false);
       mockOAuthClient.getAuthStatus.mockResolvedValue({ authorized: false });
       await authWindowManager.initializeApp();
 
-      // Show loader first
-      const window = authWindowManager.getWindow();
-      const sendSpy = jest.spyOn(window!.webContents, 'send');
-      await authWindowManager.onShowLoader();
+      // Verify window was created
+      expect(mockWindowManager.createWindow).toHaveBeenCalled();
 
-      // Clear previous calls
-      sendSpy.mockClear();
-
-      // Call onAuthSuccess
+      // Now simulate auth success
+      mockWindowManager.isWindowCreated.mockReturnValue(true);
       await authWindowManager.onAuthSuccess();
 
-      // Verify hideLoader was called (IPC event sent)
-      expect(sendSpy).toHaveBeenCalledWith('auth:hide-loader');
+      // Window should still exist (not recreated)
+      expect(mockWindowManager.getWindow).toHaveBeenCalled();
+    });
+
+    /* Preconditions: AuthWindowManager is instantiated, window exists
+       Action: call onAuthError
+       Assertions: error screen is shown with error details
+       Requirements: google-oauth-auth.11.5, google-oauth-auth.15.6 */
+    it('should show error screen on authentication failure', async () => {
+      const consoleInfoSpy = jest.spyOn(console, 'info').mockImplementation();
+
+      // Create window first
+      mockWindowManager.isWindowCreated.mockReturnValue(false);
+      mockOAuthClient.getAuthStatus.mockResolvedValue({ authorized: false });
+      await authWindowManager.initializeApp();
+
+      // Now simulate auth error
+      mockWindowManager.isWindowCreated.mockReturnValue(true);
+      await authWindowManager.onAuthError('Invalid credentials', 'invalid_grant');
+
+      // Verify error was logged
+      expect(consoleInfoSpy).toHaveBeenCalledWith(expect.stringContaining('Authentication failed'));
+
+      consoleInfoSpy.mockRestore();
+    });
+
+    /* Preconditions: AuthWindowManager is instantiated, auth error occurred
+       Action: call onRetry
+       Assertions: login window is shown again for retry
+       Requirements: google-oauth-auth.11.6, google-oauth-auth.15.7 */
+    it('should show login window on retry after error', async () => {
+      const consoleInfoSpy = jest.spyOn(console, 'info').mockImplementation();
+
+      // Create window first
+      mockWindowManager.isWindowCreated.mockReturnValue(false);
+      mockOAuthClient.getAuthStatus.mockResolvedValue({ authorized: false });
+      await authWindowManager.initializeApp();
+
+      // Simulate auth error
+      mockWindowManager.isWindowCreated.mockReturnValue(true);
+      await authWindowManager.onAuthError('Invalid credentials', 'invalid_grant');
+
+      // Now retry
+      await authWindowManager.onRetry();
+
+      // Verify retry was logged
+      expect(consoleInfoSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Retrying authentication')
+      );
+
+      consoleInfoSpy.mockRestore();
     });
   });
 });

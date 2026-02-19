@@ -6,7 +6,7 @@
 
 ### Архитектурный Принцип: База Данных как Единственный Источник Истины
 
-Приложение построено на фундаментальном архитектурном принципе: **база данных (SQLite через DataManager) является единственным источником истины для всех данных приложения**.
+Приложение построено на фундаментальном архитектурном принципе: **база данных (SQLite через DatabaseManager и UserSettingsManager) является единственным источником истины для всех данных приложения**.
 
 **Ключевые аспекты:**
 
@@ -1040,6 +1040,14 @@ describe('Error Notifications Functional Tests', () => {
 | error-notifications.1.3 | ✓ | - | ✓ |
 | error-notifications.1.4 | ✓ | - | ✓ |
 | error-notifications.1.5 | ✓ | - | ✓ |
+| error-notifications.2.1 | ✓ | - | - |
+| error-notifications.2.2 | ✓ | - | - |
+| error-notifications.2.3 | ✓ | - | - |
+| error-notifications.2.4 | ✓ | - | - |
+| error-notifications.2.5 | ✓ | - | - |
+| error-notifications.2.6 | ✓ | - | - |
+| error-notifications.2.7 | ✓ | - | - |
+| error-notifications.2.8 | ✓ | - | - |
 
 ## Технические Решения
 
@@ -1107,6 +1115,150 @@ describe('Error Notifications Functional Tests', () => {
 - Использовать console.error напрямую: Менее структурировано
 - Не логировать ошибки: Усложняет отладку
 
+### Решение 5: API Wrapper для Автоматической Обработки Ошибок
+
+**Решение:** Создать wrapper функцию `callApi()` для IPC вызовов, которая автоматически показывает toast уведомления при ошибках.
+
+**Обоснование:**
+- Устраняет необходимость писать try-catch в каждом хуке
+- Единообразная обработка ошибок во всем приложении
+- Возможность отключить уведомления для специальных случаев (`silent: true`)
+- Чистый код - один вызов вместо блоков обработки ошибок
+- Легко тестируется
+
+**Реализация:**
+
+```typescript
+// Requirements: error-notifications.2.1, error-notifications.2.2, error-notifications.2.3, error-notifications.2.4, error-notifications.2.5, error-notifications.2.6
+
+import { toast } from 'sonner';
+
+interface ApiCallOptions {
+  /**
+   * If true, don't show toast notification on error
+   */
+  silent?: boolean;
+}
+
+/**
+ * Wrapper for IPC API calls with automatic error handling
+ * 
+ * @param apiCall - Function that returns IPC result
+ * @param context - Context of the operation (e.g., "Loading agents")
+ * @param options - Optional configuration
+ * @returns Data on success, null on error
+ */
+export async function callApi<T>(
+  apiCall: () => Promise<{ success: boolean; data?: T; error?: string }>,
+  context: string,
+  options?: ApiCallOptions
+): Promise<T | null> {
+  try {
+    const result = await apiCall();
+    
+    // Requirements: error-notifications.2.5 - Return data on success
+    if (result.success && result.data !== undefined) {
+      return result.data;
+    }
+    
+    // Requirements: error-notifications.2.3 - Show toast on IPC error
+    if (!options?.silent) {
+      const errorMessage = result.error || 'Unknown error';
+      toast.error(`${context}: ${errorMessage}`);
+    }
+    
+    // Requirements: error-notifications.2.5 - Return null on error
+    return null;
+  } catch (error) {
+    // Requirements: error-notifications.2.4 - Show toast on exception
+    if (!options?.silent) {
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(`${context}: ${message}`);
+    }
+    
+    // Requirements: error-notifications.2.5 - Return null on error
+    return null;
+  }
+}
+```
+
+**Использование:**
+
+```typescript
+// Before (with manual error handling)
+const loadAgents = async () => {
+  try {
+    setError(null);
+    const result = await window.api.agents.list();
+    
+    if (result.success && result.data) {
+      setAgents(result.data);
+    } else {
+      setError(result.error || 'Failed to load agents');
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    setError(message);
+  }
+};
+
+// After (with callApi wrapper)
+const loadAgents = async () => {
+  const agents = await callApi(
+    () => window.api.agents.list(),
+    'Loading agents'
+  );
+  
+  if (agents) {
+    setAgents(agents);
+  }
+};
+```
+
+**Альтернативы:**
+- React Query: Overkill для текущей архитектуры, добавляет большую зависимость
+- Глобальный error boundary: Не ловит async ошибки в хуках
+- Оставить как есть: Много boilerplate кода, неединообразная обработка
+
+### Решение 6: Global Unhandled Rejection Handler
+
+**Решение:** Добавить global handler для необработанных промисов как safety net.
+
+**Обоснование:**
+- Ловит все необработанные промисы (если забыли обернуть в callApi)
+- Защита от "тихих" падений
+- Минимальный код
+- Не заменяет callApi, а дополняет его
+
+**Реализация:**
+
+```typescript
+// Requirements: error-notifications.2.7, error-notifications.2.8
+
+// In App.tsx
+useEffect(() => {
+  const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+    console.error('[Unhandled Rejection]', event.reason);
+    
+    const message = event.reason instanceof Error 
+      ? event.reason.message 
+      : String(event.reason);
+    
+    toast.error(`Unexpected error: ${message}`);
+  };
+  
+  window.addEventListener('unhandledrejection', handleUnhandledRejection);
+  
+  return () => {
+    window.removeEventListener('unhandledrejection', handleUnhandledRejection);
+  };
+}, []);
+```
+
+**Альтернативы:**
+- Не добавлять: Необработанные промисы будут "тихо" падать
+- Только логировать: Пользователь не узнает о проблеме
+
 ## Зависимости
 
 Система уведомлений об ошибках зависит от следующих компонентов:
@@ -1115,6 +1267,7 @@ describe('Error Notifications Functional Tests', () => {
 - **WindowManager**: Для получения ссылки на главное окно для отправки IPC событий
 - **Electron IPC**: Для передачи уведомлений из Main Process в Renderer Process
 - **React**: Для построения UI компонентов
+- **sonner**: Библиотека для toast уведомлений (уже используется в проекте)
 
 ## Заключение
 

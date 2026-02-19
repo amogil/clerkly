@@ -1,4 +1,4 @@
-// Requirements: google-oauth-auth.11.1, google-oauth-auth.11.2, google-oauth-auth.11.3, google-oauth-auth.11.4, google-oauth-auth.11.5, google-oauth-auth.11.6, google-oauth-auth.15.1, google-oauth-auth.15.2, google-oauth-auth.15.5, google-oauth-auth.15.6
+// Requirements: google-oauth-auth.11.1, google-oauth-auth.11.2, google-oauth-auth.11.3, google-oauth-auth.11.4, google-oauth-auth.11.5, google-oauth-auth.11.6
 
 import { BrowserWindow } from 'electron';
 import WindowManager from '../WindowManager';
@@ -10,12 +10,10 @@ import { Logger } from '../Logger';
  * Auth Window Manager
  *
  * Manages window transitions during the OAuth authentication flow.
- * Handles showing login screen, main window, error states, and loader.
+ * Handles showing login screen, main window, and error states.
  *
  * Requirements: google-oauth-auth.11.1, google-oauth-auth.11.2, google-oauth-auth.11.3,
- *               google-oauth-auth.11.4, google-oauth-auth.11.5, google-oauth-auth.11.6,
- *               google-oauth-auth.15.1, google-oauth-auth.15.2, google-oauth-auth.15.5,
- *               google-oauth-auth.15.6
+ *               google-oauth-auth.11.4, google-oauth-auth.11.5, google-oauth-auth.11.6
  */
 export class AuthWindowManager {
   // Requirements: clerkly.3.5, clerkly.3.7
@@ -23,7 +21,6 @@ export class AuthWindowManager {
   private windowManager: WindowManager;
   private oauthClient: OAuthClientManager;
   private currentWindow: BrowserWindow | null = null;
-  private isLoaderVisible: boolean = false;
 
   /**
    * Creates a new AuthWindowManager instance
@@ -63,7 +60,7 @@ export class AuthWindowManager {
       try {
         await this.showLoginWindow();
       } catch (loginError) {
-        Logger.error('AuthWindowManager', `Failed to show login window after error: ${loginError}`);
+        this.logger.error(`Failed to show login window after error: ${loginError}`);
         throw loginError;
       }
     }
@@ -93,7 +90,7 @@ export class AuthWindowManager {
       // Login screen is just content displayed in the main window
       // The actual routing will be handled by the renderer process
     } catch (error) {
-      Logger.error('AuthWindowManager', `Failed to show login window: ${error}`);
+      this.logger.error(`Failed to show login window: ${error}`);
       throw error;
     }
   }
@@ -140,10 +137,7 @@ export class AuthWindowManager {
       // Update window content to show error
       // The actual error display will be handled by the renderer process
       // through IPC events
-      Logger.info(
-        'AuthWindowManager',
-        `Showing login error: ${JSON.stringify({ error, errorCode })}`
-      );
+      this.logger.info(`Showing login error: ${JSON.stringify({ error, errorCode })}`);
 
       // Window should already exist from login screen
       if (!this.currentWindow) {
@@ -156,90 +150,18 @@ export class AuthWindowManager {
   }
 
   /**
-   * Shows loader on the login screen
-   *
-   * Requirements: google-oauth-auth.15.1, google-oauth-auth.15.5
-   *
-   * @returns Promise that resolves when loader is shown
-   */
-  private async showLoader(): Promise<void> {
-    if (this.isLoaderVisible) {
-      this.logger.info('Loader already visible, skipping');
-      return;
-    }
-
-    this.isLoaderVisible = true;
-
-    if (!this.currentWindow) {
-      this.logger.warn('Cannot show loader: no window available');
-      return;
-    }
-
-    // Send IPC event to renderer to show loader on login screen
-    this.currentWindow.webContents.send('auth:show-loader');
-    this.logger.info('Showing loader on login screen');
-  }
-
-  /**
-   * Hides loader from the login screen
-   *
-   * Requirements: google-oauth-auth.15.2, google-oauth-auth.15.6
-   *
-   * @returns Promise that resolves when loader is hidden
-   */
-  private async hideLoader(): Promise<void> {
-    if (!this.isLoaderVisible) {
-      return;
-    }
-
-    this.isLoaderVisible = false;
-
-    if (!this.currentWindow) {
-      return;
-    }
-
-    // Send IPC event to renderer to hide loader
-    this.currentWindow.webContents.send('auth:hide-loader');
-    this.logger.info('Hiding loader');
-  }
-
-  /**
-   * Shows loader on the login screen (public method for external use)
-   *
-   * Requirements: google-oauth-auth.15.1
-   *
-   * @returns Promise that resolves when loader is shown
-   */
-  async onShowLoader(): Promise<void> {
-    return this.showLoader();
-  }
-
-  /**
-   * Hides loader from the login screen (public method for external use)
-   *
-   * Requirements: google-oauth-auth.15.2
-   *
-   * @returns Promise that resolves when loader is hidden
-   */
-  async onHideLoader(): Promise<void> {
-    return this.hideLoader();
-  }
-
-  /**
    * Handles successful authentication
    *
-   * Requirements: google-oauth-auth.11.4, google-oauth-auth.15.6
+   * Requirements: google-oauth-auth.11.4
    *
    * @returns Promise that resolves when main window is shown
    */
   private async handleAuthSuccess(): Promise<void> {
     try {
-      // Requirements: google-oauth-auth.15.6 - Hide loader before showing main window
-      await this.hideLoader();
-      Logger.info('AuthWindowManager', 'Authentication successful, showing main window');
+      this.logger.info('Authentication successful, showing main window');
       await this.showMainWindow();
     } catch (error) {
-      Logger.error('AuthWindowManager', `Failed to handle auth success: ${error}`);
+      this.logger.error(`Failed to handle auth success: ${error}`);
       throw error;
     }
   }
@@ -247,7 +169,7 @@ export class AuthWindowManager {
   /**
    * Handles authentication error
    *
-   * Requirements: google-oauth-auth.11.5, google-oauth-auth.11.6, google-oauth-auth.15.6
+   * Requirements: google-oauth-auth.11.5, google-oauth-auth.11.6
    *
    * @param error - Error message
    * @param errorCode - Optional error code
@@ -255,12 +177,7 @@ export class AuthWindowManager {
    */
   private async handleAuthError(error: string, errorCode?: string): Promise<void> {
     try {
-      // Requirements: google-oauth-auth.15.6 - Hide loader before showing error
-      await this.hideLoader();
-      Logger.info(
-        'AuthWindowManager',
-        `Authentication failed: ${JSON.stringify({ error, errorCode })}`
-      );
+      this.logger.info(`Authentication failed: ${JSON.stringify({ error, errorCode })}`);
       // Requirements: google-oauth-auth.11.5
       await this.showLoginError(error, errorCode);
     } catch (err) {
@@ -305,7 +222,7 @@ export class AuthWindowManager {
       this.logger.info('Retrying authentication');
       await this.showLoginWindow();
     } catch (error) {
-      Logger.error('AuthWindowManager', `Failed to retry authentication: ${error}`);
+      this.logger.error(`Failed to retry authentication: ${error}`);
       throw error;
     }
   }

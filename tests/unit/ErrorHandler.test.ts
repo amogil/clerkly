@@ -1,159 +1,101 @@
 // Requirements: error-notifications.1.1, error-notifications.1.4, error-notifications.1.5
 
-import { BrowserWindow } from 'electron';
 import { handleBackgroundError, shouldFilterError } from '../../src/main/ErrorHandler';
+import { MainEventBus } from '../../src/main/events/MainEventBus';
 
-// Mock Electron
-jest.mock('electron', () => ({
-  BrowserWindow: {
-    getAllWindows: jest.fn(),
+// Mock MainEventBus module
+jest.mock('../../src/main/events/MainEventBus', () => {
+  const mockPublish = jest.fn();
+  return {
+    MainEventBus: {
+      getInstance: jest.fn(() => ({
+        publish: mockPublish,
+        subscribe: jest.fn(),
+        subscribeAll: jest.fn(),
+        clear: jest.fn(),
+        destroy: jest.fn(),
+        cleanupTimestampForEntity: jest.fn(),
+        getTimestampCacheSize: jest.fn(),
+      })),
+      resetInstance: jest.fn(),
+    },
+  };
+});
+
+// Mock Logger
+jest.mock('../../src/main/Logger', () => ({
+  Logger: {
+    create: jest.fn(() => ({
+      debug: jest.fn(),
+      info: jest.fn(),
+      warn: jest.fn(),
+      error: jest.fn(),
+    })),
   },
 }));
 
 describe('ErrorHandler', () => {
-  let mockWindow: any;
-  let consoleErrorSpy: jest.SpyInstance;
+  let mockPublish: jest.Mock;
 
   beforeEach(() => {
-    // Create mock window
-    mockWindow = {
-      webContents: {
-        send: jest.fn(),
-      },
-    };
-
-    // Mock BrowserWindow.getAllWindows
-    (BrowserWindow.getAllWindows as jest.Mock).mockReturnValue([mockWindow]);
-
-    // Spy on console.error
-    consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+    // Get the mock publish function
+    mockPublish = (MainEventBus.getInstance() as any).publish;
+    mockPublish.mockClear();
   });
 
   afterEach(() => {
     jest.clearAllMocks();
-    consoleErrorSpy.mockRestore();
   });
 
   /* Preconditions: Error object and context provided
      Action: call handleBackgroundError()
-     Assertions: error logged to console with context
-     Requirements: error-notifications.1.4 */
-  it('should log error to console with context', () => {
+     Assertions: error.created event published via EventBus
+     Requirements: error-notifications.1.1 */
+  it('should publish error.created event via EventBus', () => {
     const error = new Error('Test error');
     const context = 'Test Context';
 
     handleBackgroundError(error, context);
 
-    expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('[Test Context] Error:'));
-  });
-
-  /* Preconditions: Error object with stack trace
-     Action: call handleBackgroundError()
-     Assertions: stack trace logged to console
-     Requirements: error-notifications.1.4 */
-  it('should log stack trace if available', () => {
-    const error = new Error('Test error');
-    error.stack = 'Error: Test error\n    at test.ts:10:5';
-    const context = 'Test Context';
-
-    handleBackgroundError(error, context);
-
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
-      expect.stringContaining('[Test Context] Stack trace:')
-    );
+    expect(mockPublish).toHaveBeenCalledTimes(1);
+    const publishedEvent = mockPublish.mock.calls[0][0];
+    expect(publishedEvent.type).toBe('error.created');
+    expect(publishedEvent.message).toBe('Test error');
+    expect(publishedEvent.context).toBe('Test Context');
   });
 
   /* Preconditions: String error message
      Action: call handleBackgroundError()
-     Assertions: string logged to console
-     Requirements: error-notifications.1.4 */
+     Assertions: error.created event published with string message
+     Requirements: error-notifications.1.1 */
   it('should handle string error messages', () => {
     const error = 'Simple error message';
     const context = 'Test Context';
 
     handleBackgroundError(error, context);
 
-    expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('[Test Context] Error:'));
-    expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('Simple error message'));
-  });
-
-  /* Preconditions: Error and context provided, one window open
-     Action: call handleBackgroundError()
-     Assertions: error:notify event sent to window
-     Requirements: error-notifications.1.1 */
-  it('should send error notification to renderer process', () => {
-    const error = new Error('Test error');
-    const context = 'Test Context';
-
-    handleBackgroundError(error, context);
-
-    expect(mockWindow.webContents.send).toHaveBeenCalledWith(
-      'error:notify',
-      'Test error',
-      'Test Context'
-    );
-  });
-
-  /* Preconditions: Multiple windows open
-     Action: call handleBackgroundError()
-     Assertions: error:notify event sent to all windows
-     Requirements: error-notifications.1.1 */
-  it('should send error notification to all renderer processes', () => {
-    const mockWindow2 = {
-      webContents: {
-        send: jest.fn(),
-      },
-    };
-
-    (BrowserWindow.getAllWindows as jest.Mock).mockReturnValue([mockWindow, mockWindow2]);
-
-    const error = new Error('Test error');
-    const context = 'Test Context';
-
-    handleBackgroundError(error, context);
-
-    expect(mockWindow.webContents.send).toHaveBeenCalledWith(
-      'error:notify',
-      'Test error',
-      'Test Context'
-    );
-    expect(mockWindow2.webContents.send).toHaveBeenCalledWith(
-      'error:notify',
-      'Test error',
-      'Test Context'
-    );
-  });
-
-  /* Preconditions: No windows open
-     Action: call handleBackgroundError()
-     Assertions: no errors thrown, error still logged
-     Requirements: error-notifications.1.1, error-notifications.1.4 */
-  it('should handle case when no windows are open', () => {
-    (BrowserWindow.getAllWindows as jest.Mock).mockReturnValue([]);
-
-    const error = new Error('Test error');
-    const context = 'Test Context';
-
-    expect(() => handleBackgroundError(error, context)).not.toThrow();
-    expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('[Test Context] Error:'));
+    expect(mockPublish).toHaveBeenCalledTimes(1);
+    const publishedEvent = mockPublish.mock.calls[0][0];
+    expect(publishedEvent.type).toBe('error.created');
+    expect(publishedEvent.message).toBe('Simple error message');
+    expect(publishedEvent.context).toBe('Test Context');
   });
 
   /* Preconditions: Error with special characters in message
      Action: call handleBackgroundError()
-     Assertions: message properly logged and sent
-     Requirements: error-notifications.1.1, error-notifications.1.4 */
+     Assertions: message properly published
+     Requirements: error-notifications.1.1 */
   it('should handle errors with special characters', () => {
     const error = new Error('Error: "test" & <special> chars');
     const context = 'Test Context';
 
     handleBackgroundError(error, context);
 
-    expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('[Test Context] Error:'));
-    expect(mockWindow.webContents.send).toHaveBeenCalledWith(
-      'error:notify',
-      'Error: "test" & <special> chars',
-      'Test Context'
-    );
+    expect(mockPublish).toHaveBeenCalledTimes(1);
+    const publishedEvent = mockPublish.mock.calls[0][0];
+    expect(publishedEvent.type).toBe('error.created');
+    expect(publishedEvent.message).toBe('Error: "test" & <special> chars');
+    expect(publishedEvent.context).toBe('Test Context');
   });
 });
 
@@ -259,35 +201,21 @@ describe('shouldFilterError', () => {
 });
 
 describe('handleBackgroundError with filtering', () => {
-  let mockWindow: any;
-  let consoleErrorSpy: jest.SpyInstance;
-  let consoleInfoSpy: jest.SpyInstance;
+  let mockPublish: jest.Mock;
 
   beforeEach(() => {
-    // Create mock window
-    mockWindow = {
-      webContents: {
-        send: jest.fn(),
-      },
-    };
-
-    // Mock BrowserWindow.getAllWindows
-    (BrowserWindow.getAllWindows as jest.Mock).mockReturnValue([mockWindow]);
-
-    // Spy on console methods
-    consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
-    consoleInfoSpy = jest.spyOn(console, 'info').mockImplementation();
+    // Get the mock publish function
+    mockPublish = (MainEventBus.getInstance() as any).publish;
+    mockPublish.mockClear();
   });
 
   afterEach(() => {
     jest.clearAllMocks();
-    consoleErrorSpy.mockRestore();
-    consoleInfoSpy.mockRestore();
   });
 
   /* Preconditions: Error "No user logged in" during logout
      Action: call handleBackgroundError()
-     Assertions: error logged, filter message logged, no IPC event sent
+     Assertions: no event published (filtered)
      Requirements: error-notifications.1.5, user-data-isolation.1.21 */
   it('should filter "No user logged in" error during logout', () => {
     const error = new Error('No user logged in');
@@ -295,21 +223,13 @@ describe('handleBackgroundError with filtering', () => {
 
     handleBackgroundError(error, context);
 
-    // Error should be logged
-    expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('[Logout] Error:'));
-
-    // Filter message should be logged
-    expect(consoleInfoSpy).toHaveBeenCalledWith(
-      expect.stringContaining('[Logout] Error filtered (race condition)')
-    );
-
-    // No IPC event should be sent
-    expect(mockWindow.webContents.send).not.toHaveBeenCalled();
+    // No event should be published (filtered)
+    expect(mockPublish).not.toHaveBeenCalled();
   });
 
   /* Preconditions: Error "Operation cancelled"
      Action: call handleBackgroundError()
-     Assertions: error logged, filter message logged, no IPC event sent
+     Assertions: no event published (filtered)
      Requirements: error-notifications.1.5 */
   it('should filter cancelled operation errors', () => {
     const error = new Error('Operation cancelled');
@@ -317,21 +237,13 @@ describe('handleBackgroundError with filtering', () => {
 
     handleBackgroundError(error, context);
 
-    // Error should be logged
-    expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('[Data Sync] Error:'));
-
-    // Filter message should be logged
-    expect(consoleInfoSpy).toHaveBeenCalledWith(
-      expect.stringContaining('[Data Sync] Error filtered (race condition)')
-    );
-
-    // No IPC event should be sent
-    expect(mockWindow.webContents.send).not.toHaveBeenCalled();
+    // No event should be published (filtered)
+    expect(mockPublish).not.toHaveBeenCalled();
   });
 
   /* Preconditions: Error "Race condition detected"
      Action: call handleBackgroundError()
-     Assertions: error logged, filter message logged, no IPC event sent
+     Assertions: no event published (filtered)
      Requirements: error-notifications.1.5 */
   it('should filter race condition errors', () => {
     const error = new Error('Race condition detected');
@@ -339,23 +251,13 @@ describe('handleBackgroundError with filtering', () => {
 
     handleBackgroundError(error, context);
 
-    // Error should be logged
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
-      expect.stringContaining('[Background Process] Error:')
-    );
-
-    // Filter message should be logged
-    expect(consoleInfoSpy).toHaveBeenCalledWith(
-      expect.stringContaining('[Background Process] Error filtered (race condition)')
-    );
-
-    // No IPC event should be sent
-    expect(mockWindow.webContents.send).not.toHaveBeenCalled();
+    // No event should be published (filtered)
+    expect(mockPublish).not.toHaveBeenCalled();
   });
 
   /* Preconditions: Normal error that should not be filtered
      Action: call handleBackgroundError()
-     Assertions: error logged, IPC event sent, no filter message
+     Assertions: event published
      Requirements: error-notifications.1.1, error-notifications.1.4 */
   it('should NOT filter normal errors', () => {
     const error = new Error('Network connection failed');
@@ -363,19 +265,11 @@ describe('handleBackgroundError with filtering', () => {
 
     handleBackgroundError(error, context);
 
-    // Error should be logged
-    expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('[API Request] Error:'));
-
-    // No filter message should be logged
-    expect(consoleInfoSpy).not.toHaveBeenCalledWith(
-      expect.stringContaining('Error filtered (race condition)')
-    );
-
-    // IPC event should be sent
-    expect(mockWindow.webContents.send).toHaveBeenCalledWith(
-      'error:notify',
-      'Network connection failed',
-      'API Request'
-    );
+    // Event should be published
+    expect(mockPublish).toHaveBeenCalledTimes(1);
+    const publishedEvent = mockPublish.mock.calls[0][0];
+    expect(publishedEvent.type).toBe('error.created');
+    expect(publishedEvent.message).toBe('Network connection failed');
+    expect(publishedEvent.context).toBe('API Request');
   });
 });

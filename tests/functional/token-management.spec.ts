@@ -13,7 +13,8 @@
 
 import { test, expect, _electron as electron, ElectronApplication, Page } from '@playwright/test';
 import path from 'path';
-import { MockOAuthServer } from './helpers/mock-oauth-server';
+import { createMockOAuthServer } from './helpers/electron';
+import type { MockOAuthServer } from './helpers/mock-oauth-server';
 import { completeOAuthFlow } from './helpers/electron';
 
 let electronApp: ElectronApplication;
@@ -21,19 +22,10 @@ let mainWindow: Page;
 let mockServer: MockOAuthServer;
 
 test.beforeAll(async () => {
-  // Start mock OAuth server
-  mockServer = new MockOAuthServer({
-    port: 8890,
-    clientId: 'test-client-id-token-mgmt',
-    clientSecret: 'test-client-secret-token-mgmt',
-  });
-  await mockServer.start();
-
-  console.log(`[TEST] Mock OAuth server started at ${mockServer.getBaseUrl()}`);
+  mockServer = await createMockOAuthServer(8890);
 });
 
 test.afterAll(async () => {
-  // Stop mock server
   await mockServer.stop();
 });
 
@@ -62,7 +54,7 @@ test.beforeEach(async () => {
 
   // Launch Electron app
   electronApp = await electron.launch({
-    args: [path.join(__dirname, '../../dist/main/index.js'), '--user-data-dir', testDataPath],
+    args: [path.join(__dirname, '../../dist/main/main/index.js'), '--user-data-dir', testDataPath],
     env: {
       ...process.env,
       NODE_ENV: 'test',
@@ -126,16 +118,16 @@ test('42.2 should clear session and show login on 401 error', async () => {
   // Wait for authentication to complete
   await mainWindow.waitForTimeout(1000);
 
-  // Verify we're on dashboard
-  const dashboardHeading = await mainWindow.locator('[data-testid="agents"]').count();
-  expect(dashboardHeading).toBeGreaterThan(0);
+  // Verify we're on Agents page
+  const agentsElement = await mainWindow.locator('[data-testid="agents"]').count();
+  expect(agentsElement).toBeGreaterThan(0);
 
   // Setup: Mock API to return 401
   mockServer.setUserInfoReturn401(true);
 
   // Trigger API request by refreshing profile
   await mainWindow.evaluate(async () => {
-    await (window as any).api.auth.refreshProfile();
+    await (window as any).api.auth.refreshUser();
   });
 
   // Wait for 401 error to be processed and login screen to appear
@@ -167,7 +159,7 @@ test('42.3 should handle 401 from any API endpoint consistently', async () => {
 
   // Trigger UserInfo API request
   await mainWindow.evaluate(async () => {
-    await (window as any).api.auth.refreshProfile();
+    await (window as any).api.auth.refreshUser();
   });
 
   // Wait for 401 error to be processed
@@ -199,7 +191,7 @@ test('42.4 should log authorization errors with context', async () => {
 
   // Trigger API request
   await mainWindow.evaluate(async () => {
-    await (window as any).api.auth.refreshProfile();
+    await (window as any).api.auth.refreshUser();
   });
 
   // Wait for 401 error to be processed
@@ -234,7 +226,7 @@ test('42.5 should show user-friendly error message on session expiry', async () 
 
   // Trigger API request
   await mainWindow.evaluate(async () => {
-    await (window as any).api.auth.refreshProfile();
+    await (window as any).api.auth.refreshUser();
   });
 
   // Wait for 401 error to be processed
@@ -278,9 +270,9 @@ test('42.6 should handle multiple simultaneous 401 errors', async () => {
   await mainWindow.evaluate(async () => {
     // Trigger multiple API calls simultaneously
     await Promise.all([
-      (window as any).api.auth.refreshProfile().catch(() => {}),
-      (window as any).api.auth.refreshProfile().catch(() => {}),
-      (window as any).api.auth.refreshProfile().catch(() => {}),
+      (window as any).api.auth.refreshUser().catch(() => {}),
+      (window as any).api.auth.refreshUser().catch(() => {}),
+      (window as any).api.auth.refreshUser().catch(() => {}),
     ]);
   });
 

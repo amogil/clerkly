@@ -29,7 +29,7 @@
 1.2. THE следующие зависимости SHALL быть замокированы в модульных тестах:
 - Electron API (`BrowserWindow`, `app`, `screen`, `ipcMain`)
 - Внешние модули (`fs`, `path`, `crypto`)
-- Зависимости класса (например, `DataManager`)
+- Зависимости класса (например, `DatabaseManager`, `UserSettingsManager`)
 - Сетевые запросы (`fetch`, `https`)
 - База данных (SQLite)
 
@@ -107,7 +107,7 @@
 
 3.1.3. THE test IPC handlers SHALL быть доступны ТОЛЬКО в тестовом режиме
 
-3.1.4. THE test IPC handlers SHALL использовать реальные классы приложения (TokenStorageManager, DataManager)
+3.1.4. THE test IPC handlers SHALL использовать реальные классы приложения (TokenStorageManager, DatabaseManager, UserSettingsManager)
 
 3.1.5. THE test IPC handlers SHALL быть расположены в `tests/functional/helpers/test-ipc-handlers.ts`
 
@@ -301,3 +301,104 @@
 - Тесты производительности
 - Нагрузочное тестирование
 - Тестирование безопасности
+
+
+### 10. Helper Функции для Функциональных Тестов
+
+**ID:** testing.10
+
+**User Story:** Как разработчик, я хочу использовать стандартизированные helper функции в функциональных тестах, чтобы избежать дублирования кода и упростить поддержку.
+
+**Зависимости:** testing.3, testing.3.2
+
+#### Критерии Приемки
+
+10.1. THE функция `createMockOAuthServer(port)` SHALL быть использована для создания Mock OAuth Server во всех функциональных тестах
+
+10.2. THE функция `createMockOAuthServer(port)` SHALL:
+- Создавать MockOAuthServer с дефолтными тестовыми credentials
+- Автоматически запускать сервер
+- Возвращать готовый к использованию экземпляр MockOAuthServer
+
+10.3. THE функциональные тесты SHALL НЕ создавать MockOAuthServer напрямую через `new MockOAuthServer()`
+
+10.4. THE функция `createMockOAuthServer(port)` SHALL быть расположена в `tests/functional/helpers/electron.ts`
+
+10.5. EACH функциональный тест SHALL импортировать `createMockOAuthServer` из `./helpers/electron`
+
+**Пример использования:**
+
+```typescript
+import { createMockOAuthServer } from './helpers/electron';
+import type { MockOAuthServer } from './helpers/mock-oauth-server';
+
+let mockServer: MockOAuthServer;
+
+test.beforeAll(async () => {
+  mockServer = await createMockOAuthServer(8892);
+});
+
+test.afterAll(async () => {
+  if (mockServer) {
+    await mockServer.stop();
+  }
+});
+```
+
+### 11. Ожидание Элементов в Функциональных Тестах
+
+**ID:** testing.11
+
+**User Story:** Как разработчик, я хочу использовать правильные методы ожидания элементов в функциональных тестах, чтобы тесты были стабильными и не падали из-за race conditions.
+
+**Зависимости:** testing.3
+
+#### Критерии Приемки
+
+11.1. THE функциональные тесты SHALL использовать локаторы с встроенным ожиданием вместо `waitForTimeout`
+
+11.2. THE функциональные тесты SHALL НЕ использовать безусловные `waitForTimeout` для ожидания элементов
+
+11.3. THE функциональные тесты SHALL использовать следующие методы ожидания:
+- `await expect(locator).toBeVisible()` - ожидание видимости элемента
+- `await expect(locator).toContainText(text)` - ожидание текста в элементе
+- `await expect(locator).toHaveCount(n)` - ожидание количества элементов
+- `await locator.waitFor({ state: 'visible' })` - явное ожидание состояния
+
+11.4. WHEN элемент должен появиться после действия, THE тест SHALL использовать `await expect(locator).toBeVisible()` вместо `await waitForTimeout()`
+
+11.5. WHEN нужно дождаться изменения текста, THE тест SHALL использовать `await expect(locator).toContainText(text)` вместо `await waitForTimeout()`
+
+11.6. THE использование `waitForTimeout` SHALL быть допустимо ТОЛЬКО в исключительных случаях:
+- Ожидание анимации, которая не имеет DOM-индикатора завершения
+- Ожидание debounce/throttle функций с известным таймингом
+- В таких случаях MUST быть добавлен комментарий с объяснением
+
+**Примеры:**
+
+```typescript
+// ❌ НЕПРАВИЛЬНО - безусловное ожидание
+await messageInput.press('Enter');
+await window.waitForTimeout(500);
+const messages = window.locator('[data-testid="message"]');
+await expect(messages).toHaveCount(1);
+
+// ✅ ПРАВИЛЬНО - ожидание локатора
+await messageInput.press('Enter');
+const messages = window.locator('[data-testid="message"]');
+await expect(messages.first()).toBeVisible({ timeout: 2000 });
+await expect(messages).toHaveCount(1);
+```
+
+```typescript
+// ❌ НЕПРАВИЛЬНО - ожидание перед проверкой текста
+await button.click();
+await window.waitForTimeout(1000);
+const text = await element.textContent();
+expect(text).toContain('Success');
+
+// ✅ ПРАВИЛЬНО - ожидание текста в локаторе
+await button.click();
+await expect(element).toContainText('Success');
+```
+

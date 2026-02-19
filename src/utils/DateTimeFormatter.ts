@@ -2,7 +2,7 @@
 
 /**
  * DateTimeFormatter utility class for formatting dates and times
- * Uses system locale (Intl.DateTimeFormat) for user-facing dates
+ * Uses OS system settings for user-facing dates
  * Uses fixed format (YYYY-MM-DD HH:MM:SS) for logs
  *
  * Requirements: settings.2.1, settings.2.3
@@ -12,8 +12,8 @@
  */
 export class DateTimeFormatter {
   /**
-   * Format date only (no time) using system locale
-   * Falls back to toLocaleDateString() on error
+   * Format date only (no time) using OS system settings
+   * Uses toLocaleDateString() without parameters to respect OS date format
    *
    * Requirements: settings.2.1
    *
@@ -24,27 +24,23 @@ export class DateTimeFormatter {
     try {
       const date = typeof timestamp === 'number' ? new Date(timestamp) : timestamp;
 
-      // Use system locale (undefined) with date-only options
-      const formatter = new Intl.DateTimeFormat(undefined, {
-        year: 'numeric',
-        month: 'numeric',
-        day: 'numeric',
-      });
-
-      return formatter.format(date);
+      // Use toLocaleDateString() without parameters to respect OS date format settings
+      // This allows macOS users to use custom date format from System Preferences
+      return date.toLocaleDateString();
     } catch (error) {
-      // Fallback to toLocaleDateString on error
+      // Fallback to ISO date on error
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       console.error('[DateTimeFormatter] Error formatting date:', errorMessage);
 
       const date = typeof timestamp === 'number' ? new Date(timestamp) : timestamp;
-      return date.toLocaleDateString();
+      return date.toISOString().split('T')[0] || '';
     }
   }
 
   /**
-   * Format date and time using system locale
-   * Falls back to toLocaleString() on error
+   * Format date and time using OS system settings
+   * Uses toLocaleDateString() and toLocaleTimeString() without parameters
+   * to respect OS date/time format
    *
    * Requirements: settings.2.1
    *
@@ -55,16 +51,15 @@ export class DateTimeFormatter {
     try {
       const date = typeof timestamp === 'number' ? new Date(timestamp) : timestamp;
 
-      // Use system locale (undefined) with date and time options
-      const formatter = new Intl.DateTimeFormat(undefined, {
-        year: 'numeric',
-        month: 'numeric',
-        day: 'numeric',
+      // Use toLocaleDateString() and toLocaleTimeString() without parameters
+      // This allows macOS users to use custom date format from System Preferences
+      const dateStr = date.toLocaleDateString();
+      const timeStr = date.toLocaleTimeString(undefined, {
         hour: 'numeric',
         minute: 'numeric',
       });
 
-      return formatter.format(date);
+      return `${dateStr}, ${timeStr}`;
     } catch (error) {
       // Fallback to toLocaleString on error
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';

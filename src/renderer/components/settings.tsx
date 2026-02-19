@@ -1,7 +1,12 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Cpu, Eye, EyeOff, User, LogOut, AlertCircle } from 'lucide-react';
 import { Logger } from '../Logger';
 import { useError } from '../contexts/error-context';
+import { useEventSubscription } from '../events/useEventSubscription';
+import { EVENT_TYPES } from '../../shared/events/constants';
+import { callApi } from '../utils/apiWrapper';
+import { toast } from 'sonner';
+import type { LLMProvider } from '../../types';
 
 // Requirements: clerkly.3.5, clerkly.3.7
 const logger = Logger.create('Settings');
@@ -12,8 +17,8 @@ interface SettingsProps {
 }
 
 export function Settings({ onSignOut, onNavigate }: SettingsProps) {
-  const { showError, showSuccess } = useError();
-  const [llmProvider, setLlmProvider] = useState<'openai' | 'anthropic' | 'google'>('openai');
+  const { showSuccess } = useError();
+  const [llmProvider, setLlmProvider] = useState<LLMProvider>('openai');
   const [apiKey, setApiKey] = useState('');
   const [showApiKey, setShowApiKey] = useState(false);
   const [testingConnection, setTestingConnection] = useState(false);
@@ -30,75 +35,81 @@ export function Settings({ onSignOut, onNavigate }: SettingsProps) {
   // Track if this is the first render to avoid saving on initial mount
   const isFirstRender = useRef(true);
 
-  // Load profile data on mount
-  useEffect(() => {
-    const loadProfile = async () => {
-      try {
-        const result = await window.api.auth.getProfile();
-        if (result.success && result.profile) {
-          setProfile({
-            name: result.profile.name || '',
-            email: result.profile.email || '',
-            loading: false,
-          });
-        } else {
-          setProfile({
-            name: '',
-            email: '',
-            loading: false,
-          });
-        }
-      } catch (error) {
-        logger.error(`Failed to load profile: ${error}`);
+  // Load profile data
+  const loadProfile = useCallback(async () => {
+    try {
+      const result = await window.api.auth.getUser();
+      if (result.success && result.user) {
+        setProfile({
+          name: result.user.name || '',
+          email: result.user.email || '',
+          loading: false,
+        });
+      } else {
         setProfile({
           name: '',
           email: '',
           loading: false,
         });
       }
-    };
-
-    loadProfile();
-
-    // Listen for profile updates
-    const handleProfileUpdate = () => {
-      logger.info('Profile updated, reloading...');
-      loadProfile();
-    };
-
-    window.api.auth.onProfileUpdated(handleProfileUpdate);
-
-    // Cleanup
-    return () => {
-      // Note: There's no removeListener for onProfileUpdated in the current API
-      // If needed, this should be added to the preload API
-    };
+    } catch (error) {
+      logger.error(`Failed to load profile: ${error}`);
+      setProfile({
+        name: '',
+        email: '',
+        loading: false,
+      });
+    }
   }, []);
 
-  // Requirements: settings.1.20, settings.1.21 - Load AI Agent settings on mount
+  // Load profile data on mount
+  useEffect(() => {
+    loadProfile();
+  }, [loadProfile]);
+
+  // Subscribe to profile updates from EventBus
+  // Requirements: realtime-events.3.3, account-profile.1.5
+  useEventSubscription(EVENT_TYPES.USER_PROFILE_UPDATED, () => {
+    logger.info('Profile updated event received, reloading profile');
+    loadProfile();
+  });
+
+  // Requirements: settings.1.20, settings.1.21, error-notifications.2.1 - Load AI Agent settings on mount
   useEffect(() => {
     const loadAIAgentSettings = async () => {
-      try {
-        // Load LLM provider
-        const providerResult = await window.api.settings.loadLLMProvider();
-        if (providerResult.success && providerResult.provider) {
-          setLlmProvider(providerResult.provider);
+      // Requirements: error-notifications.2.1 - Use callApi for automatic error handling
+      // Load LLM provider
+      const providerResult = await callApi<{ provider: LLMProvider }>(
+        () =>
+          window.api.settings.loadLLMProvider() as Promise<{
+            success: boolean;
+            data?: { provider: LLMProvider };
+            error?: string;
+          }>,
+        'Loading LLM provider'
+      );
 
-          // Load API key for the loaded provider
-          const keyResult = await window.api.settings.loadAPIKey(providerResult.provider);
-          if (keyResult.success && keyResult.apiKey) {
-            setApiKey(keyResult.apiKey);
-          } else {
-            setApiKey('');
-          }
+      if (providerResult?.provider) {
+        setLlmProvider(providerResult.provider);
+
+        // Load API key for the loaded provider
+        const keyResult = await callApi<{ apiKey: string }>(
+          () =>
+            window.api.settings.loadAPIKey(providerResult.provider) as Promise<{
+              success: boolean;
+              data?: { apiKey: string };
+              error?: string;
+            }>,
+          'Loading API key'
+        );
+
+        if (keyResult?.apiKey) {
+          setApiKey(keyResult.apiKey);
         } else {
-          // Default values: openai provider, empty API key
-          setLlmProvider('openai');
           setApiKey('');
         }
-      } catch (error) {
-        logger.error(`Failed to load AI Agent settings: ${error}`);
-        // Use default values on error
+      } else {
+        // Default values: openai provider, empty API key
         setLlmProvider('openai');
         setApiKey('');
       }
@@ -107,7 +118,7 @@ export function Settings({ onSignOut, onNavigate }: SettingsProps) {
     loadAIAgentSettings();
   }, []);
 
-  // Requirements: settings.1.10, settings.1.19 - Save provider immediately and load API key for new provider
+  // Requirements: settings.1.10, settings.1.19, error-notifications.2.1 - Save provider immediately and load API key for new provider
   useEffect(() => {
     // Skip on initial mount (initial load is handled by the load effect above)
     if (isFirstRender.current) {
@@ -116,86 +127,100 @@ export function Settings({ onSignOut, onNavigate }: SettingsProps) {
     }
 
     const saveProviderAndLoadKey = async () => {
-      try {
-        // Save provider immediately (no debounce)
-        const saveResult = await window.api.settings.saveLLMProvider(llmProvider);
-        if (!saveResult.success) {
-          logger.error(`Failed to save LLM provider: ${saveResult.error}`);
-          // Requirements: settings.1.13 - Show error notification on save failure
-          // Note: Error notification will be handled by task 48.8
-        }
+      // Requirements: error-notifications.2.1 - Use callApi for automatic error handling
+      // Save provider immediately (no debounce)
+      await callApi<Record<string, never>>(
+        () =>
+          window.api.settings.saveLLMProvider(llmProvider).then((r) => ({
+            ...r,
+            data: r.success ? ({} as Record<string, never>) : undefined,
+          })),
+        'Saving LLM provider'
+      );
 
-        // Load API key for the new provider
-        const keyResult = await window.api.settings.loadAPIKey(llmProvider);
-        if (keyResult.success && keyResult.apiKey) {
-          setApiKey(keyResult.apiKey);
-        } else {
-          // If key not found, show empty field with placeholder
-          setApiKey('');
-        }
-      } catch (error) {
-        logger.error(`Failed to save provider or load API key: ${error}`);
+      // Load API key for the new provider
+      const keyResult = await callApi<{ apiKey: string }>(
+        () =>
+          window.api.settings.loadAPIKey(llmProvider) as Promise<{
+            success: boolean;
+            data?: { apiKey: string };
+            error?: string;
+          }>,
+        'Loading API key'
+      );
+
+      if (keyResult?.apiKey) {
+        setApiKey(keyResult.apiKey);
+      } else {
+        // If key not found, show empty field with placeholder
+        setApiKey('');
       }
     };
 
     saveProviderAndLoadKey();
   }, [llmProvider]);
 
-  // Requirements: settings.1.9, settings.1.11, settings.1.12 - Debounced save for API key (500ms)
+  // Requirements: settings.1.9, settings.1.11, settings.1.12, error-notifications.2.1 - Debounced save for API key (500ms)
   useEffect(() => {
     // Debounce API key save
     const timeoutId = setTimeout(async () => {
-      try {
-        if (apiKey.trim() === '') {
-          // Requirements: settings.1.11 - Delete API key when field is cleared
-          const deleteResult = await window.api.settings.deleteAPIKey(llmProvider);
-          if (!deleteResult.success) {
-            logger.error(`Failed to delete API key: ${deleteResult.error}`);
-            // Requirements: settings.1.13 - Show error notification on save failure
-            // Note: Error notification will be handled by task 48.8
-          }
-        } else {
-          // Save API key with debounce
-          const saveResult = await window.api.settings.saveAPIKey(llmProvider, apiKey);
-          if (!saveResult.success) {
-            logger.error(`Failed to save API key: ${saveResult.error}`);
-            // Requirements: settings.1.13 - Show error notification on save failure
-            showError(`Failed to save API key: ${saveResult.error || 'Unknown error'}`);
-          }
-          // Requirements: settings.1.12 - No visual indicator for saving (silent save)
-        }
-      } catch (error) {
-        logger.error(`Failed to save/delete API key: ${error}`);
+      // Requirements: error-notifications.2.1 - Use callApi for automatic error handling
+      if (apiKey.trim() === '') {
+        // Requirements: settings.1.11 - Delete API key when field is cleared
+        await callApi<Record<string, never>>(
+          () =>
+            window.api.settings.deleteAPIKey(llmProvider).then((r) => ({
+              ...r,
+              data: r.success ? ({} as Record<string, never>) : undefined,
+            })),
+          'Deleting API key'
+        );
+      } else {
+        // Save API key with debounce
+        await callApi<Record<string, never>>(
+          () =>
+            window.api.settings.saveAPIKey(llmProvider, apiKey).then((r) => ({
+              ...r,
+              data: r.success ? ({} as Record<string, never>) : undefined,
+            })),
+          'Saving API key'
+        );
+        // Requirements: settings.1.12 - No visual indicator for saving (silent save)
       }
     }, 500);
 
     // Cleanup: cancel previous timeout
     return () => clearTimeout(timeoutId);
-  }, [apiKey, llmProvider, showError]);
+  }, [apiKey, llmProvider]);
 
-  // Requirements: settings.3.4 - Handle test connection
+  // Requirements: settings.3.4, error-notifications.2.1 - Handle test connection
   const handleTestConnection = async () => {
     // Requirements: settings.3.4 - Set testing state
     setTestingConnection(true);
+
+    // Requirements: error-notifications.2.1 - Handle test connection errors
     try {
-      logger.info(`Testing connection to ${llmProvider}...`);
-      const result = await window.api.llm.testConnection(llmProvider, apiKey);
+      const result = await (window.api.llm.testConnection(llmProvider, apiKey) as Promise<{
+        success: boolean;
+        data?: { success: boolean };
+        error?: string;
+      }>);
+
+      // Requirements: settings.3.7, settings.3.8 - Reset button state
+      setTestingConnection(false);
 
       if (result.success) {
         // Requirements: settings.3.7 - Show success notification
         showSuccess('Connection successful! Your API key is valid.');
         logger.info(`Connection test successful for ${llmProvider}`);
       } else {
-        // Requirements: settings.3.8 - Show error notification
-        showError(result.error || 'Connection failed: Unknown error');
-        logger.warn(`Connection test failed for ${llmProvider}: ${result.error}`);
+        // Requirements: settings.3.8 - Show error without context prefix
+        toast.error(result.error || 'Connection test failed');
       }
     } catch (error) {
-      logger.error(`Connection test error: ${error}`);
-      showError(`Connection failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    } finally {
-      // Requirements: settings.3.7, settings.3.8 - Reset button state
       setTestingConnection(false);
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(message);
     }
   };
 
@@ -281,9 +306,7 @@ export function Settings({ onSignOut, onNavigate }: SettingsProps) {
                 </label>
                 <select
                   value={llmProvider}
-                  onChange={(e) =>
-                    setLlmProvider(e.target.value as 'openai' | 'anthropic' | 'google')
-                  }
+                  onChange={(e) => setLlmProvider(e.target.value as LLMProvider)}
                   className="w-full px-4 py-2 bg-input-background border border-border rounded-lg text-foreground"
                 >
                   <option value="openai">OpenAI (GPT)</option>

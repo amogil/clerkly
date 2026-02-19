@@ -205,6 +205,22 @@ describe('SettingsIPCHandlers', () => {
       });
     });
 
+    /* Preconditions: Handler is registered, AIAgentSettingsManager.saveLLMProvider throws Error with empty message
+       Action: Call handler with 'openai' provider
+       Assertions: Fallback error message used
+       Requirements: settings.1.9, settings.1.26 */
+    it('should use fallback error message when error message is empty', async () => {
+      mockAIAgentSettingsManager.saveLLMProvider.mockRejectedValue(new Error(''));
+
+      const handler = mockHandlers.get('settings:save-llm-provider');
+      const result = await handler!({} as any, 'openai');
+
+      expect(result).toEqual({
+        success: false,
+        error: 'Failed to save LLM provider',
+      });
+    });
+
     /* Preconditions: Handler is registered, AIAgentSettingsManager.saveLLMProvider throws error
        Action: Call handler with 'openai' provider
        Assertions: Error is logged to console
@@ -245,7 +261,7 @@ describe('SettingsIPCHandlers', () => {
       expect(mockAIAgentSettingsManager.loadLLMProvider).toHaveBeenCalled();
       expect(result).toEqual({
         success: true,
-        provider: 'openai',
+        data: { provider: 'openai' },
       });
     });
 
@@ -260,7 +276,7 @@ describe('SettingsIPCHandlers', () => {
       const result = await handler!({} as any);
 
       expect((result as IPCResult).success).toBe(true);
-      expect((result as IPCResult).provider).toBe('anthropic');
+      expect((result as IPCResult).data).toEqual({ provider: 'anthropic' });
     });
 
     /* Preconditions: Handler is registered, AIAgentSettingsManager.loadLLMProvider returns 'google'
@@ -274,7 +290,7 @@ describe('SettingsIPCHandlers', () => {
       const result = await handler!({} as any);
 
       expect((result as IPCResult).success).toBe(true);
-      expect((result as IPCResult).provider).toBe('google');
+      expect((result as IPCResult).data).toEqual({ provider: 'google' });
     });
 
     /* Preconditions: Handler is registered, AIAgentSettingsManager.loadLLMProvider throws error
@@ -289,7 +305,7 @@ describe('SettingsIPCHandlers', () => {
 
       expect(result).toEqual({
         success: true,
-        provider: 'openai',
+        data: { provider: 'openai' },
       });
     });
   });
@@ -368,6 +384,22 @@ describe('SettingsIPCHandlers', () => {
       });
     });
 
+    /* Preconditions: Handler is registered, AIAgentSettingsManager.saveAPIKey throws Error with empty message
+       Action: Call handler with provider and API key
+       Assertions: Fallback error message used
+       Requirements: settings.1.13, settings.1.26 */
+    it('should use fallback error message when error message is empty', async () => {
+      mockAIAgentSettingsManager.saveAPIKey.mockRejectedValue(new Error(''));
+
+      const handler = mockHandlers.get('settings:save-api-key');
+      const result = await handler!({} as any, 'openai', 'test-key');
+
+      expect(result).toEqual({
+        success: false,
+        error: 'Failed to save API key',
+      });
+    });
+
     /* Preconditions: Handler is registered, AIAgentSettingsManager.saveAPIKey throws error
        Action: Call handler
        Assertions: Error is logged to console
@@ -408,7 +440,7 @@ describe('SettingsIPCHandlers', () => {
       expect(mockAIAgentSettingsManager.loadAPIKey).toHaveBeenCalledWith('openai');
       expect(result).toEqual({
         success: true,
-        apiKey: 'decrypted-api-key',
+        data: { apiKey: 'decrypted-api-key' },
       });
     });
 
@@ -425,7 +457,7 @@ describe('SettingsIPCHandlers', () => {
       expect(mockAIAgentSettingsManager.loadAPIKey).toHaveBeenCalledWith('anthropic');
       expect(result).toEqual({
         success: true,
-        apiKey: null,
+        data: { apiKey: null },
       });
     });
 
@@ -441,7 +473,7 @@ describe('SettingsIPCHandlers', () => {
 
       expect(mockAIAgentSettingsManager.loadAPIKey).toHaveBeenCalledWith('google');
       expect((result as IPCResult).success).toBe(true);
-      expect((result as IPCResult).apiKey).toBe('google-api-key');
+      expect((result as IPCResult).data).toEqual({ apiKey: 'google-api-key' });
     });
 
     /* Preconditions: Handler is registered, AIAgentSettingsManager.loadAPIKey throws error
@@ -458,6 +490,22 @@ describe('SettingsIPCHandlers', () => {
       expect(result).toEqual({
         success: false,
         error: errorMessage,
+      });
+    });
+
+    /* Preconditions: Handler is registered, AIAgentSettingsManager.loadAPIKey throws Error with empty message
+       Action: Call handler with provider
+       Assertions: Fallback error message used
+       Requirements: settings.1.20, settings.1.26 */
+    it('should use fallback error message when error message is empty', async () => {
+      mockAIAgentSettingsManager.loadAPIKey.mockRejectedValue(new Error(''));
+
+      const handler = mockHandlers.get('settings:load-api-key');
+      const result = await handler!({} as any, 'openai');
+
+      expect(result).toEqual({
+        success: false,
+        error: 'Failed to load API key',
       });
     });
   });
@@ -527,6 +575,22 @@ describe('SettingsIPCHandlers', () => {
       expect(result).toEqual({
         success: false,
         error: errorMessage,
+      });
+    });
+
+    /* Preconditions: Handler is registered, AIAgentSettingsManager.deleteAPIKey throws Error with empty message
+       Action: Call handler with provider
+       Assertions: Fallback error message used
+       Requirements: settings.1.11, settings.1.26 */
+    it('should use fallback error message when error message is empty', async () => {
+      mockAIAgentSettingsManager.deleteAPIKey.mockRejectedValue(new Error(''));
+
+      const handler = mockHandlers.get('settings:delete-api-key');
+      const result = await handler!({} as any, 'openai');
+
+      expect(result).toEqual({
+        success: false,
+        error: 'Failed to delete API key',
       });
     });
 

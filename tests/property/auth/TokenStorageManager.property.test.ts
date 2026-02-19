@@ -2,35 +2,43 @@
 
 import * as fc from 'fast-check';
 import { TokenStorageManager } from '../../../src/main/auth/TokenStorageManager';
-import { DataManager } from '../../../src/main/DataManager';
+import { UserSettingsManager } from '../../../src/main/UserSettingsManager';
+import { DatabaseManager } from '../../../src/main/DatabaseManager';
 import { TokenData } from '../../../src/main/auth/OAuthConfig';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 
 describe('TokenStorageManager Property-Based Tests', () => {
-  let dataManager: DataManager;
+  let dbManager: DatabaseManager;
+  let dataManager: UserSettingsManager;
   let tokenStorage: TokenStorageManager;
   let testDbPath: string;
 
   beforeEach(() => {
     // Create a temporary directory for test database
     testDbPath = path.join(os.tmpdir(), `test-token-storage-pbt-${Date.now()}`);
-    dataManager = new DataManager(testDbPath);
-    dataManager.initialize();
 
-    // Requirements: user-data-isolation.1.10 - Mock UserProfileManager for data isolation
+    // Initialize DatabaseManager first, then UserSettingsManager
+    // Requirements: database-refactoring.1, database-refactoring.2
+    dbManager = new DatabaseManager();
+    dbManager.initialize(testDbPath);
+
+    // Requirements: user-data-isolation.1.10 - Mock UserManager for data isolation
     const mockProfileManager = {
-      getCurrentEmail: jest.fn().mockReturnValue('test@example.com'),
+      getCurrentUserId: jest.fn().mockReturnValue('test@example.com'),
     } as any;
 
-    dataManager.setUserProfileManager(mockProfileManager);
+    dbManager.setUserManager(mockProfileManager);
+
+    // Create UserSettingsManager with DatabaseManager
+    dataManager = new UserSettingsManager(dbManager);
     tokenStorage = new TokenStorageManager(dataManager);
   });
 
   afterEach(() => {
     // Clean up
-    dataManager.close();
+    dbManager.close();
     if (fs.existsSync(testDbPath)) {
       fs.rmSync(testDbPath, { recursive: true, force: true });
     }

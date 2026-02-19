@@ -7,7 +7,8 @@
 
 import { test, expect, _electron as electron, ElectronApplication, Page } from '@playwright/test';
 import * as path from 'path';
-import { MockOAuthServer } from './helpers/mock-oauth-server';
+import { createMockOAuthServer } from './helpers/electron';
+import type { MockOAuthServer } from './helpers/mock-oauth-server';
 import { completeOAuthFlow } from './helpers/electron';
 
 let electronApp: ElectronApplication;
@@ -15,21 +16,12 @@ let window: Page;
 let mockServer: MockOAuthServer;
 
 test.beforeAll(async () => {
-  // Start mock OAuth server
-  mockServer = new MockOAuthServer({
-    port: 8893,
-    clientId: 'test-client-id-12345',
-    clientSecret: 'test-client-secret-67890',
-  });
-
-  await mockServer.start();
-  console.log(`[TEST] Mock OAuth server started at ${mockServer.getBaseUrl()}`);
+  mockServer = await createMockOAuthServer(8893);
 });
 
 test.afterAll(async () => {
   if (mockServer) {
     await mockServer.stop();
-    console.log('[TEST] Mock OAuth server stopped');
   }
 });
 
@@ -51,7 +43,7 @@ test.beforeEach(async () => {
 
   // Launch Electron app for each test
   electronApp = await electron.launch({
-    args: [path.join(__dirname, '../../dist/main/index.js'), '--user-data-dir', testDataPath],
+    args: [path.join(__dirname, '../../dist/main/main/index.js'), '--user-data-dir', testDataPath],
     env: {
       ...process.env,
       NODE_ENV: 'test',

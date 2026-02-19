@@ -5,28 +5,47 @@
  */
 
 import { contextBridge, ipcRenderer } from 'electron';
+import { EVENT_TYPES } from '../shared/events/constants';
+import type { User } from '../types';
+
+// LLM Provider type (duplicated from types/index.ts due to rootDir restriction)
+type LLMProvider = 'openai' | 'anthropic' | 'google';
+
+// Message payload type for agents API (duplicated due to rootDir restriction)
+// Requirements: agents.7.2
+interface MessagePayloadAPI {
+  kind: 'user' | 'llm' | 'tool_call' | 'code_exec' | 'final_answer' | 'request_scope' | 'artifact';
+  timing?: {
+    started_at: string;
+    finished_at: string;
+  };
+  data: Record<string, unknown>;
+}
 
 /**
  * API interface for secure IPC communication
  * Exposed to renderer process via contextBridge
  */
-interface API {
+export interface API {
   saveData: (key: string, value: unknown) => Promise<{ success: boolean; error?: string }>;
   loadData: (key: string) => Promise<{ success: boolean; data?: unknown; error?: string }>;
   deleteData: (key: string) => Promise<{ success: boolean; error?: string }>;
+  // Requirements: realtime-events.4.5, realtime-events.4.6, realtime-events.4.7
+  events?: {
+    onEvent: (callback: (type: string, payload: unknown) => void) => () => void;
+    sendEvent: (type: string, payload: unknown) => void;
+  };
   // Requirements: google-oauth-auth.8.1, google-oauth-auth.8.2, google-oauth-auth.8.3, account-profile.1.2, account-profile.1.5
   auth: {
     startLogin: () => Promise<{ success: boolean; error?: string }>;
     getStatus: () => Promise<{ authorized: boolean; error?: string }>;
     logout: () => Promise<{ success: boolean; error?: string }>;
-    getProfile: () => Promise<{ success: boolean; profile?: any; error?: string }>;
-    refreshProfile: () => Promise<{ success: boolean; profile?: any; error?: string }>;
+    getUser: () => Promise<{ success: boolean; user?: User; error?: string }>;
+    refreshUser: () => Promise<{ success: boolean; user?: User; error?: string }>;
     onAuthSuccess: (callback: () => void) => () => void;
     onAuthError: (callback: (error: string, errorCode?: string) => void) => () => void;
     onLogout: (callback: () => void) => () => void;
-    onProfileUpdated: (callback: (profile: any) => void) => () => void;
-    onShowLoader: (callback: () => void) => () => void;
-    onHideLoader: (callback: () => void) => () => void;
+    onUserUpdated: (callback: (user: User) => void) => () => void;
   };
   // Requirements: error-notifications.1.1
   error: {
@@ -34,31 +53,52 @@ interface API {
   };
   // Requirements: settings.1.26
   settings: {
-    saveLLMProvider: (
-      provider: 'openai' | 'anthropic' | 'google'
-    ) => Promise<{ success: boolean; error?: string }>;
+    saveLLMProvider: (provider: LLMProvider) => Promise<{ success: boolean; error?: string }>;
     loadLLMProvider: () => Promise<{
       success: boolean;
-      provider?: 'openai' | 'anthropic' | 'google';
+      provider?: LLMProvider;
       error?: string;
     }>;
     saveAPIKey: (
-      provider: 'openai' | 'anthropic' | 'google',
+      provider: LLMProvider,
       apiKey: string
     ) => Promise<{ success: boolean; error?: string }>;
     loadAPIKey: (
-      provider: 'openai' | 'anthropic' | 'google'
+      provider: LLMProvider
     ) => Promise<{ success: boolean; apiKey?: string | null; error?: string }>;
-    deleteAPIKey: (
-      provider: 'openai' | 'anthropic' | 'google'
-    ) => Promise<{ success: boolean; error?: string }>;
+    deleteAPIKey: (provider: LLMProvider) => Promise<{ success: boolean; error?: string }>;
   };
   // Requirements: settings.3
   llm: {
     testConnection: (
-      provider: 'openai' | 'anthropic' | 'google',
+      provider: LLMProvider,
       apiKey: string
     ) => Promise<{ success: boolean; error?: string }>;
+  };
+  // Requirements: agents.2, agents.4, user-data-isolation.6.6
+  agents: {
+    create: (name?: string) => Promise<{ success: boolean; data?: unknown; error?: string }>;
+    list: () => Promise<{ success: boolean; data?: unknown; error?: string }>;
+    get: (agentId: string) => Promise<{ success: boolean; data?: unknown; error?: string }>;
+    update: (
+      agentId: string,
+      data: { name?: string }
+    ) => Promise<{ success: boolean; error?: string }>;
+    archive: (agentId: string) => Promise<{ success: boolean; error?: string }>;
+  };
+  // Requirements: agents.4, agents.7, user-data-isolation.6.6
+  messages: {
+    list: (agentId: string) => Promise<{ success: boolean; data?: unknown; error?: string }>;
+    create: (
+      agentId: string,
+      payload: MessagePayloadAPI
+    ) => Promise<{ success: boolean; data?: unknown; error?: string }>;
+    update: (
+      messageId: number,
+      agentId: string,
+      payload: MessagePayloadAPI
+    ) => Promise<{ success: boolean; error?: string }>;
+    getLast: (agentId: string) => Promise<{ success: boolean; data?: unknown; error?: string }>;
   };
   // Requirements: testing.3.1, testing.3.2 - Test API methods (only available in test environment)
   test?: {
@@ -67,10 +107,14 @@ interface API {
       errorMessage: string
     ) => Promise<{ success: boolean; error?: string }>;
     clearDataErrors: () => Promise<{ success: boolean; error?: string }>;
+    deleteCurrentUser: () => Promise<{ success: boolean; error?: string }>;
+    createAgentWithOldMessage: (
+      minutesAgo: number
+    ) => Promise<{ success: boolean; agentId?: string; timestamp?: string; error?: string }>;
   };
   // Requirements: testing.3.8 - Test IPC methods (only available in test environment)
   ipcRenderer?: {
-    invoke: (channel: string, ...args: any[]) => Promise<any>;
+    invoke: (channel: string, ...args: unknown[]) => Promise<unknown>;
   };
 }
 
@@ -109,6 +153,39 @@ const api: API = {
     return await ipcRenderer.invoke('delete-data', key);
   },
 
+  // Requirements: realtime-events.4.5, realtime-events.4.6, realtime-events.4.7
+  /**
+   * Events API
+   * Provides methods for real-time event communication between main and renderer
+   */
+  events: {
+    /**
+     * Listen for events from main process
+     * Requirements: realtime-events.4.5
+     * @param {Function} callback - Callback function to execute when event is received
+     * @returns {Function} Unsubscribe function to remove the listener
+     */
+    onEvent(callback: (type: string, payload: unknown) => void): () => void {
+      const listener = (_event: Electron.IpcRendererEvent, type: string, payload: unknown) => {
+        callback(type, payload);
+      };
+      ipcRenderer.on('events:from-main', listener);
+      return () => {
+        ipcRenderer.removeListener('events:from-main', listener);
+      };
+    },
+
+    /**
+     * Send event to main process
+     * Requirements: realtime-events.4.6
+     * @param {string} type - Event type
+     * @param {unknown} payload - Event payload
+     */
+    sendEvent(type: string, payload: unknown): void {
+      ipcRenderer.send('events:from-renderer', type, payload);
+    },
+  },
+
   // Requirements: google-oauth-auth.8.1, google-oauth-auth.8.2, google-oauth-auth.8.3, account-profile.1.2, account-profile.1.5
   /**
    * Authentication API
@@ -143,119 +220,87 @@ const api: API = {
     },
 
     /**
-     * Get user profile from local cache
-     * Returns cached profile data from DataManager
+     * Get current user from database
+     * Returns user data from users table
      * Requirements: account-profile.1.2
-     * @returns {Promise<{success: boolean, profile?: any, error?: string}>}
+     * @returns {Promise<{success: boolean, user?: User, error?: string}>}
      */
-    async getProfile(): Promise<{ success: boolean; profile?: any; error?: string }> {
-      return await ipcRenderer.invoke('auth:get-profile');
+    async getUser(): Promise<{ success: boolean; user?: User; error?: string }> {
+      return await ipcRenderer.invoke('auth:get-user');
     },
 
     /**
      * Refresh user profile from Google API
      * Fetches fresh profile data from Google UserInfo API
      * Requirements: account-profile.1.5
-     * @returns {Promise<{success: boolean, profile?: any, error?: string}>}
+     * @returns {Promise<{success: boolean, user?: User, error?: string}>}
      */
-    async refreshProfile(): Promise<{ success: boolean; profile?: any; error?: string }> {
-      return await ipcRenderer.invoke('auth:refresh-profile');
+    async refreshUser(): Promise<{ success: boolean; user?: User; error?: string }> {
+      return await ipcRenderer.invoke('auth:refresh-user');
     },
 
     /**
-     * Listen for authentication success events
+     * Listen for authentication success events via EventBus
      * Requirements: google-oauth-auth.8.4
      * @param {Function} callback - Callback function to execute on success
      * @returns {Function} Unsubscribe function to remove the listener
      */
     onAuthSuccess(callback: () => void): () => void {
-      const listener = () => {
-        callback();
-      };
-      ipcRenderer.on('auth:success', listener);
-      return () => {
-        ipcRenderer.removeListener('auth:success', listener);
-      };
+      // Use the events API to listen for auth.completed events
+      return api.events!.onEvent((type: string) => {
+        if (type === EVENT_TYPES.AUTH_COMPLETED) {
+          callback();
+        }
+      });
     },
 
     /**
-     * Listen for authentication error events
+     * Listen for authentication error events via EventBus
      * Requirements: google-oauth-auth.8.4
      * @param {Function} callback - Callback function to execute on error
      * @returns {Function} Unsubscribe function to remove the listener
      */
     onAuthError(callback: (error: string, errorCode?: string) => void): () => void {
-      const listener = (_event: any, data: { error: string; errorCode?: string }) => {
-        callback(data.error, data.errorCode);
-      };
-      ipcRenderer.on('auth:error', listener);
-      return () => {
-        ipcRenderer.removeListener('auth:error', listener);
-      };
+      // Use the events API to listen for auth.failed and auth.cancelled events
+      return api.events!.onEvent((type: string, payload: unknown) => {
+        if (type === EVENT_TYPES.AUTH_FAILED) {
+          const data = payload as { code: string; message: string };
+          callback(data.message, data.code);
+        } else if (type === EVENT_TYPES.AUTH_CANCELLED) {
+          callback('User cancelled authentication', 'access_denied');
+        }
+      });
     },
 
     /**
-     * Listen for logout events
+     * Listen for logout events via EventBus
      * Requirements: account-profile.1.8
      * @param {Function} callback - Callback function to execute on logout
      * @returns {Function} Unsubscribe function to remove the listener
      */
     onLogout(callback: () => void): () => void {
-      const listener = () => {
-        callback();
-      };
-      ipcRenderer.on('auth:logout-complete', listener);
-      return () => {
-        ipcRenderer.removeListener('auth:logout-complete', listener);
-      };
+      // Use the events API to listen for auth.signed-out events
+      return api.events!.onEvent((type: string) => {
+        if (type === EVENT_TYPES.AUTH_SIGNED_OUT || type === EVENT_TYPES.USER_LOGOUT) {
+          callback();
+        }
+      });
     },
 
     /**
-     * Listen for profile update events
+     * Listen for user update events via EventBus
      * Requirements: account-profile.1.5
-     * @param {Function} callback - Callback function to execute when profile is updated
+     * @param {Function} callback - Callback function to execute when user is updated
      * @returns {Function} Unsubscribe function to remove the listener
      */
-    onProfileUpdated(callback: (profile: any) => void): () => void {
-      const listener = (_event: any, profile: any) => {
-        callback(profile);
-      };
-      ipcRenderer.on('auth:profile-updated', listener);
-      return () => {
-        ipcRenderer.removeListener('auth:profile-updated', listener);
-      };
-    },
-
-    /**
-     * Listen for loader show events
-     * Requirements: google-oauth-auth.7.1
-     * @param {Function} callback - Callback function to execute when loader should be shown
-     * @returns {Function} Unsubscribe function to remove the listener
-     */
-    onShowLoader(callback: () => void): () => void {
-      const listener = () => {
-        callback();
-      };
-      ipcRenderer.on('auth:show-loader', listener);
-      return () => {
-        ipcRenderer.removeListener('auth:show-loader', listener);
-      };
-    },
-
-    /**
-     * Listen for loader hide events
-     * Requirements: google-oauth-auth.7.1
-     * @param {Function} callback - Callback function to execute when loader should be hidden
-     * @returns {Function} Unsubscribe function to remove the listener
-     */
-    onHideLoader(callback: () => void): () => void {
-      const listener = () => {
-        callback();
-      };
-      ipcRenderer.on('auth:hide-loader', listener);
-      return () => {
-        ipcRenderer.removeListener('auth:hide-loader', listener);
-      };
+    onUserUpdated(callback: (user: User) => void): () => void {
+      // Use the events API to listen for auth.completed events (profile is included)
+      return api.events!.onEvent((type: string, payload: unknown) => {
+        if (type === EVENT_TYPES.AUTH_COMPLETED) {
+          const data = payload as { userId: string; profile: User };
+          callback(data.profile);
+        }
+      });
     },
   },
 
@@ -266,19 +311,19 @@ const api: API = {
    */
   error: {
     /**
-     * Listen for error notification events
+     * Listen for error notification events via EventBus
      * Requirements: error-notifications.1.1, error-notifications.1.2
      * @param {Function} callback - Callback function to execute when error notification is received
      * @returns {Function} Unsubscribe function to remove the listener
      */
     onNotify(callback: (message: string, context: string) => void): () => void {
-      const listener = (_event: any, message: string, context: string) => {
-        callback(message, context);
-      };
-      ipcRenderer.on('error:notify', listener);
-      return () => {
-        ipcRenderer.removeListener('error:notify', listener);
-      };
+      // Use the events API to listen for error.created events
+      return api.events!.onEvent((type: string, payload: unknown) => {
+        if (type === EVENT_TYPES.ERROR_CREATED) {
+          const data = payload as { message: string; context: string };
+          callback(data.message, data.context);
+        }
+      });
     },
   },
 
@@ -375,6 +420,126 @@ const api: API = {
       return await ipcRenderer.invoke('llm:test-connection', { provider, apiKey });
     },
   },
+
+  // Requirements: agents.2, agents.4, user-data-isolation.6.6
+  /**
+   * Agents API
+   * Provides methods for managing AI agents (chats)
+   * userId is automatically injected by main process
+   */
+  agents: {
+    /**
+     * Create a new agent
+     * Requirements: agents.2.3, agents.2.4, agents.2.5
+     * @param {string} name - Optional agent name
+     * @returns {Promise<{success: boolean, data?: Agent, error?: string}>}
+     */
+    async create(name?: string): Promise<{ success: boolean; data?: unknown; error?: string }> {
+      return await ipcRenderer.invoke('agents:create', { name });
+    },
+
+    /**
+     * List all non-archived agents for current user
+     * Requirements: agents.1.3, agents.10.2
+     * @returns {Promise<{success: boolean, data?: Agent[], error?: string}>}
+     */
+    async list(): Promise<{ success: boolean; data?: unknown; error?: string }> {
+      return await ipcRenderer.invoke('agents:list');
+    },
+
+    /**
+     * Get a specific agent by ID
+     * Requirements: agents.3.2, agents.10.4
+     * @param {string} agentId - Agent ID
+     * @returns {Promise<{success: boolean, data?: Agent, error?: string}>}
+     */
+    async get(agentId: string): Promise<{ success: boolean; data?: unknown; error?: string }> {
+      return await ipcRenderer.invoke('agents:get', { agentId });
+    },
+
+    /**
+     * Update an agent's name
+     * Requirements: agents.10.4
+     * @param {string} agentId - Agent ID
+     * @param {object} data - Update data
+     * @returns {Promise<{success: boolean, error?: string}>}
+     */
+    async update(
+      agentId: string,
+      data: { name?: string }
+    ): Promise<{ success: boolean; error?: string }> {
+      return await ipcRenderer.invoke('agents:update', { agentId, ...data });
+    },
+
+    /**
+     * Archive an agent (soft delete)
+     * Requirements: agents.10.4
+     * @param {string} agentId - Agent ID
+     * @returns {Promise<{success: boolean, error?: string}>}
+     */
+    async archive(agentId: string): Promise<{ success: boolean; error?: string }> {
+      return await ipcRenderer.invoke('agents:archive', { agentId });
+    },
+  },
+
+  // Requirements: agents.4, agents.7, user-data-isolation.6.6
+  /**
+   * Messages API
+   * Provides methods for managing agent messages
+   * Access control is handled by main process through AgentsRepository
+   */
+  messages: {
+    /**
+     * List all messages for an agent
+     * Requirements: agents.4.8, user-data-isolation.7.6
+     * @param {string} agentId - Agent ID
+     * @returns {Promise<{success: boolean, data?: Message[], error?: string}>}
+     */
+    async list(agentId: string): Promise<{ success: boolean; data?: unknown; error?: string }> {
+      return await ipcRenderer.invoke('messages:list', { agentId });
+    },
+
+    /**
+     * Get the last message for an agent (most recent)
+     * Returns null if no messages exist
+     * Requirements: agents.5.5
+     * @param {string} agentId - Agent ID
+     * @returns {Promise<{success: boolean, data?: Message | null, error?: string}>}
+     */
+    async getLast(agentId: string): Promise<{ success: boolean; data?: unknown; error?: string }> {
+      return await ipcRenderer.invoke('messages:get-last', { agentId });
+    },
+
+    /**
+     * Create a new message for an agent
+     * Requirements: agents.4.3, agents.7.1, agents.1.4
+     * @param {string} agentId - Agent ID
+     * @param {MessagePayloadAPI} payload - Message payload
+     * @returns {Promise<{success: boolean, data?: Message, error?: string}>}
+     */
+    async create(
+      agentId: string,
+      payload: MessagePayloadAPI
+    ): Promise<{ success: boolean; data?: unknown; error?: string }> {
+      return await ipcRenderer.invoke('messages:create', { agentId, payload });
+    },
+
+    /**
+     * Update a message's payload
+     * Requirements: agents.7.1
+     * @param {number} messageId - Message ID
+     * @param {string} agentId - Agent ID (for access control)
+     * @param {MessagePayloadAPI} payload - New message payload
+     * @returns {Promise<{success: boolean, error?: string}>}
+     */
+    async update(
+      messageId: number,
+      agentId: string,
+      payload: MessagePayloadAPI
+    ): Promise<{ success: boolean; error?: string }> {
+      return await ipcRenderer.invoke('messages:update', { messageId, agentId, payload });
+    },
+  },
 };
 
 // Requirements: testing.3.8
@@ -403,16 +568,52 @@ if (process.env.NODE_ENV === 'test') {
     async clearDataErrors(): Promise<{ success: boolean; error?: string }> {
       return await ipcRenderer.invoke('test:clear-data-errors');
     },
+
+    /**
+     * Delete current user from database (for testing corrupted state)
+     * Requirements: testing.3.1
+     * @returns {Promise<{success: boolean, error?: string}>}
+     */
+    async deleteCurrentUser(): Promise<{ success: boolean; error?: string }> {
+      return await ipcRenderer.invoke('test:delete-current-user');
+    },
+
+    /**
+     * Create agent with old message timestamp for testing date updates
+     * Requirements: testing.3.1
+     * @param minutesAgo - How many minutes ago the message should be
+     * @returns {Promise<{success: boolean, agentId?: string, timestamp?: string, error?: string}>}
+     */
+    async createAgentWithOldMessage(
+      minutesAgo: number
+    ): Promise<{ success: boolean; agentId?: string; timestamp?: string; error?: string }> {
+      return await ipcRenderer.invoke('test:create-agent-with-old-message', minutesAgo);
+    },
+
+    /**
+     * Create agent message for testing autoscroll behavior
+     * Requirements: testing.3.1
+     * @param agentId - Agent ID to create message for
+     * @param text - Message text
+     * @returns {Promise<{success: boolean, error?: string}>}
+     */
+    // @ts-expect-error - Type will be added to api.test interface
+    async createAgentMessage(
+      agentId: string,
+      text: string
+    ): Promise<{ success: boolean; error?: string }> {
+      return await ipcRenderer.invoke('test:create-agent-message', agentId, text);
+    },
   };
 
   api.ipcRenderer = {
-    invoke: (channel: string, ...args: any[]) => ipcRenderer.invoke(channel, ...args),
+    invoke: (channel: string, ...args: unknown[]) => ipcRenderer.invoke(channel, ...args),
   };
 }
 
 contextBridge.exposeInMainWorld('api', api);
 contextBridge.exposeInMainWorld('electron', {
   ipcRenderer: {
-    invoke: (channel: string, ...args: any[]) => ipcRenderer.invoke(channel, ...args),
+    invoke: (channel: string, ...args: unknown[]) => ipcRenderer.invoke(channel, ...args),
   },
 });

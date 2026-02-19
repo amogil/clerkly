@@ -8,7 +8,8 @@ import {
   clearTestTokens,
   completeOAuthFlow,
 } from './helpers/electron';
-import { MockOAuthServer } from './helpers/mock-oauth-server';
+import { createMockOAuthServer } from './helpers/electron';
+import type { MockOAuthServer } from './helpers/mock-oauth-server';
 
 /**
  * Complete OAuth Flow Functional Tests
@@ -30,23 +31,12 @@ test.describe('Complete OAuth Flow', () => {
   let context: ElectronTestContext;
   let mockServer: MockOAuthServer;
   const TEST_CLIENT_ID = 'test-client-id-12345';
-  const TEST_CLIENT_SECRET = 'test-client-secret-67890';
 
   test.beforeAll(async () => {
-    console.log('\n⚠️  WARNING: These tests will show real Electron windows on your screen!\n');
-
-    // Start mock OAuth server
-    mockServer = new MockOAuthServer({
-      port: 8889,
-      clientId: TEST_CLIENT_ID,
-      clientSecret: TEST_CLIENT_SECRET,
-    });
-
-    await mockServer.start();
+    mockServer = await createMockOAuthServer(8889);
   });
 
   test.afterAll(async () => {
-    // Stop mock OAuth server
     if (mockServer) {
       await mockServer.stop();
     }

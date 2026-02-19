@@ -1,13 +1,31 @@
 import { Loader2, CheckCircle2, Clock, Mic, AlertCircle, MessageCircle } from 'lucide-react';
-import type { AgentTaskStatus } from '@/app/types/agent-task';
+
+type StatusType =
+  | 'listening'
+  | 'processing'
+  | 'completed'
+  | 'scheduled'
+  | 'upcoming'
+  | 'waiting-input'
+  | 'requesting-info'
+  | 'working'
+  | 'error';
 
 interface StatusBadgeProps {
-  status: 'listening' | 'processing' | 'completed' | 'scheduled' | 'upcoming' | AgentTaskStatus;
+  status: StatusType;
   size?: 'sm' | 'md';
 }
 
 export function StatusBadge({ status, size = 'md' }: StatusBadgeProps) {
-  const configs = {
+  const configs: Record<
+    StatusType,
+    {
+      label: string;
+      icon: typeof Loader2;
+      className: string;
+      animate?: boolean;
+    }
+  > = {
     listening: {
       label: 'Listening',
       icon: Mic,
@@ -57,7 +75,7 @@ export function StatusBadge({ status, size = 'md' }: StatusBadgeProps) {
     },
   };
 
-  const config = configs[status];
+  const config = configs[status as keyof typeof configs];
   if (!config) {
     // Fallback if status is not recognized
     return null;

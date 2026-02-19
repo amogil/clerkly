@@ -4,7 +4,7 @@
    Feature: ui, Property 26: Перенаправление на Dashboard после успешной авторизации
    Feature: ui, Property 27: Перенаправление на Login после logout
    Preconditions: NavigationManager with various auth states and routes
-   Action: call initialize(), redirectToLogin(), redirectToDashboard()
+   Action: call initialize(), redirectToLogin(), redirectToAgents()
    Assertions: correct navigation behavior based on auth status
    Requirements: navigation.1.1, navigation.1.3, navigation.1.4 */
 
@@ -160,7 +160,7 @@ describe('NavigationManager Property Tests', () => {
 
   /* Feature: ui, Property 26: Перенаправление на Dashboard после успешной авторизации
      Preconditions: various current routes
-     Action: call redirectToDashboard()
+     Action: call redirectToAgents()
      Assertions: always navigates to /agents
      Requirements: navigation.1.3 */
   it('should always redirect to dashboard regardless of current route', () => {
@@ -177,7 +177,7 @@ describe('NavigationManager Property Tests', () => {
           const navigationManager = new NavigationManager(mockRouter);
 
           // Action
-          navigationManager.redirectToDashboard();
+          navigationManager.redirectToAgents();
 
           // Assertions
           expect(navigateMock).toHaveBeenCalledWith('/agents');

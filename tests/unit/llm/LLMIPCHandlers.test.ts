@@ -63,7 +63,7 @@ describe('LLMIPCHandlers', () => {
       apiKey: 'sk-test1234567890',
     });
 
-    expect(result).toEqual({ success: true });
+    expect(result).toEqual({ success: true, data: { success: true }, error: undefined });
     expect(LLMProviderFactory.createProvider).toHaveBeenCalledWith('openai');
     expect(mockProvider.testConnection).toHaveBeenCalledWith('sk-test1234567890');
 
@@ -166,5 +166,20 @@ describe('LLMIPCHandlers', () => {
     expect(LLMProviderFactory.createProvider).toHaveBeenCalledWith('openai');
     expect(LLMProviderFactory.createProvider).toHaveBeenCalledWith('anthropic');
     expect(LLMProviderFactory.createProvider).toHaveBeenCalledWith('google');
+  });
+
+  /* Preconditions: Handler called, provider throws non-Error object
+     Action: invoke handler, provider throws string
+     Assertions: returns 'Unknown error' message
+     Requirements: settings.3.4 */
+  it('should handle non-Error exception', async () => {
+    mockProvider.testConnection.mockRejectedValueOnce('String error');
+
+    const result = await handler(null, {
+      provider: 'openai',
+      apiKey: 'test-key',
+    });
+
+    expect(result).toEqual({ success: false, error: 'Unknown error' });
   });
 });

@@ -1,9 +1,16 @@
 // Requirements: google-oauth-auth.8.1, google-oauth-auth.8.2, google-oauth-auth.8.3, google-oauth-auth.8.4, google-oauth-auth.8.5, account-profile.1.2, account-profile.1.7
 
-import { ipcMain, IpcMainInvokeEvent, BrowserWindow } from 'electron';
+import { ipcMain, IpcMainInvokeEvent } from 'electron';
 import { OAuthClientManager } from './OAuthClientManager';
-import { UserProfileManager, UserProfile } from './UserProfileManager';
+import { UserManager, User } from './UserManager';
 import { Logger } from '../Logger';
+import { MainEventBus } from '../events/MainEventBus';
+import {
+  AuthCompletedEvent,
+  AuthFailedEvent,
+  ErrorCreatedEvent,
+  UserLogoutEvent,
+} from '../../shared/events/types';
 
 // Requirements: clerkly.3.8 - Use centralized Logger instead of console.*
 /**
@@ -13,20 +20,21 @@ import { Logger } from '../Logger';
 interface IPCResult {
   success: boolean;
   error?: string;
-  profile?: UserProfile | null;
+  user?: User | null;
   [key: string]: unknown;
 }
 
 /**
  * Auth IPC Handlers
  * Manages IPC communication between renderer and main processes for OAuth authentication
+ * Uses EventBus for auth events (auth.succeeded, auth.failed, profile.synced)
  * Requirements: google-oauth-auth.8, account-profile.1.2, account-profile.1.7
  */
 export class AuthIPCHandlers {
   // Requirements: clerkly.3.5, clerkly.3.7
   private logger = Logger.create('AuthIPCHandlers');
   private oauthClient: OAuthClientManager;
-  private profileManager: UserProfileManager | null = null;
+  private userManager: UserManager | null = null;
   private handlersRegistered: boolean = false;
 
   constructor(oauthClient: OAuthClientManager) {
@@ -36,11 +44,11 @@ export class AuthIPCHandlers {
   /**
    * Set profile manager for profile-related IPC handlers
    * Requirements: account-profile.1.2
-   * @param profileManager UserProfileManager instance
+   * @param userManager UserManager instance
    */
-  setProfileManager(profileManager: UserProfileManager): void {
-    this.profileManager = profileManager;
-    this.logger.info('Profile manager set');
+  setUserManager(userManager: UserManager): void {
+    this.userManager = userManager;
+    this.logger.info('User manager set');
   }
 
   /**
@@ -56,8 +64,8 @@ export class AuthIPCHandlers {
     ipcMain.handle('auth:start-login', this.handleStartLogin.bind(this));
     ipcMain.handle('auth:get-status', this.handleGetStatus.bind(this));
     ipcMain.handle('auth:logout', this.handleLogout.bind(this));
-    ipcMain.handle('auth:get-profile', this.handleGetProfile.bind(this));
-    ipcMain.handle('auth:refresh-profile', this.handleRefreshProfile.bind(this));
+    ipcMain.handle('auth:get-user', this.handleGetUser.bind(this));
+    ipcMain.handle('auth:refresh-user', this.handleRefreshProfile.bind(this));
 
     this.handlersRegistered = true;
     this.logger.info('Handlers registered');
@@ -75,8 +83,8 @@ export class AuthIPCHandlers {
     ipcMain.removeHandler('auth:start-login');
     ipcMain.removeHandler('auth:get-status');
     ipcMain.removeHandler('auth:logout');
-    ipcMain.removeHandler('auth:get-profile');
-    ipcMain.removeHandler('auth:refresh-profile');
+    ipcMain.removeHandler('auth:get-user');
+    ipcMain.removeHandler('auth:refresh-user');
 
     this.handlersRegistered = false;
     this.logger.info('Handlers unregistered');
@@ -144,8 +152,9 @@ export class AuthIPCHandlers {
       this.logger.info('Logging out');
       await this.oauthClient.logout();
 
-      // Send event to all renderer processes
-      this.sendAuthEvent('auth:logout-complete', { success: true });
+      // Publish user.logout event via EventBus
+      const eventBus = MainEventBus.getInstance();
+      eventBus.publish(new UserLogoutEvent());
 
       return {
         success: true,
@@ -161,37 +170,37 @@ export class AuthIPCHandlers {
   }
 
   /**
-   * Handle get profile request
-   * Returns cached profile from local storage
+   * Handle get user request
+   * Returns current user from database
    * Requirements: account-profile.1.2, account-profile.1.7
    * @param event IPC event
-   * @returns IPC result with profile data or null
+   * @returns IPC result with user data or null
    */
-  private async handleGetProfile(_event: IpcMainInvokeEvent): Promise<IPCResult> {
+  private async handleGetUser(_event: IpcMainInvokeEvent): Promise<IPCResult> {
     try {
       // Requirements: account-profile.1.2, account-profile.1.7
-      if (!this.profileManager) {
-        this.logger.warn('Profile manager not set');
+      if (!this.userManager) {
+        this.logger.warn('User manager not set');
         return {
           success: true,
-          profile: null,
+          user: null,
         };
       }
 
-      this.logger.info('Getting profile');
-      const profile = await this.profileManager.loadProfile();
+      this.logger.info('Getting user');
+      const user = this.userManager.getCurrentUser();
 
       return {
         success: true,
-        profile: profile,
+        user: user,
       };
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      this.logger.error(`Failed to get profile: ${errorMessage}`);
+      this.logger.error(`Failed to get user: ${errorMessage}`);
       return {
         success: false,
-        error: errorMessage || 'Failed to get profile',
-        profile: null,
+        error: errorMessage || 'Failed to get user',
+        user: null,
       };
     }
   }
@@ -201,44 +210,31 @@ export class AuthIPCHandlers {
    * Fetches fresh profile data from Google API
    * Requirements: account-profile.1.5
    * @param event IPC event
-   * @returns IPC result with fresh profile data or null
+   * @returns IPC result with fresh user data or null
    */
   private async handleRefreshProfile(_event: IpcMainInvokeEvent): Promise<IPCResult> {
     try {
       // Requirements: account-profile.1.5
-      if (!this.profileManager) {
-        this.logger.warn('Profile manager not set');
+      if (!this.userManager) {
+        this.logger.warn('User manager not set');
         return {
           success: false,
-          error: 'Profile manager not initialized',
-          profile: null,
+          error: 'User manager not initialized',
+          user: null,
         };
       }
 
       this.logger.info('Refreshing profile');
-      const profile = await this.profileManager.fetchProfile();
-      Logger.info(
-        'AuthIPCHandlers',
-        `Profile refresh completed, result: ${profile ? 'success' : 'null'}`
-      );
-
-      // Broadcast profile update event to all windows
-      // Requirements: account-profile.1.5 - Notify UI about profile updates
-      const windows = BrowserWindow.getAllWindows();
-      windows.forEach((window) => {
-        window.webContents.send('auth:profile-updated', profile);
-      });
+      const user = await this.userManager.fetchProfile();
+      this.logger.info(`Profile refresh completed, result: ${user ? 'success' : 'null'}`);
 
       return {
         success: true,
-        profile: profile,
+        user: user,
       };
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      Logger.error(
-        'AuthIPCHandlers',
-        `[AuthIPCHandlers] Failed to refresh profile: ${errorMessage}`
-      );
+      this.logger.error(`Failed to refresh user: ${errorMessage}`);
       return {
         success: false,
         error: errorMessage || 'Failed to refresh profile',
@@ -248,38 +244,38 @@ export class AuthIPCHandlers {
   }
 
   /**
-   * Send auth event to all renderer processes
+   * Publish auth.completed event via EventBus
+   * Called after successful OAuth flow and profile fetch
    * Requirements: google-oauth-auth.8.4
-   * @param channel Event channel
-   * @param data Event data
+   * @param userId User ID from profile (required)
+   * @param profile User profile data
    */
-  private sendAuthEvent(channel: string, data: Record<string, unknown>): void {
-    const windows = BrowserWindow.getAllWindows();
-    windows.forEach((window) => {
-      window.webContents.send(channel, data);
-    });
+  sendAuthSuccess(userId: string, profile: User): void {
+    const eventBus = MainEventBus.getInstance();
+    eventBus.publish(
+      new AuthCompletedEvent(userId, {
+        id: profile.userId,
+        email: profile.email,
+        name: profile.name || '',
+        picture: undefined,
+      })
+    );
   }
 
   /**
-   * Send auth success event to all renderer processes
+   * Publish auth.failed event via EventBus
+   * Called when OAuth flow fails
    * Requirements: google-oauth-auth.8.4
+   * @param code Error code
+   * @param message Human-readable error message
    */
-  sendAuthSuccess(): void {
-    this.sendAuthEvent('auth:success', { authorized: true });
+  sendAuthError(code: string, message: string): void {
+    const eventBus = MainEventBus.getInstance();
+    eventBus.publish(new AuthFailedEvent(code, message));
   }
 
   /**
-   * Send auth error event to all renderer processes
-   * Requirements: google-oauth-auth.8.4
-   * @param error Error message
-   * @param errorCode Error code
-   */
-  sendAuthError(error: string, errorCode?: string): void {
-    this.sendAuthEvent('auth:error', { error, errorCode });
-  }
-
-  /**
-   * Send error notification to all renderer processes
+   * Send error notification via EventBus
    * Requirements: error-notifications.1.1, error-notifications.1.4
    * @param message Error message
    * @param context Context of the operation that failed
@@ -288,10 +284,8 @@ export class AuthIPCHandlers {
     // Requirements: error-notifications.1.4 - Log to console
     this.logger.error(`[${context}] Error: ${message}`);
 
-    // Requirements: error-notifications.1.1 - Notify renderer
-    const windows = BrowserWindow.getAllWindows();
-    windows.forEach((window) => {
-      window.webContents.send('error:notify', message, context);
-    });
+    // Requirements: error-notifications.1.1 - Publish error.created event
+    const eventBus = MainEventBus.getInstance();
+    eventBus.publish(new ErrorCreatedEvent(message, context));
   }
 }

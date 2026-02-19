@@ -10,7 +10,8 @@ import {
   ElectronTestContext,
   completeOAuthFlow,
 } from './helpers/electron';
-import { MockOAuthServer } from './helpers/mock-oauth-server';
+import { createMockOAuthServer } from './helpers/electron';
+import type { MockOAuthServer } from './helpers/mock-oauth-server';
 import { MockLLMServer } from './helpers/mock-llm-server';
 
 let context: ElectronTestContext;
@@ -19,14 +20,7 @@ let mockLLMServer: MockLLMServer;
 const TEST_CLIENT_ID = 'test-client-id-12345';
 
 test.beforeAll(async () => {
-  // Start mock OAuth server
-  mockOAuthServer = new MockOAuthServer({
-    port: 8892,
-    clientId: TEST_CLIENT_ID,
-    clientSecret: 'test-client-secret-67890',
-  });
-
-  await mockOAuthServer.start();
+  mockOAuthServer = await createMockOAuthServer(8892);
 
   // Set user profile data for mock OAuth server
   mockOAuthServer.setUserProfile({
@@ -154,7 +148,19 @@ test('54.3: should send request with correct parameters', async () => {
    Assertions: Success notification is shown
    Requirements: settings.3.4, settings.3.7 */
 test('54.4: should show success notification on valid API key', async () => {
-  // Mock server is already set to success mode
+  // Wait for any initial error toasts to disappear (from loading settings)
+  await context.window.waitForTimeout(2000);
+
+  // Close any existing toasts
+  const existingToasts = context.window.locator('[data-sonner-toast]');
+  const count = await existingToasts.count();
+  for (let i = 0; i < count; i++) {
+    const closeButton = existingToasts.nth(i).locator('button[aria-label="Close toast"]');
+    if (await closeButton.isVisible()) {
+      await closeButton.click();
+    }
+  }
+  await context.window.waitForTimeout(500);
 
   // Enter API key
   const apiKeyInput = context.window.locator('input[placeholder="Enter your API key"]');
@@ -165,8 +171,8 @@ test('54.4: should show success notification on valid API key', async () => {
   const testButton = context.window.locator('button:has-text("Test Connection")');
   await testButton.click();
 
-  // Wait for test to complete
-  await context.window.waitForTimeout(1000);
+  // Wait for test to complete (increased timeout for mock server response)
+  await context.window.waitForTimeout(3000);
 
   // Check that success toast is displayed
   const successToast = context.window

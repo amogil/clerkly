@@ -65,12 +65,22 @@ export class OpenAIProvider implements ILLMProvider {
    *
    * Requirements: settings.3.8 - Error messages for different HTTP statuses
    */
-  private mapErrorToMessage(status: number, errorData: any): string {
+  private mapErrorToMessage(status: number, errorData: unknown): string {
     const message = ERROR_MESSAGES[status as keyof typeof ERROR_MESSAGES];
     if (message) {
       return message;
     }
-    return `Connection failed: ${errorData.error?.message || ERROR_MESSAGES.unknown}`;
+    // Type guard for error data structure
+    const errorMessage =
+      typeof errorData === 'object' &&
+      errorData !== null &&
+      'error' in errorData &&
+      typeof (errorData as { error?: { message?: string } }).error === 'object' &&
+      (errorData as { error?: { message?: string } }).error !== null &&
+      'message' in (errorData as { error: { message?: string } }).error
+        ? (errorData as { error: { message: string } }).error.message
+        : ERROR_MESSAGES.unknown;
+    return `Connection failed: ${errorMessage}`;
   }
 
   /**
@@ -78,8 +88,14 @@ export class OpenAIProvider implements ILLMProvider {
    *
    * Requirements: settings.3.8 - Handle timeout and network errors
    */
-  private mapExceptionToMessage(error: any): string {
-    if (error.name === 'AbortError' || error.name === 'TimeoutError') {
+  private mapExceptionToMessage(error: unknown): string {
+    // Type guard for error with name property
+    if (
+      typeof error === 'object' &&
+      error !== null &&
+      'name' in error &&
+      (error.name === 'AbortError' || error.name === 'TimeoutError')
+    ) {
       return ERROR_MESSAGES.timeout;
     }
     return ERROR_MESSAGES.network;

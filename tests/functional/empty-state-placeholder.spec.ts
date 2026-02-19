@@ -1,0 +1,287 @@
+/* Preconditions: User logged in with agent that has no messages
+   Action: Navigate to agents page and view agent with no messages
+   Assertions: 
+   - EmptyStatePlaceholder is visible when agent has no messages
+   - Placeholder shows animated logo, heading, description, and 4 prompt buttons
+   - Prompt buttons send message when clicked
+   - Placeholder disappears after sending first message
+   Requirements: agents.4.14-4.18 */
+
+import { test, expect, _electron as electron, ElectronApplication, Page } from '@playwright/test';
+import path from 'path';
+import { createMockOAuthServer } from './helpers/electron';
+import type { MockOAuthServer } from './helpers/mock-oauth-server';
+import { completeOAuthFlow } from './helpers/electron';
+
+let mockServer: MockOAuthServer;
+
+test.beforeAll(async () => {
+  mockServer = await createMockOAuthServer(8896);
+});
+
+test.afterAll(async () => {
+  if (mockServer) {
+    await mockServer.stop();
+  }
+});
+
+test.describe('Agents - EmptyStatePlaceholder', () => {
+  let electronApp: ElectronApplication;
+  let window: Page;
+
+  test.beforeEach(async () => {
+    // Set user profile data for tests
+    mockServer.setUserProfile({
+      id: '070FF5B781',
+      email: 'empty.state.test@example.com',
+      name: 'Empty State Test User',
+      given_name: 'Empty',
+      family_name: 'State Test User',
+    });
+
+    // Create unique temp directory for this test
+    const testDataPath = path.join(
+      require('os').tmpdir(),
+      `clerkly-empty-state-test-${Date.now()}-${Math.random().toString(36).substring(7)}`
+    );
+
+    // Launch Electron app with clean state (no authentication)
+    electronApp = await electron.launch({
+      args: [
+        path.join(__dirname, '../../dist/main/main/index.js'),
+        '--user-data-dir',
+        testDataPath,
+      ],
+      env: {
+        ...process.env,
+        NODE_ENV: 'test',
+        CLERKLY_GOOGLE_API_URL: mockServer.getBaseUrl(),
+        CLERKLY_OAUTH_CLIENT_ID: 'test-client-id-12345',
+        CLERKLY_OAUTH_CLIENT_SECRET: 'test-client-secret-67890',
+      },
+    });
+
+    window = await electronApp.firstWindow();
+    await window.waitForLoadState('domcontentloaded');
+  });
+
+  test.afterEach(async () => {
+    await electronApp.close();
+  });
+
+  test('should show EmptyStatePlaceholder for new agent with no messages', async () => {
+    // Wait for login screen
+    const loginScreen = window.locator('[data-testid="login-screen"]');
+    await expect(loginScreen).toBeVisible({ timeout: 10000 });
+
+    // Complete OAuth flow
+    await completeOAuthFlow(electronApp, window);
+
+    // Wait for agents page to load
+    await window.waitForSelector('[data-testid="agents"]', { timeout: 15000 });
+
+    // Wait a bit for auto-created agent
+    await window.waitForTimeout(2000);
+
+    // Verify EmptyStatePlaceholder is visible with new design
+    const emptyStateHeading = window.locator('text=Assign a task to the agent');
+    await expect(emptyStateHeading).toBeVisible({ timeout: 5000 });
+
+    // Verify description text is visible
+    const emptyStateDescription = window.locator(
+      'text=Transcribes meetings, extracts tasks, creates Jira tickets'
+    );
+    await expect(emptyStateDescription).toBeVisible();
+
+    // Verify animated logo is present
+    const logo = window.locator('svg.logo-animated');
+    await expect(logo).toBeVisible();
+
+    // Verify 4 prompt buttons are visible
+    const promptButtons = window.locator('button:has-text("Transcribe")');
+    await expect(promptButtons).toBeVisible();
+  });
+
+  test('should show correct styling for EmptyStatePlaceholder', async () => {
+    // Wait for login screen
+    const loginScreen = window.locator('[data-testid="login-screen"]');
+    await expect(loginScreen).toBeVisible({ timeout: 10000 });
+
+    // Complete OAuth flow
+    await completeOAuthFlow(electronApp, window);
+
+    // Wait for agents page to load
+    await window.waitForSelector('[data-testid="agents"]', { timeout: 15000 });
+    await window.waitForTimeout(2000);
+
+    // Verify heading styling
+    const heading = window.locator('text=Assign a task to the agent');
+    await expect(heading).toBeVisible();
+
+    // Verify the heading is an h2 element
+    const headingElement = await heading.evaluateHandle((el) => el.tagName);
+    const tagName = await headingElement.jsonValue();
+    expect(tagName).toBe('H2');
+
+    // Verify prompt buttons have correct styling
+    const promptButton = window.locator('button').filter({ hasText: 'Transcribe' }).first();
+    await expect(promptButton).toBeVisible();
+
+    // Verify button has rounded-xl class
+    const hasRoundedXl = await promptButton.evaluate((el) => el.classList.contains('rounded-xl'));
+    expect(hasRoundedXl).toBe(true);
+  });
+
+  test('should hide EmptyStatePlaceholder after sending first message', async () => {
+    // Wait for login screen
+    const loginScreen = window.locator('[data-testid="login-screen"]');
+    await expect(loginScreen).toBeVisible({ timeout: 10000 });
+
+    // Complete OAuth flow
+    await completeOAuthFlow(electronApp, window);
+
+    // Wait for agents page to load
+    await window.waitForSelector('[data-testid="agents"]', { timeout: 15000 });
+    await window.waitForTimeout(2000);
+
+    // Verify EmptyStatePlaceholder is visible initially
+    const emptyStateHeading = window.locator('text=Assign a task to the agent');
+    await expect(emptyStateHeading).toBeVisible({ timeout: 5000 });
+
+    // Find input field and send button
+    const inputField = window.locator('textarea');
+    const sendButton = window.locator('button:has-text("")').last(); // Send button with icon
+
+    // Type a message
+    await inputField.fill('Hello, this is my first message!');
+    await window.waitForTimeout(500);
+
+    // Click send button
+    await sendButton.click();
+    await window.waitForTimeout(3000); // Increased timeout for message to be saved and displayed
+
+    // First check if message is displayed
+    const userMessage = window.locator('text=Hello, this is my first message!');
+    await expect(userMessage).toBeVisible({ timeout: 10000 });
+
+    // Then verify EmptyStatePlaceholder is no longer visible
+    await expect(emptyStateHeading).not.toBeVisible({ timeout: 5000 });
+  });
+
+  test('should show EmptyStatePlaceholder when creating new agent', async () => {
+    // Wait for login screen
+    const loginScreen = window.locator('[data-testid="login-screen"]');
+    await expect(loginScreen).toBeVisible({ timeout: 10000 });
+
+    // Complete OAuth flow
+    await completeOAuthFlow(electronApp, window);
+
+    // Wait for agents page to load
+    await window.waitForSelector('[data-testid="agents"]', { timeout: 15000 });
+    await window.waitForTimeout(2000);
+
+    // Verify EmptyStatePlaceholder is visible for first (auto-created) agent
+    const emptyStateHeading = window.locator('text=Assign a task to the agent');
+    await expect(emptyStateHeading).toBeVisible({ timeout: 5000 });
+
+    // Click "New chat" button to create second agent
+    const newChatButton = window.locator('.bg-sky-400').first();
+    await newChatButton.click();
+
+    // Wait for new agent to be created and UI to update
+    await window.waitForTimeout(2000);
+
+    // Verify EmptyStatePlaceholder is still visible for new agent (also has no messages)
+    await expect(emptyStateHeading).toBeVisible({ timeout: 5000 });
+
+    // Verify description is visible
+    const emptyStateDescription = window.locator(
+      'text=Transcribes meetings, extracts tasks, creates Jira tickets'
+    );
+    await expect(emptyStateDescription).toBeVisible();
+  });
+
+  test('should center EmptyStatePlaceholder in messages area', async () => {
+    // Wait for login screen
+    const loginScreen = window.locator('[data-testid="login-screen"]');
+    await expect(loginScreen).toBeVisible({ timeout: 10000 });
+
+    // Complete OAuth flow
+    await completeOAuthFlow(electronApp, window);
+
+    // Wait for agents page to load
+    await window.waitForSelector('[data-testid="agents"]', { timeout: 15000 });
+    await window.waitForTimeout(2000);
+
+    // Verify EmptyStatePlaceholder is visible
+    const emptyStateHeading = window.locator('text=Assign a task to the agent');
+    await expect(emptyStateHeading).toBeVisible({ timeout: 5000 });
+
+    // Get the parent container and verify it has centering classes
+    const container = window.locator('.flex.flex-col.items-center.justify-center').first();
+    await expect(container).toBeVisible();
+
+    // Verify the container has space-y-8 class (spacing between elements)
+    const hasSpacing = await container.evaluate((el) => el.classList.contains('space-y-8'));
+    expect(hasSpacing).toBe(true);
+  });
+
+  test('should show 4 prompt suggestion buttons', async () => {
+    // Wait for login screen
+    const loginScreen = window.locator('[data-testid="login-screen"]');
+    await expect(loginScreen).toBeVisible({ timeout: 10000 });
+
+    // Complete OAuth flow
+    await completeOAuthFlow(electronApp, window);
+
+    // Wait for agents page to load
+    await window.waitForSelector('[data-testid="agents"]', { timeout: 15000 });
+    await window.waitForTimeout(2000);
+
+    // Verify all 4 prompt buttons are visible
+    const transcribeButton = window.locator('button:has-text("Transcribe my latest meeting")');
+    await expect(transcribeButton).toBeVisible();
+
+    const extractButton = window.locator(
+      'button:has-text("Extract action items from today\'s standup")'
+    );
+    await expect(extractButton).toBeVisible();
+
+    const jiraButton = window.locator('button:has-text("Create Jira tickets from meeting notes")');
+    await expect(jiraButton).toBeVisible();
+
+    const summaryButton = window.locator('button:has-text("Send summary to the team")');
+    await expect(summaryButton).toBeVisible();
+  });
+
+  test('should send message when clicking prompt button', async () => {
+    // Wait for login screen
+    const loginScreen = window.locator('[data-testid="login-screen"]');
+    await expect(loginScreen).toBeVisible({ timeout: 10000 });
+
+    // Complete OAuth flow
+    await completeOAuthFlow(electronApp, window);
+
+    // Wait for agents page to load
+    await window.waitForSelector('[data-testid="agents"]', { timeout: 15000 });
+    await window.waitForTimeout(2000);
+
+    // Verify EmptyStatePlaceholder is visible
+    const emptyStateHeading = window.locator('text=Assign a task to the agent');
+    await expect(emptyStateHeading).toBeVisible({ timeout: 5000 });
+
+    // Click on first prompt button
+    const transcribeButton = window.locator('button:has-text("Transcribe my latest meeting")');
+    await transcribeButton.click();
+
+    // Wait for message to be sent
+    await window.waitForTimeout(1000);
+
+    // Verify EmptyStatePlaceholder is no longer visible
+    await expect(emptyStateHeading).not.toBeVisible({ timeout: 5000 });
+
+    // Verify message is displayed
+    const userMessage = window.locator('text=Transcribe my latest meeting');
+    await expect(userMessage).toBeVisible({ timeout: 5000 });
+  });
+});

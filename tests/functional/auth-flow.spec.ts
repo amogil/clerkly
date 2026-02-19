@@ -7,7 +7,8 @@ import {
   ElectronTestContext,
   completeOAuthFlow,
 } from './helpers/electron';
-import { MockOAuthServer } from './helpers/mock-oauth-server';
+import { createMockOAuthServer } from './helpers/electron';
+import type { MockOAuthServer } from './helpers/mock-oauth-server';
 
 /**
  * Functional tests for OAuth authentication flow
@@ -28,24 +29,12 @@ test.describe('Authentication Flow', () => {
   let mockServer: MockOAuthServer;
 
   test.beforeAll(async () => {
-    console.log('\n⚠️  WARNING: These tests will show real Electron windows on your screen!\n');
-
-    // Start mock OAuth server for all tests
-    mockServer = new MockOAuthServer({
-      port: 8891,
-      clientId: 'test-client-id-12345',
-      clientSecret: 'test-client-secret-67890',
-    });
-
-    await mockServer.start();
-    console.log(`[TEST] Mock OAuth server started at ${mockServer.getBaseUrl()}`);
+    mockServer = await createMockOAuthServer(8891);
   });
 
   test.afterAll(async () => {
-    // Stop mock server after all tests
     if (mockServer) {
       await mockServer.stop();
-      console.log('[TEST] Mock OAuth server stopped');
     }
   });
 
@@ -265,16 +254,7 @@ test('should NOT show loader immediately after login click, only after deep link
   let mockServer: MockOAuthServer | undefined;
 
   try {
-    // Start mock OAuth server
-    mockServer = new MockOAuthServer({
-      port: 8894,
-      clientId: 'test-client-id-12345',
-      clientSecret: 'test-client-secret-67890',
-    });
-
-    await mockServer.start();
-    console.log(`[TEST] Mock OAuth server started at ${mockServer.getBaseUrl()}`);
-
+    mockServer = await createMockOAuthServer(8891);
     // Set user profile data
     mockServer.setUserProfile({
       id: '123456789',
@@ -339,7 +319,6 @@ test('should NOT show loader immediately after login click, only after deep link
     }
     if (mockServer) {
       await mockServer.stop();
-      console.log('[TEST] Mock OAuth server stopped');
     }
   }
 });

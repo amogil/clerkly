@@ -52,8 +52,8 @@ export class MigrationRunner {
   }
 
   /**
-   * Инициализирует таблицу отслеживания миграций
-   * Создает таблицу schema_migrations для отслеживания примененных миграций
+   * Initializes migration tracking table
+   * Creates schema_migrations table for tracking applied migrations
    * Requirements: clerkly.1   */
   initializeMigrationTable(): void {
     try {
@@ -75,8 +75,8 @@ export class MigrationRunner {
   }
 
   /**
-   * Возвращает текущую версию схемы
-   * Requirements: clerkly.1   * @returns {number} Текущая версия схемы (0 если миграции не применены)
+   * Returns current schema version
+   * Requirements: clerkly.1   * @returns {number} Current schema version (0 if no migrations applied)
    */
   getCurrentVersion(): number {
     try {
@@ -94,8 +94,8 @@ export class MigrationRunner {
   }
 
   /**
-   * Возвращает список примененных версий миграций
-   * Requirements: clerkly.1   * @returns {number[]} Массив примененных версий миграций
+   * Returns list of applied migration versions
+   * Requirements: clerkly.1   * @returns {number[]} Array of applied migration versions
    */
   getAppliedMigrations(): number[] {
     try {
@@ -113,12 +113,12 @@ export class MigrationRunner {
   }
 
   /**
-   * Загружает файлы миграций из директории
-   * Requirements: clerkly.1   * @returns {Migration[]} Массив объектов миграций, отсортированных по версии
+   * Loads migration files from directory
+   * Requirements: clerkly.1   * @returns {Migration[]} Array of migration objects sorted by version
    */
   loadMigrations(): Migration[] {
     try {
-      // Проверяем существование директории миграций
+      // Check if migrations directory exists
       if (!fs.existsSync(this.migrationsPath)) {
         return [];
       }
@@ -127,31 +127,37 @@ export class MigrationRunner {
       const migrations: Migration[] = [];
 
       for (const file of files) {
-        // Пропускаем не-SQL файлы и .gitkeep
+        // Skip non-SQL files and .gitkeep
         if (!file.endsWith('.sql') || file === '.gitkeep') {
           continue;
         }
 
-        // Парсим имя файла: 001_initial_schema.sql
+        // Parse filename: 001_initial_schema.sql
         const match = file.match(/^(\d+)_(.+)\.sql$/);
         if (!match) {
           this.logger.warn(`Skipping invalid migration file: ${file}`);
           continue;
         }
 
-        const version = parseInt(match[1], 10);
+        const versionStr = match[1];
         const name = match[2];
 
-        // Читаем содержимое файла
+        if (!versionStr || !name) {
+          throw new Error(`Migration file ${file} has invalid format: missing version or name`);
+        }
+
+        const version = parseInt(versionStr, 10);
+
+        // Read file content
         const filePath = path.join(this.migrationsPath, file);
         const content = fs.readFileSync(filePath, 'utf-8');
 
-        // Разделяем на up и down миграции
+        // Split into up and down migrations
         const parts = content.split('-- DOWN');
-        const up = parts[0].replace('-- UP', '').trim();
-        const down = parts[1] ? parts[1].trim() : '';
+        const up = parts[0]?.replace('-- UP', '').trim() ?? '';
+        const down = parts[1]?.trim() ?? '';
 
-        // Валидация: up миграция обязательна
+        // Validation: up migration is required
         if (!up) {
           throw new Error(`Migration ${file} has empty UP section`);
         }
@@ -164,10 +170,10 @@ export class MigrationRunner {
         });
       }
 
-      // Сортируем по версии
+      // Sort by version
       migrations.sort((a, b) => a.version - b.version);
 
-      // Валидация: проверяем уникальность версий
+      // Validation: check version uniqueness
       const versions = migrations.map((m) => m.version);
       const uniqueVersions = new Set(versions);
       if (versions.length !== uniqueVersions.size) {
@@ -182,17 +188,17 @@ export class MigrationRunner {
   }
 
   /**
-   * Запускает все pending миграции
-   * Создает таблицу migrations для отслеживания
-   * Выполняет миграции в порядке возрастания версий
+   * Runs all pending migrations
+   * Creates migrations table for tracking
+   * Executes migrations in ascending version order
    * Requirements: clerkly.1   * @returns {MigrationResult}
    */
   runMigrations(): MigrationResult {
     try {
-      // Инициализируем таблицу миграций
+      // Initialize migrations table
       this.initializeMigrationTable();
 
-      // Загружаем все миграции
+      // Load all migrations
       const allMigrations = this.loadMigrations();
 
       if (allMigrations.length === 0) {
@@ -203,10 +209,10 @@ export class MigrationRunner {
         };
       }
 
-      // Получаем примененные миграции
+      // Get applied migrations
       const appliedVersions = new Set(this.getAppliedMigrations());
 
-      // Фильтруем pending миграции
+      // Filter pending migrations
       const pendingMigrations = allMigrations.filter((m) => !appliedVersions.has(m.version));
 
       if (pendingMigrations.length === 0) {
@@ -217,17 +223,17 @@ export class MigrationRunner {
         };
       }
 
-      // Применяем каждую pending миграцию в транзакции
+      // Apply each pending migration in a transaction
       let appliedCount = 0;
 
       for (const migration of pendingMigrations) {
         try {
-          // Выполняем миграцию в транзакции
+          // Execute migration in transaction
           const applyMigration = this.db.transaction(() => {
-            // Выполняем UP миграцию
+            // Execute UP migration
             this.db.exec(migration.up);
 
-            // Записываем в таблицу миграций
+            // Record in migrations table
             this.db
               .prepare(
                 `
@@ -248,7 +254,7 @@ export class MigrationRunner {
         } catch (migrationError: unknown) {
           const errorMessage =
             migrationError instanceof Error ? migrationError.message : 'Unknown error';
-          // Откат при ошибке миграции
+          // Rollback on migration error
           return {
             success: false,
             appliedCount,
@@ -273,15 +279,15 @@ export class MigrationRunner {
   }
 
   /**
-   * Откатывает последнюю примененную миграцию
+   * Rolls back the last applied migration
    * Requirements: clerkly.1   * @returns {MigrationResult}
    */
   rollbackLastMigration(): MigrationResult {
     try {
-      // Инициализируем таблицу миграций
+      // Initialize migrations table
       this.initializeMigrationTable();
 
-      // Получаем последнюю примененную миграцию
+      // Get last applied migration
       const lastMigration = this.db
         .prepare(
           `
@@ -299,10 +305,10 @@ export class MigrationRunner {
         };
       }
 
-      // Загружаем все миграции
+      // Load all migrations
       const allMigrations = this.loadMigrations();
 
-      // Находим миграцию для отката
+      // Find migration to rollback
       const migration = allMigrations.find((m) => m.version === lastMigration.version);
 
       if (!migration) {
@@ -312,7 +318,7 @@ export class MigrationRunner {
         };
       }
 
-      // Проверяем наличие DOWN миграции
+      // Check for DOWN migration
       if (!migration.down) {
         return {
           success: false,
@@ -320,13 +326,13 @@ export class MigrationRunner {
         };
       }
 
-      // Выполняем откат в транзакции
+      // Execute rollback in transaction
       try {
         const rollback = this.db.transaction(() => {
-          // Выполняем DOWN миграцию
+          // Execute DOWN migration
           this.db.exec(migration.down);
 
-          // Удаляем запись из таблицы миграций
+          // Remove record from migrations table
           this.db.prepare('DELETE FROM schema_migrations WHERE version = ?').run(migration.version);
         });
 
@@ -360,24 +366,24 @@ export class MigrationRunner {
   }
 
   /**
-   * Возвращает статус миграций
+   * Returns migration status
    * Requirements: clerkly.1   * @returns {MigrationStatus}
    */
   getStatus(): MigrationStatus {
     try {
-      // Инициализируем таблицу миграций
+      // Initialize migrations table
       this.initializeMigrationTable();
 
-      // Получаем текущую версию
+      // Get current version
       const currentVersion = this.getCurrentVersion();
 
-      // Загружаем все миграции
+      // Load all migrations
       const allMigrations = this.loadMigrations();
 
-      // Получаем примененные миграции
+      // Get applied migrations
       const appliedVersions = new Set(this.getAppliedMigrations());
 
-      // Фильтруем pending миграции
+      // Filter pending migrations
       const pendingMigrations = allMigrations
         .filter((m) => !appliedVersions.has(m.version))
         .map((m) => ({

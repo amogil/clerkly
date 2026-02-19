@@ -588,3 +588,39 @@
 8. **Error Handler** - Централизованная обработка ошибок
 9. **Loader Functionality** - Индикация процесса авторизации
 10. **Sign Out Flow** - Полный цикл выхода из системы
+
+---
+
+## 12. Рефакторинг: DataManager → UserSettingsManager
+
+### Обзор
+
+В рамках рефакторинга системы хранения данных (см. `.kiro/specs/database-refactoring/tasks.md`), необходимо обновить TokenStorageManager для использования UserSettingsManager вместо DataManager.
+
+**Статус:** ✅ Выполнено
+
+### 12.1 Обновить TokenStorageManager
+- [x] Обновить `src/main/auth/TokenStorageManager.ts`:
+  - Заменить `DataManager` на `UserSettingsManager` в конструкторе
+  - Обновить импорты
+  - Обновить комментарии с Requirements
+- _Requirements: google-oauth-auth.4, user-data-isolation.6.5_
+
+### 12.2 Обновить тесты TokenStorageManager
+- [x] Обновить `tests/unit/auth/TokenStorageManager.test.ts`:
+  - Заменить моки DataManager на UserSettingsManager
+  - Обновить описания тестов
+- [x] Обновить `tests/property/auth/TokenStorageManager.property.test.ts`:
+  - Заменить моки DataManager на UserSettingsManager
+- _Requirements: google-oauth-auth.4.1, google-oauth-auth.4.2, google-oauth-auth.4.3_
+
+### 12.3 Валидация
+- [x] Выполнить `npm run validate`
+- [x] Убедиться, что все тесты проходят
+- _Requirements: google-oauth-auth.4_
+
+### Примечания
+
+- TokenStorageManager использует UserSettingsManager для хранения токенов в таблице user_data
+- Токены автоматически изолируются по user_id через UserSettingsManager
+- Изменения минимальны: только переименование зависимости и обновление импортов
