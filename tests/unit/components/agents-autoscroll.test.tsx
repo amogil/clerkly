@@ -77,9 +77,12 @@ describe('Agents Autoscroll', () => {
 
   /* Preconditions: Component with messages, new message arrives, user is in bottom third
      Action: New message is added to messages array
-     Assertions: scrollIntoView is called because user is at bottom
-     Requirements: agents.4.13.1, agents.4.13.2 */
-  it('should scroll when new message arrives and user is in bottom third', async () => {
+     Assertions: scrollIntoView is called with smooth behavior because user is at bottom
+     Requirements: agents.4.13.1, agents.4.13.2, agents.4.13.5 */
+  it('should scroll with smooth behavior when new message arrives and user is in bottom third', async () => {
+    const scrollIntoViewMock = jest.fn();
+    Element.prototype.scrollIntoView = scrollIntoViewMock;
+
     const TestComponent = () => {
       const messagesEndRef = React.useRef<HTMLDivElement>(null);
       const messagesAreaRef = React.useRef<HTMLDivElement>(null);
@@ -92,14 +95,14 @@ describe('Agents Autoscroll', () => {
         return distanceFromBottom < clientHeight / 3;
       };
 
-      const scrollToBottom = () => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      const scrollToBottom = (instant = false) => {
+        messagesEndRef.current?.scrollIntoView({ behavior: instant ? 'auto' : 'smooth' });
       };
 
       // Autoscroll effect
       React.useEffect(() => {
         if (messages.length > 0 && isUserAtBottom()) {
-          scrollToBottom();
+          scrollToBottom(); // Should use smooth behavior (instant=false by default)
         }
       }, [messages]);
 
@@ -139,7 +142,7 @@ describe('Agents Autoscroll', () => {
     const button = getByTestId('add-message');
     button.click();
 
-    // Should trigger scroll
+    // Should trigger scroll with smooth behavior
     await waitFor(() => {
       expect(scrollIntoViewMock).toHaveBeenCalledWith({ behavior: 'smooth' });
     });
@@ -368,20 +371,23 @@ describe('Agents Autoscroll', () => {
 
   /* Preconditions: Component with send functionality
      Action: Send multiple messages
-     Assertions: scrollIntoView is called each time user sends
-     Requirements: agents.4.13.4, agents.4.13.5 */
-  it('should scroll on every user message send', async () => {
+     Assertions: scrollIntoView is called each time user sends with smooth behavior
+     Requirements: agents.4.13.4, agents.4.13.5, agents.4.14.6 */
+  it('should scroll on every user message send with smooth behavior', async () => {
+    const scrollIntoViewMock = jest.fn();
+    Element.prototype.scrollIntoView = scrollIntoViewMock;
+
     const TestComponent = () => {
       const messagesEndRef = React.useRef<HTMLDivElement>(null);
       const [messages, setMessages] = React.useState<string[]>([]);
 
-      const scrollToBottom = () => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      const scrollToBottom = (instant = false) => {
+        messagesEndRef.current?.scrollIntoView({ behavior: instant ? 'auto' : 'smooth' });
       };
 
       const handleSend = () => {
         setMessages((prev) => [...prev, `Message ${prev.length + 1}`]);
-        scrollToBottom();
+        scrollToBottom(); // Should use smooth behavior (instant=false by default)
       };
 
       return (
@@ -403,23 +409,23 @@ describe('Agents Autoscroll', () => {
     // Send first message
     sendButton.click();
     await waitFor(() => {
-      expect(scrollIntoViewMock).toHaveBeenCalled();
+      expect(scrollIntoViewMock).toHaveBeenCalledWith({ behavior: 'smooth' });
     });
 
-    const callCount1 = scrollIntoViewMock.mock.calls.length;
+    scrollIntoViewMock.mockClear();
 
     // Send second message
     sendButton.click();
     await waitFor(() => {
-      expect(scrollIntoViewMock.mock.calls.length).toBeGreaterThan(callCount1);
+      expect(scrollIntoViewMock).toHaveBeenCalledWith({ behavior: 'smooth' });
     });
 
-    const callCount2 = scrollIntoViewMock.mock.calls.length;
+    scrollIntoViewMock.mockClear();
 
     // Send third message
     sendButton.click();
     await waitFor(() => {
-      expect(scrollIntoViewMock.mock.calls.length).toBeGreaterThan(callCount2);
+      expect(scrollIntoViewMock).toHaveBeenCalledWith({ behavior: 'smooth' });
     });
   });
 

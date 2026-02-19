@@ -117,19 +117,18 @@ describe('Agents Scroll Position', () => {
 
   /* Preconditions: Component with agent that has no saved scroll position
      Action: Switch to agent for the first time
-     Assertions: Scroll position is set to bottom (scrollIntoView called)
-     Requirements: agents.4.14.4 */
-  it('should scroll to bottom on first visit to agent', async () => {
+     Assertions: Scroll position is set to bottom (scrollIntoView called with instant behavior)
+     Requirements: agents.4.14.4, agents.4.14.8 */
+  it('should scroll to bottom instantly on first visit to agent', async () => {
     const scrollPositions = new Map<string, number>();
-    let scrollIntoViewCalled = false;
+    const scrollIntoViewMock = jest.fn();
 
     const TestComponent = ({ agentId }: { agentId: string }) => {
       const messagesAreaRef = React.useRef<HTMLDivElement>(null);
       const messagesEndRef = React.useRef<HTMLDivElement>(null);
 
-      const scrollToBottom = () => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-        scrollIntoViewCalled = true;
+      const scrollToBottom = (instant = false) => {
+        messagesEndRef.current?.scrollIntoView({ behavior: instant ? 'auto' : 'smooth' });
       };
 
       React.useEffect(() => {
@@ -138,8 +137,8 @@ describe('Agents Scroll Position', () => {
         if (savedPosition !== undefined) {
           messagesAreaRef.current.scrollTop = savedPosition;
         } else {
-          // First visit - scroll to bottom
-          scrollToBottom();
+          // First visit - scroll to bottom instantly
+          scrollToBottom(true);
         }
       }, [agentId]);
 
@@ -156,34 +155,34 @@ describe('Agents Scroll Position', () => {
     };
 
     // Mock scrollIntoView
-    Element.prototype.scrollIntoView = jest.fn();
+    Element.prototype.scrollIntoView = scrollIntoViewMock;
 
     const { rerender } = render(<TestComponent agentId="agent-1" />);
 
-    // First visit to agent-1 (no saved position)
+    // First visit to agent-1 (no saved position) - should use instant scroll
     await waitFor(() => {
-      expect(scrollIntoViewCalled).toBe(true);
+      expect(scrollIntoViewMock).toHaveBeenCalledWith({ behavior: 'auto' });
     });
 
-    scrollIntoViewCalled = false;
+    scrollIntoViewMock.mockClear();
 
     // Save position for agent-1
     scrollPositions.set('agent-1', 100);
 
-    // Switch to agent-2 (first visit)
+    // Switch to agent-2 (first visit) - should use instant scroll
     rerender(<TestComponent agentId="agent-2" />);
 
     await waitFor(() => {
-      expect(scrollIntoViewCalled).toBe(true);
+      expect(scrollIntoViewMock).toHaveBeenCalledWith({ behavior: 'auto' });
     });
 
-    scrollIntoViewCalled = false;
+    scrollIntoViewMock.mockClear();
 
-    // Return to agent-1 (has saved position, should NOT scroll to bottom)
+    // Return to agent-1 (has saved position, should NOT call scrollIntoView)
     rerender(<TestComponent agentId="agent-1" />);
 
     await new Promise((resolve) => setTimeout(resolve, 100));
-    expect(scrollIntoViewCalled).toBe(false);
+    expect(scrollIntoViewMock).not.toHaveBeenCalled();
   });
 
   /* Preconditions: Component with saved scroll position

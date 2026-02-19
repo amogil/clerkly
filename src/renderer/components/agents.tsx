@@ -15,6 +15,7 @@ import {
 } from '../../shared/utils/agentStatus';
 import { AutoExpandingTextarea, AutoExpandingTextareaHandle } from './agents/AutoExpandingTextarea';
 import { EmptyStatePlaceholder } from './agents/EmptyStatePlaceholder';
+import { ScrollArea } from './ui/scroll-area';
 import { DateTimeFormatter } from '../../utils/DateTimeFormatter';
 import type { AgentSnapshot } from '../types/agent';
 
@@ -29,8 +30,32 @@ export function Agents() {
   const [errorMessages, setErrorMessages] = useState<Map<string, string>>(new Map());
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const chatListRef = useRef<HTMLDivElement>(null);
-  const messagesAreaRef = useRef<HTMLDivElement>(null);
+  const messagesAreaRef = useRef<HTMLDivElement | null>(
+    null
+  ) as React.MutableRefObject<HTMLDivElement | null>;
+  const scrollAreaRootRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<AutoExpandingTextareaHandle>(null);
+  // Track ResizeObserver for cleanup
+  const resizeObserverRef = useRef<ResizeObserver | null>(null);
+  // Callback ref for viewport to set CSS variable immediately when ref is attached
+  const viewportCallbackRef = (node: HTMLDivElement | null) => {
+    messagesAreaRef.current = node;
+    // Cleanup previous observer
+    if (resizeObserverRef.current) {
+      resizeObserverRef.current.disconnect();
+      resizeObserverRef.current = null;
+    }
+    if (node) {
+      const updateHeight = () => {
+        node.style.setProperty('--viewport-height', `${node.clientHeight}px`);
+      };
+      updateHeight();
+      resizeObserverRef.current = new ResizeObserver(updateHeight);
+      resizeObserverRef.current.observe(node);
+    }
+  };
+  // Temporarily switch ScrollArea type to suppress scrollbar during programmatic scroll
+  const [scrollAreaType, setScrollAreaType] = useState<'scroll' | 'hover'>('scroll');
 
   // Use real hooks for agents and messages
   const { agents, activeAgent, createAgent, selectAgent, isLoading } = useAgents();
@@ -44,9 +69,12 @@ export function Agents() {
   // Requirements: agents.4.14.5
   const scrollPositions = useRef<Map<string, number>>(new Map());
 
-  // Requirements: agents.4.13.5
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  // Requirements: agents.4.13.5, agents.4.14.4, agents.4.14.8
+  // Suppress scrollbar during programmatic scroll by temporarily switching type
+  const scrollToBottom = (instant = false) => {
+    setScrollAreaType('hover');
+    messagesEndRef.current?.scrollIntoView({ behavior: instant ? 'auto' : 'smooth' });
+    setTimeout(() => setScrollAreaType('scroll'), instant ? 50 : 500);
   };
 
   // Requirements: agents.4.13.2, agents.4.13.3
@@ -57,7 +85,7 @@ export function Agents() {
     return distanceFromBottom < clientHeight / 3;
   };
 
-  // Requirements: agents.4.14.1
+  // Requirements: agents.4.14.1 - Save scroll position for active agent
   const handleScroll = () => {
     if (!messagesAreaRef.current || !activeAgent) return;
     const scrollTop = messagesAreaRef.current.scrollTop;
@@ -92,21 +120,24 @@ export function Agents() {
     }
   }, [messages]);
 
-  // Requirements: agents.4.14.2, agents.4.14.3, agents.4.14.4, agents.4.14.7
+  // Requirements: agents.4.14.2, agents.4.14.3, agents.4.14.4, agents.4.14.7, agents.4.14.8
   // Restore scroll position when switching agents or scroll to bottom on first visit
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!messagesAreaRef.current || !activeAgent) return;
 
     const savedPosition = scrollPositions.current.get(activeAgent.id);
 
     if (savedPosition !== undefined) {
-      // Restore saved position
+      // Restore saved position instantly (no animation)
+      // Suppress scrollbar during programmatic scroll
+      setScrollAreaType('hover');
       messagesAreaRef.current.scrollTop = savedPosition;
+      setTimeout(() => setScrollAreaType('scroll'), 50);
     } else {
-      // First visit - scroll to bottom
-      scrollToBottom();
+      // First visit - scroll to bottom instantly (no animation)
+      scrollToBottom(true);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeAgent?.id, messages]);
 
   // Calculate visible chats based on container width
@@ -463,13 +494,24 @@ export function Agents() {
       </div>
 
       {/* Messages Area */}
-      <div
-        ref={messagesAreaRef}
-        data-testid="messages-area"
-        className="flex-1 overflow-y-auto p-6 min-h-0"
-        onScroll={handleScroll}
+      {/* Requirements: agents.4.13.8-11 - ScrollArea with auto-hide scrollbar */}
+      <ScrollArea
+        ref={scrollAreaRootRef}
+        className="flex-1 min-h-0"
+        type={scrollAreaType}
+        scrollHideDelay={1000}
+        viewportRef={viewportCallbackRef}
+        viewportProps={
+          {
+            'data-testid': 'messages-area',
+          } as React.ComponentProps<'div'>
+        }
+        onScrollCapture={handleScroll}
       >
-        <div className="min-h-full flex flex-col justify-end space-y-4">
+        <div
+          className="flex flex-col justify-end space-y-4 p-6"
+          style={{ minHeight: 'var(--viewport-height, 100%)' }}
+        >
           {messages.length === 0 ? (
             <EmptyStatePlaceholder onPromptClick={handlePromptClick} />
           ) : (
@@ -520,7 +562,7 @@ export function Agents() {
           )}
           <div ref={messagesEndRef} />
         </div>
-      </div>
+      </ScrollArea>
 
       {/* Input Area */}
       <div className="p-4 border-t border-border bg-card flex-shrink-0">
@@ -530,7 +572,7 @@ export function Agents() {
             value={taskInput}
             onChange={setTaskInput}
             onSubmit={handleSend}
-            chatAreaRef={messagesAreaRef}
+            chatAreaRef={scrollAreaRootRef}
             disabled={!activeAgent}
             className="flex-1 px-3.5 py-2.5 bg-secondary border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
           />

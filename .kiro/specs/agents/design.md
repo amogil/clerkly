@@ -1312,9 +1312,9 @@ useEffect(() => {
 // Requirements: agents.4.13.6
 const messagesEndRef = useRef<HTMLDivElement>(null);
 
-// Requirements: agents.4.13.5
-const scrollToBottom = () => {
-  messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+// Requirements: agents.4.13.5, agents.4.14.4, agents.4.14.8
+const scrollToBottom = (instant = false) => {
+  messagesEndRef.current?.scrollIntoView({ behavior: instant ? 'auto' : 'smooth' });
 };
 
 // Requirements: agents.4.13.2, agents.4.13.3
@@ -1339,13 +1339,10 @@ const handleSend = async () => {
   const userMessage = taskInput.trim();
   setTaskInput('');
   
-  // Create message with kind: 'user'
-  await window.api.messages.create(activeAgent.agentId, {
-    kind: 'user',
-    data: { text: userMessage }
-  });
+  await sendMessage(userMessage);
   
-  // Always scroll to bottom when user sends message
+  // Clear saved position and always scroll to bottom when user sends message
+  scrollPositions.current.delete(activeAgent.id);
   scrollToBottom();
 };
 ```
@@ -1354,22 +1351,120 @@ const handleSend = async () => {
 
 ```tsx
 {/* Messages Area */}
-<div
-  ref={messagesAreaRef}
-  data-testid="messages-area"
-  className="flex-1 overflow-y-auto p-6 min-h-0"
+{/* Requirements: agents.4.13.8-11 - ScrollArea with auto-hide scrollbar */}
+<ScrollArea
+  ref={scrollAreaRootRef}
+  className="flex-1 min-h-0"
+  type={scrollAreaType}
+  scrollHideDelay={1000}
+  viewportRef={viewportCallbackRef}
+  viewportProps={
+    {
+      'data-testid': 'messages-area',
+    } as React.ComponentProps<'div'>
+  }
+  onScrollCapture={handleScroll}
 >
-  <div className="min-h-full flex flex-col justify-end space-y-4">
-    {messages.map((message) => (
-      <motion.div key={message.id} data-testid="message">
-        {/* Message content */}
-      </motion.div>
-    ))}
+  <div
+    className="flex flex-col justify-end space-y-4 p-6"
+    style={{ minHeight: 'var(--viewport-height, 100%)' }}
+  >
+    {messages.length === 0 ? (
+      <EmptyStatePlaceholder onPromptClick={handlePromptClick} />
+    ) : (
+      messages.map((message) => (
+        <motion.div key={message.id} data-testid="message">
+          {/* Message content */}
+        </motion.div>
+      ))
+    )}
     {/* Requirements: agents.4.13.6 - Invisible div for autoscroll */}
     <div ref={messagesEndRef} />
   </div>
-</div>
+</ScrollArea>
 ```
+
+**Отображение скроллбара** (agents.4.13.8-11):
+
+**Требования пользователя:**
+- Скроллбар должен быть визуально ненавязчивым (agents.4.13.8)
+- Скроллбар появляется при взаимодействии пользователя со скроллом (agents.4.13.9)
+- Скроллбар автоматически скрывается после окончания скролла (agents.4.13.10)
+- Используется компонент ScrollArea из @radix-ui/react-scroll-area (agents.4.13.11)
+
+**Техническая реализация:**
+
+Используется готовый компонент `ScrollArea` из `@radix-ui/react-scroll-area` (shadcn/ui), который уже есть в проекте (`src/renderer/components/ui/scroll-area.tsx`).
+
+**Поведение:**
+- Скроллбар показывается автоматически при скролле (нативное поведение radix ScrollArea)
+- Скроллбар автоматически скрывается через 1 секунду после окончания скролла (`scrollHideDelay={1000}`)
+- Нативный скроллбар скрыт — radix рендерит кастомный overlay-скроллбар
+- Стилизация через Tailwind CSS классы в компоненте ScrollBar
+
+**Компонент ScrollArea расширен:**
+- `viewportRef` — ref для доступа к viewport элементу (для `scrollTop`, `scrollIntoView`). Принимает как `React.Ref<HTMLDivElement>`, так и callback ref
+- `viewportProps` — дополнительные props для viewport (например, `data-testid`)
+
+**Подавление вспышки скроллбара при программном скролле:**
+
+При переключении агентов или первой загрузке radix ScrollArea показывает скроллбар при любом изменении `scrollTop`. Чтобы скроллбар не мелькал при программном скролле, используется переключение `type` между `"scroll"` и `"hover"`:
+
+```typescript
+// Requirements: agents.4.13.8-11
+// State для управления типом ScrollArea
+const [scrollAreaType, setScrollAreaType] = useState<'scroll' | 'hover'>('scroll');
+
+// При программном скролле временно переключаем тип на 'hover' (скроллбар скрыт)
+const scrollToBottom = (instant = false) => {
+  setScrollAreaType('hover');
+  messagesEndRef.current?.scrollIntoView({ behavior: instant ? 'auto' : 'smooth' });
+  setTimeout(() => setScrollAreaType('scroll'), instant ? 50 : 500);
+};
+```
+
+- `type="scroll"` — скроллбар показывается при скролле пользователем (нормальный режим)
+- `type="hover"` — скроллбар показывается только при наведении на область (используется временно при программном скролле, чтобы подавить вспышку)
+
+**Callback ref для viewport (viewportCallbackRef):**
+
+Radix ScrollArea оборачивает контент в div с inline `style="min-width: 100%; display: table"`, что ломает `min-h-full` + `flex` + `justify-end` для выравнивания пустого стейта по нижнему краю. Решение — CSS variable `--viewport-height`, устанавливаемая через callback ref:
+
+```typescript
+const resizeObserverRef = useRef<ResizeObserver | null>(null);
+
+const viewportCallbackRef = (node: HTMLDivElement | null) => {
+  messagesAreaRef.current = node;
+  if (resizeObserverRef.current) {
+    resizeObserverRef.current.disconnect();
+    resizeObserverRef.current = null;
+  }
+  if (node) {
+    const updateHeight = () => {
+      node.style.setProperty('--viewport-height', `${node.clientHeight}px`);
+    };
+    updateHeight();
+    resizeObserverRef.current = new ResizeObserver(updateHeight);
+    resizeObserverRef.current.observe(node);
+  }
+};
+```
+
+Контент использует `style={{ minHeight: 'var(--viewport-height, 100%)' }}` вместо Tailwind `min-h-full`, что корректно работает внутри radix viewport wrapper.
+
+**Сохранение позиции скролла:**
+```typescript
+// Requirements: agents.4.14.1
+const handleScroll = () => {
+  if (!messagesAreaRef.current || !activeAgent) return;
+  const scrollTop = messagesAreaRef.current.scrollTop;
+  scrollPositions.current.set(activeAgent.id, scrollTop);
+};
+```
+
+**Тестирование:**
+- Скроллбар управляется radix-ui, визуальное поведение тестируется вручную
+- Модульные тесты покрывают логику сохранения/восстановления позиции скролла
 
 **Принцип работы:**
 
@@ -1381,9 +1476,11 @@ const handleSend = async () => {
 
 4. **Принудительный автоскролл** (agents.4.13.4): При отправке сообщения пользователем `scrollToBottom()` вызывается ВСЕГДА, независимо от позиции скролла.
 
-5. **Плавная прокрутка** (agents.4.13.5): `scrollIntoView({ behavior: 'smooth' })` обеспечивает плавную анимацию прокрутки к элементу.
+5. **Плавная прокрутка** (agents.4.13.5): `scrollIntoView({ behavior: 'smooth' })` обеспечивает плавную анимацию прокрутки к элементу ТОЛЬКО при появлении новых сообщений. При переключении агентов и первой загрузке используется `behavior: 'auto'` для мгновенного скролла.
 
 6. **Полная видимость** (agents.4.13.7): Прокрутка выполняется так, чтобы `messagesEndRef` (и, следовательно, последнее сообщение) был полностью видим в viewport.
+
+7. **Мгновенный скролл** (agents.4.14.3, agents.4.14.4, agents.4.14.8): При переключении агентов, восстановлении позиции и первой загрузке приложения скролл происходит МГНОВЕННО без визуальной анимации.
 
 **Когда автоскролл срабатывает** (agents.4.13.1, agents.4.13.2, agents.4.13.4):
 - Пользователь в нижней трети чата → появляется ЛЮБОЕ новое сообщение (user, llm, tool_call, final_answer) → автоскролл
@@ -1412,23 +1509,26 @@ const scrollPositions = useRef<Map<string, number>>(new Map());
 const handleScroll = () => {
   if (!messagesAreaRef.current || !activeAgent) return;
   const scrollTop = messagesAreaRef.current.scrollTop;
-  scrollPositions.current.set(activeAgent.agentId, scrollTop);
+  scrollPositions.current.set(activeAgent.id, scrollTop);
 };
 
 // Restore scroll position when switching agents
-// Requirements: agents.4.14.2, agents.4.14.3, agents.4.14.4, agents.4.14.7
+// Requirements: agents.4.14.2, agents.4.14.3, agents.4.14.4, agents.4.14.7, agents.4.14.8
 useEffect(() => {
   if (!messagesAreaRef.current || !activeAgent) return;
   
-  const savedPosition = scrollPositions.current.get(activeAgent.agentId);
+  const savedPosition = scrollPositions.current.get(activeAgent.id);
   if (savedPosition !== undefined) {
-    // Restore saved position
+    // Restore saved position instantly (no animation)
+    // Suppress scrollbar during programmatic scroll
+    setScrollAreaType('hover');
     messagesAreaRef.current.scrollTop = savedPosition;
+    setTimeout(() => setScrollAreaType('scroll'), 50);
   } else {
-    // First visit - scroll to bottom
-    scrollToBottom();
+    // First visit - scroll to bottom instantly (no animation)
+    scrollToBottom(true);
   }
-}, [activeAgent?.agentId, messages]);
+}, [activeAgent?.id, messages]);
 
 // Clear saved position when user sends message
 // Requirements: agents.4.14.6
@@ -1438,14 +1538,10 @@ const handleSend = async () => {
   const userMessage = taskInput.trim();
   setTaskInput('');
   
-  // Create message with kind: 'user'
-  await window.api.messages.create(activeAgent.agentId, {
-    kind: 'user',
-    data: { text: userMessage }
-  });
+  await sendMessage(userMessage);
   
   // Clear saved position and scroll to bottom
-  scrollPositions.current.delete(activeAgent.agentId);
+  scrollPositions.current.delete(activeAgent.id);
   scrollToBottom();
 };
 ```
@@ -1454,13 +1550,24 @@ const handleSend = async () => {
 
 ```tsx
 {/* Messages Area */}
-<div
-  ref={messagesAreaRef}
-  data-testid="messages-area"
-  className="flex-1 overflow-y-auto p-6 min-h-0"
-  onScroll={handleScroll}
+{/* Requirements: agents.4.13.8-11 - ScrollArea with auto-hide scrollbar */}
+<ScrollArea
+  ref={scrollAreaRootRef}
+  className="flex-1 min-h-0"
+  type={scrollAreaType}
+  scrollHideDelay={1000}
+  viewportRef={viewportCallbackRef}
+  viewportProps={
+    {
+      'data-testid': 'messages-area',
+    } as React.ComponentProps<'div'>
+  }
+  onScrollCapture={handleScroll}
 >
-  <div className="min-h-full flex flex-col justify-end space-y-4">
+  <div
+    className="flex flex-col justify-end space-y-4 p-6"
+    style={{ minHeight: 'var(--viewport-height, 100%)' }}
+  >
     {messages.map((message) => (
       <motion.div key={message.id} data-testid="message">
         {/* Message content */}
@@ -1468,7 +1575,7 @@ const handleSend = async () => {
     ))}
     <div ref={messagesEndRef} />
   </div>
-</div>
+</ScrollArea>
 ```
 
 **Принцип работы:**
@@ -1477,9 +1584,9 @@ const handleSend = async () => {
 
 2. **Хранение в памяти** (agents.4.14.5): Используется `useRef<Map>` для хранения позиций - данные НЕ теряются при ре-рендерах, но очищаются при перезагрузке приложения
 
-3. **Восстановление сохраненной позиции** (agents.4.14.3, agents.4.14.7): При переключении агента `useEffect` проверяет наличие сохраненной позиции → если есть, восстанавливает `scrollTop`
+3. **Восстановление сохраненной позиции** (agents.4.14.3, agents.4.14.7): При переключении агента `useEffect` проверяет наличие сохраненной позиции → если есть, восстанавливает `scrollTop` МГНОВЕННО (без анимации)
 
-4. **Первый визит** (agents.4.14.4): Если сохраненной позиции нет (первый визит к агенту) → автоскролл к последнему сообщению
+4. **Первый визит** (agents.4.14.4, agents.4.14.8): Если сохраненной позиции нет (первый визит к агенту или первая загрузка приложения) → автоскролл к последнему сообщению МГНОВЕННО (без визуального скролла)
 
 5. **Сброс при отправке** (agents.4.14.6): При отправке сообщения пользователем сохраненная позиция удаляется из Map → автоскролл к низу
 
@@ -2189,6 +2296,7 @@ await window.locator(`[data-testid="agent-icon-${firstAgentId}"]`).click();
 | agents.4 | ✓ | - | ✓ |
 | agents.4.7.1-4.7.2 (autofocus) | - | - | ✓ |
 | agents.4.13.1-4.13.7 (autoscroll) | ✓ | - | ✓ |
+| agents.4.13.8-4.13.11 (scrollbar) | - | - | Manual |
 | agents.4.14.1-4.14.7 (scroll position) | ✓ | - | ✓ |
 | agents.4.23 (text wrapping) | ✓ | - | ✓ |
 | agents.5 | ✓ | - | ✓ |
