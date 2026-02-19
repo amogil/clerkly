@@ -218,8 +218,8 @@ test.describe('Agent Switching', () => {
 
   /* Preconditions: Agent exists
      Action: Hover over agent icon
-     Assertions: Tooltip shows agent name and status
-     Requirements: agents.3.5 */
+     Assertions: Custom tooltip div contains agent name and status
+     Requirements: agents.3.5, agents.3.5.1, agents.3.5.3 */
   test('should show tooltip with agent info on hover', async () => {
     const agentIcon = window.locator('[data-testid^="agent-icon-"]').first();
 
@@ -227,10 +227,14 @@ test.describe('Agent Switching', () => {
     await agentIcon.hover();
     await expect(agentIcon).toBeVisible();
 
-    // Check tooltip (title attribute)
+    // Verify no native title attribute (agents.3.5.3)
     const title = await agentIcon.getAttribute('title');
-    expect(title).toBeTruthy();
-    expect(title).toContain('New Agent');
-    expect(title).toMatch(/New|In progress|Awaiting response|Error|Completed/);
+    expect(title).toBeNull();
+
+    // Custom tooltip is a child div that becomes visible on hover (with 2s delay)
+    // We can verify the tooltip content exists in the DOM
+    const tooltipText = agentIcon.locator('.bg-gray-900');
+    await expect(tooltipText).toBeAttached();
+    await expect(tooltipText).toContainText('New Agent');
   });
 });

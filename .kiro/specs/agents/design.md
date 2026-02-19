@@ -1010,7 +1010,7 @@ function AgentsList({ agents, activeAgentId, messagesMap, onAgentClick, onNewCha
 #### AgentIcon
 
 ```typescript
-// Requirements: agents.1.2, agents.1.5, agents.1.6, agents.3.5, agents.6
+// Requirements: agents.1.2, agents.1.5, agents.1.6, agents.3.5, agents.3.5.1, agents.3.5.2, agents.3.5.3, agents.6
 interface AgentIconProps {
   agent: Agent;
   status: AgentStatus;
@@ -1023,15 +1023,15 @@ function AgentIcon({ agent, status, isActive, onClick }: AgentIconProps) {
   const letter = agent.name.charAt(0).toUpperCase();
   
   return (
-    <button
+    // Requirements: agents.3.5.3 - no native title attribute to avoid double tooltip
+    <motion.div
       onClick={onClick}
       className={cn(
-        'w-8 h-8 rounded-full flex items-center justify-center relative',
+        'relative w-8 h-8 rounded-full flex items-center justify-center cursor-pointer',
+        'hover:scale-110 transition-transform group',
         style.bgColor,
-        isActive && 'ring-2 ring-primary', // Requirements: agents.1.5
-        style.animation === 'animate-pulse' && 'animate-pulse'
+        isActive && 'ring-2 ring-primary ring-offset-2', // Requirements: agents.1.5
       )}
-      title={`${agent.name} - ${style.label}`} // Requirements: agents.3.5
     >
       {/* Spinning ring for in-progress */}
       {style.animation === 'animate-spin' && (
@@ -1051,7 +1051,16 @@ function AgentIcon({ agent, status, isActive, onClick }: AgentIconProps) {
       {status === 'awaiting-response' && (
         <HelpCircle className="w-3 h-3 text-white absolute -bottom-0.5 -right-0.5" />
       )}
-    </button>
+
+      {/* Requirements: agents.3.5, agents.3.5.1, agents.3.5.2 - Custom tooltip */}
+      {/* Appears below icon with 2s delay, hides instantly on mouse leave */}
+      <div className="absolute top-full right-0 mt-2 w-64 bg-gray-900 text-white text-xs rounded-lg p-3 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 delay-0 group-hover:delay-[2000ms] z-[100] shadow-lg pointer-events-none">
+        <p className="font-semibold mb-1">{agent.name}</p>
+        <div className="flex items-center gap-1.5 text-xs text-gray-300">
+          <span>{style.label}</span>
+        </div>
+      </div>
+    </motion.div>
   );
 }
 ```
@@ -2293,6 +2302,7 @@ await window.locator(`[data-testid="agent-icon-${firstAgentId}"]`).click();
 | agents.2 | ✓ | ✓ | ✓ |
 | agents.2.7-2.11 (auto-create) | ✓ | ✓ | ✓ |
 | agents.3 | ✓ | - | ✓ |
+| agents.3.5-3.5.3 (custom tooltip) | - | - | ✓ |
 | agents.4 | ✓ | - | ✓ |
 | agents.4.7.1-4.7.2 (autofocus) | - | - | ✓ |
 | agents.4.13.1-4.13.7 (autoscroll) | ✓ | - | ✓ |
