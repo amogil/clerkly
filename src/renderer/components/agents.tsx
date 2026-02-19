@@ -571,7 +571,7 @@ export function Agents() {
             value={taskInput}
             onChange={setTaskInput}
             onSubmit={handleSend}
-            chatAreaRef={scrollAreaRootRef}
+            chatAreaRef={messagesAreaRef}
             disabled={!activeAgent}
             className="flex-1 px-3.5 py-2.5 bg-secondary border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
           />

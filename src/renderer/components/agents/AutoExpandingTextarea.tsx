@@ -7,7 +7,7 @@ export interface AutoExpandingTextareaProps {
   onSubmit: () => void;
   placeholder?: string;
   disabled?: boolean;
-  chatAreaRef: React.RefObject<HTMLDivElement>;
+  chatAreaRef: React.RefObject<HTMLDivElement | null>;
   className?: string;
 }
 
