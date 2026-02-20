@@ -7,7 +7,7 @@ export type AgentStatus = 'new' | 'in-progress' | 'awaiting-response' | 'error' 
  * Message payload structure for status computation
  */
 export interface MessagePayload {
-  kind: 'user' | 'llm' | 'tool_call' | 'code_exec' | 'final_answer' | 'request_scope' | 'artifact';
+  kind: 'user' | 'llm' | 'error' | 'tool_call' | 'code_exec' | 'final_answer' | 'request_scope' | 'artifact';
   timing?: { started_at: string; finished_at: string };
   data?: {
     result?: {

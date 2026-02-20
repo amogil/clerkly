@@ -34,15 +34,18 @@ CREATE INDEX idx_agents_user_archived_updated
 
 ```sql
 CREATE TABLE messages (
-  id INTEGER PRIMARY KEY,
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
   agent_id TEXT NOT NULL,
   timestamp TIMESTAMP NOT NULL,
+  kind TEXT NOT NULL,
   payload_json TEXT NOT NULL
 );
 
 CREATE INDEX idx_messages_agent_id ON messages(agent_id);
 CREATE INDEX idx_messages_agent_timestamp ON messages(agent_id, timestamp);
 ```
+
+**Примечание:** Колонка `kind` добавлена в рамках llm-integration.6. `kind` не хранится в `payload_json` — всегда передаётся явно при вставке.
 
 ## Типы данных
 
@@ -74,7 +77,7 @@ type AgentStatus = 'new' | 'in-progress' | 'awaiting-response' | 'error' | 'comp
 ```typescript
 // Requirements: agents.7
 interface MessagePayload {
-  kind: 'user' | 'llm' | 'tool_call' | 'code_exec' | 'final_answer' | 'request_scope' | 'artifact';
+  kind: 'user' | 'llm' | 'error' | 'tool_call' | 'code_exec' | 'final_answer' | 'request_scope' | 'artifact';
   timing?: { started_at: string; finished_at: string };
   data: Record<string, unknown>;
 }
@@ -486,32 +489,48 @@ function computeAgentStatus(messages: Message[]): AgentStatus {
   if (messages.length === 0) {
     return 'new';
   }
-  
-  const lastMessage = messages[messages.length - 1];
+
+  // Фильтруем interrupted сообщения — они не видны в UI и не влияют на статус
+  const visibleMessages = messages.filter(m => {
+    const p = JSON.parse(m.payloadJson);
+    return !(p.data?.interrupted === true);
+  });
+
+  if (visibleMessages.length === 0) {
+    return 'new';
+  }
+
+  const lastMessage = visibleMessages[visibleMessages.length - 1];
   const payload = JSON.parse(lastMessage.payloadJson) as MessagePayload;
-  
-  // Проверка на ошибки
-  if (payload.data?.result?.status === 'error' ||
-      payload.data?.result?.status === 'crash' ||
-      payload.data?.result?.status === 'timeout') {
+
+  // Ошибка — последнее видимое сообщение kind: error
+  if (lastMessage.kind === 'error') {
     return 'error';
   }
-  
+
   // Финальный ответ
-  if (payload.kind === 'final_answer') {
+  if (lastMessage.kind === 'final_answer') {
     return 'completed';
   }
-  
-  // Последнее сообщение от пользователя
-  if (payload.kind === 'user') {
-    return 'in-progress';
+
+  // in-progress: есть user-сообщение и после него нет финализированного ответа агента
+  // Ищем с конца: если встречаем user раньше чем финализированный llm/final_answer — in-progress
+  for (let i = visibleMessages.length - 1; i >= 0; i--) {
+    const msg = visibleMessages[i];
+    if (msg.kind === 'user') {
+      return 'in-progress';
+    }
+    if (msg.kind === 'llm') {
+      const p = JSON.parse(msg.payloadJson);
+      if (p.data?.action) {
+        // Финализированный llm-ответ — агент ответил
+        return 'awaiting-response';
+      }
+      // llm без action — ещё в процессе стриминга
+      return 'in-progress';
+    }
   }
-  
-  // Последнее сообщение от LLM (не final_answer)
-  if (payload.kind === 'llm') {
-    return 'awaiting-response';
-  }
-  
+
   return 'new';
 }
 

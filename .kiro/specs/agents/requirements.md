@@ -447,16 +447,18 @@
    - `id INTEGER PRIMARY KEY` - уникальный идентификатор
    - `agent_id TEXT NOT NULL` - ID агента
    - `timestamp TIMESTAMP NOT NULL` - время сообщения (ISO 8601 с timezone offset)
-   - `payload_json TEXT NOT NULL` - JSON с данными сообщения
+   - `kind TEXT NOT NULL` - тип сообщения (хранится в отдельной колонке, не в payload_json)
+   - `payload_json TEXT NOT NULL` - JSON с данными сообщения (без поля `kind`)
 
-7.2. Формат `payload_json`:
+7.2. Формат `payload_json` (поле `kind` убрано — оно в колонке БД):
    ```json
    {
-     "kind": "user | llm | tool_call | code_exec | final_answer | request_scope | artifact",
      "timing": { "started_at": "ISO+offset", "finished_at": "ISO+offset" },
      "data": {}
    }
    ```
+
+7.2.1. Допустимые значения `kind`: `user | llm | error | tool_call | code_exec | final_answer | request_scope | artifact`
 
 7.3. В UI чата ДОЛЖНЫ отображаться следующие kinds:
    - `user` - сообщение пользователя (справа, серый полупрозрачный фон, тонкая серая рамка, скругленные углы)
@@ -471,12 +473,12 @@
 
 7.5. Сообщение `user` ДОЛЖНО содержать:
    ```json
-   { "kind": "user", "data": { "reply_to_message_id": null, "text": "string" } }
+   { "data": { "reply_to_message_id": null, "text": "string" } }
    ```
 
 7.6. Сообщение `final_answer` ДОЛЖНО содержать:
    ```json
-   { "kind": "final_answer", "data": { "reply_to_message_id": 123, "text": "string", "format": "markdown|text" } }
+   { "data": { "reply_to_message_id": 123, "text": "string", "format": "markdown|text" } }
    ```
 
 7.7. КОГДА `format = "markdown"`, ТО текст ДОЛЖЕН рендериться с поддержкой Markdown
@@ -531,10 +533,10 @@
 
 9.2. Алгоритм определения статуса:
    - `new` - агент без сообщений
-   - `in-progress` - последнее сообщение от пользователя (kind = `user`)
-   - `error` - последнее сообщение содержит `result.status` = `error`, `crash`, или `timeout`
+   - `in-progress` - есть сообщение от пользователя (kind = `user`) и после него нет финализированного ответа агента и нет ошибки. Финализированным считается `kind: llm` с заполненным `action` (не `interrupted: true`) или `kind: final_answer`
+   - `error` - последнее видимое сообщение имеет `kind = 'error'`
    - `completed` - последнее сообщение `final_answer`
-   - `awaiting-response` - последнее сообщение от LLM (kind = `llm`) и НЕ `final_answer`
+   - `awaiting-response` - последнее сообщение от LLM (kind = `llm`) с заполненным `action` и НЕ `final_answer`
 
 9.3. Статус ДОЛЖЕН пересчитываться при получении любого нового сообщения в чате агента
 
