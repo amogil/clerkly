@@ -1,10 +1,10 @@
 /**
  * Functional Tests: LLM Chat
  *
- * End-to-end tests using real OpenAI API.
- * Requires OPENAI_API_KEY in .env file.
+ * End-to-end tests using real OpenAI API and MockLLMServer.
+ * Requires OPENAI_API_KEY in .env file for real API tests.
  *
- * Requirements: llm-integration.1, llm-integration.2, llm-integration.3, llm-integration.7
+ * Requirements: llm-integration.1, llm-integration.2, llm-integration.3, llm-integration.7, llm-integration.8
  */
 
 import { test, expect } from '@playwright/test';
@@ -14,20 +14,24 @@ import {
   ElectronTestContext,
   completeOAuthFlow,
   createMockOAuthServer,
+  expectNoToastError,
 } from './helpers/electron';
 import type { MockOAuthServer } from './helpers/mock-oauth-server';
+import { MockLLMServer } from './helpers/mock-llm-server';
 
 const TEST_CLIENT_ID = 'test-client-id-12345';
 const MOCK_OAUTH_PORT = 8894;
+const MOCK_LLM_PORT = 8895;
 
 // Real OpenAI API key from .env (loaded by playwright.config.ts via dotenv)
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
 let mockOAuthServer: MockOAuthServer;
+let mockLLMServer: MockLLMServer;
 
 test.beforeAll(async () => {
   if (!OPENAI_API_KEY) {
-    console.warn('[llm-chat] OPENAI_API_KEY not set — skipping all tests');
+    console.warn('[llm-chat] OPENAI_API_KEY not set — skipping real API tests');
   }
 
   mockOAuthServer = await createMockOAuthServer(MOCK_OAUTH_PORT);
@@ -38,10 +42,14 @@ test.beforeAll(async () => {
     given_name: 'LLM',
     family_name: 'Chat User',
   });
+
+  mockLLMServer = new MockLLMServer({ port: MOCK_LLM_PORT });
+  await mockLLMServer.start();
 });
 
 test.afterAll(async () => {
   if (mockOAuthServer) await mockOAuthServer.stop();
+  if (mockLLMServer) await mockLLMServer.stop();
 });
 
 /**
@@ -58,10 +66,7 @@ async function launchWithRealLLM(apiKey: string): Promise<ElectronTestContext> {
 
   // Save API key via IPC — MainPipeline reads it via loadAPIKey() on each run()
   await ctx.window.evaluate(async (key) => {
-    await (window as any).electron.ipcRenderer.invoke('settings:save-api-key', {
-      provider: 'openai',
-      apiKey: key,
-    });
+    await (window as any).api.settings.saveAPIKey('openai', key);
   }, apiKey);
 
   return ctx;
@@ -158,5 +163,89 @@ test.describe('LLM Chat (real OpenAI)', () => {
     // Contains auth error text
     const text = await errorBubble.textContent();
     expect(text?.toLowerCase()).toMatch(/invalid api key|unauthorized|forbidden/);
+  });
+});
+
+test.describe('LLM Chat (mock server)', () => {
+  let context: ElectronTestContext;
+
+  test.afterEach(async () => {
+    if (context) await closeElectron(context);
+    mockLLMServer.setStreamingMode(false);
+    mockLLMServer.setSuccess(true);
+    mockLLMServer.clearRequestLogs();
+  });
+
+  /**
+   * Launch app authenticated, pointing OpenAI provider at MockLLMServer.
+   * Mock key is accepted because mock server doesn't validate auth.
+   */
+  async function launchWithMockLLM(): Promise<ElectronTestContext> {
+    const ctx = await launchElectron(undefined, {
+      CLERKLY_GOOGLE_API_URL: mockOAuthServer.getBaseUrl(),
+      CLERKLY_OPENAI_API_URL: `http://localhost:${MOCK_LLM_PORT}/v1/chat/completions`,
+    });
+    await completeOAuthFlow(ctx.app, ctx.window, TEST_CLIENT_ID);
+    await expect(ctx.window.locator('[data-testid="agents"]')).toBeVisible({ timeout: 10000 });
+    // Check no toast errors appeared during startup/auth
+    await expectNoToastError(ctx.window);
+    // Save a mock API key — mock server doesn't validate it
+    await ctx.window.evaluate(async () => {
+      await (window as any).api.settings.saveAPIKey('openai', 'mock-key-for-testing');
+    });
+    return ctx;
+  }
+
+  /* Preconditions: MockLLMServer configured with slow streaming (300ms between chunks),
+       app authenticated with mock LLM URL
+     Action: User sends first message, then sends second message while first is still streaming
+     Assertions: Only one message-llm bubble visible (response to second message),
+       interrupted llm message is hidden
+     Requirements: llm-integration.8.1, llm-integration.8.4, llm-integration.8.5 */
+  test('should interrupt previous request when new message sent during streaming', async () => {
+    // First request: slow streaming so we can interrupt it
+    mockLLMServer.setStreamingMode(true, {
+      content: '{"action":{"type":"text","content":"First response"}}',
+      chunkDelayMs: 300,
+    });
+
+    context = await launchWithMockLLM();
+    const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
+
+    // Send first message
+    await messageInput.fill('First message');
+    await messageInput.press('Enter');
+
+    // Wait for first user message to appear
+    await expect(context.window.locator('[data-testid="message"]').first()).toBeVisible({
+      timeout: 5000,
+    });
+
+    // Wait briefly for streaming to start (first chunk arrives)
+    await context.window.waitForTimeout(500);
+
+    // Switch mock to fast response for second request
+    mockLLMServer.setStreamingMode(true, {
+      content: '{"action":{"type":"text","content":"Second response"}}',
+      chunkDelayMs: 0,
+    });
+
+    // Send second message while first is still streaming
+    await messageInput.fill('Second message');
+    await messageInput.press('Enter');
+
+    // Wait for the LLM response to the second message
+    const llmBubble = context.window.locator('[data-testid="message-llm"]');
+    await expect(llmBubble).toBeVisible({ timeout: 3000 });
+
+    // Only one llm bubble should be visible (interrupted one is hidden)
+    const llmBubbles = context.window.locator('[data-testid="message-llm"]');
+    await expect(llmBubbles).toHaveCount(1, { timeout: 3000 });
+
+    // The visible response should be for the second message
+    const actionContent = context.window.locator('[data-testid="message-llm-action"]');
+    await expect(actionContent).toBeVisible({ timeout: 3000 });
+    const text = await actionContent.textContent();
+    expect(text?.trim()).toBe('Second response');
   });
 });

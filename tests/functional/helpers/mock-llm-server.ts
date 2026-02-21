@@ -38,6 +38,7 @@ export class MockLLMServer {
   private streamingContent: string =
     '{"action":{"type":"text","content":"Hello! How can I help?"}}';
   private streamingErrorStatus: number = 0; // 0 = no error
+  private streamingChunkDelayMs: number = 0; // delay between chunks (for interrupt tests)
 
   constructor(config: MockLLMServerConfig) {
     this.port = config.port;
@@ -161,38 +162,53 @@ export class MockLLMServer {
       res.write(`data: ${JSON.stringify(data)}\n\n`);
     };
 
-    // Stream reasoning chunks (if any)
-    if (this.streamingReasoning) {
-      const words = this.streamingReasoning.split(' ');
-      for (const word of words) {
-        sendChunk({
-          choices: [{ delta: { reasoning: word + ' ' }, finish_reason: null }],
-        });
+    const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+    const streamAll = async () => {
+      // Stream reasoning chunks (if any)
+      if (this.streamingReasoning) {
+        const words = this.streamingReasoning.split(' ');
+        for (const word of words) {
+          sendChunk({
+            choices: [{ delta: { reasoning: word + ' ' }, finish_reason: null }],
+          });
+          if (this.streamingChunkDelayMs > 0) {
+            await delay(this.streamingChunkDelayMs);
+          }
+        }
       }
-    }
 
-    // Stream content chunks (structured output JSON split into pieces)
-    const contentChunks = this.streamingContent.match(/.{1,20}/g) || [this.streamingContent];
-    for (const chunk of contentChunks) {
+      // Stream content chunks (structured output JSON split into pieces)
+      const contentChunks = this.streamingContent.match(/.{1,20}/g) || [this.streamingContent];
+      for (const chunk of contentChunks) {
+        sendChunk({
+          choices: [{ delta: { content: chunk }, finish_reason: null }],
+        });
+        if (this.streamingChunkDelayMs > 0) {
+          await delay(this.streamingChunkDelayMs);
+        }
+      }
+
+      // Final chunk with usage
       sendChunk({
-        choices: [{ delta: { content: chunk }, finish_reason: null }],
+        choices: [{ delta: {}, finish_reason: 'stop' }],
+        usage: {
+          prompt_tokens: 100,
+          completion_tokens: 50,
+          total_tokens: 150,
+          prompt_tokens_details: { cached_tokens: 0 },
+          completion_tokens_details: { reasoning_tokens: 10 },
+        },
       });
-    }
 
-    // Final chunk with usage
-    sendChunk({
-      choices: [{ delta: {}, finish_reason: 'stop' }],
-      usage: {
-        prompt_tokens: 100,
-        completion_tokens: 50,
-        total_tokens: 150,
-        prompt_tokens_details: { cached_tokens: 0 },
-        completion_tokens_details: { reasoning_tokens: 10 },
-      },
+      res.write('data: [DONE]\n\n');
+      res.end();
+    };
+
+    streamAll().catch(() => {
+      // Client disconnected — ignore
+      res.end();
     });
-
-    res.write('data: [DONE]\n\n');
-    res.end();
   }
 
   private handleAnthropic(res: http.ServerResponse): void {
@@ -303,6 +319,7 @@ export class MockLLMServer {
       content?: string;
       errorStatus?: number;
       errorMessage?: string;
+      chunkDelayMs?: number;
     }
   ) {
     this.streamingEnabled = enabled;
@@ -310,6 +327,7 @@ export class MockLLMServer {
     if (options?.content !== undefined) this.streamingContent = options.content;
     if (options?.errorStatus !== undefined) this.streamingErrorStatus = options.errorStatus;
     if (options?.errorMessage !== undefined) this.errorMessage = options.errorMessage;
+    if (options?.chunkDelayMs !== undefined) this.streamingChunkDelayMs = options.chunkDelayMs;
   }
 
   getBaseUrl(): string {

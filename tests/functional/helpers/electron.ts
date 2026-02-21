@@ -359,6 +359,24 @@ export async function clearTestTokens(window: Page): Promise<void> {
   });
 }
 /**
+ * Assert that no toast error notifications are visible on screen.
+ * Fails the test with the toast message if an error toast is found.
+ *
+ * Sonner renders toasts inside [data-sonner-toaster]; each toast is [data-sonner-toast].
+ * Error toasts carry data-type="error".
+ *
+ * Requirements: testing.12.1, testing.12.2, testing.12.5
+ */
+export async function expectNoToastError(window: Page): Promise<void> {
+  const errorToast = window.locator('[data-sonner-toast][data-type="error"]');
+  const count = await errorToast.count();
+  if (count > 0) {
+    const text = await errorToast.first().textContent();
+    throw new Error(`Toast error detected: ${text?.trim()}`);
+  }
+}
+
+/**
  * Create and start a MockOAuthServer with default test configuration
  *
  * @param port - Port number for the mock server (default: 8898)

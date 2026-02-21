@@ -500,3 +500,205 @@ Renderer может подписаться только на `message.llm.reason
 - [x] `src/shared/events/types.ts` — поле `hidden: boolean` в `MessageSnapshot`
 - [x] Тесты обновлены во всех затронутых файлах
 - [x] `npm run validate` — все проверки зелёные
+
+## Этап 3: Рефакторинг — фильтрация hidden в SQL (выполнено)
+- [x] `src/main/db/repositories/MessagesRepository.ts` — `listByAgent(agentId, includeHidden = false)` фильтрует `hidden=false` в SQL по умолчанию
+- [x] `src/main/agents/PromptBuilder.ts` — убрана ручная фильтрация `msg.hidden` (теперь на уровне БД)
+- [x] `src/renderer/components/agents.tsx` — убрана проверка `if (message.hidden) return null`
+- [x] Тесты: добавлены `should exclude hidden messages by default` и `should include hidden messages when includeHidden=true`
+- [x] `npm run validate` — все проверки зелёные
+
+---
+
+## Этап 4: Оставшиеся функциональные тесты
+
+### Шаг 9: Функтесты через MockLLMServer (тесты 4, 5, 7, 8, 9, 10)
+
+Все тесты используют `MockLLMServer` вместо реального OpenAI. Требуется настроить `OpenAIProvider` принимать кастомный `baseUrl` для тестов.
+
+#### 9.1 Настройка OpenAIProvider для mock-сервера
+
+**Файлы:**
+- `src/main/llm/OpenAIProvider.ts` — принимать опциональный `baseUrl` в конструкторе (только для тестов)
+- `src/main/llm/LLMProviderFactory.ts` — пробрасывать `baseUrl` из env `MOCK_LLM_URL` (только если `PLAYWRIGHT_TEST=1`)
+
+#### 9.2 Тест 4: прерывание запроса при новом сообщении
+
+**Тест:** `should interrupt previous request when new message sent during streaming`
+
+**Сценарий:**
+1. MockLLMServer настроен на медленный стриминг (задержка между чанками)
+2. Пользователь отправляет первое сообщение
+3. Пока идёт стриминг — отправляет второе сообщение
+4. Первый `kind: llm` помечается `hidden=true` (не виден в UI)
+5. Появляется ответ на второе сообщение
+
+**Проверки:**
+- В чате виден только один `[data-testid="message-llm"]` — ответ на второе сообщение
+- Первый `kind: llm` не отображается (hidden)
+
+**Требования:** llm-integration.8.1, llm-integration.8.4, llm-integration.8.5
+
+#### 9.3 Тест 5: прерванный llm не отображается
+
+**Тест:** `should not show interrupted llm message in chat`
+
+**Сценарий:**
+1. MockLLMServer: первый запрос — медленный стриминг, второй — быстрый ответ
+2. Отправить сообщение → дождаться начала стриминга → отправить второе
+3. Проверить что в чате нет артефактов первого ответа
+
+**Проверки:**
+- Ровно один `[data-testid="message-llm"]` в DOM
+- Его контент соответствует ответу на второе сообщение
+
+**Требования:** llm-integration.8.5
+
+#### 9.4 Тест 7: ошибка провайдера (HTTP 500)
+
+**Тест:** `should show provider error message on 500`
+
+**Сценарий:**
+1. MockLLMServer возвращает HTTP 500
+2. Пользователь отправляет сообщение
+3. Появляется `[data-testid="message-error"]` с текстом про недоступность сервиса
+
+**Проверки:**
+- `[data-testid="message-error"]` виден
+- Текст содержит `"unavailable"` или `"try again"`
+
+**Требования:** llm-integration.3.1, llm-integration.3.5
+
+#### 9.5 Тест 8: error bubble исчезает при следующем сообщении
+
+**Тест:** `should hide error bubble when user sends next message`
+
+**Сценарий:**
+1. MockLLMServer: первый запрос — HTTP 500, второй — успешный ответ
+2. Отправить первое сообщение → появляется error bubble
+3. Отправить второе сообщение
+4. Error bubble исчезает, появляется llm-ответ
+
+**Проверки:**
+- После второго сообщения `[data-testid="message-error"]` не виден
+- `[data-testid="message-llm"]` виден
+
+**Требования:** llm-integration.3.8
+
+#### 9.6 Тест 9: полная история передаётся LLM при втором сообщении
+
+**Тест:** `should send full conversation history to llm on second message`
+
+**Сценарий:**
+1. MockLLMServer логирует тело запроса
+2. Отправить первое сообщение → получить ответ
+3. Отправить второе сообщение
+4. Проверить тело второго запроса к LLM через `mockLLMServer.getLastRequest()`
+
+**Проверки:**
+- Тело второго запроса содержит оба предыдущих сообщения в `messages[]`
+- Первое сообщение — `role: user`, второе — `role: assistant`
+
+**Требования:** llm-integration.3.9
+
+#### 9.7 Тест 10: kind:error не попадает в историю LLM
+
+**Тест:** `should exclude error messages from llm history`
+
+**Сценарий:**
+1. MockLLMServer: первый запрос — HTTP 500, второй — успешный
+2. Отправить первое сообщение → error bubble
+3. Отправить второе сообщение
+4. Проверить тело второго запроса — `kind: error` не должен быть в истории
+
+**Проверки:**
+- В `messages[]` второго запроса нет сообщений с ролью `system` содержащих `[error]`
+- Только `role: user` сообщение первого запроса (если не hidden)
+
+**Требования:** llm-integration.3.9
+
+---
+
+### Шаг 10: Rate limit баннер (тест 6) — требует реализации фичи
+
+**Статус:** ❌ заблокирован — фича не реализована
+
+#### 10.1 Реализация rate limit баннера
+
+**Файлы:**
+- `src/shared/events/constants.ts` — добавить `AGENT_RATE_LIMIT = 'agent.rate_limit'`
+- `src/shared/events/types.ts` — добавить `AgentRateLimitPayload { agentId, userMessageId, retryAfterSeconds }`
+- `src/main/agents/MainPipeline.ts` — при HTTP 429: эмитить `agent.rate_limit` вместо создания `kind: error`; парсить `retry-after` заголовок и текст ошибки для определения `retryAfterSeconds`
+- `src/main/agents/AgentIPCHandlers.ts` — добавить хендлеры:
+  - `messages:retry-last(agentId, userMessageId)` — повторить `MainPipeline.run()` с тем же `userMessageId`
+  - `messages:cancel-retry(agentId, userMessageId)` — удалить `kind: user` сообщение из БД
+- `src/preload/index.ts` — пробросить `agent.rate_limit` в renderer; добавить `messages.retryLast` и `messages.cancelRetry`
+- `src/renderer/components/agents/RateLimitBanner.tsx` — новый компонент:
+  - Текст: `"Rate limit exceeded. Retrying in N seconds..."`
+  - Кнопка "Cancel"
+  - Таймер обратного отсчёта
+  - По истечении — вызов `window.api.messages.retryLast(agentId, userMessageId)`
+  - По Cancel — вызов `window.api.messages.cancelRetry(agentId, userMessageId)`
+- `src/renderer/components/agents.tsx` — подписка на `agent.rate_limit`, показ `RateLimitBanner`
+- `src/renderer/hooks/useMessages.ts` — подписка на `agent.rate_limit` (или в `agents.tsx` напрямую)
+
+**Модульные тесты:**
+- `tests/unit/agents/MainPipeline.test.ts` — при HTTP 429 эмитит `agent.rate_limit`, не создаёт `kind: error`
+- `tests/unit/agents/AgentIPCHandlers.test.ts` — `messages:retry-last` запускает pipeline, `messages:cancel-retry` удаляет сообщение
+- `tests/unit/components/RateLimitBanner.test.tsx` — рендер, таймер, кнопка Cancel
+
+#### 10.2 Функтест 6: rate limit баннер
+
+**Тест:** `should show rate limit banner with countdown`
+
+**Сценарий:**
+1. MockLLMServer возвращает HTTP 429 с `retry-after: 3`
+2. Пользователь отправляет сообщение
+3. Появляется баннер с текстом `"Retrying in 3 seconds..."`
+4. Через 3 секунды MockLLMServer переключается на успешный ответ
+5. Баннер исчезает, появляется llm-ответ
+
+**Проверки:**
+- `[data-testid="rate-limit-banner"]` виден после первого запроса
+- Содержит текст с числом секунд
+- После таймаута баннер исчезает и появляется `[data-testid="message-llm"]`
+
+**Требования:** llm-integration.3.7.1, llm-integration.3.7.2, llm-integration.3.7.3, llm-integration.3.7.5
+
+
+---
+
+## Сводный список функциональных тестов
+
+### ✅ 1. `should show llm response after user message`
+Отправить сообщение → появляется `[data-testid="message-llm"]` с непустым текстом ответа.
+_(реальный OpenAI)_
+
+### ✅ 2. `should show reasoning before answer`
+Отправить сообщение → если reasoning присутствует, его DOM-позиция выше action.
+_(реальный OpenAI)_
+
+### ✅ 3. `should show error message on invalid api key`
+Сохранить невалидный ключ → отправить сообщение → появляется `[data-testid="message-error"]` с текстом про invalid key.
+_(реальный OpenAI)_
+
+### ❌ 4. `should interrupt previous request when new message sent during streaming`
+MockLLMServer с медленным стримингом → отправить первое сообщение → пока идёт стриминг отправить второе → в чате только один `message-llm` (ответ на второе).
+
+### ❌ 5. `should not show interrupted llm message in chat`
+Аналогично тесту 4, но проверяем что прерванный `kind: llm` (hidden=true) вообще не рендерится в DOM.
+
+### ❌ 6. `should show provider error message on 500`
+MockLLMServer возвращает HTTP 500 → появляется `[data-testid="message-error"]` с текстом про недоступность сервиса.
+
+### ❌ 7. `should hide error bubble when user sends next message`
+MockLLMServer: первый запрос 500, второй успешный → error bubble исчезает после второго сообщения, появляется `message-llm`.
+
+### ❌ 8. `should send full conversation history to llm on second message`
+Два сообщения подряд → в теле второго запроса к LLM (через `mockServer.getLastRequest()`) присутствуют оба предыдущих сообщения (user + assistant).
+
+### ❌ 9. `should exclude error messages from llm history`
+Первый запрос 500 → второй успешный → в теле второго запроса нет `[error]` сообщений.
+
+### ❌ 10. `should show rate limit banner with countdown` _(заблокирован — требует реализации rate limit баннера)_
+MockLLMServer возвращает HTTP 429 с `retry-after: 3` → появляется `[data-testid="rate-limit-banner"]` с обратным отсчётом → через 3 сек баннер исчезает и появляется `message-llm`.

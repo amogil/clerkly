@@ -843,3 +843,93 @@ describe('Error Handling', () => {
     }).toThrow('Failed to get applied migrations');
   });
 });
+
+describe('Migration 006: add kind column and remove kind from payload_json', () => {
+  let db: Database.Database;
+  const migrationsPath = path.join(process.cwd(), 'migrations');
+
+  beforeEach(() => {
+    db = new Database(':memory:');
+
+    // Create messages table as it existed before migration 006
+    db.exec(`
+      CREATE TABLE messages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        agent_id TEXT NOT NULL,
+        timestamp TEXT NOT NULL,
+        payload_json TEXT NOT NULL
+      );
+    `);
+  });
+
+  afterEach(() => {
+    if (db && db.open) db.close();
+  });
+
+  /* Preconditions: messages table exists without kind column; rows have kind inside payload_json
+     Action: run migration 006
+     Assertions: kind column added, backfilled from payload_json, kind removed from payload_json
+     Requirements: llm-integration.3.1 */
+  it('should backfill kind column and remove kind from payload_json', () => {
+    // Insert rows with kind inside payload_json (old format)
+    db.prepare(`INSERT INTO messages (agent_id, timestamp, payload_json) VALUES (?, ?, ?)`).run(
+      'agent-1',
+      '2026-01-01T00:00:00Z',
+      JSON.stringify({ kind: 'user', data: { text: 'Hello' } })
+    );
+    db.prepare(`INSERT INTO messages (agent_id, timestamp, payload_json) VALUES (?, ?, ?)`).run(
+      'agent-1',
+      '2026-01-01T00:01:00Z',
+      JSON.stringify({ kind: 'llm', data: { action: { type: 'text', content: 'Hi' } } })
+    );
+
+    // Run migration 006 manually (read SQL from file)
+    const sql = fs.readFileSync(path.join(migrationsPath, '006_add_kind_to_messages.sql'), 'utf-8');
+    const upSql = sql.split('-- DOWN')[0]!.replace('-- UP', '').trim();
+    db.exec(upSql);
+
+    const rows = db.prepare('SELECT kind, payload_json FROM messages ORDER BY id').all() as Array<{
+      kind: string;
+      payload_json: string;
+    }>;
+
+    // kind column backfilled correctly
+    expect(rows[0]!.kind).toBe('user');
+    expect(rows[1]!.kind).toBe('llm');
+
+    // kind removed from payload_json
+    const payload0 = JSON.parse(rows[0]!.payload_json);
+    const payload1 = JSON.parse(rows[1]!.payload_json);
+    expect(payload0).not.toHaveProperty('kind');
+    expect(payload1).not.toHaveProperty('kind');
+
+    // rest of payload preserved
+    expect(payload0.data.text).toBe('Hello');
+    expect(payload1.data.action.type).toBe('text');
+  });
+
+  /* Preconditions: messages table has rows without kind in payload_json (already clean)
+     Action: run migration 006
+     Assertions: kind column defaults to 'user', payload_json unchanged
+     Requirements: llm-integration.3.1 */
+  it('should default kind to user when payload_json has no kind field', () => {
+    db.prepare(`INSERT INTO messages (agent_id, timestamp, payload_json) VALUES (?, ?, ?)`).run(
+      'agent-1',
+      '2026-01-01T00:00:00Z',
+      JSON.stringify({ data: { text: 'Hello' } })
+    );
+
+    const sql = fs.readFileSync(path.join(migrationsPath, '006_add_kind_to_messages.sql'), 'utf-8');
+    const upSql = sql.split('-- DOWN')[0]!.replace('-- UP', '').trim();
+    db.exec(upSql);
+
+    const row = db.prepare('SELECT kind, payload_json FROM messages').get() as {
+      kind: string;
+      payload_json: string;
+    };
+
+    expect(row.kind).toBe('user');
+    // payload_json untouched
+    expect(JSON.parse(row.payload_json)).toEqual({ data: { text: 'Hello' } });
+  });
+});

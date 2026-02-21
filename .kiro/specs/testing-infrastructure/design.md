@@ -1326,3 +1326,44 @@ await expect(element).toBeVisible({ timeout: 1000 });
 - [ ] Используются `await expect(locator).toHaveCount()` вместо `count()` + `expect()`
 - [ ] Если есть `waitForTimeout`, есть комментарий с объяснением
 
+
+## Обнаружение Toast-ошибок в Функциональных Тестах
+
+**Requirements**: testing.12
+
+### Проблема
+
+Функциональные тесты могут проходить успешно, даже если приложение показывает пользователю toast-уведомление об ошибке. Например, после OAuth flow приложение может отобразить ошибку инициализации, но тест не заметит этого и продолжит выполнение.
+
+### Решение
+
+Helper функция `expectNoToastError(window)` в `tests/functional/helpers/electron.ts`.
+
+Sonner рендерит тосты в контейнере `[data-sonner-toaster]`. Каждый тост — элемент `[data-sonner-toast]`. Тосты с ошибкой имеют атрибут `data-type="error"`.
+
+```typescript
+// tests/functional/helpers/electron.ts
+// Requirements: testing.12.1, testing.12.2, testing.12.3
+
+export async function expectNoToastError(window: Page): Promise<void> {
+  const errorToast = window.locator('[data-sonner-toast][data-type="error"]');
+  const count = await errorToast.count();
+  if (count > 0) {
+    const text = await errorToast.first().textContent();
+    throw new Error(`Toast error detected: ${text?.trim()}`);
+  }
+}
+```
+
+### Когда вызывать
+
+- После `completeOAuthFlow` + ожидания `[data-testid="agents"]`
+- После любого действия, которое может вызвать фоновую ошибку
+
+### Покрытие требований
+
+| Требование | Описание | Реализация |
+|------------|----------|------------|
+| testing.12.1 | Проверка после ключевых действий | Вызов в `launchWithMockLLM` и аналогичных helpers |
+| testing.12.2 | Фейл с текстом ошибки | `throw new Error(\`Toast error detected: ${text}\`)` |
+| testing.12.3 | Переиспользуемый helper | `expectNoToastError` в `helpers/electron.ts` |

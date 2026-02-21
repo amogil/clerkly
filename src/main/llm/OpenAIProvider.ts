@@ -108,6 +108,8 @@ export class OpenAIProvider implements ILLMProvider {
     options: ChatOptions,
     onChunk: (chunk: ChatChunk) => void
   ): Promise<LLMAction> {
+    // Allow runtime override via env (used by functional tests with MockLLMServer)
+    const apiUrl = process.env.CLERKLY_OPENAI_API_URL ?? this.config.apiUrl;
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), CHAT_TIMEOUT_MS);
 
@@ -147,7 +149,7 @@ export class OpenAIProvider implements ILLMProvider {
         body.reasoning_effort = options.reasoningEffort;
       }
 
-      const response = await fetch(this.config.apiUrl, {
+      const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${this.apiKey}`,
