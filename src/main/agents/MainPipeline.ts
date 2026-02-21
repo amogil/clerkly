@@ -267,9 +267,11 @@ export class MainPipeline {
 
   /**
    * Resolve model and reasoning effort for a given provider.
-   * Requirements: llm-integration.5.1
+   * Uses test config when NODE_ENV=test, prod config otherwise.
+   * Requirements: llm-integration.5.1, llm-integration.5.8
    */
   private resolveOptions(provider: LLMProvider): ChatOptions {
-    return LLM_CHAT_MODELS[provider]?.prod ?? LLM_CHAT_MODELS.openai.prod;
+    const env = process.env.NODE_ENV === 'test' ? 'test' : 'prod';
+    return LLM_CHAT_MODELS[provider]?.[env] ?? LLM_CHAT_MODELS.openai[env];
   }
 }

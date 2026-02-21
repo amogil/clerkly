@@ -314,13 +314,39 @@ catch(error):
 
 **`PromptBuilder`** при сборке истории фильтрует сообщения с `interrupted: true` — они не попадают в YAML.
 
+**`PromptBuilder`** также фильтрует сообщения с `kind: error` — они не попадают в YAML (требование llm-integration.3.9).
+
 **UI** фильтрует сообщения с `interrupted: true` — они не отображаются в чате.
 
----
+### Скрытие kind:error при новом сообщении
 
+При создании нового `kind: user` сообщения `AgentIPCHandlers` ДОЛЖЕН пометить все `kind: error` сообщения этого агента флагом `dismissed: true` в payload перед запуском нового `MainPipeline.run()`.
 
+```
+messages:create (kind: user):
+  1. UPDATE messages SET payload_json = json_set(payload_json, '$.data.dismissed', true)
+     WHERE agent_id = ? AND kind = 'error'
+  2. Отменить активный pipeline (если есть)
+  3. Создать kind:user сообщение
+  4. Запустить MainPipeline.run()
+```
 
-Новое событие `message.llm.reasoning.updated`:
+UI фильтрует сообщения с `dismissed: true` — они не отображаются (аналогично `interrupted: true`).
+
+### Rate limit баннер (llm-integration.3.7)
+
+При получении ошибки `rate_limit` `MainPipeline` НЕ создаёт `kind: error` сообщение, а эмитит событие `agent.rate_limit` с полем `retryAfterSeconds: 10`.
+
+Renderer подписывается на `agent.rate_limit` и показывает баннер поверх чата. По истечении таймера renderer вызывает IPC `messages:retry-last` — `AgentIPCHandlers` повторяет `MainPipeline.run()` с тем же `userMessageId`. При успехе баннер исчезает. При нажатии "Cancel" renderer вызывает IPC `messages:cancel-retry` — `AgentIPCHandlers` удаляет последнее `kind: user` сообщение из БД.
+
+```typescript
+// Новое событие
+interface AgentRateLimitPayload {
+  agentId: string;
+  userMessageId: number;
+  retryAfterSeconds: number; // всегда 10
+}
+```
 
 ```typescript
 // Requirements: llm-integration.2
@@ -376,6 +402,13 @@ User отправляет сообщение
 - `tests/functional/llm-chat.spec.ts` — "should show llm response after user message"
 - `tests/functional/llm-chat.spec.ts` — "should show reasoning before answer"
 - `tests/functional/llm-chat.spec.ts` — "should show error message on invalid api key"
+- `tests/functional/llm-chat.spec.ts` — "should interrupt previous request when new message sent during streaming"
+- `tests/functional/llm-chat.spec.ts` — "should not show interrupted llm message in chat"
+- `tests/functional/llm-chat.spec.ts` — "should show rate limit banner with countdown"
+- `tests/functional/llm-chat.spec.ts` — "should show provider error message on 500"
+- `tests/functional/llm-chat.spec.ts` — "should hide error bubble when user sends next message"
+- `tests/functional/llm-chat.spec.ts` — "should send full conversation history to llm on second message"
+- `tests/functional/llm-chat.spec.ts` — "should exclude error messages from llm history"
 
 ### Покрытие Требований
 
@@ -383,9 +416,17 @@ User отправляет сообщение
 |------------|-----------------|----------------------|
 | llm-integration.1 | ✓ | ✓ |
 | llm-integration.2 | ✓ | ✓ |
-| llm-integration.3 | ✓ | ✓ |
+| llm-integration.3.1 | ✓ | ✓ |
+| llm-integration.3.2 | ✓ | ✓ |
+| llm-integration.3.4 | ✓ | ✓ |
+| llm-integration.3.5 | ✓ | ✓ |
+| llm-integration.3.7 | - | ✓ |
+| llm-integration.3.8 | - | ✓ |
+| llm-integration.3.9 | ✓ | ✓ |
 | llm-integration.4 | ✓ | - |
 | llm-integration.5 | ✓ | - |
 | llm-integration.6 | ✓ | - |
 | llm-integration.7 | ✓ | ✓ |
-| llm-integration.8 | ✓ | - |
+| llm-integration.8.1 | ✓ | ✓ |
+| llm-integration.8.5 | ✓ | ✓ |
+| llm-integration.8.6 | ✓ | - |

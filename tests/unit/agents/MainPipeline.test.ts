@@ -485,7 +485,7 @@ describe('MainPipeline.run()', () => {
         'agent-1',
         'llm',
         expect.objectContaining({
-          data: expect.objectContaining({ model: LLM_CHAT_MODELS.google.prod.model }),
+          data: expect.objectContaining({ model: LLM_CHAT_MODELS.google.test.model }),
         })
       );
     });
