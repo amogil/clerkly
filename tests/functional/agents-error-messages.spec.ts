@@ -143,8 +143,7 @@ test.describe('Agents Error Messages', () => {
 
     // Add message to first agent
     await window.evaluate(async (id) => {
-      await window.api.messages.create(id!, {
-        kind: 'user',
+      await window.api.messages.create(id!, 'user', {
         data: { text: 'First agent message' },
       });
     }, firstAgentId);
@@ -171,8 +170,7 @@ test.describe('Agents Error Messages', () => {
 
     // Add message to second agent (more recent)
     await window.evaluate(async (id) => {
-      await window.api.messages.create(id!, {
-        kind: 'user',
+      await window.api.messages.create(id!, 'user', {
         data: { text: 'Second agent message' },
       });
     }, secondAgentId);

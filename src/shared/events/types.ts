@@ -102,6 +102,7 @@ export type MessageKind =
 export interface MessageSnapshot {
   id: number;
   agentId: string;
+  kind: string;
   timestamp: number; // Unix timestamp in milliseconds
   payload: MessagePayload;
 }

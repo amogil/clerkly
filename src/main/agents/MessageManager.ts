@@ -47,6 +47,7 @@ export class MessageManager {
     return {
       id: message.id,
       agentId: message.agentId,
+      kind: message.kind,
       timestamp: new Date(message.timestamp).getTime(),
       payload,
     };
@@ -73,13 +74,14 @@ export class MessageManager {
 
   /**
    * Create a new message for an agent
-   * Requirements: agents.4.3, agents.7.1, agents.12.4
+   * Requirements: agents.4.3, agents.7.1, agents.12.4, llm-integration.2
+   * @param kind Message kind: 'user' | 'llm' | 'error' | etc.
    * @param timestamp Optional timestamp (ISO string). If not provided, uses current time.
    */
-  create(agentId: string, payload: MessagePayload, timestamp?: string): Message {
+  create(agentId: string, kind: string, payload: MessagePayload, timestamp?: string): Message {
     // Repository automatically checks access
     const payloadJson = JSON.stringify(payload);
-    const message = this.dbManager.messages.create(agentId, payloadJson, timestamp);
+    const message = this.dbManager.messages.create(agentId, kind, payloadJson, timestamp);
 
     this.logger.info(`Message created: ${message.id} for agent ${agentId}`);
 
@@ -101,17 +103,10 @@ export class MessageManager {
 
     this.logger.info(`Message updated: ${messageId}`);
 
-    // Create snapshot using toEventMessage helper
-    // Note: We create a temporary Message object since we don't fetch from DB
-    const tempMessage: Message = {
-      id: messageId,
-      agentId,
-      timestamp: new Date().toISOString(),
-      payloadJson,
-    };
-
-    // Publish event for real-time UI updates
-    // Requirements: agents.12.5
-    MainEventBus.getInstance().publish(new MessageUpdatedEvent(this.toEventMessage(tempMessage)));
+    // Fetch updated message to get correct kind for the event
+    const updated = this.dbManager.messages.getById(messageId, agentId);
+    if (updated) {
+      MainEventBus.getInstance().publish(new MessageUpdatedEvent(this.toEventMessage(updated)));
+    }
   }
 }

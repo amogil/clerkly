@@ -47,15 +47,17 @@ describe('AgentIPCHandlers', () => {
   const mockMessage: Message = {
     id: 1,
     agentId: 'abc123xyz0',
+    kind: 'user',
     timestamp: '2026-02-15T10:00:00.000Z',
-    payloadJson: JSON.stringify({ kind: 'user', data: { text: 'Hello' } }),
+    payloadJson: JSON.stringify({ data: { text: 'Hello' } }),
   };
 
   const mockMessageSnapshot = {
     id: 1,
     agentId: 'abc123xyz0',
+    kind: 'user',
     timestamp: new Date('2026-02-15T10:00:00.000Z').getTime(),
-    payload: { kind: 'user', data: { text: 'Hello' } },
+    payload: { data: { text: 'Hello' } },
   };
 
   const mockAgentSnapshot = {
@@ -357,21 +359,24 @@ describe('AgentIPCHandlers', () => {
 
   describe('messages:create handler', () => {
     const userPayload: MessagePayload = {
-      kind: 'user',
       data: { text: 'Hello, agent!' },
     };
 
     /* Preconditions: Handlers registered
-       Action: Invoke messages:create with payload
-       Assertions: MessageManager.create called, MessageSnapshot returned
-       Requirements: agents.4.3, agents.7.1, realtime-events.9.8 */
+       Action: Invoke messages:create with kind and payload
+       Assertions: MessageManager.create called with kind, MessageSnapshot returned
+       Requirements: agents.4.3, agents.7.1, realtime-events.9.8, llm-integration.2 */
     it('should create message and return success', async () => {
       handlers.registerHandlers();
       const handler = registeredHandlers.get('messages:create')!;
 
-      const result = await handler(mockEvent, { agentId: 'abc123xyz0', payload: userPayload });
+      const result = await handler(mockEvent, {
+        agentId: 'abc123xyz0',
+        kind: 'user',
+        payload: userPayload,
+      });
 
-      expect(mockMessageManager.create).toHaveBeenCalledWith('abc123xyz0', userPayload);
+      expect(mockMessageManager.create).toHaveBeenCalledWith('abc123xyz0', 'user', userPayload);
       expect(mockMessageManager.toEventMessage).toHaveBeenCalledWith(mockMessage);
       expect(result).toEqual({ success: true, data: mockMessageSnapshot });
     });
@@ -387,7 +392,11 @@ describe('AgentIPCHandlers', () => {
       handlers.registerHandlers();
       const handler = registeredHandlers.get('messages:create')!;
 
-      const result = await handler(mockEvent, { agentId: 'other-agent', payload: userPayload });
+      const result = await handler(mockEvent, {
+        agentId: 'other-agent',
+        kind: 'user',
+        payload: userPayload,
+      });
 
       expect(result).toEqual({ success: false, error: 'Access denied' });
     });
@@ -395,7 +404,6 @@ describe('AgentIPCHandlers', () => {
 
   describe('messages:update handler', () => {
     const updatedPayload: MessagePayload = {
-      kind: 'llm',
       data: { text: 'Updated response' },
     };
 

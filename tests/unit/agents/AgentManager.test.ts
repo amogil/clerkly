@@ -9,6 +9,7 @@ import {
   AgentUpdatedEvent,
   AgentArchivedEvent,
 } from '../../../src/shared/events/types';
+import { AGENT_STATUS, MESSAGE_KIND } from '../../../src/shared/utils/agentStatus';
 import type { IDatabaseManager } from '../../../src/main/DatabaseManager';
 import type { Agent } from '../../../src/main/db/schema';
 
@@ -95,7 +96,7 @@ describe('AgentManager', () => {
         createdAt: new Date(mockAgent.createdAt).getTime(),
         updatedAt: new Date(mockAgent.updatedAt).getTime(),
         archivedAt: null,
-        status: 'new',
+        status: AGENT_STATUS.NEW,
       });
       expect(typeof snapshot.createdAt).toBe('number');
       expect(typeof snapshot.updatedAt).toBe('number');
@@ -126,14 +127,15 @@ describe('AgentManager', () => {
       const lastMessage = {
         id: 1,
         agentId: mockAgent.agentId,
+        kind: MESSAGE_KIND.USER,
         timestamp: '2026-02-15T10:30:00.000Z',
-        payloadJson: JSON.stringify({ kind: 'user', data: { text: 'Hello' } }),
+        payloadJson: JSON.stringify({ data: { text: 'Hello' } }),
       };
       mockDbManager.messages.getLastByAgent = jest.fn().mockReturnValue(lastMessage);
 
       const snapshot = (agentManager as any).toEventAgent(mockAgent);
 
-      expect(snapshot.status).toBe('in-progress');
+      expect(snapshot.status).toBe(AGENT_STATUS.IN_PROGRESS);
     });
 
     /* Preconditions: Agent with last message of kind 'final_answer' exists
@@ -144,27 +146,49 @@ describe('AgentManager', () => {
       const lastMessage = {
         id: 1,
         agentId: mockAgent.agentId,
+        kind: MESSAGE_KIND.FINAL_ANSWER,
         timestamp: '2026-02-15T10:30:00.000Z',
-        payloadJson: JSON.stringify({ kind: 'final_answer', data: { text: 'Done' } }),
+        payloadJson: JSON.stringify({ data: { text: 'Done' } }),
       };
       mockDbManager.messages.getLastByAgent = jest.fn().mockReturnValue(lastMessage);
 
       const snapshot = (agentManager as any).toEventAgent(mockAgent);
 
-      expect(snapshot.status).toBe('completed');
+      expect(snapshot.status).toBe(AGENT_STATUS.COMPLETED);
     });
 
     /* Preconditions: Agent with last message containing error status exists
        Action: Call toEventAgent() with agent
        Assertions: Returns AgentSnapshot with status 'error'
-       Requirements: realtime-events.9.2, agents.5.3 */
-    it('should compute status as error when last message has error result', () => {
+       Requirements: realtime-events.9.2, agents.5.3, llm-integration.2 */
+    it('should compute status as error when last message has kind error', () => {
       const lastMessage = {
         id: 1,
         agentId: mockAgent.agentId,
+        kind: MESSAGE_KIND.ERROR,
         timestamp: '2026-02-15T10:30:00.000Z',
         payloadJson: JSON.stringify({
-          kind: 'llm',
+          data: { error: { type: 'network', message: 'Failed' } },
+        }),
+      };
+      mockDbManager.messages.getLastByAgent = jest.fn().mockReturnValue(lastMessage);
+
+      const snapshot = (agentManager as any).toEventAgent(mockAgent);
+
+      expect(snapshot.status).toBe(AGENT_STATUS.ERROR);
+    });
+
+    /* Preconditions: Agent with last message of kind 'llm' containing result.status='error' (legacy payload)
+       Action: Call toEventAgent() with agent
+       Assertions: Returns AgentSnapshot with status 'awaiting-response' (legacy result.status is ignored)
+       Requirements: realtime-events.9.2, agents.5.4, llm-integration.2 */
+    it('should ignore legacy result.status in payload and use kind instead', () => {
+      const lastMessage = {
+        id: 1,
+        agentId: mockAgent.agentId,
+        kind: MESSAGE_KIND.LLM,
+        timestamp: '2026-02-15T10:30:00.000Z',
+        payloadJson: JSON.stringify({
           data: { result: { status: 'error', message: 'Failed' } },
         }),
       };
@@ -172,7 +196,7 @@ describe('AgentManager', () => {
 
       const snapshot = (agentManager as any).toEventAgent(mockAgent);
 
-      expect(snapshot.status).toBe('error');
+      expect(snapshot.status).toBe(AGENT_STATUS.AWAITING_RESPONSE);
     });
 
     /* Preconditions: Agent with last message of kind 'llm' (not final_answer) exists
@@ -183,14 +207,15 @@ describe('AgentManager', () => {
       const lastMessage = {
         id: 1,
         agentId: mockAgent.agentId,
+        kind: MESSAGE_KIND.LLM,
         timestamp: '2026-02-15T10:30:00.000Z',
-        payloadJson: JSON.stringify({ kind: 'llm', data: { text: 'Thinking...' } }),
+        payloadJson: JSON.stringify({ data: { text: 'Thinking...' } }),
       };
       mockDbManager.messages.getLastByAgent = jest.fn().mockReturnValue(lastMessage);
 
       const snapshot = (agentManager as any).toEventAgent(mockAgent);
 
-      expect(snapshot.status).toBe('awaiting-response');
+      expect(snapshot.status).toBe(AGENT_STATUS.AWAITING_RESPONSE);
     });
   });
 

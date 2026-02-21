@@ -36,6 +36,7 @@ describe('User Data Isolation Properties', () => {
       CREATE TABLE IF NOT EXISTS messages (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         agent_id TEXT NOT NULL,
+        kind TEXT NOT NULL,
         timestamp TEXT NOT NULL,
         payload_json TEXT NOT NULL
       );
@@ -202,6 +203,7 @@ describe('Agent Access Control Properties', () => {
             CREATE TABLE IF NOT EXISTS messages (
               id INTEGER PRIMARY KEY AUTOINCREMENT,
               agent_id TEXT NOT NULL,
+              kind TEXT NOT NULL,
               timestamp TEXT NOT NULL,
               payload_json TEXT NOT NULL
             );
@@ -212,7 +214,7 @@ describe('Agent Access Control Properties', () => {
           const agentsA = new AgentsRepository(db, () => userA);
           const messagesA = new MessagesRepository(db, () => userA, agentsA);
           const agent = agentsA.create('Agent');
-          messagesA.create(agent.agentId, '{"kind":"user"}');
+          messagesA.create(agent.agentId, 'user', '{}');
 
           // User B tries to access messages
           const agentsB = new AgentsRepository(db, () => userB);

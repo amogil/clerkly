@@ -85,6 +85,7 @@ export const messages = sqliteTable(
   {
     id: integer('id').primaryKey({ autoIncrement: true }),
     agentId: text('agent_id').notNull(),
+    kind: text('kind').notNull(),
     timestamp: text('timestamp').notNull(),
     payloadJson: text('payload_json').notNull(),
   },

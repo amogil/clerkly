@@ -38,8 +38,9 @@ describe('MessageManager', () => {
   const mockMessage: Message = {
     id: 1,
     agentId: 'agent-123',
+    kind: 'user',
     timestamp: '2026-02-15T10:30:00.000Z',
-    payloadJson: JSON.stringify({ kind: 'user', data: { text: 'Hello' } }),
+    payloadJson: JSON.stringify({ data: { text: 'Hello' } }),
   };
 
   beforeEach(() => {
@@ -52,6 +53,7 @@ describe('MessageManager', () => {
       messages: {
         listByAgent: jest.fn().mockReturnValue([mockMessage]),
         getLastByAgent: jest.fn().mockReturnValue(mockMessage),
+        getById: jest.fn().mockReturnValue(mockMessage),
         create: jest.fn().mockReturnValue(mockMessage),
         update: jest.fn(),
       },
@@ -79,8 +81,9 @@ describe('MessageManager', () => {
       expect(snapshot).toEqual({
         id: mockMessage.id,
         agentId: mockMessage.agentId,
+        kind: 'user',
         timestamp: new Date(mockMessage.timestamp).getTime(),
-        payload: { kind: 'user', data: { text: 'Hello' } },
+        payload: { data: { text: 'Hello' } },
       });
       expect(typeof snapshot.timestamp).toBe('number');
       expect(typeof snapshot.payload).toBe('object');
@@ -94,9 +97,9 @@ describe('MessageManager', () => {
       const complexMessage: Message = {
         id: 2,
         agentId: 'agent-123',
+        kind: 'llm',
         timestamp: '2026-02-15T10:30:00.000Z',
         payloadJson: JSON.stringify({
-          kind: 'llm',
           data: {
             text: 'Response',
             result: { status: 'success', value: 42 },
@@ -106,8 +109,8 @@ describe('MessageManager', () => {
 
       const snapshot = (messageManager as any).toEventMessage(complexMessage);
 
+      expect(snapshot.kind).toBe('llm');
       expect(snapshot.payload).toEqual({
-        kind: 'llm',
         data: {
           text: 'Response',
           result: { status: 'success', value: 42 },
@@ -123,6 +126,7 @@ describe('MessageManager', () => {
       const invalidMessage: Message = {
         id: 3,
         agentId: 'agent-123',
+        kind: 'user',
         timestamp: '2026-02-15T10:30:00.000Z',
         payloadJson: 'invalid json {',
       };
@@ -140,6 +144,7 @@ describe('MessageManager', () => {
       const emptyMessage: Message = {
         id: 4,
         agentId: 'agent-123',
+        kind: 'user',
         timestamp: '2026-02-15T10:30:00.000Z',
         payloadJson: '',
       };
@@ -195,12 +200,13 @@ describe('MessageManager', () => {
        Assertions: Repository create called, event published with snapshot, message returned
        Requirements: agents.4.3, agents.7.1, agents.12.4, realtime-events.9.7 */
     it('should create message and publish event with snapshot', () => {
-      const payload = { kind: 'user' as const, data: { text: 'Hello' } };
+      const payload = { data: { text: 'Hello' } };
 
-      const result = messageManager.create('agent-123', payload);
+      const result = messageManager.create('agent-123', 'user', payload);
 
       expect(mockDbManager.messages.create).toHaveBeenCalledWith(
         'agent-123',
+        'user',
         JSON.stringify(payload),
         undefined
       );
@@ -210,6 +216,7 @@ describe('MessageManager', () => {
       const publishedEvent = mockEventBus.publish.mock.calls[0][0];
       expect(publishedEvent).toBeInstanceOf(MessageCreatedEvent);
       expect(publishedEvent.message.id).toBe(mockMessage.id);
+      expect(publishedEvent.message.kind).toBe('user');
       expect(publishedEvent.message.payload).toEqual(payload);
       expect(typeof publishedEvent.timestamp).toBe('number');
     });
@@ -221,7 +228,9 @@ describe('MessageManager', () => {
        Assertions: Repository update called, event published with snapshot
        Requirements: agents.7.1, realtime-events.9.7 */
     it('should update message and publish event with snapshot', () => {
-      const payload = { kind: 'user' as const, data: { text: 'Updated' } };
+      const payload = { data: { text: 'Updated' } };
+      const updatedMessage: Message = { ...mockMessage, payloadJson: JSON.stringify(payload) };
+      mockDbManager.messages.getById = jest.fn().mockReturnValue(updatedMessage);
 
       messageManager.update(1, 'agent-123', payload);
 
@@ -230,12 +239,14 @@ describe('MessageManager', () => {
         'agent-123',
         JSON.stringify(payload)
       );
+      expect(mockDbManager.messages.getById).toHaveBeenCalledWith(1, 'agent-123');
       expect(mockEventBus.publish).toHaveBeenCalledTimes(1);
 
       const publishedEvent = mockEventBus.publish.mock.calls[0][0];
       expect(publishedEvent).toBeInstanceOf(MessageUpdatedEvent);
       expect(publishedEvent.message.id).toBe(1);
       expect(publishedEvent.message.agentId).toBe('agent-123');
+      expect(publishedEvent.message.kind).toBe('user');
       expect(publishedEvent.message.payload).toEqual(payload);
       expect(typeof publishedEvent.timestamp).toBe('number');
     });

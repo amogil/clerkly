@@ -227,6 +227,7 @@ export interface API {
     list: (agentId: string) => Promise<{ success: boolean; data?: any; error?: string }>;
     create: (
       agentId: string,
+      kind: string,
       payload: any
     ) => Promise<{ success: boolean; data?: any; error?: string }>;
     update: (

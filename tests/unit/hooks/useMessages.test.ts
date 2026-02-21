@@ -50,14 +50,16 @@ describe('useMessages hook', () => {
     {
       id: 1,
       agentId: 'agent-1',
+      kind: 'user',
       timestamp: new Date('2024-01-01T10:00:00Z').getTime(),
-      payload: { kind: 'user', data: { text: 'Hello' } },
+      payload: { data: { text: 'Hello' } },
     },
     {
       id: 2,
       agentId: 'agent-1',
+      kind: 'llm',
       timestamp: new Date('2024-01-01T10:01:00Z').getTime(),
-      payload: { kind: 'llm', data: { text: 'Hi there!' } },
+      payload: { data: { text: 'Hi there!' } },
     },
   ];
 
@@ -127,9 +129,8 @@ describe('useMessages hook', () => {
         expect(result.current.isLoading).toBe(false);
       });
 
-      expect(result.current.messages[0].payload.kind).toBe('user');
       expect(result.current.messages[0].payload.data?.text).toBe('Hello');
-      expect(result.current.messages[1].payload.kind).toBe('llm');
+      expect(result.current.messages[1].kind).toBe('llm');
     });
 
     /* Preconditions: API returns error
@@ -170,8 +171,9 @@ describe('useMessages hook', () => {
         {
           id: 3,
           agentId: 'agent-2',
+          kind: 'user',
           timestamp: new Date('2024-01-02T10:00:00Z').getTime(),
-          payload: { kind: 'user', data: { text: 'Different agent' } },
+          payload: { data: { text: 'Different agent' } },
         },
       ];
       mockMessagesApi.list.mockResolvedValue({ success: true, data: newMessages });
@@ -221,8 +223,7 @@ describe('useMessages hook', () => {
         success = await result.current.sendMessage('Test message');
       });
 
-      expect(mockMessagesApi.create).toHaveBeenCalledWith('agent-1', {
-        kind: 'user',
+      expect(mockMessagesApi.create).toHaveBeenCalledWith('agent-1', 'user', {
         data: {
           text: 'Test message',
           reply_to_message_id: null,
@@ -335,8 +336,9 @@ describe('useMessages hook', () => {
           message: {
             id: 3,
             agentId: 'agent-1',
+            kind: 'user',
             timestamp: new Date('2024-01-01T10:02:00Z').getTime(),
-            payload: { kind: 'user', data: { text: 'New message' } },
+            payload: { data: { text: 'New message' } },
           },
         });
       });
@@ -371,8 +373,9 @@ describe('useMessages hook', () => {
           message: {
             id: 3,
             agentId: 'agent-2', // Different agent
+            kind: 'user',
             timestamp: new Date('2024-01-01T10:02:00Z').getTime(),
-            payload: { kind: 'user', data: { text: 'New message' } },
+            payload: { data: { text: 'New message' } },
           },
         });
       });
@@ -408,8 +411,9 @@ describe('useMessages hook', () => {
           message: {
             id: 1, // Same id as existing message
             agentId: 'agent-1',
+            kind: 'user',
             timestamp: new Date('2024-01-01T10:00:00Z').getTime(),
-            payload: { kind: 'user', data: { text: 'Hello' } },
+            payload: { data: { text: 'Hello' } },
           },
         });
       });
@@ -473,8 +477,9 @@ describe('useMessages hook', () => {
           message: {
             id: 1,
             agentId: 'agent-1',
+            kind: 'user',
             timestamp: new Date('2024-01-01T10:00:00Z').getTime(),
-            payload: { kind: 'user', data: { text: 'Updated text' } },
+            payload: { data: { text: 'Updated text' } },
           },
         });
       });
@@ -541,8 +546,9 @@ describe('useMessages hook', () => {
           message: {
             id: 999, // Non-existent message
             agentId: 'agent-1',
+            kind: 'user',
             timestamp: new Date('2024-01-01T10:00:00Z').getTime(),
-            payload: { kind: 'user', data: { text: 'Should not apply' } },
+            payload: { data: { text: 'Should not apply' } },
           },
         });
       });

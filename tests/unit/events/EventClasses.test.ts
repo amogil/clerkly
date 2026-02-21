@@ -269,8 +269,9 @@ describe('Event Classes', () => {
     const mockMessageSnapshot: MessageSnapshot = {
       id: 1,
       agentId: 'agent-1',
+      kind: 'user',
       timestamp: 1705315800000,
-      payload: { kind: 'user', data: { text: 'Hello' } },
+      payload: { data: { text: 'Hello' } },
     };
 
     /* Preconditions: MessageSnapshot provided
@@ -295,7 +296,7 @@ describe('Event Classes', () => {
       const event = new MessageCreatedEvent(mockMessageSnapshot);
 
       expect(typeof event.message.payload).toBe('object');
-      expect(event.message.payload.kind).toBe('user');
+      expect(event.message.kind).toBe('user');
       expect(event.message.payload.data).toEqual({ text: 'Hello' });
     });
   });
@@ -304,8 +305,9 @@ describe('Event Classes', () => {
     const mockMessageSnapshot: MessageSnapshot = {
       id: 1,
       agentId: 'agent-1',
+      kind: 'user',
       timestamp: 1705315800000,
-      payload: { kind: 'user', data: { text: 'Updated' } },
+      payload: { data: { text: 'Updated' } },
     };
 
     /* Preconditions: MessageSnapshot provided

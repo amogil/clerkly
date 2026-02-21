@@ -16,7 +16,8 @@ import { Logger } from '../Logger';
 import { handleBackgroundError } from '../ErrorHandler';
 import type { Agent } from '../db/schema';
 import type { Message } from '../db/schema';
-import type { AgentStatus, MessagePayload } from '../../shared/utils/agentStatus';
+import type { AgentStatus } from '../../shared/utils/agentStatus';
+import { AGENT_STATUS, MESSAGE_KIND } from '../../shared/utils/agentStatus';
 
 /**
  * AgentManager - business logic for agents
@@ -37,43 +38,37 @@ export class AgentManager {
 
   /**
    * Compute agent status based on the last message
-   * Requirements: agents.5.1, agents.5.2, agents.5.3, agents.5.4, agents.5.5
+   * Requirements: agents.5.1, agents.5.2, agents.5.3, agents.5.4, agents.5.5, agents.9.2
    */
   private computeAgentStatus(message: Message | null): AgentStatus {
     if (!message) {
-      return 'new';
+      return AGENT_STATUS.NEW;
     }
 
-    try {
-      const payload: MessagePayload = JSON.parse(message.payloadJson);
-
-      // Check for errors in result.status
-      const resultStatus = payload.data?.result?.status;
-      if (resultStatus === 'error' || resultStatus === 'crash' || resultStatus === 'timeout') {
-        return 'error';
-      }
-
-      // Final answer means completed
-      if (payload.kind === 'final_answer') {
-        return 'completed';
-      }
-
-      // Last message from user means in-progress
-      if (payload.kind === 'user') {
-        return 'in-progress';
-      }
-
-      // Last message from LLM (not final_answer) means awaiting-response
-      if (payload.kind === 'llm') {
-        return 'awaiting-response';
-      }
-
-      // Default to new for other kinds (tool_call, code_exec, etc.)
-      return 'new';
-    } catch (error) {
-      this.logger.error(`Failed to parse message payload: ${error}`);
-      return 'new';
+    // Error kind means agent has error
+    // Requirements: agents.9.2
+    if (message.kind === MESSAGE_KIND.ERROR) {
+      return AGENT_STATUS.ERROR;
     }
+
+    // Final answer means completed
+    if (message.kind === MESSAGE_KIND.FINAL_ANSWER) {
+      return AGENT_STATUS.COMPLETED;
+    }
+
+    // Last message from user means in-progress (no finalized agent response after it)
+    // Requirements: agents.9.2
+    if (message.kind === MESSAGE_KIND.USER) {
+      return AGENT_STATUS.IN_PROGRESS;
+    }
+
+    // Last message from LLM (not final_answer) means awaiting-response
+    if (message.kind === MESSAGE_KIND.LLM) {
+      return AGENT_STATUS.AWAITING_RESPONSE;
+    }
+
+    // Default to new for other kinds (tool_call, code_exec, etc.)
+    return AGENT_STATUS.NEW;
   }
 
   /**

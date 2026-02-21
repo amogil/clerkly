@@ -231,14 +231,14 @@ export class AgentIPCHandlers {
 
   /**
    * Handle messages:create request
-   * Requirements: agents.4.3, agents.7.1, agents.1.4, realtime-events.9.8
+   * Requirements: agents.4.3, agents.7.1, agents.1.4, realtime-events.9.8, llm-integration.2
    */
   private async handleMessageCreate(
     _event: IpcMainInvokeEvent,
-    args: { agentId: string; payload: MessagePayload }
+    args: { agentId: string; kind: string; payload: MessagePayload }
   ): Promise<IPCResult> {
     try {
-      const message = this.messageManager.create(args.agentId, args.payload);
+      const message = this.messageManager.create(args.agentId, args.kind, args.payload);
       this.logger.info(`Message created: ${message.id} for agent ${args.agentId}`);
       // Convert to snapshot with parsed payload
       const snapshot = this.messageManager.toEventMessage(message);

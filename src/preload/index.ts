@@ -12,9 +12,9 @@ import type { User } from '../types';
 type LLMProvider = 'openai' | 'anthropic' | 'google';
 
 // Message payload type for agents API (duplicated due to rootDir restriction)
-// Requirements: agents.7.2
+// Requirements: agents.7.2, llm-integration.2
+// Note: 'kind' is now a separate parameter, not part of payload
 interface MessagePayloadAPI {
-  kind: 'user' | 'llm' | 'tool_call' | 'code_exec' | 'final_answer' | 'request_scope' | 'artifact';
   timing?: {
     started_at: string;
     finished_at: string;
@@ -91,6 +91,7 @@ export interface API {
     list: (agentId: string) => Promise<{ success: boolean; data?: unknown; error?: string }>;
     create: (
       agentId: string,
+      kind: string,
       payload: MessagePayloadAPI
     ) => Promise<{ success: boolean; data?: unknown; error?: string }>;
     update: (
@@ -514,14 +515,16 @@ const api: API = {
      * Create a new message for an agent
      * Requirements: agents.4.3, agents.7.1, agents.1.4
      * @param {string} agentId - Agent ID
+     * @param {string} kind - Message kind ('user' | 'llm' | 'error' | ...)
      * @param {MessagePayloadAPI} payload - Message payload
      * @returns {Promise<{success: boolean, data?: Message, error?: string}>}
      */
     async create(
       agentId: string,
+      kind: string,
       payload: MessagePayloadAPI
     ): Promise<{ success: boolean; data?: unknown; error?: string }> {
-      return await ipcRenderer.invoke('messages:create', { agentId, payload });
+      return await ipcRenderer.invoke('messages:create', { agentId, kind, payload });
     },
 
     /**

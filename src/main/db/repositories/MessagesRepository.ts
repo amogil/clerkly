@@ -66,11 +66,12 @@ export class MessagesRepository {
 
   /**
    * Create a new message for an agent
-   * Requirements: user-data-isolation.7.6
+   * Requirements: user-data-isolation.7.6, llm-integration.2
+   * @param kind Message kind: 'user' | 'llm' | 'error' | etc.
    * @param timestamp Optional timestamp (ISO string). Can only be used in test environment.
    * @throws {Error} If timestamp is provided outside test environment
    */
-  create(agentId: string, payloadJson: string, timestamp?: string): Message {
+  create(agentId: string, kind: string, payloadJson: string, timestamp?: string): Message {
     this.checkAccess(agentId);
 
     // Validate timestamp parameter is only used in tests
@@ -82,11 +83,27 @@ export class MessagesRepository {
 
     const message = this.db
       .insert(messages)
-      .values({ agentId, timestamp: messageTimestamp, payloadJson })
+      .values({ agentId, kind, timestamp: messageTimestamp, payloadJson })
       .returning()
       .get();
 
     return message;
+  }
+
+  /**
+   * Get a single message by id (with access control)
+   * Returns null if not found or access denied
+   * Requirements: user-data-isolation.7.6
+   */
+  getById(messageId: number, agentId: string): Message | null {
+    this.checkAccess(agentId);
+    const result = this.db
+      .select()
+      .from(messages)
+      .where(and(eq(messages.id, messageId), eq(messages.agentId, agentId)))
+      .limit(1)
+      .all();
+    return result[0] ?? null;
   }
 
   /**

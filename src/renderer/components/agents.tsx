@@ -516,8 +516,7 @@ export function Agents() {
           ) : (
             messages.map((message, index) => {
               const showAvatar =
-                message.payload.kind !== 'user' &&
-                (index === 0 || messages[index - 1]?.payload.kind === 'user');
+                message.kind !== 'user' && (index === 0 || messages[index - 1]?.kind === 'user');
 
               return (
                 <motion.div
@@ -531,7 +530,7 @@ export function Agents() {
                     ease: [0.4, 0, 0.2, 1],
                   }}
                 >
-                  {message.payload.kind === 'user' ? (
+                  {message.kind === 'user' ? (
                     <div className="flex justify-end">
                       <div className="rounded-2xl bg-secondary/70 border border-border px-4 py-3 max-w-[75%]">
                         <p className="text-sm leading-relaxed text-foreground whitespace-pre-wrap break-words">

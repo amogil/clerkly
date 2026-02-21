@@ -88,7 +88,6 @@ export function useMessages(agentId: string | null): UseMessagesResult {
       }
 
       const payload: MessagePayload = {
-        kind: 'user',
         data: {
           text: text.trim(),
           reply_to_message_id: null,
@@ -97,7 +96,7 @@ export function useMessages(agentId: string | null): UseMessagesResult {
 
       const result = await callApi<Record<string, never>>(
         () =>
-          window.api.messages.create(agentId, payload).then((r) => ({
+          window.api.messages.create(agentId, 'user', payload).then((r) => ({
             ...r,
             data: r.success ? ({} as Record<string, never>) : undefined,
           })),

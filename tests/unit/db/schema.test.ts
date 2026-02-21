@@ -159,10 +159,11 @@ describe('Database Schema', () => {
     /* Preconditions: Schema is defined
        Action: Check messages table structure
        Assertions: All columns are defined with correct types
-       Requirements: user-data-isolation.7.3 */
+       Requirements: user-data-isolation.7.3, llm-integration.2 */
     it('should have correct column definitions', () => {
       expect(messages.id).toBeDefined();
       expect(messages.agentId).toBeDefined();
+      expect(messages.kind).toBeDefined();
       expect(messages.timestamp).toBeDefined();
       expect(messages.payloadJson).toBeDefined();
     });
@@ -170,29 +171,33 @@ describe('Database Schema', () => {
     /* Preconditions: Schema is defined
        Action: Check Message type inference
        Assertions: Message type has all expected properties
-       Requirements: user-data-isolation.7.4 */
+       Requirements: user-data-isolation.7.4, llm-integration.2 */
     it('should export Message type with correct properties', () => {
       const message: Message = {
         id: 1,
         agentId: 'agent-123',
+        kind: 'user',
         timestamp: new Date().toISOString(),
-        payloadJson: '{"kind": "user", "content": "Hello"}',
+        payloadJson: '{"content": "Hello"}',
       };
       expect(message.id).toBe(1);
       expect(message.agentId).toBe('agent-123');
+      expect(message.kind).toBe('user');
     });
 
     /* Preconditions: Schema is defined
        Action: Check NewMessage type inference
        Assertions: NewMessage type allows optional id (auto-increment)
-       Requirements: user-data-isolation.7.4 */
+       Requirements: user-data-isolation.7.4, llm-integration.2 */
     it('should export NewMessage type with optional id', () => {
       const newMessage: NewMessage = {
         agentId: 'agent-123',
+        kind: 'user',
         timestamp: new Date().toISOString(),
-        payloadJson: '{"kind": "user"}',
+        payloadJson: '{}',
       };
       expect(newMessage.agentId).toBe('agent-123');
+      expect(newMessage.kind).toBe('user');
       expect(newMessage.id).toBeUndefined();
     });
   });

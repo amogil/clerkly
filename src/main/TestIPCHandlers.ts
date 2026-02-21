@@ -134,13 +134,12 @@ export function registerTestIPCHandlers(
         const oldTimestamp = new Date(Date.now() - minutesAgo * 60 * 1000).toISOString();
 
         const payload = {
-          kind: 'user' as const,
           data: { text: 'Test message from the past' },
         };
 
         // Create message with old timestamp - this will trigger MESSAGE_CREATED event
         // which will update agent's updatedAt to match the message timestamp
-        messageManager.create(agent.agentId, payload, oldTimestamp);
+        messageManager.create(agent.agentId, 'user', payload, oldTimestamp);
 
         return {
           success: true,
@@ -376,10 +375,9 @@ export function registerTestIPCHandlers(
 
       try {
         const payload = {
-          kind: 'llm' as const,
           data: { text },
         };
-        messageManager.create(agentId, payload);
+        messageManager.create(agentId, 'llm', payload);
         logger.info(`Test: Created agent message for agent ${agentId}`);
         return { success: true };
       } catch (error: unknown) {
