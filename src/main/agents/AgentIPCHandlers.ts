@@ -1,11 +1,13 @@
-// Requirements: agents.2, agents.4, agents.10, user-data-isolation.6.8
+// Requirements: agents.2, agents.4, agents.10, user-data-isolation.6.8, llm-integration.6
 // src/main/agents/AgentIPCHandlers.ts
 // IPC handlers for agents and messages
 
 import { ipcMain, IpcMainInvokeEvent } from 'electron';
 import { AgentManager } from './AgentManager';
 import { MessageManager } from './MessageManager';
+import { MainPipeline } from './MainPipeline';
 import { Logger } from '../Logger';
+import { handleBackgroundError } from '../ErrorHandler';
 import type { MessagePayload } from '../../shared/utils/agentStatus';
 
 /**
@@ -28,12 +30,14 @@ interface IPCResult<T = unknown> {
 export class AgentIPCHandlers {
   private agentManager: AgentManager;
   private messageManager: MessageManager;
+  private pipeline: MainPipeline;
   private logger = Logger.create('AgentIPCHandlers');
   private handlersRegistered = false;
 
-  constructor(agentManager: AgentManager, messageManager: MessageManager) {
+  constructor(agentManager: AgentManager, messageManager: MessageManager, pipeline: MainPipeline) {
     this.agentManager = agentManager;
     this.messageManager = messageManager;
+    this.pipeline = pipeline;
   }
 
   /**
@@ -231,7 +235,7 @@ export class AgentIPCHandlers {
 
   /**
    * Handle messages:create request
-   * Requirements: agents.4.3, agents.7.1, agents.1.4, realtime-events.9.8, llm-integration.2
+   * Requirements: agents.4.3, agents.7.1, agents.1.4, realtime-events.9.8, llm-integration.2, llm-integration.6
    */
   private async handleMessageCreate(
     _event: IpcMainInvokeEvent,
@@ -242,6 +246,32 @@ export class AgentIPCHandlers {
       this.logger.info(`Message created: ${message.id} for agent ${args.agentId}`);
       // Convert to snapshot with parsed payload
       const snapshot = this.messageManager.toEventMessage(message);
+
+      // Launch LLM pipeline asynchronously for user messages
+      // Requirements: llm-integration.6
+      if (args.kind === 'user') {
+        // Cancel any running pipeline for this agent
+        this.agentManager.cancelPipeline(args.agentId);
+
+        // Create a new AbortController for this pipeline run
+        const controller = new AbortController();
+        this.agentManager.setPipelineController(args.agentId, controller);
+
+        // Run pipeline in background — do not await
+        this.pipeline
+          .run(args.agentId, message.id, controller.signal)
+          .catch((err: unknown) => {
+            // MainPipeline handles LLM errors internally (creates kind:error message).
+            // This catch handles unexpected errors that escape the pipeline.
+            // Requirements: error-notifications.1.1, error-notifications.1.5
+            handleBackgroundError(err, 'LLM Pipeline');
+          })
+          .finally(() => {
+            // Clean up controller reference when pipeline finishes
+            this.agentManager.cancelPipeline(args.agentId);
+          });
+      }
+
       return { success: true, data: snapshot };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);

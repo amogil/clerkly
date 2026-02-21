@@ -356,6 +356,70 @@ describe('AgentManager', () => {
       expect(publishedEvent.agent.archivedAt).toBe(new Date('2026-02-15T11:00:00.000Z').getTime());
       expect(typeof publishedEvent.timestamp).toBe('number');
     });
+
+    /* Preconditions: AgentManager initialized, agent has running pipeline
+       Action: Call archive()
+       Assertions: Pipeline cancelled before archiving
+       Requirements: agents.10.4, llm-integration.6 */
+    it('should cancel running pipeline when archiving agent', () => {
+      const archivedAgent = { ...mockAgent, archivedAt: '2026-02-15T11:00:00.000Z' };
+      mockDbManager.agents.findById = jest
+        .fn()
+        .mockReturnValueOnce(mockAgent)
+        .mockReturnValueOnce(archivedAgent);
+      mockDbManager.messages.getLastByAgent = jest.fn().mockReturnValue(null);
+
+      // Register a pipeline controller
+      const controller = new AbortController();
+      agentManager.setPipelineController('abc123xyz0', controller);
+
+      agentManager.archive('abc123xyz0');
+
+      // Controller should have been aborted
+      expect(controller.signal.aborted).toBe(true);
+    });
+  });
+
+  describe('setPipelineController / cancelPipeline', () => {
+    /* Preconditions: No pipeline running
+       Action: Call cancelPipeline()
+       Assertions: No error thrown
+       Requirements: llm-integration.6 */
+    it('should do nothing when no pipeline is running', () => {
+      expect(() => agentManager.cancelPipeline('abc123xyz0')).not.toThrow();
+    });
+
+    /* Preconditions: Pipeline controller registered
+       Action: Call cancelPipeline()
+       Assertions: AbortController aborted, controller removed
+       Requirements: llm-integration.6 */
+    it('should abort controller and remove it', () => {
+      const controller = new AbortController();
+      agentManager.setPipelineController('abc123xyz0', controller);
+
+      agentManager.cancelPipeline('abc123xyz0');
+
+      expect(controller.signal.aborted).toBe(true);
+
+      // Second cancel should not throw (controller already removed)
+      expect(() => agentManager.cancelPipeline('abc123xyz0')).not.toThrow();
+    });
+
+    /* Preconditions: Two different agents have pipeline controllers
+       Action: Cancel one agent's pipeline
+       Assertions: Only that agent's controller is aborted
+       Requirements: llm-integration.6 */
+    it('should only cancel the specified agent pipeline', () => {
+      const controller1 = new AbortController();
+      const controller2 = new AbortController();
+      agentManager.setPipelineController('agent-1', controller1);
+      agentManager.setPipelineController('agent-2', controller2);
+
+      agentManager.cancelPipeline('agent-1');
+
+      expect(controller1.signal.aborted).toBe(true);
+      expect(controller2.signal.aborted).toBe(false);
+    });
   });
 
   describe('handleMessageCreated (MESSAGE_CREATED event handler)', () => {

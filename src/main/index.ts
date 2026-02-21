@@ -197,15 +197,23 @@ const aiAgentSettingsManager = new AIAgentSettingsManager(
 // Initialize Settings IPC Handlers
 const settingsIPCHandlers = new SettingsIPCHandlers(aiAgentSettingsManager);
 
-// Requirements: agents.2, agents.4, agents.10
+// Requirements: agents.2, agents.4, agents.10, llm-integration.6
 // Initialize Agent and Message Managers
 import { AgentManager } from './agents/AgentManager';
 import { MessageManager } from './agents/MessageManager';
 import { AgentIPCHandlers } from './agents/AgentIPCHandlers';
+import { MainPipeline } from './agents/MainPipeline';
+import { PromptBuilder, FullHistoryStrategy } from './agents/PromptBuilder';
 
 const agentManager = new AgentManager(dbManager);
 const messageManager = new MessageManager(dbManager);
-const agentIPCHandlers = new AgentIPCHandlers(agentManager, messageManager);
+const promptBuilder = new PromptBuilder(
+  'You are a helpful AI assistant.',
+  [],
+  new FullHistoryStrategy()
+);
+const mainPipeline = new MainPipeline(messageManager, aiAgentSettingsManager, promptBuilder);
+const agentIPCHandlers = new AgentIPCHandlers(agentManager, messageManager, mainPipeline);
 
 // Requirements: testing.3.8
 // Initialize Test IPC Handlers (only in test environment)

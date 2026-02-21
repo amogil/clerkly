@@ -1,4 +1,4 @@
-// Requirements: agents.2, agents.10, user-data-isolation.6.5, user-data-isolation.6.3
+// Requirements: agents.2, agents.10, user-data-isolation.6.5, user-data-isolation.6.3, llm-integration.6
 // src/main/agents/AgentManager.ts
 // Business logic for agents management
 
@@ -30,6 +30,9 @@ import { AGENT_STATUS, MESSAGE_KIND } from '../../shared/utils/agentStatus';
 export class AgentManager {
   private dbManager: IDatabaseManager;
   private logger = Logger.create('AgentManager');
+  // Active AbortControllers per agent — for cancelling running pipelines
+  // Requirements: llm-integration.6
+  private pipelineControllers = new Map<string, AbortController>();
 
   constructor(dbManager: IDatabaseManager) {
     this.dbManager = dbManager;
@@ -137,6 +140,27 @@ export class AgentManager {
   }
 
   /**
+   * Store an AbortController for a running pipeline
+   * Requirements: llm-integration.6
+   */
+  setPipelineController(agentId: string, controller: AbortController): void {
+    this.pipelineControllers.set(agentId, controller);
+  }
+
+  /**
+   * Cancel the running pipeline for an agent (if any)
+   * Requirements: llm-integration.6
+   */
+  cancelPipeline(agentId: string): void {
+    const controller = this.pipelineControllers.get(agentId);
+    if (controller) {
+      controller.abort();
+      this.pipelineControllers.delete(agentId);
+      this.logger.info(`Pipeline cancelled for agent ${agentId}`);
+    }
+  }
+
+  /**
    * Create a new agent for the current user
    * Requirements: agents.2.3, agents.2.4, agents.2.5
    */
@@ -194,7 +218,7 @@ export class AgentManager {
 
   /**
    * Archive an agent (soft delete)
-   * Requirements: agents.10.4
+   * Requirements: agents.10.4, llm-integration.6
    */
   archive(agentId: string): void {
     // Get agent before archiving to create snapshot
@@ -202,6 +226,10 @@ export class AgentManager {
     if (!agent) {
       throw new Error('Agent not found');
     }
+
+    // Cancel any running pipeline for this agent before archiving
+    // Requirements: llm-integration.6
+    this.cancelPipeline(agentId);
 
     // Repository automatically checks ownership
     this.dbManager.agents.archive(agentId);

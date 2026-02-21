@@ -1,4 +1,4 @@
-// Requirements: agents.2, agents.4, agents.10
+// Requirements: agents.2, agents.4, agents.10, llm-integration.6
 // tests/unit/agents/AgentIPCHandlers.test.ts
 // Unit tests for AgentIPCHandlers
 
@@ -6,6 +6,7 @@ import { ipcMain, IpcMainInvokeEvent } from 'electron';
 import { AgentIPCHandlers } from '../../../src/main/agents/AgentIPCHandlers';
 import { AgentManager } from '../../../src/main/agents/AgentManager';
 import { MessageManager } from '../../../src/main/agents/MessageManager';
+import { MainPipeline } from '../../../src/main/agents/MainPipeline';
 import type { MessagePayload } from '../../../src/shared/utils/agentStatus';
 import type { Agent, Message } from '../../../src/main/db/schema';
 
@@ -33,6 +34,7 @@ describe('AgentIPCHandlers', () => {
   let handlers: AgentIPCHandlers;
   let mockAgentManager: jest.Mocked<AgentManager>;
   let mockMessageManager: jest.Mocked<MessageManager>;
+  let mockPipeline: jest.Mocked<MainPipeline>;
   let registeredHandlers: Map<string, (...args: unknown[]) => Promise<unknown>>;
 
   const mockAgent: Agent = {
@@ -89,6 +91,8 @@ describe('AgentIPCHandlers', () => {
       update: jest.fn(),
       archive: jest.fn(),
       toEventAgent: jest.fn().mockReturnValue(mockAgentSnapshot),
+      cancelPipeline: jest.fn(),
+      setPipelineController: jest.fn(),
     } as unknown as jest.Mocked<AgentManager>;
 
     mockMessageManager = {
@@ -99,7 +103,11 @@ describe('AgentIPCHandlers', () => {
       toEventMessage: jest.fn().mockReturnValue(mockMessageSnapshot),
     } as unknown as jest.Mocked<MessageManager>;
 
-    handlers = new AgentIPCHandlers(mockAgentManager, mockMessageManager);
+    mockPipeline = {
+      run: jest.fn().mockResolvedValue(undefined),
+    } as unknown as jest.Mocked<MainPipeline>;
+
+    handlers = new AgentIPCHandlers(mockAgentManager, mockMessageManager, mockPipeline);
   });
 
   describe('registerHandlers', () => {
@@ -379,6 +387,97 @@ describe('AgentIPCHandlers', () => {
       expect(mockMessageManager.create).toHaveBeenCalledWith('abc123xyz0', 'user', userPayload);
       expect(mockMessageManager.toEventMessage).toHaveBeenCalledWith(mockMessage);
       expect(result).toEqual({ success: true, data: mockMessageSnapshot });
+    });
+
+    /* Preconditions: Handlers registered
+       Action: Invoke messages:create with kind:user
+       Assertions: Pipeline launched asynchronously, IPC returns before pipeline completes
+       Requirements: llm-integration.6 */
+    it('should launch pipeline asynchronously for kind:user and return immediately', async () => {
+      let pipelineResolve!: () => void;
+      const pipelinePromise = new Promise<void>((resolve) => {
+        pipelineResolve = resolve;
+      });
+      mockPipeline.run = jest.fn().mockReturnValue(pipelinePromise);
+
+      handlers.registerHandlers();
+      const handler = registeredHandlers.get('messages:create')!;
+
+      // IPC should return before pipeline resolves
+      const result = await handler(mockEvent, {
+        agentId: 'abc123xyz0',
+        kind: 'user',
+        payload: userPayload,
+      });
+
+      // IPC returned immediately
+      expect(result).toEqual({ success: true, data: mockMessageSnapshot });
+      // Pipeline was started
+      expect(mockPipeline.run).toHaveBeenCalledWith(
+        'abc123xyz0',
+        mockMessage.id,
+        expect.any(AbortSignal)
+      );
+      // Previous pipeline was cancelled
+      expect(mockAgentManager.cancelPipeline).toHaveBeenCalledWith('abc123xyz0');
+      // Controller was registered
+      expect(mockAgentManager.setPipelineController).toHaveBeenCalledWith(
+        'abc123xyz0',
+        expect.any(AbortController)
+      );
+
+      // Resolve pipeline to avoid unhandled promise
+      pipelineResolve();
+      await pipelinePromise;
+    });
+
+    /* Preconditions: Handlers registered
+       Action: Invoke messages:create with kind:llm (not user)
+       Assertions: Pipeline NOT launched
+       Requirements: llm-integration.6 */
+    it('should NOT launch pipeline for non-user kinds', async () => {
+      handlers.registerHandlers();
+      const handler = registeredHandlers.get('messages:create')!;
+
+      await handler(mockEvent, {
+        agentId: 'abc123xyz0',
+        kind: 'llm',
+        payload: userPayload,
+      });
+
+      expect(mockPipeline.run).not.toHaveBeenCalled();
+    });
+
+    /* Preconditions: Handlers registered, pipeline rejects
+       Action: Invoke messages:create with kind:user, pipeline throws
+       Assertions: handleBackgroundError called, IPC still returns success
+       Requirements: llm-integration.6, error-notifications.1.1 */
+    it('should call handleBackgroundError if pipeline rejects in background', async () => {
+      const ErrorHandlerModule = require('../../../src/main/ErrorHandler');
+      const handleBackgroundErrorSpy = jest
+        .spyOn(ErrorHandlerModule, 'handleBackgroundError')
+        .mockImplementation(() => {});
+
+      const pipelineError = new Error('LLM error');
+      mockPipeline.run = jest.fn().mockRejectedValue(pipelineError);
+
+      handlers.registerHandlers();
+      const handler = registeredHandlers.get('messages:create')!;
+
+      const result = await handler(mockEvent, {
+        agentId: 'abc123xyz0',
+        kind: 'user',
+        payload: userPayload,
+      });
+
+      expect(result).toEqual({ success: true, data: mockMessageSnapshot });
+
+      // Allow microtasks to flush
+      await new Promise((r) => setTimeout(r, 0));
+
+      expect(handleBackgroundErrorSpy).toHaveBeenCalledWith(pipelineError, 'LLM Pipeline');
+
+      handleBackgroundErrorSpy.mockRestore();
     });
 
     /* Preconditions: Handlers registered, access denied
