@@ -213,6 +213,58 @@ describe('OpenAIProvider.chat()', () => {
     });
   });
 
+  describe('no response body', () => {
+    /* Preconditions: fetch returns response with null body
+       Action: Call chat()
+       Assertions: Throws "No response body"
+       Requirements: llm-integration.3.4 */
+    it('should throw when response body is null', async () => {
+      fetchMock.mockResolvedValue({ ok: true, body: null });
+
+      await expect(provider.chat(mockMessages, mockOptions, () => {})).rejects.toThrow(
+        'No response body'
+      );
+    });
+  });
+
+  describe('chunk without choices', () => {
+    /* Preconditions: SSE stream contains a chunk with empty choices array
+       Action: Call chat()
+       Assertions: Chunk is skipped, final action still returned
+       Requirements: llm-integration.3.2 */
+    it('should skip chunks with no choices', async () => {
+      const actionJson = JSON.stringify({ action: { type: 'text', content: 'OK' } });
+      const emptyChoicesChunk = JSON.stringify({ choices: [] });
+      const reader = buildMockReader([
+        `data: ${emptyChoicesChunk}`,
+        sseChunk({ content: actionJson }),
+        'data: [DONE]',
+      ]);
+      fetchMock.mockResolvedValue({ ok: true, body: { getReader: () => reader } });
+
+      const result = await provider.chat(mockMessages, mockOptions, () => {});
+      expect(result.content).toBe('OK');
+    });
+  });
+
+  describe('unknown HTTP error without error.message', () => {
+    /* Preconditions: OpenAI returns unknown status (599) with no error.message in body
+       Action: Call chat()
+       Assertions: Throws generic connection failed message
+       Requirements: llm-integration.3.4 */
+    it('should throw generic error for unknown status with no message', async () => {
+      fetchMock.mockResolvedValue({
+        ok: false,
+        status: 599,
+        json: async () => ({}),
+      });
+
+      await expect(provider.chat(mockMessages, mockOptions, () => {})).rejects.toThrow(
+        /Connection failed/
+      );
+    });
+  });
+
   describe('content split across multiple chunks', () => {
     /* Preconditions: JSON content arrives in multiple SSE chunks
        Action: Call chat()
