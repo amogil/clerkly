@@ -135,6 +135,17 @@ export interface MessageUpdatedPayload extends BaseEvent {
   timestamp: number;
 }
 
+// LLM reasoning streaming event
+export interface MessageLlmReasoningUpdatedPayload extends BaseEvent {
+  messageId: number;
+  agentId: string;
+  /** New reasoning chunk */
+  delta: string;
+  /** Full accumulated reasoning text so far */
+  accumulatedText: string;
+  timestamp: number;
+}
+
 // User events
 export type UserLoginPayload = BaseEvent & { userId: string };
 export type UserLogoutPayload = BaseEvent;
@@ -234,6 +245,7 @@ export interface ClerklyEvents {
   // Message events
   [EVENT_TYPES.MESSAGE_CREATED]: MessageCreatedPayload;
   [EVENT_TYPES.MESSAGE_UPDATED]: MessageUpdatedPayload;
+  [EVENT_TYPES.MESSAGE_LLM_REASONING_UPDATED]: MessageLlmReasoningUpdatedPayload;
 
   // User events
   [EVENT_TYPES.USER_LOGIN]: UserLoginPayload;
@@ -605,6 +617,37 @@ export class MessageUpdatedEvent extends TypedEventClass<MessageUpdatedType> {
 
   toPayload(): EventPayloadWithoutTimestamp<MessageUpdatedType> {
     return { message: this.message };
+  }
+}
+
+/**
+ * Message LLM reasoning updated event
+ * Emitted on each reasoning chunk during LLM streaming
+ * Requirements: llm-integration.5.1
+ */
+export class MessageLlmReasoningUpdatedEvent extends TypedEventClass<
+  typeof EVENT_TYPES.MESSAGE_LLM_REASONING_UPDATED
+> {
+  readonly type = EVENT_TYPES.MESSAGE_LLM_REASONING_UPDATED;
+  readonly timestamp: number;
+
+  constructor(
+    public readonly messageId: number,
+    public readonly agentId: string,
+    public readonly delta: string,
+    public readonly accumulatedText: string
+  ) {
+    super();
+    this.timestamp = Date.now();
+  }
+
+  toPayload(): EventPayloadWithoutTimestamp<typeof EVENT_TYPES.MESSAGE_LLM_REASONING_UPDATED> {
+    return {
+      messageId: this.messageId,
+      agentId: this.agentId,
+      delta: this.delta,
+      accumulatedText: this.accumulatedText,
+    };
   }
 }
 
