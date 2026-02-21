@@ -1,4 +1,4 @@
-// Requirements: agents.4, agents.7, agents.12, error-notifications.2, realtime-events.9
+// Requirements: agents.4, agents.7, agents.12, error-notifications.2, realtime-events.9, llm-integration.7
 
 import { useState, useEffect, useCallback } from 'react';
 import { useEventSubscription } from '../events/useEventSubscription';
@@ -7,6 +7,7 @@ import type { MessagePayload } from '../../shared/utils/agentStatus';
 import type {
   MessageCreatedPayload,
   MessageUpdatedPayload,
+  MessageLlmReasoningUpdatedPayload,
   MessageSnapshot,
 } from '../../shared/events/types';
 import { callApi } from '../utils/apiWrapper';
@@ -136,6 +137,32 @@ export function useMessages(agentId: string | null): UseMessagesResult {
       );
     }
   });
+
+  // Subscribe to reasoning streaming updates — update reasoning text in existing llm message
+  // Requirements: llm-integration.7
+  useEventSubscription(
+    EVENT_TYPES.MESSAGE_LLM_REASONING_UPDATED,
+    (payload: MessageLlmReasoningUpdatedPayload) => {
+      if (payload.agentId !== agentId) return;
+      setMessages((prev) =>
+        prev.map((msg) => {
+          if (msg.id !== payload.messageId) return msg;
+          // Merge accumulated reasoning into the message payload
+          const data = (msg.payload.data ?? {}) as Record<string, unknown>;
+          return {
+            ...msg,
+            payload: {
+              ...msg.payload,
+              data: {
+                ...data,
+                reasoning: { text: payload.accumulatedText, excluded_from_replay: true },
+              },
+            },
+          };
+        })
+      );
+    }
+  );
 
   return {
     messages,

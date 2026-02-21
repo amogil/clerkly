@@ -307,6 +307,7 @@ describe('useMessages hook', () => {
       const subscribedEvents = mockSubscribe.mock.calls.map((call) => call[0]);
       expect(subscribedEvents).toContain(EVENT_TYPES.MESSAGE_CREATED);
       expect(subscribedEvents).toContain(EVENT_TYPES.MESSAGE_UPDATED);
+      expect(subscribedEvents).toContain(EVENT_TYPES.MESSAGE_LLM_REASONING_UPDATED);
     });
 
     /* Preconditions: Hook is mounted
@@ -554,6 +555,99 @@ describe('useMessages hook', () => {
       });
 
       expect(result.current.messages.length).toBe(initialCount);
+    });
+  });
+
+  describe('MESSAGE_LLM_REASONING_UPDATED event', () => {
+    /* Preconditions: Hook is mounted with an llm message in state
+       Action: MESSAGE_LLM_REASONING_UPDATED event is received for current agent
+       Assertions: reasoning.text is updated in the matching message
+       Requirements: llm-integration.7 */
+    it('should update reasoning in matching message for current agent', async () => {
+      const llmMessage: MessageSnapshot = {
+        id: 10,
+        agentId: 'agent-1',
+        kind: 'llm',
+        timestamp: new Date('2024-01-01T10:02:00Z').getTime(),
+        payload: { data: {} },
+      };
+      mockMessagesApi.list.mockResolvedValue({
+        success: true,
+        data: [...mockMessages, llmMessage],
+      });
+
+      let reasoningHandler: (payload: any) => void;
+      mockSubscribe.mockImplementation((type, handler) => {
+        if (type === EVENT_TYPES.MESSAGE_LLM_REASONING_UPDATED) {
+          reasoningHandler = handler;
+        }
+        return mockUnsubscribe;
+      });
+
+      const { result } = renderHook(() => useMessages('agent-1'));
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      act(() => {
+        reasoningHandler({
+          messageId: 10,
+          agentId: 'agent-1',
+          delta: 'thinking...',
+          accumulatedText: 'thinking...',
+        });
+      });
+
+      const updated = result.current.messages.find((m) => m.id === 10);
+      const data = updated?.payload.data as Record<string, unknown> | undefined;
+      const reasoning = data?.['reasoning'] as { text?: string } | undefined;
+      expect(reasoning?.text).toBe('thinking...');
+    });
+
+    /* Preconditions: Hook is mounted with an llm message in state
+       Action: MESSAGE_LLM_REASONING_UPDATED event is received for a different agent
+       Assertions: reasoning is NOT updated (event ignored)
+       Requirements: llm-integration.7 */
+    it('should ignore MESSAGE_LLM_REASONING_UPDATED for different agent', async () => {
+      const llmMessage: MessageSnapshot = {
+        id: 10,
+        agentId: 'agent-1',
+        kind: 'llm',
+        timestamp: new Date('2024-01-01T10:02:00Z').getTime(),
+        payload: { data: {} },
+      };
+      mockMessagesApi.list.mockResolvedValue({
+        success: true,
+        data: [...mockMessages, llmMessage],
+      });
+
+      let reasoningHandler: (payload: any) => void;
+      mockSubscribe.mockImplementation((type, handler) => {
+        if (type === EVENT_TYPES.MESSAGE_LLM_REASONING_UPDATED) {
+          reasoningHandler = handler;
+        }
+        return mockUnsubscribe;
+      });
+
+      const { result } = renderHook(() => useMessages('agent-1'));
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      act(() => {
+        reasoningHandler({
+          messageId: 10,
+          agentId: 'agent-2', // different agent
+          delta: 'thinking...',
+          accumulatedText: 'thinking...',
+        });
+      });
+
+      const msg = result.current.messages.find((m) => m.id === 10);
+      const data = msg?.payload.data as Record<string, unknown> | undefined;
+      expect(data?.['reasoning']).toBeUndefined();
     });
   });
 

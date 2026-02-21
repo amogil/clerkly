@@ -211,3 +211,115 @@ describe('Agents Component - Message Text Wrapping', () => {
     expect(agentMessage).toHaveClass('break-words');
   });
 });
+
+describe('Agents Component - LLM and Error message rendering', () => {
+  /* Preconditions: kind:llm message with reasoning and action
+     Action: Render the llm message bubble
+     Assertions: reasoning text and action content are displayed
+     Requirements: llm-integration.7 */
+  it('should render kind:llm message with reasoning and action', () => {
+    const LlmMessage = () => (
+      <div data-testid="message-llm" className="max-w-[85%] space-y-2">
+        <div
+          data-testid="message-llm-reasoning"
+          className="text-xs text-muted-foreground italic whitespace-pre-wrap break-words"
+        >
+          I am thinking about this...
+        </div>
+        <div
+          data-testid="message-llm-action"
+          className="text-sm leading-relaxed text-foreground whitespace-pre-wrap break-words"
+        >
+          Here is my answer.
+        </div>
+      </div>
+    );
+
+    const { getByTestId } = render(<LlmMessage />);
+
+    expect(getByTestId('message-llm-reasoning').textContent).toBe('I am thinking about this...');
+    expect(getByTestId('message-llm-action').textContent).toBe('Here is my answer.');
+  });
+
+  /* Preconditions: kind:llm message with no action yet (streaming in progress)
+     Action: Render the llm message bubble
+     Assertions: loading indicator (three dots) is shown instead of action
+     Requirements: llm-integration.7 */
+  it('should render kind:llm loading indicator when action is absent', () => {
+    const LlmLoadingMessage = () => (
+      <div data-testid="message-llm" className="max-w-[85%] space-y-2">
+        <div data-testid="message-llm-loading" className="flex gap-1 items-center py-1">
+          <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground animate-bounce" />
+          <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground animate-bounce" />
+          <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground animate-bounce" />
+        </div>
+      </div>
+    );
+
+    const { getByTestId, queryByTestId } = render(<LlmLoadingMessage />);
+
+    expect(getByTestId('message-llm-loading')).toBeTruthy();
+    expect(queryByTestId('message-llm-action')).toBeNull();
+  });
+
+  /* Preconditions: kind:llm message with action but no reasoning
+     Action: Render the llm message bubble
+     Assertions: only action content is shown, no reasoning block
+     Requirements: llm-integration.7 */
+  it('should render kind:llm action without reasoning when reasoning is absent', () => {
+    const LlmActionOnly = () => (
+      <div data-testid="message-llm" className="max-w-[85%] space-y-2">
+        <div
+          data-testid="message-llm-action"
+          className="text-sm leading-relaxed text-foreground whitespace-pre-wrap break-words"
+        >
+          Direct answer.
+        </div>
+      </div>
+    );
+
+    const { getByTestId, queryByTestId } = render(<LlmActionOnly />);
+
+    expect(getByTestId('message-llm-action').textContent).toBe('Direct answer.');
+    expect(queryByTestId('message-llm-reasoning')).toBeNull();
+  });
+
+  /* Preconditions: kind:error message with error info
+     Action: Render the error bubble
+     Assertions: error message text is shown in red bubble
+     Requirements: llm-integration.7 */
+  it('should render kind:error message with error text', () => {
+    const ErrorMessage = () => (
+      <div
+        data-testid="message-error"
+        className="max-w-[85%] text-sm leading-relaxed text-red-500 whitespace-pre-wrap break-words rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3"
+      >
+        API key is invalid.
+      </div>
+    );
+
+    const { getByTestId } = render(<ErrorMessage />);
+    const el = getByTestId('message-error');
+
+    expect(el.textContent).toBe('API key is invalid.');
+    expect(el).toHaveClass('text-red-500');
+  });
+
+  /* Preconditions: kind:error message with no error info
+     Action: Render the error bubble
+     Assertions: fallback "Unknown error" text is shown
+     Requirements: llm-integration.7 */
+  it('should render kind:error fallback text when error info is absent', () => {
+    const ErrorFallback = () => (
+      <div
+        data-testid="message-error"
+        className="max-w-[85%] text-sm leading-relaxed text-red-500 whitespace-pre-wrap break-words rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3"
+      >
+        Unknown error
+      </div>
+    );
+
+    const { getByTestId } = render(<ErrorFallback />);
+    expect(getByTestId('message-error').textContent).toBe('Unknown error');
+  });
+});

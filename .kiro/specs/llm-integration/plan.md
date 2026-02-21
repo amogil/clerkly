@@ -462,24 +462,25 @@ Renderer может подписаться только на `message.llm.reason
 - [x] Коммит
 
 ### Шаг 7: Обновить renderer
-- [ ] `src/shared/events/types.ts` — добавить `MessageLlmReasoningUpdatedEvent` в preload-типы
-- [ ] `src/preload/index.ts` — пробросить `message.llm.reasoning.updated` в renderer
-- [ ] `src/renderer/hooks/useMessages.ts`:
-  - [ ] подписка на `message.llm.reasoning.updated` — обновлять reasoning в стейте
-  - [ ] подписка на `message.updated` — обновлять сообщение целиком
-  - [ ] обработка `kind: error`
-- [ ] `src/renderer/components/agents.tsx`:
-  - [ ] `kind: llm` — пузырь слева: сначала reasoning (стримится), потом ответ
-  - [ ] `kind: error` — красный пузырь слева с текстом ошибки
-  - [ ] фильтрация сообщений с `interrupted: true` — не отображаются в чате
-- [ ] Тесты:
-  - [ ] `tests/unit/hooks/useMessages.test.ts` — `message.llm.reasoning.updated` обновляет reasoning, `kind: error` обрабатывается
-  - [ ] `tests/unit/components/agents.test.tsx` — рендер `kind: llm` с reasoning и action, рендер `kind: error`
-- [ ] `npm run validate` проходит
-- [ ] Коммит
+- [x] `src/shared/events/types.ts` — добавить `MessageLlmReasoningUpdatedEvent` в preload-типы
+- [x] `src/preload/index.ts` — пробросить `message.llm.reasoning.updated` в renderer
+- [x] `src/renderer/hooks/useMessages.ts`:
+  - [x] подписка на `message.llm.reasoning.updated` — обновлять reasoning в стейте
+  - [x] подписка на `message.updated` — обновлять сообщение целиком
+  - [x] обработка `kind: error`
+- [x] `src/renderer/components/agents.tsx` (разбит на компоненты):
+  - [x] `kind: llm` — пузырь слева: сначала reasoning (стримится), потом ответ (`MessageBubble`)
+  - [x] `kind: error` — красный пузырь слева с текстом ошибки (`MessageBubble`)
+  - [x] фильтрация сообщений с `interrupted: true` — не отображаются в чате
+  - [x] рефакторинг: `AgentAvatar`, `AgentHeader`, `AllAgentsPage`, `MessageBubble`, `ChatInput`
+- [x] Тесты:
+  - [x] `tests/unit/hooks/useMessages.test.ts` — `message.llm.reasoning.updated` обновляет reasoning, `kind: error` обрабатывается
+  - [x] `tests/unit/components/agents.test.tsx` — рендер `kind: llm` с reasoning и action, рендер `kind: error`
+- [x] `npm run validate` проходит
+- [x] Коммит
 
 ### Шаг 8: Функциональные тесты
-- [ ] `env.example` — добавить `OPENAI_API_KEY=your-key-here`
+- [x] `env.example` — добавить `OPENAI_API_KEY=your-key-here`
 - [ ] `tests/functional/llm-chat.spec.ts`:
   - [ ] отправка сообщения → появляется llm-ответ
   - [ ] reasoning отображается перед ответом
