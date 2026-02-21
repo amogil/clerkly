@@ -1,6 +1,13 @@
 // Requirements: settings.3.5, settings.3.6, settings.3.7, settings.3.8
 
-import { ILLMProvider, TestConnectionResult } from './ILLMProvider';
+import {
+  ILLMProvider,
+  TestConnectionResult,
+  ChatMessage,
+  ChatOptions,
+  ChatChunk,
+  LLMAction,
+} from './ILLMProvider';
 import { LLM_PROVIDERS, ERROR_MESSAGES } from './LLMConfig';
 
 /**
@@ -56,6 +63,18 @@ export class GoogleProvider implements ILLMProvider {
         error: this.mapExceptionToMessage(error),
       };
     }
+  }
+
+  /**
+   * Chat is not yet implemented for Google provider
+   * Requirements: llm-integration.3
+   */
+  async chat(
+    _messages: ChatMessage[],
+    _options: ChatOptions,
+    _onChunk: (chunk: ChatChunk) => void
+  ): Promise<LLMAction> {
+    throw new Error('chat() not implemented for GoogleProvider');
   }
 
   /**

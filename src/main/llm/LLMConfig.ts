@@ -78,6 +78,23 @@ export const LLM_PROVIDERS: Record<LLMProvider, LLMProviderConfig> = {
 export const PROVIDER_TYPES: LLMProvider[] = Object.keys(LLM_PROVIDERS) as LLMProvider[];
 
 /**
+ * OpenAI chat models
+ * Requirements: llm-integration.3.1
+ */
+export const OPENAI_CHAT_MODELS = {
+  /** Fast model for functional tests */
+  TEST: 'gpt-4o-mini',
+  /** Production model */
+  PROD: 'gpt-4o',
+} as const;
+
+/**
+ * Chat request timeout in milliseconds
+ * Requirements: llm-integration.3.1
+ */
+export const CHAT_TIMEOUT_MS = 60_000;
+
+/**
  * Error messages for different HTTP status codes
  *
  * Requirements: settings.3.8 - User-friendly error messages
