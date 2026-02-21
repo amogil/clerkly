@@ -179,16 +179,8 @@ export class MainPipeline {
       // ── 8. Check cancellation after streaming ─────────────────────────────
       if (signal?.aborted) {
         if (llmMessageId !== null) {
-          this.messageManager.update(llmMessageId, agentId, {
-            data: {
-              reply_to_message_id: replyToMessageId,
-              model: options.model,
-              reasoning: accumulatedReasoning
-                ? { text: accumulatedReasoning, excluded_from_replay: true }
-                : undefined,
-              interrupted: true,
-            },
-          });
+          // Hide the partial llm message — Requirements: llm-integration.8.5
+          this.messageManager.setHidden(llmMessageId, agentId);
         }
         return;
       }
@@ -216,12 +208,11 @@ export class MainPipeline {
       this.logger.info(`Pipeline completed for agent ${agentId}`);
     } catch (error) {
       if (signal?.aborted) {
-        // Cancelled — mark interrupted if message was created, no error message
+        // Cancelled — hide llm message if created, no error message
+        // Requirements: llm-integration.8.7
         if (llmMessageId !== null) {
           try {
-            this.messageManager.update(llmMessageId, agentId, {
-              data: { interrupted: true },
-            });
+            this.messageManager.setHidden(llmMessageId, agentId);
           } catch {
             // ignore update errors during cancellation
           }
@@ -232,12 +223,10 @@ export class MainPipeline {
       const errorMessage = error instanceof Error ? error.message : String(error);
       this.logger.error(`Pipeline error for agent ${agentId}: ${errorMessage}`);
 
-      // Mark existing llm message as interrupted
+      // Hide existing llm message — Requirements: llm-integration.3.2
       if (llmMessageId !== null) {
         try {
-          this.messageManager.update(llmMessageId, agentId, {
-            data: { interrupted: true },
-          });
+          this.messageManager.setHidden(llmMessageId, agentId);
         } catch {
           // ignore
         }

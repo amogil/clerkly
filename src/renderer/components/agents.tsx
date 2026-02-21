@@ -226,13 +226,6 @@ export function Agents() {
             <EmptyStatePlaceholder onPromptClick={(p) => handleSend(p)} />
           ) : (
             messages.map((message, index) => {
-              // Filter out interrupted messages — replaced by kind:error
-              // Requirements: llm-integration.7
-              const isInterrupted =
-                message.payload.data &&
-                (message.payload.data as Record<string, unknown>)['interrupted'] === true;
-              if (isInterrupted) return null;
-
               const showAvatar =
                 message.kind !== 'user' && (index === 0 || messages[index - 1]?.kind === 'user');
 

@@ -95,8 +95,11 @@ export class PromptBuilder {
       result.push({ role: 'system', content: `Conversation history:\n${history}` });
     }
     // Convert each message to a chat message for the LLM
+    // Filter out kind:error messages
+    // Requirements: llm-integration.3.9
     const selected = this.historyStrategy.select(messages);
     for (const msg of selected) {
+      if (msg.kind === 'error') continue;
       result.push(this.messageToChat(msg));
     }
     return result;
@@ -120,13 +123,23 @@ export class PromptBuilder {
   /**
    * Serialize messages to YAML string
    * Excludes reasoning.text and model fields (excluded_from_replay)
-   * Requirements: llm-integration.4.4
+   * Excludes kind:error messages (llm-integration.3.9)
+   * Hidden messages are already excluded at the DB query level (llm-integration.3.8, llm-integration.8.6)
+   * Requirements: llm-integration.4.4, llm-integration.3.9
    */
   private serializeHistory(messages: Message[]): string {
     if (messages.length === 0) return '';
 
+    const filtered = messages.filter((msg) => {
+      // Exclude kind:error messages — llm-integration.3.9
+      if (msg.kind === 'error') return false;
+      return true;
+    });
+
+    if (filtered.length === 0) return '';
+
     const lines: string[] = ['messages:'];
-    for (const msg of messages) {
+    for (const msg of filtered) {
       lines.push(...this.serializeMessage(msg));
     }
     return lines.join('\n');

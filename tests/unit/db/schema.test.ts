@@ -166,6 +166,7 @@ describe('Database Schema', () => {
       expect(messages.kind).toBeDefined();
       expect(messages.timestamp).toBeDefined();
       expect(messages.payloadJson).toBeDefined();
+      expect(messages.hidden).toBeDefined();
     });
 
     /* Preconditions: Schema is defined
@@ -179,10 +180,12 @@ describe('Database Schema', () => {
         kind: 'user',
         timestamp: new Date().toISOString(),
         payloadJson: '{"content": "Hello"}',
+        hidden: false,
       };
       expect(message.id).toBe(1);
       expect(message.agentId).toBe('agent-123');
       expect(message.kind).toBe('user');
+      expect(message.hidden).toBe(false);
     });
 
     /* Preconditions: Schema is defined

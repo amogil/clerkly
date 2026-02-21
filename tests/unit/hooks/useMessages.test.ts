@@ -53,6 +53,7 @@ describe('useMessages hook', () => {
       kind: 'user',
       timestamp: new Date('2024-01-01T10:00:00Z').getTime(),
       payload: { data: { text: 'Hello' } },
+      hidden: false,
     },
     {
       id: 2,
@@ -60,6 +61,7 @@ describe('useMessages hook', () => {
       kind: 'llm',
       timestamp: new Date('2024-01-01T10:01:00Z').getTime(),
       payload: { data: { text: 'Hi there!' } },
+      hidden: false,
     },
   ];
 
@@ -174,6 +176,7 @@ describe('useMessages hook', () => {
           kind: 'user',
           timestamp: new Date('2024-01-02T10:00:00Z').getTime(),
           payload: { data: { text: 'Different agent' } },
+          hidden: false,
         },
       ];
       mockMessagesApi.list.mockResolvedValue({ success: true, data: newMessages });
@@ -340,6 +343,7 @@ describe('useMessages hook', () => {
             kind: 'user',
             timestamp: new Date('2024-01-01T10:02:00Z').getTime(),
             payload: { data: { text: 'New message' } },
+            hidden: false,
           },
         });
       });
@@ -377,6 +381,7 @@ describe('useMessages hook', () => {
             kind: 'user',
             timestamp: new Date('2024-01-01T10:02:00Z').getTime(),
             payload: { data: { text: 'New message' } },
+            hidden: false,
           },
         });
       });
@@ -415,6 +420,7 @@ describe('useMessages hook', () => {
             kind: 'user',
             timestamp: new Date('2024-01-01T10:00:00Z').getTime(),
             payload: { data: { text: 'Hello' } },
+            hidden: false,
           },
         });
       });
@@ -481,6 +487,7 @@ describe('useMessages hook', () => {
             kind: 'user',
             timestamp: new Date('2024-01-01T10:00:00Z').getTime(),
             payload: { data: { text: 'Updated text' } },
+            hidden: false,
           },
         });
       });
@@ -550,6 +557,7 @@ describe('useMessages hook', () => {
             kind: 'user',
             timestamp: new Date('2024-01-01T10:00:00Z').getTime(),
             payload: { data: { text: 'Should not apply' } },
+            hidden: false,
           },
         });
       });
@@ -570,6 +578,7 @@ describe('useMessages hook', () => {
         kind: 'llm',
         timestamp: new Date('2024-01-01T10:02:00Z').getTime(),
         payload: { data: {} },
+        hidden: false,
       };
       mockMessagesApi.list.mockResolvedValue({
         success: true,
@@ -616,6 +625,7 @@ describe('useMessages hook', () => {
         kind: 'llm',
         timestamp: new Date('2024-01-01T10:02:00Z').getTime(),
         payload: { data: {} },
+        hidden: false,
       };
       mockMessagesApi.list.mockResolvedValue({
         success: true,

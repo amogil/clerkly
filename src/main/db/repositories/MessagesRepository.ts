@@ -28,17 +28,16 @@ export class MessagesRepository {
   }
 
   /**
-   * List all messages for an agent, sorted by id ASC
-   * Requirements: user-data-isolation.7.6
+   * List messages for an agent, sorted by id ASC
+   * By default excludes hidden messages (interrupted llm + dismissed errors)
+   * Requirements: user-data-isolation.7.6, llm-integration.3.8, llm-integration.8.5
    */
-  listByAgent(agentId: string): Message[] {
+  listByAgent(agentId: string, includeHidden = false): Message[] {
     this.checkAccess(agentId);
-    return this.db
-      .select()
-      .from(messages)
-      .where(eq(messages.agentId, agentId))
-      .orderBy(asc(messages.id))
-      .all();
+    const condition = includeHidden
+      ? eq(messages.agentId, agentId)
+      : and(eq(messages.agentId, agentId), eq(messages.hidden, false));
+    return this.db.select().from(messages).where(condition).orderBy(asc(messages.id)).all();
   }
 
   /**
@@ -104,6 +103,34 @@ export class MessagesRepository {
       .limit(1)
       .all();
     return result[0] ?? null;
+  }
+
+  /**
+   * Mark all kind:error messages for an agent as hidden
+   * Called before creating a new kind:user message so error bubbles disappear from UI
+   * Requirements: llm-integration.3.8
+   */
+  dismissErrorMessages(agentId: string): void {
+    this.checkAccess(agentId);
+    this.db
+      .update(messages)
+      .set({ hidden: true })
+      .where(and(eq(messages.agentId, agentId), eq(messages.kind, 'error')))
+      .run();
+  }
+
+  /**
+   * Set hidden flag on a specific message
+   * Used to hide interrupted llm messages from UI and LLM history
+   * Requirements: llm-integration.8.5
+   */
+  setHidden(messageId: number, agentId: string): void {
+    this.checkAccess(agentId);
+    this.db
+      .update(messages)
+      .set({ hidden: true })
+      .where(and(eq(messages.id, messageId), eq(messages.agentId, agentId)))
+      .run();
   }
 
   /**

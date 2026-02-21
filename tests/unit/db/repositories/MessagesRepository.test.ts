@@ -32,7 +32,8 @@ describe('MessagesRepository', () => {
         agent_id TEXT NOT NULL,
         kind TEXT NOT NULL,
         timestamp TEXT NOT NULL,
-        payload_json TEXT NOT NULL
+        payload_json TEXT NOT NULL,
+        hidden INTEGER NOT NULL DEFAULT 0
       );
     `);
     db = drizzle(sqlite, { schema });
@@ -146,6 +147,35 @@ describe('MessagesRepository', () => {
       const agent = agentsRepo.create('Test');
       expect(messagesRepo.listByAgent(agent.agentId)).toEqual([]);
     });
+
+    /* Preconditions: Agent with hidden and visible messages
+       Action: Call listByAgent without includeHidden
+       Assertions: Hidden messages are excluded from result
+       Requirements: llm-integration.3.8, llm-integration.8.5 */
+    it('should exclude hidden messages by default', () => {
+      const agent = agentsRepo.create('Test');
+      const visible = messagesRepo.create(agent.agentId, 'user', '{}');
+      const hidden = messagesRepo.create(agent.agentId, 'llm', '{}');
+      messagesRepo.setHidden(hidden.id, agent.agentId);
+
+      const msgs = messagesRepo.listByAgent(agent.agentId);
+      expect(msgs).toHaveLength(1);
+      expect(msgs[0].id).toBe(visible.id);
+    });
+
+    /* Preconditions: Agent with hidden and visible messages
+       Action: Call listByAgent with includeHidden=true
+       Assertions: All messages including hidden are returned
+       Requirements: llm-integration.3.8, llm-integration.8.5 */
+    it('should include hidden messages when includeHidden=true', () => {
+      const agent = agentsRepo.create('Test');
+      messagesRepo.create(agent.agentId, 'user', '{}');
+      const hidden = messagesRepo.create(agent.agentId, 'llm', '{}');
+      messagesRepo.setHidden(hidden.id, agent.agentId);
+
+      const msgs = messagesRepo.listByAgent(agent.agentId, true);
+      expect(msgs).toHaveLength(2);
+    });
   });
 
   describe('update', () => {
@@ -253,6 +283,74 @@ describe('MessagesRepository', () => {
       expect(() => noUserMessagesRepo.listByAgent('test')).toThrow('No user logged in');
       expect(() => noUserMessagesRepo.create('test', 'user', '{}')).toThrow('No user logged in');
       expect(() => noUserMessagesRepo.update(1, 'test', '{}')).toThrow('No user logged in');
+    });
+  });
+
+  describe('dismissErrorMessages', () => {
+    /* Preconditions: Agent with kind:error messages
+       Action: Call dismissErrorMessages(agentId)
+       Assertions: All kind:error messages get hidden=true, other kinds unchanged
+       Requirements: llm-integration.3.8 */
+    it('should set dismissed:true on all kind:error messages for agent', () => {
+      const agent = agentsRepo.create('Test');
+      const repo = new MessagesRepository(db, () => 'user1', agentsRepo);
+
+      const errMsg1 = repo.create(
+        agent.agentId,
+        'error',
+        JSON.stringify({ data: { error: { message: 'Fail 1' } } })
+      );
+      const errMsg2 = repo.create(
+        agent.agentId,
+        'error',
+        JSON.stringify({ data: { error: { message: 'Fail 2' } } })
+      );
+      const userMsg = repo.create(
+        agent.agentId,
+        'user',
+        JSON.stringify({ data: { text: 'Hello' } })
+      );
+
+      repo.dismissErrorMessages(agent.agentId);
+
+      const updated1 = repo.getById(errMsg1.id, agent.agentId)!;
+      const updated2 = repo.getById(errMsg2.id, agent.agentId)!;
+      const updatedUser = repo.getById(userMsg.id, agent.agentId)!;
+
+      expect(updated1.hidden).toBe(true);
+      expect(updated2.hidden).toBe(true);
+      // user message should not be touched
+      expect(updatedUser.hidden).toBe(false);
+    });
+
+    /* Preconditions: Agent with no kind:error messages
+       Action: Call dismissErrorMessages(agentId)
+       Assertions: No error thrown, nothing changed
+       Requirements: llm-integration.3.8 */
+    it('should do nothing when no error messages exist', () => {
+      const agent = agentsRepo.create('Test');
+      const repo = new MessagesRepository(db, () => 'user1', agentsRepo);
+
+      repo.create(agent.agentId, 'user', JSON.stringify({ data: { text: 'Hello' } }));
+
+      expect(() => repo.dismissErrorMessages(agent.agentId)).not.toThrow();
+    });
+
+    /* Preconditions: Agent with a specific message
+       Action: Call setHidden(messageId, agentId)
+       Assertions: That message gets hidden=true
+       Requirements: llm-integration.8.5 */
+    it('should set hidden=true on specific message via setHidden', () => {
+      const agent = agentsRepo.create('Test');
+      const repo = new MessagesRepository(db, () => 'user1', agentsRepo);
+
+      const msg = repo.create(agent.agentId, 'llm', JSON.stringify({ data: {} }));
+      expect(msg.hidden).toBe(false);
+
+      repo.setHidden(msg.id, agent.agentId);
+
+      const updated = repo.getById(msg.id, agent.agentId)!;
+      expect(updated.hidden).toBe(true);
     });
   });
 });

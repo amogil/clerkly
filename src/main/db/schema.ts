@@ -88,10 +88,17 @@ export const messages = sqliteTable(
     kind: text('kind').notNull(),
     timestamp: text('timestamp').notNull(),
     payloadJson: text('payload_json').notNull(),
+    // Requirements: llm-integration.3.8, llm-integration.8.5
+    // Unified flag: hides message from UI and LLM history.
+    // Set for interrupted llm messages and dismissed error messages.
+    hidden: integer('hidden', { mode: 'boolean' }).notNull().default(false),
   },
   (table) => [
     index('idx_messages_agent_id').on(table.agentId),
     index('idx_messages_agent_timestamp').on(table.agentId, table.timestamp),
+    // Composite index for filtering visible messages by agent
+    // Requirements: llm-integration.3.8, llm-integration.8.5
+    index('idx_messages_agent_hidden').on(table.agentId, table.hidden),
   ]
 );
 

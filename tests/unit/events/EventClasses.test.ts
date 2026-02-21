@@ -272,6 +272,7 @@ describe('Event Classes', () => {
       kind: 'user',
       timestamp: 1705315800000,
       payload: { data: { text: 'Hello' } },
+      hidden: false,
     };
 
     /* Preconditions: MessageSnapshot provided
@@ -308,6 +309,7 @@ describe('Event Classes', () => {
       kind: 'user',
       timestamp: 1705315800000,
       payload: { data: { text: 'Updated' } },
+      hidden: false,
     };
 
     /* Preconditions: MessageSnapshot provided

@@ -18,6 +18,7 @@ function makeMessage(overrides: Partial<Message> & { id: number }): Message {
     kind: 'user',
     timestamp: '2026-02-15T10:00:00.000Z',
     payloadJson: JSON.stringify({ data: { text: 'Hello', reply_to_message_id: null } }),
+    hidden: false,
     ...overrides,
   };
 }
@@ -182,29 +183,6 @@ describe('PromptBuilder.build()', () => {
       expect(history).toContain('Answer');
     });
 
-    /* Preconditions: LLM message with interrupted:true
-       Action: Call build(messages)
-       Assertions: interrupted field is present in YAML
-       Requirements: llm-integration.4.4 */
-    it('should include interrupted:true in llm messages', () => {
-      const msgs = [
-        makeMessage({
-          id: 1,
-          kind: 'llm',
-          payloadJson: JSON.stringify({
-            data: {
-              reply_to_message_id: null,
-              interrupted: true,
-              action: { type: 'text', content: 'Partial' },
-            },
-          }),
-        }),
-      ];
-
-      const { history } = makeBuilder().build(msgs);
-      expect(history).toContain('interrupted');
-    });
-
     /* Preconditions: First message in chat
        Action: Call build(messages)
        Assertions: reply_to_message_id is null in YAML
@@ -229,8 +207,8 @@ describe('PromptBuilder edge cases', () => {
   describe('messageToChat with error kind', () => {
     /* Preconditions: Message with kind 'error'
        Action: Call buildMessages(messages)
-       Assertions: Error message mapped to system role with kind prefix
-       Requirements: llm-integration.4.3 */
+       Assertions: Error message is excluded from chat messages (llm-integration.3.9)
+       Requirements: llm-integration.3.9, llm-integration.4.3 */
     it('should map error kind to system role', () => {
       const msgs = [
         makeMessage({
@@ -240,9 +218,9 @@ describe('PromptBuilder edge cases', () => {
         }),
       ];
       const chatMessages = makeBuilder().buildMessages(msgs);
-      const systemMsgs = chatMessages.filter((m) => m.role === 'system');
-      const errorMsg = systemMsgs.find((m) => m.content.includes('[error]'));
-      expect(errorMsg).toBeDefined();
+      // kind:error messages are filtered out — llm-integration.3.9
+      const errorMsg = chatMessages.find((m) => m.content.includes('[error]'));
+      expect(errorMsg).toBeUndefined();
     });
   });
 
@@ -313,5 +291,53 @@ describe('PromptBuilder.buildMessages()', () => {
     const chatMessages = makeBuilder().buildMessages([]);
     expect(chatMessages).toHaveLength(1);
     expect(chatMessages[0].role).toBe('system');
+  });
+});
+
+describe('PromptBuilder filtering (error)', () => {
+  /* Preconditions: kind:error message in history
+     Action: Call build(messages)
+     Assertions: kind:error excluded from YAML history
+     Requirements: llm-integration.3.9 */
+  it('should exclude kind:error messages from YAML history', () => {
+    const msgs = [
+      makeMessage({
+        id: 1,
+        kind: 'user',
+        payloadJson: JSON.stringify({ data: { text: 'Hello', reply_to_message_id: null } }),
+      }),
+      makeMessage({
+        id: 2,
+        kind: 'error',
+        payloadJson: JSON.stringify({ data: { error: { message: 'Something failed' } } }),
+      }),
+    ];
+
+    const { history } = makeBuilder().build(msgs);
+    expect(history).toContain('kind: user');
+    expect(history).not.toContain('kind: error');
+  });
+
+  /* Preconditions: kind:error message in history
+     Action: Call buildMessages(messages)
+     Assertions: kind:error excluded from ChatMessage[]
+     Requirements: llm-integration.3.9 */
+  it('should exclude kind:error from buildMessages', () => {
+    const msgs = [
+      makeMessage({
+        id: 1,
+        kind: 'user',
+        payloadJson: JSON.stringify({ data: { text: 'Hello' } }),
+      }),
+      makeMessage({
+        id: 2,
+        kind: 'error',
+        payloadJson: JSON.stringify({ data: { error: { message: 'Fail' } } }),
+      }),
+    ];
+
+    const chatMessages = makeBuilder().buildMessages(msgs);
+    expect(chatMessages.some((m) => m.content.includes('[error]'))).toBe(false);
+    expect(chatMessages.some((m) => m.role === 'user')).toBe(true);
   });
 });

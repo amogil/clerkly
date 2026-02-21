@@ -130,6 +130,7 @@ describe('AgentManager', () => {
         kind: MESSAGE_KIND.USER,
         timestamp: '2026-02-15T10:30:00.000Z',
         payloadJson: JSON.stringify({ data: { text: 'Hello' } }),
+        hidden: false,
       };
       mockDbManager.messages.getLastByAgent = jest.fn().mockReturnValue(lastMessage);
 
@@ -149,6 +150,7 @@ describe('AgentManager', () => {
         kind: MESSAGE_KIND.FINAL_ANSWER,
         timestamp: '2026-02-15T10:30:00.000Z',
         payloadJson: JSON.stringify({ data: { text: 'Done' } }),
+        hidden: false,
       };
       mockDbManager.messages.getLastByAgent = jest.fn().mockReturnValue(lastMessage);
 
@@ -170,6 +172,7 @@ describe('AgentManager', () => {
         payloadJson: JSON.stringify({
           data: { error: { type: 'network', message: 'Failed' } },
         }),
+        hidden: false,
       };
       mockDbManager.messages.getLastByAgent = jest.fn().mockReturnValue(lastMessage);
 
@@ -191,6 +194,7 @@ describe('AgentManager', () => {
         payloadJson: JSON.stringify({
           data: { result: { status: 'error', message: 'Failed' } },
         }),
+        hidden: false,
       };
       mockDbManager.messages.getLastByAgent = jest.fn().mockReturnValue(lastMessage);
 
@@ -210,6 +214,7 @@ describe('AgentManager', () => {
         kind: MESSAGE_KIND.LLM,
         timestamp: '2026-02-15T10:30:00.000Z',
         payloadJson: JSON.stringify({ data: { text: 'Thinking...' } }),
+        hidden: false,
       };
       mockDbManager.messages.getLastByAgent = jest.fn().mockReturnValue(lastMessage);
 

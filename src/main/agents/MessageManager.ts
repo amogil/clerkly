@@ -50,6 +50,7 @@ export class MessageManager {
       kind: message.kind,
       timestamp: new Date(message.timestamp).getTime(),
       payload,
+      hidden: message.hidden ?? false,
     };
   }
 
@@ -70,6 +71,32 @@ export class MessageManager {
   getLastMessage(agentId: string): Message | null {
     // Repository automatically checks access through AgentsRepository
     return this.dbManager.messages.getLastByAgent(agentId);
+  }
+
+  /**
+   * Dismiss all kind:error messages for an agent (set hidden = true)
+   * Called before creating a new kind:user message
+   * Requirements: llm-integration.3.8
+   */
+  dismissErrorMessages(agentId: string): void {
+    this.dbManager.messages.dismissErrorMessages(agentId);
+    this.logger.info(`Error messages dismissed for agent ${agentId}`);
+  }
+
+  /**
+   * Hide a specific message (set hidden = true)
+   * Used for interrupted llm messages
+   * Requirements: llm-integration.8.5
+   */
+  setHidden(messageId: number, agentId: string): void {
+    this.dbManager.messages.setHidden(messageId, agentId);
+    this.logger.info(`Message hidden: ${messageId}`);
+
+    // Fetch updated message to emit event
+    const updated = this.dbManager.messages.getById(messageId, agentId);
+    if (updated) {
+      MainEventBus.getInstance().publish(new MessageUpdatedEvent(this.toEventMessage(updated)));
+    }
   }
 
   /**

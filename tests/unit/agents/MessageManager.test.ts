@@ -41,6 +41,7 @@ describe('MessageManager', () => {
     kind: 'user',
     timestamp: '2026-02-15T10:30:00.000Z',
     payloadJson: JSON.stringify({ data: { text: 'Hello' } }),
+    hidden: false,
   };
 
   beforeEach(() => {
@@ -84,6 +85,7 @@ describe('MessageManager', () => {
         kind: 'user',
         timestamp: new Date(mockMessage.timestamp).getTime(),
         payload: { data: { text: 'Hello' } },
+        hidden: false,
       });
       expect(typeof snapshot.timestamp).toBe('number');
       expect(typeof snapshot.payload).toBe('object');
@@ -105,6 +107,7 @@ describe('MessageManager', () => {
             result: { status: 'success', value: 42 },
           },
         }),
+        hidden: false,
       };
 
       const snapshot = (messageManager as any).toEventMessage(complexMessage);
@@ -129,6 +132,7 @@ describe('MessageManager', () => {
         kind: 'user',
         timestamp: '2026-02-15T10:30:00.000Z',
         payloadJson: 'invalid json {',
+        hidden: false,
       };
 
       expect(() => (messageManager as any).toEventMessage(invalidMessage)).toThrow(
@@ -147,6 +151,7 @@ describe('MessageManager', () => {
         kind: 'user',
         timestamp: '2026-02-15T10:30:00.000Z',
         payloadJson: '',
+        hidden: false,
       };
 
       expect(() => (messageManager as any).toEventMessage(emptyMessage)).toThrow();

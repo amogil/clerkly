@@ -46,6 +46,7 @@ function makeMessage(id: number, kind: string = 'user'): Message {
     kind,
     timestamp: new Date().toISOString(),
     payloadJson: JSON.stringify({ data: { text: 'Hello', reply_to_message_id: null } }),
+    hidden: false,
   };
 }
 
@@ -66,6 +67,7 @@ function makeMocks() {
       return makeMessage(99, kind);
     }),
     update: jest.fn(),
+    setHidden: jest.fn(),
     toEventMessage: jest.fn().mockReturnValue({
       id: 1,
       agentId: 'agent-1',
@@ -224,7 +226,7 @@ describe('MainPipeline.run()', () => {
   describe('error after streaming started', () => {
     /* Preconditions: LLM streams one reasoning chunk then throws
        Action: Call run(agentId, userMessageId)
-       Assertions: llm message marked interrupted:true; kind:error message created
+       Assertions: llm message hidden via setHidden; kind:error message created
        Requirements: llm-integration.5.3 */
     it('should mark llm message interrupted and create error message', async () => {
       const { pipeline, messageManager, llmProvider } = makeMocks();
@@ -238,12 +240,8 @@ describe('MainPipeline.run()', () => {
 
       await pipeline.run('agent-1', 1);
 
-      // llm message updated with interrupted:true
-      expect(messageManager.update).toHaveBeenCalledWith(
-        2,
-        'agent-1',
-        expect.objectContaining({ data: expect.objectContaining({ interrupted: true }) })
-      );
+      // llm message hidden via setHidden — Requirements: llm-integration.3.2
+      expect(messageManager.setHidden).toHaveBeenCalledWith(2, 'agent-1');
 
       // error message created
       expect(messageManager.create).toHaveBeenCalledWith('agent-1', 'error', expect.any(Object));
@@ -351,7 +349,7 @@ describe('MainPipeline.run()', () => {
   describe('AbortSignal cancellation after streaming', () => {
     /* Preconditions: Signal aborted after reasoning chunk received
        Action: Call run() with signal aborted mid-stream
-       Assertions: llm message marked interrupted:true; no error message created
+       Assertions: llm message hidden via setHidden; no error message created
        Requirements: llm-integration.5.4 */
     it('should mark llm message interrupted when aborted after streaming', async () => {
       const { pipeline, messageManager, llmProvider } = makeMocks();
@@ -369,12 +367,8 @@ describe('MainPipeline.run()', () => {
 
       await pipeline.run('agent-1', 1, controller.signal);
 
-      // llm message was created (first chunk), then marked interrupted
-      expect(messageManager.update).toHaveBeenCalledWith(
-        2,
-        'agent-1',
-        expect.objectContaining({ data: expect.objectContaining({ interrupted: true }) })
-      );
+      // llm message was created (first chunk), then hidden
+      expect(messageManager.setHidden).toHaveBeenCalledWith(2, 'agent-1');
 
       // No error message
       const errorCreates = (messageManager.create as jest.Mock).mock.calls.filter(
@@ -494,7 +488,7 @@ describe('MainPipeline.run()', () => {
   describe('AbortSignal cancellation in catch block', () => {
     /* Preconditions: Signal aborted, LLM throws, llm message was already created
        Action: Call run() where abort happens during error handling
-       Assertions: llm message marked interrupted; no error message
+       Assertions: llm message hidden via setHidden; no error message
        Requirements: llm-integration.5.4 */
     it('should mark interrupted and skip error message when aborted in catch', async () => {
       const { pipeline, messageManager, llmProvider } = makeMocks();
@@ -510,12 +504,8 @@ describe('MainPipeline.run()', () => {
 
       await pipeline.run('agent-1', 1, controller.signal);
 
-      // llm message updated with interrupted:true
-      expect(messageManager.update).toHaveBeenCalledWith(
-        2,
-        'agent-1',
-        expect.objectContaining({ data: expect.objectContaining({ interrupted: true }) })
-      );
+      // llm message hidden via setHidden
+      expect(messageManager.setHidden).toHaveBeenCalledWith(2, 'agent-1');
 
       // No error message created
       const errorCreates = (messageManager.create as jest.Mock).mock.calls.filter(

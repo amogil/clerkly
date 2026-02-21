@@ -488,4 +488,15 @@ Renderer может подписаться только на `message.llm.reason
 - [x] Коммит
 
 ### Финал
-- [ ] `npm run validate` — все проверки зелёные
+- [x] `npm run validate` — все проверки зелёные
+
+## Этап 2: Рефакторинг — колонка `hidden` вместо payload-флагов (выполнено)
+- [x] `src/main/db/schema.ts` — колонка `hidden BOOLEAN NOT NULL DEFAULT FALSE`, индекс `idx_messages_agent_hidden`; удалена миграция 001
+- [x] `src/main/db/repositories/MessagesRepository.ts` — `dismissErrorMessages` через `hidden=true`, метод `setHidden()`
+- [x] `src/main/agents/MessageManager.ts` — `setHidden()`, `dismissErrorMessages()`, `toEventMessage()` включает `hidden`
+- [x] `src/main/agents/MainPipeline.ts` — вместо `interrupted: true` в payload — вызов `messageManager.setHidden()`
+- [x] `src/main/agents/PromptBuilder.ts` — фильтрация по `msg.hidden`
+- [x] `src/renderer/components/agents.tsx` — фильтрация по `message.hidden`
+- [x] `src/shared/events/types.ts` — поле `hidden: boolean` в `MessageSnapshot`
+- [x] Тесты обновлены во всех затронутых файлах
+- [x] `npm run validate` — все проверки зелёные

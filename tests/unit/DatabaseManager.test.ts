@@ -862,7 +862,9 @@ describe('DatabaseManager Repository Accessors', () => {
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           agent_id TEXT NOT NULL,
           timestamp TEXT NOT NULL,
-          payload_json TEXT NOT NULL
+          payload_json TEXT NOT NULL,
+          kind TEXT NOT NULL DEFAULT 'user',
+          hidden INTEGER NOT NULL DEFAULT 0
         );
       `);
 

@@ -105,6 +105,8 @@ export interface MessageSnapshot {
   kind: string;
   timestamp: number; // Unix timestamp in milliseconds
   payload: MessagePayload;
+  /** Hidden messages are not shown in UI and excluded from LLM history */
+  hidden: boolean;
 }
 
 // ============================================================================

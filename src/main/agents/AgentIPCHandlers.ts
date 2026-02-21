@@ -248,8 +248,12 @@ export class AgentIPCHandlers {
       const snapshot = this.messageManager.toEventMessage(message);
 
       // Launch LLM pipeline asynchronously for user messages
-      // Requirements: llm-integration.6
+      // Requirements: llm-integration.6, llm-integration.3.8
       if (args.kind === 'user') {
+        // Dismiss all kind:error messages for this agent before sending new message
+        // Requirements: llm-integration.3.8
+        this.messageManager.dismissErrorMessages(args.agentId);
+
         // Cancel any running pipeline for this agent
         this.agentManager.cancelPipeline(args.agentId);
 

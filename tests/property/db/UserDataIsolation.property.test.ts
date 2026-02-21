@@ -38,7 +38,8 @@ describe('User Data Isolation Properties', () => {
         agent_id TEXT NOT NULL,
         kind TEXT NOT NULL,
         timestamp TEXT NOT NULL,
-        payload_json TEXT NOT NULL
+        payload_json TEXT NOT NULL,
+        hidden INTEGER NOT NULL DEFAULT 0
       );
     `);
     db = drizzle(sqlite, { schema });
@@ -205,7 +206,8 @@ describe('Agent Access Control Properties', () => {
               agent_id TEXT NOT NULL,
               kind TEXT NOT NULL,
               timestamp TEXT NOT NULL,
-              payload_json TEXT NOT NULL
+              payload_json TEXT NOT NULL,
+              hidden INTEGER NOT NULL DEFAULT 0
             );
           `);
           const db = drizzle(sqlite, { schema });
