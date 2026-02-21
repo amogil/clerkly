@@ -32,7 +32,7 @@ function sseChunk(delta: { reasoning?: string; content?: string }, usage?: objec
 }
 
 const mockMessages: ChatMessage[] = [{ role: 'user', content: 'Hello' }];
-const mockOptions: ChatOptions = { model: 'gpt-4o-mini' };
+const mockOptions: ChatOptions = { model: 'gpt-5-nano' };
 
 describe('OpenAIProvider.chat()', () => {
   let provider: OpenAIProvider;

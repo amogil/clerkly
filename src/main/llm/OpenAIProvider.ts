@@ -79,9 +79,9 @@ export class OpenAIProvider implements ILLMProvider {
         body: JSON.stringify({
           model: this.config.testModel,
           messages: [{ role: 'user', content: 'test' }],
-          max_tokens: this.config.maxTokens,
+          max_tokens: this.config.testMaxTokens,
         }),
-        signal: AbortSignal.timeout(this.config.timeout),
+        signal: AbortSignal.timeout(this.config.testTimeoutMs),
       });
 
       if (response.ok) {

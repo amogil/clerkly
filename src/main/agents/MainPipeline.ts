@@ -8,8 +8,10 @@ import { AIAgentSettingsManager } from '../AIAgentSettingsManager';
 import { LLMProviderFactory } from '../llm/LLMProviderFactory';
 import { MainEventBus } from '../events/MainEventBus';
 import { MessageLlmReasoningUpdatedEvent } from '../../shared/events/types';
+import { LLM_CHAT_MODELS } from '../llm/LLMConfig';
 import { Logger } from '../Logger';
 import type { ILLMProvider, ChatOptions } from '../llm/ILLMProvider';
+
 import type { LLMProvider } from '../../types';
 
 /**
@@ -128,9 +130,8 @@ export class MainPipeline {
       // The llm message replies to the user message that triggered it
       const replyToMessageId = userMessageId;
 
-      // ── 5. Determine model ────────────────────────────────────────────────
-      const model = this.resolveModel(provider);
-      const options: ChatOptions = { model, reasoningEffort: 'low' };
+      // ── 5. Determine model and options ───────────────────────────────────
+      const options = this.resolveOptions(provider);
 
       // ── 6. Create LLM provider ────────────────────────────────────────────
       const llmProvider = this.createProvider(provider, apiKey);
@@ -147,7 +148,7 @@ export class MainPipeline {
             const llmMsg = this.messageManager.create(agentId, 'llm', {
               data: {
                 reply_to_message_id: replyToMessageId,
-                model,
+                model: options.model,
                 reasoning: { text: accumulatedReasoning, excluded_from_replay: true },
               },
             });
@@ -157,7 +158,7 @@ export class MainPipeline {
             this.messageManager.update(llmMessageId, agentId, {
               data: {
                 reply_to_message_id: replyToMessageId,
-                model,
+                model: options.model,
                 reasoning: { text: accumulatedReasoning, excluded_from_replay: true },
               },
             });
@@ -181,7 +182,7 @@ export class MainPipeline {
           this.messageManager.update(llmMessageId, agentId, {
             data: {
               reply_to_message_id: replyToMessageId,
-              model,
+              model: options.model,
               reasoning: accumulatedReasoning
                 ? { text: accumulatedReasoning, excluded_from_replay: true }
                 : undefined,
@@ -196,7 +197,7 @@ export class MainPipeline {
       const finalPayload = {
         data: {
           reply_to_message_id: replyToMessageId,
-          model,
+          model: options.model,
           reasoning: accumulatedReasoning
             ? { text: accumulatedReasoning, excluded_from_replay: true }
             : undefined,
@@ -265,19 +266,10 @@ export class MainPipeline {
   }
 
   /**
-   * Resolve the model to use for a given provider
+   * Resolve model and reasoning effort for a given provider.
    * Requirements: llm-integration.5.1
    */
-  private resolveModel(provider: LLMProvider): string {
-    switch (provider) {
-      case 'openai':
-        return 'gpt-4o-mini';
-      case 'anthropic':
-        return 'claude-haiku-4-5';
-      case 'google':
-        return 'gemini-3-flash';
-      default:
-        return 'gpt-4o-mini';
-    }
+  private resolveOptions(provider: LLMProvider): ChatOptions {
+    return LLM_CHAT_MODELS[provider]?.prod ?? LLM_CHAT_MODELS.openai.prod;
   }
 }

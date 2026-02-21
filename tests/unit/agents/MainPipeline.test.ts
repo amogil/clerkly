@@ -16,6 +16,7 @@ import type {
   LLMAction,
 } from '../../../src/main/llm/ILLMProvider';
 import type { Message } from '../../../src/main/db/schema';
+import { LLM_CHAT_MODELS } from '../../../src/main/llm/LLMConfig';
 
 // ─── Mocks ────────────────────────────────────────────────────────────────────
 
@@ -462,7 +463,7 @@ describe('MainPipeline.run()', () => {
         'agent-1',
         'llm',
         expect.objectContaining({
-          data: expect.objectContaining({ model: 'claude-haiku-4-5' }),
+          data: expect.objectContaining({ model: LLM_CHAT_MODELS.anthropic.prod.model }),
         })
       );
     });
@@ -484,7 +485,7 @@ describe('MainPipeline.run()', () => {
         'agent-1',
         'llm',
         expect.objectContaining({
-          data: expect.objectContaining({ model: 'gemini-3-flash' }),
+          data: expect.objectContaining({ model: LLM_CHAT_MODELS.google.prod.model }),
         })
       );
     });

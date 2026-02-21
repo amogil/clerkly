@@ -166,7 +166,7 @@ describe('PromptBuilder.build()', () => {
           payloadJson: JSON.stringify({
             data: {
               reply_to_message_id: null,
-              model: 'gpt-4o',
+              model: 'gpt-5.2',
               reasoning: { text: 'My internal thoughts', excluded_from_replay: true },
               action: { type: 'text', content: 'Answer' },
             },

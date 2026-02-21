@@ -43,9 +43,9 @@ export class AnthropicProvider implements ILLMProvider {
         body: JSON.stringify({
           model: this.config.testModel,
           messages: [{ role: 'user', content: 'test' }],
-          max_tokens: this.config.maxTokens,
+          max_tokens: this.config.testMaxTokens,
         }),
-        signal: AbortSignal.timeout(this.config.timeout), // Requirements: settings.3.6 - Configured timeout
+        signal: AbortSignal.timeout(this.config.testTimeoutMs), // Requirements: settings.3.6 - Configured timeout
       });
 
       // Requirements: settings.3.7 - Success on HTTP 200

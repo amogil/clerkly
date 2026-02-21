@@ -139,7 +139,7 @@ test('54.3: should send request with correct parameters', async () => {
   expect(lastRequest?.path).toBe('/v1/chat/completions');
   expect(lastRequest?.method).toBe('POST');
   expect(lastRequest?.headers.authorization).toBe('Bearer test-api-key-12345');
-  expect(lastRequest?.body.model).toBe('gpt-4o-mini');
+  expect(lastRequest?.body.model).toBe('gpt-5-nano');
   expect(lastRequest?.body.max_tokens).toBe(5);
 });
 
@@ -217,8 +217,8 @@ test('54.5: should show error notification on invalid API key', async () => {
    Requirements: settings.3.4, settings.3.5, settings.3.7 */
 test('54.6: should test connection for all providers', async () => {
   const providers = [
-    { value: 'openai', name: 'OpenAI', path: '/v1/chat/completions', model: 'gpt-4o-mini' },
-    { value: 'anthropic', name: 'Anthropic', path: '/v1/messages', model: 'claude-haiku-4-5' },
+    { value: 'openai', name: 'OpenAI', path: '/v1/chat/completions', model: 'gpt-5-nano' },
+    { value: 'anthropic', name: 'Anthropic', path: '/v1/messages', model: 'claude-haiku-4-6' },
     {
       value: 'google',
       name: 'Google',

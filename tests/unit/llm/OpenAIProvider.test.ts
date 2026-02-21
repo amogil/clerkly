@@ -180,7 +180,7 @@ describe('OpenAIProvider', () => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'gpt-4o-mini',
+          model: 'gpt-5-nano',
           messages: [{ role: 'user', content: 'test' }],
           max_tokens: 5,
         }),

@@ -141,7 +141,7 @@
 
 5.7. `OpenAIProvider` ДОЛЖЕН реализовывать structured output через `response_format: { type: "json_schema" }`
 
-5.8. Для тестов используется модель `gpt-5-mini` с `reasoning_effort: "low"`, для прода — `gpt-5.2` с `reasoning_effort: "medium"`
+5.8. Для тестов используется модель `gpt-5-nano` с `reasoning_effort: "low"`, для прода — `gpt-5.2` с `reasoning_effort: "medium"`
 
 ---
 

@@ -42,7 +42,7 @@ export class GoogleProvider implements ILLMProvider {
         body: JSON.stringify({
           contents: [{ parts: [{ text: 'test' }] }],
         }),
-        signal: AbortSignal.timeout(this.config.timeout), // Requirements: settings.3.6 - Configured timeout
+        signal: AbortSignal.timeout(this.config.testTimeoutMs), // Requirements: settings.3.6 - Configured timeout
       });
 
       // Requirements: settings.3.7 - Success on HTTP 200
