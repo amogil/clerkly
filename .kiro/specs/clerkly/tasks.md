@@ -344,7 +344,7 @@
   
   - [x] 9.4 Создать Application Configuration
     - Реализовать класс AppConfig с настройками приложения
-    - Определить настройки окна (width: 600, height: 400, titleBarStyle: 'hiddenInset', vibrancy: 'under-window')
+    - Определить настройки окна (width: 800, height: 600, titleBarStyle: 'hiddenInset', vibrancy: 'under-window')
     - Определить версию приложения (1.0.0) и минимальную версию OS (Mac OS X 10.13)
     - Добавить комментарии с требованиями
     - _Requirements: clerkly.1.2, clerkly.1.3, clerkly.2.9, clerkly.nfr.3.1, clerkly.nfr.3.2_

@@ -112,9 +112,9 @@ describe('Property Tests - WindowStateManager', () => {
           // Call loadState which internally calls getDefaultState
           const state = windowStateManager.loadState();
 
-          // Calculate expected compact size: min(600, width) x min(400, height)
-          const expectedWidth = Math.min(600, screenSize.width);
-          const expectedHeight = Math.min(400, screenSize.height);
+          // Calculate expected compact size: min(800, width) x min(600, height)
+          const expectedWidth = Math.min(800, screenSize.width);
+          const expectedHeight = Math.min(600, screenSize.height);
           const expectedX = Math.floor((screenSize.width - expectedWidth) / 2);
           const expectedY = Math.floor((screenSize.height - expectedHeight) / 2);
 
@@ -130,12 +130,12 @@ describe('Property Tests - WindowStateManager', () => {
           expect(state.x).toBe(expectedX);
           expect(state.y).toBe(expectedY);
 
-          // Verify dimensions adapt to screen size (not always 600x400)
-          // For screens smaller than 600x400, dimensions should be smaller
-          if (screenSize.width < 600) {
+          // Verify dimensions adapt to screen size (not always 800x600)
+          // For screens smaller than 800x600, dimensions should be smaller
+          if (screenSize.width < 800) {
             expect(state.width).toBe(screenSize.width);
           }
-          if (screenSize.height < 400) {
+          if (screenSize.height < 600) {
             expect(state.height).toBe(screenSize.height);
           }
 
@@ -164,10 +164,10 @@ describe('Property Tests - WindowStateManager', () => {
 
     const state = windowStateManager.loadState();
 
-    expect(state.width).toBe(600); // min(600, 800)
-    expect(state.height).toBe(400); // min(400, 600)
-    expect(state.x).toBe(100); // (800 - 600) / 2
-    expect(state.y).toBe(100); // (600 - 400) / 2
+    expect(state.width).toBe(800); // min(800, 800)
+    expect(state.height).toBe(600); // min(600, 600)
+    expect(state.x).toBe(0); // (800 - 800) / 2
+    expect(state.y).toBe(0); // (600 - 600) / 2
     expect(state.isMaximized).toBe(false);
   });
 
@@ -188,10 +188,10 @@ describe('Property Tests - WindowStateManager', () => {
 
     const state = windowStateManager.loadState();
 
-    expect(state.width).toBe(600); // min(600, 3840)
-    expect(state.height).toBe(400); // min(400, 2160)
-    expect(state.x).toBe(1620); // (3840 - 600) / 2
-    expect(state.y).toBe(880); // (2160 - 400) / 2
+    expect(state.width).toBe(800); // min(800, 3840)
+    expect(state.height).toBe(600); // min(600, 2160)
+    expect(state.x).toBe(1520); // (3840 - 800) / 2
+    expect(state.y).toBe(780); // (2160 - 600) / 2
     expect(state.isMaximized).toBe(false);
   });
 
@@ -212,10 +212,10 @@ describe('Property Tests - WindowStateManager', () => {
 
     const state = windowStateManager.loadState();
 
-    expect(state.width).toBe(600); // min(600, 2560)
-    expect(state.height).toBe(400); // min(400, 1080)
-    expect(state.x).toBe(980); // (2560 - 600) / 2
-    expect(state.y).toBe(340); // (1080 - 400) / 2
+    expect(state.width).toBe(800); // min(800, 2560)
+    expect(state.height).toBe(600); // min(600, 1080)
+    expect(state.x).toBe(880); // (2560 - 800) / 2
+    expect(state.y).toBe(240); // (1080 - 600) / 2
     expect(state.isMaximized).toBe(false);
   });
 
@@ -236,10 +236,10 @@ describe('Property Tests - WindowStateManager', () => {
 
     const state = windowStateManager.loadState();
 
-    expect(state.width).toBe(600); // min(600, 1080)
-    expect(state.height).toBe(400); // min(400, 1920)
-    expect(state.x).toBe(240); // (1080 - 600) / 2
-    expect(state.y).toBe(760); // (1920 - 400) / 2
+    expect(state.width).toBe(800); // min(800, 1080)
+    expect(state.height).toBe(600); // min(600, 1920)
+    expect(state.x).toBe(140); // (1080 - 800) / 2
+    expect(state.y).toBe(660); // (1920 - 600) / 2
     expect(state.isMaximized).toBe(false);
   });
 
@@ -326,8 +326,8 @@ describe('Property Tests - WindowStateManager', () => {
       const state = windowStateManager.loadState();
 
       // Calculate expected compact size
-      const expectedWidth = Math.min(600, resolution.width);
-      const expectedHeight = Math.min(400, resolution.height);
+      const expectedWidth = Math.min(800, resolution.width);
+      const expectedHeight = Math.min(600, resolution.height);
       const expectedX = Math.floor((resolution.width - expectedWidth) / 2);
       const expectedY = Math.floor((resolution.height - expectedHeight) / 2);
 
@@ -359,10 +359,10 @@ describe('Property Tests - WindowStateManager', () => {
     const state = windowStateManager.loadState();
 
     // Verify dimensions are compact size
-    expect(state.width).toBe(600); // min(600, 1367)
-    expect(state.height).toBe(400); // min(400, 769)
-    expect(state.x).toBe(383); // Math.floor((1367 - 600) / 2)
-    expect(state.y).toBe(184); // Math.floor((769 - 400) / 2)
+    expect(state.width).toBe(800); // min(800, 1367)
+    expect(state.height).toBe(600); // min(600, 769)
+    expect(state.x).toBe(283); // Math.floor((1367 - 800) / 2)
+    expect(state.y).toBe(84); // Math.floor((769 - 600) / 2)
 
     // Verify integer values
     expect(Number.isInteger(state.width)).toBe(true);
@@ -411,8 +411,8 @@ describe('Property Tests - WindowStateManager', () => {
     mockGlobalWindowState.get.mockReturnValue(undefined);
 
     const state1 = windowStateManager.loadState();
-    expect(state1.width).toBe(600); // min(600, 1920)
-    expect(state1.height).toBe(400); // min(400, 1080)
+    expect(state1.width).toBe(800); // min(800, 1920)
+    expect(state1.height).toBe(600); // min(600, 1080)
 
     // Change screen size
     mockScreen.getPrimaryDisplay.mockReturnValue({
@@ -420,10 +420,10 @@ describe('Property Tests - WindowStateManager', () => {
     });
 
     const state2 = windowStateManager.loadState();
-    expect(state2.width).toBe(600); // min(600, 2560)
-    expect(state2.height).toBe(400); // min(400, 1440)
+    expect(state2.width).toBe(800); // min(800, 2560)
+    expect(state2.height).toBe(600); // min(600, 1440)
 
-    // Both should have compact size (600x400) since both screens are larger
+    // Both should have compact size (800x600) since both screens are larger
     expect(state1.width).toBe(state2.width);
     expect(state1.height).toBe(state2.height);
   });
@@ -517,8 +517,8 @@ describe('Property Tests - WindowStateManager', () => {
     // Verify default state is returned (position is invalid)
     expect(loadedState).not.toEqual(invalidState);
     expect(loadedState.isMaximized).toBe(false);
-    expect(loadedState.width).toBe(600); // Compact size: min(600, 1920)
-    expect(loadedState.height).toBe(400); // Compact size: min(400, 1080)
+    expect(loadedState.width).toBe(800); // Compact size: min(800, 1920)
+    expect(loadedState.height).toBe(600); // Compact size: min(600, 1080)
   });
 
   /* Preconditions: state with negative coordinates
@@ -733,8 +733,8 @@ describe('Property Tests - WindowStateManager', () => {
 
     // Verify default state is returned
     expect(loadedState.isMaximized).toBe(false);
-    expect(loadedState.width).toBe(600); // Compact size: min(600, 1920)
-    expect(loadedState.height).toBe(400); // Compact size: min(400, 1080)
+    expect(loadedState.width).toBe(800); // Compact size: min(800, 1920)
+    expect(loadedState.height).toBe(600); // Compact size: min(600, 1080)
   });
 
   /* Preconditions: empty data in storage
@@ -755,8 +755,8 @@ describe('Property Tests - WindowStateManager', () => {
 
     // Verify default state is returned
     expect(loadedState.isMaximized).toBe(false);
-    expect(loadedState.width).toBe(600); // Compact size: min(600, 1920)
-    expect(loadedState.height).toBe(400); // Compact size: min(400, 1080)
+    expect(loadedState.width).toBe(800); // Compact size: min(800, 1920)
+    expect(loadedState.height).toBe(600); // Compact size: min(600, 1080)
   });
 
   /* Preconditions: loadData returns success: false
@@ -777,8 +777,8 @@ describe('Property Tests - WindowStateManager', () => {
 
     // Verify default state is returned
     expect(loadedState.isMaximized).toBe(false);
-    expect(loadedState.width).toBe(600); // Compact size: min(600, 1920)
-    expect(loadedState.height).toBe(400); // Compact size: min(400, 1080)
+    expect(loadedState.width).toBe(800); // Compact size: min(800, 1920)
+    expect(loadedState.height).toBe(600); // Compact size: min(600, 1080)
   });
 });
 

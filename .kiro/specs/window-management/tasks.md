@@ -35,7 +35,7 @@
 
   - [x] 1.5 Реализовать метод getDefaultState()
     - Получать размер экрана через screen.getPrimaryDisplay().workAreaSize
-    - Вычислять размер окна: min(600, screenWidth) x min(400, screenHeight)
+    - Вычислять размер окна: min(800, screenWidth) x min(600, screenHeight)
     - Центрировать окно на экране
     - Устанавливать isMaximized: false (окно НЕ максимизировано по умолчанию)
     - _Requirements: window-management.1.1, window-management.4.1, window-management.4.2, window-management.4.4_
@@ -47,7 +47,7 @@
     - _Requirements: window-management.5.6_
 
   - [x] 1.7 Написать модульные тесты для WindowStateManager
-    - Тест: should return default state when no saved state exists (компактный размер 600x400)
+    - Тест: should return default state when no saved state exists (компактный размер 800x600)
     - Тест: should load saved state from database
     - Тест: should return default state for invalid position
     - Тест: should save state to database

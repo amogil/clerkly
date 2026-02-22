@@ -234,7 +234,7 @@ export class WindowStateManager {
    *
    * This private method calculates the default window state when no saved state
    * exists or when the saved state is invalid. The window opens with a compact
-   * size of min(600, screenWidth) x min(400, screenHeight), centered on the screen.
+   * size of min(800, screenWidth) x min(600, screenHeight), centered on the screen.
    * This provides a focused interface for agent chats while allowing immediate resizing.
    *
    * The default state has isMaximized set to false, ensuring the window
@@ -280,10 +280,10 @@ export class WindowStateManager {
     const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
 
     // Requirements: window-management.1.1, window-management.4.2, window-management.4.4
-    // Window opens with size min(600, screenWidth) x min(400, screenHeight) on first launch
+    // Window opens with size min(800, screenWidth) x min(600, screenHeight) on first launch
     // This provides a focused interface for agent chats while allowing immediate resizing
-    const width = Math.min(600, screenWidth);
-    const height = Math.min(400, screenHeight);
+    const width = Math.min(800, screenWidth);
+    const height = Math.min(600, screenHeight);
 
     // Requirements: window-management.4.4 - Center window on screen
     const x = Math.floor((screenWidth - width) / 2);
