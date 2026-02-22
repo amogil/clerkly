@@ -124,11 +124,11 @@ test.describe('Message Text Wrapping', () => {
 
   /* Preconditions: User is on agents page with active agent
      Action: Check agent message styling
-     Assertions: Agent messages have whitespace-pre-wrap and break-words classes
+     Assertions: Agent messages have whitespace-pre-wrap and break-words classes, full width
      Requirements: agents.4.22 */
   test('should have correct CSS classes for agent messages', async () => {
-    // Find any agent message (from previous tests or create new one)
-    const agentMessage = page.locator('.max-w-\\[85\\%\\]').first();
+    // Find any agent message by testid
+    const agentMessage = page.locator('[data-testid="message-llm-action"]').first();
 
     if ((await agentMessage.count()) > 0) {
       // Check that agent message has both classes
@@ -159,8 +159,8 @@ test.describe('Message Text Wrapping', () => {
     const userMessage = page.locator('.rounded-2xl.bg-secondary\\/70').last();
     const messageWidth = await userMessage.evaluate((el) => el.offsetWidth);
 
-    // Message should not exceed 75% of chat area (max-w-[75%])
-    expect(messageWidth).toBeLessThanOrEqual(chatAreaWidth * 0.75 + 1); // +1 for rounding
+    // Message should fill the chat area width (no max-w constraint)
+    expect(messageWidth).toBeLessThanOrEqual(chatAreaWidth + 1); // +1 for rounding
   });
 
   /* Preconditions: User is on agents page with active agent
@@ -247,10 +247,10 @@ test.describe('Message Text Wrapping', () => {
     });
     expect(hasHorizontalScroll).toBe(false);
 
-    // Check that message width doesn't exceed max-w-[75%]
+    // Check that message width doesn't exceed chat area width (no max-w constraint)
     const chatAreaWidth = await messagesContainer.evaluate((el) => el.clientWidth);
     const messageWidth = await userMessage.evaluate((el) => (el as HTMLElement).offsetWidth);
-    expect(messageWidth).toBeLessThanOrEqual(chatAreaWidth * 0.75 + 1);
+    expect(messageWidth).toBeLessThanOrEqual(chatAreaWidth + 1);
   });
 
   /* Preconditions: User is on agents page with active agent

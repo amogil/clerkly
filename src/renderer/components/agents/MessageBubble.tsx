@@ -23,7 +23,7 @@ export function MessageBubble({
       <div className="flex justify-end">
         <div
           data-testid="message-user"
-          className="rounded-2xl bg-secondary/70 border border-border px-4 py-3 max-w-[75%]"
+          className="rounded-2xl bg-secondary/70 border border-border px-4 py-3 min-w-0"
         >
           <p className="text-sm leading-relaxed text-foreground whitespace-pre-wrap break-words">
             {String(message.payload.data?.text || '')}
@@ -49,7 +49,7 @@ export function MessageBubble({
         )}
         <div
           data-testid="message-error"
-          className="max-w-[85%] text-sm leading-relaxed text-red-500 whitespace-pre-wrap break-words rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3"
+          className="text-sm leading-relaxed text-red-500 whitespace-pre-wrap break-words rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3"
         >
           {errorInfo?.message || 'Unknown error'}
           {errorInfo?.action_link && onNavigate && (
@@ -79,7 +79,7 @@ export function MessageBubble({
             <Logo size="sm" showText={false} animated={isInProgress(agentStatus)} />
           </div>
         )}
-        <div data-testid="message-llm" className="max-w-[85%] space-y-2">
+        <div data-testid="message-llm" className="space-y-2">
           {llmReasoning?.text && (
             <div
               data-testid="message-llm-reasoning"
@@ -116,7 +116,7 @@ export function MessageBubble({
           <Logo size="sm" showText={false} animated={isInProgress(agentStatus)} />
         </div>
       )}
-      <div className="max-w-[85%] text-sm leading-relaxed text-foreground whitespace-pre-wrap break-words">
+      <div className="text-sm leading-relaxed text-foreground whitespace-pre-wrap break-words">
         {String(message.payload.data?.text || '')}
       </div>
     </>

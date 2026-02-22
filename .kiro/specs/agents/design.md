@@ -1720,7 +1720,7 @@ function EmptyStatePlaceholder({ onPromptClick }: EmptyStatePlaceholderProps) {
 ```tsx
 // Requirements: agents.4.9, agents.4.22
 <div className="flex justify-end">
-  <div className="rounded-2xl bg-secondary/70 border border-border px-4 py-3 max-w-[75%]">
+  <div className="rounded-2xl bg-secondary/70 border border-border px-4 py-3">
     <p className="text-sm leading-relaxed text-foreground whitespace-pre-wrap break-words">
       {message.content}
     </p>
@@ -1732,7 +1732,7 @@ function EmptyStatePlaceholder({ onPromptClick }: EmptyStatePlaceholderProps) {
 - `rounded-2xl` (16px) - более скругленные углы для мягкого вида
 - `bg-secondary/70` - серый полупрозрачный фон (70% opacity)
 - `border border-border` - тонкая серая рамка (1px)
-- `max-w-[75%]` - максимальная ширина 75% для длинных сообщений
+- полная ширина — пузырь растягивается на всю доступную ширину
 - `whitespace-pre-wrap` - сохранение переносов строк из текста
 - `break-words` - перенос длинных слов без пробелов
 - Выравнивание справа через `justify-end`
@@ -1747,7 +1747,7 @@ function EmptyStatePlaceholder({ onPromptClick }: EmptyStatePlaceholderProps) {
       <Logo size="sm" showText={false} animated={isInProgress} />
     </div>
   )}
-  <div className="max-w-[85%] text-sm leading-relaxed text-foreground whitespace-pre-wrap break-words">
+  <div className="text-sm leading-relaxed text-foreground whitespace-pre-wrap break-words">
     {message.content}
   </div>
 </>
@@ -1756,7 +1756,7 @@ function EmptyStatePlaceholder({ onPromptClick }: EmptyStatePlaceholderProps) {
 **Особенности:**
 - Без фона и рамки - чистый текст
 - Message Avatar показывается только для первого сообщения в последовательности
-- `max-w-[85%]` - немного шире чем сообщения пользователя
+- полная ширина — текст агента занимает всю доступную ширину
 - `whitespace-pre-wrap` - сохранение переносов строк из текста
 - `break-words` - перенос длинных слов без пробелов
 - Message Avatar с CSS-анимацией

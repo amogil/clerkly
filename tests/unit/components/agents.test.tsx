@@ -219,7 +219,7 @@ describe('Agents Component - LLM and Error message rendering', () => {
      Requirements: llm-integration.7 */
   it('should render kind:llm message with reasoning and action', () => {
     const LlmMessage = () => (
-      <div data-testid="message-llm" className="max-w-[85%] space-y-2">
+      <div data-testid="message-llm" className="space-y-2">
         <div
           data-testid="message-llm-reasoning"
           className="text-xs text-muted-foreground italic whitespace-pre-wrap break-words"
@@ -247,7 +247,7 @@ describe('Agents Component - LLM and Error message rendering', () => {
      Requirements: llm-integration.7 */
   it('should render kind:llm loading indicator when action is absent', () => {
     const LlmLoadingMessage = () => (
-      <div data-testid="message-llm" className="max-w-[85%] space-y-2">
+      <div data-testid="message-llm" className="space-y-2">
         <div data-testid="message-llm-loading" className="flex gap-1 items-center py-1">
           <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground animate-bounce" />
           <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground animate-bounce" />
@@ -268,7 +268,7 @@ describe('Agents Component - LLM and Error message rendering', () => {
      Requirements: llm-integration.7 */
   it('should render kind:llm action without reasoning when reasoning is absent', () => {
     const LlmActionOnly = () => (
-      <div data-testid="message-llm" className="max-w-[85%] space-y-2">
+      <div data-testid="message-llm" className="space-y-2">
         <div
           data-testid="message-llm-action"
           className="text-sm leading-relaxed text-foreground whitespace-pre-wrap break-words"
