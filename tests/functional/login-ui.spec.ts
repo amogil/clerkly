@@ -101,7 +101,9 @@ test.describe('Login UI Components', () => {
     await loginButton.click();
 
     // Wait for potential error to appear (OAuth flow may fail in test environment)
-    await context.window.waitForSelector('[data-testid="login-screen"]', { timeout: 5000 }).catch(() => {});
+    await context.window
+      .waitForSelector('[data-testid="login-screen"]', { timeout: 5000 })
+      .catch(() => {});
 
     // Check if error block is visible
     // Requirements: google-oauth-auth.13.2

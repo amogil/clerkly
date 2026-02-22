@@ -169,7 +169,9 @@ test('should restore user data after re-login', async () => {
 
   // Logout
   await context.window.click('button:has-text("Sign out")');
-  await context.window.waitForSelector('button:has-text("Continue with Google")', { timeout: 10000 });
+  await context.window.waitForSelector('button:has-text("Continue with Google")', {
+    timeout: 10000,
+  });
 
   // Login again
   await completeOAuthFlow(context.app, context.window, TEST_CLIENT_ID);
@@ -221,7 +223,9 @@ test('should persist data after logout', async () => {
 
   // Logout
   await context.window.click('button:has-text("Sign out")');
-  await context.window.waitForSelector('button:has-text("Continue with Google")', { timeout: 10000 });
+  await context.window.waitForSelector('button:has-text("Continue with Google")', {
+    timeout: 10000,
+  });
 
   // Login again and verify data restored (this verifies data persisted after logout)
   await completeOAuthFlow(context.app, context.window, TEST_CLIENT_ID);
@@ -265,7 +269,9 @@ test('should filter data by user_id', async () => {
 
   // Logout
   await context.window.click('button:has-text("Sign out")');
-  await context.window.waitForSelector('button:has-text("Continue with Google")', { timeout: 10000 });
+  await context.window.waitForSelector('button:has-text("Continue with Google")', {
+    timeout: 10000,
+  });
 
   // User B: Login and save data with different provider
   mockOAuthServer.setUserProfile({
@@ -293,7 +299,9 @@ test('should filter data by user_id', async () => {
 
   // Logout
   await context.window.click('button:has-text("Sign out")');
-  await context.window.waitForSelector('button:has-text("Continue with Google")', { timeout: 10000 });
+  await context.window.waitForSelector('button:has-text("Continue with Google")', {
+    timeout: 10000,
+  });
 
   // User A: Login again and load data
   mockOAuthServer.setUserProfile({

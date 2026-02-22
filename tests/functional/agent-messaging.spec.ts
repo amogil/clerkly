@@ -262,7 +262,9 @@ test.describe('Agent Messaging', () => {
       await window.waitForTimeout(150);
     }
 
-    await expect(window.locator('[data-testid="message-user"]')).toHaveCount(20, { timeout: 10000 });
+    await expect(window.locator('[data-testid="message-user"]')).toHaveCount(20, {
+      timeout: 10000,
+    });
 
     // Scroll up significantly (to top)
     await messagesArea.evaluate((el) => {

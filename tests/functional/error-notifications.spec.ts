@@ -12,7 +12,9 @@ test.beforeEach(async () => {
   // Launch Electron app with clean state
   context = await launchElectron();
   await context.window.waitForLoadState('domcontentloaded');
-  await context.window.waitForSelector('[data-testid="login-screen"], [data-testid="agents"]', { timeout: 10000 });
+  await context.window.waitForSelector('[data-testid="login-screen"], [data-testid="agents"]', {
+    timeout: 10000,
+  });
 });
 
 test.afterEach(async () => {

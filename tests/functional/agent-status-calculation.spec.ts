@@ -112,7 +112,10 @@ test.describe('Agent Status Calculation', () => {
     await expect(window.locator('[data-testid="message-user"]')).toHaveCount(2, { timeout: 5000 });
 
     // Color lives on agent-avatar-icon
-    const agentAvatar = window.locator('[data-testid^="agent-icon-"]').first().locator('[data-testid="agent-avatar-icon"]');
+    const agentAvatar = window
+      .locator('[data-testid^="agent-icon-"]')
+      .first()
+      .locator('[data-testid="agent-avatar-icon"]');
     const updatedClasses = await agentAvatar.getAttribute('class');
 
     // Should still have a status color
@@ -130,7 +133,10 @@ test.describe('Agent Status Calculation', () => {
     await expect(window.locator('[data-testid="message-user"]')).toHaveCount(1, { timeout: 5000 });
 
     // Get status color before reload
-    const agentAvatar = window.locator('[data-testid^="agent-icon-"]').first().locator('[data-testid="agent-avatar-icon"]');
+    const agentAvatar = window
+      .locator('[data-testid^="agent-icon-"]')
+      .first()
+      .locator('[data-testid="agent-avatar-icon"]');
     const classes1 = await agentAvatar.getAttribute('class');
 
     // Refresh page
@@ -139,7 +145,10 @@ test.describe('Agent Status Calculation', () => {
     await expect(window.locator('[data-testid="agents"]')).toBeVisible({ timeout: 10000 });
 
     // Get status color after reload
-    const agentAvatarAfterReload = window.locator('[data-testid^="agent-icon-"]').first().locator('[data-testid="agent-avatar-icon"]');
+    const agentAvatarAfterReload = window
+      .locator('[data-testid^="agent-icon-"]')
+      .first()
+      .locator('[data-testid="agent-avatar-icon"]');
     const classes2 = await agentAvatarAfterReload.getAttribute('class');
 
     const getStatusColor = (classes: string | null) => {

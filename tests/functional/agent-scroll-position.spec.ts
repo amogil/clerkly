@@ -90,7 +90,9 @@ test.describe('Agent Scroll Position', () => {
     }
 
     // Wait for all user messages to appear
-    await expect(window.locator('[data-testid="message-user"]')).toHaveCount(15, { timeout: 10000 });
+    await expect(window.locator('[data-testid="message-user"]')).toHaveCount(15, {
+      timeout: 10000,
+    });
 
     // Wait for LLM response to the last message (previous ones are interrupted by rapid sending)
     await expect(window.locator('[data-testid="message-llm"]')).toHaveCount(1, { timeout: 60000 });
