@@ -297,4 +297,26 @@ test.describe('LLM Chat (mock server)', () => {
     // No text from the interrupted first response anywhere in the chat
     await expect(context.window.locator('text=First response')).toHaveCount(0);
   });
+
+  /* Preconditions: MockLLMServer configured to return HTTP 500,
+       app authenticated with mock LLM URL
+     Action: User sends a message
+     Assertions: message-error bubble appears with provider unavailable text
+     Requirements: llm-integration.3.1, llm-integration.3.5 */
+  test('should show provider error message on 500', async () => {
+    mockLLMServer.setSuccess(false);
+    mockLLMServer.setError(500, 'Internal Server Error');
+
+    context = await launchWithMockLLM();
+    const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
+
+    await messageInput.fill('Hello');
+    await messageInput.press('Enter');
+
+    const errorBubble = context.window.locator('[data-testid="message-error"]');
+    await expect(errorBubble).toBeVisible({ timeout: 15000 });
+
+    const text = await errorBubble.textContent();
+    expect(text?.toLowerCase()).toMatch(/unavailable|try again/);
+  });
 });
