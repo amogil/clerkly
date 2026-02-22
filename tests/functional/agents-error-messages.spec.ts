@@ -109,7 +109,7 @@ test.describe('Agents Error Messages', () => {
     }
 
     // Open AllAgents view
-    const allAgentsButton = window.locator('div.rounded-full.bg-muted:has-text("+")');
+    const allAgentsButton = window.locator('[data-testid="all-agents-button"]');
     await expect(allAgentsButton).toBeVisible({ timeout: 5000 });
     await allAgentsButton.click();
 
@@ -152,7 +152,7 @@ test.describe('Agents Error Messages', () => {
     const newChatButton = window.locator('div[title="New chat"]');
     await expect(newChatButton).toBeVisible({ timeout: 5000 });
 
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 9; i++) {
       await newChatButton.click();
       // Wait for new agent icon to appear
       const agentIcons = window.locator('[data-testid^="agent-icon-"]');
@@ -176,7 +176,7 @@ test.describe('Agents Error Messages', () => {
     }, secondAgentId);
 
     // Open AllAgents view
-    const allAgentsButton = window.locator('div.rounded-full.bg-muted:has-text("+")');
+    const allAgentsButton = window.locator('[data-testid="all-agents-button"]');
     await expect(allAgentsButton).toBeVisible({ timeout: 5000 });
     await allAgentsButton.click();
 

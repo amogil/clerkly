@@ -125,7 +125,7 @@ test('should auto-focus input when returning from AllAgents', async () => {
   const newChatButton = window.locator('div[title="New chat"]');
   await expect(newChatButton).toBeVisible({ timeout: 5000 });
 
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < 9; i++) {
     await newChatButton.click();
     const agentIcons = window.locator('[data-testid^="agent-icon-"]');
     await expect(agentIcons.nth(i + 1)).toBeVisible({ timeout: 5000 });
@@ -140,7 +140,7 @@ test('should auto-focus input when returning from AllAgents', async () => {
   await expect(window.locator('text=Test message')).toBeVisible({ timeout: 5000 });
 
   // Open AllAgents page via +N button
-  const allAgentsButton = window.locator('div.rounded-full.bg-muted:has-text("+")');
+  const allAgentsButton = window.locator('[data-testid="all-agents-button"]');
   await expect(allAgentsButton).toBeVisible({ timeout: 5000 });
   await allAgentsButton.click();
 
@@ -219,7 +219,7 @@ test('should not auto-focus when AllAgents page is open', async () => {
   const newChatButton = window.locator('div[title="New chat"]');
   await expect(newChatButton).toBeVisible({ timeout: 5000 });
 
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < 9; i++) {
     await newChatButton.click();
     const agentIcons = window.locator('[data-testid^="agent-icon-"]');
     await expect(agentIcons.nth(i + 1)).toBeVisible({ timeout: 5000 });
@@ -234,7 +234,7 @@ test('should not auto-focus when AllAgents page is open', async () => {
   await expect(window.locator('text=Test message')).toBeVisible({ timeout: 5000 });
 
   // Open AllAgents page via +N button
-  const allAgentsButton = window.locator('div.rounded-full.bg-muted:has-text("+")');
+  const allAgentsButton = window.locator('[data-testid="all-agents-button"]');
   await expect(allAgentsButton).toBeVisible({ timeout: 5000 });
   await allAgentsButton.click();
 

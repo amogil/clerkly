@@ -100,6 +100,7 @@ export function AgentHeader({
 
         {agents.length > visibleChatsCount && (
           <div
+            data-testid="all-agents-button"
             onClick={onShowAllAgents}
             className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-semibold text-muted-foreground cursor-pointer hover:bg-primary/10 hover:text-primary transition-colors"
           >

@@ -131,11 +131,11 @@ test.describe('Agent Reordering', () => {
     // Wait for first agent to be auto-created
     await window.waitForTimeout(1000);
 
-    // Create 6 more agents (total 7 agents, some will be hidden)
+    // Create 9 more agents (total 10 agents, some will be hidden)
     const newAgentButton = window.locator('div[title="New chat"]');
     await expect(newAgentButton).toBeVisible({ timeout: 3000 });
 
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < 9; i++) {
       await newAgentButton.click();
       await window.waitForTimeout(300);
     }
@@ -148,7 +148,7 @@ test.describe('Agent Reordering', () => {
     await window.waitForTimeout(500);
 
     // Open AllAgents page by clicking +N button
-    const allAgentsButton = window.locator('div.rounded-full.bg-muted:has-text("+")');
+    const allAgentsButton = window.locator('[data-testid="all-agents-button"]');
     await allAgentsButton.click();
     await window.waitForTimeout(500);
 
@@ -158,7 +158,7 @@ test.describe('Agent Reordering', () => {
     // Get all agent cards
     const agentCards = window.locator('[data-testid^="agent-card-"]');
     const cardCount = await agentCards.count();
-    expect(cardCount).toBeGreaterThanOrEqual(7);
+    expect(cardCount).toBeGreaterThanOrEqual(10);
 
     // Click on the last agent card (oldest)
     const lastCard = agentCards.last();
@@ -303,11 +303,11 @@ test.describe('Agent Reordering', () => {
     // Wait for first agent to be auto-created
     await window.waitForTimeout(1000);
 
-    // Create 5 more agents (total 6 agents, so +1 button will appear)
+    // Create 9 more agents (total 10 agents, so +N button will appear)
     const newAgentButton = window.locator('div[title="New chat"]');
     await expect(newAgentButton).toBeVisible({ timeout: 3000 });
 
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 9; i++) {
       await newAgentButton.click();
       await window.waitForTimeout(300);
     }
@@ -319,7 +319,7 @@ test.describe('Agent Reordering', () => {
     await window.waitForTimeout(500);
 
     // Open AllAgents by clicking +N button
-    const allAgentsButton = window.locator('div.rounded-full.bg-muted:has-text("+")');
+    const allAgentsButton = window.locator('[data-testid="all-agents-button"]');
     await allAgentsButton.click();
     await window.waitForTimeout(500);
 
