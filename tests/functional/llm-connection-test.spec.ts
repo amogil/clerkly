@@ -62,6 +62,10 @@ test.beforeEach(async () => {
     CLERKLY_OPENAI_API_URL: `${mockLLMBaseUrl}/v1/chat/completions`,
     CLERKLY_ANTHROPIC_API_URL: `${mockLLMBaseUrl}/v1/messages`,
     CLERKLY_GOOGLE_LLM_API_URL: `${mockLLMBaseUrl}/v1beta/models/gemini-3-flash:generateContent`,
+    // Override any real API keys from .env so loadAPIKey() reads from DB only
+    CLERKLY_OPENAI_API_KEY: '',
+    CLERKLY_ANTHROPIC_API_KEY: '',
+    CLERKLY_GOOGLE_API_KEY: '',
   });
   await context.window.waitForLoadState('domcontentloaded');
 
@@ -140,7 +144,7 @@ test('54.3: should send request with correct parameters', async () => {
   expect(lastRequest?.method).toBe('POST');
   expect(lastRequest?.headers.authorization).toBe('Bearer test-api-key-12345');
   expect(lastRequest?.body.model).toBe('gpt-5-nano');
-  expect(lastRequest?.body.max_tokens).toBe(5);
+  expect(lastRequest?.body.max_completion_tokens).toBe(5);
 });
 
 /* Preconditions: App is launched and authenticated, valid API key is entered

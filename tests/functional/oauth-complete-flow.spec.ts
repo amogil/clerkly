@@ -67,6 +67,8 @@ test.describe('Complete OAuth Flow', () => {
     // Launch the application with mock OAuth server URL
     context = await launchElectron(undefined, {
       CLERKLY_GOOGLE_API_URL: mockServer.getBaseUrl(),
+      CLERKLY_OAUTH_CLIENT_ID: TEST_CLIENT_ID,
+      CLERKLY_OAUTH_CLIENT_SECRET: 'test-client-secret-67890',
     });
     await context.window.waitForLoadState('domcontentloaded');
 
@@ -78,34 +80,12 @@ test.describe('Complete OAuth Flow', () => {
     await loginButton.waitFor({ state: 'visible', timeout: 5000 });
     expect(await loginButton.isVisible()).toBe(true);
 
-    // Simulate OAuth flow by directly calling deep link handler
-    // In real scenario, this would happen after user completes OAuth in browser
-
-    // Step 1: Generate authorization code (simulating Google's response)
-    const authCode = 'test_auth_code_complete_flow';
-    const state = 'test_state_value';
-
-    // Step 2: Simulate deep link callback with authorization code
+    // Complete OAuth flow using the standard helper (handles PKCE state correctly)
     // Requirements: google-oauth-auth.2.3
-    const deepLinkUrl = `com.googleusercontent.apps.${TEST_CLIENT_ID}:/oauth2redirect?code=${authCode}&state=${state}`;
+    await completeOAuthFlow(context.app, context.window, TEST_CLIENT_ID);
 
-    // Call deep link handler through Electron
-    await context.app.evaluate(
-      async ({ app }, { url }) => {
-        // Emit the 'open-url' event that would normally be triggered by macOS
-        app.emit('open-url', { preventDefault: () => {} }, url);
-      },
-      { url: deepLinkUrl }
-    );
-
-    // Wait for OAuth flow to process
-    await context.window.waitForSelector('[data-testid="login-screen"], [data-testid="agents"]', {
-      timeout: 10000,
-    });
-
-    // Step 3: Verify that authorization code was processed
-    // Note: In real implementation, this would trigger token exchange
-    // For now, we verify the app is still responsive
+    // Verify app transitioned to agents screen
+    await expect(context.window.locator('[data-testid="agents"]')).toBeVisible({ timeout: 10000 });
 
     expect(context.window.isClosed()).toBe(false);
 

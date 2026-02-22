@@ -207,12 +207,15 @@ test.describe('Agent Status Indicators', () => {
     await newChatButton.click();
     await expect(window.locator('[data-testid^="agent-icon-"]')).toHaveCount(2, { timeout: 5000 });
 
+    // Save stable IDs before sending messages (order changes after send)
     const agentIcons = window.locator('[data-testid^="agent-icon-"]');
-    const firstIcon = agentIcons.nth(0);
-    const secondIcon = agentIcons.nth(1);
+    const firstAgentTestId = await agentIcons.nth(0).getAttribute('data-testid');
+    const secondAgentTestId = await agentIcons.nth(1).getAttribute('data-testid');
+    expect(firstAgentTestId).toBeTruthy();
+    expect(secondAgentTestId).toBeTruthy();
 
-    // Switch to second agent
-    await secondIcon.click();
+    // Switch to second agent using stable ID
+    await window.locator(`[data-testid="${secondAgentTestId}"]`).click();
     await expect(window.locator('textarea[placeholder*="Ask"]')).toBeVisible();
 
     // Send message to second agent (moves it to top)
@@ -221,8 +224,8 @@ test.describe('Agent Status Indicators', () => {
     await messageInput.press('Enter');
     await expect(window.locator('[data-testid="message-user"]')).toHaveCount(1, { timeout: 5000 });
 
-    // Switch to first agent
-    await firstIcon.click();
+    // Switch to first agent using stable ID
+    await window.locator(`[data-testid="${firstAgentTestId}"]`).click();
     await expect(window.locator('textarea[placeholder*="Ask"]')).toBeVisible();
 
     // Send message to first agent (moves it to top)

@@ -143,15 +143,12 @@ test.describe('Agents - EmptyStatePlaceholder', () => {
     const emptyStateHeading = window.locator('text=Assign a task to the agent');
     await expect(emptyStateHeading).toBeVisible({ timeout: 5000 });
 
-    // Find input field and send button
-    const inputField = window.locator('textarea');
-    const sendButton = window.locator('button:has-text("")').last(); // Send button with icon
+    // Find input field and send message
+    const inputField = window.locator('textarea[placeholder*="Ask"]');
 
     // Type a message
     await inputField.fill('Hello, this is my first message!');
-
-    // Click send button
-    await sendButton.click();
+    await inputField.press('Enter');
 
     // First check if message is displayed
     const userMessage = window.locator('text=Hello, this is my first message!');
@@ -177,7 +174,7 @@ test.describe('Agents - EmptyStatePlaceholder', () => {
     await expect(emptyStateHeading).toBeVisible({ timeout: 5000 });
 
     // Click "New chat" button to create second agent
-    const newChatButton = window.locator('.bg-sky-400').first();
+    const newChatButton = window.locator('div[title="New chat"]');
     await newChatButton.click();
 
     // Wait for new agent to be created and UI to update
