@@ -141,6 +141,14 @@ export class AIAgentSettingsManager {
    */
   async loadAPIKey(provider: LLMProvider): Promise<string | null> {
     try {
+      // Check env variable first — takes priority over DB (useful for tests and CI)
+      // Requirements: settings.1.22
+      const envKey = process.env[`CLERKLY_${provider.toUpperCase()}_API_KEY`];
+      if (envKey) {
+        this.logger.info(`API key loaded from env for ${provider}`);
+        return envKey;
+      }
+
       const keyResult = this.userSettingsManager.loadData(`ai_agent_api_key_${provider}`);
       const encryptedResult = this.userSettingsManager.loadData(
         `ai_agent_api_key_${provider}_encrypted`

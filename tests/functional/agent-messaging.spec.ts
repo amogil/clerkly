@@ -77,8 +77,8 @@ test.describe('Agent Messaging', () => {
     // Press Enter
     await messageInput.press('Enter');
 
-    // Check message appears in chat
-    const messages = window.locator('[data-testid="message"]');
+    // Check user message appears in chat (LLM response/error is out of scope for this test)
+    const messages = window.locator('[data-testid="message-user"]');
     await expect(messages.first()).toBeVisible({ timeout: 2000 });
     await expect(messages).toHaveCount(1);
 
@@ -140,8 +140,8 @@ test.describe('Agent Messaging', () => {
     await messageInput.press('Enter');
     await window.waitForTimeout(500);
 
-    // Get all messages
-    const messages = window.locator('[data-testid="message"]');
+    // Get user messages only (LLM responses/errors are out of scope for chronological order test)
+    const messages = window.locator('[data-testid="message-user"]');
     await expect(messages).toHaveCount(3, { timeout: 2000 });
 
     // Check order
@@ -169,8 +169,8 @@ test.describe('Agent Messaging', () => {
       await window.waitForTimeout(300);
     }
 
-    // Check that last message is visible (scrolled into view)
-    const lastMessage = window.locator('[data-testid="message"]').last();
+    // Check that last user message is visible (scrolled into view)
+    const lastMessage = window.locator('[data-testid="message-user"]').last();
     await expect(lastMessage).toBeVisible();
 
     const lastMessageText = await lastMessage.textContent();
@@ -210,7 +210,7 @@ test.describe('Agent Messaging', () => {
       await window.waitForTimeout(200);
     }
 
-    await expect(window.locator('[data-testid="message"]')).toHaveCount(10, { timeout: 5000 });
+    await expect(window.locator('[data-testid="message-user"]')).toHaveCount(10, { timeout: 5000 });
 
     // Ensure user is at bottom
     await window.waitForFunction(
@@ -231,7 +231,7 @@ test.describe('Agent Messaging', () => {
     await messageInput.fill('New message while at bottom');
     await messageInput.press('Enter');
 
-    await expect(window.locator('[data-testid="message"]')).toHaveCount(11, { timeout: 5000 });
+    await expect(window.locator('[data-testid="message-user"]')).toHaveCount(11, { timeout: 5000 });
 
     // Wait for autoscroll
     await window.waitForTimeout(500);
@@ -262,7 +262,7 @@ test.describe('Agent Messaging', () => {
       await window.waitForTimeout(150);
     }
 
-    await expect(window.locator('[data-testid="message"]')).toHaveCount(20, { timeout: 10000 });
+    await expect(window.locator('[data-testid="message-user"]')).toHaveCount(20, { timeout: 10000 });
 
     // Scroll up significantly (to top)
     await messagesArea.evaluate((el) => {

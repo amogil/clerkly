@@ -24,14 +24,14 @@ const MOCK_OAUTH_PORT = 8894;
 const MOCK_LLM_PORT = 8895;
 
 // Real OpenAI API key from .env (loaded by playwright.config.ts via dotenv)
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+const OPENAI_API_KEY = process.env.CLERKLY_OPENAI_API_KEY;
 
 let mockOAuthServer: MockOAuthServer;
 let mockLLMServer: MockLLMServer;
 
 test.beforeAll(async () => {
   if (!OPENAI_API_KEY) {
-    console.warn('[llm-chat] OPENAI_API_KEY not set — skipping real API tests');
+    console.warn('[llm-chat] CLERKLY_OPENAI_API_KEY not set — skipping real API tests');
   }
 
   mockOAuthServer = await createMockOAuthServer(MOCK_OAUTH_PORT);
@@ -53,21 +53,17 @@ test.afterAll(async () => {
 });
 
 /**
- * Launch app, authenticate, save real OpenAI API key via IPC.
- * MainPipeline reads the key from UserSettingsManager on each run().
+ * Launch app, authenticate with real OpenAI API key passed via env.
+ * MainPipeline reads the key from CLERKLY_OPENAI_API_KEY env via loadAPIKey().
  */
 async function launchWithRealLLM(apiKey: string): Promise<ElectronTestContext> {
   const ctx = await launchElectron(undefined, {
     CLERKLY_GOOGLE_API_URL: mockOAuthServer.getBaseUrl(),
+    CLERKLY_OPENAI_API_KEY: apiKey,
   });
 
   await completeOAuthFlow(ctx.app, ctx.window, TEST_CLIENT_ID);
   await expect(ctx.window.locator('[data-testid="agents"]')).toBeVisible({ timeout: 10000 });
-
-  // Save API key via IPC — MainPipeline reads it via loadAPIKey() on each run()
-  await ctx.window.evaluate(async (key) => {
-    await (window as any).api.settings.saveAPIKey('openai', key);
-  }, apiKey);
 
   return ctx;
 }
@@ -179,21 +175,19 @@ test.describe('LLM Chat (mock server)', () => {
 
   /**
    * Launch app authenticated, pointing OpenAI provider at MockLLMServer.
-   * Mock key is accepted because mock server doesn't validate auth.
+   * Mock key is passed via env — mock server doesn't validate auth.
+   * MainPipeline reads the key from CLERKLY_OPENAI_API_KEY env via loadAPIKey().
    */
   async function launchWithMockLLM(): Promise<ElectronTestContext> {
     const ctx = await launchElectron(undefined, {
       CLERKLY_GOOGLE_API_URL: mockOAuthServer.getBaseUrl(),
       CLERKLY_OPENAI_API_URL: `http://localhost:${MOCK_LLM_PORT}/v1/chat/completions`,
+      CLERKLY_OPENAI_API_KEY: 'mock-key-for-testing',
     });
     await completeOAuthFlow(ctx.app, ctx.window, TEST_CLIENT_ID);
     await expect(ctx.window.locator('[data-testid="agents"]')).toBeVisible({ timeout: 10000 });
     // Check no toast errors appeared during startup/auth
     await expectNoToastError(ctx.window);
-    // Save a mock API key — mock server doesn't validate it
-    await ctx.window.evaluate(async () => {
-      await (window as any).api.settings.saveAPIKey('openai', 'mock-key-for-testing');
-    });
     return ctx;
   }
 

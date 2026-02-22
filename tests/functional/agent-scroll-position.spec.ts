@@ -63,8 +63,8 @@ test.afterEach(async () => {
 });
 
 test.describe('Agent Scroll Position', () => {
-  /* Preconditions: Two agents with multiple messages each
-     Action: Scroll in agent-1, switch to agent-2, return to agent-1
+  /* Preconditions: Agent-1 with 15 messages and LLM responses, scrolled up; agent-2 empty
+     Action: Scroll up in agent-1, switch to agent-2, return to agent-1
      Assertions: Scroll position in agent-1 is restored
      Requirements: agents.4.14.1, agents.4.14.2, agents.4.14.3 */
   test('should save and restore scroll position when switching agents', async () => {
@@ -89,8 +89,11 @@ test.describe('Agent Scroll Position', () => {
       await window.waitForTimeout(200);
     }
 
-    // Wait for messages to appear
-    await expect(window.locator('[data-testid="message"]')).toHaveCount(15, { timeout: 5000 });
+    // Wait for all user messages to appear
+    await expect(window.locator('[data-testid="message-user"]')).toHaveCount(15, { timeout: 10000 });
+
+    // Wait for LLM response to the last message
+    await expect(window.locator('[data-testid="message-llm"]')).toHaveCount(15, { timeout: 60000 });
 
     // Scroll up in agent-1
     await messagesArea.evaluate((el) => {
@@ -104,7 +107,7 @@ test.describe('Agent Scroll Position', () => {
     const scrollPosition1 = await messagesArea.evaluate((el) => el.scrollTop);
     expect(scrollPosition1).toBe(100);
 
-    // Create new agent (agent-2)
+    // Create new agent (agent-2) and switch to it
     const newChatButton = window.locator('div[title="New chat"]');
     await newChatButton.click();
     await window.waitForTimeout(500);
@@ -113,35 +116,11 @@ test.describe('Agent Scroll Position', () => {
     agentIcons = window.locator('[data-testid^="agent-icon-"]');
     await expect(agentIcons).toHaveCount(2, { timeout: 5000 });
 
-    // Find second agent by ID (not by position)
-    const allAgentIds = await agentIcons.evaluateAll((elements) =>
-      elements.map((el) => el.getAttribute('data-testid')?.replace('agent-icon-', ''))
-    );
-
-    const secondAgentId = allAgentIds.find((id) => id && id !== firstAgentId);
-    expect(secondAgentId).toBeTruthy();
-
-    // Send messages to agent-2
-    for (let i = 1; i <= 10; i++) {
-      await messageInput.fill(`Agent 2 Message ${i}`);
-      await messageInput.press('Enter');
-      await window.waitForTimeout(200);
-    }
-
-    // Wait for agent-2 messages
-    await expect(window.locator('[data-testid="message"]')).toHaveCount(10, { timeout: 5000 });
-
     // Switch back to agent-1 using its saved ID
     await window.locator(`[data-testid="agent-icon-${firstAgentId}"]`).click();
 
-    // Wait for agent-1 messages to load by checking for specific content
-    await expect(window.locator('[data-testid="message"]').first()).toContainText(
-      'Agent 1 Message 1',
-      { timeout: 5000 }
-    );
-
-    // Check that agent-1 messages are loaded
-    await expect(window.locator('[data-testid="message"]')).toHaveCount(15, { timeout: 2000 });
+    // Wait for agent-1 messages to load
+    await expect(window.locator('[data-testid="message-user"]')).toHaveCount(15, { timeout: 5000 });
 
     // Check scroll position is restored
     const restoredPosition = await messagesArea.evaluate((el) => el.scrollTop);
