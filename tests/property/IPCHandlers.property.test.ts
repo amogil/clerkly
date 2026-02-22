@@ -65,9 +65,10 @@ describe('Property Tests - IPC Handlers', () => {
         // Generate any JSON-safe value
         fc.oneof(fc.string(), fc.integer(), fc.boolean(), fc.object()),
         async (key: string, value: any) => {
-          // Create mock UserSettingsManager with delay > timeout
+          // Create mock UserSettingsManager with delay >> timeout
+          // Use 5x gap to reliably trigger timeout even under system load
           const timeout = 100; // 100ms timeout for faster tests
-          const delay = 200; // 200ms delay (exceeds timeout)
+          const delay = 500; // 500ms delay (5x timeout, reliably exceeds it)
           const mockUserSettingsManager = new MockUserSettingsManagerWithDelay(
             delay
           ) as unknown as UserSettingsManager;
