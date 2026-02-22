@@ -98,12 +98,13 @@ test.describe('Agent Status Indicators', () => {
 
     // Check for spinning animation
     const agentIcon = window.locator('[data-testid^="agent-icon-"]').first();
+    const agentAvatarIcon = agentIcon.locator('[data-testid="agent-avatar-icon"]');
 
-    // Look for spinning ring element
-    const spinningRing = agentIcon.locator('.animate-spin');
+    // Look for spinning ring element inside avatar
+    const spinningRing = agentAvatarIcon.locator('.animate-spin');
 
     // If in-progress status, should have spinning element
-    const classes = await agentIcon.getAttribute('class');
+    const classes = await agentAvatarIcon.getAttribute('class');
     if (classes?.includes('bg-blue-500')) {
       await expect(spinningRing).toBeVisible();
     }
