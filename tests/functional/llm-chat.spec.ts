@@ -418,4 +418,55 @@ test.describe('LLM Chat (mock server)', () => {
     const assistantIdx = messages.indexOf(assistantMsg!);
     expect(userIdx).toBeLessThan(assistantIdx);
   });
+
+  /* Preconditions: MockLLMServer returns 500 on first request, success on second;
+       app authenticated with mock LLM URL
+     Action: User sends first message (gets error), then sends second message
+     Assertions: Second LLM request body does not contain role:system with [error] content
+     Requirements: llm-integration.3.9 */
+  test('should exclude error messages from llm history', async () => {
+    // First request fails
+    mockLLMServer.setSuccess(false);
+    mockLLMServer.setError(500, 'Internal Server Error');
+
+    context = await launchWithMockLLM();
+    const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
+
+    // Send first message — expect error bubble
+    await messageInput.fill('First message');
+    await messageInput.press('Enter');
+
+    const errorBubble = context.window.locator('[data-testid="message-error"]');
+    await expect(errorBubble).toBeVisible({ timeout: 15000 });
+
+    // Switch mock to success for second request
+    mockLLMServer.setSuccess(true);
+    mockLLMServer.setStreamingMode(true, {
+      content: '{"action":{"type":"text","content":"Success response"}}',
+      chunkDelayMs: 0,
+    });
+    mockLLMServer.clearRequestLogs();
+
+    // Send second message
+    await messageInput.fill('Second message');
+    await messageInput.press('Enter');
+
+    // Wait for LLM response
+    const actionContent = context.window.locator('[data-testid="message-llm-action"]');
+    await expect(actionContent).toBeVisible({ timeout: 15000 });
+    await expect(actionContent).toHaveText('Success response', { timeout: 5000 });
+
+    // Inspect the request body sent to LLM for the second message
+    const lastRequest = mockLLMServer.getLastRequest();
+    expect(lastRequest).toBeDefined();
+
+    const messages: Array<{ role: string; content: string }> = lastRequest!.body.messages;
+    expect(messages).toBeDefined();
+
+    // Must NOT contain any role:system message with [error] content
+    const errorSystemMsg = messages.find(
+      (m) => m.role === 'system' && m.content.includes('[error]')
+    );
+    expect(errorSystemMsg).toBeUndefined();
+  });
 });
