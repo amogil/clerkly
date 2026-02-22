@@ -130,15 +130,15 @@ test.describe('Agent Messaging', () => {
     // Send multiple messages
     await messageInput.fill('First message');
     await messageInput.press('Enter');
-    await window.waitForTimeout(500);
+    await expect(window.locator('[data-testid="message-user"]')).toHaveCount(1, { timeout: 5000 });
 
     await messageInput.fill('Second message');
     await messageInput.press('Enter');
-    await window.waitForTimeout(500);
+    await expect(window.locator('[data-testid="message-user"]')).toHaveCount(2, { timeout: 5000 });
 
     await messageInput.fill('Third message');
     await messageInput.press('Enter');
-    await window.waitForTimeout(500);
+    await expect(window.locator('[data-testid="message-user"]')).toHaveCount(3, { timeout: 5000 });
 
     // Get user messages only (LLM responses/errors are out of scope for chronological order test)
     const messages = window.locator('[data-testid="message-user"]');

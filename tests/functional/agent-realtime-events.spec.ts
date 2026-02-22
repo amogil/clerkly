@@ -114,7 +114,7 @@ test.describe('Agent Real-time Events', () => {
     // Create second agent
     const newChatButton = window.locator('div[title="New chat"]');
     await newChatButton.click();
-    await window.waitForTimeout(500);
+    await expect(window.locator('[data-testid^="agent-icon-"]')).toHaveCount(2, { timeout: 5000 });
 
     const agentIcons = window.locator('[data-testid^="agent-icon-"]');
 
@@ -127,13 +127,13 @@ test.describe('Agent Real-time Events', () => {
 
     // Switch to second agent
     await secondIcon.click();
-    await window.waitForTimeout(300);
+    await expect(window.locator('textarea[placeholder*="Ask"]')).toBeVisible();
 
     // Send message (triggers agent.updated event)
     const messageInput = window.locator('textarea[placeholder*="Ask"]');
     await messageInput.fill('Update agent');
     await messageInput.press('Enter');
-    await window.waitForTimeout(500);
+    await expect(window.locator('[data-testid="message-user"]')).toHaveCount(1, { timeout: 5000 });
 
     // Agent should move to first position
     const firstIcon = agentIcons.nth(0);
@@ -150,9 +150,9 @@ test.describe('Agent Real-time Events', () => {
     // Create multiple agents
     const newChatButton = window.locator('div[title="New chat"]');
     await newChatButton.click();
-    await window.waitForTimeout(500);
+    await expect(window.locator('[data-testid^="agent-icon-"]')).toHaveCount(2, { timeout: 5000 });
     await newChatButton.click();
-    await window.waitForTimeout(500);
+    await expect(window.locator('[data-testid^="agent-icon-"]')).toHaveCount(3, { timeout: 5000 });
 
     const agentIcons = window.locator('[data-testid^="agent-icon-"]');
     const initialCount = await agentIcons.count();
@@ -184,12 +184,8 @@ test.describe('Agent Real-time Events', () => {
     await messageInput.fill('Test message for event');
     await messageInput.press('Enter');
 
-    // Wait for event to propagate
-    await window.waitForTimeout(500);
-
-    // Message should appear
-    const newCount = await messages.count();
-    expect(newCount).toBe(initialCount + 1);
+    // Wait for message to appear
+    await expect(messages).toHaveCount(initialCount + 1, { timeout: 5000 });
 
     // Message content should be correct
     const lastMessage = messages.last();
@@ -241,7 +237,7 @@ test.describe('Agent Real-time Events', () => {
     const messageInput = window.locator('textarea[placeholder*="Ask"]');
     await messageInput.fill('Change status');
     await messageInput.press('Enter');
-    await window.waitForTimeout(500);
+    await expect(window.locator('[data-testid="message-user"]')).toHaveCount(1, { timeout: 5000 });
 
     // Status should update (to in-progress or other)
     classes = await agentIcon.getAttribute('class');

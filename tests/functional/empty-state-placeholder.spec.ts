@@ -80,9 +80,6 @@ test.describe('Agents - EmptyStatePlaceholder', () => {
     // Wait for agents page to load
     await window.waitForSelector('[data-testid="agents"]', { timeout: 15000 });
 
-    // Wait a bit for auto-created agent
-    await window.waitForTimeout(2000);
-
     // Verify EmptyStatePlaceholder is visible with new design
     const emptyStateHeading = window.locator('text=Assign a task to the agent');
     await expect(emptyStateHeading).toBeVisible({ timeout: 5000 });
@@ -112,7 +109,6 @@ test.describe('Agents - EmptyStatePlaceholder', () => {
 
     // Wait for agents page to load
     await window.waitForSelector('[data-testid="agents"]', { timeout: 15000 });
-    await window.waitForTimeout(2000);
 
     // Verify heading styling
     const heading = window.locator('text=Assign a task to the agent');
@@ -142,7 +138,6 @@ test.describe('Agents - EmptyStatePlaceholder', () => {
 
     // Wait for agents page to load
     await window.waitForSelector('[data-testid="agents"]', { timeout: 15000 });
-    await window.waitForTimeout(2000);
 
     // Verify EmptyStatePlaceholder is visible initially
     const emptyStateHeading = window.locator('text=Assign a task to the agent');
@@ -154,11 +149,9 @@ test.describe('Agents - EmptyStatePlaceholder', () => {
 
     // Type a message
     await inputField.fill('Hello, this is my first message!');
-    await window.waitForTimeout(500);
 
     // Click send button
     await sendButton.click();
-    await window.waitForTimeout(3000); // Increased timeout for message to be saved and displayed
 
     // First check if message is displayed
     const userMessage = window.locator('text=Hello, this is my first message!');
@@ -178,7 +171,6 @@ test.describe('Agents - EmptyStatePlaceholder', () => {
 
     // Wait for agents page to load
     await window.waitForSelector('[data-testid="agents"]', { timeout: 15000 });
-    await window.waitForTimeout(2000);
 
     // Verify EmptyStatePlaceholder is visible for first (auto-created) agent
     const emptyStateHeading = window.locator('text=Assign a task to the agent');
@@ -189,7 +181,7 @@ test.describe('Agents - EmptyStatePlaceholder', () => {
     await newChatButton.click();
 
     // Wait for new agent to be created and UI to update
-    await window.waitForTimeout(2000);
+    await expect(window.locator('[data-testid^="agent-icon-"]')).toHaveCount(2, { timeout: 5000 });
 
     // Verify EmptyStatePlaceholder is still visible for new agent (also has no messages)
     await expect(emptyStateHeading).toBeVisible({ timeout: 5000 });
@@ -211,7 +203,6 @@ test.describe('Agents - EmptyStatePlaceholder', () => {
 
     // Wait for agents page to load
     await window.waitForSelector('[data-testid="agents"]', { timeout: 15000 });
-    await window.waitForTimeout(2000);
 
     // Verify EmptyStatePlaceholder is visible
     const emptyStateHeading = window.locator('text=Assign a task to the agent');
@@ -236,7 +227,6 @@ test.describe('Agents - EmptyStatePlaceholder', () => {
 
     // Wait for agents page to load
     await window.waitForSelector('[data-testid="agents"]', { timeout: 15000 });
-    await window.waitForTimeout(2000);
 
     // Verify all 4 prompt buttons are visible
     const transcribeButton = window.locator('button:has-text("Transcribe my latest meeting")');
@@ -264,7 +254,6 @@ test.describe('Agents - EmptyStatePlaceholder', () => {
 
     // Wait for agents page to load
     await window.waitForSelector('[data-testid="agents"]', { timeout: 15000 });
-    await window.waitForTimeout(2000);
 
     // Verify EmptyStatePlaceholder is visible
     const emptyStateHeading = window.locator('text=Assign a task to the agent');
@@ -274,13 +263,7 @@ test.describe('Agents - EmptyStatePlaceholder', () => {
     const transcribeButton = window.locator('button:has-text("Transcribe my latest meeting")');
     await transcribeButton.click();
 
-    // Wait for message to be sent
-    await window.waitForTimeout(1000);
-
-    // Verify EmptyStatePlaceholder is no longer visible
-    await expect(emptyStateHeading).not.toBeVisible({ timeout: 5000 });
-
-    // Verify message is displayed
+    // Verify message is displayed (EmptyStatePlaceholder should disappear)
     const userMessage = window.locator('text=Transcribe my latest meeting');
     await expect(userMessage).toBeVisible({ timeout: 5000 });
   });

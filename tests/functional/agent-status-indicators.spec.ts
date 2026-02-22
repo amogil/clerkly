@@ -93,7 +93,7 @@ test.describe('Agent Status Indicators', () => {
     const messageInput = window.locator('textarea[placeholder*="Ask"]');
     await messageInput.fill('Test message');
     await messageInput.press('Enter');
-    await window.waitForTimeout(500);
+    await expect(window.locator('[data-testid="message-user"]')).toHaveCount(1, { timeout: 5000 });
 
     // Check for spinning animation
     const agentIcon = window.locator('[data-testid^="agent-icon-"]').first();
@@ -136,9 +136,9 @@ test.describe('Agent Status Indicators', () => {
     // Create multiple agents
     const newChatButton = window.locator('div[title="New chat"]');
     await newChatButton.click();
-    await window.waitForTimeout(500);
+    await expect(window.locator('[data-testid^="agent-icon-"]')).toHaveCount(2, { timeout: 5000 });
     await newChatButton.click();
-    await window.waitForTimeout(500);
+    await expect(window.locator('[data-testid^="agent-icon-"]')).toHaveCount(3, { timeout: 5000 });
 
     // Get second agent
     const agentIcons = window.locator('[data-testid^="agent-icon-"]');
@@ -150,13 +150,13 @@ test.describe('Agent Status Indicators', () => {
 
     // Switch to second agent
     await secondIcon.click();
-    await window.waitForTimeout(300);
+    await expect(window.locator('textarea[placeholder*="Ask"]')).toBeVisible();
 
     // Send message to move it to first position
     const messageInput = window.locator('textarea[placeholder*="Ask"]');
     await messageInput.fill('Move to top');
     await messageInput.press('Enter');
-    await window.waitForTimeout(500);
+    await expect(window.locator('[data-testid="message-user"]')).toHaveCount(1, { timeout: 5000 });
 
     // Check that agent moved to first position
     const firstIcon = agentIcons.nth(0);
@@ -180,12 +180,12 @@ test.describe('Agent Status Indicators', () => {
     const messageInput = window.locator('textarea[placeholder*="Ask"]');
     await messageInput.fill('First message');
     await messageInput.press('Enter');
-    await window.waitForTimeout(500);
+    await expect(window.locator('[data-testid="message-user"]')).toHaveCount(1, { timeout: 5000 });
 
     // Send another message (agent stays at position 0)
     await messageInput.fill('Second message');
     await messageInput.press('Enter');
-    await window.waitForTimeout(500);
+    await expect(window.locator('[data-testid="message-user"]')).toHaveCount(2, { timeout: 5000 });
 
     // Header icon should not show activation animation
     // (This is hard to test directly, but we can check structure)
@@ -203,7 +203,7 @@ test.describe('Agent Status Indicators', () => {
     // Create second agent
     const newChatButton = window.locator('div[title="New chat"]');
     await newChatButton.click();
-    await window.waitForTimeout(500);
+    await expect(window.locator('[data-testid^="agent-icon-"]')).toHaveCount(2, { timeout: 5000 });
 
     const agentIcons = window.locator('[data-testid^="agent-icon-"]');
     const firstIcon = agentIcons.nth(0);
@@ -211,22 +211,22 @@ test.describe('Agent Status Indicators', () => {
 
     // Switch to second agent
     await secondIcon.click();
-    await window.waitForTimeout(300);
+    await expect(window.locator('textarea[placeholder*="Ask"]')).toBeVisible();
 
     // Send message to second agent (moves it to top)
     const messageInput = window.locator('textarea[placeholder*="Ask"]');
     await messageInput.fill('Message to second agent');
     await messageInput.press('Enter');
-    await window.waitForTimeout(500);
+    await expect(window.locator('[data-testid="message-user"]')).toHaveCount(1, { timeout: 5000 });
 
     // Switch to first agent
     await firstIcon.click();
-    await window.waitForTimeout(300);
+    await expect(window.locator('textarea[placeholder*="Ask"]')).toBeVisible();
 
     // Send message to first agent (moves it to top)
     await messageInput.fill('Message to first agent');
     await messageInput.press('Enter');
-    await window.waitForTimeout(500);
+    await expect(window.locator('[data-testid="message-user"]')).toHaveCount(1, { timeout: 5000 });
 
     // First agent should now be at position 0
     // Animation should have been triggered

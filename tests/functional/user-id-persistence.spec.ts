@@ -138,7 +138,7 @@ test('should clear userId on logout', async () => {
   await settingsButton.click();
 
   // Wait for Settings screen to load
-  await window.waitForTimeout(1000);
+  await window.waitForSelector('.sign-out-button', { timeout: 5000 });
 
   // Click logout button (sign-out-button class)
   const logoutButton = window.locator('.sign-out-button');

@@ -71,7 +71,7 @@ test.describe('Message Format', () => {
     const messageInput = window.locator('textarea[placeholder*="Ask"]');
     await messageInput.fill('User test message');
     await messageInput.press('Enter');
-    await window.waitForTimeout(500);
+    await expect(window.locator('[data-testid="message-user"]')).toHaveCount(1, { timeout: 5000 });
 
     // Find user message
     const userMessage = window
@@ -102,7 +102,7 @@ test.describe('Message Format', () => {
     const messageInput = window.locator('textarea[placeholder*="Ask"]');
     await messageInput.fill('Test message');
     await messageInput.press('Enter');
-    await window.waitForTimeout(1000);
+    await expect(window.locator('[data-testid="message-user"]')).toHaveCount(1, { timeout: 5000 });
 
     // Check for any messages
     const messages = window.locator('[data-testid="message"]');
@@ -138,7 +138,7 @@ test.describe('Message Format', () => {
     const messageInput = window.locator('textarea[placeholder*="Ask"]');
     await messageInput.fill('Test message');
     await messageInput.press('Enter');
-    await window.waitForTimeout(1000);
+    await expect(window.locator('[data-testid="message-user"]')).toHaveCount(1, { timeout: 5000 });
 
     // Check if markdown rendering component exists
     const messages = window.locator('[data-testid="message"]');
@@ -165,7 +165,7 @@ test.describe('Message Format', () => {
     const messageInput = window.locator('textarea[placeholder*="Ask"]');
     await messageInput.fill('Test message');
     await messageInput.press('Enter');
-    await window.waitForTimeout(500);
+    await expect(window.locator('[data-testid="message-user"]')).toHaveCount(1, { timeout: 5000 });
 
     // Check agent header for timestamp
     const headerTimestamp = window.locator('[data-testid="agent-updated-time"]');

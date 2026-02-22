@@ -110,7 +110,7 @@ test.describe('Agent Scroll Position', () => {
     // Create new agent (agent-2) and switch to it
     const newChatButton = window.locator('div[title="New chat"]');
     await newChatButton.click();
-    await window.waitForTimeout(500);
+    await expect(window.locator('[data-testid^="agent-icon-"]')).toHaveCount(2, { timeout: 5000 });
 
     // Re-create locator to get fresh list
     agentIcons = window.locator('[data-testid^="agent-icon-"]');
@@ -206,7 +206,6 @@ test.describe('Agent Scroll Position', () => {
 
     // Create agent-2 with messages and scroll to position 150
     await newChatButton.click();
-    await window.waitForTimeout(300);
 
     // Re-create locator and get second agent ID
     agentIcons = window.locator('[data-testid^="agent-icon-"]');
@@ -230,7 +229,6 @@ test.describe('Agent Scroll Position', () => {
 
     // Create agent-3 with messages and scroll to position 250
     await newChatButton.click();
-    await window.waitForTimeout(300);
 
     // Re-create locator and get third agent ID
     agentIcons = window.locator('[data-testid^="agent-icon-"]');
@@ -319,7 +317,6 @@ test.describe('Agent Scroll Position', () => {
 
     // Create agent-2
     await newChatButton.click();
-    await window.waitForTimeout(300);
 
     // Re-create locator and get second agent ID
     agentIcons = window.locator('[data-testid^="agent-icon-"]');
@@ -362,7 +359,6 @@ test.describe('Agent Scroll Position', () => {
 
     // Create agent-3 (new agent)
     await newChatButton.click();
-    await window.waitForTimeout(300);
 
     // Re-create locator and get third agent ID
     agentIcons = window.locator('[data-testid^="agent-icon-"]');

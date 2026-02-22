@@ -52,12 +52,11 @@ test('should isolate data between different users', async () => {
 
   // Complete OAuth flow for User A
   await completeOAuthFlow(context.app, context.window, TEST_CLIENT_ID);
-  await context.window.waitForTimeout(1000);
+  await context.window.waitForSelector('[data-testid="agents"]', { timeout: 10000 });
 
   // Navigate to Settings and set LLM Provider settings
   await context.window.click('text=Settings');
   await context.window.waitForSelector('text=LLM Provider');
-  await context.window.waitForTimeout(500);
 
   // Select OpenAI and enter API key for User A
   await context.window.selectOption('select:near(:text("LLM Provider"))', 'openai');
@@ -85,12 +84,11 @@ test('should isolate data between different users', async () => {
   });
 
   await completeOAuthFlow(context.app, context.window, TEST_CLIENT_ID);
-  await context.window.waitForTimeout(1000);
+  await context.window.waitForSelector('[data-testid="agents"]', { timeout: 10000 });
 
   // Navigate to Settings
   await context.window.click('text=Settings');
   await context.window.waitForSelector('text=LLM Provider');
-  await context.window.waitForTimeout(500);
 
   // Verify User B sees empty settings (not User A's data)
   const providerValue = await context.window.inputValue('select:near(:text("LLM Provider"))');
@@ -101,7 +99,7 @@ test('should isolate data between different users', async () => {
   // Select Anthropic and enter API key for User B
   await context.window.selectOption('select:near(:text("LLM Provider"))', 'anthropic');
   await context.window.fill('input[placeholder="Enter your API key"]', 'user-b-api-key-67890');
-  await context.window.waitForTimeout(600);
+  await context.window.waitForTimeout(600); // Wait for debounce
 
   // Logout User B - clear tokens and restart
   await clearTestTokens(context.window);
@@ -123,12 +121,11 @@ test('should isolate data between different users', async () => {
   });
 
   await completeOAuthFlow(context.app, context.window, TEST_CLIENT_ID);
-  await context.window.waitForTimeout(1000);
+  await context.window.waitForSelector('[data-testid="agents"]', { timeout: 10000 });
 
   // Navigate to Settings
   await context.window.click('text=Settings');
   await context.window.waitForSelector('text=LLM Provider');
-  await context.window.waitForTimeout(500);
 
   // Verify User A's data restored
   const restoredProvider = await context.window.inputValue('select:near(:text("LLM Provider"))');
@@ -138,7 +135,7 @@ test('should isolate data between different users', async () => {
 
   // Verify User B's data NOT visible
   await context.window.selectOption('select:near(:text("LLM Provider"))', 'anthropic');
-  await context.window.waitForTimeout(500);
+  await context.window.waitForTimeout(500); // Wait for UI to update after select
   const anthropicKey = await context.window.inputValue('input[placeholder="Enter your API key"]');
   expect(anthropicKey).toBe(''); // Empty, not User B's key
 });
@@ -158,31 +155,29 @@ test('should restore user data after re-login', async () => {
   });
 
   await completeOAuthFlow(context.app, context.window, TEST_CLIENT_ID);
-  await context.window.waitForTimeout(1000);
+  await context.window.waitForSelector('[data-testid="agents"]', { timeout: 10000 });
 
   // Create LLM Provider settings
   await context.window.click('text=Settings');
   await context.window.waitForSelector('text=LLM Provider');
-  await context.window.waitForTimeout(500);
   await context.window.selectOption('select:near(:text("LLM Provider"))', 'google');
   await context.window.fill('input[placeholder="Enter your API key"]', 'test-api-key-xyz');
-  await context.window.waitForTimeout(600);
+  await context.window.waitForTimeout(600); // Wait for debounce
 
   // Get window state
   const initialBounds = await getWindowBounds(context.app);
 
   // Logout
   await context.window.click('button:has-text("Sign out")');
-  await context.window.waitForTimeout(1000);
+  await context.window.waitForSelector('button:has-text("Continue with Google")', { timeout: 10000 });
 
   // Login again
   await completeOAuthFlow(context.app, context.window, TEST_CLIENT_ID);
-  await context.window.waitForTimeout(1000);
+  await context.window.waitForSelector('[data-testid="agents"]', { timeout: 10000 });
 
   // Verify LLM Provider settings restored
   await context.window.click('text=Settings');
   await context.window.waitForSelector('text=LLM Provider');
-  await context.window.waitForTimeout(500);
   const provider = await context.window.inputValue('select:near(:text("LLM Provider"))');
   const apiKey = await context.window.inputValue('input[placeholder="Enter your API key"]');
   expect(provider).toBe('google');
@@ -215,27 +210,25 @@ test('should persist data after logout', async () => {
   });
 
   await completeOAuthFlow(context.app, context.window, TEST_CLIENT_ID);
-  await context.window.waitForTimeout(1000);
+  await context.window.waitForSelector('[data-testid="agents"]', { timeout: 10000 });
 
   // Create data
   await context.window.click('text=Settings');
   await context.window.waitForSelector('text=LLM Provider');
-  await context.window.waitForTimeout(500);
   await context.window.selectOption('select:near(:text("LLM Provider"))', 'openai');
   await context.window.fill('input[placeholder="Enter your API key"]', 'persist-test-key');
-  await context.window.waitForTimeout(600);
+  await context.window.waitForTimeout(600); // Wait for debounce
 
   // Logout
   await context.window.click('button:has-text("Sign out")');
-  await context.window.waitForTimeout(1000);
+  await context.window.waitForSelector('button:has-text("Continue with Google")', { timeout: 10000 });
 
   // Login again and verify data restored (this verifies data persisted after logout)
   await completeOAuthFlow(context.app, context.window, TEST_CLIENT_ID);
-  await context.window.waitForTimeout(1000);
+  await context.window.waitForSelector('[data-testid="agents"]', { timeout: 10000 });
 
   await context.window.click('text=Settings');
   await context.window.waitForSelector('text=LLM Provider');
-  await context.window.waitForTimeout(500);
   const apiKey = await context.window.inputValue('input[placeholder="Enter your API key"]');
   expect(apiKey).toBeTruthy();
 
@@ -261,19 +254,18 @@ test('should filter data by user_id', async () => {
   });
 
   await completeOAuthFlow(context.app, context.window, TEST_CLIENT_ID);
-  await context.window.waitForTimeout(1000);
+  await context.window.waitForSelector('[data-testid="agents"]', { timeout: 10000 });
 
   // Save data - use LLM Provider settings
   await context.window.click('text=Settings');
   await context.window.waitForSelector('text=LLM Provider');
-  await context.window.waitForTimeout(500);
   await context.window.selectOption('select:near(:text("LLM Provider"))', 'openai');
   await context.window.fill('input[placeholder="Enter your API key"]', 'user-a-key-123');
-  await context.window.waitForTimeout(600);
+  await context.window.waitForTimeout(600); // Wait for debounce
 
   // Logout
   await context.window.click('button:has-text("Sign out")');
-  await context.window.waitForTimeout(1000);
+  await context.window.waitForSelector('button:has-text("Continue with Google")', { timeout: 10000 });
 
   // User B: Login and save data with different provider
   mockOAuthServer.setUserProfile({
@@ -285,14 +277,13 @@ test('should filter data by user_id', async () => {
   });
 
   await completeOAuthFlow(context.app, context.window, TEST_CLIENT_ID);
-  await context.window.waitForTimeout(1000);
+  await context.window.waitForSelector('[data-testid="agents"]', { timeout: 10000 });
 
   await context.window.click('text=Settings');
   await context.window.waitForSelector('text=LLM Provider');
-  await context.window.waitForTimeout(500);
   await context.window.selectOption('select:near(:text("LLM Provider"))', 'anthropic');
   await context.window.fill('input[placeholder="Enter your API key"]', 'user-b-key-456');
-  await context.window.waitForTimeout(600);
+  await context.window.waitForTimeout(600); // Wait for debounce
 
   // Load data as User B - verify User B sees their own data
   const providerB = await context.window.inputValue('select:near(:text("LLM Provider"))');
@@ -302,7 +293,7 @@ test('should filter data by user_id', async () => {
 
   // Logout
   await context.window.click('button:has-text("Sign out")');
-  await context.window.waitForTimeout(1000);
+  await context.window.waitForSelector('button:has-text("Continue with Google")', { timeout: 10000 });
 
   // User A: Login again and load data
   mockOAuthServer.setUserProfile({
@@ -314,11 +305,10 @@ test('should filter data by user_id', async () => {
   });
 
   await completeOAuthFlow(context.app, context.window, TEST_CLIENT_ID);
-  await context.window.waitForTimeout(1000);
+  await context.window.waitForSelector('[data-testid="agents"]', { timeout: 10000 });
 
   await context.window.click('text=Settings');
   await context.window.waitForSelector('text=LLM Provider');
-  await context.window.waitForTimeout(500);
 
   // Verify User A sees their own data (not User B's)
   const providerA = await context.window.inputValue('select:near(:text("LLM Provider"))');
@@ -352,19 +342,17 @@ test('should handle "No user logged in" error gracefully', async () => {
   });
 
   await completeOAuthFlow(context.app, context.window, TEST_CLIENT_ID);
-  await context.window.waitForTimeout(1000);
+  await context.window.waitForSelector('[data-testid="agents"]', { timeout: 10000 });
 
   // 3) Sign out
   await context.window.click('text=Settings');
   await context.window.waitForSelector('text=LLM Provider');
-  await context.window.waitForTimeout(500);
   await context.window.click('button:has-text("Sign out")');
 
   // Wait for sign out to complete and login screen to appear
   await context.window.waitForSelector('button:has-text("Continue with Google")', {
-    timeout: 5000,
+    timeout: 10000,
   });
-  await context.window.waitForTimeout(2000); // Additional wait for cleanup
 
   // 4) Try to save data via IPC (should fail - no user logged in)
   const result = await context.window.evaluate(() => {
@@ -398,7 +386,7 @@ test('should retry operation after token refresh', async () => {
   });
 
   await completeOAuthFlow(context.app, context.window, TEST_CLIENT_ID);
-  await context.window.waitForTimeout(1000);
+  await context.window.waitForSelector('[data-testid="agents"]', { timeout: 10000 });
 
   // 2) Get initial access token
   const initialTokensResult = await context.window.evaluate(() => {

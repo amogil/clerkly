@@ -99,7 +99,7 @@ test.describe('Complete OAuth Flow', () => {
     );
 
     // Wait for OAuth flow to process
-    await context.window.waitForTimeout(2000);
+    await context.window.waitForSelector('[data-testid="login-screen"], [data-testid="agents"]', { timeout: 10000 });
 
     // Step 3: Verify that authorization code was processed
     // Note: In real implementation, this would trigger token exchange
@@ -144,7 +144,7 @@ test.describe('Complete OAuth Flow', () => {
     // Reload to verify tokens persist
     await context.window.reload();
     await context.window.waitForLoadState('domcontentloaded');
-    await context.window.waitForTimeout(2000);
+    await context.window.waitForSelector('[data-testid="login-screen"], [data-testid="agents"]', { timeout: 10000 });
 
     // Verify still authenticated (not on login screen)
     const stillOnLogin = await loginButton.isVisible().catch(() => false);
@@ -185,7 +185,7 @@ test.describe('Complete OAuth Flow', () => {
     );
 
     // Wait for error handling
-    await context.window.waitForTimeout(2000);
+    await context.window.waitForSelector('[data-testid="login-screen"], [data-testid="agents"]', { timeout: 10000 });
 
     // Verify app is still responsive
     expect(context.window.isClosed()).toBe(false);

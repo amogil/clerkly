@@ -98,7 +98,7 @@ test.describe('Agent Activity Indicator', () => {
     await messageInput.press('Enter');
 
     // Wait for processing to complete
-    await window.waitForTimeout(2000);
+    await expect(window.locator('[data-testid="message-user"]')).toHaveCount(1, { timeout: 5000 });
 
     // Activity indicator should not be visible after completion
     const activityIndicator = window.locator('[data-testid="activity-indicator"]');
@@ -119,7 +119,7 @@ test.describe('Agent Activity Indicator', () => {
      Requirements: agents.11.4 */
   test('should not show activity indicator when agent is idle', async () => {
     // Wait for page to be fully loaded
-    await window.waitForTimeout(1000);
+    await expect(window.locator('[data-testid="agents"]')).toBeVisible();
 
     // Activity indicator should not be visible
     const activityIndicator = window.locator('[data-testid="activity-indicator"]');
@@ -143,7 +143,7 @@ test.describe('Agent Activity Indicator', () => {
     // Send first message
     await messageInput.fill('First message');
     await messageInput.press('Enter');
-    await window.waitForTimeout(1000);
+    await expect(window.locator('[data-testid="message-user"]')).toHaveCount(1, { timeout: 5000 });
 
     // Indicator should be hidden after first completes
     const activityIndicator = window.locator('[data-testid="activity-indicator"]');
@@ -153,7 +153,7 @@ test.describe('Agent Activity Indicator', () => {
     // Send second message
     await messageInput.fill('Second message');
     await messageInput.press('Enter');
-    await window.waitForTimeout(1000);
+    await expect(window.locator('[data-testid="message-user"]')).toHaveCount(2, { timeout: 5000 });
 
     // Indicator should be hidden after second completes
     isVisible = await activityIndicator.isVisible().catch(() => false);

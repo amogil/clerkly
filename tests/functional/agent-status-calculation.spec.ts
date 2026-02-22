@@ -80,7 +80,7 @@ test.describe('Agent Status Calculation', () => {
     const messageInput = window.locator('textarea[placeholder*="Ask"]');
     await messageInput.fill('Test message');
     await messageInput.press('Enter');
-    await window.waitForTimeout(500);
+    await expect(window.locator('[data-testid="message-user"]')).toHaveCount(1, { timeout: 5000 });
 
     // Status should update to in-progress (blue-500)
     classes = await agentIcon.getAttribute('class');
@@ -103,12 +103,12 @@ test.describe('Agent Status Calculation', () => {
     const messageInput = window.locator('textarea[placeholder*="Ask"]');
     await messageInput.fill('First message');
     await messageInput.press('Enter');
-    await window.waitForTimeout(500);
+    await expect(window.locator('[data-testid="message-user"]')).toHaveCount(1, { timeout: 5000 });
 
     // Send second message
     await messageInput.fill('Second message');
     await messageInput.press('Enter');
-    await window.waitForTimeout(500);
+    await expect(window.locator('[data-testid="message-user"]')).toHaveCount(2, { timeout: 5000 });
 
     // Status should update (classes might change)
     const agentIcon = window.locator('[data-testid^="agent-icon-"]').first();
@@ -127,7 +127,7 @@ test.describe('Agent Status Calculation', () => {
     const messageInput = window.locator('textarea[placeholder*="Ask"]');
     await messageInput.fill('Test message');
     await messageInput.press('Enter');
-    await window.waitForTimeout(500);
+    await expect(window.locator('[data-testid="message-user"]')).toHaveCount(1, { timeout: 5000 });
 
     // Get status
     const agentIcon = window.locator('[data-testid^="agent-icon-"]').first();
@@ -135,7 +135,8 @@ test.describe('Agent Status Calculation', () => {
 
     // Refresh page
     await window.reload();
-    await window.waitForTimeout(2000);
+    await window.waitForLoadState('domcontentloaded');
+    await expect(window.locator('[data-testid="agents"]')).toBeVisible({ timeout: 10000 });
 
     // Status should be the same after reload
     const agentIconAfterReload = window.locator('[data-testid^="agent-icon-"]').first();
