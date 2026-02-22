@@ -28,6 +28,7 @@ export function AgentAvatar({ status, letter, size = 'md', className = '' }: Age
 
   return (
     <div
+      data-testid="agent-avatar-icon"
       className={`relative flex-shrink-0 ${dim} rounded-full ${bg} flex items-center justify-center ${className}`}
     >
       {isCompleted(status) ? (

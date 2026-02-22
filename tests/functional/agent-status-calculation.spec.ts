@@ -72,8 +72,11 @@ test.describe('Agent Status Calculation', () => {
     const agentIcon = window.locator('[data-testid^="agent-icon-"]').first();
     await expect(agentIcon).toBeVisible();
 
+    // Color lives on agent-avatar-icon (child div inside motion.div)
+    const agentAvatar = agentIcon.locator('[data-testid="agent-avatar-icon"]');
+
     // Check initial status (should be "new" - sky-400)
-    let classes = await agentIcon.getAttribute('class');
+    let classes = await agentAvatar.getAttribute('class');
     expect(classes).toContain('bg-sky-400');
 
     // Send message - status should change to "in-progress"
@@ -83,7 +86,7 @@ test.describe('Agent Status Calculation', () => {
     await expect(window.locator('[data-testid="message-user"]')).toHaveCount(1, { timeout: 5000 });
 
     // Status should update to in-progress (blue-500)
-    classes = await agentIcon.getAttribute('class');
+    classes = await agentAvatar.getAttribute('class');
     expect(classes).toMatch(/bg-blue-500|bg-sky-400/); // Might still be processing
 
     // Check header status text
@@ -99,20 +102,18 @@ test.describe('Agent Status Calculation', () => {
      Assertions: Status updates immediately
      Requirements: agents.9.3 */
   test('should update status on new message', async () => {
-    // Send first message
     const messageInput = window.locator('textarea[placeholder*="Ask"]');
     await messageInput.fill('First message');
     await messageInput.press('Enter');
     await expect(window.locator('[data-testid="message-user"]')).toHaveCount(1, { timeout: 5000 });
 
-    // Send second message
     await messageInput.fill('Second message');
     await messageInput.press('Enter');
     await expect(window.locator('[data-testid="message-user"]')).toHaveCount(2, { timeout: 5000 });
 
-    // Status should update (classes might change)
-    const agentIcon = window.locator('[data-testid^="agent-icon-"]').first();
-    const updatedClasses = await agentIcon.getAttribute('class');
+    // Color lives on agent-avatar-icon
+    const agentAvatar = window.locator('[data-testid^="agent-icon-"]').first().locator('[data-testid="agent-avatar-icon"]');
+    const updatedClasses = await agentAvatar.getAttribute('class');
 
     // Should still have a status color
     expect(updatedClasses).toMatch(/bg-sky-400|bg-blue-500|bg-amber-500|bg-red-500|bg-green-500/);
@@ -123,26 +124,24 @@ test.describe('Agent Status Calculation', () => {
      Assertions: Status is deterministic and consistent
      Requirements: agents.9.4 */
   test('should calculate status deterministically', async () => {
-    // Create agent and send message
     const messageInput = window.locator('textarea[placeholder*="Ask"]');
     await messageInput.fill('Test message');
     await messageInput.press('Enter');
     await expect(window.locator('[data-testid="message-user"]')).toHaveCount(1, { timeout: 5000 });
 
-    // Get status
-    const agentIcon = window.locator('[data-testid^="agent-icon-"]').first();
-    const classes1 = await agentIcon.getAttribute('class');
+    // Get status color before reload
+    const agentAvatar = window.locator('[data-testid^="agent-icon-"]').first().locator('[data-testid="agent-avatar-icon"]');
+    const classes1 = await agentAvatar.getAttribute('class');
 
     // Refresh page
     await window.reload();
     await window.waitForLoadState('domcontentloaded');
     await expect(window.locator('[data-testid="agents"]')).toBeVisible({ timeout: 10000 });
 
-    // Status should be the same after reload
-    const agentIconAfterReload = window.locator('[data-testid^="agent-icon-"]').first();
-    const classes2 = await agentIconAfterReload.getAttribute('class');
+    // Get status color after reload
+    const agentAvatarAfterReload = window.locator('[data-testid^="agent-icon-"]').first().locator('[data-testid="agent-avatar-icon"]');
+    const classes2 = await agentAvatarAfterReload.getAttribute('class');
 
-    // Should have same status color
     const getStatusColor = (classes: string | null) => {
       if (!classes) return null;
       if (classes.includes('bg-sky-400')) return 'sky';
@@ -153,10 +152,7 @@ test.describe('Agent Status Calculation', () => {
       return null;
     };
 
-    const color1 = getStatusColor(classes1);
-    const color2 = getStatusColor(classes2);
-
     // Colors should match (deterministic)
-    expect(color1).toBe(color2);
+    expect(getStatusColor(classes1)).toBe(getStatusColor(classes2));
   });
 });

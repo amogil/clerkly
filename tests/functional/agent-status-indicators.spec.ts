@@ -64,8 +64,9 @@ test.describe('Agent Status Indicators', () => {
     const agentIcon = window.locator('[data-testid^="agent-icon-"]').first();
     await expect(agentIcon).toBeVisible();
 
-    // Check background color class
-    const classes = await agentIcon.getAttribute('class');
+    // Color lives on agent-avatar-icon (child div inside motion.div)
+    const agentAvatarIcon = agentIcon.locator('[data-testid="agent-avatar-icon"]');
+    const classes = await agentAvatarIcon.getAttribute('class');
     expect(classes).toBeTruthy();
 
     // New status should have sky-400 or blue color
@@ -78,9 +79,9 @@ test.describe('Agent Status Indicators', () => {
     expect(hasStatusColor).toBe(true);
 
     // Check that icon contains letter or status icon
-    const iconContent = await agentIcon.textContent();
+    const iconContent = await agentAvatarIcon.textContent();
     const hasContent =
-      iconContent && (iconContent.length > 0 || (await agentIcon.locator('svg').count()) > 0);
+      iconContent && (iconContent.length > 0 || (await agentAvatarIcon.locator('svg').count()) > 0);
     expect(hasContent).toBeTruthy();
   });
 
