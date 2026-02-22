@@ -161,6 +161,18 @@ export class AgentManager {
   }
 
   /**
+   * Clear pipeline controller only if it matches the given controller instance.
+   * Prevents a finished pipeline from removing a newer pipeline's controller.
+   * Requirements: llm-integration.6
+   */
+  clearPipelineController(agentId: string, controller: AbortController): void {
+    if (this.pipelineControllers.get(agentId) === controller) {
+      this.pipelineControllers.delete(agentId);
+      this.logger.info(`Pipeline controller cleared for agent ${agentId}`);
+    }
+  }
+
+  /**
    * Create a new agent for the current user
    * Requirements: agents.2.3, agents.2.4, agents.2.5
    */

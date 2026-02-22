@@ -95,6 +95,7 @@ describe('AgentIPCHandlers', () => {
       toEventAgent: jest.fn().mockReturnValue(mockAgentSnapshot),
       cancelPipeline: jest.fn(),
       setPipelineController: jest.fn(),
+      clearPipelineController: jest.fn(),
     } as unknown as jest.Mocked<AgentManager>;
 
     mockMessageManager = {
@@ -502,6 +503,93 @@ describe('AgentIPCHandlers', () => {
       expect(handleBackgroundErrorSpy).toHaveBeenCalledWith(pipelineError, 'LLM Pipeline');
 
       handleBackgroundErrorSpy.mockRestore();
+    });
+
+    /* Preconditions: Handlers registered, pipeline resolves normally
+       Action: Invoke messages:create with kind:user, pipeline completes
+       Assertions: clearPipelineController called with agentId and the same controller instance
+       Requirements: llm-integration.6 */
+    it('should call clearPipelineController (not cancelPipeline) when pipeline finishes', async () => {
+      mockPipeline.run = jest.fn().mockResolvedValue(undefined);
+
+      handlers.registerHandlers();
+      const handler = registeredHandlers.get('messages:create')!;
+
+      await handler(mockEvent, {
+        agentId: 'abc123xyz0',
+        kind: 'user',
+        payload: userPayload,
+      });
+
+      // Allow microtasks to flush (finally block)
+      await new Promise((r) => setTimeout(r, 0));
+
+      // clearPipelineController must be called with the same controller that was registered
+      const registeredController = (mockAgentManager.setPipelineController as jest.Mock).mock
+        .calls[0][1] as AbortController;
+      expect(mockAgentManager.clearPipelineController).toHaveBeenCalledWith(
+        'abc123xyz0',
+        registeredController
+      );
+      // cancelPipeline must NOT be called in finally (only before launching new pipeline)
+      expect(mockAgentManager.cancelPipeline).toHaveBeenCalledTimes(1); // only the pre-launch cancel
+    });
+
+    /* Preconditions: Two messages sent rapidly — second message sets a new controller
+       Action: First pipeline finishes (aborted), calls clearPipelineController
+       Assertions: Second pipeline's controller is NOT aborted (race condition fix)
+       Requirements: llm-integration.6 */
+    it('should not abort newer pipeline controller when older pipeline finishes', async () => {
+      let firstPipelineReject!: (err: Error) => void;
+      const firstPipelinePromise = new Promise<void>((_, reject) => {
+        firstPipelineReject = reject;
+      });
+
+      // First call: slow pipeline that will be aborted
+      mockPipeline.run = jest.fn().mockReturnValueOnce(firstPipelinePromise);
+
+      handlers.registerHandlers();
+      const handler = registeredHandlers.get('messages:create')!;
+
+      // Send first message
+      await handler(mockEvent, { agentId: 'abc123xyz0', kind: 'user', payload: userPayload });
+      const firstController = (mockAgentManager.setPipelineController as jest.Mock).mock
+        .calls[0][1] as AbortController;
+
+      // Second call: fast pipeline
+      mockPipeline.run = jest.fn().mockResolvedValue(undefined);
+
+      // Simulate: second message sets a NEW controller (replacing first)
+      let secondController!: AbortController;
+      (mockAgentManager.setPipelineController as jest.Mock).mockImplementationOnce(
+        (_id: string, ctrl: AbortController) => {
+          secondController = ctrl;
+        }
+      );
+      // clearPipelineController: real logic — only delete if same instance
+      (mockAgentManager.clearPipelineController as jest.Mock).mockImplementation(
+        (_id: string, ctrl: AbortController) => {
+          // Simulate: current stored controller is secondController, not firstController
+          if (ctrl !== secondController) return; // different — do nothing
+          // same — would delete (but in this test secondController is never passed)
+        }
+      );
+
+      await handler(mockEvent, { agentId: 'abc123xyz0', kind: 'user', payload: userPayload });
+
+      // Now first pipeline finishes (aborted)
+      const ErrorHandlerModule = require('../../../src/main/ErrorHandler');
+      jest.spyOn(ErrorHandlerModule, 'handleBackgroundError').mockImplementation(() => {});
+      firstPipelineReject(new Error('aborted'));
+      await new Promise((r) => setTimeout(r, 0));
+
+      // clearPipelineController was called with firstController — which does NOT match secondController
+      expect(mockAgentManager.clearPipelineController).toHaveBeenCalledWith(
+        'abc123xyz0',
+        firstController
+      );
+      // secondController must NOT be aborted
+      expect(secondController?.signal?.aborted).toBeFalsy();
     });
 
     /* Preconditions: Handlers registered, access denied

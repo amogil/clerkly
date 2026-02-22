@@ -86,14 +86,14 @@ test.describe('Agent Scroll Position', () => {
     for (let i = 1; i <= 15; i++) {
       await messageInput.fill(`Agent 1 Message ${i}`);
       await messageInput.press('Enter');
-      await window.waitForTimeout(200);
+      await window.waitForTimeout(100);
     }
 
     // Wait for all user messages to appear
     await expect(window.locator('[data-testid="message-user"]')).toHaveCount(15, { timeout: 10000 });
 
-    // Wait for LLM response to the last message
-    await expect(window.locator('[data-testid="message-llm"]')).toHaveCount(15, { timeout: 60000 });
+    // Wait for LLM response to the last message (previous ones are interrupted by rapid sending)
+    await expect(window.locator('[data-testid="message-llm"]')).toHaveCount(1, { timeout: 60000 });
 
     // Scroll up in agent-1
     await messagesArea.evaluate((el) => {

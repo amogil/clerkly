@@ -516,4 +516,51 @@ describe('AgentManager', () => {
       expect(mockEventBus.publish).not.toHaveBeenCalled();
     });
   });
+
+  describe('clearPipelineController', () => {
+    /* Preconditions: Controller set for agent via setPipelineController
+       Action: clearPipelineController called with same controller instance
+       Assertions: Controller is removed (subsequent cancelPipeline does nothing)
+       Requirements: llm-integration.6 */
+    it('should remove controller when called with matching instance', () => {
+      const controller = new AbortController();
+      agentManager.setPipelineController('abc123xyz0', controller);
+
+      agentManager.clearPipelineController('abc123xyz0', controller);
+
+      // After clearing, cancelPipeline should not abort anything
+      agentManager.cancelPipeline('abc123xyz0');
+      expect(controller.signal.aborted).toBe(false);
+    });
+
+    /* Preconditions: Controller A set, then controller B set for same agent
+       Action: clearPipelineController called with controller A (old one)
+       Assertions: Controller B is NOT removed — newer pipeline is preserved
+       Requirements: llm-integration.6 */
+    it('should NOT remove controller when called with a different (newer) instance', () => {
+      const controllerA = new AbortController();
+      const controllerB = new AbortController();
+
+      agentManager.setPipelineController('abc123xyz0', controllerA);
+      // Simulate new message: cancel A, set B
+      agentManager.cancelPipeline('abc123xyz0');
+      agentManager.setPipelineController('abc123xyz0', controllerB);
+
+      // Old pipeline finishes — tries to clear with controllerA
+      agentManager.clearPipelineController('abc123xyz0', controllerA);
+
+      // controllerB must still be registered — cancelPipeline should abort it
+      agentManager.cancelPipeline('abc123xyz0');
+      expect(controllerB.signal.aborted).toBe(true);
+    });
+
+    /* Preconditions: No controller set for agent
+       Action: clearPipelineController called
+       Assertions: No error thrown
+       Requirements: llm-integration.6 */
+    it('should not throw when no controller is registered', () => {
+      const controller = new AbortController();
+      expect(() => agentManager.clearPipelineController('nonexistent', controller)).not.toThrow();
+    });
+  });
 });

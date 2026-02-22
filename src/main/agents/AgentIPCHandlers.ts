@@ -275,8 +275,8 @@ export class AgentIPCHandlers {
             handleBackgroundError(err, 'LLM Pipeline');
           })
           .finally(() => {
-            // Clean up controller reference when pipeline finishes
-            this.agentManager.cancelPipeline(args.agentId);
+            // Clean up controller reference only if it's still ours (not replaced by a newer message)
+            this.agentManager.clearPipelineController(args.agentId, controller);
           });
       }
 
