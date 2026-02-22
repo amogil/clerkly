@@ -3,15 +3,21 @@ import { Logo } from '../logo';
 import { isInProgress, type AgentStatus } from '../../../shared/utils/agentStatus';
 import type { MessageSnapshot } from '../../../shared/events/types';
 
-// Requirements: llm-integration.7, agents.4.22
+// Requirements: llm-integration.7, llm-integration.3.4.1, agents.4.22
 
 interface MessageBubbleProps {
   message: MessageSnapshot;
   showAvatar: boolean;
   agentStatus: AgentStatus;
+  onNavigate?: (screen: string) => void;
 }
 
-export function MessageBubble({ message, showAvatar, agentStatus }: MessageBubbleProps) {
+export function MessageBubble({
+  message,
+  showAvatar,
+  agentStatus,
+  onNavigate,
+}: MessageBubbleProps) {
   if (message.kind === 'user') {
     return (
       <div className="flex justify-end">
@@ -28,9 +34,11 @@ export function MessageBubble({ message, showAvatar, agentStatus }: MessageBubbl
   }
 
   if (message.kind === 'error') {
-    // Requirements: llm-integration.7 — error bubble
+    // Requirements: llm-integration.7, llm-integration.3.4.1 — error bubble with optional action_link
     const errorData = message.payload.data as Record<string, unknown> | undefined;
-    const errorInfo = errorData?.['error'] as { message?: string } | undefined;
+    const errorInfo = errorData?.['error'] as
+      | { message?: string; action_link?: { label: string; screen: string } }
+      | undefined;
 
     return (
       <>
@@ -44,6 +52,15 @@ export function MessageBubble({ message, showAvatar, agentStatus }: MessageBubbl
           className="max-w-[85%] text-sm leading-relaxed text-red-500 whitespace-pre-wrap break-words rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3"
         >
           {errorInfo?.message || 'Unknown error'}
+          {errorInfo?.action_link && onNavigate && (
+            <button
+              data-testid="message-error-action-link"
+              onClick={() => onNavigate(errorInfo.action_link!.screen)}
+              className="ml-2 underline text-red-600 hover:text-red-800 font-medium"
+            >
+              {errorInfo.action_link.label}
+            </button>
+          )}
         </div>
       </>
     );

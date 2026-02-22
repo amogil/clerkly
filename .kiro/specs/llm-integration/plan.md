@@ -702,3 +702,43 @@ MockLLMServer: первый запрос 500, второй успешный → 
 
 ### ❌ 10. `should show rate limit banner with countdown` _(заблокирован — требует реализации rate limit баннера)_
 MockLLMServer возвращает HTTP 429 с `retry-after: 3` → появляется `[data-testid="rate-limit-banner"]` с обратным отсчётом → через 3 сек баннер исчезает и появляется `message-llm`.
+
+
+---
+
+## Актуальный статус (2026-02-22)
+
+### Всё реализовано и написано
+
+Все шаги 1–10 выполнены. Функциональные тесты в `tests/functional/llm-chat.spec.ts`:
+
+| # | Тест | Статус |
+|---|------|--------|
+| 1 | `should show llm response after user message` | ✅ написан |
+| 2 | `should show reasoning before answer` | ✅ написан |
+| 3 | `should show error message on invalid api key` | ✅ написан |
+| 4 | `should interrupt previous request when new message sent during streaming` | ✅ написан |
+| 5 | `should not show interrupted llm message in chat` | ✅ написан |
+| 6 | `should show provider error message on 500` | ✅ написан |
+| 7 | `should hide error bubble when user sends next message` | ✅ написан |
+| 8 | `should send full conversation history to llm on second message` | ✅ написан |
+| 9 | `should exclude error messages from llm history` | ✅ написан |
+| 10 | `should show rate limit banner with countdown and auto-retry` | ✅ написан |
+| 11 | `should cancel rate limit retry and hide user message` | ✅ написан |
+| 12 | `should show action_link in auth error bubble and navigate to settings on click` | ✅ написан |
+
+### Что осталось
+
+1. **Запустить функциональные тесты** (покажут окна) — нужно явное разрешение пользователя:
+   ```bash
+   npm run test:functional:single -- llm-chat.spec.ts
+   ```
+
+2. **Коммит** изменений из текущей ветки (`feature/llm-integration`):
+   - `src/renderer/components/agents/MessageBubble.tsx` — `action_link` кнопка (llm-integration.3.4.1)
+   - `src/renderer/components/agents.tsx` — проброс `onNavigate`
+   - `src/renderer/App.tsx` — `onNavigate={navigateToScreen}` в `<Agents>`
+   - `tests/unit/components/agents.test.tsx` — 2 теста для `action_link`
+   - `tests/functional/llm-chat.spec.ts` — тест 12
+
+3. **`npm run validate`** — проходит ✅ (ESLint автофикс применён, unit/property тесты зелёные)

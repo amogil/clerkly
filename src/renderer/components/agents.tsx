@@ -16,7 +16,7 @@ import { EVENT_TYPES } from '../../shared/events/constants';
 import type { AgentRateLimitPayload } from '../../shared/events/types';
 import type { AgentSnapshot } from '../types/agent';
 
-export function Agents() {
+export function Agents({ onNavigate }: { onNavigate?: (screen: string) => void }) {
   const [showAllTasksPage, setShowAllTasksPage] = useState(false);
   const [taskInput, setTaskInput] = useState('');
   const [visibleChatsCount, setVisibleChatsCount] = useState(5);
@@ -263,6 +263,7 @@ export function Agents() {
                     message={message}
                     showAvatar={showAvatar}
                     agentStatus={currentAgent.status}
+                    onNavigate={onNavigate}
                   />
                 </motion.div>
               );

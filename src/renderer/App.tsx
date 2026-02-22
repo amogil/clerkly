@@ -241,13 +241,13 @@ function AppContent() {
   const renderScreen = () => {
     switch (currentScreen) {
       case 'agents':
-        return <Agents />;
+        return <Agents onNavigate={navigateToScreen} />;
       case 'settings':
         return <Settings onSignOut={handleSignOut} onNavigate={navigateToScreen} />;
       case 'error-demo':
         return <ErrorDemoPage onBack={() => navigateToScreen('settings')} />;
       default:
-        return <Agents />;
+        return <Agents onNavigate={navigateToScreen} />;
     }
   };
 

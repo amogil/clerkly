@@ -323,3 +323,83 @@ describe('Agents Component - LLM and Error message rendering', () => {
     expect(getByTestId('message-error').textContent).toBe('Unknown error');
   });
 });
+
+describe('MessageBubble — action_link', () => {
+  /* Preconditions: kind:error message with action_link, onNavigate provided
+     Action: Render MessageBubble, click the action link
+     Assertions: action link button visible, onNavigate called with correct screen
+     Requirements: llm-integration.3.4.1 */
+  it('should render action_link button and call onNavigate on click', () => {
+    const { MessageBubble } = jest.requireActual(
+      '../../../src/renderer/components/agents/MessageBubble'
+    ) as typeof import('../../../src/renderer/components/agents/MessageBubble');
+
+    const message = {
+      id: 1,
+      agentId: 'agent-1',
+      kind: 'error' as const,
+      timestamp: Date.now(),
+      hidden: false,
+      payload: {
+        data: {
+          reply_to_message_id: null,
+          error: {
+            type: 'auth',
+            message: 'Invalid API key.',
+            action_link: { label: 'Open Settings', screen: 'settings' },
+          },
+        },
+      },
+    };
+
+    const onNavigate = jest.fn();
+    const { getByTestId } = render(
+      <MessageBubble
+        message={message}
+        showAvatar={false}
+        agentStatus="new"
+        onNavigate={onNavigate}
+      />
+    );
+
+    expect(getByTestId('message-error').textContent).toContain('Invalid API key.');
+    const link = getByTestId('message-error-action-link');
+    expect(link.textContent).toBe('Open Settings');
+    link.click();
+    expect(onNavigate).toHaveBeenCalledWith('settings');
+  });
+
+  /* Preconditions: kind:error message with action_link, no onNavigate provided
+     Action: Render MessageBubble without onNavigate
+     Assertions: action link button not rendered
+     Requirements: llm-integration.3.4.1 */
+  it('should not render action_link when onNavigate is not provided', () => {
+    const { MessageBubble } = jest.requireActual(
+      '../../../src/renderer/components/agents/MessageBubble'
+    ) as typeof import('../../../src/renderer/components/agents/MessageBubble');
+
+    const message = {
+      id: 2,
+      agentId: 'agent-1',
+      kind: 'error' as const,
+      timestamp: Date.now(),
+      hidden: false,
+      payload: {
+        data: {
+          reply_to_message_id: null,
+          error: {
+            type: 'auth',
+            message: 'Invalid API key.',
+            action_link: { label: 'Open Settings', screen: 'settings' },
+          },
+        },
+      },
+    };
+
+    const { queryByTestId } = render(
+      <MessageBubble message={message} showAvatar={false} agentStatus="new" />
+    );
+
+    expect(queryByTestId('message-error-action-link')).toBeNull();
+  });
+});

@@ -514,6 +514,41 @@ test.describe('LLM Chat (mock server)', () => {
     await expect(banner).toHaveCount(0, { timeout: 5000 });
   });
 
+  /* Preconditions: MockLLMServer returns 401 (auth error); app authenticated with mock LLM URL
+     Action: User sends a message, error bubble appears with action_link
+     Assertions: "Open Settings" button visible in error bubble, click navigates to Settings screen
+     Requirements: llm-integration.3.4.1 */
+  test('should show action_link in auth error bubble and navigate to settings on click', async () => {
+    mockLLMServer.setSuccess(false);
+    mockLLMServer.setError(401, 'Invalid API key. Please check your key and try again.');
+
+    context = await launchWithMockLLM();
+    const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
+
+    await messageInput.fill('Hello');
+    await messageInput.press('Enter');
+
+    // Error bubble appears
+    const errorBubble = context.window.locator('[data-testid="message-error"]');
+    await expect(errorBubble).toBeVisible({ timeout: 15000 });
+
+    // action_link button is visible with correct label
+    const actionLink = context.window.locator('[data-testid="message-error-action-link"]');
+    await expect(actionLink).toBeVisible({ timeout: 5000 });
+    await expect(actionLink).toHaveText('Open Settings');
+
+    // Click the action link — should navigate to Settings
+    await actionLink.click();
+
+    // Settings screen is shown (contains "LLM Provider" heading)
+    await expect(context.window.locator('h2:has-text("LLM Provider")')).toBeVisible({ timeout: 5000 });
+
+    // Agents screen is no longer visible
+    await expect(context.window.locator('[data-testid="agents"]')).toHaveCount(0, {
+      timeout: 3000,
+    });
+  });
+
   /* Preconditions: MockLLMServer returns 429; app authenticated with mock LLM URL
      Action: User sends a message, rate limit banner appears, user clicks Cancel
      Assertions: Banner disappears, user message removed from chat
