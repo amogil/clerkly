@@ -356,7 +356,7 @@
 | 6.2 | MarkdownMessage | ✅ ВЫПОЛНЕНО | 0.25 дня | agents.7.7 |
 | 6.3 | EmptyStatePlaceholder | ✅ ВЫПОЛНЕНО | 0.25 дня | agents.4 |
 | 6.4 | Перенос текста в сообщениях | ✅ ВЫПОЛНЕНО | 0.1 дня | agents.4.22 |
-| 6.5 | AllAgents | ❌ | 0.25 дня | agents.5 |
+| 6.5 | AllAgents | ✅ ВЫПОЛНЕНО | 0.25 дня | agents.5 |
 
 #### 6.1 AutoExpandingTextarea
 - **Файл:** `src/renderer/components/agents/AutoExpandingTextarea.tsx`
