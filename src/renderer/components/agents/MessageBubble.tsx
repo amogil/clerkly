@@ -15,7 +15,10 @@ export function MessageBubble({ message, showAvatar, agentStatus }: MessageBubbl
   if (message.kind === 'user') {
     return (
       <div className="flex justify-end">
-        <div className="rounded-2xl bg-secondary/70 border border-border px-4 py-3 max-w-[75%]">
+        <div
+          data-testid="message-user"
+          className="rounded-2xl bg-secondary/70 border border-border px-4 py-3 max-w-[75%]"
+        >
           <p className="text-sm leading-relaxed text-foreground whitespace-pre-wrap break-words">
             {String(message.payload.data?.text || '')}
           </p>

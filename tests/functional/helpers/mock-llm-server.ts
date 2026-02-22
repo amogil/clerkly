@@ -39,6 +39,8 @@ export class MockLLMServer {
     '{"action":{"type":"text","content":"Hello! How can I help?"}}';
   private streamingErrorStatus: number = 0; // 0 = no error
   private streamingChunkDelayMs: number = 0; // delay between chunks (for interrupt tests)
+  private rateLimitEnabled: boolean = false;
+  private rateLimitRetryAfterSeconds: number = 10;
 
   constructor(config: MockLLMServerConfig) {
     this.port = config.port;
@@ -112,6 +114,22 @@ export class MockLLMServer {
     console.log('[MOCK LLM] OpenAI request received');
 
     const sendResponse = () => {
+      // Rate limit mode takes priority
+      if (this.rateLimitEnabled) {
+        res.writeHead(429, {
+          'Content-Type': 'application/json',
+          'retry-after': String(this.rateLimitRetryAfterSeconds),
+        });
+        res.end(
+          JSON.stringify({
+            error: {
+              message: `Rate limit exceeded. Please try again in ${this.rateLimitRetryAfterSeconds}.000s`,
+            },
+          })
+        );
+        return;
+      }
+
       if (this.streamingEnabled) {
         this.handleOpenAIStreaming(res);
         return;
@@ -323,11 +341,22 @@ export class MockLLMServer {
     }
   ) {
     this.streamingEnabled = enabled;
+    if (enabled) this.rateLimitEnabled = false; // streaming mode disables rate limit
     if (options?.reasoning !== undefined) this.streamingReasoning = options.reasoning;
     if (options?.content !== undefined) this.streamingContent = options.content;
     if (options?.errorStatus !== undefined) this.streamingErrorStatus = options.errorStatus;
     if (options?.errorMessage !== undefined) this.errorMessage = options.errorMessage;
     if (options?.chunkDelayMs !== undefined) this.streamingChunkDelayMs = options.chunkDelayMs;
+  }
+
+  /** Enable rate limit mode — server returns 429 with retry-after header */
+  setRateLimitMode(enabled: boolean, retryAfterSeconds: number = 10) {
+    this.rateLimitEnabled = enabled;
+    this.rateLimitRetryAfterSeconds = retryAfterSeconds;
+    if (enabled) {
+      this.streamingEnabled = false;
+    }
+    console.log(`[MOCK LLM] Rate limit mode: ${enabled}, retry-after: ${retryAfterSeconds}s`);
   }
 
   getBaseUrl(): string {

@@ -100,6 +100,16 @@ export interface API {
       payload: MessagePayloadAPI
     ) => Promise<{ success: boolean; error?: string }>;
     getLast: (agentId: string) => Promise<{ success: boolean; data?: unknown; error?: string }>;
+    // Requirements: llm-integration.3.7.3
+    retryLast: (
+      agentId: string,
+      userMessageId: number
+    ) => Promise<{ success: boolean; error?: string }>;
+    // Requirements: llm-integration.3.7.4
+    cancelRetry: (
+      agentId: string,
+      userMessageId: number
+    ) => Promise<{ success: boolean; error?: string }>;
   };
   // Requirements: testing.3.1, testing.3.2 - Test API methods (only available in test environment)
   test?: {
@@ -541,6 +551,28 @@ const api: API = {
       payload: MessagePayloadAPI
     ): Promise<{ success: boolean; error?: string }> {
       return await ipcRenderer.invoke('messages:update', { messageId, agentId, payload });
+    },
+
+    /**
+     * Retry last LLM request after rate limit countdown
+     * Requirements: llm-integration.3.7.3
+     */
+    async retryLast(
+      agentId: string,
+      userMessageId: number
+    ): Promise<{ success: boolean; error?: string }> {
+      return await ipcRenderer.invoke('messages:retry-last', { agentId, userMessageId });
+    },
+
+    /**
+     * Cancel rate limit retry — hides the user message
+     * Requirements: llm-integration.3.7.4
+     */
+    async cancelRetry(
+      agentId: string,
+      userMessageId: number
+    ): Promise<{ success: boolean; error?: string }> {
+      return await ipcRenderer.invoke('messages:cancel-retry', { agentId, userMessageId });
     },
   },
 };

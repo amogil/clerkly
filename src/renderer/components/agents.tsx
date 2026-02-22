@@ -10,6 +10,10 @@ import { AgentHeader } from './agents/AgentHeader';
 import { AllAgentsPage } from './agents/AllAgentsPage';
 import { MessageBubble } from './agents/MessageBubble';
 import { ChatInput } from './agents/ChatInput';
+import { RateLimitBanner } from './agents/RateLimitBanner';
+import { useEventSubscription } from '../events/useEventSubscription';
+import { EVENT_TYPES } from '../../shared/events/constants';
+import type { AgentRateLimitPayload } from '../../shared/events/types';
 import type { AgentSnapshot } from '../types/agent';
 
 export function Agents() {
@@ -18,6 +22,11 @@ export function Agents() {
   const [visibleChatsCount, setVisibleChatsCount] = useState(5);
   const [errorMessages, setErrorMessages] = useState<Map<string, string>>(new Map());
   const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const [rateLimitBanner, setRateLimitBanner] = useState<{
+    agentId: string;
+    userMessageId: number;
+    retryAfterSeconds: number;
+  } | null>(null);
   const chatListRef = useRef<HTMLDivElement>(null);
   const messagesAreaRef = useRef<HTMLDivElement | null>(
     null
@@ -32,6 +41,18 @@ export function Agents() {
 
   const selectedAgent = activeAgent || agents[0];
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Subscribe to rate limit events — show countdown banner
+  // Requirements: llm-integration.3.7
+  useEventSubscription(EVENT_TYPES.AGENT_RATE_LIMIT, (payload: AgentRateLimitPayload) => {
+    if (activeAgent && payload.agentId === activeAgent.id) {
+      setRateLimitBanner({
+        agentId: payload.agentId,
+        userMessageId: payload.userMessageId,
+        retryAfterSeconds: payload.retryAfterSeconds,
+      });
+    }
+  });
 
   // Requirements: agents.4.14.5
   const scrollPositions = useRef<Map<string, number>>(new Map());
@@ -259,6 +280,15 @@ export function Agents() {
         textareaRef={textareaRef}
         chatAreaRef={messagesAreaRef}
       />
+
+      {rateLimitBanner && rateLimitBanner.agentId === currentAgent.id && (
+        <RateLimitBanner
+          agentId={rateLimitBanner.agentId}
+          userMessageId={rateLimitBanner.userMessageId}
+          retryAfterSeconds={rateLimitBanner.retryAfterSeconds}
+          onDismiss={() => setRateLimitBanner(null)}
+        />
+      )}
     </div>
   );
 }

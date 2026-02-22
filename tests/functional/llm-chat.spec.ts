@@ -172,6 +172,7 @@ test.describe('LLM Chat (mock server)', () => {
   test.afterEach(async () => {
     if (context) await closeElectron(context);
     mockLLMServer.setStreamingMode(false);
+    mockLLMServer.setRateLimitMode(false);
     mockLLMServer.setSuccess(true);
     mockLLMServer.clearRequestLogs();
   });
@@ -468,5 +469,79 @@ test.describe('LLM Chat (mock server)', () => {
       (m) => m.role === 'system' && m.content.includes('[error]')
     );
     expect(errorSystemMsg).toBeUndefined();
+  });
+
+  /* Preconditions: MockLLMServer returns 429 with retry-after=3 on first request,
+       then success on second; app authenticated with mock LLM URL
+     Action: User sends a message, rate limit banner appears, countdown completes
+     Assertions: Rate limit banner visible with countdown, auto-retries, LLM response appears
+     Requirements: llm-integration.3.7.1, llm-integration.3.7.2, llm-integration.3.7.3 */
+  test('should show rate limit banner with countdown and auto-retry', async () => {
+    // First request: rate limit with 3 second retry-after
+    mockLLMServer.setRateLimitMode(true, 3);
+
+    context = await launchWithMockLLM();
+    const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
+
+    await messageInput.fill('Hello');
+    await messageInput.press('Enter');
+
+    // Rate limit banner should appear
+    const banner = context.window.locator('[data-testid="rate-limit-banner"]');
+    await expect(banner).toBeVisible({ timeout: 10000 });
+
+    // Banner should contain countdown text
+    const bannerText = await banner.textContent();
+    expect(bannerText).toMatch(/Rate limit exceeded/);
+    expect(bannerText).toMatch(/Retrying in \d+ second/);
+
+    // Cancel button should be visible
+    await expect(context.window.locator('[data-testid="rate-limit-cancel"]')).toBeVisible();
+
+    // Switch mock to success for the retry
+    mockLLMServer.setRateLimitMode(false);
+    mockLLMServer.setStreamingMode(true, {
+      content: '{"action":{"type":"text","content":"Retry response"}}',
+      chunkDelayMs: 0,
+    });
+
+    // Wait for auto-retry (countdown ~3 seconds + buffer)
+    const actionContent = context.window.locator('[data-testid="message-llm-action"]');
+    await expect(actionContent).toBeVisible({ timeout: 15000 });
+    await expect(actionContent).toHaveText('Retry response', { timeout: 5000 });
+
+    // Banner should be gone after successful retry
+    await expect(banner).toHaveCount(0, { timeout: 5000 });
+  });
+
+  /* Preconditions: MockLLMServer returns 429; app authenticated with mock LLM URL
+     Action: User sends a message, rate limit banner appears, user clicks Cancel
+     Assertions: Banner disappears, user message removed from chat
+     Requirements: llm-integration.3.7.4 */
+  test('should cancel rate limit retry and hide user message', async () => {
+    mockLLMServer.setRateLimitMode(true, 30);
+
+    context = await launchWithMockLLM();
+    const messageInput = context.window.locator('[data-testid="auto-expanding-textarea"]').first();
+
+    await messageInput.fill('Hello cancel');
+    await messageInput.press('Enter');
+
+    // Rate limit banner should appear
+    const banner = context.window.locator('[data-testid="rate-limit-banner"]');
+    await expect(banner).toBeVisible({ timeout: 10000 });
+
+    // User message should be visible in chat
+    const userMessages = context.window.locator('[data-testid="message-user"]');
+    await expect(userMessages).toHaveCount(1, { timeout: 5000 });
+
+    // Click Cancel
+    await context.window.locator('[data-testid="rate-limit-cancel"]').click();
+
+    // Banner should disappear
+    await expect(banner).toHaveCount(0, { timeout: 5000 });
+
+    // User message should be removed from chat (hidden=true)
+    await expect(userMessages).toHaveCount(0, { timeout: 5000 });
   });
 });

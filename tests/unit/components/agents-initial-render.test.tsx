@@ -55,6 +55,7 @@ jest.mock('../../../src/renderer/components/agents/EmptyStatePlaceholder', () =>
 jest.mock('../../../src/renderer/utils/DateTimeFormatter', () => ({
   DateTimeFormatter: {
     formatDateTime: (date: Date) => date.toISOString(),
+    formatLogTimestamp: (date: Date) => date.toISOString(),
   },
 }));
 

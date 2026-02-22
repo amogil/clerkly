@@ -62,6 +62,8 @@ export class AgentIPCHandlers {
     ipcMain.handle('messages:get-last', this.handleMessageGetLast.bind(this));
     ipcMain.handle('messages:create', this.handleMessageCreate.bind(this));
     ipcMain.handle('messages:update', this.handleMessageUpdate.bind(this));
+    ipcMain.handle('messages:retry-last', this.handleMessageRetryLast.bind(this));
+    ipcMain.handle('messages:cancel-retry', this.handleMessageCancelRetry.bind(this));
 
     this.handlersRegistered = true;
     this.logger.info('Handlers registered');
@@ -84,6 +86,8 @@ export class AgentIPCHandlers {
     ipcMain.removeHandler('messages:get-last');
     ipcMain.removeHandler('messages:create');
     ipcMain.removeHandler('messages:update');
+    ipcMain.removeHandler('messages:retry-last');
+    ipcMain.removeHandler('messages:cancel-retry');
 
     this.handlersRegistered = false;
     this.logger.info('Handlers unregistered');
@@ -299,6 +303,61 @@ export class AgentIPCHandlers {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       this.logger.error(`Failed to update message: ${errorMessage}`);
+      return { success: false, error: errorMessage };
+    }
+  }
+
+  /**
+   * Handle messages:retry-last request
+   * Re-runs the pipeline with the same userMessageId after rate limit countdown
+   * Requirements: llm-integration.3.7.3
+   */
+  private async handleMessageRetryLast(
+    _event: IpcMainInvokeEvent,
+    args: { agentId: string; userMessageId: number }
+  ): Promise<IPCResult> {
+    try {
+      // Cancel any running pipeline for this agent
+      this.agentManager.cancelPipeline(args.agentId);
+
+      // Create a new AbortController for this pipeline run
+      const controller = new AbortController();
+      this.agentManager.setPipelineController(args.agentId, controller);
+
+      // Run pipeline in background — do not await
+      this.pipeline
+        .run(args.agentId, args.userMessageId, controller.signal)
+        .catch((err: unknown) => {
+          handleBackgroundError(err, 'LLM Pipeline (retry)');
+        })
+        .finally(() => {
+          this.agentManager.cancelPipeline(args.agentId);
+        });
+
+      return { success: true };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Failed to retry last message: ${errorMessage}`);
+      return { success: false, error: errorMessage };
+    }
+  }
+
+  /**
+   * Handle messages:cancel-retry request
+   * Hides the user message (hidden=true) so it disappears from chat and LLM history
+   * Requirements: llm-integration.3.7.4
+   */
+  private async handleMessageCancelRetry(
+    _event: IpcMainInvokeEvent,
+    args: { agentId: string; userMessageId: number }
+  ): Promise<IPCResult> {
+    try {
+      this.messageManager.setHidden(args.userMessageId, args.agentId);
+      this.logger.info(`Rate limit retry cancelled, message hidden: ${args.userMessageId}`);
+      return { success: true };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Failed to cancel retry: ${errorMessage}`);
       return { success: false, error: errorMessage };
     }
   }

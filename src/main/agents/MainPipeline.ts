@@ -7,7 +7,7 @@ import { PromptBuilder } from './PromptBuilder';
 import { AIAgentSettingsManager } from '../AIAgentSettingsManager';
 import { LLMProviderFactory } from '../llm/LLMProviderFactory';
 import { MainEventBus } from '../events/MainEventBus';
-import { MessageLlmReasoningUpdatedEvent } from '../../shared/events/types';
+import { MessageLlmReasoningUpdatedEvent, AgentRateLimitEvent } from '../../shared/events/types';
 import { LLM_CHAT_MODELS } from '../llm/LLMConfig';
 import { Logger } from '../Logger';
 import type { ILLMProvider, ChatOptions } from '../llm/ILLMProvider';
@@ -43,6 +43,26 @@ function classifyError(message: string): LLMErrorType {
     return 'network';
   }
   return 'provider';
+}
+
+/**
+ * Parse retry-after seconds from error message text.
+ * Supports formats like "Please try again in 10.384s" or "retry after 5 seconds".
+ * Returns default 10 seconds if not found.
+ * Requirements: llm-integration.3.7.6
+ */
+function parseRetryAfterSeconds(message: string): number {
+  // Match "in N.NNNs" or "in Ns" (OpenAI format)
+  const match = message.match(/in\s+(\d+(?:\.\d+)?)\s*s/i);
+  if (match && match[1]) {
+    return Math.ceil(parseFloat(match[1]));
+  }
+  // Match "retry after N seconds"
+  const match2 = message.match(/retry\s+after\s+(\d+)/i);
+  if (match2 && match2[1]) {
+    return parseInt(match2[1], 10);
+  }
+  return 10; // default
 }
 
 /**
@@ -236,6 +256,16 @@ export class MainPipeline {
       const errorType = classifyError(errorMessage);
       const lastMsg = this.messageManager.getLastMessage(agentId);
       const errorReplyTo = lastMsg?.id ?? null;
+
+      // Rate limit — emit event for UI banner instead of kind:error message
+      // Requirements: llm-integration.3.7
+      if (errorType === 'rate_limit') {
+        const retryAfterSeconds = parseRetryAfterSeconds(errorMessage);
+        MainEventBus.getInstance().publish(
+          new AgentRateLimitEvent(agentId, userMessageId, retryAfterSeconds)
+        );
+        return;
+      }
 
       const errorPayload: Record<string, unknown> = {
         type: errorType,

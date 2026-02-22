@@ -229,6 +229,19 @@ export interface ErrorCreatedPayload extends BaseEvent {
   context: string;
 }
 
+/**
+ * Agent rate limit event payload
+ * Emitted when LLM returns 429 — triggers countdown banner in UI
+ * Requirements: llm-integration.3.7
+ */
+export interface AgentRateLimitPayload extends BaseEvent {
+  agentId: string;
+  /** ID of the user message that triggered the rate-limited request */
+  userMessageId: number;
+  /** Seconds to wait before retrying */
+  retryAfterSeconds: number;
+}
+
 // ============================================================================
 // Event Map
 // ============================================================================
@@ -264,6 +277,9 @@ export interface ClerklyEvents {
 
   // Error events
   [EVENT_TYPES.ERROR_CREATED]: ErrorCreatedPayload;
+
+  // Rate limit events
+  [EVENT_TYPES.AGENT_RATE_LIMIT]: AgentRateLimitPayload;
 }
 
 /**
@@ -668,6 +684,35 @@ export class UserProfileUpdatedEvent extends TypedEventClass<UserProfileUpdatedT
 
   toPayload(): EventPayloadWithoutTimestamp<UserProfileUpdatedType> {
     return { id: this.id, changedFields: this.changedFields };
+  }
+}
+
+type AgentRateLimitType = typeof EVENT_TYPES.AGENT_RATE_LIMIT;
+
+/**
+ * Agent rate limit event
+ * Emitted when LLM returns 429 — triggers countdown banner in UI
+ * Requirements: llm-integration.3.7
+ */
+export class AgentRateLimitEvent extends TypedEventClass<AgentRateLimitType> {
+  readonly type = EVENT_TYPES.AGENT_RATE_LIMIT;
+  readonly timestamp: number;
+
+  constructor(
+    public readonly agentId: string,
+    public readonly userMessageId: number,
+    public readonly retryAfterSeconds: number
+  ) {
+    super();
+    this.timestamp = Date.now();
+  }
+
+  toPayload(): EventPayloadWithoutTimestamp<AgentRateLimitType> {
+    return {
+      agentId: this.agentId,
+      userMessageId: this.userMessageId,
+      retryAfterSeconds: this.retryAfterSeconds,
+    };
   }
 }
 

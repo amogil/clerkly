@@ -42,6 +42,9 @@ export const EVENT_TYPES = {
 
   // Error events
   ERROR_CREATED: 'error.created',
+
+  // Agent rate limit event
+  AGENT_RATE_LIMIT: 'agent.rate_limit',
 } as const;
 
 /**

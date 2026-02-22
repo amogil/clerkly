@@ -384,20 +384,35 @@ describe('MainPipeline.run()', () => {
        Assertions: Error type correctly classified
        Requirements: llm-integration.5.3 */
     it('should classify rate_limit error', async () => {
-      const { pipeline, messageManager, llmProvider } = makeMocks();
-      llmProvider.chat.mockRejectedValue(new Error('Rate limit exceeded'));
+      const { pipeline, messageManager, llmProvider, mockPublish } = makeMocks();
+      llmProvider.chat.mockRejectedValue(
+        new Error('Rate limit exceeded. Please try again in 10.000s')
+      );
 
       await pipeline.run('agent-1', 1);
 
-      expect(messageManager.create).toHaveBeenCalledWith(
-        'agent-1',
-        'error',
-        expect.objectContaining({
-          data: expect.objectContaining({
-            error: expect.objectContaining({ type: 'rate_limit' }),
-          }),
-        })
+      // Rate limit should NOT create kind:error — instead emits AgentRateLimitEvent
+      // Requirements: llm-integration.3.7
+      const errorCreates = (messageManager.create as jest.Mock).mock.calls.filter(
+        (call: unknown[]) => call[1] === 'error'
       );
+      expect(errorCreates).toHaveLength(0);
+
+      // AgentRateLimitEvent should be published
+      const { AgentRateLimitEvent } = require('../../../src/shared/events/types');
+      const rateLimitEvents = mockPublish.mock.calls
+        .map((call: [unknown]) => call[0])
+        .filter((e: unknown) => e instanceof AgentRateLimitEvent);
+      expect(rateLimitEvents).toHaveLength(1);
+      expect((rateLimitEvents[0] as InstanceType<typeof AgentRateLimitEvent>).agentId).toBe(
+        'agent-1'
+      );
+      expect((rateLimitEvents[0] as InstanceType<typeof AgentRateLimitEvent>).userMessageId).toBe(
+        1
+      );
+      expect(
+        (rateLimitEvents[0] as InstanceType<typeof AgentRateLimitEvent>).retryAfterSeconds
+      ).toBe(10);
     });
 
     it('should classify timeout error', async () => {
