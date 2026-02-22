@@ -75,12 +75,20 @@ export class MessageManager {
 
   /**
    * Dismiss all kind:error messages for an agent (set hidden = true)
-   * Called before creating a new kind:user message
+   * Called before creating a new kind:user message.
+   * Repository returns only the records that were actually changed (were visible before).
    * Requirements: llm-integration.3.8
    */
   dismissErrorMessages(agentId: string): void {
-    this.dbManager.messages.dismissErrorMessages(agentId);
+    // Repository filters hidden=false and returns only newly-dismissed records via RETURNING
+    const dismissed = this.dbManager.messages.dismissErrorMessages(agentId);
     this.logger.info(`Error messages dismissed for agent ${agentId}`);
+
+    // Emit message.updated for each newly hidden error message so renderer hides them
+    // Requirements: llm-integration.3.8
+    for (const msg of dismissed) {
+      MainEventBus.getInstance().publish(new MessageUpdatedEvent(this.toEventMessage(msg)));
+    }
   }
 
   /**

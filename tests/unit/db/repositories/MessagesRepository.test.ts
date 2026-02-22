@@ -287,11 +287,12 @@ describe('MessagesRepository', () => {
   });
 
   describe('dismissErrorMessages', () => {
-    /* Preconditions: Agent with kind:error messages
+    /* Preconditions: Agent with kind:error messages (some visible, some already hidden)
        Action: Call dismissErrorMessages(agentId)
-       Assertions: All kind:error messages get hidden=true, other kinds unchanged
+       Assertions: Returns only the records that were actually changed (were visible before),
+                   already-hidden errors are not returned, user messages are not touched
        Requirements: llm-integration.3.8 */
-    it('should set dismissed:true on all kind:error messages for agent', () => {
+    it('should set hidden=true on visible kind:error messages and return only changed records', () => {
       const agent = agentsRepo.create('Test');
       const repo = new MessagesRepository(db, () => 'user1', agentsRepo);
 
@@ -310,30 +311,38 @@ describe('MessagesRepository', () => {
         'user',
         JSON.stringify({ data: { text: 'Hello' } })
       );
+      // Pre-hide errMsg2 so it should NOT appear in the returned array
+      repo.setHidden(errMsg2.id, agent.agentId);
 
-      repo.dismissErrorMessages(agent.agentId);
+      const changed = repo.dismissErrorMessages(agent.agentId);
 
+      // Only errMsg1 was visible — only it should be returned
+      expect(changed).toHaveLength(1);
+      expect(changed[0].id).toBe(errMsg1.id);
+      expect(changed[0].hidden).toBe(true);
+
+      // Verify DB state
       const updated1 = repo.getById(errMsg1.id, agent.agentId)!;
       const updated2 = repo.getById(errMsg2.id, agent.agentId)!;
       const updatedUser = repo.getById(userMsg.id, agent.agentId)!;
 
       expect(updated1.hidden).toBe(true);
       expect(updated2.hidden).toBe(true);
-      // user message should not be touched
       expect(updatedUser.hidden).toBe(false);
     });
 
     /* Preconditions: Agent with no kind:error messages
        Action: Call dismissErrorMessages(agentId)
-       Assertions: No error thrown, nothing changed
+       Assertions: Returns empty array, no error thrown
        Requirements: llm-integration.3.8 */
-    it('should do nothing when no error messages exist', () => {
+    it('should return empty array when no visible error messages exist', () => {
       const agent = agentsRepo.create('Test');
       const repo = new MessagesRepository(db, () => 'user1', agentsRepo);
 
       repo.create(agent.agentId, 'user', JSON.stringify({ data: { text: 'Hello' } }));
 
-      expect(() => repo.dismissErrorMessages(agent.agentId)).not.toThrow();
+      const changed = repo.dismissErrorMessages(agent.agentId);
+      expect(changed).toEqual([]);
     });
 
     /* Preconditions: Agent with a specific message

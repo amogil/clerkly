@@ -106,17 +106,21 @@ export class MessagesRepository {
   }
 
   /**
-   * Mark all kind:error messages for an agent as hidden
-   * Called before creating a new kind:user message so error bubbles disappear from UI
+   * Mark all visible (hidden=false) kind:error messages for an agent as hidden.
+   * Returns only the records that were actually changed (were visible before the update).
+   * Called before creating a new kind:user message so error bubbles disappear from UI.
    * Requirements: llm-integration.3.8
    */
-  dismissErrorMessages(agentId: string): void {
+  dismissErrorMessages(agentId: string): Message[] {
     this.checkAccess(agentId);
-    this.db
+    return this.db
       .update(messages)
       .set({ hidden: true })
-      .where(and(eq(messages.agentId, agentId), eq(messages.kind, 'error')))
-      .run();
+      .where(
+        and(eq(messages.agentId, agentId), eq(messages.kind, 'error'), eq(messages.hidden, false))
+      )
+      .returning()
+      .all();
   }
 
   /**

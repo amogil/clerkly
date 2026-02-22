@@ -128,12 +128,16 @@ export function useMessages(agentId: string | null): UseMessagesResult {
     }
   });
 
-  // Requirements: realtime-events.9.5
+  // Requirements: realtime-events.9.5, llm-integration.3.8, llm-integration.8.5
   useEventSubscription(EVENT_TYPES.MESSAGE_UPDATED, (payload: MessageUpdatedPayload) => {
     // Event payload contains MessageSnapshot with updated payload
+    // If message became hidden (dismissed error or interrupted llm) — remove from array
+    // If message was updated with new content — replace in array
     if (payload.message) {
       setMessages((prev) =>
-        prev.map((msg) => (msg.id === payload.message.id ? payload.message : msg))
+        payload.message.hidden
+          ? prev.filter((msg) => msg.id !== payload.message.id)
+          : prev.map((msg) => (msg.id === payload.message.id ? payload.message : msg))
       );
     }
   });

@@ -227,6 +227,47 @@ describe('MessageManager', () => {
     });
   });
 
+  describe('dismissErrorMessages', () => {
+    /* Preconditions: Agent has visible kind:error messages (hidden=false)
+       Action: Call dismissErrorMessages(agentId)
+       Assertions: Repository dismissErrorMessages called, message.updated emitted for each returned (newly hidden) message
+       Requirements: llm-integration.3.8 */
+    it('should dismiss error messages and emit message.updated for each newly hidden one', () => {
+      const visibleError: Message = {
+        id: 10,
+        agentId: 'agent-123',
+        kind: 'error',
+        timestamp: '2026-02-15T10:30:00.000Z',
+        payloadJson: JSON.stringify({ data: { error: { type: 'provider', message: 'fail' } } }),
+        hidden: true, // returned by repo already with hidden=true
+      };
+
+      // Repository returns only the records that were actually changed
+      mockDbManager.messages.dismissErrorMessages = jest.fn().mockReturnValue([visibleError]);
+
+      messageManager.dismissErrorMessages('agent-123');
+
+      expect(mockDbManager.messages.dismissErrorMessages).toHaveBeenCalledWith('agent-123');
+      expect(mockEventBus.publish).toHaveBeenCalledTimes(1);
+      const event = mockEventBus.publish.mock.calls[0][0];
+      expect(event).toBeInstanceOf(MessageUpdatedEvent);
+      expect(event.message.id).toBe(10);
+      expect(event.message.hidden).toBe(true);
+    });
+
+    /* Preconditions: Agent has no visible kind:error messages (repo returns empty array)
+       Action: Call dismissErrorMessages(agentId)
+       Assertions: No events emitted
+       Requirements: llm-integration.3.8 */
+    it('should not emit events when no visible error messages exist', () => {
+      mockDbManager.messages.dismissErrorMessages = jest.fn().mockReturnValue([]);
+
+      messageManager.dismissErrorMessages('agent-123');
+
+      expect(mockEventBus.publish).not.toHaveBeenCalled();
+    });
+  });
+
   describe('update', () => {
     /* Preconditions: MessageManager initialized
        Action: Call update() with messageId, agentId, and new payload

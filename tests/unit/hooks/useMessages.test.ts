@@ -496,6 +496,46 @@ describe('useMessages hook', () => {
       expect(updatedMessage?.payload.data?.text).toBe('Updated text');
     });
 
+    /* Preconditions: Hook is mounted with a visible message in state
+       Action: MESSAGE_UPDATED event received with hidden=true
+       Assertions: Message is removed from the array (not just updated)
+       Requirements: realtime-events.9.5, llm-integration.3.8, llm-integration.8.5 */
+    it('should remove message from array when MESSAGE_UPDATED has hidden=true', async () => {
+      let updatedHandler: (payload: any) => void;
+      mockSubscribe.mockImplementation((type, handler) => {
+        if (type === EVENT_TYPES.MESSAGE_UPDATED) {
+          updatedHandler = handler;
+        }
+        return mockUnsubscribe;
+      });
+
+      const { result } = renderHook(() => useMessages('agent-1'));
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      const initialCount = result.current.messages.length;
+      const targetId = result.current.messages[0]?.id;
+
+      act(() => {
+        updatedHandler({
+          timestamp: Date.now(),
+          message: {
+            id: targetId,
+            agentId: 'agent-1',
+            kind: 'error',
+            timestamp: new Date('2024-01-01T10:00:00Z').getTime(),
+            payload: { data: { error: { type: 'provider', message: 'fail' } } },
+            hidden: true, // dismissed — should be removed from array
+          },
+        });
+      });
+
+      expect(result.current.messages.length).toBe(initialCount - 1);
+      expect(result.current.messages.find((m) => m.id === targetId)).toBeUndefined();
+    });
+
     /* Preconditions: Hook is mounted
        Action: MESSAGE_UPDATED event with no message
        Assertions: Messages unchanged
