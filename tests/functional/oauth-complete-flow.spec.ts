@@ -180,7 +180,9 @@ test.describe('Complete OAuth Flow', () => {
     await expect(context.window.locator('[data-testid="login-error"]')).toBeVisible();
 
     // Verify still on login screen (not authenticated)
-    const stillOnLogin = await context.window.locator('button:has-text("Continue with Google")').isVisible();
+    const stillOnLogin = await context.window
+      .locator('button:has-text("Continue with Google")')
+      .isVisible();
     expect(stillOnLogin).toBe(true);
 
     console.log('[TEST] OAuth error handled gracefully');
