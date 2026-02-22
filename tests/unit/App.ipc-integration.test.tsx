@@ -47,10 +47,6 @@ jest.mock('../../src/renderer/components/auth/LoginScreen', () => ({
   LoginScreen: () => <div data-testid="login-screen">LoginScreen</div>,
 }));
 
-jest.mock('../../src/renderer/components/auth/LoginError', () => ({
-  LoginError: () => <div data-testid="login-error">LoginError</div>,
-}));
-
 jest.mock('../../src/renderer/components/ErrorBoundary', () => ({
   ErrorBoundary: ({ children }: any) => <div data-testid="error-boundary">{children}</div>,
 }));

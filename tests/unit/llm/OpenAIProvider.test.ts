@@ -182,7 +182,7 @@ describe('OpenAIProvider', () => {
         body: JSON.stringify({
           model: 'gpt-5-nano',
           messages: [{ role: 'user', content: 'test' }],
-          max_tokens: 5,
+          max_completion_tokens: 5,
         }),
       })
     );
