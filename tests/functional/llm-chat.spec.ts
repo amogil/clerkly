@@ -541,7 +541,9 @@ test.describe('LLM Chat (mock server)', () => {
     await actionLink.click();
 
     // Settings screen is shown (contains "LLM Provider" heading)
-    await expect(context.window.locator('h2:has-text("LLM Provider")')).toBeVisible({ timeout: 5000 });
+    await expect(context.window.locator('h2:has-text("LLM Provider")')).toBeVisible({
+      timeout: 5000,
+    });
 
     // Agents screen is no longer visible
     await expect(context.window.locator('[data-testid="agents"]')).toHaveCount(0, {
