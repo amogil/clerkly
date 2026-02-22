@@ -8,7 +8,6 @@ import { Agents } from './components/agents';
 import { Settings } from './components/settings';
 import { ErrorDemoPage } from './components/error-demo-page';
 import { LoginScreen } from './components/auth/LoginScreen';
-import { LoginError } from './components/auth/LoginError';
 import { SimpleRouter, NavigationManager, AuthGuard } from './navigation';
 import { Logger } from './Logger';
 import { ErrorNotificationManager } from './managers/ErrorNotificationManager';
@@ -222,20 +221,16 @@ function AppContent() {
     );
   }
 
-  if (authError && !isLoading) {
+  if (!isAuthorized) {
     return (
-      <LoginError
-        errorMessage={authError.message}
-        errorCode={authError.code}
-        onRetry={handleLogin}
+      <LoginScreen
+        onLogin={handleLogin}
         isLoading={isLoading}
         isDisabled={isLoading}
+        errorMessage={authError?.message}
+        errorCode={authError?.code}
       />
     );
-  }
-
-  if (!isAuthorized) {
-    return <LoginScreen onLogin={handleLogin} isLoading={isLoading} isDisabled={isLoading} />;
   }
 
   const renderScreen = () => {

@@ -168,16 +168,19 @@ test.describe('Complete OAuth Flow', () => {
       { url: errorDeepLink }
     );
 
-    // Wait for error handling
-    await context.window.waitForSelector('[data-testid="login-screen"], [data-testid="agents"]', {
+    // Wait for error handling — app stays on login screen
+    await expect(context.window.locator('[data-testid="login-screen"]')).toBeVisible({
       timeout: 10000,
     });
 
     // Verify app is still responsive
     expect(context.window.isClosed()).toBe(false);
 
+    // Verify error panel is shown
+    await expect(context.window.locator('[data-testid="login-error"]')).toBeVisible();
+
     // Verify still on login screen (not authenticated)
-    const stillOnLogin = await loginButton.isVisible();
+    const stillOnLogin = await context.window.locator('button:has-text("Continue with Google")').isVisible();
     expect(stillOnLogin).toBe(true);
 
     console.log('[TEST] OAuth error handled gracefully');

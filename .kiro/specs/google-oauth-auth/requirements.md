@@ -29,7 +29,7 @@
 
 2. **Обработка ошибок авторизации (HTTP 401)**: При получении ошибки HTTP 401 Unauthorized от любого API (Google UserInfo, Calendar, Tasks и т.д.), система должна:
    - Немедленно очистить все токены из хранилища
-   - Показать экран логина (LoginError компонент с errorCode 'invalid_grant') с сообщением об истечении сессии
+   - Показать экран логина (LoginScreen с панелью ошибки, errorCode 'invalid_grant') с сообщением об истечении сессии
    - Пользователь может повторно авторизоваться через кнопку "Continue with Google"
    - **Примечание**: Данные пользователя в базе данных НЕ очищаются - они сохраняются для отображения при следующей авторизации
 
@@ -39,7 +39,7 @@
 
 **Поток обработки ошибки авторизации:**
 ```
-API Request → HTTP 401 → Clear Tokens → Show LoginError Component → Redirect to OAuth
+API Request → HTTP 401 → Clear Tokens → Show LoginScreen with error panel → Redirect to OAuth
 ```
 
 **Поток автоматического обновления токена:**
@@ -113,7 +113,7 @@ Token Expiring → OAuthClientManager.refreshAccessToken() → Update Tokens in 
 4. ЕСЛИ Google возвращает ошибку, ТО "OAuth Client" ДОЛЖЕН вернуть описательное сообщение об ошибке
 5. КОГДА токены получены, ТО "OAuth Client" ДОЛЖЕН вычислить время истечения access token (текущее время + expires_in)
 6. КОГДА токены сохранены, ТО система ДОЛЖНА синхронно получить профиль пользователя из Google UserInfo API (во время отображения loader, см. требование 15)
-7. ЕСЛИ получение профиля не удается, ТО система ДОЛЖНА очистить токены И показать LoginError компонент с errorCode 'profile_fetch_failed'
+7. ЕСЛИ получение профиля не удается, ТО система ДОЛЖНА очистить токены И показать LoginScreen с панелью ошибки, errorCode 'profile_fetch_failed'
 8. ЕСЛИ получение профиля успешно, ТО система ДОЛЖНА показать главный интерфейс приложения (Agents)
 
 #### Функциональные Тесты
