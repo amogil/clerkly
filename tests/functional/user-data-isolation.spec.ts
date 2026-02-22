@@ -22,6 +22,9 @@ test.beforeEach(async () => {
   // Launch Electron app with mock OAuth server
   context = await launchElectron(undefined, {
     CLERKLY_GOOGLE_API_URL: mockOAuthServer.getBaseUrl(),
+    CLERKLY_OPENAI_API_KEY: '',
+    CLERKLY_ANTHROPIC_API_KEY: '',
+    CLERKLY_GOOGLE_API_KEY: '',
   });
   await context.window.waitForLoadState('domcontentloaded');
 });
@@ -71,6 +74,9 @@ test('should isolate data between different users', async () => {
   // Relaunch app
   context = await launchElectron(testDataPath, {
     CLERKLY_GOOGLE_API_URL: mockOAuthServer.getBaseUrl(),
+    CLERKLY_OPENAI_API_KEY: '',
+    CLERKLY_ANTHROPIC_API_KEY: '',
+    CLERKLY_GOOGLE_API_KEY: '',
   });
   await context.window.waitForLoadState('domcontentloaded');
 
@@ -108,6 +114,9 @@ test('should isolate data between different users', async () => {
   // Relaunch app
   context = await launchElectron(testDataPath, {
     CLERKLY_GOOGLE_API_URL: mockOAuthServer.getBaseUrl(),
+    CLERKLY_OPENAI_API_KEY: '',
+    CLERKLY_ANTHROPIC_API_KEY: '',
+    CLERKLY_GOOGLE_API_KEY: '',
   });
   await context.window.waitForLoadState('domcontentloaded');
 

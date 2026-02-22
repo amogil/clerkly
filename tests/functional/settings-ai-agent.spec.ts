@@ -40,6 +40,9 @@ test.beforeEach(async () => {
   // Launch Electron app with mock OAuth server
   context = await launchElectron(undefined, {
     CLERKLY_GOOGLE_API_URL: mockServer.getBaseUrl(),
+    CLERKLY_OPENAI_API_KEY: '',
+    CLERKLY_ANTHROPIC_API_KEY: '',
+    CLERKLY_GOOGLE_API_KEY: '',
   });
   await context.window.waitForLoadState('domcontentloaded');
 
@@ -78,6 +81,9 @@ test('53.1: should save and load LLM provider selection', async () => {
   // Relaunch with same data path
   context = await launchElectron(testDataPath, {
     CLERKLY_GOOGLE_API_URL: mockServer.getBaseUrl(),
+    CLERKLY_OPENAI_API_KEY: '',
+    CLERKLY_ANTHROPIC_API_KEY: '',
+    CLERKLY_GOOGLE_API_KEY: '',
   });
   await context.window.waitForLoadState('domcontentloaded');
 
@@ -119,6 +125,9 @@ test('53.2: should save and load API key with encryption', async () => {
   // Relaunch with same data path
   context = await launchElectron(testDataPath, {
     CLERKLY_GOOGLE_API_URL: mockServer.getBaseUrl(),
+    CLERKLY_OPENAI_API_KEY: '',
+    CLERKLY_ANTHROPIC_API_KEY: '',
+    CLERKLY_GOOGLE_API_KEY: '',
   });
   await context.window.waitForLoadState('domcontentloaded');
 
@@ -175,6 +184,9 @@ test('53.3: should delete API key when field is cleared', async () => {
   // Relaunch with same data path
   context = await launchElectron(testDataPath, {
     CLERKLY_GOOGLE_API_URL: mockServer.getBaseUrl(),
+    CLERKLY_OPENAI_API_KEY: '',
+    CLERKLY_ANTHROPIC_API_KEY: '',
+    CLERKLY_GOOGLE_API_KEY: '',
   });
   await context.window.waitForLoadState('domcontentloaded');
 
@@ -284,6 +296,9 @@ test('53.6: should show error notification on save failure', async () => {
     CLERKLY_GOOGLE_API_URL: mockServer.getBaseUrl(),
     CLERKLY_OAUTH_CLIENT_ID: 'test-client-id-12345',
     CLERKLY_OAUTH_CLIENT_SECRET: 'test-client-secret-67890',
+    CLERKLY_OPENAI_API_KEY: '',
+    CLERKLY_ANTHROPIC_API_KEY: '',
+    CLERKLY_GOOGLE_API_KEY: '',
   });
 
   await context.window.waitForLoadState('domcontentloaded');
