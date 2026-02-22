@@ -319,4 +319,103 @@ test.describe('LLM Chat (mock server)', () => {
     const text = await errorBubble.textContent();
     expect(text?.toLowerCase()).toMatch(/unavailable|try again/);
   });
+
+  /* Preconditions: MockLLMServer returns 500 on first request, success on second;
+       app authenticated with mock LLM URL
+     Action: User sends first message (gets error), then sends second message
+     Assertions: error bubble disappears, llm response appears
+     Requirements: llm-integration.3.8 */
+  test('should hide error bubble when user sends next message', async () => {
+    // First request fails
+    mockLLMServer.setSuccess(false);
+    mockLLMServer.setError(500, 'Internal Server Error');
+
+    context = await launchWithMockLLM();
+    const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
+
+    // Send first message — expect error
+    await messageInput.fill('First message');
+    await messageInput.press('Enter');
+
+    const errorBubble = context.window.locator('[data-testid="message-error"]');
+    await expect(errorBubble).toBeVisible({ timeout: 15000 });
+
+    // Switch mock to success for second request
+    mockLLMServer.setSuccess(true);
+    mockLLMServer.setStreamingMode(true, {
+      content: '{"action":{"type":"text","content":"Success response"}}',
+      chunkDelayMs: 0,
+    });
+
+    // Send second message
+    await messageInput.fill('Second message');
+    await messageInput.press('Enter');
+
+    // Error bubble should disappear
+    await expect(errorBubble).toHaveCount(0, { timeout: 10000 });
+
+    // LLM response should appear
+    await expect(context.window.locator('[data-testid="message-llm"]')).toBeVisible({
+      timeout: 10000,
+    });
+  });
+
+  /* Preconditions: MockLLMServer configured for success, app authenticated with mock LLM URL
+     Action: User sends two messages sequentially, waiting for LLM response after each
+     Assertions: Second LLM request body contains both previous messages (user + assistant roles)
+     Requirements: llm-integration.3.9 */
+  test('should send full conversation history to llm on second message', async () => {
+    mockLLMServer.setStreamingMode(true, {
+      content: '{"action":{"type":"text","content":"First response"}}',
+      chunkDelayMs: 0,
+    });
+
+    context = await launchWithMockLLM();
+    const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
+
+    // Send first message and wait for LLM response
+    await messageInput.fill('First message');
+    await messageInput.press('Enter');
+
+    const allActionContent = context.window.locator('[data-testid="message-llm-action"]');
+    await expect(allActionContent.first()).toBeVisible({ timeout: 15000 });
+    await expect(allActionContent.first()).toHaveText('First response', { timeout: 5000 });
+
+    // Switch mock to second response
+    mockLLMServer.setStreamingMode(true, {
+      content: '{"action":{"type":"text","content":"Second response"}}',
+      chunkDelayMs: 0,
+    });
+    mockLLMServer.clearRequestLogs();
+
+    // Send second message
+    await messageInput.fill('Second message');
+    await messageInput.press('Enter');
+
+    // Wait for second LLM response
+    await expect(allActionContent).toHaveCount(2, { timeout: 15000 });
+    await expect(allActionContent.last()).toHaveText('Second response', { timeout: 5000 });
+
+    // Inspect the request body sent to LLM for the second message
+    const lastRequest = mockLLMServer.getLastRequest();
+    expect(lastRequest).toBeDefined();
+
+    const messages: Array<{ role: string; content: string }> = lastRequest!.body.messages;
+    expect(messages).toBeDefined();
+
+    // Must contain role:user with first message text
+    const userMsg = messages.find((m) => m.role === 'user' && m.content === 'First message');
+    expect(userMsg).toBeDefined();
+
+    // Must contain role:assistant with first response content
+    const assistantMsg = messages.find(
+      (m) => m.role === 'assistant' && m.content === 'First response'
+    );
+    expect(assistantMsg).toBeDefined();
+
+    // user message must come before assistant message
+    const userIdx = messages.indexOf(userMsg!);
+    const assistantIdx = messages.indexOf(assistantMsg!);
+    expect(userIdx).toBeLessThan(assistantIdx);
+  });
 });
