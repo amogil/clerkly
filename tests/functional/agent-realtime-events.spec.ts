@@ -225,9 +225,10 @@ test.describe('Agent Real-time Events', () => {
      Assertions: Agent status recalculates
      Requirements: agents.12.8 */
   test('should recalculate status on message events', async () => {
-    // Get initial status
+    // Get initial status — color lives on agent-avatar-icon (child div inside motion.div)
     const agentIcon = window.locator('[data-testid^="agent-icon-"]').first();
-    let classes = await agentIcon.getAttribute('class');
+    const agentAvatarIcon = agentIcon.locator('[data-testid="agent-avatar-icon"]');
+    let classes = await agentAvatarIcon.getAttribute('class');
 
     // Initial status can be "new" (sky-400) or "in-progress" (blue-500)
     const hasInitialStatus = classes?.includes('bg-sky-400') || classes?.includes('bg-blue-500');
@@ -240,7 +241,7 @@ test.describe('Agent Real-time Events', () => {
     await expect(window.locator('[data-testid="message-user"]')).toHaveCount(1, { timeout: 5000 });
 
     // Status should update (to in-progress or other)
-    classes = await agentIcon.getAttribute('class');
+    classes = await agentAvatarIcon.getAttribute('class');
     expect(classes).toMatch(/bg-sky-400|bg-blue-500|bg-amber-500/);
 
     // Header status should also update
