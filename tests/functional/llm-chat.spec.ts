@@ -248,4 +248,53 @@ test.describe('LLM Chat (mock server)', () => {
     const text = await actionContent.textContent();
     expect(text?.trim()).toBe('Second response');
   });
+
+  /* Preconditions: MockLLMServer configured with slow streaming for first request,
+       fast response for second; app authenticated with mock LLM URL
+     Action: User sends first message, waits for streaming to start, sends second message
+     Assertions: Exactly one message-llm in DOM, no artifacts of first (interrupted) response
+     Requirements: llm-integration.8.5 */
+  test('should not show interrupted llm message in chat', async () => {
+    // First request: slow streaming
+    mockLLMServer.setStreamingMode(true, {
+      content: '{"action":{"type":"text","content":"First response"}}',
+      chunkDelayMs: 300,
+    });
+
+    context = await launchWithMockLLM();
+    const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
+
+    // Send first message
+    await messageInput.fill('First message');
+    await messageInput.press('Enter');
+
+    // Wait for first user message to appear
+    await expect(context.window.locator('[data-testid="message"]').first()).toBeVisible({
+      timeout: 5000,
+    });
+
+    // Wait for streaming to start
+    await context.window.waitForTimeout(500);
+
+    // Switch mock to fast response for second request
+    mockLLMServer.setStreamingMode(true, {
+      content: '{"action":{"type":"text","content":"Second response"}}',
+      chunkDelayMs: 0,
+    });
+
+    // Send second message while first is still streaming
+    await messageInput.fill('Second message');
+    await messageInput.press('Enter');
+
+    // Wait for second response to appear
+    const actionContent = context.window.locator('[data-testid="message-llm-action"]');
+    await expect(actionContent).toBeVisible({ timeout: 15000 });
+    await expect(actionContent).toHaveText('Second response', { timeout: 5000 });
+
+    // Exactly one llm bubble in DOM — interrupted one must not be rendered at all
+    await expect(context.window.locator('[data-testid="message-llm"]')).toHaveCount(1);
+
+    // No text from the interrupted first response anywhere in the chat
+    await expect(context.window.locator('text=First response')).toHaveCount(0);
+  });
 });
