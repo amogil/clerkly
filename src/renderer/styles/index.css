@@ -9,3 +9,9 @@
   overflow-x: hidden;
   display: block !important;
 }
+
+/* Hide scrollbar without remounting (avoids flicker from Radix type prop change) */
+.scrollbar-hidden [data-slot="scroll-area-scrollbar"] {
+  opacity: 0;
+  pointer-events: none;
+}

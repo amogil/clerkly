@@ -222,6 +222,90 @@ test.describe('LLM Chat (real OpenAI)', () => {
     });
     expect(distanceFromBottom).toBeLessThan(50);
   });
+
+  /* Preconditions: App authenticated with real OpenAI API key, chat pre-filled with 15 messages,
+       user is at bottom
+     Action: User sends a message, waits for LLM response
+     Assertions: Scrollbar DOM node must NOT be removed and re-added during the send+response
+       cycle — Radix remounts scrollbar when type prop changes (scroll→hover→scroll),
+       causing visible flicker
+     Requirements: agents.4.13.5 */
+  test('should not flicker scrollbar when sending message and receiving response', async () => {
+    context = await launchWithRealLLM(OPENAI_API_KEY!);
+
+    const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
+
+    // Pre-fill chat with messages to make it scrollable
+    const agentIcons = context.window.locator('[data-testid^="agent-icon-"]');
+    await expect(agentIcons).toHaveCount(1, { timeout: 5000 });
+    const firstAgentId = (await agentIcons.first().getAttribute('data-testid'))?.replace(
+      'agent-icon-',
+      ''
+    );
+    for (let i = 1; i <= 15; i++) {
+      await context.window.evaluate(
+        async ({ agentId, text }) => {
+          // @ts-expect-error - window.api is exposed via contextBridge
+          return await window.api.test.createAgentMessage(agentId, text);
+        },
+        { agentId: firstAgentId as string, text: `Pre-fill message ${i}` }
+      );
+    }
+    await expect(context.window.locator('[data-testid="message"]')).toHaveCount(15, {
+      timeout: 5000,
+    });
+
+    // Scroll to bottom and wait to settle
+    await context.window.locator('[data-testid="messages-area"]').evaluate((el) => {
+      el.scrollTop = el.scrollHeight;
+    });
+    await context.window.waitForTimeout(500);
+
+    // Watch for scrollbar DOM node being removed (remount = flicker)
+    // Radix remounts scrollbar when type prop changes scroll→hover→scroll
+    await context.window.evaluate(() => {
+      (window as Window & { __scrollbarRemovals?: number }).__scrollbarRemovals = 0;
+
+      const scrollAreaRoot = document.querySelector('[data-slot="scroll-area"]');
+      if (!scrollAreaRoot) return;
+
+      const observer = new MutationObserver((mutations) => {
+        for (const mutation of mutations) {
+          for (const node of Array.from(mutation.removedNodes)) {
+            if (
+              node instanceof Element &&
+              (node.getAttribute('data-slot') === 'scroll-area-scrollbar' ||
+                node.querySelector('[data-slot="scroll-area-scrollbar"]'))
+            ) {
+              (window as Window & { __scrollbarRemovals?: number }).__scrollbarRemovals! += 1;
+            }
+          }
+        }
+      });
+      observer.observe(scrollAreaRoot, { childList: true, subtree: true });
+      (window as Window & { __scrollbarObserver?: MutationObserver }).__scrollbarObserver = observer;
+    });
+
+    // Send message
+    await messageInput.fill('Say exactly: ok');
+    await messageInput.press('Enter');
+
+    // Wait for LLM response
+    await expect(context.window.locator('[data-testid="message-llm-action"]')).toBeVisible({
+      timeout: 30000,
+    });
+
+    // Wait for post-scroll animations to settle
+    await context.window.waitForTimeout(700);
+
+    const removals = await context.window.evaluate(() => {
+      (window as Window & { __scrollbarObserver?: MutationObserver }).__scrollbarObserver?.disconnect();
+      return (window as Window & { __scrollbarRemovals?: number }).__scrollbarRemovals ?? 0;
+    });
+
+    // Scrollbar must not be removed from DOM (no remount = no flicker)
+    expect(removals).toBe(0);
+  });
 });
 
 test.describe('LLM Chat (mock server)', () => {
@@ -252,7 +336,6 @@ test.describe('LLM Chat (mock server)', () => {
     await expectNoToastError(ctx.window);
     return ctx;
   }
-
   /* Preconditions: MockLLMServer configured with slow streaming (300ms between chunks),
        app authenticated with mock LLM URL
      Action: User sends first message, then sends second message while first is still streaming
@@ -637,4 +720,6 @@ test.describe('LLM Chat (mock server)', () => {
     // User message should be removed from chat (hidden=true)
     await expect(userMessages).toHaveCount(0, { timeout: 5000 });
   });
+
 });
+

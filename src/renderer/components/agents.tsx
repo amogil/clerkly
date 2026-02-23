@@ -34,7 +34,7 @@ export function Agents({ onNavigate }: { onNavigate?: (screen: string) => void }
   const scrollAreaRootRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<AutoExpandingTextareaHandle>(null);
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
-  const [scrollAreaType, setScrollAreaType] = useState<'scroll' | 'hover'>('scroll');
+  const [scrollbarHidden, setScrollbarHidden] = useState(false);
 
   const { agents, activeAgent, createAgent, selectAgent, isLoading } = useAgents();
   const { messages, sendMessage } = useMessages(activeAgent?.id || null);
@@ -78,9 +78,9 @@ export function Agents({ onNavigate }: { onNavigate?: (screen: string) => void }
 
   // Requirements: agents.4.13.5, agents.4.14.4, agents.4.14.8
   const scrollToBottom = (instant = false) => {
-    setScrollAreaType('hover');
+    setScrollbarHidden(true);
     messagesEndRef.current?.scrollIntoView({ behavior: instant ? 'auto' : 'smooth' });
-    setTimeout(() => setScrollAreaType('scroll'), instant ? 50 : 500);
+    setTimeout(() => setScrollbarHidden(false), instant ? 50 : 500);
   };
 
   // Requirements: agents.4.13.2, agents.4.13.3
@@ -136,9 +136,9 @@ export function Agents({ onNavigate }: { onNavigate?: (screen: string) => void }
     restoredAgents.current.add(activeAgent.id);
     const savedPosition = scrollPositions.current.get(activeAgent.id);
     if (savedPosition !== undefined) {
-      setScrollAreaType('hover');
+      setScrollbarHidden(true);
       messagesAreaRef.current.scrollTop = savedPosition;
-      setTimeout(() => setScrollAreaType('scroll'), 50);
+      setTimeout(() => setScrollbarHidden(false), 50);
     } else {
       scrollToBottom(true);
     }
@@ -258,8 +258,7 @@ export function Agents({ onNavigate }: { onNavigate?: (screen: string) => void }
       {/* Requirements: agents.4.13.8-11 */}
       <ScrollArea
         ref={scrollAreaRootRef}
-        className="flex-1 min-h-0"
-        type={scrollAreaType}
+        className={`flex-1 min-h-0${scrollbarHidden ? ' scrollbar-hidden' : ''}`}
         scrollHideDelay={1000}
         viewportRef={viewportCallbackRef}
         viewportProps={{ 'data-testid': 'messages-area' } as React.ComponentProps<'div'>}
