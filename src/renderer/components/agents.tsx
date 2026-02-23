@@ -56,6 +56,8 @@ export function Agents({ onNavigate }: { onNavigate?: (screen: string) => void }
 
   // Requirements: agents.4.14.5
   const scrollPositions = useRef<Map<string, number>>(new Map());
+  // Flag: user just sent a message — scroll unconditionally on next agent message
+  const shouldScrollOnNextMessage = useRef(false);
 
   // Callback ref for viewport — sets CSS variable for min-height
   const viewportCallbackRef = (node: HTMLDivElement | null) => {
@@ -110,14 +112,28 @@ export function Agents({ onNavigate }: { onNavigate?: (screen: string) => void }
 
   // Requirements: agents.4.13.1, agents.4.13.2
   useEffect(() => {
-    if (messages.length > 0 && isUserAtBottom()) {
+    if (messages.length === 0) return;
+    const lastMessage = messages[messages.length - 1];
+    // Always scroll when user sends (flag set in handleSend)
+    // Keep flag alive until agent responds (non-user message arrives)
+    if (shouldScrollOnNextMessage.current) {
+      if (lastMessage.kind !== 'user') {
+        shouldScrollOnNextMessage.current = false;
+      }
+      scrollToBottom();
+    } else if (isUserAtBottom()) {
       scrollToBottom();
     }
   }, [messages]);
 
+  // Track which agents have had their scroll position restored on current visit
+  const restoredAgents = useRef<Set<string>>(new Set());
+
   // Requirements: agents.4.14.2, agents.4.14.3, agents.4.14.4, agents.4.14.7, agents.4.14.8
   useEffect(() => {
-    if (!messagesAreaRef.current || !activeAgent) return;
+    if (!messagesAreaRef.current || !activeAgent || messages.length === 0) return;
+    if (restoredAgents.current.has(activeAgent.id)) return;
+    restoredAgents.current.add(activeAgent.id);
     const savedPosition = scrollPositions.current.get(activeAgent.id);
     if (savedPosition !== undefined) {
       setScrollAreaType('hover');
@@ -128,6 +144,15 @@ export function Agents({ onNavigate }: { onNavigate?: (screen: string) => void }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeAgent?.id, messages]);
+
+  // Reset restored flag when switching away from agent so position restores on return
+  useEffect(() => {
+    return () => {
+      // On unmount or agent change, clear all restored flags to allow re-restoration
+      restoredAgents.current.clear();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeAgent?.id]);
 
   // Calculate visible chats based on container width
   useEffect(() => {
@@ -158,6 +183,7 @@ export function Agents({ onNavigate }: { onNavigate?: (screen: string) => void }
     if (success) {
       setTaskInput('');
       scrollPositions.current.delete(activeAgent.id);
+      shouldScrollOnNextMessage.current = true;
       scrollToBottom();
     }
   };
