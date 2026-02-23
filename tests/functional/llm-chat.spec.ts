@@ -160,6 +160,68 @@ test.describe('LLM Chat (real OpenAI)', () => {
     const text = await errorBubble.textContent();
     expect(text?.toLowerCase()).toMatch(/invalid api key|unauthorized|forbidden/);
   });
+
+  /* Preconditions: App authenticated with real OpenAI API key, chat has scrollable content
+     Action: User sends a message (smooth scroll starts), waits for LLM response
+     Assertions: LLM response is fully visible in viewport after autoscroll
+     Requirements: agents.4.13.1, agents.4.13.5 */
+  test('should scroll to show llm response after user message', async () => {
+    context = await launchWithRealLLM(OPENAI_API_KEY!);
+
+    const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
+    const messagesArea = context.window.locator('[data-testid="messages-area"]');
+
+    // Get agent ID to pre-fill chat with scrollable content
+    const agentIcons = context.window.locator('[data-testid^="agent-icon-"]');
+    await expect(agentIcons).toHaveCount(1, { timeout: 5000 });
+    const firstAgentId = (await agentIcons.first().getAttribute('data-testid'))?.replace(
+      'agent-icon-',
+      ''
+    );
+    expect(firstAgentId).toBeTruthy();
+
+    // Pre-fill chat with messages to make it scrollable
+    for (let i = 1; i <= 20; i++) {
+      await context.window.evaluate(
+        async ({ agentId, text }) => {
+          // @ts-expect-error - window.api is exposed via contextBridge
+          return await window.api.test.createAgentMessage(agentId, text);
+        },
+        { agentId: firstAgentId as string, text: `Pre-fill message ${i}` }
+      );
+    }
+    await expect(context.window.locator('[data-testid="message"]')).toHaveCount(20, {
+      timeout: 5000,
+    });
+
+    // Send user message — smooth scroll starts
+    await messageInput.fill('Say exactly: hi');
+    await messageInput.press('Enter');
+
+    await expect(context.window.locator('[data-testid="message-user"]')).toHaveCount(1, {
+      timeout: 5000,
+    });
+
+    // Wait for LLM response
+    const actionContent = context.window.locator('[data-testid="message-llm-action"]');
+    await expect(actionContent).toBeVisible({ timeout: 30000 });
+
+    // Wait for autoscroll to complete
+    await context.window.waitForTimeout(1000);
+
+    // LLM response must be fully visible in viewport
+    const windowHeight = await context.window.evaluate(() => window.innerHeight);
+    const box = await actionContent.boundingBox();
+    expect(box).not.toBeNull();
+    expect(box!.y).toBeGreaterThanOrEqual(0);
+    expect(box!.y + box!.height).toBeLessThanOrEqual(windowHeight + 1);
+
+    // Chat must be scrolled to bottom
+    const distanceFromBottom = await messagesArea.evaluate((el) => {
+      return el.scrollHeight - el.scrollTop - el.clientHeight;
+    });
+    expect(distanceFromBottom).toBeLessThan(50);
+  });
 });
 
 test.describe('LLM Chat (mock server)', () => {
