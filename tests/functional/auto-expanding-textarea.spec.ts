@@ -1,6 +1,6 @@
 import { test, expect, Page, ElectronApplication, _electron as electron } from '@playwright/test';
 import path from 'path';
-import { createMockOAuthServer } from './helpers/electron';
+import { createMockOAuthServer, activeChat } from './helpers/electron';
 import type { MockOAuthServer } from './helpers/mock-oauth-server';
 import { completeOAuthFlow } from './helpers/electron';
 
@@ -124,7 +124,7 @@ test.describe('AutoExpandingTextarea - Functional Tests', () => {
      Requirements: agents.4.6 */
   test('should cap height at 50% of chat area', async () => {
     const textarea = window.locator('[data-testid="auto-expanding-textarea"]');
-    const messagesArea = window.locator('[data-testid="messages-area"]');
+    const messagesArea = activeChat(window).messagesArea;
 
     await expect(textarea).toBeVisible();
     await expect(messagesArea).toBeVisible();

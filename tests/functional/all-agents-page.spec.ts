@@ -7,7 +7,7 @@
 
 import { test, expect, _electron as electron, ElectronApplication, Page } from '@playwright/test';
 import path from 'path';
-import { completeOAuthFlow, createMockOAuthServer } from './helpers/electron';
+import { completeOAuthFlow, createMockOAuthServer, activeChat } from './helpers/electron';
 import type { MockOAuthServer } from './helpers/mock-oauth-server';
 
 let electronApp: ElectronApplication;
@@ -162,7 +162,7 @@ test.describe('All Agents Page', () => {
       await expect(allAgentsTitle).not.toBeVisible();
 
       // Chat interface should be visible
-      const messageInput = window.locator('textarea[placeholder*="Ask"]');
+      const messageInput = activeChat(window).textarea;
       await expect(messageInput).toBeVisible();
     }
   });
@@ -181,7 +181,7 @@ test.describe('All Agents Page', () => {
     await window.waitForTimeout(500);
 
     // Send message that might trigger error (in real scenario)
-    const messageInput = window.locator('textarea[placeholder*="Ask"]');
+    const messageInput = activeChat(window).textarea;
     await messageInput.fill('Test message');
     await messageInput.press('Enter');
     await window.waitForTimeout(500);

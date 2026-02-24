@@ -9,7 +9,7 @@
 
 import { test, expect, _electron as electron, ElectronApplication, Page } from '@playwright/test';
 import path from 'path';
-import { createMockOAuthServer } from './helpers/electron';
+import { createMockOAuthServer, activeChat } from './helpers/electron';
 import type { MockOAuthServer } from './helpers/mock-oauth-server';
 import { completeOAuthFlow } from './helpers/electron';
 
@@ -144,7 +144,7 @@ test.describe('Agents - AgentWelcome', () => {
     await expect(emptyStateHeading).toBeVisible({ timeout: 5000 });
 
     // Find input field and send message
-    const inputField = window.locator('textarea[placeholder*="Ask"]');
+    const inputField = activeChat(window).textarea;
 
     // Type a message
     await inputField.fill('Hello, this is my first message!');

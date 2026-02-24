@@ -7,7 +7,7 @@
 
 import { test, expect, _electron as electron, ElectronApplication, Page } from '@playwright/test';
 import path from 'path';
-import { createMockOAuthServer, completeOAuthFlow } from './helpers/electron';
+import { createMockOAuthServer, completeOAuthFlow, activeChat } from './helpers/electron';
 import type { MockOAuthServer } from './helpers/mock-oauth-server';
 
 let electronApp: ElectronApplication;
@@ -80,10 +80,10 @@ test.describe('Agent Status Calculation', () => {
     expect(classes).toContain('bg-sky-400');
 
     // Send message - status should change to "in-progress"
-    const messageInput = window.locator('textarea[placeholder*="Ask"]');
+    const messageInput = activeChat(window).textarea;
     await messageInput.fill('Test message');
     await messageInput.press('Enter');
-    await expect(window.locator('[data-testid="message-user"]')).toHaveCount(1, { timeout: 5000 });
+    await expect(activeChat(window).userMessages).toHaveCount(1, { timeout: 5000 });
 
     // Status should update to in-progress (blue-500)
     classes = await agentAvatar.getAttribute('class');
@@ -102,14 +102,14 @@ test.describe('Agent Status Calculation', () => {
      Assertions: Status updates immediately
      Requirements: agents.9.3 */
   test('should update status on new message', async () => {
-    const messageInput = window.locator('textarea[placeholder*="Ask"]');
+    const messageInput = activeChat(window).textarea;
     await messageInput.fill('First message');
     await messageInput.press('Enter');
-    await expect(window.locator('[data-testid="message-user"]')).toHaveCount(1, { timeout: 5000 });
+    await expect(activeChat(window).userMessages).toHaveCount(1, { timeout: 5000 });
 
     await messageInput.fill('Second message');
     await messageInput.press('Enter');
-    await expect(window.locator('[data-testid="message-user"]')).toHaveCount(2, { timeout: 5000 });
+    await expect(activeChat(window).userMessages).toHaveCount(2, { timeout: 5000 });
 
     // Color lives on agent-avatar-icon
     const agentAvatar = window
@@ -127,10 +127,10 @@ test.describe('Agent Status Calculation', () => {
      Assertions: Status is deterministic and consistent
      Requirements: agents.9.4 */
   test('should calculate status deterministically', async () => {
-    const messageInput = window.locator('textarea[placeholder*="Ask"]');
+    const messageInput = activeChat(window).textarea;
     await messageInput.fill('Test message');
     await messageInput.press('Enter');
-    await expect(window.locator('[data-testid="message-user"]')).toHaveCount(1, { timeout: 5000 });
+    await expect(activeChat(window).userMessages).toHaveCount(1, { timeout: 5000 });
 
     // Get status color before reload
     const agentAvatar = window

@@ -8,7 +8,7 @@
 
 import { test, expect, _electron as electron, ElectronApplication, Page } from '@playwright/test';
 import path from 'path';
-import { createMockOAuthServer } from './helpers/electron';
+import { createMockOAuthServer, activeChat } from './helpers/electron';
 import type { MockOAuthServer } from './helpers/mock-oauth-server';
 import { completeOAuthFlow } from './helpers/electron';
 
@@ -97,7 +97,7 @@ test.describe('Agents - Auto-create First Agent', () => {
     await expect(agentTitle).toBeVisible({ timeout: 5000 });
 
     // Verify that the input field is enabled (not disabled)
-    const inputField = window.locator('textarea[placeholder*="Ask"]');
+    const inputField = activeChat(window).textarea;
     await expect(inputField).toBeEnabled();
   });
 
@@ -134,7 +134,7 @@ test.describe('Agents - Auto-create First Agent', () => {
     await expect(newAgentTitle).toBeVisible({ timeout: 5000 });
 
     // Verify that the input field is still enabled
-    const inputField = window.locator('textarea[placeholder*="Ask"]');
+    const inputField = activeChat(window).textarea;
     await expect(inputField).toBeEnabled();
   });
 
@@ -181,11 +181,11 @@ test.describe('Agents - Auto-create First Agent', () => {
     await expect(newChatButton).toBeVisible();
 
     // 3. Messages area (may be empty but should exist)
-    const messagesArea = window.locator('[data-testid="messages-area"]');
+    const messagesArea = activeChat(window).messagesArea;
     await expect(messagesArea).toBeVisible();
 
     // 4. Input field
-    const inputField = window.locator('textarea[placeholder*="Ask"]');
+    const inputField = activeChat(window).textarea;
     await expect(inputField).toBeVisible();
     await expect(inputField).toBeEnabled();
 

@@ -8,7 +8,7 @@
 
 import { test, expect, _electron as electron, ElectronApplication, Page } from '@playwright/test';
 import path from 'path';
-import { createMockOAuthServer } from './helpers/electron';
+import { createMockOAuthServer, activeChat } from './helpers/electron';
 import type { MockOAuthServer } from './helpers/mock-oauth-server';
 import { completeOAuthFlow } from './helpers/electron';
 
@@ -109,7 +109,7 @@ test.describe('Agent Reordering', () => {
     expect(lastAgentId).not.toBe(firstAgentId);
 
     // Send a message to the last agent
-    const textarea = window.locator('textarea[placeholder*="Ask"]');
+    const textarea = activeChat(window).textarea;
     await expect(textarea).toBeVisible();
     await textarea.fill('Test message to update timestamp');
     await textarea.press('Enter');
@@ -141,7 +141,7 @@ test.describe('Agent Reordering', () => {
     }
 
     // Send a message to the first agent to ensure it has history
-    const textarea = window.locator('textarea[placeholder*="Ask"]');
+    const textarea = activeChat(window).textarea;
     await expect(textarea).toBeVisible();
     await textarea.fill('Initial message');
     await textarea.press('Enter');
@@ -221,7 +221,7 @@ test.describe('Agent Reordering', () => {
     await agentIcons.nth(2).click();
     await window.waitForTimeout(300);
 
-    const textarea = window.locator('textarea[placeholder*="Ask"]');
+    const textarea = activeChat(window).textarea;
     await textarea.fill('Message to agent 3');
     await textarea.press('Enter');
 
@@ -313,7 +313,7 @@ test.describe('Agent Reordering', () => {
     }
 
     // Send message to first agent to create history
-    const textarea = window.locator('textarea[placeholder*="Ask"]');
+    const textarea = activeChat(window).textarea;
     await textarea.fill('Initial message');
     await textarea.press('Enter');
     await window.waitForTimeout(500);

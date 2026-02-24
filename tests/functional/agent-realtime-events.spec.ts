@@ -7,7 +7,7 @@
 
 import { test, expect, _electron as electron, ElectronApplication, Page } from '@playwright/test';
 import path from 'path';
-import { completeOAuthFlow, createMockOAuthServer } from './helpers/electron';
+import { completeOAuthFlow, createMockOAuthServer, activeChat } from './helpers/electron';
 import type { MockOAuthServer } from './helpers/mock-oauth-server';
 
 let electronApp: ElectronApplication;
@@ -127,13 +127,13 @@ test.describe('Agent Real-time Events', () => {
 
     // Switch to second agent
     await secondIcon.click();
-    await expect(window.locator('textarea[placeholder*="Ask"]')).toBeVisible();
+    await expect(activeChat(window).textarea).toBeVisible();
 
     // Send message (triggers agent.updated event)
-    const messageInput = window.locator('textarea[placeholder*="Ask"]');
+    const messageInput = activeChat(window).textarea;
     await messageInput.fill('Update agent');
     await messageInput.press('Enter');
-    await expect(window.locator('[data-testid="message-user"]')).toHaveCount(1, { timeout: 5000 });
+    await expect(activeChat(window).userMessages).toHaveCount(1, { timeout: 5000 });
 
     // Agent should move to first position
     const firstIcon = agentIcons.nth(0);
@@ -176,11 +176,11 @@ test.describe('Agent Real-time Events', () => {
      Requirements: agents.12.4, agents.12.7 */
   test('should add message on message.created event', async () => {
     // Get initial message count
-    const messages = window.locator('[data-testid="message"]');
+    const messages = activeChat(window).messages;
     const initialCount = await messages.count();
 
     // Send message
-    const messageInput = window.locator('textarea[placeholder*="Ask"]');
+    const messageInput = activeChat(window).textarea;
     await messageInput.fill('Test message for event');
     await messageInput.press('Enter');
 
@@ -199,7 +199,7 @@ test.describe('Agent Real-time Events', () => {
      Requirements: agents.12.5, agents.12.7 */
   test('should update message on message.updated event', async () => {
     // Send message
-    const messageInput = window.locator('textarea[placeholder*="Ask"]');
+    const messageInput = activeChat(window).textarea;
     await messageInput.fill('Initial message');
     await messageInput.press('Enter');
 
@@ -235,10 +235,10 @@ test.describe('Agent Real-time Events', () => {
     expect(hasInitialStatus).toBe(true);
 
     // Send message - status should change
-    const messageInput = window.locator('textarea[placeholder*="Ask"]');
+    const messageInput = activeChat(window).textarea;
     await messageInput.fill('Change status');
     await messageInput.press('Enter');
-    await expect(window.locator('[data-testid="message-user"]')).toHaveCount(1, { timeout: 5000 });
+    await expect(activeChat(window).userMessages).toHaveCount(1, { timeout: 5000 });
 
     // Status should update (to in-progress or other)
     classes = await agentAvatarIcon.getAttribute('class');

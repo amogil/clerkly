@@ -7,7 +7,7 @@
 
 import { test, expect, _electron as electron, ElectronApplication, Page } from '@playwright/test';
 import path from 'path';
-import { completeOAuthFlow, createMockOAuthServer } from './helpers/electron';
+import { completeOAuthFlow, createMockOAuthServer, activeChat } from './helpers/electron';
 import type { MockOAuthServer } from './helpers/mock-oauth-server';
 
 let electronApp: ElectronApplication;
@@ -91,10 +91,10 @@ test.describe('Agent Status Indicators', () => {
      Requirements: agents.6.2, agents.6.6 */
   test('should animate in-progress status', async () => {
     // Send message to create in-progress status
-    const messageInput = window.locator('textarea[placeholder*="Ask"]');
+    const messageInput = activeChat(window).textarea;
     await messageInput.fill('Test message');
     await messageInput.press('Enter');
-    await expect(window.locator('[data-testid="message-user"]')).toHaveCount(1, { timeout: 5000 });
+    await expect(activeChat(window).userMessages).toHaveCount(1, { timeout: 5000 });
 
     // Check for spinning animation
     const agentIcon = window.locator('[data-testid^="agent-icon-"]').first();
@@ -152,13 +152,13 @@ test.describe('Agent Status Indicators', () => {
 
     // Switch to second agent
     await secondIcon.click();
-    await expect(window.locator('textarea[placeholder*="Ask"]')).toBeVisible();
+    await expect(activeChat(window).textarea).toBeVisible();
 
     // Send message to move it to first position
-    const messageInput = window.locator('textarea[placeholder*="Ask"]');
+    const messageInput = activeChat(window).textarea;
     await messageInput.fill('Move to top');
     await messageInput.press('Enter');
-    await expect(window.locator('[data-testid="message-user"]')).toHaveCount(1, { timeout: 5000 });
+    await expect(activeChat(window).userMessages).toHaveCount(1, { timeout: 5000 });
 
     // Check that agent moved to first position
     const firstIcon = agentIcons.nth(0);
@@ -179,15 +179,15 @@ test.describe('Agent Status Indicators', () => {
      Requirements: agents.6.7 */
   test('should not show animation when agent status updates without position change', async () => {
     // Agent at position 0 receives message
-    const messageInput = window.locator('textarea[placeholder*="Ask"]');
+    const messageInput = activeChat(window).textarea;
     await messageInput.fill('First message');
     await messageInput.press('Enter');
-    await expect(window.locator('[data-testid="message-user"]')).toHaveCount(1, { timeout: 5000 });
+    await expect(activeChat(window).userMessages).toHaveCount(1, { timeout: 5000 });
 
     // Send another message (agent stays at position 0)
     await messageInput.fill('Second message');
     await messageInput.press('Enter');
-    await expect(window.locator('[data-testid="message-user"]')).toHaveCount(2, { timeout: 5000 });
+    await expect(activeChat(window).userMessages).toHaveCount(2, { timeout: 5000 });
 
     // Header icon should not show activation animation
     // (This is hard to test directly, but we can check structure)
@@ -216,22 +216,22 @@ test.describe('Agent Status Indicators', () => {
 
     // Switch to second agent using stable ID
     await window.locator(`[data-testid="${secondAgentTestId}"]`).click();
-    await expect(window.locator('textarea[placeholder*="Ask"]')).toBeVisible();
+    await expect(activeChat(window).textarea).toBeVisible();
 
     // Send message to second agent (moves it to top)
-    const messageInput = window.locator('textarea[placeholder*="Ask"]');
+    const messageInput = activeChat(window).textarea;
     await messageInput.fill('Message to second agent');
     await messageInput.press('Enter');
-    await expect(window.locator('[data-testid="message-user"]')).toHaveCount(1, { timeout: 5000 });
+    await expect(activeChat(window).userMessages).toHaveCount(1, { timeout: 5000 });
 
     // Switch to first agent using stable ID
     await window.locator(`[data-testid="${firstAgentTestId}"]`).click();
-    await expect(window.locator('textarea[placeholder*="Ask"]')).toBeVisible();
+    await expect(activeChat(window).textarea).toBeVisible();
 
     // Send message to first agent (moves it to top)
     await messageInput.fill('Message to first agent');
     await messageInput.press('Enter');
-    await expect(window.locator('[data-testid="message-user"]')).toHaveCount(1, { timeout: 5000 });
+    await expect(activeChat(window).userMessages).toHaveCount(1, { timeout: 5000 });
 
     // First agent should now be at position 0
     // Animation should have been triggered

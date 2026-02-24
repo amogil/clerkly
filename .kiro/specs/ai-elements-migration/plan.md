@@ -684,6 +684,304 @@ interface UseAgentChatResult {
 
 ---
 
+---
+
+## Падающие функциональные тесты
+
+### Анализ и план исправления
+
+Ниже — детальный разбор каждого упавшего теста: причина падения и конкретный план исправления.
+
+---
+
+#### 1. `agent-messaging.spec.ts`
+
+**Упавшие тесты:**
+- `should NOT autoscroll when user is scrolled up`
+- `should autoscroll when agent responds and user is at bottom`
+- `should NOT autoscroll when agent responds and user scrolled up`
+
+**Сценарий:**
+Тесты проверяют поведение автоскролла в `[data-testid="messages-area"]`: при отправке сообщения пользователем и при получении ответа агента. Используют прямой доступ к `el.scrollTop` для установки и проверки позиции скролла.
+
+**Причины падения:**
+- `messages-area` — это `ConversationContent` из AI Elements, который использует `use-stick-to-bottom`. Этот компонент управляет скроллом через собственный механизм, а не через нативный `scrollTop` DOM-элемента.
+- `el.scrollTop = 100` может не работать корректно, потому что `use-stick-to-bottom` перехватывает скролл-события и может сбрасывать позицию.
+- Тест `should autoscroll when agent responds and user is at bottom` использует `window.api.test.createAgentMessage` — этот тестовый API может не быть зарегистрирован в текущей сборке.
+- Тест `should NOT autoscroll when agent responds and user scrolled up` аналогично зависит от `window.api.test.createAgentMessage`.
+
+**План исправления:**
+1. Переписать тесты автоскролла: вместо `el.scrollTop = 100` использовать `messagesArea.evaluate(el => el.scrollTop = 100)` с последующей проверкой через `waitForFunction` что скролл действительно установился.
+2. Для тестов с `window.api.test.createAgentMessage` — проверить, зарегистрирован ли этот IPC handler в `TestIPCHandlers` или аналогичном файле. Если нет — добавить.
+3. Альтернатива для автоскролл-тестов: проверять видимость последнего сообщения через `toBeInViewport()` вместо прямого `scrollTop`.
+4. Файл для изменений: `tests/functional/agent-messaging.spec.ts`, возможно `src/main/TestIPCHandlers.ts` (или аналог).
+
+---
+
+#### 2. `agent-scroll-position.spec.ts`
+
+**Упавшие тесты:**
+- `should save and restore scroll position when switching agents`
+- `should reset scroll position when user sends message`
+- `should maintain independent scroll positions for multiple agents`
+- `should scroll to bottom on first visit to agent`
+
+**Сценарий:**
+Тесты проверяют сохранение/восстановление позиции скролла при переключении агентов. Используют `el.scrollTop = 100` для установки позиции и `el.scrollTop` для проверки.
+
+**Причины падения:**
+- Новая архитектура: все `AgentChat` монтируются одновременно и скрываются через CSS `hidden`. `Conversation` (use-stick-to-bottom) хранит позицию скролла автоматически — но только если DOM-элемент не скрыт через `display: none` (что делает `hidden`).
+- При `className="hidden"` браузер устанавливает `display: none`, что сбрасывает `scrollTop` в 0. Поэтому позиция скролла НЕ сохраняется автоматически при CSS-скрытии.
+- `el.scrollTop = 100` устанавливается на `ConversationContent`, но `use-stick-to-bottom` может перехватывать и сбрасывать это значение.
+- Тест `should reset scroll position when user sends message` ожидает автоскролл к низу после отправки — это должно работать через `use-stick-to-bottom`, но может не срабатывать из-за конфликта с ручной установкой `scrollTop`.
+
+**План исправления:**
+1. Исправить механизм скрытия агентов: вместо `className="hidden"` (display:none) использовать `className="invisible absolute"` или `visibility: hidden` + `pointer-events: none` — это сохраняет layout и scrollTop.
+2. Альтернатива: хранить `scrollTop` в Map при скрытии агента и восстанавливать при показе (аналог старого механизма, но упрощённый).
+3. Переписать тесты: вместо прямого `el.scrollTop` проверять видимость конкретных сообщений через `toBeInViewport()`.
+4. Файлы для изменений: `src/renderer/components/agents/AgentChat.tsx` (механизм скрытия), `tests/functional/agent-scroll-position.spec.ts`.
+
+---
+
+#### 3. `input-autofocus.spec.ts`
+
+**Упавшие тесты:**
+- `should auto-focus input when switching agents`
+- `should auto-focus input when returning from AllAgents`
+- `should auto-focus input when creating new agent`
+- `should not auto-focus when AllAgents page is open`
+
+**Сценарий:**
+Тесты проверяют автофокус на `textarea[placeholder*="Ask"]` при переключении агентов, создании нового агента и возврате из AllAgents.
+
+**Причины падения:**
+- В `AgentChat.tsx` автофокус реализован через `setTimeout(() => textareaRef.current?.focus(), 100)` при изменении `isActive`. Это должно работать.
+- Проблема: все `AgentChat` монтируются одновременно. При переключении агента `isActive` меняется у двух компонентов одновременно — у старого (false) и нового (true). Возможен race condition: фокус устанавливается на новый агент, но затем сбрасывается другим эффектом.
+- Тест `should not auto-focus when AllAgents page is open` — когда открыта AllAgents страница, `textarea` не видна (рендерится другой компонент). Тест проверяет `not.toBeVisible()` — это должно работать, но может падать если `textarea` всё ещё в DOM через hidden AgentChat.
+- Тест `should auto-focus input when returning from AllAgents` использует `[data-testid="all-agents-button"]` — нужно проверить что этот testid существует в `AgentHeader`.
+
+**План исправления:**
+1. Проверить наличие `data-testid="all-agents-button"` в `AgentHeader` компоненте.
+2. Исправить race condition автофокуса: добавить проверку что компонент всё ещё активен перед вызовом `focus()` внутри `setTimeout`.
+3. Для теста `should not auto-focus when AllAgents page is open`: убедиться что `textarea` действительно не видна когда открыта AllAgents (проверить что `AgentChat` скрыт через `hidden` когда `showAllTasksPage === true`).
+4. Файлы для изменений: `src/renderer/components/agents/AgentChat.tsx`, `src/renderer/components/agents/AgentHeader.tsx`.
+
+---
+
+#### 4. `empty-state-placeholder.spec.ts`
+
+**Упавшие тесты:**
+- `should hide AgentWelcome after sending first message`
+- `should show AgentWelcome when creating new agent`
+
+**Сценарий:**
+Тесты проверяют что `AgentWelcome` скрывается после отправки первого сообщения и показывается при создании нового агента.
+
+**Причины падения:**
+- В новой архитектуре `AgentWelcome` рендерится внутри `AgentChat` на основе `rawMessages.length === 0`. После отправки сообщения `rawMessages` обновляется через `MESSAGE_CREATED` событие — `AgentWelcome` должен скрыться.
+- Возможная проблема: `rawMessages` обновляется через `useEventSubscription(MESSAGE_CREATED)` в `useAgentChat`. Если событие приходит с задержкой или не приходит — `AgentWelcome` остаётся видимым.
+- Тест `should show AgentWelcome when creating new agent`: при создании нового агента новый `AgentChat` монтируется с пустым `rawMessages` — `AgentWelcome` должен быть виден. Но если `isLoading === true` (идёт загрузка начального чанка), весь `AgentChat` скрыт за лоадером в `agents.tsx`.
+- Проблема с лоадером: `agents.tsx` показывает лоадер пока `loadingAgents.size > 0`. Новый агент сразу добавляет себя в `loadingAgents` через `onLoadingChange`. Если `isLoading` не сбрасывается быстро для пустого агента — лоадер блокирует отображение `AgentWelcome`.
+
+**План исправления:**
+1. Проверить что `useAgentChat` корректно сбрасывает `isLoading = false` для агента без сообщений (пустой ответ от `messages:list-paginated`).
+2. Убедиться что `MESSAGE_CREATED` событие корректно обновляет `rawMessages` в `useAgentChat` — проверить фильтрацию по `agentId`.
+3. Файлы для изменений: `src/renderer/hooks/useAgentChat.ts`, `src/renderer/components/agents/AgentChat.tsx`.
+
+---
+
+#### 5. `agent-switching.spec.ts`
+
+**Упавший тест:**
+- `should load messages for selected agent`
+
+**Сценарий:**
+Тест отправляет сообщение агенту 1, переключается на агент 2, отправляет сообщение агенту 2, затем переключается обратно и проверяет что каждый агент показывает только свои сообщения.
+
+**Причины падения:**
+- В новой архитектуре все `AgentChat` монтируются одновременно. При переключении агента меняется только `isActive` prop — CSS `hidden` скрывает неактивный чат.
+- Проблема: `window.locator('text=Message for agent 1')` ищет текст во всём DOM, включая скрытые (через CSS `hidden`) элементы. Playwright по умолчанию находит элементы даже если они скрыты через `display: none`.
+- Тест `await expect(window.locator('text=Message for agent 2')).not.toBeVisible()` — сообщение агента 2 находится в скрытом `AgentChat`, но Playwright может считать его "не видимым" корректно. Однако `await expect(window.locator('text=Message for agent 1')).toBeVisible()` может найти элемент в скрытом AgentChat агента 1.
+- Реальная проблема: при переключении на агент 1, его `AgentChat` становится видимым, но сообщения агента 2 тоже присутствуют в DOM (в скрытом AgentChat). Тест `not.toBeVisible()` должен работать корректно для скрытых элементов.
+
+**План исправления:**
+1. Уточнить локаторы в тесте: вместо `window.locator('text=Message for agent 1')` использовать локатор внутри активного AgentChat: `window.locator('[data-testid="messages-area"]:visible >> text=Message for agent 1'`.
+2. Или добавить `data-testid` на активный AgentChat для более точного поиска.
+3. Файлы для изменений: `tests/functional/agent-switching.spec.ts`.
+
+---
+
+#### 6. `agent-reordering.spec.ts`
+
+**Упавшие тесты:**
+- `should move agent to top of list after sending message`
+- `should bring hidden agent to header after sending message`
+- `should maintain correct order when multiple agents are updated`
+- `should reorder immediately after message from AllAgents selection`
+
+**Сценарий:**
+Тесты проверяют что после отправки сообщения агент перемещается в начало списка (сортировка по `updatedAt`).
+
+**Причины падения:**
+- Тесты используют `[data-testid="all-agents-button"]` — нужно проверить что этот testid существует в `AgentHeader`.
+- Основная проблема: после отправки сообщения `updatedAt` агента обновляется в БД, main process эмитит `AGENT_UPDATED` событие, `useAgents` hook обновляет список агентов. Список в `agents.tsx` пересортировывается — `AgentHeader` получает новый порядок.
+- Возможная проблема: `useAgents` hook может не реагировать на `AGENT_UPDATED` событие достаточно быстро, или порядок сортировки не обновляется.
+- Тест `should bring hidden agent to header after sending message` зависит от `[data-testid="all-agents-button"]`.
+- Тест `should reorder immediately after message from AllAgents selection` — после выбора агента из AllAgents и отправки сообщения, агент должен переместиться в начало. Зависит от корректной работы `useAgents` и `AGENT_UPDATED`.
+
+**План исправления:**
+1. Проверить наличие `data-testid="all-agents-button"` в `AgentHeader` — добавить если отсутствует.
+2. Проверить что `useAgents` hook подписывается на `AGENT_UPDATED` событие и пересортировывает список.
+3. Увеличить таймауты ожидания в тестах если нужно.
+4. Файлы для изменений: `src/renderer/components/agents/AgentHeader.tsx`, `src/renderer/hooks/useAgents.ts`, `tests/functional/agent-reordering.spec.ts`.
+
+---
+
+#### 7. `agent-data-isolation.spec.ts`
+
+**Упавшие тесты:**
+- `should only show agents for current user`
+- `should create agent with current userId`
+
+**Сценарий:**
+Тесты проверяют что агенты изолированы по пользователю.
+
+**Причины падения:**
+- Тест `should only show agents for current user`: после создания нового агента ожидает `newCount === initialCount + 1`. Проблема: при создании нового агента он сразу становится активным и перемещается в начало списка. Если `initialCount` был получён до полной загрузки — может быть race condition.
+- Тест `should create agent with current userId`: после создания агента ожидает `ring-2 ring-primary` на первом агенте. Новый агент должен быть активным и первым в списке. Возможная проблема: новый агент создаётся, но `useAgents` не успевает обновить список до проверки.
+- Более вероятная причина: порт `8898` используется одновременно в `agent-messaging.spec.ts` (порт 8898) и `agent-data-isolation.spec.ts` (порт 8898) — конфликт портов при параллельном запуске тестов.
+
+**План исправления:**
+1. Изменить порт в `agent-data-isolation.spec.ts` с `8898` на уникальный (например `8905`) — конфликт с `agent-messaging.spec.ts` и `input-autofocus.spec.ts` которые тоже используют `8898`.
+2. Добавить `waitForTimeout` или `waitForFunction` после создания агента перед проверкой счётчика.
+3. Файлы для изменений: `tests/functional/agent-data-isolation.spec.ts`.
+
+---
+
+#### 8. `agent-date-update.spec.ts`
+
+**Упавший тест:**
+- `should update agent timestamp when new message is sent`
+
+**Сценарий:**
+Тест создаёт агента с сообщением 5-минутной давности через `window.api.test.createAgentWithOldMessage(5)`, затем отправляет новое сообщение и проверяет что timestamp в заголовке обновился.
+
+**Причины падения:**
+- `window.api.test.createAgentWithOldMessage` — тестовый IPC API. Нужно проверить что он зарегистрирован в main process.
+- `[data-testid="agent-header-timestamp"]` — нужно проверить что этот testid существует в `AgentHeader`.
+- Тест ожидает что timestamp изменится после отправки сообщения. `AgentHeader` должен отображать `updatedAt` агента и обновляться при получении `AGENT_UPDATED` события.
+
+**План исправления:**
+1. Проверить наличие `window.api.test.createAgentWithOldMessage` в main process — добавить если отсутствует.
+2. Проверить наличие `data-testid="agent-header-timestamp"` в `AgentHeader` — добавить если отсутствует.
+3. Файлы для изменений: `src/main/TestIPCHandlers.ts` (или аналог), `src/renderer/components/agents/AgentHeader.tsx`.
+
+---
+
+#### 9. `agent-list-initial-animation.spec.ts`
+
+**Упавший тест:**
+- `should animate agent reordering with spring motion`
+
+**Сценарий:**
+Тест проверяет что при перестановке агентов (после отправки сообщения) первый агент имеет `transform` или `transition` стили (признак layout-анимации Framer Motion).
+
+**Причины падения:**
+- Тест отправляет сообщение третьему агенту и ожидает что он переместится на первую позицию. Зависит от корректной работы `useAgents` и `AGENT_UPDATED`.
+- Проверка `hasTransform || hasTransition` — Framer Motion layout-анимация добавляет `transform` стили во время анимации. Если проверка происходит после завершения анимации — `transform` может быть `none`.
+- Тест использует `window.waitForFunction` с `timeout: 5000` для ожидания перестановки — может не хватать времени.
+
+**План исправления:**
+1. Увеличить таймаут ожидания перестановки.
+2. Проверять наличие `transition` стилей сразу после перестановки (до завершения анимации).
+3. Или упростить тест: проверять только что перестановка произошла (порядок изменился), без проверки CSS анимации.
+4. Файлы для изменений: `tests/functional/agent-list-initial-animation.spec.ts`.
+
+---
+
+#### 10. `agent-status-indicators.spec.ts`
+
+**Упавшие тесты:**
+- `should show animation only when agent moves to first position`
+- `should show animation when switching back to previous agent`
+
+**Сценарий:**
+Тесты проверяют что `[data-testid="agent-header-icon"]` виден после перемещения агента на первую позицию.
+
+**Причины падения:**
+- `[data-testid="agent-header-icon"]` — нужно проверить что этот testid существует в `AgentHeader`.
+- Тесты зависят от корректной работы перестановки агентов (аналогично `agent-reordering.spec.ts`).
+- Тест `should show animation when switching back to previous agent` отправляет сообщение второму агенту (он перемещается на первую позицию), затем переключается на первый агент и отправляет ему сообщение. Ожидает что `agent-header-icon` виден.
+
+**План исправления:**
+1. Проверить наличие `data-testid="agent-header-icon"` в `AgentHeader` — добавить если отсутствует.
+2. Убедиться что перестановка агентов работает корректно (зависит от исправлений в `agent-reordering.spec.ts`).
+3. Файлы для изменений: `src/renderer/components/agents/AgentHeader.tsx`.
+
+---
+
+#### 11. `all-agents-page.spec.ts`
+
+**Упавший тест:**
+- `should display error message for agent with error status in AllAgents`
+
+**Сценарий:**
+Тест открывает AllAgents страницу через `+N` кнопку и проверяет что карточки агентов содержат статус-текст.
+
+**Причины падения:**
+- Тест создаёт только 2 агента (1 начальный + 1 новый), но `+N` кнопка появляется только когда агентов больше чем `visibleChatsCount`. При маленьком окне `visibleChatsCount` может быть 1-2, и кнопка может не появиться.
+- `[data-testid^="agent-card-"]` — нужно проверить что этот testid существует в `AllAgentsPage`.
+- Тест проверяет `statusText` через `text=/New|In progress|Awaiting response|Error|Completed/` — нужно убедиться что `AllAgentsPage` отображает статус агента.
+
+**План исправления:**
+1. Создать больше агентов (5-6) чтобы гарантированно появилась `+N` кнопка.
+2. Проверить наличие `data-testid="agent-card-{id}"` в `AllAgentsPage`.
+3. Проверить что `AllAgentsPage` отображает статус агента в читаемом формате.
+4. Файлы для изменений: `tests/functional/all-agents-page.spec.ts`, `src/renderer/components/agents/AllAgentsPage.tsx`.
+
+---
+
+#### 12. `auto-expanding-textarea.spec.ts`
+
+**Упавший тест:**
+- `should send message on Enter key`
+
+**Сценарий:**
+Тест заполняет `[data-testid="auto-expanding-textarea"]`, нажимает Enter и проверяет что textarea очищается.
+
+**Причины падения:**
+- `AgentPromptInput` управляет `value` через `taskInput` state в `AgentChat`. После отправки `setTaskInput('')` очищает поле.
+- Возможная проблема: тест нажимает Enter, но `handleKeyDown` в `AgentPromptInput` вызывает `onSubmit()` который вызывает `handleSend()` в `AgentChat`. `handleSend` вызывает `sendMessage(messageText)` — это async операция. `setTaskInput('')` вызывается только если `success === true`.
+- Если `sendMessage` возвращает `false` (например, нет активного агента или ошибка) — `taskInput` не очищается.
+- Другая возможная причина: `disabled={false}` всегда передаётся в `AgentPromptInput`, но `sendMessage` может не работать если `agentId` не установлен.
+
+**План исправления:**
+1. Проверить что `sendMessage` корректно работает в тестовом окружении (без реального LLM).
+2. Убедиться что `setTaskInput('')` вызывается независимо от результата `sendMessage` (или только при успехе — это текущее поведение).
+3. Добавить `await window.waitForTimeout(500)` перед проверкой очистки textarea.
+4. Файлы для изменений: `src/renderer/components/agents/AgentChat.tsx` (логика `handleSend`).
+
+---
+
+### Сводная таблица
+
+| Тест | Основная причина | Приоритет |
+|------|-----------------|-----------|
+| `agent-messaging` (3 теста) | `use-stick-to-bottom` конфликт + `window.api.test` API | Высокий |
+| `agent-scroll-position` (4 теста) | CSS `hidden` сбрасывает `scrollTop` | Высокий |
+| `input-autofocus` (4 теста) | `data-testid="all-agents-button"` отсутствует + race condition | Средний |
+| `empty-state-placeholder` (2 теста) | Лоадер блокирует `AgentWelcome` + `isLoading` не сбрасывается | Средний |
+| `agent-switching` (1 тест) | Локаторы находят скрытые элементы в других AgentChat | Средний |
+| `agent-reordering` (4 теста) | `data-testid="all-agents-button"` отсутствует | Высокий |
+| `agent-data-isolation` (2 теста) | Конфликт портов (8898) | Низкий |
+| `agent-date-update` (1 тест) | `window.api.test.createAgentWithOldMessage` + `agent-header-timestamp` | Средний |
+| `agent-list-initial-animation` (1 тест) | Таймаут + CSS анимация проверяется после завершения | Низкий |
+| `agent-status-indicators` (2 теста) | `data-testid="agent-header-icon"` отсутствует | Средний |
+| `all-agents-page` (1 тест) | Недостаточно агентов для `+N` кнопки | Низкий |
+| `auto-expanding-textarea` (1 тест) | `sendMessage` async + `setTaskInput('')` условный | Средний |
+
+---
+
 ## Зависимости между фазами
 
 ```

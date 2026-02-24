@@ -7,7 +7,7 @@
 
 import { test, expect, _electron as electron, ElectronApplication, Page } from '@playwright/test';
 import path from 'path';
-import { createMockOAuthServer, completeOAuthFlow } from './helpers/electron';
+import { createMockOAuthServer, completeOAuthFlow, activeChat } from './helpers/electron';
 import type { MockOAuthServer } from './helpers/mock-oauth-server';
 
 let electronApp: ElectronApplication;
@@ -68,7 +68,7 @@ test.describe('Agent Messaging', () => {
      Assertions: Message is sent and appears in chat
      Requirements: agents.4.3 */
   test('should send message on Enter key', async () => {
-    const messageInput = window.locator('textarea[placeholder*="Ask"]');
+    const messageInput = activeChat(window).textarea;
     await expect(messageInput).toBeVisible();
 
     // Type message
@@ -78,7 +78,7 @@ test.describe('Agent Messaging', () => {
     await messageInput.press('Enter');
 
     // Check user message appears in chat (LLM response/error is out of scope for this test)
-    const messages = window.locator('[data-testid="message-user"]');
+    const messages = activeChat(window).userMessages;
     await expect(messages.first()).toBeVisible({ timeout: 2000 });
     await expect(messages).toHaveCount(1);
 
@@ -91,7 +91,7 @@ test.describe('Agent Messaging', () => {
      Assertions: New line is added, message is not sent
      Requirements: agents.4.4 */
   test('should add new line on Shift+Enter', async () => {
-    const messageInput = window.locator('textarea[placeholder*="Ask"]');
+    const messageInput = activeChat(window).textarea;
     await expect(messageInput).toBeVisible();
 
     // Type first line
@@ -116,7 +116,7 @@ test.describe('Agent Messaging', () => {
     expect(value).toContain('Line 2');
 
     // No messages should be sent yet
-    const messages = window.locator('[data-testid="message"]');
+    const messages = activeChat(window).messages;
     await expect(messages).toHaveCount(0);
   });
 
@@ -125,23 +125,23 @@ test.describe('Agent Messaging', () => {
      Assertions: Messages are displayed in chronological order (oldest first)
      Requirements: agents.4.8 */
   test('should display messages in chronological order', async () => {
-    const messageInput = window.locator('textarea[placeholder*="Ask"]');
+    const messageInput = activeChat(window).textarea;
 
     // Send multiple messages
     await messageInput.fill('First message');
     await messageInput.press('Enter');
-    await expect(window.locator('[data-testid="message-user"]')).toHaveCount(1, { timeout: 5000 });
+    await expect(activeChat(window).userMessages).toHaveCount(1, { timeout: 5000 });
 
     await messageInput.fill('Second message');
     await messageInput.press('Enter');
-    await expect(window.locator('[data-testid="message-user"]')).toHaveCount(2, { timeout: 5000 });
+    await expect(activeChat(window).userMessages).toHaveCount(2, { timeout: 5000 });
 
     await messageInput.fill('Third message');
     await messageInput.press('Enter');
-    await expect(window.locator('[data-testid="message-user"]')).toHaveCount(3, { timeout: 5000 });
+    await expect(activeChat(window).userMessages).toHaveCount(3, { timeout: 5000 });
 
     // Get user messages only (LLM responses/errors are out of scope for chronological order test)
-    const messages = window.locator('[data-testid="message-user"]');
+    const messages = activeChat(window).userMessages;
     await expect(messages).toHaveCount(3, { timeout: 2000 });
 
     // Check order
@@ -159,8 +159,8 @@ test.describe('Agent Messaging', () => {
      Assertions: Chat scrolls to show the new message
      Requirements: agents.4.13 */
   test('should autoscroll to last message', async () => {
-    const messageInput = window.locator('textarea[placeholder*="Ask"]');
-    const messagesContainer = window.locator('[data-testid="messages-area"]');
+    const messageInput = activeChat(window).textarea;
+    const messagesContainer = activeChat(window).messagesArea;
 
     // Send many messages to create scroll
     for (let i = 1; i <= 10; i++) {
@@ -170,7 +170,7 @@ test.describe('Agent Messaging', () => {
     }
 
     // Check that last user message is visible (scrolled into view)
-    const lastMessage = window.locator('[data-testid="message-user"]').last();
+    const lastMessage = activeChat(window).userMessages.last();
     await expect(lastMessage).toBeVisible();
 
     const lastMessageText = await lastMessage.textContent();
@@ -200,8 +200,8 @@ test.describe('Agent Messaging', () => {
      Assertions: Chat autoscrolls to show new message
      Requirements: agents.4.13.1, agents.4.13.2 */
   test('should autoscroll when new message arrives and user is at bottom', async () => {
-    const messageInput = window.locator('textarea[placeholder*="Ask"]');
-    const messagesArea = window.locator('[data-testid="messages-area"]');
+    const messageInput = activeChat(window).textarea;
+    const messagesArea = activeChat(window).messagesArea;
 
     // Send messages to create content
     for (let i = 1; i <= 10; i++) {
@@ -210,7 +210,7 @@ test.describe('Agent Messaging', () => {
       await window.waitForTimeout(200);
     }
 
-    await expect(window.locator('[data-testid="message-user"]')).toHaveCount(10, { timeout: 5000 });
+    await expect(activeChat(window).userMessages).toHaveCount(10, { timeout: 5000 });
 
     // Ensure user is at bottom
     await window.waitForFunction(
@@ -231,7 +231,7 @@ test.describe('Agent Messaging', () => {
     await messageInput.fill('New message while at bottom');
     await messageInput.press('Enter');
 
-    await expect(window.locator('[data-testid="message-user"]')).toHaveCount(11, { timeout: 5000 });
+    await expect(activeChat(window).userMessages).toHaveCount(11, { timeout: 5000 });
 
     // Wait for autoscroll
     await window.waitForTimeout(500);
@@ -252,8 +252,8 @@ test.describe('Agent Messaging', () => {
      Assertions: Chat does NOT autoscroll (preserves user's position)
      Requirements: agents.4.13.2 */
   test('should NOT autoscroll when user is scrolled up', async () => {
-    const messageInput = window.locator('textarea[placeholder*="Ask"]');
-    const messagesArea = window.locator('[data-testid="messages-area"]');
+    const messageInput = activeChat(window).textarea;
+    const messagesArea = activeChat(window).messagesArea;
 
     // Send many messages to create scrollable content
     for (let i = 1; i <= 20; i++) {
@@ -262,7 +262,7 @@ test.describe('Agent Messaging', () => {
       await window.waitForTimeout(150);
     }
 
-    await expect(window.locator('[data-testid="message-user"]')).toHaveCount(20, {
+    await expect(activeChat(window).userMessages).toHaveCount(20, {
       timeout: 10000,
     });
 
@@ -297,8 +297,8 @@ test.describe('Agent Messaging', () => {
      Assertions: Chat autoscrolls to show agent response
      Requirements: agents.4.13.1, agents.4.13.2 */
   test('should autoscroll when agent responds and user is at bottom', async () => {
-    const messageInput = window.locator('textarea[placeholder*="Ask"]');
-    const messagesArea = window.locator('[data-testid="messages-area"]');
+    const messageInput = activeChat(window).textarea;
+    const messagesArea = activeChat(window).messagesArea;
 
     // Wait for first agent to be auto-created
     const agentIcons = window.locator('[data-testid^="agent-icon-"]');
@@ -316,7 +316,7 @@ test.describe('Agent Messaging', () => {
     await messageInput.press('Enter');
 
     // Wait for message to appear
-    await expect(window.locator('[data-testid="message"]')).toHaveCount(1, { timeout: 5000 });
+    await expect(activeChat(window).messages).toHaveCount(1, { timeout: 5000 });
 
     // Verify user is at bottom
     const isAtBottom = await messagesArea.evaluate((el) => {
@@ -333,7 +333,7 @@ test.describe('Agent Messaging', () => {
     expect(result.success).toBe(true);
 
     // Wait for agent message to appear
-    await expect(window.locator('[data-testid="message"]')).toHaveCount(2, { timeout: 5000 });
+    await expect(activeChat(window).messages).toHaveCount(2, { timeout: 5000 });
 
     // Wait for autoscroll animation to complete
     await window.waitForTimeout(1000);
@@ -350,8 +350,8 @@ test.describe('Agent Messaging', () => {
      Assertions: Chat does NOT autoscroll, position preserved
      Requirements: agents.4.13.2 */
   test('should NOT autoscroll when agent responds and user scrolled up', async () => {
-    const messageInput = window.locator('textarea[placeholder*="Ask"]');
-    const messagesArea = window.locator('[data-testid="messages-area"]');
+    const messageInput = activeChat(window).textarea;
+    const messagesArea = activeChat(window).messagesArea;
 
     // Wait for first agent to be auto-created
     const agentIcons = window.locator('[data-testid^="agent-icon-"]');
@@ -371,7 +371,7 @@ test.describe('Agent Messaging', () => {
       await window.waitForTimeout(150);
     }
 
-    await expect(window.locator('[data-testid="message"]')).toHaveCount(15, { timeout: 10000 });
+    await expect(activeChat(window).messages).toHaveCount(15, { timeout: 10000 });
 
     // Scroll up
     await messagesArea.evaluate((el) => {
@@ -402,7 +402,7 @@ test.describe('Agent Messaging', () => {
     expect(result.success).toBe(true);
 
     // Wait for agent message to appear
-    await expect(window.locator('[data-testid="message"]')).toHaveCount(16, { timeout: 5000 });
+    await expect(activeChat(window).messages).toHaveCount(16, { timeout: 5000 });
 
     // Wait a bit to ensure no autoscroll happens
     await window.waitForTimeout(1000);

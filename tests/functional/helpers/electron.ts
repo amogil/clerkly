@@ -379,6 +379,38 @@ export async function clearTestTokens(window: Page): Promise<void> {
   });
 }
 /**
+ * Locators scoped to the currently active (visible) AgentChat.
+ *
+ * Because all AgentChat components are mounted simultaneously and hidden via
+ * CSS `display:none`, plain locators like `textarea[placeholder*="Ask"]` match
+ * multiple elements and trigger Playwright strict-mode violations.
+ *
+ * Use these helpers everywhere you need to interact with the active chat.
+ *
+ * Requirements: agents.13.3, agents.13.5
+ */
+export function activeChat(window: Page) {
+  // The active AgentChat is the one NOT hidden — it has no "hidden" class.
+  // We scope all child locators to it so strict-mode is never violated.
+  const chat = window.locator('[data-testid="agents"] > div > div:not(.hidden)').last();
+
+  return {
+    /** The visible textarea input */
+    textarea: chat.locator('textarea[placeholder*="Ask"]'),
+    /** The scrollable messages viewport */
+    messagesArea: chat.locator('[data-testid="messages-area"]'),
+    /** All message wrappers (motion.div) */
+    messages: chat.locator('[data-testid="message"]'),
+    /** User message bubbles */
+    userMessages: chat.locator('[data-testid="message-user"]'),
+    /** LLM message bubbles */
+    llmMessages: chat.locator('[data-testid="message-llm"]'),
+    /** Error message bubbles */
+    errorMessages: chat.locator('[data-testid="message-error"]'),
+  };
+}
+
+/**
  * Assert that no toast error notifications are visible on screen.
  * Fails the test with the toast message if an error toast is found.
  *

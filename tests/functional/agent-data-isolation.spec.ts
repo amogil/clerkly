@@ -7,7 +7,7 @@
 
 import { test, expect, _electron as electron, ElectronApplication, Page } from '@playwright/test';
 import path from 'path';
-import { completeOAuthFlow, createMockOAuthServer } from './helpers/electron';
+import { completeOAuthFlow, createMockOAuthServer, activeChat } from './helpers/electron';
 import type { MockOAuthServer } from './helpers/mock-oauth-server';
 
 let electronApp: ElectronApplication;
@@ -93,7 +93,7 @@ test.describe('Agent Data Isolation', () => {
     await window.waitForTimeout(300);
 
     // Should be able to send message (proves ownership)
-    const messageInput = window.locator('textarea[placeholder*="Ask"]');
+    const messageInput = activeChat(window).textarea;
     await expect(messageInput).toBeVisible();
     await expect(messageInput).toBeEnabled();
   });
@@ -116,13 +116,13 @@ test.describe('Agent Data Isolation', () => {
     await expect(firstAgent).toHaveClass(/ring-2 ring-primary/);
 
     // Should be able to interact with it
-    const messageInput = window.locator('textarea[placeholder*="Ask"]');
+    const messageInput = activeChat(window).textarea;
     await messageInput.fill('Test message');
     await messageInput.press('Enter');
     await window.waitForTimeout(500);
 
     // Message should appear (proves agent belongs to user)
-    const messages = window.locator('[data-testid="message"]');
+    const messages = activeChat(window).messages;
     await expect(messages).toHaveCount(1, { timeout: 2000 });
   });
 
@@ -147,7 +147,7 @@ test.describe('Agent Data Isolation', () => {
       await window.waitForTimeout(300);
 
       // Should be able to access without errors
-      const messageInput = window.locator('textarea[placeholder*="Ask"]');
+      const messageInput = activeChat(window).textarea;
       await expect(messageInput).toBeVisible();
       await expect(messageInput).toBeEnabled();
     }

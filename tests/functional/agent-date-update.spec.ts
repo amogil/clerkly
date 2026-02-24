@@ -7,7 +7,7 @@
 
 import { test, expect, _electron as electron, ElectronApplication, Page } from '@playwright/test';
 import path from 'path';
-import { createMockOAuthServer } from './helpers/electron';
+import { createMockOAuthServer, activeChat } from './helpers/electron';
 import type { MockOAuthServer } from './helpers/mock-oauth-server';
 import { completeOAuthFlow } from './helpers/electron';
 
@@ -117,7 +117,7 @@ test.describe('Agents - Date Update on New Message', () => {
     expect(timestampBefore).toBeTruthy();
 
     // Send new message
-    const textarea = window.locator('textarea[placeholder*="Ask"]');
+    const textarea = activeChat(window).textarea;
     await expect(textarea).toBeVisible({ timeout: 5000 });
     await textarea.fill('New message to update timestamp');
     await textarea.press('Enter');

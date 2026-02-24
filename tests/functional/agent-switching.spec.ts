@@ -7,7 +7,7 @@
 
 import { test, expect, _electron as electron, ElectronApplication, Page } from '@playwright/test';
 import path from 'path';
-import { createMockOAuthServer, completeOAuthFlow } from './helpers/electron';
+import { createMockOAuthServer, completeOAuthFlow, activeChat } from './helpers/electron';
 import type { MockOAuthServer } from './helpers/mock-oauth-server';
 
 let mockServer: MockOAuthServer;
@@ -143,7 +143,7 @@ test.describe('Agent Switching', () => {
     );
 
     // Send message to first agent (now active)
-    const messageInput = window.locator('textarea[placeholder*="Ask"]');
+    const messageInput = activeChat(window).textarea;
     await messageInput.fill('Message for agent 1');
     await messageInput.press('Enter');
 

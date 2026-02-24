@@ -3,7 +3,7 @@
 
 import { test, expect, _electron as electron, ElectronApplication, Page } from '@playwright/test';
 import path from 'path';
-import { createMockOAuthServer } from './helpers/electron';
+import { createMockOAuthServer, activeChat } from './helpers/electron';
 import type { MockOAuthServer } from './helpers/mock-oauth-server';
 import { completeOAuthFlow } from './helpers/electron';
 
@@ -74,7 +74,7 @@ test('should auto-focus input on first load', async () => {
   await window.waitForTimeout(500);
 
   // Get the textarea
-  const textarea = window.locator('textarea[placeholder*="Ask"]');
+  const textarea = activeChat(window).textarea;
   await expect(textarea).toBeVisible();
 
   // Check that textarea is focused
@@ -103,7 +103,7 @@ test('should auto-focus input when switching agents', async () => {
   await agentIcons.nth(1).click();
 
   // Wait for textarea to receive focus (useEffect has 100ms delay)
-  const textarea = window.locator('textarea[placeholder*="Ask"]');
+  const textarea = activeChat(window).textarea;
   await expect(textarea).toBeFocused({ timeout: 5000 });
 
   // Click on first agent (switch from second to first)
@@ -132,7 +132,7 @@ test('should auto-focus input when returning from AllAgents', async () => {
   }
 
   // Send a message to create history (so agent appears in AllAgents)
-  const textarea = window.locator('textarea[placeholder*="Ask"]');
+  const textarea = activeChat(window).textarea;
   await textarea.fill('Test message');
   await textarea.press('Enter');
 
@@ -179,7 +179,7 @@ test('should auto-focus input when creating new agent', async () => {
   await expect(agentIcons.nth(1)).toBeVisible({ timeout: 5000 });
 
   // Check that textarea is focused
-  const textarea = window.locator('textarea[placeholder*="Ask"]');
+  const textarea = activeChat(window).textarea;
   await expect(textarea).toBeFocused({ timeout: 5000 });
 });
 
@@ -191,7 +191,7 @@ test('should maintain focus while typing', async () => {
   // Wait for agents page to load
   await expect(window.locator('[data-testid="agents"]')).toBeVisible({ timeout: 5000 });
 
-  const textarea = window.locator('textarea[placeholder*="Ask"]');
+  const textarea = activeChat(window).textarea;
   await expect(textarea).toBeVisible();
 
   // Type text
@@ -226,7 +226,7 @@ test('should not auto-focus when AllAgents page is open', async () => {
   }
 
   // Send a message first
-  const textarea = window.locator('textarea[placeholder*="Ask"]');
+  const textarea = activeChat(window).textarea;
   await textarea.fill('Test message');
   await textarea.press('Enter');
 
