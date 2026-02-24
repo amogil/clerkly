@@ -319,7 +319,7 @@ interface UIMessage {
 - [x] **3.2** Реализовать маппинг типов
 - [x] **3.3** Добавить IPC endpoint `messages:list-paginated` в main process
 - [x] **3.4** Написать unit-тесты для `messageMapper` (`tests/unit/renderer/messageMapper.test.ts`)
-- [x] **3.5** Написать property-based тесты для `messageMapper` (`tests/property/renderer/messageMapper.property.test.ts`)
+- [x] **3.5** Написать unit-тесты для `messageMapper` (`tests/unit/renderer/messageMapper.test.ts`)
 - [x] **3.6** Написать unit-тесты для `listByAgentPaginated`
 - [x] **3.7** Написать unit-тесты для `MessageManager.listPaginated` и `AgentIPCHandlers` (handler `messages:list-paginated`)
 - [ ] **3.8** Написать функциональный тест для ленивой загрузки:

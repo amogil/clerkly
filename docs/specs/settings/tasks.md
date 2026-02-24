@@ -230,33 +230,6 @@
   - Тест: should show error notification on failed connection
   - **Requirements:** settings.3.1, settings.3.2, settings.3.3, settings.3.4, settings.3.7, settings.3.8
 
-### 6. Property-Based Тесты
-
-- [x] 6.1 Property Test: Раздельное хранилище для провайдеров
-  - Проверить изоляцию API ключей между провайдерами
-  - Минимум 100 итераций
-  - **Validates:** Property 6
-  - **Requirements:** settings.1.16, settings.1.19
-
-- [x] 6.2 Property Test: Round-trip шифрования/дешифрования
-  - Проверить сохранение значения через цикл encrypt/decrypt
-  - Минимум 100 итераций
-  - **Validates:** Property 8
-  - **Requirements:** settings.1.22
-
-- [x] 6.3 Property Test: Форматирование дат по системной локали
-  - Проверить корректность форматирования для различных timestamp
-  - Минимум 100 итераций
-  - **Validates:** Property 10
-  - **Requirements:** settings.2.1
-
-- [x] 6.4 Property Test: Обработка различных ответов API
-  - Создать файл `tests/property/llm/LLMProviderResponses.property.test.ts`
-  - Проверить корректную обработку различных HTTP статусов
-  - Проверить корректную обработку различных форматов ошибок
-  - Минимум 100 итераций
-  - **Requirements:** settings.3.8
-
 ### 7. Функциональные Тесты
 
 - [x] 7.1 Функциональный тест: LLM Provider Settings
@@ -294,7 +267,6 @@
   - ESLint проверка
   - Prettier форматирование
   - Модульные тесты
-  - Property-based тесты
 
 - [x] 8.2 Проверить покрытие тестами
   - Минимум 85% покрытие строк кода

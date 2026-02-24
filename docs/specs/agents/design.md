@@ -2035,13 +2035,6 @@ import { Logo } from '../logo';
 | `tests/unit/components/agents-autoscroll.test.tsx` | agents.4.13 |
 | `tests/unit/components/agents-scroll-position.test.tsx` | agents.4.14 |
 
-### Property-Based тесты
-
-| Файл | Покрытие |
-|------|----------|
-| `tests/property/agents/agentId.property.test.ts` | agents.2.3 |
-| `tests/property/agents/status.property.test.ts` | agents.9 |
-
 ### Функциональные тесты
 
 | Файл | Покрытие | Недостающие тесты |
@@ -2134,34 +2127,34 @@ await window.locator(`[data-testid="agent-icon-${firstAgentId}"]`).click();
 
 ### Покрытие требований
 
-| Требование | Модульные | Property-Based | Функциональные |
-|------------|-----------|----------------|----------------|
-| agents.1 | ✓ | - | ✓ |
-| agents.2 | ✓ | ✓ | ✓ |
-| agents.2.7-2.11 (auto-create) | ✓ | ✓ | ✓ |
-| agents.3 | ✓ | - | ✓ |
-| agents.3.5-3.5.3 (custom tooltip) | - | - | ✓ |
-| agents.4 | ✓ | - | ✓ |
-| agents.4.7.1-4.7.2 (autofocus) | - | - | ✓ |
-| agents.4.13.1-4.13.6 (autoscroll) | ✓ | - | ✓ |
-| agents.4.13.4-4.13.6 (scrollbar) | - | - | Manual |
-| agents.4.14.1-4.14.5 (scroll position) | ✓ | - | ✓ |
-| agents.4.23 (text wrapping) | ✓ | - | ✓ |
-| agents.5 | ✓ | - | ✓ |
-| agents.5.5 (error messages) | ✓ | - | ✓ |
-| agents.5.6 (filter archived) | ✓ | - | ✓ |
-| agents.5.7 (sort by updatedAt) | ✓ | - | ✓ |
-| agents.5.8 (optimized SQL) | ✓ | - | - |
-| agents.6 | ✓ | - | ✓ |
-| agents.6.7 (activation animation) | ✓ | - | ✓ |
-| agents.7 | ✓ | - | ✓ |
-| agents.8 | ✓ | - | ✓ |
-| agents.9 | ✓ | ✓ | ✓ |
-| agents.10 | ✓ | - | ✓ |
-| agents.11 | ✓ | - | ✓ |
-| agents.12 | ✓ | - | ✓ |
-| agents.13 (startup loading + lazy scroll) | ✓ | - | ✓ |
-| user-data-isolation.6 | ✓ | - | ✓ |
+| Требование | Модульные | Функциональные |
+|------------|-----------|----------------|
+| agents.1 | ✓ | ✓ |
+| agents.2 | ✓ | ✓ |
+| agents.2.7-2.11 (auto-create) | ✓ | ✓ |
+| agents.3 | ✓ | ✓ |
+| agents.3.5-3.5.3 (custom tooltip) | - | ✓ |
+| agents.4 | ✓ | ✓ |
+| agents.4.7.1-4.7.2 (autofocus) | - | ✓ |
+| agents.4.13.1-4.13.6 (autoscroll) | ✓ | ✓ |
+| agents.4.13.4-4.13.6 (scrollbar) | - | Manual |
+| agents.4.14.1-4.14.5 (scroll position) | ✓ | ✓ |
+| agents.4.23 (text wrapping) | ✓ | ✓ |
+| agents.5 | ✓ | ✓ |
+| agents.5.5 (error messages) | ✓ | ✓ |
+| agents.5.6 (filter archived) | ✓ | ✓ |
+| agents.5.7 (sort by updatedAt) | ✓ | ✓ |
+| agents.5.8 (optimized SQL) | ✓ | - |
+| agents.6 | ✓ | ✓ |
+| agents.6.7 (activation animation) | ✓ | ✓ |
+| agents.7 | ✓ | ✓ |
+| agents.8 | ✓ | ✓ |
+| agents.9 | ✓ | ✓ |
+| agents.10 | ✓ | ✓ |
+| agents.11 | ✓ | ✓ |
+| agents.12 | ✓ | ✓ |
+| agents.13 (startup loading + lazy scroll) | ✓ | ✓ |
+| user-data-isolation.6 | ✓ | ✓ |
 
 ## Зависимости
 

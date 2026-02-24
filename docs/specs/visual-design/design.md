@@ -482,27 +482,6 @@ describe('DependencyResolver', () => {
 });
 ```
 
-### Property-Based Тесты
-
-```typescript
-describe('Visual Design System Properties', () => {
-  // Property 1: Изоляция
-  it('should maintain isolation between Figma Reference and Main Application');
-  
-  // Property 2: Контролируемый перенос
-  it('should only transfer on explicit user request');
-  
-  // Property 3: Сохранение зависимостей
-  it('should preserve all dependencies during transfer');
-  
-  // Property 4: Обработка конфликтов
-  it('should handle conflicts correctly');
-  
-  // Property 5: Уведомления
-  it('should always notify user of transfer results');
-});
-```
-
 ### Функциональные Тесты
 
 ```typescript
@@ -517,7 +496,6 @@ describe('End-to-End Component Transfer', () => {
 ## Фреймворк для Тестирования
 
 - **Модульные тесты**: Jest
-- **Property-based тесты**: fast-check
 - **Функциональные тесты**: Jest + file system mocks
 
 ## Ограничения и Предположения

@@ -298,6 +298,28 @@ describe('DatabaseManager', () => {
       db.close();
     });
 
+    /* Preconditions: database file exists with corrupted content
+       Action: initialize DatabaseManager
+       Assertions: backup preserves original corrupted content
+       Requirements: clerkly.nfr.2.4, clerkly.2.6, clerkly.2.8, clerkly.nfr.4.4 */
+    it('should preserve corrupted database content in backup file', () => {
+      const corruptedContent = 'This is corrupted content that should be preserved';
+
+      originalFs.mkdirSync(testStoragePath, { recursive: true });
+      originalFs.writeFileSync(testDbPath, corruptedContent);
+
+      databaseManager = new DatabaseManager();
+      databaseManager.initialize(testStoragePath);
+
+      const files = originalFs.readdirSync(testStoragePath);
+      const backupFiles = files.filter((f: string) => f.startsWith('clerkly.db.backup-'));
+      expect(backupFiles.length).toBe(1);
+
+      const backupPath = path.join(testStoragePath, backupFiles[0]);
+      const backupContent = originalFs.readFileSync(backupPath, 'utf8');
+      expect(backupContent).toBe(corruptedContent);
+    });
+
     /* Preconditions: storage directory cannot be created due to permission error (EACCES)
        Action: create DatabaseManager and call initialize()
        Assertions: falls back to temp directory, returns success with warning

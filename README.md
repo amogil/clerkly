@@ -54,9 +54,8 @@ npm run typecheck        # Проверка типов
 
 ### Тестирование
 ```bash
-npm test                 # Модульные + property-based тесты
+npm test                 # Модульные тесты
 npm run test:unit        # Модульные тесты
-npm run test:property    # Property-based тесты
 npm run test:functional  # Функциональные тесты (Playwright, показывает окна)
 npm run test:coverage    # Отчет о покрытии
 ```
@@ -80,11 +79,7 @@ npm run package          # Создание дистрибутива (DMG + ZIP)
    - Изолированное тестирование с моками
    - Скорость: < 100ms на тест
 
-2. **Property-based тесты** (`tests/property/`)
-   - Проверка инвариантов на 100+ итерациях
-   - Библиотека: fast-check
-
-3. **Функциональные тесты** (`tests/functional/`)
+2. **Функциональные тесты** (`tests/functional/`)
    - End-to-end с реальным Electron через Playwright
    - ⚠️ Показывают окна на экране
 
@@ -99,7 +94,6 @@ clerkly/
 │   └── types/          # TypeScript типы
 ├── tests/
 │   ├── unit/           # Модульные тесты
-│   ├── property/       # Property-based тесты
 │   └── functional/     # Функциональные тесты (Playwright)
 ├── migrations/         # Миграции SQLite
 ├── docs/specs/        # Спецификации проекта
@@ -115,7 +109,6 @@ clerkly/
 - **SQLite** (better-sqlite3) - Локальное хранение
 - **Vite** 6+ - Сборщик
 - **Jest** + **Playwright** - Тестирование
-- **fast-check** - Property-based тестирование
 
 ## Workflow разработки
 

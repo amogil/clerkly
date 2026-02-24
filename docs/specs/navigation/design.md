@@ -642,33 +642,20 @@ console.log('[AuthGuard] Access denied to protected route:', route);
 
 ## Стратегия Тестирования
 
-### Двойной Подход к Тестированию
+### Подход к Тестированию
 
-Система навигации будет тестироваться с использованием двух комплементарных подходов:
+Система навигации будет тестироваться модульными и функциональными тестами:
 
 1. **Модульные тесты (Unit Tests)**: Проверяют конкретные примеры, граничные случаи и условия ошибок
-2. **Property-based тесты**: Проверяют универсальные свойства на множестве входных данных
-
-Оба подхода необходимы для комплексного покрытия.
+2. **Функциональные тесты**: Проверяют пользовательские сценарии в UI
 
 ### Баланс Модульного Тестирования
 
 - Модульные тесты полезны для конкретных примеров и граничных случаев
-- Избегать написания слишком большого количества модульных тестов - property-based тесты покрывают множество входных данных
 - Модульные тесты должны фокусироваться на:
   - Конкретных примерах, демонстрирующих корректное поведение
   - Точках интеграции между компонентами
   - Граничных случаях и условиях ошибок
-- Property-based тесты должны фокусироваться на:
-  - Универсальных свойствах, которые истинны для всех входных данных
-  - Комплексном покрытии входных данных через рандомизацию
-
-### Конфигурация Property-Based Тестов
-
-- **Библиотека**: `fast-check` для TypeScript/JavaScript
-- **Минимум итераций**: 100 итераций на property-based тест
-- **Тегирование**: Каждый тест должен ссылаться на свойство из документа дизайна
-- **Формат тега**: `Feature: navigation, Property {number}: {property_text}`
 
 ### Модульные Тесты
 
@@ -897,196 +884,6 @@ describe('Loader State Management', () => {
 });
 ```
 
-### Property-Based Тесты
-
-```typescript
-import fc from 'fast-check';
-
-describe('NavigationManager Property Tests', () => {
-  /* Feature: navigation, Property 1: Показ экрана логина для неавторизованных пользователей
-     Preconditions: various auth statuses
-     Action: call initialize() with different auth states
-     Assertions: redirectToLogin called when not authorized
-     Requirements: navigation.1.1 */
-  it('should always redirect to login when not authorized', () => {
-    fc.assert(
-      fc.property(
-        fc.boolean(),
-        async (isAuthorized) => {
-          // Mock auth status
-          mockAuthStatus(isAuthorized);
-
-          // Initialize navigation
-          await navigationManager.initialize();
-
-          // Verify redirect behavior
-          if (!isAuthorized) {
-            expect(mockRouter.navigate).toHaveBeenCalledWith('/login');
-          }
-        }
-      ),
-      { numRuns: 100 }
-    );
-  });
-
-  /* Feature: navigation, Property 2: Блокировка доступа к защищенным экранам
-     Preconditions: various routes and auth statuses
-     Action: call canActivate() with different routes
-     Assertions: protected routes blocked when not authorized
-     Requirements: navigation.1.2 */
-  it('should block access to protected routes when not authorized', () => {
-    fc.assert(
-      fc.property(
-        fc.constantFrom('/agents', '/settings'),
-        fc.boolean(),
-        async (route, isAuthorized) => {
-          // Mock auth status
-          mockAuthStatus(isAuthorized);
-
-          // Check route access
-          const canAccess = await authGuard.canActivate(route);
-
-          // Verify access control
-          if (!isAuthorized) {
-            expect(canAccess).toBe(false);
-            expect(mockNavigationManager.redirectToLogin).toHaveBeenCalled();
-          } else {
-            expect(canAccess).toBe(true);
-          }
-        }
-      ),
-      { numRuns: 100 }
-    );
-  });
-
-  /* Feature: navigation, Property 5: Показ Loader при получении authorization code
-     Preconditions: various auth code received states
-     Action: trigger auth code received event
-     Assertions: loader shown with correct message, button disabled
-     Requirements: navigation.1.5 */
-  it('should show loader when authorization code is received', () => {
-    fc.assert(
-      fc.property(
-        fc.string(),
-        (authCode) => {
-          // Trigger auth code received event
-          triggerAuthCodeReceived(authCode);
-
-          // Verify loader state
-          expect(getLoaderState()).toEqual({
-            isLoading: true,
-            message: 'Signing in...'
-          });
-          expect(getLoginButtonState()).toBe('disabled');
-        }
-      ),
-      { numRuns: 100 }
-    );
-  });
-
-  /* Feature: navigation, Property 6: Синхронный обмен кода и загрузка профиля
-     Preconditions: loader displayed, various auth codes
-     Action: exchange code and fetch profile
-     Assertions: operations complete before redirect
-     Requirements: navigation.1.6 */
-  it('should complete token exchange and profile fetch before redirect', () => {
-    fc.assert(
-      fc.property(
-        fc.string(),
-        fc.record({
-          email: fc.emailAddress(),
-          name: fc.string(),
-          picture: fc.webUrl()
-        }),
-        async (authCode, profile) => {
-          // Mock successful token exchange and profile fetch
-          mockTokenExchange(authCode, { success: true });
-          mockProfileFetch({ success: true, profile });
-
-          // Trigger auth code received
-          await processAuthCode(authCode);
-
-          // Verify operations completed in order
-          expect(getOperationLog()).toEqual([
-            'token_exchange_start',
-            'token_exchange_complete',
-            'profile_fetch_start',
-            'profile_fetch_complete',
-            'redirect_to_dashboard'
-          ]);
-        }
-      ),
-      { numRuns: 100 }
-    );
-  });
-
-  /* Feature: navigation, Property 7: Показ Agents после успешной авторизации
-     Preconditions: various successful auth and profile fetch scenarios
-     Action: complete auth flow
-     Assertions: loader hidden, redirected to dashboard
-     Requirements: navigation.1.7 */
-  it('should hide loader and redirect to dashboard on success', () => {
-    fc.assert(
-      fc.property(
-        fc.string(),
-        fc.record({
-          email: fc.emailAddress(),
-          name: fc.string(),
-          picture: fc.webUrl()
-        }),
-        async (authCode, profile) => {
-          // Mock successful flow
-          mockTokenExchange(authCode, { success: true });
-          mockProfileFetch({ success: true, profile });
-
-          // Process auth code
-          await processAuthCode(authCode);
-
-          // Verify final state
-          expect(getLoaderState().isLoading).toBe(false);
-          expect(getCurrentRoute()).toBe('/agents');
-        }
-      ),
-      { numRuns: 100 }
-    );
-  });
-
-  /* Feature: navigation, Property 8: Показ LoginError при ошибке
-     Preconditions: various error scenarios (token exchange or profile fetch)
-     Action: trigger error during auth flow
-     Assertions: loader hidden, tokens cleared, error shown
-     Requirements: navigation.1.8 */
-  it('should hide loader and show error on auth failure', () => {
-    fc.assert(
-      fc.property(
-        fc.string(),
-        fc.constantFrom('token_exchange_error', 'profile_fetch_error'),
-        async (authCode, errorType) => {
-          // Mock error scenario
-          if (errorType === 'token_exchange_error') {
-            mockTokenExchange(authCode, { success: false, error: 'invalid_grant' });
-          } else {
-            mockTokenExchange(authCode, { success: true });
-            mockProfileFetch({ success: false, error: 'network_error' });
-          }
-
-          // Process auth code
-          await processAuthCode(authCode);
-
-          // Verify error handling
-          expect(getLoaderState().isLoading).toBe(false);
-          expect(getTokensCleared()).toBe(true);
-          expect(getLoginErrorShown()).toBe(true);
-          expect(getLoginErrorCode()).toBe('profile_fetch_failed');
-        }
-      ),
-      { numRuns: 100 }
-    );
-  });
-});
-```
-
-
 ### Функциональные Тесты
 
 Функциональные тесты проверяют полную функциональность системы навигации в реальных условиях использования.
@@ -1223,22 +1020,21 @@ describe('Navigation Functional Tests', () => {
 
 ### Покрытие Требований
 
-| Требование | Модульные Тесты | Property-Based Тесты | Функциональные Тесты |
-|------------|-----------------|----------------------|----------------------|
-| navigation.1.1 | ✓ | ✓ | ✓ |
-| navigation.1.2 | ✓ | ✓ | ✓ |
-| navigation.1.3 | ✓ | - | ✓ |
-| navigation.1.4 | ✓ | - | ✓ |
-| navigation.1.5 | ✓ | ✓ | ✓ |
-| navigation.1.6 | ✓ | ✓ | ✓ |
-| navigation.1.7 | ✓ | ✓ | ✓ |
-| navigation.1.8 | ✓ | ✓ | ✓ |
-| navigation.1.9 | ✓ | - | ✓ |
+| Требование | Модульные Тесты | Функциональные Тесты |
+|------------|-----------------|----------------------|
+| navigation.1.1 | ✓ | ✓ |
+| navigation.1.2 | ✓ | ✓ |
+| navigation.1.3 | ✓ | ✓ |
+| navigation.1.4 | ✓ | ✓ |
+| navigation.1.5 | ✓ | ✓ |
+| navigation.1.6 | ✓ | ✓ |
+| navigation.1.7 | ✓ | ✓ |
+| navigation.1.8 | ✓ | ✓ |
+| navigation.1.9 | ✓ | ✓ |
 
 ### Критерии Успеха
 
 - Все модульные тесты проходят
-- Все property-based тесты проходят (минимум 100 итераций каждый)
 - Покрытие кода минимум 85%
 - Все требования покрыты тестами
 - Все граничные случаи обработаны корректно
@@ -1350,5 +1146,5 @@ describe('Navigation Functional Tests', () => {
 - Реализация NavigationManager класса
 - Реализация AuthGuard компонента
 - Интеграция с React Router
-- Написание модульных и property-based тестов
+- Написание модульных тестов
 - Написание функциональных тестов

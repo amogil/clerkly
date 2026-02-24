@@ -58,7 +58,6 @@
   - ✅ Auto-create при архивировании последнего (archiveAgent + event subscription)
   - ✅ Удаление empty state UI
   - ✅ Модульные тесты (2 новых теста)
-  - ✅ Property-based тесты (3 теста, 50+30+20 итераций)
   - ✅ Функциональные тесты (3 теста в agents-always-one.spec.ts)
   - ✅ Исправлен путь к preload script (dist/preload/preload/index.js)
 - ✅ Форматирование даты агента (agents.8.1, settings.2.1):
@@ -190,7 +189,6 @@
 
 #### 4.2 Тесты computeAgentStatus
 - **Файл:** `tests/unit/utils/computeAgentStatus.test.ts`
-- **Property-based:** `tests/property/agents/status.property.test.ts`
 
 **После завершения Фазы 4:**
 1. `npm run validate`
@@ -255,7 +253,6 @@
 | 5.1.2 | Обновить useAgents.archiveAgent | ✅ | 0.25 дня | agents.2.9, agents.2.10 |
 | 5.1.3 | Убрать empty state UI | ✅ | 0.1 дня | agents.2.11 |
 | 5.1.4 | Модульные тесты | ✅ | 0.25 дня | agents.2.7-2.11 |
-| 5.1.5 | Property-based тесты | ✅ | 0.25 дня | agents.2.7-2.11 |
 | 5.1.6 | Функциональные тесты | ✅ | 0.25 дня | agents.2.7-2.11 |
 | 5.1.7 | Исправить infinite loop в useAgents | ✅ | 0.1 дня | agents.2.7-2.11 |
 | 5.1.8 | Зарегистрировать AgentIPCHandlers | ✅ | 0.1 дня | agents.2, agents.4 |
@@ -298,13 +295,6 @@
   - `should auto-create agent when list is empty on mount`
   - `should auto-create agent when archiving last agent`
 
-#### 5.1.5 Property-based тесты
-- **Файл:** `tests/property/hooks/useAgents.property.test.ts` (новый) ✅
-- **Тесты:** ✅
-  - `AUTO-CREATE: user always has at least one agent after load`
-  - `AUTO-CREATE: user always has at least one agent after archiving`
-  - `PROPERTY: auto-created agent has correct properties`
-
 #### 5.1.6 Функциональные тесты
 - **Файл:** `tests/functional/agents-always-one.spec.ts` (новый) ✅
 - **Тесты:** ✅
@@ -337,7 +327,6 @@
 - [x] useAgents event subscription обновлен (auto-create при AGENT_ARCHIVED если список пустой)
 - [x] Empty state UI удален из agents.tsx
 - [x] Модульные тесты написаны (2 новых теста)
-- [x] Property-based тесты написаны (3 теста)
 - [x] Функциональные тесты написаны (3 теста в agents-invariant.spec.ts)
 - [x] Исправлен infinite loop в useAgents (убрана зависимость от activeAgentId)
 - [x] AgentIPCHandlers зарегистрированы в main process
@@ -346,7 +335,6 @@
 - [x] Debug логирование убрано
 - [x] `npm run validate` проходит без ошибок
 - [x] Все модульные тесты проходят (1144 теста)
-- [x] Все property-based тесты проходят (278 тестов)
 - [x] Все функциональные тесты auto-create проходят (3 теста)
 
 **Текущий прогресс:** 17/17 пунктов чек-листа (100%) ✅
@@ -503,16 +491,12 @@
 | # | Задача | Статус | Оценка | Требования |
 |---|--------|--------|--------|------------|
 | 8.1 | Тесты UI компонентов | ❌ | 1 день | agents.1-11 |
-| 8.2 | Property-based тесты | ❌ | 0.5 дня | agents.2.3, agents.9 |
-| 8.3 | Функциональные тесты | ❌ | 0.5 дня | agents.1-12 |
+| 8.2 | Функциональные тесты | ❌ | 0.5 дня | agents.1-12 |
 
 #### 8.1 Тесты UI компонентов
 - **Файлы:** `tests/unit/components/agents/*.test.tsx`
 
-#### 8.2 Property-based тесты
-- **Файлы:** `tests/property/agents/*.property.test.ts`
-
-#### 8.3 Функциональные тесты
+#### 8.2 Функциональные тесты
 - **Файл:** `tests/functional/agents.spec.ts`
 - **Запуск:** только по запросу пользователя
 

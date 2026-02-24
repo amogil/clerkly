@@ -43,8 +43,30 @@ jest.mock('../../src/renderer/components/error-demo-page', () => ({
   ErrorDemoPage: () => <div data-testid="error-demo">ErrorDemo</div>,
 }));
 
+type LoginScreenProps = {
+  onLogin: () => void;
+  isLoading: boolean;
+  isDisabled: boolean;
+  errorMessage?: string;
+  errorCode?: string;
+};
+
+let lastLoginScreenProps: LoginScreenProps | null = null;
+
 jest.mock('../../src/renderer/components/auth/LoginScreen', () => ({
-  LoginScreen: () => <div data-testid="login-screen">LoginScreen</div>,
+  LoginScreen: (props: LoginScreenProps) => {
+    lastLoginScreenProps = props;
+    return (
+      <div
+        data-testid="login-screen"
+        data-loading={props.isLoading ? 'true' : 'false'}
+        data-error-code={props.errorCode || ''}
+        data-error-message={props.errorMessage || ''}
+      >
+        LoginScreen
+      </div>
+    );
+  },
 }));
 
 jest.mock('../../src/renderer/components/ErrorBoundary', () => ({
@@ -83,6 +105,7 @@ describe('App IPC Integration with Error Notification System', () => {
   beforeEach(() => {
     // Clear event handlers
     eventHandlers.clear();
+    lastLoginScreenProps = null;
 
     // Mock window.api in jsdom environment
     Object.defineProperty(window, 'api', {
@@ -193,6 +216,59 @@ describe('App IPC Integration with Error Notification System', () => {
     // For this test, we verify that handlers were registered (which proves the hook was called)
     // The actual cleanup is handled by React's useEffect mechanism in production
     expect(handlerCountBefore).toBeGreaterThan(0);
+  });
+
+  /* Preconditions: App component mounted, user not authorized
+     Action: Emit auth.callback-received event
+     Assertions: LoginScreen shows loading state and clears error
+     Requirements: google-oauth-auth.15.1, google-oauth-auth.15.2 */
+  it('should show loader on auth callback received', async () => {
+    (window.api.auth.getStatus as jest.Mock).mockResolvedValueOnce({ authorized: false });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(eventHandlers.has(EVENT_TYPES.AUTH_CALLBACK_RECEIVED)).toBe(true);
+      expect(lastLoginScreenProps).not.toBeNull();
+    });
+
+    act(() => {
+      emitEvent(EVENT_TYPES.AUTH_CALLBACK_RECEIVED, { timestamp: Date.now() });
+    });
+
+    await waitFor(() => {
+      expect(lastLoginScreenProps?.isLoading).toBe(true);
+      expect(lastLoginScreenProps?.errorMessage).toBeUndefined();
+    });
+  });
+
+  /* Preconditions: App component mounted, user not authorized
+     Action: Emit auth.failed event
+     Assertions: LoginScreen shows error and stops loading
+     Requirements: navigation.1.8, google-oauth-auth.13.6 */
+  it('should show login error and stop loading on auth failure', async () => {
+    (window.api.auth.getStatus as jest.Mock).mockResolvedValueOnce({ authorized: false });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(eventHandlers.has(EVENT_TYPES.AUTH_FAILED)).toBe(true);
+      expect(lastLoginScreenProps).not.toBeNull();
+    });
+
+    act(() => {
+      emitEvent(EVENT_TYPES.AUTH_FAILED, {
+        message: 'Failed to load profile',
+        code: 'profile_fetch_failed',
+        timestamp: Date.now(),
+      });
+    });
+
+    await waitFor(() => {
+      expect(lastLoginScreenProps?.isLoading).toBe(false);
+      expect(lastLoginScreenProps?.errorMessage).toBe('Failed to load profile');
+      expect(lastLoginScreenProps?.errorCode).toBe('profile_fetch_failed');
+    });
   });
 
   /* Preconditions: App component is mounted

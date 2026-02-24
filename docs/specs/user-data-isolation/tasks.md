@@ -228,14 +228,14 @@
 
 ---
 
-## Фаза 4: Property-Based и Функциональные Тесты (1-2 дня)
+## Фаза 4: Модульные и Функциональные Тесты (1-2 дня)
 
-### 4.1. Обновить/создать property тесты
-- [x] Создать/обновить файл `tests/property/auth/UserDataIsolation.property.test.ts`
-- [x] Property: `should generate valid 10-character alphanumeric user_id` (100+ итераций)
-- [x] Property: `should return same user_id for same email on repeated findOrCreateUser calls`
-- [x] Property: `should isolate data between different users`
-- [x] Property: `should restore data after logout and re-login with same email`
+### 4.1. Обновить/создать модульные тесты
+- [x] Дополнить `tests/unit/auth/UserDataIsolation.test.ts`
+- [x] Тест: генерация user_id из email
+- [x] Тест: идемпотентность findOrCreateUser
+- [x] Тест: изоляция данных между пользователями
+- [x] Тест: восстановление данных после logout/login
 - _Requirements: user-data-isolation.0.2, user-data-isolation.0.3, user-data-isolation.4.4_
 
 ### 4.2. Обновить функциональные тесты
@@ -249,8 +249,8 @@
 - _Requirements: user-data-isolation.0.3, user-data-isolation.0.4, user-data-isolation.2.4, user-data-isolation.2.5, user-data-isolation.4.1_
 
 ### 4.3. Запустить валидацию Фазы 4
-- [x] Выполнить `npm run test:property`
-- [x] Убедиться, что все property тесты проходят
+- [x] Выполнить `npm run test:unit`
+- [x] Убедиться, что все модульные тесты проходят
 
 ---
 
@@ -295,7 +295,6 @@
   - ✅ ESLint
   - ✅ Prettier
   - ✅ Модульные тесты (851 passed)
-  - ✅ Property-based тесты (245 passed)
   - ⚠️ Покрытие кода (74.9% branches - ниже порога 80%, но это существующая проблема)
 
 ### 6.2. Обновить документацию

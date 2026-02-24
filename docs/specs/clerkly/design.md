@@ -9,7 +9,7 @@ Clerkly - это Electron-приложение для Mac OS X, предназн
 **Ключевые характеристики:**
 - Нативное Mac OS X приложение на базе Electron 28+
 - Локальное хранение данных с использованием SQLite
-- Комплексное тестовое покрытие (модульные, property-based, функциональные тесты)
+- Комплексное тестовое покрытие (модульные и функциональные тесты)
 - Производительность: запуск < 3 секунды, UI отклик < 100ms
 - Безопасность: локальное хранение, валидация IPC, изоляция процессов
 - Надежность: обработка ошибок, backup базы данных, graceful degradation
@@ -41,7 +41,7 @@ Clerkly - это Electron-приложение для Mac OS X, предназн
 - **NFR 4.1 - Изоляция компонентов**: Dependency injection, моки для Electron API
 - **NFR 4.2 - Моки Electron API**: Jest моки для BrowserWindow, ipcMain, app в тестах
 - **NFR 4.3 - Отчеты о покрытии**: Jest coverage, минимум 80% для бизнес-логики, 100% для критических компонентов
-- **NFR 4.4 - Property-based тесты**: Минимум 100 итераций, fast-check для генерации данных
+- **NFR 4.4 - Детерминированные тесты**: Модульные тесты воспроизводимы и устойчивы к случайным данным
 
 ```mermaid
 graph TB
@@ -109,14 +109,13 @@ graph TB
 - **SQLite** (better-sqlite3) - для локального хранения данных
 - **Jest** - для модульного и функционального тестирования
 - **ts-jest** - для запуска TypeScript тестов в Jest
-- **fast-check** - для property-based тестирования
 - **Electron Builder** - для сборки Mac OS X приложения
 
 **Обоснование выбора технологий:**
 - **Electron 28+**: Стабильная версия с поддержкой Mac OS X 10.13+, обеспечивает нативный вид и производительность
 - **TypeScript**: Статическая типизация обеспечивает раннее обнаружение ошибок, улучшает поддерживаемость кода и IDE поддержку
 - **SQLite**: Легковесная встроенная база данных, не требует отдельного сервера, идеальна для локального хранения
-- **Jest + ts-jest + fast-check**: Комплексное тестирование (unit + property-based) с полной поддержкой TypeScript
+- **Jest + ts-jest**: Комплексное тестирование (unit) с полной поддержкой TypeScript
 
 ## Компоненты и интерфейсы
 
@@ -1194,9 +1193,9 @@ CREATE TABLE schema_migrations (
 
 *Для любых* валидных данных пользователя (key-value пары), сохранение данных с последующей загрузкой должно возвращать эквивалентное значение.
 
-**Validates: Requirements 1.4, 2.6**
+**Validates: Requirements 1.4**
 
-**Обоснование:** Это свойство проверяет, что локальное хранилище данных работает корректно. Если мы сохраняем данные и затем загружаем их, мы должны получить те же данные обратно. Это классическое round-trip свойство, которое гарантирует целостность данных при сохранении и загрузке через SQLite. Это также демонстрирует property-based тестирование (требование 2.6).
+**Обоснование:** Это свойство проверяет, что локальное хранилище данных работает корректно. Если мы сохраняем данные и затем загружаем их, мы должны получить те же данные обратно. Это классическое round-trip свойство, которое гарантирует целостность данных при сохранении и загрузке через SQLite. Это также демонстрирует покрытие edge cases модульными тестами.
 
 **Тестовый сценарий:**
 - Генерируем случайные key-value пары различных типов (строки, числа, объекты, массивы, boolean)
@@ -1216,9 +1215,9 @@ CREATE TABLE schema_migrations (
 
 *Для любых* невалидных ключей (пустые строки, null, undefined, не-строки, слишком длинные строки > 1000 символов), операции saveData, loadData и deleteData должны возвращать ошибку без изменения состояния базы данных.
 
-**Validates: Requirements 1.4, 2.3, 2.6**
+**Validates: Requirements 1.4, 2.3**
 
-**Обоснование:** Это свойство проверяет, что система корректно валидирует входные данные и отклоняет невалидные запросы. Это критически важно для безопасности и надежности приложения, предотвращая некорректные операции с базой данных. Это также демонстрирует тестирование edge cases (требование 2.3) и property-based тестирование (требование 2.6).
+**Обоснование:** Это свойство проверяет, что система корректно валидирует входные данные и отклоняет невалидные запросы. Это критически важно для безопасности и надежности приложения, предотвращая некорректные операции с базой данных. Это также демонстрирует тестирование edge cases (требование 2.3) через модульные тесты.
 
 **Тестовый сценарий:**
 - Генерируем различные типы невалидных ключей
@@ -1237,9 +1236,9 @@ CREATE TABLE schema_migrations (
 
 *Для любого* состояния в "State Controller", вызов getState() должен возвращать копию состояния, и изменения в возвращенном объекте не должны влиять на внутреннее состояние.
 
-**Validates: Requirements 1.3, 2.6**
+**Validates: Requirements 1.3**
 
-**Обоснование:** Это свойство проверяет, что "State Controller" корректно изолирует внутреннее состояние от внешних изменений. Это предотвращает непреднамеренные мутации состояния и обеспечивает предсказуемое поведение приложения. Это также демонстрирует property-based тестирование (требование 2.6).
+**Обоснование:** Это свойство проверяет, что "State Controller" корректно изолирует внутреннее состояние от внешних изменений. Это предотвращает непреднамеренные мутации состояния и обеспечивает предсказуемое поведение приложения. Это также демонстрирует проверку изоляции состояния модульными тестами.
 
 **Тестовый сценарий:**
 - Создаем "State Controller" с начальным состоянием
@@ -1710,12 +1709,12 @@ class UIController {
 
 ## Стратегия тестирования
 
-### Двойной подход к тестированию
+### Подход к тестированию
 
-Приложение использует комбинацию модульных тестов и property-based тестов для обеспечения комплексного покрытия:
+Приложение использует комбинацию модульных и функциональных тестов для обеспечения комплексного покрытия:
 
 - **Модульные тесты (Unit Tests):** Проверяют конкретные примеры, граничные случаи и условия ошибок
-- **Property-based тесты:** Проверяют универсальные свойства на множестве сгенерированных входных данных
+- **Функциональные тесты:** Проверяют пользовательские сценарии end-to-end в реальном Electron окружении
 
 Оба подхода дополняют друг друга и необходимы для комплексного покрытия.
 
@@ -1765,15 +1764,9 @@ it("should perform expected behavior", () => {
 ### Фреймворк тестирования
 
 **Основной фреймворк:** Jest
-- Поддержка как unit, так и property-based тестов
 - Встроенные моки для Electron API
 - Поддержка асинхронного тестирования
 - Генерация отчетов о покрытии кода
-
-**Property-Based Testing:** fast-check (JavaScript библиотека для property-based testing)
-- Автоматическая генерация тестовых данных
-- Минимум 100 итераций на каждый property тест
-- Shrinking для поиска минимального failing case
 
 ### Стратегия модульного тестирования
 
@@ -1980,325 +1973,6 @@ test('should return immutable copy of state', () => {
 });
 ```
 
-### Стратегия Property-Based тестирования
-
-**Конфигурация Property тестов:**
-- Минимум 100 итераций на каждый property тест
-- Каждый property тест должен ссылаться на свойство из документа дизайна
-- Формат тега: **Feature: clerkly, Property {number}: {property_text}**
-
-**Property 1: Data Storage Round-Trip**
-
-```typescript
-// Requirements: clerkly.1.4, clerkly.2.6
-import * as fc from 'fast-check';
-
-describe('Property Tests - Data Storage', () => {
-  let userSettingsManager: UserSettingsManager;
-  let dbManager: DatabaseManager;
-  
-  beforeEach(() => {
-    dbManager = new DatabaseManager();
-    dbManager.initialize('/tmp/test-storage');
-    userSettingsManager = new UserSettingsManager(dbManager);
-  });
-  
-  afterEach(() => {
-    dbManager.close();
-  });
-  
-  /* Preconditions: UserSettingsManager initialized with clean database
-     Action: generate random key-value pairs, save each, then load each
-     Assertions: for all pairs, loaded value equals saved value (deep equality)
-     Requirements: clerkly.1.4 */
-  // Feature: clerkly, Property 1: Data Storage Round-Trip
-  test('Property 1: saving then loading data returns equivalent value', async () => {
-    await fc.assert(
-      fc.asyncProperty(
-        fc.string({ minLength: 1, maxLength: 100 }), // key
-        fc.oneof(
-          fc.string(),
-          fc.integer(),
-          fc.boolean(),
-          fc.double(),
-          fc.object(),
-          fc.array(fc.anything())
-        ), // value
-        async (key: string, value: any) => {
-          // Save data
-          const saveResult = userSettingsManager.saveData(key, value);
-          expect(saveResult.success).toBe(true);
-          
-          // Load data
-          const loadResult = userSettingsManager.loadData(key);
-          expect(loadResult.success).toBe(true);
-          
-          // Verify equivalence
-          expect(loadResult.data).toEqual(value);
-        }
-      ),
-      { numRuns: 100 }
-    );
-  });
-  
-  /* Preconditions: UserSettingsManager initialized
-     Action: generate random invalid keys (empty, null, undefined, non-strings, too long)
-     Assertions: for all invalid keys, saveData/loadData/deleteData return success false
-     Requirements: clerkly.1.4 */
-  // Feature: clerkly, Property 2: Invalid Key Rejection
-  test('Property 2: invalid keys are rejected', () => {
-    fc.assert(
-      fc.property(
-        fc.oneof(
-          fc.constant(''),
-          fc.constant(null),
-          fc.constant(undefined),
-          fc.integer(),
-          fc.object(),
-          fc.string({ minLength: 1001 })
-        ),
-        (invalidKey: any) => {
-          const saveResult = userSettingsManager.saveData(invalidKey, 'value');
-          expect(saveResult.success).toBe(false);
-          expect(saveResult.error).toBeTruthy();
-          
-          const loadResult = userSettingsManager.loadData(invalidKey);
-          expect(loadResult.success).toBe(false);
-          expect(loadResult.error).toBeTruthy();
-          
-          const deleteResult = userSettingsManager.deleteData(invalidKey);
-          expect(deleteResult.success).toBe(false);
-          expect(deleteResult.error).toBeTruthy();
-        }
-      ),
-      { numRuns: 100 }
-    );
-  });
-  
-  /* Preconditions: StateController initialized with random state
-     Action: call getState, mutate returned object, call getState again
-     Assertions: for all states, internal state remains unchanged after mutation
-     Requirements: clerkly.1.3 */
-  // Feature: clerkly, Property 3: State Immutability
-  test('Property 3: getState returns immutable copy', () => {
-    fc.assert(
-      fc.property(
-        fc.object(),
-        (initialState: Record<string, any>) => {
-          const stateController = new StateController(initialState);
-          
-          const state1 = stateController.getState();
-          // Mutate returned object
-          state1.newKey = 'new-value';
-          if (Object.keys(state1).length > 0) {
-            const firstKey = Object.keys(state1)[0];
-            state1[firstKey] = 'modified';
-          }
-          
-          const state2 = stateController.getState();
-          expect(state2).toEqual(initialState);
-        }
-      ),
-      { numRuns: 100 }
-    );
-  });
-  
-  /* Preconditions: application not running
-     Action: start application and measure startup time
-     Assertions: for all startups, time is less than 3000ms
-     Requirements: clerkly.nfr.1.1 */
-  // Feature: clerkly, Property 7: Application Startup Performance
-  test('Property 7: application starts within 3 seconds', async () => {
-    await fc.assert(
-      fc.asyncProperty(
-        fc.constant(null), // No input needed
-        async () => {
-          const startTime = Date.now();
-          const app = await startTestApp();
-          const loadTime = Date.now() - startTime;
-          
-          expect(loadTime).toBeLessThan(3000);
-          
-          await app.quit();
-        }
-      ),
-      { numRuns: 100 }
-    );
-  });
-  
-  /* Preconditions: UserSettingsManager initialized
-     Action: generate random small data objects, perform save/load/delete operations
-     Assertions: for all operations, execution time is less than 50ms
-     Requirements: clerkly.nfr.1.4 */
-  // Feature: clerkly, Property 8: Data Operations Performance
-  test('Property 8: data operations complete within 50ms', () => {
-    fc.assert(
-      fc.property(
-        fc.string({ minLength: 1, maxLength: 100 }), // key
-        fc.oneof(
-          fc.string({ maxLength: 1000 }),
-          fc.integer(),
-          fc.boolean()
-        ), // small value < 1KB
-        (key: string, value: any) => {
-          const testDbManager = new DatabaseManager();
-          testDbManager.initialize('/tmp/test-storage');
-          const testUserSettingsManager = new UserSettingsManager(testDbManager);
-          
-          // Test saveData performance
-          const saveStart = performance.now();
-          const saveResult = testUserSettingsManager.saveData(key, value);
-          const saveTime = performance.now() - saveStart;
-          expect(saveResult.success).toBe(true);
-          expect(saveTime).toBeLessThan(50);
-          
-          // Test loadData performance
-          const loadStart = performance.now();
-          const loadResult = testUserSettingsManager.loadData(key);
-          const loadTime = performance.now() - loadStart;
-          expect(loadResult.success).toBe(true);
-          expect(loadTime).toBeLessThan(50);
-          
-          // Test deleteData performance
-          const deleteStart = performance.now();
-          const deleteResult = testUserSettingsManager.deleteData(key);
-          const deleteTime = performance.now() - deleteStart;
-          expect(deleteResult.success).toBe(true);
-          expect(deleteTime).toBeLessThan(50);
-          
-          testDbManager.close();
-        }
-      ),
-      { numRuns: 100 }
-    );
-  });
-  
-  /* Preconditions: application not running, test database does not exist
-     Action: start app, save random data, quit app, restart app, load data
-     Assertions: for all data, loaded data equals saved data after restart
-     Requirements: clerkly.nfr.2.2 */
-  // Feature: clerkly, Property 9: Graceful Shutdown Data Persistence
-  test('Property 9: data persists across application restarts', async () => {
-    await fc.assert(
-      fc.asyncProperty(
-        fc.string({ minLength: 1, maxLength: 100 }), // key
-        fc.oneof(fc.string(), fc.integer(), fc.object()), // value
-        async (key: string, value: any) => {
-          // Start application and save data
-          const app1 = await startTestApp();
-          const userSettingsManager1 = app1.getUserSettingsManager();
-          const saveResult = userSettingsManager1.saveData(key, value);
-          expect(saveResult.success).toBe(true);
-          
-          // Gracefully quit application
-          await app1.quit();
-          
-          // Restart application and load data
-          const app2 = await startTestApp();
-          const userSettingsManager2 = app2.getUserSettingsManager();
-          const loadResult = userSettingsManager2.loadData(key);
-          expect(loadResult.success).toBe(true);
-          expect(loadResult.data).toEqual(value);
-          
-          await app2.quit();
-        }
-      ),
-      { numRuns: 100 }
-    );
-  });
-});
-```
-
-**Edge cases для Property тестов:**
-
-```typescript
-/* Preconditions: UserSettingsManager initialized
-   Action: save empty string value
-   Assertions: save succeeds, load returns same empty string
-   Requirements: clerkly.1.4 */
-test('Property 1 edge case: empty string values', () => {
-  const key = 'test-key';
-  const value = '';
-  
-  const saveResult = userSettingsManager.saveData(key, value);
-  expect(saveResult.success).toBe(true);
-  
-  const loadResult = userSettingsManager.loadData(key);
-  expect(loadResult.success).toBe(true);
-  expect(loadResult.data).toBe(value);
-});
-
-/* Preconditions: UserSettingsManager initialized
-   Action: save data with keys containing special characters
-   Assertions: all saves succeed, all loads return correct values
-   Requirements: clerkly.1.4 */
-test('Property 1 edge case: special characters in keys', () => {
-  const specialKeys = ['key-with-dash', 'key_with_underscore', 'key.with.dot'];
-  
-  for (const key of specialKeys) {
-    const value = 'test-value';
-    const saveResult = userSettingsManager.saveData(key, value);
-    expect(saveResult.success).toBe(true);
-    
-    const loadResult = userSettingsManager.loadData(key);
-    expect(loadResult.success).toBe(true);
-    expect(loadResult.data).toBe(value);
-  }
-});
-
-/* Preconditions: UserSettingsManager initialized
-   Action: save large object (1000 items array)
-   Assertions: save succeeds, load returns equivalent object
-   Requirements: clerkly.1.4 */
-test('Property 1 edge case: large objects', () => {
-  const key = 'large-object';
-  const value = {
-    data: Array(1000).fill(0).map((_, i) => ({ id: i, value: `item-${i}` }))
-  };
-  
-  const saveResult = userSettingsManager.saveData(key, value);
-  expect(saveResult.success).toBe(true);
-  
-  const loadResult = userSettingsManager.loadData(key);
-  expect(loadResult.success).toBe(true);
-  expect(loadResult.data).toEqual(value);
-});
-
-/* Preconditions: corrupted SQLite database file exists at storage path
-   Action: initialize DatabaseManager
-   Assertions: backup file created, new database created and functional
-   Requirements: clerkly.nfr.2.4 */
-test('Property 10: database corruption recovery', () => {
-  const storagePath = '/tmp/test-storage-corrupted';
-  const dbPath = path.join(storagePath, 'clerkly.db');
-  
-  // Create corrupted database file
-  fs.mkdirSync(storagePath, { recursive: true });
-  fs.writeFileSync(dbPath, 'CORRUPTED DATA NOT VALID SQLITE');
-  
-  // Initialize DatabaseManager (should detect corruption and recover)
-  const dbManager = new DatabaseManager();
-  const initResult = dbManager.initialize(storagePath);
-  
-  expect(initResult.success).toBe(true);
-  
-  // Check that backup was created
-  const backupFiles = fs.readdirSync(storagePath).filter(f => f.startsWith('clerkly.db.backup-'));
-  expect(backupFiles.length).toBeGreaterThan(0);
-  
-  // Check that new database is functional via UserSettingsManager
-  const userSettingsManager = new UserSettingsManager(dbManager);
-  const saveResult = userSettingsManager.saveData('test-key', 'test-value');
-  expect(saveResult.success).toBe(true);
-  
-  const loadResult = userSettingsManager.loadData('test-key');
-  expect(loadResult.success).toBe(true);
-  expect(loadResult.data).toBe('test-value');
-  
-  dbManager.close();
-});
-```
-
 ### Стратегия функционального тестирования
 
 **Интеграционные тесты проверяют взаимодействие между компонентами:**
@@ -2387,9 +2061,6 @@ npm test
 # Запуск только модульных тестов
 npm run test:unit
 
-# Запуск только property-based тестов
-npm run test:property
-
 # Запуск функциональных тестов (ТОЛЬКО при явной просьбе пользователя)
 npm run test:functional
 
@@ -2405,7 +2076,6 @@ npm run validate
 - 100% покрытие для критических компонентов ("Data Manager", "Lifecycle Manager", "IPC Handlers") (Requirements 2.7)
 - Все публичные API должны иметь тесты
 - Все edge cases должны быть покрыты модульными тестами (Requirements 2.3)
-- Все универсальные свойства должны быть покрыты property-based тестами (Requirements 2.6)
 - Все тесты должны содержать структурированные комментарии (Requirements 2.8)
 - Весь код должен содержать комментарии с требованиями (Requirements 2.9)
 
@@ -2413,7 +2083,6 @@ npm run validate
 
 **Автоматизация тестирования:**
 - Все тесты запускаются автоматически при каждом коммите (Requirements 2.5)
-- Property-based тесты запускаются с увеличенным количеством итераций (1000+) в CI
 - Тесты должны проходить на Mac OS X 10.13+ для валидации совместимости (Requirements NFR 3.1)
 - Функциональные тесты НЕ запускаются автоматически (только вручную)
 
@@ -2458,47 +2127,47 @@ test('UI should render within 100ms', () => {
 
 ### Покрытие Требований
 
-| Требование | Модульные Тесты | Property-Based Тесты | Функциональные Тесты |
-|------------|-----------------|----------------------|----------------------|
-| clerkly.1.1 | ✓ | - | - |
-| clerkly.1.2 | ✓ | - | ✓ |
-| clerkly.1.3 | ✓ | ✓ | ✓ |
-| clerkly.1.4 | ✓ | ✓ | ✓ |
-| clerkly.1.5 | ✓ | - | - |
-| clerkly.2.1 | ✓ | - | - |
-| clerkly.2.2 | - | - | ✓ |
-| clerkly.2.3 | ✓ | ✓ | - |
-| clerkly.2.4 | - | - | ✓ |
-| clerkly.2.5 | ✓ | - | - |
-| clerkly.2.6 | - | ✓ | - |
-| clerkly.2.7 | ✓ | - | - |
-| clerkly.2.8 | ✓ | - | - |
-| clerkly.2.9 | ✓ | - | - |
-| clerkly.3.1 | ✓ | - | - |
-| clerkly.3.2 | ✓ | - | - |
-| clerkly.3.3 | ✓ | - | - |
-| clerkly.3.4 | ✓ | - | - |
-| clerkly.3.5 | ✓ | - | - |
-| clerkly.3.6 | ✓ | - | - |
-| clerkly.3.7 | ✓ | - | - |
-| clerkly.3.8 | ✓ | - | - |
-| clerkly.3.9 | ✓ | - | - |
-| clerkly.3.10 | ✓ | - | - |
-| clerkly.nfr.1.1 | ✓ | ✓ | ✓ |
-| clerkly.nfr.1.2 | ✓ | ✓ | - |
-| clerkly.nfr.1.3 | ✓ | ✓ | - |
-| clerkly.nfr.1.4 | ✓ | ✓ | - |
-| clerkly.nfr.2.1 | ✓ | ✓ | - |
-| clerkly.nfr.2.2 | ✓ | ✓ | ✓ |
-| clerkly.nfr.2.3 | ✓ | ✓ | ✓ |
-| clerkly.nfr.2.4 | ✓ | ✓ | - |
-| clerkly.nfr.3.1 | ✓ | - | - |
-| clerkly.nfr.3.2 | ✓ | - | - |
-| clerkly.nfr.3.3 | ✓ | - | ✓ |
-| clerkly.nfr.4.1 | ✓ | - | - |
-| clerkly.nfr.4.2 | ✓ | - | - |
-| clerkly.nfr.4.3 | ✓ | - | - |
-| clerkly.nfr.4.4 | - | ✓ | - |
+| Требование | Модульные Тесты | Функциональные Тесты |
+|------------|-----------------|----------------------|
+| clerkly.1.1 | ✓ | - |
+| clerkly.1.2 | ✓ | ✓ |
+| clerkly.1.3 | ✓ | ✓ |
+| clerkly.1.4 | ✓ | ✓ |
+| clerkly.1.5 | ✓ | - |
+| clerkly.2.1 | ✓ | - |
+| clerkly.2.2 | - | ✓ |
+| clerkly.2.3 | ✓ | - |
+| clerkly.2.4 | - | ✓ |
+| clerkly.2.5 | ✓ | - |
+| clerkly.2.6 | - | - |
+| clerkly.2.7 | ✓ | - |
+| clerkly.2.8 | ✓ | - |
+| clerkly.2.9 | ✓ | - |
+| clerkly.3.1 | ✓ | - |
+| clerkly.3.2 | ✓ | - |
+| clerkly.3.3 | ✓ | - |
+| clerkly.3.4 | ✓ | - |
+| clerkly.3.5 | ✓ | - |
+| clerkly.3.6 | ✓ | - |
+| clerkly.3.7 | ✓ | - |
+| clerkly.3.8 | ✓ | - |
+| clerkly.3.9 | ✓ | - |
+| clerkly.3.10 | ✓ | - |
+| clerkly.nfr.1.1 | ✓ | ✓ |
+| clerkly.nfr.1.2 | ✓ | - |
+| clerkly.nfr.1.3 | ✓ | - |
+| clerkly.nfr.1.4 | ✓ | - |
+| clerkly.nfr.2.1 | ✓ | - |
+| clerkly.nfr.2.2 | ✓ | ✓ |
+| clerkly.nfr.2.3 | ✓ | ✓ |
+| clerkly.nfr.2.4 | ✓ | - |
+| clerkly.nfr.3.1 | ✓ | - |
+| clerkly.nfr.3.2 | ✓ | - |
+| clerkly.nfr.3.3 | ✓ | ✓ |
+| clerkly.nfr.4.1 | ✓ | - |
+| clerkly.nfr.4.2 | ✓ | - |
+| clerkly.nfr.4.3 | ✓ | - |
+| clerkly.nfr.4.4 | ✓ | - |
 
 **Легенда:**
 - ✓ - Требование покрыто данным типом тестов
@@ -2507,7 +2176,6 @@ test('UI should render within 100ms', () => {
 **Примечания:**
 - Все функциональные требования (clerkly.1.x, clerkly.2.x) покрыты соответствующими типами тестов
 - Все нефункциональные требования (clerkly.nfr.x.x) покрыты соответствующими типами тестов
-- Property-based тесты фокусируются на универсальных свойствах корректности (Property 1-10)
 - Функциональные тесты проверяют интеграцию между компонентами
 - Модульные тесты покрывают конкретные примеры, граничные случаи и обработку ошибок
 
@@ -2538,7 +2206,7 @@ test('UI should render within 100ms', () => {
 **Требование 1.4 (Локальное хранение SQLite):**
 - Реализовано: SQLite база данных с системой миграций
 - Компоненты: "Data Manager", "Migration Runner", "IPC Handlers"
-- Тестирование: Модульные тесты, property-based тесты, функциональные тесты
+- Тестирование: Модульные тесты и функциональные тесты
 - Свойства: Property 1 (Round-Trip), Property 2 (Invalid Key Rejection), Property 4 (IPC Timeout), Property 5 (Migration Idempotence)
 - NFR: NFR 2.1, NFR 2.4
 
@@ -2569,15 +2237,14 @@ test('UI should render within 100ms', () => {
 - Стратегия: Раздел "Стратегия функционального тестирования"
 
 **Требование 2.5 (Автоматизация тестов):**
-- Реализовано: npm test для запуска всех тестов
-- Команды: npm test, npm run test:unit, npm run test:property, npm run test:functional
+- Реализовано: npm test для запуска unit тестов
+- Команды: npm test, npm run test:unit, npm run test:functional
 - CI: Автоматический запуск при каждом коммите
 
-**Требование 2.6 (Property-based тесты):**
-- Реализовано: fast-check тесты с минимум 100 итераций
-- Компоненты: "Data Manager", "State Controller", "IPC Handlers"
-- Свойства: Property 1-6
-- Стратегия: Раздел "Стратегия Property-Based тестирования"
+**Требование 2.6 (Функциональные тесты):**
+- Реализовано: Функциональные тесты запускаются только по явной просьбе
+- Команды: npm run test:functional, npm run test:functional:single, npm run test:functional:debug
+- Стратегия: Раздел "Стратегия функционального тестирования"
 
 **Требование 2.7 (Покрытие кода):**
 - Реализовано: Jest coverage с минимум 80% для бизнес-логики, 100% для критических компонентов
@@ -2688,7 +2355,7 @@ test('UI should render within 100ms', () => {
 - Реализовано: 10 секунд на операцию
 - Компоненты: "IPC Handlers"
 - Свойства: Property 4 (IPC Timeout Enforcement)
-- Тестирование: Модульные тесты, property-based тесты
+- Тестирование: Модульные тесты
 
 **NFR 2.4 (Backup при повреждении):**
 - Реализовано: Автоматическое создание backup и пересоздание базы
@@ -2726,8 +2393,8 @@ test('UI should render within 100ms', () => {
 - Команды: npm run test:coverage
 - Требования: 80% для бизнес-логики, 100% для критических компонентов
 
-**NFR 4.4 (Property-based тесты 100 итераций):**
-- Реализовано: fast-check с numRuns: 100
-- Компоненты: Все property-based тесты
-- Стратегия: Раздел "Стратегия Property-Based тестирования"
+**NFR 4.4 (Детерминированные тесты):**
+- Реализовано: Модульные тесты не зависят от случайных входных данных
+- Компоненты: Все модульные тесты
+- Стратегия: Раздел "Стратегия модульного тестирования"
 ```

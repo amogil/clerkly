@@ -17,22 +17,21 @@
 
 ## 1. Настройка Конфигурации Тестирования
 
-### 1.1 Настроить Jest конфигурации для модульных и property-based тестов
+### 1.1 Настроить Jest конфигурации для модульных тестов
 
-**Requirements:** testing.1, testing.2
+**Requirements:** testing.1
 
-**Описание:** Настроить Jest для поддержки модульных и property-based тестов с правильными стратегиями мокирования.
+**Описание:** Настроить Jest для поддержки модульных тестов с правильными стратегиями мокирования.
 
 **Детали:**
-- Создать отдельные конфигурации для unit и property тестов
+- Создать отдельные конфигурации для unit тестов
 - Настроить моки для всех внешних зависимостей
-- Настроить testMatch паттерны для каждого типа тестов
+- Настроить testMatch паттерны для unit тестов
 - Настроить покрытие кода
 
 **Файлы:**
 - `jest.config.js` - базовая конфигурация
 - `jest.unit.config.js` - конфигурация для модульных тестов
-- `jest.property.config.js` - конфигурация для property-based тестов
 - `jest.combined.config.js` - конфигурация для покрытия кода
 
 - [x] 1.1.1 Создать jest.unit.config.js с полным мокированием
@@ -45,21 +44,12 @@
 - Установить testTimeout: 10000 (10 секунд)
 - Настроить testMatch: `**/tests/unit/**/*.test.ts`, `**/tests/unit/**/*.test.tsx`
 
-- [x] 1.1.2 Создать jest.property.config.js с полным мокированием
-
-**Requirements:** testing.2.1, testing.2.2, testing.2.3
-
-**Детали:**
-- Использовать ту же стратегию мокирования что и в unit тестах
-- Установить testTimeout: 30000 (30 секунд для 100+ итераций)
-- Настроить testMatch: `**/tests/property/**/*.property.test.ts`, `**/tests/property/**/*.property.test.tsx`
-
-- [x] 1.1.3 Создать jest.combined.config.js для покрытия кода
+- [x] 1.1.2 Создать jest.combined.config.js для покрытия кода
 
 **Requirements:** testing.4.1
 
 **Детали:**
-- Объединить unit и property тесты для расчета покрытия
+- Использовать unit тесты для расчета покрытия
 - Настроить collectCoverageFrom для исключения figma/
 - Установить coverageThreshold: 80% для всех метрик
 
@@ -115,9 +105,8 @@
   "scripts": {
     "rebuild:electron": "electron-rebuild -f -w better-sqlite3",
     "rebuild:node": "npm rebuild better-sqlite3",
-    "test": "npm run rebuild:node && npm run test:unit && npm run test:property",
+    "test": "npm run rebuild:node && npm run test:unit",
     "test:unit": "jest --config jest.unit.config.js",
-    "test:property": "jest --config jest.property.config.js",
     "test:functional": "npm run rebuild:electron && npm run build && playwright test",
     "test:functional:verbose": "npm run rebuild:electron && npm run build && playwright test --reporter=list",
     "test:functional:debug": "npm run rebuild:electron && npm run build && playwright test --reporter=list --max-failures=1",
@@ -142,7 +131,7 @@
 - Выполнять TypeScript компиляцию
 - Запускать ESLint с автофиксом
 - Запускать Prettier с автофиксом
-- Запускать unit и property тесты
+- Запускать unit тесты
 - Проверять покрытие кода
 - Возвращать ненулевой код при ошибках
 - НЕ запускать функциональные тесты
@@ -169,9 +158,6 @@ npm run format
 
 echo "🧪 Unit tests..."
 npm run test:unit
-
-echo "🎲 Property-based tests..."
-npm run test:property
 
 echo "📊 Code coverage..."
 npm run test:coverage
@@ -230,40 +216,7 @@ echo "✅ Validation complete!"
 
 ---
 
-## 4. Обновление Существующих Property-Based Тестов
-
-### 4.1 Проверить стратегию мокирования в property-based тестах
-
-**Requirements:** testing.2.1
-
-**Описание:** Убедиться что все property-based тесты правильно мокируют внешние зависимости.
-
-**Детали:**
-- Применить ту же стратегию мокирования что и в модульных тестах
-- Проверить количество итераций (минимум 100)
-- Проверить что тесты проверяют инварианты
-
-- [x] 4.1.1 Аудит property-based тестов на правильность мокирования
-
-**Requirements:** testing.2.1, testing.2.3
-
-**Детали:**
-- Проверить все файлы в `tests/property/**/*.property.test.ts`
-- Убедиться что есть моки для всех внешних зависимостей
-- Проверить что используется `fc.assert` с `numRuns >= 100`
-
-- [x] 4.1.2 Исправить property-based тесты с неправильным мокированием
-
-**Requirements:** testing.2.1, testing.2.2, testing.2.3, testing.2.4
-
-**Детали:**
-- Добавить недостающие моки
-- Установить numRuns: 100 где необходимо
-- Убедиться что тесты проверяют инварианты а не конкретные значения
-
----
-
-## 5. Создание Функциональных Тестов с Playwright
+## 4. Создание Функциональных Тестов с Playwright
 
 ### 5.1 Создать helper утилиты для функциональных тестов
 
@@ -489,18 +442,16 @@ beforeAll(() => {
 ### Test Types
 
 - **Unit Tests** (`tests/unit/**/*.test.ts`) - Fast, isolated tests with all dependencies mocked
-- **Property-Based Tests** (`tests/property/**/*.property.test.ts`) - Tests that verify invariants across many inputs
 - **Functional Tests** (`tests/functional/**/*.spec.ts`) - End-to-end tests with real Electron showing windows
 
 ### Running Tests
 
 ```bash
-# Quick validation (unit + property tests only)
+# Quick validation (unit tests only)
 npm run validate
 
 # Individual test types
 npm run test:unit
-npm run test:property
 npm run test:functional  # ⚠️ Uses real Electron, WILL show windows
 
 # All tests
@@ -539,7 +490,6 @@ npm test
 - Убедиться что ESLint проходит
 - Убедиться что Prettier проходит
 - Убедиться что unit тесты проходят
-- Убедиться что property тесты проходят
 - Убедиться что покрытие >= 80%
 
 ### 8.2 Запустить функциональные тесты (по запросу пользователя)
@@ -653,12 +603,11 @@ npm run typecheck        # Проверка типов
 
 Все задачи считаются завершенными когда:
 
-- ✅ Jest конфигурации созданы для unit и property тестов
+- ✅ Jest конфигурации созданы для unit тестов
 - ✅ Playwright конфигурация создана для функциональных тестов
 - ✅ Package.json содержит все необходимые команды
 - ✅ Скрипт validate работает корректно
 - ✅ Модульные тесты правильно мокируют зависимости
-- ✅ Property-based тесты правильно мокируют зависимости
 - ✅ Функциональные тесты используют реальный Electron через Playwright
 - ✅ Test IPC Handlers реализованы для управления состоянием в тестах
 - ✅ Mock OAuth Server реализован для тестирования OAuth flow

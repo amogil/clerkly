@@ -1033,20 +1033,20 @@ describe('Error Notifications Functional Tests', () => {
 
 ### Покрытие Требований
 
-| Требование | Модульные Тесты | Property-Based Тесты | Функциональные Тесты |
-|------------|-----------------|----------------------|----------------------|
-| error-notifications.1.1 | ✓ | - | ✓ |
-| error-notifications.1.2 | ✓ | - | ✓ |
-| error-notifications.1.3 | ✓ | - | ✓ |
-| error-notifications.1.4 | ✓ | - | ✓ |
-| error-notifications.1.5 | ✓ | - | ✓ |
-| error-notifications.2.1 | ✓ | - | - |
-| error-notifications.2.2 | ✓ | - | - |
-| error-notifications.2.3 | ✓ | - | - |
-| error-notifications.2.4 | ✓ | - | - |
-| error-notifications.2.5 | ✓ | - | - |
-| error-notifications.2.6 | ✓ | - | - |
-| error-notifications.2.7 | ✓ | - | - |
+| Требование | Модульные Тесты | Функциональные Тесты |
+|------------|-----------------|----------------------|
+| error-notifications.1.1 | ✓ | ✓ |
+| error-notifications.1.2 | ✓ | ✓ |
+| error-notifications.1.3 | ✓ | ✓ |
+| error-notifications.1.4 | ✓ | ✓ |
+| error-notifications.1.5 | ✓ | ✓ |
+| error-notifications.2.1 | ✓ | - |
+| error-notifications.2.2 | ✓ | - |
+| error-notifications.2.3 | ✓ | - |
+| error-notifications.2.4 | ✓ | - |
+| error-notifications.2.5 | ✓ | - |
+| error-notifications.2.6 | ✓ | - |
+| error-notifications.2.7 | ✓ | - |
 | error-notifications.2.8 | ✓ | - | - |
 
 ## Технические Решения

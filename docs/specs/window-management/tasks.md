@@ -99,38 +99,32 @@
   - Убедиться, что все тесты проходят без ошибок
   - Если есть ошибки, исправить их перед продолжением
 
-- [x] 4. Написать property-based тесты для WindowStateManager
-  - [x] 4.1 Property test: Размер окна адаптируется к экрану
-    - Использовать fast-check для генерации различных размеров экрана (800-3840 x 600-2160)
+- [x] 4. Написать модульные тесты для WindowStateManager
+  - [x] 4.1 Unit test: Размер окна адаптируется к экрану
     - Вызывать getDefaultState() с мокированным screen API
     - Проверить, что размеры <= размера экрана
     - Проверить, что размеры > 0
     - Проверить, что размеры не хардкожены (не всегда 600x400)
-    - Минимум 100 итераций
     - **Property 5: Размер окна адаптируется к экрану при первом запуске**
     - _Requirements: window-management.4.1, window-management.4.2_
 
-  - [x] 4.2 Property test: Round-trip сохранения и загрузки состояния
-    - Использовать fast-check для генерации различных WindowState
+  - [x] 4.2 Unit test: Round-trip сохранения и загрузки состояния
     - Мокировать screen API для валидации позиции
     - Вызывать saveState(), затем loadState()
     - Проверить эквивалентность загруженного и сохраненного состояния
-    - Минимум 100 итераций
     - **Property 7: Round-trip сохранения и загрузки состояния**
     - _Requirements: window-management.5.4_
 
-  - [x] 4.3 Property test: Изменения состояния окна сохраняются
-    - Использовать fast-check для генерации различных WindowState
+  - [x] 4.3 Unit test: Изменения состояния окна сохраняются
     - Создать окно через WindowManager
     - Изменить состояние окна (setBounds, maximize)
     - Триггернуть события (resize, move, maximize)
     - Проверить, что DataManager.set вызван с новым состоянием
-    - Минимум 100 итераций
     - **Property 6: Изменения состояния окна сохраняются**
     - _Requirements: window-management.5.1, window-management.5.2, window-management.5.3_
 
-- [x] 5. Checkpoint - Убедиться, что все property-based тесты проходят
-  - Запустить `npm run test:property`
+- [x] 5. Checkpoint - Убедиться, что все модульные тесты проходят
+  - Запустить `npm run test:unit`
   - Убедиться, что все тесты проходят без ошибок
   - Если есть ошибки, исправить их перед продолжением
 
@@ -205,12 +199,12 @@
   - [x] 7.3 Запустить автоматическую валидацию
     - Выполнить `npm run validate`
     - Исправить все ошибки TypeScript, ESLint, Prettier
-    - Убедиться, что все модульные и property-based тесты проходят
+    - Убедиться, что все модульные тесты проходят
     - Убедиться, что покрытие кода >= 85%
     - _Requirements: Все_
 
 - [x] 8. Checkpoint - Финальная проверка
-  - Убедиться, что все модульные и property-based тесты проходят
+  - Убедиться, что все модульные тесты проходят
   - Убедиться, что покрытие кода >= 85%
   - Спросить пользователя: "Задача выполнена. Запустить функциональные тесты? (они покажут окна на экране)"
 
@@ -287,14 +281,10 @@
   - Заменить моки `mockDbManager.getRow` на `mockGlobalWindowState.get`
   - Заменить моки `mockDbManager.runQuery` на `mockGlobalWindowState.set`
   - Добавить `mockGlobalWindowState` в beforeEach
-- [x] Обновить `tests/property/WindowStateManager.property.test.ts`:
-  - Заменить моки на репозиторий API
-  - Обновить оба describe блока
 - _Requirements: user-data-isolation.6.8_
 
 ### 10.3 Валидация
 - [x] Выполнить `npm run test:unit -- tests/unit/WindowStateManager.test.ts`
-- [x] Выполнить `npm run test:property -- tests/property/WindowStateManager.property.test.ts`
 - [x] Убедиться, что все тесты проходят
 - _Requirements: user-data-isolation.6.8_
 

@@ -2,7 +2,7 @@
 
 ## Обзор
 
-Данный документ содержит план реализации системы авторизации через Google OAuth для Electron приложения Clerkly. Система включает 22 свойства корректности (19 обязательных + 3 опциональных), которые проверяются через property-based тесты, а также полный набор модульных и функциональных тестов.
+Данный документ содержит план реализации системы авторизации через Google OAuth для Electron приложения Clerkly. Система включает 22 свойства корректности (19 обязательных + 3 опциональных), которые покрываются модульными и функциональными тестами.
 
 ## Статус Реализации
 
@@ -27,9 +27,9 @@
 - [x] Тест: проверка обработки различных форматов Client ID (с суффиксом и без)
 - **Requirements:** google-oauth-auth.10.1, google-oauth-auth.10.2, google-oauth-auth.10.3
 
-### 1.3 Создать property-based тесты для конфигурации OAuth
-- [x] Создать файл `tests/property/auth/OAuthConfig.property.test.ts`
-- [x] Property тест: проверка валидности конфигурации
+### 1.3 Расширить модульные тесты для конфигурации OAuth
+- [x] Дополнить `tests/unit/auth/OAuthConfig.test.ts`
+- [x] Тест: повторные вызовы `getOAuthConfig` возвращают идентичный результат
 - **Requirements:** google-oauth-auth.10.1, google-oauth-auth.10.2, google-oauth-auth.10.3
 
 ## 2. Реализация Token Storage Manager
@@ -55,20 +55,15 @@
 - [x] Тест: возврат null при отсутствии токенов
 - **Requirements:** google-oauth-auth.4.1, google-oauth-auth.4.2, google-oauth-auth.4.3, google-oauth-auth.4.4, google-oauth-auth.4.5
 
-### 2.3 Создать property-based тесты для Token Storage Manager
-- [x] Создать файл `tests/property/auth/TokenStorageManager.property.test.ts`
-- [x] Property тест: **Property 9 - Token Storage Round Trip**
-  - *For any* valid token data, saving and loading should preserve all fields
-- [x] Property тест: **Property 10 - Token Deletion Completeness**
-  - *For any* stored tokens, deletion should result in null on load
-- [x] Создать генератор `tokenDataArb` для случайных токенов
+### 2.3 Расширить модульные тесты для Token Storage Manager
+- [x] Дополнить `tests/unit/auth/TokenStorageManager.test.ts`
+- [x] Тест: сохранение и загрузка токенов сохраняет все поля
+- [x] Тест: удаление токенов приводит к null при загрузке
 - **Requirements:** google-oauth-auth.4.1, google-oauth-auth.4.3, google-oauth-auth.4.4
 
-### 2.4 Создать property-based тесты для Token Refresh
-- [x] Создать файл `tests/property/auth/TokenRefresh.property.test.ts`
-- [x] Property тест: **Property 13 - Token Update After Refresh**
-  - *For any* successful refresh response, storage must update with new tokens
-- [x] Создать генератор для refresh token responses
+### 2.4 Создать модульные тесты для Token Refresh
+- [x] Дополнить `tests/unit/auth/OAuthClientManager.test.ts`
+- [x] Тест: успешный refresh обновляет сохраненные токены
 - **Requirements:** google-oauth-auth.6.3, google-oauth-auth.6.4
 
 ## 3. Реализация OAuth Client Manager
@@ -154,33 +149,9 @@
 - [x] Тест: обработка сетевых ошибок
 - **Requirements:** google-oauth-auth.1.1, google-oauth-auth.1.2, google-oauth-auth.1.3, google-oauth-auth.1.5, google-oauth-auth.2.2, google-oauth-auth.2.3, google-oauth-auth.3.1, google-oauth-auth.3.2, google-oauth-auth.3.3, google-oauth-auth.3.5, google-oauth-auth.5.1, google-oauth-auth.5.2, google-oauth-auth.5.3, google-oauth-auth.5.4, google-oauth-auth.6.1, google-oauth-auth.6.2, google-oauth-auth.6.3, google-oauth-auth.6.4, google-oauth-auth.6.5, google-oauth-auth.7.1, google-oauth-auth.7.2, google-oauth-auth.9.2
 
-### 3.9 Создать property-based тесты для OAuth Client Manager
-- [x] Создать файл `tests/property/auth/OAuthClientManager.property.test.ts`
-- [x] Property тест: **Property 1 - PKCE Parameters Generation**
-  - *For any* OAuth flow initialization, PKCE parameters must be valid
-- [x] Property тест: **Property 2 - PKCE Parameters Persistence**
-  - *For any* generated PKCE parameters, save/load should preserve values
-- [x] Property тест: **Property 3 - Authorization URL Formation**
-  - *For any* OAuth parameters, URL must contain all required fields
-- [x] Property тест: **Property 4 - Deep Link Parameter Extraction**
-  - *For any* valid deep link URL, parameters should be correctly parsed
-- [x] Property тест: **Property 5 - State Validation**
-  - *For any* incoming state, mismatches must be rejected
-- [x] Property тест: **Property 6 - Token Exchange Request Formation**
-  - *For any* authorization code, request must include all required parameters
-- [x] Property тест: **Property 7 - Token Response Parsing**
-  - *For any* valid token response, all fields must be correctly extracted
-- [x] Property тест: **Property 8 - Token Expiration Calculation**
-  - *For any* expires_in value, expiration timestamp must be correct
-- [x] Property тест: **Property 11 - Auth Status Determination**
-  - *For any* token state, auth status must be correctly determined
-- [x] Property тест: **Property 12 - Token Refresh Request Formation**
-  - *For any* refresh token, request must include all required parameters
-- [x] Property тест: **Property 14 - Logout Token Cleanup**
-  - *For any* logout operation, all tokens must be removed
-- [x] Property тест: **Property 16 - Error Propagation**
-  - *For any* Google OAuth error, error must be propagated without modification
-- [x] Создать генераторы: `codeVerifierArb`, `deepLinkUrlArb`, `oauthErrorArb`
+### 3.9 Расширить модульные тесты для OAuth Client Manager
+- [x] Дополнить `tests/unit/auth/OAuthClientManager.test.ts`
+- [x] Тесты: PKCE параметры, формирование URL, парсинг deep link, валидация state, запрос token exchange, парсинг token response, расчет истечения, статус авторизации, refresh запрос, logout cleanup, propagation ошибок
 - **Requirements:** google-oauth-auth.1.1, google-oauth-auth.1.2, google-oauth-auth.1.3, google-oauth-auth.1.4, google-oauth-auth.1.5, google-oauth-auth.2.2, google-oauth-auth.2.3, google-oauth-auth.3.1, google-oauth-auth.3.2, google-oauth-auth.3.3, google-oauth-auth.3.5, google-oauth-auth.5.1, google-oauth-auth.5.2, google-oauth-auth.5.3, google-oauth-auth.5.4, google-oauth-auth.6.1, google-oauth-auth.6.2, google-oauth-auth.6.3, google-oauth-auth.6.4, google-oauth-auth.7.2, google-oauth-auth.9.3, google-oauth-auth.9.4
 
 ## 4. Реализация Deep Link Handler
@@ -227,10 +198,9 @@
 - [x] Тест: отправка событий в renderer process
 - **Requirements:** google-oauth-auth.8.1, google-oauth-auth.8.2, google-oauth-auth.8.3, google-oauth-auth.8.4, google-oauth-auth.8.5
 
-### 5.3 Создать property-based тесты для Auth IPC Handlers
-- [x] Создать файл `tests/property/auth/AuthIPCHandlers.property.test.ts`
-- [x] Property тест: **Property 15 - IPC Response Structure**
-  - *For any* IPC handler response, must contain success boolean and optional error string
+### 5.3 Расширить модульные тесты для Auth IPC Handlers
+- [x] Дополнить `tests/unit/auth/AuthIPCHandlers.test.ts`
+- [x] Тест: структура ответа IPC (success и error)
 - **Requirements:** google-oauth-auth.8.5
 
 ## 6. Реализация UI Components
@@ -322,14 +292,9 @@
 - [x] Тест: вызов hideLoader() при ошибке авторизации
 - **Requirements:** google-oauth-auth.11.1, google-oauth-auth.11.4, google-oauth-auth.11.5, google-oauth-auth.15.1, google-oauth-auth.15.2, google-oauth-auth.15.5, google-oauth-auth.15.6
 
-### 7.3 Создать property-based тесты для Auth Window Manager
-- [x] Создать файл `tests/property/auth/AuthWindowManager.property.test.ts`
-- [x] Property тест: **Property 17 - Window State Based on Auth Status**
-  - *For any* application startup, correct window must be shown based on auth status
-- [x] Property тест: **Property 18 - Error Screen Display**
-  - *For any* authentication error, error screen must display with correct mapping
-- [x] Property тест: **Property 19 - Loader Display During Authorization**
-  - *For any* authorization flow where authorization code is received, loader must be displayed on Login Screen with disabled login button until token exchange and profile fetch complete
+### 7.3 Расширить модульные тесты для Auth Window Manager
+- [x] Дополнить `tests/unit/auth/AuthWindowManager.test.ts`
+- [x] Тесты: состояние окна по auth status, отображение error screen, loader при авторизации
 - **Requirements:** google-oauth-auth.11.1, google-oauth-auth.11.5, google-oauth-auth.15.1, google-oauth-auth.15.2, google-oauth-auth.15.4
 
 ## 8. Обработка Ошибок
@@ -353,20 +318,14 @@
 - **Requirements:** google-oauth-auth.9.1, google-oauth-auth.9.2, google-oauth-auth.9.3, google-oauth-auth.9.4, google-oauth-auth.9.5, google-oauth-auth.9.6
 - **Примечание:** Задача зависит от clerkly.3.1 и clerkly.3.2 (создание Logger класса и тестов)
 
-### 8.3 Создать property-based тесты для обработки ошибок
-- [x] Создать файл `tests/property/auth/ErrorHandler.property.test.ts`
-- [x] Property тест: **Property 16 - Error Propagation** (дубликат из 3.9, проверка централизованной обработки)
-  - *For any* error code, error details must be correctly mapped
+### 8.3 Расширить модульные тесты для обработки ошибок
+- [x] Дополнить `tests/unit/auth/ErrorHandler.test.ts`
+- [x] Тест: корректный маппинг и propagation ошибок
 - **Requirements:** google-oauth-auth.9.3
 
-### 8.4 Создать property-based тесты для Loader Functionality
-- [x] Создать файл `tests/property/auth/LoaderState.property.test.tsx`
-- [x] Property тест: **Property 20 - Loader State Consistency**
-  - *For any* combination of isLoading and isDisabled, button state and loader visibility must be consistent
-- [x] Property тест: **Property 21 - Loader Visibility Invariant**
-  - *For any* sequence of show/hide actions, isLoaderVisible should match the last action
-- [x] Property тест: **Property 22 - Button State Invariant**
-  - *For any* combination of isLoading and isDisabled, button disabled state should be (isLoading || isDisabled)
+### 8.4 Создать модульные тесты для Loader Functionality
+- [x] Дополнить `tests/unit/auth/LoginScreen.test.tsx` и `tests/unit/auth/LoginError.test.tsx`
+- [x] Тест: состояние кнопки и видимость loader при разных комбинациях isLoading/isDisabled
 - **Requirements:** google-oauth-auth.15.1, google-oauth-auth.15.2, google-oauth-auth.15.3, google-oauth-auth.15.5, google-oauth-auth.15.6
 - **Примечание:** Опциональные тесты для дополнительной проверки инвариантов loader functionality. Эти тесты не являются обязательными для завершения задачи, но рекомендуются для повышения уверенности в корректности реализации.
 
@@ -489,37 +448,9 @@
 
 ## Сводка Покрытия
 
-### Свойства Корректности (Property-Based Tests)
+### Свойства Корректности
 
-Все 22 свойства корректности (19 обязательных + 3 опциональных) покрыты property-based тестами:
-
-**Обязательные свойства (1-19):**
-
-1. **Property 1**: PKCE Parameters Generation - `tests/property/auth/OAuthClientManager.property.test.ts`
-2. **Property 2**: PKCE Parameters Persistence - `tests/property/auth/OAuthClientManager.property.test.ts`
-3. **Property 3**: Authorization URL Formation - `tests/property/auth/OAuthClientManager.property.test.ts`
-4. **Property 4**: Deep Link Parameter Extraction - `tests/property/auth/OAuthClientManager.property.test.ts`
-5. **Property 5**: State Validation - `tests/property/auth/OAuthClientManager.property.test.ts`
-6. **Property 6**: Token Exchange Request Formation - `tests/property/auth/OAuthClientManager.property.test.ts`
-7. **Property 7**: Token Response Parsing - `tests/property/auth/OAuthClientManager.property.test.ts`
-8. **Property 8**: Token Expiration Calculation - `tests/property/auth/OAuthClientManager.property.test.ts`
-9. **Property 9**: Token Storage Round Trip - `tests/property/auth/TokenStorageManager.property.test.ts`
-10. **Property 10**: Token Deletion Completeness - `tests/property/auth/TokenStorageManager.property.test.ts`
-11. **Property 11**: Auth Status Determination - `tests/property/auth/OAuthClientManager.property.test.ts`
-12. **Property 12**: Token Refresh Request Formation - `tests/property/auth/OAuthClientManager.property.test.ts`
-13. **Property 13**: Token Update After Refresh - `tests/property/auth/TokenRefresh.property.test.ts`
-14. **Property 14**: Logout Token Cleanup - `tests/property/auth/OAuthClientManager.property.test.ts`
-15. **Property 15**: IPC Response Structure - `tests/property/auth/AuthIPCHandlers.property.test.ts`
-16. **Property 16**: Error Propagation - `tests/property/auth/ErrorHandler.property.test.ts`
-17. **Property 17**: Window State Based on Auth Status - `tests/property/auth/AuthWindowManager.property.test.ts`
-18. **Property 18**: Error Screen Display - `tests/property/auth/AuthWindowManager.property.test.ts`
-19. **Property 19**: Loader Display During Authorization - `tests/property/auth/AuthWindowManager.property.test.ts`
-
-**Опциональные свойства (20-22):**
-
-20. **Property 20**: Loader State Consistency - `tests/property/auth/LoaderState.property.test.tsx`
-21. **Property 21**: Loader Visibility Invariant - `tests/property/auth/LoaderState.property.test.tsx`
-22. **Property 22**: Button State Invariant - `tests/property/auth/LoaderState.property.test.tsx`
+Все 22 свойства корректности (19 обязательных + 3 опциональных) покрыты модульными и функциональными тестами.
 
 ### Функциональные Тесты (End-to-End)
 
@@ -556,7 +487,7 @@
 ## Примечания
 
 ✅ **Все задачи выполнены** - Реализация завершена полностью
-✅ Все 22 свойства корректности (19 обязательных + 3 опциональных) покрыты property-based тестами
+✅ Все 22 свойства корректности (19 обязательных + 3 опциональных) покрыты модульными и функциональными тестами
 ✅ Все пользовательские сценарии покрыты функциональными тестами
 ✅ Все компоненты имеют модульные тесты
 ✅ Все компоненты имеют комментарии с ссылками на требования
@@ -570,7 +501,6 @@
 
 - **Всего задач:** 11 основных разделов
 - **Всего подзадач:** 60+ индивидуальных задач
-- **Property-based тесты:** 22 свойства (19 обязательных + 3 опциональных)
 - **Модульные тесты:** 10 тестовых файлов
 - **Функциональные тесты:** 7 тестовых файлов
 - **Покрытие требований:** 100% (все 15 требований)

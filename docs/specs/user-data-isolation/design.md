@@ -1366,38 +1366,6 @@ describe('DatabaseManager', () => {
 });
 ```
 
-### Property-Based Тесты
-
-**Файл:** `tests/property/auth/UserDataIsolation.property.test.ts`
-
-```typescript
-describe('User Data Isolation - Property Tests', () => {
-  /* Property 1: Генерация user_id
-     **Validates: Requirements user-data-isolation.0.2** */
-  it('should generate valid 10-character alphanumeric user_id');
-
-  /* Property 2: Идемпотентность findOrCreateUser
-     **Validates: Requirements user-data-isolation.0.3** */
-  it('should return same user_id for same email on repeated findOrCreateUser calls');
-
-  /* Property 3: Изоляция данных
-     **Validates: Requirements user-data-isolation.4.4** */
-  it('should isolate data between different users');
-
-  /* Property 4: Восстановление данных
-     **Validates: Requirements user-data-isolation.1.3** */
-  it('should restore data after logout and re-login with same email');
-
-  /* Property 5: Обновление имени
-     **Validates: Requirements user-data-isolation.0.4** */
-  it('should update user name when changed');
-
-  /* Property 6: Игнорирование null имени
-     **Validates: Requirements user-data-isolation.0.4** */
-  it('should not update name when null is passed');
-});
-```
-
 ### Функциональные Тесты
 
 **Файл:** `tests/functional/user-data-isolation.spec.ts`

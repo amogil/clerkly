@@ -303,7 +303,7 @@ export class DatabaseManager implements IDatabaseManager {
    *
    * Note: Direct database access should be limited to:
    * - Migrations (MigrationRunner)
-   * - Tests (unit tests, property tests)
+   * - Tests (unit tests)
    *
    * For data operations, prefer using repositories:
    * - dbManager.settings - for user settings

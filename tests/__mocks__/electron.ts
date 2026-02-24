@@ -1,5 +1,5 @@
 // Requirements: testing.1.2
-// Mock for Electron API used in unit and property-based tests
+// Mock for Electron API used in unit tests
 
 export const BrowserWindow = jest.fn().mockImplementation(() => ({
   loadFile: jest.fn(),

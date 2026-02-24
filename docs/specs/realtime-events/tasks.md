@@ -205,26 +205,7 @@
   - Запросить ревью от пользователя
   - После согласования: `git add . && git commit -m "feat(events): add React hooks for event subscription"`
 
-### 6. Property-Based тесты
-
-- [x] 6.1 Написать property-based тесты для EventBus
-  - Создать файл `tests/property/events/EventTypes.property.test.ts`
-  - Тест: subscribe always returns unsubscribe function (for any event type)
-  - Тест: events are delivered in order by timestamp
-  - Тест: no memory leaks after subscribe/unsubscribe cycles
-  - Тест: callback isolation (error in one doesn't affect others)
-  - Тест: timestamp deduplication works for any sequence of events
-  - Тест: batching merges multiple events for same entity within one tick
-  - Тест: timestamp cache is cleaned up on entity.deleted
-  - **Requirements:** realtime-events.2.4, realtime-events.3.6, realtime-events.6.3, realtime-events.6.5
-
-- [x] 6.2 **Checkpoint: Фаза 6** ✅
-  - Запустить `npm run validate`
-  - Дать резюме выполненной работы
-  - Запросить ревью от пользователя
-  - После согласования: `git add . && git commit -m "feat(events): add property-based tests for EventBus"`
-
-### 7. Функциональные тесты
+### 6. Функциональные тесты
 
 - [x] 7.1 Написать функциональные тесты для IPC
   - Создать файл `tests/functional/realtime-events.spec.ts`
@@ -248,7 +229,7 @@
   - Запросить ревью от пользователя
   - После согласования: `git add . && git commit -m "feat(events): add functional tests for IPC and UI"`
 
-### 8. Интеграция и экспорт
+### 7. Интеграция и экспорт
 
 - [x] 8.1 Экспортировать API
   - Создать `src/main/events/index.ts`
@@ -272,7 +253,6 @@
   - ESLint проверка
   - Prettier форматирование
   - Модульные тесты
-  - Property-based тесты
 
 - [x] 9.2 Проверить покрытие тестами
   - Минимум 85% покрытие строк кода
@@ -307,7 +287,6 @@
 ## Критерии Завершения
 
 - ✅ Все модульные тесты проходят
-- ✅ Все property-based тесты проходят
 - ✅ Все функциональные тесты проходят
 - ✅ Покрытие кода ≥ 85%
 - ✅ TypeScript компилируется без ошибок

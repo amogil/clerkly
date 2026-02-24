@@ -284,6 +284,42 @@ describe('OAuthClientManager', () => {
 
       expect(result.authorized).toBe(false);
       expect(result.error).toBe('profile_fetch_failed');
+
+      const storedTokens = await tokenStorage.loadTokens();
+      expect(storedTokens).toBeNull();
+    });
+
+    /* Preconditions: userManager set, token exchange fails
+       Action: Call handleDeepLink with valid code+state
+       Assertions: Profile fetch is not called, tokens not saved
+       Requirements: google-oauth-auth.3.1, google-oauth-auth.3.6, google-oauth-auth.3.7 */
+    it('should not fetch profile when token exchange fails', async () => {
+      const mockUserManager = {
+        fetchProfile: jest.fn().mockResolvedValue(null),
+        findOrCreateUser: jest.fn(),
+        setCurrentUser: jest.fn(),
+        updateProfileAfterTokenRefresh: jest.fn().mockResolvedValue(undefined),
+        clearSession: jest.fn(),
+      };
+      oauthClient.setUserManager(mockUserManager);
+
+      await oauthClient.startAuthFlow();
+      const state = (oauthClient as any).pkceStorage.state;
+
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        json: async () => ({ error: { message: 'invalid_request' } }),
+      });
+
+      const deepLinkUrl = `clerkly://oauth/callback?code=test-code&state=${state}`;
+      const result = await oauthClient.handleDeepLink(deepLinkUrl);
+
+      expect(result.authorized).toBe(false);
+      expect(mockUserManager.fetchProfile).not.toHaveBeenCalled();
+
+      const storedTokens = await tokenStorage.loadTokens();
+      expect(storedTokens).toBeNull();
     });
 
     /* Preconditions: userManager set, profile has null name

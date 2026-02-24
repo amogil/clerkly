@@ -1337,33 +1337,20 @@ console.error('[DateTimeFormatter] Failed to format datetime:', error);
 
 ## Стратегия Тестирования
 
-### Двойной Подход к Тестированию
+### Подход к Тестированию
 
-Система настроек будет тестироваться с использованием двух комплементарных подходов:
+Система настроек будет тестироваться модульными и функциональными тестами:
 
 1. **Модульные тесты (Unit Tests)**: Проверяют конкретные примеры, граничные случаи и условия ошибок
-2. **Property-based тесты**: Проверяют универсальные свойства на множестве входных данных
-
-Оба подхода необходимы для комплексного покрытия.
+2. **Функциональные тесты**: Проверяют пользовательские сценарии в UI
 
 ### Баланс Модульного Тестирования
 
 - Модульные тесты полезны для конкретных примеров и граничных случаев
-- Избегать написания слишком большого количества модульных тестов - property-based тесты покрывают множество входных данных
 - Модульные тесты должны фокусироваться на:
   - Конкретных примерах, демонстрирующих корректное поведение
   - Точках интеграции между компонентами
   - Граничных случаях и условиях ошибок
-- Property-based тесты должны фокусироваться на:
-  - Универсальных свойствах, которые истинны для всех входных данных
-  - Комплексном покрытии входных данных через рандомизацию
-
-### Конфигурация Property-Based Тестов
-
-- **Библиотека**: `fast-check` для TypeScript/JavaScript
-- **Минимум итераций**: 100 итераций на property-based тест
-- **Тегирование**: Каждый тест должен ссылаться на свойство из документа дизайна
-- **Формат тега**: `Feature: settings, Property {number}: {property_text}`
 
 ### Модульные Тесты
 
@@ -1459,96 +1446,6 @@ describe('DateTimeFormatter', () => {
 });
 ```
 
-### Property-Based Тесты
-
-```typescript
-import fc from 'fast-check';
-
-describe('AIAgentSettingsManager Property Tests', () => {
-  /* Feature: settings, Property 6: Раздельное хранилище для провайдеров
-     Preconditions: multiple providers with API keys
-     Action: save and load API keys for different providers
-     Assertions: keys are isolated, changing one doesn't affect others
-     Requirements: settings.1.16, settings.1.19 */
-  it('should isolate API keys by provider', () => {
-    fc.assert(
-      fc.property(
-        fc.record({
-          openai: fc.string({ minLength: 10, maxLength: 100 }),
-          anthropic: fc.string({ minLength: 10, maxLength: 100 }),
-          google: fc.string({ minLength: 10, maxLength: 100 })
-        }),
-        async (apiKeys) => {
-          // Save keys for all providers
-          await settingsManager.saveAPIKey('openai', apiKeys.openai);
-          await settingsManager.saveAPIKey('anthropic', apiKeys.anthropic);
-          await settingsManager.saveAPIKey('google', apiKeys.google);
-
-          // Load and verify each key
-          const loadedOpenAI = await settingsManager.loadAPIKey('openai');
-          const loadedAnthropic = await settingsManager.loadAPIKey('anthropic');
-          const loadedGoogle = await settingsManager.loadAPIKey('google');
-
-          expect(loadedOpenAI).toBe(apiKeys.openai);
-          expect(loadedAnthropic).toBe(apiKeys.anthropic);
-          expect(loadedGoogle).toBe(apiKeys.google);
-        }
-      ),
-      { numRuns: 100 }
-    );
-  });
-
-  /* Feature: settings, Property 8: Round-trip шифрования/дешифрования
-     Preconditions: encryption available, various API keys
-     Action: save encrypted key then load it
-     Assertions: loaded key equals original key
-     Requirements: settings.1.22 */
-  it('should preserve API key through encryption/decryption cycle', () => {
-    fc.assert(
-      fc.property(
-        fc.string({ minLength: 10, maxLength: 200 }),
-        async (apiKey) => {
-          // Mock encryption available
-          mockSafeStorage.isEncryptionAvailable.mockReturnValue(true);
-
-          // Save and load
-          await settingsManager.saveAPIKey('openai', apiKey);
-          const loaded = await settingsManager.loadAPIKey('openai');
-
-          // Verify round-trip
-          expect(loaded).toBe(apiKey);
-        }
-      ),
-      { numRuns: 100 }
-    );
-  });
-
-  /* Feature: settings, Property 10: Форматирование дат по системной локали
-     Preconditions: various timestamps
-     Action: format dates with different system locales
-     Assertions: formatted string matches locale format
-     Requirements: settings.2.1 */
-  it('should format dates according to system locale', () => {
-    fc.assert(
-      fc.property(
-        fc.integer({ min: 0, max: Date.now() }),
-        (timestamp) => {
-          const formatted = DateTimeFormatter.formatDate(timestamp);
-          
-          // Verify it's a valid date string
-          expect(formatted).toBeTruthy();
-          expect(typeof formatted).toBe('string');
-          
-          // Verify it's not the default toString format
-          expect(formatted).not.toContain('GMT');
-        }
-      ),
-      { numRuns: 100 }
-    );
-  });
-});
-```
-
 ### Функциональные Тесты
 
 Функциональные тесты проверяют полную функциональность системы в реальных условиях использования.
@@ -1592,30 +1489,30 @@ describe('Settings Functional Tests', () => {
 
 ### Покрытие Требований
 
-| Требование | Модульные Тесты | Property-Based Тесты | Функциональные Тесты |
-|------------|-----------------|----------------------|----------------------|
-| settings.1.1 | ✓ | - | ✓ |
-| settings.1.2 | ✓ | - | ✓ |
-| settings.1.3 | ✓ | - | ✓ |
-| settings.1.4 | ✓ | - | ✓ |
-| settings.1.5 | ✓ | - | ✓ |
-| settings.1.6 | ✓ | - | ✓ |
-| settings.1.7 | ✓ | - | ✓ |
-| settings.1.8 | ✓ | - | ✓ |
-| settings.1.9 | ✓ | ✓ | ✓ |
-| settings.1.10 | ✓ | ✓ | ✓ |
-| settings.1.11 | ✓ | ✓ | ✓ |
-| settings.1.12 | ✓ | - | ✓ |
-| settings.1.13 | ✓ | - | ✓ |
-| settings.1.14 | ✓ | ✓ | ✓ |
-| settings.1.15 | ✓ | ✓ | ✓ |
-| settings.1.16 | ✓ | ✓ | ✓ |
-| settings.1.17 | ✓ | - | - |
-| settings.1.18 | ✓ | - | - |
-| settings.1.19 | ✓ | ✓ | ✓ |
-| settings.1.20 | ✓ | - | ✓ |
-| settings.1.21 | ✓ | - | ✓ |
-| settings.1.22 | ✓ | ✓ | ✓ |
+| Требование | Модульные Тесты | Функциональные Тесты |
+|------------|-----------------|----------------------|
+| settings.1.1 | ✓ | ✓ |
+| settings.1.2 | ✓ | ✓ |
+| settings.1.3 | ✓ | ✓ |
+| settings.1.4 | ✓ | ✓ |
+| settings.1.5 | ✓ | ✓ |
+| settings.1.6 | ✓ | ✓ |
+| settings.1.7 | ✓ | ✓ |
+| settings.1.8 | ✓ | ✓ |
+| settings.1.9 | ✓ | ✓ |
+| settings.1.10 | ✓ | ✓ |
+| settings.1.11 | ✓ | ✓ |
+| settings.1.12 | ✓ | ✓ |
+| settings.1.13 | ✓ | ✓ |
+| settings.1.14 | ✓ | ✓ |
+| settings.1.15 | ✓ | ✓ |
+| settings.1.16 | ✓ | ✓ |
+| settings.1.17 | ✓ | - |
+| settings.1.18 | ✓ | - |
+| settings.1.19 | ✓ | ✓ |
+| settings.1.20 | ✓ | ✓ |
+| settings.1.21 | ✓ | ✓ |
+| settings.1.22 | ✓ | ✓ |
 | settings.1.23 | ✓ | - | - |
 | settings.1.24 | ✓ | - | - |
 | settings.1.25 | - | - | - |

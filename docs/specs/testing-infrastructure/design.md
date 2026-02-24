@@ -9,16 +9,12 @@
 ### Пирамида Тестирования
 
 ```
-        Functional Tests
-       (Real Electron + Playwright)
-       /                \
-      /   Property-Based  \
-     /    (Mocked)          \
-    /________________________\
-   Unit Tests (Fully Mocked)
+Functional Tests (Real Electron + Playwright)
+---------------------------------------------
+Unit Tests (Fully Mocked)
 ```
 
-**Requirements**: testing.1, testing.2, testing.3
+**Requirements**: testing.1, testing.3
 
 ### Типы Тестов
 
@@ -45,36 +41,7 @@ jest.mock('fs');
 jest.mock('better-sqlite3');
 ```
 
-#### 2. Property-Based Тесты
-
-**Расположение**: `tests/property/**/*.property.test.ts`
-
-**Характеристики**:
-- Проверяют инварианты на множестве входных данных
-- Используют fast-check для генерации данных
-- Все зависимости замокированы
-- Выполняют 100+ итераций
-
-**Пример**:
-```typescript
-// Requirements: testing.2.2, testing.2.3
-fc.assert(
-  fc.property(
-    fc.record({
-      width: fc.integer({ min: 800, max: 3840 }),
-      height: fc.integer({ min: 600, max: 2160 })
-    }),
-    (screenSize) => {
-      // Проверка инварианта
-      const state = windowStateManager.loadState();
-      expect(state.width).toBeLessThanOrEqual(screenSize.width);
-    }
-  ),
-  { numRuns: 100 }
-);
-```
-
-#### 3. Функциональные Тесты (Functional Tests)
+#### 2. Функциональные Тесты (Functional Tests)
 
 **Расположение**: `tests/functional/**/*.spec.ts`
 
@@ -574,8 +541,7 @@ interface MockTokenResponse {
 2. **ESLint** - `npm run lint:fix` (с автофиксом)
 3. **Prettier** - `npm run format` (с автофиксом)
 4. **Модульные тесты** - `npm run test:unit`
-5. **Property-based тесты** - `npm run test:property`
-6. **Покрытие кода** - `npm run test:coverage`
+5. **Покрытие кода** - `npm run test:coverage`
 
 **Скрипт валидации** (`scripts/validate.sh`):
 ```bash
@@ -601,10 +567,6 @@ npm run format
 # Unit tests
 echo "🧪 Unit tests..."
 npm run test:unit
-
-# Property-based tests
-echo "🎲 Property-based tests..."
-npm run test:property
 
 # Coverage check
 echo "📊 Coverage check..."
@@ -661,97 +623,27 @@ npm test
 
 ### Таблица Мокирования
 
-**Requirements**: testing.1.2, testing.2.1, testing.3.2
+**Requirements**: testing.1.2, testing.3.2
 
-| Компонент | Unit | Property | Functional |
-|-----------|------|----------|------------|
-| **Electron API** | ✅ Мок | ✅ Мок | ❌ Реальный |
-| **Внутренние классы** | ✅ Мок | ✅ Мок | ❌ Реальные |
-| **База данных** | ✅ Мок | ✅ Мок | ❌ Реальная |
-| **Файловая система** | ✅ Мок | ✅ Мок | ❌ Реальная |
-| **Сетевые запросы (OAuth)** | ✅ Мок | ✅ Мок | ✅ Мок (Mock OAuth Server) |
+| Компонент | Unit | Functional |
+|-----------|------|------------|
+| **Electron API** | ✅ Мок | ❌ Реальный |
+| **Внутренние классы** | ✅ Мок | ❌ Реальные |
+| **База данных** | ✅ Мок | ❌ Реальная |
+| **Файловая система** | ✅ Мок | ❌ Реальная |
+| **Сетевые запросы (OAuth)** | ✅ Мок | ✅ Мок (Mock OAuth Server) |
 
 ### Покрытие Требований
-
-| Требование | Модульные Тесты | Property-Based Тесты | Функциональные Тесты |
-|------------|-----------------|----------------------|----------------------|
-| testing.1.1 | ✓ | - | - |
-| testing.1.2 | ✓ | - | - |
-| testing.1.3 | ✓ | - | - |
-| testing.1.4 | ✓ | - | - |
-| testing.2.1 | - | ✓ | - |
-| testing.2.2 | - | ✓ | - |
-| testing.2.3 | - | ✓ | - |
-| testing.2.4 | - | ✓ | - |
-| testing.3.1 | - | - | ✓ |
-| testing.3.2 | - | - | ✓ |
-| testing.3.3 | - | - | ✓ |
-| testing.3.4 | - | - | ✓ |
-| testing.3.5 | - | - | ✓ |
-| testing.3.6 | - | - | ✓ |
-| testing.3.7 | - | - | ✓ |
-| testing.3.8 | - | - | ✓ |
-| testing.3.9 | - | - | ✓ |
-| testing.3.10 | - | - | ✓ |
-| testing.3.11 | - | - | ✓ |
-| testing.3.1.1 | - | - | ✓ |
-| testing.3.1.2 | - | - | ✓ |
-| testing.3.1.3 | - | - | ✓ |
-| testing.3.1.4 | - | - | ✓ |
-| testing.3.1.5 | - | - | ✓ |
-| testing.3.1.6 | - | - | ✓ |
-| testing.3.2.1 | - | - | ✓ |
-| testing.3.2.2 | - | - | ✓ |
-| testing.3.2.3 | - | - | ✓ |
-| testing.3.2.4 | - | - | ✓ |
-| testing.3.2.5 | - | - | ✓ |
-| testing.3.2.6 | - | - | ✓ |
-| testing.3.2.7 | - | - | ✓ |
-| testing.4.1 | ✓ | ✓ | - |
-| testing.4.2 | - | - | - |
-| testing.4.3 | ✓ | ✓ | - |
-| testing.4.4 | ✓ | ✓ | - |
-| testing.5.1 | - | - | ✓ |
-| testing.5.2 | - | - | ✓ |
-| testing.5.3 | - | - | ✓ |
-| testing.5.4 | - | - | ✓ |
-| testing.6.1 | - | - | ✓ |
-| testing.6.2 | - | - | ✓ |
-| testing.6.3 | - | - | ✓ |
-| testing.6.4 | - | - | ✓ |
-| testing.6.5 | - | - | ✓ |
-| testing.7.1 | ✓ | ✓ | ✓ |
-| testing.7.2 | ✓ | ✓ | ✓ |
-| testing.7.3 | ✓ | ✓ | ✓ |
-| testing.7.4 | ✓ | ✓ | ✓ |
-| testing.7.5 | - | - | - |
-| testing.7.6 | - | - | - |
-| testing.7.7 | - | - | - |
-| testing.7.8 | - | - | - |
-| testing.7.9 | - | - | - |
-| testing.7.10 | ✓ | ✓ | ✓ |
-| testing.8.1 | - | - | ✓ |
-| testing.8.2 | - | - | ✓ |
-| testing.8.3 | - | - | ✓ |
-| testing.8.4 | - | - | ✓ |
-| testing.8.5 | - | - | ✓ |
-| testing.8.6 | - | - | ✓ |
-| testing.9.1 | - | - | - |
-| testing.9.2 | - | - | - |
-| testing.9.3 | - | - | - |
-| testing.9.4 | - | - | - |
-| testing.9.5 | - | - | - |
-| testing.9.6 | - | - | - |
-| testing.9.7 | - | - | - |
-| testing.9.8 | - | - | - |
-| testing.9.9 | - | - | - |
-| testing.9.10 | - | - | - |
+Покрытие требований фиксируется в таблицах покрытия соответствующих спецификаций. Для инфраструктуры тестирования применяются следующие правила:
+- `testing.1.*` покрывается модульными тестами
+- `testing.3.*`, `testing.5.*`, `testing.6.*`, `testing.8.*` покрывается функциональными тестами
+- `testing.4.*` проверяется скриптом валидации
 
 ## Требования к Окружению
 
-### Для Модульных и Property-Based Тестов
+### Для Модульных Тестов
 
-**Requirements**: testing.1, testing.2
+**Requirements**: testing.1
 
 - Node.js 18+
 - npm 9+
@@ -943,15 +835,14 @@ npm run dev:app
 ## Критерии Успеха
 
 1. ✅ Модульные тесты выполняются < 10 секунд (Requirements: testing.1.3)
-2. ✅ Property-based тесты выполняются < 20 секунд (Requirements: testing.2.3)
-3. ✅ Валидация выполняется < 30 секунд (Requirements: testing.4.3)
-4. ✅ Функциональные тесты используют реальный Electron через Playwright (Requirements: testing.3.1, testing.3.2, testing.3.9)
-5. ✅ Test IPC Handlers доступны только в тестовом режиме (Requirements: testing.3.1.1, testing.3.1.3)
-6. ✅ Mock OAuth Server эмулирует Google OAuth endpoints (Requirements: testing.3.2.1)
-7. ✅ Покрытие кода > 80% (Requirements: testing.4.1)
-8. ✅ Все тесты проходят без ошибок
-9. ✅ Reference Code исключен из тестирования и анализа (Requirements: testing.7.6, testing.7.7, testing.7.10)
-10. ✅ Development mode с deep links работает за < 30 секунд (Requirements: testing.9.5)
+2. ✅ Валидация выполняется < 30 секунд (Requirements: testing.4.3)
+3. ✅ Функциональные тесты используют реальный Electron через Playwright (Requirements: testing.3.1, testing.3.2, testing.3.9)
+4. ✅ Test IPC Handlers доступны только в тестовом режиме (Requirements: testing.3.1.1, testing.3.1.3)
+5. ✅ Mock OAuth Server эмулирует Google OAuth endpoints (Requirements: testing.3.2.1)
+6. ✅ Покрытие кода > 80% (Requirements: testing.4.1)
+7. ✅ Все тесты проходят без ошибок
+8. ✅ Reference Code исключен из тестирования и анализа (Requirements: testing.7.6, testing.7.7, testing.7.10)
+9. ✅ Development mode с deep links работает за < 30 секунд (Requirements: testing.9.5)
 
 ## Correctness Properties
 
@@ -965,53 +856,47 @@ npm run dev:app
 
 ### Property 2: Mock Consistency
 
-*For any* unit or property-based test, all external dependencies (Electron API, fs, database, network) should be mocked.
+*For any* unit test, all external dependencies (Electron API, fs, database, network) should be mocked.
 
-**Validates: Requirements testing.1.2, testing.2.1**
+**Validates: Requirements testing.1.2**
 
-### Property 3: Property Test Iterations
-
-*For any* property-based test, the test should execute at least 100 iterations with randomly generated inputs.
-
-**Validates: Requirements testing.2.3**
-
-### Property 4: Functional Test Real Electron
+### Property 3: Functional Test Real Electron
 
 *For any* functional test, the test should use real Electron through Playwright without mocking Electron API.
 
 **Validates: Requirements testing.3.1, testing.3.2**
 
-### Property 5: Test IPC Handler Security
+### Property 4: Test IPC Handler Security
 
 *For any* attempt to use test IPC handlers, the handlers should only be available when NODE_ENV=test.
 
 **Validates: Requirements testing.3.1.1, testing.3.1.3**
 
-### Property 6: Mock OAuth Token Generation
+### Property 5: Mock OAuth Token Generation
 
 *For any* valid authorization code starting with 'test_auth_code_', the Mock OAuth Server should generate valid test tokens.
 
 **Validates: Requirements testing.3.2.2, testing.3.2.4**
 
-### Property 7: Temporary Directory Cleanup
+### Property 6: Temporary Directory Cleanup
 
 *For any* functional test, temporary test data directories should be cleaned up after test completion.
 
 **Validates: Requirements testing.3.7**
 
-### Property 8: Validation Speed
+### Property 7: Validation Speed
 
 *For any* validation run, the total execution time should be less than 30 seconds.
 
 **Validates: Requirements testing.4.3**
 
-### Property 9: Reference Code Exclusion
+### Property 8: Reference Code Exclusion
 
 *For any* test coverage calculation, files in the `figma/` directory should be excluded from coverage metrics.
 
 **Validates: Requirements testing.7.10**
 
-### Property 10: Deep Link Registration
+### Property 9: Deep Link Registration
 
 *For any* unpacked .app bundle created with `npm run dev:app`, the bundle should correctly register custom protocol handlers for OAuth deep links.
 
@@ -1021,7 +906,7 @@ npm run dev:app
 
 ### Test Failures
 
-**Unit/Property Tests**:
+**Unit Tests**:
 - Fail fast on first error
 - Provide clear error messages with stack traces
 - Log which requirement the test validates
@@ -1092,18 +977,14 @@ mockServer.clearUserInfoError();
 ### Test Pyramid
 
 ```
-     Functional (E2E)
-    /                \
-   /  Property-Based  \
-  /                    \
- /________________________\
-        Unit Tests
+Functional (E2E)
+----------------
+Unit Tests
 ```
 
 **Distribution**:
-- Unit Tests: 70% (fast, isolated, comprehensive coverage)
-- Property-Based Tests: 20% (invariant validation, edge cases)
-- Functional Tests: 10% (user scenarios, end-to-end validation)
+- Unit Tests: 80% (fast, isolated, comprehensive coverage)
+- Functional Tests: 20% (user scenarios, end-to-end validation)
 
 ### Coverage Goals
 
@@ -1116,7 +997,6 @@ mockServer.clearUserInfoError();
 ### Test Naming Convention
 
 **Unit Tests**: `*.test.ts` or `*.test.tsx`
-**Property Tests**: `*.property.test.ts` or `*.property.test.tsx`
 **Functional Tests**: `*.spec.ts`
 
 ### Test Structure

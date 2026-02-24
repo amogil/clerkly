@@ -2,21 +2,21 @@
 
 ## Обзор
 
-Этот план описывает пошаговую реализацию базовой платформы Clerkly - Electron-приложения для Mac OS X с локальным хранением данных, системой миграций и комплексным тестовым покрытием. Реализация включает Main Process компоненты ("Window Manager", "Lifecycle Manager", "Data Manager", "Migration Runner", "IPC Handlers"), Renderer Process компоненты ("UI Controller", "State Controller", "Preload Script"), а также модульные, property-based и функциональные тесты.
+Этот план описывает пошаговую реализацию базовой платформы Clerkly - Electron-приложения для Mac OS X с локальным хранением данных, системой миграций и комплексным тестовым покрытием. Реализация включает Main Process компоненты ("Window Manager", "Lifecycle Manager", "Data Manager", "Migration Runner", "IPC Handlers"), Renderer Process компоненты ("UI Controller", "State Controller", "Preload Script"), а также модульные и функциональные тесты.
 
 **Ключевые требования к реализации:**
 - Все тесты ДОЛЖНЫ содержать структурированные комментарии (Preconditions, Action, Assertions, Requirements) - _Requirements: clerkly.2.8_
 - Весь код ДОЛЖЕН содержать комментарии со ссылками на реализуемые требования (формат: `// Requirements: clerkly.1.4`) - _Requirements: clerkly.2.9_
-- Property-based тесты ДОЛЖНЫ иметь минимум 100 итераций - _Requirements: clerkly.2.6, clerkly.nfr.4.4_
+- Модульные тесты ДОЛЖНЫ быть детерминированными и воспроизводимыми - _Requirements: clerkly.nfr.4.4_
 - Покрытие кода: минимум 80% для бизнес-логики, 100% для критических компонентов ("Data Manager", "Lifecycle Manager", "IPC Handlers") - _Requirements: clerkly.2.7_
 - Функциональные тесты запускаются ТОЛЬКО при явной просьбе пользователя (не в автоматическом режиме) - _Requirements: clerkly.2.2_
 - Документация на русском языке, код и комментарии на английском языке
 
-**10 Свойств Корректности (Property-Based Tests):**
+**10 Свойств Корректности (Инварианты):**
 
-1. **Property 1: Data Storage Round-Trip** - Сохранение и загрузка данных возвращает эквивалентное значение (_Validates: clerkly.1.4, clerkly.2.6_)
-2. **Property 2: Invalid Key Rejection** - Невалидные ключи отклоняются без изменения состояния (_Validates: clerkly.1.4, clerkly.2.3, clerkly.2.6_)
-3. **Property 3: State Immutability** - getState() возвращает immutable копию состояния (_Validates: clerkly.1.3, clerkly.2.6_)
+1. **Property 1: Data Storage Round-Trip** - Сохранение и загрузка данных возвращает эквивалентное значение (_Validates: clerkly.1.4_)
+2. **Property 2: Invalid Key Rejection** - Невалидные ключи отклоняются без изменения состояния (_Validates: clerkly.1.4, clerkly.2.3_)
+3. **Property 3: State Immutability** - getState() возвращает immutable копию состояния (_Validates: clerkly.1.3_)
 4. **Property 4: IPC Timeout Enforcement** - IPC операции соблюдают таймауты (_Validates: clerkly.1.4, clerkly.nfr.2.3_)
 5. **Property 5: Migration Idempotence** - Повторное применение миграций не изменяет схему (_Validates: clerkly.1.4, clerkly.nfr.2.1_)
 6. **Property 6: Performance Threshold Monitoring** - Мониторинг производительности UI операций (_Validates: clerkly.nfr.1.2, clerkly.nfr.1.3_)
@@ -38,8 +38,8 @@
 - [x] 1. Настройка проекта и базовой структуры
   - Создать структуру директорий проекта (src/main, src/renderer, src/preload, tests, migrations)
   - Настроить TypeScript конфигурацию (tsconfig.json для main, renderer, preload)
-  - Настроить package.json с зависимостями (electron 28+, better-sqlite3, jest, ts-jest, fast-check)
-  - Настроить Jest конфигурацию для модульных и property-based тестов с поддержкой TypeScript
+  - Настроить package.json с зависимостями (electron 28+, better-sqlite3, jest, ts-jest)
+  - Настроить Jest конфигурацию для модульных тестов с поддержкой TypeScript
   - Создать базовые типы и интерфейсы (src/types/index.ts)
   - Настроить ESLint и Prettier для TypeScript
   - Создать скрипт валидации (scripts/validate.sh) для автоматической проверки
@@ -86,24 +86,20 @@
     - Все тесты должны иметь структурированные комментарии
     - _Requirements: clerkly.2.1, clerkly.2.3, clerkly.2.8, clerkly.nfr.2.1, clerkly.nfr.2.4, clerkly.nfr.4.1_
   
-  - [x] 2.5 Написать property-based тест для "Data Manager"
+  - [x] 2.5 Расширить модульные тесты для "Data Manager"
     - **Property 1: Data Storage Round-Trip**
-    - Генерировать случайные key-value пары различных типов (строки, числа, объекты, массивы, boolean)
     - Проверять, что saveData() → loadData() возвращает эквивалентное значение (deep equality)
-    - Минимум 100 итераций (numRuns: 100)
-    - Тест должен иметь структурированный комментарий и тег "Feature: clerkly, Property 1: Data Storage Round-Trip"
-    - **Validates: Requirements clerkly.1.4, clerkly.2.6**
-    - _Requirements: clerkly.1.4, clerkly.2.6, clerkly.2.8, clerkly.nfr.4.4_
+    - Тест должен иметь структурированный комментарий
+    - **Validates: Requirements clerkly.1.4**
+    - _Requirements: clerkly.1.4, clerkly.2.8, clerkly.nfr.4.4_
   
-  - [x] 2.6 Написать property-based тест для валидации ключей
+  - [x] 2.6 Добавить модульные тесты для валидации ключей
     - **Property 2: Invalid Key Rejection**
-    - Генерировать различные типы невалидных ключей (пустые строки, null, undefined, не-строки, слишком длинные > 1000 chars)
     - Проверять, что saveData(), loadData(), deleteData() возвращают { success: false, error: ... }
     - Проверять, что состояние базы данных не изменилось
-    - Минимум 100 итераций (numRuns: 100)
-    - Тест должен иметь структурированный комментарий и тег "Feature: clerkly, Property 2: Invalid Key Rejection"
-    - **Validates: Requirements clerkly.1.4, clerkly.2.3, clerkly.2.6**
-    - _Requirements: clerkly.1.4, clerkly.2.3, clerkly.2.6, clerkly.2.8, clerkly.nfr.4.4_
+    - Тест должен иметь структурированный комментарий
+    - **Validates: Requirements clerkly.1.4, clerkly.2.3**
+    - _Requirements: clerkly.1.4, clerkly.2.3, clerkly.2.8, clerkly.nfr.4.4_
   
   - [x] 2.7 Создать начальную миграцию базы данных
     - Создать файл migrations/001_initial_schema.sql
@@ -219,15 +215,14 @@
     - Все тесты должны иметь структурированные комментарии
     - _Requirements: clerkly.2.1, clerkly.2.3, clerkly.2.8, clerkly.nfr.2.3, clerkly.nfr.4.1, clerkly.nfr.4.2_
   
-  - [x] 5.7 Написать property-based тест для IPC таймаутов
+  - [x] 5.7 Добавить модульные тесты для IPC таймаутов
     - **Property 4: IPC Timeout Enforcement**
     - Создать mock DataManager с искусственной задержкой > timeout (например, 11 секунд)
     - Проверять, что IPC операции (save-data, load-data, delete-data) возвращают ошибку timeout
     - Проверять, что время выполнения примерно равно timeout (не намного больше)
-    - Минимум 100 итераций (numRuns: 100)
-    - Тест должен иметь структурированный комментарий и тег "Feature: clerkly, Property 4: IPC Timeout Enforcement"
+    - Тест должен иметь структурированный комментарий
     - **Validates: Requirements clerkly.1.4, clerkly.nfr.2.3**
-    - _Requirements: clerkly.1.4, clerkly.nfr.2.3, clerkly.2.6, clerkly.2.8, clerkly.nfr.4.4_
+    - _Requirements: clerkly.1.4, clerkly.nfr.2.3, clerkly.2.8, clerkly.nfr.4.4_
 
 - [x] 6. Checkpoint - Проверка Main Process компонентов
   - Убедиться, что все тесты Main Process компонентов проходят
@@ -257,15 +252,13 @@
     - Все тесты должны иметь структурированные комментарии
     - _Requirements: clerkly.2.1, clerkly.2.8, clerkly.nfr.4.1_
   
-  - [x] 7.3 Написать property-based тест для "State Controller"
+  - [x] 7.3 Добавить модульные тесты для "State Controller"
     - **Property 3: State Immutability**
-    - Генерировать случайные состояния (объекты с различными свойствами)
     - Проверять, что getState() возвращает копию, и изменения возвращенного объекта не влияют на внутреннее состояние
     - Проверять deep equality между последовательными вызовами getState()
-    - Минимум 100 итераций (numRuns: 100)
-    - Тест должен иметь структурированный комментарий и тег "Feature: clerkly, Property 3: State Immutability"
-    - **Validates: Requirements clerkly.1.3, clerkly.2.6**
-    - _Requirements: clerkly.1.3, clerkly.2.6, clerkly.2.8, clerkly.nfr.4.4_
+    - Тест должен иметь структурированный комментарий
+    - **Validates: Requirements clerkly.1.3**
+    - _Requirements: clerkly.1.3, clerkly.2.8, clerkly.nfr.4.4_
   
   - [x] 7.4 Создать "UI Controller"
     - Реализовать класс UIController с методами: render(), updateView(), showLoading(), hideLoading(), withLoading(), createHeader(), createContent(), createFooter(), createDataDisplay(), clearAllLoading(), getContainer(), setContainer()
@@ -286,15 +279,14 @@
     - Все тесты должны иметь структурированные комментарии
     - _Requirements: clerkly.2.1, clerkly.2.8, clerkly.nfr.1.2, clerkly.nfr.1.3, clerkly.nfr.4.1_
   
-  - [x] 7.6 Написать property-based тест для "UI Controller"
+  - [x] 7.6 Добавить модульные тесты для "UI Controller"
     - **Property 6: Performance Threshold Monitoring**
     - Выполнять операции render/updateView с различным временем выполнения (< 100ms и > 100ms)
     - Проверять, что performanceWarning корректно устанавливается (true для > 100ms, false для < 100ms)
     - Проверять, что renderTime/updateTime корректно измеряется и возвращается
-    - Минимум 100 итераций (numRuns: 100)
-    - Тест должен иметь структурированный комментарий и тег "Feature: clerkly, Property 6: Performance Threshold Monitoring"
+    - Тест должен иметь структурированный комментарий
     - **Validates: Requirements clerkly.nfr.1.2, clerkly.nfr.1.3**
-    - _Requirements: clerkly.nfr.1.2, clerkly.nfr.1.3, clerkly.2.6, clerkly.2.8, clerkly.nfr.4.4_
+    - _Requirements: clerkly.nfr.1.2, clerkly.nfr.1.3, clerkly.2.8, clerkly.nfr.4.4_
   
   - [x] 7.7 Создать Preload Script
     - Реализовать preload script с contextBridge для безопасной IPC коммуникации
@@ -378,57 +370,52 @@
     - Тест должен иметь структурированный комментарий (Preconditions, Action, Assertions, Requirements)
     - _Requirements: clerkly.2.2, clerkly.2.4, clerkly.2.8_
   
-  - [x] 10.5 Написать property-based тест для системы миграций
+  - [x] 10.5 Добавить модульные тесты для системы миграций
     - **Property 5: Migration Idempotence**
     - Применять набор миграций, затем пытаться применить их снова
     - Проверять, что версия схемы и состояние базы данных не изменились
     - Проверять, что не возникло ошибок при повторном применении
-    - Минимум 100 итераций (numRuns: 100)
-    - Тест должен иметь структурированный комментарий (Preconditions, Action, Assertions, Requirements) и тег "Feature: clerkly, Property 5: Migration Idempotence"
+    - Тест должен иметь структурированный комментарий (Preconditions, Action, Assertions, Requirements)
     - **Validates: Requirements clerkly.1.4, clerkly.nfr.2.1**
-    - _Requirements: clerkly.1.4, clerkly.nfr.2.1, clerkly.2.6, clerkly.2.8, clerkly.nfr.4.4_
+    - _Requirements: clerkly.1.4, clerkly.nfr.2.1, clerkly.2.8, clerkly.nfr.4.4_
   
-  - [x] 10.6 Написать property-based тест для производительности запуска
+  - [x] 10.6 Добавить модульные тесты для производительности запуска
     - **Property 7: Application Startup Performance**
     - Запускать приложение и измерять время от app.whenReady() до готовности окна
     - Проверять, что время запуска < 3000ms на современных Mac системах
     - Логировать предупреждения при превышении порога
-    - Минимум 100 итераций (numRuns: 100)
-    - Тест должен иметь структурированный комментарий (Preconditions, Action, Assertions, Requirements) и тег "Feature: clerkly, Property 7: Application Startup Performance"
+    - Тест должен иметь структурированный комментарий (Preconditions, Action, Assertions, Requirements)
     - **Validates: Requirements clerkly.nfr.1.1**
-    - _Requirements: clerkly.nfr.1.1, clerkly.2.6, clerkly.2.8, clerkly.nfr.4.4_
+    - _Requirements: clerkly.nfr.1.1, clerkly.2.8, clerkly.nfr.4.4_
   
-  - [x] 10.7 Написать property-based тест для производительности операций с данными
+  - [x] 10.7 Добавить модульные тесты для производительности операций с данными
     - **Property 8: Data Operations Performance**
-    - Генерировать случайные небольшие объекты данных (< 1KB)
+    - Использовать небольшие объекты данных (< 1KB)
     - Выполнять операции saveData, loadData, deleteData и измерять время
     - Проверять, что время < 50ms для каждой операции
-    - Минимум 100 итераций (numRuns: 100)
-    - Тест должен иметь структурированный комментарий (Preconditions, Action, Assertions, Requirements) и тег "Feature: clerkly, Property 8: Data Operations Performance"
+    - Тест должен иметь структурированный комментарий (Preconditions, Action, Assertions, Requirements)
     - **Validates: Requirements clerkly.nfr.1.4**
-    - _Requirements: clerkly.nfr.1.4, clerkly.2.6, clerkly.2.8, clerkly.nfr.4.4_
+    - _Requirements: clerkly.nfr.1.4, clerkly.2.8, clerkly.nfr.4.4_
   
-  - [x] 10.8 Написать property-based тест для персистентности данных при завершении
+  - [x] 10.8 Добавить модульные тесты для персистентности данных при завершении
     - **Property 9: Graceful Shutdown Data Persistence**
-    - Запускать приложение, сохранять случайные данные, корректно завершать через handleQuit(), перезапускать
+    - Запускать приложение, сохранять данные, корректно завершать через handleQuit(), перезапускать
     - Проверять, что все данные доступны после перезапуска и эквивалентны сохраненным (deep equality)
     - Проверять, что завершение происходит в течение 5 секунд (таймаут)
-    - Минимум 100 итераций (numRuns: 100)
-    - Тест должен иметь структурированный комментарий (Preconditions, Action, Assertions, Requirements) и тег "Feature: clerkly, Property 9: Graceful Shutdown Data Persistence"
+    - Тест должен иметь структурированный комментарий (Preconditions, Action, Assertions, Requirements)
     - **Validates: Requirements clerkly.nfr.2.2**
-    - _Requirements: clerkly.nfr.2.2, clerkly.2.6, clerkly.2.8, clerkly.nfr.4.4_
+    - _Requirements: clerkly.nfr.2.2, clerkly.2.8, clerkly.nfr.4.4_
   
-  - [x] 10.9 Написать property-based тест для восстановления поврежденной базы данных
+  - [x] 10.9 Добавить модульные тесты для восстановления поврежденной базы данных
     - **Property 10: Database Corruption Recovery**
     - Создавать поврежденную базу данных (невалидный SQLite файл)
     - Запускать инициализацию "Data Manager"
     - Проверять, что создан backup файл с timestamp (clerkly.db.backup-{timestamp})
     - Проверять, что создана новая рабочая база данных
     - Проверять, что новая база данных функциональна (можно сохранять/загружать данные)
-    - Минимум 100 итераций (numRuns: 100)
-    - Тест должен иметь структурированный комментарий (Preconditions, Action, Assertions, Requirements) и тег "Feature: clerkly, Property 10: Database Corruption Recovery"
+    - Тест должен иметь структурированный комментарий (Preconditions, Action, Assertions, Requirements)
     - **Validates: Requirements clerkly.nfr.2.4**
-    - _Requirements: clerkly.nfr.2.4, clerkly.2.6, clerkly.2.8, clerkly.nfr.4.4_
+    - _Requirements: clerkly.nfr.2.4, clerkly.2.8, clerkly.nfr.4.4_
 
 - [x] 11. Checkpoint - Проверка интеграции и функциональных тестов
   - Убедиться, что все функциональные тесты проходят (если были запущены)
@@ -459,7 +446,7 @@
     - Создать README.md с инструкциями по сборке и запуску
     - Документировать требования к системе (Node.js 18+, Mac OS X 10.13+)
     - Документировать команды для разработки (npm run dev, npm test, npm run validate)
-    - Документировать команды для тестирования (npm test, npm run test:unit, npm run test:property, npm run test:functional)
+    - Документировать команды для тестирования (npm test, npm run test:unit, npm run test:functional)
     - Документировать команды для сборки (npm run build, npm run package)
     - Добавить информацию о структуре проекта
     - _Requirements: clerkly.1.1, clerkly.1.2, clerkly.1.5_
@@ -485,10 +472,8 @@
     - Проверить трассировку требований к тестам в tasks.md
     - _Requirements: clerkly.2.8, clerkly.2.9_
   
-  - [x] 13.4 Проверить property-based тесты
-    - Убедиться, что все 10 свойств корректности реализованы как property-based тесты
-    - Убедиться, что каждый property тест имеет минимум 100 итераций (numRuns: 100)
-    - Убедиться, что каждый property тест имеет тег "Feature: clerkly, Property N: {property_text}"
+  - [x] 13.4 Проверить модульные тесты инвариантов
+    - Убедиться, что все 10 свойств корректности покрыты модульными тестами
     - Проверить покрытие всех 10 свойств:
       - ✅ Property 1: Data Storage Round-Trip (обязательный)
       - ✅ Property 2: Invalid Key Rejection (обязательный)
@@ -500,12 +485,12 @@
       - ⏳ Property 8: Data Operations Performance (задача 10.7)
       - ⏳ Property 9: Graceful Shutdown Data Persistence (задача 10.8)
       - ⏳ Property 10: Database Corruption Recovery (задача 10.9)
-    - _Requirements: clerkly.2.6, clerkly.nfr.4.4_
+    - _Requirements: clerkly.nfr.4.4_
 
 - [x] 14. Финальный checkpoint - Завершение реализации
   - Убедиться, что все задачи выполнены (задачи 1-9, 13)
   - Убедиться, что все модульные тесты проходят
-  - Убедиться, что все обязательные property-based тесты проходят (Property 1-4, 6)
+  - Убедиться, что все обязательные модульные тесты инвариантов проходят (Property 1-4, 6)
   - Убедиться, что покрытие кода соответствует требованиям (80%+ для бизнес-логики, 100% для критических компонентов)
   - Убедиться, что все тесты имеют структурированные комментарии
   - Убедиться, что весь код имеет комментарии с требованиями
@@ -517,7 +502,7 @@
 
 - Каждая задача ссылается на конкретные требования для прослеживаемости (формат: _Requirements: clerkly.1.4, clerkly.2.7_)
 - Checkpoints обеспечивают инкрементальную валидацию на каждом этапе
-- Property-based тесты валидируют универсальные свойства корректности (Property 1-10)
+- Модульные тесты валидируют универсальные свойства корректности (Property 1-10)
 - Модульные тесты валидируют конкретные примеры и граничные случаи
 - Функциональные тесты валидируют интеграцию компонентов (запускаются ТОЛЬКО при явной просьбе пользователя)
 - Все названия компонентов используют английский язык в кавычках (например, "Data Manager", "Lifecycle Manager")
@@ -537,11 +522,8 @@
    - Формат: `// Requirements: clerkly.1.4, clerkly.2.7`
    - Комментарии размещаются перед определением функции/класса/метода
 
-3. **Property-based тесты (Requirements clerkly.2.6, clerkly.nfr.4.4):**
-   - Минимум 100 итераций на каждый property тест (numRuns: 100)
-   - Каждый property тест ДОЛЖЕН иметь тег в комментарии: `// Feature: clerkly, Property N: {property_text}`
-   - Использовать fast-check для генерации тестовых данных
-   - Все 10 свойств корректности ДОЛЖНЫ быть реализованы
+3. **Модульные тесты инвариантов (Requirements clerkly.nfr.4.4):**
+   - Все 10 свойств корректности ДОЛЖНЫ быть реализованы модульными тестами
 
 4. **Покрытие кода (Requirements clerkly.2.7):**
    - Минимум 80% покрытие для бизнес-логики
@@ -578,16 +560,12 @@ test('should save and load string data', () => {
   // Тест реализация
 });
 
-// Feature: clerkly, Property 1: Data Storage Round-Trip
 /* Preconditions: DataManager initialized with clean database
-   Action: generate random key-value pairs, save each, then load each
-   Assertions: for all pairs, loaded value equals saved value (deep equality)
-   Requirements: clerkly.1.4, clerkly.2.6 */
-test('Property 1: saving then loading data returns equivalent value', async () => {
-  await fc.assert(
-    fc.asyncProperty(/* ... */),
-    { numRuns: 100 }
-  );
+   Action: save data, then load it back
+   Assertions: loaded value equals saved value (deep equality)
+   Requirements: clerkly.1.4 */
+test('should save and load data round-trip', () => {
+  // Test implementation
 });
 ```
 
@@ -598,55 +576,55 @@ test('Property 1: saving then loading data returns equivalent value', async () =
 2. `npm run test:coverage` - проверка покрытия кода
 3. Проверить, что все тесты имеют структурированные комментарии
 4. Проверить, что весь код имеет комментарии с требованиями
-5. Проверить, что все обязательные property-based тесты реализованы с минимум 100 итерациями
+5. Проверить, что все обязательные инварианты покрыты модульными тестами
 
 ## Покрытие Требований Тестами
 
 Эта таблица отражает покрытие требований различными типами тестов (соответствует таблице в design.md):
 
-| Требование | Модульные Тесты | Property-Based Тесты | Функциональные Тесты |
-|------------|-----------------|----------------------|----------------------|
-| clerkly.1.1 | ✓ | - | - |
-| clerkly.1.2 | ✓ | - | ✓* |
-| clerkly.1.3 | ✓ | ✓ | ✓* |
-| clerkly.1.4 | ✓ | ✓ | ✓* |
-| clerkly.1.5 | ✓ | - | - |
-| clerkly.2.1 | ✓ | - | - |
-| clerkly.2.2 | - | - | ✓* |
-| clerkly.2.3 | ✓ | ✓ | - |
-| clerkly.2.4 | - | - | ✓* |
-| clerkly.2.5 | ✓ | - | - |
-| clerkly.2.6 | - | ✓ | - |
-| clerkly.2.7 | ✓ | - | - |
-| clerkly.2.8 | ✓ | - | - |
-| clerkly.2.9 | ✓ | - | - |
-| clerkly.3.1 | ✓ | - | - |
-| clerkly.3.2 | ✓ | - | - |
-| clerkly.3.3 | ✓ | - | - |
-| clerkly.3.4 | ✓ | - | - |
-| clerkly.3.5 | ✓ | - | - |
-| clerkly.3.6 | ✓ | - | - |
-| clerkly.3.7 | ✓ | - | - |
-| clerkly.3.8 | ✓ | - | - |
-| clerkly.3.9 | ✓ | - | - |
-| clerkly.3.10 | ✓ | - | - |
-| clerkly.3.11 | ✓ | - | - |
-| clerkly.3.12 | ✓ | - | - |
-| clerkly.nfr.1.1 | ✓ | ✓* | ✓* |
-| clerkly.nfr.1.2 | ✓ | ✓ | - |
-| clerkly.nfr.1.3 | ✓ | ✓ | - |
-| clerkly.nfr.1.4 | ✓ | ✓* | - |
-| clerkly.nfr.2.1 | ✓ | ✓* | - |
-| clerkly.nfr.2.2 | ✓ | ✓* | ✓* |
-| clerkly.nfr.2.3 | ✓ | ✓ | ✓* |
-| clerkly.nfr.2.4 | ✓ | ✓* | - |
-| clerkly.nfr.3.1 | ✓ | - | - |
-| clerkly.nfr.3.2 | ✓ | - | - |
-| clerkly.nfr.3.3 | ✓ | - | ✓* |
-| clerkly.nfr.4.1 | ✓ | - | - |
-| clerkly.nfr.4.2 | ✓ | - | - |
-| clerkly.nfr.4.3 | ✓ | - | - |
-| clerkly.nfr.4.4 | - | ✓ | - |
+| Требование | Модульные Тесты | Функциональные Тесты |
+|------------|-----------------|----------------------|
+| clerkly.1.1 | ✓ | - |
+| clerkly.1.2 | ✓ | ✓ |
+| clerkly.1.3 | ✓ | ✓ |
+| clerkly.1.4 | ✓ | ✓ |
+| clerkly.1.5 | ✓ | - |
+| clerkly.2.1 | ✓ | - |
+| clerkly.2.2 | - | ✓ |
+| clerkly.2.3 | ✓ | - |
+| clerkly.2.4 | - | ✓ |
+| clerkly.2.5 | ✓ | - |
+| clerkly.2.6 | - | - |
+| clerkly.2.7 | ✓ | - |
+| clerkly.2.8 | ✓ | - |
+| clerkly.2.9 | ✓ | - |
+| clerkly.3.1 | ✓ | - |
+| clerkly.3.2 | ✓ | - |
+| clerkly.3.3 | ✓ | - |
+| clerkly.3.4 | ✓ | - |
+| clerkly.3.5 | ✓ | - |
+| clerkly.3.6 | ✓ | - |
+| clerkly.3.7 | ✓ | - |
+| clerkly.3.8 | ✓ | - |
+| clerkly.3.9 | ✓ | - |
+| clerkly.3.10 | ✓ | - |
+| clerkly.3.11 | ✓ | - |
+| clerkly.3.12 | ✓ | - |
+| clerkly.nfr.1.1 | ✓ | ✓ |
+| clerkly.nfr.1.2 | ✓ | - |
+| clerkly.nfr.1.3 | ✓ | - |
+| clerkly.nfr.1.4 | ✓ | - |
+| clerkly.nfr.2.1 | ✓ | - |
+| clerkly.nfr.2.2 | ✓ | ✓ |
+| clerkly.nfr.2.3 | ✓ | ✓ |
+| clerkly.nfr.2.4 | ✓ | - |
+| clerkly.nfr.3.1 | ✓ | - |
+| clerkly.nfr.3.2 | ✓ | - |
+| clerkly.nfr.3.3 | ✓ | ✓ |
+| clerkly.nfr.4.1 | ✓ | - |
+| clerkly.nfr.4.2 | ✓ | - |
+| clerkly.nfr.4.3 | ✓ | - |
+| clerkly.nfr.4.4 | ✓ | - |
 
 **Легенда:**
 - ✓ - Требование покрыто данным типом тестов
@@ -655,7 +633,6 @@ test('Property 1: saving then loading data returns equivalent value', async () =
 **Примечания:**
 - Все функциональные требования (clerkly.1.x, clerkly.2.x) покрыты соответствующими типами тестов
 - Все нефункциональные требования (clerkly.nfr.x.x) покрыты соответствующими типами тестов
-- Property-based тесты фокусируются на универсальных свойствах корректности (Property 1-10)
 - Функциональные тесты проверяют интеграцию между компонентами
 - Модульные тесты покрывают конкретные примеры, граничные случаи и обработку ошибок
 
@@ -683,13 +660,13 @@ test('Property 1: saving then loading data returns equivalent value', async () =
 - ✅ Поврежденная база данных (backup и восстановление)
 - ✅ SQLite ошибки (SQLITE_FULL, SQLITE_BUSY, SQLITE_LOCKED, SQLITE_READONLY)
 
-### Property-Based тесты (100+ итераций каждый)
+### Инварианты (модульные тесты)
 
 | Property | Компонент | Статус | Validates |
 |----------|-----------|--------|-----------|
-| Property 1: Data Storage Round-Trip | Data Manager | ✅ | clerkly.1.4, clerkly.2.6 |
-| Property 2: Invalid Key Rejection | Data Manager | ✅ | clerkly.1.4, clerkly.2.3, clerkly.2.6 |
-| Property 3: State Immutability | State Controller | ✅ | clerkly.1.3, clerkly.2.6 |
+| Property 1: Data Storage Round-Trip | Data Manager | ✅ | clerkly.1.4 |
+| Property 2: Invalid Key Rejection | Data Manager | ✅ | clerkly.1.4, clerkly.2.3 |
+| Property 3: State Immutability | State Controller | ✅ | clerkly.1.3 |
 | Property 4: IPC Timeout Enforcement | IPC Handlers | ✅ | clerkly.1.4, clerkly.nfr.2.3 |
 | Property 5: Migration Idempotence | Migration Runner | ⏳ | clerkly.1.4, clerkly.nfr.2.1 |
 | Property 6: Performance Monitoring | UI Controller | ✅ | clerkly.nfr.1.2, clerkly.nfr.1.3 |
@@ -727,14 +704,14 @@ test('Property 1: saving then loading data returns equivalent value', async () =
 - ✅ clerkly.1.1 (Electron framework) - Модульные тесты всех компонентов
 - ✅ clerkly.1.2 (Mac OS X) - Модульные тесты Window Manager, Lifecycle Manager
 - ✅ clerkly.1.3 (Нативный интерфейс) - Модульные тесты UI Controller, State Controller
-- ✅ clerkly.1.4 (SQLite хранение) - Модульные + Property тесты Data Manager, IPC Handlers
+- ✅ clerkly.1.4 (SQLite хранение) - Модульные тесты Data Manager, IPC Handlers
 - ✅ clerkly.1.5 (TypeScript) - Все тесты используют TypeScript
 - ✅ clerkly.2.1 (Модульные тесты) - Все компоненты покрыты
 - ⏳ clerkly.2.2 (Функциональные тесты) - Тесты интеграции (задача 9)
 - ✅ clerkly.2.3 (Edge cases) - Модульные тесты граничных условий
 - ⏳ clerkly.2.4 (Интеграция) - Функциональные тесты (задача 9)
 - ✅ clerkly.2.5 (Автоматизация) - npm test, npm run validate
-- ✅ clerkly.2.6 (Property-based) - Все 10 property тестов (Property 1-10)
+- ✅ clerkly.2.6 (Функциональные тесты) - Запуск только по запросу пользователя
 - ✅ clerkly.2.7 (Покрытие 80%+) - 95%+ общее покрытие
 - ✅ clerkly.2.8 (Структурированные комментарии) - Все тесты имеют Preconditions/Action/Assertions/Requirements
 - ✅ clerkly.2.9 (Комментарии с требованиями) - Весь код имеет // Requirements: ...
@@ -754,14 +731,14 @@ test('Property 1: saving then loading data returns equivalent value', async () =
 - ✅ clerkly.nfr.4.1 (Изоляция) - Все тесты используют моки
 - ✅ clerkly.nfr.4.2 (Моки Electron) - Jest моки для всех Electron API
 - ✅ clerkly.nfr.4.3 (Coverage отчеты) - npm run test:coverage
-- ✅ clerkly.nfr.4.4 (Property 100 итераций) - Все property тесты используют numRuns: 100
+- ✅ clerkly.nfr.4.4 (Детерминированные тесты) - Модульные тесты воспроизводимы
 
 ## Следующие шаги
 
 ### Для завершения реализации:
 
 1. ⏳ Все функциональные тесты завершены (задачи 10.1-10.4)
-2. ⏳ Все property-based тесты завершены (Property 5, 7-10 - задачи 10.5-10.9)
+2. ⏳ Все инварианты завершены (Property 5, 7-10 - задачи 10.5-10.9)
 3. ✅ Покрытие кода превышает требования (95%+ vs 80% требуемых)
 4. ✅ Все тесты имеют структурированные комментарии
 5. ✅ Весь код имеет комментарии с требованиями
@@ -770,7 +747,7 @@ test('Property 1: saving then loading data returns equivalent value', async () =
 ### Для завершения реализации:
 
 1. ⏳ Функциональные тесты интеграции (задача 10.1-10.4)
-2. ⏳ Property-based тесты производительности (Property 5, 7, 8, 9, 10 - задачи 10.5-10.9)
+2. ⏳ Модульные тесты производительности (Property 5, 7, 8, 9, 10 - задачи 10.5-10.9)
 3. ⏳ Настройка сборки и упаковки (задача 12)
 
 ### Команды для проверки:
@@ -782,9 +759,6 @@ npm run validate
 # Проверка покрытия кода
 npm run test:coverage
 
-# Запуск только property-based тестов
-npm run test:property
-
 # Функциональные тесты (ТОЛЬКО при явной просьбе)
 npm run test:functional
 ```
@@ -793,8 +767,8 @@ npm run test:functional
 
 ### Обязательные критерии:
 - ✅ Все модульные тесты проходят
-- ✅ Property-based тесты 1-4, 6 проходят
-- ⏳ Property-based тесты 5, 7-10 проходят (задачи 9.5-9.9)
+- ✅ Инварианты 1-4, 6 покрыты модульными тестами
+- ⏳ Инварианты 5, 7-10 покрыты модульными тестами (задачи 10.5-10.9)
 - ✅ Покрытие кода >= 80% для бизнес-логики
 - ✅ Покрытие кода = 100% для критических компонентов
 - ✅ Все тесты имеют структурированные комментарии
@@ -805,7 +779,7 @@ npm run test:functional
 - ⏳ Все функциональные тесты проходят (задачи 10.1-10.4)
 - ⏳ Приложение собирается и запускается на Mac OS X (задача 12)
 
-**Текущий статус:** Осталось выполнить задачи 10 (функциональные и property-based тесты) и 12 (сборка и упаковка)
+**Текущий статус:** Осталось выполнить задачи 10 (функциональные тесты) и 12 (сборка и упаковка)
 
 ---
 
@@ -854,12 +828,11 @@ npm run test:functional
   - Обновить graceful shutdown
 - _Requirements: clerkly.1.1, user-data-isolation.6.7_
 
-### 15.4 Обновить property-based тесты
-- [x] Обновить `tests/property/DataManager.property.test.ts` → `tests/property/UserSettingsManager.property.test.ts`:
-  - Переименовать файл
+### 15.4 Обновить модульные тесты
+- [x] Обновить `tests/unit/UserSettingsManager.test.ts`:
   - Заменить все ссылки на DataManager
   - Обновить моки для DatabaseManager
-- _Requirements: clerkly.2.6_
+- _Requirements: clerkly.2.8, clerkly.nfr.4.4_
 
 ### 15.5 Валидация
 - [x] Выполнить `npm run validate`

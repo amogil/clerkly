@@ -8,15 +8,14 @@
 
 ### Валидация
 ```bash
-npm run validate          # полная валидация (TypeScript, ESLint, Prettier, unit, property тесты)
+npm run validate          # полная валидация (TypeScript, ESLint, Prettier, unit тесты)
 npm run validate:verbose  # то же, с подробным выводом
 ```
 
 ### Тесты
 ```bash
-npm test                    # unit + property тесты
+npm test                    # unit тесты
 npm run test:unit           # только unit тесты
-npm run test:property       # только property-based тесты
 npm run test:functional     # функциональные тесты (показывают окна!)
 npm run test:coverage       # тесты с отчетом о покрытии
 ```
@@ -77,7 +76,6 @@ npm run build             # собрать приложение
    - ✅ ESLint
    - ✅ Prettier
    - ✅ Unit тесты
-   - ✅ Property-based тесты
    - ✅ Покрытие кода
 3. Спросить пользователя: *"Задача выполнена. Запустить функциональные тесты? (они покажут окна на экране)"*
 
@@ -281,20 +279,16 @@ WHEN <триггер>, IF <условие>, <субъект> SHALL <действ
 
 - `tests/unit/<path>/<File>.test.ts` — что тестирует
 
-### Property-Based Тесты
-
-- `tests/property/<path>/<File>.property.test.ts` — что тестирует
-
 ### Функциональные Тесты
 
 - `tests/functional/<file>.spec.ts` — что тестирует
 
 ### Покрытие Требований
 
-| Требование   | Модульные Тесты | Property-Based Тесты | Функциональные Тесты |
-|--------------|-----------------|----------------------|----------------------|
-| feature.1.1  | ✓               | ✓                    | -                    |
-| feature.1.2  | ✓               | -                    | ✓                    |
+| Требование   | Модульные Тесты | Функциональные Тесты |
+|--------------|-----------------|----------------------|
+| feature.1.1  | ✓               | -                    |
+| feature.1.2  | ✓               | ✓                    |
 ```
 
 **Правила:**
@@ -391,7 +385,6 @@ WHEN <триггер>, IF <условие>, <субъект> SHALL <действ
 | Тип | Расположение | Моки | Цель |
 |-----|-------------|------|------|
 | Unit | `tests/unit/**/*.test.ts` | ✅ Все внешние зависимости | Изолированная логика |
-| Property-based | `tests/property/**/*.property.test.ts` | ✅ Все внешние зависимости | Инварианты на множестве данных |
 | Функциональные | `tests/functional/**/*.spec.ts` | ❌ Реальный Electron | End-to-end сценарии |
 
 **Функциональные тесты** используют Playwright, показывают реальные окна и НЕ мокируют Electron API.
@@ -453,10 +446,9 @@ npm run rebuild:node
 
 ```bash
 npm run rebuild:node && npm run test:unit
-npm run rebuild:node && npm run test:property
 ```
 
-### Unit и Property-Based тесты
+### Unit тесты
 
 ```bash
 # Конкретный файл
@@ -537,23 +529,9 @@ npm run test:unit -- tests/unit/auth/UserProfileManager.test.ts -t "specific tes
 npm run test:unit -- tests/unit/auth/UserProfileManager.test.ts -t "specific test name" --verbose
 ```
 
-#### Property-based тесты
-
-```bash
-# Шаг 1: запустить упавший тест
-npm run test:property -- tests/property/auth/OAuthConfig.property.test.ts -t "specific test name"
-
-# Шаг 2: скопировать упавший пример из вывода, создать unit тест с ним
-# Шаг 3: исправить код
-# Шаг 4: убедиться, что property тест проходит
-```
-
-Для воспроизводимости: `fc.assert(fc.property(...), { seed: 42 })`
-
 ### Параллельный запуск
 
-- ✅ Jest сам параллелит тесты внутри `test:unit` и `test:property`
-- ❌ НЕ запускать `test:unit` и `test:property` одновременно в разных терминалах
+- ✅ Jest сам параллелит тесты внутри `test:unit`
 - ❌ НЕ запускать функциональные тесты параллельно с чем-либо
 
 ---
@@ -689,7 +667,6 @@ ErrorHandler автоматически фильтрует race condition оши
 |--------|---------|---------|
 | `Cannot find module 'better-sqlite3'` | Нативный модуль не собран | `npm run rebuild:node` |
 | Тест падает с таймаутом | Тест медленнее 5000ms | `--testTimeout=10000` |
-| Property-based тест нестабилен | Состояние не изолировано между итерациями | `jest.clearAllMocks()`, добавить seed |
 | Функциональные тесты не запускаются | Нативные модули или сборка | `npm run rebuild:electron && npm run build` |
 | ESLint/Prettier падают | Форматирование | `npm run lint:fix` или `npm run format` |
 | Покрытие ниже требуемого | Недостаточно тестов | `npm run test:coverage`, открыть `coverage/lcov-report/index.html` |

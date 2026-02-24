@@ -73,19 +73,7 @@
 
 ---
 
-## 4. Фаза 8.2 — Property-based тесты
-
-Каталог `tests/property/agents/` пустой.
-
-- [ ] `tests/property/agents/status.property.test.ts` — инварианты `computeAgentStatus`
-  - Статус всегда один из допустимых значений
-  - Агент без сообщений всегда `new`
-  - После user-сообщения без ответа всегда `in-progress`
-  - После error-сообщения всегда `error`
-
----
-
-## 5. Фаза 8.3 — Функциональные тесты
+## 4. Фаза 8.2 — Функциональные тесты
 
 ### Уже написаны (нужно запустить и проверить):
 
@@ -130,7 +118,7 @@
 
 ### Средний приоритет:
 4. Unit тесты `AllAgentsPage` и `AgentHeader`
-5. Property-based тесты `tests/property/agents/status.property.test.ts`
+5. Unit тесты для `computeAgentStatus`
 6. Обновить tasks.md (отметить выполненные фазы)
 
 ### Низкий приоритет:
@@ -150,6 +138,4 @@ npm run test:functional:single -- agent-switching.spec.ts
 # Unit тесты по agents
 npm run test:unit -- tests/unit/components/agents
 
-# Property-based тесты по agents
-npm run test:property -- tests/property/agents/
 ```

@@ -93,7 +93,7 @@ test('42.1 should automatically refresh expired access token', async () => {
   const dashboardHeading = await mainWindow.locator('[data-testid="agents"]').count();
   expect(dashboardHeading).toBeGreaterThan(0);
 
-  // Note: Automatic token refresh is tested in property-based tests
+  // Note: Automatic token refresh is tested in unit tests
   // This functional test verifies the user experience remains smooth
   // The mock server tracks refresh token calls
 

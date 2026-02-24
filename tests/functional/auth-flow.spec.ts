@@ -125,7 +125,7 @@ test.describe('Authentication Flow', () => {
     // Take screenshot
     await context.window.screenshot({ path: 'playwright-report/login-screen-no-tokens.png' });
 
-    // Note: Full token persistence is tested in unit and property tests
+    // Note: Full token persistence is tested in unit tests
     // Functional test would require real OAuth flow or complex DB setup
   });
 

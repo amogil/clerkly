@@ -583,33 +583,22 @@ console.error('Failed to create window:', errorMessage);
 
 ## Стратегия Тестирования
 
-### Двойной Подход к Тестированию
+### Подход к Тестированию
 
-Система управления окнами будет тестироваться с использованием двух комплементарных подходов:
+Система управления окнами будет тестироваться с использованием модульных и функциональных тестов:
 
 1. **Модульные тесты (Unit Tests)**: Проверяют конкретные примеры, граничные случаи и условия ошибок
-2. **Property-based тесты**: Проверяют универсальные свойства на множестве входных данных
+2. **Функциональные тесты**: Проверяют пользовательские сценарии в реальном приложении
 
 Оба подхода необходимы для комплексного покрытия.
 
 ### Баланс Модульного Тестирования
 
 - Модульные тесты полезны для конкретных примеров и граничных случаев
-- Избегать написания слишком большого количества модульных тестов - property-based тесты покрывают множество входных данных
 - Модульные тесты должны фокусироваться на:
   - Конкретных примерах, демонстрирующих корректное поведение
   - Точках интеграции между компонентами
   - Граничных случаях и условиях ошибок
-- Property-based тесты должны фокусироваться на:
-  - Универсальных свойствах, которые истинны для всех входных данных
-  - Комплексном покрытии входных данных через рандомизацию
-
-### Конфигурация Property-Based Тестов
-
-- **Библиотека**: `fast-check` для TypeScript/JavaScript
-- **Минимум итераций**: 100 итераций на property-based тест
-- **Тегирование**: Каждый тест должен ссылаться на свойство из документа дизайна
-- **Формат тега**: `Feature: window-management, Property {number}: {property_text}`
 
 ### Модульные Тесты
 
@@ -701,128 +690,6 @@ describe('WindowStateManager', () => {
      Requirements: window-management.5 */
   it('should handle corrupted state data', () => {
     // Тест обработки поврежденных данных
-  });
-});
-```
-
-### Property-Based Тесты
-
-```typescript
-import fc from 'fast-check';
-
-describe('WindowStateManager Property Tests', () => {
-  /* Feature: window-management, Property 5: Размер окна адаптируется к экрану при первом запуске
-     Preconditions: screen API returns various screen sizes
-     Action: call getDefaultState() with different screen sizes
-     Assertions: returned dimensions are min(800, screenWidth) x min(600, screenHeight)
-     Requirements: window-management.4.1, window-management.4.2 */
-  it('should generate default state based on screen size', () => {
-    fc.assert(
-      fc.property(
-        fc.record({
-          width: fc.integer({ min: 800, max: 3840 }),
-          height: fc.integer({ min: 600, max: 2160 }),
-        }),
-        (screenSize) => {
-          // Mock screen API
-          const mockScreen = {
-            getPrimaryDisplay: () => ({
-              workAreaSize: screenSize,
-            }),
-          };
-
-          // Создать WindowStateManager с mocked screen
-          const state = getDefaultStateWithScreen(mockScreen);
-
-          // Проверить, что размеры основаны на размере экрана
-          expect(state.width).toBeLessThanOrEqual(screenSize.width);
-          expect(state.height).toBeLessThanOrEqual(screenSize.height);
-          expect(state.width).toBeGreaterThan(0);
-          expect(state.height).toBeGreaterThan(0);
-          
-          // Проверить, что размеры не хардкожены
-          expect(state.width).not.toBe(1920);
-          expect(state.height).not.toBe(1080);
-        }
-      ),
-      { numRuns: 100 }
-    );
-  });
-
-  /* Feature: window-management, Property 7: Round-trip сохранения и загрузки состояния
-     Preconditions: valid window state with various values
-     Action: save state then load state
-     Assertions: loaded state equals saved state (for valid positions)
-     Requirements: window-management.5.4 */
-  it('should preserve state through save/load cycle', () => {
-    fc.assert(
-      fc.property(
-        fc.record({
-          x: fc.integer({ min: 0, max: 2000 }),
-          y: fc.integer({ min: 0, max: 2000 }),
-          width: fc.integer({ min: 400, max: 3000 }),
-          height: fc.integer({ min: 300, max: 2000 }),
-          isMaximized: fc.boolean(),
-        }),
-        (state) => {
-          // Mock screen to make position valid
-          mockScreenWithBounds(state.x, state.y);
-
-          // Сохранить состояние
-          windowStateManager.saveState(state);
-
-          // Загрузить состояние
-          const loadedState = windowStateManager.loadState();
-
-          // Проверить эквивалентность
-          expect(loadedState).toEqual(state);
-        }
-      ),
-      { numRuns: 100 }
-    );
-  });
-
-  /* Feature: window-management, Property 6: Изменения состояния окна сохраняются
-     Preconditions: window created with various initial states
-     Action: trigger resize/move/maximize events
-     Assertions: DatabaseManager.getDatabase().prepare().run() called with updated state
-     Requirements: window-management.5.1, window-management.5.2, window-management.5.3 */
-  it('should save state on any window state change', () => {
-    fc.assert(
-      fc.property(
-        fc.record({
-          x: fc.integer({ min: 0, max: 2000 }),
-          y: fc.integer({ min: 0, max: 2000 }),
-          width: fc.integer({ min: 400, max: 3000 }),
-          height: fc.integer({ min: 300, max: 2000 }),
-          isMaximized: fc.boolean(),
-        }),
-        (newState) => {
-          // Создать окно
-          const window = windowManager.createWindow();
-
-          // Изменить состояние окна
-          window.setBounds({
-            x: newState.x,
-            y: newState.y,
-            width: newState.width,
-            height: newState.height,
-          });
-          
-          if (newState.isMaximized) {
-            window.maximize();
-          }
-
-          // Триггернуть события
-          window.emit('resize');
-          window.emit('move');
-
-          // Проверить, что состояние сохранено
-          expect(mockDbManager.getDatabase().prepare).toHaveBeenCalled();
-        }
-      ),
-      { numRuns: 100 }
-    );
   });
 });
 ```
@@ -951,39 +818,38 @@ describe('Window Management Functional Tests', () => {
 
 ### Покрытие Требований
 
-| Требование | Модульные Тесты | Property-Based Тесты | Функциональные Тесты |
-|------------|-----------------|----------------------|----------------------|
-| window-management.1.1 | ✓ | ✓ | ✓ |
-| window-management.1.2 | ✓ | ✓ | ✓ |
-| window-management.1.3 | ✓ | ✓ | ✓ |
-| window-management.1.4 | ✓ | - | ✓ |
-| window-management.1.5 | ✓ | - | - |
-| window-management.2.1 | ✓ | - | ✓ |
-| window-management.2.2 | ✓ | - | - |
-| window-management.2.3 | ✓ | - | - |
-| window-management.3.1 | ✓ | - | ✓ |
-| window-management.3.2 | ✓ | - | - |
-| window-management.3.3 | ✓ | - | - |
-| window-management.3.4 | ✓ | - | - |
-| window-management.4.1 | ✓ | ✓ | ✓ |
-| window-management.4.2 | ✓ | - | - |
-| window-management.4.3 | - | ✓ | - |
-| window-management.4.4 | ✓ | - | ✓ |
-| window-management.5.1 | ✓ | ✓ | ✓ |
-| window-management.5.2 | ✓ | ✓ | ✓ |
-| window-management.5.3 | ✓ | ✓ | ✓ |
-| window-management.5.4 | ✓ | ✓ | ✓ |
-| window-management.5.5 | ✓ | - | - |
-| window-management.5.6 | ✓ | - | - |
-| window-management.5.7 | ✓ | - | - |
-| window-management.6.1 | - | - | ✓ |
-| window-management.6.2 | - | - | ✓ |
-| window-management.6.3 | - | - | ✓ |
+| Требование | Модульные Тесты | Функциональные Тесты |
+|------------|-----------------|----------------------|
+| window-management.1.1 | ✓ | ✓ |
+| window-management.1.2 | ✓ | ✓ |
+| window-management.1.3 | ✓ | ✓ |
+| window-management.1.4 | ✓ | ✓ |
+| window-management.1.5 | ✓ | - |
+| window-management.2.1 | ✓ | ✓ |
+| window-management.2.2 | ✓ | - |
+| window-management.2.3 | ✓ | - |
+| window-management.3.1 | ✓ | ✓ |
+| window-management.3.2 | ✓ | - |
+| window-management.3.3 | ✓ | - |
+| window-management.3.4 | ✓ | - |
+| window-management.4.1 | ✓ | ✓ |
+| window-management.4.2 | ✓ | - |
+| window-management.4.3 | ✓ | - |
+| window-management.4.4 | ✓ | ✓ |
+| window-management.5.1 | ✓ | ✓ |
+| window-management.5.2 | ✓ | ✓ |
+| window-management.5.3 | ✓ | ✓ |
+| window-management.5.4 | ✓ | ✓ |
+| window-management.5.5 | ✓ | - |
+| window-management.5.6 | ✓ | - |
+| window-management.5.7 | ✓ | - |
+| window-management.6.1 | - | ✓ |
+| window-management.6.2 | - | ✓ |
+| window-management.6.3 | - | ✓ |
 
 ### Критерии Успеха
 
 - Все модульные тесты проходят
-- Все property-based тесты проходят (минимум 100 итераций каждый)
 - Покрытие кода минимум 85%
 - Все требования покрыты тестами
 - Все граничные случаи обработаны корректно

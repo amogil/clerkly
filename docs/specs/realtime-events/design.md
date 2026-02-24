@@ -1072,16 +1072,6 @@ eventBus.publish('user.login', { userId: 'user-123' }, { local: true });
 | should forward event to MainEventBus | realtime-events.4.2 |
 | should not duplicate events from renderer | realtime-events.4.3 |
 
-### Property-Based Тесты
-
-**Файл:** `tests/property/events/EventBus.property.test.ts`
-
-| Тест | Требование |
-|------|------------|
-| subscribe always returns unsubscribe function | realtime-events.2.4 |
-| events are delivered in order by timestamp | realtime-events.3.6 |
-| no memory leaks after subscribe/unsubscribe cycles | realtime-events.6.5 |
-
 ### Функциональные Тесты
 
 **Файл:** `tests/functional/realtime-events.spec.ts`
@@ -1098,59 +1088,9 @@ eventBus.publish('user.login', { userId: 'user-123' }, { local: true });
 | should remove from UI on entity.deleted | realtime-events.5.3 |
 
 ### Покрытие Требований
-
-| Требование | Модульные | Property-Based | Функциональные |
-|------------|-----------|----------------|----------------|
-| realtime-events.1.1 | ✓ | - | - |
-| realtime-events.1.2 | ✓ | - | - |
-| realtime-events.1.3 | ✓ | - | - |
-| realtime-events.1.4 | - | - | ✓ |
-| realtime-events.1.5 | ✓ | - | - |
-| realtime-events.1.6 | ✓ | - | - |
-| realtime-events.2.1 | ✓ | - | - |
-| realtime-events.2.2 | ✓ | - | - |
-| realtime-events.2.3 | ✓ | - | - |
-| realtime-events.2.4 | ✓ | ✓ | - |
-| realtime-events.2.5 | ✓ | - | - |
-| realtime-events.2.6 | ✓ | - | - |
-| realtime-events.2.7 | ✓ | - | - |
-| realtime-events.2.8 | ✓ | - | - |
-| realtime-events.2.9 | - | - | ✓ |
-| realtime-events.2.10 | - | - | ✓ |
-| realtime-events.3.1 | ✓ | - | - |
-| realtime-events.3.2 | ✓ | - | - |
-| realtime-events.3.3 | ✓ | - | - |
-| realtime-events.3.4 | ✓ | - | - |
-| realtime-events.3.5 | ✓ | - | - |
-| realtime-events.3.6 | ✓ | ✓ | - |
-| realtime-events.4.1 | ✓ | - | ✓ |
-| realtime-events.4.2 | ✓ | - | ✓ |
-| realtime-events.4.3 | ✓ | - | - |
-| realtime-events.4.4 | ✓ | - | - |
-| realtime-events.4.5 | ✓ | - | - |
-| realtime-events.4.6 | ✓ | - | - |
-| realtime-events.4.7 | ✓ | - | - |
-| realtime-events.5.1 | - | - | ✓ |
-| realtime-events.5.2 | - | - | ✓ |
-| realtime-events.5.3 | - | - | ✓ |
-| realtime-events.5.4 | - | - | ✓ |
-| realtime-events.5.5 | ✓ | - | - |
-| realtime-events.6.1 | ✓ | - | - |
-| realtime-events.6.2 | ✓ | - | - |
-| realtime-events.6.3 | ✓ | - | - |
-| realtime-events.6.4 | ✓ | ✓ | - |
-| realtime-events.6.5 | ✓ | ✓ | - |
-| realtime-events.7.1 | ✓ | - | - |
-| realtime-events.7.2 | ✓ | - | - |
-| realtime-events.7.3 | ✓ | - | - |
-| realtime-events.7.4 | ✓ | - | - |
-| realtime-events.7.5 | ✓ | - | - |
-| realtime-events.7.6 | ✓ | - | - |
-| realtime-events.8.1 | ✓ (tsc) | - | - |
-| realtime-events.8.2 | ✓ (tsc) | - | - |
-| realtime-events.8.3 | ✓ (tsc) | - | - |
-| realtime-events.8.4 | ✓ | - | - |
-| realtime-events.8.5 | ✓ | - | - |
+Покрытие требований обеспечивается модульными и функциональными тестами:
+- Реализация и утилиты покрываются модульными тестами
+- IPC и пользовательские сценарии покрываются функциональными тестами
 
 ## Безопасность
 

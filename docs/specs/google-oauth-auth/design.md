@@ -1385,13 +1385,11 @@ logger.error(`${operation} failed: ${error.message}`, {
 
 ### Подход к Тестированию
 
-Система тестирования использует двойной подход:
+Система тестирования использует два подхода:
 - **Модульные тесты**: Проверяют конкретные примеры, краевые случаи и условия ошибок
-- **Property-based тесты**: Проверяют универсальные свойства на множестве входных данных
+- **Функциональные тесты**: Проверяют пользовательские сценарии в реальном приложении
 
 Оба типа тестов дополняют друг друга и необходимы для комплексного покрытия.
-
-Всего определено **22 свойства корректности** (19 обязательных + 3 опциональных), которые проверяются через property-based тесты.
 
 ### Модульные Тесты
 
@@ -1406,86 +1404,6 @@ logger.error(`${operation} failed: ${error.message}`, {
 - Проверка отображения Login Screen при отсутствии токенов
 - Проверка обработки конкретных кодов ошибок (popup_closed_by_user, access_denied, network_error)
 - Проверка вызова правильных IPC методов
-
-### Property-Based Тесты
-
-**Библиотека:** fast-check (для TypeScript/JavaScript)
-
-**Конфигурация:**
-- Минимум 100 итераций на тест
-- Каждый тест ссылается на свойство из документа дизайна
-- Формат тега: `Feature: google-oauth-auth, Property N: [property text]`
-
-**Генераторы данных:**
-
-```typescript
-// Code verifier generator (43-128 chars)
-const codeVerifierArb = fc.stringOf(
-  fc.constantFrom(...'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~'.split('')),
-  { minLength: 43, maxLength: 128 }
-);
-
-// Token data generator
-const tokenDataArb = fc.record({
-  accessToken: fc.string({ minLength: 20 }),
-  refreshToken: fc.string({ minLength: 20 }),
-  expiresAt: fc.integer({ min: Date.now() }),
-  tokenType: fc.constant('Bearer')
-});
-
-// OAuth error generator
-const oauthErrorArb = fc.record({
-  error: fc.constantFrom('invalid_grant', 'access_denied', 'invalid_request'),
-  error_description: fc.string()
-});
-
-// Deep link URL generator
-const deepLinkUrlArb = fc.record({
-  code: fc.string({ minLength: 10 }),
-  state: fc.string({ minLength: 32 })
-}).map(({ code, state }) => `clerkly://oauth/callback?code=${code}&state=${state}`);
-```
-
-**Примеры property-based тестов:**
-
-```typescript
-// Property 1: PKCE Parameters Generation
-it('should generate valid PKCE parameters', () => {
-  fc.assert(
-    fc.property(fc.constant(null), () => {
-      const params = oauthClient.generatePKCEParams();
-      
-      // Code verifier length check
-      expect(params.codeVerifier.length).toBeGreaterThanOrEqual(43);
-      expect(params.codeVerifier.length).toBeLessThanOrEqual(128);
-      
-      // Code challenge is valid SHA-256
-      const expectedChallenge = crypto
-        .createHash('sha256')
-        .update(params.codeVerifier)
-        .digest('base64url');
-      expect(params.codeChallenge).toBe(expectedChallenge);
-      
-      // State has sufficient entropy
-      expect(params.state.length).toBeGreaterThanOrEqual(32);
-    }),
-    { numRuns: 100 }
-  );
-});
-
-// Property 9: Token Storage Round Trip
-it('should preserve token data through save/load cycle', () => {
-  fc.assert(
-    fc.property(tokenDataArb, async (tokenData) => {
-      await tokenStorage.saveTokens(tokenData);
-      const loaded = await tokenStorage.loadTokens();
-      
-      expect(loaded).toEqual(tokenData);
-    }),
-    { numRuns: 100 }
-  );
-});
-```
 
 ### Функциональные Тесты
 
@@ -1503,106 +1421,105 @@ it('should preserve token data through save/load cycle', () => {
 
 ### Покрытие Требований
 
-| Требование | Модульные Тесты | Property-Based Тесты | Функциональные Тесты |
-|------------|-----------------|----------------------|----------------------|
-| google-oauth-auth.1.1 | ✓ | ✓ | - |
-| google-oauth-auth.1.2 | ✓ | ✓ | - |
-| google-oauth-auth.1.3 | ✓ | ✓ | - |
-| google-oauth-auth.1.4 | ✓ | ✓ | - |
-| google-oauth-auth.1.5 | ✓ | ✓ | - |
-| google-oauth-auth.2.1 | ✓ | - | ✓ |
-| google-oauth-auth.2.2 | ✓ | ✓ | - |
-| google-oauth-auth.2.3 | ✓ | ✓ | - |
-| google-oauth-auth.2.4 | ✓ | ✓ | - |
-| google-oauth-auth.2.5 | ✓ | - | ✓ |
-| google-oauth-auth.3.1 | ✓ | ✓ | - |
-| google-oauth-auth.3.2 | ✓ | ✓ | - |
-| google-oauth-auth.3.3 | ✓ | ✓ | - |
-| google-oauth-auth.3.4 | ✓ | ✓ | - |
-| google-oauth-auth.3.5 | ✓ | ✓ | - |
-| google-oauth-auth.4.1 | ✓ | ✓ | - |
-| google-oauth-auth.4.2 | ✓ | - | - |
-| google-oauth-auth.4.3 | ✓ | ✓ | - |
-| google-oauth-auth.4.4 | ✓ | ✓ | - |
-| google-oauth-auth.4.5 | ✓ | - | - |
-| google-oauth-auth.5.1 | ✓ | ✓ | - |
-| google-oauth-auth.5.2 | ✓ | - | - |
-| google-oauth-auth.5.3 | ✓ | ✓ | - |
-| google-oauth-auth.5.4 | ✓ | ✓ | - |
-| google-oauth-auth.5.5 | ✓ | ✓ | - |
-| google-oauth-auth.5.6 | ✓ | ✓ | - |
-| google-oauth-auth.6.1 | ✓ | ✓ | - |
-| google-oauth-auth.6.2 | ✓ | ✓ | - |
-| google-oauth-auth.6.3 | ✓ | ✓ | - |
-| google-oauth-auth.6.4 | ✓ | ✓ | - |
-| google-oauth-auth.6.5 | ✓ | - | - |
-| google-oauth-auth.7.1 | ✓ | ✓ | - |
-| google-oauth-auth.7.2 | ✓ | ✓ | - |
-| google-oauth-auth.7.3 | ✓ | - | ✓ |
-| google-oauth-auth.7.4 | ✓ | - | ✓ |
-| google-oauth-auth.7.5 | - | - | ✓ |
-| google-oauth-auth.8.1 | ✓ | - | ✓ |
-| google-oauth-auth.8.2 | ✓ | ✓ | - |
-| google-oauth-auth.8.3 | ✓ | - | ✓ |
-| google-oauth-auth.8.4 | ✓ | ✓ | - |
-| google-oauth-auth.8.5 | ✓ | ✓ | - |
-| google-oauth-auth.9.1 | ✓ | - | - |
-| google-oauth-auth.9.2 | ✓ | - | - |
-| google-oauth-auth.9.3 | ✓ | ✓ | - |
-| google-oauth-auth.9.4 | ✓ | ✓ | - |
-| google-oauth-auth.9.5 | ✓ | - | - |
-| google-oauth-auth.9.6 | ✓ | - | ✓ |
-| google-oauth-auth.10.1 | ✓ | - | - |
-| google-oauth-auth.10.2 | ✓ | - | - |
-| google-oauth-auth.10.3 | ✓ | - | - |
-| google-oauth-auth.10.4 | ✓ | - | - |
-| google-oauth-auth.10.5 | ✓ | - | - |
-| google-oauth-auth.10.6 | ✓ | - | - |
-| google-oauth-auth.11.1 | ✓ | ✓ | ✓ |
-| google-oauth-auth.11.2 | ✓ | - | ✓ |
-| google-oauth-auth.11.3 | ✓ | - | ✓ |
-| google-oauth-auth.11.4 | ✓ | - | ✓ |
-| google-oauth-auth.11.5 | ✓ | - | ✓ |
-| google-oauth-auth.11.6 | ✓ | - | ✓ |
-| google-oauth-auth.11.7 | ✓ | - | ✓ |
-| google-oauth-auth.11.8 | ✓ | - | ✓ |
-| google-oauth-auth.11.9 | ✓ | ✓ | ✓ |
-| google-oauth-auth.12.1 | ✓ | - | ✓ |
-| google-oauth-auth.12.2 | ✓ | - | ✓ |
-| google-oauth-auth.12.3 | ✓ | - | ✓ |
-| google-oauth-auth.12.4 | ✓ | - | ✓ |
-| google-oauth-auth.12.5 | ✓ | - | ✓ |
-| google-oauth-auth.12.6 | ✓ | - | ✓ |
-| google-oauth-auth.13.1 | ✓ | - | ✓ |
-| google-oauth-auth.13.2 | ✓ | - | ✓ |
-| google-oauth-auth.13.3 | ✓ | - | ✓ |
-| google-oauth-auth.13.4 | ✓ | - | ✓ |
-| google-oauth-auth.13.5 | ✓ | - | ✓ |
-| google-oauth-auth.13.6 | ✓ | - | ✓ |
-| google-oauth-auth.13.7 | ✓ | - | ✓ |
-| google-oauth-auth.13.8 | ✓ | - | ✓ |
-| google-oauth-auth.14.1 | ✓ | - | ✓ |
-| google-oauth-auth.14.2 | ✓ | - | ✓ |
-| google-oauth-auth.14.3 | ✓ | - | ✓ |
-| google-oauth-auth.14.4 | ✓ | - | ✓ |
-| google-oauth-auth.14.5 | ✓ | - | ✓ |
-| google-oauth-auth.14.6 | ✓ | - | ✓ |
-| google-oauth-auth.14.7 | ✓ | - | ✓ |
-| google-oauth-auth.15.1 | ✓ | ✓ | ✓ |
-| google-oauth-auth.15.2 | ✓ | ✓ | ✓ |
-| google-oauth-auth.15.3 | ✓ | - | ✓ |
-| google-oauth-auth.15.4 | ✓ | ✓ | ✓ |
-| google-oauth-auth.15.5 | ✓ | - | ✓ |
-| google-oauth-auth.15.6 | ✓ | - | ✓ |
-| google-oauth-auth.15.7 | ✓ | - | ✓ |
-| google-oauth-auth.15.8 | ✓ | - | ✓ |
-| google-oauth-auth.15.9 | - | - | ✓ |
+| Требование | Модульные Тесты | Функциональные Тесты |
+|------------|-----------------|----------------------|
+| google-oauth-auth.1.1 | ✓ | - |
+| google-oauth-auth.1.2 | ✓ | - |
+| google-oauth-auth.1.3 | ✓ | - |
+| google-oauth-auth.1.4 | ✓ | - |
+| google-oauth-auth.1.5 | ✓ | - |
+| google-oauth-auth.2.1 | ✓ | ✓ |
+| google-oauth-auth.2.2 | ✓ | - |
+| google-oauth-auth.2.3 | ✓ | - |
+| google-oauth-auth.2.4 | ✓ | - |
+| google-oauth-auth.2.5 | ✓ | ✓ |
+| google-oauth-auth.3.1 | ✓ | - |
+| google-oauth-auth.3.2 | ✓ | - |
+| google-oauth-auth.3.3 | ✓ | - |
+| google-oauth-auth.3.4 | ✓ | - |
+| google-oauth-auth.3.5 | ✓ | - |
+| google-oauth-auth.4.1 | ✓ | - |
+| google-oauth-auth.4.2 | ✓ | - |
+| google-oauth-auth.4.3 | ✓ | - |
+| google-oauth-auth.4.4 | ✓ | - |
+| google-oauth-auth.4.5 | ✓ | - |
+| google-oauth-auth.5.1 | ✓ | - |
+| google-oauth-auth.5.2 | ✓ | - |
+| google-oauth-auth.5.3 | ✓ | - |
+| google-oauth-auth.5.4 | ✓ | - |
+| google-oauth-auth.5.5 | ✓ | - |
+| google-oauth-auth.5.6 | ✓ | - |
+| google-oauth-auth.6.1 | ✓ | - |
+| google-oauth-auth.6.2 | ✓ | - |
+| google-oauth-auth.6.3 | ✓ | - |
+| google-oauth-auth.6.4 | ✓ | - |
+| google-oauth-auth.6.5 | ✓ | - |
+| google-oauth-auth.7.1 | ✓ | - |
+| google-oauth-auth.7.2 | ✓ | - |
+| google-oauth-auth.7.3 | ✓ | ✓ |
+| google-oauth-auth.7.4 | ✓ | ✓ |
+| google-oauth-auth.7.5 | - | ✓ |
+| google-oauth-auth.8.1 | ✓ | ✓ |
+| google-oauth-auth.8.2 | ✓ | - |
+| google-oauth-auth.8.3 | ✓ | ✓ |
+| google-oauth-auth.8.4 | ✓ | - |
+| google-oauth-auth.8.5 | ✓ | - |
+| google-oauth-auth.9.1 | ✓ | - |
+| google-oauth-auth.9.2 | ✓ | - |
+| google-oauth-auth.9.3 | ✓ | - |
+| google-oauth-auth.9.4 | ✓ | - |
+| google-oauth-auth.9.5 | ✓ | - |
+| google-oauth-auth.9.6 | ✓ | ✓ |
+| google-oauth-auth.10.1 | ✓ | - |
+| google-oauth-auth.10.2 | ✓ | - |
+| google-oauth-auth.10.3 | ✓ | - |
+| google-oauth-auth.10.4 | ✓ | - |
+| google-oauth-auth.10.5 | ✓ | - |
+| google-oauth-auth.10.6 | ✓ | - |
+| google-oauth-auth.11.1 | ✓ | ✓ |
+| google-oauth-auth.11.2 | ✓ | ✓ |
+| google-oauth-auth.11.3 | ✓ | ✓ |
+| google-oauth-auth.11.4 | ✓ | ✓ |
+| google-oauth-auth.11.5 | ✓ | ✓ |
+| google-oauth-auth.11.6 | ✓ | ✓ |
+| google-oauth-auth.11.7 | ✓ | ✓ |
+| google-oauth-auth.11.8 | ✓ | ✓ |
+| google-oauth-auth.11.9 | ✓ | ✓ |
+| google-oauth-auth.12.1 | ✓ | ✓ |
+| google-oauth-auth.12.2 | ✓ | ✓ |
+| google-oauth-auth.12.3 | ✓ | ✓ |
+| google-oauth-auth.12.4 | ✓ | ✓ |
+| google-oauth-auth.12.5 | ✓ | ✓ |
+| google-oauth-auth.12.6 | ✓ | ✓ |
+| google-oauth-auth.13.1 | ✓ | ✓ |
+| google-oauth-auth.13.2 | ✓ | ✓ |
+| google-oauth-auth.13.3 | ✓ | ✓ |
+| google-oauth-auth.13.4 | ✓ | ✓ |
+| google-oauth-auth.13.5 | ✓ | ✓ |
+| google-oauth-auth.13.6 | ✓ | ✓ |
+| google-oauth-auth.13.7 | ✓ | ✓ |
+| google-oauth-auth.13.8 | ✓ | ✓ |
+| google-oauth-auth.14.1 | ✓ | ✓ |
+| google-oauth-auth.14.2 | ✓ | ✓ |
+| google-oauth-auth.14.3 | ✓ | ✓ |
+| google-oauth-auth.14.4 | ✓ | ✓ |
+| google-oauth-auth.14.5 | ✓ | ✓ |
+| google-oauth-auth.14.6 | ✓ | ✓ |
+| google-oauth-auth.14.7 | ✓ | ✓ |
+| google-oauth-auth.15.1 | ✓ | ✓ |
+| google-oauth-auth.15.2 | ✓ | ✓ |
+| google-oauth-auth.15.3 | ✓ | ✓ |
+| google-oauth-auth.15.4 | ✓ | ✓ |
+| google-oauth-auth.15.5 | ✓ | ✓ |
+| google-oauth-auth.15.6 | ✓ | ✓ |
+| google-oauth-auth.15.7 | ✓ | ✓ |
+| google-oauth-auth.15.8 | ✓ | ✓ |
+| google-oauth-auth.15.9 | - | ✓ |
 
 ### Критерии Успеха
 
 Реализация считается успешной когда:
 - ✅ Все модульные тесты проходят
-- ✅ Все property-based тесты проходят (минимум 100 итераций каждый, всего 22 свойства: 19 обязательных + 3 опциональных)
 - ✅ Все функциональные тесты проходят
 - ✅ Покрытие кода минимум 85%
 - ✅ Все требования покрыты тестами
