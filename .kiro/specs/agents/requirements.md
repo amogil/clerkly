@@ -717,8 +717,8 @@
 
 ### React хуки
 - `useState` - управление состоянием компонента
-- `useRef` - ссылки на DOM элементы (chatListRef, messagesEndRef)
-- `useEffect` - побочные эффекты (resize listener, autoscroll)
+- `useRef` - ссылки на DOM элементы (chatListRef)
+- `useEffect` - побочные эффекты (resize listener, autofocus)
 
 ## Ограничения
 

@@ -6,7 +6,7 @@
 
 **Общая оценка:** 10-12 дней (без учёта выполненной Фазы 1-5)
 
-**Текущий статус:** Фаза 5.1 (Auto-create First Agent) ✅ ЗАВЕРШЕНА
+**Текущий статус:** Фаза 9 (AI Elements миграция) ✅ ЗАВЕРШЕНА
 
 ---
 
@@ -76,13 +76,20 @@
   - ✅ Реализация useEffect для автофокуса при смене activeAgent
   - ✅ Функциональный тест (input-autofocus.spec.ts) - 6 тестов
   - ✅ Коммит создан
+- ✅ AI Elements миграция (Фаза 9):
+  - ✅ IPCChatTransport + messageMapper
+  - ✅ useAgentChat hook (заменяет useMessages)
+  - ✅ AgentMessage, AgentPromptInput, AgentChat компоненты
+  - ✅ agents.tsx: все AgentChat смонтированы при старте, CSS show/hide, стартовый лоадер
+  - ✅ AnthropicProvider и GoogleProvider через нативный HTTP+SSE
+  - ✅ messages:list-paginated IPC endpoint
+  - ✅ Unit-тесты всех новых компонентов (1426 тестов)
 
 ### В процессе
 - Нет активных задач
 
 ### Не выполнено
-- ❌ UI компоненты (AgentIcon, MessageList, AutoExpandingTextarea, HistoryPage)
-- ❌ Функциональные тесты (кроме agents-invariant.spec.ts)
+- ❌ Функциональные тесты скролла и ленивой загрузки (переписать под новую архитектуру)
 
 ---
 
@@ -343,6 +350,39 @@
 - [x] Все функциональные тесты auto-create проходят (3 теста)
 
 **Текущий прогресс:** 17/17 пунктов чек-листа (100%) ✅
+
+---
+
+### Фаза 9: AI Elements миграция ✅ ЗАВЕРШЕНА
+
+**Зависимости:** Фаза 5, Фаза 6
+
+| # | Задача | Статус | Требования |
+|---|--------|--------|------------|
+| 9.1 | IPCChatTransport | ✅ | llm-integration.2, agents.13 |
+| 9.2 | messageMapper | ✅ | agents.13, llm-integration.7 |
+| 9.3 | messages:list-paginated IPC endpoint | ✅ | agents.13.2 |
+| 9.4 | useAgentChat hook | ✅ | agents.4, agents.13 |
+| 9.5 | AgentMessage компонент | ✅ | agents.4.9, agents.4.10, llm-integration.7 |
+| 9.6 | AgentPromptInput компонент | ✅ | agents.4.3–4.7 |
+| 9.7 | AgentChat компонент | ✅ | agents.4, agents.13 |
+| 9.8 | Интеграция в agents.tsx | ✅ | agents.13.3, agents.13.5, agents.13.10 |
+| 9.9 | AnthropicProvider.chat() | ✅ | llm-integration.2 |
+| 9.10 | GoogleProvider.chat() | ✅ | llm-integration.2 |
+| 9.11 | Удаление старых компонентов | ✅ | — |
+| 9.12 | Unit-тесты всех новых компонентов | ✅ | — |
+
+**Что реализовано:**
+- `src/renderer/lib/IPCChatTransport.ts` — мост между `useChat` и Electron IPC
+- `src/renderer/lib/messageMapper.ts` — маппинг `MessageSnapshot` → `UIMessage`
+- `src/renderer/hooks/useAgentChat.ts` — заменяет `useMessages`, оборачивает `useChat`
+- `src/renderer/components/agents/AgentMessage.tsx` — рендер user/llm/error сообщений
+- `src/renderer/components/agents/AgentPromptInput.tsx` — поле ввода с auto-expand
+- `src/renderer/components/agents/AgentChat.tsx` — per-agent компонент, смонтирован всё время
+- `src/renderer/components/agents.tsx` — рендерит все AgentChat, CSS show/hide, стартовый лоадер
+- `src/main/llm/AnthropicProvider.ts` — нативный HTTP+SSE
+- `src/main/llm/GoogleProvider.ts` — нативный HTTP+SSE
+- Удалены: `MessageBubble.tsx`, `ChatInput.tsx`, `AutoExpandingTextarea.tsx`, `useMessages.ts`
 
 ---
 

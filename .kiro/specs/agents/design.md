@@ -1330,74 +1330,53 @@ useEffect(() => {
 
 #### Автоскролл к последнему сообщению
 
-> **⚠️ УСТАРЕЛО — будет заменено в Фазе 9 (AI Elements миграция).** После миграции автоскролл управляется компонентом `Conversation` (`use-stick-to-bottom`). Актуальная архитектура — в разделе "AI Elements интеграция (Фаза 9)".
-
 **Requirements:** agents.4.13
 
-При появлении новых сообщений чат автоматически прокручивается вниз, если пользователь находится в нижней трети чата.
+Автоскролл управляется компонентом `Conversation` из `use-stick-to-bottom`. Срабатывает только когда пользователь находится внизу чата (agents.4.13.2).
 
-**Реализация в Agents компоненте:**
+**Реализация:**
+
+`Conversation` (`src/renderer/components/ai-elements/conversation.tsx`) — тонкая обёртка над `StickToBottom` из `use-stick-to-bottom`. Автоматически прокручивает вниз при появлении новых сообщений, если пользователь не прокрутил вверх.
+
+```tsx
+// Requirements: agents.4.13
+<Conversation className="flex-1 min-h-0" onScroll={handleScroll}>
+  <ConversationContent data-testid="messages-area" className="flex flex-col gap-4 p-6 justify-end min-h-full">
+    {/* сообщения */}
+  </ConversationContent>
+  <ConversationScrollButton /> {/* кнопка "вниз" когда пользователь прокрутил вверх */}
+</Conversation>
+```
+
+**Поведение:**
+- Пользователь внизу → новое сообщение → автоскролл (agents.4.13.1)
+- Пользователь прокрутил вверх → новое сообщение → автоскролл НЕ срабатывает (agents.4.13.2)
+- `ConversationScrollButton` показывается когда пользователь не внизу — клик возвращает вниз
+- Скроллбар управляется нативно браузером через `overflow-y: auto` на контейнере `StickToBottom`
+
+**Ленивая подгрузка при скролле вверх (agents.13.9):**
 
 ```typescript
-// Requirements: agents.4.13.6
-const messagesEndRef = useRef<HTMLDivElement>(null);
-
-// Requirements: agents.4.13.5, agents.4.14.4, agents.4.14.8
-const scrollToBottom = (instant = false) => {
-  messagesEndRef.current?.scrollIntoView({ behavior: instant ? 'auto' : 'smooth' });
-};
-
-// Requirements: agents.4.13.2, agents.4.13.3
-const isUserAtBottom = (): boolean => {
-  if (!messagesAreaRef.current) return true;
-  const { scrollHeight, scrollTop, clientHeight } = messagesAreaRef.current;
-  const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
-  return distanceFromBottom < clientHeight / 3;
-};
-
-// Requirements: agents.4.13.1, agents.4.13.2
-useEffect(() => {
-  if (messages.length > 0 && isUserAtBottom()) {
-    scrollToBottom();
-  }
-}, [messages]);
-
-// Requirements: agents.4.13.4
-const handleSend = async () => {
-  if (!taskInput.trim() || !activeAgent) return;
-  
-  const userMessage = taskInput.trim();
-  setTaskInput('');
-  
-  await sendMessage(userMessage);
-  
-  // Clear saved position and always scroll to bottom when user sends message
-  scrollPositions.current.delete(activeAgent.id);
-  scrollToBottom();
-};
+// Requirements: agents.13.9 — load more when scrolled to top
+const handleScroll = useCallback(
+  (e: React.UIEvent<HTMLDivElement>) => {
+    if (hasMore && e.currentTarget.scrollTop < 50) loadMore();
+  },
+  [hasMore, loadMore]
+);
 ```
 
 **Структура DOM:**
 
 ```tsx
 {/* Messages Area */}
-{/* Requirements: agents.4.13.8-11 - ScrollArea with auto-hide scrollbar */}
-<ScrollArea
-  ref={scrollAreaRootRef}
-  className="flex-1 min-h-0"
-  type={scrollAreaType}
-  scrollHideDelay={1000}
-  viewportRef={viewportCallbackRef}
-  viewportProps={
-    {
-      'data-testid': 'messages-area',
-    } as React.ComponentProps<'div'>
-  }
-  onScrollCapture={handleScroll}
->
-  <div
-    className="flex flex-col justify-end space-y-4 p-6"
-    style={{ minHeight: 'var(--viewport-height, 100%)' }}
+{/* Requirements: agents.4.13, agents.13 */}
+<Conversation className="flex-1 min-h-0" onScroll={handleScroll}>
+  <ConversationContent
+    data-testid="messages-area"
+    className="flex flex-col gap-4 p-6 justify-end min-h-full"
+  >
+    {/* сообщения */}
   >
     {messages.length === 0 ? (
       <AgentWelcome onPromptClick={handlePromptClick} />
@@ -1524,120 +1503,45 @@ const handleScroll = () => {
 
 #### Сохранение позиции скролла
 
-> **⚠️ УСТАРЕЛО — будет заменено в Фазе 9 (AI Elements миграция).** После миграции механизм сохранения позиции переработан под `Conversation`. Актуальная архитектура — в разделе "AI Elements интеграция (Фаза 9)".
-
 **Requirements:** agents.4.14
 
-Позиция скролла сохраняется для каждого агента независимо и восстанавливается при переключении между агентами.
+Позиция скролла сохраняется для каждого агента автоматически — каждый `AgentChat` остаётся смонтированным всё время работы приложения (agents.13.3). Переключение агента = CSS `display: none/block`, без ремонта компонента. `Conversation` каждого агента трекает скролл независимо.
 
-**Реализация в Agents компоненте:**
-
-```typescript
-// Requirements: agents.4.14.5
-const scrollPositions = useRef<Map<string, number>>(new Map());
-
-// Save scroll position when user scrolls
-// Requirements: agents.4.14.1
-const handleScroll = () => {
-  if (!messagesAreaRef.current || !activeAgent) return;
-  const scrollTop = messagesAreaRef.current.scrollTop;
-  scrollPositions.current.set(activeAgent.id, scrollTop);
-};
-
-// Restore scroll position when switching agents
-// Requirements: agents.4.14.2, agents.4.14.3, agents.4.14.4, agents.4.14.7, agents.4.14.8
-useEffect(() => {
-  if (!messagesAreaRef.current || !activeAgent) return;
-  
-  const savedPosition = scrollPositions.current.get(activeAgent.id);
-  if (savedPosition !== undefined) {
-    // Restore saved position instantly (no animation)
-    // Suppress scrollbar during programmatic scroll
-    setScrollAreaType('hover');
-    messagesAreaRef.current.scrollTop = savedPosition;
-    setTimeout(() => setScrollAreaType('scroll'), 50);
-  } else {
-    // First visit - scroll to bottom instantly (no animation)
-    scrollToBottom(true);
-  }
-}, [activeAgent?.id, messages]);
-
-// Clear saved position when user sends message
-// Requirements: agents.4.14.6
-const handleSend = async () => {
-  if (!taskInput.trim() || !activeAgent) return;
-  
-  const userMessage = taskInput.trim();
-  setTaskInput('');
-  
-  await sendMessage(userMessage);
-  
-  // Clear saved position and scroll to bottom
-  scrollPositions.current.delete(activeAgent.id);
-  scrollToBottom();
-};
-```
-
-**Структура DOM с обработчиком скролла:**
+**Реализация:**
 
 ```tsx
-{/* Messages Area */}
-{/* Requirements: agents.4.13.8-11 - ScrollArea with auto-hide scrollbar */}
-<ScrollArea
-  ref={scrollAreaRootRef}
-  className="flex-1 min-h-0"
-  type={scrollAreaType}
-  scrollHideDelay={1000}
-  viewportRef={viewportCallbackRef}
-  viewportProps={
-    {
-      'data-testid': 'messages-area',
-    } as React.ComponentProps<'div'>
-  }
-  onScrollCapture={handleScroll}
->
-  <div
-    className="flex flex-col justify-end space-y-4 p-6"
-    style={{ minHeight: 'var(--viewport-height, 100%)' }}
-  >
-    {messages.map((message) => (
-      <motion.div key={message.id} data-testid="message">
-        {/* Message content */}
-      </motion.div>
-    ))}
-    <div ref={messagesEndRef} />
-  </div>
-</ScrollArea>
+// Requirements: agents.13.3, agents.13.5 — mounted forever, hidden via CSS
+<div className={`flex flex-col flex-1 min-h-0${isActive ? '' : ' hidden'}`}>
+  <Conversation className="flex-1 min-h-0" onScroll={handleScroll}>
+    {/* ... */}
+  </Conversation>
+</div>
 ```
 
 **Принцип работы:**
 
-1. **Сохранение позиции** (agents.4.14.1): При скролле пользователем срабатывает `onScroll` → `handleScroll()` → сохраняет `scrollTop` в `Map<agentId, scrollTop>`
+1. **Автоматическое сохранение** (agents.4.14): `Conversation` (`StickToBottom`) хранит `scrollTop` в своём внутреннем состоянии. Поскольку компонент не размонтируется при переключении агентов, позиция сохраняется без дополнительной логики.
 
-2. **Хранение в памяти** (agents.4.14.5): Используется `useRef<Map>` для хранения позиций - данные НЕ теряются при ре-рендерах, но очищаются при перезагрузке приложения
+2. **Переключение агентов** (agents.4.14.2–4.14.4): CSS `hidden` скрывает неактивный `AgentChat`, но не размонтирует его. При возврате к агенту `Conversation` восстанавливает ту же позицию скролла.
 
-3. **Восстановление сохраненной позиции** (agents.4.14.3, agents.4.14.7): При переключении агента `useEffect` проверяет наличие сохраненной позиции → если есть, восстанавливает `scrollTop` МГНОВЕННО (без анимации)
+3. **Первый визит** (agents.4.14.4): При первой загрузке `Conversation` с `initial="smooth"` автоматически прокручивает к последнему сообщению.
 
-4. **Первый визит** (agents.4.14.4, agents.4.14.8): Если сохраненной позиции нет (первый визит к агенту или первая загрузка приложения) → автоскролл к последнему сообщению МГНОВЕННО (без визуального скролла)
-
-5. **Сброс при отправке** (agents.4.14.6): При отправке сообщения пользователем сохраненная позиция удаляется из Map → автоскролл к низу
+4. **После отправки сообщения** (agents.4.14.6): `use-stick-to-bottom` автоматически прокручивает вниз при добавлении нового сообщения, если пользователь был внизу.
 
 **Сценарии:**
 
 1. **Пользователь читает старые сообщения:**
-   - Прокручивает вверх → позиция сохраняется
-   - Переключается на другого агента → позиция сохранена
-   - Возвращается → позиция восстановлена, пользователь продолжает читать
+   - Прокручивает вверх → позиция сохраняется в `Conversation`
+   - Переключается на другого агента → `AgentChat` скрыт через CSS
+   - Возвращается → `Conversation` восстанавливает позицию автоматически
 
 2. **Пользователь отправляет сообщение:**
-   - Прокручивает вверх → позиция сохраняется
-   - Отправляет сообщение → позиция сбрасывается → автоскролл к низу
-   - Видит свое новое сообщение внизу
+   - Отправляет → `use-stick-to-bottom` прокручивает вниз (если был внизу)
+   - Видит своё новое сообщение внизу
 
 3. **Агент отвечает в фоне:**
    - Пользователь читает старые сообщения (прокручен вверх)
-   - Агент отвечает → сообщение добавляется
-   - Позиция НЕ меняется → пользователь продолжает читать
+   - Агент отвечает → автоскролл НЕ срабатывает (пользователь не внизу)
    - Переключается на другого агента и возвращается → позиция восстановлена
 
 ### AgentWelcome
@@ -1720,52 +1624,69 @@ function AgentWelcome({ onPromptClick }: AgentWelcomeProps) {
 
 ### Стилизация Сообщений
 
-> **⚠️ УСТАРЕЛО — будет заменено в Фазе 9 (AI Elements миграция).** `MessageBubble` заменяется компонентом `AgentMessage`. Актуальная архитектура — в разделе "AI Elements интеграция (Фаза 9)".
+**Requirements:** agents.4.9, agents.4.10, agents.4.22
 
-**Сообщения пользователя:**
+Сообщения рендерятся через компонент `AgentMessage` (`src/renderer/components/agents/AgentMessage.tsx`). Каждое сообщение оборачивается в `motion.div` для анимации появления (fade-in + slide-up).
+
+**Сообщения пользователя (kind: 'user'):**
 ```tsx
 // Requirements: agents.4.9, agents.4.22
-<div className="flex justify-end">
-  <div className="rounded-2xl bg-secondary/70 border border-border px-4 py-3">
+<div data-testid="message-user" className="flex justify-end">
+  <div className="rounded-2xl bg-secondary/70 border border-border px-4 py-3 min-w-0">
     <p className="text-sm leading-relaxed text-foreground whitespace-pre-wrap break-words">
-      {message.content}
+      {text}
     </p>
   </div>
 </div>
 ```
 
-**Особенности:**
-- `rounded-2xl` (16px) - более скругленные углы для мягкого вида
-- `bg-secondary/70` - серый полупрозрачный фон (70% opacity)
-- `border border-border` - тонкая серая рамка (1px)
-- полная ширина — пузырь растягивается на всю доступную ширину
-- `whitespace-pre-wrap` - сохранение переносов строк из текста
-- `break-words` - перенос длинных слов без пробелов
-- Выравнивание справа через `justify-end`
-- Текст выравнен слева внутри баллона (без `text-right`)
-
-**Сообщения агента:**
+**Сообщения агента (kind: 'llm'):**
 ```tsx
-// Requirements: agents.4.10, agents.4.22
-<>
-  {showAvatar && (
-    <div className="mb-2">
-      <Logo size="sm" showText={false} animated={isInProgress} />
+// Requirements: agents.4.10, agents.4.22, llm-integration.7
+<div data-testid="message-llm" className="space-y-2">
+  {showAvatar && <Logo size="sm" showText={false} animated={isInProgress(agentStatus)} />}
+  {reasoning && (
+    <div data-testid="message-llm-reasoning">
+      <Reasoning>{/* collapsible reasoning */}</Reasoning>
     </div>
   )}
-  <div className="text-sm leading-relaxed text-foreground whitespace-pre-wrap break-words">
-    {message.content}
-  </div>
-</>
+  {action?.content ? (
+    <div data-testid="message-llm-action" className="text-sm leading-relaxed whitespace-pre-wrap break-words">
+      {action.content}
+    </div>
+  ) : (
+    <div data-testid="message-llm-loading">{/* loading dots */}</div>
+  )}
+</div>
 ```
 
-**Особенности:**
-- Без фона и рамки - чистый текст
-- Message Avatar показывается только для первого сообщения в последовательности
-- полная ширина — текст агента занимает всю доступную ширину
-- `whitespace-pre-wrap` - сохранение переносов строк из текста
-- `break-words` - перенос длинных слов без пробелов
-- Message Avatar с CSS-анимацией
+**Сообщения об ошибке (kind: 'error'):**
+```tsx
+// Requirements: llm-integration.3.4.1
+<div data-testid="message-error" className="text-sm text-red-500 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3">
+  {error.message}
+  {action_link && onNavigate && (
+    <button data-testid="message-error-action-link" onClick={() => onNavigate(action_link.screen)}>
+      {action_link.label}
+    </button>
+  )}
+</div>
+```
+
+**Анимация появления:**
+```tsx
+// Requirements: agents.4.22
+<motion.div
+  key={message.id}
+  data-testid="message"
+  data-message-id={message.id}
+  initial={{ opacity: 0, y: 10 }}
+  animate={{ opacity: 1, y: 0 }}
+  transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+>
+  <AgentMessage message={message} showAvatar={showAvatar} agentStatus={agent.status} onNavigate={onNavigate} />
+</motion.div>
+```
 
 ## Markdown рендеринг
 
@@ -2369,10 +2290,10 @@ await window.locator(`[data-testid="agent-icon-${firstAgentId}"]`).click();
 - `Logo` — компонент логотипа агента
 - `MainEventBus` — шина событий main процесса
 - `useEventSubscription` — React hook для подписки на события
-- `IPCChatTransport` — кастомный ChatTransport для AI SDK (Фаза 9)
-- `useAgentChat` — хук управления сообщениями, заменяет `useMessages` (Фаза 9)
-- `AgentMessage` — компонент сообщения, заменяет `MessageBubble` (Фаза 9)
-- `AgentPromptInput` — компонент ввода, заменяет `ChatInput` + `AutoExpandingTextarea` (Фаза 9)
+- `IPCChatTransport` — кастомный ChatTransport для AI SDK (`src/renderer/lib/IPCChatTransport.ts`)
+- `useAgentChat` — хук управления сообщениями, заменяет `useMessages` (`src/renderer/hooks/useAgentChat.ts`)
+- `AgentMessage` — компонент сообщения (`src/renderer/components/agents/AgentMessage.tsx`)
+- `AgentPromptInput` — компонент ввода (`src/renderer/components/agents/AgentPromptInput.tsx`)
 
 ## Производительность
 
