@@ -6,17 +6,13 @@
 // Polyfill ReadableStream for jsdom environment
 import { ReadableStream as NodeReadableStream } from 'stream/web';
 if (typeof globalThis.ReadableStream === 'undefined') {
-  (globalThis as unknown as { ReadableStream: typeof NodeReadableStream }).ReadableStream = NodeReadableStream;
+  (globalThis as unknown as { ReadableStream: typeof NodeReadableStream }).ReadableStream =
+    NodeReadableStream;
 }
 
 import { IPCChatTransport } from '../../../src/renderer/lib/IPCChatTransport';
 import { RendererEventBus } from '../../../src/renderer/events/RendererEventBus';
 import { EVENT_TYPES } from '../../../src/shared/events/constants';
-import {
-  MessageCreatedEvent,
-  MessageUpdatedEvent,
-  MessageLlmReasoningUpdatedEvent,
-} from '../../../src/shared/events/types';
 import type { UIMessage, UIMessageChunk } from 'ai';
 
 // Mock RendererEventBus
@@ -38,7 +34,7 @@ const mockCreate = jest.fn();
 async function collectChunks(stream: ReadableStream<UIMessageChunk>): Promise<UIMessageChunk[]> {
   const chunks: UIMessageChunk[] = [];
   const reader = stream.getReader();
-  while (true) {
+  for (;;) {
     const { done, value } = await reader.read();
     if (done) break;
     chunks.push(value);
@@ -147,7 +143,11 @@ describe('IPCChatTransport', () => {
       expect(types).toContain('finish-step');
       expect(types).toContain('finish');
 
-      const textDelta = chunks.find((c) => c.type === 'text-delta') as { type: 'text-delta'; delta: string; id: string };
+      const textDelta = chunks.find((c) => c.type === 'text-delta') as {
+        type: 'text-delta';
+        delta: string;
+        id: string;
+      };
       expect(textDelta?.delta).toBe('Hello back!');
     });
 
@@ -179,7 +179,10 @@ describe('IPCChatTransport', () => {
       expect(types).toContain('error');
       expect(types).toContain('finish');
 
-      const errorChunk = chunks.find((c) => c.type === 'error') as { type: 'error'; errorText: string };
+      const errorChunk = chunks.find((c) => c.type === 'error') as {
+        type: 'error';
+        errorText: string;
+      };
       expect(errorChunk?.errorText).toBe('API key invalid');
     });
 
@@ -231,7 +234,11 @@ describe('IPCChatTransport', () => {
       expect(types).toContain('reasoning-delta');
       expect(types).toContain('reasoning-end');
 
-      const reasoningDelta = chunks.find((c) => c.type === 'reasoning-delta') as { type: 'reasoning-delta'; delta: string; id: string };
+      const reasoningDelta = chunks.find((c) => c.type === 'reasoning-delta') as {
+        type: 'reasoning-delta';
+        delta: string;
+        id: string;
+      };
       expect(reasoningDelta?.delta).toBe('thinking...');
 
       // reasoning-end must come before text-start
@@ -295,6 +302,90 @@ describe('IPCChatTransport', () => {
 
       const chunks = await collectChunks(stream);
       expect(chunks).toHaveLength(0);
+    });
+
+    /* Preconditions: transport created for agent-1, window.api.messages.create returns success:false
+       Action: call sendMessages, IPC create returns failure result
+       Assertions: stream emits error chunk + finish
+       Requirements: agents.4.3 */
+    it('should emit error chunk when IPC create returns success:false', async () => {
+      mockCreate.mockResolvedValue({ success: false, error: 'Agent not found' });
+
+      const streamPromise = transport.sendMessages(makeSendOptions());
+      await Promise.resolve();
+      await Promise.resolve(); // allow .then to run
+
+      const stream = await streamPromise;
+      const chunks = await collectChunks(stream);
+      const types = chunks.map((c) => c.type);
+
+      expect(types).toContain('error');
+      expect(types).toContain('finish');
+      const errorChunk = chunks.find((c) => c.type === 'error') as {
+        type: 'error';
+        errorText: string;
+      };
+      expect(errorChunk?.errorText).toBe('Agent not found');
+    });
+
+    /* Preconditions: transport created for agent-1
+       Action: emit MESSAGE_CREATED with kind:llm that already has action.content (non-streaming)
+       Assertions: stream emits start, start-step, text-start, text-delta, text-end, finish-step, finish immediately
+       Requirements: llm-integration.2 */
+    it('should emit complete text chunks when llm message arrives already complete', async () => {
+      const streamPromise = transport.sendMessages(makeSendOptions());
+      await Promise.resolve();
+
+      emitEvent(EVENT_TYPES.MESSAGE_CREATED, {
+        message: {
+          id: 88,
+          agentId: 'agent-1',
+          kind: 'llm',
+          timestamp: Date.now(),
+          payload: { data: { action: { content: 'Already complete response' } } },
+          hidden: false,
+        },
+        timestamp: Date.now(),
+      });
+
+      const stream = await streamPromise;
+      const chunks = await collectChunks(stream);
+      const types = chunks.map((c) => c.type);
+
+      expect(types).toContain('start');
+      expect(types).toContain('start-step');
+      expect(types).toContain('text-start');
+      expect(types).toContain('text-delta');
+      expect(types).toContain('text-end');
+      expect(types).toContain('finish-step');
+      expect(types).toContain('finish');
+
+      const textDelta = chunks.find((c) => c.type === 'text-delta') as {
+        type: 'text-delta';
+        delta: string;
+        id: string;
+      };
+      expect(textDelta?.delta).toBe('Already complete response');
+    });
+
+    /* Preconditions: transport created for agent-1, window.api.messages.create returns success:false without error message
+       Action: call sendMessages, IPC create returns failure result with no error field
+       Assertions: stream emits error chunk with fallback message + finish
+       Requirements: agents.4.3 */
+    it('should use fallback error message when IPC create returns success:false without error', async () => {
+      mockCreate.mockResolvedValue({ success: false });
+
+      const streamPromise = transport.sendMessages(makeSendOptions());
+      await Promise.resolve();
+      await Promise.resolve();
+
+      const stream = await streamPromise;
+      const chunks = await collectChunks(stream);
+      const errorChunk = chunks.find((c) => c.type === 'error') as {
+        type: 'error';
+        errorText: string;
+      };
+      expect(errorChunk?.errorText).toBe('Failed to send message');
     });
 
     /* Preconditions: transport created for agent-1, window.api.messages.create rejects

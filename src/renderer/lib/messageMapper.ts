@@ -1,0 +1,86 @@
+// Requirements: agents.4, agents.7, agents.13, llm-integration.3, llm-integration.3.8, llm-integration.8.5
+
+import type { UIMessage } from 'ai';
+import type { MessageSnapshot } from '../../shared/events/types';
+
+/**
+ * Convert a single MessageSnapshot to UIMessage for AI SDK useChat.
+ * Returns null for hidden messages (dismissed errors, interrupted llm).
+ *
+ * Mapping rules:
+ * - kind: 'user'  → role: 'user',      parts: [{ type: 'text', text }]
+ * - kind: 'llm'   → role: 'assistant', parts: [reasoning?, text?]
+ * - kind: 'error' → role: 'assistant', parts: [{ type: 'text', text: errorMessage }], metadata: { isError, ... }
+ * - hidden: true  → null (filtered out)
+ *
+ * Requirements: agents.7.3, llm-integration.3.4, llm-integration.3.8, llm-integration.8.5
+ */
+export function toUIMessage(msg: MessageSnapshot): UIMessage | null {
+  // Filter hidden messages (dismissed errors, interrupted llm)
+  if (msg.hidden) return null;
+
+  const data = (msg.payload.data ?? {}) as Record<string, unknown>;
+
+  if (msg.kind === 'user') {
+    const text = (data.text as string | undefined) ?? '';
+    return {
+      id: String(msg.id),
+      role: 'user',
+      parts: [{ type: 'text', text }],
+    };
+  }
+
+  if (msg.kind === 'llm') {
+    const parts: UIMessage['parts'] = [];
+
+    // Reasoning part (if present)
+    const reasoning = data.reasoning as { text?: string } | undefined;
+    if (reasoning?.text) {
+      parts.push({ type: 'reasoning', text: reasoning.text, state: 'done' });
+    }
+
+    // Text part from action.content (if present)
+    const action = data.action as { content?: string } | undefined;
+    if (action?.content) {
+      parts.push({ type: 'text', text: action.content, state: 'done' });
+    }
+
+    return {
+      id: String(msg.id),
+      role: 'assistant',
+      parts,
+    };
+  }
+
+  if (msg.kind === 'error') {
+    const errorMessage = (data.message as string | undefined) ?? 'An error occurred';
+    const actionLink = data.action_link as { label: string; screen: string } | undefined;
+
+    return {
+      id: String(msg.id),
+      role: 'assistant',
+      parts: [{ type: 'text', text: errorMessage }],
+      metadata: {
+        isError: true,
+        errorMessage,
+        actionLink,
+      },
+    };
+  }
+
+  // Unknown kinds — skip
+  return null;
+}
+
+/**
+ * Convert an array of MessageSnapshots to UIMessages, filtering out hidden/unknown.
+ * Requirements: agents.4.8, agents.13.1
+ */
+export function toUIMessages(messages: MessageSnapshot[]): UIMessage[] {
+  const result: UIMessage[] = [];
+  for (const msg of messages) {
+    const uiMsg = toUIMessage(msg);
+    if (uiMsg !== null) result.push(uiMsg);
+  }
+  return result;
+}

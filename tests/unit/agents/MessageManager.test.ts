@@ -53,6 +53,9 @@ describe('MessageManager', () => {
     mockDbManager = {
       messages: {
         listByAgent: jest.fn().mockReturnValue([mockMessage]),
+        listByAgentPaginated: jest
+          .fn()
+          .mockReturnValue({ messages: [mockMessage], hasMore: false }),
         getLastByAgent: jest.fn().mockReturnValue(mockMessage),
         getById: jest.fn().mockReturnValue(mockMessage),
         create: jest.fn().mockReturnValue(mockMessage),
@@ -174,6 +177,56 @@ describe('MessageManager', () => {
     });
   });
 
+  describe('listPaginated', () => {
+    /* Preconditions: MessageManager initialized, messages exist
+       Action: Call listPaginated() with agentId and limit
+       Assertions: Repository listByAgentPaginated called, messages + hasMore returned
+       Requirements: agents.13.1, agents.13.2 */
+    it('should return paginated messages from repository', () => {
+      const result = messageManager.listPaginated('agent-123', 50, undefined);
+
+      expect(mockDbManager.messages.listByAgentPaginated).toHaveBeenCalledWith(
+        'agent-123',
+        50,
+        undefined
+      );
+      expect(result).toEqual({ messages: [mockMessage], hasMore: false });
+    });
+
+    /* Preconditions: MessageManager initialized, many messages exist
+       Action: Call listPaginated() with beforeId
+       Assertions: Repository called with beforeId, hasMore=true when more pages exist
+       Requirements: agents.13.2, agents.13.4 */
+    it('should pass beforeId and return hasMore=true when more pages exist', () => {
+      mockDbManager.messages.listByAgentPaginated = jest
+        .fn()
+        .mockReturnValue({ messages: [mockMessage], hasMore: true });
+
+      const result = messageManager.listPaginated('agent-123', 20, 100);
+
+      expect(mockDbManager.messages.listByAgentPaginated).toHaveBeenCalledWith(
+        'agent-123',
+        20,
+        100
+      );
+      expect(result.hasMore).toBe(true);
+    });
+
+    /* Preconditions: MessageManager initialized, no messages exist
+       Action: Call listPaginated() with agentId
+       Assertions: Empty messages array and hasMore=false returned
+       Requirements: agents.13.1 */
+    it('should return empty list when no messages exist', () => {
+      mockDbManager.messages.listByAgentPaginated = jest
+        .fn()
+        .mockReturnValue({ messages: [], hasMore: false });
+
+      const result = messageManager.listPaginated('agent-123', 50, undefined);
+
+      expect(result).toEqual({ messages: [], hasMore: false });
+    });
+  });
+
   describe('getLastMessage', () => {
     /* Preconditions: MessageManager initialized, messages exist
        Action: Call getLastMessage() with agentId
@@ -268,6 +321,22 @@ describe('MessageManager', () => {
     });
   });
 
+  describe('setHidden', () => {
+    /* Preconditions: MessageManager initialized, getById returns null after setHidden
+       Action: Call setHidden() for a message that no longer exists
+       Assertions: setHidden called, no event published
+       Requirements: llm-integration.8.5 */
+    it('should not publish event when hidden message is not found after update', () => {
+      mockDbManager.messages.setHidden = jest.fn();
+      mockDbManager.messages.getById = jest.fn().mockReturnValue(null);
+
+      (messageManager as any).setHidden(999, 'agent-123');
+
+      expect(mockDbManager.messages.setHidden).toHaveBeenCalledWith(999, 'agent-123');
+      expect(mockEventBus.publish).not.toHaveBeenCalled();
+    });
+  });
+
   describe('update', () => {
     /* Preconditions: MessageManager initialized
        Action: Call update() with messageId, agentId, and new payload
@@ -295,6 +364,19 @@ describe('MessageManager', () => {
       expect(publishedEvent.message.kind).toBe('user');
       expect(publishedEvent.message.payload).toEqual(payload);
       expect(typeof publishedEvent.timestamp).toBe('number');
+    });
+
+    /* Preconditions: MessageManager initialized, getById returns null (message deleted)
+       Action: Call update() with messageId that no longer exists
+       Assertions: Repository update called, no event published
+       Requirements: agents.7.1 */
+    it('should not publish event when updated message is not found', () => {
+      mockDbManager.messages.getById = jest.fn().mockReturnValue(null);
+
+      messageManager.update(999, 'agent-123', { data: { text: 'x' } });
+
+      expect(mockDbManager.messages.update).toHaveBeenCalled();
+      expect(mockEventBus.publish).not.toHaveBeenCalled();
     });
   });
 });

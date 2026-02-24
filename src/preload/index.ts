@@ -89,6 +89,15 @@ export interface API {
   // Requirements: agents.4, agents.7, user-data-isolation.6.6
   messages: {
     list: (agentId: string) => Promise<{ success: boolean; data?: unknown; error?: string }>;
+    listPaginated: (
+      agentId: string,
+      limit?: number,
+      beforeId?: number
+    ) => Promise<{
+      success: boolean;
+      data?: { messages: unknown[]; hasMore: boolean };
+      error?: string;
+    }>;
     create: (
       agentId: string,
       kind: string,
@@ -500,6 +509,22 @@ const api: API = {
    * Access control is handled by main process through AgentsRepository
    */
   messages: {
+    /**
+     * List messages for an agent with pagination
+     * Requirements: agents.13.1, agents.13.2, agents.13.4
+     */
+    async listPaginated(
+      agentId: string,
+      limit?: number,
+      beforeId?: number
+    ): Promise<{
+      success: boolean;
+      data?: { messages: unknown[]; hasMore: boolean };
+      error?: string;
+    }> {
+      return await ipcRenderer.invoke('messages:list-paginated', { agentId, limit, beforeId });
+    },
+
     /**
      * List all messages for an agent
      * Requirements: agents.4.8, user-data-isolation.7.6

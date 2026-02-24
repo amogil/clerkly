@@ -362,4 +362,96 @@ describe('MessagesRepository', () => {
       expect(updated.hidden).toBe(true);
     });
   });
+
+  describe('listByAgentPaginated', () => {
+    let agentId: string;
+
+    beforeEach(() => {
+      // Create a test agent
+      const agent = agentsRepo.create('Paginated Agent');
+      agentId = agent.agentId;
+    });
+
+    /* Preconditions: agent with 3 messages
+       Action: listByAgentPaginated with limit 50 (no beforeId)
+       Assertions: returns all 3 messages in ascending order, hasMore: false
+       Requirements: agents.13.1, agents.13.4 */
+    it('should return all messages when count <= limit', () => {
+      messagesRepo.create(agentId, 'user', JSON.stringify({ data: { text: 'a' } }));
+      messagesRepo.create(agentId, 'llm', JSON.stringify({ data: {} }));
+      messagesRepo.create(agentId, 'user', JSON.stringify({ data: { text: 'b' } }));
+
+      const { messages: msgs, hasMore } = messagesRepo.listByAgentPaginated(agentId, 50);
+      expect(msgs).toHaveLength(3);
+      expect(hasMore).toBe(false);
+      // Ascending order (oldest first)
+      expect(msgs[0].id).toBeLessThan(msgs[1].id);
+    });
+
+    /* Preconditions: agent with 5 messages
+       Action: listByAgentPaginated with limit 3
+       Assertions: returns last 3 messages, hasMore: true
+       Requirements: agents.13.1, agents.13.2 */
+    it('should return last N messages and hasMore: true when more exist', () => {
+      for (let i = 0; i < 5; i++) {
+        messagesRepo.create(agentId, 'user', JSON.stringify({ data: { text: `msg ${i}` } }));
+      }
+
+      const { messages: msgs, hasMore } = messagesRepo.listByAgentPaginated(agentId, 3);
+      expect(msgs).toHaveLength(3);
+      expect(hasMore).toBe(true);
+    });
+
+    /* Preconditions: agent with 5 messages, beforeId set to 4th message id
+       Action: listByAgentPaginated with limit 10, beforeId = id of 4th message
+       Assertions: returns first 3 messages (older than beforeId)
+       Requirements: agents.13.2 */
+    it('should load messages older than beforeId', () => {
+      const created: number[] = [];
+      for (let i = 0; i < 5; i++) {
+        const msg = messagesRepo.create(
+          agentId,
+          'user',
+          JSON.stringify({ data: { text: `msg ${i}` } })
+        );
+        created.push(msg.id);
+      }
+
+      const beforeId = created[3]; // 4th message
+      const { messages: msgs, hasMore } = messagesRepo.listByAgentPaginated(agentId, 10, beforeId);
+
+      // Should return messages with id < beforeId (first 3)
+      expect(msgs).toHaveLength(3);
+      expect(msgs.every((m) => m.id < beforeId)).toBe(true);
+      expect(hasMore).toBe(false);
+    });
+
+    /* Preconditions: agent with hidden messages
+       Action: listByAgentPaginated
+       Assertions: hidden messages are excluded
+       Requirements: llm-integration.3.8, llm-integration.8.5 */
+    it('should exclude hidden messages', () => {
+      messagesRepo.create(agentId, 'user', JSON.stringify({ data: { text: 'visible' } }));
+      const hidden = messagesRepo.create(
+        agentId,
+        'error',
+        JSON.stringify({ data: { message: 'err' } })
+      );
+      messagesRepo.setHidden(hidden.id, agentId);
+
+      const { messages: msgs } = messagesRepo.listByAgentPaginated(agentId, 50);
+      expect(msgs).toHaveLength(1);
+      expect(msgs[0].kind).toBe('user');
+    });
+
+    /* Preconditions: empty agent
+       Action: listByAgentPaginated
+       Assertions: returns empty array, hasMore: false
+       Requirements: agents.13.4 */
+    it('should return empty result for agent with no messages', () => {
+      const { messages: msgs, hasMore } = messagesRepo.listByAgentPaginated(agentId, 50);
+      expect(msgs).toHaveLength(0);
+      expect(hasMore).toBe(false);
+    });
+  });
 });

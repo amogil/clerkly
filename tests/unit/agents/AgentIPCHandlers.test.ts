@@ -100,6 +100,7 @@ describe('AgentIPCHandlers', () => {
 
     mockMessageManager = {
       list: jest.fn().mockReturnValue([mockMessage]),
+      listPaginated: jest.fn().mockReturnValue({ messages: [mockMessage], hasMore: false }),
       create: jest.fn().mockReturnValue(mockMessage),
       update: jest.fn(),
       getLastMessage: jest.fn().mockReturnValue(mockMessage),
@@ -117,18 +118,19 @@ describe('AgentIPCHandlers', () => {
   describe('registerHandlers', () => {
     /* Preconditions: AgentIPCHandlers initialized
        Action: Call registerHandlers()
-       Assertions: All 11 handlers registered
-       Requirements: agents.2, agents.4, agents.5.5, llm-integration.3.7 */
+       Assertions: All 12 handlers registered
+       Requirements: agents.2, agents.4, agents.5.5, agents.13, llm-integration.3.7 */
     it('should register all IPC handlers', () => {
       handlers.registerHandlers();
 
-      expect(ipcMain.handle).toHaveBeenCalledTimes(11);
+      expect(ipcMain.handle).toHaveBeenCalledTimes(12);
       expect(ipcMain.handle).toHaveBeenCalledWith('agents:create', expect.any(Function));
       expect(ipcMain.handle).toHaveBeenCalledWith('agents:list', expect.any(Function));
       expect(ipcMain.handle).toHaveBeenCalledWith('agents:get', expect.any(Function));
       expect(ipcMain.handle).toHaveBeenCalledWith('agents:update', expect.any(Function));
       expect(ipcMain.handle).toHaveBeenCalledWith('agents:archive', expect.any(Function));
       expect(ipcMain.handle).toHaveBeenCalledWith('messages:list', expect.any(Function));
+      expect(ipcMain.handle).toHaveBeenCalledWith('messages:list-paginated', expect.any(Function));
       expect(ipcMain.handle).toHaveBeenCalledWith('messages:create', expect.any(Function));
       expect(ipcMain.handle).toHaveBeenCalledWith('messages:update', expect.any(Function));
       expect(ipcMain.handle).toHaveBeenCalledWith('messages:get-last', expect.any(Function));
@@ -144,7 +146,7 @@ describe('AgentIPCHandlers', () => {
       handlers.registerHandlers();
       handlers.registerHandlers();
 
-      expect(ipcMain.handle).toHaveBeenCalledTimes(11);
+      expect(ipcMain.handle).toHaveBeenCalledTimes(12);
     });
   });
 
@@ -157,13 +159,14 @@ describe('AgentIPCHandlers', () => {
       handlers.registerHandlers();
       handlers.unregisterHandlers();
 
-      expect(ipcMain.removeHandler).toHaveBeenCalledTimes(11);
+      expect(ipcMain.removeHandler).toHaveBeenCalledTimes(12);
       expect(ipcMain.removeHandler).toHaveBeenCalledWith('agents:create');
       expect(ipcMain.removeHandler).toHaveBeenCalledWith('agents:list');
       expect(ipcMain.removeHandler).toHaveBeenCalledWith('agents:get');
       expect(ipcMain.removeHandler).toHaveBeenCalledWith('agents:update');
       expect(ipcMain.removeHandler).toHaveBeenCalledWith('agents:archive');
       expect(ipcMain.removeHandler).toHaveBeenCalledWith('messages:list');
+      expect(ipcMain.removeHandler).toHaveBeenCalledWith('messages:list-paginated');
       expect(ipcMain.removeHandler).toHaveBeenCalledWith('messages:create');
       expect(ipcMain.removeHandler).toHaveBeenCalledWith('messages:update');
       expect(ipcMain.removeHandler).toHaveBeenCalledWith('messages:get-last');
@@ -338,13 +341,97 @@ describe('AgentIPCHandlers', () => {
       expect(mockAgentManager.archive).toHaveBeenCalledWith('abc123xyz0');
       expect(result).toEqual({ success: true });
     });
+
+    /* Preconditions: Handlers registered, AgentManager throws
+       Action: Invoke agents:archive
+       Assertions: Error returned
+       Requirements: agents.10.4 */
+    it('should return error on failure', async () => {
+      mockAgentManager.archive = jest.fn().mockImplementation(() => {
+        throw new Error('Archive failed');
+      });
+      handlers.registerHandlers();
+      const handler = registeredHandlers.get('agents:archive')!;
+
+      const result = await handler(mockEvent, { agentId: 'abc123xyz0' });
+
+      expect(result).toEqual({ success: false, error: 'Archive failed' });
+    });
+  });
+
+  describe('messages:list-paginated handler', () => {
+    /* Preconditions: Handlers registered, messages exist
+       Action: Invoke messages:list-paginated with agentId and default limit
+       Assertions: MessageManager.listPaginated called with limit=50, snapshots + hasMore returned
+       Requirements: agents.13.1, agents.13.2, agents.13.4 */
+    it('should return paginated messages with default limit', async () => {
+      handlers.registerHandlers();
+      const handler = registeredHandlers.get('messages:list-paginated')!;
+
+      const result = await handler(mockEvent, { agentId: 'abc123xyz0' });
+
+      expect(mockMessageManager.listPaginated).toHaveBeenCalledWith('abc123xyz0', 50, undefined);
+      expect(mockMessageManager.toEventMessage).toHaveBeenCalledWith(mockMessage);
+      expect(result).toEqual({
+        success: true,
+        data: { messages: [mockMessageSnapshot], hasMore: false },
+      });
+    });
+
+    /* Preconditions: Handlers registered, many messages exist
+       Action: Invoke messages:list-paginated with custom limit and beforeId
+       Assertions: MessageManager.listPaginated called with provided limit and beforeId
+       Requirements: agents.13.1, agents.13.2 */
+    it('should pass custom limit and beforeId to listPaginated', async () => {
+      mockMessageManager.listPaginated = jest
+        .fn()
+        .mockReturnValue({ messages: [mockMessage], hasMore: true });
+      handlers.registerHandlers();
+      const handler = registeredHandlers.get('messages:list-paginated')!;
+
+      const result = await handler(mockEvent, { agentId: 'abc123xyz0', limit: 20, beforeId: 100 });
+
+      expect(mockMessageManager.listPaginated).toHaveBeenCalledWith('abc123xyz0', 20, 100);
+      expect(result).toEqual({
+        success: true,
+        data: { messages: [mockMessageSnapshot], hasMore: true },
+      });
+    });
+
+    /* Preconditions: Handlers registered, no messages exist
+       Action: Invoke messages:list-paginated
+       Assertions: Empty messages array and hasMore=false returned
+       Requirements: agents.13.1 */
+    it('should return empty list when no messages exist', async () => {
+      mockMessageManager.listPaginated = jest
+        .fn()
+        .mockReturnValue({ messages: [], hasMore: false });
+      handlers.registerHandlers();
+      const handler = registeredHandlers.get('messages:list-paginated')!;
+
+      const result = await handler(mockEvent, { agentId: 'abc123xyz0' });
+
+      expect(result).toEqual({ success: true, data: { messages: [], hasMore: false } });
+    });
+
+    /* Preconditions: Handlers registered, access denied
+       Action: Invoke messages:list-paginated for agent user doesn't own
+       Assertions: Error returned
+       Requirements: agents.13.4 */
+    it('should return error when access denied', async () => {
+      mockMessageManager.listPaginated = jest.fn().mockImplementation(() => {
+        throw new Error('Access denied');
+      });
+      handlers.registerHandlers();
+      const handler = registeredHandlers.get('messages:list-paginated')!;
+
+      const result = await handler(mockEvent, { agentId: 'other-agent' });
+
+      expect(result).toEqual({ success: false, error: 'Access denied' });
+    });
   });
 
   describe('messages:list handler', () => {
-    /* Preconditions: Handlers registered
-       Action: Invoke messages:list with agentId
-       Assertions: MessageManager.list called, MessageSnapshot[] returned
-       Requirements: agents.4.8, user-data-isolation.7.6, realtime-events.9.8 */
     it('should list messages and return success', async () => {
       handlers.registerHandlers();
       const handler = registeredHandlers.get('messages:list')!;

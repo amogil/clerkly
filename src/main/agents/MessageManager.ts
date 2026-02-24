@@ -55,6 +55,18 @@ export class MessageManager {
   }
 
   /**
+   * List messages for an agent with pagination (last N, optionally before a given id)
+   * Requirements: agents.13.1, agents.13.2, agents.13.4
+   */
+  listPaginated(
+    agentId: string,
+    limit: number,
+    beforeId?: number
+  ): { messages: Message[]; hasMore: boolean } {
+    return this.dbManager.messages.listByAgentPaginated(agentId, limit, beforeId);
+  }
+
+  /**
    * List all messages for an agent
    * Requirements: agents.4.8, user-data-isolation.7.6
    */

@@ -40,15 +40,18 @@ export class IPCChatTransport implements ChatTransport<UIMessage> {
   }
 
   // Requirements: agents.4.3, llm-integration.2, llm-integration.8
-  async sendMessages(options: Parameters<ChatTransport<UIMessage>['sendMessages']>[0]): Promise<ReadableStream<UIMessageChunk>> {
+  async sendMessages(
+    options: Parameters<ChatTransport<UIMessage>['sendMessages']>[0]
+  ): Promise<ReadableStream<UIMessageChunk>> {
     const { messages, abortSignal } = options;
 
     // Extract the last user message to send
     const lastUserMessage = [...messages].reverse().find((m) => m.role === 'user');
-    const text = lastUserMessage?.parts
-      ?.filter((p) => p.type === 'text')
-      .map((p) => (p as { type: 'text'; text: string }).text)
-      .join('') ?? '';
+    const text =
+      lastUserMessage?.parts
+        ?.filter((p) => p.type === 'text')
+        .map((p) => (p as { type: 'text'; text: string }).text)
+        .join('') ?? '';
 
     const agentId = this.agentId;
     const eventBus = RendererEventBus.getInstance();

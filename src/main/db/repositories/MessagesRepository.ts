@@ -2,7 +2,7 @@
 // src/main/db/repositories/MessagesRepository.ts
 // Repository for messages with access control through AgentsRepository
 
-import { eq, and, asc, desc } from 'drizzle-orm';
+import { eq, and, asc, desc, lt } from 'drizzle-orm';
 import { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import * as schema from '../schema';
 import { messages, Message } from '../schema';
@@ -135,6 +135,40 @@ export class MessagesRepository {
       .set({ hidden: true })
       .where(and(eq(messages.id, messageId), eq(messages.agentId, agentId)))
       .run();
+  }
+
+  /**
+   * List messages for an agent with pagination (last N messages, optionally before a given id).
+   * Returns messages in ascending order (oldest first) and a hasMore flag.
+   * Requirements: agents.13.1, agents.13.2, agents.13.4
+   */
+  listByAgentPaginated(
+    agentId: string,
+    limit: number,
+    beforeId?: number
+  ): { messages: Message[]; hasMore: boolean } {
+    this.checkAccess(agentId);
+
+    // Fetch limit+1 to detect if there are more messages
+    const fetchLimit = limit + 1;
+
+    const whereClause =
+      beforeId !== undefined
+        ? and(eq(messages.agentId, agentId), eq(messages.hidden, false), lt(messages.id, beforeId))
+        : and(eq(messages.agentId, agentId), eq(messages.hidden, false));
+
+    // Fetch in DESC order to get the latest N, then reverse for chronological display
+    const rows = this.db
+      .select()
+      .from(messages)
+      .where(whereClause)
+      .orderBy(desc(messages.id))
+      .limit(fetchLimit)
+      .all();
+
+    const hasMore = rows.length > limit;
+    const page = rows.slice(0, limit).reverse(); // oldest first
+    return { messages: page, hasMore };
   }
 
   /**

@@ -59,6 +59,7 @@ export class AgentIPCHandlers {
 
     // Message handlers
     ipcMain.handle('messages:list', this.handleMessageList.bind(this));
+    ipcMain.handle('messages:list-paginated', this.handleMessageListPaginated.bind(this));
     ipcMain.handle('messages:get-last', this.handleMessageGetLast.bind(this));
     ipcMain.handle('messages:create', this.handleMessageCreate.bind(this));
     ipcMain.handle('messages:update', this.handleMessageUpdate.bind(this));
@@ -83,6 +84,7 @@ export class AgentIPCHandlers {
     ipcMain.removeHandler('agents:update');
     ipcMain.removeHandler('agents:archive');
     ipcMain.removeHandler('messages:list');
+    ipcMain.removeHandler('messages:list-paginated');
     ipcMain.removeHandler('messages:get-last');
     ipcMain.removeHandler('messages:create');
     ipcMain.removeHandler('messages:update');
@@ -209,6 +211,27 @@ export class AgentIPCHandlers {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       this.logger.error(`Failed to list messages: ${errorMessage}`);
+      return { success: false, error: errorMessage };
+    }
+  }
+
+  // Requirements: agents.13.1, agents.13.2, agents.13.4
+  private async handleMessageListPaginated(
+    _event: IpcMainInvokeEvent,
+    args: { agentId: string; limit?: number; beforeId?: number }
+  ): Promise<IPCResult> {
+    try {
+      const limit = args.limit ?? 50;
+      const { messages: dbMessages, hasMore } = this.messageManager.listPaginated(
+        args.agentId,
+        limit,
+        args.beforeId
+      );
+      const snapshots = dbMessages.map((msg) => this.messageManager.toEventMessage(msg));
+      return { success: true, data: { messages: snapshots, hasMore } };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Failed to list paginated messages: ${errorMessage}`);
       return { success: false, error: errorMessage };
     }
   }
