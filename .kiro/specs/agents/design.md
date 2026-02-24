@@ -2405,9 +2405,52 @@ agents.tsx
 
 ### IPCChatTransport
 
-`src/renderer/lib/IPCChatTransport.ts` — реализует интерфейс `ChatTransport` из `ai@5`.
+`src/renderer/lib/IPCChatTransport.ts` — реализует интерфейс `ChatTransport` из `ai@5`. Мост между `useChat` и Electron IPC.
 
-Маппинг IPC-событий → UIMessageChunk:
+**Схема потока данных:**
+
+```
+Renderer                          Main Process
+────────────────────────────────────────────────────────────
+useChat.sendMessage()
+  │
+  └─► IPCChatTransport.sendMessages()
+        │
+        ├─► window.api.messages.create(agentId, 'user', payload)  ──► IPC ──► MessageManager.create()
+        │                                                                            │
+        │                                                                            └─► MainPipeline.run()
+        │                                                                                      │
+        └─► подписка на IPC события ◄──────────────────────────────────────────────────────────┘
+              │
+              ├── MESSAGE_CREATED (kind: llm)
+              │     └─► enqueue: { type: 'start' }
+              │         enqueue: { type: 'text-start', id: messageId }
+              │
+              ├── MESSAGE_LLM_REASONING_UPDATED
+              │     └─► enqueue: { type: 'reasoning-start', id } (первый раз)
+              │         enqueue: { type: 'reasoning-delta', id, delta }
+              │
+              ├── MESSAGE_UPDATED (с action.content)
+              │     └─► enqueue: { type: 'reasoning-end', id } (если было reasoning)
+              │         enqueue: { type: 'text-delta', id, delta: action.content }
+              │         enqueue: { type: 'text-end', id }
+              │         enqueue: { type: 'finish' }
+              │         controller.close()
+              │
+              ├── MESSAGE_CREATED (kind: error)
+              │     └─► enqueue: { type: 'error', errorText }
+              │         enqueue: { type: 'finish' }
+              │         controller.close()
+              │
+              └── MESSAGE_UPDATED (hidden: true)
+                    └─► controller.close()  // прерывание
+```
+
+**Методы интерфейса `ChatTransport`:**
+- `sendMessages({ messages, abortSignal })` — вызывает IPC, возвращает `ReadableStream<UIMessageChunk>`
+- `reconnectToStream()` — возвращает `null` (нет серверного стриминга для reconnect)
+
+**Маппинг IPC-событий → UIMessageChunk:**
 - `MESSAGE_CREATED` (kind: llm) → `{ type: 'start' }` + `{ type: 'text-start', id }`
 - `MESSAGE_LLM_REASONING_UPDATED` → `{ type: 'reasoning-delta', id, delta }`
 - `MESSAGE_UPDATED` с action → `{ type: 'text-delta', id, delta: action.content }` + `{ type: 'finish' }`

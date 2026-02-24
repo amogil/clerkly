@@ -278,7 +278,7 @@ interface UIMessage {
   - `IPCChatTransport` просто слушает события — прерванные сообщения придут как `MESSAGE_UPDATED` с `hidden: true` и будут отфильтрованы
   - **Ключевой момент:** Проверить как `useChat` обрабатывает ситуацию когда `stop()` вызван и сразу после — новый `sendMessages()`. Если `useChat` не поддерживает это нативно — может потребоваться `key` remount или `setMessages()` для очистки состояния
 - [x] **2.6** Написать unit-тесты для `IPCChatTransport`
-- [ ] **2.7** Обновить `design.md` — добавить детальную схему `IPCChatTransport`
+- [x] **2.7** Обновить `design.md` — добавить детальную схему `IPCChatTransport`
 
 ---
 
@@ -344,7 +344,7 @@ interface UIMessage {
   - инвариант: user messages всегда role: 'user'
   - инвариант: hidden сообщения никогда не попадают в результат
 - [x] **3.6** Написать unit-тесты для `listByAgentPaginated`
-- [ ] **3.7** Написать unit-тесты для `MessageManager.listPaginated` и `AgentIPCHandlers` (handler `messages:list-paginated`)
+- [x] **3.7** Написать unit-тесты для `MessageManager.listPaginated` и `AgentIPCHandlers` (handler `messages:list-paginated`)
 - [ ] **3.8** Написать функциональный тест для ленивой загрузки:
   - `tests/functional/lazy-loading.spec.ts` — "should load last 50 messages on agent open"
   - `tests/functional/lazy-loading.spec.ts` — "should load more messages on scroll to top"
