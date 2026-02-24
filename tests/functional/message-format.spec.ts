@@ -15,7 +15,7 @@ let window: Page;
 let mockOAuthServer: MockOAuthServer;
 
 test.beforeAll(async () => {
-  mockOAuthServer = await createMockOAuthServer(8905);
+  mockOAuthServer = await createMockOAuthServer();
 });
 
 test.afterAll(async () => {

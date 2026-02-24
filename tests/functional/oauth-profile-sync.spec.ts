@@ -25,7 +25,7 @@ test.describe('OAuth Profile Synchronous Fetch', () => {
   let mockServer: MockOAuthServer;
 
   test.beforeAll(async () => {
-    mockServer = await createMockOAuthServer(8890);
+    mockServer = await createMockOAuthServer();
   });
 
   test.afterAll(async () => {

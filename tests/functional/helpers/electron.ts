@@ -3,8 +3,28 @@
 import { _electron as electron, ElectronApplication, Page } from 'playwright';
 import * as path from 'path';
 import * as fs from 'fs';
+import * as net from 'net';
 import * as os from 'os';
 import { MockOAuthServer } from './mock-oauth-server';
+
+/**
+ * Find a free TCP port by binding to port 0 and letting the OS assign one.
+ * Requirements: testing.3.9
+ */
+export function getFreePort(): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const server = net.createServer();
+    server.listen(0, '127.0.0.1', () => {
+      const address = server.address();
+      const port = typeof address === 'object' && address ? address.port : 0;
+      server.close((err) => {
+        if (err) reject(err);
+        else resolve(port);
+      });
+    });
+    server.on('error', reject);
+  });
+}
 
 /**
  * Electron Test Helper
@@ -377,16 +397,18 @@ export async function expectNoToastError(window: Page): Promise<void> {
 }
 
 /**
- * Create and start a MockOAuthServer with default test configuration
+ * Create and start a MockOAuthServer on a free port chosen by the OS.
+ * Pass an explicit port only when you need a fixed address (legacy usage).
  *
- * @param port - Port number for the mock server (default: 8898)
+ * @param port - Optional port number. Omit to use a random free port.
  * @returns MockOAuthServer instance (already started)
  *
  * Requirements: testing.3.9 - Mock external services in functional tests
  */
-export async function createMockOAuthServer(port: number = 8898): Promise<MockOAuthServer> {
+export async function createMockOAuthServer(port?: number): Promise<MockOAuthServer> {
+  const resolvedPort = port ?? (await getFreePort());
   const mockServer = new MockOAuthServer({
-    port,
+    port: resolvedPort,
     clientId: 'test-client-id-12345',
     clientSecret: 'test-client-secret-67890',
   });

@@ -12,7 +12,7 @@ let electronApp: ElectronApplication;
 let page: Page;
 
 test.beforeAll(async () => {
-  mockServer = await createMockOAuthServer(8896);
+  mockServer = await createMockOAuthServer();
 
   // Set user profile
   mockServer.setUserProfile({

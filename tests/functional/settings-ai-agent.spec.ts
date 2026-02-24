@@ -18,7 +18,7 @@ let mockServer: MockOAuthServer;
 const TEST_CLIENT_ID = 'test-client-id-12345';
 
 test.beforeAll(async () => {
-  mockServer = await createMockOAuthServer(8891);
+  mockServer = await createMockOAuthServer();
 
   // Set user profile data for mock OAuth server
   mockServer.setUserProfile({

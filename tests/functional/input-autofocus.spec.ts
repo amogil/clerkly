@@ -12,7 +12,7 @@ let electronApp: ElectronApplication;
 let window: Page;
 
 test.beforeAll(async () => {
-  mockServer = await createMockOAuthServer(8898);
+  mockServer = await createMockOAuthServer();
 });
 
 test.afterAll(async () => {

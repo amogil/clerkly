@@ -16,7 +16,7 @@ import { completeOAuthFlow } from './helpers/electron';
 let mockServer: MockOAuthServer;
 
 test.beforeAll(async () => {
-  mockServer = await createMockOAuthServer(8896);
+  mockServer = await createMockOAuthServer();
 });
 
 test.afterAll(async () => {

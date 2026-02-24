@@ -16,7 +16,7 @@ import type { MockOAuthServer } from './helpers/mock-oauth-server';
 let mockServer: MockOAuthServer;
 
 test.beforeAll(async () => {
-  mockServer = await createMockOAuthServer(8899);
+  mockServer = await createMockOAuthServer();
 });
 
 test.afterAll(async () => {

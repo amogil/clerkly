@@ -29,7 +29,7 @@ test.describe('Account Profile', () => {
   let mockServer: MockOAuthServer;
 
   test.beforeAll(async () => {
-    mockServer = await createMockOAuthServer(8889);
+    mockServer = await createMockOAuthServer();
     // Set CLERKLY_GOOGLE_API_URL to point to mock server
     process.env.CLERKLY_GOOGLE_API_URL = mockServer.getBaseUrl();
     console.log(`[TEST] CLERKLY_GOOGLE_API_URL set to ${process.env.CLERKLY_GOOGLE_API_URL}`);

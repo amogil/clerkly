@@ -17,7 +17,7 @@ let mockOAuthServer: MockOAuthServer;
 const TEST_CLIENT_ID = 'test-client-id-12345'; // Use same as completeOAuthFlow default
 
 test.beforeEach(async () => {
-  mockOAuthServer = await createMockOAuthServer(3333);
+  mockOAuthServer = await createMockOAuthServer();
 
   // Launch Electron app with mock OAuth server
   context = await launchElectron(undefined, {

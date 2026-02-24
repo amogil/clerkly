@@ -33,7 +33,7 @@ test.describe('Complete OAuth Flow', () => {
   const TEST_CLIENT_ID = 'test-client-id-12345';
 
   test.beforeAll(async () => {
-    mockServer = await createMockOAuthServer(8889);
+    mockServer = await createMockOAuthServer();
   });
 
   test.afterAll(async () => {

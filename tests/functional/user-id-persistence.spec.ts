@@ -15,7 +15,7 @@ let mockServer: MockOAuthServer;
 let testDataPath: string;
 
 test.beforeAll(async () => {
-  mockServer = await createMockOAuthServer(8892);
+  mockServer = await createMockOAuthServer();
 });
 
 test.afterAll(async () => {
