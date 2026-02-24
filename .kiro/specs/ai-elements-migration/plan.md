@@ -144,11 +144,11 @@ messagesArea.evaluate(el => el.scrollHeight - el.scrollTop - el.clientHeight)
 - [x] **0.3** Изучить интерфейс `ChatTransport` из пакета `ai@5` — понять какие методы нужно реализовать (`sendMessages`, обработка UI message stream)
 - [x] **0.4** Изучить формат `UIMessage` из `@ai-sdk/react@5` — понять как маппить `MessageSnapshot` (kind: user/llm/error) в AI SDK формат, особенно reasoning parts
 - [x] **0.5** Изучить исходники AI Elements компонентов через registry API. **Решение:**
-  - `Conversation` — скопировать исходник напрямую (тонкая обёртка над `use-stick-to-bottom`, ~100 строк). Установить только `use-stick-to-bottom`.
+  - `Conversation` — установить через CLI (`npx ai-elements@latest add conversation`). Тонкая обёртка над `use-stick-to-bottom`.
+  - `Message` — установить через CLI (`npx ai-elements@latest add message`). Использует `streamdown` для markdown — это нормально, зависимость уже установлена.
+  - `Reasoning` — установить через CLI (`npx ai-elements@latest add reasoning`). Использует `streamdown` для markdown.
   - `PromptInput` — **пропустить** (зависит от `nanoid`, `Command`, `DropdownMenu`, `HoverCard`, `InputGroup`, `Select`, `Spinner` — избыточно). Сохранить `ChatInput` + `AutoExpandingTextarea` → переименовать в `AgentPromptInput`.
-  - `Message` — **пропустить** (зависит от `streamdown` и `@streamdown/*` плагинов — избыточно). Написать `AgentMessage` с нуля.
-  - `Reasoning` — скопировать исходник, заменить `<Streamdown>` на plain text рендеринг (убрать зависимость от `streamdown`).
-  - **Итог:** Устанавливается только `use-stick-to-bottom`. CLI не нужен.
+  - **Итог:** Устанавливать через CLI. Инструкция по установке — `.kiro/specs/agents/design.md` (секция "Установка и обновление AI Elements компонентов").
 - [x] **0.6** `AutoExpandingTextarea` уже поддерживает: `ref` через `useImperativeHandle` (focus/blur), `maxHeight = chatArea.offsetHeight * 0.5`, Enter/Shift+Enter, `data-testid="auto-expanding-textarea"`. Дополнительных изменений не требуется.
 - [x] **0.7** `Conversation` (`use-stick-to-bottom`): автоскролл при новых сообщениях — ✅ (StickToBottom с `initial="smooth"`), кнопка scroll-to-bottom — ✅ (`ConversationScrollButton` через `useStickToBottomContext`), поведение при смене `key` — стандартное React remount.
 - [x] **0.8** Изучить API `streamText` из `ai@5`. **Выводы:**
@@ -170,11 +170,11 @@ messagesArea.evaluate(el => el.scrollHeight - el.scrollTop - el.clientHeight)
 
 ### Фаза 1: Установка зависимостей
 
-- [ ] **1.1** Апгрейд React: `npm install react@19 react-dom@19 @types/react@19 @types/react-dom@19`
-- [ ] **1.2** Установить AI SDK: `npm install ai@5 @ai-sdk/react@5 @ai-sdk/openai @ai-sdk/anthropic @ai-sdk/google`
-- [ ] **1.3** Установить AI Elements компоненты: `npx ai-elements@latest add conversation message prompt-input reasoning`
-- [ ] **1.4** Проверить что сгенерированные компоненты появились в `src/renderer/components/ai-elements/`
-- [ ] **1.5** Запустить `npm run validate` — убедиться что установка не сломала сборку и тесты
+- [x] **1.1** Апгрейд React: `npm install react@19 react-dom@19 @types/react@19 @types/react-dom@19`
+- [x] **1.2** Установить AI SDK: `npm install ai@5 @ai-sdk/react@5 @ai-sdk/openai @ai-sdk/anthropic @ai-sdk/google`
+- [x] **1.3** Установить AI Elements компоненты: `yes | npx ai-elements@latest add conversation message reasoning` (PromptInput пропущен — см. 0.5)
+- [x] **1.4** Компоненты появились в `src/renderer/components/ai-elements/`: `conversation.tsx`, `message.tsx`, `reasoning.tsx`, `shimmer.tsx`
+- [x] **1.5** `npm run typecheck && npm run build:renderer` — проходят без ошибок. Unit-тесты (1419) проходят.
 
 ---
 

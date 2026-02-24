@@ -2452,3 +2452,46 @@ interface UseAgentChatResult {
 - `loadMore()` вызывает `messages:list-paginated` с `beforeId = oldestIdRef.current`, prepend-ит старые сообщения
 - При скролле к верхней границе `Conversation` вызывает `loadMore()`
 - Позиция скролла сохраняется при подгрузке (не прыгает вверх)
+
+## Установка и обновление AI Elements компонентов
+
+AI Elements использует **shadcn-подход**: CLI копирует исходники компонентов прямо в проект (`src/renderer/components/ai-elements/`). Нет npm-пакета для импорта — код живёт в репозитории и полностью кастомизируем.
+
+Документация: https://elements.ai-sdk.dev
+
+### Установленные компоненты
+
+| Файл | Компоненты |
+|------|-----------|
+| `src/renderer/components/ai-elements/conversation.tsx` | `Conversation`, `ConversationContent`, `ConversationScrollButton`, `ConversationEmptyState`, `ConversationDownload` |
+| `src/renderer/components/ai-elements/message.tsx` | `Message`, `MessageContent`, `MessageActions`, `MessageAction`, `MessageBranch`, `MessageResponse`, `MessageToolbar` |
+| `src/renderer/components/ai-elements/reasoning.tsx` | `Reasoning`, `ReasoningTrigger`, `ReasoningContent` |
+| `src/renderer/components/ai-elements/shimmer.tsx` | `Shimmer` |
+
+### Установка нового / обновление существующего компонента
+
+```bash
+# Установить или обновить (yes на все вопросы)
+yes | npx ai-elements@latest add <component-name>
+
+# Проверить
+npm run typecheck
+```
+
+Файлы попадают сразу в `src/renderer/components/ai-elements/` через симлинк `src/components → src/renderer/components`.
+
+> Симлинк создан один раз: `ln -s renderer/components src/components` и закоммичен в репозиторий.
+
+### Почему импорты работают без правок
+
+`components.json` настроен с `"utils": "@/lib/utils"`. В проекте существует `src/renderer/lib/utils.ts` который реэкспортирует `cn`. Поэтому CLI генерирует корректные импорты автоматически — ручных правок не требуется.
+
+Если CLI перезаписал ui-компоненты и они сломались — проверить что `src/renderer/lib/utils.ts` существует.
+
+### Зависимости AI Elements
+
+Все уже установлены в проекте:
+- `use-stick-to-bottom` — автоскролл в `Conversation`
+- `streamdown` + `@streamdown/*` — markdown рендеринг в `MessageResponse` и `ReasoningContent`
+- `@radix-ui/react-use-controllable-state` — состояние в `Reasoning`
+- shadcn ui: `button`, `tooltip`, `collapsible`, `separator`, `button-group`

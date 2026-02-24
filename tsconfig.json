@@ -15,7 +15,10 @@
     "declarationMap": true,
     "sourceMap": true,
     "moduleResolution": "node",
-    "types": ["node", "jest"]
+    "types": ["node", "jest"],
+    "paths": {
+      "@/*": ["./src/renderer/*"]
+    }
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist", "tests", "figma"]
