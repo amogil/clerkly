@@ -1330,6 +1330,8 @@ useEffect(() => {
 
 #### Автоскролл к последнему сообщению
 
+> **⚠️ УСТАРЕЛО — будет заменено в Фазе 9 (AI Elements миграция).** После миграции автоскролл управляется компонентом `Conversation` (`use-stick-to-bottom`). Актуальная архитектура — в разделе "AI Elements интеграция (Фаза 9)".
+
 **Requirements:** agents.4.13
 
 При появлении новых сообщений чат автоматически прокручивается вниз, если пользователь находится в нижней трети чата.
@@ -1521,6 +1523,8 @@ const handleScroll = () => {
 - Обновляется существующее сообщение (без изменения длины массива) → автоскролл НЕ срабатывает
 
 #### Сохранение позиции скролла
+
+> **⚠️ УСТАРЕЛО — будет заменено в Фазе 9 (AI Elements миграция).** После миграции механизм сохранения позиции переработан под `Conversation`. Актуальная архитектура — в разделе "AI Elements интеграция (Фаза 9)".
 
 **Requirements:** agents.4.14
 
@@ -1715,6 +1719,8 @@ function EmptyStatePlaceholder({ onPromptClick }: EmptyStatePlaceholderProps) {
 - Выравнивание по нижнему краю области сообщений (justify-end)
 
 ### Стилизация Сообщений
+
+> **⚠️ УСТАРЕЛО — будет заменено в Фазе 9 (AI Elements миграция).** `MessageBubble` заменяется компонентом `AgentMessage`. Актуальная архитектура — в разделе "AI Elements интеграция (Фаза 9)".
 
 **Сообщения пользователя:**
 ```tsx
@@ -2341,6 +2347,7 @@ await window.locator(`[data-testid="agent-icon-${firstAgentId}"]`).click();
 | agents.10 | ✓ | - | ✓ |
 | agents.11 | ✓ | - | ✓ |
 | agents.12 | ✓ | - | ✓ |
+| agents.13 (lazy loading) | - | - | - |
 | user-data-isolation.6 | ✓ | - | ✓ |
 
 ## Зависимости
@@ -2350,7 +2357,10 @@ await window.locator(`[data-testid="agent-icon-${firstAgentId}"]`).click();
 ```json
 {
   "lucide-react": "^0.300.0",
-  "react-markdown": "^9.0.0"
+  "react-markdown": "^10.0.0",
+  "ai": "^5.0.0",
+  "@ai-sdk/react": "^3.0.0",
+  "use-stick-to-bottom": "latest"
 }
 ```
 
@@ -2359,6 +2369,10 @@ await window.locator(`[data-testid="agent-icon-${firstAgentId}"]`).click();
 - `Logo` — компонент логотипа агента
 - `MainEventBus` — шина событий main процесса
 - `useEventSubscription` — React hook для подписки на события
+- `IPCChatTransport` — кастомный ChatTransport для AI SDK (Фаза 9)
+- `useAgentChat` — хук управления сообщениями, заменяет `useMessages` (Фаза 9)
+- `AgentMessage` — компонент сообщения, заменяет `MessageBubble` (Фаза 9)
+- `AgentPromptInput` — компонент ввода, заменяет `ChatInput` + `AutoExpandingTextarea` (Фаза 9)
 
 ## Производительность
 
