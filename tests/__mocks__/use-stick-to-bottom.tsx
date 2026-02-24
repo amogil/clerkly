@@ -12,9 +12,7 @@ const StickToBottomContext = createContext<StickToBottomContextValue>({
 
 export function StickToBottom({ children }: { children: React.ReactNode }) {
   return (
-    <StickToBottomContext.Provider
-      value={{ isAtBottom: true, scrollToBottom: () => undefined }}
-    >
+    <StickToBottomContext.Provider value={{ isAtBottom: true, scrollToBottom: () => undefined }}>
       <div data-testid="stick-to-bottom-mock">{children}</div>
     </StickToBottomContext.Provider>
   );

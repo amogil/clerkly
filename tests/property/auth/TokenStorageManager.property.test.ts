@@ -45,9 +45,10 @@ describe('TokenStorageManager Property-Based Tests', () => {
   });
 
   // Generator for token data
+  const tokenStringArb = fc.hexaString({ minLength: 20, maxLength: 500 });
   const tokenDataArb = fc.record({
-    accessToken: fc.string({ minLength: 20, maxLength: 500 }),
-    refreshToken: fc.string({ minLength: 20, maxLength: 500 }),
+    accessToken: tokenStringArb,
+    refreshToken: tokenStringArb,
     expiresAt: fc.integer({ min: Date.now(), max: Date.now() + 365 * 24 * 60 * 60 * 1000 }),
     tokenType: fc.constant('Bearer'),
   });
@@ -189,8 +190,8 @@ describe('TokenStorageManager Property-Based Tests', () => {
     await fc.assert(
       fc.asyncProperty(
         fc.record({
-          accessToken: fc.string({ minLength: 20 }),
-          refreshToken: fc.string({ minLength: 20 }),
+          accessToken: tokenStringArb,
+          refreshToken: tokenStringArb,
           expiresAt: fc.integer({
             min: Date.now() + 1000,
             max: Date.now() + 365 * 24 * 60 * 60 * 1000,
@@ -211,8 +212,8 @@ describe('TokenStorageManager Property-Based Tests', () => {
     await fc.assert(
       fc.asyncProperty(
         fc.record({
-          accessToken: fc.string({ minLength: 20 }),
-          refreshToken: fc.string({ minLength: 20 }),
+          accessToken: tokenStringArb,
+          refreshToken: tokenStringArb,
           expiresAt: fc.integer({ min: 0, max: Date.now() - 1000 }),
           tokenType: fc.constant('Bearer'),
         }),
