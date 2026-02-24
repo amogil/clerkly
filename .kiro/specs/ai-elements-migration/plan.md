@@ -668,13 +668,13 @@ interface UseAgentChatResult {
 
 ### Фаза 11: Удаление старых компонентов
 
-- [ ] **11.1** Удалить `src/renderer/components/agents/MessageBubble.tsx`
-- [ ] **11.2** Удалить `src/renderer/components/agents/ChatInput.tsx`
-- [ ] **11.3** Удалить `src/renderer/components/agents/AutoExpandingTextarea.tsx`
-- [ ] **11.4** НЕ удалять `src/renderer/components/agents/RateLimitBanner.tsx` — компонент сохраняется
-- [ ] **11.5** Удалить `src/renderer/hooks/useMessages.ts`
-- [ ] **11.6** Удалить unit-тесты старых компонентов
-- [ ] **11.7** Запустить `npm run validate` — убедиться что покрытие >= 85%
+- [x] **11.1** Удалить `src/renderer/components/agents/MessageBubble.tsx`
+- [x] **11.2** Удалить `src/renderer/components/agents/ChatInput.tsx`
+- [x] **11.3** Удалить `src/renderer/components/agents/AutoExpandingTextarea.tsx`
+- [x] **11.4** НЕ удалять `src/renderer/components/agents/RateLimitBanner.tsx` — компонент сохраняется
+- [x] **11.5** Удалить `src/renderer/hooks/useMessages.ts`
+- [x] **11.6** Удалить unit-тесты старых компонентов
+- [x] **11.7** Запустить `npm run validate` — убедиться что покрытие >= 85%
 
 ---
 
