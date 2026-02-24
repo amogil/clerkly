@@ -500,6 +500,63 @@
 
 ---
 
+### Фаза 9: AI Elements — Загрузка всех чатов при старте (agents.13)
+
+**Зависимости:** Фаза 5.1 ✅, ai-elements-migration план (Фазы 2–8)
+
+**Описание:** Реализация новой архитектуры чатов — все `AgentChat` монтируются при старте, переключение через CSS show/hide, лоадер пока все чаты не загружены.
+
+| # | Задача | Статус | Оценка | Требования |
+|---|--------|--------|--------|------------|
+| 9.1 | Компонент `AgentChat` | ❌ | 0.5 дня | agents.13.3, agents.13.5 |
+| 9.2 | Лоадер при старте | ❌ | 0.25 дня | agents.13.1, agents.13.2 |
+| 9.3 | CSS show/hide при переключении | ❌ | 0.25 дня | agents.13.4, agents.13.5 |
+| 9.4 | Монтирование нового агента | ❌ | 0.25 дня | agents.13.7 |
+| 9.5 | Ленивая подгрузка при скролле вверх | ❌ | 0.5 дня | agents.13.9 |
+| 9.6 | Тесты | ❌ | 0.5 дня | agents.13 |
+
+#### 9.1 Компонент `AgentChat`
+- **Файл:** `src/renderer/components/agents/AgentChat.tsx`
+- **Описание:** Независимый компонент для каждого агента. Монтируется при старте, остаётся смонтированным всё время.
+- **Использует:** `useAgentChat(agentId)` — загружает последние 50 сообщений при mount
+- **Содержит:** `Conversation` + `ConversationContent` + список `AgentMessage` + `AgentPromptInput`
+- **Экспортирует:** `isLoading` для лоадера в `agents.tsx`
+
+#### 9.2 Лоадер при старте
+- **Файл:** `src/renderer/components/agents.tsx`
+- **Логика:** `agents.tsx` рендерит все `AgentChat` компоненты сразу, но показывает лоадер пока хотя бы один `isLoading === true`
+- **Реализация:** `const allLoaded = agentChatStates.every(s => !s.isLoading)` — показывать основной интерфейс только когда `allLoaded === true`
+
+#### 9.3 CSS show/hide при переключении
+- **Файл:** `src/renderer/components/agents.tsx`
+- **Логика:** Каждый `AgentChat` рендерится с `className={activeAgentId === agent.agentId ? '' : 'hidden'}` (или `display: none`)
+- **Результат:** Переключение агента = мгновенно, без ремонта, позиция скролла сохраняется
+
+#### 9.4 Монтирование нового агента
+- **Файл:** `src/renderer/components/agents.tsx`
+- **Логика:** При получении события `AGENT_CREATED` — новый `AgentChat` добавляется в список и монтируется немедленно
+
+#### 9.5 Ленивая подгрузка при скролле вверх
+- **Файл:** `src/renderer/components/agents/AgentChat.tsx`
+- **Логика:** `Conversation` при скролле к верхней границе вызывает `loadMore()` из `useAgentChat`
+- **Результат:** Старые сообщения подгружаются порциями по 50, позиция скролла не прыгает
+
+#### 9.6 Тесты
+- **Модульные:** `tests/unit/components/agents/AgentChat.test.tsx`
+  - Рендерится с лоадером пока `isLoading === true`
+  - Скрывается через CSS когда не активен
+  - Показывается без ремонта при активации
+- **Функциональные:** `tests/functional/agent-switching.spec.ts`
+  - "should preserve scroll position when switching agents"
+  - "should show correct chat immediately on agent click"
+
+**После завершения Фазы 9:**
+1. `npm run validate`
+2. Подтверждение пользователя
+3. `git commit -m "feat(agents): implement all-chats-on-startup architecture"`
+
+---
+
 ## Критерии Завершения
 
 Работа считается завершенной когда:

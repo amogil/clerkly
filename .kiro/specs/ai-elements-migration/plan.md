@@ -14,7 +14,7 @@
 |--------|-------|
 | `MessageBubble.tsx` | `Message` + `MessageContent` + `MessageResponse` + `Reasoning` (AI Elements) |
 | `ChatInput.tsx` + `AutoExpandingTextarea.tsx` | `PromptInput` + `PromptInputTextarea` + `PromptInputButton` (AI Elements) |
-| `ScrollArea` + ручной скролл-менеджмент | `Conversation` + `ConversationContent` + `ConversationScrollButton` (AI Elements) |
+| `ScrollArea` + ручной скролл-менеджмент | `AgentChat` (per-agent компонент) + `Conversation` + `ConversationContent` + `ConversationScrollButton` (AI Elements). CSS show/hide вместо ремонта при смене агента |
 | `useMessages` hook | `useAgentChat` (обёртка над `useChat` с кастомным transport) |
 | `AnthropicProvider.ts` / `OpenAIProvider.ts` / `GoogleProvider.ts` | нативный HTTP+SSE для всех трёх провайдеров (chat() реализован, интерфейс ILLMProvider сохранён) |
 
@@ -258,7 +258,7 @@ interface UIMessage {
 - Отправка сообщения: `window.api.messages.create(agentId, 'user', payload)` где payload = `{ data: { text, reply_to_message_id: null } }`
 - `IPCChatTransport` должен конвертировать эти IPC-события в `ReadableStream<UIMessageStreamPart>` для `useChat`
 
-- [x] **2.1** Создать `src/renderer/lib/IPCChatTransport.ts`
+- [x] **2.1** Создать `src/renderer/lib/IPCChatTransport.ts` (`tests/unit/renderer/IPCChatTransport.test.ts`)
 - [x] **2.2** Реализовать интерфейс `ChatTransport`:
   - Метод `sendMessages({ messages, abortSignal })` — вызывает `window.api.messages.create(agentId, 'user', payload)` через IPC
   - Возвращает `ReadableStream<UIMessageStreamPart>` — поток обновлений для `useChat`
@@ -268,13 +268,8 @@ interface UIMessage {
   - `MESSAGE_UPDATED` с `action` → `{ type: 'text-delta', delta: action.content }` + `{ type: 'finish' }`
   - `MESSAGE_CREATED` (kind: error) → `{ type: 'error', error }`
 - [x] **2.4** Реализовать отмену через `abortSignal` — при abort отписаться от событий и закрыть stream
-- [x] **2.5** Реализовать сценарий прерывания при новом сообщении (llm-integration.8):
-  - КОГДА пользователь отправляет новое сообщение пока агент стримит, `useChat` вызывает `stop()` (abort текущего stream) и затем `sendMessages()` с новым сообщением
-  - `IPCChatTransport.sendMessages()` при получении `abortSignal` уже в aborted состоянии — должен корректно обработать (не подписываться на события, вернуть пустой/закрытый stream)
-  - Main process сам обрабатывает прерывание: `MainPipeline` отменяет текущий запрос, помечает llm `interrupted: true`, создаёт новый user message и запускает новый `run()`
-  - `IPCChatTransport` просто слушает события — прерванные сообщения придут как `MESSAGE_UPDATED` с `hidden: true` и будут отфильтрованы
-  - **Ключевой момент:** Проверить как `useChat` обрабатывает ситуацию когда `stop()` вызван и сразу после — новый `sendMessages()`. Если `useChat` не поддерживает это нативно — может потребоваться `key` remount или `setMessages()` для очистки состояния
-- [x] **2.6** Написать unit-тесты для `IPCChatTransport`
+- [x] **2.5** Реализовать сценарий прерывания при новом сообщении (llm-integration.8)
+- [x] **2.6** Написать unit-тесты для `IPCChatTransport` (`tests/unit/renderer/IPCChatTransport.test.ts`)
 - [x] **2.7** Обновить `design.md` — добавить детальную схему `IPCChatTransport`
 
 ---
@@ -291,9 +286,7 @@ interface UIMessage {
 
 #### Ленивая загрузка истории
 
-**Проблема:** Текущий `useMessages` загружает все сообщения агента одним запросом. При длинной истории (100+ сообщений) это замедляет переключение между агентами.
-
-**Решение:** Пагинация с загрузкой последних N сообщений + подгрузка при скролле вверх.
+**Архитектура:** Все `AgentChat` монтируются при старте приложения. Каждый при mount загружает последние 50 сообщений через `messages:list-paginated`. Остальные сообщения подгружаются лениво при скролле вверх.
 
 **Детали реализации:**
 
@@ -314,32 +307,19 @@ interface UIMessage {
    - Передаёт их как `initialMessages` в `useChat` (через `toUIMessages()`)
    - Хранит `hasMore` флаг и `oldestMessageId` для пагинации
    - Экспортирует `loadMore()` функцию для подгрузки при скролле вверх
+   - Экспортирует `isLoading` — `true` пока идёт загрузка начального чанка
 
-4. **В `Conversation`:**
+4. **В `AgentChat`:**
    - При скролле к верхней границе вызывает `loadMore()`
    - `loadMore()` загружает следующие 50 сообщений через `messages:list-paginated` с `beforeId = oldestMessageId`
    - Новые (старые) сообщения prepend-ятся в начало списка
    - Позиция скролла сохраняется (не прыгает вверх при подгрузке)
 
-- [x] **3.1** Создать `src/renderer/lib/messageMapper.ts` с функциями:
-  - `toUIMessages(messages: MessageSnapshot[]): UIMessage[]`
-  - `toUIMessage(msg: MessageSnapshot): UIMessage | null` (null для hidden)
-- [x] **3.2** Реализовать маппинг типов:
-  - `kind: 'user'` → `{ role: 'user', parts: [{ type: 'text', text: data.text }] }`
-  - `kind: 'llm'` с `action` → `{ role: 'assistant', parts: [{ type: 'reasoning', reasoning: reasoning.text }, { type: 'text', text: action.content }] }`
-  - `kind: 'llm'` без `action` (стриминг) → `{ role: 'assistant', parts: [] }` (пустой, будет заполняться через stream)
-  - `kind: 'error'` → `{ role: 'assistant', parts: [{ type: 'text', text: error.message }], metadata: { isError: true, errorMessage: error.message, actionLink: error.action_link } }`
-  - Фильтрация: `hidden === true` → вернуть null (не включать)
-- [x] **3.3** Добавить IPC endpoint `messages:list-paginated` в main process:
-  - `MessagesRepository.listByAgentPaginated(agentId, limit, beforeId?)`
-  - `MessageManager.listPaginated(agentId, limit, beforeId?)`
-  - `AgentIPCHandlers` — зарегистрировать `messages:list-paginated`
-  - Preload API — добавить `messages.listPaginated(agentId, limit, beforeId?)`
-- [x] **3.4** Написать unit-тесты для `messageMapper`
-- [x] **3.5** Написать property-based тесты для `messageMapper`:
-  - инвариант: количество UIMessages ≤ количества MessageSnapshots
-  - инвариант: user messages всегда role: 'user'
-  - инвариант: hidden сообщения никогда не попадают в результат
+- [x] **3.1** Создать `src/renderer/lib/messageMapper.ts` (`tests/unit/renderer/messageMapper.test.ts`)
+- [x] **3.2** Реализовать маппинг типов
+- [x] **3.3** Добавить IPC endpoint `messages:list-paginated` в main process
+- [x] **3.4** Написать unit-тесты для `messageMapper` (`tests/unit/renderer/messageMapper.test.ts`)
+- [x] **3.5** Написать property-based тесты для `messageMapper` (`tests/property/renderer/messageMapper.property.test.ts`)
 - [x] **3.6** Написать unit-тесты для `listByAgentPaginated`
 - [x] **3.7** Написать unit-тесты для `MessageManager.listPaginated` и `AgentIPCHandlers` (handler `messages:list-paginated`)
 - [ ] **3.8** Написать функциональный тест для ленивой загрузки:
@@ -360,16 +340,18 @@ interface UIMessage {
 - Новый `useAgentChat(agentId)` должен возвращать совместимый интерфейс, но использовать `useChat` внутри.
 - `useChat` из `@ai-sdk/react@5` принимает `{ id, transport, initialMessages }`.
 - `id` = agentId — `useChat` автоматически изолирует состояние по `id`.
+- Хук используется внутри `AgentChat` компонента — каждый `AgentChat` монтируется при старте и вызывает `useAgentChat(agentId)`.
+- `isLoading = true` пока идёт загрузка начального чанка (50 сообщений). `agents.tsx` показывает лоадер пока хотя бы один агент имеет `isLoading === true`.
 - `initialMessages` — загружаются асинхронно через `messages:list-paginated`, поэтому нужен двухфазный mount:
   1. Сначала `useChat` создаётся с пустым `initialMessages`
-  2. После загрузки истории — вызвать `setMessages(loaded)` (если `useChat` поддерживает) или пересоздать через `key`
+  2. После загрузки начального чанка — вызвать `setMessages(loaded)` (если `useChat` поддерживает) или пересоздать через `key`
 
 **Интерфейс:**
 ```typescript
 interface UseAgentChatResult {
   messages: UIMessage[];           // AI SDK формат
   rawMessages: MessageSnapshot[];  // Оригинальный формат (для data-testid, metadata)
-  isLoading: boolean;
+  isLoading: boolean;              // true пока загружается начальный чанк (50 сообщений)
   isStreaming: boolean;
   sendMessage: (text: string) => Promise<boolean>;
   loadMore: () => Promise<void>;   // Ленивая подгрузка при скролле вверх
@@ -393,11 +375,11 @@ interface UseAgentChatResult {
 
 - [x] **4.1** Создать `src/renderer/hooks/useAgentChat.ts`
 - [x] **4.2** Реализовать хук с `useChat` + `IPCChatTransport`
-- [x] **4.3** Реализовать загрузку начальной истории (последние 50 сообщений) через `messages:list-paginated` + `toUIMessages()`
+- [x] **4.3** Реализовать загрузку начального чанка (последние 50 сообщений) через `messages:list-paginated` + `toUIMessages()`
 - [x] **4.4** Реализовать `loadMore()` — подгрузка старых сообщений при скролле вверх
 - [x] **4.5** Реализовать синхронизацию `rawMessages` с `UIMessage[]` (для доступа к kind, metadata)
-- [x] **4.6** Реализовать обработку `MESSAGE_UPDATED` с `hidden: true` — удалять сообщение из `rawMessages` и вызывать `setMessages()` для `useChat` (нужно для Cancel rate limit и interrupted messages)
-- [x] **4.7** Написать unit-тесты для `useAgentChat`
+- [x] **4.6** Реализовать обработку `MESSAGE_UPDATED` с `hidden: true`
+- [x] **4.7** Написать unit-тесты для `useAgentChat` (`tests/unit/hooks/useAgentChat.test.ts`)
 - [x] **4.8** Обновить `design.md` — добавить описание `useAgentChat`
 
 ---
@@ -420,7 +402,7 @@ interface UseAgentChatResult {
 - useEffect для сброса `restoredAgents`
 - CSS `.scrollbar-hidden` из `src/renderer/styles/index.css`
 
-**Контекст:** `Conversation` из AI Elements управляет скроллом автоматически (автоскролл при новых сообщениях, кнопка "scroll to bottom"). Но сохранение позиции при смене агента — скорее всего нужно реализовать самостоятельно поверх `Conversation`.
+**Контекст:** `Conversation` из AI Elements управляет скроллом автоматически (автоскролл при новых сообщениях, кнопка "scroll to bottom"). Каждый `AgentChat` имеет свой `Conversation` — он остаётся смонтированным всё время, поэтому позиция скролла сохраняется автоматически без дополнительной логики.
 
 **AgentWelcome внутри Conversation:**
 - Сейчас `AgentWelcome` рендерится внутри `ScrollArea` с выравниванием `min-h-full flex flex-col justify-end` (agents.4.20).
@@ -429,13 +411,16 @@ interface UseAgentChatResult {
 - Если `Conversation` ожидает только `Message` компоненты — `AgentWelcome` может потребовать обёртки или рендера вне `ConversationContent`.
 
 - [x] **5.1** Изучить API `Conversation`, `ConversationContent`, `ConversationScrollButton`
-- [x] **5.2** Интегрировать `Conversation` в `agents.tsx` вместо `ScrollArea`
-- [x] **5.3** Добавить `data-testid="messages-area"` на контейнер сообщений (для функциональных тестов)
-- [x] **5.4** Убедиться что `AgentWelcome` корректно рендерится внутри `Conversation` с выравниванием `justify-end` (agents.4.20). Если `Conversation` не поддерживает произвольный контент — рендерить `AgentWelcome` вне `ConversationContent` (условно: показывать вместо `Conversation` когда нет сообщений)
-- [x] **5.5** Реализовать сохранение/восстановление позиции скролла при смене агента (если `Conversation` не поддерживает из коробки). `key={currentAgent.id}` на `Conversation` — remount при смене агента, скролл к низу автоматически
-- [x] **5.6** Реализовать подгрузку при скролле вверх — вызов `loadMore()` из `useAgentChat` при достижении верхней границы
-- [x] **5.7** Написать unit-тесты
-- [x] **5.8** Обновить `design.md`
+- [ ] **5.2** Создать `AgentChat` компонент (`src/renderer/components/agents/AgentChat.tsx`):
+  - Использует `useAgentChat(agentId)` для загрузки сообщений
+  - Содержит `Conversation` + `ConversationContent` + список `AgentMessage` + `AgentPromptInput`
+  - Экспортирует `isLoading` через props callback или через ref
+- [ ] **5.3** Добавить `data-testid="messages-area"` на контейнер сообщений (для функциональных тестов)
+- [ ] **5.4** Убедиться что `AgentWelcome` корректно рендерится внутри `Conversation` с выравниванием `justify-end` (agents.4.20). Если `Conversation` не поддерживает произвольный контент — рендерить `AgentWelcome` вне `ConversationContent` (условно: показывать вместо `Conversation` когда нет сообщений)
+- [ ] **5.5** В `agents.tsx` рендерить все `AgentChat` одновременно, скрывать неактивные через CSS `hidden` (или `display: none`). НЕ использовать `key={currentAgent.id}` — это вызовет ремонт при смене агента.
+- [ ] **5.6** Реализовать подгрузку при скролле вверх — вызов `loadMore()` из `useAgentChat` при достижении верхней границы `Conversation`
+- [ ] **5.7** Написать unit-тесты
+- [ ] **5.8** Обновить `design.md`
 
 ---
 
@@ -541,19 +526,9 @@ interface UseAgentChatResult {
 - `action_link` рендерится как кнопка с `onNavigate` callback
 - Сохраняют `data-testid="message-error"` и `data-testid="message-error-action-link"`
 
-- [x] **6.1** Создать `src/renderer/components/agents/AgentMessage.tsx` с использованием AI Elements `Message`:
-  - User: `<Message>` с кастомными стилями `rounded-2xl bg-secondary/70 border border-border`; `data-testid="message-user"`
-  - LLM: `<Message>` + `<Reasoning>` + action content; `data-testid="message-llm"`, `data-testid="message-llm-action"`, `data-testid="message-llm-reasoning"`
-  - Error: `<Message>` с красными стилями `border-red-500/30 bg-red-500/10 text-red-500`; `data-testid="message-error"`, `data-testid="message-error-action-link"`
-  - Loading: три анимированных точки (bounce) когда llm без action
-  - Avatar: `<Logo>` перед первым llm/error в последовательности
-- [x] **6.2** Обновить `RateLimitBanner` — сохранить как отдельный компонент (не AgentMessage):
-  - Сохранить жёлтый стиль: `bg-yellow-50 border-yellow-200 text-yellow-800`
-  - Сохранить countdown логику (useState + setTimeout)
-  - Сохранить IPC вызовы: `window.api.messages.retryLast()`, `window.api.messages.cancelRetry()`
-  - Сохранить `data-testid="rate-limit-banner"` и `data-testid="rate-limit-cancel"`
-  - Убедиться что компонент корректно рендерится внутри `Conversation`
-- [x] **6.3** Написать unit-тесты для `AgentMessage` (все виды: user, llm, error)
+- [x] **6.1** Создать `src/renderer/components/agents/AgentMessage.tsx` (`tests/unit/components/agents/AgentMessage.test.tsx`)
+- [x] **6.2** Обновить `RateLimitBanner` — сохранить как отдельный компонент
+- [x] **6.3** Написать unit-тесты для `AgentMessage` (`tests/unit/components/agents/AgentMessage.test.tsx`)
 - [x] **6.4** Обновить `design.md`
 
 ---
@@ -562,10 +537,7 @@ interface UseAgentChatResult {
 
 **Контекст:** Текущий reasoning рендерится как простой `<div>` с `text-xs text-muted-foreground italic`. AI Elements `Reasoning` компонент добавляет collapsible UI (кнопка "Show thinking" / "Hide thinking").
 
-- [x] **7.1** Интегрировать `Reasoning` из AI Elements в `AgentMessage` для llm сообщений:
-  - `<ReasoningTrigger>` — кнопка toggle
-  - `<ReasoningContent>` — текст reasoning; добавить `data-testid="message-llm-reasoning"`
-  - Стриминг reasoning работает через `useChat` + `IPCChatTransport` автоматически
+- [x] **7.1** Интегрировать `Reasoning` из AI Elements в `AgentMessage` для llm сообщений
 - [x] **7.2** Написать unit-тесты
 - [x] **7.3** Обновить `design.md`
 
@@ -605,14 +577,8 @@ interface UseAgentChatResult {
 - Enter без Shift → submit, Shift+Enter → новая строка
 - `ref` с `focus()` / `blur()` через `useImperativeHandle`
 
-- [x] **8.1** Создать `src/renderer/components/agents/AgentPromptInput.tsx` с AI Elements:
-  - `<PromptInput>` контейнер
-  - `<PromptInputTextarea>` — добавить `data-testid="auto-expanding-textarea"`, placeholder "Ask, reply, or give command..."
-  - `<PromptInputButton>` — иконка Send, disabled при пустом поле
-  - Максимальная высота 50% области чата (agents.4.6)
-  - Автофокус при смене агента через ref (agents.4.7.1)
-  - Сохранить подсказку "Press Enter to send, Shift+Enter for new line"
-- [x] **8.2** Написать unit-тесты
+- [x] **8.1** Создать `src/renderer/components/agents/AgentPromptInput.tsx` (`tests/unit/components/agents/AgentPromptInput.test.tsx`)
+- [x] **8.2** Написать unit-тесты (`tests/unit/components/agents/AgentPromptInput.test.tsx`)
 - [x] **8.3** Обновить `design.md`
 
 ---
@@ -642,18 +608,20 @@ interface UseAgentChatResult {
 
 ### Фаза 10: Интеграция в agents.tsx
 
-- [x] **10.1** Заменить `useMessages` на `useAgentChat`
-- [x] **10.2** Заменить `ScrollArea` блок на `Conversation` + `ConversationContent` + `ConversationScrollButton`
-- [x] **10.3** Заменить `MessageBubble` на `AgentMessage` в списке сообщений. Сохранить `motion.div` обёртку вокруг каждого `AgentMessage` для анимации появления (agents.4.22: fade-in + slide-up). Убедиться что `motion.div` не конфликтует с внутренней структурой `Message` из AI Elements и что `Conversation` корректно обрабатывает анимированные дочерние элементы
-- [x] **10.4** Заменить `ChatInput` на `AgentPromptInput`
-- [x] **10.5** Перенести `RateLimitBanner` внутрь `Conversation` как специальный элемент (НЕ как `AgentMessage`). Подписка на `AGENT_RATE_LIMIT` остаётся в `agents.tsx` — `rateLimitBanner` state управляет показом баннера. Баннер рендерится внутри `Conversation` после списка сообщений (перед `ConversationScrollButton`)
-- [x] **10.6** Убрать импорты: `ScrollArea`, `ChatInput`, `MessageBubble`, `AutoExpandingTextareaHandle`
-- [x] **10.7** Убрать весь ручной скролл-менеджмент (refs, effects, handlers — см. список в Фазе 5)
-- [x] **10.8** Убрать `scrollbarHidden` state и CSS `.scrollbar-hidden` из `src/renderer/styles/index.css`
-- [x] **10.9** Убрать `viewportCallbackRef` и `resizeObserverRef`
-- [x] **10.10** Сохранить `AgentWelcome` без изменений — убедиться что он корректно рендерится внутри `Conversation` (или вместо `Conversation` когда нет сообщений, в зависимости от результатов Фазы 5.4)
-- [x] **10.11** Сохранить `AgentHeader` без изменений — включая все анимации, список агентов, кнопки
-- [ ] **10.12** Обновить функциональные тесты скролла:
+- [ ] **10.1** Заменить `useMessages` на `useAgentChat` (теперь используется внутри `AgentChat`) — `useMessages.ts` уже удалён, но интеграция не завершена
+- [ ] **10.2** Создать `AgentChat` компонент — содержит `Conversation` + `ConversationContent` + `ConversationScrollButton` + список `AgentMessage` + `AgentPromptInput` + `RateLimitBanner`
+- [ ] **10.3** В `agents.tsx` рендерить все `AgentChat` одновременно (по одному на каждого агента из `agents` массива). Скрывать неактивные через CSS `className={isActive ? '' : 'hidden'}`. НЕ использовать `key={currentAgent.id}` — это вызовет ремонт.
+- [ ] **10.4** Добавить лоадер при старте: показывать пока хотя бы один `AgentChat` имеет `isLoading === true`. Реализовать через callback/ref из `AgentChat` в `agents.tsx`.
+- [ ] **10.5** Заменить `MessageBubble` на `AgentMessage` в `AgentChat`. Сохранить `motion.div` обёртку вокруг каждого `AgentMessage` для анимации появления (agents.4.22: fade-in + slide-up). Убедиться что `motion.div` не конфликтует с внутренней структурой `Message` из AI Elements и что `Conversation` корректно обрабатывает анимированные дочерние элементы
+- [ ] **10.6** Заменить `ChatInput` на `AgentPromptInput` в `AgentChat`
+- [ ] **10.7** Перенести `RateLimitBanner` внутрь `AgentChat` / `Conversation` как специальный элемент (НЕ как `AgentMessage`). Подписка на `AGENT_RATE_LIMIT` остаётся в `agents.tsx` — `rateLimitBanner` state передаётся в `AgentChat` через props. Баннер рендерится внутри `Conversation` после списка сообщений (перед `ConversationScrollButton`)
+- [ ] **10.8** Убрать импорты: `ScrollArea`, `ChatInput`, `MessageBubble`, `AutoExpandingTextareaHandle`
+- [ ] **10.9** Убрать весь ручной скролл-менеджмент из `agents.tsx` (refs, effects, handlers — см. список в Фазе 5)
+- [ ] **10.10** Убрать `scrollbarHidden` state и CSS `.scrollbar-hidden` из `src/renderer/styles/index.css`
+- [ ] **10.11** Убрать `viewportCallbackRef` и `resizeObserverRef`
+- [ ] **10.12** Сохранить `AgentWelcome` без изменений — убедиться что он корректно рендерится внутри `AgentChat` / `Conversation` (или вместо `Conversation` когда нет сообщений, в зависимости от результатов Фазы 5.4)
+- [ ] **10.13** Сохранить `AgentHeader` без изменений — включая все анимации, список агентов, кнопки
+- [ ] **10.14** Обновить функциональные тесты скролла:
   - `tests/functional/agent-scroll-position.spec.ts` — переписать проверки с `el.scrollTop` на проверку видимости сообщений (`toBeVisible`, `toBeInViewport`). Суть тестов сохранить:
     - При переключении агентов позиция скролла восстанавливается (последнее видимое сообщение остаётся видимым)
     - При отправке нового сообщения — автоскролл к низу
@@ -663,19 +631,19 @@ interface UseAgentChatResult {
     - Вместо `messagesArea.evaluate(el => el.scrollHeight - el.scrollTop - el.clientHeight)` проверять что `message-llm-action` видим в viewport
   - `tests/functional/llm-chat.spec.ts` — обновить тест `should not flicker scrollbar`:
     - Если `Conversation` не использует Radix ScrollArea — тест может стать неактуальным, заменить на проверку что скроллбар не мигает визуально (или удалить если `Conversation` управляет скроллбаром сам)
-- [x] **10.13** Запустить `npm run validate`
+- [ ] **10.15** Запустить `npm run validate`
 
 ---
 
 ### Фаза 11: Удаление старых компонентов
 
-- [x] **11.1** Удалить `src/renderer/components/agents/MessageBubble.tsx`
-- [x] **11.2** Удалить `src/renderer/components/agents/ChatInput.tsx`
-- [x] **11.3** Удалить `src/renderer/components/agents/AutoExpandingTextarea.tsx`
+- [x] **11.1** Удалить `src/renderer/components/agents/MessageBubble.tsx` — ✅ удалён
+- [x] **11.2** Удалить `src/renderer/components/agents/ChatInput.tsx` — ✅ удалён
+- [x] **11.3** Удалить `src/renderer/components/agents/AutoExpandingTextarea.tsx` — ✅ удалён
 - [x] **11.4** НЕ удалять `src/renderer/components/agents/RateLimitBanner.tsx` — компонент сохраняется
-- [x] **11.5** Удалить `src/renderer/hooks/useMessages.ts`
-- [x] **11.6** Удалить unit-тесты старых компонентов
-- [x] **11.7** Запустить `npm run validate` — убедиться что покрытие >= 85%
+- [x] **11.5** Удалить `src/renderer/hooks/useMessages.ts` — ✅ удалён
+- [x] **11.6** Удалить unit-тесты старых компонентов — ✅ удалены
+- [ ] **11.7** Запустить `npm run validate` — убедиться что покрытие >= 85% (не запускалось после удаления)
 
 ---
 

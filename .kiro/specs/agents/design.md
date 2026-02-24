@@ -2330,9 +2330,9 @@ await window.locator(`[data-testid="agent-icon-${firstAgentId}"]`).click();
 | agents.3.5-3.5.3 (custom tooltip) | - | - | ✓ |
 | agents.4 | ✓ | - | ✓ |
 | agents.4.7.1-4.7.2 (autofocus) | - | - | ✓ |
-| agents.4.13.1-4.13.7 (autoscroll) | ✓ | - | ✓ |
-| agents.4.13.8-4.13.11 (scrollbar) | - | - | Manual |
-| agents.4.14.1-4.14.7 (scroll position) | ✓ | - | ✓ |
+| agents.4.13.1-4.13.6 (autoscroll) | ✓ | - | ✓ |
+| agents.4.13.4-4.13.6 (scrollbar) | - | - | Manual |
+| agents.4.14.1-4.14.5 (scroll position) | ✓ | - | ✓ |
 | agents.4.23 (text wrapping) | ✓ | - | ✓ |
 | agents.5 | ✓ | - | ✓ |
 | agents.5.5 (error messages) | ✓ | - | ✓ |
@@ -2347,7 +2347,7 @@ await window.locator(`[data-testid="agent-icon-${firstAgentId}"]`).click();
 | agents.10 | ✓ | - | ✓ |
 | agents.11 | ✓ | - | ✓ |
 | agents.12 | ✓ | - | ✓ |
-| agents.13 (lazy loading) | - | - | - |
+| agents.13 (startup loading + lazy scroll) | ✓ | - | ✓ |
 | user-data-isolation.6 | ✓ | - | ✓ |
 
 ## Зависимости
@@ -2394,14 +2394,23 @@ await window.locator(`[data-testid="agent-icon-${firstAgentId}"]`).click();
 ```
 agents.tsx
   ├── AgentHeader (без изменений)
-  ├── Conversation (use-stick-to-bottom)
-  │     ├── ConversationContent
-  │     │     ├── AgentWelcome (если нет сообщений)
-  │     │     └── motion.div > AgentMessage (для каждого сообщения)
-  │     ├── RateLimitBanner (если активен rate limit)
-  │     └── ConversationScrollButton
-  └── AgentPromptInput
+  ├── [для каждого агента, скрытые через CSS если не активны]
+  │     AgentChat (смонтирован всё время, скрыт через className="hidden" если не активен)
+  │       ├── Conversation (use-stick-to-bottom, трекает скролл сам)
+  │       │     ├── ConversationContent
+  │       │     │     ├── AgentWelcome (если нет сообщений)
+  │       │     │     └── motion.div > AgentMessage (для каждого сообщения)
+  │       │     ├── RateLimitBanner (если активен rate limit)
+  │       │     └── ConversationScrollButton
+  │       └── AgentPromptInput
+  └── [лоадер пока не все чаты загружены]
 ```
+
+**Ключевые принципы:**
+- Все `AgentChat` монтируются при старте и остаются смонтированными
+- Переключение агента = CSS `display: none/block`, без ремонта
+- `Conversation` каждого агента трекает скролл независимо — позиция сохраняется автоматически
+- Лоадер показывается пока хотя бы один агент ещё загружает сообщения
 
 ### IPCChatTransport
 
@@ -2466,7 +2475,7 @@ useChat.sendMessage()
 interface UseAgentChatResult {
   messages: UIMessage[];           // AI SDK формат для рендеринга
   rawMessages: MessageSnapshot[];  // Оригинальный формат для metadata (kind, action_link)
-  isLoading: boolean;              // true пока загружается начальная история
+  isLoading: boolean;              // true пока загружается начальный чанк сообщений
   isStreaming: boolean;            // true когда LLM стримит ответ
   sendMessage(text: string): Promise<boolean>;
   loadMore(): Promise<void>;       // ленивая подгрузка при скролле вверх
@@ -2480,7 +2489,7 @@ interface UseAgentChatResult {
 
 2. **Параллельный массив `rawMessages`** — AI SDK `UIMessage` не хранит `kind`, `hidden`, `action_link`. Хук хранит `rawMessages: MessageSnapshot[]` синхронно с `UIMessage[]` для доступа к оригинальным данным при рендеринге `AgentMessage`.
 
-3. **Двухфазный mount** — `useChat` создаётся с пустым состоянием, затем после загрузки истории вызывается `setMessages(toUIMessages(snapshots))`.
+3. **Двухфазный mount** — `useChat` создаётся с пустым состоянием, затем после загрузки начального чанка вызывается `setMessages(toUIMessages(snapshots))`.
 
 4. **Синхронизация через события** — `MESSAGE_CREATED` добавляет в `rawMessages` (дедупликация по id), `MESSAGE_UPDATED` с `hidden: true` удаляет из обоих массивов через `setMessages()`.
 
@@ -2488,13 +2497,21 @@ interface UseAgentChatResult {
 
 6. **`AGENT_RATE_LIMIT` не в хуке** — подписка остаётся в `agents.tsx`, т.к. rate limit — UI-состояние (показать/скрыть баннер), не часть потока сообщений.
 
-### Ленивая загрузка
+### Загрузка чатов при старте и ленивая подгрузка
 
-- При mount: загружает последние 50 сообщений через `messages:list-paginated`
+**Загрузка при старте:**
+- Все `AgentChat` компоненты монтируются при старте приложения одновременно
+- Каждый `AgentChat` при mount вызывает `useAgentChat(agentId)`, который загружает последние 50 сообщений через `messages:list-paginated`
+- `isLoading = true` пока идёт загрузка начального чанка
+- `agents.tsx` показывает лоадер пока хотя бы один `AgentChat` имеет `isLoading = true`
+- После загрузки всех чатов лоадер скрывается и показывается основной интерфейс
+
+**Ленивая подгрузка при скролле вверх:**
 - `oldestIdRef` хранит ID самого старого загруженного сообщения — курсор для пагинации
 - `loadMore()` вызывает `messages:list-paginated` с `beforeId = oldestIdRef.current`, prepend-ит старые сообщения
 - При скролле к верхней границе `Conversation` вызывает `loadMore()`
 - Позиция скролла сохраняется при подгрузке (не прыгает вверх)
+- `hasMore = false` когда все сообщения загружены — `loadMore()` больше не вызывается
 
 ## Установка и обновление AI Elements компонентов
 
