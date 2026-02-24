@@ -5,12 +5,16 @@ import { useMessages } from '../hooks/useMessages';
 import { hasError } from '../../shared/utils/agentStatus';
 import { AutoExpandingTextareaHandle } from './agents/AutoExpandingTextarea';
 import { AgentWelcome } from './agents/AgentWelcome';
-import { ScrollArea } from './ui/scroll-area';
 import { AgentHeader } from './agents/AgentHeader';
 import { AllAgentsPage } from './agents/AllAgentsPage';
 import { MessageBubble } from './agents/MessageBubble';
 import { ChatInput } from './agents/ChatInput';
 import { RateLimitBanner } from './agents/RateLimitBanner';
+import {
+  Conversation,
+  ConversationContent,
+  ConversationScrollButton,
+} from './ai-elements/conversation';
 import { useEventSubscription } from '../events/useEventSubscription';
 import { EVENT_TYPES } from '../../shared/events/constants';
 import type { AgentRateLimitPayload } from '../../shared/events/types';
@@ -28,19 +32,14 @@ export function Agents({ onNavigate }: { onNavigate?: (screen: string) => void }
     retryAfterSeconds: number;
   } | null>(null);
   const chatListRef = useRef<HTMLDivElement>(null);
-  const messagesAreaRef = useRef<HTMLDivElement | null>(
-    null
-  ) as React.MutableRefObject<HTMLDivElement | null>;
-  const scrollAreaRootRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<AutoExpandingTextareaHandle>(null);
-  const resizeObserverRef = useRef<ResizeObserver | null>(null);
-  const [scrollbarHidden, setScrollbarHidden] = useState(false);
+  // chatAreaRef passed to ChatInput for max-height calculation (agents.4.6)
+  const chatAreaRef = useRef<HTMLDivElement>(null);
 
   const { agents, activeAgent, createAgent, selectAgent, isLoading } = useAgents();
   const { messages, sendMessage } = useMessages(activeAgent?.id || null);
 
   const selectedAgent = activeAgent || agents[0];
-  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Subscribe to rate limit events — show countdown banner
   // Requirements: llm-integration.3.7
@@ -53,52 +52,6 @@ export function Agents({ onNavigate }: { onNavigate?: (screen: string) => void }
       });
     }
   });
-
-  // Requirements: agents.4.14.5
-  const scrollPositions = useRef<Map<string, number>>(new Map());
-  // Flag: user just sent a message — scroll unconditionally on next agent message
-  const shouldScrollOnNextMessage = useRef(false);
-
-  // Callback ref for viewport — sets CSS variable for min-height
-  const viewportCallbackRef = (node: HTMLDivElement | null) => {
-    messagesAreaRef.current = node;
-    if (resizeObserverRef.current) {
-      resizeObserverRef.current.disconnect();
-      resizeObserverRef.current = null;
-    }
-    if (node) {
-      const updateHeight = () => {
-        node.style.setProperty('--viewport-height', `${node.clientHeight}px`);
-      };
-      updateHeight();
-      resizeObserverRef.current = new ResizeObserver(updateHeight);
-      resizeObserverRef.current.observe(node);
-    }
-  };
-
-  // Requirements: agents.4.13.5, agents.4.14.4, agents.4.14.8
-  const scrollToBottom = (instant = false) => {
-    setScrollbarHidden(true);
-    messagesEndRef.current?.scrollIntoView({ behavior: instant ? 'auto' : 'smooth' });
-    setTimeout(() => setScrollbarHidden(false), instant ? 50 : 500);
-  };
-
-  // Requirements: agents.4.13.2, agents.4.13.3
-  const isUserAtBottom = (): boolean => {
-    if (!messagesAreaRef.current) return true;
-    const { scrollHeight, scrollTop, clientHeight } = messagesAreaRef.current;
-    return scrollHeight - scrollTop - clientHeight < clientHeight / 3;
-  };
-
-  // Requirements: agents.4.14.1
-  const handleScroll = () => {
-    if (!messagesAreaRef.current || !activeAgent) return;
-    scrollPositions.current.set(activeAgent.id, messagesAreaRef.current.scrollTop);
-    // If user manually scrolled away from bottom, cancel the pending autoscroll
-    if (shouldScrollOnNextMessage.current && !isUserAtBottom()) {
-      shouldScrollOnNextMessage.current = false;
-    }
-  };
 
   // Requirements: agents.1.4.4
   useEffect(() => {
@@ -113,50 +66,6 @@ export function Agents({ onNavigate }: { onNavigate?: (screen: string) => void }
       setTimeout(() => textareaRef.current?.focus(), 100);
     }
   }, [activeAgent, showAllTasksPage]);
-
-  // Requirements: agents.4.13.1, agents.4.13.2
-  useEffect(() => {
-    if (messages.length === 0) return;
-    const lastMessage = messages[messages.length - 1];
-    // Always scroll when user sends (flag set in handleSend)
-    // Keep flag alive until agent responds (non-user message arrives)
-    if (shouldScrollOnNextMessage.current) {
-      if (lastMessage?.kind !== 'user') {
-        shouldScrollOnNextMessage.current = false;
-      }
-      scrollToBottom();
-    } else if (isUserAtBottom()) {
-      scrollToBottom();
-    }
-  }, [messages]);
-
-  // Track which agents have had their scroll position restored on current visit
-  const restoredAgents = useRef<Set<string>>(new Set());
-
-  // Requirements: agents.4.14.2, agents.4.14.3, agents.4.14.4, agents.4.14.7, agents.4.14.8
-  useEffect(() => {
-    if (!messagesAreaRef.current || !activeAgent || messages.length === 0) return;
-    if (restoredAgents.current.has(activeAgent.id)) return;
-    restoredAgents.current.add(activeAgent.id);
-    const savedPosition = scrollPositions.current.get(activeAgent.id);
-    if (savedPosition !== undefined) {
-      setScrollbarHidden(true);
-      messagesAreaRef.current.scrollTop = savedPosition;
-      setTimeout(() => setScrollbarHidden(false), 50);
-    } else {
-      scrollToBottom(true);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeAgent?.id, messages]);
-
-  // Reset restored flag when switching away from agent so position restores on return
-  useEffect(() => {
-    return () => {
-      // On unmount or agent change, clear all restored flags to allow re-restoration
-      restoredAgents.current.clear();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeAgent?.id]);
 
   // Calculate visible chats based on container width
   useEffect(() => {
@@ -186,9 +95,6 @@ export function Agents({ onNavigate }: { onNavigate?: (screen: string) => void }
     const success = await sendMessage(messageText);
     if (success) {
       setTaskInput('');
-      scrollPositions.current.delete(activeAgent.id);
-      shouldScrollOnNextMessage.current = true;
-      scrollToBottom();
     }
   };
 
@@ -259,18 +165,12 @@ export function Agents({ onNavigate }: { onNavigate?: (screen: string) => void }
         onShowAllAgents={() => setShowAllTasksPage(true)}
       />
 
-      {/* Requirements: agents.4.13.8-11 */}
-      <ScrollArea
-        ref={scrollAreaRootRef}
-        className={`flex-1 min-h-0${scrollbarHidden ? ' scrollbar-hidden' : ''}`}
-        scrollHideDelay={1000}
-        viewportRef={viewportCallbackRef}
-        viewportProps={{ 'data-testid': 'messages-area' } as React.ComponentProps<'div'>}
-        onScrollCapture={handleScroll}
-      >
-        <div
-          className="flex flex-col justify-end space-y-4 p-6"
-          style={{ minHeight: 'var(--viewport-height, 100%)' }}
+      {/* Requirements: agents.4.13.8-11 — Conversation manages autoscroll via use-stick-to-bottom */}
+      {/* key=agentId remounts Conversation on agent switch — resets scroll to bottom for new agents */}
+      <Conversation key={currentAgent.id} className="flex-1 min-h-0">
+        <ConversationContent
+          data-testid="messages-area"
+          className="flex flex-col gap-4 p-6 justify-end min-h-full"
         >
           {messages.length === 0 ? (
             <AgentWelcome onPromptClick={(p) => handleSend(p)} />
@@ -298,27 +198,30 @@ export function Agents({ onNavigate }: { onNavigate?: (screen: string) => void }
               );
             })
           )}
-          <div ref={messagesEndRef} />
-        </div>
-      </ScrollArea>
+        </ConversationContent>
 
-      <ChatInput
-        value={taskInput}
-        onChange={setTaskInput}
-        onSubmit={handleSend}
-        disabled={!activeAgent}
-        textareaRef={textareaRef}
-        chatAreaRef={messagesAreaRef}
-      />
+        {rateLimitBanner && rateLimitBanner.agentId === currentAgent.id && (
+          <RateLimitBanner
+            agentId={rateLimitBanner.agentId}
+            userMessageId={rateLimitBanner.userMessageId}
+            retryAfterSeconds={rateLimitBanner.retryAfterSeconds}
+            onDismiss={() => setRateLimitBanner(null)}
+          />
+        )}
 
-      {rateLimitBanner && rateLimitBanner.agentId === currentAgent.id && (
-        <RateLimitBanner
-          agentId={rateLimitBanner.agentId}
-          userMessageId={rateLimitBanner.userMessageId}
-          retryAfterSeconds={rateLimitBanner.retryAfterSeconds}
-          onDismiss={() => setRateLimitBanner(null)}
+        <ConversationScrollButton />
+      </Conversation>
+
+      <div ref={chatAreaRef} className="flex-shrink-0">
+        <ChatInput
+          value={taskInput}
+          onChange={setTaskInput}
+          onSubmit={handleSend}
+          disabled={!activeAgent}
+          textareaRef={textareaRef}
+          chatAreaRef={chatAreaRef}
         />
-      )}
+      </div>
     </div>
   );
 }

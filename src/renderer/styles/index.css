@@ -2,16 +2,4 @@
 @import './tailwind.css';
 @import './theme.css';
 
-/* Prevent horizontal scroll in messages area - Radix ScrollArea content wrapper uses display:table */
-[data-testid="messages-area"] > div {
-  max-width: 100%;
-  width: 100%;
-  overflow-x: hidden;
-  display: block !important;
-}
 
-/* Hide scrollbar without remounting (avoids flicker from Radix type prop change) */
-.scrollbar-hidden [data-slot="scroll-area-scrollbar"] {
-  opacity: 0;
-  pointer-events: none;
-}
