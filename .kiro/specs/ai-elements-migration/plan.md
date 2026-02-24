@@ -109,7 +109,7 @@ messagesArea.evaluate(el => el.scrollHeight - el.scrollTop - el.clientHeight)
 
 1. **agents.4.13.8-11 (ScrollArea)** — текущий `ScrollArea` из radix-ui заменяется `Conversation`. `Conversation` из AI Elements управляет автоскроллом из коробки. Функциональные тесты скролла будут переписаны на проверку видимости элементов вместо прямого `scrollTop`.
 
-2. **agents.4.14 (сохранение позиции скролла)** — весь ручной механизм (`scrollPositions` Map, `restoredAgents` Set) заменяется. Если `Conversation` не поддерживает сохранение позиции при смене агента — реализовать через хранение ID последнего видимого сообщения и `scrollIntoView` при возврате.
+2. **agents.4.14 (сохранение позиции скролла)** — весь ручной механизм (`scrollPositions` Map, `restoredAgents` Set) заменяется. `Conversation` (use-stick-to-bottom) управляет скролом автоматически — компонент остаётся смонтированным, позиция сохраняется без дополнительной логики.
 
 3. **agents.4.7.1 (автофокус)** — `textareaRef` с `AutoExpandingTextareaHandle` заменяется. `PromptInputTextarea` должен поддерживать `ref` для программного фокуса.
 
@@ -676,7 +676,7 @@ interface UseAgentChatResult {
 | AI Elements не поддерживает `data-testid` на viewport | Низкая | Обернуть в div с нужным testid |
 | `Conversation` viewport не имеет нативного `scrollTop` | Низкая | Тесты скролла будут переписаны на проверку видимости элементов |
 | `PromptInputTextarea` не поддерживает `ref` для фокуса | Низкая | Фаза 0.6 — проверить; если нет — `autoFocus` prop |
-| `Conversation` не сохраняет позицию скролла при смене агента | Средняя | Фаза 5.4 — реализовать через ID последнего видимого сообщения |
+| `Conversation` не сохраняет позицию скролла при смене агента | Средняя | Не актуально — `Conversation` (use-stick-to-bottom) сохраняет позицию автоматически, компонент не размонтируется |
 | AI SDK v5 `ChatTransport` интерфейс отличается от ожидаемого | Средняя | Фаза 0.3 — изучить до начала работы |
 | `@ai-sdk/*` несовместимы с `ai@5` в main process | Решено | Нативный HTTP+SSE для всех провайдеров, `ai@5` только в renderer |
 | Ленивая загрузка ломает подсчёт сообщений в функциональных тестах | Средняя | Limit 50 достаточен для тестов (макс 20 сообщений в тестах) |
@@ -727,19 +727,15 @@ interface UseAgentChatResult {
 - `should scroll to bottom on first visit to agent`
 
 **Сценарий:**
-Тесты проверяют сохранение/восстановление позиции скролла при переключении агентов. Используют `el.scrollTop = 100` для установки позиции и `el.scrollTop` для проверки.
+Тесты проверяют сохранение/восстановление позиции скролла при переключении агентов. `Conversation` (use-stick-to-bottom) управляет скролом — компонент остаётся смонтированным, позиция сохраняется автоматически.
 
 **Причины падения:**
-- Новая архитектура: все `AgentChat` монтируются одновременно и скрываются через CSS `hidden`. `Conversation` (use-stick-to-bottom) хранит позицию скролла автоматически — но только если DOM-элемент не скрыт через `display: none` (что делает `hidden`).
-- При `className="hidden"` браузер устанавливает `display: none`, что сбрасывает `scrollTop` в 0. Поэтому позиция скролла НЕ сохраняется автоматически при CSS-скрытии.
-- `el.scrollTop = 100` устанавливается на `ConversationContent`, но `use-stick-to-bottom` может перехватывать и сбрасывать это значение.
-- Тест `should reset scroll position when user sends message` ожидает автоскролл к низу после отправки — это должно работать через `use-stick-to-bottom`, но может не срабатывать из-за конфликта с ручной установкой `scrollTop`.
+- Тесты переписаны: вместо `el.scrollTop = X` используется `mouse.wheel(0, -2000)` + проверка видимости кнопки `[data-testid="scroll-to-bottom"]`.
+- Тесты падают потому что `use-stick-to-bottom` при переключении агентов (show/hide через CSS `hidden`) может сбрасывать состояние `isAtBottom` — нужно проверить реальное поведение.
 
 **План исправления:**
-1. Исправить механизм скрытия агентов: вместо `className="hidden"` (display:none) использовать `className="invisible absolute"` или `visibility: hidden` + `pointer-events: none` — это сохраняет layout и scrollTop.
-2. Альтернатива: хранить `scrollTop` в Map при скрытии агента и восстанавливать при показе (аналог старого механизма, но упрощённый).
-3. Переписать тесты: вместо прямого `el.scrollTop` проверять видимость конкретных сообщений через `toBeInViewport()`.
-4. Файлы для изменений: `src/renderer/components/agents/AgentChat.tsx` (механизм скрытия), `tests/functional/agent-scroll-position.spec.ts`.
+- Переписать тесты на проверку видимости конкретных сообщений через `toBeInViewport()` вместо кнопки scroll-to-bottom — это более надёжный способ проверить позицию скролла.
+- Файл для изменений: `tests/functional/agent-scroll-position.spec.ts`.
 
 ---
 
@@ -968,7 +964,7 @@ interface UseAgentChatResult {
 | Тест | Основная причина | Приоритет | Статус |
 |------|-----------------|-----------|--------|
 | `agent-messaging` (3 теста) | `use-stick-to-bottom` конфликт + `window.api.test` API | Высокий | ✅ Исправлено |
-| `agent-scroll-position` (4 теста) | CSS `hidden` сбрасывает `scrollTop` | Высокий | |
+| `agent-scroll-position` (4 теста) | Тесты проверяют поведение `Conversation` (use-stick-to-bottom) через видимость кнопки scroll-to-bottom | Высокий | |
 | `input-autofocus` (4 теста) | `data-testid="all-agents-button"` отсутствует + race condition | Средний | |
 | `empty-state-placeholder` (2 теста) | Лоадер блокирует `AgentWelcome` + `isLoading` не сбрасывается | Средний | |
 | `agent-switching` (1 тест) | Локаторы находят скрытые элементы в других AgentChat | Средний | |

@@ -99,7 +99,6 @@ test.describe('Agent Messaging', () => {
 
     // Press Shift+Enter
     await messageInput.press('Shift+Enter');
-    await window.waitForTimeout(100);
 
     // Type second line
     await messageInput.press('L');
@@ -166,7 +165,7 @@ test.describe('Agent Messaging', () => {
     for (let i = 1; i <= 10; i++) {
       await messageInput.fill(`Message ${i}`);
       await messageInput.press('Enter');
-      await window.waitForTimeout(300);
+      await expect(activeChat(window).userMessages).toHaveCount(i, { timeout: 5000 });
     }
 
     // Check that last user message is visible (scrolled into view)
@@ -207,7 +206,7 @@ test.describe('Agent Messaging', () => {
     for (let i = 1; i <= 10; i++) {
       await messageInput.fill(`Message ${i}`);
       await messageInput.press('Enter');
-      await window.waitForTimeout(200);
+      await expect(activeChat(window).userMessages).toHaveCount(i, { timeout: 5000 });
     }
 
     await expect(activeChat(window).userMessages).toHaveCount(10, { timeout: 5000 });
@@ -234,7 +233,14 @@ test.describe('Agent Messaging', () => {
     await expect(activeChat(window).userMessages).toHaveCount(11, { timeout: 5000 });
 
     // Wait for autoscroll
-    await window.waitForTimeout(500);
+    await window.waitForFunction(
+      () => {
+        const container = document.querySelector('[data-testid="messages-area"]');
+        if (!container) return false;
+        return (container.scrollHeight - container.scrollTop - container.clientHeight) < 50;
+      },
+      { timeout: 5000 }
+    );
 
     // Check that scroll position changed (autoscrolled)
     const finalScrollTop = await messagesArea.evaluate((el) => el.scrollTop);
@@ -255,15 +261,12 @@ test.describe('Agent Messaging', () => {
     const messageInput = activeChat(window).textarea;
     const messagesArea = activeChat(window).messagesArea;
     // ConversationScrollButton appears when user is NOT at bottom
-    const scrollButton = window.locator('button[type="button"]').filter({
-      has: window.locator('svg'),
-    });
 
     // Send many messages to create scrollable content
     for (let i = 1; i <= 20; i++) {
       await messageInput.fill(`Message ${i}`);
       await messageInput.press('Enter');
-      await window.waitForTimeout(150);
+      await expect(activeChat(window).userMessages).toHaveCount(i, { timeout: 5000 });
     }
 
     await expect(activeChat(window).userMessages).toHaveCount(20, {
@@ -273,7 +276,6 @@ test.describe('Agent Messaging', () => {
     // Scroll up via real wheel event — use-stick-to-bottom tracks this correctly
     await messagesArea.hover();
     await window.mouse.wheel(0, -2000);
-    await window.waitForTimeout(500);
 
     // Verify user is NOT at bottom — scroll-to-bottom button should be visible
     const scrollToBottomBtn = window.locator('[data-testid="scroll-to-bottom"]');
@@ -284,7 +286,11 @@ test.describe('Agent Messaging', () => {
     await messageInput.press('Enter');
     await expect(activeChat(window).userMessages).toHaveCount(21, { timeout: 5000 });
 
-    await window.waitForTimeout(500);
+    // Wait for any potential autoscroll to settle
+    await window.waitForFunction(
+      () => document.querySelector('[data-testid="scroll-to-bottom"]') !== null,
+      { timeout: 3000 }
+    );
 
     // Scroll-to-bottom button should still be visible (no autoscroll happened)
     await expect(scrollToBottomBtn).toBeVisible();
@@ -333,8 +339,9 @@ test.describe('Agent Messaging', () => {
     // Wait for agent message to appear
     await expect(activeChat(window).messages).toHaveCount(2, { timeout: 5000 });
 
-    // Wait for autoscroll animation to complete
-    await window.waitForTimeout(1000);
+    // Verify chat autoscrolled to bottom — scroll-to-bottom button should NOT be visible
+    const scrollToBottomBtn = window.locator('[data-testid="scroll-to-bottom"]');
+    await expect(scrollToBottomBtn).not.toBeVisible({ timeout: 5000 });
 
     // Verify chat autoscrolled to bottom
     const distanceFromBottom = await messagesArea.evaluate((el) => {
@@ -366,7 +373,7 @@ test.describe('Agent Messaging', () => {
     for (let i = 1; i <= 15; i++) {
       await messageInput.fill(`User message ${i}`);
       await messageInput.press('Enter');
-      await window.waitForTimeout(150);
+      await expect(activeChat(window).messages).toHaveCount(i, { timeout: 5000 });
     }
 
     await expect(activeChat(window).messages).toHaveCount(15, { timeout: 10000 });
@@ -374,7 +381,6 @@ test.describe('Agent Messaging', () => {
     // Scroll up via real wheel event — use-stick-to-bottom tracks this correctly
     await messagesArea.hover();
     await window.mouse.wheel(0, -2000);
-    await window.waitForTimeout(500);
 
     // Verify user is NOT at bottom — scroll-to-bottom button should be visible
     const scrollToBottomBtn = window.locator('[data-testid="scroll-to-bottom"]');
@@ -393,8 +399,11 @@ test.describe('Agent Messaging', () => {
     // Wait for agent message to appear
     await expect(activeChat(window).messages).toHaveCount(16, { timeout: 5000 });
 
-    // Wait to ensure no autoscroll happens
-    await window.waitForTimeout(1000);
+    // Wait to ensure no autoscroll happens — button should remain visible
+    await window.waitForFunction(
+      () => document.querySelector('[data-testid="scroll-to-bottom"]') !== null,
+      { timeout: 3000 }
+    );
 
     // Scroll-to-bottom button should still be visible (no autoscroll happened)
     await expect(scrollToBottomBtn).toBeVisible();

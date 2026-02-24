@@ -1,6 +1,6 @@
 // Requirements: agents.4, agents.13, llm-integration.2, llm-integration.3, llm-integration.7, llm-integration.8
 // Per-agent chat component — mounted at startup, stays mounted forever.
-// Hidden via CSS when not active — scroll position preserved automatically.
+// Scroll position is managed by Conversation (use-stick-to-bottom) — preserved automatically.
 
 import React, { useRef, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
@@ -56,7 +56,7 @@ function ScrollToBottomButton() {
  * AgentChat — independent chat component per agent.
  * Mounted at app startup, stays mounted forever (agents.13.3).
  * Hidden via className="hidden" when not active (agents.13.5).
- * Conversation tracks scroll independently — position preserved automatically (agents.4.14).
+ * Conversation (use-stick-to-bottom) manages scroll position automatically (agents.4.14).
  */
 export function AgentChat({
   agent,
@@ -104,7 +104,7 @@ export function AgentChat({
   );
 
   return (
-    // Hidden via CSS — NOT unmounted — so Conversation keeps scroll position (agents.13.5)
+    // Hidden via CSS — NOT unmounted — Conversation preserves scroll position automatically (agents.13.5, agents.4.14)
     <div className={`flex flex-col flex-1 min-h-0${isActive ? '' : ' hidden'}`}>
       {/* Conversation manages autoscroll via use-stick-to-bottom (agents.4.13) */}
       <Conversation className="flex-1 min-h-0" onScroll={handleScroll}>
