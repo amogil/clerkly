@@ -139,20 +139,31 @@ messagesArea.evaluate(el => el.scrollHeight - el.scrollTop - el.clientHeight)
 
 ### Фаза 0: Подготовка и исследование
 
-- [ ] **0.1** Проверить совместимость React 18 → 19: `npm install react@19 react-dom@19 @types/react@19 @types/react-dom@19`, запустить `npm run validate`
-- [ ] **0.2** Установить AI SDK v5: `npm install ai@5 @ai-sdk/react@5 @ai-sdk/openai @ai-sdk/anthropic @ai-sdk/google`, проверить что нет конфликтов
-- [ ] **0.3** Изучить интерфейс `ChatTransport` из пакета `ai@5` — понять какие методы нужно реализовать (`sendMessages`, обработка UI message stream)
-- [ ] **0.4** Изучить формат `UIMessage` из `@ai-sdk/react@5` — понять как маппить `MessageSnapshot` (kind: user/llm/error) в AI SDK формат, особенно reasoning parts
-- [ ] **0.5** Запустить AI Elements CLI: `npx ai-elements@latest add conversation message prompt-input reasoning` — изучить что генерируется, проверить кастомизируемость стилей
-- [ ] **0.6** Проверить что `PromptInputTextarea` поддерживает: `ref` для фокуса, кастомный `maxHeight`, Enter/Shift+Enter поведение, возможность добавить `data-testid="auto-expanding-textarea"`
-- [ ] **0.7** Проверить что `Conversation` поддерживает: автоскролл при новых сообщениях, кнопку "scroll to bottom", поведение при смене `key`
-- [ ] **0.8** Изучить API `streamText` из `ai@5` — понять как заменить ручной SSE-парсинг в провайдерах
-- [ ] **0.9** Обновить `requirements.md`:
-  - Добавить раздел `agents.15` (AI Elements интеграция)
-  - Обновить `agents.4.13.8-4.13.11` — заменить требование ScrollArea из radix-ui на `Conversation` из AI Elements (текущее требование 4.13.11 явно указывает radix-ui — это будет противоречием после миграции)
-  - Обновить `agents.4.14.5` — заменить `Map<agentId, scrollTop>` на хранение ID последнего видимого сообщения (если `Conversation` не поддерживает `scrollTop` напрямую)
-- [ ] **0.10** Обновить `design.md` — добавить секцию архитектуры `IPCChatTransport`, `useAgentChat`, маппинга сообщений
-- [ ] **0.11** Обновить `tasks.md` — добавить Фазу 9 (AI Elements Migration)
+- [x] **0.1** Проверить совместимость React 18 → 19: `npm install react@19 react-dom@19 @types/react@19 @types/react-dom@19`, запустить `npm run validate`
+- [x] **0.2** Установить AI SDK v5: `npm install ai@5 @ai-sdk/react@5 @ai-sdk/openai @ai-sdk/anthropic @ai-sdk/google`, проверить что нет конфликтов
+- [x] **0.3** Изучить интерфейс `ChatTransport` из пакета `ai@5` — понять какие методы нужно реализовать (`sendMessages`, обработка UI message stream)
+- [x] **0.4** Изучить формат `UIMessage` из `@ai-sdk/react@5` — понять как маппить `MessageSnapshot` (kind: user/llm/error) в AI SDK формат, особенно reasoning parts
+- [x] **0.5** Изучить исходники AI Elements компонентов через registry API. **Решение:**
+  - `Conversation` — скопировать исходник напрямую (тонкая обёртка над `use-stick-to-bottom`, ~100 строк). Установить только `use-stick-to-bottom`.
+  - `PromptInput` — **пропустить** (зависит от `nanoid`, `Command`, `DropdownMenu`, `HoverCard`, `InputGroup`, `Select`, `Spinner` — избыточно). Сохранить `ChatInput` + `AutoExpandingTextarea` → переименовать в `AgentPromptInput`.
+  - `Message` — **пропустить** (зависит от `streamdown` и `@streamdown/*` плагинов — избыточно). Написать `AgentMessage` с нуля.
+  - `Reasoning` — скопировать исходник, заменить `<Streamdown>` на plain text рендеринг (убрать зависимость от `streamdown`).
+  - **Итог:** Устанавливается только `use-stick-to-bottom`. CLI не нужен.
+- [x] **0.6** `AutoExpandingTextarea` уже поддерживает: `ref` через `useImperativeHandle` (focus/blur), `maxHeight = chatArea.offsetHeight * 0.5`, Enter/Shift+Enter, `data-testid="auto-expanding-textarea"`. Дополнительных изменений не требуется.
+- [x] **0.7** `Conversation` (`use-stick-to-bottom`): автоскролл при новых сообщениях — ✅ (StickToBottom с `initial="smooth"`), кнопка scroll-to-bottom — ✅ (`ConversationScrollButton` через `useStickToBottomContext`), поведение при смене `key` — стандартное React remount.
+- [x] **0.8** Изучить API `streamText` из `ai@5`. **Выводы:**
+  - `streamText({ model, messages, onChunk })` возвращает `StreamTextResult` с `fullStream` (AsyncIterable) и `text` (Promise)
+  - Чанки reasoning: `{ type: 'reasoning', textDelta: string }` — заменяет ручной SSE-парсинг
+  - Чанки текста: `{ type: 'text-delta', textDelta: string }` — для накопления content
+  - Ошибки: `{ type: 'error', error: unknown }` — для обработки 401/429/5xx
+  - Structured output: `generateObject({ schema })` или `streamObject` — но текущий подход (JSON schema в response_format) работает через `streamText` с накоплением JSON
+  - **Решение для Phase 9:** Заменить ручной fetch+SSE на `streamText` с `@ai-sdk/openai`, `@ai-sdk/anthropic`, `@ai-sdk/google`. Сохранить интерфейс `ILLMProvider.chat()` без изменений — только внутренняя реализация меняется.
+- [x] **0.9** Обновить `requirements.md`:
+  - Добавлен раздел `agents.15` (AI Elements интеграция)
+  - Обновлён `agents.4.13.11` — заменено требование ScrollArea из radix-ui на `Conversation` из AI Elements
+  - Обновлён `agents.4.14.5` — допускается хранение ID последнего видимого сообщения вместо `scrollTop`
+- [x] **0.10** Обновить `design.md` — добавлена секция "AI Elements интеграция (Фаза 9)" с архитектурой `IPCChatTransport`, `useAgentChat`, маппинга сообщений, ленивой загрузки
+- [x] **0.11** Обновить `tasks.md` — задачи 9.0 и 9.1 отмечены выполненными
 
 
 ---
@@ -172,6 +183,75 @@ messagesArea.evaluate(el => el.scrollHeight - el.scrollTop - el.clientHeight)
 Ключевой компонент — мост между `useChat` и Electron IPC.
 
 **Файл:** `src/renderer/lib/IPCChatTransport.ts`
+
+**Результаты исследования (0.3, 0.4):**
+
+`ChatTransport<UI_MESSAGE>` требует реализации двух методов:
+```typescript
+interface ChatTransport<UI_MESSAGE extends UIMessage> {
+  sendMessages(options: {
+    trigger: 'submit-message' | 'regenerate-message';
+    chatId: string;
+    messageId: string | undefined;
+    messages: UI_MESSAGE[];
+    abortSignal: AbortSignal | undefined;
+    // + headers, body, metadata
+  }): Promise<ReadableStream<UIMessageChunk>>;
+
+  reconnectToStream(options: {
+    chatId: string;
+    // + headers, body, metadata
+  }): Promise<ReadableStream<UIMessageChunk> | null>;
+}
+```
+
+`UIMessageChunk` — это union type. Нужные нам чанки:
+- `{ type: 'start', messageId?: string }` — начало сообщения
+- `{ type: 'reasoning-start', id: string }` — начало reasoning
+- `{ type: 'reasoning-delta', id: string, delta: string }` — дельта reasoning
+- `{ type: 'reasoning-end', id: string }` — конец reasoning
+- `{ type: 'text-start', id: string }` — начало текста
+- `{ type: 'text-delta', id: string, delta: string }` — дельта текста
+- `{ type: 'text-end', id: string }` — конец текста
+- `{ type: 'finish' }` — завершение
+- `{ type: 'error', errorText: string }` — ошибка
+- `{ type: 'abort' }` — отмена
+
+`UIMessage` структура:
+```typescript
+interface UIMessage {
+  id: string;
+  role: 'user' | 'assistant' | 'system';
+  metadata?: unknown;
+  parts: Array<TextUIPart | ReasoningUIPart | ...>;
+}
+// TextUIPart: { type: 'text', text: string, state?: 'streaming' | 'done' }
+// ReasoningUIPart: { type: 'reasoning', text: string, state?: 'streaming' | 'done' }
+```
+
+`useChat` из `@ai-sdk/react` принимает `ChatInit` (или `{ chat: Chat }`):
+```typescript
+// UseChatHelpers возвращает:
+{
+  id: string;
+  messages: UIMessage[];
+  setMessages: (msgs) => void;
+  sendMessage: (message?) => void;
+  stop: () => void;
+  status: 'idle' | 'streaming' | 'submitted' | 'error';
+  error: Error | undefined;
+  // + regenerate, resumeStream, addToolResult, clearError
+}
+```
+
+**Стратегия реализации `IPCChatTransport`:**
+- `sendMessages()` — вызывает `window.api.messages.create()`, затем подписывается на IPC события и пишет чанки в `ReadableStream`
+- `reconnectToStream()` — возвращает `null` (нет серверного стриминга для reconnect)
+- Маппинг событий → чанки:
+  - `MESSAGE_CREATED` (kind: llm) → `start` + `reasoning-start` (если будет reasoning)
+  - `MESSAGE_LLM_REASONING_UPDATED` → `reasoning-delta`
+  - `MESSAGE_UPDATED` с `action` → `reasoning-end` + `text-start` + `text-delta` + `text-end` + `finish`
+  - `MESSAGE_CREATED` (kind: error) → `error` + `finish`
 
 **Контекст для реализации:**
 - Текущий `useMessages` hook (`src/renderer/hooks/useMessages.ts`) подписывается на 3 события:

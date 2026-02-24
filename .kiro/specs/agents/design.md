@@ -2372,3 +2372,49 @@ await window.locator(`[data-testid="agent-icon-${firstAgentId}"]`).click();
 - Все запросы к БД фильтруются по userId
 - Проверка владельца агента при операциях с сообщениями
 - Санитизация HTML в сообщениях через react-markdown
+
+## AI Elements интеграция (Фаза 9)
+
+### Архитектура
+
+```
+agents.tsx
+  ├── AgentHeader (без изменений)
+  ├── Conversation (use-stick-to-bottom)
+  │     ├── ConversationContent
+  │     │     ├── EmptyStatePlaceholder (если нет сообщений)
+  │     │     └── motion.div > AgentMessage (для каждого сообщения)
+  │     ├── RateLimitBanner (если активен rate limit)
+  │     └── ConversationScrollButton
+  └── AgentPromptInput
+```
+
+### IPCChatTransport
+
+`src/renderer/lib/IPCChatTransport.ts` — реализует интерфейс `ChatTransport` из `ai@5`.
+
+Маппинг IPC-событий → UIMessageChunk:
+- `MESSAGE_CREATED` (kind: llm) → `{ type: 'start' }` + `{ type: 'text-start', id }`
+- `MESSAGE_LLM_REASONING_UPDATED` → `{ type: 'reasoning-delta', id, delta }`
+- `MESSAGE_UPDATED` с action → `{ type: 'text-delta', id, delta: action.content }` + `{ type: 'finish' }`
+- `MESSAGE_CREATED` (kind: error) → `{ type: 'error', errorText }` + `{ type: 'finish' }`
+- `MESSAGE_UPDATED` с `hidden: true` → закрыть stream (прерывание)
+
+### useAgentChat
+
+`src/renderer/hooks/useAgentChat.ts` — заменяет `useMessages`.
+
+Возвращает:
+- `messages: UIMessage[]` — AI SDK формат для рендеринга
+- `rawMessages: MessageSnapshot[]` — оригинальный формат для metadata (kind, action_link)
+- `isLoading: boolean`
+- `isStreaming: boolean`
+- `sendMessage(text): Promise<boolean>`
+- `loadMore(): Promise<void>` — ленивая подгрузка при скролле вверх
+- `hasMore: boolean`
+
+### Ленивая загрузка
+
+- При mount: загружает последние 50 сообщений через `messages:list-paginated`
+- При скролле к верхней границе: `loadMore()` загружает следующие 50 с `beforeId`
+- Позиция скролла сохраняется при подгрузке (не прыгает вверх)
