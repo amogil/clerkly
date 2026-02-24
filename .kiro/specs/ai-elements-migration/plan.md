@@ -411,15 +411,25 @@ interface UseAgentChatResult {
 - Если `Conversation` ожидает только `Message` компоненты — `AgentWelcome` может потребовать обёртки или рендера вне `ConversationContent`.
 
 - [x] **5.1** Изучить API `Conversation`, `ConversationContent`, `ConversationScrollButton`
-- [ ] **5.2** Создать `AgentChat` компонент (`src/renderer/components/agents/AgentChat.tsx`):
+- [x] **5.2** Создать `AgentChat` компонент (`src/renderer/components/agents/AgentChat.tsx`):
   - Использует `useAgentChat(agentId)` для загрузки сообщений
   - Содержит `Conversation` + `ConversationContent` + список `AgentMessage` + `AgentPromptInput`
   - Экспортирует `isLoading` через props callback или через ref
-- [ ] **5.3** Добавить `data-testid="messages-area"` на контейнер сообщений (для функциональных тестов)
-- [ ] **5.4** Убедиться что `AgentWelcome` корректно рендерится внутри `Conversation` с выравниванием `justify-end` (agents.4.20). Если `Conversation` не поддерживает произвольный контент — рендерить `AgentWelcome` вне `ConversationContent` (условно: показывать вместо `Conversation` когда нет сообщений)
-- [ ] **5.5** В `agents.tsx` рендерить все `AgentChat` одновременно, скрывать неактивные через CSS `hidden` (или `display: none`). НЕ использовать `key={currentAgent.id}` — это вызовет ремонт при смене агента.
-- [ ] **5.6** Реализовать подгрузку при скролле вверх — вызов `loadMore()` из `useAgentChat` при достижении верхней границы `Conversation`
+- [x] **5.3** Добавить `data-testid="messages-area"` на контейнер сообщений (для функциональных тестов)
+- [x] **5.4** `AgentWelcome` рендерится внутри `ConversationContent` с `justify-end min-h-full` — корректно
+- [x] **5.5** В `agents.tsx` рендерить все `AgentChat` одновременно, скрывать неактивные через CSS `hidden`. НЕ использовать `key={currentAgent.id}`.
+- [x] **5.6** Реализовать подгрузку при скролле вверх — `onScroll` на `Conversation`, проверка `scrollTop < 50`
 - [ ] **5.7** Написать unit-тесты
+- [ ] **5.7.1** Написать функциональные тесты автоскролла и ленивой подгрузки (`tests/functional/agent-scroll-position.spec.ts`):
+  - "should autoscroll to bottom when user is at bottom and new message arrives"
+  - "should NOT autoscroll when user has scrolled up"
+  - "should load more messages when scrolled to top (scrollTop < 50)"
+  - "should NOT trigger load more when all messages are loaded (hasMore = false)"
+  - "should preserve scroll position when switching between agents"
+- [ ] **5.7.2** Написать функциональный тест стартового лоадера (`tests/functional/startup-loader.spec.ts`):
+  - "should show loader while agents are loading initial messages" — лоадер (три точки) виден сразу после запуска, пока идёт загрузка
+  - "should load last 50 messages per agent on startup" — после исчезновения лоадера каждый агент показывает до 50 сообщений
+  - "should hide loader and show chat UI after all agents finish loading" — после загрузки всех агентов лоадер скрывается и отображается интерфейс чата (textarea, сообщения)
 - [ ] **5.8** Обновить `design.md`
 
 ---

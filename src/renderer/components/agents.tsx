@@ -1,19 +1,10 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { motion } from 'framer-motion';
+// Requirements: agents.1, agents.2, agents.3, agents.4, agents.5, agents.6, agents.12, agents.13
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useAgents } from '../hooks/useAgents';
-import { useAgentChat } from '../hooks/useAgentChat';
 import { hasError } from '../../shared/utils/agentStatus';
-import { AgentWelcome } from './agents/AgentWelcome';
 import { AgentHeader } from './agents/AgentHeader';
+import { AgentChat } from './agents/AgentChat';
 import { AllAgentsPage } from './agents/AllAgentsPage';
-import { AgentMessage } from './agents/AgentMessage';
-import { AgentPromptInput, AgentPromptInputHandle } from './agents/AgentPromptInput';
-import { RateLimitBanner } from './agents/RateLimitBanner';
-import {
-  Conversation,
-  ConversationContent,
-  ConversationScrollButton,
-} from './ai-elements/conversation';
 import { useEventSubscription } from '../events/useEventSubscription';
 import { EVENT_TYPES } from '../../shared/events/constants';
 import type { AgentRateLimitPayload } from '../../shared/events/types';
@@ -21,7 +12,6 @@ import type { AgentSnapshot } from '../types/agent';
 
 export function Agents({ onNavigate }: { onNavigate?: (screen: string) => void }) {
   const [showAllTasksPage, setShowAllTasksPage] = useState(false);
-  const [taskInput, setTaskInput] = useState('');
   const [visibleChatsCount, setVisibleChatsCount] = useState(5);
   const [errorMessages, setErrorMessages] = useState<Map<string, string>>(new Map());
   const [isInitialLoad, setIsInitialLoad] = useState(true);
@@ -30,18 +20,14 @@ export function Agents({ onNavigate }: { onNavigate?: (screen: string) => void }
     userMessageId: number;
     retryAfterSeconds: number;
   } | null>(null);
+  // Track loading state per agent — show loader until all chats loaded (agents.13.2, agents.13.10)
+  const [loadingAgents, setLoadingAgents] = useState<Set<string>>(new Set());
+
   const chatListRef = useRef<HTMLDivElement>(null);
-  const textareaRef = useRef<AgentPromptInputHandle>(null);
-  // chatAreaRef for AgentPromptInput max-height calculation (agents.4.6)
-  const chatAreaRef = useRef<HTMLDivElement>(null);
 
   const { agents, activeAgent, createAgent, selectAgent, isLoading } = useAgents();
-  const { rawMessages, sendMessage } = useAgentChat(activeAgent?.id || null);
 
-  const selectedAgent = activeAgent || agents[0];
-
-  // Subscribe to rate limit events — show countdown banner
-  // Requirements: llm-integration.3.7
+  // Subscribe to rate limit events (llm-integration.3.7)
   useEventSubscription(EVENT_TYPES.AGENT_RATE_LIMIT, (payload: AgentRateLimitPayload) => {
     if (activeAgent && payload.agentId === activeAgent.id) {
       setRateLimitBanner({
@@ -59,14 +45,7 @@ export function Agents({ onNavigate }: { onNavigate?: (screen: string) => void }
     }
   }, [isLoading, agents.length, isInitialLoad]);
 
-  // Requirements: agents.4.7.1, agents.4.7.2
-  useEffect(() => {
-    if (activeAgent && textareaRef.current && !showAllTasksPage) {
-      setTimeout(() => textareaRef.current?.focus(), 100);
-    }
-  }, [activeAgent, showAllTasksPage]);
-
-  // Calculate visible chats based on container width
+  // Calculate visible chats based on container width (agents.1.7)
   useEffect(() => {
     const calculate = () => {
       if (!chatListRef.current) return;
@@ -87,15 +66,15 @@ export function Agents({ onNavigate }: { onNavigate?: (screen: string) => void }
     setVisibleChatsCount(Math.max(1, maxChats));
   }, [agents.length]);
 
-  // Requirements: agents.4.13.4, agents.4.14.6
-  const handleSend = async (text?: string) => {
-    const messageText = text || taskInput;
-    if (!messageText.trim() || !activeAgent) return;
-    const success = await sendMessage(messageText);
-    if (success) {
-      setTaskInput('');
-    }
-  };
+  // Track per-agent loading state for global startup loader (agents.13.2, agents.13.10)
+  const handleLoadingChange = useCallback((agentId: string, loading: boolean) => {
+    setLoadingAgents((prev) => {
+      const next = new Set(prev);
+      if (loading) next.add(agentId);
+      else next.delete(agentId);
+      return next;
+    });
+  }, []);
 
   const handleAgentClick = (agent: AgentSnapshot) => {
     selectAgent(agent.id);
@@ -110,7 +89,6 @@ export function Agents({ onNavigate }: { onNavigate?: (screen: string) => void }
   // Requirements: agents.5.5, realtime-events.9
   useEffect(() => {
     if (!showAllTasksPage) return;
-
     async function loadErrorMessages() {
       const errors = new Map<string, string>();
       for (const agent of agents) {
@@ -130,7 +108,6 @@ export function Agents({ onNavigate }: { onNavigate?: (screen: string) => void }
       }
       setErrorMessages(errors);
     }
-
     loadErrorMessages();
   }, [showAllTasksPage, agents]);
 
@@ -148,8 +125,9 @@ export function Agents({ onNavigate }: { onNavigate?: (screen: string) => void }
     );
   }
 
-  // Requirements: agents.2.7, agents.2.10, agents.2.11
-  const currentAgent = selectedAgent || agents[0]!;
+  const currentAgent = activeAgent || agents[0]!;
+  // Show loader while any AgentChat is still loading its initial chunk (agents.13.2, agents.13.10)
+  const allChatsLoaded = loadingAgents.size === 0;
 
   return (
     <div data-testid="agents" className="h-[calc(100vh-4rem)] bg-card flex flex-col">
@@ -164,62 +142,30 @@ export function Agents({ onNavigate }: { onNavigate?: (screen: string) => void }
         onShowAllAgents={() => setShowAllTasksPage(true)}
       />
 
-      {/* Requirements: agents.4.13.8-11 — Conversation manages autoscroll via use-stick-to-bottom */}
-      {/* key=agentId remounts Conversation on agent switch — resets scroll to bottom for new agents */}
-      <Conversation key={currentAgent.id} className="flex-1 min-h-0">
-        <ConversationContent
-          data-testid="messages-area"
-          className="flex flex-col gap-4 p-6 justify-end min-h-full"
-        >
-          {rawMessages.length === 0 ? (
-            <AgentWelcome onPromptClick={(p) => handleSend(p)} />
-          ) : (
-            rawMessages.map((message, index) => {
-              const showAvatar =
-                message.kind !== 'user' && (index === 0 || rawMessages[index - 1]?.kind === 'user');
+      {/* Startup loader — shown until all AgentChat components finish loading (agents.13.2) */}
+      {!allChatsLoaded && (
+        <div className="flex-1 flex items-center justify-center">
+          <div className="flex gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-muted-foreground animate-bounce" />
+            <span className="w-2 h-2 rounded-full bg-muted-foreground animate-bounce [animation-delay:150ms]" />
+            <span className="w-2 h-2 rounded-full bg-muted-foreground animate-bounce [animation-delay:300ms]" />
+          </div>
+        </div>
+      )}
 
-              return (
-                <motion.div
-                  key={message.id}
-                  data-testid="message"
-                  data-message-id={message.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
-                >
-                  <AgentMessage
-                    message={message}
-                    showAvatar={showAvatar}
-                    agentStatus={currentAgent.status}
-                    onNavigate={onNavigate}
-                  />
-                </motion.div>
-              );
-            })
-          )}
-        </ConversationContent>
-
-        {rateLimitBanner && rateLimitBanner.agentId === currentAgent.id && (
-          <RateLimitBanner
-            agentId={rateLimitBanner.agentId}
-            userMessageId={rateLimitBanner.userMessageId}
-            retryAfterSeconds={rateLimitBanner.retryAfterSeconds}
-            onDismiss={() => setRateLimitBanner(null)}
+      {/* All AgentChat components mounted at startup — CSS show/hide on agent switch (agents.13.3, agents.13.5) */}
+      <div className={`flex-1 min-h-0 flex flex-col${allChatsLoaded ? '' : ' hidden'}`}>
+        {agents.map((agent) => (
+          <AgentChat
+            key={agent.id}
+            agent={agent}
+            isActive={agent.id === currentAgent.id}
+            rateLimitBanner={rateLimitBanner}
+            onRateLimitDismiss={() => setRateLimitBanner(null)}
+            onLoadingChange={handleLoadingChange}
+            onNavigate={onNavigate}
           />
-        )}
-
-        <ConversationScrollButton />
-      </Conversation>
-
-      <div ref={chatAreaRef} className="flex-shrink-0">
-        <AgentPromptInput
-          ref={textareaRef}
-          value={taskInput}
-          onChange={setTaskInput}
-          onSubmit={handleSend}
-          disabled={!activeAgent}
-          chatAreaRef={chatAreaRef}
-        />
+        ))}
       </div>
     </div>
   );
