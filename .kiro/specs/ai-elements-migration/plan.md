@@ -419,7 +419,7 @@ interface UseAgentChatResult {
 - [x] **5.4** `AgentWelcome` рендерится внутри `ConversationContent` с `justify-end min-h-full` — корректно
 - [x] **5.5** В `agents.tsx` рендерить все `AgentChat` одновременно, скрывать неактивные через CSS `hidden`. НЕ использовать `key={currentAgent.id}`.
 - [x] **5.6** Реализовать подгрузку при скролле вверх — `onScroll` на `Conversation`, проверка `scrollTop < 50`
-- [ ] **5.7** Написать unit-тесты
+- [x] **5.7** Написать unit-тесты (`tests/unit/components/agents/AgentChat.test.tsx`) — 19 тестов
 - [ ] **5.7.1** Написать функциональные тесты автоскролла и ленивой подгрузки (`tests/functional/agent-scroll-position.spec.ts`):
   - "should autoscroll to bottom when user is at bottom and new message arrives"
   - "should NOT autoscroll when user has scrolled up"
