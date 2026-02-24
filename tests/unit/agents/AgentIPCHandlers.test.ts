@@ -293,6 +293,39 @@ describe('AgentIPCHandlers', () => {
 
       expect(result).toEqual({ success: false, error: 'Agent not found' });
     });
+
+    /* Preconditions: Handlers registered, AgentManager.get throws
+       Action: Invoke agents:get
+       Assertions: Error returned
+       Requirements: agents.3.2 */
+    it('should return error when AgentManager.get throws', async () => {
+      mockAgentManager.get = jest.fn().mockImplementation(() => {
+        throw new Error('DB connection lost');
+      });
+      handlers.registerHandlers();
+      const handler = registeredHandlers.get('agents:get')!;
+
+      const result = await handler(mockEvent, { agentId: 'abc123xyz0' });
+
+      expect(result).toEqual({ success: false, error: 'DB connection lost' });
+    });
+
+    /* Preconditions: Handlers registered, AgentManager.get throws non-Error
+       Action: Invoke agents:get
+       Assertions: String representation returned
+       Requirements: agents.3.2 */
+    it('should handle non-Error thrown from AgentManager.get', async () => {
+      mockAgentManager.get = jest.fn().mockImplementation(() => {
+        // eslint-disable-next-line @typescript-eslint/only-throw-error
+        throw 'string error';
+      });
+      handlers.registerHandlers();
+      const handler = registeredHandlers.get('agents:get')!;
+
+      const result = await handler(mockEvent, { agentId: 'abc123xyz0' });
+
+      expect(result).toEqual({ success: false, error: 'string error' });
+    });
   });
 
   describe('agents:update handler', () => {
@@ -825,6 +858,33 @@ describe('AgentIPCHandlers', () => {
       const result = await handler(mockEvent, { agentId: 'abc123xyz0', userMessageId: 42 });
 
       expect(result).toEqual({ success: false, error: 'Cancel failed' });
+    });
+
+    /* Preconditions: Handlers registered, pipeline rejects in background
+       Action: Invoke messages:retry-last, pipeline rejects
+       Assertions: handleBackgroundError called
+       Requirements: llm-integration.3.7.3 */
+    it('should call handleBackgroundError when retry pipeline rejects in background', async () => {
+      const ErrorHandlerModule = require('../../../src/main/ErrorHandler');
+      const handleBackgroundErrorSpy = jest
+        .spyOn(ErrorHandlerModule, 'handleBackgroundError')
+        .mockImplementation(() => {});
+
+      const pipelineError = new Error('Retry pipeline failed');
+      mockPipeline.run = jest.fn().mockRejectedValue(pipelineError);
+
+      handlers.registerHandlers();
+      const handler = registeredHandlers.get('messages:retry-last')!;
+
+      const result = await handler(mockEvent, { agentId: 'abc123xyz0', userMessageId: 42 });
+
+      expect(result).toEqual({ success: true });
+
+      await new Promise((r) => setTimeout(r, 0));
+
+      expect(handleBackgroundErrorSpy).toHaveBeenCalledWith(pipelineError, 'LLM Pipeline (retry)');
+
+      handleBackgroundErrorSpy.mockRestore();
     });
   });
 

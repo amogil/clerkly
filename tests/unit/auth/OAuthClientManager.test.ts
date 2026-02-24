@@ -211,6 +211,118 @@ describe('OAuthClientManager', () => {
       expect(result.authorized).toBe(false);
       expect(result.error).toBe('access_denied');
     });
+
+    /* Preconditions: Deep link with non-access_denied error parameter
+       Action: Call handleDeepLink with error=server_error
+       Assertions: Returns error from URL
+       Requirements: google-oauth-auth.2.2 */
+    it('should handle non-access_denied error in deep link', async () => {
+      const deepLinkUrl = 'clerkly://oauth/callback?error=server_error';
+      const result = await oauthClient.handleDeepLink(deepLinkUrl);
+
+      expect(result.authorized).toBe(false);
+      expect(result.error).toBe('server_error');
+    });
+
+    /* Preconditions: Deep link with empty code parameter
+       Action: Call handleDeepLink with empty code
+       Assertions: Returns invalid_request error
+       Requirements: google-oauth-auth.2.2 */
+    it('should reject deep link with empty code', async () => {
+      await oauthClient.startAuthFlow();
+      const state = (oauthClient as any).pkceStorage.state;
+
+      const deepLinkUrl = `clerkly://oauth/callback?code=&state=${state}`;
+      const result = await oauthClient.handleDeepLink(deepLinkUrl);
+
+      expect(result.authorized).toBe(false);
+      expect(result.error).toBe('invalid_request');
+    });
+
+    /* Preconditions: startAuthFlow not called, no pkceStorage
+       Action: Call handleDeepLink with valid-looking code and state
+       Assertions: Returns csrf_attack_detected
+       Requirements: google-oauth-auth.2.3 */
+    it('should reject when no auth flow was started', async () => {
+      const deepLinkUrl = 'clerkly://oauth/callback?code=some-code&state=some-state';
+      const result = await oauthClient.handleDeepLink(deepLinkUrl);
+
+      expect(result.authorized).toBe(false);
+      expect(result.error).toBe('csrf_attack_detected');
+    });
+
+    /* Preconditions: userManager set, UserInfo API returns 401
+       Action: Call handleDeepLink with valid code+state
+       Assertions: Returns profile_fetch_failed
+       Requirements: google-oauth-auth.3.7 */
+    it('should return profile_fetch_failed when UserInfo API returns error', async () => {
+      const mockUserManager = {
+        fetchProfile: jest.fn().mockResolvedValue(null),
+        findOrCreateUser: jest.fn(),
+        setCurrentUser: jest.fn(),
+        updateProfileAfterTokenRefresh: jest.fn().mockResolvedValue(undefined),
+        clearSession: jest.fn(),
+      };
+      oauthClient.setUserManager(mockUserManager);
+
+      await oauthClient.startAuthFlow();
+      const state = (oauthClient as any).pkceStorage.state;
+
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          access_token: 'test-access-token',
+          refresh_token: 'test-refresh-token',
+          expires_in: 3600,
+          token_type: 'Bearer',
+        }),
+      });
+      (global.fetch as jest.Mock).mockResolvedValueOnce({ ok: false, status: 401 });
+
+      const deepLinkUrl = `clerkly://oauth/callback?code=test-code&state=${state}`;
+      const result = await oauthClient.handleDeepLink(deepLinkUrl);
+
+      expect(result.authorized).toBe(false);
+      expect(result.error).toBe('profile_fetch_failed');
+    });
+
+    /* Preconditions: userManager set, profile has null name
+       Action: Call handleDeepLink with valid code+state
+       Assertions: Authorized successfully with 'User' name fallback
+       Requirements: google-oauth-auth.3.8 */
+    it('should use User fallback when profile name is null', async () => {
+      const mockUser = { userId: 'user-123', email: 'test@example.com', name: null };
+      const mockUserManager = {
+        fetchProfile: jest.fn().mockResolvedValue(mockUser),
+        findOrCreateUser: jest.fn().mockReturnValue(mockUser),
+        setCurrentUser: jest.fn(),
+        updateProfileAfterTokenRefresh: jest.fn().mockResolvedValue(undefined),
+        clearSession: jest.fn(),
+      };
+      oauthClient.setUserManager(mockUserManager);
+
+      await oauthClient.startAuthFlow();
+      const state = (oauthClient as any).pkceStorage.state;
+
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          access_token: 'test-access-token',
+          refresh_token: 'test-refresh-token',
+          expires_in: 3600,
+          token_type: 'Bearer',
+        }),
+      });
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ id: 'user-123', email: 'test@example.com', name: null }),
+      });
+
+      const deepLinkUrl = `clerkly://oauth/callback?code=test-code&state=${state}`;
+      const result = await oauthClient.handleDeepLink(deepLinkUrl);
+
+      expect(result.authorized).toBe(true);
+    });
   });
 
   describe('Token Exchange', () => {
@@ -578,6 +690,69 @@ describe('OAuthClientManager', () => {
       const tokens = await tokenStorage.loadTokens();
       expect(tokens).toBeNull();
     });
+
+    /* Preconditions: No tokens in storage
+       Action: Call refreshAccessToken
+       Assertions: Returns false immediately
+       Requirements: google-oauth-auth.6.1 */
+    it('should return false when no tokens in storage', async () => {
+      const result = await oauthClient.refreshAccessToken();
+      expect(result).toBe(false);
+    });
+
+    /* Preconditions: Tokens exist but no refresh token
+       Action: Call refreshAccessToken
+       Assertions: Returns false
+       Requirements: google-oauth-auth.6.1 */
+    it('should return false when no refresh token', async () => {
+      await tokenStorage.saveTokens({
+        accessToken: 'access-token',
+        expiresAt: Date.now() - 1000,
+        tokenType: 'Bearer',
+      });
+
+      const result = await oauthClient.refreshAccessToken();
+      expect(result).toBe(false);
+    });
+
+    /* Preconditions: Valid refresh token, server returns non-invalid_grant error
+       Action: Call refreshAccessToken
+       Assertions: Returns false
+       Requirements: google-oauth-auth.6.5 */
+    it('should return false on non-invalid_grant server error', async () => {
+      await tokenStorage.saveTokens({
+        accessToken: 'old-access-token',
+        refreshToken: 'test-refresh-token',
+        expiresAt: Date.now() - 1000,
+        tokenType: 'Bearer',
+      });
+
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: false,
+        json: async () => ({ error: 'server_error' }),
+      });
+
+      const result = await oauthClient.refreshAccessToken();
+      expect(result).toBe(false);
+    });
+
+    /* Preconditions: Valid refresh token, fetch throws
+       Action: Call refreshAccessToken
+       Assertions: Returns false
+       Requirements: google-oauth-auth.6.5 */
+    it('should return false when fetch throws during refresh', async () => {
+      await tokenStorage.saveTokens({
+        accessToken: 'old-access-token',
+        refreshToken: 'test-refresh-token',
+        expiresAt: Date.now() - 1000,
+        tokenType: 'Bearer',
+      });
+
+      (global.fetch as jest.Mock).mockRejectedValueOnce(new Error('Network failure'));
+
+      const result = await oauthClient.refreshAccessToken();
+      expect(result).toBe(false);
+    });
   });
 
   describe('Logout', () => {
@@ -634,6 +809,55 @@ describe('OAuthClientManager', () => {
        Requirements: google-oauth-auth.7.2 */
     it('should handle logout when no tokens exist', async () => {
       await expect(oauthClient.logout()).resolves.not.toThrow();
+    });
+
+    /* Preconditions: Tokens exist, userManager set
+       Action: Call logout
+       Assertions: userManager.clearSession called
+       Requirements: google-oauth-auth.7.3, navigation.1.4 */
+    it('should call userManager.clearSession on logout', async () => {
+      const mockUserManager = {
+        fetchProfile: jest.fn(),
+        findOrCreateUser: jest.fn(),
+        setCurrentUser: jest.fn(),
+        updateProfileAfterTokenRefresh: jest.fn(),
+        clearSession: jest.fn(),
+      };
+      oauthClient.setUserManager(mockUserManager);
+
+      await tokenStorage.saveTokens({
+        accessToken: 'test-access-token',
+        refreshToken: 'test-refresh-token',
+        expiresAt: Date.now() + 3600000,
+        tokenType: 'Bearer',
+      });
+
+      (global.fetch as jest.Mock).mockResolvedValueOnce({ ok: true, json: async () => ({}) });
+
+      await oauthClient.logout();
+
+      expect(mockUserManager.clearSession).toHaveBeenCalled();
+    });
+
+    /* Preconditions: tokenStorage.deleteTokens throws
+       Action: Call logout
+       Assertions: Error rethrown
+       Requirements: google-oauth-auth.7.4 */
+    it('should throw when deleteTokens fails', async () => {
+      jest.spyOn(tokenStorage, 'deleteTokens').mockRejectedValueOnce(new Error('Storage error'));
+
+      await expect(oauthClient.logout()).rejects.toThrow('Logout failed: Storage error');
+    });
+  });
+
+  describe('setAuthWindowManager', () => {
+    /* Preconditions: None
+       Action: Call setAuthWindowManager
+       Assertions: No error thrown
+       Requirements: google-oauth-auth.7.1 */
+    it('should set auth window manager without error', () => {
+      const mockAuthWindowManager = {};
+      expect(() => oauthClient.setAuthWindowManager(mockAuthWindowManager)).not.toThrow();
     });
   });
 });
