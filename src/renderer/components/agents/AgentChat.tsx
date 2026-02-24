@@ -9,10 +9,7 @@ import { AgentMessage } from './AgentMessage';
 import { AgentPromptInput, AgentPromptInputHandle } from './AgentPromptInput';
 import { AgentWelcome } from './AgentWelcome';
 import { RateLimitBanner } from './RateLimitBanner';
-import {
-  Conversation,
-  ConversationContent,
-} from '../ai-elements/conversation';
+import { Conversation, ConversationContent } from '../ai-elements/conversation';
 import { useStickToBottomContext } from 'use-stick-to-bottom';
 import { ArrowDownIcon } from 'lucide-react';
 import type { AgentSnapshot } from '../../types/agent';
@@ -57,8 +54,6 @@ interface AgentChatInnerProps {
   isActive: boolean;
   rateLimitBanner: RateLimitState | null;
   onRateLimitDismiss: () => void;
-  hasMore: boolean;
-  loadMore: () => void;
   rawMessages: ReturnType<typeof useAgentChat>['rawMessages'];
   sendMessage: ReturnType<typeof useAgentChat>['sendMessage'];
   onNavigate?: (screen: string) => void;
@@ -73,8 +68,6 @@ function AgentChatInner({
   isActive,
   rateLimitBanner,
   onRateLimitDismiss,
-  hasMore,
-  loadMore,
   rawMessages,
   sendMessage,
   onNavigate,
@@ -192,7 +185,9 @@ export function AgentChat({
 
   return (
     // Hidden via CSS — NOT unmounted — absolute+opacity-0 keeps scrollTop intact (agents.13.5, agents.4.14)
-    <div className={`flex flex-col flex-1 min-h-0${isActive ? '' : ' absolute inset-0 opacity-0 pointer-events-none'}`}>
+    <div
+      className={`flex flex-col flex-1 min-h-0${isActive ? '' : ' absolute inset-0 opacity-0 pointer-events-none'}`}
+    >
       {/* Conversation manages autoscroll via use-stick-to-bottom (agents.4.13) */}
       <Conversation className="flex-1 min-h-0" onScroll={handleScroll}>
         <AgentChatInner
@@ -200,8 +195,6 @@ export function AgentChat({
           isActive={isActive}
           rateLimitBanner={rateLimitBanner}
           onRateLimitDismiss={onRateLimitDismiss}
-          hasMore={hasMore}
-          loadMore={loadMore}
           rawMessages={rawMessages}
           sendMessage={sendMessage}
           onNavigate={onNavigate}

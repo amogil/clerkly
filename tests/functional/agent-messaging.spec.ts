@@ -237,7 +237,7 @@ test.describe('Agent Messaging', () => {
       () => {
         const container = document.querySelector('[data-testid="messages-area"]');
         if (!container) return false;
-        return (container.scrollHeight - container.scrollTop - container.clientHeight) < 50;
+        return container.scrollHeight - container.scrollTop - container.clientHeight < 50;
       },
       { timeout: 5000 }
     );
