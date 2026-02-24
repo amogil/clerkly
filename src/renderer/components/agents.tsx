@@ -94,6 +94,10 @@ export function Agents({ onNavigate }: { onNavigate?: (screen: string) => void }
   const handleScroll = () => {
     if (!messagesAreaRef.current || !activeAgent) return;
     scrollPositions.current.set(activeAgent.id, messagesAreaRef.current.scrollTop);
+    // If user manually scrolled away from bottom, cancel the pending autoscroll
+    if (shouldScrollOnNextMessage.current && !isUserAtBottom()) {
+      shouldScrollOnNextMessage.current = false;
+    }
   };
 
   // Requirements: agents.1.4.4
