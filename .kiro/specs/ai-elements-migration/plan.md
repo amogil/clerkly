@@ -16,7 +16,7 @@
 | `ChatInput.tsx` + `AutoExpandingTextarea.tsx` | `PromptInput` + `PromptInputTextarea` + `PromptInputButton` (AI Elements) |
 | `ScrollArea` + ручной скролл-менеджмент | `Conversation` + `ConversationContent` + `ConversationScrollButton` (AI Elements) |
 | `useMessages` hook | `useAgentChat` (обёртка над `useChat` с кастомным transport) |
-| `AnthropicProvider.ts` / `OpenAIProvider.ts` / `GoogleProvider.ts` | AI SDK `streamText` + `@ai-sdk/anthropic`, `@ai-sdk/openai`, `@ai-sdk/google` |
+| `AnthropicProvider.ts` / `OpenAIProvider.ts` / `GoogleProvider.ts` | нативный HTTP+SSE для всех трёх провайдеров (chat() реализован, интерфейс ILLMProvider сохранён) |
 
 ### Что НЕ меняется (граница скоупа)
 
@@ -152,12 +152,9 @@ messagesArea.evaluate(el => el.scrollHeight - el.scrollTop - el.clientHeight)
 - [x] **0.6** `AutoExpandingTextarea` уже поддерживает: `ref` через `useImperativeHandle` (focus/blur), `maxHeight = chatArea.offsetHeight * 0.5`, Enter/Shift+Enter, `data-testid="auto-expanding-textarea"`. Дополнительных изменений не требуется.
 - [x] **0.7** `Conversation` (`use-stick-to-bottom`): автоскролл при новых сообщениях — ✅ (StickToBottom с `initial="smooth"`), кнопка scroll-to-bottom — ✅ (`ConversationScrollButton` через `useStickToBottomContext`), поведение при смене `key` — стандартное React remount.
 - [x] **0.8** Изучить API `streamText` из `ai@5`. **Выводы:**
-  - `streamText({ model, messages, onChunk })` возвращает `StreamTextResult` с `fullStream` (AsyncIterable) и `text` (Promise)
-  - Чанки reasoning: `{ type: 'reasoning', textDelta: string }` — заменяет ручной SSE-парсинг
-  - Чанки текста: `{ type: 'text-delta', textDelta: string }` — для накопления content
-  - Ошибки: `{ type: 'error', error: unknown }` — для обработки 401/429/5xx
-  - Structured output: `generateObject({ schema })` или `streamObject` — но текущий подход (JSON schema в response_format) работает через `streamText` с накоплением JSON
-  - **Решение для Phase 9:** Заменить ручной fetch+SSE на `streamText` с `@ai-sdk/openai`, `@ai-sdk/anthropic`, `@ai-sdk/google`. Сохранить интерфейс `ILLMProvider.chat()` без изменений — только внутренняя реализация меняется.
+  - `streamText` из `ai@5` несовместим с `@ai-sdk/anthropic@3`/`@ai-sdk/google@3`/`@ai-sdk/openai@3` — они используют `LanguageModelV3`, а `ai@5` ожидает `LanguageModelV2`
+  - **Решение для Phase 9:** Сохранить нативный fetch+SSE для OpenAI (уже работал), реализовать Anthropic и Google аналогично через нативный HTTP+SSE
+  - `ai@5` используется только в renderer (для `useChat`, `UIMessage`) — в main process не импортируется
 - [x] **0.9** Обновить `requirements.md`:
   - Добавлен раздел `agents.13` (AI Elements интеграция)
   - Обновлён `agents.4.13.11` — заменено требование ScrollArea из radix-ui на `Conversation` из AI Elements
@@ -622,20 +619,24 @@ interface UseAgentChatResult {
 
 ### Фаза 9: Миграция LLM провайдеров (main process)
 
-Заменяет ручной SSE-парсинг в провайдерах на AI SDK `streamText`.
+Реализует `chat()` для Anthropic и Google провайдеров через нативный HTTP+SSE (по образцу OpenAI).
 
 **Контекст:**
-- Текущие провайдеры (`AnthropicProvider.ts`, `OpenAIProvider.ts`, `GoogleProvider.ts`) реализуют `ILLMProvider.chat(messages, options, onChunk): Promise<LLMAction>`
-- Они вручную парсят SSE-стримы от API провайдеров
-- AI SDK `streamText` делает это автоматически через `@ai-sdk/openai`, `@ai-sdk/anthropic`, `@ai-sdk/google`
-- Нужно сохранить интерфейс `ILLMProvider` и обработку ошибок (401, 429, 5xx)
+- `OpenAIProvider.ts` — уже реализован через нативный fetch+SSE, тесты написаны
+- `AnthropicProvider.ts` — `chat()` бросал `not implemented`, теперь реализован через Anthropic Messages API (SSE)
+- `GoogleProvider.ts` — `chat()` бросал `not implemented`, теперь реализован через Gemini `streamGenerateContent?alt=sse`
+- `ai@5` используется только в renderer (для `useChat`, `UIMessage`). В main process — не используется.
+- Интерфейс `ILLMProvider` сохранён без изменений
 
-- [ ] **9.1** Обновить `OpenAIProvider.ts` — заменить ручной HTTP + SSE на `streamText` с `@ai-sdk/openai`
-- [ ] **9.2** Обновить `AnthropicProvider.ts` — аналогично с `@ai-sdk/anthropic`
-- [ ] **9.3** Обновить `GoogleProvider.ts` — аналогично с `@ai-sdk/google`
-- [ ] **9.4** Сохранить обработку ошибок: 401 → "Invalid API key", 429 → rate limit с retry-after, 5xx → "Provider unavailable"
-- [ ] **9.5** Обновить unit-тесты провайдеров
-- [ ] **9.6** Запустить `npm run validate`
+**Почему не AI SDK streamText:**
+- `ai@5` использует `LanguageModelV2`, а `@ai-sdk/anthropic@3`/`@ai-sdk/google@3`/`@ai-sdk/openai@3` реализуют `LanguageModelV3` — несовместимы
+
+- [x] **9.1** `OpenAIProvider.ts` — уже реализован через нативный fetch+SSE (без изменений)
+- [x] **9.2** Реализовать `AnthropicProvider.chat()` через нативный HTTP+SSE (Anthropic Messages API)
+- [x] **9.3** Реализовать `GoogleProvider.chat()` через нативный HTTP+SSE (Gemini streamGenerateContent)
+- [x] **9.4** Обработка ошибок: 401 → "Invalid API key", 429 → rate limit, 5xx → "Provider unavailable"
+- [x] **9.5** Написать unit-тесты: `AnthropicProvider.chat.test.ts`, `GoogleProvider.chat.test.ts`
+- [x] **9.6** Запустить `npm run validate`
 
 ---
 
@@ -708,7 +709,7 @@ interface UseAgentChatResult {
 | `PromptInputTextarea` не поддерживает `ref` для фокуса | Низкая | Фаза 0.6 — проверить; если нет — `autoFocus` prop |
 | `Conversation` не сохраняет позицию скролла при смене агента | Средняя | Фаза 5.4 — реализовать через ID последнего видимого сообщения |
 | AI SDK v5 `ChatTransport` интерфейс отличается от ожидаемого | Средняя | Фаза 0.3 — изучить до начала работы |
-| `streamText` не поддерживает structured output (LLMAction) | Средняя | Фаза 0.8 — изучить; если нет — `generateObject` |
+| `@ai-sdk/*` несовместимы с `ai@5` в main process | Решено | Нативный HTTP+SSE для всех провайдеров, `ai@5` только в renderer |
 | Ленивая загрузка ломает подсчёт сообщений в функциональных тестах | Средняя | Limit 50 достаточен для тестов (макс 20 сообщений в тестах) |
 | `motion` vs `framer-motion` конфликт | Низкая | Проверить импорты |
 
