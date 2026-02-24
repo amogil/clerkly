@@ -52,30 +52,37 @@ function ScrollToBottomButton() {
   );
 }
 
+interface AgentChatInnerProps {
+  agent: AgentSnapshot;
+  isActive: boolean;
+  rateLimitBanner: RateLimitState | null;
+  onRateLimitDismiss: () => void;
+  hasMore: boolean;
+  loadMore: () => void;
+  rawMessages: ReturnType<typeof useAgentChat>['rawMessages'];
+  sendMessage: ReturnType<typeof useAgentChat>['sendMessage'];
+  onNavigate?: (screen: string) => void;
+}
+
 /**
- * AgentChat — independent chat component per agent.
- * Mounted at app startup, stays mounted forever (agents.13.3).
- * Hidden via className="hidden" when not active (agents.13.5).
- * Conversation (use-stick-to-bottom) manages scroll position automatically (agents.4.14).
+ * Inner component — lives inside <Conversation> so it can access useStickToBottomContext.
+ * Calls scrollToBottom() on send to reset scroll position (agents.4.14.5).
  */
-export function AgentChat({
+function AgentChatInner({
   agent,
   isActive,
   rateLimitBanner,
   onRateLimitDismiss,
-  onLoadingChange,
+  hasMore,
+  loadMore,
+  rawMessages,
+  sendMessage,
   onNavigate,
-}: AgentChatProps) {
+}: AgentChatInnerProps) {
   const textareaRef = useRef<AgentPromptInputHandle>(null);
   const chatAreaRef = useRef<HTMLDivElement>(null);
   const [taskInput, setTaskInput] = React.useState('');
-
-  const { rawMessages, sendMessage, isLoading, loadMore, hasMore } = useAgentChat(agent.id);
-
-  // Notify parent when loading state changes (agents.13.2, agents.13.10)
-  useEffect(() => {
-    onLoadingChange(agent.id, isLoading);
-  }, [agent.id, isLoading, onLoadingChange]);
+  const { scrollToBottom } = useStickToBottomContext();
 
   // Autofocus textarea when this chat becomes active (agents.4.7.1)
   useEffect(() => {
@@ -84,72 +91,61 @@ export function AgentChat({
     }
   }, [isActive]);
 
+  // Requirements: agents.4.14.5 — scroll to bottom when user sends a message
   const handleSend = useCallback(
     async (text?: string) => {
       const messageText = text || taskInput;
       if (!messageText.trim()) return;
+      scrollToBottom('instant');
       const success = await sendMessage(messageText);
       if (success) setTaskInput('');
     },
-    [taskInput, sendMessage]
-  );
-
-  // Load more messages when scrolled to top (agents.13.9)
-  // Autoscroll ONLY fires when user is at the bottom — handled by use-stick-to-bottom (agents.4.13.2)
-  const handleScroll = useCallback(
-    (e: React.UIEvent<HTMLDivElement>) => {
-      if (hasMore && e.currentTarget.scrollTop < 50) loadMore();
-    },
-    [hasMore, loadMore]
+    [taskInput, sendMessage, scrollToBottom]
   );
 
   return (
-    // Hidden via CSS — NOT unmounted — Conversation preserves scroll position automatically (agents.13.5, agents.4.14)
-    <div className={`flex flex-col flex-1 min-h-0${isActive ? '' : ' hidden'}`}>
-      {/* Conversation manages autoscroll via use-stick-to-bottom (agents.4.13) */}
-      <Conversation className="flex-1 min-h-0" onScroll={handleScroll}>
-        <ConversationContent
-          data-testid="messages-area"
-          className="flex flex-col gap-4 p-6 justify-end min-h-full"
-        >
-          {rawMessages.length === 0 ? (
-            <AgentWelcome onPromptClick={(p) => handleSend(p)} />
-          ) : (
-            rawMessages.map((message, index) => {
-              const showAvatar =
-                message.kind !== 'user' && (index === 0 || rawMessages[index - 1]?.kind === 'user');
-              return (
-                <motion.div
-                  key={message.id}
-                  data-testid="message"
-                  data-message-id={message.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
-                >
-                  <AgentMessage
-                    message={message}
-                    showAvatar={showAvatar}
-                    agentStatus={agent.status}
-                    onNavigate={onNavigate}
-                  />
-                </motion.div>
-              );
-            })
-          )}
-        </ConversationContent>
-
-        {rateLimitBanner && rateLimitBanner.agentId === agent.id && (
-          <RateLimitBanner
-            agentId={rateLimitBanner.agentId}
-            userMessageId={rateLimitBanner.userMessageId}
-            retryAfterSeconds={rateLimitBanner.retryAfterSeconds}
-            onDismiss={onRateLimitDismiss}
-          />
+    <>
+      <ConversationContent
+        data-testid="messages-area"
+        className="flex flex-col gap-4 p-6 justify-end min-h-full"
+      >
+        {rawMessages.length === 0 ? (
+          <AgentWelcome onPromptClick={(p) => handleSend(p)} />
+        ) : (
+          rawMessages.map((message, index) => {
+            const showAvatar =
+              message.kind !== 'user' && (index === 0 || rawMessages[index - 1]?.kind === 'user');
+            return (
+              <motion.div
+                key={message.id}
+                data-testid="message"
+                data-message-id={message.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+              >
+                <AgentMessage
+                  message={message}
+                  showAvatar={showAvatar}
+                  agentStatus={agent.status}
+                  onNavigate={onNavigate}
+                />
+              </motion.div>
+            );
+          })
         )}
+      </ConversationContent>
 
-        <ScrollToBottomButton />
-      </Conversation>
+      {rateLimitBanner && rateLimitBanner.agentId === agent.id && (
+        <RateLimitBanner
+          agentId={rateLimitBanner.agentId}
+          userMessageId={rateLimitBanner.userMessageId}
+          retryAfterSeconds={rateLimitBanner.retryAfterSeconds}
+          onDismiss={onRateLimitDismiss}
+        />
+      )}
+
+      <ScrollToBottomButton />
 
       <div ref={chatAreaRef} className="flex-shrink-0">
         <AgentPromptInput
@@ -161,6 +157,56 @@ export function AgentChat({
           chatAreaRef={chatAreaRef}
         />
       </div>
+    </>
+  );
+}
+
+/**
+ * AgentChat — independent chat component per agent.
+ * Mounted at app startup, stays mounted forever (agents.13.3).
+ * Hidden via absolute+opacity-0 when not active — keeps scrollTop intact (agents.13.5, agents.4.14).
+ * Conversation (use-stick-to-bottom) manages scroll position automatically (agents.4.14).
+ */
+export function AgentChat({
+  agent,
+  isActive,
+  rateLimitBanner,
+  onRateLimitDismiss,
+  onLoadingChange,
+  onNavigate,
+}: AgentChatProps) {
+  const { rawMessages, sendMessage, isLoading, loadMore, hasMore } = useAgentChat(agent.id);
+
+  // Notify parent when loading state changes (agents.13.2, agents.13.10)
+  useEffect(() => {
+    onLoadingChange(agent.id, isLoading);
+  }, [agent.id, isLoading, onLoadingChange]);
+
+  // Load more messages when scrolled to top (agents.13.9)
+  const handleScroll = useCallback(
+    (e: React.UIEvent<HTMLDivElement>) => {
+      if (hasMore && e.currentTarget.scrollTop < 50) loadMore();
+    },
+    [hasMore, loadMore]
+  );
+
+  return (
+    // Hidden via CSS — NOT unmounted — absolute+opacity-0 keeps scrollTop intact (agents.13.5, agents.4.14)
+    <div className={`flex flex-col flex-1 min-h-0${isActive ? '' : ' absolute inset-0 opacity-0 pointer-events-none'}`}>
+      {/* Conversation manages autoscroll via use-stick-to-bottom (agents.4.13) */}
+      <Conversation className="flex-1 min-h-0" onScroll={handleScroll}>
+        <AgentChatInner
+          agent={agent}
+          isActive={isActive}
+          rateLimitBanner={rateLimitBanner}
+          onRateLimitDismiss={onRateLimitDismiss}
+          hasMore={hasMore}
+          loadMore={loadMore}
+          rawMessages={rawMessages}
+          sendMessage={sendMessage}
+          onNavigate={onNavigate}
+        />
+      </Conversation>
     </div>
   );
 }

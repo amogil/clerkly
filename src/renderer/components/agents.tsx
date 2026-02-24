@@ -154,7 +154,7 @@ export function Agents({ onNavigate }: { onNavigate?: (screen: string) => void }
       )}
 
       {/* All AgentChat components mounted at startup — CSS show/hide on agent switch (agents.13.3, agents.13.5) */}
-      <div className={`flex-1 min-h-0 flex flex-col${allChatsLoaded ? '' : ' hidden'}`}>
+      <div className={`flex-1 min-h-0 flex flex-col relative${allChatsLoaded ? '' : ' hidden'}`}>
         {agents.map((agent) => (
           <AgentChat
             key={agent.id}
