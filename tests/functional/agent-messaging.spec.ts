@@ -254,6 +254,10 @@ test.describe('Agent Messaging', () => {
   test('should NOT autoscroll when user is scrolled up', async () => {
     const messageInput = activeChat(window).textarea;
     const messagesArea = activeChat(window).messagesArea;
+    // ConversationScrollButton appears when user is NOT at bottom
+    const scrollButton = window.locator('button[type="button"]').filter({
+      has: window.locator('svg'),
+    });
 
     // Send many messages to create scrollable content
     for (let i = 1; i <= 20; i++) {
@@ -266,30 +270,24 @@ test.describe('Agent Messaging', () => {
       timeout: 10000,
     });
 
-    // Scroll up significantly (to top)
-    await messagesArea.evaluate((el) => {
-      el.scrollTop = 100;
-    });
-
-    await window.waitForTimeout(300);
-
-    // Verify user is NOT at bottom
-    const isAtBottom = await messagesArea.evaluate((el) => {
-      const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-      return distanceFromBottom < el.clientHeight / 3;
-    });
-    expect(isAtBottom).toBe(false);
-
-    // Get scroll position
-    const scrollBeforeNewMessage = await messagesArea.evaluate((el) => el.scrollTop);
-    expect(scrollBeforeNewMessage).toBe(100);
-
-    // Wait to ensure scroll position is stable
+    // Scroll up via real wheel event — use-stick-to-bottom tracks this correctly
+    await messagesArea.hover();
+    await window.mouse.wheel(0, -2000);
     await window.waitForTimeout(500);
 
-    // Verify scroll position hasn't changed
-    const scrollAfter = await messagesArea.evaluate((el) => el.scrollTop);
-    expect(scrollAfter).toBe(100);
+    // Verify user is NOT at bottom — scroll-to-bottom button should be visible
+    const scrollToBottomBtn = window.locator('[data-testid="scroll-to-bottom"]');
+    await expect(scrollToBottomBtn).toBeVisible({ timeout: 3000 });
+
+    // Send new message — should NOT autoscroll since user scrolled up
+    await messageInput.fill('New message while scrolled up');
+    await messageInput.press('Enter');
+    await expect(activeChat(window).userMessages).toHaveCount(21, { timeout: 5000 });
+
+    await window.waitForTimeout(500);
+
+    // Scroll-to-bottom button should still be visible (no autoscroll happened)
+    await expect(scrollToBottomBtn).toBeVisible();
   });
 
   /* Preconditions: User at bottom of chat
@@ -373,23 +371,14 @@ test.describe('Agent Messaging', () => {
 
     await expect(activeChat(window).messages).toHaveCount(15, { timeout: 10000 });
 
-    // Scroll up
-    await messagesArea.evaluate((el) => {
-      el.scrollTop = 100;
-    });
+    // Scroll up via real wheel event — use-stick-to-bottom tracks this correctly
+    await messagesArea.hover();
+    await window.mouse.wheel(0, -2000);
+    await window.waitForTimeout(500);
 
-    await window.waitForTimeout(300);
-
-    // Verify user is NOT at bottom
-    const isAtBottom = await messagesArea.evaluate((el) => {
-      const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-      return distanceFromBottom < el.clientHeight / 3;
-    });
-    expect(isAtBottom).toBe(false);
-
-    // Get scroll position before agent message
-    const scrollBeforeAgentMessage = await messagesArea.evaluate((el) => el.scrollTop);
-    expect(scrollBeforeAgentMessage).toBe(100);
+    // Verify user is NOT at bottom — scroll-to-bottom button should be visible
+    const scrollToBottomBtn = window.locator('[data-testid="scroll-to-bottom"]');
+    await expect(scrollToBottomBtn).toBeVisible({ timeout: 3000 });
 
     // Create agent message using test API
     const result = await window.evaluate(async (agentId) => {
@@ -404,11 +393,10 @@ test.describe('Agent Messaging', () => {
     // Wait for agent message to appear
     await expect(activeChat(window).messages).toHaveCount(16, { timeout: 5000 });
 
-    // Wait a bit to ensure no autoscroll happens
+    // Wait to ensure no autoscroll happens
     await window.waitForTimeout(1000);
 
-    // Verify scroll position did NOT change
-    const scrollAfterAgentMessage = await messagesArea.evaluate((el) => el.scrollTop);
-    expect(scrollAfterAgentMessage).toBe(100);
+    // Scroll-to-bottom button should still be visible (no autoscroll happened)
+    await expect(scrollToBottomBtn).toBeVisible();
   });
 });

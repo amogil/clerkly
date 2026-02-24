@@ -12,8 +12,9 @@ import { RateLimitBanner } from './RateLimitBanner';
 import {
   Conversation,
   ConversationContent,
-  ConversationScrollButton,
 } from '../ai-elements/conversation';
+import { useStickToBottomContext } from 'use-stick-to-bottom';
+import { ArrowDownIcon } from 'lucide-react';
 import type { AgentSnapshot } from '../../types/agent';
 
 interface RateLimitState {
@@ -29,6 +30,26 @@ interface AgentChatProps {
   onRateLimitDismiss: () => void;
   onLoadingChange: (agentId: string, isLoading: boolean) => void;
   onNavigate?: (screen: string) => void;
+}
+
+/**
+ * Scroll-to-bottom button with data-testid for functional tests.
+ * Uses useStickToBottomContext from use-stick-to-bottom (same as ConversationScrollButton).
+ * Requirements: agents.4.13
+ */
+function ScrollToBottomButton() {
+  const { isAtBottom, scrollToBottom } = useStickToBottomContext();
+  if (isAtBottom) return null;
+  return (
+    <button
+      data-testid="scroll-to-bottom"
+      onClick={() => scrollToBottom()}
+      type="button"
+      className="absolute bottom-4 left-[50%] translate-x-[-50%] rounded-full border bg-background shadow-sm hover:bg-muted size-8 flex items-center justify-center"
+    >
+      <ArrowDownIcon className="size-4" />
+    </button>
+  );
 }
 
 /**
@@ -127,7 +148,7 @@ export function AgentChat({
           />
         )}
 
-        <ConversationScrollButton />
+        <ScrollToBottomButton />
       </Conversation>
 
       <div ref={chatAreaRef} className="flex-shrink-0">

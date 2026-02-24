@@ -694,7 +694,7 @@ interface UseAgentChatResult {
 
 ---
 
-#### 1. `agent-messaging.spec.ts`
+#### 1. `agent-messaging.spec.ts` ✅ Исправлено
 
 **Упавшие тесты:**
 - `should NOT autoscroll when user is scrolled up`
@@ -965,20 +965,20 @@ interface UseAgentChatResult {
 
 ### Сводная таблица
 
-| Тест | Основная причина | Приоритет |
-|------|-----------------|-----------|
-| `agent-messaging` (3 теста) | `use-stick-to-bottom` конфликт + `window.api.test` API | Высокий |
-| `agent-scroll-position` (4 теста) | CSS `hidden` сбрасывает `scrollTop` | Высокий |
-| `input-autofocus` (4 теста) | `data-testid="all-agents-button"` отсутствует + race condition | Средний |
-| `empty-state-placeholder` (2 теста) | Лоадер блокирует `AgentWelcome` + `isLoading` не сбрасывается | Средний |
-| `agent-switching` (1 тест) | Локаторы находят скрытые элементы в других AgentChat | Средний |
-| `agent-reordering` (4 теста) | `data-testid="all-agents-button"` отсутствует | Высокий |
-| `agent-data-isolation` (2 теста) | Конфликт портов (8898) | Низкий |
-| `agent-date-update` (1 тест) | `window.api.test.createAgentWithOldMessage` + `agent-header-timestamp` | Средний |
-| `agent-list-initial-animation` (1 тест) | Таймаут + CSS анимация проверяется после завершения | Низкий |
-| `agent-status-indicators` (2 теста) | `data-testid="agent-header-icon"` отсутствует | Средний |
-| `all-agents-page` (1 тест) | Недостаточно агентов для `+N` кнопки | Низкий |
-| `auto-expanding-textarea` (1 тест) | `sendMessage` async + `setTaskInput('')` условный | Средний |
+| Тест | Основная причина | Приоритет | Статус |
+|------|-----------------|-----------|--------|
+| `agent-messaging` (3 теста) | `use-stick-to-bottom` конфликт + `window.api.test` API | Высокий | ✅ Исправлено |
+| `agent-scroll-position` (4 теста) | CSS `hidden` сбрасывает `scrollTop` | Высокий | |
+| `input-autofocus` (4 теста) | `data-testid="all-agents-button"` отсутствует + race condition | Средний | |
+| `empty-state-placeholder` (2 теста) | Лоадер блокирует `AgentWelcome` + `isLoading` не сбрасывается | Средний | |
+| `agent-switching` (1 тест) | Локаторы находят скрытые элементы в других AgentChat | Средний | |
+| `agent-reordering` (4 теста) | `data-testid="all-agents-button"` отсутствует | Высокий | |
+| `agent-data-isolation` (2 теста) | Конфликт портов (8898) | Низкий | |
+| `agent-date-update` (1 тест) | `window.api.test.createAgentWithOldMessage` + `agent-header-timestamp` | Средний | |
+| `agent-list-initial-animation` (1 тест) | Таймаут + CSS анимация проверяется после завершения | Низкий | |
+| `agent-status-indicators` (2 теста) | `data-testid="agent-header-icon"` отсутствует | Средний | |
+| `all-agents-page` (1 тест) | Недостаточно агентов для `+N` кнопки | Низкий | |
+| `auto-expanding-textarea` (1 тест) | `sendMessage` async + `setTaskInput('')` условный | Средний | |
 
 ---
 
