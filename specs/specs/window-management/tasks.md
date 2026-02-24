@@ -220,7 +220,7 @@
 
 ### Обзор
 
-В рамках рефакторинга системы хранения данных (см. `.kiro/specs/database-refactoring/tasks.md`), необходимо обновить WindowStateManager для использования DatabaseManager вместо DataManager.
+В рамках рефакторинга системы хранения данных (см. `specs/specs/database-refactoring/tasks.md`), необходимо обновить WindowStateManager для использования DatabaseManager вместо DataManager.
 
 **ВАЖНО:** WindowStateManager является ИСКЛЮЧЕНИЕМ из правила изоляции данных по user_id. Состояние окна является глобальным для устройства, а не для пользователя.
 
@@ -268,7 +268,7 @@
 
 ### Обзор
 
-В рамках миграции на Drizzle ORM (см. `.kiro/specs/user-data-isolation/requirements.md`), WindowStateManager обновлен для использования репозиториев вместо raw SQL.
+В рамках миграции на Drizzle ORM (см. `specs/specs/user-data-isolation/requirements.md`), WindowStateManager обновлен для использования репозиториев вместо raw SQL.
 
 **ВАЖНО:** WindowStateManager использует `dbManager.global.windowState` репозиторий для глобальных данных (не изолированных по user_id).
 

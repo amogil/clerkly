@@ -813,7 +813,7 @@ npm run test:functional
 
 ### Обзор
 
-В рамках рефакторинга системы хранения данных (см. `.kiro/specs/database-refactoring/tasks.md`), необходимо обновить компоненты Clerkly для использования новой архитектуры:
+В рамках рефакторинга системы хранения данных (см. `specs/specs/database-refactoring/tasks.md`), необходимо обновить компоненты Clerkly для использования новой архитектуры:
 - **DatabaseManager** — единая точка входа для доступа к БД
 - **UserSettingsManager** — управление пользовательскими настройками (переименован из DataManager)
 
@@ -873,4 +873,4 @@ npm run test:functional
 - DatabaseManager становится единой точкой входа для доступа к БД
 - Порядок инициализации: DatabaseManager → UserSettingsManager → другие менеджеры
 - UserManager устанавливается в DatabaseManager после создания через `setUserManager()`
-- **Query API:** DatabaseManager предоставляет методы `runUserQuery`, `getUserRow`, `getUserRows` для запросов с автоматической подстановкой user_id, и `runQuery`, `getRow`, `getRows` для глобальных запросов (см. `.kiro/specs/database-manager-refactoring/tasks.md`)
+- **Query API:** DatabaseManager предоставляет методы `runUserQuery`, `getUserRow`, `getUserRows` для запросов с автоматической подстановкой user_id, и `runQuery`, `getRow`, `getRows` для глобальных запросов (см. `specs/specs/database-manager-refactoring/tasks.md`)

@@ -595,7 +595,7 @@
 
 ### Обзор
 
-В рамках рефакторинга системы хранения данных (см. `.kiro/specs/database-refactoring/tasks.md`), необходимо обновить TokenStorageManager для использования UserSettingsManager вместо DataManager.
+В рамках рефакторинга системы хранения данных (см. `specs/specs/database-refactoring/tasks.md`), необходимо обновить TokenStorageManager для использования UserSettingsManager вместо DataManager.
 
 **Статус:** ✅ Выполнено
 

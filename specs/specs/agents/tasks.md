@@ -627,7 +627,7 @@
 
 **Зависимости:** Фаза 5.1 ✅
 
-**Детальный план:** `.kiro/specs/ai-elements-migration/plan.md`
+**Детальный план:** `specs/specs/ai-elements-migration/plan.md`
 
 **⚠️ КРИТИЧЕСКИ ВАЖНО:**
 - Функциональные тесты НЕ трогать

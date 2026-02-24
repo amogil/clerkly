@@ -268,12 +268,12 @@
 - [x] Обновить соответствующие тесты - уже сделано
 
 ### 5.3. Обновить связанные спецификации
-- [x] Обновить `.kiro/specs/settings/requirements.md`:
+- [x] Обновить `specs/specs/settings/requirements.md`:
   - Заменить упоминания `user_email` на `user_id`
   - Обновить ссылки на требования user-data-isolation
-- [x] Обновить `.kiro/specs/google-oauth-auth/requirements.md`:
+- [x] Обновить `specs/specs/google-oauth-auth/requirements.md`:
   - Обновить ссылки на требования user-data-isolation
-- [x] Обновить `.kiro/specs/settings/design.md`:
+- [x] Обновить `specs/specs/settings/design.md`:
   - Заменить упоминания `user_email` на `user_id`
 - _Requirements: документация_
 
@@ -310,7 +310,7 @@
 
 ## Фаза 7: Рефакторинг DataManager → DatabaseManager + UserSettingsManager (3-4 дня)
 
-**Статус:** ✅ Завершено (реализовано через `.kiro/specs/database-refactoring/tasks.md`)
+**Статус:** ✅ Завершено (реализовано через `specs/specs/database-refactoring/tasks.md`)
 
 **Описание:** Разделение DataManager на два компонента согласно обновленному дизайну (user-data-isolation.6).
 
@@ -364,11 +364,11 @@
 
 ## Фаза 8: Расширение DatabaseManager Query API (2-3 дня)
 
-**Статус:** ✅ Завершено (реализовано через `.kiro/specs/database-manager-refactoring/tasks.md`)
+**Статус:** ✅ Завершено (реализовано через `specs/specs/database-manager-refactoring/tasks.md`)
 
 **Описание:** Добавление методов для выполнения SQL-запросов с автоматической подстановкой user_id согласно обновленным требованиям (user-data-isolation.6.3-6.6).
 
-**Ссылка:** Детальный план и выполнение задач описаны в `.kiro/specs/database-manager-refactoring/tasks.md`
+**Ссылка:** Детальный план и выполнение задач описаны в `specs/specs/database-manager-refactoring/tasks.md`
 
 ### 8.1. Добавить методы для запросов с user_id
 - [x] Добавить метод `runUserQuery(sql, params?)` — выполняет INSERT/UPDATE/DELETE с автоматической подстановкой user_id
@@ -562,9 +562,9 @@
 - _Requirements: user-data-isolation.1.3, user-data-isolation.1.4_
 
 ### 10.9. Обновить спецификации
-- [x] Обновить `.kiro/specs/user-data-isolation/requirements.md` - добавить критерии 1.6
-- [x] Обновить `.kiro/specs/user-data-isolation/design.md` - добавить GlobalRepository.currentUser
-- [x] Обновить `.kiro/specs/user-data-isolation/tasks.md` - добавить Фазу 10
+- [x] Обновить `specs/specs/user-data-isolation/requirements.md` - добавить критерии 1.6
+- [x] Обновить `specs/specs/user-data-isolation/design.md` - добавить GlobalRepository.currentUser
+- [x] Обновить `specs/specs/user-data-isolation/tasks.md` - добавить Фазу 10
 - _Requirements: документация_
 
 ### 10.10. Запустить валидацию Фазы 10
