@@ -261,23 +261,23 @@ interface UIMessage {
 - Отправка сообщения: `window.api.messages.create(agentId, 'user', payload)` где payload = `{ data: { text, reply_to_message_id: null } }`
 - `IPCChatTransport` должен конвертировать эти IPC-события в `ReadableStream<UIMessageStreamPart>` для `useChat`
 
-- [ ] **2.1** Создать `src/renderer/lib/IPCChatTransport.ts`
-- [ ] **2.2** Реализовать интерфейс `ChatTransport`:
+- [x] **2.1** Создать `src/renderer/lib/IPCChatTransport.ts`
+- [x] **2.2** Реализовать интерфейс `ChatTransport`:
   - Метод `sendMessages({ messages, abortSignal })` — вызывает `window.api.messages.create(agentId, 'user', payload)` через IPC
   - Возвращает `ReadableStream<UIMessageStreamPart>` — поток обновлений для `useChat`
-- [ ] **2.3** Реализовать конвертацию IPC-событий в UI message stream:
+- [x] **2.3** Реализовать конвертацию IPC-событий в UI message stream:
   - `MESSAGE_CREATED` (kind: llm) → `{ type: 'text-start' }`
   - `MESSAGE_LLM_REASONING_UPDATED` → `{ type: 'reasoning-delta', delta }`
   - `MESSAGE_UPDATED` с `action` → `{ type: 'text-delta', delta: action.content }` + `{ type: 'finish' }`
   - `MESSAGE_CREATED` (kind: error) → `{ type: 'error', error }`
-- [ ] **2.4** Реализовать отмену через `abortSignal` — при abort отписаться от событий и закрыть stream
-- [ ] **2.5** Реализовать сценарий прерывания при новом сообщении (llm-integration.8):
+- [x] **2.4** Реализовать отмену через `abortSignal` — при abort отписаться от событий и закрыть stream
+- [x] **2.5** Реализовать сценарий прерывания при новом сообщении (llm-integration.8):
   - КОГДА пользователь отправляет новое сообщение пока агент стримит, `useChat` вызывает `stop()` (abort текущего stream) и затем `sendMessages()` с новым сообщением
   - `IPCChatTransport.sendMessages()` при получении `abortSignal` уже в aborted состоянии — должен корректно обработать (не подписываться на события, вернуть пустой/закрытый stream)
   - Main process сам обрабатывает прерывание: `MainPipeline` отменяет текущий запрос, помечает llm `interrupted: true`, создаёт новый user message и запускает новый `run()`
   - `IPCChatTransport` просто слушает события — прерванные сообщения придут как `MESSAGE_UPDATED` с `hidden: true` и будут отфильтрованы
   - **Ключевой момент:** Проверить как `useChat` обрабатывает ситуацию когда `stop()` вызван и сразу после — новый `sendMessages()`. Если `useChat` не поддерживает это нативно — может потребоваться `key` remount или `setMessages()` для очистки состояния
-- [ ] **2.6** Написать unit-тесты для `IPCChatTransport`
+- [x] **2.6** Написать unit-тесты для `IPCChatTransport`
 - [ ] **2.7** Обновить `design.md` — добавить детальную схему `IPCChatTransport`
 
 ---
