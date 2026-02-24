@@ -618,19 +618,19 @@ interface UseAgentChatResult {
 
 ### Фаза 10: Интеграция в agents.tsx
 
-- [ ] **10.1** Заменить `useMessages` на `useAgentChat` (теперь используется внутри `AgentChat`) — `useMessages.ts` уже удалён, но интеграция не завершена
-- [ ] **10.2** Создать `AgentChat` компонент — содержит `Conversation` + `ConversationContent` + `ConversationScrollButton` + список `AgentMessage` + `AgentPromptInput` + `RateLimitBanner`
-- [ ] **10.3** В `agents.tsx` рендерить все `AgentChat` одновременно (по одному на каждого агента из `agents` массива). Скрывать неактивные через CSS `className={isActive ? '' : 'hidden'}`. НЕ использовать `key={currentAgent.id}` — это вызовет ремонт.
-- [ ] **10.4** Добавить лоадер при старте: показывать пока хотя бы один `AgentChat` имеет `isLoading === true`. Реализовать через callback/ref из `AgentChat` в `agents.tsx`.
-- [ ] **10.5** Заменить `MessageBubble` на `AgentMessage` в `AgentChat`. Сохранить `motion.div` обёртку вокруг каждого `AgentMessage` для анимации появления (agents.4.22: fade-in + slide-up). Убедиться что `motion.div` не конфликтует с внутренней структурой `Message` из AI Elements и что `Conversation` корректно обрабатывает анимированные дочерние элементы
-- [ ] **10.6** Заменить `ChatInput` на `AgentPromptInput` в `AgentChat`
-- [ ] **10.7** Перенести `RateLimitBanner` внутрь `AgentChat` / `Conversation` как специальный элемент (НЕ как `AgentMessage`). Подписка на `AGENT_RATE_LIMIT` остаётся в `agents.tsx` — `rateLimitBanner` state передаётся в `AgentChat` через props. Баннер рендерится внутри `Conversation` после списка сообщений (перед `ConversationScrollButton`)
-- [ ] **10.8** Убрать импорты: `ScrollArea`, `ChatInput`, `MessageBubble`, `AutoExpandingTextareaHandle`
-- [ ] **10.9** Убрать весь ручной скролл-менеджмент из `agents.tsx` (refs, effects, handlers — см. список в Фазе 5)
-- [ ] **10.10** Убрать `scrollbarHidden` state и CSS `.scrollbar-hidden` из `src/renderer/styles/index.css`
-- [ ] **10.11** Убрать `viewportCallbackRef` и `resizeObserverRef`
-- [ ] **10.12** Сохранить `AgentWelcome` без изменений — убедиться что он корректно рендерится внутри `AgentChat` / `Conversation` (или вместо `Conversation` когда нет сообщений, в зависимости от результатов Фазы 5.4)
-- [ ] **10.13** Сохранить `AgentHeader` без изменений — включая все анимации, список агентов, кнопки
+- [x] **10.1** Заменить `useMessages` на `useAgentChat` (теперь используется внутри `AgentChat`) — `useMessages.ts` уже удалён, но интеграция не завершена
+- [x] **10.2** Создать `AgentChat` компонент — содержит `Conversation` + `ConversationContent` + `ConversationScrollButton` + список `AgentMessage` + `AgentPromptInput` + `RateLimitBanner`
+- [x] **10.3** В `agents.tsx` рендерить все `AgentChat` одновременно (по одному на каждого агента из `agents` массива). Скрывать неактивные через CSS `className={isActive ? '' : 'hidden'}`. НЕ использовать `key={currentAgent.id}` — это вызовет ремонт.
+- [x] **10.4** Добавить лоадер при старте: показывать пока хотя бы один `AgentChat` имеет `isLoading === true`. Реализовать через callback/ref из `AgentChat` в `agents.tsx`.
+- [x] **10.5** Заменить `MessageBubble` на `AgentMessage` в `AgentChat`. Сохранить `motion.div` обёртку вокруг каждого `AgentMessage` для анимации появления (agents.4.22: fade-in + slide-up). Убедиться что `motion.div` не конфликтует с внутренней структурой `Message` из AI Elements и что `Conversation` корректно обрабатывает анимированные дочерние элементы
+- [x] **10.6** Заменить `ChatInput` на `AgentPromptInput` в `AgentChat`
+- [x] **10.7** Перенести `RateLimitBanner` внутрь `AgentChat` / `Conversation` как специальный элемент (НЕ как `AgentMessage`). Подписка на `AGENT_RATE_LIMIT` остаётся в `agents.tsx` — `rateLimitBanner` state передаётся в `AgentChat` через props. Баннер рендерится внутри `Conversation` после списка сообщений (перед `ConversationScrollButton`)
+- [x] **10.8** Убрать импорты: `ScrollArea`, `ChatInput`, `MessageBubble`, `AutoExpandingTextareaHandle`
+- [x] **10.9** Убрать весь ручной скролл-менеджмент из `agents.tsx` (refs, effects, handlers — см. список в Фазе 5)
+- [x] **10.10** Убрать `scrollbarHidden` state и CSS `.scrollbar-hidden` из `src/renderer/styles/index.css`
+- [x] **10.11** Убрать `viewportCallbackRef` и `resizeObserverRef`
+- [x] **10.12** Сохранить `AgentWelcome` без изменений — убедиться что он корректно рендерится внутри `AgentChat` / `Conversation` (или вместо `Conversation` когда нет сообщений, в зависимости от результатов Фазы 5.4)
+- [x] **10.13** Сохранить `AgentHeader` без изменений — включая все анимации, список агентов, кнопки
 - [ ] **10.14** Обновить функциональные тесты скролла:
   - `tests/functional/agent-scroll-position.spec.ts` — переписать проверки с `el.scrollTop` на проверку видимости сообщений (`toBeVisible`, `toBeInViewport`). Суть тестов сохранить:
     - При переключении агентов позиция скролла восстанавливается (последнее видимое сообщение остаётся видимым)
