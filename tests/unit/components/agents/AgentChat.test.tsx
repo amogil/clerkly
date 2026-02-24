@@ -183,11 +183,16 @@ describe('AgentChat — visibility', () => {
 
   /* Preconditions: isActive=false
      Action: render AgentChat
-     Assertions: root div HAS 'hidden' class — component stays mounted
-     Requirements: agents.13.5 */
-  it('should have hidden class when isActive=false', () => {
+     Assertions: root div has CSS hide classes while staying mounted
+     Requirements: agents.13.5, agents.4.14.1 */
+  it('should have CSS hide classes when isActive=false', () => {
     const { container } = render(<AgentChat {...defaultProps} isActive={false} />);
-    expect(container.firstChild).toHaveClass('hidden');
+    expect(container.firstChild).toHaveClass(
+      'absolute',
+      'inset-0',
+      'opacity-0',
+      'pointer-events-none'
+    );
   });
 });
 
