@@ -15,7 +15,7 @@ interface AgentHeaderProps {
   agents: AgentSnapshot[];
   visibleChatsCount: number;
   isInitialLoad: boolean;
-  chatListRef: React.RefObject<HTMLDivElement>;
+  chatListRef: React.RefObject<HTMLDivElement | null>;
   onNewChat: () => void;
   onAgentClick: (agent: AgentSnapshot) => void;
   onShowAllAgents: () => void;

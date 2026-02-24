@@ -9,7 +9,7 @@ interface ChatInputProps {
   onChange: (value: string) => void;
   onSubmit: () => void;
   disabled: boolean;
-  textareaRef: React.RefObject<AutoExpandingTextareaHandle>;
+  textareaRef: React.RefObject<AutoExpandingTextareaHandle | null>;
   chatAreaRef: React.MutableRefObject<HTMLDivElement | null>;
 }
 

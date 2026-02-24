@@ -283,7 +283,8 @@ test.describe('LLM Chat (real OpenAI)', () => {
         }
       });
       observer.observe(scrollAreaRoot, { childList: true, subtree: true });
-      (window as Window & { __scrollbarObserver?: MutationObserver }).__scrollbarObserver = observer;
+      (window as Window & { __scrollbarObserver?: MutationObserver }).__scrollbarObserver =
+        observer;
     });
 
     // Send message
@@ -299,7 +300,9 @@ test.describe('LLM Chat (real OpenAI)', () => {
     await context.window.waitForTimeout(700);
 
     const removals = await context.window.evaluate(() => {
-      (window as Window & { __scrollbarObserver?: MutationObserver }).__scrollbarObserver?.disconnect();
+      (
+        window as Window & { __scrollbarObserver?: MutationObserver }
+      ).__scrollbarObserver?.disconnect();
       return (window as Window & { __scrollbarRemovals?: number }).__scrollbarRemovals ?? 0;
     });
 
@@ -720,6 +723,4 @@ test.describe('LLM Chat (mock server)', () => {
     // User message should be removed from chat (hidden=true)
     await expect(userMessages).toHaveCount(0, { timeout: 5000 });
   });
-
 });
-

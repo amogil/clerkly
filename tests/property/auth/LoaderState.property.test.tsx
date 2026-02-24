@@ -14,11 +14,9 @@ import React from 'react';
 import { render } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { LoginScreen } from '../../../src/renderer/components/auth/LoginScreen';
-import { LoginError } from '../../../src/renderer/components/auth/LoginError';
 
 describe('Loader State Property-Based Tests', () => {
   const mockOnLogin = jest.fn();
-  const mockOnRetry = jest.fn();
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -61,18 +59,18 @@ describe('Loader State Property-Based Tests', () => {
     );
   });
 
-  /* Preconditions: LoginError with any combination of isLoading and isDisabled
-     Action: Render component with various prop combinations
+  /* Preconditions: LoginScreen with errorCode and any combination of isLoading and isDisabled
+     Action: Render component in error state with various prop combinations
      Assertions: Button state and loader visibility must be consistent
      Requirements: google-oauth-auth.15.1, google-oauth-auth.15.2 */
-  it('Property 20 (LoginError): Loader State Consistency for error screen', () => {
+  it('Property 20 (error state): Loader State Consistency for LoginScreen with error', () => {
     fc.assert(
       fc.property(fc.boolean(), fc.boolean(), (isLoading, isDisabled) => {
         const { container } = render(
-          <LoginError
+          <LoginScreen
+            onLogin={mockOnLogin}
             errorCode="network_error"
             errorMessage="Network error"
-            onRetry={mockOnRetry}
             isLoading={isLoading}
             isDisabled={isDisabled}
           />
@@ -81,7 +79,7 @@ describe('Loader State Property-Based Tests', () => {
         const button = container.querySelector('button');
         const spinner = container.querySelector('.animate-spin');
 
-        // Same invariants as LoginScreen
+        // Same invariants as LoginScreen without error
         if (isLoading) {
           expect(spinner).toBeInTheDocument();
         } else {
@@ -164,18 +162,18 @@ describe('Loader State Property-Based Tests', () => {
     );
   });
 
-  /* Preconditions: Any combination of isLoading and isDisabled for LoginError
-     Action: Render LoginError component and check button state
-     Assertions: Button disabled state should be (isLoading || isDisabled)
+  /* Preconditions: LoginScreen in error state with any combination of isLoading and isDisabled
+     Action: Render LoginScreen with errorCode and check button state
+     Assertions: Button disabled state should be (isLoading || isDisabled) even in error state
      Requirements: google-oauth-auth.15.2, google-oauth-auth.15.3 */
-  it('Property 22 (LoginError): Button State Invariant for error screen', () => {
+  it('Property 22 (error state): Button State Invariant for LoginScreen with error', () => {
     fc.assert(
       fc.property(fc.boolean(), fc.boolean(), (isLoading, isDisabled) => {
         const { container } = render(
-          <LoginError
+          <LoginScreen
+            onLogin={mockOnLogin}
             errorCode="network_error"
             errorMessage="Network error"
-            onRetry={mockOnRetry}
             isLoading={isLoading}
             isDisabled={isDisabled}
           />

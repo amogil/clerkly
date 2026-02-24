@@ -121,7 +121,7 @@ export function Agents({ onNavigate }: { onNavigate?: (screen: string) => void }
     // Always scroll when user sends (flag set in handleSend)
     // Keep flag alive until agent responds (non-user message arrives)
     if (shouldScrollOnNextMessage.current) {
-      if (lastMessage.kind !== 'user') {
+      if (lastMessage?.kind !== 'user') {
         shouldScrollOnNextMessage.current = false;
       }
       scrollToBottom();
