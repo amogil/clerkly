@@ -634,7 +634,9 @@ interface UseAgentChatResult {
 - [x] **10.14** Обновить функциональные тесты скролла:
   - `tests/functional/agent-scroll-position.spec.ts` — переписаны: проверки `el.scrollTop` заменены на `mouse.wheel` + видимость кнопки `scroll-to-bottom` + `toBeInViewport`. Все 4 теста проходят.
   - `tests/functional/helpers/electron.ts` — `activeChat()` обновлён: селектор `div:not(.absolute)` вместо `div:not(.hidden)`, добавлено поле `scrollToBottomBtn` (скоупировано к активному чату).
-- [ ] **10.15** Запустить `npm run validate`
+  - `src/renderer/components/agents/AgentChat.tsx` — добавлен `ScrollToBottomButton` с `data-testid="scroll-to-bottom"`, добавлен `AgentChatInner` с `scrollToBottom('instant')` при отправке (agents.4.14.5).
+  - `src/renderer/components/agents.tsx` — неактивные чаты скрыты через `absolute inset-0 opacity-0 pointer-events-none` (НЕ `hidden`), добавлен `relative` на родительский контейнер.
+- [x] **10.15** Запустить `npm run validate` — все проверки проходят (TypeScript ✅, Build ✅, ESLint ✅, Prettier ✅, unit tests ✅, coverage ✅)
 
 ---
 
@@ -957,7 +959,7 @@ interface UseAgentChatResult {
 | Тест | Основная причина | Приоритет | Статус |
 |------|-----------------|-----------|--------|
 | `agent-messaging` (3 теста) | `use-stick-to-bottom` конфликт + `window.api.test` API | Высокий | ✅ Исправлено |
-| `agent-scroll-position` (4 теста) | Тесты проверяют поведение `Conversation` (use-stick-to-bottom) через видимость кнопки scroll-to-bottom | Высокий | |
+| `agent-scroll-position` (4 теста) | Тесты проверяют поведение `Conversation` (use-stick-to-bottom) через видимость кнопки scroll-to-bottom | Высокий | ✅ Исправлено |
 | `input-autofocus` (4 теста) | `data-testid="all-agents-button"` отсутствует + race condition | Средний | |
 | `empty-state-placeholder` (2 теста) | Лоадер блокирует `AgentWelcome` + `isLoading` не сбрасывается | Средний | |
 | `agent-switching` (1 тест) | Локаторы находят скрытые элементы в других AgentChat | Средний | |

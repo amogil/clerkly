@@ -1399,14 +1399,17 @@ const handleScroll = useCallback(
 - Скроллбар должен быть визуально ненавязчивым (agents.4.13.8)
 - Скроллбар появляется при взаимодействии пользователя со скроллом (agents.4.13.9)
 - Скроллбар автоматически скрывается после окончания скролла (agents.4.13.10)
-- Используется компонент ScrollArea из @radix-ui/react-scroll-area (agents.4.13.11)
+- Используется компонент `Conversation` из AI Elements (`use-stick-to-bottom`) (agents.4.13.11)
 
 **Техническая реализация:**
 
-Используется готовый компонент `ScrollArea` из `@radix-ui/react-scroll-area` (shadcn/ui), который уже есть в проекте (`src/renderer/components/ui/scroll-area.tsx`).
+Используется компонент `Conversation` из AI Elements (`src/renderer/components/ai-elements/conversation.tsx`), который управляет автоскроллом через `use-stick-to-bottom`.
 
-**Поведение:**
-- Скроллбар показывается автоматически при скролле (нативное поведение radix ScrollArea)
+**Кнопка "Scroll to Bottom":**
+- Реализована как `ScrollToBottomButton` внутри `AgentChat` — использует `useStickToBottomContext`
+- Имеет `data-testid="scroll-to-bottom"` для функциональных тестов
+- Показывается только когда пользователь не внизу (`isAtBottom === false`)
+
 **Принцип работы:**
 
 1. **Автоматическое сохранение** (agents.4.14): `Conversation` (`StickToBottom`) управляет скролом полностью. Поскольку компонент не размонтируется при переключении агентов, позиция сохраняется без дополнительной логики.
@@ -2045,7 +2048,7 @@ import { Logo } from '../logo';
 |------|----------|-------------------|
 | `tests/functional/agent-switching.spec.ts` | agents.3 | - |
 | `tests/functional/agent-messaging.spec.ts` | agents.4.3, 4.4, 4.8, 4.13.1, 4.13.2, 4.13.4 | - |
-| `tests/functional/agent-scroll-position.spec.ts` | agents.4.14.1-4.14.4, 4.14.6 | - |
+| `tests/functional/agent-scroll-position.spec.ts` | agents.4.14.1-4.14.5 | - |
 | `tests/functional/all-agents-page.spec.ts` | agents.5 | - |
 | `tests/functional/agent-status-indicators.spec.ts` | agents.6 | - |
 | `tests/functional/message-format.spec.ts` | agents.7 | - |
