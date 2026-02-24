@@ -3,12 +3,11 @@ import { motion } from 'framer-motion';
 import { useAgents } from '../hooks/useAgents';
 import { useMessages } from '../hooks/useMessages';
 import { hasError } from '../../shared/utils/agentStatus';
-import { AutoExpandingTextareaHandle } from './agents/AutoExpandingTextarea';
 import { AgentWelcome } from './agents/AgentWelcome';
 import { AgentHeader } from './agents/AgentHeader';
 import { AllAgentsPage } from './agents/AllAgentsPage';
-import { MessageBubble } from './agents/MessageBubble';
-import { ChatInput } from './agents/ChatInput';
+import { AgentMessage } from './agents/AgentMessage';
+import { AgentPromptInput, AgentPromptInputHandle } from './agents/AgentPromptInput';
 import { RateLimitBanner } from './agents/RateLimitBanner';
 import {
   Conversation,
@@ -32,8 +31,8 @@ export function Agents({ onNavigate }: { onNavigate?: (screen: string) => void }
     retryAfterSeconds: number;
   } | null>(null);
   const chatListRef = useRef<HTMLDivElement>(null);
-  const textareaRef = useRef<AutoExpandingTextareaHandle>(null);
-  // chatAreaRef passed to ChatInput for max-height calculation (agents.4.6)
+  const textareaRef = useRef<AgentPromptInputHandle>(null);
+  // chatAreaRef for AgentPromptInput max-height calculation (agents.4.6)
   const chatAreaRef = useRef<HTMLDivElement>(null);
 
   const { agents, activeAgent, createAgent, selectAgent, isLoading } = useAgents();
@@ -188,7 +187,7 @@ export function Agents({ onNavigate }: { onNavigate?: (screen: string) => void }
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
                 >
-                  <MessageBubble
+                  <AgentMessage
                     message={message}
                     showAvatar={showAvatar}
                     agentStatus={currentAgent.status}
@@ -213,12 +212,12 @@ export function Agents({ onNavigate }: { onNavigate?: (screen: string) => void }
       </Conversation>
 
       <div ref={chatAreaRef} className="flex-shrink-0">
-        <ChatInput
+        <AgentPromptInput
+          ref={textareaRef}
           value={taskInput}
           onChange={setTaskInput}
           onSubmit={handleSend}
           disabled={!activeAgent}
-          textareaRef={textareaRef}
           chatAreaRef={chatAreaRef}
         />
       </div>
