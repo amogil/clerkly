@@ -159,7 +159,7 @@ messagesArea.evaluate(el => el.scrollHeight - el.scrollTop - el.clientHeight)
   - Structured output: `generateObject({ schema })` или `streamObject` — но текущий подход (JSON schema в response_format) работает через `streamText` с накоплением JSON
   - **Решение для Phase 9:** Заменить ручной fetch+SSE на `streamText` с `@ai-sdk/openai`, `@ai-sdk/anthropic`, `@ai-sdk/google`. Сохранить интерфейс `ILLMProvider.chat()` без изменений — только внутренняя реализация меняется.
 - [x] **0.9** Обновить `requirements.md`:
-  - Добавлен раздел `agents.15` (AI Elements интеграция)
+  - Добавлен раздел `agents.13` (AI Elements интеграция)
   - Обновлён `agents.4.13.11` — заменено требование ScrollArea из radix-ui на `Conversation` из AI Elements
   - Обновлён `agents.4.14.5` — допускается хранение ID последнего видимого сообщения вместо `scrollTop`
 - [x] **0.10** Обновить `design.md` — добавлена секция "AI Elements интеграция (Фаза 9)" с архитектурой `IPCChatTransport`, `useAgentChat`, маппинга сообщений, ленивой загрузки
