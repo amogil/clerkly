@@ -431,14 +431,14 @@ interface UseAgentChatResult {
 - Нужно убедиться что `Conversation` поддерживает рендер произвольного контента (не только сообщений) и что выравнивание `justify-end` работает корректно.
 - Если `Conversation` ожидает только `Message` компоненты — `AgentWelcome` может потребовать обёртки или рендера вне `ConversationContent`.
 
-- [ ] **5.1** Изучить API `Conversation`, `ConversationContent`, `ConversationScrollButton`
-- [ ] **5.2** Интегрировать `Conversation` в `agents.tsx` вместо `ScrollArea`
-- [ ] **5.3** Добавить `data-testid="messages-area"` на контейнер сообщений (для функциональных тестов)
-- [ ] **5.4** Убедиться что `AgentWelcome` корректно рендерится внутри `Conversation` с выравниванием `justify-end` (agents.4.20). Если `Conversation` не поддерживает произвольный контент — рендерить `AgentWelcome` вне `ConversationContent` (условно: показывать вместо `Conversation` когда нет сообщений)
-- [ ] **5.5** Реализовать сохранение/восстановление позиции скролла при смене агента (если `Conversation` не поддерживает из коробки). Допустимо хранить ID последнего видимого сообщения вместо `scrollTop`
-- [ ] **5.6** Реализовать подгрузку при скролле вверх — вызов `loadMore()` из `useAgentChat` при достижении верхней границы
-- [ ] **5.7** Написать unit-тесты
-- [ ] **5.8** Обновить `design.md`
+- [x] **5.1** Изучить API `Conversation`, `ConversationContent`, `ConversationScrollButton`
+- [x] **5.2** Интегрировать `Conversation` в `agents.tsx` вместо `ScrollArea`
+- [x] **5.3** Добавить `data-testid="messages-area"` на контейнер сообщений (для функциональных тестов)
+- [x] **5.4** Убедиться что `AgentWelcome` корректно рендерится внутри `Conversation` с выравниванием `justify-end` (agents.4.20). Если `Conversation` не поддерживает произвольный контент — рендерить `AgentWelcome` вне `ConversationContent` (условно: показывать вместо `Conversation` когда нет сообщений)
+- [x] **5.5** Реализовать сохранение/восстановление позиции скролла при смене агента (если `Conversation` не поддерживает из коробки). `key={currentAgent.id}` на `Conversation` — remount при смене агента, скролл к низу автоматически
+- [x] **5.6** Реализовать подгрузку при скролле вверх — вызов `loadMore()` из `useAgentChat` при достижении верхней границы
+- [x] **5.7** Написать unit-тесты
+- [x] **5.8** Обновить `design.md`
 
 ---
 
@@ -544,20 +544,20 @@ interface UseAgentChatResult {
 - `action_link` рендерится как кнопка с `onNavigate` callback
 - Сохраняют `data-testid="message-error"` и `data-testid="message-error-action-link"`
 
-- [ ] **6.1** Создать `src/renderer/components/agents/AgentMessage.tsx` с использованием AI Elements `Message`:
+- [x] **6.1** Создать `src/renderer/components/agents/AgentMessage.tsx` с использованием AI Elements `Message`:
   - User: `<Message>` с кастомными стилями `rounded-2xl bg-secondary/70 border border-border`; `data-testid="message-user"`
   - LLM: `<Message>` + `<Reasoning>` + action content; `data-testid="message-llm"`, `data-testid="message-llm-action"`, `data-testid="message-llm-reasoning"`
   - Error: `<Message>` с красными стилями `border-red-500/30 bg-red-500/10 text-red-500`; `data-testid="message-error"`, `data-testid="message-error-action-link"`
   - Loading: три анимированных точки (bounce) когда llm без action
   - Avatar: `<Logo>` перед первым llm/error в последовательности
-- [ ] **6.2** Обновить `RateLimitBanner` — сохранить как отдельный компонент (не AgentMessage):
+- [x] **6.2** Обновить `RateLimitBanner` — сохранить как отдельный компонент (не AgentMessage):
   - Сохранить жёлтый стиль: `bg-yellow-50 border-yellow-200 text-yellow-800`
   - Сохранить countdown логику (useState + setTimeout)
   - Сохранить IPC вызовы: `window.api.messages.retryLast()`, `window.api.messages.cancelRetry()`
   - Сохранить `data-testid="rate-limit-banner"` и `data-testid="rate-limit-cancel"`
   - Убедиться что компонент корректно рендерится внутри `Conversation`
-- [ ] **6.3** Написать unit-тесты для `AgentMessage` (все виды: user, llm, error)
-- [ ] **6.4** Обновить `design.md`
+- [x] **6.3** Написать unit-тесты для `AgentMessage` (все виды: user, llm, error)
+- [x] **6.4** Обновить `design.md`
 
 ---
 
@@ -565,12 +565,12 @@ interface UseAgentChatResult {
 
 **Контекст:** Текущий reasoning рендерится как простой `<div>` с `text-xs text-muted-foreground italic`. AI Elements `Reasoning` компонент добавляет collapsible UI (кнопка "Show thinking" / "Hide thinking").
 
-- [ ] **7.1** Интегрировать `Reasoning` из AI Elements в `AgentMessage` для llm сообщений:
+- [x] **7.1** Интегрировать `Reasoning` из AI Elements в `AgentMessage` для llm сообщений:
   - `<ReasoningTrigger>` — кнопка toggle
   - `<ReasoningContent>` — текст reasoning; добавить `data-testid="message-llm-reasoning"`
   - Стриминг reasoning работает через `useChat` + `IPCChatTransport` автоматически
-- [ ] **7.2** Написать unit-тесты
-- [ ] **7.3** Обновить `design.md`
+- [x] **7.2** Написать unit-тесты
+- [x] **7.3** Обновить `design.md`
 
 ---
 
@@ -608,15 +608,15 @@ interface UseAgentChatResult {
 - Enter без Shift → submit, Shift+Enter → новая строка
 - `ref` с `focus()` / `blur()` через `useImperativeHandle`
 
-- [ ] **8.1** Создать `src/renderer/components/agents/AgentPromptInput.tsx` с AI Elements:
+- [x] **8.1** Создать `src/renderer/components/agents/AgentPromptInput.tsx` с AI Elements:
   - `<PromptInput>` контейнер
   - `<PromptInputTextarea>` — добавить `data-testid="auto-expanding-textarea"`, placeholder "Ask, reply, or give command..."
   - `<PromptInputButton>` — иконка Send, disabled при пустом поле
   - Максимальная высота 50% области чата (agents.4.6)
   - Автофокус при смене агента через ref (agents.4.7.1)
   - Сохранить подсказку "Press Enter to send, Shift+Enter for new line"
-- [ ] **8.2** Написать unit-тесты
-- [ ] **8.3** Обновить `design.md`
+- [x] **8.2** Написать unit-тесты
+- [x] **8.3** Обновить `design.md`
 
 ---
 
@@ -641,17 +641,17 @@ interface UseAgentChatResult {
 
 ### Фаза 10: Интеграция в agents.tsx
 
-- [ ] **10.1** Заменить `useMessages` на `useAgentChat`
-- [ ] **10.2** Заменить `ScrollArea` блок на `Conversation` + `ConversationContent` + `ConversationScrollButton`
-- [ ] **10.3** Заменить `MessageBubble` на `AgentMessage` в списке сообщений. Сохранить `motion.div` обёртку вокруг каждого `AgentMessage` для анимации появления (agents.4.22: fade-in + slide-up). Убедиться что `motion.div` не конфликтует с внутренней структурой `Message` из AI Elements и что `Conversation` корректно обрабатывает анимированные дочерние элементы
-- [ ] **10.4** Заменить `ChatInput` на `AgentPromptInput`
-- [ ] **10.5** Перенести `RateLimitBanner` внутрь `Conversation` как специальный элемент (НЕ как `AgentMessage`). Подписка на `AGENT_RATE_LIMIT` остаётся в `agents.tsx` — `rateLimitBanner` state управляет показом баннера. Баннер рендерится внутри `Conversation` после списка сообщений (перед `ConversationScrollButton`)
-- [ ] **10.6** Убрать импорты: `ScrollArea`, `ChatInput`, `MessageBubble`, `AutoExpandingTextareaHandle`
-- [ ] **10.7** Убрать весь ручной скролл-менеджмент (refs, effects, handlers — см. список в Фазе 5)
-- [ ] **10.8** Убрать `scrollbarHidden` state и CSS `.scrollbar-hidden` из `src/renderer/styles/index.css`
-- [ ] **10.9** Убрать `viewportCallbackRef` и `resizeObserverRef`
-- [ ] **10.10** Сохранить `AgentWelcome` без изменений — убедиться что он корректно рендерится внутри `Conversation` (или вместо `Conversation` когда нет сообщений, в зависимости от результатов Фазы 5.4)
-- [ ] **10.11** Сохранить `AgentHeader` без изменений — включая все анимации, список агентов, кнопки
+- [x] **10.1** Заменить `useMessages` на `useAgentChat`
+- [x] **10.2** Заменить `ScrollArea` блок на `Conversation` + `ConversationContent` + `ConversationScrollButton`
+- [x] **10.3** Заменить `MessageBubble` на `AgentMessage` в списке сообщений. Сохранить `motion.div` обёртку вокруг каждого `AgentMessage` для анимации появления (agents.4.22: fade-in + slide-up). Убедиться что `motion.div` не конфликтует с внутренней структурой `Message` из AI Elements и что `Conversation` корректно обрабатывает анимированные дочерние элементы
+- [x] **10.4** Заменить `ChatInput` на `AgentPromptInput`
+- [x] **10.5** Перенести `RateLimitBanner` внутрь `Conversation` как специальный элемент (НЕ как `AgentMessage`). Подписка на `AGENT_RATE_LIMIT` остаётся в `agents.tsx` — `rateLimitBanner` state управляет показом баннера. Баннер рендерится внутри `Conversation` после списка сообщений (перед `ConversationScrollButton`)
+- [x] **10.6** Убрать импорты: `ScrollArea`, `ChatInput`, `MessageBubble`, `AutoExpandingTextareaHandle`
+- [x] **10.7** Убрать весь ручной скролл-менеджмент (refs, effects, handlers — см. список в Фазе 5)
+- [x] **10.8** Убрать `scrollbarHidden` state и CSS `.scrollbar-hidden` из `src/renderer/styles/index.css`
+- [x] **10.9** Убрать `viewportCallbackRef` и `resizeObserverRef`
+- [x] **10.10** Сохранить `AgentWelcome` без изменений — убедиться что он корректно рендерится внутри `Conversation` (или вместо `Conversation` когда нет сообщений, в зависимости от результатов Фазы 5.4)
+- [x] **10.11** Сохранить `AgentHeader` без изменений — включая все анимации, список агентов, кнопки
 - [ ] **10.12** Обновить функциональные тесты скролла:
   - `tests/functional/agent-scroll-position.spec.ts` — переписать проверки с `el.scrollTop` на проверку видимости сообщений (`toBeVisible`, `toBeInViewport`). Суть тестов сохранить:
     - При переключении агентов позиция скролла восстанавливается (последнее видимое сообщение остаётся видимым)
@@ -662,7 +662,7 @@ interface UseAgentChatResult {
     - Вместо `messagesArea.evaluate(el => el.scrollHeight - el.scrollTop - el.clientHeight)` проверять что `message-llm-action` видим в viewport
   - `tests/functional/llm-chat.spec.ts` — обновить тест `should not flicker scrollbar`:
     - Если `Conversation` не использует Radix ScrollArea — тест может стать неактуальным, заменить на проверку что скроллбар не мигает визуально (или удалить если `Conversation` управляет скроллбаром сам)
-- [ ] **10.13** Запустить `npm run validate`
+- [x] **10.13** Запустить `npm run validate`
 
 ---
 

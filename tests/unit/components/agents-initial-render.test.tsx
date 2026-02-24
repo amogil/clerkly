@@ -29,14 +29,14 @@ Object.defineProperty(HTMLElement.prototype, 'offsetWidth', {
 
 // Mock hooks
 const mockUseAgents = jest.fn();
-const mockUseMessages = jest.fn();
+const mockUseAgentChat = jest.fn();
 
 jest.mock('../../../src/renderer/hooks/useAgents', () => ({
   useAgents: () => mockUseAgents(),
 }));
 
-jest.mock('../../../src/renderer/hooks/useMessages', () => ({
-  useMessages: () => mockUseMessages(),
+jest.mock('../../../src/renderer/hooks/useAgentChat', () => ({
+  useAgentChat: () => mockUseAgentChat(),
 }));
 
 // Mock components
@@ -140,8 +140,8 @@ describe('Agents Initial Render', () => {
       isLoading: false,
     });
 
-    mockUseMessages.mockReturnValue({
-      messages: [],
+    mockUseAgentChat.mockReturnValue({
+      rawMessages: [],
       sendMessage: jest.fn(),
       refreshMessages: jest.fn(),
       isLoading: false,

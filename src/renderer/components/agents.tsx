@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useAgents } from '../hooks/useAgents';
-import { useMessages } from '../hooks/useMessages';
+import { useAgentChat } from '../hooks/useAgentChat';
 import { hasError } from '../../shared/utils/agentStatus';
 import { AgentWelcome } from './agents/AgentWelcome';
 import { AgentHeader } from './agents/AgentHeader';
@@ -36,7 +36,7 @@ export function Agents({ onNavigate }: { onNavigate?: (screen: string) => void }
   const chatAreaRef = useRef<HTMLDivElement>(null);
 
   const { agents, activeAgent, createAgent, selectAgent, isLoading } = useAgents();
-  const { messages, sendMessage } = useMessages(activeAgent?.id || null);
+  const { rawMessages, sendMessage } = useAgentChat(activeAgent?.id || null);
 
   const selectedAgent = activeAgent || agents[0];
 
@@ -171,12 +171,12 @@ export function Agents({ onNavigate }: { onNavigate?: (screen: string) => void }
           data-testid="messages-area"
           className="flex flex-col gap-4 p-6 justify-end min-h-full"
         >
-          {messages.length === 0 ? (
+          {rawMessages.length === 0 ? (
             <AgentWelcome onPromptClick={(p) => handleSend(p)} />
           ) : (
-            messages.map((message, index) => {
+            rawMessages.map((message, index) => {
               const showAvatar =
-                message.kind !== 'user' && (index === 0 || messages[index - 1]?.kind === 'user');
+                message.kind !== 'user' && (index === 0 || rawMessages[index - 1]?.kind === 'user');
 
               return (
                 <motion.div

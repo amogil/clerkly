@@ -14,6 +14,12 @@ module.exports = {
   automock: false,
   setupFilesAfterEnv: ['<rootDir>/tests/setup.ts'],
   moduleNameMapper: {
-    '^electron$': '<rootDir>/tests/__mocks__/electron.ts'
+    '^electron$': '<rootDir>/tests/__mocks__/electron.ts',
+    '^react-markdown$': '<rootDir>/tests/__mocks__/react-markdown.tsx',
+    '^@/(.*)$': '<rootDir>/src/renderer/$1',
+    // Mock AI Elements components that use ESM-only deps (use-stick-to-bottom, streamdown)
+    '^.*/ai-elements/conversation$': '<rootDir>/tests/__mocks__/ai-elements/conversation.tsx',
+    '^.*/ai-elements/message$': '<rootDir>/tests/__mocks__/ai-elements/message.tsx',
+    '^.*/ai-elements/reasoning$': '<rootDir>/tests/__mocks__/ai-elements/reasoning.tsx',
   }
 };
