@@ -1,5 +1,5 @@
 // Requirements: agents.1, agents.2, agents.3, agents.4, agents.5, agents.6, agents.12, agents.13
-import { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useAgents } from '../hooks/useAgents';
 import { hasError } from '../../shared/utils/agentStatus';
 import { AgentHeader } from './agents/AgentHeader';

@@ -3,7 +3,7 @@
  */
 // Requirements: agents.4, agents.13, llm-integration.3, llm-integration.7, llm-integration.8
 import React from 'react';
-import { render, screen, fireEvent, act, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { AgentChat } from '../../../../src/renderer/components/agents/AgentChat';
 import type { AgentSnapshot } from '../../../../src/renderer/types/agent';
@@ -30,7 +30,10 @@ jest.mock('../../../../src/renderer/hooks/useAgentChat', () => ({
 // Stub framer-motion to avoid animation complexity in tests
 jest.mock('framer-motion', () => ({
   motion: {
-    div: ({ children, ...props }: React.HTMLAttributes<HTMLDivElement> & { children?: React.ReactNode }) =>
+    div: ({
+      children,
+      ...props
+    }: React.HTMLAttributes<HTMLDivElement> & { children?: React.ReactNode }) =>
       React.createElement('div', props, children),
   },
 }));
@@ -73,8 +76,8 @@ jest.mock('../../../../src/renderer/components/agents/AgentWelcome', () => ({
   ),
 }));
 
-jest.mock('../../../../src/renderer/components/agents/AgentPromptInput', () => ({
-  AgentPromptInput: React.forwardRef(
+jest.mock('../../../../src/renderer/components/agents/AgentPromptInput', () => {
+  const MockAgentPromptInput = React.forwardRef(
     (
       {
         value,
@@ -100,8 +103,10 @@ jest.mock('../../../../src/renderer/components/agents/AgentPromptInput', () => (
         </button>
       </div>
     )
-  ),
-}));
+  );
+  MockAgentPromptInput.displayName = 'MockAgentPromptInput';
+  return { AgentPromptInput: MockAgentPromptInput };
+});
 
 jest.mock('../../../../src/renderer/components/agents/RateLimitBanner', () => ({
   RateLimitBanner: ({
