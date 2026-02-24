@@ -18,7 +18,7 @@
 
 ## Архитектурный Принцип
 
-Приложение следует архитектурному принципу **Единого Источника Истины (Single Source of Truth)**, описанному в спецификации `clerkly` (см. `specs/specs/clerkly/requirements.md`).
+Приложение следует архитектурному принципу **Единого Источника Истины (Single Source of Truth)**, описанному в спецификации `clerkly` (см. `docs/specs/clerkly/requirements.md`).
 
 **Применение к Account Profile:**
 - Данные профиля пользователя сохраняются в базе данных после загрузки из Google UserInfo API

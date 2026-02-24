@@ -627,7 +627,7 @@
 
 **Зависимости:** Фаза 5.1 ✅
 
-**Детальный план:** `specs/specs/ai-elements-migration/plan.md`
+**Детальный план:** `docs/specs/ai-elements-migration/plan.md`
 
 **⚠️ КРИТИЧЕСКИ ВАЖНО:**
 - Функциональные тесты НЕ трогать

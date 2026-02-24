@@ -148,7 +148,7 @@ messagesArea.evaluate(el => el.scrollHeight - el.scrollTop - el.clientHeight)
   - `Message` — установить через CLI (`npx ai-elements@latest add message`). Использует `streamdown` для markdown — это нормально, зависимость уже установлена.
   - `Reasoning` — установить через CLI (`npx ai-elements@latest add reasoning`). Использует `streamdown` для markdown.
   - `PromptInput` — **пропустить** (зависит от `nanoid`, `Command`, `DropdownMenu`, `HoverCard`, `InputGroup`, `Select`, `Spinner` — избыточно). Сохранить `ChatInput` + `AutoExpandingTextarea` → переименовать в `AgentPromptInput`.
-  - **Итог:** Устанавливать через CLI. Инструкция по установке — `specs/specs/agents/design.md` (секция "Установка и обновление AI Elements компонентов").
+  - **Итог:** Устанавливать через CLI. Инструкция по установке — `docs/specs/agents/design.md` (секция "Установка и обновление AI Elements компонентов").
 - [x] **0.6** `AutoExpandingTextarea` уже поддерживает: `ref` через `useImperativeHandle` (focus/blur), `maxHeight = chatArea.offsetHeight * 0.5`, Enter/Shift+Enter, `data-testid="auto-expanding-textarea"`. Дополнительных изменений не требуется.
 - [x] **0.7** `Conversation` (`use-stick-to-bottom`): автоскролл при новых сообщениях — ✅ (StickToBottom с `initial="smooth"`), кнопка scroll-to-bottom — ✅ (`ConversationScrollButton` через `useStickToBottomContext`), поведение при смене `key` — стандартное React remount.
 - [x] **0.8** Изучить API `streamText` из `ai@5`. **Выводы:**

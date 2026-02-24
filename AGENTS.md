@@ -107,32 +107,32 @@ npm run build             # собрать приложение
 
 ### Структура спецификаций
 
-Все спецификации находятся в `specs/specs/<feature-name>/`. Каждая фича содержит три файла:
+Все спецификации находятся в `docs/specs/<feature-name>/`. Каждая фича содержит три файла:
 
 ```
-specs/specs/
+docs/specs/
   <feature-name>/
     requirements.md   # Что нужно сделать (требования)
     design.md         # Как это устроено (архитектура и дизайн)
     tasks.md          # Список задач с прогрессом
 ```
 
-Дополнительно в корне `specs/specs/` может быть `AGENTS-DESIGN.md` — общий архитектурный референс.
+Дополнительно в корне `docs/specs/` может быть `AGENTS-DESIGN.md` — общий архитектурный референс.
 
 ### Перед началом работы с фичей
 
 ОБЯЗАТЕЛЬНО прочитать все три файла спецификации:
 
 ```
-specs/specs/<feature>/requirements.md
-specs/specs/<feature>/design.md
-specs/specs/<feature>/tasks.md
+docs/specs/<feature>/requirements.md
+docs/specs/<feature>/design.md
+docs/specs/<feature>/tasks.md
 ```
 
 Для работы с тестами также прочитать:
 ```
-specs/specs/testing-infrastructure/requirements.md
-specs/specs/testing-infrastructure/design.md
+docs/specs/testing-infrastructure/requirements.md
+docs/specs/testing-infrastructure/design.md
 ```
 
 Там описаны: стратегия мокирования, правила helper функций (testing.10), правила ожидания элементов (testing.11), проверка toast-ошибок (testing.12).
@@ -358,7 +358,7 @@ WHEN <триггер>, IF <условие>, <субъект> SHALL <действ
 
 При создании новой фичи:
 
-1. Создать папку `specs/specs/<feature-name>/`
+1. Создать папку `docs/specs/<feature-name>/`
 2. Создать `requirements.md` — описать User Stories и критерии приемки
 3. Создать `design.md` — описать архитектуру и компоненты
 4. Создать `tasks.md` — разбить на фазы и задачи
