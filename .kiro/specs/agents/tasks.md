@@ -354,7 +354,7 @@
 |---|--------|--------|--------|------------|
 | 6.1 | AutoExpandingTextarea | ✅ ВЫПОЛНЕНО | 0.25 дня | agents.4.5-4.7 |
 | 6.2 | MarkdownMessage | ✅ ВЫПОЛНЕНО | 0.25 дня | agents.7.7 |
-| 6.3 | EmptyStatePlaceholder | ✅ ВЫПОЛНЕНО | 0.25 дня | agents.4 |
+| 6.3 | AgentWelcome | ✅ ВЫПОЛНЕНО | 0.25 дня | agents.4 |
 | 6.4 | Перенос текста в сообщениях | ✅ ВЫПОЛНЕНО | 0.1 дня | agents.4.22 |
 | 6.5 | AllAgents | ✅ ВЫПОЛНЕНО | 0.25 дня | agents.5 |
 
@@ -368,8 +368,8 @@
 - **Markdown:** react-markdown ✅
 - **Тесты:** `tests/unit/components/agents/MarkdownMessage.test.tsx` (12 тестов) ✅
 
-#### 6.3 EmptyStatePlaceholder
-- **Файл:** `src/renderer/components/agents/EmptyStatePlaceholder.tsx` ✅
+#### 6.3 AgentWelcome
+- **Файл:** `src/renderer/components/agents/AgentWelcome.tsx` ✅
 - **Интеграция:** `src/renderer/components/agents.tsx` (показывается когда messages.length === 0) ✅
 - **Дизайн:** Application Logo + 4 промпт-кнопки с иконками ✅
 - **Промпты:** 
@@ -378,7 +378,7 @@
   - "Create Jira tickets from meeting notes" (FileText icon)
   - "Send summary to the team" (Calendar icon)
 - **Анимации:** framer-motion (fade in, scale on hover/tap) ✅
-- **Модульные тесты:** `tests/unit/components/agents/EmptyStatePlaceholder.test.tsx` (10 тестов) ✅
+- **Модульные тесты:** `tests/unit/components/agents/AgentWelcome.test.tsx` (10 тестов) ✅
 - **Функциональные тесты:** `tests/functional/empty-state-placeholder.spec.ts` (7 тестов) ✅
 - **Стилизация сообщений пользователя:** ✅
   - `rounded-2xl` (16px скругленные углы)

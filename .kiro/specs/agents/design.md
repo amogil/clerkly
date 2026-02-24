@@ -928,7 +928,7 @@ function AgentsComponent() {
 │  │  (flex-1, overflow-y-auto)                         │ │
 │  │                                                    │ │
 │  │  Chat mode:                                        │ │
-│  │  - EmptyStatePlaceholder (if no messages)         │ │
+│  │  - AgentWelcome (if no messages)         │ │
 │  │  - MessageList                                     │ │
 │  │  - ActivityIndicator (during tool_call/code_exec) │ │
 │  │                                                    │ │
@@ -1400,7 +1400,7 @@ const handleSend = async () => {
     style={{ minHeight: 'var(--viewport-height, 100%)' }}
   >
     {messages.length === 0 ? (
-      <EmptyStatePlaceholder onPromptClick={handlePromptClick} />
+      <AgentWelcome onPromptClick={handlePromptClick} />
     ) : (
       messages.map((message) => (
         <motion.div key={message.id} data-testid="message">
@@ -1640,7 +1640,7 @@ const handleSend = async () => {
    - Позиция НЕ меняется → пользователь продолжает читать
    - Переключается на другого агента и возвращается → позиция восстановлена
 
-### EmptyStatePlaceholder
+### AgentWelcome
 
 Компонент пустого стейта для нового агента без сообщений.
 
@@ -1650,11 +1650,11 @@ import { motion } from 'framer-motion';
 import { Video, CheckSquare, FileText, Calendar } from 'lucide-react';
 import { Logo } from '../logo';
 
-interface EmptyStatePlaceholderProps {
+interface AgentWelcomeProps {
   onPromptClick?: (prompt: string) => void;
 }
 
-function EmptyStatePlaceholder({ onPromptClick }: EmptyStatePlaceholderProps) {
+function AgentWelcome({ onPromptClick }: AgentWelcomeProps) {
   const prompts = [
     { icon: <Video className="w-4 h-4" />, prompt: 'Transcribe my latest meeting' },
     { icon: <CheckSquare className="w-4 h-4" />, prompt: "Extract action items from today's standup" },
@@ -2396,7 +2396,7 @@ agents.tsx
   ├── AgentHeader (без изменений)
   ├── Conversation (use-stick-to-bottom)
   │     ├── ConversationContent
-  │     │     ├── EmptyStatePlaceholder (если нет сообщений)
+  │     │     ├── AgentWelcome (если нет сообщений)
   │     │     └── motion.div > AgentMessage (для каждого сообщения)
   │     ├── RateLimitBanner (если активен rate limit)
   │     └── ConversationScrollButton

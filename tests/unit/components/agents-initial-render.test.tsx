@@ -48,8 +48,8 @@ jest.mock('../../../src/renderer/components/agents/AutoExpandingTextarea', () =>
   AutoExpandingTextarea: () => <textarea data-testid="textarea" />,
 }));
 
-jest.mock('../../../src/renderer/components/agents/EmptyStatePlaceholder', () => ({
-  EmptyStatePlaceholder: () => <div data-testid="empty-state">Empty State</div>,
+jest.mock('../../../src/renderer/components/agents/AgentWelcome', () => ({
+  AgentWelcome: () => <div data-testid="empty-state">Empty State</div>,
 }));
 
 jest.mock('../../../src/renderer/utils/DateTimeFormatter', () => ({

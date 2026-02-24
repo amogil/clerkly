@@ -5,11 +5,11 @@ import { Video, CheckSquare, FileText, Calendar } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Logo } from '../logo';
 
-interface EmptyStatePlaceholderProps {
+interface AgentWelcomeProps {
   onPromptClick?: (prompt: string) => void;
 }
 
-export function EmptyStatePlaceholder({ onPromptClick }: EmptyStatePlaceholderProps) {
+export function AgentWelcome({ onPromptClick }: AgentWelcomeProps) {
   const prompts = [
     {
       icon: <Video className="w-4 h-4" />,

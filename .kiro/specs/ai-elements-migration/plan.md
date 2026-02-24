@@ -24,7 +24,7 @@
 
 - `AgentHeader` — полностью сохраняется (иконка активного агента, список агентов, анимации, кнопка New Chat, кнопка +N, тултипы, spring-анимация перестановки)
 - `AllAgentsPage` — не трогается
-- `EmptyStatePlaceholder` — не трогается
+- `AgentWelcome` — не трогается
 - `RateLimitBanner` — остаётся отдельным компонентом, рендерится внутри `Conversation` (см. Фазу 6)
 - `useAgents` hook — не трогается
 - Весь main process, IPC handlers, события — не трогается (кроме LLM провайдеров)
@@ -425,16 +425,16 @@ interface UseAgentChatResult {
 
 **Контекст:** `Conversation` из AI Elements управляет скроллом автоматически (автоскролл при новых сообщениях, кнопка "scroll to bottom"). Но сохранение позиции при смене агента — скорее всего нужно реализовать самостоятельно поверх `Conversation`.
 
-**EmptyStatePlaceholder внутри Conversation:**
-- Сейчас `EmptyStatePlaceholder` рендерится внутри `ScrollArea` с выравниванием `min-h-full flex flex-col justify-end` (agents.4.20).
-- После миграции `EmptyStatePlaceholder` будет рендериться внутри `Conversation` / `ConversationContent`.
+**AgentWelcome внутри Conversation:**
+- Сейчас `AgentWelcome` рендерится внутри `ScrollArea` с выравниванием `min-h-full flex flex-col justify-end` (agents.4.20).
+- После миграции `AgentWelcome` будет рендериться внутри `Conversation` / `ConversationContent`.
 - Нужно убедиться что `Conversation` поддерживает рендер произвольного контента (не только сообщений) и что выравнивание `justify-end` работает корректно.
-- Если `Conversation` ожидает только `Message` компоненты — `EmptyStatePlaceholder` может потребовать обёртки или рендера вне `ConversationContent`.
+- Если `Conversation` ожидает только `Message` компоненты — `AgentWelcome` может потребовать обёртки или рендера вне `ConversationContent`.
 
 - [ ] **5.1** Изучить API `Conversation`, `ConversationContent`, `ConversationScrollButton`
 - [ ] **5.2** Интегрировать `Conversation` в `agents.tsx` вместо `ScrollArea`
 - [ ] **5.3** Добавить `data-testid="messages-area"` на контейнер сообщений (для функциональных тестов)
-- [ ] **5.4** Убедиться что `EmptyStatePlaceholder` корректно рендерится внутри `Conversation` с выравниванием `justify-end` (agents.4.20). Если `Conversation` не поддерживает произвольный контент — рендерить `EmptyStatePlaceholder` вне `ConversationContent` (условно: показывать вместо `Conversation` когда нет сообщений)
+- [ ] **5.4** Убедиться что `AgentWelcome` корректно рендерится внутри `Conversation` с выравниванием `justify-end` (agents.4.20). Если `Conversation` не поддерживает произвольный контент — рендерить `AgentWelcome` вне `ConversationContent` (условно: показывать вместо `Conversation` когда нет сообщений)
 - [ ] **5.5** Реализовать сохранение/восстановление позиции скролла при смене агента (если `Conversation` не поддерживает из коробки). Допустимо хранить ID последнего видимого сообщения вместо `scrollTop`
 - [ ] **5.6** Реализовать подгрузку при скролле вверх — вызов `loadMore()` из `useAgentChat` при достижении верхней границы
 - [ ] **5.7** Написать unit-тесты
@@ -650,7 +650,7 @@ interface UseAgentChatResult {
 - [ ] **10.7** Убрать весь ручной скролл-менеджмент (refs, effects, handlers — см. список в Фазе 5)
 - [ ] **10.8** Убрать `scrollbarHidden` state и CSS `.scrollbar-hidden` из `src/renderer/styles/index.css`
 - [ ] **10.9** Убрать `viewportCallbackRef` и `resizeObserverRef`
-- [ ] **10.10** Сохранить `EmptyStatePlaceholder` без изменений — убедиться что он корректно рендерится внутри `Conversation` (или вместо `Conversation` когда нет сообщений, в зависимости от результатов Фазы 5.4)
+- [ ] **10.10** Сохранить `AgentWelcome` без изменений — убедиться что он корректно рендерится внутри `Conversation` (или вместо `Conversation` когда нет сообщений, в зависимости от результатов Фазы 5.4)
 - [ ] **10.11** Сохранить `AgentHeader` без изменений — включая все анимации, список агентов, кнопки
 - [ ] **10.12** Обновить функциональные тесты скролла:
   - `tests/functional/agent-scroll-position.spec.ts` — переписать проверки с `el.scrollTop` на проверку видимости сообщений (`toBeVisible`, `toBeInViewport`). Суть тестов сохранить:

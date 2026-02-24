@@ -298,7 +298,7 @@
 - `tests/functional/empty-state-placeholder.spec.ts` - "should display empty state for new agent"
 - `tests/functional/empty-state-placeholder.spec.ts` - "should show 4 prompt suggestions"
 - `tests/functional/empty-state-placeholder.spec.ts` - "should send message on prompt click"
-- `tests/functional/empty-state-placeholder.spec.ts` - "should center EmptyStatePlaceholder in messages area"
+- `tests/functional/empty-state-placeholder.spec.ts` - "should center AgentWelcome in messages area"
 - `tests/functional/message-text-wrapping.spec.ts` - "should wrap long words without spaces in user messages"
 - `tests/functional/message-text-wrapping.spec.ts` - "should preserve line breaks in user messages"
 - `tests/functional/message-text-wrapping.spec.ts` - "should have correct CSS classes for agent messages"

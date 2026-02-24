@@ -4,7 +4,7 @@ import { useAgents } from '../hooks/useAgents';
 import { useMessages } from '../hooks/useMessages';
 import { hasError } from '../../shared/utils/agentStatus';
 import { AutoExpandingTextareaHandle } from './agents/AutoExpandingTextarea';
-import { EmptyStatePlaceholder } from './agents/EmptyStatePlaceholder';
+import { AgentWelcome } from './agents/AgentWelcome';
 import { ScrollArea } from './ui/scroll-area';
 import { AgentHeader } from './agents/AgentHeader';
 import { AllAgentsPage } from './agents/AllAgentsPage';
@@ -273,7 +273,7 @@ export function Agents({ onNavigate }: { onNavigate?: (screen: string) => void }
           style={{ minHeight: 'var(--viewport-height, 100%)' }}
         >
           {messages.length === 0 ? (
-            <EmptyStatePlaceholder onPromptClick={(p) => handleSend(p)} />
+            <AgentWelcome onPromptClick={(p) => handleSend(p)} />
           ) : (
             messages.map((message, index) => {
               const showAvatar =

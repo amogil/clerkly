@@ -49,7 +49,7 @@
 
 ### Уже есть:
 - `tests/unit/components/agents/AutoExpandingTextarea.test.tsx` ✅
-- `tests/unit/components/agents/EmptyStatePlaceholder.test.tsx` ✅
+- `tests/unit/components/agents/AgentWelcome.test.tsx` ✅
 - `tests/unit/components/agents/MarkdownMessage.test.tsx` ✅
 - `tests/unit/components/agents.test.tsx` ✅ (MessageBubble, text wrapping, action_link)
 - `tests/unit/components/agents-autoscroll.test.tsx` ✅

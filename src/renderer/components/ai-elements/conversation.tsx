@@ -1,4 +1,4 @@
-"use client";
+ f"use client";
 
 import type { ComponentProps } from "react";
 

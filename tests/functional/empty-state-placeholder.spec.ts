@@ -1,7 +1,7 @@
 /* Preconditions: User logged in with agent that has no messages
    Action: Navigate to agents page and view agent with no messages
    Assertions: 
-   - EmptyStatePlaceholder is visible when agent has no messages
+   - AgentWelcome is visible when agent has no messages
    - Placeholder shows animated logo, heading, description, and 4 prompt buttons
    - Prompt buttons send message when clicked
    - Placeholder disappears after sending first message
@@ -25,7 +25,7 @@ test.afterAll(async () => {
   }
 });
 
-test.describe('Agents - EmptyStatePlaceholder', () => {
+test.describe('Agents - AgentWelcome', () => {
   let electronApp: ElectronApplication;
   let window: Page;
 
@@ -69,7 +69,7 @@ test.describe('Agents - EmptyStatePlaceholder', () => {
     await electronApp.close();
   });
 
-  test('should show EmptyStatePlaceholder for new agent with no messages', async () => {
+  test('should show AgentWelcome for new agent with no messages', async () => {
     // Wait for login screen
     const loginScreen = window.locator('[data-testid="login-screen"]');
     await expect(loginScreen).toBeVisible({ timeout: 10000 });
@@ -80,7 +80,7 @@ test.describe('Agents - EmptyStatePlaceholder', () => {
     // Wait for agents page to load
     await window.waitForSelector('[data-testid="agents"]', { timeout: 15000 });
 
-    // Verify EmptyStatePlaceholder is visible with new design
+    // Verify AgentWelcome is visible with new design
     const emptyStateHeading = window.locator('text=Assign a task to the agent');
     await expect(emptyStateHeading).toBeVisible({ timeout: 5000 });
 
@@ -99,7 +99,7 @@ test.describe('Agents - EmptyStatePlaceholder', () => {
     await expect(promptButtons).toBeVisible();
   });
 
-  test('should show correct styling for EmptyStatePlaceholder', async () => {
+  test('should show correct styling for AgentWelcome', async () => {
     // Wait for login screen
     const loginScreen = window.locator('[data-testid="login-screen"]');
     await expect(loginScreen).toBeVisible({ timeout: 10000 });
@@ -128,7 +128,7 @@ test.describe('Agents - EmptyStatePlaceholder', () => {
     expect(hasRoundedXl).toBe(true);
   });
 
-  test('should hide EmptyStatePlaceholder after sending first message', async () => {
+  test('should hide AgentWelcome after sending first message', async () => {
     // Wait for login screen
     const loginScreen = window.locator('[data-testid="login-screen"]');
     await expect(loginScreen).toBeVisible({ timeout: 10000 });
@@ -139,7 +139,7 @@ test.describe('Agents - EmptyStatePlaceholder', () => {
     // Wait for agents page to load
     await window.waitForSelector('[data-testid="agents"]', { timeout: 15000 });
 
-    // Verify EmptyStatePlaceholder is visible initially
+    // Verify AgentWelcome is visible initially
     const emptyStateHeading = window.locator('text=Assign a task to the agent');
     await expect(emptyStateHeading).toBeVisible({ timeout: 5000 });
 
@@ -154,11 +154,11 @@ test.describe('Agents - EmptyStatePlaceholder', () => {
     const userMessage = window.locator('text=Hello, this is my first message!');
     await expect(userMessage).toBeVisible({ timeout: 10000 });
 
-    // Then verify EmptyStatePlaceholder is no longer visible
+    // Then verify AgentWelcome is no longer visible
     await expect(emptyStateHeading).not.toBeVisible({ timeout: 5000 });
   });
 
-  test('should show EmptyStatePlaceholder when creating new agent', async () => {
+  test('should show AgentWelcome when creating new agent', async () => {
     // Wait for login screen
     const loginScreen = window.locator('[data-testid="login-screen"]');
     await expect(loginScreen).toBeVisible({ timeout: 10000 });
@@ -169,7 +169,7 @@ test.describe('Agents - EmptyStatePlaceholder', () => {
     // Wait for agents page to load
     await window.waitForSelector('[data-testid="agents"]', { timeout: 15000 });
 
-    // Verify EmptyStatePlaceholder is visible for first (auto-created) agent
+    // Verify AgentWelcome is visible for first (auto-created) agent
     const emptyStateHeading = window.locator('text=Assign a task to the agent');
     await expect(emptyStateHeading).toBeVisible({ timeout: 5000 });
 
@@ -180,7 +180,7 @@ test.describe('Agents - EmptyStatePlaceholder', () => {
     // Wait for new agent to be created and UI to update
     await expect(window.locator('[data-testid^="agent-icon-"]')).toHaveCount(2, { timeout: 5000 });
 
-    // Verify EmptyStatePlaceholder is still visible for new agent (also has no messages)
+    // Verify AgentWelcome is still visible for new agent (also has no messages)
     await expect(emptyStateHeading).toBeVisible({ timeout: 5000 });
 
     // Verify description is visible
@@ -190,7 +190,7 @@ test.describe('Agents - EmptyStatePlaceholder', () => {
     await expect(emptyStateDescription).toBeVisible();
   });
 
-  test('should center EmptyStatePlaceholder in messages area', async () => {
+  test('should center AgentWelcome in messages area', async () => {
     // Wait for login screen
     const loginScreen = window.locator('[data-testid="login-screen"]');
     await expect(loginScreen).toBeVisible({ timeout: 10000 });
@@ -201,7 +201,7 @@ test.describe('Agents - EmptyStatePlaceholder', () => {
     // Wait for agents page to load
     await window.waitForSelector('[data-testid="agents"]', { timeout: 15000 });
 
-    // Verify EmptyStatePlaceholder is visible
+    // Verify AgentWelcome is visible
     const emptyStateHeading = window.locator('text=Assign a task to the agent');
     await expect(emptyStateHeading).toBeVisible({ timeout: 5000 });
 
@@ -252,7 +252,7 @@ test.describe('Agents - EmptyStatePlaceholder', () => {
     // Wait for agents page to load
     await window.waitForSelector('[data-testid="agents"]', { timeout: 15000 });
 
-    // Verify EmptyStatePlaceholder is visible
+    // Verify AgentWelcome is visible
     const emptyStateHeading = window.locator('text=Assign a task to the agent');
     await expect(emptyStateHeading).toBeVisible({ timeout: 5000 });
 
@@ -260,7 +260,7 @@ test.describe('Agents - EmptyStatePlaceholder', () => {
     const transcribeButton = window.locator('button:has-text("Transcribe my latest meeting")');
     await transcribeButton.click();
 
-    // Verify message is displayed (EmptyStatePlaceholder should disappear)
+    // Verify message is displayed (AgentWelcome should disappear)
     const userMessage = window.locator('text=Transcribe my latest meeting');
     await expect(userMessage).toBeVisible({ timeout: 5000 });
   });
