@@ -324,26 +324,31 @@ interface UIMessage {
    - Новые (старые) сообщения prepend-ятся в начало списка
    - Позиция скролла сохраняется (не прыгает вверх при подгрузке)
 
-- [ ] **3.1** Создать `src/renderer/lib/messageMapper.ts` с функциями:
+- [x] **3.1** Создать `src/renderer/lib/messageMapper.ts` с функциями:
   - `toUIMessages(messages: MessageSnapshot[]): UIMessage[]`
   - `toUIMessage(msg: MessageSnapshot): UIMessage | null` (null для hidden)
-- [ ] **3.2** Реализовать маппинг типов:
+- [x] **3.2** Реализовать маппинг типов:
   - `kind: 'user'` → `{ role: 'user', parts: [{ type: 'text', text: data.text }] }`
   - `kind: 'llm'` с `action` → `{ role: 'assistant', parts: [{ type: 'reasoning', reasoning: reasoning.text }, { type: 'text', text: action.content }] }`
   - `kind: 'llm'` без `action` (стриминг) → `{ role: 'assistant', parts: [] }` (пустой, будет заполняться через stream)
   - `kind: 'error'` → `{ role: 'assistant', parts: [{ type: 'text', text: error.message }], metadata: { isError: true, errorMessage: error.message, actionLink: error.action_link } }`
   - Фильтрация: `hidden === true` → вернуть null (не включать)
-- [ ] **3.3** Добавить IPC endpoint `messages:list-paginated` в main process:
+- [x] **3.3** Добавить IPC endpoint `messages:list-paginated` в main process:
   - `MessagesRepository.listByAgentPaginated(agentId, limit, beforeId?)`
   - `MessageManager.listPaginated(agentId, limit, beforeId?)`
   - `AgentIPCHandlers` — зарегистрировать `messages:list-paginated`
   - Preload API — добавить `messages.listPaginated(agentId, limit, beforeId?)`
-- [ ] **3.4** Написать unit-тесты для `messageMapper`
-- [ ] **3.5** Написать property-based тесты для `messageMapper`:
+- [x] **3.4** Написать unit-тесты для `messageMapper`
+- [x] **3.5** Написать property-based тесты для `messageMapper`:
   - инвариант: количество UIMessages ≤ количества MessageSnapshots
   - инвариант: user messages всегда role: 'user'
   - инвариант: hidden сообщения никогда не попадают в результат
-- [ ] **3.6** Написать unit-тесты для `listByAgentPaginated`
+- [x] **3.6** Написать unit-тесты для `listByAgentPaginated`
+- [ ] **3.7** Написать unit-тесты для `MessageManager.listPaginated` и `AgentIPCHandlers` (handler `messages:list-paginated`)
+- [ ] **3.8** Написать функциональный тест для ленивой загрузки:
+  - `tests/functional/lazy-loading.spec.ts` — "should load last 50 messages on agent open"
+  - `tests/functional/lazy-loading.spec.ts` — "should load more messages on scroll to top"
+  - `tests/functional/lazy-loading.spec.ts` — "should not trigger load more when all messages loaded"
 
 ---
 

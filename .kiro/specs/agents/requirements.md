@@ -677,6 +677,12 @@
 
 13.4. КОГДА все сообщения загружены, ТО подгрузка НЕ ДОЛЖНА срабатывать повторно
 
+#### Функциональные Тесты
+
+- `tests/functional/lazy-loading.spec.ts` - "should load last 50 messages on agent open"
+- `tests/functional/lazy-loading.spec.ts` - "should load more messages on scroll to top"
+- `tests/functional/lazy-loading.spec.ts` - "should not trigger load more when all messages loaded"
+
 ---
 
 ## Нефункциональные Требования
