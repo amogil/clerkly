@@ -2416,19 +2416,39 @@ agents.tsx
 
 ### useAgentChat
 
-`src/renderer/hooks/useAgentChat.ts` — заменяет `useMessages`.
+`src/renderer/hooks/useAgentChat.ts` — заменяет `useMessages`. Оборачивает `useChat` из `@ai-sdk/react` с кастомным `IPCChatTransport`.
 
-Возвращает:
-- `messages: UIMessage[]` — AI SDK формат для рендеринга
-- `rawMessages: MessageSnapshot[]` — оригинальный формат для metadata (kind, action_link)
-- `isLoading: boolean`
-- `isStreaming: boolean`
-- `sendMessage(text): Promise<boolean>`
-- `loadMore(): Promise<void>` — ленивая подгрузка при скролле вверх
-- `hasMore: boolean`
+**Интерфейс:**
+```typescript
+interface UseAgentChatResult {
+  messages: UIMessage[];           // AI SDK формат для рендеринга
+  rawMessages: MessageSnapshot[];  // Оригинальный формат для metadata (kind, action_link)
+  isLoading: boolean;              // true пока загружается начальная история
+  isStreaming: boolean;            // true когда LLM стримит ответ
+  sendMessage(text: string): Promise<boolean>;
+  loadMore(): Promise<void>;       // ленивая подгрузка при скролле вверх
+  hasMore: boolean;                // есть ли ещё сообщения для подгрузки
+}
+```
+
+**Ключевые решения:**
+
+1. **`Chat` вместо прямого `useChat`** — используется `new Chat({ id: agentId, transport })` из `@ai-sdk/react` для изоляции состояния по `agentId`. `Chat` инстанс стабилен через `useMemo`.
+
+2. **Параллельный массив `rawMessages`** — AI SDK `UIMessage` не хранит `kind`, `hidden`, `action_link`. Хук хранит `rawMessages: MessageSnapshot[]` синхронно с `UIMessage[]` для доступа к оригинальным данным при рендеринге `AgentMessage`.
+
+3. **Двухфазный mount** — `useChat` создаётся с пустым состоянием, затем после загрузки истории вызывается `setMessages(toUIMessages(snapshots))`.
+
+4. **Синхронизация через события** — `MESSAGE_CREATED` добавляет в `rawMessages` (дедупликация по id), `MESSAGE_UPDATED` с `hidden: true` удаляет из обоих массивов через `setMessages()`.
+
+5. **`isStreaming`** = `status === 'streaming' || status === 'submitted'` (оба состояния означают активный запрос к LLM).
+
+6. **`AGENT_RATE_LIMIT` не в хуке** — подписка остаётся в `agents.tsx`, т.к. rate limit — UI-состояние (показать/скрыть баннер), не часть потока сообщений.
 
 ### Ленивая загрузка
 
 - При mount: загружает последние 50 сообщений через `messages:list-paginated`
-- При скролле к верхней границе: `loadMore()` загружает следующие 50 с `beforeId`
+- `oldestIdRef` хранит ID самого старого загруженного сообщения — курсор для пагинации
+- `loadMore()` вызывает `messages:list-paginated` с `beforeId = oldestIdRef.current`, prepend-ит старые сообщения
+- При скролле к верхней границе `Conversation` вызывает `loadMore()`
 - Позиция скролла сохраняется при подгрузке (не прыгает вверх)

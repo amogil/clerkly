@@ -394,14 +394,14 @@ interface UseAgentChatResult {
 - `IPCChatTransport` / `useAgentChat` получает это событие и удаляет сообщение из `rawMessages`.
 - Для `useChat` state: нужно вызвать `setMessages()` чтобы убрать user message из `UIMessage[]`. Хук `useAgentChat` должен слушать `MESSAGE_UPDATED` с `hidden: true` и синхронизировать оба массива.
 
-- [ ] **4.1** Создать `src/renderer/hooks/useAgentChat.ts`
-- [ ] **4.2** Реализовать хук с `useChat` + `IPCChatTransport`
-- [ ] **4.3** Реализовать загрузку начальной истории (последние 50 сообщений) через `messages:list-paginated` + `toUIMessages()`
-- [ ] **4.4** Реализовать `loadMore()` — подгрузка старых сообщений при скролле вверх
-- [ ] **4.5** Реализовать синхронизацию `rawMessages` с `UIMessage[]` (для доступа к kind, metadata)
-- [ ] **4.6** Реализовать обработку `MESSAGE_UPDATED` с `hidden: true` — удалять сообщение из `rawMessages` и вызывать `setMessages()` для `useChat` (нужно для Cancel rate limit и interrupted messages)
-- [ ] **4.7** Написать unit-тесты для `useAgentChat`
-- [ ] **4.8** Обновить `design.md` — добавить описание `useAgentChat`
+- [x] **4.1** Создать `src/renderer/hooks/useAgentChat.ts`
+- [x] **4.2** Реализовать хук с `useChat` + `IPCChatTransport`
+- [x] **4.3** Реализовать загрузку начальной истории (последние 50 сообщений) через `messages:list-paginated` + `toUIMessages()`
+- [x] **4.4** Реализовать `loadMore()` — подгрузка старых сообщений при скролле вверх
+- [x] **4.5** Реализовать синхронизацию `rawMessages` с `UIMessage[]` (для доступа к kind, metadata)
+- [x] **4.6** Реализовать обработку `MESSAGE_UPDATED` с `hidden: true` — удалять сообщение из `rawMessages` и вызывать `setMessages()` для `useChat` (нужно для Cancel rate limit и interrupted messages)
+- [x] **4.7** Написать unit-тесты для `useAgentChat`
+- [x] **4.8** Обновить `design.md` — добавить описание `useAgentChat`
 
 ---
 
