@@ -1,5 +1,5 @@
 // Requirements: agents.1, agents.2, agents.3, agents.4, agents.5, agents.6, agents.12, agents.13
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react';
 import { useAgents } from '../hooks/useAgents';
 import { hasError } from '../../shared/utils/agentStatus';
 import { AgentHeader } from './agents/AgentHeader';
@@ -15,6 +15,7 @@ export function Agents({ onNavigate }: { onNavigate?: (screen: string) => void }
   const [visibleChatsCount, setVisibleChatsCount] = useState(5);
   const [errorMessages, setErrorMessages] = useState<Map<string, string>>(new Map());
   const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const [startupLoaderVisible, setStartupLoaderVisible] = useState(true);
   const [rateLimitBanner, setRateLimitBanner] = useState<{
     agentId: string;
     userMessageId: number;
@@ -22,6 +23,7 @@ export function Agents({ onNavigate }: { onNavigate?: (screen: string) => void }
   } | null>(null);
   // Track loading state per agent — show loader until all chats loaded (agents.13.2, agents.13.10)
   const [loadingAgents, setLoadingAgents] = useState<Set<string>>(new Set());
+  const startupLoaderShownAtRef = useRef<number | null>(null);
 
   const chatListRef = useRef<HTMLDivElement>(null);
 
@@ -44,6 +46,35 @@ export function Agents({ onNavigate }: { onNavigate?: (screen: string) => void }
       setIsInitialLoad(false);
     }
   }, [isLoading, agents.length, isInitialLoad]);
+
+  useLayoutEffect(() => {
+    if (!isInitialLoad || agents.length === 0) return;
+    setLoadingAgents(new Set(agents.map((agent) => agent.id)));
+  }, [agents, isInitialLoad]);
+
+  useEffect(() => {
+    const shouldShowLoader =
+      isLoading || agents.length === 0 || loadingAgents.size > 0 || isInitialLoad;
+
+    if (shouldShowLoader) {
+      if (startupLoaderShownAtRef.current === null) {
+        startupLoaderShownAtRef.current = Date.now();
+      }
+      setStartupLoaderVisible(true);
+      return;
+    }
+
+    const shownAt = startupLoaderShownAtRef.current ?? Date.now();
+    const elapsed = Date.now() - shownAt;
+    const remaining = Math.max(0, 200 - elapsed);
+    const timeoutId = window.setTimeout(() => {
+      setStartupLoaderVisible(false);
+    }, remaining);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [agents.length, isInitialLoad, isLoading, loadingAgents.size]);
 
   // Calculate visible chats based on container width (agents.1.7)
   useEffect(() => {
@@ -112,7 +143,13 @@ export function Agents({ onNavigate }: { onNavigate?: (screen: string) => void }
   }, [showAllTasksPage, agents]);
 
   // Requirements: agents.2.7
-  if (isLoading || agents.length === 0) return null;
+  if (isLoading || agents.length === 0) {
+    return (
+      <div data-testid="agents" className="h-[calc(100vh-4rem)] bg-card flex flex-col">
+        <StartupLoader />
+      </div>
+    );
+  }
 
   if (showAllTasksPage) {
     return (
@@ -128,6 +165,7 @@ export function Agents({ onNavigate }: { onNavigate?: (screen: string) => void }
   const currentAgent = activeAgent || agents[0]!;
   // Show loader while any AgentChat is still loading its initial chunk (agents.13.2, agents.13.10)
   const allChatsLoaded = loadingAgents.size === 0;
+  const showStartupLoader = startupLoaderVisible || !allChatsLoaded;
 
   return (
     <div data-testid="agents" className="h-[calc(100vh-4rem)] bg-card flex flex-col">
@@ -143,18 +181,13 @@ export function Agents({ onNavigate }: { onNavigate?: (screen: string) => void }
       />
 
       {/* Startup loader — shown until all AgentChat components finish loading (agents.13.2) */}
-      {!allChatsLoaded && (
-        <div className="flex-1 flex items-center justify-center">
-          <div className="flex gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-muted-foreground animate-bounce" />
-            <span className="w-2 h-2 rounded-full bg-muted-foreground animate-bounce [animation-delay:150ms]" />
-            <span className="w-2 h-2 rounded-full bg-muted-foreground animate-bounce [animation-delay:300ms]" />
-          </div>
-        </div>
-      )}
+      {showStartupLoader && <StartupLoader />}
 
       {/* All AgentChat components mounted at startup — CSS show/hide on agent switch (agents.13.3, agents.13.5) */}
-      <div className={`flex-1 min-h-0 flex flex-col relative${allChatsLoaded ? '' : ' hidden'}`}>
+      <div
+        data-testid="agent-chats"
+        className={`flex-1 min-h-0 flex flex-col relative${showStartupLoader ? ' hidden' : ''}`}
+      >
         {agents.map((agent) => (
           <AgentChat
             key={agent.id}
@@ -166,6 +199,18 @@ export function Agents({ onNavigate }: { onNavigate?: (screen: string) => void }
             onNavigate={onNavigate}
           />
         ))}
+      </div>
+    </div>
+  );
+}
+
+function StartupLoader() {
+  return (
+    <div data-testid="startup-loader" className="flex-1 flex items-center justify-center">
+      <div className="flex gap-1.5">
+        <span className="w-2 h-2 rounded-full bg-muted-foreground animate-bounce" />
+        <span className="w-2 h-2 rounded-full bg-muted-foreground animate-bounce [animation-delay:150ms]" />
+        <span className="w-2 h-2 rounded-full bg-muted-foreground animate-bounce [animation-delay:300ms]" />
       </div>
     </div>
   );

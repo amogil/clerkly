@@ -66,7 +66,7 @@ const PAGE_SIZE = 50;
 export function useAgentChat(agentId: string | null): UseAgentChatResult {
   // ── Initial history state ──────────────────────────────────────────────
   const [rawMessages, setRawMessages] = useState<MessageSnapshot[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(() => Boolean(agentId));
   const [hasMore, setHasMore] = useState(false);
   // ID of the oldest loaded message — used as cursor for loadMore()
   const oldestIdRef = useRef<number | undefined>(undefined);
@@ -114,6 +114,8 @@ export function useAgentChat(agentId: string | null): UseAgentChatResult {
         oldestIdRef.current = snapshots.length > 0 ? snapshots[0]!.id : undefined;
       }
     } finally {
+      // Ensure loading state renders at least once.
+      await new Promise((resolve) => setTimeout(resolve, 0));
       setIsLoading(false);
     }
   }, [agentId, setMessages]);
