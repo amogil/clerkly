@@ -10,6 +10,7 @@ import {
   createMockOAuthServer,
   completeOAuthFlow,
   activeChat,
+  expectNoToastError,
   launchElectron,
   closeElectron,
   ElectronTestContext,
@@ -19,6 +20,26 @@ import type { MockOAuthServer } from './helpers/mock-oauth-server';
 let context: ElectronTestContext;
 let window: Page;
 let mockOAuthServer: MockOAuthServer;
+
+async function seedMessages(
+  page: Page,
+  targetAgentId: string,
+  count: number,
+  prefix: string
+): Promise<void> {
+  await page.evaluate(
+    async ({ agentId, total, label }) => {
+      for (let i = 1; i <= total; i++) {
+        // @ts-expect-error - window.api is exposed via contextBridge
+        const result = await window.api.test.createAgentMessage(agentId, `${label} ${i}`);
+        if (!result?.success) {
+          throw new Error(result?.error || 'Failed to seed message');
+        }
+      }
+    },
+    { agentId: targetAgentId, total: count, label: prefix }
+  );
+}
 
 test.beforeAll(async () => {
   mockOAuthServer = await createMockOAuthServer();
@@ -185,6 +206,62 @@ test.describe('Agent Scroll Position', () => {
     // No autoscroll when user is scrolled up
     await expect(scrollToBottomBtn).toBeVisible({ timeout: 3000 });
     await expect(messages.last()).not.toBeInViewport({ timeout: 3000 });
+  });
+
+  /* Preconditions: Agent has 80 messages (hasMore=true on initial load)
+     Action: Scroll to top of chat
+     Assertions: Older messages are loaded and total count increases
+     Requirements: agents.13.9 */
+  test('should load more messages when scrolled to top', async () => {
+    const messagesArea = activeChat(window).messagesArea;
+    const messages = activeChat(window).messages;
+
+    const agentIcons = window.locator('[data-testid^="agent-icon-"]');
+    await expect(agentIcons).toHaveCount(1, { timeout: 5000 });
+    const agentId = (await agentIcons.first().getAttribute('data-testid'))?.replace(
+      'agent-icon-',
+      ''
+    );
+    expect(agentId).toBeTruthy();
+
+    await seedMessages(window, agentId as string, 80, 'Seed message');
+
+    await expect
+      .poll(async () => await messages.count(), { timeout: 10000 })
+      .toBeGreaterThanOrEqual(50);
+
+    await messagesArea.hover();
+    await window.mouse.wheel(0, -999999);
+
+    await expect(messages).toHaveCount(80, { timeout: 10000 });
+    await expectNoToastError(window);
+  });
+
+  /* Preconditions: Agent has 30 messages (hasMore=false on initial load)
+     Action: Scroll to top of chat
+     Assertions: No additional messages are loaded
+     Requirements: agents.13.9 */
+  test('should NOT trigger load more when all messages are loaded (hasMore=false)', async () => {
+    const messagesArea = activeChat(window).messagesArea;
+    const messages = activeChat(window).messages;
+
+    const agentIcons = window.locator('[data-testid^="agent-icon-"]');
+    await expect(agentIcons).toHaveCount(1, { timeout: 5000 });
+    const agentId = (await agentIcons.first().getAttribute('data-testid'))?.replace(
+      'agent-icon-',
+      ''
+    );
+    expect(agentId).toBeTruthy();
+
+    await seedMessages(window, agentId as string, 30, 'Seed message');
+
+    await expect(messages).toHaveCount(30, { timeout: 10000 });
+
+    await messagesArea.hover();
+    await window.mouse.wheel(0, -999999);
+
+    await expect.poll(async () => await messages.count(), { timeout: 2000 }).toBe(30);
+    await expectNoToastError(window);
   });
 
   /* Preconditions: Agent-1 with 15 messages and LLM responses, scrolled up; agent-2 empty

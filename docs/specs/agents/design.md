@@ -559,7 +559,7 @@ Auto-create first agent обеспечивается на уровне UI (rende
 3. **Empty state UI никогда не показывается**:
    - Компонент \`agents.tsx\` не имеет UI для пустого состояния
    - Если \`agents.length === 0\`, это означает загрузку или ошибку
-   - Показывается "Loading..." вместо "No agents yet"
+   - Вместо локального empty-state показывается глобальный экран загрузки в \`App.tsx\` ("Loading...")
 
 ### Почему на уровне UI, а не Main Process?
 
