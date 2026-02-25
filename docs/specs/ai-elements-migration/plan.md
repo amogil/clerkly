@@ -341,7 +341,7 @@ interface UIMessage {
 - `useChat` из `@ai-sdk/react@5` принимает `{ id, transport, initialMessages }`.
 - `id` = agentId — `useChat` автоматически изолирует состояние по `id`.
 - Хук используется внутри `AgentChat` компонента — каждый `AgentChat` монтируется при старте и вызывает `useAgentChat(agentId)`.
-- `isLoading = true` пока идёт загрузка начального чанка (50 сообщений). `agents.tsx` показывает лоадер пока хотя бы один агент имеет `isLoading === true`.
+- `isLoading = true` пока идёт загрузка начального чанка (50 сообщений). `App.tsx` показывает экран "Loading..." пока хотя бы один агент имеет `isLoading === true`.
 - `initialMessages` — загружаются асинхронно через `messages:list-paginated`, поэтому нужен двухфазный mount:
   1. Сначала `useChat` создаётся с пустым `initialMessages`
   2. После загрузки начального чанка — вызвать `setMessages(loaded)` (если `useChat` поддерживает) или пересоздать через `key`
@@ -426,10 +426,10 @@ interface UseAgentChatResult {
   - [ ] "should load more messages when scrolled to top (scrollTop < 50)"
   - [ ] "should NOT trigger load more when all messages are loaded (hasMore = false)"
   - [ ] "should preserve scroll position when switching between agents"
-- [x] **5.7.2** Написать функциональный тест стартового лоадера (`tests/functional/startup-loader.spec.ts`):
-  - "should show loader while agents are loading initial messages" — лоадер (три точки) виден сразу после запуска, пока идёт загрузка
-  - "should load last 50 messages per agent on startup" — после исчезновения лоадера каждый агент показывает до 50 сообщений
-  - "should hide loader and show chat UI after all agents finish loading" — после загрузки всех агентов лоадер скрывается и отображается интерфейс чата (textarea, сообщения)
+- [x] **5.7.2** Написать функциональный тест стартового экрана загрузки (`tests/functional/startup-loader.spec.ts`):
+  - "should show loader while agents are loading initial messages" — экран "Loading..." виден сразу после запуска, пока идёт загрузка
+  - "should load last 50 messages per agent on startup" — после исчезновения экрана загрузки каждый агент показывает до 50 сообщений
+  - "should hide loader and show chat UI after all agents finish loading" — после загрузки всех агентов экран загрузки скрывается и отображается интерфейс чата (textarea, сообщения)
 - [x] **5.8** Обновить `design.md` — убраны пометки ⚠️ УСТАРЕЛО, заменены на актуальные описания
 
 ---
@@ -621,7 +621,7 @@ interface UseAgentChatResult {
 - [x] **10.1** Заменить `useMessages` на `useAgentChat` (теперь используется внутри `AgentChat`) — `useMessages.ts` уже удалён, но интеграция не завершена
 - [x] **10.2** Создать `AgentChat` компонент — содержит `Conversation` + `ConversationContent` + `ConversationScrollButton` + список `AgentMessage` + `AgentPromptInput` + `RateLimitBanner`
 - [x] **10.3** В `agents.tsx` рендерить все `AgentChat` одновременно (по одному на каждого агента из `agents` массива). Скрывать неактивные через CSS `absolute inset-0 opacity-0 pointer-events-none` (НЕ `hidden`/`display:none` — это сбрасывает `scrollTop`). НЕ использовать `key={currentAgent.id}` — это вызовет ремонт.
-- [x] **10.4** Добавить лоадер при старте: показывать пока хотя бы один `AgentChat` имеет `isLoading === true`. Реализовать через callback/ref из `AgentChat` в `agents.tsx`.
+- [x] **10.4** Добавить экран загрузки при старте: показывать в `App.tsx` пока хотя бы один `AgentChat` имеет `isLoading === true`. Реализовать через callback/ref из `AgentChat` в `agents.tsx`.
 - [x] **10.5** Заменить `MessageBubble` на `AgentMessage` в `AgentChat`. Сохранить `motion.div` обёртку вокруг каждого `AgentMessage` для анимации появления (agents.4.22: fade-in + slide-up). Убедиться что `motion.div` не конфликтует с внутренней структурой `Message` из AI Elements и что `Conversation` корректно обрабатывает анимированные дочерние элементы
 - [x] **10.6** Заменить `ChatInput` на `AgentPromptInput` в `AgentChat`
 - [x] **10.7** Перенести `RateLimitBanner` внутрь `AgentChat` / `Conversation` как специальный элемент (НЕ как `AgentMessage`). Подписка на `AGENT_RATE_LIMIT` остаётся в `agents.tsx` — `rateLimitBanner` state передаётся в `AgentChat` через props. Баннер рендерится внутри `Conversation` после списка сообщений (перед `ConversationScrollButton`)
@@ -771,8 +771,8 @@ interface UseAgentChatResult {
 **Причины падения:**
 - В новой архитектуре `AgentWelcome` рендерится внутри `AgentChat` на основе `rawMessages.length === 0`. После отправки сообщения `rawMessages` обновляется через `MESSAGE_CREATED` событие — `AgentWelcome` должен скрыться.
 - Возможная проблема: `rawMessages` обновляется через `useEventSubscription(MESSAGE_CREATED)` в `useAgentChat`. Если событие приходит с задержкой или не приходит — `AgentWelcome` остаётся видимым.
-- Тест `should show AgentWelcome when creating new agent`: при создании нового агента новый `AgentChat` монтируется с пустым `rawMessages` — `AgentWelcome` должен быть виден. Но если `isLoading === true` (идёт загрузка начального чанка), весь `AgentChat` скрыт за лоадером в `agents.tsx`.
-- Проблема с лоадером: `agents.tsx` показывает лоадер пока `loadingAgents.size > 0`. Новый агент сразу добавляет себя в `loadingAgents` через `onLoadingChange`. Если `isLoading` не сбрасывается быстро для пустого агента — лоадер блокирует отображение `AgentWelcome`.
+- Тест `should show AgentWelcome when creating new agent`: при создании нового агента новый `AgentChat` монтируется с пустым `rawMessages` — `AgentWelcome` должен быть виден. Но если `isLoading === true` (идёт загрузка начального чанка), экран загрузки в `App.tsx` может задержать появление `AgentWelcome`.
+- Проблема с экраном загрузки: `App.tsx` показывает "Loading..." пока `loadingAgents.size > 0`. Новый агент сразу добавляет себя в `loadingAgents` через `onLoadingChange`. Если `isLoading` не сбрасывается быстро для пустого агента — экран загрузки блокирует отображение `AgentWelcome`.
 
 **План исправления:**
 1. Проверить что `useAgentChat` корректно сбрасывает `isLoading = false` для агента без сообщений (пустой ответ от `messages:list-paginated`).

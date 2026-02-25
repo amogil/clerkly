@@ -48,6 +48,7 @@ function AppContent() {
   const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null);
   const [authError, setAuthError] = useState<{ message: string; code?: string } | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isChatsLoading, setIsChatsLoading] = useState<boolean>(true);
   const [currentScreen, setCurrentScreen] = useState<string>('agents');
 
   const router = useMemo(() => {
@@ -77,6 +78,12 @@ function AppContent() {
     router.updateCurrentRoute(routeMap[currentScreen] || '/agents');
   }, [currentScreen, router]);
 
+  useEffect(() => {
+    if (isAuthorized) {
+      setIsChatsLoading(true);
+    }
+  }, [isAuthorized]);
+
   const navigateToScreen = async (screen: string) => {
     const routeMap: Record<string, string> = {
       login: '/login',
@@ -102,6 +109,7 @@ function AppContent() {
       setIsLoading(false);
       setAuthError(null);
       setIsAuthorized(true);
+      setIsChatsLoading(true);
       navigationManager.redirectToAgents();
     },
     [navigationManager]
@@ -112,6 +120,7 @@ function AppContent() {
     setIsLoading(false);
     setAuthError({ message: payload.message, code: payload.code });
     setIsAuthorized(false);
+    setIsChatsLoading(false);
   }, []);
 
   const handleAuthCancelled = useCallback((_payload: AuthCancelledPayload) => {
@@ -119,6 +128,7 @@ function AppContent() {
     setIsLoading(false);
     setAuthError({ message: 'User cancelled authentication', code: 'access_denied' });
     setIsAuthorized(false);
+    setIsChatsLoading(false);
   }, []);
 
   const handleAuthSignedOut = useCallback(() => {
@@ -126,6 +136,7 @@ function AppContent() {
     setIsAuthorized(false);
     setAuthError(null);
     setIsLoading(false);
+    setIsChatsLoading(false);
     navigationManager.redirectToLogin();
   }, [navigationManager]);
 
@@ -211,14 +222,7 @@ function AppContent() {
   };
 
   if (isAuthorized === null) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading...</p>
-        </div>
-      </div>
-    );
+    return <AppLoadingScreen />;
   }
 
   if (!isAuthorized) {
@@ -236,7 +240,7 @@ function AppContent() {
   const renderScreen = () => {
     switch (currentScreen) {
       case 'agents':
-        return <Agents onNavigate={navigateToScreen} />;
+        return <Agents onNavigate={navigateToScreen} onChatsLoadingChange={setIsChatsLoading} />;
       case 'settings':
         return <Settings onSignOut={handleSignOut} onNavigate={navigateToScreen} />;
       case 'error-demo':
@@ -247,9 +251,30 @@ function AppContent() {
   };
 
   return (
-    <div className="min-h-screen bg-background" data-testid="agents-screen">
-      <TopNavigation currentScreen={currentScreen} onNavigate={navigateToScreen} />
-      <div className="pt-16">{renderScreen()}</div>
+    <>
+      {isChatsLoading && <AppLoadingScreen />}
+      <div
+        className={`min-h-screen bg-background${isChatsLoading ? ' hidden' : ''}`}
+        data-testid="agents-screen"
+      >
+        <TopNavigation currentScreen={currentScreen} onNavigate={navigateToScreen} />
+        <div className="pt-16">{renderScreen()}</div>
+      </div>
+    </>
+  );
+}
+
+// Requirements: agents.13.2, agents.13.10
+function AppLoadingScreen() {
+  return (
+    <div
+      data-testid="app-loading-screen"
+      className="min-h-screen bg-background flex items-center justify-center"
+    >
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+        <p className="text-muted-foreground">Loading...</p>
+      </div>
     </div>
   );
 }

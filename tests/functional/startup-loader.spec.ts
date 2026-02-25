@@ -1,7 +1,7 @@
 /**
  * Functional Tests: Startup Loader
  *
- * Verifies startup loader behavior while AgentChat initial chunks load.
+ * Verifies App loading screen behavior while AgentChat initial chunks load.
  * Requirements: agents.13.2, agents.13.10
  */
 
@@ -22,19 +22,12 @@ import type { MockOAuthServer } from './helpers/mock-oauth-server';
 let context: ElectronTestContext | null = null;
 let mockOAuthServer: MockOAuthServer;
 
-async function seedAgentMessages(
-  window: Page,
-  agentId: string,
-  count: number
-): Promise<void> {
+async function seedAgentMessages(window: Page, agentId: string, count: number): Promise<void> {
   await window.evaluate(
     async ({ targetAgentId, total }) => {
       for (let i = 1; i <= total; i++) {
         // @ts-expect-error - window.api is exposed via contextBridge
-        const result = await window.api.test.createAgentMessage(
-          targetAgentId,
-          `Seed message ${i}`
-        );
+        const result = await window.api.test.createAgentMessage(targetAgentId, `Seed message ${i}`);
         if (!result?.success) {
           throw new Error(result?.error || 'Failed to seed message');
         }
@@ -74,7 +67,7 @@ test.afterEach(async () => {
 test.describe('Startup loader', () => {
   /* Preconditions: App launched, user authenticates
      Action: App loads initial message chunks for AgentChat
-     Assertions: Startup loader appears before chats are ready
+     Assertions: App loading screen appears before chats are ready
      Requirements: agents.13.2 */
   test('should show loader while agents are loading initial messages', async () => {
     context = await launchElectron(undefined, {
@@ -82,33 +75,77 @@ test.describe('Startup loader', () => {
     });
 
     await context.window.evaluate(() => {
+      (window as any).__appLoadingSeen = false;
+      const observer = new MutationObserver(() => {
+        const loading = document.querySelector(
+          '[data-testid="app-loading-screen"]'
+        ) as HTMLElement | null;
+        if (loading && loading.offsetParent !== null) {
+          (window as any).__appLoadingSeen = true;
+        }
+      });
+      observer.observe(document.body, { childList: true, subtree: true, attributes: true });
+      (window as any).__appLoadingObserver = observer;
+    });
+
+    await context.window.evaluate(() => {
       const api = (window as any).api;
       const original = api.messages.listPaginated;
       api.messages.listPaginated = async (...args: unknown[]) => {
-        await new Promise((resolve) => setTimeout(resolve, 200));
+        await new Promise((resolve) => setTimeout(resolve, 800));
         return original(...args);
       };
     });
 
     await completeOAuthFlow(context.app, context.window);
-    await expect(context.window.locator('[data-testid="agents"]')).toBeVisible({ timeout: 10000 });
 
-    const loader = context.window.locator('[data-testid="startup-loader"]');
-    const loaderCount = await loader.count();
-    if (loaderCount > 0) {
-      await expect(loader).toBeVisible({ timeout: 2000 });
-      await expect(loader).toBeHidden({ timeout: 10000 });
-    } else {
-      await expect(context.window.locator('[data-testid="agent-chats"]')).toBeVisible({
+    const appLoading = context.window.locator('[data-testid="app-loading-screen"]');
+    await expect(appLoading).toBeHidden({ timeout: 10000 });
+
+    await expect(context.window.locator('[data-testid="agents"]')).toBeVisible({ timeout: 10000 });
+    await expect
+      .poll(async () => await context.window.evaluate(() => (window as any).__appLoadingSeen), {
         timeout: 10000,
-      });
-    }
+      })
+      .toBe(true);
+    await expectNoToastError(context.window);
+  });
+
+  /* Preconditions: User already authorized, app relaunches
+     Action: App loads initial message chunks for AgentChat
+     Assertions: App loading screen appears before agents screen
+     Requirements: agents.13.2 */
+  test('should show loading screen on startup when already authorized', async () => {
+    const testDataPath = path.join(
+      os.tmpdir(),
+      `clerkly-startup-loader-auth-${Date.now()}-${Math.random().toString(36).substring(7)}`
+    );
+
+    const firstContext = await launchElectron(testDataPath, {
+      CLERKLY_GOOGLE_API_URL: mockOAuthServer.getBaseUrl(),
+    });
+
+    await completeOAuthFlow(firstContext.app, firstContext.window);
+    await expect(firstContext.window.locator('[data-testid="agents"]')).toBeVisible({
+      timeout: 10000,
+    });
+
+    await closeElectron(firstContext, false);
+
+    context = await launchElectron(testDataPath, {
+      CLERKLY_GOOGLE_API_URL: mockOAuthServer.getBaseUrl(),
+    });
+
+    const appLoading = context.window.locator('[data-testid="app-loading-screen"]');
+    await expect(appLoading).toBeVisible({ timeout: 10000 });
+    await expect(appLoading).toBeHidden({ timeout: 10000 });
+    await expect(context.window.locator('[data-testid="agents"]')).toBeVisible({ timeout: 10000 });
     await expectNoToastError(context.window);
   });
 
   /* Preconditions: Two agents with 60 messages each in storage
      Action: Relaunch app and load initial chunks
-     Assertions: Each agent shows only last 50 messages on startup
+     Assertions: App loading screen shows, then each agent shows only last 50 messages
      Requirements: agents.13.1, agents.13.2 */
   test('should load last 50 messages per agent on startup', async () => {
     const testDataPath = path.join(
@@ -156,17 +193,44 @@ test.describe('Startup loader', () => {
       CLERKLY_GOOGLE_API_URL: mockOAuthServer.getBaseUrl(),
     });
 
-    await expect(context.window.locator('[data-testid="agents"]')).toBeVisible({ timeout: 10000 });
-    await expect(context.window.locator('[data-testid="startup-loader"]')).toBeHidden({
+    const appLoading = context.window.locator('[data-testid="app-loading-screen"]');
+    await expect(appLoading).toBeVisible({ timeout: 10000 });
+    await expect(appLoading).toBeHidden({
       timeout: 10000,
     });
+    await expect(context.window.locator('[data-testid="agents"]')).toBeVisible({ timeout: 10000 });
+
+    const selectAgent = async (agentId: string) => {
+      const agentIcon = context.window.locator(`[data-testid="agent-icon-${agentId}"]`);
+      const allAgentsButton = context.window.locator('[data-testid="all-agents-button"]');
+      await expect
+        .poll(async () => {
+          const iconCount = await agentIcon.count();
+          const buttonCount = await allAgentsButton.count();
+          return iconCount + buttonCount;
+        })
+        .toBeGreaterThan(0);
+
+      if ((await agentIcon.count()) > 0) {
+        await agentIcon.click();
+        return;
+      }
+
+      if ((await allAgentsButton.count()) > 0) {
+        await allAgentsButton.click();
+        await context.window.locator(`[data-testid="agent-card-${agentId}"]`).click();
+        return;
+      }
+
+      await agentIcon.click();
+    };
 
     // Agent 1 shows last 50 messages
-    await context.window.locator(`[data-testid="agent-icon-${firstAgentId}"]`).click();
+    await selectAgent(firstAgentId);
     await expect(activeChat(context.window).messages).toHaveCount(50, { timeout: 5000 });
 
     // Agent 2 shows last 50 messages
-    await context.window.locator(`[data-testid="agent-icon-${secondAgentId}"]`).click();
+    await selectAgent(secondAgentId);
     await expect(activeChat(context.window).messages).toHaveCount(50, { timeout: 5000 });
 
     await expectNoToastError(context.window);
@@ -174,7 +238,7 @@ test.describe('Startup loader', () => {
 
   /* Preconditions: App launched, agents load initial chunks
      Action: Wait for all chats to finish loading
-     Assertions: Loader hides and chat UI becomes visible
+     Assertions: App loading screen hides and chat UI becomes visible
      Requirements: agents.13.10 */
   test('should hide loader and show chat UI after all agents finish loading', async () => {
     context = await launchElectron(undefined, {
@@ -182,14 +246,11 @@ test.describe('Startup loader', () => {
     });
 
     await completeOAuthFlow(context.app, context.window);
+
+    const appLoading = context.window.locator('[data-testid="app-loading-screen"]');
+    await expect(appLoading).toBeHidden({ timeout: 10000 });
+
     await expect(context.window.locator('[data-testid="agents"]')).toBeVisible({ timeout: 10000 });
-
-    const loader = context.window.locator('[data-testid="startup-loader"]');
-    await expect(loader).toBeHidden({ timeout: 10000 });
-
-    await expect(context.window.locator('[data-testid="agent-chats"]')).toBeVisible({
-      timeout: 5000,
-    });
     await expect(activeChat(context.window).textarea).toBeVisible({ timeout: 5000 });
     await expectNoToastError(context.window);
   });

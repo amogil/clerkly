@@ -10,7 +10,13 @@ import { EVENT_TYPES } from '../../shared/events/constants';
 import type { AgentRateLimitPayload } from '../../shared/events/types';
 import type { AgentSnapshot } from '../types/agent';
 
-export function Agents({ onNavigate }: { onNavigate?: (screen: string) => void }) {
+export function Agents({
+  onNavigate,
+  onChatsLoadingChange,
+}: {
+  onNavigate?: (screen: string) => void;
+  onChatsLoadingChange?: (isLoading: boolean) => void;
+}) {
   const [showAllTasksPage, setShowAllTasksPage] = useState(false);
   const [visibleChatsCount, setVisibleChatsCount] = useState(5);
   const [errorMessages, setErrorMessages] = useState<Map<string, string>>(new Map());
@@ -21,7 +27,7 @@ export function Agents({ onNavigate }: { onNavigate?: (screen: string) => void }
     userMessageId: number;
     retryAfterSeconds: number;
   } | null>(null);
-  // Track loading state per agent — show loader until all chats loaded (agents.13.2, agents.13.10)
+  // Track loading state per agent — inform App loader until all chats loaded (agents.13.2, agents.13.10)
   const [loadingAgents, setLoadingAgents] = useState<Set<string>>(new Set());
   const startupLoaderShownAtRef = useRef<number | null>(null);
 
@@ -75,6 +81,23 @@ export function Agents({ onNavigate }: { onNavigate?: (screen: string) => void }
       window.clearTimeout(timeoutId);
     };
   }, [agents.length, isInitialLoad, isLoading, loadingAgents.size]);
+
+  useEffect(() => {
+    const isChatsLoading =
+      isLoading ||
+      agents.length === 0 ||
+      loadingAgents.size > 0 ||
+      isInitialLoad ||
+      startupLoaderVisible;
+    onChatsLoadingChange?.(isChatsLoading);
+  }, [
+    agents.length,
+    isInitialLoad,
+    isLoading,
+    loadingAgents.size,
+    onChatsLoadingChange,
+    startupLoaderVisible,
+  ]);
 
   // Calculate visible chats based on container width (agents.1.7)
   useEffect(() => {
@@ -144,11 +167,7 @@ export function Agents({ onNavigate }: { onNavigate?: (screen: string) => void }
 
   // Requirements: agents.2.7
   if (isLoading || agents.length === 0) {
-    return (
-      <div data-testid="agents" className="h-[calc(100vh-4rem)] bg-card flex flex-col">
-        <StartupLoader />
-      </div>
-    );
+    return null;
   }
 
   if (showAllTasksPage) {
@@ -163,10 +182,6 @@ export function Agents({ onNavigate }: { onNavigate?: (screen: string) => void }
   }
 
   const currentAgent = activeAgent || agents[0]!;
-  // Show loader while any AgentChat is still loading its initial chunk (agents.13.2, agents.13.10)
-  const allChatsLoaded = loadingAgents.size === 0;
-  const showStartupLoader = startupLoaderVisible || !allChatsLoaded;
-
   return (
     <div data-testid="agents" className="h-[calc(100vh-4rem)] bg-card flex flex-col">
       <AgentHeader
@@ -180,14 +195,8 @@ export function Agents({ onNavigate }: { onNavigate?: (screen: string) => void }
         onShowAllAgents={() => setShowAllTasksPage(true)}
       />
 
-      {/* Startup loader — shown until all AgentChat components finish loading (agents.13.2) */}
-      {showStartupLoader && <StartupLoader />}
-
       {/* All AgentChat components mounted at startup — CSS show/hide on agent switch (agents.13.3, agents.13.5) */}
-      <div
-        data-testid="agent-chats"
-        className={`flex-1 min-h-0 flex flex-col relative${showStartupLoader ? ' hidden' : ''}`}
-      >
+      <div data-testid="agent-chats" className="flex-1 min-h-0 flex flex-col relative">
         {agents.map((agent) => (
           <AgentChat
             key={agent.id}
@@ -199,18 +208,6 @@ export function Agents({ onNavigate }: { onNavigate?: (screen: string) => void }
             onNavigate={onNavigate}
           />
         ))}
-      </div>
-    </div>
-  );
-}
-
-function StartupLoader() {
-  return (
-    <div data-testid="startup-loader" className="flex-1 flex items-center justify-center">
-      <div className="flex gap-1.5">
-        <span className="w-2 h-2 rounded-full bg-muted-foreground animate-bounce" />
-        <span className="w-2 h-2 rounded-full bg-muted-foreground animate-bounce [animation-delay:150ms]" />
-        <span className="w-2 h-2 rounded-full bg-muted-foreground animate-bounce [animation-delay:300ms]" />
       </div>
     </div>
   );

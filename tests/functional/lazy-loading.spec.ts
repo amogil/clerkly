@@ -20,19 +20,12 @@ import type { MockOAuthServer } from './helpers/mock-oauth-server';
 let context: ElectronTestContext;
 let mockOAuthServer: MockOAuthServer;
 
-async function seedAgentMessages(
-  window: Page,
-  agentId: string,
-  count: number
-): Promise<void> {
+async function seedAgentMessages(window: Page, agentId: string, count: number): Promise<void> {
   await window.evaluate(
     async ({ targetAgentId, total }) => {
       for (let i = 1; i <= total; i++) {
         // @ts-expect-error - window.api is exposed via contextBridge
-        const result = await window.api.test.createAgentMessage(
-          targetAgentId,
-          `Seed message ${i}`
-        );
+        const result = await window.api.test.createAgentMessage(targetAgentId, `Seed message ${i}`);
         if (!result?.success) {
           throw new Error(result?.error || 'Failed to seed message');
         }
