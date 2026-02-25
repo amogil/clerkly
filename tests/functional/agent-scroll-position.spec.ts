@@ -5,12 +5,18 @@
  * Requirements: agents.4.14
  */
 
-import { test, expect, _electron as electron, ElectronApplication, Page } from '@playwright/test';
-import path from 'path';
-import { createMockOAuthServer, completeOAuthFlow, activeChat } from './helpers/electron';
+import { test, expect, Page } from '@playwright/test';
+import {
+  createMockOAuthServer,
+  completeOAuthFlow,
+  activeChat,
+  launchElectron,
+  closeElectron,
+  ElectronTestContext,
+} from './helpers/electron';
 import type { MockOAuthServer } from './helpers/mock-oauth-server';
 
-let electronApp: ElectronApplication;
+let context: ElectronTestContext;
 let window: Page;
 let mockOAuthServer: MockOAuthServer;
 
@@ -33,36 +39,87 @@ test.beforeEach(async () => {
     family_name: 'Test User',
   });
 
-  // Create unique temp directory for this test
-  const testDataPath = path.join(
-    require('os').tmpdir(),
-    `clerkly-test-${Date.now()}-${Math.random().toString(36).substring(7)}`
-  );
-
-  electronApp = await electron.launch({
-    args: [path.join(__dirname, '../../dist/main/main/index.js'), '--user-data-dir', testDataPath],
-    env: {
-      ...process.env,
-      NODE_ENV: 'test',
-      ELECTRON_DISABLE_SECURITY_WARNINGS: 'true',
-      CLERKLY_GOOGLE_API_URL: mockOAuthServer.getBaseUrl(),
-      CLERKLY_OAUTH_CLIENT_ID: 'test-client-id-12345',
-      CLERKLY_OAUTH_CLIENT_SECRET: 'test-client-secret-67890',
-    },
+  context = await launchElectron(undefined, {
+    ELECTRON_DISABLE_SECURITY_WARNINGS: 'true',
+    CLERKLY_GOOGLE_API_URL: mockOAuthServer.getBaseUrl(),
+    CLERKLY_OAUTH_CLIENT_ID: 'test-client-id-12345',
+    CLERKLY_OAUTH_CLIENT_SECRET: 'test-client-secret-67890',
   });
 
-  window = await electronApp.firstWindow();
-  await window.waitForLoadState('domcontentloaded');
+  window = context.window;
 
-  await completeOAuthFlow(electronApp, window);
+  await completeOAuthFlow(context.app, window);
   await expect(window.locator('[data-testid="agents"]')).toBeVisible({ timeout: 10000 });
 });
 
 test.afterEach(async () => {
-  await electronApp.close();
+  if (context) {
+    await closeElectron(context);
+  }
 });
 
 test.describe('Agent Scroll Position', () => {
+  /* Preconditions: Agent has enough messages to be scrollable, user is at bottom
+     Action: A new message arrives while user stays at bottom
+     Assertions: Chat autoscrolls to keep the latest message visible
+     Requirements: agents.4.13.1 */
+  test('should autoscroll to bottom when user is at bottom and new message arrives', async () => {
+    const messagesArea = activeChat(window).messagesArea;
+    const messages = activeChat(window).messages;
+    const scrollToBottomBtn = activeChat(window).scrollToBottomBtn;
+
+    const agentIcons = window.locator('[data-testid^="agent-icon-"]');
+    await expect(agentIcons).toHaveCount(1, { timeout: 5000 });
+    const agentId = (await agentIcons.first().getAttribute('data-testid'))?.replace(
+      'agent-icon-',
+      ''
+    );
+    expect(agentId).toBeTruthy();
+
+    await window.evaluate(
+      async ({ targetAgentId }) => {
+        for (let i = 1; i <= 20; i++) {
+          // @ts-expect-error - window.api is exposed via contextBridge
+          const result = await window.api.test.createAgentMessage(
+            targetAgentId,
+            `Seed message ${i}`
+          );
+          if (!result?.success) {
+            throw new Error(result?.error || 'Failed to seed message');
+          }
+        }
+      },
+      { targetAgentId: agentId as string }
+    );
+
+    await expect(messages).toHaveCount(20, { timeout: 5000 });
+
+    await messagesArea.hover();
+    await window.mouse.wheel(0, 999999);
+
+    // Ensure we are at bottom before new message arrives
+    await expect(scrollToBottomBtn).not.toBeVisible({ timeout: 3000 });
+
+    await window.evaluate(async ({ targetAgentId }) => {
+      // @ts-expect-error - window.api is exposed via contextBridge
+      const result = await window.api.test.createAgentMessage(
+        targetAgentId,
+        'New incoming message'
+      );
+      if (!result?.success) {
+        throw new Error(result?.error || 'Failed to create incoming message');
+      }
+    }, {
+      targetAgentId: agentId as string,
+    });
+
+    await expect(messages).toHaveCount(21, { timeout: 5000 });
+
+    // Autoscroll keeps us at bottom
+    await expect(scrollToBottomBtn).not.toBeVisible({ timeout: 3000 });
+    await expect(messages.last()).toBeInViewport({ timeout: 3000 });
+  });
+
   /* Preconditions: Agent-1 with 15 messages and LLM responses, scrolled up; agent-2 empty
      Action: Scroll up in agent-1, switch to agent-2, return to agent-1
      Assertions: Scroll position in agent-1 is restored

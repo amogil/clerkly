@@ -70,7 +70,7 @@ export async function launchElectron(
 
   const sanitizedEnv = Object.fromEntries(
     Object.entries(process.env).filter(
-      ([key, value]) => key !== 'CLERKLY_ELECTRON_RUN_AS_NODE' && value !== undefined
+      ([key, value]) => key !== 'ELECTRON_RUN_AS_NODE' && value !== undefined
     )
   ) as Record<string, string>;
 
