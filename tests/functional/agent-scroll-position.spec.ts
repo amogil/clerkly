@@ -120,6 +120,67 @@ test.describe('Agent Scroll Position', () => {
     await expect(messages.last()).toBeInViewport({ timeout: 3000 });
   });
 
+  /* Preconditions: Agent has enough messages to be scrollable, user scrolls up
+     Action: A new message arrives while user is scrolled up
+     Assertions: Chat does NOT autoscroll, scroll-to-bottom button stays visible
+     Requirements: agents.4.13.2 */
+  test('should NOT autoscroll when user has scrolled up', async () => {
+    const messagesArea = activeChat(window).messagesArea;
+    const messages = activeChat(window).messages;
+    const scrollToBottomBtn = activeChat(window).scrollToBottomBtn;
+
+    const agentIcons = window.locator('[data-testid^="agent-icon-"]');
+    await expect(agentIcons).toHaveCount(1, { timeout: 5000 });
+    const agentId = (await agentIcons.first().getAttribute('data-testid'))?.replace(
+      'agent-icon-',
+      ''
+    );
+    expect(agentId).toBeTruthy();
+
+    await window.evaluate(
+      async ({ targetAgentId }) => {
+        for (let i = 1; i <= 30; i++) {
+          // @ts-expect-error - window.api is exposed via contextBridge
+          const result = await window.api.test.createAgentMessage(
+            targetAgentId,
+            `Seed message ${i}`
+          );
+          if (!result?.success) {
+            throw new Error(result?.error || 'Failed to seed message');
+          }
+        }
+      },
+      { targetAgentId: agentId as string }
+    );
+
+    await expect(messages).toHaveCount(30, { timeout: 5000 });
+
+    await messagesArea.hover();
+    await window.mouse.wheel(0, -999999);
+
+    // Ensure we are scrolled up before new message arrives
+    await expect(scrollToBottomBtn).toBeVisible({ timeout: 3000 });
+
+    await window.evaluate(async ({ targetAgentId }) => {
+      // @ts-expect-error - window.api is exposed via contextBridge
+      const result = await window.api.test.createAgentMessage(
+        targetAgentId,
+        'New incoming message'
+      );
+      if (!result?.success) {
+        throw new Error(result?.error || 'Failed to create incoming message');
+      }
+    }, {
+      targetAgentId: agentId as string,
+    });
+
+    await expect(messages).toHaveCount(31, { timeout: 5000 });
+
+    // No autoscroll when user is scrolled up
+    await expect(scrollToBottomBtn).toBeVisible({ timeout: 3000 });
+    await expect(messages.last()).not.toBeInViewport({ timeout: 3000 });
+  });
+
   /* Preconditions: Agent-1 with 15 messages and LLM responses, scrolled up; agent-2 empty
      Action: Scroll up in agent-1, switch to agent-2, return to agent-1
      Assertions: Scroll position in agent-1 is restored

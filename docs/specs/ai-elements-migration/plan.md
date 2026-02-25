@@ -322,7 +322,7 @@ interface UIMessage {
 - [x] **3.5** Написать unit-тесты для `messageMapper` (`tests/unit/renderer/messageMapper.test.ts`)
 - [x] **3.6** Написать unit-тесты для `listByAgentPaginated`
 - [x] **3.7** Написать unit-тесты для `MessageManager.listPaginated` и `AgentIPCHandlers` (handler `messages:list-paginated`)
-- [ ] **3.8** Написать функциональный тест для ленивой загрузки:
+- [x] **3.8** Написать функциональный тест для ленивой загрузки:
   - `tests/functional/lazy-loading.spec.ts` — "should load last 50 messages on agent open"
   - `tests/functional/lazy-loading.spec.ts` — "should load more messages on scroll to top"
   - `tests/functional/lazy-loading.spec.ts` — "should not trigger load more when all messages loaded"
@@ -421,12 +421,12 @@ interface UseAgentChatResult {
 - [x] **5.6** Реализовать подгрузку при скролле вверх — `onScroll` на `Conversation`, проверка `scrollTop < 50`
 - [x] **5.7** Написать unit-тесты (`tests/unit/components/agents/AgentChat.test.tsx`) — 19 тестов
 - [ ] **5.7.1** Написать функциональные тесты автоскролла и ленивой подгрузки (`tests/functional/agent-scroll-position.spec.ts`):
-  - "should autoscroll to bottom when user is at bottom and new message arrives"
-  - "should NOT autoscroll when user has scrolled up"
-  - "should load more messages when scrolled to top (scrollTop < 50)"
-  - "should NOT trigger load more when all messages are loaded (hasMore = false)"
-  - "should preserve scroll position when switching between agents"
-- [ ] **5.7.2** Написать функциональный тест стартового лоадера (`tests/functional/startup-loader.spec.ts`):
+  - [x] "should autoscroll to bottom when user is at bottom and new message arrives"
+  - [x] "should NOT autoscroll when user has scrolled up"
+  - [ ] "should load more messages when scrolled to top (scrollTop < 50)"
+  - [ ] "should NOT trigger load more when all messages are loaded (hasMore = false)"
+  - [ ] "should preserve scroll position when switching between agents"
+- [x] **5.7.2** Написать функциональный тест стартового лоадера (`tests/functional/startup-loader.spec.ts`):
   - "should show loader while agents are loading initial messages" — лоадер (три точки) виден сразу после запуска, пока идёт загрузка
   - "should load last 50 messages per agent on startup" — после исчезновения лоадера каждый агент показывает до 50 сообщений
   - "should hide loader and show chat UI after all agents finish loading" — после загрузки всех агентов лоадер скрывается и отображается интерфейс чата (textarea, сообщения)
