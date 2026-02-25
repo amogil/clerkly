@@ -68,13 +68,19 @@ export async function launchElectron(
   const electronPath = require('electron') as unknown as string;
   const appPath = path.join(__dirname, '../../../dist/main/main/index.js');
 
+  const sanitizedEnv = Object.fromEntries(
+    Object.entries(process.env).filter(
+      ([key, value]) => key !== 'CLERKLY_ELECTRON_RUN_AS_NODE' && value !== undefined
+    )
+  ) as Record<string, string>;
+
   // Launch Electron
   // Requirements: testing.3.1, testing.3.2
   const app = await electron.launch({
     executablePath: electronPath,
     args: [appPath, '--user-data-dir', testDataPath],
     env: {
-      ...process.env,
+      ...sanitizedEnv,
       NODE_ENV: 'test',
       ...env, // Merge additional environment variables
     },
