@@ -34,14 +34,14 @@ describe('AppConfig', () => {
 
   /* Preconditions: AppConfig instance created
      Action: access windowSettings property
-     Assertions: windowSettings contains correct default values (width: 800, height: 600, minWidth: 600, minHeight: 400, titleBarStyle: 'hiddenInset', vibrancy: 'under-window')
+     Assertions: windowSettings contains correct default values (width: 900, height: 700, minWidth: 150, minHeight: 150, titleBarStyle: 'hiddenInset', vibrancy: 'under-window')
      Requirements: clerkly.1*/
   it('should have correct default window settings', () => {
     expect(appConfig.windowSettings).toEqual({
-      width: 800,
-      height: 600,
-      minWidth: 600,
-      minHeight: 400,
+      width: 900,
+      height: 700,
+      minWidth: 150,
+      minHeight: 150,
       titleBarStyle: 'hiddenInset',
       vibrancy: 'under-window',
     });
@@ -78,10 +78,10 @@ describe('AppConfig', () => {
   it('should return window settings via getWindowSettings()', () => {
     const settings = appConfig.getWindowSettings();
     expect(settings).toEqual({
-      width: 800,
-      height: 600,
-      minWidth: 600,
-      minHeight: 400,
+      width: 900,
+      height: 700,
+      minWidth: 150,
+      minHeight: 150,
       titleBarStyle: 'hiddenInset',
       vibrancy: 'under-window',
     });
@@ -96,8 +96,8 @@ describe('AppConfig', () => {
     settings.width = 1000;
     settings.height = 800;
 
-    expect(appConfig.windowSettings.width).toBe(800);
-    expect(appConfig.windowSettings.height).toBe(600);
+    expect(appConfig.windowSettings.width).toBe(900);
+    expect(appConfig.windowSettings.height).toBe(700);
   });
 
   /* Preconditions: AppConfig instance created with default settings
@@ -109,8 +109,8 @@ describe('AppConfig', () => {
 
     expect(appConfig.windowSettings.width).toBe(1024);
     expect(appConfig.windowSettings.height).toBe(768);
-    expect(appConfig.windowSettings.minWidth).toBe(600);
-    expect(appConfig.windowSettings.minHeight).toBe(400);
+    expect(appConfig.windowSettings.minWidth).toBe(150);
+    expect(appConfig.windowSettings.minHeight).toBe(150);
     expect(appConfig.windowSettings.titleBarStyle).toBe('hiddenInset');
     expect(appConfig.windowSettings.vibrancy).toBe('under-window');
   });
@@ -123,8 +123,8 @@ describe('AppConfig', () => {
     appConfig.updateWindowSettings({ titleBarStyle: 'hidden' });
 
     expect(appConfig.windowSettings.titleBarStyle).toBe('hidden');
-    expect(appConfig.windowSettings.width).toBe(800);
-    expect(appConfig.windowSettings.height).toBe(600);
+    expect(appConfig.windowSettings.width).toBe(900);
+    expect(appConfig.windowSettings.height).toBe(700);
     expect(appConfig.windowSettings.vibrancy).toBe('under-window');
   });
 
@@ -165,19 +165,19 @@ describe('AppConfig', () => {
 
   /* Preconditions: AppConfig instance created
      Action: access windowSettings minimum dimensions
-     Assertions: minWidth is 600, minHeight is 400
+     Assertions: minWidth is 150, minHeight is 150
      Requirements: clerkly.1*/
   it('should have correct minimum window dimensions', () => {
-    expect(appConfig.windowSettings.minWidth).toBe(600);
-    expect(appConfig.windowSettings.minHeight).toBe(400);
+    expect(appConfig.windowSettings.minWidth).toBe(150);
+    expect(appConfig.windowSettings.minHeight).toBe(150);
   });
 
   /* Preconditions: AppConfig instance created
      Action: access windowSettings default dimensions
-     Assertions: width is 800, height is 600
+     Assertions: width is 900, height is 700
      Requirements: clerkly.1*/
   it('should have correct default window dimensions', () => {
-    expect(appConfig.windowSettings.width).toBe(800);
-    expect(appConfig.windowSettings.height).toBe(600);
+    expect(appConfig.windowSettings.width).toBe(900);
+    expect(appConfig.windowSettings.height).toBe(700);
   });
 });

@@ -36,7 +36,7 @@ test.describe('Window State Persistence', () => {
 
   /* Preconditions: Application not running, no saved window state
      Action: Launch application, check initial window size
-     Assertions: Window opens with compact size min(800, screenWidth) x min(600, screenHeight), centered, not maximized
+     Assertions: Window opens with compact size min(900, screenWidth) x min(700, screenHeight), centered, not maximized
      Requirements: window-management.1.1, window-management.4.1, window-management.4.2, window-management.4.4 */
   test('should open at default size on first launch', async () => {
     // Launch the application with a fresh data directory
@@ -54,9 +54,9 @@ test.describe('Window State Persistence', () => {
       return primaryDisplay.workAreaSize;
     });
 
-    // Calculate expected compact size: min(800, screenWidth) x min(600, screenHeight)
-    const expectedWidth = Math.min(800, screenSize.width);
-    const expectedHeight = Math.min(600, screenSize.height);
+    // Calculate expected compact size: min(900, screenWidth) x min(700, screenHeight)
+    const expectedWidth = Math.min(900, screenSize.width);
+    const expectedHeight = Math.min(700, screenSize.height);
 
     // Verify window has compact size (not full screen)
     // Requirements: window-management.1.1, window-management.4.1, window-management.4.2
@@ -69,6 +69,29 @@ test.describe('Window State Persistence', () => {
 
     // Take screenshot
     await context.window.screenshot({ path: 'playwright-report/window-default-size.png' });
+  });
+
+  /* Preconditions: Application running
+     Action: Resize window below minimum size using Electron API
+     Assertions: Window size is clamped to minimum 150x150
+     Requirements: window-management.1.6 */
+  test('should enforce minimum window size', async () => {
+    context = await launchElectron();
+    await context.window.waitForLoadState('domcontentloaded');
+
+    // Try to resize window below allowed minimum
+    await context.app.evaluate(({ BrowserWindow }) => {
+      const window = BrowserWindow.getAllWindows()[0];
+      if (window) {
+        window.setSize(10, 10);
+      }
+    });
+
+    await context.window.waitForTimeout(500);
+
+    const bounds = await getWindowBounds(context.app);
+    expect(bounds.width).toBeGreaterThanOrEqual(150);
+    expect(bounds.height).toBeGreaterThanOrEqual(150);
   });
 
   /* Preconditions: Application running with default window size

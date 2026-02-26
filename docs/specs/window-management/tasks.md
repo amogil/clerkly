@@ -35,7 +35,7 @@
 
   - [x] 1.5 Реализовать метод getDefaultState()
     - Получать размер экрана через screen.getPrimaryDisplay().workAreaSize
-    - Вычислять размер окна: min(800, screenWidth) x min(600, screenHeight)
+    - Вычислять размер окна: min(900, screenWidth) x min(700, screenHeight)
     - Центрировать окно на экране
     - Устанавливать isMaximized: false (окно НЕ максимизировано по умолчанию)
     - _Requirements: window-management.1.1, window-management.4.1, window-management.4.2, window-management.4.4_
@@ -47,7 +47,7 @@
     - _Requirements: window-management.5.6_
 
   - [x] 1.7 Написать модульные тесты для WindowStateManager
-    - Тест: should return default state when no saved state exists (компактный размер 800x600)
+    - Тест: should return default state when no saved state exists (компактный размер 900x700)
     - Тест: should load saved state from database
     - Тест: should return default state for invalid position
     - Тест: should save state to database
@@ -68,9 +68,10 @@
     - Устанавливать title: '' (пустой заголовок)
     - Устанавливать titleBarStyle: 'default' (нативные элементы macOS)
     - Устанавливать resizable: true (окно можно изменять в размере)
+    - Устанавливать minWidth: 150 и minHeight: 150 (окно нельзя уменьшить меньше)
     - НЕ вызывать maximize() сразу, даже если isMaximized: true
     - В обработчике ready-to-show: показать окно, затем применить maximize() если isMaximized: true
-    - _Requirements: window-management.1.1, window-management.1.2, window-management.1.3, window-management.2.1, window-management.3.1, window-management.5.4_
+    - _Requirements: window-management.1.1, window-management.1.2, window-management.1.3, window-management.1.6, window-management.2.1, window-management.3.1, window-management.5.4_
 
   - [x] 2.3 Реализовать метод setupStateTracking()
     - Подписаться на события: resize, move, maximize, unmaximize
@@ -131,7 +132,7 @@
 - [x] 6. Написать функциональные тесты для window state persistence
   - [x] 6.1 Функциональный тест: should open application with correct initial window state
     - Запустить приложение с чистой базой данных
-    - Проверить размер окна: min(600, screenWidth) x min(400, screenHeight)
+    - Проверить размер окна: min(900, screenWidth) x min(700, screenHeight)
     - Проверить, что окно НЕ в maximized состоянии
     - Проверить пустой заголовок (title: '')
     - Проверить, что НЕ в fullscreen режиме

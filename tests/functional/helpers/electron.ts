@@ -181,7 +181,7 @@ export async function getWindowBounds(app: ElectronApplication): Promise<{
     if (window) {
       return window.getBounds();
     }
-    return { x: 0, y: 0, width: 800, height: 600 };
+    return { x: 0, y: 0, width: 900, height: 700 };
   });
 }
 

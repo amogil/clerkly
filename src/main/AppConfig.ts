@@ -37,10 +37,10 @@ export class AppConfig {
    * Includes native Mac OS X styling (hiddenInset titlebar, vibrancy)
    */
   windowSettings: WindowSettings = {
-    width: 800,
-    height: 600,
-    minWidth: 600,
-    minHeight: 400,
+    width: 900,
+    height: 700,
+    minWidth: 150,
+    minHeight: 150,
     titleBarStyle: 'hiddenInset',
     vibrancy: 'under-window',
   };

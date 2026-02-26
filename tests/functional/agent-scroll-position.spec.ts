@@ -10,7 +10,6 @@ import {
   createMockOAuthServer,
   completeOAuthFlow,
   activeChat,
-  expectNoToastError,
   launchElectron,
   closeElectron,
   ElectronTestContext,
@@ -20,26 +19,6 @@ import type { MockOAuthServer } from './helpers/mock-oauth-server';
 let context: ElectronTestContext;
 let window: Page;
 let mockOAuthServer: MockOAuthServer;
-
-async function seedMessages(
-  page: Page,
-  targetAgentId: string,
-  count: number,
-  prefix: string
-): Promise<void> {
-  await page.evaluate(
-    async ({ agentId, total, label }) => {
-      for (let i = 1; i <= total; i++) {
-        // @ts-expect-error - window.api is exposed via contextBridge
-        const result = await window.api.test.createAgentMessage(agentId, `${label} ${i}`);
-        if (!result?.success) {
-          throw new Error(result?.error || 'Failed to seed message');
-        }
-      }
-    },
-    { agentId: targetAgentId, total: count, label: prefix }
-  );
-}
 
 test.beforeAll(async () => {
   mockOAuthServer = await createMockOAuthServer();

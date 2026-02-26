@@ -67,7 +67,7 @@ describe('WindowStateManager', () => {
   describe('loadState', () => {
     /* Preconditions: no saved state in database
        Action: call loadState()
-       Assertions: returns default state with isMaximized: false, dimensions min(800, screenWidth) x min(600, screenHeight), centered
+       Assertions: returns default state with isMaximized: false, dimensions min(900, screenWidth) x min(700, screenHeight), centered
        Requirements: window-management.1.1, window-management.4.1, window-management.4.2, window-management.4.4, window-management.5.5, user-data-isolation.6.8 */
     it('should return default state when no saved state exists', () => {
       mockGlobalWindowState.get.mockReturnValue(undefined);
@@ -76,10 +76,10 @@ describe('WindowStateManager', () => {
 
       expect(result).toBeDefined();
       expect(result.isMaximized).toBe(false); // Not maximized to keep resizable
-      expect(result.width).toBe(800); // Compact size: min(800, 1920)
-      expect(result.height).toBe(600); // Compact size: min(600, 1080)
-      expect(result.x).toBe(560); // Centered: (1920 - 800) / 2
-      expect(result.y).toBe(240); // Centered: (1080 - 600) / 2
+      expect(result.width).toBe(900); // Compact size: min(900, 1920)
+      expect(result.height).toBe(700); // Compact size: min(700, 1080)
+      expect(result.x).toBe(510); // Centered: (1920 - 900) / 2
+      expect(result.y).toBe(190); // Centered: (1080 - 700) / 2
 
       // Verify global.windowState.get was called
       expect(mockGlobalWindowState.get).toHaveBeenCalled();
@@ -124,10 +124,34 @@ describe('WindowStateManager', () => {
 
       // Should return default state instead
       expect(result.isMaximized).toBe(false); // Not maximized to keep resizable
-      expect(result.x).toBe(560); // Centered: (1920 - 800) / 2
-      expect(result.y).toBe(240); // Centered: (1080 - 600) / 2
-      expect(result.width).toBe(800); // Compact size: min(800, 1920)
-      expect(result.height).toBe(600); // Compact size: min(600, 1080)
+      expect(result.x).toBe(510); // Centered: (1920 - 900) / 2
+      expect(result.y).toBe(190); // Centered: (1080 - 700) / 2
+      expect(result.width).toBe(900); // Compact size: min(900, 1920)
+      expect(result.height).toBe(700); // Compact size: min(700, 1080)
+    });
+
+    /* Preconditions: saved state exists with size smaller than minimum
+       Action: call loadState()
+       Assertions: returns saved state with width/height clamped to minimum 150x150
+       Requirements: window-management.1.6, window-management.5.4, user-data-isolation.6.8 */
+    it('should clamp saved state to minimum size', () => {
+      const savedState: WindowState = {
+        x: 100,
+        y: 100,
+        width: 10,
+        height: 20,
+        isMaximized: false,
+      };
+
+      mockGlobalWindowState.get.mockReturnValue(savedState);
+
+      const result = windowStateManager.loadState();
+
+      expect(result.width).toBe(150);
+      expect(result.height).toBe(150);
+      expect(result.x).toBe(savedState.x);
+      expect(result.y).toBe(savedState.y);
+      expect(result.isMaximized).toBe(false);
     });
 
     /* Preconditions: repository throws error
@@ -246,7 +270,7 @@ describe('WindowStateManager', () => {
   describe('getDefaultState', () => {
     /* Preconditions: screen size is 1920x1080
        Action: call getDefaultState()
-       Assertions: returns state with compact size 800x600, centered, not maximized
+       Assertions: returns state with compact size 900x700, centered, not maximized
        Requirements: window-management.1.1, window-management.1.3, window-management.4.1, window-management.4.2, window-management.4.4 */
     it('should generate default state based on screen size', () => {
       mockScreen.getPrimaryDisplay.mockReturnValue({
@@ -255,10 +279,10 @@ describe('WindowStateManager', () => {
 
       const result = (windowStateManager as any).getDefaultState();
 
-      expect(result.width).toBe(800); // Compact size: min(800, 1920)
-      expect(result.height).toBe(600); // Compact size: min(600, 1080)
-      expect(result.x).toBe(560); // Centered: (1920 - 800) / 2
-      expect(result.y).toBe(240); // Centered: (1080 - 600) / 2
+      expect(result.width).toBe(900); // Compact size: min(900, 1920)
+      expect(result.height).toBe(700); // Compact size: min(700, 1080)
+      expect(result.x).toBe(510); // Centered: (1920 - 900) / 2
+      expect(result.y).toBe(190); // Centered: (1080 - 700) / 2
       expect(result.isMaximized).toBe(false); // Not maximized to keep resizable
     });
 
@@ -273,16 +297,16 @@ describe('WindowStateManager', () => {
 
       const result = (windowStateManager as any).getDefaultState();
 
-      expect(result.width).toBe(800); // Compact size: min(800, 1366)
-      expect(result.height).toBe(600); // Compact size: min(600, 768)
-      expect(result.x).toBe(283); // Centered: (1366 - 800) / 2
-      expect(result.y).toBe(84); // Centered: (768 - 600) / 2
+      expect(result.width).toBe(900); // Compact size: min(900, 1366)
+      expect(result.height).toBe(700); // Compact size: min(700, 768)
+      expect(result.x).toBe(233); // Centered: (1366 - 900) / 2
+      expect(result.y).toBe(34); // Centered: (768 - 700) / 2
       expect(result.isMaximized).toBe(false);
     });
 
     /* Preconditions: large screen size (3840x2160)
        Action: call getDefaultState()
-       Assertions: returns state with compact size 800x600, centered (not full screen)
+       Assertions: returns state with compact size 900x700, centered (not full screen)
        Requirements: window-management.4.1, window-management.4.2, window-management.4.4 */
     it('should adapt to large screen size', () => {
       mockScreen.getPrimaryDisplay.mockReturnValue({
@@ -291,16 +315,16 @@ describe('WindowStateManager', () => {
 
       const result = (windowStateManager as any).getDefaultState();
 
-      expect(result.width).toBe(800); // Compact size: min(800, 3840)
-      expect(result.height).toBe(600); // Compact size: min(600, 2160)
-      expect(result.x).toBe(1520); // Centered: (3840 - 800) / 2
-      expect(result.y).toBe(780); // Centered: (2160 - 600) / 2
+      expect(result.width).toBe(900); // Compact size: min(900, 3840)
+      expect(result.height).toBe(700); // Compact size: min(700, 2160)
+      expect(result.x).toBe(1470); // Centered: (3840 - 900) / 2
+      expect(result.y).toBe(730); // Centered: (2160 - 700) / 2
       expect(result.isMaximized).toBe(false);
     });
 
     /* Preconditions: various screen sizes
        Action: call getDefaultState() with different screen sizes
-       Assertions: dimensions adapt to screen size using min(800, width) x min(600, height)
+       Assertions: dimensions adapt to screen size using min(900, width) x min(700, height)
        Requirements: window-management.4.2, window-management.4.3 */
     it('should not use hardcoded dimensions', () => {
       const screenSizes = [
@@ -317,9 +341,9 @@ describe('WindowStateManager', () => {
 
         const result = (windowStateManager as any).getDefaultState();
 
-        // Verify dimensions use min(800, width) x min(600, height), not hardcoded
-        const expectedWidth = Math.min(800, size.width);
-        const expectedHeight = Math.min(600, size.height);
+        // Verify dimensions use min(900, width) x min(700, height), not hardcoded
+        const expectedWidth = Math.min(900, size.width);
+        const expectedHeight = Math.min(700, size.height);
         const expectedX = Math.floor((size.width - expectedWidth) / 2);
         const expectedY = Math.floor((size.height - expectedHeight) / 2);
 
