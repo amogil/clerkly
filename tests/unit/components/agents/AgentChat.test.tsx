@@ -12,13 +12,10 @@ import type { MessageSnapshot } from '../../../../src/shared/events/types';
 // ── Mocks ──────────────────────────────────────────────────────────────────
 
 const mockSendMessage = jest.fn();
-const mockLoadMore = jest.fn();
 let mockUseAgentChatState = {
   rawMessages: [] as MessageSnapshot[],
   isLoading: false,
-  hasMore: false,
   sendMessage: mockSendMessage,
-  loadMore: mockLoadMore,
   messages: [],
   isStreaming: false,
 };
@@ -43,13 +40,11 @@ jest.mock('../../../../src/renderer/components/ai-elements/conversation', () => 
   Conversation: ({
     children,
     className,
-    onScroll,
   }: {
     children: React.ReactNode;
     className?: string;
-    onScroll?: React.UIEventHandler<HTMLDivElement>;
   }) => (
-    <div data-testid="conversation" className={className} onScroll={onScroll}>
+    <div data-testid="conversation" className={className}>
       {children}
     </div>
   ),
@@ -159,13 +154,10 @@ const defaultProps = {
 beforeEach(() => {
   jest.clearAllMocks();
   mockSendMessage.mockResolvedValue(true);
-  mockLoadMore.mockResolvedValue(undefined);
   mockUseAgentChatState = {
     rawMessages: [],
     isLoading: false,
-    hasMore: false,
     sendMessage: mockSendMessage,
-    loadMore: mockLoadMore,
     messages: [],
     isStreaming: false,
   };
@@ -324,72 +316,6 @@ describe('AgentChat — send message', () => {
     });
 
     expect(screen.getByTestId('prompt-input-field')).toHaveValue('Hello');
-  });
-});
-
-describe('AgentChat — scroll to top / loadMore', () => {
-  /* Preconditions: hasMore=true, scrollTop=0
-     Action: scroll event with scrollTop=0
-     Assertions: loadMore called
-     Requirements: agents.13.9 */
-  it('should call loadMore when scrolled to top and hasMore=true', () => {
-    mockUseAgentChatState.hasMore = true;
-
-    render(<AgentChat {...defaultProps} />);
-
-    fireEvent.scroll(screen.getByTestId('conversation'), {
-      target: { scrollTop: 0 },
-    });
-
-    expect(mockLoadMore).toHaveBeenCalled();
-  });
-
-  /* Preconditions: hasMore=true, scrollTop=30 (< 50 threshold)
-     Action: scroll event with scrollTop=30
-     Assertions: loadMore called
-     Requirements: agents.13.9 */
-  it('should call loadMore when scrollTop < 50 and hasMore=true', () => {
-    mockUseAgentChatState.hasMore = true;
-
-    render(<AgentChat {...defaultProps} />);
-
-    fireEvent.scroll(screen.getByTestId('conversation'), {
-      target: { scrollTop: 30 },
-    });
-
-    expect(mockLoadMore).toHaveBeenCalled();
-  });
-
-  /* Preconditions: hasMore=true, scrollTop=200 (far from top)
-     Action: scroll event with scrollTop=200
-     Assertions: loadMore NOT called
-     Requirements: agents.13.9 */
-  it('should NOT call loadMore when scrollTop >= 50', () => {
-    mockUseAgentChatState.hasMore = true;
-
-    render(<AgentChat {...defaultProps} />);
-
-    fireEvent.scroll(screen.getByTestId('conversation'), {
-      target: { scrollTop: 200 },
-    });
-
-    expect(mockLoadMore).not.toHaveBeenCalled();
-  });
-
-  /* Preconditions: hasMore=false, scrollTop=0
-     Action: scroll event with scrollTop=0
-     Assertions: loadMore NOT called
-     Requirements: agents.13.9 */
-  it('should NOT call loadMore when hasMore=false even at top', () => {
-    mockUseAgentChatState.hasMore = false;
-
-    render(<AgentChat {...defaultProps} />);
-
-    fireEvent.scroll(screen.getByTestId('conversation'), {
-      target: { scrollTop: 0 },
-    });
-
-    expect(mockLoadMore).not.toHaveBeenCalled();
   });
 });
 

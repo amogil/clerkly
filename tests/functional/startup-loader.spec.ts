@@ -1,7 +1,7 @@
 /**
  * Functional Tests: Startup Loader
  *
- * Verifies App loading screen behavior while AgentChat initial chunks load.
+ * Verifies App loading screen behavior while AgentChat history loads.
  * Requirements: agents.13.2, agents.13.10
  */
 
@@ -66,7 +66,7 @@ test.afterEach(async () => {
 
 test.describe('Startup loader', () => {
   /* Preconditions: App launched, user authenticates
-     Action: App loads initial message chunks for AgentChat
+     Action: App loads initial message history for AgentChat
      Assertions: App loading screen appears before chats are ready
      Requirements: agents.13.2 */
   test('should show loader while agents are loading initial messages', async () => {
@@ -90,8 +90,8 @@ test.describe('Startup loader', () => {
 
     await context.window.evaluate(() => {
       const api = (window as any).api;
-      const original = api.messages.listPaginated;
-      api.messages.listPaginated = async (...args: unknown[]) => {
+      const original = api.messages.list;
+      api.messages.list = async (...args: unknown[]) => {
         await new Promise((resolve) => setTimeout(resolve, 800));
         return original(...args);
       };
@@ -112,7 +112,7 @@ test.describe('Startup loader', () => {
   });
 
   /* Preconditions: User already authorized, app relaunches
-     Action: App loads initial message chunks for AgentChat
+     Action: App loads initial message history for AgentChat
      Assertions: App loading screen appears before agents screen
      Requirements: agents.13.2 */
   test('should show loading screen on startup when already authorized', async () => {
@@ -144,10 +144,10 @@ test.describe('Startup loader', () => {
   });
 
   /* Preconditions: Two agents with 60 messages each in storage
-     Action: Relaunch app and load initial chunks
-     Assertions: App loading screen shows, then each agent shows only last 50 messages
-     Requirements: agents.13.1, agents.13.2 */
-  test('should load last 50 messages per agent on startup', async () => {
+     Action: Relaunch app and load full history
+     Assertions: App loading screen shows, then each agent shows all 60 messages
+     Requirements: agents.13.1, agents.13.2, agents.13.8 */
+  test('should load all messages per agent on startup', async () => {
     const testDataPath = path.join(
       os.tmpdir(),
       `clerkly-startup-loader-${Date.now()}-${Math.random().toString(36).substring(7)}`
@@ -225,18 +225,18 @@ test.describe('Startup loader', () => {
       await agentIcon.click();
     };
 
-    // Agent 1 shows last 50 messages
+    // Agent 1 shows all 60 messages
     await selectAgent(firstAgentId);
-    await expect(activeChat(context.window).messages).toHaveCount(50, { timeout: 5000 });
+    await expect(activeChat(context.window).messages).toHaveCount(60, { timeout: 5000 });
 
-    // Agent 2 shows last 50 messages
+    // Agent 2 shows all 60 messages
     await selectAgent(secondAgentId);
-    await expect(activeChat(context.window).messages).toHaveCount(50, { timeout: 5000 });
+    await expect(activeChat(context.window).messages).toHaveCount(60, { timeout: 5000 });
 
     await expectNoToastError(context.window);
   });
 
-  /* Preconditions: App launched, agents load initial chunks
+  /* Preconditions: App launched, agents load initial history
      Action: Wait for all chats to finish loading
      Assertions: App loading screen hides and chat UI becomes visible
      Requirements: agents.13.10 */

@@ -1,8 +1,8 @@
 /**
- * Functional Tests: Lazy Loading
+ * Functional Tests: History Loading
  *
- * Tests for loading recent messages and paginating older history on scroll.
- * Requirements: agents.13.1, agents.13.2, agents.13.4
+ * Tests for loading full message history on agent open.
+ * Requirements: agents.13.1, agents.13.2, agents.13.8
  */
 
 import { test, expect, Page } from '@playwright/test';
@@ -75,12 +75,12 @@ test.afterEach(async () => {
   }
 });
 
-test.describe('Lazy loading chat history', () => {
+test.describe('History loading on agent open', () => {
   /* Preconditions: Agent has 60 existing messages in storage
      Action: Open the agent chat after reload
-     Assertions: Only the last 50 messages are loaded initially
-     Requirements: agents.13.1 */
-  test('should load last 50 messages on agent open', async () => {
+     Assertions: All 60 messages are loaded
+     Requirements: agents.13.1, agents.13.8 */
+  test('should load all messages on agent open', async () => {
     const agentIcons = context.window.locator('[data-testid^="agent-icon-"]');
     await expect(agentIcons).toHaveCount(1, { timeout: 5000 });
     const agentId = (await agentIcons.first().getAttribute('data-testid'))?.replace(
@@ -94,41 +94,14 @@ test.describe('Lazy loading chat history', () => {
     await expectNoToastError(context.window);
 
     const messages = activeChat(context.window).messages;
-    await expect(messages).toHaveCount(50, { timeout: 5000 });
-  });
-
-  /* Preconditions: Agent has 60 existing messages in storage
-     Action: Scroll to the top of the messages list
-     Assertions: Older messages are loaded and total count becomes 60
-     Requirements: agents.13.2, agents.13.4 */
-  test('should load more messages on scroll to top', async () => {
-    const agentIcons = context.window.locator('[data-testid^="agent-icon-"]');
-    await expect(agentIcons).toHaveCount(1, { timeout: 5000 });
-    const agentId = (await agentIcons.first().getAttribute('data-testid'))?.replace(
-      'agent-icon-',
-      ''
-    );
-    expect(agentId).toBeTruthy();
-
-    await seedAgentMessages(context.window, agentId as string, 60);
-    await reloadAndWaitForAgents(context.window);
-    await expectNoToastError(context.window);
-
-    const { messagesArea, messages } = activeChat(context.window);
-    await expect(messages).toHaveCount(50, { timeout: 5000 });
-
-    await messagesArea.hover();
-    await context.window.mouse.wheel(0, -999999);
-
     await expect(messages).toHaveCount(60, { timeout: 5000 });
-    await expectNoToastError(context.window);
   });
 
   /* Preconditions: Agent has 30 existing messages in storage
-     Action: Scroll to the top of the messages list
-     Assertions: No additional messages are loaded (count remains 30)
-     Requirements: agents.13.2 */
-  test('should not trigger load more when all messages loaded', async () => {
+     Action: Open the agent chat after reload
+     Assertions: All 30 messages are loaded
+     Requirements: agents.13.1, agents.13.8 */
+  test('should load all messages when history is short', async () => {
     const agentIcons = context.window.locator('[data-testid^="agent-icon-"]');
     await expect(agentIcons).toHaveCount(1, { timeout: 5000 });
     const agentId = (await agentIcons.first().getAttribute('data-testid'))?.replace(
@@ -141,13 +114,8 @@ test.describe('Lazy loading chat history', () => {
     await reloadAndWaitForAgents(context.window);
     await expectNoToastError(context.window);
 
-    const { messagesArea, messages } = activeChat(context.window);
+    const { messages } = activeChat(context.window);
     await expect(messages).toHaveCount(30, { timeout: 5000 });
-
-    await messagesArea.hover();
-    await context.window.mouse.wheel(0, -999999);
-
-    await expect(messages).toHaveCount(30, { timeout: 3000 });
     await expectNoToastError(context.window);
   });
 });

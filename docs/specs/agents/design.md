@@ -1340,7 +1340,7 @@ useEffect(() => {
 
 ```tsx
 // Requirements: agents.4.13
-<Conversation className="flex-1 min-h-0" onScroll={handleScroll}>
+<Conversation className="flex-1 min-h-0">
   <ConversationContent data-testid="messages-area" className="flex flex-col gap-4 p-6 justify-end min-h-full">
     {/* сообщения */}
   </ConversationContent>
@@ -1354,24 +1354,16 @@ useEffect(() => {
 - `ConversationScrollButton` показывается когда пользователь не внизу — клик возвращает вниз
 - Скроллбар управляется нативно браузером через `overflow-y: auto` на контейнере `StickToBottom`
 
-**Ленивая подгрузка при скролле вверх (agents.13.9):**
-
-```typescript
-// Requirements: agents.13.9 — load more when scrolled to top
-const handleScroll = useCallback(
-  (e: React.UIEvent<HTMLDivElement>) => {
-    if (hasMore && e.currentTarget.scrollTop < 50) loadMore();
-  },
-  [hasMore, loadMore]
-);
-```
+**Скролл при чтении истории:**
+- Скролл работает нативно через `Conversation`
+- Дополнительных обработчиков подгрузки нет
 
 **Структура DOM:**
 
 ```tsx
 {/* Messages Area */}
 {/* Requirements: agents.4.13, agents.13 */}
-<Conversation className="flex-1 min-h-0" onScroll={handleScroll}>
+<Conversation className="flex-1 min-h-0">
   <ConversationContent
     data-testid="messages-area"
     className="flex flex-col gap-4 p-6 justify-end min-h-full"
@@ -2153,7 +2145,7 @@ await window.locator(`[data-testid="agent-icon-${firstAgentId}"]`).click();
 | agents.10 | ✓ | ✓ |
 | agents.11 | ✓ | ✓ |
 | agents.12 | ✓ | ✓ |
-| agents.13 (startup loading + lazy scroll) | ✓ | ✓ |
+| agents.13 (startup loading) | ✓ | ✓ |
 | user-data-isolation.6 | ✓ | ✓ |
 
 ## Зависимости
@@ -2281,11 +2273,9 @@ useChat.sendMessage()
 interface UseAgentChatResult {
   messages: UIMessage[];           // AI SDK формат для рендеринга
   rawMessages: MessageSnapshot[];  // Оригинальный формат для metadata (kind, action_link)
-  isLoading: boolean;              // true пока загружается начальный чанк сообщений
+  isLoading: boolean;              // true пока загружается история
   isStreaming: boolean;            // true когда LLM стримит ответ
   sendMessage(text: string): Promise<boolean>;
-  loadMore(): Promise<void>;       // ленивая подгрузка при скролле вверх
-  hasMore: boolean;                // есть ли ещё сообщения для подгрузки
 }
 ```
 
@@ -2303,21 +2293,14 @@ interface UseAgentChatResult {
 
 6. **`AGENT_RATE_LIMIT` не в хуке** — подписка остаётся в `agents.tsx`, т.к. rate limit — UI-состояние (показать/скрыть баннер), не часть потока сообщений.
 
-### Загрузка чатов при старте и ленивая подгрузка
+### Загрузка чатов при старте
 
 **Загрузка при старте:**
 - Все `AgentChat` компоненты монтируются при старте приложения одновременно
-- Каждый `AgentChat` при mount вызывает `useAgentChat(agentId)`, который загружает последние 50 сообщений через `messages:list-paginated`
-- `isLoading = true` пока идёт загрузка начального чанка
+- Каждый `AgentChat` при mount вызывает `useAgentChat(agentId)`, который загружает ВСЕ сообщения через `messages:list`
+- `isLoading = true` пока идёт загрузка истории
 - `App.tsx` показывает экран загрузки "Loading..." пока хотя бы один `AgentChat` имеет `isLoading = true`
 - После загрузки всех чатов экран загрузки скрывается и показывается основной интерфейс
-
-**Ленивая подгрузка при скролле вверх:**
-- `oldestIdRef` хранит ID самого старого загруженного сообщения — курсор для пагинации
-- `loadMore()` вызывает `messages:list-paginated` с `beforeId = oldestIdRef.current`, prepend-ит старые сообщения
-- При скролле к верхней границе `Conversation` вызывает `loadMore()`
-- Позиция скролла сохраняется при подгрузке (не прыгает вверх)
-- `hasMore = false` когда все сообщения загружены — `loadMore()` больше не вызывается
 
 ## Установка и обновление AI Elements компонентов
 

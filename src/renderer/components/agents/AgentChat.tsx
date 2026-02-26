@@ -168,7 +168,7 @@ export function AgentChat({
   onLoadingChange,
   onNavigate,
 }: AgentChatProps) {
-  const { rawMessages, sendMessage, isLoading, loadMore, hasMore } = useAgentChat(agent.id);
+  const { rawMessages, sendMessage, isLoading } = useAgentChat(agent.id);
   const stickContextRef = useRef<StickToBottomContext | null>(null);
   const lastScrollTopRef = useRef<number | null>(null);
   const hasAutoScrolledRef = useRef(false);
@@ -177,14 +177,6 @@ export function AgentChat({
   useEffect(() => {
     onLoadingChange(agent.id, isLoading);
   }, [agent.id, isLoading, onLoadingChange]);
-
-  // Load more messages when scrolled to top (agents.13.9)
-  const handleScroll = useCallback(
-    (e: React.UIEvent<HTMLDivElement>) => {
-      if (hasMore && e.currentTarget.scrollTop < 50) loadMore();
-    },
-    [hasMore, loadMore]
-  );
 
   // Requirements: agents.4.14.1, agents.4.14.4 — restore scroll per agent,
   // and auto-scroll only on first active load.
@@ -229,7 +221,7 @@ export function AgentChat({
       className={`flex flex-col flex-1 min-h-0${isActive ? '' : ' absolute inset-0 opacity-0 pointer-events-none'}`}
     >
       {/* Conversation manages autoscroll via use-stick-to-bottom (agents.4.13) */}
-      <Conversation className="flex-1 min-h-0" contextRef={stickContextRef} onScroll={handleScroll}>
+      <Conversation className="flex-1 min-h-0" contextRef={stickContextRef}>
         <AgentChatInner
           agent={agent}
           isActive={isActive}

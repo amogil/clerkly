@@ -10,6 +10,7 @@
 
 import { test, expect, Page, ElectronApplication } from '@playwright/test';
 import {
+  activeChat,
   completeOAuthFlow,
   createMockOAuthServer,
   launchElectronWithMockOAuth,
@@ -222,7 +223,7 @@ test.describe('Agent list initial animation', () => {
     await window.waitForTimeout(200);
 
     // Send a message to trigger updatedAt change
-    const textarea = window.locator('textarea');
+    const textarea = activeChat(window).textarea;
     await textarea.fill('Test message to trigger reordering');
     await textarea.press('Enter');
 

@@ -56,10 +56,10 @@ jest.mock('../../../src/renderer/events/RendererEventBus', () => ({
 }));
 
 // Mock window.api
-const mockListPaginated = jest.fn();
+const mockList = jest.fn();
 (window as unknown as { api: unknown }).api = {
   messages: {
-    listPaginated: mockListPaginated,
+    list: mockList,
   },
 };
 
@@ -92,9 +92,9 @@ describe('useAgentChat hook', () => {
     mockStatus.current = 'ready';
 
     // Default: empty history
-    mockListPaginated.mockResolvedValue({
+    mockList.mockResolvedValue({
       success: true,
-      data: { messages: [], hasMore: false },
+      data: [],
     });
     mockToUIMessages.mockReturnValue([]);
     mockToUIMessage.mockReturnValue(null);
@@ -108,14 +108,14 @@ describe('useAgentChat hook', () => {
   describe('initial load', () => {
     /* Preconditions: agentId provided, API returns 2 messages
        Action: Hook mounts
-       Assertions: listPaginated called with agentId and PAGE_SIZE=50, rawMessages set
-       Requirements: agents.13.1, agents.13.2 */
+       Assertions: list called with agentId, rawMessages set
+       Requirements: agents.13.1, agents.13.2, agents.13.8 */
     it('should load initial messages on mount', async () => {
       const snapshots = [makeSnapshot(1), makeSnapshot(2)];
       const uiMessages = [makeUIMessage(1), makeUIMessage(2)];
-      mockListPaginated.mockResolvedValue({
+      mockList.mockResolvedValue({
         success: true,
-        data: { messages: snapshots, hasMore: false },
+        data: snapshots,
       });
       mockToUIMessages.mockReturnValue(uiMessages);
 
@@ -125,28 +125,8 @@ describe('useAgentChat hook', () => {
 
       await waitFor(() => expect(result.current.isLoading).toBe(false));
 
-      expect(mockListPaginated).toHaveBeenCalledWith('agent-1', 50);
+      expect(mockList).toHaveBeenCalledWith('agent-1');
       expect(result.current.rawMessages).toEqual(snapshots);
-      expect(result.current.hasMore).toBe(false);
-    });
-
-    /* Preconditions: agentId provided, API returns hasMore=true
-       Action: Hook mounts
-       Assertions: hasMore is true
-       Requirements: agents.13.2 */
-    it('should set hasMore=true when more pages exist', async () => {
-      const snapshots = Array.from({ length: 50 }, (_, i) => makeSnapshot(i + 1));
-      mockListPaginated.mockResolvedValue({
-        success: true,
-        data: { messages: snapshots, hasMore: true },
-      });
-      mockToUIMessages.mockReturnValue([]);
-
-      const { result } = renderHook(() => useAgentChat('agent-1'));
-
-      await waitFor(() => expect(result.current.isLoading).toBe(false));
-
-      expect(result.current.hasMore).toBe(true);
     });
 
     /* Preconditions: agentId is null
@@ -158,9 +138,8 @@ describe('useAgentChat hook', () => {
 
       await waitFor(() => expect(result.current.isLoading).toBe(false));
 
-      expect(mockListPaginated).not.toHaveBeenCalled();
+      expect(mockList).not.toHaveBeenCalled();
       expect(result.current.rawMessages).toEqual([]);
-      expect(result.current.hasMore).toBe(false);
     });
 
     /* Preconditions: agentId provided, API returns success:false
@@ -168,74 +147,13 @@ describe('useAgentChat hook', () => {
        Assertions: rawMessages stays empty, no crash
        Requirements: agents.13.1 */
     it('should handle API failure gracefully', async () => {
-      mockListPaginated.mockResolvedValue({ success: false, error: 'DB error' });
+      mockList.mockResolvedValue({ success: false, error: 'DB error' });
 
       const { result } = renderHook(() => useAgentChat('agent-1'));
 
       await waitFor(() => expect(result.current.isLoading).toBe(false));
 
       expect(result.current.rawMessages).toEqual([]);
-    });
-  });
-
-  // ── loadMore ─────────────────────────────────────────────────────────────
-
-  describe('loadMore', () => {
-    /* Preconditions: Initial load done, hasMore=true, oldestId=1
-       Action: loadMore() called
-       Assertions: listPaginated called with beforeId=1, older messages prepended
-       Requirements: agents.13.2, agents.13.4 */
-    it('should load older messages with beforeId cursor', async () => {
-      const initial = [makeSnapshot(10), makeSnapshot(20)];
-      const older = [makeSnapshot(5), makeSnapshot(8)];
-      const olderUI = [makeUIMessage(5), makeUIMessage(8)];
-
-      mockListPaginated
-        .mockResolvedValueOnce({
-          success: true,
-          data: { messages: initial, hasMore: true },
-        })
-        .mockResolvedValueOnce({
-          success: true,
-          data: { messages: older, hasMore: false },
-        });
-
-      mockToUIMessages.mockReturnValue([]);
-
-      const { result } = renderHook(() => useAgentChat('agent-1'));
-      await waitFor(() => expect(result.current.isLoading).toBe(false));
-
-      // Simulate loadMore
-      mockToUIMessages.mockReturnValue(olderUI);
-      await act(async () => {
-        await result.current.loadMore();
-      });
-
-      // Should call with beforeId = oldest message id (10)
-      expect(mockListPaginated).toHaveBeenCalledWith('agent-1', 50, 10);
-      expect(result.current.rawMessages).toEqual([...older, ...initial]);
-      expect(result.current.hasMore).toBe(false);
-    });
-
-    /* Preconditions: hasMore=false
-       Action: loadMore() called
-       Assertions: No API call made
-       Requirements: agents.13.2 */
-    it('should not call API when hasMore is false', async () => {
-      mockListPaginated.mockResolvedValue({
-        success: true,
-        data: { messages: [], hasMore: false },
-      });
-
-      const { result } = renderHook(() => useAgentChat('agent-1'));
-      await waitFor(() => expect(result.current.isLoading).toBe(false));
-
-      await act(async () => {
-        await result.current.loadMore();
-      });
-
-      // Only the initial load call
-      expect(mockListPaginated).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -425,9 +343,9 @@ describe('useAgentChat hook', () => {
        Requirements: llm-integration.3.8, llm-integration.8.5 */
     it('should remove hidden message from rawMessages and UIMessages', async () => {
       const snapshot = makeSnapshot(1);
-      mockListPaginated.mockResolvedValue({
+      mockList.mockResolvedValue({
         success: true,
-        data: { messages: [snapshot], hasMore: false },
+        data: [snapshot],
       });
 
       const { result } = renderHook(() => useAgentChat('agent-1'));
@@ -455,9 +373,9 @@ describe('useAgentChat hook', () => {
        Requirements: realtime-events.9.5 */
     it('should update existing message in rawMessages on MESSAGE_UPDATED', async () => {
       const snapshot = makeSnapshot(1);
-      mockListPaginated.mockResolvedValue({
+      mockList.mockResolvedValue({
         success: true,
-        data: { messages: [snapshot], hasMore: false },
+        data: [snapshot],
       });
 
       const { result } = renderHook(() => useAgentChat('agent-1'));
@@ -484,9 +402,9 @@ describe('useAgentChat hook', () => {
        Requirements: realtime-events.9.5 */
     it('should ignore MESSAGE_UPDATED from other agents', async () => {
       const snapshot = makeSnapshot(1);
-      mockListPaginated.mockResolvedValue({
+      mockList.mockResolvedValue({
         success: true,
-        data: { messages: [snapshot], hasMore: false },
+        data: [snapshot],
       });
 
       const { result } = renderHook(() => useAgentChat('agent-1'));
