@@ -37,13 +37,7 @@ jest.mock('framer-motion', () => ({
 
 // Stub Conversation — renders children directly with a scrollable div
 jest.mock('../../../../src/renderer/components/ai-elements/conversation', () => ({
-  Conversation: ({
-    children,
-    className,
-  }: {
-    children: React.ReactNode;
-    className?: string;
-  }) => (
+  Conversation: ({ children, className }: { children: React.ReactNode; className?: string }) => (
     <div data-testid="conversation" className={className}>
       {children}
     </div>
