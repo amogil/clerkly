@@ -11,9 +11,8 @@
  * Properties: 28, 29, 30, 31
  */
 
-import { test, expect, _electron as electron, ElectronApplication, Page } from '@playwright/test';
-import path from 'path';
-import { createMockOAuthServer } from './helpers/electron';
+import { test, expect, ElectronApplication, Page } from '@playwright/test';
+import { createMockOAuthServer, launchElectronWithMockOAuth } from './helpers/electron';
 import type { MockOAuthServer } from './helpers/mock-oauth-server';
 import { completeOAuthFlow } from './helpers/electron';
 
@@ -46,27 +45,12 @@ test.beforeEach(async () => {
     family_name: 'Test User',
   });
 
-  // Create unique temp directory for this test
-  const testDataPath = path.join(
-    require('os').tmpdir(),
-    `clerkly-token-test-${Date.now()}-${Math.random().toString(36).substring(7)}`
-  );
-
-  // Launch Electron app
-  electronApp = await electron.launch({
-    args: [path.join(__dirname, '../../dist/main/main/index.js'), '--user-data-dir', testDataPath],
-    env: {
-      ...process.env,
-      NODE_ENV: 'test',
-      CLERKLY_GOOGLE_API_URL: mockServer.getBaseUrl(),
-      CLERKLY_OAUTH_CLIENT_ID: 'test-client-id-token-mgmt',
-      CLERKLY_OAUTH_CLIENT_SECRET: 'test-client-secret-token-mgmt',
-    },
+  const context = await launchElectronWithMockOAuth(mockServer, {
+    CLERKLY_OAUTH_CLIENT_ID: 'test-client-id-token-mgmt',
+    CLERKLY_OAUTH_CLIENT_SECRET: 'test-client-secret-token-mgmt',
   });
-
-  // Get main window
-  mainWindow = await electronApp.firstWindow();
-  await mainWindow.waitForLoadState('domcontentloaded');
+  electronApp = context.app;
+  mainWindow = context.window;
   await mainWindow.waitForTimeout(2000);
 });
 

@@ -8,9 +8,13 @@
  * 3. Agent icons DO animate with spring motion when reordering
  */
 
-import { test, expect, Page, ElectronApplication, _electron as electron } from '@playwright/test';
-import path from 'path';
-import { completeOAuthFlow, createMockOAuthServer } from './helpers/electron';
+import { test, expect, Page, ElectronApplication } from '@playwright/test';
+import {
+  completeOAuthFlow,
+  createMockOAuthServer,
+  launchElectronWithMockOAuth,
+  closeElectron,
+} from './helpers/electron';
 import type { MockOAuthServer } from './helpers/mock-oauth-server';
 
 let mockServer: MockOAuthServer;
@@ -28,6 +32,7 @@ test.afterAll(async () => {
 test.describe('Agent list initial animation', () => {
   let electronApp: ElectronApplication;
   let window: Page;
+  let testDataPath: string;
 
   test.beforeEach(async () => {
     mockServer.setUserProfile({
@@ -38,30 +43,10 @@ test.describe('Agent list initial animation', () => {
       family_name: 'Test User',
     });
 
-    // Create unique temp directory for this test
-    const testDataPath = path.join(
-      require('os').tmpdir(),
-      `clerkly-animation-test-${Date.now()}-${Math.random().toString(36).substring(7)}`
-    );
-
-    electronApp = await electron.launch({
-      args: [
-        path.join(__dirname, '../../dist/main/main/index.js'),
-        '--user-data-dir',
-        testDataPath,
-      ],
-      env: {
-        ...process.env,
-        NODE_ENV: 'test',
-        ELECTRON_DISABLE_SECURITY_WARNINGS: 'true',
-        CLERKLY_GOOGLE_API_URL: mockServer.getBaseUrl(),
-        CLERKLY_OAUTH_CLIENT_ID: 'test-client-id-12345',
-        CLERKLY_OAUTH_CLIENT_SECRET: 'test-client-secret-67890',
-      },
-    });
-
-    window = await electronApp.firstWindow();
-    await window.waitForLoadState('domcontentloaded');
+    const context = await launchElectronWithMockOAuth(mockServer);
+    electronApp = context.app;
+    window = context.window;
+    testDataPath = context.testDataPath;
 
     await completeOAuthFlow(electronApp, window);
     await expect(window.locator('[data-testid="agents"]')).toBeVisible({ timeout: 10000 });
@@ -69,7 +54,7 @@ test.describe('Agent list initial animation', () => {
 
   test.afterEach(async () => {
     if (electronApp) {
-      await electronApp.close();
+      await closeElectron({ app: electronApp, window, testDataPath });
     }
   });
 

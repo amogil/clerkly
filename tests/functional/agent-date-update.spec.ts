@@ -6,7 +6,12 @@
    Requirements: agents.8.1, agents.5.3, settings.2.1 */
 
 import { test, expect, ElectronApplication, Page } from '@playwright/test';
-import { createMockOAuthServer, activeChat, launchElectron, closeElectron } from './helpers/electron';
+import {
+  createMockOAuthServer,
+  activeChat,
+  launchElectronWithMockOAuth,
+  closeElectron,
+} from './helpers/electron';
 import type { MockOAuthServer } from './helpers/mock-oauth-server';
 import { completeOAuthFlow } from './helpers/electron';
 
@@ -37,11 +42,7 @@ test.describe('Agents - Date Update on New Message', () => {
       family_name: 'Test User',
     });
 
-    const context = await launchElectron(undefined, {
-      CLERKLY_GOOGLE_API_URL: mockServer.getBaseUrl(),
-      CLERKLY_OAUTH_CLIENT_ID: 'test-client-id-12345',
-      CLERKLY_OAUTH_CLIENT_SECRET: 'test-client-secret-67890',
-    });
+    const context = await launchElectronWithMockOAuth(mockServer);
     electronApp = context.app;
     window = context.window;
     testDataPath = context.testDataPath;

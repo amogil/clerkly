@@ -9,7 +9,7 @@ import { test, expect, ElectronApplication, Page } from '@playwright/test';
 import {
   completeOAuthFlow,
   createMockOAuthServer,
-  launchElectron,
+  launchElectronWithMockOAuth,
   closeElectron,
 } from './helpers/electron';
 import type { MockOAuthServer } from './helpers/mock-oauth-server';
@@ -38,8 +38,7 @@ test.beforeEach(async () => {
     family_name: 'Test User',
   });
 
-  const context = await launchElectron(undefined, {
-    CLERKLY_GOOGLE_API_URL: mockServer.getBaseUrl(),
+  const context = await launchElectronWithMockOAuth(mockServer, {
     CLERKLY_OAUTH_CLIENT_ID: 'test-client-id',
     CLERKLY_OAUTH_CLIENT_SECRET: 'test-client-secret',
   });

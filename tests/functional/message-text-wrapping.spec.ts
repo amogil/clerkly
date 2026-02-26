@@ -1,9 +1,8 @@
 // Requirements: agents.4.22
 // Functional tests for message text wrapping
 
-import { test, expect, _electron as electron, ElectronApplication, Page } from '@playwright/test';
-import path from 'path';
-import { createMockOAuthServer } from './helpers/electron';
+import { test, expect, ElectronApplication, Page } from '@playwright/test';
+import { createMockOAuthServer, launchElectronWithMockOAuth } from './helpers/electron';
 import type { MockOAuthServer } from './helpers/mock-oauth-server';
 import { completeOAuthFlow } from './helpers/electron';
 
@@ -23,26 +22,9 @@ test.beforeAll(async () => {
     family_name: 'Wrap',
   });
 
-  // Create unique temp directory
-  const testDataPath = path.join(
-    require('os').tmpdir(),
-    `clerkly-text-wrap-${Date.now()}-${Math.random().toString(36).substring(7)}`
-  );
-
-  // Launch Electron app
-  electronApp = await electron.launch({
-    args: [path.join(__dirname, '../../dist/main/main/index.js'), '--user-data-dir', testDataPath],
-    env: {
-      ...process.env,
-      NODE_ENV: 'test',
-      CLERKLY_GOOGLE_API_URL: mockServer.getBaseUrl(),
-      CLERKLY_OAUTH_CLIENT_ID: 'test-client-id-12345',
-      CLERKLY_OAUTH_CLIENT_SECRET: 'test-client-secret-67890',
-    },
-  });
-
-  page = await electronApp.firstWindow();
-  await page.waitForLoadState('domcontentloaded');
+  const context = await launchElectronWithMockOAuth(mockServer);
+  electronApp = context.app;
+  page = context.window;
 
   // Complete OAuth flow to login
   await completeOAuthFlow(electronApp, page);

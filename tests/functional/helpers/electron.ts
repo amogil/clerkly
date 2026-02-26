@@ -97,6 +97,25 @@ export async function launchElectron(
 }
 
 /**
+ * Launch Electron with Mock OAuth environment variables
+ *
+ * @param mockServer - Mock OAuth server instance
+ * @param envOverrides - Additional environment variables or overrides
+ */
+export async function launchElectronWithMockOAuth(
+  mockServer: MockOAuthServer,
+  envOverrides: Record<string, string> = {},
+  testDataPath?: string
+): Promise<ElectronTestContext> {
+  return launchElectron(testDataPath, {
+    CLERKLY_GOOGLE_API_URL: mockServer.getBaseUrl(),
+    CLERKLY_OAUTH_CLIENT_ID: 'test-client-id-12345',
+    CLERKLY_OAUTH_CLIENT_SECRET: 'test-client-secret-67890',
+    ...envOverrides,
+  });
+}
+
+/**
  * Close Electron application and cleanup
  *
  * @param context - Electron test context
