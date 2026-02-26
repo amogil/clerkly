@@ -6,6 +6,11 @@
 
 ## Задачи
 
+- [x] 0. Статус реализации
+  - Базовая реализация завершена
+  - Модульные и функциональные тесты присутствуют
+  - Осталось поддерживать актуальность тестов при изменениях смежных фич
+
 - [x] 1. Создать ErrorNotificationManager в Renderer Process
   - Создать файл `src/renderer/ErrorNotificationManager.ts`
   - Реализовать класс с методами `showNotification()`, `dismissNotification()`, `subscribe()`
@@ -20,7 +25,7 @@
   - Тест: уведомление слушателей при изменениях
   - _Requirements: error-notifications.1.1, error-notifications.1.2, error-notifications.1.3_
 
-- [ ] 2. Создать NotificationUI компонент
+- [x] 2. Создать NotificationUI компонент
   - [x] 2.1 Создать React компонент NotificationUI
     - Создать файл `src/renderer/components/NotificationUI.tsx`
     - Реализовать отображение списка уведомлений
@@ -43,7 +48,7 @@
     - Тест: обработка ошибок рендеринга
     - _Requirements: error-notifications.1.1, error-notifications.1.2, error-notifications.1.3_
 
-- [ ] 3. Создать Error Handler в Main Process
+- [x] 3. Создать Error Handler в Main Process
   - [x] 3.1 Создать функцию handleBackgroundError
     - Создать файл `src/main/ErrorHandler.ts` (или добавить в существующий файл)
     - Реализовать функцию `handleBackgroundError(error, context)`
@@ -67,7 +72,7 @@
     - Тест: фильтрация race condition ошибок
     - _Requirements: error-notifications.1.1, error-notifications.1.4, error-notifications.1.5, user-data-isolation.1.21_
 
-- [ ] 4. Интегрировать IPC события
+- [x] 4. Интегрировать IPC события
   - [x] 4.1 Обновить preload script
     - Добавить API для подписки на событие `error:notify`
     - Реализовать безопасную передачу данных через contextBridge
@@ -84,7 +89,7 @@
 - [x] 5. Checkpoint - Убедиться что базовая функциональность работает
   - Убедиться что все тесты проходят, спросить пользователя если возникли вопросы.
 
-- [ ] 6. Интегрировать с существующими компонентами
+- [x] 6. Интегрировать с существующими компонентами
   - [x] 6.1 Обновить обработку ошибок в OAuth flow
     - Использовать `handleBackgroundError()` для ошибок авторизации
     - Передавать контекст "OAuth Flow" или "Token Refresh"
@@ -101,7 +106,7 @@
     - Передавать соответствующий контекст для каждой операции
     - _Requirements: error-notifications.1.1, error-notifications.1.4_
 
-- [ ] 7. Написать функциональные тесты
+- [x] 7. Написать функциональные тесты
   - [x] 7.1 Тест: показ уведомления при ошибке фонового процесса
     - **Validates: Requirements error-notifications.1.1, error-notifications.1.2**
     - Запустить приложение

@@ -4,7 +4,7 @@
 
 Данный документ содержит список задач для обновления системы изоляции данных пользователей. Основное изменение: переход с `user_email` на `user_id` (10-символьная случайная alphanumeric строка) с введением таблицы `users`.
 
-**Статус:** Требуется обновление существующей реализации
+**Статус:** ✅ Реализация завершена, поддержка и точечные улучшения по мере необходимости
 
 **Оценка времени:** 6-8 дней
 
@@ -14,29 +14,28 @@
 
 ### Текущая Реализация (что есть сейчас):
 
-**UserProfileManager (`src/main/auth/UserProfileManager.ts`):**
-- ❌ Использует `currentUserEmail: string | null` (нужно `currentUserId`)
-- ❌ Метод `getCurrentEmail()` (нужно `getCurrentUserId()`)
-- ❌ Нет таблицы `users`
-- ❌ Нет метода `generateUserId()`
-- ❌ Нет метода `findOrCreateUser()`
-- ❌ Ссылается на старые требования (user-data-isolation.1.14-1.18)
+**UserManager (`src/main/auth/UserManager.ts`):**
+- ✅ Использует `currentUserId` и кэш `userIdCache`
+- ✅ Метод `getCurrentUserId()` реализован
+- ✅ Таблица `users` существует (см. миграции и schema)
+- ✅ Методы `generateUserId()` и `findOrCreateUser()` реализованы
+- ✅ Используются актуальные ID требований
 
-**DataManager (`src/main/DataManager.ts`):**
-- ❌ Использует `user_email` для изоляции (нужно `user_id`)
-- ❌ Вызывает `getCurrentEmail()` (нужно `getCurrentUserId()`)
-- ❌ SQL запросы используют `user_email` (нужно `user_id`)
-- ❌ Ссылается на старые требования
+**UserSettingsManager (`src/main/UserSettingsManager.ts`):**
+- ✅ Использует `user_id` через `dbManager.settings`
+- ✅ `getCurrentEmail()` не используется
+- ✅ Прямые SQL запросы отсутствуют (репозитории Drizzle)
+- ✅ Используются актуальные ID требований
 
-**Миграции (`migrations/001_initial_schema.sql`):**
-- ❌ Нет таблицы `users`
-- ❌ Таблица `user_data` использует `user_email` (нужно `user_id`)
-- ❌ Таблица `user_data` имеет колонку `timestamp` (нужно удалить)
+**Миграции (`migrations/001_initial_schema.sql`, `002_create_users_table.sql`, `003_migrate_user_data_to_user_id.sql`):**
+- ✅ Таблица `users` создана
+- ✅ `user_data` мигрирована на `user_id`
+- ✅ Колонка `timestamp` удалена из актуальной схемы
 
 **Тесты:**
-- ❌ Тесты UserProfileManager используют `getCurrentEmail()`
-- ❌ Тесты DataManager используют `user_email`
-- ❌ Нет тестов для `generateUserId()`, `findOrCreateUser()`
+- ✅ Тесты используют `getCurrentUserId()`
+- ✅ Тесты миграции покрывают переход `user_email` → `user_id`
+- ✅ Есть тесты для `generateUserId()` и `findOrCreateUser()`
 
 ---
 
@@ -399,11 +398,11 @@
 - _Requirements: user-data-isolation.6.3, user-data-isolation.6.4, user-data-isolation.6.5, user-data-isolation.6.6_
 
 ### 8.5. Обновить UserSettingsManager для использования новых методов
-- [ ] Заменить прямой доступ к БД на `runUserQuery`, `getUserRow`
-- [ ] Удалить `private get db()` и `private get userId()`
-- [ ] Обновить тесты
+- [x] Заменить прямой доступ к БД на `dbManager.settings` (репозитории)
+- [x] Удалить `private get db()` и `private get userId()`
+- [x] Обновить тесты
 - _Requirements: user-data-isolation.6.7, user-data-isolation.6.8_
-- **Примечание:** Отложено — UserSettingsManager продолжает использовать getDatabase() напрямую
+**Примечание:** Актуальная реализация использует Drizzle-репозитории, прямого доступа к БД нет.
 
 ### 8.6. Обновить WindowStateManager для использования глобальных методов
 - [x] Заменить `getDatabase().prepare()` на `runQuery`, `getRow`, `getRows`
