@@ -59,21 +59,23 @@ test.describe('Agents - AgentWelcome', () => {
     await window.waitForSelector('[data-testid="agents"]', { timeout: 15000 });
 
     // Verify AgentWelcome is visible with new design
-    const emptyStateHeading = window.locator('text=Assign a task to the agent');
+    const emptyStateHeading = activeChat(window).messagesArea.locator(
+      'text=Assign a task to the agent'
+    );
     await expect(emptyStateHeading).toBeVisible({ timeout: 5000 });
 
     // Verify description text is visible
-    const emptyStateDescription = window.locator(
+    const emptyStateDescription = activeChat(window).messagesArea.locator(
       'text=Transcribes meetings, extracts tasks, creates Jira tickets'
     );
     await expect(emptyStateDescription).toBeVisible();
 
     // Verify animated logo is present
-    const logo = window.locator('svg.logo-animated');
+    const logo = activeChat(window).messagesArea.locator('svg.logo-animated');
     await expect(logo).toBeVisible();
 
     // Verify 4 prompt buttons are visible
-    const promptButtons = window.locator('button:has-text("Transcribe")');
+    const promptButtons = activeChat(window).messagesArea.locator('button:has-text("Transcribe")');
     await expect(promptButtons).toBeVisible();
   });
 
@@ -89,7 +91,7 @@ test.describe('Agents - AgentWelcome', () => {
     await window.waitForSelector('[data-testid="agents"]', { timeout: 15000 });
 
     // Verify heading styling
-    const heading = window.locator('text=Assign a task to the agent');
+    const heading = activeChat(window).messagesArea.locator('text=Assign a task to the agent');
     await expect(heading).toBeVisible();
 
     // Verify the heading is an h2 element
@@ -98,7 +100,10 @@ test.describe('Agents - AgentWelcome', () => {
     expect(tagName).toBe('H2');
 
     // Verify prompt buttons have correct styling
-    const promptButton = window.locator('button').filter({ hasText: 'Transcribe' }).first();
+    const promptButton = activeChat(window)
+      .messagesArea.locator('button')
+      .filter({ hasText: 'Transcribe' })
+      .first();
     await expect(promptButton).toBeVisible();
 
     // Verify button has rounded-xl class
@@ -118,7 +123,9 @@ test.describe('Agents - AgentWelcome', () => {
     await window.waitForSelector('[data-testid="agents"]', { timeout: 15000 });
 
     // Verify AgentWelcome is visible initially
-    const emptyStateHeading = window.locator('text=Assign a task to the agent');
+    const emptyStateHeading = activeChat(window).messagesArea.locator(
+      'text=Assign a task to the agent'
+    );
     await expect(emptyStateHeading).toBeVisible({ timeout: 5000 });
 
     // Find input field and send message
@@ -129,8 +136,10 @@ test.describe('Agents - AgentWelcome', () => {
     await inputField.press('Enter');
 
     // First check if message is displayed
-    const userMessage = window.locator('text=Hello, this is my first message!');
-    await expect(userMessage).toBeVisible({ timeout: 10000 });
+    const userMessage = activeChat(window).userMessages.filter({
+      hasText: 'Hello, this is my first message!',
+    });
+    await expect(userMessage).toHaveCount(1, { timeout: 10000 });
 
     // Then verify AgentWelcome is no longer visible
     await expect(emptyStateHeading).not.toBeVisible({ timeout: 5000 });
@@ -148,7 +157,9 @@ test.describe('Agents - AgentWelcome', () => {
     await window.waitForSelector('[data-testid="agents"]', { timeout: 15000 });
 
     // Verify AgentWelcome is visible for first (auto-created) agent
-    const emptyStateHeading = window.locator('text=Assign a task to the agent');
+    const emptyStateHeading = activeChat(window).messagesArea.locator(
+      'text=Assign a task to the agent'
+    );
     await expect(emptyStateHeading).toBeVisible({ timeout: 5000 });
 
     // Click "New chat" button to create second agent
@@ -162,7 +173,7 @@ test.describe('Agents - AgentWelcome', () => {
     await expect(emptyStateHeading).toBeVisible({ timeout: 5000 });
 
     // Verify description is visible
-    const emptyStateDescription = window.locator(
+    const emptyStateDescription = activeChat(window).messagesArea.locator(
       'text=Transcribes meetings, extracts tasks, creates Jira tickets'
     );
     await expect(emptyStateDescription).toBeVisible();
@@ -180,11 +191,15 @@ test.describe('Agents - AgentWelcome', () => {
     await window.waitForSelector('[data-testid="agents"]', { timeout: 15000 });
 
     // Verify AgentWelcome is visible
-    const emptyStateHeading = window.locator('text=Assign a task to the agent');
+    const emptyStateHeading = activeChat(window).messagesArea.locator(
+      'text=Assign a task to the agent'
+    );
     await expect(emptyStateHeading).toBeVisible({ timeout: 5000 });
 
     // Get the parent container and verify it has centering classes
-    const container = window.locator('.flex.flex-col.items-center.justify-center').first();
+    const container = activeChat(window)
+      .messagesArea.locator('.flex.flex-col.items-center.justify-center')
+      .first();
     await expect(container).toBeVisible();
 
     // Verify the container has space-y-8 class (spacing between elements)
@@ -204,18 +219,21 @@ test.describe('Agents - AgentWelcome', () => {
     await window.waitForSelector('[data-testid="agents"]', { timeout: 15000 });
 
     // Verify all 4 prompt buttons are visible
-    const transcribeButton = window.locator('button:has-text("Transcribe my latest meeting")');
+    const transcribeButton = activeChat(window)
+      .messagesArea.locator('button:has-text("Transcribe my latest meeting")');
     await expect(transcribeButton).toBeVisible();
 
-    const extractButton = window.locator(
+    const extractButton = activeChat(window).messagesArea.locator(
       'button:has-text("Extract action items from today\'s standup")'
     );
     await expect(extractButton).toBeVisible();
 
-    const jiraButton = window.locator('button:has-text("Create Jira tickets from meeting notes")');
+    const jiraButton = activeChat(window)
+      .messagesArea.locator('button:has-text("Create Jira tickets from meeting notes")');
     await expect(jiraButton).toBeVisible();
 
-    const summaryButton = window.locator('button:has-text("Send summary to the team")');
+    const summaryButton = activeChat(window)
+      .messagesArea.locator('button:has-text("Send summary to the team")');
     await expect(summaryButton).toBeVisible();
   });
 
@@ -231,15 +249,20 @@ test.describe('Agents - AgentWelcome', () => {
     await window.waitForSelector('[data-testid="agents"]', { timeout: 15000 });
 
     // Verify AgentWelcome is visible
-    const emptyStateHeading = window.locator('text=Assign a task to the agent');
+    const emptyStateHeading = activeChat(window).messagesArea.locator(
+      'text=Assign a task to the agent'
+    );
     await expect(emptyStateHeading).toBeVisible({ timeout: 5000 });
 
     // Click on first prompt button
-    const transcribeButton = window.locator('button:has-text("Transcribe my latest meeting")');
+    const transcribeButton = activeChat(window)
+      .messagesArea.locator('button:has-text("Transcribe my latest meeting")');
     await transcribeButton.click();
 
     // Verify message is displayed (AgentWelcome should disappear)
-    const userMessage = window.locator('text=Transcribe my latest meeting');
-    await expect(userMessage).toBeVisible({ timeout: 5000 });
+    const userMessage = activeChat(window).userMessages.filter({
+      hasText: 'Transcribe my latest meeting',
+    });
+    await expect(userMessage).toHaveCount(1, { timeout: 5000 });
   });
 });

@@ -78,9 +78,13 @@ function AgentChatInner({
 
   // Autofocus textarea when this chat becomes active (agents.4.7.1)
   useEffect(() => {
-    if (isActive) {
-      setTimeout(() => textareaRef.current?.focus(), 100);
-    }
+    if (!isActive) return;
+    const timeouts = [0, 100, 300, 600].map((delay) =>
+      window.setTimeout(() => textareaRef.current?.focus(), delay)
+    );
+    return () => {
+      timeouts.forEach((timeoutId) => window.clearTimeout(timeoutId));
+    };
   }, [isActive]);
 
   const handleSend = useCallback(

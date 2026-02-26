@@ -130,8 +130,11 @@ test.describe('Agent Switching', () => {
     await messageInput.fill('Message for agent 1');
     await messageInput.press('Enter');
 
-    // Wait for message to appear
-    await expect(window.locator('text=Message for agent 1')).toBeVisible({ timeout: 5000 });
+    // Wait for message to appear in active chat
+    const firstAgentMessage = activeChat(window).userMessages.filter({
+      hasText: 'Message for agent 1',
+    });
+    await expect(firstAgentMessage).toHaveCount(1, { timeout: 5000 });
 
     // Switch to second agent using ID
     await window.locator(`[data-testid="agent-icon-${secondAgentId}"]`).click();
@@ -140,8 +143,11 @@ test.describe('Agent Switching', () => {
     await messageInput.fill('Message for agent 2');
     await messageInput.press('Enter');
 
-    // Wait for message to appear
-    await expect(window.locator('text=Message for agent 2')).toBeVisible({ timeout: 5000 });
+    // Wait for message to appear in active chat
+    const secondAgentMessage = activeChat(window).userMessages.filter({
+      hasText: 'Message for agent 2',
+    });
+    await expect(secondAgentMessage).toHaveCount(1, { timeout: 5000 });
 
     // Switch back to first agent using ID
     await window.locator(`[data-testid="agent-icon-${firstAgentId}"]`).click();
@@ -153,8 +159,12 @@ test.describe('Agent Switching', () => {
     );
 
     // Check that first agent's message is displayed
-    await expect(window.locator('text=Message for agent 1')).toBeVisible({ timeout: 5000 });
-    await expect(window.locator('text=Message for agent 2')).not.toBeVisible();
+    await expect(
+      activeChat(window).userMessages.filter({ hasText: 'Message for agent 1' })
+    ).toHaveCount(1, { timeout: 5000 });
+    await expect(
+      activeChat(window).userMessages.filter({ hasText: 'Message for agent 2' })
+    ).toHaveCount(0);
 
     // Switch to second agent using ID
     await window.locator(`[data-testid="agent-icon-${secondAgentId}"]`).click();
@@ -166,8 +176,12 @@ test.describe('Agent Switching', () => {
     );
 
     // Check that second agent's message is displayed
-    await expect(window.locator('text=Message for agent 2')).toBeVisible({ timeout: 5000 });
-    await expect(window.locator('text=Message for agent 1')).not.toBeVisible();
+    await expect(
+      activeChat(window).userMessages.filter({ hasText: 'Message for agent 2' })
+    ).toHaveCount(1, { timeout: 5000 });
+    await expect(
+      activeChat(window).userMessages.filter({ hasText: 'Message for agent 1' })
+    ).toHaveCount(0);
   });
 
   /* Preconditions: Multiple agents exist

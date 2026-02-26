@@ -188,12 +188,12 @@ test.describe('AutoExpandingTextarea - Functional Tests', () => {
     // Press Enter
     await textarea.press('Enter');
 
-    // Wait for message to be sent
-    await window.waitForTimeout(500);
+    // Wait for message to be sent in active chat
+    const userMessage = activeChat(window).userMessages.filter({ hasText: 'Test message' });
+    await expect(userMessage).toHaveCount(1, { timeout: 5000 });
 
     // Textarea should be cleared
-    const value = await textarea.inputValue();
-    expect(value).toBe('');
+    await expect(textarea).toHaveValue('', { timeout: 5000 });
   });
 
   /* Preconditions: User is on agents page with textarea visible

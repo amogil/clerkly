@@ -53,15 +53,14 @@ test('should auto-focus input on first load', async () => {
   await expect(window.locator('[data-testid="agents"]')).toBeVisible({ timeout: 5000 });
 
   // Wait for first agent to be created and selected
-  await window.waitForTimeout(500);
+  await expect(window.locator('[data-testid^="agent-icon-"]')).toHaveCount(1, { timeout: 5000 });
 
   // Get the textarea
   const textarea = activeChat(window).textarea;
   await expect(textarea).toBeVisible();
 
   // Check that textarea is focused
-  const isFocused = await textarea.evaluate((el) => el === document.activeElement);
-  expect(isFocused).toBe(true);
+  await expect(textarea).toBeFocused({ timeout: 5000 });
 });
 
 /* Preconditions: Application with multiple agents
@@ -118,8 +117,9 @@ test('should auto-focus input when returning from AllAgents', async () => {
   await textarea.fill('Test message');
   await textarea.press('Enter');
 
-  // Wait for message to appear in UI
-  await expect(window.locator('text=Test message')).toBeVisible({ timeout: 5000 });
+  // Wait for message to appear in active chat
+  const message = activeChat(window).userMessages.filter({ hasText: 'Test message' });
+  await expect(message).toHaveCount(1, { timeout: 5000 });
 
   // Open AllAgents page via +N button
   const allAgentsButton = window.locator('[data-testid="all-agents-button"]');
@@ -212,8 +212,9 @@ test('should not auto-focus when AllAgents page is open', async () => {
   await textarea.fill('Test message');
   await textarea.press('Enter');
 
-  // Wait for message to appear in UI
-  await expect(window.locator('text=Test message')).toBeVisible({ timeout: 5000 });
+  // Wait for message to appear in active chat
+  const message = activeChat(window).userMessages.filter({ hasText: 'Test message' });
+  await expect(message).toHaveCount(1, { timeout: 5000 });
 
   // Open AllAgents page via +N button
   const allAgentsButton = window.locator('[data-testid="all-agents-button"]');
