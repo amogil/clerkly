@@ -65,7 +65,9 @@ test.afterEach(async () => {
    Requirements: settings.1.4, settings.1.15 */
 test('53.1: should save and load LLM provider selection', async () => {
   // Navigate to Settings
-  await context.window.click('text=Settings');
+  const settingsNavBefore = context.window.locator('button:has-text("Settings")');
+  await settingsNavBefore.waitFor({ state: 'visible', timeout: 5000 });
+  await settingsNavBefore.click();
   await context.window.waitForSelector('text=LLM Provider');
 
   // Select Anthropic
@@ -92,7 +94,9 @@ test('53.1: should save and load LLM provider selection', async () => {
   await context.window.waitForTimeout(1000);
 
   // Navigate to Settings
-  await context.window.click('text=Settings');
+  const settingsNavAfter = context.window.locator('button:has-text("Settings")');
+  await settingsNavAfter.waitFor({ state: 'visible', timeout: 5000 });
+  await settingsNavAfter.click();
   await context.window.waitForSelector('text=LLM Provider');
 
   // Check that Anthropic is selected

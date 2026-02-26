@@ -9,11 +9,11 @@
 5) Исправить, прогнать
 6) Перейти к следующему тесту
 
-## Упавшие (4, 1 исправлен)
+## Упавшие (4, 4 исправлены)
 - [x] `tests/functional/agent-scroll-position.spec.ts` — "should NOT force autoscroll when user sends message while scrolled up"
-- [ ] `tests/functional/settings-ai-agent.spec.ts` — "53.1: should save and load LLM provider selection"
-- [ ] `tests/functional/settings-ai-agent.spec.ts` — "53.2: should save and load API key with encryption"
-- [ ] `tests/functional/settings-ai-agent.spec.ts` — "53.3: should delete API key when field is cleared"
+- [x] `tests/functional/settings-ai-agent.spec.ts` — "53.1: should save and load LLM provider selection"
+- [x] `tests/functional/settings-ai-agent.spec.ts` — "53.2: should save and load API key with encryption"
+- [x] `tests/functional/settings-ai-agent.spec.ts` — "53.3: should delete API key when field is cleared"
 
 ## Flaky (5, прошли на повторе)
 - [ ] `tests/functional/agent-reordering.spec.ts` — "should bring hidden agent to header after sending message"

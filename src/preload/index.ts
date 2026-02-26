@@ -7,6 +7,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import { EVENT_TYPES } from '../shared/events/constants';
 import type { User } from '../types';
+import type { AppPhase, AppScreen } from '../shared/events/types';
 
 // LLM Provider type (duplicated from types/index.ts due to rootDir restriction)
 type LLMProvider = 'openai' | 'anthropic' | 'google';
@@ -30,6 +31,14 @@ export interface API {
   saveData: (key: string, value: unknown) => Promise<{ success: boolean; error?: string }>;
   loadData: (key: string) => Promise<{ success: boolean; data?: unknown; error?: string }>;
   deleteData: (key: string) => Promise<{ success: boolean; error?: string }>;
+  app: {
+    getState: () => Promise<{
+      phase: AppPhase;
+      authorized: boolean;
+      targetScreen: AppScreen;
+      reason?: string;
+    }>;
+  };
   // Requirements: realtime-events.4.5, realtime-events.4.6, realtime-events.4.7
   events?: {
     onEvent: (callback: (type: string, payload: unknown) => void) => () => void;
@@ -171,6 +180,17 @@ const api: API = {
    */
   async deleteData(key: string): Promise<{ success: boolean; error?: string }> {
     return await ipcRenderer.invoke('delete-data', key);
+  },
+
+  app: {
+    async getState(): Promise<{
+      phase: AppPhase;
+      authorized: boolean;
+      targetScreen: AppScreen;
+      reason?: string;
+    }> {
+      return await ipcRenderer.invoke('app:get-state');
+    },
   },
 
   // Requirements: realtime-events.4.5, realtime-events.4.6, realtime-events.4.7

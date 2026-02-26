@@ -673,10 +673,23 @@
 
 13.10. Экран загрузки из `src/renderer/App.tsx` ДОЛЖЕН показываться пока хотя бы один `AgentChat` ещё загружает начальный чанк сообщений
 
+13.11. Оркестрация стартового workflow ДОЛЖНА выполняться централизованно в main process через `AppCoordinator` (единый source of truth для фаз запуска)
+
+13.12. `AppCoordinator` ДОЛЖЕН публиковать событие `app.state.changed` при каждом переходе фаз (`booting`, `unauthenticated`, `authenticating`, `preparing-session`, `waiting-for-chats`, `ready`, `error`)
+
+13.13. Renderer ДОЛЖЕН определять показ глобального loading-экрана и целевого экрана (`login`/`agents`/`settings`) по состоянию `AppCoordinator`, а НЕ по локально-разрозненным флагам
+
+13.14. КОГДА чаты полностью загружены, ТО Renderer ДОЛЖЕН публиковать `app.chats.ready`, после чего `AppCoordinator` ДОЛЖЕН перевести приложение в фазу `ready`
+
+13.15. ЕСЛИ в фазе `waiting-for-chats` не получено `app.chats.ready` за timeout, `AppCoordinator` ДОЛЖЕН перевести приложение в фазу `error` с диагностической причиной
+
 #### Функциональные Тесты
 
 - `tests/functional/agent-switching.spec.ts` - "should preserve scroll position when switching agents"
 - `tests/functional/agent-switching.spec.ts` - "should show correct chat immediately on agent click"
+- `tests/functional/settings-ai-agent.spec.ts` - "53.1: should save and load LLM provider selection"
+- `tests/functional/settings-ai-agent.spec.ts` - "53.2: should save and load API key with encryption"
+- `tests/functional/settings-ai-agent.spec.ts` - "53.3: should delete API key when field is cleared"
 
 ---
 

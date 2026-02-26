@@ -167,6 +167,21 @@ export interface API {
   saveData: (key: string, value: any) => Promise<{ success: boolean; error?: string }>;
   loadData: (key: string) => Promise<{ success: boolean; data?: any; error?: string }>;
   deleteData: (key: string) => Promise<{ success: boolean; error?: string }>;
+  app: {
+    getState: () => Promise<{
+      phase:
+        | 'booting'
+        | 'unauthenticated'
+        | 'authenticating'
+        | 'preparing-session'
+        | 'waiting-for-chats'
+        | 'ready'
+        | 'error';
+      authorized: boolean;
+      targetScreen: 'login' | 'agents' | 'settings' | 'error-demo';
+      reason?: string;
+    }>;
+  };
   // Requirements: google-oauth-auth.8.1, google-oauth-auth.8.2, google-oauth-auth.8.3, account-profile.1.2, account-profile.1.5
   auth: {
     startLogin: () => Promise<{ success: boolean; error?: string }>;

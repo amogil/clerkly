@@ -6,7 +6,9 @@ import { AgentHeader } from './agents/AgentHeader';
 import { AgentChat } from './agents/AgentChat';
 import { AllAgentsPage } from './agents/AllAgentsPage';
 import { useEventSubscription } from '../events/useEventSubscription';
+import { RendererEventBus } from '../events/RendererEventBus';
 import { EVENT_TYPES } from '../../shared/events/constants';
+import { AppChatsReadyEvent } from '../../shared/events/types';
 import type { AgentRateLimitPayload } from '../../shared/events/types';
 import type { AgentSnapshot } from '../types/agent';
 
@@ -30,6 +32,7 @@ export function Agents({
   // Track loading state per agent — inform App loader until all chats loaded (agents.13.2, agents.13.10)
   const [loadingAgents, setLoadingAgents] = useState<Set<string>>(new Set());
   const startupLoaderShownAtRef = useRef<number | null>(null);
+  const hasPublishedChatsReadyRef = useRef(false);
 
   const chatListRef = useRef<HTMLDivElement>(null);
 
@@ -90,6 +93,12 @@ export function Agents({
       isInitialLoad ||
       startupLoaderVisible;
     onChatsLoadingChange?.(isChatsLoading);
+
+    if (!isChatsLoading && !hasPublishedChatsReadyRef.current) {
+      hasPublishedChatsReadyRef.current = true;
+      const eventBus = RendererEventBus.getInstance();
+      eventBus.publish(new AppChatsReadyEvent());
+    }
   }, [
     agents.length,
     isInitialLoad,

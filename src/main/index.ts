@@ -5,7 +5,7 @@
  * Initializes all components and manages application lifecycle
  */
 
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, ipcMain } from 'electron';
 import * as path from 'path';
 import WindowManager from './WindowManager';
 import { LifecycleManager } from './LifecycleManager';
@@ -24,6 +24,7 @@ import { registerEventIPCHandlers } from './events/EventIPCHandlers';
 import { EventLogger } from './events/EventLogger';
 import { Logger } from './Logger';
 import { registerTestIPCHandlers } from './TestIPCHandlers';
+import { AppCoordinator } from './app/AppCoordinator';
 
 // Requirements: clerkly.3.5, clerkly.3.7 - Create parameterized logger for Main module
 const logger = Logger.create('Main');
@@ -214,6 +215,7 @@ const promptBuilder = new PromptBuilder(
 );
 const mainPipeline = new MainPipeline(messageManager, aiAgentSettingsManager, promptBuilder);
 const agentIPCHandlers = new AgentIPCHandlers(agentManager, messageManager, mainPipeline);
+const appCoordinator = new AppCoordinator(oauthClient);
 
 // Requirements: testing.3.8
 // Initialize Test IPC Handlers (only in test environment)
@@ -302,10 +304,17 @@ app.whenReady().then(async () => {
     registerEventIPCHandlers();
     logger.info('Event IPC handlers registered');
 
+    // Coordinator state query IPC for renderer bootstrap
+    ipcMain.handle('app:get-state', () => appCoordinator.getState());
+    logger.info('AppCoordinator state IPC handler registered');
+
     // Requirements: agents.2, agents.4, agents.10
     // Register Agent IPC handlers
     agentIPCHandlers.registerHandlers();
     logger.info('Agent IPC handlers registered');
+
+    await appCoordinator.start();
+    logger.info('AppCoordinator started');
 
     // Requirements: realtime-events.1.3, clerkly.3
     // Start EventLogger to log all events
@@ -356,6 +365,8 @@ app.on('window-all-closed', () => {
 // Handle before-quit event
 app.on('before-quit', () => {
   logger.info('Application quitting...');
+  ipcMain.removeHandler('app:get-state');
+  appCoordinator.stop();
   lifecycleManager.handleWindowClose();
 });
 

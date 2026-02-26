@@ -2026,6 +2026,7 @@ import { Logo } from '../logo';
 | `tests/unit/components/agents.test.tsx` | agents.4.22 |
 | `tests/unit/components/agents-autoscroll.test.tsx` | agents.4.13 |
 | `tests/unit/components/agents-scroll-position.test.tsx` | agents.4.14 |
+| `tests/unit/app/AppCoordinator.test.ts` | agents.13.11-13.15, navigation.1.1, navigation.1.3 |
 
 ### Функциональные тесты
 
@@ -2034,6 +2035,7 @@ import { Logo } from '../logo';
 | `tests/functional/agent-switching.spec.ts` | agents.3 | - |
 | `tests/functional/agent-messaging.spec.ts` | agents.4.3, 4.4, 4.8, 4.13.1, 4.13.2, 4.13.4 | - |
 | `tests/functional/agent-scroll-position.spec.ts` | agents.4.14.1-4.14.5 | - |
+| `tests/functional/settings-ai-agent.spec.ts` | agents.13.11-13.15 (регрессия startup/loading orchestration) | - |
 | `tests/functional/all-agents-page.spec.ts` | agents.5 | - |
 | `tests/functional/agent-status-indicators.spec.ts` | agents.6 | - |
 | `tests/functional/message-format.spec.ts` | agents.7 | - |
@@ -2301,6 +2303,37 @@ interface UseAgentChatResult {
 - `isLoading = true` пока идёт загрузка истории
 - `App.tsx` показывает экран загрузки "Loading..." пока хотя бы один `AgentChat` имеет `isLoading = true`
 - После загрузки всех чатов экран загрузки скрывается и показывается основной интерфейс
+
+### AppCoordinator (main process orchestration)
+
+**Requirements:** agents.13.11-13.15, navigation.1.1, navigation.1.3
+
+`AppCoordinator` (`src/main/app/AppCoordinator.ts`) централизует жизненный цикл приложения и убирает race condition между восстановлением сессии, загрузкой профиля и инициализацией чатов.
+
+**Состояния:**
+- `booting` — старт приложения
+- `unauthenticated` — пользователь не авторизован, показывается `login`
+- `preparing-session` — сессия авторизована, подготовка к загрузке рабочих экранов
+- `waiting-for-chats` — ожидание явного сигнала `app.chats.ready` от renderer
+- `ready` — основной UI полностью доступен
+- `error` — критическая ошибка инициализации (включая timeout ожидания чатов)
+
+**Ключевые события:**
+- `app.state.changed` — публикуется `AppCoordinator` при каждом переходе состояния
+- `app.chats.ready` — публикуется renderer (`Agents`) после завершения начальной загрузки чатов
+- `app.chats.failed` — публикуется renderer при критической ошибке загрузки чатов
+
+**Поток запуска:**
+1. `src/main/index.ts` создаёт и запускает `AppCoordinator`
+2. renderer получает initial state через IPC `app:get-state`
+3. renderer подписывается на `app.state.changed` через event bus
+4. после готовности чатов renderer публикует `app.chats.ready`
+5. `AppCoordinator` переводит приложение в `ready`, loading-экран скрывается
+
+**Timeout-защита:**
+- В фазе `waiting-for-chats` запускается таймер
+- Если `app.chats.ready` не получен вовремя, состояние переходит в `error`
+- Причина перехода публикуется в `reason` для диагностики флейков/регрессий
 
 ## Установка и обновление AI Elements компонентов
 
