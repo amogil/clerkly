@@ -277,10 +277,12 @@
 
 #### Функциональные Тесты
 
-- `tests/functional/agents.spec.ts` - "should send message on Enter key"
-- `tests/functional/agents.spec.ts` - "should add new line on Shift+Enter"
-- `tests/functional/agents.spec.ts` - "should display messages in chronological order"
-- `tests/functional/agents.spec.ts` - "should autoscroll to last message"
+- `tests/functional/agent-messaging.spec.ts` - "should send message on Enter key"
+- `tests/functional/agent-messaging.spec.ts` - "should add new line on Shift+Enter"
+- `tests/functional/agent-messaging.spec.ts` - "should display messages in chronological order"
+- `tests/functional/agent-messaging.spec.ts` - "should autoscroll to last message"
+- `tests/functional/auto-expanding-textarea.spec.ts` - "AutoExpandingTextarea - Functional Tests"
+- `tests/functional/input-autofocus.spec.ts` - "Functional tests for input autofocus on agent activation"
 - `tests/functional/empty-state-placeholder.spec.ts` - "should display empty state for new agent"
 - `tests/functional/empty-state-placeholder.spec.ts` - "should show 4 prompt suggestions"
 - `tests/functional/empty-state-placeholder.spec.ts` - "should send message on prompt click"

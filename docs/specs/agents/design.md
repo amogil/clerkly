@@ -940,8 +940,9 @@ function AgentsComponent() {
 │                                                          │
 │  ┌────────────────────────────────────────────────────┐ │
 │  │              InputArea                             │ │
-│  │  - AutoExpandingTextarea (max 50% chat height)    │ │
-│  │  - SendButton                                      │ │
+│  │  - PromptInput (AI Elements)                       │ │
+│  │  - PromptInputTextarea (max 50% chat height)       │ │
+│  │  - PromptInputSubmit                               │ │
 │  └────────────────────────────────────────────────────┘ │
 └─────────────────────────────────────────────────────────┘
 ```
@@ -1243,61 +1244,51 @@ function ActivityIndicator({ isActive }: { isActive: boolean }) {
 }
 ```
 
-#### AutoExpandingTextarea
+#### PromptInput (AI Elements)
 
 ```typescript
-// Requirements: agents.4.5, agents.4.6, agents.4.7, agents.4.7.1
-function AutoExpandingTextarea({ 
-  value, 
-  onChange, 
-  onSubmit,
-  chatAreaRef 
-}: AutoExpandingTextareaProps) {
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-  
-  // Expose focus method to parent via ref
-  // Requirements: agents.4.7.1
-  useImperativeHandle(ref, () => ({
-    focus: () => textareaRef.current?.focus(),
-    blur: () => textareaRef.current?.blur(),
-  }));
-  
+// Requirements: agents.4.1, agents.4.3, agents.4.4, agents.4.5, agents.4.6, agents.4.7
+function ChatInput({
+  taskInput,
+  setTaskInput,
+  handleSend,
+  textareaRef,
+  chatAreaRef,
+}: ChatInputProps) {
+  // Auto-resize remains controlled by AgentChat to preserve existing UX contracts.
   useEffect(() => {
     const textarea = textareaRef.current;
     const chatArea = chatAreaRef.current;
     if (!textarea || !chatArea) return;
-    
-    // Reset height to auto to get scrollHeight
     textarea.style.height = 'auto';
-    
-    // Calculate max height (50% of chat area)
     const maxHeight = chatArea.offsetHeight * 0.5;
-    
-    // Set height to scrollHeight, capped at maxHeight
-    const newHeight = Math.min(textarea.scrollHeight, maxHeight);
-    textarea.style.height = `${newHeight}px`;
-    
-    // Show scrollbar if content exceeds max height
+    textarea.style.height = `${Math.min(textarea.scrollHeight, maxHeight)}px`;
     textarea.style.overflowY = textarea.scrollHeight > maxHeight ? 'auto' : 'hidden';
-  }, [value, chatAreaRef]);
-  
+  }, [taskInput, textareaRef, chatAreaRef]);
+
   return (
-    <textarea
-      ref={textareaRef}
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-          e.preventDefault();
-          onSubmit();
-        }
-      }}
-      placeholder="Ask, reply, or give command..."
-      className="w-full resize-none border rounded-lg p-3"
-    />
+    <PromptInput onSubmit={(message) => handleSend(message.text)}>
+      <PromptInputBody>
+        <PromptInputTextarea
+          ref={textareaRef}
+          data-testid="auto-expanding-textarea"
+          placeholder="Ask, reply, or give command..."
+          value={taskInput}
+          onChange={(event) => setTaskInput(event.target.value)}
+        />
+        <PromptInputSubmit disabled={!taskInput.trim()} />
+      </PromptInputBody>
+      <PromptInputFooter>
+        <p>Press Enter to send, Shift+Enter for new line</p>
+      </PromptInputFooter>
+    </PromptInput>
   );
 }
 ```
+
+**Важно:** поведение клавиатуры (`Enter` submit, `Shift+Enter` newline) делегировано `PromptInputTextarea`, без дополнительного кастомного `onKeyDown` в `AgentChat`.
+
+**Техническое решение:** в текущей реализации поле ввода стандартизировано на AI Elements `PromptInput` и интегрировано с существующим chat send-flow.
 
 #### Автофокус на поле ввода
 
@@ -1308,12 +1299,12 @@ function AutoExpandingTextarea({
 **Реализация в Agents компоненте:**
 
 ```typescript
-const textareaRef = useRef<AutoExpandingTextareaHandle>(null);
+const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
 // Auto-focus input when active agent changes
 // Requirements: agents.4.7.1, agents.4.7.2
 useEffect(() => {
-  if (activeAgent && textareaRef.current) {
+  if (activeAgent) {
     // Small delay to ensure DOM is ready
     setTimeout(() => {
       textareaRef.current?.focus();
@@ -2022,7 +2013,7 @@ import { Logo } from '../logo';
 | `tests/unit/agents/AgentIPCHandlers.test.ts` | agents.2, agents.4, agents.5.5 |
 | `tests/unit/agents/computeAgentStatus.test.ts` | agents.9 |
 | `tests/unit/agents/ActivityIndicator.test.tsx` | agents.11 |
-| `tests/unit/agents/AutoExpandingTextarea.test.tsx` | agents.4.5-4.7 |
+| `tests/unit/components/ai-elements/prompt-input.test.tsx` | agents.4.3-4.7 |
 | `tests/unit/components/agents.test.tsx` | agents.4.22 |
 | `tests/unit/components/agents-autoscroll.test.tsx` | agents.4.13 |
 | `tests/unit/components/agents-scroll-position.test.tsx` | agents.4.14 |
@@ -2172,7 +2163,7 @@ await window.locator(`[data-testid="agent-icon-${firstAgentId}"]`).click();
 - `IPCChatTransport` — кастомный ChatTransport для AI SDK (`src/renderer/lib/IPCChatTransport.ts`)
 - `useAgentChat` — хук управления сообщениями, заменяет `useMessages` (`src/renderer/hooks/useAgentChat.ts`)
 - `AgentMessage` — компонент сообщения (`src/renderer/components/agents/AgentMessage.tsx`)
-- `AgentPromptInput` — компонент ввода (`src/renderer/components/agents/AgentPromptInput.tsx`)
+- `PromptInput` — AI Elements компонент ввода (`src/renderer/components/ai-elements/prompt-input.tsx`)
 
 ## Производительность
 
@@ -2202,7 +2193,7 @@ agents.tsx
   │       │     │     └── motion.div > AgentMessage (для каждого сообщения)
   │       │     ├── RateLimitBanner (если активен rate limit)
   │       │     └── ConversationScrollButton
-  │       └── AgentPromptInput
+  │       └── PromptInput
   └── [лоадер пока не все чаты загружены]
 ```
 

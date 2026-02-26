@@ -15,6 +15,19 @@
 
 ---
 
+## Обновление 2026-02-26: PromptInput интеграция
+
+- ✅ `AgentPromptInput` заменён на `PromptInput` (AI Elements) в `AgentChat`
+- ✅ Обновлены unit-тесты под новый input flow:
+  - `tests/unit/components/agents/AgentChat.test.tsx`
+  - `tests/unit/components/ai-elements/prompt-input.test.tsx`
+- 🔄 Обязательный регрессионный прогон функциональных тестов input-поведения:
+  - `tests/functional/agent-messaging.spec.ts`
+  - `tests/functional/auto-expanding-textarea.spec.ts`
+  - `tests/functional/input-autofocus.spec.ts`
+
+---
+
 ## 1. Обновить tasks.md (технический долг)
 
 Фазы 7.1, 7.2, 7.3 фактически выполнены — код существует:

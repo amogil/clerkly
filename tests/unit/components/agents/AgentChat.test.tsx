@@ -65,36 +65,50 @@ jest.mock('../../../../src/renderer/components/agents/AgentWelcome', () => ({
   ),
 }));
 
-jest.mock('../../../../src/renderer/components/agents/AgentPromptInput', () => {
-  const MockAgentPromptInput = React.forwardRef(
-    (
-      {
-        value,
-        onChange,
-        onSubmit,
-      }: {
-        value: string;
-        onChange: (v: string) => void;
-        onSubmit: (text?: string) => void;
-        disabled: boolean;
-        chatAreaRef: React.RefObject<HTMLDivElement | null>;
-      },
-      _ref: React.Ref<unknown>
-    ) => (
-      <div data-testid="agent-prompt-input">
-        <input
-          data-testid="prompt-input-field"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-        />
-        <button data-testid="prompt-submit" onClick={() => onSubmit()}>
-          Send
-        </button>
-      </div>
-    )
+jest.mock('../../../../src/renderer/components/ai-elements/prompt-input', () => {
+  const PromptInput = ({
+    children,
+    onSubmit,
+  }: {
+    children: React.ReactNode;
+    onSubmit?: (message: { text?: string }) => void;
+  }) => (
+    <form
+      data-testid="agent-prompt-input"
+      onSubmit={(event) => {
+        event.preventDefault();
+        const formData = new FormData(event.currentTarget);
+        const text = (formData.get('prompt-input-field') as string | null) ?? '';
+        onSubmit?.({ text });
+      }}
+    >
+      {children}
+    </form>
   );
-  MockAgentPromptInput.displayName = 'MockAgentPromptInput';
-  return { AgentPromptInput: MockAgentPromptInput };
+
+  const PromptInputBody = ({ children }: { children: React.ReactNode }) => <div>{children}</div>;
+  const PromptInputFooter = ({ children }: { children: React.ReactNode }) => <div>{children}</div>;
+  const PromptInputSubmit = ({ disabled }: { disabled?: boolean }) => (
+    <button data-testid="prompt-submit" disabled={disabled} type="submit">
+      Send
+    </button>
+  );
+  const PromptInputTextarea = ({
+    value,
+    onChange,
+  }: {
+    value: string;
+    onChange: (event: React.ChangeEvent<HTMLTextAreaElement>) => void;
+  }) => (
+    <textarea
+      data-testid="prompt-input-field"
+      name="prompt-input-field"
+      onChange={onChange}
+      value={value}
+    />
+  );
+
+  return { PromptInput, PromptInputBody, PromptInputFooter, PromptInputSubmit, PromptInputTextarea };
 });
 
 jest.mock('../../../../src/renderer/components/agents/RateLimitBanner', () => ({
@@ -373,12 +387,12 @@ describe('AgentChat — rate limit banner', () => {
   });
 });
 
-describe('AgentChat — AgentPromptInput rendered', () => {
+describe('AgentChat — PromptInput rendered', () => {
   /* Preconditions: component rendered
      Action: render AgentChat
-     Assertions: AgentPromptInput present
+     Assertions: PromptInput present
      Requirements: agents.4.3 */
-  it('should render AgentPromptInput', () => {
+  it('should render PromptInput', () => {
     render(<AgentChat {...defaultProps} />);
     expect(screen.getByTestId('agent-prompt-input')).toBeInTheDocument();
   });

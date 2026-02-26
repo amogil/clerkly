@@ -6,10 +6,16 @@ import React, { useRef, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { useAgentChat } from '../../hooks/useAgentChat';
 import { AgentMessage } from './AgentMessage';
-import { AgentPromptInput, AgentPromptInputHandle } from './AgentPromptInput';
 import { AgentWelcome } from './AgentWelcome';
 import { RateLimitBanner } from './RateLimitBanner';
 import { Conversation, ConversationContent } from '../ai-elements/conversation';
+import {
+  PromptInput,
+  PromptInputBody,
+  PromptInputFooter,
+  PromptInputSubmit,
+  PromptInputTextarea,
+} from '../ai-elements/prompt-input';
 import { type StickToBottomContext, useStickToBottomContext } from 'use-stick-to-bottom';
 import { ArrowDownIcon } from 'lucide-react';
 import type { AgentSnapshot } from '../../types/agent';
@@ -72,7 +78,7 @@ function AgentChatInner({
   sendMessage,
   onNavigate,
 }: AgentChatInnerProps) {
-  const textareaRef = useRef<AgentPromptInputHandle>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const chatAreaRef = useRef<HTMLDivElement>(null);
   const [taskInput, setTaskInput] = React.useState('');
 
@@ -86,6 +92,20 @@ function AgentChatInner({
       timeouts.forEach((timeoutId) => window.clearTimeout(timeoutId));
     };
   }, [isActive]);
+
+  // Requirements: agents.4.5, agents.4.6, agents.4.7
+  // Keep PromptInput textarea auto-resize behavior capped at 50% of chat area.
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    const chatArea = chatAreaRef.current;
+    if (!textarea || !chatArea) return;
+
+    textarea.style.height = 'auto';
+    const maxHeight = chatArea.offsetHeight * 0.5;
+    const nextHeight = Math.min(textarea.scrollHeight, maxHeight);
+    textarea.style.height = `${nextHeight}px`;
+    textarea.style.overflowY = textarea.scrollHeight > maxHeight ? 'auto' : 'hidden';
+  }, [taskInput]);
 
   const handleSend = useCallback(
     async (text?: string) => {
@@ -142,14 +162,22 @@ function AgentChatInner({
       <ScrollToBottomButton />
 
       <div ref={chatAreaRef} className="flex-shrink-0">
-        <AgentPromptInput
-          ref={textareaRef}
-          value={taskInput}
-          onChange={setTaskInput}
-          onSubmit={handleSend}
-          disabled={false}
-          chatAreaRef={chatAreaRef}
-        />
+        <PromptInput onSubmit={(message) => handleSend(message.text)}>
+          <PromptInputBody>
+            <PromptInputTextarea
+              ref={textareaRef}
+              data-testid="auto-expanding-textarea"
+              disabled={false}
+              onChange={(event) => setTaskInput(event.target.value)}
+              placeholder="Ask, reply, or give command..."
+              value={taskInput}
+            />
+            <PromptInputSubmit disabled={!taskInput.trim()} />
+          </PromptInputBody>
+          <PromptInputFooter>
+            <p className="px-0.5 text-xs text-muted-foreground">Press Enter to send, Shift+Enter for new line</p>
+          </PromptInputFooter>
+        </PromptInput>
       </div>
     </>
   );
