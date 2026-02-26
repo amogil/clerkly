@@ -15,9 +15,9 @@
 - [x] `tests/functional/settings-ai-agent.spec.ts` — "53.2: should save and load API key with encryption"
 - [x] `tests/functional/settings-ai-agent.spec.ts` — "53.3: should delete API key when field is cleared"
 
-## Flaky (5, прошли на повторе)
-- [ ] `tests/functional/agent-reordering.spec.ts` — "should bring hidden agent to header after sending message"
-- [ ] `tests/functional/agent-status-indicators.spec.ts` — "should animate in-progress status"
-- [ ] `tests/functional/agent-switching.spec.ts` — "should switch active agent on click"
-- [ ] `tests/functional/llm-chat.spec.ts` — "should show action_link in auth error bubble and navigate to settings on click"
-- [ ] `tests/functional/message-format.spec.ts` — "should display agent responses correctly"
+## Flaky (5, стабилизированы)
+- [x] `tests/functional/agent-reordering.spec.ts` — "should bring hidden agent to header after sending message" (5/5 после фикса stale locator + explicit wait)
+- [x] `tests/functional/agent-status-indicators.spec.ts` — "should animate in-progress status" (5/5 после controlled delay mock LLM)
+- [x] `tests/functional/agent-switching.spec.ts` — "should switch active agent on click" (5/5)
+- [x] `tests/functional/llm-chat.spec.ts` — "should show action_link in auth error bubble and navigate to settings on click" (5/5)
+- [x] `tests/functional/message-format.spec.ts` — "should display agent responses correctly" (5/5)
