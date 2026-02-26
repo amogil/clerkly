@@ -147,16 +147,29 @@ test.describe('Agent Reordering', () => {
     // Verify we're back to chat view
     await expect(window.locator('text=All Agents')).not.toBeVisible();
 
-    // Send a message to this agent
-    await expect(textarea).toBeVisible();
-    await textarea.fill('Message to bring agent to top');
-    await textarea.press('Enter');
-    await window.waitForTimeout(1000);
+    // Re-acquire active chat input after agent selection from AllAgents.
+    // The previous locator can point to stale/hidden chat instance.
+    const selectedAgentTextarea = activeChat(window).textarea;
+    await expect(selectedAgentTextarea).toBeVisible();
+    await selectedAgentTextarea.fill('Message to bring agent to top');
+    await selectedAgentTextarea.press('Enter');
 
     // Get agent icons in header
     const agentIcons = window.locator('[data-testid^="agent-icon-"]');
 
-    // The agent should now be first in the list
+    // Wait until selected agent moves to the first header slot after updatedAt refresh.
+    await window.waitForFunction(
+      (expectedAgentId) => {
+        const firstIcon = document.querySelector('[data-testid^="agent-icon-"]');
+        const firstIconTestId = firstIcon?.getAttribute('data-testid');
+        const firstAgentId = firstIconTestId?.replace('agent-icon-', '');
+        return firstAgentId === expectedAgentId;
+      },
+      lastCardId?.replace('agent-card-', ''),
+      { timeout: 10000 }
+    );
+
+    // The agent should now be first in the list.
     const firstIconId = await agentIcons.first().getAttribute('data-testid');
 
     // Extract agent ID from card and icon IDs
