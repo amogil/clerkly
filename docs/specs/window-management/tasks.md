@@ -68,7 +68,7 @@
     - Устанавливать title: '' (пустой заголовок)
     - Устанавливать titleBarStyle: 'default' (нативные элементы macOS)
     - Устанавливать resizable: true (окно можно изменять в размере)
-    - Устанавливать minWidth: 250 и minHeight: 250 (окно нельзя уменьшить меньше)
+    - Устанавливать minWidth: 350 и minHeight: 300 (окно нельзя уменьшить меньше)
     - НЕ вызывать maximize() сразу, даже если isMaximized: true
     - В обработчике ready-to-show: показать окно, затем применить maximize() если isMaximized: true
     - _Requirements: window-management.1.1, window-management.1.2, window-management.1.3, window-management.1.6, window-management.2.1, window-management.3.1, window-management.5.4_

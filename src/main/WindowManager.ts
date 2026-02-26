@@ -187,8 +187,8 @@ class WindowManager {
         y: windowState.y,
         width: windowState.width,
         height: windowState.height,
-        minWidth: 250, // Requirements: window-management.1.6
-        minHeight: 250, // Requirements: window-management.1.6
+        minWidth: 350, // Requirements: window-management.1.6
+        minHeight: 300, // Requirements: window-management.1.6
         title: '', // Requirements: window-management.2.1
         show: false,
         resizable: true, // Requirements: window-management.1.3

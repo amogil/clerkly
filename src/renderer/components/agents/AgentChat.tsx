@@ -75,7 +75,6 @@ function AgentChatInner({
   const textareaRef = useRef<AgentPromptInputHandle>(null);
   const chatAreaRef = useRef<HTMLDivElement>(null);
   const [taskInput, setTaskInput] = React.useState('');
-  const { scrollToBottom } = useStickToBottomContext();
 
   // Autofocus textarea when this chat becomes active (agents.4.7.1)
   useEffect(() => {
@@ -84,16 +83,14 @@ function AgentChatInner({
     }
   }, [isActive]);
 
-  // Requirements: agents.4.14.5 — scroll to bottom when user sends a message
   const handleSend = useCallback(
     async (text?: string) => {
       const messageText = text || taskInput;
       if (!messageText.trim()) return;
-      scrollToBottom('instant');
       const success = await sendMessage(messageText);
       if (success) setTaskInput('');
     },
-    [taskInput, sendMessage, scrollToBottom]
+    [taskInput, sendMessage]
   );
 
   return (

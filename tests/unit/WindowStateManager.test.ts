@@ -132,7 +132,7 @@ describe('WindowStateManager', () => {
 
     /* Preconditions: saved state exists with size smaller than minimum
        Action: call loadState()
-       Assertions: returns saved state with width/height clamped to minimum 250x250
+       Assertions: returns saved state with width/height clamped to minimum 350x300
        Requirements: window-management.1.6, window-management.5.4, user-data-isolation.6.8 */
     it('should clamp saved state to minimum size', () => {
       const savedState: WindowState = {
@@ -147,8 +147,8 @@ describe('WindowStateManager', () => {
 
       const result = windowStateManager.loadState();
 
-      expect(result.width).toBe(250);
-      expect(result.height).toBe(250);
+      expect(result.width).toBe(350);
+      expect(result.height).toBe(300);
       expect(result.x).toBe(savedState.x);
       expect(result.y).toBe(savedState.y);
       expect(result.isMaximized).toBe(false);
