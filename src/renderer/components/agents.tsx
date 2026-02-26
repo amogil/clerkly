@@ -99,26 +99,30 @@ export function Agents({
     startupLoaderVisible,
   ]);
 
-  // Calculate visible chats based on container width (agents.1.7)
-  useEffect(() => {
-    const calculate = () => {
-      if (!chatListRef.current) return;
-      const maxChats = Math.floor((chatListRef.current.offsetWidth - 80) / 40);
-      setVisibleChatsCount(Math.max(1, maxChats));
-    };
-    const rafId = requestAnimationFrame(calculate);
-    window.addEventListener('resize', calculate);
-    return () => {
-      cancelAnimationFrame(rafId);
-      window.removeEventListener('resize', calculate);
-    };
-  }, []);
-
-  useEffect(() => {
+  const calculateVisibleChats = useCallback(() => {
     if (!chatListRef.current) return;
     const maxChats = Math.floor((chatListRef.current.offsetWidth - 80) / 40);
     setVisibleChatsCount(Math.max(1, maxChats));
-  }, [agents.length]);
+  }, []);
+
+  // Calculate visible chats based on container width (agents.1.7)
+  useEffect(() => {
+    const rafId = requestAnimationFrame(calculateVisibleChats);
+    window.addEventListener('resize', calculateVisibleChats);
+    return () => {
+      cancelAnimationFrame(rafId);
+      window.removeEventListener('resize', calculateVisibleChats);
+    };
+  }, [calculateVisibleChats]);
+
+  useEffect(() => {
+    calculateVisibleChats();
+  }, [agents.length, calculateVisibleChats]);
+
+  useEffect(() => {
+    if (startupLoaderVisible) return;
+    requestAnimationFrame(calculateVisibleChats);
+  }, [startupLoaderVisible, calculateVisibleChats]);
 
   // Track per-agent loading state for global startup loader (agents.13.2, agents.13.10)
   const handleLoadingChange = useCallback((agentId: string, loading: boolean) => {
