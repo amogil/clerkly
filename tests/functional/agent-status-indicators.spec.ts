@@ -7,31 +7,47 @@
 
 import { test, expect, ElectronApplication, Page } from '@playwright/test';
 import {
+  getFreePort,
+  launchElectron,
   completeOAuthFlow,
   createMockOAuthServer,
   activeChat,
-  launchElectronWithMockOAuth,
 } from './helpers/electron';
 import type { MockOAuthServer } from './helpers/mock-oauth-server';
+import { MockLLMServer } from './helpers/mock-llm-server';
 
 let electronApp: ElectronApplication;
 let window: Page;
 let mockServer: MockOAuthServer;
+let mockLLMServer: MockLLMServer;
 
 test.beforeAll(async () => {
   mockServer = await createMockOAuthServer();
+  const llmPort = await getFreePort();
+  mockLLMServer = new MockLLMServer({ port: llmPort });
+  await mockLLMServer.start();
 });
 
 test.afterAll(async () => {
   if (mockServer) {
     await mockServer.stop();
   }
+  if (mockLLMServer) {
+    await mockLLMServer.stop();
+  }
 });
 
 test.beforeEach(async () => {
-  const context = await launchElectronWithMockOAuth(mockServer, {
+  mockLLMServer.setSuccess(true);
+  mockLLMServer.setDelay(0);
+  mockLLMServer.clearRequestLogs();
+
+  const context = await launchElectron(undefined, {
+    CLERKLY_GOOGLE_API_URL: mockServer.getBaseUrl(),
     CLERKLY_OAUTH_CLIENT_ID: 'test-client-id',
     CLERKLY_OAUTH_CLIENT_SECRET: 'test-client-secret',
+    CLERKLY_OPENAI_API_URL: `${mockLLMServer.getBaseUrl()}/v1/chat/completions`,
+    CLERKLY_OPENAI_API_KEY: 'mock-key-for-testing',
   });
   electronApp = context.app;
   window = context.window;
@@ -80,6 +96,9 @@ test.describe('Agent Status Indicators', () => {
      Assertions: Spinning ring animation is visible
      Requirements: agents.6.2, agents.6.6 */
   test('should animate in-progress status', async () => {
+    // Keep model response slow so in-progress state remains visible for assertion.
+    mockLLMServer.setDelay(2500);
+
     // Send message to create in-progress status
     const messageInput = activeChat(window).textarea;
     await messageInput.fill('Test message');
@@ -93,11 +112,11 @@ test.describe('Agent Status Indicators', () => {
     // Look for spinning ring element inside avatar
     const spinningRing = agentAvatarIcon.locator('.animate-spin');
 
-    // If in-progress status, should have spinning element
-    const classes = await agentAvatarIcon.getAttribute('class');
-    if (classes?.includes('bg-blue-500')) {
-      await expect(spinningRing).toBeVisible();
-    }
+    // In delayed-response window status should be in-progress (blue) with visible spinner.
+    await expect
+      .poll(async () => await agentAvatarIcon.getAttribute('class'), { timeout: 4000 })
+      .toContain('bg-blue-500');
+    await expect(spinningRing).toBeVisible();
   });
 
   /* Preconditions: Agent with awaiting-response status exists
