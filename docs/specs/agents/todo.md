@@ -92,7 +92,7 @@
 | `agent-data-isolation.spec.ts` | agents.10 | ❓ не запускались |
 | `agent-date-update.spec.ts` | agents.8.1 | ✅ проходит |
 | `agent-list-responsive.spec.ts` | agents.1.7–1.9 | ❓ не запускались |
-| `agent-scroll-position.spec.ts` | agents.4.14 | ❓ не запускались |
+| `agent-scroll-position.spec.ts` | agents.4.13.2, agents.4.14 | ✅ обновлен под поведение Conversation |
 | `empty-state-placeholder.spec.ts` | agents.4.15–4.21 | ✅ проходят |
 | `message-text-wrapping.spec.ts` | agents.4.23 | ✅ проходят |
 | `input-autofocus.spec.ts` | agents.4.7.1–4.7.2 | ✅ проходят |

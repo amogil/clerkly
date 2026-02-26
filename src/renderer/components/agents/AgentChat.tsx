@@ -61,7 +61,7 @@ interface AgentChatInnerProps {
 
 /**
  * Inner component — lives inside <Conversation> so it can access useStickToBottomContext.
- * Calls scrollToBottom() on send to reset scroll position (agents.4.14.5).
+ * Does not force manual scroll on send; Conversation controls autoscroll behavior (agents.4.13.2).
  */
 function AgentChatInner({
   agent,

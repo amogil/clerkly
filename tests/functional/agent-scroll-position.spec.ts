@@ -256,9 +256,9 @@ test.describe('Agent Scroll Position', () => {
 
   /* Preconditions: Agent with scrollable content
      Action: Scroll up, send new message
-     Assertions: Scroll position resets to bottom (autoscroll)
-     Requirements: agents.4.14.5 */
-  test('should reset scroll position when user sends message', async () => {
+     Assertions: Scroll position is preserved, scroll-to-bottom button stays visible
+     Requirements: agents.4.13.2 */
+  test('should NOT force autoscroll when user sends message while scrolled up', async () => {
     const messageInput = activeChat(window).textarea;
     const messagesArea = activeChat(window).messagesArea;
     const scrollToBottomBtn = activeChat(window).scrollToBottomBtn;
@@ -278,15 +278,16 @@ test.describe('Agent Scroll Position', () => {
     // Verify scrolled up — scroll-to-bottom button visible
     await expect(scrollToBottomBtn).toBeVisible({ timeout: 3000 });
 
-    // Send new message — should trigger autoscroll to bottom
+    // Send new message while scrolled up
     await messageInput.fill('New message after scroll');
     await messageInput.press('Enter');
 
     // Wait for message to appear
     await expect(activeChat(window).messages).toHaveCount(16, { timeout: 5000 });
 
-    // After sending, scroll-to-bottom button should disappear (back at bottom)
-    await expect(scrollToBottomBtn).not.toBeVisible({ timeout: 5000 });
+    // While scrolled up, Conversation should keep position and keep the button visible.
+    await expect(scrollToBottomBtn).toBeVisible({ timeout: 5000 });
+    await expect(activeChat(window).messages.last()).not.toBeInViewport({ timeout: 3000 });
   });
 
   /* Preconditions: Three agents with different scroll positions
