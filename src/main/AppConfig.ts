@@ -39,8 +39,8 @@ export class AppConfig {
   windowSettings: WindowSettings = {
     width: 900,
     height: 700,
-    minWidth: 150,
-    minHeight: 150,
+    minWidth: 250,
+    minHeight: 250,
     titleBarStyle: 'hiddenInset',
     vibrancy: 'under-window',
   };

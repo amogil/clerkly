@@ -6,8 +6,8 @@ import { Logger } from './Logger';
 
 const DEFAULT_WINDOW_WIDTH = 900;
 const DEFAULT_WINDOW_HEIGHT = 700;
-const MIN_WINDOW_WIDTH = 150;
-const MIN_WINDOW_HEIGHT = 150;
+const MIN_WINDOW_WIDTH = 250;
+const MIN_WINDOW_HEIGHT = 250;
 
 // Requirements: clerkly.3.8 - Use centralized Logger instead of console.*
 /**
@@ -286,7 +286,7 @@ export class WindowStateManager {
 
     // Requirements: window-management.1.1, window-management.1.6, window-management.4.2, window-management.4.4
     // Window opens with size min(900, screenWidth) x min(700, screenHeight) on first launch,
-    // but is never allowed to be smaller than 150x150.
+    // but is never allowed to be smaller than 250x250.
     // This provides a focused interface for agent chats while allowing immediate resizing
     const desiredWidth = Math.min(DEFAULT_WINDOW_WIDTH, screenWidth);
     const desiredHeight = Math.min(DEFAULT_WINDOW_HEIGHT, screenHeight);
