@@ -140,4 +140,151 @@ describe('PromptInput', () => {
 
     expect(ref.current).toBeInstanceOf(HTMLTextAreaElement);
   });
+
+  /* Preconditions: PromptInput rendered with textarea
+     Action: enter multiline text
+     Assertions: textarea height is updated from scrollHeight
+     Requirements: agents.4.5 */
+  it('should auto-resize textarea on multiline input', () => {
+    const Wrapper = () => {
+      const [value, setValue] = React.useState('');
+      return (
+        <PromptInput onSubmit={jest.fn()}>
+          <PromptInputBody>
+            <PromptInputTextarea
+              data-testid="auto-expanding-textarea"
+              onChange={(event: React.ChangeEvent<HTMLTextAreaElement>) =>
+                setValue(event.target.value)
+              }
+              value={value}
+            />
+            <PromptInputSubmit />
+          </PromptInputBody>
+        </PromptInput>
+      );
+    };
+
+    render(<Wrapper />);
+    const textarea = screen.getByTestId('auto-expanding-textarea') as HTMLTextAreaElement;
+    Object.defineProperty(textarea, 'scrollHeight', {
+      configurable: true,
+      value: 80,
+    });
+
+    fireEvent.change(textarea, { target: { value: 'Line 1\nLine 2' } });
+
+    expect(textarea.style.height).toBe('80px');
+    expect(textarea.style.overflowY).toBe('hidden');
+  });
+
+  /* Preconditions: PromptInput rendered with textarea max-height
+     Action: enter very long multiline text
+     Assertions: textarea caps height and enables internal scroll
+     Requirements: agents.4.5, agents.4.7 */
+  it('should cap textarea growth and enable scroll after max height', () => {
+    const Wrapper = () => {
+      const [value, setValue] = React.useState('');
+      return (
+        <PromptInput onSubmit={jest.fn()}>
+          <PromptInputBody>
+            <PromptInputTextarea
+              data-testid="auto-expanding-textarea"
+              onChange={(event: React.ChangeEvent<HTMLTextAreaElement>) =>
+                setValue(event.target.value)
+              }
+              value={value}
+            />
+            <PromptInputSubmit />
+          </PromptInputBody>
+        </PromptInput>
+      );
+    };
+
+    render(<Wrapper />);
+    const textarea = screen.getByTestId('auto-expanding-textarea') as HTMLTextAreaElement;
+    Object.defineProperty(textarea, 'scrollHeight', {
+      configurable: true,
+      value: 400,
+    });
+
+    fireEvent.change(textarea, { target: { value: Array(20).fill('Line').join('\n') } });
+
+    expect(textarea.style.height).toBe('160px');
+    expect(textarea.style.overflowY).toBe('auto');
+  });
+
+  /* Preconditions: PromptInput rendered with empty textarea
+     Action: focus textarea without typing
+     Assertions: textarea gets baseline non-collapsed height
+     Requirements: agents.4.5, agents.4.7.1 */
+  it('should keep baseline height on focus before first input', () => {
+    render(
+      <PromptInput onSubmit={jest.fn()}>
+        <PromptInputBody>
+          <PromptInputTextarea
+            data-testid="auto-expanding-textarea"
+            onChange={jest.fn()}
+            value=""
+          />
+          <PromptInputSubmit />
+        </PromptInputBody>
+      </PromptInput>
+    );
+
+    const textarea = screen.getByTestId('auto-expanding-textarea') as HTMLTextAreaElement;
+    Object.defineProperty(textarea, 'scrollHeight', {
+      configurable: true,
+      value: 0,
+    });
+
+    fireEvent.focus(textarea);
+
+    expect(Number.parseFloat(textarea.style.height)).toBeGreaterThanOrEqual(20);
+    expect(textarea.style.overflowY).toBe('hidden');
+  });
+
+  /* Preconditions: PromptInput rendered with textarea and long pasted text
+     Action: paste multiline content into textarea
+     Assertions: textarea resizes immediately after paste
+     Requirements: agents.4.5, agents.4.7 */
+  it('should resize on paste without agent switch', () => {
+    const Wrapper = () => {
+      const [value, setValue] = React.useState('');
+      return (
+        <PromptInput onSubmit={jest.fn()}>
+          <PromptInputBody>
+            <PromptInputTextarea
+              data-testid="auto-expanding-textarea"
+              onChange={(event: React.ChangeEvent<HTMLTextAreaElement>) =>
+                setValue(event.target.value)
+              }
+              value={value}
+            />
+            <PromptInputSubmit />
+          </PromptInputBody>
+        </PromptInput>
+      );
+    };
+
+    render(<Wrapper />);
+    const textarea = screen.getByTestId('auto-expanding-textarea') as HTMLTextAreaElement;
+    Object.defineProperty(textarea, 'scrollHeight', {
+      configurable: true,
+      value: 400,
+    });
+
+    const rafSpy = jest
+      .spyOn(window, 'requestAnimationFrame')
+      .mockImplementation((callback: FrameRequestCallback): number => {
+        callback(0);
+        return 0;
+      });
+
+    fireEvent.paste(textarea, { target: { value: Array(20).fill('Line').join('\n') } });
+
+    expect(textarea.style.height).toBe('160px');
+    expect(textarea.style.overflowY).toBe('auto');
+
+    rafSpy.mockRestore();
+  });
 });

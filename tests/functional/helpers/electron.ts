@@ -26,6 +26,10 @@ export function getFreePort(): Promise<number> {
   });
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 /**
  * Electron Test Helper
  *
@@ -277,7 +281,7 @@ export async function completeOAuthFlow(
   });
 
   // Wait for OAuth flow to initialize
-  await window.waitForTimeout(2000);
+  await sleep(2000);
 
   // Get PKCE state from OAuthClientManager
   const pkceState = await electronApp.evaluate(async () => {
@@ -301,7 +305,7 @@ export async function completeOAuthFlow(
   }, deepLinkUrl);
 
   // Wait for profile to be fetched and saved
-  await window.waitForTimeout(5000);
+  await sleep(5000);
 
   // Check if still on login screen, reload if needed
   const loginButton = window.locator('button:has-text("Continue with Google")');
@@ -312,7 +316,7 @@ export async function completeOAuthFlow(
     console.log(`[TEST] Still on login screen, reloading (attempt ${retries + 1}/5)`);
     await window.reload();
     await window.waitForLoadState('domcontentloaded');
-    await window.waitForTimeout(3000);
+    await sleep(3000);
     hasLoginScreen = await loginButton.isVisible().catch(() => false);
     retries++;
   }
@@ -350,7 +354,7 @@ export async function completeOAuthFlowWithError(
   });
 
   // Wait for OAuth flow to initialize
-  await window.waitForTimeout(2000);
+  await sleep(2000);
 
   // Get PKCE state from OAuthClientManager
   const pkceState = await electronApp.evaluate(async () => {
@@ -374,7 +378,7 @@ export async function completeOAuthFlowWithError(
   }, deepLinkUrl);
 
   // Wait for error to be processed and error screen to appear
-  await window.waitForTimeout(5000);
+  await sleep(5000);
 
   // Check if error screen is displayed
   const errorMessage = window.locator('text=/unable to load your google profile/i');
@@ -384,7 +388,7 @@ export async function completeOAuthFlowWithError(
     // Try reloading to see if error screen appears
     await window.reload();
     await window.waitForLoadState('domcontentloaded');
-    await window.waitForTimeout(2000);
+    await sleep(2000);
 
     const hasErrorScreenAfterReload = await errorMessage.isVisible().catch(() => false);
     if (!hasErrorScreenAfterReload) {

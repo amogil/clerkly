@@ -3,7 +3,7 @@ import { createMockOAuthServer, activeChat, launchElectronWithMockOAuth } from '
 import type { MockOAuthServer } from './helpers/mock-oauth-server';
 import { completeOAuthFlow } from './helpers/electron';
 
-// Requirements: agents.4.3, agents.4.4, agents.4.5, agents.4.6, agents.4.7
+// Requirements: agents.4.3, agents.4.4, agents.4.5, agents.4.7
 
 let mockServer: MockOAuthServer;
 
@@ -18,6 +18,7 @@ test.afterAll(async () => {
 });
 
 test.describe('AutoExpandingTextarea - Functional Tests', () => {
+  const PROMPT_TEXTAREA_MAX_HEIGHT_PX = 160;
   let electronApp: ElectronApplication;
   let window: Page;
 
@@ -84,10 +85,11 @@ test.describe('AutoExpandingTextarea - Functional Tests', () => {
 
     // Add more lines
     await textarea.fill('Line 1\nLine 2\nLine 3\nLine 4\nLine 5');
-
-    // Wait for height to update
-    await window.waitForTimeout(100);
-
+    await expect
+      .poll(async () => {
+        return await textarea.evaluate((el: HTMLTextAreaElement) => el.offsetHeight);
+      })
+      .toBeGreaterThan(initialHeight);
     const expandedHeight = await textarea.evaluate((el: HTMLTextAreaElement) => {
       return el.offsetHeight;
     });
@@ -97,36 +99,22 @@ test.describe('AutoExpandingTextarea - Functional Tests', () => {
   });
 
   /* Preconditions: User is on agents page with textarea visible
-     Action: Type many lines to exceed 50% of chat area
-     Assertions: Textarea height is capped at 50% of chat area
-     Requirements: agents.4.6 */
-  test('should cap height at 50% of chat area', async () => {
+     Action: Type many lines to exceed textarea max height
+     Assertions: Textarea height is capped at component max height
+     Requirements: agents.4.5, agents.4.7 */
+  test('should cap height at PromptInput max height', async () => {
     const textarea = window.locator('[data-testid="auto-expanding-textarea"]');
-    const messagesArea = activeChat(window).messagesArea;
 
     await expect(textarea).toBeVisible();
-    await expect(messagesArea).toBeVisible();
-
-    // Get chat area height
-    const chatAreaHeight = await messagesArea.evaluate((el: HTMLElement) => {
-      return el.offsetHeight;
-    });
-
-    const maxAllowedHeight = chatAreaHeight * 0.5;
 
     // Fill with many lines to exceed max height
     const manyLines = Array(50).fill('Line').join('\n');
     await textarea.fill(manyLines);
-
-    // Wait for height to update
-    await window.waitForTimeout(200);
-
-    const textareaHeight = await textarea.evaluate((el: HTMLTextAreaElement) => {
-      return el.offsetHeight;
-    });
-
-    // Height should not exceed 50% of chat area
-    expect(textareaHeight).toBeLessThanOrEqual(maxAllowedHeight + 5); // +5px tolerance
+    await expect
+      .poll(async () => {
+        return await textarea.evaluate((el: HTMLTextAreaElement) => el.offsetHeight);
+      })
+      .toBeLessThanOrEqual(PROMPT_TEXTAREA_MAX_HEIGHT_PX + 2);
   });
 
   /* Preconditions: User is on agents page with textarea visible
@@ -141,15 +129,11 @@ test.describe('AutoExpandingTextarea - Functional Tests', () => {
     const manyLines = Array(50).fill('Line').join('\n');
     await textarea.fill(manyLines);
 
-    // Wait for height to update
-    await window.waitForTimeout(200);
-
-    const overflowY = await textarea.evaluate((el: HTMLTextAreaElement) => {
-      return getComputedStyle(el).overflowY;
-    });
-
-    // Should have scrollbar
-    expect(overflowY).toBe('auto');
+    await expect
+      .poll(async () => {
+        return await textarea.evaluate((el: HTMLTextAreaElement) => getComputedStyle(el).overflowY);
+      })
+      .toBe('auto');
   });
 
   /* Preconditions: User is on agents page with textarea visible
@@ -163,15 +147,11 @@ test.describe('AutoExpandingTextarea - Functional Tests', () => {
     // Fill with short text
     await textarea.fill('Short text');
 
-    // Wait for height to update
-    await window.waitForTimeout(100);
-
-    const overflowY = await textarea.evaluate((el: HTMLTextAreaElement) => {
-      return getComputedStyle(el).overflowY;
-    });
-
-    // Should not have scrollbar
-    expect(overflowY).toBe('hidden');
+    await expect
+      .poll(async () => {
+        return await textarea.evaluate((el: HTMLTextAreaElement) => getComputedStyle(el).overflowY);
+      })
+      .toBe('hidden');
   });
 
   /* Preconditions: User is on agents page with textarea visible
@@ -204,26 +184,16 @@ test.describe('AutoExpandingTextarea - Functional Tests', () => {
     const textarea = window.locator('[data-testid="auto-expanding-textarea"]');
     await expect(textarea).toBeVisible();
 
-    // Type first line
-    await textarea.fill('Line 1');
-
-    // Press Shift+Enter to add new line
+    // Type first line and add newline without submit.
+    await textarea.type('Line 1');
     await textarea.press('Shift+Enter');
-
-    // Type second line by appending to existing value
-    await textarea.evaluate((el: HTMLTextAreaElement) => {
-      el.value += 'Line 2';
-      el.dispatchEvent(new Event('input', { bubbles: true }));
-    });
-
-    // Wait a bit
-    await window.waitForTimeout(200);
+    await textarea.type('Line 2');
 
     // Value should contain both lines
     const value = await textarea.inputValue();
     expect(value).toContain('Line 1');
     expect(value).toContain('Line 2');
-    expect(value).toMatch(/Line 1\s+Line 2/);
+    expect(value).toBe('Line 1\nLine 2');
   });
 
   /* Preconditions: User is on agents page with textarea visible
@@ -236,15 +206,17 @@ test.describe('AutoExpandingTextarea - Functional Tests', () => {
 
     // Fill with multiple lines
     await textarea.fill('Line 1\nLine 2\nLine 3\nLine 4\nLine 5');
-    await window.waitForTimeout(100);
-
+    await expect
+      .poll(async () => {
+        return await textarea.evaluate((el: HTMLTextAreaElement) => el.offsetHeight);
+      })
+      .toBeGreaterThan(0);
     const expandedHeight = await textarea.evaluate((el: HTMLTextAreaElement) => {
       return el.offsetHeight;
     });
 
     // Clear textarea
     await textarea.fill('');
-    await window.waitForTimeout(100);
 
     const clearedHeight = await textarea.evaluate((el: HTMLTextAreaElement) => {
       return el.offsetHeight;
@@ -255,7 +227,6 @@ test.describe('AutoExpandingTextarea - Functional Tests', () => {
 
     // Type short text again
     await textarea.fill('Short');
-    await window.waitForTimeout(100);
 
     const shortHeight = await textarea.evaluate((el: HTMLTextAreaElement) => {
       return el.offsetHeight;
@@ -276,7 +247,6 @@ test.describe('AutoExpandingTextarea - Functional Tests', () => {
     // Rapidly change content
     for (let i = 0; i < 5; i++) {
       await textarea.fill(`Line ${i}\n`.repeat(i + 1));
-      await window.waitForTimeout(50);
     }
 
     // Should still be visible and functional

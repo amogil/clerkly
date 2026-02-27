@@ -96,11 +96,13 @@ jest.mock('../../../../src/renderer/components/ai-elements/prompt-input', () => 
   const PromptInputTextarea = React.forwardRef<
     HTMLTextAreaElement,
     {
+      className?: string;
       value: string;
       onChange: (event: React.ChangeEvent<HTMLTextAreaElement>) => void;
     }
-  >(({ value, onChange }, ref) => (
+  >(({ className, value, onChange }, ref) => (
     <textarea
+      className={className}
       ref={ref}
       data-testid="prompt-input-field"
       name="prompt-input-field"
@@ -409,25 +411,13 @@ describe('AgentChat — PromptInput rendered', () => {
 describe('AgentChat — textarea auto-resize on activation', () => {
   /* Preconditions: textarea rendered in inactive chat
      Action: chat becomes active without input change
-     Assertions: textarea height recalculated from content
+     Assertions: AgentChat does not inject inline sizing and preserves default PromptInput behavior
      Requirements: agents.4.5, agents.4.6, agents.4.7 */
-  it('should recalculate textarea height when chat becomes active', () => {
+  it('should keep default PromptInput sizing behavior when chat becomes active', () => {
     const { rerender } = render(<AgentChat {...defaultProps} isActive={false} />);
-    const textarea = screen.getByTestId('prompt-input-field') as HTMLTextAreaElement;
-    const chatArea = screen.getByTestId('agent-prompt-input').parentElement as HTMLDivElement;
-
-    Object.defineProperty(chatArea, 'offsetHeight', {
-      configurable: true,
-      value: 400,
-    });
-    Object.defineProperty(textarea, 'scrollHeight', {
-      configurable: true,
-      value: 120,
-    });
-
     rerender(<AgentChat {...defaultProps} isActive={true} />);
-
-    expect(textarea.style.height).toBe('120px');
-    expect(textarea.style.overflowY).toBe('hidden');
+    const textarea = screen.getByTestId('prompt-input-field') as HTMLTextAreaElement;
+    expect(textarea.style.height).toBe('');
+    expect(textarea.style.overflowY).toBe('');
   });
 });

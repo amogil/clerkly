@@ -2,22 +2,26 @@
 // Per-agent chat component — mounted at startup, stays mounted forever.
 // Scroll position is managed by Conversation (use-stick-to-bottom) — preserved automatically.
 
-import React, { useRef, useEffect, useCallback, useLayoutEffect } from 'react';
+import React, { useRef, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { useAgentChat } from '../../hooks/useAgentChat';
 import { AgentMessage } from './AgentMessage';
 import { AgentWelcome } from './AgentWelcome';
 import { RateLimitBanner } from './RateLimitBanner';
-import { Conversation, ConversationContent } from '../ai-elements/conversation';
+import {
+  Conversation,
+  ConversationContent,
+  ConversationScrollButton,
+} from '../ai-elements/conversation';
 import {
   PromptInput,
   PromptInputBody,
   PromptInputFooter,
+  type PromptInputMessage,
   PromptInputSubmit,
   PromptInputTextarea,
 } from '../ai-elements/prompt-input';
-import { type StickToBottomContext, useStickToBottomContext } from 'use-stick-to-bottom';
-import { ArrowDownIcon } from 'lucide-react';
+import { type StickToBottomContext } from 'use-stick-to-bottom';
 import type { AgentSnapshot } from '../../types/agent';
 
 interface RateLimitState {
@@ -35,33 +39,12 @@ interface AgentChatProps {
   onNavigate?: (screen: string) => void;
 }
 
-/**
- * Scroll-to-bottom button with data-testid for functional tests.
- * Uses useStickToBottomContext from use-stick-to-bottom (same as ConversationScrollButton).
- * Requirements: agents.4.13
- */
-function ScrollToBottomButton() {
-  const { isAtBottom, scrollToBottom } = useStickToBottomContext();
-  if (isAtBottom) return null;
-  return (
-    <button
-      data-testid="scroll-to-bottom"
-      onClick={() => scrollToBottom()}
-      type="button"
-      className="absolute bottom-4 left-[50%] translate-x-[-50%] rounded-full border bg-background shadow-sm hover:bg-muted size-8 flex items-center justify-center"
-    >
-      <ArrowDownIcon className="size-4" />
-    </button>
-  );
-}
-
 interface AgentChatInnerProps {
   agent: AgentSnapshot;
-  isActive: boolean;
   rateLimitBanner: RateLimitState | null;
   onRateLimitDismiss: () => void;
   rawMessages: ReturnType<typeof useAgentChat>['rawMessages'];
-  sendMessage: ReturnType<typeof useAgentChat>['sendMessage'];
+  onPromptClick: (prompt: string) => Promise<void>;
   onNavigate?: (screen: string) => void;
 }
 
@@ -71,92 +54,12 @@ interface AgentChatInnerProps {
  */
 function AgentChatInner({
   agent,
-  isActive,
   rateLimitBanner,
   onRateLimitDismiss,
   rawMessages,
-  sendMessage,
+  onPromptClick,
   onNavigate,
 }: AgentChatInnerProps) {
-  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const chatAreaRef = useRef<HTMLDivElement>(null);
-  const [taskInput, setTaskInput] = React.useState('');
-
-  // Autofocus textarea when this chat becomes active (agents.4.7.1)
-  useEffect(() => {
-    if (!isActive) return;
-    const timeouts = [0, 100, 300, 600].map((delay) =>
-      window.setTimeout(() => textareaRef.current?.focus(), delay)
-    );
-    return () => {
-      timeouts.forEach((timeoutId) => window.clearTimeout(timeoutId));
-    };
-  }, [isActive]);
-
-  // Requirements: agents.4.5, agents.4.6, agents.4.7
-  // Keep PromptInput textarea auto-resize behavior capped at 50% of chat area.
-  const recalculateTextareaHeight = useCallback(() => {
-    const textarea = textareaRef.current;
-    const chatArea = chatAreaRef.current;
-    if (!textarea) return;
-
-    textarea.style.height = 'auto';
-    const computedStyle = window.getComputedStyle(textarea);
-    const lineHeight = Number.parseFloat(computedStyle.lineHeight);
-    const paddingTop = Number.parseFloat(computedStyle.paddingTop) || 0;
-    const paddingBottom = Number.parseFloat(computedStyle.paddingBottom) || 0;
-    const borderTop = Number.parseFloat(computedStyle.borderTopWidth) || 0;
-    const borderBottom = Number.parseFloat(computedStyle.borderBottomWidth) || 0;
-    const minContentHeight = Number.isFinite(lineHeight) ? lineHeight : 20;
-    const minTextareaHeight = Math.ceil(
-      minContentHeight + paddingTop + paddingBottom + borderTop + borderBottom
-    );
-    const chatAreaHeight = chatArea?.offsetHeight ?? 0;
-    const maxHeight = chatAreaHeight > 0 ? chatAreaHeight * 0.5 : Number.POSITIVE_INFINITY;
-    const measuredScrollHeight = textarea.scrollHeight > 0 ? textarea.scrollHeight : minTextareaHeight;
-    const nextHeight = Math.max(minTextareaHeight, Math.min(measuredScrollHeight, maxHeight));
-    textarea.style.height = `${nextHeight}px`;
-    textarea.style.overflowY = measuredScrollHeight > maxHeight ? 'auto' : 'hidden';
-  }, []);
-
-  useLayoutEffect(() => {
-    recalculateTextareaHeight();
-  }, [isActive, taskInput, recalculateTextareaHeight]);
-
-  useEffect(() => {
-    if (!isActive) return;
-    const rafId = window.requestAnimationFrame(recalculateTextareaHeight);
-    const timeoutId = window.setTimeout(recalculateTextareaHeight, 120);
-    return () => {
-      window.cancelAnimationFrame(rafId);
-      window.clearTimeout(timeoutId);
-    };
-  }, [isActive, recalculateTextareaHeight]);
-
-  useEffect(() => {
-    if (!isActive || typeof window.ResizeObserver === 'undefined') return;
-    const textarea = textareaRef.current;
-    const chatArea = chatAreaRef.current;
-    if (!textarea || !chatArea) return;
-
-    const observer = new window.ResizeObserver(() => {
-      recalculateTextareaHeight();
-    });
-    observer.observe(textarea);
-    observer.observe(chatArea);
-    return () => observer.disconnect();
-  }, [isActive, recalculateTextareaHeight]);
-
-  const handleSend = useCallback(
-    async (text?: string) => {
-      const messageText = text || taskInput;
-      if (!messageText.trim()) return;
-      const success = await sendMessage(messageText);
-      if (success) setTaskInput('');
-    },
-    [taskInput, sendMessage]
-  );
-
   return (
     <>
       <ConversationContent
@@ -164,7 +67,7 @@ function AgentChatInner({
         className="flex flex-col gap-4 p-6 justify-end min-h-full"
       >
         {rawMessages.length === 0 ? (
-          <AgentWelcome onPromptClick={(p) => handleSend(p)} />
+          <AgentWelcome onPromptClick={onPromptClick} />
         ) : (
           rawMessages.map((message, index) => {
             const showAvatar =
@@ -198,29 +101,6 @@ function AgentChatInner({
           onDismiss={onRateLimitDismiss}
         />
       )}
-
-      <ScrollToBottomButton />
-
-      <div ref={chatAreaRef} className="flex-shrink-0">
-        <PromptInput onSubmit={(message) => handleSend(message.text)}>
-          <PromptInputBody>
-            <PromptInputTextarea
-              ref={textareaRef}
-              data-testid="auto-expanding-textarea"
-              disabled={false}
-              onChange={(event) => setTaskInput(event.target.value)}
-              placeholder="Ask, reply, or give command..."
-              value={taskInput}
-            />
-            <PromptInputSubmit disabled={!taskInput.trim()} />
-          </PromptInputBody>
-          <PromptInputFooter>
-            <p className="px-0.5 text-xs text-muted-foreground">
-              Press Enter to send, Shift+Enter for new line
-            </p>
-          </PromptInputFooter>
-        </PromptInput>
-      </div>
     </>
   );
 }
@@ -240,9 +120,21 @@ export function AgentChat({
   onNavigate,
 }: AgentChatProps) {
   const { rawMessages, sendMessage, isLoading } = useAgentChat(agent.id);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const stickContextRef = useRef<StickToBottomContext | null>(null);
   const lastScrollTopRef = useRef<number | null>(null);
   const hasAutoScrolledRef = useRef(false);
+
+  // Autofocus textarea when this chat becomes active (agents.4.7.1)
+  useEffect(() => {
+    if (!isActive) return;
+    const timeouts = [0, 100, 300, 600].map((delay) =>
+      window.setTimeout(() => textareaRef.current?.focus(), delay)
+    );
+    return () => {
+      timeouts.forEach((timeoutId) => window.clearTimeout(timeoutId));
+    };
+  }, [isActive]);
 
   // Notify parent when loading state changes (agents.13.2, agents.13.10)
   useEffect(() => {
@@ -286,6 +178,22 @@ export function AgentChat({
     };
   }, [isActive, rawMessages.length]);
 
+  const handleSubmit = useCallback(
+    async (message: PromptInputMessage) => {
+      const messageText = message.text?.trim();
+      if (!messageText) return;
+      await sendMessage(messageText);
+    },
+    [sendMessage]
+  );
+
+  const handlePromptClick = useCallback(
+    async (prompt: string) => {
+      await sendMessage(prompt);
+    },
+    [sendMessage]
+  );
+
   return (
     // Hidden via CSS — NOT unmounted — absolute+opacity-0 keeps scrollTop intact (agents.13.5, agents.4.14)
     <div
@@ -295,14 +203,31 @@ export function AgentChat({
       <Conversation className="flex-1 min-h-0" contextRef={stickContextRef}>
         <AgentChatInner
           agent={agent}
-          isActive={isActive}
           rateLimitBanner={rateLimitBanner}
           onRateLimitDismiss={onRateLimitDismiss}
           rawMessages={rawMessages}
-          sendMessage={sendMessage}
+          onPromptClick={handlePromptClick}
           onNavigate={onNavigate}
         />
+        <ConversationScrollButton data-testid="scroll-to-bottom" />
       </Conversation>
+      <div className="flex-shrink-0">
+        <PromptInput className="mt-2" onSubmit={handleSubmit}>
+          <PromptInputBody>
+            <PromptInputTextarea
+              ref={textareaRef}
+              data-testid="auto-expanding-textarea"
+              placeholder="Ask, reply, or give command..."
+            />
+            <PromptInputSubmit />
+          </PromptInputBody>
+          <PromptInputFooter>
+            <p className="px-0.5 text-xs text-muted-foreground">
+              Press Enter to send, Shift+Enter for new line
+            </p>
+          </PromptInputFooter>
+        </PromptInput>
+      </div>
     </div>
   );
 }

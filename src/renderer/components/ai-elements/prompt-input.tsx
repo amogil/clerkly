@@ -41,8 +41,10 @@ export function PromptInput({ className, onSubmit, children, ...props }: PromptI
     (event: React.FormEvent<HTMLFormElement>) => {
       event.preventDefault();
       onSubmit?.({ text }, event);
+      event.currentTarget.reset();
+      setText('');
     },
-    [onSubmit, text]
+    [onSubmit, setText, text]
   );
 
   const submitFromTextarea = React.useCallback(() => {
@@ -76,10 +78,56 @@ export function PromptInputFooter({ className, ...props }: PromptInputFooterProp
 }
 
 export type PromptInputTextareaProps = React.ComponentProps<typeof Textarea>;
+const DEFAULT_PROMPT_TEXTAREA_MAX_HEIGHT_PX = 160;
 
 export const PromptInputTextarea = React.forwardRef<HTMLTextAreaElement, PromptInputTextareaProps>(
-  ({ className, value, onChange, onKeyDown, ...props }, ref) => {
-    const { setText, submitFromTextarea } = usePromptInputContext();
+  ({ className, style, value, onChange, onFocus, onInput, onPaste, onKeyDown, ...props }, ref) => {
+    const { text, setText, submitFromTextarea } = usePromptInputContext();
+    const textareaRef = React.useRef<HTMLTextAreaElement | null>(null);
+    const resolvedMaxHeight = React.useMemo(() => {
+      const maxHeight = style?.maxHeight;
+      if (typeof maxHeight === 'number') return maxHeight;
+      if (typeof maxHeight === 'string' && maxHeight.endsWith('px')) {
+        const parsed = Number.parseFloat(maxHeight);
+        if (Number.isFinite(parsed) && parsed > 0) return parsed;
+      }
+      return DEFAULT_PROMPT_TEXTAREA_MAX_HEIGHT_PX;
+    }, [style?.maxHeight]);
+
+    const setRefs = React.useCallback(
+      (node: HTMLTextAreaElement | null) => {
+        textareaRef.current = node;
+        if (typeof ref === 'function') {
+          ref(node);
+        } else if (ref) {
+          ref.current = node;
+        }
+      },
+      [ref]
+    );
+
+    const resizeTextarea = React.useCallback(() => {
+      const textarea = textareaRef.current;
+      if (!textarea) return;
+
+      const computedStyle = window.getComputedStyle(textarea);
+      const lineHeight = Number.parseFloat(computedStyle.lineHeight);
+      const paddingTop = Number.parseFloat(computedStyle.paddingTop) || 0;
+      const paddingBottom = Number.parseFloat(computedStyle.paddingBottom) || 0;
+      const borderTop = Number.parseFloat(computedStyle.borderTopWidth) || 0;
+      const borderBottom = Number.parseFloat(computedStyle.borderBottomWidth) || 0;
+      const singleLineHeight = Number.isFinite(lineHeight) && lineHeight > 0 ? lineHeight : 20;
+      const minHeight = Math.ceil(
+        singleLineHeight + paddingTop + paddingBottom + borderTop + borderBottom
+      );
+
+      textarea.style.height = 'auto';
+      textarea.style.minHeight = `${minHeight}px`;
+      const measuredHeight = textarea.scrollHeight > 0 ? textarea.scrollHeight : minHeight;
+      const nextHeight = Math.min(Math.max(measuredHeight, minHeight), resolvedMaxHeight);
+      textarea.style.height = `${nextHeight}px`;
+      textarea.style.overflowY = measuredHeight > resolvedMaxHeight ? 'auto' : 'hidden';
+    }, [resolvedMaxHeight]);
 
     React.useEffect(() => {
       if (typeof value === 'string') {
@@ -87,12 +135,43 @@ export const PromptInputTextarea = React.forwardRef<HTMLTextAreaElement, PromptI
       }
     }, [setText, value]);
 
+    React.useLayoutEffect(() => {
+      resizeTextarea();
+    }, [resizeTextarea, text, value]);
+
     const handleChange = React.useCallback(
       (event: React.ChangeEvent<HTMLTextAreaElement>) => {
         setText(event.target.value);
         onChange?.(event);
+        resizeTextarea();
       },
-      [onChange, setText]
+      [onChange, resizeTextarea, setText]
+    );
+
+    const handleFocus = React.useCallback(
+      (event: React.FocusEvent<HTMLTextAreaElement>) => {
+        resizeTextarea();
+        onFocus?.(event);
+      },
+      [onFocus, resizeTextarea]
+    );
+
+    const handleInput = React.useCallback(
+      (event: React.InputEvent<HTMLTextAreaElement>) => {
+        resizeTextarea();
+        onInput?.(event);
+      },
+      [onInput, resizeTextarea]
+    );
+
+    const handlePaste = React.useCallback(
+      (event: React.ClipboardEvent<HTMLTextAreaElement>) => {
+        onPaste?.(event);
+        window.requestAnimationFrame(() => {
+          resizeTextarea();
+        });
+      },
+      [onPaste, resizeTextarea]
     );
 
     const handleKeyDown = React.useCallback(
@@ -109,11 +188,21 @@ export const PromptInputTextarea = React.forwardRef<HTMLTextAreaElement, PromptI
 
     return (
       <Textarea
-        ref={ref}
+        ref={setRefs}
         className={cn('min-h-0 flex-1 text-sm', className)}
         onChange={handleChange}
+        onFocus={handleFocus}
+        onInput={handleInput}
         onKeyDown={handleKeyDown}
+        onPaste={handlePaste}
         rows={1}
+        style={{
+          ...style,
+          maxHeight:
+            style?.maxHeight === undefined
+              ? `${DEFAULT_PROMPT_TEXTAREA_MAX_HEIGHT_PX}px`
+              : style.maxHeight,
+        }}
         value={value}
         {...props}
       />
