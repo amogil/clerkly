@@ -50,7 +50,7 @@
 - [x] `tests/functional/oauth-profile-sync.spec.ts:186:7` — OAuth Profile Synchronous Fetch › should synchronously fetch profile during authorization (error)
 - [x] `tests/functional/oauth-profile-sync.spec.ts:416:7` — OAuth Profile Synchronous Fetch › should show LoginError when profile fetch fails
 - [x] `tests/functional/sign-out-flow.spec.ts:56:5` — should show login screen after sign out
-- [ ] `tests/functional/sign-out-flow.spec.ts:108:5` — should clear tokens after sign out
+- [x] `tests/functional/sign-out-flow.spec.ts:108:5` — should clear tokens after sign out
 - [ ] `tests/functional/sign-out-flow.spec.ts:155:5` — should handle sign out when revoke fails
 
 ## Мигающие функциональные тесты (flaky)
