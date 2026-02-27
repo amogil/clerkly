@@ -33,6 +33,7 @@ describe('MessagesRepository', () => {
         agent_id TEXT NOT NULL,
         kind TEXT NOT NULL,
         timestamp TEXT NOT NULL,
+        reply_to_message_id INTEGER,
         payload_json TEXT NOT NULL,
         hidden INTEGER NOT NULL DEFAULT 0
       );
@@ -61,7 +62,7 @@ describe('MessagesRepository', () => {
     });
 
     it('should throw Access denied for non-existent agent', () => {
-      expect(() => messagesRepo.create('nonexistent', 'user', '{}')).toThrow('Access denied');
+      expect(() => messagesRepo.create('nonexistent', 'user', '{}', null)).toThrow('Access denied');
     });
 
     it('should throw Access denied when creating message for other user agent', () => {
@@ -74,7 +75,7 @@ describe('MessagesRepository', () => {
           updatedAt: new Date().toISOString(),
         })
         .run();
-      expect(() => messagesRepo.create('other123', 'user', '{}')).toThrow('Access denied');
+      expect(() => messagesRepo.create('other123', 'user', '{}', null)).toThrow('Access denied');
     });
 
     it('should throw Access denied when updating message for other user agent', () => {
@@ -94,8 +95,8 @@ describe('MessagesRepository', () => {
   describe('create', () => {
     it('should auto-increment message id and store kind in column', () => {
       const agent = agentsRepo.create('Test');
-      const msg1 = messagesRepo.create(agent.agentId, 'user', '{}');
-      const msg2 = messagesRepo.create(agent.agentId, 'llm', '{}');
+      const msg1 = messagesRepo.create(agent.agentId, 'user', '{}', null);
+      const msg2 = messagesRepo.create(agent.agentId, 'llm', '{}', msg1.id);
       expect(msg2.id).toBe(msg1.id + 1);
       expect(msg1.kind).toBe('user');
       expect(msg2.kind).toBe('llm');
@@ -104,7 +105,7 @@ describe('MessagesRepository', () => {
     it('should set timestamp on message creation', () => {
       const agent = agentsRepo.create('Test');
       const before = new Date().toISOString();
-      const message = messagesRepo.create(agent.agentId, 'user', '{}');
+      const message = messagesRepo.create(agent.agentId, 'user', '{}', null);
       const after = new Date().toISOString();
       expect(message.timestamp >= before).toBe(true);
       expect(message.timestamp <= after).toBe(true);
@@ -115,7 +116,8 @@ describe('MessagesRepository', () => {
       const message = messagesRepo.create(
         agent.agentId,
         'error',
-        '{"data":{"error":{"message":"fail"}}}'
+        '{"data":{"error":{"message":"fail"}}}',
+        null
       );
       expect(message.kind).toBe('error');
     });
@@ -124,9 +126,9 @@ describe('MessagesRepository', () => {
   describe('listByAgent', () => {
     it('should list messages for owned agent with kind', () => {
       const agent = agentsRepo.create('Test');
-      messagesRepo.create(agent.agentId, 'user', '{}');
-      messagesRepo.create(agent.agentId, 'llm', '{}');
-      messagesRepo.create(agent.agentId, 'user', '{}');
+      const first = messagesRepo.create(agent.agentId, 'user', '{}', null);
+      const second = messagesRepo.create(agent.agentId, 'llm', '{}', first.id);
+      messagesRepo.create(agent.agentId, 'user', '{}', second.id);
       const msgs = messagesRepo.listByAgent(agent.agentId);
       expect(msgs).toHaveLength(3);
       expect(msgs[0].kind).toBe('user');
@@ -135,9 +137,9 @@ describe('MessagesRepository', () => {
 
     it('should return messages sorted by id ASC', () => {
       const agent = agentsRepo.create('Test');
-      const msg1 = messagesRepo.create(agent.agentId, 'user', '{}');
-      const msg2 = messagesRepo.create(agent.agentId, 'llm', '{}');
-      const msg3 = messagesRepo.create(agent.agentId, 'user', '{}');
+      const msg1 = messagesRepo.create(agent.agentId, 'user', '{}', null);
+      const msg2 = messagesRepo.create(agent.agentId, 'llm', '{}', msg1.id);
+      const msg3 = messagesRepo.create(agent.agentId, 'user', '{}', msg2.id);
       const msgs = messagesRepo.listByAgent(agent.agentId);
       expect(msgs[0].id).toBe(msg1.id);
       expect(msgs[1].id).toBe(msg2.id);
@@ -155,8 +157,8 @@ describe('MessagesRepository', () => {
        Requirements: llm-integration.3.8, llm-integration.8.5 */
     it('should exclude hidden messages by default', () => {
       const agent = agentsRepo.create('Test');
-      const visible = messagesRepo.create(agent.agentId, 'user', '{}');
-      const hidden = messagesRepo.create(agent.agentId, 'llm', '{}');
+      const visible = messagesRepo.create(agent.agentId, 'user', '{}', null);
+      const hidden = messagesRepo.create(agent.agentId, 'llm', '{}', visible.id);
       messagesRepo.setHidden(hidden.id, agent.agentId);
 
       const msgs = messagesRepo.listByAgent(agent.agentId);
@@ -170,8 +172,8 @@ describe('MessagesRepository', () => {
        Requirements: llm-integration.3.8, llm-integration.8.5 */
     it('should include hidden messages when includeHidden=true', () => {
       const agent = agentsRepo.create('Test');
-      messagesRepo.create(agent.agentId, 'user', '{}');
-      const hidden = messagesRepo.create(agent.agentId, 'llm', '{}');
+      const first = messagesRepo.create(agent.agentId, 'user', '{}', null);
+      const hidden = messagesRepo.create(agent.agentId, 'llm', '{}', first.id);
       messagesRepo.setHidden(hidden.id, agent.agentId);
 
       const msgs = messagesRepo.listByAgent(agent.agentId, true);
@@ -182,7 +184,7 @@ describe('MessagesRepository', () => {
   describe('update', () => {
     it('should update message payload', () => {
       const agent = agentsRepo.create('Test');
-      const message = messagesRepo.create(agent.agentId, 'user', '{}');
+      const message = messagesRepo.create(agent.agentId, 'user', '{}', null);
       messagesRepo.update(message.id, agent.agentId, '{"content":"Updated"}');
       const msgs = messagesRepo.listByAgent(agent.agentId);
       expect(msgs[0].payloadJson).toBe('{"content":"Updated"}');
@@ -191,7 +193,7 @@ describe('MessagesRepository', () => {
     it('should not update message with wrong agentId', () => {
       const agent1 = agentsRepo.create('Agent 1');
       const agent2 = agentsRepo.create('Agent 2');
-      const message = messagesRepo.create(agent1.agentId, 'user', '{"original":true}');
+      const message = messagesRepo.create(agent1.agentId, 'user', '{"original":true}', null);
       messagesRepo.update(message.id, agent2.agentId, '{"hacked":true}');
       const msgs = messagesRepo.listByAgent(agent1.agentId);
       expect(msgs[0].payloadJson).toBe('{"original":true}');
@@ -201,11 +203,11 @@ describe('MessagesRepository', () => {
   describe('getLastByAgent', () => {
     it('should return last message by timestamp', async () => {
       const agent = agentsRepo.create('Test');
-      messagesRepo.create(agent.agentId, 'user', '{"text":"First"}');
+      const first = messagesRepo.create(agent.agentId, 'user', '{"text":"First"}', null);
       await new Promise((resolve) => setTimeout(resolve, 10));
-      messagesRepo.create(agent.agentId, 'llm', '{"text":"Second"}');
+      messagesRepo.create(agent.agentId, 'llm', '{"text":"Second"}', first.id);
       await new Promise((resolve) => setTimeout(resolve, 10));
-      const msg3 = messagesRepo.create(agent.agentId, 'user', '{"text":"Third"}');
+      const msg3 = messagesRepo.create(agent.agentId, 'user', '{"text":"Third"}', first.id);
       const lastMessage = messagesRepo.getLastByAgent(agent.agentId);
       expect(lastMessage).not.toBeNull();
       expect(lastMessage!.id).toBe(msg3.id);
@@ -237,7 +239,7 @@ describe('MessagesRepository', () => {
 
     it('should return last message for archived agent', () => {
       const agent = agentsRepo.create('Test');
-      const msg = messagesRepo.create(agent.agentId, 'user', '{"text":"Message"}');
+      const msg = messagesRepo.create(agent.agentId, 'user', '{"text":"Message"}', null);
       agentsRepo.archive(agent.agentId);
       const lastMessage = messagesRepo.getLastByAgent(agent.agentId);
       expect(lastMessage).not.toBeNull();
@@ -246,7 +248,7 @@ describe('MessagesRepository', () => {
 
     it('should return single message when only one exists', () => {
       const agent = agentsRepo.create('Test');
-      const msg = messagesRepo.create(agent.agentId, 'user', '{"text":"Only"}');
+      const msg = messagesRepo.create(agent.agentId, 'user', '{"text":"Only"}', null);
       const lastMessage = messagesRepo.getLastByAgent(agent.agentId);
       expect(lastMessage).not.toBeNull();
       expect(lastMessage!.id).toBe(msg.id);
@@ -255,12 +257,13 @@ describe('MessagesRepository', () => {
 
     it('should return error message when it is the last message', async () => {
       const agent = agentsRepo.create('Test');
-      messagesRepo.create(agent.agentId, 'user', '{"text":"Request"}');
+      const request = messagesRepo.create(agent.agentId, 'user', '{"text":"Request"}', null);
       await new Promise((resolve) => setTimeout(resolve, 10));
       const errorMsg = messagesRepo.create(
         agent.agentId,
         'error',
-        '{"data":{"error":{"message":"Something went wrong"}}}'
+        '{"data":{"error":{"message":"Something went wrong"}}}',
+        request.id
       );
       const lastMessage = messagesRepo.getLastByAgent(agent.agentId);
       expect(lastMessage).not.toBeNull();
@@ -282,7 +285,7 @@ describe('MessagesRepository', () => {
         noUserAgentsRepo
       );
       expect(() => noUserMessagesRepo.listByAgent('test')).toThrow(NO_USER_LOGGED_IN_ERROR);
-      expect(() => noUserMessagesRepo.create('test', 'user', '{}')).toThrow(
+      expect(() => noUserMessagesRepo.create('test', 'user', '{}', null)).toThrow(
         NO_USER_LOGGED_IN_ERROR
       );
       expect(() => noUserMessagesRepo.update(1, 'test', '{}')).toThrow(NO_USER_LOGGED_IN_ERROR);
@@ -302,17 +305,20 @@ describe('MessagesRepository', () => {
       const errMsg1 = repo.create(
         agent.agentId,
         'error',
-        JSON.stringify({ data: { error: { message: 'Fail 1' } } })
+        JSON.stringify({ data: { error: { message: 'Fail 1' } } }),
+        null
       );
       const errMsg2 = repo.create(
         agent.agentId,
         'error',
-        JSON.stringify({ data: { error: { message: 'Fail 2' } } })
+        JSON.stringify({ data: { error: { message: 'Fail 2' } } }),
+        errMsg1.id
       );
       const userMsg = repo.create(
         agent.agentId,
         'user',
-        JSON.stringify({ data: { text: 'Hello' } })
+        JSON.stringify({ data: { text: 'Hello' } }),
+        errMsg2.id
       );
       // Pre-hide errMsg2 so it should NOT appear in the returned array
       repo.setHidden(errMsg2.id, agent.agentId);
@@ -342,7 +348,7 @@ describe('MessagesRepository', () => {
       const agent = agentsRepo.create('Test');
       const repo = new MessagesRepository(db, () => 'user1', agentsRepo);
 
-      repo.create(agent.agentId, 'user', JSON.stringify({ data: { text: 'Hello' } }));
+      repo.create(agent.agentId, 'user', JSON.stringify({ data: { text: 'Hello' } }), null);
 
       const changed = repo.dismissErrorMessages(agent.agentId);
       expect(changed).toEqual([]);
@@ -356,7 +362,7 @@ describe('MessagesRepository', () => {
       const agent = agentsRepo.create('Test');
       const repo = new MessagesRepository(db, () => 'user1', agentsRepo);
 
-      const msg = repo.create(agent.agentId, 'llm', JSON.stringify({ data: {} }));
+      const msg = repo.create(agent.agentId, 'llm', JSON.stringify({ data: {} }), null);
       expect(msg.hidden).toBe(false);
 
       repo.setHidden(msg.id, agent.agentId);
@@ -380,9 +386,14 @@ describe('MessagesRepository', () => {
        Assertions: returns all 3 messages in ascending order, hasMore: false
        Requirements: agents.13.1, agents.13.4 */
     it('should return all messages when count <= limit', () => {
-      messagesRepo.create(agentId, 'user', JSON.stringify({ data: { text: 'a' } }));
-      messagesRepo.create(agentId, 'llm', JSON.stringify({ data: {} }));
-      messagesRepo.create(agentId, 'user', JSON.stringify({ data: { text: 'b' } }));
+      const first = messagesRepo.create(
+        agentId,
+        'user',
+        JSON.stringify({ data: { text: 'a' } }),
+        null
+      );
+      const second = messagesRepo.create(agentId, 'llm', JSON.stringify({ data: {} }), first.id);
+      messagesRepo.create(agentId, 'user', JSON.stringify({ data: { text: 'b' } }), second.id);
 
       const { messages: msgs, hasMore } = messagesRepo.listByAgentPaginated(agentId, 50);
       expect(msgs).toHaveLength(3);
@@ -397,7 +408,7 @@ describe('MessagesRepository', () => {
        Requirements: agents.13.1, agents.13.2 */
     it('should return last N messages and hasMore: true when more exist', () => {
       for (let i = 0; i < 5; i++) {
-        messagesRepo.create(agentId, 'user', JSON.stringify({ data: { text: `msg ${i}` } }));
+        messagesRepo.create(agentId, 'user', JSON.stringify({ data: { text: `msg ${i}` } }), null);
       }
 
       const { messages: msgs, hasMore } = messagesRepo.listByAgentPaginated(agentId, 3);
@@ -415,7 +426,8 @@ describe('MessagesRepository', () => {
         const msg = messagesRepo.create(
           agentId,
           'user',
-          JSON.stringify({ data: { text: `msg ${i}` } })
+          JSON.stringify({ data: { text: `msg ${i}` } }),
+          null
         );
         created.push(msg.id);
       }
@@ -434,11 +446,17 @@ describe('MessagesRepository', () => {
        Assertions: hidden messages are excluded
        Requirements: llm-integration.3.8, llm-integration.8.5 */
     it('should exclude hidden messages', () => {
-      messagesRepo.create(agentId, 'user', JSON.stringify({ data: { text: 'visible' } }));
+      const visible = messagesRepo.create(
+        agentId,
+        'user',
+        JSON.stringify({ data: { text: 'visible' } }),
+        null
+      );
       const hidden = messagesRepo.create(
         agentId,
         'error',
-        JSON.stringify({ data: { message: 'err' } })
+        JSON.stringify({ data: { message: 'err' } }),
+        visible.id
       );
       messagesRepo.setHidden(hidden.id, agentId);
 

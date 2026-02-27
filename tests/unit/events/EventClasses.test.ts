@@ -271,6 +271,7 @@ describe('Event Classes', () => {
       agentId: 'agent-1',
       kind: 'user',
       timestamp: 1705315800000,
+      replyToMessageId: null,
       payload: { data: { text: 'Hello' } },
       hidden: false,
     };
@@ -308,6 +309,7 @@ describe('Event Classes', () => {
       agentId: 'agent-1',
       kind: 'user',
       timestamp: 1705315800000,
+      replyToMessageId: null,
       payload: { data: { text: 'Updated' } },
       hidden: false,
     };

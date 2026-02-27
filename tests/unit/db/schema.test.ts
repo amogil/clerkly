@@ -179,6 +179,7 @@ describe('Database Schema', () => {
         agentId: 'agent-123',
         kind: 'user',
         timestamp: new Date().toISOString(),
+        replyToMessageId: null,
         payloadJson: '{"content": "Hello"}',
         hidden: false,
       };
@@ -197,6 +198,7 @@ describe('Database Schema', () => {
         agentId: 'agent-123',
         kind: 'user',
         timestamp: new Date().toISOString(),
+        replyToMessageId: null,
         payloadJson: '{}',
       };
       expect(newMessage.agentId).toBe('agent-123');

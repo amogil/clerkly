@@ -73,6 +73,7 @@ const makeSnapshot = (id: number, kind = 'user', hidden = false): MessageSnapsho
   agentId: 'agent-1',
   kind,
   timestamp: Date.now(),
+  replyToMessageId: null,
   payload: { data: { text: `msg ${id}` } },
   hidden,
 });

@@ -335,8 +335,12 @@ describe('Migration 003_migrate_user_data_to_user_id', () => {
         'INSERT INTO user_data (key, value, user_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?)'
       ).run('test_key', '"test_value"', 'ABCDEF1234', now, now);
 
-      // Rollback migration 007 first
+      // Rollback migration 008 first
       let rollbackResult = migrationRunner.rollbackLastMigration();
+      expect(rollbackResult.success).toBe(true);
+
+      // Rollback migration 007
+      rollbackResult = migrationRunner.rollbackLastMigration();
       expect(rollbackResult.success).toBe(true);
 
       // Rollback migration 006
@@ -380,8 +384,12 @@ describe('Migration 003_migrate_user_data_to_user_id', () => {
         'INSERT INTO user_data (key, value, user_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?)'
       ).run('test_key', '"test_value"', 'ABCDEF1234', now, now);
 
-      // Rollback migration 007 first
+      // Rollback migration 008 first
       let rollbackResult = migrationRunner.rollbackLastMigration();
+      expect(rollbackResult.success).toBe(true);
+
+      // Rollback migration 007
+      rollbackResult = migrationRunner.rollbackLastMigration();
       expect(rollbackResult.success).toBe(true);
 
       // Rollback migration 006
@@ -424,8 +432,12 @@ describe('Migration 003_migrate_user_data_to_user_id', () => {
       const result = migrationRunner.runMigrations();
       expect(result.success).toBe(true);
 
-      // Rollback migration 007 first
+      // Rollback migration 008 first
       let rollbackResult = migrationRunner.rollbackLastMigration();
+      expect(rollbackResult.success).toBe(true);
+
+      // Rollback migration 007
+      rollbackResult = migrationRunner.rollbackLastMigration();
       expect(rollbackResult.success).toBe(true);
 
       // Rollback migration 006
