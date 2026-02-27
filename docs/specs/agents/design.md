@@ -1793,56 +1793,18 @@ useEffect(() => {
   - `ring-2` с цветом статуса (ring-amber-500/30)
   - Плавная пульсация opacity
 
-**JS spring-анимация перемещения (framer-motion):**
-- `layout` prop для автоматической анимации позиции при изменении порядка
-- Параметры spring:
-  - `type: 'spring'`
-  - `stiffness: 400` - жесткость пружины
-  - `damping: 30` - затухание
-  - `mass: 0.8` - масса элемента
-- Анимация появления/исчезновения:
-  - `initial={{ opacity: 0, scale: 0.8 }}` - ТОЛЬКО для новых агентов
-  - `initial={false}` - при первой загрузке (отключает анимацию)
-  - `animate={{ opacity: 1, scale: 1 }}`
-  - `exit={{ opacity: 0, scale: 0.8 }}`
-  - `duration: 0.2` для opacity и scale
-- `AnimatePresence` с `mode="popLayout"` для управления анимацией списка
-
-**Логика отключения initial анимации:**
-```typescript
-const [isInitialLoad, setIsInitialLoad] = useState(true);
-
-// Track initial load completion
-useEffect(() => {
-  if (!isLoading && agents.length > 0 && isInitialLoad) {
-    setIsInitialLoad(false);
-  }
-}, [isLoading, agents.length, isInitialLoad]);
-
-// In motion.div
-initial={isInitialLoad ? false : { opacity: 0, scale: 0.8 }}
-```
+**Перемещение без анимации:**
+- Пересортировка списка происходит мгновенно, без анимации перемещения
+- `layout` анимации для списка НЕ используются
+- CSS-анимации статусов остаются (spin/pulse)
 
 **Реализация:**
 ```typescript
-<AnimatePresence mode="popLayout">
-  {agents.slice(0, visibleChatsCount).map(agent => (
-    <motion.div
-      key={agent.id}
-      layout
-      initial={{ opacity: 0, scale: 0.8 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.8 }}
-      transition={{
-        layout: { type: 'spring', stiffness: 400, damping: 30, mass: 0.8 },
-        opacity: { duration: 0.2 },
-        scale: { duration: 0.2 }
-      }}
-    >
-      {/* Иконка агента */}
-    </motion.div>
-  ))}
-</AnimatePresence>
+{agents.slice(0, visibleChatsCount).map(agent => (
+  <div key={agent.id}>
+    {/* Иконка агента */}
+  </div>
+))}
 ```
 
 **Файл:** `src/renderer/components/agents.tsx`
@@ -2232,7 +2194,6 @@ agents.tsx
 - Экран `Agents` остаётся смонтированным всегда.
 - Переключение между `Agents` и `Settings` выполняется через CSS (скрытие через `opacity-0` и `pointer-events-none`), без размонтирования.
 - Другие экраны могут монтироваться по требованию, но не должны влиять на сохранение состояния `Agents`.
-- При возврате на `Agents` layout-анимация иконок в хедере временно отключается на один кадр, чтобы избежать визуального “подпрыгивания” при смене режима отображения.
 
 ### IPCChatTransport
 

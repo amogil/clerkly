@@ -1,6 +1,6 @@
 import React from 'react';
 import { Plus } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { AgentAvatar } from './AgentAvatar';
 import { getStatusText, getStatusStyles } from '../../../shared/utils/agentStatus';
 import { DateTimeFormatter } from '../../../utils/DateTimeFormatter';
@@ -15,7 +15,6 @@ interface AgentHeaderProps {
   agents: AgentSnapshot[];
   visibleChatsCount: number;
   isInitialLoad: boolean;
-  disableLayoutAnimation?: boolean;
   chatListRef: React.RefObject<HTMLDivElement | null>;
   onNewChat: () => void;
   onAgentClick: (agent: AgentSnapshot) => void;
@@ -27,7 +26,6 @@ export function AgentHeader({
   agents,
   visibleChatsCount,
   isInitialLoad,
-  disableLayoutAnimation = false,
   chatListRef,
   onNewChat,
   onAgentClick,
@@ -65,40 +63,35 @@ export function AgentHeader({
           <Plus className="w-4 h-4 text-white" />
         </div>
 
-        <AnimatePresence mode="popLayout">
-          {agents.slice(0, visibleChatsCount).map((agent) => {
-            const agentName = getAgentName(agent);
-            const agentLetter = agentName.charAt(0).toUpperCase();
-            const isSelected = agent.id === currentAgent.id;
+        {agents.slice(0, visibleChatsCount).map((agent) => {
+          const agentName = getAgentName(agent);
+          const agentLetter = agentName.charAt(0).toUpperCase();
+          const isSelected = agent.id === currentAgent.id;
 
-            return (
-              <motion.div
-                key={agent.id}
-                data-testid={`agent-icon-${agent.id}`}
-                layout={disableLayoutAnimation ? false : true}
-                initial={isInitialLoad || disableLayoutAnimation ? false : { opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.8 }}
-                transition={{
-                  layout: { type: 'spring', stiffness: 400, damping: 30, mass: 0.8 },
-                  opacity: { duration: 0.2 },
-                  scale: { duration: 0.2 },
-                }}
-                onClick={() => onAgentClick(agent)}
-                className={`cursor-pointer hover:scale-110 transition-transform group ${isSelected ? 'ring-2 ring-primary ring-offset-2 rounded-full' : ''}`}
-              >
-                <AgentAvatar status={agent.status} letter={agentLetter} size="sm" />
+          return (
+            <motion.div
+              key={agent.id}
+              data-testid={`agent-icon-${agent.id}`}
+              initial={isInitialLoad ? false : { opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{
+                opacity: { duration: 0.2 },
+                scale: { duration: 0.2 },
+              }}
+              onClick={() => onAgentClick(agent)}
+              className={`cursor-pointer hover:scale-110 transition-transform group ${isSelected ? 'ring-2 ring-primary ring-offset-2 rounded-full' : ''}`}
+            >
+              <AgentAvatar status={agent.status} letter={agentLetter} size="sm" />
 
-                <div className="absolute top-full right-0 mt-2 w-64 bg-gray-900 text-white text-xs rounded-lg p-3 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 delay-0 group-hover:delay-[2000ms] z-[100] shadow-lg pointer-events-none">
-                  <p className="font-semibold mb-1">{agentName}</p>
-                  <div className="flex items-center gap-1.5 text-xs text-gray-300">
-                    <span>{getStatusText(agent.status)}</span>
-                  </div>
+              <div className="absolute top-full right-0 mt-2 w-64 bg-gray-900 text-white text-xs rounded-lg p-3 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 delay-0 group-hover:delay-[2000ms] z-[100] shadow-lg pointer-events-none">
+                <p className="font-semibold mb-1">{agentName}</p>
+                <div className="flex items-center gap-1.5 text-xs text-gray-300">
+                  <span>{getStatusText(agent.status)}</span>
                 </div>
-              </motion.div>
-            );
-          })}
-        </AnimatePresence>
+              </div>
+            </motion.div>
+          );
+        })}
 
         {agents.length > visibleChatsCount && (
           <div
