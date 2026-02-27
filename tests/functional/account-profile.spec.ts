@@ -1536,9 +1536,9 @@ test.describe('Account Profile', () => {
     // Requirements: google-oauth-auth.3.7, account-profile.1.5 - Tokens should be cleared on error
     // Check directly through app context (not through IPC which requires email)
     const tokensCleared = await context.app.evaluate(async () => {
-      const { tokenStorage } = (global as any).testContext || {};
-      if (!tokenStorage) {
-        throw new Error('Token storage not found in test context');
+      const { tokenStorage, isNoUserLoggedInError } = (global as any).testContext || {};
+      if (!tokenStorage || !isNoUserLoggedInError) {
+        throw new Error('Test context missing token storage or error helper');
       }
       try {
         const tokens = await tokenStorage.loadTokens();

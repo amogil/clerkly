@@ -25,6 +25,7 @@ import { EventLogger } from './events/EventLogger';
 import { Logger } from './Logger';
 import { registerTestIPCHandlers } from './TestIPCHandlers';
 import { AppCoordinator } from './app/AppCoordinator';
+import { isNoUserLoggedInError } from '../shared/errors/userErrors';
 
 // Requirements: clerkly.3.5, clerkly.3.7 - Create parameterized logger for Main module
 const logger = Logger.create('Main');
@@ -228,6 +229,7 @@ if (process.env['NODE_ENV'] === 'test') {
     userManager,
     dataManager,
     dbManager,
+    isNoUserLoggedInError,
   };
 
   // Store testDataManager in global for test handlers
