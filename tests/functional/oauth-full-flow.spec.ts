@@ -6,7 +6,6 @@ import {
   closeElectron,
   ElectronTestContext,
   completeOAuthFlow,
-  clearTestTokens,
 } from './helpers/electron';
 import { createMockOAuthServer } from './helpers/electron';
 import type { MockOAuthServer } from './helpers/mock-oauth-server';
@@ -111,7 +110,7 @@ test.describe('Full OAuth Flow', () => {
   });
 
   /* Preconditions: Application running with valid tokens
-     Action: Clear tokens via IPC, reload app
+     Action: Execute logout workflow
      Assertions: App transitions from main screen to login
      Requirements: google-oauth-auth.7.2, google-oauth-auth.11.1 */
   test('should transition from main app to login after logout', async () => {
@@ -129,14 +128,15 @@ test.describe('Full OAuth Flow', () => {
     const isLoginVisible = await loginButton.isVisible().catch(() => false);
     expect(isLoginVisible).toBe(false);
 
-    // Clear tokens (simulating logout)
-    await clearTestTokens(context.window);
-
-    // Reload to trigger auth check
-    await context.window.reload();
-    await context.window.waitForLoadState('domcontentloaded');
+    // Execute real logout workflow (same pattern as stable auth tests)
+    const logoutResult = await context.window.evaluate(async () => {
+      return await (window as any).electron.ipcRenderer.invoke('auth:logout');
+    });
+    expect(logoutResult.success).toBe(true);
 
     // Verify login screen is displayed
+    const loginScreen = context.window.locator('[data-testid="login-screen"]');
+    await expect(loginScreen).toBeVisible({ timeout: 10000 });
     await loginButton.waitFor({ state: 'visible', timeout: 5000 });
     expect(await loginButton.isVisible()).toBe(true);
 
