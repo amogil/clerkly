@@ -251,9 +251,7 @@ export interface API {
       payload: any
     ) => Promise<{ success: boolean; error?: string }>;
     getLast: (agentId: string) => Promise<{ success: boolean; data?: any; error?: string }>;
-    retryLast: (
-      agentId: string
-    ) => Promise<{ success: boolean; error?: string }>;
+    retryLast: (agentId: string) => Promise<{ success: boolean; error?: string }>;
     cancelRetry: (
       agentId: string,
       userMessageId: number

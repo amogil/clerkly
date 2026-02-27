@@ -299,12 +299,7 @@ describe('MainPipeline.run()', () => {
 
       await pipeline.run('agent-1', 5);
 
-      expect(messageManager.create).toHaveBeenCalledWith(
-        'agent-1',
-        'llm',
-        expect.any(Object),
-        5
-      );
+      expect(messageManager.create).toHaveBeenCalledWith('agent-1', 'llm', expect.any(Object), 5);
     });
   });
 

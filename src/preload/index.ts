@@ -119,9 +119,7 @@ export interface API {
     ) => Promise<{ success: boolean; error?: string }>;
     getLast: (agentId: string) => Promise<{ success: boolean; data?: unknown; error?: string }>;
     // Requirements: llm-integration.3.7.3
-    retryLast: (
-      agentId: string
-    ) => Promise<{ success: boolean; error?: string }>;
+    retryLast: (agentId: string) => Promise<{ success: boolean; error?: string }>;
     // Requirements: llm-integration.3.7.4
     cancelRetry: (
       agentId: string,

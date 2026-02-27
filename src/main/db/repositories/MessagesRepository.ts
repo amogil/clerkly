@@ -73,7 +73,9 @@ export class MessagesRepository {
     const result = this.db
       .select()
       .from(messages)
-      .where(and(eq(messages.agentId, agentId), eq(messages.kind, 'user'), eq(messages.hidden, false)))
+      .where(
+        and(eq(messages.agentId, agentId), eq(messages.kind, 'user'), eq(messages.hidden, false))
+      )
       .orderBy(desc(messages.timestamp))
       .limit(1)
       .all();

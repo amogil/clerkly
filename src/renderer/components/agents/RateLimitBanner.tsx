@@ -27,11 +27,11 @@ export function RateLimitBanner({
     if (secondsLeft <= 0) {
       if (!hasRetried.current) {
         hasRetried.current = true;
-          // Auto-retry when countdown reaches zero
-          // Requirements: llm-integration.3.7.3
-          window.api.messages.retryLast(agentId).finally(() => {
-            onDismiss();
-          });
+        // Auto-retry when countdown reaches zero
+        // Requirements: llm-integration.3.7.3
+        window.api.messages.retryLast(agentId).finally(() => {
+          onDismiss();
+        });
       }
       return;
     }

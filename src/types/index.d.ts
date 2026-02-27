@@ -205,9 +205,7 @@ declare global {
           payload: unknown
         ) => Promise<{ success: boolean; error?: string }>;
         getLast: (agentId: string) => Promise<{ success: boolean; data?: unknown; error?: string }>;
-        retryLast: (
-          agentId: string,
-        ) => Promise<{ success: boolean; error?: string }>;
+        retryLast: (agentId: string) => Promise<{ success: boolean; error?: string }>;
         cancelRetry: (
           agentId: string,
           userMessageId: number

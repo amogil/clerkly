@@ -165,12 +165,17 @@ export class MainPipeline {
 
           if (llmMessageId === null) {
             // Create the llm message on first reasoning chunk
-            const llmMsg = this.messageManager.create(agentId, 'llm', {
-              data: {
-                model: options.model,
-                reasoning: { text: accumulatedReasoning, excluded_from_replay: true },
+            const llmMsg = this.messageManager.create(
+              agentId,
+              'llm',
+              {
+                data: {
+                  model: options.model,
+                  reasoning: { text: accumulatedReasoning, excluded_from_replay: true },
+                },
               },
-          }, replyToMessageId);
+              replyToMessageId
+            );
             llmMessageId = llmMsg.id;
           } else {
             // Update reasoning in existing message
@@ -271,11 +276,16 @@ export class MainPipeline {
         errorPayload['action_link'] = { label: 'Open Settings', screen: 'settings' };
       }
 
-      this.messageManager.create(agentId, 'error', {
-        data: {
-          error: errorPayload,
+      this.messageManager.create(
+        agentId,
+        'error',
+        {
+          data: {
+            error: errorPayload,
+          },
         },
-      }, errorReplyTo);
+        errorReplyTo
+      );
     }
   }
 
