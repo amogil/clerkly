@@ -122,8 +122,6 @@ export function AgentChat({
   const { rawMessages, sendMessage, isLoading } = useAgentChat(agent.id);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const stickContextRef = useRef<StickToBottomContext | null>(null);
-  const lastScrollTopRef = useRef<number | null>(null);
-  const hasAutoScrolledRef = useRef(false);
 
   // Autofocus textarea when this chat becomes active (agents.4.7.1)
   useEffect(() => {
@@ -140,43 +138,6 @@ export function AgentChat({
   useEffect(() => {
     onLoadingChange(agent.id, isLoading);
   }, [agent.id, isLoading, onLoadingChange]);
-
-  // Requirements: agents.4.14.1, agents.4.14.4 — restore scroll per agent,
-  // and auto-scroll only on first active load.
-  useEffect(() => {
-    const scrollEl = stickContextRef.current?.scrollRef?.current;
-    if (!isActive) {
-      if (scrollEl) lastScrollTopRef.current = scrollEl.scrollTop;
-      return;
-    }
-
-    let cancelled = false;
-    const attempt = () => {
-      if (cancelled) return;
-      const context = stickContextRef.current;
-      const activeScrollEl = context?.scrollRef?.current;
-      if (!activeScrollEl) {
-        requestAnimationFrame(attempt);
-        return;
-      }
-
-      if (!hasAutoScrolledRef.current && rawMessages.length > 0) {
-        activeScrollEl.scrollTop = context.state.targetScrollTop;
-        context.scrollToBottom('instant');
-        hasAutoScrolledRef.current = true;
-        return;
-      }
-
-      if (lastScrollTopRef.current !== null) {
-        activeScrollEl.scrollTop = lastScrollTopRef.current;
-      }
-    };
-
-    attempt();
-    return () => {
-      cancelled = true;
-    };
-  }, [isActive, rawMessages.length]);
 
   const handleSubmit = useCallback(
     async (message: PromptInputMessage) => {
