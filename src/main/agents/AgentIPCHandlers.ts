@@ -346,6 +346,8 @@ export class AgentIPCHandlers {
     args: { agentId: string }
   ): Promise<IPCResult> {
     try {
+      // Hide existing error dialogs before retrying the request.
+      this.messageManager.dismissErrorMessages(args.agentId);
       const lastUser = this.messageManager.getLastUserMessage(args.agentId);
       if (!lastUser) {
         return { success: false, error: 'No user message to retry' };

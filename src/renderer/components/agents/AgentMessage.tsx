@@ -45,15 +45,6 @@ export function AgentMessage({ message, showAvatar, agentStatus, onNavigate }: A
     const canRetry = errorInfo?.type === 'auth';
 
     const actionItems: AgentDialogActionItem[] = [];
-    if (actionLink && onNavigate) {
-      actionItems.push({
-        id: 'error-open-settings',
-        label: actionLink.label,
-        onClick: () => onNavigate(actionLink.screen),
-        testId: 'message-error-action-link',
-        variant: 'outline',
-      });
-    }
     if (canRetry) {
       actionItems.push({
         id: 'error-retry',
@@ -62,6 +53,15 @@ export function AgentMessage({ message, showAvatar, agentStatus, onNavigate }: A
           window.api.messages.retryLast(message.agentId).catch(() => {});
         },
         testId: 'message-error-retry',
+        variant: 'outline',
+      });
+    }
+    if (actionLink && onNavigate) {
+      actionItems.push({
+        id: 'error-open-settings',
+        label: actionLink.label,
+        onClick: () => onNavigate(actionLink.screen),
+        testId: 'message-error-action-link',
         variant: 'default',
       });
     }
