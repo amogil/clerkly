@@ -16,6 +16,10 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
+# Clear npm env config that triggers warnings in npm v9+
+unset npm_config_devdir
+unset NPM_CONFIG_DEVDIR
+
 # Parse command line arguments
 VERBOSE=false
 if [[ "$1" == "--verbose" || "$1" == "-v" ]]; then
