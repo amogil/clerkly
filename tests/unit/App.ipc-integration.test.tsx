@@ -52,6 +52,13 @@ type LoginScreenProps = {
 };
 
 let lastLoginScreenProps: LoginScreenProps | null = null;
+let mockCoordinatorState: {
+  state: { phase: string; authorized: boolean; targetScreen: string } | null;
+  isBootstrapping: boolean;
+} = {
+  state: { phase: 'ready', authorized: true, targetScreen: 'agents' },
+  isBootstrapping: false,
+};
 
 jest.mock('../../src/renderer/components/auth/LoginScreen', () => ({
   LoginScreen: (props: LoginScreenProps) => {
@@ -67,6 +74,10 @@ jest.mock('../../src/renderer/components/auth/LoginScreen', () => ({
       </div>
     );
   },
+}));
+
+jest.mock('../../src/renderer/hooks/useAppCoordinatorState', () => ({
+  useAppCoordinatorState: () => mockCoordinatorState,
 }));
 
 jest.mock('../../src/renderer/components/ErrorBoundary', () => ({
@@ -106,6 +117,10 @@ describe('App IPC Integration with Error Notification System', () => {
     // Clear event handlers
     eventHandlers.clear();
     lastLoginScreenProps = null;
+    mockCoordinatorState = {
+      state: { phase: 'ready', authorized: true, targetScreen: 'agents' },
+      isBootstrapping: false,
+    };
 
     // Mock window.api in jsdom environment
     Object.defineProperty(window, 'api', {
@@ -223,7 +238,10 @@ describe('App IPC Integration with Error Notification System', () => {
      Assertions: LoginScreen shows loading state and clears error
      Requirements: google-oauth-auth.15.1, google-oauth-auth.15.2 */
   it('should show loader on auth callback received', async () => {
-    (window.api.auth.getStatus as jest.Mock).mockResolvedValueOnce({ authorized: false });
+    mockCoordinatorState = {
+      state: { phase: 'unauthenticated', authorized: false, targetScreen: 'login' },
+      isBootstrapping: false,
+    };
 
     render(<App />);
 
@@ -247,7 +265,10 @@ describe('App IPC Integration with Error Notification System', () => {
      Assertions: LoginScreen shows error and stops loading
      Requirements: navigation.1.8, google-oauth-auth.13.6 */
   it('should show login error and stop loading on auth failure', async () => {
-    (window.api.auth.getStatus as jest.Mock).mockResolvedValueOnce({ authorized: false });
+    mockCoordinatorState = {
+      state: { phase: 'unauthenticated', authorized: false, targetScreen: 'login' },
+      isBootstrapping: false,
+    };
 
     render(<App />);
 

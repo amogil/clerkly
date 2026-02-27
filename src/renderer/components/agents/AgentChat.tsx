@@ -2,7 +2,7 @@
 // Per-agent chat component — mounted at startup, stays mounted forever.
 // Scroll position is managed by Conversation (use-stick-to-bottom) — preserved automatically.
 
-import React, { useRef, useEffect, useCallback } from 'react';
+import React, { useRef, useEffect, useCallback, useLayoutEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useAgentChat } from '../../hooks/useAgentChat';
 import { AgentMessage } from './AgentMessage';
@@ -95,17 +95,57 @@ function AgentChatInner({
 
   // Requirements: agents.4.5, agents.4.6, agents.4.7
   // Keep PromptInput textarea auto-resize behavior capped at 50% of chat area.
+  const recalculateTextareaHeight = useCallback(() => {
+    const textarea = textareaRef.current;
+    const chatArea = chatAreaRef.current;
+    if (!textarea) return;
+
+    textarea.style.height = 'auto';
+    const computedStyle = window.getComputedStyle(textarea);
+    const lineHeight = Number.parseFloat(computedStyle.lineHeight);
+    const paddingTop = Number.parseFloat(computedStyle.paddingTop) || 0;
+    const paddingBottom = Number.parseFloat(computedStyle.paddingBottom) || 0;
+    const borderTop = Number.parseFloat(computedStyle.borderTopWidth) || 0;
+    const borderBottom = Number.parseFloat(computedStyle.borderBottomWidth) || 0;
+    const minContentHeight = Number.isFinite(lineHeight) ? lineHeight : 20;
+    const minTextareaHeight = Math.ceil(
+      minContentHeight + paddingTop + paddingBottom + borderTop + borderBottom
+    );
+    const chatAreaHeight = chatArea?.offsetHeight ?? 0;
+    const maxHeight = chatAreaHeight > 0 ? chatAreaHeight * 0.5 : Number.POSITIVE_INFINITY;
+    const measuredScrollHeight = textarea.scrollHeight > 0 ? textarea.scrollHeight : minTextareaHeight;
+    const nextHeight = Math.max(minTextareaHeight, Math.min(measuredScrollHeight, maxHeight));
+    textarea.style.height = `${nextHeight}px`;
+    textarea.style.overflowY = measuredScrollHeight > maxHeight ? 'auto' : 'hidden';
+  }, []);
+
+  useLayoutEffect(() => {
+    recalculateTextareaHeight();
+  }, [isActive, taskInput, recalculateTextareaHeight]);
+
   useEffect(() => {
+    if (!isActive) return;
+    const rafId = window.requestAnimationFrame(recalculateTextareaHeight);
+    const timeoutId = window.setTimeout(recalculateTextareaHeight, 120);
+    return () => {
+      window.cancelAnimationFrame(rafId);
+      window.clearTimeout(timeoutId);
+    };
+  }, [isActive, recalculateTextareaHeight]);
+
+  useEffect(() => {
+    if (!isActive || typeof window.ResizeObserver === 'undefined') return;
     const textarea = textareaRef.current;
     const chatArea = chatAreaRef.current;
     if (!textarea || !chatArea) return;
 
-    textarea.style.height = 'auto';
-    const maxHeight = chatArea.offsetHeight * 0.5;
-    const nextHeight = Math.min(textarea.scrollHeight, maxHeight);
-    textarea.style.height = `${nextHeight}px`;
-    textarea.style.overflowY = textarea.scrollHeight > maxHeight ? 'auto' : 'hidden';
-  }, [taskInput]);
+    const observer = new window.ResizeObserver(() => {
+      recalculateTextareaHeight();
+    });
+    observer.observe(textarea);
+    observer.observe(chatArea);
+    return () => observer.disconnect();
+  }, [isActive, recalculateTextareaHeight]);
 
   const handleSend = useCallback(
     async (text?: string) => {
@@ -175,7 +215,9 @@ function AgentChatInner({
             <PromptInputSubmit disabled={!taskInput.trim()} />
           </PromptInputBody>
           <PromptInputFooter>
-            <p className="px-0.5 text-xs text-muted-foreground">Press Enter to send, Shift+Enter for new line</p>
+            <p className="px-0.5 text-xs text-muted-foreground">
+              Press Enter to send, Shift+Enter for new line
+            </p>
           </PromptInputFooter>
         </PromptInput>
       </div>

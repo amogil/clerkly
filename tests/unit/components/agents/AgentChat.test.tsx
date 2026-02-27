@@ -93,22 +93,30 @@ jest.mock('../../../../src/renderer/components/ai-elements/prompt-input', () => 
       Send
     </button>
   );
-  const PromptInputTextarea = ({
-    value,
-    onChange,
-  }: {
-    value: string;
-    onChange: (event: React.ChangeEvent<HTMLTextAreaElement>) => void;
-  }) => (
+  const PromptInputTextarea = React.forwardRef<
+    HTMLTextAreaElement,
+    {
+      value: string;
+      onChange: (event: React.ChangeEvent<HTMLTextAreaElement>) => void;
+    }
+  >(({ value, onChange }, ref) => (
     <textarea
+      ref={ref}
       data-testid="prompt-input-field"
       name="prompt-input-field"
       onChange={onChange}
       value={value}
     />
-  );
+  ));
+  PromptInputTextarea.displayName = 'PromptInputTextarea';
 
-  return { PromptInput, PromptInputBody, PromptInputFooter, PromptInputSubmit, PromptInputTextarea };
+  return {
+    PromptInput,
+    PromptInputBody,
+    PromptInputFooter,
+    PromptInputSubmit,
+    PromptInputTextarea,
+  };
 });
 
 jest.mock('../../../../src/renderer/components/agents/RateLimitBanner', () => ({
@@ -395,5 +403,31 @@ describe('AgentChat — PromptInput rendered', () => {
   it('should render PromptInput', () => {
     render(<AgentChat {...defaultProps} />);
     expect(screen.getByTestId('agent-prompt-input')).toBeInTheDocument();
+  });
+});
+
+describe('AgentChat — textarea auto-resize on activation', () => {
+  /* Preconditions: textarea rendered in inactive chat
+     Action: chat becomes active without input change
+     Assertions: textarea height recalculated from content
+     Requirements: agents.4.5, agents.4.6, agents.4.7 */
+  it('should recalculate textarea height when chat becomes active', () => {
+    const { rerender } = render(<AgentChat {...defaultProps} isActive={false} />);
+    const textarea = screen.getByTestId('prompt-input-field') as HTMLTextAreaElement;
+    const chatArea = screen.getByTestId('agent-prompt-input').parentElement as HTMLDivElement;
+
+    Object.defineProperty(chatArea, 'offsetHeight', {
+      configurable: true,
+      value: 400,
+    });
+    Object.defineProperty(textarea, 'scrollHeight', {
+      configurable: true,
+      value: 120,
+    });
+
+    rerender(<AgentChat {...defaultProps} isActive={true} />);
+
+    expect(textarea.style.height).toBe('120px');
+    expect(textarea.style.overflowY).toBe('hidden');
   });
 });
