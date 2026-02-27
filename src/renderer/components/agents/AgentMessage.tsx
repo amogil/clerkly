@@ -3,14 +3,10 @@ import React from 'react';
 import { Logo } from '../logo';
 import { isInProgress, type AgentStatus } from '../../../shared/utils/agentStatus';
 import { Message, MessageContent, MessageResponse } from '../ai-elements/message';
-import {
-  Confirmation,
-  ConfirmationAction,
-  ConfirmationActions,
-  ConfirmationRequest,
-} from '../ai-elements/confirmation';
+import { ConfirmationAction } from '../ai-elements/confirmation';
 import { Reasoning, ReasoningTrigger, ReasoningContent } from '../ai-elements/reasoning';
 import type { MessageSnapshot } from '../../../shared/events/types';
+import { AgentDialog } from './AgentDialog';
 
 interface AgentMessageProps {
   message: MessageSnapshot;
@@ -54,17 +50,15 @@ export function AgentMessage({ message, showAvatar, agentStatus, onNavigate }: A
             <Logo size="sm" showText={false} animated={false} />
           </div>
         )}
-        <Confirmation
-          data-testid="message-error"
-          state="approval-requested"
-          approval={{ id: `error-${message.id}`, approved: false }}
-          className="w-fit max-w-full rounded-2xl border border-red-500/30 bg-red-500/10 text-red-700 px-4 py-3"
-        >
-          <ConfirmationRequest className="text-sm leading-relaxed whitespace-pre-wrap break-words text-red-700">
-            {errorMessage}
-          </ConfirmationRequest>
-          {actionLink && onNavigate && (
-            <ConfirmationActions className="pt-1">
+        <AgentDialog
+          intent="error"
+          testId="message-error"
+          approvalId={`error-${message.id}`}
+          message={errorMessage}
+          messageClassName="text-red-700"
+          actionsClassName={actionLink && onNavigate ? 'pt-1' : undefined}
+          actions={
+            actionLink && onNavigate ? (
               <ConfirmationAction
                 data-testid="message-error-action-link"
                 variant="link"
@@ -74,9 +68,9 @@ export function AgentMessage({ message, showAvatar, agentStatus, onNavigate }: A
               >
                 {actionLink.label}
               </ConfirmationAction>
-            </ConfirmationActions>
-          )}
-        </Confirmation>
+            ) : null
+          }
+        />
       </Message>
     );
   }

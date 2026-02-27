@@ -1,11 +1,7 @@
 // Requirements: llm-integration.3.7
 import React, { useState, useEffect, useRef } from 'react';
-import {
-  Confirmation,
-  ConfirmationAction,
-  ConfirmationActions,
-  ConfirmationRequest,
-} from '../ai-elements/confirmation';
+import { ConfirmationAction } from '../ai-elements/confirmation';
+import { AgentDialog } from './AgentDialog';
 
 // Access window.api with proper typing
 declare const window: Window & {
@@ -67,16 +63,17 @@ export function RateLimitBanner({
   };
 
   return (
-    <Confirmation
-      data-testid="rate-limit-banner"
-      state="approval-requested"
-      approval={{ id: `rate-limit-${userMessageId}`, approved: false }}
-      className="flex items-center gap-3 px-4 py-2 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-800"
-    >
-      <ConfirmationRequest className="text-sm">
-        Rate limit exceeded. Retrying in {secondsLeft} second{secondsLeft !== 1 ? 's' : ''}...
-      </ConfirmationRequest>
-      <ConfirmationActions className="ml-auto">
+    <AgentDialog
+      intent="info"
+      testId="rate-limit-banner"
+      approvalId={`rate-limit-${userMessageId}`}
+      className="flex items-center gap-3 rounded-lg px-4 py-2"
+      messageClassName="text-sm"
+      actionsClassName="ml-auto"
+      message={`Rate limit exceeded. Retrying in ${secondsLeft} second${
+        secondsLeft !== 1 ? 's' : ''
+      }...`}
+      actions={
         <ConfirmationAction
           data-testid="rate-limit-cancel"
           onClick={handleCancel}
@@ -86,7 +83,7 @@ export function RateLimitBanner({
         >
           Cancel
         </ConfirmationAction>
-      </ConfirmationActions>
-    </Confirmation>
+      }
+    />
   );
 }

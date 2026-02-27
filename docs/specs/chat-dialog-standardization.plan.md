@@ -26,7 +26,7 @@
 
 3. Имплементация UI на базе `Confirmation`
    - [x] Добавить `Confirmation` в `src/renderer/components/ai-elements/confirmation.tsx`.
-   - [ ] Создать единый обёрточный компонент для чата (например, `AgentDialog`).
+   - [x] Создать единый обёрточный компонент для чата (например, `AgentDialog`).
    - [x] Перевести `RateLimitBanner` на `Confirmation`, сохранив поведение и `data-testid`.
    - [x] Перевести `kind:error` в `AgentMessage` на `Confirmation`, сохранив `data-testid` и логику `action_link`.
 
@@ -38,6 +38,6 @@
    - [ ] Провести инвентаризацию функциональных и модульных тестов и добавить недостающие.
 
 5. Проверки
-   - [x] Запустить `npm run test:unit` после ключевых UI-изменений.
-   - [x] В конце запустить `npm run validate`.
+   - [ ] Запустить `npm run test:unit` после ключевых UI-изменений.
+   - [ ] В конце запустить `npm run validate`.
    - [ ] Предложить запуск функциональных тестов с предупреждением об окнах.
