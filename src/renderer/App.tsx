@@ -186,7 +186,7 @@ function AppContent() {
               currentScreen === 'agents' ? '' : 'opacity-0 pointer-events-none absolute inset-0'
             }`}
           >
-            <Agents onNavigate={navigateToScreen} />
+            <Agents onNavigate={navigateToScreen} isScreenActive={currentScreen === 'agents'} />
           </div>
           {currentScreen === 'settings' && (
             <Settings onSignOut={handleSignOut} onNavigate={navigateToScreen} />

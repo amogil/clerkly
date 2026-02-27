@@ -15,6 +15,7 @@ interface AgentHeaderProps {
   agents: AgentSnapshot[];
   visibleChatsCount: number;
   isInitialLoad: boolean;
+  disableLayoutAnimation?: boolean;
   chatListRef: React.RefObject<HTMLDivElement | null>;
   onNewChat: () => void;
   onAgentClick: (agent: AgentSnapshot) => void;
@@ -26,6 +27,7 @@ export function AgentHeader({
   agents,
   visibleChatsCount,
   isInitialLoad,
+  disableLayoutAnimation = false,
   chatListRef,
   onNewChat,
   onAgentClick,
@@ -73,8 +75,8 @@ export function AgentHeader({
               <motion.div
                 key={agent.id}
                 data-testid={`agent-icon-${agent.id}`}
-                layout
-                initial={isInitialLoad ? false : { opacity: 0, scale: 0.8 }}
+                layout={disableLayoutAnimation ? false : true}
+                initial={isInitialLoad || disableLayoutAnimation ? false : { opacity: 0, scale: 0.8 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.8 }}
                 transition={{

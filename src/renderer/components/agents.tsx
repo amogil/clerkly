@@ -15,15 +15,18 @@ import type { AgentSnapshot } from '../types/agent';
 export function Agents({
   onNavigate,
   onChatsLoadingChange,
+  isScreenActive = true,
 }: {
   onNavigate?: (screen: string) => void;
   onChatsLoadingChange?: (isLoading: boolean) => void;
+  isScreenActive?: boolean;
 }) {
   const [showAllTasksPage, setShowAllTasksPage] = useState(false);
   const [visibleChatsCount, setVisibleChatsCount] = useState(5);
   const [errorMessages, setErrorMessages] = useState<Map<string, string>>(new Map());
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [startupLoaderVisible, setStartupLoaderVisible] = useState(true);
+  const [disableHeaderLayout, setDisableHeaderLayout] = useState(false);
   const [rateLimitBanner, setRateLimitBanner] = useState<{
     agentId: string;
     userMessageId: number;
@@ -133,6 +136,13 @@ export function Agents({
     requestAnimationFrame(calculateVisibleChats);
   }, [startupLoaderVisible, calculateVisibleChats]);
 
+  useEffect(() => {
+    if (!isScreenActive) return;
+    setDisableHeaderLayout(true);
+    const rafId = requestAnimationFrame(() => setDisableHeaderLayout(false));
+    return () => cancelAnimationFrame(rafId);
+  }, [isScreenActive]);
+
   // Track per-agent loading state for global startup loader (agents.13.2, agents.13.10)
   const handleLoadingChange = useCallback((agentId: string, loading: boolean) => {
     setLoadingAgents((prev) => {
@@ -202,6 +212,7 @@ export function Agents({
         agents={agents}
         visibleChatsCount={visibleChatsCount}
         isInitialLoad={isInitialLoad}
+        disableLayoutAnimation={disableHeaderLayout}
         chatListRef={chatListRef}
         onNewChat={handleNewChat}
         onAgentClick={handleAgentClick}
