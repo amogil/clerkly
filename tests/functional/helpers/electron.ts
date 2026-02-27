@@ -26,10 +26,6 @@ export function getFreePort(): Promise<number> {
   });
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 async function getPkceState(electronApp: ElectronApplication): Promise<string> {
   return electronApp.evaluate(async () => {
     const { oauthClient } = (global as any).testContext || {};
@@ -59,7 +55,10 @@ async function isLoginScreenVisible(window: Page): Promise<boolean> {
 
 async function isAgentsScreenVisible(window: Page): Promise<boolean> {
   if (window.isClosed()) return false;
-  return window.locator('[data-testid="agents"]').isVisible().catch(() => false);
+  return window
+    .locator('[data-testid="agents"]')
+    .isVisible()
+    .catch(() => false);
 }
 
 /**
