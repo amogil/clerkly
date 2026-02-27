@@ -508,9 +508,10 @@ test.describe('OAuth Profile Synchronous Fetch', () => {
     // Requirements: google-oauth-auth.3.7 - Tokens should be cleared when profile fetch fails
     // Check directly through app context (not through IPC which requires email)
     const tokensCleared = await context.app.evaluate(async () => {
-      const { tokenStorage } = (global as any).testContext || {};
-      if (!tokenStorage) {
-        throw new Error('Token storage not found in test context');
+      const { tokenStorage, isNoUserLoggedInError: noUserErrorHelper } =
+        (global as any).testContext || {};
+      if (!tokenStorage || !noUserErrorHelper) {
+        throw new Error('Test context missing token storage or error helper');
       }
       try {
         const tokens = await tokenStorage.loadTokens();
@@ -518,7 +519,7 @@ test.describe('OAuth Profile Synchronous Fetch', () => {
       } catch (error: unknown) {
         // If loadTokens throws error about no user logged in, tokens are cleared
         const errorMessage = error instanceof Error ? error.message : '';
-        return isNoUserLoggedInError(errorMessage);
+        return noUserErrorHelper(errorMessage);
       }
     });
 
