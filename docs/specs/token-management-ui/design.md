@@ -420,10 +420,9 @@ export function LoginError({
       <div className="w-full max-w-md">
         {/* Logo and Header */}
         <div className="text-center mb-12">
-          <div className="flex justify-center mb-6">
-            <Logo size="lg" showText={false} />
+          <div className="flex justify-center">
+            <Logo size="lg" showText={true} />
           </div>
-          <h1 className="text-4xl font-semibold text-foreground mb-3">Clerkly</h1>
         </div>
 
         {/* Login Card */}

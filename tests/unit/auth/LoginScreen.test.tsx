@@ -139,11 +139,10 @@ describe('LoginScreen', () => {
     it('should keep all elements visible during loader', () => {
       render(<LoginScreen onLogin={mockOnLogin} isLoading={true} />);
 
-      // Check Logo is visible (Logo component renders an SVG)
-      const logo = document.querySelector('svg');
+      // Check brand block includes logo and title
+      const brandBlock = screen.getByTestId('login-brand');
+      const logo = brandBlock.querySelector('svg');
       expect(logo).toBeInTheDocument();
-
-      // Check "Clerkly" header is visible
       expect(screen.getByText('Clerkly')).toBeInTheDocument();
 
       // Check "Welcome" card header is visible
@@ -181,6 +180,9 @@ describe('LoginScreen', () => {
       render(<LoginScreen onLogin={mockOnLogin} isLoading={false} />);
 
       // Check all major elements are visible
+      const brandBlock = screen.getByTestId('login-brand');
+      const logo = brandBlock.querySelector('svg');
+      expect(logo).toBeInTheDocument();
       expect(screen.getByText('Clerkly')).toBeInTheDocument();
       expect(screen.getByText('Welcome')).toBeInTheDocument();
       expect(screen.getByText('Continue with Google')).toBeInTheDocument();

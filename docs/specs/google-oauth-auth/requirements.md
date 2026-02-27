@@ -272,7 +272,7 @@ Token Expiring → OAuthClientManager.refreshAccessToken() → Update Tokens in 
 
 #### Критерии Приемки
 
-1. "Login Screen" ДОЛЖЕН отображать логотип Clerkly и заголовок "Clerkly" размером text-4xl
+1. "Login Screen" ДОЛЖЕН отображать логотип Clerkly и заголовок "Clerkly" в одном горизонтальном ряду
 2. "Login Screen" ДОЛЖЕН отображать заголовок карты "Welcome" и описание "Your autonomous AI agent that listens, organizes, and acts"
 3. "Login Screen" ДОЛЖЕН отображать кнопку с текстом "Continue with Google" и иконкой Google
 4. "Login Screen" ДОЛЖЕН отображать превью функций с иконками и текстами:
