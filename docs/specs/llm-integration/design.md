@@ -89,14 +89,14 @@ CREATE TABLE messages (
     "reply_to_message_id": 2,
     "error": {
       "type": "auth",
-      "message": "Invalid API key.",
+      "message": "Invalid API key. Please check your key and try again.",
       "action_link": { "label": "Open Settings", "screen": "settings" }
     }
   }
 }
 ```
 
-Для ошибок без action_link (network, rate_limit, provider, timeout):
+Для ошибок без action_link (network, provider, timeout):
 
 ```json
 {
@@ -106,6 +106,23 @@ CREATE TABLE messages (
   }
 }
 ```
+
+Для отсутствующего API ключа (dialog тот же, другое сообщение):
+
+```json
+{
+  "data": {
+    "reply_to_message_id": 2,
+    "error": {
+      "type": "auth",
+      "message": "API key is not set. Add it in Settings to continue.",
+      "action_link": { "label": "Open Settings", "screen": "settings" }
+    }
+  }
+}
+```
+
+**UI отображение:** в renderer `kind: error` рендерится как стандартизированный диалог на базе `Confirmation`, с единым layout для ошибок и опциональным действием.
 
 ---
 
@@ -333,11 +350,11 @@ messages:create (kind: user):
 
 UI фильтрует сообщения с `dismissed: true` — они не отображаются (аналогично `interrupted: true`).
 
-### Rate limit баннер (llm-integration.3.7)
+### Rate limit диалог (llm-integration.3.7)
 
 При получении ошибки `rate_limit` `MainPipeline` НЕ создаёт `kind: error` сообщение, а эмитит событие `agent.rate_limit` с полем `retryAfterSeconds: 10`.
 
-Renderer подписывается на `agent.rate_limit` и показывает баннер поверх чата. По истечении таймера renderer вызывает IPC `messages:retry-last` — `AgentIPCHandlers` повторяет `MainPipeline.run()` с тем же `userMessageId`. При успехе баннер исчезает. При нажатии "Cancel" renderer вызывает IPC `messages:cancel-retry` — `AgentIPCHandlers` удаляет последнее `kind: user` сообщение из БД.
+Renderer подписывается на `agent.rate_limit` и показывает диалог поверх чата. По истечении таймера renderer вызывает IPC `messages:retry-last` — `AgentIPCHandlers` повторяет `MainPipeline.run()` с тем же `userMessageId`. При успехе диалог исчезает. При нажатии "Cancel" renderer вызывает IPC `messages:cancel-retry` — `AgentIPCHandlers` удаляет последнее `kind: user` сообщение из БД.
 
 ```typescript
 // Новое событие

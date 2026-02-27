@@ -1538,14 +1538,27 @@ function AgentWelcome({ onPromptClick }: AgentWelcomeProps) {
 **Сообщения об ошибке (kind: 'error'):**
 ```tsx
 // Requirements: llm-integration.3.4.1
-<div data-testid="message-error" className="text-sm text-red-500 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3">
-  {error.message}
-  {action_link && onNavigate && (
-    <button data-testid="message-error-action-link" onClick={() => onNavigate(action_link.screen)}>
-      {action_link.label}
-    </button>
-  )}
-</div>
+<Confirmation state="approval-requested" approval={{ id: 'error', approved: false }}>
+  <ConfirmationRequest>
+    {/* error message */}
+  </ConfirmationRequest>
+  <ConfirmationActions>
+    {/* optional action_link to Settings */}
+  </ConfirmationActions>
+</Confirmation>
+```
+
+**Диалог rate limit (agent.rate_limit):**
+```tsx
+// Requirements: llm-integration.3.7
+<Confirmation state="approval-requested" approval={{ id: 'rate-limit', approved: false }}>
+  <ConfirmationRequest>
+    {/* countdown text */}
+  </ConfirmationRequest>
+  <ConfirmationActions>
+    {/* retry and cancel actions */}
+  </ConfirmationActions>
+</Confirmation>
 ```
 
 **Анимация появления:**
@@ -2191,7 +2204,7 @@ agents.tsx
   │       │     ├── ConversationContent
   │       │     │     ├── AgentWelcome (если нет сообщений)
   │       │     │     └── motion.div > AgentMessage (для каждого сообщения)
-  │       │     ├── RateLimitBanner (если активен rate limit)
+  │       │     ├── RateLimitDialog (если активен rate limit)
   │       │     └── ConversationScrollButton
   │       └── PromptInput
   └── [лоадер пока не все чаты загружены]
@@ -2337,6 +2350,7 @@ AI Elements использует **shadcn-подход**: CLI копирует �
 | Файл | Компоненты |
 |------|-----------|
 | `src/renderer/components/ai-elements/conversation.tsx` | `Conversation`, `ConversationContent`, `ConversationScrollButton`, `ConversationEmptyState`, `ConversationDownload` |
+| `src/renderer/components/ai-elements/confirmation.tsx` | `Confirmation`, `ConfirmationRequest`, `ConfirmationActions` |
 | `src/renderer/components/ai-elements/message.tsx` | `Message`, `MessageContent`, `MessageActions`, `MessageAction`, `MessageBranch`, `MessageResponse`, `MessageToolbar` |
 | `src/renderer/components/ai-elements/reasoning.tsx` | `Reasoning`, `ReasoningTrigger`, `ReasoningContent` |
 | `src/renderer/components/ai-elements/shimmer.tsx` | `Shimmer` |
