@@ -9,10 +9,9 @@ import { test, expect, ElectronApplication, Page } from '@playwright/test';
 import { createMockOAuthServer, launchElectronWithMockOAuth } from './helpers/electron';
 import type { MockOAuthServer } from './helpers/mock-oauth-server';
 import { completeOAuthFlow } from './helpers/electron';
-import { isNoUserLoggedInError } from '../../src/shared/errors/userErrors';
 
 let electronApp: ElectronApplication;
-let window: Page;
+let appWindow: Page;
 let mockServer: MockOAuthServer;
 
 test.beforeAll(async () => {
@@ -37,10 +36,12 @@ test.beforeEach(async () => {
 
   const context = await launchElectronWithMockOAuth(mockServer);
   electronApp = context.app;
-  window = context.window;
+  appWindow = context.window;
 
   // Wait for app to fully initialize (IPC handlers registration)
-  await window.waitForTimeout(2000);
+  await expect(appWindow.locator('button:has-text("Continue with Google")')).toBeVisible({
+    timeout: 5000,
+  });
 });
 
 test.afterEach(async () => {
@@ -55,33 +56,31 @@ test.afterEach(async () => {
    Requirements: google-oauth-auth.14.1, google-oauth-auth.14.2, google-oauth-auth.14.3, google-oauth-auth.14.4, google-oauth-auth.14.5, google-oauth-auth.14.6 */
 test('should show login screen after sign out', async () => {
   // Setup: Complete OAuth flow to authenticate
-  await completeOAuthFlow(electronApp, window);
+  await completeOAuthFlow(electronApp, appWindow);
 
   // Wait for authentication to complete and UI to update
-  await window.waitForTimeout(2000);
+  await expect(appWindow.locator('button:has-text("Settings")')).toBeVisible({ timeout: 5000 });
 
   // Reload to ensure UI is updated
-  await window.reload();
-  await window.waitForLoadState('domcontentloaded');
-  await window.waitForTimeout(1000);
+  await appWindow.reload();
+  await appWindow.waitForLoadState('domcontentloaded');
+  await expect(appWindow.locator('button:has-text("Settings")')).toBeVisible({ timeout: 5000 });
 
   // Verify main app is shown (not login screen)
-  const loginButton = await window.locator('button:has-text("Continue with Google")').count();
+  const loginButton = await appWindow.locator('button:has-text("Continue with Google")').count();
   expect(loginButton).toBe(0);
 
   // Navigate to settings by clicking Settings button in navigation
-  await window.click('button:has-text("Settings")');
-  await window.waitForTimeout(1000);
+  await appWindow.click('button:has-text("Settings")');
 
   // Wait for Account component to load with profile
-  await window.waitForSelector('.sign-out-button', { timeout: 5000 });
+  await expect(appWindow.locator('.sign-out-button')).toBeVisible({ timeout: 5000 });
 
   // Click Sign Out button using class selector
-  await window.click('.sign-out-button');
-  await window.waitForTimeout(1000);
+  await appWindow.click('.sign-out-button');
 
   // Verify Login Screen is shown
-  const loginButtonAfter = await window.locator('button:has-text("Continue with Google")');
+  const loginButtonAfter = await appWindow.locator('button:has-text("Continue with Google")');
   await expect(loginButtonAfter).toBeVisible();
 
   // Verify tokens are cleared (check through app context)
@@ -108,7 +107,7 @@ test('should show login screen after sign out', async () => {
    Requirements: google-oauth-auth.14.3, google-oauth-auth.14.4 */
 test('should clear tokens after sign out', async () => {
   // Setup: Complete OAuth flow to authenticate
-  await completeOAuthFlow(electronApp, window);
+  await completeOAuthFlow(electronApp, appWindow);
 
   // Verify tokens exist (check through app context)
   const tokensExist = await electronApp.evaluate(async () => {
@@ -126,28 +125,32 @@ test('should clear tokens after sign out', async () => {
   expect(tokensExist).toBe(true);
 
   // Call logout via IPC
-  await window.evaluate(async () => {
-    await window.electron.ipcRenderer.invoke('auth:logout');
+  await appWindow.evaluate(async () => {
+    await (window as any).electron.ipcRenderer.invoke('auth:logout');
   });
-
-  await window.waitForTimeout(500);
 
   // Verify tokens are cleared
-  const tokensCleared = await electronApp.evaluate(async () => {
-    const { tokenStorage, isNoUserLoggedInError: noUserErrorHelper } =
-      (global as any).testContext || {};
-    if (!tokenStorage || !noUserErrorHelper) {
-      throw new Error('Test context missing token storage or error helper');
-    }
-    try {
-      const tokens = await tokenStorage.loadTokens();
-      return tokens === null;
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : '';
-      return noUserErrorHelper(errorMessage);
-    }
-  });
-  expect(tokensCleared).toBe(true);
+  await expect
+    .poll(
+      async () => {
+        return electronApp.evaluate(async () => {
+          const { tokenStorage, isNoUserLoggedInError: noUserErrorHelper } =
+            (global as any).testContext || {};
+          if (!tokenStorage || !noUserErrorHelper) {
+            throw new Error('Test context missing token storage or error helper');
+          }
+          try {
+            const tokens = await tokenStorage.loadTokens();
+            return tokens === null;
+          } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : '';
+            return noUserErrorHelper(errorMessage);
+          }
+        });
+      },
+      { timeout: 5000 }
+    )
+    .toBe(true);
 });
 
 /* Preconditions: User is logged in, Google revoke endpoint fails
@@ -156,10 +159,10 @@ test('should clear tokens after sign out', async () => {
    Requirements: google-oauth-auth.14.7 */
 test('should handle sign out when revoke fails', async () => {
   // Setup: Complete OAuth flow to authenticate
-  await completeOAuthFlow(electronApp, window);
+  await completeOAuthFlow(electronApp, appWindow);
 
   // Mock fetch to simulate revoke failure
-  await window.evaluate(() => {
+  await appWindow.evaluate(() => {
     const originalFetch = window.fetch;
     window.fetch = async (url: string | URL | Request, init?: RequestInit) => {
       if (typeof url === 'string' && url.includes('revoke')) {
@@ -170,36 +173,40 @@ test('should handle sign out when revoke fails', async () => {
   });
 
   // Call logout via IPC
-  const result = await window.evaluate(async () => {
-    return await window.electron.ipcRenderer.invoke('auth:logout');
+  const result = await appWindow.evaluate(async () => {
+    return await (window as any).electron.ipcRenderer.invoke('auth:logout');
   });
 
   // Logout should still succeed locally
   expect(result.success).toBe(true);
 
-  await window.waitForTimeout(500);
-
   // Verify tokens are cleared despite revoke failure
-  const tokensCleared = await electronApp.evaluate(async () => {
-    const { tokenStorage, isNoUserLoggedInError: noUserErrorHelper } =
-      (global as any).testContext || {};
-    if (!tokenStorage || !noUserErrorHelper) {
-      throw new Error('Test context missing token storage or error helper');
-    }
-    try {
-      const tokens = await tokenStorage.loadTokens();
-      return tokens === null;
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : '';
-      return noUserErrorHelper(errorMessage);
-    }
-  });
-  expect(tokensCleared).toBe(true);
+  await expect
+    .poll(
+      async () => {
+        return electronApp.evaluate(async () => {
+          const { tokenStorage, isNoUserLoggedInError: noUserErrorHelper } =
+            (global as any).testContext || {};
+          if (!tokenStorage || !noUserErrorHelper) {
+            throw new Error('Test context missing token storage or error helper');
+          }
+          try {
+            const tokens = await tokenStorage.loadTokens();
+            return tokens === null;
+          } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : '';
+            return noUserErrorHelper(errorMessage);
+          }
+        });
+      },
+      { timeout: 5000 }
+    )
+    .toBe(true);
 
   // Reload to verify Login Screen is shown
-  await window.reload();
-  await window.waitForLoadState('domcontentloaded');
+  await appWindow.reload();
+  await appWindow.waitForLoadState('domcontentloaded');
 
-  const loginButton = await window.locator('button:has-text("Continue with Google")');
+  const loginButton = await appWindow.locator('button:has-text("Continue with Google")');
   await expect(loginButton).toBeVisible();
 });

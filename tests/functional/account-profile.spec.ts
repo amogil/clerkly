@@ -8,7 +8,6 @@ import {
 import { createMockOAuthServer } from './helpers/electron';
 import type { MockOAuthServer } from './helpers/mock-oauth-server';
 import { testIPC } from './helpers/test-ipc';
-import { isNoUserLoggedInError } from '../../src/shared/errors/userErrors';
 
 /**
  * Functional tests for Account Profile component
