@@ -3,6 +3,12 @@ import React from 'react';
 import { Logo } from '../logo';
 import { isInProgress, type AgentStatus } from '../../../shared/utils/agentStatus';
 import { Message, MessageContent, MessageResponse } from '../ai-elements/message';
+import {
+  Confirmation,
+  ConfirmationAction,
+  ConfirmationActions,
+  ConfirmationRequest,
+} from '../ai-elements/confirmation';
 import { Reasoning, ReasoningTrigger, ReasoningContent } from '../ai-elements/reasoning';
 import type { MessageSnapshot } from '../../../shared/events/types';
 
@@ -13,6 +19,7 @@ interface AgentMessageProps {
   onNavigate?: (screen: string) => void;
 }
 
+// Requirements: llm-integration.7, llm-integration.3.4.1, agents.4.22, agents.4.9
 export function AgentMessage({ message, showAvatar, agentStatus, onNavigate }: AgentMessageProps) {
   if (message.kind === 'user') {
     return (
@@ -37,6 +44,9 @@ export function AgentMessage({ message, showAvatar, agentStatus, onNavigate }: A
       | { message?: string; action_link?: { label: string; screen: string } }
       | undefined;
 
+    const errorMessage = errorInfo?.message || 'Unknown error';
+    const actionLink = errorInfo?.action_link;
+
     return (
       <Message from="assistant">
         {showAvatar && (
@@ -44,21 +54,29 @@ export function AgentMessage({ message, showAvatar, agentStatus, onNavigate }: A
             <Logo size="sm" showText={false} animated={false} />
           </div>
         )}
-        <MessageContent
+        <Confirmation
           data-testid="message-error"
-          className="text-sm leading-relaxed text-red-500 whitespace-pre-wrap break-words rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3"
+          state="approval-requested"
+          approval={{ id: `error-${message.id}`, approved: false }}
+          className="w-fit max-w-full rounded-2xl border border-red-500/30 bg-red-500/10 text-red-700 px-4 py-3"
         >
-          {errorInfo?.message || 'Unknown error'}
-          {errorInfo?.action_link && onNavigate && (
-            <button
-              data-testid="message-error-action-link"
-              onClick={() => onNavigate(errorInfo.action_link!.screen)}
-              className="ml-2 underline text-red-600 hover:text-red-800 font-medium"
-            >
-              {errorInfo.action_link.label}
-            </button>
+          <ConfirmationRequest className="text-sm leading-relaxed whitespace-pre-wrap break-words text-red-700">
+            {errorMessage}
+          </ConfirmationRequest>
+          {actionLink && onNavigate && (
+            <ConfirmationActions className="pt-1">
+              <ConfirmationAction
+                data-testid="message-error-action-link"
+                variant="link"
+                size="xs"
+                onClick={() => onNavigate(actionLink.screen)}
+                className="h-auto p-0 text-red-700 hover:text-red-800"
+              >
+                {actionLink.label}
+              </ConfirmationAction>
+            </ConfirmationActions>
           )}
-        </MessageContent>
+        </Confirmation>
       </Message>
     );
   }
