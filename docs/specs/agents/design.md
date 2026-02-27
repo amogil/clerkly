@@ -1499,7 +1499,7 @@ function AgentWelcome({ onPromptClick }: AgentWelcomeProps) {
 
 ### Стилизация Сообщений
 
-**Requirements:** agents.4.9, agents.4.10, agents.4.22
+**Requirements:** agents.4.9, agents.4.10, agents.4.10.1, agents.4.10.2, agents.4.22, llm-integration.3.4.4
 
 Сообщения рендерятся через компонент `AgentMessage` (`src/renderer/components/agents/AgentMessage.tsx`). Каждое сообщение оборачивается в `motion.div` для анимации появления (fade-in + slide-up).
 
@@ -1517,8 +1517,8 @@ function AgentWelcome({ onPromptClick }: AgentWelcomeProps) {
 
 **Сообщения агента (kind: 'llm'):**
 ```tsx
-// Requirements: agents.4.10, agents.4.22, llm-integration.7
-<div data-testid="message-llm" className="space-y-2">
+// Requirements: agents.4.10, agents.4.10.1, agents.4.22, llm-integration.7
+<div data-testid="message-llm" className="space-y-2 w-full">
   {showAvatar && <Logo size="sm" showText={false} animated={isInProgress(agentStatus)} />}
   {reasoning && (
     <div data-testid="message-llm-reasoning">
@@ -1526,7 +1526,7 @@ function AgentWelcome({ onPromptClick }: AgentWelcomeProps) {
     </div>
   )}
   {action?.content ? (
-    <div data-testid="message-llm-action" className="text-sm leading-relaxed whitespace-pre-wrap break-words">
+    <div data-testid="message-llm-action" className="text-sm leading-relaxed whitespace-pre-wrap break-words w-full">
       {action.content}
     </div>
   ) : (
@@ -1537,28 +1537,36 @@ function AgentWelcome({ onPromptClick }: AgentWelcomeProps) {
 
 **Сообщения об ошибке (kind: 'error'):**
 ```tsx
-// Requirements: llm-integration.3.4.1
-<Confirmation state="approval-requested" approval={{ id: 'error', approved: false }}>
-  <ConfirmationRequest>
-    {/* error message */}
-  </ConfirmationRequest>
-  <ConfirmationActions>
-    {/* optional action_link to Settings */}
-  </ConfirmationActions>
-</Confirmation>
+// Requirements: llm-integration.3.4.1, llm-integration.3.4.4, agents.4.10.2
+<AgentDialog
+  intent="error"
+  approvalId="error"
+  className="w-full max-w-full"
+  message="Invalid API key. Please check your key and try again."
+  actions={
+    <Button variant="link" size="xs" className="h-auto p-0 text-red-700 hover:text-red-800">
+      Open Settings
+    </Button>
+  }
+/>
 ```
+
+`AgentDialog` — кастомный диалог уведомлений. Поддерживает intent: `error`, `warning`, `info`, `confirmation`.
 
 **Диалог rate limit (agent.rate_limit):**
 ```tsx
-// Requirements: llm-integration.3.7
-<Confirmation state="approval-requested" approval={{ id: 'rate-limit', approved: false }}>
-  <ConfirmationRequest>
-    {/* countdown text */}
-  </ConfirmationRequest>
-  <ConfirmationActions>
-    {/* retry and cancel actions */}
-  </ConfirmationActions>
-</Confirmation>
+// Requirements: llm-integration.3.7, llm-integration.3.4.4, agents.4.10.2
+<AgentDialog
+  intent="info"
+  approvalId="rate-limit"
+  className="w-full max-w-full"
+  message="Rate limit exceeded. Retrying in N seconds..."
+  actions={
+    <>
+      {/* retry and cancel actions */}
+    </>
+  }
+/>
 ```
 
 **Анимация появления:**

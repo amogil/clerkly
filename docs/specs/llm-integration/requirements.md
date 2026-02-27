@@ -90,6 +90,8 @@
 
 3.4.3. ЕСЛИ ошибка относится к отсутствию API ключа ИЛИ к ошибке авторизации (HTTP 401/403), ТО диалог ДОЛЖЕН содержать действие "Open Settings", которое навигирует пользователя к настройкам LLM Provider
 
+3.4.4. Диалоги ошибок и уведомлений (включая rate limit) ДОЛЖНЫ занимать всю ширину области чата
+
 3.5. Типы ошибок и их сообщения:
   - **Нет API ключа**: `"API key is not set. Add it in Settings to continue."` + действие "Open Settings"
   - **Неверный ключ** (HTTP 401/403): `"Invalid API key. Please check your key and try again."` + действие "Open Settings"

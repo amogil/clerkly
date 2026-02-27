@@ -56,7 +56,7 @@ export function ConfirmationRequest({ className, ...props }: ConfirmationRequest
   if (state !== 'approval-requested') {
     return null;
   }
-  return <div className={cn('text-sm leading-relaxed', className)} {...props} />;
+  return <div className={cn('col-start-2 text-sm leading-relaxed', className)} {...props} />;
 }
 
 export type ConfirmationAcceptedProps = React.ComponentProps<'div'>;
@@ -68,7 +68,7 @@ export function ConfirmationAccepted({ className, ...props }: ConfirmationAccept
   if (!isAccepted || approval?.approved === false) {
     return null;
   }
-  return <div className={cn('flex items-center gap-2 text-sm', className)} {...props} />;
+  return <div className={cn('col-start-2 flex items-center gap-2 text-sm', className)} {...props} />;
 }
 
 export type ConfirmationRejectedProps = React.ComponentProps<'div'>;
@@ -80,7 +80,7 @@ export function ConfirmationRejected({ className, ...props }: ConfirmationReject
   if (!isRejected) {
     return null;
   }
-  return <div className={cn('flex items-center gap-2 text-sm', className)} {...props} />;
+  return <div className={cn('col-start-2 flex items-center gap-2 text-sm', className)} {...props} />;
 }
 
 export type ConfirmationActionsProps = React.ComponentProps<'div'>;
@@ -91,7 +91,7 @@ export function ConfirmationActions({ className, ...props }: ConfirmationActions
   if (state !== 'approval-requested') {
     return null;
   }
-  return <div className={cn('flex items-center gap-2', className)} {...props} />;
+  return <div className={cn('col-start-2 flex items-center gap-2', className)} {...props} />;
 }
 
 export type ConfirmationActionProps = React.ComponentProps<typeof Button>;

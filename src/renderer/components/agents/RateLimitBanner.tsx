@@ -1,6 +1,6 @@
 // Requirements: llm-integration.3.7
 import React, { useState, useEffect, useRef } from 'react';
-import { ConfirmationAction } from '../ai-elements/confirmation';
+import { Button } from '../ui/button';
 import { AgentDialog } from './AgentDialog';
 
 // Access window.api with proper typing
@@ -67,22 +67,22 @@ export function RateLimitBanner({
       intent="info"
       testId="rate-limit-banner"
       approvalId={`rate-limit-${userMessageId}`}
-      className="flex items-center gap-3 rounded-lg px-4 py-2"
+      className="flex flex-row items-center gap-3 rounded-lg px-4 py-2"
       messageClassName="text-sm"
       actionsClassName="ml-auto"
       message={`Rate limit exceeded. Retrying in ${secondsLeft} second${
         secondsLeft !== 1 ? 's' : ''
       }...`}
       actions={
-        <ConfirmationAction
+        <Button
           data-testid="rate-limit-cancel"
           onClick={handleCancel}
           variant="link"
           size="xs"
-          className="h-auto p-0 text-yellow-700 hover:text-yellow-900 font-medium"
+          className="h-auto p-0 text-sky-700 hover:text-sky-900 font-medium"
         >
           Cancel
-        </ConfirmationAction>
+        </Button>
       }
     />
   );

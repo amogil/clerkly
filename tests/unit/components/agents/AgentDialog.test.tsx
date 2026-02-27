@@ -33,10 +33,10 @@ describe('AgentDialog', () => {
   it('should render actions when provided', () => {
     render(
       <AgentDialog
-        intent="info"
-        approvalId="info-1"
+        intent="warning"
+        approvalId="warning-1"
         testId="agent-dialog-actions"
-        message="Info message"
+        message="Warning message"
         actions={<span>Action</span>}
       />
     );

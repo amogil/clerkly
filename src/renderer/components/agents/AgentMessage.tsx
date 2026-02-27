@@ -1,11 +1,11 @@
 import React from 'react';
-// Requirements: llm-integration.7, llm-integration.3.4.1, agents.4.22, agents.4.9
+// Requirements: llm-integration.7, llm-integration.3.4.1, llm-integration.3.4.4, agents.4.22, agents.4.9, agents.4.10.1, agents.4.10.2
 import { Logo } from '../logo';
 import { isInProgress, type AgentStatus } from '../../../shared/utils/agentStatus';
 import { Message, MessageContent, MessageResponse } from '../ai-elements/message';
-import { ConfirmationAction } from '../ai-elements/confirmation';
 import { Reasoning, ReasoningTrigger, ReasoningContent } from '../ai-elements/reasoning';
 import type { MessageSnapshot } from '../../../shared/events/types';
+import { Button } from '../ui/button';
 import { AgentDialog } from './AgentDialog';
 
 interface AgentMessageProps {
@@ -15,7 +15,7 @@ interface AgentMessageProps {
   onNavigate?: (screen: string) => void;
 }
 
-// Requirements: llm-integration.7, llm-integration.3.4.1, agents.4.22, agents.4.9
+// Requirements: llm-integration.7, llm-integration.3.4.1, llm-integration.3.4.4, agents.4.22, agents.4.9, agents.4.10.1, agents.4.10.2
 export function AgentMessage({ message, showAvatar, agentStatus, onNavigate }: AgentMessageProps) {
   if (message.kind === 'user') {
     return (
@@ -44,7 +44,7 @@ export function AgentMessage({ message, showAvatar, agentStatus, onNavigate }: A
     const actionLink = errorInfo?.action_link;
 
     return (
-      <Message from="assistant">
+      <Message from="assistant" className="w-full max-w-full">
         {showAvatar && (
           <div className="mb-2">
             <Logo size="sm" showText={false} animated={false} />
@@ -59,7 +59,7 @@ export function AgentMessage({ message, showAvatar, agentStatus, onNavigate }: A
           actionsClassName={actionLink && onNavigate ? 'pt-1' : undefined}
           actions={
             actionLink && onNavigate ? (
-              <ConfirmationAction
+              <Button
                 data-testid="message-error-action-link"
                 variant="link"
                 size="xs"
@@ -67,7 +67,7 @@ export function AgentMessage({ message, showAvatar, agentStatus, onNavigate }: A
                 className="h-auto p-0 text-red-700 hover:text-red-800"
               >
                 {actionLink.label}
-              </ConfirmationAction>
+              </Button>
             ) : null
           }
         />
@@ -82,7 +82,7 @@ export function AgentMessage({ message, showAvatar, agentStatus, onNavigate }: A
     const llmAction = llmData?.['action'] as { type?: string; content?: string } | undefined;
 
     return (
-      <Message from="assistant">
+      <Message from="assistant" className="w-full max-w-full">
         {showAvatar && (
           <div className="mb-2">
             <Logo size="sm" showText={false} animated={isInProgress(agentStatus)} />
@@ -99,7 +99,7 @@ export function AgentMessage({ message, showAvatar, agentStatus, onNavigate }: A
             </Reasoning>
           )}
           {llmAction?.content ? (
-            <MessageContent data-testid="message-llm-action">
+            <MessageContent data-testid="message-llm-action" className="w-full">
               <MessageResponse className="text-sm leading-relaxed whitespace-pre-wrap break-words">
                 {llmAction.content}
               </MessageResponse>
@@ -119,13 +119,13 @@ export function AgentMessage({ message, showAvatar, agentStatus, onNavigate }: A
 
   // Fallback for other kinds
   return (
-    <Message from="assistant">
+    <Message from="assistant" className="w-full max-w-full">
       {showAvatar && (
         <div className="mb-2">
           <Logo size="sm" showText={false} animated={isInProgress(agentStatus)} />
         </div>
       )}
-      <MessageContent>
+      <MessageContent className="w-full">
         <p className="text-sm leading-relaxed text-foreground whitespace-pre-wrap break-words">
           {String(message.payload.data?.text || '')}
         </p>

@@ -122,7 +122,7 @@ CREATE TABLE messages (
 }
 ```
 
-**UI отображение:** в renderer `kind: error` рендерится как стандартизированный диалог на базе `Confirmation`, с единым layout для ошибок и опциональным действием.
+**UI отображение:** в renderer `kind: error` рендерится как стандартизированный диалог через кастомный `AgentDialog`, с единым layout и опциональным действием. `AgentDialog` поддерживает intent `error`, `warning`, `info`, `confirmation`; диалоги уведомлений (например, rate limit) используют этот же компонент с intent `info`.
 
 ---
 
@@ -354,7 +354,7 @@ UI фильтрует сообщения с `dismissed: true` — они не о
 
 При получении ошибки `rate_limit` `MainPipeline` НЕ создаёт `kind: error` сообщение, а эмитит событие `agent.rate_limit` с полем `retryAfterSeconds: 10`.
 
-Renderer подписывается на `agent.rate_limit` и показывает диалог поверх чата. По истечении таймера renderer вызывает IPC `messages:retry-last` — `AgentIPCHandlers` повторяет `MainPipeline.run()` с тем же `userMessageId`. При успехе диалог исчезает. При нажатии "Cancel" renderer вызывает IPC `messages:cancel-retry` — `AgentIPCHandlers` удаляет последнее `kind: user` сообщение из БД.
+Renderer подписывается на `agent.rate_limit` и показывает диалог поверх чата. По истечении таймера renderer вызывает IPC `messages:retry-last` — `AgentIPCHandlers` повторяет `MainPipeline.run()` с тем же `userMessageId`. При успехе диалог исчезает. При нажатии "Cancel" renderer вызывает IPC `messages:cancel-retry` — `AgentIPCHandlers` удаляет последнее `kind: user` сообщение из БД. Диалоги ошибок и уведомлений растягиваются на всю ширину области чата (llm-integration.3.4.4).
 
 ```typescript
 // Новое событие
@@ -436,6 +436,7 @@ User отправляет сообщение
 | llm-integration.3.1 | ✓ | ✓ |
 | llm-integration.3.2 | ✓ | ✓ |
 | llm-integration.3.4 | ✓ | ✓ |
+| llm-integration.3.4.4 | - | - |
 | llm-integration.3.5 | ✓ | ✓ |
 | llm-integration.3.7 | - | ✓ |
 | llm-integration.3.8 | - | ✓ |
