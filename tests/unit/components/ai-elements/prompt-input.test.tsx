@@ -24,11 +24,7 @@ describe('PromptInput', () => {
     render(
       <PromptInput onSubmit={jest.fn()}>
         <PromptInputBody>
-          <PromptInputTextarea
-            data-testid="auto-expanding-textarea"
-            onChange={onChange}
-            value=""
-          />
+          <PromptInputTextarea data-testid="auto-expanding-textarea" onChange={onChange} value="" />
           <PromptInputSubmit />
         </PromptInputBody>
       </PromptInput>
