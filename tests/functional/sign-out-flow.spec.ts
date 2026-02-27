@@ -181,16 +181,17 @@ test('should handle sign out when revoke fails', async () => {
 
   // Verify tokens are cleared despite revoke failure
   const tokensCleared = await electronApp.evaluate(async () => {
-    const { tokenStorage } = (global as any).testContext || {};
-    if (!tokenStorage) {
-      throw new Error('Token storage not found in test context');
+    const { tokenStorage, isNoUserLoggedInError: noUserErrorHelper } =
+      (global as any).testContext || {};
+    if (!tokenStorage || !noUserErrorHelper) {
+      throw new Error('Test context missing token storage or error helper');
     }
     try {
       const tokens = await tokenStorage.loadTokens();
       return tokens === null;
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : '';
-      return isNoUserLoggedInError(errorMessage);
+      return noUserErrorHelper(errorMessage);
     }
   });
   expect(tokensCleared).toBe(true);
