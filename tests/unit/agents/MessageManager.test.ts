@@ -41,6 +41,7 @@ describe('MessageManager', () => {
     kind: 'user',
     timestamp: '2026-02-15T10:30:00.000Z',
     payloadJson: JSON.stringify({ data: { text: 'Hello' } }),
+    replyToMessageId: null,
     hidden: false,
   };
 
@@ -57,6 +58,7 @@ describe('MessageManager', () => {
           .fn()
           .mockReturnValue({ messages: [mockMessage], hasMore: false }),
         getLastByAgent: jest.fn().mockReturnValue(mockMessage),
+        getLastUserByAgent: jest.fn().mockReturnValue(mockMessage),
         getById: jest.fn().mockReturnValue(mockMessage),
         create: jest.fn().mockReturnValue(mockMessage),
         update: jest.fn(),
@@ -88,6 +90,7 @@ describe('MessageManager', () => {
         kind: 'user',
         timestamp: new Date(mockMessage.timestamp).getTime(),
         payload: { data: { text: 'Hello' } },
+        replyToMessageId: mockMessage.replyToMessageId ?? null,
         hidden: false,
       });
       expect(typeof snapshot.timestamp).toBe('number');
@@ -110,6 +113,7 @@ describe('MessageManager', () => {
             result: { status: 'success', value: 42 },
           },
         }),
+        replyToMessageId: 1,
         hidden: false,
       };
 
@@ -135,6 +139,7 @@ describe('MessageManager', () => {
         kind: 'user',
         timestamp: '2026-02-15T10:30:00.000Z',
         payloadJson: 'invalid json {',
+        replyToMessageId: null,
         hidden: false,
       };
 
@@ -154,6 +159,7 @@ describe('MessageManager', () => {
         kind: 'user',
         timestamp: '2026-02-15T10:30:00.000Z',
         payloadJson: '',
+        replyToMessageId: null,
         hidden: false,
       };
 
@@ -260,12 +266,13 @@ describe('MessageManager', () => {
     it('should create message and publish event with snapshot', () => {
       const payload = { data: { text: 'Hello' } };
 
-      const result = messageManager.create('agent-123', 'user', payload);
+      const result = messageManager.create('agent-123', 'user', payload, null);
 
       expect(mockDbManager.messages.create).toHaveBeenCalledWith(
         'agent-123',
         'user',
         JSON.stringify(payload),
+        null,
         undefined
       );
       expect(result).toEqual(mockMessage);
@@ -292,6 +299,7 @@ describe('MessageManager', () => {
         kind: 'error',
         timestamp: '2026-02-15T10:30:00.000Z',
         payloadJson: JSON.stringify({ data: { error: { type: 'provider', message: 'fail' } } }),
+        replyToMessageId: null,
         hidden: true, // returned by repo already with hidden=true
       };
 

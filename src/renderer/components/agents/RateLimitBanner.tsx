@@ -2,22 +2,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { AgentDialog } from './AgentDialog';
 
-// Access window.api with proper typing
-declare const window: Window & {
-  api: {
-    messages: {
-      retryLast: (
-        agentId: string,
-        userMessageId: number
-      ) => Promise<{ success: boolean; error?: string }>;
-      cancelRetry: (
-        agentId: string,
-        userMessageId: number
-      ) => Promise<{ success: boolean; error?: string }>;
-    };
-  };
-};
-
 interface RateLimitBannerProps {
   agentId: string;
   userMessageId: number;
@@ -43,10 +27,11 @@ export function RateLimitBanner({
     if (secondsLeft <= 0) {
       if (!hasRetried.current) {
         hasRetried.current = true;
-        // Auto-retry when countdown reaches zero
-        // Requirements: llm-integration.3.7.3
-        window.api.messages.retryLast(agentId, userMessageId).catch(() => {});
-        onDismiss();
+          // Auto-retry when countdown reaches zero
+          // Requirements: llm-integration.3.7.3
+          window.api.messages.retryLast(agentId).finally(() => {
+            onDismiss();
+          });
       }
       return;
     }

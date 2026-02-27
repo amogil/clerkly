@@ -45,7 +45,8 @@ function makeMessage(id: number, kind: string = 'user'): Message {
     agentId: 'agent-1',
     kind,
     timestamp: new Date().toISOString(),
-    payloadJson: JSON.stringify({ data: { text: 'Hello', reply_to_message_id: null } }),
+    payloadJson: JSON.stringify({ data: { text: 'Hello' } }),
+    replyToMessageId: null,
     hidden: false,
   };
 }
@@ -74,6 +75,7 @@ function makeMocks() {
       kind: 'user',
       timestamp: Date.now(),
       payload: {},
+      replyToMessageId: null,
     }),
   } as unknown as jest.Mocked<MessageManager>;
 
@@ -138,7 +140,8 @@ describe('MainPipeline.run()', () => {
           data: expect.objectContaining({
             action: { type: 'text', content: 'Hello back!' },
           }),
-        })
+        }),
+        1
       );
     });
   });
@@ -163,7 +166,7 @@ describe('MainPipeline.run()', () => {
       await pipeline.run('agent-1', 1);
 
       // llm message created on first reasoning chunk
-      expect(messageManager.create).toHaveBeenCalledWith('agent-1', 'llm', expect.any(Object));
+      expect(messageManager.create).toHaveBeenCalledWith('agent-1', 'llm', expect.any(Object), 1);
 
       // reasoning events emitted for each non-done chunk
       const reasoningEvents = mockPublish.mock.calls
@@ -218,7 +221,8 @@ describe('MainPipeline.run()', () => {
           data: expect.objectContaining({
             error: expect.objectContaining({ type: 'network' }),
           }),
-        })
+        }),
+        1
       );
     });
   });
@@ -244,7 +248,7 @@ describe('MainPipeline.run()', () => {
       expect(messageManager.setHidden).toHaveBeenCalledWith(2, 'agent-1');
 
       // error message created
-      expect(messageManager.create).toHaveBeenCalledWith('agent-1', 'error', expect.any(Object));
+      expect(messageManager.create).toHaveBeenCalledWith('agent-1', 'error', expect.any(Object), 1);
     });
   });
 
@@ -272,7 +276,8 @@ describe('MainPipeline.run()', () => {
               action_link: { label: 'Open Settings', screen: 'settings' },
             }),
           }),
-        })
+        }),
+        1
       );
     });
   });
@@ -297,9 +302,8 @@ describe('MainPipeline.run()', () => {
       expect(messageManager.create).toHaveBeenCalledWith(
         'agent-1',
         'llm',
-        expect.objectContaining({
-          data: expect.objectContaining({ reply_to_message_id: 5 }),
-        })
+        expect.any(Object),
+        5
       );
     });
   });
@@ -323,7 +327,8 @@ describe('MainPipeline.run()', () => {
           data: expect.objectContaining({
             error: expect.objectContaining({ type: 'auth' }),
           }),
-        })
+        }),
+        1
       );
     });
   });
@@ -428,7 +433,8 @@ describe('MainPipeline.run()', () => {
           data: expect.objectContaining({
             error: expect.objectContaining({ type: 'timeout' }),
           }),
-        })
+        }),
+        1
       );
     });
 
@@ -445,7 +451,8 @@ describe('MainPipeline.run()', () => {
           data: expect.objectContaining({
             error: expect.objectContaining({ type: 'provider' }),
           }),
-        })
+        }),
+        1
       );
     });
   });
@@ -473,7 +480,8 @@ describe('MainPipeline.run()', () => {
         'llm',
         expect.objectContaining({
           data: expect.objectContaining({ model: LLM_CHAT_MODELS.anthropic.prod.model }),
-        })
+        }),
+        1
       );
     });
 
@@ -495,7 +503,8 @@ describe('MainPipeline.run()', () => {
         'llm',
         expect.objectContaining({
           data: expect.objectContaining({ model: LLM_CHAT_MODELS.google.test.model }),
-        })
+        }),
+        1
       );
     });
   });

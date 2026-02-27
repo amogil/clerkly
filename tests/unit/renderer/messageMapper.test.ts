@@ -9,6 +9,7 @@ function makeSnapshot(overrides: Partial<MessageSnapshot> & { kind: string }): M
     agentId: 'agent-1',
     timestamp: Date.now(),
     payload: { data: {} },
+    replyToMessageId: null,
     hidden: false,
     ...overrides,
   };

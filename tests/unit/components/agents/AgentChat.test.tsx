@@ -156,6 +156,7 @@ const makeMessage = (id: number, kind: 'user' | 'llm' | 'error' = 'user'): Messa
   kind,
   timestamp: Date.now(),
   payload: { data: { text: `msg ${id}` } },
+  replyToMessageId: null,
   hidden: false,
 });
 

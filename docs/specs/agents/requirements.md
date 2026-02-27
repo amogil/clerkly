@@ -438,6 +438,7 @@
    - `agent_id TEXT NOT NULL` - ID агента
    - `timestamp TIMESTAMP NOT NULL` - время сообщения (ISO 8601 с timezone offset)
    - `kind TEXT NOT NULL` - тип сообщения (хранится в отдельной колонке, не в payload_json)
+   - `reply_to_message_id INTEGER` - связь с сообщением, на которое даётся ответ (null для первого)
    - `payload_json TEXT NOT NULL` - JSON с данными сообщения (без поля `kind`)
 
 7.2. Формат `payload_json` (поле `kind` убрано — оно в колонке БД):
@@ -463,12 +464,12 @@
 
 7.5. Сообщение `user` ДОЛЖНО содержать:
    ```json
-   { "data": { "reply_to_message_id": null, "text": "string" } }
+   { "data": { "text": "string" } }
    ```
 
 7.6. Сообщение `final_answer` ДОЛЖНО содержать:
    ```json
-   { "data": { "reply_to_message_id": 123, "text": "string", "format": "markdown|text" } }
+   { "data": { "text": "string", "format": "markdown|text" } }
    ```
 
 7.7. КОГДА `format = "markdown"`, ТО текст ДОЛЖЕН рендериться с поддержкой Markdown

@@ -458,7 +458,7 @@ describe('IPCChatTransport', () => {
       await Promise.resolve();
 
       expect(mockCreate).toHaveBeenCalledWith('agent-1', 'user', {
-        data: { text: 'test message', reply_to_message_id: null },
+        data: { text: 'test message' },
       });
     });
   });

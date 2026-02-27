@@ -64,13 +64,38 @@ export class MessagesRepository {
   }
 
   /**
+   * Get the last user message for an agent (most recent by id)
+   * Returns null if no user messages exist
+   * Requirements: llm-integration.3.4.3, llm-integration.3.7.3
+   */
+  getLastUserByAgent(agentId: string): Message | null {
+    this.checkAccess(agentId);
+    const result = this.db
+      .select()
+      .from(messages)
+      .where(and(eq(messages.agentId, agentId), eq(messages.kind, 'user'), eq(messages.hidden, false)))
+      .orderBy(desc(messages.timestamp))
+      .limit(1)
+      .all();
+
+    const message = result[0];
+    return message ?? null;
+  }
+
+  /**
    * Create a new message for an agent
    * Requirements: user-data-isolation.7.6, llm-integration.2
    * @param kind Message kind: 'user' | 'llm' | 'error' | etc.
    * @param timestamp Optional timestamp (ISO string). Can only be used in test environment.
    * @throws {Error} If timestamp is provided outside test environment
    */
-  create(agentId: string, kind: string, payloadJson: string, timestamp?: string): Message {
+  create(
+    agentId: string,
+    kind: string,
+    payloadJson: string,
+    replyToMessageId: number | null,
+    timestamp?: string
+  ): Message {
     this.checkAccess(agentId);
 
     // Validate timestamp parameter is only used in tests
@@ -82,7 +107,7 @@ export class MessagesRepository {
 
     const message = this.db
       .insert(messages)
-      .values({ agentId, kind, timestamp: messageTimestamp, payloadJson })
+      .values({ agentId, kind, timestamp: messageTimestamp, payloadJson, replyToMessageId })
       .returning()
       .get();
 

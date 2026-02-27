@@ -5,19 +5,21 @@ import { Button } from '../ui/button';
 
 type AgentDialogIntent = 'error' | 'warning' | 'info' | 'confirmation';
 
+export type AgentDialogActionItem = {
+  id?: string;
+  testId?: string;
+  label: string;
+  onClick: () => void;
+  variant?: 'default' | 'outline';
+};
+
 interface AgentDialogProps {
   intent: AgentDialogIntent;
   message: React.ReactNode;
   approvalId: string;
   testId?: string;
   actions?: React.ReactNode;
-  actionItems?: Array<{
-    id?: string;
-    testId?: string;
-    label: string;
-    onClick: () => void;
-    variant?: 'default' | 'outline';
-  }>;
+  actionItems?: AgentDialogActionItem[];
   className?: string;
   messageClassName?: string;
   actionsClassName?: string;

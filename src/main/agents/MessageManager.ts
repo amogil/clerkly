@@ -50,6 +50,7 @@ export class MessageManager {
       kind: message.kind,
       timestamp: new Date(message.timestamp).getTime(),
       payload,
+      replyToMessageId: message.replyToMessageId ?? null,
       hidden: message.hidden ?? false,
     };
   }
@@ -83,6 +84,16 @@ export class MessageManager {
   getLastMessage(agentId: string): Message | null {
     // Repository automatically checks access through AgentsRepository
     return this.dbManager.messages.getLastByAgent(agentId);
+  }
+
+  /**
+   * Get the last user message for an agent (most recent)
+   * Returns null if no user messages exist
+   * Requirements: llm-integration.3.4.3, llm-integration.3.7.3
+   */
+  getLastUserMessage(agentId: string): Message | null {
+    // Repository automatically checks access through AgentsRepository
+    return this.dbManager.messages.getLastUserByAgent(agentId);
   }
 
   /**
@@ -125,10 +136,22 @@ export class MessageManager {
    * @param kind Message kind: 'user' | 'llm' | 'error' | etc.
    * @param timestamp Optional timestamp (ISO string). If not provided, uses current time.
    */
-  create(agentId: string, kind: string, payload: MessagePayload, timestamp?: string): Message {
+  create(
+    agentId: string,
+    kind: string,
+    payload: MessagePayload,
+    replyToMessageId: number | null,
+    timestamp?: string
+  ): Message {
     // Repository automatically checks access
     const payloadJson = JSON.stringify(payload);
-    const message = this.dbManager.messages.create(agentId, kind, payloadJson, timestamp);
+    const message = this.dbManager.messages.create(
+      agentId,
+      kind,
+      payloadJson,
+      replyToMessageId,
+      timestamp
+    );
 
     this.logger.info(`Message created: ${message.id} for agent ${agentId}`);
 

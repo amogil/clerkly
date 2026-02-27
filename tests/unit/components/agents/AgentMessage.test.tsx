@@ -7,6 +7,13 @@ import '@testing-library/jest-dom';
 import { AgentMessage } from '../../../../src/renderer/components/agents/AgentMessage';
 import type { MessageSnapshot } from '../../../../src/shared/events/types';
 
+const mockRetryLast = jest.fn().mockResolvedValue({ success: true });
+(window as any).api = {
+  messages: {
+    retryLast: mockRetryLast,
+  },
+};
+
 const baseMessage = (overrides: Partial<MessageSnapshot> = {}): MessageSnapshot =>
   ({
     id: 1,
@@ -15,6 +22,7 @@ const baseMessage = (overrides: Partial<MessageSnapshot> = {}): MessageSnapshot 
     timestamp: '2024-01-01T00:00:00Z',
     hidden: false,
     payload: { data: { text: 'Hello' } },
+    replyToMessageId: null,
     ...overrides,
   }) as MessageSnapshot;
 
@@ -162,6 +170,10 @@ describe('AgentMessage — llm', () => {
 });
 
 describe('AgentMessage — error', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
   /* Preconditions: kind:error with error message
      Action: render AgentMessage
      Assertions: message-error testid visible, error text shown
@@ -209,11 +221,13 @@ describe('AgentMessage — error', () => {
           payload: {
             data: {
               error: {
+                type: 'auth',
                 message: 'API key invalid',
                 action_link: { label: 'Open Settings', screen: 'settings' },
               },
             },
           },
+          replyToMessageId: 99,
         })}
         showAvatar={false}
         agentStatus="error"
@@ -222,6 +236,35 @@ describe('AgentMessage — error', () => {
     );
     fireEvent.click(screen.getByTestId('message-error-action-link'));
     expect(onNavigate).toHaveBeenCalledWith('settings');
+  });
+
+  /* Preconditions: kind:error auth
+     Action: click Retry button
+     Assertions: retryLast called for agent
+     Requirements: llm-integration.3.4.3 */
+  it('should retry last message when retry action clicked', async () => {
+    render(
+      <AgentMessage
+        message={baseMessage({
+          kind: 'error',
+          payload: {
+            data: {
+              error: {
+                type: 'auth',
+                message: 'API key invalid',
+                action_link: { label: 'Open Settings', screen: 'settings' },
+              },
+            },
+          },
+        })}
+        showAvatar={false}
+        agentStatus="error"
+      />
+    );
+
+    fireEvent.click(screen.getByTestId('message-error-retry'));
+    await Promise.resolve();
+    expect(mockRetryLast).toHaveBeenCalledWith('agent1');
   });
 
   /* Preconditions: kind:error with action_link, no onNavigate

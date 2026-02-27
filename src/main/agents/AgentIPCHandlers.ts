@@ -269,7 +269,13 @@ export class AgentIPCHandlers {
     args: { agentId: string; kind: string; payload: MessagePayload }
   ): Promise<IPCResult> {
     try {
-      const message = this.messageManager.create(args.agentId, args.kind, args.payload);
+      const replyToMessageId = args.kind === 'user' ? null : null;
+      const message = this.messageManager.create(
+        args.agentId,
+        args.kind,
+        args.payload,
+        replyToMessageId
+      );
       this.logger.info(`Message created: ${message.id} for agent ${args.agentId}`);
       // Convert to snapshot with parsed payload
       const snapshot = this.messageManager.toEventMessage(message);
@@ -337,9 +343,13 @@ export class AgentIPCHandlers {
    */
   private async handleMessageRetryLast(
     _event: IpcMainInvokeEvent,
-    args: { agentId: string; userMessageId: number }
+    args: { agentId: string }
   ): Promise<IPCResult> {
     try {
+      const lastUser = this.messageManager.getLastUserMessage(args.agentId);
+      if (!lastUser) {
+        return { success: false, error: 'No user message to retry' };
+      }
       // Cancel any running pipeline for this agent
       this.agentManager.cancelPipeline(args.agentId);
 
@@ -349,7 +359,7 @@ export class AgentIPCHandlers {
 
       // Run pipeline in background — do not await
       this.pipeline
-        .run(args.agentId, args.userMessageId, controller.signal)
+        .run(args.agentId, lastUser.id, controller.signal)
         .catch((err: unknown) => {
           handleBackgroundError(err, 'LLM Pipeline (retry)');
         })

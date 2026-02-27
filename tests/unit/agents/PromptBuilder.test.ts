@@ -17,7 +17,8 @@ function makeMessage(overrides: Partial<Message> & { id: number }): Message {
     agentId: 'agent-1',
     kind: 'user',
     timestamp: '2026-02-15T10:00:00.000Z',
-    payloadJson: JSON.stringify({ data: { text: 'Hello', reply_to_message_id: null } }),
+    payloadJson: JSON.stringify({ data: { text: 'Hello' } }),
+    replyToMessageId: null,
     hidden: false,
     ...overrides,
   };
@@ -132,17 +133,18 @@ describe('PromptBuilder.build()', () => {
         makeMessage({
           id: 1,
           kind: 'user',
-          payloadJson: JSON.stringify({ data: { text: 'Hello', reply_to_message_id: null } }),
+          payloadJson: JSON.stringify({ data: { text: 'Hello' } }),
+          replyToMessageId: null,
         }),
         makeMessage({
           id: 2,
           kind: 'llm',
           payloadJson: JSON.stringify({
             data: {
-              reply_to_message_id: 1,
               action: { type: 'text', content: 'Hi there!' },
             },
           }),
+          replyToMessageId: 1,
         }),
       ];
 
@@ -166,12 +168,12 @@ describe('PromptBuilder.build()', () => {
           kind: 'llm',
           payloadJson: JSON.stringify({
             data: {
-              reply_to_message_id: null,
               model: 'gpt-5.2',
               reasoning: { text: 'My internal thoughts', excluded_from_replay: true },
               action: { type: 'text', content: 'Answer' },
             },
           }),
+          replyToMessageId: null,
         }),
       ];
 
@@ -192,7 +194,8 @@ describe('PromptBuilder.build()', () => {
         makeMessage({
           id: 1,
           kind: 'user',
-          payloadJson: JSON.stringify({ data: { text: 'First', reply_to_message_id: null } }),
+          payloadJson: JSON.stringify({ data: { text: 'First' } }),
+          replyToMessageId: null,
         }),
       ];
 
@@ -236,10 +239,10 @@ describe('PromptBuilder edge cases', () => {
           kind: 'llm',
           payloadJson: JSON.stringify({
             data: {
-              reply_to_message_id: null,
               action: { type: 'text', content: 'Hello' },
             },
           }),
+          replyToMessageId: null,
         }),
       ];
       const { history } = makeBuilder().build(msgs);
@@ -304,7 +307,8 @@ describe('PromptBuilder filtering (error)', () => {
       makeMessage({
         id: 1,
         kind: 'user',
-        payloadJson: JSON.stringify({ data: { text: 'Hello', reply_to_message_id: null } }),
+        payloadJson: JSON.stringify({ data: { text: 'Hello' } }),
+        replyToMessageId: null,
       }),
       makeMessage({
         id: 2,

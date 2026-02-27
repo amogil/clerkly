@@ -9,19 +9,6 @@ import type {
   MessageLlmReasoningUpdatedPayload,
 } from '../../shared/events/types';
 
-// Access window.api with proper typing
-declare const window: Window & {
-  api: {
-    messages: {
-      create: (
-        agentId: string,
-        kind: string,
-        payload: { data: { text: string; reply_to_message_id: null } }
-      ) => Promise<{ success: boolean; data?: unknown; error?: string }>;
-    };
-  };
-};
-
 /**
  * IPC-based ChatTransport for AI SDK useChat hook.
  * Bridges useChat with Electron IPC instead of HTTP.
@@ -190,7 +177,7 @@ export class IPCChatTransport implements ChatTransport<UIMessage> {
         // Requirements: agents.4.3
         window.api.messages
           .create(agentId, 'user', {
-            data: { text, reply_to_message_id: null },
+            data: { text },
           })
           .then((result) => {
             if (!result.success) {

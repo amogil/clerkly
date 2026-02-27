@@ -31,6 +31,7 @@ CREATE TABLE messages (
   agent_id TEXT NOT NULL,
   timestamp TEXT NOT NULL,
   kind TEXT NOT NULL,
+  reply_to_message_id INTEGER,
   payload_json TEXT NOT NULL
 );
 ```
@@ -39,12 +40,13 @@ CREATE TABLE messages (
 
 ## Форматы Сообщений
 
+`reply_to_message_id` хранится в колонке `messages.reply_to_message_id` и не входит в payload JSON.
+
 ### kind: user
 
 ```json
 {
   "data": {
-    "reply_to_message_id": null,
     "text": "Hello"
   }
 }
@@ -55,7 +57,6 @@ CREATE TABLE messages (
 ```json
 {
   "data": {
-    "reply_to_message_id": 1,
     "reasoning": { "text": "...", "excluded_from_replay": true },
     "action": { "type": "text", "content": "Hi! How can I help?" },
     "usage": {
@@ -74,7 +75,6 @@ CREATE TABLE messages (
 ```json
 {
   "data": {
-    "reply_to_message_id": 1,
     "interrupted": true,
     "reasoning": { "text": "частичный...", "excluded_from_replay": true }
   }
@@ -86,7 +86,6 @@ CREATE TABLE messages (
 ```json
 {
   "data": {
-    "reply_to_message_id": 2,
     "error": {
       "type": "auth",
       "message": "Invalid API key. Please check your key and try again.",
@@ -101,7 +100,6 @@ CREATE TABLE messages (
 ```json
 {
   "data": {
-    "reply_to_message_id": 2,
     "error": { "type": "network", "message": "Network error. Please check your internet connection." }
   }
 }
@@ -112,7 +110,6 @@ CREATE TABLE messages (
 ```json
 {
   "data": {
-    "reply_to_message_id": 2,
     "error": {
       "type": "auth",
       "message": "API key is not set. Add it in Settings to continue.",
@@ -122,7 +119,7 @@ CREATE TABLE messages (
 }
 ```
 
-**UI отображение:** в renderer `kind: error` рендерится как стандартизированный диалог через кастомный `AgentDialog`, с единым layout и опциональным действием. `AgentDialog` поддерживает intent `error`, `warning`, `info`, `confirmation`; диалоги уведомлений (например, rate limit) используют этот же компонент с intent `info`.
+**UI отображение:** `reply_to_message_id` хранится в колонке `messages.reply_to_message_id` и передаётся в `MessageSnapshot` отдельным полем, не внутри payload. В renderer `kind: error` рендерится как стандартизированный диалог через кастомный `AgentDialog` с intent `error`, единым layout и опциональными действиями. Для ошибок API ключа (auth) диалог показывает "Open Settings" и "Retry". `AgentDialog` поддерживает intent `error`, `warning`, `info`, `confirmation`; диалоги уведомлений (например, rate limit) используют этот же компонент с intent `info`.
 
 ---
 
@@ -305,7 +302,7 @@ catch(error):
   if llmMessageId != null:
     обновить kind:llm: добавить interrupted: true
     эмитить message.updated
-  создать kind:error { reply_to_message_id, error.message }
+  создать kind:error (messages.reply_to_message_id = userMessageId, payload.error.message)
   эмитить message.created
 ```
 
@@ -354,7 +351,7 @@ UI фильтрует сообщения с `dismissed: true` — они не о
 
 При получении ошибки `rate_limit` `MainPipeline` НЕ создаёт `kind: error` сообщение, а эмитит событие `agent.rate_limit` с полем `retryAfterSeconds: 10`.
 
-Renderer подписывается на `agent.rate_limit` и показывает диалог поверх чата. По истечении таймера renderer вызывает IPC `messages:retry-last` — `AgentIPCHandlers` повторяет `MainPipeline.run()` с тем же `userMessageId`. При успехе диалог исчезает. При нажатии "Cancel" renderer вызывает IPC `messages:cancel-retry` — `AgentIPCHandlers` удаляет последнее `kind: user` сообщение из БД. Диалоги ошибок и уведомлений растягиваются на всю ширину области чата (llm-integration.3.4.4).
+Renderer подписывается на `agent.rate_limit` и показывает диалог поверх чата. По истечении таймера renderer вызывает IPC `messages:retry-last` — `AgentIPCHandlers` берёт последний `kind:user` из БД и повторяет `MainPipeline.run()` с этим `userMessageId`. При успехе диалог исчезает. При нажатии "Cancel" renderer вызывает IPC `messages:cancel-retry` — `AgentIPCHandlers` удаляет последнее `kind: user` сообщение из БД. Диалоги ошибок и уведомлений растягиваются на всю ширину области чата (llm-integration.3.4.4).
 
 ```typescript
 // Новое событие

@@ -120,8 +120,7 @@ export interface API {
     getLast: (agentId: string) => Promise<{ success: boolean; data?: unknown; error?: string }>;
     // Requirements: llm-integration.3.7.3
     retryLast: (
-      agentId: string,
-      userMessageId: number
+      agentId: string
     ) => Promise<{ success: boolean; error?: string }>;
     // Requirements: llm-integration.3.7.4
     cancelRetry: (
@@ -602,11 +601,8 @@ const api: API = {
      * Retry last LLM request after rate limit countdown
      * Requirements: llm-integration.3.7.3
      */
-    async retryLast(
-      agentId: string,
-      userMessageId: number
-    ): Promise<{ success: boolean; error?: string }> {
-      return await ipcRenderer.invoke('messages:retry-last', { agentId, userMessageId });
+    async retryLast(agentId: string): Promise<{ success: boolean; error?: string }> {
+      return await ipcRenderer.invoke('messages:retry-last', { agentId });
     },
 
     /**

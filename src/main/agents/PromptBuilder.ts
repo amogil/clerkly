@@ -154,6 +154,10 @@ export class PromptBuilder {
     }
 
     const data = this.sanitizeData(msg.kind, payload.data as Record<string, unknown> | undefined);
+    const dataWithReply = {
+      reply_to_message_id: msg.replyToMessageId ?? null,
+      ...data,
+    };
 
     const lines: string[] = [
       `  - id: ${msg.id}`,
@@ -162,7 +166,7 @@ export class PromptBuilder {
       `    data:`,
     ];
 
-    for (const [key, value] of Object.entries(data)) {
+    for (const [key, value] of Object.entries(dataWithReply)) {
       lines.push(`      ${key}: ${this.yamlValue(value)}`);
     }
 

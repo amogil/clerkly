@@ -87,7 +87,7 @@ describe('RateLimitBanner', () => {
       jest.advanceTimersByTime(1000);
     });
 
-    expect(mockRetryLast).toHaveBeenCalledWith('agent-1', 42);
+    expect(mockRetryLast).toHaveBeenCalledWith('agent-1');
     expect(onDismiss).toHaveBeenCalled();
   });
 

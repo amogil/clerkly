@@ -88,6 +88,7 @@ export const messages = sqliteTable(
     kind: text('kind').notNull(),
     timestamp: text('timestamp').notNull(),
     payloadJson: text('payload_json').notNull(),
+    replyToMessageId: integer('reply_to_message_id'),
     // Requirements: llm-integration.3.8, llm-integration.8.5
     // Unified flag: hides message from UI and LLM history.
     // Set for interrupted llm messages and dismissed error messages.

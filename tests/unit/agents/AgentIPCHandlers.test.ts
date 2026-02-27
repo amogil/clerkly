@@ -53,6 +53,7 @@ describe('AgentIPCHandlers', () => {
     kind: 'user',
     timestamp: '2026-02-15T10:00:00.000Z',
     payloadJson: JSON.stringify({ data: { text: 'Hello' } }),
+    replyToMessageId: null,
     hidden: false,
   };
 
@@ -62,6 +63,7 @@ describe('AgentIPCHandlers', () => {
     kind: 'user',
     timestamp: new Date('2026-02-15T10:00:00.000Z').getTime(),
     payload: { data: { text: 'Hello' } },
+    replyToMessageId: null,
     hidden: false,
   };
 
@@ -105,6 +107,7 @@ describe('AgentIPCHandlers', () => {
       create: jest.fn().mockReturnValue(mockMessage),
       update: jest.fn(),
       getLastMessage: jest.fn().mockReturnValue(mockMessage),
+      getLastUserMessage: jest.fn().mockReturnValue(mockMessage),
       toEventMessage: jest.fn().mockReturnValue(mockMessageSnapshot),
       dismissErrorMessages: jest.fn(),
     } as unknown as jest.Mocked<MessageManager>;
@@ -513,7 +516,12 @@ describe('AgentIPCHandlers', () => {
         payload: userPayload,
       });
 
-      expect(mockMessageManager.create).toHaveBeenCalledWith('abc123xyz0', 'user', userPayload);
+      expect(mockMessageManager.create).toHaveBeenCalledWith(
+        'abc123xyz0',
+        'user',
+        userPayload,
+        null
+      );
       expect(mockMessageManager.toEventMessage).toHaveBeenCalledWith(mockMessage);
       expect(result).toEqual({ success: true, data: mockMessageSnapshot });
     });
@@ -827,14 +835,14 @@ describe('AgentIPCHandlers', () => {
 
   describe('messages:retry-last handler', () => {
     /* Preconditions: Handlers registered
-       Action: Invoke messages:retry-last with agentId and userMessageId
-       Assertions: Pipeline launched with same userMessageId, success returned
+       Action: Invoke messages:retry-last with agentId
+       Assertions: Pipeline launched with last user message id, success returned
        Requirements: llm-integration.3.7.3 */
     it('should launch pipeline with same userMessageId and return success', async () => {
       handlers.registerHandlers();
       const handler = registeredHandlers.get('messages:retry-last')!;
 
-      const result = await handler(mockEvent, { agentId: 'abc123xyz0', userMessageId: 42 });
+      const result = await handler(mockEvent, { agentId: 'abc123xyz0' });
 
       expect(result).toEqual({ success: true });
       expect(mockAgentManager.cancelPipeline).toHaveBeenCalledWith('abc123xyz0');
@@ -842,7 +850,7 @@ describe('AgentIPCHandlers', () => {
         'abc123xyz0',
         expect.any(AbortController)
       );
-      expect(mockPipeline.run).toHaveBeenCalledWith('abc123xyz0', 42, expect.any(AbortSignal));
+      expect(mockPipeline.run).toHaveBeenCalledWith('abc123xyz0', 1, expect.any(AbortSignal));
     });
 
     /* Preconditions: Handlers registered, pipeline throws
@@ -856,7 +864,7 @@ describe('AgentIPCHandlers', () => {
       handlers.registerHandlers();
       const handler = registeredHandlers.get('messages:retry-last')!;
 
-      const result = await handler(mockEvent, { agentId: 'abc123xyz0', userMessageId: 42 });
+      const result = await handler(mockEvent, { agentId: 'abc123xyz0' });
 
       expect(result).toEqual({ success: false, error: 'Cancel failed' });
     });
@@ -877,7 +885,7 @@ describe('AgentIPCHandlers', () => {
       handlers.registerHandlers();
       const handler = registeredHandlers.get('messages:retry-last')!;
 
-      const result = await handler(mockEvent, { agentId: 'abc123xyz0', userMessageId: 42 });
+      const result = await handler(mockEvent, { agentId: 'abc123xyz0' });
 
       expect(result).toEqual({ success: true });
 

@@ -167,17 +167,15 @@ export class MainPipeline {
             // Create the llm message on first reasoning chunk
             const llmMsg = this.messageManager.create(agentId, 'llm', {
               data: {
-                reply_to_message_id: replyToMessageId,
                 model: options.model,
                 reasoning: { text: accumulatedReasoning, excluded_from_replay: true },
               },
-            });
+          }, replyToMessageId);
             llmMessageId = llmMsg.id;
           } else {
             // Update reasoning in existing message
             this.messageManager.update(llmMessageId, agentId, {
               data: {
-                reply_to_message_id: replyToMessageId,
                 model: options.model,
                 reasoning: { text: accumulatedReasoning, excluded_from_replay: true },
               },
@@ -208,7 +206,6 @@ export class MainPipeline {
       // ── 9. Write final action ─────────────────────────────────────────────
       const finalPayload = {
         data: {
-          reply_to_message_id: replyToMessageId,
           model: options.model,
           reasoning: accumulatedReasoning
             ? { text: accumulatedReasoning, excluded_from_replay: true }
@@ -220,7 +217,7 @@ export class MainPipeline {
 
       if (llmMessageId === null) {
         // No reasoning chunks — create message now
-        this.messageManager.create(agentId, 'llm', finalPayload);
+        this.messageManager.create(agentId, 'llm', finalPayload, replyToMessageId);
       } else {
         this.messageManager.update(llmMessageId, agentId, finalPayload);
       }
@@ -254,8 +251,7 @@ export class MainPipeline {
 
       // Create error message
       const errorType = classifyError(errorMessage);
-      const lastMsg = this.messageManager.getLastMessage(agentId);
-      const errorReplyTo = lastMsg?.id ?? null;
+      const errorReplyTo = userMessageId;
 
       // Rate limit — emit event for UI banner instead of kind:error message
       // Requirements: llm-integration.3.7
@@ -277,10 +273,9 @@ export class MainPipeline {
 
       this.messageManager.create(agentId, 'error', {
         data: {
-          reply_to_message_id: errorReplyTo,
           error: errorPayload,
         },
-      });
+      }, errorReplyTo);
     }
   }
 

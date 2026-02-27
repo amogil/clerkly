@@ -6,6 +6,7 @@ import { Message, MessageContent, MessageResponse } from '../ai-elements/message
 import { Reasoning, ReasoningTrigger, ReasoningContent } from '../ai-elements/reasoning';
 import type { MessageSnapshot } from '../../../shared/events/types';
 import { AgentErrorDialog } from './AgentErrorDialog';
+import type { AgentDialogActionItem } from './AgentDialog';
 
 interface AgentMessageProps {
   message: MessageSnapshot;
@@ -33,14 +34,37 @@ export function AgentMessage({ message, showAvatar, agentStatus, onNavigate }: A
   }
 
   if (message.kind === 'error') {
-    // Requirements: llm-integration.7, llm-integration.3.4.1 — error bubble with optional action_link
+    // Requirements: llm-integration.7, llm-integration.3.4.1, llm-integration.3.4.3 — error bubble with optional actions
     const errorData = message.payload.data as Record<string, unknown> | undefined;
     const errorInfo = errorData?.['error'] as
-      | { message?: string; action_link?: { label: string; screen: string } }
+      | { type?: string; message?: string; action_link?: { label: string; screen: string } }
       | undefined;
 
     const errorMessage = errorInfo?.message || 'Unknown error';
     const actionLink = errorInfo?.action_link;
+    const canRetry = errorInfo?.type === 'auth';
+
+    const actionItems: AgentDialogActionItem[] = [];
+    if (actionLink && onNavigate) {
+      actionItems.push({
+        id: 'error-open-settings',
+        label: actionLink.label,
+        onClick: () => onNavigate(actionLink.screen),
+        testId: 'message-error-action-link',
+        variant: 'outline',
+      });
+    }
+    if (canRetry) {
+      actionItems.push({
+        id: 'error-retry',
+        label: 'Retry',
+        onClick: () => {
+          window.api.messages.retryLast(message.agentId).catch(() => {});
+        },
+        testId: 'message-error-retry',
+        variant: 'default',
+      });
+    }
 
     return (
       <Message from="assistant" className="w-full max-w-full">
@@ -53,15 +77,7 @@ export function AgentMessage({ message, showAvatar, agentStatus, onNavigate }: A
           testId="message-error"
           approvalId={`error-${message.id}`}
           message={errorMessage}
-          action={
-            actionLink && onNavigate
-              ? {
-                  label: actionLink.label,
-                  onClick: () => onNavigate(actionLink.screen),
-                  testId: 'message-error-action-link',
-                }
-              : undefined
-          }
+          actions={actionItems.length ? actionItems : undefined}
         />
       </Message>
     );

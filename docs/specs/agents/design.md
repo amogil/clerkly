@@ -1537,17 +1537,16 @@ function AgentWelcome({ onPromptClick }: AgentWelcomeProps) {
 
 **Сообщения об ошибке (kind: 'error'):**
 ```tsx
-// Requirements: llm-integration.3.4.1, llm-integration.3.4.4, agents.4.10.2
+// Requirements: llm-integration.3.4.1, llm-integration.3.4.3, llm-integration.3.4.4, agents.4.10.2
 <AgentDialog
   intent="error"
   approvalId="error"
   className="w-full max-w-full"
   message="Invalid API key. Please check your key and try again."
-  actions={
-    <Button variant="link" size="xs" className="h-auto p-0 text-red-700 hover:text-red-800">
-      Open Settings
-    </Button>
-  }
+  actionItems={[
+    { label: 'Open Settings', onClick: () => onNavigate('settings'), variant: 'outline' },
+    { label: 'Retry', onClick: () => retryLast(agentId, replyToMessageId), variant: 'default' },
+  ]}
 />
 ```
 
@@ -1561,11 +1560,9 @@ function AgentWelcome({ onPromptClick }: AgentWelcomeProps) {
   approvalId="rate-limit"
   className="w-full max-w-full"
   message="Rate limit exceeded. Retrying in N seconds..."
-  actions={
-    <>
-      {/* retry and cancel actions */}
-    </>
-  }
+  actionItems={[
+    { label: 'Cancel', onClick: () => cancelRetry(), variant: 'outline' },
+  ]}
 />
 ```
 
