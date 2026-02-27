@@ -73,7 +73,7 @@ test.describe('Window State Persistence', () => {
 
   /* Preconditions: Application running
      Action: Resize window below minimum size using Electron API
-     Assertions: Window size is clamped to minimum 350x300
+     Assertions: Window size is clamped to minimum 350x650
      Requirements: window-management.1.6 */
   test('should enforce minimum window size', async () => {
     context = await launchElectron();
@@ -91,7 +91,7 @@ test.describe('Window State Persistence', () => {
 
     const bounds = await getWindowBounds(context.app);
     expect(bounds.width).toBeGreaterThanOrEqual(350);
-    expect(bounds.height).toBeGreaterThanOrEqual(300);
+    expect(bounds.height).toBeGreaterThanOrEqual(650);
   });
 
   /* Preconditions: Application running with default window size

@@ -149,7 +149,7 @@ describe('WindowManager', () => {
           width: 900, // min(900, 1920)
           height: 700, // min(700, 1080)
           minWidth: 350, // Requirements: window-management.1.6
-          minHeight: 300, // Requirements: window-management.1.6
+          minHeight: 650, // Requirements: window-management.1.6
         })
       );
     });

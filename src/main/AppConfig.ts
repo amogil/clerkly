@@ -40,7 +40,7 @@ export class AppConfig {
     width: 900,
     height: 700,
     minWidth: 350,
-    minHeight: 300,
+    minHeight: 650,
     titleBarStyle: 'hiddenInset',
     vibrancy: 'under-window',
   };

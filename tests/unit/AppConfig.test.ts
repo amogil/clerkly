@@ -34,14 +34,14 @@ describe('AppConfig', () => {
 
   /* Preconditions: AppConfig instance created
      Action: access windowSettings property
-     Assertions: windowSettings contains correct default values (width: 900, height: 700, minWidth: 350, minHeight: 300, titleBarStyle: 'hiddenInset', vibrancy: 'under-window')
+     Assertions: windowSettings contains correct default values (width: 900, height: 700, minWidth: 350, minHeight: 650, titleBarStyle: 'hiddenInset', vibrancy: 'under-window')
      Requirements: clerkly.1*/
   it('should have correct default window settings', () => {
     expect(appConfig.windowSettings).toEqual({
       width: 900,
       height: 700,
       minWidth: 350,
-      minHeight: 300,
+      minHeight: 650,
       titleBarStyle: 'hiddenInset',
       vibrancy: 'under-window',
     });
@@ -81,7 +81,7 @@ describe('AppConfig', () => {
       width: 900,
       height: 700,
       minWidth: 350,
-      minHeight: 300,
+      minHeight: 650,
       titleBarStyle: 'hiddenInset',
       vibrancy: 'under-window',
     });
@@ -110,7 +110,7 @@ describe('AppConfig', () => {
     expect(appConfig.windowSettings.width).toBe(1024);
     expect(appConfig.windowSettings.height).toBe(768);
     expect(appConfig.windowSettings.minWidth).toBe(350);
-    expect(appConfig.windowSettings.minHeight).toBe(300);
+    expect(appConfig.windowSettings.minHeight).toBe(650);
     expect(appConfig.windowSettings.titleBarStyle).toBe('hiddenInset');
     expect(appConfig.windowSettings.vibrancy).toBe('under-window');
   });
@@ -165,11 +165,11 @@ describe('AppConfig', () => {
 
   /* Preconditions: AppConfig instance created
      Action: access windowSettings minimum dimensions
-     Assertions: minWidth is 350, minHeight is 300
+     Assertions: minWidth is 350, minHeight is 650
      Requirements: clerkly.1*/
   it('should have correct minimum window dimensions', () => {
     expect(appConfig.windowSettings.minWidth).toBe(350);
-    expect(appConfig.windowSettings.minHeight).toBe(300);
+    expect(appConfig.windowSettings.minHeight).toBe(650);
   });
 
   /* Preconditions: AppConfig instance created

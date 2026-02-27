@@ -94,7 +94,7 @@ describe('WindowStateManager', () => {
         x: 100,
         y: 100,
         width: 800,
-        height: 600,
+        height: 700,
         isMaximized: false,
       };
 
@@ -132,7 +132,7 @@ describe('WindowStateManager', () => {
 
     /* Preconditions: saved state exists with size smaller than minimum
        Action: call loadState()
-       Assertions: returns saved state with width/height clamped to minimum 350x300
+       Assertions: returns saved state with width/height clamped to minimum 350x650
        Requirements: window-management.1.6, window-management.5.4, user-data-isolation.6.8 */
     it('should clamp saved state to minimum size', () => {
       const savedState: WindowState = {
@@ -148,7 +148,7 @@ describe('WindowStateManager', () => {
       const result = windowStateManager.loadState();
 
       expect(result.width).toBe(350);
-      expect(result.height).toBe(300);
+      expect(result.height).toBe(650);
       expect(result.x).toBe(savedState.x);
       expect(result.y).toBe(savedState.y);
       expect(result.isMaximized).toBe(false);
@@ -203,7 +203,7 @@ describe('WindowStateManager', () => {
         x: 2000, // On secondary display
         y: 100,
         width: 800,
-        height: 600,
+        height: 700,
         isMaximized: false,
       };
 
@@ -229,7 +229,7 @@ describe('WindowStateManager', () => {
         x: 1919, // At right edge of display
         y: 1079, // At bottom edge of display
         width: 800,
-        height: 600,
+        height: 700,
         isMaximized: false,
       };
 
@@ -249,7 +249,7 @@ describe('WindowStateManager', () => {
         x: -1000, // On display to the left
         y: 100,
         width: 800,
-        height: 600,
+        height: 700,
         isMaximized: false,
       };
 
