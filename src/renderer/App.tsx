@@ -172,19 +172,6 @@ function AppContent() {
     appState.phase === 'preparing-session' ||
     appState.phase === 'waiting-for-chats';
 
-  const renderScreen = () => {
-    switch (currentScreen) {
-      case 'agents':
-        return <Agents onNavigate={navigateToScreen} />;
-      case 'settings':
-        return <Settings onSignOut={handleSignOut} onNavigate={navigateToScreen} />;
-      case 'error-demo':
-        return <ErrorDemoPage onBack={() => navigateToScreen('settings')} />;
-      default:
-        return <Agents onNavigate={navigateToScreen} />;
-    }
-  };
-
   return (
     <>
       {isGlobalLoading && <AppLoadingScreen />}
@@ -193,7 +180,21 @@ function AppContent() {
         data-testid="agents-screen"
       >
         <TopNavigation currentScreen={currentScreen} onNavigate={navigateToScreen} />
-        <div className="pt-16">{renderScreen()}</div>
+        <div className="pt-16">
+          <div
+            className={`${
+              currentScreen === 'agents' ? '' : 'opacity-0 pointer-events-none absolute inset-0'
+            }`}
+          >
+            <Agents onNavigate={navigateToScreen} />
+          </div>
+          {currentScreen === 'settings' && (
+            <Settings onSignOut={handleSignOut} onNavigate={navigateToScreen} />
+          )}
+          {currentScreen === 'error-demo' && (
+            <ErrorDemoPage onBack={() => navigateToScreen('settings')} />
+          )}
+        </div>
       </div>
     </>
   );
