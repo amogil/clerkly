@@ -73,6 +73,7 @@ export function RateLimitBanner({
       actionItems={[
         {
           id: 'rate-limit-cancel',
+          testId: 'rate-limit-cancel',
           label: 'Cancel',
           onClick: handleCancel,
           variant: 'outline',

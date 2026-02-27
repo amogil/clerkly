@@ -58,6 +58,7 @@ export function AgentMessage({ message, showAvatar, agentStatus, onNavigate }: A
               ? {
                   label: actionLink.label,
                   onClick: () => onNavigate(actionLink.screen),
+                  testId: 'message-error-action-link',
                 }
               : undefined
           }

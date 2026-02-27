@@ -8,6 +8,7 @@ interface AgentErrorDialogProps {
   action?: {
     label: string;
     onClick: () => void;
+    testId?: string;
   };
   testId?: string;
 }
@@ -26,6 +27,7 @@ export function AgentErrorDialog({ approvalId, message, action, testId }: AgentE
           ? [
               {
                 id: 'error-action',
+                testId: action.testId,
                 label: action.label,
                 onClick: action.onClick,
                 variant: 'outline',

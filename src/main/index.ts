@@ -210,7 +210,7 @@ import { PromptBuilder, FullHistoryStrategy } from './agents/PromptBuilder';
 const agentManager = new AgentManager(dbManager);
 const messageManager = new MessageManager(dbManager);
 const promptBuilder = new PromptBuilder(
-  'You are a helpful AI assistant.',
+  'You are a helpful AI assistant. You may respond in Markdown when it improves clarity.',
   [],
   new FullHistoryStrategy()
 );

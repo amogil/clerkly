@@ -68,7 +68,9 @@ export function ConfirmationAccepted({ className, ...props }: ConfirmationAccept
   if (!isAccepted || approval?.approved === false) {
     return null;
   }
-  return <div className={cn('col-start-2 flex items-center gap-2 text-sm', className)} {...props} />;
+  return (
+    <div className={cn('col-start-2 flex items-center gap-2 text-sm', className)} {...props} />
+  );
 }
 
 export type ConfirmationRejectedProps = React.ComponentProps<'div'>;
@@ -80,7 +82,9 @@ export function ConfirmationRejected({ className, ...props }: ConfirmationReject
   if (!isRejected) {
     return null;
   }
-  return <div className={cn('col-start-2 flex items-center gap-2 text-sm', className)} {...props} />;
+  return (
+    <div className={cn('col-start-2 flex items-center gap-2 text-sm', className)} {...props} />
+  );
 }
 
 export type ConfirmationActionsProps = React.ComponentProps<'div'>;
