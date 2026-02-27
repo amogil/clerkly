@@ -8,7 +8,6 @@ import { useAgentChat } from '../../hooks/useAgentChat';
 import { AgentMessage } from './AgentMessage';
 import { AgentWelcome } from './AgentWelcome';
 import { RateLimitBanner } from './RateLimitBanner';
-import { AgentDialog } from './AgentDialog';
 import {
   Conversation,
   ConversationContent,
@@ -22,11 +21,8 @@ import {
   PromptInputSubmit,
   PromptInputTextarea,
 } from '../ai-elements/prompt-input';
-import { Button } from '../ui/button';
 import { type StickToBottomContext } from 'use-stick-to-bottom';
 import type { AgentSnapshot } from '../../types/agent';
-
-let debugFirstAgentId: string | null = null;
 
 interface RateLimitState {
   agentId: string;
@@ -50,7 +46,6 @@ interface AgentChatInnerProps {
   rawMessages: ReturnType<typeof useAgentChat>['rawMessages'];
   onPromptClick: (prompt: string) => Promise<void>;
   onNavigate?: (screen: string) => void;
-  showNotificationPreview: boolean;
 }
 
 /**
@@ -64,7 +59,6 @@ function AgentChatInner({
   rawMessages,
   onPromptClick,
   onNavigate,
-  showNotificationPreview,
 }: AgentChatInnerProps) {
   return (
     <>
@@ -72,57 +66,6 @@ function AgentChatInner({
         data-testid="messages-area"
         className="flex flex-col gap-4 p-6 justify-end min-h-full"
       >
-      {showNotificationPreview && (
-        <div className="space-y-3">
-          {/* Temporary preview of notification styles — remove after review. */}
-          <AgentDialog
-            intent="error"
-            testId="debug-notification-error"
-            approvalId="debug-error"
-            message="Invalid API key. Please check your key and try again."
-            messageClassName="text-red-700"
-            actionsClassName="pt-1"
-            actions={
-              <Button
-                variant="link"
-                size="xs"
-                className="h-auto p-0 text-red-700 hover:text-red-800"
-                onClick={() => onNavigate?.('settings')}
-              >
-                Open Settings
-              </Button>
-            }
-          />
-          <AgentDialog
-            intent="info"
-            testId="debug-notification-info"
-            approvalId="debug-info"
-            message="Sync paused. We'll keep trying in the background."
-          />
-          <AgentDialog
-            intent="warning"
-            testId="debug-notification-warning"
-            approvalId="debug-warning"
-            message="Storage is almost full. Clean up files to avoid issues."
-          />
-          <AgentDialog
-            intent="confirmation"
-            testId="debug-notification-confirmation"
-            approvalId="debug-confirmation"
-            message="Confirm this action?"
-            actions={
-              <>
-                <Button size="sm" variant="secondary" onClick={() => undefined}>
-                  Cancel
-                </Button>
-                <Button size="sm" onClick={() => undefined}>
-                  Confirm
-                </Button>
-              </>
-            }
-          />
-        </div>
-      )}
         {rawMessages.length === 0 ? (
           <AgentWelcome onPromptClick={onPromptClick} />
         ) : (
@@ -179,10 +122,6 @@ export function AgentChat({
   const { rawMessages, sendMessage, isLoading } = useAgentChat(agent.id);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const stickContextRef = useRef<StickToBottomContext | null>(null);
-  if (!debugFirstAgentId) {
-    debugFirstAgentId = agent.id;
-  }
-  const showNotificationPreview = debugFirstAgentId === agent.id;
 
   // Autofocus textarea when this chat becomes active (agents.4.7.1)
   useEffect(() => {
@@ -230,7 +169,6 @@ export function AgentChat({
           rawMessages={rawMessages}
           onPromptClick={handlePromptClick}
           onNavigate={onNavigate}
-          showNotificationPreview={showNotificationPreview}
         />
         <ConversationScrollButton data-testid="scroll-to-bottom" />
       </Conversation>

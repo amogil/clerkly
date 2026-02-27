@@ -5,8 +5,7 @@ import { isInProgress, type AgentStatus } from '../../../shared/utils/agentStatu
 import { Message, MessageContent, MessageResponse } from '../ai-elements/message';
 import { Reasoning, ReasoningTrigger, ReasoningContent } from '../ai-elements/reasoning';
 import type { MessageSnapshot } from '../../../shared/events/types';
-import { Button } from '../ui/button';
-import { AgentDialog } from './AgentDialog';
+import { AgentErrorDialog } from './AgentErrorDialog';
 
 interface AgentMessageProps {
   message: MessageSnapshot;
@@ -50,25 +49,17 @@ export function AgentMessage({ message, showAvatar, agentStatus, onNavigate }: A
             <Logo size="sm" showText={false} animated={false} />
           </div>
         )}
-        <AgentDialog
-          intent="error"
+        <AgentErrorDialog
           testId="message-error"
           approvalId={`error-${message.id}`}
           message={errorMessage}
-          messageClassName="text-red-700"
-          actionsClassName={actionLink && onNavigate ? 'pt-1' : undefined}
-          actions={
-            actionLink && onNavigate ? (
-              <Button
-                data-testid="message-error-action-link"
-                variant="link"
-                size="xs"
-                onClick={() => onNavigate(actionLink.screen)}
-                className="h-auto p-0 text-red-700 hover:text-red-800"
-              >
-                {actionLink.label}
-              </Button>
-            ) : null
+          action={
+            actionLink && onNavigate
+              ? {
+                  label: actionLink.label,
+                  onClick: () => onNavigate(actionLink.screen),
+                }
+              : undefined
           }
         />
       </Message>

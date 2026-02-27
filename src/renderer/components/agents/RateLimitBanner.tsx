@@ -1,6 +1,5 @@
 // Requirements: llm-integration.3.7
 import React, { useState, useEffect, useRef } from 'react';
-import { Button } from '../ui/button';
 import { AgentDialog } from './AgentDialog';
 
 // Access window.api with proper typing
@@ -64,26 +63,21 @@ export function RateLimitBanner({
 
   return (
     <AgentDialog
-      intent="info"
+      intent="warning"
       testId="rate-limit-banner"
       approvalId={`rate-limit-${userMessageId}`}
-      className="flex flex-row items-center gap-3 rounded-lg px-4 py-2"
       messageClassName="text-sm"
-      actionsClassName="ml-auto"
       message={`Rate limit exceeded. Retrying in ${secondsLeft} second${
         secondsLeft !== 1 ? 's' : ''
       }...`}
-      actions={
-        <Button
-          data-testid="rate-limit-cancel"
-          onClick={handleCancel}
-          variant="link"
-          size="xs"
-          className="h-auto p-0 text-sky-700 hover:text-sky-900 font-medium"
-        >
-          Cancel
-        </Button>
-      }
+      actionItems={[
+        {
+          id: 'rate-limit-cancel',
+          label: 'Cancel',
+          onClick: handleCancel,
+          variant: 'outline',
+        },
+      ]}
     />
   );
 }
