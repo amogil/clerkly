@@ -136,7 +136,9 @@ export function PromptInputSubmit({
   return (
     <Button className={cn('h-10 w-10 shrink-0 p-0', className)} type="submit" {...props}>
       {children ?? <Send className="h-4 w-4" />}
-      <span className="sr-only">{status === 'streaming' ? 'Streaming response' : 'Send message'}</span>
+      <span className="sr-only">
+        {status === 'streaming' ? 'Streaming response' : 'Send message'}
+      </span>
     </Button>
   );
 }

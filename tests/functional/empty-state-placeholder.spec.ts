@@ -219,8 +219,9 @@ test.describe('Agents - AgentWelcome', () => {
     await window.waitForSelector('[data-testid="agents"]', { timeout: 15000 });
 
     // Verify all 4 prompt buttons are visible
-    const transcribeButton = activeChat(window)
-      .messagesArea.locator('button:has-text("Transcribe my latest meeting")');
+    const transcribeButton = activeChat(window).messagesArea.locator(
+      'button:has-text("Transcribe my latest meeting")'
+    );
     await expect(transcribeButton).toBeVisible();
 
     const extractButton = activeChat(window).messagesArea.locator(
@@ -228,12 +229,14 @@ test.describe('Agents - AgentWelcome', () => {
     );
     await expect(extractButton).toBeVisible();
 
-    const jiraButton = activeChat(window)
-      .messagesArea.locator('button:has-text("Create Jira tickets from meeting notes")');
+    const jiraButton = activeChat(window).messagesArea.locator(
+      'button:has-text("Create Jira tickets from meeting notes")'
+    );
     await expect(jiraButton).toBeVisible();
 
-    const summaryButton = activeChat(window)
-      .messagesArea.locator('button:has-text("Send summary to the team")');
+    const summaryButton = activeChat(window).messagesArea.locator(
+      'button:has-text("Send summary to the team")'
+    );
     await expect(summaryButton).toBeVisible();
   });
 
@@ -255,8 +258,9 @@ test.describe('Agents - AgentWelcome', () => {
     await expect(emptyStateHeading).toBeVisible({ timeout: 5000 });
 
     // Click on first prompt button
-    const transcribeButton = activeChat(window)
-      .messagesArea.locator('button:has-text("Transcribe my latest meeting")');
+    const transcribeButton = activeChat(window).messagesArea.locator(
+      'button:has-text("Transcribe my latest meeting")'
+    );
     await transcribeButton.click();
 
     // Verify message is displayed (AgentWelcome should disappear)

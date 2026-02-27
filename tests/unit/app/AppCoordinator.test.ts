@@ -77,7 +77,11 @@ describe('AppCoordinator', () => {
     const oauthClient = {
       getAuthStatus: jest.fn().mockResolvedValue({ authorized: true }),
     };
-    const coordinator = new AppCoordinator(oauthClient as any, { chatsReadyTimeoutMs: 5000 }, eventBus as any);
+    const coordinator = new AppCoordinator(
+      oauthClient as any,
+      { chatsReadyTimeoutMs: 5000 },
+      eventBus as any
+    );
 
     await coordinator.start();
     eventBus.emit(EVENT_TYPES.APP_CHATS_READY, { source: 'agents', timestamp: Date.now() });
@@ -108,7 +112,11 @@ describe('AppCoordinator', () => {
     const oauthClient = {
       getAuthStatus: jest.fn().mockResolvedValue({ authorized: true }),
     };
-    const coordinator = new AppCoordinator(oauthClient as any, { chatsReadyTimeoutMs: 100 }, eventBus as any);
+    const coordinator = new AppCoordinator(
+      oauthClient as any,
+      { chatsReadyTimeoutMs: 100 },
+      eventBus as any
+    );
 
     await coordinator.start();
     expect(coordinator.getState().phase).toBe('waiting-for-chats');
@@ -151,7 +159,11 @@ describe('AppCoordinator', () => {
     const oauthClient = {
       getAuthStatus: jest.fn().mockResolvedValue({ authorized: true }),
     };
-    const coordinator = new AppCoordinator(oauthClient as any, { chatsReadyTimeoutMs: 5000 }, eventBus as any);
+    const coordinator = new AppCoordinator(
+      oauthClient as any,
+      { chatsReadyTimeoutMs: 5000 },
+      eventBus as any
+    );
 
     await coordinator.start();
     expect(coordinator.getState().phase).toBe('waiting-for-chats');
@@ -181,7 +193,11 @@ describe('AppCoordinator', () => {
     const oauthClient = {
       getAuthStatus: jest.fn().mockResolvedValue({ authorized: true }),
     };
-    const coordinator = new AppCoordinator(oauthClient as any, { chatsReadyTimeoutMs: 100 }, eventBus as any);
+    const coordinator = new AppCoordinator(
+      oauthClient as any,
+      { chatsReadyTimeoutMs: 100 },
+      eventBus as any
+    );
 
     await coordinator.start();
     expect(coordinator.getState().phase).toBe('waiting-for-chats');
@@ -217,7 +233,11 @@ describe('AppCoordinator', () => {
     const oauthClient = {
       getAuthStatus: jest.fn().mockResolvedValue({ authorized: true }),
     };
-    const coordinator = new AppCoordinator(oauthClient as any, { chatsReadyTimeoutMs: 100 }, eventBus as any);
+    const coordinator = new AppCoordinator(
+      oauthClient as any,
+      { chatsReadyTimeoutMs: 100 },
+      eventBus as any
+    );
 
     await coordinator.start();
     expect(coordinator.getState().phase).toBe('waiting-for-chats');

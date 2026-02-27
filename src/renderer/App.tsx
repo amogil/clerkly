@@ -47,7 +47,9 @@ function AppContent() {
   const { state: appState, isBootstrapping } = useAppCoordinatorState();
   const [authError, setAuthError] = useState<{ message: string; code?: string } | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState<boolean>(false);
-  const [currentScreen, setCurrentScreen] = useState<'agents' | 'settings' | 'error-demo'>('agents');
+  const [currentScreen, setCurrentScreen] = useState<'agents' | 'settings' | 'error-demo'>(
+    'agents'
+  );
 
   useEffect(() => {
     if (!appState?.authorized) return;
@@ -56,12 +58,15 @@ function AppContent() {
     if (appState.targetScreen === 'agents') setCurrentScreen('agents');
   }, [appState]);
 
-  const navigateToScreen = useCallback((screen: string) => {
-    if (!appState?.authorized) return;
-    if (screen === 'agents' || screen === 'settings' || screen === 'error-demo') {
-      setCurrentScreen(screen);
-    }
-  }, [appState?.authorized]);
+  const navigateToScreen = useCallback(
+    (screen: string) => {
+      if (!appState?.authorized) return;
+      if (screen === 'agents' || screen === 'settings' || screen === 'error-demo') {
+        setCurrentScreen(screen);
+      }
+    },
+    [appState?.authorized]
+  );
 
   const handleAuthCallbackReceived = useCallback((_payload: AuthCallbackReceivedPayload) => {
     logger.info('Auth callback received - showing loader');
