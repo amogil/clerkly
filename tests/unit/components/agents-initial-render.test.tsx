@@ -145,10 +145,10 @@ describe('Agents Initial Render', () => {
   });
 
   /* Preconditions: Component renders with multiple agents
-     Action: Check initial animation prop on initial render
-     Assertions: initial prop is false for all agent icons on initial load (no entry animation)
+     Action: Check layout animation props on initial render
+     Assertions: agent icons do not render layout animation attributes
      Requirements: agents.1.4.4 */
-  it('should disable layout prop on initial render', () => {
+  it('should render agent icons without layout animation', () => {
     render(<Agents />);
 
     // Check that agents are rendered
@@ -159,18 +159,17 @@ describe('Agents Initial Render', () => {
     const agentIcons = screen.getAllByTestId(/^agent-icon-/);
     expect(agentIcons.length).toBe(3);
 
-    // On initial render, layout animation is enabled (layout=true) but entry animation is disabled
-    // The motion.div always has layout=true for smooth reordering
+    // Layout animation is not used for header reordering
     agentIcons.forEach((icon) => {
-      expect(icon.getAttribute('data-layout')).toBe('true');
+      expect(icon.getAttribute('data-layout')).not.toBe('true');
     });
   });
 
   /* Preconditions: Component renders with single auto-created agent
      Action: Check that agent icon is rendered
-     Assertions: agent icon is present in the DOM
+     Assertions: agent icon is present without layout animation attributes
      Requirements: agents.1.4.4 */
-  it('should render auto-created first agent without spring animation', () => {
+  it('should render auto-created first agent without layout animation', () => {
     const singleAgent = [mockAgents[0]];
 
     mockUseAgents.mockReturnValue({
@@ -188,7 +187,6 @@ describe('Agents Initial Render', () => {
     // Check that single agent is rendered
     const agentIcon = screen.getByTestId(`agent-icon-${singleAgent[0].id}`);
     expect(agentIcon).toBeInTheDocument();
-    // layout is always true for smooth reordering
-    expect(agentIcon.getAttribute('data-layout')).toBe('true');
+    expect(agentIcon.getAttribute('data-layout')).not.toBe('true');
   });
 });
