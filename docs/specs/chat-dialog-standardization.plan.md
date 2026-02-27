@@ -31,6 +31,7 @@
    - [x] Перевести `kind:error` в `AgentMessage` на `Confirmation`, сохранив `data-testid` и логику `action_link`.
 
 4. Тесты
+   - [x] Добавить unit-тесты для `AgentDialog`.
    - [ ] Обновить `tests/unit/components/RateLimitBanner.test.tsx`.
    - [ ] Обновить `tests/unit/components/agents/AgentMessage.test.tsx`.
    - [ ] При необходимости обновить `tests/unit/components/agents/AgentChat.test.tsx`.
