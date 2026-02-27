@@ -26,7 +26,11 @@ export function getFreePort(): Promise<number> {
   });
 }
 
-async function getPkceState(electronApp: ElectronApplication): Promise<string> {
+/**
+ * Read PKCE state from OAuthClientManager in test context.
+ * Requirements: testing.3.1
+ */
+export async function getPkceState(electronApp: ElectronApplication): Promise<string> {
   return electronApp.evaluate(async () => {
     const { oauthClient } = (global as any).testContext || {};
     if (!oauthClient || !oauthClient.pkceStorage?.state) {
@@ -36,7 +40,14 @@ async function getPkceState(electronApp: ElectronApplication): Promise<string> {
   });
 }
 
-async function waitForPkceState(electronApp: ElectronApplication, timeoutMs = 5000): Promise<void> {
+/**
+ * Wait until PKCE state is available in test context.
+ * Requirements: testing.3.1
+ */
+export async function waitForPkceState(
+  electronApp: ElectronApplication,
+  timeoutMs = 5000
+): Promise<void> {
   await waitFor(async () => {
     try {
       const state = await getPkceState(electronApp);

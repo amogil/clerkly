@@ -6,6 +6,7 @@ import * as path from 'path';
 import * as os from 'os';
 import { DatabaseManager } from '../../src/main/DatabaseManager';
 import type { UserManager } from '../../src/main/auth/UserManager';
+import { NO_USER_LOGGED_IN_ERROR } from '../../src/shared/errors/userErrors';
 
 // Mock fs module for permission error tests
 jest.mock('fs', () => {
@@ -161,7 +162,7 @@ describe('DatabaseManager', () => {
       databaseManager.initialize(testStoragePath);
       // UserManager NOT set
 
-      expect(() => databaseManager.getCurrentUserIdStrict()).toThrow('No user logged in');
+      expect(() => databaseManager.getCurrentUserIdStrict()).toThrow(NO_USER_LOGGED_IN_ERROR);
     });
 
     /* Preconditions: DatabaseManager initialized, UserManager set but returns null
@@ -178,7 +179,7 @@ describe('DatabaseManager', () => {
 
       databaseManager.setUserManager(mockUserManagerNoUser);
 
-      expect(() => databaseManager.getCurrentUserIdStrict()).toThrow('No user logged in');
+      expect(() => databaseManager.getCurrentUserIdStrict()).toThrow(NO_USER_LOGGED_IN_ERROR);
     });
 
     /* Preconditions: DatabaseManager initialized, UserManager set with valid user
@@ -801,7 +802,7 @@ describe('DatabaseManager Repository Accessors', () => {
       databaseManager.initialize(testStoragePath);
       // UserManager NOT set
 
-      expect(() => databaseManager.settings.get('testKey')).toThrow('No user logged in');
+      expect(() => databaseManager.settings.get('testKey')).toThrow(NO_USER_LOGGED_IN_ERROR);
     });
 
     /* Preconditions: DatabaseManager initialized

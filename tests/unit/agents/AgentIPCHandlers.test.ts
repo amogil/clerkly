@@ -9,6 +9,7 @@ import { MessageManager } from '../../../src/main/agents/MessageManager';
 import { MainPipeline } from '../../../src/main/agents/MainPipeline';
 import type { MessagePayload } from '../../../src/shared/utils/agentStatus';
 import type { Agent, Message } from '../../../src/main/db/schema';
+import { NO_USER_LOGGED_IN_ERROR } from '../../../src/shared/errors/userErrors';
 
 // Mock electron
 jest.mock('electron', () => ({
@@ -253,14 +254,14 @@ describe('AgentIPCHandlers', () => {
        Requirements: agents.1.3 */
     it('should return error on failure', async () => {
       mockAgentManager.list = jest.fn().mockImplementation(() => {
-        throw new Error('No user logged in');
+        throw new Error(NO_USER_LOGGED_IN_ERROR);
       });
       handlers.registerHandlers();
       const handler = registeredHandlers.get('agents:list')!;
 
       const result = await handler(mockEvent);
 
-      expect(result).toEqual({ success: false, error: 'No user logged in' });
+      expect(result).toEqual({ success: false, error: NO_USER_LOGGED_IN_ERROR });
     });
   });
 

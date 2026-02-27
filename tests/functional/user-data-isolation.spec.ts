@@ -11,6 +11,7 @@ import {
   ElectronTestContext,
   getWindowBounds,
 } from './helpers/electron';
+import { NO_USER_LOGGED_IN_ERROR } from '../../src/shared/errors/userErrors';
 
 let context: ElectronTestContext;
 let mockOAuthServer: MockOAuthServer;
@@ -381,7 +382,7 @@ test('should handle "No user logged in" error gracefully', async () => {
   });
 
   expect(result.success).toBe(false);
-  expect(result.error).toContain('No user logged in');
+  expect(result.error).toContain(NO_USER_LOGGED_IN_ERROR);
 
   // 5) Verify interface doesn't show error (error is only logged)
   // Login screen should still be visible without error notifications

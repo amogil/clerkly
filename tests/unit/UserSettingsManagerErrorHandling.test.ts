@@ -6,6 +6,7 @@ import type { UserManager } from '../../src/main/auth/UserManager';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
+import { NO_USER_LOGGED_IN_ERROR } from '../../src/shared/errors/userErrors';
 
 // Mock electron BrowserWindow
 jest.mock('electron', () => ({
@@ -76,7 +77,7 @@ describe('UserSettingsManager Error Handling - "No user logged in"', () => {
     const result = dataManager.saveData('test_key', 'test_value');
 
     expect(result.success).toBe(false);
-    expect(result.error).toContain('No user logged in');
+    expect(result.error).toContain(NO_USER_LOGGED_IN_ERROR);
   });
 
   /* Preconditions: getCurrentUserId returns null during operation, user was authenticated
@@ -99,7 +100,7 @@ describe('UserSettingsManager Error Handling - "No user logged in"', () => {
     const result = dataManager.saveData('test_key', 'new_value');
 
     expect(result.success).toBe(false);
-    expect(result.error).toContain('No user logged in');
+    expect(result.error).toContain(NO_USER_LOGGED_IN_ERROR);
   });
 
   /* Preconditions: getCurrentUserId returns null
@@ -112,7 +113,7 @@ describe('UserSettingsManager Error Handling - "No user logged in"', () => {
     const result = dataManager.loadData('test_key');
 
     expect(result.success).toBe(false);
-    expect(result.error).toContain('No user logged in');
+    expect(result.error).toContain(NO_USER_LOGGED_IN_ERROR);
   });
 
   /* Preconditions: getCurrentUserId returns null
@@ -125,7 +126,7 @@ describe('UserSettingsManager Error Handling - "No user logged in"', () => {
     const result = dataManager.deleteData('test_key');
 
     expect(result.success).toBe(false);
-    expect(result.error).toContain('No user logged in');
+    expect(result.error).toContain(NO_USER_LOGGED_IN_ERROR);
   });
 
   /* Preconditions: User authenticated, data saved, then user logs out
@@ -143,11 +144,11 @@ describe('UserSettingsManager Error Handling - "No user logged in"', () => {
     // Try to load data
     const loadResult = dataManager.loadData('test_key');
     expect(loadResult.success).toBe(false);
-    expect(loadResult.error).toContain('No user logged in');
+    expect(loadResult.error).toContain(NO_USER_LOGGED_IN_ERROR);
 
     // Try to delete data
     const deleteResult = dataManager.deleteData('test_key');
     expect(deleteResult.success).toBe(false);
-    expect(deleteResult.error).toContain('No user logged in');
+    expect(deleteResult.error).toContain(NO_USER_LOGGED_IN_ERROR);
   });
 });

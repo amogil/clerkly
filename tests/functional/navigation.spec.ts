@@ -4,7 +4,11 @@
    Requirements: navigation.1.1, navigation.1.2, navigation.1.3, navigation.1.4 */
 
 import { test, expect, ElectronApplication, Page } from '@playwright/test';
-import { createMockOAuthServer, launchElectronWithMockOAuth } from './helpers/electron';
+import {
+  createMockOAuthServer,
+  launchElectronWithMockOAuth,
+  expectNoToastError,
+} from './helpers/electron';
 import type { MockOAuthServer } from './helpers/mock-oauth-server';
 import { completeOAuthFlow } from './helpers/electron';
 
@@ -185,6 +189,7 @@ test('should redirect to login screen after logout', async () => {
   // Verify login screen is shown
   const loginScreen = window.locator('[data-testid="login-screen"]');
   await expect(loginScreen).toBeVisible({ timeout: 10000 });
+  await expectNoToastError(window);
 
   // Verify sign-in button is present
   const signInButton = window.locator('button:has-text("Continue with Google")');
@@ -195,8 +200,39 @@ test('should redirect to login screen after logout', async () => {
     .locator('[data-testid="dashboard"]')
     .or(window.locator('[data-testid="settings"]'));
   await expect(protectedContent).not.toBeVisible();
+});
 
-  console.log('[TEST] ✓ Logout successful, login screen displayed');
+/* Preconditions: User is authenticated and on dashboard
+   Action: User logs out, then app is reloaded
+   Assertions: User is redirected to login screen after logout and after reload
+   Requirements: navigation.1.4 */
+test('should stay on login screen after logout and app reload', async () => {
+  // Setup: Authenticate user first
+  await completeOAuthFlow(electronApp, window);
+
+  // Verify we're authenticated (Settings button visible)
+  const settingsButton = window.locator('button:has-text("Settings")');
+  await expect(settingsButton).toBeVisible({ timeout: 5000 });
+
+  // Navigate to Settings and perform logout via UI
+  await settingsButton.click();
+  const signOutButton = window.locator('button:has-text("Sign out")');
+  await expect(signOutButton).toBeVisible({ timeout: 5000 });
+  await signOutButton.click();
+
+  // Verify login screen is shown
+  const loginScreen = window.locator('[data-testid="login-screen"]');
+  await expect(loginScreen).toBeVisible({ timeout: 10000 });
+
+  // Reload app and ensure login screen remains
+  await window.reload();
+  await window.waitForLoadState('domcontentloaded');
+  await expect(loginScreen).toBeVisible({ timeout: 10000 });
+
+  // Verify sign-in button is present after reload
+  const signInButton = window.locator('button:has-text("Continue with Google")');
+  await expect(signInButton).toBeVisible();
+  await expectNoToastError(window);
 });
 
 /* Preconditions: User on login screen, mock OAuth server configured to return error

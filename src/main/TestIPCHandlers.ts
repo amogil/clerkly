@@ -12,6 +12,7 @@ import type { MessageManager } from './agents/MessageManager';
 import type { AuthIPCHandlers } from './auth/AuthIPCHandlers';
 import type { OAuthClientManager } from './auth/OAuthClientManager';
 import { Logger } from './Logger';
+import { NO_USER_LOGGED_IN_ERROR } from '../shared/errors/userErrors';
 
 const logger = Logger.create('TestIPCHandlers');
 
@@ -127,7 +128,7 @@ export function registerTestIPCHandlers(
       try {
         const userId = userManager.getCurrentUserId();
         if (!userId) {
-          throw new Error('No user logged in');
+          throw new Error(NO_USER_LOGGED_IN_ERROR);
         }
 
         const agent = agentManager.create(userId);

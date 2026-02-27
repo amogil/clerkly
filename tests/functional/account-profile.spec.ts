@@ -8,6 +8,7 @@ import {
 import { createMockOAuthServer } from './helpers/electron';
 import type { MockOAuthServer } from './helpers/mock-oauth-server';
 import { testIPC } from './helpers/test-ipc';
+import { isNoUserLoggedInError } from '../../src/shared/errors/userErrors';
 
 /**
  * Functional tests for Account Profile component
@@ -1434,7 +1435,7 @@ test.describe('Account Profile', () => {
       } catch (error: unknown) {
         // If loadTokens throws error about no user logged in, no tokens
         const errorMessage = error instanceof Error ? error.message : '';
-        return { hasTokens: !errorMessage.includes('No user logged in') };
+        return { hasTokens: !isNoUserLoggedInError(errorMessage) };
       }
     });
 
@@ -1545,7 +1546,7 @@ test.describe('Account Profile', () => {
       } catch (error: unknown) {
         // If loadTokens throws error about no user logged in, tokens are cleared
         const errorMessage = error instanceof Error ? error.message : '';
-        return errorMessage.includes('No user logged in');
+        return isNoUserLoggedInError(errorMessage);
       }
     });
 
@@ -1684,7 +1685,7 @@ test.describe('Account Profile', () => {
       } catch (error: unknown) {
         // If loadTokens throws error about no user logged in, tokens are cleared
         const errorMessage = error instanceof Error ? error.message : '';
-        return errorMessage.includes('No user logged in');
+        return isNoUserLoggedInError(errorMessage);
       }
     });
 
@@ -2126,7 +2127,7 @@ test.describe('Account Profile', () => {
       } catch (error: unknown) {
         // If loadTokens throws error about no user logged in, no tokens
         const errorMessage = error instanceof Error ? error.message : '';
-        return { hasTokens: !errorMessage.includes('No user logged in') };
+        return { hasTokens: !isNoUserLoggedInError(errorMessage) };
       }
     });
 

@@ -95,7 +95,6 @@ function AppContent() {
   const handleAuthSignedOut = useCallback(() => {
     setIsAuthLoading(false);
     setAuthError(null);
-    setCurrentScreen('agents');
   }, []);
 
   const handleErrorCreated = useCallback((payload: ErrorCreatedPayload) => {

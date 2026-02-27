@@ -8,6 +8,7 @@ import * as schema from '../../../../src/main/db/schema';
 import { agents } from '../../../../src/main/db/schema';
 import { AgentsRepository } from '../../../../src/main/db/repositories/AgentsRepository';
 import { MessagesRepository } from '../../../../src/main/db/repositories/MessagesRepository';
+import { NO_USER_LOGGED_IN_ERROR } from '../../../../src/shared/errors/userErrors';
 
 describe('MessagesRepository', () => {
   let sqlite: Database.Database;
@@ -271,18 +272,20 @@ describe('MessagesRepository', () => {
   describe('No user logged in', () => {
     it('should throw error when no user logged in', () => {
       const noUserAgentsRepo = new AgentsRepository(db, () => {
-        throw new Error('No user logged in');
+        throw new Error(NO_USER_LOGGED_IN_ERROR);
       });
       const noUserMessagesRepo = new MessagesRepository(
         db,
         () => {
-          throw new Error('No user logged in');
+          throw new Error(NO_USER_LOGGED_IN_ERROR);
         },
         noUserAgentsRepo
       );
-      expect(() => noUserMessagesRepo.listByAgent('test')).toThrow('No user logged in');
-      expect(() => noUserMessagesRepo.create('test', 'user', '{}')).toThrow('No user logged in');
-      expect(() => noUserMessagesRepo.update(1, 'test', '{}')).toThrow('No user logged in');
+      expect(() => noUserMessagesRepo.listByAgent('test')).toThrow(NO_USER_LOGGED_IN_ERROR);
+      expect(() => noUserMessagesRepo.create('test', 'user', '{}')).toThrow(
+        NO_USER_LOGGED_IN_ERROR
+      );
+      expect(() => noUserMessagesRepo.update(1, 'test', '{}')).toThrow(NO_USER_LOGGED_IN_ERROR);
     });
   });
 

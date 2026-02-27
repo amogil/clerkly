@@ -2,6 +2,7 @@
 
 import { handleBackgroundError, shouldFilterError } from '../../src/main/ErrorHandler';
 import { MainEventBus } from '../../src/main/events/MainEventBus';
+import { NO_USER_LOGGED_IN_ERROR } from '../../src/shared/errors/userErrors';
 
 // Mock MainEventBus module
 jest.mock('../../src/main/events/MainEventBus', () => {
@@ -105,7 +106,7 @@ describe('shouldFilterError', () => {
      Assertions: returns true (error should be filtered)
      Requirements: error-notifications.1.5, user-data-isolation.1.21 */
   it('should filter "No user logged in" error during logout', () => {
-    const error = new Error('No user logged in');
+    const error = new Error(NO_USER_LOGGED_IN_ERROR);
     const context = 'Logout';
 
     expect(shouldFilterError(error, context)).toBe(true);
@@ -116,7 +117,7 @@ describe('shouldFilterError', () => {
      Assertions: returns true (error should be filtered)
      Requirements: error-notifications.1.5, user-data-isolation.1.21 */
   it('should filter "No user logged in" error during logout (case insensitive)', () => {
-    const error = new Error('NO USER LOGGED IN');
+    const error = new Error(NO_USER_LOGGED_IN_ERROR.toUpperCase());
     const context = 'LOGOUT';
 
     expect(shouldFilterError(error, context)).toBe(true);
@@ -127,7 +128,7 @@ describe('shouldFilterError', () => {
      Assertions: returns false (error should NOT be filtered)
      Requirements: error-notifications.1.5 */
   it('should NOT filter "No user logged in" error during other operations', () => {
-    const error = new Error('No user logged in');
+    const error = new Error(NO_USER_LOGGED_IN_ERROR);
     const context = 'Profile Loading';
 
     expect(shouldFilterError(error, context)).toBe(false);
@@ -218,7 +219,7 @@ describe('handleBackgroundError with filtering', () => {
      Assertions: no event published (filtered)
      Requirements: error-notifications.1.5, user-data-isolation.1.21 */
   it('should filter "No user logged in" error during logout', () => {
-    const error = new Error('No user logged in');
+    const error = new Error(NO_USER_LOGGED_IN_ERROR);
     const context = 'Logout';
 
     handleBackgroundError(error, context);

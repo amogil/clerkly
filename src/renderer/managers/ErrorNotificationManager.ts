@@ -88,10 +88,7 @@ export class ErrorNotificationManager {
     }, this.AUTO_DISMISS_DELAY);
 
     // Requirements: error-notifications.1.4 - Log errors for debugging
-    Logger.info(
-      'ErrorNotificationManager',
-      `[ErrorNotificationManager] Notification shown: ${notification}`
-    );
+    Logger.info('ErrorNotificationManager', 'Notification registered');
 
     return notification.id;
   }

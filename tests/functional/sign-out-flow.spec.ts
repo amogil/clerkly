@@ -9,6 +9,7 @@ import { test, expect, ElectronApplication, Page } from '@playwright/test';
 import { createMockOAuthServer, launchElectronWithMockOAuth } from './helpers/electron';
 import type { MockOAuthServer } from './helpers/mock-oauth-server';
 import { completeOAuthFlow } from './helpers/electron';
+import { isNoUserLoggedInError } from '../../src/shared/errors/userErrors';
 
 let electronApp: ElectronApplication;
 let window: Page;
@@ -94,7 +95,7 @@ test('should show login screen after sign out', async () => {
       return tokens === null;
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : '';
-      return errorMessage.includes('No user logged in');
+      return isNoUserLoggedInError(errorMessage);
     }
   });
   expect(tokensCleared).toBe(true);
@@ -141,7 +142,7 @@ test('should clear tokens after sign out', async () => {
       return tokens === null;
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : '';
-      return errorMessage.includes('No user logged in');
+      return isNoUserLoggedInError(errorMessage);
     }
   });
   expect(tokensCleared).toBe(true);
@@ -187,7 +188,7 @@ test('should handle sign out when revoke fails', async () => {
       return tokens === null;
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : '';
-      return errorMessage.includes('No user logged in');
+      return isNoUserLoggedInError(errorMessage);
     }
   });
   expect(tokensCleared).toBe(true);

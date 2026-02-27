@@ -3,6 +3,7 @@
 import { Logger } from './Logger';
 import { MainEventBus } from './events/MainEventBus';
 import { ErrorCreatedEvent } from '../shared/events/types';
+import { isNoUserLoggedInError } from '../shared/errors/userErrors';
 
 // Requirements: clerkly.3.5, clerkly.3.7 - Create parameterized logger for ErrorHandler module
 const logger = Logger.create('ErrorHandler');
@@ -13,7 +14,7 @@ const logger = Logger.create('ErrorHandler');
  * Requirements: error-notifications.1.5, user-data-isolation.1.21
  *
  * Filters race condition errors that should be logged but not shown to users:
- * - "No user logged in" during logout (race condition between logout and data operations)
+ * - NO_USER_LOGGED_IN_ERROR during logout (race condition between logout and data operations)
  * - Cancelled/aborted operations (user-initiated cancellations)
  * - Explicit race condition errors
  *
@@ -26,8 +27,8 @@ export function shouldFilterError(error: unknown, context: string): boolean {
     error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
   const contextLower = context.toLowerCase();
 
-  // Filter "No user logged in" during logout (race condition)
-  if (errorMessage.includes('no user logged in') && contextLower.includes('logout')) {
+  // Filter NO_USER_LOGGED_IN_ERROR during logout (race condition)
+  if (isNoUserLoggedInError(error) && contextLower.includes('logout')) {
     return true;
   }
 
