@@ -30,6 +30,38 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+async function getPkceState(electronApp: ElectronApplication): Promise<string> {
+  return electronApp.evaluate(async () => {
+    const { oauthClient } = (global as any).testContext || {};
+    if (!oauthClient || !oauthClient.pkceStorage?.state) {
+      throw new Error('PKCE storage not found');
+    }
+    return oauthClient.pkceStorage.state as string;
+  });
+}
+
+async function waitForPkceState(electronApp: ElectronApplication, timeoutMs = 5000): Promise<void> {
+  await waitFor(async () => {
+    try {
+      const state = await getPkceState(electronApp);
+      return typeof state === 'string' && state.length > 0;
+    } catch {
+      return false;
+    }
+  }, timeoutMs);
+}
+
+async function isLoginScreenVisible(window: Page): Promise<boolean> {
+  if (window.isClosed()) return false;
+  const loginButton = window.locator('button:has-text("Continue with Google")');
+  return loginButton.isVisible().catch(() => false);
+}
+
+async function isAgentsScreenVisible(window: Page): Promise<boolean> {
+  if (window.isClosed()) return false;
+  return window.locator('[data-testid="agents"]').isVisible().catch(() => false);
+}
+
 /**
  * Electron Test Helper
  *
@@ -280,17 +312,10 @@ export async function completeOAuthFlow(
     await (window as any).electron.ipcRenderer.invoke('auth:start-login');
   });
 
-  // Wait for OAuth flow to initialize
-  await sleep(2000);
+  await waitForPkceState(electronApp);
 
   // Get PKCE state from OAuthClientManager
-  const pkceState = await electronApp.evaluate(async () => {
-    const { oauthClient } = (global as any).testContext || {};
-    if (!oauthClient || !oauthClient.pkceStorage) {
-      throw new Error('PKCE storage not found');
-    }
-    return oauthClient.pkceStorage.state;
-  });
+  const pkceState = await getPkceState(electronApp);
 
   // Generate authorization code
   const authCode = `test_auth_code_${Date.now()}_${Math.random().toString(36).substring(7)}`;
@@ -304,8 +329,15 @@ export async function completeOAuthFlow(
     return await (window as any).electron.ipcRenderer.invoke('test:handle-deep-link', url);
   }, deepLinkUrl);
 
-  // Wait for profile to be fetched and saved
-  await sleep(5000);
+  // Wait until auth flow leaves login screen or reaches agents screen.
+  await waitFor(async () => {
+    if (window.isClosed()) return false;
+    const [loginVisible, agentsVisible] = await Promise.all([
+      isLoginScreenVisible(window),
+      isAgentsScreenVisible(window),
+    ]);
+    return agentsVisible || !loginVisible;
+  }, 15000);
 
   // Check if still on login screen, reload if needed
   const loginButton = window.locator('button:has-text("Continue with Google")');
@@ -316,7 +348,9 @@ export async function completeOAuthFlow(
     console.log(`[TEST] Still on login screen, reloading (attempt ${retries + 1}/5)`);
     await window.reload();
     await window.waitForLoadState('domcontentloaded');
-    await sleep(3000);
+    await waitFor(async () => !(await isLoginScreenVisible(window)), 5000).catch(() => {
+      // Continue retry loop if login still visible after timeout.
+    });
     hasLoginScreen = await loginButton.isVisible().catch(() => false);
     retries++;
   }
@@ -353,17 +387,10 @@ export async function completeOAuthFlowWithError(
     await (window as any).electron.ipcRenderer.invoke('auth:start-login');
   });
 
-  // Wait for OAuth flow to initialize
-  await sleep(2000);
+  await waitForPkceState(electronApp);
 
   // Get PKCE state from OAuthClientManager
-  const pkceState = await electronApp.evaluate(async () => {
-    const { oauthClient } = (global as any).testContext || {};
-    if (!oauthClient || !oauthClient.pkceStorage) {
-      throw new Error('PKCE storage not found');
-    }
-    return oauthClient.pkceStorage.state;
-  });
+  const pkceState = await getPkceState(electronApp);
 
   // Generate authorization code
   const authCode = `test_auth_code_${Date.now()}_${Math.random().toString(36).substring(7)}`;
@@ -378,17 +405,19 @@ export async function completeOAuthFlowWithError(
   }, deepLinkUrl);
 
   // Wait for error to be processed and error screen to appear
-  await sleep(5000);
+  const errorMessage = window.locator('text=/unable to load your google profile/i');
+  await waitFor(async () => errorMessage.isVisible().catch(() => false), 15000);
 
   // Check if error screen is displayed
-  const errorMessage = window.locator('text=/unable to load your google profile/i');
   const hasErrorScreen = await errorMessage.isVisible().catch(() => false);
 
   if (!hasErrorScreen) {
     // Try reloading to see if error screen appears
     await window.reload();
     await window.waitForLoadState('domcontentloaded');
-    await sleep(2000);
+    await waitFor(async () => errorMessage.isVisible().catch(() => false), 5000).catch(() => {
+      // Fall through to explicit final assertion below.
+    });
 
     const hasErrorScreenAfterReload = await errorMessage.isVisible().catch(() => false);
     if (!hasErrorScreenAfterReload) {
