@@ -1425,9 +1425,10 @@ test.describe('Account Profile', () => {
     // Requirements: google-oauth-auth.3.8 - Tokens should remain after successful auth
     // Check directly through app context (not through IPC which was removed)
     const tokensCheck = await context.app.evaluate(async () => {
-      const { tokenStorage } = (global as any).testContext || {};
-      if (!tokenStorage) {
-        throw new Error('Token storage not found in test context');
+      const { tokenStorage, isNoUserLoggedInError: noUserErrorHelper } =
+        (global as any).testContext || {};
+      if (!tokenStorage || !noUserErrorHelper) {
+        throw new Error('Test context missing token storage or error helper');
       }
       try {
         const tokens = await tokenStorage.loadTokens();
@@ -1435,7 +1436,7 @@ test.describe('Account Profile', () => {
       } catch (error: unknown) {
         // If loadTokens throws error about no user logged in, no tokens
         const errorMessage = error instanceof Error ? error.message : '';
-        return { hasTokens: !isNoUserLoggedInError(errorMessage) };
+        return { hasTokens: !noUserErrorHelper(errorMessage) };
       }
     });
 
@@ -2117,9 +2118,10 @@ test.describe('Account Profile', () => {
     // Note: We can't navigate to Settings without authentication, so we verify tokens are cleared
     // Check directly through app context (not through IPC which was removed)
     const tokensCheck = await context.app.evaluate(async () => {
-      const { tokenStorage } = (global as any).testContext || {};
-      if (!tokenStorage) {
-        throw new Error('Token storage not found in test context');
+      const { tokenStorage, isNoUserLoggedInError: noUserErrorHelper } =
+        (global as any).testContext || {};
+      if (!tokenStorage || !noUserErrorHelper) {
+        throw new Error('Test context missing token storage or error helper');
       }
       try {
         const tokens = await tokenStorage.loadTokens();
@@ -2127,7 +2129,7 @@ test.describe('Account Profile', () => {
       } catch (error: unknown) {
         // If loadTokens throws error about no user logged in, no tokens
         const errorMessage = error instanceof Error ? error.message : '';
-        return { hasTokens: !isNoUserLoggedInError(errorMessage) };
+        return { hasTokens: !noUserErrorHelper(errorMessage) };
       }
     });
 
