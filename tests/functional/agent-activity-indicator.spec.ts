@@ -11,6 +11,7 @@ import {
   createMockOAuthServer,
   activeChat,
   launchElectronWithMockOAuth,
+  expectAgentsVisible,
 } from './helpers/electron';
 import type { MockOAuthServer } from './helpers/mock-oauth-server';
 
@@ -45,7 +46,7 @@ test.beforeEach(async () => {
   window = context.window;
 
   await completeOAuthFlow(electronApp, window);
-  await expect(window.locator('[data-testid="agents"]')).toBeVisible({ timeout: 10000 });
+  await expectAgentsVisible(window, 10000);
 });
 
 test.afterEach(async () => {
@@ -109,7 +110,7 @@ test.describe('Agent Activity Indicator', () => {
      Requirements: agents.11.4 */
   test('should not show activity indicator when agent is idle', async () => {
     // Wait for page to be fully loaded
-    await expect(window.locator('[data-testid="agents"]')).toBeVisible();
+    await expectAgentsVisible(window);
 
     // Activity indicator should not be visible
     const activityIndicator = window.locator('[data-testid="activity-indicator"]');

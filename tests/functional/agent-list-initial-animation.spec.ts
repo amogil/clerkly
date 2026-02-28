@@ -15,6 +15,7 @@ import {
   createMockOAuthServer,
   launchElectronWithMockOAuth,
   closeElectron,
+  expectAgentsVisible,
 } from './helpers/electron';
 import type { MockOAuthServer } from './helpers/mock-oauth-server';
 
@@ -50,7 +51,7 @@ test.describe('Agent list initial animation', () => {
     testDataPath = context.testDataPath;
 
     await completeOAuthFlow(electronApp, window);
-    await expect(window.locator('[data-testid="agents"]')).toBeVisible({ timeout: 10000 });
+    await expectAgentsVisible(window, 10000);
   });
 
   test.afterEach(async () => {

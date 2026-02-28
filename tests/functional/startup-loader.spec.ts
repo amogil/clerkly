@@ -16,6 +16,7 @@ import {
   createMockOAuthServer,
   activeChat,
   expectNoToastError,
+  expectAgentsVisible,
 } from './helpers/electron';
 import type { MockOAuthServer } from './helpers/mock-oauth-server';
 
@@ -102,7 +103,7 @@ test.describe('Startup loader', () => {
     const appLoading = context.window.locator('[data-testid="app-loading-screen"]');
     await expect(appLoading).toBeHidden({ timeout: 10000 });
 
-    await expect(context.window.locator('[data-testid="agents"]')).toBeVisible({ timeout: 10000 });
+    await expectAgentsVisible(context.window, 10000);
     await expect
       .poll(async () => await context.window.evaluate(() => (window as any).__appLoadingSeen), {
         timeout: 10000,
@@ -126,9 +127,7 @@ test.describe('Startup loader', () => {
     });
 
     await completeOAuthFlow(firstContext.app, firstContext.window);
-    await expect(firstContext.window.locator('[data-testid="agents"]')).toBeVisible({
-      timeout: 10000,
-    });
+    await expectAgentsVisible(firstContext.window, 10000);
 
     await closeElectron(firstContext, false);
 
@@ -139,7 +138,7 @@ test.describe('Startup loader', () => {
     const appLoading = context.window.locator('[data-testid="app-loading-screen"]');
     await expect(appLoading).toBeVisible({ timeout: 10000 });
     await expect(appLoading).toBeHidden({ timeout: 10000 });
-    await expect(context.window.locator('[data-testid="agents"]')).toBeVisible({ timeout: 10000 });
+    await expectAgentsVisible(context.window, 10000);
     await expectNoToastError(context.window);
   });
 
@@ -158,9 +157,7 @@ test.describe('Startup loader', () => {
     });
 
     await completeOAuthFlow(firstContext.app, firstContext.window);
-    await expect(firstContext.window.locator('[data-testid="agents"]')).toBeVisible({
-      timeout: 10000,
-    });
+    await expectAgentsVisible(firstContext.window, 10000);
 
     const agentIcons = firstContext.window.locator('[data-testid^="agent-icon-"]');
     await expect(agentIcons).toHaveCount(1, { timeout: 5000 });
@@ -198,7 +195,7 @@ test.describe('Startup loader', () => {
     await expect(appLoading).toBeHidden({
       timeout: 10000,
     });
-    await expect(context.window.locator('[data-testid="agents"]')).toBeVisible({ timeout: 10000 });
+    await expectAgentsVisible(context.window, 10000);
 
     const selectAgent = async (agentId: string) => {
       const agentIcon = context.window.locator(`[data-testid="agent-icon-${agentId}"]`);
@@ -250,7 +247,7 @@ test.describe('Startup loader', () => {
     const appLoading = context.window.locator('[data-testid="app-loading-screen"]');
     await expect(appLoading).toBeHidden({ timeout: 10000 });
 
-    await expect(context.window.locator('[data-testid="agents"]')).toBeVisible({ timeout: 10000 });
+    await expectAgentsVisible(context.window, 10000);
     await expect(activeChat(context.window).textarea).toBeVisible({ timeout: 5000 });
     await expectNoToastError(context.window);
   });

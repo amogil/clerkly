@@ -2,9 +2,13 @@
 // Functional tests for message text wrapping
 
 import { test, expect, ElectronApplication, Page } from '@playwright/test';
-import { createMockOAuthServer, launchElectronWithMockOAuth } from './helpers/electron';
+import {
+  createMockOAuthServer,
+  launchElectronWithMockOAuth,
+  expectAgentsVisible,
+  completeOAuthFlow,
+} from './helpers/electron';
 import type { MockOAuthServer } from './helpers/mock-oauth-server';
-import { completeOAuthFlow } from './helpers/electron';
 
 let mockServer: MockOAuthServer;
 let electronApp: ElectronApplication;
@@ -30,7 +34,7 @@ test.beforeAll(async () => {
   await completeOAuthFlow(electronApp, page);
 
   // Wait for agents page to load (automatic redirect after OAuth)
-  await expect(page.locator('[data-testid="agents"]')).toBeVisible({ timeout: 5000 });
+  await expectAgentsVisible(page, 5000);
 });
 
 test.afterAll(async () => {

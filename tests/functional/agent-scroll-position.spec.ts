@@ -13,6 +13,7 @@ import {
   launchElectron,
   closeElectron,
   ElectronTestContext,
+  expectAgentsVisible,
 } from './helpers/electron';
 import type { MockOAuthServer } from './helpers/mock-oauth-server';
 
@@ -49,7 +50,7 @@ test.beforeEach(async () => {
   window = context.window;
 
   await completeOAuthFlow(context.app, window);
-  await expect(window.locator('[data-testid="agents"]')).toBeVisible({ timeout: 10000 });
+  await expectAgentsVisible(window, 10000);
 });
 
 test.afterEach(async () => {

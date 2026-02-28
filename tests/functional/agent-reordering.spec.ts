@@ -7,9 +7,14 @@
    Requirements: agents.1.3, agents.1.4, agents.5.7 */
 
 import { test, expect, ElectronApplication, Page } from '@playwright/test';
-import { createMockOAuthServer, activeChat, launchElectronWithMockOAuth } from './helpers/electron';
+import {
+  createMockOAuthServer,
+  activeChat,
+  launchElectronWithMockOAuth,
+  completeOAuthFlow,
+  expectAgentsVisible,
+} from './helpers/electron';
 import type { MockOAuthServer } from './helpers/mock-oauth-server';
-import { completeOAuthFlow } from './helpers/electron';
 
 let mockServer: MockOAuthServer;
 
@@ -55,7 +60,7 @@ test.describe('Agent Reordering', () => {
      Requirements: agents.1.3, agents.1.4, agents.5.7 */
   test('should move agent to top of list after sending message', async () => {
     // Wait for agents page to load
-    await expect(window.locator('[data-testid="agents"]')).toBeVisible({ timeout: 5000 });
+    await expectAgentsVisible(window, 5000);
 
     // Wait for first agent to be auto-created
     await window.waitForTimeout(1000);
@@ -104,7 +109,7 @@ test.describe('Agent Reordering', () => {
      Requirements: agents.1.3, agents.1.4, agents.5.7 */
   test('should bring hidden agent to header after sending message', async () => {
     // Wait for agents page to load
-    await expect(window.locator('[data-testid="agents"]')).toBeVisible({ timeout: 5000 });
+    await expectAgentsVisible(window, 5000);
 
     // Wait for first agent to be auto-created
     await window.waitForTimeout(1000);
@@ -185,7 +190,7 @@ test.describe('Agent Reordering', () => {
      Requirements: agents.1.3, agents.1.4, agents.5.7 */
   test('should maintain correct order when multiple agents are updated', async () => {
     // Wait for agents page to load
-    await expect(window.locator('[data-testid="agents"]')).toBeVisible({ timeout: 5000 });
+    await expectAgentsVisible(window, 5000);
 
     // Wait for first agent to be auto-created
     await window.waitForTimeout(1000);
@@ -289,7 +294,7 @@ test.describe('Agent Reordering', () => {
      Requirements: agents.1.3, agents.1.4, agents.5.7 */
   test('should reorder immediately after message from AllAgents selection', async () => {
     // Wait for agents page to load
-    await expect(window.locator('[data-testid="agents"]')).toBeVisible({ timeout: 5000 });
+    await expectAgentsVisible(window, 5000);
 
     // Wait for first agent to be auto-created
     await window.waitForTimeout(1000);

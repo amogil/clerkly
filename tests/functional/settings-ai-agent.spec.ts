@@ -116,7 +116,7 @@ test('53.2: should save and load API key with encryption', async () => {
   await context.window.waitForSelector('text=LLM Provider');
 
   // Enter API key
-  const apiKeyInput = context.window.locator('[data-testid="ai-agent-api-key"]');
+  const apiKeyInput = context.window.locator('input[placeholder="Enter your API key"]');
   await apiKeyInput.fill(testApiKey);
 
   // Wait for debounce and data to flush to disk
@@ -144,7 +144,7 @@ test('53.2: should save and load API key with encryption', async () => {
   await context.window.waitForSelector('text=LLM Provider');
 
   // Check that API key field is filled (but hidden)
-  const apiKeyInput2 = context.window.locator('[data-testid="ai-agent-api-key"]');
+  const apiKeyInput2 = context.window.locator('input[placeholder="Enter your API key"]');
   const inputType = await apiKeyInput2.getAttribute('type');
   expect(inputType).toBe('password');
 
@@ -152,10 +152,7 @@ test('53.2: should save and load API key with encryption', async () => {
   expect(inputValue).toBeTruthy();
 
   // Toggle visibility
-  const toggleButton = apiKeyInput2
-    .locator('xpath=..')
-    .locator('button[type="button"]')
-    .first();
+  const toggleButton = context.window.locator('button:has(svg):near(:text("API Key"))');
   await toggleButton.click();
 
   // Check that key is visible and correct
@@ -262,7 +259,7 @@ test('53.5: should toggle API key visibility', async () => {
   await context.window.waitForSelector('text=LLM Provider');
 
   // Enter API key
-  const apiKeyInput = context.window.locator('[data-testid="ai-agent-api-key"]');
+  const apiKeyInput = context.window.locator('input[placeholder="Enter your API key"]');
   await apiKeyInput.fill('test-visibility-key');
 
   // Check initial state (password)
@@ -270,10 +267,7 @@ test('53.5: should toggle API key visibility', async () => {
   expect(inputType).toBe('password');
 
   // Find toggle button
-  const toggleButton = apiKeyInput
-    .locator('xpath=..')
-    .locator('button[type="button"]')
-    .first();
+  const toggleButton = context.window.locator('button:has(svg):near(:text("API Key"))');
 
   // Click to show
   await toggleButton.click();

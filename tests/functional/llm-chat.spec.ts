@@ -15,6 +15,9 @@ import {
   completeOAuthFlow,
   createMockOAuthServer,
   expectNoToastError,
+  getAgentIdsFromApi,
+  expectAgentsVisible,
+  expectAgentsHiddenByCss,
 } from './helpers/electron';
 import type { MockOAuthServer } from './helpers/mock-oauth-server';
 import { MockLLMServer } from './helpers/mock-llm-server';
@@ -63,7 +66,7 @@ async function launchWithRealLLM(apiKey: string): Promise<ElectronTestContext> {
   });
 
   await completeOAuthFlow(ctx.app, ctx.window, TEST_CLIENT_ID);
-  await expect(ctx.window.locator('[data-testid="agents"]')).toBeVisible({ timeout: 10000 });
+  await expectAgentsVisible(ctx.window, 10000);
 
   return ctx;
 }
@@ -172,12 +175,10 @@ test.describe('LLM Chat (real OpenAI)', () => {
     const messagesArea = context.window.locator('[data-testid="messages-area"]');
 
     // Get agent ID to pre-fill chat with scrollable content
-    const agentIcons = context.window.locator('[data-testid^="agent-icon-"]');
-    await expect(agentIcons).toHaveCount(1, { timeout: 5000 });
-    const firstAgentId = (await agentIcons.first().getAttribute('data-testid'))?.replace(
-      'agent-icon-',
-      ''
-    );
+    await expect
+      .poll(async () => (await getAgentIdsFromApi(context.window)).length, { timeout: 5000 })
+      .toBeGreaterThan(0);
+    const firstAgentId = (await getAgentIdsFromApi(context.window))[0];
     expect(firstAgentId).toBeTruthy();
 
     // Pre-fill chat with messages to make it scrollable
@@ -236,12 +237,10 @@ test.describe('LLM Chat (real OpenAI)', () => {
     const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
 
     // Pre-fill chat with messages to make it scrollable
-    const agentIcons = context.window.locator('[data-testid^="agent-icon-"]');
-    await expect(agentIcons).toHaveCount(1, { timeout: 5000 });
-    const firstAgentId = (await agentIcons.first().getAttribute('data-testid'))?.replace(
-      'agent-icon-',
-      ''
-    );
+    await expect
+      .poll(async () => (await getAgentIdsFromApi(context.window)).length, { timeout: 5000 })
+      .toBeGreaterThan(0);
+    const firstAgentId = (await getAgentIdsFromApi(context.window))[0];
     for (let i = 1; i <= 15; i++) {
       await context.window.evaluate(
         async ({ agentId, text }) => {
@@ -334,7 +333,7 @@ test.describe('LLM Chat (mock server)', () => {
       CLERKLY_OPENAI_API_KEY: 'mock-key-for-testing',
     });
     await completeOAuthFlow(ctx.app, ctx.window, TEST_CLIENT_ID);
-    await expect(ctx.window.locator('[data-testid="agents"]')).toBeVisible({ timeout: 10000 });
+    await expectAgentsVisible(ctx.window, 10000);
     // Check no toast errors appeared during startup/auth
     await expectNoToastError(ctx.window);
     return ctx;
@@ -687,6 +686,8 @@ test.describe('LLM Chat (mock server)', () => {
       timeout: 5000,
     });
 
+    // Agents screen wrapper is hidden via CSS while staying in DOM
+    await expectAgentsHiddenByCss(context.window, 3000);
   });
 
   /* Preconditions: MockLLMServer returns 429; app authenticated with mock LLM URL

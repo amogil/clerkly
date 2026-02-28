@@ -7,6 +7,7 @@ import {
   ElectronTestContext,
   clearTestTokens,
   completeOAuthFlow,
+  expectAgentsVisible,
 } from './helpers/electron';
 import { createMockOAuthServer } from './helpers/electron';
 import type { MockOAuthServer } from './helpers/mock-oauth-server';
@@ -85,7 +86,7 @@ test.describe('Complete OAuth Flow', () => {
     await completeOAuthFlow(context.app, context.window, TEST_CLIENT_ID);
 
     // Verify app transitioned to agents screen
-    await expect(context.window.locator('[data-testid="agents"]')).toBeVisible({ timeout: 10000 });
+    await expectAgentsVisible(context.window, 10000);
 
     expect(context.window.isClosed()).toBe(false);
 

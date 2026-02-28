@@ -14,6 +14,7 @@ import {
   createMockOAuthServer,
   activeChat,
   expectNoToastError,
+  expectAgentsVisible,
 } from './helpers/electron';
 import type { MockOAuthServer } from './helpers/mock-oauth-server';
 
@@ -38,7 +39,7 @@ async function seedAgentMessages(window: Page, agentId: string, count: number): 
 async function reloadAndWaitForAgents(window: Page): Promise<void> {
   await window.reload();
   await window.waitForLoadState('domcontentloaded');
-  await expect(window.locator('[data-testid="agents"]')).toBeVisible({ timeout: 10000 });
+  await expectAgentsVisible(window, 10000);
 }
 
 test.beforeAll(async () => {
@@ -65,7 +66,7 @@ test.beforeEach(async () => {
   });
 
   await completeOAuthFlow(context.app, context.window);
-  await expect(context.window.locator('[data-testid="agents"]')).toBeVisible({ timeout: 10000 });
+  await expectAgentsVisible(context.window, 10000);
   await expectNoToastError(context.window);
 });
 

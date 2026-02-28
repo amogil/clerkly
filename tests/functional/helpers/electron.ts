@@ -1,5 +1,6 @@
 // Requirements: testing.3.1, testing.3.2, testing.3.6
 
+import { expect } from '@playwright/test';
 import { _electron as electron, ElectronApplication, Page } from 'playwright';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -479,6 +480,72 @@ export function activeChat(window: Page) {
     /** Scroll-to-bottom button (scoped to active chat to avoid strict-mode violations) */
     scrollToBottomBtn: chat.locator('[data-testid="scroll-to-bottom"]'),
   };
+}
+
+/**
+ * Read agent IDs from the API (ordered by updatedAt DESC).
+ */
+// Requirements: testing.10
+export async function getAgentIdsFromApi(window: Page): Promise<string[]> {
+  return window.evaluate(async () => {
+    const api = (globalThis as any).api;
+    const agents = await api.agents.list();
+    if (agents.success && agents.data) {
+      return (agents.data as Array<{ id: string }>).map((agent) => agent.id);
+    }
+    return [];
+  });
+}
+
+/**
+ * Read agent IDs from the header icons list (ordered by DOM).
+ */
+// Requirements: testing.10
+export async function getAgentIdsFromHeader(window: Page): Promise<string[]> {
+  return window.evaluate(() =>
+    Array.from(document.querySelectorAll('[data-testid^="agent-icon-"]'))
+      .map((el) => el.getAttribute('data-testid'))
+      .filter((id): id is string => Boolean(id))
+      .map((id) => id.replace('agent-icon-', ''))
+  );
+}
+
+/**
+ * Read agent IDs from the AllAgents list (ordered by DOM).
+ */
+// Requirements: testing.10
+export async function getAgentIdsFromAllAgents(window: Page): Promise<string[]> {
+  return window.evaluate(() =>
+    Array.from(document.querySelectorAll('[data-testid^="agent-card-"]'))
+      .map((el) => el.getAttribute('data-testid'))
+      .filter((id): id is string => Boolean(id))
+      .map((id) => id.replace('agent-card-', ''))
+  );
+}
+
+/**
+ * Agents screen root locator.
+ */
+// Requirements: testing.10
+export function agentsScreen(window: Page) {
+  return window.locator('[data-testid="agents"]');
+}
+
+/**
+ * Expect Agents screen to be visible.
+ */
+// Requirements: testing.10
+export async function expectAgentsVisible(window: Page, timeout = 10000): Promise<void> {
+  await expect(agentsScreen(window)).toBeVisible({ timeout });
+}
+
+/**
+ * Expect Agents screen wrapper to be hidden via CSS (opacity-0).
+ */
+// Requirements: testing.10
+export async function expectAgentsHiddenByCss(window: Page, timeout = 3000): Promise<void> {
+  const agentsWrapper = agentsScreen(window).locator('..');
+  await expect(agentsWrapper).toHaveClass(/opacity-0/, { timeout });
 }
 
 /**
