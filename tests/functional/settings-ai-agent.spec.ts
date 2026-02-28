@@ -152,7 +152,7 @@ test('53.2: should save and load API key with encryption', async () => {
   expect(inputValue).toBeTruthy();
 
   // Toggle visibility
-  const toggleButton = context.window.locator('button:has(svg):near(:text("API Key"))');
+  const toggleButton = context.window.locator('[data-testid="ai-agent-api-key-toggle"]');
   await toggleButton.click();
 
   // Check that key is visible and correct
@@ -267,7 +267,7 @@ test('53.5: should toggle API key visibility', async () => {
   expect(inputType).toBe('password');
 
   // Find toggle button
-  const toggleButton = context.window.locator('button:has(svg):near(:text("API Key"))');
+  const toggleButton = context.window.locator('[data-testid="ai-agent-api-key-toggle"]');
 
   // Click to show
   await toggleButton.click();
