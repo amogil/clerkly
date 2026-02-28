@@ -505,6 +505,7 @@
 - `tests/functional/llm-chat.spec.ts` - "should render markdown mermaid diagrams"
 - `tests/functional/llm-chat.spec.ts` - "should render markdown inline math"
 - `tests/functional/llm-chat.spec.ts` - "should render markdown block math"
+- `tests/functional/llm-chat.spec.ts` - "should avoid duplicate line breaks between markdown blocks"
 
 ---
 

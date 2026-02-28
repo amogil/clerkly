@@ -415,7 +415,9 @@ test.describe('LLM Chat (mock server)', () => {
      Requirements: agents.7.7 */
   test('should render markdown blockquotes', async () => {
     await renderMarkdownMessage('> Quoted text');
-    await expect(context.window.locator('[data-testid="message-llm-action"] blockquote')).toBeVisible();
+    await expect(
+      context.window.locator('[data-testid="message-llm-action"] blockquote')
+    ).toBeVisible();
   });
 
   /* Preconditions: MockLLMServer returns unordered list
@@ -471,7 +473,9 @@ test.describe('LLM Chat (mock server)', () => {
      Requirements: agents.7.7 */
   test('should render markdown fenced code', async () => {
     await renderMarkdownMessage('```json\n{\n  "ok": true\n}\n```');
-    await expect(context.window.locator('[data-testid="message-llm-action"] pre code')).toBeVisible();
+    await expect(
+      context.window.locator('[data-testid="message-llm-action"] pre code')
+    ).toBeVisible();
   });
 
   /* Preconditions: MockLLMServer returns markdown tables
@@ -530,6 +534,23 @@ test.describe('LLM Chat (mock server)', () => {
     await expect(
       context.window.locator('[data-testid="message-llm-action"] .katex-display')
     ).toBeVisible();
+  });
+
+  /* Preconditions: MockLLMServer returns task list and blockquotes
+     Action: User sends a message
+     Assertions: no empty paragraphs are rendered between blocks
+     Requirements: agents.7.7 */
+  test('should avoid duplicate line breaks between markdown blocks', async () => {
+    const markdown =
+      '### Список задач (task list)\n\n- [x] Сделано\n- [ ] В процессе\n- [ ] Не начато\n\n---\n\n## Цитаты\n\n> Это цитата в один уровень.\n\n> Это цитата в два уровня.';
+    await renderMarkdownMessage(markdown);
+
+    const emptyParagraphs = await context.window
+      .locator('[data-testid="message-llm-action"] p')
+      .evaluateAll(
+        (nodes) => nodes.filter((node) => (node.textContent ?? '').trim().length === 0).length
+      );
+    expect(emptyParagraphs).toBe(0);
   });
 
   /**
@@ -650,7 +671,6 @@ test.describe('LLM Chat (mock server)', () => {
     // No text from the interrupted first response anywhere in the chat
     await expect(context.window.locator('text=First response')).toHaveCount(0);
   });
-
 
   /* Preconditions: MockLLMServer configured to return HTTP 500,
        app authenticated with mock LLM URL

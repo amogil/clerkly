@@ -100,7 +100,11 @@ const renderMockMarkdown = (markdown: string) => {
       continue;
     }
 
-    if (line.includes('|') && index + 1 < lines.length && /^(\s*\|?[-: ]+\|)+\s*$/.test(lines[index + 1])) {
+    if (
+      line.includes('|') &&
+      index + 1 < lines.length &&
+      /^(\s*\|?[-: ]+\|)+\s*$/.test(lines[index + 1])
+    ) {
       closeListsToIndent(0);
       const headerCells = line
         .trim()
@@ -121,7 +125,9 @@ const renderMockMarkdown = (markdown: string) => {
         index += 1;
       }
       index -= 1;
-      htmlParts.push(`<table><thead><tr>${headerCells}</tr></thead><tbody>${bodyRows.join('')}</tbody></table>`);
+      htmlParts.push(
+        `<table><thead><tr>${headerCells}</tr></thead><tbody>${bodyRows.join('')}</tbody></table>`
+      );
       continue;
     }
 

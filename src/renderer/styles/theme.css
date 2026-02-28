@@ -183,6 +183,7 @@
 @layer components {
   .message-markdown {
     line-height: 1.5;
+    white-space: normal;
   }
 
   .message-markdown p,

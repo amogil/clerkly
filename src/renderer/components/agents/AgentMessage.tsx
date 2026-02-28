@@ -109,7 +109,7 @@ export function AgentMessage({ message, showAvatar, agentStatus, onNavigate }: A
           {llmAction?.content ? (
             <MessageContent
               data-testid="message-llm-action"
-              className="message-markdown whitespace-pre-wrap break-words w-full"
+              className="message-markdown break-words w-full"
             >
               <MessageResponse>{llmAction.content}</MessageResponse>
             </MessageContent>
@@ -134,7 +134,7 @@ export function AgentMessage({ message, showAvatar, agentStatus, onNavigate }: A
           <Logo size="sm" showText={false} animated={isInProgress(agentStatus)} />
         </div>
       )}
-      <MessageContent className="message-markdown whitespace-pre-wrap break-words w-full">
+      <MessageContent className="message-markdown break-words w-full">
         <MessageResponse>{String(message.payload.data?.text || '')}</MessageResponse>
       </MessageContent>
     </Message>
