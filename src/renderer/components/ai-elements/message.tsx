@@ -9,11 +9,13 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { cn } from '@/lib/utils';
 import { cjk } from '@streamdown/cjk';
 import { code } from '@streamdown/code';
-import { math } from '@streamdown/math';
+import { createMathPlugin } from '@streamdown/math';
 import { mermaid } from '@streamdown/mermaid';
 import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react';
 import { createContext, memo, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { Streamdown } from 'streamdown';
+import { visit } from 'unist-util-visit';
+import remarkGfm from 'remark-gfm';
 
 export type MessageProps = HTMLAttributes<HTMLDivElement> & {
   from: UIMessage['role'];
@@ -271,13 +273,36 @@ export const MessageBranchPage = ({ className, ...props }: MessageBranchPageProp
 
 export type MessageResponseProps = ComponentProps<typeof Streamdown>;
 
-const streamdownPlugins = { cjk, code, math, mermaid };
+const streamdownPlugins = {
+  cjk,
+  code,
+  math: createMathPlugin({ singleDollarTextMath: true }),
+  mermaid,
+};
+
+const stripFootnotes = () => (tree: unknown) => {
+  const nodesToRemove: Array<{ parent: { children?: unknown[] }; index: number }> = [];
+  visit(tree as any, (node: any, index: number | undefined, parent: any) => {
+    if (!parent || typeof index !== 'number') return;
+    if (node.type === 'footnoteDefinition' || node.type === 'footnoteReference') {
+      nodesToRemove.push({ parent: parent as { children?: unknown[] }, index });
+    }
+  });
+  nodesToRemove
+    .sort((a, b) => b.index - a.index)
+    .forEach(({ parent, index }) => {
+      if (Array.isArray(parent.children)) {
+        parent.children.splice(index, 1);
+      }
+    });
+};
 
 export const MessageResponse = memo(
   ({ className, ...props }: MessageResponseProps) => (
     <Streamdown
       className={cn('size-full [&>*:first-child]:mt-0 [&>*:last-child]:mb-0', className)}
       plugins={streamdownPlugins}
+      remarkPlugins={[remarkGfm, stripFootnotes]}
       {...props}
     />
   ),

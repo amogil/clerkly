@@ -875,7 +875,9 @@ test.describe('LLM Chat (mock server)', () => {
   test('should render markdown fenced code', async () => {
     await renderMarkdownMessage('```js\nconsole.log("hi");\n```');
     await expect(context.window.locator('[data-testid="message-llm-action"] pre')).toBeVisible();
-    await expect(context.window.locator('[data-testid="message-llm-action"] pre code')).toBeVisible();
+    await expect(
+      context.window.locator('[data-testid="message-llm-action"] pre code')
+    ).toBeVisible();
   });
 
   /* Preconditions: MockLLMServer returns markdown table
@@ -957,14 +959,9 @@ test.describe('LLM Chat (mock server)', () => {
      Assertions: Code block actions and task list checkboxes are rendered
      Requirements: agents.7.7 */
   test('should render streamdown code blocks and task lists', async () => {
-    const markdown = [
-      '```ts',
-      'const value = 42;',
-      '```',
-      '',
-      '- [x] Done',
-      '- [ ] Pending',
-    ].join('\n');
+    const markdown = ['```ts', 'const value = 42;', '```', '', '- [x] Done', '- [ ] Pending'].join(
+      '\n'
+    );
 
     mockLLMServer.setStreamingMode(true, {
       content: JSON.stringify({ action: { type: 'text', content: markdown } }),

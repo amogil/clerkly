@@ -7,7 +7,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { cn } from '@/lib/utils';
 import { cjk } from '@streamdown/cjk';
 import { code } from '@streamdown/code';
-import { math } from '@streamdown/math';
+import { createMathPlugin } from '@streamdown/math';
 import { mermaid } from '@streamdown/mermaid';
 import { BrainIcon, ChevronDownIcon } from 'lucide-react';
 import {
@@ -21,6 +21,8 @@ import {
   useState,
 } from 'react';
 import { Streamdown } from 'streamdown';
+import { visit } from 'unist-util-visit';
+import remarkGfm from 'remark-gfm';
 
 import { Shimmer } from './shimmer';
 
@@ -189,7 +191,29 @@ export type ReasoningContentProps = ComponentProps<typeof CollapsibleContent> & 
   children: string;
 };
 
-const streamdownPlugins = { cjk, code, math, mermaid };
+const streamdownPlugins = {
+  cjk,
+  code,
+  math: createMathPlugin({ singleDollarTextMath: true }),
+  mermaid,
+};
+
+const stripFootnotes = () => (tree: unknown) => {
+  const nodesToRemove: Array<{ parent: { children?: unknown[] }; index: number }> = [];
+  visit(tree as any, (node: any, index: number | undefined, parent: any) => {
+    if (!parent || typeof index !== 'number') return;
+    if (node.type === 'footnoteDefinition' || node.type === 'footnoteReference') {
+      nodesToRemove.push({ parent: parent as { children?: unknown[] }, index });
+    }
+  });
+  nodesToRemove
+    .sort((a, b) => b.index - a.index)
+    .forEach(({ parent, index }) => {
+      if (Array.isArray(parent.children)) {
+        parent.children.splice(index, 1);
+      }
+    });
+};
 
 export const ReasoningContent = memo(({ className, children, ...props }: ReasoningContentProps) => (
   <CollapsibleContent
@@ -200,7 +224,7 @@ export const ReasoningContent = memo(({ className, children, ...props }: Reasoni
     )}
     {...props}
   >
-    <Streamdown plugins={streamdownPlugins} {...props}>
+    <Streamdown plugins={streamdownPlugins} remarkPlugins={[remarkGfm, stripFootnotes]} {...props}>
       {children}
     </Streamdown>
   </CollapsibleContent>
