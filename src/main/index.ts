@@ -210,7 +210,7 @@ import { PromptBuilder, FullHistoryStrategy } from './agents/PromptBuilder';
 const agentManager = new AgentManager(dbManager);
 const messageManager = new MessageManager(dbManager);
 const promptBuilder = new PromptBuilder(
-  'You are a helpful AI assistant. You may respond in Markdown when it improves clarity.',
+  'You are a helpful AI assistant. You may respond in Markdown when it improves clarity. Supported Markdown: headings, paragraphs, bold/italic/strikethrough, links/autolinks, blockquotes, lists (including task lists), code (inline and fenced with language tags), tables, horizontal rules, images, Mermaid diagrams, and math using $$...$$ (inline) or $$ blocks.',
   [],
   new FullHistoryStrategy()
 );

@@ -1590,6 +1590,19 @@ markdown-элементов (p, ul/ol, li, pre) и единый line-height.
 Ответы агента рендерятся через `MessageResponse` (Streamdown) с едиными
 правилами типографики, чтобы plain text и markdown выглядели одинаково.
 
+`message-markdown` нормализует базовые элементы markdown:
+- заголовки (`h1-h6`) с единым line-height и умеренными размерами
+- списки (`ul`, `ol`, `li`) с видимыми маркерами и отступами
+- task lists (checkbox) с базовым выравниванием и цветом
+- цитаты (`blockquote`) с левой границей и приглушенным цветом
+- ссылки (`a`) и автоссылки с подчёркиванием и цветом primary
+- зачёркивание (`del`) для `~~text~~`
+- код (`code`, `pre`) с фоном, отступами и скроллом по оси X для блоков
+- разделители (`hr`) с тонкой границей
+- таблицы (`table`, `th`, `td`) с границами и padding
+- изображения (`img`) с ограничением по ширине и скруглением
+- диаграммы Mermaid и формулы KaTeX с адаптивной шириной
+
 ```typescript
 // Requirements: agents.7.7
 import { MessageResponse } from '../ai-elements/message';
@@ -2011,6 +2024,7 @@ import { Logo } from '../logo';
 | `tests/functional/all-agents-page.spec.ts` | agents.5 | - |
 | `tests/functional/agent-status-indicators.spec.ts` | agents.6 | - |
 | `tests/functional/message-format.spec.ts` | agents.7, agents.4.24 | - |
+| `tests/functional/llm-chat.spec.ts` | agents.7.7 | - |
 | `tests/functional/agent-status-calculation.spec.ts` | agents.9 | - |
 | `tests/functional/agent-data-isolation.spec.ts` | agents.10 | - |
 | `tests/functional/agent-activity-indicator.spec.ts` | agents.11 | - |

@@ -203,6 +203,12 @@ class PromptBuilder {
 }
 ```
 
+**Базовый системный промпт (MVP):**
+
+```
+You are a helpful AI assistant. You may respond in Markdown when it improves clarity. Supported Markdown: headings, paragraphs, bold/italic/strikethrough, links/autolinks, blockquotes, lists (including task lists), code (inline and fenced with language tags), tables, horizontal rules, images, Mermaid diagrams, and math using $$...$$ (inline) or $$ blocks.
+```
+
 **YAML-формат истории:**
 
 ```yaml
