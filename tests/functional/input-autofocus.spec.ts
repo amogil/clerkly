@@ -106,10 +106,25 @@ test('should auto-focus input when returning from AllAgents', async () => {
   const newChatButton = window.locator('div[title="New chat"]');
   await expect(newChatButton).toBeVisible({ timeout: 5000 });
 
+  const baseAgentCount = await window.evaluate(async () => {
+    const agents = await window.api.agents.list();
+    return agents.success && agents.data ? agents.data.length : 0;
+  });
+  expect(baseAgentCount).toBeGreaterThan(0);
+
   for (let i = 0; i < 9; i++) {
     await newChatButton.click();
-    const agentIcons = window.locator('[data-testid^="agent-icon-"]');
-    await expect(agentIcons.nth(i + 1)).toBeVisible({ timeout: 5000 });
+    await expect
+      .poll(
+        async () => {
+          return window.evaluate(async () => {
+            const agents = await window.api.agents.list();
+            return agents.success && agents.data ? agents.data.length : 0;
+          });
+        },
+        { timeout: 5000 }
+      )
+      .toBe(baseAgentCount + i + 1);
   }
 
   // Send a message to create history (so agent appears in AllAgents)
@@ -129,8 +144,17 @@ test('should auto-focus input when returning from AllAgents', async () => {
   // Verify AllAgents page is shown
   await expect(window.locator('text=All Agents')).toBeVisible({ timeout: 5000 });
 
-  // Click on the agent in the list
-  const agentCard = window.locator('[data-testid^="agent-card-"]').first();
+  const targetAgentId = await window.evaluate(async () => {
+    const agents = await window.api.agents.list();
+    if (agents.success && agents.data) {
+      return (agents.data as Array<{ id: string }>)[0]?.id ?? null;
+    }
+    return null;
+  });
+  expect(targetAgentId).toBeTruthy();
+
+  // Click on the agent in the list by ID
+  const agentCard = window.locator(`[data-testid="agent-card-${targetAgentId}"]`);
   await expect(agentCard).toBeVisible({ timeout: 5000 });
   await agentCard.click();
 
@@ -201,10 +225,25 @@ test('should not auto-focus when AllAgents page is open', async () => {
   const newChatButton = window.locator('div[title="New chat"]');
   await expect(newChatButton).toBeVisible({ timeout: 5000 });
 
+  const baseAgentCount = await window.evaluate(async () => {
+    const agents = await window.api.agents.list();
+    return agents.success && agents.data ? agents.data.length : 0;
+  });
+  expect(baseAgentCount).toBeGreaterThan(0);
+
   for (let i = 0; i < 9; i++) {
     await newChatButton.click();
-    const agentIcons = window.locator('[data-testid^="agent-icon-"]');
-    await expect(agentIcons.nth(i + 1)).toBeVisible({ timeout: 5000 });
+    await expect
+      .poll(
+        async () => {
+          return window.evaluate(async () => {
+            const agents = await window.api.agents.list();
+            return agents.success && agents.data ? agents.data.length : 0;
+          });
+        },
+        { timeout: 5000 }
+      )
+      .toBe(baseAgentCount + i + 1);
   }
 
   // Send a message first
