@@ -159,25 +159,41 @@ test.describe('Agents Error Messages', () => {
       });
     }, firstAgentId);
 
-    // Create 5 more agents (total 6 agents)
+    const baseAgentCount = await window.evaluate(async () => {
+      const agents = await window.api.agents.list();
+      return agents.success && agents.data ? agents.data.length : 0;
+    });
+    expect(baseAgentCount).toBeGreaterThan(0);
+
+    // Create 9 more agents to ensure a larger list
     const newChatButton = window.locator('div[title="New chat"]');
     await expect(newChatButton).toBeVisible({ timeout: 5000 });
 
     for (let i = 0; i < 9; i++) {
       await newChatButton.click();
-      // Wait for new agent icon to appear
-      const agentIcons = window.locator('[data-testid^="agent-icon-"]');
-      await expect(agentIcons.nth(i + 1)).toBeVisible({ timeout: 5000 });
+      await expect
+        .poll(
+          async () => {
+            return window.evaluate(async () => {
+              const agents = await window.api.agents.list();
+              return agents.success && agents.data ? agents.data.length : 0;
+            });
+          },
+          { timeout: 5000 }
+        )
+        .toBe(baseAgentCount + i + 1);
     }
 
-    const secondAgentId = await window.evaluate(async () => {
+    const secondAgentId = await window.evaluate(async (firstId) => {
       const agents = await window.api.agents.list();
       if (agents.success && agents.data) {
         const agentList = agents.data as Array<{ id: string }>;
-        return agentList[0].id; // Most recent is first
+        const otherAgent = agentList.find((agent) => agent.id !== firstId);
+        return otherAgent?.id ?? null;
       }
       return null;
-    });
+    }, firstAgentId);
+    expect(secondAgentId).toBeTruthy();
 
     // Add message to second agent (more recent)
     await window.evaluate(async (id) => {
@@ -194,14 +210,23 @@ test.describe('Agents Error Messages', () => {
     // Verify we're in AllAgents view
     await expect(window.locator('text=All Agents')).toBeVisible({ timeout: 5000 });
 
-    // Get all agent cards
-    const agentCards = window.locator('[data-testid^="agent-card-"]');
-    const count = await agentCards.count();
+    const expectedOrder = await window.evaluate(async () => {
+      const agents = await window.api.agents.list();
+      if (agents.success && agents.data) {
+        return (agents.data as Array<{ id: string }>).map((agent) => agent.id);
+      }
+      return [];
+    });
+    expect(expectedOrder.length).toBeGreaterThan(0);
 
-    // Verify at least 6 agents
-    expect(count).toBeGreaterThanOrEqual(6);
+    const visibleAgentIds = await window.evaluate(() =>
+      Array.from(document.querySelectorAll('[data-testid^="agent-card-"]'))
+        .map((el) => el.getAttribute('data-testid'))
+        .filter((id): id is string => Boolean(id))
+        .map((id) => id.replace('agent-card-', ''))
+    );
 
-    // Verify second agent (more recent) appears before first agent
-    // This is implicit in the order of the list - most recent updatedAt first
+    // Verify ordering by updatedAt (most recent first)
+    expect(visibleAgentIds).toEqual(expectedOrder);
   });
 });
