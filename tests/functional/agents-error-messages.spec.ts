@@ -79,12 +79,36 @@ test.describe('Agents Error Messages', () => {
     const newChatButton = window.locator('div[title="New chat"]');
     await expect(newChatButton).toBeVisible({ timeout: 5000 });
 
-    // Create 10 more agents (total 11 active agents) to ensure +N button appears
+    const baseAgentCount = await window.evaluate(async () => {
+      const agents = await window.api.agents.list();
+      return agents.success && agents.data ? agents.data.length : 0;
+    });
+    expect(baseAgentCount).toBeGreaterThan(0);
+
+    // Create 10 more agents to ensure +N button appears
     for (let i = 0; i < 10; i++) {
       await newChatButton.click();
-      const agentIcons = window.locator('[data-testid^="agent-icon-"]');
-      await expect(agentIcons.nth(i + 1)).toBeVisible({ timeout: 5000 });
+      await expect
+        .poll(
+          async () => {
+            return window.evaluate(async () => {
+              const agents = await window.api.agents.list();
+              return agents.success && agents.data ? agents.data.length : 0;
+            });
+          },
+          { timeout: 5000 }
+        )
+        .toBe(baseAgentCount + i + 1);
     }
+
+    const expectedAgentIds = await window.evaluate(async () => {
+      const agents = await window.api.agents.list();
+      if (agents.success && agents.data) {
+        return (agents.data as Array<{ id: string }>).map((agent) => agent.id);
+      }
+      return [];
+    });
+    expect(expectedAgentIds.length).toBeGreaterThan(0);
 
     // Open AllAgents view
     const allAgentsButton = window.locator('[data-testid="all-agents-button"]');
@@ -94,11 +118,20 @@ test.describe('Agents Error Messages', () => {
     // Verify we're in AllAgents view
     await expect(window.locator('text=All Agents')).toBeVisible({ timeout: 5000 });
 
-    // Verify only 11 active agents are shown (archived agent is filtered out)
-    const agentCards = window.locator('[data-testid^="agent-card-"]');
-    await expect(agentCards).toHaveCount(11);
+    const visibleAgentIds = await window.evaluate(() =>
+      Array.from(document.querySelectorAll('[data-testid^="agent-card-"]'))
+        .map((el) => el.getAttribute('data-testid'))
+        .filter((id): id is string => Boolean(id))
+        .map((id) => id.replace('agent-card-', ''))
+    );
+
+    // Verify all expected agents are visible
+    for (const agentId of expectedAgentIds) {
+      expect(visibleAgentIds).toContain(agentId);
+    }
 
     // Verify archived agent is NOT visible
+    expect(visibleAgentIds).not.toContain(archivedAgentId);
     await expect(window.locator(`[data-testid="agent-card-${archivedAgentId}"]`)).not.toBeVisible();
   });
 
