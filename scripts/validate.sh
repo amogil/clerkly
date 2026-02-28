@@ -105,6 +105,14 @@ fi
 
 # 5. Unit Tests
 print_step "5. Unit Tests"
+echo "Running: npm run rebuild:node"
+if npm run rebuild:node; then
+    print_success "Node native modules rebuild passed"
+else
+    print_error "Node native modules rebuild failed"
+    exit 1
+fi
+
 if [ "$VERBOSE" = true ]; then
     echo "Running: npm run test:unit"
     if npm run test:unit; then
@@ -132,6 +140,14 @@ fi
 
 # 6. Test Coverage (unit tests only)
 print_step "6. Test Coverage"
+echo "Running: npm run rebuild:node"
+if npm run rebuild:node; then
+    print_success "Node native modules rebuild passed"
+else
+    print_error "Node native modules rebuild failed"
+    exit 1
+fi
+
 if [ "$VERBOSE" = true ]; then
     echo "Running: npm run test:coverage"
     if npm run test:coverage; then
