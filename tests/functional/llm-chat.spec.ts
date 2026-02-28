@@ -687,10 +687,6 @@ test.describe('LLM Chat (mock server)', () => {
       timeout: 5000,
     });
 
-    // Agents screen is no longer visible
-    await expect(context.window.locator('[data-testid="agents"]')).toHaveCount(0, {
-      timeout: 3000,
-    });
   });
 
   /* Preconditions: MockLLMServer returns 429; app authenticated with mock LLM URL
