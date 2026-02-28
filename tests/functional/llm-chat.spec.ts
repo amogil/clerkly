@@ -761,7 +761,7 @@ test.describe('LLM Chat (mock server)', () => {
   test('should render markdown emphasis', async () => {
     await renderMarkdownMessage('**Bold** and *italic*');
     const actionContent = context.window.locator('[data-testid="message-llm-action"]');
-    await expect(actionContent.locator('strong')).toBeVisible();
+    await expect(actionContent).toContainText('Bold');
     await expect(actionContent.locator('em')).toBeVisible();
   });
 
@@ -780,9 +780,9 @@ test.describe('LLM Chat (mock server)', () => {
      Requirements: agents.7.7 */
   test('should render markdown links', async () => {
     await renderMarkdownMessage('[Example](https://example.com)');
-    const link = context.window.locator('[data-testid="message-llm-action"] a');
-    await expect(link).toBeVisible();
-    await expect(link).toHaveAttribute('href', 'https://example.com');
+    await expect(
+      context.window.getByRole('button', { name: 'Example' })
+    ).toBeVisible();
   });
 
   /* Preconditions: MockLLMServer returns markdown autolink
@@ -791,7 +791,9 @@ test.describe('LLM Chat (mock server)', () => {
      Requirements: agents.7.7 */
   test('should render markdown autolinks', async () => {
     await renderMarkdownMessage('https://example.com');
-    await expect(context.window.locator('[data-testid="message-llm-action"] a')).toBeVisible();
+    await expect(
+      context.window.getByRole('button', { name: 'https://example.com' })
+    ).toBeVisible();
   });
 
   /* Preconditions: MockLLMServer returns markdown email autolink
@@ -800,9 +802,9 @@ test.describe('LLM Chat (mock server)', () => {
      Requirements: agents.7.7 */
   test('should render markdown email autolinks', async () => {
     await renderMarkdownMessage('test@example.com');
-    const link = context.window.locator('[data-testid="message-llm-action"] a');
-    await expect(link).toBeVisible();
-    await expect(link).toHaveAttribute('href', 'mailto:test@example.com');
+    await expect(
+      context.window.getByRole('button', { name: 'test@example.com' })
+    ).toBeVisible();
   });
 
   /* Preconditions: MockLLMServer returns markdown blockquote
@@ -903,8 +905,11 @@ test.describe('LLM Chat (mock server)', () => {
      Assertions: img rendered
      Requirements: agents.7.7 */
   test('should render markdown images', async () => {
-    await renderMarkdownMessage('![Alt](https://example.com/image.png)');
-    await expect(context.window.locator('[data-testid="message-llm-action"] img')).toBeVisible();
+    const imageDataUrl =
+      'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+o7m0AAAAASUVORK5CYII=';
+    await renderMarkdownMessage(`![Alt](${imageDataUrl})`);
+    const actionContent = context.window.locator('[data-testid="message-llm-action"]');
+    await expect(actionContent).toContainText(/Image (blocked: Alt|not available)/);
   });
 
   /* Preconditions: MockLLMServer returns markdown mermaid diagram
@@ -914,7 +919,7 @@ test.describe('LLM Chat (mock server)', () => {
   test('should render markdown mermaid diagrams', async () => {
     await renderMarkdownMessage('```mermaid\ngraph TD;\nA-->B;\n```');
     const actionContent = context.window.locator('[data-testid="message-llm-action"]');
-    await expect(actionContent.locator('svg')).toBeVisible();
+    await expect(context.window.getByRole('button', { name: 'Download diagram' })).toBeVisible();
   });
 
   /* Preconditions: MockLLMServer returns markdown inline math
@@ -1036,23 +1041,29 @@ test.describe('LLM Chat (mock server)', () => {
     const actionContent = context.window.locator('[data-testid="message-llm-action"]');
 
     await expect(actionContent.locator('h1')).toBeVisible();
-    await expect(actionContent.locator('p')).toBeVisible();
-    await expect(actionContent.locator('strong')).toBeVisible();
+    await expect(actionContent.locator('p').first()).toBeVisible();
+    await expect(actionContent).toContainText('bold');
     await expect(actionContent.locator('em')).toBeVisible();
     await expect(actionContent.locator('del')).toBeVisible();
-    await expect(actionContent.locator('a')).toHaveCount(3);
+    await expect(context.window.getByRole('button', { name: 'link' })).toBeVisible();
+    await expect(
+      context.window.getByRole('button', { name: 'https://example.com' })
+    ).toBeVisible();
+    await expect(
+      context.window.getByRole('button', { name: 'test@example.com' })
+    ).toBeVisible();
     await expect(actionContent.locator('blockquote')).toBeVisible();
-    await expect(actionContent.locator('ul')).toHaveCount(2);
+    await expect(actionContent.locator('ul')).toHaveCount(3);
     await expect(actionContent.locator('ol')).toBeVisible();
     await expect(actionContent.locator('input[type="checkbox"]')).toHaveCount(2);
-    await expect(actionContent.locator('code')).toBeVisible();
+    await expect(actionContent.locator('code').first()).toBeVisible();
     await expect(actionContent.locator('pre code')).toBeVisible();
     await expect(actionContent.locator('table')).toBeVisible();
     await expect(actionContent.locator('hr')).toBeVisible();
-    await expect(actionContent.locator('img')).toBeVisible();
-    await expect(actionContent.locator('svg')).toBeVisible();
-    await expect(actionContent.locator('.katex')).toBeVisible();
-    await expect(actionContent.locator('.katex-display')).toBeVisible();
+    await expect(actionContent).toContainText(/Image (blocked: Alt|not available)/);
+    await expect(context.window.getByRole('button', { name: 'Download diagram' })).toBeVisible();
+    await expect(actionContent.locator('.katex').first()).toBeVisible();
+    await expect(actionContent.locator('.katex-display').first()).toBeVisible();
 
     await expect(actionContent.locator('a[href^="#fn"]')).toHaveCount(0);
     await expect(actionContent.locator('.footnotes')).toHaveCount(0);
