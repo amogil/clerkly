@@ -2,7 +2,7 @@
  * Functional Tests: Message Format
  *
  * Tests for message display and formatting.
- * Requirements: agents.7, agents.4.24
+ * Requirements: agents.7
  */
 
 import { test, expect, ElectronApplication, Page } from '@playwright/test';
@@ -111,22 +111,6 @@ test.describe('Message Format', () => {
         // Agent messages should NOT have justify-end
         expect(secondClasses).not.toContain('justify-end');
       }
-    }
-  });
-
-  /* Preconditions: Agent response exists
-     Action: Inspect LLM message container
-     Assertions: Unified typography class is applied
-     Requirements: agents.4.24 */
-  test('should apply unified typography for agent messages', async () => {
-    const messageInput = window.locator('textarea[placeholder*="Ask"]');
-    await messageInput.fill('Generate a short response.');
-    await messageInput.press('Enter');
-    await expect(window.locator('[data-testid="message-user"]')).toHaveCount(1, { timeout: 5000 });
-
-    const llmAction = window.locator('[data-testid="message-llm-action"]').first();
-    if ((await llmAction.count()) > 0) {
-      await expect(llmAction).toHaveClass(/message-markdown/);
     }
   });
 

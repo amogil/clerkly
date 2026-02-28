@@ -1503,10 +1503,6 @@ function AgentWelcome({ onPromptClick }: AgentWelcomeProps) {
 
 Сообщения рендерятся через компонент `AgentMessage` (`src/renderer/components/agents/AgentMessage.tsx`). Каждое сообщение оборачивается в `motion.div` для анимации появления (fade-in + slide-up).
 
-Для унификации межстрочного и межабзацного расстояния в ответах агента
-используется общий класс `message-markdown`, который нормализует отступы
-markdown-элементов (p, ul/ol, li, pre) и единый line-height.
-
 **Сообщения пользователя (kind: 'user'):**
 ```tsx
 // Requirements: agents.4.9, agents.4.22
@@ -1530,7 +1526,7 @@ markdown-элементов (p, ul/ol, li, pre) и единый line-height.
     </div>
   )}
   {action?.content ? (
-    <div data-testid="message-llm-action" className="message-markdown whitespace-pre-wrap break-words w-full">
+    <div data-testid="message-llm-action" className="text-sm leading-relaxed whitespace-pre-wrap break-words w-full">
       {action.content}
     </div>
   ) : (
@@ -1587,32 +1583,23 @@ markdown-элементов (p, ul/ol, li, pre) и единый line-height.
 
 ## Markdown рендеринг
 
-Ответы агента рендерятся через `MessageResponse` (Streamdown) с едиными
-правилами типографики, чтобы plain text и markdown выглядели одинаково.
-
-`message-markdown` нормализует базовые элементы markdown:
-- заголовки (`h1-h6`) с единым line-height и умеренными размерами
-- списки (`ul`, `ol`, `li`) с видимыми маркерами и отступами
-- task lists (checkbox) с базовым выравниванием и цветом
-- цитаты (`blockquote`) с левой границей и приглушенным цветом
-- ссылки (`a`) и автоссылки с подчёркиванием и цветом primary
-- зачёркивание (`del`) для `~~text~~`
-- код (`code`, `pre`) с фоном, отступами и скроллом по оси X для блоков
-- разделители (`hr`) с тонкой границей
-- таблицы (`table`, `th`, `td`) с границами и padding
-- изображения (`img`) с ограничением по ширине и скруглением
-- диаграммы Mermaid и формулы KaTeX с адаптивной шириной
+Используется `MessageResponse` (Streamdown) с GFM и подсветкой кода. Поддерживаются:
+- заголовки, параграфы, жирный/курсив/зачеркнутый
+- ссылки и автоссылки (включая email)
+- цитаты
+- списки (маркированные/нумерованные), вложенные списки и task lists
+- inline код и fenced code blocks с языком (подсветка синтаксиса)
+- таблицы и горизонтальные разделители
+- изображения
+- Mermaid диаграммы
+- математика через KaTeX (inline и block)
 
 ```typescript
 // Requirements: agents.7.7
 import { MessageResponse } from '../ai-elements/message';
 
-function AgentMarkdownMessage({ content }: { content: string }) {
-  return (
-    <div className="message-markdown whitespace-pre-wrap break-words">
-      <MessageResponse>{content}</MessageResponse>
-    </div>
-  );
+function MarkdownMessage({ content }: { content: string }) {
+  return <MessageResponse>{content}</MessageResponse>;
 }
 ```
 
@@ -2023,7 +2010,7 @@ import { Logo } from '../logo';
 | `tests/functional/settings-ai-agent.spec.ts` | agents.13.11-13.15 (регрессия startup/loading orchestration) | - |
 | `tests/functional/all-agents-page.spec.ts` | agents.5 | - |
 | `tests/functional/agent-status-indicators.spec.ts` | agents.6 | - |
-| `tests/functional/message-format.spec.ts` | agents.7, agents.4.24 | - |
+| `tests/functional/message-format.spec.ts` | agents.7 | - |
 | `tests/functional/llm-chat.spec.ts` | agents.7.7 | - |
 | `tests/functional/agent-status-calculation.spec.ts` | agents.9 | - |
 | `tests/functional/agent-data-isolation.spec.ts` | agents.10 | - |
@@ -2120,7 +2107,6 @@ await window.locator(`[data-testid="agent-icon-${firstAgentId}"]`).click();
 | agents.4.13.4-4.13.6 (scrollbar) | - | Manual |
 | agents.4.14.1-4.14.5 (scroll position) | ✓ | ✓ |
 | agents.4.23 (text wrapping) | ✓ | ✓ |
-| agents.4.24 (llm typography) | - | ✓ |
 | agents.5 | ✓ | ✓ |
 | agents.5.5 (error messages) | ✓ | ✓ |
 | agents.5.6 (filter archived) | ✓ | ✓ |
@@ -2143,11 +2129,15 @@ await window.locator(`[data-testid="agent-icon-${firstAgentId}"]`).click();
 
 ```json
 {
-  "lucide-react": "^0.300.0",
-  "react-markdown": "^10.0.0",
-  "ai": "^5.0.0",
-  "@ai-sdk/react": "^3.0.0",
-  "use-stick-to-bottom": "latest"
+  "lucide-react": "^0.487.0",
+  "ai": "^5.0.137",
+  "@ai-sdk/react": "^3.0.99",
+  "streamdown": "^2.3.0",
+  "@streamdown/code": "^1.0.3",
+  "@streamdown/math": "^1.0.2",
+  "@streamdown/mermaid": "^1.0.2",
+  "@streamdown/cjk": "^1.0.2",
+  "use-stick-to-bottom": "^1.1.3"
 }
 ```
 
@@ -2172,7 +2162,7 @@ await window.locator(`[data-testid="agent-icon-${firstAgentId}"]`).click();
 
 - Все запросы к БД фильтруются по userId
 - Проверка владельца агента при операциях с сообщениями
-- Санитизация HTML в сообщениях через react-markdown
+- Санитизация HTML в сообщениях через Streamdown (rehype-harden)
 
 ## AI Elements интеграция (Фаза 9)
 

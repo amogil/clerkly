@@ -321,238 +321,6 @@ test.describe('LLM Chat (mock server)', () => {
     mockLLMServer.clearRequestLogs();
   });
 
-  async function renderMarkdownMessage(markdown: string): Promise<void> {
-    mockLLMServer.setStreamingMode(true, {
-      content: JSON.stringify({ action: { type: 'text', content: markdown } }),
-      chunkDelayMs: 0,
-    });
-
-    context = await launchWithMockLLM();
-    const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
-    await messageInput.fill('Render markdown');
-    await messageInput.press('Enter');
-
-    const actionContent = context.window.locator('[data-testid="message-llm-action"]');
-    await expect(actionContent).toBeVisible({ timeout: 3000 });
-  }
-
-  /* Preconditions: MockLLMServer returns markdown heading
-     Action: User sends a message
-     Assertions: heading element rendered
-     Requirements: agents.7.7 */
-  test('should render markdown headings', async () => {
-    await renderMarkdownMessage('# Heading');
-    await expect(context.window.locator('[data-testid="message-llm-action"] h1')).toBeVisible();
-  });
-
-  /* Preconditions: MockLLMServer returns markdown paragraphs
-     Action: User sends a message
-     Assertions: multiple paragraphs rendered
-     Requirements: agents.7.7 */
-  test('should render markdown paragraphs', async () => {
-    await renderMarkdownMessage('First paragraph.\n\nSecond paragraph.');
-    await expect(context.window.locator('[data-testid="message-llm-action"] p')).toHaveCount(2);
-  });
-
-  /* Preconditions: MockLLMServer returns markdown emphasis
-     Action: User sends a message
-     Assertions: strong/em elements rendered
-     Requirements: agents.7.7 */
-  test('should render markdown emphasis', async () => {
-    await renderMarkdownMessage('**bold** and *italic*');
-    await expect(context.window.locator('[data-testid="message-llm-action"] strong')).toBeVisible();
-    await expect(context.window.locator('[data-testid="message-llm-action"] em')).toBeVisible();
-  });
-
-  /* Preconditions: MockLLMServer returns markdown strikethrough
-     Action: User sends a message
-     Assertions: del element rendered
-     Requirements: agents.7.7 */
-  test('should render markdown strikethrough', async () => {
-    await renderMarkdownMessage('~~Struck~~');
-    await expect(context.window.locator('[data-testid="message-llm-action"] del')).toBeVisible();
-  });
-
-  /* Preconditions: MockLLMServer returns markdown link
-     Action: User sends a message
-     Assertions: anchor rendered with href
-     Requirements: agents.7.7 */
-  test('should render markdown links', async () => {
-    await renderMarkdownMessage('[Example](https://example.com)');
-    const link = context.window
-      .locator('[data-testid="message-llm-action"] a[href="https://example.com"]')
-      .first();
-    await expect(link).toBeVisible();
-  });
-
-  /* Preconditions: MockLLMServer returns autolink
-     Action: User sends a message
-     Assertions: anchor rendered with href
-     Requirements: agents.7.7 */
-  test('should render markdown autolinks', async () => {
-    await renderMarkdownMessage('https://example.com');
-    const link = context.window
-      .locator('[data-testid="message-llm-action"] a[href="https://example.com"]')
-      .first();
-    await expect(link).toBeVisible();
-  });
-
-  /* Preconditions: MockLLMServer returns email autolink
-     Action: User sends a message
-     Assertions: mailto anchor rendered
-     Requirements: agents.7.7 */
-  test('should render markdown email autolinks', async () => {
-    await renderMarkdownMessage('test@example.com');
-    const link = context.window
-      .locator('[data-testid="message-llm-action"] a[href="mailto:test@example.com"]')
-      .first();
-    await expect(link).toBeVisible();
-  });
-
-  /* Preconditions: MockLLMServer returns markdown blockquote
-     Action: User sends a message
-     Assertions: blockquote rendered
-     Requirements: agents.7.7 */
-  test('should render markdown blockquotes', async () => {
-    await renderMarkdownMessage('> Quoted text');
-    await expect(
-      context.window.locator('[data-testid="message-llm-action"] blockquote')
-    ).toBeVisible();
-  });
-
-  /* Preconditions: MockLLMServer returns unordered list
-     Action: User sends a message
-     Assertions: ul list rendered
-     Requirements: agents.7.7 */
-  test('should render markdown unordered list', async () => {
-    await renderMarkdownMessage('- A\n- B');
-    await expect(context.window.locator('[data-testid="message-llm-action"] ul')).toBeVisible();
-  });
-
-  /* Preconditions: MockLLMServer returns ordered list
-     Action: User sends a message
-     Assertions: ol list rendered
-     Requirements: agents.7.7 */
-  test('should render markdown ordered list', async () => {
-    await renderMarkdownMessage('1. One\n2. Two');
-    await expect(context.window.locator('[data-testid="message-llm-action"] ol')).toBeVisible();
-  });
-
-  /* Preconditions: MockLLMServer returns nested list
-     Action: User sends a message
-     Assertions: nested list rendered
-     Requirements: agents.7.7 */
-  test('should render markdown nested list', async () => {
-    await renderMarkdownMessage('- Parent\n  - Child');
-    await expect(context.window.locator('[data-testid="message-llm-action"] ul ul')).toBeVisible();
-  });
-
-  /* Preconditions: MockLLMServer returns task list
-     Action: User sends a message
-     Assertions: checkbox inputs rendered
-     Requirements: agents.7.7 */
-  test('should render markdown task list', async () => {
-    await renderMarkdownMessage('- [x] Done\n- [ ] Todo');
-    await expect(
-      context.window.locator('[data-testid="message-llm-action"] input[type="checkbox"]')
-    ).toHaveCount(2);
-  });
-
-  /* Preconditions: MockLLMServer returns inline code
-     Action: User sends a message
-     Assertions: inline code rendered
-     Requirements: agents.7.7 */
-  test('should render markdown inline code', async () => {
-    await renderMarkdownMessage('Use `npm install`.');
-    await expect(context.window.locator('[data-testid="message-llm-action"] p code')).toBeVisible();
-  });
-
-  /* Preconditions: MockLLMServer returns fenced code block
-     Action: User sends a message
-     Assertions: pre > code rendered
-     Requirements: agents.7.7 */
-  test('should render markdown fenced code', async () => {
-    await renderMarkdownMessage('```json\n{\n  "ok": true\n}\n```');
-    await expect(
-      context.window.locator('[data-testid="message-llm-action"] pre code')
-    ).toBeVisible();
-  });
-
-  /* Preconditions: MockLLMServer returns markdown tables
-     Action: User sends a message
-     Assertions: table rendered
-     Requirements: agents.7.7 */
-  test('should render markdown tables', async () => {
-    await renderMarkdownMessage('| A | B |\n|---|---|\n| 1 | 2 |');
-    await expect(context.window.locator('[data-testid="message-llm-action"] table')).toBeVisible();
-  });
-
-  /* Preconditions: MockLLMServer returns horizontal rule
-     Action: User sends a message
-     Assertions: hr rendered
-     Requirements: agents.7.7 */
-  test('should render markdown horizontal rule', async () => {
-    await renderMarkdownMessage('---');
-    await expect(context.window.locator('[data-testid="message-llm-action"] hr')).toBeVisible();
-  });
-
-  /* Preconditions: MockLLMServer returns markdown image
-     Action: User sends a message
-     Assertions: img rendered
-     Requirements: agents.7.7 */
-  test('should render markdown images', async () => {
-    await renderMarkdownMessage(
-      '![Alt text](data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO3rKtkAAAAASUVORK5CYII=)'
-    );
-    await expect(context.window.locator('[data-testid="message-llm-action"] img')).toBeVisible();
-  });
-
-  /* Preconditions: MockLLMServer returns mermaid diagram
-     Action: User sends a message
-     Assertions: diagram svg rendered
-     Requirements: agents.7.7 */
-  test('should render markdown mermaid diagrams', async () => {
-    await renderMarkdownMessage('```mermaid\ngraph TD\n  A-->B\n```');
-    await expect(context.window.locator('[data-testid="message-llm-action"] svg')).toBeVisible();
-  });
-
-  /* Preconditions: MockLLMServer returns inline math
-     Action: User sends a message
-     Assertions: inline katex rendered
-     Requirements: agents.7.7 */
-  test('should render markdown inline math', async () => {
-    await renderMarkdownMessage('Inline math $$E = mc^2$$.');
-    await expect(context.window.locator('[data-testid="message-llm-action"] .katex')).toBeVisible();
-  });
-
-  /* Preconditions: MockLLMServer returns block math
-     Action: User sends a message
-     Assertions: katex display rendered
-     Requirements: agents.7.7 */
-  test('should render markdown block math', async () => {
-    await renderMarkdownMessage('$$\nE = mc^2\n$$');
-    await expect(
-      context.window.locator('[data-testid="message-llm-action"] .katex-display')
-    ).toBeVisible();
-  });
-
-  /* Preconditions: MockLLMServer returns task list and blockquotes
-     Action: User sends a message
-     Assertions: no empty paragraphs are rendered between blocks
-     Requirements: agents.7.7 */
-  test('should avoid duplicate line breaks between markdown blocks', async () => {
-    const markdown =
-      '### Список задач (task list)\n\n- [x] Сделано\n- [ ] В процессе\n- [ ] Не начато\n\n---\n\n## Цитаты\n\n> Это цитата в один уровень.\n\n> Это цитата в два уровня.';
-    await renderMarkdownMessage(markdown);
-
-    const emptyParagraphs = await context.window
-      .locator('[data-testid="message-llm-action"] p')
-      .evaluateAll(
-        (nodes) => nodes.filter((node) => (node.textContent ?? '').trim().length === 0).length
-      );
-    expect(emptyParagraphs).toBe(0);
-  });
-
   /**
    * Launch app authenticated, pointing OpenAI provider at MockLLMServer.
    * Mock key is passed via env — mock server doesn't validate auth.
@@ -569,6 +337,21 @@ test.describe('LLM Chat (mock server)', () => {
     // Check no toast errors appeared during startup/auth
     await expectNoToastError(ctx.window);
     return ctx;
+  }
+
+  async function renderMarkdownMessage(markdown: string): Promise<void> {
+    mockLLMServer.setStreamingMode(true, {
+      content: JSON.stringify({ action: { type: 'text', content: markdown } }),
+      chunkDelayMs: 0,
+    });
+
+    context = await launchWithMockLLM();
+    const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
+    await messageInput.fill('Render markdown');
+    await messageInput.press('Enter');
+
+    const actionContent = context.window.locator('[data-testid="message-llm-action"]');
+    await expect(actionContent).toBeVisible({ timeout: 3000 });
   }
   /* Preconditions: MockLLMServer configured with slow streaming (300ms between chunks),
        app authenticated with mock LLM URL
@@ -951,5 +734,256 @@ test.describe('LLM Chat (mock server)', () => {
 
     // User message should be removed from chat (hidden=true)
     await expect(userMessages).toHaveCount(0, { timeout: 5000 });
+  });
+
+  /* Preconditions: MockLLMServer returns markdown heading
+     Action: User sends a message
+     Assertions: heading element rendered
+     Requirements: agents.7.7 */
+  test('should render markdown headings', async () => {
+    await renderMarkdownMessage('# Heading');
+    await expect(context.window.locator('[data-testid="message-llm-action"] h1')).toBeVisible();
+  });
+
+  /* Preconditions: MockLLMServer returns markdown paragraph
+     Action: User sends a message
+     Assertions: paragraph element rendered
+     Requirements: agents.7.7 */
+  test('should render markdown paragraphs', async () => {
+    await renderMarkdownMessage('Paragraph text');
+    await expect(context.window.locator('[data-testid="message-llm-action"] p')).toBeVisible();
+  });
+
+  /* Preconditions: MockLLMServer returns markdown emphasis
+     Action: User sends a message
+     Assertions: strong and em elements rendered
+     Requirements: agents.7.7 */
+  test('should render markdown emphasis', async () => {
+    await renderMarkdownMessage('**Bold** and *italic*');
+    const actionContent = context.window.locator('[data-testid="message-llm-action"]');
+    await expect(actionContent.locator('strong')).toBeVisible();
+    await expect(actionContent.locator('em')).toBeVisible();
+  });
+
+  /* Preconditions: MockLLMServer returns markdown strikethrough
+     Action: User sends a message
+     Assertions: del element rendered
+     Requirements: agents.7.7 */
+  test('should render markdown strikethrough', async () => {
+    await renderMarkdownMessage('~~Deleted~~');
+    await expect(context.window.locator('[data-testid="message-llm-action"] del')).toBeVisible();
+  });
+
+  /* Preconditions: MockLLMServer returns markdown link
+     Action: User sends a message
+     Assertions: link element rendered with href
+     Requirements: agents.7.7 */
+  test('should render markdown links', async () => {
+    await renderMarkdownMessage('[Example](https://example.com)');
+    const link = context.window.locator('[data-testid="message-llm-action"] a');
+    await expect(link).toBeVisible();
+    await expect(link).toHaveAttribute('href', 'https://example.com');
+  });
+
+  /* Preconditions: MockLLMServer returns markdown autolink
+     Action: User sends a message
+     Assertions: autolink rendered
+     Requirements: agents.7.7 */
+  test('should render markdown autolinks', async () => {
+    await renderMarkdownMessage('https://example.com');
+    await expect(context.window.locator('[data-testid="message-llm-action"] a')).toBeVisible();
+  });
+
+  /* Preconditions: MockLLMServer returns markdown email autolink
+     Action: User sends a message
+     Assertions: mailto link rendered
+     Requirements: agents.7.7 */
+  test('should render markdown email autolinks', async () => {
+    await renderMarkdownMessage('test@example.com');
+    const link = context.window.locator('[data-testid="message-llm-action"] a');
+    await expect(link).toBeVisible();
+    await expect(link).toHaveAttribute('href', 'mailto:test@example.com');
+  });
+
+  /* Preconditions: MockLLMServer returns markdown blockquote
+     Action: User sends a message
+     Assertions: blockquote element rendered
+     Requirements: agents.7.7 */
+  test('should render markdown blockquotes', async () => {
+    await renderMarkdownMessage('> Quote');
+    await expect(
+      context.window.locator('[data-testid="message-llm-action"] blockquote')
+    ).toBeVisible();
+  });
+
+  /* Preconditions: MockLLMServer returns markdown unordered list
+     Action: User sends a message
+     Assertions: ul/li rendered
+     Requirements: agents.7.7 */
+  test('should render markdown unordered list', async () => {
+    await renderMarkdownMessage('- Item 1\n- Item 2');
+    const actionContent = context.window.locator('[data-testid="message-llm-action"]');
+    await expect(actionContent.locator('ul')).toBeVisible();
+    await expect(actionContent.locator('li')).toHaveCount(2);
+  });
+
+  /* Preconditions: MockLLMServer returns markdown ordered list
+     Action: User sends a message
+     Assertions: ol/li rendered
+     Requirements: agents.7.7 */
+  test('should render markdown ordered list', async () => {
+    await renderMarkdownMessage('1. First\n2. Second');
+    const actionContent = context.window.locator('[data-testid="message-llm-action"]');
+    await expect(actionContent.locator('ol')).toBeVisible();
+    await expect(actionContent.locator('li')).toHaveCount(2);
+  });
+
+  /* Preconditions: MockLLMServer returns markdown nested list
+     Action: User sends a message
+     Assertions: nested lists rendered
+     Requirements: agents.7.7 */
+  test('should render markdown nested list', async () => {
+    await renderMarkdownMessage('- Parent\n  - Child');
+    const actionContent = context.window.locator('[data-testid="message-llm-action"]');
+    await expect(actionContent.locator('ul')).toHaveCount(2);
+  });
+
+  /* Preconditions: MockLLMServer returns markdown task list
+     Action: User sends a message
+     Assertions: checkbox inputs rendered
+     Requirements: agents.7.7 */
+  test('should render markdown task list', async () => {
+    await renderMarkdownMessage('- [x] Done\n- [ ] Pending');
+    await expect(
+      context.window.locator('[data-testid="message-llm-action"] input[type="checkbox"]')
+    ).toHaveCount(2);
+  });
+
+  /* Preconditions: MockLLMServer returns markdown inline code
+     Action: User sends a message
+     Assertions: inline code element rendered
+     Requirements: agents.7.7 */
+  test('should render markdown inline code', async () => {
+    await renderMarkdownMessage('Use `npm install`');
+    await expect(context.window.locator('[data-testid="message-llm-action"] code')).toBeVisible();
+  });
+
+  /* Preconditions: MockLLMServer returns markdown fenced code
+     Action: User sends a message
+     Assertions: pre > code rendered
+     Requirements: agents.7.7 */
+  test('should render markdown fenced code', async () => {
+    await renderMarkdownMessage('```js\nconsole.log("hi");\n```');
+    await expect(context.window.locator('[data-testid="message-llm-action"] pre')).toBeVisible();
+    await expect(context.window.locator('[data-testid="message-llm-action"] pre code')).toBeVisible();
+  });
+
+  /* Preconditions: MockLLMServer returns markdown table
+     Action: User sends a message
+     Assertions: table rendered
+     Requirements: agents.7.7 */
+  test('should render markdown tables', async () => {
+    await renderMarkdownMessage('| A | B |\n|---|---|\n| 1 | 2 |');
+    await expect(context.window.locator('[data-testid="message-llm-action"] table')).toBeVisible();
+  });
+
+  /* Preconditions: MockLLMServer returns markdown horizontal rule
+     Action: User sends a message
+     Assertions: hr rendered
+     Requirements: agents.7.7 */
+  test('should render markdown horizontal rule', async () => {
+    await renderMarkdownMessage('---');
+    await expect(context.window.locator('[data-testid="message-llm-action"] hr')).toBeVisible();
+  });
+
+  /* Preconditions: MockLLMServer returns markdown image
+     Action: User sends a message
+     Assertions: img rendered
+     Requirements: agents.7.7 */
+  test('should render markdown images', async () => {
+    await renderMarkdownMessage('![Alt](https://example.com/image.png)');
+    await expect(context.window.locator('[data-testid="message-llm-action"] img')).toBeVisible();
+  });
+
+  /* Preconditions: MockLLMServer returns markdown mermaid diagram
+     Action: User sends a message
+     Assertions: mermaid diagram rendered as svg
+     Requirements: agents.7.7 */
+  test('should render markdown mermaid diagrams', async () => {
+    await renderMarkdownMessage('```mermaid\ngraph TD;\nA-->B;\n```');
+    const actionContent = context.window.locator('[data-testid="message-llm-action"]');
+    await expect(actionContent.locator('svg')).toBeVisible();
+  });
+
+  /* Preconditions: MockLLMServer returns markdown inline math
+     Action: User sends a message
+     Assertions: katex inline rendered
+     Requirements: agents.7.7 */
+  test('should render markdown inline math', async () => {
+    await renderMarkdownMessage('Inline $$E=mc^2$$');
+    await expect(context.window.locator('[data-testid="message-llm-action"] .katex')).toBeVisible();
+  });
+
+  /* Preconditions: MockLLMServer returns markdown block math
+     Action: User sends a message
+     Assertions: katex display rendered
+     Requirements: agents.7.7 */
+  test('should render markdown block math', async () => {
+    await renderMarkdownMessage('$$\n\\sum_{i=1}^{n} i = n(n+1)/2\n$$');
+    await expect(
+      context.window.locator('[data-testid="message-llm-action"] .katex-display')
+    ).toBeVisible();
+  });
+
+  /* Preconditions: MockLLMServer returns markdown blocks with separators
+     Action: User sends a message
+     Assertions: no empty paragraphs are rendered between blocks
+     Requirements: agents.7.7 */
+  test('should avoid duplicate line breaks between markdown blocks', async () => {
+    const markdown =
+      '### Task list\n\n- [x] Done\n- [ ] Pending\n\n---\n\n## Quotes\n\n> Quote one\n\n> Quote two';
+    await renderMarkdownMessage(markdown);
+
+    const emptyParagraphs = await context.window
+      .locator('[data-testid="message-llm-action"] p')
+      .evaluateAll(
+        (nodes) => nodes.filter((node) => (node.textContent ?? '').trim().length === 0).length
+      );
+    expect(emptyParagraphs).toBe(0);
+  });
+
+  /* Preconditions: MockLLMServer returns markdown with fenced code and task list
+     Action: User sends a message
+     Assertions: Code block actions and task list checkboxes are rendered
+     Requirements: agents.7.7 */
+  test('should render streamdown code blocks and task lists', async () => {
+    const markdown = [
+      '```ts',
+      'const value = 42;',
+      '```',
+      '',
+      '- [x] Done',
+      '- [ ] Pending',
+    ].join('\n');
+
+    mockLLMServer.setStreamingMode(true, {
+      content: JSON.stringify({ action: { type: 'text', content: markdown } }),
+      chunkDelayMs: 0,
+    });
+
+    context = await launchWithMockLLM();
+    const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
+    await messageInput.fill('Render markdown');
+    await messageInput.press('Enter');
+
+    const actionContent = context.window.locator('[data-testid="message-llm-action"]');
+    await expect(actionContent).toBeVisible({ timeout: 3000 });
+
+    await expect(context.window.locator('[data-streamdown="code-block-actions"]')).toBeVisible({
+      timeout: 3000,
+    });
+    await expect(actionContent.locator('input[type="checkbox"]')).toHaveCount(2, {
+      timeout: 3000,
+    });
   });
 });

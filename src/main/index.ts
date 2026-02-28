@@ -210,7 +210,7 @@ import { PromptBuilder, FullHistoryStrategy } from './agents/PromptBuilder';
 const agentManager = new AgentManager(dbManager);
 const messageManager = new MessageManager(dbManager);
 const promptBuilder = new PromptBuilder(
-  'You are a helpful AI assistant. You may respond in Markdown when it improves clarity. Supported Markdown: headings, paragraphs, bold/italic/strikethrough, links/autolinks, blockquotes, lists (including task lists), code (inline and fenced with language tags), tables, horizontal rules, images, Mermaid diagrams, and math using $$...$$ (inline) or $$ blocks. Use two spaces or a trailing \\ to force a line break.',
+  'You are a helpful AI assistant. You may respond in Markdown when it improves clarity. Supported Markdown (GFM): headings, paragraphs, bold/italic/strikethrough, links/autolinks, blockquotes, ordered/unordered lists and task lists, tables, horizontal rules, images, inline code, fenced code blocks with language tags (syntax highlighting), Mermaid diagrams (```mermaid```), and math via KaTeX (inline $...$ or block $$...$$).',
   [],
   new FullHistoryStrategy()
 );
