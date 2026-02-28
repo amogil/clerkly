@@ -60,7 +60,8 @@ test.describe('Agents Error Messages', () => {
 
     // Get current agent ID
     const archivedAgentId = await window.evaluate(async () => {
-      const agents = await window.api.agents.list();
+      const api = (globalThis as any).api;
+      const agents = await api.agents.list();
       if (agents.success && agents.data) {
         const agentList = agents.data as Array<{ id: string }>;
         return agentList[0].id;
@@ -72,7 +73,8 @@ test.describe('Agents Error Messages', () => {
 
     // Archive the first agent
     await window.evaluate(async (id) => {
-      await window.api.agents.archive(id!);
+      const api = (globalThis as any).api;
+      await api.agents.archive(id!);
     }, archivedAgentId);
 
     // Wait for auto-created agent to appear (agents.2.7, agents.2.9)
@@ -80,7 +82,8 @@ test.describe('Agents Error Messages', () => {
     await expect(newChatButton).toBeVisible({ timeout: 5000 });
 
     const baseAgentCount = await window.evaluate(async () => {
-      const agents = await window.api.agents.list();
+      const api = (globalThis as any).api;
+      const agents = await api.agents.list();
       return agents.success && agents.data ? agents.data.length : 0;
     });
     expect(baseAgentCount).toBeGreaterThan(0);
@@ -92,7 +95,8 @@ test.describe('Agents Error Messages', () => {
         .poll(
           async () => {
             return window.evaluate(async () => {
-              const agents = await window.api.agents.list();
+              const api = (globalThis as any).api;
+              const agents = await api.agents.list();
               return agents.success && agents.data ? agents.data.length : 0;
             });
           },
@@ -102,7 +106,8 @@ test.describe('Agents Error Messages', () => {
     }
 
     const expectedAgentIds = await window.evaluate(async () => {
-      const agents = await window.api.agents.list();
+      const api = (globalThis as any).api;
+      const agents = await api.agents.list();
       if (agents.success && agents.data) {
         return (agents.data as Array<{ id: string }>).map((agent) => agent.id);
       }
@@ -144,7 +149,8 @@ test.describe('Agents Error Messages', () => {
     await expect(window.locator('[data-testid="agents"]')).toBeVisible({ timeout: 5000 });
 
     const firstAgentId = await window.evaluate(async () => {
-      const agents = await window.api.agents.list();
+      const api = (globalThis as any).api;
+      const agents = await api.agents.list();
       if (agents.success && agents.data) {
         const agentList = agents.data as Array<{ id: string }>;
         return agentList[0].id;
@@ -154,13 +160,15 @@ test.describe('Agents Error Messages', () => {
 
     // Add message to first agent
     await window.evaluate(async (id) => {
-      await window.api.messages.create(id!, 'user', {
+      const api = (globalThis as any).api;
+      await api.messages.create(id!, 'user', {
         data: { text: 'First agent message' },
       });
     }, firstAgentId);
 
     const baseAgentCount = await window.evaluate(async () => {
-      const agents = await window.api.agents.list();
+      const api = (globalThis as any).api;
+      const agents = await api.agents.list();
       return agents.success && agents.data ? agents.data.length : 0;
     });
     expect(baseAgentCount).toBeGreaterThan(0);
@@ -175,7 +183,8 @@ test.describe('Agents Error Messages', () => {
         .poll(
           async () => {
             return window.evaluate(async () => {
-              const agents = await window.api.agents.list();
+              const api = (globalThis as any).api;
+              const agents = await api.agents.list();
               return agents.success && agents.data ? agents.data.length : 0;
             });
           },
@@ -185,7 +194,8 @@ test.describe('Agents Error Messages', () => {
     }
 
     const secondAgentId = await window.evaluate(async (firstId) => {
-      const agents = await window.api.agents.list();
+      const api = (globalThis as any).api;
+      const agents = await api.agents.list();
       if (agents.success && agents.data) {
         const agentList = agents.data as Array<{ id: string }>;
         const otherAgent = agentList.find((agent) => agent.id !== firstId);
@@ -197,7 +207,8 @@ test.describe('Agents Error Messages', () => {
 
     // Add message to second agent (more recent)
     await window.evaluate(async (id) => {
-      await window.api.messages.create(id!, 'user', {
+      const api = (globalThis as any).api;
+      await api.messages.create(id!, 'user', {
         data: { text: 'Second agent message' },
       });
     }, secondAgentId);
@@ -211,7 +222,8 @@ test.describe('Agents Error Messages', () => {
     await expect(window.locator('text=All Agents')).toBeVisible({ timeout: 5000 });
 
     const expectedOrder = await window.evaluate(async () => {
-      const agents = await window.api.agents.list();
+      const api = (globalThis as any).api;
+      const agents = await api.agents.list();
       if (agents.success && agents.data) {
         return (agents.data as Array<{ id: string }>).map((agent) => agent.id);
       }
