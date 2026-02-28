@@ -108,7 +108,7 @@ export function AgentMessage({ message, showAvatar, agentStatus, onNavigate }: A
           )}
           {llmAction?.content ? (
             <MessageContent data-testid="message-llm-action" className="w-full">
-              <MessageResponse className="text-sm leading-relaxed whitespace-pre-wrap break-words">
+              <MessageResponse className="text-sm leading-relaxed break-words">
                 {llmAction.content}
               </MessageResponse>
             </MessageContent>

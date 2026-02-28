@@ -986,4 +986,78 @@ test.describe('LLM Chat (mock server)', () => {
       timeout: 3000,
     });
   });
+
+  /* Preconditions: MockLLMServer returns markdown with footnotes and other elements
+     Action: User sends a message
+     Assertions: footnotes are not rendered; other markdown elements render
+     Requirements: agents.7.7 */
+  test('should not render footnotes while rendering other markdown elements', async () => {
+    const markdown = [
+      '# Title',
+      '',
+      'Paragraph with **bold**, *italic*, ~~strike~~, [link](https://example.com),',
+      'autolink https://example.com and email test@example.com, plus `inline`.',
+      '',
+      '> Quote block.',
+      '',
+      '- Item 1',
+      '  - Nested',
+      '1. First',
+      '2. Second',
+      '- [x] Done',
+      '- [ ] Pending',
+      '',
+      '```js',
+      'console.log("code");',
+      '```',
+      '',
+      '| A | B |',
+      '|---|---|',
+      '| 1 | 2 |',
+      '',
+      '---',
+      '',
+      '![Alt](https://example.com/image.png)',
+      '',
+      '```mermaid',
+      'graph TD;',
+      'A-->B;',
+      '```',
+      '',
+      'Inline math $E=mc^2$ and block math:',
+      '',
+      '$$',
+      '\\sum_{i=1}^{n} i = n(n+1)/2',
+      '$$',
+      '',
+      'Footnote reference[^1].',
+      '',
+      '[^1]: Footnote text.',
+    ].join('\n');
+
+    await renderMarkdownMessage(markdown);
+    const actionContent = context.window.locator('[data-testid="message-llm-action"]');
+
+    await expect(actionContent.locator('h1')).toBeVisible();
+    await expect(actionContent.locator('p')).toBeVisible();
+    await expect(actionContent.locator('strong')).toBeVisible();
+    await expect(actionContent.locator('em')).toBeVisible();
+    await expect(actionContent.locator('del')).toBeVisible();
+    await expect(actionContent.locator('a')).toHaveCount(3);
+    await expect(actionContent.locator('blockquote')).toBeVisible();
+    await expect(actionContent.locator('ul')).toHaveCount(2);
+    await expect(actionContent.locator('ol')).toBeVisible();
+    await expect(actionContent.locator('input[type="checkbox"]')).toHaveCount(2);
+    await expect(actionContent.locator('code')).toBeVisible();
+    await expect(actionContent.locator('pre code')).toBeVisible();
+    await expect(actionContent.locator('table')).toBeVisible();
+    await expect(actionContent.locator('hr')).toBeVisible();
+    await expect(actionContent.locator('img')).toBeVisible();
+    await expect(actionContent.locator('svg')).toBeVisible();
+    await expect(actionContent.locator('.katex')).toBeVisible();
+    await expect(actionContent.locator('.katex-display')).toBeVisible();
+
+    await expect(actionContent.locator('a[href^="#fn"]')).toHaveCount(0);
+    await expect(actionContent.locator('.footnotes')).toHaveCount(0);
+  });
 });

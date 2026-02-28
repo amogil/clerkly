@@ -1593,6 +1593,7 @@ function AgentWelcome({ onPromptClick }: AgentWelcomeProps) {
 - изображения
 - Mermaid диаграммы
 - математика через KaTeX (inline и block)
+- сноски не поддерживаются
 
 ```typescript
 // Requirements: agents.7.7
