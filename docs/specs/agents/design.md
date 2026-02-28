@@ -1503,6 +1503,10 @@ function AgentWelcome({ onPromptClick }: AgentWelcomeProps) {
 
 Сообщения рендерятся через компонент `AgentMessage` (`src/renderer/components/agents/AgentMessage.tsx`). Каждое сообщение оборачивается в `motion.div` для анимации появления (fade-in + slide-up).
 
+Для унификации межстрочного и межабзацного расстояния в ответах агента
+используется общий класс `message-markdown`, который нормализует отступы
+markdown-элементов (p, ul/ol, li, pre) и единый line-height.
+
 **Сообщения пользователя (kind: 'user'):**
 ```tsx
 // Requirements: agents.4.9, agents.4.22
@@ -1526,7 +1530,7 @@ function AgentWelcome({ onPromptClick }: AgentWelcomeProps) {
     </div>
   )}
   {action?.content ? (
-    <div data-testid="message-llm-action" className="text-sm leading-relaxed whitespace-pre-wrap break-words w-full">
+    <div data-testid="message-llm-action" className="message-markdown whitespace-pre-wrap break-words w-full">
       {action.content}
     </div>
   ) : (
@@ -1583,22 +1587,19 @@ function AgentWelcome({ onPromptClick }: AgentWelcomeProps) {
 
 ## Markdown рендеринг
 
-Для первой версии — простой рендеринг без подсветки синтаксиса:
+Ответы агента рендерятся через `MessageResponse` (Streamdown) с едиными
+правилами типографики, чтобы plain text и markdown выглядели одинаково.
 
 ```typescript
 // Requirements: agents.7.7
-import ReactMarkdown from 'react-markdown';
+import { MessageResponse } from '../ai-elements/message';
 
-function MarkdownMessage({ content, format }: { content: string; format?: 'markdown' | 'text' }) {
-  if (format === 'markdown') {
-    return (
-      <ReactMarkdown className="prose prose-sm max-w-none">
-        {content}
-      </ReactMarkdown>
-    );
-  }
-  
-  return <p>{content}</p>;
+function AgentMarkdownMessage({ content }: { content: string }) {
+  return (
+    <div className="message-markdown whitespace-pre-wrap break-words">
+      <MessageResponse>{content}</MessageResponse>
+    </div>
+  );
 }
 ```
 
@@ -2009,7 +2010,7 @@ import { Logo } from '../logo';
 | `tests/functional/settings-ai-agent.spec.ts` | agents.13.11-13.15 (регрессия startup/loading orchestration) | - |
 | `tests/functional/all-agents-page.spec.ts` | agents.5 | - |
 | `tests/functional/agent-status-indicators.spec.ts` | agents.6 | - |
-| `tests/functional/message-format.spec.ts` | agents.7 | - |
+| `tests/functional/message-format.spec.ts` | agents.7, agents.4.24 | - |
 | `tests/functional/agent-status-calculation.spec.ts` | agents.9 | - |
 | `tests/functional/agent-data-isolation.spec.ts` | agents.10 | - |
 | `tests/functional/agent-activity-indicator.spec.ts` | agents.11 | - |
@@ -2105,6 +2106,7 @@ await window.locator(`[data-testid="agent-icon-${firstAgentId}"]`).click();
 | agents.4.13.4-4.13.6 (scrollbar) | - | Manual |
 | agents.4.14.1-4.14.5 (scroll position) | ✓ | ✓ |
 | agents.4.23 (text wrapping) | ✓ | ✓ |
+| agents.4.24 (llm typography) | - | ✓ |
 | agents.5 | ✓ | ✓ |
 | agents.5.5 (error messages) | ✓ | ✓ |
 | agents.5.6 (filter archived) | ✓ | ✓ |

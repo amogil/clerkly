@@ -179,3 +179,44 @@
     line-height: 1.5;
   }
 }
+
+@layer components {
+  .message-markdown {
+    line-height: 1.5;
+  }
+
+  .message-markdown p,
+  .message-markdown li {
+    line-height: 1.5;
+  }
+
+  .message-markdown p {
+    margin: 0;
+  }
+
+  .message-markdown > * + * {
+    margin-top: 0.5rem;
+  }
+
+  .message-markdown ul,
+  .message-markdown ol {
+    margin: 0;
+    padding-left: 1.25rem;
+  }
+
+  .message-markdown li + li {
+    margin-top: 0.25rem;
+  }
+
+  .message-markdown pre {
+    margin: 0.5rem 0;
+  }
+
+  .message-markdown code {
+    line-height: 1.5;
+  }
+
+  .message-markdown pre code {
+    line-height: 1.5;
+  }
+}

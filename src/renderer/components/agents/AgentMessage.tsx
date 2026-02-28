@@ -101,16 +101,17 @@ export function AgentMessage({ message, showAvatar, agentStatus, onNavigate }: A
             // Requirements: llm-integration.2 — collapsible reasoning block
             <Reasoning>
               <ReasoningTrigger />
-              <ReasoningContent data-testid="message-llm-reasoning">
+              <ReasoningContent data-testid="message-llm-reasoning" className="message-markdown">
                 {llmReasoning.text}
               </ReasoningContent>
             </Reasoning>
           )}
           {llmAction?.content ? (
-            <MessageContent data-testid="message-llm-action" className="w-full">
-              <MessageResponse className="text-sm leading-relaxed whitespace-pre-wrap break-words">
-                {llmAction.content}
-              </MessageResponse>
+            <MessageContent
+              data-testid="message-llm-action"
+              className="message-markdown whitespace-pre-wrap break-words w-full"
+            >
+              <MessageResponse>{llmAction.content}</MessageResponse>
             </MessageContent>
           ) : (
             // Loading indicator — three bouncing dots
@@ -133,10 +134,8 @@ export function AgentMessage({ message, showAvatar, agentStatus, onNavigate }: A
           <Logo size="sm" showText={false} animated={isInProgress(agentStatus)} />
         </div>
       )}
-      <MessageContent className="w-full">
-        <p className="text-sm leading-relaxed text-foreground whitespace-pre-wrap break-words">
-          {String(message.payload.data?.text || '')}
-        </p>
+      <MessageContent className="message-markdown whitespace-pre-wrap break-words w-full">
+        <MessageResponse>{String(message.payload.data?.text || '')}</MessageResponse>
       </MessageContent>
     </Message>
   );

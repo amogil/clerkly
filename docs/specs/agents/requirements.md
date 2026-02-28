@@ -279,6 +279,9 @@
    - Пробелы в начале и конце текста ДОЛЖНЫ удаляться (trim)
    - Пробелы внутри текста ДОЛЖНЫ сохраняться
 
+4.24. КОГДА сообщение агента отображается, ТО межстрочное и межабзацное расстояние
+ДОЛЖНО быть единым независимо от того, содержит ли ответ plain text или markdown
+
 #### Функциональные Тесты
 
 - `tests/functional/agent-messaging.spec.ts` - "should send message on Enter key"
@@ -302,6 +305,7 @@
 - `tests/functional/message-text-wrapping.spec.ts` - "should preserve internal whitespace and trim leading/trailing"
 - `tests/functional/message-text-wrapping.spec.ts` - "should maintain text wrapping after window resize"
 - `tests/functional/message-text-wrapping.spec.ts` - "should handle emoji and Unicode characters correctly"
+- `tests/functional/message-format.spec.ts` - "should apply unified typography for agent messages"
 
 ### 5. Просмотр всех агентов
 
