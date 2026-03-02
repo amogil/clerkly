@@ -10,9 +10,16 @@ import { MainEventBus } from '../events/MainEventBus';
 import { MessageLlmReasoningUpdatedEvent, AgentRateLimitEvent } from '../../shared/events/types';
 import { LLM_CHAT_MODELS } from '../llm/LLMConfig';
 import { Logger } from '../Logger';
-import type { ILLMProvider, ChatOptions } from '../llm/ILLMProvider';
+import type { ILLMProvider, ChatOptions, LLMStructuredOutput } from '../llm/ILLMProvider';
+import { ImageStorageManager } from '../media/ImageStorageManager';
+import { parseImagePlaceholders } from '../../shared/utils/imagePlaceholders';
+import { safeParseStructuredOutput } from '../llm/StructuredOutputContract';
+import { handleBackgroundError } from '../ErrorHandler';
 
 import type { LLMProvider } from '../../types';
+
+const INVALID_STRUCTURED_OUTPUT_RETRY_INSTRUCTION =
+  'Your previous response did not match the required JSON schema. Reply again using the exact required format only.';
 
 /**
  * Error type categories for kind:error messages
@@ -28,6 +35,7 @@ function classifyError(message: string): LLMErrorType {
   const lower = message.toLowerCase();
   if (
     lower.includes('invalid api key') ||
+    lower.includes('api key is not set') ||
     lower.includes('unauthorized') ||
     lower.includes('forbidden')
   ) {
@@ -89,6 +97,7 @@ export class MainPipeline {
     private messageManager: MessageManager,
     private settingsManager: AIAgentSettingsManager,
     private promptBuilder: PromptBuilder,
+    private imageStorageManager: ImageStorageManager,
     private createProvider: (provider: LLMProvider, apiKey: string) => ILLMProvider = (p, k) => {
       const instance = LLMProviderFactory.createProvider(p);
       // Recreate with apiKey — OpenAIProvider accepts it in constructor
@@ -126,167 +135,402 @@ export class MainPipeline {
    * Requirements: llm-integration.5.1, llm-integration.5.2, llm-integration.5.3
    */
   async run(agentId: string, userMessageId: number, signal?: AbortSignal): Promise<void> {
-    // Track the created llm message id (null until first chunk arrives)
+    // Track last created llm message for error handling
+    let lastLlmMessageId: number | null = null;
+
+    try {
+      const context = await this.buildRunContext(agentId, userMessageId, signal);
+      if (!context) return;
+
+      await this.executeWithRetries(
+        context,
+        agentId,
+        signal,
+        (messageId) => {
+          lastLlmMessageId = messageId;
+        },
+        () => lastLlmMessageId,
+        () => {
+          lastLlmMessageId = null;
+        }
+      );
+    } catch (error) {
+      this.handleRunError(error, agentId, userMessageId, signal, lastLlmMessageId);
+    }
+  }
+
+  /**
+   * Build settings and prompt context for the run.
+   * Requirements: llm-integration.1.3, llm-integration.1.4, llm-integration.5.2
+   */
+  private async buildRunContext(
+    agentId: string,
+    userMessageId: number,
+    signal?: AbortSignal
+  ): Promise<{
+    provider: LLMProvider;
+    apiKey: string;
+    baseChatMessages: ReturnType<PromptBuilder['buildMessages']>;
+    options: ChatOptions;
+    replyToMessageId: number;
+    llmProvider: ILLMProvider;
+  } | null> {
+    if (signal?.aborted) return null;
+
+    const provider = await this.settingsManager.loadLLMProvider();
+    if (signal?.aborted) return null;
+
+    const apiKey = await this.settingsManager.loadAPIKey(provider);
+    if (signal?.aborted) return null;
+
+    if (!apiKey) {
+      throw new Error('API key is not set. Add it in Settings to continue.');
+    }
+
+    const messages = this.messageManager.listForModelHistory(agentId);
+    const baseChatMessages = this.promptBuilder.buildMessages(messages);
+    const replyToMessageId = userMessageId;
+    const options = this.resolveOptions(provider);
+    const llmProvider = this.createProvider(provider, apiKey);
+
+    return { provider, apiKey, baseChatMessages, options, replyToMessageId, llmProvider };
+  }
+
+  /**
+   * Execute the LLM request with retry/validation and image downloads.
+   * Requirements: llm-integration.1, llm-integration.3, llm-integration.9, llm-integration.12
+   */
+  private async executeWithRetries(
+    context: {
+      baseChatMessages: ReturnType<PromptBuilder['buildMessages']>;
+      options: ChatOptions;
+      replyToMessageId: number;
+      llmProvider: ILLMProvider;
+    },
+    agentId: string,
+    signal: AbortSignal | undefined,
+    setLastLlmMessageId: (messageId: number) => void,
+    getLastLlmMessageId: () => number | null,
+    clearLastLlmMessageId: () => void
+  ): Promise<void> {
+    // Requirements: llm-integration.12.1
+    // Initial request + up to 2 retries.
+    const maxRetries = 2;
+    const maxAttempts = maxRetries + 1;
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+      const { output, llmMessageId, accumulatedReasoning } = await this.callProviderWithStreaming(
+        context,
+        attempt,
+        agentId,
+        signal,
+        setLastLlmMessageId
+      );
+
+      if (signal?.aborted) {
+        this.handleAbortAfterStreaming(llmMessageId, agentId, clearLastLlmMessageId);
+        return;
+      }
+
+      const validation = this.validateStructuredOutput(output);
+      if (!validation.ok) {
+        const action = this.handleInvalidStructuredOutput(
+          attempt,
+          maxAttempts,
+          agentId,
+          context.replyToMessageId,
+          llmMessageId,
+          clearLastLlmMessageId
+        );
+        if (action === 'retry') {
+          continue;
+        }
+        return;
+      }
+
+      const finalMessageId = this.writeFinalAction(
+        agentId,
+        context.replyToMessageId,
+        llmMessageId,
+        accumulatedReasoning,
+        context.options,
+        output
+      );
+      setLastLlmMessageId(finalMessageId);
+
+      this.persistUsageEnvelope(finalMessageId, agentId, output);
+
+      this.queueImageDownloads(agentId, String(finalMessageId), output, validation.placeholders);
+
+      this.logger.info(`Pipeline completed for agent ${agentId}`);
+      return;
+    }
+
+    if (getLastLlmMessageId() !== null) {
+      clearLastLlmMessageId();
+    }
+  }
+
+  /**
+   * Call provider with streaming reasoning updates.
+   * Requirements: llm-integration.1.5, llm-integration.1.6, llm-integration.2
+   */
+  private async callProviderWithStreaming(
+    context: {
+      baseChatMessages: ReturnType<PromptBuilder['buildMessages']>;
+      options: ChatOptions;
+      replyToMessageId: number;
+      llmProvider: ILLMProvider;
+    },
+    attempt: number,
+    agentId: string,
+    signal: AbortSignal | undefined,
+    setLastLlmMessageId: (messageId: number) => void
+  ): Promise<{
+    output: LLMStructuredOutput;
+    llmMessageId: number | null;
+    accumulatedReasoning: string;
+  }> {
     let llmMessageId: number | null = null;
     let accumulatedReasoning = '';
 
-    try {
-      // ── 1. Load settings ──────────────────────────────────────────────────
-      const provider = await this.settingsManager.loadLLMProvider();
-      const apiKey = await this.settingsManager.loadAPIKey(provider);
+    const chatMessages =
+      attempt === 0
+        ? context.baseChatMessages
+        : [
+            ...context.baseChatMessages,
+            {
+              role: 'system' as const,
+              content: INVALID_STRUCTURED_OUTPUT_RETRY_INSTRUCTION,
+            },
+          ];
 
-      if (!apiKey) {
-        throw new Error('Invalid API key. Please check your key and try again.');
-      }
-
-      // ── 2. Check cancellation before starting ─────────────────────────────
+    const output = await context.llmProvider.chat(chatMessages, context.options, (chunk) => {
       if (signal?.aborted) return;
+      if (chunk.type !== 'reasoning' || chunk.done || !chunk.delta) return;
 
-      // ── 3. Build prompt ───────────────────────────────────────────────────
-      const messages = this.messageManager.list(agentId);
-      const chatMessages = this.promptBuilder.buildMessages(messages);
-
-      // ── 4. Determine reply_to_message_id ──────────────────────────────────
-      // The llm message replies to the user message that triggered it
-      const replyToMessageId = userMessageId;
-
-      // ── 5. Determine model and options ───────────────────────────────────
-      const options = this.resolveOptions(provider);
-
-      // ── 6. Create LLM provider ────────────────────────────────────────────
-      const llmProvider = this.createProvider(provider, apiKey);
-
-      // ── 7. Call LLM with streaming ────────────────────────────────────────
-      const action = await llmProvider.chat(chatMessages, options, (chunk) => {
-        if (signal?.aborted) return;
-
-        if (chunk.type === 'reasoning' && !chunk.done && chunk.delta) {
-          accumulatedReasoning += chunk.delta;
-
-          if (llmMessageId === null) {
-            // Create the llm message on first reasoning chunk
-            const llmMsg = this.messageManager.create(
-              agentId,
-              'llm',
-              {
-                data: {
-                  model: options.model,
-                  reasoning: { text: accumulatedReasoning, excluded_from_replay: true },
-                },
-              },
-              replyToMessageId
-            );
-            llmMessageId = llmMsg.id;
-          } else {
-            // Update reasoning in existing message
-            this.messageManager.update(llmMessageId, agentId, {
-              data: {
-                model: options.model,
-                reasoning: { text: accumulatedReasoning, excluded_from_replay: true },
-              },
-            });
-          }
-
-          // Emit reasoning-specific event
-          MainEventBus.getInstance().publish(
-            new MessageLlmReasoningUpdatedEvent(
-              llmMessageId!,
-              agentId,
-              chunk.delta,
-              accumulatedReasoning
-            )
-          );
-        }
-      });
-
-      // ── 8. Check cancellation after streaming ─────────────────────────────
-      if (signal?.aborted) {
-        if (llmMessageId !== null) {
-          // Hide the partial llm message — Requirements: llm-integration.8.5
-          this.messageManager.setHidden(llmMessageId, agentId);
-        }
-        return;
-      }
-
-      // ── 9. Write final action ─────────────────────────────────────────────
-      const finalPayload = {
-        data: {
-          model: options.model,
-          reasoning: accumulatedReasoning
-            ? { text: accumulatedReasoning, excluded_from_replay: true }
-            : undefined,
-          action: { type: action.type, content: action.content },
-          usage: action.usage,
-        },
-      };
-
-      if (llmMessageId === null) {
-        // No reasoning chunks — create message now
-        this.messageManager.create(agentId, 'llm', finalPayload, replyToMessageId);
-      } else {
-        this.messageManager.update(llmMessageId, agentId, finalPayload);
-      }
-
-      this.logger.info(`Pipeline completed for agent ${agentId}`);
-    } catch (error) {
-      if (signal?.aborted) {
-        // Cancelled — hide llm message if created, no error message
-        // Requirements: llm-integration.8.7
-        if (llmMessageId !== null) {
-          try {
-            this.messageManager.setHidden(llmMessageId, agentId);
-          } catch {
-            // ignore update errors during cancellation
-          }
-        }
-        return;
-      }
-
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      this.logger.error(`Pipeline error for agent ${agentId}: ${errorMessage}`);
-
-      // Hide existing llm message — Requirements: llm-integration.3.2
-      if (llmMessageId !== null) {
-        try {
-          this.messageManager.setHidden(llmMessageId, agentId);
-        } catch {
-          // ignore
-        }
-      }
-
-      // Create error message
-      const errorType = classifyError(errorMessage);
-      const errorReplyTo = userMessageId;
-
-      // Rate limit — emit event for UI banner instead of kind:error message
-      // Requirements: llm-integration.3.7
-      if (errorType === 'rate_limit') {
-        const retryAfterSeconds = parseRetryAfterSeconds(errorMessage);
-        MainEventBus.getInstance().publish(
-          new AgentRateLimitEvent(agentId, userMessageId, retryAfterSeconds)
-        );
-        return;
-      }
-
-      const errorPayload: Record<string, unknown> = {
-        type: errorType,
-        message: errorMessage,
-      };
-      if (errorType === 'auth') {
-        errorPayload['action_link'] = { label: 'Open Settings', screen: 'settings' };
-      }
-
-      this.messageManager.create(
+      accumulatedReasoning += chunk.delta;
+      llmMessageId = this.upsertReasoningMessage(
+        llmMessageId,
         agentId,
-        'error',
+        context.replyToMessageId,
+        context.options.model,
+        accumulatedReasoning,
+        chunk.delta,
+        setLastLlmMessageId
+      );
+    });
+
+    return { output, llmMessageId, accumulatedReasoning };
+  }
+
+  /**
+   * Create or update the llm message for reasoning chunks.
+   * Requirements: llm-integration.1.5, llm-integration.1.6, llm-integration.2.1
+   */
+  private upsertReasoningMessage(
+    llmMessageId: number | null,
+    agentId: string,
+    replyToMessageId: number,
+    model: string,
+    accumulatedReasoning: string,
+    delta: string,
+    setLastLlmMessageId: (messageId: number) => void
+  ): number {
+    if (llmMessageId === null) {
+      const llmMsg = this.messageManager.create(
+        agentId,
+        'llm',
         {
           data: {
-            error: errorPayload,
+            model,
+            reasoning: { text: accumulatedReasoning, excluded_from_replay: true },
           },
         },
-        errorReplyTo
+        replyToMessageId
       );
+      setLastLlmMessageId(llmMsg.id);
+      llmMessageId = llmMsg.id;
+    } else {
+      this.messageManager.update(llmMessageId, agentId, {
+        data: {
+          model,
+          reasoning: { text: accumulatedReasoning, excluded_from_replay: true },
+        },
+      });
     }
+
+    MainEventBus.getInstance().publish(
+      new MessageLlmReasoningUpdatedEvent(llmMessageId, agentId, delta, accumulatedReasoning)
+    );
+
+    return llmMessageId;
+  }
+
+  /**
+   * Handle cancellation after streaming finishes.
+   * Requirements: llm-integration.8.5, llm-integration.8.7
+   */
+  private handleAbortAfterStreaming(
+    llmMessageId: number | null,
+    agentId: string,
+    clearLastLlmMessageId: () => void
+  ): void {
+    if (llmMessageId !== null) {
+      this.messageManager.setHidden(llmMessageId, agentId);
+      clearLastLlmMessageId();
+    }
+  }
+
+  /**
+   * Handle invalid structured output.
+   * Requirements: llm-integration.12.1, llm-integration.12.2
+   */
+  private handleInvalidStructuredOutput(
+    attempt: number,
+    maxAttempts: number,
+    agentId: string,
+    replyToMessageId: number,
+    llmMessageId: number | null,
+    clearLastLlmMessageId: () => void
+  ): 'retry' | 'error' {
+    if (llmMessageId !== null) {
+      this.messageManager.setHidden(llmMessageId, agentId);
+      clearLastLlmMessageId();
+    }
+    if (attempt < maxAttempts - 1) {
+      return 'retry';
+    }
+
+    this.messageManager.create(
+      agentId,
+      'error',
+      {
+        data: {
+          error: {
+            type: 'provider',
+            message: 'Invalid response format. Please try again later.',
+          },
+        },
+      },
+      replyToMessageId
+    );
+    return 'error';
+  }
+
+  /**
+   * Write the final LLM action to the message.
+   * Requirements: llm-integration.1.6, llm-integration.7.3
+   */
+  private writeFinalAction(
+    agentId: string,
+    replyToMessageId: number,
+    llmMessageId: number | null,
+    accumulatedReasoning: string,
+    options: ChatOptions,
+    output: LLMStructuredOutput
+  ): number {
+    const finalPayload = {
+      data: {
+        model: options.model,
+        reasoning: accumulatedReasoning
+          ? { text: accumulatedReasoning, excluded_from_replay: true }
+          : undefined,
+        action: { type: output.action.type, content: output.action.content },
+        images: output.images,
+      },
+    };
+
+    if (llmMessageId === null) {
+      const msg = this.messageManager.create(agentId, 'llm', finalPayload, replyToMessageId);
+      return msg.id;
+    }
+
+    this.messageManager.update(llmMessageId, agentId, finalPayload);
+    return llmMessageId;
+  }
+
+  /**
+   * Persist usage envelope in a dedicated DB column as separate step.
+   * Requirements: llm-integration.13
+   */
+  private persistUsageEnvelope(
+    messageId: number,
+    agentId: string,
+    output: LLMStructuredOutput
+  ): void {
+    if (!output.usage) {
+      return;
+    }
+
+    try {
+      this.messageManager.setUsage(messageId, agentId, output.usage);
+    } catch (error) {
+      handleBackgroundError(error, 'Message Usage Persistence');
+    }
+  }
+
+  /**
+   * Handle errors outside the retry loop.
+   * Requirements: llm-integration.3, llm-integration.8.7
+   */
+  private handleRunError(
+    error: unknown,
+    agentId: string,
+    userMessageId: number,
+    signal: AbortSignal | undefined,
+    lastLlmMessageId: number | null
+  ): void {
+    if (signal?.aborted) {
+      if (lastLlmMessageId !== null) {
+        try {
+          this.messageManager.setHidden(lastLlmMessageId, agentId);
+        } catch {
+          // ignore update errors during cancellation
+        }
+      }
+      return;
+    }
+
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    this.logger.error(`Pipeline error for agent ${agentId}: ${errorMessage}`);
+
+    if (lastLlmMessageId !== null) {
+      try {
+        this.messageManager.setHidden(lastLlmMessageId, agentId);
+      } catch {
+        // ignore
+      }
+    }
+
+    const errorType = classifyError(errorMessage);
+    const errorReplyTo = userMessageId;
+
+    if (errorType === 'rate_limit') {
+      const retryAfterSeconds = parseRetryAfterSeconds(errorMessage);
+      MainEventBus.getInstance().publish(
+        new AgentRateLimitEvent(agentId, userMessageId, retryAfterSeconds)
+      );
+      return;
+    }
+
+    const errorPayload: Record<string, unknown> = {
+      type: errorType,
+      message: errorMessage,
+    };
+    if (errorType === 'auth') {
+      errorPayload['action_link'] = { label: 'Open Settings', screen: 'settings' };
+    }
+
+    this.messageManager.create(
+      agentId,
+      'error',
+      {
+        data: {
+          error: errorPayload,
+        },
+      },
+      errorReplyTo
+    );
   }
 
   /**
@@ -297,5 +541,47 @@ export class MainPipeline {
   private resolveOptions(provider: LLMProvider): ChatOptions {
     const env = process.env.NODE_ENV === 'test' ? 'test' : 'prod';
     return LLM_CHAT_MODELS[provider]?.[env] ?? LLM_CHAT_MODELS.openai[env];
+  }
+
+  // Requirements: llm-integration.9.1, llm-integration.9.7, llm-integration.9.8
+  private validateStructuredOutput(output: LLMStructuredOutput): {
+    ok: boolean;
+    placeholders: Array<{ id: number; link?: string; size?: { width: number; height: number } }>;
+  } {
+    const parsed = safeParseStructuredOutput(output);
+    if (!parsed.success) {
+      return { ok: false, placeholders: [] };
+    }
+
+    const { placeholders, invalid } = parseImagePlaceholders(parsed.data.action.content);
+    if (invalid) {
+      return { ok: false, placeholders };
+    }
+
+    return { ok: true, placeholders };
+  }
+
+  // Requirements: llm-integration.9.6, llm-integration.9.4
+  private queueImageDownloads(
+    agentId: string,
+    messageId: string,
+    output: LLMStructuredOutput,
+    placeholders: Array<{ id: number }>
+  ): void {
+    const images = output.images ?? [];
+    const placeholderIds = new Set(placeholders.map((p) => p.id));
+    const downloaded = new Set<number>();
+
+    for (const image of images) {
+      if (downloaded.has(image.id)) continue;
+      downloaded.add(image.id);
+      void this.imageStorageManager.downloadAndStore(agentId, messageId, image.id, image.url);
+    }
+
+    for (const placeholderId of placeholderIds) {
+      if (!downloaded.has(placeholderId)) {
+        this.imageStorageManager.markMissingDescriptor(agentId, messageId, placeholderId);
+      }
+    }
   }
 }

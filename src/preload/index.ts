@@ -126,6 +126,20 @@ export interface API {
       userMessageId: number
     ) => Promise<{ success: boolean; error?: string }>;
   };
+  images: {
+    // Requirements: llm-integration.9.3, llm-integration.9.5, llm-integration.9.8
+    get: (
+      agentId: string,
+      messageId: string,
+      imageId: number
+    ) => Promise<{
+      found: boolean;
+      status: 'pending' | 'error' | 'success';
+      bytes?: Uint8Array;
+      contentType?: string | null;
+      size?: number | null;
+    }>;
+  };
   // Requirements: testing.3.1, testing.3.2 - Test API methods (only available in test environment)
   test?: {
     simulateDataError: (
@@ -612,6 +626,22 @@ const api: API = {
       userMessageId: number
     ): Promise<{ success: boolean; error?: string }> {
       return await ipcRenderer.invoke('messages:cancel-retry', { agentId, userMessageId });
+    },
+  },
+  images: {
+    // Requirements: llm-integration.9.3, llm-integration.9.5, llm-integration.9.8
+    async get(
+      agentId: string,
+      messageId: string,
+      imageId: number
+    ): Promise<{
+      found: boolean;
+      status: 'pending' | 'error' | 'success';
+      bytes?: Uint8Array;
+      contentType?: string | null;
+      size?: number | null;
+    }> {
+      return await ipcRenderer.invoke('images:get', { agentId, messageId, imageId });
     },
   },
 };

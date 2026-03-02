@@ -29,7 +29,7 @@ export class MessagesRepository {
 
   /**
    * List messages for an agent, sorted by id ASC
-   * By default excludes hidden messages (interrupted llm + dismissed errors)
+   * By default excludes hidden messages.
    * Requirements: user-data-isolation.7.6, llm-integration.3.8, llm-integration.8.5
    */
   listByAgent(agentId: string, includeHidden = false): Message[] {
@@ -138,7 +138,7 @@ export class MessagesRepository {
    * Called before creating a new kind:user message so error bubbles disappear from UI.
    * Requirements: llm-integration.3.8
    */
-  dismissErrorMessages(agentId: string): Message[] {
+  hideErrorMessages(agentId: string): Message[] {
     this.checkAccess(agentId);
     return this.db
       .update(messages)
@@ -152,7 +152,7 @@ export class MessagesRepository {
 
   /**
    * Set hidden flag on a specific message
-   * Used to hide interrupted llm messages from UI and LLM history
+   * Used to hide cancelled llm messages from UI and LLM history
    * Requirements: llm-integration.8.5
    */
   setHidden(messageId: number, agentId: string): void {
@@ -208,6 +208,20 @@ export class MessagesRepository {
     this.db
       .update(messages)
       .set({ payloadJson })
+      .where(and(eq(messages.id, messageId), eq(messages.agentId, agentId)))
+      .run();
+  }
+
+  /**
+   * Update usage envelope JSON for a message.
+   * Requirements: llm-integration.13
+   */
+  updateUsageJson(messageId: number, agentId: string, usageJson: string): void {
+    this.checkAccess(agentId);
+
+    this.db
+      .update(messages)
+      .set({ usageJson })
       .where(and(eq(messages.id, messageId), eq(messages.agentId, agentId)))
       .run();
   }

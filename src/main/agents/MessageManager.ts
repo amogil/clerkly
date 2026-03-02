@@ -12,6 +12,7 @@ import {
 import { Logger } from '../Logger';
 import type { Message } from '../db/schema';
 import type { MessagePayload } from '../../shared/utils/agentStatus';
+import type { LLMUsage } from '../llm/ILLMProvider';
 
 /**
  * MessageManager - business logic for messages
@@ -77,6 +78,15 @@ export class MessageManager {
   }
 
   /**
+   * List messages for LLM history (excludes hidden and kind:error).
+   * Requirements: llm-integration.3.9, llm-integration.8.6
+   */
+  listForModelHistory(agentId: string): Message[] {
+    const messages = this.dbManager.messages.listByAgent(agentId, true);
+    return messages.filter((msg) => !msg.hidden && msg.kind !== 'error');
+  }
+
+  /**
    * Get the last message for an agent (most recent)
    * Returns null if no messages exist
    * Requirements: agents.5.5
@@ -97,26 +107,25 @@ export class MessageManager {
   }
 
   /**
-   * Dismiss all kind:error messages for an agent (set hidden = true)
+   * Hide all visible kind:error messages for an agent (set hidden = true)
    * Called before creating a new kind:user message.
-   * Repository returns only the records that were actually changed (were visible before).
+   * Repository returns only the records that were actually changed.
    * Requirements: llm-integration.3.8
    */
-  dismissErrorMessages(agentId: string): void {
-    // Repository filters hidden=false and returns only newly-dismissed records via RETURNING
-    const dismissed = this.dbManager.messages.dismissErrorMessages(agentId);
-    this.logger.info(`Error messages dismissed for agent ${agentId}`);
+  hideErrorMessages(agentId: string): void {
+    const hiddenMessages = this.dbManager.messages.hideErrorMessages(agentId);
+    this.logger.info(`Error messages hidden for agent ${agentId}`);
 
     // Emit message.updated for each newly hidden error message so renderer hides them
     // Requirements: llm-integration.3.8
-    for (const msg of dismissed) {
+    for (const msg of hiddenMessages) {
       MainEventBus.getInstance().publish(new MessageUpdatedEvent(this.toEventMessage(msg)));
     }
   }
 
   /**
    * Hide a specific message (set hidden = true)
-   * Used for interrupted llm messages
+   * Used for cancelled llm messages
    * Requirements: llm-integration.8.5
    */
   setHidden(messageId: number, agentId: string): void {
@@ -178,5 +187,14 @@ export class MessageManager {
     if (updated) {
       MainEventBus.getInstance().publish(new MessageUpdatedEvent(this.toEventMessage(updated)));
     }
+  }
+
+  /**
+   * Persist normalized+raw usage envelope in messages.usage_json.
+   * Requirements: llm-integration.13
+   */
+  setUsage(messageId: number, agentId: string, usage: LLMUsage): void {
+    this.dbManager.messages.updateUsageJson(messageId, agentId, JSON.stringify(usage));
+    this.logger.info(`Message usage saved: ${messageId}`);
   }
 }
