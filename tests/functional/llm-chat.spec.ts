@@ -455,6 +455,63 @@ test.describe('LLM Chat (mock server)', () => {
     await expect(context.window.locator('text=First response')).toHaveCount(0);
   });
 
+  /* Preconditions: First request is interrupted after streaming starts (its llm message becomes hidden),
+       second request succeeds; app authenticated with mock LLM URL
+     Action: User sends two messages in sequence with interruption between them
+     Assertions: LLM history for second request contains first user message but excludes hidden first llm response
+     Requirements: llm-integration.8.6, llm-integration.10.3 */
+  test('should exclude hidden llm messages from model history on next request', async () => {
+    // First request: slow streaming so it can be interrupted
+    mockLLMServer.setStreamingMode(true, {
+      content: '{"action":{"type":"text","content":"First response"}}',
+      chunkDelayMs: 300,
+    });
+
+    context = await launchWithMockLLM();
+    const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
+
+    // Send first message and wait for streaming start
+    await messageInput.fill('First message');
+    await messageInput.press('Enter');
+    await expect(context.window.locator('[data-testid="message"]').first()).toBeVisible({
+      timeout: 5000,
+    });
+    await context.window.waitForTimeout(500);
+
+    // Switch to fast second response and clear logs to inspect only second request payload
+    mockLLMServer.setStreamingMode(true, {
+      content: '{"action":{"type":"text","content":"Second response"}}',
+      chunkDelayMs: 0,
+    });
+    mockLLMServer.clearRequestLogs();
+
+    // Send second message
+    await messageInput.fill('Second message');
+    await messageInput.press('Enter');
+
+    // Wait for second response
+    const actionContent = context.window.locator('[data-testid="message-llm-action"]');
+    await expect(actionContent).toHaveCount(1, { timeout: 15000 });
+    await expect(actionContent.first()).toHaveText('Second response', { timeout: 5000 });
+
+    const lastRequest = mockLLMServer.getLastRequest();
+    expect(lastRequest).toBeDefined();
+    const messages: Array<{ role: string; content: string }> =
+      lastRequest!.body.input ?? lastRequest!.body.messages;
+
+    // First user message remains part of dialog context
+    const hasFirstUser = messages.some(
+      (m) => m.role === 'user' && m.content.includes('First message')
+    );
+    expect(hasFirstUser).toBe(true);
+
+    // Hidden first assistant message must not be replayed
+    const hasHiddenAssistantReplay = messages.some(
+      (m) => m.role === 'assistant' && m.content.includes('First response')
+    );
+    expect(hasHiddenAssistantReplay).toBe(false);
+  });
+
   /* Preconditions: MockLLMServer configured to return HTTP 500,
        app authenticated with mock LLM URL
      Action: User sends a message
