@@ -21,6 +21,7 @@ import {
   useState,
 } from 'react';
 import { Streamdown } from 'streamdown';
+import type { Node, Parent } from 'unist';
 import { visit } from 'unist-util-visit';
 import remarkGfm from 'remark-gfm';
 
@@ -199,11 +200,11 @@ const streamdownPlugins = {
 };
 
 const stripFootnotes = () => (tree: unknown) => {
-  const nodesToRemove: Array<{ parent: { children?: unknown[] }; index: number }> = [];
-  visit(tree as any, (node: any, index: number | undefined, parent: any) => {
+  const nodesToRemove: Array<{ parent: Parent; index: number }> = [];
+  visit(tree as Node, (node: Node, index: number | undefined, parent: Parent | undefined) => {
     if (!parent || typeof index !== 'number') return;
     if (node.type === 'footnoteDefinition' || node.type === 'footnoteReference') {
-      nodesToRemove.push({ parent: parent as { children?: unknown[] }, index });
+      nodesToRemove.push({ parent, index });
     }
   });
   nodesToRemove

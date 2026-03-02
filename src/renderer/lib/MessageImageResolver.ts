@@ -12,6 +12,50 @@ const POLL_TIMEOUT_MS = 60_000;
 
 const SKIP_TAGS = new Set(['CODE', 'PRE', 'A', 'TEXTAREA', 'INPUT']);
 
+interface DomNodeLike {
+  nodeType?: number;
+  tagName?: string;
+  nodeValue?: string;
+  parentNode?: DomNodeLike | null;
+  removeChild?: (node: unknown) => void;
+  appendChild?: (node: unknown) => void;
+  replaceWith?: (node: unknown) => void;
+}
+
+interface DomElementLike extends DomNodeLike {
+  dataset?: Record<string, string>;
+  className?: string;
+  style?: { width?: string; height?: string };
+  src?: string;
+  alt?: string;
+  onload?: () => void;
+  width?: number;
+  height?: number;
+  href?: string;
+  target?: string;
+  rel?: string;
+  attributes?: ArrayLike<{ name: string }>;
+  setAttribute?: (name: string, value: string) => void;
+  appendChild?: (node: unknown) => void;
+  removeChild?: (node: unknown) => void;
+  removeAttribute?: (name: string) => void;
+  replaceChildren?: (...nodes: unknown[]) => void;
+  remove?: () => void;
+  querySelectorAll?: (selector: string) => DomElementLike[];
+  innerHTML?: string;
+}
+
+interface DomDocumentLike {
+  createTreeWalker: (root: unknown, whatToShow: number) => { nextNode: () => unknown | null };
+  createDocumentFragment: () => { appendChild: (node: unknown) => void };
+  createTextNode: (text: string) => unknown;
+  createElement: (tag: string) => DomElementLike;
+}
+
+interface SvgDocumentLike {
+  querySelectorAll: (selector: string) => DomElementLike[];
+}
+
 declare const window: {
   api?: {
     images?: {
@@ -28,13 +72,13 @@ declare const window: {
       }>;
     };
   };
-  document?: any;
+  document?: DomDocumentLike;
   setTimeout?: (handler: () => void, timeout: number) => number;
   clearTimeout?: (handle: number) => void;
   NodeFilter?: { SHOW_TEXT: number };
   Node?: { ELEMENT_NODE: number };
-  DOMParser?: new () => { parseFromString: (text: string, type: string) => any };
-  XMLSerializer?: new () => { serializeToString: (node: any) => string };
+  DOMParser?: new () => { parseFromString: (text: string, type: string) => SvgDocumentLike };
+  XMLSerializer?: new () => { serializeToString: (node: unknown) => string };
 };
 
 export interface ImageDescriptor {
@@ -53,7 +97,7 @@ export interface MessageImageResolverOptions {
 
 // Requirements: llm-integration.9.2, llm-integration.9.3, llm-integration.9.5
 export function resolveMessageImages(
-  container: HTMLElement,
+  container: unknown,
   options: MessageImageResolverOptions
 ): () => void {
   const getImage = window?.api?.images?.get;
@@ -88,13 +132,13 @@ export function resolveMessageImages(
 
 interface PlaceholderNode {
   id: number;
-  element: HTMLElement;
+  element: DomElementLike;
   placeholder: ImagePlaceholder;
 }
 
 // Requirements: llm-integration.9.2
 function replacePlaceholders(
-  container: HTMLElement,
+  container: unknown,
   placeholders: ImagePlaceholder[],
   descriptorMap: Map<string, ImageDescriptor>
 ): PlaceholderNode[] {
@@ -103,11 +147,11 @@ function replacePlaceholders(
   if (!doc) return [];
   const showText = window.NodeFilter?.SHOW_TEXT ?? 4;
   const walker = doc.createTreeWalker(container, showText);
-  let node: any | null;
+  let node: unknown | null;
   const placeholderRegex = /\[\[image:[^\]]+\]\]/g;
 
   while ((node = walker.nextNode())) {
-    const textNode = node as any;
+    const textNode = node as DomNodeLike;
     if (!textNode.nodeValue) continue;
     if (shouldSkipNode(textNode)) continue;
 
@@ -145,7 +189,7 @@ function replacePlaceholders(
       fragment.appendChild(doc.createTextNode(text.slice(lastIndex)));
     }
 
-    textNode.replaceWith(fragment);
+    textNode.replaceWith?.(fragment);
   }
 
   return result;
@@ -155,24 +199,28 @@ function replacePlaceholders(
 function createPlaceholderElement(
   placeholder: ImagePlaceholder,
   descriptorMap: Map<string, ImageDescriptor>
-): HTMLElement {
+): DomElementLike {
   const descriptor = descriptorMap.get(String(placeholder.id));
   const width = placeholder.size?.width ?? DEFAULT_WIDTH;
   const height = placeholder.size?.height ?? DEFAULT_HEIGHT;
 
   const doc = window.document;
+  if (!doc) {
+    return {};
+  }
   const wrapper = doc.createElement('span');
-  wrapper.dataset.imageId = String(placeholder.id);
+  wrapper.dataset = { ...(wrapper.dataset ?? {}), imageId: String(placeholder.id) };
   wrapper.className = 'inline-block align-middle';
 
   const skeleton = doc.createElement('span');
   skeleton.className = 'inline-block bg-muted/40 animate-pulse rounded-md';
+  skeleton.style = skeleton.style ?? {};
   skeleton.style.width = `${width}px`;
   skeleton.style.height = `${height}px`;
-  skeleton.setAttribute('role', 'img');
-  skeleton.setAttribute('aria-label', descriptor?.alt ?? 'Image loading');
+  skeleton.setAttribute?.('role', 'img');
+  skeleton.setAttribute?.('aria-label', descriptor?.alt ?? 'Image loading');
 
-  wrapper.appendChild(skeleton);
+  wrapper.appendChild?.(skeleton);
   return wrapper;
 }
 
@@ -259,8 +307,11 @@ function buildImageElement(
   url: string,
   descriptor: ImageDescriptor | undefined,
   placeholder: ImagePlaceholder
-): HTMLElement {
+): DomElementLike {
   const doc = window.document;
+  if (!doc) {
+    return {};
+  }
   const img = doc.createElement('img');
   img.src = url;
   img.alt = descriptor?.alt ?? '';
@@ -285,7 +336,7 @@ function buildImageElement(
     anchor.href = link;
     anchor.target = '_blank';
     anchor.rel = 'noreferrer';
-    anchor.appendChild(img);
+    anchor.appendChild?.(img);
     return anchor;
   }
 
@@ -293,24 +344,20 @@ function buildImageElement(
 }
 
 // Requirements: llm-integration.9.5
-function removeElement(element: HTMLElement): void {
-  const anyEl = element as any;
-  if (anyEl?.parentNode?.removeChild) {
-    anyEl.parentNode.removeChild(anyEl);
+function removeElement(element: DomElementLike): void {
+  if (element.parentNode?.removeChild) {
+    element.parentNode.removeChild(element);
   }
 }
 
 // Requirements: llm-integration.9.3
-function replaceElementChildren(element: HTMLElement, child: HTMLElement): void {
-  const anyEl = element as any;
-  if (anyEl?.replaceChildren) {
-    anyEl.replaceChildren(child);
+function replaceElementChildren(element: DomElementLike, child: DomElementLike): void {
+  if (element.replaceChildren) {
+    element.replaceChildren(child);
     return;
   }
-  if (anyEl) {
-    anyEl.innerHTML = '';
-    anyEl.appendChild(child);
-  }
+  element.innerHTML = '';
+  element.appendChild?.(child);
 }
 
 // Requirements: llm-integration.9.3
@@ -339,13 +386,13 @@ function sanitizeSvg(svg: string): string {
   const parser = new Parser();
   const doc = parser.parseFromString(svg, 'image/svg+xml');
   const scripts = doc.querySelectorAll('script, foreignObject');
-  scripts.forEach((node: any) => node.remove());
+  scripts.forEach((node: DomElementLike) => node.remove?.());
 
   const elements = doc.querySelectorAll('*');
-  elements.forEach((el: any) => {
-    [...el.attributes].forEach((attr: any) => {
+  elements.forEach((el: DomElementLike) => {
+    Array.from(el.attributes ?? []).forEach((attr: { name: string }) => {
       if (attr.name.toLowerCase().startsWith('on')) {
-        el.removeAttribute(attr.name);
+        el.removeAttribute?.(attr.name);
       }
     });
   });
@@ -356,14 +403,14 @@ function sanitizeSvg(svg: string): string {
 }
 
 // Requirements: llm-integration.9.2
-function shouldSkipNode(node: any): boolean {
-  let current: any | null = node.parentNode;
+function shouldSkipNode(node: DomNodeLike): boolean {
+  let current: DomNodeLike | null = node.parentNode ?? null;
   while (current) {
     if (current.nodeType === (window.Node?.ELEMENT_NODE ?? 1)) {
-      const tag = current.tagName;
+      const tag = current.tagName ?? '';
       if (SKIP_TAGS.has(tag)) return true;
     }
-    current = current.parentNode;
+    current = current.parentNode ?? null;
   }
   return false;
 }

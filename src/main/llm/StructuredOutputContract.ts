@@ -71,10 +71,15 @@ const IMAGE_PLACEHOLDER_RULES =
  * Returns a cloned JSON schema object to prevent accidental mutation by callers.
  */
 export function getStructuredOutputJsonSchema(): Record<string, unknown> {
-  const raw = zodToJsonSchema(LLMStructuredOutputSchema as unknown as any, {
+  const contractSchema: unknown = LLMStructuredOutputSchema;
+  const toJsonSchema = zodToJsonSchema as unknown as (
+    schema: unknown,
+    options: { $refStrategy: 'none'; target: 'jsonSchema7' }
+  ) => Record<string, unknown>;
+  const raw = toJsonSchema(contractSchema, {
     $refStrategy: 'none',
     target: 'jsonSchema7',
-  }) as Record<string, unknown>;
+  });
   const cloned = JSON.parse(JSON.stringify(raw)) as Record<string, unknown>;
   // OpenAI accepts plain schema object; keep payload minimal.
   delete cloned['$schema'];

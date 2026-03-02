@@ -24,24 +24,22 @@ export function AgentMessage({ message, showAvatar, agentStatus, onNavigate }: A
     : undefined;
   const llmReasoning = llmData?.['reasoning'] as { text?: string } | undefined;
   const llmAction = llmData?.['action'] as { type?: string; content?: string } | undefined;
-  const llmImages = (llmData?.['images'] as Array<Record<string, unknown>> | undefined) ?? [];
   const contentRef = useRef<HTMLDivElement>(null);
-  const descriptors = useMemo(
-    () =>
-      llmImages
-        .map((img) => {
-          const rawId = img['id'];
-          const id = typeof rawId === 'number' ? rawId : Number(rawId);
-          return {
-            id,
-            url: typeof img['url'] === 'string' ? img['url'] : undefined,
-            alt: typeof img['alt'] === 'string' ? img['alt'] : undefined,
-            link: typeof img['link'] === 'string' ? img['link'] : undefined,
-          };
-        })
-        .filter((img) => Number.isInteger(img.id) && (img.id as number) > 0),
-    [llmImages]
-  );
+  const descriptors = useMemo(() => {
+    const llmImages = (llmData?.['images'] as Array<Record<string, unknown>> | undefined) ?? [];
+    return llmImages
+      .map((img) => {
+        const rawId = img['id'];
+        const id = typeof rawId === 'number' ? rawId : Number(rawId);
+        return {
+          id,
+          url: typeof img['url'] === 'string' ? img['url'] : undefined,
+          alt: typeof img['alt'] === 'string' ? img['alt'] : undefined,
+          link: typeof img['link'] === 'string' ? img['link'] : undefined,
+        };
+      })
+      .filter((img) => Number.isInteger(img.id) && img.id > 0);
+  }, [llmData]);
 
   useEffect(() => {
     if (!isLlmMessage || !llmAction?.content || !contentRef.current) return;
