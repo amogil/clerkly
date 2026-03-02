@@ -1,8 +1,10 @@
 /**
  * Functional Tests: LLM Chat
  *
- * End-to-end tests using real OpenAI API and MockLLMServer.
- * Requires OPENAI_API_KEY in .env file for real API tests.
+ * Default mode: real OpenAI API for end-to-end scenarios.
+ * Exception mode: controlled mock LLM transport for scenarios that require
+ * deterministic HTTP status/stream timing/request-body inspection. This exception
+ * is explicitly user-approved for technically necessary cases.
  *
  * Requirements: llm-integration.1, llm-integration.2, llm-integration.3, llm-integration.7, llm-integration.8
  */
@@ -146,7 +148,8 @@ test.describe('LLM Chat (real OpenAI)', () => {
 
   /* Preconditions: App authenticated, invalid API key saved
      Action: User sends a message
-     Assertions: Error bubble appears with auth error text
+     Assertions: Error bubble appears with auth error text and "Open Settings" action;
+       click navigates to Settings screen
      Requirements: llm-integration.3.1, llm-integration.3.4, llm-integration.3.5 */
   test('should show error message on invalid api key', async () => {
     context = await launchWithRealLLM('sk-invalid-key-000000000000');
@@ -162,6 +165,16 @@ test.describe('LLM Chat (real OpenAI)', () => {
     // Contains auth error text
     const text = await errorBubble.textContent();
     expect(text?.toLowerCase()).toMatch(/invalid api key|unauthorized|forbidden/);
+
+    const actionLink = context.window.locator('[data-testid="message-error-action-link"]');
+    await expect(actionLink).toBeVisible({ timeout: 5000 });
+    await expect(actionLink).toHaveText('Open Settings');
+
+    await actionLink.click();
+    await expect(context.window.locator('h2:has-text("LLM Provider")')).toBeVisible({
+      timeout: 5000,
+    });
+    await expectAgentsHiddenByCss(context.window, 3000);
   });
 
   /* Preconditions: App authenticated with real OpenAI API key, chat has scrollable content
@@ -310,7 +323,18 @@ test.describe('LLM Chat (real OpenAI)', () => {
   });
 });
 
-test.describe('LLM Chat (mock server)', () => {
+/**
+ * User-approved exception block:
+ * these scenarios cannot be made stable with a real external LLM because they
+ * require one or more of:
+ * - deterministic 429/500 transport responses;
+ * - deterministic chunk timing for interruption/race checks;
+ * - inspection of raw provider request bodies;
+ * - deterministic markdown/image fixtures for renderer assertions.
+ * Approval status:
+ * - user approved mock usage per test, then approved all remaining tests in this block.
+ */
+test.describe('LLM Chat (controlled mock transport exceptions)', () => {
   let context: ElectronTestContext;
 
   test.afterEach(async () => {
@@ -628,6 +652,68 @@ test.describe('LLM Chat (mock server)', () => {
     expect(priorAssistantMsg).toBeDefined();
   });
 
+  /* Preconditions: First LLM response contains text with image placeholder and images[] metadata;
+       app authenticated with mock LLM URL
+     Action: User sends two messages sequentially
+     Assertions: Second LLM request replay includes assistant text, placeholder and Images block with id/url/link/alt
+     Requirements: llm-integration.10.1, llm-integration.10.2 */
+  test('should include assistant replay text and image metadata in second request history', async () => {
+    mockLLMServer.setStreamingMode(true, {
+      content: JSON.stringify({
+        action: { type: 'text', content: 'First response with [[image:1]]' },
+        images: [
+          {
+            id: 1,
+            url: 'http://localhost:8895/mock-image.png',
+            link: 'https://example.com/source',
+            alt: 'Mock image alt',
+          },
+        ],
+      }),
+      chunkDelayMs: 0,
+    });
+
+    context = await launchWithMockLLM();
+    const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
+    const allActionContent = context.window.locator('[data-testid="message-llm-action"]');
+
+    // First turn
+    await messageInput.fill('First message');
+    await messageInput.press('Enter');
+    await expect(allActionContent.first()).toBeVisible({ timeout: 15000 });
+    await expect(allActionContent.first()).toContainText('First response with', { timeout: 5000 });
+
+    // Second turn
+    mockLLMServer.setStreamingMode(true, {
+      content: '{"action":{"type":"text","content":"Second response"}}',
+      chunkDelayMs: 0,
+    });
+    mockLLMServer.clearRequestLogs();
+
+    await messageInput.fill('Second message');
+    await messageInput.press('Enter');
+    await expect(allActionContent).toHaveCount(2, { timeout: 15000 });
+    await expect(allActionContent.last()).toHaveText('Second response', { timeout: 5000 });
+
+    const lastRequest = mockLLMServer.getLastRequest();
+    expect(lastRequest).toBeDefined();
+
+    const messages: Array<{ role: string; content: string }> =
+      lastRequest!.body.input ?? lastRequest!.body.messages;
+    expect(messages).toBeDefined();
+
+    const priorAssistantMsg = messages.find(
+      (m) => m.role === 'assistant' && m.content.includes('First response with')
+    );
+    expect(priorAssistantMsg).toBeDefined();
+    expect(priorAssistantMsg!.content).toContain('[[image:1]]');
+    expect(priorAssistantMsg!.content).toContain('Images:');
+    expect(priorAssistantMsg!.content).toContain('id=1');
+    expect(priorAssistantMsg!.content).toContain('url=http://localhost:8895/mock-image.png');
+    expect(priorAssistantMsg!.content).toContain('link=https://example.com/source');
+    expect(priorAssistantMsg!.content).toContain('alt=Mock image alt');
+  });
+
   /* Preconditions: MockLLMServer returns 500 on first request, success on second;
        app authenticated with mock LLM URL
      Action: User sends first message (gets error), then sends second message
@@ -744,41 +830,6 @@ test.describe('LLM Chat (mock server)', () => {
 
     // Banner should be gone after successful retry
     await expect(banner).toHaveCount(0, { timeout: 5000 });
-  });
-
-  /* Preconditions: MockLLMServer returns 401 (auth error); app authenticated with mock LLM URL
-     Action: User sends a message, error bubble appears with action_link
-     Assertions: "Open Settings" button visible in error bubble, click navigates to Settings screen
-     Requirements: llm-integration.3.4.1 */
-  test('should show action_link in auth error bubble and navigate to settings on click', async () => {
-    mockLLMServer.setSuccess(false);
-    mockLLMServer.setError(401, 'Invalid API key. Please check your key and try again.');
-
-    context = await launchWithMockLLM();
-    const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
-
-    await messageInput.fill('Hello');
-    await messageInput.press('Enter');
-
-    // Error bubble appears
-    const errorBubble = context.window.locator('[data-testid="message-error"]');
-    await expect(errorBubble).toBeVisible({ timeout: 15000 });
-
-    // action_link button is visible with correct label
-    const actionLink = context.window.locator('[data-testid="message-error-action-link"]');
-    await expect(actionLink).toBeVisible({ timeout: 5000 });
-    await expect(actionLink).toHaveText('Open Settings');
-
-    // Click the action link — should navigate to Settings
-    await actionLink.click();
-
-    // Settings screen is shown (contains "LLM Provider" heading)
-    await expect(context.window.locator('h2:has-text("LLM Provider")')).toBeVisible({
-      timeout: 5000,
-    });
-
-    // Agents screen wrapper is hidden via CSS while staying in DOM
-    await expectAgentsHiddenByCss(context.window, 3000);
   });
 
   /* Preconditions: MockLLMServer returns 429; app authenticated with mock LLM URL
