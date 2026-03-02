@@ -209,7 +209,11 @@ function createPlaceholderElement(
     return {};
   }
   const wrapper = doc.createElement('span');
-  wrapper.dataset = { ...(wrapper.dataset ?? {}), imageId: String(placeholder.id) };
+  if (wrapper.dataset) {
+    wrapper.dataset.imageId = String(placeholder.id);
+  } else {
+    wrapper.setAttribute?.('data-image-id', String(placeholder.id));
+  }
   wrapper.className = 'inline-block align-middle';
 
   const skeleton = doc.createElement('span');

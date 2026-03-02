@@ -1,0 +1,214 @@
+/** @jest-environment jsdom */
+// Requirements: llm-integration.9.2, llm-integration.9.3, llm-integration.9.5
+// tests/unit/renderer/lib/MessageImageResolver.test.ts
+
+import { resolveMessageImages } from '../../../../src/renderer/lib/MessageImageResolver';
+
+type ImagesGet = (
+  agentId: string,
+  messageId: string,
+  imageId: number
+) => Promise<{
+  found: boolean;
+  status: 'pending' | 'error' | 'success';
+  bytes?: Uint8Array;
+  contentType?: string | null;
+}>;
+
+function setImagesApi(get: ImagesGet | undefined): void {
+  const w = window as unknown as { api?: { images?: { get: ImagesGet } } };
+  if (!get) {
+    w.api = undefined;
+    return;
+  }
+  w.api = { images: { get } };
+}
+
+async function flush(): Promise<void> {
+  await Promise.resolve();
+  await Promise.resolve();
+}
+
+describe('resolveMessageImages', () => {
+  const originalCreateObjectURL = URL.createObjectURL;
+  const originalRevokeObjectURL = URL.revokeObjectURL;
+
+  beforeEach(() => {
+    jest.useRealTimers();
+    URL.createObjectURL = jest.fn().mockReturnValue('blob:test');
+    URL.revokeObjectURL = jest.fn();
+    document.body.innerHTML = '';
+  });
+
+  afterEach(() => {
+    setImagesApi(undefined);
+    URL.createObjectURL = originalCreateObjectURL;
+    URL.revokeObjectURL = originalRevokeObjectURL;
+    jest.restoreAllMocks();
+  });
+
+  /* Preconditions: window.api.images.get is unavailable
+     Action: resolveMessageImages() is called
+     Assertions: Returns noop cleanup and does not throw
+     Requirements: llm-integration.9.2 */
+  it('should return noop when images API is unavailable', () => {
+    const root = document.createElement('div');
+    root.textContent = '[[image:1]]';
+    setImagesApi(undefined);
+
+    const cleanup = resolveMessageImages(root as unknown as HTMLElement, {
+      agentId: 'agent-1',
+      messageId: 1,
+      content: '[[image:1]]',
+      descriptors: [{ id: 1, url: 'https://example.com/a.png' }],
+    });
+    expect(typeof cleanup).toBe('function');
+    cleanup();
+  });
+
+  /* Preconditions: Text has no image placeholders
+     Action: resolveMessageImages() is called
+     Assertions: No polling is started
+     Requirements: llm-integration.9.2 */
+  it('should return noop when no placeholders exist', () => {
+    const getImage = jest.fn();
+    setImagesApi(getImage);
+    const root = document.createElement('div');
+    root.textContent = 'no placeholders';
+
+    resolveMessageImages(root as unknown as HTMLElement, {
+      agentId: 'agent-1',
+      messageId: 1,
+      content: 'plain text',
+      descriptors: [],
+    });
+
+    expect(getImage).not.toHaveBeenCalled();
+  });
+
+  /* Preconditions: Placeholder exists and image becomes available after pending status
+     Action: resolveMessageImages() starts polling
+     Assertions: Placeholder is replaced with clickable image element
+     Requirements: llm-integration.9.2, llm-integration.9.3, llm-integration.9.5 */
+  it('should poll pending image and then render anchor with image', async () => {
+    const getImage = jest
+      .fn()
+      .mockResolvedValueOnce({ found: true, status: 'pending' })
+      .mockResolvedValueOnce({
+        found: true,
+        status: 'success',
+        bytes: new Uint8Array([1, 2, 3]),
+        contentType: 'image/png',
+      });
+    setImagesApi(getImage);
+    jest.useFakeTimers();
+
+    const root = document.createElement('div');
+    root.textContent =
+      'prefix [[image:99]] [[image:1|link:https://placeholder.link|size:120x40]] suffix';
+    resolveMessageImages(root as unknown as HTMLElement, {
+      agentId: 'agent-1',
+      messageId: 2,
+      content: 'prefix [[image:99]] [[image:1|link:https://placeholder.link|size:120x40]] suffix',
+      descriptors: [{ id: 1, url: 'https://example.com/a.png', alt: 'chart' }],
+    });
+
+    await flush();
+    jest.runOnlyPendingTimers();
+    await flush();
+
+    expect(getImage).toHaveBeenCalledTimes(2);
+    const anchor = root.querySelector('span[data-image-id="1"] a') as HTMLAnchorElement | null;
+    expect(anchor).not.toBeNull();
+    expect(anchor?.getAttribute('href')).toBe('https://placeholder.link');
+    const img = anchor?.querySelector('img') as HTMLImageElement | null;
+    expect(img).not.toBeNull();
+    expect(img?.width).toBe(120);
+    expect(img?.height).toBe(40);
+    jest.useRealTimers();
+  });
+
+  /* Preconditions: Placeholder node is nested inside link/code block
+     Action: resolveMessageImages() processes nodes
+     Assertions: Nested placeholder is skipped and not transformed
+     Requirements: llm-integration.9.2 */
+  it('should skip placeholders inside unsupported tags', () => {
+    const getImage = jest.fn();
+    setImagesApi(getImage);
+    const root = document.createElement('div');
+    root.innerHTML = '<a>[[image:2]]</a>';
+
+    resolveMessageImages(root as unknown as HTMLElement, {
+      agentId: 'agent-1',
+      messageId: 3,
+      content: '[[image:2]]',
+      descriptors: [{ id: 2, url: 'https://example.com/b.png' }],
+    });
+
+    expect(getImage).not.toHaveBeenCalled();
+    expect(root.querySelector('a')?.textContent).toContain('[[image:2]]');
+  });
+
+  /* Preconditions: Polling result is found=false or throws
+     Action: resolveMessageImages() polls image status
+     Assertions: Placeholder is removed without UI error
+     Requirements: llm-integration.9.4 */
+  it('should remove placeholder on missing image and on polling exception', async () => {
+    const missingGet = jest.fn().mockResolvedValue({ found: false, status: 'error' });
+    setImagesApi(missingGet);
+    const rootMissing = document.createElement('div');
+    rootMissing.textContent = '[[image:3]]';
+    resolveMessageImages(rootMissing as unknown as HTMLElement, {
+      agentId: 'agent-1',
+      messageId: 4,
+      content: '[[image:3]]',
+      descriptors: [{ id: 3, url: 'https://example.com/c.png' }],
+    });
+    await flush();
+    expect(rootMissing.querySelector('span[data-image-id="3"]')).toBeNull();
+
+    const errorGet = jest.fn().mockRejectedValue(new Error('poll failure'));
+    setImagesApi(errorGet);
+    const rootError = document.createElement('div');
+    rootError.textContent = '[[image:4]]';
+    resolveMessageImages(rootError as unknown as HTMLElement, {
+      agentId: 'agent-1',
+      messageId: 5,
+      content: '[[image:4]]',
+      descriptors: [{ id: 4, url: 'https://example.com/d.png' }],
+    });
+    await flush();
+    expect(rootError.querySelector('span[data-image-id="4"]')).toBeNull();
+  });
+
+  /* Preconditions: Successful image response and link fallback to descriptor
+     Action: resolveMessageImages() processes success result
+     Assertions: Descriptor link is used when placeholder link is invalid
+     Requirements: llm-integration.9.3, llm-integration.9.5 */
+  it('should use descriptor link fallback when placeholder link is invalid', async () => {
+    const getImage = jest.fn().mockResolvedValue({
+      found: true,
+      status: 'success',
+      bytes: new Uint8Array([60, 115, 118, 103, 62]), // <svg>
+      contentType: 'image/png',
+    });
+    setImagesApi(getImage);
+    const root = document.createElement('div');
+    root.textContent = '[[image:98]] [[image:5|link:not-a-url]]';
+    resolveMessageImages(root as unknown as HTMLElement, {
+      agentId: 'agent-1',
+      messageId: 6,
+      content: '[[image:98]] [[image:5|link:not-a-url]]',
+      descriptors: [
+        { id: 5, url: 'https://example.com/e.svg', link: 'https://example.com/fallback' },
+      ],
+    });
+
+    await flush();
+
+    const anchor = root.querySelector('span[data-image-id="5"] a') as HTMLAnchorElement | null;
+    expect(anchor).not.toBeNull();
+    expect(anchor?.getAttribute('href')).toBe('https://example.com/fallback');
+    expect(URL.createObjectURL).toHaveBeenCalled();
+  });
+});

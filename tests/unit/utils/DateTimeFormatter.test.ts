@@ -137,6 +137,50 @@ describe('DateTimeFormatter', () => {
     consoleErrorSpy.mockRestore();
   });
 
+  /* Preconditions: Date.prototype.toLocaleDateString throws non-Error value
+     Action: call formatDate(timestamp)
+     Assertions: fallback uses unknown-error branch and returns ISO date
+     Requirements: settings.2.1 */
+  it('should handle non-Error exceptions in formatDate fallback', () => {
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+    const originalToLocaleDateString = Date.prototype.toLocaleDateString;
+    Date.prototype.toLocaleDateString = jest.fn(() => {
+      throw 'boom';
+    });
+
+    const result = DateTimeFormatter.formatDate(new Date('2026-02-07T10:30:00Z').getTime());
+    expect(result).toBe('2026-02-07');
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      '[DateTimeFormatter] Error formatting date:',
+      'Unknown error'
+    );
+
+    Date.prototype.toLocaleDateString = originalToLocaleDateString;
+    consoleErrorSpy.mockRestore();
+  });
+
+  /* Preconditions: Date.prototype.toLocaleDateString throws non-Error value
+     Action: call formatDateTime(timestamp)
+     Assertions: fallback uses unknown-error branch
+     Requirements: settings.2.1 */
+  it('should handle non-Error exceptions in formatDateTime fallback', () => {
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+    const originalToLocaleDateString = Date.prototype.toLocaleDateString;
+    Date.prototype.toLocaleDateString = jest.fn(() => {
+      throw 'boom';
+    });
+
+    const result = DateTimeFormatter.formatDateTime(new Date('2026-02-07T10:30:00Z').getTime());
+    expect(typeof result).toBe('string');
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      '[DateTimeFormatter] Error formatting date/time:',
+      'Unknown error'
+    );
+
+    Date.prototype.toLocaleDateString = originalToLocaleDateString;
+    consoleErrorSpy.mockRestore();
+  });
+
   /* Preconditions: various timestamps (past, present, future)
      Action: call formatDate() and formatDateTime()
      Assertions: results do NOT contain relative formats ("ago", "yesterday", "tomorrow", "hours", "minutes")
@@ -218,6 +262,21 @@ describe('DateTimeFormatter', () => {
     const expectedTimezone = `${timezoneSign}${String(timezoneOffsetHours).padStart(2, '0')}:${String(timezoneOffsetMins).padStart(2, '0')}`;
 
     expect(timezone).toBe(expectedTimezone);
+  });
+
+  /* Preconditions: Date has positive timezone offset
+     Action: call formatLogTimestamp(date)
+     Assertions: timezone sign follows "-" branch
+     Requirements: clerkly.3.3 */
+  it('should use negative timezone sign for positive timezone offset', () => {
+    const date = new Date('2026-02-07T10:30:45Z');
+    const originalGetTimezoneOffset = date.getTimezoneOffset;
+    date.getTimezoneOffset = () => 120;
+
+    const result = DateTimeFormatter.formatLogTimestamp(date);
+    expect(result).toMatch(/-02:00$/);
+
+    date.getTimezoneOffset = originalGetTimezoneOffset;
   });
 
   /* Preconditions: Date methods throw error
