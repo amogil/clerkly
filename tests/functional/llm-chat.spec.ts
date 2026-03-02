@@ -765,6 +765,40 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     expect(errorInConversation).toBe(false);
   });
 
+  /* Preconditions: MockLLMServer always returns invalid structured output payload
+       (invalid image placeholder id format), app authenticated with mock LLM URL
+     Action: User sends a message
+     Assertions: MainPipeline retries up to 2 times, then renders standardized
+       invalid-format error with Retry action
+     Requirements: llm-integration.12.1, llm-integration.12.2, llm-integration.12.3 */
+  test('should retry invalid structured output and show error with Retry action', async () => {
+    mockLLMServer.setStreamingMode(true, {
+      content: JSON.stringify({
+        action: { type: 'text', content: 'Broken placeholder [[image:abc]]' },
+        images: [],
+      }),
+      chunkDelayMs: 0,
+    });
+
+    context = await launchWithMockLLM();
+    const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
+
+    await messageInput.fill('Trigger invalid structured output');
+    await messageInput.press('Enter');
+
+    const errorBubble = context.window.locator('[data-testid="message-error"]');
+    await expect(errorBubble).toBeVisible({ timeout: 15000 });
+    await expect(errorBubble).toContainText('Invalid response format. Please try again later.');
+    await expect(context.window.locator('[data-testid="message-error-retry"]')).toBeVisible({
+      timeout: 5000,
+    });
+
+    const requestCount = mockLLMServer
+      .getRequestLogs()
+      .filter((entry) => entry.method === 'POST' && entry.path === '/v1/responses').length;
+    expect(requestCount).toBe(3);
+  });
+
   /* Preconditions: MockLLMServer returns placeholder + images list
      Action: User sends a message
      Assertions: Image appears after async download
@@ -787,6 +821,34 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     const actionContent = context.window.locator('[data-testid="message-llm-action"]');
     await expect(actionContent).toBeVisible({ timeout: 5000 });
     await expect(actionContent.locator('img')).toBeVisible({ timeout: 6000 });
+  });
+
+  /* Preconditions: MockLLMServer returns placeholder with link+size and matching images[] descriptor
+     Action: User sends a message
+     Assertions: Rendered output contains clickable anchor wrapping image with expected href
+     Requirements: llm-integration.1, llm-integration.9.3 */
+  test('should render clickable image wrapper for descriptor link and size', async () => {
+    const imageUrl = `http://localhost:${MOCK_LLM_PORT}/mock-image.png`;
+    const clickUrl = 'https://example.com/source';
+    mockLLMServer.setStreamingMode(true, {
+      content: JSON.stringify({
+        action: { type: 'text', content: 'Click image: [[image:1|size:64x64]]' },
+        images: [{ id: 1, url: imageUrl, alt: 'Clickable image', link: clickUrl }],
+      }),
+      chunkDelayMs: 0,
+    });
+
+    context = await launchWithMockLLM();
+    const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
+    await messageInput.fill('Show clickable image');
+    await messageInput.press('Enter');
+
+    const actionContent = context.window.locator('[data-testid="message-llm-action"]');
+    await expect(actionContent).toBeVisible({ timeout: 5000 });
+
+    const anchor = actionContent.locator(`a[href="${clickUrl}"]`);
+    await expect(anchor).toBeVisible({ timeout: 6000 });
+    await expect(anchor.locator('img')).toBeVisible({ timeout: 6000 });
   });
 
   /* Preconditions: MockLLMServer returns 429 with retry-after=3 on first request,

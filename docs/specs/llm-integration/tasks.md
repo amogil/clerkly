@@ -372,10 +372,10 @@
 - [x] Обсудить и согласовать формат replay-истории: в историю передаётся человеко-читаемый текст и информация о ссылках/метаданных изображений из прошлых `images[]` (без сырого JSON-дампа как единственного источника смысла).
 - [x] Реализовать согласованный replay-формат истории: передавать текст ответа и информацию по изображениям (минимум `id`, `url`, `link`, опционально `alt`) в сообщениях для модели.
 - [x] Добавить unit/functional-тесты на replay-историю: проверить, что в историю попадают и текст, и данные по ссылкам изображений.
-- [ ] Добавить functional-тест: invalid structured output → retry (до 2 повторов) → ошибка `"Invalid response format. Please try again later."` + действие `Retry`.
-- [ ] Добавить unit-тест в `MainPipeline`: проверить, что при retry отправляется инструкция `"Your previous response did not match the required JSON schema. Reply again using the exact required format only."`.
-- [ ] Добавить unit-тесты провайдеров/контракта: проверить, что описание Structured Output (схема + форматы + семантика) передаётся из единого декларативного контракта.
-- [ ] Добавить unit-тест: `messages.usage_json` не дублирует `provider`, `model`, `timestamp`.
+- [x] Добавить functional-тест: invalid structured output → retry (до 2 повторов) → ошибка `"Invalid response format. Please try again later."` + действие `Retry`.
+- [x] Добавить unit-тест в `MainPipeline`: проверить, что при retry отправляется инструкция `"Your previous response did not match the required JSON schema. Reply again using the exact required format only."`.
+- [x] Добавить unit-тесты провайдеров/контракта: проверить, что описание Structured Output (схема + форматы + семантика) передаётся из единого декларативного контракта.
+- [x] Добавить unit-тест: `messages.usage_json` не дублирует `provider`, `model`, `timestamp`.
 - [ ] Выровнять requirement-ссылки в комментариях тестов под `llm-integration.10/11/12/13`.
 
 ## Чек-лист тестов
@@ -425,15 +425,15 @@
 - [x] История: hidden исключаются из replay.
 - [x] История: в replay передаются текст ответа и данные изображений (`id/url/link/alt`).
 - [x] История: плейсхолдеры остаются в истории (не удаляются).
-- [ ] MainPipeline: invalid response format → retry с системным сообщением.
-- [ ] MainPipeline: после 1–2 retry создаётся `kind: error` с `Retry`.
-- [ ] MainPipeline: retry не зацикливается (счётчик попыток).
-- [ ] Добавить functional test: invalid structured output → 2 retry → `kind:error` в чате с кнопкой `Retry`.
+- [x] MainPipeline: invalid response format → retry с системным сообщением.
+- [x] MainPipeline: после 1–2 retry создаётся `kind: error` с `Retry`.
+- [x] MainPipeline: retry не зацикливается (счётчик попыток).
+- [x] Добавить functional test: invalid structured output → 2 retry → `kind:error` в чате с кнопкой `Retry`.
 - [ ] Renderer: отмена polling при unmount сообщения.
 
 ### Функциональные тесты
 - [x] Базовый рендер: `[[image:1]]` + `images[]` → `<img>` появляется.
-- [ ] Кликабельность: `link` оборачивает `<img>` в `<a>`.
+- [x] Кликабельность: `link` оборачивает `<img>` в `<a>`.
 - [ ] Размер: `size:640x180` задаёт размер заглушки до загрузки.
 - [ ] Без размера: дефолтная заглушка.
 - [ ] Ошибка: неизвестный `id` → placeholder удаляется.
@@ -441,7 +441,7 @@
 - [ ] Ошибка: неподдерживаемый тип → placeholder удаляется.
 - [x] Polling вместо событий: изображение вставляется после готовности в main.
 - [ ] Повторный рендер не вызывает повторных загрузок (кэш).
-- [ ] Кликабельная картинка с `size` → правильная заглушка и `<a><img></a>`.
+- [x] Кликабельная картинка с `size` → правильная заглушка и `<a><img></a>`.
 
 ## Definition of Done (Фаза 3)
 
