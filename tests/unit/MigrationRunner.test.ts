@@ -933,3 +933,50 @@ describe('Migration 006: add kind column and remove kind from payload_json', () 
     expect(JSON.parse(row.payload_json)).toEqual({ data: { text: 'Hello' } });
   });
 });
+
+describe('Migration 010: add usage_json column to messages', () => {
+  let db: Database.Database;
+  const migrationsPath = path.join(process.cwd(), 'migrations');
+
+  beforeEach(() => {
+    db = new Database(':memory:');
+
+    // Create messages table as it existed before migration 010
+    db.exec(`
+      CREATE TABLE messages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        agent_id TEXT NOT NULL,
+        timestamp TEXT NOT NULL,
+        kind TEXT NOT NULL,
+        payload_json TEXT NOT NULL,
+        hidden INTEGER NOT NULL DEFAULT 0,
+        reply_to_message_id INTEGER
+      );
+    `);
+  });
+
+  afterEach(() => {
+    if (db && db.open) db.close();
+  });
+
+  /* Preconditions: messages table exists without usage_json
+     Action: run migration 010
+     Assertions: usage_json column is added and nullable
+     Requirements: llm-integration.13 */
+  it('should add nullable usage_json column to messages', () => {
+    const sql = fs.readFileSync(
+      path.join(migrationsPath, '010_add_usage_json_to_messages.sql'),
+      'utf-8'
+    );
+    db.exec(sql);
+
+    const columns = db.prepare('PRAGMA table_info(messages)').all() as Array<{
+      name: string;
+      notnull: number;
+    }>;
+    const usageColumn = columns.find((column) => column.name === 'usage_json');
+
+    expect(usageColumn).toBeDefined();
+    expect(usageColumn?.notnull).toBe(0);
+  });
+});

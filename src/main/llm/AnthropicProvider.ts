@@ -6,10 +6,15 @@ import {
   ChatMessage,
   ChatOptions,
   ChatChunk,
-  LLMAction,
+  LLMStructuredOutput,
   LLMUsage,
 } from './ILLMProvider';
 import { LLM_PROVIDERS, ERROR_MESSAGES, CHAT_TIMEOUT_MS } from './LLMConfig';
+import {
+  buildStructuredOutputInstruction,
+  getStructuredOutputJsonSchema,
+  safeParseStructuredOutput,
+} from './StructuredOutputContract';
 
 // ─── Anthropic SSE event shapes ───────────────────────────────────────────────
 
@@ -27,13 +32,13 @@ interface AnthropicContentBlockDelta {
 
 interface AnthropicMessageDelta {
   type: 'message_delta';
-  usage?: { output_tokens?: number };
+  usage?: Record<string, unknown> & { output_tokens?: number };
 }
 
 interface AnthropicMessageStart {
   type: 'message_start';
   message?: {
-    usage?: { input_tokens?: number; output_tokens?: number };
+    usage?: Record<string, unknown> & { input_tokens?: number; output_tokens?: number };
   };
 }
 
@@ -106,7 +111,7 @@ export class AnthropicProvider implements ILLMProvider {
     messages: ChatMessage[],
     options: ChatOptions,
     onChunk: (chunk: ChatChunk) => void
-  ): Promise<LLMAction> {
+  ): Promise<LLMStructuredOutput> {
     const apiUrl = process.env.CLERKLY_ANTHROPIC_API_URL ?? this.config.apiUrl;
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), CHAT_TIMEOUT_MS);
@@ -118,15 +123,20 @@ export class AnthropicProvider implements ILLMProvider {
 
       // Build system prompt: inject JSON output instruction
       const systemBase = systemMessages.map((m) => m.content).join('\n');
-      const systemPrompt =
-        (systemBase ? systemBase + '\n\n' : '') +
-        'Always respond with valid JSON in this exact format: {"action":{"type":"text","content":"<your response here>"}}';
+      const structuredInstruction = buildStructuredOutputInstruction();
+      const systemPrompt = (systemBase ? systemBase + '\n\n' : '') + structuredInstruction;
 
       const body: Record<string, unknown> = {
         model: options.model,
         max_tokens: 16000,
         system: systemPrompt,
         messages: conversationMessages.map((m) => ({ role: m.role, content: m.content })),
+        output_config: {
+          format: {
+            type: 'json_schema',
+            schema: getStructuredOutputJsonSchema(),
+          },
+        },
         stream: true,
       };
 
@@ -150,6 +160,16 @@ export class AnthropicProvider implements ILLMProvider {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
+        const retryAfterSeconds = this.parseRetryAfterHeader(response);
+        if (response.status === 429 && retryAfterSeconds !== null) {
+          throw new Error(`Rate limit exceeded. Please try again in ${retryAfterSeconds}s`);
+        }
+        if (response.status === 429) {
+          const providerMessage = this.extractErrorMessage(errorData);
+          if (providerMessage) {
+            throw new Error(providerMessage);
+          }
+        }
         throw new Error(this.mapErrorToMessage(response.status, errorData));
       }
 
@@ -166,7 +186,7 @@ export class AnthropicProvider implements ILLMProvider {
   private async parseStream(
     response: Response,
     onChunk: (chunk: ChatChunk) => void
-  ): Promise<LLMAction> {
+  ): Promise<LLMStructuredOutput> {
     const reader = response.body?.getReader();
     if (!reader) {
       throw new Error('No response body');
@@ -181,6 +201,7 @@ export class AnthropicProvider implements ILLMProvider {
     let contentAccumulator = '';
     let inputTokens = 0;
     let outputTokens = 0;
+    let rawUsage: Record<string, unknown> = {};
 
     try {
       for (;;) {
@@ -207,9 +228,15 @@ export class AnthropicProvider implements ILLMProvider {
             const e = event as AnthropicMessageStart;
             inputTokens = e.message?.usage?.input_tokens ?? 0;
             outputTokens = e.message?.usage?.output_tokens ?? 0;
+            if (e.message?.usage && typeof e.message.usage === 'object') {
+              rawUsage = { ...rawUsage, ...(e.message.usage as Record<string, unknown>) };
+            }
           } else if (event.type === 'message_delta') {
             const e = event as AnthropicMessageDelta;
             outputTokens += e.usage?.output_tokens ?? 0;
+            if (e.usage && typeof e.usage === 'object') {
+              rawUsage = { ...rawUsage, ...(e.usage as Record<string, unknown>) };
+            }
           } else if (event.type === 'content_block_delta') {
             const e = event as AnthropicContentBlockDelta;
             if (e.delta.type === 'thinking_delta') {
@@ -227,9 +254,12 @@ export class AnthropicProvider implements ILLMProvider {
     onChunk({ type: 'reasoning', delta: '', done: true });
 
     const usage: LLMUsage = {
-      input_tokens: inputTokens,
-      output_tokens: outputTokens,
-      total_tokens: inputTokens + outputTokens,
+      canonical: {
+        input_tokens: inputTokens,
+        output_tokens: outputTokens,
+        total_tokens: inputTokens + outputTokens,
+      },
+      raw: rawUsage,
     };
 
     return { ...this.parseAction(contentAccumulator), usage };
@@ -245,15 +275,19 @@ export class AnthropicProvider implements ILLMProvider {
 
   /**
    * Parse structured output JSON into LLMAction
-   * Requirements: llm-integration.3.3
+   * Requirements: llm-integration.3.3, llm-integration.9.8
    */
-  private parseAction(json: string): LLMAction {
+  private parseAction(json: string): LLMStructuredOutput {
     if (!json.trim()) {
       throw new Error('Empty response from LLM');
     }
     try {
-      const parsed = JSON.parse(json) as { action: { type: 'text'; content: string } };
-      return { type: parsed.action.type, content: parsed.action.content };
+      const parsedJson = JSON.parse(json) as unknown;
+      const parsed = safeParseStructuredOutput(parsedJson);
+      if (!parsed.success) {
+        throw new Error(parsed.error.message);
+      }
+      return parsed.data;
     } catch {
       throw new Error(`Failed to parse LLM response: ${json}`);
     }
@@ -292,5 +326,36 @@ export class AnthropicProvider implements ILLMProvider {
       return ERROR_MESSAGES.timeout;
     }
     return ERROR_MESSAGES.network;
+  }
+
+  private extractErrorMessage(errorData: unknown): string | null {
+    if (
+      typeof errorData === 'object' &&
+      errorData !== null &&
+      'error' in errorData &&
+      typeof (errorData as { error?: { message?: string } }).error === 'object' &&
+      (errorData as { error?: { message?: string } }).error !== null &&
+      'message' in (errorData as { error: { message?: string } }).error
+    ) {
+      const message = (errorData as { error: { message?: string } }).error.message;
+      return typeof message === 'string' && message.trim().length > 0 ? message : null;
+    }
+    return null;
+  }
+
+  private parseRetryAfterHeader(response: Response): number | null {
+    const headers = response.headers as Headers | undefined;
+    if (!headers || typeof headers.get !== 'function') {
+      return null;
+    }
+    const retryAfter = headers.get('retry-after');
+    if (!retryAfter) {
+      return null;
+    }
+    const parsed = Number(retryAfter);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      return null;
+    }
+    return Math.ceil(parsed);
   }
 }

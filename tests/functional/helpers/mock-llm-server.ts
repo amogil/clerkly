@@ -62,6 +62,15 @@ export class MockLLMServer {
 
     console.log(`[MOCK LLM] ${req.method} ${pathname}`);
 
+    if (pathname === '/mock-image.png') {
+      const pngBase64 =
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+o7m0AAAAASUVORK5CYII=';
+      const buffer = Buffer.from(pngBase64, 'base64');
+      res.writeHead(200, { 'Content-Type': 'image/png' });
+      res.end(buffer);
+      return;
+    }
+
     // CORS headers
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -97,7 +106,7 @@ export class MockLLMServer {
       this.logRequest(req.method || 'POST', pathname, req.headers, parsedBody);
 
       // Route to appropriate handler
-      if (pathname === '/v1/chat/completions') {
+      if (pathname === '/v1/responses') {
         this.handleOpenAI(res);
       } else if (pathname === '/v1/messages') {
         this.handleAnthropic(res);
@@ -187,9 +196,7 @@ export class MockLLMServer {
       if (this.streamingReasoning) {
         const words = this.streamingReasoning.split(' ');
         for (const word of words) {
-          sendChunk({
-            choices: [{ delta: { reasoning: word + ' ' }, finish_reason: null }],
-          });
+          sendChunk({ type: 'response.reasoning_text.delta', delta: word + ' ' });
           if (this.streamingChunkDelayMs > 0) {
             await delay(this.streamingChunkDelayMs);
           }
@@ -199,9 +206,7 @@ export class MockLLMServer {
       // Stream content chunks (structured output JSON split into pieces)
       const contentChunks = this.streamingContent.match(/.{1,20}/g) || [this.streamingContent];
       for (const chunk of contentChunks) {
-        sendChunk({
-          choices: [{ delta: { content: chunk }, finish_reason: null }],
-        });
+        sendChunk({ type: 'response.output_text.delta', delta: chunk });
         if (this.streamingChunkDelayMs > 0) {
           await delay(this.streamingChunkDelayMs);
         }
@@ -209,13 +214,15 @@ export class MockLLMServer {
 
       // Final chunk with usage
       sendChunk({
-        choices: [{ delta: {}, finish_reason: 'stop' }],
-        usage: {
-          prompt_tokens: 100,
-          completion_tokens: 50,
-          total_tokens: 150,
-          prompt_tokens_details: { cached_tokens: 0 },
-          completion_tokens_details: { reasoning_tokens: 10 },
+        type: 'response.completed',
+        response: {
+          usage: {
+            input_tokens: 100,
+            output_tokens: 50,
+            total_tokens: 150,
+            input_tokens_details: { cached_tokens: 0 },
+            output_tokens_details: { reasoning_tokens: 10 },
+          },
         },
       });
 

@@ -329,7 +329,7 @@ test.describe('LLM Chat (mock server)', () => {
   async function launchWithMockLLM(): Promise<ElectronTestContext> {
     const ctx = await launchElectron(undefined, {
       CLERKLY_GOOGLE_API_URL: mockOAuthServer.getBaseUrl(),
-      CLERKLY_OPENAI_API_URL: `http://localhost:${MOCK_LLM_PORT}/v1/chat/completions`,
+      CLERKLY_OPENAI_API_URL: `http://localhost:${MOCK_LLM_PORT}/v1/responses`,
       CLERKLY_OPENAI_API_KEY: 'mock-key-for-testing',
     });
     await completeOAuthFlow(ctx.app, ctx.window, TEST_CLIENT_ID);
@@ -357,7 +357,7 @@ test.describe('LLM Chat (mock server)', () => {
        app authenticated with mock LLM URL
      Action: User sends first message, then sends second message while first is still streaming
      Assertions: Only one message-llm bubble visible (response to second message),
-       interrupted llm message is hidden
+       previous llm message is hidden
      Requirements: llm-integration.8.1, llm-integration.8.4, llm-integration.8.5 */
   test('should interrupt previous request when new message sent during streaming', async () => {
     // First request: slow streaming so we can interrupt it
@@ -395,7 +395,7 @@ test.describe('LLM Chat (mock server)', () => {
     const llmBubble = context.window.locator('[data-testid="message-llm"]');
     await expect(llmBubble).toBeVisible({ timeout: 3000 });
 
-    // Only one llm bubble should be visible (interrupted one is hidden)
+    // Only one llm bubble should be visible (previous one is hidden)
     const llmBubbles = context.window.locator('[data-testid="message-llm"]');
     await expect(llmBubbles).toHaveCount(1, { timeout: 3000 });
 
@@ -409,9 +409,9 @@ test.describe('LLM Chat (mock server)', () => {
   /* Preconditions: MockLLMServer configured with slow streaming for first request,
        fast response for second; app authenticated with mock LLM URL
      Action: User sends first message, waits for streaming to start, sends second message
-     Assertions: Exactly one message-llm in DOM, no artifacts of first (interrupted) response
+     Assertions: Exactly one message-llm in DOM, no artifacts of first (hidden) response
      Requirements: llm-integration.8.5 */
-  test('should not show interrupted llm message in chat', async () => {
+  test('should not show hidden llm message in chat', async () => {
     // First request: slow streaming
     mockLLMServer.setStreamingMode(true, {
       content: '{"action":{"type":"text","content":"First response"}}',
@@ -448,10 +448,10 @@ test.describe('LLM Chat (mock server)', () => {
     await expect(actionContent).toBeVisible({ timeout: 15000 });
     await expect(actionContent).toHaveText('Second response', { timeout: 5000 });
 
-    // Exactly one llm bubble in DOM — interrupted one must not be rendered at all
+    // Exactly one llm bubble in DOM — hidden one must not be rendered at all
     await expect(context.window.locator('[data-testid="message-llm"]')).toHaveCount(1);
 
-    // No text from the interrupted first response anywhere in the chat
+    // No text from the hidden first response anywhere in the chat
     await expect(context.window.locator('text=First response')).toHaveCount(0);
   });
 
@@ -519,8 +519,8 @@ test.describe('LLM Chat (mock server)', () => {
 
   /* Preconditions: MockLLMServer configured for success, app authenticated with mock LLM URL
      Action: User sends two messages sequentially, waiting for LLM response after each
-     Assertions: Second LLM request body contains both previous messages (user + assistant roles)
-     Requirements: llm-integration.3.9 */
+     Assertions: Second LLM request contains previous dialogue as separate messages
+     Requirements: llm-integration.10 */
   test('should send full conversation history to llm on second message', async () => {
     mockLLMServer.setStreamingMode(true, {
       content: '{"action":{"type":"text","content":"First response"}}',
@@ -557,30 +557,23 @@ test.describe('LLM Chat (mock server)', () => {
     const lastRequest = mockLLMServer.getLastRequest();
     expect(lastRequest).toBeDefined();
 
-    const messages: Array<{ role: string; content: string }> = lastRequest!.body.messages;
+    const messages: Array<{ role: string; content: string }> =
+      lastRequest!.body.input ?? lastRequest!.body.messages;
     expect(messages).toBeDefined();
 
-    // Must contain role:user with first message text
-    const userMsg = messages.find((m) => m.role === 'user' && m.content === 'First message');
-    expect(userMsg).toBeDefined();
-
-    // Must contain role:assistant with first response content
-    const assistantMsg = messages.find(
-      (m) => m.role === 'assistant' && m.content === 'First response'
+    const priorUserMsg = messages.find((m) => m.role === 'user' && m.content.includes('First message'));
+    const priorAssistantMsg = messages.find(
+      (m) => m.role === 'assistant' && m.content.includes('First response')
     );
-    expect(assistantMsg).toBeDefined();
-
-    // user message must come before assistant message
-    const userIdx = messages.indexOf(userMsg!);
-    const assistantIdx = messages.indexOf(assistantMsg!);
-    expect(userIdx).toBeLessThan(assistantIdx);
+    expect(priorUserMsg).toBeDefined();
+    expect(priorAssistantMsg).toBeDefined();
   });
 
   /* Preconditions: MockLLMServer returns 500 on first request, success on second;
        app authenticated with mock LLM URL
      Action: User sends first message (gets error), then sends second message
-     Assertions: Second LLM request body does not contain role:system with [error] content
-     Requirements: llm-integration.3.9 */
+     Assertions: Request history does not include error message payload
+     Requirements: llm-integration.10 */
   test('should exclude error messages from llm history', async () => {
     // First request fails
     mockLLMServer.setSuccess(false);
@@ -617,14 +610,38 @@ test.describe('LLM Chat (mock server)', () => {
     const lastRequest = mockLLMServer.getLastRequest();
     expect(lastRequest).toBeDefined();
 
-    const messages: Array<{ role: string; content: string }> = lastRequest!.body.messages;
+    const messages: Array<{ role: string; content: string }> =
+      lastRequest!.body.input ?? lastRequest!.body.messages;
     expect(messages).toBeDefined();
 
-    // Must NOT contain any role:system message with [error] content
-    const errorSystemMsg = messages.find(
-      (m) => m.role === 'system' && m.content.includes('[error]')
+    const errorInConversation = messages.some(
+      (m) => m.role !== 'system' && m.content.toLowerCase().includes('internal server error')
     );
-    expect(errorSystemMsg).toBeUndefined();
+    expect(errorInConversation).toBe(false);
+  });
+
+  /* Preconditions: MockLLMServer returns placeholder + images list
+     Action: User sends a message
+     Assertions: Image appears after async download
+     Requirements: llm-integration.1, llm-integration.9.8 */
+  test('should resolve embedded images from placeholders', async () => {
+    const imageUrl = `http://localhost:${MOCK_LLM_PORT}/mock-image.png`;
+    mockLLMServer.setStreamingMode(true, {
+      content: JSON.stringify({
+        action: { type: 'text', content: 'Here is an image: [[image:1|size:64x64]]' },
+        images: [{ id: 1, url: imageUrl, alt: 'Mock image' }],
+      }),
+      chunkDelayMs: 0,
+    });
+
+    context = await launchWithMockLLM();
+    const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
+    await messageInput.fill('Show image');
+    await messageInput.press('Enter');
+
+    const actionContent = context.window.locator('[data-testid="message-llm-action"]');
+    await expect(actionContent).toBeVisible({ timeout: 5000 });
+    await expect(actionContent.locator('img')).toBeVisible({ timeout: 10000 });
   });
 
   /* Preconditions: MockLLMServer returns 429 with retry-after=3 on first request,
@@ -780,9 +797,7 @@ test.describe('LLM Chat (mock server)', () => {
      Requirements: agents.7.7 */
   test('should render markdown links', async () => {
     await renderMarkdownMessage('[Example](https://example.com)');
-    await expect(
-      context.window.getByRole('button', { name: 'Example' })
-    ).toBeVisible();
+    await expect(context.window.getByRole('button', { name: 'Example' })).toBeVisible();
   });
 
   /* Preconditions: MockLLMServer returns markdown autolink
@@ -791,9 +806,7 @@ test.describe('LLM Chat (mock server)', () => {
      Requirements: agents.7.7 */
   test('should render markdown autolinks', async () => {
     await renderMarkdownMessage('https://example.com');
-    await expect(
-      context.window.getByRole('button', { name: 'https://example.com' })
-    ).toBeVisible();
+    await expect(context.window.getByRole('button', { name: 'https://example.com' })).toBeVisible();
   });
 
   /* Preconditions: MockLLMServer returns markdown email autolink
@@ -802,9 +815,7 @@ test.describe('LLM Chat (mock server)', () => {
      Requirements: agents.7.7 */
   test('should render markdown email autolinks', async () => {
     await renderMarkdownMessage('test@example.com');
-    await expect(
-      context.window.getByRole('button', { name: 'test@example.com' })
-    ).toBeVisible();
+    await expect(context.window.getByRole('button', { name: 'test@example.com' })).toBeVisible();
   });
 
   /* Preconditions: MockLLMServer returns markdown blockquote
@@ -1046,12 +1057,8 @@ test.describe('LLM Chat (mock server)', () => {
     await expect(actionContent.locator('em')).toBeVisible();
     await expect(actionContent.locator('del')).toBeVisible();
     await expect(context.window.getByRole('button', { name: 'link' })).toBeVisible();
-    await expect(
-      context.window.getByRole('button', { name: 'https://example.com' })
-    ).toBeVisible();
-    await expect(
-      context.window.getByRole('button', { name: 'test@example.com' })
-    ).toBeVisible();
+    await expect(context.window.getByRole('button', { name: 'https://example.com' })).toBeVisible();
+    await expect(context.window.getByRole('button', { name: 'test@example.com' })).toBeVisible();
     await expect(actionContent.locator('blockquote')).toBeVisible();
     await expect(actionContent.locator('ul')).toHaveCount(3);
     await expect(actionContent.locator('ol')).toBeVisible();

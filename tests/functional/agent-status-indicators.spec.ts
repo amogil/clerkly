@@ -47,7 +47,7 @@ test.beforeEach(async () => {
     CLERKLY_GOOGLE_API_URL: mockServer.getBaseUrl(),
     CLERKLY_OAUTH_CLIENT_ID: 'test-client-id',
     CLERKLY_OAUTH_CLIENT_SECRET: 'test-client-secret',
-    CLERKLY_OPENAI_API_URL: `${mockLLMServer.getBaseUrl()}/v1/chat/completions`,
+    CLERKLY_OPENAI_API_URL: `${mockLLMServer.getBaseUrl()}/v1/responses`,
     CLERKLY_OPENAI_API_KEY: 'mock-key-for-testing',
   });
   electronApp = context.app;

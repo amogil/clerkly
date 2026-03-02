@@ -6,41 +6,32 @@ import {
   ChatMessage,
   ChatOptions,
   ChatChunk,
-  LLMAction,
+  LLMStructuredOutput,
   LLMUsage,
 } from './ILLMProvider';
 import { LLM_PROVIDERS, ERROR_MESSAGES, CHAT_TIMEOUT_MS } from './LLMConfig';
+import {
+  buildStructuredOutputInstruction,
+  getStructuredOutputJsonSchema,
+  safeParseStructuredOutput,
+} from './StructuredOutputContract';
 
-/**
- * OpenAI SSE event data shape
- */
-interface OpenAIStreamDelta {
-  reasoning?: string;
-  content?: string;
+interface OpenAIResponsesUsage {
+  input_tokens?: number;
+  output_tokens?: number;
+  total_tokens?: number;
+  input_tokens_details?: { cached_tokens?: number };
+  output_tokens_details?: { reasoning_tokens?: number };
 }
 
-interface OpenAIStreamChoice {
-  delta: OpenAIStreamDelta;
-  finish_reason?: string | null;
-}
-
-interface OpenAIStreamChunk {
-  choices: OpenAIStreamChoice[];
-  usage?: {
-    prompt_tokens?: number;
-    completion_tokens?: number;
-    total_tokens?: number;
-    prompt_tokens_details?: { cached_tokens?: number };
-    completion_tokens_details?: { reasoning_tokens?: number };
+interface OpenAIResponsesEvent {
+  type?: string;
+  delta?: string;
+  text?: string;
+  response?: {
+    usage?: OpenAIResponsesUsage;
   };
-}
-
-/**
- * OpenAI structured output action schema
- */
-interface OpenAIAction {
-  type: 'text';
-  content: string;
+  usage?: OpenAIResponsesUsage;
 }
 
 /**
@@ -70,17 +61,19 @@ export class OpenAIProvider implements ILLMProvider {
    */
   async testConnection(apiKey: string): Promise<TestConnectionResult> {
     try {
+      const testBody = {
+        model: this.config.testModel,
+        input: [{ role: 'user', content: 'test' }],
+        max_output_tokens: this.config.testMaxTokens,
+        text: { format: { type: 'json_object' } },
+      };
       const response = await fetch(this.config.apiUrl, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${apiKey}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          model: this.config.testModel,
-          messages: [{ role: 'user', content: 'test' }],
-          max_completion_tokens: this.config.testMaxTokens,
-        }),
+        body: JSON.stringify(testBody),
         signal: AbortSignal.timeout(this.config.testTimeoutMs),
       });
 
@@ -107,7 +100,16 @@ export class OpenAIProvider implements ILLMProvider {
     messages: ChatMessage[],
     options: ChatOptions,
     onChunk: (chunk: ChatChunk) => void
-  ): Promise<LLMAction> {
+  ): Promise<LLMStructuredOutput> {
+    const systemMessages = messages.filter((m) => m.role === 'system');
+    const conversationMessages = messages.filter((m) => m.role !== 'system');
+    const systemBase = systemMessages.map((m) => m.content).join('\n');
+    const structuredInstruction = buildStructuredOutputInstruction();
+    const mergedSystemPrompt = [systemBase, structuredInstruction].filter(Boolean).join('\n\n');
+    const requestMessages: ChatMessage[] = mergedSystemPrompt
+      ? [{ role: 'system', content: mergedSystemPrompt }, ...conversationMessages]
+      : conversationMessages;
+
     // Allow runtime override via env (used by functional tests with MockLLMServer)
     const apiUrl = process.env.CLERKLY_OPENAI_API_URL ?? this.config.apiUrl;
     const controller = new AbortController();
@@ -116,38 +118,18 @@ export class OpenAIProvider implements ILLMProvider {
     try {
       const body: Record<string, unknown> = {
         model: options.model,
-        messages,
+        input: requestMessages,
         stream: true,
-        stream_options: { include_usage: true },
-        // Structured output: action with type and content
-        response_format: {
-          type: 'json_schema',
-          json_schema: {
-            name: 'action',
+        text: {
+          format: {
+            type: 'json_schema',
             strict: true,
-            schema: {
-              type: 'object',
-              properties: {
-                action: {
-                  type: 'object',
-                  properties: {
-                    type: { type: 'string', enum: ['text'] },
-                    content: { type: 'string' },
-                  },
-                  required: ['type', 'content'],
-                  additionalProperties: false,
-                },
-              },
-              required: ['action'],
-              additionalProperties: false,
-            },
+            name: 'structured_output',
+            schema: getStructuredOutputJsonSchema(),
           },
         },
+        ...(options.reasoningEffort ? { reasoning: { effort: options.reasoningEffort } } : {}),
       };
-
-      if (options.reasoningEffort) {
-        body.reasoning_effort = options.reasoningEffort;
-      }
 
       const response = await fetch(apiUrl, {
         method: 'POST',
@@ -161,6 +143,10 @@ export class OpenAIProvider implements ILLMProvider {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
+        const retryAfterSeconds = this.parseRetryAfterHeader(response);
+        if (response.status === 429 && retryAfterSeconds !== null) {
+          throw new Error(`Rate limit exceeded. Please try again in ${retryAfterSeconds}s`);
+        }
         throw new Error(this.mapErrorToMessage(response.status, errorData));
       }
 
@@ -177,7 +163,7 @@ export class OpenAIProvider implements ILLMProvider {
   private async parseStream(
     response: Response,
     onChunk: (chunk: ChatChunk) => void
-  ): Promise<LLMAction> {
+  ): Promise<LLMStructuredOutput> {
     const reader = response.body?.getReader();
     if (!reader) {
       throw new Error('No response body');
@@ -206,31 +192,31 @@ export class OpenAIProvider implements ILLMProvider {
           const data = line.slice(6).trim();
           if (data === '[DONE]') continue;
 
-          let chunk: OpenAIStreamChunk;
+          let event: OpenAIResponsesEvent;
           try {
-            chunk = JSON.parse(data) as OpenAIStreamChunk;
+            event = JSON.parse(data) as OpenAIResponsesEvent;
           } catch {
             continue;
           }
 
-          // Capture usage from the final chunk
-          if (chunk.usage) {
-            usage = this.mapUsage(chunk.usage);
+          if (event.type === 'response.output_text.delta' && typeof event.delta === 'string') {
+            contentAccumulator += event.delta;
           }
 
-          const choice = chunk.choices?.[0];
-          if (!choice) continue;
-
-          const delta = choice.delta;
-
-          // Stream reasoning chunks
-          if (delta.reasoning) {
-            onChunk({ type: 'reasoning', delta: delta.reasoning, done: false });
+          if (
+            typeof event.type === 'string' &&
+            event.type.includes('reasoning') &&
+            typeof event.delta === 'string' &&
+            event.delta.length > 0
+          ) {
+            onChunk({ type: 'reasoning', delta: event.delta, done: false });
           }
 
-          // Accumulate content (structured output JSON)
-          if (delta.content) {
-            contentAccumulator += delta.content;
+          if (event.type === 'response.completed') {
+            const completedUsage = event.response?.usage ?? event.usage;
+            if (completedUsage) {
+              usage = this.mapResponsesUsage(completedUsage);
+            }
           }
         }
       }
@@ -242,38 +228,59 @@ export class OpenAIProvider implements ILLMProvider {
     onChunk({ type: 'reasoning', delta: '', done: true });
 
     // Parse structured output
-    const action = this.parseAction(contentAccumulator);
-    return { ...action, usage };
+    const output = this.parseAction(contentAccumulator);
+    return { ...output, usage };
   }
 
   /**
    * Parse structured output JSON into LLMAction
-   * Requirements: llm-integration.3.3
+   * Requirements: llm-integration.3.3, llm-integration.9.8
    */
-  private parseAction(json: string): LLMAction {
+  private parseAction(json: string): LLMStructuredOutput {
     if (!json.trim()) {
       throw new Error('Empty response from LLM');
     }
     try {
-      const parsed = JSON.parse(json) as { action: OpenAIAction };
-      return { type: parsed.action.type, content: parsed.action.content };
+      const parsedJson = JSON.parse(json) as unknown;
+      const parsed = safeParseStructuredOutput(parsedJson);
+      if (!parsed.success) {
+        throw new Error(parsed.error.message);
+      }
+      return parsed.data;
     } catch {
       throw new Error(`Failed to parse LLM response: ${json}`);
     }
   }
 
-  /**
-   * Map OpenAI usage object to LLMUsage
-   * Requirements: llm-integration.3.3
-   */
-  private mapUsage(raw: OpenAIStreamChunk['usage']): LLMUsage {
-    return {
-      input_tokens: raw?.prompt_tokens ?? 0,
-      output_tokens: raw?.completion_tokens ?? 0,
-      total_tokens: raw?.total_tokens ?? 0,
-      cached_tokens: raw?.prompt_tokens_details?.cached_tokens,
-      reasoning_tokens: raw?.completion_tokens_details?.reasoning_tokens,
+  private mapResponsesUsage(raw: OpenAIResponsesUsage): LLMUsage {
+    const canonical = {
+      input_tokens: raw.input_tokens ?? 0,
+      output_tokens: raw.output_tokens ?? 0,
+      total_tokens: raw.total_tokens ?? 0,
+      cached_tokens: raw.input_tokens_details?.cached_tokens,
+      reasoning_tokens: raw.output_tokens_details?.reasoning_tokens,
     };
+
+    return {
+      canonical,
+      raw: raw as Record<string, unknown>,
+    };
+  }
+
+  private parseRetryAfterHeader(response: Response): number | null {
+    const headers = response.headers as Headers | undefined;
+    if (!headers || typeof headers.get !== 'function') {
+      return null;
+    }
+    const retryAfter = headers.get('retry-after');
+    if (!retryAfter) {
+      return null;
+    }
+    const parsed = Number(retryAfter);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      return null;
+    }
+    return Math.ceil(parsed);
   }
 
   /**

@@ -26,7 +26,7 @@ export const LLM_PROVIDERS: Record<LLMProvider, LLMProviderConfig> = {
   openai: {
     id: 'openai',
     name: 'OpenAI',
-    apiUrl: process.env.CLERKLY_OPENAI_API_URL || 'https://api.openai.com/v1/chat/completions',
+    apiUrl: process.env.CLERKLY_OPENAI_API_URL || 'https://api.openai.com/v1/responses',
     testModel: 'gpt-5-nano',
     testMaxTokens: 5,
     testTimeoutMs: 10_000,

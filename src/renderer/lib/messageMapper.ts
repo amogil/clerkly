@@ -5,7 +5,7 @@ import type { MessageSnapshot } from '../../shared/events/types';
 
 /**
  * Convert a single MessageSnapshot to UIMessage for AI SDK useChat.
- * Returns null for hidden messages (dismissed errors, interrupted llm).
+ * Returns null for hidden messages (hidden errors, cancelled llm).
  *
  * Mapping rules:
  * - kind: 'user'  → role: 'user',      parts: [{ type: 'text', text }]
@@ -16,7 +16,7 @@ import type { MessageSnapshot } from '../../shared/events/types';
  * Requirements: agents.7.3, llm-integration.3.4, llm-integration.3.8, llm-integration.8.5
  */
 export function toUIMessage(msg: MessageSnapshot): UIMessage | null {
-  // Filter hidden messages (dismissed errors, interrupted llm)
+  // Filter hidden messages (hidden errors, cancelled llm)
   if (msg.hidden) return null;
 
   const data = (msg.payload.data ?? {}) as Record<string, unknown>;

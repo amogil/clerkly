@@ -886,6 +886,7 @@ describe('DatabaseManager Repository Accessors', () => {
           agent_id TEXT NOT NULL,
           timestamp TEXT NOT NULL,
           payload_json TEXT NOT NULL,
+          usage_json TEXT,
           kind TEXT NOT NULL DEFAULT 'user',
           hidden INTEGER NOT NULL DEFAULT 0
         );

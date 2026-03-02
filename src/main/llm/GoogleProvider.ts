@@ -6,10 +6,15 @@ import {
   ChatMessage,
   ChatOptions,
   ChatChunk,
-  LLMAction,
+  LLMStructuredOutput,
   LLMUsage,
 } from './ILLMProvider';
 import { LLM_PROVIDERS, ERROR_MESSAGES, CHAT_TIMEOUT_MS } from './LLMConfig';
+import {
+  buildStructuredOutputInstruction,
+  getStructuredOutputJsonSchema,
+  safeParseStructuredOutput,
+} from './StructuredOutputContract';
 
 // ─── Google Gemini SSE event shapes ──────────────────────────────────────────
 
@@ -90,7 +95,7 @@ export class GoogleProvider implements ILLMProvider {
     messages: ChatMessage[],
     options: ChatOptions,
     onChunk: (chunk: ChatChunk) => void
-  ): Promise<LLMAction> {
+  ): Promise<LLMStructuredOutput> {
     // Build streaming URL: replace generateContent with streamGenerateContent
     const baseApiUrl = process.env.CLERKLY_GOOGLE_LLM_API_URL ?? this.config.apiUrl;
     const streamUrl =
@@ -106,9 +111,8 @@ export class GoogleProvider implements ILLMProvider {
       const conversationMessages = messages.filter((m) => m.role !== 'system');
 
       const systemBase = systemMessages.map((m) => m.content).join('\n');
-      const systemInstruction =
-        (systemBase ? systemBase + '\n\n' : '') +
-        'Always respond with valid JSON in this exact format: {"action":{"type":"text","content":"<your response here>"}}';
+      const structuredInstruction = buildStructuredOutputInstruction();
+      const systemInstruction = (systemBase ? systemBase + '\n\n' : '') + structuredInstruction;
 
       // Map to Gemini contents format
       const contents = conversationMessages.map((m) => ({
@@ -121,6 +125,7 @@ export class GoogleProvider implements ILLMProvider {
         contents,
         generationConfig: {
           responseMimeType: 'application/json',
+          responseSchema: getStructuredOutputJsonSchema(),
         },
       };
 
@@ -142,6 +147,16 @@ export class GoogleProvider implements ILLMProvider {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
+        const retryAfterSeconds = this.parseRetryAfterHeader(response);
+        if (response.status === 429 && retryAfterSeconds !== null) {
+          throw new Error(`Rate limit exceeded. Please try again in ${retryAfterSeconds}s`);
+        }
+        if (response.status === 429) {
+          const providerMessage = this.extractErrorMessage(errorData);
+          if (providerMessage) {
+            throw new Error(providerMessage);
+          }
+        }
         throw new Error(this.mapErrorToMessage(response.status, errorData));
       }
 
@@ -158,7 +173,7 @@ export class GoogleProvider implements ILLMProvider {
   private async parseStream(
     response: Response,
     onChunk: (chunk: ChatChunk) => void
-  ): Promise<LLMAction> {
+  ): Promise<LLMStructuredOutput> {
     const reader = response.body?.getReader();
     if (!reader) {
       throw new Error('No response body');
@@ -196,9 +211,12 @@ export class GoogleProvider implements ILLMProvider {
 
           if (chunk.usageMetadata) {
             usage = {
-              input_tokens: chunk.usageMetadata.promptTokenCount ?? 0,
-              output_tokens: chunk.usageMetadata.candidatesTokenCount ?? 0,
-              total_tokens: chunk.usageMetadata.totalTokenCount ?? 0,
+              canonical: {
+                input_tokens: chunk.usageMetadata.promptTokenCount ?? 0,
+                output_tokens: chunk.usageMetadata.candidatesTokenCount ?? 0,
+                total_tokens: chunk.usageMetadata.totalTokenCount ?? 0,
+              },
+              raw: chunk.usageMetadata as Record<string, unknown>,
             };
           }
 
@@ -231,15 +249,19 @@ export class GoogleProvider implements ILLMProvider {
 
   /**
    * Parse structured output JSON into LLMAction
-   * Requirements: llm-integration.3.3
+   * Requirements: llm-integration.3.3, llm-integration.9.8
    */
-  private parseAction(json: string): LLMAction {
+  private parseAction(json: string): LLMStructuredOutput {
     if (!json.trim()) {
       throw new Error('Empty response from LLM');
     }
     try {
-      const parsed = JSON.parse(json) as { action: { type: 'text'; content: string } };
-      return { type: parsed.action.type, content: parsed.action.content };
+      const parsedJson = JSON.parse(json) as unknown;
+      const parsed = safeParseStructuredOutput(parsedJson);
+      if (!parsed.success) {
+        throw new Error(parsed.error.message);
+      }
+      return parsed.data;
     } catch {
       throw new Error(`Failed to parse LLM response: ${json}`);
     }
@@ -278,5 +300,36 @@ export class GoogleProvider implements ILLMProvider {
       return ERROR_MESSAGES.timeout;
     }
     return ERROR_MESSAGES.network;
+  }
+
+  private extractErrorMessage(errorData: unknown): string | null {
+    if (
+      typeof errorData === 'object' &&
+      errorData !== null &&
+      'error' in errorData &&
+      typeof (errorData as { error?: { message?: string } }).error === 'object' &&
+      (errorData as { error?: { message?: string } }).error !== null &&
+      'message' in (errorData as { error: { message?: string } }).error
+    ) {
+      const message = (errorData as { error: { message?: string } }).error.message;
+      return typeof message === 'string' && message.trim().length > 0 ? message : null;
+    }
+    return null;
+  }
+
+  private parseRetryAfterHeader(response: Response): number | null {
+    const headers = response.headers as Headers | undefined;
+    if (!headers || typeof headers.get !== 'function') {
+      return null;
+    }
+    const retryAfter = headers.get('retry-after');
+    if (!retryAfter) {
+      return null;
+    }
+    const parsed = Number(retryAfter);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      return null;
+    }
+    return Math.ceil(parsed);
   }
 }

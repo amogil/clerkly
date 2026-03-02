@@ -122,7 +122,7 @@ export class IPCChatTransport implements ChatTransport<UIMessage> {
             if (msg.agentId !== agentId) return;
             if (msg.id !== llmMessageId) return;
 
-            // Hidden = interrupted, close stream without content
+            // Hidden = cancelled previous response, close stream without content
             if (msg.hidden) {
               finish();
               return;

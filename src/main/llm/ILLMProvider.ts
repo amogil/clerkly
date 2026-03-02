@@ -48,15 +48,35 @@ export interface ChatChunk {
 }
 
 /**
- * Token usage statistics
- * Requirements: llm-integration.3.3
+ * Canonical token usage statistics
+ * Requirements: llm-integration.3.3, llm-integration.13
  */
-export interface LLMUsage {
+export interface LLMUsageCanonical {
   input_tokens: number;
   output_tokens: number;
   total_tokens: number;
   cached_tokens?: number;
   reasoning_tokens?: number;
+}
+
+/**
+ * Usage envelope with normalized and raw provider usage.
+ * Requirements: llm-integration.13
+ */
+export interface LLMUsage {
+  canonical: LLMUsageCanonical;
+  raw: Record<string, unknown>;
+}
+
+/**
+ * Image descriptor returned by the LLM
+ * Requirements: llm-integration.1
+ */
+export interface LLMImageDescriptor {
+  id: number;
+  url: string;
+  alt?: string;
+  link?: string;
 }
 
 /**
@@ -66,6 +86,15 @@ export interface LLMUsage {
 export interface LLMAction {
   type: 'text';
   content: string;
+}
+
+/**
+ * Structured output returned by the LLM
+ * Requirements: llm-integration.1
+ */
+export interface LLMStructuredOutput {
+  action: LLMAction;
+  images?: LLMImageDescriptor[];
   usage?: LLMUsage;
 }
 
@@ -88,13 +117,13 @@ export interface ILLMProvider {
    * @param messages - Chat history
    * @param options - Model and request options
    * @param onChunk - Callback for streaming reasoning chunks
-   * @returns Final LLMAction with content and usage
+   * @returns Final structured output with content and usage
    */
   chat(
     messages: ChatMessage[],
     options: ChatOptions,
     onChunk: (chunk: ChatChunk) => void
-  ): Promise<LLMAction>;
+  ): Promise<LLMStructuredOutput>;
 
   /**
    * Get the name of this provider

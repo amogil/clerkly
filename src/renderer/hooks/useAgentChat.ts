@@ -47,7 +47,7 @@ export interface UseAgentChatResult {
  * Responsibilities:
  * - Loads all messages on mount via messages:list
  * - Keeps rawMessages in sync with UIMessage[] for metadata access
- * - Handles MESSAGE_UPDATED hidden=true (cancel retry, interrupted llm)
+ * - Handles MESSAGE_UPDATED hidden=true (cancel retry, cancelled llm)
  * - Delegates streaming to IPCChatTransport + useChat
  *
  * Requirements: agents.4, agents.13, llm-integration.2, llm-integration.8
