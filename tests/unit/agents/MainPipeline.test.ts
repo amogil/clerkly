@@ -13,7 +13,7 @@ import type {
   ChatMessage,
   ChatOptions,
   ChatChunk,
-  LLMAction,
+  LLMStructuredOutput,
 } from '../../../src/main/llm/ILLMProvider';
 import type { Message } from '../../../src/main/db/schema';
 import { LLM_CHAT_MODELS } from '../../../src/main/llm/LLMConfig';
@@ -46,6 +46,7 @@ function makeMessage(id: number, kind: string = 'user'): Message {
     kind,
     timestamp: new Date().toISOString(),
     payloadJson: JSON.stringify({ data: { text: 'Hello' } }),
+    usageJson: null,
     replyToMessageId: null,
     hidden: false,
   };
@@ -61,6 +62,7 @@ function makeMocks() {
 
   const messageManager = {
     list: jest.fn().mockReturnValue([userMsg]),
+    listForModelHistory: jest.fn().mockReturnValue([userMsg]),
     getLastMessage: jest.fn().mockReturnValue(userMsg),
     create: jest.fn().mockImplementation((_agentId: string, kind: string) => {
       if (kind === 'llm') return llmMsg;
@@ -69,6 +71,7 @@ function makeMocks() {
     }),
     update: jest.fn(),
     setHidden: jest.fn(),
+    setUsage: jest.fn(),
     toEventMessage: jest.fn().mockReturnValue({
       id: 1,
       agentId: 'agent-1',
@@ -96,7 +99,18 @@ function makeMocks() {
 
   const createProvider = jest.fn().mockReturnValue(llmProvider);
 
-  const pipeline = new MainPipeline(messageManager, settingsManager, promptBuilder, createProvider);
+  const imageStorageManager = {
+    downloadAndStore: jest.fn(),
+    markMissingDescriptor: jest.fn(),
+  };
+
+  const pipeline = new MainPipeline(
+    messageManager,
+    settingsManager,
+    promptBuilder,
+    imageStorageManager as any,
+    createProvider
+  );
 
   return {
     pipeline,
@@ -127,7 +141,10 @@ describe('MainPipeline.run()', () => {
       llmProvider.chat.mockImplementation(
         async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
           onChunk({ type: 'reasoning', delta: '', done: true });
-          return { type: 'text', content: 'Hello back!' } as LLMAction;
+          return {
+            action: { type: 'text', content: 'Hello back!' },
+            images: [],
+          } as LLMStructuredOutput;
         }
       );
 
@@ -146,6 +163,39 @@ describe('MainPipeline.run()', () => {
     });
   });
 
+  describe('usage_json persistence', () => {
+    /* Preconditions: Provider returns usage envelope in successful response
+       Action: Call run(agentId, userMessageId)
+       Assertions: usage is persisted via dedicated MessageManager.setUsage step
+       Requirements: llm-integration.13 */
+    it('should persist usage envelope as separate step after llm finalization', async () => {
+      const { pipeline, llmProvider, messageManager } = makeMocks();
+
+      llmProvider.chat.mockImplementation(
+        async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+          onChunk({ type: 'reasoning', delta: '', done: true });
+          return {
+            action: { type: 'text', content: 'with usage' },
+            usage: {
+              canonical: { input_tokens: 12, output_tokens: 4, total_tokens: 16 },
+              raw: { prompt_tokens: 12, completion_tokens: 4, total_tokens: 16 },
+            },
+          } as LLMStructuredOutput;
+        }
+      );
+
+      await pipeline.run('agent-1', 1);
+
+      expect(messageManager.setUsage).toHaveBeenCalledWith(
+        2,
+        'agent-1',
+        expect.objectContaining({
+          canonical: { input_tokens: 12, output_tokens: 4, total_tokens: 16 },
+        })
+      );
+    });
+  });
+
   describe('successful cycle with reasoning', () => {
     /* Preconditions: LLM streams reasoning chunks then returns action
        Action: Call run(agentId, userMessageId)
@@ -159,7 +209,10 @@ describe('MainPipeline.run()', () => {
           onChunk({ type: 'reasoning', delta: 'Let me think', done: false });
           onChunk({ type: 'reasoning', delta: ' more', done: false });
           onChunk({ type: 'reasoning', delta: '', done: true });
-          return { type: 'text', content: 'Answer' } as LLMAction;
+          return {
+            action: { type: 'text', content: 'Answer' },
+            images: [],
+          } as LLMStructuredOutput;
         }
       );
 
@@ -198,7 +251,7 @@ describe('MainPipeline.run()', () => {
   describe('error before first chunk', () => {
     /* Preconditions: LLM throws before any chunks
        Action: Call run(agentId, userMessageId)
-       Assertions: No llm message created; kind:error message created; no interrupted flag
+       Assertions: No llm message created; kind:error message created; no hidden llm message
        Requirements: llm-integration.5.3 */
     it('should create only error message when LLM fails before streaming', async () => {
       const { pipeline, messageManager, llmProvider } = makeMocks();
@@ -232,7 +285,7 @@ describe('MainPipeline.run()', () => {
        Action: Call run(agentId, userMessageId)
        Assertions: llm message hidden via setHidden; kind:error message created
        Requirements: llm-integration.5.3 */
-    it('should mark llm message interrupted and create error message', async () => {
+    it('should hide llm message and create error message', async () => {
       const { pipeline, messageManager, llmProvider } = makeMocks();
 
       llmProvider.chat.mockImplementation(
@@ -249,6 +302,51 @@ describe('MainPipeline.run()', () => {
 
       // error message created
       expect(messageManager.create).toHaveBeenCalledWith('agent-1', 'error', expect.any(Object), 1);
+    });
+  });
+
+  describe('invalid structured output retries', () => {
+    /* Preconditions: LLM keeps returning invalid placeholders in action.content
+       Action: Call run(agentId, userMessageId)
+       Assertions: Pipeline performs initial call + 2 retries, then creates provider error
+       Requirements: llm-integration.12.1, llm-integration.12.2 */
+    it('should retry invalid structured output twice and then create error', async () => {
+      const { pipeline, messageManager, llmProvider } = makeMocks();
+
+      llmProvider.chat.mockImplementation(
+        async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+          onChunk({ type: 'reasoning', delta: '', done: true });
+          return {
+            action: { type: 'text', content: 'Bad placeholder [[image:abc]]' },
+            images: [],
+          } as LLMStructuredOutput;
+        }
+      );
+
+      await pipeline.run('agent-1', 1);
+
+      expect(llmProvider.chat).toHaveBeenCalledTimes(3);
+      const secondAttemptMessages = (llmProvider.chat as jest.Mock).mock.calls[1][0] as ChatMessage[];
+      const thirdAttemptMessages = (llmProvider.chat as jest.Mock).mock.calls[2][0] as ChatMessage[];
+      expect(secondAttemptMessages.some((m) => m.content.includes('did not match the required JSON schema'))).toBe(
+        true
+      );
+      expect(thirdAttemptMessages.some((m) => m.content.includes('did not match the required JSON schema'))).toBe(
+        true
+      );
+      expect(messageManager.create).toHaveBeenCalledWith(
+        'agent-1',
+        'error',
+        expect.objectContaining({
+          data: {
+            error: {
+              type: 'provider',
+              message: 'Invalid response format. Please try again later.',
+            },
+          },
+        }),
+        1
+      );
     });
   });
 
@@ -293,7 +391,10 @@ describe('MainPipeline.run()', () => {
       llmProvider.chat.mockImplementation(
         async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
           onChunk({ type: 'reasoning', delta: '', done: true });
-          return { type: 'text', content: 'OK' } as LLMAction;
+          return {
+            action: { type: 'text', content: 'OK' },
+            images: [],
+          } as LLMStructuredOutput;
         }
       );
 
@@ -320,11 +421,31 @@ describe('MainPipeline.run()', () => {
         'error',
         expect.objectContaining({
           data: expect.objectContaining({
-            error: expect.objectContaining({ type: 'auth' }),
+            error: expect.objectContaining({
+              type: 'auth',
+              message: 'API key is not set. Add it in Settings to continue.',
+            }),
           }),
         }),
         1
       );
+    });
+  });
+
+  describe('AbortSignal cancellation before API key validation', () => {
+    /* Preconditions: Signal is aborted before context build and API key is missing
+       Action: Call run() with pre-aborted signal
+       Assertions: Pipeline exits silently without creating auth error message
+       Requirements: llm-integration.8.7 */
+    it('should not create auth error when aborted before API key check', async () => {
+      const { pipeline, messageManager, settingsManager } = makeMocks();
+      const controller = new AbortController();
+      controller.abort();
+      (settingsManager.loadAPIKey as jest.Mock).mockResolvedValue(null);
+
+      await pipeline.run('agent-1', 1, controller.signal);
+
+      expect(messageManager.create).not.toHaveBeenCalled();
     });
   });
 
@@ -351,7 +472,7 @@ describe('MainPipeline.run()', () => {
        Action: Call run() with signal aborted mid-stream
        Assertions: llm message hidden via setHidden; no error message created
        Requirements: llm-integration.5.4 */
-    it('should mark llm message interrupted when aborted after streaming', async () => {
+    it('should hide llm message when aborted after streaming', async () => {
       const { pipeline, messageManager, llmProvider } = makeMocks();
       const controller = new AbortController();
 
@@ -361,7 +482,10 @@ describe('MainPipeline.run()', () => {
           // Abort after first chunk
           controller.abort();
           onChunk({ type: 'reasoning', delta: '', done: true });
-          return { type: 'text', content: 'Answer' } as LLMAction;
+          return {
+            action: { type: 'text', content: 'Answer' },
+            images: [],
+          } as LLMStructuredOutput;
         }
       );
 
@@ -464,7 +588,10 @@ describe('MainPipeline.run()', () => {
       llmProvider.chat.mockImplementation(
         async (_msgs: ChatMessage[], opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
           onChunk({ type: 'reasoning', delta: '', done: true });
-          return { type: 'text', content: 'Claude answer' } as LLMAction;
+          return {
+            action: { type: 'text', content: 'Claude answer' },
+            images: [],
+          } as LLMStructuredOutput;
         }
       );
 
@@ -487,7 +614,10 @@ describe('MainPipeline.run()', () => {
       llmProvider.chat.mockImplementation(
         async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
           onChunk({ type: 'reasoning', delta: '', done: true });
-          return { type: 'text', content: 'Gemini answer' } as LLMAction;
+          return {
+            action: { type: 'text', content: 'Gemini answer' },
+            images: [],
+          } as LLMStructuredOutput;
         }
       );
 
@@ -509,7 +639,7 @@ describe('MainPipeline.run()', () => {
        Action: Call run() where abort happens during error handling
        Assertions: llm message hidden via setHidden; no error message
        Requirements: llm-integration.5.4 */
-    it('should mark interrupted and skip error message when aborted in catch', async () => {
+    it('should hide llm message and skip error message when aborted in catch', async () => {
       const { pipeline, messageManager, llmProvider } = makeMocks();
       const controller = new AbortController();
 
@@ -548,7 +678,10 @@ describe('MainPipeline.run()', () => {
           callCount++;
           const content = callCount === 1 ? 'Response for agent-1' : 'Response for agent-2';
           onChunk({ type: 'reasoning', delta: '', done: true });
-          return { type: 'text', content } as LLMAction;
+          return {
+            action: { type: 'text', content },
+            images: [],
+          } as LLMStructuredOutput;
         }
       );
 

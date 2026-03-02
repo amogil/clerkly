@@ -58,8 +58,8 @@ describe('GoogleProvider.chat()', () => {
       const chunks: ChatChunk[] = [];
       const result = await provider.chat(mockMessages, mockOptions, (c) => chunks.push(c));
 
-      expect(result.type).toBe('text');
-      expect(result.content).toBe('Hello back!');
+      expect(result.action.type).toBe('text');
+      expect(result.action.content).toBe('Hello back!');
       expect(chunks).toHaveLength(1);
       expect(chunks[0]).toEqual({ type: 'reasoning', delta: '', done: true });
     });
@@ -93,7 +93,7 @@ describe('GoogleProvider.chat()', () => {
         (c) => chunks.push(c)
       );
 
-      expect(result.content).toBe('Answer');
+      expect(result.action.content).toBe('Answer');
 
       const reasoningChunks = chunks.filter((c) => !c.done);
       expect(reasoningChunks).toHaveLength(2);
@@ -123,9 +123,16 @@ describe('GoogleProvider.chat()', () => {
       const result = await provider.chat(mockMessages, mockOptions, () => {});
 
       expect(result.usage).toEqual({
-        input_tokens: 10,
-        output_tokens: 20,
-        total_tokens: 30,
+        canonical: {
+          input_tokens: 10,
+          output_tokens: 20,
+          total_tokens: 30,
+        },
+        raw: {
+          promptTokenCount: 10,
+          candidatesTokenCount: 20,
+          totalTokenCount: 30,
+        },
       });
     });
   });
@@ -157,11 +164,46 @@ describe('GoogleProvider.chat()', () => {
       fetchMock.mockResolvedValue({
         ok: false,
         status: 429,
+        headers: { get: () => null },
         json: async () => ({}),
       });
 
       await expect(provider.chat(mockMessages, mockOptions, () => {})).rejects.toThrow(
         /Rate limit/
+      );
+    });
+
+    /* Preconditions: Google returns 429 with retry-after header
+       Action: Call chat()
+       Assertions: Error message uses retry-after seconds from header
+       Requirements: llm-integration.3.7.6 */
+    it('should prioritize retry-after header when present', async () => {
+      fetchMock.mockResolvedValue({
+        ok: false,
+        status: 429,
+        headers: { get: (name: string) => (name === 'retry-after' ? '9' : null) },
+        json: async () => ({ error: { message: 'Rate limited' } }),
+      });
+
+      await expect(provider.chat(mockMessages, mockOptions, () => {})).rejects.toThrow(
+        /try again in 9s/i
+      );
+    });
+
+    /* Preconditions: Google returns 429 without retry-after but with provider message
+       Action: Call chat()
+       Assertions: Provider message is preserved for retry-after parsing upstream
+       Requirements: llm-integration.3.7.6 */
+    it('should keep provider 429 message when header is absent', async () => {
+      fetchMock.mockResolvedValue({
+        ok: false,
+        status: 429,
+        headers: { get: () => null },
+        json: async () => ({ error: { message: 'Rate limit. Please try again in 8.2s' } }),
+      });
+
+      await expect(provider.chat(mockMessages, mockOptions, () => {})).rejects.toThrow(
+        /8\.2s/
       );
     });
   });
@@ -229,7 +271,7 @@ describe('GoogleProvider.chat()', () => {
       fetchMock.mockResolvedValue({ ok: true, body: { getReader: () => reader } });
 
       const result = await provider.chat(mockMessages, mockOptions, () => {});
-      expect(result.content).toBe('Full answer');
+      expect(result.action.content).toBe('Full answer');
     });
   });
 
@@ -251,6 +293,37 @@ describe('GoogleProvider.chat()', () => {
       expect(calledUrl).toContain('streamGenerateContent');
       expect(calledUrl).toContain('alt=sse');
       expect(calledUrl).toContain('key=test-api-key');
+    });
+  });
+
+  describe('structured output contract in request', () => {
+    /* Preconditions: Google provider receives chat request
+       Action: Call chat() and inspect outgoing request body
+       Assertions: Request includes centralized responseSchema and semantic instruction
+       Requirements: llm-integration.11 */
+    it('should include centralized structured output schema and instruction', async () => {
+      const actionJson = JSON.stringify({ action: { type: 'text', content: 'OK' } });
+      const reader = buildMockReader([
+        sseChunk({ candidates: [{ content: { parts: [{ text: actionJson }] } }] }),
+      ]);
+      fetchMock.mockResolvedValue({ ok: true, body: { getReader: () => reader } });
+
+      await provider.chat(
+        [
+          { role: 'system', content: 'Base system prompt' },
+          { role: 'user', content: 'Hello' },
+        ],
+        mockOptions,
+        () => {}
+      );
+
+      const callBody = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string) as {
+        system_instruction?: { parts?: Array<{ text?: string }> };
+        generationConfig?: { responseSchema?: Record<string, unknown> };
+      };
+      const systemText = callBody.system_instruction?.parts?.[0]?.text ?? '';
+      expect(systemText).toContain('Field semantics and formats:');
+      expect(callBody.generationConfig?.responseSchema).toBeDefined();
     });
   });
 });

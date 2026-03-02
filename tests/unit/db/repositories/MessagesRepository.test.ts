@@ -35,6 +35,7 @@ describe('MessagesRepository', () => {
         timestamp TEXT NOT NULL,
         reply_to_message_id INTEGER,
         payload_json TEXT NOT NULL,
+        usage_json TEXT,
         hidden INTEGER NOT NULL DEFAULT 0
       );
     `);
@@ -292,9 +293,9 @@ describe('MessagesRepository', () => {
     });
   });
 
-  describe('dismissErrorMessages', () => {
+  describe('hideErrorMessages', () => {
     /* Preconditions: Agent with kind:error messages (some visible, some already hidden)
-       Action: Call dismissErrorMessages(agentId)
+       Action: Call hideErrorMessages(agentId)
        Assertions: Returns only the records that were actually changed (were visible before),
                    already-hidden errors are not returned, user messages are not touched
        Requirements: llm-integration.3.8 */
@@ -323,7 +324,7 @@ describe('MessagesRepository', () => {
       // Pre-hide errMsg2 so it should NOT appear in the returned array
       repo.setHidden(errMsg2.id, agent.agentId);
 
-      const changed = repo.dismissErrorMessages(agent.agentId);
+      const changed = repo.hideErrorMessages(agent.agentId);
 
       // Only errMsg1 was visible — only it should be returned
       expect(changed).toHaveLength(1);
@@ -341,7 +342,7 @@ describe('MessagesRepository', () => {
     });
 
     /* Preconditions: Agent with no kind:error messages
-       Action: Call dismissErrorMessages(agentId)
+       Action: Call hideErrorMessages(agentId)
        Assertions: Returns empty array, no error thrown
        Requirements: llm-integration.3.8 */
     it('should return empty array when no visible error messages exist', () => {
@@ -350,7 +351,7 @@ describe('MessagesRepository', () => {
 
       repo.create(agent.agentId, 'user', JSON.stringify({ data: { text: 'Hello' } }), null);
 
-      const changed = repo.dismissErrorMessages(agent.agentId);
+      const changed = repo.hideErrorMessages(agent.agentId);
       expect(changed).toEqual([]);
     });
 
@@ -369,6 +370,26 @@ describe('MessagesRepository', () => {
 
       const updated = repo.getById(msg.id, agent.agentId)!;
       expect(updated.hidden).toBe(true);
+    });
+  });
+
+  describe('updateUsageJson', () => {
+    /* Preconditions: Existing llm message for owned agent
+       Action: Call updateUsageJson(messageId, agentId, usageJson)
+       Assertions: usage_json is persisted for that message
+       Requirements: llm-integration.13 */
+    it('should persist usage_json for a message', () => {
+      const agent = agentsRepo.create('Test');
+      const message = messagesRepo.create(agent.agentId, 'llm', '{"data":{}}', null);
+      const usageJson = JSON.stringify({
+        canonical: { input_tokens: 10, output_tokens: 5, total_tokens: 15 },
+        raw: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 },
+      });
+
+      messagesRepo.updateUsageJson(message.id, agent.agentId, usageJson);
+
+      const updated = messagesRepo.getById(message.id, agent.agentId);
+      expect(updated?.usageJson).toBe(usageJson);
     });
   });
 

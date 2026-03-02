@@ -62,8 +62,8 @@ describe('AnthropicProvider.chat()', () => {
       const chunks: ChatChunk[] = [];
       const result = await provider.chat(mockMessages, mockOptions, (c) => chunks.push(c));
 
-      expect(result.type).toBe('text');
-      expect(result.content).toBe('Hello back!');
+      expect(result.action.type).toBe('text');
+      expect(result.action.content).toBe('Hello back!');
       expect(chunks).toHaveLength(1);
       expect(chunks[0]).toEqual({ type: 'reasoning', delta: '', done: true });
     });
@@ -104,7 +104,7 @@ describe('AnthropicProvider.chat()', () => {
         (c) => chunks.push(c)
       );
 
-      expect(result.content).toBe('Answer');
+      expect(result.action.content).toBe('Answer');
 
       const reasoningChunks = chunks.filter((c) => !c.done);
       expect(reasoningChunks).toHaveLength(2);
@@ -137,9 +137,15 @@ describe('AnthropicProvider.chat()', () => {
       const result = await provider.chat(mockMessages, mockOptions, () => {});
 
       expect(result.usage).toEqual({
-        input_tokens: 10,
-        output_tokens: 20,
-        total_tokens: 30,
+        canonical: {
+          input_tokens: 10,
+          output_tokens: 20,
+          total_tokens: 30,
+        },
+        raw: {
+          input_tokens: 10,
+          output_tokens: 20,
+        },
       });
     });
   });
@@ -171,11 +177,46 @@ describe('AnthropicProvider.chat()', () => {
       fetchMock.mockResolvedValue({
         ok: false,
         status: 429,
+        headers: { get: () => null },
         json: async () => ({}),
       });
 
       await expect(provider.chat(mockMessages, mockOptions, () => {})).rejects.toThrow(
         /Rate limit/
+      );
+    });
+
+    /* Preconditions: Anthropic returns 429 with retry-after header
+       Action: Call chat()
+       Assertions: Error message uses retry-after seconds from header
+       Requirements: llm-integration.3.7.6 */
+    it('should prioritize retry-after header when present', async () => {
+      fetchMock.mockResolvedValue({
+        ok: false,
+        status: 429,
+        headers: { get: (name: string) => (name === 'retry-after' ? '11' : null) },
+        json: async () => ({ error: { message: 'Please try again later' } }),
+      });
+
+      await expect(provider.chat(mockMessages, mockOptions, () => {})).rejects.toThrow(
+        /try again in 11s/i
+      );
+    });
+
+    /* Preconditions: Anthropic returns 429 without retry-after but with provider message
+       Action: Call chat()
+       Assertions: Provider message is preserved for retry-after parsing upstream
+       Requirements: llm-integration.3.7.6 */
+    it('should keep provider 429 message when header is absent', async () => {
+      fetchMock.mockResolvedValue({
+        ok: false,
+        status: 429,
+        headers: { get: () => null },
+        json: async () => ({ error: { message: 'Please try again in 12.4s' } }),
+      });
+
+      await expect(provider.chat(mockMessages, mockOptions, () => {})).rejects.toThrow(
+        /12\.4s/
       );
     });
   });
@@ -245,7 +286,7 @@ describe('AnthropicProvider.chat()', () => {
       fetchMock.mockResolvedValue({ ok: true, body: { getReader: () => reader } });
 
       const result = await provider.chat(mockMessages, mockOptions, () => {});
-      expect(result.content).toBe('Full answer');
+      expect(result.action.content).toBe('Full answer');
     });
   });
 
@@ -280,6 +321,39 @@ describe('AnthropicProvider.chat()', () => {
       expect(callBody.system).toContain('You are a helpful assistant.');
       expect(callBody.messages).toHaveLength(1);
       expect(callBody.messages[0].role).toBe('user');
+    });
+  });
+
+  describe('structured output contract in request', () => {
+    /* Preconditions: Anthropic provider receives chat request
+       Action: Call chat() and inspect outgoing request body
+       Assertions: Request includes output_config.format with json_schema
+       Requirements: llm-integration.11 */
+    it('should include output_config.format json_schema in request', async () => {
+      const actionJson = JSON.stringify({ action: { type: 'text', content: 'OK' } });
+      const reader = buildMockReader([
+        sseEvent('message_start', { message: { usage: { input_tokens: 1, output_tokens: 0 } } }),
+        sseEvent('content_block_delta', { index: 0, delta: { type: 'text_delta', text: actionJson } }),
+        sseEvent('message_stop', {}),
+      ]);
+      fetchMock.mockResolvedValue({ ok: true, body: { getReader: () => reader } });
+
+      await provider.chat(
+        [
+          { role: 'system', content: 'Base system prompt' },
+          { role: 'user', content: 'Hello' },
+        ],
+        mockOptions,
+        () => {}
+      );
+
+      const callBody = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string) as {
+        system: string;
+        output_config?: { format?: { type?: string; schema?: Record<string, unknown> } };
+      };
+      expect(callBody.system).toContain('Field semantics and formats:');
+      expect(callBody.output_config?.format?.type).toBe('json_schema');
+      expect(callBody.output_config?.format?.schema).toBeDefined();
     });
   });
 });

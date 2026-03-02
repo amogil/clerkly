@@ -36,7 +36,7 @@ describe('OpenAIProvider', () => {
     expect(result.success).toBe(true);
     expect(result.error).toBeUndefined();
     expect(global.fetch).toHaveBeenCalledWith(
-      'https://api.openai.com/v1/chat/completions',
+      'https://api.openai.com/v1/responses',
       expect.objectContaining({
         method: 'POST',
         headers: expect.objectContaining({
@@ -172,7 +172,7 @@ describe('OpenAIProvider', () => {
     await provider.testConnection('test-key');
 
     expect(global.fetch).toHaveBeenCalledWith(
-      'https://api.openai.com/v1/chat/completions',
+      'https://api.openai.com/v1/responses',
       expect.objectContaining({
         method: 'POST',
         headers: {
@@ -181,8 +181,9 @@ describe('OpenAIProvider', () => {
         },
         body: JSON.stringify({
           model: 'gpt-5-nano',
-          messages: [{ role: 'user', content: 'test' }],
-          max_completion_tokens: 5,
+          input: [{ role: 'user', content: 'test' }],
+          max_output_tokens: 5,
+          text: { format: { type: 'json_object' } },
         }),
       })
     );

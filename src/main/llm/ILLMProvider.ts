@@ -10,7 +10,7 @@ export interface TestConnectionResult {
 
 /**
  * A single message in the chat history
- * Requirements: llm-integration.3.1
+ * Requirements: llm-integration.5.1
  */
 export interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
@@ -19,7 +19,7 @@ export interface ChatMessage {
 
 /**
  * Options for a chat request
- * Requirements: llm-integration.3.1
+ * Requirements: llm-integration.5.1
  */
 export interface ChatOptions {
   model: string;
@@ -29,7 +29,7 @@ export interface ChatOptions {
 
 /**
  * A tool that can be called by the LLM
- * Requirements: llm-integration.3.1
+ * Requirements: llm-integration.5.1
  */
 export interface LLMTool {
   name: string;
@@ -39,7 +39,7 @@ export interface LLMTool {
 
 /**
  * A streaming chunk from the LLM (reasoning only for now)
- * Requirements: llm-integration.3.2
+ * Requirements: llm-integration.5.3
  */
 export interface ChatChunk {
   type: 'reasoning';
@@ -49,7 +49,7 @@ export interface ChatChunk {
 
 /**
  * Canonical token usage statistics
- * Requirements: llm-integration.3.3, llm-integration.13
+ * Requirements: llm-integration.5.6, llm-integration.13
  */
 export interface LLMUsageCanonical {
   input_tokens: number;
@@ -61,7 +61,7 @@ export interface LLMUsageCanonical {
 
 /**
  * Usage envelope with normalized and raw provider usage.
- * Requirements: llm-integration.13
+ * Requirements: llm-integration.5.6, llm-integration.13
  */
 export interface LLMUsage {
   canonical: LLMUsageCanonical;
@@ -70,7 +70,7 @@ export interface LLMUsage {
 
 /**
  * Image descriptor returned by the LLM
- * Requirements: llm-integration.1
+ * Requirements: llm-integration.9
  */
 export interface LLMImageDescriptor {
   id: number;
@@ -81,7 +81,7 @@ export interface LLMImageDescriptor {
 
 /**
  * The final action returned by the LLM
- * Requirements: llm-integration.3.3
+ * Requirements: llm-integration.5.4, llm-integration.5.5
  */
 export interface LLMAction {
   type: 'text';
@@ -89,8 +89,10 @@ export interface LLMAction {
 }
 
 /**
- * Structured output returned by the LLM
- * Requirements: llm-integration.1
+ * Provider-level chat result envelope:
+ * - model structured output (action/images)
+ * - optional provider usage envelope (canonical/raw)
+ * Requirements: llm-integration.5.1, llm-integration.5.6
  */
 export interface LLMStructuredOutput {
   action: LLMAction;
@@ -100,7 +102,7 @@ export interface LLMStructuredOutput {
 
 /**
  * Interface for LLM provider implementations
- * Requirements: settings.3, llm-integration.3
+ * Requirements: settings.3, llm-integration.5
  */
 export interface ILLMProvider {
   /**
@@ -112,12 +114,12 @@ export interface ILLMProvider {
   /**
    * Send a chat request with streaming support
    * apiKey is passed to the constructor at provider creation time
-   * Requirements: llm-integration.3.1, llm-integration.3.2, llm-integration.3.3
+   * Requirements: llm-integration.5.1, llm-integration.5.2, llm-integration.5.3, llm-integration.5.4
    *
    * @param messages - Chat history
    * @param options - Model and request options
    * @param onChunk - Callback for streaming reasoning chunks
-   * @returns Final structured output with content and usage
+   * @returns Provider-level chat result envelope
    */
   chat(
     messages: ChatMessage[],

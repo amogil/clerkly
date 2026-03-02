@@ -23,12 +23,8 @@ function buildMockReader(lines: string[]) {
   };
 }
 
-function sseChunk(delta: { reasoning?: string; content?: string }, usage?: object): string {
-  const chunk = {
-    choices: [{ delta, finish_reason: null }],
-    ...(usage ? { usage } : {}),
-  };
-  return `data: ${JSON.stringify(chunk)}`;
+function sseResponsesEvent(event: Record<string, unknown>): string {
+  return `data: ${JSON.stringify(event)}`;
 }
 
 const mockMessages: ChatMessage[] = [{ role: 'user', content: 'Hello' }];
@@ -55,14 +51,18 @@ describe('OpenAIProvider.chat()', () => {
        Requirements: llm-integration.3.1, llm-integration.3.3 */
     it('should return LLMAction with content', async () => {
       const actionJson = JSON.stringify({ action: { type: 'text', content: 'Hello back!' } });
-      const reader = buildMockReader([sseChunk({ content: actionJson }), 'data: [DONE]']);
+      const reader = buildMockReader([
+        sseResponsesEvent({ type: 'response.output_text.delta', delta: actionJson }),
+        sseResponsesEvent({ type: 'response.completed', response: { usage: {} } }),
+        'data: [DONE]',
+      ]);
       fetchMock.mockResolvedValue({ ok: true, body: { getReader: () => reader } });
 
       const chunks: ChatChunk[] = [];
       const result = await provider.chat(mockMessages, mockOptions, (c) => chunks.push(c));
 
-      expect(result.type).toBe('text');
-      expect(result.content).toBe('Hello back!');
+      expect(result.action.type).toBe('text');
+      expect(result.action.content).toBe('Hello back!');
       // Only the done:true sentinel chunk
       expect(chunks).toHaveLength(1);
       expect(chunks[0]).toEqual({ type: 'reasoning', delta: '', done: true });
@@ -77,9 +77,9 @@ describe('OpenAIProvider.chat()', () => {
     it('should stream reasoning chunks and return final action', async () => {
       const actionJson = JSON.stringify({ action: { type: 'text', content: 'Answer' } });
       const reader = buildMockReader([
-        sseChunk({ reasoning: 'Let me think' }),
-        sseChunk({ reasoning: ' about this' }),
-        sseChunk({ content: actionJson }),
+        sseResponsesEvent({ type: 'response.reasoning_text.delta', delta: 'Let me think' }),
+        sseResponsesEvent({ type: 'response.reasoning_text.delta', delta: ' about this' }),
+        sseResponsesEvent({ type: 'response.output_text.delta', delta: actionJson }),
         'data: [DONE]',
       ]);
       fetchMock.mockResolvedValue({ ok: true, body: { getReader: () => reader } });
@@ -87,7 +87,7 @@ describe('OpenAIProvider.chat()', () => {
       const chunks: ChatChunk[] = [];
       const result = await provider.chat(mockMessages, mockOptions, (c) => chunks.push(c));
 
-      expect(result.content).toBe('Answer');
+      expect(result.action.content).toBe('Answer');
 
       const reasoningChunks = chunks.filter((c) => !c.done);
       expect(reasoningChunks).toHaveLength(2);
@@ -106,19 +106,20 @@ describe('OpenAIProvider.chat()', () => {
        Requirements: llm-integration.3.3 */
     it('should map usage fields correctly', async () => {
       const actionJson = JSON.stringify({ action: { type: 'text', content: 'Hi' } });
-      const usageChunk = {
-        choices: [{ delta: {}, finish_reason: 'stop' }],
-        usage: {
-          prompt_tokens: 10,
-          completion_tokens: 20,
-          total_tokens: 30,
-          prompt_tokens_details: { cached_tokens: 5 },
-          completion_tokens_details: { reasoning_tokens: 8 },
-        },
-      };
       const reader = buildMockReader([
-        sseChunk({ content: actionJson }),
-        `data: ${JSON.stringify(usageChunk)}`,
+        sseResponsesEvent({ type: 'response.output_text.delta', delta: actionJson }),
+        sseResponsesEvent({
+          type: 'response.completed',
+          response: {
+            usage: {
+              input_tokens: 10,
+              output_tokens: 20,
+              total_tokens: 30,
+              input_tokens_details: { cached_tokens: 5 },
+              output_tokens_details: { reasoning_tokens: 8 },
+            },
+          },
+        }),
         'data: [DONE]',
       ]);
       fetchMock.mockResolvedValue({ ok: true, body: { getReader: () => reader } });
@@ -126,11 +127,20 @@ describe('OpenAIProvider.chat()', () => {
       const result = await provider.chat(mockMessages, mockOptions, () => {});
 
       expect(result.usage).toEqual({
-        input_tokens: 10,
-        output_tokens: 20,
-        total_tokens: 30,
-        cached_tokens: 5,
-        reasoning_tokens: 8,
+        canonical: {
+          input_tokens: 10,
+          output_tokens: 20,
+          total_tokens: 30,
+          cached_tokens: 5,
+          reasoning_tokens: 8,
+        },
+        raw: {
+          input_tokens: 10,
+          output_tokens: 20,
+          total_tokens: 30,
+          input_tokens_details: { cached_tokens: 5 },
+          output_tokens_details: { reasoning_tokens: 8 },
+        },
       });
     });
   });
@@ -176,11 +186,29 @@ describe('OpenAIProvider.chat()', () => {
       fetchMock.mockResolvedValue({
         ok: false,
         status: 429,
+        headers: { get: () => null },
         json: async () => ({}),
       });
 
       await expect(provider.chat(mockMessages, mockOptions, () => {})).rejects.toThrow(
         /Rate limit/
+      );
+    });
+
+    /* Preconditions: OpenAI returns 429 with retry-after header
+       Action: Call chat()
+       Assertions: Error message uses retry-after seconds from header
+       Requirements: llm-integration.3.7.6 */
+    it('should prioritize retry-after header when present', async () => {
+      fetchMock.mockResolvedValue({
+        ok: false,
+        status: 429,
+        headers: { get: (name: string) => (name === 'retry-after' ? '7' : null) },
+        json: async () => ({ error: { message: 'Please try again in 20s' } }),
+      });
+
+      await expect(provider.chat(mockMessages, mockOptions, () => {})).rejects.toThrow(
+        /Retry again in 7s|try again in 7s/i
       );
     });
   });
@@ -228,22 +256,21 @@ describe('OpenAIProvider.chat()', () => {
   });
 
   describe('chunk without choices', () => {
-    /* Preconditions: SSE stream contains a chunk with empty choices array
+    /* Preconditions: SSE stream contains irrelevant non-response event
        Action: Call chat()
-       Assertions: Chunk is skipped, final action still returned
+       Assertions: Event is skipped, final action still returned
        Requirements: llm-integration.3.2 */
-    it('should skip chunks with no choices', async () => {
+    it('should skip unknown events', async () => {
       const actionJson = JSON.stringify({ action: { type: 'text', content: 'OK' } });
-      const emptyChoicesChunk = JSON.stringify({ choices: [] });
       const reader = buildMockReader([
-        `data: ${emptyChoicesChunk}`,
-        sseChunk({ content: actionJson }),
+        sseResponsesEvent({ type: 'response.unknown.delta', delta: 'noop' }),
+        sseResponsesEvent({ type: 'response.output_text.delta', delta: actionJson }),
         'data: [DONE]',
       ]);
       fetchMock.mockResolvedValue({ ok: true, body: { getReader: () => reader } });
 
       const result = await provider.chat(mockMessages, mockOptions, () => {});
-      expect(result.content).toBe('OK');
+      expect(result.action.content).toBe('OK');
     });
   });
 
@@ -277,15 +304,52 @@ describe('OpenAIProvider.chat()', () => {
       const part3 = actionJson.slice(25);
 
       const reader = buildMockReader([
-        sseChunk({ content: part1 }),
-        sseChunk({ content: part2 }),
-        sseChunk({ content: part3 }),
+        sseResponsesEvent({ type: 'response.output_text.delta', delta: part1 }),
+        sseResponsesEvent({ type: 'response.output_text.delta', delta: part2 }),
+        sseResponsesEvent({ type: 'response.output_text.delta', delta: part3 }),
         'data: [DONE]',
       ]);
       fetchMock.mockResolvedValue({ ok: true, body: { getReader: () => reader } });
 
       const result = await provider.chat(mockMessages, mockOptions, () => {});
-      expect(result.content).toBe('Full answer');
+      expect(result.action.content).toBe('Full answer');
+    });
+  });
+
+  describe('structured output contract in request', () => {
+    /* Preconditions: OpenAI provider receives chat request
+       Action: Call chat() and inspect outgoing request body
+       Assertions: Request uses Responses API format with text.format json_schema
+       Requirements: llm-integration.5.7, llm-integration.5.7.1, llm-integration.11 */
+    it('should include text.format json_schema and avoid legacy response_format', async () => {
+      const actionJson = JSON.stringify({ action: { type: 'text', content: 'OK' } });
+      const reader = buildMockReader([
+        sseResponsesEvent({ type: 'response.output_text.delta', delta: actionJson }),
+        'data: [DONE]',
+      ]);
+      fetchMock.mockResolvedValue({ ok: true, body: { getReader: () => reader } });
+
+      await provider.chat(
+        [
+          { role: 'system', content: 'Base system prompt' },
+          { role: 'user', content: 'Hello' },
+        ],
+        mockOptions,
+        () => {}
+      );
+
+      const calledUrl = fetchMock.mock.calls[0][0] as string;
+      expect(calledUrl.toLowerCase()).toContain('responses');
+
+      const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string) as {
+        input?: Array<{ role: string; content: string }>;
+        text?: { format?: { type?: string; schema?: Record<string, unknown> } };
+        response_format?: unknown;
+      };
+      expect(body.text?.format?.type).toBe('json_schema');
+      expect(body.text?.format?.schema).toBeDefined();
+      expect(body.response_format).toBeUndefined();
+      expect(Array.isArray(body.input)).toBe(true);
     });
   });
 });

@@ -41,6 +41,7 @@ describe('MessageManager', () => {
     kind: 'user',
     timestamp: '2026-02-15T10:30:00.000Z',
     payloadJson: JSON.stringify({ data: { text: 'Hello' } }),
+    usageJson: null,
     replyToMessageId: null,
     hidden: false,
   };
@@ -62,6 +63,7 @@ describe('MessageManager', () => {
         getById: jest.fn().mockReturnValue(mockMessage),
         create: jest.fn().mockReturnValue(mockMessage),
         update: jest.fn(),
+        updateUsageJson: jest.fn(),
       },
       agents: {} as IDatabaseManager['agents'],
       settings: {} as IDatabaseManager['settings'],
@@ -113,6 +115,7 @@ describe('MessageManager', () => {
             result: { status: 'success', value: 42 },
           },
         }),
+        usageJson: null,
         replyToMessageId: 1,
         hidden: false,
       };
@@ -139,6 +142,7 @@ describe('MessageManager', () => {
         kind: 'user',
         timestamp: '2026-02-15T10:30:00.000Z',
         payloadJson: 'invalid json {',
+        usageJson: null,
         replyToMessageId: null,
         hidden: false,
       };
@@ -159,6 +163,7 @@ describe('MessageManager', () => {
         kind: 'user',
         timestamp: '2026-02-15T10:30:00.000Z',
         payloadJson: '',
+        usageJson: null,
         replyToMessageId: null,
         hidden: false,
       };
@@ -180,6 +185,33 @@ describe('MessageManager', () => {
 
       expect(mockDbManager.messages.listByAgent).toHaveBeenCalledWith('agent-123');
       expect(result).toEqual(messages);
+    });
+  });
+
+  describe('listForModelHistory', () => {
+    /* Preconditions: Messages include hidden and kind:error
+       Action: Call listForModelHistory(agentId)
+       Assertions: Excludes hidden and kind:error messages
+       Requirements: llm-integration.3.9, llm-integration.8.6 */
+    it('should exclude hidden and kind:error messages from model history', () => {
+      const visibleUser: Message = { ...mockMessage, id: 1, kind: 'user', hidden: false };
+      const hiddenLlm: Message = { ...mockMessage, id: 2, kind: 'llm', hidden: true };
+      const errorMsg: Message = {
+        ...mockMessage,
+        id: 3,
+        kind: 'error',
+        hidden: false,
+        payloadJson: JSON.stringify({ data: { error: { message: 'fail' } } }),
+      };
+
+      mockDbManager.messages.listByAgent = jest
+        .fn()
+        .mockReturnValue([visibleUser, hiddenLlm, errorMsg]);
+
+      const result = messageManager.listForModelHistory('agent-123');
+
+      expect(mockDbManager.messages.listByAgent).toHaveBeenCalledWith('agent-123', true);
+      expect(result).toEqual([visibleUser]);
     });
   });
 
@@ -287,28 +319,29 @@ describe('MessageManager', () => {
     });
   });
 
-  describe('dismissErrorMessages', () => {
+  describe('hideErrorMessages', () => {
     /* Preconditions: Agent has visible kind:error messages (hidden=false)
-       Action: Call dismissErrorMessages(agentId)
-       Assertions: Repository dismissErrorMessages called, message.updated emitted for each returned (newly hidden) message
+       Action: Call hideErrorMessages(agentId)
+       Assertions: Repository hideErrorMessages called, message.updated emitted for each returned (newly hidden) message
        Requirements: llm-integration.3.8 */
-    it('should dismiss error messages and emit message.updated for each newly hidden one', () => {
+    it('should hide error messages and emit message.updated for each newly hidden one', () => {
       const visibleError: Message = {
         id: 10,
         agentId: 'agent-123',
         kind: 'error',
         timestamp: '2026-02-15T10:30:00.000Z',
         payloadJson: JSON.stringify({ data: { error: { type: 'provider', message: 'fail' } } }),
+        usageJson: null,
         replyToMessageId: null,
         hidden: true, // returned by repo already with hidden=true
       };
 
       // Repository returns only the records that were actually changed
-      mockDbManager.messages.dismissErrorMessages = jest.fn().mockReturnValue([visibleError]);
+      mockDbManager.messages.hideErrorMessages = jest.fn().mockReturnValue([visibleError]);
 
-      messageManager.dismissErrorMessages('agent-123');
+      messageManager.hideErrorMessages('agent-123');
 
-      expect(mockDbManager.messages.dismissErrorMessages).toHaveBeenCalledWith('agent-123');
+      expect(mockDbManager.messages.hideErrorMessages).toHaveBeenCalledWith('agent-123');
       expect(mockEventBus.publish).toHaveBeenCalledTimes(1);
       const event = mockEventBus.publish.mock.calls[0][0];
       expect(event).toBeInstanceOf(MessageUpdatedEvent);
@@ -317,13 +350,13 @@ describe('MessageManager', () => {
     });
 
     /* Preconditions: Agent has no visible kind:error messages (repo returns empty array)
-       Action: Call dismissErrorMessages(agentId)
+       Action: Call hideErrorMessages(agentId)
        Assertions: No events emitted
        Requirements: llm-integration.3.8 */
     it('should not emit events when no visible error messages exist', () => {
-      mockDbManager.messages.dismissErrorMessages = jest.fn().mockReturnValue([]);
+      mockDbManager.messages.hideErrorMessages = jest.fn().mockReturnValue([]);
 
-      messageManager.dismissErrorMessages('agent-123');
+      messageManager.hideErrorMessages('agent-123');
 
       expect(mockEventBus.publish).not.toHaveBeenCalled();
     });
@@ -385,6 +418,49 @@ describe('MessageManager', () => {
 
       expect(mockDbManager.messages.update).toHaveBeenCalled();
       expect(mockEventBus.publish).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('setUsage', () => {
+    /* Preconditions: MessageManager initialized and message exists
+       Action: Call setUsage() with canonical+raw envelope
+       Assertions: Repository updateUsageJson called with serialized envelope
+       Requirements: llm-integration.13 */
+    it('should persist usage envelope into messages.usage_json', () => {
+      const usage = {
+        canonical: { input_tokens: 11, output_tokens: 7, total_tokens: 18 },
+        raw: { prompt_tokens: 11, completion_tokens: 7, total_tokens: 18 },
+      };
+
+      messageManager.setUsage(1, 'agent-123', usage);
+
+      expect(mockDbManager.messages.updateUsageJson).toHaveBeenCalledWith(
+        1,
+        'agent-123',
+        JSON.stringify(usage)
+      );
+    });
+
+    /* Preconditions: Usage envelope provided for message persistence
+       Action: Call setUsage() and inspect serialized payload
+       Assertions: usage_json does not duplicate provider/model/timestamp metadata
+       Requirements: llm-integration.13.5 */
+    it('should not include provider/model/timestamp in serialized usage_json envelope', () => {
+      const usage = {
+        canonical: { input_tokens: 3, output_tokens: 2, total_tokens: 5 },
+        raw: { prompt_tokens: 3, completion_tokens: 2, total_tokens: 5 },
+      };
+
+      messageManager.setUsage(1, 'agent-123', usage);
+
+      const usageJson = (mockDbManager.messages.updateUsageJson as jest.Mock).mock.calls[0][2] as string;
+      const parsed = JSON.parse(usageJson) as Record<string, unknown>;
+      expect(parsed).not.toHaveProperty('provider');
+      expect(parsed).not.toHaveProperty('model');
+      expect(parsed).not.toHaveProperty('timestamp');
+      expect(parsed.raw).not.toHaveProperty('provider');
+      expect(parsed.raw).not.toHaveProperty('model');
+      expect(parsed.raw).not.toHaveProperty('timestamp');
     });
   });
 });

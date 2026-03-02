@@ -53,6 +53,7 @@ describe('AgentIPCHandlers', () => {
     kind: 'user',
     timestamp: '2026-02-15T10:00:00.000Z',
     payloadJson: JSON.stringify({ data: { text: 'Hello' } }),
+    usageJson: null,
     replyToMessageId: null,
     hidden: false,
   };
@@ -109,7 +110,9 @@ describe('AgentIPCHandlers', () => {
       getLastMessage: jest.fn().mockReturnValue(mockMessage),
       getLastUserMessage: jest.fn().mockReturnValue(mockMessage),
       toEventMessage: jest.fn().mockReturnValue(mockMessageSnapshot),
-      dismissErrorMessages: jest.fn(),
+      hideErrorMessages: jest.fn(),
+      setHidden: jest.fn(),
+      setUsage: jest.fn(),
     } as unknown as jest.Mocked<MessageManager>;
 
     mockPipeline = {
@@ -587,7 +590,7 @@ describe('AgentIPCHandlers', () => {
 
     /* Preconditions: Handlers registered, kind:user message
        Action: Invoke messages:create with kind:user
-       Assertions: dismissErrorMessages called before pipeline launch
+       Assertions: hideErrorMessages called before pipeline launch
        Requirements: llm-integration.3.8 */
     it('should dismiss error messages before launching pipeline', async () => {
       handlers.registerHandlers();
@@ -599,7 +602,7 @@ describe('AgentIPCHandlers', () => {
         payload: userPayload,
       });
 
-      expect(mockMessageManager.dismissErrorMessages).toHaveBeenCalledWith('abc123xyz0');
+      expect(mockMessageManager.hideErrorMessages).toHaveBeenCalledWith('abc123xyz0');
     });
 
     /* Preconditions: Handlers registered, pipeline rejects

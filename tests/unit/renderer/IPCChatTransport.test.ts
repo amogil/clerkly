@@ -251,7 +251,7 @@ describe('IPCChatTransport', () => {
        Action: emit MESSAGE_UPDATED with hidden: true for the llm message
        Assertions: stream closes without emitting text chunks
        Requirements: llm-integration.8.5 */
-    it('should close stream when llm message becomes hidden (interrupted)', async () => {
+    it('should close stream when llm message becomes hidden', async () => {
       const streamPromise = transport.sendMessages(makeSendOptions());
       await Promise.resolve();
 

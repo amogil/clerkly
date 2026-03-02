@@ -18,6 +18,7 @@ function makeMessage(overrides: Partial<Message> & { id: number }): Message {
     kind: 'user',
     timestamp: '2026-02-15T10:00:00.000Z',
     payloadJson: JSON.stringify({ data: { text: 'Hello' } }),
+    usageJson: null,
     replyToMessageId: null,
     hidden: false,
     ...overrides,
@@ -123,12 +124,12 @@ describe('PromptBuilder.build()', () => {
     });
   });
 
-  describe('YAML history serialization', () => {
+  describe('history serialization for provider messages', () => {
     /* Preconditions: User and LLM messages exist
        Action: Call build(messages)
-       Assertions: history contains correct YAML with id, kind, timestamp, data
+       Assertions: buildMessages contains separate user/assistant entries
        Requirements: llm-integration.4.3, llm-integration.4.4 */
-    it('should serialize user and llm messages to YAML', () => {
+    it('should serialize user and llm messages into separate chat messages', () => {
       const msgs = [
         makeMessage({
           id: 1,
@@ -148,20 +149,20 @@ describe('PromptBuilder.build()', () => {
         }),
       ];
 
-      const { history } = makeBuilder().build(msgs);
+      const chatMessages = makeBuilder().buildMessages(msgs);
 
-      expect(history).toContain('messages:');
-      expect(history).toContain('id: 1');
-      expect(history).toContain('kind: user');
-      expect(history).toContain('id: 2');
-      expect(history).toContain('kind: llm');
+      expect(chatMessages).toHaveLength(3);
+      expect(chatMessages[1]).toMatchObject({ role: 'user' });
+      expect(chatMessages[2]).toMatchObject({ role: 'assistant' });
+      expect(chatMessages[1].content).toContain('Hello');
+      expect(chatMessages[2].content).toContain('Hi there!');
     });
 
-    /* Preconditions: LLM message with reasoning and model fields
+    /* Preconditions: LLM message with model and reasoning* fields
        Action: Call build(messages)
-       Assertions: reasoning.text and model are excluded from YAML
-       Requirements: llm-integration.4.4 */
-    it('should exclude reasoning.text and model from llm messages', () => {
+       Assertions: model and all reasoning* fields are excluded from replayed content
+       Requirements: llm-integration.10.2 */
+    it('should exclude model and all reasoning-prefixed fields from llm messages', () => {
       const msgs = [
         makeMessage({
           id: 1,
@@ -170,6 +171,8 @@ describe('PromptBuilder.build()', () => {
             data: {
               model: 'gpt-5.2',
               reasoning: { text: 'My internal thoughts', excluded_from_replay: true },
+              reasoning_summary: 'summary',
+              reasoning_tokens: 123,
               action: { type: 'text', content: 'Answer' },
             },
           }),
@@ -177,78 +180,98 @@ describe('PromptBuilder.build()', () => {
         }),
       ];
 
-      const { history } = makeBuilder().build(msgs);
-
-      expect(history).not.toContain('model');
-      expect(history).not.toContain('My internal thoughts');
-      expect(history).not.toContain('excluded_from_replay');
-      expect(history).toContain('Answer');
-    });
-
-    /* Preconditions: First message in chat
-       Action: Call build(messages)
-       Assertions: reply_to_message_id is null in YAML
-       Requirements: llm-integration.4.4 */
-    it('should include reply_to_message_id: null for first message', () => {
-      const msgs = [
-        makeMessage({
-          id: 1,
-          kind: 'user',
-          payloadJson: JSON.stringify({ data: { text: 'First' } }),
-          replyToMessageId: null,
-        }),
-      ];
-
-      const { history } = makeBuilder().build(msgs);
-      expect(history).toContain('reply_to_message_id');
-      expect(history).toContain('null');
-    });
-  });
-});
-
-describe('PromptBuilder edge cases', () => {
-  describe('messageToChat with error kind', () => {
-    /* Preconditions: Message with kind 'error'
-       Action: Call buildMessages(messages)
-       Assertions: Error message is excluded from chat messages (llm-integration.3.9)
-       Requirements: llm-integration.3.9, llm-integration.4.3 */
-    it('should map error kind to system role', () => {
-      const msgs = [
-        makeMessage({
-          id: 1,
-          kind: 'error',
-          payloadJson: JSON.stringify({ data: { error: { message: 'Something failed' } } }),
-        }),
-      ];
       const chatMessages = makeBuilder().buildMessages(msgs);
-      // kind:error messages are filtered out — llm-integration.3.9
-      const errorMsg = chatMessages.find((m) => m.content.includes('[error]'));
-      expect(errorMsg).toBeUndefined();
+      const assistant = chatMessages.find((m) => m.role === 'assistant');
+      expect(assistant).toBeDefined();
+      expect(assistant!.content).not.toContain('model');
+      expect(assistant!.content).not.toContain('My internal thoughts');
+      expect(assistant!.content).not.toContain('reasoning');
+      expect(assistant!.content).not.toContain('reasoning_summary');
+      expect(assistant!.content).not.toContain('reasoning_tokens');
+      expect(assistant!.content).not.toContain('excluded_from_replay');
+      expect(assistant!.content).toContain('Answer');
     });
-  });
 
-  describe('yamlValue with object', () => {
-    /* Preconditions: LLM message with nested action object
-       Action: Call build(messages)
-       Assertions: Object values serialized as JSON in YAML
-       Requirements: llm-integration.4.4 */
-    it('should serialize nested objects as JSON in YAML', () => {
+    /* Preconditions: Assistant payload contains images with URLs/links
+       Action: Call buildMessages(messages)
+       Assertions: replayed assistant content includes image references for model context
+       Requirements: llm-integration.10.2, llm-integration.13.5 */
+    it('should include image references in assistant replay content', () => {
       const msgs = [
         makeMessage({
           id: 1,
           kind: 'llm',
           payloadJson: JSON.stringify({
             data: {
-              action: { type: 'text', content: 'Hello' },
+              action: { type: 'text', content: 'See [[image:1]]' },
+              images: [{ id: 1, url: 'https://example.com/image.png', link: 'https://example.com' }],
+            },
+          }),
+        }),
+      ];
+
+      const chatMessages = makeBuilder().buildMessages(msgs);
+      const assistant = chatMessages.find((m) => m.role === 'assistant');
+      expect(assistant).toBeDefined();
+      expect(assistant!.content).toContain('[[image:1]]');
+      expect(assistant!.content).toContain('Images:');
+      expect(assistant!.content).toContain('https://example.com/image.png');
+      expect(assistant!.content).toContain('link=https://example.com');
+    });
+  });
+});
+
+describe('PromptBuilder edge cases', () => {
+  describe('llm messages without replayable content', () => {
+    /* Preconditions: LLM message lacks action.content and images
+       Action: Call build(messages)
+       Assertions: Message is excluded from replay history
+       Requirements: llm-integration.10.2, llm-integration.10.3 */
+    it('should skip llm message when replayable content is absent', () => {
+      const msgs = [
+        makeMessage({
+          id: 1,
+          kind: 'llm',
+          payloadJson: JSON.stringify({
+            data: {
+              action: { type: 'text' },
+              note: 'Hello',
             },
           }),
           replyToMessageId: null,
         }),
       ];
-      const { history } = makeBuilder().build(msgs);
-      // action is an object — should be JSON-serialized
-      expect(history).toContain('action');
-      expect(history).toContain('text');
+      const chatMessages = makeBuilder().buildMessages(msgs);
+      const assistant = chatMessages.find((m) => m.role === 'assistant');
+      expect(assistant).toBeUndefined();
+      expect(chatMessages).toHaveLength(1);
+    });
+  });
+
+  describe('hidden messages', () => {
+    /* Preconditions: History contains hidden user/llm messages
+       Action: Call buildMessages(messages)
+       Assertions: Hidden messages are excluded from replay history
+       Requirements: llm-integration.10.3 */
+    it('should exclude hidden messages from replay history', () => {
+      const msgs = [
+        makeMessage({
+          id: 1,
+          kind: 'user',
+          hidden: true,
+          payloadJson: JSON.stringify({ data: { text: 'Hidden user' } }),
+        }),
+        makeMessage({
+          id: 2,
+          kind: 'llm',
+          hidden: true,
+          payloadJson: JSON.stringify({ data: { action: { type: 'text', content: 'Hidden llm' } } }),
+        }),
+      ];
+
+      const chatMessages = makeBuilder().buildMessages(msgs);
+      expect(chatMessages).toHaveLength(1);
+      expect(chatMessages[0].role).toBe('system');
     });
   });
 });
@@ -256,9 +279,9 @@ describe('PromptBuilder edge cases', () => {
 describe('PromptBuilder.buildMessages()', () => {
   /* Preconditions: User and LLM messages exist
      Action: Call buildMessages(messages)
-     Assertions: Returns ChatMessage[] with system + user/assistant roles
+     Assertions: Returns system message + separate history messages
      Requirements: llm-integration.4.3 */
-  it('should return system message followed by user/assistant messages', () => {
+  it('should return system message followed by separate history messages', () => {
     const msgs = [
       makeMessage({
         id: 1,
@@ -278,12 +301,11 @@ describe('PromptBuilder.buildMessages()', () => {
 
     expect(chatMessages[0].role).toBe('system');
     expect(chatMessages[0].content).toContain('helpful AI assistant');
-
-    const userMsg = chatMessages.find((m) => m.role === 'user');
-    expect(userMsg?.content).toBe('Hello');
-
-    const assistantMsg = chatMessages.find((m) => m.role === 'assistant');
-    expect(assistantMsg?.content).toBe('Hi!');
+    expect(chatMessages).toHaveLength(3);
+    expect(chatMessages[1].role).toBe('user');
+    expect(chatMessages[1].content).toContain('Hello');
+    expect(chatMessages[2].role).toBe('assistant');
+    expect(chatMessages[2].content).toContain('Hi!');
   });
 
   /* Preconditions: No messages
@@ -294,54 +316,5 @@ describe('PromptBuilder.buildMessages()', () => {
     const chatMessages = makeBuilder().buildMessages([]);
     expect(chatMessages).toHaveLength(1);
     expect(chatMessages[0].role).toBe('system');
-  });
-});
-
-describe('PromptBuilder filtering (error)', () => {
-  /* Preconditions: kind:error message in history
-     Action: Call build(messages)
-     Assertions: kind:error excluded from YAML history
-     Requirements: llm-integration.3.9 */
-  it('should exclude kind:error messages from YAML history', () => {
-    const msgs = [
-      makeMessage({
-        id: 1,
-        kind: 'user',
-        payloadJson: JSON.stringify({ data: { text: 'Hello' } }),
-        replyToMessageId: null,
-      }),
-      makeMessage({
-        id: 2,
-        kind: 'error',
-        payloadJson: JSON.stringify({ data: { error: { message: 'Something failed' } } }),
-      }),
-    ];
-
-    const { history } = makeBuilder().build(msgs);
-    expect(history).toContain('kind: user');
-    expect(history).not.toContain('kind: error');
-  });
-
-  /* Preconditions: kind:error message in history
-     Action: Call buildMessages(messages)
-     Assertions: kind:error excluded from ChatMessage[]
-     Requirements: llm-integration.3.9 */
-  it('should exclude kind:error from buildMessages', () => {
-    const msgs = [
-      makeMessage({
-        id: 1,
-        kind: 'user',
-        payloadJson: JSON.stringify({ data: { text: 'Hello' } }),
-      }),
-      makeMessage({
-        id: 2,
-        kind: 'error',
-        payloadJson: JSON.stringify({ data: { error: { message: 'Fail' } } }),
-      }),
-    ];
-
-    const chatMessages = makeBuilder().buildMessages(msgs);
-    expect(chatMessages.some((m) => m.content.includes('[error]'))).toBe(false);
-    expect(chatMessages.some((m) => m.role === 'user')).toBe(true);
   });
 });

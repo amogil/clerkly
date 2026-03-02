@@ -130,6 +130,7 @@ describe('AgentManager', () => {
         kind: MESSAGE_KIND.USER,
         timestamp: '2026-02-15T10:30:00.000Z',
         payloadJson: JSON.stringify({ data: { text: 'Hello' } }),
+        usageJson: null,
         replyToMessageId: null,
         hidden: false,
       };
@@ -151,6 +152,7 @@ describe('AgentManager', () => {
         kind: MESSAGE_KIND.FINAL_ANSWER,
         timestamp: '2026-02-15T10:30:00.000Z',
         payloadJson: JSON.stringify({ data: { text: 'Done' } }),
+        usageJson: null,
         replyToMessageId: null,
         hidden: false,
       };
@@ -174,6 +176,7 @@ describe('AgentManager', () => {
         payloadJson: JSON.stringify({
           data: { error: { type: 'network', message: 'Failed' } },
         }),
+        usageJson: null,
         replyToMessageId: null,
         hidden: false,
       };
@@ -197,6 +200,7 @@ describe('AgentManager', () => {
         payloadJson: JSON.stringify({
           data: { result: { status: 'error', message: 'Failed' } },
         }),
+        usageJson: null,
         replyToMessageId: null,
         hidden: false,
       };
@@ -218,6 +222,7 @@ describe('AgentManager', () => {
         kind: MESSAGE_KIND.LLM,
         timestamp: '2026-02-15T10:30:00.000Z',
         payloadJson: JSON.stringify({ data: { text: 'Thinking...' } }),
+        usageJson: null,
         replyToMessageId: null,
         hidden: false,
       };

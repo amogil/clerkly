@@ -225,9 +225,7 @@ CREATE TABLE images (
 - `action.type`: строка, значение `text`.
 - `action.content`: строка; может содержать плейсхолдеры изображений.
 - `images[]`: массив объектов изображений (может отсутствовать). Схема, форматы полей и плейсхолдеры описаны в разделе «Встроенные изображения».
-- `usage`: usage-envelope провайдера (опционально, для runtime):
-  - `canonical`: нормализованные токен-поля (`input_tokens`, `output_tokens`, `total_tokens`, `cached_tokens?`, `reasoning_tokens?`);
-  - `raw`: исходный usage-пейлоад провайдера.
+- `usage` НЕ является частью model structured output; usage-envelope (`canonical + raw`) передаётся провайдером отдельно и сохраняется в `messages.usage_json`.
 
 Модель возвращает JSON:
 
