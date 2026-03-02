@@ -6,6 +6,7 @@ module.exports = {
   ...baseConfig,
   testMatch: ['**/tests/unit/**/*.test.ts', '**/tests/unit/**/*.test.tsx'],
   testTimeout: 10000,
+  maxWorkers: '50%',
   automock: false,
   testEnvironment: 'jsdom', // React components need jsdom
   setupFilesAfterEnv: ['<rootDir>/tests/setup.ts'],

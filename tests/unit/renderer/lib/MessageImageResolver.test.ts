@@ -32,15 +32,29 @@ async function flush(): Promise<void> {
 describe('resolveMessageImages', () => {
   const originalCreateObjectURL = URL.createObjectURL;
   const originalRevokeObjectURL = URL.revokeObjectURL;
+  let activeCleanups: Array<() => void> = [];
+
+  function resolveWithTracking(
+    root: HTMLElement,
+    options: Parameters<typeof resolveMessageImages>[1]
+  ): void {
+    const cleanup = resolveMessageImages(root, options);
+    activeCleanups.push(cleanup);
+  }
 
   beforeEach(() => {
     jest.useRealTimers();
     URL.createObjectURL = jest.fn().mockReturnValue('blob:test');
     URL.revokeObjectURL = jest.fn();
     document.body.innerHTML = '';
+    activeCleanups = [];
   });
 
   afterEach(() => {
+    activeCleanups.forEach((cleanup) => cleanup());
+    activeCleanups = [];
+    jest.clearAllTimers();
+    jest.useRealTimers();
     setImagesApi(undefined);
     URL.createObjectURL = originalCreateObjectURL;
     URL.revokeObjectURL = originalRevokeObjectURL;
@@ -76,7 +90,7 @@ describe('resolveMessageImages', () => {
     const root = document.createElement('div');
     root.textContent = 'no placeholders';
 
-    resolveMessageImages(root as unknown as HTMLElement, {
+    resolveWithTracking(root as unknown as HTMLElement, {
       agentId: 'agent-1',
       messageId: 1,
       content: 'plain text',
@@ -106,7 +120,7 @@ describe('resolveMessageImages', () => {
     const root = document.createElement('div');
     root.textContent =
       'prefix [[image:99]] [[image:1|link:https://placeholder.link|size:120x40]] suffix';
-    resolveMessageImages(root as unknown as HTMLElement, {
+    resolveWithTracking(root as unknown as HTMLElement, {
       agentId: 'agent-1',
       messageId: 2,
       content: 'prefix [[image:99]] [[image:1|link:https://placeholder.link|size:120x40]] suffix',
@@ -138,7 +152,7 @@ describe('resolveMessageImages', () => {
     const root = document.createElement('div');
     root.innerHTML = '<a>[[image:2]]</a>';
 
-    resolveMessageImages(root as unknown as HTMLElement, {
+    resolveWithTracking(root as unknown as HTMLElement, {
       agentId: 'agent-1',
       messageId: 3,
       content: '[[image:2]]',
@@ -158,7 +172,7 @@ describe('resolveMessageImages', () => {
     setImagesApi(missingGet);
     const rootMissing = document.createElement('div');
     rootMissing.textContent = '[[image:3]]';
-    resolveMessageImages(rootMissing as unknown as HTMLElement, {
+    resolveWithTracking(rootMissing as unknown as HTMLElement, {
       agentId: 'agent-1',
       messageId: 4,
       content: '[[image:3]]',
@@ -171,7 +185,7 @@ describe('resolveMessageImages', () => {
     setImagesApi(errorGet);
     const rootError = document.createElement('div');
     rootError.textContent = '[[image:4]]';
-    resolveMessageImages(rootError as unknown as HTMLElement, {
+    resolveWithTracking(rootError as unknown as HTMLElement, {
       agentId: 'agent-1',
       messageId: 5,
       content: '[[image:4]]',
@@ -195,7 +209,7 @@ describe('resolveMessageImages', () => {
     setImagesApi(getImage);
     const root = document.createElement('div');
     root.textContent = '[[image:98]] [[image:5|link:not-a-url]]';
-    resolveMessageImages(root as unknown as HTMLElement, {
+    resolveWithTracking(root as unknown as HTMLElement, {
       agentId: 'agent-1',
       messageId: 6,
       content: '[[image:98]] [[image:5|link:not-a-url]]',
