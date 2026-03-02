@@ -202,9 +202,7 @@ describe('GoogleProvider.chat()', () => {
         json: async () => ({ error: { message: 'Rate limit. Please try again in 8.2s' } }),
       });
 
-      await expect(provider.chat(mockMessages, mockOptions, () => {})).rejects.toThrow(
-        /8\.2s/
-      );
+      await expect(provider.chat(mockMessages, mockOptions, () => {})).rejects.toThrow(/8\.2s/);
     });
   });
 

@@ -81,7 +81,10 @@ export class PromptBuilder {
    * Requirements: llm-integration.10
    */
   buildMessages(messages: Message[]): ChatMessage[] {
-    return [{ role: 'system', content: this.buildSystemPrompt() }, ...this.buildHistoryMessages(messages)];
+    return [
+      { role: 'system', content: this.buildSystemPrompt() },
+      ...this.buildHistoryMessages(messages),
+    ];
   }
 
   private buildSystemPrompt(): string {

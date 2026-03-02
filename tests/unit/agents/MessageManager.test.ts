@@ -453,7 +453,8 @@ describe('MessageManager', () => {
 
       messageManager.setUsage(1, 'agent-123', usage);
 
-      const usageJson = (mockDbManager.messages.updateUsageJson as jest.Mock).mock.calls[0][2] as string;
+      const usageJson = (mockDbManager.messages.updateUsageJson as jest.Mock).mock
+        .calls[0][2] as string;
       const parsed = JSON.parse(usageJson) as Record<string, unknown>;
       expect(parsed).not.toHaveProperty('provider');
       expect(parsed).not.toHaveProperty('model');

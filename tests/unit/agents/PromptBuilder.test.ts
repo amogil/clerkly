@@ -204,7 +204,9 @@ describe('PromptBuilder.build()', () => {
           payloadJson: JSON.stringify({
             data: {
               action: { type: 'text', content: 'See [[image:1]]' },
-              images: [{ id: 1, url: 'https://example.com/image.png', link: 'https://example.com' }],
+              images: [
+                { id: 1, url: 'https://example.com/image.png', link: 'https://example.com' },
+              ],
             },
           }),
         }),
@@ -265,7 +267,9 @@ describe('PromptBuilder edge cases', () => {
           id: 2,
           kind: 'llm',
           hidden: true,
-          payloadJson: JSON.stringify({ data: { action: { type: 'text', content: 'Hidden llm' } } }),
+          payloadJson: JSON.stringify({
+            data: { action: { type: 'text', content: 'Hidden llm' } },
+          }),
         }),
       ];
 

@@ -326,14 +326,20 @@ describe('MainPipeline.run()', () => {
       await pipeline.run('agent-1', 1);
 
       expect(llmProvider.chat).toHaveBeenCalledTimes(3);
-      const secondAttemptMessages = (llmProvider.chat as jest.Mock).mock.calls[1][0] as ChatMessage[];
-      const thirdAttemptMessages = (llmProvider.chat as jest.Mock).mock.calls[2][0] as ChatMessage[];
-      expect(secondAttemptMessages.some((m) => m.content.includes('did not match the required JSON schema'))).toBe(
-        true
-      );
-      expect(thirdAttemptMessages.some((m) => m.content.includes('did not match the required JSON schema'))).toBe(
-        true
-      );
+      const secondAttemptMessages = (llmProvider.chat as jest.Mock).mock
+        .calls[1][0] as ChatMessage[];
+      const thirdAttemptMessages = (llmProvider.chat as jest.Mock).mock
+        .calls[2][0] as ChatMessage[];
+      expect(
+        secondAttemptMessages.some((m) =>
+          m.content.includes('did not match the required JSON schema')
+        )
+      ).toBe(true);
+      expect(
+        thirdAttemptMessages.some((m) =>
+          m.content.includes('did not match the required JSON schema')
+        )
+      ).toBe(true);
       expect(messageManager.create).toHaveBeenCalledWith(
         'agent-1',
         'error',

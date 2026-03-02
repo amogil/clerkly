@@ -561,7 +561,9 @@ test.describe('LLM Chat (mock server)', () => {
       lastRequest!.body.input ?? lastRequest!.body.messages;
     expect(messages).toBeDefined();
 
-    const priorUserMsg = messages.find((m) => m.role === 'user' && m.content.includes('First message'));
+    const priorUserMsg = messages.find(
+      (m) => m.role === 'user' && m.content.includes('First message')
+    );
     const priorAssistantMsg = messages.find(
       (m) => m.role === 'assistant' && m.content.includes('First response')
     );
@@ -929,7 +931,6 @@ test.describe('LLM Chat (mock server)', () => {
      Requirements: agents.7.7 */
   test('should render markdown mermaid diagrams', async () => {
     await renderMarkdownMessage('```mermaid\ngraph TD;\nA-->B;\n```');
-    const actionContent = context.window.locator('[data-testid="message-llm-action"]');
     await expect(context.window.getByRole('button', { name: 'Download diagram' })).toBeVisible();
   });
 

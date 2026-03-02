@@ -69,7 +69,9 @@ function expectInstructionWithFieldFormatsAndImageLinks(instruction: string): vo
   expect(instruction).toContain(
     '- images: optional list of image descriptors tied to placeholders in action.content.'
   );
-  expect(instruction).toContain('- images[].id: natural number identifier matching placeholder id.');
+  expect(instruction).toContain(
+    '- images[].id: natural number identifier matching placeholder id.'
+  );
   expect(instruction).toContain('- images[].url: image URL for download/rendering.');
   expect(instruction).toContain('- images[].alt: optional accessibility text for rendered image.');
   expect(instruction).toContain(
@@ -135,7 +137,10 @@ describe('Provider structured output description in requests', () => {
 
     const actionJson = JSON.stringify({ action: { type: 'text', content: 'ok' } });
     const reader = buildMockReader([
-      sseEvent({ type: 'message_start', message: { usage: { input_tokens: 1, output_tokens: 0 } } }),
+      sseEvent({
+        type: 'message_start',
+        message: { usage: { input_tokens: 1, output_tokens: 0 } },
+      }),
       sseEvent({ type: 'content_block_delta', delta: { type: 'text_delta', text: actionJson } }),
       sseEvent({ type: 'message_delta', usage: { output_tokens: 1 } }),
     ]);
@@ -150,8 +155,9 @@ describe('Provider structured output description in requests', () => {
     >;
 
     const systemInstruction = String(body.system ?? '');
-    const schema = ((((body.output_config as Record<string, unknown>).format as Record<string, unknown>)
-      .schema ?? {}) as Record<string, unknown>);
+    const schema = ((
+      (body.output_config as Record<string, unknown>).format as Record<string, unknown>
+    ).schema ?? {}) as Record<string, unknown>;
 
     expectStructuredSchemaWithDescriptions(schema);
     expectInstructionWithFieldFormatsAndImageLinks(systemInstruction);
@@ -180,11 +186,12 @@ describe('Provider structured output description in requests', () => {
     >;
 
     const systemInstruction = String(
-      (((body.system_instruction as Record<string, unknown>).parts as Array<Record<string, unknown>>)?.[0]
-        ?.text ?? '') as string
+      ((
+        (body.system_instruction as Record<string, unknown>).parts as Array<Record<string, unknown>>
+      )?.[0]?.text ?? '') as string
     );
-    const schema = (((body.generationConfig as Record<string, unknown>).responseSchema ??
-      {}) as Record<string, unknown>);
+    const schema = ((body.generationConfig as Record<string, unknown>).responseSchema ??
+      {}) as Record<string, unknown>;
 
     expectStructuredSchemaWithDescriptions(schema);
     expectInstructionWithFieldFormatsAndImageLinks(systemInstruction);

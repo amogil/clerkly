@@ -215,9 +215,7 @@ describe('AnthropicProvider.chat()', () => {
         json: async () => ({ error: { message: 'Please try again in 12.4s' } }),
       });
 
-      await expect(provider.chat(mockMessages, mockOptions, () => {})).rejects.toThrow(
-        /12\.4s/
-      );
+      await expect(provider.chat(mockMessages, mockOptions, () => {})).rejects.toThrow(/12\.4s/);
     });
   });
 
@@ -333,7 +331,10 @@ describe('AnthropicProvider.chat()', () => {
       const actionJson = JSON.stringify({ action: { type: 'text', content: 'OK' } });
       const reader = buildMockReader([
         sseEvent('message_start', { message: { usage: { input_tokens: 1, output_tokens: 0 } } }),
-        sseEvent('content_block_delta', { index: 0, delta: { type: 'text_delta', text: actionJson } }),
+        sseEvent('content_block_delta', {
+          index: 0,
+          delta: { type: 'text_delta', text: actionJson },
+        }),
         sseEvent('message_stop', {}),
       ]);
       fetchMock.mockResolvedValue({ ok: true, body: { getReader: () => reader } });

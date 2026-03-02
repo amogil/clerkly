@@ -119,12 +119,10 @@ function replacePlaceholders(
 
     const fragment = doc.createDocumentFragment();
     let lastIndex = 0;
-    placeholderRegex.lastIndex = 0;
-    let match: RegExpExecArray | null;
-
-    while ((match = placeholderRegex.exec(text))) {
+    const matches = Array.from(text.matchAll(placeholderRegex)) as RegExpMatchArray[];
+    for (const match of matches) {
       const matchText = match[0];
-      const start = match.index;
+      const start = match.index ?? 0;
       const end = start + matchText.length;
 
       if (start > lastIndex) {
