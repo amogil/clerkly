@@ -1,6 +1,6 @@
 -- Migration: 007_add_hidden_to_messages
 -- Requirements: llm-integration.3.8, llm-integration.8.5
--- Adds hidden column to messages table for filtering interrupted/dismissed messages
+-- Adds hidden column to messages table for filtering hidden messages
 
 -- UP
 ALTER TABLE messages ADD COLUMN hidden INTEGER NOT NULL DEFAULT 0;

@@ -490,11 +490,8 @@ function computeAgentStatus(messages: Message[]): AgentStatus {
     return 'new';
   }
 
-  // Фильтруем interrupted сообщения — они не видны в UI и не влияют на статус
-  const visibleMessages = messages.filter(m => {
-    const p = JSON.parse(m.payloadJson);
-    return !(p.data?.interrupted === true);
-  });
+  // Фильтруем hidden сообщения — они не видны в UI и не влияют на статус
+  const visibleMessages = messages.filter(m => m.hidden !== true);
 
   if (visibleMessages.length === 0) {
     return 'new';

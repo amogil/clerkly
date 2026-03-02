@@ -12,6 +12,7 @@ import { Logger } from './Logger';
 import { SettingsRepository } from './db/repositories/SettingsRepository';
 import { AgentsRepository } from './db/repositories/AgentsRepository';
 import { MessagesRepository } from './db/repositories/MessagesRepository';
+import { ImagesRepository } from './db/repositories/ImagesRepository';
 import { UsersRepository } from './db/repositories/UsersRepository';
 import { GlobalRepository } from './db/repositories/GlobalRepository';
 import { NO_USER_LOGGED_IN_ERROR } from '../shared/errors/userErrors';
@@ -47,6 +48,7 @@ export interface IDatabaseManager {
   readonly settings: SettingsRepository;
   readonly agents: AgentsRepository;
   readonly messages: MessagesRepository;
+  readonly images: ImagesRepository;
   readonly users: UsersRepository;
   readonly global: GlobalRepository;
 }
@@ -83,6 +85,7 @@ export class DatabaseManager implements IDatabaseManager {
   private _settings: SettingsRepository | null = null;
   private _agents: AgentsRepository | null = null;
   private _messages: MessagesRepository | null = null;
+  private _images: ImagesRepository | null = null;
   private _users: UsersRepository | null = null;
   private _global: GlobalRepository | null = null;
 
@@ -129,6 +132,7 @@ export class DatabaseManager implements IDatabaseManager {
     this._settings = new SettingsRepository(this.drizzleDb, this.requireUserId);
     this._agents = new AgentsRepository(this.drizzleDb, this.requireUserId);
     this._messages = new MessagesRepository(this.drizzleDb, this.requireUserId, this._agents);
+    this._images = new ImagesRepository(this.drizzleDb, this._agents);
 
     this.logger.info('Drizzle ORM and repositories initialized');
   }
@@ -158,6 +162,14 @@ export class DatabaseManager implements IDatabaseManager {
   get messages(): MessagesRepository {
     if (!this._messages) throw new Error('Database not initialized');
     return this._messages;
+  }
+
+  /**
+   * Images repository for message images
+   */
+  get images(): ImagesRepository {
+    if (!this._images) throw new Error('Database not initialized');
+    return this._images;
   }
 
   /**

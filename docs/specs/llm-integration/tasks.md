@@ -47,7 +47,7 @@
   - `error` → не сериализуется (исключается из YAML‑истории)
 - **Фильтры**:
   - `kind:error` по‑прежнему исключается из истории;
-  - `hidden/interrupted` исключаются на уровне выборки из БД.
+  - `hidden` исключаются на уровне выборки из БД.
 
 ### Формат YAML‑истории (kind‑history)
 
@@ -68,7 +68,7 @@ messages:
           type: text
           content: "Вот ответ..."
         images:
-          - id: img_1
+          - id: 1
             url: https://example.com/a.png
             alt: "Схема 1"
 ```
@@ -91,9 +91,9 @@ messages:
 
 ```
 Вот схема:
-[[image:img_1]]
+[[image:1]]
 И ещё одна:
-[[image:diagram_2]]
+[[image:2]]
 ```
 
 #### Кликабельные изображения
@@ -107,7 +107,7 @@ messages:
 Пример:
 
 ```
-[[image:img_1|link:https://example.com]]
+[[image:1|link:https://example.com]]
 ```
 
 #### Размеры изображений
@@ -127,7 +127,7 @@ messages:
 Пример:
 
 ```
-[[image:img_1|size:640x180]]
+[[image:1|size:640x180]]
 ```
 
 ### Список изображений
@@ -138,15 +138,15 @@ messages:
   "data": {
     "action": { "type": "text", "content": "..." },
     "images": [
-      { "id": "img_1", "url": "https://example.com/a.png", "alt": "Схема 1", "link": "https://example.com" },
-      { "id": "diagram_2", "url": "https://example.com/b.png" }
+      { "id": 1, "url": "https://example.com/a.png", "alt": "Схема 1", "link": "https://example.com" },
+      { "id": 2, "url": "https://example.com/b.png" }
     ]
   }
 }
 ```
 
 Правила:
-- `id` должен совпадать с `[[image:<id>]]` в тексте.
+- `id` должен совпадать с `[[image:<id>]]` в тексте и быть натуральным числом.
 - `url` допустим только `http/https`.
 - `alt` необязателен.
 - `link` необязателен; при наличии изображение кликабельно.
@@ -164,7 +164,7 @@ messages:
 
 - `agent_id TEXT NOT NULL`
 - `message_id TEXT NOT NULL`
-- `image_id TEXT NOT NULL`
+- `image_id INTEGER NOT NULL`
 - `url TEXT NOT NULL`
 - `status TEXT NOT NULL` (`pending` | `error` | `success`)
 - `hash TEXT` (nullable, только при `success`)
@@ -330,11 +330,29 @@ messages:
   - `images:get(agentId, messageId, imageId)` → `{ found: boolean, status: 'pending'|'error'|'success', bytes?, contentType?, size? }`
 - **Polling:** первые 10 секунд — 0.5с, следующие 10 секунд — 1с, далее — 5с, максимум 60 секунд.
 
-## Дополнение: hidden/interrupted не должны попадать в историю
+## Дополнение: hidden не должны попадать в историю
 
-- **Правило:** сообщения с флагом `hidden` (включая interrupted) не включаются в историю промпта.
+- **Правило:** сообщения с флагом `hidden` не включаются в историю промпта.
 - **Где исправить:** фильтрация в `MessageManager.list()` и/или `MessagesRepository.listByAgent()` по `payload.data.hidden !== true`.
 - **Тесты:** модульный тест для истории и функциональный тест, который проверяет, что скрытое сообщение не попадает в историю при втором запросе LLM.
+
+## Актуальный статус и задачи
+
+**Текущий статус:** Фаза 3 — Планирование дозакрытия тестового покрытия
+
+### Выполнено
+- ✅ Базовый LLM pipeline и история.
+- ✅ Embedded images (Structured Output + DB + UI).
+- ✅ Таблица `images` + миграции.
+- ✅ `ImageStorageManager` и IPC `images:get`.
+- ✅ `MainPipeline` (валидация, retry, загрузки).
+- ✅ `MessageImageResolver` в renderer.
+
+### В работе
+- 🔄 Подготовка дозакрытия тестов для `llm-integration.11`, `llm-integration.12`, `llm-integration.13.5`.
+
+### Запланировано (дозакрытие)
+- См. разделы `Чек‑лист работ` и `Чек‑лист тестов` ниже (в них включены задачи, перенесённые из `tasks.md`).
 
 ## Тестирование
 
@@ -353,23 +371,30 @@ messages:
 
 ## Чек‑лист работ
 
-- [ ] Уточнить формат `[[image:<id>]]` и правила валидации `id`.
-- [ ] Зафиксировать формат `data.images[]` (id, url, alt).
-- [ ] Добавить таблицу `images` (agent/message/image/status/hash/bytes) + миграцию.
-- [ ] Реализовать `ImageStorageManager`.
-- [ ] Реализовать загрузку изображений внутри `MainPipeline` (без отдельного класса).
-- [ ] Реализовать IPC `images:get` в `ImageStorageManager` с чтением `images`.
-- [ ] Реализовать `MessageImageResolver` в renderer.
-- [ ] Добавить кэширование и защиту от повторных загрузок.
-- [ ] Добавить обработку ошибок: неизвестный id, не найден URL, неподдерживаемый тип, превышение лимита.
-- [ ] Добавить поддержку `link` и валидацию URL (http/https) для кликов.
-- [ ] Добавить поддержку `size` и заглушку с неброским лоадером.
-- [ ] Определить дефолтный размер заглушки, если `size` не указан.
-- [ ] Добавить в коде единое описание схемы Structured Output (поля, автоматически передаваемые в модель).
-- [ ] Обновить системный промпт.
+### Фаза 2: Embedded Images (реализация)
+- [x] Уточнить формат `[[image:<id>]]` и правила валидации `id`.
+- [x] Зафиксировать формат `data.images[]` (id, url, alt).
+- [x] Добавить таблицу `images` (agent/message/image/status/hash/bytes) + миграцию.
+- [x] Реализовать `ImageStorageManager`.
+- [x] Реализовать загрузку изображений внутри `MainPipeline` (без отдельного класса).
+- [x] Реализовать IPC `images:get` в `ImageStorageManager` с чтением `images`.
+- [x] Реализовать `MessageImageResolver` в renderer.
+- [x] Добавить обработку ошибок: неизвестный id, не найден URL, неподдерживаемый тип, превышение лимита.
+- [x] Добавить поддержку `link` и валидацию URL (http/https) для кликов.
+- [x] Добавить поддержку `size` и заглушку с неброским лоадером.
+- [x] Определить дефолтный размер заглушки, если `size` не указан.
+- [x] Добавить в коде единое описание схемы Structured Output (поля, автоматически передаваемые в модель).
+- [x] Обновить системный промпт.
+
+### Фаза 3: Дозакрытие тестового покрытия
 - [ ] Добавить unit‑тесты (парсер/хранилище/ошибки).
 - [ ] Добавить functional‑тесты (рендер/ошибки/кэш).
-- [ ] Исключить hidden/interrupted из истории и покрыть модульным и функциональным тестом.
+- [ ] Исключить hidden из истории и покрыть модульным и функциональным тестом.
+- [ ] Добавить functional-тест: invalid structured output → retry (до 2 повторов) → ошибка `"Invalid response format. Please try again later."` + действие `Retry`.
+- [ ] Добавить unit-тест в `MainPipeline`: проверить, что при retry отправляется инструкция `"Your previous response did not match the required JSON schema. Reply again using the exact required format only."`.
+- [ ] Добавить unit-тесты провайдеров/контракта: проверить, что описание Structured Output (схема + форматы + семантика) передаётся из единого декларативного контракта.
+- [ ] Добавить unit-тест: `messages.usage_json` не дублирует `provider`, `model`, `timestamp`.
+- [ ] Выровнять requirement-ссылки в комментариях тестов под `llm-integration.10/11/12/13`.
 
 ## Чек‑лист тестов
 
@@ -415,12 +440,13 @@ messages:
 - [ ] Polling: пока `status=pending` → placeholder остаётся.
 - [ ] Polling: при `status=success` → изображение вставляется.
 - [ ] Polling: таймаут 60 секунд → placeholder удаляется.
-- [ ] История: hidden/interrupted исключаются из replay.
+- [ ] История: hidden исключаются из replay.
 - [ ] История: payload сериализуется целиком, кроме `kind` и `reply_to_message_id`.
 - [ ] История: плейсхолдеры остаются в истории (не удаляются).
 - [ ] MainPipeline: invalid response format → retry с системным сообщением.
 - [ ] MainPipeline: после 1–2 retry создаётся `kind: error` с `Retry`.
 - [ ] MainPipeline: retry не зацикливается (счётчик попыток).
+- [ ] Добавить functional test: invalid structured output → 2 retry → `kind:error` в чате с кнопкой `Retry`.
 - [ ] Renderer: отмена polling при unmount сообщения.
 
 ### Функциональные тесты

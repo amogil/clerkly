@@ -11,6 +11,7 @@ module.exports = {
   setupFilesAfterEnv: ['<rootDir>/tests/setup.ts'],
   moduleNameMapper: {
     '^electron$': '<rootDir>/tests/__mocks__/electron.ts',
+    '^yaml$': '<rootDir>/node_modules/yaml/dist/index.js',
     '^react-markdown$': '<rootDir>/tests/__mocks__/react-markdown.tsx',
     '^@/(.*)$': '<rootDir>/src/renderer/$1',
     '^use-stick-to-bottom$': '<rootDir>/tests/__mocks__/use-stick-to-bottom.tsx',

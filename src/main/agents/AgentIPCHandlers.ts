@@ -283,9 +283,9 @@ export class AgentIPCHandlers {
       // Launch LLM pipeline asynchronously for user messages
       // Requirements: llm-integration.6, llm-integration.3.8
       if (args.kind === 'user') {
-        // Dismiss all kind:error messages for this agent before sending new message
+        // Hide all visible kind:error messages for this agent before sending new message
         // Requirements: llm-integration.3.8
-        this.messageManager.dismissErrorMessages(args.agentId);
+        this.messageManager.hideErrorMessages(args.agentId);
 
         // Cancel any running pipeline for this agent
         this.agentManager.cancelPipeline(args.agentId);
@@ -347,7 +347,7 @@ export class AgentIPCHandlers {
   ): Promise<IPCResult> {
     try {
       // Hide existing error dialogs before retrying the request.
-      this.messageManager.dismissErrorMessages(args.agentId);
+      this.messageManager.hideErrorMessages(args.agentId);
       const lastUser = this.messageManager.getLastUserMessage(args.agentId);
       if (!lastUser) {
         return { success: false, error: 'No user message to retry' };
