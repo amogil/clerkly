@@ -548,7 +548,12 @@ export class MainPipeline {
     ok: boolean;
     placeholders: Array<{ id: number; link?: string; size?: { width: number; height: number } }>;
   } {
-    const parsed = safeParseStructuredOutput(output);
+    // Validate only model structured payload fields.
+    // Provider usage envelope is handled separately via messages.usage_json.
+    const parsed = safeParseStructuredOutput({
+      action: output.action,
+      images: output.images,
+    });
     if (!parsed.success) {
       return { ok: false, placeholders: [] };
     }

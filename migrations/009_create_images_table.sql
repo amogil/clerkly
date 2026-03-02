@@ -1,4 +1,5 @@
 -- Requirements: llm-integration.1
+-- UP
 CREATE TABLE IF NOT EXISTS images (
   agent_id TEXT NOT NULL,
   message_id TEXT NOT NULL,
@@ -13,3 +14,6 @@ CREATE TABLE IF NOT EXISTS images (
   updated_at TEXT NOT NULL,
   UNIQUE (agent_id, message_id, image_id)
 );
+
+-- DOWN
+DROP TABLE IF EXISTS images;
