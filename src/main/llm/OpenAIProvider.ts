@@ -12,7 +12,7 @@ import {
 import { LLM_PROVIDERS, ERROR_MESSAGES, CHAT_TIMEOUT_MS } from './LLMConfig';
 import {
   buildStructuredOutputInstruction,
-  getStructuredOutputJsonSchema,
+  getOpenAIStructuredOutputJsonSchema,
   safeParseStructuredOutput,
 } from './StructuredOutputContract';
 
@@ -125,7 +125,7 @@ export class OpenAIProvider implements ILLMProvider {
             type: 'json_schema',
             strict: true,
             name: 'structured_output',
-            schema: getStructuredOutputJsonSchema(),
+            schema: getOpenAIStructuredOutputJsonSchema(),
           },
         },
         ...(options.reasoningEffort ? { reasoning: { effort: options.reasoningEffort } } : {}),
@@ -242,7 +242,8 @@ export class OpenAIProvider implements ILLMProvider {
     }
     try {
       const parsedJson = JSON.parse(json) as unknown;
-      const parsed = safeParseStructuredOutput(parsedJson);
+      const normalized = this.normalizeNullableImageFields(parsedJson);
+      const parsed = safeParseStructuredOutput(normalized);
       if (!parsed.success) {
         throw new Error(parsed.error.message);
       }
@@ -250,6 +251,31 @@ export class OpenAIProvider implements ILLMProvider {
     } catch {
       throw new Error(`Failed to parse LLM response: ${json}`);
     }
+  }
+
+  private normalizeNullableImageFields(value: unknown): unknown {
+    if (!value || typeof value !== 'object') {
+      return value;
+    }
+    const root = value as Record<string, unknown>;
+    const images = root['images'];
+    if (!Array.isArray(images)) {
+      return value;
+    }
+    root['images'] = images.map((item) => {
+      if (!item || typeof item !== 'object') {
+        return item;
+      }
+      const image = { ...(item as Record<string, unknown>) };
+      if (image['alt'] === null) {
+        delete image['alt'];
+      }
+      if (image['link'] === null) {
+        delete image['link'];
+      }
+      return image;
+    });
+    return root;
   }
 
   private mapResponsesUsage(raw: OpenAIResponsesUsage): LLMUsage {

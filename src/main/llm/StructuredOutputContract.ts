@@ -86,6 +86,78 @@ export function getStructuredOutputJsonSchema(): Record<string, unknown> {
   return cloned;
 }
 
+function asObject(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function toNullableType(typeValue: unknown): unknown {
+  if (typeof typeValue === 'string') {
+    return typeValue === 'null' ? 'null' : [typeValue, 'null'];
+  }
+  if (Array.isArray(typeValue)) {
+    return typeValue.includes('null') ? typeValue : [...typeValue, 'null'];
+  }
+  return typeValue;
+}
+
+function transformOpenAISchema(value: unknown, path: string[] = []): unknown {
+  if (Array.isArray(value)) {
+    return value.map((item, index) => transformOpenAISchema(item, [...path, String(index)]));
+  }
+  if (!value || typeof value !== 'object') {
+    return value;
+  }
+
+  const record = value as Record<string, unknown>;
+  const transformed: Record<string, unknown> = {};
+  for (const [key, entry] of Object.entries(record)) {
+    if (key === 'format' && typeof entry === 'string') {
+      if (entry === 'uri') {
+        // OpenAI strict schema rejects "uri" format.
+        continue;
+      }
+      throw new Error(
+        `Unsupported JSON Schema format for OpenAI strict adapter at ${[...path, key].join('.')}: ${entry}`
+      );
+    }
+    transformed[key] = transformOpenAISchema(entry, [...path, key]);
+  }
+
+  // OpenAI strict requires required[] to include every key from properties.
+  if (transformed['type'] === 'object') {
+    const properties = asObject(transformed['properties']);
+    if (properties) {
+      transformed['required'] = Object.keys(properties);
+    }
+  }
+
+  // Keep alt/link logically optional by making them nullable in OpenAI schema.
+  const isImageItemSchema = path.join('.') === 'properties.images.items';
+  if (isImageItemSchema) {
+    const properties = asObject(transformed['properties']);
+    if (properties) {
+      for (const key of ['alt', 'link']) {
+        const fieldSchema = asObject(properties[key]);
+        if (fieldSchema && 'type' in fieldSchema) {
+          fieldSchema['type'] = toNullableType(fieldSchema['type']);
+        }
+      }
+    }
+  }
+
+  return transformed;
+}
+
+/**
+ * OpenAI-compatible schema variant.
+ * Keeps canonical contract semantics while removing unsupported JSON Schema formats.
+ */
+export function getOpenAIStructuredOutputJsonSchema(): Record<string, unknown> {
+  return transformOpenAISchema(getStructuredOutputJsonSchema()) as Record<string, unknown>;
+}
+
 /**
  * Build shared model instruction with schema + semantic descriptions.
  * Requirements: llm-integration.11.1, llm-integration.11.2, llm-integration.11.3

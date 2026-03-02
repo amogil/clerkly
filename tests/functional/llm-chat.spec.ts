@@ -786,7 +786,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
 
     const actionContent = context.window.locator('[data-testid="message-llm-action"]');
     await expect(actionContent).toBeVisible({ timeout: 5000 });
-    await expect(actionContent.locator('img')).toBeVisible({ timeout: 10000 });
+    await expect(actionContent.locator('img')).toBeVisible({ timeout: 6000 });
   });
 
   /* Preconditions: MockLLMServer returns 429 with retry-after=3 on first request,

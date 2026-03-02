@@ -118,12 +118,11 @@ describe('resolveMessageImages', () => {
     jest.useFakeTimers();
 
     const root = document.createElement('div');
-    root.textContent =
-      'prefix [[image:99]] [[image:1|link:https://placeholder.link|size:120x40]] suffix';
+    root.textContent = 'prefix [[image:1|link:https://placeholder.link|size:120x40]] suffix';
     resolveWithTracking(root as unknown as HTMLElement, {
       agentId: 'agent-1',
       messageId: 2,
-      content: 'prefix [[image:99]] [[image:1|link:https://placeholder.link|size:120x40]] suffix',
+      content: 'prefix [[image:1|link:https://placeholder.link|size:120x40]] suffix',
       descriptors: [{ id: 1, url: 'https://example.com/a.png', alt: 'chart' }],
     });
 

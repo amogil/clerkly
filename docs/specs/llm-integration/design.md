@@ -218,6 +218,15 @@ CREATE TABLE images (
   - `Anthropic`: поддерживает Structured Outputs через `output_config.format` с типом `json_schema`.
 - Все провайдеры при парсинге ответа модели выполняют валидацию через общий `safeParse` контракта.
 
+#### OpenAI strict schema adapter
+
+- Для `OpenAI` используется provider-specific адаптер схемы перед отправкой в `text.format.schema`.
+- Адаптер удаляет только `format: "uri"` (ограничение strict subset OpenAI для URL-формата).
+- Если адаптер встречает любой другой `format`, выполнение прерывается с явной ошибкой конфигурации схемы (fail-fast), чтобы не отправлять неоднозначную/неподдерживаемую схему.
+- Для strict-совместимости optional-поля `images[].alt` и `images[].link` в OpenAI-схеме представляются как required + nullable (`["string","null"]`).
+- После получения ответа от OpenAI `null` в `alt/link` нормализуется в отсутствие поля (`undefined`), после чего применяется канонический `safeParse`.
+- Жёсткая проверка URL (`http/https`) выполняется runtime-валидацией канонического контракта приложения.
+
 #### Формат structured output
 
 **Схема и форматы полей:**

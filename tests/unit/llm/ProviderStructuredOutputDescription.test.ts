@@ -60,6 +60,24 @@ function expectStructuredSchemaWithDescriptions(schema: unknown): void {
   );
 }
 
+function expectOpenAIStrictSchemaAdjustments(schema: unknown): void {
+  const typed = schema as Record<string, unknown>;
+  const imageItem = (
+    ((typed.properties as Record<string, unknown>)?.images as Record<string, unknown>)
+      ?.items as Record<string, unknown>
+  ) as Record<string, unknown>;
+  const imageProps = (imageItem.properties ?? {}) as Record<string, unknown>;
+  const required = (imageItem.required ?? []) as string[];
+
+  // format: "uri" must be stripped in OpenAI strict schema adapter.
+  expect((imageProps.url as Record<string, unknown>).format).toBeUndefined();
+  // OpenAI strict schema requires all keys listed in required.
+  expect(required).toEqual(expect.arrayContaining(['id', 'url', 'alt', 'link']));
+  // logically optional fields are represented as nullable under strict schema.
+  expect((imageProps.alt as Record<string, unknown>).type).toEqual(['string', 'null']);
+  expect((imageProps.link as Record<string, unknown>).type).toEqual(['string', 'null']);
+}
+
 function expectInstructionWithFieldFormatsAndImageLinks(instruction: string): void {
   expect(instruction).toContain('Field semantics and formats:');
   expect(instruction).toContain('- action.type: always "text"; defines the action kind.');
@@ -125,8 +143,11 @@ describe('Provider structured output description in requests', () => {
     const systemInstruction = String(input[0]?.content ?? '');
     const schema = (((body.text as Record<string, unknown>).format as Record<string, unknown>)
       .schema ?? {}) as Record<string, unknown>;
+    const format = ((body.text as Record<string, unknown>).format ?? {}) as Record<string, unknown>;
 
     expectStructuredSchemaWithDescriptions(schema);
+    expectOpenAIStrictSchemaAdjustments(schema);
+    expect(format.strict).toBe(true);
     expectInstructionWithFieldFormatsAndImageLinks(systemInstruction);
   });
 

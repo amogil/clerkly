@@ -343,13 +343,48 @@ describe('OpenAIProvider.chat()', () => {
 
       const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string) as {
         input?: Array<{ role: string; content: string }>;
-        text?: { format?: { type?: string; schema?: Record<string, unknown> } };
+        text?: { format?: { type?: string; strict?: boolean; schema?: Record<string, unknown> } };
         response_format?: unknown;
       };
       expect(body.text?.format?.type).toBe('json_schema');
+      expect(body.text?.format?.strict).toBe(true);
       expect(body.text?.format?.schema).toBeDefined();
+      const schema = body.text?.format?.schema as Record<string, unknown>;
+      const imageProperties = (
+        ((schema.properties as Record<string, unknown>)?.images as Record<string, unknown>)
+          ?.items as Record<string, unknown>
+      )?.properties as Record<string, unknown>;
+      expect((imageProperties?.url as Record<string, unknown>)?.format).toBeUndefined();
+      expect(
+        (((
+          (schema.properties as Record<string, unknown>)?.images as Record<string, unknown>
+        )?.items as Record<string, unknown>)?.required as string[]) ?? []
+      ).toEqual(expect.arrayContaining(['id', 'url', 'alt', 'link']));
+      expect((imageProperties?.alt as Record<string, unknown>)?.type).toEqual(['string', 'null']);
+      expect((imageProperties?.link as Record<string, unknown>)?.type).toEqual(['string', 'null']);
       expect(body.response_format).toBeUndefined();
       expect(Array.isArray(body.input)).toBe(true);
+    });
+  });
+
+  describe('nullable image fields from OpenAI strict schema', () => {
+    /* Preconditions: OpenAI returns alt/link as null from strict schema response
+       Action: Call chat() and parse action
+       Assertions: Null nullable fields are normalized and response stays valid
+       Requirements: llm-integration.12.4 */
+    it('should normalize image alt/link null values before safeParse', async () => {
+      const actionJson = JSON.stringify({
+        action: { type: 'text', content: 'Image [[image:1]]' },
+        images: [{ id: 1, url: 'https://example.com/image.png', alt: null, link: null }],
+      });
+      const reader = buildMockReader([
+        sseResponsesEvent({ type: 'response.output_text.delta', delta: actionJson }),
+        'data: [DONE]',
+      ]);
+      fetchMock.mockResolvedValue({ ok: true, body: { getReader: () => reader } });
+
+      const result = await provider.chat(mockMessages, mockOptions, () => {});
+      expect(result.images).toEqual([{ id: 1, url: 'https://example.com/image.png' }]);
     });
   });
 });

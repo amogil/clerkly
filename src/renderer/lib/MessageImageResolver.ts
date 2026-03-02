@@ -160,6 +160,8 @@ function replacePlaceholders(
       placeholderRegex.lastIndex = 0;
       continue;
     }
+    // RegExp#test with /g advances lastIndex; reset before matchAll to avoid skipping first match.
+    placeholderRegex.lastIndex = 0;
 
     const fragment = doc.createDocumentFragment();
     let lastIndex = 0;
