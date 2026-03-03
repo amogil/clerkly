@@ -3,6 +3,7 @@
 // tests/unit/renderer/lib/MessageImageResolver.test.ts
 
 import { resolveMessageImages } from '../../../../src/renderer/lib/MessageImageResolver';
+import { TextDecoder as NodeTextDecoder } from 'util';
 
 type ImagesGet = (
   agentId: string,
@@ -44,6 +45,7 @@ describe('resolveMessageImages', () => {
 
   beforeEach(() => {
     jest.useRealTimers();
+    (global as unknown as { TextDecoder?: typeof NodeTextDecoder }).TextDecoder = NodeTextDecoder;
     URL.createObjectURL = jest.fn().mockReturnValue('blob:test');
     URL.revokeObjectURL = jest.fn();
     document.body.innerHTML = '';
@@ -223,5 +225,116 @@ describe('resolveMessageImages', () => {
     expect(anchor).not.toBeNull();
     expect(anchor?.getAttribute('href')).toBe('https://example.com/fallback');
     expect(URL.createObjectURL).toHaveBeenCalled();
+  });
+
+  /* Preconditions: Image status remains pending longer than resolver timeout
+     Action: resolveMessageImages() keeps polling with fake timers
+     Assertions: Placeholder is removed after 60s timeout
+     Requirements: llm-integration.9.5 */
+  it('should remove placeholder after 60s polling timeout', async () => {
+    const getImage = jest.fn().mockResolvedValue({ found: true, status: 'pending' });
+    setImagesApi(getImage);
+    jest.useFakeTimers();
+
+    const root = document.createElement('div');
+    root.textContent = '[[image:6]]';
+    resolveWithTracking(root as unknown as HTMLElement, {
+      agentId: 'agent-1',
+      messageId: 7,
+      content: '[[image:6]]',
+      descriptors: [{ id: 6, url: 'https://example.com/f.png' }],
+    });
+
+    await flush();
+    expect(root.querySelector('span[data-image-id="6"]')).not.toBeNull();
+
+    // Drive staged polling (0.5s -> 1s -> 5s) past 60s timeout boundary.
+    for (let i = 0; i < 40; i++) {
+      jest.advanceTimersByTime(2000);
+      await flush();
+    }
+
+    expect(root.querySelector('span[data-image-id="6"]')).toBeNull();
+    expect(getImage).toHaveBeenCalled();
+    jest.useRealTimers();
+  });
+
+  /* Preconditions: Polling started for pending image
+     Action: Cleanup callback is invoked (message unmount)
+     Assertions: Further polling is cancelled and no new image requests are made
+     Requirements: llm-integration.9.5 */
+  it('should cancel polling on cleanup (unmount)', async () => {
+    const getImage = jest.fn().mockResolvedValue({ found: true, status: 'pending' });
+    setImagesApi(getImage);
+    jest.useFakeTimers();
+
+    const root = document.createElement('div');
+    root.textContent = '[[image:7]]';
+    const cleanup = resolveMessageImages(root as unknown as HTMLElement, {
+      agentId: 'agent-1',
+      messageId: 8,
+      content: '[[image:7]]',
+      descriptors: [{ id: 7, url: 'https://example.com/g.png' }],
+    });
+    activeCleanups.push(cleanup);
+
+    await flush();
+    expect(getImage).toHaveBeenCalledTimes(1);
+
+    cleanup();
+    jest.advanceTimersByTime(10_000);
+    await flush();
+
+    expect(getImage).toHaveBeenCalledTimes(1);
+    jest.useRealTimers();
+  });
+
+  /* Preconditions: Successful SVG image contains unsafe tags/attributes
+     Action: resolveMessageImages() creates blob URL for SVG
+     Assertions: SVG content is sanitized before rendering
+     Requirements: llm-integration.9.3 */
+  it('should sanitize svg content before rendering', async () => {
+    const rawSvg =
+      '<svg onload="alert(1)"><script>alert(2)</script><foreignObject>x</foreignObject><g id="ok"/></svg>';
+    const bytes = Uint8Array.from(Buffer.from(rawSvg, 'utf-8'));
+    const getImage = jest.fn().mockResolvedValue({
+      found: true,
+      status: 'success',
+      bytes,
+      contentType: 'image/svg+xml',
+    });
+    setImagesApi(getImage);
+
+    let capturedBlob: Blob | null = null;
+    URL.createObjectURL = jest.fn().mockImplementation((blob: Blob) => {
+      capturedBlob = blob;
+      return 'blob:test';
+    });
+
+    const root = document.createElement('div');
+    root.textContent = '[[image:8]]';
+    resolveWithTracking(root as unknown as HTMLElement, {
+      agentId: 'agent-1',
+      messageId: 9,
+      content: '[[image:8]]',
+      descriptors: [{ id: 8, url: 'https://example.com/h.svg' }],
+    });
+
+    await flush();
+
+    expect(root.querySelector('span[data-image-id="8"] img')).not.toBeNull();
+    expect(capturedBlob).not.toBeNull();
+    if (!capturedBlob) {
+      throw new Error('Expected SVG blob to be captured');
+    }
+    const sanitized = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(reader.error ?? new Error('Failed to read blob'));
+      reader.onload = () => resolve(String(reader.result ?? ''));
+      reader.readAsText(capturedBlob as Blob);
+    });
+    expect(sanitized).not.toContain('<script');
+    expect(sanitized).not.toContain('foreignObject');
+    expect(sanitized).not.toContain('onload=');
   });
 });

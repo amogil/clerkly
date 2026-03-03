@@ -10,6 +10,18 @@ jest.mock('electron', () => ({
   },
 }));
 
+const loggerWarn = jest.fn();
+jest.mock('../../../src/main/Logger', () => ({
+  Logger: {
+    create: jest.fn(() => ({
+      warn: loggerWarn,
+      info: jest.fn(),
+      error: jest.fn(),
+      debug: jest.fn(),
+    })),
+  },
+}));
+
 interface ImagesRepoMock {
   upsert: jest.Mock;
   get: jest.Mock;
@@ -33,6 +45,7 @@ describe('ImageStorageManager', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    loggerWarn.mockReset();
   });
 
   afterEach(() => {
@@ -171,6 +184,85 @@ describe('ImageStorageManager', () => {
     expect(images.upsert).toHaveBeenCalledWith(expect.objectContaining({ status: 'error' }));
   });
 
+  /* Preconditions: Fetch rejects with AbortError (timeout-like behavior)
+     Action: downloadAndStore() is called
+     Assertions: Status set to error
+     Requirements: llm-integration.1, llm-integration.9.8 */
+  it('should mark error when fetch is aborted', async () => {
+    const { manager, images } = createManager();
+    global.fetch = jest
+      .fn()
+      .mockRejectedValue(new DOMException('aborted', 'AbortError')) as unknown as typeof fetch;
+
+    await manager.downloadAndStore('agent-1', '1', 70, 'https://example.com/timeout.png');
+
+    expect(images.upsert).toHaveBeenCalledWith(expect.objectContaining({ status: 'error' }));
+  });
+
+  /* Preconditions: Same (agentId, messageId, imageId) requested twice
+     Action: downloadAndStore() is called two times
+     Assertions: Record is updated via upsert for same key
+     Requirements: llm-integration.1, llm-integration.9.6 */
+  it('should upsert same image key on repeated download requests', async () => {
+    const { manager, images } = createManager();
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      headers: { get: () => 'image/png' },
+      arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer,
+    }) as unknown as typeof fetch;
+
+    await manager.downloadAndStore('agent-1', '1', 8, 'https://example.com/first.png');
+    await manager.downloadAndStore('agent-1', '1', 8, 'https://example.com/second.png');
+
+    const sameKeyCalls = images.upsert.mock.calls
+      .map((call) => call[0])
+      .filter(
+        (payload) =>
+          payload.agentId === 'agent-1' && payload.messageId === '1' && payload.imageId === 8
+      );
+    expect(sameKeyCalls.length).toBeGreaterThanOrEqual(4); // pending+success for each request
+  });
+
+  /* Preconditions: Response body exceeds max image size limit
+     Action: downloadAndStore() is called
+     Assertions: Status set to error
+     Requirements: llm-integration.1, llm-integration.9.8 */
+  it('should mark error when image exceeds size limit', async () => {
+    const { manager, images } = createManager();
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      headers: { get: () => 'image/png' },
+      arrayBuffer: async () => new Uint8Array([1]).buffer,
+    }) as unknown as typeof fetch;
+    const fromSpy = jest
+      .spyOn(Buffer, 'from')
+      .mockImplementation(() => ({ length: 50 * 1024 * 1024 * 1024 + 1 }) as any);
+
+    await manager.downloadAndStore('agent-1', '1', 9, 'https://example.com/huge.png');
+
+    expect(images.upsert).toHaveBeenCalledWith(expect.objectContaining({ status: 'error' }));
+    fromSpy.mockRestore();
+  });
+
+  /* Preconditions: Response content type is image/svg+xml
+     Action: downloadAndStore() is called
+     Assertions: SVG is accepted and stored as success
+     Requirements: llm-integration.1, llm-integration.9.8 */
+  it('should store svg image content type successfully', async () => {
+    const { manager, images } = createManager();
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      headers: { get: () => 'image/svg+xml' },
+      arrayBuffer: async () => new Uint8Array([60, 115, 118, 103, 47, 62]).buffer, // <svg/>
+    }) as unknown as typeof fetch;
+
+    await manager.downloadAndStore('agent-1', '1', 10, 'https://example.com/vector.svg');
+
+    expect(images.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'success', contentType: 'image/svg+xml' })
+    );
+  });
+
   /* Preconditions: Missing descriptor for placeholder id
      Action: markMissingDescriptor() is called
      Assertions: Error image record is upserted
@@ -227,6 +319,20 @@ describe('ImageStorageManager', () => {
     expect(manager.getImage('agent-1', '1', 10)).toEqual({ found: false, status: 'error' });
   });
 
+  /* Preconditions: Repository access throws while reading image record
+     Action: getImage() is called
+     Assertions: Returns error status without throwing
+     Requirements: llm-integration.1, llm-integration.9.8 */
+  it('should return error status when repository get throws', () => {
+    const { manager } = createManager({
+      get: jest.fn(() => {
+        throw new Error('db timeout');
+      }),
+    });
+
+    expect(manager.getImage('agent-1', '1', 99)).toEqual({ found: false, status: 'error' });
+  });
+
   /* Preconditions: Image record is in pending state
      Action: getImage() is called
      Assertions: Returns pending status
@@ -270,5 +376,20 @@ describe('ImageStorageManager', () => {
     const result = await handler({}, { agentId: 'agent-1', messageId: '1', imageId: 13 });
     expect(result).toEqual({ found: true, status: 'pending' });
     expect(images.get).toHaveBeenCalledWith('agent-1', '1', 13);
+  });
+
+  /* Preconditions: Download fails
+     Action: downloadAndStore() is called
+     Assertions: Failure is logged through logger.warn
+     Requirements: llm-integration.1 */
+  it('should log warning on image download failure', async () => {
+    const { manager } = createManager();
+    global.fetch = jest
+      .fn()
+      .mockRejectedValue(new Error('network down')) as unknown as typeof fetch;
+
+    await manager.downloadAndStore('agent-1', '1', 71, 'https://example.com/fail.png');
+
+    expect(loggerWarn).toHaveBeenCalled();
   });
 });

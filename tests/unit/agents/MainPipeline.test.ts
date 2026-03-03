@@ -120,6 +120,7 @@ function makeMocks() {
     llmProvider,
     createProvider,
     mockPublish,
+    imageStorageManager,
   };
 }
 
@@ -696,6 +697,130 @@ describe('MainPipeline.run()', () => {
 
       // Both should have created llm messages
       expect(messageManager.create).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('image download queue', () => {
+    /* Preconditions: Structured output contains multiple unique images
+       Action: Call run(agentId, userMessageId)
+       Assertions: downloadAndStore called for each unique image
+       Requirements: llm-integration.9.6 */
+    it('should call downloadAndStore for all images from output.images', async () => {
+      const { pipeline, llmProvider, imageStorageManager } = makeMocks();
+      llmProvider.chat.mockResolvedValue({
+        action: { type: 'text', content: 'Images: [[image:1]] [[image:2]]' },
+        images: [
+          { id: 1, url: 'https://example.com/a.png' },
+          { id: 2, url: 'https://example.com/b.png' },
+        ],
+      } as LLMStructuredOutput);
+
+      await pipeline.run('agent-1', 1);
+
+      expect(imageStorageManager.downloadAndStore).toHaveBeenCalledTimes(2);
+      expect(imageStorageManager.downloadAndStore).toHaveBeenCalledWith(
+        'agent-1',
+        '2',
+        1,
+        'https://example.com/a.png'
+      );
+      expect(imageStorageManager.downloadAndStore).toHaveBeenCalledWith(
+        'agent-1',
+        '2',
+        2,
+        'https://example.com/b.png'
+      );
+    });
+
+    /* Preconditions: Structured output contains duplicate image ids
+       Action: Call run(agentId, userMessageId)
+       Assertions: downloadAndStore called once per unique id
+       Requirements: llm-integration.9.6 */
+    it('should avoid duplicate download calls for repeated image ids', async () => {
+      const { pipeline, llmProvider, imageStorageManager } = makeMocks();
+      llmProvider.chat.mockResolvedValue({
+        action: { type: 'text', content: '[[image:1]]' },
+        images: [
+          { id: 1, url: 'https://example.com/a.png' },
+          { id: 1, url: 'https://example.com/a-duplicate.png' },
+        ],
+      } as LLMStructuredOutput);
+
+      await pipeline.run('agent-1', 1);
+
+      expect(imageStorageManager.downloadAndStore).toHaveBeenCalledTimes(1);
+      expect(imageStorageManager.downloadAndStore).toHaveBeenCalledWith(
+        'agent-1',
+        '2',
+        1,
+        'https://example.com/a.png'
+      );
+    });
+
+    /* Preconditions: Structured output contains image descriptors without placeholders in text
+       Action: Call run(agentId, userMessageId)
+       Assertions: Images are still downloaded for caching/storage
+       Requirements: llm-integration.9.6 */
+    it('should download images even when placeholders are absent in content', async () => {
+      const { pipeline, llmProvider, imageStorageManager } = makeMocks();
+      llmProvider.chat.mockResolvedValue({
+        action: { type: 'text', content: 'No placeholders here' },
+        images: [{ id: 9, url: 'https://example.com/no-placeholder.png' }],
+      } as LLMStructuredOutput);
+
+      await pipeline.run('agent-1', 1);
+
+      expect(imageStorageManager.downloadAndStore).toHaveBeenCalledTimes(1);
+      expect(imageStorageManager.downloadAndStore).toHaveBeenCalledWith(
+        'agent-1',
+        '2',
+        9,
+        'https://example.com/no-placeholder.png'
+      );
+    });
+
+    /* Preconditions: Placeholder id has no matching descriptor in images[]
+       Action: Call run(agentId, userMessageId)
+       Assertions: markMissingDescriptor is called for missing id
+       Requirements: llm-integration.9.4, llm-integration.9.6 */
+    it('should mark missing descriptor when placeholder id is not present in images', async () => {
+      const { pipeline, llmProvider, imageStorageManager } = makeMocks();
+      llmProvider.chat.mockResolvedValue({
+        action: { type: 'text', content: '[[image:10]]' },
+        images: [],
+      } as LLMStructuredOutput);
+
+      await pipeline.run('agent-1', 1);
+
+      expect(imageStorageManager.downloadAndStore).not.toHaveBeenCalled();
+      expect(imageStorageManager.markMissingDescriptor).toHaveBeenCalledWith('agent-1', '2', 10);
+    });
+
+    /* Preconditions: Multiple image downloads are queued; one download rejects
+       Action: Call run(agentId, userMessageId)
+       Assertions: Pipeline still queues all downloads (partial success path)
+       Requirements: llm-integration.9.6 */
+    it('should queue all downloads even if one image download rejects', async () => {
+      const { pipeline, llmProvider, imageStorageManager, messageManager } = makeMocks();
+      llmProvider.chat.mockResolvedValue({
+        action: { type: 'text', content: '[[image:20]] [[image:21]]' },
+        images: [
+          { id: 20, url: 'https://example.com/ok.png' },
+          { id: 21, url: 'https://example.com/fail.png' },
+        ],
+      } as LLMStructuredOutput);
+      (imageStorageManager.downloadAndStore as jest.Mock).mockImplementation(
+        async (_agentId: string, _messageId: string, imageId: number) => {
+          if (imageId === 21) {
+            throw new Error('download failed');
+          }
+        }
+      );
+
+      await pipeline.run('agent-1', 1);
+
+      expect(imageStorageManager.downloadAndStore).toHaveBeenCalledTimes(2);
+      expect(messageManager.create).toHaveBeenCalledWith('agent-1', 'llm', expect.any(Object), 1);
     });
   });
 });

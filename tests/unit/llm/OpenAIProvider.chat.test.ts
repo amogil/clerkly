@@ -356,9 +356,10 @@ describe('OpenAIProvider.chat()', () => {
       )?.properties as Record<string, unknown>;
       expect((imageProperties?.url as Record<string, unknown>)?.format).toBeUndefined();
       expect(
-        (((
-          (schema.properties as Record<string, unknown>)?.images as Record<string, unknown>
-        )?.items as Record<string, unknown>)?.required as string[]) ?? []
+        ((
+          ((schema.properties as Record<string, unknown>)?.images as Record<string, unknown>)
+            ?.items as Record<string, unknown>
+        )?.required as string[]) ?? []
       ).toEqual(expect.arrayContaining(['id', 'url', 'alt', 'link']));
       expect((imageProperties?.alt as Record<string, unknown>)?.type).toEqual(['string', 'null']);
       expect((imageProperties?.link as Record<string, unknown>)?.type).toEqual(['string', 'null']);

@@ -332,7 +332,8 @@ test.describe('LLM Chat (real OpenAI)', () => {
  * - inspection of raw provider request bodies;
  * - deterministic markdown/image fixtures for renderer assertions.
  * Approval status:
- * - user approved mock usage per test, then approved all remaining tests in this block.
+ * - mock LLM usage is allowed only for scenarios explicitly approved by the user;
+ * - new tests in this block are not auto-approved and require separate confirmation.
  */
 test.describe('LLM Chat (controlled mock transport exceptions)', () => {
   let context: ElectronTestContext;
@@ -341,6 +342,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     if (context) await closeElectron(context);
     mockLLMServer.setStreamingMode(false);
     mockLLMServer.setRateLimitMode(false);
+    mockLLMServer.setImageDelay(0);
     mockLLMServer.setSuccess(true);
     mockLLMServer.clearRequestLogs();
   });
@@ -601,7 +603,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
   /* Preconditions: MockLLMServer configured for success, app authenticated with mock LLM URL
      Action: User sends two messages sequentially, waiting for LLM response after each
      Assertions: Second LLM request contains previous dialogue as separate messages
-     Requirements: llm-integration.10 */
+     Requirements: llm-integration.10.1, llm-integration.10.2, llm-integration.10.4 */
   test('should send full conversation history to llm on second message', async () => {
     mockLLMServer.setStreamingMode(true, {
       content: '{"action":{"type":"text","content":"First response"}}',
@@ -718,7 +720,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
        app authenticated with mock LLM URL
      Action: User sends first message (gets error), then sends second message
      Assertions: Request history does not include error message payload
-     Requirements: llm-integration.10 */
+     Requirements: llm-integration.10.3 */
   test('should exclude error messages from llm history', async () => {
     // First request fails
     mockLLMServer.setSuccess(false);
@@ -770,6 +772,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
      Action: User sends a message
      Assertions: MainPipeline retries up to 2 times, then renders standardized
        invalid-format error with Retry action
+     User-approved mock scenario: yes
      Requirements: llm-integration.12.1, llm-integration.12.2, llm-integration.12.3 */
   test('should retry invalid structured output and show error with Retry action', async () => {
     mockLLMServer.setStreamingMode(true, {
@@ -849,6 +852,184 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     const anchor = actionContent.locator(`a[href="${clickUrl}"]`);
     await expect(anchor).toBeVisible({ timeout: 6000 });
     await expect(anchor.locator('img')).toBeVisible({ timeout: 6000 });
+  });
+
+  /* Preconditions: Placeholder id is present in action.content but missing in images[]
+     Action: User sends a message
+     Assertions: Missing descriptor is treated as error and placeholder is removed
+     User-approved mock scenario: yes
+     Requirements: llm-integration.9.4 */
+  test('should remove placeholder when descriptor id is missing', async () => {
+    mockLLMServer.setStreamingMode(true, {
+      content: JSON.stringify({
+        action: { type: 'text', content: 'Missing image [[image:99]]' },
+        images: [],
+      }),
+      chunkDelayMs: 0,
+    });
+
+    context = await launchWithMockLLM();
+    const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
+    await messageInput.fill('Show missing image');
+    await messageInput.press('Enter');
+
+    const actionContent = context.window.locator('[data-testid="message-llm-action"]');
+    await expect(actionContent).toBeVisible({ timeout: 5000 });
+    await expect(actionContent.locator('span[data-image-id="99"]')).toHaveCount(0, {
+      timeout: 6000,
+    });
+    await expect(actionContent.locator('img')).toHaveCount(0);
+  });
+
+  /* Preconditions: Placeholder has descriptor with unreachable URL
+     Action: User sends a message
+     Assertions: Download failure causes error status and placeholder is removed
+     User-approved mock scenario: yes
+     Requirements: llm-integration.9.8 */
+  test('should remove placeholder for invalid image url', async () => {
+    mockLLMServer.setStreamingMode(true, {
+      content: JSON.stringify({
+        action: { type: 'text', content: 'Invalid url [[image:1]]' },
+        images: [{ id: 1, url: 'http://localhost:1/bad.png' }],
+      }),
+      chunkDelayMs: 0,
+    });
+
+    context = await launchWithMockLLM();
+    const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
+    await messageInput.fill('Show invalid image URL');
+    await messageInput.press('Enter');
+
+    const actionContent = context.window.locator('[data-testid="message-llm-action"]');
+    await expect(actionContent).toBeVisible({ timeout: 5000 });
+    await expect(actionContent.locator('span[data-image-id="1"]')).toHaveCount(0, {
+      timeout: 6000,
+    });
+    await expect(actionContent.locator('img')).toHaveCount(0);
+  });
+
+  /* Preconditions: Descriptor URL returns unsupported media type (non-image)
+     Action: User sends a message
+     Assertions: Unsupported content type leads to placeholder removal
+     User-approved mock scenario: yes
+     Requirements: llm-integration.9.8 */
+  test('should remove placeholder for unsupported image content type', async () => {
+    const unsupportedUrl = `http://localhost:${MOCK_LLM_PORT}/v1/responses`;
+    mockLLMServer.setStreamingMode(true, {
+      content: JSON.stringify({
+        action: { type: 'text', content: 'Unsupported type [[image:1]]' },
+        images: [{ id: 1, url: unsupportedUrl }],
+      }),
+      chunkDelayMs: 0,
+    });
+
+    context = await launchWithMockLLM();
+    const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
+    await messageInput.fill('Show unsupported type');
+    await messageInput.press('Enter');
+
+    const actionContent = context.window.locator('[data-testid="message-llm-action"]');
+    await expect(actionContent).toBeVisible({ timeout: 5000 });
+    await expect(actionContent.locator('span[data-image-id="1"]')).toHaveCount(0, {
+      timeout: 6000,
+    });
+    await expect(actionContent.locator('img')).toHaveCount(0);
+  });
+
+  /* Preconditions: Placeholder includes explicit size and image response is delayed
+     Action: User sends a message
+     Assertions: Placeholder skeleton uses requested size before image resolves
+     User-approved mock scenario: yes
+     Requirements: llm-integration.9.2 */
+  test('should render placeholder with requested size before image resolves', async () => {
+    const imageUrl = `http://localhost:${MOCK_LLM_PORT}/mock-image.png`;
+    mockLLMServer.setImageDelay(1500);
+    mockLLMServer.setStreamingMode(true, {
+      content: JSON.stringify({
+        action: { type: 'text', content: 'Sized image [[image:1|size:640x180]]' },
+        images: [{ id: 1, url: imageUrl }],
+      }),
+      chunkDelayMs: 0,
+    });
+
+    context = await launchWithMockLLM();
+    const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
+    await messageInput.fill('Show sized placeholder');
+    await messageInput.press('Enter');
+
+    const actionContent = context.window.locator('[data-testid="message-llm-action"]');
+    await expect(actionContent).toBeVisible({ timeout: 5000 });
+    const skeleton = actionContent.locator('span[data-image-id="1"] > span').first();
+    await expect(skeleton).toBeVisible({ timeout: 3000 });
+    await expect(skeleton).toHaveCSS('width', '640px');
+    await expect(skeleton).toHaveCSS('height', '180px');
+    await expect(actionContent.locator('img')).toBeVisible({ timeout: 8000 });
+  });
+
+  /* Preconditions: Placeholder omits size and image response is delayed
+     Action: User sends a message
+     Assertions: Placeholder skeleton uses default size before image resolves
+     User-approved mock scenario: yes
+     Requirements: llm-integration.9.2 */
+  test('should render default-size placeholder when size is omitted', async () => {
+    const imageUrl = `http://localhost:${MOCK_LLM_PORT}/mock-image.png`;
+    mockLLMServer.setImageDelay(1500);
+    mockLLMServer.setStreamingMode(true, {
+      content: JSON.stringify({
+        action: { type: 'text', content: 'Default image [[image:1]]' },
+        images: [{ id: 1, url: imageUrl }],
+      }),
+      chunkDelayMs: 0,
+    });
+
+    context = await launchWithMockLLM();
+    const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
+    await messageInput.fill('Show default placeholder');
+    await messageInput.press('Enter');
+
+    const actionContent = context.window.locator('[data-testid="message-llm-action"]');
+    await expect(actionContent).toBeVisible({ timeout: 5000 });
+    const skeleton = actionContent.locator('span[data-image-id="1"] > span').first();
+    await expect(skeleton).toBeVisible({ timeout: 3000 });
+    await expect(skeleton).toHaveCSS('width', '320px');
+    await expect(skeleton).toHaveCSS('height', '180px');
+  });
+
+  /* Preconditions: Image message already rendered and downloaded once
+     Action: User triggers UI re-render by navigating away and back
+     Assertions: No repeated image download request is issued (cache is reused)
+     User-approved mock scenario: yes
+     Requirements: llm-integration.9.6 */
+  test('should not trigger repeated image download on re-render', async () => {
+    const imageUrl = `http://localhost:${MOCK_LLM_PORT}/mock-image.png`;
+    mockLLMServer.setStreamingMode(true, {
+      content: JSON.stringify({
+        action: { type: 'text', content: 'Cached image [[image:1]]' },
+        images: [{ id: 1, url: imageUrl }],
+      }),
+      chunkDelayMs: 0,
+    });
+
+    context = await launchWithMockLLM();
+    const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
+    await messageInput.fill('Show cached image');
+    await messageInput.press('Enter');
+
+    const actionContent = context.window.locator('[data-testid="message-llm-action"]');
+    await expect(actionContent).toBeVisible({ timeout: 5000 });
+
+    mockLLMServer.clearRequestLogs();
+
+    await context.window.getByRole('button', { name: 'Settings' }).click();
+    await context.window.getByRole('button', { name: 'Agents' }).click();
+    await expect(context.window.locator('[data-testid="message-llm-action"]')).toBeVisible({
+      timeout: 5000,
+    });
+
+    const imageDownloads = mockLLMServer
+      .getRequestLogs()
+      .filter((entry) => entry.method === 'GET' && entry.path === '/mock-image.png');
+    expect(imageDownloads).toHaveLength(0);
   });
 
   /* Preconditions: MockLLMServer returns 429 with retry-after=3 on first request,

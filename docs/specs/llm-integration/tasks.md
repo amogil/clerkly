@@ -367,7 +367,7 @@
 
 ### Фаза 3: Дозакрытие тестового покрытия
 - [x] Добавить unit-тесты (парсер/хранилище/ошибки).
-- [ ] Добавить functional-тесты (рендер/ошибки/кэш).
+- [x] Добавить functional-тесты (рендер/ошибки/кэш).
 - [x] Исключить hidden из истории и покрыть модульным и функциональным тестом.
 - [x] Обсудить и согласовать формат replay-истории: в историю передаётся человеко-читаемый текст и информация о ссылках/метаданных изображений из прошлых `images[]` (без сырого JSON-дампа как единственного источника смысла).
 - [x] Реализовать согласованный replay-формат истории: передавать текст ответа и информацию по изображениям (минимум `id`, `url`, `link`, опционально `alt`) в сообщениях для модели.
@@ -376,7 +376,7 @@
 - [x] Добавить unit-тест в `MainPipeline`: проверить, что при retry отправляется инструкция `"Your previous response did not match the required JSON schema. Reply again using the exact required format only."`.
 - [x] Добавить unit-тесты провайдеров/контракта: проверить, что описание Structured Output (схема + форматы + семантика) передаётся из единого декларативного контракта.
 - [x] Добавить unit-тест: `messages.usage_json` не дублирует `provider`, `model`, `timestamp`.
-- [ ] Выровнять requirement-ссылки в комментариях тестов под `llm-integration.10/11/12/13`.
+- [x] Выровнять requirement-ссылки в комментариях тестов под `llm-integration.10/11/12/13`.
 
 ## Чек-лист тестов
 
@@ -385,12 +385,12 @@
 - [x] Парсер плейсхолдеров: `[[image:id|link:https://...]]` извлекает `link`.
 - [x] Парсер плейсхолдеров: `[[image:id|size:640x180]]` извлекает размеры.
 - [x] Парсер плейсхолдеров: комбинация `link+size`.
-- [ ] Парсер плейсхолдеров: невалидный формат игнорируется.
+- [x] Парсер плейсхолдеров: невалидный формат игнорируется.
 - [x] Парсер плейсхолдеров: лишние пробелы/порядок параметров обрабатываются корректно.
-- [ ] Парсер плейсхолдеров: дубликаты `id` в тексте → корректный список.
-- [ ] Парсер плейсхолдеров: вложенные плейсхолдеры в одном параграфе.
-- [ ] Парсер плейсхолдеров: плейсхолдер внутри ссылок/кода не обрабатывается.
-- [ ] Парсер плейсхолдеров: кириллица/юникод в `id` запрещена.
+- [x] Парсер плейсхолдеров: дубликаты `id` в тексте → корректный список.
+- [x] Парсер плейсхолдеров: вложенные плейсхолдеры в одном параграфе.
+- [x] Парсер плейсхолдеров: плейсхолдер внутри ссылок/кода не обрабатывается.
+- [x] Парсер плейсхолдеров: кириллица/юникод в `id` запрещена.
 - [x] Валидация `id`: запрещённые символы → ошибка.
 - [x] Валидация URL: не http/https → `status=error`.
 - [x] Валидация URL: слишком длинный URL → `status=error`.
@@ -398,30 +398,30 @@
 - [x] Валидация `size`: нулевые/отрицательные значения → игнор.
 - [x] Валидация `size`: слишком большие значения → игнор/ограничить.
 - [x] `ImageStorageManager`: успешная загрузка → запись в БД.
-- [ ] `ImageStorageManager`: повторный запрос для того же `(agentId, messageId, imageId)` → обновляет запись.
-- [ ] `ImageStorageManager`: превышение 50GB → ошибка.
+- [x] `ImageStorageManager`: повторный запрос для того же `(agentId, messageId, imageId)` → обновляет запись.
+- [x] `ImageStorageManager`: превышение 50GB → ошибка.
 - [x] `ImageStorageManager`: неподдерживаемый content-type → ошибка.
 - [x] `ImageStorageManager`: `images:get` → `status=error` при отсутствии записи (нештатно).
-- [ ] `ImageStorageManager`: `images:get` → `status=error` при ошибке/таймауте.
+- [x] `ImageStorageManager`: `images:get` → `status=error` при ошибке/таймауте.
 - [x] `ImageStorageManager`: `images:get` → `status=success` и bytes при успехе.
-- [ ] `MainPipeline`: вызывает `downloadAndStore` для всех изображений из `images[]`.
-- [ ] `ImageStorageManager`: сетевой/timeout → ошибка.
+- [x] `MainPipeline`: вызывает `downloadAndStore` для всех изображений из `images[]`.
+- [x] `ImageStorageManager`: сетевой/timeout → ошибка.
 - [x] `ImageStorageManager`: пустой ответ/0 bytes → ошибка.
 - [x] `ImageStorageManager`: отсутствует content-type → ошибка.
-- [ ] `ImageStorageManager`: корректная обработка `image/svg+xml`.
-- [ ] SVG: санитизация перед рендером удаляет опасные теги/атрибуты (script/foreignObject/on*).
-- [ ] `ImageStorageManager`: корректно логирует ошибки без UI-показа.
+- [x] `ImageStorageManager`: корректная обработка `image/svg+xml`.
+- [x] SVG: санитизация перед рендером удаляет опасные теги/атрибуты (script/foreignObject/on*).
+- [x] `ImageStorageManager`: корректно логирует ошибки без UI-показа.
 - [x] `ImageStorageManager`: ставит `status=success` при успехе.
 - [x] `ImageStorageManager`: ставит `status=error` при ошибке/таймауте.
-- [ ] `MainPipeline`: `missing_image_descriptor` если id нет в `images[]` (через `ImageStorageManager.markMissingDescriptor`).
-- [ ] `MainPipeline`: не запускает повторную загрузку для того же `(agentId, messageId, imageId)` в рамках одного сообщения.
-- [ ] `MainPipeline`: несколько изображений в одном сообщении.
-- [ ] `MainPipeline`: одинаковые `id` → один запрос на загрузку.
-- [ ] `MainPipeline`: изображения без плейсхолдеров → всё равно скачиваются.
-- [ ] `MainPipeline`: частичный успех (1 ok, 1 fail).
+- [x] `MainPipeline`: `missing_image_descriptor` если id нет в `images[]` (через `ImageStorageManager.markMissingDescriptor`).
+- [x] `MainPipeline`: не запускает повторную загрузку для того же `(agentId, messageId, imageId)` в рамках одного сообщения.
+- [x] `MainPipeline`: несколько изображений в одном сообщении.
+- [x] `MainPipeline`: одинаковые `id` → один запрос на загрузку.
+- [x] `MainPipeline`: изображения без плейсхолдеров → всё равно скачиваются.
+- [x] `MainPipeline`: частичный успех (1 ok, 1 fail).
 - [x] Polling: пока `status=pending` → placeholder остаётся.
 - [x] Polling: при `status=success` → изображение вставляется.
-- [ ] Polling: таймаут 60 секунд → placeholder удаляется.
+- [x] Polling: таймаут 60 секунд → placeholder удаляется.
 - [x] История: hidden исключаются из replay.
 - [x] История: в replay передаются текст ответа и данные изображений (`id/url/link/alt`).
 - [x] История: плейсхолдеры остаются в истории (не удаляются).
@@ -429,20 +429,20 @@
 - [x] MainPipeline: после 1–2 retry создаётся `kind: error` с `Retry`.
 - [x] MainPipeline: retry не зацикливается (счётчик попыток).
 - [x] Добавить functional test: invalid structured output → 2 retry → `kind:error` в чате с кнопкой `Retry`.
-- [ ] Renderer: отмена polling при unmount сообщения.
+- [x] Renderer: отмена polling при unmount сообщения.
 
 ### Функциональные тесты
 - [x] Базовый рендер: `[[image:1]]` + `images[]` → `<img>` появляется.
 - [x] Кликабельность: `link` оборачивает `<img>` в `<a>`.
-- [ ] Размер: `size:640x180` задаёт размер заглушки до загрузки.
-- [ ] Без размера: дефолтная заглушка.
-- [ ] Ошибка: неизвестный `id` → placeholder удаляется.
-- [ ] Ошибка: невалидный URL → placeholder удаляется.
-- [ ] Ошибка: неподдерживаемый тип → placeholder удаляется.
+- [x] Размер: `size:640x180` задаёт размер заглушки до загрузки.
+- [x] Без размера: дефолтная заглушка.
+- [x] Ошибка: неизвестный `id` → placeholder удаляется.
+- [x] Ошибка: невалидный URL → placeholder удаляется.
+- [x] Ошибка: неподдерживаемый тип → placeholder удаляется.
 - [x] Polling вместо событий: изображение вставляется после готовности в main.
-- [ ] Повторный рендер не вызывает повторных загрузок (кэш).
+- [x] Повторный рендер не вызывает повторных загрузок (кэш).
 - [x] Кликабельная картинка с `size` → правильная заглушка и `<a><img></a>`.
 
 ## Definition of Done (Фаза 3)
 
-- [ ] реализация не противоречит `design.md` и `requirements.md`.
+- [x] реализация не противоречит `design.md` и `requirements.md`.

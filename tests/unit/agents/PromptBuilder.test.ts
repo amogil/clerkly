@@ -1,4 +1,4 @@
-// Requirements: llm-integration.4
+// Requirements: llm-integration.10
 // tests/unit/agents/PromptBuilder.test.ts
 // Unit tests for PromptBuilder
 
@@ -38,7 +38,7 @@ describe('FullHistoryStrategy', () => {
   /* Preconditions: Strategy initialized
      Action: Call select() with messages
      Assertions: Returns all messages unchanged
-     Requirements: llm-integration.4.2 */
+     Requirements: llm-integration.10.1 */
   it('should return all messages', () => {
     const strategy = new FullHistoryStrategy();
     const msgs = [makeMessage({ id: 1 }), makeMessage({ id: 2 })];
@@ -55,7 +55,7 @@ describe('PromptBuilder.build()', () => {
     /* Preconditions: No messages
        Action: Call build([])
        Assertions: history is empty string, systemPrompt is base prompt
-       Requirements: llm-integration.4.3 */
+       Requirements: llm-integration.10.4 */
     it('should return empty history and base system prompt', () => {
       const result = makeBuilder().build([]);
       expect(result.history).toBe('');
@@ -68,7 +68,7 @@ describe('PromptBuilder.build()', () => {
     /* Preconditions: Two features with system prompt sections
        Action: Call build([])
        Assertions: systemPrompt concatenates base + feature sections
-       Requirements: llm-integration.4.1 */
+       Requirements: llm-integration.10.4 */
     it('should concatenate base prompt with feature sections', () => {
       const feature1: AgentFeature = {
         name: 'f1',
@@ -89,7 +89,7 @@ describe('PromptBuilder.build()', () => {
     /* Preconditions: Feature with empty system prompt section
        Action: Call build([])
        Assertions: Empty sections are not added
-       Requirements: llm-integration.4.1 */
+       Requirements: llm-integration.10.4 */
     it('should skip empty feature sections', () => {
       const feature: AgentFeature = {
         name: 'empty',
@@ -105,7 +105,7 @@ describe('PromptBuilder.build()', () => {
     /* Preconditions: Features with tools
        Action: Call build([])
        Assertions: tools array contains all tools from all features
-       Requirements: llm-integration.4.1 */
+       Requirements: llm-integration.10.4 */
     it('should collect tools from all features', () => {
       const tool1: LLMTool = { name: 'tool1', description: 'T1', parameters: {} };
       const tool2: LLMTool = { name: 'tool2', description: 'T2', parameters: {} };
@@ -128,7 +128,7 @@ describe('PromptBuilder.build()', () => {
     /* Preconditions: User and LLM messages exist
        Action: Call build(messages)
        Assertions: buildMessages contains separate user/assistant entries
-       Requirements: llm-integration.4.3, llm-integration.4.4 */
+       Requirements: llm-integration.10.1, llm-integration.10.2, llm-integration.10.4 */
     it('should serialize user and llm messages into separate chat messages', () => {
       const msgs = [
         makeMessage({
@@ -284,7 +284,7 @@ describe('PromptBuilder.buildMessages()', () => {
   /* Preconditions: User and LLM messages exist
      Action: Call buildMessages(messages)
      Assertions: Returns system message + separate history messages
-     Requirements: llm-integration.4.3 */
+     Requirements: llm-integration.10.1, llm-integration.10.4 */
   it('should return system message followed by separate history messages', () => {
     const msgs = [
       makeMessage({
@@ -315,7 +315,7 @@ describe('PromptBuilder.buildMessages()', () => {
   /* Preconditions: No messages
      Action: Call buildMessages([])
      Assertions: Returns only system message
-     Requirements: llm-integration.4.3 */
+     Requirements: llm-integration.10.4 */
   it('should return only system message for empty history', () => {
     const chatMessages = makeBuilder().buildMessages([]);
     expect(chatMessages).toHaveLength(1);

@@ -580,7 +580,14 @@ export class MainPipeline {
     for (const image of images) {
       if (downloaded.has(image.id)) continue;
       downloaded.add(image.id);
-      void this.imageStorageManager.downloadAndStore(agentId, messageId, image.id, image.url);
+      void Promise.resolve(
+        this.imageStorageManager.downloadAndStore(agentId, messageId, image.id, image.url)
+      ).catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : String(error);
+        this.logger.warn(
+          `Image download queue failed for agent=${agentId}, message=${messageId}, image=${image.id}: ${message}`
+        );
+      });
     }
 
     for (const placeholderId of placeholderIds) {

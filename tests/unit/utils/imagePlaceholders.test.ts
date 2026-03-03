@@ -110,4 +110,46 @@ describe('parseImagePlaceholders', () => {
       { id: 8, size: { width: 320, height: 180 }, link: 'https://example.com' },
     ]);
   });
+
+  /* Preconditions: Placeholder contains unknown parameter
+     Action: Parse placeholders
+     Assertions: Unknown parameter is ignored without invalidating placeholder
+     Requirements: llm-integration.1, llm-integration.9.8 */
+  it('should ignore unknown placeholder params', () => {
+    const result = parseImagePlaceholders('[[image:9|foo:bar|size:10x20]]');
+    expect(result.invalid).toBe(false);
+    expect(result.placeholders).toEqual([{ id: 9, size: { width: 10, height: 20 } }]);
+  });
+
+  /* Preconditions: Text contains duplicate placeholder ids
+     Action: Parse placeholders
+     Assertions: Both placeholders are returned in original order
+     Requirements: llm-integration.1, llm-integration.9.8 */
+  it('should keep duplicate ids as separate placeholders', () => {
+    const result = parseImagePlaceholders('[[image:10]] and again [[image:10|size:20x20]]');
+    expect(result.invalid).toBe(false);
+    expect(result.placeholders).toEqual([{ id: 10 }, { id: 10, size: { width: 20, height: 20 } }]);
+  });
+
+  /* Preconditions: A single paragraph contains multiple placeholders
+     Action: Parse placeholders
+     Assertions: Parser extracts all placeholders from one paragraph
+     Requirements: llm-integration.1, llm-integration.9.8 */
+  it('should parse multiple placeholders in one paragraph', () => {
+    const result = parseImagePlaceholders(
+      'Paragraph with [[image:11]], text, and [[image:12|link:https://example.com]].'
+    );
+    expect(result.invalid).toBe(false);
+    expect(result.placeholders).toEqual([{ id: 11 }, { id: 12, link: 'https://example.com' }]);
+  });
+
+  /* Preconditions: Placeholder id uses non-digit unicode characters
+     Action: Parse placeholders
+     Assertions: Input is marked invalid and placeholder is skipped
+     Requirements: llm-integration.1, llm-integration.9.8 */
+  it('should reject cyrillic/unicode ids', () => {
+    const result = parseImagePlaceholders('[[image:тест]] [[image:१२३]]');
+    expect(result.invalid).toBe(true);
+    expect(result.placeholders).toEqual([]);
+  });
 });

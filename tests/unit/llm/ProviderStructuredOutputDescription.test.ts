@@ -63,9 +63,8 @@ function expectStructuredSchemaWithDescriptions(schema: unknown): void {
 function expectOpenAIStrictSchemaAdjustments(schema: unknown): void {
   const typed = schema as Record<string, unknown>;
   const imageItem = (
-    ((typed.properties as Record<string, unknown>)?.images as Record<string, unknown>)
-      ?.items as Record<string, unknown>
-  ) as Record<string, unknown>;
+    (typed.properties as Record<string, unknown>)?.images as Record<string, unknown>
+  )?.items as Record<string, unknown> as Record<string, unknown>;
   const imageProps = (imageItem.properties ?? {}) as Record<string, unknown>;
   const required = (imageItem.required ?? []) as string[];
 

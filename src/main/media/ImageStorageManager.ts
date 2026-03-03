@@ -147,26 +147,32 @@ export class ImageStorageManager {
    */
   // Requirements: llm-integration.1, llm-integration.9.8
   getImage(agentId: string, messageId: string, imageId: number): ImageGetResult {
-    const record = this.dbManager.images.get(agentId, messageId, imageId);
-    if (!record) {
+    try {
+      const record = this.dbManager.images.get(agentId, messageId, imageId);
+      if (!record) {
+        return { found: false, status: 'error' };
+      }
+
+      if (record.status === 'pending') {
+        return { found: true, status: 'pending' };
+      }
+
+      if (record.status === 'error') {
+        return { found: true, status: 'error' };
+      }
+
+      return {
+        found: true,
+        status: 'success',
+        bytes: (record.bytes as Buffer | null) ?? undefined,
+        contentType: record.contentType,
+        size: record.size,
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.warn(`Image lookup failed (${imageId}): ${message}`);
       return { found: false, status: 'error' };
     }
-
-    if (record.status === 'pending') {
-      return { found: true, status: 'pending' };
-    }
-
-    if (record.status === 'error') {
-      return { found: true, status: 'error' };
-    }
-
-    return {
-      found: true,
-      status: 'success',
-      bytes: (record.bytes as Buffer | null) ?? undefined,
-      contentType: record.contentType,
-      size: record.size,
-    };
   }
 
   // Requirements: llm-integration.1
