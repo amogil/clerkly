@@ -1403,7 +1403,7 @@ useEffect(() => {
 
 2. **Переключение агентов** (agents.4.14.2–4.14.4): CSS `absolute inset-0 opacity-0 pointer-events-none` скрывает неактивный `AgentChat`, но не размонтирует его и не сбрасывает `scrollTop` (в отличие от `display:none`). При возврате к агенту `Conversation` восстанавливает ту же позицию скролла.
 
-3. **Первый визит** (agents.4.14.4): При первой загрузке `Conversation` с `initial="smooth"` автоматически прокручивает к последнему сообщению.
+3. **Первый визит** (agents.4.14.5): при первичной загрузке истории `AgentChat` передаёт в `Conversation` режим `resize="instant"` пока `isLoading === true`, чтобы активный чат открывался сразу у нижней границы без видимой анимации прокрутки. После завершения загрузки возвращается `resize="smooth"` для обычных сценариев изменения высоты контента.
 
 4. **После отправки сообщения** (agents.4.13.2): `AgentChatInner` НЕ выполняет ручной вызов `scrollToBottom`. Поведение остаётся у `Conversation`: если пользователь не внизу, позиция сохраняется, а кнопка `scroll-to-bottom` остаётся видимой.
 
@@ -2012,6 +2012,7 @@ import { Logo } from '../logo';
 | `tests/functional/agent-switching.spec.ts` | agents.3 | - |
 | `tests/functional/agent-messaging.spec.ts` | agents.4.3, 4.4, 4.8, 4.13.1, 4.13.2, 4.13.4 | - |
 | `tests/functional/agent-scroll-position.spec.ts` | agents.4.14.1-4.14.5 | - |
+| `tests/functional/startup-loader.spec.ts` | agents.13.2, agents.13.10, agents.4.14.5 (startup instant scroll) | - |
 | `tests/functional/settings-ai-agent.spec.ts` | agents.13.11-13.15 (регрессия startup/loading orchestration) | - |
 | `tests/functional/all-agents-page.spec.ts` | agents.5 | - |
 | `tests/functional/agent-status-indicators.spec.ts` | agents.6 | - |

@@ -36,12 +36,25 @@ jest.mock('framer-motion', () => ({
 }));
 
 // Stub Conversation — renders children directly with a scrollable div
-jest.mock('../../../../src/renderer/components/ai-elements/conversation', () => ({
-  Conversation: ({ children, className }: { children: React.ReactNode; className?: string }) => (
-    <div data-testid="conversation" className={className}>
+const mockConversation = jest.fn(
+  ({
+    children,
+    className,
+    resize,
+  }: {
+    children: React.ReactNode;
+    className?: string;
+    resize?: string;
+  }) => (
+    <div data-testid="conversation" className={className} data-resize={resize}>
       {children}
     </div>
-  ),
+  )
+);
+
+jest.mock('../../../../src/renderer/components/ai-elements/conversation', () => ({
+  Conversation: (props: { children: React.ReactNode; className?: string; resize?: string }) =>
+    mockConversation(props),
   ConversationContent: ({
     children,
     ...props
@@ -183,6 +196,7 @@ beforeEach(() => {
     messages: [],
     isStreaming: false,
   };
+  mockConversation.mockClear();
 });
 
 describe('AgentChat — visibility', () => {
@@ -235,6 +249,24 @@ describe('AgentChat — loading state', () => {
     render(<AgentChat {...defaultProps} onLoadingChange={onLoadingChange} />);
 
     expect(onLoadingChange).toHaveBeenCalledWith('agent-1', false);
+  });
+
+  /* Preconditions: useAgentChat returns isLoading=true then false
+     Action: render AgentChat for each loading state
+     Assertions: Conversation resize is instant while loading and smooth after loading
+     Requirements: agents.4.14.5 */
+  it('should set Conversation resize to instant during initial loading and smooth after load', () => {
+    mockUseAgentChatState.isLoading = true;
+    const { rerender } = render(<AgentChat {...defaultProps} />);
+    expect(mockConversation).toHaveBeenLastCalledWith(
+      expect.objectContaining({ resize: 'instant' })
+    );
+
+    mockUseAgentChatState.isLoading = false;
+    rerender(<AgentChat {...defaultProps} />);
+    expect(mockConversation).toHaveBeenLastCalledWith(
+      expect.objectContaining({ resize: 'smooth' })
+    );
   });
 });
 

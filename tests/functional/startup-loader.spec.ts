@@ -233,6 +233,71 @@ test.describe('Startup loader', () => {
     await expectNoToastError(context.window);
   });
 
+  /* Preconditions: Existing authorized session with chat history
+     Action: Relaunch app and observe active chat scroll right after startup load
+     Assertions: Active chat opens near bottom immediately without visible scrolling animation
+     Requirements: agents.4.14.5 */
+  test('should open active chat at bottom immediately on app restart without visual scroll', async () => {
+    const firstContext = await launchElectron(undefined, {
+      CLERKLY_GOOGLE_API_URL: mockOAuthServer.getBaseUrl(),
+    });
+    const testDataPath = firstContext.testDataPath;
+
+    await completeOAuthFlow(firstContext.app, firstContext.window);
+    await expectAgentsVisible(firstContext.window, 10000);
+
+    const agentIcons = firstContext.window.locator('[data-testid^="agent-icon-"]');
+    await expect(agentIcons).toHaveCount(1, { timeout: 5000 });
+    const firstAgentId = (await agentIcons.first().getAttribute('data-testid'))?.replace(
+      'agent-icon-',
+      ''
+    );
+    expect(firstAgentId).toBeTruthy();
+
+    await seedAgentMessages(firstContext.window, firstAgentId as string, 80);
+    await expect(activeChat(firstContext.window).messages).toHaveCount(80, { timeout: 10000 });
+
+    await closeElectron(firstContext, false);
+
+    context = await launchElectron(testDataPath, {
+      CLERKLY_GOOGLE_API_URL: mockOAuthServer.getBaseUrl(),
+    });
+
+    const appLoading = context.window.locator('[data-testid="app-loading-screen"]');
+    await expect(appLoading).toBeVisible({ timeout: 10000 });
+    await expect(appLoading).toBeHidden({ timeout: 10000 });
+    await expectAgentsVisible(context.window, 10000);
+    await expect(activeChat(context.window).messages).toHaveCount(80, { timeout: 10000 });
+
+    const scrollMetrics = await context.window.evaluate(async () => {
+      const container = document.querySelector('[data-testid="messages-area"]')
+        ?.parentElement as HTMLElement | null;
+      if (!container) {
+        return null;
+      }
+
+      const samples: Array<{ scrollTop: number; distanceFromBottom: number }> = [];
+      for (let i = 0; i < 20; i++) {
+        await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+        samples.push({
+          scrollTop: container.scrollTop,
+          distanceFromBottom: container.scrollHeight - container.scrollTop - container.clientHeight,
+        });
+      }
+
+      return {
+        firstDistanceFromBottom: samples[0]?.distanceFromBottom ?? Infinity,
+        minScrollTop: Math.min(...samples.map((sample) => sample.scrollTop)),
+        maxScrollTop: Math.max(...samples.map((sample) => sample.scrollTop)),
+      };
+    });
+
+    expect(scrollMetrics).not.toBeNull();
+    expect(scrollMetrics!.firstDistanceFromBottom).toBeLessThan(120);
+    expect(scrollMetrics!.maxScrollTop - scrollMetrics!.minScrollTop).toBeLessThan(40);
+    await expectNoToastError(context.window);
+  });
+
   /* Preconditions: App launched, agents load initial history
      Action: Wait for all chats to finish loading
      Assertions: App loading screen hides and chat UI becomes visible

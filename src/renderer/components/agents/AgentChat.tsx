@@ -172,8 +172,12 @@ export function AgentChat({
     <div
       className={`flex flex-col flex-1 min-h-0${isActive ? '' : ' absolute inset-0 opacity-0 pointer-events-none'}`}
     >
-      {/* Conversation manages autoscroll via use-stick-to-bottom (agents.4.13) */}
-      <Conversation className="flex-1 min-h-0" contextRef={stickContextRef}>
+      {/* During initial history hydration use instant resize to avoid visible startup scroll (agents.4.14.5). */}
+      <Conversation
+        className="flex-1 min-h-0"
+        contextRef={stickContextRef}
+        resize={isLoading ? 'instant' : 'smooth'}
+      >
         <AgentChatInner
           agent={agent}
           rateLimitBanner={rateLimitBanner}
