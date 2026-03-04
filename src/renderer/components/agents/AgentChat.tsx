@@ -4,10 +4,12 @@
 
 import React, { useRef, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
+import { CornerDownLeft, Square } from 'lucide-react';
 import { useAgentChat } from '../../hooks/useAgentChat';
 import { AgentMessage } from './AgentMessage';
 import { AgentWelcome } from './AgentWelcome';
 import { RateLimitBanner } from './RateLimitBanner';
+import { Button } from '../ui/button';
 import {
   Conversation,
   ConversationContent,
@@ -119,7 +121,9 @@ export function AgentChat({
   onLoadingChange,
   onNavigate,
 }: AgentChatProps) {
-  const { rawMessages, sendMessage, isLoading } = useAgentChat(agent.id);
+  const { rawMessages, sendMessage, cancelCurrentRequest, isLoading, isStreaming } = useAgentChat(
+    agent.id
+  );
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const stickContextRef = useRef<StickToBottomContext | null>(null);
 
@@ -155,6 +159,14 @@ export function AgentChat({
     [sendMessage]
   );
 
+  const handleStop = useCallback(async () => {
+    await cancelCurrentRequest();
+  }, [cancelCurrentRequest]);
+
+  // Stop button is shown only for active generation of current in-progress agent.
+  // This avoids stale in-progress status keeping the button in stop mode after cancel.
+  const isInProgress = agent.status === 'in-progress' && isStreaming;
+
   return (
     // Hidden via CSS — NOT unmounted — absolute+opacity-0 keeps scrollTop intact (agents.13.5, agents.4.14)
     <div
@@ -180,7 +192,21 @@ export function AgentChat({
               data-testid="auto-expanding-textarea"
               placeholder="Ask, reply, or give command..."
             />
-            <PromptInputSubmit />
+            {isInProgress ? (
+              <Button
+                className="h-10 w-10 shrink-0 p-0"
+                data-testid="prompt-input-stop"
+                onClick={() => void handleStop()}
+                type="button"
+              >
+                <Square className="h-4 w-4 fill-current" />
+                <span className="sr-only">Stop generation</span>
+              </Button>
+            ) : (
+              <PromptInputSubmit data-testid="prompt-input-send">
+                <CornerDownLeft className="h-4 w-4" />
+              </PromptInputSubmit>
+            )}
           </PromptInputBody>
           <PromptInputFooter>
             <p className="px-0.5 text-xs text-muted-foreground">

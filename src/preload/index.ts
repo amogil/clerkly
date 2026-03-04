@@ -118,6 +118,8 @@ export interface API {
       payload: MessagePayloadAPI
     ) => Promise<{ success: boolean; error?: string }>;
     getLast: (agentId: string) => Promise<{ success: boolean; data?: unknown; error?: string }>;
+    // Requirements: llm-integration.8.1, llm-integration.8.7
+    cancel: (agentId: string) => Promise<{ success: boolean; error?: string }>;
     // Requirements: llm-integration.3.7.3
     retryLast: (agentId: string) => Promise<{ success: boolean; error?: string }>;
     // Requirements: llm-integration.3.7.4
@@ -593,6 +595,14 @@ const api: API = {
       payload: MessagePayloadAPI
     ): Promise<{ success: boolean; error?: string }> {
       return await ipcRenderer.invoke('messages:update', { messageId, agentId, payload });
+    },
+
+    /**
+     * Cancel active LLM request for an agent
+     * Requirements: llm-integration.8.1, llm-integration.8.7
+     */
+    async cancel(agentId: string): Promise<{ success: boolean; error?: string }> {
+      return await ipcRenderer.invoke('messages:cancel', { agentId });
     },
 
     /**

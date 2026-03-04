@@ -1273,7 +1273,14 @@ function ChatInput({
           value={taskInput}
           onChange={(event) => setTaskInput(event.target.value)}
         />
-        <PromptInputSubmit disabled={!taskInput.trim()} />
+        <Button
+          type={agent.status === 'in-progress' && isStreaming ? 'button' : 'submit'}
+          onClick={
+            agent.status === 'in-progress' && isStreaming ? () => cancelCurrentRequest() : undefined
+          }
+        >
+          {agent.status === 'in-progress' && isStreaming ? <Square /> : <Send />}
+        </Button>
       </PromptInputBody>
       <PromptInputFooter>
         <p>Press Enter to send, Shift+Enter for new line</p>
@@ -1992,7 +1999,7 @@ import { Logo } from '../logo';
 | `tests/unit/agents/AgentIPCHandlers.test.ts` | agents.2, agents.4, agents.5.5 |
 | `tests/unit/agents/computeAgentStatus.test.ts` | agents.9 |
 | `tests/unit/agents/ActivityIndicator.test.tsx` | agents.11 |
-| `tests/unit/components/ai-elements/prompt-input.test.tsx` | agents.4.3-4.7 |
+| `tests/unit/components/ai-elements/prompt-input.test.tsx` | agents.4.3-4.7, agents.4.24 |
 | `tests/unit/components/agents.test.tsx` | agents.4.22 |
 | `tests/unit/components/agents-autoscroll.test.tsx` | agents.4.13 |
 | `tests/unit/components/agents-scroll-position.test.tsx` | agents.4.14 |
@@ -2009,7 +2016,7 @@ import { Logo } from '../logo';
 | `tests/functional/all-agents-page.spec.ts` | agents.5 | - |
 | `tests/functional/agent-status-indicators.spec.ts` | agents.6 | - |
 | `tests/functional/message-format.spec.ts` | agents.7 | - |
-| `tests/functional/llm-chat.spec.ts` | agents.7.7 | - |
+| `tests/functional/llm-chat.spec.ts` | agents.7.7, agents.4.24 | - |
 | `tests/functional/agent-status-calculation.spec.ts` | agents.9 | - |
 | `tests/functional/agent-data-isolation.spec.ts` | agents.10 | - |
 | `tests/functional/agent-activity-indicator.spec.ts` | agents.11 | - |
@@ -2265,6 +2272,7 @@ interface UseAgentChatResult {
   isLoading: boolean;              // true пока загружается история
   isStreaming: boolean;            // true когда LLM стримит ответ
   sendMessage(text: string): Promise<boolean>;
+  cancelCurrentRequest(): Promise<boolean>;
 }
 ```
 
@@ -2278,9 +2286,13 @@ interface UseAgentChatResult {
 
 4. **Синхронизация через события** — `MESSAGE_CREATED` добавляет в `rawMessages` (дедупликация по id), `MESSAGE_UPDATED` с `hidden: true` удаляет из обоих массивов через `setMessages()`.
 
-5. **`isStreaming`** = `status === 'streaming' || status === 'submitted'` (оба состояния означают активный запрос к LLM).
+5. **`isStreaming`** = `status === 'streaming' || status === 'submitted'` (внутреннее состояние запроса в `useChat`).
 
-6. **`AGENT_RATE_LIMIT` не в хуке** — подписка остаётся в `agents.tsx`, т.к. rate limit — UI-состояние (показать/скрыть баннер), не часть потока сообщений.
+6. **Stop по статусу и активному запросу** — action-кнопка в `AgentChat` переключается в режим `stop`, когда `agent.status === 'in-progress'` и `isStreaming === true` (`submitted`/`streaming` в `useChat`); нажатие вызывает `cancelCurrentRequest()` и IPC `messages:cancel`.
+
+7. **Ошибки stop без toast** — `cancelCurrentRequest()` перехватывает ошибки/`success:false` от `messages:cancel`, возвращает `false` и не инициирует toast-уведомления.
+
+8. **`AGENT_RATE_LIMIT` не в хуке** — подписка остаётся в `agents.tsx`, т.к. rate limit — UI-состояние (показать/скрыть баннер), не часть потока сообщений.
 
 ### Загрузка чатов при старте
 

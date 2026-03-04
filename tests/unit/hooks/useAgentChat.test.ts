@@ -14,6 +14,7 @@ import type { MessageSnapshot } from '../../../src/shared/events/types';
 // Mock @ai-sdk/react useChat + Chat
 const mockSetMessages = jest.fn();
 const mockChatSendMessage = jest.fn().mockResolvedValue(undefined);
+const mockChatStop = jest.fn();
 const mockStatus = { current: 'ready' as string };
 
 jest.mock('@ai-sdk/react', () => {
@@ -22,6 +23,7 @@ jest.mock('@ai-sdk/react', () => {
     messages: [],
     setMessages: mockSetMessages,
     sendMessage: mockChatSendMessage,
+    stop: mockChatStop,
     get status() {
       return mockStatus.current;
     },
@@ -57,9 +59,11 @@ jest.mock('../../../src/renderer/events/RendererEventBus', () => ({
 
 // Mock window.api
 const mockList = jest.fn();
+const mockCancel = jest.fn();
 (window as unknown as { api: unknown }).api = {
   messages: {
     list: mockList,
+    cancel: mockCancel,
   },
 };
 
@@ -91,6 +95,9 @@ describe('useAgentChat hook', () => {
     jest.clearAllMocks();
     mockSubscribe.mockReturnValue(mockUnsubscribe);
     mockStatus.current = 'ready';
+    mockChatStop.mockReset();
+    mockCancel.mockReset();
+    mockCancel.mockResolvedValue({ success: true });
 
     // Default: empty history
     mockList.mockResolvedValue({
@@ -225,6 +232,81 @@ describe('useAgentChat hook', () => {
         success = await result.current.sendMessage('hello');
       });
 
+      expect(success).toBe(false);
+    });
+  });
+
+  describe('cancelCurrentRequest', () => {
+    /* Preconditions: agentId set, cancel endpoint returns success
+       Action: cancelCurrentRequest() called
+       Assertions: chat stop called, cancel IPC called, returns true
+       Requirements: llm-integration.8.1, llm-integration.8.7 */
+    it('should stop streaming and cancel active request', async () => {
+      const { result } = renderHook(() => useAgentChat('agent-1'));
+      await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+      let success: boolean | undefined;
+      await act(async () => {
+        success = await result.current.cancelCurrentRequest();
+      });
+
+      expect(mockChatStop).toHaveBeenCalled();
+      expect(mockCancel).toHaveBeenCalledWith('agent-1');
+      expect(success).toBe(true);
+    });
+
+    /* Preconditions: agentId is null
+       Action: cancelCurrentRequest() called
+       Assertions: returns false and no side effects
+       Requirements: llm-integration.8.1 */
+    it('should return false when agentId is null', async () => {
+      const { result } = renderHook(() => useAgentChat(null));
+
+      let success: boolean | undefined;
+      await act(async () => {
+        success = await result.current.cancelCurrentRequest();
+      });
+
+      expect(mockChatStop).not.toHaveBeenCalled();
+      expect(mockCancel).not.toHaveBeenCalled();
+      expect(success).toBe(false);
+    });
+
+    /* Preconditions: agentId set, cancel endpoint throws
+       Action: cancelCurrentRequest() called
+       Assertions: returns false
+       Requirements: llm-integration.8.7 */
+    it('should return false when cancel endpoint fails', async () => {
+      mockCancel.mockRejectedValueOnce(new Error('IPC error'));
+
+      const { result } = renderHook(() => useAgentChat('agent-1'));
+      await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+      let success: boolean | undefined;
+      await act(async () => {
+        success = await result.current.cancelCurrentRequest();
+      });
+
+      expect(mockChatStop).toHaveBeenCalled();
+      expect(success).toBe(false);
+    });
+
+    /* Preconditions: agentId set, cancel endpoint returns success:false
+       Action: cancelCurrentRequest() called
+       Assertions: returns false without throwing
+       Requirements: agents.4.24.3 */
+    it('should return false when cancel endpoint returns unsuccessful result', async () => {
+      mockCancel.mockResolvedValueOnce({ success: false, error: 'cancel failed' });
+
+      const { result } = renderHook(() => useAgentChat('agent-1'));
+      await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+      let success: boolean | undefined;
+      await act(async () => {
+        success = await result.current.cancelCurrentRequest();
+      });
+
+      expect(mockChatStop).toHaveBeenCalled();
       expect(success).toBe(false);
     });
   });

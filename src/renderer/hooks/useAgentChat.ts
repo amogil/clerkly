@@ -24,6 +24,7 @@ declare const window: Window & {
         data?: unknown[];
         error?: string;
       }>;
+      cancel: (agentId: string) => Promise<{ success: boolean; error?: string }>;
     };
   };
 };
@@ -39,6 +40,8 @@ export interface UseAgentChatResult {
   isStreaming: boolean;
   /** Send a user text message */
   sendMessage: (text: string) => Promise<boolean>;
+  /** Cancel active LLM request for this agent */
+  cancelCurrentRequest: () => Promise<boolean>;
 }
 
 /**
@@ -73,6 +76,7 @@ export function useAgentChat(agentId: string | null): UseAgentChatResult {
     messages,
     setMessages,
     sendMessage: chatSendMessage,
+    stop: stopStreaming,
     status,
   } = useChat(chat ? { chat } : { id: '__no_agent__' });
 
@@ -158,6 +162,20 @@ export function useAgentChat(agentId: string | null): UseAgentChatResult {
     [agentId, chatSendMessage]
   );
 
+  // Requirements: llm-integration.8.1, llm-integration.8.7, agents.4.24.3
+  const cancelCurrentRequest = useCallback(async (): Promise<boolean> => {
+    if (!agentId) return false;
+    stopStreaming();
+    try {
+      const result = await window.api.messages.cancel(agentId);
+      // Stop-cancel failures are treated as non-fatal and must not surface as toast errors.
+      if (!result.success) return false;
+      return true;
+    } catch {
+      return false;
+    }
+  }, [agentId, stopStreaming]);
+
   const isStreaming = status === 'streaming' || status === 'submitted';
 
   return {
@@ -167,5 +185,6 @@ export function useAgentChat(agentId: string | null): UseAgentChatResult {
     isLoading,
     isStreaming,
     sendMessage,
+    cancelCurrentRequest,
   };
 }
