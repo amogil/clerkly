@@ -170,9 +170,22 @@ export async function launchElectronWithMockOAuth(
  */
 export async function closeElectron(
   context: ElectronTestContext,
-  cleanup: boolean = true
+  cleanup: boolean = true,
+  checkToastErrors: boolean = true
 ): Promise<void> {
-  // Close the application
+  let toastError: Error | null = null;
+
+  // Requirements: testing.12.1, testing.12.2, testing.12.5
+  // Enforce global toast-error check by default for functional tests.
+  if (checkToastErrors && !context.window.isClosed()) {
+    try {
+      await expectNoToastError(context.window);
+    } catch (error) {
+      toastError = error as Error;
+    }
+  }
+
+  // Close the application even when toast assertion fails.
   await context.app.close();
 
   // Cleanup test data directory
@@ -183,6 +196,10 @@ export async function closeElectron(
     } catch (error) {
       console.warn(`Failed to cleanup test data: ${error}`);
     }
+  }
+
+  if (toastError) {
+    throw toastError;
   }
 }
 
@@ -369,6 +386,10 @@ export async function completeOAuthFlow(
   if (hasLoginScreen) {
     throw new Error('Failed to complete OAuth flow: still on login screen after 5 retries');
   }
+
+  // Requirements: testing.12.1, testing.12.2, testing.12.5
+  // OAuth is a key action; assert that it did not produce unexpected error toasts.
+  await expectNoToastError(window);
 }
 
 /**

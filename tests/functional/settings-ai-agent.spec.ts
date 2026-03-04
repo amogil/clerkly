@@ -55,7 +55,7 @@ test.beforeEach(async () => {
 
 test.afterEach(async () => {
   if (context) {
-    await closeElectron(context);
+    await closeElectron(context, true, false);
   }
 });
 
