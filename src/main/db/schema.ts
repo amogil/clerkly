@@ -2,7 +2,7 @@
 // src/main/db/schema.ts
 // Declarative schema for all database tables
 
-import { sqliteTable, text, integer, primaryKey, index, blob } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, primaryKey, index } from 'drizzle-orm/sqlite-core';
 
 // ============================================
 // Users Table
@@ -108,32 +108,3 @@ export const messages = sqliteTable(
 
 export type Message = typeof messages.$inferSelect;
 export type NewMessage = typeof messages.$inferInsert;
-
-// ============================================
-// Images Table
-// Requirements: llm-integration.1
-// ============================================
-
-export const images = sqliteTable(
-  'images',
-  {
-    agentId: text('agent_id').notNull(),
-    messageId: text('message_id').notNull(),
-    imageId: integer('image_id').notNull(),
-    url: text('url').notNull(),
-    status: text('status').notNull(),
-    hash: text('hash'),
-    contentType: text('content_type'),
-    size: integer('size'),
-    bytes: blob('bytes'),
-    createdAt: text('created_at').notNull(),
-    updatedAt: text('updated_at').notNull(),
-  },
-  (table) => [
-    index('idx_images_agent_message').on(table.agentId, table.messageId),
-    index('idx_images_agent_message_image').on(table.agentId, table.messageId, table.imageId),
-  ]
-);
-
-export type Image = typeof images.$inferSelect;
-export type NewImage = typeof images.$inferInsert;

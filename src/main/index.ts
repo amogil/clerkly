@@ -206,22 +206,15 @@ import { MessageManager } from './agents/MessageManager';
 import { AgentIPCHandlers } from './agents/AgentIPCHandlers';
 import { MainPipeline } from './agents/MainPipeline';
 import { PromptBuilder, FullHistoryStrategy } from './agents/PromptBuilder';
-import { ImageStorageManager } from './media/ImageStorageManager';
 
 const agentManager = new AgentManager(dbManager);
 const messageManager = new MessageManager(dbManager);
-const imageStorageManager = new ImageStorageManager(dbManager);
 const promptBuilder = new PromptBuilder(
-  'You are a helpful AI assistant. You may respond in Markdown when it improves clarity. Supported Markdown (GFM): headings, paragraphs, bold/italic/strikethrough, links/autolinks, blockquotes, ordered/unordered lists and task lists, tables, horizontal rules, images, inline code, fenced code blocks with language tags (syntax highlighting), Mermaid diagrams (```mermaid```), and math via KaTeX (inline $...$ or block $$...$$). Do not use footnotes.',
+  'You are a helpful AI assistant. You may respond in Markdown when it improves clarity. Supported Markdown (GFM): headings, paragraphs, bold/italic/strikethrough, links/autolinks, blockquotes, ordered/unordered lists and task lists, tables, horizontal rules, inline code, fenced code blocks with language tags (syntax highlighting), Mermaid diagrams (```mermaid```), and math via KaTeX (inline $...$ or block $$...$$). Do not use footnotes.',
   [],
   new FullHistoryStrategy()
 );
-const mainPipeline = new MainPipeline(
-  messageManager,
-  aiAgentSettingsManager,
-  promptBuilder,
-  imageStorageManager
-);
+const mainPipeline = new MainPipeline(messageManager, aiAgentSettingsManager, promptBuilder);
 const agentIPCHandlers = new AgentIPCHandlers(agentManager, messageManager, mainPipeline);
 const appCoordinator = new AppCoordinator(oauthClient);
 
@@ -321,10 +314,6 @@ app.whenReady().then(async () => {
     // Register Agent IPC handlers
     agentIPCHandlers.registerHandlers();
     logger.info('Agent IPC handlers registered');
-
-    // Register Image IPC handlers
-    imageStorageManager.registerHandlers();
-    logger.info('Image IPC handlers registered');
 
     await appCoordinator.start();
     logger.info('AppCoordinator started');

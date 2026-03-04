@@ -11,8 +11,6 @@ import { MessageLlmReasoningUpdatedEvent, AgentRateLimitEvent } from '../../shar
 import { LLM_CHAT_MODELS } from '../llm/LLMConfig';
 import { Logger } from '../Logger';
 import type { ILLMProvider, ChatOptions, LLMStructuredOutput } from '../llm/ILLMProvider';
-import { ImageStorageManager } from '../media/ImageStorageManager';
-import { parseImagePlaceholders } from '../../shared/utils/imagePlaceholders';
 import { safeParseStructuredOutput } from '../llm/StructuredOutputContract';
 import { handleBackgroundError } from '../ErrorHandler';
 
@@ -97,7 +95,6 @@ export class MainPipeline {
     private messageManager: MessageManager,
     private settingsManager: AIAgentSettingsManager,
     private promptBuilder: PromptBuilder,
-    private imageStorageManager: ImageStorageManager,
     private createProvider: (provider: LLMProvider, apiKey: string) => ILLMProvider = (p, k) => {
       const instance = LLMProviderFactory.createProvider(p);
       // Recreate with apiKey — OpenAIProvider accepts it in constructor
@@ -197,8 +194,8 @@ export class MainPipeline {
   }
 
   /**
-   * Execute the LLM request with retry/validation and image downloads.
-   * Requirements: llm-integration.1, llm-integration.3, llm-integration.9, llm-integration.12
+   * Execute the LLM request with retry/validation.
+   * Requirements: llm-integration.1, llm-integration.3, llm-integration.12
    */
   private async executeWithRetries(
     context: {
@@ -258,8 +255,6 @@ export class MainPipeline {
       setLastLlmMessageId(finalMessageId);
 
       this.persistUsageEnvelope(finalMessageId, agentId, output);
-
-      this.queueImageDownloads(agentId, String(finalMessageId), output, validation.placeholders);
 
       this.logger.info(`Pipeline completed for agent ${agentId}`);
       return;
@@ -436,7 +431,6 @@ export class MainPipeline {
           ? { text: accumulatedReasoning, excluded_from_replay: true }
           : undefined,
         action: { type: output.action.type, content: output.action.content },
-        images: output.images,
       },
     };
 
@@ -543,57 +537,15 @@ export class MainPipeline {
     return LLM_CHAT_MODELS[provider]?.[env] ?? LLM_CHAT_MODELS.openai[env];
   }
 
-  // Requirements: llm-integration.9.1, llm-integration.9.7, llm-integration.9.8
-  private validateStructuredOutput(output: LLMStructuredOutput): {
-    ok: boolean;
-    placeholders: Array<{ id: number; link?: string; size?: { width: number; height: number } }>;
-  } {
+  private validateStructuredOutput(output: LLMStructuredOutput): { ok: boolean } {
     // Validate only model structured payload fields.
     // Provider usage envelope is handled separately via messages.usage_json.
     const parsed = safeParseStructuredOutput({
       action: output.action,
-      images: output.images,
     });
     if (!parsed.success) {
-      return { ok: false, placeholders: [] };
+      return { ok: false };
     }
-
-    const { placeholders, invalid } = parseImagePlaceholders(parsed.data.action.content);
-    if (invalid) {
-      return { ok: false, placeholders };
-    }
-
-    return { ok: true, placeholders };
-  }
-
-  // Requirements: llm-integration.9.6, llm-integration.9.4
-  private queueImageDownloads(
-    agentId: string,
-    messageId: string,
-    output: LLMStructuredOutput,
-    placeholders: Array<{ id: number }>
-  ): void {
-    const images = output.images ?? [];
-    const placeholderIds = new Set(placeholders.map((p) => p.id));
-    const downloaded = new Set<number>();
-
-    for (const image of images) {
-      if (downloaded.has(image.id)) continue;
-      downloaded.add(image.id);
-      void Promise.resolve(
-        this.imageStorageManager.downloadAndStore(agentId, messageId, image.id, image.url)
-      ).catch((error: unknown) => {
-        const message = error instanceof Error ? error.message : String(error);
-        this.logger.warn(
-          `Image download queue failed for agent=${agentId}, message=${messageId}, image=${image.id}: ${message}`
-        );
-      });
-    }
-
-    for (const placeholderId of placeholderIds) {
-      if (!downloaded.has(placeholderId)) {
-        this.imageStorageManager.markMissingDescriptor(agentId, messageId, placeholderId);
-      }
-    }
+    return { ok: true };
   }
 }

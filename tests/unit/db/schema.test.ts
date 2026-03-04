@@ -7,7 +7,6 @@ import {
   userData,
   agents,
   messages,
-  images,
   User,
   NewUser,
   UserData,
@@ -16,8 +15,6 @@ import {
   NewAgent,
   Message,
   NewMessage,
-  Image,
-  NewImage,
 } from '../../../src/main/db/schema';
 
 describe('Database Schema', () => {
@@ -209,61 +206,6 @@ describe('Database Schema', () => {
       expect(newMessage.agentId).toBe('agent-123');
       expect(newMessage.kind).toBe('user');
       expect(newMessage.id).toBeUndefined();
-    });
-  });
-
-  describe('Images Table', () => {
-    /* Preconditions: Schema is defined
-       Action: Check images table structure
-       Assertions: All columns are defined with correct types
-       Requirements: llm-integration.1, llm-integration.9.8 */
-    it('should have correct column definitions', () => {
-      expect(images.agentId).toBeDefined();
-      expect(images.messageId).toBeDefined();
-      expect(images.imageId).toBeDefined();
-      expect(images.url).toBeDefined();
-      expect(images.status).toBeDefined();
-      expect(images.bytes).toBeDefined();
-    });
-
-    /* Preconditions: Schema is defined
-       Action: Check Image type inference
-       Assertions: Image type has all expected properties
-       Requirements: llm-integration.1, llm-integration.9.8 */
-    it('should export Image type with correct properties', () => {
-      const image: Image = {
-        agentId: 'agent-123',
-        messageId: '1',
-        imageId: 1,
-        url: 'https://example.com/a.png',
-        status: 'success',
-        hash: 'hash',
-        contentType: 'image/png',
-        size: 12,
-        bytes: Buffer.from([1, 2]),
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      expect(image.imageId).toBe(1);
-      expect(image.status).toBe('success');
-    });
-
-    /* Preconditions: Schema is defined
-       Action: Check NewImage type inference
-       Assertions: NewImage type allows optional bytes/hash
-       Requirements: llm-integration.1, llm-integration.9.8 */
-    it('should export NewImage type with optional fields', () => {
-      const newImage: NewImage = {
-        agentId: 'agent-123',
-        messageId: '1',
-        imageId: 1,
-        url: 'https://example.com/a.png',
-        status: 'pending',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      expect(newImage.imageId).toBe(1);
-      expect(newImage.bytes).toBeUndefined();
     });
   });
 });

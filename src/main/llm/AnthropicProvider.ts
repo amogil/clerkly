@@ -274,8 +274,8 @@ export class AnthropicProvider implements ILLMProvider {
   }
 
   /**
-   * Parse structured output JSON into LLMAction
-   * Requirements: llm-integration.3.3, llm-integration.9.8
+   * Parse structured output JSON into structured action
+   * Requirements: llm-integration.3.3
    */
   private parseAction(json: string): LLMStructuredOutput {
     if (!json.trim()) {

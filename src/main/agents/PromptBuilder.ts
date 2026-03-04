@@ -147,44 +147,7 @@ export class PromptBuilder {
         ? (data['action'] as Record<string, unknown>)
         : undefined;
     const text = typeof action?.['content'] === 'string' ? action['content'].trim() : '';
-    const imageSection = this.formatImagesForReplay(data?.['images']);
-    const parts = [text, imageSection].filter((part) => part.length > 0);
-    if (parts.length > 0) {
-      return parts.join('\n\n');
-    }
-
-    return '';
-  }
-
-  private formatImagesForReplay(imagesValue: unknown): string {
-    if (!Array.isArray(imagesValue) || imagesValue.length === 0) {
-      return '';
-    }
-
-    const lines: string[] = ['Images:'];
-    for (const item of imagesValue) {
-      if (!item || typeof item !== 'object') {
-        continue;
-      }
-      const image = item as Record<string, unknown>;
-      const id = typeof image['id'] === 'number' ? String(image['id']) : undefined;
-      const url = typeof image['url'] === 'string' ? image['url'] : undefined;
-      if (!id || !url) {
-        continue;
-      }
-
-      const alt =
-        typeof image['alt'] === 'string' && image['alt'].trim().length > 0
-          ? ` alt=${image['alt']}`
-          : '';
-      const link =
-        typeof image['link'] === 'string' && image['link'].trim().length > 0
-          ? ` link=${image['link']}`
-          : '';
-      lines.push(`- id=${id} url=${url}${alt}${link}`);
-    }
-
-    return lines.length > 1 ? lines.join('\n') : '';
+    return text;
   }
 
   /**

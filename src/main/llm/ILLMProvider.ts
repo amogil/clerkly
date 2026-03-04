@@ -69,17 +69,6 @@ export interface LLMUsage {
 }
 
 /**
- * Image descriptor returned by the LLM
- * Requirements: llm-integration.9
- */
-export interface LLMImageDescriptor {
-  id: number;
-  url: string;
-  alt?: string;
-  link?: string;
-}
-
-/**
  * The final action returned by the LLM
  * Requirements: llm-integration.5.4, llm-integration.5.5
  */
@@ -90,13 +79,12 @@ export interface LLMAction {
 
 /**
  * Provider-level chat result envelope:
- * - model structured output (action/images)
+ * - model structured output (action)
  * - optional provider usage envelope (canonical/raw)
  * Requirements: llm-integration.5.1, llm-integration.5.6
  */
 export interface LLMStructuredOutput {
   action: LLMAction;
-  images?: LLMImageDescriptor[];
   usage?: LLMUsage;
 }
 

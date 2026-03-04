@@ -191,41 +191,12 @@ describe('PromptBuilder.build()', () => {
       expect(assistant!.content).not.toContain('excluded_from_replay');
       expect(assistant!.content).toContain('Answer');
     });
-
-    /* Preconditions: Assistant payload contains images with URLs/links
-       Action: Call buildMessages(messages)
-       Assertions: replayed assistant content includes image references for model context
-       Requirements: llm-integration.10.2, llm-integration.13.5 */
-    it('should include image references in assistant replay content', () => {
-      const msgs = [
-        makeMessage({
-          id: 1,
-          kind: 'llm',
-          payloadJson: JSON.stringify({
-            data: {
-              action: { type: 'text', content: 'See [[image:1]]' },
-              images: [
-                { id: 1, url: 'https://example.com/image.png', link: 'https://example.com' },
-              ],
-            },
-          }),
-        }),
-      ];
-
-      const chatMessages = makeBuilder().buildMessages(msgs);
-      const assistant = chatMessages.find((m) => m.role === 'assistant');
-      expect(assistant).toBeDefined();
-      expect(assistant!.content).toContain('[[image:1]]');
-      expect(assistant!.content).toContain('Images:');
-      expect(assistant!.content).toContain('https://example.com/image.png');
-      expect(assistant!.content).toContain('link=https://example.com');
-    });
   });
 });
 
 describe('PromptBuilder edge cases', () => {
   describe('llm messages without replayable content', () => {
-    /* Preconditions: LLM message lacks action.content and images
+    /* Preconditions: LLM message lacks replayable action.content
        Action: Call build(messages)
        Assertions: Message is excluded from replay history
        Requirements: llm-integration.10.2, llm-integration.10.3 */

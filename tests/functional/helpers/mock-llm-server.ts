@@ -41,7 +41,6 @@ export class MockLLMServer {
   private streamingChunkDelayMs: number = 0; // delay between chunks (for interrupt tests)
   private rateLimitEnabled: boolean = false;
   private rateLimitRetryAfterSeconds: number = 10;
-  private imageResponseDelayMs: number = 0;
 
   constructor(config: MockLLMServerConfig) {
     this.port = config.port;
@@ -62,22 +61,6 @@ export class MockLLMServer {
     const pathname = parsedUrl.pathname || '';
 
     console.log(`[MOCK LLM] ${req.method} ${pathname}`);
-
-    if (pathname === '/mock-image.png') {
-      const pngBase64 =
-        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+o7m0AAAAASUVORK5CYII=';
-      const buffer = Buffer.from(pngBase64, 'base64');
-      const sendImage = () => {
-        res.writeHead(200, { 'Content-Type': 'image/png' });
-        res.end(buffer);
-      };
-      if (this.imageResponseDelayMs > 0) {
-        setTimeout(sendImage, this.imageResponseDelayMs);
-      } else {
-        sendImage();
-      }
-      return;
-    }
 
     // CORS headers
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -372,10 +355,6 @@ export class MockLLMServer {
       this.streamingEnabled = false;
     }
     console.log(`[MOCK LLM] Rate limit mode: ${enabled}, retry-after: ${retryAfterSeconds}s`);
-  }
-
-  setImageDelay(delayMs: number) {
-    this.imageResponseDelayMs = delayMs;
   }
 
   getBaseUrl(): string {

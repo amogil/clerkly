@@ -24,25 +24,6 @@ CREATE TABLE messages (
 );
 ```
 
-### Таблица `images`
-
-```sql
-CREATE TABLE images (
-  agent_id TEXT NOT NULL,
-  message_id TEXT NOT NULL,
-  image_id INTEGER NOT NULL,
-  url TEXT NOT NULL,
-  status TEXT NOT NULL,
-  hash TEXT,
-  content_type TEXT,
-  size INTEGER,
-  bytes BLOB,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL,
-  UNIQUE (agent_id, message_id, image_id)
-);
-```
-
 ---
 
 ## Форматы Сообщений
@@ -65,10 +46,7 @@ CREATE TABLE images (
 {
   "data": {
     "reasoning": { "text": "...", "excluded_from_replay": true },
-    "action": { "type": "text", "content": "Hi! How can I help?" },
-    "images": [
-      { "id": 1, "url": "https://example.com/a.png", "alt": "Diagram 1" }
-    ]
+    "action": { "type": "text", "content": "Hi! How can I help?" }
   }
 }
 ```
@@ -162,7 +140,7 @@ CREATE TABLE images (
 #### Контроль формата Structured Output и повтор запроса
 
 - **Ответственный:** `MainPipeline`.
-- **Проверка формата:** после получения ответа LLM валидируем соответствие единому декларативному контракту (`safeParse`) и корректность плейсхолдеров.
+- **Проверка формата:** после получения ответа LLM валидируем соответствие единому декларативному контракту (`safeParse`).
 - **При нарушении формата:** запрос повторяется с дополнительной инструкцией о строгом соблюдении формата Structured Output.
 - **Ограничение:** выполняется не более 2 повторных попыток.
 - **Если формат не исправлен:** создаётся `kind: error` с типом `provider` и сообщением `"Invalid response format. Please try again later."` в чате текущего агента.
@@ -179,7 +157,7 @@ CREATE TABLE images (
 
 #### Некорректный Structured Output
 
-ЕСЛИ Structured Output не соответствует контракту (например, отсутствует `action.content` или нарушен формат `images[]`/плейсхолдеров), система:
+ЕСЛИ Structured Output не соответствует контракту (например, отсутствует `action.content`), система:
 - выполняет не более 2 повторных запросов;
 - передаёт в повторный запрос инструкцию: `"Your previous response did not match the required JSON schema. Reply again using the exact required format only."`;
 - после исчерпания повторов применяет поведение из блока «Контроль формата Structured Output и повтор запроса» выше.
@@ -195,7 +173,7 @@ CREATE TABLE images (
    - определяем `role`: `user` для `kind:user`, `assistant` для `kind:llm`;
    - формируем отдельный элемент входного массива `messages` с текстовым `content`:
      - для `kind:user` передаём текст пользовательского сообщения;
-     - для `kind:llm` передаём текст ответа и, при наличии `images[]`, добавляем ссылки изображений в текстовый replay-блок, чтобы модель видела контекст ранее отправленных изображений.
+     - для `kind:llm` передаём только текст ответа.
 4. Для всех поддерживаемых провайдеров формируем единый итоговый входной массив сообщений:
    - отдельный элемент `role: system` для системной инструкции;
    - отдельные элементы истории в хронологическом порядке (по одному элементу на каждое сообщение диалога).
@@ -223,212 +201,45 @@ CREATE TABLE images (
 - Для `OpenAI` используется provider-specific адаптер схемы перед отправкой в `text.format.schema`.
 - Адаптер удаляет только `format: "uri"` (ограничение strict subset OpenAI для URL-формата).
 - Если адаптер встречает любой другой `format`, выполнение прерывается с явной ошибкой конфигурации схемы (fail-fast), чтобы не отправлять неоднозначную/неподдерживаемую схему.
-- Для strict-совместимости optional-поля `images[].alt` и `images[].link` в OpenAI-схеме представляются как required + nullable (`["string","null"]`).
-- После получения ответа от OpenAI `null` в `alt/link` нормализуется в отсутствие поля (`undefined`), после чего применяется канонический `safeParse`.
-- Жёсткая проверка URL (`http/https`) выполняется runtime-валидацией канонического контракта приложения.
 
 #### Формат structured output
 
 **Схема и форматы полей:**
 
 - `action.type`: строка, значение `text`.
-- `action.content`: строка; может содержать плейсхолдеры изображений.
-- `images[]`: массив объектов изображений (может отсутствовать). Схема, форматы полей и плейсхолдеры описаны в разделе «Встроенные изображения».
+- `action.content`: строка с пользовательским текстом ответа.
 - `usage` НЕ является частью model structured output; usage-envelope (`canonical + raw`) передаётся провайдером отдельно и сохраняется в `messages.usage_json`.
 
 Модель возвращает JSON:
 
 ```json
 {
-  "action": { "type": "text", "content": "Text with [[image:1]]" },
-  "images": [
-    { "id": 1, "url": "https://example.com/a.png", "alt": "Diagram 1", "link": "https://example.com" }
-  ]
+  "action": { "type": "text", "content": "Text response" }
 }
 ```
-
-#### Список изображений
-В `images[]` модель возвращает список:
-
-```json
-{
-  "action": { "type": "text", "content": "..." },
-  "images": [
-    { "id": 1, "url": "https://example.com/a.png", "alt": "Схема 1", "link": "https://example.com" },
-    { "id": 2, "url": "https://example.com/b.png" }
-  ]
-}
-```
-
-## Встроенные изображения
-
-### Требования к системному промпту
-
-Системный промпт должен:
-- использовать плейсхолдеры `[[image:<id>]]` в тексте;
-- передавать список изображений в `images[]`;
-- не вставлять обычные Markdown‑картинки `![alt](url)`.
-- перечислить поддерживаемые форматы изображений (`png/jpeg/webp/gif/svg`).
-
-### Форматы плейсхолдеров
-
-- базовый формат: `[[image:<id>]]`;
-- ссылка: `[[image:<id>|link:<url>]]`;
-- размер: `[[image:<id>|size:<width>x<height>]]`;
-- комбинация: `[[image:<id>|link:<url>|size:<width>x<height>]]`;
-- `size` — `width` и `height` как положительные целые.
-
-### Правила
-
-- `id` должен совпадать с `[[image:<id>]]` в тексте и быть натуральным числом.
-- `url` допустим только `http/https`.
-- `alt` необязателен.
-- `link` необязателен; при наличии изображение кликабельно.
-- `alt` используется как `alt` для `<img>`.
-- `size` является опциональным атрибутом плейсхолдера; при наличии используется для размеров заглушки.
-- если `size` не указан, заглушка всё равно показывается — размер определяется автоматически (дефолтные значения).
-- изображения без плейсхолдеров игнорируются для рендера, но всё равно скачиваются и сохраняются в БД.
-- обработка плейсхолдеров выполняется в renderer: при первичном рендере ставится placeholder+loader, затем он заменяется при успешном получении изображения или удаляется при ошибке/таймауте.
-- если изображение присутствует в тексте, но отсутствует в `images[]`, `MainPipeline` помечает запись как ошибочную; renderer получает `status=error` и снимает placeholder/loader.
-
-### Основные компоненты
-- **`ImageStorageManager`** (`src/main/media/ImageStorageManager.ts`)
-  - **Назначение:** единственная точка работы с бинарными данными и БД изображений.
-  - **Поведение:**
-    - `downloadAndStore(agentId, messageId, imageId, url)`:
-      - если записи нет — создаёт её со `status=pending`;
-      - валидирует URL (только http/https);
-      - скачивает данные (лимит 50GB);
-      - таймаут загрузки: 60 секунд (по таймауту → `status=error`);
-      - проверяет content‑type (разрешённые форматы);
-      - считает SHA‑256 hash;
-      - сохраняет bytes+метаданные в `images` для `(agentId, messageId, imageId)` и ставит `status=success`;
-      - при ошибке/таймауте обновляет запись → `status=error`.
-    - `markMissingDescriptor(agentId, messageId, imageId)`:
-      - создаёт (или обновляет) запись в `images` со `status=error`, если плейсхолдер есть, а `images[]` не содержит `id`.
-  - `images:get(agentId, messageId, imageId)` (IPC):
-    - читает `images` по `(agentId, messageId, imageId)`;
-    - если записи нет — `{ found: false, status: 'error' }` (нештатная ситуация, запись должна создаваться `ImageStorageManager` при `downloadAndStore`/`markMissingDescriptor`);
-    - если `status = pending` — `{ found: true, status: 'pending' }`;
-    - если `status = error` — `{ found: true, status: 'error' }`;
-    - если `status = success` — возвращает `{ found: true, status: 'success', bytes, contentType, size }`.
-  - **Ответственность:** хранение, валидация, безопасность.
-  - **Ошибки:** не показываются пользователю, только логируются.
-- **`MainPipeline`**
-  - **Назначение:** оркестратор ответа LLM и запуск фоновой загрузки изображений.
-  - **Поведение:**
-    - получает Structured Output;
-    - валидирует формат и делает retry при ошибке;
-    - сохраняет `kind: llm` с полным Structured Output;
-    - извлекает плейсхолдеры из `action.content`;
-    - сопоставляет их с `images[]`;
-    - запускает `ImageStorageManager.downloadAndStore` для каждого изображения.
-  - для плейсхолдеров без `images[]` вызывает `ImageStorageManager.markMissingDescriptor`.
-  - **Ответственность:** запись сообщения и запуск загрузок (без управления статусами).
-- **`MessageImageResolver`** (`src/renderer/lib/MessageImageResolver.ts`)
-  - **Назначение:** визуальная подстановка изображений в UI.
-  - **Поведение:**
-    - находит плейсхолдеры;
-    - вставляет заглушки нужного размера;
-    - вызывает `images:get(agentId, messageId, imageId)`:
-      - первые 10 секунд — раз в 0.5 секунды;
-      - следующие 10 секунд — раз в 1 секунду;
-      - затем — раз в 5 секунд;
-    - при `status=success` создаёт `blob:` URL и заменяет заглушку;
-    - при `status=error` или ошибке IPC снимает заглушку сразу;
-    - по таймауту 60 секунд удаляет заглушку.
-  - при обновлении сообщения рендерит заново (полный re-render, как обычно).
-  - **Ответственность:** отображение, polling, замена заглушек.
-- **`AgentMessage`**
-  - **Назначение:** интеграция рендеринга сообщения и `MessageImageResolver`.
-  - **Поведение:** передаёт `action.content`, запускает резолвер после первичного рендера.
-  - **Ответственность:** связка между данными сообщения и UI‑подстановкой изображений.
-
-### Polling стратегия
-
-- 0–10s: каждые 0.5s
-- 10–20s: каждые 1s
-- 20–60s: каждые 5s
-- Таймаут: 60s
-
-### Поток рендера (после первичного Markdown)
-
-1. `MessageResponse` рендерит Markdown.
-2. Рендерер находит плейсхолдеры `[[image:<id>]]` в DOM и заменяет их на заглушки.
-3. По `id` сразу обращается к `images:get(agentId, messageId, imageId)` и получает текущее состояние изображения.
-4. Renderer опрашивает `images:get(agentId, messageId, imageId)` только для изображений, у которых на шаге 3 получен `status=pending`:
-   - первые 10 секунд — раз в 0.5 секунды;
-   - следующие 10 секунд — раз в 1 секунду;
-   - затем — раз в 5 секунд.
-5. Пока ожидание идёт (`status=pending`) — рендерится заглушка нужного размера с лоадером.
-6. При `status=success` получает bytes + contentType → подмена заглушки на `<img>` (alt из `images[]`) или `<a><img></a>` если `link` указан в плейсхолдере.
-7. При `status=error` или ошибке IPC — снимает заглушку/placeholder сразу.
-8. По таймауту 60 секунд — удаляет заглушку/placeholder.
 
 ### Полный pipeline обработки сообщения (события и реакции)
 
 #### 1. Main process: получение ответа LLM
 1) `MainPipeline` получает Structured Output от провайдера.
-2) Валидирует формат (`action.content`, `images[]`, плейсхолдеры).
+2) Валидирует формат (`action.content`, `action.type`).
 3) При ошибке формата — делает retry с системным сообщением.
 4) Сохраняет `kind: llm` сообщение в БД (payload целиком).
-5) Запускает фоновую загрузку изображений внутри `MainPipeline`.
-6) Эмитит `message.created`/`message.updated` как обычно (отдельных событий для изображений нет).
+5) Эмитит `message.created`/`message.updated` как обычно.
 
-#### 2. Main process: загрузка изображений
-1) `MainPipeline` извлекает плейсхолдеры из `action.content`.
-2) Сопоставляет плейсхолдеры с `images[]`.
-3) Для каждого изображения запускает загрузку через `ImageStorageManager`.
-4) `ImageStorageManager` сам создаёт запись `images` со `status=pending`, затем по результату загрузки обновляет запись:
-   - успех → `status=success` + `hash/bytes/content_type/size`;
-   - ошибка/таймаут → `status=error`.
-5) Если `imageId` нет в `images[]`:
-   - `MainPipeline` вызывает `ImageStorageManager.markMissingDescriptor(...)`.
-
-#### 3. Renderer: первичный рендер
+#### 2. Renderer: первичный рендер
 1) Получает `message.created`/`message.updated`.
-2) `AgentMessage` рендерит `MessageResponse`.
-3) `MessageImageResolver` ищет плейсхолдеры, заменяет их на заглушки.
-4) Для каждого `imageId`:
-   - polling: первые 10 секунд — раз в 0.5 секунды, следующие 10 секунд — раз в 1 секунду, затем — раз в 5 секунд, до готовности или таймаута 60 секунд.
-
-#### 4. Renderer: обработка ожидания (polling)
-1) Вызывает IPC `images:get(agentId, messageId, imageId)` (интервалы: 0.5с → 1с → 5с) и получает:
-   - `status: 'pending'` → продолжает ждать (loader остаётся);
-   - `status: 'error'` → снимает заглушку/placeholder сразу (для "нет записи" это нештатно, можно игнорировать без UI-ошибки);
-   - `status: 'success'` + bytes → подменяет заглушку на `<img>`.
-2) Таймаут ожидания 60 секунд → удаляет заглушку/лоадер.
-3) Ошибка IPC/исключение → снимает заглушку/лоадер сразу (без UI-ошибки).
-
-#### 5. Гонки и порядок событий
-- Гонки решаются polling‑механизмом: renderer опрашивает main до готовности или таймаута.
+2) `AgentMessage` рендерит `action.content` как Markdown.
+3) Дополнительных post-processing этапов нет.
 
 ### Крайние случаи
 
-- Плейсхолдер есть, `images[]` не содержит `id`:
-  - main создаёт запись в `images` со `status=error`;
-  - `images:get` возвращает `status: error`, renderer снимает заглушку/лоадер сразу.
-- Изображение есть, плейсхолдера нет → игнорировать для рендера, но скачивать и сохранять в БД.
-- URL недоступен / ошибка сети → снять placeholder/loader (без UI‑ошибки) и записать в лог.
-- content‑type не `image/*` → снять placeholder/loader (без UI‑ошибки) и записать в лог.
-- размер > лимита → снять placeholder/loader (без UI‑ошибки) и записать в лог.
-- повторные плейсхолдеры одного `id` → повторно опрашивать `images:get` без отдельного кэша.
-- `link` невалидный/не http(s) → игнорировать ссылку, оставить `<img>`.
-- неверный `size` (не `<width>x<height>`) → игнорировать размер.
-- `size` отсутствует → использовать дефолтный размер заглушки.
-- **Гонки событий:** решаются polling‑механизмом; pending‑кэш не используется.
+- Некорректный structured output от провайдера → выполняются retry по контракту.
+- При исчерпании retry создаётся `kind:error` сообщение с единым пользовательским текстом.
 
 ### Дополнительные параметры (выбраны по умолчанию)
 
-- **Дефолтный размер заглушки:** `320x180` (16:9).
-- **Стиль лоадера:** неброский серый скелетон + лёгкая пульсация (`bg-muted/40`, `animate-pulse`, скругление `rounded-md`).
-- **Лимиты загрузки:**
-  - max size: `50GB`
-  - content types: `image/png`, `image/jpeg`, `image/webp`, `image/gif`, `image/svg+xml`
-- **SVG:** санитизировать перед рендером.
-- **Формат IPC (обслуживает `ImageStorageManager`):**
-  - `images:get(agentId, messageId, imageId)` → `{ found: boolean, status: 'pending'|'error'|'success', bytes?, contentType?, size? }`
-- **Polling:** первые 10 секунд — 0.5с, следующие 10 секунд — 1с, далее — 5с, максимум 60 секунд.
+- Дополнительных параметров для image-pipeline нет (функциональность удалена).
 
 ### Исключение hidden из истории
 
@@ -439,20 +250,14 @@ CREATE TABLE images (
 ### Тестирование
 
 #### Unit tests
-- парсер плейсхолдеров и замена в DOM/HTML.
-- `ImageStorageManager` (ограничения размера, фильтр типов).
-- обработка отсутствующего id/URL.
+- валидация и парсинг structured output.
+- обработка usage-envelope и persist в `messages.usage_json`.
+- обработка ошибок формата и retry в `MainPipeline`.
 
 #### Functional tests
 - История передаётся как отдельные сообщения и исключает служебные поля.
 - Structured Output описан в системном промпте и используется моделью.
 - Invalid structured output → retry, затем ошибка с `Retry`.
-- LLM ответ с `[[image:1]]` и `images[]` → `<img>` появляется после загрузки.
-- Ошибка: неизвестный id → снять placeholder/loader (без UI‑ошибки) и записать в лог.
-- Повторная перерисовка не вызывает повторной загрузки.
-- Кликабельная картинка: `[[image:1|link:https://...]]` → `<a>` вокруг `<img>`.
-- Асинхронность: рендер без картинки → после `status=success` картинка вставляется.
-- Заглушка: размер из `size` используется до загрузки, затем заменяется на изображение.
 
 ---
 
@@ -494,16 +299,8 @@ interface LLMUsage {
   raw: Record<string, unknown>;
 }
 
-interface LLMImageDescriptor {
-  id: number;
-  url: string;
-  alt?: string;
-  link?: string;
-}
-
 interface LLMStructuredOutput {
   action: LLMAction;
-  images?: LLMImageDescriptor[];
   usage?: LLMUsage;
 }
 
@@ -566,7 +363,7 @@ You are a helpful AI assistant. You may respond in Markdown when it improves cla
 [
   { "role": "system", "content": "System instruction..." },
   { "role": "user", "content": "Hello" },
-  { "role": "assistant", "content": "Hi! Here is an image [[image:1]].\nImages: id=1 url=https://example.com/a.png" }
+  { "role": "assistant", "content": "Hi! How can I help?" }
 ]
 ```
 
@@ -756,8 +553,6 @@ User отправляет сообщение
 - `tests/unit/agents/AgentIPCHandlers.test.ts` — запуск pipeline при kind:user
 - `tests/unit/hooks/useMessages.test.ts` — обработка новых событий
 - `tests/unit/db/repositories/MessagesRepository.test.ts` — kind как параметр
-- `tests/unit/utils/imagePlaceholders.test.ts` — парсер плейсхолдеров
-- `tests/unit/media/ImageStorageManager.test.ts` — загрузка/ошибки/IPC
 
 ### Функциональные тесты
 
@@ -771,12 +566,6 @@ User отправляет сообщение
 - `tests/functional/llm-chat.spec.ts` — "should hide error bubble when user sends next message"
 - `tests/functional/llm-chat.spec.ts` — "should send full conversation history to llm on second message"
 - `tests/functional/llm-chat.spec.ts` — "should exclude error messages from llm history"
-- `tests/functional/llm-chat.spec.ts` — "LLM ответ с `[[image:1]]` и `images[]` → `<img>` появляется после загрузки"
-- `tests/functional/llm-chat.spec.ts` — "Ошибка: неизвестный id → снять placeholder/loader (без UI‑ошибки) и записать в лог"
-- `tests/functional/llm-chat.spec.ts` — "Повторная перерисовка не вызывает повторной загрузки"
-- `tests/functional/llm-chat.spec.ts` — "Кликабельная картинка: `[[image:1|link:https://...]]` → `<a>` вокруг `<img>`"
-- `tests/functional/llm-chat.spec.ts` — "Асинхронность: рендер без картинки → после `status=success` картинка вставляется"
-- `tests/functional/llm-chat.spec.ts` — "Заглушка: размер из `size` используется до загрузки, затем заменяется на изображение"
 
 ### Покрытие Требований
 
@@ -799,7 +588,6 @@ User отправляет сообщение
 | llm-integration.8.1 | ✓ | ✓ |
 | llm-integration.8.5 | ✓ | ✓ |
 | llm-integration.8.6 | ✓ | - |
-| llm-integration.9 | ✓ | ✓ |
 | llm-integration.10 | - | - |
 | llm-integration.11 | - | - |
 | llm-integration.12 | - | - |

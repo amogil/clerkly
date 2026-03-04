@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useRef } from 'react';
-// Requirements: llm-integration.7, llm-integration.9.2, llm-integration.9.3, llm-integration.9.5, llm-integration.3.4.1, llm-integration.3.4.4, agents.4.22, agents.4.9, agents.4.10.1, agents.4.10.2
+import React from 'react';
+// Requirements: llm-integration.7, llm-integration.3.4.1, llm-integration.3.4.4, agents.4.22, agents.4.9, agents.4.10.1, agents.4.10.2
 import { Logo } from '../logo';
 import { isInProgress, type AgentStatus } from '../../../shared/utils/agentStatus';
 import { Message, MessageContent, MessageResponse } from '../ai-elements/message';
@@ -7,7 +7,6 @@ import { Reasoning, ReasoningTrigger, ReasoningContent } from '../ai-elements/re
 import type { MessageSnapshot } from '../../../shared/events/types';
 import { AgentErrorDialog } from './AgentErrorDialog';
 import type { AgentDialogActionItem } from './AgentDialog';
-import { resolveMessageImages } from '../../lib/MessageImageResolver';
 
 interface AgentMessageProps {
   message: MessageSnapshot;
@@ -16,7 +15,7 @@ interface AgentMessageProps {
   onNavigate?: (screen: string) => void;
 }
 
-// Requirements: llm-integration.7, llm-integration.9.2, llm-integration.9.3, llm-integration.9.5, llm-integration.3.4.1, llm-integration.3.4.4, agents.4.22, agents.4.9, agents.4.10.1, agents.4.10.2
+// Requirements: llm-integration.7, llm-integration.3.4.1, llm-integration.3.4.4, agents.4.22, agents.4.9, agents.4.10.1, agents.4.10.2
 export function AgentMessage({ message, showAvatar, agentStatus, onNavigate }: AgentMessageProps) {
   const isLlmMessage = message.kind === 'llm';
   const llmData = isLlmMessage
@@ -24,33 +23,7 @@ export function AgentMessage({ message, showAvatar, agentStatus, onNavigate }: A
     : undefined;
   const llmReasoning = llmData?.['reasoning'] as { text?: string } | undefined;
   const llmAction = llmData?.['action'] as { type?: string; content?: string } | undefined;
-  const contentRef = useRef<HTMLDivElement>(null);
-  const descriptors = useMemo(() => {
-    const llmImages = (llmData?.['images'] as Array<Record<string, unknown>> | undefined) ?? [];
-    return llmImages
-      .map((img) => {
-        const rawId = img['id'];
-        const id = typeof rawId === 'number' ? rawId : Number(rawId);
-        return {
-          id,
-          url: typeof img['url'] === 'string' ? img['url'] : undefined,
-          alt: typeof img['alt'] === 'string' ? img['alt'] : undefined,
-          link: typeof img['link'] === 'string' ? img['link'] : undefined,
-        };
-      })
-      .filter((img) => Number.isInteger(img.id) && img.id > 0);
-  }, [llmData]);
-
-  useEffect(() => {
-    if (!isLlmMessage || !llmAction?.content || !contentRef.current) return;
-    const cleanup = resolveMessageImages(contentRef.current, {
-      agentId: message.agentId,
-      messageId: message.id,
-      content: llmAction.content,
-      descriptors,
-    });
-    return () => cleanup();
-  }, [descriptors, isLlmMessage, llmAction?.content, message.agentId, message.id]);
+  const actionContent = llmAction?.content ?? '';
 
   if (message.kind === 'user') {
     return (
@@ -144,11 +117,9 @@ export function AgentMessage({ message, showAvatar, agentStatus, onNavigate }: A
           )}
           {llmAction?.content ? (
             <MessageContent data-testid="message-llm-action" className="w-full">
-              <div ref={contentRef}>
-                <MessageResponse className="text-sm leading-relaxed break-words">
-                  {llmAction.content}
-                </MessageResponse>
-              </div>
+              <MessageResponse className="text-sm leading-relaxed break-words">
+                {actionContent}
+              </MessageResponse>
             </MessageContent>
           ) : (
             // Loading indicator — three bouncing dots

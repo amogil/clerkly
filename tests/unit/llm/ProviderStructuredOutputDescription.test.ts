@@ -30,7 +30,6 @@ function expectStructuredSchemaWithDescriptions(schema: unknown): void {
 
   const properties = typed.properties as Record<string, unknown>;
   const action = properties.action as Record<string, unknown>;
-  const images = properties.images as Record<string, unknown>;
 
   expect(action.description).toBe('Primary assistant action payload shown to the user.');
   const actionProps = action.properties as Record<string, unknown>;
@@ -38,72 +37,19 @@ function expectStructuredSchemaWithDescriptions(schema: unknown): void {
     'Action discriminator. Must be "text". User-visible response text is stored in action.content.'
   );
   expect((actionProps.content as Record<string, unknown>).description).toBe(
-    'User-visible response text. Can include image placeholders like [[image:1]].'
-  );
-
-  expect(images.description).toBe(
-    'Optional image descriptors referenced by placeholders in action.content. Descriptors without placeholders may still be returned for background download.'
-  );
-
-  const imageItem = (images.items as Record<string, unknown>).properties as Record<string, unknown>;
-  expect((imageItem.id as Record<string, unknown>).description).toBe(
-    'Natural number image identifier that must match placeholder id in action.content.'
-  );
-  expect((imageItem.url as Record<string, unknown>).description).toBe(
-    'Direct HTTP/HTTPS URL to download image content.'
-  );
-  expect((imageItem.alt as Record<string, unknown>).description).toBe(
-    'Optional human-readable alternative text for accessibility.'
-  );
-  expect((imageItem.link as Record<string, unknown>).description).toBe(
-    'Optional clickable target URL associated with the rendered image in chat.'
+    'User-visible assistant response text.'
   );
 }
 
-function expectOpenAIStrictSchemaAdjustments(schema: unknown): void {
-  const typed = schema as Record<string, unknown>;
-  const imageItem = (
-    (typed.properties as Record<string, unknown>)?.images as Record<string, unknown>
-  )?.items as Record<string, unknown> as Record<string, unknown>;
-  const imageProps = (imageItem.properties ?? {}) as Record<string, unknown>;
-  const required = (imageItem.required ?? []) as string[];
-
-  // format: "uri" must be stripped in OpenAI strict schema adapter.
-  expect((imageProps.url as Record<string, unknown>).format).toBeUndefined();
-  // OpenAI strict schema requires all keys listed in required.
-  expect(required).toEqual(expect.arrayContaining(['id', 'url', 'alt', 'link']));
-  // logically optional fields are represented as nullable under strict schema.
-  expect((imageProps.alt as Record<string, unknown>).type).toEqual(['string', 'null']);
-  expect((imageProps.link as Record<string, unknown>).type).toEqual(['string', 'null']);
-}
-
-function expectInstructionWithFieldFormatsAndImageLinks(instruction: string): void {
+function expectInstructionWithFieldFormats(instruction: string): void {
   expect(instruction).toContain('Field semantics and formats:');
   expect(instruction).toContain('- action.type: always "text"; defines the action kind.');
-  expect(instruction).toContain(
-    '- action.content: user-visible assistant text; may include image placeholders.'
-  );
-  expect(instruction).toContain(
-    '- images: optional list of image descriptors tied to placeholders in action.content.'
-  );
-  expect(instruction).toContain(
-    '- images[].id: natural number identifier matching placeholder id.'
-  );
-  expect(instruction).toContain('- images[].url: image URL for download/rendering.');
-  expect(instruction).toContain('- images[].alt: optional accessibility text for rendered image.');
-  expect(instruction).toContain(
-    '- images[].link: optional clickable URL opened when image is clicked.'
-  );
-
-  expect(instruction).toContain('[[image:<id>]]');
-  expect(instruction).toContain('[[image:<id>|link:<url>]]');
-  expect(instruction).toContain('[[image:<id>|size:<width>x<height>]]');
-  expect(instruction).toContain('[[image:<id>|link:<url>|size:<width>x<height>]]');
+  expect(instruction).toContain('- action.content: user-visible assistant text.');
 }
 
 const messages: ChatMessage[] = [
   { role: 'system', content: 'You are a helpful assistant.' },
-  { role: 'user', content: 'Show me a diagram' },
+  { role: 'user', content: 'Say hello' },
 ];
 
 describe('Provider structured output description in requests', () => {
@@ -113,7 +59,7 @@ describe('Provider structured output description in requests', () => {
 
   /* Preconditions: OpenAI provider is called with streaming response mocked
      Action: Execute chat() and inspect outgoing request body
-     Assertions: Request contains schema with field descriptions and text instruction with field formats/image links
+     Assertions: Request contains schema with field descriptions and text instruction for action fields
      Requirements: llm-integration.11.1, llm-integration.11.2, llm-integration.11.3, llm-integration.11.4, llm-integration.5.7.1 */
   it('should send complete schema and instruction in OpenAI request', async () => {
     const provider = new OpenAIProvider('test-key');
@@ -145,9 +91,8 @@ describe('Provider structured output description in requests', () => {
     const format = ((body.text as Record<string, unknown>).format ?? {}) as Record<string, unknown>;
 
     expectStructuredSchemaWithDescriptions(schema);
-    expectOpenAIStrictSchemaAdjustments(schema);
     expect(format.strict).toBe(true);
-    expectInstructionWithFieldFormatsAndImageLinks(systemInstruction);
+    expectInstructionWithFieldFormats(systemInstruction);
   });
 
   it('should send complete schema and instruction in Anthropic request', async () => {
@@ -180,7 +125,7 @@ describe('Provider structured output description in requests', () => {
     ).schema ?? {}) as Record<string, unknown>;
 
     expectStructuredSchemaWithDescriptions(schema);
-    expectInstructionWithFieldFormatsAndImageLinks(systemInstruction);
+    expectInstructionWithFieldFormats(systemInstruction);
   });
 
   it('should send complete schema and instruction in Google request', async () => {
@@ -214,6 +159,6 @@ describe('Provider structured output description in requests', () => {
       {}) as Record<string, unknown>;
 
     expectStructuredSchemaWithDescriptions(schema);
-    expectInstructionWithFieldFormatsAndImageLinks(systemInstruction);
+    expectInstructionWithFieldFormats(systemInstruction);
   });
 });

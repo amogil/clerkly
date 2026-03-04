@@ -150,7 +150,8 @@ export class MessageManager {
     kind: string,
     payload: MessagePayload,
     replyToMessageId: number | null,
-    timestamp?: string
+    timestamp?: string,
+    emitEvent: boolean = true
   ): Message {
     // Repository automatically checks access
     const payloadJson = JSON.stringify(payload);
@@ -164,9 +165,11 @@ export class MessageManager {
 
     this.logger.info(`Message created: ${message.id} for agent ${agentId}`);
 
-    // Publish message created event for real-time UI updates
-    // Requirements: agents.12.4
-    MainEventBus.getInstance().publish(new MessageCreatedEvent(this.toEventMessage(message)));
+    if (emitEvent) {
+      // Publish message created event for real-time UI updates
+      // Requirements: agents.12.4
+      MainEventBus.getInstance().publish(new MessageCreatedEvent(this.toEventMessage(message)));
+    }
 
     return message;
   }
@@ -175,17 +178,24 @@ export class MessageManager {
    * Update a message's payload
    * Requirements: agents.7.1
    */
-  update(messageId: number, agentId: string, payload: MessagePayload): void {
+  update(
+    messageId: number,
+    agentId: string,
+    payload: MessagePayload,
+    emitEvent: boolean = true
+  ): void {
     // Repository automatically checks access
     const payloadJson = JSON.stringify(payload);
     this.dbManager.messages.update(messageId, agentId, payloadJson);
 
     this.logger.info(`Message updated: ${messageId}`);
 
-    // Fetch updated message to get correct kind for the event
-    const updated = this.dbManager.messages.getById(messageId, agentId);
-    if (updated) {
-      MainEventBus.getInstance().publish(new MessageUpdatedEvent(this.toEventMessage(updated)));
+    if (emitEvent) {
+      // Fetch updated message to get correct kind for the event
+      const updated = this.dbManager.messages.getById(messageId, agentId);
+      if (updated) {
+        MainEventBus.getInstance().publish(new MessageUpdatedEvent(this.toEventMessage(updated)));
+      }
     }
   }
 
