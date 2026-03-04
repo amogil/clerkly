@@ -1,6 +1,6 @@
 // Requirements: clerkly.3.1, clerkly.3.2, clerkly.3.3, clerkly.3.4, clerkly.3.5, clerkly.3.6, clerkly.3.9, clerkly.3.10, clerkly.2.9
 
-import { DateTimeFormatter } from './utils/DateTimeFormatter';
+import { DateTimeFormatter } from '../shared/utils/DateTimeFormatter';
 
 /**
  * Log level type

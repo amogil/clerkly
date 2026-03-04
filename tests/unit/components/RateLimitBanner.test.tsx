@@ -21,7 +21,7 @@ const mockCancelRetry = jest.fn().mockResolvedValue({ success: true });
   },
 };
 // Mock DateTimeFormatter
-jest.mock('../../../src/renderer/utils/DateTimeFormatter', () => ({
+jest.mock('../../../src/shared/utils/DateTimeFormatter', () => ({
   DateTimeFormatter: {
     formatLogTimestamp: (date: Date) => date.toISOString(),
     formatDateTime: (date: Date) => date.toISOString(),

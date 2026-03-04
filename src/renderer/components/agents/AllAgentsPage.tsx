@@ -2,7 +2,7 @@ import React from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { AgentAvatar } from './AgentAvatar';
 import { hasError, isNew, getStatusText, getStatusStyles } from '../../../shared/utils/agentStatus';
-import { DateTimeFormatter } from '../../../utils/DateTimeFormatter';
+import { DateTimeFormatter } from '../../../shared/utils/DateTimeFormatter';
 import type { AgentSnapshot } from '../../types/agent';
 
 // Requirements: agents.2.1, agents.5.5, realtime-events.9

@@ -48,7 +48,7 @@ jest.mock('../../../src/renderer/components/agents/AgentWelcome', () => ({
   AgentWelcome: () => <div data-testid="empty-state">Empty State</div>,
 }));
 
-jest.mock('../../../src/renderer/utils/DateTimeFormatter', () => ({
+jest.mock('../../../src/shared/utils/DateTimeFormatter', () => ({
   DateTimeFormatter: {
     formatDateTime: (date: Date) => date.toISOString(),
     formatLogTimestamp: (date: Date) => date.toISOString(),

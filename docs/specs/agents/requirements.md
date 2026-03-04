@@ -82,14 +82,14 @@
 
 #### Функциональные Тесты
 
-- `tests/functional/agents.spec.ts` - "should display agents list in header"
-- `tests/functional/agents.spec.ts` - "should sort agents by updatedAt timestamp"
+- `tests/functional/agent-list-responsive.spec.ts` - "should adapt visible agents count to window width"
+- `tests/functional/agent-reordering.spec.ts` - "should maintain correct order when multiple agents are updated"
 - `tests/functional/agent-reordering.spec.ts` - "should move agent to top of list after sending message"
 - `tests/functional/agent-reordering.spec.ts` - "should bring hidden agent to header after sending message"
 - `tests/functional/agent-reordering.spec.ts` - "should maintain correct order when multiple agents are updated"
 - `tests/functional/agent-reordering.spec.ts` - "should reorder immediately after message from AllAgents selection"
-- `tests/functional/agents.spec.ts` - "should adapt visible agents count to window width"
-- `tests/functional/agents.spec.ts` - "should show +N button for hidden agents"
+- `tests/functional/agent-list-responsive.spec.ts` - "should adapt visible agents count to window width"
+- `tests/functional/agent-list-responsive.spec.ts` - "should show +N button for hidden agents"
 
 ### 2. Создание нового агента
 
@@ -157,8 +157,8 @@
 
 #### Функциональные Тесты
 
-- `tests/functional/agents.spec.ts` - "should switch active agent on click"
-- `tests/functional/agents.spec.ts` - "should load messages for selected agent"
+- `tests/functional/agent-switching.spec.ts` - "should switch active agent on click"
+- `tests/functional/agent-switching.spec.ts` - "should load messages for selected agent"
 
 ### 4. Общение с агентом
 
@@ -340,11 +340,11 @@
 
 #### Функциональные Тесты
 
-- `tests/functional/agents.spec.ts` - "should open all agents page on +N button click"
-- `tests/functional/agents.spec.ts` - "should display all agents in history"
-- `tests/functional/agents.spec.ts` - "should open agent chat from history"
+- `tests/functional/all-agents-page.spec.ts` - "should open all agents page on +N button click"
+- `tests/functional/all-agents-page.spec.ts` - "should display all agents in history"
+- `tests/functional/all-agents-page.spec.ts` - "should open agent chat from history"
 - `tests/functional/agents-error-messages.spec.ts` - "should display error message for agent with error status in AllAgents"
-- `tests/functional/agents-error-messages.spec.ts` - "should not display error messages for archived agents in AllAgents"
+- `tests/functional/agents-error-messages.spec.ts` - "should not display archived agents in AllAgents"
 - `tests/functional/agents-error-messages.spec.ts` - "should sort agents by updatedAt in AllAgents"
 - `tests/functional/agents-error-messages.spec.ts` - "should display only the last error message in AllAgents"
 
@@ -418,12 +418,12 @@
 
 #### Функциональные Тесты
 
-- `tests/functional/agents.spec.ts` - "should display correct visual indicators for each status"
-- `tests/functional/agents.spec.ts` - "should animate in-progress status"
-- `tests/functional/agents.spec.ts` - "should pulse awaiting-response status"
-- `tests/functional/agent-activation-animation.spec.ts` - "should show animation only when switching to different agent"
-- `tests/functional/agent-activation-animation.spec.ts` - "should not show animation when agent status updates without switching"
-- `tests/functional/agent-activation-animation.spec.ts` - "should show animation when switching back to previous agent"
+- `tests/functional/agent-status-indicators.spec.ts` - "should display correct visual indicators for each status"
+- `tests/functional/agent-status-indicators.spec.ts` - "should animate in-progress status"
+- `tests/functional/agent-status-indicators.spec.ts` - "should pulse awaiting-response status"
+- `tests/functional/agent-status-indicators.spec.ts` - "should show animation only when agent moves to first position"
+- `tests/functional/agent-status-indicators.spec.ts` - "should not show animation when agent status updates without position change"
+- `tests/functional/agent-status-indicators.spec.ts` - "should show animation when switching back to previous agent"
 
 ### 7. Формат сообщений в чате
 
@@ -478,9 +478,9 @@
 
 #### Функциональные Тесты
 
-- `tests/functional/agents.spec.ts` - "should display user messages correctly"
-- `tests/functional/agents.spec.ts` - "should display agent responses correctly"
-- `tests/functional/agents.spec.ts` - "should render markdown in final_answer"
+- `tests/functional/agent-messaging.spec.ts` - "should display messages in chronological order"
+- `tests/functional/llm-chat.spec.ts` - "should show llm response after user message"
+- `tests/functional/llm-chat.spec.ts` - "should render markdown headings"
 - `tests/functional/llm-chat.spec.ts` - "should render markdown headings"
 - `tests/functional/llm-chat.spec.ts` - "should render markdown paragraphs"
 - `tests/functional/llm-chat.spec.ts` - "should render markdown emphasis"
@@ -525,8 +525,8 @@
 
 #### Функциональные Тесты
 
-- `tests/functional/agents.spec.ts` - "should display active agent info in header"
-- `tests/functional/agents.spec.ts` - "should truncate long agent names"
+- `tests/functional/header-layout.spec.ts` - "should split header into 50% left (active agent info) and 50% right (agent list)"
+- `tests/functional/header-layout.spec.ts` - "should maintain 50%/50% split with long agent name"
 - `tests/functional/agent-date-update.spec.ts` - "should update agent timestamp when new message is sent"
 
 ---
@@ -556,8 +556,8 @@
 
 #### Функциональные Тесты
 
-- `tests/functional/agents.spec.ts` - "should calculate agent status from messages"
-- `tests/functional/agents.spec.ts` - "should update status on new message"
+- `tests/functional/agent-status-calculation.spec.ts` - "should calculate agent status from messages"
+- `tests/functional/agent-status-calculation.spec.ts` - "should update status on new message"
 
 ---
 
@@ -581,8 +581,8 @@
 
 #### Функциональные Тесты
 
-- `tests/functional/agents.spec.ts` - "should only show agents for current user"
-- `tests/functional/agents.spec.ts` - "should create agent with current userId"
+- `tests/functional/agent-data-isolation.spec.ts` - "should only show agents for current user"
+- `tests/functional/agent-data-isolation.spec.ts` - "should create agent with current userId"
 
 ---
 
@@ -604,8 +604,8 @@
 
 #### Функциональные Тесты
 
-- `tests/functional/agents.spec.ts` - "should show activity indicator during tool_call"
-- `tests/functional/agents.spec.ts` - "should hide activity indicator when operation completes"
+- `tests/functional/agent-activity-indicator.spec.ts` - "should show activity indicator during tool_call"
+- `tests/functional/agent-activity-indicator.spec.ts` - "should hide activity indicator when operation completes"
 
 ---
 
@@ -668,10 +668,10 @@
 
 #### Функциональные Тесты
 
-- `tests/functional/agents.spec.ts` - "should add agent to list on agent.created event"
-- `tests/functional/agents.spec.ts` - "should update agent on agent.updated event"
-- `tests/functional/agents.spec.ts` - "should remove agent on agent.archived event"
-- `tests/functional/agents.spec.ts` - "should add message on message.created event"
+- `tests/functional/agent-realtime-events.spec.ts` - "should add agent to list on agent.created event"
+- `tests/functional/agent-realtime-events.spec.ts` - "should update agent on agent.updated event"
+- `tests/functional/agent-realtime-events.spec.ts` - "should remove agent on agent.archived event"
+- `tests/functional/agent-realtime-events.spec.ts` - "should add message on message.created event"
 
 ---
 

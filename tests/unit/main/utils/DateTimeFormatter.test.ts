@@ -1,6 +1,6 @@
 // Requirements: settings.2.1, settings.2.3, settings.2.4
 
-import { DateTimeFormatter } from '../../../../src/main/utils/DateTimeFormatter';
+import { DateTimeFormatter } from '../../../../src/shared/utils/DateTimeFormatter';
 
 describe('DateTimeFormatter (Main Process)', () => {
   /* Preconditions: valid timestamp provided

@@ -65,8 +65,8 @@
 
 #### Функциональные Тесты
 
-- `tests/functional/realtime-events.spec.ts` - "should deliver event from main to renderer via IPC"
-- `tests/functional/realtime-events.spec.ts` - "should deliver event from renderer to main via IPC"
+- `tests/functional/agent-realtime-events.spec.ts` - "should add agent to list on agent.created event"
+- `tests/functional/agent-realtime-events.spec.ts` - "should update agent on agent.updated event"
 
 ### Требование 2: Подписка на события
 
@@ -102,7 +102,7 @@
 
 #### Функциональные Тесты
 
-- `tests/functional/realtime-events.spec.ts` - "should receive events across IPC boundary"
+- `tests/functional/agent-realtime-events.spec.ts` - "should remove agent on agent.archived event"
 
 ### Требование 3: Стандартные типы событий
 
@@ -163,8 +163,8 @@
 
 #### Функциональные Тесты
 
-- `tests/functional/realtime-events.spec.ts` - "should forward events from main to renderer"
-- `tests/functional/realtime-events.spec.ts` - "should forward events from renderer to main"
+- `tests/functional/agent-realtime-events.spec.ts` - "should add message on message.created event"
+- `tests/functional/agent-realtime-events.spec.ts` - "should update message on message.updated event"
 
 ### Требование 5: Обработка событий в UI
 
@@ -190,9 +190,9 @@
 
 #### Функциональные Тесты
 
-- `tests/functional/realtime-events.spec.ts` - "should update UI on entity.created"
-- `tests/functional/realtime-events.spec.ts` - "should update UI on entity.updated"
-- `tests/functional/realtime-events.spec.ts` - "should remove from UI on entity.deleted"
+- `tests/functional/agent-realtime-events.spec.ts` - "should add agent to list on agent.created event"
+- `tests/functional/agent-realtime-events.spec.ts` - "should update agent on agent.updated event"
+- `tests/functional/agent-realtime-events.spec.ts` - "should remove agent on agent.archived event"
 
 ### Требование 6: Производительность
 

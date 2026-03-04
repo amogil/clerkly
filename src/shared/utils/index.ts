@@ -9,3 +9,4 @@ export {
   getStatusStyles,
 } from './agentStatus';
 export type { AgentStatus, MessagePayload } from './agentStatus';
+export { DateTimeFormatter } from './DateTimeFormatter';

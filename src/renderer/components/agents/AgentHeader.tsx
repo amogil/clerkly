@@ -3,7 +3,7 @@ import { Plus } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { AgentAvatar } from './AgentAvatar';
 import { getStatusText, getStatusStyles } from '../../../shared/utils/agentStatus';
-import { DateTimeFormatter } from '../../../utils/DateTimeFormatter';
+import { DateTimeFormatter } from '../../../shared/utils/DateTimeFormatter';
 import type { AgentSnapshot } from '../../types/agent';
 
 // Requirements: agents.2.1, agents.4.7, agents.1.4.4
