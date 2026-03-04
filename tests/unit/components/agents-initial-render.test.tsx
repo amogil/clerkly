@@ -85,6 +85,8 @@ jest.mock('framer-motion', () => ({
 // Mock lucide-react
 jest.mock('lucide-react', () => ({
   Send: () => <div>Send</div>,
+  CornerDownLeft: () => <div>CornerDownLeft</div>,
+  Square: () => <div>Square</div>,
   Plus: () => <div>Plus</div>,
   Check: () => <div>Check</div>,
   X: () => <div>X</div>,
