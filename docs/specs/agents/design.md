@@ -753,7 +753,7 @@ MessageManager.create()
         │       └─→ useAgents (Renderer)
         │           → Обновляет timestamp в UI
         │
-        └─→ useMessages (Renderer)
+        └─→ useAgentChat (Renderer)
             → Добавляет сообщение в чат
 ```
 
@@ -815,8 +815,8 @@ function AgentsComponent() {
   2. Получает обновленного агента из БД
   3. Генерирует событие `AGENT_UPDATED`
 
-*Подписчик 2: useMessages (Renderer)*
-- **Файл:** `src/renderer/hooks/useMessages.ts`
+*Подписчик 2: useAgentChat (Renderer)*
+- **Файл:** `src/renderer/hooks/useAgentChat.ts`
 - **Подписка:** `useEventSubscription(MESSAGE_CREATED, handler)`
 - **Фильтр:** `payload.data.agentId === activeAgentId` (только для активного агента)
 - **Действия:**
@@ -828,8 +828,8 @@ function AgentsComponent() {
 
 **MESSAGE_UPDATED** (agents.12.5, agents.12.7)
 
-*Подписчик: useMessages (Renderer)*
-- **Файл:** `src/renderer/hooks/useMessages.ts`
+*Подписчик: useAgentChat (Renderer)*
+- **Файл:** `src/renderer/hooks/useAgentChat.ts`
 - **Подписка:** `useEventSubscription(MESSAGE_UPDATED, handler)`
 - **Фильтр:** Нет (обрабатывает все обновления)
 - **Действия:**
@@ -871,19 +871,8 @@ function AgentsComponent() {
 - Используется `Array.sort()` с компаратором по `updatedAt` DESC
 
 **Анимация перехода агента (agents.1.4.4):**
-- Используется `framer-motion` с `AnimatePresence` и `motion.div`
-- `AnimatePresence` с `mode="popLayout"` для управления анимацией списка
-- Каждый агент обернут в `motion.div` с `layout` prop для плавного перемещения
-- Spring анимация с параметрами:
-  - `type: 'spring'`
-  - `stiffness: 400` - жесткость пружины
-  - `damping: 30` - затухание
-  - `mass: 0.8` - масса элемента
-- Анимация появления/исчезновения:
-  - `initial={{ opacity: 0, scale: 0.8 }}`
-  - `animate={{ opacity: 1, scale: 1 }}`
-  - `exit={{ opacity: 0, scale: 0.8 }}`
-  - `duration: 0.2` для opacity и scale
+- Пересортировка списка при изменении `updatedAt` выполняется без анимации перемещения.
+- Для иконок списка используется только анимация появления (opacity/scale) через `motion.div`.
 
 **AGENT_ARCHIVED** (agents.12.3, agents.12.6)
 
@@ -900,8 +889,8 @@ function AgentsComponent() {
 
 | Событие | Генератор | Подписчики | Файлы |
 |---------|-----------|------------|-------|
-| **MESSAGE_CREATED** | `MessageManager.create()` | 1. `AgentManager` (Main)<br>2. `useMessages` (Renderer) | `src/main/agents/MessageManager.ts`<br>`src/main/agents/AgentManager.ts`<br>`src/renderer/hooks/useMessages.ts` |
-| **MESSAGE_UPDATED** | `MessageManager.update()` | `useMessages` (Renderer) | `src/main/agents/MessageManager.ts`<br>`src/renderer/hooks/useMessages.ts` |
+| **MESSAGE_CREATED** | `MessageManager.create()` | 1. `AgentManager` (Main)<br>2. `useAgentChat` (Renderer) | `src/main/agents/MessageManager.ts`<br>`src/main/agents/AgentManager.ts`<br>`src/renderer/hooks/useAgentChat.ts` |
+| **MESSAGE_UPDATED** | `MessageManager.update()` | `useAgentChat` (Renderer) | `src/main/agents/MessageManager.ts`<br>`src/renderer/hooks/useAgentChat.ts` |
 | **AGENT_CREATED** | `AgentManager.create()` | `useAgents` (Renderer) | `src/main/agents/AgentManager.ts`<br>`src/renderer/hooks/useAgents.ts` |
 | **AGENT_UPDATED** | 1. `AgentManager.update()`<br>2. `AgentManager.handleMessageCreated()` | `useAgents` (Renderer) | `src/main/agents/AgentManager.ts`<br>`src/renderer/hooks/useAgents.ts` |
 | **AGENT_ARCHIVED** | `AgentManager.archive()` | `useAgents` (Renderer) | `src/main/agents/AgentManager.ts`<br>`src/renderer/hooks/useAgents.ts` |
@@ -1521,23 +1510,45 @@ function AgentWelcome({ onPromptClick }: AgentWelcomeProps) {
 
 **Сообщения агента (kind: 'llm'):**
 ```tsx
-// Requirements: agents.4.10, agents.4.10.1, agents.4.22, llm-integration.7
+// Requirements: agents.4.10, agents.4.10.1, agents.4.22, llm-integration.7, llm-integration.2
 <div data-testid="message-llm" className="space-y-2 w-full">
-  {showAvatar && <Logo size="sm" showText={false} animated={isInProgress(agentStatus)} />}
-  {reasoning && (
-    <div data-testid="message-llm-reasoning">
-      <Reasoning>{/* collapsible reasoning */}</Reasoning>
-    </div>
+  {reasoningText && (
+    <Reasoning isStreaming={isReasoningStreaming}>
+      {/* App-owned trigger composition over AI Elements primitive */}
+      <AgentReasoningTrigger />
+      <ReasoningContent data-testid="message-llm-reasoning">
+        {reasoningText}
+      </ReasoningContent>
+    </Reasoning>
   )}
   {action?.content ? (
     <div data-testid="message-llm-action" className="text-sm leading-relaxed whitespace-pre-wrap break-words w-full">
       {action.content}
     </div>
-  ) : (
-    <div data-testid="message-llm-loading">{/* loading dots */}</div>
-  )}
+  ) : null}
 </div>
 ```
+
+**Streaming контракт для `Reasoning`:**
+- `Reasoning` используется как основной UI-блок reasoning из AI Elements (без замены на кастомный компонент).
+- В `Reasoning` передаётся `isStreaming`, чтобы получить штатное поведение AI Elements:
+  - авто-раскрытие во время стриминга;
+  - авто-сворачивание после завершения стриминга;
+  - возможность ручного раскрытия/сворачивания остаётся.
+- `isReasoningStreaming` вычисляется только для активного LLM-сообщения, чтобы исторические сообщения не переходили в streaming-состояние.
+- Порядок блоков неизменен: reasoning всегда рендерится выше `message-llm-action` (соответствие `llm-integration.7.2-7.3`).
+- Парсинг reasoning в `OpenAIProvider` должен поддерживать вариативные формы SSE-дельт (`string`, объект с `text/delta/content`, массив content-part), чтобы streaming не терялся при изменении формата события провайдера.
+- В запросе к OpenAI для reasoning-моделей должен передаваться `reasoning.summary`, чтобы провайдер возвращал стриминг-канал reasoning-summary и UI получал живые reasoning-чанки.
+- При приёме reasoning-событий провайдера парсер должен исключать повторные/снапшотные чанки, чтобы accumulated reasoning в UI не дублировался.
+- При активном reasoning без финального `action.content` в сообщении отображается reasoning-блок как единственный индикатор стриминга до появления action.
+- Визуальный маркер reasoning-сообщения рендерится в заголовке `ReasoningTrigger` (иконка приложения + текстовый индикатор + chevron).
+  Этот маркер в рамках спеки считается `Message Avatar` для reasoning-сообщений.
+
+**Trigger иконка (`ReasoningTrigger`):**
+- В app-owned компоненте `AgentReasoningTrigger` используется иконка приложения (`Logo`) вместо `BrainIcon`.
+- Исходники `src/renderer/components/ai-elements/reasoning.tsx` не модифицируются.
+- Иконка остаётся компактной и не ломает baseline строки trigger.
+- Замена иконки не меняет API AI Elements primitives и не влияет на логику toggling.
 
 **Сообщения об ошибке (kind: 'error'):**
 ```tsx
@@ -1581,7 +1592,7 @@ function AgentWelcome({ onPromptClick }: AgentWelcomeProps) {
   animate={{ opacity: 1, y: 0 }}
   transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
 >
-  <AgentMessage message={message} showAvatar={showAvatar} agentStatus={agent.status} onNavigate={onNavigate} />
+  <AgentMessage message={message} onNavigate={onNavigate} />
 </motion.div>
 ```
 
@@ -1704,7 +1715,7 @@ const STATUS_STYLES: Record<AgentStatus, StatusStyle> = {
 
 Есть два типа анимации:
 1. CSS-анимация узлов и линий (для логотипов)
-2. JS spring-анимация перемещения (для списка агентов)
+2. JS-анимация появления элементов (opacity/scale) без spring-пересортировки списка
 
 ### 1. Application Logo (компонент Logo)
 
@@ -1757,29 +1768,16 @@ const STATUS_STYLES: Record<AgentStatus, StatusStyle> = {
 **Визуальное представление:** Идентичен Application Logo (те же узлы и линии)
 
 **Условия показа анимации:**
-- Анимация включается только при перемещении агента на первую позицию
-- Условие: агент был НЕ на первой позиции → получил сообщение → переместился на первую позицию
-- Длительность показа: 3 секунды (затем анимация отключается)
-- НЕ показывается при запуске приложения или переключении между агентами
+- Иконка отражает текущий статус активного агента.
+- Для `in-progress` используется вращающееся кольцо.
+- Для `awaiting-response` используется пульсирующее кольцо.
 
 **Реализация:**
 ```typescript
-// Отслеживание изменения позиции агента
-useEffect(() => {
-  const currentPosition = agents.findIndex(a => a.id === currentAgentId);
-  const previousPosition = previousAgentPositionRef.current;
-  const orderChanged = currentAgentsOrder !== previousAgentsOrder;
-  
-  // Показать анимацию если агент переместился на позицию 0
-  if (orderChanged && currentAgentId === previousAgentId && 
-      currentPosition === 0 && previousPosition > 0) {
-    setShowActivationAnimation(true);
-    setTimeout(() => setShowActivationAnimation(false), 3000);
-  }
-}, [activeAgent?.id, agents]);
+<AgentAvatar status={currentAgent.status} letter={letter} size="md" />
 ```
 
-**CSS-анимация:** Идентична Application Logo (узлы и линии)
+**CSS-анимация:** Статусная (spin/pulse) через компонент `AgentAvatar`
 
 **Файл:** `src/renderer/components/agents.tsx`
 
@@ -1831,9 +1829,7 @@ useEffect(() => {
 
 **Test ID:** `data-testid="agent-card-{agentId}"`
 
-### 5. Message Avatar (компонент AgentAvatar)
-
-**Назначение:** Маленькая иконка слева сверху от сообщений агента
+### 5. Message Avatar
 
 **Визуальное представление:** Идентичен Application Logo (те же узлы и линии)
 
@@ -1843,109 +1839,42 @@ useEffect(() => {
 - Индивидуальные задержки для органичного эффекта
 
 **Особенности:**
-- Показывается перед первым сообщением агента в последовательности
-- Всегда анимирован (`animated={true}`)
+- В навигационных блоках используется через компонент `AgentAvatar`
+- В `kind: llm` сообщениях с reasoning используется в заголовке `AgentReasoningTrigger`
 
 **Файл:** `src/renderer/components/agents/AgentAvatar.tsx`
 
 **Test ID:** `data-testid="agent-avatar"`
+
+**Файл reasoning-версии:** `src/renderer/components/agents/AgentReasoningTrigger.tsx`
 
 #### Реализация
 
 **Файл:** `src/renderer/components/agents.tsx`
 
 ```typescript
-// Requirements: agents.6.7
-const [showActivationAnimation, setShowActivationAnimation] = useState(false);
-const previousActiveAgentIdRef = useRef<string | null>(null);
-const previousAgentPositionRef = useRef<number>(-1);
-const previousAgentsOrderRef = useRef<string>('');
-
-// Track agent position changes and trigger activation animation
-// Requirements: agents.6.7.1, agents.6.7.2, agents.6.7.4, agents.6.7.5
-useEffect(() => {
-  if (!activeAgent) return;
-
-  const currentAgentId = activeAgent.id;
-  const currentPosition = agents.findIndex(a => a.id === currentAgentId);
-  const previousPosition = previousAgentPositionRef.current;
-  const previousAgentId = previousActiveAgentIdRef.current;
-  const currentAgentsOrder = agents.map(a => a.id).join(',');
-  const previousAgentsOrder = previousAgentsOrderRef.current;
-
-  // Initialize on first render (empty previousAgentsOrder)
-  if (previousAgentsOrder === '') {
-    previousActiveAgentIdRef.current = currentAgentId;
-    previousAgentPositionRef.current = currentPosition;
-    previousAgentsOrderRef.current = currentAgentsOrder;
-    return;
-  }
-
-  // Check if order actually changed (not just array reference)
-  const orderChanged = currentAgentsOrder !== previousAgentsOrder;
-
-  // Same agent moved to position 0 from non-zero position AND order changed - show animation
-  if (
-    orderChanged &&
-    currentAgentId === previousAgentId &&
-    currentPosition === 0 &&
-    previousPosition > 0
-  ) {
-    setShowActivationAnimation(true);
-    // Hide animation after 3 seconds
-    const timer = setTimeout(() => {
-      setShowActivationAnimation(false);
-    }, 3000);
-
-    // Update refs
-    previousActiveAgentIdRef.current = currentAgentId;
-    previousAgentPositionRef.current = currentPosition;
-    previousAgentsOrderRef.current = currentAgentsOrder;
-
-    return () => clearTimeout(timer);
-  }
-
-  // Update refs
-  previousActiveAgentIdRef.current = currentAgentId;
-  previousAgentPositionRef.current = currentPosition;
-  previousAgentsOrderRef.current = currentAgentsOrder;
-}, [activeAgent?.id, agents]);
+// Requirements: agents.6.7.2
+<AgentAvatar status={currentAgent.status} letter={letter} size="md" />
 ```
 
 **Ключевые изменения:**
-- Добавлен `previousAgentsOrderRef` для отслеживания порядка агентов
-- Анимация срабатывает ТОЛЬКО когда порядок агентов реально изменился
-- Это предотвращает срабатывание анимации при запуске приложения
-- Refs обновляются ВСЕГДА после проверки условия анимации
+- Визуализация статуса активного агента полностью делегирована компоненту `AgentAvatar`.
+- Пересортировка списка не использует JS-анимацию перемещения.
+- Визуальная динамика в хедере определяется только статусными CSS-анимациями (`spin/pulse`).
 
-#### Использование в UI
-
-**Иконка агента в хедере (с анимацией):**
 #### Использование в UI
 
 **Active Agent Icon в хедере:**
 ```tsx
 // Requirements: agents.6.7.2
-<div className="relative flex-shrink-0 w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center">
-  <span className="text-white text-sm font-semibold">A</span>
-  {/* CSS-анимация: вращающееся кольцо для in-progress */}
-  {isInProgress(selectedAgent) && (
-    <div className="absolute inset-0 rounded-full border-2 border-white border-t-transparent animate-spin" />
-  )}
-</div>
+<AgentAvatar status={currentAgent.status} letter={letter} size="md" />
 ```
 
-**Message Avatar в сообщениях:**
-```tsx
-// Requirements: agents.6.7.5
-import { AgentAvatar } from './agents/AgentAvatar';
-
-{showAvatar && (
-  <div className="mb-2">
-    <AgentAvatar size="sm" animated={true} />
-  </div>
-)}
-```
+**Сообщения в чате:**
+- для reasoning-сообщений визуальный маркер рендерится в заголовке `ReasoningTrigger`;
+- `action.content` рендерится отдельным блоком под reasoning.
+- В терминах требований это поведение покрывает `Message Avatar` для `kind: llm` с reasoning.
+- В reasoning-сообщениях используется анимированная версия логотипа приложения (`Logo animated={isStreaming}`).
 
 **Application Logo в пустом стейте:**
 ```tsx
@@ -1958,32 +1887,24 @@ import { Logo } from '../logo';
 #### Логика работы
 
 1. **Первый запуск приложения:**
-   - Агент на позиции 0
-   - `previousPosition = -1` (не инициализирован)
-   - Анимация НЕ показывается
+   - Активный агент рендерится со статусным индикатором через `AgentAvatar`.
+   - Дополнительная JS-анимация пересортировки не запускается.
 
 2. **Активный агент получает сообщение:**
-   - Агент был на позиции 2
-   - updatedAt обновляется → агент пересортировывается на позицию 0
-   - `currentPosition = 0`, `previousPosition = 2`
-   - `currentAgentId === previousAgentId` → анимация показывается
+   - `updatedAt` обновляется.
+   - Агент мгновенно пересортировывается на позицию 0 без layout/spring-анимации.
 
 3. **Агент уже на первой позиции получает сообщение:**
-   - Агент был на позиции 0
-   - updatedAt обновляется → агент остается на позиции 0
-   - `currentPosition = 0`, `previousPosition = 0`
-   - Условие не выполняется → анимация НЕ показывается
+   - Порядок списка не меняется, UI остается стабильным.
 
 4. **Переключение на другого агента:**
-   - `currentAgentId !== previousAgentId`
-   - Условие не выполняется → анимация НЕ показывается
+   - Отображается статусная иконка выбранного агента.
+   - Состояние списка не сопровождается дополнительной JS-анимацией пересортировки.
 
-#### Почему отслеживаем позицию, а не клики?
+#### Почему пересортировка без анимации?
 
-- Анимация показывает **физическое перемещение** агента в списке
-- Это визуальная обратная связь о том, что агент "подпрыгнул" на первое место
-- Связано с spring-анимацией перемещения (agents.1.4.4)
-- Не зависит от способа активации агента (клик, событие, автовыбор)
+- Требование `agents.1.4.4` фиксирует мгновенную пересортировку без анимации перемещения.
+- Это сохраняет предсказуемый порядок и исключает визуальные артефакты при частых обновлениях `updatedAt`.
 
 ## Стратегия тестирования
 
@@ -2000,6 +1921,10 @@ import { Logo } from '../logo';
 | `tests/unit/agents/computeAgentStatus.test.ts` | agents.9 |
 | `tests/unit/agents/ActivityIndicator.test.tsx` | agents.11 |
 | `tests/unit/components/ai-elements/prompt-input.test.tsx` | agents.4.3-4.7, agents.4.24 |
+| `tests/unit/components/agents/AgentMessage.test.tsx` | agents.4.10, agents.4.11.1, llm-integration.2, llm-integration.7 |
+| `tests/unit/components/agents/AgentReasoningTrigger.test.tsx` | agents.4.11, llm-integration.2, llm-integration.7.2 |
+| `tests/unit/renderer/IPCChatTransport.test.ts` | llm-integration.2, llm-integration.7 |
+| `tests/unit/hooks/useAgentChat.test.ts` | agents.4.24, llm-integration.8.7 |
 | `tests/unit/components/agents.test.tsx` | agents.4.22 |
 | `tests/unit/components/agents-autoscroll.test.tsx` | agents.4.13 |
 | `tests/unit/components/agents-scroll-position.test.tsx` | agents.4.14 |
@@ -2017,7 +1942,7 @@ import { Logo } from '../logo';
 | `tests/functional/all-agents-page.spec.ts` | agents.5 | - |
 | `tests/functional/agent-status-indicators.spec.ts` | agents.6 | - |
 | `tests/functional/message-format.spec.ts` | agents.7 | - |
-| `tests/functional/llm-chat.spec.ts` | agents.7.7, agents.4.24 | - |
+| `tests/functional/llm-chat.spec.ts` | agents.4.11, agents.7.7, agents.4.24, llm-integration.2, llm-integration.7.2, llm-integration.8.7 | - |
 | `tests/functional/agent-status-calculation.spec.ts` | agents.9 | - |
 | `tests/functional/agent-data-isolation.spec.ts` | agents.10 | - |
 | `tests/functional/agent-activity-indicator.spec.ts` | agents.11 | - |
@@ -2108,6 +2033,8 @@ await window.locator(`[data-testid="agent-icon-${firstAgentId}"]`).click();
 | agents.3 | ✓ | ✓ |
 | agents.3.5-3.5.3 (custom tooltip) | - | ✓ |
 | agents.4 | ✓ | ✓ |
+| agents.4.11 | ✓ | ✓ |
+| agents.4.11.1 | ✓ | ✓ |
 | agents.4.7.1-4.7.2 (autofocus) | - | ✓ |
 | agents.4.13.1-4.13.6 (autoscroll) | ✓ | ✓ |
 | agents.4.13.4-4.13.6 (scrollbar) | - | Manual |

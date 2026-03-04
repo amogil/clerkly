@@ -12,6 +12,7 @@
 - **Agents List** - Горизонтальный список иконок агентов в хедере
 - **All Agents** - Страница со всеми агентами для просмотра истории
 - **Message** - Сообщение в чате. Хранится в таблице messages с payload_json
+- **Message Avatar** - Визуальный маркер сообщения агента в чате (для reasoning отображается в заголовке reasoning-блока)
 - **updatedAt** - Время последнего обновления агента (последнее сообщение в чате)
 - **agentId** - Уникальный идентификатор агента (TEXT, 10-символьная alphanumeric строка)
 
@@ -19,7 +20,7 @@
 
 Есть два типа анимации:
 1. Само лого анимированное (CSS-анимация узлов и линий)
-2. Анимация JS (spring-анимация перемещения в списке)
+2. JS-анимация появления элементов списка (opacity/scale), без анимации пересортировки
 
 **1. Application Logo (Логотип приложения)**
 1. Логотип Clerkly для брендинга
@@ -34,11 +35,12 @@
 1. Иконка агента в списках
 2. Два контекста: Agents List / All Agents
 3. Сама иконка использует CSS-анимацию
-4. При обновлении порядка в Agents List дополнительно используется JS-анимация
+4. Пересортировка в Agents List происходит без JS-анимации перемещения
 
-**4. Message Avatar (Аватар агента в чате)**
-- Маленькая иконка слева сверху от сообщений агента
-- CSS-анимированная
+**4. Message Avatar (Иконка сообщения агента)**
+1. Визуальный маркер сообщения агента в чате
+2. Для `kind: llm` с reasoning отображается в заголовке reasoning-блока
+3. Использует CSS-анимацию узлов и линий в едином стиле с Application Logo
 
 ## Архитектурный Принцип
 
@@ -86,9 +88,7 @@
 - `tests/functional/agent-reordering.spec.ts` - "should maintain correct order when multiple agents are updated"
 - `tests/functional/agent-reordering.spec.ts` - "should move agent to top of list after sending message"
 - `tests/functional/agent-reordering.spec.ts` - "should bring hidden agent to header after sending message"
-- `tests/functional/agent-reordering.spec.ts` - "should maintain correct order when multiple agents are updated"
 - `tests/functional/agent-reordering.spec.ts` - "should reorder immediately after message from AllAgents selection"
-- `tests/functional/agent-list-responsive.spec.ts` - "should adapt visible agents count to window width"
 - `tests/functional/agent-list-responsive.spec.ts` - "should show +N button for hidden agents"
 
 ### 2. Создание нового агента
@@ -200,7 +200,9 @@
 
 4.10.2. Диалоги уведомлений в чате агента ДОЛЖНЫ занимать всю ширину области чата
 
-4.11. Message Avatar ДОЛЖЕН показываться перед первым сообщением агента в последовательности
+4.11. КОГДА сообщение агента (`kind: llm`) содержит блок reasoning, заголовок reasoning-блока ДОЛЖЕН содержать Message Avatar (иконка приложения), текстовый индикатор размышления и управляющий chevron
+
+4.11.1. КОГДА сообщение агента (`kind: llm`) содержит `action.content`, блок с ответом модели ДОЛЖЕН отображаться под reasoning-блоком
 
 4.12. Сообщения агента ДОЛЖНЫ поддерживать React-компоненты (для rich content)
 
@@ -418,14 +420,15 @@
 
 6.7.3. Agent List Icon в Agents List (правая часть хедера):
    - CSS-анимация: вращающееся кольцо (in-progress), пульсирующее кольцо (awaiting-response)
-   - JS-анимация: spring-анимация перемещения при изменении позиции (stiffness: 400, damping: 30, mass: 0.8)
+   - JS-анимация пересортировки НЕ используется (перемещение при reorder — без анимации)
 
 6.7.4. Agent List Icon в All Agents:
    - CSS-анимация: вращающееся кольцо (in-progress), пульсирующее кольцо (awaiting-response)
    - БЕЗ JS-анимации перемещения
 
 6.7.5. Message Avatar:
-   - CSS-анимация: собственная анимация
+   - CSS-анимация узлов и линий в стиле Application Logo
+   - Для `kind: llm` с reasoning отображается в заголовке reasoning-блока
 
 #### Функциональные Тесты
 
@@ -757,7 +760,8 @@
 
 ### Внешние компоненты
 - `Logo` - компонент логотипа Clerkly (из `src/renderer/components/logo.tsx`). Используется для Application Logo в пустом стейте чата
-- `AgentAvatar` - компонент аватара агента (из `src/renderer/components/agents/AgentAvatar.tsx`). Используется для Message Avatar
+- `AgentAvatar` - компонент аватара агента (из `src/renderer/components/agents/AgentAvatar.tsx`). Используется в Active Agent Icon и Agent List Icon
+- `AgentReasoningTrigger` - компонент заголовка reasoning-блока (из `src/renderer/components/agents/AgentReasoningTrigger.tsx`). Используется для отображения Message Avatar в `kind: llm` сообщениях с reasoning
 - `lucide-react` - библиотека иконок (Send, AlertCircle, Check, X, HelpCircle, ArrowLeft, Plus, FileText, Calendar, Video)
 
 ### Типы

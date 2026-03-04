@@ -64,10 +64,25 @@ jest.mock('../../../../src/renderer/components/ai-elements/conversation', () => 
 }));
 
 // Stub child components
+const mockAgentMessage = jest.fn(
+  ({
+    message,
+    isReasoningStreaming,
+  }: {
+    message: MessageSnapshot;
+    isReasoningStreaming?: boolean;
+  }) => (
+    <div
+      data-testid="agent-message"
+      data-message-id={message.id}
+      data-reasoning-streaming={isReasoningStreaming ? 'true' : 'false'}
+    />
+  )
+);
+
 jest.mock('../../../../src/renderer/components/agents/AgentMessage', () => ({
-  AgentMessage: ({ message }: { message: MessageSnapshot }) => (
-    <div data-testid="agent-message" data-message-id={message.id} />
-  ),
+  AgentMessage: (props: { message: MessageSnapshot; isReasoningStreaming?: boolean }) =>
+    mockAgentMessage(props),
 }));
 
 jest.mock('../../../../src/renderer/components/agents/AgentWelcome', () => ({
@@ -197,6 +212,7 @@ beforeEach(() => {
     isStreaming: false,
   };
   mockConversation.mockClear();
+  mockAgentMessage.mockClear();
 });
 
 describe('AgentChat — visibility', () => {
@@ -340,6 +356,56 @@ describe('AgentChat — messages rendering', () => {
     const ids = Array.from(msgs).map((el) => el.getAttribute('data-message-id'));
     expect(ids).toContain('10');
     expect(ids).toContain('20');
+  });
+
+  /* Preconditions: status is streaming and last llm message has reasoning without action
+     Action: render AgentChat
+     Assertions: only active llm message receives isReasoningStreaming=true
+     Requirements: llm-integration.2, llm-integration.7.2 */
+  it('should mark only active reasoning message as streaming', () => {
+    mockUseAgentChatState.isStreaming = true;
+    mockUseAgentChatState.rawMessages = [
+      makeMessage(1, 'user'),
+      {
+        ...makeMessage(2, 'llm'),
+        payload: { data: { reasoning: { text: 'Thinking' } } },
+      },
+      makeMessage(3, 'user'),
+    ];
+
+    render(<AgentChat {...defaultProps} />);
+
+    const rendered = screen.getAllByTestId('agent-message');
+    expect(rendered).toHaveLength(3);
+    expect(rendered[0]).toHaveAttribute('data-reasoning-streaming', 'false');
+    expect(rendered[1]).toHaveAttribute('data-reasoning-streaming', 'true');
+    expect(rendered[2]).toHaveAttribute('data-reasoning-streaming', 'false');
+  });
+
+  /* Preconditions: status is streaming but llm message already has action
+     Action: render AgentChat
+     Assertions: reasoning streaming flag is false (streaming reasoning is finished)
+     Requirements: llm-integration.7.3 */
+  it('should not mark llm message as reasoning-streaming when action is already present', () => {
+    mockUseAgentChatState.isStreaming = true;
+    mockUseAgentChatState.rawMessages = [
+      makeMessage(1, 'user'),
+      {
+        ...makeMessage(2, 'llm'),
+        payload: {
+          data: {
+            reasoning: { text: 'Thinking' },
+            action: { content: 'Done' },
+          },
+        },
+      },
+    ];
+
+    render(<AgentChat {...defaultProps} />);
+
+    const rendered = screen.getAllByTestId('agent-message');
+    expect(rendered).toHaveLength(2);
+    expect(rendered[1]).toHaveAttribute('data-reasoning-streaming', 'false');
   });
 });
 

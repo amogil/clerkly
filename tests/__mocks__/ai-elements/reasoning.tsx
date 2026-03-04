@@ -1,8 +1,15 @@
 import React from 'react';
 
-export const Reasoning = ({ children }: React.ComponentProps<'div'>) => <div>{children}</div>;
-export const ReasoningTrigger = ({ children }: React.ComponentProps<'button'>) => (
-  <button>{children}</button>
+export const Reasoning = ({
+  children,
+  isStreaming,
+}: React.ComponentProps<'div'> & { isStreaming?: boolean }) => (
+  <div data-streaming={isStreaming ? 'true' : 'false'} data-testid="reasoning-root">
+    {children}
+  </div>
+);
+export const ReasoningTrigger = ({ children, ...props }: React.ComponentProps<'button'>) => (
+  <button {...props}>{children}</button>
 );
 export const ReasoningContent = ({
   children,
@@ -11,3 +18,10 @@ export const ReasoningContent = ({
   children: string;
   [key: string]: unknown;
 }) => <div {...props}>{children}</div>;
+
+export const useReasoning = () => ({
+  isStreaming: false,
+  isOpen: true,
+  setIsOpen: () => {},
+  duration: undefined,
+});

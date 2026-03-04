@@ -98,6 +98,145 @@ describe('OpenAIProvider.chat()', () => {
       const doneChunk = chunks.find((c) => c.done);
       expect(doneChunk).toEqual({ type: 'reasoning', delta: '', done: true });
     });
+
+    /* Preconditions: OpenAI streams reasoning event where delta is object with text
+       Action: Call chat() and collect chunks
+       Assertions: Extracts text and emits reasoning chunk
+       Requirements: llm-integration.2 */
+    it('should extract reasoning text from object delta shape', async () => {
+      const actionJson = JSON.stringify({ action: { type: 'text', content: 'Answer' } });
+      const reader = buildMockReader([
+        sseResponsesEvent({
+          type: 'response.reasoning_summary_text.delta',
+          delta: { text: 'Let me think' },
+        }),
+        sseResponsesEvent({ type: 'response.output_text.delta', delta: actionJson }),
+        'data: [DONE]',
+      ]);
+      fetchMock.mockResolvedValue({ ok: true, body: { getReader: () => reader } });
+
+      const chunks: ChatChunk[] = [];
+      await provider.chat(mockMessages, mockOptions, (c) => chunks.push(c));
+
+      const reasoningChunks = chunks.filter((c) => !c.done);
+      expect(reasoningChunks).toHaveLength(1);
+      expect(reasoningChunks[0]).toEqual({ type: 'reasoning', delta: 'Let me think', done: false });
+    });
+
+    /* Preconditions: OpenAI streams event where type is generic but part.type marks reasoning
+       Action: Call chat() and collect chunks
+       Assertions: Emits reasoning chunk from nested part content
+       Requirements: llm-integration.2 */
+    it('should extract reasoning text from nested part shape', async () => {
+      const actionJson = JSON.stringify({ action: { type: 'text', content: 'Answer' } });
+      const reader = buildMockReader([
+        sseResponsesEvent({
+          type: 'response.content_part.added',
+          part: { type: 'reasoning_summary_text', text: 'Plan first' },
+        }),
+        sseResponsesEvent({ type: 'response.output_text.delta', delta: actionJson }),
+        'data: [DONE]',
+      ]);
+      fetchMock.mockResolvedValue({ ok: true, body: { getReader: () => reader } });
+
+      const chunks: ChatChunk[] = [];
+      await provider.chat(mockMessages, mockOptions, (c) => chunks.push(c));
+
+      const reasoningChunks = chunks.filter((c) => !c.done);
+      expect(reasoningChunks).toHaveLength(1);
+      expect(reasoningChunks[0]).toEqual({ type: 'reasoning', delta: 'Plan first', done: false });
+    });
+
+    /* Preconditions: OpenAI streams generic event with item.type=reasoning and content parts
+       Action: Call chat() and collect chunks
+       Assertions: Emits reasoning chunk composed from item.content text parts
+       Requirements: llm-integration.2 */
+    it('should extract reasoning text from nested item content parts', async () => {
+      const actionJson = JSON.stringify({ action: { type: 'text', content: 'Answer' } });
+      const reader = buildMockReader([
+        sseResponsesEvent({
+          type: 'response.output_item.added',
+          item: {
+            type: 'reasoning',
+            content: [{ text: 'Think ' }, { text: 'deeper' }],
+          },
+        }),
+        sseResponsesEvent({ type: 'response.output_text.delta', delta: actionJson }),
+        'data: [DONE]',
+      ]);
+      fetchMock.mockResolvedValue({ ok: true, body: { getReader: () => reader } });
+
+      const chunks: ChatChunk[] = [];
+      await provider.chat(mockMessages, mockOptions, (c) => chunks.push(c));
+
+      const reasoningChunks = chunks.filter((c) => !c.done);
+      expect(reasoningChunks).toHaveLength(1);
+      expect(reasoningChunks[0]).toEqual({ type: 'reasoning', delta: 'Think deeper', done: false });
+    });
+
+    /* Preconditions: OpenAI streams generic event with delta.type=reasoning and delta.content string
+       Action: Call chat() and collect chunks
+       Assertions: Recognizes reasoning via delta.type and emits delta.content
+       Requirements: llm-integration.2 */
+    it('should detect reasoning by delta.type and extract delta content', async () => {
+      const actionJson = JSON.stringify({ action: { type: 'text', content: 'Answer' } });
+      const reader = buildMockReader([
+        sseResponsesEvent({
+          type: 'response.delta',
+          delta: { type: 'reasoning_summary_text', content: 'Structured thought' },
+        }),
+        sseResponsesEvent({ type: 'response.output_text.delta', delta: actionJson }),
+        'data: [DONE]',
+      ]);
+      fetchMock.mockResolvedValue({ ok: true, body: { getReader: () => reader } });
+
+      const chunks: ChatChunk[] = [];
+      await provider.chat(mockMessages, mockOptions, (c) => chunks.push(c));
+
+      const reasoningChunks = chunks.filter((c) => !c.done);
+      expect(reasoningChunks).toHaveLength(1);
+      expect(reasoningChunks[0]).toEqual({
+        type: 'reasoning',
+        delta: 'Structured thought',
+        done: false,
+      });
+    });
+
+    /* Preconditions: OpenAI sends repeated reasoning snapshot events with identical text
+       Action: Call chat() and collect reasoning chunks
+       Assertions: Duplicate snapshots are ignored; reasoning emitted once
+       Requirements: llm-integration.2 */
+    it('should avoid duplicate reasoning when snapshot event repeats', async () => {
+      const actionJson = JSON.stringify({ action: { type: 'text', content: 'Answer' } });
+      const reader = buildMockReader([
+        sseResponsesEvent({
+          type: 'response.content_part.added',
+          part: { type: 'reasoning_summary_text', text: 'Think carefully' },
+        }),
+        sseResponsesEvent({
+          type: 'response.content_part.added',
+          part: { type: 'reasoning_summary_text', text: 'Think carefully' },
+        }),
+        sseResponsesEvent({
+          type: 'response.content_part.added',
+          part: { type: 'reasoning_summary_text', text: 'Think carefully' },
+        }),
+        sseResponsesEvent({ type: 'response.output_text.delta', delta: actionJson }),
+        'data: [DONE]',
+      ]);
+      fetchMock.mockResolvedValue({ ok: true, body: { getReader: () => reader } });
+
+      const chunks: ChatChunk[] = [];
+      await provider.chat(mockMessages, mockOptions, (c) => chunks.push(c));
+
+      const reasoningChunks = chunks.filter((c) => !c.done);
+      expect(reasoningChunks).toHaveLength(1);
+      expect(reasoningChunks[0]).toEqual({
+        type: 'reasoning',
+        delta: 'Think carefully',
+        done: false,
+      });
+    });
   });
 
   describe('usage fields', () => {
@@ -210,6 +349,23 @@ describe('OpenAIProvider.chat()', () => {
 
       await expect(provider.chat(mockMessages, mockOptions, () => {})).rejects.toThrow(
         /Retry again in 7s|try again in 7s/i
+      );
+    });
+
+    /* Preconditions: OpenAI returns 429 with non-numeric retry-after header
+       Action: Call chat()
+       Assertions: Falls back to default rate limit error text
+       Requirements: llm-integration.3.7.6 */
+    it('should ignore invalid retry-after header values', async () => {
+      fetchMock.mockResolvedValue({
+        ok: false,
+        status: 429,
+        headers: { get: (name: string) => (name === 'retry-after' ? 'abc' : null) },
+        json: async () => ({}),
+      });
+
+      await expect(provider.chat(mockMessages, mockOptions, () => {})).rejects.toThrow(
+        /Rate limit exceeded/i
       );
     });
   });
@@ -335,7 +491,7 @@ describe('OpenAIProvider.chat()', () => {
           { role: 'system', content: 'Base system prompt' },
           { role: 'user', content: 'Hello' },
         ],
-        mockOptions,
+        { ...mockOptions, reasoningEffort: 'low' },
         () => {}
       );
 
@@ -345,6 +501,7 @@ describe('OpenAIProvider.chat()', () => {
       const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string) as {
         input?: Array<{ role: string; content: string }>;
         text?: { format?: { type?: string; strict?: boolean; schema?: Record<string, unknown> } };
+        reasoning?: { effort?: string; summary?: string };
         response_format?: unknown;
       };
       expect(body.text?.format?.type).toBe('json_schema');
@@ -356,6 +513,8 @@ describe('OpenAIProvider.chat()', () => {
       expect(actionProperties).toBeDefined();
       expect(body.response_format).toBeUndefined();
       expect(Array.isArray(body.input)).toBe(true);
+      expect(body.reasoning?.effort).toBe('low');
+      expect(body.reasoning?.summary).toBe('auto');
     });
   });
 });

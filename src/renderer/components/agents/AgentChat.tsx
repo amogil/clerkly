@@ -46,6 +46,7 @@ interface AgentChatInnerProps {
   rateLimitBanner: RateLimitState | null;
   onRateLimitDismiss: () => void;
   rawMessages: ReturnType<typeof useAgentChat>['rawMessages'];
+  streamingReasoningMessageId: number | null;
   onPromptClick: (prompt: string) => Promise<void>;
   onNavigate?: (screen: string) => void;
 }
@@ -59,6 +60,7 @@ function AgentChatInner({
   rateLimitBanner,
   onRateLimitDismiss,
   rawMessages,
+  streamingReasoningMessageId,
   onPromptClick,
   onNavigate,
 }: AgentChatInnerProps) {
@@ -71,27 +73,22 @@ function AgentChatInner({
         {rawMessages.length === 0 ? (
           <AgentWelcome onPromptClick={onPromptClick} />
         ) : (
-          rawMessages.map((message, index) => {
-            const showAvatar =
-              message.kind !== 'user' && (index === 0 || rawMessages[index - 1]?.kind === 'user');
-            return (
-              <motion.div
-                key={message.id}
-                data-testid="message"
-                data-message-id={message.id}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
-              >
-                <AgentMessage
-                  message={message}
-                  showAvatar={showAvatar}
-                  agentStatus={agent.status}
-                  onNavigate={onNavigate}
-                />
-              </motion.div>
-            );
-          })
+          rawMessages.map((message) => (
+            <motion.div
+              key={message.id}
+              data-testid="message"
+              data-message-id={message.id}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+            >
+              <AgentMessage
+                message={message}
+                isReasoningStreaming={message.id === streamingReasoningMessageId}
+                onNavigate={onNavigate}
+              />
+            </motion.div>
+          ))
         )}
       </ConversationContent>
 
@@ -181,6 +178,22 @@ export function AgentChat({
     await cancelCurrentRequest();
   }, [cancelCurrentRequest]);
 
+  const streamingReasoningMessageId = (() => {
+    if (!isStreaming) return null;
+    for (let index = rawMessages.length - 1; index >= 0; index -= 1) {
+      const message = rawMessages[index];
+      if (!message) continue;
+      if (message.kind !== 'llm' || message.hidden) continue;
+      const llmData = message.payload.data as
+        | { reasoning?: { text?: string }; action?: { content?: string } }
+        | undefined;
+      const hasReasoning = Boolean(llmData?.reasoning?.text);
+      const hasAction = Boolean(llmData?.action?.content);
+      if (hasReasoning && !hasAction) return message.id;
+    }
+    return null;
+  })();
+
   // Stop button is shown only for active generation of current in-progress agent.
   // This avoids stale in-progress status keeping the button in stop mode after cancel.
   const isInProgress = agent.status === 'in-progress' && isStreaming;
@@ -201,6 +214,7 @@ export function AgentChat({
           rateLimitBanner={rateLimitBanner}
           onRateLimitDismiss={onRateLimitDismiss}
           rawMessages={rawMessages}
+          streamingReasoningMessageId={streamingReasoningMessageId}
           onPromptClick={handlePromptClick}
           onNavigate={onNavigate}
         />

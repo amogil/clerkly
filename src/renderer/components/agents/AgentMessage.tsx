@@ -1,22 +1,24 @@
 import React from 'react';
 // Requirements: llm-integration.7, llm-integration.3.4.1, llm-integration.3.4.4, agents.4.22, agents.4.9, agents.4.10.1, agents.4.10.2
-import { Logo } from '../logo';
-import { isInProgress, type AgentStatus } from '../../../shared/utils/agentStatus';
 import { Message, MessageContent, MessageResponse } from '../ai-elements/message';
-import { Reasoning, ReasoningTrigger, ReasoningContent } from '../ai-elements/reasoning';
+import { Reasoning, ReasoningContent } from '../ai-elements/reasoning';
 import type { MessageSnapshot } from '../../../shared/events/types';
 import { AgentErrorDialog } from './AgentErrorDialog';
 import type { AgentDialogActionItem } from './AgentDialog';
+import { AgentReasoningTrigger } from './AgentReasoningTrigger';
 
 interface AgentMessageProps {
   message: MessageSnapshot;
-  showAvatar: boolean;
-  agentStatus: AgentStatus;
+  isReasoningStreaming?: boolean;
   onNavigate?: (screen: string) => void;
 }
 
 // Requirements: llm-integration.7, llm-integration.3.4.1, llm-integration.3.4.4, agents.4.22, agents.4.9, agents.4.10.1, agents.4.10.2
-export function AgentMessage({ message, showAvatar, agentStatus, onNavigate }: AgentMessageProps) {
+export function AgentMessage({
+  message,
+  isReasoningStreaming = false,
+  onNavigate,
+}: AgentMessageProps) {
   const isLlmMessage = message.kind === 'llm';
   const llmData = isLlmMessage
     ? (message.payload.data as Record<string, unknown> | undefined)
@@ -81,11 +83,6 @@ export function AgentMessage({ message, showAvatar, agentStatus, onNavigate }: A
 
     return (
       <Message from="assistant" className="w-full max-w-full">
-        {showAvatar && (
-          <div className="mb-2">
-            <Logo size="sm" showText={false} animated={false} />
-          </div>
-        )}
         <AgentErrorDialog
           testId="message-error"
           approvalId={`error-${message.id}`}
@@ -100,16 +97,11 @@ export function AgentMessage({ message, showAvatar, agentStatus, onNavigate }: A
     // Requirements: llm-integration.7 — llm bubble: reasoning (collapsible) then action, or loading
     return (
       <Message from="assistant" className="w-full max-w-full">
-        {showAvatar && (
-          <div className="mb-2">
-            <Logo size="sm" showText={false} animated={isInProgress(agentStatus)} />
-          </div>
-        )}
         <div data-testid="message-llm" className="space-y-2">
           {llmReasoning?.text && (
-            // Requirements: llm-integration.2 — collapsible reasoning block
-            <Reasoning>
-              <ReasoningTrigger />
+            // Requirements: llm-integration.2, llm-integration.7.2 — collapsible reasoning block with streaming state
+            <Reasoning isStreaming={isReasoningStreaming}>
+              <AgentReasoningTrigger />
               <ReasoningContent data-testid="message-llm-reasoning">
                 {llmReasoning.text}
               </ReasoningContent>
@@ -121,14 +113,7 @@ export function AgentMessage({ message, showAvatar, agentStatus, onNavigate }: A
                 {actionContent}
               </MessageResponse>
             </MessageContent>
-          ) : (
-            // Loading indicator — three bouncing dots
-            <div data-testid="message-llm-loading" className="flex gap-1 items-center py-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground animate-bounce [animation-delay:0ms]" />
-              <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground animate-bounce [animation-delay:150ms]" />
-              <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground animate-bounce [animation-delay:300ms]" />
-            </div>
-          )}
+          ) : null}
         </div>
       </Message>
     );
@@ -137,11 +122,6 @@ export function AgentMessage({ message, showAvatar, agentStatus, onNavigate }: A
   // Fallback for other kinds
   return (
     <Message from="assistant" className="w-full max-w-full">
-      {showAvatar && (
-        <div className="mb-2">
-          <Logo size="sm" showText={false} animated={isInProgress(agentStatus)} />
-        </div>
-      )}
       <MessageContent className="w-full">
         <p className="text-sm leading-relaxed text-foreground whitespace-pre-wrap break-words">
           {String(message.payload.data?.text || '')}

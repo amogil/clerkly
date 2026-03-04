@@ -453,6 +453,46 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     await expect(context.window.locator('[data-testid="message-error"]')).toHaveCount(0);
   });
 
+  /* Preconditions: MockLLMServer streams reasoning and then action content; app authenticated with mock LLM URL
+     Action: User sends message, waits for reasoning trigger, verifies trigger composition and toggles content
+     Assertions: Reasoning trigger contains app logo, thinking text and chevron; content can be collapsed/expanded, no toast errors
+     Requirements: agents.4.11, llm-integration.2, llm-integration.7.2 */
+  test('should render app logo in reasoning trigger and allow toggle', async () => {
+    mockLLMServer.setStreamingMode(true, {
+      reasoning: 'Thinking through the answer carefully',
+      content: '{"action":{"type":"text","content":"Final answer"}}',
+      chunkDelayMs: 80,
+    });
+
+    context = await launchWithMockLLM();
+    const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
+
+    await messageInput.fill('Show reasoning');
+    await messageInput.press('Enter');
+
+    const reasoningTrigger = context.window.locator(
+      '[data-testid="message-llm-reasoning-trigger"]'
+    );
+    const reasoningContent = context.window.locator('[data-testid="message-llm-reasoning"]');
+    await expect(reasoningTrigger).toBeVisible({ timeout: 5000 });
+    await expect(reasoningContent).toBeVisible({ timeout: 5000 });
+
+    // During streaming trigger should show animated app logo.
+    await expect(reasoningTrigger.locator('svg.logo-animated')).toBeVisible({ timeout: 5000 });
+    await expect(reasoningTrigger).toContainText('Thinking...');
+    await expect(reasoningTrigger.locator('svg.lucide-chevron-down')).toBeVisible({
+      timeout: 5000,
+    });
+
+    // Collapse then expand manually.
+    await reasoningTrigger.click();
+    await expect(reasoningContent).not.toBeVisible({ timeout: 5000 });
+    await reasoningTrigger.click();
+    await expect(reasoningContent).toBeVisible({ timeout: 5000 });
+
+    await expectNoToastError(context.window);
+  });
+
   /* Preconditions: MockLLMServer configured with slow streaming, cancel IPC is forced to fail
        app authenticated with mock LLM URL
      Action: User sends message, presses stop, cancel returns success:false
