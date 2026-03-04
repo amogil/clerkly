@@ -279,6 +279,16 @@
    - Пробелы в начале и конце текста ДОЛЖНЫ удаляться (trim)
    - Пробелы внутри текста ДОЛЖНЫ сохраняться
 
+4.24. КОГДА статус активного агента равен `in-progress` И текущий запрос находится в состоянии активной генерации (`submitted` или `streaming`), кнопка отправки ДОЛЖНА переключаться в режим остановки (`stop`)
+
+4.24.1. КОГДА пользователь нажимает кнопку `stop`, текущий активный запрос ДОЛЖЕН быть отменён для текущего агента
+
+4.24.2. Отмена через кнопку `stop` НЕ ДОЛЖНА создавать `kind:error` сообщение, так как это штатное действие
+
+4.24.3. ЕСЛИ при попытке остановки запроса возникает ошибка отмены, ТО приложение НЕ ДОЛЖНО показывать toast-уведомление об ошибке
+
+4.24.4. КОГДА активная генерация остановлена, кнопка ДОЛЖНА возвращаться в режим отправки (`send`) без ожидания пересчёта статуса агента
+
 #### Функциональные Тесты
 
 - `tests/functional/agent-messaging.spec.ts` - "should send message on Enter key"
@@ -302,6 +312,7 @@
 - `tests/functional/message-text-wrapping.spec.ts` - "should preserve internal whitespace and trim leading/trailing"
 - `tests/functional/message-text-wrapping.spec.ts` - "should maintain text wrapping after window resize"
 - `tests/functional/message-text-wrapping.spec.ts` - "should handle emoji and Unicode characters correctly"
+- `tests/functional/llm-chat.spec.ts` - "should cancel active request via stop button without creating error message"
 
 ### 5. Просмотр всех агентов
 

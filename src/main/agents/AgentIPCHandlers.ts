@@ -63,6 +63,7 @@ export class AgentIPCHandlers {
     ipcMain.handle('messages:get-last', this.handleMessageGetLast.bind(this));
     ipcMain.handle('messages:create', this.handleMessageCreate.bind(this));
     ipcMain.handle('messages:update', this.handleMessageUpdate.bind(this));
+    ipcMain.handle('messages:cancel', this.handleMessageCancel.bind(this));
     ipcMain.handle('messages:retry-last', this.handleMessageRetryLast.bind(this));
     ipcMain.handle('messages:cancel-retry', this.handleMessageCancelRetry.bind(this));
 
@@ -88,6 +89,7 @@ export class AgentIPCHandlers {
     ipcMain.removeHandler('messages:get-last');
     ipcMain.removeHandler('messages:create');
     ipcMain.removeHandler('messages:update');
+    ipcMain.removeHandler('messages:cancel');
     ipcMain.removeHandler('messages:retry-last');
     ipcMain.removeHandler('messages:cancel-retry');
 
@@ -332,6 +334,25 @@ export class AgentIPCHandlers {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       this.logger.error(`Failed to update message: ${errorMessage}`);
+      return { success: false, error: errorMessage };
+    }
+  }
+
+  /**
+   * Handle messages:cancel request
+   * Cancels the currently running pipeline for the agent (if any)
+   * Requirements: llm-integration.8.1, llm-integration.8.7
+   */
+  private async handleMessageCancel(
+    _event: IpcMainInvokeEvent,
+    args: { agentId: string }
+  ): Promise<IPCResult> {
+    try {
+      this.agentManager.cancelPipeline(args.agentId);
+      return { success: true };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Failed to cancel message pipeline: ${errorMessage}`);
       return { success: false, error: errorMessage };
     }
   }

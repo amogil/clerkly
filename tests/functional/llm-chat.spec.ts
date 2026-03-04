@@ -426,6 +426,65 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     expect(text?.trim()).toBe('Second response');
   });
 
+  /* Preconditions: MockLLMServer configured with slow streaming,
+       app authenticated with mock LLM URL
+     Action: User sends message and presses stop button while agent status is in-progress
+     Assertions: Request is cancelled, send button returns, no error bubble appears
+     Requirements: llm-integration.8.1, llm-integration.8.7 */
+  test('should cancel active request via stop button without creating error message', async () => {
+    mockLLMServer.setStreamingMode(true, {
+      content: '{"action":{"type":"text","content":"Long response"}}',
+      chunkDelayMs: 300,
+    });
+
+    context = await launchWithMockLLM();
+    const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
+
+    await messageInput.fill('Cancel this request');
+    await messageInput.press('Enter');
+
+    const stopButton = context.window.locator('[data-testid="prompt-input-stop"]');
+    await expect(stopButton).toBeVisible({ timeout: 5000 });
+    await stopButton.click();
+
+    await expect(context.window.locator('[data-testid="prompt-input-send"]')).toBeVisible({
+      timeout: 5000,
+    });
+    await expect(context.window.locator('[data-testid="message-error"]')).toHaveCount(0);
+  });
+
+  /* Preconditions: MockLLMServer configured with slow streaming, cancel IPC is forced to fail
+       app authenticated with mock LLM URL
+     Action: User sends message, presses stop, cancel returns success:false
+     Assertions: No error toast is shown
+     Requirements: agents.4.24.3 */
+  test('should not show toast when stop cancel request fails', async () => {
+    mockLLMServer.setStreamingMode(true, {
+      content: '{"action":{"type":"text","content":"Long response"}}',
+      chunkDelayMs: 300,
+    });
+
+    context = await launchWithMockLLM();
+    const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
+
+    await context.window.evaluate(() => {
+      const api = (window as unknown as { api: any }).api;
+      api.messages.cancel = async () => ({ success: false, error: 'forced cancel failure' });
+    });
+
+    await messageInput.fill('Cancel should fail silently');
+    await messageInput.press('Enter');
+
+    const stopButton = context.window.locator('[data-testid="prompt-input-stop"]');
+    await expect(stopButton).toBeVisible({ timeout: 5000 });
+    await stopButton.click();
+
+    await expect(context.window.locator('[data-testid="prompt-input-send"]')).toBeVisible({
+      timeout: 5000,
+    });
+    await expectNoToastError(context.window);
+  });
+
   /* Preconditions: MockLLMServer configured with slow streaming for first request,
        fast response for second; app authenticated with mock LLM URL
      Action: User sends first message, waits for streaming to start, sends second message

@@ -125,12 +125,12 @@ describe('AgentIPCHandlers', () => {
   describe('registerHandlers', () => {
     /* Preconditions: AgentIPCHandlers initialized
        Action: Call registerHandlers()
-       Assertions: All 12 handlers registered
+       Assertions: All 13 handlers registered
        Requirements: agents.2, agents.4, agents.5.5, agents.13, llm-integration.3.7 */
     it('should register all IPC handlers', () => {
       handlers.registerHandlers();
 
-      expect(ipcMain.handle).toHaveBeenCalledTimes(12);
+      expect(ipcMain.handle).toHaveBeenCalledTimes(13);
       expect(ipcMain.handle).toHaveBeenCalledWith('agents:create', expect.any(Function));
       expect(ipcMain.handle).toHaveBeenCalledWith('agents:list', expect.any(Function));
       expect(ipcMain.handle).toHaveBeenCalledWith('agents:get', expect.any(Function));
@@ -141,6 +141,7 @@ describe('AgentIPCHandlers', () => {
       expect(ipcMain.handle).toHaveBeenCalledWith('messages:create', expect.any(Function));
       expect(ipcMain.handle).toHaveBeenCalledWith('messages:update', expect.any(Function));
       expect(ipcMain.handle).toHaveBeenCalledWith('messages:get-last', expect.any(Function));
+      expect(ipcMain.handle).toHaveBeenCalledWith('messages:cancel', expect.any(Function));
       expect(ipcMain.handle).toHaveBeenCalledWith('messages:retry-last', expect.any(Function));
       expect(ipcMain.handle).toHaveBeenCalledWith('messages:cancel-retry', expect.any(Function));
     });
@@ -153,7 +154,7 @@ describe('AgentIPCHandlers', () => {
       handlers.registerHandlers();
       handlers.registerHandlers();
 
-      expect(ipcMain.handle).toHaveBeenCalledTimes(12);
+      expect(ipcMain.handle).toHaveBeenCalledTimes(13);
     });
   });
 
@@ -166,7 +167,7 @@ describe('AgentIPCHandlers', () => {
       handlers.registerHandlers();
       handlers.unregisterHandlers();
 
-      expect(ipcMain.removeHandler).toHaveBeenCalledTimes(12);
+      expect(ipcMain.removeHandler).toHaveBeenCalledTimes(13);
       expect(ipcMain.removeHandler).toHaveBeenCalledWith('agents:create');
       expect(ipcMain.removeHandler).toHaveBeenCalledWith('agents:list');
       expect(ipcMain.removeHandler).toHaveBeenCalledWith('agents:get');
@@ -177,6 +178,7 @@ describe('AgentIPCHandlers', () => {
       expect(ipcMain.removeHandler).toHaveBeenCalledWith('messages:create');
       expect(ipcMain.removeHandler).toHaveBeenCalledWith('messages:update');
       expect(ipcMain.removeHandler).toHaveBeenCalledWith('messages:get-last');
+      expect(ipcMain.removeHandler).toHaveBeenCalledWith('messages:cancel');
       expect(ipcMain.removeHandler).toHaveBeenCalledWith('messages:retry-last');
       expect(ipcMain.removeHandler).toHaveBeenCalledWith('messages:cancel-retry');
     });
@@ -930,6 +932,38 @@ describe('AgentIPCHandlers', () => {
       const result = await handler(mockEvent, { agentId: 'abc123xyz0', userMessageId: 42 });
 
       expect(result).toEqual({ success: false, error: 'DB error' });
+    });
+  });
+
+  describe('messages:cancel handler', () => {
+    /* Preconditions: Handlers registered
+       Action: Invoke messages:cancel with agentId
+       Assertions: AgentManager.cancelPipeline called, success returned
+       Requirements: llm-integration.8.1, llm-integration.8.7 */
+    it('should cancel active pipeline and return success', async () => {
+      handlers.registerHandlers();
+      const handler = registeredHandlers.get('messages:cancel')!;
+
+      const result = await handler(mockEvent, { agentId: 'abc123xyz0' });
+
+      expect(result).toEqual({ success: true });
+      expect(mockAgentManager.cancelPipeline).toHaveBeenCalledWith('abc123xyz0');
+    });
+
+    /* Preconditions: Handlers registered, cancelPipeline throws
+       Action: Invoke messages:cancel
+       Assertions: Error returned
+       Requirements: llm-integration.8.7 */
+    it('should return error when cancel fails', async () => {
+      mockAgentManager.cancelPipeline = jest.fn().mockImplementation(() => {
+        throw new Error('Cancel failed');
+      });
+      handlers.registerHandlers();
+      const handler = registeredHandlers.get('messages:cancel')!;
+
+      const result = await handler(mockEvent, { agentId: 'abc123xyz0' });
+
+      expect(result).toEqual({ success: false, error: 'Cancel failed' });
     });
   });
 });

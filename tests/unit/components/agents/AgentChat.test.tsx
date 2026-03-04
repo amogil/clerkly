@@ -88,8 +88,11 @@ jest.mock('../../../../src/renderer/components/ai-elements/prompt-input', () => 
 
   const PromptInputBody = ({ children }: { children: React.ReactNode }) => <div>{children}</div>;
   const PromptInputFooter = ({ children }: { children: React.ReactNode }) => <div>{children}</div>;
-  const PromptInputSubmit = ({ disabled }: { disabled?: boolean }) => (
-    <button data-testid="prompt-submit" disabled={disabled} type="submit">
+  const PromptInputSubmit = ({
+    disabled,
+    ...props
+  }: React.ButtonHTMLAttributes<HTMLButtonElement>) => (
+    <button data-testid="prompt-submit" disabled={disabled} type="submit" {...props}>
       Send
     </button>
   );
@@ -294,7 +297,7 @@ describe('AgentChat — send message', () => {
       });
     });
     await act(async () => {
-      fireEvent.click(screen.getByTestId('prompt-submit'));
+      fireEvent.click(screen.getByTestId('prompt-input-send'));
     });
 
     expect(mockSendMessage).toHaveBeenCalledWith('Hello agent');
@@ -331,7 +334,7 @@ describe('AgentChat — send message', () => {
       });
     });
     await act(async () => {
-      fireEvent.click(screen.getByTestId('prompt-submit'));
+      fireEvent.click(screen.getByTestId('prompt-input-send'));
     });
 
     expect(screen.getByTestId('prompt-input-field')).toHaveValue('Hello');
@@ -406,6 +409,45 @@ describe('AgentChat — PromptInput rendered', () => {
   it('should render PromptInput', () => {
     render(<AgentChat {...defaultProps} />);
     expect(screen.getByTestId('agent-prompt-input')).toBeInTheDocument();
+  });
+
+  /* Preconditions: agent status is not in-progress
+     Action: render AgentChat
+     Assertions: send button is rendered, stop button is not rendered
+     Requirements: agents.4.24.1 */
+  it('should render send button when agent is not in progress', () => {
+    render(<AgentChat {...defaultProps} />);
+
+    expect(screen.getByTestId('prompt-input-send')).toBeInTheDocument();
+    expect(screen.queryByTestId('prompt-input-stop')).not.toBeInTheDocument();
+  });
+
+  /* Preconditions: agent status is in-progress
+     Action: render AgentChat
+     Assertions: stop button is rendered, send button is not rendered
+     Requirements: agents.4.24.1 */
+  it('should render stop button when agent is in progress', () => {
+    mockUseAgentChatState.isStreaming = true;
+    render(
+      <AgentChat {...defaultProps} agent={{ ...defaultProps.agent, status: 'in-progress' }} />
+    );
+
+    expect(screen.getByTestId('prompt-input-stop')).toBeInTheDocument();
+    expect(screen.queryByTestId('prompt-input-send')).not.toBeInTheDocument();
+  });
+
+  /* Preconditions: agent status is in-progress but request is not streaming
+     Action: render AgentChat
+     Assertions: send button is rendered to allow new request
+     Requirements: agents.4.24.1 */
+  it('should render send button when in-progress status is stale and not streaming', () => {
+    mockUseAgentChatState.isStreaming = false;
+    render(
+      <AgentChat {...defaultProps} agent={{ ...defaultProps.agent, status: 'in-progress' }} />
+    );
+
+    expect(screen.getByTestId('prompt-input-send')).toBeInTheDocument();
+    expect(screen.queryByTestId('prompt-input-stop')).not.toBeInTheDocument();
   });
 });
 
