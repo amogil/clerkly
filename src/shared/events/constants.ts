@@ -38,9 +38,18 @@ export const EVENT_TYPES = {
   // Message events
   MESSAGE_CREATED: 'message.created',
   MESSAGE_UPDATED: 'message.updated',
+  MESSAGE_LLM_REASONING_UPDATED: 'message.llm.reasoning.updated',
 
   // Error events
   ERROR_CREATED: 'error.created',
+
+  // Agent rate limit event
+  AGENT_RATE_LIMIT: 'agent.rate_limit',
+
+  // App coordinator events
+  APP_STATE_CHANGED: 'app.state.changed',
+  APP_CHATS_READY: 'app.chats.ready',
+  APP_CHATS_FAILED: 'app.chats.failed',
 } as const;
 
 /**

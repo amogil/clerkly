@@ -1,6 +1,6 @@
 // Requirements: settings.2.1, settings.2.3, settings.2.4
 
-import { DateTimeFormatter } from '../../../../src/main/utils/DateTimeFormatter';
+import { DateTimeFormatter } from '../../../../src/shared/utils/DateTimeFormatter';
 
 describe('DateTimeFormatter (Main Process)', () => {
   /* Preconditions: valid timestamp provided
@@ -132,6 +132,50 @@ describe('DateTimeFormatter (Main Process)', () => {
     consoleErrorSpy.mockRestore();
   });
 
+  /* Preconditions: Intl.DateTimeFormat throws non-Error value
+     Action: call formatDate(timestamp)
+     Assertions: fallback branch uses "Unknown error" message path
+     Requirements: settings.2.1 */
+  it('should handle non-Error exceptions in formatDate fallback', () => {
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+    const originalDateTimeFormat = Intl.DateTimeFormat;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (Intl as any).DateTimeFormat = jest.fn(() => {
+      throw 'boom';
+    });
+
+    const result = DateTimeFormatter.formatDate(new Date('2026-02-07T10:30:00Z').getTime());
+    expect(typeof result).toBe('string');
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      expect.stringContaining('[DateTimeFormatter] Error formatting date: Unknown error')
+    );
+
+    Intl.DateTimeFormat = originalDateTimeFormat;
+    consoleErrorSpy.mockRestore();
+  });
+
+  /* Preconditions: Intl.DateTimeFormat throws non-Error value
+     Action: call formatDateTime(timestamp)
+     Assertions: fallback branch uses "Unknown error" message path
+     Requirements: settings.2.1 */
+  it('should handle non-Error exceptions in formatDateTime fallback', () => {
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+    const originalDateTimeFormat = Intl.DateTimeFormat;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (Intl as any).DateTimeFormat = jest.fn(() => {
+      throw 'boom';
+    });
+
+    const result = DateTimeFormatter.formatDateTime(new Date('2026-02-07T10:30:00Z').getTime());
+    expect(typeof result).toBe('string');
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      expect.stringContaining('[DateTimeFormatter] Error formatting date/time: Unknown error')
+    );
+
+    Intl.DateTimeFormat = originalDateTimeFormat;
+    consoleErrorSpy.mockRestore();
+  });
+
   /* Preconditions: various timestamps (past, present, future)
      Action: call formatDate() and formatDateTime()
      Assertions: results do NOT contain relative time words
@@ -213,6 +257,21 @@ describe('DateTimeFormatter (Main Process)', () => {
     const expectedTimezone = `${timezoneSign}${String(timezoneOffsetHours).padStart(2, '0')}:${String(timezoneOffsetMins).padStart(2, '0')}`;
 
     expect(timezone).toBe(expectedTimezone);
+  });
+
+  /* Preconditions: Date has positive timezone offset
+     Action: call formatLogTimestamp(date)
+     Assertions: timezone sign uses "-" branch for offsets behind UTC
+     Requirements: clerkly.3.3 */
+  it('should use negative timezone sign for positive timezone offset', () => {
+    const date = new Date('2026-02-07T10:30:45Z');
+    const originalGetTimezoneOffset = date.getTimezoneOffset;
+    date.getTimezoneOffset = () => 120;
+
+    const result = DateTimeFormatter.formatLogTimestamp(date);
+    expect(result).toMatch(/-02:00$/);
+
+    date.getTimezoneOffset = originalGetTimezoneOffset;
   });
 
   /* Preconditions: Date methods throw error

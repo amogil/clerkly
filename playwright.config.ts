@@ -2,6 +2,11 @@
 
 import { defineConfig, devices } from '@playwright/test';
 
+// Load .env file so CLERKLY_OPENAI_API_KEY and other secrets are available in tests
+// Requirements: llm-integration.8
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+require('dotenv').config();
+
 /**
  * Playwright configuration for Electron functional tests
  *

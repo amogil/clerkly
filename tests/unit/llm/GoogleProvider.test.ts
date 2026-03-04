@@ -36,7 +36,7 @@ describe('GoogleProvider', () => {
     expect(result.success).toBe(true);
     expect(result.error).toBeUndefined();
     expect(global.fetch).toHaveBeenCalledWith(
-      'https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash:generateContent?key=test-api-key',
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=test-api-key',
       expect.objectContaining({
         method: 'POST',
       })
@@ -169,7 +169,7 @@ describe('GoogleProvider', () => {
     await provider.testConnection('test-key');
 
     expect(global.fetch).toHaveBeenCalledWith(
-      'https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash:generateContent?key=test-key',
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=test-key',
       expect.objectContaining({
         method: 'POST',
         headers: {

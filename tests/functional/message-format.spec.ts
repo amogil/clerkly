@@ -5,9 +5,13 @@
  * Requirements: agents.7
  */
 
-import { test, expect, _electron as electron, ElectronApplication, Page } from '@playwright/test';
-import path from 'path';
-import { createMockOAuthServer, completeOAuthFlow } from './helpers/electron';
+import { test, expect, ElectronApplication, Page } from '@playwright/test';
+import {
+  createMockOAuthServer,
+  completeOAuthFlow,
+  launchElectronWithMockOAuth,
+  expectAgentsVisible,
+} from './helpers/electron';
 import type { MockOAuthServer } from './helpers/mock-oauth-server';
 
 let electronApp: ElectronApplication;
@@ -15,7 +19,7 @@ let window: Page;
 let mockOAuthServer: MockOAuthServer;
 
 test.beforeAll(async () => {
-  mockOAuthServer = await createMockOAuthServer(8905);
+  mockOAuthServer = await createMockOAuthServer();
 });
 
 test.afterAll(async () => {
@@ -33,29 +37,12 @@ test.beforeEach(async () => {
     family_name: 'Test User',
   });
 
-  // Create unique temp directory for this test
-  const testDataPath = path.join(
-    require('os').tmpdir(),
-    `clerkly-test-${Date.now()}-${Math.random().toString(36).substring(7)}`
-  );
-
-  electronApp = await electron.launch({
-    args: [path.join(__dirname, '../../dist/main/main/index.js'), '--user-data-dir', testDataPath],
-    env: {
-      ...process.env,
-      NODE_ENV: 'test',
-      ELECTRON_DISABLE_SECURITY_WARNINGS: 'true',
-      CLERKLY_GOOGLE_API_URL: mockOAuthServer.getBaseUrl(),
-      CLERKLY_OAUTH_CLIENT_ID: 'test-client-id-12345',
-      CLERKLY_OAUTH_CLIENT_SECRET: 'test-client-secret-67890',
-    },
-  });
-
-  window = await electronApp.firstWindow();
-  await window.waitForLoadState('domcontentloaded');
+  const context = await launchElectronWithMockOAuth(mockOAuthServer);
+  electronApp = context.app;
+  window = context.window;
 
   await completeOAuthFlow(electronApp, window);
-  await expect(window.locator('[data-testid="agents"]')).toBeVisible({ timeout: 10000 });
+  await expectAgentsVisible(window, 10000);
 });
 
 test.afterEach(async () => {
@@ -71,7 +58,7 @@ test.describe('Message Format', () => {
     const messageInput = window.locator('textarea[placeholder*="Ask"]');
     await messageInput.fill('User test message');
     await messageInput.press('Enter');
-    await window.waitForTimeout(500);
+    await expect(window.locator('[data-testid="message-user"]')).toHaveCount(1, { timeout: 5000 });
 
     // Find user message
     const userMessage = window
@@ -102,7 +89,7 @@ test.describe('Message Format', () => {
     const messageInput = window.locator('textarea[placeholder*="Ask"]');
     await messageInput.fill('Test message');
     await messageInput.press('Enter');
-    await window.waitForTimeout(1000);
+    await expect(window.locator('[data-testid="message-user"]')).toHaveCount(1, { timeout: 5000 });
 
     // Check for any messages
     const messages = window.locator('[data-testid="message"]');
@@ -138,7 +125,7 @@ test.describe('Message Format', () => {
     const messageInput = window.locator('textarea[placeholder*="Ask"]');
     await messageInput.fill('Test message');
     await messageInput.press('Enter');
-    await window.waitForTimeout(1000);
+    await expect(window.locator('[data-testid="message-user"]')).toHaveCount(1, { timeout: 5000 });
 
     // Check if markdown rendering component exists
     const messages = window.locator('[data-testid="message"]');
@@ -165,7 +152,7 @@ test.describe('Message Format', () => {
     const messageInput = window.locator('textarea[placeholder*="Ask"]');
     await messageInput.fill('Test message');
     await messageInput.press('Enter');
-    await window.waitForTimeout(500);
+    await expect(window.locator('[data-testid="message-user"]')).toHaveCount(1, { timeout: 5000 });
 
     // Check agent header for timestamp
     const headerTimestamp = window.locator('[data-testid="agent-updated-time"]');

@@ -288,6 +288,25 @@ describe('AIAgentSettingsManager', () => {
   });
 
   describe('loadAPIKey', () => {
+    /* Preconditions: CLERKLY_OPENAI_API_KEY env variable is set
+       Action: Call loadAPIKey for openai provider
+       Assertions: Returns env value without touching UserSettingsManager
+       Requirements: settings.1.22 */
+    it('should return API key from env variable when set', async () => {
+      const envKey = 'env-api-key-from-process';
+      process.env['CLERKLY_OPENAI_API_KEY'] = envKey;
+
+      try {
+        const result = await manager.loadAPIKey('openai');
+
+        expect(result).toBe(envKey);
+        expect(mockUserSettingsManager.loadData).not.toHaveBeenCalled();
+        expect(mockSafeStorage.decryptString).not.toHaveBeenCalled();
+      } finally {
+        delete process.env['CLERKLY_OPENAI_API_KEY'];
+      }
+    });
+
     /* Preconditions: Encrypted key is stored in UserSettingsManager
        Action: Call loadAPIKey
        Assertions: Verify key is decrypted and returned

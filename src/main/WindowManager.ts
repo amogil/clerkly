@@ -1,6 +1,6 @@
-// Requirements: clerkly.1, window-management.5, database-refactoring.3.6
+// Requirements: clerkly.1, window-management.5, window-management.7, database-refactoring.3.6
 
-import { BrowserWindow, BrowserWindowConstructorOptions } from 'electron';
+import { BrowserWindow, BrowserWindowConstructorOptions, shell } from 'electron';
 import * as path from 'path';
 import type { IDatabaseManager } from './DatabaseManager';
 import { WindowStateManager } from './WindowStateManager';
@@ -134,7 +134,7 @@ class WindowManager {
    *
    * Creates the main application window with the following characteristics:
    * - Loads saved window state (position, size, maximized) from database
-   * - Opens with compact size min(600, screenWidth) x min(400, screenHeight) by default (first launch or no saved state)
+   * - Opens with compact size min(900, screenWidth) x min(800, screenHeight) by default (first launch or no saved state)
    * - Uses native macOS window controls and title bar style
    * - Has empty title for minimalist interface
    * - Adapts to screen size (no hardcoded dimensions)
@@ -151,7 +151,7 @@ class WindowManager {
    * - title: '' - Empty title for clean interface (window-management.2.1)
    * - titleBarStyle: 'default' - Native macOS controls (window-management.3.1)
    * - Position and size from saved state or screen-based defaults (window-management.4.1, window-management.4.2, window-management.5.4, window-management.5.5)
-   * - Compact size min(600, screenWidth) x min(400, screenHeight) on first launch (window-management.1.1, window-management.4.2)
+   * - Compact size min(900, screenWidth) x min(800, screenHeight) on first launch (window-management.1.1, window-management.4.2)
    * - NOT maximized by default - window is resizable from the start (window-management.1.1, window-management.1.3)
    * - Not fullscreen - preserves macOS system elements (window-management.1.2)
    * - Resizable - user can adjust window size (window-management.1.3)
@@ -172,7 +172,7 @@ class WindowManager {
    * ```typescript
    * const windowManager = new WindowManager(dataManager);
    * const mainWindow = windowManager.createWindow();
-   * // Window opens with compact 600x400 size (or saved state) and is resizable
+   * // Window opens with compact 900x800 size (or saved state) and is resizable
    * // State changes are automatically persisted
    * ```
    */
@@ -181,12 +181,14 @@ class WindowManager {
       // Requirements: window-management.5.4, window-management.5.5
       const windowState = this.windowStateManager.loadState();
 
-      // Requirements: window-management.1.2, window-management.1.3, window-management.2.1, window-management.3.1, window-management.4.1, window-management.4.2
+      // Requirements: window-management.1.2, window-management.1.3, window-management.1.6, window-management.2.1, window-management.3.1, window-management.4.1, window-management.4.2
       const windowConfig: BrowserWindowConstructorOptions = {
         x: windowState.x,
         y: windowState.y,
         width: windowState.width,
         height: windowState.height,
+        minWidth: 350, // Requirements: window-management.1.6
+        minHeight: 650, // Requirements: window-management.1.6
         title: '', // Requirements: window-management.2.1
         show: false,
         resizable: true, // Requirements: window-management.1.3
@@ -203,7 +205,7 @@ class WindowManager {
       this.mainWindow = new BrowserWindow(windowConfig);
 
       // Requirements: window-management.1.1, window-management.1.3, window-management.5.3, window-management.5.4
-      // On first launch, the window opens with compact size min(600, screenWidth) x min(400, screenHeight) and is NOT maximized.
+      // On first launch, the window opens with compact size min(900, screenWidth) x min(800, screenHeight) and is NOT maximized.
       // This ensures the window is immediately resizable by the user (window-management.1.3).
       // If the user previously maximized the window and we saved that state (window-management.5.3, window-management.5.4),
       // we restore the maximized state here.
@@ -238,6 +240,9 @@ class WindowManager {
         this.logger.info(`${message}`);
       });
 
+      // Requirements: window-management.7 — open external links in default system browser
+      this.setupExternalLinkHandling();
+
       // Clean up reference when window is closed
       this.mainWindow.on('closed', () => {
         this.mainWindow = null;
@@ -251,6 +256,51 @@ class WindowManager {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(`Failed to create window: ${errorMessage}`);
       throw new Error(`Window creation failed: ${errorMessage}`);
+    }
+  }
+
+  /**
+   * Intercept external link clicks and open in default system browser.
+   * Requirements: window-management.7.1, window-management.7.2, window-management.7.3
+   */
+  private setupExternalLinkHandling(): void {
+    if (!this.mainWindow) return;
+
+    const webContents = this.mainWindow.webContents;
+
+    // Requirements: window-management.7.1, window-management.7.2 — target="_blank" / window.open()
+    webContents.setWindowOpenHandler(({ url }) => {
+      if (this.isExternalUrl(url)) {
+        shell.openExternal(url).catch((err) => {
+          this.logger.error(`Failed to open external URL: ${err}`);
+        });
+        return { action: 'deny' };
+      }
+      return { action: 'deny' };
+    });
+
+    // Requirements: window-management.7.1, window-management.7.2 — same-window navigation
+    webContents.on('will-navigate', (event, url) => {
+      if (this.isExternalUrl(url)) {
+        event.preventDefault();
+        shell.openExternal(url).catch((err) => {
+          this.logger.error(`Failed to open external URL: ${err}`);
+        });
+      }
+    });
+  }
+
+  /**
+   * Requirements: window-management.7.3 — only http, https, mailto are external
+   */
+  private isExternalUrl(url: string): boolean {
+    try {
+      const parsed = new URL(url);
+      return (
+        parsed.protocol === 'http:' || parsed.protocol === 'https:' || parsed.protocol === 'mailto:'
+      );
+    } catch {
+      return false;
     }
   }
 

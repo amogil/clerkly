@@ -28,30 +28,30 @@ module.exports = {
   coverageThreshold: {
     global: {
       branches: 80,
-      functions: 80,
-      lines: 80,
-      statements: 80
+      functions: 85,
+      lines: 85,
+      statements: 85
     },
     // Critical components require high coverage
     // UserSettingsManager uses DatabaseManager Query API (user-data-isolation.6.7, 6.8)
     // Coverage adjusted after migration to runUserQuery/getUserRow methods
     './src/main/UserSettingsManager.ts': {
-      branches: 70,
-      functions: 87,
-      lines: 81,
-      statements: 80
+      branches: 80,
+      functions: 85,
+      lines: 85,
+      statements: 85
     },
     './src/main/LifecycleManager.ts': {
-      branches: 66,
-      functions: 90,
-      lines: 96,
-      statements: 94
+      branches: 80,
+      functions: 85,
+      lines: 85,
+      statements: 85
     },
     './src/main/IPCHandlers.ts': {
-      branches: 52,
-      functions: 81,
-      lines: 63,
-      statements: 63
+      branches: 80,
+      functions: 85,
+      lines: 85,
+      statements: 85
     }
   },
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],

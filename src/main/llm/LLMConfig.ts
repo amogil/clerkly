@@ -1,86 +1,105 @@
-// Requirements: settings.3
+// Requirements: settings.3, llm-integration.3.1
 
 import type { LLMProvider } from '../../types';
+import type { ChatOptions } from './ILLMProvider';
+
+// ─── Provider connection config ───────────────────────────────────────────────
 
 /**
- * Configuration for a single LLM provider
+ * Per-provider settings for testConnection() and API routing.
+ * Requirements: settings.3.5, settings.3.6
  */
 export interface LLMProviderConfig {
-  /**
-   * Provider identifier
-   */
   id: LLMProvider;
-
-  /**
-   * Human-readable provider name
-   */
   name: string;
-
-  /**
-   * API endpoint URL
-   */
+  /** Base API endpoint URL (overridable via env) */
   apiUrl: string;
-
-  /**
-   * Model identifier to use for testing
-   */
+  /** Cheap/fast model used only for testConnection() */
   testModel: string;
-
-  /**
-   * Maximum tokens for test request
-   */
-  maxTokens: number;
-
-  /**
-   * Timeout in milliseconds
-   */
-  timeout: number;
+  /** Max tokens for testConnection() request */
+  testMaxTokens: number;
+  /** Timeout for testConnection() in ms */
+  testTimeoutMs: number;
 }
 
-/**
- * Configuration for all LLM providers
- *
- * Requirements: settings.3.5 - Model identifiers and API endpoints
- * Requirements: settings.3.6 - Timeout configuration
- */
 export const LLM_PROVIDERS: Record<LLMProvider, LLMProviderConfig> = {
   openai: {
     id: 'openai',
     name: 'OpenAI',
-    apiUrl: process.env.CLERKLY_OPENAI_API_URL || 'https://api.openai.com/v1/chat/completions',
-    testModel: 'gpt-4o-mini',
-    maxTokens: 5,
-    timeout: 10000, // 10 seconds
+    apiUrl: process.env.CLERKLY_OPENAI_API_URL || 'https://api.openai.com/v1/responses',
+    testModel: 'gpt-5-nano',
+    testMaxTokens: 16,
+    testTimeoutMs: 10_000,
   },
   anthropic: {
     id: 'anthropic',
     name: 'Anthropic',
     apiUrl: process.env.CLERKLY_ANTHROPIC_API_URL || 'https://api.anthropic.com/v1/messages',
-    testModel: 'claude-haiku-4-5',
-    maxTokens: 5,
-    timeout: 10000, // 10 seconds
+    testModel: 'claude-haiku-4-6',
+    testMaxTokens: 5,
+    testTimeoutMs: 10_000,
   },
   google: {
     id: 'google',
     name: 'Google',
     apiUrl:
       process.env.CLERKLY_GOOGLE_LLM_API_URL ||
-      'https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash:generateContent',
-    testModel: 'gemini-3-flash',
-    maxTokens: 5,
-    timeout: 10000, // 10 seconds
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent',
+    testModel: 'gemini-3-flash-preview',
+    testMaxTokens: 5,
+    testTimeoutMs: 10_000,
   },
 };
 
-/**
- * Get list of all provider types
- */
 export const PROVIDER_TYPES: LLMProvider[] = Object.keys(LLM_PROVIDERS) as LLMProvider[];
 
+// ─── Chat model config ────────────────────────────────────────────────────────
+
 /**
- * Error messages for different HTTP status codes
+ * Chat options per environment for a single provider.
+ * Requirements: llm-integration.3.1, llm-integration.5.8
+ */
+export interface LLMChatEnvConfig {
+  /** Used in production */
+  prod: ChatOptions;
+  /** Used in functional tests (cheaper/faster) */
+  test: ChatOptions;
+}
+
+/**
+ * Per-provider, per-environment chat model configuration.
  *
- * Requirements: settings.3.8 - User-friendly error messages
+ * Usage:
+ *   LLM_CHAT_MODELS[provider].prod  — production
+ *   LLM_CHAT_MODELS[provider].test  — functional tests
+ *
+ * Requirements: llm-integration.3.1, llm-integration.5.8
+ */
+export const LLM_CHAT_MODELS: Record<LLMProvider, LLMChatEnvConfig> = {
+  openai: {
+    prod: { model: 'gpt-5.2', reasoningEffort: 'medium' },
+    test: { model: 'gpt-5-nano', reasoningEffort: 'low' },
+  },
+  anthropic: {
+    prod: { model: 'claude-opus-4-6', reasoningEffort: 'medium' },
+    test: { model: 'claude-opus-4-6', reasoningEffort: 'low' },
+  },
+  google: {
+    prod: { model: 'gemini-3.1-pro-preview', reasoningEffort: 'medium' },
+    test: { model: 'gemini-3-flash-preview', reasoningEffort: 'low' },
+  },
+};
+
+// ─── Chat timeout ─────────────────────────────────────────────────────────────
+
+/** Timeout for LLM chat requests in ms. Requirements: llm-integration.3.6 */
+export const CHAT_TIMEOUT_MS = 60_000;
+
+// ─── Error messages ───────────────────────────────────────────────────────────
+
+/**
+ * User-facing error messages by HTTP status code.
+ * Requirements: settings.3.8
  */
 export const ERROR_MESSAGES = {
   401: 'Invalid API key. Please check your key and try again.',

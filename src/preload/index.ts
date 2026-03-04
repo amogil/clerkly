@@ -7,14 +7,15 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import { EVENT_TYPES } from '../shared/events/constants';
 import type { User } from '../types';
+import type { AppPhase, AppScreen } from '../shared/events/types';
 
 // LLM Provider type (duplicated from types/index.ts due to rootDir restriction)
 type LLMProvider = 'openai' | 'anthropic' | 'google';
 
 // Message payload type for agents API (duplicated due to rootDir restriction)
-// Requirements: agents.7.2
+// Requirements: agents.7.2, llm-integration.2
+// Note: 'kind' is now a separate parameter, not part of payload
 interface MessagePayloadAPI {
-  kind: 'user' | 'llm' | 'tool_call' | 'code_exec' | 'final_answer' | 'request_scope' | 'artifact';
   timing?: {
     started_at: string;
     finished_at: string;
@@ -30,6 +31,14 @@ export interface API {
   saveData: (key: string, value: unknown) => Promise<{ success: boolean; error?: string }>;
   loadData: (key: string) => Promise<{ success: boolean; data?: unknown; error?: string }>;
   deleteData: (key: string) => Promise<{ success: boolean; error?: string }>;
+  app: {
+    getState: () => Promise<{
+      phase: AppPhase;
+      authorized: boolean;
+      targetScreen: AppScreen;
+      reason?: string;
+    }>;
+  };
   // Requirements: realtime-events.4.5, realtime-events.4.6, realtime-events.4.7
   events?: {
     onEvent: (callback: (type: string, payload: unknown) => void) => () => void;
@@ -89,8 +98,18 @@ export interface API {
   // Requirements: agents.4, agents.7, user-data-isolation.6.6
   messages: {
     list: (agentId: string) => Promise<{ success: boolean; data?: unknown; error?: string }>;
+    listPaginated: (
+      agentId: string,
+      limit?: number,
+      beforeId?: number
+    ) => Promise<{
+      success: boolean;
+      data?: { messages: unknown[]; hasMore: boolean };
+      error?: string;
+    }>;
     create: (
       agentId: string,
+      kind: string,
       payload: MessagePayloadAPI
     ) => Promise<{ success: boolean; data?: unknown; error?: string }>;
     update: (
@@ -99,6 +118,13 @@ export interface API {
       payload: MessagePayloadAPI
     ) => Promise<{ success: boolean; error?: string }>;
     getLast: (agentId: string) => Promise<{ success: boolean; data?: unknown; error?: string }>;
+    // Requirements: llm-integration.3.7.3
+    retryLast: (agentId: string) => Promise<{ success: boolean; error?: string }>;
+    // Requirements: llm-integration.3.7.4
+    cancelRetry: (
+      agentId: string,
+      userMessageId: number
+    ) => Promise<{ success: boolean; error?: string }>;
   };
   // Requirements: testing.3.1, testing.3.2 - Test API methods (only available in test environment)
   test?: {
@@ -151,6 +177,17 @@ const api: API = {
    */
   async deleteData(key: string): Promise<{ success: boolean; error?: string }> {
     return await ipcRenderer.invoke('delete-data', key);
+  },
+
+  app: {
+    async getState(): Promise<{
+      phase: AppPhase;
+      authorized: boolean;
+      targetScreen: AppScreen;
+      reason?: string;
+    }> {
+      return await ipcRenderer.invoke('app:get-state');
+    },
   },
 
   // Requirements: realtime-events.4.5, realtime-events.4.6, realtime-events.4.7
@@ -490,6 +527,22 @@ const api: API = {
    */
   messages: {
     /**
+     * List messages for an agent with pagination
+     * Requirements: agents.13.1, agents.13.2, agents.13.4
+     */
+    async listPaginated(
+      agentId: string,
+      limit?: number,
+      beforeId?: number
+    ): Promise<{
+      success: boolean;
+      data?: { messages: unknown[]; hasMore: boolean };
+      error?: string;
+    }> {
+      return await ipcRenderer.invoke('messages:list-paginated', { agentId, limit, beforeId });
+    },
+
+    /**
      * List all messages for an agent
      * Requirements: agents.4.8, user-data-isolation.7.6
      * @param {string} agentId - Agent ID
@@ -514,14 +567,16 @@ const api: API = {
      * Create a new message for an agent
      * Requirements: agents.4.3, agents.7.1, agents.1.4
      * @param {string} agentId - Agent ID
+     * @param {string} kind - Message kind ('user' | 'llm' | 'error' | ...)
      * @param {MessagePayloadAPI} payload - Message payload
      * @returns {Promise<{success: boolean, data?: Message, error?: string}>}
      */
     async create(
       agentId: string,
+      kind: string,
       payload: MessagePayloadAPI
     ): Promise<{ success: boolean; data?: unknown; error?: string }> {
-      return await ipcRenderer.invoke('messages:create', { agentId, payload });
+      return await ipcRenderer.invoke('messages:create', { agentId, kind, payload });
     },
 
     /**
@@ -538,6 +593,25 @@ const api: API = {
       payload: MessagePayloadAPI
     ): Promise<{ success: boolean; error?: string }> {
       return await ipcRenderer.invoke('messages:update', { messageId, agentId, payload });
+    },
+
+    /**
+     * Retry last LLM request after rate limit countdown
+     * Requirements: llm-integration.3.7.3
+     */
+    async retryLast(agentId: string): Promise<{ success: boolean; error?: string }> {
+      return await ipcRenderer.invoke('messages:retry-last', { agentId });
+    },
+
+    /**
+     * Cancel rate limit retry — hides the user message
+     * Requirements: llm-integration.3.7.4
+     */
+    async cancelRetry(
+      agentId: string,
+      userMessageId: number
+    ): Promise<{ success: boolean; error?: string }> {
+      return await ipcRenderer.invoke('messages:cancel-retry', { agentId, userMessageId });
     },
   },
 };

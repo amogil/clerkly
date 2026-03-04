@@ -50,7 +50,7 @@ test.describe('OAuth Flow Components', () => {
     // Take screenshot
     await context.window.screenshot({ path: 'playwright-report/expired-tokens-login-screen.png' });
 
-    // Note: Token expiration logic is tested in unit and property tests
+    // Note: Token expiration logic is tested in unit tests
     // Functional test would require complex DB setup with version conflicts
   });
 
@@ -76,7 +76,7 @@ test.describe('OAuth Flow Components', () => {
     // Take screenshot
     await context.window.screenshot({ path: 'playwright-report/logout-login-screen.png' });
 
-    // Note: Token deletion logic is tested in unit and property tests
+    // Note: Token deletion logic is tested in unit tests
     // Functional test would require real OAuth flow and logout button interaction
   });
 

@@ -7,6 +7,7 @@ import {
   ElectronTestContext,
   clearTestTokens,
   completeOAuthFlow,
+  expectAgentsVisible,
 } from './helpers/electron';
 import { createMockOAuthServer } from './helpers/electron';
 import type { MockOAuthServer } from './helpers/mock-oauth-server';
@@ -33,7 +34,7 @@ test.describe('Complete OAuth Flow', () => {
   const TEST_CLIENT_ID = 'test-client-id-12345';
 
   test.beforeAll(async () => {
-    mockServer = await createMockOAuthServer(8889);
+    mockServer = await createMockOAuthServer();
   });
 
   test.afterAll(async () => {
@@ -67,6 +68,8 @@ test.describe('Complete OAuth Flow', () => {
     // Launch the application with mock OAuth server URL
     context = await launchElectron(undefined, {
       CLERKLY_GOOGLE_API_URL: mockServer.getBaseUrl(),
+      CLERKLY_OAUTH_CLIENT_ID: TEST_CLIENT_ID,
+      CLERKLY_OAUTH_CLIENT_SECRET: 'test-client-secret-67890',
     });
     await context.window.waitForLoadState('domcontentloaded');
 
@@ -78,32 +81,12 @@ test.describe('Complete OAuth Flow', () => {
     await loginButton.waitFor({ state: 'visible', timeout: 5000 });
     expect(await loginButton.isVisible()).toBe(true);
 
-    // Simulate OAuth flow by directly calling deep link handler
-    // In real scenario, this would happen after user completes OAuth in browser
-
-    // Step 1: Generate authorization code (simulating Google's response)
-    const authCode = 'test_auth_code_complete_flow';
-    const state = 'test_state_value';
-
-    // Step 2: Simulate deep link callback with authorization code
+    // Complete OAuth flow using the standard helper (handles PKCE state correctly)
     // Requirements: google-oauth-auth.2.3
-    const deepLinkUrl = `com.googleusercontent.apps.${TEST_CLIENT_ID}:/oauth2redirect?code=${authCode}&state=${state}`;
+    await completeOAuthFlow(context.app, context.window, TEST_CLIENT_ID);
 
-    // Call deep link handler through Electron
-    await context.app.evaluate(
-      async ({ app }, { url }) => {
-        // Emit the 'open-url' event that would normally be triggered by macOS
-        app.emit('open-url', { preventDefault: () => {} }, url);
-      },
-      { url: deepLinkUrl }
-    );
-
-    // Wait for OAuth flow to process
-    await context.window.waitForTimeout(2000);
-
-    // Step 3: Verify that authorization code was processed
-    // Note: In real implementation, this would trigger token exchange
-    // For now, we verify the app is still responsive
+    // Verify app transitioned to agents screen
+    await expectAgentsVisible(context.window, 10000);
 
     expect(context.window.isClosed()).toBe(false);
 
@@ -144,7 +127,9 @@ test.describe('Complete OAuth Flow', () => {
     // Reload to verify tokens persist
     await context.window.reload();
     await context.window.waitForLoadState('domcontentloaded');
-    await context.window.waitForTimeout(2000);
+    await context.window.waitForSelector('[data-testid="login-screen"], [data-testid="agents"]', {
+      timeout: 10000,
+    });
 
     // Verify still authenticated (not on login screen)
     const stillOnLogin = await loginButton.isVisible().catch(() => false);
@@ -184,14 +169,21 @@ test.describe('Complete OAuth Flow', () => {
       { url: errorDeepLink }
     );
 
-    // Wait for error handling
-    await context.window.waitForTimeout(2000);
+    // Wait for error handling — app stays on login screen
+    await expect(context.window.locator('[data-testid="login-screen"]')).toBeVisible({
+      timeout: 10000,
+    });
 
     // Verify app is still responsive
     expect(context.window.isClosed()).toBe(false);
 
+    // Verify error panel is shown
+    await expect(context.window.locator('[data-testid="login-error"]')).toBeVisible();
+
     // Verify still on login screen (not authenticated)
-    const stillOnLogin = await loginButton.isVisible();
+    const stillOnLogin = await context.window
+      .locator('button:has-text("Continue with Google")')
+      .isVisible();
     expect(stillOnLogin).toBe(true);
 
     console.log('[TEST] OAuth error handled gracefully');

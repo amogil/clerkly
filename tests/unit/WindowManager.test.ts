@@ -1,10 +1,14 @@
-// Requirements: clerkly.2, window-management.5, database-refactoring.3.6
+// Requirements: clerkly.2, window-management.5, database-refactoring.3.6, window-management.7
 
-import { BrowserWindow } from 'electron';
+import { BrowserWindow, shell } from 'electron';
 import WindowManager from '../../src/main/WindowManager';
 import type { IDatabaseManager } from '../../src/main/DatabaseManager';
 
-// Mock Electron's BrowserWindow
+let capturedSetWindowOpenHandler: ((opts: { url: string }) => { action: string }) | null = null;
+let capturedWillNavigateHandler:
+  | ((event: { preventDefault: () => void }, url: string) => void)
+  | null = null;
+
 jest.mock('electron', () => ({
   BrowserWindow: jest.fn().mockImplementation(() => ({
     loadFile: jest.fn().mockResolvedValue(undefined),
@@ -25,9 +29,19 @@ jest.mock('electron', () => ({
           onHeadersReceived: jest.fn(),
         },
       },
-      on: jest.fn(),
+      on: jest.fn((ev: string, fn: (...args: unknown[]) => void) => {
+        if (ev === 'will-navigate') {
+          capturedWillNavigateHandler = fn as typeof capturedWillNavigateHandler;
+        }
+      }),
+      setWindowOpenHandler: jest.fn((fn: (opts: { url: string }) => { action: string }) => {
+        capturedSetWindowOpenHandler = fn;
+      }),
     },
   })),
+  shell: {
+    openExternal: jest.fn().mockResolvedValue(undefined),
+  },
   screen: {
     getPrimaryDisplay: jest.fn(() => ({
       workAreaSize: { width: 1920, height: 1080 },
@@ -47,6 +61,8 @@ describe('WindowManager', () => {
   beforeEach(() => {
     // Clear all mocks before each test
     jest.clearAllMocks();
+    capturedSetWindowOpenHandler = null;
+    capturedWillNavigateHandler = null;
 
     // Create mock for global.windowState repository
     // Requirements: user-data-isolation.6.8 - WindowStateManager uses dbManager.global.windowState
@@ -136,18 +152,20 @@ describe('WindowManager', () => {
 
     /* Preconditions: WindowManager created, no saved state exists
        Action: call createWindow()
-       Assertions: window created with compact default state min(600, screenWidth) x min(400, screenHeight), centered
-       Requirements: window-management.1.1, window-management.4.1, window-management.4.2, window-management.4.4, window-management.5.5 */
+       Assertions: window created with compact default state min(900, screenWidth) x min(800, screenHeight), centered
+       Requirements: window-management.1.1, window-management.1.6, window-management.4.1, window-management.4.2, window-management.4.4, window-management.5.5 */
     it('should create window with default state when no saved state exists', () => {
       windowManager.createWindow();
 
-      // Default state should be compact size 600x400, centered on 1920x1080 screen
+      // Default state should be compact size 900x800, centered on 1920x1080 screen
       expect(BrowserWindow).toHaveBeenCalledWith(
         expect.objectContaining({
-          x: 660, // (1920 - 600) / 2
-          y: 340, // (1080 - 400) / 2
-          width: 600, // min(600, 1920)
-          height: 400, // min(400, 1080)
+          x: 510, // (1920 - 900) / 2
+          y: 140, // (1080 - 800) / 2
+          width: 900, // min(900, 1920)
+          height: 800, // min(800, 1080)
+          minWidth: 350, // Requirements: window-management.1.6
+          minHeight: 650, // Requirements: window-management.1.6
         })
       );
     });
@@ -690,6 +708,95 @@ describe('WindowManager', () => {
         'console-message',
         expect.any(Function)
       );
+    });
+  });
+
+  describe('External link handling', () => {
+    /* Preconditions: WindowManager created
+       Action: call createWindow()
+       Assertions: setWindowOpenHandler and will-navigate registered
+       Requirements: window-management.7.1, window-management.7.2 */
+    it('should register setWindowOpenHandler and will-navigate when creating window', () => {
+      windowManager.createWindow();
+      const mockWindow = getMockWindow();
+
+      expect(mockWindow.webContents.setWindowOpenHandler).toHaveBeenCalledWith(
+        expect.any(Function)
+      );
+      expect(mockWindow.webContents.on).toHaveBeenCalledWith('will-navigate', expect.any(Function));
+    });
+
+    /* Preconditions: Window created, handler captured
+       Action: invoke setWindowOpenHandler with https URL
+       Assertions: shell.openExternal called, returns { action: 'deny' }
+       Requirements: window-management.7.1, window-management.7.2 */
+    it('should open external URL in system browser via setWindowOpenHandler', async () => {
+      windowManager.createWindow();
+      expect(capturedSetWindowOpenHandler).not.toBeNull();
+
+      const result = await capturedSetWindowOpenHandler!({ url: 'https://example.com/page' });
+
+      expect(shell.openExternal).toHaveBeenCalledWith('https://example.com/page');
+      expect(result).toEqual({ action: 'deny' });
+    });
+
+    /* Preconditions: Window created, handler captured
+       Action: invoke setWindowOpenHandler with file: URL
+       Assertions: shell.openExternal NOT called, returns { action: 'deny' }
+       Requirements: window-management.7.3 */
+    it('should not open internal file: URL in system browser', async () => {
+      windowManager.createWindow();
+      expect(capturedSetWindowOpenHandler).not.toBeNull();
+
+      await capturedSetWindowOpenHandler!({ url: 'file:///app/index.html' });
+
+      expect(shell.openExternal).not.toHaveBeenCalled();
+    });
+
+    /* Preconditions: Window created, will-navigate handler captured
+       Action: invoke handler with https URL
+       Assertions: preventDefault called, shell.openExternal called
+       Requirements: window-management.7.1, window-management.7.2 */
+    it('should open external URL on will-navigate and prevent in-window navigation', () => {
+      windowManager.createWindow();
+      expect(capturedWillNavigateHandler).not.toBeNull();
+
+      const mockEvent = { preventDefault: jest.fn() };
+      capturedWillNavigateHandler!(mockEvent as any, 'https://example.com');
+
+      expect(mockEvent.preventDefault).toHaveBeenCalled();
+      expect(shell.openExternal).toHaveBeenCalledWith('https://example.com');
+    });
+
+    /* Preconditions: Window created, will-navigate handler captured
+       Action: invoke handler with file: URL
+       Assertions: preventDefault NOT called, shell.openExternal NOT called
+       Requirements: window-management.7.3 */
+    it('should allow internal file: navigation without opening external browser', () => {
+      windowManager.createWindow();
+      expect(capturedWillNavigateHandler).not.toBeNull();
+
+      const mockEvent = { preventDefault: jest.fn() };
+      capturedWillNavigateHandler!(mockEvent as any, 'file:///app/index.html');
+
+      expect(mockEvent.preventDefault).not.toHaveBeenCalled();
+      expect(shell.openExternal).not.toHaveBeenCalled();
+    });
+
+    /* Preconditions: Window created
+       Action: invoke setWindowOpenHandler with http and mailto URLs
+       Assertions: shell.openExternal called for both
+       Requirements: window-management.7.1 */
+    it('should treat http: and mailto: as external URLs', async () => {
+      windowManager.createWindow();
+      expect(capturedSetWindowOpenHandler).not.toBeNull();
+
+      await capturedSetWindowOpenHandler!({ url: 'http://example.com' });
+      expect(shell.openExternal).toHaveBeenCalledWith('http://example.com');
+
+      (shell.openExternal as jest.Mock).mockClear();
+      await capturedSetWindowOpenHandler!({ url: 'mailto:support@example.com' });
+      expect(shell.openExternal).toHaveBeenCalledWith('mailto:support@example.com');
     });
   });
 });

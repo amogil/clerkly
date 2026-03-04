@@ -5,49 +5,56 @@
  * Requirements: agents.6
  */
 
-import { test, expect, _electron as electron, ElectronApplication, Page } from '@playwright/test';
-import path from 'path';
-import { completeOAuthFlow, createMockOAuthServer } from './helpers/electron';
+import { test, expect, ElectronApplication, Page } from '@playwright/test';
+import {
+  getFreePort,
+  launchElectron,
+  completeOAuthFlow,
+  createMockOAuthServer,
+  activeChat,
+  expectAgentsVisible,
+} from './helpers/electron';
 import type { MockOAuthServer } from './helpers/mock-oauth-server';
+import { MockLLMServer } from './helpers/mock-llm-server';
 
 let electronApp: ElectronApplication;
 let window: Page;
 let mockServer: MockOAuthServer;
+let mockLLMServer: MockLLMServer;
 
 test.beforeAll(async () => {
-  mockServer = await createMockOAuthServer(8902);
+  mockServer = await createMockOAuthServer();
+  const llmPort = await getFreePort();
+  mockLLMServer = new MockLLMServer({ port: llmPort });
+  await mockLLMServer.start();
 });
 
 test.afterAll(async () => {
   if (mockServer) {
     await mockServer.stop();
   }
+  if (mockLLMServer) {
+    await mockLLMServer.stop();
+  }
 });
 
 test.beforeEach(async () => {
-  // Create unique temp directory for this test
-  const testDataPath = path.join(
-    require('os').tmpdir(),
-    `clerkly-status-test-${Date.now()}-${Math.random().toString(36).substring(7)}`
-  );
+  mockLLMServer.setSuccess(true);
+  mockLLMServer.setDelay(0);
+  mockLLMServer.clearRequestLogs();
 
-  electronApp = await electron.launch({
-    args: [path.join(__dirname, '../../dist/main/main/index.js'), '--user-data-dir', testDataPath],
-    env: {
-      ...process.env,
-      NODE_ENV: 'test',
-      ELECTRON_DISABLE_SECURITY_WARNINGS: 'true',
-      CLERKLY_GOOGLE_API_URL: mockServer.getBaseUrl(),
-      CLERKLY_OAUTH_CLIENT_ID: 'test-client-id',
-      CLERKLY_OAUTH_CLIENT_SECRET: 'test-client-secret',
-    },
+  const context = await launchElectron(undefined, {
+    CLERKLY_GOOGLE_API_URL: mockServer.getBaseUrl(),
+    CLERKLY_OAUTH_CLIENT_ID: 'test-client-id',
+    CLERKLY_OAUTH_CLIENT_SECRET: 'test-client-secret',
+    CLERKLY_OPENAI_API_URL: `${mockLLMServer.getBaseUrl()}/v1/responses`,
+    CLERKLY_OPENAI_API_KEY: 'mock-key-for-testing',
   });
-
-  window = await electronApp.firstWindow();
-  await window.waitForLoadState('domcontentloaded');
+  electronApp = context.app;
+  window = context.window;
 
   await completeOAuthFlow(electronApp, window);
-  await expect(window.locator('[data-testid="agents"]')).toBeVisible({ timeout: 10000 });
+  await expectAgentsVisible(window, 10000);
 });
 
 test.afterEach(async () => {
@@ -64,8 +71,9 @@ test.describe('Agent Status Indicators', () => {
     const agentIcon = window.locator('[data-testid^="agent-icon-"]').first();
     await expect(agentIcon).toBeVisible();
 
-    // Check background color class
-    const classes = await agentIcon.getAttribute('class');
+    // Color lives on agent-avatar-icon (child div inside motion.div)
+    const agentAvatarIcon = agentIcon.locator('[data-testid="agent-avatar-icon"]');
+    const classes = await agentAvatarIcon.getAttribute('class');
     expect(classes).toBeTruthy();
 
     // New status should have sky-400 or blue color
@@ -78,9 +86,9 @@ test.describe('Agent Status Indicators', () => {
     expect(hasStatusColor).toBe(true);
 
     // Check that icon contains letter or status icon
-    const iconContent = await agentIcon.textContent();
+    const iconContent = await agentAvatarIcon.textContent();
     const hasContent =
-      iconContent && (iconContent.length > 0 || (await agentIcon.locator('svg').count()) > 0);
+      iconContent && (iconContent.length > 0 || (await agentAvatarIcon.locator('svg').count()) > 0);
     expect(hasContent).toBeTruthy();
   });
 
@@ -89,23 +97,27 @@ test.describe('Agent Status Indicators', () => {
      Assertions: Spinning ring animation is visible
      Requirements: agents.6.2, agents.6.6 */
   test('should animate in-progress status', async () => {
+    // Keep model response slow so in-progress state remains visible for assertion.
+    mockLLMServer.setDelay(2500);
+
     // Send message to create in-progress status
-    const messageInput = window.locator('textarea[placeholder*="Ask"]');
+    const messageInput = activeChat(window).textarea;
     await messageInput.fill('Test message');
     await messageInput.press('Enter');
-    await window.waitForTimeout(500);
+    await expect(activeChat(window).userMessages).toHaveCount(1, { timeout: 5000 });
 
     // Check for spinning animation
     const agentIcon = window.locator('[data-testid^="agent-icon-"]').first();
+    const agentAvatarIcon = agentIcon.locator('[data-testid="agent-avatar-icon"]');
 
-    // Look for spinning ring element
-    const spinningRing = agentIcon.locator('.animate-spin');
+    // Look for spinning ring element inside avatar
+    const spinningRing = agentAvatarIcon.locator('.animate-spin');
 
-    // If in-progress status, should have spinning element
-    const classes = await agentIcon.getAttribute('class');
-    if (classes?.includes('bg-blue-500')) {
-      await expect(spinningRing).toBeVisible();
-    }
+    // In delayed-response window status should be in-progress (blue) with visible spinner.
+    await expect
+      .poll(async () => await agentAvatarIcon.getAttribute('class'), { timeout: 4000 })
+      .toContain('bg-blue-500');
+    await expect(spinningRing).toBeVisible();
   });
 
   /* Preconditions: Agent with awaiting-response status exists
@@ -136,9 +148,9 @@ test.describe('Agent Status Indicators', () => {
     // Create multiple agents
     const newChatButton = window.locator('div[title="New chat"]');
     await newChatButton.click();
-    await window.waitForTimeout(500);
+    await expect(window.locator('[data-testid^="agent-icon-"]')).toHaveCount(2, { timeout: 5000 });
     await newChatButton.click();
-    await window.waitForTimeout(500);
+    await expect(window.locator('[data-testid^="agent-icon-"]')).toHaveCount(3, { timeout: 5000 });
 
     // Get second agent
     const agentIcons = window.locator('[data-testid^="agent-icon-"]');
@@ -150,13 +162,13 @@ test.describe('Agent Status Indicators', () => {
 
     // Switch to second agent
     await secondIcon.click();
-    await window.waitForTimeout(300);
+    await expect(activeChat(window).textarea).toBeVisible();
 
     // Send message to move it to first position
-    const messageInput = window.locator('textarea[placeholder*="Ask"]');
+    const messageInput = activeChat(window).textarea;
     await messageInput.fill('Move to top');
     await messageInput.press('Enter');
-    await window.waitForTimeout(500);
+    await expect(activeChat(window).userMessages).toHaveCount(1, { timeout: 5000 });
 
     // Check that agent moved to first position
     const firstIcon = agentIcons.nth(0);
@@ -177,15 +189,15 @@ test.describe('Agent Status Indicators', () => {
      Requirements: agents.6.7 */
   test('should not show animation when agent status updates without position change', async () => {
     // Agent at position 0 receives message
-    const messageInput = window.locator('textarea[placeholder*="Ask"]');
+    const messageInput = activeChat(window).textarea;
     await messageInput.fill('First message');
     await messageInput.press('Enter');
-    await window.waitForTimeout(500);
+    await expect(activeChat(window).userMessages).toHaveCount(1, { timeout: 5000 });
 
     // Send another message (agent stays at position 0)
     await messageInput.fill('Second message');
     await messageInput.press('Enter');
-    await window.waitForTimeout(500);
+    await expect(activeChat(window).userMessages).toHaveCount(2, { timeout: 5000 });
 
     // Header icon should not show activation animation
     // (This is hard to test directly, but we can check structure)
@@ -203,30 +215,33 @@ test.describe('Agent Status Indicators', () => {
     // Create second agent
     const newChatButton = window.locator('div[title="New chat"]');
     await newChatButton.click();
-    await window.waitForTimeout(500);
+    await expect(window.locator('[data-testid^="agent-icon-"]')).toHaveCount(2, { timeout: 5000 });
 
+    // Save stable IDs before sending messages (order changes after send)
     const agentIcons = window.locator('[data-testid^="agent-icon-"]');
-    const firstIcon = agentIcons.nth(0);
-    const secondIcon = agentIcons.nth(1);
+    const firstAgentTestId = await agentIcons.nth(0).getAttribute('data-testid');
+    const secondAgentTestId = await agentIcons.nth(1).getAttribute('data-testid');
+    expect(firstAgentTestId).toBeTruthy();
+    expect(secondAgentTestId).toBeTruthy();
 
-    // Switch to second agent
-    await secondIcon.click();
-    await window.waitForTimeout(300);
+    // Switch to second agent using stable ID
+    await window.locator(`[data-testid="${secondAgentTestId}"]`).click();
+    await expect(activeChat(window).textarea).toBeVisible();
 
     // Send message to second agent (moves it to top)
-    const messageInput = window.locator('textarea[placeholder*="Ask"]');
+    const messageInput = activeChat(window).textarea;
     await messageInput.fill('Message to second agent');
     await messageInput.press('Enter');
-    await window.waitForTimeout(500);
+    await expect(activeChat(window).userMessages).toHaveCount(1, { timeout: 5000 });
 
-    // Switch to first agent
-    await firstIcon.click();
-    await window.waitForTimeout(300);
+    // Switch to first agent using stable ID
+    await window.locator(`[data-testid="${firstAgentTestId}"]`).click();
+    await expect(activeChat(window).textarea).toBeVisible();
 
     // Send message to first agent (moves it to top)
     await messageInput.fill('Message to first agent');
     await messageInput.press('Enter');
-    await window.waitForTimeout(500);
+    await expect(activeChat(window).userMessages).toHaveCount(1, { timeout: 5000 });
 
     // First agent should now be at position 0
     // Animation should have been triggered

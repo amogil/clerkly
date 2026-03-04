@@ -5,7 +5,7 @@
  * Initializes all components and manages application lifecycle
  */
 
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, ipcMain } from 'electron';
 import * as path from 'path';
 import WindowManager from './WindowManager';
 import { LifecycleManager } from './LifecycleManager';
@@ -24,6 +24,8 @@ import { registerEventIPCHandlers } from './events/EventIPCHandlers';
 import { EventLogger } from './events/EventLogger';
 import { Logger } from './Logger';
 import { registerTestIPCHandlers } from './TestIPCHandlers';
+import { AppCoordinator } from './app/AppCoordinator';
+import { isNoUserLoggedInError } from '../shared/errors/userErrors';
 
 // Requirements: clerkly.3.5, clerkly.3.7 - Create parameterized logger for Main module
 const logger = Logger.create('Main');
@@ -197,15 +199,24 @@ const aiAgentSettingsManager = new AIAgentSettingsManager(
 // Initialize Settings IPC Handlers
 const settingsIPCHandlers = new SettingsIPCHandlers(aiAgentSettingsManager);
 
-// Requirements: agents.2, agents.4, agents.10
+// Requirements: agents.2, agents.4, agents.10, llm-integration.6
 // Initialize Agent and Message Managers
 import { AgentManager } from './agents/AgentManager';
 import { MessageManager } from './agents/MessageManager';
 import { AgentIPCHandlers } from './agents/AgentIPCHandlers';
+import { MainPipeline } from './agents/MainPipeline';
+import { PromptBuilder, FullHistoryStrategy } from './agents/PromptBuilder';
 
 const agentManager = new AgentManager(dbManager);
 const messageManager = new MessageManager(dbManager);
-const agentIPCHandlers = new AgentIPCHandlers(agentManager, messageManager);
+const promptBuilder = new PromptBuilder(
+  'You are a helpful AI assistant. You may respond in Markdown when it improves clarity. Supported Markdown (GFM): headings, paragraphs, bold/italic/strikethrough, links/autolinks, blockquotes, ordered/unordered lists and task lists, tables, horizontal rules, inline code, fenced code blocks with language tags (syntax highlighting), Mermaid diagrams (```mermaid```), and math via KaTeX (inline $...$ or block $$...$$). Do not use footnotes.',
+  [],
+  new FullHistoryStrategy()
+);
+const mainPipeline = new MainPipeline(messageManager, aiAgentSettingsManager, promptBuilder);
+const agentIPCHandlers = new AgentIPCHandlers(agentManager, messageManager, mainPipeline);
+const appCoordinator = new AppCoordinator(oauthClient);
 
 // Requirements: testing.3.8
 // Initialize Test IPC Handlers (only in test environment)
@@ -218,6 +229,7 @@ if (process.env['NODE_ENV'] === 'test') {
     userManager,
     dataManager,
     dbManager,
+    isNoUserLoggedInError,
   };
 
   // Store testDataManager in global for test handlers
@@ -294,10 +306,17 @@ app.whenReady().then(async () => {
     registerEventIPCHandlers();
     logger.info('Event IPC handlers registered');
 
+    // Coordinator state query IPC for renderer bootstrap
+    ipcMain.handle('app:get-state', () => appCoordinator.getState());
+    logger.info('AppCoordinator state IPC handler registered');
+
     // Requirements: agents.2, agents.4, agents.10
     // Register Agent IPC handlers
     agentIPCHandlers.registerHandlers();
     logger.info('Agent IPC handlers registered');
+
+    await appCoordinator.start();
+    logger.info('AppCoordinator started');
 
     // Requirements: realtime-events.1.3, clerkly.3
     // Start EventLogger to log all events
@@ -348,6 +367,8 @@ app.on('window-all-closed', () => {
 // Handle before-quit event
 app.on('before-quit', () => {
   logger.info('Application quitting...');
+  ipcMain.removeHandler('app:get-state');
+  appCoordinator.stop();
   lifecycleManager.handleWindowClose();
 });
 

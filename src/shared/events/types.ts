@@ -102,8 +102,12 @@ export type MessageKind =
 export interface MessageSnapshot {
   id: number;
   agentId: string;
+  kind: string;
   timestamp: number; // Unix timestamp in milliseconds
   payload: MessagePayload;
+  replyToMessageId: number | null;
+  /** Hidden messages are not shown in UI and excluded from LLM history */
+  hidden: boolean;
 }
 
 // ============================================================================
@@ -131,6 +135,17 @@ export interface MessageCreatedPayload extends BaseEvent {
 }
 export interface MessageUpdatedPayload extends BaseEvent {
   message: MessageSnapshot;
+  timestamp: number;
+}
+
+// LLM reasoning streaming event
+export interface MessageLlmReasoningUpdatedPayload extends BaseEvent {
+  messageId: number;
+  agentId: string;
+  /** New reasoning chunk */
+  delta: string;
+  /** Full accumulated reasoning text so far */
+  accumulatedText: string;
   timestamp: number;
 }
 
@@ -215,6 +230,47 @@ export interface ErrorCreatedPayload extends BaseEvent {
   context: string;
 }
 
+/**
+ * Agent rate limit event payload
+ * Emitted when LLM returns 429 — triggers countdown banner in UI
+ * Requirements: llm-integration.3.7
+ */
+export interface AgentRateLimitPayload extends BaseEvent {
+  agentId: string;
+  /** ID of the user message that triggered the rate-limited request */
+  userMessageId: number;
+  /** Seconds to wait before retrying */
+  retryAfterSeconds: number;
+}
+
+// App coordinator events
+export type AppScreen = 'login' | 'agents' | 'settings' | 'error-demo';
+export type AppPhase =
+  | 'booting'
+  | 'unauthenticated'
+  | 'authenticating'
+  | 'preparing-session'
+  | 'waiting-for-chats'
+  | 'ready'
+  | 'error';
+
+export interface AppStateChangedPayload extends BaseEvent {
+  phase: AppPhase;
+  authorized: boolean;
+  targetScreen: AppScreen;
+  reason?: string;
+}
+
+export interface AppChatsReadyPayload extends BaseEvent {
+  source: 'agents';
+}
+
+export interface AppChatsFailedPayload extends BaseEvent {
+  source: 'agents';
+  reason: string;
+  recoverable?: boolean;
+}
+
 // ============================================================================
 // Event Map
 // ============================================================================
@@ -233,6 +289,7 @@ export interface ClerklyEvents {
   // Message events
   [EVENT_TYPES.MESSAGE_CREATED]: MessageCreatedPayload;
   [EVENT_TYPES.MESSAGE_UPDATED]: MessageUpdatedPayload;
+  [EVENT_TYPES.MESSAGE_LLM_REASONING_UPDATED]: MessageLlmReasoningUpdatedPayload;
 
   // User events
   [EVENT_TYPES.USER_LOGIN]: UserLoginPayload;
@@ -249,6 +306,14 @@ export interface ClerklyEvents {
 
   // Error events
   [EVENT_TYPES.ERROR_CREATED]: ErrorCreatedPayload;
+
+  // Rate limit events
+  [EVENT_TYPES.AGENT_RATE_LIMIT]: AgentRateLimitPayload;
+
+  // App coordinator events
+  [EVENT_TYPES.APP_STATE_CHANGED]: AppStateChangedPayload;
+  [EVENT_TYPES.APP_CHATS_READY]: AppChatsReadyPayload;
+  [EVENT_TYPES.APP_CHATS_FAILED]: AppChatsFailedPayload;
 }
 
 /**
@@ -360,6 +425,9 @@ type AgentArchivedType = typeof EVENT_TYPES.AGENT_ARCHIVED;
 type MessageCreatedType = typeof EVENT_TYPES.MESSAGE_CREATED;
 type MessageUpdatedType = typeof EVENT_TYPES.MESSAGE_UPDATED;
 type UserProfileUpdatedType = typeof EVENT_TYPES.USER_PROFILE_UPDATED;
+type AppStateChangedType = typeof EVENT_TYPES.APP_STATE_CHANGED;
+type AppChatsReadyType = typeof EVENT_TYPES.APP_CHATS_READY;
+type AppChatsFailedType = typeof EVENT_TYPES.APP_CHATS_FAILED;
 
 /**
  * Auth started event
@@ -608,6 +676,37 @@ export class MessageUpdatedEvent extends TypedEventClass<MessageUpdatedType> {
 }
 
 /**
+ * Message LLM reasoning updated event
+ * Emitted on each reasoning chunk during LLM streaming
+ * Requirements: llm-integration.5.1
+ */
+export class MessageLlmReasoningUpdatedEvent extends TypedEventClass<
+  typeof EVENT_TYPES.MESSAGE_LLM_REASONING_UPDATED
+> {
+  readonly type = EVENT_TYPES.MESSAGE_LLM_REASONING_UPDATED;
+  readonly timestamp: number;
+
+  constructor(
+    public readonly messageId: number,
+    public readonly agentId: string,
+    public readonly delta: string,
+    public readonly accumulatedText: string
+  ) {
+    super();
+    this.timestamp = Date.now();
+  }
+
+  toPayload(): EventPayloadWithoutTimestamp<typeof EVENT_TYPES.MESSAGE_LLM_REASONING_UPDATED> {
+    return {
+      messageId: this.messageId,
+      agentId: this.agentId,
+      delta: this.delta,
+      accumulatedText: this.accumulatedText,
+    };
+  }
+}
+
+/**
  * User profile updated event
  */
 export class UserProfileUpdatedEvent extends TypedEventClass<UserProfileUpdatedType> {
@@ -622,6 +721,101 @@ export class UserProfileUpdatedEvent extends TypedEventClass<UserProfileUpdatedT
 
   toPayload(): EventPayloadWithoutTimestamp<UserProfileUpdatedType> {
     return { id: this.id, changedFields: this.changedFields };
+  }
+}
+
+type AgentRateLimitType = typeof EVENT_TYPES.AGENT_RATE_LIMIT;
+
+/**
+ * Agent rate limit event
+ * Emitted when LLM returns 429 — triggers countdown banner in UI
+ * Requirements: llm-integration.3.7
+ */
+export class AgentRateLimitEvent extends TypedEventClass<AgentRateLimitType> {
+  readonly type = EVENT_TYPES.AGENT_RATE_LIMIT;
+  readonly timestamp: number;
+
+  constructor(
+    public readonly agentId: string,
+    public readonly userMessageId: number,
+    public readonly retryAfterSeconds: number
+  ) {
+    super();
+    this.timestamp = Date.now();
+  }
+
+  toPayload(): EventPayloadWithoutTimestamp<AgentRateLimitType> {
+    return {
+      agentId: this.agentId,
+      userMessageId: this.userMessageId,
+      retryAfterSeconds: this.retryAfterSeconds,
+    };
+  }
+}
+
+/**
+ * App state changed event
+ * Emitted by AppCoordinator as a single source of startup/auth state truth.
+ */
+export class AppStateChangedEvent extends TypedEventClass<AppStateChangedType> {
+  readonly type = EVENT_TYPES.APP_STATE_CHANGED;
+
+  constructor(
+    public readonly phase: AppPhase,
+    public readonly authorized: boolean,
+    public readonly targetScreen: AppScreen,
+    public readonly reason?: string
+  ) {
+    super();
+  }
+
+  toPayload(): EventPayloadWithoutTimestamp<AppStateChangedType> {
+    return {
+      phase: this.phase,
+      authorized: this.authorized,
+      targetScreen: this.targetScreen,
+      reason: this.reason,
+    };
+  }
+}
+
+/**
+ * App chats ready event
+ * Emitted by renderer when initial agents/chats loading is fully finished.
+ */
+export class AppChatsReadyEvent extends TypedEventClass<AppChatsReadyType> {
+  readonly type = EVENT_TYPES.APP_CHATS_READY;
+
+  constructor(public readonly source: 'agents' = 'agents') {
+    super();
+  }
+
+  toPayload(): EventPayloadWithoutTimestamp<AppChatsReadyType> {
+    return { source: this.source };
+  }
+}
+
+/**
+ * App chats failed event
+ * Emitted by renderer when initial agents/chats loading fails critically.
+ */
+export class AppChatsFailedEvent extends TypedEventClass<AppChatsFailedType> {
+  readonly type = EVENT_TYPES.APP_CHATS_FAILED;
+
+  constructor(
+    public readonly source: 'agents' = 'agents',
+    public readonly reason: string = 'Unknown chats startup failure',
+    public readonly recoverable?: boolean
+  ) {
+    super();
+  }
+
+  toPayload(): EventPayloadWithoutTimestamp<AppChatsFailedType> {
+    return {
+      source: this.source,
+      reason: this.reason,
+      recoverable: this.recoverable,
+    };
   }
 }
 

@@ -32,6 +32,15 @@ export class MockLLMServer {
   private errorMessage: string = 'Invalid API key';
   private requestLogs: RequestLog[] = [];
   private responseDelay: number = 0; // Delay in milliseconds
+  // Streaming chat response config
+  private streamingEnabled: boolean = false;
+  private streamingReasoning: string = '';
+  private streamingContent: string =
+    '{"action":{"type":"text","content":"Hello! How can I help?"}}';
+  private streamingErrorStatus: number = 0; // 0 = no error
+  private streamingChunkDelayMs: number = 0; // delay between chunks (for interrupt tests)
+  private rateLimitEnabled: boolean = false;
+  private rateLimitRetryAfterSeconds: number = 10;
 
   constructor(config: MockLLMServerConfig) {
     this.port = config.port;
@@ -88,7 +97,7 @@ export class MockLLMServer {
       this.logRequest(req.method || 'POST', pathname, req.headers, parsedBody);
 
       // Route to appropriate handler
-      if (pathname === '/v1/chat/completions') {
+      if (pathname === '/v1/responses') {
         this.handleOpenAI(res);
       } else if (pathname === '/v1/messages') {
         this.handleAnthropic(res);
@@ -105,6 +114,27 @@ export class MockLLMServer {
     console.log('[MOCK LLM] OpenAI request received');
 
     const sendResponse = () => {
+      // Rate limit mode takes priority
+      if (this.rateLimitEnabled) {
+        res.writeHead(429, {
+          'Content-Type': 'application/json',
+          'retry-after': String(this.rateLimitRetryAfterSeconds),
+        });
+        res.end(
+          JSON.stringify({
+            error: {
+              message: `Rate limit exceeded. Please try again in ${this.rateLimitRetryAfterSeconds}.000s`,
+            },
+          })
+        );
+        return;
+      }
+
+      if (this.streamingEnabled) {
+        this.handleOpenAIStreaming(res);
+        return;
+      }
+
       if (this.shouldSucceed) {
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(
@@ -127,6 +157,74 @@ export class MockLLMServer {
     } else {
       sendResponse();
     }
+  }
+
+  /**
+   * Handle OpenAI streaming chat request (SSE format)
+   * Emits reasoning chunks then content chunks, matching OpenAIProvider.parseStream() expectations
+   */
+  private handleOpenAIStreaming(res: http.ServerResponse): void {
+    if (this.streamingErrorStatus > 0) {
+      res.writeHead(this.streamingErrorStatus, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: { message: this.errorMessage } }));
+      return;
+    }
+
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      Connection: 'keep-alive',
+    });
+
+    const sendChunk = (data: object) => {
+      res.write(`data: ${JSON.stringify(data)}\n\n`);
+    };
+
+    const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+    const streamAll = async () => {
+      // Stream reasoning chunks (if any)
+      if (this.streamingReasoning) {
+        const words = this.streamingReasoning.split(' ');
+        for (const word of words) {
+          sendChunk({ type: 'response.reasoning_text.delta', delta: word + ' ' });
+          if (this.streamingChunkDelayMs > 0) {
+            await delay(this.streamingChunkDelayMs);
+          }
+        }
+      }
+
+      // Stream content chunks (structured output JSON split into pieces)
+      const contentChunks = this.streamingContent.match(/.{1,20}/g) || [this.streamingContent];
+      for (const chunk of contentChunks) {
+        sendChunk({ type: 'response.output_text.delta', delta: chunk });
+        if (this.streamingChunkDelayMs > 0) {
+          await delay(this.streamingChunkDelayMs);
+        }
+      }
+
+      // Final chunk with usage
+      sendChunk({
+        type: 'response.completed',
+        response: {
+          usage: {
+            input_tokens: 100,
+            output_tokens: 50,
+            total_tokens: 150,
+            input_tokens_details: { cached_tokens: 0 },
+            output_tokens_details: { reasoning_tokens: 10 },
+          },
+        },
+      });
+
+      res.write('data: [DONE]\n\n');
+      res.end();
+    };
+
+    streamAll().catch(() => {
+      // Client disconnected — ignore
+      res.end();
+    });
   }
 
   private handleAnthropic(res: http.ServerResponse): void {
@@ -227,6 +325,36 @@ export class MockLLMServer {
   setDelay(delayMs: number) {
     this.responseDelay = delayMs;
     console.log(`[MOCK LLM] Response delay set to: ${delayMs}ms`);
+  }
+
+  /** Enable streaming mode for chat requests */
+  setStreamingMode(
+    enabled: boolean,
+    options?: {
+      reasoning?: string;
+      content?: string;
+      errorStatus?: number;
+      errorMessage?: string;
+      chunkDelayMs?: number;
+    }
+  ) {
+    this.streamingEnabled = enabled;
+    if (enabled) this.rateLimitEnabled = false; // streaming mode disables rate limit
+    if (options?.reasoning !== undefined) this.streamingReasoning = options.reasoning;
+    if (options?.content !== undefined) this.streamingContent = options.content;
+    if (options?.errorStatus !== undefined) this.streamingErrorStatus = options.errorStatus;
+    if (options?.errorMessage !== undefined) this.errorMessage = options.errorMessage;
+    if (options?.chunkDelayMs !== undefined) this.streamingChunkDelayMs = options.chunkDelayMs;
+  }
+
+  /** Enable rate limit mode — server returns 429 with retry-after header */
+  setRateLimitMode(enabled: boolean, retryAfterSeconds: number = 10) {
+    this.rateLimitEnabled = enabled;
+    this.rateLimitRetryAfterSeconds = retryAfterSeconds;
+    if (enabled) {
+      this.streamingEnabled = false;
+    }
+    console.log(`[MOCK LLM] Rate limit mode: ${enabled}, retry-after: ${retryAfterSeconds}s`);
   }
 
   getBaseUrl(): string {

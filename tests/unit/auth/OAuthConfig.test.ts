@@ -181,6 +181,41 @@ describe('OAuthConfig', () => {
       }
     });
 
+    /* Preconditions: No endpoint overrides set
+       Action: Call getOAuthConfig
+       Assertions: Uses default Google OAuth endpoints over HTTPS
+       Requirements: google-oauth-auth.10.4, google-oauth-auth.10.5, google-oauth-auth.10.6 */
+    it('should use default Google HTTPS endpoints', () => {
+      const originalApiUrl = process.env.CLERKLY_GOOGLE_API_URL;
+      delete process.env.CLERKLY_GOOGLE_API_URL;
+
+      const config = getOAuthConfig('test-client-id');
+
+      expect(config.authorizationEndpoint).toBe('https://accounts.google.com/o/oauth2/v2/auth');
+      expect(config.tokenEndpoint).toBe('https://oauth2.googleapis.com/token');
+      expect(config.revokeEndpoint).toBe('https://oauth2.googleapis.com/revoke');
+
+      expect(config.authorizationEndpoint.startsWith('https://')).toBe(true);
+      expect(config.tokenEndpoint.startsWith('https://')).toBe(true);
+      expect(config.revokeEndpoint.startsWith('https://')).toBe(true);
+
+      if (originalApiUrl) {
+        process.env.CLERKLY_GOOGLE_API_URL = originalApiUrl;
+      }
+    });
+
+    /* Preconditions: Same client ID provided multiple times
+       Action: Call getOAuthConfig repeatedly
+       Assertions: Returns identical config each time
+       Requirements: google-oauth-auth.10.1 */
+    it('should return identical config for the same client ID', () => {
+      const clientId = 'consistent-client-id';
+      const config1 = getOAuthConfig(clientId);
+      const config2 = getOAuthConfig(clientId);
+
+      expect(config1).toEqual(config2);
+    });
+
     /* Preconditions: Custom client ID provided, CLERKLY_OAUTH_CLIENT_ID also set
        Action: Call getOAuthConfig with custom client ID
        Assertions: Custom client ID takes precedence over environment variable

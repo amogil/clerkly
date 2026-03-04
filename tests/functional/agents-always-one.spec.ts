@@ -6,16 +6,15 @@
    - Agent has default name "New Agent"
    Requirements: agents.2.7, agents.2.8, agents.2.11 */
 
-import { test, expect, _electron as electron, ElectronApplication, Page } from '@playwright/test';
-import path from 'path';
-import { createMockOAuthServer } from './helpers/electron';
+import { test, expect, ElectronApplication, Page } from '@playwright/test';
+import { createMockOAuthServer, activeChat, launchElectronWithMockOAuth } from './helpers/electron';
 import type { MockOAuthServer } from './helpers/mock-oauth-server';
 import { completeOAuthFlow } from './helpers/electron';
 
 let mockServer: MockOAuthServer;
 
 test.beforeAll(async () => {
-  mockServer = await createMockOAuthServer(8895);
+  mockServer = await createMockOAuthServer();
 });
 
 test.afterAll(async () => {
@@ -38,30 +37,9 @@ test.describe('Agents - Auto-create First Agent', () => {
       family_name: 'Test User',
     });
 
-    // Create unique temp directory for this test
-    const testDataPath = path.join(
-      require('os').tmpdir(),
-      `clerkly-agents-test-${Date.now()}-${Math.random().toString(36).substring(7)}`
-    );
-
-    // Launch Electron app with clean state (no authentication)
-    electronApp = await electron.launch({
-      args: [
-        path.join(__dirname, '../../dist/main/main/index.js'),
-        '--user-data-dir',
-        testDataPath,
-      ],
-      env: {
-        ...process.env,
-        NODE_ENV: 'test',
-        CLERKLY_GOOGLE_API_URL: mockServer.getBaseUrl(),
-        CLERKLY_OAUTH_CLIENT_ID: 'test-client-id-12345',
-        CLERKLY_OAUTH_CLIENT_SECRET: 'test-client-secret-67890',
-      },
-    });
-
-    window = await electronApp.firstWindow();
-    await window.waitForLoadState('domcontentloaded');
+    const context = await launchElectronWithMockOAuth(mockServer);
+    electronApp = context.app;
+    window = context.window;
   });
 
   test.afterEach(async () => {
@@ -97,7 +75,7 @@ test.describe('Agents - Auto-create First Agent', () => {
     await expect(agentTitle).toBeVisible({ timeout: 5000 });
 
     // Verify that the input field is enabled (not disabled)
-    const inputField = window.locator('textarea[placeholder*="Ask"]');
+    const inputField = activeChat(window).textarea;
     await expect(inputField).toBeEnabled();
   });
 
@@ -134,7 +112,7 @@ test.describe('Agents - Auto-create First Agent', () => {
     await expect(newAgentTitle).toBeVisible({ timeout: 5000 });
 
     // Verify that the input field is still enabled
-    const inputField = window.locator('textarea[placeholder*="Ask"]');
+    const inputField = activeChat(window).textarea;
     await expect(inputField).toBeEnabled();
   });
 
@@ -181,11 +159,11 @@ test.describe('Agents - Auto-create First Agent', () => {
     await expect(newChatButton).toBeVisible();
 
     // 3. Messages area (may be empty but should exist)
-    const messagesArea = window.locator('[data-testid="messages-area"]');
+    const messagesArea = activeChat(window).messagesArea;
     await expect(messagesArea).toBeVisible();
 
     // 4. Input field
-    const inputField = window.locator('textarea[placeholder*="Ask"]');
+    const inputField = activeChat(window).textarea;
     await expect(inputField).toBeVisible();
     await expect(inputField).toBeEnabled();
 

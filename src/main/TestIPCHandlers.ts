@@ -12,6 +12,7 @@ import type { MessageManager } from './agents/MessageManager';
 import type { AuthIPCHandlers } from './auth/AuthIPCHandlers';
 import type { OAuthClientManager } from './auth/OAuthClientManager';
 import { Logger } from './Logger';
+import { NO_USER_LOGGED_IN_ERROR } from '../shared/errors/userErrors';
 
 const logger = Logger.create('TestIPCHandlers');
 
@@ -127,20 +128,19 @@ export function registerTestIPCHandlers(
       try {
         const userId = userManager.getCurrentUserId();
         if (!userId) {
-          throw new Error('No user logged in');
+          throw new Error(NO_USER_LOGGED_IN_ERROR);
         }
 
         const agent = agentManager.create(userId);
         const oldTimestamp = new Date(Date.now() - minutesAgo * 60 * 1000).toISOString();
 
         const payload = {
-          kind: 'user' as const,
           data: { text: 'Test message from the past' },
         };
 
         // Create message with old timestamp - this will trigger MESSAGE_CREATED event
         // which will update agent's updatedAt to match the message timestamp
-        messageManager.create(agent.agentId, payload, oldTimestamp);
+        messageManager.create(agent.agentId, 'user', payload, null, oldTimestamp);
 
         return {
           success: true,
@@ -376,10 +376,9 @@ export function registerTestIPCHandlers(
 
       try {
         const payload = {
-          kind: 'llm' as const,
           data: { text },
         };
-        messageManager.create(agentId, payload);
+        messageManager.create(agentId, 'llm', payload, null);
         logger.info(`Test: Created agent message for agent ${agentId}`);
         return { success: true };
       } catch (error: unknown) {

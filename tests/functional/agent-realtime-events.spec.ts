@@ -5,9 +5,14 @@
  * Requirements: agents.12
  */
 
-import { test, expect, _electron as electron, ElectronApplication, Page } from '@playwright/test';
-import path from 'path';
-import { completeOAuthFlow, createMockOAuthServer } from './helpers/electron';
+import { test, expect, ElectronApplication, Page } from '@playwright/test';
+import {
+  completeOAuthFlow,
+  createMockOAuthServer,
+  activeChat,
+  launchElectronWithMockOAuth,
+  expectAgentsVisible,
+} from './helpers/electron';
 import type { MockOAuthServer } from './helpers/mock-oauth-server';
 
 let electronApp: ElectronApplication;
@@ -15,7 +20,7 @@ let window: Page;
 let mockServer: MockOAuthServer;
 
 test.beforeAll(async () => {
-  mockServer = await createMockOAuthServer(8901);
+  mockServer = await createMockOAuthServer();
 });
 
 test.afterAll(async () => {
@@ -25,29 +30,15 @@ test.afterAll(async () => {
 });
 
 test.beforeEach(async () => {
-  // Create unique temp directory for this test
-  const testDataPath = path.join(
-    require('os').tmpdir(),
-    `clerkly-realtime-test-${Date.now()}-${Math.random().toString(36).substring(7)}`
-  );
-
-  electronApp = await electron.launch({
-    args: [path.join(__dirname, '../../dist/main/main/index.js'), '--user-data-dir', testDataPath],
-    env: {
-      ...process.env,
-      NODE_ENV: 'test',
-      ELECTRON_DISABLE_SECURITY_WARNINGS: 'true',
-      CLERKLY_GOOGLE_API_URL: mockServer.getBaseUrl(),
-      CLERKLY_OAUTH_CLIENT_ID: 'test-client-id',
-      CLERKLY_OAUTH_CLIENT_SECRET: 'test-client-secret',
-    },
+  const context = await launchElectronWithMockOAuth(mockServer, {
+    CLERKLY_OAUTH_CLIENT_ID: 'test-client-id',
+    CLERKLY_OAUTH_CLIENT_SECRET: 'test-client-secret',
   });
-
-  window = await electronApp.firstWindow();
-  await window.waitForLoadState('domcontentloaded');
+  electronApp = context.app;
+  window = context.window;
 
   await completeOAuthFlow(electronApp, window);
-  await expect(window.locator('[data-testid="agents"]')).toBeVisible({ timeout: 10000 });
+  await expectAgentsVisible(window, 10000);
 });
 
 test.afterEach(async () => {
@@ -114,7 +105,7 @@ test.describe('Agent Real-time Events', () => {
     // Create second agent
     const newChatButton = window.locator('div[title="New chat"]');
     await newChatButton.click();
-    await window.waitForTimeout(500);
+    await expect(window.locator('[data-testid^="agent-icon-"]')).toHaveCount(2, { timeout: 5000 });
 
     const agentIcons = window.locator('[data-testid^="agent-icon-"]');
 
@@ -127,13 +118,13 @@ test.describe('Agent Real-time Events', () => {
 
     // Switch to second agent
     await secondIcon.click();
-    await window.waitForTimeout(300);
+    await expect(activeChat(window).textarea).toBeVisible();
 
     // Send message (triggers agent.updated event)
-    const messageInput = window.locator('textarea[placeholder*="Ask"]');
+    const messageInput = activeChat(window).textarea;
     await messageInput.fill('Update agent');
     await messageInput.press('Enter');
-    await window.waitForTimeout(500);
+    await expect(activeChat(window).userMessages).toHaveCount(1, { timeout: 5000 });
 
     // Agent should move to first position
     const firstIcon = agentIcons.nth(0);
@@ -150,9 +141,9 @@ test.describe('Agent Real-time Events', () => {
     // Create multiple agents
     const newChatButton = window.locator('div[title="New chat"]');
     await newChatButton.click();
-    await window.waitForTimeout(500);
+    await expect(window.locator('[data-testid^="agent-icon-"]')).toHaveCount(2, { timeout: 5000 });
     await newChatButton.click();
-    await window.waitForTimeout(500);
+    await expect(window.locator('[data-testid^="agent-icon-"]')).toHaveCount(3, { timeout: 5000 });
 
     const agentIcons = window.locator('[data-testid^="agent-icon-"]');
     const initialCount = await agentIcons.count();
@@ -176,20 +167,16 @@ test.describe('Agent Real-time Events', () => {
      Requirements: agents.12.4, agents.12.7 */
   test('should add message on message.created event', async () => {
     // Get initial message count
-    const messages = window.locator('[data-testid="message"]');
+    const messages = activeChat(window).messages;
     const initialCount = await messages.count();
 
     // Send message
-    const messageInput = window.locator('textarea[placeholder*="Ask"]');
+    const messageInput = activeChat(window).textarea;
     await messageInput.fill('Test message for event');
     await messageInput.press('Enter');
 
-    // Wait for event to propagate
-    await window.waitForTimeout(500);
-
-    // Message should appear
-    const newCount = await messages.count();
-    expect(newCount).toBe(initialCount + 1);
+    // Wait for message to appear
+    await expect(messages).toHaveCount(initialCount + 1, { timeout: 5000 });
 
     // Message content should be correct
     const lastMessage = messages.last();
@@ -203,7 +190,7 @@ test.describe('Agent Real-time Events', () => {
      Requirements: agents.12.5, agents.12.7 */
   test('should update message on message.updated event', async () => {
     // Send message
-    const messageInput = window.locator('textarea[placeholder*="Ask"]');
+    const messageInput = activeChat(window).textarea;
     await messageInput.fill('Initial message');
     await messageInput.press('Enter');
 
@@ -229,22 +216,23 @@ test.describe('Agent Real-time Events', () => {
      Assertions: Agent status recalculates
      Requirements: agents.12.8 */
   test('should recalculate status on message events', async () => {
-    // Get initial status
+    // Get initial status — color lives on agent-avatar-icon (child div inside motion.div)
     const agentIcon = window.locator('[data-testid^="agent-icon-"]').first();
-    let classes = await agentIcon.getAttribute('class');
+    const agentAvatarIcon = agentIcon.locator('[data-testid="agent-avatar-icon"]');
+    let classes = await agentAvatarIcon.getAttribute('class');
 
     // Initial status can be "new" (sky-400) or "in-progress" (blue-500)
     const hasInitialStatus = classes?.includes('bg-sky-400') || classes?.includes('bg-blue-500');
     expect(hasInitialStatus).toBe(true);
 
     // Send message - status should change
-    const messageInput = window.locator('textarea[placeholder*="Ask"]');
+    const messageInput = activeChat(window).textarea;
     await messageInput.fill('Change status');
     await messageInput.press('Enter');
-    await window.waitForTimeout(500);
+    await expect(activeChat(window).userMessages).toHaveCount(1, { timeout: 5000 });
 
     // Status should update (to in-progress or other)
-    classes = await agentIcon.getAttribute('class');
+    classes = await agentAvatarIcon.getAttribute('class');
     expect(classes).toMatch(/bg-sky-400|bg-blue-500|bg-amber-500/);
 
     // Header status should also update

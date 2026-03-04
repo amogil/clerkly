@@ -45,6 +45,7 @@ export class ErrorNotificationManager {
   private logger = Logger.create('ErrorNotificationManager');
   private notifications: ErrorNotification[] = [];
   private listeners: ((notifications: ErrorNotification[]) => void)[] = [];
+  private dismissTimers = new Map<string, ReturnType<typeof setTimeout>>();
   private readonly AUTO_DISMISS_DELAY = 15000; // 15 seconds
 
   /**
@@ -83,15 +84,19 @@ export class ErrorNotificationManager {
 
     // Requirements: error-notifications.1.3 - Auto-dismiss after 15 seconds
     // Property: 22
-    setTimeout(() => {
+    const timerId = setTimeout(() => {
+      this.dismissTimers.delete(notification.id);
       this.dismissNotification(notification.id);
     }, this.AUTO_DISMISS_DELAY);
+    this.dismissTimers.set(notification.id, timerId);
+
+    // Prevent test workers from being kept alive by long auto-dismiss timers.
+    if (typeof (timerId as { unref?: () => void }).unref === 'function') {
+      (timerId as { unref: () => void }).unref();
+    }
 
     // Requirements: error-notifications.1.4 - Log errors for debugging
-    Logger.info(
-      'ErrorNotificationManager',
-      `[ErrorNotificationManager] Notification shown: ${notification}`
-    );
+    Logger.info('ErrorNotificationManager', 'Notification registered');
 
     return notification.id;
   }
@@ -117,6 +122,12 @@ export class ErrorNotificationManager {
   dismissNotification(id: string): void {
     const index = this.notifications.findIndex((n) => n.id === id);
     if (index !== -1) {
+      const dismissTimer = this.dismissTimers.get(id);
+      if (dismissTimer) {
+        clearTimeout(dismissTimer);
+        this.dismissTimers.delete(id);
+      }
+
       this.notifications.splice(index, 1);
       this.notifyListeners();
       Logger.info(

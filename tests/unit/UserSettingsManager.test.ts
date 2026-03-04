@@ -5,6 +5,7 @@ import * as path from 'path';
 import * as os from 'os';
 import { UserSettingsManager } from '../../src/main/UserSettingsManager';
 import { DatabaseManager } from '../../src/main/DatabaseManager';
+import { NO_USER_LOGGED_IN_ERROR } from '../../src/shared/errors/userErrors';
 
 describe('UserSettingsManager', () => {
   let dataManager: UserSettingsManager;
@@ -307,7 +308,7 @@ describe('UserSettingsManager', () => {
 
       const result = dataManager.saveData('test-key', 'test-value');
       expect(result.success).toBe(false);
-      expect(result.error).toContain('No user logged in');
+      expect(result.error).toContain(NO_USER_LOGGED_IN_ERROR);
     });
 
     /* Preconditions: No user logged in (getCurrentUserId returns null)
@@ -322,7 +323,7 @@ describe('UserSettingsManager', () => {
 
       const result = dataManager.loadData('test-key');
       expect(result.success).toBe(false);
-      expect(result.error).toContain('No user logged in');
+      expect(result.error).toContain(NO_USER_LOGGED_IN_ERROR);
     });
 
     /* Preconditions: No user logged in (getCurrentUserId returns null)
@@ -337,7 +338,7 @@ describe('UserSettingsManager', () => {
 
       const result = dataManager.deleteData('test-key');
       expect(result.success).toBe(false);
-      expect(result.error).toContain('No user logged in');
+      expect(result.error).toContain(NO_USER_LOGGED_IN_ERROR);
     });
   });
 });

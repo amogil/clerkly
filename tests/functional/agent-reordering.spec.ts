@@ -6,16 +6,20 @@
    - Order is maintained by updatedAt timestamp
    Requirements: agents.1.3, agents.1.4, agents.5.7 */
 
-import { test, expect, _electron as electron, ElectronApplication, Page } from '@playwright/test';
-import path from 'path';
-import { createMockOAuthServer } from './helpers/electron';
+import { test, expect, ElectronApplication, Page } from '@playwright/test';
+import {
+  createMockOAuthServer,
+  activeChat,
+  launchElectronWithMockOAuth,
+  completeOAuthFlow,
+  expectAgentsVisible,
+} from './helpers/electron';
 import type { MockOAuthServer } from './helpers/mock-oauth-server';
-import { completeOAuthFlow } from './helpers/electron';
 
 let mockServer: MockOAuthServer;
 
 test.beforeAll(async () => {
-  mockServer = await createMockOAuthServer(8899);
+  mockServer = await createMockOAuthServer();
 });
 
 test.afterAll(async () => {
@@ -38,30 +42,9 @@ test.describe('Agent Reordering', () => {
       family_name: 'Test User',
     });
 
-    // Create unique temp directory for this test
-    const testDataPath = path.join(
-      require('os').tmpdir(),
-      `clerkly-reorder-test-${Date.now()}-${Math.random().toString(36).substring(7)}`
-    );
-
-    // Launch Electron app with clean state
-    electronApp = await electron.launch({
-      args: [
-        path.join(__dirname, '../../dist/main/main/index.js'),
-        '--user-data-dir',
-        testDataPath,
-      ],
-      env: {
-        ...process.env,
-        NODE_ENV: 'test',
-        CLERKLY_GOOGLE_API_URL: mockServer.getBaseUrl(),
-        CLERKLY_OAUTH_CLIENT_ID: 'test-client-id-12345',
-        CLERKLY_OAUTH_CLIENT_SECRET: 'test-client-secret-67890',
-      },
-    });
-
-    window = await electronApp.firstWindow();
-    await window.waitForLoadState('domcontentloaded');
+    const context = await launchElectronWithMockOAuth(mockServer);
+    electronApp = context.app;
+    window = context.window;
 
     // Complete OAuth flow
     await completeOAuthFlow(electronApp, window);
@@ -77,7 +60,7 @@ test.describe('Agent Reordering', () => {
      Requirements: agents.1.3, agents.1.4, agents.5.7 */
   test('should move agent to top of list after sending message', async () => {
     // Wait for agents page to load
-    await expect(window.locator('[data-testid="agents"]')).toBeVisible({ timeout: 5000 });
+    await expectAgentsVisible(window, 5000);
 
     // Wait for first agent to be auto-created
     await window.waitForTimeout(1000);
@@ -109,7 +92,7 @@ test.describe('Agent Reordering', () => {
     expect(lastAgentId).not.toBe(firstAgentId);
 
     // Send a message to the last agent
-    const textarea = window.locator('textarea[placeholder*="Ask"]');
+    const textarea = activeChat(window).textarea;
     await expect(textarea).toBeVisible();
     await textarea.fill('Test message to update timestamp');
     await textarea.press('Enter');
@@ -126,29 +109,29 @@ test.describe('Agent Reordering', () => {
      Requirements: agents.1.3, agents.1.4, agents.5.7 */
   test('should bring hidden agent to header after sending message', async () => {
     // Wait for agents page to load
-    await expect(window.locator('[data-testid="agents"]')).toBeVisible({ timeout: 5000 });
+    await expectAgentsVisible(window, 5000);
 
     // Wait for first agent to be auto-created
     await window.waitForTimeout(1000);
 
-    // Create 6 more agents (total 7 agents, some will be hidden)
+    // Create 9 more agents (total 10 agents, some will be hidden)
     const newAgentButton = window.locator('div[title="New chat"]');
     await expect(newAgentButton).toBeVisible({ timeout: 3000 });
 
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < 9; i++) {
       await newAgentButton.click();
       await window.waitForTimeout(300);
     }
 
     // Send a message to the first agent to ensure it has history
-    const textarea = window.locator('textarea[placeholder*="Ask"]');
+    const textarea = activeChat(window).textarea;
     await expect(textarea).toBeVisible();
     await textarea.fill('Initial message');
     await textarea.press('Enter');
     await window.waitForTimeout(500);
 
     // Open AllAgents page by clicking +N button
-    const allAgentsButton = window.locator('div.rounded-full.bg-muted:has-text("+")');
+    const allAgentsButton = window.locator('[data-testid="all-agents-button"]');
     await allAgentsButton.click();
     await window.waitForTimeout(500);
 
@@ -158,7 +141,7 @@ test.describe('Agent Reordering', () => {
     // Get all agent cards
     const agentCards = window.locator('[data-testid^="agent-card-"]');
     const cardCount = await agentCards.count();
-    expect(cardCount).toBeGreaterThanOrEqual(7);
+    expect(cardCount).toBeGreaterThanOrEqual(10);
 
     // Click on the last agent card (oldest)
     const lastCard = agentCards.last();
@@ -169,16 +152,29 @@ test.describe('Agent Reordering', () => {
     // Verify we're back to chat view
     await expect(window.locator('text=All Agents')).not.toBeVisible();
 
-    // Send a message to this agent
-    await expect(textarea).toBeVisible();
-    await textarea.fill('Message to bring agent to top');
-    await textarea.press('Enter');
-    await window.waitForTimeout(1000);
+    // Re-acquire active chat input after agent selection from AllAgents.
+    // The previous locator can point to stale/hidden chat instance.
+    const selectedAgentTextarea = activeChat(window).textarea;
+    await expect(selectedAgentTextarea).toBeVisible();
+    await selectedAgentTextarea.fill('Message to bring agent to top');
+    await selectedAgentTextarea.press('Enter');
 
     // Get agent icons in header
     const agentIcons = window.locator('[data-testid^="agent-icon-"]');
 
-    // The agent should now be first in the list
+    // Wait until selected agent moves to the first header slot after updatedAt refresh.
+    await window.waitForFunction(
+      (expectedAgentId) => {
+        const firstIcon = document.querySelector('[data-testid^="agent-icon-"]');
+        const firstIconTestId = firstIcon?.getAttribute('data-testid');
+        const firstAgentId = firstIconTestId?.replace('agent-icon-', '');
+        return firstAgentId === expectedAgentId;
+      },
+      lastCardId?.replace('agent-card-', ''),
+      { timeout: 10000 }
+    );
+
+    // The agent should now be first in the list.
     const firstIconId = await agentIcons.first().getAttribute('data-testid');
 
     // Extract agent ID from card and icon IDs
@@ -194,7 +190,7 @@ test.describe('Agent Reordering', () => {
      Requirements: agents.1.3, agents.1.4, agents.5.7 */
   test('should maintain correct order when multiple agents are updated', async () => {
     // Wait for agents page to load
-    await expect(window.locator('[data-testid="agents"]')).toBeVisible({ timeout: 5000 });
+    await expectAgentsVisible(window, 5000);
 
     // Wait for first agent to be auto-created
     await window.waitForTimeout(1000);
@@ -221,7 +217,7 @@ test.describe('Agent Reordering', () => {
     await agentIcons.nth(2).click();
     await window.waitForTimeout(300);
 
-    const textarea = window.locator('textarea[placeholder*="Ask"]');
+    const textarea = activeChat(window).textarea;
     await textarea.fill('Message to agent 3');
     await textarea.press('Enter');
 
@@ -298,28 +294,28 @@ test.describe('Agent Reordering', () => {
      Requirements: agents.1.3, agents.1.4, agents.5.7 */
   test('should reorder immediately after message from AllAgents selection', async () => {
     // Wait for agents page to load
-    await expect(window.locator('[data-testid="agents"]')).toBeVisible({ timeout: 5000 });
+    await expectAgentsVisible(window, 5000);
 
     // Wait for first agent to be auto-created
     await window.waitForTimeout(1000);
 
-    // Create 5 more agents (total 6 agents, so +1 button will appear)
+    // Create 9 more agents (total 10 agents, so +N button will appear)
     const newAgentButton = window.locator('div[title="New chat"]');
     await expect(newAgentButton).toBeVisible({ timeout: 3000 });
 
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 9; i++) {
       await newAgentButton.click();
       await window.waitForTimeout(300);
     }
 
     // Send message to first agent to create history
-    const textarea = window.locator('textarea[placeholder*="Ask"]');
+    const textarea = activeChat(window).textarea;
     await textarea.fill('Initial message');
     await textarea.press('Enter');
     await window.waitForTimeout(500);
 
     // Open AllAgents by clicking +N button
-    const allAgentsButton = window.locator('div.rounded-full.bg-muted:has-text("+")');
+    const allAgentsButton = window.locator('[data-testid="all-agents-button"]');
     await allAgentsButton.click();
     await window.waitForTimeout(500);
 

@@ -8,6 +8,7 @@ import { eq } from 'drizzle-orm';
 import * as schema from '../../../../src/main/db/schema';
 import { agents } from '../../../../src/main/db/schema';
 import { AgentsRepository } from '../../../../src/main/db/repositories/AgentsRepository';
+import { NO_USER_LOGGED_IN_ERROR } from '../../../../src/shared/errors/userErrors';
 
 describe('AgentsRepository', () => {
   let sqlite: Database.Database;
@@ -307,14 +308,14 @@ describe('AgentsRepository', () => {
        Requirements: user-data-isolation.6.4 */
     it('should throw error when no user logged in', () => {
       const noUserRepo = new AgentsRepository(db, () => {
-        throw new Error('No user logged in');
+        throw new Error(NO_USER_LOGGED_IN_ERROR);
       });
 
-      expect(() => noUserRepo.list()).toThrow('No user logged in');
-      expect(() => noUserRepo.create('Test')).toThrow('No user logged in');
-      expect(() => noUserRepo.findById('test')).toThrow('No user logged in');
-      expect(() => noUserRepo.update('test', { name: 'New' })).toThrow('No user logged in');
-      expect(() => noUserRepo.archive('test')).toThrow('No user logged in');
+      expect(() => noUserRepo.list()).toThrow(NO_USER_LOGGED_IN_ERROR);
+      expect(() => noUserRepo.create('Test')).toThrow(NO_USER_LOGGED_IN_ERROR);
+      expect(() => noUserRepo.findById('test')).toThrow(NO_USER_LOGGED_IN_ERROR);
+      expect(() => noUserRepo.update('test', { name: 'New' })).toThrow(NO_USER_LOGGED_IN_ERROR);
+      expect(() => noUserRepo.archive('test')).toThrow(NO_USER_LOGGED_IN_ERROR);
     });
   });
 });

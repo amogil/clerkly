@@ -1,7 +1,7 @@
 // Requirements: error-notifications.2.1, error-notifications.2.2, error-notifications.2.3, error-notifications.2.4, error-notifications.2.5, error-notifications.2.6
 
 import { toast } from 'sonner';
-
+import { isNoUserLoggedInError } from '../../shared/errors/userErrors';
 interface ApiCallOptions {
   /**
    * If true, don't show toast notification on error
@@ -31,8 +31,11 @@ export async function callApi<T>(
     }
 
     // Requirements: error-notifications.2.3 - Show toast on IPC error
+    const errorMessage = result.error || 'Unknown error';
+    if (isNoUserLoggedInError(errorMessage)) {
+      return null;
+    }
     if (!options?.silent) {
-      const errorMessage = result.error || 'Unknown error';
       toast.error(`${context}: ${errorMessage}`);
     }
 

@@ -29,7 +29,7 @@ test.describe('Authentication Flow', () => {
   let mockServer: MockOAuthServer;
 
   test.beforeAll(async () => {
-    mockServer = await createMockOAuthServer(8891);
+    mockServer = await createMockOAuthServer();
   });
 
   test.afterAll(async () => {
@@ -125,7 +125,7 @@ test.describe('Authentication Flow', () => {
     // Take screenshot
     await context.window.screenshot({ path: 'playwright-report/login-screen-no-tokens.png' });
 
-    // Note: Full token persistence is tested in unit and property tests
+    // Note: Full token persistence is tested in unit tests
     // Functional test would require real OAuth flow or complex DB setup
   });
 
@@ -254,7 +254,7 @@ test('should NOT show loader immediately after login click, only after deep link
   let mockServer: MockOAuthServer | undefined;
 
   try {
-    mockServer = await createMockOAuthServer(8891);
+    mockServer = await createMockOAuthServer();
     // Set user profile data
     mockServer.setUserProfile({
       id: '123456789',

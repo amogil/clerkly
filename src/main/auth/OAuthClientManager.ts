@@ -614,7 +614,7 @@ export class OAuthClientManager {
       this.logger.info('Tokens cleared, profile data preserved in database');
     } catch (error: unknown) {
       // Requirements: error-notifications.1.1, error-notifications.1.4
-      // Note: Logout errors may include race conditions (e.g., "No user logged in")
+      // Note: Logout errors may include race conditions (e.g., NO_USER_LOGGED_IN_ERROR)
       // These will be filtered by shouldFilterError() in handleBackgroundError
       handleBackgroundError(error, 'Logout');
 

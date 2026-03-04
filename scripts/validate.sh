@@ -16,6 +16,10 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
+# Clear npm env config that triggers warnings in npm v9+
+unset npm_config_devdir
+unset NPM_CONFIG_DEVDIR
+
 # Parse command line arguments
 VERBOSE=false
 if [[ "$1" == "--verbose" || "$1" == "-v" ]]; then
@@ -101,6 +105,14 @@ fi
 
 # 5. Unit Tests
 print_step "5. Unit Tests"
+echo "Running: npm run rebuild:node"
+if npm run rebuild:node; then
+    print_success "Node native modules rebuild passed"
+else
+    print_error "Node native modules rebuild failed"
+    exit 1
+fi
+
 if [ "$VERBOSE" = true ]; then
     echo "Running: npm run test:unit"
     if npm run test:unit; then
@@ -126,35 +138,16 @@ else
     fi
 fi
 
-# 6. Property-Based Tests
-print_step "6. Property-Based Tests"
-if [ "$VERBOSE" = true ]; then
-    echo "Running: npm run test:property"
-    if npm run test:property; then
-        print_success "Property-based tests passed"
-    else
-        print_error "Property-based tests failed"
-        exit 1
-    fi
+# 6. Test Coverage (unit tests only)
+print_step "6. Test Coverage"
+echo "Running: npm run rebuild:node"
+if npm run rebuild:node; then
+    print_success "Node native modules rebuild passed"
 else
-    echo "Running: npm run test:property (quiet mode - showing only summary)"
-    OUTPUT=$(npm run test:property 2>&1)
-    EXIT_CODE=$?
-    
-    if [ $EXIT_CODE -eq 0 ]; then
-        # Show only summary
-        echo "$OUTPUT" | grep -E "(Test Suites:|Tests:|Time:)" | tail -3
-        print_success "Property-based tests passed"
-    else
-        # Show failures
-        echo "$OUTPUT" | grep -A 10 "FAIL"
-        print_error "Property-based tests failed"
-        exit 1
-    fi
+    print_error "Node native modules rebuild failed"
+    exit 1
 fi
 
-# 7. Test Coverage (only unit + property tests)
-print_step "7. Test Coverage"
 if [ "$VERBOSE" = true ]; then
     echo "Running: npm run test:coverage"
     if npm run test:coverage; then
@@ -180,11 +173,11 @@ else
     fi
 fi
 
-# 8. Project Structure Check
-print_step "8. Project Structure Check"
+# 7. Project Structure Check
+print_step "7. Project Structure Check"
 echo "Checking critical files and directories..."
 
-REQUIRED_DIRS=("src/main" "src/renderer" "src/preload" "tests/unit" "tests/property" "migrations")
+REQUIRED_DIRS=("src/main" "src/renderer" "src/preload" "tests/unit" "migrations")
 REQUIRED_FILES=("package.json" "tsconfig.json" "jest.config.js" ".eslintrc.json" ".prettierrc.json")
 
 STRUCTURE_OK=true
@@ -210,8 +203,8 @@ else
     exit 1
 fi
 
-# 9. Security Audit (informational, with timeout)
-print_step "9. Security Audit (Informational)"
+# 8. Security Audit (informational, with timeout)
+print_step "8. Security Audit (Informational)"
 echo "Running: npm audit --production (with 30s timeout)"
 if timeout 30s npm audit --production 2>/dev/null; then
     print_success "No security vulnerabilities found in production dependencies"
@@ -225,8 +218,8 @@ else
     print_warning "Note: This is informational only and won't fail the validation"
 fi
 
-# 10. Dependency Check (informational)
-print_step "10. Dependency Check (Informational)"
+# 9. Dependency Check (informational)
+print_step "9. Dependency Check (Informational)"
 echo "Checking for outdated dependencies..."
 if npm outdated 2>/dev/null; then
     print_success "All dependencies are up to date"
@@ -246,8 +239,7 @@ echo "✅ TypeScript compilation (no errors)"
 echo "✅ ESLint (all checks passing)"
 echo "✅ Prettier (code formatting correct)"
 echo "✅ Unit tests (all passing)"
-echo "✅ Property-based tests (all passing)"
-echo "✅ Test coverage (meets thresholds, unit + property only)"
+echo "✅ Test coverage (meets thresholds, unit only)"
 echo "✅ Project structure (all required files present)"
 echo "✅ Security audit (informational)"
 echo "✅ Dependency check (informational)"

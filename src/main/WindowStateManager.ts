@@ -4,6 +4,11 @@ import { screen } from 'electron';
 import type { IDatabaseManager } from './DatabaseManager';
 import { Logger } from './Logger';
 
+const DEFAULT_WINDOW_WIDTH = 900;
+const DEFAULT_WINDOW_HEIGHT = 800;
+const MIN_WINDOW_WIDTH = 350;
+const MIN_WINDOW_HEIGHT = 650;
+
 // Requirements: clerkly.3.8 - Use centralized Logger instead of console.*
 /**
  * Represents the state of the application window
@@ -145,7 +150,7 @@ export class WindowStateManager {
       if (state) {
         // Requirements: window-management.5.6
         if (this.isPositionValid(state.x, state.y)) {
-          return state;
+          return this.normalizeStateSize(state);
         }
       }
     } catch (error) {
@@ -178,7 +183,7 @@ export class WindowStateManager {
    * @example
    * ```typescript
    * const stateManager = new WindowStateManager(dbManager);
-   * const window = new BrowserWindow({ width: 800, height: 600 });
+   * const window = new BrowserWindow({ width: 900, height: 800 });
    *
    * // Save state when window is resized (window-management.5.1)
    * window.on('resize', () => {
@@ -234,13 +239,13 @@ export class WindowStateManager {
    *
    * This private method calculates the default window state when no saved state
    * exists or when the saved state is invalid. The window opens with a compact
-   * size of min(600, screenWidth) x min(400, screenHeight), centered on the screen.
+   * size of min(900, screenWidth) x min(800, screenHeight), centered on the screen.
    * This provides a focused interface for agent chats while allowing immediate resizing.
    *
    * The default state has isMaximized set to false, ensuring the window
    * opens in a compact size but remains resizable by the user.
    *
-   * Requirements: window-management.1.1, window-management.1.3, window-management.4.1, window-management.4.2, window-management.4.4
+   * Requirements: window-management.1.1, window-management.1.3, window-management.1.6, window-management.4.1, window-management.4.2, window-management.4.4
    *
    * @returns Default WindowState object with position, size, and maximized status
    *          calculated based on the primary display's dimensions.
@@ -249,28 +254,28 @@ export class WindowStateManager {
    * ```typescript
    * // For a 1920x1080 display with workAreaSize 1920x1055 (25px menu bar):
    * // Returns: {
-   * //   x: 660,
-   * //   y: 327,
-   * //   width: 600,
-   * //   height: 400,
+   * //   x: 510,
+   * //   y: 177,
+   * //   width: 900,
+   * //   height: 800,
    * //   isMaximized: false
    * // }
    *
    * // For a smaller 1366x768 display with workAreaSize 1366x743:
    * // Returns: {
-   * //   x: 383,
-   * //   y: 171,
-   * //   width: 600,
-   * //   height: 400,
+   * //   x: 233,
+   * //   y: 21,
+   * //   width: 900,
+   * //   height: 800,
    * //   isMaximized: false
    * // }
    *
    * // For a very small 800x600 display:
    * // Returns: {
-   * //   x: 100,
-   * //   y: 100,
-   * //   width: 600,
-   * //   height: 400,
+   * //   x: 0,
+   * //   y: 0,
+   * //   width: 800,
+   * //   height: 600,
    * //   isMaximized: false
    * // }
    * ```
@@ -279,11 +284,14 @@ export class WindowStateManager {
     const primaryDisplay = screen.getPrimaryDisplay();
     const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
 
-    // Requirements: window-management.1.1, window-management.4.2, window-management.4.4
-    // Window opens with size min(600, screenWidth) x min(400, screenHeight) on first launch
+    // Requirements: window-management.1.1, window-management.1.6, window-management.4.2, window-management.4.4
+    // Window opens with size min(900, screenWidth) x min(800, screenHeight) on first launch,
+    // but is never allowed to be smaller than 350x650.
     // This provides a focused interface for agent chats while allowing immediate resizing
-    const width = Math.min(600, screenWidth);
-    const height = Math.min(400, screenHeight);
+    const desiredWidth = Math.min(DEFAULT_WINDOW_WIDTH, screenWidth);
+    const desiredHeight = Math.min(DEFAULT_WINDOW_HEIGHT, screenHeight);
+    const width = this.clampDimension(desiredWidth, MIN_WINDOW_WIDTH, screenWidth);
+    const height = this.clampDimension(desiredHeight, MIN_WINDOW_HEIGHT, screenHeight);
 
     // Requirements: window-management.4.4 - Center window on screen
     const x = Math.floor((screenWidth - width) / 2);
@@ -297,6 +305,27 @@ export class WindowStateManager {
       height: height,
       isMaximized: false,
     };
+  }
+
+  // Requirements: window-management.1.6
+  private normalizeStateSize(state: WindowState): WindowState {
+    const primaryDisplay = screen.getPrimaryDisplay();
+    const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
+
+    return {
+      ...state,
+      width: this.clampDimension(state.width, MIN_WINDOW_WIDTH, screenWidth),
+      height: this.clampDimension(state.height, MIN_WINDOW_HEIGHT, screenHeight),
+    };
+  }
+
+  // Requirements: window-management.1.6
+  private clampDimension(value: number, min: number, max: number): number {
+    if (max < min) {
+      return max;
+    }
+
+    return Math.max(min, Math.min(value, max));
   }
 
   /**

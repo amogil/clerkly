@@ -6,6 +6,7 @@ import * as path from 'path';
 import * as os from 'os';
 import { DatabaseManager } from '../../src/main/DatabaseManager';
 import type { UserManager } from '../../src/main/auth/UserManager';
+import { NO_USER_LOGGED_IN_ERROR } from '../../src/shared/errors/userErrors';
 
 // Mock fs module for permission error tests
 jest.mock('fs', () => {
@@ -161,7 +162,7 @@ describe('DatabaseManager', () => {
       databaseManager.initialize(testStoragePath);
       // UserManager NOT set
 
-      expect(() => databaseManager.getCurrentUserIdStrict()).toThrow('No user logged in');
+      expect(() => databaseManager.getCurrentUserIdStrict()).toThrow(NO_USER_LOGGED_IN_ERROR);
     });
 
     /* Preconditions: DatabaseManager initialized, UserManager set but returns null
@@ -178,7 +179,7 @@ describe('DatabaseManager', () => {
 
       databaseManager.setUserManager(mockUserManagerNoUser);
 
-      expect(() => databaseManager.getCurrentUserIdStrict()).toThrow('No user logged in');
+      expect(() => databaseManager.getCurrentUserIdStrict()).toThrow(NO_USER_LOGGED_IN_ERROR);
     });
 
     /* Preconditions: DatabaseManager initialized, UserManager set with valid user
@@ -296,6 +297,28 @@ describe('DatabaseManager', () => {
       const db = new Database(testDbPath);
       expect(() => db.prepare('SELECT 1').get()).not.toThrow();
       db.close();
+    });
+
+    /* Preconditions: database file exists with corrupted content
+       Action: initialize DatabaseManager
+       Assertions: backup preserves original corrupted content
+       Requirements: clerkly.nfr.2.4, clerkly.2.6, clerkly.2.8, clerkly.nfr.4.4 */
+    it('should preserve corrupted database content in backup file', () => {
+      const corruptedContent = 'This is corrupted content that should be preserved';
+
+      originalFs.mkdirSync(testStoragePath, { recursive: true });
+      originalFs.writeFileSync(testDbPath, corruptedContent);
+
+      databaseManager = new DatabaseManager();
+      databaseManager.initialize(testStoragePath);
+
+      const files = originalFs.readdirSync(testStoragePath);
+      const backupFiles = files.filter((f: string) => f.startsWith('clerkly.db.backup-'));
+      expect(backupFiles.length).toBe(1);
+
+      const backupPath = path.join(testStoragePath, backupFiles[0]);
+      const backupContent = originalFs.readFileSync(backupPath, 'utf8');
+      expect(backupContent).toBe(corruptedContent);
     });
 
     /* Preconditions: storage directory cannot be created due to permission error (EACCES)
@@ -779,7 +802,7 @@ describe('DatabaseManager Repository Accessors', () => {
       databaseManager.initialize(testStoragePath);
       // UserManager NOT set
 
-      expect(() => databaseManager.settings.get('testKey')).toThrow('No user logged in');
+      expect(() => databaseManager.settings.get('testKey')).toThrow(NO_USER_LOGGED_IN_ERROR);
     });
 
     /* Preconditions: DatabaseManager initialized
@@ -862,7 +885,10 @@ describe('DatabaseManager Repository Accessors', () => {
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           agent_id TEXT NOT NULL,
           timestamp TEXT NOT NULL,
-          payload_json TEXT NOT NULL
+          payload_json TEXT NOT NULL,
+          usage_json TEXT,
+          kind TEXT NOT NULL DEFAULT 'user',
+          hidden INTEGER NOT NULL DEFAULT 0
         );
       `);
 

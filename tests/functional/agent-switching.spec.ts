@@ -5,15 +5,20 @@
  * Requirements: agents.3
  */
 
-import { test, expect, _electron as electron, ElectronApplication, Page } from '@playwright/test';
-import path from 'path';
-import { createMockOAuthServer, completeOAuthFlow } from './helpers/electron';
+import { test, expect, ElectronApplication, Page } from '@playwright/test';
+import {
+  createMockOAuthServer,
+  completeOAuthFlow,
+  activeChat,
+  launchElectronWithMockOAuth,
+  expectAgentsVisible,
+} from './helpers/electron';
 import type { MockOAuthServer } from './helpers/mock-oauth-server';
 
 let mockServer: MockOAuthServer;
 
 test.beforeAll(async () => {
-  mockServer = await createMockOAuthServer(8897);
+  mockServer = await createMockOAuthServer();
 });
 
 test.afterAll(async () => {
@@ -36,36 +41,15 @@ test.describe('Agent Switching', () => {
       family_name: 'Test User',
     });
 
-    // Create unique temp directory for this test
-    const testDataPath = path.join(
-      require('os').tmpdir(),
-      `clerkly-switching-test-${Date.now()}-${Math.random().toString(36).substring(7)}`
-    );
-
-    // Launch Electron app with clean state
-    electronApp = await electron.launch({
-      args: [
-        path.join(__dirname, '../../dist/main/main/index.js'),
-        '--user-data-dir',
-        testDataPath,
-      ],
-      env: {
-        ...process.env,
-        NODE_ENV: 'test',
-        CLERKLY_GOOGLE_API_URL: mockServer.getBaseUrl(),
-        CLERKLY_OAUTH_CLIENT_ID: 'test-client-id-12345',
-        CLERKLY_OAUTH_CLIENT_SECRET: 'test-client-secret-67890',
-      },
-    });
-
-    window = await electronApp.firstWindow();
-    await window.waitForLoadState('domcontentloaded');
+    const context = await launchElectronWithMockOAuth(mockServer);
+    electronApp = context.app;
+    window = context.window;
 
     // Complete OAuth flow to get to agents page
     await completeOAuthFlow(electronApp, window);
 
     // Wait for agents page to load
-    await expect(window.locator('[data-testid="agents"]')).toBeVisible({ timeout: 10000 });
+    await expectAgentsVisible(window, 10000);
   });
 
   test.afterEach(async () => {
@@ -143,12 +127,15 @@ test.describe('Agent Switching', () => {
     );
 
     // Send message to first agent (now active)
-    const messageInput = window.locator('textarea[placeholder*="Ask"]');
+    const messageInput = activeChat(window).textarea;
     await messageInput.fill('Message for agent 1');
     await messageInput.press('Enter');
 
-    // Wait for message to appear
-    await expect(window.locator('text=Message for agent 1')).toBeVisible({ timeout: 5000 });
+    // Wait for message to appear in active chat
+    const firstAgentMessage = activeChat(window).userMessages.filter({
+      hasText: 'Message for agent 1',
+    });
+    await expect(firstAgentMessage).toHaveCount(1, { timeout: 5000 });
 
     // Switch to second agent using ID
     await window.locator(`[data-testid="agent-icon-${secondAgentId}"]`).click();
@@ -157,8 +144,11 @@ test.describe('Agent Switching', () => {
     await messageInput.fill('Message for agent 2');
     await messageInput.press('Enter');
 
-    // Wait for message to appear
-    await expect(window.locator('text=Message for agent 2')).toBeVisible({ timeout: 5000 });
+    // Wait for message to appear in active chat
+    const secondAgentMessage = activeChat(window).userMessages.filter({
+      hasText: 'Message for agent 2',
+    });
+    await expect(secondAgentMessage).toHaveCount(1, { timeout: 5000 });
 
     // Switch back to first agent using ID
     await window.locator(`[data-testid="agent-icon-${firstAgentId}"]`).click();
@@ -170,8 +160,12 @@ test.describe('Agent Switching', () => {
     );
 
     // Check that first agent's message is displayed
-    await expect(window.locator('text=Message for agent 1')).toBeVisible({ timeout: 5000 });
-    await expect(window.locator('text=Message for agent 2')).not.toBeVisible();
+    await expect(
+      activeChat(window).userMessages.filter({ hasText: 'Message for agent 1' })
+    ).toHaveCount(1, { timeout: 5000 });
+    await expect(
+      activeChat(window).userMessages.filter({ hasText: 'Message for agent 2' })
+    ).toHaveCount(0);
 
     // Switch to second agent using ID
     await window.locator(`[data-testid="agent-icon-${secondAgentId}"]`).click();
@@ -183,8 +177,12 @@ test.describe('Agent Switching', () => {
     );
 
     // Check that second agent's message is displayed
-    await expect(window.locator('text=Message for agent 2')).toBeVisible({ timeout: 5000 });
-    await expect(window.locator('text=Message for agent 1')).not.toBeVisible();
+    await expect(
+      activeChat(window).userMessages.filter({ hasText: 'Message for agent 2' })
+    ).toHaveCount(1, { timeout: 5000 });
+    await expect(
+      activeChat(window).userMessages.filter({ hasText: 'Message for agent 1' })
+    ).toHaveCount(0);
   });
 
   /* Preconditions: Multiple agents exist

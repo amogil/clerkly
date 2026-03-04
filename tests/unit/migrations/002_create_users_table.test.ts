@@ -192,8 +192,18 @@ describe('Migration 002_create_users_table', () => {
         .get();
       expect(tableExists).toBeDefined();
 
-      // Rollback all migrations after 002 (005, 004, 003)
-      let rollbackResult = migrationRunner.rollbackLastMigration(); // 005
+      // Rollback all migrations after 002 (010, 009, 008, 007, 006, 005, 004, 003)
+      let rollbackResult = migrationRunner.rollbackLastMigration(); // 010
+      expect(rollbackResult.success).toBe(true);
+      rollbackResult = migrationRunner.rollbackLastMigration(); // 009
+      expect(rollbackResult.success).toBe(true);
+      rollbackResult = migrationRunner.rollbackLastMigration(); // 008
+      expect(rollbackResult.success).toBe(true);
+      rollbackResult = migrationRunner.rollbackLastMigration(); // 007
+      expect(rollbackResult.success).toBe(true);
+      rollbackResult = migrationRunner.rollbackLastMigration(); // 006
+      expect(rollbackResult.success).toBe(true);
+      rollbackResult = migrationRunner.rollbackLastMigration(); // 005
       expect(rollbackResult.success).toBe(true);
       rollbackResult = migrationRunner.rollbackLastMigration(); // 004
       expect(rollbackResult.success).toBe(true);
@@ -226,8 +236,18 @@ describe('Migration 002_create_users_table', () => {
         .get();
       expect(indexExists).toBeDefined();
 
-      // Rollback all migrations after 002 (005, 004, 003)
-      let rollbackResult = migrationRunner.rollbackLastMigration(); // 005
+      // Rollback all migrations after 002 (010, 009, 008, 007, 006, 005, 004, 003)
+      let rollbackResult = migrationRunner.rollbackLastMigration(); // 010
+      expect(rollbackResult.success).toBe(true);
+      rollbackResult = migrationRunner.rollbackLastMigration(); // 009
+      expect(rollbackResult.success).toBe(true);
+      rollbackResult = migrationRunner.rollbackLastMigration(); // 008
+      expect(rollbackResult.success).toBe(true);
+      rollbackResult = migrationRunner.rollbackLastMigration(); // 007
+      expect(rollbackResult.success).toBe(true);
+      rollbackResult = migrationRunner.rollbackLastMigration(); // 006
+      expect(rollbackResult.success).toBe(true);
+      rollbackResult = migrationRunner.rollbackLastMigration(); // 005
       expect(rollbackResult.success).toBe(true);
       rollbackResult = migrationRunner.rollbackLastMigration(); // 004
       expect(rollbackResult.success).toBe(true);

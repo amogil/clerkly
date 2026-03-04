@@ -3,9 +3,9 @@
    Assertions: userId is saved to DB, restored on restart, cleared on logout
    Requirements: user-data-isolation.1.3, user-data-isolation.1.4, user-data-isolation.1.6 */
 
-import { test, expect, _electron as electron, ElectronApplication, Page } from '@playwright/test';
+import { test, expect, ElectronApplication, Page } from '@playwright/test';
 import path from 'path';
-import { createMockOAuthServer } from './helpers/electron';
+import { createMockOAuthServer, launchElectronWithMockOAuth } from './helpers/electron';
 import type { MockOAuthServer } from './helpers/mock-oauth-server';
 import { completeOAuthFlow } from './helpers/electron';
 
@@ -15,7 +15,7 @@ let mockServer: MockOAuthServer;
 let testDataPath: string;
 
 test.beforeAll(async () => {
-  mockServer = await createMockOAuthServer(8892);
+  mockServer = await createMockOAuthServer();
 });
 
 test.afterAll(async () => {
@@ -54,19 +54,9 @@ test.afterEach(async () => {
    Property: 26 */
 test('should persist userId between app restarts', async () => {
   // Launch app first time
-  electronApp = await electron.launch({
-    args: [path.join(__dirname, '../../dist/main/main/index.js'), '--user-data-dir', testDataPath],
-    env: {
-      ...process.env,
-      NODE_ENV: 'test',
-      CLERKLY_GOOGLE_API_URL: mockServer.getBaseUrl(),
-      CLERKLY_OAUTH_CLIENT_ID: 'test-client-id-12345',
-      CLERKLY_OAUTH_CLIENT_SECRET: 'test-client-secret-67890',
-    },
-  });
-
-  window = await electronApp.firstWindow();
-  await window.waitForLoadState('domcontentloaded');
+  const initialContext = await launchElectronWithMockOAuth(mockServer, {}, testDataPath);
+  electronApp = initialContext.app;
+  window = initialContext.window;
 
   // Complete OAuth flow
   await completeOAuthFlow(electronApp, window);
@@ -82,19 +72,9 @@ test('should persist userId between app restarts', async () => {
   await new Promise((resolve) => setTimeout(resolve, 1000));
 
   // Reopen app with same data directory
-  electronApp = await electron.launch({
-    args: [path.join(__dirname, '../../dist/main/main/index.js'), '--user-data-dir', testDataPath],
-    env: {
-      ...process.env,
-      NODE_ENV: 'test',
-      CLERKLY_GOOGLE_API_URL: mockServer.getBaseUrl(),
-      CLERKLY_OAUTH_CLIENT_ID: 'test-client-id-12345',
-      CLERKLY_OAUTH_CLIENT_SECRET: 'test-client-secret-67890',
-    },
-  });
-
-  window = await electronApp.firstWindow();
-  await window.waitForLoadState('domcontentloaded');
+  const restartContext = await launchElectronWithMockOAuth(mockServer, {}, testDataPath);
+  electronApp = restartContext.app;
+  window = restartContext.window;
 
   // User should be automatically logged in (Agents screen visible)
   const agentsScreenAfterRestart = window.locator('[data-testid="agents-screen"]');
@@ -112,19 +92,9 @@ test('should persist userId between app restarts', async () => {
    Property: 27 */
 test('should clear userId on logout', async () => {
   // Launch app and authenticate
-  electronApp = await electron.launch({
-    args: [path.join(__dirname, '../../dist/main/main/index.js'), '--user-data-dir', testDataPath],
-    env: {
-      ...process.env,
-      NODE_ENV: 'test',
-      CLERKLY_GOOGLE_API_URL: mockServer.getBaseUrl(),
-      CLERKLY_OAUTH_CLIENT_ID: 'test-client-id-12345',
-      CLERKLY_OAUTH_CLIENT_SECRET: 'test-client-secret-67890',
-    },
-  });
-
-  window = await electronApp.firstWindow();
-  await window.waitForLoadState('domcontentloaded');
+  const authenticatedContext = await launchElectronWithMockOAuth(mockServer, {}, testDataPath);
+  electronApp = authenticatedContext.app;
+  window = authenticatedContext.window;
 
   // Complete OAuth flow
   await completeOAuthFlow(electronApp, window);
@@ -138,7 +108,7 @@ test('should clear userId on logout', async () => {
   await settingsButton.click();
 
   // Wait for Settings screen to load
-  await window.waitForTimeout(1000);
+  await window.waitForSelector('.sign-out-button', { timeout: 5000 });
 
   // Click logout button (sign-out-button class)
   const logoutButton = window.locator('.sign-out-button');
@@ -152,19 +122,9 @@ test('should clear userId on logout', async () => {
   await electronApp.close();
   await new Promise((resolve) => setTimeout(resolve, 1000));
 
-  electronApp = await electron.launch({
-    args: [path.join(__dirname, '../../dist/main/main/index.js'), '--user-data-dir', testDataPath],
-    env: {
-      ...process.env,
-      NODE_ENV: 'test',
-      CLERKLY_GOOGLE_API_URL: mockServer.getBaseUrl(),
-      CLERKLY_OAUTH_CLIENT_ID: 'test-client-id-12345',
-      CLERKLY_OAUTH_CLIENT_SECRET: 'test-client-secret-67890',
-    },
-  });
-
-  window = await electronApp.firstWindow();
-  await window.waitForLoadState('domcontentloaded');
+  const afterLogoutContext = await launchElectronWithMockOAuth(mockServer, {}, testDataPath);
+  electronApp = afterLogoutContext.app;
+  window = afterLogoutContext.window;
 
   // Should still show login screen (userId was cleared)
   const loginScreenAfterRestart = window.locator('[data-testid="login-screen"]');
@@ -185,19 +145,9 @@ test('should show Login if userId not found in users table', async () => {
   // 4. Verify login screen is shown
 
   // Launch app and authenticate
-  electronApp = await electron.launch({
-    args: [path.join(__dirname, '../../dist/main/main/index.js'), '--user-data-dir', testDataPath],
-    env: {
-      ...process.env,
-      NODE_ENV: 'test',
-      CLERKLY_GOOGLE_API_URL: mockServer.getBaseUrl(),
-      CLERKLY_OAUTH_CLIENT_ID: 'test-client-id-12345',
-      CLERKLY_OAUTH_CLIENT_SECRET: 'test-client-secret-67890',
-    },
-  });
-
-  window = await electronApp.firstWindow();
-  await window.waitForLoadState('domcontentloaded');
+  const relaunchContext = await launchElectronWithMockOAuth(mockServer, {}, testDataPath);
+  electronApp = relaunchContext.app;
+  window = relaunchContext.window;
 
   // Complete OAuth flow
   await completeOAuthFlow(electronApp, window);
@@ -216,19 +166,9 @@ test('should show Login if userId not found in users table', async () => {
   await electronApp.close();
   await new Promise((resolve) => setTimeout(resolve, 1000));
 
-  electronApp = await electron.launch({
-    args: [path.join(__dirname, '../../dist/main/main/index.js'), '--user-data-dir', testDataPath],
-    env: {
-      ...process.env,
-      NODE_ENV: 'test',
-      CLERKLY_GOOGLE_API_URL: mockServer.getBaseUrl(),
-      CLERKLY_OAUTH_CLIENT_ID: 'test-client-id-12345',
-      CLERKLY_OAUTH_CLIENT_SECRET: 'test-client-secret-67890',
-    },
-  });
-
-  window = await electronApp.firstWindow();
-  await window.waitForLoadState('domcontentloaded');
+  const corruptedStateContext = await launchElectronWithMockOAuth(mockServer, {}, testDataPath);
+  electronApp = corruptedStateContext.app;
+  window = corruptedStateContext.window;
 
   // Should show login screen (user not found, userId cleared)
   const loginScreen = window.locator('[data-testid="login-screen"]');

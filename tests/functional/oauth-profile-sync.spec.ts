@@ -1,9 +1,16 @@
 // Requirements: google-oauth-auth.3.6, google-oauth-auth.3.7, google-oauth-auth.3.8, account-profile.1.3, account-profile.1.4, account-profile.1.5, testing.3.1, testing.3.2, testing.3.6
 
 import { test, expect } from '@playwright/test';
-import { launchElectron, closeElectron, ElectronTestContext } from './helpers/electron';
-import { createMockOAuthServer } from './helpers/electron';
+import {
+  launchElectron,
+  closeElectron,
+  ElectronTestContext,
+  createMockOAuthServer,
+  getPkceState,
+  waitForPkceState,
+} from './helpers/electron';
 import type { MockOAuthServer } from './helpers/mock-oauth-server';
+import { isNoUserLoggedInError } from '../../src/shared/errors/userErrors';
 
 /**
  * Functional tests for synchronous profile fetch during OAuth authorization
@@ -25,7 +32,7 @@ test.describe('OAuth Profile Synchronous Fetch', () => {
   let mockServer: MockOAuthServer;
 
   test.beforeAll(async () => {
-    mockServer = await createMockOAuthServer(8890);
+    mockServer = await createMockOAuthServer();
   });
 
   test.afterAll(async () => {
@@ -78,24 +85,10 @@ test.describe('OAuth Profile Synchronous Fetch', () => {
       await (window as any).electron.ipcRenderer.invoke('auth:start-login');
     });
 
-    // Wait for OAuth flow to initialize AND for app to be fully initialized
-    // App needs to be initialized before it can handle deep links
-    await context.window.waitForTimeout(2000);
-
-    console.log('[TEST] OAuth flow started, getting PKCE state...');
-
     // Get PKCE state from OAuthClientManager
     // We need this to construct valid deep link
-    const pkceState = await context.app.evaluate(async () => {
-      // Access OAuthClientManager through global (set in main/index.ts for testing)
-      const { oauthClient } = (global as any).testContext || {};
-      if (!oauthClient || !oauthClient.pkceStorage) {
-        throw new Error('PKCE storage not found');
-      }
-      return oauthClient.pkceStorage.state;
-    });
-
-    console.log('[TEST] PKCE state retrieved:', pkceState);
+    await waitForPkceState(context.app);
+    const pkceState = await getPkceState(context.app);
 
     // Generate authorization code (mock OAuth server will accept any code starting with test_auth_code_)
     const authCode = `test_auth_code_${Date.now()}_${Math.random().toString(36).substring(7)}`;
@@ -138,7 +131,7 @@ test.describe('OAuth Profile Synchronous Fetch', () => {
         // If loadTokens throws error about no user logged in, no tokens
         const errorMessage = error instanceof Error ? error.message : '';
         return {
-          hasTokens: !errorMessage.includes('No user logged in'),
+          hasTokens: !isNoUserLoggedInError(errorMessage),
           accessToken: undefined,
           refreshToken: undefined,
         };
@@ -262,9 +255,10 @@ test.describe('OAuth Profile Synchronous Fetch', () => {
     // Requirements: google-oauth-auth.3.7 - Tokens should be cleared when profile fetch fails
     // Check directly through app context (not through IPC which requires email)
     const tokensCleared = await context.app.evaluate(async () => {
-      const { tokenStorage } = (global as any).testContext || {};
-      if (!tokenStorage) {
-        throw new Error('Token storage not found in test context');
+      const { tokenStorage, isNoUserLoggedInError: noUserErrorHelper } =
+        (global as any).testContext || {};
+      if (!tokenStorage || !noUserErrorHelper) {
+        throw new Error('Test context missing token storage or error helper');
       }
       try {
         const tokens = await tokenStorage.loadTokens();
@@ -272,7 +266,7 @@ test.describe('OAuth Profile Synchronous Fetch', () => {
       } catch (error: unknown) {
         // If loadTokens throws error about no user logged in, tokens are cleared
         const errorMessage = error instanceof Error ? error.message : '';
-        return errorMessage.includes('No user logged in');
+        return noUserErrorHelper(errorMessage);
       }
     });
 
@@ -514,9 +508,10 @@ test.describe('OAuth Profile Synchronous Fetch', () => {
     // Requirements: google-oauth-auth.3.7 - Tokens should be cleared when profile fetch fails
     // Check directly through app context (not through IPC which requires email)
     const tokensCleared = await context.app.evaluate(async () => {
-      const { tokenStorage } = (global as any).testContext || {};
-      if (!tokenStorage) {
-        throw new Error('Token storage not found in test context');
+      const { tokenStorage, isNoUserLoggedInError: noUserErrorHelper } =
+        (global as any).testContext || {};
+      if (!tokenStorage || !noUserErrorHelper) {
+        throw new Error('Test context missing token storage or error helper');
       }
       try {
         const tokens = await tokenStorage.loadTokens();
@@ -524,7 +519,7 @@ test.describe('OAuth Profile Synchronous Fetch', () => {
       } catch (error: unknown) {
         // If loadTokens throws error about no user logged in, tokens are cleared
         const errorMessage = error instanceof Error ? error.message : '';
-        return errorMessage.includes('No user logged in');
+        return noUserErrorHelper(errorMessage);
       }
     });
 

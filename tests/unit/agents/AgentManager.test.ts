@@ -9,6 +9,7 @@ import {
   AgentUpdatedEvent,
   AgentArchivedEvent,
 } from '../../../src/shared/events/types';
+import { AGENT_STATUS, MESSAGE_KIND } from '../../../src/shared/utils/agentStatus';
 import type { IDatabaseManager } from '../../../src/main/DatabaseManager';
 import type { Agent } from '../../../src/main/db/schema';
 
@@ -95,7 +96,7 @@ describe('AgentManager', () => {
         createdAt: new Date(mockAgent.createdAt).getTime(),
         updatedAt: new Date(mockAgent.updatedAt).getTime(),
         archivedAt: null,
-        status: 'new',
+        status: AGENT_STATUS.NEW,
       });
       expect(typeof snapshot.createdAt).toBe('number');
       expect(typeof snapshot.updatedAt).toBe('number');
@@ -126,14 +127,18 @@ describe('AgentManager', () => {
       const lastMessage = {
         id: 1,
         agentId: mockAgent.agentId,
+        kind: MESSAGE_KIND.USER,
         timestamp: '2026-02-15T10:30:00.000Z',
-        payloadJson: JSON.stringify({ kind: 'user', data: { text: 'Hello' } }),
+        payloadJson: JSON.stringify({ data: { text: 'Hello' } }),
+        usageJson: null,
+        replyToMessageId: null,
+        hidden: false,
       };
       mockDbManager.messages.getLastByAgent = jest.fn().mockReturnValue(lastMessage);
 
       const snapshot = (agentManager as any).toEventAgent(mockAgent);
 
-      expect(snapshot.status).toBe('in-progress');
+      expect(snapshot.status).toBe(AGENT_STATUS.IN_PROGRESS);
     });
 
     /* Preconditions: Agent with last message of kind 'final_answer' exists
@@ -144,35 +149,66 @@ describe('AgentManager', () => {
       const lastMessage = {
         id: 1,
         agentId: mockAgent.agentId,
+        kind: MESSAGE_KIND.FINAL_ANSWER,
         timestamp: '2026-02-15T10:30:00.000Z',
-        payloadJson: JSON.stringify({ kind: 'final_answer', data: { text: 'Done' } }),
+        payloadJson: JSON.stringify({ data: { text: 'Done' } }),
+        usageJson: null,
+        replyToMessageId: null,
+        hidden: false,
       };
       mockDbManager.messages.getLastByAgent = jest.fn().mockReturnValue(lastMessage);
 
       const snapshot = (agentManager as any).toEventAgent(mockAgent);
 
-      expect(snapshot.status).toBe('completed');
+      expect(snapshot.status).toBe(AGENT_STATUS.COMPLETED);
     });
 
     /* Preconditions: Agent with last message containing error status exists
        Action: Call toEventAgent() with agent
        Assertions: Returns AgentSnapshot with status 'error'
-       Requirements: realtime-events.9.2, agents.5.3 */
-    it('should compute status as error when last message has error result', () => {
+       Requirements: realtime-events.9.2, agents.5.3, llm-integration.2 */
+    it('should compute status as error when last message has kind error', () => {
       const lastMessage = {
         id: 1,
         agentId: mockAgent.agentId,
+        kind: MESSAGE_KIND.ERROR,
         timestamp: '2026-02-15T10:30:00.000Z',
         payloadJson: JSON.stringify({
-          kind: 'llm',
-          data: { result: { status: 'error', message: 'Failed' } },
+          data: { error: { type: 'network', message: 'Failed' } },
         }),
+        usageJson: null,
+        replyToMessageId: null,
+        hidden: false,
       };
       mockDbManager.messages.getLastByAgent = jest.fn().mockReturnValue(lastMessage);
 
       const snapshot = (agentManager as any).toEventAgent(mockAgent);
 
-      expect(snapshot.status).toBe('error');
+      expect(snapshot.status).toBe(AGENT_STATUS.ERROR);
+    });
+
+    /* Preconditions: Agent with last message of kind 'llm' containing result.status='error' (legacy payload)
+       Action: Call toEventAgent() with agent
+       Assertions: Returns AgentSnapshot with status 'awaiting-response' (legacy result.status is ignored)
+       Requirements: realtime-events.9.2, agents.5.4, llm-integration.2 */
+    it('should ignore legacy result.status in payload and use kind instead', () => {
+      const lastMessage = {
+        id: 1,
+        agentId: mockAgent.agentId,
+        kind: MESSAGE_KIND.LLM,
+        timestamp: '2026-02-15T10:30:00.000Z',
+        payloadJson: JSON.stringify({
+          data: { result: { status: 'error', message: 'Failed' } },
+        }),
+        usageJson: null,
+        replyToMessageId: null,
+        hidden: false,
+      };
+      mockDbManager.messages.getLastByAgent = jest.fn().mockReturnValue(lastMessage);
+
+      const snapshot = (agentManager as any).toEventAgent(mockAgent);
+
+      expect(snapshot.status).toBe(AGENT_STATUS.AWAITING_RESPONSE);
     });
 
     /* Preconditions: Agent with last message of kind 'llm' (not final_answer) exists
@@ -183,14 +219,18 @@ describe('AgentManager', () => {
       const lastMessage = {
         id: 1,
         agentId: mockAgent.agentId,
+        kind: MESSAGE_KIND.LLM,
         timestamp: '2026-02-15T10:30:00.000Z',
-        payloadJson: JSON.stringify({ kind: 'llm', data: { text: 'Thinking...' } }),
+        payloadJson: JSON.stringify({ data: { text: 'Thinking...' } }),
+        usageJson: null,
+        replyToMessageId: null,
+        hidden: false,
       };
       mockDbManager.messages.getLastByAgent = jest.fn().mockReturnValue(lastMessage);
 
       const snapshot = (agentManager as any).toEventAgent(mockAgent);
 
-      expect(snapshot.status).toBe('awaiting-response');
+      expect(snapshot.status).toBe(AGENT_STATUS.AWAITING_RESPONSE);
     });
   });
 
@@ -331,6 +371,70 @@ describe('AgentManager', () => {
       expect(publishedEvent.agent.archivedAt).toBe(new Date('2026-02-15T11:00:00.000Z').getTime());
       expect(typeof publishedEvent.timestamp).toBe('number');
     });
+
+    /* Preconditions: AgentManager initialized, agent has running pipeline
+       Action: Call archive()
+       Assertions: Pipeline cancelled before archiving
+       Requirements: agents.10.4, llm-integration.6 */
+    it('should cancel running pipeline when archiving agent', () => {
+      const archivedAgent = { ...mockAgent, archivedAt: '2026-02-15T11:00:00.000Z' };
+      mockDbManager.agents.findById = jest
+        .fn()
+        .mockReturnValueOnce(mockAgent)
+        .mockReturnValueOnce(archivedAgent);
+      mockDbManager.messages.getLastByAgent = jest.fn().mockReturnValue(null);
+
+      // Register a pipeline controller
+      const controller = new AbortController();
+      agentManager.setPipelineController('abc123xyz0', controller);
+
+      agentManager.archive('abc123xyz0');
+
+      // Controller should have been aborted
+      expect(controller.signal.aborted).toBe(true);
+    });
+  });
+
+  describe('setPipelineController / cancelPipeline', () => {
+    /* Preconditions: No pipeline running
+       Action: Call cancelPipeline()
+       Assertions: No error thrown
+       Requirements: llm-integration.6 */
+    it('should do nothing when no pipeline is running', () => {
+      expect(() => agentManager.cancelPipeline('abc123xyz0')).not.toThrow();
+    });
+
+    /* Preconditions: Pipeline controller registered
+       Action: Call cancelPipeline()
+       Assertions: AbortController aborted, controller removed
+       Requirements: llm-integration.6 */
+    it('should abort controller and remove it', () => {
+      const controller = new AbortController();
+      agentManager.setPipelineController('abc123xyz0', controller);
+
+      agentManager.cancelPipeline('abc123xyz0');
+
+      expect(controller.signal.aborted).toBe(true);
+
+      // Second cancel should not throw (controller already removed)
+      expect(() => agentManager.cancelPipeline('abc123xyz0')).not.toThrow();
+    });
+
+    /* Preconditions: Two different agents have pipeline controllers
+       Action: Cancel one agent's pipeline
+       Assertions: Only that agent's controller is aborted
+       Requirements: llm-integration.6 */
+    it('should only cancel the specified agent pipeline', () => {
+      const controller1 = new AbortController();
+      const controller2 = new AbortController();
+      agentManager.setPipelineController('agent-1', controller1);
+      agentManager.setPipelineController('agent-2', controller2);
+
+      agentManager.cancelPipeline('agent-1');
+
+      expect(controller1.signal.aborted).toBe(true);
+      expect(controller2.signal.aborted).toBe(false);
+    });
   });
 
   describe('handleMessageCreated (MESSAGE_CREATED event handler)', () => {
@@ -420,6 +524,53 @@ describe('AgentManager', () => {
 
       // Verify no event was published
       expect(mockEventBus.publish).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('clearPipelineController', () => {
+    /* Preconditions: Controller set for agent via setPipelineController
+       Action: clearPipelineController called with same controller instance
+       Assertions: Controller is removed (subsequent cancelPipeline does nothing)
+       Requirements: llm-integration.6 */
+    it('should remove controller when called with matching instance', () => {
+      const controller = new AbortController();
+      agentManager.setPipelineController('abc123xyz0', controller);
+
+      agentManager.clearPipelineController('abc123xyz0', controller);
+
+      // After clearing, cancelPipeline should not abort anything
+      agentManager.cancelPipeline('abc123xyz0');
+      expect(controller.signal.aborted).toBe(false);
+    });
+
+    /* Preconditions: Controller A set, then controller B set for same agent
+       Action: clearPipelineController called with controller A (old one)
+       Assertions: Controller B is NOT removed — newer pipeline is preserved
+       Requirements: llm-integration.6 */
+    it('should NOT remove controller when called with a different (newer) instance', () => {
+      const controllerA = new AbortController();
+      const controllerB = new AbortController();
+
+      agentManager.setPipelineController('abc123xyz0', controllerA);
+      // Simulate new message: cancel A, set B
+      agentManager.cancelPipeline('abc123xyz0');
+      agentManager.setPipelineController('abc123xyz0', controllerB);
+
+      // Old pipeline finishes — tries to clear with controllerA
+      agentManager.clearPipelineController('abc123xyz0', controllerA);
+
+      // controllerB must still be registered — cancelPipeline should abort it
+      agentManager.cancelPipeline('abc123xyz0');
+      expect(controllerB.signal.aborted).toBe(true);
+    });
+
+    /* Preconditions: No controller set for agent
+       Action: clearPipelineController called
+       Assertions: No error thrown
+       Requirements: llm-integration.6 */
+    it('should not throw when no controller is registered', () => {
+      const controller = new AbortController();
+      expect(() => agentManager.clearPipelineController('nonexistent', controller)).not.toThrow();
     });
   });
 });

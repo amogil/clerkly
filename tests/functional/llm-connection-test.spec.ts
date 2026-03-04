@@ -20,7 +20,7 @@ let mockLLMServer: MockLLMServer;
 const TEST_CLIENT_ID = 'test-client-id-12345';
 
 test.beforeAll(async () => {
-  mockOAuthServer = await createMockOAuthServer(8892);
+  mockOAuthServer = await createMockOAuthServer();
 
   // Set user profile data for mock OAuth server
   mockOAuthServer.setUserProfile({
@@ -59,9 +59,13 @@ test.beforeEach(async () => {
   const mockLLMBaseUrl = mockLLMServer.getBaseUrl();
   context = await launchElectron(undefined, {
     CLERKLY_GOOGLE_API_URL: mockOAuthServer.getBaseUrl(),
-    CLERKLY_OPENAI_API_URL: `${mockLLMBaseUrl}/v1/chat/completions`,
+    CLERKLY_OPENAI_API_URL: `${mockLLMBaseUrl}/v1/responses`,
     CLERKLY_ANTHROPIC_API_URL: `${mockLLMBaseUrl}/v1/messages`,
     CLERKLY_GOOGLE_LLM_API_URL: `${mockLLMBaseUrl}/v1beta/models/gemini-3-flash:generateContent`,
+    // Override any real API keys from .env so loadAPIKey() reads from DB only
+    CLERKLY_OPENAI_API_KEY: '',
+    CLERKLY_ANTHROPIC_API_KEY: '',
+    CLERKLY_GOOGLE_API_KEY: '',
   });
   await context.window.waitForLoadState('domcontentloaded');
 
@@ -78,7 +82,7 @@ test.beforeEach(async () => {
 
 test.afterEach(async () => {
   if (context) {
-    await closeElectron(context);
+    await closeElectron(context, true, false);
   }
 });
 
@@ -136,11 +140,12 @@ test('54.3: should send request with correct parameters', async () => {
   // Check that request was sent to mock server with correct parameters
   const lastRequest = mockLLMServer.getLastRequest();
   expect(lastRequest).toBeDefined();
-  expect(lastRequest?.path).toBe('/v1/chat/completions');
+  expect(lastRequest?.path).toBe('/v1/responses');
   expect(lastRequest?.method).toBe('POST');
   expect(lastRequest?.headers.authorization).toBe('Bearer test-api-key-12345');
-  expect(lastRequest?.body.model).toBe('gpt-4o-mini');
-  expect(lastRequest?.body.max_tokens).toBe(5);
+  expect(lastRequest?.body.model).toBe('gpt-5-nano');
+  expect(lastRequest?.body.max_output_tokens).toBe(16);
+  expect(lastRequest?.body.input?.[0]?.content).toContain('JSON');
 });
 
 /* Preconditions: App is launched and authenticated, valid API key is entered
@@ -217,8 +222,8 @@ test('54.5: should show error notification on invalid API key', async () => {
    Requirements: settings.3.4, settings.3.5, settings.3.7 */
 test('54.6: should test connection for all providers', async () => {
   const providers = [
-    { value: 'openai', name: 'OpenAI', path: '/v1/chat/completions', model: 'gpt-4o-mini' },
-    { value: 'anthropic', name: 'Anthropic', path: '/v1/messages', model: 'claude-haiku-4-5' },
+    { value: 'openai', name: 'OpenAI', path: '/v1/responses', model: 'gpt-5-nano' },
+    { value: 'anthropic', name: 'Anthropic', path: '/v1/messages', model: 'claude-haiku-4-6' },
     {
       value: 'google',
       name: 'Google',

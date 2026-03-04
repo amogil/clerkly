@@ -167,6 +167,21 @@ export interface API {
   saveData: (key: string, value: any) => Promise<{ success: boolean; error?: string }>;
   loadData: (key: string) => Promise<{ success: boolean; data?: any; error?: string }>;
   deleteData: (key: string) => Promise<{ success: boolean; error?: string }>;
+  app: {
+    getState: () => Promise<{
+      phase:
+        | 'booting'
+        | 'unauthenticated'
+        | 'authenticating'
+        | 'preparing-session'
+        | 'waiting-for-chats'
+        | 'ready'
+        | 'error';
+      authorized: boolean;
+      targetScreen: 'login' | 'agents' | 'settings' | 'error-demo';
+      reason?: string;
+    }>;
+  };
   // Requirements: google-oauth-auth.8.1, google-oauth-auth.8.2, google-oauth-auth.8.3, account-profile.1.2, account-profile.1.5
   auth: {
     startLogin: () => Promise<{ success: boolean; error?: string }>;
@@ -227,6 +242,7 @@ export interface API {
     list: (agentId: string) => Promise<{ success: boolean; data?: any; error?: string }>;
     create: (
       agentId: string,
+      kind: string,
       payload: any
     ) => Promise<{ success: boolean; data?: any; error?: string }>;
     update: (
@@ -235,6 +251,11 @@ export interface API {
       payload: any
     ) => Promise<{ success: boolean; error?: string }>;
     getLast: (agentId: string) => Promise<{ success: boolean; data?: any; error?: string }>;
+    retryLast: (agentId: string) => Promise<{ success: boolean; error?: string }>;
+    cancelRetry: (
+      agentId: string,
+      userMessageId: number
+    ) => Promise<{ success: boolean; error?: string }>;
   };
   // Requirements: realtime-events.4.5, realtime-events.4.6, realtime-events.4.7
   events?: {

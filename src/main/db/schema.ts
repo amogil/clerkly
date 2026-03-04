@@ -85,12 +85,24 @@ export const messages = sqliteTable(
   {
     id: integer('id').primaryKey({ autoIncrement: true }),
     agentId: text('agent_id').notNull(),
+    kind: text('kind').notNull(),
     timestamp: text('timestamp').notNull(),
     payloadJson: text('payload_json').notNull(),
+    // Requirements: llm-integration.13
+    // Canonical + raw provider token usage envelope for billing pipeline.
+    usageJson: text('usage_json'),
+    replyToMessageId: integer('reply_to_message_id'),
+    // Requirements: llm-integration.3.8, llm-integration.8.5
+    // Unified flag: hides message from UI and LLM history.
+    // Set for cancelled llm messages and hidden error messages.
+    hidden: integer('hidden', { mode: 'boolean' }).notNull().default(false),
   },
   (table) => [
     index('idx_messages_agent_id').on(table.agentId),
     index('idx_messages_agent_timestamp').on(table.agentId, table.timestamp),
+    // Composite index for filtering visible messages by agent
+    // Requirements: llm-integration.3.8, llm-integration.8.5
+    index('idx_messages_agent_hidden').on(table.agentId, table.hidden),
   ]
 );
 

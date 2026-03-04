@@ -196,8 +196,10 @@ describe('Settings Component - Account Profile Section', () => {
     const emailInput = screen.getByLabelText('Email') as HTMLInputElement;
     expect(nameInput).toBeInTheDocument();
     expect(emailInput).toBeInTheDocument();
-    expect(nameInput.value).toBe('Not available');
-    expect(emailInput.value).toBe('Not available');
+    await waitFor(() => {
+      expect(nameInput.value).toBe('Not available');
+      expect(emailInput.value).toBe('Not available');
+    });
   });
 
   /* Preconditions: test User object created with data (name: "John Doe", email: "john@example.com"), window.api.auth.getUser() mocked to return { success: true, user: testUser }

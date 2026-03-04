@@ -329,6 +329,7 @@ export function Settings({ onSignOut, onNavigate }: SettingsProps) {
                   />
                   <button
                     type="button"
+                    data-testid="ai-agent-api-key-toggle"
                     onClick={() => setShowApiKey(!showApiKey)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-secondary rounded transition-colors"
                   >

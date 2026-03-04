@@ -5,16 +5,20 @@
    - After sending new message, timestamp updates to current time
    Requirements: agents.8.1, agents.5.3, settings.2.1 */
 
-import { test, expect, _electron as electron, ElectronApplication, Page } from '@playwright/test';
-import path from 'path';
-import { createMockOAuthServer } from './helpers/electron';
+import { test, expect, ElectronApplication, Page } from '@playwright/test';
+import {
+  createMockOAuthServer,
+  activeChat,
+  launchElectronWithMockOAuth,
+  closeElectron,
+} from './helpers/electron';
 import type { MockOAuthServer } from './helpers/mock-oauth-server';
 import { completeOAuthFlow } from './helpers/electron';
 
 let mockServer: MockOAuthServer;
 
 test.beforeAll(async () => {
-  mockServer = await createMockOAuthServer(8896);
+  mockServer = await createMockOAuthServer();
 });
 
 test.afterAll(async () => {
@@ -26,6 +30,7 @@ test.afterAll(async () => {
 test.describe('Agents - Date Update on New Message', () => {
   let electronApp: ElectronApplication;
   let window: Page;
+  let testDataPath: string;
 
   test.beforeEach(async () => {
     // Set user profile data for tests
@@ -37,30 +42,10 @@ test.describe('Agents - Date Update on New Message', () => {
       family_name: 'Test User',
     });
 
-    // Create unique temp directory for this test
-    const testDataPath = path.join(
-      require('os').tmpdir(),
-      `clerkly-date-test-${Date.now()}-${Math.random().toString(36).substring(7)}`
-    );
-
-    // Launch Electron app with clean state (no authentication)
-    electronApp = await electron.launch({
-      args: [
-        path.join(__dirname, '../../dist/main/main/index.js'),
-        '--user-data-dir',
-        testDataPath,
-      ],
-      env: {
-        ...process.env,
-        NODE_ENV: 'test',
-        CLERKLY_GOOGLE_API_URL: mockServer.getBaseUrl(),
-        CLERKLY_OAUTH_CLIENT_ID: 'test-client-id-12345',
-        CLERKLY_OAUTH_CLIENT_SECRET: 'test-client-secret-67890',
-      },
-    });
-
-    window = await electronApp.firstWindow();
-    await window.waitForLoadState('domcontentloaded');
+    const context = await launchElectronWithMockOAuth(mockServer);
+    electronApp = context.app;
+    window = context.window;
+    testDataPath = context.testDataPath;
 
     // Wait for login screen
     const loginScreen = window.locator('[data-testid="login-screen"]');
@@ -74,9 +59,8 @@ test.describe('Agents - Date Update on New Message', () => {
   });
 
   test.afterEach(async () => {
-    // Close the app
     if (electronApp) {
-      await electronApp.close();
+      await closeElectron({ app: electronApp, window, testDataPath });
     }
   });
 
@@ -104,8 +88,6 @@ test.describe('Agents - Date Update on New Message', () => {
     // Reload page to ensure agent is loaded from database
     await window.reload();
     await expect(agentsPage).toBeVisible({ timeout: 10000 });
-
-    // Click on test agent
     const testAgentIcon = window.locator(`[data-testid="agent-icon-${testAgentId}"]`);
     await expect(testAgentIcon).toBeVisible({ timeout: 5000 });
     await testAgentIcon.click();
@@ -117,14 +99,16 @@ test.describe('Agents - Date Update on New Message', () => {
     expect(timestampBefore).toBeTruthy();
 
     // Send new message
-    const textarea = window.locator('textarea[placeholder*="Ask"]');
+    const textarea = activeChat(window).textarea;
     await expect(textarea).toBeVisible({ timeout: 5000 });
     await textarea.fill('New message to update timestamp');
     await textarea.press('Enter');
 
     // Verify message appears
-    const messageText = window.locator('text=New message to update timestamp');
-    await expect(messageText).toBeVisible({ timeout: 5000 });
+    const messageText = activeChat(window).userMessages.filter({
+      hasText: 'New message to update timestamp',
+    });
+    await expect(messageText.first()).toBeVisible({ timeout: 5000 });
 
     // Wait for timestamp to update
     await window.waitForFunction(

@@ -2,16 +2,21 @@
 // tests/functional/agents-error-messages.spec.ts
 // Functional tests for error messages in AllAgents view
 
-import { test, expect, _electron as electron, ElectronApplication, Page } from '@playwright/test';
-import path from 'path';
-import { createMockOAuthServer } from './helpers/electron';
+import { test, expect, ElectronApplication, Page } from '@playwright/test';
+import {
+  createMockOAuthServer,
+  launchElectronWithMockOAuth,
+  getAgentIdsFromApi,
+  getAgentIdsFromAllAgents,
+  completeOAuthFlow,
+  expectAgentsVisible,
+} from './helpers/electron';
 import type { MockOAuthServer } from './helpers/mock-oauth-server';
-import { completeOAuthFlow } from './helpers/electron';
 
 let mockServer: MockOAuthServer;
 
 test.beforeAll(async () => {
-  mockServer = await createMockOAuthServer(8897);
+  mockServer = await createMockOAuthServer();
 });
 
 test.afterAll(async () => {
@@ -34,30 +39,9 @@ test.describe('Agents Error Messages', () => {
       family_name: 'Test User',
     });
 
-    // Create unique temp directory for this test
-    const testDataPath = path.join(
-      require('os').tmpdir(),
-      `clerkly-error-test-${Date.now()}-${Math.random().toString(36).substring(7)}`
-    );
-
-    // Launch Electron app with clean state
-    electronApp = await electron.launch({
-      args: [
-        path.join(__dirname, '../../dist/main/main/index.js'),
-        '--user-data-dir',
-        testDataPath,
-      ],
-      env: {
-        ...process.env,
-        NODE_ENV: 'test',
-        CLERKLY_GOOGLE_API_URL: mockServer.getBaseUrl(),
-        CLERKLY_OAUTH_CLIENT_ID: 'test-client-id-12345',
-        CLERKLY_OAUTH_CLIENT_SECRET: 'test-client-secret-67890',
-      },
-    });
-
-    window = await electronApp.firstWindow();
-    await window.waitForLoadState('domcontentloaded');
+    const context = await launchElectronWithMockOAuth(mockServer);
+    electronApp = context.app;
+    window = context.window;
 
     // Complete OAuth flow
     await completeOAuthFlow(electronApp, window);
@@ -78,49 +62,54 @@ test.describe('Agents Error Messages', () => {
      Requirements: agents.5.6 */
   test('should not display archived agents in AllAgents', async () => {
     // Wait for agents page to load
-    await expect(window.locator('[data-testid="agents"]')).toBeVisible({ timeout: 5000 });
+    await expectAgentsVisible(window, 5000);
 
     // Get current agent ID
-    const archivedAgentId = await window.evaluate(async () => {
-      const agents = await window.api.agents.list();
-      if (agents.success && agents.data) {
-        const agentList = agents.data as Array<{ id: string }>;
-        return agentList[0].id;
-      }
-      return null;
-    });
+    const archivedAgentId = (await getAgentIdsFromApi(window))[0] ?? null;
 
     expect(archivedAgentId).not.toBeNull();
 
     // Archive the first agent
     await window.evaluate(async (id) => {
-      await window.api.agents.archive(id!);
+      const api = (globalThis as any).api;
+      await api.agents.archive(id!);
     }, archivedAgentId);
 
     // Wait for auto-created agent to appear (agents.2.7, agents.2.9)
     const newChatButton = window.locator('div[title="New chat"]');
     await expect(newChatButton).toBeVisible({ timeout: 5000 });
 
-    // Create 10 more agents (total 11 active agents) to ensure +N button appears
+    const baseAgentCount = (await getAgentIdsFromApi(window)).length;
+    expect(baseAgentCount).toBeGreaterThan(0);
+
+    // Create 10 more agents to ensure +N button appears
     for (let i = 0; i < 10; i++) {
       await newChatButton.click();
-      const agentIcons = window.locator('[data-testid^="agent-icon-"]');
-      await expect(agentIcons.nth(i + 1)).toBeVisible({ timeout: 5000 });
+      await expect
+        .poll(async () => (await getAgentIdsFromApi(window)).length, { timeout: 5000 })
+        .toBe(baseAgentCount + i + 1);
     }
 
+    const expectedAgentIds = await getAgentIdsFromApi(window);
+    expect(expectedAgentIds.length).toBeGreaterThan(0);
+
     // Open AllAgents view
-    const allAgentsButton = window.locator('div.rounded-full.bg-muted:has-text("+")');
+    const allAgentsButton = window.locator('[data-testid="all-agents-button"]');
     await expect(allAgentsButton).toBeVisible({ timeout: 5000 });
     await allAgentsButton.click();
 
     // Verify we're in AllAgents view
     await expect(window.locator('text=All Agents')).toBeVisible({ timeout: 5000 });
 
-    // Verify only 11 active agents are shown (archived agent is filtered out)
-    const agentCards = window.locator('[data-testid^="agent-card-"]');
-    await expect(agentCards).toHaveCount(11);
+    const visibleAgentIds = await getAgentIdsFromAllAgents(window);
+
+    // Verify all expected agents are visible
+    for (const agentId of expectedAgentIds) {
+      expect(visibleAgentIds).toContain(agentId);
+    }
 
     // Verify archived agent is NOT visible
+    expect(visibleAgentIds).not.toContain(archivedAgentId);
     await expect(window.locator(`[data-testid="agent-card-${archivedAgentId}"]`)).not.toBeVisible();
   });
 
@@ -130,21 +119,14 @@ test.describe('Agents Error Messages', () => {
      Requirements: agents.5.5, agents.1.3 */
   test('should sort agents by updatedAt in AllAgents', async () => {
     // Wait for agents page to load
-    await expect(window.locator('[data-testid="agents"]')).toBeVisible({ timeout: 5000 });
+    await expectAgentsVisible(window, 5000);
 
-    const firstAgentId = await window.evaluate(async () => {
-      const agents = await window.api.agents.list();
-      if (agents.success && agents.data) {
-        const agentList = agents.data as Array<{ id: string }>;
-        return agentList[0].id;
-      }
-      return null;
-    });
+    const firstAgentId = (await getAgentIdsFromApi(window))[0] ?? null;
 
     // Add message to first agent
     await window.evaluate(async (id) => {
-      await window.api.messages.create(id!, {
-        kind: 'user',
+      const api = (globalThis as any).api;
+      await api.messages.create(id!, 'user', {
         data: { text: 'First agent message' },
       });
     }, firstAgentId);
@@ -153,32 +135,25 @@ test.describe('Agents Error Messages', () => {
     const newChatButton = window.locator('div[title="New chat"]');
     await expect(newChatButton).toBeVisible({ timeout: 5000 });
 
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 9; i++) {
       await newChatButton.click();
-      // Wait for new agent icon to appear
-      const agentIcons = window.locator('[data-testid^="agent-icon-"]');
-      await expect(agentIcons.nth(i + 1)).toBeVisible({ timeout: 5000 });
+      await expect
+        .poll(async () => (await getAgentIdsFromApi(window)).length, { timeout: 5000 })
+        .toBe(i + 2);
     }
 
-    const secondAgentId = await window.evaluate(async () => {
-      const agents = await window.api.agents.list();
-      if (agents.success && agents.data) {
-        const agentList = agents.data as Array<{ id: string }>;
-        return agentList[0].id; // Most recent is first
-      }
-      return null;
-    });
+    const secondAgentId = (await getAgentIdsFromApi(window))[0] ?? null;
 
     // Add message to second agent (more recent)
     await window.evaluate(async (id) => {
-      await window.api.messages.create(id!, {
-        kind: 'user',
+      const api = (globalThis as any).api;
+      await api.messages.create(id!, 'user', {
         data: { text: 'Second agent message' },
       });
     }, secondAgentId);
 
     // Open AllAgents view
-    const allAgentsButton = window.locator('div.rounded-full.bg-muted:has-text("+")');
+    const allAgentsButton = window.locator('[data-testid="all-agents-button"]');
     await expect(allAgentsButton).toBeVisible({ timeout: 5000 });
     await allAgentsButton.click();
 

@@ -4,10 +4,10 @@
    Requirements: clerkly.3.1, clerkly.3.2, clerkly.3.4, clerkly.3.5, clerkly.3.7 */
 
 import { Logger } from '../../../src/renderer/Logger';
-import { DateTimeFormatter } from '../../../src/renderer/utils/DateTimeFormatter';
+import { DateTimeFormatter } from '../../../src/shared/utils/DateTimeFormatter';
 
 // Mock DateTimeFormatter
-jest.mock('../../../src/renderer/utils/DateTimeFormatter');
+jest.mock('../../../src/shared/utils/DateTimeFormatter');
 
 describe('Logger (Renderer)', () => {
   let consoleDebugSpy: jest.SpyInstance;

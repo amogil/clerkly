@@ -29,7 +29,7 @@ test.describe('Account Profile', () => {
   let mockServer: MockOAuthServer;
 
   test.beforeAll(async () => {
-    mockServer = await createMockOAuthServer(8889);
+    mockServer = await createMockOAuthServer();
     // Set CLERKLY_GOOGLE_API_URL to point to mock server
     process.env.CLERKLY_GOOGLE_API_URL = mockServer.getBaseUrl();
     console.log(`[TEST] CLERKLY_GOOGLE_API_URL set to ${process.env.CLERKLY_GOOGLE_API_URL}`);
@@ -1424,9 +1424,10 @@ test.describe('Account Profile', () => {
     // Requirements: google-oauth-auth.3.8 - Tokens should remain after successful auth
     // Check directly through app context (not through IPC which was removed)
     const tokensCheck = await context.app.evaluate(async () => {
-      const { tokenStorage } = (global as any).testContext || {};
-      if (!tokenStorage) {
-        throw new Error('Token storage not found in test context');
+      const { tokenStorage, isNoUserLoggedInError: noUserErrorHelper } =
+        (global as any).testContext || {};
+      if (!tokenStorage || !noUserErrorHelper) {
+        throw new Error('Test context missing token storage or error helper');
       }
       try {
         const tokens = await tokenStorage.loadTokens();
@@ -1434,7 +1435,7 @@ test.describe('Account Profile', () => {
       } catch (error: unknown) {
         // If loadTokens throws error about no user logged in, no tokens
         const errorMessage = error instanceof Error ? error.message : '';
-        return { hasTokens: !errorMessage.includes('No user logged in') };
+        return { hasTokens: !noUserErrorHelper(errorMessage) };
       }
     });
 
@@ -1535,9 +1536,9 @@ test.describe('Account Profile', () => {
     // Requirements: google-oauth-auth.3.7, account-profile.1.5 - Tokens should be cleared on error
     // Check directly through app context (not through IPC which requires email)
     const tokensCleared = await context.app.evaluate(async () => {
-      const { tokenStorage } = (global as any).testContext || {};
-      if (!tokenStorage) {
-        throw new Error('Token storage not found in test context');
+      const { tokenStorage, isNoUserLoggedInError } = (global as any).testContext || {};
+      if (!tokenStorage || !isNoUserLoggedInError) {
+        throw new Error('Test context missing token storage or error helper');
       }
       try {
         const tokens = await tokenStorage.loadTokens();
@@ -1545,7 +1546,7 @@ test.describe('Account Profile', () => {
       } catch (error: unknown) {
         // If loadTokens throws error about no user logged in, tokens are cleared
         const errorMessage = error instanceof Error ? error.message : '';
-        return errorMessage.includes('No user logged in');
+        return isNoUserLoggedInError(errorMessage);
       }
     });
 
@@ -1674,9 +1675,9 @@ test.describe('Account Profile', () => {
     // Requirements: google-oauth-auth.3.7, account-profile.1.5
     // Check directly through app context (not through IPC which requires email)
     const tokensCleared = await context.app.evaluate(async () => {
-      const { tokenStorage } = (global as any).testContext || {};
-      if (!tokenStorage) {
-        throw new Error('Token storage not found in test context');
+      const { tokenStorage, isNoUserLoggedInError } = (global as any).testContext || {};
+      if (!tokenStorage || !isNoUserLoggedInError) {
+        throw new Error('Test context missing token storage or error helper');
       }
       try {
         const tokens = await tokenStorage.loadTokens();
@@ -1684,7 +1685,7 @@ test.describe('Account Profile', () => {
       } catch (error: unknown) {
         // If loadTokens throws error about no user logged in, tokens are cleared
         const errorMessage = error instanceof Error ? error.message : '';
-        return errorMessage.includes('No user logged in');
+        return isNoUserLoggedInError(errorMessage);
       }
     });
 
@@ -2116,9 +2117,10 @@ test.describe('Account Profile', () => {
     // Note: We can't navigate to Settings without authentication, so we verify tokens are cleared
     // Check directly through app context (not through IPC which was removed)
     const tokensCheck = await context.app.evaluate(async () => {
-      const { tokenStorage } = (global as any).testContext || {};
-      if (!tokenStorage) {
-        throw new Error('Token storage not found in test context');
+      const { tokenStorage, isNoUserLoggedInError: noUserErrorHelper } =
+        (global as any).testContext || {};
+      if (!tokenStorage || !noUserErrorHelper) {
+        throw new Error('Test context missing token storage or error helper');
       }
       try {
         const tokens = await tokenStorage.loadTokens();
@@ -2126,7 +2128,7 @@ test.describe('Account Profile', () => {
       } catch (error: unknown) {
         // If loadTokens throws error about no user logged in, no tokens
         const errorMessage = error instanceof Error ? error.message : '';
-        return { hasTokens: !errorMessage.includes('No user logged in') };
+        return { hasTokens: !noUserErrorHelper(errorMessage) };
       }
     });
 

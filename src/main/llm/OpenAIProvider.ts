@@ -1,15 +1,56 @@
-// Requirements: settings.3.5, settings.3.6, settings.3.7, settings.3.8
+// Requirements: settings.3.5, settings.3.6, settings.3.7, settings.3.8, llm-integration.3
 
-import { ILLMProvider, TestConnectionResult } from './ILLMProvider';
-import { LLM_PROVIDERS, ERROR_MESSAGES } from './LLMConfig';
+import {
+  ILLMProvider,
+  TestConnectionResult,
+  ChatMessage,
+  ChatOptions,
+  ChatChunk,
+  LLMStructuredOutput,
+  LLMUsage,
+} from './ILLMProvider';
+import { LLM_PROVIDERS, ERROR_MESSAGES, CHAT_TIMEOUT_MS } from './LLMConfig';
+import {
+  buildStructuredOutputInstruction,
+  getOpenAIStructuredOutputJsonSchema,
+  InvalidStructuredOutputError,
+  safeParseStructuredOutput,
+} from './StructuredOutputContract';
+
+interface OpenAIResponsesUsage {
+  input_tokens?: number;
+  output_tokens?: number;
+  total_tokens?: number;
+  input_tokens_details?: { cached_tokens?: number };
+  output_tokens_details?: { reasoning_tokens?: number };
+}
+
+interface OpenAIResponsesEvent {
+  type?: string;
+  delta?: string;
+  text?: string;
+  response?: {
+    usage?: OpenAIResponsesUsage;
+  };
+  usage?: OpenAIResponsesUsage;
+}
 
 /**
  * OpenAI LLM provider implementation
+ * Supports testConnection() and chat() with streaming reasoning + structured output
  *
- * Tests connection to OpenAI API using configured model
+ * Requirements: settings.3, llm-integration.3
  */
 export class OpenAIProvider implements ILLMProvider {
   private config = LLM_PROVIDERS.openai;
+  private apiKey: string;
+
+  /**
+   * @param apiKey - OpenAI API key. Pass empty string for test-connection-only usage.
+   */
+  constructor(apiKey: string = '') {
+    this.apiKey = apiKey;
+  }
 
   getProviderName(): string {
     return this.config.name;
@@ -17,60 +58,241 @@ export class OpenAIProvider implements ILLMProvider {
 
   /**
    * Test connection to OpenAI API
-   *
-   * Requirements: settings.3.5 - Use minimal test request with configured model
-   * Requirements: settings.3.6 - Configured timeout
-   * Requirements: settings.3.7 - Return success on HTTP 200
-   * Requirements: settings.3.8 - Map errors to user-friendly messages
+   * Requirements: settings.3.5, settings.3.6, settings.3.7, settings.3.8
    */
   async testConnection(apiKey: string): Promise<TestConnectionResult> {
     try {
-      // Requirements: settings.3.5 - Minimal test request
+      const maxOutputTokens = Math.max(16, this.config.testMaxTokens);
+      const testBody = {
+        model: this.config.testModel,
+        input: [{ role: 'user', content: 'Return JSON: {"ok": true}' }],
+        max_output_tokens: maxOutputTokens,
+        text: { format: { type: 'json_object' } },
+      };
       const response = await fetch(this.config.apiUrl, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${apiKey}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          model: this.config.testModel,
-          messages: [{ role: 'user', content: 'test' }],
-          max_tokens: this.config.maxTokens,
-        }),
-        signal: AbortSignal.timeout(this.config.timeout), // Requirements: settings.3.6 - Configured timeout
+        body: JSON.stringify(testBody),
+        signal: AbortSignal.timeout(this.config.testTimeoutMs),
       });
 
-      // Requirements: settings.3.7 - Success on HTTP 200
       if (response.ok) {
         return { success: true };
       }
 
-      // Requirements: settings.3.8 - Map error to message
       const errorData = await response.json().catch(() => ({}));
-      return {
-        success: false,
-        error: this.mapErrorToMessage(response.status, errorData),
-      };
+      return { success: false, error: this.mapErrorToMessage(response.status, errorData) };
     } catch (error) {
-      // Requirements: settings.3.8 - Handle network errors and timeout
-      return {
-        success: false,
-        error: this.mapExceptionToMessage(error),
-      };
+      return { success: false, error: this.mapExceptionToMessage(error) };
     }
   }
 
   /**
-   * Map HTTP status code to user-friendly error message
+   * Send a chat request with streaming reasoning and structured output
+   * Requirements: llm-integration.3.1, llm-integration.3.2, llm-integration.3.3
    *
-   * Requirements: settings.3.8 - Error messages for different HTTP statuses
+   * Structured output JSON schema: { action: { type: "text", content: "..." } }
+   * Reasoning chunks are streamed via onChunk callback.
+   * Action (JSON) is received whole at the end.
+   */
+  async chat(
+    messages: ChatMessage[],
+    options: ChatOptions,
+    onChunk: (chunk: ChatChunk) => void
+  ): Promise<LLMStructuredOutput> {
+    const systemMessages = messages.filter((m) => m.role === 'system');
+    const conversationMessages = messages.filter((m) => m.role !== 'system');
+    const systemBase = systemMessages.map((m) => m.content).join('\n');
+    const structuredInstruction = buildStructuredOutputInstruction();
+    const mergedSystemPrompt = [systemBase, structuredInstruction].filter(Boolean).join('\n\n');
+    const requestMessages: ChatMessage[] = mergedSystemPrompt
+      ? [{ role: 'system', content: mergedSystemPrompt }, ...conversationMessages]
+      : conversationMessages;
+
+    // Allow runtime override via env (used by functional tests with MockLLMServer)
+    const apiUrl = process.env.CLERKLY_OPENAI_API_URL ?? this.config.apiUrl;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), CHAT_TIMEOUT_MS);
+
+    try {
+      const body: Record<string, unknown> = {
+        model: options.model,
+        input: requestMessages,
+        stream: true,
+        text: {
+          format: {
+            type: 'json_schema',
+            strict: true,
+            name: 'structured_output',
+            schema: getOpenAIStructuredOutputJsonSchema(),
+          },
+        },
+        ...(options.reasoningEffort ? { reasoning: { effort: options.reasoningEffort } } : {}),
+      };
+
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${this.apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        const retryAfterSeconds = this.parseRetryAfterHeader(response);
+        if (response.status === 429 && retryAfterSeconds !== null) {
+          throw new Error(`Rate limit exceeded. Please try again in ${retryAfterSeconds}s`);
+        }
+        throw new Error(this.mapErrorToMessage(response.status, errorData));
+      }
+
+      return await this.parseStream(response, onChunk);
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }
+
+  /**
+   * Parse SSE stream, call onChunk for reasoning, return final LLMAction
+   * Requirements: llm-integration.3.2, llm-integration.3.3
+   */
+  private async parseStream(
+    response: Response,
+    onChunk: (chunk: ChatChunk) => void
+  ): Promise<LLMStructuredOutput> {
+    const reader = response.body?.getReader();
+    if (!reader) {
+      throw new Error('No response body');
+    }
+
+    const decoder =
+      typeof TextDecoder !== 'undefined'
+        ? new TextDecoder()
+        : { decode: (v: Uint8Array, _opts?: unknown) => Buffer.from(v).toString('utf-8') };
+    let buffer = '';
+    let contentAccumulator = '';
+    let usage: LLMUsage | undefined;
+
+    try {
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        // Keep last incomplete line in buffer
+        buffer = lines.pop() ?? '';
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          const data = line.slice(6).trim();
+          if (data === '[DONE]') continue;
+
+          let event: OpenAIResponsesEvent;
+          try {
+            event = JSON.parse(data) as OpenAIResponsesEvent;
+          } catch {
+            continue;
+          }
+
+          if (event.type === 'response.output_text.delta' && typeof event.delta === 'string') {
+            contentAccumulator += event.delta;
+          }
+
+          if (
+            typeof event.type === 'string' &&
+            event.type.includes('reasoning') &&
+            typeof event.delta === 'string' &&
+            event.delta.length > 0
+          ) {
+            onChunk({ type: 'reasoning', delta: event.delta, done: false });
+          }
+
+          if (event.type === 'response.completed') {
+            const completedUsage = event.response?.usage ?? event.usage;
+            if (completedUsage) {
+              usage = this.mapResponsesUsage(completedUsage);
+            }
+          }
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
+
+    // Signal reasoning done
+    onChunk({ type: 'reasoning', delta: '', done: true });
+
+    // Parse structured output
+    const output = this.parseAction(contentAccumulator);
+    return { ...output, usage };
+  }
+
+  /**
+   * Parse structured output JSON into structured action
+   * Requirements: llm-integration.3.3
+   */
+  private parseAction(json: string): LLMStructuredOutput {
+    if (!json.trim()) {
+      throw new InvalidStructuredOutputError(json);
+    }
+    try {
+      const parsedJson = JSON.parse(json) as unknown;
+      const parsed = safeParseStructuredOutput(parsedJson);
+      if (!parsed.success) {
+        throw new InvalidStructuredOutputError(json);
+      }
+      return parsed.data;
+    } catch (err) {
+      if (err instanceof InvalidStructuredOutputError) throw err;
+      throw new InvalidStructuredOutputError(json);
+    }
+  }
+
+  private mapResponsesUsage(raw: OpenAIResponsesUsage): LLMUsage {
+    const canonical = {
+      input_tokens: raw.input_tokens ?? 0,
+      output_tokens: raw.output_tokens ?? 0,
+      total_tokens: raw.total_tokens ?? 0,
+      cached_tokens: raw.input_tokens_details?.cached_tokens,
+      reasoning_tokens: raw.output_tokens_details?.reasoning_tokens,
+    };
+
+    return {
+      canonical,
+      raw: raw as Record<string, unknown>,
+    };
+  }
+
+  private parseRetryAfterHeader(response: Response): number | null {
+    const headers = response.headers as Headers | undefined;
+    if (!headers || typeof headers.get !== 'function') {
+      return null;
+    }
+    const retryAfter = headers.get('retry-after');
+    if (!retryAfter) {
+      return null;
+    }
+    const parsed = Number(retryAfter);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      return null;
+    }
+    return Math.ceil(parsed);
+  }
+
+  /**
+   * Map HTTP status code to user-friendly error message
+   * Requirements: settings.3.8
    */
   private mapErrorToMessage(status: number, errorData: unknown): string {
     const message = ERROR_MESSAGES[status as keyof typeof ERROR_MESSAGES];
-    if (message) {
-      return message;
-    }
-    // Type guard for error data structure
+    if (message) return message;
     const errorMessage =
       typeof errorData === 'object' &&
       errorData !== null &&
@@ -85,11 +307,9 @@ export class OpenAIProvider implements ILLMProvider {
 
   /**
    * Map exception to user-friendly error message
-   *
-   * Requirements: settings.3.8 - Handle timeout and network errors
+   * Requirements: settings.3.8
    */
   private mapExceptionToMessage(error: unknown): string {
-    // Type guard for error with name property
     if (
       typeof error === 'object' &&
       error !== null &&

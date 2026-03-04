@@ -105,6 +105,27 @@ describe('TokenStorageManager', () => {
     expect(loaded).toBeNull();
   });
 
+  /* Preconditions: Tokens saved in database
+     Action: Call deleteTokens multiple times
+     Assertions: No errors thrown, tokens remain deleted
+     Requirements: google-oauth-auth.4.4 */
+  it('should handle multiple token deletions without errors', async () => {
+    const tokens: TokenData = {
+      accessToken: 'test-access-token',
+      refreshToken: 'test-refresh-token',
+      expiresAt: Date.now() + 3600000,
+      tokenType: 'Bearer',
+    };
+
+    await tokenStorage.saveTokens(tokens);
+    await tokenStorage.deleteTokens();
+    await tokenStorage.deleteTokens();
+    await tokenStorage.deleteTokens();
+
+    const loaded = await tokenStorage.loadTokens();
+    expect(loaded).toBeNull();
+  });
+
   /* Preconditions: Valid non-expired tokens saved in database
      Action: Call hasValidTokens
      Assertions: Returns true

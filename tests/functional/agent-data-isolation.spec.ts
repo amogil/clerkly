@@ -5,9 +5,14 @@
  * Requirements: agents.10
  */
 
-import { test, expect, _electron as electron, ElectronApplication, Page } from '@playwright/test';
-import path from 'path';
-import { completeOAuthFlow, createMockOAuthServer } from './helpers/electron';
+import { test, expect, ElectronApplication, Page } from '@playwright/test';
+import {
+  completeOAuthFlow,
+  createMockOAuthServer,
+  activeChat,
+  launchElectronWithMockOAuth,
+  expectAgentsVisible,
+} from './helpers/electron';
 import type { MockOAuthServer } from './helpers/mock-oauth-server';
 
 let electronApp: ElectronApplication;
@@ -15,7 +20,7 @@ let window: Page;
 let mockServer: MockOAuthServer;
 
 test.beforeAll(async () => {
-  mockServer = await createMockOAuthServer(8898);
+  mockServer = await createMockOAuthServer();
 });
 
 test.afterAll(async () => {
@@ -33,29 +38,15 @@ test.beforeEach(async () => {
     family_name: 'Test User',
   });
 
-  // Create unique temp directory for this test
-  const testDataPath = path.join(
-    require('os').tmpdir(),
-    `clerkly-isolation-test-${Date.now()}-${Math.random().toString(36).substring(7)}`
-  );
-
-  electronApp = await electron.launch({
-    args: [path.join(__dirname, '../../dist/main/main/index.js'), '--user-data-dir', testDataPath],
-    env: {
-      ...process.env,
-      NODE_ENV: 'test',
-      ELECTRON_DISABLE_SECURITY_WARNINGS: 'true',
-      CLERKLY_GOOGLE_API_URL: mockServer.getBaseUrl(),
-      CLERKLY_OAUTH_CLIENT_ID: 'test-client-id',
-      CLERKLY_OAUTH_CLIENT_SECRET: 'test-client-secret',
-    },
+  const context = await launchElectronWithMockOAuth(mockServer, {
+    CLERKLY_OAUTH_CLIENT_ID: 'test-client-id',
+    CLERKLY_OAUTH_CLIENT_SECRET: 'test-client-secret',
   });
-
-  window = await electronApp.firstWindow();
-  await window.waitForLoadState('domcontentloaded');
+  electronApp = context.app;
+  window = context.window;
 
   await completeOAuthFlow(electronApp, window);
-  await expect(window.locator('[data-testid="agents"]')).toBeVisible({ timeout: 10000 });
+  await expectAgentsVisible(window, 10000);
 });
 
 test.afterEach(async () => {
@@ -93,7 +84,7 @@ test.describe('Agent Data Isolation', () => {
     await window.waitForTimeout(300);
 
     // Should be able to send message (proves ownership)
-    const messageInput = window.locator('textarea[placeholder*="Ask"]');
+    const messageInput = activeChat(window).textarea;
     await expect(messageInput).toBeVisible();
     await expect(messageInput).toBeEnabled();
   });
@@ -116,13 +107,13 @@ test.describe('Agent Data Isolation', () => {
     await expect(firstAgent).toHaveClass(/ring-2 ring-primary/);
 
     // Should be able to interact with it
-    const messageInput = window.locator('textarea[placeholder*="Ask"]');
+    const messageInput = activeChat(window).textarea;
     await messageInput.fill('Test message');
     await messageInput.press('Enter');
     await window.waitForTimeout(500);
 
     // Message should appear (proves agent belongs to user)
-    const messages = window.locator('[data-testid="message"]');
+    const messages = activeChat(window).messages;
     await expect(messages).toHaveCount(1, { timeout: 2000 });
   });
 
@@ -147,7 +138,7 @@ test.describe('Agent Data Isolation', () => {
       await window.waitForTimeout(300);
 
       // Should be able to access without errors
-      const messageInput = window.locator('textarea[placeholder*="Ask"]');
+      const messageInput = activeChat(window).textarea;
       await expect(messageInput).toBeVisible();
       await expect(messageInput).toBeEnabled();
     }

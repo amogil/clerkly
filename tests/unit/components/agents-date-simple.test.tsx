@@ -5,7 +5,7 @@
 // Requirements: agents.8.1, settings.2.1
 // Simple unit test for date formatting in Agents component
 
-import { DateTimeFormatter } from '../../../src/utils/DateTimeFormatter';
+import { DateTimeFormatter } from '../../../src/shared/utils/DateTimeFormatter';
 
 describe('Agents Component - Date Formatting (Simple)', () => {
   /* Preconditions: DateTimeFormatter exists

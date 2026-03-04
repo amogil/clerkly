@@ -18,7 +18,7 @@ let mockServer: MockOAuthServer;
 const TEST_CLIENT_ID = 'test-client-id-12345';
 
 test.beforeAll(async () => {
-  mockServer = await createMockOAuthServer(8891);
+  mockServer = await createMockOAuthServer();
 
   // Set user profile data for mock OAuth server
   mockServer.setUserProfile({
@@ -40,6 +40,9 @@ test.beforeEach(async () => {
   // Launch Electron app with mock OAuth server
   context = await launchElectron(undefined, {
     CLERKLY_GOOGLE_API_URL: mockServer.getBaseUrl(),
+    CLERKLY_OPENAI_API_KEY: '',
+    CLERKLY_ANTHROPIC_API_KEY: '',
+    CLERKLY_GOOGLE_API_KEY: '',
   });
   await context.window.waitForLoadState('domcontentloaded');
 
@@ -52,7 +55,7 @@ test.beforeEach(async () => {
 
 test.afterEach(async () => {
   if (context) {
-    await closeElectron(context);
+    await closeElectron(context, true, false);
   }
 });
 
@@ -62,7 +65,9 @@ test.afterEach(async () => {
    Requirements: settings.1.4, settings.1.15 */
 test('53.1: should save and load LLM provider selection', async () => {
   // Navigate to Settings
-  await context.window.click('text=Settings');
+  const settingsNavBefore = context.window.locator('button:has-text("Settings")');
+  await settingsNavBefore.waitFor({ state: 'visible', timeout: 5000 });
+  await settingsNavBefore.click();
   await context.window.waitForSelector('text=LLM Provider');
 
   // Select Anthropic
@@ -78,6 +83,9 @@ test('53.1: should save and load LLM provider selection', async () => {
   // Relaunch with same data path
   context = await launchElectron(testDataPath, {
     CLERKLY_GOOGLE_API_URL: mockServer.getBaseUrl(),
+    CLERKLY_OPENAI_API_KEY: '',
+    CLERKLY_ANTHROPIC_API_KEY: '',
+    CLERKLY_GOOGLE_API_KEY: '',
   });
   await context.window.waitForLoadState('domcontentloaded');
 
@@ -86,7 +94,9 @@ test('53.1: should save and load LLM provider selection', async () => {
   await context.window.waitForTimeout(1000);
 
   // Navigate to Settings
-  await context.window.click('text=Settings');
+  const settingsNavAfter = context.window.locator('button:has-text("Settings")');
+  await settingsNavAfter.waitFor({ state: 'visible', timeout: 5000 });
+  await settingsNavAfter.click();
   await context.window.waitForSelector('text=LLM Provider');
 
   // Check that Anthropic is selected
@@ -119,6 +129,9 @@ test('53.2: should save and load API key with encryption', async () => {
   // Relaunch with same data path
   context = await launchElectron(testDataPath, {
     CLERKLY_GOOGLE_API_URL: mockServer.getBaseUrl(),
+    CLERKLY_OPENAI_API_KEY: '',
+    CLERKLY_ANTHROPIC_API_KEY: '',
+    CLERKLY_GOOGLE_API_KEY: '',
   });
   await context.window.waitForLoadState('domcontentloaded');
 
@@ -139,7 +152,7 @@ test('53.2: should save and load API key with encryption', async () => {
   expect(inputValue).toBeTruthy();
 
   // Toggle visibility
-  const toggleButton = context.window.locator('button:has(svg):near(:text("API Key"))');
+  const toggleButton = context.window.locator('[data-testid="ai-agent-api-key-toggle"]');
   await toggleButton.click();
 
   // Check that key is visible and correct
@@ -175,6 +188,9 @@ test('53.3: should delete API key when field is cleared', async () => {
   // Relaunch with same data path
   context = await launchElectron(testDataPath, {
     CLERKLY_GOOGLE_API_URL: mockServer.getBaseUrl(),
+    CLERKLY_OPENAI_API_KEY: '',
+    CLERKLY_ANTHROPIC_API_KEY: '',
+    CLERKLY_GOOGLE_API_KEY: '',
   });
   await context.window.waitForLoadState('domcontentloaded');
 
@@ -251,7 +267,7 @@ test('53.5: should toggle API key visibility', async () => {
   expect(inputType).toBe('password');
 
   // Find toggle button
-  const toggleButton = context.window.locator('button:has(svg):near(:text("API Key"))');
+  const toggleButton = context.window.locator('[data-testid="ai-agent-api-key-toggle"]');
 
   // Click to show
   await toggleButton.click();
@@ -284,6 +300,9 @@ test('53.6: should show error notification on save failure', async () => {
     CLERKLY_GOOGLE_API_URL: mockServer.getBaseUrl(),
     CLERKLY_OAUTH_CLIENT_ID: 'test-client-id-12345',
     CLERKLY_OAUTH_CLIENT_SECRET: 'test-client-secret-67890',
+    CLERKLY_OPENAI_API_KEY: '',
+    CLERKLY_ANTHROPIC_API_KEY: '',
+    CLERKLY_GOOGLE_API_KEY: '',
   });
 
   await context.window.waitForLoadState('domcontentloaded');

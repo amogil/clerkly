@@ -7,3 +7,6 @@ test-results/
 coverage/
 release/
 playwright-report/
+
+# Local environment variables (copy from .env.example)
+.env

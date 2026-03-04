@@ -3,11 +3,26 @@
 
 export type AgentStatus = 'new' | 'in-progress' | 'awaiting-response' | 'error' | 'completed';
 
+export const AGENT_STATUS = {
+  NEW: 'new',
+  IN_PROGRESS: 'in-progress',
+  AWAITING_RESPONSE: 'awaiting-response',
+  ERROR: 'error',
+  COMPLETED: 'completed',
+} as const;
+
+export const MESSAGE_KIND = {
+  USER: 'user',
+  LLM: 'llm',
+  ERROR: 'error',
+  FINAL_ANSWER: 'final_answer',
+} as const;
+
 /**
  * Message payload structure for status computation
+ * Note: 'kind' is stored as a separate DB column, not in payload
  */
 export interface MessagePayload {
-  kind: 'user' | 'llm' | 'tool_call' | 'code_exec' | 'final_answer' | 'request_scope' | 'artifact';
   timing?: { started_at: string; finished_at: string };
   data?: {
     result?: {

@@ -14,6 +14,7 @@ import { AgentsRepository } from './db/repositories/AgentsRepository';
 import { MessagesRepository } from './db/repositories/MessagesRepository';
 import { UsersRepository } from './db/repositories/UsersRepository';
 import { GlobalRepository } from './db/repositories/GlobalRepository';
+import { NO_USER_LOGGED_IN_ERROR } from '../shared/errors/userErrors';
 
 /**
  * Initialize result for DatabaseManager
@@ -108,7 +109,7 @@ export class DatabaseManager implements IDatabaseManager {
   private requireUserId = (): string => {
     const userId = this.userManager?.getCurrentUserId();
     if (!userId) {
-      throw new Error('No user logged in');
+      throw new Error(NO_USER_LOGGED_IN_ERROR);
     }
     return userId;
   };
@@ -303,7 +304,7 @@ export class DatabaseManager implements IDatabaseManager {
    *
    * Note: Direct database access should be limited to:
    * - Migrations (MigrationRunner)
-   * - Tests (unit tests, property tests)
+   * - Tests (unit tests)
    *
    * For data operations, prefer using repositories:
    * - dbManager.settings - for user settings
@@ -360,7 +361,7 @@ export class DatabaseManager implements IDatabaseManager {
   getCurrentUserIdStrict(): string {
     const userId = this.userManager?.getCurrentUserId();
     if (!userId) {
-      throw new Error('No user logged in');
+      throw new Error(NO_USER_LOGGED_IN_ERROR);
     }
     return userId;
   }

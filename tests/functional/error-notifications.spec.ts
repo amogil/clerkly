@@ -12,12 +12,14 @@ test.beforeEach(async () => {
   // Launch Electron app with clean state
   context = await launchElectron();
   await context.window.waitForLoadState('domcontentloaded');
-  await context.window.waitForTimeout(1000);
+  await context.window.waitForSelector('[data-testid="login-screen"], [data-testid="agents"]', {
+    timeout: 10000,
+  });
 });
 
 test.afterEach(async () => {
   if (context) {
-    await closeElectron(context);
+    await closeElectron(context, true, false);
   }
 });
 
@@ -27,8 +29,7 @@ test.afterEach(async () => {
    Requirements: error-notifications.1.1, error-notifications.1.2
    Property: 20, 21 */
 test('should show error notification on background process failure', async () => {
-  // Wait for App to fully initialize
-  await context.window.waitForTimeout(3000);
+  // Wait for App to fully initialize (already done in beforeEach)
 
   // Trigger error notification via IPC handler
   await context.window.evaluate(async () => {
@@ -81,9 +82,6 @@ test('should auto-dismiss error notification after timeout', async () => {
    Requirements: error-notifications.1.3
    Property: 22 */
 test('should dismiss notification on click', async () => {
-  // Wait for App to fully initialize
-  await context.window.waitForTimeout(3000);
-
   // Show a notification via IPC
   await context.window.evaluate(async () => {
     await (window as any).electron.ipcRenderer.invoke('test:trigger-error-notification', {

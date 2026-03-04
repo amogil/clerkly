@@ -8,6 +8,7 @@ import { eq } from 'drizzle-orm';
 import * as schema from '../../../../src/main/db/schema';
 import { userData } from '../../../../src/main/db/schema';
 import { SettingsRepository } from '../../../../src/main/db/repositories/SettingsRepository';
+import { NO_USER_LOGGED_IN_ERROR } from '../../../../src/shared/errors/userErrors';
 
 describe('SettingsRepository', () => {
   let sqlite: Database.Database;
@@ -221,13 +222,13 @@ describe('SettingsRepository', () => {
        Requirements: user-data-isolation.6.4 */
     it('should throw error when no user logged in', () => {
       const noUserRepo = new SettingsRepository(db, () => {
-        throw new Error('No user logged in');
+        throw new Error(NO_USER_LOGGED_IN_ERROR);
       });
 
-      expect(() => noUserRepo.get('key')).toThrow('No user logged in');
-      expect(() => noUserRepo.set('key', 'value')).toThrow('No user logged in');
-      expect(() => noUserRepo.delete('key')).toThrow('No user logged in');
-      expect(() => noUserRepo.getAll()).toThrow('No user logged in');
+      expect(() => noUserRepo.get('key')).toThrow(NO_USER_LOGGED_IN_ERROR);
+      expect(() => noUserRepo.set('key', 'value')).toThrow(NO_USER_LOGGED_IN_ERROR);
+      expect(() => noUserRepo.delete('key')).toThrow(NO_USER_LOGGED_IN_ERROR);
+      expect(() => noUserRepo.getAll()).toThrow(NO_USER_LOGGED_IN_ERROR);
     });
   });
 });

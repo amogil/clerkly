@@ -3,6 +3,7 @@
 import { handleBackgroundError } from './ErrorHandler';
 import type { IDatabaseManager } from './DatabaseManager';
 import { Logger } from './Logger';
+import { isNoUserLoggedInError, NO_USER_LOGGED_IN_ERROR } from '../shared/errors/userErrors';
 
 // Requirements: clerkly.3.8 - Use centralized Logger instead of console.*
 /**
@@ -132,9 +133,9 @@ export class UserSettingsManager implements IUserSettingsManager {
         );
         return { success: false, error: 'Database is read-only: check permissions' };
       }
-      // Handle "No user logged in" error
-      if (errorObj.message === 'No user logged in') {
-        return { success: false, error: 'No user logged in' };
+      // Handle NO_USER_LOGGED_IN_ERROR
+      if (isNoUserLoggedInError(errorObj.message)) {
+        return { success: false, error: NO_USER_LOGGED_IN_ERROR };
       }
       // Handle "Database not initialized" error
       if (errorObj.message === 'Database not initialized') {
@@ -196,9 +197,9 @@ export class UserSettingsManager implements IUserSettingsManager {
       if (errorObj.code === 'SQLITE_BUSY' || errorObj.code === 'SQLITE_LOCKED') {
         return { success: false, error: 'Database is locked: try again later' };
       }
-      // Handle "No user logged in" error
-      if (errorObj.message === 'No user logged in') {
-        return { success: false, error: 'No user logged in' };
+      // Handle NO_USER_LOGGED_IN_ERROR
+      if (isNoUserLoggedInError(errorObj.message)) {
+        return { success: false, error: NO_USER_LOGGED_IN_ERROR };
       }
       // Handle "Database not initialized" error
       if (errorObj.message === 'Database not initialized') {
@@ -245,9 +246,9 @@ export class UserSettingsManager implements IUserSettingsManager {
       } else if (errorObj.code === 'SQLITE_READONLY') {
         return { success: false, error: 'Database is read-only: check permissions' };
       }
-      // Handle "No user logged in" error
-      if (errorObj.message === 'No user logged in') {
-        return { success: false, error: 'No user logged in' };
+      // Handle NO_USER_LOGGED_IN_ERROR
+      if (isNoUserLoggedInError(errorObj.message)) {
+        return { success: false, error: NO_USER_LOGGED_IN_ERROR };
       }
       // Handle "Database not initialized" error
       if (errorObj.message === 'Database not initialized') {

@@ -1,7 +1,7 @@
 // Requirements: token-management-ui.1.1, token-management-ui.1.2, token-management-ui.1.3, token-management-ui.1.4, token-management-ui.1.5, token-management-ui.1.6, error-notifications.1.1, error-notifications.1.4
 
 import { TokenStorageManager } from './TokenStorageManager';
-import { DateTimeFormatter } from '../utils/DateTimeFormatter';
+import { DateTimeFormatter } from '../../shared/utils/DateTimeFormatter';
 import { Logger } from '../Logger';
 import { handleBackgroundError } from '../ErrorHandler';
 import { MainEventBus } from '../events/MainEventBus';
