@@ -5,7 +5,7 @@ import type { IDatabaseManager } from './DatabaseManager';
 import { Logger } from './Logger';
 
 const DEFAULT_WINDOW_WIDTH = 900;
-const DEFAULT_WINDOW_HEIGHT = 700;
+const DEFAULT_WINDOW_HEIGHT = 800;
 const MIN_WINDOW_WIDTH = 350;
 const MIN_WINDOW_HEIGHT = 650;
 
@@ -183,7 +183,7 @@ export class WindowStateManager {
    * @example
    * ```typescript
    * const stateManager = new WindowStateManager(dbManager);
-   * const window = new BrowserWindow({ width: 900, height: 700 });
+   * const window = new BrowserWindow({ width: 900, height: 800 });
    *
    * // Save state when window is resized (window-management.5.1)
    * window.on('resize', () => {
@@ -239,7 +239,7 @@ export class WindowStateManager {
    *
    * This private method calculates the default window state when no saved state
    * exists or when the saved state is invalid. The window opens with a compact
-   * size of min(900, screenWidth) x min(700, screenHeight), centered on the screen.
+   * size of min(900, screenWidth) x min(800, screenHeight), centered on the screen.
    * This provides a focused interface for agent chats while allowing immediate resizing.
    *
    * The default state has isMaximized set to false, ensuring the window
@@ -257,7 +257,7 @@ export class WindowStateManager {
    * //   x: 510,
    * //   y: 177,
    * //   width: 900,
-   * //   height: 700,
+   * //   height: 800,
    * //   isMaximized: false
    * // }
    *
@@ -266,7 +266,7 @@ export class WindowStateManager {
    * //   x: 233,
    * //   y: 21,
    * //   width: 900,
-   * //   height: 700,
+   * //   height: 800,
    * //   isMaximized: false
    * // }
    *
@@ -285,7 +285,7 @@ export class WindowStateManager {
     const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
 
     // Requirements: window-management.1.1, window-management.1.6, window-management.4.2, window-management.4.4
-    // Window opens with size min(900, screenWidth) x min(700, screenHeight) on first launch,
+    // Window opens with size min(900, screenWidth) x min(800, screenHeight) on first launch,
     // but is never allowed to be smaller than 350x650.
     // This provides a focused interface for agent chats while allowing immediate resizing
     const desiredWidth = Math.min(DEFAULT_WINDOW_WIDTH, screenWidth);

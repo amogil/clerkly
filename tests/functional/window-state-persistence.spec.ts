@@ -36,7 +36,7 @@ test.describe('Window State Persistence', () => {
 
   /* Preconditions: Application not running, no saved window state
      Action: Launch application, check initial window size
-     Assertions: Window opens with compact size min(900, screenWidth) x min(700, screenHeight), centered, not maximized
+     Assertions: Window opens with compact size min(900, screenWidth) x min(800, screenHeight), centered, not maximized
      Requirements: window-management.1.1, window-management.4.1, window-management.4.2, window-management.4.4 */
   test('should open at default size on first launch', async () => {
     // Launch the application with a fresh data directory
@@ -54,9 +54,9 @@ test.describe('Window State Persistence', () => {
       return primaryDisplay.workAreaSize;
     });
 
-    // Calculate expected compact size: min(900, screenWidth) x min(700, screenHeight)
+    // Calculate expected compact size: min(900, screenWidth) x min(800, screenHeight)
     const expectedWidth = Math.min(900, screenSize.width);
-    const expectedHeight = Math.min(700, screenSize.height);
+    const expectedHeight = Math.min(800, screenSize.height);
 
     // Verify window has compact size (not full screen)
     // Requirements: window-management.1.1, window-management.4.1, window-management.4.2

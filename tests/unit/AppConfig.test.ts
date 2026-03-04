@@ -34,12 +34,12 @@ describe('AppConfig', () => {
 
   /* Preconditions: AppConfig instance created
      Action: access windowSettings property
-     Assertions: windowSettings contains correct default values (width: 900, height: 700, minWidth: 350, minHeight: 650, titleBarStyle: 'hiddenInset', vibrancy: 'under-window')
+     Assertions: windowSettings contains correct default values (width: 900, height: 800, minWidth: 350, minHeight: 650, titleBarStyle: 'hiddenInset', vibrancy: 'under-window')
      Requirements: clerkly.1*/
   it('should have correct default window settings', () => {
     expect(appConfig.windowSettings).toEqual({
       width: 900,
-      height: 700,
+      height: 800,
       minWidth: 350,
       minHeight: 650,
       titleBarStyle: 'hiddenInset',
@@ -79,7 +79,7 @@ describe('AppConfig', () => {
     const settings = appConfig.getWindowSettings();
     expect(settings).toEqual({
       width: 900,
-      height: 700,
+      height: 800,
       minWidth: 350,
       minHeight: 650,
       titleBarStyle: 'hiddenInset',
@@ -97,7 +97,7 @@ describe('AppConfig', () => {
     settings.height = 800;
 
     expect(appConfig.windowSettings.width).toBe(900);
-    expect(appConfig.windowSettings.height).toBe(700);
+    expect(appConfig.windowSettings.height).toBe(800);
   });
 
   /* Preconditions: AppConfig instance created with default settings
@@ -124,7 +124,7 @@ describe('AppConfig', () => {
 
     expect(appConfig.windowSettings.titleBarStyle).toBe('hidden');
     expect(appConfig.windowSettings.width).toBe(900);
-    expect(appConfig.windowSettings.height).toBe(700);
+    expect(appConfig.windowSettings.height).toBe(800);
     expect(appConfig.windowSettings.vibrancy).toBe('under-window');
   });
 
@@ -174,10 +174,10 @@ describe('AppConfig', () => {
 
   /* Preconditions: AppConfig instance created
      Action: access windowSettings default dimensions
-     Assertions: width is 900, height is 700
+     Assertions: width is 900, height is 800
      Requirements: clerkly.1*/
   it('should have correct default window dimensions', () => {
     expect(appConfig.windowSettings.width).toBe(900);
-    expect(appConfig.windowSettings.height).toBe(700);
+    expect(appConfig.windowSettings.height).toBe(800);
   });
 });

@@ -148,7 +148,7 @@ class WindowManager {
 
     // Note: We don't call maximize() here even if windowState.isMaximized is true
     // because on macOS, maximized windows cannot be resized by dragging edges.
-    // The window will open with the saved size (or compact 900x700 by default),
+    // The window will open with the saved size (or compact 900x800 by default),
     // which provides a focused window that is still resizable.
     // If the user previously maximized the window and closed it in that state,
     // we restore the maximized state after showing.
@@ -276,10 +276,10 @@ class WindowStateManager {
     const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
 
     // Requirements: window-management.1.1, window-management.4.2, window-management.4.4
-    // Window opens with size min(900, screenWidth) x min(700, screenHeight) on first launch
+    // Window opens with size min(900, screenWidth) x min(800, screenHeight) on first launch
     // This provides a focused interface for agent chats while allowing immediate resizing
     const width = Math.min(900, screenWidth);
-    const height = Math.min(700, screenHeight);
+    const height = Math.min(800, screenHeight);
     
     // Requirements: window-management.4.4 - Center window on screen
     const x = Math.floor((screenWidth - width) / 2);
@@ -410,7 +410,7 @@ interface WindowState {
 
 ### Property 1: Окно открывается с адаптивным размером при первом запуске
 
-*Для любого* первого запуска приложения (когда сохраненное состояние отсутствует), окно должно иметь размер min(900, ширина экрана) x min(700, высота экрана), быть центрировано на экране, но НЕ находиться в maximized состоянии (isMaximized: false), чтобы пользователь мог сразу изменять его размер через перетаскивание краев окна.
+*Для любого* первого запуска приложения (когда сохраненное состояние отсутствует), окно должно иметь размер min(900, ширина экрана) x min(800, высота экрана), быть центрировано на экране, но НЕ находиться в maximized состоянии (isMaximized: false), чтобы пользователь мог сразу изменять его размер через перетаскивание краев окна.
 
 **Validates: Requirements window-management.1.1, window-management.1.3**
 
@@ -434,7 +434,7 @@ interface WindowState {
 
 ### Property 5: Размер окна адаптируется к экрану при первом запуске
 
-*Для любого* первого запуска приложения (когда сохраненное состояние отсутствует), размеры окна по умолчанию должны быть min(900, ширина экрана) x min(700, высота экрана), адаптируясь к размеру экрана.
+*Для любого* первого запуска приложения (когда сохраненное состояние отсутствует), размеры окна по умолчанию должны быть min(900, ширина экрана) x min(800, высота экрана), адаптируясь к размеру экрана.
 
 **Validates: Requirements window-management.4.1, window-management.4.2**
 
@@ -460,9 +460,9 @@ interface WindowState {
 
 Следующие граничные случаи должны быть обработаны корректно:
 
-1. **Маленький экран (window-management.4.2)**: Когда размер экрана меньше 900x700, размеры окна должны адаптироваться: min(900, ширина экрана) x min(700, высота экрана).
+1. **Маленький экран (window-management.4.2)**: Когда размер экрана меньше 900x800, размеры окна должны адаптироваться: min(900, ширина экрана) x min(800, высота экрана).
 
-2. **Первый запуск (window-management.5.5)**: Когда сохраненное состояние отсутствует, должно использоваться состояние по умолчанию с размером min(900, ширина экрана) x min(700, высота экрана), центрированным на экране, но НЕ в maximized состоянии.
+2. **Первый запуск (window-management.5.5)**: Когда сохраненное состояние отсутствует, должно использоваться состояние по умолчанию с размером min(900, ширина экрана) x min(800, высота экрана), центрированным на экране, но НЕ в maximized состоянии.
 
 3. **Невалидная позиция (window-management.5.6)**: Когда сохраненная позиция находится за пределами доступных экранов, должно использоваться состояние по умолчанию на основном экране.
 
@@ -654,7 +654,7 @@ describe('WindowManager', () => {
 describe('WindowStateManager', () => {
   /* Preconditions: no saved state in database
      Action: call loadState()
-     Assertions: returns default state with isMaximized: false, dimensions min(900, screenWidth) x min(700, screenHeight)
+     Assertions: returns default state with isMaximized: false, dimensions min(900, screenWidth) x min(800, screenHeight)
      Requirements: window-management.4.1, window-management.4.2, window-management.5.5 */
   it('should return default state when no saved state exists', () => {
     // Тест возврата состояния по умолчанию
@@ -710,7 +710,7 @@ describe('WindowStateManager', () => {
 describe('Window Management Functional Tests', () => {
   /* Preconditions: fresh application start, no saved state
      Action: launch application, verify window state
-     Assertions: window opens with size min(900, screenWidth) x min(700, screenHeight), not maximized, has empty title, uses native macOS controls
+     Assertions: window opens with size min(900, screenWidth) x min(800, screenHeight), not maximized, has empty title, uses native macOS controls
      Requirements: window-management.1.1, window-management.1.2, window-management.2.1, window-management.3.1 */
   it('should open application with correct initial window state', async () => {
     // Запустить приложение
@@ -719,11 +719,11 @@ describe('Window Management Functional Tests', () => {
     // Получить главное окно
     const window = app.getMainWindow();
     
-    // Проверить размеры (должны быть компактными: 900x700 или адаптированы к меньшему экрану)
+    // Проверить размеры (должны быть компактными: 900x800 или адаптированы к меньшему экрану)
     const bounds = window.getBounds();
     const screenSize = screen.getPrimaryDisplay().workAreaSize;
     const expectedWidth = Math.min(900, screenSize.width);
-    const expectedHeight = Math.min(700, screenSize.height);
+    const expectedHeight = Math.min(800, screenSize.height);
     expect(bounds.width).toBe(expectedWidth);
     expect(bounds.height).toBe(expectedHeight);
     
@@ -750,7 +750,7 @@ describe('Window Management Functional Tests', () => {
     const window1 = app1.getMainWindow();
     
     // Изменить размер и позицию
-    window1.setBounds({ x: 100, y: 100, width: 900, height: 700 });
+    window1.setBounds({ x: 100, y: 100, width: 900, height: 800 });
     await wait(500); // Дать время на сохранение
     
     // Закрыть приложение
@@ -765,7 +765,7 @@ describe('Window Management Functional Tests', () => {
     expect(bounds.x).toBe(100);
     expect(bounds.y).toBe(100);
     expect(bounds.width).toBe(900);
-    expect(bounds.height).toBe(700);
+    expect(bounds.height).toBe(800);
     
     // Закрыть приложение
     await app2.close();
@@ -911,7 +911,7 @@ describe('Window Management Functional Tests', () => {
 
 ### Решение 4: Состояние по Умолчанию - Не Максимизировано
 
-**Решение:** По умолчанию окно открывается с компактным размером 900x700, но НЕ в maximized состоянии.
+**Решение:** По умолчанию окно открывается с компактным размером 900x800, но НЕ в maximized состоянии.
 
 **Альтернативы:**
 - Открывать окно в maximized состоянии
@@ -927,7 +927,7 @@ describe('Window Management Functional Tests', () => {
 
 ### Решение 5: Компактный Размер с Адаптацией
 
-**Решение:** Использовать компактный размер 900x700 пикселей по умолчанию, с адаптацией к меньшим экранам: min(900, ширина) x min(700, высота).
+**Решение:** Использовать компактный размер 900x800 пикселей по умолчанию, с адаптацией к меньшим экранам: min(900, ширина) x min(800, высота).
 
 **Альтернативы:**
 - Использовать workAreaSize (весь экран)

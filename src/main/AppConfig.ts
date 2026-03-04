@@ -38,7 +38,7 @@ export class AppConfig {
    */
   windowSettings: WindowSettings = {
     width: 900,
-    height: 700,
+    height: 800,
     minWidth: 350,
     minHeight: 650,
     titleBarStyle: 'hiddenInset',
