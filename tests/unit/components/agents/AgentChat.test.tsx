@@ -566,16 +566,16 @@ describe('AgentChat — PromptInput rendered', () => {
 
   /* Preconditions: agent status is in-progress but request is not streaming
      Action: render AgentChat
-     Assertions: send button is rendered to allow new request
-     Requirements: agents.4.24.1 */
-  it('should render send button when in-progress status is stale and not streaming', () => {
+     Assertions: stop button is still rendered because mode depends only on agent status
+     Requirements: agents.4.24 */
+  it('should render stop button when agent is in progress even if request is not streaming', () => {
     mockUseAgentChatState.isStreaming = false;
     render(
       <AgentChat {...defaultProps} agent={{ ...defaultProps.agent, status: 'in-progress' }} />
     );
 
-    expect(screen.getByTestId('prompt-input-send')).toBeInTheDocument();
-    expect(screen.queryByTestId('prompt-input-stop')).not.toBeInTheDocument();
+    expect(screen.getByTestId('prompt-input-stop')).toBeInTheDocument();
+    expect(screen.queryByTestId('prompt-input-send')).not.toBeInTheDocument();
   });
 });
 

@@ -1263,12 +1263,10 @@ function ChatInput({
           onChange={(event) => setTaskInput(event.target.value)}
         />
         <Button
-          type={agent.status === 'in-progress' && isStreaming ? 'button' : 'submit'}
-          onClick={
-            agent.status === 'in-progress' && isStreaming ? () => cancelCurrentRequest() : undefined
-          }
+          type={agent.status === 'in-progress' ? 'button' : 'submit'}
+          onClick={agent.status === 'in-progress' ? () => cancelCurrentRequest() : undefined}
         >
-          {agent.status === 'in-progress' && isStreaming ? <Square /> : <Send />}
+          {agent.status === 'in-progress' ? <Square /> : <Send />}
         </Button>
       </PromptInputBody>
       <PromptInputFooter>
@@ -2214,9 +2212,9 @@ interface UseAgentChatResult {
 
 4. **Синхронизация через события** — `MESSAGE_CREATED` добавляет в `rawMessages` (дедупликация по id), `MESSAGE_UPDATED` с `hidden: true` удаляет из обоих массивов через `setMessages()`.
 
-5. **`isStreaming`** = `status === 'streaming' || status === 'submitted'` (внутреннее состояние запроса в `useChat`).
+5. **`isStreaming`** = `status === 'streaming' || status === 'submitted'` (внутреннее состояние запроса в `useChat`); используется для потока сообщений и reasoning, но НЕ для переключения `send/stop`.
 
-6. **Stop по статусу и активному запросу** — action-кнопка в `AgentChat` переключается в режим `stop`, когда `agent.status === 'in-progress'` и `isStreaming === true` (`submitted`/`streaming` в `useChat`); нажатие вызывает `cancelCurrentRequest()` и IPC `messages:cancel`.
+6. **Stop только по статусу агента** — action-кнопка в `AgentChat` переключается в режим `stop`, когда `agent.status === 'in-progress'`; во всех остальных статусах отображается `send`. Нажатие `stop` вызывает `cancelCurrentRequest()` и IPC `messages:cancel`.
 
 7. **Ошибки stop без toast** — `cancelCurrentRequest()` перехватывает ошибки/`success:false` от `messages:cancel`, возвращает `false` и не инициирует toast-уведомления.
 

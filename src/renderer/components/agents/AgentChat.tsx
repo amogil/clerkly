@@ -194,9 +194,9 @@ export function AgentChat({
     return null;
   })();
 
-  // Stop button is shown only for active generation of current in-progress agent.
-  // This avoids stale in-progress status keeping the button in stop mode after cancel.
-  const isInProgress = agent.status === 'in-progress' && isStreaming;
+  // Stop/send mode is driven only by agent status.
+  // Requirements: agents.4.24, agents.4.24.4
+  const isInProgress = agent.status === 'in-progress';
 
   return (
     // Hidden via CSS — NOT unmounted — absolute+opacity-0 keeps scrollTop intact (agents.13.5, agents.4.14)
