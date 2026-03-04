@@ -36,12 +36,25 @@ jest.mock('framer-motion', () => ({
 }));
 
 // Stub Conversation — renders children directly with a scrollable div
-jest.mock('../../../../src/renderer/components/ai-elements/conversation', () => ({
-  Conversation: ({ children, className }: { children: React.ReactNode; className?: string }) => (
-    <div data-testid="conversation" className={className}>
+const mockConversation = jest.fn(
+  ({
+    children,
+    className,
+    resize,
+  }: {
+    children: React.ReactNode;
+    className?: string;
+    resize?: string;
+  }) => (
+    <div data-testid="conversation" className={className} data-resize={resize}>
       {children}
     </div>
-  ),
+  )
+);
+
+jest.mock('../../../../src/renderer/components/ai-elements/conversation', () => ({
+  Conversation: (props: { children: React.ReactNode; className?: string; resize?: string }) =>
+    mockConversation(props),
   ConversationContent: ({
     children,
     ...props
@@ -183,6 +196,7 @@ beforeEach(() => {
     messages: [],
     isStreaming: false,
   };
+  mockConversation.mockClear();
 });
 
 describe('AgentChat — visibility', () => {
@@ -235,6 +249,54 @@ describe('AgentChat — loading state', () => {
     render(<AgentChat {...defaultProps} onLoadingChange={onLoadingChange} />);
 
     expect(onLoadingChange).toHaveBeenCalledWith('agent-1', false);
+  });
+
+  /* Preconditions: Active chat is rendered
+     Action: Wait 5 seconds after activation
+     Assertions: Conversation resize switches from instant to smooth
+     Requirements: agents.4.14.5 */
+  it('should keep instant resize for first 5 seconds of active chat and then switch to smooth', () => {
+    jest.useFakeTimers();
+    const { unmount } = render(<AgentChat {...defaultProps} isActive={true} />);
+    expect(mockConversation).toHaveBeenLastCalledWith(
+      expect.objectContaining({ resize: 'instant' })
+    );
+
+    act(() => {
+      jest.advanceTimersByTime(5000);
+    });
+
+    expect(mockConversation).toHaveBeenLastCalledWith(
+      expect.objectContaining({ resize: 'smooth' })
+    );
+
+    unmount();
+    jest.useRealTimers();
+  });
+
+  /* Preconditions: Chat has completed initial 5-second instant window
+     Action: Deactivate and activate chat again
+     Assertions: Instant window is NOT restarted for the same chat
+     Requirements: agents.4.14.5 */
+  it('should not restart instant resize window when chat becomes active again', () => {
+    jest.useFakeTimers();
+    const { rerender, unmount } = render(<AgentChat {...defaultProps} isActive={true} />);
+
+    act(() => {
+      jest.advanceTimersByTime(5000);
+    });
+    expect(mockConversation).toHaveBeenLastCalledWith(
+      expect.objectContaining({ resize: 'smooth' })
+    );
+
+    rerender(<AgentChat {...defaultProps} isActive={false} />);
+    rerender(<AgentChat {...defaultProps} isActive={true} />);
+    expect(mockConversation).toHaveBeenLastCalledWith(
+      expect.objectContaining({ resize: 'smooth' })
+    );
+
+    unmount();
+    jest.useRealTimers();
   });
 });
 

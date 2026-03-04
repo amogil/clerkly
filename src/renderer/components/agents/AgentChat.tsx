@@ -2,7 +2,7 @@
 // Per-agent chat component — mounted at startup, stays mounted forever.
 // Scroll position is managed by Conversation (use-stick-to-bottom) — preserved automatically.
 
-import React, { useRef, useEffect, useCallback } from 'react';
+import React, { useRef, useEffect, useCallback, useState } from 'react';
 import { motion } from 'framer-motion';
 import { CornerDownLeft, Square } from 'lucide-react';
 import { useAgentChat } from '../../hooks/useAgentChat';
@@ -126,6 +126,8 @@ export function AgentChat({
   );
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const stickContextRef = useRef<StickToBottomContext | null>(null);
+  const hasCompletedInitialResizeWindowRef = useRef(false);
+  const [isInstantResizeMode, setIsInstantResizeMode] = useState(true);
 
   // Autofocus textarea when this chat becomes active (agents.4.7.1)
   useEffect(() => {
@@ -142,6 +144,22 @@ export function AgentChat({
   useEffect(() => {
     onLoadingChange(agent.id, isLoading);
   }, [agent.id, isLoading, onLoadingChange]);
+
+  // Keep instant scroll behavior for 5 seconds only once per chat (first activation), then stay smooth.
+  // Requirements: agents.4.14.5
+  useEffect(() => {
+    if (!isActive || hasCompletedInitialResizeWindowRef.current) return;
+
+    setIsInstantResizeMode(true);
+    const timeoutId = window.setTimeout(() => {
+      setIsInstantResizeMode(false);
+      hasCompletedInitialResizeWindowRef.current = true;
+    }, 5000);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [isActive]);
 
   const handleSubmit = useCallback(
     async (message: PromptInputMessage) => {
@@ -172,8 +190,12 @@ export function AgentChat({
     <div
       className={`flex flex-col flex-1 min-h-0${isActive ? '' : ' absolute inset-0 opacity-0 pointer-events-none'}`}
     >
-      {/* Conversation manages autoscroll via use-stick-to-bottom (agents.4.13) */}
-      <Conversation className="flex-1 min-h-0" contextRef={stickContextRef}>
+      {/* Per chat: one-time 5s instant resize on first activation, then smooth permanently (agents.4.14.5). */}
+      <Conversation
+        className="flex-1 min-h-0"
+        contextRef={stickContextRef}
+        resize={isInstantResizeMode ? 'instant' : 'smooth'}
+      >
         <AgentChatInner
           agent={agent}
           rateLimitBanner={rateLimitBanner}
