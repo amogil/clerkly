@@ -1,6 +1,6 @@
-// Requirements: clerkly.1, window-management.5, database-refactoring.3.6
+// Requirements: clerkly.1, window-management.5, window-management.7, database-refactoring.3.6
 
-import { BrowserWindow, BrowserWindowConstructorOptions } from 'electron';
+import { BrowserWindow, BrowserWindowConstructorOptions, shell } from 'electron';
 import * as path from 'path';
 import type { IDatabaseManager } from './DatabaseManager';
 import { WindowStateManager } from './WindowStateManager';
@@ -240,6 +240,9 @@ class WindowManager {
         this.logger.info(`${message}`);
       });
 
+      // Requirements: window-management.7 — open external links in default system browser
+      this.setupExternalLinkHandling();
+
       // Clean up reference when window is closed
       this.mainWindow.on('closed', () => {
         this.mainWindow = null;
@@ -253,6 +256,51 @@ class WindowManager {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(`Failed to create window: ${errorMessage}`);
       throw new Error(`Window creation failed: ${errorMessage}`);
+    }
+  }
+
+  /**
+   * Intercept external link clicks and open in default system browser.
+   * Requirements: window-management.7.1, window-management.7.2, window-management.7.3
+   */
+  private setupExternalLinkHandling(): void {
+    if (!this.mainWindow) return;
+
+    const webContents = this.mainWindow.webContents;
+
+    // Requirements: window-management.7.1, window-management.7.2 — target="_blank" / window.open()
+    webContents.setWindowOpenHandler(({ url }) => {
+      if (this.isExternalUrl(url)) {
+        shell.openExternal(url).catch((err) => {
+          this.logger.error(`Failed to open external URL: ${err}`);
+        });
+        return { action: 'deny' };
+      }
+      return { action: 'deny' };
+    });
+
+    // Requirements: window-management.7.1, window-management.7.2 — same-window navigation
+    webContents.on('will-navigate', (event, url) => {
+      if (this.isExternalUrl(url)) {
+        event.preventDefault();
+        shell.openExternal(url).catch((err) => {
+          this.logger.error(`Failed to open external URL: ${err}`);
+        });
+      }
+    });
+  }
+
+  /**
+   * Requirements: window-management.7.3 — only http, https, mailto are external
+   */
+  private isExternalUrl(url: string): boolean {
+    try {
+      const parsed = new URL(url);
+      return (
+        parsed.protocol === 'http:' || parsed.protocol === 'https:' || parsed.protocol === 'mailto:'
+      );
+    } catch {
+      return false;
     }
   }
 

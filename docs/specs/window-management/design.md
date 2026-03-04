@@ -214,6 +214,18 @@ class WindowManager {
 - Пустой заголовок окна (`title: ''`)
 - Применение состояния maximized после создания окна
 
+### Обработка Внешних Ссылок (window-management.7)
+
+При клике на внешнюю ссылку (http:, https:, mailto:) в контенте приложения (в т.ч. в сообщениях агента с markdown) ссылка должна открываться в системном браузере по умолчанию, а не во встроенном окне Electron.
+
+**Реализация в `WindowManager`:**
+- `setupExternalLinkHandling()` вызывается после создания окна
+- `webContents.setWindowOpenHandler` — перехват запросов на открытие нового окна (target="_blank", window.open): при внешнем URL вызывается `shell.openExternal(url)`, создание нового окна запрещается
+- `webContents.on('will-navigate')` — перехват навигации в текущем окне на внешний URL: предотвращается навигация, вызывается `shell.openExternal(url)`
+- `isExternalUrl(url)` — проверка, что URL имеет протокол http:, https: или mailto: (внутренняя навигация file: не перехватывается)
+
+**Покрытие требований:** window-management.7.1, window-management.7.2, window-management.7.3
+
 ### WindowStateManager (Новый Компонент)
 
 Новый класс для управления состоянием окна и его персистентностью.
@@ -855,6 +867,9 @@ describe('Window Management Functional Tests', () => {
 | window-management.6.1 | - | ✓ |
 | window-management.6.2 | - | ✓ |
 | window-management.6.3 | - | ✓ |
+| window-management.7.1 | ✓ | - |
+| window-management.7.2 | ✓ | - |
+| window-management.7.3 | ✓ | - |
 
 ### Критерии Успеха
 
