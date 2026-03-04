@@ -106,7 +106,7 @@ export function buildStructuredOutputInstruction(): string {
     `Schema: ${schema}.`,
     'Field semantics and formats:',
     '- action.type: always "text"; defines the action kind.',
-    '- action.content: user-visible assistant text.',
+    '- action.content: user-visible assistant text. Do not include images in the response.',
   ].join(' ');
 }
 
