@@ -4,6 +4,7 @@
 
 import { AnthropicProvider } from '../../../src/main/llm/AnthropicProvider';
 import type { ChatMessage, ChatOptions, ChatChunk } from '../../../src/main/llm/ILLMProvider';
+import { InvalidStructuredOutputError } from '../../../src/main/llm/StructuredOutputContract';
 
 function buildMockReader(lines: string[]) {
   const chunks = lines.map((line) => Buffer.from(line + '\n'));
@@ -232,7 +233,7 @@ describe('AnthropicProvider.chat()', () => {
       fetchMock.mockResolvedValue({ ok: true, body: { getReader: () => reader } });
 
       await expect(provider.chat(mockMessages, mockOptions, () => {})).rejects.toThrow(
-        /Empty response/
+        InvalidStructuredOutputError
       );
     });
   });

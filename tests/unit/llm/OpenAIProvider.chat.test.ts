@@ -4,6 +4,7 @@
 
 import { OpenAIProvider } from '../../../src/main/llm/OpenAIProvider';
 import type { ChatMessage, ChatOptions, ChatChunk } from '../../../src/main/llm/ILLMProvider';
+import { InvalidStructuredOutputError } from '../../../src/main/llm/StructuredOutputContract';
 
 /**
  * Build a mock response body reader from SSE data lines.
@@ -223,7 +224,7 @@ describe('OpenAIProvider.chat()', () => {
       fetchMock.mockResolvedValue({ ok: true, body: { getReader: () => reader } });
 
       await expect(provider.chat(mockMessages, mockOptions, () => {})).rejects.toThrow(
-        /Empty response/
+        InvalidStructuredOutputError
       );
     });
   });

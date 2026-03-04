@@ -280,7 +280,7 @@ export class AnthropicProvider implements ILLMProvider {
    */
   private parseAction(json: string): LLMStructuredOutput {
     if (!json.trim()) {
-      throw new Error('Empty response from LLM');
+      throw new InvalidStructuredOutputError(json);
     }
     try {
       const parsedJson = JSON.parse(json) as unknown;

@@ -17,6 +17,7 @@ import type {
 } from '../../../src/main/llm/ILLMProvider';
 import type { Message } from '../../../src/main/db/schema';
 import { LLM_CHAT_MODELS } from '../../../src/main/llm/LLMConfig';
+import { InvalidStructuredOutputError } from '../../../src/main/llm/StructuredOutputContract';
 
 // ─── Mocks ────────────────────────────────────────────────────────────────────
 
@@ -326,6 +327,35 @@ describe('MainPipeline.run()', () => {
           m.content.includes('did not match the required JSON schema')
         )
       ).toBe(true);
+      expect(messageManager.create).toHaveBeenCalledWith(
+        'agent-1',
+        'error',
+        expect.objectContaining({
+          data: {
+            error: {
+              type: 'provider',
+              message: 'Invalid response format. Please try again later.',
+            },
+          },
+        }),
+        1
+      );
+    });
+
+    /* Preconditions: LLM provider throws InvalidStructuredOutputError (parse/schema failure)
+       Action: Call run(agentId, userMessageId)
+       Assertions: Pipeline catches error, retries twice, then creates standardized error
+       Requirements: llm-integration.12.1, llm-integration.12.2 */
+    it('should retry when provider throws InvalidStructuredOutputError and then create error', async () => {
+      const { pipeline, messageManager, llmProvider } = makeMocks();
+
+      llmProvider.chat.mockRejectedValue(
+        new InvalidStructuredOutputError('{"action":{"type":"invalid-type","content":"Broken"}}')
+      );
+
+      await pipeline.run('agent-1', 1);
+
+      expect(llmProvider.chat).toHaveBeenCalledTimes(3);
       expect(messageManager.create).toHaveBeenCalledWith(
         'agent-1',
         'error',

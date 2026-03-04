@@ -4,6 +4,7 @@
 
 import { GoogleProvider } from '../../../src/main/llm/GoogleProvider';
 import type { ChatMessage, ChatOptions, ChatChunk } from '../../../src/main/llm/ILLMProvider';
+import { InvalidStructuredOutputError } from '../../../src/main/llm/StructuredOutputContract';
 
 function buildMockReader(lines: string[]) {
   const chunks = lines.map((line) => Buffer.from(line + '\n'));
@@ -216,7 +217,7 @@ describe('GoogleProvider.chat()', () => {
       fetchMock.mockResolvedValue({ ok: true, body: { getReader: () => reader } });
 
       await expect(provider.chat(mockMessages, mockOptions, () => {})).rejects.toThrow(
-        /Empty response/
+        InvalidStructuredOutputError
       );
     });
   });
