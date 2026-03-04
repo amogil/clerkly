@@ -174,7 +174,7 @@
    - Система ДОЛЖНА отправить тестовый запрос к выбранному LLM провайдеру
 
 3.5. Тестовый запрос ДОЛЖЕН использовать минимальные параметры:
-   - OpenAI: `POST https://api.openai.com/v1/responses` с моделью `gpt-5-nano`, `input` с сообщением "test", `max_output_tokens: 16`, `text.format.type: "json_object"`
+   - OpenAI: `POST https://api.openai.com/v1/responses` с моделью `gpt-5-nano`, `input` с сообщением, содержащим слово "JSON" (например, `Return JSON: {"ok": true}`), `max_output_tokens: 16`, `text.format.type: "json_object"`
    - Anthropic: `POST https://api.anthropic.com/v1/messages` с моделью `claude-haiku-4-6`, сообщением "test", `max_tokens: 5`
    - Google: `POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key={apiKey}` с содержимым "test"
 

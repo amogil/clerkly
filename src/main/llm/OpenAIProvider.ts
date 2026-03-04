@@ -65,7 +65,7 @@ export class OpenAIProvider implements ILLMProvider {
       const maxOutputTokens = Math.max(16, this.config.testMaxTokens);
       const testBody = {
         model: this.config.testModel,
-        input: [{ role: 'user', content: 'test' }],
+        input: [{ role: 'user', content: 'Return JSON: {"ok": true}' }],
         max_output_tokens: maxOutputTokens,
         text: { format: { type: 'json_object' } },
       };
