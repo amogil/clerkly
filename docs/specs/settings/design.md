@@ -155,16 +155,17 @@ class OpenAIProvider implements ILLMProvider {
   async testConnection(apiKey: string): Promise<TestConnectionResult> {
     try {
       // Requirements: settings.3.5 - Minimal test request
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      const response = await fetch('https://api.openai.com/v1/responses', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${apiKey}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          model: 'gpt-4o-mini',
-          messages: [{ role: 'user', content: 'test' }],
-          max_tokens: 5
+          model: 'gpt-5-nano',
+          input: [{ role: 'user', content: 'test' }],
+          max_output_tokens: 16,
+          text: { format: { type: 'json_object' } }
         }),
         signal: AbortSignal.timeout(10000) // Requirements: settings.3.6 - 10 second timeout
       });
@@ -236,7 +237,7 @@ class AnthropicProvider implements ILLMProvider {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          model: 'claude-haiku-4-5',
+          model: 'claude-haiku-4-6',
           messages: [{ role: 'user', content: 'test' }],
           max_tokens: 5
         }),
@@ -1655,4 +1656,3 @@ describe('Settings Functional Tests', () => {
 - Не требует дополнительных IPC handlers
 - Консистентность с остальными данными приложения
 - Упрощает код и поддержку
-

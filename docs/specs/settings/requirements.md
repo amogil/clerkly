@@ -174,9 +174,9 @@
    - Система ДОЛЖНА отправить тестовый запрос к выбранному LLM провайдеру
 
 3.5. Тестовый запрос ДОЛЖЕН использовать минимальные параметры:
-   - OpenAI: `POST https://api.openai.com/v1/chat/completions` с моделью `gpt-4o-mini`, сообщением "test", max_tokens: 5
-   - Anthropic: `POST https://api.anthropic.com/v1/messages` с моделью `claude-haiku-4-5`, сообщением "test", max_tokens: 5
-   - Google: `POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash:generateContent?key={apiKey}` с содержимым "test"
+   - OpenAI: `POST https://api.openai.com/v1/responses` с моделью `gpt-5-nano`, `input` с сообщением "test", `max_output_tokens: 16`, `text.format.type: "json_object"`
+   - Anthropic: `POST https://api.anthropic.com/v1/messages` с моделью `claude-haiku-4-6`, сообщением "test", `max_tokens: 5`
+   - Google: `POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key={apiKey}` с содержимым "test"
 
 3.6. Тестовый запрос ДОЛЖЕН иметь timeout 10 секунд
 
@@ -212,6 +212,7 @@
 - `tests/functional/llm-connection-test.spec.ts` - "should show success notification on valid API key"
 - `tests/functional/llm-connection-test.spec.ts` - "should show error notification on invalid API key"
 - `tests/functional/llm-connection-test.spec.ts` - "should test connection for each provider (OpenAI, Anthropic, Google)"
+- `tests/functional/llm-connection-real.spec.ts` - "should validate Test Connection against real OpenAI API" (opt-in, требует `CLERKLY_RUN_REAL_OPENAI_CONNECTION_TEST=1` и `CLERKLY_OPENAI_API_KEY`)
 
 ### Требование 3: Форматирование Дат и Времени из Системных Настроек
 

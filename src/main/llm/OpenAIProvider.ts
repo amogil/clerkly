@@ -62,10 +62,11 @@ export class OpenAIProvider implements ILLMProvider {
    */
   async testConnection(apiKey: string): Promise<TestConnectionResult> {
     try {
+      const maxOutputTokens = Math.max(16, this.config.testMaxTokens);
       const testBody = {
         model: this.config.testModel,
         input: [{ role: 'user', content: 'test' }],
-        max_output_tokens: this.config.testMaxTokens,
+        max_output_tokens: maxOutputTokens,
         text: { format: { type: 'json_object' } },
       };
       const response = await fetch(this.config.apiUrl, {

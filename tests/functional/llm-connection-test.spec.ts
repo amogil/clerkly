@@ -144,7 +144,7 @@ test('54.3: should send request with correct parameters', async () => {
   expect(lastRequest?.method).toBe('POST');
   expect(lastRequest?.headers.authorization).toBe('Bearer test-api-key-12345');
   expect(lastRequest?.body.model).toBe('gpt-5-nano');
-  expect(lastRequest?.body.max_output_tokens).toBe(5);
+  expect(lastRequest?.body.max_output_tokens).toBe(16);
 });
 
 /* Preconditions: App is launched and authenticated, valid API key is entered

@@ -28,7 +28,7 @@ export const LLM_PROVIDERS: Record<LLMProvider, LLMProviderConfig> = {
     name: 'OpenAI',
     apiUrl: process.env.CLERKLY_OPENAI_API_URL || 'https://api.openai.com/v1/responses',
     testModel: 'gpt-5-nano',
-    testMaxTokens: 5,
+    testMaxTokens: 16,
     testTimeoutMs: 10_000,
   },
   anthropic: {
