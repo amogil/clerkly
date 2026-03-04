@@ -36,7 +36,7 @@ let mockLLMServer: MockLLMServer;
 
 test.beforeAll(async () => {
   if (!OPENAI_API_KEY) {
-    console.warn('[llm-chat] CLERKLY_OPENAI_API_KEY not set — skipping real API tests');
+    throw new Error('[llm-chat] CLERKLY_OPENAI_API_KEY is required for standard functional runs');
   }
 
   mockOAuthServer = await createMockOAuthServer(MOCK_OAUTH_PORT);
@@ -75,10 +75,6 @@ async function launchWithRealLLM(apiKey: string): Promise<ElectronTestContext> {
 
 test.describe('LLM Chat (real OpenAI)', () => {
   let context: ElectronTestContext;
-
-  test.beforeEach(async () => {
-    if (!OPENAI_API_KEY) test.skip();
-  });
 
   test.afterEach(async () => {
     if (context) await closeElectron(context);

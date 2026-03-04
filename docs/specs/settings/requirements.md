@@ -212,7 +212,7 @@
 - `tests/functional/llm-connection-test.spec.ts` - "should show success notification on valid API key"
 - `tests/functional/llm-connection-test.spec.ts` - "should show error notification on invalid API key"
 - `tests/functional/llm-connection-test.spec.ts` - "should test connection for each provider (OpenAI, Anthropic, Google)"
-- `tests/functional/llm-connection-real.spec.ts` - "should validate Test Connection against real OpenAI API" (opt-in, требует `CLERKLY_RUN_REAL_OPENAI_CONNECTION_TEST=1` и `CLERKLY_OPENAI_API_KEY`)
+- `tests/functional/llm-connection-real.spec.ts` - "should validate Test Connection against real OpenAI API" (входит в стандартный functional прогон; требует `CLERKLY_OPENAI_API_KEY`)
 
 ### Требование 3: Форматирование Дат и Времени из Системных Настроек
 

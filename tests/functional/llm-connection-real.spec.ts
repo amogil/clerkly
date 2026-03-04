@@ -16,15 +16,14 @@ import type { MockOAuthServer } from './helpers/mock-oauth-server';
 
 const TEST_CLIENT_ID = 'test-client-id-12345';
 const OPENAI_REAL_API_KEY = process.env.CLERKLY_OPENAI_API_KEY;
-const RUN_REAL_OPENAI_CONNECTION_TEST = process.env.CLERKLY_RUN_REAL_OPENAI_CONNECTION_TEST === '1';
 
 let context: ElectronTestContext;
 let mockOAuthServer: MockOAuthServer;
 
 test.beforeAll(async () => {
-  if (!RUN_REAL_OPENAI_CONNECTION_TEST || !OPENAI_REAL_API_KEY) {
-    console.warn(
-      '[llm-connection-real] set CLERKLY_RUN_REAL_OPENAI_CONNECTION_TEST=1 and CLERKLY_OPENAI_API_KEY to run real API test'
+  if (!OPENAI_REAL_API_KEY) {
+    throw new Error(
+      '[llm-connection-real] CLERKLY_OPENAI_API_KEY is required for standard functional runs'
     );
   }
 
@@ -52,10 +51,6 @@ test.afterEach(async () => {
 
 test.describe('LLM Connection (real OpenAI)', () => {
   test.beforeEach(async () => {
-    if (!RUN_REAL_OPENAI_CONNECTION_TEST || !OPENAI_REAL_API_KEY) {
-      test.skip();
-    }
-
     context = await launchElectron(undefined, {
       CLERKLY_GOOGLE_API_URL: mockOAuthServer.getBaseUrl(),
       CLERKLY_OPENAI_API_URL: 'https://api.openai.com/v1/responses',
