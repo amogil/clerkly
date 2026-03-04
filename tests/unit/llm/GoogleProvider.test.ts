@@ -123,7 +123,9 @@ describe('GoogleProvider', () => {
     const result = await provider.testConnection('test-key');
 
     expect(result.success).toBe(false);
-    expect(result.error).toBe('Connection timeout. Please check your internet connection.');
+    expect(result.error).toBe(
+      'Model response timeout. The provider took too long to respond. Please try again later.'
+    );
   });
 
   /* Preconditions: fetch throws network error

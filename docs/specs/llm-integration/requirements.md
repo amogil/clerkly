@@ -98,12 +98,12 @@
 3.5. Типы ошибок и их сообщения:
   - **Нет API ключа**: `"API key is not set. Add it in Settings to continue."` + действие "Open Settings"
   - **Неверный ключ** (HTTP 401/403): `"Invalid API key. Please check your key and try again."` + действие "Open Settings"
-  - **Нет сети / таймаут**: `"Network error. Please check your internet connection."`
+  - **Нет сети**: `"Network error. Please check your internet connection."`
   - **Rate limit** (HTTP 429): `"Rate limit exceeded. Please try again later."` — см. требование 3.7
   - **Внутренняя ошибка провайдера** (HTTP 5xx): `"Provider service unavailable. Please try again later."`
-  - **Таймаут ожидания ответа**: `"Request timed out. The model took too long to respond."`
+  - **Таймаут ожидания ответа**: `"Model response timeout. The provider took too long to respond. Please try again later."`
 
-3.6. Таймаут ожидания ответа от LLM ДОЛЖЕН составлять 60 секунд. ЕСЛИ за это время не получен ни один чанк, ТО запрос прерывается с ошибкой таймаута
+3.6. Таймаут ожидания ответа от LLM ДОЛЖЕН составлять 300 секунд (5 минут). ЕСЛИ за это время не получен финальный ответ модели, ТО запрос прерывается с ошибкой таймаута
 
 3.7. **Rate limit (HTTP 429) — стандартизированный диалог с обратным отсчётом:**
 

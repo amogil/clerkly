@@ -684,7 +684,7 @@ describe('WindowManager', () => {
 
     /* Preconditions: WindowManager created
        Action: call createWindow()
-       Assertions: CSP header configured via webRequest.onHeadersReceived
+       Assertions: CSP header configured via webRequest.onHeadersReceived with data: allowed for fonts
        Requirements: clerkly.1, clerkly.2*/
     it('should configure Content Security Policy', () => {
       windowManager.createWindow();
@@ -693,6 +693,25 @@ describe('WindowManager', () => {
       expect(mockWindow.webContents.session.webRequest.onHeadersReceived).toHaveBeenCalledTimes(1);
       expect(mockWindow.webContents.session.webRequest.onHeadersReceived).toHaveBeenCalledWith(
         expect.any(Function)
+      );
+
+      type HeadersReceivedCallback = (response: {
+        responseHeaders: Record<string, string[]>;
+      }) => void;
+      const headersHandler = mockWindow.webContents.session.webRequest.onHeadersReceived.mock
+        .calls[0][0] as (
+        details: { responseHeaders: Record<string, string[]> },
+        callback: HeadersReceivedCallback
+      ) => void;
+      const callback = jest.fn();
+
+      headersHandler({ responseHeaders: {} }, callback);
+
+      const callbackArg = callback.mock.calls[0][0] as {
+        responseHeaders: Record<string, string[]>;
+      };
+      expect(callbackArg.responseHeaders['Content-Security-Policy'][0]).toContain(
+        "font-src 'self' https://fonts.gstatic.com data:"
       );
     });
 

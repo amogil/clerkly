@@ -12,6 +12,7 @@ import {
   AuthCancelledEvent,
   AuthSignedOutEvent,
   ErrorCreatedEvent,
+  LLMPipelineDiagnosticEvent,
   UserLoginEvent,
   UserLogoutEvent,
   AgentCreatedEvent,
@@ -158,6 +159,41 @@ describe('Event Classes', () => {
       expect(event.toPayload()).toEqual({
         message: 'Failed to save',
         context: 'DataManager',
+      });
+    });
+  });
+
+  describe('LLMPipelineDiagnosticEvent', () => {
+    /* Preconditions: Diagnostic payload fields provided
+       Action: Create LLMPipelineDiagnosticEvent
+       Assertions: Event has correct type and payload for bridge to renderer Developer Log
+       Requirements: realtime-events.4.8 */
+    it('should create event with diagnostic details', () => {
+      const event = new LLMPipelineDiagnosticEvent(
+        'error',
+        'MainPipeline',
+        'Pipeline failure diagnostics: timeout',
+        {
+          agentId: 'agent-1',
+          userMessageId: 42,
+          signalAborted: false,
+          errorName: 'LLMRequestAbortedError',
+          errorType: 'timeout',
+        }
+      );
+
+      expect(event.type).toBe('llm.pipeline.diagnostic');
+      expect(event.toPayload()).toEqual({
+        level: 'error',
+        context: 'MainPipeline',
+        message: 'Pipeline failure diagnostics: timeout',
+        details: {
+          agentId: 'agent-1',
+          userMessageId: 42,
+          signalAborted: false,
+          errorName: 'LLMRequestAbortedError',
+          errorType: 'timeout',
+        },
       });
     });
   });

@@ -4,7 +4,10 @@
 
 import { MainPipeline } from '../../../src/main/agents/MainPipeline';
 import { MainEventBus } from '../../../src/main/events/MainEventBus';
-import { MessageLlmReasoningUpdatedEvent } from '../../../src/shared/events/types';
+import {
+  MessageLlmReasoningUpdatedEvent,
+  LLMPipelineDiagnosticEvent,
+} from '../../../src/shared/events/types';
 import type { MessageManager } from '../../../src/main/agents/MessageManager';
 import type { AIAgentSettingsManager } from '../../../src/main/AIAgentSettingsManager';
 import type { PromptBuilder } from '../../../src/main/agents/PromptBuilder';
@@ -18,6 +21,7 @@ import type {
 import type { Message } from '../../../src/main/db/schema';
 import { LLM_CHAT_MODELS } from '../../../src/main/llm/LLMConfig';
 import { InvalidStructuredOutputError } from '../../../src/main/llm/StructuredOutputContract';
+import { LLMRequestAbortedError } from '../../../src/main/llm/LLMErrors';
 
 // ─── Mocks ────────────────────────────────────────────────────────────────────
 
@@ -575,6 +579,46 @@ describe('MainPipeline.run()', () => {
         }),
         1
       );
+    });
+
+    it('should classify typed abort error as timeout', async () => {
+      const { pipeline, messageManager, llmProvider, mockPublish } = makeMocks();
+      llmProvider.chat.mockRejectedValue(
+        new LLMRequestAbortedError(
+          'Model response timeout. The provider took too long to respond. Please try again later.',
+          new DOMException('The operation was aborted', 'AbortError')
+        )
+      );
+
+      await pipeline.run('agent-1', 1);
+
+      expect(messageManager.create).toHaveBeenCalledWith(
+        'agent-1',
+        'error',
+        expect.objectContaining({
+          data: expect.objectContaining({
+            error: expect.objectContaining({
+              type: 'timeout',
+              message:
+                'Model response timeout. The provider took too long to respond. Please try again later.',
+            }),
+          }),
+        }),
+        1
+      );
+
+      const diagnosticEvents = mockPublish.mock.calls
+        .map((call: [unknown]) => call[0])
+        .filter((event: unknown) => event instanceof LLMPipelineDiagnosticEvent);
+      expect(diagnosticEvents).toHaveLength(1);
+      const diagnostic = diagnosticEvents[0] as LLMPipelineDiagnosticEvent;
+      expect(diagnostic.details).toMatchObject({
+        agentId: 'agent-1',
+        userMessageId: 1,
+        signalAborted: false,
+        errorName: 'LLMRequestAbortedError',
+        errorType: 'timeout',
+      });
     });
 
     it('should classify provider error for unknown messages', async () => {

@@ -209,7 +209,7 @@ class OpenAIProvider implements ILLMProvider {
   private mapExceptionToMessage(error: any): string {
     // Requirements: settings.3.8 - Network errors
     if (error.name === 'AbortError') {
-      return 'Connection timeout. Please check your internet connection.';
+      return 'Model response timeout. The provider took too long to respond. Please try again later.';
     }
     return 'Network error. Please check your internet connection.';
   }
@@ -281,7 +281,7 @@ class AnthropicProvider implements ILLMProvider {
 
   private mapExceptionToMessage(error: any): string {
     if (error.name === 'AbortError') {
-      return 'Connection timeout. Please check your internet connection.';
+      return 'Model response timeout. The provider took too long to respond. Please try again later.';
     }
     return 'Network error. Please check your internet connection.';
   }
@@ -352,7 +352,7 @@ class GoogleProvider implements ILLMProvider {
 
   private mapExceptionToMessage(error: any): string {
     if (error.name === 'AbortError') {
-      return 'Connection timeout. Please check your internet connection.';
+      return 'Model response timeout. The provider took too long to respond. Please try again later.';
     }
     return 'Network error. Please check your internet connection.';
   }

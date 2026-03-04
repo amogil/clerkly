@@ -93,7 +93,7 @@ export const LLM_CHAT_MODELS: Record<LLMProvider, LLMChatEnvConfig> = {
 // ─── Chat timeout ─────────────────────────────────────────────────────────────
 
 /** Timeout for LLM chat requests in ms. Requirements: llm-integration.3.6 */
-export const CHAT_TIMEOUT_MS = 60_000;
+export const CHAT_TIMEOUT_MS = 300_000;
 
 // ─── Error messages ───────────────────────────────────────────────────────────
 
@@ -108,7 +108,7 @@ export const ERROR_MESSAGES = {
   500: 'Provider service unavailable. Please try again later.',
   502: 'Provider service unavailable. Please try again later.',
   503: 'Provider service unavailable. Please try again later.',
-  timeout: 'Connection timeout. Please check your internet connection.',
+  timeout: 'Model response timeout. The provider took too long to respond. Please try again later.',
   network: 'Network error. Please check your internet connection.',
   unknown: 'Unknown error',
 } as const;

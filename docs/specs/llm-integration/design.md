@@ -371,7 +371,7 @@ You are a helpful AI assistant. Always reply in the user's language (detected fr
 
 ```typescript
 // Requirements: llm-integration.3
-const TIMEOUT_MS = 60_000; // 1 минута
+const TIMEOUT_MS = 300_000; // 5 минут
 
 // Таймаут через AbortController
 const controller = new AbortController();
@@ -382,7 +382,7 @@ try {
   // ...
 } catch (error) {
   if (error.name === 'AbortError') {
-    throw new LLMError('timeout', 'Request timed out. The model took too long to respond.');
+    throw new LLMError('timeout', 'Model response timeout. The provider took too long to respond. Please try again later.');
   }
   throw new LLMError('network', 'Network error. Please check your internet connection.');
 } finally {

@@ -5,6 +5,7 @@
 import { GoogleProvider } from '../../../src/main/llm/GoogleProvider';
 import type { ChatMessage, ChatOptions, ChatChunk } from '../../../src/main/llm/ILLMProvider';
 import { InvalidStructuredOutputError } from '../../../src/main/llm/StructuredOutputContract';
+import { LLMRequestAbortedError } from '../../../src/main/llm/LLMErrors';
 
 function buildMockReader(lines: string[]) {
   const chunks = lines.map((line) => Buffer.from(line + '\n'));
@@ -245,6 +246,21 @@ describe('GoogleProvider.chat()', () => {
       fetchMock.mockRejectedValue(new TypeError('Failed to fetch'));
 
       await expect(provider.chat(mockMessages, mockOptions, () => {})).rejects.toThrow();
+    });
+  });
+
+  describe('timeout / abort', () => {
+    /* Preconditions: fetch is aborted via AbortController
+       Action: Call chat() when request is aborted
+       Assertions: Throws typed LLMRequestAbortedError with timeout message
+       Requirements: llm-integration.3.4 */
+    it('should throw typed timeout error when request is aborted', async () => {
+      const abortError = new DOMException('The operation was aborted', 'AbortError');
+      fetchMock.mockRejectedValue(abortError);
+
+      await expect(provider.chat(mockMessages, mockOptions, () => {})).rejects.toBeInstanceOf(
+        LLMRequestAbortedError
+      );
     });
   });
 

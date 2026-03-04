@@ -5,6 +5,7 @@
 import { OpenAIProvider } from '../../../src/main/llm/OpenAIProvider';
 import type { ChatMessage, ChatOptions, ChatChunk } from '../../../src/main/llm/ILLMProvider';
 import { InvalidStructuredOutputError } from '../../../src/main/llm/StructuredOutputContract';
+import { LLMRequestAbortedError } from '../../../src/main/llm/LLMErrors';
 
 /**
  * Build a mock response body reader from SSE data lines.
@@ -388,13 +389,17 @@ describe('OpenAIProvider.chat()', () => {
   describe('timeout / abort', () => {
     /* Preconditions: fetch is aborted via AbortController
        Action: Call chat() when request is aborted
-       Assertions: Throws AbortError
+       Assertions: Throws typed LLMRequestAbortedError with timeout message
        Requirements: llm-integration.3.4 */
     it('should throw when request is aborted', async () => {
       const abortError = new DOMException('The operation was aborted', 'AbortError');
       fetchMock.mockRejectedValue(abortError);
 
-      await expect(provider.chat(mockMessages, mockOptions, () => {})).rejects.toThrow();
+      const request = provider.chat(mockMessages, mockOptions, () => {});
+      await expect(request).rejects.toBeInstanceOf(LLMRequestAbortedError);
+      await expect(request).rejects.toThrow(
+        'Model response timeout. The provider took too long to respond. Please try again later.'
+      );
     });
   });
 

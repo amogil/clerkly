@@ -16,6 +16,7 @@ import {
   InvalidStructuredOutputError,
   safeParseStructuredOutput,
 } from './StructuredOutputContract';
+import { LLMRequestAbortedError, isAbortLikeError } from './LLMErrors';
 
 // ─── Anthropic SSE event shapes ───────────────────────────────────────────────
 
@@ -175,6 +176,11 @@ export class AnthropicProvider implements ILLMProvider {
       }
 
       return await this.parseStream(response, onChunk);
+    } catch (error) {
+      if (isAbortLikeError(error)) {
+        throw new LLMRequestAbortedError(this.mapExceptionToMessage(error), error);
+      }
+      throw error;
     } finally {
       clearTimeout(timeoutId);
     }

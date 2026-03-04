@@ -159,12 +159,24 @@
 
 4.7. IPC listeners в renderer ДОЛЖНЫ корректно очищаться при пересоздании EventBus (hot reload)
 
+4.8. КОГДА в main процессе возникает ошибка LLM pipeline, ТО система ДОЛЖНА публиковать диагностическое событие `llm.pipeline.diagnostic` через существующий EventBus/IPC bridge в renderer
+
+4.9. Диагностическое событие `llm.pipeline.diagnostic` ДОЛЖНО содержать:
+   - `level` (`warn` | `error`)
+   - `context` (`MainPipeline`)
+   - `message` (человекочитаемое описание)
+   - `details` (`agentId`, `userMessageId`, `signalAborted`, `errorName`, `errorType`)
+   - `timestamp`
+
+4.10. КОГДА renderer получает `llm.pipeline.diagnostic`, ТО сообщение ДОЛЖНО попадать в Developer Log renderer (console) без показа toast-уведомления пользователю
+
 **Тестируемость:** Да - через функциональные тесты IPC
 
 #### Функциональные Тесты
 
 - `tests/functional/agent-realtime-events.spec.ts` - "should add message on message.created event"
 - `tests/functional/agent-realtime-events.spec.ts` - "should update message on message.updated event"
+- `tests/unit/App.ipc-integration.test.tsx` - "should log llm.pipeline.diagnostic events to renderer console"
 
 ### Требование 5: Обработка событий в UI
 
