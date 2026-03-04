@@ -251,22 +251,52 @@ describe('AgentChat — loading state', () => {
     expect(onLoadingChange).toHaveBeenCalledWith('agent-1', false);
   });
 
-  /* Preconditions: useAgentChat returns isLoading=true then false
-     Action: render AgentChat for each loading state
-     Assertions: Conversation resize is instant while loading and smooth after loading
+  /* Preconditions: Active chat is rendered
+     Action: Wait 5 seconds after activation
+     Assertions: Conversation resize switches from instant to smooth
      Requirements: agents.4.14.5 */
-  it('should set Conversation resize to instant during initial loading and smooth after load', () => {
-    mockUseAgentChatState.isLoading = true;
-    const { rerender } = render(<AgentChat {...defaultProps} />);
+  it('should keep instant resize for first 5 seconds of active chat and then switch to smooth', () => {
+    jest.useFakeTimers();
+    const { unmount } = render(<AgentChat {...defaultProps} isActive={true} />);
     expect(mockConversation).toHaveBeenLastCalledWith(
       expect.objectContaining({ resize: 'instant' })
     );
 
-    mockUseAgentChatState.isLoading = false;
-    rerender(<AgentChat {...defaultProps} />);
+    act(() => {
+      jest.advanceTimersByTime(5000);
+    });
+
     expect(mockConversation).toHaveBeenLastCalledWith(
       expect.objectContaining({ resize: 'smooth' })
     );
+
+    unmount();
+    jest.useRealTimers();
+  });
+
+  /* Preconditions: Chat has completed initial 5-second instant window
+     Action: Deactivate and activate chat again
+     Assertions: Instant window is NOT restarted for the same chat
+     Requirements: agents.4.14.5 */
+  it('should not restart instant resize window when chat becomes active again', () => {
+    jest.useFakeTimers();
+    const { rerender, unmount } = render(<AgentChat {...defaultProps} isActive={true} />);
+
+    act(() => {
+      jest.advanceTimersByTime(5000);
+    });
+    expect(mockConversation).toHaveBeenLastCalledWith(
+      expect.objectContaining({ resize: 'smooth' })
+    );
+
+    rerender(<AgentChat {...defaultProps} isActive={false} />);
+    rerender(<AgentChat {...defaultProps} isActive={true} />);
+    expect(mockConversation).toHaveBeenLastCalledWith(
+      expect.objectContaining({ resize: 'smooth' })
+    );
+
+    unmount();
+    jest.useRealTimers();
   });
 });
 
