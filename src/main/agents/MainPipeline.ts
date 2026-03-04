@@ -11,7 +11,10 @@ import { MessageLlmReasoningUpdatedEvent, AgentRateLimitEvent } from '../../shar
 import { LLM_CHAT_MODELS } from '../llm/LLMConfig';
 import { Logger } from '../Logger';
 import type { ILLMProvider, ChatOptions, LLMStructuredOutput } from '../llm/ILLMProvider';
-import { safeParseStructuredOutput } from '../llm/StructuredOutputContract';
+import {
+  InvalidStructuredOutputError,
+  safeParseStructuredOutput,
+} from '../llm/StructuredOutputContract';
 import { handleBackgroundError } from '../ErrorHandler';
 
 import type { LLMProvider } from '../../types';
@@ -215,13 +218,38 @@ export class MainPipeline {
     const maxRetries = 2;
     const maxAttempts = maxRetries + 1;
     for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-      const { output, llmMessageId, accumulatedReasoning } = await this.callProviderWithStreaming(
-        context,
-        attempt,
-        agentId,
-        signal,
-        setLastLlmMessageId
-      );
+      let output: LLMStructuredOutput;
+      let llmMessageId: number | null;
+      let accumulatedReasoning: string;
+
+      try {
+        const result = await this.callProviderWithStreaming(
+          context,
+          attempt,
+          agentId,
+          signal,
+          setLastLlmMessageId
+        );
+        output = result.output;
+        llmMessageId = result.llmMessageId;
+        accumulatedReasoning = result.accumulatedReasoning;
+      } catch (err) {
+        if (err instanceof InvalidStructuredOutputError) {
+          const action = this.handleInvalidStructuredOutput(
+            attempt,
+            maxAttempts,
+            agentId,
+            context.replyToMessageId,
+            getLastLlmMessageId(),
+            clearLastLlmMessageId
+          );
+          if (action === 'retry') {
+            continue;
+          }
+          return;
+        }
+        throw err;
+      }
 
       if (signal?.aborted) {
         this.handleAbortAfterStreaming(llmMessageId, agentId, clearLastLlmMessageId);

@@ -117,3 +117,15 @@ export function buildStructuredOutputInstruction(): string {
 export function safeParseStructuredOutput(value: unknown) {
   return LLMStructuredOutputSchema.safeParse(value);
 }
+
+/**
+ * Thrown when LLM response fails schema validation.
+ * MainPipeline catches this to apply retry logic and standardized user message.
+ * Requirements: llm-integration.12.1, llm-integration.12.2
+ */
+export class InvalidStructuredOutputError extends Error {
+  constructor(public readonly rawJson: string) {
+    super(`Invalid structured output: ${rawJson}`);
+    this.name = 'InvalidStructuredOutputError';
+  }
+}

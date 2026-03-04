@@ -13,6 +13,7 @@ import { LLM_PROVIDERS, ERROR_MESSAGES, CHAT_TIMEOUT_MS } from './LLMConfig';
 import {
   buildStructuredOutputInstruction,
   getOpenAIStructuredOutputJsonSchema,
+  InvalidStructuredOutputError,
   safeParseStructuredOutput,
 } from './StructuredOutputContract';
 
@@ -244,11 +245,12 @@ export class OpenAIProvider implements ILLMProvider {
       const parsedJson = JSON.parse(json) as unknown;
       const parsed = safeParseStructuredOutput(parsedJson);
       if (!parsed.success) {
-        throw new Error(parsed.error.message);
+        throw new InvalidStructuredOutputError(json);
       }
       return parsed.data;
-    } catch {
-      throw new Error(`Failed to parse LLM response: ${json}`);
+    } catch (err) {
+      if (err instanceof InvalidStructuredOutputError) throw err;
+      throw new InvalidStructuredOutputError(json);
     }
   }
 
