@@ -236,6 +236,11 @@ export class AppCoordinator {
         reason: `chats_ready_timeout_${this.chatsReadyTimeoutMs}ms`,
       });
     }, this.chatsReadyTimeoutMs);
+
+    // Do not keep Node/Jest process alive solely because of this watchdog timer.
+    if (typeof (this.chatsReadyTimeoutId as { unref?: () => void }).unref === 'function') {
+      (this.chatsReadyTimeoutId as { unref: () => void }).unref();
+    }
   }
 
   private clearChatsReadyTimeout(): void {

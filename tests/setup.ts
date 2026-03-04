@@ -1,3 +1,5 @@
+import { cleanup } from '@testing-library/react';
+
 // Requirements: clerkly.2
 /**
  * Jest test setup file
@@ -18,3 +20,12 @@ global.console = {
   debug: jest.fn(),
   info: jest.fn(),
 };
+
+// Keep test workers clean between tests to avoid leaked timers/handles.
+afterEach(() => {
+  cleanup();
+  jest.clearAllTimers();
+  jest.useRealTimers();
+  jest.restoreAllMocks();
+  jest.clearAllMocks();
+});
