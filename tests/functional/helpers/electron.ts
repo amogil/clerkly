@@ -480,10 +480,9 @@ export async function clearTestTokens(window: Page): Promise<void> {
  * Requirements: agents.13.3, agents.13.5
  */
 export function activeChat(window: Page) {
-  // The active AgentChat is the one NOT hidden — it has no "absolute" class.
-  // Inactive chats use "absolute inset-0 opacity-0 pointer-events-none" to preserve scrollTop.
-  // We scope all child locators to it so strict-mode is never violated.
-  const chat = window.locator('[data-testid="agents"] > div > div:not(.absolute)');
+  // Inactive chats are kept mounted and include "pointer-events-none".
+  // Scope to the interactive chat root only.
+  const chat = window.locator('[data-testid="agent-chat-root"]:not(.pointer-events-none)');
 
   return {
     /** The visible textarea input */

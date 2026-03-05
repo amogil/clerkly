@@ -114,6 +114,7 @@ describe('IPCChatTransport', () => {
           timestamp: Date.now(),
           payload: { data: {} },
           hidden: false,
+          done: true,
         },
         timestamp: Date.now(),
       });
@@ -127,6 +128,7 @@ describe('IPCChatTransport', () => {
           timestamp: Date.now(),
           payload: { data: { action: { content: 'Hello back!' } } },
           hidden: false,
+          done: true,
         },
         timestamp: Date.now(),
       });
@@ -165,8 +167,9 @@ describe('IPCChatTransport', () => {
           agentId: 'agent-1',
           kind: 'error',
           timestamp: Date.now(),
-          payload: { data: { message: 'API key invalid' } },
+          payload: { data: { error: { message: 'API key invalid' } } },
           hidden: false,
+          done: true,
         },
         timestamp: Date.now(),
       });
@@ -202,6 +205,7 @@ describe('IPCChatTransport', () => {
           timestamp: Date.now(),
           payload: { data: {} },
           hidden: false,
+          done: true,
         },
         timestamp: Date.now(),
       });
@@ -222,6 +226,7 @@ describe('IPCChatTransport', () => {
           timestamp: Date.now(),
           payload: { data: { action: { content: 'Done' } } },
           hidden: false,
+          done: true,
         },
         timestamp: Date.now(),
       });
@@ -263,6 +268,7 @@ describe('IPCChatTransport', () => {
           timestamp: Date.now(),
           payload: { data: {} },
           hidden: false,
+          done: true,
         },
         timestamp: Date.now(),
       });
@@ -275,6 +281,7 @@ describe('IPCChatTransport', () => {
           timestamp: Date.now(),
           payload: { data: {} },
           hidden: true,
+          done: false,
         },
         timestamp: Date.now(),
       });
@@ -344,6 +351,7 @@ describe('IPCChatTransport', () => {
           timestamp: Date.now(),
           payload: { data: { action: { content: 'Already complete response' } } },
           hidden: false,
+          done: true,
         },
         timestamp: Date.now(),
       });
@@ -424,6 +432,7 @@ describe('IPCChatTransport', () => {
           timestamp: Date.now(),
           payload: { data: { action: { content: 'Not for us' } } },
           hidden: false,
+          done: true,
         },
         timestamp: Date.now(),
       });
@@ -435,8 +444,9 @@ describe('IPCChatTransport', () => {
           agentId: 'agent-1',
           kind: 'error',
           timestamp: Date.now(),
-          payload: { data: { message: 'done' } },
+          payload: { data: { error: { message: 'done' } } },
           hidden: false,
+          done: true,
         },
         timestamp: Date.now(),
       });

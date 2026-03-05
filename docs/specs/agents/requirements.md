@@ -170,7 +170,13 @@
 
 4.1. Поле ввода ДОЛЖНО быть доступно для ввода текста с placeholder "Ask, reply, or give command..."
 
-4.2. Кнопка отправки ДОЛЖНА быть активна только при наличии текста в поле ввода
+4.2. Состояние и активность кнопки в поле ввода ДОЛЖНЫ определяться по двум факторам:
+   - статус активного агента (`in-progress` или любой другой)
+   - наличие текста в поле ввода
+
+4.2.1. КОГДА статус активного агента равен `in-progress`, кнопка ДОЛЖНА работать в режиме остановки (`stop generation`) и ДОЛЖНА быть активной независимо от текста в поле ввода
+
+4.2.2. КОГДА статус активного агента отличается от `in-progress`, кнопка ДОЛЖНА работать в режиме отправки (`send`) и ДОЛЖНА быть активной только при наличии текста в поле ввода
 
 4.3. КОГДА пользователь нажимает Enter (без Shift), ТО сообщение ДОЛЖНО отправляться
 
@@ -452,6 +458,8 @@
    - `agent_id TEXT NOT NULL` - ID агента
    - `timestamp TIMESTAMP NOT NULL` - время сообщения (ISO 8601 с timezone offset)
    - `kind TEXT NOT NULL` - тип сообщения (хранится в отдельной колонке, не в payload_json)
+   - `hidden INTEGER NOT NULL DEFAULT 0` - флаг скрытия сообщения (скрытые сообщения не участвуют в UI и в расчёте статуса)
+   - `done INTEGER NOT NULL DEFAULT 0` - флаг завершённости сообщения (`0` пока сообщение формируется/стримится, `1` после полного получения)
    - `reply_to_message_id INTEGER` - связь с сообщением, на которое даётся ответ (null для первого)
    - `payload_json TEXT NOT NULL` - JSON с данными сообщения (без поля `kind`)
 
@@ -494,7 +502,6 @@
 
 - `tests/functional/agent-messaging.spec.ts` - "should display messages in chronological order"
 - `tests/functional/llm-chat.spec.ts` - "should show llm response after user message"
-- `tests/functional/llm-chat.spec.ts` - "should render markdown headings"
 - `tests/functional/llm-chat.spec.ts` - "should render markdown headings"
 - `tests/functional/llm-chat.spec.ts` - "should render markdown paragraphs"
 - `tests/functional/llm-chat.spec.ts` - "should render markdown emphasis"
@@ -558,11 +565,15 @@
 9.1. Статус агента ДОЛЖЕН вычисляться динамически из последних сообщений, а НЕ храниться в таблице agents
 
 9.2. Алгоритм определения статуса:
-   - `new` - агент без сообщений
-   - `in-progress` - есть сообщение от пользователя (kind = `user`) и после него нет финализированного ответа агента и нет ошибки. Финализированным считается `kind: llm` с заполненным `action` и `hidden = false` или `kind: final_answer`
-   - `error` - последнее видимое сообщение имеет `kind = 'error'`
-   - `completed` - последнее сообщение `final_answer`
-   - `awaiting-response` - последнее сообщение от LLM (kind = `llm`) с заполненным `action` и НЕ `final_answer`
+   - ЕСЛИ у агента нет сообщений, ТО статус `new`
+   - Далее из истории исключаются все сообщения с `hidden = true`
+   - ЕСЛИ после исключения сообщений не осталось, ТО статус `new`
+   - Далее статус определяется по последнему видимому сообщению:
+     - `kind = 'user'` → `in-progress`
+     - `kind = 'llm'` и `done = false` → `in-progress`
+     - `kind = 'llm'` и `done = true` → `awaiting-response`
+     - `kind = 'error'` → `error`
+     - `kind = 'final_answer'` → `completed`
 
 9.3. Статус ДОЛЖЕН пересчитываться при получении любого нового сообщения в чате агента
 

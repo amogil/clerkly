@@ -493,6 +493,47 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     await expectNoToastError(context.window);
   });
 
+  /* Preconditions: MockLLMServer streams long reasoning before final structured action; app authenticated with mock LLM URL
+     Action: User sends message, observes reasoning phase and then final action arrival
+     Assertions: Header status stays "In progress" while llm message has reasoning without action, then switches to "Awaiting response" after action is persisted
+     Requirements: agents.9.2, llm-integration.2, llm-integration.7.3 */
+  test('should keep agent in-progress during reasoning-only llm phase', async () => {
+    mockLLMServer.setStreamingMode(true, {
+      reasoning:
+        'Reasoning chunk one reasoning chunk two reasoning chunk three reasoning chunk four reasoning chunk five',
+      content: '{"action":{"type":"text","content":"Final answer after reasoning"}}',
+      chunkDelayMs: 120,
+    });
+
+    context = await launchWithMockLLM();
+    const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
+
+    await messageInput.fill('Show long reasoning and then final answer');
+    await messageInput.press('Enter');
+
+    const agentAvatarIcon = context.window
+      .locator('[data-testid^="agent-icon-"]')
+      .first()
+      .locator('[data-testid="agent-avatar-icon"]');
+    const reasoningTrigger = context.window.locator(
+      '[data-testid="message-llm-reasoning-trigger"]'
+    );
+    const actionContent = context.window.locator('[data-testid="message-llm-action"]');
+
+    await expect(reasoningTrigger).toBeVisible({ timeout: 5000 });
+    await expect(actionContent).toHaveCount(0);
+    await expect
+      .poll(async () => await agentAvatarIcon.getAttribute('class'), { timeout: 5000 })
+      .toContain('bg-blue-500');
+
+    await expect(actionContent).toBeVisible({ timeout: 10000 });
+    await expect
+      .poll(async () => await agentAvatarIcon.getAttribute('class'), { timeout: 5000 })
+      .toContain('bg-amber-500');
+
+    await expectNoToastError(context.window);
+  });
+
   /* Preconditions: MockLLMServer configured with slow streaming, cancel IPC is forced to fail
        app authenticated with mock LLM URL
      Action: User sends message, presses stop, cancel returns success:false

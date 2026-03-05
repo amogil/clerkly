@@ -374,17 +374,23 @@ export class MainPipeline {
             reasoning: { text: accumulatedReasoning, excluded_from_replay: true },
           },
         },
-        replyToMessageId
+        replyToMessageId,
+        false
       );
       setLastLlmMessageId(llmMsg.id);
       llmMessageId = llmMsg.id;
     } else {
-      this.messageManager.update(llmMessageId, agentId, {
-        data: {
-          model,
-          reasoning: { text: accumulatedReasoning, excluded_from_replay: true },
+      this.messageManager.update(
+        llmMessageId,
+        agentId,
+        {
+          data: {
+            model,
+            reasoning: { text: accumulatedReasoning, excluded_from_replay: true },
+          },
         },
-      });
+        false
+      );
     }
 
     MainEventBus.getInstance().publish(
@@ -440,7 +446,8 @@ export class MainPipeline {
           },
         },
       },
-      replyToMessageId
+      replyToMessageId,
+      true
     );
     return 'error';
   }
@@ -468,11 +475,11 @@ export class MainPipeline {
     };
 
     if (llmMessageId === null) {
-      const msg = this.messageManager.create(agentId, 'llm', finalPayload, replyToMessageId);
+      const msg = this.messageManager.create(agentId, 'llm', finalPayload, replyToMessageId, true);
       return msg.id;
     }
 
-    this.messageManager.update(llmMessageId, agentId, finalPayload);
+    this.messageManager.update(llmMessageId, agentId, finalPayload, true);
     return llmMessageId;
   }
 
@@ -580,7 +587,8 @@ export class MainPipeline {
           error: errorPayload,
         },
       },
-      errorReplyTo
+      errorReplyTo,
+      true
     );
   }
 

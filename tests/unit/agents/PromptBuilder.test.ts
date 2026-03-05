@@ -21,6 +21,7 @@ function makeMessage(overrides: Partial<Message> & { id: number }): Message {
     usageJson: null,
     replyToMessageId: null,
     hidden: false,
+    done: true,
     ...overrides,
   };
 }

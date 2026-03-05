@@ -4,6 +4,7 @@
 
 import { AgentManager } from '../../../src/main/agents/AgentManager';
 import { MainEventBus } from '../../../src/main/events/MainEventBus';
+import { EVENT_TYPES } from '../../../src/shared/events/constants';
 import {
   AgentCreatedEvent,
   AgentUpdatedEvent,
@@ -80,13 +81,28 @@ describe('AgentManager', () => {
     agentManager = new AgentManager(mockDbManager);
   });
 
+  /* Preconditions: AgentManager constructed
+     Action: Constructor subscribes to event bus
+     Assertions: Subscriptions for MESSAGE_CREATED and MESSAGE_UPDATED are registered
+     Requirements: agents.12.2, agents.12.4 */
+  it('should subscribe to MESSAGE_CREATED and MESSAGE_UPDATED events', () => {
+    expect(mockEventBus.subscribe).toHaveBeenCalledWith(
+      EVENT_TYPES.MESSAGE_CREATED,
+      expect.any(Function)
+    );
+    expect(mockEventBus.subscribe).toHaveBeenCalledWith(
+      EVENT_TYPES.MESSAGE_UPDATED,
+      expect.any(Function)
+    );
+  });
+
   describe('toEventAgent (private method)', () => {
     /* Preconditions: Agent with no messages exists
        Action: Call toEventAgent() with agent
        Assertions: Returns AgentSnapshot with status 'new'
        Requirements: realtime-events.9.2, realtime-events.9.4, realtime-events.9.5 */
     it('should convert Agent to AgentSnapshot with status new when no messages', () => {
-      mockDbManager.messages.getLastByAgent = jest.fn().mockReturnValue(null);
+      mockDbManager.messages.listByAgent = jest.fn().mockReturnValue([]);
 
       const snapshot = (agentManager as any).toEventAgent(mockAgent);
 
@@ -111,7 +127,7 @@ describe('AgentManager', () => {
         ...mockAgent,
         archivedAt: '2026-02-15T11:00:00.000Z',
       };
-      mockDbManager.messages.getLastByAgent = jest.fn().mockReturnValue(null);
+      mockDbManager.messages.listByAgent = jest.fn().mockReturnValue([]);
 
       const snapshot = (agentManager as any).toEventAgent(archivedAgent);
 
@@ -133,8 +149,9 @@ describe('AgentManager', () => {
         usageJson: null,
         replyToMessageId: null,
         hidden: false,
+        done: true,
       };
-      mockDbManager.messages.getLastByAgent = jest.fn().mockReturnValue(lastMessage);
+      mockDbManager.messages.listByAgent = jest.fn().mockReturnValue([lastMessage]);
 
       const snapshot = (agentManager as any).toEventAgent(mockAgent);
 
@@ -155,8 +172,9 @@ describe('AgentManager', () => {
         usageJson: null,
         replyToMessageId: null,
         hidden: false,
+        done: true,
       };
-      mockDbManager.messages.getLastByAgent = jest.fn().mockReturnValue(lastMessage);
+      mockDbManager.messages.listByAgent = jest.fn().mockReturnValue([lastMessage]);
 
       const snapshot = (agentManager as any).toEventAgent(mockAgent);
 
@@ -179,8 +197,9 @@ describe('AgentManager', () => {
         usageJson: null,
         replyToMessageId: null,
         hidden: false,
+        done: true,
       };
-      mockDbManager.messages.getLastByAgent = jest.fn().mockReturnValue(lastMessage);
+      mockDbManager.messages.listByAgent = jest.fn().mockReturnValue([lastMessage]);
 
       const snapshot = (agentManager as any).toEventAgent(mockAgent);
 
@@ -189,7 +208,7 @@ describe('AgentManager', () => {
 
     /* Preconditions: Agent with last message of kind 'llm' containing result.status='error' (legacy payload)
        Action: Call toEventAgent() with agent
-       Assertions: Returns AgentSnapshot with status 'awaiting-response' (legacy result.status is ignored)
+       Assertions: Returns AgentSnapshot with status 'in-progress' (legacy result.status is ignored and action is absent)
        Requirements: realtime-events.9.2, agents.5.4, llm-integration.2 */
     it('should ignore legacy result.status in payload and use kind instead', () => {
       const lastMessage = {
@@ -203,19 +222,20 @@ describe('AgentManager', () => {
         usageJson: null,
         replyToMessageId: null,
         hidden: false,
+        done: false,
       };
-      mockDbManager.messages.getLastByAgent = jest.fn().mockReturnValue(lastMessage);
+      mockDbManager.messages.listByAgent = jest.fn().mockReturnValue([lastMessage]);
 
       const snapshot = (agentManager as any).toEventAgent(mockAgent);
 
-      expect(snapshot.status).toBe(AGENT_STATUS.AWAITING_RESPONSE);
+      expect(snapshot.status).toBe(AGENT_STATUS.IN_PROGRESS);
     });
 
-    /* Preconditions: Agent with last message of kind 'llm' (not final_answer) exists
+    /* Preconditions: Agent with last message of kind 'llm' without action (reasoning-only, not final_answer) exists
        Action: Call toEventAgent() with agent
-       Assertions: Returns AgentSnapshot with status 'awaiting-response'
-       Requirements: realtime-events.9.2, agents.5.4 */
-    it('should compute status as awaiting-response when last message is from LLM', () => {
+       Assertions: Returns AgentSnapshot with status 'in-progress'
+       Requirements: realtime-events.9.2, agents.5.1, agents.9.2 */
+    it('should compute status as in-progress when last llm message has no action', () => {
       const lastMessage = {
         id: 1,
         agentId: mockAgent.agentId,
@@ -225,12 +245,64 @@ describe('AgentManager', () => {
         usageJson: null,
         replyToMessageId: null,
         hidden: false,
+        done: false,
       };
-      mockDbManager.messages.getLastByAgent = jest.fn().mockReturnValue(lastMessage);
+      mockDbManager.messages.listByAgent = jest.fn().mockReturnValue([lastMessage]);
+
+      const snapshot = (agentManager as any).toEventAgent(mockAgent);
+
+      expect(snapshot.status).toBe(AGENT_STATUS.IN_PROGRESS);
+    });
+
+    /* Preconditions: Agent with last message of kind 'llm' and finalized action exists
+       Action: Call toEventAgent() with agent
+       Assertions: Returns AgentSnapshot with status 'awaiting-response'
+       Requirements: realtime-events.9.2, agents.5.4, agents.9.2 */
+    it('should compute status as awaiting-response when last llm message has action', () => {
+      const lastMessage = {
+        id: 1,
+        agentId: mockAgent.agentId,
+        kind: MESSAGE_KIND.LLM,
+        timestamp: '2026-02-15T10:30:00.000Z',
+        payloadJson: JSON.stringify({
+          data: {
+            reasoning: { text: 'Thinking...' },
+            action: { type: 'text', content: 'Done' },
+          },
+        }),
+        usageJson: null,
+        replyToMessageId: null,
+        hidden: false,
+        done: true,
+      };
+      mockDbManager.messages.listByAgent = jest.fn().mockReturnValue([lastMessage]);
 
       const snapshot = (agentManager as any).toEventAgent(mockAgent);
 
       expect(snapshot.status).toBe(AGENT_STATUS.AWAITING_RESPONSE);
+    });
+
+    /* Preconditions: Agent with malformed llm payload exists
+       Action: Call toEventAgent() with agent
+       Assertions: Returns AgentSnapshot with status 'in-progress' without throwing
+       Requirements: realtime-events.9.2, agents.9.2 */
+    it('should compute status as in-progress when llm payload is malformed', () => {
+      const lastMessage = {
+        id: 1,
+        agentId: mockAgent.agentId,
+        kind: MESSAGE_KIND.LLM,
+        timestamp: '2026-02-15T10:30:00.000Z',
+        payloadJson: '{invalid json',
+        usageJson: null,
+        replyToMessageId: null,
+        hidden: false,
+        done: false,
+      };
+      mockDbManager.messages.listByAgent = jest.fn().mockReturnValue([lastMessage]);
+
+      const snapshot = (agentManager as any).toEventAgent(mockAgent);
+
+      expect(snapshot.status).toBe(AGENT_STATUS.IN_PROGRESS);
     });
   });
 
@@ -240,7 +312,7 @@ describe('AgentManager', () => {
        Assertions: Repository create called with default name, event published with snapshot, agent returned
        Requirements: agents.2.3, agents.2.4, agents.12.1, realtime-events.9.7 */
     it('should create agent with default name and publish event with snapshot', () => {
-      mockDbManager.messages.getLastByAgent = jest.fn().mockReturnValue(null);
+      mockDbManager.messages.listByAgent = jest.fn().mockReturnValue([]);
 
       const result = agentManager.create();
 
@@ -260,7 +332,7 @@ describe('AgentManager', () => {
        Assertions: Repository create called with name
        Requirements: agents.2.3 */
     it('should create agent with custom name', () => {
-      mockDbManager.messages.getLastByAgent = jest.fn().mockReturnValue(null);
+      mockDbManager.messages.listByAgent = jest.fn().mockReturnValue([]);
 
       agentManager.create('My Custom Agent');
 
@@ -327,7 +399,7 @@ describe('AgentManager', () => {
        Assertions: Repository update called, event published with snapshot
        Requirements: agents.10.4, agents.12.2, realtime-events.9.7 */
     it('should update agent and publish event with snapshot', () => {
-      mockDbManager.messages.getLastByAgent = jest.fn().mockReturnValue(null);
+      mockDbManager.messages.listByAgent = jest.fn().mockReturnValue([]);
 
       agentManager.update('abc123xyz0', { name: 'Updated Name' });
 
@@ -358,7 +430,7 @@ describe('AgentManager', () => {
         .fn()
         .mockReturnValueOnce(mockAgent) // First call in archive() before archiving
         .mockReturnValueOnce(archivedAgent); // Second call after archiving
-      mockDbManager.messages.getLastByAgent = jest.fn().mockReturnValue(null);
+      mockDbManager.messages.listByAgent = jest.fn().mockReturnValue([]);
 
       agentManager.archive('abc123xyz0');
 
@@ -382,7 +454,7 @@ describe('AgentManager', () => {
         .fn()
         .mockReturnValueOnce(mockAgent)
         .mockReturnValueOnce(archivedAgent);
-      mockDbManager.messages.getLastByAgent = jest.fn().mockReturnValue(null);
+      mockDbManager.messages.listByAgent = jest.fn().mockReturnValue([]);
 
       // Register a pipeline controller
       const controller = new AbortController();
@@ -446,7 +518,7 @@ describe('AgentManager', () => {
       // Clear publish calls from constructor
       mockEventBus.publish.mockClear();
 
-      mockDbManager.messages.getLastByAgent = jest.fn().mockReturnValue(null);
+      mockDbManager.messages.listByAgent = jest.fn().mockReturnValue([]);
 
       // Message timestamp (5 minutes ago)
       const messageTimestamp = Date.now() - 5 * 60 * 1000;
@@ -524,6 +596,51 @@ describe('AgentManager', () => {
 
       // Verify no event was published
       expect(mockEventBus.publish).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('handleMessageUpdated (MESSAGE_UPDATED event handler)', () => {
+    /* Preconditions: Agent exists and last message is finalized llm with action
+       Action: handleMessageUpdated called with agentId
+       Assertions: Publishes AGENT_UPDATED with recomputed status
+       Requirements: agents.9.2, agents.9.3, agents.12.2 */
+    it('should publish AGENT_UPDATED with recomputed status on message update', () => {
+      mockDbManager.messages.listByAgent = jest.fn().mockReturnValue([
+        {
+          id: 2,
+          agentId: mockAgent.agentId,
+          kind: MESSAGE_KIND.LLM,
+          timestamp: '2026-02-15T10:31:00.000Z',
+          payloadJson: JSON.stringify({
+            data: { action: { type: 'text', content: 'Done' } },
+          }),
+          usageJson: null,
+          replyToMessageId: 1,
+          hidden: false,
+          done: true,
+        },
+      ]);
+
+      (agentManager as any).handleMessageUpdated(mockAgent.agentId);
+
+      expect(mockEventBus.publish).toHaveBeenCalledTimes(1);
+      const publishedEvent = mockEventBus.publish.mock.calls[0][0];
+      expect(publishedEvent).toBeInstanceOf(AgentUpdatedEvent);
+      expect(publishedEvent.agent.status).toBe(AGENT_STATUS.AWAITING_RESPONSE);
+    });
+
+    /* Preconditions: Agent lookup throws error
+       Action: handleMessageUpdated called
+       Assertions: Error is re-thrown after error handling path
+       Requirements: error-notifications.1 */
+    it('should re-throw errors from handleMessageUpdated', () => {
+      mockDbManager.agents.findById = jest.fn().mockImplementation(() => {
+        throw new Error('DB update failed');
+      });
+
+      expect(() => (agentManager as any).handleMessageUpdated(mockAgent.agentId)).toThrow(
+        'DB update failed'
+      );
     });
   });
 

@@ -310,6 +310,7 @@ describe('Event Classes', () => {
       replyToMessageId: null,
       payload: { data: { text: 'Hello' } },
       hidden: false,
+      done: true,
     };
 
     /* Preconditions: MessageSnapshot provided
@@ -348,6 +349,7 @@ describe('Event Classes', () => {
       replyToMessageId: null,
       payload: { data: { text: 'Updated' } },
       hidden: false,
+      done: true,
     };
 
     /* Preconditions: MessageSnapshot provided

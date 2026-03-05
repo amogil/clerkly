@@ -108,6 +108,8 @@ export interface MessageSnapshot {
   replyToMessageId: number | null;
   /** Hidden messages are not shown in UI and excluded from LLM history */
   hidden: boolean;
+  /** Completion flag for message lifecycle */
+  done: boolean;
 }
 
 // ============================================================================

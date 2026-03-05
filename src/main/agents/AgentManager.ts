@@ -9,6 +9,7 @@ import {
   AgentUpdatedEvent,
   AgentArchivedEvent,
   MessageCreatedPayload,
+  MessageUpdatedPayload,
   AgentSnapshot,
 } from '../../shared/events/types';
 import { EVENT_TYPES } from '../../shared/events/constants';
@@ -40,37 +41,40 @@ export class AgentManager {
   }
 
   /**
-   * Compute agent status based on the last message
-   * Requirements: agents.5.1, agents.5.2, agents.5.3, agents.5.4, agents.5.5, agents.9.2
+   * Compute agent status from full message history.
+   * Requirements: agents.9.2, agents.9.4
    */
-  private computeAgentStatus(message: Message | null): AgentStatus {
-    if (!message) {
+  private computeAgentStatus(messages: Message[]): AgentStatus {
+    if (messages.length === 0) {
       return AGENT_STATUS.NEW;
     }
 
-    // Error kind means agent has error
-    // Requirements: agents.9.2
-    if (message.kind === MESSAGE_KIND.ERROR) {
+    const visible = messages.filter((message) => !message.hidden);
+    if (visible.length === 0) {
+      return AGENT_STATUS.NEW;
+    }
+
+    const lastMessage = visible[visible.length - 1];
+    if (!lastMessage) {
+      return AGENT_STATUS.NEW;
+    }
+
+    if (lastMessage.kind === MESSAGE_KIND.ERROR) {
       return AGENT_STATUS.ERROR;
     }
 
-    // Final answer means completed
-    if (message.kind === MESSAGE_KIND.FINAL_ANSWER) {
+    if (lastMessage.kind === MESSAGE_KIND.FINAL_ANSWER) {
       return AGENT_STATUS.COMPLETED;
     }
 
-    // Last message from user means in-progress (no finalized agent response after it)
-    // Requirements: agents.9.2
-    if (message.kind === MESSAGE_KIND.USER) {
+    if (lastMessage.kind === MESSAGE_KIND.USER) {
       return AGENT_STATUS.IN_PROGRESS;
     }
 
-    // Last message from LLM (not final_answer) means awaiting-response
-    if (message.kind === MESSAGE_KIND.LLM) {
-      return AGENT_STATUS.AWAITING_RESPONSE;
+    if (lastMessage.kind === MESSAGE_KIND.LLM) {
+      return lastMessage.done ? AGENT_STATUS.AWAITING_RESPONSE : AGENT_STATUS.IN_PROGRESS;
     }
 
-    // Default to new for other kinds (tool_call, code_exec, etc.)
     return AGENT_STATUS.NEW;
   }
 
@@ -79,9 +83,8 @@ export class AgentManager {
    * Requirements: realtime-events.9.5
    */
   public toEventAgent(agent: Agent): AgentSnapshot {
-    // Get last message to compute status
-    const lastMessage = this.dbManager.messages.getLastByAgent(agent.agentId);
-    const status = this.computeAgentStatus(lastMessage);
+    const history = this.dbManager.messages.listByAgent(agent.agentId, true);
+    const status = this.computeAgentStatus(history);
 
     return {
       id: agent.agentId,
@@ -103,6 +106,15 @@ export class AgentManager {
       (payload: MessageCreatedPayload) => {
         if (payload.message) {
           this.handleMessageCreated(payload.message.agentId, payload.message.timestamp);
+        }
+      }
+    );
+
+    MainEventBus.getInstance().subscribe(
+      EVENT_TYPES.MESSAGE_UPDATED,
+      (payload: MessageUpdatedPayload) => {
+        if (payload.message) {
+          this.handleMessageUpdated(payload.message.agentId);
         }
       }
     );
@@ -136,6 +148,23 @@ export class AgentManager {
       // Requirements: error-notifications.1
       handleBackgroundError(error, 'Agent Update');
       throw error; // Re-throw for logging in MainEventBus
+    }
+  }
+
+  /**
+   * Handle MESSAGE_UPDATED event - recalculate status and publish AGENT_UPDATED.
+   * Does not mutate updatedAt, because message update may only change payload (e.g. reasoning -> action).
+   * Requirements: agents.9.2, agents.9.3, agents.12.2
+   */
+  private handleMessageUpdated(agentId: string): void {
+    try {
+      const updatedAgent = this.dbManager.agents.findById(agentId);
+      if (updatedAgent) {
+        MainEventBus.getInstance().publish(new AgentUpdatedEvent(this.toEventAgent(updatedAgent)));
+      }
+    } catch (error) {
+      handleBackgroundError(error, 'Agent Status Update');
+      throw error;
     }
   }
 

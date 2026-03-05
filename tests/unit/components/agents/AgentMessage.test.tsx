@@ -21,6 +21,7 @@ const baseMessage = (overrides: Partial<MessageSnapshot> = {}): MessageSnapshot 
     kind: 'user',
     timestamp: '2024-01-01T00:00:00Z',
     hidden: false,
+    done: true,
     payload: { data: { text: 'Hello' } },
     replyToMessageId: null,
     ...overrides,

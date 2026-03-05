@@ -56,6 +56,7 @@ describe('AgentIPCHandlers', () => {
     usageJson: null,
     replyToMessageId: null,
     hidden: false,
+    done: true,
   };
 
   const mockMessageSnapshot = {
@@ -66,6 +67,7 @@ describe('AgentIPCHandlers', () => {
     payload: { data: { text: 'Hello' } },
     replyToMessageId: null,
     hidden: false,
+    done: true,
   };
 
   const mockAgentSnapshot = {
@@ -525,7 +527,8 @@ describe('AgentIPCHandlers', () => {
         'abc123xyz0',
         'user',
         userPayload,
-        null
+        1,
+        true
       );
       expect(mockMessageManager.toEventMessage).toHaveBeenCalledWith(mockMessage);
       expect(result).toEqual({ success: true, data: mockMessageSnapshot });
@@ -938,8 +941,8 @@ describe('AgentIPCHandlers', () => {
   describe('messages:cancel handler', () => {
     /* Preconditions: Handlers registered
        Action: Invoke messages:cancel with agentId
-       Assertions: AgentManager.cancelPipeline called, success returned
-       Requirements: llm-integration.8.1, llm-integration.8.7 */
+       Assertions: AgentManager.cancelPipeline called, pending user message hidden, success returned
+       Requirements: llm-integration.8.1, llm-integration.8.5, llm-integration.8.7 */
     it('should cancel active pipeline and return success', async () => {
       handlers.registerHandlers();
       const handler = registeredHandlers.get('messages:cancel')!;
@@ -948,6 +951,30 @@ describe('AgentIPCHandlers', () => {
 
       expect(result).toEqual({ success: true });
       expect(mockAgentManager.cancelPipeline).toHaveBeenCalledWith('abc123xyz0');
+      expect(mockMessageManager.setHidden).toHaveBeenCalledWith(1, 'abc123xyz0');
+    });
+
+    /* Preconditions: Last message is in-flight llm with replyToMessageId
+       Action: Invoke messages:cancel with agentId
+       Assertions: In-flight llm and its user message are hidden
+       Requirements: llm-integration.8.5, llm-integration.8.7 */
+    it('should hide in-flight llm and its reply-to user message', async () => {
+      const inFlightLlm: Message = {
+        ...mockMessage,
+        id: 12,
+        kind: 'llm',
+        done: false,
+        replyToMessageId: 11,
+      };
+      mockMessageManager.getLastMessage = jest.fn().mockReturnValue(inFlightLlm);
+      handlers.registerHandlers();
+      const handler = registeredHandlers.get('messages:cancel')!;
+
+      const result = await handler(mockEvent, { agentId: 'abc123xyz0' });
+
+      expect(result).toEqual({ success: true });
+      expect(mockMessageManager.setHidden).toHaveBeenNthCalledWith(1, 12, 'abc123xyz0');
+      expect(mockMessageManager.setHidden).toHaveBeenNthCalledWith(2, 11, 'abc123xyz0');
     });
 
     /* Preconditions: Handlers registered, cancelPipeline throws

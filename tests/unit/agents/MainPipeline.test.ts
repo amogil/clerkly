@@ -54,6 +54,7 @@ function makeMessage(id: number, kind: string = 'user'): Message {
     usageJson: null,
     replyToMessageId: null,
     hidden: false,
+    done: true,
   };
 }
 
@@ -84,6 +85,8 @@ function makeMocks() {
       timestamp: Date.now(),
       payload: {},
       replyToMessageId: null,
+      hidden: false,
+      done: true,
     }),
   } as unknown as jest.Mocked<MessageManager>;
 
@@ -151,7 +154,8 @@ describe('MainPipeline.run()', () => {
             action: { type: 'text', content: 'Hello back!' },
           }),
         }),
-        1
+        1,
+        true
       );
     });
   });
@@ -211,7 +215,13 @@ describe('MainPipeline.run()', () => {
       await pipeline.run('agent-1', 1);
 
       // llm message created on first reasoning chunk
-      expect(messageManager.create).toHaveBeenCalledWith('agent-1', 'llm', expect.any(Object), 1);
+      expect(messageManager.create).toHaveBeenCalledWith(
+        'agent-1',
+        'llm',
+        expect.any(Object),
+        1,
+        false
+      );
 
       // reasoning events emitted for each non-done chunk
       const reasoningEvents = mockPublish.mock.calls
@@ -235,7 +245,8 @@ describe('MainPipeline.run()', () => {
           data: expect.objectContaining({
             action: { type: 'text', content: 'Answer' },
           }),
-        })
+        }),
+        true
       );
     });
   });
@@ -267,7 +278,8 @@ describe('MainPipeline.run()', () => {
             error: expect.objectContaining({ type: 'network' }),
           }),
         }),
-        1
+        1,
+        true
       );
     });
   });
@@ -293,7 +305,13 @@ describe('MainPipeline.run()', () => {
       expect(messageManager.setHidden).toHaveBeenCalledWith(2, 'agent-1');
 
       // error message created
-      expect(messageManager.create).toHaveBeenCalledWith('agent-1', 'error', expect.any(Object), 1);
+      expect(messageManager.create).toHaveBeenCalledWith(
+        'agent-1',
+        'error',
+        expect.any(Object),
+        1,
+        true
+      );
     });
   });
 
@@ -342,7 +360,8 @@ describe('MainPipeline.run()', () => {
             },
           },
         }),
-        1
+        1,
+        true
       );
     });
 
@@ -371,7 +390,8 @@ describe('MainPipeline.run()', () => {
             },
           },
         }),
-        1
+        1,
+        true
       );
     });
   });
@@ -401,7 +421,8 @@ describe('MainPipeline.run()', () => {
             }),
           }),
         }),
-        1
+        1,
+        true
       );
     });
   });
@@ -425,7 +446,13 @@ describe('MainPipeline.run()', () => {
 
       await pipeline.run('agent-1', 5);
 
-      expect(messageManager.create).toHaveBeenCalledWith('agent-1', 'llm', expect.any(Object), 5);
+      expect(messageManager.create).toHaveBeenCalledWith(
+        'agent-1',
+        'llm',
+        expect.any(Object),
+        5,
+        true
+      );
     });
   });
 
@@ -452,7 +479,8 @@ describe('MainPipeline.run()', () => {
             }),
           }),
         }),
-        1
+        1,
+        true
       );
     });
   });
@@ -577,7 +605,8 @@ describe('MainPipeline.run()', () => {
             error: expect.objectContaining({ type: 'timeout' }),
           }),
         }),
-        1
+        1,
+        true
       );
     });
 
@@ -604,7 +633,8 @@ describe('MainPipeline.run()', () => {
             }),
           }),
         }),
-        1
+        1,
+        true
       );
 
       const diagnosticEvents = mockPublish.mock.calls
@@ -635,7 +665,8 @@ describe('MainPipeline.run()', () => {
             error: expect.objectContaining({ type: 'provider' }),
           }),
         }),
-        1
+        1,
+        true
       );
     });
   });
@@ -666,7 +697,8 @@ describe('MainPipeline.run()', () => {
         expect.objectContaining({
           data: expect.objectContaining({ model: LLM_CHAT_MODELS.anthropic.prod.model }),
         }),
-        1
+        1,
+        true
       );
     });
 
@@ -691,7 +723,8 @@ describe('MainPipeline.run()', () => {
         expect.objectContaining({
           data: expect.objectContaining({ model: LLM_CHAT_MODELS.google.test.model }),
         }),
-        1
+        1,
+        true
       );
     });
   });

@@ -18,11 +18,26 @@ CREATE TABLE messages (
   agent_id TEXT NOT NULL,
   timestamp TEXT NOT NULL,
   kind TEXT NOT NULL,
+  hidden INTEGER NOT NULL DEFAULT 0,
+  done INTEGER NOT NULL DEFAULT 0,
   reply_to_message_id INTEGER,
   payload_json TEXT NOT NULL,
   usage_json TEXT
 );
 ```
+
+### Семантика `done`
+
+- Колонка `done` присутствует в `messages` как обязательный флаг завершённости сообщения.
+- Для сообщений `kind:error` значение `done` равно `1`.
+- Для сообщений, которые находятся в процессе формирования (например, streaming `kind:llm`), значение `done` равно `0`.
+- Для полностью сформированных сообщений `done` равно `1`.
+
+### Правило `reply_to_message_id`
+
+- Первое сообщение в чате агента сохраняется с `reply_to_message_id = NULL`.
+- Каждое следующее сообщение сохраняется со ссылкой на `id` предыдущего сообщения этого агента.
+- Для `MainPipeline.run(agentId, userMessageId)` все создаваемые сообщения пайплайна (`kind: llm`, `kind: error`) используют `reply_to_message_id = userMessageId`.
 
 ---
 
@@ -74,6 +89,7 @@ CREATE TABLE messages (
 {
   "id": 124,
   "kind": "llm",
+  "done": false,
   "hidden": true,
   "payload": {
     "data": {
@@ -96,6 +112,8 @@ CREATE TABLE messages (
   }
 }
 ```
+
+`kind: error` сообщения всегда сохраняются как завершённые (`done: true`).
 
 Для ошибок без action_link (network, provider, timeout):
 
@@ -316,6 +334,10 @@ interface ILLMProvider {
 }
 ```
 
+**Выбор модели и reasoning effort (llm-integration.5.8):**
+- Тестовая конфигурация: `gpt-5-nano` + `reasoning_effort: "low"`.
+- Продовая конфигурация: `gpt-5.2` + `reasoning_effort: "medium"`.
+
 ### PromptBuilder
 
 ```typescript
@@ -428,13 +450,13 @@ class MainPipeline {
 6. Вызывает `provider.chat(messages, options, onChunk)`:
    onChunk(chunk):
      if llmMessageId == null:
-      создаёт `kind: llm` сообщение → `llmMessageId = message.id`
+      создаёт `kind: llm` сообщение (`done: false`, `reply_to_message_id = userMessageId`) → `llmMessageId = message.id`
      accumulatedReasoning += chunk.delta
-     обновляет `kind: llm` (`reasoning.text = accumulatedReasoning`)
+     обновляет `kind: llm` (`reasoning.text = accumulatedReasoning`, `done: false`)
      эмитит `message.llm.reasoning.updated { delta, accumulatedText }`
      эмитит `message.updated`
 7. Получает финальный Structured Output
-8. Обновляет `kind: llm` (action + usage)
+8. Обновляет `kind: llm` (action + usage, `done: true`)
 9. Эмитит финальный `message.updated`
 ```
 
@@ -443,9 +465,9 @@ class MainPipeline {
 ```
 catch(error):
   if llmMessageId != null:
-    обновляет `kind: llm` с `hidden: true`
+    обновляет `kind: llm` с `hidden: true, done: false`
     эмитит `message.updated`
-  создаёт `kind: error` (messages.reply_to_message_id = userMessageId, payload.error.message)
+  создаёт `kind: error` (`done: true`, messages.reply_to_message_id = userMessageId, payload.error.message)
   эмитит `message.created`
 ```
 
@@ -467,7 +489,7 @@ catch(error):
 
 `MainPipeline.run()` принимает `AbortSignal` и передаёт его в `fetch()`. При отмене:
 - Если `kind: llm` ещё не создан — просто выходим (нет сообщений для очистки)
-- Если `kind: llm` уже создан — помечаем `hidden: true`, выходим без создания `kind: error`
+- Если `kind: llm` уже создан — помечаем `hidden: true, done: false`, выходим без создания `kind: error`
 
 **`MessageManager.listForModelHistory()`** фильтрует сообщения с `hidden` — они не попадают во входной массив `messages`.
 
@@ -529,15 +551,15 @@ User отправляет сообщение
       → PromptBuilder.buildMessages(history)
       → OpenAIProvider.chat(messages, options, onChunk)
           → [reasoning chunk]
-              → MessageManager.create/update(kind: 'llm')
+              → MessageManager.create/update(kind: 'llm', done: false, reply_to_message_id: userMessageId)
               → message.llm.reasoning.updated
               → message.updated
           → [LLMAction received]
-              → MessageManager.update(kind: 'llm', action)
+              → MessageManager.update(kind: 'llm', action, done: true)
               → message.updated
       → [on error]
-          → MessageManager.update(kind: 'llm', hidden: true) [если уже создан]
-          → MessageManager.create(kind: 'error')
+          → MessageManager.update(kind: 'llm', hidden: true, done: false) [если уже создан]
+          → MessageManager.create(kind: 'error', done: true, reply_to_message_id: userMessageId)
           → message.updated / message.created
 ```
 
@@ -572,23 +594,33 @@ User отправляет сообщение
 | Требование | Модульные тесты | Функциональные тесты |
 |------------|-----------------|----------------------|
 | llm-integration.1 | ✓ | ✓ |
+| llm-integration.1.6.1 (`llm` с `done=false` до финализации) | ✓ | ✓ |
+| llm-integration.1.6.2 (финализация `llm` с `done=true`) | ✓ | ✓ |
+| llm-integration.1.7 (`reply_to_message_id` для создаваемых сообщений) | ✓ | ✓ |
 | llm-integration.2 | ✓ | ✓ |
 | llm-integration.3.1 | ✓ | ✓ |
+| llm-integration.3.1.1 (`error` сохраняется с `done=true`) | ✓ | ✓ |
 | llm-integration.3.2 | ✓ | ✓ |
 | llm-integration.3.4 | ✓ | ✓ |
-| llm-integration.3.4.4 | - | - |
+| llm-integration.3.4.4 | - | ✓ |
 | llm-integration.3.5 | ✓ | ✓ |
+| llm-integration.3.6 (таймаут 300s) | ✓ | ✓ |
 | llm-integration.3.7 | - | ✓ |
 | llm-integration.3.8 | - | ✓ |
 | llm-integration.3.9 | ✓ | ✓ |
 | llm-integration.4 | ✓ | - |
+| llm-integration.4.7 (ответ и reasoning на языке пользователя) | ✓ | ✓ |
 | llm-integration.5 | ✓ | - |
+| llm-integration.5.8 (модели/`reasoning_effort` для test/prod) | ✓ | ✓ |
 | llm-integration.6 | ✓ | - |
+| llm-integration.6.5 (`done` как отдельный флаг) | ✓ | - |
+| llm-integration.6.6 (совместимость `done` для существующих записей) | ✓ | - |
 | llm-integration.7 | ✓ | ✓ |
 | llm-integration.8.1 | ✓ | ✓ |
 | llm-integration.8.5 | ✓ | ✓ |
 | llm-integration.8.6 | ✓ | - |
-| llm-integration.10 | - | - |
-| llm-integration.11 | - | - |
-| llm-integration.12 | - | - |
+| llm-integration.8.7 | ✓ | ✓ |
+| llm-integration.10 | ✓ | ✓ |
+| llm-integration.11 | ✓ | ✓ |
+| llm-integration.12 | ✓ | ✓ |
 | llm-integration.13 | ✓ | - |

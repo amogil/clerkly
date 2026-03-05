@@ -189,6 +189,7 @@ const makeMessage = (id: number, kind: 'user' | 'llm' | 'error' = 'user'): Messa
   payload: { data: { text: `msg ${id}` } },
   replyToMessageId: null,
   hidden: false,
+  done: true,
 });
 
 const defaultProps = {

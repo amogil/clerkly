@@ -140,7 +140,7 @@ export function registerTestIPCHandlers(
 
         // Create message with old timestamp - this will trigger MESSAGE_CREATED event
         // which will update agent's updatedAt to match the message timestamp
-        messageManager.create(agent.agentId, 'user', payload, null, oldTimestamp);
+        messageManager.create(agent.agentId, 'user', payload, null, false, oldTimestamp);
 
         return {
           success: true,

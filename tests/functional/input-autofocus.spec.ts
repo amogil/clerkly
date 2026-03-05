@@ -88,17 +88,14 @@ test('should auto-focus input when switching agents', async () => {
 
   const [newAgentId, originalAgentId] = await getAgentIdsFromApi(window);
 
-  // Click on second agent (switch from first to second)
-  await window.locator(`[data-testid="agent-icon-${newAgentId}"]`).click();
-
-  // Wait for textarea to receive focus (useEffect has 100ms delay)
+  // Newly created agent is active by default. Switch to original agent first.
+  await window.locator(`[data-testid="agent-icon-${originalAgentId}"]`).click();
   const textarea = activeChat(window).textarea;
   await expect(textarea).toBeFocused({ timeout: 5000 });
 
-  // Click on first agent (switch from second to first)
-  await window.locator(`[data-testid="agent-icon-${originalAgentId}"]`).click();
+  // Switch back to the second agent and verify autofocus again.
+  await window.locator(`[data-testid="agent-icon-${newAgentId}"]`).click();
 
-  // Wait for textarea to receive focus again
   await expect(textarea).toBeFocused({ timeout: 5000 });
 });
 

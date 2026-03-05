@@ -168,6 +168,7 @@ describe('Database Schema', () => {
       expect(messages.payloadJson).toBeDefined();
       expect(messages.usageJson).toBeDefined();
       expect(messages.hidden).toBeDefined();
+      expect(messages.done).toBeDefined();
     });
 
     /* Preconditions: Schema is defined
@@ -184,11 +185,13 @@ describe('Database Schema', () => {
         payloadJson: '{"content": "Hello"}',
         usageJson: null,
         hidden: false,
+        done: true,
       };
       expect(message.id).toBe(1);
       expect(message.agentId).toBe('agent-123');
       expect(message.kind).toBe('user');
       expect(message.hidden).toBe(false);
+      expect(message.done).toBe(true);
     });
 
     /* Preconditions: Schema is defined
@@ -202,6 +205,7 @@ describe('Database Schema', () => {
         timestamp: new Date().toISOString(),
         replyToMessageId: null,
         payloadJson: '{}',
+        done: false,
       };
       expect(newMessage.agentId).toBe('agent-123');
       expect(newMessage.kind).toBe('user');

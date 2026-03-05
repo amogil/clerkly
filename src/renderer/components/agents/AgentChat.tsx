@@ -201,6 +201,8 @@ export function AgentChat({
   return (
     // Hidden via CSS — NOT unmounted — absolute+opacity-0 keeps scrollTop intact (agents.13.5, agents.4.14)
     <div
+      data-testid="agent-chat-root"
+      data-active={isActive ? 'true' : 'false'}
       className={`flex flex-col flex-1 min-h-0${isActive ? '' : ' absolute inset-0 opacity-0 pointer-events-none'}`}
     >
       {/* Per chat: one-time 5s instant resize on first activation, then smooth permanently (agents.4.14.5). */}

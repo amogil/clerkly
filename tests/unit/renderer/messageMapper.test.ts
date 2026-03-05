@@ -11,6 +11,7 @@ function makeSnapshot(overrides: Partial<MessageSnapshot> & { kind: string }): M
     payload: { data: {} },
     replyToMessageId: null,
     hidden: false,
+    done: true,
     ...overrides,
   };
 }
@@ -119,7 +120,7 @@ describe('toUIMessage', () => {
   it('should map error message with isError metadata', () => {
     const msg = makeSnapshot({
       kind: 'error',
-      payload: { data: { message: 'API key invalid' } },
+      payload: { data: { error: { message: 'API key invalid' } } },
     });
     const result = toUIMessage(msg);
 
@@ -139,8 +140,10 @@ describe('toUIMessage', () => {
       kind: 'error',
       payload: {
         data: {
-          message: 'Settings required',
-          action_link: { label: 'Open Settings', screen: 'settings' },
+          error: {
+            message: 'Settings required',
+            action_link: { label: 'Open Settings', screen: 'settings' },
+          },
         },
       },
     });
@@ -215,7 +218,7 @@ describe('toUIMessages', () => {
     const msgs: MessageSnapshot[] = [
       makeSnapshot({ id: 1, kind: 'user', payload: { data: { text: 'a' } } }),
       makeSnapshot({ id: 2, kind: 'llm', payload: { data: {} } }),
-      makeSnapshot({ id: 3, kind: 'error', payload: { data: { message: 'err' } } }),
+      makeSnapshot({ id: 3, kind: 'error', payload: { data: { error: { message: 'err' } } } }),
     ];
     const result = toUIMessages(msgs);
     expect(result.length).toBeLessThanOrEqual(msgs.length);

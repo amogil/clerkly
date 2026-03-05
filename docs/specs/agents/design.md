@@ -38,6 +38,9 @@ CREATE TABLE messages (
   agent_id TEXT NOT NULL,
   timestamp TIMESTAMP NOT NULL,
   kind TEXT NOT NULL,
+  hidden INTEGER NOT NULL DEFAULT 0,
+  done INTEGER NOT NULL DEFAULT 0,
+  reply_to_message_id INTEGER,
   payload_json TEXT NOT NULL
 );
 
@@ -45,7 +48,7 @@ CREATE INDEX idx_messages_agent_id ON messages(agent_id);
 CREATE INDEX idx_messages_agent_timestamp ON messages(agent_id, timestamp);
 ```
 
-**Примечание:** Колонка `kind` добавлена в рамках llm-integration.6. `kind` не хранится в `payload_json` — всегда передаётся явно при вставке.
+**Примечание:** Детальный контракт хранения сообщений (`kind`, `done`, `reply_to_message_id`, `usage_json`, структура payload) задаётся в `docs/specs/llm-integration/design.md`; здесь используется его целевая схема.
 
 ## Типы данных
 
@@ -77,9 +80,16 @@ type AgentStatus = 'new' | 'in-progress' | 'awaiting-response' | 'error' | 'comp
 ```typescript
 // Requirements: agents.7
 interface MessagePayload {
-  kind: 'user' | 'llm' | 'error' | 'tool_call' | 'code_exec' | 'final_answer' | 'request_scope' | 'artifact';
   timing?: { started_at: string; finished_at: string };
   data: Record<string, unknown>;
+}
+
+interface Message {
+  kind: 'user' | 'llm' | 'error' | 'tool_call' | 'code_exec' | 'final_answer' | 'request_scope' | 'artifact';
+  done: boolean;
+  hidden: boolean;
+  replyToMessageId?: number | null;
+  payloadJson: string;
 }
 ```
 
@@ -486,10 +496,6 @@ contextBridge.exposeInMainWorld('api', {
 ```typescript
 // Requirements: agents.9.1, agents.9.2, agents.9.4
 function computeAgentStatus(messages: Message[]): AgentStatus {
-  if (messages.length === 0) {
-    return 'new';
-  }
-
   // Фильтруем hidden сообщения — они не видны в UI и не влияют на статус
   const visibleMessages = messages.filter(m => m.hidden !== true);
 
@@ -498,36 +504,12 @@ function computeAgentStatus(messages: Message[]): AgentStatus {
   }
 
   const lastMessage = visibleMessages[visibleMessages.length - 1];
-  const payload = JSON.parse(lastMessage.payloadJson) as MessagePayload;
-
-  // Ошибка — последнее видимое сообщение kind: error
-  if (lastMessage.kind === 'error') {
-    return 'error';
+  if (lastMessage.kind === 'error') return 'error';
+  if (lastMessage.kind === 'final_answer') return 'completed';
+  if (lastMessage.kind === 'user') return 'in-progress';
+  if (lastMessage.kind === 'llm') {
+    return lastMessage.done ? 'awaiting-response' : 'in-progress';
   }
-
-  // Финальный ответ
-  if (lastMessage.kind === 'final_answer') {
-    return 'completed';
-  }
-
-  // in-progress: есть user-сообщение и после него нет финализированного ответа агента
-  // Ищем с конца: если встречаем user раньше чем финализированный llm/final_answer — in-progress
-  for (let i = visibleMessages.length - 1; i >= 0; i--) {
-    const msg = visibleMessages[i];
-    if (msg.kind === 'user') {
-      return 'in-progress';
-    }
-    if (msg.kind === 'llm') {
-      const p = JSON.parse(msg.payloadJson);
-      if (p.data?.action) {
-        // Финализированный llm-ответ — агент ответил
-        return 'awaiting-response';
-      }
-      // llm без action — ещё в процессе стриминга
-      return 'in-progress';
-    }
-  }
-
   return 'new';
 }
 
@@ -1233,11 +1215,13 @@ function ActivityIndicator({ isActive }: { isActive: boolean }) {
 #### PromptInput (AI Elements)
 
 ```typescript
-// Requirements: agents.4.1, agents.4.3, agents.4.4, agents.4.5, agents.4.6, agents.4.7
+// Requirements: agents.4.1, agents.4.2, agents.4.2.1, agents.4.2.2, agents.4.3, agents.4.4, agents.4.5, agents.4.6, agents.4.7, agents.4.24
 function ChatInput({
+  agent,
   taskInput,
   setTaskInput,
   handleSend,
+  cancelCurrentRequest,
   textareaRef,
   chatAreaRef,
 }: ChatInputProps) {
@@ -1252,6 +1236,9 @@ function ChatInput({
     textarea.style.overflowY = textarea.scrollHeight > maxHeight ? 'auto' : 'hidden';
   }, [taskInput, textareaRef, chatAreaRef]);
 
+  const isStopMode = agent.status === 'in-progress';
+  const canSend = taskInput.trim().length > 0;
+
   return (
     <PromptInput onSubmit={(message) => handleSend(message.text)}>
       <PromptInputBody>
@@ -1263,10 +1250,12 @@ function ChatInput({
           onChange={(event) => setTaskInput(event.target.value)}
         />
         <Button
-          type={agent.status === 'in-progress' ? 'button' : 'submit'}
-          onClick={agent.status === 'in-progress' ? () => cancelCurrentRequest() : undefined}
+          type={isStopMode ? 'button' : 'submit'}
+          disabled={isStopMode ? false : !canSend}
+          onClick={isStopMode ? () => cancelCurrentRequest() : undefined}
+          aria-label={isStopMode ? 'Stop generation' : 'Send message'}
         >
-          {agent.status === 'in-progress' ? <Square /> : <Send />}
+          {isStopMode ? <Square /> : <Send />}
         </Button>
       </PromptInputBody>
       <PromptInputFooter>
@@ -1280,6 +1269,10 @@ function ChatInput({
 **Важно:** поведение клавиатуры (`Enter` submit, `Shift+Enter` newline) делегировано `PromptInputTextarea`, без дополнительного кастомного `onKeyDown` в `AgentChat`.
 
 **Техническое решение:** в текущей реализации поле ввода стандартизировано на AI Elements `PromptInput` и интегрировано с существующим chat send-flow.
+
+**Алгоритм активности action-кнопки (agents.4.2, agents.4.2.1, agents.4.2.2):**
+- Режим `stop` (`agent.status === 'in-progress'`) — кнопка всегда активна, независимо от текста в поле ввода.
+- Режим `send` (любой статус кроме `in-progress`) — кнопка активна только если `taskInput.trim().length > 0`.
 
 #### Автофокус на поле ввода
 
@@ -1918,7 +1911,7 @@ import { Logo } from '../logo';
 | `tests/unit/agents/AgentIPCHandlers.test.ts` | agents.2, agents.4, agents.5.5 |
 | `tests/unit/agents/computeAgentStatus.test.ts` | agents.9 |
 | `tests/unit/agents/ActivityIndicator.test.tsx` | agents.11 |
-| `tests/unit/components/ai-elements/prompt-input.test.tsx` | agents.4.3-4.7, agents.4.24 |
+| `tests/unit/components/ai-elements/prompt-input.test.tsx` | agents.4.2-4.7, agents.4.24 |
 | `tests/unit/components/agents/AgentMessage.test.tsx` | agents.4.10, agents.4.11.1, llm-integration.2, llm-integration.7 |
 | `tests/unit/components/agents/AgentReasoningTrigger.test.tsx` | agents.4.11, llm-integration.2, llm-integration.7.2 |
 | `tests/unit/renderer/IPCChatTransport.test.ts` | llm-integration.2, llm-integration.7 |
@@ -1930,8 +1923,8 @@ import { Logo } from '../logo';
 
 ### Функциональные тесты
 
-| Файл | Покрытие | Недостающие тесты |
-|------|----------|-------------------|
+| Файл | Покрытие | Примечание |
+|------|----------|------------|
 | `tests/functional/agent-switching.spec.ts` | agents.3 | - |
 | `tests/functional/agent-messaging.spec.ts` | agents.4.3, 4.4, 4.8, 4.13.1, 4.13.2, 4.13.4 | - |
 | `tests/functional/agent-scroll-position.spec.ts` | agents.4.14.1-4.14.5 | - |
@@ -1958,9 +1951,9 @@ import { Logo } from '../logo';
 | `tests/functional/input-autofocus.spec.ts` | agents.4.7.1, 4.7.2 | - |
 | `tests/functional/header-layout.spec.ts` | agents.8.3 | - |
 
-#### Недостающие функциональные тесты
+#### Статус покрытия функциональными тестами
 
-Все функциональные тесты для автоскролла и управления позицией скролла реализованы.
+Покрытие функциональными тестами для автоскролла и управления позицией скролла зафиксировано в таблице выше.
 
 #### Правила написания функциональных тестов
 
@@ -2214,7 +2207,7 @@ interface UseAgentChatResult {
 
 5. **`isStreaming`** = `status === 'streaming' || status === 'submitted'` (внутреннее состояние запроса в `useChat`); используется для потока сообщений и reasoning, но НЕ для переключения `send/stop`.
 
-6. **Stop только по статусу агента** — action-кнопка в `AgentChat` переключается в режим `stop`, когда `agent.status === 'in-progress'`; во всех остальных статусах отображается `send`. Нажатие `stop` вызывает `cancelCurrentRequest()` и IPC `messages:cancel`.
+6. **Action-кнопка по статусу и тексту** — кнопка в `AgentChat` переключается в режим `stop`, когда `agent.status === 'in-progress'`; во всех остальных статусах отображается `send`. В режиме `stop` кнопка всегда активна. В режиме `send` кнопка активна только при непустом `taskInput.trim()`. Нажатие `stop` вызывает `cancelCurrentRequest()` и IPC `messages:cancel`.
 
 7. **Ошибки stop без toast** — `cancelCurrentRequest()` перехватывает ошибки/`success:false` от `messages:cancel`, возвращает `false` и не инициирует toast-уведомления.
 
