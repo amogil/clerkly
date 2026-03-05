@@ -32,6 +32,14 @@ CREATE TABLE messages (
 - Для сообщений `kind:error` значение `done` равно `1`.
 - Для сообщений, которые находятся в процессе формирования (например, streaming `kind:llm`), значение `done` равно `0`.
 - Для полностью сформированных сообщений `done` равно `1`.
+- Для исторических сообщений `kind:llm` с уже сохранённым финальным `data.action` выполняется backfill `done = 1`.
+
+### Backfill исторических `llm`
+
+- Backfill выполняется отдельной SQL-миграцией после добавления колонки `done`.
+- Критерий завершённости для legacy-данных: `kind = 'llm'` и `json_type(payload_json, '$.data.action') = 'object'`.
+- Такие записи обновляются с `done = 0` на `done = 1`.
+- Миграция является идемпотентной: уже завершённые записи (`done = 1`) не изменяются.
 
 ### Правило `reply_to_message_id`
 
@@ -575,6 +583,7 @@ User отправляет сообщение
 - `tests/unit/agents/AgentIPCHandlers.test.ts` — запуск pipeline при kind:user
 - `tests/unit/hooks/useMessages.test.ts` — обработка новых событий
 - `tests/unit/db/repositories/MessagesRepository.test.ts` — kind как параметр
+- `tests/unit/MigrationRunner.test.ts` — миграции `done`, включая backfill historical `llm`
 
 ### Функциональные тесты
 
@@ -615,6 +624,7 @@ User отправляет сообщение
 | llm-integration.6 | ✓ | - |
 | llm-integration.6.5 (`done` как отдельный флаг) | ✓ | - |
 | llm-integration.6.6 (совместимость `done` для существующих записей) | ✓ | - |
+| llm-integration.6.6.1 (backfill завершённых legacy `llm`) | ✓ | - |
 | llm-integration.7 | ✓ | ✓ |
 | llm-integration.8.1 | ✓ | ✓ |
 | llm-integration.8.5 | ✓ | ✓ |
