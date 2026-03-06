@@ -401,6 +401,7 @@ export function getEntityId(
     data?: { id?: string };
     agent?: { id?: string };
     message?: { id?: number };
+    messageId?: number;
   }
 ): string | undefined {
   // Old format: payload.id
@@ -418,6 +419,10 @@ export function getEntityId(
   // New snapshot format: payload.message.id (MessageSnapshot)
   if ('message' in payload && payload.message && typeof payload.message.id === 'number') {
     return String(payload.message.id);
+  }
+  // Message reasoning payload: payload.messageId
+  if ('messageId' in payload && typeof payload.messageId === 'number') {
+    return String(payload.messageId);
   }
   return undefined;
 }

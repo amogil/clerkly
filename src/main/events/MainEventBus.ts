@@ -19,7 +19,7 @@ import {
   getEventKey,
   TypedEventClass,
 } from '../../shared/events/types';
-import { IPC_CHANNELS, EVENT_CONFIG } from '../../shared/events/constants';
+import { IPC_CHANNELS, EVENT_CONFIG, EVENT_TYPES } from '../../shared/events/constants';
 import { Logger } from '../Logger';
 
 // Internal event map type for mitt
@@ -44,6 +44,7 @@ export class MainEventBus {
     { type: EventType; payload: BaseEvent; options?: PublishOptions }
   > = new Map();
   private batchScheduled = false;
+  private nonCoalescedSequence = 0;
 
   private constructor() {
     this.emitter = mitt<MittEvents>();
@@ -92,7 +93,7 @@ export class MainEventBus {
       timestamp: Date.now(),
     } as EventPayload<T>;
 
-    const eventKey = getEventKey(type, payloadWithTimestamp);
+    const eventKey = this.getBatchKey(type, payloadWithTimestamp);
 
     // Add to batch for same-tick batching
     // Requirements: realtime-events.6.3
@@ -111,7 +112,7 @@ export class MainEventBus {
    * Requirements: realtime-events.4.3
    */
   public deliverFromIPC<T extends EventType>(type: T, payload: EventPayload<T>): void {
-    const eventKey = getEventKey(type, payload);
+    const eventKey = this.getBatchKey(type, payload);
 
     // Add to batch for same-tick batching, always localOnly
     this.pendingBatch.set(eventKey, { type, payload, options: { localOnly: true } });
@@ -134,6 +135,19 @@ export class MainEventBus {
     for (const [eventKey, { type, payload, options }] of batch) {
       this.deliverEvent(type as EventType, payload, eventKey, options);
     }
+  }
+
+  // Requirements: realtime-events.6.3, llm-integration.2
+  private getBatchKey<T extends EventType>(type: T, payload: EventPayload<T>): string {
+    const baseKey = getEventKey(type, payload);
+    if (
+      type === EVENT_TYPES.MESSAGE_UPDATED ||
+      type === EVENT_TYPES.MESSAGE_LLM_REASONING_UPDATED
+    ) {
+      this.nonCoalescedSequence += 1;
+      return `${baseKey}:seq:${this.nonCoalescedSequence}`;
+    }
+    return baseKey;
   }
 
   /**
