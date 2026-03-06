@@ -427,6 +427,8 @@ test.describe('Agent Messaging', () => {
     const scrollToBottomBtn = window.locator('[data-testid="scroll-to-bottom"]');
     await expect(scrollToBottomBtn).toBeVisible({ timeout: 3000 });
 
+    const messagesBeforeAgentResponse = await activeChat(window).messages.count();
+
     // Create agent message using test API
     const result = await window.evaluate(async (agentId) => {
       // @ts-expect-error - window.api is exposed via contextBridge
@@ -437,8 +439,15 @@ test.describe('Agent Messaging', () => {
     }, firstAgentId as string);
     expect(result.success).toBe(true);
 
-    // Wait for agent message to appear
-    await expect(activeChat(window).messages).toHaveCount(16, { timeout: 5000 });
+    // Wait for at least one new message to appear
+    await window.waitForFunction(
+      (beforeCount) =>
+        document.querySelectorAll(
+          '[data-testid="agent-chat-root"]:not(.pointer-events-none) [data-testid="message"]'
+        ).length > beforeCount,
+      messagesBeforeAgentResponse,
+      { timeout: 5000 }
+    );
 
     // Wait to ensure no autoscroll happens — button should remain visible
     await window.waitForFunction(
