@@ -9,6 +9,9 @@ import {
   AgentCreatedEvent,
   AgentUpdatedEvent,
   AgentArchivedEvent,
+  MessageUpdatedEvent,
+  MessageLlmReasoningUpdatedEvent,
+  type MessageSnapshot,
 } from '../../../src/shared/events/types';
 
 // Mock Electron
@@ -33,6 +36,17 @@ jest.mock('../../../src/main/Logger', () => ({
 import { BrowserWindow } from 'electron';
 
 describe('MainEventBus', () => {
+  const createMessageSnapshot = (id: number, text: string): MessageSnapshot => ({
+    id,
+    agentId: 'agent-1',
+    kind: 'llm',
+    timestamp: Date.now(),
+    payload: { data: { text } },
+    replyToMessageId: null,
+    hidden: false,
+    done: false,
+  });
+
   beforeEach(() => {
     MainEventBus.resetInstance();
     jest.clearAllMocks();
@@ -546,6 +560,50 @@ describe('MainEventBus', () => {
           agent: expect.objectContaining({ name: 'Name 3' }),
         })
       );
+    });
+
+    /* Preconditions: EventBus instance exists
+       Action: Publish multiple MESSAGE_UPDATED events for the same message in one tick
+       Assertions: All events are delivered (no coalescing for streaming path)
+       Requirements: realtime-events.6.3, llm-integration.2 */
+    it('should not coalesce message.updated events within one tick', async () => {
+      const bus = MainEventBus.getInstance();
+      const handler = jest.fn();
+
+      bus.subscribe('message.updated', handler);
+
+      bus.publish(new MessageUpdatedEvent(createMessageSnapshot(42, 'chunk 1')));
+      bus.publish(new MessageUpdatedEvent(createMessageSnapshot(42, 'chunk 2')));
+      bus.publish(new MessageUpdatedEvent(createMessageSnapshot(42, 'chunk 3')));
+
+      await Promise.resolve();
+
+      expect(handler).toHaveBeenCalledTimes(3);
+      expect(handler.mock.calls[0][0].message.payload.data).toEqual({ text: 'chunk 1' });
+      expect(handler.mock.calls[1][0].message.payload.data).toEqual({ text: 'chunk 2' });
+      expect(handler.mock.calls[2][0].message.payload.data).toEqual({ text: 'chunk 3' });
+    });
+
+    /* Preconditions: EventBus instance exists
+       Action: Publish multiple reasoning delta events in one tick
+       Assertions: All deltas are delivered in order (no coalescing for reasoning stream)
+       Requirements: realtime-events.6.3, llm-integration.2 */
+    it('should not coalesce message.llm.reasoning.updated events within one tick', async () => {
+      const bus = MainEventBus.getInstance();
+      const handler = jest.fn();
+
+      bus.subscribe('message.llm.reasoning.updated', handler);
+
+      bus.publish(new MessageLlmReasoningUpdatedEvent(7, 'agent-1', 'a', 'a'));
+      bus.publish(new MessageLlmReasoningUpdatedEvent(7, 'agent-1', 'b', 'ab'));
+      bus.publish(new MessageLlmReasoningUpdatedEvent(7, 'agent-1', 'c', 'abc'));
+
+      await Promise.resolve();
+
+      expect(handler).toHaveBeenCalledTimes(3);
+      expect(handler.mock.calls[0][0].delta).toBe('a');
+      expect(handler.mock.calls[1][0].delta).toBe('b');
+      expect(handler.mock.calls[2][0].delta).toBe('c');
     });
   });
 

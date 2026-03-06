@@ -143,6 +143,111 @@ test.describe('LLM Chat (real OpenAI)', () => {
     }
   });
 
+  /* Preconditions: Existing chat history is present after app reopen (real npm-start-like path)
+     Action: On reopened app user sends the first message immediately after chat becomes interactive
+     Assertions: Reasoning stream must be visible and progressively updated before final action appears
+     Requirements: llm-integration.2, llm-integration.7.2, agents.4.11 */
+  test('should display reasoning streaming after sending message', async () => {
+    test.setTimeout(180000);
+    context = await launchWithRealLLM(OPENAI_API_KEY!);
+    const firstLaunchDataPath = context.testDataPath;
+    const firstInput = context.window.locator('textarea[placeholder*="Ask"]');
+
+    // Seed persistent history in the same user-data-dir.
+    await firstInput.fill('Warm up session with a short reply');
+    await firstInput.press('Enter');
+    await expect(context.window.locator('[data-testid="message-llm-action"]').last()).toBeVisible({
+      timeout: 90000,
+    });
+
+    await closeElectron(context, false);
+
+    context = await launchElectron(firstLaunchDataPath, {
+      CLERKLY_GOOGLE_API_URL: mockOAuthServer.getBaseUrl(),
+      CLERKLY_OPENAI_API_KEY: OPENAI_API_KEY!,
+    });
+    await expectAgentsVisible(context.window, 15000);
+    const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
+    await expect(messageInput).toBeVisible({ timeout: 10000 });
+
+    await messageInput.fill(
+      'Solve this carefully: compare 17! and 2^57, explain each step briefly, then give final answer.'
+    );
+    await messageInput.press('Enter');
+
+    const reasoningTrigger = context.window.locator(
+      '[data-testid="message-llm-reasoning-trigger"]'
+    );
+    const reasoningContent = context.window.locator('[data-testid="message-llm-reasoning"]').last();
+    const actionContent = context.window.locator('[data-testid="message-llm-action"]');
+    const actionCountBeforeRequest = await actionContent.count();
+
+    await expect(reasoningTrigger.last()).toBeVisible({ timeout: 45000 });
+    await expect(reasoningTrigger.last()).toContainText('Thinking...', { timeout: 45000 });
+    await expect(reasoningContent).toBeVisible({ timeout: 45000 });
+
+    await context.window.evaluate((baselineActionCount: number) => {
+      const state = {
+        updatesBeforeAction: 0,
+        maxLengthBeforeAction: 0,
+        sawReasoningBeforeAction: false,
+        actionSeen: false,
+      };
+      const getReasoningNode = () =>
+        document.querySelectorAll('[data-testid="message-llm-reasoning"]')[
+          document.querySelectorAll('[data-testid="message-llm-reasoning"]').length - 1
+        ] as HTMLElement | undefined;
+      const getActionCount = () =>
+        document.querySelectorAll('[data-testid="message-llm-action"]').length;
+
+      const readReasoning = () => (getReasoningNode()?.textContent ?? '').trim();
+      const refresh = () => {
+        if (getActionCount() > baselineActionCount) {
+          state.actionSeen = true;
+        }
+        if (!state.actionSeen) {
+          const text = readReasoning();
+          if (text.length > 0) state.sawReasoningBeforeAction = true;
+          if (text.length > state.maxLengthBeforeAction) {
+            state.maxLengthBeforeAction = text.length;
+            state.updatesBeforeAction += 1;
+          }
+        }
+      };
+
+      refresh();
+      const observer = new MutationObserver(() => {
+        refresh();
+      });
+      observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+
+      (window as Window & { __reasoningStreamProbe?: unknown }).__reasoningStreamProbe = {
+        state,
+        stop: () => observer.disconnect(),
+      };
+    }, actionCountBeforeRequest);
+
+    await expect(actionContent.last()).toBeVisible({ timeout: 90000 });
+
+    const streamProbe = await context.window.evaluate(() => {
+      const probe = (window as Window & { __reasoningStreamProbe?: any }).__reasoningStreamProbe;
+      if (!probe) {
+        return {
+          sawReasoningBeforeAction: false,
+          updatesBeforeAction: 0,
+          maxLengthBeforeAction: 0,
+        };
+      }
+      probe.stop();
+      return probe.state;
+    });
+
+    expect(streamProbe.sawReasoningBeforeAction).toBe(true);
+    expect(streamProbe.maxLengthBeforeAction).toBeGreaterThan(20);
+    expect(streamProbe.updatesBeforeAction).toBeGreaterThanOrEqual(2);
+    await expectNoToastError(context.window);
+  });
+
   /* Preconditions: App authenticated, invalid API key saved
      Action: User sends a message
      Assertions: Error bubble appears with auth error text and "Open Settings" action;

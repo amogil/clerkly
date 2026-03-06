@@ -134,7 +134,7 @@ export class OpenAIProvider implements ILLMProvider {
           },
         },
         ...(options.reasoningEffort
-          ? { reasoning: { effort: options.reasoningEffort, summary: 'auto' } }
+          ? { reasoning: { effort: options.reasoningEffort, summary: 'concise' } }
           : {}),
       };
 

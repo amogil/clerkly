@@ -483,7 +483,7 @@ describe('OpenAIProvider.chat()', () => {
        Action: Call chat() and inspect outgoing request body
        Assertions: Request uses Responses API format with text.format json_schema
        Requirements: llm-integration.5.7, llm-integration.5.7.1, llm-integration.11 */
-    it('should include text.format json_schema and avoid legacy response_format', async () => {
+    it('should include text.format json_schema, concise reasoning summary, and avoid legacy response_format', async () => {
       const actionJson = JSON.stringify({ action: { type: 'text', content: 'OK' } });
       const reader = buildMockReader([
         sseResponsesEvent({ type: 'response.output_text.delta', delta: actionJson }),
@@ -519,7 +519,7 @@ describe('OpenAIProvider.chat()', () => {
       expect(body.response_format).toBeUndefined();
       expect(Array.isArray(body.input)).toBe(true);
       expect(body.reasoning?.effort).toBe('low');
-      expect(body.reasoning?.summary).toBe('auto');
+      expect(body.reasoning?.summary).toBe('concise');
     });
   });
 });
