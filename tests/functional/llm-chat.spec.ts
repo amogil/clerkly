@@ -11,6 +11,7 @@
 
 import { test, expect } from '@playwright/test';
 import {
+  getFreePort,
   launchElectron,
   closeElectron,
   ElectronTestContext,
@@ -25,8 +26,7 @@ import type { MockOAuthServer } from './helpers/mock-oauth-server';
 import { MockLLMServer } from './helpers/mock-llm-server';
 
 const TEST_CLIENT_ID = 'test-client-id-12345';
-const MOCK_OAUTH_PORT = 8894;
-const MOCK_LLM_PORT = 8895;
+let mockLLMPort: number;
 
 // Real OpenAI API key from .env (loaded by playwright.config.ts via dotenv)
 const OPENAI_API_KEY = process.env.CLERKLY_OPENAI_API_KEY;
@@ -39,7 +39,7 @@ test.beforeAll(async () => {
     throw new Error('[llm-chat] CLERKLY_OPENAI_API_KEY is required for standard functional runs');
   }
 
-  mockOAuthServer = await createMockOAuthServer(MOCK_OAUTH_PORT);
+  mockOAuthServer = await createMockOAuthServer();
   mockOAuthServer.setUserProfile({
     id: 'test-user-llm-chat',
     email: 'llm-chat@example.com',
@@ -48,7 +48,8 @@ test.beforeAll(async () => {
     family_name: 'Chat User',
   });
 
-  mockLLMServer = new MockLLMServer({ port: MOCK_LLM_PORT });
+  mockLLMPort = await getFreePort();
+  mockLLMServer = new MockLLMServer({ port: mockLLMPort });
   await mockLLMServer.start();
 });
 
@@ -541,7 +542,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
   async function launchWithMockLLM(): Promise<ElectronTestContext> {
     const ctx = await launchElectron(undefined, {
       CLERKLY_GOOGLE_API_URL: mockOAuthServer.getBaseUrl(),
-      CLERKLY_OPENAI_API_URL: `http://localhost:${MOCK_LLM_PORT}/v1/responses`,
+      CLERKLY_OPENAI_API_URL: `http://localhost:${mockLLMPort}/v1/responses`,
       CLERKLY_OPENAI_API_KEY: 'mock-key-for-testing',
     });
     await completeOAuthFlow(ctx.app, ctx.window, TEST_CLIENT_ID);
