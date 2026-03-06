@@ -1939,7 +1939,7 @@ import { Logo } from '../logo';
 | `tests/functional/agent-activity-indicator.spec.ts` | agents.11 | - |
 | `tests/functional/agent-realtime-events.spec.ts` | agents.12 | - |
 | `tests/functional/agent-list-responsive.spec.ts` | agents.1.7, 1.8, 1.9 | - |
-| `tests/functional/agents-always-one.spec.ts` | agents.2.7-2.11 | - |
+| `tests/functional/agents-always-one.spec.ts` | agents.2.7-2.11 | Сценарии: auto-create первого агента, отсутствие empty state, скрытие startup loader с сохранением видимости и интерактивности стандартного UI после `startupSettled` |
 | `tests/functional/agents-error-messages.spec.ts` | agents.5.5, 5.6, 5.7 | - |
 | `tests/functional/auto-expanding-textarea.spec.ts` | agents.4.5-4.7 | - |
 | `tests/functional/empty-state-placeholder.spec.ts` | agents.4.15-4.19 | - |

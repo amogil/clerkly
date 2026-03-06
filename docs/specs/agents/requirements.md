@@ -129,7 +129,7 @@
 - `tests/functional/agents-always-one.spec.ts` - "should auto-create first agent for new user after login"
 - `tests/functional/agents-always-one.spec.ts` - "should auto-create agent when last agent is archived"
 - `tests/functional/agents-always-one.spec.ts` - "should never show empty state UI"
-- `tests/functional/agents-always-one.spec.ts` - "should never show loading state - UI always visible"
+- `tests/functional/agents-always-one.spec.ts` - "should hide startup loading state and keep UI visible after startup settles"
 
 ### 3. Переключение между агентами
 
