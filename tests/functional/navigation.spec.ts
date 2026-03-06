@@ -219,7 +219,11 @@ test('should keep page scroll locked and allow internal agents chat scroll', asy
   await window.evaluate(async () => {
     const api = (window as any).api;
     const agentsResult = await api.agents.list();
-    if (!agentsResult?.success || !Array.isArray(agentsResult.data) || agentsResult.data.length === 0) {
+    if (
+      !agentsResult?.success ||
+      !Array.isArray(agentsResult.data) ||
+      agentsResult.data.length === 0
+    ) {
       throw new Error('Failed to read agents list');
     }
 
@@ -232,11 +236,17 @@ test('should keep page scroll locked and allow internal agents chat scroll', asy
     }
   });
 
-  await expect.poll(
-    async () =>
-      await window.locator('[data-testid="agent-chat-root"]:not(.pointer-events-none) [data-testid="message"]').count(),
-    { timeout: 10000 }
-  ).toBeGreaterThan(80);
+  await expect
+    .poll(
+      async () =>
+        await window
+          .locator(
+            '[data-testid="agent-chat-root"]:not(.pointer-events-none) [data-testid="message"]'
+          )
+          .count(),
+      { timeout: 10000 }
+    )
+    .toBeGreaterThan(80);
 
   const metrics = await window.evaluate(() => {
     const messagesArea = document.querySelector(
