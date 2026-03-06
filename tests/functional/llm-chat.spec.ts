@@ -317,6 +317,198 @@ test.describe('LLM Chat (real OpenAI)', () => {
     // Scrollbar must not be removed from DOM (no remount = no flicker)
     expect(removals).toBe(0);
   });
+
+  /* Preconditions: App authenticated with real OpenAI API key, at least one long LLM response is persisted in chat history
+     Action: Restart app and record chat scrollTop frame-by-frame from the earliest startup frames
+     Assertions: After chat becomes visible, scrollTop stays stable (no visual startup autoscroll)
+     Requirements: agents.4.14.5, agents.4.14.6 */
+  test('should keep chat viewport visually stable on app reopen with real llm history', async () => {
+    test.setTimeout(180000);
+
+    context = await launchWithRealLLM(OPENAI_API_KEY!);
+    const testDataPath = context.testDataPath;
+
+    const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
+    await expect(messageInput).toBeVisible({ timeout: 10000 });
+
+    await messageInput.fill(
+      'Write a long Russian text with 8 numbered sections and bullet lists. No code blocks.'
+    );
+    await messageInput.press('Enter');
+
+    const stopButton = context.window.locator('[data-testid="prompt-input-stop"]');
+    await expect(stopButton).toBeVisible({ timeout: 15000 });
+    await expect(context.window.locator('[data-testid="prompt-input-send"]')).toBeVisible({
+      timeout: 120000,
+    });
+
+    const actionContent = context.window.locator('[data-testid="message-llm-action"]');
+    await expect(actionContent).toBeVisible({ timeout: 120000 });
+
+    await closeElectron(context, false);
+
+    context = await launchElectron(testDataPath, {
+      CLERKLY_GOOGLE_API_URL: mockOAuthServer.getBaseUrl(),
+      CLERKLY_OPENAI_API_KEY: OPENAI_API_KEY!,
+    });
+
+    await context.window.evaluate(() => {
+      const state = {
+        samples: [] as Array<{
+          t: number;
+          visible: boolean;
+          scrollTop: number | null;
+          loaderVisible: boolean;
+        }>,
+        firstVisibleToUserAt: null as number | null,
+        firstVisibleToUserScrollTop: null as number | null,
+        maxScrollDeltaAfterVisibleToUser: 0,
+        movedFramesAfterVisibleToUser: 0,
+        scrollEventsAfterVisibleToUser: 0,
+      };
+
+      let listenerAttached = false;
+      let lastVisibleScrollTop: number | null = null;
+      const startedAt = performance.now();
+
+      const isLoaderVisible = () => {
+        const loader = document.querySelector(
+          '[data-testid="app-loading-screen"]'
+        ) as HTMLElement | null;
+        if (!loader) return false;
+        const style = window.getComputedStyle(loader);
+        return (
+          loader.getAttribute('aria-hidden') !== 'true' &&
+          style.display !== 'none' &&
+          style.visibility !== 'hidden' &&
+          style.opacity !== '0'
+        );
+      };
+
+      const getMessagesArea = () =>
+        document.querySelector('[data-testid="messages-area"]') as HTMLElement | null;
+
+      const isVisible = (el: HTMLElement | null) => {
+        if (!el) return false;
+        const rect = el.getBoundingClientRect();
+        const style = window.getComputedStyle(el);
+        return (
+          rect.width > 0 &&
+          rect.height > 0 &&
+          style.display !== 'none' &&
+          style.visibility !== 'hidden' &&
+          style.opacity !== '0'
+        );
+      };
+
+      const attachScrollListener = (el: HTMLElement) => {
+        if (listenerAttached) return;
+        listenerAttached = true;
+        el.addEventListener(
+          'scroll',
+          () => {
+            if (state.firstVisibleToUserAt !== null) {
+              state.scrollEventsAfterVisibleToUser += 1;
+            }
+          },
+          { passive: true }
+        );
+      };
+
+      (window as any).__startupScrollTracePromise = new Promise<void>((resolve) => {
+        const run = () => {
+          const now = performance.now();
+          const messagesArea = getMessagesArea();
+          if (messagesArea) {
+            attachScrollListener(messagesArea);
+          }
+
+          const visible = isVisible(messagesArea);
+          const scrollTop = messagesArea ? messagesArea.scrollTop : null;
+          const loaderVisible = isLoaderVisible();
+
+          if (visible && !loaderVisible && state.firstVisibleToUserAt === null) {
+            state.firstVisibleToUserAt = now - startedAt;
+            state.firstVisibleToUserScrollTop = scrollTop;
+          }
+
+          if (
+            visible &&
+            !loaderVisible &&
+            scrollTop !== null &&
+            state.firstVisibleToUserScrollTop !== null
+          ) {
+            const totalDelta = Math.abs(scrollTop - state.firstVisibleToUserScrollTop);
+            if (totalDelta > state.maxScrollDeltaAfterVisibleToUser) {
+              state.maxScrollDeltaAfterVisibleToUser = totalDelta;
+            }
+
+            if (lastVisibleScrollTop !== null) {
+              const frameDelta = Math.abs(scrollTop - lastVisibleScrollTop);
+              if (frameDelta > 1) {
+                state.movedFramesAfterVisibleToUser += 1;
+              }
+            }
+            lastVisibleScrollTop = scrollTop;
+          }
+
+          state.samples.push({
+            t: now - startedAt,
+            visible,
+            scrollTop,
+            loaderVisible,
+          });
+
+          if (now - startedAt < 5000) {
+            requestAnimationFrame(run);
+            return;
+          }
+
+          (window as any).__startupScrollTrace = state;
+          resolve();
+        };
+
+        requestAnimationFrame(run);
+      });
+    });
+
+    await expectAgentsVisible(context.window, 10000);
+    await context.window.evaluate(async () => {
+      await (window as any).__startupScrollTracePromise;
+    });
+
+    const traceSummary = await context.window.evaluate(() => {
+      const state = (window as any).__startupScrollTrace as {
+        samples: Array<{ visible: boolean; loaderVisible: boolean }>;
+        firstVisibleToUserAt: number | null;
+        maxScrollDeltaAfterVisibleToUser: number;
+        movedFramesAfterVisibleToUser: number;
+        scrollEventsAfterVisibleToUser: number;
+      };
+
+      const visibleSamples = state.samples.filter((sample) => sample.visible).length;
+      const visibleToUserSamples = state.samples.filter(
+        (sample) => sample.visible && !sample.loaderVisible
+      ).length;
+
+      return {
+        firstVisibleToUserAt: state.firstVisibleToUserAt,
+        maxScrollDeltaAfterVisibleToUser: state.maxScrollDeltaAfterVisibleToUser,
+        movedFramesAfterVisibleToUser: state.movedFramesAfterVisibleToUser,
+        scrollEventsAfterVisibleToUser: state.scrollEventsAfterVisibleToUser,
+        visibleSamples,
+        visibleToUserSamples,
+      };
+    });
+
+    expect(traceSummary.firstVisibleToUserAt).not.toBeNull();
+    expect(traceSummary.visibleSamples).toBeGreaterThan(20);
+    expect(traceSummary.visibleToUserSamples).toBeGreaterThan(20);
+    expect(traceSummary.maxScrollDeltaAfterVisibleToUser).toBeLessThanOrEqual(2);
+    expect(traceSummary.movedFramesAfterVisibleToUser).toBe(0);
+    expect(traceSummary.scrollEventsAfterVisibleToUser).toBe(0);
+    await expectNoToastError(context.window);
+  });
 });
 
 /**

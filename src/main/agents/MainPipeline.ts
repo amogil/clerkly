@@ -410,7 +410,7 @@ export class MainPipeline {
     clearLastLlmMessageId: () => void
   ): void {
     if (llmMessageId !== null) {
-      this.messageManager.setHidden(llmMessageId, agentId);
+      this.hideIncompleteLlmMessage(llmMessageId, agentId);
       clearLastLlmMessageId();
     }
   }
@@ -428,7 +428,7 @@ export class MainPipeline {
     clearLastLlmMessageId: () => void
   ): 'retry' | 'error' {
     if (llmMessageId !== null) {
-      this.messageManager.setHidden(llmMessageId, agentId);
+      this.hideIncompleteLlmMessage(llmMessageId, agentId);
       clearLastLlmMessageId();
     }
     if (attempt < maxAttempts - 1) {
@@ -543,7 +543,7 @@ export class MainPipeline {
     if (signalAborted) {
       if (lastLlmMessageId !== null) {
         try {
-          this.messageManager.setHidden(lastLlmMessageId, agentId);
+          this.hideIncompleteLlmMessage(lastLlmMessageId, agentId);
         } catch {
           // ignore update errors during cancellation
         }
@@ -555,7 +555,7 @@ export class MainPipeline {
 
     if (lastLlmMessageId !== null) {
       try {
-        this.messageManager.setHidden(lastLlmMessageId, agentId);
+        this.hideIncompleteLlmMessage(lastLlmMessageId, agentId);
       } catch {
         // ignore
       }
@@ -612,5 +612,14 @@ export class MainPipeline {
       return { ok: false };
     }
     return { ok: true };
+  }
+
+  /**
+   * Hide interrupted llm message and keep it in unfinished state.
+   * Requirements: llm-integration.3.2
+   */
+  private hideIncompleteLlmMessage(messageId: number, agentId: string): void {
+    this.messageManager.setHidden(messageId, agentId);
+    this.messageManager.setDone(messageId, agentId, false);
   }
 }

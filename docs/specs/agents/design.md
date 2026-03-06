@@ -1383,7 +1383,7 @@ useEffect(() => {
 
 2. **Переключение агентов** (agents.4.14.2–4.14.4): CSS `absolute inset-0 opacity-0 pointer-events-none` скрывает неактивный `AgentChat`, но не размонтирует его и не сбрасывает `scrollTop` (в отличие от `display:none`). При возврате к агенту `Conversation` восстанавливает ту же позицию скролла.
 
-3. **Показ активного чата** (agents.4.14.5): для каждого `AgentChat` режим `resize="instant"` включается только один раз при первой активации (`isActive=true`) на 5 секунд, чтобы исключить визуальный рывок при первом показе чата. После истечения 5 секунд `Conversation` переключается на `resize="smooth"` и больше не возвращается в `instant` для этого чата.
+3. **Показ активного чата** (agents.4.14.5-4.14.6): первый показ активного чата выполняется только после достижения `startupSettled` у этого чата. До этого пользователь видит глобальный startup loader, а контент `AgentChat` не показывается, чтобы исключить скачок ширины/переносов и визуальный доскролл.
 
 4. **После отправки сообщения** (agents.4.13.2): `AgentChatInner` НЕ выполняет ручной вызов `scrollToBottom`. Поведение остаётся у `Conversation`: если пользователь не внизу, позиция сохраняется, а кнопка `scroll-to-bottom` остаётся видимой.
 
@@ -1926,9 +1926,9 @@ import { Logo } from '../logo';
 | Файл | Покрытие | Примечание |
 |------|----------|------------|
 | `tests/functional/agent-switching.spec.ts` | agents.3 | - |
-| `tests/functional/agent-messaging.spec.ts` | agents.4.3, 4.4, 4.8, 4.13.1, 4.13.2, 4.13.4 | - |
-| `tests/functional/agent-scroll-position.spec.ts` | agents.4.14.1-4.14.5 | - |
-| `tests/functional/startup-loader.spec.ts` | agents.13.2, agents.13.10, agents.4.14.5 (startup instant scroll) | - |
+| `tests/functional/agent-messaging.spec.ts` | agents.4.2.1, agents.4.2.2, 4.3, 4.4, 4.8, 4.13.1, 4.13.2, 4.13.4 | - |
+| `tests/functional/agent-scroll-position.spec.ts` | agents.4.14.1-4.14.6 | - |
+| `tests/functional/startup-loader.spec.ts` | agents.13.2, agents.13.10, agents.4.14.5-4.14.6 (startup settled без визуального рывка, без page-level scrollbar во время loader, стабильная ширина в раннем окне после скрытия loader) | - |
 | `tests/functional/settings-ai-agent.spec.ts` | agents.13.11-13.15 (регрессия startup/loading orchestration) | - |
 | `tests/functional/all-agents-page.spec.ts` | agents.5 | - |
 | `tests/functional/agent-status-indicators.spec.ts` | agents.6 | - |
@@ -2029,7 +2029,7 @@ await window.locator(`[data-testid="agent-icon-${firstAgentId}"]`).click();
 | agents.4.7.1-4.7.2 (autofocus) | - | ✓ |
 | agents.4.13.1-4.13.6 (autoscroll) | ✓ | ✓ |
 | agents.4.13.4-4.13.6 (scrollbar) | - | Manual |
-| agents.4.14.1-4.14.5 (scroll position) | ✓ | ✓ |
+| agents.4.14.1-4.14.6 (scroll position) | ✓ | ✓ |
 | agents.4.23 (text wrapping) | ✓ | ✓ |
 | agents.5 | ✓ | ✓ |
 | agents.5.5 (error messages) | ✓ | ✓ |
@@ -2096,7 +2096,7 @@ await window.locator(`[data-testid="agent-icon-${firstAgentId}"]`).click();
 agents.tsx
   ├── AgentHeader (без изменений)
   ├── [для каждого агента, скрытые через CSS если не активны]
-  │     AgentChat (смонтирован всё время, скрыт через className="hidden" если не активен)
+  │     AgentChat (смонтирован всё время, скрыт через CSS, но не размонтируется)
   │       ├── Conversation (use-stick-to-bottom, трекает скролл сам)
   │       │     ├── ConversationContent
   │       │     │     ├── AgentWelcome (если нет сообщений)
@@ -2109,9 +2109,9 @@ agents.tsx
 
 **Ключевые принципы:**
 - Все `AgentChat` монтируются при старте и остаются смонтированными
-- Переключение агента = CSS `display: none/block`, без ремонта
+- Переключение агента = CSS-скрытие без размонтирования (`absolute inset-0 opacity-0 pointer-events-none`)
 - `Conversation` каждого агента трекает скролл независимо — позиция сохраняется автоматически
-- Лоадер показывается пока хотя бы один агент ещё загружает сообщения
+- Лоадер показывается пока хотя бы один агент ещё загружает сообщения или активный чат ещё не достиг `startupSettled`
 
 ### Переключение экранов (Agents ↔ Settings)
 
@@ -2218,9 +2218,16 @@ interface UseAgentChatResult {
 **Загрузка при старте:**
 - Все `AgentChat` компоненты монтируются при старте приложения одновременно
 - Каждый `AgentChat` при mount вызывает `useAgentChat(agentId)`, который загружает ВСЕ сообщения через `messages:list`
-- `isLoading = true` пока идёт загрузка истории
-- `App.tsx` показывает экран загрузки "Loading..." пока хотя бы один `AgentChat` имеет `isLoading = true`
-- После загрузки всех чатов экран загрузки скрывается и показывается основной интерфейс
+- Каждый `AgentChat` дополнительно выставляет локальный флаг `startupSettled` только после фактической стабилизации первого отображения: ширина контейнера сообщений перестала изменяться, новые `scroll`-события в контейнере не приходят в течение короткого окна стабильности, и финальный кадр отрисован (double `requestAnimationFrame`)
+- `App.tsx` показывает экран загрузки "Loading..." пока хотя бы один `AgentChat` имеет `isLoading = true` ИЛИ активный `AgentChat` ещё не имеет `startupSettled = true`
+- После загрузки всех чатов и достижения `startupSettled` активным чатом экран загрузки скрывается и показывается основной интерфейс
+- Экран загрузки рендерится как `fixed`-overlay и не участвует в нормальном потоке документа, чтобы не создавать временный второй scroll-контекст
+- Глобальная блокировка page-level scroll задаётся на уровне спецификации `navigation` (`navigation.1.10`); в сценарии `Agents` единственный допустимый scroll-контекст — внутренний контейнер `Conversation`
+
+**Контракт визуальной стабильности старта (anti-regression):**
+- Во время `startup-loader` не допускается появление page-level scrollbar (ни на `html`, ни на `body`)
+- После скрытия `startup-loader` в раннем окне наблюдения не допускаются скачки ширины контейнера сообщений, вызванные поздним появлением/исчезновением скроллбара
+- Контейнер сообщений резервирует gutter скроллбара (`scrollbar-gutter: stable`), чтобы исключить shift ширины при переходе между состояниями с/без вертикального скролла
 
 ### AppCoordinator (main process orchestration)
 
@@ -2238,7 +2245,7 @@ interface UseAgentChatResult {
 
 **Ключевые события:**
 - `app.state.changed` — публикуется `AppCoordinator` при каждом переходе состояния
-- `app.chats.ready` — публикуется renderer (`Agents`) после завершения начальной загрузки чатов
+- `app.chats.ready` — публикуется renderer (`Agents`) только когда загружены все чаты и активный чат достиг `startupSettled`
 - `app.chats.failed` — публикуется renderer при критической ошибке загрузки чатов
 
 **Поток запуска:**

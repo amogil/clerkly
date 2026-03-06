@@ -51,6 +51,59 @@ test.afterEach(async () => {
 });
 
 test.describe('Agent Messaging', () => {
+  /* Preconditions: Agent is active, send mode is visible
+     Action: Keep input empty, then type prompt text
+     Assertions: Send button is disabled for empty input and enabled for non-empty input
+     Requirements: agents.4.2.2 */
+  test('should enable send button only when input has text', async () => {
+    const messageInput = activeChat(window).textarea;
+    const sendButton = window.locator('[data-testid="prompt-input-send"]');
+
+    await expect(messageInput).toBeVisible();
+    await expect(sendButton).toBeDisabled();
+
+    await messageInput.fill('hello');
+    await expect(sendButton).toBeEnabled();
+
+    await messageInput.fill('   ');
+    await expect(sendButton).toBeDisabled();
+  });
+
+  /* Preconditions: Last visible message is llm(done=false), so agent is in-progress and stop mode is visible
+     Action: Change input text between empty and non-empty values
+     Assertions: Stop button remains enabled regardless of input content
+     Requirements: agents.4.2.1 */
+  test('should keep stop button enabled regardless of input text in in-progress status', async () => {
+    const firstAgentDataTestId = await window
+      .locator('[data-testid^="agent-icon-"]')
+      .first()
+      .getAttribute('data-testid');
+    const activeAgentId = firstAgentDataTestId?.replace('agent-icon-', '');
+    expect(activeAgentId).toBeTruthy();
+
+    await window.evaluate(async (agentId) => {
+      const api = (window as unknown as { api: any }).api;
+      const result = await api.messages.create(agentId, 'llm', {
+        data: { reasoning: { text: 'streaming...' } },
+      });
+      if (!result?.success) {
+        throw new Error(result?.error || 'Failed to create in-progress llm message');
+      }
+    }, activeAgentId as string);
+
+    const stopButton = window.locator('[data-testid="prompt-input-stop"]');
+    const messageInput = activeChat(window).textarea;
+
+    await expect(stopButton).toBeVisible({ timeout: 5000 });
+    await expect(stopButton).toBeEnabled();
+
+    await messageInput.fill('');
+    await expect(stopButton).toBeEnabled();
+
+    await messageInput.fill('hello');
+    await expect(stopButton).toBeEnabled();
+  });
+
   /* Preconditions: Agent is active, input field is visible
      Action: Type message and press Enter
      Assertions: Message is sent and appears in chat

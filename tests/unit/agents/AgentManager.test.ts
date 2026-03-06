@@ -304,6 +304,72 @@ describe('AgentManager', () => {
 
       expect(snapshot.status).toBe(AGENT_STATUS.IN_PROGRESS);
     });
+
+    /* Preconditions: Last message is hidden llm(done=false), previous visible message is llm(done=true)
+       Action: Call toEventAgent() with agent
+       Assertions: Hidden message is ignored, status is computed from last visible message
+       Requirements: agents.9.2 */
+    it('should ignore hidden last message and compute status from last visible message', () => {
+      const history = [
+        {
+          id: 1,
+          agentId: mockAgent.agentId,
+          kind: MESSAGE_KIND.LLM,
+          timestamp: '2026-02-15T10:00:00.000Z',
+          payloadJson: JSON.stringify({
+            data: {
+              reasoning: { text: 'Done' },
+              action: { type: 'text', content: 'Final' },
+            },
+          }),
+          usageJson: null,
+          replyToMessageId: null,
+          hidden: false,
+          done: true,
+        },
+        {
+          id: 2,
+          agentId: mockAgent.agentId,
+          kind: MESSAGE_KIND.LLM,
+          timestamp: '2026-02-15T10:01:00.000Z',
+          payloadJson: JSON.stringify({ data: { reasoning: { text: 'Interrupted' } } }),
+          usageJson: null,
+          replyToMessageId: 1,
+          hidden: true,
+          done: false,
+        },
+      ];
+      mockDbManager.messages.listByAgent = jest.fn().mockReturnValue(history);
+
+      const snapshot = (agentManager as any).toEventAgent(mockAgent);
+
+      expect(snapshot.status).toBe(AGENT_STATUS.AWAITING_RESPONSE);
+    });
+
+    /* Preconditions: Agent has only hidden messages
+       Action: Call toEventAgent() with agent
+       Assertions: Status is `new` because visible history is empty
+       Requirements: agents.9.2 */
+    it('should return new status when all messages are hidden', () => {
+      const hiddenHistory = [
+        {
+          id: 1,
+          agentId: mockAgent.agentId,
+          kind: MESSAGE_KIND.USER,
+          timestamp: '2026-02-15T10:00:00.000Z',
+          payloadJson: JSON.stringify({ data: { text: 'Hello' } }),
+          usageJson: null,
+          replyToMessageId: null,
+          hidden: true,
+          done: true,
+        },
+      ];
+      mockDbManager.messages.listByAgent = jest.fn().mockReturnValue(hiddenHistory);
+
+      const snapshot = (agentManager as any).toEventAgent(mockAgent);
+
+      expect(snapshot.status).toBe(AGENT_STATUS.NEW);
+    });
   });
 
   describe('create', () => {

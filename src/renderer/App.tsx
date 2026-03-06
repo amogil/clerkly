@@ -238,15 +238,16 @@ function AppContent() {
     <>
       {isGlobalLoading && <AppLoadingScreen />}
       <div
-        className={`min-h-screen bg-background${isGlobalLoading ? ' hidden' : ''}`}
+        className={`h-screen overflow-hidden bg-background${
+          isGlobalLoading ? ' opacity-0 pointer-events-none select-none' : ''
+        }`}
         data-testid="agents-screen"
+        aria-hidden={isGlobalLoading}
       >
         <TopNavigation currentScreen={currentScreen} onNavigate={navigateToScreen} />
-        <div className="pt-16">
+        <div className="h-full pt-16">
           <div
-            className={`${
-              currentScreen === 'agents' ? '' : 'opacity-0 pointer-events-none absolute inset-0'
-            }`}
+            className={`${currentScreen === 'agents' ? 'h-full' : 'opacity-0 pointer-events-none absolute inset-0'}`}
           >
             <Agents onNavigate={navigateToScreen} />
           </div>
@@ -267,7 +268,7 @@ function AppLoadingScreen() {
   return (
     <div
       data-testid="app-loading-screen"
-      className="min-h-screen bg-background flex items-center justify-center"
+      className="fixed inset-0 z-[200] bg-background flex items-center justify-center"
     >
       <div className="text-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>

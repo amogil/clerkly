@@ -2,7 +2,7 @@
 // Per-agent chat component — mounted at startup, stays mounted forever.
 // Scroll position is managed by Conversation (use-stick-to-bottom) — preserved automatically.
 
-import React, { useRef, useEffect, useCallback, useState } from 'react';
+import React, { useRef, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { CornerDownLeft, Square } from 'lucide-react';
 import { useAgentChat } from '../../hooks/useAgentChat';
@@ -38,6 +38,7 @@ interface AgentChatProps {
   rateLimitBanner: RateLimitState | null;
   onRateLimitDismiss: () => void;
   onLoadingChange: (agentId: string, isLoading: boolean) => void;
+  onStartupSettledChange: (agentId: string, isSettled: boolean) => void;
   onNavigate?: (screen: string) => void;
 }
 
@@ -116,6 +117,7 @@ export function AgentChat({
   rateLimitBanner,
   onRateLimitDismiss,
   onLoadingChange,
+  onStartupSettledChange,
   onNavigate,
 }: AgentChatProps) {
   const { rawMessages, sendMessage, cancelCurrentRequest, isLoading, isStreaming } = useAgentChat(
@@ -123,8 +125,8 @@ export function AgentChat({
   );
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const stickContextRef = useRef<StickToBottomContext | null>(null);
-  const hasCompletedInitialResizeWindowRef = useRef(false);
-  const [isInstantResizeMode, setIsInstantResizeMode] = useState(true);
+  const hasReachedStartupSettledRef = useRef(false);
+  const rootRef = useRef<HTMLDivElement | null>(null);
 
   // Autofocus textarea when this chat becomes active (agents.4.7.1)
   useEffect(() => {
@@ -142,21 +144,105 @@ export function AgentChat({
     onLoadingChange(agent.id, isLoading);
   }, [agent.id, isLoading, onLoadingChange]);
 
-  // Keep instant scroll behavior for 5 seconds only once per chat (first activation), then stay smooth.
-  // Requirements: agents.4.14.5
+  // Requirements: agents.4.14.5, agents.4.14.6, agents.13.2, agents.13.10
+  // Mark startup as settled only after the active chat width stops changing for a short window.
+  // This prevents showing chat during late startup reflow/scrollbar-induced width jumps.
   useEffect(() => {
-    if (!isActive || hasCompletedInitialResizeWindowRef.current) return;
+    if (hasReachedStartupSettledRef.current) return;
+    if (!isActive || isLoading) {
+      onStartupSettledChange(agent.id, false);
+      return;
+    }
 
-    setIsInstantResizeMode(true);
-    const timeoutId = window.setTimeout(() => {
-      setIsInstantResizeMode(false);
-      hasCompletedInitialResizeWindowRef.current = true;
-    }, 5000);
+    const startupSettleDelayMs = 250;
+    let settleTimeoutId: number | null = null;
+    let raf1: number | null = null;
+    let raf2: number | null = null;
+    let settled = false;
+
+    const markSettled = () => {
+      if (settled) return;
+      settled = true;
+      hasReachedStartupSettledRef.current = true;
+      onStartupSettledChange(agent.id, true);
+    };
+
+    const scheduleSettle = () => {
+      if (settleTimeoutId !== null) {
+        window.clearTimeout(settleTimeoutId);
+      }
+      settleTimeoutId = window.setTimeout(() => {
+        // Two RAF ticks ensure paint/layout flush after the final resize event.
+        raf1 = window.requestAnimationFrame(() => {
+          raf2 = window.requestAnimationFrame(() => {
+            markSettled();
+          });
+        });
+      }, startupSettleDelayMs);
+    };
+
+    const root = rootRef.current;
+    const messagesArea = root?.querySelector('[data-testid="messages-area"]');
+    const observedNode = (messagesArea?.parentElement ?? messagesArea) as Element | null;
+    const scrollNode =
+      observedNode instanceof HTMLElement
+        ? observedNode
+        : observedNode?.parentElement instanceof HTMLElement
+          ? observedNode.parentElement
+          : null;
+
+    scheduleSettle();
+
+    if (typeof ResizeObserver === 'undefined' || !observedNode) {
+      // Fallback for environments without ResizeObserver (e.g., some tests).
+      return () => {
+        if (settleTimeoutId !== null) {
+          window.clearTimeout(settleTimeoutId);
+        }
+        if (raf1 !== null) {
+          window.cancelAnimationFrame(raf1);
+        }
+        if (raf2 !== null) {
+          window.cancelAnimationFrame(raf2);
+        }
+      };
+    }
+
+    const resizeObserver = new ResizeObserver(scheduleSettle);
+    resizeObserver.observe(observedNode);
+    scrollNode?.addEventListener('scroll', scheduleSettle, { passive: true });
 
     return () => {
-      window.clearTimeout(timeoutId);
+      resizeObserver.disconnect();
+      scrollNode?.removeEventListener('scroll', scheduleSettle);
+      if (settleTimeoutId !== null) {
+        window.clearTimeout(settleTimeoutId);
+      }
+      if (raf1 !== null) {
+        window.cancelAnimationFrame(raf1);
+      }
+      if (raf2 !== null) {
+        window.cancelAnimationFrame(raf2);
+      }
     };
-  }, [isActive]);
+  }, [agent.id, isActive, isLoading, onStartupSettledChange]);
+
+  // Reserve scrollbar gutter to prevent width jump when vertical scrollbar appears/disappears.
+  // Requirements: agents.4.14.5, agents.4.14.6
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+    const messagesArea = root.querySelector('[data-testid="messages-area"]');
+    const scrollContainer = messagesArea?.parentElement as HTMLElement | null;
+    if (!scrollContainer) return;
+
+    const previousScrollbarGutter = scrollContainer.style.scrollbarGutter;
+    scrollContainer.style.scrollbarGutter = 'stable';
+
+    return () => {
+      scrollContainer.style.scrollbarGutter = previousScrollbarGutter;
+    };
+  }, []);
 
   const handleSubmit = useCallback(
     async (message: PromptInputMessage) => {
@@ -201,16 +287,12 @@ export function AgentChat({
   return (
     // Hidden via CSS — NOT unmounted — absolute+opacity-0 keeps scrollTop intact (agents.13.5, agents.4.14)
     <div
+      ref={rootRef}
       data-testid="agent-chat-root"
       data-active={isActive ? 'true' : 'false'}
       className={`flex flex-col flex-1 min-h-0${isActive ? '' : ' absolute inset-0 opacity-0 pointer-events-none'}`}
     >
-      {/* Per chat: one-time 5s instant resize on first activation, then smooth permanently (agents.4.14.5). */}
-      <Conversation
-        className="flex-1 min-h-0"
-        contextRef={stickContextRef}
-        resize={isInstantResizeMode ? 'instant' : 'smooth'}
-      >
+      <Conversation className="flex-1 min-h-0" contextRef={stickContextRef}>
         <AgentChatInner
           agent={agent}
           rateLimitBanner={rateLimitBanner}

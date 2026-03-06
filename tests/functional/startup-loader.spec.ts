@@ -76,12 +76,23 @@ test.describe('Startup loader', () => {
     });
 
     await context.window.evaluate(() => {
-      (window as any).__appLoadingSeen = false;
-      const observer = new MutationObserver(() => {
+      const isLoadingVisible = () => {
         const loading = document.querySelector(
           '[data-testid="app-loading-screen"]'
         ) as HTMLElement | null;
-        if (loading && loading.offsetParent !== null) {
+        if (!loading) return false;
+        const style = window.getComputedStyle(loading);
+        return (
+          loading.getAttribute('aria-hidden') !== 'true' &&
+          style.display !== 'none' &&
+          style.visibility !== 'hidden' &&
+          style.opacity !== '0'
+        );
+      };
+
+      (window as any).__appLoadingSeen = isLoadingVisible();
+      const observer = new MutationObserver(() => {
+        if (isLoadingVisible()) {
           (window as any).__appLoadingSeen = true;
         }
       });
@@ -137,6 +148,55 @@ test.describe('Startup loader', () => {
 
     const appLoading = context.window.locator('[data-testid="app-loading-screen"]');
     await expect(appLoading).toBeVisible({ timeout: 10000 });
+    await expect(appLoading).toBeHidden({ timeout: 10000 });
+    await expectAgentsVisible(context.window, 10000);
+    await expectNoToastError(context.window);
+  });
+
+  /* Preconditions: User already authorized, app relaunches into waiting-for-chats
+     Action: Observe UI while startup loader is visible
+     Assertions: Agents screen remains mounted (no display:none/hidden), only visually masked;
+                 page-level vertical scrollbar does not appear during loader
+     Requirements: agents.4.14.5, agents.13.2 */
+  test('should keep agents screen mounted while startup loader is visible', async () => {
+    const testDataPath = path.join(
+      os.tmpdir(),
+      `clerkly-startup-mounted-${Date.now()}-${Math.random().toString(36).substring(7)}`
+    );
+
+    const firstContext = await launchElectron(testDataPath, {
+      CLERKLY_GOOGLE_API_URL: mockOAuthServer.getBaseUrl(),
+    });
+
+    await completeOAuthFlow(firstContext.app, firstContext.window);
+    await expectAgentsVisible(firstContext.window, 10000);
+    await closeElectron(firstContext, false);
+
+    context = await launchElectron(testDataPath, {
+      CLERKLY_GOOGLE_API_URL: mockOAuthServer.getBaseUrl(),
+    });
+
+    const appLoading = context.window.locator('[data-testid="app-loading-screen"]');
+    await expect(appLoading).toBeVisible({ timeout: 10000 });
+
+    const screenState = await context.window.evaluate(() => {
+      const screen = document.querySelector('[data-testid="agents-screen"]') as HTMLElement | null;
+      if (!screen) return null;
+      const html = document.documentElement;
+      const body = document.body;
+      return {
+        className: screen.className,
+        ariaHidden: screen.getAttribute('aria-hidden'),
+        hasPageVerticalScroll:
+          html.scrollHeight > html.clientHeight || body.scrollHeight > body.clientHeight,
+      };
+    });
+
+    expect(screenState).not.toBeNull();
+    expect(screenState!.className).not.toContain(' hidden');
+    expect(screenState!.ariaHidden).toBe('true');
+    expect(screenState!.hasPageVerticalScroll).toBe(false);
+
     await expect(appLoading).toBeHidden({ timeout: 10000 });
     await expectAgentsVisible(context.window, 10000);
     await expectNoToastError(context.window);
@@ -295,6 +355,236 @@ test.describe('Startup loader', () => {
     expect(scrollMetrics).not.toBeNull();
     expect(scrollMetrics!.firstDistanceFromBottom).toBeLessThan(120);
     expect(scrollMetrics!.maxScrollTop - scrollMetrics!.minScrollTop).toBeLessThan(40);
+    await expectNoToastError(context.window);
+  });
+
+  /* Preconditions: Existing authorized session with long chat history (scrollable chat)
+     Action: Relaunch app and observe active chat width immediately after startup loader hides
+     Assertions: Active chat content width stays stable in the first visible seconds (no startup jerk)
+     Requirements: agents.4.14.5, agents.4.14.6 */
+  test('should keep active chat width stable after startup with history', async () => {
+    const firstContext = await launchElectron(undefined, {
+      CLERKLY_GOOGLE_API_URL: mockOAuthServer.getBaseUrl(),
+    });
+    const testDataPath = firstContext.testDataPath;
+
+    await completeOAuthFlow(firstContext.app, firstContext.window);
+    await expectAgentsVisible(firstContext.window, 10000);
+
+    const agentIcons = firstContext.window.locator('[data-testid^="agent-icon-"]');
+    await expect(agentIcons).toHaveCount(1, { timeout: 5000 });
+    const firstAgentId = (await agentIcons.first().getAttribute('data-testid'))?.replace(
+      'agent-icon-',
+      ''
+    );
+    expect(firstAgentId).toBeTruthy();
+
+    await seedAgentMessages(firstContext.window, firstAgentId as string, 100);
+    await expect(activeChat(firstContext.window).messages).toHaveCount(100, { timeout: 10000 });
+
+    await closeElectron(firstContext, false);
+
+    context = await launchElectron(testDataPath, {
+      CLERKLY_GOOGLE_API_URL: mockOAuthServer.getBaseUrl(),
+    });
+
+    const appLoading = context.window.locator('[data-testid="app-loading-screen"]');
+    await expect(appLoading).toBeVisible({ timeout: 10000 });
+    await expect(appLoading).toBeHidden({ timeout: 10000 });
+    await expectAgentsVisible(context.window, 10000);
+    await expect(activeChat(context.window).messages).toHaveCount(100, { timeout: 10000 });
+
+    const widthStability = await context.window.evaluate(async () => {
+      const target = document.querySelector('[data-testid="messages-area"]') as HTMLElement | null;
+      if (!target) return null;
+
+      let widthChanges = 0;
+      let significantWidthChanges = 0;
+      let maxDelta = 0;
+      let lastWidth = 0;
+      let initialized = false;
+
+      const observer = new ResizeObserver((entries) => {
+        const entry = entries[0];
+        if (!entry) return;
+        const width = entry.contentRect.width;
+        if (!initialized) {
+          lastWidth = width;
+          initialized = true;
+          return;
+        }
+        const delta = Math.abs(width - lastWidth);
+        if (delta > 0.5) {
+          widthChanges += 1;
+          if (delta > 4) significantWidthChanges += 1;
+          if (delta > maxDelta) maxDelta = delta;
+          lastWidth = width;
+        }
+      });
+
+      // Observe immediately after loader disappears to catch early startup layout shifts.
+      observer.observe(target);
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+      await new Promise<void>((resolve) => setTimeout(resolve, 2200));
+      observer.disconnect();
+
+      return { widthChanges, significantWidthChanges, maxDelta };
+    });
+
+    expect(widthStability).not.toBeNull();
+    expect(widthStability!.significantWidthChanges).toBe(0);
+    expect(widthStability!.maxDelta).toBeLessThan(2);
+    await expectNoToastError(context.window);
+  });
+
+  /* Preconditions: Existing authorized session with long chat history (scrollable conversation)
+     Action: Relaunch app, sample layout/scroll state frame-by-frame across loader phase and first visible frames
+     Assertions: Page-level vertical scroll never appears and no frame has both page and conversation scroll contexts
+     Requirements: agents.4.14.5, agents.4.14.6, agents.13.2 */
+  test('should not expose transient page scroll or dual scrollbars during startup transition', async () => {
+    const firstContext = await launchElectron(undefined, {
+      CLERKLY_GOOGLE_API_URL: mockOAuthServer.getBaseUrl(),
+    });
+    const testDataPath = firstContext.testDataPath;
+
+    await completeOAuthFlow(firstContext.app, firstContext.window);
+    await expectAgentsVisible(firstContext.window, 10000);
+
+    const agentIcons = firstContext.window.locator('[data-testid^="agent-icon-"]');
+    await expect(agentIcons).toHaveCount(1, { timeout: 5000 });
+    const firstAgentId = (await agentIcons.first().getAttribute('data-testid'))?.replace(
+      'agent-icon-',
+      ''
+    );
+    expect(firstAgentId).toBeTruthy();
+
+    await seedAgentMessages(firstContext.window, firstAgentId as string, 120);
+    await expect(activeChat(firstContext.window).messages).toHaveCount(120, { timeout: 10000 });
+    await closeElectron(firstContext, false);
+
+    context = await launchElectron(testDataPath, {
+      CLERKLY_GOOGLE_API_URL: mockOAuthServer.getBaseUrl(),
+    });
+
+    await context.window.evaluate(() => {
+      (window as any).__startupScrollTrace = [];
+      const trace = (window as any).__startupScrollTrace as Array<{
+        phase: 'loader' | 'visible';
+        hasPageVerticalScroll: boolean;
+        pageAllowsVerticalScroll: boolean;
+        chatScrollable: boolean;
+        chatAllowsVerticalScroll: boolean;
+        dualScrollContext: boolean;
+      }>;
+
+      const sampleFrame = (phase: 'loader' | 'visible') => {
+        const html = document.documentElement;
+        const body = document.body;
+        const hasPageVerticalScroll =
+          html.scrollHeight > html.clientHeight || body.scrollHeight > body.clientHeight;
+        const htmlOverflowY = window.getComputedStyle(html).overflowY;
+        const bodyOverflowY = window.getComputedStyle(body).overflowY;
+        const pageAllowsVerticalScroll = htmlOverflowY !== 'hidden' || bodyOverflowY !== 'hidden';
+
+        const chatContainer = document.querySelector('[data-testid="messages-area"]')
+          ?.parentElement as HTMLElement | null;
+        const chatScrollable =
+          !!chatContainer && chatContainer.scrollHeight > chatContainer.clientHeight;
+        const chatOverflowY = chatContainer ? window.getComputedStyle(chatContainer).overflowY : '';
+        const chatAllowsVerticalScroll = !!chatContainer && chatOverflowY !== 'hidden';
+
+        trace.push({
+          phase,
+          hasPageVerticalScroll,
+          pageAllowsVerticalScroll,
+          chatScrollable,
+          chatAllowsVerticalScroll,
+          dualScrollContext:
+            hasPageVerticalScroll &&
+            pageAllowsVerticalScroll &&
+            chatScrollable &&
+            chatAllowsVerticalScroll,
+        });
+      };
+
+      const recordFrames = async (phase: 'loader' | 'visible', frames: number) => {
+        for (let i = 0; i < frames; i++) {
+          await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+          sampleFrame(phase);
+        }
+      };
+
+      (window as any).__recordStartupFrames = recordFrames;
+    });
+
+    const appLoading = context.window.locator('[data-testid="app-loading-screen"]');
+    await expect(appLoading).toBeVisible({ timeout: 10000 });
+
+    await context.window.evaluate(async () => {
+      await (window as any).__recordStartupFrames('loader', 45);
+    });
+
+    await expect(appLoading).toBeHidden({ timeout: 10000 });
+    await expectAgentsVisible(context.window, 10000);
+    await expect(activeChat(context.window).messages).toHaveCount(120, { timeout: 10000 });
+
+    await context.window.evaluate(async () => {
+      await (window as any).__recordStartupFrames('visible', 90);
+    });
+
+    const traceSummary = await context.window.evaluate(() => {
+      const trace = ((window as any).__startupScrollTrace ?? []) as Array<{
+        phase: 'loader' | 'visible';
+        hasPageVerticalScroll: boolean;
+        pageAllowsVerticalScroll: boolean;
+        dualScrollContext: boolean;
+      }>;
+
+      const pageScrollFrames = trace.filter(
+        (entry) => entry.hasPageVerticalScroll && entry.pageAllowsVerticalScroll
+      ).length;
+      const dualScrollFrames = trace.filter((entry) => entry.dualScrollContext).length;
+      const loaderSamples = trace.filter((entry) => entry.phase === 'loader').length;
+      const visibleSamples = trace.filter((entry) => entry.phase === 'visible').length;
+
+      return { pageScrollFrames, dualScrollFrames, loaderSamples, visibleSamples };
+    });
+
+    expect(traceSummary.loaderSamples).toBeGreaterThanOrEqual(40);
+    expect(traceSummary.visibleSamples).toBeGreaterThanOrEqual(80);
+    expect(traceSummary.pageScrollFrames).toBe(0);
+    expect(traceSummary.dualScrollFrames).toBe(0);
+    await expectNoToastError(context.window);
+  });
+
+  /* Preconditions: Startup flow is authorized, messages:list resolves quickly,
+     startup-settle callback is artificially delayed via requestAnimationFrame wrapper
+     Action: Complete OAuth and wait for first messages:list completion
+     Assertions: Global loader remains visible after chats are loaded and hides only after startup settlement
+     Requirements: agents.13.2, agents.13.10, agents.4.14.6 */
+  test('should keep loader visible until active chat startup settles even after messages are loaded', async () => {
+    context = await launchElectron(undefined, {
+      CLERKLY_GOOGLE_API_URL: mockOAuthServer.getBaseUrl(),
+    });
+
+    await context.window.evaluate(() => {
+      const nativeRaf = window.requestAnimationFrame.bind(window);
+      window.requestAnimationFrame = ((callback: FrameRequestCallback) =>
+        nativeRaf((time) => {
+          window.setTimeout(() => callback(time), 1500);
+        })) as typeof window.requestAnimationFrame;
+    });
+
+    await completeOAuthFlow(context.app, context.window);
+
+    const appLoading = context.window.locator('[data-testid="app-loading-screen"]');
+    await expect(appLoading).toBeVisible({ timeout: 5000 });
+    // Intentional fixed wait: verifies loader remains visible during delayed startup-settled RAF phase.
+    await context.window.waitForTimeout(900);
+    await expect(appLoading).toBeVisible();
+    await expect(appLoading).toBeHidden({ timeout: 10000 });
+    await expectAgentsVisible(context.window, 10000);
     await expectNoToastError(context.window);
   });
 

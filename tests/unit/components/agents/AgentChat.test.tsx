@@ -94,53 +94,72 @@ jest.mock('../../../../src/renderer/components/agents/AgentWelcome', () => ({
 }));
 
 jest.mock('../../../../src/renderer/components/ai-elements/prompt-input', () => {
+  const PromptContext = React.createContext<{
+    text: string;
+    setText: React.Dispatch<React.SetStateAction<string>>;
+  } | null>(null);
+
   const PromptInput = ({
     children,
     onSubmit,
   }: {
     children: React.ReactNode;
     onSubmit?: (message: { text?: string }) => void;
-  }) => (
-    <form
-      data-testid="agent-prompt-input"
-      onSubmit={(event) => {
-        event.preventDefault();
-        const formData = new FormData(event.currentTarget);
-        const text = (formData.get('prompt-input-field') as string | null) ?? '';
-        onSubmit?.({ text });
-      }}
-    >
-      {children}
-    </form>
-  );
+  }) => {
+    const [text, setText] = React.useState('');
+    return (
+      <PromptContext.Provider value={{ text, setText }}>
+        <form
+          data-testid="agent-prompt-input"
+          onSubmit={(event) => {
+            event.preventDefault();
+            onSubmit?.({ text });
+          }}
+        >
+          {children}
+        </form>
+      </PromptContext.Provider>
+    );
+  };
 
   const PromptInputBody = ({ children }: { children: React.ReactNode }) => <div>{children}</div>;
   const PromptInputFooter = ({ children }: { children: React.ReactNode }) => <div>{children}</div>;
   const PromptInputSubmit = ({
     disabled,
     ...props
-  }: React.ButtonHTMLAttributes<HTMLButtonElement>) => (
-    <button data-testid="prompt-submit" disabled={disabled} type="submit" {...props}>
-      Send
-    </button>
-  );
+  }: React.ButtonHTMLAttributes<HTMLButtonElement>) => {
+    const context = React.useContext(PromptContext);
+    const isDisabled = disabled ?? (context ? context.text.trim().length === 0 : false);
+    return (
+      <button data-testid="prompt-submit" disabled={isDisabled} type="submit" {...props}>
+        Send
+      </button>
+    );
+  };
   const PromptInputTextarea = React.forwardRef<
     HTMLTextAreaElement,
     {
       className?: string;
-      value: string;
-      onChange: (event: React.ChangeEvent<HTMLTextAreaElement>) => void;
+      value?: string;
+      onChange?: (event: React.ChangeEvent<HTMLTextAreaElement>) => void;
     }
-  >(({ className, value, onChange }, ref) => (
-    <textarea
-      className={className}
-      ref={ref}
-      data-testid="prompt-input-field"
-      name="prompt-input-field"
-      onChange={onChange}
-      value={value}
-    />
-  ));
+  >(({ className, value, onChange }, ref) => {
+    const context = React.useContext(PromptContext);
+    const resolvedValue = value ?? context?.text ?? '';
+    return (
+      <textarea
+        className={className}
+        ref={ref}
+        data-testid="prompt-input-field"
+        name="prompt-input-field"
+        onChange={(event) => {
+          context?.setText(event.target.value);
+          onChange?.(event);
+        }}
+        value={resolvedValue}
+      />
+    );
+  });
   PromptInputTextarea.displayName = 'PromptInputTextarea';
 
   return {
@@ -198,6 +217,7 @@ const defaultProps = {
   rateLimitBanner: null,
   onRateLimitDismiss: jest.fn(),
   onLoadingChange: jest.fn(),
+  onStartupSettledChange: jest.fn(),
 };
 
 // ── Tests ──────────────────────────────────────────────────────────────────
@@ -268,51 +288,34 @@ describe('AgentChat — loading state', () => {
     expect(onLoadingChange).toHaveBeenCalledWith('agent-1', false);
   });
 
-  /* Preconditions: Active chat is rendered
-     Action: Wait 5 seconds after activation
-     Assertions: Conversation resize switches from instant to smooth
-     Requirements: agents.4.14.5 */
-  it('should keep instant resize for first 5 seconds of active chat and then switch to smooth', () => {
-    jest.useFakeTimers();
-    const { unmount } = render(<AgentChat {...defaultProps} isActive={true} />);
-    expect(mockConversation).toHaveBeenLastCalledWith(
-      expect.objectContaining({ resize: 'instant' })
-    );
+  /* Preconditions: Active chat still loads initial history
+     Action: render AgentChat
+     Assertions: startup settled callback is false
+     Requirements: agents.4.14.6, agents.13.10 */
+  it('should report startup settled=false while history is loading', () => {
+    const onStartupSettledChange = jest.fn();
+    mockUseAgentChatState.isLoading = true;
 
-    act(() => {
-      jest.advanceTimersByTime(5000);
-    });
+    render(<AgentChat {...defaultProps} onStartupSettledChange={onStartupSettledChange} />);
 
-    expect(mockConversation).toHaveBeenLastCalledWith(
-      expect.objectContaining({ resize: 'smooth' })
-    );
-
-    unmount();
-    jest.useRealTimers();
+    expect(onStartupSettledChange).toHaveBeenCalledWith('agent-1', false);
   });
 
-  /* Preconditions: Chat has completed initial 5-second instant window
-     Action: Deactivate and activate chat again
-     Assertions: Instant window is NOT restarted for the same chat
-     Requirements: agents.4.14.5 */
-  it('should not restart instant resize window when chat becomes active again', () => {
+  /* Preconditions: Active chat has loaded history
+     Action: render AgentChat and advance animation frames
+     Assertions: startup settled callback becomes true once
+     Requirements: agents.4.14.5, agents.13.2 */
+  it('should report startup settled=true after initial active render stabilizes', () => {
     jest.useFakeTimers();
-    const { rerender, unmount } = render(<AgentChat {...defaultProps} isActive={true} />);
+    const onStartupSettledChange = jest.fn();
+
+    render(<AgentChat {...defaultProps} onStartupSettledChange={onStartupSettledChange} />);
 
     act(() => {
-      jest.advanceTimersByTime(5000);
+      jest.advanceTimersByTime(400);
     });
-    expect(mockConversation).toHaveBeenLastCalledWith(
-      expect.objectContaining({ resize: 'smooth' })
-    );
 
-    rerender(<AgentChat {...defaultProps} isActive={false} />);
-    rerender(<AgentChat {...defaultProps} isActive={true} />);
-    expect(mockConversation).toHaveBeenLastCalledWith(
-      expect.objectContaining({ resize: 'smooth' })
-    );
-
-    unmount();
+    expect(onStartupSettledChange).toHaveBeenCalledWith('agent-1', true);
     jest.useRealTimers();
   });
 });
@@ -577,6 +580,44 @@ describe('AgentChat — PromptInput rendered', () => {
 
     expect(screen.getByTestId('prompt-input-stop')).toBeInTheDocument();
     expect(screen.queryByTestId('prompt-input-send')).not.toBeInTheDocument();
+  });
+
+  /* Preconditions: agent status is not in-progress and input is empty/non-empty
+     Action: type text into input
+     Assertions: send button is disabled for empty input and enabled for non-empty input
+     Requirements: agents.4.2.2 */
+  it('should disable send button for empty text and enable for non-empty text', async () => {
+    render(<AgentChat {...defaultProps} />);
+
+    const sendButton = screen.getByTestId('prompt-input-send');
+    expect(sendButton).toBeDisabled();
+
+    await act(async () => {
+      fireEvent.change(screen.getByTestId('prompt-input-field'), {
+        target: { value: 'hello' },
+      });
+    });
+    expect(sendButton).toBeEnabled();
+  });
+
+  /* Preconditions: agent status is in-progress
+     Action: render AgentChat with empty input
+     Assertions: stop button stays enabled regardless of input content
+     Requirements: agents.4.2.1 */
+  it('should keep stop button enabled regardless of input text', async () => {
+    render(
+      <AgentChat {...defaultProps} agent={{ ...defaultProps.agent, status: 'in-progress' }} />
+    );
+
+    const stopButton = screen.getByTestId('prompt-input-stop');
+    expect(stopButton).toBeEnabled();
+
+    await act(async () => {
+      fireEvent.change(screen.getByTestId('prompt-input-field'), {
+        target: { value: '' },
+      });
+    });
+    expect(stopButton).toBeEnabled();
   });
 });
 

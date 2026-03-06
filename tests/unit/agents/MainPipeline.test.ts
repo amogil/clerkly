@@ -77,6 +77,7 @@ function makeMocks() {
     }),
     update: jest.fn(),
     setHidden: jest.fn(),
+    setDone: jest.fn(),
     setUsage: jest.fn(),
     toEventMessage: jest.fn().mockReturnValue({
       id: 1,
@@ -249,6 +250,41 @@ describe('MainPipeline.run()', () => {
         true
       );
     });
+
+    /* Preconditions: LLM streams reasoning and then final action
+       Action: Call run(agentId, userMessageId)
+       Assertions: llm updates keep done=false during reasoning and switch to done=true on final action
+       Requirements: llm-integration.1.6.1, llm-integration.1.6.2 */
+    it('should keep llm done=false during reasoning and set done=true on final action', async () => {
+      const { pipeline, messageManager, llmProvider } = makeMocks();
+
+      llmProvider.chat.mockImplementation(
+        async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+          onChunk({ type: 'reasoning', delta: 'chunk-1', done: false });
+          onChunk({ type: 'reasoning', delta: 'chunk-2', done: false });
+          onChunk({ type: 'reasoning', delta: '', done: true });
+          return {
+            action: { type: 'text', content: 'Final answer' },
+          } as LLMStructuredOutput;
+        }
+      );
+
+      await pipeline.run('agent-1', 1);
+
+      expect(messageManager.create).toHaveBeenCalledWith(
+        'agent-1',
+        'llm',
+        expect.any(Object),
+        1,
+        false
+      );
+
+      const updateDoneFlags = (messageManager.update as jest.Mock).mock.calls.map(
+        (call: unknown[]) => call[3]
+      );
+      expect(updateDoneFlags).toContain(false);
+      expect(updateDoneFlags.at(-1)).toBe(true);
+    });
   });
 
   describe('error before first chunk', () => {
@@ -303,6 +339,7 @@ describe('MainPipeline.run()', () => {
 
       // llm message hidden via setHidden — Requirements: llm-integration.3.2
       expect(messageManager.setHidden).toHaveBeenCalledWith(2, 'agent-1');
+      expect(messageManager.setDone).toHaveBeenCalledWith(2, 'agent-1', false);
 
       // error message created
       expect(messageManager.create).toHaveBeenCalledWith(

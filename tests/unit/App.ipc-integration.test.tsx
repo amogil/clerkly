@@ -292,6 +292,28 @@ describe('App IPC Integration with Error Notification System', () => {
     });
   });
 
+  /* Preconditions: App is authorized and waiting for chats (global startup loader active)
+     Action: Render App component during waiting-for-chats phase
+     Assertions: Agents screen stays mounted and must not be hidden via display:none class
+     Requirements: agents.4.14.5, agents.13.2 */
+  it('should keep agents screen mounted without hidden class while global loader is visible', async () => {
+    mockCoordinatorState = {
+      state: { phase: 'waiting-for-chats', authorized: true, targetScreen: 'agents' },
+      isBootstrapping: false,
+    };
+
+    const { getByTestId } = render(<App />);
+
+    await waitFor(() => {
+      expect(getByTestId('app-loading-screen')).toBeInTheDocument();
+      expect(getByTestId('agents-screen')).toBeInTheDocument();
+    });
+
+    const agentsScreen = getByTestId('agents-screen');
+    expect(agentsScreen.className).not.toContain(' hidden');
+    expect(agentsScreen).toHaveAttribute('aria-hidden', 'true');
+  });
+
   /* Preconditions: App component is mounted
      Action: Render App component
      Assertions: Toaster and NotificationUI components are rendered

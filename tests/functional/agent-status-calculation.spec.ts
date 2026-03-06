@@ -152,4 +152,41 @@ test.describe('Agent Status Calculation', () => {
     // Colors should match (deterministic)
     expect(getStatusColor(classes1)).toBe(getStatusColor(classes2));
   });
+
+  /* Preconditions: Agent has only hidden messages (user message was hidden via cancel-retry path)
+     Action: Recalculate status after message becomes hidden
+     Assertions: Hidden message is excluded and status is `new`
+     Requirements: agents.9.2 */
+  test('should ignore hidden messages when calculating status', async () => {
+    const agentId = await window
+      .locator('[data-testid^="agent-icon-"]')
+      .first()
+      .getAttribute('data-testid');
+    const resolvedAgentId = agentId?.replace('agent-icon-', '');
+    expect(resolvedAgentId).toBeTruthy();
+
+    const userMessageId = await window.evaluate(async (id) => {
+      const api = (window as unknown as { api: any }).api;
+      const created = await api.messages.create(id, 'user', { data: { text: 'temp message' } });
+      if (!created?.success || !created?.data?.id) {
+        throw new Error(created?.error || 'Failed to create user message');
+      }
+      const cancelResult = await api.messages.cancelRetry(id, created.data.id);
+      if (!cancelResult?.success) {
+        throw new Error(cancelResult?.error || 'Failed to hide message');
+      }
+      return created.data.id as number;
+    }, resolvedAgentId as string);
+
+    expect(userMessageId).toBeGreaterThan(0);
+
+    const agentAvatar = window
+      .locator('[data-testid^="agent-icon-"]')
+      .first()
+      .locator('[data-testid="agent-avatar-icon"]');
+
+    await expect
+      .poll(async () => await agentAvatar.getAttribute('class'), { timeout: 5000 })
+      .toContain('bg-sky-400');
+  });
 });

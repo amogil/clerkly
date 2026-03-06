@@ -1126,4 +1126,43 @@ describe('Migration 012: backfill done for historical llm with final action', ()
     expect(rows[1]).toEqual({ kind: 'llm', done: 0 });
     expect(rows[2]).toEqual({ kind: 'error', done: 1 });
   });
+
+  /* Preconditions: Migration 012 already executed once
+     Action: Execute migration 012 second time
+     Assertions: Result is stable (idempotent), no extra changes
+     Requirements: llm-integration.6.6, llm-integration.6.6.1 */
+  it('should be idempotent when migration 012 runs multiple times', () => {
+    db.prepare(
+      `INSERT INTO messages (agent_id, timestamp, kind, payload_json, done) VALUES (?, ?, ?, ?, ?)`
+    ).run(
+      'agent-1',
+      '2026-01-01T00:00:00Z',
+      'llm',
+      JSON.stringify({ data: { action: { type: 'text', content: 'completed' } } }),
+      0
+    );
+    db.prepare(
+      `INSERT INTO messages (agent_id, timestamp, kind, payload_json, done) VALUES (?, ?, ?, ?, ?)`
+    ).run(
+      'agent-1',
+      '2026-01-01T00:01:00Z',
+      'llm',
+      JSON.stringify({ data: { reasoning: { text: 'partial' } } }),
+      0
+    );
+
+    const sql = fs.readFileSync(
+      path.join(migrationsPath, '012_backfill_done_for_historical_llm.sql'),
+      'utf-8'
+    );
+    const upSql = sql.split('-- DOWN')[0]!.replace('-- UP', '').trim();
+
+    db.exec(upSql);
+    const firstPass = db.prepare('SELECT id, done FROM messages ORDER BY id').all();
+
+    db.exec(upSql);
+    const secondPass = db.prepare('SELECT id, done FROM messages ORDER BY id').all();
+
+    expect(secondPass).toEqual(firstPass);
+  });
 });

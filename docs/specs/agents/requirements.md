@@ -236,7 +236,9 @@
 
 4.14.4. Ручное сохранение/восстановление `scrollTop` НЕ используется
 
-4.14.5. При первой загрузке приложения активный агент ДОЛЖЕН открываться с позицией скролла на последнем сообщении МГНОВЕННО (без визуального скролла, `behavior: 'auto'`)
+4.14.5. При первой загрузке приложения активный чат ДОЛЖЕН впервые отображаться пользователю только в финальном стартовом состоянии: корректная ширина контента, корректные переносы текста и позиция на последнем сообщении без визуального доскролла
+
+4.14.6. ПОКА активный чат не достиг финального стартового состояния, содержимое чата НЕ ДОЛЖНО показываться пользователю
 
 4.15. КОГДА у агента нет сообщений (новый агент), ТО ДОЛЖЕН отображаться пустой стейт с промпт-подсказками
 
@@ -301,6 +303,8 @@
 
 - `tests/functional/agent-messaging.spec.ts` - "should send message on Enter key"
 - `tests/functional/agent-messaging.spec.ts` - "should add new line on Shift+Enter"
+- `tests/functional/agent-messaging.spec.ts` - "should enable send button only when input has text"
+- `tests/functional/agent-messaging.spec.ts` - "should keep stop button enabled regardless of input text in in-progress status"
 - `tests/functional/agent-messaging.spec.ts` - "should display messages in chronological order"
 - `tests/functional/agent-messaging.spec.ts` - "should autoscroll to last message"
 - `tests/functional/auto-expanding-textarea.spec.ts` - "AutoExpandingTextarea - Functional Tests"
@@ -710,13 +714,13 @@
 
 13.1. При старте приложения ДОЛЖНЫ загружаться сообщения ВСЕХ агентов одновременно
 
-13.2. Основной интерфейс ДОЛЖЕН показываться ТОЛЬКО после того, как все чаты всех агентов загружены (пока идёт загрузка — показывается экран загрузки из `src/renderer/App.tsx` с текстом "Loading...", который заменяет весь интерфейс)
+13.2. Основной интерфейс ДОЛЖЕН показываться ТОЛЬКО после того, как одновременно выполнены два условия: загружены чаты всех агентов и активный чат достиг финального стартового состояния
 
 13.3. Каждый агент ДОЛЖЕН иметь независимый компонент `AgentChat`, который монтируется при старте и остаётся смонтированным всё время работы приложения
 
 13.4. КОГДА пользователь кликает на агента, ТО показывается уже смонтированный чат этого агента (без перезагрузки, без ремонта)
 
-13.5. Скрытые чаты ДОЛЖНЫ скрываться через CSS (`display: none`), а НЕ размонтироваться
+13.5. Скрытые чаты ДОЛЖНЫ скрываться через CSS без размонтирования
 
 13.6. Позиция скролла каждого агента сохраняется автоматически — компонент `Conversation` остаётся смонтированным и трекает скролл сам
 
@@ -724,7 +728,7 @@
 
 13.8. При монтировании `AgentChat` ДОЛЖНЫ загружаться ВСЕ сообщения агента через `messages:list`
 
-13.10. Экран загрузки из `src/renderer/App.tsx` ДОЛЖЕН показываться пока хотя бы один `AgentChat` ещё загружает начальный чанк сообщений
+13.10. Экран загрузки ДОЛЖЕН оставаться видимым, ПОКА хотя бы один `AgentChat` ещё загружает начальный чанк сообщений ИЛИ активный чат ещё не достиг финального стартового состояния
 
 13.11. Оркестрация стартового workflow ДОЛЖНА выполняться централизованно в main process через `AppCoordinator` (единый source of truth для фаз запуска)
 
@@ -740,6 +744,7 @@
 
 - `tests/functional/agent-switching.spec.ts` - "should preserve scroll position when switching agents"
 - `tests/functional/agent-switching.spec.ts` - "should show correct chat immediately on agent click"
+- `tests/functional/startup-loader.spec.ts` - стартовый экран скрывается только после полной готовности чатов и стабилизации первого отображения активного чата
 - `tests/functional/settings-ai-agent.spec.ts` - "53.1: should save and load LLM provider selection"
 - `tests/functional/settings-ai-agent.spec.ts` - "53.2: should save and load API key with encryption"
 - `tests/functional/settings-ai-agent.spec.ts` - "53.3: should delete API key when field is cleared"

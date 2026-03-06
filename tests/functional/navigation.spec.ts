@@ -155,6 +155,122 @@ test('should redirect to agents after successful authentication', async () => {
   await expect(settingsButton).toBeVisible({ timeout: 5000 });
 });
 
+/* Preconditions: User is authenticated and can open protected screens
+   Action: Open Settings and force tall content
+   Assertions: Page-level scroll stays locked, Settings uses internal scroll container
+   Requirements: navigation.1.10 */
+test('should keep page scroll locked and allow internal settings scroll', async () => {
+  await completeOAuthFlow(electronApp, window);
+
+  const settingsButton = window.locator('button:has-text("Settings")');
+  await expect(settingsButton).toBeVisible({ timeout: 5000 });
+  await settingsButton.click();
+
+  const settingsScreen = window.locator('[data-testid="settings-screen"]');
+  await expect(settingsScreen).toBeVisible({ timeout: 5000 });
+
+  const metrics = await window.evaluate(() => {
+    const settings = document.querySelector(
+      '[data-testid="settings-screen"]'
+    ) as HTMLElement | null;
+    if (!settings) return null;
+
+    const content = settings.firstElementChild as HTMLElement | null;
+    if (!content) return null;
+
+    const filler = document.createElement('div');
+    filler.setAttribute('data-testid', 'settings-scroll-filler');
+    filler.style.height = '2400px';
+    content.appendChild(filler);
+
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+    settings.scrollTop = 0;
+    settings.scrollTo({ top: 600, behavior: 'auto' });
+
+    return {
+      settingsScrollTop: settings.scrollTop,
+      settingsScrollHeight: settings.scrollHeight,
+      settingsClientHeight: settings.clientHeight,
+      htmlScrollTop: document.documentElement.scrollTop,
+      bodyScrollTop: document.body.scrollTop,
+      htmlOverflowY: getComputedStyle(document.documentElement).overflowY,
+      bodyOverflowY: getComputedStyle(document.body).overflowY,
+    };
+  });
+
+  expect(metrics).not.toBeNull();
+  expect(metrics!.settingsScrollHeight).toBeGreaterThan(metrics!.settingsClientHeight);
+  expect(metrics!.settingsScrollTop).toBeGreaterThan(0);
+  expect(metrics!.htmlScrollTop).toBe(0);
+  expect(metrics!.bodyScrollTop).toBe(0);
+  expect(metrics!.htmlOverflowY).toBe('hidden');
+  expect(metrics!.bodyOverflowY).toBe('hidden');
+  await expectNoToastError(window);
+});
+
+/* Preconditions: User is authenticated and has a long message history
+   Action: Scroll chat in Agents screen
+   Assertions: Scroll is applied to chat container, while page-level scroll remains locked
+   Requirements: navigation.1.10 */
+test('should keep page scroll locked and allow internal agents chat scroll', async () => {
+  await completeOAuthFlow(electronApp, window);
+
+  await window.evaluate(async () => {
+    const api = (window as any).api;
+    const agentsResult = await api.agents.list();
+    if (!agentsResult?.success || !Array.isArray(agentsResult.data) || agentsResult.data.length === 0) {
+      throw new Error('Failed to read agents list');
+    }
+
+    const activeAgentId = agentsResult.data[0].id;
+    for (let i = 0; i < 120; i += 1) {
+      const result = await api.test.createAgentMessage(activeAgentId, `Seed message ${i + 1}`);
+      if (!result?.success) {
+        throw new Error(result?.error || 'Failed to seed message');
+      }
+    }
+  });
+
+  await expect.poll(
+    async () =>
+      await window.locator('[data-testid="agent-chat-root"]:not(.pointer-events-none) [data-testid="message"]').count(),
+    { timeout: 10000 }
+  ).toBeGreaterThan(80);
+
+  const metrics = await window.evaluate(() => {
+    const messagesArea = document.querySelector(
+      '[data-testid="agent-chat-root"]:not(.pointer-events-none) [data-testid="messages-area"]'
+    ) as HTMLElement | null;
+    const scrollContainer = messagesArea?.parentElement as HTMLElement | null;
+    if (!scrollContainer) return null;
+
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+    scrollContainer.scrollTop = 0;
+    scrollContainer.scrollTo({ top: scrollContainer.scrollHeight, behavior: 'auto' });
+
+    return {
+      containerScrollTop: scrollContainer.scrollTop,
+      containerScrollHeight: scrollContainer.scrollHeight,
+      containerClientHeight: scrollContainer.clientHeight,
+      htmlScrollTop: document.documentElement.scrollTop,
+      bodyScrollTop: document.body.scrollTop,
+      htmlOverflowY: getComputedStyle(document.documentElement).overflowY,
+      bodyOverflowY: getComputedStyle(document.body).overflowY,
+    };
+  });
+
+  expect(metrics).not.toBeNull();
+  expect(metrics!.containerScrollHeight).toBeGreaterThan(metrics!.containerClientHeight);
+  expect(metrics!.containerScrollTop).toBeGreaterThan(0);
+  expect(metrics!.htmlScrollTop).toBe(0);
+  expect(metrics!.bodyScrollTop).toBe(0);
+  expect(metrics!.htmlOverflowY).toBe('hidden');
+  expect(metrics!.bodyOverflowY).toBe('hidden');
+  await expectNoToastError(window);
+});
+
 /* Preconditions: User is authenticated and on dashboard
    Action: User logs out
    Assertions: User is redirected to login screen
