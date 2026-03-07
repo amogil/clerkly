@@ -20,9 +20,11 @@ export function AllAgentsPage({ agents, errorMessages, onBack, onAgentClick }: A
   const historyAgents = agents.filter((agent) => !(!agent.name && isNew(agent.status)));
 
   return (
-    <div className="h-[calc(100vh-4rem)] bg-card flex flex-col">
+    <div className="h-full bg-card flex flex-col">
       <div className="h-16 px-6 border-b border-border flex items-center gap-4 flex-shrink-0">
         <button
+          data-testid="all-agents-back-button"
+          aria-label="Back"
           onClick={onBack}
           className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
         >

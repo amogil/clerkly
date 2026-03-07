@@ -12,6 +12,7 @@ import {
   activeChat,
   launchElectronWithMockOAuth,
   expectAgentsVisible,
+  getAgentIdsFromApi,
 } from './helpers/electron';
 import type { MockOAuthServer } from './helpers/mock-oauth-server';
 
@@ -46,18 +47,24 @@ test.afterEach(async () => {
 });
 
 test.describe('All Agents Page', () => {
+  async function createAdditionalAgents(count: number): Promise<void> {
+    const newChatButton = window.locator('div[title="New chat"]');
+    const baseCount = (await getAgentIdsFromApi(window)).length;
+
+    for (let i = 0; i < count; i++) {
+      await newChatButton.click();
+      await expect
+        .poll(async () => (await getAgentIdsFromApi(window)).length, { timeout: 5000 })
+        .toBe(baseCount + i + 1);
+    }
+  }
+
   /* Preconditions: Multiple agents exist, some are hidden
      Action: Click +N button
      Assertions: All Agents page opens
      Requirements: agents.5.1 */
   test('should open all agents page on +N button click', async () => {
-    // Create many agents to trigger +N button
-    const newChatButton = window.locator('div[title="New chat"]');
-
-    for (let i = 0; i < 8; i++) {
-      await newChatButton.click();
-      await window.waitForTimeout(300);
-    }
+    await createAdditionalAgents(8);
 
     // Find +N button
     const plusNButton = window.locator('button').filter({ hasText: /^\+\d+$/ });
@@ -65,7 +72,6 @@ test.describe('All Agents Page', () => {
     // If button exists, click it
     if ((await plusNButton.count()) > 0) {
       await plusNButton.click();
-      await window.waitForTimeout(500);
 
       // Check All Agents page is visible
       const allAgentsTitle = window.locator('text=All Agents');
@@ -86,20 +92,13 @@ test.describe('All Agents Page', () => {
      Assertions: All agents are displayed in the list
      Requirements: agents.5.2, agents.5.3 */
   test('should display all agents in history', async () => {
-    // Create multiple agents
-    const newChatButton = window.locator('div[title="New chat"]');
-
-    for (let i = 0; i < 5; i++) {
-      await newChatButton.click();
-      await window.waitForTimeout(300);
-    }
+    await createAdditionalAgents(5);
 
     // Open All Agents (click +N button if available)
     const plusNButton = window.locator('button').filter({ hasText: /^\+\d+$/ });
 
     if ((await plusNButton.count()) > 0) {
       await plusNButton.click();
-      await window.waitForTimeout(500);
 
       // Check All Agents title
       const allAgentsTitle = window.locator('text=All Agents');
@@ -127,26 +126,19 @@ test.describe('All Agents Page', () => {
      Assertions: Agent chat opens, returns to chat view
      Requirements: agents.5.4 */
   test('should open agent chat from history', async () => {
-    // Create multiple agents
-    const newChatButton = window.locator('div[title="New chat"]');
-
-    for (let i = 0; i < 3; i++) {
-      await newChatButton.click();
-      await window.waitForTimeout(300);
-    }
+    await createAdditionalAgents(3);
 
     // Open All Agents
     const plusNButton = window.locator('button').filter({ hasText: /^\+\d+$/ });
 
     if ((await plusNButton.count()) > 0) {
       await plusNButton.click();
-      await window.waitForTimeout(500);
 
       // Click on second agent in list
       const agentCards = window.locator('[data-testid^="agent-card-"]');
+      await expect(agentCards).toHaveCount(4, { timeout: 5000 });
       const secondAgent = agentCards.nth(1);
       await secondAgent.click();
-      await window.waitForTimeout(500);
 
       // Should return to chat view
       const allAgentsTitle = window.locator('text=All Agents');
@@ -169,20 +161,22 @@ test.describe('All Agents Page', () => {
     // Create agent
     const newChatButton = window.locator('div[title="New chat"]');
     await newChatButton.click();
-    await window.waitForTimeout(500);
+    await expect
+      .poll(async () => (await getAgentIdsFromApi(window)).length, { timeout: 5000 })
+      .toBe(2);
 
     // Send message that might trigger error (in real scenario)
     const messageInput = activeChat(window).textarea;
     await messageInput.fill('Test message');
     await messageInput.press('Enter');
-    await window.waitForTimeout(500);
+    const sentMessage = activeChat(window).userMessages.filter({ hasText: 'Test message' });
+    await expect(sentMessage).toHaveCount(1, { timeout: 5000 });
 
     // Open All Agents
     const plusNButton = window.locator('button').filter({ hasText: /^\+\d+$/ });
 
     if ((await plusNButton.count()) > 0) {
       await plusNButton.click();
-      await window.waitForTimeout(500);
 
       // Check that agent cards have status text
       const agentCards = window.locator('[data-testid^="agent-card-"]');
@@ -206,14 +200,15 @@ test.describe('All Agents Page', () => {
 
     const newChatButton = window.locator('div[title="New chat"]');
     await newChatButton.click();
-    await window.waitForTimeout(500);
+    await expect
+      .poll(async () => (await getAgentIdsFromApi(window)).length, { timeout: 5000 })
+      .toBe(2);
 
     // Open All Agents if possible
     const plusNButton = window.locator('button').filter({ hasText: /^\+\d+$/ });
 
     if ((await plusNButton.count()) > 0) {
       await plusNButton.click();
-      await window.waitForTimeout(500);
 
       // Check agent cards structure
       const agentCards = window.locator('[data-testid^="agent-card-"]');

@@ -187,7 +187,7 @@ test('should maintain focus while typing', async () => {
 
   // Type text
   await textarea.fill('Hello world');
-  await window.waitForTimeout(100);
+  await expect(textarea).toHaveValue('Hello world');
 
   // Check that textarea still has focus
   const isFocused = await textarea.evaluate((el) => el === document.activeElement);
