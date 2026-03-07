@@ -5,20 +5,12 @@ import { MainEventBus } from '../events/MainEventBus';
 import { OAuthClientManager } from '../auth/OAuthClientManager';
 import { EVENT_TYPES } from '../../shared/events/constants';
 import type {
-  AppPhase,
-  AppScreen,
+  AppCoordinatorState,
   AuthCompletedPayload,
   AuthFailedPayload,
   AuthSignedOutPayload,
   UserProfileUpdatedPayload,
 } from '../../shared/events/types';
-
-interface AppCoordinatorState {
-  phase: AppPhase;
-  authorized: boolean;
-  targetScreen: AppScreen;
-  reason?: string;
-}
 
 interface AppCoordinatorOptions {
   chatsReadyTimeoutMs?: number;

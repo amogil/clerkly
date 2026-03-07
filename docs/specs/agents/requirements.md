@@ -732,7 +732,7 @@
 
 13.11. Оркестрация стартового workflow ДОЛЖНА выполняться централизованно в main process через `AppCoordinator` (единый source of truth для фаз запуска)
 
-13.12. Renderer ДОЛЖЕН получать состояние старта через polling IPC `app:get-state` с интервалом 200мс (без подписки на startup-события event bus)
+13.12. Renderer ДОЛЖЕН получать состояние старта через polling IPC `app:get-state` с интервалом 200мс
 
 13.13. Renderer ДОЛЖЕН определять показ глобального loading-экрана и целевого экрана (`login`/`agents`/`settings`) по состоянию `AppCoordinator`, а НЕ по локально-разрозненным флагам
 

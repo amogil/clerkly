@@ -1848,7 +1848,7 @@ const STATUS_STYLES: Record<AgentStatus, StatusStyle> = {
 <AgentAvatar status={currentAgent.status} letter={letter} size="md" />
 ```
 
-**Ключевые изменения:**
+**Ключевые свойства реализации:**
 - Визуализация статуса активного агента полностью делегирована компоненту `AgentAvatar`.
 - Пересортировка списка не использует JS-анимацию перемещения.
 - Визуальная динамика в хедере определяется только статусными CSS-анимациями (`spin/pulse`).
@@ -2072,7 +2072,7 @@ await window.locator(`[data-testid="agent-icon-${firstAgentId}"]`).click();
 - `MainEventBus` — шина событий main процесса
 - `useEventSubscription` — React hook для подписки на события
 - `IPCChatTransport` — кастомный ChatTransport для AI SDK (`src/renderer/lib/IPCChatTransport.ts`)
-- `useAgentChat` — хук управления сообщениями, заменяет `useMessages` (`src/renderer/hooks/useAgentChat.ts`)
+- `useAgentChat` — хук управления сообщениями (`src/renderer/hooks/useAgentChat.ts`)
 - `AgentMessage` — компонент сообщения (`src/renderer/components/agents/AgentMessage.tsx`)
 - `PromptInput` — AI Elements компонент ввода (`src/renderer/components/ai-elements/prompt-input.tsx`)
 
@@ -2182,7 +2182,7 @@ useChat.sendMessage()
 
 ### useAgentChat
 
-`src/renderer/hooks/useAgentChat.ts` — заменяет `useMessages`. Оборачивает `useChat` из `@ai-sdk/react` с кастомным `IPCChatTransport`.
+`src/renderer/hooks/useAgentChat.ts` — хук управления сообщениями. Оборачивает `useChat` из `@ai-sdk/react` с кастомным `IPCChatTransport`.
 
 **Интерфейс:**
 ```typescript
@@ -2198,7 +2198,7 @@ interface UseAgentChatResult {
 
 **Ключевые решения:**
 
-1. **`Chat` вместо прямого `useChat`** — используется `new Chat({ id: agentId, transport })` из `@ai-sdk/react` для изоляции состояния по `agentId`. `Chat` инстанс стабилен через `useMemo`.
+1. **Изоляция состояния чата по агенту** — используется `new Chat({ id: agentId, transport })` из `@ai-sdk/react`; `Chat` инстанс стабилен через `useMemo`.
 
 2. **Параллельный массив `rawMessages`** — AI SDK `UIMessage` не хранит `kind`, `hidden`, `action_link`. Хук хранит `rawMessages: MessageSnapshot[]` синхронно с `UIMessage[]` для доступа к оригинальным данным при рендеринге `AgentMessage`.
 

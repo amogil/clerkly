@@ -103,34 +103,6 @@ describe('Event Types', () => {
     expect(key1).not.toBe(key2);
   });
 
-  /* Preconditions: app.state.changed payloads with different phases
-     Action: Generate keys for app.state.changed
-     Assertions: Keys differ per coordinator state transition
-     Requirements: realtime-events.5.5 */
-  it('should include app coordinator state fields in app.state.changed key', () => {
-    const payloadBooting = {
-      timestamp: Date.now(),
-      phase: 'booting',
-      authorized: false,
-      targetScreen: 'login',
-      reason: 'startup',
-    } as const;
-    const payloadWaiting = {
-      timestamp: Date.now(),
-      phase: 'waiting-for-chats',
-      authorized: true,
-      targetScreen: 'agents',
-      reason: 'startup_authorized',
-    } as const;
-
-    const keyBooting = getEventKey('app.state.changed', payloadBooting);
-    const keyWaiting = getEventKey('app.state.changed', payloadWaiting);
-
-    expect(keyBooting).not.toBe(keyWaiting);
-    expect(keyBooting).toContain('booting');
-    expect(keyWaiting).toContain('waiting-for-chats');
-  });
-
   /* Preconditions: Agent created/updated/archived payloads
      Action: Extract entity ID
      Assertions: ID extracted correctly

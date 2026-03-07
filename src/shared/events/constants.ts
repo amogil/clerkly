@@ -46,11 +46,6 @@ export const EVENT_TYPES = {
 
   // Agent rate limit event
   AGENT_RATE_LIMIT: 'agent.rate_limit',
-
-  // App coordinator events
-  APP_STATE_CHANGED: 'app.state.changed',
-  APP_CHATS_READY: 'app.chats.ready',
-  APP_CHATS_FAILED: 'app.chats.failed',
 } as const;
 
 /**
