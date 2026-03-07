@@ -113,4 +113,21 @@ describe('AgentReasoningTrigger', () => {
 
     expect(screen.getByTestId('reasoning-trigger-logo')).toHaveAttribute('data-animated', 'false');
   });
+
+  /* Preconditions: reasoning is still streaming but trigger is already collapsed
+     Action: render AgentReasoningTrigger
+     Assertions: logo remains static because active reasoning animation requires open trigger
+     Requirements: agents.4.11.2, llm-integration.7.6 */
+  it('should keep logo static when streaming is true but trigger is collapsed', () => {
+    mockUseReasoning.mockReturnValue({
+      isStreaming: true,
+      isOpen: false,
+      duration: 1,
+      setIsOpen: jest.fn(),
+    });
+
+    render(<AgentReasoningTrigger />);
+
+    expect(screen.getByTestId('reasoning-trigger-logo')).toHaveAttribute('data-animated', 'false');
+  });
 });
