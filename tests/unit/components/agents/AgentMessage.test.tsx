@@ -62,7 +62,7 @@ describe('AgentMessage — llm', () => {
       <AgentMessage
         message={baseMessage({
           kind: 'llm',
-          payload: { data: { action: { type: 'final_answer', content: 'Response text' } } },
+          payload: { data: { action: { content: 'Response text' } } },
         })}
       />
     );
@@ -93,7 +93,7 @@ describe('AgentMessage — llm', () => {
           payload: {
             data: {
               reasoning: { text: 'Thinking...' },
-              action: { type: 'final_answer', content: 'Answer' },
+              action: { content: 'Answer' },
             },
           },
         })}

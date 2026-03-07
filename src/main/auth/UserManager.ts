@@ -57,6 +57,17 @@ export class UserManager {
   }
 
   /**
+   * Normalize changed fields payload for updated events.
+   * Requirements: realtime-events.3.3.2
+   */
+  private normalizeChangedFields(fields: string[]): string[] | undefined {
+    if (fields.length === 0) {
+      return undefined;
+    }
+    return Array.from(new Set(fields)).sort((a, b) => a.localeCompare(b));
+  }
+
+  /**
    * Generate random 10-character alphanumeric user_id
    * Requirements: user-data-isolation.0.2, user-data-isolation.1.1
    *
@@ -125,13 +136,8 @@ export class UserManager {
       // Publish user.profile.updated event
       // Requirements: realtime-events.3.3
       const eventBus = MainEventBus.getInstance();
-      eventBus.publish(
-        new UserProfileUpdatedEvent(updatedUser.userId, {
-          name: updatedUser.name,
-          email: updatedUser.email,
-          locale: updatedUser.locale,
-        })
-      );
+      const changedFields = this.normalizeChangedFields(Object.keys(updates));
+      eventBus.publish(new UserProfileUpdatedEvent(updatedUser.userId, changedFields));
 
       return updatedUser;
     }
@@ -160,13 +166,14 @@ export class UserManager {
     // Publish user.profile.updated event for new user
     // Requirements: realtime-events.3.3
     const eventBus = MainEventBus.getInstance();
-    eventBus.publish(
-      new UserProfileUpdatedEvent(completeUser.userId, {
-        name: completeUser.name,
-        email: completeUser.email,
-        locale: completeUser.locale,
-      })
-    );
+    const changedFields = this.normalizeChangedFields([
+      'email',
+      'googleId',
+      'lastSynced',
+      'locale',
+      'name',
+    ]);
+    eventBus.publish(new UserProfileUpdatedEvent(completeUser.userId, changedFields));
 
     return completeUser;
   }

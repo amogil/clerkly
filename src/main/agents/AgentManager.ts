@@ -53,10 +53,6 @@ export class AgentManager {
       return AGENT_STATUS.ERROR;
     }
 
-    if (lastMessage.kind === MESSAGE_KIND.FINAL_ANSWER) {
-      return AGENT_STATUS.COMPLETED;
-    }
-
     if (lastMessage.kind === MESSAGE_KIND.USER) {
       return AGENT_STATUS.IN_PROGRESS;
     }

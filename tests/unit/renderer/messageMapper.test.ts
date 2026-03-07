@@ -176,11 +176,6 @@ describe('toUIMessage', () => {
     const msg = makeSnapshot({ kind: 'tool_call' });
     expect(toUIMessage(msg)).toBeNull();
   });
-
-  it('should return null for code_exec kind', () => {
-    const msg = makeSnapshot({ kind: 'code_exec' });
-    expect(toUIMessage(msg)).toBeNull();
-  });
 });
 
 describe('toUIMessages', () => {

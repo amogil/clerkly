@@ -54,7 +54,7 @@ test.afterEach(async () => {
 });
 
 test.describe('Agent Activity Indicator', () => {
-  /* Preconditions: Agent is processing tool_call or code_exec
+  /* Preconditions: Agent is processing tool_call
      Action: View messages area
      Assertions: Activity indicator (spinner) is visible
      Requirements: agents.11.1, agents.11.2, agents.11.3 */

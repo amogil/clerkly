@@ -20,6 +20,9 @@ import {
   AgentArchivedEvent,
   MessageCreatedEvent,
   MessageUpdatedEvent,
+  MessageLlmReasoningUpdatedEvent,
+  MessageLlmTextUpdatedEvent,
+  MessageToolCallEvent,
   UserProfileUpdatedEvent,
   isTypedEvent,
   AgentSnapshot,
@@ -373,13 +376,83 @@ describe('Event Classes', () => {
        Assertions: Event has correct type and payload
        Requirements: realtime-events.3.6 */
     it('should create event with id and changed fields', () => {
-      const changedFields = { name: 'New Name', locale: 'ru' };
+      const changedFields = ['locale', 'name'];
       const event = new UserProfileUpdatedEvent('user-1', changedFields);
 
       expect(event.type).toBe('user.profile.updated');
       expect(event.id).toBe('user-1');
       expect(event.changedFields).toEqual(changedFields);
       expect(event.toPayload()).toEqual({ id: 'user-1', changedFields });
+    });
+
+    /* Preconditions: Only user id provided
+       Action: Create UserProfileUpdatedEvent without changed fields
+       Assertions: Payload contains only id
+       Requirements: realtime-events.3.3.1 */
+    it('should create event without changed fields when omitted', () => {
+      const event = new UserProfileUpdatedEvent('user-1');
+
+      expect(event.type).toBe('user.profile.updated');
+      expect(event.id).toBe('user-1');
+      expect(event.changedFields).toBeUndefined();
+      expect(event.toPayload()).toEqual({ id: 'user-1' });
+    });
+  });
+
+  describe('MessageLlmReasoningUpdatedEvent', () => {
+    /* Preconditions: Reasoning chunk payload fields provided
+       Action: Create MessageLlmReasoningUpdatedEvent
+       Assertions: Event has correct type and payload
+       Requirements: llm-integration.2 */
+    it('should create reasoning streaming event with payload', () => {
+      const event = new MessageLlmReasoningUpdatedEvent(11, 'agent-1', 'th', 'thinking');
+
+      expect(event.type).toBe('message.llm.reasoning.updated');
+      expect(event.toPayload()).toEqual({
+        messageId: 11,
+        agentId: 'agent-1',
+        delta: 'th',
+        accumulatedText: 'thinking',
+      });
+    });
+  });
+
+  describe('MessageLlmTextUpdatedEvent', () => {
+    /* Preconditions: Text chunk payload fields provided
+       Action: Create MessageLlmTextUpdatedEvent
+       Assertions: Event has correct type and payload
+       Requirements: llm-integration.2 */
+    it('should create text streaming event with payload', () => {
+      const event = new MessageLlmTextUpdatedEvent(12, 'agent-1', 'he', 'hello');
+
+      expect(event.type).toBe('message.llm.text.updated');
+      expect(event.toPayload()).toEqual({
+        messageId: 12,
+        agentId: 'agent-1',
+        delta: 'he',
+        accumulatedText: 'hello',
+      });
+    });
+  });
+
+  describe('MessageToolCallEvent', () => {
+    /* Preconditions: Fully assembled tool call fields provided
+       Action: Create MessageToolCallEvent
+       Assertions: Event has correct type and payload
+       Requirements: llm-integration.11.1 */
+    it('should create single-shot tool call event with payload', () => {
+      const event = new MessageToolCallEvent('agent-1', 13, 'call-1', 'search_docs', {
+        query: 'changedFields format',
+      });
+
+      expect(event.type).toBe('message.tool_call');
+      expect(event.toPayload()).toEqual({
+        agentId: 'agent-1',
+        llmMessageId: 13,
+        callId: 'call-1',
+        toolName: 'search_docs',
+        arguments: { query: 'changedFields format' },
+      });
     });
   });
 

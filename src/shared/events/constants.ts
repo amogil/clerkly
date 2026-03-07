@@ -40,6 +40,8 @@ export const EVENT_TYPES = {
   MESSAGE_CREATED: 'message.created',
   MESSAGE_UPDATED: 'message.updated',
   MESSAGE_LLM_REASONING_UPDATED: 'message.llm.reasoning.updated',
+  MESSAGE_LLM_TEXT_UPDATED: 'message.llm.text.updated',
+  MESSAGE_TOOL_CALL: 'message.tool_call',
 
   // Error events
   ERROR_CREATED: 'error.created',

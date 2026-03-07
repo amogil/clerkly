@@ -191,7 +191,7 @@ test.describe('LLM Chat (real OpenAI)', () => {
     await expect(messageInput).toBeVisible({ timeout: 10000 });
 
     await messageInput.fill(
-      'Solve this carefully: compare 17! and 2^57, explain each step briefly, then give final answer.'
+      'Solve this carefully: compare 17! and 2^57, explain each step briefly, then give response text.'
     );
     await messageInput.press('Enter');
 
@@ -836,7 +836,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     context = await launchWithMockLLM();
     const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
 
-    await messageInput.fill('Show long reasoning and then final answer');
+    await messageInput.fill('Show long reasoning and then response text');
     await messageInput.press('Enter');
 
     const agentAvatarIcon = context.window
@@ -859,6 +859,63 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
       .poll(async () => await agentAvatarIcon.getAttribute('class'), { timeout: 5000 })
       .toContain('bg-amber-500');
 
+    await expectNoToastError(context.window);
+  });
+
+  /* Preconditions: MockLLMServer streams long text response in multiple chunks; app authenticated with mock LLM URL
+     Action: User sends message and waits until response completes
+     Assertions: Final text is rendered in one active llm bubble without duplicate action blocks
+     Requirements: llm-integration.7.3 */
+  test('should keep a single active action block while streamed text is assembling', async () => {
+    mockLLMServer.setStreamingMode(true, {
+      content: JSON.stringify({
+        action: {
+          type: 'text',
+          content:
+            'This is a long streamed response used for deterministic chunk-by-chunk rendering verification.',
+        },
+      }),
+      chunkDelayMs: 120,
+    });
+
+    context = await launchWithMockLLM();
+    const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
+    await messageInput.fill('Stream text in chunks');
+    await messageInput.press('Enter');
+
+    const actionContent = context.window.locator('[data-testid="message-llm-action"]').last();
+    await expect(actionContent).toBeVisible({ timeout: 10000 });
+
+    const bubbleStats = await context.window.evaluate(async () => {
+      const actionCounts: number[] = [];
+      const getNode = () =>
+        document.querySelectorAll('[data-testid="message-llm-action"]')[
+          document.querySelectorAll('[data-testid="message-llm-action"]').length - 1
+        ] as HTMLElement | undefined;
+
+      const startedAt = Date.now();
+      while (Date.now() - startedAt < 8000) {
+        const node = getNode();
+        actionCounts.push(document.querySelectorAll('[data-testid="message-llm-action"]').length);
+        if (node) {
+          // Touch text to ensure node remains readable during updates.
+          node.textContent?.trim();
+        }
+        await new Promise((resolve) => setTimeout(resolve, 120));
+      }
+
+      return {
+        maxActionCount: Math.max(...actionCounts, 0),
+      };
+    });
+
+    await expect(actionContent).toContainText(
+      'This is a long streamed response used for deterministic chunk-by-chunk rendering verification.',
+      {
+        timeout: 10000,
+      }
+    );
+    expect(bubbleStats.maxActionCount).toBe(1);
     await expectNoToastError(context.window);
   });
 

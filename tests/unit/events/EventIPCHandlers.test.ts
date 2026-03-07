@@ -94,7 +94,18 @@ describe('EventIPCHandlers', () => {
        Requirements: realtime-events.4.3 */
     it('should not duplicate events from renderer', () => {
       const mockEvent = {} as IpcMainEvent;
-      const payload = { timestamp: Date.now(), id: 'agent-1', changedFields: { name: 'New' } };
+      const payload = {
+        timestamp: Date.now(),
+        agent: {
+          id: 'agent-1',
+          name: 'Agent',
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          archivedAt: null,
+          status: 'in-progress',
+        },
+        changedFields: ['name'],
+      };
 
       ipcHandler(mockEvent, 'agent.updated', payload);
 
@@ -204,8 +215,15 @@ describe('EventIPCHandlers', () => {
       const mockEvent = {} as IpcMainEvent;
       const payload = {
         timestamp: Date.now(),
-        id: 'agent-1',
-        changedFields: { name: 'Updated' },
+        agent: {
+          id: 'agent-1',
+          name: 'Updated',
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          archivedAt: null,
+          status: 'awaiting-response',
+        },
+        changedFields: ['name'],
       };
 
       ipcHandler(mockEvent, 'agent.updated', payload);
@@ -243,6 +261,26 @@ describe('EventIPCHandlers', () => {
       ipcHandler(mockEvent, 'user.login', payload);
 
       expect(mockDeliverFromIPC).toHaveBeenCalledWith('user.login', payload);
+    });
+
+    /* Preconditions: IPC handler registered
+       Action: Receive message.tool_call event
+       Assertions: Event is forwarded correctly
+       Requirements: realtime-events.4.2, realtime-events.3.9 */
+    it('should forward message.tool_call events', () => {
+      const mockEvent = {} as IpcMainEvent;
+      const payload = {
+        timestamp: Date.now(),
+        agentId: 'agent-1',
+        llmMessageId: 77,
+        callId: 'call-1',
+        toolName: 'search_docs',
+        arguments: { query: 'status rules' },
+      };
+
+      ipcHandler(mockEvent, 'message.tool_call', payload);
+
+      expect(mockDeliverFromIPC).toHaveBeenCalledWith('message.tool_call', payload);
     });
   });
 });

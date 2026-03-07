@@ -4,7 +4,6 @@
  * Source of truth for all event type definitions in Clerkly
  */
 
-import { User } from '../../types';
 import { EVENT_TYPES } from './constants';
 import { AgentStatus, MessagePayload } from '../utils/agentStatus';
 
@@ -49,11 +48,11 @@ export interface EntityCreatedEvent<T> extends BaseEvent {
  * Event for entity update
  * Requirements: realtime-events.3.3
  */
-export interface EntityUpdatedEvent<T> extends BaseEvent {
+export interface EntityUpdatedEvent extends BaseEvent {
   /** Entity ID */
   id: string;
-  /** Changed fields with new values */
-  changedFields: Partial<T>;
+  /** Changed snapshot fields (dot-path, unique, sorted) */
+  changedFields?: string[];
 }
 
 /**
@@ -86,14 +85,7 @@ export interface AgentSnapshot {
  * Message payload kinds
  * Requirements: agents.7.2
  */
-export type MessageKind =
-  | 'user'
-  | 'llm'
-  | 'tool_call'
-  | 'code_exec'
-  | 'final_answer'
-  | 'request_scope'
-  | 'artifact';
+export type MessageKind = 'user' | 'llm' | 'error' | 'tool_call';
 
 /**
  * Message snapshot for events
@@ -151,10 +143,31 @@ export interface MessageLlmReasoningUpdatedPayload extends BaseEvent {
   timestamp: number;
 }
 
+// LLM text streaming event
+export interface MessageLlmTextUpdatedPayload extends BaseEvent {
+  messageId: number;
+  agentId: string;
+  /** New text chunk */
+  delta: string;
+  /** Full accumulated text so far */
+  accumulatedText: string;
+  timestamp: number;
+}
+
+// Tool call single-shot event
+export interface MessageToolCallPayload extends BaseEvent {
+  agentId: string;
+  llmMessageId: number;
+  callId: string;
+  toolName: string;
+  arguments: Record<string, unknown>;
+  timestamp: number;
+}
+
 // User events
 export type UserLoginPayload = BaseEvent & { userId: string };
 export type UserLogoutPayload = BaseEvent;
-export type UserProfileUpdatedPayload = EntityUpdatedEvent<User>;
+export type UserProfileUpdatedPayload = EntityUpdatedEvent;
 
 // ============================================================================
 // Auth Events
@@ -312,6 +325,8 @@ export interface ClerklyEvents {
   [EVENT_TYPES.MESSAGE_CREATED]: MessageCreatedPayload;
   [EVENT_TYPES.MESSAGE_UPDATED]: MessageUpdatedPayload;
   [EVENT_TYPES.MESSAGE_LLM_REASONING_UPDATED]: MessageLlmReasoningUpdatedPayload;
+  [EVENT_TYPES.MESSAGE_LLM_TEXT_UPDATED]: MessageLlmTextUpdatedPayload;
+  [EVENT_TYPES.MESSAGE_TOOL_CALL]: MessageToolCallPayload;
 
   // User events
   [EVENT_TYPES.USER_LOGIN]: UserLoginPayload;
@@ -396,6 +411,7 @@ export function getEntityId(
     agent?: { id?: string };
     message?: { id?: number };
     messageId?: number;
+    llmMessageId?: number;
   }
 ): string | undefined {
   // Old format: payload.id
@@ -417,6 +433,10 @@ export function getEntityId(
   // Message reasoning payload: payload.messageId
   if ('messageId' in payload && typeof payload.messageId === 'number') {
     return String(payload.messageId);
+  }
+  // Tool call payload: payload.llmMessageId
+  if ('llmMessageId' in payload && typeof payload.llmMessageId === 'number') {
+    return String(payload.llmMessageId);
   }
   return undefined;
 }
@@ -450,6 +470,8 @@ type AgentUpdatedType = typeof EVENT_TYPES.AGENT_UPDATED;
 type AgentArchivedType = typeof EVENT_TYPES.AGENT_ARCHIVED;
 type MessageCreatedType = typeof EVENT_TYPES.MESSAGE_CREATED;
 type MessageUpdatedType = typeof EVENT_TYPES.MESSAGE_UPDATED;
+type MessageLlmTextUpdatedType = typeof EVENT_TYPES.MESSAGE_LLM_TEXT_UPDATED;
+type MessageToolCallType = typeof EVENT_TYPES.MESSAGE_TOOL_CALL;
 type UserProfileUpdatedType = typeof EVENT_TYPES.USER_PROFILE_UPDATED;
 
 /**
@@ -779,6 +801,66 @@ export class MessageLlmReasoningUpdatedEvent extends TypedEventClass<
 }
 
 /**
+ * Message LLM text updated event
+ * Emitted on each text chunk during LLM streaming
+ * Requirements: llm-integration.5.1
+ */
+export class MessageLlmTextUpdatedEvent extends TypedEventClass<MessageLlmTextUpdatedType> {
+  readonly type = EVENT_TYPES.MESSAGE_LLM_TEXT_UPDATED;
+  readonly timestamp: number;
+
+  constructor(
+    public readonly messageId: number,
+    public readonly agentId: string,
+    public readonly delta: string,
+    public readonly accumulatedText: string
+  ) {
+    super();
+    this.timestamp = Date.now();
+  }
+
+  toPayload(): EventPayloadWithoutTimestamp<MessageLlmTextUpdatedType> {
+    return {
+      messageId: this.messageId,
+      agentId: this.agentId,
+      delta: this.delta,
+      accumulatedText: this.accumulatedText,
+    };
+  }
+}
+
+/**
+ * Message tool call event
+ * Emitted once when tool call arguments are fully assembled
+ * Requirements: llm-integration.11.1
+ */
+export class MessageToolCallEvent extends TypedEventClass<MessageToolCallType> {
+  readonly type = EVENT_TYPES.MESSAGE_TOOL_CALL;
+  readonly timestamp: number;
+
+  constructor(
+    public readonly agentId: string,
+    public readonly llmMessageId: number,
+    public readonly callId: string,
+    public readonly toolName: string,
+    public readonly args: Record<string, unknown>
+  ) {
+    super();
+    this.timestamp = Date.now();
+  }
+
+  toPayload(): EventPayloadWithoutTimestamp<MessageToolCallType> {
+    return {
+      agentId: this.agentId,
+      llmMessageId: this.llmMessageId,
+      callId: this.callId,
+      toolName: this.toolName,
+      arguments: this.args,
+    };
+  }
+}
+
+/**
  * User profile updated event
  */
 export class UserProfileUpdatedEvent extends TypedEventClass<UserProfileUpdatedType> {
@@ -786,13 +868,15 @@ export class UserProfileUpdatedEvent extends TypedEventClass<UserProfileUpdatedT
 
   constructor(
     public readonly id: string,
-    public readonly changedFields: Partial<User>
+    public readonly changedFields?: string[]
   ) {
     super();
   }
 
   toPayload(): EventPayloadWithoutTimestamp<UserProfileUpdatedType> {
-    return { id: this.id, changedFields: this.changedFields };
+    return this.changedFields
+      ? { id: this.id, changedFields: this.changedFields }
+      : { id: this.id };
   }
 }
 

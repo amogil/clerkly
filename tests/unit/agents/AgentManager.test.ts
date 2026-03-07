@@ -159,15 +159,15 @@ describe('AgentManager', () => {
       expect(snapshot.status).toBe(AGENT_STATUS.IN_PROGRESS);
     });
 
-    /* Preconditions: Agent with last message of kind 'final_answer' exists
+    /* Preconditions: Agent with last message of kind 'llm' and done=true exists
        Action: Call toEventAgent() with agent
-       Assertions: Returns AgentSnapshot with status 'completed'
+       Assertions: Returns AgentSnapshot with status 'awaiting-response'
        Requirements: realtime-events.9.2, agents.5.2 */
-    it('should compute status as completed when last message is final_answer', () => {
+    it('should compute status as awaiting-response when last message is done llm', () => {
       const lastMessage = {
         id: 1,
         agentId: mockAgent.agentId,
-        kind: MESSAGE_KIND.FINAL_ANSWER,
+        kind: MESSAGE_KIND.LLM,
         timestamp: '2026-02-15T10:30:00.000Z',
         payloadJson: JSON.stringify({ data: { text: 'Done' } }),
         usageJson: null,
@@ -179,7 +179,7 @@ describe('AgentManager', () => {
 
       const snapshot = (agentManager as any).toEventAgent(mockAgent);
 
-      expect(snapshot.status).toBe(AGENT_STATUS.COMPLETED);
+      expect(snapshot.status).toBe(AGENT_STATUS.AWAITING_RESPONSE);
     });
 
     /* Preconditions: Agent with last message containing error status exists
@@ -232,7 +232,7 @@ describe('AgentManager', () => {
       expect(snapshot.status).toBe(AGENT_STATUS.IN_PROGRESS);
     });
 
-    /* Preconditions: Agent with last message of kind 'llm' without action (reasoning-only, not final_answer) exists
+    /* Preconditions: Agent with last message of kind 'llm' without action (reasoning-only) exists
        Action: Call toEventAgent() with agent
        Assertions: Returns AgentSnapshot with status 'in-progress'
        Requirements: realtime-events.9.2, agents.5.1, agents.9.2 */
@@ -306,6 +306,45 @@ describe('AgentManager', () => {
 
       expect(snapshot.status).toBe(AGENT_STATUS.IN_PROGRESS);
       expect(mockDbManager.messages.listByAgent).not.toHaveBeenCalled();
+    });
+
+    /* Preconditions: Last stored message is hidden and previous visible message is done llm
+       Action: Call toEventAgent()
+       Assertions: Falls back to visible history and computes status from last visible message
+       Requirements: agents.9.2, realtime-events.6.1 */
+    it('should fallback to visible history when latest message is hidden', () => {
+      const hiddenTailMessage = {
+        id: 6,
+        agentId: mockAgent.agentId,
+        kind: MESSAGE_KIND.LLM,
+        timestamp: '2026-02-15T10:31:00.000Z',
+        payloadJson: JSON.stringify({ data: { action: { content: 'Hidden' } } }),
+        usageJson: null,
+        replyToMessageId: 5,
+        hidden: true,
+        done: false,
+      };
+      const lastVisibleMessage = {
+        id: 5,
+        agentId: mockAgent.agentId,
+        kind: MESSAGE_KIND.LLM,
+        timestamp: '2026-02-15T10:30:00.000Z',
+        payloadJson: JSON.stringify({ data: { action: { content: 'Done' } } }),
+        usageJson: null,
+        replyToMessageId: 4,
+        hidden: false,
+        done: true,
+      };
+
+      mockDbManager.messages.getLastByAgent = jest.fn().mockReturnValue(hiddenTailMessage);
+      mockDbManager.messages.listByAgent = jest
+        .fn()
+        .mockReturnValue([{ ...lastVisibleMessage, id: 1, done: true }, lastVisibleMessage]);
+
+      const snapshot = (agentManager as any).toEventAgent(mockAgent);
+
+      expect(snapshot.status).toBe(AGENT_STATUS.AWAITING_RESPONSE);
+      expect(mockDbManager.messages.listByAgent).toHaveBeenCalledWith(mockAgent.agentId, false);
     });
 
     /* Preconditions: Agent with malformed llm payload exists

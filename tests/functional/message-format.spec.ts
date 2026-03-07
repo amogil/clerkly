@@ -114,11 +114,11 @@ test.describe('Message Format', () => {
     }
   });
 
-  /* Preconditions: Agent sends final_answer with markdown
+  /* Preconditions: Agent sends llm with markdown
      Action: View message
      Assertions: Markdown is rendered correctly
      Requirements: agents.7.7 */
-  test('should render markdown in final_answer', async () => {
+  test('should render markdown in llm', async () => {
     // This test would require actual agent response with markdown
     // For now, we test the structure
 
