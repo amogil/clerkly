@@ -404,9 +404,7 @@ export function registerTestIPCHandlers(
         return { success: false, error: 'agentId parameter is required' };
       }
 
-      if (
-        !['new', 'in-progress', 'awaiting-response', 'error', 'completed'].includes(status)
-      ) {
+      if (!['new', 'in-progress', 'awaiting-response', 'error', 'completed'].includes(status)) {
         return { success: false, error: `Unsupported status: ${status}` };
       }
 
