@@ -400,8 +400,11 @@ test.describe('Agent Messaging', () => {
     await messageInput.fill('User message');
     await messageInput.press('Enter');
 
-    // Wait for message to appear
-    await expect(activeChat(window).messages).toHaveCount(1, { timeout: 5000 });
+    // Wait for user message to appear and capture baseline count.
+    await expect(activeChat(window).userMessages.last()).toContainText('User message', {
+      timeout: 5000,
+    });
+    const messagesBeforeAgentResponse = await activeChat(window).messages.count();
 
     // Verify user is at bottom
     const isAtBottom = await messagesArea.evaluate((el) => {
@@ -417,8 +420,15 @@ test.describe('Agent Messaging', () => {
     }, firstAgentId as string);
     expect(result.success).toBe(true);
 
-    // Wait for agent message to appear
-    await expect(activeChat(window).messages).toHaveCount(2, { timeout: 5000 });
+    // Wait for agent response to append at least one new message
+    await window.waitForFunction(
+      (beforeCount) =>
+        document.querySelectorAll(
+          '[data-testid="agent-chat-root"]:not(.pointer-events-none) [data-testid="message"]'
+        ).length > beforeCount,
+      messagesBeforeAgentResponse,
+      { timeout: 5000 }
+    );
 
     // Verify chat autoscrolled to bottom — scroll-to-bottom button should NOT be visible
     const scrollToBottomBtn = window.locator('[data-testid="scroll-to-bottom"]');
@@ -454,10 +464,10 @@ test.describe('Agent Messaging', () => {
     for (let i = 1; i <= 15; i++) {
       await messageInput.fill(`User message ${i}`);
       await messageInput.press('Enter');
-      await expect(activeChat(window).messages).toHaveCount(i, { timeout: 5000 });
+      await expect(activeChat(window).userMessages).toHaveCount(i, { timeout: 5000 });
     }
 
-    await expect(activeChat(window).messages).toHaveCount(15, { timeout: 10000 });
+    await expect(activeChat(window).userMessages).toHaveCount(15, { timeout: 10000 });
 
     // Scroll up via real wheel event — use-stick-to-bottom tracks this correctly
     await messagesArea.hover();

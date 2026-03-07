@@ -389,5 +389,85 @@ export function registerTestIPCHandlers(
     }
   );
 
+  ipcMain.handle(
+    'test:set-agent-status',
+    async (
+      _event: Electron.IpcMainInvokeEvent,
+      agentId: string,
+      status: 'new' | 'in-progress' | 'awaiting-response' | 'error' | 'completed'
+    ) => {
+      if (!isTestEnvironment()) {
+        throw new Error('test:set-agent-status can only be used in test environment');
+      }
+
+      if (!agentId || typeof agentId !== 'string') {
+        return { success: false, error: 'agentId parameter is required' };
+      }
+
+      if (
+        !['new', 'in-progress', 'awaiting-response', 'error', 'completed'].includes(status)
+      ) {
+        return { success: false, error: `Unsupported status: ${status}` };
+      }
+
+      try {
+        const lastMessage = messageManager.getLastMessage(agentId);
+        const replyToMessageId = lastMessage?.id ?? null;
+
+        if (status === 'new') {
+          // "new" means no messages; tests should call this for a fresh agent.
+          return { success: true };
+        }
+
+        if (status === 'in-progress') {
+          messageManager.create(
+            agentId,
+            'llm',
+            { data: { text: 'In progress status fixture' } },
+            replyToMessageId,
+            false
+          );
+          return { success: true };
+        }
+
+        if (status === 'awaiting-response') {
+          messageManager.create(
+            agentId,
+            'llm',
+            { data: { text: 'Awaiting response status fixture' } },
+            replyToMessageId,
+            true
+          );
+          return { success: true };
+        }
+
+        if (status === 'error') {
+          messageManager.create(
+            agentId,
+            'error',
+            { data: { error: { message: 'Status fixture error' } } },
+            replyToMessageId,
+            true
+          );
+          return { success: true };
+        }
+
+        // status === 'completed'
+        messageManager.create(
+          agentId,
+          'final_answer',
+          { data: { text: 'Status fixture completed', format: 'text' } },
+          replyToMessageId,
+          true
+        );
+        return { success: true };
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        logger.error(`Test: Failed to set agent status: ${errorMessage}`);
+        return { success: false, error: errorMessage };
+      }
+    }
+  );
+
   logger.info('Test IPC handlers registered');
 }

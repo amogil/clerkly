@@ -100,6 +100,9 @@ export type TestClearDataErrorsResponse = TestIPCResponse;
 // test:create-agent-message
 export type TestCreateAgentMessageResponse = TestIPCResponse;
 
+// test:set-agent-status
+export type TestSetAgentStatusResponse = TestIPCResponse;
+
 // Unified type map for all test IPC handlers
 export interface TestIPCHandlers {
   'test:clear-tokens': () => Promise<TestClearTokensResponse>;
@@ -131,6 +134,10 @@ export interface TestIPCHandlers {
     agentId: string,
     text: string
   ) => Promise<TestCreateAgentMessageResponse>;
+  'test:set-agent-status': (
+    agentId: string,
+    status: 'new' | 'in-progress' | 'awaiting-response' | 'error' | 'completed'
+  ) => Promise<TestSetAgentStatusResponse>;
 }
 
 // Helper type for invoking test IPC handlers with type safety

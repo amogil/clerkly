@@ -226,6 +226,10 @@ declare global {
           agentId: string,
           text: string
         ) => Promise<{ success: boolean; error?: string }>;
+        setAgentStatus: (
+          agentId: string,
+          status: 'new' | 'in-progress' | 'awaiting-response' | 'error' | 'completed'
+        ) => Promise<{ success: boolean; error?: string }>;
       };
       ipcRenderer?: {
         invoke: (channel: string, ...args: unknown[]) => Promise<unknown>;
