@@ -114,6 +114,7 @@ describe('AgentIPCHandlers', () => {
       toEventMessage: jest.fn().mockReturnValue(mockMessageSnapshot),
       hideErrorMessages: jest.fn(),
       setHidden: jest.fn(),
+      hideAndMarkIncomplete: jest.fn(),
       setDone: jest.fn(),
       setUsage: jest.fn(),
     } as unknown as jest.Mocked<MessageManager>;
@@ -992,9 +993,8 @@ describe('AgentIPCHandlers', () => {
       const result = await handler(mockEvent, { agentId: 'abc123xyz0' });
 
       expect(result).toEqual({ success: true });
-      expect(mockMessageManager.setHidden).toHaveBeenNthCalledWith(1, 12, 'abc123xyz0');
-      expect(mockMessageManager.setDone).toHaveBeenCalledWith(12, 'abc123xyz0', false);
-      expect(mockMessageManager.setHidden).toHaveBeenNthCalledWith(2, 11, 'abc123xyz0');
+      expect(mockMessageManager.hideAndMarkIncomplete).toHaveBeenCalledWith(12, 'abc123xyz0');
+      expect(mockMessageManager.setHidden).toHaveBeenCalledWith(11, 'abc123xyz0');
     });
 
     /* Preconditions: Handlers registered, cancelPipeline throws

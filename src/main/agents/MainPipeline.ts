@@ -619,7 +619,6 @@ export class MainPipeline {
    * Requirements: llm-integration.3.2
    */
   private hideIncompleteLlmMessage(messageId: number, agentId: string): void {
-    this.messageManager.setHidden(messageId, agentId);
-    this.messageManager.setDone(messageId, agentId, false);
+    this.messageManager.hideAndMarkIncomplete(messageId, agentId);
   }
 }

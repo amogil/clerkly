@@ -369,8 +369,7 @@ export class AgentIPCHandlers {
         if (lastMessage.kind === 'user') {
           this.messageManager.setHidden(lastMessage.id, args.agentId);
         } else if (lastMessage.kind === 'llm' && !lastMessage.done) {
-          this.messageManager.setHidden(lastMessage.id, args.agentId);
-          this.messageManager.setDone(lastMessage.id, args.agentId, false);
+          this.messageManager.hideAndMarkIncomplete(lastMessage.id, args.agentId);
           if (lastMessage.replyToMessageId !== null) {
             this.messageManager.setHidden(lastMessage.replyToMessageId, args.agentId);
           }

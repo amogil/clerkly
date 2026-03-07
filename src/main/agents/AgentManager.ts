@@ -41,20 +41,10 @@ export class AgentManager {
   }
 
   /**
-   * Compute agent status from full message history.
+   * Compute agent status from the latest visible message.
    * Requirements: agents.9.2, agents.9.4
    */
-  private computeAgentStatus(messages: Message[]): AgentStatus {
-    if (messages.length === 0) {
-      return AGENT_STATUS.NEW;
-    }
-
-    const visible = messages.filter((message) => !message.hidden);
-    if (visible.length === 0) {
-      return AGENT_STATUS.NEW;
-    }
-
-    const lastMessage = visible[visible.length - 1];
+  private computeAgentStatus(lastMessage: Message | null): AgentStatus {
     if (!lastMessage) {
       return AGENT_STATUS.NEW;
     }
@@ -79,12 +69,30 @@ export class AgentManager {
   }
 
   /**
+   * Resolve latest visible message with fast path for normal streaming updates.
+   * Requirements: agents.9.2, realtime-events.6.1
+   */
+  private getLatestVisibleMessage(agentId: string): Message | null {
+    const lastMessage = this.dbManager.messages.getLastByAgent(agentId);
+    if (!lastMessage) {
+      return null;
+    }
+    if (!lastMessage.hidden) {
+      return lastMessage;
+    }
+
+    // Fallback for tail-hidden threads (e.g. after cancellation) to preserve status correctness.
+    const visible = this.dbManager.messages.listByAgent(agentId, false);
+    return visible[visible.length - 1] ?? null;
+  }
+
+  /**
    * Convert DB Agent entity to Event Agent model with computed status
    * Requirements: realtime-events.9.5
    */
   public toEventAgent(agent: Agent): AgentSnapshot {
-    const history = this.dbManager.messages.listByAgent(agent.agentId, true);
-    const status = this.computeAgentStatus(history);
+    const lastVisible = this.getLatestVisibleMessage(agent.agentId);
+    const status = this.computeAgentStatus(lastVisible);
 
     return {
       id: agent.agentId,

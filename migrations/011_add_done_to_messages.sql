@@ -8,6 +8,7 @@ ALTER TABLE messages ADD COLUMN done INTEGER NOT NULL DEFAULT 0;
 -- Backfill completion semantics for existing data
 UPDATE messages
 SET done = CASE
+  WHEN kind = 'user' THEN 1
   WHEN kind = 'error' THEN 1
   ELSE 0
 END;

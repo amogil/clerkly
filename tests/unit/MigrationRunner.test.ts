@@ -1025,6 +1025,9 @@ describe('Migration 011: add done column to messages', () => {
   it('should backfill done by message kind', () => {
     db.prepare(
       `INSERT INTO messages (agent_id, timestamp, kind, payload_json) VALUES (?, ?, ?, ?)`
+    ).run('agent-1', '2026-01-01T00:00:00Z', 'user', JSON.stringify({ data: { text: 'hello' } }));
+    db.prepare(
+      `INSERT INTO messages (agent_id, timestamp, kind, payload_json) VALUES (?, ?, ?, ?)`
     ).run(
       'agent-1',
       '2026-01-01T00:00:00Z',
@@ -1047,8 +1050,9 @@ describe('Migration 011: add done column to messages', () => {
       kind: string;
       done: number;
     }>;
-    expect(rows[0]).toEqual({ kind: 'error', done: 1 });
-    expect(rows[1]).toEqual({ kind: 'llm', done: 0 });
+    expect(rows[0]).toEqual({ kind: 'user', done: 1 });
+    expect(rows[1]).toEqual({ kind: 'error', done: 1 });
+    expect(rows[2]).toEqual({ kind: 'llm', done: 0 });
   });
 });
 

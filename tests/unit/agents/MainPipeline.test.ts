@@ -77,6 +77,7 @@ function makeMocks() {
     }),
     update: jest.fn(),
     setHidden: jest.fn(),
+    hideAndMarkIncomplete: jest.fn(),
     setDone: jest.fn(),
     setUsage: jest.fn(),
     toEventMessage: jest.fn().mockReturnValue({
@@ -323,7 +324,7 @@ describe('MainPipeline.run()', () => {
   describe('error after streaming started', () => {
     /* Preconditions: LLM streams one reasoning chunk then throws
        Action: Call run(agentId, userMessageId)
-       Assertions: llm message hidden via setHidden; kind:error message created
+       Assertions: llm message marked hidden+incomplete; kind:error message created
        Requirements: llm-integration.5.3 */
     it('should hide llm message and create error message', async () => {
       const { pipeline, messageManager, llmProvider } = makeMocks();
@@ -337,9 +338,8 @@ describe('MainPipeline.run()', () => {
 
       await pipeline.run('agent-1', 1);
 
-      // llm message hidden via setHidden — Requirements: llm-integration.3.2
-      expect(messageManager.setHidden).toHaveBeenCalledWith(2, 'agent-1');
-      expect(messageManager.setDone).toHaveBeenCalledWith(2, 'agent-1', false);
+      // llm message hidden+incomplete via single mutation — Requirements: llm-integration.3.2
+      expect(messageManager.hideAndMarkIncomplete).toHaveBeenCalledWith(2, 'agent-1');
 
       // error message created
       expect(messageManager.create).toHaveBeenCalledWith(
@@ -580,8 +580,8 @@ describe('MainPipeline.run()', () => {
 
       await pipeline.run('agent-1', 1, controller.signal);
 
-      // llm message was created (first chunk), then hidden
-      expect(messageManager.setHidden).toHaveBeenCalledWith(2, 'agent-1');
+      // llm message was created (first chunk), then marked hidden/incomplete
+      expect(messageManager.hideAndMarkIncomplete).toHaveBeenCalledWith(2, 'agent-1');
 
       // No error message
       const errorCreates = (messageManager.create as jest.Mock).mock.calls.filter(
@@ -785,8 +785,8 @@ describe('MainPipeline.run()', () => {
 
       await pipeline.run('agent-1', 1, controller.signal);
 
-      // llm message hidden via setHidden
-      expect(messageManager.setHidden).toHaveBeenCalledWith(2, 'agent-1');
+      // llm message hidden via atomic hidden+incomplete update
+      expect(messageManager.hideAndMarkIncomplete).toHaveBeenCalledWith(2, 'agent-1');
 
       // No error message created
       const errorCreates = (messageManager.create as jest.Mock).mock.calls.filter(

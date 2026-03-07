@@ -17,6 +17,7 @@ import {
   TypedEventClass,
 } from '../../shared/events/types';
 import { Logger } from '../Logger';
+import { EVENT_TYPES } from '../../shared/events/constants';
 
 // Internal event map type for mitt
 type MittEvents = {
@@ -79,6 +80,12 @@ export class RendererEventBus {
     }
   }
 
+  private isNonCoalescedStreamingType(type: EventType): boolean {
+    return (
+      type === EVENT_TYPES.MESSAGE_UPDATED || type === EVENT_TYPES.MESSAGE_LLM_REASONING_UPDATED
+    );
+  }
+
   /**
    * Publish an event (timestamp is added automatically)
    * Only accepts TypedEventClass instances
@@ -103,7 +110,12 @@ export class RendererEventBus {
     // Timestamp-based deduplication
     // Requirements: realtime-events.5.5
     const lastTimestamp = this.lastEventTimestamps.get(eventKey);
-    if (lastTimestamp !== undefined && payloadWithTimestamp.timestamp <= lastTimestamp) {
+    const isOutdated =
+      lastTimestamp !== undefined &&
+      (this.isNonCoalescedStreamingType(type)
+        ? payloadWithTimestamp.timestamp < lastTimestamp
+        : payloadWithTimestamp.timestamp <= lastTimestamp);
+    if (isOutdated) {
       this.logger.debug(
         `Ignoring outdated event: ${type} (${payloadWithTimestamp.timestamp} <= ${lastTimestamp})`
       );

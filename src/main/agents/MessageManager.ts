@@ -141,6 +141,18 @@ export class MessageManager {
   }
 
   /**
+   * Mark an in-flight llm message as hidden+incomplete and emit a single update event only on real state change.
+   * Requirements: llm-integration.3.2, llm-integration.8.5
+   */
+  hideAndMarkIncomplete(messageId: number, agentId: string): void {
+    const updated = this.dbManager.messages.hideAndMarkIncomplete(messageId, agentId);
+    if (updated) {
+      this.logger.info(`Message hidden+incomplete: ${messageId}`);
+      MainEventBus.getInstance().publish(new MessageUpdatedEvent(this.toEventMessage(updated)));
+    }
+  }
+
+  /**
    * Create a new message for an agent
    * Requirements: agents.4.3, agents.7.1, agents.12.4, llm-integration.2
    * @param kind Message kind: 'user' | 'llm' | 'error' | etc.
