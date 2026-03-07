@@ -213,6 +213,10 @@ function AppContent() {
     }
   };
 
+  const phase = appState?.phase ?? 'none';
+  const isGlobalLoading =
+    phase === 'authenticating' || phase === 'preparing-session' || phase === 'waiting-for-chats';
+
   if (isBootstrapping || !appState || appState.phase === 'booting') {
     return <AppLoadingScreen />;
   }
@@ -228,11 +232,6 @@ function AppContent() {
       />
     );
   }
-
-  const isGlobalLoading =
-    appState.phase === 'authenticating' ||
-    appState.phase === 'preparing-session' ||
-    appState.phase === 'waiting-for-chats';
 
   return (
     <>

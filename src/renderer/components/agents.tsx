@@ -6,9 +6,7 @@ import { AgentHeader } from './agents/AgentHeader';
 import { AgentChat } from './agents/AgentChat';
 import { AllAgentsPage } from './agents/AllAgentsPage';
 import { useEventSubscription } from '../events/useEventSubscription';
-import { RendererEventBus } from '../events/RendererEventBus';
 import { EVENT_TYPES } from '../../shared/events/constants';
-import { AppChatsReadyEvent } from '../../shared/events/types';
 import type { AgentRateLimitPayload } from '../../shared/events/types';
 import type { AgentSnapshot } from '../types/agent';
 
@@ -119,8 +117,12 @@ export function Agents({
 
     if (!isChatsLoading && !hasPublishedChatsReadyRef.current) {
       hasPublishedChatsReadyRef.current = true;
-      const eventBus = RendererEventBus.getInstance();
-      eventBus.publish(new AppChatsReadyEvent());
+      if (typeof window.api?.app?.setChatsReady !== 'function') {
+        return;
+      }
+      void window.api.app.setChatsReady().catch(() => {
+        // Non-fatal: polling still converges to a terminal coordinator state.
+      });
     }
   }, [
     agents.length,

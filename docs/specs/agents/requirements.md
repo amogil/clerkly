@@ -731,17 +731,33 @@
 
 13.8. При монтировании `AgentChat` ДОЛЖНЫ загружаться ВСЕ сообщения агента через `messages:list`
 
+13.9. Для этой спецификации ДОЛЖНЫ использоваться следующие границы этапа запуска:
+
+13.9.1. Старт приложения ДОЛЖЕН начинаться в момент первого рендера `App` в renderer process (до получения первого состояния `AppCoordinator`)
+
+13.9.2. Интервал между первым рендером `App` и первым запросом `app:get-state` ДОЛЖЕН относиться к этапу запуска; в этом интервале renderer ДОЛЖЕН показывать стартовый экран и запускать стартовый polling-контур
+
+13.9.3. Этап запуска приложения ДОЛЖЕН считаться активным с первого запроса `app:get-state` и продолжаться до первого достижения терминальной фазы `AppCoordinator` (`ready`/`unauthenticated`/`error`) по polling IPC `app:get-state` ИЛИ до диагностического timeout
+
+13.9.4. Этап запуска приложения ДОЛЖЕН считаться завершённым после фиксации терминальной фазы из пункта 13.9.3; после этого переходы состояния считаются runtime-этапом
+
 13.10. Экран загрузки ДОЛЖЕН оставаться видимым, ПОКА хотя бы один `AgentChat` ещё загружает начальный чанк сообщений ИЛИ активный чат ещё не достиг финального стартового состояния
 
 13.11. Оркестрация стартового workflow ДОЛЖНА выполняться централизованно в main process через `AppCoordinator` (единый source of truth для фаз запуска)
 
-13.12. `AppCoordinator` ДОЛЖЕН публиковать событие `app.state.changed` при каждом переходе фаз (`booting`, `unauthenticated`, `authenticating`, `preparing-session`, `waiting-for-chats`, `ready`, `error`)
+13.12. Renderer ДОЛЖЕН получать стартовое состояние через polling IPC `app:get-state` с интервалом 200мс только в границах этапа запуска, определённых в пунктах 13.9.1–13.9.4
 
 13.13. Renderer ДОЛЖЕН определять показ глобального loading-экрана и целевого экрана (`login`/`agents`/`settings`) по состоянию `AppCoordinator`, а НЕ по локально-разрозненным флагам
 
-13.14. КОГДА чаты полностью загружены, ТО Renderer ДОЛЖЕН публиковать `app.chats.ready`, после чего `AppCoordinator` ДОЛЖЕН перевести приложение в фазу `ready`
+13.14. КОГДА чаты полностью загружены и активный чат достиг `startupSettled`, ТО Renderer ДОЛЖЕН вызвать IPC `app:set-chats-ready`, после чего `AppCoordinator` ДОЛЖЕН перевести приложение в фазу `ready`
 
-13.15. ЕСЛИ в фазе `waiting-for-chats` не получено `app.chats.ready` за timeout, `AppCoordinator` ДОЛЖЕН перевести приложение в фазу `error` с диагностической причиной
+13.15. ЕСЛИ в фазе `waiting-for-chats` не получен IPC-сигнал `app:set-chats-ready` за timeout, `AppCoordinator` ДОЛЖЕН перевести приложение в фазу `error` с диагностической причиной
+
+13.16. КОГДА renderer находится в стартовых фазах, ТО polling `app:get-state` ДОЛЖЕН продолжаться до терминальной фазы (`ready`/`unauthenticated`/`error`) или до диагностического timeout
+
+13.17. КОГДА `AppCoordinator` меняет фазу, ТО main process ДОЛЖЕН публиковать событие `app.coordinator.state-changed` (событие МОЖЕТ приходить как во время старта, так и после старта)
+
+13.18. Стартовая оркестрация (показ стартовых экранов, переходы стартовых фаз и готовность к показу финального UI) ДОЛЖНА определяться по polling IPC `app:get-state`; событие `app.coordinator.state-changed` НЕ ДОЛЖНО быть единственным источником истины для принятия стартовых решений
 
 #### Функциональные Тесты
 
@@ -751,6 +767,8 @@
 - `tests/functional/settings-ai-agent.spec.ts` - "53.1: should save and load LLM provider selection"
 - `tests/functional/settings-ai-agent.spec.ts` - "53.2: should save and load API key with encryption"
 - `tests/functional/settings-ai-agent.spec.ts` - "53.3: should delete API key when field is cleared"
+- `tests/unit/hooks/useAppCoordinatorState.test.ts` - "should resync state via IPC polling during bootstrap"
+- `tests/unit/hooks/useAppCoordinatorState.test.ts` - "should update state from app coordinator state-changed event after startup"
 
 ---
 

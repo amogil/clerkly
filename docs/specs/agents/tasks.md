@@ -67,6 +67,7 @@
 - [x] `tests/unit/agents/MainPipeline.test.ts` — lifecycle `done` и ветка скрытия незавершённого `llm`.
 - [x] `tests/unit/agents/AgentManager.test.ts` — hidden-aware расчёт статуса.
 - [x] `tests/unit/components/agents/AgentChat.test.tsx` — send/stop поведение.
+- [x] `tests/unit/hooks/useAppCoordinatorState.test.ts` — polling-ресинк `app:get-state` до терминальной фазы координатора.
 - [x] `tests/functional/startup-loader.spec.ts` — startup-settled и анти-регрессии по скроллу/ширине.
 - [x] `tests/functional/agent-status-calculation.spec.ts` — hidden-aware статус в e2e.
 - [x] `tests/functional/agent-messaging.spec.ts` — `send` активен только при тексте.
@@ -79,11 +80,19 @@
 - [x] Добавить отдельный functional-тест: в режиме `stop` кнопка остаётся активной при пустом и непустом вводе.
 - [x] Прогнать этот функциональный тест точечно.
 
+### 9) Startup orchestration redesign (startup polling + runtime events)
+- [x] Startup orchestration реализована через IPC polling state (`app:get-state`) и явный ready-signal (`app:set-chats-ready`).
+- [x] `useAppCoordinatorState` использует polling `app:get-state` только на этапе запуска до терминальной стартовой фазы.
+- [x] `AppCoordinator` публикует `app.coordinator.state-changed` для runtime-синхронизации без постоянного polling.
+- [x] Добавлен IPC-контракт `app:set-chats-ready` для перевода `AppCoordinator` в `ready`.
+- [x] Обновлены unit-тесты `AppCoordinator` и `useAppCoordinatorState` под гибридную модель (startup polling + runtime events).
+- [x] Обновлены `agents/requirements.md` и `agents/design.md` под целевой гибридный контракт.
+
 ---
 
 ## Запланировано
 
-### 9) Финальные проверки
+### 10) Финальные проверки
 - [x] Прогнать `npm run validate`.
 - [x] Прогнать профильные функциональные тесты по изменённым сценариям.
 - [x] Обновить этот `tasks.md` до финального состояния «выполнено».

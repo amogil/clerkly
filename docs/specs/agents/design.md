@@ -1848,7 +1848,7 @@ const STATUS_STYLES: Record<AgentStatus, StatusStyle> = {
 <AgentAvatar status={currentAgent.status} letter={letter} size="md" />
 ```
 
-**Ключевые изменения:**
+**Ключевые свойства реализации:**
 - Визуализация статуса активного агента полностью делегирована компоненту `AgentAvatar`.
 - Пересортировка списка не использует JS-анимацию перемещения.
 - Визуальная динамика в хедере определяется только статусными CSS-анимациями (`spin/pulse`).
@@ -1916,10 +1916,11 @@ import { Logo } from '../logo';
 | `tests/unit/components/agents/AgentReasoningTrigger.test.tsx` | agents.4.11, agents.4.11.2, llm-integration.2, llm-integration.7.2 |
 | `tests/unit/renderer/IPCChatTransport.test.ts` | llm-integration.2, llm-integration.7 |
 | `tests/unit/hooks/useAgentChat.test.ts` | agents.4.24, llm-integration.8.7 |
+| `tests/unit/hooks/useAppCoordinatorState.test.ts` | agents.13.9.2, agents.13.9.3, agents.13.12, agents.13.16, agents.13.18 |
 | `tests/unit/components/agents.test.tsx` | agents.4.22 |
 | `tests/unit/components/agents-autoscroll.test.tsx` | agents.4.13 |
 | `tests/unit/components/agents-scroll-position.test.tsx` | agents.4.14 |
-| `tests/unit/app/AppCoordinator.test.ts` | agents.13.11-13.15, navigation.1.1, navigation.1.3 |
+| `tests/unit/app/AppCoordinator.test.ts` | agents.13.11-13.15, agents.13.17, navigation.1.1, navigation.1.3 |
 
 ### Функциональные тесты
 
@@ -1928,8 +1929,8 @@ import { Logo } from '../logo';
 | `tests/functional/agent-switching.spec.ts` | agents.3 | - |
 | `tests/functional/agent-messaging.spec.ts` | agents.4.2.1, agents.4.2.2, 4.3, 4.4, 4.8, 4.13.1, 4.13.2, 4.13.4 | - |
 | `tests/functional/agent-scroll-position.spec.ts` | agents.4.14.1-4.14.6 | - |
-| `tests/functional/startup-loader.spec.ts` | agents.13.2, agents.13.10, agents.4.14.5-4.14.6 (startup settled без визуального рывка, без page-level scrollbar во время loader, стабильная ширина в раннем окне после скрытия loader) | - |
-| `tests/functional/settings-ai-agent.spec.ts` | agents.13.11-13.15 (регрессия startup/loading orchestration) | - |
+| `tests/functional/startup-loader.spec.ts` | agents.13.2, agents.13.9.1-13.9.4, agents.13.10, agents.13.12, agents.13.16, agents.13.18, agents.4.14.5-4.14.6 (startup settled без визуального рывка, без page-level scrollbar во время loader, стабильная ширина в раннем окне после скрытия loader) | - |
+| `tests/functional/settings-ai-agent.spec.ts` | - | Кросс-фича тест для settings; не используется для покрытия agents.* |
 | `tests/functional/all-agents-page.spec.ts` | agents.5 | - |
 | `tests/functional/agent-status-indicators.spec.ts` | agents.6 | - |
 | `tests/functional/message-format.spec.ts` | agents.7 | - |
@@ -2046,6 +2047,10 @@ await window.locator(`[data-testid="agent-icon-${firstAgentId}"]`).click();
 | agents.11 | ✓ | ✓ |
 | agents.12 | ✓ | ✓ |
 | agents.13 (startup loading) | ✓ | ✓ |
+| agents.13.9.1-13.9.4 (границы этапа запуска) | ✓ | ✓ |
+| agents.13.12, agents.13.16 (polling на этапе запуска) | ✓ | ✓ |
+| agents.13.17 (state-changed событие) | ✓ | - |
+| agents.13.18 (startup source of truth = polling) | ✓ | ✓ |
 | user-data-isolation.6 | ✓ | ✓ |
 
 ## Зависимости
@@ -2072,7 +2077,7 @@ await window.locator(`[data-testid="agent-icon-${firstAgentId}"]`).click();
 - `MainEventBus` — шина событий main процесса
 - `useEventSubscription` — React hook для подписки на события
 - `IPCChatTransport` — кастомный ChatTransport для AI SDK (`src/renderer/lib/IPCChatTransport.ts`)
-- `useAgentChat` — хук управления сообщениями, заменяет `useMessages` (`src/renderer/hooks/useAgentChat.ts`)
+- `useAgentChat` — хук управления сообщениями (`src/renderer/hooks/useAgentChat.ts`)
 - `AgentMessage` — компонент сообщения (`src/renderer/components/agents/AgentMessage.tsx`)
 - `PromptInput` — AI Elements компонент ввода (`src/renderer/components/ai-elements/prompt-input.tsx`)
 
@@ -2182,7 +2187,7 @@ useChat.sendMessage()
 
 ### useAgentChat
 
-`src/renderer/hooks/useAgentChat.ts` — заменяет `useMessages`. Оборачивает `useChat` из `@ai-sdk/react` с кастомным `IPCChatTransport`.
+`src/renderer/hooks/useAgentChat.ts` — хук управления сообщениями. Оборачивает `useChat` из `@ai-sdk/react` с кастомным `IPCChatTransport`.
 
 **Интерфейс:**
 ```typescript
@@ -2198,7 +2203,7 @@ interface UseAgentChatResult {
 
 **Ключевые решения:**
 
-1. **`Chat` вместо прямого `useChat`** — используется `new Chat({ id: agentId, transport })` из `@ai-sdk/react` для изоляции состояния по `agentId`. `Chat` инстанс стабилен через `useMemo`.
+1. **Изоляция состояния чата по агенту** — используется `new Chat({ id: agentId, transport })` из `@ai-sdk/react`; `Chat` инстанс стабилен через `useMemo`.
 
 2. **Параллельный массив `rawMessages`** — AI SDK `UIMessage` не хранит `kind`, `hidden`, `action_link`. Хук хранит `rawMessages: MessageSnapshot[]` синхронно с `UIMessage[]` для доступа к оригинальным данным при рендеринге `AgentMessage`.
 
@@ -2240,25 +2245,26 @@ interface UseAgentChatResult {
 - `booting` — старт приложения
 - `unauthenticated` — пользователь не авторизован, показывается `login`
 - `preparing-session` — сессия авторизована, подготовка к загрузке рабочих экранов
-- `waiting-for-chats` — ожидание явного сигнала `app.chats.ready` от renderer
+- `waiting-for-chats` — ожидание IPC-сигнала `app:set-chats-ready` от renderer
 - `ready` — основной UI полностью доступен
 - `error` — критическая ошибка инициализации (включая timeout ожидания чатов)
 
-**Ключевые события:**
-- `app.state.changed` — публикуется `AppCoordinator` при каждом переходе состояния
-- `app.chats.ready` — публикуется renderer (`Agents`) только когда загружены все чаты и активный чат достиг `startupSettled`
-- `app.chats.failed` — публикуется renderer при критической ошибке загрузки чатов
+**Ключевые IPC-контракты и события:**
+- `app:get-state` — renderer опрашивает состояние `AppCoordinator` каждые 200мс на этапе старта; этот polling является источником истины для стартовой оркестрации
+- `app:set-chats-ready` — renderer подтверждает готовность финального UI (все чаты загружены + active chat settled)
+- `app.coordinator.state-changed` — main process публикует изменение состояния `AppCoordinator` через EventBus для runtime-синхронизации без постоянного polling; событие может приходить и во время старта, но не заменяет стартовый polling-контур
 
 **Поток запуска:**
 1. `src/main/index.ts` создаёт и запускает `AppCoordinator`
 2. renderer получает initial state через IPC `app:get-state`
-3. renderer подписывается на `app.state.changed` через event bus
-4. после готовности чатов renderer публикует `app.chats.ready`
-5. `AppCoordinator` переводит приложение в `ready`, loading-экран скрывается
+3. renderer продолжает polling `app:get-state` с интервалом 200мс до терминальной фазы
+4. после готовности чатов renderer вызывает `app:set-chats-ready`
+5. `AppCoordinator` переводит приложение в `ready` и публикует `app.coordinator.state-changed`
+6. renderer завершает стартовый polling только после фиксации терминальной фазы в стартовом polling-контуре (или по startup timeout), а событие `app.coordinator.state-changed` использует для runtime-синхронизации после завершения этапа запуска
 
 **Timeout-защита:**
 - В фазе `waiting-for-chats` запускается таймер
-- Если `app.chats.ready` не получен вовремя, состояние переходит в `error`
+- Если `app:set-chats-ready` не получен вовремя, состояние переходит в `error`
 - Причина перехода публикуется в `reason` для диагностики флейков/регрессий
 
 ## Установка и обновление AI Elements компонентов

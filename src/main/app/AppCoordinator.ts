@@ -1,33 +1,23 @@
-// Requirements: agents.13.2, navigation.1.1, navigation.1.3
+// Requirements: agents.13.2, agents.13.17, navigation.1.1, navigation.1.3
 
 import { Logger } from '../Logger';
 import { MainEventBus } from '../events/MainEventBus';
 import { OAuthClientManager } from '../auth/OAuthClientManager';
 import { EVENT_TYPES } from '../../shared/events/constants';
+import { AppCoordinatorStateChangedEvent } from '../../shared/events/types';
 import type {
-  AppPhase,
-  AppScreen,
+  AppCoordinatorState,
   AuthCompletedPayload,
   AuthFailedPayload,
   AuthSignedOutPayload,
   UserProfileUpdatedPayload,
-  AppChatsReadyPayload,
-  AppChatsFailedPayload,
 } from '../../shared/events/types';
-import { AppStateChangedEvent } from '../../shared/events/types';
-
-interface AppCoordinatorState {
-  phase: AppPhase;
-  authorized: boolean;
-  targetScreen: AppScreen;
-  reason?: string;
-}
 
 interface AppCoordinatorOptions {
   chatsReadyTimeoutMs?: number;
 }
 
-// Requirements: agents.13.2, navigation.1.1, navigation.1.3
+// Requirements: agents.13.2, agents.13.17, navigation.1.1, navigation.1.3
 export class AppCoordinator {
   private readonly logger = Logger.create('AppCoordinator');
   private readonly eventBus: MainEventBus;
@@ -111,6 +101,19 @@ export class AppCoordinator {
     return { ...this.state };
   }
 
+  // Requirements: agents.13.14
+  markChatsReady(source: 'renderer' = 'renderer'): void {
+    if (!this.started) return;
+    if (!this.state.authorized) return;
+    this.clearChatsReadyTimeout();
+    this.transition({
+      phase: 'ready',
+      authorized: true,
+      targetScreen: 'agents',
+      reason: `chats_ready_${source}`,
+    });
+  }
+
   // Requirements: realtime-events.1.3
   private subscribeEvents(): void {
     this.unsubscribes.push(
@@ -132,16 +135,6 @@ export class AppCoordinator {
       this.eventBus.subscribe(
         EVENT_TYPES.USER_PROFILE_UPDATED,
         (payload: UserProfileUpdatedPayload) => this.handleUserProfileUpdated(payload)
-      )
-    );
-    this.unsubscribes.push(
-      this.eventBus.subscribe(EVENT_TYPES.APP_CHATS_READY, (payload: AppChatsReadyPayload) =>
-        this.handleChatsReady(payload)
-      )
-    );
-    this.unsubscribes.push(
-      this.eventBus.subscribe(EVENT_TYPES.APP_CHATS_FAILED, (payload: AppChatsFailedPayload) =>
-        this.handleChatsFailed(payload)
       )
     );
   }
@@ -195,27 +188,6 @@ export class AppCoordinator {
     }
   }
 
-  private handleChatsReady(_payload: AppChatsReadyPayload): void {
-    if (!this.state.authorized) return;
-    this.clearChatsReadyTimeout();
-    this.transition({
-      phase: 'ready',
-      authorized: true,
-      targetScreen: 'agents',
-      reason: 'chats_ready',
-    });
-  }
-
-  private handleChatsFailed(payload: AppChatsFailedPayload): void {
-    this.clearChatsReadyTimeout();
-    this.transition({
-      phase: 'error',
-      authorized: this.state.authorized,
-      targetScreen: this.state.authorized ? 'agents' : 'login',
-      reason: `chats_failed:${payload.reason}`,
-    });
-  }
-
   private transitionToWaitingForChats(reason: string): void {
     this.transition({
       phase: 'waiting-for-chats',
@@ -263,8 +235,6 @@ export class AppCoordinator {
     this.logger.info(
       `state ${prev.phase}/${prev.targetScreen} -> ${next.phase}/${next.targetScreen} (${next.reason || 'no_reason'})`
     );
-    this.eventBus.publish(
-      new AppStateChangedEvent(next.phase, next.authorized, next.targetScreen, next.reason)
-    );
+    this.eventBus.publish(new AppCoordinatorStateChangedEvent(next));
   }
 }

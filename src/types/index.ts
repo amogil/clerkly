@@ -181,6 +181,7 @@ export interface API {
       targetScreen: 'login' | 'agents' | 'settings' | 'error-demo';
       reason?: string;
     }>;
+    setChatsReady: () => Promise<{ success: boolean; error?: string }>;
   };
   // Requirements: google-oauth-auth.8.1, google-oauth-auth.8.2, google-oauth-auth.8.3, account-profile.1.2, account-profile.1.5
   auth: {
