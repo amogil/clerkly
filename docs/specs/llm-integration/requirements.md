@@ -256,6 +256,12 @@
 
 7.5. Пока идёт стриминг reasoning, агент ДОЛЖЕН иметь статус `in-progress`
 
+7.6. КОГДА reasoning завершён и блок reasoning автоматически свёрнут, иконка в `ReasoningTrigger` ДОЛЖНА быть статичной (без `logo-animated`)
+
+#### Функциональные Тесты
+
+- `tests/functional/llm-chat.spec.ts` — "should keep reasoning trigger logo static after finish and auto-collapse"
+
 ---
 
 ### 8. Прерывание текущего запроса при новом сообщении
