@@ -14,7 +14,7 @@ function renderThinkingMessage(isStreaming: boolean, duration: number | undefine
   return <p>Thought for {duration} seconds</p>;
 }
 
-// Requirements: llm-integration.2, llm-integration.7.2, llm-integration.7.6, agents.4.11, agents.4.11.2
+// Requirements: llm-integration.2, llm-integration.7.2, agents.4.11, agents.4.11.2
 export function AgentReasoningTrigger() {
   const { isStreaming, isOpen, duration } = useReasoning();
   const isReasoningActive = isStreaming && isOpen;

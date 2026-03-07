@@ -609,7 +609,6 @@ User отправляет сообщение
 - `tests/functional/llm-chat.spec.ts` — "should hide error bubble when user sends next message"
 - `tests/functional/llm-chat.spec.ts` — "should send full conversation history to llm on second message"
 - `tests/functional/llm-chat.spec.ts` — "should exclude error messages from llm history"
-- `tests/functional/llm-chat.spec.ts` — "should keep reasoning trigger logo static after finish and auto-collapse"
 
 ### Покрытие Требований
 
@@ -639,7 +638,6 @@ User отправляет сообщение
 | llm-integration.6.6 (совместимость `done` для существующих записей) | ✓ | - |
 | llm-integration.6.6.1 (backfill завершённых legacy `llm`) | ✓ | - |
 | llm-integration.7 | ✓ | ✓ |
-| llm-integration.7.6 (статичная иконка trigger после finish+collapse) | ✓ | ✓ |
 | llm-integration.8.1 | ✓ | ✓ |
 | llm-integration.8.5 | ✓ | ✓ |
 | llm-integration.8.6 | ✓ | - |

@@ -773,7 +773,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
   /* Preconditions: MockLLMServer streams reasoning and then action content; app authenticated with mock LLM URL
      Action: User sends message, waits for reasoning trigger, verifies trigger composition, waits for auto-collapse and toggles content
      Assertions: Trigger logo is animated only while reasoning is active; after finish + collapse it stays static; content can still be manually toggled
-     Requirements: agents.4.11, agents.4.11.2, llm-integration.2, llm-integration.7.2, llm-integration.7.6 */
+     Requirements: agents.4.11, agents.4.11.2, llm-integration.2, llm-integration.7.2 */
   test('should keep reasoning trigger logo static after finish and auto-collapse', async () => {
     mockLLMServer.setStreamingMode(true, {
       reasoning: 'Thinking through the answer carefully',

@@ -91,7 +91,7 @@ describe('AgentReasoningTrigger', () => {
   /* Preconditions: reasoning transitions from active streaming to finished auto-collapsed state
      Action: render trigger, then rerender with streaming=false and isOpen=false
      Assertions: logo animation turns off after reasoning is finished and collapsed
-     Requirements: agents.4.11.2, llm-integration.7.6 */
+     Requirements: agents.4.11.2 */
   it('should keep logo static after reasoning is finished and collapsed', () => {
     mockUseReasoning.mockReturnValue({
       isStreaming: true,
@@ -117,7 +117,7 @@ describe('AgentReasoningTrigger', () => {
   /* Preconditions: reasoning is still streaming but trigger is already collapsed
      Action: render AgentReasoningTrigger
      Assertions: logo remains static because active reasoning animation requires open trigger
-     Requirements: agents.4.11.2, llm-integration.7.6 */
+     Requirements: agents.4.11.2 */
   it('should keep logo static when streaming is true but trigger is collapsed', () => {
     mockUseReasoning.mockReturnValue({
       isStreaming: true,
