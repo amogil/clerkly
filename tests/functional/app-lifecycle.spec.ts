@@ -14,6 +14,11 @@ import { launchElectron, closeElectron, ElectronTestContext } from './helpers/el
  * Requirements: testing.3.1 - Use real Electron
  * Requirements: testing.3.2 - Do NOT mock Electron API
  * Requirements: testing.3.6 - Show real windows on screen
+ *
+ * LLM usage note (testing.3.13):
+ * This suite validates process/window lifecycle invariants only.
+ * LLM is intentionally not used because it is irrelevant to the scenario.
+ * Exception approved by user in this task discussion (2026-03-07).
  */
 
 test.describe('Application Lifecycle', () => {
@@ -47,6 +52,13 @@ test.describe('Application Lifecycle', () => {
 
     // Verify window is visible by checking it's not closed
     expect(context.window.isClosed()).toBe(false);
+
+    // Verify visible login UI is rendered in the real window.
+    const loginScreen = context.window.locator('[data-testid="login-screen"]');
+    await expect(loginScreen).toBeVisible({ timeout: 5000 });
+    const loginButton = context.window.locator('button:has-text("Continue with Google")');
+    await expect(loginButton).toBeVisible({ timeout: 5000 });
+    await expect(loginButton).toBeEnabled({ timeout: 5000 });
 
     // Take screenshot for verification
     await context.window.screenshot({ path: 'playwright-report/app-launch.png' });
@@ -88,6 +100,10 @@ test.describe('Application Lifecycle', () => {
     // Verify we can interact with the window
     const title = await context.window.title();
     expect(title).toBeDefined();
+
+    // Verify UI remains interactable after stability window.
+    const loginButton = context.window.locator('button:has-text("Continue with Google")');
+    await expect(loginButton).toBeVisible({ timeout: 5000 });
   });
 
   /* Preconditions: Application not running

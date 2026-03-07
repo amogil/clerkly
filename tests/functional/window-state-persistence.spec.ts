@@ -21,7 +21,20 @@ import {
  * Requirements: testing.3.1 - Use real Electron
  * Requirements: testing.3.2 - Do NOT mock Electron API
  * Requirements: testing.3.6 - Show real windows on screen
+ *
+ * LLM usage note (testing.3.13):
+ * This suite validates native window geometry/state persistence only.
+ * LLM is intentionally not used because model behavior is unrelated.
+ * Exception approved by user in this task discussion (2026-03-07).
  */
+
+async function assertLoginUIVisible(context: ElectronTestContext): Promise<void> {
+  const loginScreen = context.window.locator('[data-testid="login-screen"]');
+  await expect(loginScreen).toBeVisible({ timeout: 5000 });
+  await expect(context.window.locator('button:has-text("Continue with Google")')).toBeVisible({
+    timeout: 5000,
+  });
+}
 
 test.describe('Window State Persistence', () => {
   let context: ElectronTestContext;
@@ -44,6 +57,7 @@ test.describe('Window State Persistence', () => {
 
     // Wait for window to be ready
     await context.window.waitForLoadState('domcontentloaded');
+    await assertLoginUIVisible(context);
 
     // Get window bounds
     const bounds = await getWindowBounds(context.app);
@@ -78,6 +92,7 @@ test.describe('Window State Persistence', () => {
   test('should enforce minimum window size', async () => {
     context = await launchElectron();
     await context.window.waitForLoadState('domcontentloaded');
+    await assertLoginUIVisible(context);
 
     // Try to resize window below allowed minimum
     await context.app.evaluate(({ BrowserWindow }) => {
@@ -102,6 +117,7 @@ test.describe('Window State Persistence', () => {
     // First launch
     context = await launchElectron();
     await context.window.waitForLoadState('domcontentloaded');
+    await assertLoginUIVisible(context);
 
     // Get initial bounds
     const initialBounds = await getWindowBounds(context.app);
@@ -140,6 +156,7 @@ test.describe('Window State Persistence', () => {
     // Relaunch application with same data path
     context = await launchElectron(context.testDataPath);
     await context.window.waitForLoadState('domcontentloaded');
+    await assertLoginUIVisible(context);
 
     // Get new bounds
     const restoredBounds = await getWindowBounds(context.app);
