@@ -364,11 +364,14 @@
 
 5.8. Для получения error message ДОЛЖЕН использоваться оптимизированный SQL запрос с ORDER BY timestamp DESC LIMIT 1
 
+5.9. КОГДА пользователь открывает `All Agents` и возвращается кнопкой `Back` без выбора другого агента, ТО активный чат НЕ ДОЛЖЕН размонтироваться, а его текущая позиция скролла ДОЛЖНА сохраняться без визуального доскролла сверху вниз
+
 #### Функциональные Тесты
 
 - `tests/functional/all-agents-page.spec.ts` - "should open all agents page on +N button click"
 - `tests/functional/all-agents-page.spec.ts` - "should display all agents in history"
 - `tests/functional/all-agents-page.spec.ts` - "should open agent chat from history"
+- `tests/functional/agent-scroll-position.spec.ts` - "should preserve active chat scroll position when returning from All Agents via Back"
 - `tests/functional/agents-error-messages.spec.ts` - "should display error message for agent with error status in AllAgents"
 - `tests/functional/agents-error-messages.spec.ts` - "should not display archived agents in AllAgents"
 - `tests/functional/agents-error-messages.spec.ts` - "should sort agents by updatedAt in AllAgents"

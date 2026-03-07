@@ -16,7 +16,7 @@
 - `docs/specs/testing-infrastructure/requirements.md`
 - `docs/specs/testing-infrastructure/design.md`
 
-**Текущий статус:** Фаза 11 — выполнено.
+**Текущий статус:** Фаза 12 — выполнено.
 
 ---
 
@@ -170,3 +170,21 @@
 
 - Возможен разъезд между "isStreaming чата" и "isStreaming reasoning".
 - Возможны флейки в functional-тесте из-за тайминга автосворачивания.
+
+---
+
+## Фаза 12: Scroll preservation on All Agents Back (issue #46)
+
+Цель работ: устранить сброс позиции скролла активного чата при открытии `All Agents` и возврате через `Back` без выбора другого агента.
+
+**Текущий статус:** Фаза 12 — выполнено.
+
+### Выполнено
+- [x] Переведён переключатель `Agents ↔ All Agents` на CSS-hide без размонтирования `AgentChat`-слоя.
+- [x] Добавлен стабильный `Back`-селектор (`data-testid="all-agents-back-button"`, `aria-label="Back"`).
+- [x] Добавлен functional-тест `tests/functional/agent-scroll-position.spec.ts`:
+  - `should preserve active chat scroll position when returning from All Agents via Back`
+- [x] Обновлены `agents/requirements.md` (`agents.5.9`) и `agents/design.md` (архитектура + покрытие).
+- [x] Прогнаны проверки:
+  - `npm run test:functional:single -- tests/functional/agent-scroll-position.spec.ts --grep "should preserve active chat scroll position when returning from All Agents via Back"`
+  - `npm run validate`

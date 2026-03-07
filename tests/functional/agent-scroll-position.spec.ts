@@ -255,6 +255,98 @@ test.describe('Agent Scroll Position', () => {
     expect(scrollTopAfter).toBeLessThan(100);
   });
 
+  /* Preconditions: Active agent has long history and user scrolled up
+     Action: Open All Agents via +N and return with Back without selecting another agent
+     Assertions: Active chat keeps scroll position without reset
+     Requirements: agents.4.14.1, agents.4.14.2, agents.4.14.3, agents.5.9 */
+  test('should preserve active chat scroll position when returning from All Agents via Back', async () => {
+    const messagesArea = activeChat(window).messagesArea;
+    const messages = activeChat(window).messages;
+    const scrollToBottomBtn = activeChat(window).scrollToBottomBtn;
+
+    const initialAgentIcon = window.locator('[data-testid^="agent-icon-"]').first();
+    await expect(initialAgentIcon).toBeVisible({ timeout: 5000 });
+    const initialAgentId = (await initialAgentIcon.getAttribute('data-testid'))?.replace(
+      'agent-icon-',
+      ''
+    );
+    expect(initialAgentId).toBeTruthy();
+
+    await window.evaluate(
+      async ({ targetAgentId }) => {
+        for (let i = 1; i <= 60; i++) {
+          // @ts-expect-error - window.api is exposed via contextBridge
+          const result = await window.api.test.createAgentMessage(
+            targetAgentId,
+            `Back flow message ${i}`
+          );
+          if (!result?.success) {
+            throw new Error(result?.error || 'Failed to seed message');
+          }
+        }
+      },
+      { targetAgentId: initialAgentId as string }
+    );
+    await expect(messages).toHaveCount(60, { timeout: 10000 });
+
+    await messagesArea.hover();
+    await window.mouse.wheel(0, -999999);
+    await expect(scrollToBottomBtn).toBeVisible({ timeout: 3000 });
+
+    const newChatButton = window.locator('div[title="New chat"]');
+    const initialAgentsCount = await window.evaluate(async () => {
+      // @ts-expect-error - window.api is exposed via contextBridge
+      const response = await window.api.agents.list();
+      return response.success && Array.isArray(response.data) ? response.data.length : 0;
+    });
+
+    for (let i = 0; i < 9; i++) {
+      await newChatButton.click();
+      await expect
+        .poll(
+          async () =>
+            window.evaluate(async () => {
+              // @ts-expect-error - window.api is exposed via contextBridge
+              const response = await window.api.agents.list();
+              return response.success && Array.isArray(response.data) ? response.data.length : 0;
+            }),
+          { timeout: 5000 }
+        )
+        .toBe(initialAgentsCount + i + 1);
+    }
+
+    const allAgentsButton = window.locator('[data-testid="all-agents-button"]');
+    await expect(allAgentsButton).toBeVisible({ timeout: 5000 });
+    await allAgentsButton.click();
+
+    await expect(window.locator('text=All Agents')).toBeVisible({ timeout: 5000 });
+    const initialAgentCard = window.locator(`[data-testid="agent-card-${initialAgentId}"]`);
+    await expect(initialAgentCard).toBeVisible({ timeout: 5000 });
+    await initialAgentCard.click();
+
+    await expect(window.locator('text=All Agents')).not.toBeVisible({ timeout: 5000 });
+    await expect(messages).toHaveCount(60, { timeout: 10000 });
+    await messagesArea.hover();
+    await window.mouse.wheel(0, -999999);
+    await expect(scrollToBottomBtn).toBeVisible({ timeout: 3000 });
+    const scrollTopBefore = await messagesArea.locator('..').evaluate((el) => el.scrollTop);
+
+    await allAgentsButton.click();
+    await expect(window.locator('text=All Agents')).toBeVisible({ timeout: 5000 });
+    const backButton = window.locator('[data-testid="all-agents-back-button"]');
+    await expect(backButton).toBeVisible({ timeout: 5000 });
+    await backButton.click();
+
+    await expect(window.locator('text=All Agents')).not.toBeVisible({ timeout: 5000 });
+    await expect(messages).toHaveCount(60, { timeout: 10000 });
+    await expect(scrollToBottomBtn).toBeVisible({ timeout: 3000 });
+
+    const scrollTopAfter = await activeChat(window)
+      .messagesArea.locator('..')
+      .evaluate((el) => el.scrollTop);
+    expect(Math.abs(scrollTopAfter - scrollTopBefore)).toBeLessThan(100);
+  });
+
   /* Preconditions: Agent with scrollable content
      Action: Scroll up, send new message
      Assertions: Scroll position is preserved, scroll-to-bottom button stays visible

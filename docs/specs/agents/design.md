@@ -903,7 +903,8 @@ function AgentsComponent() {
 │  │  All Agents mode (showAllAgentsPage):              │ │
 │  │  - Back button                                     │ │
 │  │  - "All Agents" title                              │ │
-│  │  - List of all agents                             │ │
+│  │  - List of all agents                              │ │
+│  │  - Chat layer stays mounted and hidden via CSS     │ │
 │  └────────────────────────────────────────────────────┘ │
 │                                                          │
 │  ┌────────────────────────────────────────────────────┐ │
@@ -1339,12 +1340,7 @@ useEffect(() => {
 {/* Messages Area */}
 {/* Requirements: agents.4.13, agents.13 */}
 <Conversation className="flex-1 min-h-0">
-  <ConversationContent
-    data-testid="messages-area"
-    className="flex flex-col gap-4 p-6 justify-end min-h-full"
-  >
-    {/* сообщения */}
-  >
+  <ConversationContent data-testid="messages-area" className="flex flex-col gap-4 p-6 justify-end min-h-full">
     {messages.length === 0 ? (
       <AgentWelcome onPromptClick={handlePromptClick} />
     ) : (
@@ -1354,19 +1350,18 @@ useEffect(() => {
         </motion.div>
       ))
     )}
-    {/* Requirements: agents.4.13.6 - Invisible div for autoscroll */}
-    <div ref={messagesEndRef} />
-  </div>
-</ScrollArea>
+  </ConversationContent>
+  <ConversationScrollButton data-testid="scroll-to-bottom" />
+</Conversation>
 ```
 
-**Отображение скроллбара** (agents.4.13.8-11):
+**Отображение скроллбара** (agents.4.13.4-4.13.6):
 
 **Требования пользователя:**
-- Скроллбар должен быть визуально ненавязчивым (agents.4.13.8)
-- Скроллбар появляется при взаимодействии пользователя со скроллом (agents.4.13.9)
-- Скроллбар автоматически скрывается после окончания скролла (agents.4.13.10)
-- Используется компонент `Conversation` из AI Elements (`use-stick-to-bottom`) (agents.4.13.11)
+- Скроллбар должен быть визуально ненавязчивым (agents.4.13.4)
+- Скроллбар появляется при взаимодействии пользователя со скроллом (agents.4.13.5)
+- Скроллбар автоматически скрывается после окончания скролла (agents.4.13.6)
+- Автоскролл делегирован `Conversation`/`use-stick-to-bottom` без ручного `scrollTop`/`scrollIntoView` (agents.4.13.3)
 
 **Техническая реализация:**
 
@@ -1381,7 +1376,7 @@ useEffect(() => {
 
 1. **Автоматическое сохранение** (agents.4.14): `Conversation` (`StickToBottom`) управляет скролом полностью. Поскольку компонент не размонтируется при переключении агентов, позиция сохраняется без дополнительной логики.
 
-2. **Переключение агентов** (agents.4.14.2–4.14.4): CSS `absolute inset-0 opacity-0 pointer-events-none` скрывает неактивный `AgentChat`, но не размонтирует его и не сбрасывает `scrollTop` (в отличие от `display:none`). При возврате к агенту `Conversation` восстанавливает ту же позицию скролла.
+2. **Переключение агентов и вход/выход из All Agents** (agents.4.14.2–4.14.4, agents.5.9): CSS `absolute inset-0 opacity-0 pointer-events-none` скрывает неактивный `AgentChat`, а при открытии `All Agents` весь слой чатов скрывается через CSS (`invisible pointer-events-none`) без размонтирования. Это сохраняет `scrollTop`; при возврате `Back` `Conversation` восстанавливает ту же позицию скролла.
 
 3. **Показ активного чата** (agents.4.14.5-4.14.6): первый показ активного чата выполняется только после достижения `startupSettled` у этого чата. До этого пользователь видит глобальный startup loader, а контент `AgentChat` не показывается, чтобы исключить скачок ширины/переносов и визуальный доскролл.
 
@@ -1928,7 +1923,7 @@ import { Logo } from '../logo';
 |------|----------|------------|
 | `tests/functional/agent-switching.spec.ts` | agents.3 | - |
 | `tests/functional/agent-messaging.spec.ts` | agents.4.2.1, agents.4.2.2, 4.3, 4.4, 4.8, 4.13.1, 4.13.2, 4.13.4 | - |
-| `tests/functional/agent-scroll-position.spec.ts` | agents.4.14.1-4.14.6 | - |
+| `tests/functional/agent-scroll-position.spec.ts` | agents.4.14.1-4.14.6, agents.5.9 | - |
 | `tests/functional/startup-loader.spec.ts` | agents.13.2, agents.13.9.1-13.9.4, agents.13.10, agents.13.12, agents.13.16, agents.13.18, agents.4.14.5-4.14.6 (startup settled без визуального рывка, без page-level scrollbar во время loader, стабильная ширина в раннем окне после скрытия loader) | - |
 | `tests/functional/settings-ai-agent.spec.ts` | - | Кросс-фича тест для settings; не используется для покрытия agents.* |
 | `tests/functional/all-agents-page.spec.ts` | agents.5 | - |
@@ -2021,34 +2016,54 @@ await window.locator(`[data-testid="agent-icon-${firstAgentId}"]`).click();
 |------------|-----------|----------------|
 | agents.1 | ✓ | ✓ |
 | agents.2 | ✓ | ✓ |
+| agents.2.3, agents.2.4, agents.2.5, agents.2.6 | ✓ | ✓ |
 | agents.2.7-2.11 (auto-create) | ✓ | ✓ |
+| agents.2.9, agents.2.10, agents.2.11 | ✓ | ✓ |
 | agents.3 | ✓ | ✓ |
 | agents.3.5-3.5.3 (custom tooltip) | - | ✓ |
 | agents.4 | ✓ | ✓ |
+| agents.4.8 | ✓ | ✓ |
+| agents.4.12 | ✓ | ✓ |
+| agents.4.13.3 | ✓ | ✓ |
+| agents.4.13.5 | - | Manual |
 | agents.4.11 | ✓ | ✓ |
 | agents.4.11.1 | ✓ | ✓ |
 | agents.4.11.2 | ✓ | ✓ |
 | agents.4.7.1-4.7.2 (autofocus) | - | ✓ |
 | agents.4.13.1-4.13.6 (autoscroll) | ✓ | ✓ |
 | agents.4.13.4-4.13.6 (scrollbar) | - | Manual |
-| agents.4.14.1-4.14.6 (scroll position) | ✓ | ✓ |
+| agents.4.14.1, agents.4.14.2, agents.4.14.3, agents.4.14.4, agents.4.14.5, agents.4.14.6 (scroll position) | ✓ | ✓ |
+| agents.4.16, agents.4.17, agents.4.18, agents.4.19, agents.4.20, agents.4.21 (empty state content/animations) | ✓ | ✓ |
+| agents.4.24.1, agents.4.24.2, agents.4.24.3, agents.4.24.4 (stop/cancel flow) | ✓ | ✓ |
+| agents.5.9 (Back from All Agents preserves scroll) | - | ✓ |
 | agents.4.23 (text wrapping) | ✓ | ✓ |
 | agents.5 | ✓ | ✓ |
+| agents.5.2, agents.5.4 | ✓ | ✓ |
 | agents.5.5 (error messages) | ✓ | ✓ |
 | agents.5.6 (filter archived) | ✓ | ✓ |
 | agents.5.7 (sort by updatedAt) | ✓ | ✓ |
 | agents.5.8 (optimized SQL) | ✓ | - |
 | agents.6 | ✓ | ✓ |
+| agents.6.1, agents.6.2, agents.6.3, agents.6.4, agents.6.5, agents.6.6 | ✓ | ✓ |
 | agents.6.7 (activation animation) | ✓ | ✓ |
+| agents.6.7.3, agents.6.7.4, agents.6.7.5 | ✓ | ✓ |
 | agents.7 | ✓ | ✓ |
+| agents.7.1, agents.7.2, agents.7.2.1, agents.7.3, agents.7.4, agents.7.5, agents.7.6, agents.7.8 | ✓ | ✓ |
 | agents.8 | ✓ | ✓ |
+| agents.8.2 | ✓ | ✓ |
 | agents.9 | ✓ | ✓ |
+| agents.9.3 | ✓ | ✓ |
 | agents.10 | ✓ | ✓ |
+| agents.10.1, agents.10.2, agents.10.3, agents.10.4 | ✓ | ✓ |
 | agents.11 | ✓ | ✓ |
+| agents.11.1, agents.11.2, agents.11.3, agents.11.4 | ✓ | ✓ |
 | agents.12 | ✓ | ✓ |
 | agents.13 (startup loading) | ✓ | ✓ |
-| agents.13.9.1-13.9.4 (границы этапа запуска) | ✓ | ✓ |
+| agents.13.1, agents.13.3, agents.13.4, agents.13.5, agents.13.6, agents.13.7, agents.13.8 | ✓ | ✓ |
+| agents.13.9 | ✓ | ✓ |
+| agents.13.9.1, agents.13.9.2, agents.13.9.3, agents.13.9.4 (границы этапа запуска) | ✓ | ✓ |
 | agents.13.12, agents.13.16 (polling на этапе запуска) | ✓ | ✓ |
+| agents.13.13, agents.13.14, agents.13.15 | ✓ | ✓ |
 | agents.13.17 (state-changed событие) | ✓ | - |
 | agents.13.18 (startup source of truth = polling) | ✓ | ✓ |
 | user-data-isolation.6 | ✓ | ✓ |

@@ -220,45 +220,51 @@ export function Agents({
     return null;
   }
 
-  if (showAllTasksPage) {
-    return (
-      <AllAgentsPage
-        agents={agents}
-        errorMessages={errorMessages}
-        onBack={() => setShowAllTasksPage(false)}
-        onAgentClick={handleAgentClick}
-      />
-    );
-  }
-
   const currentAgent = activeAgent || agents[0]!;
   return (
-    <div data-testid="agents" className="h-[calc(100vh-4rem)] bg-card flex flex-col">
-      <AgentHeader
-        currentAgent={currentAgent}
-        agents={agents}
-        visibleChatsCount={visibleChatsCount}
-        isInitialLoad={isInitialLoad}
-        chatListRef={chatListRef}
-        onNewChat={handleNewChat}
-        onAgentClick={handleAgentClick}
-        onShowAllAgents={() => setShowAllTasksPage(true)}
-      />
+    <div data-testid="agents" className="h-[calc(100vh-4rem)] bg-card relative">
+      <div
+        className={`absolute inset-0 flex flex-col${
+          showAllTasksPage ? ' invisible pointer-events-none' : ''
+        }`}
+      >
+        <AgentHeader
+          currentAgent={currentAgent}
+          agents={agents}
+          visibleChatsCount={visibleChatsCount}
+          isInitialLoad={isInitialLoad}
+          chatListRef={chatListRef}
+          onNewChat={handleNewChat}
+          onAgentClick={handleAgentClick}
+          onShowAllAgents={() => setShowAllTasksPage(true)}
+        />
 
-      {/* All AgentChat components mounted at startup — CSS show/hide on agent switch (agents.13.3, agents.13.5) */}
-      <div data-testid="agent-chats" className="flex-1 min-h-0 flex flex-col relative">
-        {agents.map((agent) => (
-          <AgentChat
-            key={agent.id}
-            agent={agent}
-            isActive={agent.id === currentAgent.id}
-            rateLimitBanner={rateLimitBanner}
-            onRateLimitDismiss={() => setRateLimitBanner(null)}
-            onLoadingChange={handleLoadingChange}
-            onStartupSettledChange={handleStartupSettledChange}
-            onNavigate={onNavigate}
-          />
-        ))}
+        {/* All AgentChat components stay mounted while AllAgents is open to preserve per-agent scroll state (agents.4.14.1-4.14.3) */}
+        <div data-testid="agent-chats" className="flex-1 min-h-0 flex flex-col relative">
+          {agents.map((agent) => (
+            <AgentChat
+              key={agent.id}
+              agent={agent}
+              isActive={agent.id === currentAgent.id}
+              rateLimitBanner={rateLimitBanner}
+              onRateLimitDismiss={() => setRateLimitBanner(null)}
+              onLoadingChange={handleLoadingChange}
+              onStartupSettledChange={handleStartupSettledChange}
+              onNavigate={onNavigate}
+            />
+          ))}
+        </div>
+      </div>
+
+      <div
+        className={`absolute inset-0${showAllTasksPage ? '' : ' invisible pointer-events-none'}`}
+      >
+        <AllAgentsPage
+          agents={agents}
+          errorMessages={errorMessages}
+          onBack={() => setShowAllTasksPage(false)}
+          onAgentClick={handleAgentClick}
+        />
       </div>
     </div>
   );
