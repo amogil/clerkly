@@ -8,6 +8,10 @@ on:
       - reopened
       - ready_for_review
 
+concurrency:
+  group: pr-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
