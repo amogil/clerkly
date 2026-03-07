@@ -164,8 +164,15 @@ export class MockLLMServer {
    * Emits reasoning chunks then content chunks, matching OpenAIProvider.parseStream() expectations
    */
   private handleOpenAIStreaming(res: http.ServerResponse): void {
-    if (this.streamingErrorStatus > 0) {
-      res.writeHead(this.streamingErrorStatus, { 'Content-Type': 'application/json' });
+    // Snapshot streaming configuration per-request to avoid cross-request races
+    // when tests reconfigure the mock while an older stream is still in-flight.
+    const streamingErrorStatus = this.streamingErrorStatus;
+    const streamingReasoning = this.streamingReasoning;
+    const streamingContent = this.streamingContent;
+    const streamingChunkDelayMs = this.streamingChunkDelayMs;
+
+    if (streamingErrorStatus > 0) {
+      res.writeHead(streamingErrorStatus, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: { message: this.errorMessage } }));
       return;
     }
@@ -184,22 +191,22 @@ export class MockLLMServer {
 
     const streamAll = async () => {
       // Stream reasoning chunks (if any)
-      if (this.streamingReasoning) {
-        const words = this.streamingReasoning.split(' ');
+      if (streamingReasoning) {
+        const words = streamingReasoning.split(' ');
         for (const word of words) {
           sendChunk({ type: 'response.reasoning_text.delta', delta: word + ' ' });
-          if (this.streamingChunkDelayMs > 0) {
-            await delay(this.streamingChunkDelayMs);
+          if (streamingChunkDelayMs > 0) {
+            await delay(streamingChunkDelayMs);
           }
         }
       }
 
       // Stream content chunks (structured output JSON split into pieces)
-      const contentChunks = this.streamingContent.match(/.{1,20}/g) || [this.streamingContent];
+      const contentChunks = streamingContent.match(/.{1,20}/g) || [streamingContent];
       for (const chunk of contentChunks) {
         sendChunk({ type: 'response.output_text.delta', delta: chunk });
-        if (this.streamingChunkDelayMs > 0) {
-          await delay(this.streamingChunkDelayMs);
+        if (streamingChunkDelayMs > 0) {
+          await delay(streamingChunkDelayMs);
         }
       }
 

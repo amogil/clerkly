@@ -731,16 +731,13 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     await messageInput.fill('Second message');
     await messageInput.press('Enter');
 
-    // Wait for the LLM response to the second message
-    const llmBubble = context.window.locator('[data-testid="message-llm"]');
-    await expect(llmBubble).toBeVisible({ timeout: 3000 });
-
-    // Only one llm bubble should be visible (previous one is hidden)
+    // Only one llm bubble should remain (previous one is hidden)
     const llmBubbles = context.window.locator('[data-testid="message-llm"]');
-    await expect(llmBubbles).toHaveCount(1, { timeout: 3000 });
+    await expect(llmBubbles).toHaveCount(1, { timeout: 5000 });
+    await expect(llmBubbles.first()).toBeVisible({ timeout: 3000 });
 
     // The visible response should be for the second message
-    const actionContent = context.window.locator('[data-testid="message-llm-action"]');
+    const actionContent = llmBubbles.first().locator('[data-testid="message-llm-action"]');
     await expect(actionContent).toBeVisible({ timeout: 3000 });
     const text = await actionContent.textContent();
     expect(text?.trim()).toBe('Second response');

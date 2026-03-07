@@ -605,6 +605,60 @@ describe('MainEventBus', () => {
       expect(handler.mock.calls[1][0].delta).toBe('b');
       expect(handler.mock.calls[2][0].delta).toBe('c');
     });
+
+    /* Preconditions: EventBus has subscriber for message.updated
+       Action: Deliver a newer event then an older one for same message via IPC
+       Assertions: Older event is ignored even when message.updated batching is non-coalesced
+       Requirements: realtime-events.5.5, llm-integration.2 */
+    it('should ignore out-of-order older message.updated events', async () => {
+      const bus = MainEventBus.getInstance();
+      const handler = jest.fn();
+      bus.subscribe('message.updated', handler);
+
+      bus.deliverFromIPC('message.updated', {
+        message: createMessageSnapshot(42, 'new'),
+        timestamp: 2000,
+      });
+      bus.deliverFromIPC('message.updated', {
+        message: createMessageSnapshot(42, 'old'),
+        timestamp: 1000,
+      });
+
+      await Promise.resolve();
+
+      expect(handler).toHaveBeenCalledTimes(1);
+      expect(handler.mock.calls[0][0].message.payload.data).toEqual({ text: 'new' });
+    });
+
+    /* Preconditions: EventBus has subscriber for message.llm.reasoning.updated
+       Action: Deliver a newer delta then an older delta for same message via IPC
+       Assertions: Older delta is ignored even when reasoning events are non-coalesced
+       Requirements: realtime-events.5.5, llm-integration.2 */
+    it('should ignore out-of-order older message.llm.reasoning.updated events', async () => {
+      const bus = MainEventBus.getInstance();
+      const handler = jest.fn();
+      bus.subscribe('message.llm.reasoning.updated', handler);
+
+      bus.deliverFromIPC('message.llm.reasoning.updated', {
+        messageId: 7,
+        agentId: 'agent-1',
+        delta: 'new',
+        accumulatedText: 'new',
+        timestamp: 2000,
+      });
+      bus.deliverFromIPC('message.llm.reasoning.updated', {
+        messageId: 7,
+        agentId: 'agent-1',
+        delta: 'old',
+        accumulatedText: 'old',
+        timestamp: 1000,
+      });
+
+      await Promise.resolve();
+
+      expect(handler).toHaveBeenCalledTimes(1);
+      expect(handler.mock.calls[0][0].delta).toBe('new');
+    });
   });
 
   describe('timestamp cache cleanup', () => {

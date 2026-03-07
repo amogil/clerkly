@@ -353,7 +353,12 @@ export class AgentIPCHandlers {
     args: { agentId: string }
   ): Promise<IPCResult> {
     try {
-      this.agentManager.cancelPipeline(args.agentId);
+      const cancelledActivePipeline = this.agentManager.cancelPipeline(args.agentId);
+      if (!cancelledActivePipeline) {
+        // No active run to cancel: do not mutate message visibility.
+        // Requirements: llm-integration.8.1, llm-integration.8.7
+        return { success: true };
+      }
 
       // Requirements: llm-integration.8.5, llm-integration.8.7
       // Cancel is treated as "discard current turn":

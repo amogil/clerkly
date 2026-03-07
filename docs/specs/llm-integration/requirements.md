@@ -56,9 +56,13 @@
 
 #### Критерии Приемки
 
-2.1. На каждый reasoning чанк ДОЛЖНЫ эмититься два события одновременно:
-  - `message.llm.reasoning.updated` — с полями `{ messageId, agentId, delta, accumulatedText }`
-  - `message.updated` — с полным snapshot сообщения
+2.1. КОГДА приходит reasoning чанк, ТО система ДОЛЖНА эмитить realtime-событие обновления reasoning для соответствующего `kind: llm` сообщения
+
+2.1.1. КОГДА reasoning чанк создаёт первое `kind: llm` сообщение (сообщение ещё не существовало), ТО дополнительно ДОЛЖНО эмититься `message.created` с полным snapshot нового сообщения
+
+2.1.2. КОГДА reasoning чанк обновляет уже существующее `kind: llm` сообщение, ТО дополнительно ДОЛЖНО эмититься `message.updated` с полным snapshot обновлённого сообщения
+
+2.1.3. Точный технический контракт realtime-события reasoning (имя события и payload) ДОЛЖЕН определяться в `design.md` и быть согласован с `realtime-events` спецификацией
 
 2.2. `message.created` ДОЛЖЕН эмититься при создании любого нового сообщения (user, llm, error)
 

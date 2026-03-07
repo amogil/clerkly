@@ -180,13 +180,15 @@ export class AgentManager {
    * Cancel the running pipeline for an agent (if any)
    * Requirements: llm-integration.6
    */
-  cancelPipeline(agentId: string): void {
+  cancelPipeline(agentId: string): boolean {
     const controller = this.pipelineControllers.get(agentId);
     if (controller) {
       controller.abort();
       this.pipelineControllers.delete(agentId);
       this.logger.info(`Pipeline cancelled for agent ${agentId}`);
+      return true;
     }
+    return false;
   }
 
   /**

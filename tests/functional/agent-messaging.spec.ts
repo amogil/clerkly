@@ -12,6 +12,7 @@ import {
   activeChat,
   launchElectronWithMockOAuth,
   expectAgentsVisible,
+  expectNoToastError,
 } from './helpers/electron';
 import type { MockOAuthServer } from './helpers/mock-oauth-server';
 
@@ -102,6 +103,45 @@ test.describe('Agent Messaging', () => {
 
     await messageInput.fill('hello');
     await expect(stopButton).toBeEnabled();
+  });
+
+  /* Preconditions: Agent has stale in-progress UI state (llm done=false) without an active main-process pipeline
+     Action: User presses stop button
+     Assertions: Existing user/llm messages remain visible; stop acts as no-op
+     Requirements: llm-integration.8.1, llm-integration.8.7 */
+  test('should not hide existing messages when stop is pressed without active pipeline', async () => {
+    const setupResult = await window.evaluate(async () => {
+      const api = (window as unknown as { api: any }).api;
+      const created = await api.test.createAgentWithOldMessage(3);
+      if (!created?.success || !created.agentId) {
+        throw new Error(created?.error || 'Failed to create agent with old message');
+      }
+
+      const llmCreated = await api.messages.create(created.agentId, 'llm', {
+        data: { reasoning: { text: 'orphan reasoning stream' } },
+      });
+      if (!llmCreated?.success) {
+        throw new Error(llmCreated?.error || 'Failed to create stale in-progress llm message');
+      }
+
+      return { agentId: created.agentId };
+    });
+
+    await window.locator(`[data-testid="agent-icon-${setupResult.agentId}"]`).click();
+
+    await expect(activeChat(window).userMessages).toHaveCount(1, { timeout: 5000 });
+    await expect(activeChat(window).llmMessages).toHaveCount(1, { timeout: 5000 });
+
+    const stopButton = window.locator('[data-testid="prompt-input-stop"]');
+    await expect(stopButton).toBeVisible({ timeout: 5000 });
+    await stopButton.click();
+
+    await expect(activeChat(window).userMessages).toHaveCount(1, { timeout: 5000 });
+    await expect(activeChat(window).llmMessages).toHaveCount(1, { timeout: 5000 });
+    await expect(window.locator('[data-testid="prompt-input-send"]')).toBeVisible({
+      timeout: 5000,
+    });
+    await expectNoToastError(window);
   });
 
   /* Preconditions: Agent is active, input field is visible

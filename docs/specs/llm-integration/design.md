@@ -459,10 +459,11 @@ class MainPipeline {
    onChunk(chunk):
      if llmMessageId == null:
       создаёт `kind: llm` сообщение (`done: false`, `reply_to_message_id = userMessageId`) → `llmMessageId = message.id`
+      эмитит `message.created`
      accumulatedReasoning += chunk.delta
      обновляет `kind: llm` (`reasoning.text = accumulatedReasoning`, `done: false`)
      эмитит `message.llm.reasoning.updated { delta, accumulatedText }`
-     эмитит `message.updated`
+     if llmMessageId уже существовал до этого чанка: эмитит `message.updated`
 7. Получает финальный Structured Output
 8. Обновляет `kind: llm` (action + usage, `done: true`)
 9. Эмитит финальный `message.updated`
@@ -535,17 +536,28 @@ interface AgentRateLimitPayload {
 }
 ```
 
+### Контракт reasoning-события (реализация)
+
+Технический контракт realtime-события reasoning фиксируется на уровне дизайна и синхронизируется с `realtime-events` спецификацией:
+
 ```typescript
-// Requirements: llm-integration.2
+// Requirements: llm-integration.2, realtime-events.5.5
+type EventName = 'message.llm.reasoning.updated';
+
 interface MessageLlmReasoningUpdatedPayload {
   messageId: number;
   agentId: string;
   delta: string;
   accumulatedText: string;
+  timestamp: number;
 }
 ```
 
-Событие определено в `src/shared/events/types.ts` и `src/shared/events/constants.ts`.
+Правило обработки timestamp для стриминговых типов (`message.updated`, `message.llm.reasoning.updated`):
+- события с одинаковым timestamp НЕ коалесцируются;
+- устаревшим считается только событие с меньшим timestamp (`<`), чтобы не терять чанки в одном миллисекундном тике.
+
+События определены в `src/shared/events/types.ts` и `src/shared/events/constants.ts`, а доставка реализована в `MainEventBus`.
 
 ---
 
@@ -561,7 +573,7 @@ User отправляет сообщение
           → [reasoning chunk]
               → MessageManager.create/update(kind: 'llm', done: false, reply_to_message_id: userMessageId)
               → message.llm.reasoning.updated
-              → message.updated
+              → message.created (для первого чанка) / message.updated (для последующих чанков)
           → [LLMAction received]
               → MessageManager.update(kind: 'llm', action, done: true)
               → message.updated

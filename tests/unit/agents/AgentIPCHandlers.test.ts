@@ -99,7 +99,7 @@ describe('AgentIPCHandlers', () => {
       update: jest.fn(),
       archive: jest.fn(),
       toEventAgent: jest.fn().mockReturnValue(mockAgentSnapshot),
-      cancelPipeline: jest.fn(),
+      cancelPipeline: jest.fn().mockReturnValue(true),
       setPipelineController: jest.fn(),
       clearPipelineController: jest.fn(),
     } as unknown as jest.Mocked<AgentManager>;
@@ -953,6 +953,24 @@ describe('AgentIPCHandlers', () => {
       expect(result).toEqual({ success: true });
       expect(mockAgentManager.cancelPipeline).toHaveBeenCalledWith('abc123xyz0');
       expect(mockMessageManager.setHidden).toHaveBeenCalledWith(1, 'abc123xyz0');
+    });
+
+    /* Preconditions: Handlers registered, no active pipeline for agent
+       Action: Invoke messages:cancel with agentId
+       Assertions: Returns success and does not hide any messages
+       Requirements: llm-integration.8.1, llm-integration.8.7 */
+    it('should not hide messages when no active pipeline exists', async () => {
+      mockAgentManager.cancelPipeline = jest.fn().mockReturnValue(false);
+      handlers.registerHandlers();
+      const handler = registeredHandlers.get('messages:cancel')!;
+
+      const result = await handler(mockEvent, { agentId: 'abc123xyz0' });
+
+      expect(result).toEqual({ success: true });
+      expect(mockAgentManager.cancelPipeline).toHaveBeenCalledWith('abc123xyz0');
+      expect(mockMessageManager.getLastMessage).not.toHaveBeenCalled();
+      expect(mockMessageManager.setHidden).not.toHaveBeenCalled();
+      expect(mockMessageManager.setDone).not.toHaveBeenCalled();
     });
 
     /* Preconditions: Last message is in-flight llm with replyToMessageId

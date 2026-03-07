@@ -41,7 +41,7 @@ export class MainEventBus {
   private cleanupIntervalId: ReturnType<typeof setInterval> | null = null;
   private pendingBatch: Map<
     string,
-    { type: EventType; payload: BaseEvent; options?: PublishOptions }
+    { type: EventType; payload: BaseEvent; dedupeKey: string; options?: PublishOptions }
   > = new Map();
   private batchScheduled = false;
   private nonCoalescedSequence = 0;
@@ -93,11 +93,16 @@ export class MainEventBus {
       timestamp: Date.now(),
     } as EventPayload<T>;
 
-    const eventKey = this.getBatchKey(type, payloadWithTimestamp);
+    const { batchKey, dedupeKey } = this.getEventKeys(type, payloadWithTimestamp);
 
     // Add to batch for same-tick batching
     // Requirements: realtime-events.6.3
-    this.pendingBatch.set(eventKey, { type, payload: payloadWithTimestamp, options });
+    this.pendingBatch.set(batchKey, {
+      type,
+      payload: payloadWithTimestamp,
+      dedupeKey,
+      options,
+    });
 
     if (!this.batchScheduled) {
       this.batchScheduled = true;
@@ -112,10 +117,15 @@ export class MainEventBus {
    * Requirements: realtime-events.4.3
    */
   public deliverFromIPC<T extends EventType>(type: T, payload: EventPayload<T>): void {
-    const eventKey = this.getBatchKey(type, payload);
+    const { batchKey, dedupeKey } = this.getEventKeys(type, payload);
 
     // Add to batch for same-tick batching, always localOnly
-    this.pendingBatch.set(eventKey, { type, payload, options: { localOnly: true } });
+    this.pendingBatch.set(batchKey, {
+      type,
+      payload,
+      dedupeKey,
+      options: { localOnly: true },
+    });
 
     if (!this.batchScheduled) {
       this.batchScheduled = true;
@@ -132,22 +142,32 @@ export class MainEventBus {
     const batch = new Map(this.pendingBatch);
     this.pendingBatch.clear();
 
-    for (const [eventKey, { type, payload, options }] of batch) {
-      this.deliverEvent(type as EventType, payload, eventKey, options);
+    for (const [, { type, payload, dedupeKey, options }] of batch) {
+      this.deliverEvent(type as EventType, payload, dedupeKey, options);
     }
   }
 
-  // Requirements: realtime-events.6.3, llm-integration.2
-  private getBatchKey<T extends EventType>(type: T, payload: EventPayload<T>): string {
-    const baseKey = getEventKey(type, payload);
+  // Requirements: realtime-events.5.5, realtime-events.6.3, llm-integration.2
+  private getEventKeys<T extends EventType>(
+    type: T,
+    payload: EventPayload<T>
+  ): { batchKey: string; dedupeKey: string } {
+    const dedupeKey = getEventKey(type, payload);
+    let batchKey = dedupeKey;
     if (
       type === EVENT_TYPES.MESSAGE_UPDATED ||
       type === EVENT_TYPES.MESSAGE_LLM_REASONING_UPDATED
     ) {
       this.nonCoalescedSequence += 1;
-      return `${baseKey}:seq:${this.nonCoalescedSequence}`;
+      batchKey = `${dedupeKey}:seq:${this.nonCoalescedSequence}`;
     }
-    return baseKey;
+    return { batchKey, dedupeKey };
+  }
+
+  private isNonCoalescedStreamingType(type: EventType): boolean {
+    return (
+      type === EVENT_TYPES.MESSAGE_UPDATED || type === EVENT_TYPES.MESSAGE_LLM_REASONING_UPDATED
+    );
   }
 
   /**
@@ -157,19 +177,24 @@ export class MainEventBus {
   private deliverEvent<T extends EventType>(
     type: T,
     payload: EventPayload<T>,
-    eventKey: string,
+    dedupeKey: string,
     options?: PublishOptions
   ): void {
     // Timestamp-based deduplication
     // Requirements: realtime-events.5.5
-    const lastTimestamp = this.lastEventTimestamps.get(eventKey);
-    if (lastTimestamp !== undefined && payload.timestamp <= lastTimestamp) {
+    const lastTimestamp = this.lastEventTimestamps.get(dedupeKey);
+    const isOutdated =
+      lastTimestamp !== undefined &&
+      (this.isNonCoalescedStreamingType(type)
+        ? payload.timestamp < lastTimestamp
+        : payload.timestamp <= lastTimestamp);
+    if (isOutdated) {
       this.logger.debug(
-        `Ignoring outdated event: ${type} (${payload.timestamp} <= ${lastTimestamp})`
+        `Ignoring outdated event: ${type} (${payload.timestamp} not newer than ${lastTimestamp})`
       );
       return;
     }
-    this.lastEventTimestamps.set(eventKey, payload.timestamp);
+    this.lastEventTimestamps.set(dedupeKey, payload.timestamp);
 
     this.logger.debug(`Publishing event: ${type}`);
 
