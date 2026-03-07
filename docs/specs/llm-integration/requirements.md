@@ -256,6 +256,11 @@
 
 7.5. Пока идёт стриминг reasoning, агент ДОЛЖЕН иметь статус `in-progress`
 
+#### Функциональные Тесты
+
+- `tests/functional/llm-chat.spec.ts` — "should show reasoning before answer"
+- `tests/functional/llm-chat.spec.ts` — "should keep agent in-progress during reasoning-only llm phase"
+
 ---
 
 ### 8. Прерывание текущего запроса при новом сообщении

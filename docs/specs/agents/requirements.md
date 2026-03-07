@@ -210,6 +210,8 @@
 
 4.11.1. КОГДА сообщение агента (`kind: llm`) содержит `action.content`, блок с ответом модели ДОЛЖЕН отображаться под reasoning-блоком
 
+4.11.2. КОГДА reasoning-фаза завершена и reasoning-блок автоматически свёрнут, иконка в заголовке reasoning-блока ДОЛЖНА оставаться статичной (`animated=false`)
+
 4.12. Сообщения агента ДОЛЖНЫ поддерживать React-компоненты (для rich content)
 
 4.13. ДОЛЖЕН выполняться автоскролл к последнему сообщению при появлении новых сообщений
@@ -325,6 +327,7 @@
 - `tests/functional/message-text-wrapping.spec.ts` - "should maintain text wrapping after window resize"
 - `tests/functional/message-text-wrapping.spec.ts` - "should handle emoji and Unicode characters correctly"
 - `tests/functional/llm-chat.spec.ts` - "should cancel active request via stop button without creating error message"
+- `tests/functional/llm-chat.spec.ts` - "should keep reasoning trigger logo static after finish and auto-collapse"
 
 ### 5. Просмотр всех агентов
 

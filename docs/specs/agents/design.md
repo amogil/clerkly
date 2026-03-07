@@ -1865,7 +1865,7 @@ const STATUS_STYLES: Record<AgentStatus, StatusStyle> = {
 - для reasoning-сообщений визуальный маркер рендерится в заголовке `ReasoningTrigger`;
 - `action.content` рендерится отдельным блоком под reasoning.
 - В терминах требований это поведение покрывает `Message Avatar` для `kind: llm` с reasoning.
-- В reasoning-сообщениях используется анимированная версия логотипа приложения (`Logo animated={isStreaming}`).
+- В reasoning-сообщениях используется анимированная версия логотипа приложения только во время активной reasoning-фазы (`Logo animated={isStreaming}`), после завершения reasoning и автосворачивания trigger логотип остаётся статичным.
 
 **Application Logo в пустом стейте:**
 ```tsx
@@ -1913,7 +1913,7 @@ import { Logo } from '../logo';
 | `tests/unit/agents/ActivityIndicator.test.tsx` | agents.11 |
 | `tests/unit/components/ai-elements/prompt-input.test.tsx` | agents.4.2-4.7, agents.4.24 |
 | `tests/unit/components/agents/AgentMessage.test.tsx` | agents.4.10, agents.4.11.1, llm-integration.2, llm-integration.7 |
-| `tests/unit/components/agents/AgentReasoningTrigger.test.tsx` | agents.4.11, llm-integration.2, llm-integration.7.2 |
+| `tests/unit/components/agents/AgentReasoningTrigger.test.tsx` | agents.4.11, agents.4.11.2, llm-integration.2, llm-integration.7.2 |
 | `tests/unit/renderer/IPCChatTransport.test.ts` | llm-integration.2, llm-integration.7 |
 | `tests/unit/hooks/useAgentChat.test.ts` | agents.4.24, llm-integration.8.7 |
 | `tests/unit/components/agents.test.tsx` | agents.4.22 |
@@ -1933,7 +1933,7 @@ import { Logo } from '../logo';
 | `tests/functional/all-agents-page.spec.ts` | agents.5 | - |
 | `tests/functional/agent-status-indicators.spec.ts` | agents.6 | - |
 | `tests/functional/message-format.spec.ts` | agents.7 | - |
-| `tests/functional/llm-chat.spec.ts` | agents.4.11, agents.7.7, agents.4.24, llm-integration.2, llm-integration.7.2, llm-integration.8.7 | - |
+| `tests/functional/llm-chat.spec.ts` | agents.4.11, agents.4.11.2, agents.7.7, agents.4.24, llm-integration.2, llm-integration.7.2, llm-integration.8.7 | - |
 | `tests/functional/agent-status-calculation.spec.ts` | agents.9 | - |
 | `tests/functional/agent-data-isolation.spec.ts` | agents.10 | - |
 | `tests/functional/agent-activity-indicator.spec.ts` | agents.11 | - |
@@ -2026,6 +2026,7 @@ await window.locator(`[data-testid="agent-icon-${firstAgentId}"]`).click();
 | agents.4 | ✓ | ✓ |
 | agents.4.11 | ✓ | ✓ |
 | agents.4.11.1 | ✓ | ✓ |
+| agents.4.11.2 | ✓ | ✓ |
 | agents.4.7.1-4.7.2 (autofocus) | - | ✓ |
 | agents.4.13.1-4.13.6 (autoscroll) | ✓ | ✓ |
 | agents.4.13.4-4.13.6 (scrollbar) | - | Manual |

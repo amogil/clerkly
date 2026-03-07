@@ -87,4 +87,47 @@ describe('AgentReasoningTrigger', () => {
 
     expect(screen.getByText('Thought for a few seconds')).toBeInTheDocument();
   });
+
+  /* Preconditions: reasoning transitions from active streaming to finished auto-collapsed state
+     Action: render trigger, then rerender with streaming=false and isOpen=false
+     Assertions: logo animation turns off after reasoning is finished and collapsed
+     Requirements: agents.4.11.2 */
+  it('should keep logo static after reasoning is finished and collapsed', () => {
+    mockUseReasoning.mockReturnValue({
+      isStreaming: true,
+      isOpen: true,
+      duration: undefined,
+      setIsOpen: jest.fn(),
+    });
+
+    const { rerender } = render(<AgentReasoningTrigger />);
+    expect(screen.getByTestId('reasoning-trigger-logo')).toHaveAttribute('data-animated', 'true');
+
+    mockUseReasoning.mockReturnValue({
+      isStreaming: false,
+      isOpen: false,
+      duration: 2,
+      setIsOpen: jest.fn(),
+    });
+    rerender(<AgentReasoningTrigger />);
+
+    expect(screen.getByTestId('reasoning-trigger-logo')).toHaveAttribute('data-animated', 'false');
+  });
+
+  /* Preconditions: reasoning is still streaming but trigger is already collapsed
+     Action: render AgentReasoningTrigger
+     Assertions: logo remains static because active reasoning animation requires open trigger
+     Requirements: agents.4.11.2 */
+  it('should keep logo static when streaming is true but trigger is collapsed', () => {
+    mockUseReasoning.mockReturnValue({
+      isStreaming: true,
+      isOpen: false,
+      duration: 1,
+      setIsOpen: jest.fn(),
+    });
+
+    render(<AgentReasoningTrigger />);
+
+    expect(screen.getByTestId('reasoning-trigger-logo')).toHaveAttribute('data-animated', 'false');
+  });
 });
