@@ -2,30 +2,20 @@
  * @jest-environment jsdom
  */
 
-/* Preconditions: useAppCoordinatorState hook with mocked app IPC and event subscription
-   Action: load initial state and receive app.state.changed events
+/* Preconditions: useAppCoordinatorState hook with mocked app IPC polling
+   Action: load initial state and continue polling app:get-state
    Assertions: returns correct state and bootstrapping flags
    Requirements: agents.13.2, navigation.1.1, navigation.1.3 */
 
 import { act, renderHook, waitFor } from '@testing-library/react';
-import { EVENT_TYPES } from '../../../src/shared/events/constants';
 import { useAppCoordinatorState } from '../../../src/renderer/hooks/useAppCoordinatorState';
-import { useEventSubscription } from '../../../src/renderer/events/useEventSubscription';
-
-jest.mock('../../../src/renderer/events/useEventSubscription', () => ({
-  useEventSubscription: jest.fn(),
-}));
 
 describe('useAppCoordinatorState', () => {
-  const mockedUseEventSubscription = useEventSubscription as jest.MockedFunction<
-    typeof useEventSubscription
-  >;
-  let appStateChangedHandler: ((payload: any) => void) | null = null;
   let mockGetState: jest.Mock;
 
   beforeEach(() => {
     jest.clearAllMocks();
-    appStateChangedHandler = null;
+    jest.useFakeTimers();
     mockGetState = jest.fn();
 
     (window as any).api = {
@@ -33,12 +23,10 @@ describe('useAppCoordinatorState', () => {
         getState: mockGetState,
       },
     };
+  });
 
-    mockedUseEventSubscription.mockImplementation((type: string, handler: any) => {
-      if (type === EVENT_TYPES.APP_STATE_CHANGED) {
-        appStateChangedHandler = handler;
-      }
-    });
+  afterEach(() => {
+    jest.useRealTimers();
   });
 
   /* Preconditions: app:get-state IPC resolves successfully
@@ -56,10 +44,6 @@ describe('useAppCoordinatorState', () => {
     const { result } = renderHook(() => useAppCoordinatorState());
 
     expect(result.current.isBootstrapping).toBe(true);
-    expect(mockedUseEventSubscription).toHaveBeenCalledWith(
-      EVENT_TYPES.APP_STATE_CHANGED,
-      expect.any(Function)
-    );
 
     await waitFor(() => {
       expect(result.current.isBootstrapping).toBe(false);
@@ -89,37 +73,73 @@ describe('useAppCoordinatorState', () => {
     expect(result.current.state).toBeNull();
   });
 
-  /* Preconditions: hook mounted and app.state.changed event received
-     Action: invoke subscribed APP_STATE_CHANGED handler
-     Assertions: state updates from event and bootstrapping becomes false
-     Requirements: agents.13.2, navigation.1.3 */
-  it('should update state from APP_STATE_CHANGED event', async () => {
-    mockGetState.mockImplementation(
-      () =>
-        new Promise(() => {
-          // Keep pending to ensure state update comes from event.
-        })
-    );
-
-    const { result } = renderHook(() => useAppCoordinatorState());
-    expect(appStateChangedHandler).toBeTruthy();
-
-    act(() => {
-      appStateChangedHandler?.({
-        phase: 'unauthenticated',
+  /* Preconditions: initial IPC state is stale booting
+     Action: mount hook and advance polling timer
+     Assertions: hook recovers state via repeated app:get-state polling
+     Requirements: agents.13.13 */
+  it('should resync state via IPC polling during bootstrap', async () => {
+    mockGetState
+      .mockResolvedValueOnce({
+        phase: 'booting',
         authorized: false,
         targetScreen: 'login',
-        reason: 'auth_failed',
-        timestamp: Date.now(),
+        reason: 'startup',
+      })
+      .mockResolvedValue({
+        phase: 'waiting-for-chats',
+        authorized: true,
+        targetScreen: 'agents',
+        reason: 'startup_authorized',
       });
+
+    const { result } = renderHook(() => useAppCoordinatorState());
+
+    await waitFor(() => {
+      expect(result.current.state?.phase).toBe('booting');
+      expect(result.current.isBootstrapping).toBe(false);
     });
 
-    expect(result.current.isBootstrapping).toBe(false);
-    expect(result.current.state).toMatchObject({
-      phase: 'unauthenticated',
-      authorized: false,
-      targetScreen: 'login',
-      reason: 'auth_failed',
+    await act(async () => {
+      jest.advanceTimersByTime(200);
+      await Promise.resolve();
     });
+
+    await waitFor(() => {
+      expect(result.current.state).toMatchObject({
+        phase: 'waiting-for-chats',
+        authorized: true,
+        targetScreen: 'agents',
+        reason: 'startup_authorized',
+      });
+    });
+    expect(mockGetState).toHaveBeenCalledTimes(2);
+  });
+
+  /* Preconditions: initial IPC state is already terminal (ready)
+     Action: mount hook and advance polling timers
+     Assertions: hook does not continue polling after terminal phase
+     Requirements: agents.13.13 */
+  it('should stop bootstrap polling when initial state is terminal', async () => {
+    mockGetState.mockResolvedValue({
+      phase: 'ready',
+      authorized: true,
+      targetScreen: 'agents',
+      reason: 'chats_ready',
+    });
+
+    const { result } = renderHook(() => useAppCoordinatorState());
+
+    await waitFor(() => {
+      expect(result.current.state?.phase).toBe('ready');
+      expect(result.current.isBootstrapping).toBe(false);
+    });
+    expect(mockGetState).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      jest.advanceTimersByTime(5000);
+      await Promise.resolve();
+    });
+
+    expect(mockGetState).toHaveBeenCalledTimes(1);
   });
 });

@@ -155,15 +155,40 @@ export function AgentChat({
     }
 
     const startupSettleDelayMs = 250;
+    const minScrollDeltaForReschedulePx = 24;
     let settleTimeoutId: number | null = null;
     let raf1: number | null = null;
     let raf2: number | null = null;
     let settled = false;
+    let cleanupDone = false;
+    let resizeObserver: ResizeObserver | null = null;
+    let scrollListenerNode: HTMLElement | null = null;
+    let onScrollHandler: (() => void) | null = null;
+    let lastScheduledScrollTop: number | null = null;
+
+    const cleanupRuntime = () => {
+      if (cleanupDone) return;
+      cleanupDone = true;
+      resizeObserver?.disconnect();
+      if (scrollListenerNode && onScrollHandler) {
+        scrollListenerNode.removeEventListener('scroll', onScrollHandler);
+      }
+      if (settleTimeoutId !== null) {
+        window.clearTimeout(settleTimeoutId);
+      }
+      if (raf1 !== null) {
+        window.cancelAnimationFrame(raf1);
+      }
+      if (raf2 !== null) {
+        window.cancelAnimationFrame(raf2);
+      }
+    };
 
     const markSettled = () => {
       if (settled) return;
       settled = true;
       hasReachedStartupSettledRef.current = true;
+      cleanupRuntime();
       onStartupSettledChange(agent.id, true);
     };
 
@@ -196,34 +221,30 @@ export function AgentChat({
     if (typeof ResizeObserver === 'undefined' || !observedNode) {
       // Fallback for environments without ResizeObserver (e.g., some tests).
       return () => {
-        if (settleTimeoutId !== null) {
-          window.clearTimeout(settleTimeoutId);
-        }
-        if (raf1 !== null) {
-          window.cancelAnimationFrame(raf1);
-        }
-        if (raf2 !== null) {
-          window.cancelAnimationFrame(raf2);
-        }
+        cleanupRuntime();
       };
     }
 
-    const resizeObserver = new ResizeObserver(scheduleSettle);
+    resizeObserver = new ResizeObserver(() => {
+      scheduleSettle();
+    });
     resizeObserver.observe(observedNode);
-    scrollNode?.addEventListener('scroll', scheduleSettle, { passive: true });
+    onScrollHandler = () => {
+      const top = scrollNode?.scrollTop ?? 0;
+      if (
+        lastScheduledScrollTop !== null &&
+        Math.abs(top - lastScheduledScrollTop) < minScrollDeltaForReschedulePx
+      ) {
+        return;
+      }
+      lastScheduledScrollTop = top;
+      scheduleSettle();
+    };
+    scrollListenerNode = scrollNode;
+    scrollListenerNode?.addEventListener('scroll', onScrollHandler, { passive: true });
 
     return () => {
-      resizeObserver.disconnect();
-      scrollNode?.removeEventListener('scroll', scheduleSettle);
-      if (settleTimeoutId !== null) {
-        window.clearTimeout(settleTimeoutId);
-      }
-      if (raf1 !== null) {
-        window.cancelAnimationFrame(raf1);
-      }
-      if (raf2 !== null) {
-        window.cancelAnimationFrame(raf2);
-      }
+      cleanupRuntime();
     };
   }, [agent.id, isActive, isLoading, onStartupSettledChange]);
 

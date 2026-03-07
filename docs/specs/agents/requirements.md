@@ -732,13 +732,15 @@
 
 13.11. Оркестрация стартового workflow ДОЛЖНА выполняться централизованно в main process через `AppCoordinator` (единый source of truth для фаз запуска)
 
-13.12. `AppCoordinator` ДОЛЖЕН публиковать событие `app.state.changed` при каждом переходе фаз (`booting`, `unauthenticated`, `authenticating`, `preparing-session`, `waiting-for-chats`, `ready`, `error`)
+13.12. Renderer ДОЛЖЕН получать состояние старта через polling IPC `app:get-state` с интервалом 200мс (без подписки на startup-события event bus)
 
 13.13. Renderer ДОЛЖЕН определять показ глобального loading-экрана и целевого экрана (`login`/`agents`/`settings`) по состоянию `AppCoordinator`, а НЕ по локально-разрозненным флагам
 
-13.14. КОГДА чаты полностью загружены, ТО Renderer ДОЛЖЕН публиковать `app.chats.ready`, после чего `AppCoordinator` ДОЛЖЕН перевести приложение в фазу `ready`
+13.14. КОГДА чаты полностью загружены и активный чат достиг `startupSettled`, ТО Renderer ДОЛЖЕН вызвать IPC `app:set-chats-ready`, после чего `AppCoordinator` ДОЛЖЕН перевести приложение в фазу `ready`
 
-13.15. ЕСЛИ в фазе `waiting-for-chats` не получено `app.chats.ready` за timeout, `AppCoordinator` ДОЛЖЕН перевести приложение в фазу `error` с диагностической причиной
+13.15. ЕСЛИ в фазе `waiting-for-chats` не получен IPC-сигнал `app:set-chats-ready` за timeout, `AppCoordinator` ДОЛЖЕН перевести приложение в фазу `error` с диагностической причиной
+
+13.16. КОГДА renderer находится в стартовых фазах, ТО polling `app:get-state` ДОЛЖЕН продолжаться до терминальной фазы (`ready`/`unauthenticated`/`error`) или до диагностического timeout
 
 #### Функциональные Тесты
 
@@ -748,6 +750,7 @@
 - `tests/functional/settings-ai-agent.spec.ts` - "53.1: should save and load LLM provider selection"
 - `tests/functional/settings-ai-agent.spec.ts` - "53.2: should save and load API key with encryption"
 - `tests/functional/settings-ai-agent.spec.ts` - "53.3: should delete API key when field is cleared"
+- `tests/unit/hooks/useAppCoordinatorState.test.ts` - "should resync state via IPC polling during bootstrap"
 
 ---
 

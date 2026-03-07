@@ -65,7 +65,6 @@ describe('AppCoordinator', () => {
       authorized: false,
       targetScreen: 'login',
     });
-    expect(eventBus.published.some((e) => e.type === EVENT_TYPES.APP_STATE_CHANGED)).toBe(true);
   });
 
   /* Preconditions: app reached ready state and auth.completed is emitted again
@@ -84,7 +83,7 @@ describe('AppCoordinator', () => {
     );
 
     await coordinator.start();
-    eventBus.emit(EVENT_TYPES.APP_CHATS_READY, { source: 'agents', timestamp: Date.now() });
+    coordinator.markChatsReady();
 
     expect(coordinator.getState().phase).toBe('ready');
 
@@ -151,10 +150,10 @@ describe('AppCoordinator', () => {
   });
 
   /* Preconditions: startup is authorized and waiting for chats
-     Action: emit app.chats.failed event
-     Assertions: coordinator transitions to error state with reason
+     Action: mark chats ready from renderer side
+     Assertions: coordinator transitions to ready state
      Requirements: agents.13.2 */
-  it('should transition to error when chats loading fails', async () => {
+  it('should transition to ready when chats loading completes', async () => {
     const eventBus = new FakeMainEventBus();
     const oauthClient = {
       getAuthStatus: jest.fn().mockResolvedValue({ authorized: true }),
@@ -168,18 +167,13 @@ describe('AppCoordinator', () => {
     await coordinator.start();
     expect(coordinator.getState().phase).toBe('waiting-for-chats');
 
-    eventBus.emit(EVENT_TYPES.APP_CHATS_FAILED, {
-      source: 'agents',
-      reason: 'messages list failed',
-      timestamp: Date.now(),
-    });
+    coordinator.markChatsReady();
 
     expect(coordinator.getState()).toMatchObject({
-      phase: 'error',
+      phase: 'ready',
       authorized: true,
       targetScreen: 'agents',
     });
-    expect(coordinator.getState().reason).toContain('messages list failed');
   });
 
   /* Preconditions: startup authorized and chats timeout is running
@@ -244,7 +238,7 @@ describe('AppCoordinator', () => {
 
     coordinator.stop();
 
-    eventBus.emit(EVENT_TYPES.APP_CHATS_READY, { source: 'agents', timestamp: Date.now() });
+    coordinator.markChatsReady();
     jest.advanceTimersByTime(200);
 
     expect(coordinator.getState().phase).toBe('waiting-for-chats');

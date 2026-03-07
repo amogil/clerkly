@@ -306,8 +306,12 @@ app.whenReady().then(async () => {
     registerEventIPCHandlers();
     logger.info('Event IPC handlers registered');
 
-    // Coordinator state query IPC for renderer bootstrap
+    // Coordinator state query IPC for renderer bootstrap (polling model)
     ipcMain.handle('app:get-state', () => appCoordinator.getState());
+    ipcMain.handle('app:set-chats-ready', () => {
+      appCoordinator.markChatsReady('renderer');
+      return { success: true };
+    });
     logger.info('AppCoordinator state IPC handler registered');
 
     // Requirements: agents.2, agents.4, agents.10
@@ -368,6 +372,7 @@ app.on('window-all-closed', () => {
 app.on('before-quit', () => {
   logger.info('Application quitting...');
   ipcMain.removeHandler('app:get-state');
+  ipcMain.removeHandler('app:set-chats-ready');
   appCoordinator.stop();
   lifecycleManager.handleWindowClose();
 });

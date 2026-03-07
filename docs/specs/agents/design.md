@@ -1916,6 +1916,7 @@ import { Logo } from '../logo';
 | `tests/unit/components/agents/AgentReasoningTrigger.test.tsx` | agents.4.11, llm-integration.2, llm-integration.7.2 |
 | `tests/unit/renderer/IPCChatTransport.test.ts` | llm-integration.2, llm-integration.7 |
 | `tests/unit/hooks/useAgentChat.test.ts` | agents.4.24, llm-integration.8.7 |
+| `tests/unit/hooks/useAppCoordinatorState.test.ts` | agents.13.12, agents.13.16 |
 | `tests/unit/components/agents.test.tsx` | agents.4.22 |
 | `tests/unit/components/agents-autoscroll.test.tsx` | agents.4.13 |
 | `tests/unit/components/agents-scroll-position.test.tsx` | agents.4.14 |
@@ -2239,25 +2240,24 @@ interface UseAgentChatResult {
 - `booting` — старт приложения
 - `unauthenticated` — пользователь не авторизован, показывается `login`
 - `preparing-session` — сессия авторизована, подготовка к загрузке рабочих экранов
-- `waiting-for-chats` — ожидание явного сигнала `app.chats.ready` от renderer
+- `waiting-for-chats` — ожидание IPC-сигнала `app:set-chats-ready` от renderer
 - `ready` — основной UI полностью доступен
 - `error` — критическая ошибка инициализации (включая timeout ожидания чатов)
 
-**Ключевые события:**
-- `app.state.changed` — публикуется `AppCoordinator` при каждом переходе состояния
-- `app.chats.ready` — публикуется renderer (`Agents`) только когда загружены все чаты и активный чат достиг `startupSettled`
-- `app.chats.failed` — публикуется renderer при критической ошибке загрузки чатов
+**Ключевые IPC-контракты:**
+- `app:get-state` — renderer опрашивает состояние `AppCoordinator` каждые 200мс
+- `app:set-chats-ready` — renderer подтверждает готовность финального UI (все чаты загружены + active chat settled)
 
 **Поток запуска:**
 1. `src/main/index.ts` создаёт и запускает `AppCoordinator`
 2. renderer получает initial state через IPC `app:get-state`
-3. renderer подписывается на `app.state.changed` через event bus
-4. после готовности чатов renderer публикует `app.chats.ready`
+3. renderer продолжает polling `app:get-state` с интервалом 200мс до терминальной фазы
+4. после готовности чатов renderer вызывает `app:set-chats-ready`
 5. `AppCoordinator` переводит приложение в `ready`, loading-экран скрывается
 
 **Timeout-защита:**
 - В фазе `waiting-for-chats` запускается таймер
-- Если `app.chats.ready` не получен вовремя, состояние переходит в `error`
+- Если `app:set-chats-ready` не получен вовремя, состояние переходит в `error`
 - Причина перехода публикуется в `reason` для диагностики флейков/регрессий
 
 ## Установка и обновление AI Elements компонентов

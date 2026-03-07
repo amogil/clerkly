@@ -67,6 +67,7 @@
 - [x] `tests/unit/agents/MainPipeline.test.ts` — lifecycle `done` и ветка скрытия незавершённого `llm`.
 - [x] `tests/unit/agents/AgentManager.test.ts` — hidden-aware расчёт статуса.
 - [x] `tests/unit/components/agents/AgentChat.test.tsx` — send/stop поведение.
+- [x] `tests/unit/hooks/useAppCoordinatorState.test.ts` — fallback pull-ресинк `app:get-state` при пропущенном `app.state.changed`.
 - [x] `tests/functional/startup-loader.spec.ts` — startup-settled и анти-регрессии по скроллу/ширине.
 - [x] `tests/functional/agent-status-calculation.spec.ts` — hidden-aware статус в e2e.
 - [x] `tests/functional/agent-messaging.spec.ts` — `send` активен только при тексте.
@@ -79,11 +80,18 @@
 - [x] Добавить отдельный functional-тест: в режиме `stop` кнопка остаётся активной при пустом и непустом вводе.
 - [x] Прогнать этот функциональный тест точечно.
 
+### 9) Startup orchestration redesign (polling-only)
+- [x] Убрана startup-связка через event bus (`app.state.changed` / `app.chats.ready`) между renderer и main.
+- [x] `useAppCoordinatorState` переведён на polling `app:get-state` каждые 200мс до терминальной фазы.
+- [x] Добавлен IPC-контракт `app:set-chats-ready` для перевода `AppCoordinator` в `ready`.
+- [x] Обновлены unit-тесты `AppCoordinator` и `useAppCoordinatorState` под polling-модель.
+- [x] Обновлены `agents/requirements.md` и `agents/design.md` под polling-only контракт.
+
 ---
 
 ## Запланировано
 
-### 9) Финальные проверки
+### 10) Финальные проверки
 - [x] Прогнать `npm run validate`.
 - [x] Прогнать профильные функциональные тесты по изменённым сценариям.
 - [x] Обновить этот `tasks.md` до финального состояния «выполнено».

@@ -431,6 +431,19 @@ export function getEntityId(
  * Create a unique key for timestamp deduplication
  */
 export function getEventKey(type: EventType, payload: BaseEvent): string {
+  if (
+    type === EVENT_TYPES.APP_STATE_CHANGED &&
+    'phase' in payload &&
+    'authorized' in payload &&
+    'targetScreen' in payload
+  ) {
+    const phase = String(payload.phase);
+    const authorized = payload.authorized ? '1' : '0';
+    const targetScreen = String(payload.targetScreen);
+    const reason = 'reason' in payload && typeof payload.reason === 'string' ? payload.reason : '';
+    return `${type}:${phase}:${authorized}:${targetScreen}:${reason}`;
+  }
+
   const entityId = getEntityId(payload as BaseEvent & { id?: string; data?: { id?: string } });
   return entityId ? `${type}:${entityId}` : type;
 }
