@@ -1,0 +1,65 @@
+name: PR Validation and Functional Tests
+
+on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+
+concurrency:
+  group: pr-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run validation
+        run: npm run validate:verbose
+
+  functional:
+    if: github.event.pull_request.draft == false && github.event.pull_request.head.repo.full_name == github.repository && needs.validate.result == 'success'
+    needs: validate
+    runs-on: macos-latest
+    timeout-minutes: 90
+    environment: ci-functional
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check OpenAI key is present
+        env:
+          CLERKLY_OPENAI_API_KEY: ${{ secrets.CLERKLY_OPENAI_API_KEY }}
+        run: test -n "$CLERKLY_OPENAI_API_KEY"
+
+      - name: Run functional tests
+        env:
+          CLERKLY_OPENAI_API_KEY: ${{ secrets.CLERKLY_OPENAI_API_KEY }}
+        run: npm run test:functional:verbose

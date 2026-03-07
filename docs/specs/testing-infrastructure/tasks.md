@@ -20,6 +20,7 @@
 ### Выполнено
 
 - ✅ Зафиксированы требования LLM/UI в спеках тестирования
+- ✅ Добавлен PR workflow CI: `npm run validate` и `npm run test:functional` на macOS runner
 
 ### В Работе
 

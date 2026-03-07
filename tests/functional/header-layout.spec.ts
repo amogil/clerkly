@@ -54,7 +54,7 @@ test.describe('Header Layout', () => {
     await window.waitForSelector('[data-testid="agents"]', { timeout: 10000 });
 
     // Get header element
-    const header = window.locator('[data-testid="agents"] > div').first();
+    const header = window.locator('[data-testid="agent-header"]');
     await expect(header).toBeVisible();
 
     // Get header width
@@ -62,14 +62,14 @@ test.describe('Header Layout', () => {
     expect(headerBox).not.toBeNull();
     const headerWidth = headerBox!.width;
 
-    // Get left section (active agent info) - first child div
-    const leftSection = header.locator('> div').first();
+    // Get left section (active agent info)
+    const leftSection = window.locator('[data-testid="agent-header-left"]');
     const leftBox = await leftSection.boundingBox();
     expect(leftBox).not.toBeNull();
     const leftWidth = leftBox!.width;
 
-    // Get right section (agent list) - second child div with ref={chatListRef}
-    const rightSection = header.locator('> div').nth(1);
+    // Get right section (agent list)
+    const rightSection = window.locator('[data-testid="agent-header-right"]');
     const rightBox = await rightSection.boundingBox();
     expect(rightBox).not.toBeNull();
     const rightWidth = rightBox!.width;
@@ -98,9 +98,9 @@ test.describe('Header Layout', () => {
     // Wait for agents page to load
     await window.waitForSelector('[data-testid="agents"]', { timeout: 10000 });
 
-    const header = window.locator('[data-testid="agents"] > div').first();
-    const leftSection = header.locator('> div').first();
-    const rightSection = header.locator('> div').nth(1);
+    const header = window.locator('[data-testid="agent-header"]');
+    const leftSection = window.locator('[data-testid="agent-header-left"]');
+    const rightSection = window.locator('[data-testid="agent-header-right"]');
 
     // Test at different window widths
     const widths = [1024, 1280, 1440, 1920];
@@ -159,9 +159,9 @@ test.describe('Header Layout', () => {
     // Wait for UI to update
     await window.waitForTimeout(500);
 
-    const header = window.locator('[data-testid="agents"] > div').first();
-    const leftSection = header.locator('> div').first();
-    const rightSection = header.locator('> div').nth(1);
+    const header = window.locator('[data-testid="agent-header"]');
+    const leftSection = window.locator('[data-testid="agent-header-left"]');
+    const rightSection = window.locator('[data-testid="agent-header-right"]');
 
     const headerBox = await header.boundingBox();
     expect(headerBox).not.toBeNull();
@@ -197,7 +197,7 @@ test.describe('Header Layout', () => {
     // Wait for agents page to load
     await window.waitForSelector('[data-testid="agents"]', { timeout: 10000 });
 
-    const header = window.locator('[data-testid="agents"] > div').first();
+    const header = window.locator('[data-testid="agent-header"]');
     await expect(header).toBeVisible();
 
     const headerBox = await header.boundingBox();
@@ -226,8 +226,8 @@ test.describe('Header Layout', () => {
     // Wait for agents to be created
     await window.waitForTimeout(500);
 
-    const header = window.locator('[data-testid="agents"] > div').first();
-    const rightSection = header.locator('> div').nth(1);
+    const header = window.locator('[data-testid="agent-header"]');
+    const rightSection = window.locator('[data-testid="agent-header-right"]');
 
     const headerBox = await header.boundingBox();
     const rightBox = await rightSection.boundingBox();

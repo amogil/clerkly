@@ -112,9 +112,12 @@ test.describe('Agent Data Isolation', () => {
     await messageInput.press('Enter');
     await window.waitForTimeout(500);
 
-    // Message should appear (proves agent belongs to user)
-    const messages = activeChat(window).messages;
-    await expect(messages).toHaveCount(1, { timeout: 2000 });
+    // User message should appear (proves agent belongs to current user)
+    // Avoid asserting exact total message count because LLM pipeline may append
+    // assistant/error messages asynchronously right after user message creation.
+    const userMessages = activeChat(window).userMessages;
+    await expect(userMessages.first()).toBeVisible({ timeout: 2000 });
+    await expect(userMessages.last()).toContainText('Test message');
   });
 
   /* Preconditions: Multiple users exist (simulated)
