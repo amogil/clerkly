@@ -32,14 +32,7 @@ CREATE TABLE messages (
 - Для сообщений `kind:error` значение `done` равно `1`.
 - Для сообщений, которые находятся в процессе формирования (например, streaming `kind:llm`), значение `done` равно `0`.
 - Для полностью сформированных сообщений `done` равно `1`.
-- Для исторических сообщений `kind:llm` с уже сохранённым финальным `data.action` выполняется backfill `done = 1`.
-
-### Backfill исторических `llm`
-
-- Backfill выполняется отдельной SQL-миграцией после добавления колонки `done`.
-- Критерий завершённости для legacy-данных: `kind = 'llm'` и `json_type(payload_json, '$.data.action') = 'object'`.
-- Такие записи обновляются с `done = 0` на `done = 1`.
-- Миграция является идемпотентной: уже завершённые записи (`done = 1`) не изменяются.
+- Для `kind:llm` с финальным ответом (`data.text`) значение `done` равно `1`.
 
 ### Правило `reply_to_message_id`
 
@@ -69,10 +62,12 @@ CREATE TABLE messages (
 {
   "data": {
     "reasoning": { "text": "...", "excluded_from_replay": true },
-    "action": { "type": "text", "content": "Hi! How can I help?" }
+    "text": "Hi! How can I help?"
   }
 }
 ```
+
+Финальный текст ответа в chat-flow хранится в `data.text`.
 
 `messages.usage_json` хранит usage-envelope отдельно от `payload_json`:
 
@@ -151,27 +146,14 @@ CREATE TABLE messages (
 
 ---
 
-## Structured Output
+## Поток Ответа Модели
 
-### Единый декларативный контракт схемы
+### Event-driven streaming
 
-- **Single source of truth:** используется единый модуль контракта Structured Output (`StructuredOutputContract`), где поля задаются декларативно вместе с ограничениями и описаниями.
-- **Семантика полей:** для каждого поля задаётся `description`, чтобы модель получала не только формат, но и смысл поля.
-- **Автогенерация схемы:** JSON Schema для провайдеров строится автоматически из декларативного контракта.
-- **Единая валидация:** парсинг ответа модели выполняется через `safeParse` этого же контракта, без дублирования ручных проверок структуры.
-- **Эффект:** схема, форматы и семантика полей синхронизированы между prompt-инструкциями, провайдерами и runtime-валидацией.
-
-### Structured Output: обработка ответа и ошибок
-
-#### Контроль формата Structured Output и повтор запроса
-
-- **Ответственный:** `MainPipeline`.
-- **Проверка формата:** после получения ответа LLM валидируем соответствие единому декларативному контракту (`safeParse`).
-- **При нарушении формата:** запрос повторяется с дополнительной инструкцией о строгом соблюдении формата Structured Output.
-- **Ограничение:** выполняется не более 2 повторных попыток.
-- **Если формат не исправлен:** создаётся `kind: error` с типом `provider` и сообщением `"Invalid response format. Please try again later."` в чате текущего агента.
-- **Отображение:** `AgentMessage` рендерит это сообщение в чате агента как стандартный диалог ошибки (как и другие `kind: error`).
-- **Повтор:** в этом же сообщении в чате агента доступна кнопка `Retry` для повторного запроса.
+- `MainPipeline` обрабатывает поток чанков `reasoning` и `text`.
+- Для одного turn создаётся `kind: llm` сообщение.
+- Пока turn не завершён, `done = 0`; после завершения `done = 1`.
+- Tool-calling в чат-flow не стримится по шагам в UI: система эмитит одно событие `message.tool_call` только после полной сборки аргументов.
 
 ### Usage JSON: отдельный поток сохранения
 
@@ -181,19 +163,12 @@ CREATE TABLE messages (
 - **Устойчивость:** ошибка записи `usage_json` не должна ломать основной ответ в чате.
 - **Без дублирования:** `usage_json` не содержит `provider`, `model`, `captured_at` (они выводятся из записи сообщения).
 
-#### Некорректный Structured Output
-
-ЕСЛИ Structured Output не соответствует контракту (например, отсутствует `action.content`), система:
-- выполняет не более 2 повторных запросов;
-- передаёт в повторный запрос инструкцию: `"Your previous response did not match the required JSON schema. Reply again using the exact required format only."`;
-- после исчерпания повторов применяет поведение из блока «Контроль формата Structured Output и повтор запроса» выше.
-
 ### История для модели: формирование входных сообщений
 
 Логика передачи истории в модель:
 
 1. Берём всю историю сообщений агента.
-2. Исключаем сообщения `kind:error` и сообщения с `hidden: true`.
+2. Исключаем сообщения `kind:error`, `kind:tool_call` и сообщения с `hidden: true`.
 3. Для каждого сообщения истории:
    - санитизируем `payload`: удаляем `data.model` и всю ветку `data.reasoning*`;
    - определяем `role`: `user` для `kind:user`, `assistant` для `kind:llm`;
@@ -206,62 +181,24 @@ CREATE TABLE messages (
 
 `reply_to_message_id` в историю для LLM не передаётся.
 
-### Structured Output: описание формата для модели
-
-#### Как контракт передаётся провайдерам
-
-Единый декларативный контракт используется в двух формах:
-- JSON Schema (машинная схема для провайдера, где это поддерживается);
-- текстовая инструкция (семантика и форматы полей), сформированная из того же контракта.
-
-#### Использование контракта в провайдерах
-
-- **Возможности внешних API (по документации провайдеров):**
-  - `OpenAI`: интеграция выполняется через **Responses API**; Structured Output задаётся через `text.format` с типом `json_schema`.
-  - `Google Gemini`: поддерживает JSON Schema через `generationConfig.responseSchema` (с `responseMimeType`).
-  - `Anthropic`: поддерживает Structured Outputs через `output_config.format` с типом `json_schema`.
-- Все провайдеры при парсинге ответа модели выполняют валидацию через общий `safeParse` контракта.
-
-#### OpenAI strict schema adapter
-
-- Для `OpenAI` используется provider-specific адаптер схемы перед отправкой в `text.format.schema`.
-- Адаптер удаляет только `format: "uri"` (ограничение strict subset OpenAI для URL-формата).
-- Если адаптер встречает любой другой `format`, выполнение прерывается с явной ошибкой конфигурации схемы (fail-fast), чтобы не отправлять неоднозначную/неподдерживаемую схему.
-
-#### Формат structured output
-
-**Схема и форматы полей:**
-
-- `action.type`: строка, значение `text`.
-- `action.content`: строка с пользовательским текстом ответа.
-- `usage` НЕ является частью model structured output; usage-envelope (`canonical + raw`) передаётся провайдером отдельно и сохраняется в `messages.usage_json`.
-
-Модель возвращает JSON:
-
-```json
-{
-  "action": { "type": "text", "content": "Text response" }
-}
-```
-
 ### Полный pipeline обработки сообщения (события и реакции)
 
 #### 1. Main process: получение ответа LLM
-1) `MainPipeline` получает Structured Output от провайдера.
-2) Валидирует формат (`action.content`, `action.type`).
-3) При ошибке формата — делает retry с системным сообщением.
-4) Сохраняет `kind: llm` сообщение в БД (payload целиком).
-5) Эмитит `message.created`/`message.updated` как обычно.
+1) `MainPipeline` получает streaming chunks от провайдера (`reasoning`, `text`).
+2) На первом meaningful chunk создаёт `kind: llm` (`done: 0`).
+3) На каждом чанке обновляет payload `kind: llm`.
+4) На завершении turn финализирует `kind: llm` (`done: 1`).
+5) Отдельно сохраняет `usage_json` (если есть).
 
 #### 2. Renderer: первичный рендер
 1) Получает `message.created`/`message.updated`.
-2) `AgentMessage` рендерит `action.content` как Markdown.
+2) `AgentMessage` рендерит `data.text` как Markdown.
 3) Дополнительных post-processing этапов нет.
 
 ### Крайние случаи
 
-- Некорректный structured output от провайдера → выполняются retry по контракту.
-- При исчерпании retry создаётся `kind:error` сообщение с единым пользовательским текстом.
+- Неконсистентный event-stream от провайдера → контролируемая ошибка без падения процесса.
+- При неисправимой ошибке создаётся `kind:error` сообщение с единым пользовательским текстом.
 
 ### Дополнительные параметры (выбраны по умолчанию)
 
@@ -276,14 +213,14 @@ CREATE TABLE messages (
 ### Тестирование
 
 #### Unit tests
-- валидация и парсинг structured output.
+- обработка streaming chunks в `MainPipeline`.
 - обработка usage-envelope и persist в `messages.usage_json`.
-- обработка ошибок формата и retry в `MainPipeline`.
+- обработка ошибок event-stream и retry policy в `MainPipeline`.
 
 #### Functional tests
 - История передаётся как отдельные сообщения и исключает служебные поля.
-- Structured Output описан в системном промпте и используется моделью.
-- Invalid structured output → retry, затем ошибка с `Retry`.
+- Reasoning и text стримятся инкрементально.
+- Tool calling работает в режиме single-shot события `message.tool_call`.
 
 ---
 
@@ -301,18 +238,15 @@ interface ChatMessage {
 interface ChatOptions {
   model: string;
   reasoningEffort?: 'low' | 'medium' | 'high';
+  tools?: LLMTool[];
 }
 
-interface ChatChunk {
-  type: 'reasoning';
-  delta: string;
-  done: boolean;
-}
-
-interface LLMAction {
-  type: 'text';
-  content: string;
-}
+type ChatChunk =
+  | { type: 'reasoning'; delta: string }
+  | { type: 'text'; delta: string }
+  | { type: 'tool_call'; callId: string; toolName: string; arguments: Record<string, unknown> }
+  | { type: 'turn_done' }
+  | { type: 'turn_error'; errorType: 'auth' | 'rate_limit' | 'provider' | 'network' | 'timeout'; message: string };
 
 interface LLMUsage {
   canonical: {
@@ -325,8 +259,7 @@ interface LLMUsage {
   raw: Record<string, unknown>;
 }
 
-interface LLMStructuredOutput {
-  action: LLMAction;
+interface LLMChatResult {
   usage?: LLMUsage;
 }
 
@@ -337,7 +270,7 @@ interface ILLMProvider {
     messages: ChatMessage[],
     options: ChatOptions,
     onChunk: (chunk: ChatChunk) => void
-  ): Promise<LLMStructuredOutput>;
+  ): Promise<LLMChatResult>;
   getProviderName(): string;
 }
 ```
@@ -373,18 +306,22 @@ class PromptBuilder {
     private historyStrategy: HistoryStrategy
   ) {}
 
-  buildMessages(messages: Message[]): ChatMessage[] // system + history messages
+  build(messages: Message[]): { messages: ChatMessage[]; tools: LLMTool[] } // system + history + tools
 }
 ```
 
-`PromptBuilder.buildMessages()` возвращает итоговый массив `ChatMessage[]`:
+`PromptBuilder.build()` возвращает:
+- `messages`: итоговый массив `ChatMessage[]`;
+- `tools`: объединённый список инструментов из `AgentFeature.getTools()`.
+
+`messages` содержит:
 - один элемент `role: system` с системной инструкцией;
 - затем отдельные элементы истории (`role: user`/`role: assistant`) по одному на сообщение.
 
 **Базовая инструкция для system-role:**
 
 ```
-You are a helpful AI assistant. Always reply in the user's language (detected from the latest user message in the current request), including both your final answer and any reasoning text. You may respond in Markdown when it improves clarity. Supported Markdown (GFM): headings, paragraphs, bold/italic/strikethrough, links/autolinks, blockquotes, ordered/unordered lists and task lists, tables, horizontal rules, inline code, fenced code blocks with language tags (syntax highlighting), Mermaid diagrams (```mermaid```), and math via KaTeX (inline $...$ or block $$...$$). Do not use footnotes.
+You are a helpful AI assistant. Always reply in the user's language (detected from the latest user message in the current request), including both your response text and any reasoning text. You may respond in Markdown when it improves clarity. Supported Markdown (GFM): headings, paragraphs, bold/italic/strikethrough, links/autolinks, blockquotes, ordered/unordered lists and task lists, tables, horizontal rules, inline code, fenced code blocks with language tags (syntax highlighting), Mermaid diagrams (```mermaid```), and math via KaTeX (inline $...$ or block $$...$$). Do not use footnotes.
 ```
 
 **Формат входных сообщений (пример):**
@@ -454,19 +391,26 @@ class MainPipeline {
 2. Получает API ключ из UserSettingsManager
 3. Создаёт экземпляр провайдера с актуальными настройками
 4. Собирает промпт через PromptBuilder
-5. Инициализирует локальное состояние выполнения (`llmMessageId`, `accumulatedReasoning`)
-6. Вызывает `provider.chat(messages, options, onChunk)`:
+   - `const { messages, tools } = promptBuilder.build(history)`
+5. Инициализирует локальное состояние выполнения (`llmMessageId`, `accumulatedReasoning`, `accumulatedText`)
+6. Вызывает `provider.chat(messages, { ...options, tools }, onChunk)`:
    onChunk(chunk):
      if llmMessageId == null:
       создаёт `kind: llm` сообщение (`done: false`, `reply_to_message_id = userMessageId`) → `llmMessageId = message.id`
       эмитит `message.created`
-     accumulatedReasoning += chunk.delta
-     обновляет `kind: llm` (`reasoning.text = accumulatedReasoning`, `done: false`)
-     эмитит `message.llm.reasoning.updated { delta, accumulatedText }`
-     if llmMessageId уже существовал до этого чанка: эмитит `message.updated`
-7. Получает финальный Structured Output
-8. Обновляет `kind: llm` (action + usage, `done: true`)
-9. Эмитит финальный `message.updated`
+    if chunk.type == 'reasoning':
+      accumulatedReasoning += chunk.delta
+      обновляет `kind: llm` (`reasoning.text = accumulatedReasoning`, `done: false`)
+      эмитит `message.llm.reasoning.updated { delta, accumulatedText }`
+    if chunk.type == 'text':
+      accumulatedText += chunk.delta
+      обновляет `kind: llm` (`data.text = accumulatedText`, `done: false`)
+      эмитит `message.llm.text.updated { delta, accumulatedText }`
+    if chunk.type == 'tool_call':
+      эмитит одно событие `message.tool_call` (аргументы уже собраны полностью)
+    if llmMessageId уже существовал до этого чанка: эмитит `message.updated` (snapshot/consistency)
+7. При `turn_done` обновляет `kind: llm` (`done: true`) и сохраняет `usage_json` отдельным шагом
+8. Эмитит финальный `message.updated`
 ```
 
 **Обработка ошибок:**
@@ -502,7 +446,7 @@ catch(error):
 
 **`MessageManager.listForModelHistory()`** фильтрует сообщения с `hidden` — они не попадают во входной массив `messages`.
 
-**`MessageManager.listForModelHistory()`** также фильтрует сообщения с `kind: error` — они не попадают во входной массив `messages` (требование llm-integration.3.9).
+**`MessageManager.listForModelHistory()`** также фильтрует сообщения с `kind: error` и `kind: tool_call` — они не попадают во входной массив `messages`.
 
 **UI** фильтрует сообщения с `hidden: true` — они не отображаются в чате.
 
@@ -536,13 +480,16 @@ interface AgentRateLimitPayload {
 }
 ```
 
-### Контракт reasoning-события (реализация)
+### Контракты streaming-событий (реализация)
 
-Технический контракт realtime-события reasoning фиксируется на уровне дизайна и синхронизируется с `realtime-events` спецификацией:
+Технические контракты realtime-событий фиксируются на уровне дизайна и синхронизируются с `realtime-events` спецификацией:
 
 ```typescript
 // Requirements: llm-integration.2, realtime-events.5.5
-type EventName = 'message.llm.reasoning.updated';
+type EventName =
+  | 'message.llm.reasoning.updated'
+  | 'message.llm.text.updated'
+  | 'message.tool_call';
 
 interface MessageLlmReasoningUpdatedPayload {
   messageId: number;
@@ -551,11 +498,37 @@ interface MessageLlmReasoningUpdatedPayload {
   accumulatedText: string;
   timestamp: number;
 }
+
+interface MessageLlmTextUpdatedPayload {
+  messageId: number;
+  agentId: string;
+  delta: string;
+  accumulatedText: string;
+  timestamp: number;
+}
+
+interface MessageToolCallPayload {
+  agentId: string;
+  llmMessageId: number;
+  callId: string;
+  toolName: string;
+  arguments: Record<string, unknown>;
+  timestamp: number;
+}
 ```
 
-Правило обработки timestamp для стриминговых типов (`message.updated`, `message.llm.reasoning.updated`):
+Потребитель `message.tool_call`:
+- подписка выполняется в main-process tool execution orchestrator (`MainPipeline`/`ToolRunner`);
+- renderer может получать событие через IPC, но не обязан рендерить отдельный chat message.
+
+Правило обработки timestamp для стриминговых типов (`message.updated`, `message.llm.reasoning.updated`, `message.llm.text.updated`):
 - события с одинаковым timestamp НЕ коалесцируются;
 - устаревшим считается только событие с меньшим timestamp (`<`), чтобы не терять чанки в одном миллисекундном тике.
+
+Правило источников данных в renderer:
+- `message.llm.reasoning.updated` и `message.llm.text.updated` используются как primary source для delta-стриминга.
+- `message.updated` используется как snapshot source для persisted-состояния и финализации turn.
+- Во время активного стриминга renderer не должен повторно добавлять тот же контент из snapshot, уже применённый через delta-события.
 
 События определены в `src/shared/events/types.ts` и `src/shared/events/constants.ts`, а доставка реализована в `MainEventBus`.
 
@@ -568,14 +541,20 @@ User отправляет сообщение
   → AgentIPCHandlers.messages:create
   → MessageManager.create(kind: 'user')        → message.created
   → MainPipeline.run(agentId, messageId) [async]
-      → PromptBuilder.buildMessages(history)
-      → OpenAIProvider.chat(messages, options, onChunk)
+      → PromptBuilder.build(history) -> { messages, tools }
+      → OpenAIProvider.chat(messages, { ...options, tools }, onChunk)
           → [reasoning chunk]
               → MessageManager.create/update(kind: 'llm', done: false, reply_to_message_id: userMessageId)
               → message.llm.reasoning.updated
               → message.created (для первого чанка) / message.updated (для последующих чанков)
-          → [LLMAction received]
-              → MessageManager.update(kind: 'llm', action, done: true)
+          → [text chunk]
+              → MessageManager.update(kind: 'llm', text, done: false)
+              → message.llm.text.updated
+              → message.updated
+          → [tool_call with full arguments]
+              → message.tool_call
+          → [turn done]
+              → MessageManager.update(kind: 'llm', done: true)
               → message.updated
       → [on error]
           → MessageManager.update(kind: 'llm', hidden: true, done: false) [если уже создан]
@@ -595,7 +574,7 @@ User отправляет сообщение
 - `tests/unit/agents/AgentIPCHandlers.test.ts` — запуск pipeline при kind:user
 - `tests/unit/hooks/useMessages.test.ts` — обработка новых событий
 - `tests/unit/db/repositories/MessagesRepository.test.ts` — kind как параметр
-- `tests/unit/MigrationRunner.test.ts` — миграции `done`, включая backfill historical `llm`
+- `tests/unit/db/repositories/MessagesRepository.test.ts` — семантика `done` для `kind:llm` и `kind:error`
 
 ### Функциональные тесты
 
@@ -635,14 +614,15 @@ User отправляет сообщение
 | llm-integration.5.8 (модели/`reasoning_effort` для test/prod) | ✓ | ✓ |
 | llm-integration.6 | ✓ | - |
 | llm-integration.6.5 (`done` как отдельный флаг) | ✓ | - |
-| llm-integration.6.6 (совместимость `done` для существующих записей) | ✓ | - |
-| llm-integration.6.6.1 (backfill завершённых legacy `llm`) | ✓ | - |
+| llm-integration.6.6 (`kind:llm` с `data.text` имеет `done = true`) | ✓ | - |
 | llm-integration.7 | ✓ | ✓ |
 | llm-integration.8.1 | ✓ | ✓ |
 | llm-integration.8.5 | ✓ | ✓ |
 | llm-integration.8.6 | ✓ | - |
 | llm-integration.8.7 | ✓ | ✓ |
+| llm-integration.9 | ✓ | ✓ |
 | llm-integration.10 | ✓ | ✓ |
 | llm-integration.11 | ✓ | ✓ |
 | llm-integration.12 | ✓ | ✓ |
 | llm-integration.13 | ✓ | - |
+| llm-integration.14 | ✓ | ✓ |

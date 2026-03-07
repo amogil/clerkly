@@ -85,7 +85,7 @@ interface MessagePayload {
 }
 
 interface Message {
-  kind: 'user' | 'llm' | 'error' | 'tool_call' | 'code_exec' | 'final_answer' | 'request_scope' | 'artifact';
+  kind: 'user' | 'llm' | 'error' | 'tool_call';
   done: boolean;
   hidden: boolean;
   replyToMessageId?: number | null;
@@ -107,7 +107,7 @@ class DatabaseManager {
   private db: Database.Database | null = null;
   private userManager: UserManager | null = null;
   
-  // Инициализация БД и миграции
+  // Инициализация БД
   initialize(storagePath: string): void { ... }
   
   // Установка UserManager для получения userId
@@ -207,7 +207,10 @@ class AgentManager {
       WHERE agent_id = ? AND user_id = ?
     `).run(data.name, now, agentId, this.userId);
     
-    MainEventBus.getInstance().publish(new AgentUpdatedEvent(agentId, data));
+    const updatedAgent = await this.get(agentId);
+    if (updatedAgent) {
+      MainEventBus.getInstance().publish(new AgentUpdatedEvent(this.toEventAgent(updatedAgent)));
+    }
     
     return { agentId, userId: this.userId, name: data.name!, createdAt: '', updatedAt: now };
   }
@@ -221,7 +224,10 @@ class AgentManager {
       WHERE agent_id = ? AND user_id = ?
     `).run(now, agentId, this.userId);
     
-    MainEventBus.getInstance().publish(new AgentArchivedEvent(agentId));
+    const archivedAgent = await this.get(agentId);
+    if (archivedAgent) {
+      MainEventBus.getInstance().publish(new AgentArchivedEvent(this.toEventAgent(archivedAgent)));
+    }
   }
   
   // Обновление updated_at (вызывается из MessageManager)
@@ -232,9 +238,10 @@ class AgentManager {
       UPDATE agents SET updated_at = ? WHERE agent_id = ?
     `).run(now, agentId);
     
-    MainEventBus.getInstance().publish(new AgentUpdatedEvent(agentId, {
-      updatedAt: Date.parse(now)
-    }));
+    const updatedAgent = await this.get(agentId);
+    if (updatedAgent) {
+      MainEventBus.getInstance().publish(new AgentUpdatedEvent(this.toEventAgent(updatedAgent)));
+    }
   }
   
   private generateAgentId(): string {
@@ -505,7 +512,6 @@ function computeAgentStatus(messages: Message[]): AgentStatus {
 
   const lastMessage = visibleMessages[visibleMessages.length - 1];
   if (lastMessage.kind === 'error') return 'error';
-  if (lastMessage.kind === 'final_answer') return 'completed';
   if (lastMessage.kind === 'user') return 'in-progress';
   if (lastMessage.kind === 'llm') {
     return lastMessage.done ? 'awaiting-response' : 'in-progress';
@@ -641,12 +647,12 @@ const archiveAgent = useCallback(async (agentId: string): Promise<boolean> => {
 export class AgentArchivedEvent extends TypedEventClass<AgentArchivedType> {
   readonly type = EVENT_TYPES.AGENT_ARCHIVED; // 'agent.archived'
   
-  constructor(public readonly id: string) {
+  constructor(public readonly agent: AgentSnapshot) {
     super();
   }
   
   toPayload(): EventPayloadWithoutTimestamp<AgentArchivedType> {
-    return { id: this.id };
+    return { agent: this.agent };
   }
 }
 ```
@@ -662,16 +668,16 @@ export class AgentArchivedEvent extends TypedEventClass<AgentArchivedType> {
 MainEventBus.getInstance().publish(new AgentCreatedEvent(agentData));
 
 // При обновлении агента (name, updatedAt)
-MainEventBus.getInstance().publish(new AgentUpdatedEvent(agentId, changedFields));
+MainEventBus.getInstance().publish(new AgentUpdatedEvent(agentSnapshot));
 
 // При архивировании агента
-MainEventBus.getInstance().publish(new AgentArchivedEvent(agentId));
+MainEventBus.getInstance().publish(new AgentArchivedEvent(agentSnapshot));
 
 // При создании сообщения
 MainEventBus.getInstance().publish(new MessageCreatedEvent(messageData));
 
 // При обновлении сообщения
-MainEventBus.getInstance().publish(new MessageUpdatedEvent(messageId, changedFields));
+MainEventBus.getInstance().publish(new MessageUpdatedEvent(messageSnapshot));
 ```
 
 #### Детальная Спецификация Генераторов
@@ -681,28 +687,28 @@ MainEventBus.getInstance().publish(new MessageUpdatedEvent(messageId, changedFie
 - **Файл:** `src/main/agents/AgentManager.ts`
 - **Момент:** После создания агента в БД через `AgentsRepository.create()`
 - **Условие:** Всегда при создании нового агента
-- **Payload:** `{ data: { id, name, createdAt, updatedAt } }`
+- **Payload:** `{ agent: agentSnapshot }`
 
 **AGENT_UPDATED** (agents.12.2)
 - **Генератор 1:** `AgentManager.update()`
   - **Файл:** `src/main/agents/AgentManager.ts`
   - **Момент:** После обновления в БД через `AgentsRepository.update()`
   - **Условие:** При изменении имени агента через API
-  - **Payload:** `{ id: agentId, changedFields: { name } }`
+  - **Payload:** `{ agent: agentSnapshot }`
 
 - **Генератор 2:** `AgentManager.handleMessageCreated()`
   - **Файл:** `src/main/agents/AgentManager.ts`
   - **Триггер:** Подписка на событие `MESSAGE_CREATED` (в конструкторе)
   - **Момент:** После обновления `updatedAt` в БД через `AgentsRepository.touch()`
   - **Условие:** При создании любого сообщения в чате агента
-  - **Payload:** `{ id: agentId, changedFields: { updatedAt } }`
+  - **Payload:** `{ agent: agentSnapshot }`
 
 **AGENT_ARCHIVED** (agents.12.3)
 - **Генератор:** `AgentManager.archive()`
 - **Файл:** `src/main/agents/AgentManager.ts`
 - **Момент:** После архивирования в БД через `AgentsRepository.archive()`
 - **Условие:** При архивировании агента через API
-- **Payload:** `{ id: agentId }`
+- **Payload:** `{ agent: agentSnapshot }`
 
 **MESSAGE_CREATED** (agents.12.4)
 - **Генератор:** `MessageManager.create()`
@@ -716,8 +722,8 @@ MainEventBus.getInstance().publish(new MessageUpdatedEvent(messageId, changedFie
 - **Генератор:** `MessageManager.update()`
 - **Файл:** `src/main/agents/MessageManager.ts`
 - **Момент:** После обновления payload в БД через `MessagesRepository.update()`
-- **Условие:** При обновлении содержимого сообщения (например, завершение tool_call)
-- **Payload:** `{ id: messageId, changedFields: { payloadJson } }`
+- **Условие:** При обновлении содержимого сообщения (например, промежуточный/финальный апдейт `kind: llm`)
+- **Payload:** полный snapshot сообщения
 
 #### Flow Событий: Создание Сообщения
 
@@ -751,32 +757,32 @@ function AgentsComponent() {
   
   // Подписка на события агентов
   useEventSubscription(EVENT_TYPES.AGENT_CREATED, (payload) => {
-    setAgents(prev => [payload.data, ...prev]);
+    setAgents(prev => [payload.agent, ...prev]);
   });
   
   useEventSubscription(EVENT_TYPES.AGENT_UPDATED, (payload) => {
     setAgents(prev => prev.map(agent => 
-      agent.agentId === payload.id 
-        ? { ...agent, ...payload.changedFields }
+      agent.agentId === payload.agent.id 
+        ? payload.agent
         : agent
     ));
   });
   
   useEventSubscription(EVENT_TYPES.AGENT_ARCHIVED, (payload) => {
-    setAgents(prev => prev.filter(agent => agent.agentId !== payload.id));
+    setAgents(prev => prev.filter(agent => agent.agentId !== payload.agent.id));
   });
   
   // Подписка на события сообщений
   useEventSubscription(EVENT_TYPES.MESSAGE_CREATED, (payload) => {
-    if (payload.data.agentId === activeAgentId) {
-      setMessages(prev => [...prev, payload.data]);
+    if (payload.message.agentId === activeAgentId) {
+      setMessages(prev => [...prev, payload.message]);
     }
   });
   
   useEventSubscription(EVENT_TYPES.MESSAGE_UPDATED, (payload) => {
     setMessages(prev => prev.map(msg =>
-      msg.id === payload.id
-        ? { ...msg, ...payload.changedFields }
+      msg.id === payload.message.id
+        ? payload.message
         : msg
     ));
   });
@@ -800,7 +806,7 @@ function AgentsComponent() {
 *Подписчик 2: useAgentChat (Renderer)*
 - **Файл:** `src/renderer/hooks/useAgentChat.ts`
 - **Подписка:** `useEventSubscription(MESSAGE_CREATED, handler)`
-- **Фильтр:** `payload.data.agentId === activeAgentId` (только для активного агента)
+- **Фильтр:** `payload.message.agentId === activeAgentId` (только для активного агента)
 - **Действия:**
   1. Конвертирует event message → renderer message
   2. Парсит payload
@@ -816,8 +822,8 @@ function AgentsComponent() {
 - **Фильтр:** Нет (обрабатывает все обновления)
 - **Действия:**
   1. Находит сообщение по `id` в state
-  2. Обновляет `payloadJson` из `changedFields`
-  3. Парсит новый payload
+  2. Заменяет snapshot сообщения целиком из `payload.message`
+  3. Использует уже распарсенный payload сообщения
   4. Триггерит React re-render → сообщение обновляется в чате
 
 **AGENT_CREATED** (agents.12.1, agents.12.6)
@@ -837,11 +843,11 @@ function AgentsComponent() {
 *Подписчик: useAgents (Renderer)*
 - **Файл:** `src/renderer/hooks/useAgents.ts`
 - **Подписка:** `useEventSubscription(AGENT_UPDATED, handler)`
-- **Фильтр:** `payload.id === agent.agentId`
+- **Фильтр:** `payload.agent.id === agent.agentId`
 - **Действия:**
   1. Находит агента по `id` в state
-  2. Обновляет `name` (если есть в `changedFields`)
-  3. Обновляет `updatedAt` (если есть в `changedFields`)
+  2. Заменяет snapshot агента целиком из `payload.agent`
+  3. Использует `payload.agent.updatedAt` для пересортировки
   4. Конвертирует timestamp → ISO string
   5. **Пересортировывает список агентов по `updatedAt` DESC** (agents.1.4.1, agents.1.4.2)
   6. Триггерит React re-render → агент перемещается в начало списка
@@ -898,7 +904,7 @@ function AgentsComponent() {
 │  │  Chat mode:                                        │ │
 │  │  - AgentWelcome (if no messages)         │ │
 │  │  - MessageList                                     │ │
-│  │  - ActivityIndicator (during tool_call/code_exec) │ │
+│  │  - ActivityIndicator (while llm is in-progress)    │ │
 │  │                                                    │ │
 │  │  All Agents mode (showAllAgentsPage):              │ │
 │  │  - Back button                                     │ │
@@ -1507,9 +1513,9 @@ function AgentWelcome({ onPromptClick }: AgentWelcomeProps) {
       </ReasoningContent>
     </Reasoning>
   )}
-  {action?.content ? (
+  {text ? (
     <div data-testid="message-llm-action" className="text-sm leading-relaxed whitespace-pre-wrap break-words w-full">
-      {action.content}
+      {text}
     </div>
   ) : null}
 </div>
@@ -1526,7 +1532,7 @@ function AgentWelcome({ onPromptClick }: AgentWelcomeProps) {
 - Парсинг reasoning в `OpenAIProvider` должен поддерживать вариативные формы SSE-дельт (`string`, объект с `text/delta/content`, массив content-part), чтобы streaming не терялся при изменении формата события провайдера.
 - В запросе к OpenAI для reasoning-моделей должен передаваться `reasoning.summary`, чтобы провайдер возвращал стриминг-канал reasoning-summary и UI получал живые reasoning-чанки.
 - При приёме reasoning-событий провайдера парсер должен исключать повторные/снапшотные чанки, чтобы accumulated reasoning в UI не дублировался.
-- При активном reasoning без финального `action.content` в сообщении отображается reasoning-блок как единственный индикатор стриминга до появления action.
+- При активном reasoning без финального `data.text` в сообщении отображается reasoning-блок как единственный индикатор стриминга до появления текста ответа.
 - Визуальный маркер reasoning-сообщения рендерится в заголовке `ReasoningTrigger` (иконка приложения + текстовый индикатор + chevron).
   Этот маркер в рамках спеки считается `Message Avatar` для reasoning-сообщений.
 
@@ -1858,7 +1864,7 @@ const STATUS_STYLES: Record<AgentStatus, StatusStyle> = {
 
 **Сообщения в чате:**
 - для reasoning-сообщений визуальный маркер рендерится в заголовке `ReasoningTrigger`;
-- `action.content` рендерится отдельным блоком под reasoning.
+- `data.text` рендерится отдельным блоком под reasoning.
 - В терминах требований это поведение покрывает `Message Avatar` для `kind: llm` с reasoning.
 - В reasoning-сообщениях используется анимированная версия логотипа приложения только во время активной reasoning-фазы (`Logo animated={isStreaming}`), после завершения reasoning и автосворачивания trigger логотип остаётся статичным.
 
@@ -2173,12 +2179,17 @@ useChat.sendMessage()
               │     └─► enqueue: { type: 'reasoning-start', id } (первый раз)
               │         enqueue: { type: 'reasoning-delta', id, delta }
               │
-              ├── MESSAGE_UPDATED (с action.content)
-              │     └─► enqueue: { type: 'reasoning-end', id } (если было reasoning)
-              │         enqueue: { type: 'text-delta', id, delta: action.content }
-              │         enqueue: { type: 'text-end', id }
+              ├── MESSAGE_LLM_TEXT_UPDATED
+              │     └─► enqueue: { type: 'reasoning-end', id } (если reasoning завершен)
+              │         enqueue: { type: 'text-delta', id, delta }
+              │
+              ├── MESSAGE_UPDATED (done: true)
+              │     └─► enqueue: { type: 'text-end', id }
               │         enqueue: { type: 'finish' }
               │         controller.close()
+              │
+              ├── MESSAGE_TOOL_CALL
+              │     └─► UI transport event не создаётся (internal orchestration only)
               │
               ├── MESSAGE_CREATED (kind: error)
               │     └─► enqueue: { type: 'error', errorText }
@@ -2196,7 +2207,9 @@ useChat.sendMessage()
 **Маппинг IPC-событий → UIMessageChunk:**
 - `MESSAGE_CREATED` (kind: llm) → `{ type: 'start' }` + `{ type: 'text-start', id }`
 - `MESSAGE_LLM_REASONING_UPDATED` → `{ type: 'reasoning-delta', id, delta }`
-- `MESSAGE_UPDATED` с action → `{ type: 'text-delta', id, delta: action.content }` + `{ type: 'finish' }`
+- `MESSAGE_LLM_TEXT_UPDATED` → `{ type: 'text-delta', id, delta }`
+- `MESSAGE_UPDATED` с `done: true` → `{ type: 'text-end', id }` + `{ type: 'finish' }`
+- `MESSAGE_TOOL_CALL` → не транслируется в отдельный UI chunk
 - `MESSAGE_CREATED` (kind: error) → `{ type: 'error', errorText }` + `{ type: 'finish' }`
 - `MESSAGE_UPDATED` с `hidden: true` → закрыть stream (прерывание)
 
