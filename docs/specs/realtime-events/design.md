@@ -1579,25 +1579,7 @@ function dbMessageToSnapshot(dbMessage: Message): MessageSnapshot {
 
 ### Обновление API для возврата снапшотов
 
-**Проблема:** Текущий API возвращает DB модели, но UI нужны снапшоты.
-
-**Решение:** API должен возвращать снапшоты напрямую.
-
-**До (текущее состояние):**
-
-```typescript
-// Main Process
-ipcMain.handle('agents:list', () => {
-  return agentManager.list(); // Возвращает Agent[] из БД
-});
-
-// Renderer
-const result = await window.api.agents.list();
-const agents = result.data as Agent[]; // DB модели
-// Нужно вычислять статус вручную
-```
-
-**После (целевое состояние):**
+Целевой контракт API: обработчик `agents:list` возвращает `AgentSnapshot[]`.
 
 ```typescript
 // Main Process
