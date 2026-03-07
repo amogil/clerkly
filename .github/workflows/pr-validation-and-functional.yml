@@ -36,7 +36,7 @@ jobs:
         run: npm run validate:verbose
 
   functional:
-    if: github.event.pull_request.draft == false && github.event.pull_request.head.repo.full_name == github.repository
+    if: github.event.pull_request.draft == false && github.event.pull_request.head.repo.full_name == github.repository && needs.validate.result == 'success'
     needs: validate
     runs-on: macos-latest
     timeout-minutes: 90
