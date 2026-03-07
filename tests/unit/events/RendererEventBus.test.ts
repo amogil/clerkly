@@ -12,6 +12,8 @@ import {
   AgentCreatedEvent,
   AgentUpdatedEvent,
   AgentArchivedEvent,
+  MessageUpdatedEvent,
+  MessageLlmReasoningUpdatedEvent,
 } from '../../../src/shared/events/types';
 
 // Mock Logger
@@ -393,6 +395,63 @@ describe('RendererEventBus', () => {
           agent: expect.objectContaining({ name: 'New Name' }),
         })
       );
+    });
+
+    /* Preconditions: Same message.updated key receives two events in the same millisecond
+       Action: Publish two MessageUpdatedEvent with equal timestamp
+       Assertions: Both events are delivered (equal timestamp is not treated as outdated for streaming types)
+       Requirements: realtime-events.5.5 */
+    it('should not drop message.updated events with equal timestamp', () => {
+      const bus = RendererEventBus.getInstance();
+      const handler = jest.fn();
+      const now = Date.now();
+      const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(1234567890);
+
+      bus.subscribe('message.updated', handler);
+      bus.publish(
+        new MessageUpdatedEvent({
+          id: 42,
+          agentId: 'agent-1',
+          kind: 'llm',
+          timestamp: now,
+          payload: { data: { text: 'chunk 1' } },
+          replyToMessageId: 1,
+          hidden: false,
+          done: false,
+        })
+      );
+      bus.publish(
+        new MessageUpdatedEvent({
+          id: 42,
+          agentId: 'agent-1',
+          kind: 'llm',
+          timestamp: now,
+          payload: { data: { text: 'chunk 2' } },
+          replyToMessageId: 1,
+          hidden: false,
+          done: false,
+        })
+      );
+
+      expect(handler).toHaveBeenCalledTimes(2);
+      nowSpy.mockRestore();
+    });
+
+    /* Preconditions: Same reasoning key receives two events in the same millisecond
+       Action: Publish two MessageLlmReasoningUpdatedEvent with equal timestamp
+       Assertions: Both deltas are delivered
+       Requirements: realtime-events.5.5, llm-integration.2 */
+    it('should not drop message.llm.reasoning.updated events with equal timestamp', () => {
+      const bus = RendererEventBus.getInstance();
+      const handler = jest.fn();
+      const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(1234567890);
+
+      bus.subscribe('message.llm.reasoning.updated', handler);
+      bus.publish(new MessageLlmReasoningUpdatedEvent(7, 'agent-1', 'a', 'a'));
+      bus.publish(new MessageLlmReasoningUpdatedEvent(7, 'agent-1', 'b', 'ab'));
+
+      expect(handler).toHaveBeenCalledTimes(2);
+      nowSpy.mockRestore();
     });
   });
 

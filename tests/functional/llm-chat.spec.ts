@@ -11,6 +11,7 @@
 
 import { test, expect } from '@playwright/test';
 import {
+  getFreePort,
   launchElectron,
   closeElectron,
   ElectronTestContext,
@@ -25,8 +26,7 @@ import type { MockOAuthServer } from './helpers/mock-oauth-server';
 import { MockLLMServer } from './helpers/mock-llm-server';
 
 const TEST_CLIENT_ID = 'test-client-id-12345';
-const MOCK_OAUTH_PORT = 8894;
-const MOCK_LLM_PORT = 8895;
+let mockLLMPort: number;
 
 // Real OpenAI API key from .env (loaded by playwright.config.ts via dotenv)
 const OPENAI_API_KEY = process.env.CLERKLY_OPENAI_API_KEY;
@@ -39,7 +39,7 @@ test.beforeAll(async () => {
     throw new Error('[llm-chat] CLERKLY_OPENAI_API_KEY is required for standard functional runs');
   }
 
-  mockOAuthServer = await createMockOAuthServer(MOCK_OAUTH_PORT);
+  mockOAuthServer = await createMockOAuthServer();
   mockOAuthServer.setUserProfile({
     id: 'test-user-llm-chat',
     email: 'llm-chat@example.com',
@@ -48,7 +48,8 @@ test.beforeAll(async () => {
     family_name: 'Chat User',
   });
 
-  mockLLMServer = new MockLLMServer({ port: MOCK_LLM_PORT });
+  mockLLMPort = await getFreePort();
+  mockLLMServer = new MockLLMServer({ port: mockLLMPort });
   await mockLLMServer.start();
 });
 
@@ -140,6 +141,133 @@ test.describe('LLM Chat (real OpenAI)', () => {
       // Reasoning is above action (lower y = higher on screen)
       expect(reasoningBox!.y).toBeLessThan(actionBox!.y);
     }
+  });
+
+  /* Preconditions: Existing chat history is present after app reopen (npm-start-like path),
+     provider stream is deterministic via mock transport
+     Action: On reopened app user sends the first message immediately after chat becomes interactive
+     Assertions: Reasoning stream must be visible and progressively updated before final action appears
+     Requirements: llm-integration.2, llm-integration.7.2, agents.4.11 */
+  test('should display reasoning streaming after sending message', async () => {
+    test.setTimeout(180000);
+    mockLLMServer.setStreamingMode(true, {
+      reasoning: 'Warmup reasoning stream chunk one chunk two',
+      content: '{"action":{"type":"text","content":"Warmup response"}}',
+      chunkDelayMs: 30,
+    });
+    context = await launchElectron(undefined, {
+      CLERKLY_GOOGLE_API_URL: mockOAuthServer.getBaseUrl(),
+      CLERKLY_OPENAI_API_URL: `http://localhost:${mockLLMPort}/v1/responses`,
+      CLERKLY_OPENAI_API_KEY: 'mock-key-for-testing',
+    });
+    await completeOAuthFlow(context.app, context.window, TEST_CLIENT_ID);
+    await expectAgentsVisible(context.window, 10000);
+    const firstLaunchDataPath = context.testDataPath;
+    const firstInput = context.window.locator('textarea[placeholder*="Ask"]');
+
+    // Seed persistent history in the same user-data-dir.
+    await firstInput.fill('Warm up session with a short reply');
+    await firstInput.press('Enter');
+    await expect(context.window.locator('[data-testid="message-llm-action"]').last()).toBeVisible({
+      timeout: 90000,
+    });
+
+    await closeElectron(context, false);
+
+    mockLLMServer.setStreamingMode(true, {
+      reasoning:
+        'Compare factorial and power carefully step by step with intermediate checks and short validations',
+      content:
+        '{"action":{"type":"text","content":"17! is greater than 2^57 because 17! = 355687428096000 and 2^57 = 144115188075855872."}}',
+      chunkDelayMs: 250,
+    });
+    context = await launchElectron(firstLaunchDataPath, {
+      CLERKLY_GOOGLE_API_URL: mockOAuthServer.getBaseUrl(),
+      CLERKLY_OPENAI_API_URL: `http://localhost:${mockLLMPort}/v1/responses`,
+      CLERKLY_OPENAI_API_KEY: 'mock-key-for-testing',
+    });
+    await expectAgentsVisible(context.window, 15000);
+    const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
+    await expect(messageInput).toBeVisible({ timeout: 10000 });
+
+    await messageInput.fill(
+      'Solve this carefully: compare 17! and 2^57, explain each step briefly, then give final answer.'
+    );
+    await messageInput.press('Enter');
+
+    const reasoningTrigger = context.window.locator(
+      '[data-testid="message-llm-reasoning-trigger"]'
+    );
+    const reasoningContent = context.window.locator('[data-testid="message-llm-reasoning"]').last();
+    const actionContent = context.window.locator('[data-testid="message-llm-action"]');
+    const actionCountBeforeRequest = await actionContent.count();
+
+    await expect(reasoningTrigger.last()).toBeVisible({ timeout: 45000 });
+    await expect(reasoningTrigger.last()).toContainText('Thinking...', { timeout: 45000 });
+    await expect(reasoningContent).toBeVisible({ timeout: 45000 });
+
+    await context.window.evaluate((baselineActionCount: number) => {
+      const state = {
+        updatesBeforeAction: 0,
+        maxLengthBeforeAction: 0,
+        sawReasoningBeforeAction: false,
+        actionSeen: false,
+      };
+      const getReasoningNode = () =>
+        document.querySelectorAll('[data-testid="message-llm-reasoning"]')[
+          document.querySelectorAll('[data-testid="message-llm-reasoning"]').length - 1
+        ] as HTMLElement | undefined;
+      const getActionCount = () =>
+        document.querySelectorAll('[data-testid="message-llm-action"]').length;
+
+      const readReasoning = () => (getReasoningNode()?.textContent ?? '').trim();
+      const refresh = () => {
+        if (getActionCount() > baselineActionCount) {
+          state.actionSeen = true;
+        }
+        if (!state.actionSeen) {
+          const text = readReasoning();
+          if (text.length > 0) state.sawReasoningBeforeAction = true;
+          if (text.length > state.maxLengthBeforeAction) {
+            state.maxLengthBeforeAction = text.length;
+            state.updatesBeforeAction += 1;
+          }
+        }
+      };
+
+      refresh();
+      const observer = new MutationObserver(() => {
+        refresh();
+      });
+      observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+
+      (window as Window & { __reasoningStreamProbe?: unknown }).__reasoningStreamProbe = {
+        state,
+        stop: () => {
+          observer.disconnect();
+        },
+      };
+    }, actionCountBeforeRequest);
+
+    await expect(actionContent.last()).toBeVisible({ timeout: 90000 });
+
+    const streamProbe = await context.window.evaluate(() => {
+      const probe = (window as Window & { __reasoningStreamProbe?: any }).__reasoningStreamProbe;
+      if (!probe) {
+        return {
+          sawReasoningBeforeAction: false,
+          updatesBeforeAction: 0,
+          maxLengthBeforeAction: 0,
+        };
+      }
+      probe.stop();
+      return probe.state;
+    });
+
+    expect(streamProbe.sawReasoningBeforeAction).toBe(true);
+    expect(streamProbe.maxLengthBeforeAction).toBeGreaterThan(0);
+    expect(streamProbe.updatesBeforeAction).toBeGreaterThanOrEqual(1);
+    await expectNoToastError(context.window);
   });
 
   /* Preconditions: App authenticated, invalid API key saved
@@ -317,6 +445,198 @@ test.describe('LLM Chat (real OpenAI)', () => {
     // Scrollbar must not be removed from DOM (no remount = no flicker)
     expect(removals).toBe(0);
   });
+
+  /* Preconditions: App authenticated with real OpenAI API key, at least one long LLM response is persisted in chat history
+     Action: Restart app and record chat scrollTop frame-by-frame from the earliest startup frames
+     Assertions: After chat becomes visible, scrollTop stays stable (no visual startup autoscroll)
+     Requirements: agents.4.14.5, agents.4.14.6 */
+  test('should keep chat viewport visually stable on app reopen with real llm history', async () => {
+    test.setTimeout(180000);
+
+    context = await launchWithRealLLM(OPENAI_API_KEY!);
+    const testDataPath = context.testDataPath;
+
+    const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
+    await expect(messageInput).toBeVisible({ timeout: 10000 });
+
+    await messageInput.fill(
+      'Write a long Russian text with 8 numbered sections and bullet lists. No code blocks.'
+    );
+    await messageInput.press('Enter');
+
+    const stopButton = context.window.locator('[data-testid="prompt-input-stop"]');
+    await expect(stopButton).toBeVisible({ timeout: 15000 });
+    await expect(context.window.locator('[data-testid="prompt-input-send"]')).toBeVisible({
+      timeout: 120000,
+    });
+
+    const actionContent = context.window.locator('[data-testid="message-llm-action"]');
+    await expect(actionContent).toBeVisible({ timeout: 120000 });
+
+    await closeElectron(context, false);
+
+    context = await launchElectron(testDataPath, {
+      CLERKLY_GOOGLE_API_URL: mockOAuthServer.getBaseUrl(),
+      CLERKLY_OPENAI_API_KEY: OPENAI_API_KEY!,
+    });
+
+    await context.window.evaluate(() => {
+      const state = {
+        samples: [] as Array<{
+          t: number;
+          visible: boolean;
+          scrollTop: number | null;
+          loaderVisible: boolean;
+        }>,
+        firstVisibleToUserAt: null as number | null,
+        firstVisibleToUserScrollTop: null as number | null,
+        maxScrollDeltaAfterVisibleToUser: 0,
+        movedFramesAfterVisibleToUser: 0,
+        scrollEventsAfterVisibleToUser: 0,
+      };
+
+      let listenerAttached = false;
+      let lastVisibleScrollTop: number | null = null;
+      const startedAt = performance.now();
+
+      const isLoaderVisible = () => {
+        const loader = document.querySelector(
+          '[data-testid="app-loading-screen"]'
+        ) as HTMLElement | null;
+        if (!loader) return false;
+        const style = window.getComputedStyle(loader);
+        return (
+          loader.getAttribute('aria-hidden') !== 'true' &&
+          style.display !== 'none' &&
+          style.visibility !== 'hidden' &&
+          style.opacity !== '0'
+        );
+      };
+
+      const getMessagesArea = () =>
+        document.querySelector('[data-testid="messages-area"]') as HTMLElement | null;
+
+      const isVisible = (el: HTMLElement | null) => {
+        if (!el) return false;
+        const rect = el.getBoundingClientRect();
+        const style = window.getComputedStyle(el);
+        return (
+          rect.width > 0 &&
+          rect.height > 0 &&
+          style.display !== 'none' &&
+          style.visibility !== 'hidden' &&
+          style.opacity !== '0'
+        );
+      };
+
+      const attachScrollListener = (el: HTMLElement) => {
+        if (listenerAttached) return;
+        listenerAttached = true;
+        el.addEventListener(
+          'scroll',
+          () => {
+            if (state.firstVisibleToUserAt !== null) {
+              state.scrollEventsAfterVisibleToUser += 1;
+            }
+          },
+          { passive: true }
+        );
+      };
+
+      (window as any).__startupScrollTracePromise = new Promise<void>((resolve) => {
+        const run = () => {
+          const now = performance.now();
+          const messagesArea = getMessagesArea();
+          if (messagesArea) {
+            attachScrollListener(messagesArea);
+          }
+
+          const visible = isVisible(messagesArea);
+          const scrollTop = messagesArea ? messagesArea.scrollTop : null;
+          const loaderVisible = isLoaderVisible();
+
+          if (visible && !loaderVisible && state.firstVisibleToUserAt === null) {
+            state.firstVisibleToUserAt = now - startedAt;
+            state.firstVisibleToUserScrollTop = scrollTop;
+          }
+
+          if (
+            visible &&
+            !loaderVisible &&
+            scrollTop !== null &&
+            state.firstVisibleToUserScrollTop !== null
+          ) {
+            const totalDelta = Math.abs(scrollTop - state.firstVisibleToUserScrollTop);
+            if (totalDelta > state.maxScrollDeltaAfterVisibleToUser) {
+              state.maxScrollDeltaAfterVisibleToUser = totalDelta;
+            }
+
+            if (lastVisibleScrollTop !== null) {
+              const frameDelta = Math.abs(scrollTop - lastVisibleScrollTop);
+              if (frameDelta > 1) {
+                state.movedFramesAfterVisibleToUser += 1;
+              }
+            }
+            lastVisibleScrollTop = scrollTop;
+          }
+
+          state.samples.push({
+            t: now - startedAt,
+            visible,
+            scrollTop,
+            loaderVisible,
+          });
+
+          if (now - startedAt < 5000) {
+            requestAnimationFrame(run);
+            return;
+          }
+
+          (window as any).__startupScrollTrace = state;
+          resolve();
+        };
+
+        requestAnimationFrame(run);
+      });
+    });
+
+    await expectAgentsVisible(context.window, 10000);
+    await context.window.evaluate(async () => {
+      await (window as any).__startupScrollTracePromise;
+    });
+
+    const traceSummary = await context.window.evaluate(() => {
+      const state = (window as any).__startupScrollTrace as {
+        samples: Array<{ visible: boolean; loaderVisible: boolean }>;
+        firstVisibleToUserAt: number | null;
+        maxScrollDeltaAfterVisibleToUser: number;
+        movedFramesAfterVisibleToUser: number;
+        scrollEventsAfterVisibleToUser: number;
+      };
+
+      const visibleSamples = state.samples.filter((sample) => sample.visible).length;
+      const visibleToUserSamples = state.samples.filter(
+        (sample) => sample.visible && !sample.loaderVisible
+      ).length;
+
+      return {
+        firstVisibleToUserAt: state.firstVisibleToUserAt,
+        maxScrollDeltaAfterVisibleToUser: state.maxScrollDeltaAfterVisibleToUser,
+        movedFramesAfterVisibleToUser: state.movedFramesAfterVisibleToUser,
+        scrollEventsAfterVisibleToUser: state.scrollEventsAfterVisibleToUser,
+        visibleSamples,
+        visibleToUserSamples,
+      };
+    });
+
+    expect(traceSummary.firstVisibleToUserAt).not.toBeNull();
+    expect(traceSummary.visibleSamples).toBeGreaterThan(20);
+    expect(traceSummary.visibleToUserSamples).toBeGreaterThan(20);
+    expect(traceSummary.maxScrollDeltaAfterVisibleToUser).toBeLessThanOrEqual(2);
+    expect(traceSummary.movedFramesAfterVisibleToUser).toBe(0);
+    expect(traceSummary.scrollEventsAfterVisibleToUser).toBe(0);
+    await expectNoToastError(context.window);
+  });
 });
 
 /**
@@ -349,7 +669,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
   async function launchWithMockLLM(): Promise<ElectronTestContext> {
     const ctx = await launchElectron(undefined, {
       CLERKLY_GOOGLE_API_URL: mockOAuthServer.getBaseUrl(),
-      CLERKLY_OPENAI_API_URL: `http://localhost:${MOCK_LLM_PORT}/v1/responses`,
+      CLERKLY_OPENAI_API_URL: `http://localhost:${mockLLMPort}/v1/responses`,
       CLERKLY_OPENAI_API_KEY: 'mock-key-for-testing',
     });
     await completeOAuthFlow(ctx.app, ctx.window, TEST_CLIENT_ID);
@@ -411,16 +731,13 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     await messageInput.fill('Second message');
     await messageInput.press('Enter');
 
-    // Wait for the LLM response to the second message
-    const llmBubble = context.window.locator('[data-testid="message-llm"]');
-    await expect(llmBubble).toBeVisible({ timeout: 3000 });
-
-    // Only one llm bubble should be visible (previous one is hidden)
+    // Only one llm bubble should remain (previous one is hidden)
     const llmBubbles = context.window.locator('[data-testid="message-llm"]');
-    await expect(llmBubbles).toHaveCount(1, { timeout: 3000 });
+    await expect(llmBubbles).toHaveCount(1, { timeout: 5000 });
+    await expect(llmBubbles.first()).toBeVisible({ timeout: 3000 });
 
     // The visible response should be for the second message
-    const actionContent = context.window.locator('[data-testid="message-llm-action"]');
+    const actionContent = llmBubbles.first().locator('[data-testid="message-llm-action"]');
     await expect(actionContent).toBeVisible({ timeout: 3000 });
     const text = await actionContent.textContent();
     expect(text?.trim()).toBe('Second response');
@@ -451,6 +768,87 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
       timeout: 5000,
     });
     await expect(context.window.locator('[data-testid="message-error"]')).toHaveCount(0);
+  });
+
+  /* Preconditions: MockLLMServer streams reasoning and then action content; app authenticated with mock LLM URL
+     Action: User sends message, waits for reasoning trigger, verifies trigger composition and toggles content
+     Assertions: Reasoning trigger contains app logo, thinking text and chevron; content can be collapsed/expanded, no toast errors
+     Requirements: agents.4.11, llm-integration.2, llm-integration.7.2 */
+  test('should render app logo in reasoning trigger and allow toggle', async () => {
+    mockLLMServer.setStreamingMode(true, {
+      reasoning: 'Thinking through the answer carefully',
+      content: '{"action":{"type":"text","content":"Final answer"}}',
+      chunkDelayMs: 80,
+    });
+
+    context = await launchWithMockLLM();
+    const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
+
+    await messageInput.fill('Show reasoning');
+    await messageInput.press('Enter');
+
+    const reasoningTrigger = context.window.locator(
+      '[data-testid="message-llm-reasoning-trigger"]'
+    );
+    const reasoningContent = context.window.locator('[data-testid="message-llm-reasoning"]');
+    await expect(reasoningTrigger).toBeVisible({ timeout: 5000 });
+    await expect(reasoningContent).toBeVisible({ timeout: 5000 });
+
+    // During streaming trigger should show animated app logo.
+    await expect(reasoningTrigger.locator('svg.logo-animated')).toBeVisible({ timeout: 5000 });
+    await expect(reasoningTrigger).toContainText('Thinking...');
+    await expect(reasoningTrigger.locator('svg.lucide-chevron-down')).toBeVisible({
+      timeout: 5000,
+    });
+
+    // Collapse then expand manually.
+    await reasoningTrigger.click();
+    await expect(reasoningContent).not.toBeVisible({ timeout: 5000 });
+    await reasoningTrigger.click();
+    await expect(reasoningContent).toBeVisible({ timeout: 5000 });
+
+    await expectNoToastError(context.window);
+  });
+
+  /* Preconditions: MockLLMServer streams long reasoning before final structured action; app authenticated with mock LLM URL
+     Action: User sends message, observes reasoning phase and then final action arrival
+     Assertions: Header status stays "In progress" while llm message has reasoning without action, then switches to "Awaiting response" after action is persisted
+     Requirements: agents.9.2, llm-integration.2, llm-integration.7.3 */
+  test('should keep agent in-progress during reasoning-only llm phase', async () => {
+    mockLLMServer.setStreamingMode(true, {
+      reasoning:
+        'Reasoning chunk one reasoning chunk two reasoning chunk three reasoning chunk four reasoning chunk five',
+      content: '{"action":{"type":"text","content":"Final answer after reasoning"}}',
+      chunkDelayMs: 120,
+    });
+
+    context = await launchWithMockLLM();
+    const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
+
+    await messageInput.fill('Show long reasoning and then final answer');
+    await messageInput.press('Enter');
+
+    const agentAvatarIcon = context.window
+      .locator('[data-testid^="agent-icon-"]')
+      .first()
+      .locator('[data-testid="agent-avatar-icon"]');
+    const reasoningTrigger = context.window.locator(
+      '[data-testid="message-llm-reasoning-trigger"]'
+    );
+    const actionContent = context.window.locator('[data-testid="message-llm-action"]');
+
+    await expect(reasoningTrigger).toBeVisible({ timeout: 5000 });
+    await expect(actionContent).toHaveCount(0);
+    await expect
+      .poll(async () => await agentAvatarIcon.getAttribute('class'), { timeout: 5000 })
+      .toContain('bg-blue-500');
+
+    await expect(actionContent).toBeVisible({ timeout: 10000 });
+    await expect
+      .poll(async () => await agentAvatarIcon.getAttribute('class'), { timeout: 5000 })
+      .toContain('bg-amber-500');
+
+    await expectNoToastError(context.window);
   });
 
   /* Preconditions: MockLLMServer configured with slow streaming, cancel IPC is forced to fail

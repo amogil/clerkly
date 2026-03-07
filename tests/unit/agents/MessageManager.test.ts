@@ -44,6 +44,7 @@ describe('MessageManager', () => {
     usageJson: null,
     replyToMessageId: null,
     hidden: false,
+    done: true,
   };
 
   beforeEach(() => {
@@ -63,6 +64,7 @@ describe('MessageManager', () => {
         getById: jest.fn().mockReturnValue(mockMessage),
         create: jest.fn().mockReturnValue(mockMessage),
         update: jest.fn(),
+        setDone: jest.fn(),
         updateUsageJson: jest.fn(),
       },
       agents: {} as IDatabaseManager['agents'],
@@ -94,6 +96,7 @@ describe('MessageManager', () => {
         payload: { data: { text: 'Hello' } },
         replyToMessageId: mockMessage.replyToMessageId ?? null,
         hidden: false,
+        done: true,
       });
       expect(typeof snapshot.timestamp).toBe('number');
       expect(typeof snapshot.payload).toBe('object');
@@ -118,6 +121,7 @@ describe('MessageManager', () => {
         usageJson: null,
         replyToMessageId: 1,
         hidden: false,
+        done: false,
       };
 
       const snapshot = (messageManager as any).toEventMessage(complexMessage);
@@ -145,6 +149,7 @@ describe('MessageManager', () => {
         usageJson: null,
         replyToMessageId: null,
         hidden: false,
+        done: true,
       };
 
       expect(() => (messageManager as any).toEventMessage(invalidMessage)).toThrow(
@@ -166,6 +171,7 @@ describe('MessageManager', () => {
         usageJson: null,
         replyToMessageId: null,
         hidden: false,
+        done: true,
       };
 
       expect(() => (messageManager as any).toEventMessage(emptyMessage)).toThrow();
@@ -305,6 +311,7 @@ describe('MessageManager', () => {
         'user',
         JSON.stringify(payload),
         null,
+        false,
         undefined
       );
       expect(result).toEqual(mockMessage);
@@ -334,6 +341,7 @@ describe('MessageManager', () => {
         usageJson: null,
         replyToMessageId: null,
         hidden: true, // returned by repo already with hidden=true
+        done: true,
       };
 
       // Repository returns only the records that were actually changed
@@ -393,7 +401,8 @@ describe('MessageManager', () => {
       expect(mockDbManager.messages.update).toHaveBeenCalledWith(
         1,
         'agent-123',
-        JSON.stringify(payload)
+        JSON.stringify(payload),
+        undefined
       );
       expect(mockDbManager.messages.getById).toHaveBeenCalledWith(1, 'agent-123');
       expect(mockEventBus.publish).toHaveBeenCalledTimes(1);

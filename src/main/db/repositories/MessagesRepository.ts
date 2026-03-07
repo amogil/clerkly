@@ -2,7 +2,7 @@
 // src/main/db/repositories/MessagesRepository.ts
 // Repository for messages with access control through AgentsRepository
 
-import { eq, and, asc, desc, lt } from 'drizzle-orm';
+import { eq, and, asc, desc, lt, or } from 'drizzle-orm';
 import { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import * as schema from '../schema';
 import { messages, Message } from '../schema';
@@ -96,6 +96,7 @@ export class MessagesRepository {
     kind: string,
     payloadJson: string,
     replyToMessageId: number | null,
+    done: boolean = false,
     timestamp?: string
   ): Message {
     this.checkAccess(agentId);
@@ -109,7 +110,7 @@ export class MessagesRepository {
 
     const message = this.db
       .insert(messages)
-      .values({ agentId, kind, timestamp: messageTimestamp, payloadJson, replyToMessageId })
+      .values({ agentId, kind, timestamp: messageTimestamp, payloadJson, replyToMessageId, done })
       .returning()
       .get();
 
@@ -165,6 +166,42 @@ export class MessagesRepository {
   }
 
   /**
+   * Mark in-flight llm message as hidden and incomplete in a single DB update.
+   * Returns updated message only when state actually changed.
+   * Requirements: llm-integration.3.2, llm-integration.8.5
+   */
+  hideAndMarkIncomplete(messageId: number, agentId: string): Message | null {
+    this.checkAccess(agentId);
+    const updatedRows = this.db
+      .update(messages)
+      .set({ hidden: true, done: false })
+      .where(
+        and(
+          eq(messages.id, messageId),
+          eq(messages.agentId, agentId),
+          // Avoid redundant updates/events when row is already in target state.
+          or(eq(messages.hidden, false), eq(messages.done, true))
+        )
+      )
+      .returning()
+      .all();
+    return updatedRows[0] ?? null;
+  }
+
+  /**
+   * Update done flag on a specific message.
+   * Requirements: llm-integration.1.6.1, llm-integration.1.6.2, llm-integration.6.5
+   */
+  setDone(messageId: number, agentId: string, done: boolean): void {
+    this.checkAccess(agentId);
+    this.db
+      .update(messages)
+      .set({ done })
+      .where(and(eq(messages.id, messageId), eq(messages.agentId, agentId)))
+      .run();
+  }
+
+  /**
    * List messages for an agent with pagination (last N messages, optionally before a given id).
    * Returns messages in ascending order (oldest first) and a hasMore flag.
    * Requirements: agents.13.1, agents.13.2, agents.13.4
@@ -202,12 +239,16 @@ export class MessagesRepository {
    * Update a message's payload
    * Requirements: user-data-isolation.7.6
    */
-  update(messageId: number, agentId: string, payloadJson: string): void {
+  update(messageId: number, agentId: string, payloadJson: string, done?: boolean): void {
     this.checkAccess(agentId);
+    const patch: { payloadJson: string; done?: boolean } = { payloadJson };
+    if (done !== undefined) {
+      patch.done = done;
+    }
 
     this.db
       .update(messages)
-      .set({ payloadJson })
+      .set(patch)
       .where(and(eq(messages.id, messageId), eq(messages.agentId, agentId)))
       .run();
   }

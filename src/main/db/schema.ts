@@ -96,6 +96,9 @@ export const messages = sqliteTable(
     // Unified flag: hides message from UI and LLM history.
     // Set for cancelled llm messages and hidden error messages.
     hidden: integer('hidden', { mode: 'boolean' }).notNull().default(false),
+    // Requirements: llm-integration.1.6.1, llm-integration.1.6.2, llm-integration.6.5
+    // Completion flag for message lifecycle.
+    done: integer('done', { mode: 'boolean' }).notNull().default(false),
   },
   (table) => [
     index('idx_messages_agent_id').on(table.agentId),

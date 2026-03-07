@@ -41,6 +41,15 @@ External API → Main Process → Database → IPC Event → Renderer → UI Upd
 - **IPC (Inter-Process Communication)**: Electron API для связи между процессами
 - **OAuth Events**: События авторизации для синхронизации состояния
 
+### Политика Scroll-Контекстов Экранов
+
+Требование `navigation.1.10` фиксирует единый контракт для всех экранов приложения:
+
+- Page-level scroll (`html`, `body`) заблокирован, чтобы избежать transient scrollbar и визуальных рывков при старте.
+- Каждый экран с потенциально длинным контентом обязан иметь собственный внутренний вертикальный scroll-контейнер.
+- Для экрана "Settings" внутренний контейнер реализуется на корневом блоке экрана (`data-testid="settings-screen"`) с `h-full overflow-y-auto`.
+- Экран "Agents" использует внутренний scroll-контейнер чата и не полагается на page-level прокрутку.
+
 
 ## Архитектура
 
@@ -1008,6 +1017,8 @@ describe('Navigation Functional Tests', () => {
 - `tests/functional/navigation.spec.ts` - "should block access to protected routes when not authenticated"
 - `tests/functional/navigation.spec.ts` - "should show loader during authorization"
 - `tests/functional/navigation.spec.ts` - "should allow multiple login attempts before authorization completes"
+- `tests/functional/navigation.spec.ts` - "should keep page scroll locked and allow internal settings scroll"
+- `tests/functional/navigation.spec.ts` - "should keep page scroll locked and allow internal agents chat scroll"
 - `tests/functional/auth-flow.spec.ts` - "should complete full authentication flow"
 - `tests/functional/auth-flow.spec.ts` - "should redirect to login after logout"
 - `tests/functional/auth-flow.spec.ts` - "should show loader after receiving authorization code"
@@ -1031,6 +1042,7 @@ describe('Navigation Functional Tests', () => {
 | navigation.1.7 | ✓ | ✓ |
 | navigation.1.8 | ✓ | ✓ |
 | navigation.1.9 | ✓ | ✓ |
+| navigation.1.10 | - | ✓ |
 
 ### Критерии Успеха
 

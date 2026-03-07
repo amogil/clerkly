@@ -225,8 +225,8 @@ export function Settings({ onSignOut, onNavigate }: SettingsProps) {
   };
 
   return (
-    <div className="p-8">
-      <div className="max-w-4xl mx-auto">
+    <div data-testid="settings-screen" className="h-full overflow-y-auto">
+      <div className="max-w-4xl mx-auto p-8">
         <div className="mb-8">
           <h1 className="text-3xl font-semibold text-foreground mb-2">Settings</h1>
         </div>

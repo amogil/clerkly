@@ -5,6 +5,7 @@
 
 import { test, expect } from '@playwright/test';
 import {
+  getFreePort,
   launchElectron,
   closeElectron,
   ElectronTestContext,
@@ -18,6 +19,7 @@ let context: ElectronTestContext;
 let mockOAuthServer: MockOAuthServer;
 let mockLLMServer: MockLLMServer;
 const TEST_CLIENT_ID = 'test-client-id-12345';
+let mockLLMPort: number;
 
 test.beforeAll(async () => {
   mockOAuthServer = await createMockOAuthServer();
@@ -32,8 +34,9 @@ test.beforeAll(async () => {
   });
 
   // Start mock LLM server
+  mockLLMPort = await getFreePort();
   mockLLMServer = new MockLLMServer({
-    port: 8893,
+    port: mockLLMPort,
   });
 
   await mockLLMServer.start();

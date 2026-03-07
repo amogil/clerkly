@@ -53,8 +53,11 @@ export function toUIMessage(msg: MessageSnapshot): UIMessage | null {
   }
 
   if (msg.kind === 'error') {
-    const errorMessage = (data.message as string | undefined) ?? 'An error occurred';
-    const actionLink = data.action_link as { label: string; screen: string } | undefined;
+    const error = data.error as
+      | { message?: string; action_link?: { label: string; screen: string } }
+      | undefined;
+    const errorMessage = error?.message ?? 'An error occurred';
+    const actionLink = error?.action_link;
 
     return {
       id: String(msg.id),

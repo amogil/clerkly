@@ -143,11 +143,11 @@ test.describe('Agent Scroll Position', () => {
 
     await window.evaluate(
       async ({ targetAgentId }) => {
-        for (let i = 1; i <= 30; i++) {
+        for (let i = 1; i <= 80; i++) {
           // @ts-expect-error - window.api is exposed via contextBridge
           const result = await window.api.test.createAgentMessage(
             targetAgentId,
-            `Seed message ${i}`
+            `Seed message ${i} — this line is intentionally long to guarantee chat overflow in functional tests.`
           );
           if (!result?.success) {
             throw new Error(result?.error || 'Failed to seed message');
@@ -157,7 +157,7 @@ test.describe('Agent Scroll Position', () => {
       { targetAgentId: agentId as string }
     );
 
-    await expect(messages).toHaveCount(30, { timeout: 5000 });
+    await expect(messages).toHaveCount(80, { timeout: 5000 });
 
     await messagesArea.hover();
     await window.mouse.wheel(0, -999999);
@@ -181,7 +181,7 @@ test.describe('Agent Scroll Position', () => {
       }
     );
 
-    await expect(messages).toHaveCount(31, { timeout: 5000 });
+    await expect(messages).toHaveCount(81, { timeout: 5000 });
 
     // No autoscroll when user is scrolled up
     await expect(scrollToBottomBtn).toBeVisible({ timeout: 3000 });

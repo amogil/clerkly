@@ -190,7 +190,7 @@
      - HTTP 403: "Access forbidden. Please check your API key permissions."
      - HTTP 429: "Rate limit exceeded. Please try again later."
      - HTTP 500/502/503: "Provider service unavailable. Please try again later."
-     - Timeout: "Connection timeout. Please check your internet connection."
+     - Timeout: "Model response timeout. The provider took too long to respond. Please try again later."
      - Network error: "Network error. Please check your internet connection."
      - Другие ошибки: "Connection failed: {error message}"
    - Кнопка ДОЛЖНА вернуться в состояние "Test Connection" и стать enabled

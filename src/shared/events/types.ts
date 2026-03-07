@@ -108,6 +108,8 @@ export interface MessageSnapshot {
   replyToMessageId: number | null;
   /** Hidden messages are not shown in UI and excluded from LLM history */
   hidden: boolean;
+  /** Completion flag for message lifecycle */
+  done: boolean;
 }
 
 // ============================================================================
@@ -231,6 +233,28 @@ export interface ErrorCreatedPayload extends BaseEvent {
 }
 
 /**
+ * LLM pipeline diagnostic event payload
+ * Emitted for main-process LLM pipeline failures to mirror diagnostics into renderer Developer Log
+ * Requirements: realtime-events.4.9
+ */
+export interface LLMPipelineDiagnosticPayload extends BaseEvent {
+  /** Log level for renderer console output */
+  level: 'warn' | 'error';
+  /** Main-process context that produced diagnostic */
+  context: 'MainPipeline';
+  /** Human-readable diagnostic message */
+  message: string;
+  /** Structured details for debugging */
+  details: {
+    agentId: string;
+    userMessageId: number;
+    signalAborted: boolean;
+    errorName: string;
+    errorType: 'auth' | 'rate_limit' | 'provider' | 'network' | 'timeout';
+  };
+}
+
+/**
  * Agent rate limit event payload
  * Emitted when LLM returns 429 — triggers countdown banner in UI
  * Requirements: llm-integration.3.7
@@ -306,6 +330,7 @@ export interface ClerklyEvents {
 
   // Error events
   [EVENT_TYPES.ERROR_CREATED]: ErrorCreatedPayload;
+  [EVENT_TYPES.LLM_PIPELINE_DIAGNOSTIC]: LLMPipelineDiagnosticPayload;
 
   // Rate limit events
   [EVENT_TYPES.AGENT_RATE_LIMIT]: AgentRateLimitPayload;
@@ -376,6 +401,7 @@ export function getEntityId(
     data?: { id?: string };
     agent?: { id?: string };
     message?: { id?: number };
+    messageId?: number;
   }
 ): string | undefined {
   // Old format: payload.id
@@ -393,6 +419,10 @@ export function getEntityId(
   // New snapshot format: payload.message.id (MessageSnapshot)
   if ('message' in payload && payload.message && typeof payload.message.id === 'number') {
     return String(payload.message.id);
+  }
+  // Message reasoning payload: payload.messageId
+  if ('messageId' in payload && typeof payload.messageId === 'number') {
+    return String(payload.messageId);
   }
   return undefined;
 }
@@ -417,6 +447,7 @@ type AuthFailedType = typeof EVENT_TYPES.AUTH_FAILED;
 type AuthCancelledType = typeof EVENT_TYPES.AUTH_CANCELLED;
 type AuthSignedOutType = typeof EVENT_TYPES.AUTH_SIGNED_OUT;
 type ErrorCreatedType = typeof EVENT_TYPES.ERROR_CREATED;
+type LLMPipelineDiagnosticType = typeof EVENT_TYPES.LLM_PIPELINE_DIAGNOSTIC;
 type UserLoginType = typeof EVENT_TYPES.USER_LOGIN;
 type UserLogoutType = typeof EVENT_TYPES.USER_LOGOUT;
 type AgentCreatedType = typeof EVENT_TYPES.AGENT_CREATED;
@@ -555,6 +586,39 @@ export class ErrorCreatedEvent extends TypedEventClass<ErrorCreatedType> {
 
   toPayload(): EventPayloadWithoutTimestamp<ErrorCreatedType> {
     return { message: this.message, context: this.context };
+  }
+}
+
+/**
+ * LLM pipeline diagnostic event
+ * Emitted for LLM pipeline failures to mirror diagnostics into renderer Developer Log
+ * Requirements: realtime-events.4.8, realtime-events.4.9
+ */
+export class LLMPipelineDiagnosticEvent extends TypedEventClass<LLMPipelineDiagnosticType> {
+  readonly type = EVENT_TYPES.LLM_PIPELINE_DIAGNOSTIC;
+
+  constructor(
+    public readonly level: 'warn' | 'error',
+    public readonly context: 'MainPipeline',
+    public readonly message: string,
+    public readonly details: {
+      agentId: string;
+      userMessageId: number;
+      signalAborted: boolean;
+      errorName: string;
+      errorType: 'auth' | 'rate_limit' | 'provider' | 'network' | 'timeout';
+    }
+  ) {
+    super();
+  }
+
+  toPayload(): EventPayloadWithoutTimestamp<LLMPipelineDiagnosticType> {
+    return {
+      level: this.level,
+      context: this.context,
+      message: this.message,
+      details: this.details,
+    };
   }
 }
 

@@ -980,3 +980,193 @@ describe('Migration 010: add usage_json column to messages', () => {
     expect(usageColumn?.notnull).toBe(0);
   });
 });
+
+describe('Migration 011: add done column to messages', () => {
+  let db: Database.Database;
+  const migrationsPath = path.join(process.cwd(), 'migrations');
+
+  beforeEach(() => {
+    db = new Database(':memory:');
+
+    db.exec(`
+      CREATE TABLE messages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        agent_id TEXT NOT NULL,
+        timestamp TEXT NOT NULL,
+        kind TEXT NOT NULL,
+        payload_json TEXT NOT NULL,
+        hidden INTEGER NOT NULL DEFAULT 0,
+        reply_to_message_id INTEGER,
+        usage_json TEXT
+      );
+    `);
+  });
+
+  afterEach(() => {
+    if (db && db.open) db.close();
+  });
+
+  it('should add done column with default 0', () => {
+    const sql = fs.readFileSync(path.join(migrationsPath, '011_add_done_to_messages.sql'), 'utf-8');
+    db.exec(sql.split('-- DOWN')[0]!.replace('-- UP', '').trim());
+
+    const columns = db.prepare('PRAGMA table_info(messages)').all() as Array<{
+      name: string;
+      notnull: number;
+      dflt_value: string | null;
+    }>;
+    const doneColumn = columns.find((column) => column.name === 'done');
+
+    expect(doneColumn).toBeDefined();
+    expect(doneColumn?.notnull).toBe(1);
+    expect(doneColumn?.dflt_value).toBe('0');
+  });
+
+  it('should backfill done by message kind', () => {
+    db.prepare(
+      `INSERT INTO messages (agent_id, timestamp, kind, payload_json) VALUES (?, ?, ?, ?)`
+    ).run('agent-1', '2026-01-01T00:00:00Z', 'user', JSON.stringify({ data: { text: 'hello' } }));
+    db.prepare(
+      `INSERT INTO messages (agent_id, timestamp, kind, payload_json) VALUES (?, ?, ?, ?)`
+    ).run(
+      'agent-1',
+      '2026-01-01T00:00:00Z',
+      'error',
+      JSON.stringify({ data: { error: { message: 'x' } } })
+    );
+    db.prepare(
+      `INSERT INTO messages (agent_id, timestamp, kind, payload_json) VALUES (?, ?, ?, ?)`
+    ).run(
+      'agent-1',
+      '2026-01-01T00:01:00Z',
+      'llm',
+      JSON.stringify({ data: { action: { type: 'text', content: 'ok' } } })
+    );
+
+    const sql = fs.readFileSync(path.join(migrationsPath, '011_add_done_to_messages.sql'), 'utf-8');
+    db.exec(sql.split('-- DOWN')[0]!.replace('-- UP', '').trim());
+
+    const rows = db.prepare('SELECT kind, done FROM messages ORDER BY id').all() as Array<{
+      kind: string;
+      done: number;
+    }>;
+    expect(rows[0]).toEqual({ kind: 'user', done: 1 });
+    expect(rows[1]).toEqual({ kind: 'error', done: 1 });
+    expect(rows[2]).toEqual({ kind: 'llm', done: 0 });
+  });
+});
+
+describe('Migration 012: backfill done for historical llm with final action', () => {
+  let db: Database.Database;
+  const migrationsPath = path.join(process.cwd(), 'migrations');
+
+  beforeEach(() => {
+    db = new Database(':memory:');
+
+    db.exec(`
+      CREATE TABLE messages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        agent_id TEXT NOT NULL,
+        timestamp TEXT NOT NULL,
+        kind TEXT NOT NULL,
+        payload_json TEXT NOT NULL,
+        hidden INTEGER NOT NULL DEFAULT 0,
+        done INTEGER NOT NULL DEFAULT 0,
+        reply_to_message_id INTEGER,
+        usage_json TEXT
+      );
+    `);
+  });
+
+  afterEach(() => {
+    if (db && db.open) db.close();
+  });
+
+  /* Preconditions: Historical messages contain llm rows with and without final data.action
+     Action: run migration 012
+     Assertions: only llm rows with final action are marked done=1
+     Requirements: llm-integration.6.6, llm-integration.6.6.1 */
+  it('should mark historical llm with final action as done', () => {
+    db.prepare(
+      `INSERT INTO messages (agent_id, timestamp, kind, payload_json, done) VALUES (?, ?, ?, ?, ?)`
+    ).run(
+      'agent-1',
+      '2026-01-01T00:00:00Z',
+      'llm',
+      JSON.stringify({ data: { action: { type: 'text', content: 'completed' } } }),
+      0
+    );
+    db.prepare(
+      `INSERT INTO messages (agent_id, timestamp, kind, payload_json, done) VALUES (?, ?, ?, ?, ?)`
+    ).run(
+      'agent-1',
+      '2026-01-01T00:01:00Z',
+      'llm',
+      JSON.stringify({ data: { reasoning: { text: 'partial' } } }),
+      0
+    );
+    db.prepare(
+      `INSERT INTO messages (agent_id, timestamp, kind, payload_json, done) VALUES (?, ?, ?, ?, ?)`
+    ).run(
+      'agent-1',
+      '2026-01-01T00:02:00Z',
+      'error',
+      JSON.stringify({ data: { error: { message: 'x' } } }),
+      1
+    );
+
+    const sql = fs.readFileSync(
+      path.join(migrationsPath, '012_backfill_done_for_historical_llm.sql'),
+      'utf-8'
+    );
+    db.exec(sql.split('-- DOWN')[0]!.replace('-- UP', '').trim());
+
+    const rows = db.prepare('SELECT kind, done FROM messages ORDER BY id').all() as Array<{
+      kind: string;
+      done: number;
+    }>;
+
+    expect(rows[0]).toEqual({ kind: 'llm', done: 1 });
+    expect(rows[1]).toEqual({ kind: 'llm', done: 0 });
+    expect(rows[2]).toEqual({ kind: 'error', done: 1 });
+  });
+
+  /* Preconditions: Migration 012 already executed once
+     Action: Execute migration 012 second time
+     Assertions: Result is stable (idempotent), no extra changes
+     Requirements: llm-integration.6.6, llm-integration.6.6.1 */
+  it('should be idempotent when migration 012 runs multiple times', () => {
+    db.prepare(
+      `INSERT INTO messages (agent_id, timestamp, kind, payload_json, done) VALUES (?, ?, ?, ?, ?)`
+    ).run(
+      'agent-1',
+      '2026-01-01T00:00:00Z',
+      'llm',
+      JSON.stringify({ data: { action: { type: 'text', content: 'completed' } } }),
+      0
+    );
+    db.prepare(
+      `INSERT INTO messages (agent_id, timestamp, kind, payload_json, done) VALUES (?, ?, ?, ?, ?)`
+    ).run(
+      'agent-1',
+      '2026-01-01T00:01:00Z',
+      'llm',
+      JSON.stringify({ data: { reasoning: { text: 'partial' } } }),
+      0
+    );
+
+    const sql = fs.readFileSync(
+      path.join(migrationsPath, '012_backfill_done_for_historical_llm.sql'),
+      'utf-8'
+    );
+    const upSql = sql.split('-- DOWN')[0]!.replace('-- UP', '').trim();
+
+    db.exec(upSql);
+    const firstPass = db.prepare('SELECT id, done FROM messages ORDER BY id').all();
+
+    db.exec(upSql);
+    const secondPass = db.prepare('SELECT id, done FROM messages ORDER BY id').all();
+
+    expect(secondPass).toEqual(firstPass);
+  });
+});

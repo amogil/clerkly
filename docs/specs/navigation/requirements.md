@@ -56,6 +56,8 @@
 
 1.9. КОГДА пользователь выходит из системы (logout), ТО приложение ДОЛЖНО очистить все токены авторизации (см. google-oauth-auth.7) И автоматически перенаправить пользователя на экран логина
 
+1.10. КОГДА отображается любой экран приложения, ТО page-level вертикальный скролл (`html`, `body`) ДОЛЖЕН быть отключён, а прокрутка длинного контента ДОЛЖНА выполняться только внутри внутреннего scroll-контейнера конкретного экрана
+
 #### Функциональные Тесты
 
 - `tests/functional/navigation.spec.ts` - "should show login screen when not authenticated"
@@ -64,6 +66,8 @@
 - `tests/functional/navigation.spec.ts` - "should redirect to login screen after logout"
 - `tests/functional/navigation.spec.ts` - "should show loader during authorization"
 - `tests/functional/navigation.spec.ts` - "should allow multiple login attempts before authorization completes"
+- `tests/functional/navigation.spec.ts` - "should keep page scroll locked and allow internal settings scroll"
+- `tests/functional/navigation.spec.ts` - "should keep page scroll locked and allow internal agents chat scroll"
 
 #### Нефункциональные Требования
 

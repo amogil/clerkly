@@ -7,7 +7,11 @@ import { PromptBuilder } from './PromptBuilder';
 import { AIAgentSettingsManager } from '../AIAgentSettingsManager';
 import { LLMProviderFactory } from '../llm/LLMProviderFactory';
 import { MainEventBus } from '../events/MainEventBus';
-import { MessageLlmReasoningUpdatedEvent, AgentRateLimitEvent } from '../../shared/events/types';
+import {
+  MessageLlmReasoningUpdatedEvent,
+  AgentRateLimitEvent,
+  LLMPipelineDiagnosticEvent,
+} from '../../shared/events/types';
 import { LLM_CHAT_MODELS } from '../llm/LLMConfig';
 import { Logger } from '../Logger';
 import type { ILLMProvider, ChatOptions, LLMStructuredOutput } from '../llm/ILLMProvider';
@@ -16,6 +20,7 @@ import {
   safeParseStructuredOutput,
 } from '../llm/StructuredOutputContract';
 import { handleBackgroundError } from '../ErrorHandler';
+import { LLMRequestAbortedError } from '../llm/LLMErrors';
 
 import type { LLMProvider } from '../../types';
 
@@ -369,17 +374,23 @@ export class MainPipeline {
             reasoning: { text: accumulatedReasoning, excluded_from_replay: true },
           },
         },
-        replyToMessageId
+        replyToMessageId,
+        false
       );
       setLastLlmMessageId(llmMsg.id);
       llmMessageId = llmMsg.id;
     } else {
-      this.messageManager.update(llmMessageId, agentId, {
-        data: {
-          model,
-          reasoning: { text: accumulatedReasoning, excluded_from_replay: true },
+      this.messageManager.update(
+        llmMessageId,
+        agentId,
+        {
+          data: {
+            model,
+            reasoning: { text: accumulatedReasoning, excluded_from_replay: true },
+          },
         },
-      });
+        false
+      );
     }
 
     MainEventBus.getInstance().publish(
@@ -399,7 +410,7 @@ export class MainPipeline {
     clearLastLlmMessageId: () => void
   ): void {
     if (llmMessageId !== null) {
-      this.messageManager.setHidden(llmMessageId, agentId);
+      this.hideIncompleteLlmMessage(llmMessageId, agentId);
       clearLastLlmMessageId();
     }
   }
@@ -417,7 +428,7 @@ export class MainPipeline {
     clearLastLlmMessageId: () => void
   ): 'retry' | 'error' {
     if (llmMessageId !== null) {
-      this.messageManager.setHidden(llmMessageId, agentId);
+      this.hideIncompleteLlmMessage(llmMessageId, agentId);
       clearLastLlmMessageId();
     }
     if (attempt < maxAttempts - 1) {
@@ -435,7 +446,8 @@ export class MainPipeline {
           },
         },
       },
-      replyToMessageId
+      replyToMessageId,
+      true
     );
     return 'error';
   }
@@ -463,11 +475,11 @@ export class MainPipeline {
     };
 
     if (llmMessageId === null) {
-      const msg = this.messageManager.create(agentId, 'llm', finalPayload, replyToMessageId);
+      const msg = this.messageManager.create(agentId, 'llm', finalPayload, replyToMessageId, true);
       return msg.id;
     }
 
-    this.messageManager.update(llmMessageId, agentId, finalPayload);
+    this.messageManager.update(llmMessageId, agentId, finalPayload, true);
     return llmMessageId;
   }
 
@@ -493,7 +505,7 @@ export class MainPipeline {
 
   /**
    * Handle errors outside the retry loop.
-   * Requirements: llm-integration.3, llm-integration.8.7
+   * Requirements: llm-integration.3, llm-integration.8.7, realtime-events.4.8
    */
   private handleRunError(
     error: unknown,
@@ -502,10 +514,36 @@ export class MainPipeline {
     signal: AbortSignal | undefined,
     lastLlmMessageId: number | null
   ): void {
-    if (signal?.aborted) {
+    const errorName = error instanceof Error ? error.name : typeof error;
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const signalAborted = signal?.aborted ?? false;
+    const errorType =
+      error instanceof LLMRequestAbortedError ? 'timeout' : classifyError(errorMessage);
+
+    this.logger.warn(
+      `Pipeline failure diagnostics: agentId=${agentId}, userMessageId=${userMessageId}, signalAborted=${
+        signalAborted
+      }, errorName=${errorName}, errorMessage=${errorMessage}`
+    );
+    MainEventBus.getInstance().publish(
+      new LLMPipelineDiagnosticEvent(
+        signalAborted ? 'warn' : 'error',
+        'MainPipeline',
+        `Pipeline failure diagnostics: ${errorMessage}`,
+        {
+          agentId,
+          userMessageId,
+          signalAborted,
+          errorName,
+          errorType,
+        }
+      )
+    );
+
+    if (signalAborted) {
       if (lastLlmMessageId !== null) {
         try {
-          this.messageManager.setHidden(lastLlmMessageId, agentId);
+          this.hideIncompleteLlmMessage(lastLlmMessageId, agentId);
         } catch {
           // ignore update errors during cancellation
         }
@@ -513,18 +551,16 @@ export class MainPipeline {
       return;
     }
 
-    const errorMessage = error instanceof Error ? error.message : String(error);
     this.logger.error(`Pipeline error for agent ${agentId}: ${errorMessage}`);
 
     if (lastLlmMessageId !== null) {
       try {
-        this.messageManager.setHidden(lastLlmMessageId, agentId);
+        this.hideIncompleteLlmMessage(lastLlmMessageId, agentId);
       } catch {
         // ignore
       }
     }
 
-    const errorType = classifyError(errorMessage);
     const errorReplyTo = userMessageId;
 
     if (errorType === 'rate_limit') {
@@ -551,7 +587,8 @@ export class MainPipeline {
           error: errorPayload,
         },
       },
-      errorReplyTo
+      errorReplyTo,
+      true
     );
   }
 
@@ -575,5 +612,13 @@ export class MainPipeline {
       return { ok: false };
     }
     return { ok: true };
+  }
+
+  /**
+   * Hide interrupted llm message and keep it in unfinished state.
+   * Requirements: llm-integration.3.2
+   */
+  private hideIncompleteLlmMessage(messageId: number, agentId: string): void {
+    this.messageManager.hideAndMarkIncomplete(messageId, agentId);
   }
 }

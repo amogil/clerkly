@@ -18,11 +18,34 @@ CREATE TABLE messages (
   agent_id TEXT NOT NULL,
   timestamp TEXT NOT NULL,
   kind TEXT NOT NULL,
+  hidden INTEGER NOT NULL DEFAULT 0,
+  done INTEGER NOT NULL DEFAULT 0,
   reply_to_message_id INTEGER,
   payload_json TEXT NOT NULL,
   usage_json TEXT
 );
 ```
+
+### Семантика `done`
+
+- Колонка `done` присутствует в `messages` как обязательный флаг завершённости сообщения.
+- Для сообщений `kind:error` значение `done` равно `1`.
+- Для сообщений, которые находятся в процессе формирования (например, streaming `kind:llm`), значение `done` равно `0`.
+- Для полностью сформированных сообщений `done` равно `1`.
+- Для исторических сообщений `kind:llm` с уже сохранённым финальным `data.action` выполняется backfill `done = 1`.
+
+### Backfill исторических `llm`
+
+- Backfill выполняется отдельной SQL-миграцией после добавления колонки `done`.
+- Критерий завершённости для legacy-данных: `kind = 'llm'` и `json_type(payload_json, '$.data.action') = 'object'`.
+- Такие записи обновляются с `done = 0` на `done = 1`.
+- Миграция является идемпотентной: уже завершённые записи (`done = 1`) не изменяются.
+
+### Правило `reply_to_message_id`
+
+- Первое сообщение в чате агента сохраняется с `reply_to_message_id = NULL`.
+- Каждое следующее сообщение сохраняется со ссылкой на `id` предыдущего сообщения этого агента.
+- Для `MainPipeline.run(agentId, userMessageId)` все создаваемые сообщения пайплайна (`kind: llm`, `kind: error`) используют `reply_to_message_id = userMessageId`.
 
 ---
 
@@ -74,6 +97,7 @@ CREATE TABLE messages (
 {
   "id": 124,
   "kind": "llm",
+  "done": false,
   "hidden": true,
   "payload": {
     "data": {
@@ -96,6 +120,8 @@ CREATE TABLE messages (
   }
 }
 ```
+
+`kind: error` сообщения всегда сохраняются как завершённые (`done: true`).
 
 Для ошибок без action_link (network, provider, timeout):
 
@@ -316,6 +342,10 @@ interface ILLMProvider {
 }
 ```
 
+**Выбор модели и reasoning effort (llm-integration.5.8):**
+- Тестовая конфигурация: `gpt-5-nano` + `reasoning_effort: "low"`.
+- Продовая конфигурация: `gpt-5.2` + `reasoning_effort: "medium"`.
+
 ### PromptBuilder
 
 ```typescript
@@ -354,7 +384,7 @@ class PromptBuilder {
 **Базовая инструкция для system-role:**
 
 ```
-You are a helpful AI assistant. You may respond in Markdown when it improves clarity. Supported Markdown (GFM): headings, paragraphs, bold/italic/strikethrough, links/autolinks, blockquotes, ordered/unordered lists and task lists, tables, horizontal rules, inline code, fenced code blocks with language tags (syntax highlighting), Mermaid diagrams (```mermaid```), and math via KaTeX (inline $...$ or block $$...$$). Do not use footnotes.
+You are a helpful AI assistant. Always reply in the user's language (detected from the latest user message in the current request), including both your final answer and any reasoning text. You may respond in Markdown when it improves clarity. Supported Markdown (GFM): headings, paragraphs, bold/italic/strikethrough, links/autolinks, blockquotes, ordered/unordered lists and task lists, tables, horizontal rules, inline code, fenced code blocks with language tags (syntax highlighting), Mermaid diagrams (```mermaid```), and math via KaTeX (inline $...$ or block $$...$$). Do not use footnotes.
 ```
 
 **Формат входных сообщений (пример):**
@@ -371,7 +401,7 @@ You are a helpful AI assistant. You may respond in Markdown when it improves cla
 
 ```typescript
 // Requirements: llm-integration.3
-const TIMEOUT_MS = 60_000; // 1 минута
+const TIMEOUT_MS = 300_000; // 5 минут
 
 // Таймаут через AbortController
 const controller = new AbortController();
@@ -382,7 +412,7 @@ try {
   // ...
 } catch (error) {
   if (error.name === 'AbortError') {
-    throw new LLMError('timeout', 'Request timed out. The model took too long to respond.');
+    throw new LLMError('timeout', 'Model response timeout. The provider took too long to respond. Please try again later.');
   }
   throw new LLMError('network', 'Network error. Please check your internet connection.');
 } finally {
@@ -428,13 +458,14 @@ class MainPipeline {
 6. Вызывает `provider.chat(messages, options, onChunk)`:
    onChunk(chunk):
      if llmMessageId == null:
-      создаёт `kind: llm` сообщение → `llmMessageId = message.id`
+      создаёт `kind: llm` сообщение (`done: false`, `reply_to_message_id = userMessageId`) → `llmMessageId = message.id`
+      эмитит `message.created`
      accumulatedReasoning += chunk.delta
-     обновляет `kind: llm` (`reasoning.text = accumulatedReasoning`)
+     обновляет `kind: llm` (`reasoning.text = accumulatedReasoning`, `done: false`)
      эмитит `message.llm.reasoning.updated { delta, accumulatedText }`
-     эмитит `message.updated`
+     if llmMessageId уже существовал до этого чанка: эмитит `message.updated`
 7. Получает финальный Structured Output
-8. Обновляет `kind: llm` (action + usage)
+8. Обновляет `kind: llm` (action + usage, `done: true`)
 9. Эмитит финальный `message.updated`
 ```
 
@@ -443,9 +474,9 @@ class MainPipeline {
 ```
 catch(error):
   if llmMessageId != null:
-    обновляет `kind: llm` с `hidden: true`
+    обновляет `kind: llm` с `hidden: true, done: false`
     эмитит `message.updated`
-  создаёт `kind: error` (messages.reply_to_message_id = userMessageId, payload.error.message)
+  создаёт `kind: error` (`done: true`, messages.reply_to_message_id = userMessageId, payload.error.message)
   эмитит `message.created`
 ```
 
@@ -467,7 +498,7 @@ catch(error):
 
 `MainPipeline.run()` принимает `AbortSignal` и передаёт его в `fetch()`. При отмене:
 - Если `kind: llm` ещё не создан — просто выходим (нет сообщений для очистки)
-- Если `kind: llm` уже создан — помечаем `hidden: true`, выходим без создания `kind: error`
+- Если `kind: llm` уже создан — помечаем `hidden: true, done: false`, выходим без создания `kind: error`
 
 **`MessageManager.listForModelHistory()`** фильтрует сообщения с `hidden` — они не попадают во входной массив `messages`.
 
@@ -505,17 +536,28 @@ interface AgentRateLimitPayload {
 }
 ```
 
+### Контракт reasoning-события (реализация)
+
+Технический контракт realtime-события reasoning фиксируется на уровне дизайна и синхронизируется с `realtime-events` спецификацией:
+
 ```typescript
-// Requirements: llm-integration.2
+// Requirements: llm-integration.2, realtime-events.5.5
+type EventName = 'message.llm.reasoning.updated';
+
 interface MessageLlmReasoningUpdatedPayload {
   messageId: number;
   agentId: string;
   delta: string;
   accumulatedText: string;
+  timestamp: number;
 }
 ```
 
-Событие определено в `src/shared/events/types.ts` и `src/shared/events/constants.ts`.
+Правило обработки timestamp для стриминговых типов (`message.updated`, `message.llm.reasoning.updated`):
+- события с одинаковым timestamp НЕ коалесцируются;
+- устаревшим считается только событие с меньшим timestamp (`<`), чтобы не терять чанки в одном миллисекундном тике.
+
+События определены в `src/shared/events/types.ts` и `src/shared/events/constants.ts`, а доставка реализована в `MainEventBus`.
 
 ---
 
@@ -529,15 +571,15 @@ User отправляет сообщение
       → PromptBuilder.buildMessages(history)
       → OpenAIProvider.chat(messages, options, onChunk)
           → [reasoning chunk]
-              → MessageManager.create/update(kind: 'llm')
+              → MessageManager.create/update(kind: 'llm', done: false, reply_to_message_id: userMessageId)
               → message.llm.reasoning.updated
-              → message.updated
+              → message.created (для первого чанка) / message.updated (для последующих чанков)
           → [LLMAction received]
-              → MessageManager.update(kind: 'llm', action)
+              → MessageManager.update(kind: 'llm', action, done: true)
               → message.updated
       → [on error]
-          → MessageManager.update(kind: 'llm', hidden: true) [если уже создан]
-          → MessageManager.create(kind: 'error')
+          → MessageManager.update(kind: 'llm', hidden: true, done: false) [если уже создан]
+          → MessageManager.create(kind: 'error', done: true, reply_to_message_id: userMessageId)
           → message.updated / message.created
 ```
 
@@ -553,6 +595,7 @@ User отправляет сообщение
 - `tests/unit/agents/AgentIPCHandlers.test.ts` — запуск pipeline при kind:user
 - `tests/unit/hooks/useMessages.test.ts` — обработка новых событий
 - `tests/unit/db/repositories/MessagesRepository.test.ts` — kind как параметр
+- `tests/unit/MigrationRunner.test.ts` — миграции `done`, включая backfill historical `llm`
 
 ### Функциональные тесты
 
@@ -572,23 +615,34 @@ User отправляет сообщение
 | Требование | Модульные тесты | Функциональные тесты |
 |------------|-----------------|----------------------|
 | llm-integration.1 | ✓ | ✓ |
+| llm-integration.1.6.1 (`llm` с `done=false` до финализации) | ✓ | ✓ |
+| llm-integration.1.6.2 (финализация `llm` с `done=true`) | ✓ | ✓ |
+| llm-integration.1.7 (`reply_to_message_id` для создаваемых сообщений) | ✓ | ✓ |
 | llm-integration.2 | ✓ | ✓ |
 | llm-integration.3.1 | ✓ | ✓ |
+| llm-integration.3.1.1 (`error` сохраняется с `done=true`) | ✓ | ✓ |
 | llm-integration.3.2 | ✓ | ✓ |
 | llm-integration.3.4 | ✓ | ✓ |
-| llm-integration.3.4.4 | - | - |
+| llm-integration.3.4.4 | - | ✓ |
 | llm-integration.3.5 | ✓ | ✓ |
+| llm-integration.3.6 (таймаут 300s) | ✓ | ✓ |
 | llm-integration.3.7 | - | ✓ |
 | llm-integration.3.8 | - | ✓ |
 | llm-integration.3.9 | ✓ | ✓ |
 | llm-integration.4 | ✓ | - |
+| llm-integration.4.7 (ответ и reasoning на языке пользователя) | ✓ | ✓ |
 | llm-integration.5 | ✓ | - |
+| llm-integration.5.8 (модели/`reasoning_effort` для test/prod) | ✓ | ✓ |
 | llm-integration.6 | ✓ | - |
+| llm-integration.6.5 (`done` как отдельный флаг) | ✓ | - |
+| llm-integration.6.6 (совместимость `done` для существующих записей) | ✓ | - |
+| llm-integration.6.6.1 (backfill завершённых legacy `llm`) | ✓ | - |
 | llm-integration.7 | ✓ | ✓ |
 | llm-integration.8.1 | ✓ | ✓ |
 | llm-integration.8.5 | ✓ | ✓ |
 | llm-integration.8.6 | ✓ | - |
-| llm-integration.10 | - | - |
-| llm-integration.11 | - | - |
-| llm-integration.12 | - | - |
+| llm-integration.8.7 | ✓ | ✓ |
+| llm-integration.10 | ✓ | ✓ |
+| llm-integration.11 | ✓ | ✓ |
+| llm-integration.12 | ✓ | ✓ |
 | llm-integration.13 | ✓ | - |

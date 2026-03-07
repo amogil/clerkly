@@ -16,6 +16,7 @@ import {
   InvalidStructuredOutputError,
   safeParseStructuredOutput,
 } from './StructuredOutputContract';
+import { LLMRequestAbortedError, isAbortLikeError } from './LLMErrors';
 
 interface OpenAIResponsesUsage {
   input_tokens?: number;
@@ -27,8 +28,10 @@ interface OpenAIResponsesUsage {
 
 interface OpenAIResponsesEvent {
   type?: string;
-  delta?: string;
+  delta?: unknown;
   text?: string;
+  part?: { type?: string; text?: string; delta?: string; content?: unknown };
+  item?: { type?: string; text?: string; delta?: string; content?: unknown };
   response?: {
     usage?: OpenAIResponsesUsage;
   };
@@ -130,7 +133,9 @@ export class OpenAIProvider implements ILLMProvider {
             schema: getOpenAIStructuredOutputJsonSchema(),
           },
         },
-        ...(options.reasoningEffort ? { reasoning: { effort: options.reasoningEffort } } : {}),
+        ...(options.reasoningEffort
+          ? { reasoning: { effort: options.reasoningEffort, summary: 'detailed' } }
+          : {}),
       };
 
       const response = await fetch(apiUrl, {
@@ -153,6 +158,11 @@ export class OpenAIProvider implements ILLMProvider {
       }
 
       return await this.parseStream(response, onChunk);
+    } catch (error) {
+      if (isAbortLikeError(error)) {
+        throw new LLMRequestAbortedError(this.mapExceptionToMessage(error), error);
+      }
+      throw error;
     } finally {
       clearTimeout(timeoutId);
     }
@@ -177,6 +187,7 @@ export class OpenAIProvider implements ILLMProvider {
         : { decode: (v: Uint8Array, _opts?: unknown) => Buffer.from(v).toString('utf-8') };
     let buffer = '';
     let contentAccumulator = '';
+    let reasoningAccumulator = '';
     let usage: LLMUsage | undefined;
 
     try {
@@ -205,13 +216,15 @@ export class OpenAIProvider implements ILLMProvider {
             contentAccumulator += event.delta;
           }
 
-          if (
-            typeof event.type === 'string' &&
-            event.type.includes('reasoning') &&
-            typeof event.delta === 'string' &&
-            event.delta.length > 0
-          ) {
-            onChunk({ type: 'reasoning', delta: event.delta, done: false });
+          if (this.isReasoningEvent(event)) {
+            const reasoningDelta = this.extractReasoningDelta(event);
+            if (reasoningDelta) {
+              const normalized = this.normalizeReasoningDelta(reasoningDelta, reasoningAccumulator);
+              reasoningAccumulator = normalized.accumulated;
+              if (normalized.delta) {
+                onChunk({ type: 'reasoning', delta: normalized.delta, done: false });
+              }
+            }
           }
 
           if (event.type === 'response.completed') {
@@ -268,6 +281,120 @@ export class OpenAIProvider implements ILLMProvider {
       canonical,
       raw: raw as Record<string, unknown>,
     };
+  }
+
+  private extractReasoningDelta(event: OpenAIResponsesEvent): string | null {
+    if (typeof event.delta === 'string' && event.delta.length > 0) {
+      return event.delta;
+    }
+
+    if (typeof event.text === 'string' && event.text.length > 0) {
+      return event.text;
+    }
+
+    if (event.delta && typeof event.delta === 'object') {
+      const obj = event.delta as { text?: unknown; delta?: unknown; content?: unknown };
+      if (typeof obj.text === 'string' && obj.text.length > 0) return obj.text;
+      if (typeof obj.delta === 'string' && obj.delta.length > 0) return obj.delta;
+      if (typeof obj.content === 'string' && obj.content.length > 0) return obj.content;
+      if (Array.isArray(obj.content)) {
+        const joined = this.extractTextFromContentParts(obj.content);
+        if (joined.length > 0) return joined;
+      }
+    }
+
+    if (event.part && typeof event.part === 'object') {
+      const partText = this.extractTextFromNode(event.part);
+      if (partText) return partText;
+    }
+
+    if (event.item && typeof event.item === 'object') {
+      const itemText = this.extractTextFromNode(event.item);
+      if (itemText) return itemText;
+    }
+
+    return null;
+  }
+
+  private isReasoningEvent(event: OpenAIResponsesEvent): boolean {
+    if (typeof event.type === 'string' && event.type.includes('reasoning')) {
+      return true;
+    }
+
+    const partType = event.part?.type;
+    if (typeof partType === 'string' && partType.includes('reasoning')) {
+      return true;
+    }
+
+    const itemType = event.item?.type;
+    if (typeof itemType === 'string' && itemType.includes('reasoning')) {
+      return true;
+    }
+
+    if (event.delta && typeof event.delta === 'object' && 'type' in event.delta) {
+      const deltaType = (event.delta as { type?: unknown }).type;
+      if (typeof deltaType === 'string' && deltaType.includes('reasoning')) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  private extractTextFromNode(node: {
+    text?: unknown;
+    delta?: unknown;
+    content?: unknown;
+  }): string | null {
+    if (typeof node.text === 'string' && node.text.length > 0) return node.text;
+    if (typeof node.delta === 'string' && node.delta.length > 0) return node.delta;
+    if (typeof node.content === 'string' && node.content.length > 0) return node.content;
+    if (Array.isArray(node.content)) {
+      const joined = this.extractTextFromContentParts(node.content);
+      if (joined.length > 0) return joined;
+    }
+    return null;
+  }
+
+  private extractTextFromContentParts(content: unknown[]): string {
+    return content
+      .map((item) =>
+        item && typeof item === 'object' && 'text' in item && typeof item.text === 'string'
+          ? item.text
+          : ''
+      )
+      .join('');
+  }
+
+  private normalizeReasoningDelta(
+    incoming: string,
+    accumulated: string
+  ): { delta: string | null; accumulated: string } {
+    if (!incoming) {
+      return { delta: null, accumulated };
+    }
+
+    if (!accumulated) {
+      return { delta: incoming, accumulated: incoming };
+    }
+
+    if (incoming === accumulated) {
+      return { delta: null, accumulated };
+    }
+
+    if (incoming.startsWith(accumulated)) {
+      const appended = incoming.slice(accumulated.length);
+      if (!appended) {
+        return { delta: null, accumulated };
+      }
+      return { delta: appended, accumulated: incoming };
+    }
+
+    if (accumulated.endsWith(incoming)) {
+      return { delta: null, accumulated };
+    }
+
+    return { delta: incoming, accumulated: accumulated + incoming };
   }
 
   private parseRetryAfterHeader(response: Response): number | null {

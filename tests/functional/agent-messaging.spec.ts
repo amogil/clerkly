@@ -12,6 +12,7 @@ import {
   activeChat,
   launchElectronWithMockOAuth,
   expectAgentsVisible,
+  expectNoToastError,
 } from './helpers/electron';
 import type { MockOAuthServer } from './helpers/mock-oauth-server';
 
@@ -51,6 +52,98 @@ test.afterEach(async () => {
 });
 
 test.describe('Agent Messaging', () => {
+  /* Preconditions: Agent is active, send mode is visible
+     Action: Keep input empty, then type prompt text
+     Assertions: Send button is disabled for empty input and enabled for non-empty input
+     Requirements: agents.4.2.2 */
+  test('should enable send button only when input has text', async () => {
+    const messageInput = activeChat(window).textarea;
+    const sendButton = window.locator('[data-testid="prompt-input-send"]');
+
+    await expect(messageInput).toBeVisible();
+    await expect(sendButton).toBeDisabled();
+
+    await messageInput.fill('hello');
+    await expect(sendButton).toBeEnabled();
+
+    await messageInput.fill('   ');
+    await expect(sendButton).toBeDisabled();
+  });
+
+  /* Preconditions: Last visible message is llm(done=false), so agent is in-progress and stop mode is visible
+     Action: Change input text between empty and non-empty values
+     Assertions: Stop button remains enabled regardless of input content
+     Requirements: agents.4.2.1 */
+  test('should keep stop button enabled regardless of input text in in-progress status', async () => {
+    const firstAgentDataTestId = await window
+      .locator('[data-testid^="agent-icon-"]')
+      .first()
+      .getAttribute('data-testid');
+    const activeAgentId = firstAgentDataTestId?.replace('agent-icon-', '');
+    expect(activeAgentId).toBeTruthy();
+
+    await window.evaluate(async (agentId) => {
+      const api = (window as unknown as { api: any }).api;
+      const result = await api.messages.create(agentId, 'llm', {
+        data: { reasoning: { text: 'streaming...' } },
+      });
+      if (!result?.success) {
+        throw new Error(result?.error || 'Failed to create in-progress llm message');
+      }
+    }, activeAgentId as string);
+
+    const stopButton = window.locator('[data-testid="prompt-input-stop"]');
+    const messageInput = activeChat(window).textarea;
+
+    await expect(stopButton).toBeVisible({ timeout: 5000 });
+    await expect(stopButton).toBeEnabled();
+
+    await messageInput.fill('');
+    await expect(stopButton).toBeEnabled();
+
+    await messageInput.fill('hello');
+    await expect(stopButton).toBeEnabled();
+  });
+
+  /* Preconditions: Agent has stale in-progress UI state (llm done=false) without an active main-process pipeline
+     Action: User presses stop button
+     Assertions: Existing user/llm messages remain visible; stop acts as no-op
+     Requirements: llm-integration.8.1, llm-integration.8.7 */
+  test('should not hide existing messages when stop is pressed without active pipeline', async () => {
+    const setupResult = await window.evaluate(async () => {
+      const api = (window as unknown as { api: any }).api;
+      const created = await api.test.createAgentWithOldMessage(3);
+      if (!created?.success || !created.agentId) {
+        throw new Error(created?.error || 'Failed to create agent with old message');
+      }
+
+      const llmCreated = await api.messages.create(created.agentId, 'llm', {
+        data: { reasoning: { text: 'orphan reasoning stream' } },
+      });
+      if (!llmCreated?.success) {
+        throw new Error(llmCreated?.error || 'Failed to create stale in-progress llm message');
+      }
+
+      return { agentId: created.agentId };
+    });
+
+    await window.locator(`[data-testid="agent-icon-${setupResult.agentId}"]`).click();
+
+    await expect(activeChat(window).userMessages).toHaveCount(1, { timeout: 5000 });
+    await expect(activeChat(window).llmMessages).toHaveCount(1, { timeout: 5000 });
+
+    const stopButton = window.locator('[data-testid="prompt-input-stop"]');
+    await expect(stopButton).toBeVisible({ timeout: 5000 });
+    await stopButton.click();
+
+    await expect(activeChat(window).userMessages).toHaveCount(1, { timeout: 5000 });
+    await expect(activeChat(window).llmMessages).toHaveCount(1, { timeout: 5000 });
+    await expect(window.locator('[data-testid="prompt-input-send"]')).toBeVisible({
+      timeout: 5000,
+    });
+    await expectNoToastError(window);
+  });
+
   /* Preconditions: Agent is active, input field is visible
      Action: Type message and press Enter
      Assertions: Message is sent and appears in chat
@@ -374,6 +467,8 @@ test.describe('Agent Messaging', () => {
     const scrollToBottomBtn = window.locator('[data-testid="scroll-to-bottom"]');
     await expect(scrollToBottomBtn).toBeVisible({ timeout: 3000 });
 
+    const messagesBeforeAgentResponse = await activeChat(window).messages.count();
+
     // Create agent message using test API
     const result = await window.evaluate(async (agentId) => {
       // @ts-expect-error - window.api is exposed via contextBridge
@@ -384,8 +479,15 @@ test.describe('Agent Messaging', () => {
     }, firstAgentId as string);
     expect(result.success).toBe(true);
 
-    // Wait for agent message to appear
-    await expect(activeChat(window).messages).toHaveCount(16, { timeout: 5000 });
+    // Wait for at least one new message to appear
+    await window.waitForFunction(
+      (beforeCount) =>
+        document.querySelectorAll(
+          '[data-testid="agent-chat-root"]:not(.pointer-events-none) [data-testid="message"]'
+        ).length > beforeCount,
+      messagesBeforeAgentResponse,
+      { timeout: 5000 }
+    );
 
     // Wait to ensure no autoscroll happens — button should remain visible
     await window.waitForFunction(

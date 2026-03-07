@@ -888,7 +888,8 @@ describe('DatabaseManager Repository Accessors', () => {
           payload_json TEXT NOT NULL,
           usage_json TEXT,
           kind TEXT NOT NULL DEFAULT 'user',
-          hidden INTEGER NOT NULL DEFAULT 0
+          hidden INTEGER NOT NULL DEFAULT 0,
+          done INTEGER NOT NULL DEFAULT 0
         );
       `);
 

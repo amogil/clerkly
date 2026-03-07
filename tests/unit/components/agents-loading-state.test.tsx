@@ -45,13 +45,16 @@ jest.mock('../../../src/renderer/components/agents/AgentChat', () => ({
   AgentChat: ({
     agent,
     onLoadingChange,
+    onStartupSettledChange,
   }: {
     agent: AgentSnapshot;
     onLoadingChange?: (agentId: string, loading: boolean) => void;
+    onStartupSettledChange?: (agentId: string, settled: boolean) => void;
   }) => {
     useEffect(() => {
       onLoadingChange?.(agent.id, false);
-    }, [agent.id, onLoadingChange]);
+      onStartupSettledChange?.(agent.id, true);
+    }, [agent.id, onLoadingChange, onStartupSettledChange]);
     return <div data-testid={`agent-chat-${agent.id}`} />;
   },
 }));

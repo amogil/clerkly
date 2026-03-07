@@ -21,6 +21,7 @@ const baseMessage = (overrides: Partial<MessageSnapshot> = {}): MessageSnapshot 
     kind: 'user',
     timestamp: '2024-01-01T00:00:00Z',
     hidden: false,
+    done: true,
     payload: { data: { text: 'Hello' } },
     replyToMessageId: null,
     ...overrides,
@@ -35,8 +36,6 @@ describe('AgentMessage — user', () => {
     render(
       <AgentMessage
         message={baseMessage({ kind: 'user', payload: { data: { text: 'Hello world' } } })}
-        showAvatar={false}
-        agentStatus="completed"
       />
     );
     expect(screen.getByTestId('message-user')).toBeInTheDocument();
@@ -48,13 +47,7 @@ describe('AgentMessage — user', () => {
      Assertions: renders without crash, empty string shown
      Requirements: agents.4.9 */
   it('should render empty user message without crash', () => {
-    render(
-      <AgentMessage
-        message={baseMessage({ kind: 'user', payload: { data: {} } })}
-        showAvatar={false}
-        agentStatus="completed"
-      />
-    );
+    render(<AgentMessage message={baseMessage({ kind: 'user', payload: { data: {} } })} />);
     expect(screen.getByTestId('message-user')).toBeInTheDocument();
   });
 });
@@ -71,8 +64,6 @@ describe('AgentMessage — llm', () => {
           kind: 'llm',
           payload: { data: { action: { type: 'final_answer', content: 'Response text' } } },
         })}
-        showAvatar={false}
-        agentStatus="completed"
       />
     );
     expect(screen.getByTestId('message-llm')).toBeInTheDocument();
@@ -80,19 +71,13 @@ describe('AgentMessage — llm', () => {
     expect(screen.getByText('Response text')).toBeInTheDocument();
   });
 
-  /* Preconditions: kind:llm without action (streaming)
+  /* Preconditions: kind:llm without action and without reasoning
      Action: render AgentMessage
-     Assertions: loading indicator shown, no action content
+     Assertions: no loading indicator and no action content
      Requirements: llm-integration.7 */
-  it('should render loading indicator when action is absent', () => {
-    render(
-      <AgentMessage
-        message={baseMessage({ kind: 'llm', payload: { data: {} } })}
-        showAvatar={false}
-        agentStatus="in-progress"
-      />
-    );
-    expect(screen.getByTestId('message-llm-loading')).toBeInTheDocument();
+  it('should not render loading indicator when action and reasoning are absent', () => {
+    render(<AgentMessage message={baseMessage({ kind: 'llm', payload: { data: {} } })} />);
+    expect(screen.queryByTestId('message-llm-loading')).not.toBeInTheDocument();
     expect(screen.queryByTestId('message-llm-action')).not.toBeInTheDocument();
   });
 
@@ -112,12 +97,35 @@ describe('AgentMessage — llm', () => {
             },
           },
         })}
-        showAvatar={false}
-        agentStatus="completed"
       />
     );
+    expect(screen.getByTestId('message-llm-reasoning-trigger')).toBeInTheDocument();
     expect(screen.getByTestId('message-llm-reasoning')).toBeInTheDocument();
+    expect(screen.getByTestId('reasoning-root')).toHaveAttribute('data-streaming', 'false');
     expect(screen.getByTestId('message-llm-action')).toBeInTheDocument();
+  });
+
+  /* Preconditions: kind:llm with reasoning, active streaming for this message
+     Action: render AgentMessage with isReasoningStreaming=true
+     Assertions: Reasoning receives data-streaming=true
+     Requirements: llm-integration.2, llm-integration.7.2 */
+  it('should pass streaming flag to Reasoning for active reasoning message', () => {
+    render(
+      <AgentMessage
+        message={baseMessage({
+          kind: 'llm',
+          payload: {
+            data: {
+              reasoning: { text: 'Thinking...' },
+            },
+          },
+        })}
+        isReasoningStreaming={true}
+      />
+    );
+    expect(screen.getByTestId('reasoning-root')).toHaveAttribute('data-streaming', 'true');
+    expect(screen.queryByTestId('message-llm-loading')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('message-llm-avatar')).not.toBeInTheDocument();
   });
 
   /* Preconditions: kind:llm with action but no reasoning
@@ -131,41 +139,43 @@ describe('AgentMessage — llm', () => {
           kind: 'llm',
           payload: { data: { action: { content: 'Answer' } } },
         })}
-        showAvatar={false}
-        agentStatus="completed"
       />
     );
     expect(screen.queryByTestId('message-llm-reasoning')).not.toBeInTheDocument();
   });
 
-  /* Preconditions: kind:llm, showAvatar=true
+  /* Preconditions: kind:llm message with action content
      Action: render AgentMessage
-     Assertions: Logo (svg) rendered above message
-     Requirements: agents.4.22 */
-  it('should render avatar when showAvatar is true', () => {
-    const { container } = render(
+     Assertions: top message avatar is not rendered as separate block
+     Requirements: agents.4.11 */
+  it('should not render top avatar for llm message with action content', () => {
+    render(
       <AgentMessage
         message={baseMessage({ kind: 'llm', payload: { data: { action: { content: 'Hi' } } } })}
-        showAvatar={true}
-        agentStatus="completed"
       />
     );
-    expect(container.querySelector('svg')).toBeInTheDocument();
+    expect(screen.queryByTestId('message-llm-avatar')).not.toBeInTheDocument();
   });
 
-  /* Preconditions: kind:llm, showAvatar=false
+  /* Preconditions: kind:llm with reasoning
      Action: render AgentMessage
-     Assertions: no Logo rendered
-     Requirements: agents.4.22 */
-  it('should not render avatar when showAvatar is false', () => {
-    const { container } = render(
+     Assertions: top message avatar is hidden to avoid duplication with reasoning trigger icon
+     Requirements: agents.4.11, agents.4.11.1, llm-integration.7.2 */
+  it('should keep top avatar hidden for llm message when reasoning is present', () => {
+    render(
       <AgentMessage
-        message={baseMessage({ kind: 'llm', payload: { data: { action: { content: 'Hi' } } } })}
-        showAvatar={false}
-        agentStatus="completed"
+        message={baseMessage({
+          kind: 'llm',
+          payload: {
+            data: {
+              reasoning: { text: 'Thinking...' },
+            },
+          },
+        })}
+        isReasoningStreaming={true}
       />
     );
-    expect(container.querySelector('svg')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('message-llm-avatar')).not.toBeInTheDocument();
   });
 });
 
@@ -185,8 +195,6 @@ describe('AgentMessage — error', () => {
           kind: 'error',
           payload: { data: { error: { message: 'Something went wrong' } } },
         })}
-        showAvatar={false}
-        agentStatus="error"
       />
     );
     expect(screen.getByTestId('message-error')).toBeInTheDocument();
@@ -198,13 +206,7 @@ describe('AgentMessage — error', () => {
      Assertions: fallback "Unknown error" shown
      Requirements: llm-integration.7 */
   it('should render fallback text when error info absent', () => {
-    render(
-      <AgentMessage
-        message={baseMessage({ kind: 'error', payload: { data: {} } })}
-        showAvatar={false}
-        agentStatus="error"
-      />
-    );
+    render(<AgentMessage message={baseMessage({ kind: 'error', payload: { data: {} } })} />);
     expect(screen.getByText('Unknown error')).toBeInTheDocument();
   });
 
@@ -229,8 +231,6 @@ describe('AgentMessage — error', () => {
           },
           replyToMessageId: 99,
         })}
-        showAvatar={false}
-        agentStatus="error"
         onNavigate={onNavigate}
       />
     );
@@ -257,8 +257,6 @@ describe('AgentMessage — error', () => {
             },
           },
         })}
-        showAvatar={false}
-        agentStatus="error"
       />
     );
 
@@ -285,8 +283,6 @@ describe('AgentMessage — error', () => {
             },
           },
         })}
-        showAvatar={false}
-        agentStatus="error"
       />
     );
     expect(screen.queryByTestId('message-error-action-link')).not.toBeInTheDocument();

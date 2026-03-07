@@ -271,12 +271,21 @@ export class AgentIPCHandlers {
     args: { agentId: string; kind: string; payload: MessagePayload }
   ): Promise<IPCResult> {
     try {
-      const replyToMessageId = args.kind === 'user' ? null : null;
+      if (args.kind === 'user') {
+        // Requirements: llm-integration.3.8
+        // Hide visible error messages before creating the next user message.
+        this.messageManager.hideErrorMessages(args.agentId);
+      }
+
+      const lastMessage = this.messageManager.getLastMessage(args.agentId);
+      const replyToMessageId = lastMessage?.id ?? null;
+      const done = args.kind === 'llm' ? false : true;
       const message = this.messageManager.create(
         args.agentId,
         args.kind,
         args.payload,
-        replyToMessageId
+        replyToMessageId,
+        done
       );
       this.logger.info(`Message created: ${message.id} for agent ${args.agentId}`);
       // Convert to snapshot with parsed payload
@@ -285,10 +294,6 @@ export class AgentIPCHandlers {
       // Launch LLM pipeline asynchronously for user messages
       // Requirements: llm-integration.6, llm-integration.3.8
       if (args.kind === 'user') {
-        // Hide all visible kind:error messages for this agent before sending new message
-        // Requirements: llm-integration.3.8
-        this.messageManager.hideErrorMessages(args.agentId);
-
         // Cancel any running pipeline for this agent
         this.agentManager.cancelPipeline(args.agentId);
 
@@ -348,7 +353,29 @@ export class AgentIPCHandlers {
     args: { agentId: string }
   ): Promise<IPCResult> {
     try {
-      this.agentManager.cancelPipeline(args.agentId);
+      const cancelledActivePipeline = this.agentManager.cancelPipeline(args.agentId);
+      if (!cancelledActivePipeline) {
+        // No active run to cancel: do not mutate message visibility.
+        // Requirements: llm-integration.8.1, llm-integration.8.7
+        return { success: true };
+      }
+
+      // Requirements: llm-integration.8.5, llm-integration.8.7
+      // Cancel is treated as "discard current turn":
+      // - hide pending user message if generation hasn't produced an llm message yet
+      // - hide in-flight llm message and its reply-to user message when present
+      const lastMessage = this.messageManager.getLastMessage(args.agentId);
+      if (lastMessage && !lastMessage.hidden) {
+        if (lastMessage.kind === 'user') {
+          this.messageManager.setHidden(lastMessage.id, args.agentId);
+        } else if (lastMessage.kind === 'llm' && !lastMessage.done) {
+          this.messageManager.hideAndMarkIncomplete(lastMessage.id, args.agentId);
+          if (lastMessage.replyToMessageId !== null) {
+            this.messageManager.setHidden(lastMessage.replyToMessageId, args.agentId);
+          }
+        }
+      }
+
       return { success: true };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);

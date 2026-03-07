@@ -22,6 +22,7 @@ import type {
   AuthFailedPayload,
   AuthCancelledPayload,
   ErrorCreatedPayload,
+  LLMPipelineDiagnosticPayload,
 } from '../shared/events/types';
 
 // Requirements: clerkly.3.5, clerkly.3.7
@@ -29,6 +30,43 @@ const logger = Logger.create('App');
 
 // Requirements: error-notifications.1.1 - Create ErrorNotificationManager instance
 const errorNotificationManager = new ErrorNotificationManager();
+
+function describeUnhandledReason(reason: unknown): string {
+  if (reason instanceof Error) {
+    return JSON.stringify(
+      {
+        type: 'Error',
+        name: reason.name,
+        message: reason.message,
+        stack: reason.stack ?? null,
+      },
+      null,
+      2
+    );
+  }
+
+  return JSON.stringify(
+    {
+      type: typeof reason,
+      value: String(reason),
+    },
+    null,
+    2
+  );
+}
+
+function isBenignCancellationReason(reason: unknown): boolean {
+  const name = reason instanceof Error ? reason.name : '';
+  const message = reason instanceof Error ? reason.message : String(reason ?? '');
+  const normalized = message.toLowerCase();
+
+  return (
+    name === 'AbortError' ||
+    normalized.includes('aborted') ||
+    normalized.includes('cancelled') ||
+    normalized.includes('canceled')
+  );
+}
 
 // Requirements: clerkly.1, google-oauth-auth.12.1, google-oauth-auth.12.2, navigation.1.1, navigation.1.3, navigation.1.4, error-notifications.1.1
 export default function App() {
@@ -102,16 +140,40 @@ function AppContent() {
     errorNotificationManager.showNotification(payload.message, payload.context);
   }, []);
 
+  // Requirements: realtime-events.4.10
+  const handleLLMPipelineDiagnostic = useCallback((payload: LLMPipelineDiagnosticPayload) => {
+    const details = JSON.stringify(payload.details);
+    const message = `LLM pipeline diagnostic (${payload.context}): ${payload.message}; details=${details}`;
+    if (payload.level === 'warn') {
+      logger.warn(message);
+      return;
+    }
+    logger.error(message);
+  }, []);
+
   useEventSubscription(EVENT_TYPES.AUTH_CALLBACK_RECEIVED, handleAuthCallbackReceived);
   useEventSubscription(EVENT_TYPES.AUTH_COMPLETED, handleAuthCompleted);
   useEventSubscription(EVENT_TYPES.AUTH_FAILED, handleAuthFailed);
   useEventSubscription(EVENT_TYPES.AUTH_CANCELLED, handleAuthCancelled);
   useEventSubscription(EVENT_TYPES.AUTH_SIGNED_OUT, handleAuthSignedOut);
   useEventSubscription(EVENT_TYPES.ERROR_CREATED, handleErrorCreated);
+  useEventSubscription(EVENT_TYPES.LLM_PIPELINE_DIAGNOSTIC, handleLLMPipelineDiagnostic);
 
   // Requirements: error-notifications.2.7, error-notifications.2.8 - Global unhandled rejection handler
   useEffect(() => {
     const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+      logger.warn(
+        `Unhandled rejection captured in renderer: ${describeUnhandledReason(event.reason)}`
+      );
+
+      if (isBenignCancellationReason(event.reason)) {
+        logger.info(
+          `Unhandled rejection filtered as cancellation: ${describeUnhandledReason(event.reason)}`
+        );
+        event.preventDefault();
+        return;
+      }
+
       logger.error('Unhandled rejection: ' + String(event.reason));
 
       const message = event.reason instanceof Error ? event.reason.message : String(event.reason);
@@ -176,15 +238,16 @@ function AppContent() {
     <>
       {isGlobalLoading && <AppLoadingScreen />}
       <div
-        className={`min-h-screen bg-background${isGlobalLoading ? ' hidden' : ''}`}
+        className={`h-screen overflow-hidden bg-background${
+          isGlobalLoading ? ' opacity-0 pointer-events-none select-none' : ''
+        }`}
         data-testid="agents-screen"
+        aria-hidden={isGlobalLoading}
       >
         <TopNavigation currentScreen={currentScreen} onNavigate={navigateToScreen} />
-        <div className="pt-16">
+        <div className="h-full pt-16">
           <div
-            className={`${
-              currentScreen === 'agents' ? '' : 'opacity-0 pointer-events-none absolute inset-0'
-            }`}
+            className={`${currentScreen === 'agents' ? 'h-full' : 'opacity-0 pointer-events-none absolute inset-0'}`}
           >
             <Agents onNavigate={navigateToScreen} />
           </div>
@@ -205,7 +268,7 @@ function AppLoadingScreen() {
   return (
     <div
       data-testid="app-loading-screen"
-      className="min-h-screen bg-background flex items-center justify-center"
+      className="fixed inset-0 z-[200] bg-background flex items-center justify-center"
     >
       <div className="text-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>

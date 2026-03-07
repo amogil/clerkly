@@ -38,6 +38,9 @@ CREATE TABLE messages (
   agent_id TEXT NOT NULL,
   timestamp TIMESTAMP NOT NULL,
   kind TEXT NOT NULL,
+  hidden INTEGER NOT NULL DEFAULT 0,
+  done INTEGER NOT NULL DEFAULT 0,
+  reply_to_message_id INTEGER,
   payload_json TEXT NOT NULL
 );
 
@@ -45,7 +48,7 @@ CREATE INDEX idx_messages_agent_id ON messages(agent_id);
 CREATE INDEX idx_messages_agent_timestamp ON messages(agent_id, timestamp);
 ```
 
-**Примечание:** Колонка `kind` добавлена в рамках llm-integration.6. `kind` не хранится в `payload_json` — всегда передаётся явно при вставке.
+**Примечание:** Детальный контракт хранения сообщений (`kind`, `done`, `reply_to_message_id`, `usage_json`, структура payload) задаётся в `docs/specs/llm-integration/design.md`; здесь используется его целевая схема.
 
 ## Типы данных
 
@@ -77,9 +80,16 @@ type AgentStatus = 'new' | 'in-progress' | 'awaiting-response' | 'error' | 'comp
 ```typescript
 // Requirements: agents.7
 interface MessagePayload {
-  kind: 'user' | 'llm' | 'error' | 'tool_call' | 'code_exec' | 'final_answer' | 'request_scope' | 'artifact';
   timing?: { started_at: string; finished_at: string };
   data: Record<string, unknown>;
+}
+
+interface Message {
+  kind: 'user' | 'llm' | 'error' | 'tool_call' | 'code_exec' | 'final_answer' | 'request_scope' | 'artifact';
+  done: boolean;
+  hidden: boolean;
+  replyToMessageId?: number | null;
+  payloadJson: string;
 }
 ```
 
@@ -486,10 +496,6 @@ contextBridge.exposeInMainWorld('api', {
 ```typescript
 // Requirements: agents.9.1, agents.9.2, agents.9.4
 function computeAgentStatus(messages: Message[]): AgentStatus {
-  if (messages.length === 0) {
-    return 'new';
-  }
-
   // Фильтруем hidden сообщения — они не видны в UI и не влияют на статус
   const visibleMessages = messages.filter(m => m.hidden !== true);
 
@@ -498,36 +504,12 @@ function computeAgentStatus(messages: Message[]): AgentStatus {
   }
 
   const lastMessage = visibleMessages[visibleMessages.length - 1];
-  const payload = JSON.parse(lastMessage.payloadJson) as MessagePayload;
-
-  // Ошибка — последнее видимое сообщение kind: error
-  if (lastMessage.kind === 'error') {
-    return 'error';
+  if (lastMessage.kind === 'error') return 'error';
+  if (lastMessage.kind === 'final_answer') return 'completed';
+  if (lastMessage.kind === 'user') return 'in-progress';
+  if (lastMessage.kind === 'llm') {
+    return lastMessage.done ? 'awaiting-response' : 'in-progress';
   }
-
-  // Финальный ответ
-  if (lastMessage.kind === 'final_answer') {
-    return 'completed';
-  }
-
-  // in-progress: есть user-сообщение и после него нет финализированного ответа агента
-  // Ищем с конца: если встречаем user раньше чем финализированный llm/final_answer — in-progress
-  for (let i = visibleMessages.length - 1; i >= 0; i--) {
-    const msg = visibleMessages[i];
-    if (msg.kind === 'user') {
-      return 'in-progress';
-    }
-    if (msg.kind === 'llm') {
-      const p = JSON.parse(msg.payloadJson);
-      if (p.data?.action) {
-        // Финализированный llm-ответ — агент ответил
-        return 'awaiting-response';
-      }
-      // llm без action — ещё в процессе стриминга
-      return 'in-progress';
-    }
-  }
-
   return 'new';
 }
 
@@ -753,7 +735,7 @@ MessageManager.create()
         │       └─→ useAgents (Renderer)
         │           → Обновляет timestamp в UI
         │
-        └─→ useMessages (Renderer)
+        └─→ useAgentChat (Renderer)
             → Добавляет сообщение в чат
 ```
 
@@ -815,8 +797,8 @@ function AgentsComponent() {
   2. Получает обновленного агента из БД
   3. Генерирует событие `AGENT_UPDATED`
 
-*Подписчик 2: useMessages (Renderer)*
-- **Файл:** `src/renderer/hooks/useMessages.ts`
+*Подписчик 2: useAgentChat (Renderer)*
+- **Файл:** `src/renderer/hooks/useAgentChat.ts`
 - **Подписка:** `useEventSubscription(MESSAGE_CREATED, handler)`
 - **Фильтр:** `payload.data.agentId === activeAgentId` (только для активного агента)
 - **Действия:**
@@ -828,8 +810,8 @@ function AgentsComponent() {
 
 **MESSAGE_UPDATED** (agents.12.5, agents.12.7)
 
-*Подписчик: useMessages (Renderer)*
-- **Файл:** `src/renderer/hooks/useMessages.ts`
+*Подписчик: useAgentChat (Renderer)*
+- **Файл:** `src/renderer/hooks/useAgentChat.ts`
 - **Подписка:** `useEventSubscription(MESSAGE_UPDATED, handler)`
 - **Фильтр:** Нет (обрабатывает все обновления)
 - **Действия:**
@@ -871,19 +853,8 @@ function AgentsComponent() {
 - Используется `Array.sort()` с компаратором по `updatedAt` DESC
 
 **Анимация перехода агента (agents.1.4.4):**
-- Используется `framer-motion` с `AnimatePresence` и `motion.div`
-- `AnimatePresence` с `mode="popLayout"` для управления анимацией списка
-- Каждый агент обернут в `motion.div` с `layout` prop для плавного перемещения
-- Spring анимация с параметрами:
-  - `type: 'spring'`
-  - `stiffness: 400` - жесткость пружины
-  - `damping: 30` - затухание
-  - `mass: 0.8` - масса элемента
-- Анимация появления/исчезновения:
-  - `initial={{ opacity: 0, scale: 0.8 }}`
-  - `animate={{ opacity: 1, scale: 1 }}`
-  - `exit={{ opacity: 0, scale: 0.8 }}`
-  - `duration: 0.2` для opacity и scale
+- Пересортировка списка при изменении `updatedAt` выполняется без анимации перемещения.
+- Для иконок списка используется только анимация появления (opacity/scale) через `motion.div`.
 
 **AGENT_ARCHIVED** (agents.12.3, agents.12.6)
 
@@ -900,8 +871,8 @@ function AgentsComponent() {
 
 | Событие | Генератор | Подписчики | Файлы |
 |---------|-----------|------------|-------|
-| **MESSAGE_CREATED** | `MessageManager.create()` | 1. `AgentManager` (Main)<br>2. `useMessages` (Renderer) | `src/main/agents/MessageManager.ts`<br>`src/main/agents/AgentManager.ts`<br>`src/renderer/hooks/useMessages.ts` |
-| **MESSAGE_UPDATED** | `MessageManager.update()` | `useMessages` (Renderer) | `src/main/agents/MessageManager.ts`<br>`src/renderer/hooks/useMessages.ts` |
+| **MESSAGE_CREATED** | `MessageManager.create()` | 1. `AgentManager` (Main)<br>2. `useAgentChat` (Renderer) | `src/main/agents/MessageManager.ts`<br>`src/main/agents/AgentManager.ts`<br>`src/renderer/hooks/useAgentChat.ts` |
+| **MESSAGE_UPDATED** | `MessageManager.update()` | `useAgentChat` (Renderer) | `src/main/agents/MessageManager.ts`<br>`src/renderer/hooks/useAgentChat.ts` |
 | **AGENT_CREATED** | `AgentManager.create()` | `useAgents` (Renderer) | `src/main/agents/AgentManager.ts`<br>`src/renderer/hooks/useAgents.ts` |
 | **AGENT_UPDATED** | 1. `AgentManager.update()`<br>2. `AgentManager.handleMessageCreated()` | `useAgents` (Renderer) | `src/main/agents/AgentManager.ts`<br>`src/renderer/hooks/useAgents.ts` |
 | **AGENT_ARCHIVED** | `AgentManager.archive()` | `useAgents` (Renderer) | `src/main/agents/AgentManager.ts`<br>`src/renderer/hooks/useAgents.ts` |
@@ -1244,11 +1215,13 @@ function ActivityIndicator({ isActive }: { isActive: boolean }) {
 #### PromptInput (AI Elements)
 
 ```typescript
-// Requirements: agents.4.1, agents.4.3, agents.4.4, agents.4.5, agents.4.6, agents.4.7
+// Requirements: agents.4.1, agents.4.2, agents.4.2.1, agents.4.2.2, agents.4.3, agents.4.4, agents.4.5, agents.4.6, agents.4.7, agents.4.24
 function ChatInput({
+  agent,
   taskInput,
   setTaskInput,
   handleSend,
+  cancelCurrentRequest,
   textareaRef,
   chatAreaRef,
 }: ChatInputProps) {
@@ -1263,6 +1236,9 @@ function ChatInput({
     textarea.style.overflowY = textarea.scrollHeight > maxHeight ? 'auto' : 'hidden';
   }, [taskInput, textareaRef, chatAreaRef]);
 
+  const isStopMode = agent.status === 'in-progress';
+  const canSend = taskInput.trim().length > 0;
+
   return (
     <PromptInput onSubmit={(message) => handleSend(message.text)}>
       <PromptInputBody>
@@ -1274,12 +1250,12 @@ function ChatInput({
           onChange={(event) => setTaskInput(event.target.value)}
         />
         <Button
-          type={agent.status === 'in-progress' && isStreaming ? 'button' : 'submit'}
-          onClick={
-            agent.status === 'in-progress' && isStreaming ? () => cancelCurrentRequest() : undefined
-          }
+          type={isStopMode ? 'button' : 'submit'}
+          disabled={isStopMode ? false : !canSend}
+          onClick={isStopMode ? () => cancelCurrentRequest() : undefined}
+          aria-label={isStopMode ? 'Stop generation' : 'Send message'}
         >
-          {agent.status === 'in-progress' && isStreaming ? <Square /> : <Send />}
+          {isStopMode ? <Square /> : <Send />}
         </Button>
       </PromptInputBody>
       <PromptInputFooter>
@@ -1293,6 +1269,10 @@ function ChatInput({
 **Важно:** поведение клавиатуры (`Enter` submit, `Shift+Enter` newline) делегировано `PromptInputTextarea`, без дополнительного кастомного `onKeyDown` в `AgentChat`.
 
 **Техническое решение:** в текущей реализации поле ввода стандартизировано на AI Elements `PromptInput` и интегрировано с существующим chat send-flow.
+
+**Алгоритм активности action-кнопки (agents.4.2, agents.4.2.1, agents.4.2.2):**
+- Режим `stop` (`agent.status === 'in-progress'`) — кнопка всегда активна, независимо от текста в поле ввода.
+- Режим `send` (любой статус кроме `in-progress`) — кнопка активна только если `taskInput.trim().length > 0`.
 
 #### Автофокус на поле ввода
 
@@ -1403,7 +1383,7 @@ useEffect(() => {
 
 2. **Переключение агентов** (agents.4.14.2–4.14.4): CSS `absolute inset-0 opacity-0 pointer-events-none` скрывает неактивный `AgentChat`, но не размонтирует его и не сбрасывает `scrollTop` (в отличие от `display:none`). При возврате к агенту `Conversation` восстанавливает ту же позицию скролла.
 
-3. **Показ активного чата** (agents.4.14.5): для каждого `AgentChat` режим `resize="instant"` включается только один раз при первой активации (`isActive=true`) на 5 секунд, чтобы исключить визуальный рывок при первом показе чата. После истечения 5 секунд `Conversation` переключается на `resize="smooth"` и больше не возвращается в `instant` для этого чата.
+3. **Показ активного чата** (agents.4.14.5-4.14.6): первый показ активного чата выполняется только после достижения `startupSettled` у этого чата. До этого пользователь видит глобальный startup loader, а контент `AgentChat` не показывается, чтобы исключить скачок ширины/переносов и визуальный доскролл.
 
 4. **После отправки сообщения** (agents.4.13.2): `AgentChatInner` НЕ выполняет ручной вызов `scrollToBottom`. Поведение остаётся у `Conversation`: если пользователь не внизу, позиция сохраняется, а кнопка `scroll-to-bottom` остаётся видимой.
 
@@ -1521,23 +1501,45 @@ function AgentWelcome({ onPromptClick }: AgentWelcomeProps) {
 
 **Сообщения агента (kind: 'llm'):**
 ```tsx
-// Requirements: agents.4.10, agents.4.10.1, agents.4.22, llm-integration.7
+// Requirements: agents.4.10, agents.4.10.1, agents.4.22, llm-integration.7, llm-integration.2
 <div data-testid="message-llm" className="space-y-2 w-full">
-  {showAvatar && <Logo size="sm" showText={false} animated={isInProgress(agentStatus)} />}
-  {reasoning && (
-    <div data-testid="message-llm-reasoning">
-      <Reasoning>{/* collapsible reasoning */}</Reasoning>
-    </div>
+  {reasoningText && (
+    <Reasoning isStreaming={isReasoningStreaming}>
+      {/* App-owned trigger composition over AI Elements primitive */}
+      <AgentReasoningTrigger />
+      <ReasoningContent data-testid="message-llm-reasoning">
+        {reasoningText}
+      </ReasoningContent>
+    </Reasoning>
   )}
   {action?.content ? (
     <div data-testid="message-llm-action" className="text-sm leading-relaxed whitespace-pre-wrap break-words w-full">
       {action.content}
     </div>
-  ) : (
-    <div data-testid="message-llm-loading">{/* loading dots */}</div>
-  )}
+  ) : null}
 </div>
 ```
+
+**Streaming контракт для `Reasoning`:**
+- `Reasoning` используется как основной UI-блок reasoning из AI Elements (без замены на кастомный компонент).
+- В `Reasoning` передаётся `isStreaming`, чтобы получить штатное поведение AI Elements:
+  - авто-раскрытие во время стриминга;
+  - авто-сворачивание после завершения стриминга;
+  - возможность ручного раскрытия/сворачивания остаётся.
+- `isReasoningStreaming` вычисляется только для активного LLM-сообщения, чтобы исторические сообщения не переходили в streaming-состояние.
+- Порядок блоков неизменен: reasoning всегда рендерится выше `message-llm-action` (соответствие `llm-integration.7.2-7.3`).
+- Парсинг reasoning в `OpenAIProvider` должен поддерживать вариативные формы SSE-дельт (`string`, объект с `text/delta/content`, массив content-part), чтобы streaming не терялся при изменении формата события провайдера.
+- В запросе к OpenAI для reasoning-моделей должен передаваться `reasoning.summary`, чтобы провайдер возвращал стриминг-канал reasoning-summary и UI получал живые reasoning-чанки.
+- При приёме reasoning-событий провайдера парсер должен исключать повторные/снапшотные чанки, чтобы accumulated reasoning в UI не дублировался.
+- При активном reasoning без финального `action.content` в сообщении отображается reasoning-блок как единственный индикатор стриминга до появления action.
+- Визуальный маркер reasoning-сообщения рендерится в заголовке `ReasoningTrigger` (иконка приложения + текстовый индикатор + chevron).
+  Этот маркер в рамках спеки считается `Message Avatar` для reasoning-сообщений.
+
+**Trigger иконка (`ReasoningTrigger`):**
+- В app-owned компоненте `AgentReasoningTrigger` используется иконка приложения (`Logo`) вместо `BrainIcon`.
+- Исходники `src/renderer/components/ai-elements/reasoning.tsx` не модифицируются.
+- Иконка остаётся компактной и не ломает baseline строки trigger.
+- Замена иконки не меняет API AI Elements primitives и не влияет на логику toggling.
 
 **Сообщения об ошибке (kind: 'error'):**
 ```tsx
@@ -1581,7 +1583,7 @@ function AgentWelcome({ onPromptClick }: AgentWelcomeProps) {
   animate={{ opacity: 1, y: 0 }}
   transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
 >
-  <AgentMessage message={message} showAvatar={showAvatar} agentStatus={agent.status} onNavigate={onNavigate} />
+  <AgentMessage message={message} onNavigate={onNavigate} />
 </motion.div>
 ```
 
@@ -1704,7 +1706,7 @@ const STATUS_STYLES: Record<AgentStatus, StatusStyle> = {
 
 Есть два типа анимации:
 1. CSS-анимация узлов и линий (для логотипов)
-2. JS spring-анимация перемещения (для списка агентов)
+2. JS-анимация появления элементов (opacity/scale) без spring-пересортировки списка
 
 ### 1. Application Logo (компонент Logo)
 
@@ -1757,29 +1759,16 @@ const STATUS_STYLES: Record<AgentStatus, StatusStyle> = {
 **Визуальное представление:** Идентичен Application Logo (те же узлы и линии)
 
 **Условия показа анимации:**
-- Анимация включается только при перемещении агента на первую позицию
-- Условие: агент был НЕ на первой позиции → получил сообщение → переместился на первую позицию
-- Длительность показа: 3 секунды (затем анимация отключается)
-- НЕ показывается при запуске приложения или переключении между агентами
+- Иконка отражает текущий статус активного агента.
+- Для `in-progress` используется вращающееся кольцо.
+- Для `awaiting-response` используется пульсирующее кольцо.
 
 **Реализация:**
 ```typescript
-// Отслеживание изменения позиции агента
-useEffect(() => {
-  const currentPosition = agents.findIndex(a => a.id === currentAgentId);
-  const previousPosition = previousAgentPositionRef.current;
-  const orderChanged = currentAgentsOrder !== previousAgentsOrder;
-  
-  // Показать анимацию если агент переместился на позицию 0
-  if (orderChanged && currentAgentId === previousAgentId && 
-      currentPosition === 0 && previousPosition > 0) {
-    setShowActivationAnimation(true);
-    setTimeout(() => setShowActivationAnimation(false), 3000);
-  }
-}, [activeAgent?.id, agents]);
+<AgentAvatar status={currentAgent.status} letter={letter} size="md" />
 ```
 
-**CSS-анимация:** Идентична Application Logo (узлы и линии)
+**CSS-анимация:** Статусная (spin/pulse) через компонент `AgentAvatar`
 
 **Файл:** `src/renderer/components/agents.tsx`
 
@@ -1831,9 +1820,7 @@ useEffect(() => {
 
 **Test ID:** `data-testid="agent-card-{agentId}"`
 
-### 5. Message Avatar (компонент AgentAvatar)
-
-**Назначение:** Маленькая иконка слева сверху от сообщений агента
+### 5. Message Avatar
 
 **Визуальное представление:** Идентичен Application Logo (те же узлы и линии)
 
@@ -1843,109 +1830,42 @@ useEffect(() => {
 - Индивидуальные задержки для органичного эффекта
 
 **Особенности:**
-- Показывается перед первым сообщением агента в последовательности
-- Всегда анимирован (`animated={true}`)
+- В навигационных блоках используется через компонент `AgentAvatar`
+- В `kind: llm` сообщениях с reasoning используется в заголовке `AgentReasoningTrigger`
 
 **Файл:** `src/renderer/components/agents/AgentAvatar.tsx`
 
 **Test ID:** `data-testid="agent-avatar"`
+
+**Файл reasoning-версии:** `src/renderer/components/agents/AgentReasoningTrigger.tsx`
 
 #### Реализация
 
 **Файл:** `src/renderer/components/agents.tsx`
 
 ```typescript
-// Requirements: agents.6.7
-const [showActivationAnimation, setShowActivationAnimation] = useState(false);
-const previousActiveAgentIdRef = useRef<string | null>(null);
-const previousAgentPositionRef = useRef<number>(-1);
-const previousAgentsOrderRef = useRef<string>('');
-
-// Track agent position changes and trigger activation animation
-// Requirements: agents.6.7.1, agents.6.7.2, agents.6.7.4, agents.6.7.5
-useEffect(() => {
-  if (!activeAgent) return;
-
-  const currentAgentId = activeAgent.id;
-  const currentPosition = agents.findIndex(a => a.id === currentAgentId);
-  const previousPosition = previousAgentPositionRef.current;
-  const previousAgentId = previousActiveAgentIdRef.current;
-  const currentAgentsOrder = agents.map(a => a.id).join(',');
-  const previousAgentsOrder = previousAgentsOrderRef.current;
-
-  // Initialize on first render (empty previousAgentsOrder)
-  if (previousAgentsOrder === '') {
-    previousActiveAgentIdRef.current = currentAgentId;
-    previousAgentPositionRef.current = currentPosition;
-    previousAgentsOrderRef.current = currentAgentsOrder;
-    return;
-  }
-
-  // Check if order actually changed (not just array reference)
-  const orderChanged = currentAgentsOrder !== previousAgentsOrder;
-
-  // Same agent moved to position 0 from non-zero position AND order changed - show animation
-  if (
-    orderChanged &&
-    currentAgentId === previousAgentId &&
-    currentPosition === 0 &&
-    previousPosition > 0
-  ) {
-    setShowActivationAnimation(true);
-    // Hide animation after 3 seconds
-    const timer = setTimeout(() => {
-      setShowActivationAnimation(false);
-    }, 3000);
-
-    // Update refs
-    previousActiveAgentIdRef.current = currentAgentId;
-    previousAgentPositionRef.current = currentPosition;
-    previousAgentsOrderRef.current = currentAgentsOrder;
-
-    return () => clearTimeout(timer);
-  }
-
-  // Update refs
-  previousActiveAgentIdRef.current = currentAgentId;
-  previousAgentPositionRef.current = currentPosition;
-  previousAgentsOrderRef.current = currentAgentsOrder;
-}, [activeAgent?.id, agents]);
+// Requirements: agents.6.7.2
+<AgentAvatar status={currentAgent.status} letter={letter} size="md" />
 ```
 
 **Ключевые изменения:**
-- Добавлен `previousAgentsOrderRef` для отслеживания порядка агентов
-- Анимация срабатывает ТОЛЬКО когда порядок агентов реально изменился
-- Это предотвращает срабатывание анимации при запуске приложения
-- Refs обновляются ВСЕГДА после проверки условия анимации
+- Визуализация статуса активного агента полностью делегирована компоненту `AgentAvatar`.
+- Пересортировка списка не использует JS-анимацию перемещения.
+- Визуальная динамика в хедере определяется только статусными CSS-анимациями (`spin/pulse`).
 
-#### Использование в UI
-
-**Иконка агента в хедере (с анимацией):**
 #### Использование в UI
 
 **Active Agent Icon в хедере:**
 ```tsx
 // Requirements: agents.6.7.2
-<div className="relative flex-shrink-0 w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center">
-  <span className="text-white text-sm font-semibold">A</span>
-  {/* CSS-анимация: вращающееся кольцо для in-progress */}
-  {isInProgress(selectedAgent) && (
-    <div className="absolute inset-0 rounded-full border-2 border-white border-t-transparent animate-spin" />
-  )}
-</div>
+<AgentAvatar status={currentAgent.status} letter={letter} size="md" />
 ```
 
-**Message Avatar в сообщениях:**
-```tsx
-// Requirements: agents.6.7.5
-import { AgentAvatar } from './agents/AgentAvatar';
-
-{showAvatar && (
-  <div className="mb-2">
-    <AgentAvatar size="sm" animated={true} />
-  </div>
-)}
-```
+**Сообщения в чате:**
+- для reasoning-сообщений визуальный маркер рендерится в заголовке `ReasoningTrigger`;
+- `action.content` рендерится отдельным блоком под reasoning.
+- В терминах требований это поведение покрывает `Message Avatar` для `kind: llm` с reasoning.
+- В reasoning-сообщениях используется анимированная версия логотипа приложения (`Logo animated={isStreaming}`).
 
 **Application Logo в пустом стейте:**
 ```tsx
@@ -1958,32 +1878,24 @@ import { Logo } from '../logo';
 #### Логика работы
 
 1. **Первый запуск приложения:**
-   - Агент на позиции 0
-   - `previousPosition = -1` (не инициализирован)
-   - Анимация НЕ показывается
+   - Активный агент рендерится со статусным индикатором через `AgentAvatar`.
+   - Дополнительная JS-анимация пересортировки не запускается.
 
 2. **Активный агент получает сообщение:**
-   - Агент был на позиции 2
-   - updatedAt обновляется → агент пересортировывается на позицию 0
-   - `currentPosition = 0`, `previousPosition = 2`
-   - `currentAgentId === previousAgentId` → анимация показывается
+   - `updatedAt` обновляется.
+   - Агент мгновенно пересортировывается на позицию 0 без layout/spring-анимации.
 
 3. **Агент уже на первой позиции получает сообщение:**
-   - Агент был на позиции 0
-   - updatedAt обновляется → агент остается на позиции 0
-   - `currentPosition = 0`, `previousPosition = 0`
-   - Условие не выполняется → анимация НЕ показывается
+   - Порядок списка не меняется, UI остается стабильным.
 
 4. **Переключение на другого агента:**
-   - `currentAgentId !== previousAgentId`
-   - Условие не выполняется → анимация НЕ показывается
+   - Отображается статусная иконка выбранного агента.
+   - Состояние списка не сопровождается дополнительной JS-анимацией пересортировки.
 
-#### Почему отслеживаем позицию, а не клики?
+#### Почему пересортировка без анимации?
 
-- Анимация показывает **физическое перемещение** агента в списке
-- Это визуальная обратная связь о том, что агент "подпрыгнул" на первое место
-- Связано с spring-анимацией перемещения (agents.1.4.4)
-- Не зависит от способа активации агента (клик, событие, автовыбор)
+- Требование `agents.1.4.4` фиксирует мгновенную пересортировку без анимации перемещения.
+- Это сохраняет предсказуемый порядок и исключает визуальные артефакты при частых обновлениях `updatedAt`.
 
 ## Стратегия тестирования
 
@@ -1999,7 +1911,11 @@ import { Logo } from '../logo';
 | `tests/unit/agents/AgentIPCHandlers.test.ts` | agents.2, agents.4, agents.5.5 |
 | `tests/unit/agents/computeAgentStatus.test.ts` | agents.9 |
 | `tests/unit/agents/ActivityIndicator.test.tsx` | agents.11 |
-| `tests/unit/components/ai-elements/prompt-input.test.tsx` | agents.4.3-4.7, agents.4.24 |
+| `tests/unit/components/ai-elements/prompt-input.test.tsx` | agents.4.2-4.7, agents.4.24 |
+| `tests/unit/components/agents/AgentMessage.test.tsx` | agents.4.10, agents.4.11.1, llm-integration.2, llm-integration.7 |
+| `tests/unit/components/agents/AgentReasoningTrigger.test.tsx` | agents.4.11, llm-integration.2, llm-integration.7.2 |
+| `tests/unit/renderer/IPCChatTransport.test.ts` | llm-integration.2, llm-integration.7 |
+| `tests/unit/hooks/useAgentChat.test.ts` | agents.4.24, llm-integration.8.7 |
 | `tests/unit/components/agents.test.tsx` | agents.4.22 |
 | `tests/unit/components/agents-autoscroll.test.tsx` | agents.4.13 |
 | `tests/unit/components/agents-scroll-position.test.tsx` | agents.4.14 |
@@ -2007,23 +1923,23 @@ import { Logo } from '../logo';
 
 ### Функциональные тесты
 
-| Файл | Покрытие | Недостающие тесты |
-|------|----------|-------------------|
+| Файл | Покрытие | Примечание |
+|------|----------|------------|
 | `tests/functional/agent-switching.spec.ts` | agents.3 | - |
-| `tests/functional/agent-messaging.spec.ts` | agents.4.3, 4.4, 4.8, 4.13.1, 4.13.2, 4.13.4 | - |
-| `tests/functional/agent-scroll-position.spec.ts` | agents.4.14.1-4.14.5 | - |
-| `tests/functional/startup-loader.spec.ts` | agents.13.2, agents.13.10, agents.4.14.5 (startup instant scroll) | - |
+| `tests/functional/agent-messaging.spec.ts` | agents.4.2.1, agents.4.2.2, 4.3, 4.4, 4.8, 4.13.1, 4.13.2, 4.13.4 | - |
+| `tests/functional/agent-scroll-position.spec.ts` | agents.4.14.1-4.14.6 | - |
+| `tests/functional/startup-loader.spec.ts` | agents.13.2, agents.13.10, agents.4.14.5-4.14.6 (startup settled без визуального рывка, без page-level scrollbar во время loader, стабильная ширина в раннем окне после скрытия loader) | - |
 | `tests/functional/settings-ai-agent.spec.ts` | agents.13.11-13.15 (регрессия startup/loading orchestration) | - |
 | `tests/functional/all-agents-page.spec.ts` | agents.5 | - |
 | `tests/functional/agent-status-indicators.spec.ts` | agents.6 | - |
 | `tests/functional/message-format.spec.ts` | agents.7 | - |
-| `tests/functional/llm-chat.spec.ts` | agents.7.7, agents.4.24 | - |
+| `tests/functional/llm-chat.spec.ts` | agents.4.11, agents.7.7, agents.4.24, llm-integration.2, llm-integration.7.2, llm-integration.8.7 | - |
 | `tests/functional/agent-status-calculation.spec.ts` | agents.9 | - |
 | `tests/functional/agent-data-isolation.spec.ts` | agents.10 | - |
 | `tests/functional/agent-activity-indicator.spec.ts` | agents.11 | - |
 | `tests/functional/agent-realtime-events.spec.ts` | agents.12 | - |
 | `tests/functional/agent-list-responsive.spec.ts` | agents.1.7, 1.8, 1.9 | - |
-| `tests/functional/agents-always-one.spec.ts` | agents.2.7-2.11 | - |
+| `tests/functional/agents-always-one.spec.ts` | agents.2.7-2.11 | Сценарии: auto-create первого агента, отсутствие empty state, скрытие startup loader с сохранением видимости и интерактивности стандартного UI после `startupSettled` |
 | `tests/functional/agents-error-messages.spec.ts` | agents.5.5, 5.6, 5.7 | - |
 | `tests/functional/auto-expanding-textarea.spec.ts` | agents.4.5-4.7 | - |
 | `tests/functional/empty-state-placeholder.spec.ts` | agents.4.15-4.19 | - |
@@ -2035,9 +1951,9 @@ import { Logo } from '../logo';
 | `tests/functional/input-autofocus.spec.ts` | agents.4.7.1, 4.7.2 | - |
 | `tests/functional/header-layout.spec.ts` | agents.8.3 | - |
 
-#### Недостающие функциональные тесты
+#### Статус покрытия функциональными тестами
 
-Все функциональные тесты для автоскролла и управления позицией скролла реализованы.
+Покрытие функциональными тестами для автоскролла и управления позицией скролла зафиксировано в таблице выше.
 
 #### Правила написания функциональных тестов
 
@@ -2108,10 +2024,12 @@ await window.locator(`[data-testid="agent-icon-${firstAgentId}"]`).click();
 | agents.3 | ✓ | ✓ |
 | agents.3.5-3.5.3 (custom tooltip) | - | ✓ |
 | agents.4 | ✓ | ✓ |
+| agents.4.11 | ✓ | ✓ |
+| agents.4.11.1 | ✓ | ✓ |
 | agents.4.7.1-4.7.2 (autofocus) | - | ✓ |
 | agents.4.13.1-4.13.6 (autoscroll) | ✓ | ✓ |
 | agents.4.13.4-4.13.6 (scrollbar) | - | Manual |
-| agents.4.14.1-4.14.5 (scroll position) | ✓ | ✓ |
+| agents.4.14.1-4.14.6 (scroll position) | ✓ | ✓ |
 | agents.4.23 (text wrapping) | ✓ | ✓ |
 | agents.5 | ✓ | ✓ |
 | agents.5.5 (error messages) | ✓ | ✓ |
@@ -2178,7 +2096,7 @@ await window.locator(`[data-testid="agent-icon-${firstAgentId}"]`).click();
 agents.tsx
   ├── AgentHeader (без изменений)
   ├── [для каждого агента, скрытые через CSS если не активны]
-  │     AgentChat (смонтирован всё время, скрыт через className="hidden" если не активен)
+  │     AgentChat (смонтирован всё время, скрыт через CSS, но не размонтируется)
   │       ├── Conversation (use-stick-to-bottom, трекает скролл сам)
   │       │     ├── ConversationContent
   │       │     │     ├── AgentWelcome (если нет сообщений)
@@ -2191,9 +2109,9 @@ agents.tsx
 
 **Ключевые принципы:**
 - Все `AgentChat` монтируются при старте и остаются смонтированными
-- Переключение агента = CSS `display: none/block`, без ремонта
+- Переключение агента = CSS-скрытие без размонтирования (`absolute inset-0 opacity-0 pointer-events-none`)
 - `Conversation` каждого агента трекает скролл независимо — позиция сохраняется автоматически
-- Лоадер показывается пока хотя бы один агент ещё загружает сообщения
+- Лоадер показывается пока хотя бы один агент ещё загружает сообщения или активный чат ещё не достиг `startupSettled`
 
 ### Переключение экранов (Agents ↔ Settings)
 
@@ -2287,9 +2205,9 @@ interface UseAgentChatResult {
 
 4. **Синхронизация через события** — `MESSAGE_CREATED` добавляет в `rawMessages` (дедупликация по id), `MESSAGE_UPDATED` с `hidden: true` удаляет из обоих массивов через `setMessages()`.
 
-5. **`isStreaming`** = `status === 'streaming' || status === 'submitted'` (внутреннее состояние запроса в `useChat`).
+5. **`isStreaming`** = `status === 'streaming' || status === 'submitted'` (внутреннее состояние запроса в `useChat`); используется для потока сообщений и reasoning, но НЕ для переключения `send/stop`.
 
-6. **Stop по статусу и активному запросу** — action-кнопка в `AgentChat` переключается в режим `stop`, когда `agent.status === 'in-progress'` и `isStreaming === true` (`submitted`/`streaming` в `useChat`); нажатие вызывает `cancelCurrentRequest()` и IPC `messages:cancel`.
+6. **Action-кнопка по статусу и тексту** — кнопка в `AgentChat` переключается в режим `stop`, когда `agent.status === 'in-progress'`; во всех остальных статусах отображается `send`. В режиме `stop` кнопка всегда активна. В режиме `send` кнопка активна только при непустом `taskInput.trim()`. Нажатие `stop` вызывает `cancelCurrentRequest()` и IPC `messages:cancel`.
 
 7. **Ошибки stop без toast** — `cancelCurrentRequest()` перехватывает ошибки/`success:false` от `messages:cancel`, возвращает `false` и не инициирует toast-уведомления.
 
@@ -2300,9 +2218,16 @@ interface UseAgentChatResult {
 **Загрузка при старте:**
 - Все `AgentChat` компоненты монтируются при старте приложения одновременно
 - Каждый `AgentChat` при mount вызывает `useAgentChat(agentId)`, который загружает ВСЕ сообщения через `messages:list`
-- `isLoading = true` пока идёт загрузка истории
-- `App.tsx` показывает экран загрузки "Loading..." пока хотя бы один `AgentChat` имеет `isLoading = true`
-- После загрузки всех чатов экран загрузки скрывается и показывается основной интерфейс
+- Каждый `AgentChat` дополнительно выставляет локальный флаг `startupSettled` только после фактической стабилизации первого отображения: ширина контейнера сообщений перестала изменяться, новые `scroll`-события в контейнере не приходят в течение короткого окна стабильности, и финальный кадр отрисован (double `requestAnimationFrame`)
+- `App.tsx` показывает экран загрузки "Loading..." пока хотя бы один `AgentChat` имеет `isLoading = true` ИЛИ активный `AgentChat` ещё не имеет `startupSettled = true`
+- После загрузки всех чатов и достижения `startupSettled` активным чатом экран загрузки скрывается и показывается основной интерфейс
+- Экран загрузки рендерится как `fixed`-overlay и не участвует в нормальном потоке документа, чтобы не создавать временный второй scroll-контекст
+- Глобальная блокировка page-level scroll задаётся на уровне спецификации `navigation` (`navigation.1.10`); в сценарии `Agents` единственный допустимый scroll-контекст — внутренний контейнер `Conversation`
+
+**Контракт визуальной стабильности старта (anti-regression):**
+- Во время `startup-loader` не допускается появление page-level scrollbar (ни на `html`, ни на `body`)
+- После скрытия `startup-loader` в раннем окне наблюдения не допускаются скачки ширины контейнера сообщений, вызванные поздним появлением/исчезновением скроллбара
+- Контейнер сообщений резервирует gutter скроллбара (`scrollbar-gutter: stable`), чтобы исключить shift ширины при переходе между состояниями с/без вертикального скролла
 
 ### AppCoordinator (main process orchestration)
 
@@ -2320,7 +2245,7 @@ interface UseAgentChatResult {
 
 **Ключевые события:**
 - `app.state.changed` — публикуется `AppCoordinator` при каждом переходе состояния
-- `app.chats.ready` — публикуется renderer (`Agents`) после завершения начальной загрузки чатов
+- `app.chats.ready` — публикуется renderer (`Agents`) только когда загружены все чаты и активный чат достиг `startupSettled`
 - `app.chats.failed` — публикуется renderer при критической ошибке загрузки чатов
 
 **Поток запуска:**

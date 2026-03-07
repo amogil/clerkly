@@ -80,6 +80,7 @@ const makeSnapshot = (id: number, kind = 'user', hidden = false): MessageSnapsho
   replyToMessageId: null,
   payload: { data: { text: `msg ${id}` } },
   hidden,
+  done: true,
 });
 
 const makeUIMessage = (id: number) => ({

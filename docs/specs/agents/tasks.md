@@ -1,103 +1,163 @@
-# Список Задач: Prompt Input Button (Issue #34)
+# Список задач: Приведение Agents к обновлённым требованиям (status/done/startup-settled)
 
 ## Обзор
 
-Задача: привести кнопку в `PromptInput` к поведению и внешнему виду AI Elements компонента, сохранить фирменный цвет приложения и добавить явную отмену текущего запроса через кнопку во время `in-progress`.
+Цель работ: привести реализацию `agents` и связанные части `llm-integration` к целевому поведению по:
+- статусам агента через `kind + hidden + done`;
+- режимам кнопки `send/stop`;
+- жизненному циклу `done` и backfill исторических `llm`;
+- устранению стартового визуального дёрганья чата.
 
-Связанная issue: `#34`  
-Ссылка: `https://github.com/amogil/clerkly/issues/34`
+Связанные спецификации:
+- `docs/specs/agents/requirements.md`
+- `docs/specs/agents/design.md`
+- `docs/specs/llm-integration/requirements.md`
+- `docs/specs/llm-integration/design.md`
+- `docs/specs/testing-infrastructure/requirements.md`
+- `docs/specs/testing-infrastructure/design.md`
 
-**Текущий статус:** Завершено
-
----
-
-## КРИТИЧЕСКИ ВАЖНЫЕ ПРАВИЛА
-
-- Не ломать текущие сценарии `Enter` / `Shift+Enter` и авто-ресайз textarea (agents.4.3-4.7).
-- Внешний вид кнопки должен соответствовать AI Elements стилю, но цвет должен использовать текущую тему приложения (`primary` токены).
-- Во время `agent.status === 'in-progress'` и активной генерации (`submitted`/`streaming`) кнопка должна переключаться в режим остановки и отменять только текущий запрос текущего агента.
-- Отмена через кнопку не должна создавать `kind:error` сообщение (штатная отмена).
-- Не добавлять новые `process.env.*` без отдельного согласования.
-
----
-
-## Текущее Состояние
-
-### Выполнено
-- ✅ Issue #34 проанализирована.
-- ✅ Проверено, что `PromptInput` уже находится в исходниках (`src/renderer/components/ai-elements/prompt-input.tsx`) как локальный код AI Elements-подхода.
-- ✅ Выявлен gap: в `AgentChat` кнопка используется как статичный submit без режима stop/cancel.
-- ✅ Обновлены `requirements.md` и `design.md` для поведения stop-кнопки по `agent.status` + фактическому состоянию активной генерации.
-- ✅ Добавлен IPC `messages:cancel` (main + preload), реализована штатная отмена без `kind:error`.
-- ✅ Обновлены `useAgentChat` и `AgentChat` для сценария `send ↔ stop` без изменения внешних `ai-elements` исходников.
-- ✅ Добавлены/обновлены unit и functional тесты под сценарий stop-кнопки.
-- ✅ Запущены релевантные unit-тесты.
-- ✅ Выполнен `npm run validate` (успешно).
-- ✅ Проверено соответствие `docs/specs/llm-integration/*`: дополнительные правки не требуются, т.к. штатная отмена без `kind:error` уже покрыта `llm-integration.8.7`.
-- ✅ По согласованию с пользователем: дополнительные прогоны functional-тестов в этом шаге не запускались.
-
-### В Работе
-- Нет активных задач.
-
-### Запланировано
-
-#### Фаза 2: Обновление спецификаций
-
-- [x] Зафиксировать новые/уточнённые требования в `docs/specs/agents/requirements.md`:
-  - [x] Поведение кнопки submit/stop по статусу агента и активной генерации (`in-progress` + `submitted/streaming` => stop, иначе => send).
-  - [x] Явная отмена текущего запроса по нажатию stop.
-  - [x] Визуальное требование: стиль AI Elements + фирменный цвет приложения.
-- [x] Обновить `docs/specs/agents/design.md`:
-  - [x] Контракт `PromptInputSubmit` (state + обработчик stop).
-  - [x] Поток отмены из renderer в main process.
-  - [x] Обновить таблицу покрытия требований тестами.
-- [x] Проверено связанное поведение в `docs/specs/llm-integration/design.md`/`requirements.md` для ручной отмены через кнопку — изменения не требуются.
-
-#### Фаза 3: Main/Preload контракт отмены
-
-- [x] Добавить отдельный IPC-метод отмены текущего активного pipeline для агента (без создания нового user-сообщения).
-- [x] Расширить preload API для безопасного вызова отмены из renderer.
-- [x] Обеспечить корректный lifecycle `AbortController` в `AgentManager`/`AgentIPCHandlers`.
-- [x] Убедиться, что отмена через stop не порождает пользовательскую ошибку (`kind:error`) и обрабатывается как штатное действие.
-
-#### Фаза 4: Renderer — кнопка и UX
-
-- [x] Реализовать action-кнопку в `AgentChat` (обёртка над внешним `ai-elements`):
-  - [x] Переключение вида кнопки по статусу (`send` ↔ `stop`).
-  - [x] Корректный `aria-label`/sr-only текст.
-  - [x] Сохранить визуальный паттерн AI Elements кнопки.
-- [x] Обновить `useAgentChat`:
-  - [x] Экспортировать действие отмены текущего запроса.
-  - [x] Сохранить текущий контракт `sendMessage` без регрессий.
-- [x] Обновить `AgentChat`:
-  - [x] Пробросить в action-кнопку состояние, вычисляемое от `agent.status` и `isStreaming`.
-  - [x] Пробросить `onStop`/cancel handler.
-  - [x] Применить фирменную цветовую схему кнопки через текущие theme-токены.
-
-#### Фаза 5: Тесты
-
-- [x] Unit:
-  - [x] `tests/unit/components/ai-elements/prompt-input.test.tsx` — состояния кнопки send/stop и обработчик stop.
-  - [x] `tests/unit/hooks/useAgentChat.test.ts` — cancel action в хуке.
-  - [x] Unit-тест(ы) для IPC handler отмены текущего pipeline.
-- [x] Functional:
-  - [x] Тест: при `agent.status = in-progress` кнопка переключается в stop.
-  - [x] Тест: нажатие stop отменяет текущий запрос без `kind:error`.
-- [x] Проверить соответствие testing.10/testing.11/testing.12.
-
-#### Фаза 6: Валидация и завершение
-
-- [x] Запустить релевантные unit-тесты по изменённым файлам.
-- [x] Запустить `npm run validate`.
-- [x] Подготовить итоговый отчёт по изменениям.
-- [x] Согласовать с пользователем запуск functional-тестов: в финальном шаге принято решение дополнительные functional не запускать.
+**Текущий статус:** Фаза 10 — выполнено.
 
 ---
 
-## Критерии Готовности
+## Критически важные правила
 
-- [x] Кнопка визуально соответствует AI Elements паттерну и использует фирменный цвет приложения.
-- [x] Во время `in-progress` + активной генерации доступна stop-кнопка.
-- [x] Stop-кнопка отменяет только текущий запрос текущего агента.
-- [x] Нет регрессий базового ввода/отправки сообщений.
-- [x] Все релевантные тесты и `npm run validate` проходят.
+- Внешние AI Elements-компоненты не модифицируются; интеграция реализуется в коде приложения.
+- Сообщения с `hidden=true` исключаются из UI и из расчёта статуса.
+- Для прерванного/повреждённого `llm` сообщения фиксируется `hidden=true` и `done=false`.
+- Отмена через `stop` — штатный сценарий, без создания `kind:error`.
+
+---
+
+## Выполнено
+
+### 1) Спеки и дизайн
+- [x] Обновлены `agents/requirements.md` под `startupSettled` и двухфакторный показ основного экрана (`all chats loaded` + `active chat settled`).
+- [x] Обновлён `agents/design.md` под целевую архитектуру без миграционных формулировок.
+- [x] Уточнён контракт `messages` и логика статуса по `hidden/done`.
+
+### 2) База данных и backfill
+- [x] Добавлена/проверена поддержка `messages.done`.
+- [x] Реализован backfill исторических `llm` с финальным `action` в `done=1`.
+- [x] Добавлена проверка идемпотентности миграции `012_backfill_done_for_historical_llm.sql`.
+
+### 3) Pipeline и сообщения
+- [x] Во время reasoning `llm` создаётся/обновляется с `done=false`.
+- [x] На финальном action `llm` переводится в `done=true`.
+- [x] В error/abort/cancel ветках для незавершённого `llm` выставляется `hidden=true` и `done=false`.
+- [x] Ошибки `kind:error` сохраняются с `done=true`.
+
+### 4) Статус агента
+- [x] Логика статуса приведена к `agents.9.2`.
+- [x] `hidden=true` сообщения исключаются из расчёта.
+- [x] Сценарий `last llm + done=false => in-progress` закреплён тестами.
+
+### 5) Prompt input (`send/stop`)
+- [x] Режим кнопки зависит от статуса агента (`in-progress => stop`, иначе `send`).
+- [x] В режиме `send` активность зависит от наличия текста.
+- [x] В режиме `stop` кнопка активна независимо от текста (unit-покрытие есть).
+
+### 6) Startup UX и отсутствие дёрганья
+- [x] Реализован `startupSettled` в рендерере и его учёт в глобальном loader.
+- [x] Основной экран остаётся смонтированным и визуально маскируется loader-экраном.
+- [x] Добавлены проверки отсутствия transient page-scroll / dual-scrollbar / late width-shift.
+
+### 7) Покрытие тестами (уже есть в коде)
+- [x] `tests/unit/MigrationRunner.test.ts` — backfill + идемпотентность.
+- [x] `tests/unit/agents/MainPipeline.test.ts` — lifecycle `done` и ветка скрытия незавершённого `llm`.
+- [x] `tests/unit/agents/AgentManager.test.ts` — hidden-aware расчёт статуса.
+- [x] `tests/unit/components/agents/AgentChat.test.tsx` — send/stop поведение.
+- [x] `tests/functional/startup-loader.spec.ts` — startup-settled и анти-регрессии по скроллу/ширине.
+- [x] `tests/functional/agent-status-calculation.spec.ts` — hidden-aware статус в e2e.
+- [x] `tests/functional/agent-messaging.spec.ts` — `send` активен только при тексте.
+
+---
+
+## В работе
+
+### 8) Функциональный пробел по `stop`
+- [x] Добавить отдельный functional-тест: в режиме `stop` кнопка остаётся активной при пустом и непустом вводе.
+- [x] Прогнать этот функциональный тест точечно.
+
+---
+
+## Запланировано
+
+### 9) Финальные проверки
+- [x] Прогнать `npm run validate`.
+- [x] Прогнать профильные функциональные тесты по изменённым сценариям.
+- [x] Обновить этот `tasks.md` до финального состояния «выполнено».
+
+Профильные функциональные прогоны:
+- [x] `tests/functional/agent-messaging.spec.ts`:
+  - `should enable send button only when input has text`
+  - `should keep stop button enabled regardless of input text in in-progress status`
+- [x] `tests/functional/agent-status-calculation.spec.ts`:
+  - `should ignore hidden messages when calculating status`
+- [x] `tests/functional/startup-loader.spec.ts`:
+  - `should keep agents screen mounted while startup loader is visible`
+  - `should keep active chat width stable after startup with history`
+  - `should not expose transient page scroll or dual scrollbars during startup transition`
+  - `should keep loader visible until active chat startup settles even after messages are loaded`
+- [x] `tests/functional/llm-chat.spec.ts`:
+  - `should keep chat viewport visually stable on app reopen with real llm history`
+
+---
+
+## Ожидаемый результат
+
+- Поведение UI и статусов полностью соответствует актуальным требованиям `agents` и `llm-integration`.
+- Проблемы со стартовым визуальным скроллом/ресайзом не воспроизводятся.
+- В функциональном покрытии есть отдельная проверка `stop`-кнопки независимо от текста ввода.
+
+---
+
+## Фаза 11: Reasoning trigger icon animation lifecycle (план)
+
+Цель работ: обеспечить поведение иконки в заголовке reasoning-блока — анимация только во время активного reasoning, после завершения reasoning и сворачивания блока иконка остаётся статичной.
+
+Связанные спецификации:
+- `docs/specs/agents/requirements.md`
+- `docs/specs/agents/design.md`
+- `docs/specs/llm-integration/requirements.md`
+- `docs/specs/llm-integration/design.md`
+- `docs/specs/testing-infrastructure/requirements.md`
+- `docs/specs/testing-infrastructure/design.md`
+
+**Текущий статус:** Фаза 11 — запланировано (ожидает реализации).
+
+### Чек-лист работ
+
+#### 1) Спеки и критерии
+- [ ] Уточнить acceptance-критерий в `agents`/`llm-integration`: иконка в reasoning-trigger анимирована только во время активного reasoning; после завершения reasoning и автосворачивания остаётся статичной.
+- [ ] Добавить/обновить ссылки на функциональный тест в секциях "Функциональные Тесты".
+- [ ] Обновить таблицы покрытия требований в `design.md`.
+
+#### 2) Репродукция и фиксация текущего поведения
+- [ ] Запустить точечный functional-сценарий reasoning-trigger и зафиксировать переходы: streaming → finish → collapse.
+- [ ] Подтвердить единый источник truth для состояния "reasoning завершён" в renderer.
+
+#### 3) Тесты сначала (red → green)
+- [ ] Добавить unit-тест на переход состояния trigger: после завершения reasoning и collapsed-состояния `Logo` получает `animated=false`.
+- [ ] Добавить functional-тест: после появления финального `action.content` и автосворачивания trigger в DOM отсутствует `svg.logo-animated`.
+- [ ] Проверить отсутствие регрессий toggle-поведения (manual collapse/expand).
+
+#### 4) Изменение реализации (точечно)
+- [ ] Обновить вычисление флага анимации в `AgentReasoningTrigger` (и при необходимости связанный источник флага в `AgentChat`) так, чтобы анимация зависела только от активной reasoning-фазы.
+- [ ] Убедиться, что текст, chevron и поведение раскрытия/сворачивания не меняются.
+
+#### 5) Валидация
+- [ ] Запустить только затронутые unit-тесты.
+- [ ] Запустить только затронутые functional-тесты (с предупреждением о показе окон).
+- [ ] Запустить `npm run validate`.
+
+### Ожидаемый результат
+
+- Во время reasoning иконка в trigger анимируется.
+- После завершения reasoning и сворачивания блока иконка остаётся статичной.
+- Поведение toggle и порядок reasoning/action остаются без изменений.
+
+### Риски
+
+- Возможен разъезд между "isStreaming чата" и "isStreaming reasoning".
+- Возможны флейки в functional-тесте из-за тайминга автосворачивания.

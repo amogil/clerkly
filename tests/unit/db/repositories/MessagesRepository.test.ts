@@ -36,7 +36,8 @@ describe('MessagesRepository', () => {
         reply_to_message_id INTEGER,
         payload_json TEXT NOT NULL,
         usage_json TEXT,
-        hidden INTEGER NOT NULL DEFAULT 0
+        hidden INTEGER NOT NULL DEFAULT 0,
+        done INTEGER NOT NULL DEFAULT 0
       );
     `);
     db = drizzle(sqlite, { schema });
@@ -121,6 +122,12 @@ describe('MessagesRepository', () => {
         null
       );
       expect(message.kind).toBe('error');
+    });
+
+    it('should persist done flag when explicitly provided', () => {
+      const agent = agentsRepo.create('Test');
+      const message = messagesRepo.create(agent.agentId, 'user', '{}', null, true);
+      expect(message.done).toBe(true);
     });
   });
 
@@ -370,6 +377,18 @@ describe('MessagesRepository', () => {
 
       const updated = repo.getById(msg.id, agent.agentId)!;
       expect(updated.hidden).toBe(true);
+    });
+  });
+
+  describe('setDone', () => {
+    it('should update done flag for existing message', () => {
+      const agent = agentsRepo.create('Test');
+      const message = messagesRepo.create(agent.agentId, 'llm', '{}', null, false);
+
+      messagesRepo.setDone(message.id, agent.agentId, true);
+
+      const updated = messagesRepo.getById(message.id, agent.agentId);
+      expect(updated?.done).toBe(true);
     });
   });
 

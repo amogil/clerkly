@@ -292,6 +292,28 @@ describe('App IPC Integration with Error Notification System', () => {
     });
   });
 
+  /* Preconditions: App is authorized and waiting for chats (global startup loader active)
+     Action: Render App component during waiting-for-chats phase
+     Assertions: Agents screen stays mounted and must not be hidden via display:none class
+     Requirements: agents.4.14.5, agents.13.2 */
+  it('should keep agents screen mounted without hidden class while global loader is visible', async () => {
+    mockCoordinatorState = {
+      state: { phase: 'waiting-for-chats', authorized: true, targetScreen: 'agents' },
+      isBootstrapping: false,
+    };
+
+    const { getByTestId } = render(<App />);
+
+    await waitFor(() => {
+      expect(getByTestId('app-loading-screen')).toBeInTheDocument();
+      expect(getByTestId('agents-screen')).toBeInTheDocument();
+    });
+
+    const agentsScreen = getByTestId('agents-screen');
+    expect(agentsScreen.className).not.toContain(' hidden');
+    expect(agentsScreen).toHaveAttribute('aria-hidden', 'true');
+  });
+
   /* Preconditions: App component is mounted
      Action: Render App component
      Assertions: Toaster and NotificationUI components are rendered
@@ -373,6 +395,93 @@ describe('App IPC Integration with Error Notification System', () => {
       expect(eventHandlers.has(EVENT_TYPES.AUTH_CANCELLED)).toBe(true);
       expect(eventHandlers.has(EVENT_TYPES.AUTH_SIGNED_OUT)).toBe(true);
       expect(eventHandlers.has(EVENT_TYPES.ERROR_CREATED)).toBe(true);
+      expect(eventHandlers.has(EVENT_TYPES.LLM_PIPELINE_DIAGNOSTIC)).toBe(true);
+    });
+  });
+
+  /* Preconditions: App component mounted and LLM diagnostic subscription is set
+     Action: Emit llm.pipeline.diagnostic event from EventBus
+     Assertions: Diagnostic is written to renderer Developer Log via App logger
+     Requirements: realtime-events.4.8 */
+  it('should log llm.pipeline.diagnostic events to renderer console', async () => {
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(eventHandlers.has(EVENT_TYPES.LLM_PIPELINE_DIAGNOSTIC)).toBe(true);
+    });
+
+    act(() => {
+      emitEvent(EVENT_TYPES.LLM_PIPELINE_DIAGNOSTIC, {
+        level: 'error',
+        context: 'MainPipeline',
+        message: 'Pipeline failure diagnostics: timeout',
+        details: {
+          agentId: 'agent-1',
+          userMessageId: 12,
+          signalAborted: false,
+          errorName: 'LLMRequestAbortedError',
+          errorType: 'timeout',
+        },
+        timestamp: Date.now(),
+      });
+    });
+
+    await waitFor(() => {
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[ERROR] [App] LLM pipeline diagnostic (MainPipeline):')
+      );
+    });
+
+    consoleErrorSpy.mockRestore();
+  });
+
+  /* Preconditions: App component is mounted and global unhandled rejection listener is active
+     Action: Dispatch unhandledrejection event with AbortError reason
+     Assertions: Event is prevented and notification is not displayed
+     Requirements: error-notifications.2.7, error-notifications.2.8 */
+  it('should ignore AbortError unhandled rejections', async () => {
+    const { container } = render(<App />);
+    const notificationCountBefore = container.querySelectorAll('.notification-item').length;
+
+    const event = new Event('unhandledrejection', { cancelable: true }) as PromiseRejectionEvent;
+    Object.defineProperty(event, 'reason', {
+      value: new DOMException('This operation was aborted', 'AbortError'),
+      configurable: true,
+    });
+
+    act(() => {
+      window.dispatchEvent(event);
+    });
+
+    expect(event.defaultPrevented).toBe(true);
+    expect(container.querySelectorAll('.notification-item')).toHaveLength(notificationCountBefore);
+  });
+
+  /* Preconditions: App component is mounted and global unhandled rejection listener is active
+     Action: Dispatch unhandledrejection event with non-cancellation Error
+     Assertions: Notification is displayed with error message
+     Requirements: error-notifications.2.7, error-notifications.2.8 */
+  it('should show notification for non-cancellation unhandled rejections', async () => {
+    const { container } = render(<App />);
+    const notificationCountBefore = container.querySelectorAll('.notification-item').length;
+
+    const event = new Event('unhandledrejection', { cancelable: true }) as PromiseRejectionEvent;
+    Object.defineProperty(event, 'reason', {
+      value: new Error('Unexpected failure'),
+      configurable: true,
+    });
+
+    act(() => {
+      window.dispatchEvent(event);
+    });
+
+    await waitFor(() => {
+      expect(container.querySelectorAll('.notification-item').length).toBeGreaterThan(
+        notificationCountBefore
+      );
+      expect(container.textContent).toContain('Unexpected failure');
     });
   });
 });

@@ -220,10 +220,19 @@ export function PromptInputSubmit({
   className,
   children,
   status,
+  disabled,
   ...props
 }: PromptInputSubmitProps) {
+  const { text } = usePromptInputContext();
+  const resolvedDisabled = disabled ?? text.trim().length === 0;
+
   return (
-    <Button className={cn('h-10 w-10 shrink-0 p-0', className)} type="submit" {...props}>
+    <Button
+      className={cn('h-10 w-10 shrink-0 p-0', className)}
+      disabled={resolvedDisabled}
+      type="submit"
+      {...props}
+    >
       {children ?? <Send className="h-4 w-4" />}
       <span className="sr-only">
         {status === 'streaming' ? 'Streaming response' : 'Send message'}

@@ -50,6 +50,16 @@ describe('Migration 002_create_users_table', () => {
     }
   });
 
+  // Requirements: user-data-isolation.0.1, user-data-isolation.0.5
+  const rollbackToVersion = (targetVersion: number) => {
+    let currentVersion = migrationRunner.getCurrentVersion();
+    while (currentVersion > targetVersion) {
+      const rollbackResult = migrationRunner.rollbackLastMigration();
+      expect(rollbackResult.success).toBe(true);
+      currentVersion = migrationRunner.getCurrentVersion();
+    }
+  };
+
   describe('UP migration', () => {
     /* Preconditions: database is empty, migrations not applied
        Action: run all migrations
@@ -192,26 +202,9 @@ describe('Migration 002_create_users_table', () => {
         .get();
       expect(tableExists).toBeDefined();
 
-      // Rollback all migrations after 002 (010, 009, 008, 007, 006, 005, 004, 003)
-      let rollbackResult = migrationRunner.rollbackLastMigration(); // 010
-      expect(rollbackResult.success).toBe(true);
-      rollbackResult = migrationRunner.rollbackLastMigration(); // 009
-      expect(rollbackResult.success).toBe(true);
-      rollbackResult = migrationRunner.rollbackLastMigration(); // 008
-      expect(rollbackResult.success).toBe(true);
-      rollbackResult = migrationRunner.rollbackLastMigration(); // 007
-      expect(rollbackResult.success).toBe(true);
-      rollbackResult = migrationRunner.rollbackLastMigration(); // 006
-      expect(rollbackResult.success).toBe(true);
-      rollbackResult = migrationRunner.rollbackLastMigration(); // 005
-      expect(rollbackResult.success).toBe(true);
-      rollbackResult = migrationRunner.rollbackLastMigration(); // 004
-      expect(rollbackResult.success).toBe(true);
-      rollbackResult = migrationRunner.rollbackLastMigration(); // 003
-      expect(rollbackResult.success).toBe(true);
-
-      // Rollback migration 002
-      rollbackResult = migrationRunner.rollbackLastMigration();
+      // Roll back to the state right before migration 002.
+      rollbackToVersion(2);
+      const rollbackResult = migrationRunner.rollbackLastMigration();
       expect(rollbackResult.success).toBe(true);
 
       // Verify table is dropped
@@ -236,26 +229,9 @@ describe('Migration 002_create_users_table', () => {
         .get();
       expect(indexExists).toBeDefined();
 
-      // Rollback all migrations after 002 (010, 009, 008, 007, 006, 005, 004, 003)
-      let rollbackResult = migrationRunner.rollbackLastMigration(); // 010
-      expect(rollbackResult.success).toBe(true);
-      rollbackResult = migrationRunner.rollbackLastMigration(); // 009
-      expect(rollbackResult.success).toBe(true);
-      rollbackResult = migrationRunner.rollbackLastMigration(); // 008
-      expect(rollbackResult.success).toBe(true);
-      rollbackResult = migrationRunner.rollbackLastMigration(); // 007
-      expect(rollbackResult.success).toBe(true);
-      rollbackResult = migrationRunner.rollbackLastMigration(); // 006
-      expect(rollbackResult.success).toBe(true);
-      rollbackResult = migrationRunner.rollbackLastMigration(); // 005
-      expect(rollbackResult.success).toBe(true);
-      rollbackResult = migrationRunner.rollbackLastMigration(); // 004
-      expect(rollbackResult.success).toBe(true);
-      rollbackResult = migrationRunner.rollbackLastMigration(); // 003
-      expect(rollbackResult.success).toBe(true);
-
-      // Rollback migration 002
-      rollbackResult = migrationRunner.rollbackLastMigration();
+      // Roll back to the state right before migration 002.
+      rollbackToVersion(2);
+      const rollbackResult = migrationRunner.rollbackLastMigration();
       expect(rollbackResult.success).toBe(true);
 
       // Verify index is dropped

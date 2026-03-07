@@ -12,6 +12,7 @@
 - **Agents List** - Горизонтальный список иконок агентов в хедере
 - **All Agents** - Страница со всеми агентами для просмотра истории
 - **Message** - Сообщение в чате. Хранится в таблице messages с payload_json
+- **Message Avatar** - Визуальный маркер сообщения агента в чате (для reasoning отображается в заголовке reasoning-блока)
 - **updatedAt** - Время последнего обновления агента (последнее сообщение в чате)
 - **agentId** - Уникальный идентификатор агента (TEXT, 10-символьная alphanumeric строка)
 
@@ -19,7 +20,7 @@
 
 Есть два типа анимации:
 1. Само лого анимированное (CSS-анимация узлов и линий)
-2. Анимация JS (spring-анимация перемещения в списке)
+2. JS-анимация появления элементов списка (opacity/scale), без анимации пересортировки
 
 **1. Application Logo (Логотип приложения)**
 1. Логотип Clerkly для брендинга
@@ -34,11 +35,12 @@
 1. Иконка агента в списках
 2. Два контекста: Agents List / All Agents
 3. Сама иконка использует CSS-анимацию
-4. При обновлении порядка в Agents List дополнительно используется JS-анимация
+4. Пересортировка в Agents List происходит без JS-анимации перемещения
 
-**4. Message Avatar (Аватар агента в чате)**
-- Маленькая иконка слева сверху от сообщений агента
-- CSS-анимированная
+**4. Message Avatar (Иконка сообщения агента)**
+1. Визуальный маркер сообщения агента в чате
+2. Для `kind: llm` с reasoning отображается в заголовке reasoning-блока
+3. Использует CSS-анимацию узлов и линий в едином стиле с Application Logo
 
 ## Архитектурный Принцип
 
@@ -86,9 +88,7 @@
 - `tests/functional/agent-reordering.spec.ts` - "should maintain correct order when multiple agents are updated"
 - `tests/functional/agent-reordering.spec.ts` - "should move agent to top of list after sending message"
 - `tests/functional/agent-reordering.spec.ts` - "should bring hidden agent to header after sending message"
-- `tests/functional/agent-reordering.spec.ts` - "should maintain correct order when multiple agents are updated"
 - `tests/functional/agent-reordering.spec.ts` - "should reorder immediately after message from AllAgents selection"
-- `tests/functional/agent-list-responsive.spec.ts` - "should adapt visible agents count to window width"
 - `tests/functional/agent-list-responsive.spec.ts` - "should show +N button for hidden agents"
 
 ### 2. Создание нового агента
@@ -129,7 +129,7 @@
 - `tests/functional/agents-always-one.spec.ts` - "should auto-create first agent for new user after login"
 - `tests/functional/agents-always-one.spec.ts` - "should auto-create agent when last agent is archived"
 - `tests/functional/agents-always-one.spec.ts` - "should never show empty state UI"
-- `tests/functional/agents-always-one.spec.ts` - "should never show loading state - UI always visible"
+- `tests/functional/agents-always-one.spec.ts` - "should hide startup loading state and keep UI visible after startup settles"
 
 ### 3. Переключение между агентами
 
@@ -170,7 +170,13 @@
 
 4.1. Поле ввода ДОЛЖНО быть доступно для ввода текста с placeholder "Ask, reply, or give command..."
 
-4.2. Кнопка отправки ДОЛЖНА быть активна только при наличии текста в поле ввода
+4.2. Состояние и активность кнопки в поле ввода ДОЛЖНЫ определяться по двум факторам:
+   - статус активного агента (`in-progress` или любой другой)
+   - наличие текста в поле ввода
+
+4.2.1. КОГДА статус активного агента равен `in-progress`, кнопка ДОЛЖНА работать в режиме остановки (`stop generation`) и ДОЛЖНА быть активной независимо от текста в поле ввода
+
+4.2.2. КОГДА статус активного агента отличается от `in-progress`, кнопка ДОЛЖНА работать в режиме отправки (`send`) и ДОЛЖНА быть активной только при наличии текста в поле ввода
 
 4.3. КОГДА пользователь нажимает Enter (без Shift), ТО сообщение ДОЛЖНО отправляться
 
@@ -200,7 +206,9 @@
 
 4.10.2. Диалоги уведомлений в чате агента ДОЛЖНЫ занимать всю ширину области чата
 
-4.11. Message Avatar ДОЛЖЕН показываться перед первым сообщением агента в последовательности
+4.11. КОГДА сообщение агента (`kind: llm`) содержит блок reasoning, заголовок reasoning-блока ДОЛЖЕН содержать Message Avatar (иконка приложения), текстовый индикатор размышления и управляющий chevron
+
+4.11.1. КОГДА сообщение агента (`kind: llm`) содержит `action.content`, блок с ответом модели ДОЛЖЕН отображаться под reasoning-блоком
 
 4.12. Сообщения агента ДОЛЖНЫ поддерживать React-компоненты (для rich content)
 
@@ -228,7 +236,9 @@
 
 4.14.4. Ручное сохранение/восстановление `scrollTop` НЕ используется
 
-4.14.5. При первой загрузке приложения активный агент ДОЛЖЕН открываться с позицией скролла на последнем сообщении МГНОВЕННО (без визуального скролла, `behavior: 'auto'`)
+4.14.5. При первой загрузке приложения активный чат ДОЛЖЕН впервые отображаться пользователю только в финальном стартовом состоянии: корректная ширина контента, корректные переносы текста и позиция на последнем сообщении без визуального доскролла
+
+4.14.6. ПОКА активный чат не достиг финального стартового состояния, содержимое чата НЕ ДОЛЖНО показываться пользователю
 
 4.15. КОГДА у агента нет сообщений (новый агент), ТО ДОЛЖЕН отображаться пустой стейт с промпт-подсказками
 
@@ -279,7 +289,7 @@
    - Пробелы в начале и конце текста ДОЛЖНЫ удаляться (trim)
    - Пробелы внутри текста ДОЛЖНЫ сохраняться
 
-4.24. КОГДА статус активного агента равен `in-progress` И текущий запрос находится в состоянии активной генерации (`submitted` или `streaming`), кнопка отправки ДОЛЖНА переключаться в режим остановки (`stop`)
+4.24. КОГДА статус активного агента равен `in-progress`, кнопка отправки ДОЛЖНА переключаться в режим остановки (`stop`) с иконкой остановки `Square` и текстом доступности `Stop generation`
 
 4.24.1. КОГДА пользователь нажимает кнопку `stop`, текущий активный запрос ДОЛЖЕН быть отменён для текущего агента
 
@@ -287,12 +297,14 @@
 
 4.24.3. ЕСЛИ при попытке остановки запроса возникает ошибка отмены, ТО приложение НЕ ДОЛЖНО показывать toast-уведомление об ошибке
 
-4.24.4. КОГДА активная генерация остановлена, кнопка ДОЛЖНА возвращаться в режим отправки (`send`) без ожидания пересчёта статуса агента
+4.24.4. КОГДА статус активного агента отличается от `in-progress`, кнопка ДОЛЖНА отображаться в режиме отправки (`send`)
 
 #### Функциональные Тесты
 
 - `tests/functional/agent-messaging.spec.ts` - "should send message on Enter key"
 - `tests/functional/agent-messaging.spec.ts` - "should add new line on Shift+Enter"
+- `tests/functional/agent-messaging.spec.ts` - "should enable send button only when input has text"
+- `tests/functional/agent-messaging.spec.ts` - "should keep stop button enabled regardless of input text in in-progress status"
 - `tests/functional/agent-messaging.spec.ts` - "should display messages in chronological order"
 - `tests/functional/agent-messaging.spec.ts` - "should autoscroll to last message"
 - `tests/functional/auto-expanding-textarea.spec.ts` - "AutoExpandingTextarea - Functional Tests"
@@ -418,14 +430,15 @@
 
 6.7.3. Agent List Icon в Agents List (правая часть хедера):
    - CSS-анимация: вращающееся кольцо (in-progress), пульсирующее кольцо (awaiting-response)
-   - JS-анимация: spring-анимация перемещения при изменении позиции (stiffness: 400, damping: 30, mass: 0.8)
+   - JS-анимация пересортировки НЕ используется (перемещение при reorder — без анимации)
 
 6.7.4. Agent List Icon в All Agents:
    - CSS-анимация: вращающееся кольцо (in-progress), пульсирующее кольцо (awaiting-response)
    - БЕЗ JS-анимации перемещения
 
 6.7.5. Message Avatar:
-   - CSS-анимация: собственная анимация
+   - CSS-анимация узлов и линий в стиле Application Logo
+   - Для `kind: llm` с reasoning отображается в заголовке reasoning-блока
 
 #### Функциональные Тесты
 
@@ -449,6 +462,8 @@
    - `agent_id TEXT NOT NULL` - ID агента
    - `timestamp TIMESTAMP NOT NULL` - время сообщения (ISO 8601 с timezone offset)
    - `kind TEXT NOT NULL` - тип сообщения (хранится в отдельной колонке, не в payload_json)
+   - `hidden INTEGER NOT NULL DEFAULT 0` - флаг скрытия сообщения (скрытые сообщения не участвуют в UI и в расчёте статуса)
+   - `done INTEGER NOT NULL DEFAULT 0` - флаг завершённости сообщения (`0` пока сообщение формируется/стримится, `1` после полного получения)
    - `reply_to_message_id INTEGER` - связь с сообщением, на которое даётся ответ (null для первого)
    - `payload_json TEXT NOT NULL` - JSON с данными сообщения (без поля `kind`)
 
@@ -491,7 +506,6 @@
 
 - `tests/functional/agent-messaging.spec.ts` - "should display messages in chronological order"
 - `tests/functional/llm-chat.spec.ts` - "should show llm response after user message"
-- `tests/functional/llm-chat.spec.ts` - "should render markdown headings"
 - `tests/functional/llm-chat.spec.ts` - "should render markdown headings"
 - `tests/functional/llm-chat.spec.ts` - "should render markdown paragraphs"
 - `tests/functional/llm-chat.spec.ts` - "should render markdown emphasis"
@@ -555,11 +569,15 @@
 9.1. Статус агента ДОЛЖЕН вычисляться динамически из последних сообщений, а НЕ храниться в таблице agents
 
 9.2. Алгоритм определения статуса:
-   - `new` - агент без сообщений
-   - `in-progress` - есть сообщение от пользователя (kind = `user`) и после него нет финализированного ответа агента и нет ошибки. Финализированным считается `kind: llm` с заполненным `action` и `hidden = false` или `kind: final_answer`
-   - `error` - последнее видимое сообщение имеет `kind = 'error'`
-   - `completed` - последнее сообщение `final_answer`
-   - `awaiting-response` - последнее сообщение от LLM (kind = `llm`) с заполненным `action` и НЕ `final_answer`
+   - ЕСЛИ у агента нет сообщений, ТО статус `new`
+   - Далее из истории исключаются все сообщения с `hidden = true`
+   - ЕСЛИ после исключения сообщений не осталось, ТО статус `new`
+   - Далее статус определяется по последнему видимому сообщению:
+     - `kind = 'user'` → `in-progress`
+     - `kind = 'llm'` и `done = false` → `in-progress`
+     - `kind = 'llm'` и `done = true` → `awaiting-response`
+     - `kind = 'error'` → `error`
+     - `kind = 'final_answer'` → `completed`
 
 9.3. Статус ДОЛЖЕН пересчитываться при получении любого нового сообщения в чате агента
 
@@ -696,13 +714,13 @@
 
 13.1. При старте приложения ДОЛЖНЫ загружаться сообщения ВСЕХ агентов одновременно
 
-13.2. Основной интерфейс ДОЛЖЕН показываться ТОЛЬКО после того, как все чаты всех агентов загружены (пока идёт загрузка — показывается экран загрузки из `src/renderer/App.tsx` с текстом "Loading...", который заменяет весь интерфейс)
+13.2. Основной интерфейс ДОЛЖЕН показываться ТОЛЬКО после того, как одновременно выполнены два условия: загружены чаты всех агентов и активный чат достиг финального стартового состояния
 
 13.3. Каждый агент ДОЛЖЕН иметь независимый компонент `AgentChat`, который монтируется при старте и остаётся смонтированным всё время работы приложения
 
 13.4. КОГДА пользователь кликает на агента, ТО показывается уже смонтированный чат этого агента (без перезагрузки, без ремонта)
 
-13.5. Скрытые чаты ДОЛЖНЫ скрываться через CSS (`display: none`), а НЕ размонтироваться
+13.5. Скрытые чаты ДОЛЖНЫ скрываться через CSS без размонтирования
 
 13.6. Позиция скролла каждого агента сохраняется автоматически — компонент `Conversation` остаётся смонтированным и трекает скролл сам
 
@@ -710,7 +728,7 @@
 
 13.8. При монтировании `AgentChat` ДОЛЖНЫ загружаться ВСЕ сообщения агента через `messages:list`
 
-13.10. Экран загрузки из `src/renderer/App.tsx` ДОЛЖЕН показываться пока хотя бы один `AgentChat` ещё загружает начальный чанк сообщений
+13.10. Экран загрузки ДОЛЖЕН оставаться видимым, ПОКА хотя бы один `AgentChat` ещё загружает начальный чанк сообщений ИЛИ активный чат ещё не достиг финального стартового состояния
 
 13.11. Оркестрация стартового workflow ДОЛЖНА выполняться централизованно в main process через `AppCoordinator` (единый source of truth для фаз запуска)
 
@@ -726,6 +744,7 @@
 
 - `tests/functional/agent-switching.spec.ts` - "should preserve scroll position when switching agents"
 - `tests/functional/agent-switching.spec.ts` - "should show correct chat immediately on agent click"
+- `tests/functional/startup-loader.spec.ts` - стартовый экран скрывается только после полной готовности чатов и стабилизации первого отображения активного чата
 - `tests/functional/settings-ai-agent.spec.ts` - "53.1: should save and load LLM provider selection"
 - `tests/functional/settings-ai-agent.spec.ts` - "53.2: should save and load API key with encryption"
 - `tests/functional/settings-ai-agent.spec.ts` - "53.3: should delete API key when field is cleared"
@@ -757,7 +776,8 @@
 
 ### Внешние компоненты
 - `Logo` - компонент логотипа Clerkly (из `src/renderer/components/logo.tsx`). Используется для Application Logo в пустом стейте чата
-- `AgentAvatar` - компонент аватара агента (из `src/renderer/components/agents/AgentAvatar.tsx`). Используется для Message Avatar
+- `AgentAvatar` - компонент аватара агента (из `src/renderer/components/agents/AgentAvatar.tsx`). Используется в Active Agent Icon и Agent List Icon
+- `AgentReasoningTrigger` - компонент заголовка reasoning-блока (из `src/renderer/components/agents/AgentReasoningTrigger.tsx`). Используется для отображения Message Avatar в `kind: llm` сообщениях с reasoning
 - `lucide-react` - библиотека иконок (Send, AlertCircle, Check, X, HelpCircle, ArrowLeft, Plus, FileText, Calendar, Video)
 
 ### Типы

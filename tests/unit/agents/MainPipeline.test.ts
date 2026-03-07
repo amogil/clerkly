@@ -4,7 +4,10 @@
 
 import { MainPipeline } from '../../../src/main/agents/MainPipeline';
 import { MainEventBus } from '../../../src/main/events/MainEventBus';
-import { MessageLlmReasoningUpdatedEvent } from '../../../src/shared/events/types';
+import {
+  MessageLlmReasoningUpdatedEvent,
+  LLMPipelineDiagnosticEvent,
+} from '../../../src/shared/events/types';
 import type { MessageManager } from '../../../src/main/agents/MessageManager';
 import type { AIAgentSettingsManager } from '../../../src/main/AIAgentSettingsManager';
 import type { PromptBuilder } from '../../../src/main/agents/PromptBuilder';
@@ -18,6 +21,7 @@ import type {
 import type { Message } from '../../../src/main/db/schema';
 import { LLM_CHAT_MODELS } from '../../../src/main/llm/LLMConfig';
 import { InvalidStructuredOutputError } from '../../../src/main/llm/StructuredOutputContract';
+import { LLMRequestAbortedError } from '../../../src/main/llm/LLMErrors';
 
 // ─── Mocks ────────────────────────────────────────────────────────────────────
 
@@ -50,6 +54,7 @@ function makeMessage(id: number, kind: string = 'user'): Message {
     usageJson: null,
     replyToMessageId: null,
     hidden: false,
+    done: true,
   };
 }
 
@@ -72,6 +77,8 @@ function makeMocks() {
     }),
     update: jest.fn(),
     setHidden: jest.fn(),
+    hideAndMarkIncomplete: jest.fn(),
+    setDone: jest.fn(),
     setUsage: jest.fn(),
     toEventMessage: jest.fn().mockReturnValue({
       id: 1,
@@ -80,6 +87,8 @@ function makeMocks() {
       timestamp: Date.now(),
       payload: {},
       replyToMessageId: null,
+      hidden: false,
+      done: true,
     }),
   } as unknown as jest.Mocked<MessageManager>;
 
@@ -147,7 +156,8 @@ describe('MainPipeline.run()', () => {
             action: { type: 'text', content: 'Hello back!' },
           }),
         }),
-        1
+        1,
+        true
       );
     });
   });
@@ -207,7 +217,13 @@ describe('MainPipeline.run()', () => {
       await pipeline.run('agent-1', 1);
 
       // llm message created on first reasoning chunk
-      expect(messageManager.create).toHaveBeenCalledWith('agent-1', 'llm', expect.any(Object), 1);
+      expect(messageManager.create).toHaveBeenCalledWith(
+        'agent-1',
+        'llm',
+        expect.any(Object),
+        1,
+        false
+      );
 
       // reasoning events emitted for each non-done chunk
       const reasoningEvents = mockPublish.mock.calls
@@ -231,8 +247,44 @@ describe('MainPipeline.run()', () => {
           data: expect.objectContaining({
             action: { type: 'text', content: 'Answer' },
           }),
-        })
+        }),
+        true
       );
+    });
+
+    /* Preconditions: LLM streams reasoning and then final action
+       Action: Call run(agentId, userMessageId)
+       Assertions: llm updates keep done=false during reasoning and switch to done=true on final action
+       Requirements: llm-integration.1.6.1, llm-integration.1.6.2 */
+    it('should keep llm done=false during reasoning and set done=true on final action', async () => {
+      const { pipeline, messageManager, llmProvider } = makeMocks();
+
+      llmProvider.chat.mockImplementation(
+        async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+          onChunk({ type: 'reasoning', delta: 'chunk-1', done: false });
+          onChunk({ type: 'reasoning', delta: 'chunk-2', done: false });
+          onChunk({ type: 'reasoning', delta: '', done: true });
+          return {
+            action: { type: 'text', content: 'Final answer' },
+          } as LLMStructuredOutput;
+        }
+      );
+
+      await pipeline.run('agent-1', 1);
+
+      expect(messageManager.create).toHaveBeenCalledWith(
+        'agent-1',
+        'llm',
+        expect.any(Object),
+        1,
+        false
+      );
+
+      const updateDoneFlags = (messageManager.update as jest.Mock).mock.calls.map(
+        (call: unknown[]) => call[3]
+      );
+      expect(updateDoneFlags).toContain(false);
+      expect(updateDoneFlags.at(-1)).toBe(true);
     });
   });
 
@@ -263,7 +315,8 @@ describe('MainPipeline.run()', () => {
             error: expect.objectContaining({ type: 'network' }),
           }),
         }),
-        1
+        1,
+        true
       );
     });
   });
@@ -271,7 +324,7 @@ describe('MainPipeline.run()', () => {
   describe('error after streaming started', () => {
     /* Preconditions: LLM streams one reasoning chunk then throws
        Action: Call run(agentId, userMessageId)
-       Assertions: llm message hidden via setHidden; kind:error message created
+       Assertions: llm message marked hidden+incomplete; kind:error message created
        Requirements: llm-integration.5.3 */
     it('should hide llm message and create error message', async () => {
       const { pipeline, messageManager, llmProvider } = makeMocks();
@@ -285,11 +338,17 @@ describe('MainPipeline.run()', () => {
 
       await pipeline.run('agent-1', 1);
 
-      // llm message hidden via setHidden — Requirements: llm-integration.3.2
-      expect(messageManager.setHidden).toHaveBeenCalledWith(2, 'agent-1');
+      // llm message hidden+incomplete via single mutation — Requirements: llm-integration.3.2
+      expect(messageManager.hideAndMarkIncomplete).toHaveBeenCalledWith(2, 'agent-1');
 
       // error message created
-      expect(messageManager.create).toHaveBeenCalledWith('agent-1', 'error', expect.any(Object), 1);
+      expect(messageManager.create).toHaveBeenCalledWith(
+        'agent-1',
+        'error',
+        expect.any(Object),
+        1,
+        true
+      );
     });
   });
 
@@ -338,7 +397,8 @@ describe('MainPipeline.run()', () => {
             },
           },
         }),
-        1
+        1,
+        true
       );
     });
 
@@ -367,7 +427,8 @@ describe('MainPipeline.run()', () => {
             },
           },
         }),
-        1
+        1,
+        true
       );
     });
   });
@@ -397,7 +458,8 @@ describe('MainPipeline.run()', () => {
             }),
           }),
         }),
-        1
+        1,
+        true
       );
     });
   });
@@ -421,7 +483,13 @@ describe('MainPipeline.run()', () => {
 
       await pipeline.run('agent-1', 5);
 
-      expect(messageManager.create).toHaveBeenCalledWith('agent-1', 'llm', expect.any(Object), 5);
+      expect(messageManager.create).toHaveBeenCalledWith(
+        'agent-1',
+        'llm',
+        expect.any(Object),
+        5,
+        true
+      );
     });
   });
 
@@ -448,7 +516,8 @@ describe('MainPipeline.run()', () => {
             }),
           }),
         }),
-        1
+        1,
+        true
       );
     });
   });
@@ -511,8 +580,8 @@ describe('MainPipeline.run()', () => {
 
       await pipeline.run('agent-1', 1, controller.signal);
 
-      // llm message was created (first chunk), then hidden
-      expect(messageManager.setHidden).toHaveBeenCalledWith(2, 'agent-1');
+      // llm message was created (first chunk), then marked hidden/incomplete
+      expect(messageManager.hideAndMarkIncomplete).toHaveBeenCalledWith(2, 'agent-1');
 
       // No error message
       const errorCreates = (messageManager.create as jest.Mock).mock.calls.filter(
@@ -573,8 +642,50 @@ describe('MainPipeline.run()', () => {
             error: expect.objectContaining({ type: 'timeout' }),
           }),
         }),
-        1
+        1,
+        true
       );
+    });
+
+    it('should classify typed abort error as timeout', async () => {
+      const { pipeline, messageManager, llmProvider, mockPublish } = makeMocks();
+      llmProvider.chat.mockRejectedValue(
+        new LLMRequestAbortedError(
+          'Model response timeout. The provider took too long to respond. Please try again later.',
+          new DOMException('The operation was aborted', 'AbortError')
+        )
+      );
+
+      await pipeline.run('agent-1', 1);
+
+      expect(messageManager.create).toHaveBeenCalledWith(
+        'agent-1',
+        'error',
+        expect.objectContaining({
+          data: expect.objectContaining({
+            error: expect.objectContaining({
+              type: 'timeout',
+              message:
+                'Model response timeout. The provider took too long to respond. Please try again later.',
+            }),
+          }),
+        }),
+        1,
+        true
+      );
+
+      const diagnosticEvents = mockPublish.mock.calls
+        .map((call: [unknown]) => call[0])
+        .filter((event: unknown) => event instanceof LLMPipelineDiagnosticEvent);
+      expect(diagnosticEvents).toHaveLength(1);
+      const diagnostic = diagnosticEvents[0] as LLMPipelineDiagnosticEvent;
+      expect(diagnostic.details).toMatchObject({
+        agentId: 'agent-1',
+        userMessageId: 1,
+        signalAborted: false,
+        errorName: 'LLMRequestAbortedError',
+        errorType: 'timeout',
+      });
     });
 
     it('should classify provider error for unknown messages', async () => {
@@ -591,7 +702,8 @@ describe('MainPipeline.run()', () => {
             error: expect.objectContaining({ type: 'provider' }),
           }),
         }),
-        1
+        1,
+        true
       );
     });
   });
@@ -622,7 +734,8 @@ describe('MainPipeline.run()', () => {
         expect.objectContaining({
           data: expect.objectContaining({ model: LLM_CHAT_MODELS.anthropic.prod.model }),
         }),
-        1
+        1,
+        true
       );
     });
 
@@ -647,7 +760,8 @@ describe('MainPipeline.run()', () => {
         expect.objectContaining({
           data: expect.objectContaining({ model: LLM_CHAT_MODELS.google.test.model }),
         }),
-        1
+        1,
+        true
       );
     });
   });
@@ -671,8 +785,8 @@ describe('MainPipeline.run()', () => {
 
       await pipeline.run('agent-1', 1, controller.signal);
 
-      // llm message hidden via setHidden
-      expect(messageManager.setHidden).toHaveBeenCalledWith(2, 'agent-1');
+      // llm message hidden via atomic hidden+incomplete update
+      expect(messageManager.hideAndMarkIncomplete).toHaveBeenCalledWith(2, 'agent-1');
 
       // No error message created
       const errorCreates = (messageManager.create as jest.Mock).mock.calls.filter(

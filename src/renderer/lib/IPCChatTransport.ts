@@ -105,7 +105,8 @@ export class IPCChatTransport implements ChatTransport<UIMessage> {
             } else if (msg.kind === 'error') {
               // Requirements: llm-integration.3.4 — error messages
               const data = msg.payload.data as Record<string, unknown> | undefined;
-              const errorMsg = (data?.message as string) ?? 'An error occurred';
+              const error = data?.error as { message?: string } | undefined;
+              const errorMsg = error?.message ?? 'An error occurred';
               enqueue({ type: 'start', messageId: String(msg.id) });
               enqueue({ type: 'error', errorText: errorMsg });
               enqueue({ type: 'finish' });

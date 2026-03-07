@@ -31,6 +31,8 @@ export function Agents({
   } | null>(null);
   // Track loading state per agent — inform App loader until all chats loaded (agents.13.2, agents.13.10)
   const [loadingAgents, setLoadingAgents] = useState<Set<string>>(new Set());
+  // Track first-show layout stabilization for each chat (agents.4.14.5, agents.4.14.6)
+  const [startupSettledAgents, setStartupSettledAgents] = useState<Set<string>>(new Set());
   const startupLoaderShownAtRef = useRef<number | null>(null);
   const hasPublishedChatsReadyRef = useRef(false);
 
@@ -59,11 +61,31 @@ export function Agents({
   useLayoutEffect(() => {
     if (!isInitialLoad || agents.length === 0) return;
     setLoadingAgents(new Set(agents.map((agent) => agent.id)));
+    setStartupSettledAgents(new Set());
   }, [agents, isInitialLoad]);
 
   useEffect(() => {
+    // Keep only currently existing agents in settled set (agents.13.2, agents.13.10).
+    setStartupSettledAgents((prev) => {
+      const ids = new Set(agents.map((agent) => agent.id));
+      const next = new Set<string>();
+      prev.forEach((id) => {
+        if (ids.has(id)) next.add(id);
+      });
+      return next;
+    });
+  }, [agents]);
+
+  const activeAgentId = activeAgent?.id ?? agents[0]?.id ?? null;
+  const isActiveChatSettled = activeAgentId ? startupSettledAgents.has(activeAgentId) : false;
+
+  useEffect(() => {
     const shouldShowLoader =
-      isLoading || agents.length === 0 || loadingAgents.size > 0 || isInitialLoad;
+      isLoading ||
+      agents.length === 0 ||
+      loadingAgents.size > 0 ||
+      isInitialLoad ||
+      !isActiveChatSettled;
 
     if (shouldShowLoader) {
       if (startupLoaderShownAtRef.current === null) {
@@ -83,7 +105,7 @@ export function Agents({
     return () => {
       window.clearTimeout(timeoutId);
     };
-  }, [agents.length, isInitialLoad, isLoading, loadingAgents.size]);
+  }, [agents.length, isInitialLoad, isLoading, isActiveChatSettled, loadingAgents.size]);
 
   useEffect(() => {
     const isChatsLoading =
@@ -91,6 +113,7 @@ export function Agents({
       agents.length === 0 ||
       loadingAgents.size > 0 ||
       isInitialLoad ||
+      !isActiveChatSettled ||
       startupLoaderVisible;
     onChatsLoadingChange?.(isChatsLoading);
 
@@ -103,6 +126,7 @@ export function Agents({
     agents.length,
     isInitialLoad,
     isLoading,
+    isActiveChatSettled,
     loadingAgents.size,
     onChatsLoadingChange,
     startupLoaderVisible,
@@ -138,6 +162,17 @@ export function Agents({
     setLoadingAgents((prev) => {
       const next = new Set(prev);
       if (loading) next.add(agentId);
+      else next.delete(agentId);
+      return next;
+    });
+  }, []);
+
+  // Track startup settlement of each mounted chat.
+  // Requirements: agents.4.14.5, agents.4.14.6, agents.13.2, agents.13.10
+  const handleStartupSettledChange = useCallback((agentId: string, settled: boolean) => {
+    setStartupSettledAgents((prev) => {
+      const next = new Set(prev);
+      if (settled) next.add(agentId);
       else next.delete(agentId);
       return next;
     });
@@ -218,6 +253,7 @@ export function Agents({
             rateLimitBanner={rateLimitBanner}
             onRateLimitDismiss={() => setRateLimitBanner(null)}
             onLoadingChange={handleLoadingChange}
+            onStartupSettledChange={handleStartupSettledChange}
             onNavigate={onNavigate}
           />
         ))}

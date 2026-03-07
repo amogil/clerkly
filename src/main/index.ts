@@ -199,7 +199,7 @@ const aiAgentSettingsManager = new AIAgentSettingsManager(
 // Initialize Settings IPC Handlers
 const settingsIPCHandlers = new SettingsIPCHandlers(aiAgentSettingsManager);
 
-// Requirements: agents.2, agents.4, agents.10, llm-integration.6
+// Requirements: agents.2, agents.4, agents.10, llm-integration.4.5, llm-integration.4.7, llm-integration.6
 // Initialize Agent and Message Managers
 import { AgentManager } from './agents/AgentManager';
 import { MessageManager } from './agents/MessageManager';
@@ -210,7 +210,7 @@ import { PromptBuilder, FullHistoryStrategy } from './agents/PromptBuilder';
 const agentManager = new AgentManager(dbManager);
 const messageManager = new MessageManager(dbManager);
 const promptBuilder = new PromptBuilder(
-  'You are a helpful AI assistant. You may respond in Markdown when it improves clarity. Supported Markdown (GFM): headings, paragraphs, bold/italic/strikethrough, links/autolinks, blockquotes, ordered/unordered lists and task lists, tables, horizontal rules, inline code, fenced code blocks with language tags (syntax highlighting), Mermaid diagrams (```mermaid```), and math via KaTeX (inline $...$ or block $$...$$). Do not use footnotes.',
+  "You are a helpful AI assistant. Always reply in the user's language (detected from the latest user message in the current request). Both your final answer and your reasoning text must be in the user's language. You may respond in Markdown when it improves clarity. Supported Markdown (GFM): headings, paragraphs, bold/italic/strikethrough, links/autolinks, blockquotes, ordered/unordered lists and task lists, tables, horizontal rules, inline code, fenced code blocks with language tags (syntax highlighting), Mermaid diagrams (```mermaid```), and math via KaTeX (inline $...$ or block $$...$$). Do not use footnotes.",
   [],
   new FullHistoryStrategy()
 );

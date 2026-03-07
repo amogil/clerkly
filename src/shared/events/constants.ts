@@ -42,6 +42,7 @@ export const EVENT_TYPES = {
 
   // Error events
   ERROR_CREATED: 'error.created',
+  LLM_PIPELINE_DIAGNOSTIC: 'llm.pipeline.diagnostic',
 
   // Agent rate limit event
   AGENT_RATE_LIMIT: 'agent.rate_limit',

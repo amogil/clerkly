@@ -53,6 +53,7 @@ export class MessageManager {
       payload,
       replyToMessageId: message.replyToMessageId ?? null,
       hidden: message.hidden ?? false,
+      done: message.done ?? false,
     };
   }
 
@@ -140,6 +141,18 @@ export class MessageManager {
   }
 
   /**
+   * Mark an in-flight llm message as hidden+incomplete and emit a single update event only on real state change.
+   * Requirements: llm-integration.3.2, llm-integration.8.5
+   */
+  hideAndMarkIncomplete(messageId: number, agentId: string): void {
+    const updated = this.dbManager.messages.hideAndMarkIncomplete(messageId, agentId);
+    if (updated) {
+      this.logger.info(`Message hidden+incomplete: ${messageId}`);
+      MainEventBus.getInstance().publish(new MessageUpdatedEvent(this.toEventMessage(updated)));
+    }
+  }
+
+  /**
    * Create a new message for an agent
    * Requirements: agents.4.3, agents.7.1, agents.12.4, llm-integration.2
    * @param kind Message kind: 'user' | 'llm' | 'error' | etc.
@@ -150,6 +163,7 @@ export class MessageManager {
     kind: string,
     payload: MessagePayload,
     replyToMessageId: number | null,
+    done: boolean = false,
     timestamp?: string,
     emitEvent: boolean = true
   ): Message {
@@ -160,6 +174,7 @@ export class MessageManager {
       kind,
       payloadJson,
       replyToMessageId,
+      done,
       timestamp
     );
 
@@ -182,11 +197,12 @@ export class MessageManager {
     messageId: number,
     agentId: string,
     payload: MessagePayload,
+    done?: boolean,
     emitEvent: boolean = true
   ): void {
     // Repository automatically checks access
     const payloadJson = JSON.stringify(payload);
-    this.dbManager.messages.update(messageId, agentId, payloadJson);
+    this.dbManager.messages.update(messageId, agentId, payloadJson, done);
 
     this.logger.info(`Message updated: ${messageId}`);
 
@@ -206,5 +222,17 @@ export class MessageManager {
   setUsage(messageId: number, agentId: string, usage: LLMUsage): void {
     this.dbManager.messages.updateUsageJson(messageId, agentId, JSON.stringify(usage));
     this.logger.info(`Message usage saved: ${messageId}`);
+  }
+
+  /**
+   * Update completion state for message without modifying payload.
+   * Requirements: llm-integration.6.5
+   */
+  setDone(messageId: number, agentId: string, done: boolean): void {
+    this.dbManager.messages.setDone(messageId, agentId, done);
+    const updated = this.dbManager.messages.getById(messageId, agentId);
+    if (updated) {
+      MainEventBus.getInstance().publish(new MessageUpdatedEvent(this.toEventMessage(updated)));
+    }
   }
 }

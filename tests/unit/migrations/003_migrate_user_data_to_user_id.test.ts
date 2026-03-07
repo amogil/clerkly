@@ -50,6 +50,16 @@ describe('Migration 003_migrate_user_data_to_user_id', () => {
     }
   });
 
+  // Requirements: user-data-isolation.5.4
+  const rollbackToVersion = (targetVersion: number) => {
+    let currentVersion = migrationRunner.getCurrentVersion();
+    while (currentVersion > targetVersion) {
+      const rollbackResult = migrationRunner.rollbackLastMigration();
+      expect(rollbackResult.success).toBe(true);
+      currentVersion = migrationRunner.getCurrentVersion();
+    }
+  };
+
   // Helper to apply only migrations 001 and 002 (before 003)
   const applyMigrationsUpTo002 = () => {
     // Initialize schema_migrations table first
@@ -335,32 +345,9 @@ describe('Migration 003_migrate_user_data_to_user_id', () => {
         'INSERT INTO user_data (key, value, user_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?)'
       ).run('test_key', '"test_value"', 'ABCDEF1234', now, now);
 
-      // Rollback migrations above 003 first (010, 009, then 008)
-      let rollbackResult = migrationRunner.rollbackLastMigration();
-      expect(rollbackResult.success).toBe(true);
-      rollbackResult = migrationRunner.rollbackLastMigration();
-      expect(rollbackResult.success).toBe(true);
-      rollbackResult = migrationRunner.rollbackLastMigration();
-      expect(rollbackResult.success).toBe(true);
-
-      // Rollback migration 007
-      rollbackResult = migrationRunner.rollbackLastMigration();
-      expect(rollbackResult.success).toBe(true);
-
-      // Rollback migration 006
-      rollbackResult = migrationRunner.rollbackLastMigration();
-      expect(rollbackResult.success).toBe(true);
-
-      // Rollback migration 005
-      rollbackResult = migrationRunner.rollbackLastMigration();
-      expect(rollbackResult.success).toBe(true);
-
-      // Rollback migration 004
-      rollbackResult = migrationRunner.rollbackLastMigration();
-      expect(rollbackResult.success).toBe(true);
-
-      // Rollback migration 003
-      rollbackResult = migrationRunner.rollbackLastMigration();
+      // Roll back to the state right before migration 003.
+      rollbackToVersion(3);
+      const rollbackResult = migrationRunner.rollbackLastMigration();
       expect(rollbackResult.success).toBe(true);
 
       // Verify user_email column is restored
@@ -388,32 +375,9 @@ describe('Migration 003_migrate_user_data_to_user_id', () => {
         'INSERT INTO user_data (key, value, user_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?)'
       ).run('test_key', '"test_value"', 'ABCDEF1234', now, now);
 
-      // Rollback migrations above 003 first (010, 009, then 008)
-      let rollbackResult = migrationRunner.rollbackLastMigration();
-      expect(rollbackResult.success).toBe(true);
-      rollbackResult = migrationRunner.rollbackLastMigration();
-      expect(rollbackResult.success).toBe(true);
-      rollbackResult = migrationRunner.rollbackLastMigration();
-      expect(rollbackResult.success).toBe(true);
-
-      // Rollback migration 007
-      rollbackResult = migrationRunner.rollbackLastMigration();
-      expect(rollbackResult.success).toBe(true);
-
-      // Rollback migration 006
-      rollbackResult = migrationRunner.rollbackLastMigration();
-      expect(rollbackResult.success).toBe(true);
-
-      // Rollback migration 005
-      rollbackResult = migrationRunner.rollbackLastMigration();
-      expect(rollbackResult.success).toBe(true);
-
-      // Rollback migration 004
-      rollbackResult = migrationRunner.rollbackLastMigration();
-      expect(rollbackResult.success).toBe(true);
-
-      // Rollback migration 003
-      rollbackResult = migrationRunner.rollbackLastMigration();
+      // Roll back to the state right before migration 003.
+      rollbackToVersion(3);
+      const rollbackResult = migrationRunner.rollbackLastMigration();
       expect(rollbackResult.success).toBe(true);
 
       // Verify data is preserved with user_email
@@ -440,32 +404,9 @@ describe('Migration 003_migrate_user_data_to_user_id', () => {
       const result = migrationRunner.runMigrations();
       expect(result.success).toBe(true);
 
-      // Rollback migrations above 003 first (010, 009, then 008)
-      let rollbackResult = migrationRunner.rollbackLastMigration();
-      expect(rollbackResult.success).toBe(true);
-      rollbackResult = migrationRunner.rollbackLastMigration();
-      expect(rollbackResult.success).toBe(true);
-      rollbackResult = migrationRunner.rollbackLastMigration();
-      expect(rollbackResult.success).toBe(true);
-
-      // Rollback migration 007
-      rollbackResult = migrationRunner.rollbackLastMigration();
-      expect(rollbackResult.success).toBe(true);
-
-      // Rollback migration 006
-      rollbackResult = migrationRunner.rollbackLastMigration();
-      expect(rollbackResult.success).toBe(true);
-
-      // Rollback migration 005
-      rollbackResult = migrationRunner.rollbackLastMigration();
-      expect(rollbackResult.success).toBe(true);
-
-      // Rollback migration 004
-      rollbackResult = migrationRunner.rollbackLastMigration();
-      expect(rollbackResult.success).toBe(true);
-
-      // Rollback migration 003
-      rollbackResult = migrationRunner.rollbackLastMigration();
+      // Roll back to the state right before migration 003.
+      rollbackToVersion(3);
+      const rollbackResult = migrationRunner.rollbackLastMigration();
       expect(rollbackResult.success).toBe(true);
 
       // Verify old indexes are restored

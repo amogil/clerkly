@@ -173,6 +173,35 @@ export interface MessageUpdatedPayload extends BaseEvent {
 }
 ```
 
+#### Диагностическое событие LLM pipeline
+
+**Requirements:** realtime-events.4.8, realtime-events.4.9, realtime-events.4.10
+
+Для зеркалирования ошибок `MainPipeline` в renderer Developer Log вводится типизированное событие `llm.pipeline.diagnostic`.
+
+```typescript
+export interface LLMPipelineDiagnosticPayload extends BaseEvent {
+  level: 'warn' | 'error';
+  context: 'MainPipeline';
+  message: string;
+  details: {
+    agentId: string;
+    userMessageId: number;
+    signalAborted: boolean;
+    errorName: string;
+    errorType: 'auth' | 'rate_limit' | 'provider' | 'network' | 'timeout';
+  };
+  timestamp: number;
+}
+```
+
+Поток данных:
+1. `MainPipeline` в main процессе публикует `new LLMPipelineDiagnosticEvent(...)` при ошибках выполнения запроса к LLM.
+2. `MainEventBus` пересылает событие через стандартный IPC канал `events:from-main`.
+3. `RendererEventBus` доставляет payload в подписчики.
+4. `App` подписывается на `EVENT_TYPES.LLM_PIPELINE_DIAGNOSTIC` и пишет запись в renderer console (Developer Log) через `Logger`.
+5. Toast-уведомления для этого события не показываются.
+
 #### Генерация снапшотов
 
 **Requirements:** realtime-events.9.5, realtime-events.9.6
@@ -1048,6 +1077,15 @@ eventBus.publish('user.login', { userId: 'user-123' }, { local: true });
 | should emit entity.deleted with ID only | realtime-events.3.4 |
 | should support custom event types | realtime-events.3.5 |
 | should include timestamp in all events | realtime-events.3.6 |
+| should create llm.pipeline.diagnostic payload | realtime-events.4.9 |
+
+#### Renderer Developer Log Integration
+
+**Файл:** `tests/unit/App.ipc-integration.test.tsx`
+
+| Тест | Требование |
+|------|------------|
+| should log llm.pipeline.diagnostic events to renderer console | realtime-events.4.10 |
 
 #### React Hook
 
@@ -1875,4 +1913,3 @@ it('should show correct status color', () => {
 - [ ] Обновить все функциональные тесты
 - [ ] Удалить `computeAgentStatus` из renderer (если есть)
 - [ ] Проверить, что все компоненты обновляются автоматически
-
