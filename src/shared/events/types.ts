@@ -217,6 +217,14 @@ export type AuthCancelledPayload = BaseEvent;
  */
 export type AuthSignedOutPayload = BaseEvent;
 
+/**
+ * App coordinator state changed event payload
+ * Emitted when AppCoordinator transitions between phases
+ */
+export interface AppCoordinatorStateChangedPayload extends BaseEvent {
+  state: AppCoordinatorState;
+}
+
 // ============================================================================
 // Error Events
 // ============================================================================
@@ -278,21 +286,11 @@ export type AppPhase =
   | 'ready'
   | 'error';
 
-export interface AppStateChangedPayload extends BaseEvent {
+export interface AppCoordinatorState {
   phase: AppPhase;
   authorized: boolean;
   targetScreen: AppScreen;
   reason?: string;
-}
-
-export interface AppChatsReadyPayload extends BaseEvent {
-  source: 'agents';
-}
-
-export interface AppChatsFailedPayload extends BaseEvent {
-  source: 'agents';
-  reason: string;
-  recoverable?: boolean;
 }
 
 // ============================================================================
@@ -327,6 +325,7 @@ export interface ClerklyEvents {
   [EVENT_TYPES.AUTH_FAILED]: AuthFailedPayload;
   [EVENT_TYPES.AUTH_CANCELLED]: AuthCancelledPayload;
   [EVENT_TYPES.AUTH_SIGNED_OUT]: AuthSignedOutPayload;
+  [EVENT_TYPES.APP_COORDINATOR_STATE_CHANGED]: AppCoordinatorStateChangedPayload;
 
   // Error events
   [EVENT_TYPES.ERROR_CREATED]: ErrorCreatedPayload;
@@ -334,11 +333,6 @@ export interface ClerklyEvents {
 
   // Rate limit events
   [EVENT_TYPES.AGENT_RATE_LIMIT]: AgentRateLimitPayload;
-
-  // App coordinator events
-  [EVENT_TYPES.APP_STATE_CHANGED]: AppStateChangedPayload;
-  [EVENT_TYPES.APP_CHATS_READY]: AppChatsReadyPayload;
-  [EVENT_TYPES.APP_CHATS_FAILED]: AppChatsFailedPayload;
 }
 
 /**
@@ -446,6 +440,7 @@ type AuthCompletedType = typeof EVENT_TYPES.AUTH_COMPLETED;
 type AuthFailedType = typeof EVENT_TYPES.AUTH_FAILED;
 type AuthCancelledType = typeof EVENT_TYPES.AUTH_CANCELLED;
 type AuthSignedOutType = typeof EVENT_TYPES.AUTH_SIGNED_OUT;
+type AppCoordinatorStateChangedType = typeof EVENT_TYPES.APP_COORDINATOR_STATE_CHANGED;
 type ErrorCreatedType = typeof EVENT_TYPES.ERROR_CREATED;
 type LLMPipelineDiagnosticType = typeof EVENT_TYPES.LLM_PIPELINE_DIAGNOSTIC;
 type UserLoginType = typeof EVENT_TYPES.USER_LOGIN;
@@ -456,9 +451,6 @@ type AgentArchivedType = typeof EVENT_TYPES.AGENT_ARCHIVED;
 type MessageCreatedType = typeof EVENT_TYPES.MESSAGE_CREATED;
 type MessageUpdatedType = typeof EVENT_TYPES.MESSAGE_UPDATED;
 type UserProfileUpdatedType = typeof EVENT_TYPES.USER_PROFILE_UPDATED;
-type AppStateChangedType = typeof EVENT_TYPES.APP_STATE_CHANGED;
-type AppChatsReadyType = typeof EVENT_TYPES.APP_CHATS_READY;
-type AppChatsFailedType = typeof EVENT_TYPES.APP_CHATS_FAILED;
 
 /**
  * Auth started event
@@ -567,6 +559,22 @@ export class AuthSignedOutEvent extends TypedEventClass<AuthSignedOutType> {
 
   toPayload(): EventPayloadWithoutTimestamp<AuthSignedOutType> {
     return {};
+  }
+}
+
+/**
+ * App coordinator state changed event
+ * Emitted when AppCoordinator transitions between phases
+ */
+export class AppCoordinatorStateChangedEvent extends TypedEventClass<AppCoordinatorStateChangedType> {
+  readonly type = EVENT_TYPES.APP_COORDINATOR_STATE_CHANGED;
+
+  constructor(public readonly state: AppCoordinatorState) {
+    super();
+  }
+
+  toPayload(): EventPayloadWithoutTimestamp<AppCoordinatorStateChangedType> {
+    return { state: this.state };
   }
 }
 
@@ -813,72 +821,6 @@ export class AgentRateLimitEvent extends TypedEventClass<AgentRateLimitType> {
       agentId: this.agentId,
       userMessageId: this.userMessageId,
       retryAfterSeconds: this.retryAfterSeconds,
-    };
-  }
-}
-
-/**
- * App state changed event
- * Emitted by AppCoordinator as a single source of startup/auth state truth.
- */
-export class AppStateChangedEvent extends TypedEventClass<AppStateChangedType> {
-  readonly type = EVENT_TYPES.APP_STATE_CHANGED;
-
-  constructor(
-    public readonly phase: AppPhase,
-    public readonly authorized: boolean,
-    public readonly targetScreen: AppScreen,
-    public readonly reason?: string
-  ) {
-    super();
-  }
-
-  toPayload(): EventPayloadWithoutTimestamp<AppStateChangedType> {
-    return {
-      phase: this.phase,
-      authorized: this.authorized,
-      targetScreen: this.targetScreen,
-      reason: this.reason,
-    };
-  }
-}
-
-/**
- * App chats ready event
- * Emitted by renderer when initial agents/chats loading is fully finished.
- */
-export class AppChatsReadyEvent extends TypedEventClass<AppChatsReadyType> {
-  readonly type = EVENT_TYPES.APP_CHATS_READY;
-
-  constructor(public readonly source: 'agents' = 'agents') {
-    super();
-  }
-
-  toPayload(): EventPayloadWithoutTimestamp<AppChatsReadyType> {
-    return { source: this.source };
-  }
-}
-
-/**
- * App chats failed event
- * Emitted by renderer when initial agents/chats loading fails critically.
- */
-export class AppChatsFailedEvent extends TypedEventClass<AppChatsFailedType> {
-  readonly type = EVENT_TYPES.APP_CHATS_FAILED;
-
-  constructor(
-    public readonly source: 'agents' = 'agents',
-    public readonly reason: string = 'Unknown chats startup failure',
-    public readonly recoverable?: boolean
-  ) {
-    super();
-  }
-
-  toPayload(): EventPayloadWithoutTimestamp<AppChatsFailedType> {
-    return {
-      source: this.source,
-      reason: this.reason,
-      recoverable: this.recoverable,
     };
   }
 }
