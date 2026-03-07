@@ -8,6 +8,9 @@ on:
       - reopened
       - ready_for_review
 
+permissions:
+  contents: read
+
 jobs:
   validate:
     if: github.event.pull_request.draft == false
@@ -29,10 +32,11 @@ jobs:
         run: npm run validate
 
   functional:
-    if: github.event.pull_request.draft == false
+    if: github.event.pull_request.draft == false && github.event.pull_request.head.repo.full_name == github.repository
     needs: validate
     runs-on: macos-latest
     timeout-minutes: 90
+    environment: ci-functional
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -46,5 +50,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Check OpenAI key is present
+        env:
+          CLERKLY_OPENAI_API_KEY: ${{ secrets.CLERKLY_OPENAI_API_KEY }}
+        run: test -n "$CLERKLY_OPENAI_API_KEY"
+
       - name: Run functional tests
+        env:
+          CLERKLY_OPENAI_API_KEY: ${{ secrets.CLERKLY_OPENAI_API_KEY }}
         run: npm run test:functional
