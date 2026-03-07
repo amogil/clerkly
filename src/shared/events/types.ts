@@ -217,6 +217,14 @@ export type AuthCancelledPayload = BaseEvent;
  */
 export type AuthSignedOutPayload = BaseEvent;
 
+/**
+ * App coordinator state changed event payload
+ * Emitted when AppCoordinator transitions between phases
+ */
+export interface AppCoordinatorStateChangedPayload extends BaseEvent {
+  state: AppCoordinatorState;
+}
+
 // ============================================================================
 // Error Events
 // ============================================================================
@@ -317,6 +325,7 @@ export interface ClerklyEvents {
   [EVENT_TYPES.AUTH_FAILED]: AuthFailedPayload;
   [EVENT_TYPES.AUTH_CANCELLED]: AuthCancelledPayload;
   [EVENT_TYPES.AUTH_SIGNED_OUT]: AuthSignedOutPayload;
+  [EVENT_TYPES.APP_COORDINATOR_STATE_CHANGED]: AppCoordinatorStateChangedPayload;
 
   // Error events
   [EVENT_TYPES.ERROR_CREATED]: ErrorCreatedPayload;
@@ -431,6 +440,7 @@ type AuthCompletedType = typeof EVENT_TYPES.AUTH_COMPLETED;
 type AuthFailedType = typeof EVENT_TYPES.AUTH_FAILED;
 type AuthCancelledType = typeof EVENT_TYPES.AUTH_CANCELLED;
 type AuthSignedOutType = typeof EVENT_TYPES.AUTH_SIGNED_OUT;
+type AppCoordinatorStateChangedType = typeof EVENT_TYPES.APP_COORDINATOR_STATE_CHANGED;
 type ErrorCreatedType = typeof EVENT_TYPES.ERROR_CREATED;
 type LLMPipelineDiagnosticType = typeof EVENT_TYPES.LLM_PIPELINE_DIAGNOSTIC;
 type UserLoginType = typeof EVENT_TYPES.USER_LOGIN;
@@ -549,6 +559,22 @@ export class AuthSignedOutEvent extends TypedEventClass<AuthSignedOutType> {
 
   toPayload(): EventPayloadWithoutTimestamp<AuthSignedOutType> {
     return {};
+  }
+}
+
+/**
+ * App coordinator state changed event
+ * Emitted when AppCoordinator transitions between phases
+ */
+export class AppCoordinatorStateChangedEvent extends TypedEventClass<AppCoordinatorStateChangedType> {
+  readonly type = EVENT_TYPES.APP_COORDINATOR_STATE_CHANGED;
+
+  constructor(public readonly state: AppCoordinatorState) {
+    super();
+  }
+
+  toPayload(): EventPayloadWithoutTimestamp<AppCoordinatorStateChangedType> {
+    return { state: this.state };
   }
 }
 

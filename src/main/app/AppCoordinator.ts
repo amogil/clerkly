@@ -1,9 +1,10 @@
-// Requirements: agents.13.2, navigation.1.1, navigation.1.3
+// Requirements: agents.13.2, agents.13.17, navigation.1.1, navigation.1.3
 
 import { Logger } from '../Logger';
 import { MainEventBus } from '../events/MainEventBus';
 import { OAuthClientManager } from '../auth/OAuthClientManager';
 import { EVENT_TYPES } from '../../shared/events/constants';
+import { AppCoordinatorStateChangedEvent } from '../../shared/events/types';
 import type {
   AppCoordinatorState,
   AuthCompletedPayload,
@@ -16,7 +17,7 @@ interface AppCoordinatorOptions {
   chatsReadyTimeoutMs?: number;
 }
 
-// Requirements: agents.13.2, navigation.1.1, navigation.1.3
+// Requirements: agents.13.2, agents.13.17, navigation.1.1, navigation.1.3
 export class AppCoordinator {
   private readonly logger = Logger.create('AppCoordinator');
   private readonly eventBus: MainEventBus;
@@ -234,5 +235,6 @@ export class AppCoordinator {
     this.logger.info(
       `state ${prev.phase}/${prev.targetScreen} -> ${next.phase}/${next.targetScreen} (${next.reason || 'no_reason'})`
     );
+    this.eventBus.publish(new AppCoordinatorStateChangedEvent(next));
   }
 }

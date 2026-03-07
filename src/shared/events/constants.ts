@@ -24,6 +24,7 @@ export const EVENT_TYPES = {
   AUTH_FAILED: 'auth.failed',
   AUTH_CANCELLED: 'auth.cancelled',
   AUTH_SIGNED_OUT: 'auth.signed-out',
+  APP_COORDINATOR_STATE_CHANGED: 'app.coordinator.state-changed',
 
   // User events
   USER_LOGIN: 'user.login',

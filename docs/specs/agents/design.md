@@ -1916,11 +1916,11 @@ import { Logo } from '../logo';
 | `tests/unit/components/agents/AgentReasoningTrigger.test.tsx` | agents.4.11, llm-integration.2, llm-integration.7.2 |
 | `tests/unit/renderer/IPCChatTransport.test.ts` | llm-integration.2, llm-integration.7 |
 | `tests/unit/hooks/useAgentChat.test.ts` | agents.4.24, llm-integration.8.7 |
-| `tests/unit/hooks/useAppCoordinatorState.test.ts` | agents.13.12, agents.13.16 |
+| `tests/unit/hooks/useAppCoordinatorState.test.ts` | agents.13.9.2, agents.13.9.3, agents.13.12, agents.13.16, agents.13.18 |
 | `tests/unit/components/agents.test.tsx` | agents.4.22 |
 | `tests/unit/components/agents-autoscroll.test.tsx` | agents.4.13 |
 | `tests/unit/components/agents-scroll-position.test.tsx` | agents.4.14 |
-| `tests/unit/app/AppCoordinator.test.ts` | agents.13.11-13.15, navigation.1.1, navigation.1.3 |
+| `tests/unit/app/AppCoordinator.test.ts` | agents.13.11-13.15, agents.13.17, navigation.1.1, navigation.1.3 |
 
 ### Функциональные тесты
 
@@ -1929,8 +1929,8 @@ import { Logo } from '../logo';
 | `tests/functional/agent-switching.spec.ts` | agents.3 | - |
 | `tests/functional/agent-messaging.spec.ts` | agents.4.2.1, agents.4.2.2, 4.3, 4.4, 4.8, 4.13.1, 4.13.2, 4.13.4 | - |
 | `tests/functional/agent-scroll-position.spec.ts` | agents.4.14.1-4.14.6 | - |
-| `tests/functional/startup-loader.spec.ts` | agents.13.2, agents.13.10, agents.4.14.5-4.14.6 (startup settled без визуального рывка, без page-level scrollbar во время loader, стабильная ширина в раннем окне после скрытия loader) | - |
-| `tests/functional/settings-ai-agent.spec.ts` | agents.13.11-13.15 (регрессия startup/loading orchestration) | - |
+| `tests/functional/startup-loader.spec.ts` | agents.13.2, agents.13.9.1-13.9.4, agents.13.10, agents.13.12, agents.13.16, agents.13.18, agents.4.14.5-4.14.6 (startup settled без визуального рывка, без page-level scrollbar во время loader, стабильная ширина в раннем окне после скрытия loader) | - |
+| `tests/functional/settings-ai-agent.spec.ts` | - | Кросс-фича тест для settings; не используется для покрытия agents.* |
 | `tests/functional/all-agents-page.spec.ts` | agents.5 | - |
 | `tests/functional/agent-status-indicators.spec.ts` | agents.6 | - |
 | `tests/functional/message-format.spec.ts` | agents.7 | - |
@@ -2046,6 +2046,10 @@ await window.locator(`[data-testid="agent-icon-${firstAgentId}"]`).click();
 | agents.11 | ✓ | ✓ |
 | agents.12 | ✓ | ✓ |
 | agents.13 (startup loading) | ✓ | ✓ |
+| agents.13.9.1-13.9.4 (границы этапа запуска) | ✓ | ✓ |
+| agents.13.12, agents.13.16 (polling на этапе запуска) | ✓ | ✓ |
+| agents.13.17 (state-changed событие) | ✓ | - |
+| agents.13.18 (startup source of truth = polling) | ✓ | ✓ |
 | user-data-isolation.6 | ✓ | ✓ |
 
 ## Зависимости
@@ -2244,16 +2248,18 @@ interface UseAgentChatResult {
 - `ready` — основной UI полностью доступен
 - `error` — критическая ошибка инициализации (включая timeout ожидания чатов)
 
-**Ключевые IPC-контракты:**
-- `app:get-state` — renderer опрашивает состояние `AppCoordinator` каждые 200мс
+**Ключевые IPC-контракты и события:**
+- `app:get-state` — renderer опрашивает состояние `AppCoordinator` каждые 200мс на этапе старта; этот polling является источником истины для стартовой оркестрации
 - `app:set-chats-ready` — renderer подтверждает готовность финального UI (все чаты загружены + active chat settled)
+- `app.coordinator.state-changed` — main process публикует изменение состояния `AppCoordinator` через EventBus для runtime-синхронизации без постоянного polling; событие может приходить и во время старта, но не заменяет стартовый polling-контур
 
 **Поток запуска:**
 1. `src/main/index.ts` создаёт и запускает `AppCoordinator`
 2. renderer получает initial state через IPC `app:get-state`
 3. renderer продолжает polling `app:get-state` с интервалом 200мс до терминальной фазы
 4. после готовности чатов renderer вызывает `app:set-chats-ready`
-5. `AppCoordinator` переводит приложение в `ready`, loading-экран скрывается
+5. `AppCoordinator` переводит приложение в `ready` и публикует `app.coordinator.state-changed`
+6. renderer завершает стартовый polling только после фиксации терминальной фазы в стартовом polling-контуре (или по startup timeout), а событие `app.coordinator.state-changed` использует для runtime-синхронизации после завершения этапа запуска
 
 **Timeout-защита:**
 - В фазе `waiting-for-chats` запускается таймер

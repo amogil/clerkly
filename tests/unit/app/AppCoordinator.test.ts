@@ -65,6 +65,35 @@ describe('AppCoordinator', () => {
       authorized: false,
       targetScreen: 'login',
     });
+    expect(
+      eventBus.published.some((event) => event.type === EVENT_TYPES.APP_COORDINATOR_STATE_CHANGED)
+    ).toBe(true);
+  });
+
+  /* Preconditions: app coordinator transitions state in main process
+     Action: start coordinator for authorized startup and mark chats ready
+     Assertions: app.coordinator.state-changed events carry latest state snapshots
+     Requirements: agents.13.17 */
+  it('should publish app coordinator state-changed events on transitions', async () => {
+    const eventBus = new FakeMainEventBus();
+    const oauthClient = {
+      getAuthStatus: jest.fn().mockResolvedValue({ authorized: true }),
+    };
+    const coordinator = new AppCoordinator(oauthClient as any, undefined, eventBus as any);
+
+    await coordinator.start();
+    coordinator.markChatsReady();
+
+    const stateEvents = eventBus.published.filter(
+      (event) => event.type === EVENT_TYPES.APP_COORDINATOR_STATE_CHANGED
+    );
+
+    expect(stateEvents.length).toBeGreaterThan(0);
+    expect(stateEvents[stateEvents.length - 1]?.payload.state).toMatchObject({
+      phase: 'ready',
+      authorized: true,
+      targetScreen: 'agents',
+    });
   });
 
   /* Preconditions: app reached ready state and auth.completed is emitted again

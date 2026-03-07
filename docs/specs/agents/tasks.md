@@ -80,12 +80,13 @@
 - [x] Добавить отдельный functional-тест: в режиме `stop` кнопка остаётся активной при пустом и непустом вводе.
 - [x] Прогнать этот функциональный тест точечно.
 
-### 9) Startup orchestration redesign (polling-only)
+### 9) Startup orchestration redesign (startup polling + runtime events)
 - [x] Startup orchestration реализована через IPC polling state (`app:get-state`) и явный ready-signal (`app:set-chats-ready`).
-- [x] `useAppCoordinatorState` переведён на polling `app:get-state` каждые 200мс до терминальной фазы.
+- [x] `useAppCoordinatorState` использует polling `app:get-state` только на этапе запуска до терминальной стартовой фазы.
+- [x] `AppCoordinator` публикует `app.coordinator.state-changed` для runtime-синхронизации без постоянного polling.
 - [x] Добавлен IPC-контракт `app:set-chats-ready` для перевода `AppCoordinator` в `ready`.
-- [x] Обновлены unit-тесты `AppCoordinator` и `useAppCoordinatorState` под polling-модель.
-- [x] Обновлены `agents/requirements.md` и `agents/design.md` под polling-only контракт.
+- [x] Обновлены unit-тесты `AppCoordinator` и `useAppCoordinatorState` под гибридную модель (startup polling + runtime events).
+- [x] Обновлены `agents/requirements.md` и `agents/design.md` под целевой гибридный контракт.
 
 ---
 
