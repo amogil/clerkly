@@ -204,23 +204,90 @@ export class MockLLMServer {
     const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
     const streamAll = async () => {
+      const messageItemId = `msg_${Date.now()}`;
+      const reasoningItemId = `rs_${Date.now()}`;
+
+      sendChunk({
+        type: 'response.created',
+        response: {
+          id: `resp_${Date.now()}`,
+          created_at: Math.floor(Date.now() / 1000),
+          model: 'gpt-5-nano',
+          service_tier: null,
+        },
+      });
+
       if (scriptedResponse) {
+        sendChunk({
+          type: 'response.output_item.added',
+          output_index: 0,
+          item: { type: 'message', id: messageItemId, phase: 'commentary' },
+        });
+
         if (scriptedResponse.reasoning) {
+          sendChunk({
+            type: 'response.output_item.added',
+            output_index: 1,
+            item: { type: 'reasoning', id: reasoningItemId, encrypted_content: null },
+          });
+          sendChunk({
+            type: 'response.reasoning_summary_part.added',
+            item_id: reasoningItemId,
+            summary_index: 0,
+          });
           for (const word of scriptedResponse.reasoning.split(' ')) {
-            sendChunk({ type: 'response.reasoning_text.delta', delta: `${word} ` });
+            sendChunk({
+              type: 'response.reasoning_summary_text.delta',
+              item_id: reasoningItemId,
+              summary_index: 0,
+              delta: `${word} `,
+            });
             if (streamingChunkDelayMs > 0) {
               await delay(streamingChunkDelayMs);
             }
           }
+          sendChunk({
+            type: 'response.reasoning_summary_part.done',
+            item_id: reasoningItemId,
+            summary_index: 0,
+          });
+          sendChunk({
+            type: 'response.output_item.done',
+            output_index: 1,
+            item: { type: 'reasoning', id: reasoningItemId, encrypted_content: null },
+          });
         }
 
         for (const [index, toolCall] of (scriptedResponse.toolCalls ?? []).entries()) {
+          const toolOutputIndex = index + 2;
           sendChunk({
-            type: 'response.function_call_arguments.done',
-            output_index: index,
-            call_id: toolCall.callId,
-            name: toolCall.toolName,
-            arguments: JSON.stringify(toolCall.arguments),
+            type: 'response.output_item.added',
+            output_index: toolOutputIndex,
+            item: {
+              type: 'function_call',
+              id: `fc_${toolCall.callId}`,
+              call_id: toolCall.callId,
+              name: toolCall.toolName,
+              arguments: '',
+            },
+          });
+          sendChunk({
+            type: 'response.function_call_arguments.delta',
+            item_id: `fc_${toolCall.callId}`,
+            output_index: toolOutputIndex,
+            delta: JSON.stringify(toolCall.arguments),
+          });
+          sendChunk({
+            type: 'response.output_item.done',
+            output_index: toolOutputIndex,
+            item: {
+              type: 'function_call',
+              id: `fc_${toolCall.callId}`,
+              call_id: toolCall.callId,
+              name: toolCall.toolName,
+              arguments: JSON.stringify(toolCall.arguments),
+              status: 'completed',
+            },
           });
           if (streamingChunkDelayMs > 0) {
             await delay(streamingChunkDelayMs);
@@ -231,12 +298,18 @@ export class MockLLMServer {
         if (scriptedContent) {
           const chunks = scriptedContent.match(/[\s\S]{1,20}/g) || [scriptedContent];
           for (const chunk of chunks) {
-            sendChunk({ type: 'response.output_text.delta', delta: chunk });
+            sendChunk({ type: 'response.output_text.delta', item_id: messageItemId, delta: chunk });
             if (streamingChunkDelayMs > 0) {
               await delay(streamingChunkDelayMs);
             }
           }
         }
+
+        sendChunk({
+          type: 'response.output_item.done',
+          output_index: 0,
+          item: { type: 'message', id: messageItemId, phase: 'final_answer' },
+        });
 
         sendChunk({
           type: 'response.completed',
@@ -256,25 +329,62 @@ export class MockLLMServer {
         return;
       }
 
+      sendChunk({
+        type: 'response.output_item.added',
+        output_index: 0,
+        item: { type: 'message', id: messageItemId, phase: 'commentary' },
+      });
+
       // Stream reasoning chunks (if any)
       if (streamingReasoning) {
+        sendChunk({
+          type: 'response.output_item.added',
+          output_index: 1,
+          item: { type: 'reasoning', id: reasoningItemId, encrypted_content: null },
+        });
+        sendChunk({
+          type: 'response.reasoning_summary_part.added',
+          item_id: reasoningItemId,
+          summary_index: 0,
+        });
         const words = streamingReasoning.split(' ');
         for (const word of words) {
-          sendChunk({ type: 'response.reasoning_text.delta', delta: word + ' ' });
+          sendChunk({
+            type: 'response.reasoning_summary_text.delta',
+            item_id: reasoningItemId,
+            summary_index: 0,
+            delta: word + ' ',
+          });
           if (streamingChunkDelayMs > 0) {
             await delay(streamingChunkDelayMs);
           }
         }
+        sendChunk({
+          type: 'response.reasoning_summary_part.done',
+          item_id: reasoningItemId,
+          summary_index: 0,
+        });
+        sendChunk({
+          type: 'response.output_item.done',
+          output_index: 1,
+          item: { type: 'reasoning', id: reasoningItemId, encrypted_content: null },
+        });
       }
 
       // Stream content chunks; include newlines so multiline markdown is preserved.
       const contentChunks = streamingContent.match(/[\s\S]{1,20}/g) || [streamingContent];
       for (const chunk of contentChunks) {
-        sendChunk({ type: 'response.output_text.delta', delta: chunk });
+        sendChunk({ type: 'response.output_text.delta', item_id: messageItemId, delta: chunk });
         if (streamingChunkDelayMs > 0) {
           await delay(streamingChunkDelayMs);
         }
       }
+
+      sendChunk({
+        type: 'response.output_item.done',
+        output_index: 0,
+        item: { type: 'message', id: messageItemId, phase: 'final_answer' },
+      });
 
       // Final chunk with usage
       sendChunk({
