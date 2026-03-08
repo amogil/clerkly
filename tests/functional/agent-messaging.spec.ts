@@ -232,19 +232,23 @@ test.describe('Agent Messaging', () => {
      Requirements: agents.4.8 */
   test('should display messages in chronological order', async () => {
     const messageInput = activeChat(window).textarea;
+    const sendButton = window.locator('[data-testid="prompt-input-send"]');
 
     // Send multiple messages
     await messageInput.fill('First message');
     await messageInput.press('Enter');
     await expect(activeChat(window).userMessages).toHaveCount(1, { timeout: 5000 });
+    await expect(sendButton).toBeVisible({ timeout: 30000 });
 
     await messageInput.fill('Second message');
     await messageInput.press('Enter');
     await expect(activeChat(window).userMessages).toHaveCount(2, { timeout: 5000 });
+    await expect(sendButton).toBeVisible({ timeout: 30000 });
 
     await messageInput.fill('Third message');
     await messageInput.press('Enter');
     await expect(activeChat(window).userMessages).toHaveCount(3, { timeout: 5000 });
+    await expect(sendButton).toBeVisible({ timeout: 30000 });
 
     // Get user messages only (LLM responses/errors are out of scope for chronological order test)
     const messages = activeChat(window).userMessages;
