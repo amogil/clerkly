@@ -219,6 +219,37 @@ describe('MessageManager', () => {
       expect(mockDbManager.messages.listByAgent).toHaveBeenCalledWith('agent-123', true);
       expect(result).toEqual([visibleUser]);
     });
+
+    /* Preconditions: Messages include visible kind:tool_call and visible llm
+       Action: Call listForModelHistory(agentId)
+       Assertions: kind:tool_call messages are excluded from model replay history
+       Requirements: llm-integration.3.9, llm-integration.8.6 */
+    it('should exclude kind:tool_call messages from model history', () => {
+      const visibleUser: Message = { ...mockMessage, id: 1, kind: 'user', hidden: false };
+      const toolCall: Message = {
+        ...mockMessage,
+        id: 2,
+        kind: 'tool_call',
+        hidden: false,
+        payloadJson: JSON.stringify({ data: { toolName: 'search_docs', arguments: {} } }),
+      };
+      const visibleLlm: Message = {
+        ...mockMessage,
+        id: 3,
+        kind: 'llm',
+        hidden: false,
+        payloadJson: JSON.stringify({ data: { text: 'Answer' } }),
+      };
+
+      mockDbManager.messages.listByAgent = jest
+        .fn()
+        .mockReturnValue([visibleUser, toolCall, visibleLlm]);
+
+      const result = messageManager.listForModelHistory('agent-123');
+
+      expect(result).toEqual([visibleUser, visibleLlm]);
+      expect(result.map((m) => m.kind)).not.toContain('tool_call');
+    });
   });
 
   describe('listPaginated', () => {

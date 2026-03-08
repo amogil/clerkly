@@ -57,6 +57,7 @@ export class IPCChatTransport implements ChatTransport<UIMessage> {
         let reasoningId: string | null = null;
         let textPartId: string | null = null;
         const unsubscribers: (() => void)[] = [];
+        const protocolErrorText = 'Response stream error. Please try again.';
 
         function finish() {
           if (finished) return;
@@ -76,6 +77,12 @@ export class IPCChatTransport implements ChatTransport<UIMessage> {
           } catch {
             // stream closed
           }
+        }
+
+        function failProtocol() {
+          enqueue({ type: 'error', errorText: protocolErrorText });
+          enqueue({ type: 'finish' });
+          finish();
         }
 
         // Requirements: agents.12.7 — subscribe to MESSAGE_CREATED for llm/error messages
@@ -170,6 +177,7 @@ export class IPCChatTransport implements ChatTransport<UIMessage> {
               enqueue({ type: 'start', messageId: String(payload.messageId) });
               enqueue({ type: 'start-step' });
             } else if (llmMessageId !== payload.messageId) {
+              failProtocol();
               return;
             }
 
@@ -190,6 +198,7 @@ export class IPCChatTransport implements ChatTransport<UIMessage> {
               enqueue({ type: 'start', messageId: String(payload.messageId) });
               enqueue({ type: 'start-step' });
             } else if (llmMessageId !== payload.messageId) {
+              failProtocol();
               return;
             }
 

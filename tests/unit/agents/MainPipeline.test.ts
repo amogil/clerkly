@@ -177,6 +177,11 @@ describe('MainPipeline.run()', () => {
       }),
       true
     );
+    const finalPayload = (messageManager.update as jest.Mock).mock.calls.at(-1)?.[2] as {
+      data?: Record<string, unknown>;
+    };
+    expect(finalPayload.data?.text).toBe('Hello back');
+    expect(finalPayload.data).not.toHaveProperty('action');
 
     const reasoningEvents = mockPublish.mock.calls
       .map((call: [unknown]) => call[0])

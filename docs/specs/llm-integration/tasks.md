@@ -120,17 +120,17 @@
 ## Фаза B2.2: Persisted message lifecycle conformance
 
 - [ ] `src/main/agents/MainPipeline.ts` + `MessageManager`:
-  - [ ] Создавать `kind:llm` на первом meaningful chunk (`reasoning`/`text`) либо при завершении, если чанков не было.
-  - [ ] До завершения ответа держать `done=false`, на завершении ставить `done=true`.
-  - [ ] На ошибке после старта стрима: скрывать in-flight `kind:llm` (`hidden=true`, `done=false`) и создавать `kind:error`.
-  - [ ] На cancel: не создавать `kind:error`; при созданном `kind:llm` скрывать его через `hidden=true`.
-  - [ ] Проставлять `reply_to_message_id` для всех сообщений pipeline согласно контракту.
+  - [x] Создавать `kind:llm` на первом meaningful chunk (`reasoning`/`text`) либо при завершении, если чанков не было.
+  - [x] До завершения ответа держать `done=false`, на завершении ставить `done=true`.
+  - [x] На ошибке после старта стрима: скрывать in-flight `kind:llm` (`hidden=true`, `done=false`) и создавать `kind:error`.
+  - [x] На cancel: не создавать `kind:error`; при созданном `kind:llm` скрывать его через `hidden=true`.
+  - [x] Проставлять `reply_to_message_id` для всех сообщений pipeline согласно контракту.
 - [ ] `src/main/db/repositories/MessagesRepository.ts`:
-  - [ ] Гарантировать отдельное хранение `usage_json` (`canonical + raw`) без `provider/model/timestamp`.
-  - [ ] Гарантировать, что `kind` не дублируется в `payload_json`.
+  - [x] Гарантировать отдельное хранение `usage_json` (`canonical + raw`) без `provider/model/timestamp`.
+  - [x] Гарантировать, что `kind` не дублируется в `payload_json`.
 - [ ] Unit:
   - [x] `MainPipeline` кейсы no-chunk completion / post-stream error / cancel behavior.
-  - [ ] `MessagesRepository` кейсы `reply_to_message_id`, `done`, `usage_json`.
+  - [x] `MessagesRepository` кейсы `reply_to_message_id`, `done`, `usage_json`.
 
 ## Фаза B2.1: Статусы и snapshot-контракты
 
@@ -138,8 +138,8 @@
   - [x] Подтвердить правило `kind='llm' && done=true -> awaiting-response`.
   - [x] Для persisted `kind='tool_call'` реализовать/проверить: `done=false -> in-progress`, `done=true -> awaiting-response`.
 - [ ] `src/main/agents/MessageManager.ts` + snapshot converters:
-  - [ ] Подтвердить canonical финальный текст только в `payload.data.text`.
-  - [ ] Убедиться, что `kind:error`, `kind:tool_call`, `hidden=true` исключаются из model history.
+  - [x] Подтвердить canonical финальный текст только в `payload.data.text`.
+  - [x] Убедиться, что `kind:error`, `kind:tool_call`, `hidden=true` исключаются из model history.
 - [ ] `src/shared/events/types.ts`:
   - [x] Удалить типы/константы/классы `message.tool_call` из целевого runtime-контракта.
   - [x] Проверить optional `changedFields` формат для `{entity}.updated` событий.
@@ -156,7 +156,7 @@
   - [x] Гарантировать отсутствие дубликатов между delta-событиями и `message.updated` snapshot.
   - [ ] Гарантировать корректное завершение стрима при cancel/hidden/done.
 - [ ] Добавить protocol guards:
-  - [ ] controlled fail на invalid sequence (с диагностикой, без падения процесса).
+  - [x] controlled fail на invalid sequence (с диагностикой, без падения процесса).
 
 ## Фаза C1.1: Realtime-events conformance
 

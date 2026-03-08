@@ -129,6 +129,28 @@ describe('MessagesRepository', () => {
       const message = messagesRepo.create(agent.agentId, 'user', '{}', null, true);
       expect(message.done).toBe(true);
     });
+
+    /* Preconditions: Parent user message exists
+       Action: Create llm message with replyToMessageId = parent id
+       Assertions: reply_to_message_id is persisted and returned
+       Requirements: llm-integration.2 */
+    it('should persist reply_to_message_id for linked messages', () => {
+      const agent = agentsRepo.create('Test');
+      const parent = messagesRepo.create(agent.agentId, 'user', '{"data":{"text":"q"}}', null);
+
+      const child = messagesRepo.create(
+        agent.agentId,
+        'llm',
+        '{"data":{"text":"a"}}',
+        parent.id,
+        false
+      );
+
+      expect(child.replyToMessageId).toBe(parent.id);
+
+      const fromDb = messagesRepo.getById(child.id, agent.agentId);
+      expect(fromDb?.replyToMessageId).toBe(parent.id);
+    });
   });
 
   describe('listByAgent', () => {
@@ -390,6 +412,20 @@ describe('MessagesRepository', () => {
       const updated = messagesRepo.getById(message.id, agent.agentId);
       expect(updated?.done).toBe(true);
     });
+
+    /* Preconditions: Agent has message with done=true
+       Action: Call setDone(messageId, agentId, false)
+       Assertions: done flag is updated to false
+       Requirements: llm-integration.6.5 */
+    it('should set done=false for existing message', () => {
+      const agent = agentsRepo.create('Test');
+      const message = messagesRepo.create(agent.agentId, 'llm', '{}', null, true);
+
+      messagesRepo.setDone(message.id, agent.agentId, false);
+
+      const updated = messagesRepo.getById(message.id, agent.agentId);
+      expect(updated?.done).toBe(false);
+    });
   });
 
   describe('updateUsageJson', () => {
@@ -409,6 +445,28 @@ describe('MessagesRepository', () => {
 
       const updated = messagesRepo.getById(message.id, agent.agentId);
       expect(updated?.usageJson).toBe(usageJson);
+    });
+
+    /* Preconditions: Existing message with payload and kind
+       Action: Update usage_json
+       Assertions: payload_json and kind stay unchanged (no duplication in payload)
+       Requirements: llm-integration.13 */
+    it('should update usage_json without mutating payload_json or kind', () => {
+      const agent = agentsRepo.create('Test');
+      const payloadJson = '{"data":{"text":"result"}}';
+      const message = messagesRepo.create(agent.agentId, 'llm', payloadJson, null);
+      const usageJson = JSON.stringify({
+        canonical: { input_tokens: 1, output_tokens: 2, total_tokens: 3 },
+        raw: { input_tokens: 1, output_tokens: 2, total_tokens: 3 },
+      });
+
+      messagesRepo.updateUsageJson(message.id, agent.agentId, usageJson);
+
+      const updated = messagesRepo.getById(message.id, agent.agentId);
+      expect(updated?.usageJson).toBe(usageJson);
+      expect(updated?.payloadJson).toBe(payloadJson);
+      expect(updated?.kind).toBe('llm');
+      expect(JSON.parse(updated?.payloadJson ?? '{}')).not.toHaveProperty('kind');
     });
   });
 

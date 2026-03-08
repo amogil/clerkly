@@ -649,7 +649,7 @@ describe('IPCChatTransport', () => {
       expect(textDelta?.delta).toBe('snapshot-only-text');
     });
 
-    it('should ignore MESSAGE_LLM_TEXT_UPDATED for a different llm message id', async () => {
+    it('should fail controlled on MESSAGE_LLM_TEXT_UPDATED for a different llm message id', async () => {
       const streamPromise = transport.sendMessages(makeSendOptions());
       await Promise.resolve();
 
@@ -674,25 +674,16 @@ describe('IPCChatTransport', () => {
         timestamp: Date.now(),
       });
 
-      emitEvent(EVENT_TYPES.MESSAGE_UPDATED, {
-        message: {
-          id: 900,
-          agentId: 'agent-1',
-          kind: 'llm',
-          timestamp: Date.now(),
-          payload: { data: { text: 'final' } },
-          hidden: false,
-          done: true,
-        },
-        timestamp: Date.now(),
-      });
-
       const stream = await streamPromise;
       const chunks = await collectChunks(stream);
-      const deltas = chunks
-        .filter((chunk) => chunk.type === 'text-delta')
-        .map((chunk) => (chunk as { type: 'text-delta'; delta: string }).delta);
-      expect(deltas).toEqual(['final']);
+      const types = chunks.map((chunk) => chunk.type);
+      expect(types).toContain('error');
+      expect(types).toContain('finish');
+      const errorChunk = chunks.find((chunk) => chunk.type === 'error') as {
+        type: 'error';
+        errorText: string;
+      };
+      expect(errorChunk.errorText).toBe('Response stream error. Please try again.');
     });
 
     it('should close stream when abortSignal fires after start', async () => {
