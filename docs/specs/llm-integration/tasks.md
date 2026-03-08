@@ -97,6 +97,7 @@
 - [ ] `src/main/llm/OpenAIProvider.ts`:
   - [ ] Финально перевести все streaming/tool semantics на AI SDK primitives.
   - [ ] Убрать ручные provider-specific parser ветки, если покрываются AI SDK layer.
+  - [ ] Синхронизировать версии `ai` и `@ai-sdk/*` по model-spec (v2/v3), чтобы убрать runtime fallback на legacy transport.
 - [ ] `src/main/llm/AnthropicProvider.ts`:
   - [x] Довести parity (`reasoning`, `text`, `tool_call`, `turn_error`, usage).
   - [x] Проверить provider options (`thinking`, `sendReasoning`, parallel tool policy).

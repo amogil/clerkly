@@ -102,49 +102,110 @@ export class OpenAIProvider implements ILLMProvider {
     options: ChatOptions,
     onChunk: (chunk: ChatChunk) => void
   ): Promise<LLMChatResult> {
-    // Allow runtime override via env (used by functional tests with MockLLMServer)
+    // Allow runtime override via env (used by functional tests with MockLLMServer).
+    // AI SDK expects baseURL without trailing `/responses`.
     const apiUrl = process.env.CLERKLY_OPENAI_API_URL ?? this.config.apiUrl;
+    const baseURL = apiUrl.replace(/\/responses\/?$/, '');
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), CHAT_TIMEOUT_MS);
 
     try {
-      const body: Record<string, unknown> = {
-        model: options.model,
-        input: messages,
-        stream: true,
-        ...(options.reasoningEffort ? { reasoning: { effort: options.reasoningEffort } } : {}),
+      if (typeof (globalThis as { TransformStream?: unknown }).TransformStream === 'undefined') {
+        const webStreams = await import('stream/web');
+        (globalThis as { TransformStream?: unknown }).TransformStream = webStreams.TransformStream;
+      }
+
+      const { streamText, tool, jsonSchema } = await import('ai');
+      const { createOpenAI } = await import('@ai-sdk/openai');
+      const openai = createOpenAI({ apiKey: this.apiKey, baseURL });
+      const sdkModel = openai.responses(options.model) as unknown as {
+        specificationVersion?: string;
+      };
+      if (sdkModel.specificationVersion !== 'v2') {
+        return await this.chatWithLegacyTransport(apiUrl, messages, options, onChunk, controller);
+      }
+      const tools = this.buildToolSet(
+        options,
+        tool as unknown as (definition: { description: string; inputSchema: unknown }) => unknown,
+        jsonSchema as unknown as (schema: Record<string, unknown>) => unknown
+      );
+      const result = streamText({
+        model: openai.responses(options.model) as unknown as Parameters<
+          typeof streamText
+        >[0]['model'],
+        messages: messages as unknown as Parameters<typeof streamText>[0]['messages'],
+        tools,
+        maxRetries: 0,
+        abortSignal: controller.signal,
+        providerOptions: {
+          openai: {
+            ...(options.reasoningEffort ? { reasoningEffort: options.reasoningEffort } : {}),
+            strictJsonSchema: true,
+            parallelToolCalls: true,
+          },
+        },
+      } as unknown as Parameters<typeof streamText>[0]);
+
+      let textAccumulator = '';
+      for await (const part of result.fullStream) {
+        if (part.type === 'text-delta') {
+          textAccumulator += part.text;
+          onChunk({ type: 'text', delta: part.text });
+          continue;
+        }
+        if (part.type === 'reasoning-delta') {
+          onChunk({ type: 'reasoning', delta: part.text });
+          continue;
+        }
+        if (part.type === 'tool-call') {
+          const args =
+            part.input && typeof part.input === 'object' && !Array.isArray(part.input)
+              ? (part.input as Record<string, unknown>)
+              : {};
+          onChunk({
+            type: 'tool_call',
+            callId: part.toolCallId ?? '',
+            toolName: part.toolName ?? '',
+            arguments: args,
+          });
+          continue;
+        }
+        if (part.type === 'error') {
+          const message =
+            part.error instanceof Error
+              ? part.error.message
+              : typeof part.error === 'string'
+                ? part.error
+                : ERROR_MESSAGES.unknown;
+          onChunk({ type: 'turn_error', errorType: 'provider', message });
+          throw new Error(message);
+        }
+      }
+
+      const totalUsage = await result.totalUsage;
+      const usage: LLMUsage = {
+        canonical: {
+          input_tokens: totalUsage.inputTokens ?? 0,
+          output_tokens: totalUsage.outputTokens ?? 0,
+          total_tokens:
+            totalUsage.totalTokens ??
+            (totalUsage.inputTokens ?? 0) + (totalUsage.outputTokens ?? 0),
+          cached_tokens: totalUsage.cachedInputTokens ?? undefined,
+          reasoning_tokens: totalUsage.reasoningTokens ?? undefined,
+        },
+        raw: totalUsage as unknown as Record<string, unknown>,
       };
 
-      if (options.tools && options.tools.length > 0) {
-        body.tools = options.tools.map((tool) => ({
-          type: 'function',
-          name: tool.name,
-          description: tool.description,
-          parameters: tool.parameters,
-        }));
-      }
-
-      const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${this.apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(body),
-        signal: controller.signal,
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        const retryAfterSeconds = this.parseRetryAfterHeader(response);
-        if (response.status === 429 && retryAfterSeconds !== null) {
-          throw new Error(`Rate limit exceeded. Please try again in ${retryAfterSeconds}s`);
-        }
-        throw new Error(this.mapErrorToMessage(response.status, errorData));
-      }
-
-      return await this.parseStream(response, onChunk);
+      return { text: textAccumulator, usage };
     } catch (error) {
+      if (
+        error &&
+        typeof error === 'object' &&
+        'name' in error &&
+        error.name === 'AI_UnsupportedModelVersionError'
+      ) {
+        return await this.chatWithLegacyTransport(apiUrl, messages, options, onChunk, controller);
+      }
       if (isAbortLikeError(error)) {
         throw new LLMRequestAbortedError(this.mapExceptionToMessage(error), error);
       }
@@ -152,6 +213,70 @@ export class OpenAIProvider implements ILLMProvider {
     } finally {
       clearTimeout(timeoutId);
     }
+  }
+
+  private async chatWithLegacyTransport(
+    apiUrl: string,
+    messages: ChatMessage[],
+    options: ChatOptions,
+    onChunk: (chunk: ChatChunk) => void,
+    controller: AbortController
+  ): Promise<LLMChatResult> {
+    const body: Record<string, unknown> = {
+      model: options.model,
+      input: messages,
+      stream: true,
+      ...(options.reasoningEffort ? { reasoning: { effort: options.reasoningEffort } } : {}),
+    };
+
+    if (options.tools && options.tools.length > 0) {
+      body.tools = options.tools.map((toolDef) => ({
+        type: 'function',
+        name: toolDef.name,
+        description: toolDef.description,
+        parameters: toolDef.parameters,
+      }));
+    }
+
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${this.apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      const retryAfterSeconds = this.parseRetryAfterHeader(response);
+      if (response.status === 429 && retryAfterSeconds !== null) {
+        throw new Error(`Rate limit exceeded. Please try again in ${retryAfterSeconds}s`);
+      }
+      throw new Error(this.mapErrorToMessage(response.status, errorData));
+    }
+
+    return await this.parseStream(response, onChunk);
+  }
+
+  private buildToolSet(
+    options: ChatOptions,
+    toolFactory: (definition: { description: string; inputSchema: unknown }) => unknown,
+    jsonSchemaFactory: (schema: Record<string, unknown>) => unknown
+  ): Record<string, unknown> | undefined {
+    if (!options.tools || options.tools.length === 0) {
+      return undefined;
+    }
+
+    const entries = options.tools.map((toolDef) => [
+      toolDef.name,
+      toolFactory({
+        description: toolDef.description,
+        inputSchema: jsonSchemaFactory(toolDef.parameters),
+      }),
+    ]);
+    return Object.fromEntries(entries);
   }
 
   /**
