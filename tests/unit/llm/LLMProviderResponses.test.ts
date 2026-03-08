@@ -1,4 +1,4 @@
-// Requirements: settings.3.8
+// Requirements: settings.2.8
 
 import { AnthropicProvider } from '../../../src/main/llm/AnthropicProvider';
 import { GoogleProvider } from '../../../src/main/llm/GoogleProvider';
@@ -16,7 +16,7 @@ describe('LLM Provider Responses', () => {
   /* Preconditions: Unknown HTTP status with error message payload
      Action: Call testConnection
      Assertions: Returns Connection failed with error message
-     Requirements: settings.3.8 */
+     Requirements: settings.2.8 */
   it('should return custom error for unknown status codes', async () => {
     for (const provider of providers) {
       (global.fetch as jest.Mock).mockResolvedValueOnce({
@@ -34,7 +34,7 @@ describe('LLM Provider Responses', () => {
   /* Preconditions: Unknown HTTP status with missing error message
      Action: Call testConnection
      Assertions: Returns Connection failed with Unknown error fallback
-     Requirements: settings.3.8 */
+     Requirements: settings.2.8 */
   it('should fall back to Unknown error when error payload is missing', async () => {
     for (const provider of providers) {
       (global.fetch as jest.Mock).mockResolvedValueOnce({
@@ -52,7 +52,7 @@ describe('LLM Provider Responses', () => {
   /* Preconditions: HTTP error status, response.json throws
      Action: Call testConnection
      Assertions: Returns Connection failed with status-based fallback
-     Requirements: settings.3.8 */
+     Requirements: settings.2.8 */
   it('should handle JSON parsing errors gracefully', async () => {
     for (const provider of providers) {
       (global.fetch as jest.Mock).mockResolvedValueOnce({

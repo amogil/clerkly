@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 
-// Requirements: settings.3.1, settings.3.2, settings.3.3, settings.3.4, settings.3.7, settings.3.8, error-notifications.2.1
+// Requirements: settings.2.1, settings.2.2, settings.2.3, settings.2.4, settings.2.7, settings.2.8, error-notifications.2.1
 
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
@@ -100,7 +100,7 @@ describe('Settings Component - Test Connection', () => {
   /* Preconditions: Settings component rendered with empty API key
      Action: Check Test Connection button state
      Assertions: Button is disabled when API key is empty
-     Requirements: settings.3.1, settings.3.2 */
+     Requirements: settings.2.2 */
   it('should disable Test Connection button when API key is empty', async () => {
     render(<Settings />);
 
@@ -117,7 +117,7 @@ describe('Settings Component - Test Connection', () => {
   /* Preconditions: Settings component rendered with filled API key
      Action: Enter API key and check button state
      Assertions: Button is enabled when API key is filled
-     Requirements: settings.3.1, settings.3.2 */
+     Requirements: settings.2.3 */
   it('should enable Test Connection button when API key is filled', async () => {
     render(<Settings />);
 
@@ -138,7 +138,7 @@ describe('Settings Component - Test Connection', () => {
   /* Preconditions: Settings component rendered with API key
      Action: Click Test Connection button
      Assertions: Shows "Testing..." during connection test
-     Requirements: settings.3.3, settings.3.4 */
+     Requirements: settings.2.4 */
   it('should show "Testing..." during connection test', async () => {
     // Mock slow connection test - return data in correct format for callApi
     mockTestConnection.mockImplementation(
@@ -183,7 +183,7 @@ describe('Settings Component - Test Connection', () => {
   /* Preconditions: Settings component rendered with API key
      Action: Click Test Connection button
      Assertions: Calls window.api.llm.testConnection with correct params
-     Requirements: settings.3.4 */
+     Requirements: settings.2.4 */
   it('should call window.api.llm.testConnection with correct params', async () => {
     mockTestConnection.mockResolvedValue({ success: true });
 
@@ -211,7 +211,7 @@ describe('Settings Component - Test Connection', () => {
   /* Preconditions: Settings component rendered with API key
      Action: Test connection succeeds
      Assertions: Shows success notification
-     Requirements: settings.3.7 */
+     Requirements: settings.2.7 */
   it('should show success notification on successful connection', async () => {
     mockTestConnection.mockResolvedValue({ success: true, data: { success: true } });
 
@@ -239,7 +239,7 @@ describe('Settings Component - Test Connection', () => {
   /* Preconditions: Settings component rendered with API key
      Action: Test connection fails
      Assertions: Shows toast error notification via callApi
-     Requirements: settings.3.8, error-notifications.2.1 */
+     Requirements: settings.2.8, error-notifications.2.1 */
   it('should show toast error notification on failed connection', async () => {
     mockTestConnection.mockResolvedValue({
       success: false,
@@ -272,7 +272,7 @@ describe('Settings Component - Test Connection', () => {
   /* Preconditions: Settings component rendered with API key
      Action: Test connection throws exception
      Assertions: Shows toast error notification via callApi
-     Requirements: settings.3.8, error-notifications.2.1 */
+     Requirements: settings.2.8, error-notifications.2.1 */
   it('should show toast error notification on connection exception', async () => {
     mockTestConnection.mockRejectedValue(new Error('Network error'));
 
@@ -300,7 +300,7 @@ describe('Settings Component - Test Connection', () => {
   /* Preconditions: Settings component rendered with different providers
      Action: Test connection with OpenAI provider
      Assertions: Calls testConnection with correct provider
-     Requirements: settings.3.4 */
+     Requirements: settings.2.4 */
   it('should test connection for OpenAI provider', async () => {
     mockTestConnection.mockResolvedValue({ success: true, data: { success: true } });
 
@@ -326,7 +326,7 @@ describe('Settings Component - Test Connection', () => {
   /* Preconditions: Settings component rendered, connection test in progress
      Action: Button is disabled during testing
      Assertions: Button remains disabled until test completes
-     Requirements: settings.3.3 */
+     Requirements: settings.2.2 */
   it('should disable button during connection test', async () => {
     // Mock slow connection test - return data in correct format for callApi
     mockTestConnection.mockImplementation(
@@ -375,7 +375,7 @@ describe('Settings Component - Test Connection', () => {
   /* Preconditions: Settings component rendered with API key
      Action: Clear API key after successful test
      Assertions: Button becomes disabled again
-     Requirements: settings.3.2 */
+     Requirements: settings.2.3 */
   it('should disable button when API key is cleared', async () => {
     mockTestConnection.mockResolvedValue({ success: true, data: { success: true } });
 

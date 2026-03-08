@@ -3,7 +3,7 @@
    Assertions: 
    - Agent's updatedAt timestamp is old initially
    - After sending new message, timestamp updates to current time
-   Requirements: agents.8.1, agents.5.3, settings.2.1 */
+   Requirements: agents.8.1, agents.5.3, settings.3.1 */
 
 import { test, expect, ElectronApplication, Page } from '@playwright/test';
 import {

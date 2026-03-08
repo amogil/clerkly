@@ -56,6 +56,15 @@ export interface UseAgentChatResult {
  * Requirements: agents.4, agents.13, llm-integration.2, llm-integration.8
  */
 export function useAgentChat(agentId: string | null): UseAgentChatResult {
+  const sanitizeUIMessages = useCallback(async (messages: UIMessage[]): Promise<UIMessage[]> => {
+    try {
+      const { validateUIMessages } = await import('ai');
+      return await validateUIMessages({ messages });
+    } catch {
+      return messages;
+    }
+  }, []);
+
   // ── Initial history state ──────────────────────────────────────────────
   const [rawMessages, setRawMessages] = useState<MessageSnapshot[]>([]);
   const [isLoading, setIsLoading] = useState(() => Boolean(agentId));
@@ -116,15 +125,16 @@ export function useAgentChat(agentId: string | null): UseAgentChatResult {
       if (result.success && result.data) {
         const snapshots = result.data as MessageSnapshot[];
         setRawMessages(snapshots);
+        const uiMessages = await sanitizeUIMessages(toUIMessages(snapshots));
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        setMessages(toUIMessages(snapshots) as any);
+        setMessages(uiMessages as any);
       }
     } finally {
       // Ensure loading state renders at least once.
       await new Promise((resolve) => setTimeout(resolve, 0));
       setIsLoading(false);
     }
-  }, [agentId, setMessages]);
+  }, [agentId, sanitizeUIMessages, setMessages]);
 
   useEffect(() => {
     loadInitial();

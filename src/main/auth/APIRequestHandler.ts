@@ -108,7 +108,7 @@ export async function handleAPIRequest(
           // Requirements: token-management-ui.1.5 - Log error with context
           const logContext = context || 'API Request';
           // Requirements: token-management-ui.1.5 - Log authorization errors with context
-          // Requirements: settings.2.3 - Use fixed format for log timestamps
+          // Requirements: settings.3.3 - Use fixed format for log timestamps
           logger.error(
             `Authorization error (401) from ${logContext}: ${JSON.stringify({
               url,

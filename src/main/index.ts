@@ -296,7 +296,7 @@ app.whenReady().then(async () => {
     settingsIPCHandlers.registerHandlers();
     logger.info('Settings IPC handlers registered');
 
-    // Requirements: settings.3.4, settings.3.9
+    // Requirements: settings.2.4, settings.2.9
     // Register LLM IPC handlers
     registerLLMIPCHandlers();
     logger.info('LLM IPC handlers registered');

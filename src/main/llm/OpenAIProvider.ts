@@ -1,4 +1,4 @@
-// Requirements: settings.3.5, settings.3.6, settings.3.7, settings.3.8, llm-integration.3
+// Requirements: settings.2.5, settings.2.6, settings.2.7, settings.2.8, llm-integration.3
 
 import {
   ILLMProvider,
@@ -35,7 +35,7 @@ export class OpenAIProvider implements ILLMProvider {
 
   /**
    * Test connection to OpenAI API
-   * Requirements: settings.3.5, settings.3.6, settings.3.7, settings.3.8
+   * Requirements: settings.2.5, settings.2.6, settings.2.7, settings.2.8
    */
   async testConnection(apiKey: string): Promise<TestConnectionResult> {
     try {
@@ -82,6 +82,15 @@ export class OpenAIProvider implements ILLMProvider {
     const baseURL = apiUrl.replace(/\/responses\/?$/, '');
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), CHAT_TIMEOUT_MS);
+    const stepDiagnostics: Array<{
+      stepIndex: number;
+      finishReason?: string;
+      toolCallsCount: number;
+      toolResultsCount: number;
+      latencyMs?: number;
+      usage?: Record<string, unknown>;
+    }> = [];
+    const stepStartedAt = new Map<number, number>();
 
     try {
       if (typeof (globalThis as { TransformStream?: unknown }).TransformStream === 'undefined') {
@@ -111,6 +120,41 @@ export class OpenAIProvider implements ILLMProvider {
         ...(stopWhen ? { stopWhen } : {}),
         maxRetries: 0,
         abortSignal: controller.signal,
+        onStepFinish: (event: Record<string, unknown>) => {
+          const stepIndex =
+            typeof event.stepNumber === 'number'
+              ? event.stepNumber
+              : typeof event.stepIndex === 'number'
+                ? event.stepIndex
+                : stepDiagnostics.length;
+          const now = Date.now();
+          const startedAt = stepStartedAt.get(stepIndex) ?? now;
+          const toolCalls = Array.isArray(event.toolCalls) ? event.toolCalls.length : 0;
+          const toolResults = Array.isArray(event.toolResults) ? event.toolResults.length : 0;
+          const usage =
+            event.usage && typeof event.usage === 'object'
+              ? (event.usage as Record<string, unknown>)
+              : undefined;
+          const finishReason =
+            typeof event.finishReason === 'string' ? event.finishReason : undefined;
+          stepDiagnostics.push({
+            stepIndex,
+            finishReason,
+            toolCallsCount: toolCalls,
+            toolResultsCount: toolResults,
+            latencyMs: Math.max(0, now - startedAt),
+            usage,
+          });
+        },
+        experimental_onStepStart: (event: Record<string, unknown>) => {
+          const stepIndex =
+            typeof event.stepNumber === 'number'
+              ? event.stepNumber
+              : typeof event.stepIndex === 'number'
+                ? event.stepIndex
+                : stepDiagnostics.length;
+          stepStartedAt.set(stepIndex, Date.now());
+        },
         providerOptions: {
           openai: {
             ...(options.reasoningEffort ? { reasoningEffort: options.reasoningEffort } : {}),
@@ -206,7 +250,7 @@ export class OpenAIProvider implements ILLMProvider {
         raw: totalUsage as unknown as Record<string, unknown>,
       };
 
-      return { text: textAccumulator, usage };
+      return { text: textAccumulator, usage, stepDiagnostics };
     } catch (error) {
       if (isAbortLikeError(error) || this.isSdkAbortLikeError(error)) {
         throw new LLMRequestAbortedError(this.mapExceptionToMessage(error), error);
@@ -260,7 +304,7 @@ export class OpenAIProvider implements ILLMProvider {
 
   /**
    * Map HTTP status code to user-friendly error message
-   * Requirements: settings.3.8
+   * Requirements: settings.2.8
    */
   private mapErrorToMessage(status: number, errorData: unknown): string {
     const message = ERROR_MESSAGES[status as keyof typeof ERROR_MESSAGES];
@@ -279,7 +323,7 @@ export class OpenAIProvider implements ILLMProvider {
 
   /**
    * Map exception to user-friendly error message
-   * Requirements: settings.3.8
+   * Requirements: settings.2.8
    */
   private mapExceptionToMessage(error: unknown): string {
     if (

@@ -11,6 +11,7 @@ jest.mock('ai', () => ({
   streamText: jest.fn(),
   tool: jest.fn((definition) => ({ ...definition })),
   jsonSchema: jest.fn((schema) => schema),
+  stepCountIs: jest.fn(() => ({ kind: 'step-count' })),
 }));
 
 jest.mock('@ai-sdk/google', () => ({
@@ -230,5 +231,32 @@ describe('GoogleProvider.chat()', () => {
 
     expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), CHAT_TIMEOUT_MS);
     setTimeoutSpy.mockRestore();
+  });
+
+  it('collects per-step diagnostics from SDK onStep callbacks', async () => {
+    (aiModule.streamText as unknown as jest.Mock).mockImplementation((options) => {
+      options.experimental_onStepStart?.({ stepNumber: 0 });
+      options.onStepFinish?.({
+        stepNumber: 0,
+        finishReason: 'stop',
+        toolCalls: [{ id: 't1' }],
+        toolResults: [{ id: 't1' }],
+        usage: { inputTokens: 1, outputTokens: 2 },
+      });
+      return {
+        fullStream: toAsyncIterable([{ type: 'text-delta', text: 'ok' }]),
+        totalUsage: Promise.resolve({}),
+      };
+    });
+
+    const result = await provider.chat(mockMessages, mockOptions, () => {});
+    expect(result.stepDiagnostics?.[0]).toEqual(
+      expect.objectContaining({
+        stepIndex: 0,
+        finishReason: 'stop',
+        toolCallsCount: 1,
+        toolResultsCount: 1,
+      })
+    );
   });
 });

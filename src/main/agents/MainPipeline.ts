@@ -85,6 +85,7 @@ export class MainPipeline {
       await this.executeWithRetries(
         context,
         agentId,
+        userMessageId,
         signal,
         (messageId) => {
           lastLlmMessageId = messageId;
@@ -151,6 +152,7 @@ export class MainPipeline {
       llmProvider: ILLMProvider;
     },
     agentId: string,
+    userMessageId: number,
     signal: AbortSignal | undefined,
     setLastLlmMessageId: (messageId: number) => void,
     clearLastLlmMessageId: () => void
@@ -195,6 +197,7 @@ export class MainPipeline {
     );
     setLastLlmMessageId(finalMessageId);
     this.persistUsageEnvelope(finalMessageId, agentId, streamResult.output);
+    this.publishStepDiagnostics(agentId, userMessageId, streamResult.output);
     this.logger.info(`Pipeline completed for agent ${agentId}`);
   }
 
@@ -653,35 +656,89 @@ export class MainPipeline {
   private bindToolExecutors(
     tools: NonNullable<ChatOptions['tools']>
   ): NonNullable<ChatOptions['tools']> {
+    const runLimited = this.createConcurrencyLimiter(3);
     return tools.map((toolDef) => ({
       ...toolDef,
-      execute: async (args: Record<string, unknown>, signal?: AbortSignal) => {
-        if (toolDef.execute) {
-          return toolDef.execute(args, signal);
-        }
+      execute: async (args: Record<string, unknown>, signal?: AbortSignal) =>
+        runLimited(async () => {
+          if (toolDef.execute) {
+            return toolDef.execute(args, signal);
+          }
 
-        const [result] = await this.toolExecutor.executeBatch(
-          [
-            {
-              callId: `call-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-              toolName: toolDef.name,
-              arguments: args,
-            },
-          ],
-          signal
-        );
+          const [result] = await this.toolExecutor.executeBatch(
+            [
+              {
+                callId: `call-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+                toolName: toolDef.name,
+                arguments: args,
+              },
+            ],
+            signal
+          );
 
-        if (!result) {
-          throw new Error(`Tool "${toolDef.name}" returned no result.`);
-        }
+          if (!result) {
+            throw new Error(`Tool "${toolDef.name}" returned no result.`);
+          }
 
-        if (result.status === 'success') {
-          return { status: 'success', content: result.output };
-        }
+          if (result.status === 'success') {
+            return { status: 'success', content: result.output };
+          }
 
-        throw new Error(result.output);
-      },
+          throw new Error(result.output);
+        }),
     }));
+  }
+
+  private createConcurrencyLimiter(limit: number): <T>(job: () => Promise<T>) => Promise<T> {
+    let active = 0;
+    const queue: Array<() => void> = [];
+
+    const release = (): void => {
+      active = Math.max(0, active - 1);
+      const next = queue.shift();
+      if (next) {
+        next();
+      }
+    };
+
+    return async <T>(job: () => Promise<T>): Promise<T> => {
+      if (active >= limit) {
+        await new Promise<void>((resolve) => queue.push(resolve));
+      }
+      active += 1;
+      try {
+        return await job();
+      } finally {
+        release();
+      }
+    };
+  }
+
+  private publishStepDiagnostics(
+    agentId: string,
+    userMessageId: number,
+    output: LLMChatResult
+  ): void {
+    if (!output.stepDiagnostics || output.stepDiagnostics.length === 0) {
+      return;
+    }
+
+    for (const step of output.stepDiagnostics) {
+      MainEventBus.getInstance().publish(
+        new LLMPipelineDiagnosticEvent(
+          'warn',
+          'MainPipeline',
+          `Step diagnostic: step=${step.stepIndex} finishReason=${step.finishReason ?? 'unknown'} toolCalls=${step.toolCallsCount} toolResults=${step.toolResultsCount} latencyMs=${step.latencyMs ?? 0}`,
+          {
+            agentId,
+            userMessageId,
+            signalAborted: false,
+            errorName: 'StepDiagnostic',
+            errorType: 'provider',
+          }
+        )
+      );
+    }
   }
 
   /**

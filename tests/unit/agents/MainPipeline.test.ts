@@ -676,6 +676,33 @@ describe('MainPipeline.run()', () => {
     expect(diagnostics.length).toBeGreaterThan(0);
   });
 
+  it('publishes step diagnostics when provider returns stepDiagnostics', async () => {
+    const { pipeline, llmProvider, mockPublish } = makeMocks();
+    llmProvider.chat.mockResolvedValue({
+      text: 'ok',
+      stepDiagnostics: [
+        {
+          stepIndex: 0,
+          finishReason: 'stop',
+          toolCallsCount: 1,
+          toolResultsCount: 1,
+          latencyMs: 10,
+        },
+      ],
+    });
+
+    await pipeline.run('agent-1', 1);
+
+    const stepDiagnosticEvents = mockPublish.mock.calls
+      .map((call: [unknown]) => call[0])
+      .filter(
+        (event: unknown) =>
+          event instanceof LLMPipelineDiagnosticEvent &&
+          (event as LLMPipelineDiagnosticEvent).message.includes('Step diagnostic:')
+      );
+    expect(stepDiagnosticEvents).toHaveLength(1);
+  });
+
   it('handles generic fetch-like errors as network errors', async () => {
     const { pipeline, llmProvider, messageManager } = makeMocks();
     llmProvider.chat.mockRejectedValue(new Error('fetch failed'));

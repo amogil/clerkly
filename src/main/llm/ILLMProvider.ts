@@ -105,6 +105,15 @@ export interface LLMUsage {
   raw: Record<string, unknown>;
 }
 
+export interface LLMStepDiagnostic {
+  stepIndex: number;
+  finishReason?: string;
+  toolCallsCount: number;
+  toolResultsCount: number;
+  latencyMs?: number;
+  usage?: Record<string, unknown>;
+}
+
 /**
  * Provider-level chat result envelope
  * - optional final assistant text
@@ -114,6 +123,7 @@ export interface LLMUsage {
 export interface LLMChatResult {
   text?: string;
   usage?: LLMUsage;
+  stepDiagnostics?: LLMStepDiagnostic[];
 }
 
 /**
@@ -123,7 +133,7 @@ export interface LLMChatResult {
 export interface ILLMProvider {
   /**
    * Test connection to LLM provider with given API key
-   * Requirements: settings.3.5, settings.3.6, settings.3.7, settings.3.8
+   * Requirements: settings.2.5, settings.2.6, settings.2.7, settings.2.8
    */
   testConnection(apiKey: string): Promise<TestConnectionResult>;
 

@@ -792,7 +792,7 @@ logger.error(
 - Параметризованный logger с модулем 'APIRequestHandler'
 - Описательное сообщение об ошибке
 - JSON объект с контекстом (url, timestamp, context)
-- Фиксированный формат timestamp через DateTimeFormatter (см. settings.2.3)
+- Фиксированный формат timestamp через DateTimeFormatter (см. settings.3.3)
 
 ## Стратегия Тестирования
 
