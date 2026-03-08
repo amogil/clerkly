@@ -18,6 +18,7 @@ import type {
   ChatOptions,
   ChatChunk,
 } from '../../../src/main/llm/ILLMProvider';
+import type { IToolExecutor } from '../../../src/main/tools/ToolRunner';
 import type { Message } from '../../../src/main/db/schema';
 import { LLMRequestAbortedError } from '../../../src/main/llm/LLMErrors';
 
@@ -94,9 +95,26 @@ function makeMocks() {
   };
 
   const createProvider = jest.fn().mockReturnValue(llmProvider);
-  const pipeline = new MainPipeline(messageManager, settingsManager, promptBuilder, createProvider);
+  const toolExecutor: jest.Mocked<IToolExecutor> = {
+    executeBatch: jest.fn().mockResolvedValue([]),
+  };
+  const pipeline = new MainPipeline(
+    messageManager,
+    settingsManager,
+    promptBuilder,
+    createProvider,
+    toolExecutor
+  );
 
-  return { pipeline, messageManager, settingsManager, promptBuilder, llmProvider, mockPublish };
+  return {
+    pipeline,
+    messageManager,
+    settingsManager,
+    promptBuilder,
+    llmProvider,
+    toolExecutor,
+    mockPublish,
+  };
 }
 
 describe('MainPipeline.run()', () => {
@@ -178,22 +196,37 @@ describe('MainPipeline.run()', () => {
     );
   });
 
-  it('publishes single message.tool_call event when tool call chunk arrives', async () => {
-    const { pipeline, llmProvider, mockPublish } = makeMocks();
+  it('publishes single message.tool_call event and continues tool loop until final text', async () => {
+    const { pipeline, llmProvider, toolExecutor, mockPublish } = makeMocks();
 
-    llmProvider.chat.mockImplementation(
-      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
-        onChunk({ type: 'reasoning', delta: 'Think' });
-        onChunk({
-          type: 'tool_call',
-          callId: 'call-1',
-          toolName: 'search_docs',
-          arguments: { query: 'streaming' },
-        });
-        onChunk({ type: 'text', delta: 'Done' });
-        return { text: 'Done' };
-      }
-    );
+    llmProvider.chat
+      .mockImplementationOnce(
+        async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+          onChunk({ type: 'reasoning', delta: 'Think' });
+          onChunk({
+            type: 'tool_call',
+            callId: 'call-1',
+            toolName: 'search_docs',
+            arguments: { query: 'streaming' },
+          });
+          return {};
+        }
+      )
+      .mockImplementationOnce(
+        async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+          onChunk({ type: 'text', delta: 'Done' });
+          return { text: 'Done' };
+        }
+      );
+
+    toolExecutor.executeBatch.mockResolvedValue([
+      {
+        callId: 'call-1',
+        toolName: 'search_docs',
+        status: 'success',
+        output: 'result',
+      },
+    ]);
 
     await pipeline.run('agent-1', 1);
 
@@ -208,6 +241,59 @@ describe('MainPipeline.run()', () => {
       callId: 'call-1',
       toolName: 'search_docs',
     });
+    expect(toolExecutor.executeBatch).toHaveBeenCalledTimes(1);
+    expect(llmProvider.chat).toHaveBeenCalledTimes(2);
+  });
+
+  it('executes multi-tool batch and sends deterministic tool transcript ordered by call_id', async () => {
+    const { pipeline, llmProvider, toolExecutor } = makeMocks();
+
+    llmProvider.chat
+      .mockImplementationOnce(
+        async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+          onChunk({
+            type: 'tool_call',
+            callId: 'call-b',
+            toolName: 'tool_b',
+            arguments: { q: 2 },
+          });
+          onChunk({
+            type: 'tool_call',
+            callId: 'call-a',
+            toolName: 'tool_a',
+            arguments: { q: 1 },
+          });
+          return {};
+        }
+      )
+      .mockImplementationOnce(async (msgs: ChatMessage[]) => {
+        const lastAssistant = msgs[msgs.length - 2];
+        const lastUser = msgs[msgs.length - 1];
+        expect(lastAssistant?.content).toContain('call_id=call-a');
+        expect(lastAssistant?.content).toContain('call_id=call-b');
+        expect(lastAssistant?.content.indexOf('call_id=call-a')).toBeLessThan(
+          lastAssistant?.content.indexOf('call_id=call-b')
+        );
+        expect(lastUser?.content.indexOf('call_id=call-a')).toBeLessThan(
+          lastUser?.content.indexOf('call_id=call-b')
+        );
+        return { text: 'final' };
+      });
+
+    toolExecutor.executeBatch.mockResolvedValue([
+      { callId: 'call-b', toolName: 'tool_b', status: 'success', output: 'B' },
+      { callId: 'call-a', toolName: 'tool_a', status: 'success', output: 'A' },
+    ]);
+
+    await pipeline.run('agent-1', 1);
+
+    expect(toolExecutor.executeBatch).toHaveBeenCalledWith(
+      [
+        { callId: 'call-b', toolName: 'tool_b', arguments: { q: 2 } },
+        { callId: 'call-a', toolName: 'tool_a', arguments: { q: 1 } },
+      ],
+      undefined
+    );
   });
 
   it('creates finalized llm message from result.text when no text chunks were emitted', async () => {
@@ -352,6 +438,37 @@ describe('MainPipeline.run()', () => {
         return { text: 'partial' };
       }
     );
+
+    await pipeline.run('agent-1', 1, controller.signal);
+
+    expect(messageManager.hideAndMarkIncomplete).toHaveBeenCalledWith(2, 'agent-1');
+    const errorCreates = (messageManager.create as jest.Mock).mock.calls.filter(
+      (call: unknown[]) => call[1] === 'error'
+    );
+    expect(errorCreates).toHaveLength(0);
+  });
+
+  it('cancels during tool execution without creating kind:error', async () => {
+    const { pipeline, llmProvider, toolExecutor, messageManager } = makeMocks();
+    const controller = new AbortController();
+
+    llmProvider.chat.mockImplementationOnce(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({ type: 'reasoning', delta: 'Thinking...' });
+        onChunk({
+          type: 'tool_call',
+          callId: 'call-1',
+          toolName: 'search_docs',
+          arguments: { query: 'x' },
+        });
+        return {};
+      }
+    );
+
+    toolExecutor.executeBatch.mockImplementation(async () => {
+      controller.abort();
+      return [{ callId: 'call-1', toolName: 'search_docs', status: 'success', output: 'ok' }];
+    });
 
     await pipeline.run('agent-1', 1, controller.signal);
 

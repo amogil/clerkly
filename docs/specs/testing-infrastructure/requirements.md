@@ -402,3 +402,30 @@ await expect(element).toContainText('Success');
 12.2. WHEN в DOM присутствует toast-уведомление с типом `error`, THE тест SHALL завершаться с ошибкой, содержащей текст этого уведомления.
 
 12.3. THE проверка toast-ошибок SHALL быть реализована как переиспользуемый helper в модуле тестовых утилит.
+
+### 13. Контракты тестирования AI SDK chat-flow
+
+**ID:** testing.13
+
+**User Story:** Как разработчик, я хочу проверять AI SDK chat-flow контракт на уровне unit/functional тестов, чтобы стриминг, ошибки и tool-loop оставались стабильными.
+
+**Зависимости:** testing.1, testing.3
+
+#### Критерии Приемки
+
+13.1. THE модульные тесты SHALL покрывать stream protocol sequence (`start -> start-step -> delta -> finish-step -> finish`) для renderer transport.
+13.1.1. `start-step` SHALL соответствовать transport chunk `text-start`, а `finish-step` SHALL соответствовать transport chunk `text-end`.
+
+13.2. THE модульные тесты SHALL покрывать отсутствие дублирования между delta-событиями (`message.llm.reasoning.updated`, `message.llm.text.updated`) и snapshot `message.updated`.
+
+13.3. THE модульные тесты SHALL проверять, что persisted `kind:tool_call` рендерится как отдельный tool-call блок в сообщении ассистента.
+
+13.4. THE модульные тесты SHALL покрывать ErrorNormalizer для классов ошибок AI SDK и доменного маппинга (`auth`, `rate_limit`, `provider`, `network`, `timeout`, `tool`, `protocol`).
+
+13.5. THE модульные тесты SHALL покрывать multi-tool сценарии в одном запросе и продолжение цикла `model -> tools -> model`.
+
+13.6. THE функциональные тесты SHALL проверять одновременный стриминг reasoning и текста в одном `kind:llm` сообщении.
+
+13.7. THE функциональные тесты SHALL проверять `rate_limit` countdown без создания `kind:error` записи в истории.
+
+13.8. THE функциональные тесты SHALL проверять, что cancel во время tool execution НЕ создаёт `kind:error`.

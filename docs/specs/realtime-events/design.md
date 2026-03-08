@@ -224,21 +224,11 @@ export interface MessageLlmTextUpdatedPayload extends BaseEvent {
   accumulatedText: string;
   timestamp: number;
 }
-
-// Single-shot: эмитится один раз, когда аргументы уже полностью собраны
-export interface MessageToolCallPayload extends BaseEvent {
-  agentId: string;
-  llmMessageId: number;
-  callId: string;
-  toolName: string;
-  arguments: Record<string, unknown>;
-  timestamp: number;
-}
 ```
 
 Правило использования:
 - `message.llm.reasoning.updated` и `message.llm.text.updated` — инкрементальные чанки для UI-стриминга.
-- `message.tool_call` — внутреннее оркестрационное событие (не отдельный chat message, не lifecycle-stream).
+- Рендер tool-call блока строится по persisted `message.created`/`message.updated` для `kind: tool_call`.
 
 #### Генерация снапшотов
 
@@ -1552,9 +1542,8 @@ function dbAgentToSnapshot(dbAgent: Agent): AgentSnapshot {
     archivedAt: dbAgent.archivedAt 
       ? new Date(dbAgent.archivedAt).getTime() 
       : null,
-    // Статус НЕ вычисляется здесь - он должен прийти из API
-    // Временно используем 'new' как fallback
-    status: 'new',
+    // Статус приходит из Main Process в snapshot
+    status: dbAgent.status,
   };
 }
 

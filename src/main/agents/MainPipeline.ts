@@ -19,6 +19,8 @@ import { Logger } from '../Logger';
 import type { ILLMProvider, ChatOptions, LLMChatResult } from '../llm/ILLMProvider';
 import { handleBackgroundError } from '../ErrorHandler';
 import { LLMRequestAbortedError } from '../llm/LLMErrors';
+import type { IToolExecutor, ToolCallRequest, ToolCallResult } from '../tools/ToolRunner';
+import { ToolRunner } from '../tools/ToolRunner';
 
 import type { LLMProvider } from '../../types';
 
@@ -122,7 +124,8 @@ export class MainPipeline {
         default:
           throw new Error(`Unknown provider: ${p}`);
       }
-    }
+    },
+    private toolExecutor: IToolExecutor = new ToolRunner({}, 3)
   ) {}
 
   /**
@@ -212,31 +215,62 @@ export class MainPipeline {
     setLastLlmMessageId: (messageId: number) => void,
     clearLastLlmMessageId: () => void
   ): Promise<void> {
-    const streamResult = await this.callProviderWithStreaming(
-      context,
-      agentId,
-      signal,
-      setLastLlmMessageId
-    );
+    let chatMessages = [...context.baseChatMessages];
+    let llmMessageId: number | null = null;
+    let accumulatedReasoning = '';
+    let accumulatedText = '';
+    let latestUsage: LLMChatResult['usage'];
 
-    if (signal?.aborted) {
-      this.handleAbortAfterStreaming(streamResult.llmMessageId, agentId, clearLastLlmMessageId);
-      return;
+    for (;;) {
+      const streamResult = await this.callProviderWithStreaming(
+        {
+          chatMessages,
+          options: context.options,
+          replyToMessageId: context.replyToMessageId,
+          llmProvider: context.llmProvider,
+        },
+        agentId,
+        signal,
+        setLastLlmMessageId,
+        llmMessageId,
+        accumulatedReasoning,
+        accumulatedText
+      );
+
+      llmMessageId = streamResult.llmMessageId;
+      accumulatedReasoning = streamResult.accumulatedReasoning;
+      accumulatedText = streamResult.accumulatedText;
+      latestUsage = streamResult.output.usage ?? latestUsage;
+
+      if (signal?.aborted) {
+        this.handleAbortAfterStreaming(llmMessageId, agentId, clearLastLlmMessageId);
+        return;
+      }
+
+      if (streamResult.toolCalls.length === 0) {
+        const finalMessageId = this.writeFinalMessage(
+          agentId,
+          context.replyToMessageId,
+          llmMessageId,
+          context.options.model,
+          accumulatedReasoning,
+          accumulatedText,
+          { text: accumulatedText, usage: latestUsage }
+        );
+        setLastLlmMessageId(finalMessageId);
+        this.persistUsageEnvelope(finalMessageId, agentId, { usage: latestUsage });
+        this.logger.info(`Pipeline completed for agent ${agentId}`);
+        return;
+      }
+
+      const toolResults = await this.executeToolCalls(streamResult.toolCalls, signal);
+      if (signal?.aborted) {
+        this.handleAbortAfterStreaming(llmMessageId, agentId, clearLastLlmMessageId);
+        return;
+      }
+
+      chatMessages = this.appendToolLoopMessages(chatMessages, streamResult.toolCalls, toolResults);
     }
-
-    const finalMessageId = this.writeFinalMessage(
-      agentId,
-      context.replyToMessageId,
-      streamResult.llmMessageId,
-      context.options.model,
-      streamResult.accumulatedReasoning,
-      streamResult.accumulatedText,
-      streamResult.output
-    );
-    setLastLlmMessageId(finalMessageId);
-
-    this.persistUsageEnvelope(finalMessageId, agentId, streamResult.output);
-    this.logger.info(`Pipeline completed for agent ${agentId}`);
   }
 
   /**
@@ -245,26 +279,28 @@ export class MainPipeline {
    */
   private async callProviderWithStreaming(
     context: {
-      baseChatMessages: ReturnType<PromptBuilder['buildMessages']>;
+      chatMessages: ReturnType<PromptBuilder['buildMessages']>;
       options: ChatOptions;
       replyToMessageId: number;
       llmProvider: ILLMProvider;
     },
     agentId: string,
     signal: AbortSignal | undefined,
-    setLastLlmMessageId: (messageId: number) => void
+    setLastLlmMessageId: (messageId: number) => void,
+    llmMessageId: number | null,
+    accumulatedReasoning: string,
+    accumulatedText: string
   ): Promise<{
     output: LLMChatResult;
     llmMessageId: number | null;
     accumulatedReasoning: string;
     accumulatedText: string;
+    toolCalls: ToolCallRequest[];
   }> {
-    let llmMessageId: number | null = null;
-    let accumulatedReasoning = '';
-    let accumulatedText = '';
+    const pendingToolCalls = new Map<string, ToolCallRequest>();
 
     const output = await context.llmProvider.chat(
-      context.baseChatMessages,
+      context.chatMessages,
       context.options,
       (chunk) => {
         if (signal?.aborted) {
@@ -335,6 +371,11 @@ export class MainPipeline {
               chunk.arguments
             )
           );
+          pendingToolCalls.set(chunk.callId, {
+            callId: chunk.callId,
+            toolName: chunk.toolName,
+            arguments: chunk.arguments,
+          });
           return;
         }
 
@@ -345,11 +386,54 @@ export class MainPipeline {
     );
 
     if (!accumulatedText) {
-      accumulatedText =
-        output.text || (output as { action?: { content?: string } }).action?.content || '';
+      accumulatedText = output.text || '';
     }
 
-    return { output, llmMessageId, accumulatedReasoning, accumulatedText };
+    return {
+      output,
+      llmMessageId,
+      accumulatedReasoning,
+      accumulatedText,
+      toolCalls: [...pendingToolCalls.values()],
+    };
+  }
+
+  private async executeToolCalls(
+    toolCalls: ToolCallRequest[],
+    signal?: AbortSignal
+  ): Promise<ToolCallResult[]> {
+    return this.toolExecutor.executeBatch(toolCalls, signal);
+  }
+
+  private appendToolLoopMessages(
+    chatMessages: ReturnType<PromptBuilder['buildMessages']>,
+    toolCalls: ToolCallRequest[],
+    toolResults: ToolCallResult[]
+  ): ReturnType<PromptBuilder['buildMessages']> {
+    const toolCallsSorted = [...toolCalls].sort((a, b) => a.callId.localeCompare(b.callId));
+    const toolResultsSorted = [...toolResults].sort((a, b) => a.callId.localeCompare(b.callId));
+
+    const assistantToolCalls = {
+      role: 'assistant' as const,
+      content: toolCallsSorted
+        .map((call) => {
+          const args = JSON.stringify(call.arguments);
+          return `[tool_call] call_id=${call.callId} name=${call.toolName} args=${args}`;
+        })
+        .join('\n'),
+    };
+
+    const userToolResults = {
+      role: 'user' as const,
+      content: toolResultsSorted
+        .map(
+          (result) =>
+            `[tool_result] call_id=${result.callId} name=${result.toolName} status=${result.status} output=${result.output}`
+        )
+        .join('\n'),
+    };
+
+    return [...chatMessages, assistantToolCalls, userToolResults];
   }
 
   /**
@@ -419,8 +503,7 @@ export class MainPipeline {
     accumulatedText: string,
     output: LLMChatResult
   ): number {
-    const legacyAction = (output as { action?: { content?: string } }).action;
-    const finalText = accumulatedText || output.text || legacyAction?.content || '';
+    const finalText = accumulatedText || output.text || '';
     const finalPayload = {
       data: {
         model,

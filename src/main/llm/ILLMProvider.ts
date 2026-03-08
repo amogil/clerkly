@@ -100,16 +100,6 @@ export interface LLMChatResult {
   usage?: LLMUsage;
 }
 
-// Legacy compatibility type for tests/older providers. Chat-flow canonical result is LLMChatResult.text.
-export interface LLMAction {
-  type: 'text';
-  content: string;
-}
-
-export interface LLMStructuredOutput extends LLMChatResult {
-  action: LLMAction;
-}
-
 /**
  * Interface for LLM provider implementations
  * Requirements: settings.3, llm-integration.5

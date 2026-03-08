@@ -15,6 +15,18 @@ interface RequestLog {
   timestamp: number;
 }
 
+interface MockOpenAIToolCall {
+  callId: string;
+  toolName: string;
+  arguments: Record<string, unknown>;
+}
+
+interface MockOpenAIStreamScript {
+  reasoning?: string;
+  content?: string;
+  toolCalls?: MockOpenAIToolCall[];
+}
+
 /**
  * Mock LLM Server
  *
@@ -38,6 +50,7 @@ export class MockLLMServer {
   private streamingContent: string = 'Hello! How can I help?';
   private streamingErrorStatus: number = 0; // 0 = no error
   private streamingChunkDelayMs: number = 0; // delay between chunks (for interrupt tests)
+  private openAIStreamScripts: MockOpenAIStreamScript[] = [];
   private rateLimitEnabled: boolean = false;
   private rateLimitRetryAfterSeconds: number = 10;
 
@@ -169,6 +182,8 @@ export class MockLLMServer {
     const streamingReasoning = this.streamingReasoning;
     const streamingContent = this.normalizeStreamingContent(this.streamingContent);
     const streamingChunkDelayMs = this.streamingChunkDelayMs;
+    const scriptedResponse =
+      this.openAIStreamScripts.length > 0 ? this.openAIStreamScripts.shift() : null;
 
     if (streamingErrorStatus > 0) {
       res.writeHead(streamingErrorStatus, { 'Content-Type': 'application/json' });
@@ -189,6 +204,58 @@ export class MockLLMServer {
     const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
     const streamAll = async () => {
+      if (scriptedResponse) {
+        if (scriptedResponse.reasoning) {
+          for (const word of scriptedResponse.reasoning.split(' ')) {
+            sendChunk({ type: 'response.reasoning_text.delta', delta: `${word} ` });
+            if (streamingChunkDelayMs > 0) {
+              await delay(streamingChunkDelayMs);
+            }
+          }
+        }
+
+        for (const [index, toolCall] of (scriptedResponse.toolCalls ?? []).entries()) {
+          sendChunk({
+            type: 'response.function_call_arguments.done',
+            output_index: index,
+            call_id: toolCall.callId,
+            name: toolCall.toolName,
+            arguments: JSON.stringify(toolCall.arguments),
+          });
+          if (streamingChunkDelayMs > 0) {
+            await delay(streamingChunkDelayMs);
+          }
+        }
+
+        const scriptedContent = this.normalizeStreamingContent(scriptedResponse.content ?? '');
+        if (scriptedContent) {
+          const chunks = scriptedContent.match(/[\s\S]{1,20}/g) || [scriptedContent];
+          for (const chunk of chunks) {
+            sendChunk({ type: 'response.output_text.delta', delta: chunk });
+            if (streamingChunkDelayMs > 0) {
+              await delay(streamingChunkDelayMs);
+            }
+          }
+        }
+
+        sendChunk({
+          type: 'response.completed',
+          response: {
+            usage: {
+              input_tokens: 100,
+              output_tokens: 50,
+              total_tokens: 150,
+              input_tokens_details: { cached_tokens: 0 },
+              output_tokens_details: { reasoning_tokens: 10 },
+            },
+          },
+        });
+
+        res.write('data: [DONE]\n\n');
+        res.end();
+        return;
+      }
+
       // Stream reasoning chunks (if any)
       if (streamingReasoning) {
         const words = streamingReasoning.split(' ');
@@ -362,6 +429,10 @@ export class MockLLMServer {
     if (options?.errorStatus !== undefined) this.streamingErrorStatus = options.errorStatus;
     if (options?.errorMessage !== undefined) this.errorMessage = options.errorMessage;
     if (options?.chunkDelayMs !== undefined) this.streamingChunkDelayMs = options.chunkDelayMs;
+  }
+
+  setOpenAIStreamScripts(scripts: MockOpenAIStreamScript[]) {
+    this.openAIStreamScripts = [...scripts];
   }
 
   /** Enable rate limit mode — server returns 429 with retry-after header */

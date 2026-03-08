@@ -1249,6 +1249,42 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     expect(requestCount).toBe(1);
   });
 
+  /* Preconditions: MockLLMServer returns tool call on first response and final text on second
+     Action: User sends a message
+     Assertions: tool_call is processed via second model request; chat renders only llm bubble without separate tool_call message
+     Requirements: llm-integration.11.1, llm-integration.11.4, llm-integration.11.6 */
+  test('should continue model -> tools -> model loop and avoid separate tool_call bubble', async () => {
+    mockLLMServer.setStreamingMode(true);
+    mockLLMServer.setOpenAIStreamScripts([
+      {
+        reasoning: 'thinking',
+        toolCalls: [{ callId: 'call-1', toolName: 'search_docs', arguments: { query: 'stream' } }],
+      },
+      {
+        content: 'Tool-assisted answer',
+      },
+    ]);
+
+    context = await launchWithMockLLM();
+    const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
+
+    await messageInput.fill('Use tool');
+    await messageInput.press('Enter');
+
+    const actionContent = context.window.locator('[data-testid="message-llm-action"]').last();
+    await expect(actionContent).toBeVisible({ timeout: 15000 });
+    await expect(actionContent).toContainText('Tool-assisted answer');
+
+    const requestCount = mockLLMServer
+      .getRequestLogs()
+      .filter((entry) => entry.method === 'POST' && entry.path === '/v1/responses').length;
+    expect(requestCount).toBe(2);
+
+    const llmBubbles = context.window.locator('[data-testid="message-llm"]');
+    await expect(llmBubbles).toHaveCount(1);
+    await expect(context.window.locator('[data-testid="message-user"]')).toHaveCount(1);
+  });
+
   /* Preconditions: MockLLMServer returns 429 with retry-after=3 on first request,
        then success on second; app authenticated with mock LLM URL
      Action: User sends a message, rate limit banner appears, countdown completes

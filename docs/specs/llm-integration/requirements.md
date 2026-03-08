@@ -3,17 +3,18 @@
 ## Введение
 
 Данный документ описывает требования к интеграции LLM в приложение Clerkly. Функциональность обеспечивает полный цикл взаимодействия пользователя с AI-агентом: отправка сообщения → вызов LLM → стриминг reasoning и текста ответа → (опционально) вызовы инструментов → отображение результата в UI.
+Целевой runtime-слой оркестрации LLM-цикла — `Vercel AI SDK` для всех поддерживаемых провайдеров.
 
 ## Глоссарий
 
 - **MainPipeline** — оркестратор LLM-цикла в main process
 - **PromptBuilder** — компонент сборки промпта (системный промпт + история как последовательность сообщений + инструменты)
 - **LLMProvider** — провайдер LLM (OpenAI, Anthropic, Google)
+- **Vercel AI SDK** — единый SDK-слой (`ai` + провайдерные пакеты), через который выполняются streaming и tool-loop
 - **Reasoning** — внутренние "размышления" модели (стримятся в реальном времени)
 - **Assistant text** — пользовательский текстовый ответ модели (стримится инкрементально)
 - **Tool call** — запрос модели на вызов инструмента и получение результата
 - **kind** — тип сообщения: `user | llm | error | tool_call`
-- **message.tool_call** — отдельное realtime-событие оркестрации вызова инструмента (single-shot после полной сборки аргументов)
 - **done** — флаг завершённости сообщения в БД (`false` пока сообщение ещё формируется/стримится, `true` после полного получения)
 - **reply_to_message_id** — ссылка на сообщение, на которое даётся ответ (колонка `messages.reply_to_message_id`, null только у первого)
 - **usage_json** — отдельное JSON-поле в `messages` для хранения токен-метрик провайдера в формате `canonical + raw`
@@ -44,11 +45,13 @@
 
 1.6.2. После завершения текущего ответа модели `kind: llm` сообщение ДОЛЖНО иметь `done = true`
 
-1.6.3. Для LLM pipeline canonical финальный ответ ДОЛЖЕН завершаться тем же `kind: llm` сообщением (`done = true`) без отдельного типа сообщения
+1.6.3. Для LLM pipeline canonical финальный ответ ДОЛЖЕН завершаться тем же `kind: llm` сообщением (`done = true`)
 
 1.7. `MainPipeline` ДОЛЖЕН проставлять `messages.reply_to_message_id` для каждого создаваемого сообщения:
   - Для первого сообщения в чате агента — `null`
   - Для сообщений, создаваемых в рамках `MainPipeline.run(agentId, userMessageId)`, — `reply_to_message_id = userMessageId`
+
+1.8. `MainPipeline` ДОЛЖЕН реализовывать вызов модели и tool-loop через `Vercel AI SDK` для всех поддерживаемых провайдеров (`OpenAI`, `Anthropic`, `Google`)
 
 ---
 
@@ -68,7 +71,7 @@
 
 2.1.3. Точный технический контракт realtime-события reasoning (имя события и payload) ДОЛЖЕН определяться в `design.md` и быть согласован с `realtime-events` спецификацией
 
-2.2. `message.created` ДОЛЖЕН эмититься при создании любого нового сообщения (user, llm, error)
+2.2. `message.created` ДОЛЖЕН эмититься при создании любого нового сообщения (user, llm, error, tool_call)
 
 2.3. `message.updated` ДОЛЖЕН эмититься при любом обновлении сообщения (промежуточном и финальном)
 
@@ -76,9 +79,11 @@
 
 2.5. Renderer ДОЛЖЕН подписываться на `message.llm.text.updated` для инкрементального отображения text-stream
 
-2.6. Система ДОЛЖНА эмитить `message.tool_call` (single-shot событие), которое приходит один раз после полной сборки аргументов tool call; это событие используется для оркестрации tool execution и НЕ требует отдельного рендера сообщения в чате
+2.6. Рендер tool-call блока в UI ДОЛЖЕН опираться на persisted сообщения `kind: tool_call` через `message.created`/`message.updated`
 
 2.7. Renderer ДОЛЖЕН подписываться на `message.updated` для общего snapshot-обновления состояния сообщения
+
+2.8. Renderer ДОЛЖЕН использовать `useChat` + transport-слой на базе `UIMessage stream protocol` как единый контракт стриминга для `reasoning`, `text` и завершения ответа
 
 ---
 
@@ -122,6 +127,8 @@
   - **Rate limit** (HTTP 429): `"Rate limit exceeded. Please try again later."` — см. требование 3.7
   - **Внутренняя ошибка провайдера** (HTTP 5xx): `"Provider service unavailable. Please try again later."`
   - **Таймаут ожидания ответа**: `"Model response timeout. The provider took too long to respond. Please try again later."`
+  - **Ошибка инструмента** (`tool`): `"Tool execution failed. Please try again."`
+  - **Ошибка stream protocol** (`protocol`): `"Response stream error. Please try again."`
 
 3.6. Таймаут ожидания ответа от LLM ДОЛЖЕН составлять 300 секунд (5 минут). ЕСЛИ за это время не получен финальный ответ модели, ТО запрос прерывается с ошибкой таймаута
 
@@ -133,7 +140,7 @@
     - Текст: `"Rate limit exceeded. Retrying in N seconds..."`
     - Кнопку "Cancel" для отмены повтора
 
-3.7.3. КОГДА отсчёт достигает нуля, ТО `MainPipeline` ДОЛЖЕН автоматически повторить последний запрос на основе последнего `kind:user` сообщения в БД
+3.7.3. КОГДА отсчёт достигает нуля, ТО система ДОЛЖНА автоматически повторить последний запрос на основе последнего `kind:user` сообщения в БД через IPC-команду повтора (`messages:retry-last`), которая запускает `MainPipeline.run(...)`
 
   3.7.3.1. Countdown-диалог для 429 ДОЛЖЕН быть transient UI-состоянием и НЕ ДОЛЖЕН создавать отдельную запись `kind:error` в `messages`
 
@@ -158,6 +165,15 @@
 3.9. `kind: error` сообщения НЕ ДОЛЖНЫ включаться в историю при сборке промпта для LLM:
   - `MessageManager.listForModelHistory()` ДОЛЖЕН фильтровать сообщения с `kind: error` при подготовке истории для `PromptBuilder`
   - Это гарантирует что LLM не видит технические ошибки как часть диалога
+
+3.10. Ошибки провайдеров и стриминга ДОЛЖНЫ нормализоваться в единый доменный формат на базе классов ошибок `Vercel AI SDK`:
+  - `APICallError` с `401/403` → `auth`
+  - `APICallError` с `429` → `rate_limit`
+  - `APICallError` с `5xx` → `provider`
+  - timeout/abort → `timeout`
+  - transport-level ошибки без `statusCode` → `network`
+  - ошибки tool execution (`NoSuchToolError`, `InvalidToolInputError`, `ToolExecutionError`, `ToolCallRepairError`) → `tool`
+  - ошибки stream protocol (`UIMessageStreamError`) → `protocol`
 
 ---
 
@@ -184,7 +200,7 @@
      (подсветка синтаксиса), диаграммы Mermaid, математика через KaTeX
      (inline $...$ и block $$...$$)). Сноски использовать нельзя.
 
-4.6. Список фич пустой, история — полная (`FullHistoryStrategy`)
+4.6. Базовая стратегия истории ДОЛЖНА быть полной (`FullHistoryStrategy`); список `AgentFeature` МОЖЕТ быть пустым или содержать feature-модули (включая инструменты), в зависимости от конфигурации агента
 
 4.7. КОГДА пользователь отправляет сообщение, ТО модель ДОЛЖНА формировать и reasoning, и текст ответа на языке пользователя (по языку последнего `kind:user` сообщения в текущем запросе).
 
@@ -198,7 +214,7 @@
 
 #### Критерии Приемки
 
-5.1. `ILLMProvider` ДОЛЖЕН иметь метод `chat(messages, options, onChunk)` с event-driven стримингом чанков (`reasoning`, `text`, `turn_error`) и одиночным сигналом `tool_call` после полной сборки аргументов
+5.1. Внутренний слой адаптера провайдера (`ILLMProvider` или эквивалент) ДОЛЖЕН иметь метод `chat(messages, options, onChunk)` с event-driven стримингом чанков (`reasoning`, `text`, `tool_call`, `turn_error`) и успешным завершением текущего ответа модели через завершение `chat(...)` без ошибки
 
 5.2. `apiKey` ДОЛЖЕН передаваться в конструктор провайдера (не в каждый вызов)
 
@@ -208,7 +224,7 @@
 
 5.4. Текст ответа ДОЛЖЕН стримиться через `onChunk` инкрементально (`text delta`), без ожидания только финального агрегированного блока
 
-5.5. Провайдер ДОЛЖЕН поддерживать tool-calling в рамках одного turn: в chat-flow публикуется одиночное событие `tool_call` только после полной сборки аргументов
+5.5. Провайдер ДОЛЖЕН поддерживать tool-calling в рамках одного turn: в chat-flow передаются полностью собранные данные tool call для persisted сообщения `kind: tool_call`
 
 5.6. Ответ провайдера ДОЛЖЕН включать usage-envelope в формате:
   - `canonical`: `input_tokens`, `output_tokens`, `total_tokens`, `cached_tokens?`, `reasoning_tokens?`
@@ -219,6 +235,8 @@
 5.7.1. Structured Output в виде обязательного `json_schema` НЕ ДОЛЖЕН быть единственным допустимым форматом chat-flow
 
 5.8. Для тестов используется модель `gpt-5-nano` с `reasoning_effort: "low"`, для прода — `gpt-5.2` с `reasoning_effort: "medium"`
+
+5.9. Провайдерные реализации (`OpenAIProvider`, `AnthropicProvider`, `GoogleProvider`) ДОЛЖНЫ быть построены поверх `Vercel AI SDK` и поддерживать единый streaming/tool-loop контракт `ILLMProvider`
 
 ---
 
@@ -316,11 +334,13 @@
 
 9.1. LLM pipeline ДОЛЖЕН использовать согласованный набор `kind` из спецификации `agents.7.2.1`
 
-9.2. Для текущего chat-flow финальный ответ ДОЛЖЕН завершаться сообщением `kind: llm` с `done = true` (canonical path)
+9.2. Финальный ответ ДОЛЖЕН завершаться сообщением `kind: llm` с `done = true` (canonical path)
 
-9.3. Отдельный тип для финализации LLM turn НЕ ДОЛЖЕН использоваться; завершение фиксируется через `kind: llm` и `done = true`
+9.3. Отдельный тип завершения ответа модели НЕ ДОЛЖЕН использоваться; завершение фиксируется через `kind: llm` и `done = true`
 
-9.4. В текущем chat-flow `tool_call` НЕ ДОЛЖЕН создавать отдельное сообщение в чате; статус агента во время выполнения инструмента определяется через активное `kind: llm` сообщение с `done = false`
+9.4. `tool_call` ДОЛЖЕН отображаться в чате как отдельный tool-call блок; для persisted `kind: tool_call` его поле `done` ДОЛЖНО участвовать в вычислении статуса так же, как для `kind: llm`:
+  - `done = false` → `in-progress`
+  - `done = true` → `awaiting-response`
 
 ---
 
@@ -354,21 +374,26 @@
 
 #### Критерии Приемки
 
-11.1. КОГДА модель запрашивает вызов инструмента, ТО `MainPipeline` ДОЛЖЕН дождаться полной сборки аргументов и эмитить одно событие `message.tool_call`.
+11.1. КОГДА модель запрашивает вызов инструмента, ТО `MainPipeline` ДОЛЖЕН дождаться полной сборки аргументов и сохранить/обновить сообщение `kind: tool_call` в `messages`.
 
-11.2. Событие `message.tool_call` ДОЛЖНО содержать `agentId`, `llmMessageId`, `callId`, `toolName` и полностью собранные `arguments`.
+11.2. При обработке tool call система ДОЛЖНА создавать/обновлять persisted сообщение `kind: tool_call` с полями `callId`, `toolName`, полностью собранными `arguments` и результатом выполнения.
 
-11.3. Выполнение инструмента после `message.tool_call` МОЖЕТ сопровождаться сохранением сообщения `kind: tool_call` в `messages`, но UI чата НЕ ДОЛЖЕН рендерить его как отдельное пользовательское сообщение.
+11.3. Выполнение инструмента ДОЛЖНО сопровождаться сохранением сообщения `kind: tool_call` в `messages`; UI чата ДОЛЖЕН рендерить его как отдельный tool-call блок.
 
-11.3.1. Сообщения `kind: tool_call` НЕ ДОЛЖНЫ входить в model history (`PromptBuilder`/`listForModelHistory`) и НЕ ДОЛЖНЫ отображаться как элементы истории чата.
+11.3.1. Сообщения `kind: tool_call` НЕ ДОЛЖНЫ входить в model history (`PromptBuilder`/`listForModelHistory`), но ДОЛЖНЫ отображаться в истории чата как tool-call блоки.
 
-11.3.2. Потребителем `message.tool_call` ДОЛЖЕН быть оркестратор выполнения инструментов в main process (`MainPipeline`/`ToolRunner`); renderer МОЖЕТ игнорировать это событие для рендера чата.
+11.3.2. Renderer НЕ ДОЛЖЕН зависеть от каких-либо отдельных realtime-сигналов tool-calling; отображение tool-call блока ДОЛЖНО строиться по persisted `message.created`/`message.updated`.
 
 11.4. Система ДОЛЖНА поддерживать несколько tool calls в одном turn, включая контролируемую параллельность.
 
 11.5. После получения результатов инструментов `MainPipeline` ДОЛЖЕН продолжать цикл `model -> tools -> model` до завершения turn или ошибки.
 
-11.6. UI НЕ ДОЛЖЕН отображать отдельные промежуточные tool-call сообщения; пользователю показывается общий прогресс через `kind: llm` в состоянии `done = false` (`in-progress`).
+11.6. UI ДОЛЖЕН отображать промежуточные `tool_call` сообщения как отдельные tool-call блоки; параллельно пользователю показывается общий прогресс через статус `in-progress`, который определяется по последнему видимому сообщению (`kind: llm` или `kind: tool_call`) с `done = false`.
+
+11.7. ЕСЛИ реальное выполнение инструмента недоступно, система ДОЛЖНА завершать `kind: tool_call` через заглушку результата:
+  - сохранять диагностически понятный placeholder output,
+  - переводить сообщение в `done = true`,
+  - эмитить `message.updated` с финальным snapshot.
 
 ### 12. Надёжность chat-flow и обработка некорректных ответов
 
@@ -400,7 +425,7 @@
 
 #### Критерии Приемки
 
-13.1. КОГДА LLM-провайдер возвращает usage-метрики, система ДОЛЖНА сохранять их в `messages.usage_json` отдельным шагом после финализации `kind: llm` сообщения.
+13.1. КОГДА LLM-провайдер возвращает usage-метрики, система ДОЛЖНА сохранять их в `messages.usage_json` отдельным шагом после завершения `kind: llm` сообщения.
 
 13.2. `messages.usage_json` ДОЛЖЕН хранить единый envelope:
   - `canonical`: нормализованные токен-поля (`input_tokens`, `output_tokens`, `total_tokens`, `cached_tokens?`, `reasoning_tokens?`)

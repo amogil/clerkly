@@ -119,7 +119,7 @@ External API → Main Process → Database → IPC Event → Renderer → UI Upd
 ### Интерфейс ILLMProvider
 
 ```typescript
-// Requirements: settings.3
+// Requirements: settings.2
 
 interface TestConnectionResult {
   success: boolean;
@@ -129,7 +129,7 @@ interface TestConnectionResult {
 interface ILLMProvider {
   /**
    * Test connection to LLM provider
-   * Requirements: settings.3.5, settings.3.6, settings.3.7, settings.3.8
+   * Requirements: settings.2.5, settings.2.6, settings.2.7, settings.2.8
    */
   testConnection(apiKey: string): Promise<TestConnectionResult>;
 
@@ -145,7 +145,7 @@ interface ILLMProvider {
 #### OpenAIProvider
 
 ```typescript
-// Requirements: settings.3.5
+// Requirements: settings.2.5
 
 class OpenAIProvider implements ILLMProvider {
   getProviderName(): string {
@@ -154,7 +154,7 @@ class OpenAIProvider implements ILLMProvider {
 
   async testConnection(apiKey: string): Promise<TestConnectionResult> {
     try {
-      // Requirements: settings.3.5 - Minimal test request
+      // Requirements: settings.2.5 - Minimal test request
       const response = await fetch('https://api.openai.com/v1/responses', {
         method: 'POST',
         headers: {
@@ -167,10 +167,10 @@ class OpenAIProvider implements ILLMProvider {
           max_output_tokens: 16,
           text: { format: { type: 'json_object' } }
         }),
-        signal: AbortSignal.timeout(10000) // Requirements: settings.3.6 - 10 second timeout
+        signal: AbortSignal.timeout(10000) // Requirements: settings.2.6 - 10 second timeout
       });
 
-      // Requirements: settings.3.7, settings.3.8 - Handle response
+      // Requirements: settings.2.7, settings.2.8 - Handle response
       if (response.ok) {
         return { success: true };
       }
@@ -189,7 +189,7 @@ class OpenAIProvider implements ILLMProvider {
   }
 
   private mapErrorToMessage(status: number, errorData: any): string {
-    // Requirements: settings.3.8 - Error messages
+    // Requirements: settings.2.8 - Error messages
     switch (status) {
       case 401:
         return 'Invalid API key. Please check your key and try again.';
@@ -207,7 +207,7 @@ class OpenAIProvider implements ILLMProvider {
   }
 
   private mapExceptionToMessage(error: any): string {
-    // Requirements: settings.3.8 - Network errors
+    // Requirements: settings.2.8 - Network errors
     if (error.name === 'AbortError') {
       return 'Model response timeout. The provider took too long to respond. Please try again later.';
     }
@@ -219,7 +219,7 @@ class OpenAIProvider implements ILLMProvider {
 #### AnthropicProvider
 
 ```typescript
-// Requirements: settings.3.5
+// Requirements: settings.2.5
 
 class AnthropicProvider implements ILLMProvider {
   getProviderName(): string {
@@ -228,7 +228,7 @@ class AnthropicProvider implements ILLMProvider {
 
   async testConnection(apiKey: string): Promise<TestConnectionResult> {
     try {
-      // Requirements: settings.3.5 - Minimal test request
+      // Requirements: settings.2.5 - Minimal test request
       const response = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {
@@ -241,7 +241,7 @@ class AnthropicProvider implements ILLMProvider {
           messages: [{ role: 'user', content: 'test' }],
           max_tokens: 5
         }),
-        signal: AbortSignal.timeout(10000) // Requirements: settings.3.6
+        signal: AbortSignal.timeout(10000) // Requirements: settings.2.6
       });
 
       if (response.ok) {
@@ -291,7 +291,7 @@ class AnthropicProvider implements ILLMProvider {
 #### GoogleProvider
 
 ```typescript
-// Requirements: settings.3.5
+// Requirements: settings.2.5
 
 class GoogleProvider implements ILLMProvider {
   getProviderName(): string {
@@ -300,7 +300,7 @@ class GoogleProvider implements ILLMProvider {
 
   async testConnection(apiKey: string): Promise<TestConnectionResult> {
     try {
-      // Requirements: settings.3.5 - Minimal test request
+      // Requirements: settings.2.5 - Minimal test request
       const response = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash:generateContent?key=${apiKey}`,
         {
@@ -311,7 +311,7 @@ class GoogleProvider implements ILLMProvider {
           body: JSON.stringify({
             contents: [{ parts: [{ text: 'test' }] }]
           }),
-          signal: AbortSignal.timeout(10000) // Requirements: settings.3.6
+          signal: AbortSignal.timeout(10000) // Requirements: settings.2.6
         }
       );
 
@@ -362,7 +362,7 @@ class GoogleProvider implements ILLMProvider {
 ### LLMProviderFactory
 
 ```typescript
-// Requirements: settings.3
+// Requirements: settings.2
 
 class LLMProviderFactory {
   static createProvider(type: 'openai' | 'anthropic' | 'google'): ILLMProvider {
@@ -383,7 +383,7 @@ class LLMProviderFactory {
 ### IPC Handlers
 
 ```typescript
-// Requirements: settings.3.4, settings.3.9
+// Requirements: settings.2.4, settings.2.9
 
 import { ipcMain } from 'electron';
 import { Logger } from './Logger';
@@ -392,13 +392,13 @@ const logger = Logger.create('LLMIPCHandlers');
 
 ipcMain.handle('llm:test-connection', async (event, { provider, apiKey }) => {
   try {
-    // Requirements: settings.3.9 - Log attempt (only first 4 chars of key)
+    // Requirements: settings.2.9 - Log attempt (only first 4 chars of key)
     logger.info(`Testing connection to ${provider} (key: ${apiKey.substring(0, 4)}...)`);
 
     const llmProvider = LLMProviderFactory.createProvider(provider);
     const result = await llmProvider.testConnection(apiKey);
 
-    // Requirements: settings.3.9 - Log result
+    // Requirements: settings.2.9 - Log result
     if (result.success) {
       logger.info(`Connection test successful for ${provider}`);
     } else {
@@ -419,7 +419,7 @@ ipcMain.handle('llm:test-connection', async (event, { provider, apiKey }) => {
 ### UI Component Updates
 
 ```typescript
-// Requirements: settings.3.1, settings.3.2, settings.3.3, settings.3.4
+// Requirements: settings.2.1, settings.2.2, settings.2.3, settings.2.4
 
 export function Settings() {
   const { showSuccess, showError } = useError();
@@ -427,30 +427,30 @@ export function Settings() {
   const [apiKey, setApiKey] = useState('');
   const [llmProvider, setLlmProvider] = useState<'openai' | 'anthropic' | 'google'>('openai');
 
-  // Requirements: settings.3.4 - Handle test connection
+  // Requirements: settings.2.4 - Handle test connection
   const handleTestConnection = async () => {
     setTestingConnection(true);
     try {
       const result = await window.api.llm.testConnection(llmProvider, apiKey);
       
       if (result.success) {
-        // Requirements: settings.3.7 - Show success notification
+        // Requirements: settings.2.7 - Show success notification
         showSuccess('Connection successful! Your API key is valid.');
       } else {
-        // Requirements: settings.3.8 - Show error notification
+        // Requirements: settings.2.8 - Show error notification
         showError(result.error || 'Connection failed: Unknown error');
       }
     } catch (error) {
       showError(`Connection failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
-      // Requirements: settings.3.7, settings.3.8 - Reset button state
+      // Requirements: settings.2.7, settings.2.8 - Reset button state
       setTestingConnection(false);
     }
   };
 
   return (
     <div className="pt-4 border-t border-border">
-      {/* Requirements: settings.3.1, settings.3.2, settings.3.3 */}
+      {/* Requirements: settings.2.1, settings.2.2, settings.2.3 */}
       <button
         onClick={handleTestConnection}
         disabled={testingConnection || apiKey.trim() === ''}
@@ -466,7 +466,7 @@ export function Settings() {
 ### Preload API
 
 ```typescript
-// Requirements: settings.3
+// Requirements: settings.2
 
 contextBridge.exposeInMainWorld('api', {
   // ... existing API
@@ -756,16 +756,16 @@ class AIAgentSettingsManager {
 Класс для форматирования дат и времени с использованием системной локали.
 
 ```typescript
-// Requirements: settings.2
+// Requirements: settings.3
 
 class DateTimeFormatter {
   /**
    * Format date using system locale
-   * Requirements: settings.2.1, settings.2.2
+   * Requirements: settings.3.1, settings.3.2
    */
   static formatDate(timestamp: number): string {
     try {
-      // Requirements: settings.2.1 - Use system locale (undefined = system default)
+      // Requirements: settings.3.1 - Use system locale (undefined = system default)
       const formatter = new Intl.DateTimeFormat(undefined, {
         year: 'numeric',
         month: 'short',
@@ -781,11 +781,11 @@ class DateTimeFormatter {
 
   /**
    * Format datetime using system locale
-   * Requirements: settings.2.1, settings.2.2
+   * Requirements: settings.3.1, settings.3.2
    */
   static formatDateTime(timestamp: number): string {
     try {
-      // Requirements: settings.2.1 - Use system locale
+      // Requirements: settings.3.1 - Use system locale
       const formatter = new Intl.DateTimeFormat(undefined, {
         year: 'numeric',
         month: 'short',
@@ -803,7 +803,7 @@ class DateTimeFormatter {
 
   /**
    * Format timestamp for logs (fixed format)
-   * Requirements: settings.2.3
+   * Requirements: settings.3.3
    */
   static formatLogTimestamp(timestamp: number): string {
     const date = new Date(timestamp);
@@ -971,12 +971,12 @@ export function AIAgentSettings() {
         </div>
       </div>
 
-      {/* Requirements: settings.1.24 - Security message */}
+      {/* Requirements: settings.1.25 - Security message */}
       <p className="security-message">
         Your API key is stored securely. It will only be used to communicate with your selected LLM provider.
       </p>
 
-      {/* Requirements: settings.1.25 - Test Connection button (placeholder) */}
+      {/* Requirements: settings.1.26 - Test Connection button */}
       <button type="button" className="test-connection" disabled>
         Test Connection
       </button>
@@ -1138,13 +1138,13 @@ user_id: 'aB3xK9mNpQ'
 
 *Для любого* timestamp, метод `DateTimeFormatter.formatDate()` должен использовать системную локаль (через `Intl.DateTimeFormat(undefined, ...)`) для форматирования даты.
 
-**Validates: Requirements settings.2.1**
+**Validates: Requirements settings.3.1**
 
 ### Property 11: Фиксированный формат для логов
 
 *Для любого* timestamp, метод `DateTimeFormatter.formatLogTimestamp()` должен возвращать строку в формате `YYYY-MM-DD HH:MM:SS` независимо от системной локали.
 
-**Validates: Requirements settings.2.3**
+**Validates: Requirements settings.3.3**
 
 ### Edge Cases
 
@@ -1162,9 +1162,9 @@ user_id: 'aB3xK9mNpQ'
 
 6. **Очистка поля API ключа (settings.1.11)**: Когда пользователь очищает поле API ключа (пустая строка), запись для текущего провайдера должна быть удалена из базы данных.
 
-7. **Ошибка форматирования даты (settings.2.1)**: Когда `Intl.DateTimeFormat` выбрасывает ошибку, система должна использовать fallback форматирование через `toLocaleDateString()`.
+7. **Ошибка форматирования даты (settings.3.1)**: Когда `Intl.DateTimeFormat` выбрасывает ошибку, система должна использовать fallback форматирование через `toLocaleDateString()`.
 
-8. **Изменение системной локали (settings.2.6)**: Когда пользователь изменяет системные настройки локали, приложение должно автоматически применить новый формат при следующем запуске.
+8. **Изменение системной локали (settings.3.6)**: Когда пользователь изменяет системные настройки локали, приложение должно автоматически применить новый формат при следующем запуске.
 
 
 ## Обработка Ошибок
@@ -1294,7 +1294,7 @@ try {
 
 **Обработка:**
 ```typescript
-// Requirements: settings.2.1
+// Requirements: settings.3.1
 static formatDate(timestamp: number): string {
   try {
     const formatter = new Intl.DateTimeFormat(undefined, {
@@ -1424,7 +1424,7 @@ describe('DateTimeFormatter', () => {
   /* Preconditions: system locale set to en-US
      Action: call formatDate(timestamp)
      Assertions: date formatted in en-US format (e.g., "Jan 15, 2024")
-     Requirements: settings.2.1 */
+     Requirements: settings.3.1 */
   it('should format date using system locale', () => {
     // Тест форматирования даты по системной локали
   });
@@ -1432,7 +1432,7 @@ describe('DateTimeFormatter', () => {
   /* Preconditions: any timestamp
      Action: call formatLogTimestamp(timestamp)
      Assertions: returns format "YYYY-MM-DD HH:MM:SS"
-     Requirements: settings.2.3 */
+     Requirements: settings.3.3 */
   it('should format log timestamp in fixed format', () => {
     // Тест фиксированного формата для логов
   });
@@ -1440,7 +1440,7 @@ describe('DateTimeFormatter', () => {
   /* Preconditions: Intl.DateTimeFormat throws error
      Action: call formatDate(timestamp)
      Assertions: fallback to toLocaleDateString(), error logged
-     Requirements: settings.2.1 */
+     Requirements: settings.3.1 */
   it('should handle formatting errors gracefully', () => {
     // Тест обработки ошибок форматирования
   });
@@ -1480,7 +1480,7 @@ describe('Settings Functional Tests', () => {
   /* Preconditions: application launched with system locale en-US
      Action: view dates in application components
      Assertions: all dates formatted in en-US format
-     Requirements: settings.2.1, settings.2.2 */
+     Requirements: settings.3.1, settings.3.2 */
   it('should format dates using system locale', async () => {
     // Функциональный тест форматирования дат
   });
@@ -1514,28 +1514,28 @@ describe('Settings Functional Tests', () => {
 | settings.1.20 | ✓ | ✓ |
 | settings.1.21 | ✓ | ✓ |
 | settings.1.22 | ✓ | ✓ |
-| settings.1.23 | ✓ | - | - |
-| settings.1.24 | ✓ | - | - |
-| settings.1.25 | - | - | - |
-| settings.1.26 | ✓ | - | ✓ |
-| settings.1.27 | ✓ | - | - |
-| settings.3.1 | - | - | ✓ |
-| settings.3.2 | ✓ | - | ✓ |
-| settings.3.3 | ✓ | - | ✓ |
-| settings.3.4 | ✓ | - | ✓ |
-| settings.3.5 | ✓ | ✓ | ✓ |
-| settings.3.6 | ✓ | - | ✓ |
-| settings.3.7 | ✓ | - | ✓ |
-| settings.3.8 | ✓ | ✓ | ✓ |
-| settings.3.9 | ✓ | - | - |
-| settings.3.10 | ✓ | - | - |
-| settings.2.1 | ✓ | ✓ | ✓ |
-| settings.2.2 | ✓ | ✓ | ✓ |
-| settings.2.3 | ✓ | - | - |
-| settings.2.4 | ✓ | - | ✓ |
-| settings.2.5 | ✓ | - | ✓ |
-| settings.2.6 | ✓ | - | ✓ |
-| settings.2.7 | - | - | ✓ |
+| settings.1.23 | ✓ | - |
+| settings.1.24 | ✓ | - |
+| settings.1.25 | - | ✓ |
+| settings.1.26 | ✓ | ✓ |
+| settings.1.27 | ✓ | - |
+| settings.2.1 | - | ✓ |
+| settings.2.2 | ✓ | ✓ |
+| settings.2.3 | ✓ | ✓ |
+| settings.2.4 | ✓ | ✓ |
+| settings.2.5 | ✓ | ✓ |
+| settings.2.6 | ✓ | ✓ |
+| settings.2.7 | ✓ | ✓ |
+| settings.2.8 | ✓ | ✓ |
+| settings.2.9 | ✓ | - |
+| settings.2.10 | ✓ | - |
+| settings.3.1 | ✓ | ✓ |
+| settings.3.2 | ✓ | ✓ |
+| settings.3.3 | ✓ | - |
+| settings.3.4 | ✓ | ✓ |
+| settings.3.5 | ✓ | ✓ |
+| settings.3.6 | ✓ | ✓ |
+| settings.3.7 | - | ✓ |
 
 ## Технические Решения
 
@@ -1600,7 +1600,7 @@ describe('Settings Functional Tests', () => {
 - Добавить настройку формата в UI
 
 **Обоснование:**
-- Соответствует требованию settings.2.1
+- Соответствует требованию settings.3.1
 - Нативный API, не требует зависимостей
 - Автоматически использует системную локаль (undefined = system default)
 - Поддерживает все локали без дополнительной конфигурации
@@ -1617,7 +1617,7 @@ describe('Settings Functional Tests', () => {
 - Использовать Unix timestamp
 
 **Обоснование:**
-- Соответствует требованию settings.2.3
+- Соответствует требованию settings.3.3
 - Консистентность логов независимо от локали пользователя
 - Легко читается человеком
 - Легко парсится программно

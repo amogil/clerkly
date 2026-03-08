@@ -142,16 +142,13 @@
 
 3.6. Все события ДОЛЖНЫ содержать timestamp для определения порядка событий
 
-3.7. Для LLM/Agents чата система ДОЛЖНА поддерживать кастомные события потоковых обновлений:
+3.7. Для LLM/Agents чата система ДОЛЖНА поддерживать кастомные chat-события:
    - `message.llm.reasoning.updated`
    - `message.llm.text.updated`
-   - `message.tool_call`
 
 3.8. События `message.llm.reasoning.updated` и `message.llm.text.updated` ДОЛЖНЫ передавать инкрементальные delta-данные и идентификатор сообщения, к которому относится update
 
-3.9. Событие `message.tool_call` ДОЛЖНО эмититься один раз после полной сборки аргументов tool call и содержать `agentId`, `llmMessageId`, `callId`, `toolName`, `arguments`
-
-3.9.1. Основным потребителем `message.tool_call` ДОЛЖЕН быть main-process оркестратор выполнения инструментов; событие НЕ ДОЛЖНО требовать обязательного рендера отдельного сообщения в UI чата.
+3.9. Рендер tool-call в UI ДОЛЖЕН строиться по persisted snapshot-событиям `message.created`/`message.updated` для сообщений `kind: tool_call`.
 
 **Примечание:** Целевой список типов событий определяется этой спецификацией; `src/shared/events/types.ts` ДОЛЖЕН быть синхронизирован с данным контрактом.
 

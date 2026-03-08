@@ -1251,3 +1251,51 @@ export async function expectNoToastError(window: Page): Promise<void> {
 | testing.12.1 | Проверка после ключевых действий | Вызов в `launchWithMockLLM` и аналогичных helpers |
 | testing.12.2 | Фейл с текстом ошибки | `throw new Error(\`Toast error detected: ${text}\`)` |
 | testing.12.3 | Переиспользуемый helper | `expectNoToastError` в `helpers/electron.ts` |
+
+## AI SDK Chat-Flow Контракты
+
+**Requirements**: testing.13
+
+### Unit: Stream Protocol
+
+- `tests/unit/renderer/IPCChatTransport.test.ts` проверяет порядок `UIMessageChunk`:
+  - `start -> start-step -> reasoning/text deltas -> finish-step -> finish`
+- Отдельные кейсы проверяют отсутствие дублирования между delta-событиями и `message.updated`.
+
+### Unit: Tool Loop и Status
+
+- `tests/unit/agents/MainPipeline.test.ts` покрывает:
+  - несколько `tool_call` в одном запросе;
+  - продолжение `model -> tools -> model`;
+  - cancel во время выполнения tools без `kind:error`.
+- `tests/unit/components/agents-status-colors.test.tsx` покрывает статусные переходы для `llm/tool_call` с `done=true/false`.
+
+### Unit: Error Normalization
+
+- `tests/unit/llm/ErrorNormalizer.test.ts` покрывает mapping AI SDK ошибок:
+  - `APICallError` (401/403/429/5xx),
+  - timeout/abort,
+  - transport-level network,
+  - `NoSuchToolError`, `InvalidToolInputError`, `ToolExecutionError`, `ToolCallRepairError`,
+  - `UIMessageStreamError`.
+
+### Functional: End-to-End Контракты
+
+- `tests/functional/llm-chat.spec.ts` проверяет:
+  - параллельный стриминг reasoning + текста;
+  - отображение persisted `tool_call` как отдельного tool-call блока (по `message.created`/`message.updated`);
+  - корректный rate-limit countdown без persisted `kind:error`;
+  - отсутствие `kind:error` при cancel во время tool execution.
+
+### Покрытие требований
+
+| Требование | Модульные тесты | Функциональные тесты |
+|---|---|---|
+| testing.13.1 | ✓ | - |
+| testing.13.2 | ✓ | - |
+| testing.13.3 | ✓ | ✓ |
+| testing.13.4 | ✓ | - |
+| testing.13.5 | ✓ | ✓ |
+| testing.13.6 | - | ✓ |
+| testing.13.7 | ✓ | ✓ |
+| testing.13.8 | ✓ | ✓ |
