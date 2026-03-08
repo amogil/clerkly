@@ -36,25 +36,25 @@
 
 ## Фаза B1: Контракты ошибок AI SDK
 
-- [ ] Ввести единый `ErrorNormalizer` в main-process (`src/main/llm/*`):
-  - [ ] `APICallError` -> классификация по `statusCode`:
-    - [ ] `401/403 -> auth`
-    - [ ] `429 -> rate_limit` (с извлечением `retry-after` / fallback parsing)
-    - [ ] `5xx -> provider`
-  - [ ] timeout/abort -> `timeout`
-  - [ ] transport-level failures без `statusCode` -> `network`
-  - [ ] `RetryError` после исчерпания попыток -> `provider`
-  - [ ] tool ошибки (`NoSuchToolError`, `InvalidToolInputError`, `ToolExecutionError`, `ToolCallRepairError`) -> `tool`
-  - [ ] stream protocol ошибки (`UIMessageStreamError`) -> `protocol`
+- [x] Ввести единый `ErrorNormalizer` в main-process (`src/main/llm/*`):
+  - [x] `APICallError` -> классификация по `statusCode`:
+    - [x] `401/403 -> auth`
+    - [x] `429 -> rate_limit` (с извлечением `retry-after` / fallback parsing)
+    - [x] `5xx -> provider`
+  - [x] timeout/abort -> `timeout`
+  - [x] transport-level failures без `statusCode` -> `network`
+  - [x] `RetryError` после исчерпания попыток -> `provider`
+  - [x] tool ошибки (`NoSuchToolError`, `InvalidToolInputError`, `ToolExecutionError`, `ToolCallRepairError`) -> `tool`
+  - [x] stream protocol ошибки (`UIMessageStreamError`) -> `protocol`
 - [ ] Зафиксировать и реализовать retry policy из `llm-integration/design.md`:
-  - [ ] retry только до первого meaningful chunk;
-  - [ ] максимум 1 retry на запуск `MainPipeline.run()`;
-  - [ ] после начала стрима retry не выполняется.
+  - [x] retry только до первого meaningful chunk;
+  - [x] максимум 1 retry на запуск `MainPipeline.run()`;
+  - [x] после начала стрима retry не выполняется.
 - [ ] Синхронизировать `ErrorNormalizer` с UI контрактом ошибок:
-  - [ ] `kind:error` payload
-  - [ ] rate-limit countdown (`agent.rate_limit`)
-  - [ ] диагностические события (`llm.pipeline.diagnostic`)
-- [ ] Удалить ad-hoc ветки ошибок, дублирующие ErrorNormalizer.
+  - [x] `kind:error` payload
+  - [x] rate-limit countdown (`agent.rate_limit`)
+  - [x] диагностические события (`llm.pipeline.diagnostic`)
+- [x] Удалить ad-hoc ветки ошибок, дублирующие ErrorNormalizer.
 
 ## Фаза B1.1: Конформанс ошибок и каналов уведомлений (cross-spec)
 
@@ -66,7 +66,7 @@
 - [ ] Синхронизировать тексты ошибок в `LLMError`/renderer диалогах с `llm-integration.3.5`.
 - [ ] Обновить unit-тесты:
   - [ ] `tests/unit/utils/apiWrapper.test.ts` (chat suppression vs background toast).
-  - [ ] `tests/unit/agents/MainPipeline.test.ts` (tool/protocol error mapping, no toast assumptions).
+  - [x] `tests/unit/agents/MainPipeline.test.ts` (tool/protocol error mapping, no toast assumptions).
 
 ## Фаза B1.2: UX-контракты ошибок в чате
 

@@ -263,7 +263,7 @@ export interface LLMPipelineDiagnosticPayload extends BaseEvent {
     userMessageId: number;
     signalAborted: boolean;
     errorName: string;
-    errorType: 'auth' | 'rate_limit' | 'provider' | 'network' | 'timeout';
+    errorType: 'auth' | 'rate_limit' | 'provider' | 'network' | 'timeout' | 'tool' | 'protocol';
   };
 }
 
@@ -621,7 +621,7 @@ export class LLMPipelineDiagnosticEvent extends TypedEventClass<LLMPipelineDiagn
       userMessageId: number;
       signalAborted: boolean;
       errorName: string;
-      errorType: 'auth' | 'rate_limit' | 'provider' | 'network' | 'timeout';
+      errorType: 'auth' | 'rate_limit' | 'provider' | 'network' | 'timeout' | 'tool' | 'protocol';
     }
   ) {
     super();

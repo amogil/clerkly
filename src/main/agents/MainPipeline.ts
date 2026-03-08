@@ -17,7 +17,7 @@ import { LLM_CHAT_MODELS } from '../llm/LLMConfig';
 import { Logger } from '../Logger';
 import type { ILLMProvider, ChatOptions, LLMChatResult } from '../llm/ILLMProvider';
 import { handleBackgroundError } from '../ErrorHandler';
-import { LLMRequestAbortedError } from '../llm/LLMErrors';
+import { normalizeLLMError } from '../llm/ErrorNormalizer';
 import type { IToolExecutor, ToolCallRequest, ToolCallResult } from '../tools/ToolRunner';
 import { ToolRunner } from '../tools/ToolRunner';
 
@@ -27,53 +27,14 @@ import type { LLMProvider } from '../../types';
  * Error type categories for kind:error messages
  * Requirements: llm-integration.5.3
  */
-export type LLMErrorType = 'auth' | 'rate_limit' | 'provider' | 'network' | 'timeout';
-
-/**
- * Classify an error message into a typed category
- * Requirements: llm-integration.5.3
- */
-function classifyError(message: string): LLMErrorType {
-  const lower = message.toLowerCase();
-  if (
-    lower.includes('invalid api key') ||
-    lower.includes('api key is not set') ||
-    lower.includes('unauthorized') ||
-    lower.includes('forbidden')
-  ) {
-    return 'auth';
-  }
-  if (lower.includes('rate limit') || lower.includes('429')) {
-    return 'rate_limit';
-  }
-  if (lower.includes('timeout') || lower.includes('timed out')) {
-    return 'timeout';
-  }
-  if (lower.includes('network') || lower.includes('fetch')) {
-    return 'network';
-  }
-  return 'provider';
-}
-
-/**
- * Parse retry-after seconds from error message text.
- * Supports formats like "Please try again in 10.384s" or "retry after 5 seconds".
- * Returns default 10 seconds if not found.
- * Requirements: llm-integration.3.7.6
- */
-function parseRetryAfterSeconds(message: string): number {
-  // Match "in N.NNNs" or "in Ns" (OpenAI format)
-  const match = message.match(/in\s+(\d+(?:\.\d+)?)\s*s/i);
-  if (match && match[1]) {
-    return Math.ceil(parseFloat(match[1]));
-  }
-  // Match "retry after N seconds"
-  const match2 = message.match(/retry\s+after\s+(\d+)/i);
-  if (match2 && match2[1]) {
-    return parseInt(match2[1], 10);
-  }
-  return 10; // default
-}
+export type LLMErrorType =
+  | 'auth'
+  | 'rate_limit'
+  | 'provider'
+  | 'network'
+  | 'timeout'
+  | 'tool'
+  | 'protocol';
 
 /**
  * MainPipeline — stateless LLM execution pipeline
@@ -306,100 +267,115 @@ export class MainPipeline {
     accumulatedText: string;
     toolCalls: ToolCallRequest[];
   }> {
-    const pendingToolCalls = new Map<string, ToolCallRequest>();
+    let attempts = 0;
+    for (;;) {
+      const pendingToolCalls = new Map<string, ToolCallRequest>();
+      let meaningfulChunkSeen = false;
 
-    const output = await context.llmProvider.chat(
-      context.chatMessages,
-      context.options,
-      (chunk) => {
-        if (signal?.aborted) {
-          return;
-        }
+      try {
+        const output = await context.llmProvider.chat(
+          context.chatMessages,
+          context.options,
+          (chunk) => {
+            if (signal?.aborted) {
+              return;
+            }
 
-        if (chunk.type === 'reasoning') {
-          if (!chunk.delta) {
-            return;
+            if (chunk.type === 'reasoning') {
+              if (!chunk.delta) {
+                return;
+              }
+              meaningfulChunkSeen = true;
+              accumulatedReasoning += chunk.delta;
+              llmMessageId = this.upsertStreamingMessage(
+                llmMessageId,
+                agentId,
+                context.replyToMessageId,
+                context.options.model,
+                accumulatedReasoning,
+                accumulatedText,
+                setLastLlmMessageId
+              );
+              MainEventBus.getInstance().publish(
+                new MessageLlmReasoningUpdatedEvent(
+                  llmMessageId,
+                  agentId,
+                  chunk.delta,
+                  accumulatedReasoning
+                )
+              );
+              return;
+            }
+
+            if (chunk.type === 'text') {
+              if (!chunk.delta) {
+                return;
+              }
+              meaningfulChunkSeen = true;
+              accumulatedText += chunk.delta;
+              llmMessageId = this.upsertStreamingMessage(
+                llmMessageId,
+                agentId,
+                context.replyToMessageId,
+                context.options.model,
+                accumulatedReasoning,
+                accumulatedText,
+                setLastLlmMessageId
+              );
+              MainEventBus.getInstance().publish(
+                new MessageLlmTextUpdatedEvent(llmMessageId, agentId, chunk.delta, accumulatedText)
+              );
+              return;
+            }
+
+            if (chunk.type === 'tool_call') {
+              meaningfulChunkSeen = true;
+              pendingToolCalls.set(chunk.callId, {
+                callId: chunk.callId,
+                toolName: chunk.toolName,
+                arguments: chunk.arguments,
+              });
+              llmMessageId = this.persistInProgressToolCall(
+                llmMessageId,
+                agentId,
+                context.replyToMessageId,
+                context.options.model,
+                accumulatedReasoning,
+                accumulatedText,
+                setLastLlmMessageId,
+                chunk.callId,
+                chunk.toolName,
+                chunk.arguments,
+                toolCallMessageIds
+              );
+              return;
+            }
+
+            if (chunk.type === 'turn_error') {
+              throw new Error(chunk.message);
+            }
           }
-          accumulatedReasoning += chunk.delta;
-          llmMessageId = this.upsertStreamingMessage(
-            llmMessageId,
-            agentId,
-            context.replyToMessageId,
-            context.options.model,
-            accumulatedReasoning,
-            accumulatedText,
-            setLastLlmMessageId
-          );
-          MainEventBus.getInstance().publish(
-            new MessageLlmReasoningUpdatedEvent(
-              llmMessageId,
-              agentId,
-              chunk.delta,
-              accumulatedReasoning
-            )
-          );
-          return;
+        );
+
+        if (!accumulatedText) {
+          accumulatedText = output.text || '';
         }
 
-        if (chunk.type === 'text') {
-          if (!chunk.delta) {
-            return;
-          }
-          accumulatedText += chunk.delta;
-          llmMessageId = this.upsertStreamingMessage(
-            llmMessageId,
-            agentId,
-            context.replyToMessageId,
-            context.options.model,
-            accumulatedReasoning,
-            accumulatedText,
-            setLastLlmMessageId
-          );
-          MainEventBus.getInstance().publish(
-            new MessageLlmTextUpdatedEvent(llmMessageId, agentId, chunk.delta, accumulatedText)
-          );
-          return;
+        return {
+          output,
+          llmMessageId,
+          accumulatedReasoning,
+          accumulatedText,
+          toolCalls: [...pendingToolCalls.values()],
+        };
+      } catch (error) {
+        const shouldRetry = attempts < 1 && !meaningfulChunkSeen && !signal?.aborted;
+        if (!shouldRetry) {
+          throw error;
         }
-
-        if (chunk.type === 'tool_call') {
-          pendingToolCalls.set(chunk.callId, {
-            callId: chunk.callId,
-            toolName: chunk.toolName,
-            arguments: chunk.arguments,
-          });
-          llmMessageId = this.persistInProgressToolCall(
-            llmMessageId,
-            agentId,
-            context.replyToMessageId,
-            context.options.model,
-            accumulatedReasoning,
-            accumulatedText,
-            setLastLlmMessageId,
-            chunk.callId,
-            chunk.toolName,
-            chunk.arguments,
-            toolCallMessageIds
-          );
-          return;
-        }
-
-        if (chunk.type === 'turn_error') {
-          throw new Error(chunk.message);
-        }
+        attempts += 1;
       }
-    );
-
-    if (!accumulatedText) {
-      accumulatedText = output.text || '';
     }
-
-    return {
-      output,
-      llmMessageId,
-      accumulatedReasoning,
-      accumulatedText,
-      toolCalls: [...pendingToolCalls.values()],
-    };
   }
 
   /**
@@ -650,8 +626,8 @@ export class MainPipeline {
     const errorName = error instanceof Error ? error.name : typeof error;
     const errorMessage = error instanceof Error ? error.message : String(error);
     const signalAborted = signal?.aborted ?? false;
-    const errorType =
-      error instanceof LLMRequestAbortedError ? 'timeout' : classifyError(errorMessage);
+    const normalizedError = normalizeLLMError(error);
+    const errorType = normalizedError.type;
 
     this.logger.warn(
       `Pipeline failure diagnostics: agentId=${agentId}, userMessageId=${userMessageId}, signalAborted=${
@@ -697,7 +673,7 @@ export class MainPipeline {
     const errorReplyTo = userMessageId;
 
     if (errorType === 'rate_limit') {
-      const retryAfterSeconds = parseRetryAfterSeconds(errorMessage);
+      const retryAfterSeconds = normalizedError.retryAfterSeconds ?? 10;
       MainEventBus.getInstance().publish(
         new AgentRateLimitEvent(agentId, userMessageId, retryAfterSeconds)
       );
@@ -706,7 +682,7 @@ export class MainPipeline {
 
     const errorPayload: Record<string, unknown> = {
       type: errorType,
-      message: errorMessage,
+      message: normalizedError.message,
     };
     if (errorType === 'auth') {
       errorPayload['action_link'] = { label: 'Open Settings', screen: 'settings' };

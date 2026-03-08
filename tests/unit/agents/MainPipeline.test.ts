@@ -572,6 +572,98 @@ describe('MainPipeline.run()', () => {
     );
   });
 
+  it('retries once when provider fails before first meaningful chunk', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+    llmProvider.chat
+      .mockRejectedValueOnce(new Error('temporary provider error'))
+      .mockResolvedValueOnce({ text: 'Recovered response' });
+
+    await pipeline.run('agent-1', 1);
+
+    expect(llmProvider.chat).toHaveBeenCalledTimes(2);
+    expect(messageManager.create).toHaveBeenCalledWith(
+      'agent-1',
+      'llm',
+      expect.objectContaining({ data: expect.objectContaining({ text: 'Recovered response' }) }),
+      1,
+      true
+    );
+  });
+
+  it('does not retry after first meaningful chunk is emitted', async () => {
+    const { pipeline, llmProvider } = makeMocks();
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({ type: 'reasoning', delta: 'Thinking...' });
+        throw new Error('stream interrupted');
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    expect(llmProvider.chat).toHaveBeenCalledTimes(1);
+  });
+
+  it('limits retries to one attempt before first meaningful chunk', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+    llmProvider.chat
+      .mockRejectedValueOnce(new Error('temporary provider error 1'))
+      .mockRejectedValueOnce(new Error('temporary provider error 2'));
+
+    await pipeline.run('agent-1', 1);
+
+    expect(llmProvider.chat).toHaveBeenCalledTimes(2);
+    expect(messageManager.create).toHaveBeenCalledWith(
+      'agent-1',
+      'error',
+      expect.objectContaining({
+        data: expect.objectContaining({
+          error: expect.objectContaining({ type: 'provider' }),
+        }),
+      }),
+      1,
+      true
+    );
+  });
+
+  it('maps ToolExecutionError-like failures to tool kind:error', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+    llmProvider.chat.mockRejectedValue({ name: 'ToolExecutionError', message: 'executor failed' });
+
+    await pipeline.run('agent-1', 1);
+
+    expect(messageManager.create).toHaveBeenCalledWith(
+      'agent-1',
+      'error',
+      expect.objectContaining({
+        data: expect.objectContaining({
+          error: expect.objectContaining({ type: 'tool' }),
+        }),
+      }),
+      1,
+      true
+    );
+  });
+
+  it('maps UIMessageStreamError-like failures to protocol kind:error', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+    llmProvider.chat.mockRejectedValue({ name: 'UIMessageStreamError', message: 'invalid stream' });
+
+    await pipeline.run('agent-1', 1);
+
+    expect(messageManager.create).toHaveBeenCalledWith(
+      'agent-1',
+      'error',
+      expect.objectContaining({
+        data: expect.objectContaining({
+          error: expect.objectContaining({ type: 'protocol' }),
+        }),
+      }),
+      1,
+      true
+    );
+  });
+
   it('calls handleBackgroundError when usage persistence fails', async () => {
     const { pipeline, llmProvider, messageManager } = makeMocks();
     (messageManager.setUsage as jest.Mock).mockImplementation(() => {
