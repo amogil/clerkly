@@ -254,11 +254,7 @@ test.describe('Header Layout', () => {
       )
       .toBe(true);
 
-<<<<<<< HEAD
-    const header = window.locator('[data-testid="agent-header"]').first();
-=======
     const header = window.locator('[data-testid="agent-header"]');
->>>>>>> origin/main
     const rightSection = window.locator('[data-testid="agent-header-right"]');
 
     const headerBox = await header.boundingBox();
