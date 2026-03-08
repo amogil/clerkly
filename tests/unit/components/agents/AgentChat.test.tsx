@@ -411,6 +411,28 @@ describe('AgentChat — messages rendering', () => {
     expect(rendered).toHaveLength(2);
     expect(rendered[1]).toHaveAttribute('data-reasoning-streaming', 'false');
   });
+
+  /* Preconditions: status is streaming and latest llm message has no text yet (done=false)
+     Action: render AgentChat
+     Assertions: llm message receives isReasoningStreaming=true even before first reasoning delta
+     Requirements: llm-integration.2, llm-integration.7.2 */
+  it('should mark in-flight llm without text as reasoning-streaming', () => {
+    mockUseAgentChatState.isStreaming = true;
+    mockUseAgentChatState.rawMessages = [
+      makeMessage(1, 'user'),
+      {
+        ...makeMessage(2, 'llm'),
+        payload: { data: {} },
+        done: false,
+      },
+    ];
+
+    render(<AgentChat {...defaultProps} />);
+
+    const rendered = screen.getAllByTestId('agent-message');
+    expect(rendered).toHaveLength(2);
+    expect(rendered[1]).toHaveAttribute('data-reasoning-streaming', 'true');
+  });
 });
 
 describe('AgentChat — send message', () => {

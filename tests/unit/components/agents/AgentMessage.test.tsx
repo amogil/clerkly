@@ -184,6 +184,27 @@ describe('AgentMessage — llm', () => {
     expect(screen.queryByTestId('message-llm-avatar')).not.toBeInTheDocument();
   });
 
+  /* Preconditions: kind:llm without reasoning text, but message is currently streaming
+     Action: render AgentMessage with isReasoningStreaming=true
+     Assertions: reasoning block is still shown for active stream
+     Requirements: llm-integration.2, llm-integration.7.2 */
+  it('should render reasoning block when stream is active even before first reasoning delta', () => {
+    render(
+      <AgentMessage
+        message={baseMessage({
+          kind: 'llm',
+          payload: {
+            data: {},
+          },
+          done: false,
+        })}
+        isReasoningStreaming={true}
+      />
+    );
+    expect(screen.getByTestId('message-llm-reasoning-trigger')).toBeInTheDocument();
+    expect(screen.getByTestId('reasoning-root')).toHaveAttribute('data-streaming', 'true');
+  });
+
   /* Preconditions: kind:llm with data.text but no reasoning
      Action: render AgentMessage
      Assertions: no reasoning block rendered

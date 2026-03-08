@@ -296,7 +296,7 @@ export function AgentChat({
         | undefined;
       const hasReasoning = Boolean(llmData?.reasoning?.text);
       const hasAction = Boolean(llmData?.text);
-      if (hasReasoning && !hasAction) return message.id;
+      if ((hasReasoning || !message.done) && !hasAction) return message.id;
     }
     return null;
   })();

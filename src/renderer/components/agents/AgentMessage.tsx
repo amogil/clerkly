@@ -96,12 +96,12 @@ export function AgentMessage({
     return (
       <Message from="assistant" className="w-full max-w-full">
         <div data-testid="message-llm" className="space-y-2">
-          {llmReasoning?.text && (
+          {(llmReasoning?.text || isReasoningStreaming) && (
             // Requirements: llm-integration.2, llm-integration.7.2 — collapsible reasoning block with streaming state
             <Reasoning isStreaming={isReasoningStreaming}>
               <AgentReasoningTrigger />
               <ReasoningContent data-testid="message-llm-reasoning">
-                {llmReasoning.text}
+                {llmReasoning?.text ?? ''}
               </ReasoningContent>
             </Reasoning>
           )}
