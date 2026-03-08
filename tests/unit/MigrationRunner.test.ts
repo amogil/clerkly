@@ -1263,7 +1263,9 @@ describe('Migration 013: backfill legacy llm data.text from data.action.content'
     );
     db.exec(sql.split('-- DOWN')[0]!.replace('-- UP', '').trim());
 
-    const row = db.prepare('SELECT payload_json FROM messages LIMIT 1').get() as { payload_json: string };
+    const row = db.prepare('SELECT payload_json FROM messages LIMIT 1').get() as {
+      payload_json: string;
+    };
     expect(JSON.parse(row.payload_json)).toEqual(originalPayload);
   });
 

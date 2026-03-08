@@ -168,18 +168,19 @@ describe('toUIMessage', () => {
 
   // ─── unknown kinds ───────────────────────────────────────────────────────
 
-  /* Preconditions: message with kind 'tool_call'
+  /* Preconditions: message with kind 'tool_call' and done=false
      Action: call toUIMessage
-     Assertions: returns assistant message with tool metadata
+     Assertions: returns assistant message with dynamic-tool input-available part
      Requirements: llm-integration.11.3 */
-  it('should map tool_call message to assistant summary part', () => {
+  it('should map in-progress tool_call to dynamic-tool input-available part', () => {
     const msg = makeSnapshot({
       kind: 'tool_call',
+      done: false,
       payload: {
         data: {
           callId: 'call-1',
           toolName: 'search_docs',
-          output: { content: 'result' },
+          arguments: { query: 'streaming' },
         },
       },
     });
@@ -187,12 +188,75 @@ describe('toUIMessage', () => {
     expect(result).not.toBeNull();
     expect(result!.role).toBe('assistant');
     expect(result!.parts[0]).toEqual({
-      type: 'text',
-      text: '[tool_call] search_docs (call-1)\nresult',
+      type: 'dynamic-tool',
+      toolName: 'search_docs',
+      toolCallId: 'call-1',
+      state: 'input-available',
+      input: { query: 'streaming' },
     });
     const meta = result!.metadata as Record<string, unknown>;
     expect(meta.isToolCall).toBe(true);
     expect(meta.toolName).toBe('search_docs');
+  });
+
+  /* Preconditions: message with kind 'tool_call', done=true, success output
+     Action: call toUIMessage
+     Assertions: returns dynamic-tool output-available part
+     Requirements: llm-integration.11.3 */
+  it('should map completed successful tool_call to dynamic-tool output-available part', () => {
+    const msg = makeSnapshot({
+      kind: 'tool_call',
+      done: true,
+      payload: {
+        data: {
+          callId: 'call-1',
+          toolName: 'search_docs',
+          arguments: { query: 'streaming' },
+          output: { status: 'success', content: 'result' },
+        },
+      },
+    });
+    const result = toUIMessage(msg);
+    expect(result).not.toBeNull();
+    expect(result!.role).toBe('assistant');
+    expect(result!.parts[0]).toEqual({
+      type: 'dynamic-tool',
+      toolName: 'search_docs',
+      toolCallId: 'call-1',
+      state: 'output-available',
+      input: { query: 'streaming' },
+      output: { status: 'success', content: 'result' },
+    });
+  });
+
+  /* Preconditions: message with kind 'tool_call', done=true, error output
+     Action: call toUIMessage
+     Assertions: returns dynamic-tool output-error part
+     Requirements: llm-integration.11.3 */
+  it('should map failed tool_call to dynamic-tool output-error part', () => {
+    const msg = makeSnapshot({
+      kind: 'tool_call',
+      done: true,
+      payload: {
+        data: {
+          callId: 'call-1',
+          toolName: 'search_docs',
+          arguments: { query: 'streaming' },
+          output: { status: 'error', content: 'tool failed' },
+        },
+      },
+    });
+    const result = toUIMessage(msg);
+    expect(result).not.toBeNull();
+    expect(result!.role).toBe('assistant');
+    expect(result!.parts[0]).toEqual({
+      type: 'dynamic-tool',
+      toolName: 'search_docs',
+      toolCallId: 'call-1',
+      state: 'output-error',
+      input: { query: 'streaming' },
+      errorText: 'tool failed',
+    });
   });
 });
 

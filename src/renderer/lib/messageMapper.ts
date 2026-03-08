@@ -11,7 +11,7 @@ import type { MessageSnapshot } from '../../shared/events/types';
  * - kind: 'user'  → role: 'user',      parts: [{ type: 'text', text }]
  * - kind: 'llm'   → role: 'assistant', parts: [reasoning?, text?]
  * - kind: 'error' → role: 'assistant', parts: [{ type: 'text', text: errorMessage }], metadata: { isError, ... }
- * - kind: 'tool_call' → role: 'assistant', parts: [{ type: 'text', text: tool summary }], metadata: { isToolCall, ... }
+ * - kind: 'tool_call' → role: 'assistant', parts: [dynamic-tool part], metadata: { isToolCall, ... }
  * - hidden: true  → null (filtered out)
  *
  * Requirements: agents.7.3, llm-integration.3.4, llm-integration.3.8, llm-integration.8.5
@@ -76,17 +76,46 @@ export function toUIMessage(msg: MessageSnapshot): UIMessage | null {
     const call = data as {
       toolName?: string;
       callId?: string;
-      output?: { content?: string };
+      arguments?: Record<string, unknown>;
+      output?: { status?: string; content?: string };
     };
     const toolName = call.toolName ?? 'tool';
     const callId = call.callId ?? String(msg.id);
-    const output =
-      call.output && typeof call.output.content === 'string' ? `\n${call.output.content}` : '';
+    const input = call.arguments ?? {};
+
+    const toolPart: UIMessage['parts'][number] = msg.done
+      ? call.output?.status === 'error'
+        ? {
+            type: 'dynamic-tool',
+            toolName,
+            toolCallId: callId,
+            state: 'output-error',
+            input,
+            errorText:
+              typeof call.output?.content === 'string' && call.output.content.length > 0
+                ? call.output.content
+                : 'Tool execution failed',
+          }
+        : {
+            type: 'dynamic-tool',
+            toolName,
+            toolCallId: callId,
+            state: 'output-available',
+            input,
+            output: call.output ?? {},
+          }
+      : {
+          type: 'dynamic-tool',
+          toolName,
+          toolCallId: callId,
+          state: 'input-available',
+          input,
+        };
 
     return {
       id: String(msg.id),
       role: 'assistant',
-      parts: [{ type: 'text', text: `[tool_call] ${toolName} (${callId})${output}` }],
+      parts: [toolPart],
       metadata: {
         isToolCall: true,
         toolName,

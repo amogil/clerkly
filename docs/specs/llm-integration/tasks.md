@@ -89,6 +89,11 @@
 - [ ] `src/main/llm/LLMProviderFactory.ts` и типы:
   - [ ] Проверить, что все провайдеры создаются как AI SDK adapters.
   - [ ] Удалить остаточные structured-output/legacy типы из chat-flow.
+- [ ] Добавить SDK-native Tool Calling (даже при пустом списке инструментов):
+  - [ ] Перевести orchestration tool-calling на AI SDK `streamText/generateText` (`tools`, `toolChoice`, `stopWhen`) вместо ручной склейки tool-loop.
+  - [ ] Зафиксировать пустой реестр инструментов как валидный стартовый режим (`tools = {}` / `[]` по контракту адаптера).
+  - [ ] Включить strict-режим для tool schemas (через AI SDK tool strict + provider strict-json-schema опции, где поддерживается).
+  - [ ] Добавить unit-тест: при пустом tool registry модель не падает и не генерирует runtime-ошибку tool executor.
 - [ ] `src/main/llm/OpenAIProvider.ts`:
   - [ ] Финально перевести все streaming/tool semantics на AI SDK primitives.
   - [ ] Убрать ручные provider-specific parser ветки, если покрываются AI SDK layer.
@@ -196,6 +201,11 @@
 - [ ] `src/renderer/lib/messageMapper.ts` / `IPCChatTransport`:
   - [x] корректно маппить persisted `kind:tool_call` в UIMessage tool parts.
   - [ ] исключить дублирование tool-call частей между `message.created` и `message.updated`.
+- [ ] Использовать SDK-метрики шагов вместо ручной агрегации usage/timing:
+  - [ ] Брать usage из `result.totalUsage` и `result.steps[*].usage`, а не только из provider-raw envelope.
+  - [ ] Для каждого step сохранять диагностику шага (toolCalls, finishReason, usage) в `llm.pipeline.diagnostic`.
+  - [ ] Latency per step считать в pipeline через `onStepFinish` + локальные timestamps рантайма (SDK не даёт готовый duration-поле).
+  - [ ] Сохранение в `messages.usage_json` оставить в формате `canonical + raw`, где `canonical` заполняется из SDK usage.
 
 ## Фаза C4: Settings/Test Connection conformance
 
@@ -298,3 +308,19 @@
 - [x] Отдельное realtime-событие `message.tool_call` удалено из shared events/types/constants, IPC bridge и unit-тестов.
 - [ ] `payload.data.text` остаётся canonical финальным ответом.
 - [ ] `npm run validate` и полный `npm run test:functional` проходят.
+
+---
+
+## Дополнительный To Do (по результатам проверки)
+
+- [ ] Перевести текущий mapping `tool_call` с text-summary на полноценные AI SDK tool parts (`tool-input-*` / `tool-output-*`) в `messageMapper` и/или `IPCChatTransport`.
+- [ ] Добавить unit-тесты на формирование именно tool parts (а не text part) для persisted `kind:tool_call`.
+- [ ] Добавить функциональный сценарий на отображение historical `llm` сообщений после миграции `013` (каноничный рендер из `data.text` без `data.action` fallback).
+- [ ] После внедрения tool parts синхронизировать рендер `AgentMessage`/`Tool` так, чтобы UI использовал единый контракт tool-part без дублирующих путей.
+
+### Отдельные шаги исправления
+
+- [x] Шаг 1. Реализовать AI SDK tool parts для persisted `kind:tool_call` (убрать text-summary путь).
+- [x] Шаг 2. Добавить/обновить unit-тесты, проверяющие именно tool parts контракт.
+- [x] Шаг 3. Добавить functional-тест на исторические `llm` после миграции `013` (рендер только из `data.text`).
+- [ ] Шаг 4. Привести `AgentMessage`/`Tool` к единому пути рендера по tool parts и удалить дубли.

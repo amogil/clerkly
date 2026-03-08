@@ -167,6 +167,32 @@ test.describe('Agent Messaging', () => {
     await expect(messages.first()).toContainText('Test message');
   });
 
+  /* Preconditions: Historical llm message is persisted in canonical format (data.text, no data.action)
+     Action: Insert llm message via test API and open active chat
+     Assertions: Assistant message is rendered from data.text
+     Requirements: llm-integration.6.6.1 */
+  test('should render historical llm message from canonical data.text', async () => {
+    const firstAgentDataTestId = await window
+      .locator('[data-testid^="agent-icon-"]')
+      .first()
+      .getAttribute('data-testid');
+    const activeAgentId = firstAgentDataTestId?.replace('agent-icon-', '');
+    expect(activeAgentId).toBeTruthy();
+
+    const result = await window.evaluate(async (agentId) => {
+      const api = (window as unknown as { api: any }).api;
+      return await api.test.createAgentMessage(agentId, 'Historical canonical response');
+    }, activeAgentId as string);
+
+    expect(result.success).toBe(true);
+
+    const llmAction = window
+      .locator('[data-testid="message-llm-action"]')
+      .filter({ hasText: 'Historical canonical response' });
+    await expect(llmAction).toHaveCount(1, { timeout: 5000 });
+    await expectNoToastError(window);
+  });
+
   /* Preconditions: Agent is active, input field is visible
      Action: Type message and press Shift+Enter
      Assertions: New line is added, message is not sent
