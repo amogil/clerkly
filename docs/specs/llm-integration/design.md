@@ -464,6 +464,7 @@ catch(error):
 `MainPipeline.run()` принимает `AbortSignal` и передаёт его в `provider.chat(...)` (через AI SDK adapter). При отмене:
 - Если `kind: llm` ещё не создан — просто выходим (нет сообщений для очистки)
 - Если `kind: llm` уже создан — помечаем `hidden: true, done: false`, выходим без создания `kind: error`
+- Исходное `kind: user` сообщение отменённого turn не скрывается и остаётся видимым в чате
 
 **`MessageManager.listForModelHistory()`** фильтрует сообщения с `hidden` — они не попадают во входной массив `messages`.
 
@@ -634,6 +635,7 @@ User отправляет сообщение
 | llm-integration.8.1 | ✓ | ✓ |
 | llm-integration.8.5 | ✓ | ✓ |
 | llm-integration.8.6 | ✓ | - |
+| llm-integration.8.6.1 | ✓ | ✓ |
 | llm-integration.8.7 | ✓ | ✓ |
 | llm-integration.9 | ✓ | ✓ |
 | llm-integration.10 | ✓ | ✓ |

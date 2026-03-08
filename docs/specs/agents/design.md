@@ -2249,6 +2249,8 @@ interface UseAgentChatResult {
 
 6. **Action-кнопка по статусу и тексту** — кнопка в `AgentChat` переключается в режим `stop`, когда `agent.status === 'in-progress'`; во всех остальных статусах отображается `send`. В режиме `stop` кнопка всегда активна. В режиме `send` кнопка активна только при непустом `taskInput.trim()`. Нажатие `stop` вызывает `cancelCurrentRequest()` и IPC `messages:cancel`.
 
+6.1. **Поведение отмены после старта ответа** — если `kind: llm` уже начал стримиться, при `stop` скрывается только in-flight `kind: llm`; исходное `kind: user` сообщение этого turn остаётся видимым.
+
 7. **Ошибки stop без toast** — `cancelCurrentRequest()` перехватывает ошибки/`success:false` от `messages:cancel`, возвращает `false` и не инициирует toast-уведомления.
 
 8. **`AGENT_RATE_LIMIT` не в хуке** — подписка остаётся в `agents.tsx`, т.к. rate limit — UI-состояние (показать/скрыть баннер), не часть потока сообщений.

@@ -1004,7 +1004,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
   test('should exclude hidden llm messages from model history on next request', async () => {
     // First request: slow streaming so it can be interrupted
     mockLLMServer.setStreamingMode(true, {
-      content: '{"action":{"type":"text","content":"First response"}}',
+      content: 'First response '.repeat(20),
       chunkDelayMs: 300,
     });
 
@@ -1017,7 +1017,13 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     await expect(context.window.locator('[data-testid="message"]').first()).toBeVisible({
       timeout: 5000,
     });
-    await context.window.waitForTimeout(500);
+    const firstResponse = context.window
+      .locator('[data-testid="message-llm-action"]')
+      .filter({ hasText: 'First response' });
+    await expect(firstResponse).toBeVisible({ timeout: 5000 });
+    await expect(context.window.locator('[data-testid="prompt-input-stop"]')).toBeVisible({
+      timeout: 5000,
+    });
 
     // Switch to fast second response and clear logs to inspect only second request payload
     mockLLMServer.setStreamingMode(true, {
@@ -1037,18 +1043,31 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
 
     const lastRequest = mockLLMServer.getLastRequest();
     expect(lastRequest).toBeDefined();
-    const messages: Array<{ role: string; content: string }> =
+    const messages: Array<{ role: string; content: unknown }> =
       lastRequest!.body.input ?? lastRequest!.body.messages;
+    const contentToText = (content: unknown): string => {
+      if (typeof content === 'string') return content;
+      if (Array.isArray(content)) {
+        return content
+          .map((part) =>
+            part && typeof part === 'object' && typeof (part as { text?: unknown }).text === 'string'
+              ? (part as { text: string }).text
+              : ''
+          )
+          .join(' ');
+      }
+      return '';
+    };
 
     // First user message remains part of dialog context
     const hasFirstUser = messages.some(
-      (m) => m.role === 'user' && m.content.includes('First message')
+      (m) => m.role === 'user' && contentToText(m.content).includes('First message')
     );
     expect(hasFirstUser).toBe(true);
 
     // Hidden first assistant message must not be replayed
     const hasHiddenAssistantReplay = messages.some(
-      (m) => m.role === 'assistant' && m.content.includes('First response')
+      (m) => m.role === 'assistant' && contentToText(m.content).includes('First response')
     );
     expect(hasHiddenAssistantReplay).toBe(false);
   });

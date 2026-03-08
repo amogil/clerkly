@@ -272,6 +272,12 @@ export class AgentIPCHandlers {
   ): Promise<IPCResult> {
     try {
       if (args.kind === 'user') {
+        // Cancel and normalize previous in-flight tail before creating next user message.
+        // Requirements: llm-integration.8.5, llm-integration.8.6, llm-integration.8.7
+        this.cancelActivePipelineAndNormalizeTail(args.agentId);
+      }
+
+      if (args.kind === 'user') {
         // Requirements: llm-integration.3.8
         // Hide visible error messages before creating the next user message.
         this.messageManager.hideErrorMessages(args.agentId);
@@ -294,9 +300,6 @@ export class AgentIPCHandlers {
       // Launch LLM pipeline asynchronously for user messages
       // Requirements: llm-integration.6, llm-integration.3.8
       if (args.kind === 'user') {
-        // Cancel any running pipeline for this agent
-        this.agentManager.cancelPipeline(args.agentId);
-
         // Create a new AbortController for this pipeline run
         const controller = new AbortController();
         this.agentManager.setPipelineController(args.agentId, controller);
@@ -353,27 +356,11 @@ export class AgentIPCHandlers {
     args: { agentId: string }
   ): Promise<IPCResult> {
     try {
-      const cancelledActivePipeline = this.agentManager.cancelPipeline(args.agentId);
+      const cancelledActivePipeline = this.cancelActivePipelineAndNormalizeTail(args.agentId);
       if (!cancelledActivePipeline) {
         // No active run to cancel: do not mutate message visibility.
         // Requirements: llm-integration.8.1, llm-integration.8.7
         return { success: true };
-      }
-
-      // Requirements: llm-integration.8.5, llm-integration.8.7
-      // Cancel is treated as "discard current turn":
-      // - hide pending user message if generation hasn't produced an llm message yet
-      // - hide in-flight llm message and its reply-to user message when present
-      const lastMessage = this.messageManager.getLastMessage(args.agentId);
-      if (lastMessage && !lastMessage.hidden) {
-        if (lastMessage.kind === 'user') {
-          this.messageManager.setHidden(lastMessage.id, args.agentId);
-        } else if (lastMessage.kind === 'llm' && !lastMessage.done) {
-          this.messageManager.hideAndMarkIncomplete(lastMessage.id, args.agentId);
-          if (lastMessage.replyToMessageId !== null) {
-            this.messageManager.setHidden(lastMessage.replyToMessageId, args.agentId);
-          }
-        }
       }
 
       return { success: true };
@@ -382,6 +369,32 @@ export class AgentIPCHandlers {
       this.logger.error(`Failed to cancel message pipeline: ${errorMessage}`);
       return { success: false, error: errorMessage };
     }
+  }
+
+  /**
+   * Cancel active pipeline and normalize in-flight tail visibility/state.
+   * Returns true when a running pipeline was cancelled.
+   * Requirements: llm-integration.8.5, llm-integration.8.6, llm-integration.8.7
+   */
+  private cancelActivePipelineAndNormalizeTail(agentId: string): boolean {
+    const cancelledActivePipeline = this.agentManager.cancelPipeline(agentId);
+    if (!cancelledActivePipeline) {
+      return false;
+    }
+
+    // Keep already-sent user message visible when llm has started:
+    // - hide pending user message if generation hasn't produced an llm message yet
+    // - hide only in-flight llm message when present
+    const lastMessage = this.messageManager.getLastMessage(agentId);
+    if (lastMessage && !lastMessage.hidden) {
+      if (lastMessage.kind === 'user') {
+        this.messageManager.setHidden(lastMessage.id, agentId);
+      } else if (lastMessage.kind === 'llm' && !lastMessage.done) {
+        this.messageManager.hideAndMarkIncomplete(lastMessage.id, agentId);
+      }
+    }
+
+    return true;
   }
 
   /**
