@@ -38,14 +38,35 @@ export interface LLMTool {
 }
 
 /**
- * A streaming chunk from the LLM (reasoning only for now)
- * Requirements: llm-integration.5.3
+ * Error categories in provider chat stream
+ * Requirements: llm-integration.5.1
  */
-export interface ChatChunk {
-  type: 'reasoning';
-  delta: string;
-  done: boolean;
-}
+export type ChatErrorType = 'auth' | 'rate_limit' | 'provider' | 'network' | 'timeout';
+
+/**
+ * A streaming chunk from the LLM
+ * Requirements: llm-integration.5.1, llm-integration.5.3, llm-integration.5.4, llm-integration.5.5
+ */
+export type ChatChunk =
+  | {
+      type: 'reasoning';
+      delta: string;
+    }
+  | {
+      type: 'text';
+      delta: string;
+    }
+  | {
+      type: 'tool_call';
+      callId: string;
+      toolName: string;
+      arguments: Record<string, unknown>;
+    }
+  | {
+      type: 'turn_error';
+      errorType: ChatErrorType;
+      message: string;
+    };
 
 /**
  * Canonical token usage statistics
@@ -69,23 +90,24 @@ export interface LLMUsage {
 }
 
 /**
- * The final action returned by the LLM
- * Requirements: llm-integration.5.4, llm-integration.5.5
+ * Provider-level chat result envelope
+ * - optional final assistant text (fallback if provider exposes final snapshot)
+ * - optional provider usage envelope (canonical/raw)
+ * Requirements: llm-integration.5.1, llm-integration.5.6
  */
+export interface LLMChatResult {
+  text?: string;
+  usage?: LLMUsage;
+}
+
+// Legacy compatibility type for tests/older providers. Chat-flow canonical result is LLMChatResult.text.
 export interface LLMAction {
   type: 'text';
   content: string;
 }
 
-/**
- * Provider-level chat result envelope:
- * - model structured output (action)
- * - optional provider usage envelope (canonical/raw)
- * Requirements: llm-integration.5.1, llm-integration.5.6
- */
-export interface LLMStructuredOutput {
+export interface LLMStructuredOutput extends LLMChatResult {
   action: LLMAction;
-  usage?: LLMUsage;
 }
 
 /**
@@ -106,14 +128,14 @@ export interface ILLMProvider {
    *
    * @param messages - Chat history
    * @param options - Model and request options
-   * @param onChunk - Callback for streaming reasoning chunks
+   * @param onChunk - Callback for streaming provider chunks
    * @returns Provider-level chat result envelope
    */
   chat(
     messages: ChatMessage[],
     options: ChatOptions,
     onChunk: (chunk: ChatChunk) => void
-  ): Promise<LLMStructuredOutput>;
+  ): Promise<LLMChatResult>;
 
   /**
    * Get the name of this provider

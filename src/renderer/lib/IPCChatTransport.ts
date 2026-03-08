@@ -7,6 +7,7 @@ import type {
   MessageCreatedPayload,
   MessageUpdatedPayload,
   MessageLlmReasoningUpdatedPayload,
+  MessageLlmTextUpdatedPayload,
 } from '../../shared/events/types';
 
 /**
@@ -15,7 +16,7 @@ import type {
  *
  * Flow:
  * 1. sendMessages() extracts the last user message and calls window.api.messages.create()
- * 2. Subscribes to IPC events (MESSAGE_CREATED, MESSAGE_UPDATED, MESSAGE_LLM_REASONING_UPDATED)
+ * 2. Subscribes to IPC events (MESSAGE_CREATED, MESSAGE_UPDATED, MESSAGE_LLM_REASONING_UPDATED, MESSAGE_LLM_TEXT_UPDATED)
  * 3. Converts IPC events into UIMessageChunk stream for useChat
  * 4. Closes stream on finish or abort
  */
@@ -90,13 +91,13 @@ export class IPCChatTransport implements ChatTransport<UIMessage> {
               enqueue({ type: 'start', messageId: String(msg.id) });
               enqueue({ type: 'start-step' });
 
-              // If message already has action content (non-streaming case), emit it now
+              // If message already has text content (non-streaming case), emit it now
               const data = msg.payload.data as Record<string, unknown> | undefined;
-              const action = data?.action as { content?: string } | undefined;
-              if (action?.content) {
+              const text = data?.text;
+              if (typeof text === 'string' && text.length > 0) {
                 textPartId = `text-${msg.id}`;
                 enqueue({ type: 'text-start', id: textPartId });
-                enqueue({ type: 'text-delta', id: textPartId, delta: action.content });
+                enqueue({ type: 'text-delta', id: textPartId, delta: text });
                 enqueue({ type: 'text-end', id: textPartId });
                 enqueue({ type: 'finish-step' });
                 enqueue({ type: 'finish' });
@@ -129,21 +130,24 @@ export class IPCChatTransport implements ChatTransport<UIMessage> {
               return;
             }
 
-            const data = msg.payload.data as Record<string, unknown> | undefined;
-            const action = data?.action as { content?: string } | undefined;
-
-            if (action?.content) {
-              // End reasoning if it was streaming
+            if (msg.done) {
               if (reasoningId) {
                 enqueue({ type: 'reasoning-end', id: reasoningId });
                 reasoningId = null;
               }
-
-              // Emit text content
-              textPartId = `text-${msg.id}`;
-              enqueue({ type: 'text-start', id: textPartId });
-              enqueue({ type: 'text-delta', id: textPartId, delta: action.content });
-              enqueue({ type: 'text-end', id: textPartId });
+              if (textPartId) {
+                enqueue({ type: 'text-end', id: textPartId });
+                textPartId = null;
+              } else {
+                const data = msg.payload.data as Record<string, unknown> | undefined;
+                const text = data?.text;
+                if (typeof text === 'string' && text.length > 0) {
+                  const doneTextId = `text-${msg.id}`;
+                  enqueue({ type: 'text-start', id: doneTextId });
+                  enqueue({ type: 'text-delta', id: doneTextId, delta: text });
+                  enqueue({ type: 'text-end', id: doneTextId });
+                }
+              }
               enqueue({ type: 'finish-step' });
               enqueue({ type: 'finish' });
               finish();
@@ -165,7 +169,28 @@ export class IPCChatTransport implements ChatTransport<UIMessage> {
           }
         );
 
-        unsubscribers.push(unsubCreated, unsubUpdated, unsubReasoning);
+        const unsubText = eventBus.subscribe(
+          EVENT_TYPES.MESSAGE_LLM_TEXT_UPDATED,
+          (payload: MessageLlmTextUpdatedPayload) => {
+            if (payload.agentId !== agentId) return;
+            if (llmMessageId === null) {
+              llmMessageId = payload.messageId;
+              enqueue({ type: 'start', messageId: String(payload.messageId) });
+              enqueue({ type: 'start-step' });
+            } else if (llmMessageId !== payload.messageId) {
+              return;
+            }
+
+            if (!textPartId) {
+              textPartId = `text-${payload.messageId}`;
+              enqueue({ type: 'text-start', id: textPartId });
+            }
+
+            enqueue({ type: 'text-delta', id: textPartId, delta: payload.delta });
+          }
+        );
+
+        unsubscribers.push(unsubCreated, unsubUpdated, unsubReasoning, unsubText);
 
         // Handle abort signal
         if (abortSignal) {

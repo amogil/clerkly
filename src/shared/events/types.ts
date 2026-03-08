@@ -115,6 +115,7 @@ export interface AgentCreatedPayload extends BaseEvent {
 }
 export interface AgentUpdatedPayload extends BaseEvent {
   agent: AgentSnapshot;
+  changedFields?: string[];
   timestamp: number;
 }
 export interface AgentArchivedPayload extends BaseEvent {
@@ -129,6 +130,7 @@ export interface MessageCreatedPayload extends BaseEvent {
 }
 export interface MessageUpdatedPayload extends BaseEvent {
   message: MessageSnapshot;
+  changedFields?: string[];
   timestamp: number;
 }
 
@@ -706,13 +708,18 @@ export class AgentUpdatedEvent extends TypedEventClass<AgentUpdatedType> {
   readonly type = EVENT_TYPES.AGENT_UPDATED;
   readonly timestamp: number;
 
-  constructor(public readonly agent: AgentSnapshot) {
+  constructor(
+    public readonly agent: AgentSnapshot,
+    public readonly changedFields?: string[]
+  ) {
     super();
     this.timestamp = Date.now();
   }
 
   toPayload(): EventPayloadWithoutTimestamp<AgentUpdatedType> {
-    return { agent: this.agent };
+    return this.changedFields
+      ? { agent: this.agent, changedFields: this.changedFields }
+      : { agent: this.agent };
   }
 }
 
@@ -759,13 +766,18 @@ export class MessageUpdatedEvent extends TypedEventClass<MessageUpdatedType> {
   readonly type = EVENT_TYPES.MESSAGE_UPDATED;
   readonly timestamp: number;
 
-  constructor(public readonly message: MessageSnapshot) {
+  constructor(
+    public readonly message: MessageSnapshot,
+    public readonly changedFields?: string[]
+  ) {
     super();
     this.timestamp = Date.now();
   }
 
   toPayload(): EventPayloadWithoutTimestamp<MessageUpdatedType> {
-    return { message: this.message };
+    return this.changedFields
+      ? { message: this.message, changedFields: this.changedFields }
+      : { message: this.message };
   }
 }
 

@@ -59,14 +59,14 @@ describe('toUIMessage', () => {
 
   // ─── llm messages ────────────────────────────────────────────────────────
 
-  /* Preconditions: kind: 'llm' message with action.content
+  /* Preconditions: kind: 'llm' message with data.text
      Action: call toUIMessage
      Assertions: returns UIMessage with role: 'assistant' and text part
      Requirements: agents.7.3 */
-  it('should map llm message with action to role: assistant with text part', () => {
+  it('should map llm message with data.text to role: assistant with text part', () => {
     const msg = makeSnapshot({
       kind: 'llm',
-      payload: { data: { action: { content: 'Here is my response' } } },
+      payload: { data: { text: 'Here is my response' } },
     });
     const result = toUIMessage(msg);
 
@@ -76,7 +76,7 @@ describe('toUIMessage', () => {
     expect(textPart).toEqual({ type: 'text', text: 'Here is my response', state: 'done' });
   });
 
-  /* Preconditions: kind: 'llm' message with reasoning and action
+  /* Preconditions: kind: 'llm' message with reasoning and data.text
      Action: call toUIMessage
      Assertions: returns UIMessage with reasoning part before text part
      Requirements: llm-integration.7 */
@@ -86,7 +86,7 @@ describe('toUIMessage', () => {
       payload: {
         data: {
           reasoning: { text: 'Let me think...' },
-          action: { content: 'Answer' },
+          text: 'Answer',
         },
       },
     });
@@ -98,11 +98,11 @@ describe('toUIMessage', () => {
     expect(result!.parts[1]).toEqual({ type: 'text', text: 'Answer', state: 'done' });
   });
 
-  /* Preconditions: kind: 'llm' message without action (streaming in progress)
+  /* Preconditions: kind: 'llm' message without data.text (streaming in progress)
      Action: call toUIMessage
      Assertions: returns UIMessage with empty parts array
      Requirements: agents.4.13 */
-  it('should return empty parts for llm message without action (streaming)', () => {
+  it('should return empty parts for llm message without data.text (streaming)', () => {
     const msg = makeSnapshot({ kind: 'llm', payload: { data: {} } });
     const result = toUIMessage(msg);
 
@@ -188,7 +188,7 @@ describe('toUIMessages', () => {
       makeSnapshot({ id: 1, kind: 'user', payload: { data: { text: 'hi' } } }),
       makeSnapshot({ id: 2, kind: 'user', hidden: true, payload: { data: { text: 'hidden' } } }),
       makeSnapshot({ id: 3, kind: 'tool_call' }),
-      makeSnapshot({ id: 4, kind: 'llm', payload: { data: { action: { content: 'response' } } } }),
+      makeSnapshot({ id: 4, kind: 'llm', payload: { data: { text: 'response' } } }),
     ];
 
     const result = toUIMessages(msgs);

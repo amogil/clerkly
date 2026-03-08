@@ -9,23 +9,18 @@ import { LLMProviderFactory } from '../llm/LLMProviderFactory';
 import { MainEventBus } from '../events/MainEventBus';
 import {
   MessageLlmReasoningUpdatedEvent,
+  MessageLlmTextUpdatedEvent,
+  MessageToolCallEvent,
   AgentRateLimitEvent,
   LLMPipelineDiagnosticEvent,
 } from '../../shared/events/types';
 import { LLM_CHAT_MODELS } from '../llm/LLMConfig';
 import { Logger } from '../Logger';
-import type { ILLMProvider, ChatOptions, LLMStructuredOutput } from '../llm/ILLMProvider';
-import {
-  InvalidStructuredOutputError,
-  safeParseStructuredOutput,
-} from '../llm/StructuredOutputContract';
+import type { ILLMProvider, ChatOptions, LLMChatResult } from '../llm/ILLMProvider';
 import { handleBackgroundError } from '../ErrorHandler';
 import { LLMRequestAbortedError } from '../llm/LLMErrors';
 
 import type { LLMProvider } from '../../types';
-
-const INVALID_STRUCTURED_OUTPUT_RETRY_INSTRUCTION =
-  'Your previous response did not match the required JSON schema. Reply again using the exact required format only.';
 
 /**
  * Error type categories for kind:error messages
@@ -154,7 +149,6 @@ export class MainPipeline {
         (messageId) => {
           lastLlmMessageId = messageId;
         },
-        () => lastLlmMessageId,
         () => {
           lastLlmMessageId = null;
         }
@@ -194,16 +188,17 @@ export class MainPipeline {
 
     const messages = this.messageManager.listForModelHistory(agentId);
     const baseChatMessages = this.promptBuilder.buildMessages(messages);
+    const builtPrompt = this.promptBuilder.build(messages);
     const replyToMessageId = userMessageId;
-    const options = this.resolveOptions(provider);
+    const options = { ...this.resolveOptions(provider), tools: builtPrompt.tools };
     const llmProvider = this.createProvider(provider, apiKey);
 
     return { provider, apiKey, baseChatMessages, options, replyToMessageId, llmProvider };
   }
 
   /**
-   * Execute the LLM request with retry/validation.
-   * Requirements: llm-integration.1, llm-integration.3, llm-integration.12
+   * Execute a single provider request with streaming updates.
+   * Requirements: llm-integration.1, llm-integration.2, llm-integration.5
    */
   private async executeWithRetries(
     context: {
@@ -215,91 +210,37 @@ export class MainPipeline {
     agentId: string,
     signal: AbortSignal | undefined,
     setLastLlmMessageId: (messageId: number) => void,
-    getLastLlmMessageId: () => number | null,
     clearLastLlmMessageId: () => void
   ): Promise<void> {
-    // Requirements: llm-integration.12.1
-    // Initial request + up to 2 retries.
-    const maxRetries = 2;
-    const maxAttempts = maxRetries + 1;
-    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-      let output: LLMStructuredOutput;
-      let llmMessageId: number | null;
-      let accumulatedReasoning: string;
+    const streamResult = await this.callProviderWithStreaming(
+      context,
+      agentId,
+      signal,
+      setLastLlmMessageId
+    );
 
-      try {
-        const result = await this.callProviderWithStreaming(
-          context,
-          attempt,
-          agentId,
-          signal,
-          setLastLlmMessageId
-        );
-        output = result.output;
-        llmMessageId = result.llmMessageId;
-        accumulatedReasoning = result.accumulatedReasoning;
-      } catch (err) {
-        if (err instanceof InvalidStructuredOutputError) {
-          const action = this.handleInvalidStructuredOutput(
-            attempt,
-            maxAttempts,
-            agentId,
-            context.replyToMessageId,
-            getLastLlmMessageId(),
-            clearLastLlmMessageId
-          );
-          if (action === 'retry') {
-            continue;
-          }
-          return;
-        }
-        throw err;
-      }
-
-      if (signal?.aborted) {
-        this.handleAbortAfterStreaming(llmMessageId, agentId, clearLastLlmMessageId);
-        return;
-      }
-
-      const validation = this.validateStructuredOutput(output);
-      if (!validation.ok) {
-        const action = this.handleInvalidStructuredOutput(
-          attempt,
-          maxAttempts,
-          agentId,
-          context.replyToMessageId,
-          llmMessageId,
-          clearLastLlmMessageId
-        );
-        if (action === 'retry') {
-          continue;
-        }
-        return;
-      }
-
-      const finalMessageId = this.writeFinalAction(
-        agentId,
-        context.replyToMessageId,
-        llmMessageId,
-        accumulatedReasoning,
-        context.options,
-        output
-      );
-      setLastLlmMessageId(finalMessageId);
-
-      this.persistUsageEnvelope(finalMessageId, agentId, output);
-
-      this.logger.info(`Pipeline completed for agent ${agentId}`);
+    if (signal?.aborted) {
+      this.handleAbortAfterStreaming(streamResult.llmMessageId, agentId, clearLastLlmMessageId);
       return;
     }
 
-    if (getLastLlmMessageId() !== null) {
-      clearLastLlmMessageId();
-    }
+    const finalMessageId = this.writeFinalMessage(
+      agentId,
+      context.replyToMessageId,
+      streamResult.llmMessageId,
+      context.options.model,
+      streamResult.accumulatedReasoning,
+      streamResult.accumulatedText,
+      streamResult.output
+    );
+    setLastLlmMessageId(finalMessageId);
+
+    this.persistUsageEnvelope(finalMessageId, agentId, streamResult.output);
+    this.logger.info(`Pipeline completed for agent ${agentId}`);
   }
 
   /**
-   * Call provider with streaming reasoning updates.
+   * Call provider and map stream chunks into llm message updates/events.
    * Requirements: llm-integration.1.5, llm-integration.1.6, llm-integration.2
    */
   private async callProviderWithStreaming(
@@ -309,94 +250,144 @@ export class MainPipeline {
       replyToMessageId: number;
       llmProvider: ILLMProvider;
     },
-    attempt: number,
     agentId: string,
     signal: AbortSignal | undefined,
     setLastLlmMessageId: (messageId: number) => void
   ): Promise<{
-    output: LLMStructuredOutput;
+    output: LLMChatResult;
     llmMessageId: number | null;
     accumulatedReasoning: string;
+    accumulatedText: string;
   }> {
     let llmMessageId: number | null = null;
     let accumulatedReasoning = '';
+    let accumulatedText = '';
 
-    const chatMessages =
-      attempt === 0
-        ? context.baseChatMessages
-        : [
-            ...context.baseChatMessages,
-            {
-              role: 'system' as const,
-              content: INVALID_STRUCTURED_OUTPUT_RETRY_INSTRUCTION,
-            },
-          ];
+    const output = await context.llmProvider.chat(
+      context.baseChatMessages,
+      context.options,
+      (chunk) => {
+        if (signal?.aborted) {
+          return;
+        }
 
-    const output = await context.llmProvider.chat(chatMessages, context.options, (chunk) => {
-      if (signal?.aborted) return;
-      if (chunk.type !== 'reasoning' || chunk.done || !chunk.delta) return;
+        if (chunk.type === 'reasoning') {
+          if (!chunk.delta) {
+            return;
+          }
+          accumulatedReasoning += chunk.delta;
+          llmMessageId = this.upsertStreamingMessage(
+            llmMessageId,
+            agentId,
+            context.replyToMessageId,
+            context.options.model,
+            accumulatedReasoning,
+            accumulatedText,
+            setLastLlmMessageId
+          );
+          MainEventBus.getInstance().publish(
+            new MessageLlmReasoningUpdatedEvent(
+              llmMessageId,
+              agentId,
+              chunk.delta,
+              accumulatedReasoning
+            )
+          );
+          return;
+        }
 
-      accumulatedReasoning += chunk.delta;
-      llmMessageId = this.upsertReasoningMessage(
-        llmMessageId,
-        agentId,
-        context.replyToMessageId,
-        context.options.model,
-        accumulatedReasoning,
-        chunk.delta,
-        setLastLlmMessageId
-      );
-    });
+        if (chunk.type === 'text') {
+          if (!chunk.delta) {
+            return;
+          }
+          accumulatedText += chunk.delta;
+          llmMessageId = this.upsertStreamingMessage(
+            llmMessageId,
+            agentId,
+            context.replyToMessageId,
+            context.options.model,
+            accumulatedReasoning,
+            accumulatedText,
+            setLastLlmMessageId
+          );
+          MainEventBus.getInstance().publish(
+            new MessageLlmTextUpdatedEvent(llmMessageId, agentId, chunk.delta, accumulatedText)
+          );
+          return;
+        }
 
-    return { output, llmMessageId, accumulatedReasoning };
+        if (chunk.type === 'tool_call') {
+          llmMessageId = this.upsertStreamingMessage(
+            llmMessageId,
+            agentId,
+            context.replyToMessageId,
+            context.options.model,
+            accumulatedReasoning,
+            accumulatedText,
+            setLastLlmMessageId
+          );
+          MainEventBus.getInstance().publish(
+            new MessageToolCallEvent(
+              agentId,
+              llmMessageId,
+              chunk.callId,
+              chunk.toolName,
+              chunk.arguments
+            )
+          );
+          return;
+        }
+
+        if (chunk.type === 'turn_error') {
+          throw new Error(chunk.message);
+        }
+      }
+    );
+
+    if (!accumulatedText) {
+      accumulatedText =
+        output.text || (output as { action?: { content?: string } }).action?.content || '';
+    }
+
+    return { output, llmMessageId, accumulatedReasoning, accumulatedText };
   }
 
   /**
-   * Create or update the llm message for reasoning chunks.
-   * Requirements: llm-integration.1.5, llm-integration.1.6, llm-integration.2.1
+   * Upsert in-flight llm message during streaming.
+   * Requirements: llm-integration.1.5, llm-integration.1.6
    */
-  private upsertReasoningMessage(
+  private upsertStreamingMessage(
     llmMessageId: number | null,
     agentId: string,
     replyToMessageId: number,
     model: string,
     accumulatedReasoning: string,
-    delta: string,
+    accumulatedText: string,
     setLastLlmMessageId: (messageId: number) => void
   ): number {
+    const streamingPayload = {
+      data: {
+        model,
+        reasoning: accumulatedReasoning
+          ? { text: accumulatedReasoning, excluded_from_replay: true }
+          : undefined,
+        text: accumulatedText || undefined,
+      },
+    };
+
     if (llmMessageId === null) {
       const llmMsg = this.messageManager.create(
         agentId,
         'llm',
-        {
-          data: {
-            model,
-            reasoning: { text: accumulatedReasoning, excluded_from_replay: true },
-          },
-        },
+        streamingPayload,
         replyToMessageId,
         false
       );
       setLastLlmMessageId(llmMsg.id);
-      llmMessageId = llmMsg.id;
-    } else {
-      this.messageManager.update(
-        llmMessageId,
-        agentId,
-        {
-          data: {
-            model,
-            reasoning: { text: accumulatedReasoning, excluded_from_replay: true },
-          },
-        },
-        false
-      );
+      return llmMsg.id;
     }
 
-    MainEventBus.getInstance().publish(
-      new MessageLlmReasoningUpdatedEvent(llmMessageId, agentId, delta, accumulatedReasoning)
-    );
-
+    this.messageManager.update(llmMessageId, agentId, streamingPayload, false);
     return llmMessageId;
   }
 
@@ -416,61 +407,27 @@ export class MainPipeline {
   }
 
   /**
-   * Handle invalid structured output.
-   * Requirements: llm-integration.12.1, llm-integration.12.2
+   * Finalize llm message with done=true and canonical data.text.
+   * Requirements: llm-integration.1.6, llm-integration.6.6.1
    */
-  private handleInvalidStructuredOutput(
-    attempt: number,
-    maxAttempts: number,
+  private writeFinalMessage(
     agentId: string,
     replyToMessageId: number,
     llmMessageId: number | null,
-    clearLastLlmMessageId: () => void
-  ): 'retry' | 'error' {
-    if (llmMessageId !== null) {
-      this.hideIncompleteLlmMessage(llmMessageId, agentId);
-      clearLastLlmMessageId();
-    }
-    if (attempt < maxAttempts - 1) {
-      return 'retry';
-    }
-
-    this.messageManager.create(
-      agentId,
-      'error',
-      {
-        data: {
-          error: {
-            type: 'provider',
-            message: 'Invalid response format. Please try again later.',
-          },
-        },
-      },
-      replyToMessageId,
-      true
-    );
-    return 'error';
-  }
-
-  /**
-   * Write the final LLM action to the message.
-   * Requirements: llm-integration.1.6, llm-integration.7.3
-   */
-  private writeFinalAction(
-    agentId: string,
-    replyToMessageId: number,
-    llmMessageId: number | null,
+    model: string,
     accumulatedReasoning: string,
-    options: ChatOptions,
-    output: LLMStructuredOutput
+    accumulatedText: string,
+    output: LLMChatResult
   ): number {
+    const legacyAction = (output as { action?: { content?: string } }).action;
+    const finalText = accumulatedText || output.text || legacyAction?.content || '';
     const finalPayload = {
       data: {
-        model: options.model,
+        model,
         reasoning: accumulatedReasoning
           ? { text: accumulatedReasoning, excluded_from_replay: true }
           : undefined,
-        action: { type: output.action.type, content: output.action.content },
+        text: finalText,
       },
     };
 
@@ -487,11 +444,7 @@ export class MainPipeline {
    * Persist usage envelope in a dedicated DB column as separate step.
    * Requirements: llm-integration.13
    */
-  private persistUsageEnvelope(
-    messageId: number,
-    agentId: string,
-    output: LLMStructuredOutput
-  ): void {
+  private persistUsageEnvelope(messageId: number, agentId: string, output: LLMChatResult): void {
     if (!output.usage) {
       return;
     }
@@ -600,18 +553,6 @@ export class MainPipeline {
   private resolveOptions(provider: LLMProvider): ChatOptions {
     const env = process.env.NODE_ENV === 'test' ? 'test' : 'prod';
     return LLM_CHAT_MODELS[provider]?.[env] ?? LLM_CHAT_MODELS.openai[env];
-  }
-
-  private validateStructuredOutput(output: LLMStructuredOutput): { ok: boolean } {
-    // Validate only model structured payload fields.
-    // Provider usage envelope is handled separately via messages.usage_json.
-    const parsed = safeParseStructuredOutput({
-      action: output.action,
-    });
-    if (!parsed.success) {
-      return { ok: false };
-    }
-    return { ok: true };
   }
 
   /**

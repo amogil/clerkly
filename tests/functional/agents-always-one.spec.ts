@@ -168,7 +168,7 @@ test.describe('Agents - Auto-create First Agent', () => {
     await expect(inputField).toBeEnabled();
 
     // 5. Send button
-    const sendButton = window.locator('button:has-text("Send"), button:has(svg)').last();
+    const sendButton = window.locator('[data-testid="prompt-input-send"]');
     await expect(sendButton).toBeVisible();
 
     // Verify startup loader does not reappear after chat becomes interactive.

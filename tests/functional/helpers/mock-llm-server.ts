@@ -35,8 +35,7 @@ export class MockLLMServer {
   // Streaming chat response config
   private streamingEnabled: boolean = false;
   private streamingReasoning: string = '';
-  private streamingContent: string =
-    '{"action":{"type":"text","content":"Hello! How can I help?"}}';
+  private streamingContent: string = 'Hello! How can I help?';
   private streamingErrorStatus: number = 0; // 0 = no error
   private streamingChunkDelayMs: number = 0; // delay between chunks (for interrupt tests)
   private rateLimitEnabled: boolean = false;
@@ -168,7 +167,7 @@ export class MockLLMServer {
     // when tests reconfigure the mock while an older stream is still in-flight.
     const streamingErrorStatus = this.streamingErrorStatus;
     const streamingReasoning = this.streamingReasoning;
-    const streamingContent = this.streamingContent;
+    const streamingContent = this.normalizeStreamingContent(this.streamingContent);
     const streamingChunkDelayMs = this.streamingChunkDelayMs;
 
     if (streamingErrorStatus > 0) {
@@ -201,8 +200,8 @@ export class MockLLMServer {
         }
       }
 
-      // Stream content chunks (structured output JSON split into pieces)
-      const contentChunks = streamingContent.match(/.{1,20}/g) || [streamingContent];
+      // Stream content chunks; include newlines so multiline markdown is preserved.
+      const contentChunks = streamingContent.match(/[\s\S]{1,20}/g) || [streamingContent];
       for (const chunk of contentChunks) {
         sendChunk({ type: 'response.output_text.delta', delta: chunk });
         if (streamingChunkDelayMs > 0) {
@@ -232,6 +231,17 @@ export class MockLLMServer {
       // Client disconnected — ignore
       res.end();
     });
+  }
+
+  private normalizeStreamingContent(content: string): string {
+    if (!content) return content;
+    try {
+      const parsed = JSON.parse(content) as { action?: { content?: unknown } };
+      const actionText = parsed?.action?.content;
+      return typeof actionText === 'string' ? actionText : content;
+    } catch {
+      return content;
+    }
   }
 
   private handleAnthropic(res: http.ServerResponse): void {

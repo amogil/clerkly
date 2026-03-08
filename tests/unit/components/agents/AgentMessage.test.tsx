@@ -53,16 +53,16 @@ describe('AgentMessage — user', () => {
 });
 
 describe('AgentMessage — llm', () => {
-  /* Preconditions: kind:llm with action.content
+  /* Preconditions: kind:llm with data.text
      Action: render AgentMessage
      Assertions: message-llm and message-llm-action visible, content rendered
      Requirements: llm-integration.7 */
-  it('should render llm message with action content', () => {
+  it('should render llm message with data.text', () => {
     render(
       <AgentMessage
         message={baseMessage({
           kind: 'llm',
-          payload: { data: { action: { content: 'Response text' } } },
+          payload: { data: { text: 'Response text' } },
         })}
       />
     );
@@ -71,19 +71,19 @@ describe('AgentMessage — llm', () => {
     expect(screen.getByText('Response text')).toBeInTheDocument();
   });
 
-  /* Preconditions: kind:llm without action and without reasoning
+  /* Preconditions: kind:llm without data.text and without reasoning
      Action: render AgentMessage
-     Assertions: no loading indicator and no action content
+     Assertions: no loading indicator and no response text content
      Requirements: llm-integration.7 */
-  it('should not render loading indicator when action and reasoning are absent', () => {
+  it('should not render loading indicator when text and reasoning are absent', () => {
     render(<AgentMessage message={baseMessage({ kind: 'llm', payload: { data: {} } })} />);
     expect(screen.queryByTestId('message-llm-loading')).not.toBeInTheDocument();
     expect(screen.queryByTestId('message-llm-action')).not.toBeInTheDocument();
   });
 
-  /* Preconditions: kind:llm with reasoning and action
+  /* Preconditions: kind:llm with reasoning and data.text
      Action: render AgentMessage
-     Assertions: reasoning testid present, action content present
+     Assertions: reasoning testid present, response text present
      Requirements: llm-integration.2, llm-integration.7 */
   it('should render reasoning block when present', () => {
     render(
@@ -93,7 +93,7 @@ describe('AgentMessage — llm', () => {
           payload: {
             data: {
               reasoning: { text: 'Thinking...' },
-              action: { content: 'Answer' },
+              text: 'Answer',
             },
           },
         })}
@@ -128,7 +128,7 @@ describe('AgentMessage — llm', () => {
     expect(screen.queryByTestId('message-llm-avatar')).not.toBeInTheDocument();
   });
 
-  /* Preconditions: kind:llm with action but no reasoning
+  /* Preconditions: kind:llm with data.text but no reasoning
      Action: render AgentMessage
      Assertions: no reasoning block rendered
      Requirements: llm-integration.7 */
@@ -137,22 +137,20 @@ describe('AgentMessage — llm', () => {
       <AgentMessage
         message={baseMessage({
           kind: 'llm',
-          payload: { data: { action: { content: 'Answer' } } },
+          payload: { data: { text: 'Answer' } },
         })}
       />
     );
     expect(screen.queryByTestId('message-llm-reasoning')).not.toBeInTheDocument();
   });
 
-  /* Preconditions: kind:llm message with action content
+  /* Preconditions: kind:llm message with data.text
      Action: render AgentMessage
      Assertions: top message avatar is not rendered as separate block
      Requirements: agents.4.11 */
-  it('should not render top avatar for llm message with action content', () => {
+  it('should not render top avatar for llm message with data.text', () => {
     render(
-      <AgentMessage
-        message={baseMessage({ kind: 'llm', payload: { data: { action: { content: 'Hi' } } } })}
-      />
+      <AgentMessage message={baseMessage({ kind: 'llm', payload: { data: { text: 'Hi' } } })} />
     );
     expect(screen.queryByTestId('message-llm-avatar')).not.toBeInTheDocument();
   });

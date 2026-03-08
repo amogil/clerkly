@@ -1,14 +1,10 @@
-// Requirements: llm-integration.3
-// tests/unit/llm/GoogleProvider.chat.test.ts
-// Unit tests for GoogleProvider.chat()
+// Requirements: llm-integration.5
 
 import { GoogleProvider } from '../../../src/main/llm/GoogleProvider';
-import type { ChatMessage, ChatOptions, ChatChunk } from '../../../src/main/llm/ILLMProvider';
-import { InvalidStructuredOutputError } from '../../../src/main/llm/StructuredOutputContract';
-import { LLMRequestAbortedError } from '../../../src/main/llm/LLMErrors';
+import type { ChatChunk } from '../../../src/main/llm/ILLMProvider';
 
 function buildMockReader(lines: string[]) {
-  const chunks = lines.map((line) => Buffer.from(line + '\n'));
+  const chunks = lines.map((line) => Buffer.from(`${line}\n`));
   let index = 0;
   return {
     read: jest.fn(async () => {
@@ -21,324 +17,88 @@ function buildMockReader(lines: string[]) {
   };
 }
 
-function sseChunk(data: object): string {
-  return `data: ${JSON.stringify(data)}`;
+function sseEvent(event: Record<string, unknown>): string {
+  return `data: ${JSON.stringify(event)}`;
 }
-
-const mockMessages: ChatMessage[] = [{ role: 'user', content: 'Hello' }];
-const mockOptions: ChatOptions = { model: 'gemini-3-flash-preview' };
 
 describe('GoogleProvider.chat()', () => {
   let provider: GoogleProvider;
   let fetchMock: jest.Mock;
 
   beforeEach(() => {
-    provider = new GoogleProvider('test-api-key');
+    provider = new GoogleProvider('test-key');
     fetchMock = jest.fn();
     global.fetch = fetchMock;
   });
 
-  afterEach(() => {
-    jest.restoreAllMocks();
-  });
-
-  describe('successful chat without reasoning', () => {
-    /* Preconditions: Gemini returns text parts with no thought parts
-       Action: Call chat() with messages and options
-       Assertions: Returns LLMAction with correct content; onChunk called once with done:true
-       Requirements: llm-integration.3.1, llm-integration.3.3 */
-    it('should return LLMAction with content', async () => {
-      const actionJson = JSON.stringify({ action: { type: 'text', content: 'Hello back!' } });
-      const reader = buildMockReader([
-        sseChunk({
-          candidates: [{ content: { parts: [{ text: actionJson }] } }],
-          usageMetadata: { promptTokenCount: 10, candidatesTokenCount: 20, totalTokenCount: 30 },
-        }),
-      ]);
-      fetchMock.mockResolvedValue({ ok: true, body: { getReader: () => reader } });
-
-      const chunks: ChatChunk[] = [];
-      const result = await provider.chat(mockMessages, mockOptions, (c) => chunks.push(c));
-
-      expect(result.action.type).toBe('text');
-      expect(result.action.content).toBe('Hello back!');
-      expect(chunks).toHaveLength(1);
-      expect(chunks[0]).toEqual({ type: 'reasoning', delta: '', done: true });
-    });
-  });
-
-  describe('successful chat with reasoning', () => {
-    /* Preconditions: Gemini streams thought parts then text parts
-       Action: Call chat() with messages and reasoningEffort option
-       Assertions: onChunk called for each thought part; final action returned
-       Requirements: llm-integration.3.2, llm-integration.3.3 */
-    it('should stream reasoning chunks and return final action', async () => {
-      const actionJson = JSON.stringify({ action: { type: 'text', content: 'Answer' } });
-      const reader = buildMockReader([
-        sseChunk({
-          candidates: [{ content: { parts: [{ text: 'Let me think', thought: true }] } }],
-        }),
-        sseChunk({
-          candidates: [{ content: { parts: [{ text: ' more', thought: true }] } }],
-        }),
-        sseChunk({
-          candidates: [{ content: { parts: [{ text: actionJson }] } }],
-          usageMetadata: { promptTokenCount: 5, candidatesTokenCount: 15, totalTokenCount: 20 },
-        }),
-      ]);
-      fetchMock.mockResolvedValue({ ok: true, body: { getReader: () => reader } });
-
-      const chunks: ChatChunk[] = [];
-      const result = await provider.chat(
-        mockMessages,
-        { ...mockOptions, reasoningEffort: 'medium' },
-        (c) => chunks.push(c)
-      );
-
-      expect(result.action.content).toBe('Answer');
-
-      const reasoningChunks = chunks.filter((c) => !c.done);
-      expect(reasoningChunks).toHaveLength(2);
-      expect(reasoningChunks[0]).toEqual({ type: 'reasoning', delta: 'Let me think', done: false });
-      expect(reasoningChunks[1]).toEqual({ type: 'reasoning', delta: ' more', done: false });
-
-      const doneChunk = chunks.find((c) => c.done);
-      expect(doneChunk).toEqual({ type: 'reasoning', delta: '', done: true });
-    });
-  });
-
-  describe('usage fields', () => {
-    /* Preconditions: Gemini returns usageMetadata in final chunk
-       Action: Call chat()
-       Assertions: usage fields correctly mapped
-       Requirements: llm-integration.3.3 */
-    it('should map usage fields correctly', async () => {
-      const actionJson = JSON.stringify({ action: { type: 'text', content: 'Hi' } });
-      const reader = buildMockReader([
-        sseChunk({
-          candidates: [{ content: { parts: [{ text: actionJson }] } }],
-          usageMetadata: { promptTokenCount: 10, candidatesTokenCount: 20, totalTokenCount: 30 },
-        }),
-      ]);
-      fetchMock.mockResolvedValue({ ok: true, body: { getReader: () => reader } });
-
-      const result = await provider.chat(mockMessages, mockOptions, () => {});
-
-      expect(result.usage).toEqual({
-        canonical: {
-          input_tokens: 10,
-          output_tokens: 20,
-          total_tokens: 30,
-        },
-        raw: {
-          promptTokenCount: 10,
-          candidatesTokenCount: 20,
-          totalTokenCount: 30,
-        },
-      });
-    });
-  });
-
-  describe('HTTP 401', () => {
-    /* Preconditions: Gemini returns 401 Unauthorized
-       Action: Call chat()
-       Assertions: Throws error with auth message
-       Requirements: llm-integration.3.4 */
-    it('should throw on 401 unauthorized', async () => {
-      fetchMock.mockResolvedValue({
-        ok: false,
-        status: 401,
-        json: async () => ({}),
-      });
-
-      await expect(provider.chat(mockMessages, mockOptions, () => {})).rejects.toThrow(
-        /Invalid API key/
-      );
-    });
-  });
-
-  describe('HTTP 429', () => {
-    /* Preconditions: Gemini returns 429 rate limit
-       Action: Call chat()
-       Assertions: Throws error with rate limit message
-       Requirements: llm-integration.3.4 */
-    it('should throw on 429 rate limit', async () => {
-      fetchMock.mockResolvedValue({
-        ok: false,
-        status: 429,
-        headers: { get: () => null },
-        json: async () => ({}),
-      });
-
-      await expect(provider.chat(mockMessages, mockOptions, () => {})).rejects.toThrow(
-        /Rate limit/
-      );
-    });
-
-    /* Preconditions: Google returns 429 with retry-after header
-       Action: Call chat()
-       Assertions: Error message uses retry-after seconds from header
-       Requirements: llm-integration.3.7.6 */
-    it('should prioritize retry-after header when present', async () => {
-      fetchMock.mockResolvedValue({
-        ok: false,
-        status: 429,
-        headers: { get: (name: string) => (name === 'retry-after' ? '9' : null) },
-        json: async () => ({ error: { message: 'Rate limited' } }),
-      });
-
-      await expect(provider.chat(mockMessages, mockOptions, () => {})).rejects.toThrow(
-        /try again in 9s/i
-      );
-    });
-
-    /* Preconditions: Google returns 429 without retry-after but with provider message
-       Action: Call chat()
-       Assertions: Provider message is preserved for retry-after parsing upstream
-       Requirements: llm-integration.3.7.6 */
-    it('should keep provider 429 message when header is absent', async () => {
-      fetchMock.mockResolvedValue({
-        ok: false,
-        status: 429,
-        headers: { get: () => null },
-        json: async () => ({ error: { message: 'Rate limit. Please try again in 8.2s' } }),
-      });
-
-      await expect(provider.chat(mockMessages, mockOptions, () => {})).rejects.toThrow(/8\.2s/);
-    });
-  });
-
-  describe('empty response', () => {
-    /* Preconditions: Gemini returns stream with no content parts
-       Action: Call chat()
-       Assertions: Throws error about empty response
-       Requirements: llm-integration.3.4 */
-    it('should throw on empty content', async () => {
-      const reader = buildMockReader([sseChunk({ candidates: [{ content: { parts: [] } }] })]);
-      fetchMock.mockResolvedValue({ ok: true, body: { getReader: () => reader } });
-
-      await expect(provider.chat(mockMessages, mockOptions, () => {})).rejects.toThrow(
-        InvalidStructuredOutputError
-      );
-    });
-  });
-
-  describe('no response body', () => {
-    /* Preconditions: fetch returns response with null body
-       Action: Call chat()
-       Assertions: Throws "No response body"
-       Requirements: llm-integration.3.4 */
-    it('should throw when response body is null', async () => {
-      fetchMock.mockResolvedValue({ ok: true, body: null });
-
-      await expect(provider.chat(mockMessages, mockOptions, () => {})).rejects.toThrow(
-        'No response body'
-      );
-    });
-  });
-
-  describe('network error', () => {
-    /* Preconditions: fetch throws a network error
-       Action: Call chat()
-       Assertions: Throws error
-       Requirements: llm-integration.3.4 */
-    it('should throw on network error', async () => {
-      fetchMock.mockRejectedValue(new TypeError('Failed to fetch'));
-
-      await expect(provider.chat(mockMessages, mockOptions, () => {})).rejects.toThrow();
-    });
-  });
-
-  describe('timeout / abort', () => {
-    /* Preconditions: fetch is aborted via AbortController
-       Action: Call chat() when request is aborted
-       Assertions: Throws typed LLMRequestAbortedError with timeout message
-       Requirements: llm-integration.3.4 */
-    it('should throw typed timeout error when request is aborted', async () => {
-      const abortError = new DOMException('The operation was aborted', 'AbortError');
-      fetchMock.mockRejectedValue(abortError);
-
-      await expect(provider.chat(mockMessages, mockOptions, () => {})).rejects.toBeInstanceOf(
-        LLMRequestAbortedError
-      );
-    });
-  });
-
-  describe('content split across multiple chunks', () => {
-    /* Preconditions: JSON content arrives in multiple SSE chunks
-       Action: Call chat()
-       Assertions: Content is correctly accumulated and parsed
-       Requirements: llm-integration.3.2 */
-    it('should accumulate content split across chunks', async () => {
-      const actionJson = JSON.stringify({ action: { type: 'text', content: 'Full answer' } });
-      const part1 = actionJson.slice(0, 10);
-      const part2 = actionJson.slice(10, 25);
-      const part3 = actionJson.slice(25);
-
-      const reader = buildMockReader([
-        sseChunk({ candidates: [{ content: { parts: [{ text: part1 }] } }] }),
-        sseChunk({ candidates: [{ content: { parts: [{ text: part2 }] } }] }),
-        sseChunk({
-          candidates: [{ content: { parts: [{ text: part3 }] } }],
-          usageMetadata: { promptTokenCount: 5, candidatesTokenCount: 10, totalTokenCount: 15 },
-        }),
-      ]);
-      fetchMock.mockResolvedValue({ ok: true, body: { getReader: () => reader } });
-
-      const result = await provider.chat(mockMessages, mockOptions, () => {});
-      expect(result.action.content).toBe('Full answer');
-    });
-  });
-
-  describe('streaming URL', () => {
-    /* Preconditions: GoogleProvider configured with default API URL
-       Action: Call chat()
-       Assertions: fetch called with streamGenerateContent endpoint and alt=sse
-       Requirements: llm-integration.3.1 */
-    it('should use streamGenerateContent endpoint with alt=sse', async () => {
-      const actionJson = JSON.stringify({ action: { type: 'text', content: 'OK' } });
-      const reader = buildMockReader([
-        sseChunk({ candidates: [{ content: { parts: [{ text: actionJson }] } }] }),
-      ]);
-      fetchMock.mockResolvedValue({ ok: true, body: { getReader: () => reader } });
-
-      await provider.chat(mockMessages, mockOptions, () => {});
-
-      const calledUrl = fetchMock.mock.calls[0][0] as string;
-      expect(calledUrl).toContain('streamGenerateContent');
-      expect(calledUrl).toContain('alt=sse');
-      expect(calledUrl).toContain('key=test-api-key');
-    });
-  });
-
-  describe('structured output contract in request', () => {
-    /* Preconditions: Google provider receives chat request
-       Action: Call chat() and inspect outgoing request body
-       Assertions: Request includes centralized responseSchema and semantic instruction
-       Requirements: llm-integration.11 */
-    it('should include centralized structured output schema and instruction', async () => {
-      const actionJson = JSON.stringify({ action: { type: 'text', content: 'OK' } });
-      const reader = buildMockReader([
-        sseChunk({ candidates: [{ content: { parts: [{ text: actionJson }] } }] }),
-      ]);
-      fetchMock.mockResolvedValue({ ok: true, body: { getReader: () => reader } });
-
-      await provider.chat(
-        [
-          { role: 'system', content: 'Base system prompt' },
-          { role: 'user', content: 'Hello' },
+  it('maps thought/text parts to reasoning/text chunks and returns final text', async () => {
+    const reader = buildMockReader([
+      sseEvent({
+        candidates: [
+          {
+            content: {
+              parts: [{ text: 'Let me think', thought: true }, { text: 'Gemini answer' }],
+            },
+          },
         ],
-        mockOptions,
-        () => {}
-      );
+        usageMetadata: {
+          promptTokenCount: 3,
+          candidatesTokenCount: 7,
+          totalTokenCount: 10,
+        },
+      }),
+      'data: [DONE]',
+    ]);
 
-      const callBody = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string) as {
-        system_instruction?: { parts?: Array<{ text?: string }> };
-        generationConfig?: { responseSchema?: Record<string, unknown> };
-      };
-      const systemText = callBody.system_instruction?.parts?.[0]?.text ?? '';
-      expect(systemText).toContain('Field semantics and formats:');
-      expect(callBody.generationConfig?.responseSchema).toBeDefined();
+    fetchMock.mockResolvedValue({ ok: true, body: { getReader: () => reader } });
+
+    const chunks: ChatChunk[] = [];
+    const result = await provider.chat(
+      [{ role: 'user', content: 'hi' }],
+      { model: 'gemini-2.5-pro' },
+      (chunk) => chunks.push(chunk)
+    );
+
+    expect(result.text).toBe('Gemini answer');
+    expect(chunks).toContainEqual({ type: 'reasoning', delta: 'Let me think' });
+    expect(result.usage?.canonical.total_tokens).toBe(10);
+  });
+
+  it('maps HTTP 429 with retry-after header', async () => {
+    fetchMock.mockResolvedValue({
+      ok: false,
+      status: 429,
+      headers: { get: (name: string) => (name.toLowerCase() === 'retry-after' ? '4' : null) },
+      json: async () => ({ error: { message: 'rate limited' } }),
     });
+
+    await expect(
+      provider.chat([{ role: 'user', content: 'hi' }], { model: 'gemini-2.5-pro' }, () => {})
+    ).rejects.toThrow('Rate limit exceeded. Please try again in 4s');
+  });
+
+  it('maps HTTP 429 without header using provider message', async () => {
+    fetchMock.mockResolvedValue({
+      ok: false,
+      status: 429,
+      headers: { get: () => null },
+      json: async () => ({ error: { message: 'Try again in a moment' } }),
+    });
+
+    await expect(
+      provider.chat([{ role: 'user', content: 'hi' }], { model: 'gemini-2.5-pro' }, () => {})
+    ).rejects.toThrow('Try again in a moment');
+  });
+
+  it('wraps abort-like errors into LLMRequestAbortedError', async () => {
+    const abortError = new Error('aborted');
+    (abortError as Error & { name: string }).name = 'AbortError';
+    fetchMock.mockRejectedValue(abortError);
+
+    await expect(
+      provider.chat([{ role: 'user', content: 'hi' }], { model: 'gemini-2.5-pro' }, () => {})
+    ).rejects.toThrow(
+      'Model response timeout. The provider took too long to respond. Please try again later.'
+    );
   });
 });

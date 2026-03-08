@@ -6,16 +6,10 @@ import {
   ChatMessage,
   ChatOptions,
   ChatChunk,
-  LLMStructuredOutput,
+  LLMChatResult,
   LLMUsage,
 } from './ILLMProvider';
 import { LLM_PROVIDERS, ERROR_MESSAGES, CHAT_TIMEOUT_MS } from './LLMConfig';
-import {
-  buildStructuredOutputInstruction,
-  getStructuredOutputJsonSchema,
-  InvalidStructuredOutputError,
-  safeParseStructuredOutput,
-} from './StructuredOutputContract';
 import { LLMRequestAbortedError, isAbortLikeError } from './LLMErrors';
 
 // ─── Google Gemini SSE event shapes ──────────────────────────────────────────
@@ -85,19 +79,16 @@ export class GoogleProvider implements ILLMProvider {
   }
 
   /**
-   * Send a chat request with streaming reasoning and structured output
+   * Send a chat request with streaming reasoning/text deltas.
    * Requirements: llm-integration.3.1, llm-integration.3.2, llm-integration.3.3
    *
    * Uses streamGenerateContent endpoint with alt=sse.
-   * Structured output: system instruction tells model to respond with JSON
-   * { action: { type: "text", content: "..." } }
-   * Thinking chunks (thought: true) are streamed via onChunk callback.
    */
   async chat(
     messages: ChatMessage[],
     options: ChatOptions,
     onChunk: (chunk: ChatChunk) => void
-  ): Promise<LLMStructuredOutput> {
+  ): Promise<LLMChatResult> {
     // Build streaming URL: replace generateContent with streamGenerateContent
     const baseApiUrl = process.env.CLERKLY_GOOGLE_LLM_API_URL ?? this.config.apiUrl;
     const streamUrl =
@@ -112,9 +103,7 @@ export class GoogleProvider implements ILLMProvider {
       const systemMessages = messages.filter((m) => m.role === 'system');
       const conversationMessages = messages.filter((m) => m.role !== 'system');
 
-      const systemBase = systemMessages.map((m) => m.content).join('\n');
-      const structuredInstruction = buildStructuredOutputInstruction();
-      const systemInstruction = (systemBase ? systemBase + '\n\n' : '') + structuredInstruction;
+      const systemInstruction = systemMessages.map((m) => m.content).join('\n');
 
       // Map to Gemini contents format
       const contents = conversationMessages.map((m) => ({
@@ -125,10 +114,7 @@ export class GoogleProvider implements ILLMProvider {
       const body: Record<string, unknown> = {
         system_instruction: { parts: [{ text: systemInstruction }] },
         contents,
-        generationConfig: {
-          responseMimeType: 'application/json',
-          responseSchema: getStructuredOutputJsonSchema(),
-        },
+        generationConfig: {},
       };
 
       if (options.reasoningEffort) {
@@ -174,13 +160,13 @@ export class GoogleProvider implements ILLMProvider {
   }
 
   /**
-   * Parse Gemini SSE stream, call onChunk for reasoning, return final LLMAction
+   * Parse Gemini SSE stream, call onChunk for deltas, return final text.
    * Requirements: llm-integration.3.2, llm-integration.3.3
    */
   private async parseStream(
     response: Response,
     onChunk: (chunk: ChatChunk) => void
-  ): Promise<LLMStructuredOutput> {
+  ): Promise<LLMChatResult> {
     const reader = response.body?.getReader();
     if (!reader) {
       throw new Error('No response body');
@@ -230,9 +216,10 @@ export class GoogleProvider implements ILLMProvider {
           const parts = chunk.candidates?.[0]?.content?.parts ?? [];
           for (const part of parts) {
             if (part.thought) {
-              onChunk({ type: 'reasoning', delta: part.text, done: false });
+              onChunk({ type: 'reasoning', delta: part.text });
             } else {
               contentAccumulator += part.text;
+              onChunk({ type: 'text', delta: part.text });
             }
           }
         }
@@ -241,9 +228,7 @@ export class GoogleProvider implements ILLMProvider {
       reader.releaseLock();
     }
 
-    onChunk({ type: 'reasoning', delta: '', done: true });
-
-    return { ...this.parseAction(contentAccumulator), usage };
+    return { text: contentAccumulator, usage };
   }
 
   /**
@@ -252,27 +237,6 @@ export class GoogleProvider implements ILLMProvider {
   private reasoningBudget(effort: 'low' | 'medium' | 'high'): number {
     const budgets = { low: 1024, medium: 8000, high: 16000 };
     return budgets[effort];
-  }
-
-  /**
-   * Parse structured output JSON into structured action
-   * Requirements: llm-integration.3.3
-   */
-  private parseAction(json: string): LLMStructuredOutput {
-    if (!json.trim()) {
-      throw new InvalidStructuredOutputError(json);
-    }
-    try {
-      const parsedJson = JSON.parse(json) as unknown;
-      const parsed = safeParseStructuredOutput(parsedJson);
-      if (!parsed.success) {
-        throw new InvalidStructuredOutputError(json);
-      }
-      return parsed.data;
-    } catch (err) {
-      if (err instanceof InvalidStructuredOutputError) throw err;
-      throw new InvalidStructuredOutputError(json);
-    }
   }
 
   /**

@@ -198,7 +198,7 @@
 
 #### Критерии Приемки
 
-5.1. `ILLMProvider` ДОЛЖЕН иметь метод `chat(messages, options, onChunk)` с event-driven стримингом чанков (`reasoning`, `text`, `turn done/error`) и одиночным сигналом `tool_call` после полной сборки аргументов
+5.1. `ILLMProvider` ДОЛЖЕН иметь метод `chat(messages, options, onChunk)` с event-driven стримингом чанков (`reasoning`, `text`, `turn_error`) и одиночным сигналом `tool_call` после полной сборки аргументов
 
 5.2. `apiKey` ДОЛЖЕН передаваться в конструктор провайдера (не в каждый вызов)
 

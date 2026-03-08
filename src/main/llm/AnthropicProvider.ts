@@ -6,16 +6,10 @@ import {
   ChatMessage,
   ChatOptions,
   ChatChunk,
-  LLMStructuredOutput,
+  LLMChatResult,
   LLMUsage,
 } from './ILLMProvider';
 import { LLM_PROVIDERS, ERROR_MESSAGES, CHAT_TIMEOUT_MS } from './LLMConfig';
-import {
-  buildStructuredOutputInstruction,
-  getStructuredOutputJsonSchema,
-  InvalidStructuredOutputError,
-  safeParseStructuredOutput,
-} from './StructuredOutputContract';
 import { LLMRequestAbortedError, isAbortLikeError } from './LLMErrors';
 
 // ─── Anthropic SSE event shapes ───────────────────────────────────────────────
@@ -102,18 +96,14 @@ export class AnthropicProvider implements ILLMProvider {
   }
 
   /**
-   * Send a chat request with streaming reasoning and structured output
+   * Send a chat request with streaming reasoning/text deltas.
    * Requirements: llm-integration.3.1, llm-integration.3.2, llm-integration.3.3
-   *
-   * Structured output: system prompt instructs model to respond with JSON
-   * { action: { type: "text", content: "..." } }
-   * Reasoning (thinking) chunks are streamed via onChunk callback.
    */
   async chat(
     messages: ChatMessage[],
     options: ChatOptions,
     onChunk: (chunk: ChatChunk) => void
-  ): Promise<LLMStructuredOutput> {
+  ): Promise<LLMChatResult> {
     const apiUrl = process.env.CLERKLY_ANTHROPIC_API_URL ?? this.config.apiUrl;
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), CHAT_TIMEOUT_MS);
@@ -123,22 +113,13 @@ export class AnthropicProvider implements ILLMProvider {
       const systemMessages = messages.filter((m) => m.role === 'system');
       const conversationMessages = messages.filter((m) => m.role !== 'system');
 
-      // Build system prompt: inject JSON output instruction
-      const systemBase = systemMessages.map((m) => m.content).join('\n');
-      const structuredInstruction = buildStructuredOutputInstruction();
-      const systemPrompt = (systemBase ? systemBase + '\n\n' : '') + structuredInstruction;
+      const systemPrompt = systemMessages.map((m) => m.content).join('\n');
 
       const body: Record<string, unknown> = {
         model: options.model,
         max_tokens: 16000,
         system: systemPrompt,
         messages: conversationMessages.map((m) => ({ role: m.role, content: m.content })),
-        output_config: {
-          format: {
-            type: 'json_schema',
-            schema: getStructuredOutputJsonSchema(),
-          },
-        },
         stream: true,
       };
 
@@ -187,13 +168,13 @@ export class AnthropicProvider implements ILLMProvider {
   }
 
   /**
-   * Parse Anthropic SSE stream, call onChunk for reasoning, return final LLMAction
+   * Parse Anthropic SSE stream, call onChunk for deltas, return final text.
    * Requirements: llm-integration.3.2, llm-integration.3.3
    */
   private async parseStream(
     response: Response,
     onChunk: (chunk: ChatChunk) => void
-  ): Promise<LLMStructuredOutput> {
+  ): Promise<LLMChatResult> {
     const reader = response.body?.getReader();
     if (!reader) {
       throw new Error('No response body');
@@ -247,9 +228,10 @@ export class AnthropicProvider implements ILLMProvider {
           } else if (event.type === 'content_block_delta') {
             const e = event as AnthropicContentBlockDelta;
             if (e.delta.type === 'thinking_delta') {
-              onChunk({ type: 'reasoning', delta: e.delta.thinking, done: false });
+              onChunk({ type: 'reasoning', delta: e.delta.thinking });
             } else if (e.delta.type === 'text_delta') {
               contentAccumulator += e.delta.text;
+              onChunk({ type: 'text', delta: e.delta.text });
             }
           }
         }
@@ -257,8 +239,6 @@ export class AnthropicProvider implements ILLMProvider {
     } finally {
       reader.releaseLock();
     }
-
-    onChunk({ type: 'reasoning', delta: '', done: true });
 
     const usage: LLMUsage = {
       canonical: {
@@ -269,7 +249,7 @@ export class AnthropicProvider implements ILLMProvider {
       raw: rawUsage,
     };
 
-    return { ...this.parseAction(contentAccumulator), usage };
+    return { text: contentAccumulator, usage };
   }
 
   /**
@@ -278,27 +258,6 @@ export class AnthropicProvider implements ILLMProvider {
   private reasoningBudget(effort: 'low' | 'medium' | 'high'): number {
     const budgets = { low: 1024, medium: 8000, high: 16000 };
     return budgets[effort];
-  }
-
-  /**
-   * Parse structured output JSON into structured action
-   * Requirements: llm-integration.3.3
-   */
-  private parseAction(json: string): LLMStructuredOutput {
-    if (!json.trim()) {
-      throw new InvalidStructuredOutputError(json);
-    }
-    try {
-      const parsedJson = JSON.parse(json) as unknown;
-      const parsed = safeParseStructuredOutput(parsedJson);
-      if (!parsed.success) {
-        throw new InvalidStructuredOutputError(json);
-      }
-      return parsed.data;
-    } catch (err) {
-      if (err instanceof InvalidStructuredOutputError) throw err;
-      throw new InvalidStructuredOutputError(json);
-    }
   }
 
   /**

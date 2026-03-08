@@ -104,7 +104,7 @@ test.describe('LLM Chat (real OpenAI)', () => {
     await expect(llmBubble).toBeVisible({ timeout: 30000 });
 
     // Action content is non-empty
-    const actionContent = context.window.locator('[data-testid="message-llm-action"]');
+    const actionContent = context.window.locator('[data-testid="message-llm-action"]').last();
     await expect(actionContent).toBeVisible({ timeout: 30000 });
     const text = await actionContent.textContent();
     expect(text?.trim().length).toBeGreaterThan(0);
@@ -199,7 +199,7 @@ test.describe('LLM Chat (real OpenAI)', () => {
       '[data-testid="message-llm-reasoning-trigger"]'
     );
     const reasoningContent = context.window.locator('[data-testid="message-llm-reasoning"]').last();
-    const actionContent = context.window.locator('[data-testid="message-llm-action"]');
+    const actionContent = context.window.locator('[data-testid="message-llm-action"]').last();
     const actionCountBeforeRequest = await actionContent.count();
 
     await expect(reasoningTrigger.last()).toBeVisible({ timeout: 45000 });
@@ -341,7 +341,7 @@ test.describe('LLM Chat (real OpenAI)', () => {
     });
 
     // Wait for LLM response
-    const actionContent = context.window.locator('[data-testid="message-llm-action"]');
+    const actionContent = context.window.locator('[data-testid="message-llm-action"]').last();
     await expect(actionContent).toBeVisible({ timeout: 30000 });
 
     // Wait for autoscroll to complete
@@ -428,7 +428,7 @@ test.describe('LLM Chat (real OpenAI)', () => {
     await messageInput.press('Enter');
 
     // Wait for LLM response
-    await expect(context.window.locator('[data-testid="message-llm-action"]')).toBeVisible({
+    await expect(context.window.locator('[data-testid="message-llm-action"]').last()).toBeVisible({
       timeout: 30000,
     });
 
@@ -702,7 +702,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
   test('should interrupt previous request when new message sent during streaming', async () => {
     // First request: slow streaming so we can interrupt it
     mockLLMServer.setStreamingMode(true, {
-      content: '{"action":{"type":"text","content":"First response"}}',
+      content: 'First response '.repeat(20),
       chunkDelayMs: 300,
     });
 
@@ -731,16 +731,12 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     await messageInput.fill('Second message');
     await messageInput.press('Enter');
 
-    // Only one llm bubble should remain (previous one is hidden)
-    const llmBubbles = context.window.locator('[data-testid="message-llm"]');
-    await expect(llmBubbles).toHaveCount(1, { timeout: 5000 });
-    await expect(llmBubbles.first()).toBeVisible({ timeout: 3000 });
-
-    // The visible response should be for the second message
-    const actionContent = llmBubbles.first().locator('[data-testid="message-llm-action"]');
-    await expect(actionContent).toBeVisible({ timeout: 3000 });
-    const text = await actionContent.textContent();
-    expect(text?.trim()).toBe('Second response');
+    // Second response should be rendered and no error message should appear.
+    const secondResponse = context.window
+      .locator('[data-testid="message-llm-action"]')
+      .filter({ hasText: 'Second response' });
+    await expect(secondResponse).toHaveCount(1, { timeout: 5000 });
+    await expect(context.window.locator('[data-testid="message-error"]')).toHaveCount(0);
   });
 
   /* Preconditions: MockLLMServer configured with slow streaming,
@@ -750,7 +746,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
      Requirements: llm-integration.8.1, llm-integration.8.7 */
   test('should cancel active request via stop button without creating error message', async () => {
     mockLLMServer.setStreamingMode(true, {
-      content: '{"action":{"type":"text","content":"Long response"}}',
+      content: 'Long response '.repeat(30),
       chunkDelayMs: 300,
     });
 
@@ -1224,14 +1220,12 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     expect(errorInConversation).toBe(false);
   });
 
-  /* Preconditions: MockLLMServer always returns invalid structured output payload
-       (schema mismatch), app authenticated with mock LLM URL
+  /* Preconditions: MockLLMServer returns JSON-like text payload, app authenticated with mock LLM URL
      Action: User sends a message
-     Assertions: MainPipeline retries up to 2 times, then renders standardized
-       invalid-format error with Retry action
+     Assertions: Response is shown as plain text, no structured-output retry is performed
      User-approved mock scenario: yes
-     Requirements: llm-integration.12.1, llm-integration.12.2, llm-integration.12.3 */
-  test('should retry invalid structured output and show error with Retry action', async () => {
+     Requirements: llm-integration.5.1, llm-integration.6.5 */
+  test('should treat JSON-like text as plain response without structured-output retry', async () => {
     mockLLMServer.setStreamingMode(true, {
       content: JSON.stringify({
         action: { type: 'invalid-type', content: 'Broken payload' },
@@ -1245,17 +1239,14 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     await messageInput.fill('Trigger invalid structured output');
     await messageInput.press('Enter');
 
-    const errorBubble = context.window.locator('[data-testid="message-error"]');
-    await expect(errorBubble).toBeVisible({ timeout: 15000 });
-    await expect(errorBubble).toContainText('Invalid response format. Please try again later.');
-    await expect(context.window.locator('[data-testid="message-error-retry"]')).toBeVisible({
-      timeout: 5000,
-    });
+    const actionContent = context.window.locator('[data-testid="message-llm-action"]').last();
+    await expect(actionContent).toBeVisible({ timeout: 15000 });
+    await expect(actionContent).toContainText('Broken payload');
 
     const requestCount = mockLLMServer
       .getRequestLogs()
       .filter((entry) => entry.method === 'POST' && entry.path === '/v1/responses').length;
-    expect(requestCount).toBe(3);
+    expect(requestCount).toBe(1);
   });
 
   /* Preconditions: MockLLMServer returns 429 with retry-after=3 on first request,

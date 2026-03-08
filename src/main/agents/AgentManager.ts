@@ -145,7 +145,9 @@ export class AgentManager {
         this.logger.info(`Agent updatedAt updated to message timestamp: ${agentId}`);
 
         // Publish AGENT_UPDATED event for UI with full agent model including status
-        MainEventBus.getInstance().publish(new AgentUpdatedEvent(this.toEventAgent(updatedAgent)));
+        MainEventBus.getInstance().publish(
+          new AgentUpdatedEvent(this.toEventAgent(updatedAgent), ['updatedAt', 'status'])
+        );
       }
     } catch (error) {
       // Use ErrorHandler to show error notification to user
@@ -164,7 +166,9 @@ export class AgentManager {
     try {
       const updatedAgent = this.dbManager.agents.findById(agentId);
       if (updatedAgent) {
-        MainEventBus.getInstance().publish(new AgentUpdatedEvent(this.toEventAgent(updatedAgent)));
+        MainEventBus.getInstance().publish(
+          new AgentUpdatedEvent(this.toEventAgent(updatedAgent), ['status'])
+        );
       }
     } catch (error) {
       handleBackgroundError(error, 'Agent Status Update');
@@ -259,7 +263,9 @@ export class AgentManager {
     // Requirements: agents.12.2
     const updatedAgent = this.dbManager.agents.findById(agentId);
     if (updatedAgent) {
-      MainEventBus.getInstance().publish(new AgentUpdatedEvent(this.toEventAgent(updatedAgent)));
+      MainEventBus.getInstance().publish(
+        new AgentUpdatedEvent(this.toEventAgent(updatedAgent), ['name', 'updatedAt'])
+      );
     }
   }
 

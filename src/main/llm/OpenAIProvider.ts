@@ -6,16 +6,10 @@ import {
   ChatMessage,
   ChatOptions,
   ChatChunk,
-  LLMStructuredOutput,
+  LLMChatResult,
   LLMUsage,
 } from './ILLMProvider';
 import { LLM_PROVIDERS, ERROR_MESSAGES, CHAT_TIMEOUT_MS } from './LLMConfig';
-import {
-  buildStructuredOutputInstruction,
-  getOpenAIStructuredOutputJsonSchema,
-  InvalidStructuredOutputError,
-  safeParseStructuredOutput,
-} from './StructuredOutputContract';
 import { LLMRequestAbortedError, isAbortLikeError } from './LLMErrors';
 
 interface OpenAIResponsesUsage {
@@ -28,6 +22,12 @@ interface OpenAIResponsesUsage {
 
 interface OpenAIResponsesEvent {
   type?: string;
+  output_index?: number;
+  item_id?: string;
+  call_id?: string;
+  name?: string;
+  arguments?: string;
+  output?: unknown;
   delta?: unknown;
   text?: string;
   part?: { type?: string; text?: string; delta?: string; content?: unknown };
@@ -94,27 +94,14 @@ export class OpenAIProvider implements ILLMProvider {
   }
 
   /**
-   * Send a chat request with streaming reasoning and structured output
-   * Requirements: llm-integration.3.1, llm-integration.3.2, llm-integration.3.3
-   *
-   * Structured output JSON schema: { action: { type: "text", content: "..." } }
-   * Reasoning chunks are streamed via onChunk callback.
-   * Action (JSON) is received whole at the end.
+   * Send a chat request with streaming reasoning/text and native tool-calling events.
+   * Requirements: llm-integration.5.1, llm-integration.5.4, llm-integration.5.5, llm-integration.5.7
    */
   async chat(
     messages: ChatMessage[],
     options: ChatOptions,
     onChunk: (chunk: ChatChunk) => void
-  ): Promise<LLMStructuredOutput> {
-    const systemMessages = messages.filter((m) => m.role === 'system');
-    const conversationMessages = messages.filter((m) => m.role !== 'system');
-    const systemBase = systemMessages.map((m) => m.content).join('\n');
-    const structuredInstruction = buildStructuredOutputInstruction();
-    const mergedSystemPrompt = [systemBase, structuredInstruction].filter(Boolean).join('\n\n');
-    const requestMessages: ChatMessage[] = mergedSystemPrompt
-      ? [{ role: 'system', content: mergedSystemPrompt }, ...conversationMessages]
-      : conversationMessages;
-
+  ): Promise<LLMChatResult> {
     // Allow runtime override via env (used by functional tests with MockLLMServer)
     const apiUrl = process.env.CLERKLY_OPENAI_API_URL ?? this.config.apiUrl;
     const controller = new AbortController();
@@ -123,20 +110,19 @@ export class OpenAIProvider implements ILLMProvider {
     try {
       const body: Record<string, unknown> = {
         model: options.model,
-        input: requestMessages,
+        input: messages,
         stream: true,
-        text: {
-          format: {
-            type: 'json_schema',
-            strict: true,
-            name: 'structured_output',
-            schema: getOpenAIStructuredOutputJsonSchema(),
-          },
-        },
-        ...(options.reasoningEffort
-          ? { reasoning: { effort: options.reasoningEffort, summary: 'detailed' } }
-          : {}),
+        ...(options.reasoningEffort ? { reasoning: { effort: options.reasoningEffort } } : {}),
       };
+
+      if (options.tools && options.tools.length > 0) {
+        body.tools = options.tools.map((tool) => ({
+          type: 'function',
+          name: tool.name,
+          description: tool.description,
+          parameters: tool.parameters,
+        }));
+      }
 
       const response = await fetch(apiUrl, {
         method: 'POST',
@@ -169,13 +155,13 @@ export class OpenAIProvider implements ILLMProvider {
   }
 
   /**
-   * Parse SSE stream, call onChunk for reasoning, return final LLMAction
-   * Requirements: llm-integration.3.2, llm-integration.3.3
+   * Parse SSE stream and emit normalized chunks.
+   * Requirements: llm-integration.5.1, llm-integration.5.4, llm-integration.5.5
    */
   private async parseStream(
     response: Response,
     onChunk: (chunk: ChatChunk) => void
-  ): Promise<LLMStructuredOutput> {
+  ): Promise<LLMChatResult> {
     const reader = response.body?.getReader();
     if (!reader) {
       throw new Error('No response body');
@@ -186,9 +172,13 @@ export class OpenAIProvider implements ILLMProvider {
         ? new TextDecoder()
         : { decode: (v: Uint8Array, _opts?: unknown) => Buffer.from(v).toString('utf-8') };
     let buffer = '';
-    let contentAccumulator = '';
+    let textAccumulator = '';
     let reasoningAccumulator = '';
     let usage: LLMUsage | undefined;
+    const toolCallsByIndex = new Map<
+      number,
+      { callId: string; toolName: string; argumentsText: string }
+    >();
 
     try {
       for (;;) {
@@ -212,8 +202,16 @@ export class OpenAIProvider implements ILLMProvider {
             continue;
           }
 
+          if (event.type === 'response.error') {
+            const message =
+              typeof event.text === 'string' && event.text ? event.text : ERROR_MESSAGES.unknown;
+            onChunk({ type: 'turn_error', errorType: 'provider', message });
+            throw new Error(message);
+          }
+
           if (event.type === 'response.output_text.delta' && typeof event.delta === 'string') {
-            contentAccumulator += event.delta;
+            textAccumulator += event.delta;
+            onChunk({ type: 'text', delta: event.delta });
           }
 
           if (this.isReasoningEvent(event)) {
@@ -222,12 +220,28 @@ export class OpenAIProvider implements ILLMProvider {
               const normalized = this.normalizeReasoningDelta(reasoningDelta, reasoningAccumulator);
               reasoningAccumulator = normalized.accumulated;
               if (normalized.delta) {
-                onChunk({ type: 'reasoning', delta: normalized.delta, done: false });
+                onChunk({ type: 'reasoning', delta: normalized.delta });
               }
             }
           }
 
+          this.collectToolCallDelta(event, toolCallsByIndex);
+          const completedToolCall = this.extractCompletedToolCall(event, toolCallsByIndex);
+          if (completedToolCall) {
+            onChunk({
+              type: 'tool_call',
+              callId: completedToolCall.callId,
+              toolName: completedToolCall.toolName,
+              arguments: completedToolCall.arguments,
+            });
+          }
+
           if (event.type === 'response.completed') {
+            const completedText = this.extractCompletedText(event);
+            if (completedText && !textAccumulator) {
+              textAccumulator = completedText;
+              onChunk({ type: 'text', delta: completedText });
+            }
             const completedUsage = event.response?.usage ?? event.usage;
             if (completedUsage) {
               usage = this.mapResponsesUsage(completedUsage);
@@ -238,34 +252,7 @@ export class OpenAIProvider implements ILLMProvider {
     } finally {
       reader.releaseLock();
     }
-
-    // Signal reasoning done
-    onChunk({ type: 'reasoning', delta: '', done: true });
-
-    // Parse structured output
-    const output = this.parseAction(contentAccumulator);
-    return { ...output, usage };
-  }
-
-  /**
-   * Parse structured output JSON into structured action
-   * Requirements: llm-integration.3.3
-   */
-  private parseAction(json: string): LLMStructuredOutput {
-    if (!json.trim()) {
-      throw new InvalidStructuredOutputError(json);
-    }
-    try {
-      const parsedJson = JSON.parse(json) as unknown;
-      const parsed = safeParseStructuredOutput(parsedJson);
-      if (!parsed.success) {
-        throw new InvalidStructuredOutputError(json);
-      }
-      return parsed.data;
-    } catch (err) {
-      if (err instanceof InvalidStructuredOutputError) throw err;
-      throw new InvalidStructuredOutputError(json);
-    }
+    return { text: textAccumulator, usage };
   }
 
   private mapResponsesUsage(raw: OpenAIResponsesUsage): LLMUsage {
@@ -395,6 +382,90 @@ export class OpenAIProvider implements ILLMProvider {
     }
 
     return { delta: incoming, accumulated: accumulated + incoming };
+  }
+
+  private collectToolCallDelta(
+    event: OpenAIResponsesEvent,
+    toolCallsByIndex: Map<number, { callId: string; toolName: string; argumentsText: string }>
+  ): void {
+    if (event.type !== 'response.function_call_arguments.delta') {
+      return;
+    }
+
+    const outputIndex = typeof event.output_index === 'number' ? event.output_index : 0;
+    const previous = toolCallsByIndex.get(outputIndex);
+    const delta = typeof event.delta === 'string' ? event.delta : '';
+    const callId = event.call_id ?? previous?.callId ?? '';
+    const toolName = event.name ?? previous?.toolName ?? '';
+    const argumentsText = `${previous?.argumentsText ?? ''}${delta}`;
+
+    toolCallsByIndex.set(outputIndex, { callId, toolName, argumentsText });
+  }
+
+  private extractCompletedToolCall(
+    event: OpenAIResponsesEvent,
+    toolCallsByIndex: Map<number, { callId: string; toolName: string; argumentsText: string }>
+  ): { callId: string; toolName: string; arguments: Record<string, unknown> } | null {
+    if (event.type !== 'response.function_call_arguments.done') {
+      return null;
+    }
+
+    const outputIndex = typeof event.output_index === 'number' ? event.output_index : 0;
+    const previous = toolCallsByIndex.get(outputIndex);
+    const argumentsText =
+      typeof event.arguments === 'string' ? event.arguments : (previous?.argumentsText ?? '');
+    const callId = event.call_id ?? previous?.callId ?? `call-${outputIndex}`;
+    const toolName = event.name ?? previous?.toolName ?? 'unknown_tool';
+    toolCallsByIndex.delete(outputIndex);
+
+    return {
+      callId,
+      toolName,
+      arguments: this.parseToolArguments(argumentsText),
+    };
+  }
+
+  private parseToolArguments(argumentsText: string): Record<string, unknown> {
+    if (!argumentsText.trim()) {
+      return {};
+    }
+    try {
+      const parsed = JSON.parse(argumentsText);
+      return parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : {};
+    } catch {
+      return {};
+    }
+  }
+
+  private extractCompletedText(event: OpenAIResponsesEvent): string {
+    if (!Array.isArray(event.output)) {
+      return '';
+    }
+
+    const parts: string[] = [];
+    for (const outputItem of event.output) {
+      if (!outputItem || typeof outputItem !== 'object') {
+        continue;
+      }
+      const item = outputItem as { type?: string; content?: unknown; text?: unknown };
+      if (typeof item.text === 'string' && item.text.length > 0) {
+        parts.push(item.text);
+      }
+      if (!Array.isArray(item.content)) {
+        continue;
+      }
+      for (const contentPart of item.content) {
+        if (!contentPart || typeof contentPart !== 'object') {
+          continue;
+        }
+        const part = contentPart as { text?: unknown };
+        if (typeof part.text === 'string' && part.text.length > 0) {
+          parts.push(part.text);
+        }
+      }
+    }
+
+    return parts.join('');
   }
 
   private parseRetryAfterHeader(response: Response): number | null {

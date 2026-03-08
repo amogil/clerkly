@@ -142,12 +142,17 @@ export class PromptBuilder {
       return typeof text === 'string' ? text.trim() : '';
     }
 
+    const text = data?.['text'];
+    if (typeof text === 'string' && text.trim().length > 0) {
+      return text.trim();
+    }
+
+    // Legacy fallback for old records persisted before data.text.
     const action =
       data?.['action'] && typeof data['action'] === 'object'
         ? (data['action'] as Record<string, unknown>)
         : undefined;
-    const text = typeof action?.['content'] === 'string' ? action['content'].trim() : '';
-    return text;
+    return typeof action?.['content'] === 'string' ? action['content'].trim() : '';
   }
 
   /**

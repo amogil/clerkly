@@ -545,6 +545,7 @@ describe('AgentManager', () => {
       expect(publishedEvent).toBeInstanceOf(AgentUpdatedEvent);
       expect(publishedEvent.agent.id).toBe('abc123xyz0');
       expect(publishedEvent.agent.status).toBe('new');
+      expect(publishedEvent.changedFields).toEqual(['name', 'updatedAt']);
       expect(typeof publishedEvent.timestamp).toBe('number');
     });
   });
@@ -673,6 +674,7 @@ describe('AgentManager', () => {
       expect(publishedEvent).toBeInstanceOf(AgentUpdatedEvent);
       expect(publishedEvent.agent.id).toBe('abc123xyz0');
       expect(publishedEvent.agent.status).toBe('new');
+      expect(publishedEvent.changedFields).toEqual(['updatedAt', 'status']);
       expect(typeof publishedEvent.timestamp).toBe('number');
     });
 
@@ -758,6 +760,7 @@ describe('AgentManager', () => {
       const publishedEvent = mockEventBus.publish.mock.calls[0][0];
       expect(publishedEvent).toBeInstanceOf(AgentUpdatedEvent);
       expect(publishedEvent.agent.status).toBe(AGENT_STATUS.AWAITING_RESPONSE);
+      expect(publishedEvent.changedFields).toEqual(['status']);
     });
 
     /* Preconditions: Agent lookup throws error

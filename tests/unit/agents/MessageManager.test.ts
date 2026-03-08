@@ -355,6 +355,7 @@ describe('MessageManager', () => {
       expect(event).toBeInstanceOf(MessageUpdatedEvent);
       expect(event.message.id).toBe(10);
       expect(event.message.hidden).toBe(true);
+      expect(event.changedFields).toEqual(['hidden']);
     });
 
     /* Preconditions: Agent has no visible kind:error messages (repo returns empty array)
@@ -371,6 +372,24 @@ describe('MessageManager', () => {
   });
 
   describe('setHidden', () => {
+    /* Preconditions: Message exists after setHidden
+       Action: Call setHidden() for existing message
+       Assertions: Emits message.updated with hidden changed field only
+       Requirements: llm-integration.8.5 */
+    it('should publish hidden changed field when setHidden updates a message', () => {
+      const hiddenMessage: Message = { ...mockMessage, hidden: true };
+      mockDbManager.messages.setHidden = jest.fn();
+      mockDbManager.messages.getById = jest.fn().mockReturnValue(hiddenMessage);
+
+      (messageManager as any).setHidden(1, 'agent-123');
+
+      expect(mockDbManager.messages.setHidden).toHaveBeenCalledWith(1, 'agent-123');
+      expect(mockEventBus.publish).toHaveBeenCalledTimes(1);
+      const event = mockEventBus.publish.mock.calls[0][0];
+      expect(event).toBeInstanceOf(MessageUpdatedEvent);
+      expect(event.changedFields).toEqual(['hidden']);
+    });
+
     /* Preconditions: MessageManager initialized, getById returns null after setHidden
        Action: Call setHidden() for a message that no longer exists
        Assertions: setHidden called, no event published
@@ -413,6 +432,7 @@ describe('MessageManager', () => {
       expect(publishedEvent.message.agentId).toBe('agent-123');
       expect(publishedEvent.message.kind).toBe('user');
       expect(publishedEvent.message.payload).toEqual(payload);
+      expect(publishedEvent.changedFields).toEqual(['payload']);
       expect(typeof publishedEvent.timestamp).toBe('number');
     });
 
@@ -427,6 +447,65 @@ describe('MessageManager', () => {
 
       expect(mockDbManager.messages.update).toHaveBeenCalled();
       expect(mockEventBus.publish).not.toHaveBeenCalled();
+    });
+
+    /* Preconditions: Update call sets completion flag
+       Action: Call update() with done=true
+       Assertions: Emits payload and done changed fields
+       Requirements: agents.7.1 */
+    it('should include done in changed fields when update sets completion flag', () => {
+      const payload = { data: { text: 'Updated + done' } };
+      const updatedMessage: Message = {
+        ...mockMessage,
+        payloadJson: JSON.stringify(payload),
+        done: true,
+      };
+      mockDbManager.messages.getById = jest.fn().mockReturnValue(updatedMessage);
+
+      messageManager.update(1, 'agent-123', payload, true);
+
+      const event = mockEventBus.publish.mock.calls[0][0];
+      expect(event).toBeInstanceOf(MessageUpdatedEvent);
+      expect(event.changedFields).toEqual(['done', 'payload']);
+    });
+  });
+
+  describe('hideAndMarkIncomplete', () => {
+    /* Preconditions: Repository returns updated message
+       Action: Call hideAndMarkIncomplete()
+       Assertions: Emits hidden+done changed fields
+       Requirements: llm-integration.3.2, llm-integration.8.5 */
+    it('should publish done and hidden changed fields', () => {
+      const updatedMessage: Message = { ...mockMessage, hidden: true, done: false };
+      mockDbManager.messages.hideAndMarkIncomplete = jest.fn().mockReturnValue(updatedMessage);
+
+      messageManager.hideAndMarkIncomplete(1, 'agent-123');
+
+      expect(mockDbManager.messages.hideAndMarkIncomplete).toHaveBeenCalledWith(1, 'agent-123');
+      expect(mockEventBus.publish).toHaveBeenCalledTimes(1);
+      const event = mockEventBus.publish.mock.calls[0][0];
+      expect(event).toBeInstanceOf(MessageUpdatedEvent);
+      expect(event.changedFields).toEqual(['done', 'hidden']);
+    });
+  });
+
+  describe('setDone', () => {
+    /* Preconditions: Message exists after setDone
+       Action: Call setDone()
+       Assertions: Emits done changed field
+       Requirements: llm-integration.6.5 */
+    it('should publish done changed field', () => {
+      const updatedMessage: Message = { ...mockMessage, done: false };
+      mockDbManager.messages.setDone = jest.fn();
+      mockDbManager.messages.getById = jest.fn().mockReturnValue(updatedMessage);
+
+      messageManager.setDone(1, 'agent-123', false);
+
+      expect(mockDbManager.messages.setDone).toHaveBeenCalledWith(1, 'agent-123', false);
+      expect(mockEventBus.publish).toHaveBeenCalledTimes(1);
+      const event = mockEventBus.publish.mock.calls[0][0];
+      expect(event).toBeInstanceOf(MessageUpdatedEvent);
+      expect(event.changedFields).toEqual(['done']);
     });
   });
 

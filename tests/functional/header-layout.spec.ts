@@ -54,7 +54,7 @@ test.describe('Header Layout', () => {
     await window.waitForSelector('[data-testid="agents"]', { timeout: 10000 });
 
     // Get header element
-    const header = window.locator('[data-testid="agents"] > div').first();
+    const header = window.locator('[data-testid="agent-header"]').first();
     await expect(header).toBeVisible();
 
     // Get header width
@@ -63,13 +63,13 @@ test.describe('Header Layout', () => {
     const headerWidth = headerBox!.width;
 
     // Get left section (active agent info) - first child div
-    const leftSection = header.locator('> div').first();
+    const leftSection = window.locator('[data-testid="agent-header-left"]');
     const leftBox = await leftSection.boundingBox();
     expect(leftBox).not.toBeNull();
     const leftWidth = leftBox!.width;
 
     // Get right section (agent list) - second child div with ref={chatListRef}
-    const rightSection = header.locator('> div').nth(1);
+    const rightSection = window.locator('[data-testid="agent-header-right"]');
     const rightBox = await rightSection.boundingBox();
     expect(rightBox).not.toBeNull();
     const rightWidth = rightBox!.width;
@@ -98,16 +98,15 @@ test.describe('Header Layout', () => {
     // Wait for agents page to load
     await window.waitForSelector('[data-testid="agents"]', { timeout: 10000 });
 
-    const header = window.locator('[data-testid="agents"] > div').first();
-    const leftSection = header.locator('> div').first();
-    const rightSection = header.locator('> div').nth(1);
+    const header = window.locator('[data-testid="agent-header"]').first();
+    const leftSection = window.locator('[data-testid="agent-header-left"]');
+    const rightSection = window.locator('[data-testid="agent-header-right"]');
 
     // Test at different window widths
     const widths = [1024, 1280, 1440, 1920];
 
     for (const width of widths) {
       await window.setViewportSize({ width, height: 768 });
-      await window.waitForTimeout(100); // Wait for resize to complete
 
       const headerBox = await header.boundingBox();
       expect(headerBox).not.toBeNull();
@@ -150,18 +149,39 @@ test.describe('Header Layout', () => {
 
     // Update agent name via IPC
     await window.evaluate(async (name) => {
-      const agents = await window.api.agents.list();
+      const result = await window.api.agents.list();
+      const agents = Array.isArray(result)
+        ? result
+        : result && typeof result === 'object' && 'data' in result
+          ? (result.data as Array<{ id?: string; agentId?: string }>)
+          : [];
       if (agents.length > 0) {
-        await window.api.agents.update(agents[0].agentId, { name });
+        const id = agents[0].agentId ?? agents[0].id;
+        if (id) {
+          await window.api.agents.update(id, { name });
+        }
       }
     }, longName);
 
-    // Wait for UI to update
-    await window.waitForTimeout(500);
+    await expect
+      .poll(
+        async () =>
+          await window.evaluate(async (name) => {
+            const result = await window.api.agents.list();
+            const agents = Array.isArray(result)
+              ? result
+              : result && typeof result === 'object' && 'data' in result
+                ? (result.data as Array<{ name?: string | null }>)
+                : [];
+            return agents.some((agent) => agent.name === name);
+          }, longName),
+        { timeout: 5000 }
+      )
+      .toBe(true);
 
-    const header = window.locator('[data-testid="agents"] > div').first();
-    const leftSection = header.locator('> div').first();
-    const rightSection = header.locator('> div').nth(1);
+    const header = window.locator('[data-testid="agent-header"]').first();
+    const leftSection = window.locator('[data-testid="agent-header-left"]');
+    const rightSection = window.locator('[data-testid="agent-header-right"]');
 
     const headerBox = await header.boundingBox();
     expect(headerBox).not.toBeNull();
@@ -197,7 +217,7 @@ test.describe('Header Layout', () => {
     // Wait for agents page to load
     await window.waitForSelector('[data-testid="agents"]', { timeout: 10000 });
 
-    const header = window.locator('[data-testid="agents"] > div').first();
+    const header = window.locator('[data-testid="agent-header"]').first();
     await expect(header).toBeVisible();
 
     const headerBox = await header.boundingBox();
@@ -223,11 +243,19 @@ test.describe('Header Layout', () => {
       });
     }
 
-    // Wait for agents to be created
-    await window.waitForTimeout(500);
+    await expect
+      .poll(
+        async () => {
+          const count = await window.locator('[data-testid^="agent-icon-"]').count();
+          const plusCount = await window.locator('[data-testid="all-agents-button"]').count();
+          return count > 1 || plusCount > 0;
+        },
+        { timeout: 5000 }
+      )
+      .toBe(true);
 
-    const header = window.locator('[data-testid="agents"] > div').first();
-    const rightSection = header.locator('> div').nth(1);
+    const header = window.locator('[data-testid="agent-header"]').first();
+    const rightSection = window.locator('[data-testid="agent-header-right"]');
 
     const headerBox = await header.boundingBox();
     const rightBox = await rightSection.boundingBox();

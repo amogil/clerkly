@@ -245,7 +245,6 @@ type ChatChunk =
   | { type: 'reasoning'; delta: string }
   | { type: 'text'; delta: string }
   | { type: 'tool_call'; callId: string; toolName: string; arguments: Record<string, unknown> }
-  | { type: 'turn_done' }
   | { type: 'turn_error'; errorType: 'auth' | 'rate_limit' | 'provider' | 'network' | 'timeout'; message: string };
 
 interface LLMUsage {
@@ -409,7 +408,7 @@ class MainPipeline {
     if chunk.type == 'tool_call':
       эмитит одно событие `message.tool_call` (аргументы уже собраны полностью)
     if llmMessageId уже существовал до этого чанка: эмитит `message.updated` (snapshot/consistency)
-7. При `turn_done` обновляет `kind: llm` (`done: true`) и сохраняет `usage_json` отдельным шагом
+7. После завершения `provider.chat(...)` обновляет `kind: llm` (`done: true`) и сохраняет `usage_json` отдельным шагом
 8. Эмитит финальный `message.updated`
 ```
 
@@ -553,7 +552,7 @@ User отправляет сообщение
               → message.updated
           → [tool_call with full arguments]
               → message.tool_call
-          → [turn done]
+          → [chat completion]
               → MessageManager.update(kind: 'llm', done: true)
               → message.updated
       → [on error]

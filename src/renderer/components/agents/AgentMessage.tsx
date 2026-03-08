@@ -24,8 +24,7 @@ export function AgentMessage({
     ? (message.payload.data as Record<string, unknown> | undefined)
     : undefined;
   const llmReasoning = llmData?.['reasoning'] as { text?: string } | undefined;
-  const llmAction = llmData?.['action'] as { type?: string; content?: string } | undefined;
-  const actionContent = llmAction?.content ?? '';
+  const llmText = typeof llmData?.['text'] === 'string' ? (llmData['text'] as string) : undefined;
 
   if (message.kind === 'user') {
     return (
@@ -107,10 +106,10 @@ export function AgentMessage({
               </ReasoningContent>
             </Reasoning>
           )}
-          {llmAction?.content ? (
+          {llmText ? (
             <MessageContent data-testid="message-llm-action" className="w-full">
               <MessageResponse className="text-sm leading-relaxed break-words">
-                {actionContent}
+                {llmText}
               </MessageResponse>
             </MessageContent>
           ) : null}

@@ -293,4 +293,33 @@ describe('PromptBuilder.buildMessages()', () => {
     expect(chatMessages).toHaveLength(1);
     expect(chatMessages[0].role).toBe('system');
   });
+
+  /* Preconditions: History contains kind:tool_call message
+     Action: Call buildMessages() with user + tool_call + llm
+     Assertions: tool_call is excluded from model history
+     Requirements: llm-integration.10.1 */
+  it('should ignore tool_call messages in model history', () => {
+    const msgs = [
+      makeMessage({
+        id: 1,
+        kind: 'user',
+        payloadJson: JSON.stringify({ data: { text: 'Question' } }),
+      }),
+      makeMessage({
+        id: 2,
+        kind: 'tool_call',
+        payloadJson: JSON.stringify({ data: { toolName: 'search_docs' } }),
+      }),
+      makeMessage({
+        id: 3,
+        kind: 'llm',
+        payloadJson: JSON.stringify({ data: { text: 'Answer' } }),
+      }),
+    ];
+
+    const chatMessages = makeBuilder().buildMessages(msgs);
+    expect(chatMessages).toHaveLength(3);
+    expect(chatMessages[1].role).toBe('user');
+    expect(chatMessages[2].role).toBe('assistant');
+  });
 });

@@ -231,12 +231,14 @@ test.describe('Agent Reordering', () => {
       { timeout: 5000 }
     );
 
-    // Agent 3 should now be first
-    let currentFirstId = await agentIcons.first().getAttribute('data-testid');
-    expect(currentFirstId).toBe(agent3Id);
-
-    // Wait for UI to fully stabilize and animations to complete
-    await window.waitForTimeout(1000);
+    await expect
+      .poll(
+        async () => {
+          return await agentIcons.first().getAttribute('data-testid');
+        },
+        { timeout: 5000 }
+      )
+      .toBe(agent3Id);
 
     // Send message to agent 2 (find by ID with proper locator)
     const agent2Icon = window.locator(`[data-testid="${agent2Id}"]`);
@@ -257,12 +259,14 @@ test.describe('Agent Reordering', () => {
       { timeout: 10000 }
     );
 
-    // Agent 2 should now be first
-    currentFirstId = await agentIcons.first().getAttribute('data-testid');
-    expect(currentFirstId).toBe(agent2Id);
-
-    // Wait for UI to fully stabilize and animations to complete
-    await window.waitForTimeout(1000);
+    await expect
+      .poll(
+        async () => {
+          return await agentIcons.first().getAttribute('data-testid');
+        },
+        { timeout: 5000 }
+      )
+      .toBe(agent2Id);
 
     // Send message to agent 1 (find by ID with proper locator)
     const agent1Icon = window.locator(`[data-testid="${agent1Id}"]`);
@@ -283,9 +287,14 @@ test.describe('Agent Reordering', () => {
       { timeout: 10000 }
     );
 
-    // Agent 1 should now be first
-    currentFirstId = await agentIcons.first().getAttribute('data-testid');
-    expect(currentFirstId).toBe(agent1Id);
+    await expect
+      .poll(
+        async () => {
+          return await agentIcons.first().getAttribute('data-testid');
+        },
+        { timeout: 5000 }
+      )
+      .toBe(agent1Id);
   });
 
   /* Preconditions: Agent selected from AllAgents

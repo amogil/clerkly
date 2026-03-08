@@ -96,7 +96,7 @@ describe('IPCChatTransport', () => {
 
   describe('sendMessages', () => {
     /* Preconditions: transport created for agent-1, window.api.messages.create resolves success
-       Action: call sendMessages with a user message, then emit MESSAGE_CREATED (llm) + MESSAGE_UPDATED with action
+       Action: call sendMessages with a user message, then emit MESSAGE_CREATED (llm) + MESSAGE_LLM_TEXT_UPDATED + MESSAGE_UPDATED done=true
        Assertions: stream emits start, start-step, reasoning-end (if any), text-start, text-delta, text-end, finish-step, finish
        Requirements: agents.4.3, llm-integration.2 */
     it('should emit correct chunks for a normal llm response', async () => {
@@ -119,14 +119,22 @@ describe('IPCChatTransport', () => {
         timestamp: Date.now(),
       });
 
-      // Emit message updated with action content
+      emitEvent(EVENT_TYPES.MESSAGE_LLM_TEXT_UPDATED, {
+        messageId: 42,
+        agentId: 'agent-1',
+        delta: 'Hello back!',
+        accumulatedText: 'Hello back!',
+        timestamp: Date.now(),
+      });
+
+      // Emit message updated with completion snapshot
       emitEvent(EVENT_TYPES.MESSAGE_UPDATED, {
         message: {
           id: 42,
           agentId: 'agent-1',
           kind: 'llm',
           timestamp: Date.now(),
-          payload: { data: { action: { content: 'Hello back!' } } },
+          payload: { data: { text: 'Hello back!' } },
           hidden: false,
           done: true,
         },
@@ -190,7 +198,7 @@ describe('IPCChatTransport', () => {
     });
 
     /* Preconditions: transport created for agent-1
-       Action: emit MESSAGE_LLM_REASONING_UPDATED events, then MESSAGE_UPDATED with action
+       Action: emit MESSAGE_LLM_REASONING_UPDATED events, then MESSAGE_LLM_TEXT_UPDATED and MESSAGE_UPDATED done=true
        Assertions: stream emits reasoning-start, reasoning-delta, reasoning-end before text chunks
        Requirements: llm-integration.7 */
     it('should emit reasoning chunks during streaming', async () => {
@@ -218,13 +226,21 @@ describe('IPCChatTransport', () => {
         timestamp: Date.now(),
       });
 
+      emitEvent(EVENT_TYPES.MESSAGE_LLM_TEXT_UPDATED, {
+        messageId: 55,
+        agentId: 'agent-1',
+        delta: 'Done',
+        accumulatedText: 'Done',
+        timestamp: Date.now(),
+      });
+
       emitEvent(EVENT_TYPES.MESSAGE_UPDATED, {
         message: {
           id: 55,
           agentId: 'agent-1',
           kind: 'llm',
           timestamp: Date.now(),
-          payload: { data: { action: { content: 'Done' } } },
+          payload: { data: { text: 'Done' } },
           hidden: false,
           done: true,
         },
@@ -246,10 +262,10 @@ describe('IPCChatTransport', () => {
       };
       expect(reasoningDelta?.delta).toBe('thinking...');
 
-      // reasoning-end must come before text-start
+      // reasoning-end must occur before stream finalization
       const reasoningEndIdx = types.indexOf('reasoning-end');
-      const textStartIdx = types.indexOf('text-start');
-      expect(reasoningEndIdx).toBeLessThan(textStartIdx);
+      const finishStepIdx = types.indexOf('finish-step');
+      expect(reasoningEndIdx).toBeLessThan(finishStepIdx);
     });
 
     /* Preconditions: transport created for agent-1
@@ -336,7 +352,7 @@ describe('IPCChatTransport', () => {
     });
 
     /* Preconditions: transport created for agent-1
-       Action: emit MESSAGE_CREATED with kind:llm that already has action.content (non-streaming)
+       Action: emit MESSAGE_CREATED with kind:llm that already has data.text (non-streaming)
        Assertions: stream emits start, start-step, text-start, text-delta, text-end, finish-step, finish immediately
        Requirements: llm-integration.2 */
     it('should emit complete text chunks when llm message arrives already complete', async () => {
@@ -349,7 +365,7 @@ describe('IPCChatTransport', () => {
           agentId: 'agent-1',
           kind: 'llm',
           timestamp: Date.now(),
-          payload: { data: { action: { content: 'Already complete response' } } },
+          payload: { data: { text: 'Already complete response' } },
           hidden: false,
           done: true,
         },
@@ -430,7 +446,7 @@ describe('IPCChatTransport', () => {
           agentId: 'other-agent',
           kind: 'llm',
           timestamp: Date.now(),
-          payload: { data: { action: { content: 'Not for us' } } },
+          payload: { data: { text: 'Not for us' } },
           hidden: false,
           done: true,
         },
@@ -470,6 +486,151 @@ describe('IPCChatTransport', () => {
       expect(mockCreate).toHaveBeenCalledWith('agent-1', 'user', {
         data: { text: 'test message' },
       });
+    });
+
+    it('should start stream from MESSAGE_LLM_TEXT_UPDATED even before MESSAGE_CREATED', async () => {
+      const streamPromise = transport.sendMessages(makeSendOptions());
+      await Promise.resolve();
+
+      emitEvent(EVENT_TYPES.MESSAGE_LLM_TEXT_UPDATED, {
+        messageId: 501,
+        agentId: 'agent-1',
+        delta: 'hello',
+        accumulatedText: 'hello',
+        timestamp: Date.now(),
+      });
+
+      emitEvent(EVENT_TYPES.MESSAGE_UPDATED, {
+        message: {
+          id: 501,
+          agentId: 'agent-1',
+          kind: 'llm',
+          timestamp: Date.now(),
+          payload: { data: { text: 'hello' } },
+          hidden: false,
+          done: true,
+        },
+        timestamp: Date.now(),
+      });
+
+      const stream = await streamPromise;
+      const chunks = await collectChunks(stream);
+      const types = chunks.map((c) => c.type);
+      expect(types[0]).toBe('start');
+      expect(types).toContain('text-delta');
+      expect(types).toContain('finish');
+    });
+
+    it('should use MESSAGE_UPDATED snapshot text when no text stream part exists', async () => {
+      const streamPromise = transport.sendMessages(makeSendOptions());
+      await Promise.resolve();
+
+      emitEvent(EVENT_TYPES.MESSAGE_CREATED, {
+        message: {
+          id: 777,
+          agentId: 'agent-1',
+          kind: 'llm',
+          timestamp: Date.now(),
+          payload: { data: {} },
+          hidden: false,
+          done: false,
+        },
+        timestamp: Date.now(),
+      });
+
+      emitEvent(EVENT_TYPES.MESSAGE_UPDATED, {
+        message: {
+          id: 777,
+          agentId: 'agent-1',
+          kind: 'llm',
+          timestamp: Date.now(),
+          payload: { data: { text: 'snapshot-only-text' } },
+          hidden: false,
+          done: true,
+        },
+        timestamp: Date.now(),
+      });
+
+      const stream = await streamPromise;
+      const chunks = await collectChunks(stream);
+      const textDelta = chunks.find((chunk) => chunk.type === 'text-delta') as
+        | { type: 'text-delta'; delta: string }
+        | undefined;
+      expect(textDelta?.delta).toBe('snapshot-only-text');
+    });
+
+    it('should ignore MESSAGE_LLM_TEXT_UPDATED for a different llm message id', async () => {
+      const streamPromise = transport.sendMessages(makeSendOptions());
+      await Promise.resolve();
+
+      emitEvent(EVENT_TYPES.MESSAGE_CREATED, {
+        message: {
+          id: 900,
+          agentId: 'agent-1',
+          kind: 'llm',
+          timestamp: Date.now(),
+          payload: { data: {} },
+          hidden: false,
+          done: false,
+        },
+        timestamp: Date.now(),
+      });
+
+      emitEvent(EVENT_TYPES.MESSAGE_LLM_TEXT_UPDATED, {
+        messageId: 901,
+        agentId: 'agent-1',
+        delta: 'wrong-id',
+        accumulatedText: 'wrong-id',
+        timestamp: Date.now(),
+      });
+
+      emitEvent(EVENT_TYPES.MESSAGE_UPDATED, {
+        message: {
+          id: 900,
+          agentId: 'agent-1',
+          kind: 'llm',
+          timestamp: Date.now(),
+          payload: { data: { text: 'final' } },
+          hidden: false,
+          done: true,
+        },
+        timestamp: Date.now(),
+      });
+
+      const stream = await streamPromise;
+      const chunks = await collectChunks(stream);
+      const deltas = chunks
+        .filter((chunk) => chunk.type === 'text-delta')
+        .map((chunk) => (chunk as { type: 'text-delta'; delta: string }).delta);
+      expect(deltas).toEqual(['final']);
+    });
+
+    it('should close stream when abortSignal fires after start', async () => {
+      const controller = new AbortController();
+      const streamPromise = transport.sendMessages({
+        ...makeSendOptions(),
+        abortSignal: controller.signal,
+      });
+      await Promise.resolve();
+
+      emitEvent(EVENT_TYPES.MESSAGE_CREATED, {
+        message: {
+          id: 333,
+          agentId: 'agent-1',
+          kind: 'llm',
+          timestamp: Date.now(),
+          payload: { data: {} },
+          hidden: false,
+          done: false,
+        },
+        timestamp: Date.now(),
+      });
+
+      controller.abort();
+
+      const stream = await streamPromise;
+      const chunks = await collectChunks(stream);
+      expect(chunks.find((chunk) => chunk.type === 'finish')).toBeUndefined();
     });
   });
 

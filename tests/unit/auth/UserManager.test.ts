@@ -323,6 +323,25 @@ describe('UserManager', () => {
       ]);
       getInstanceSpy.mockRestore();
     });
+
+    /* Preconditions: normalizeChangedFields receives different shapes
+       Action: Call normalizeChangedFields() with table-driven inputs
+       Assertions: Returns undefined for empty input and returns unique sorted paths otherwise
+       Requirements: realtime-events.3.3.2 */
+    it('should normalize changed fields with dedupe and lexicographic sort', () => {
+      const cases: Array<{ input: string[]; expected: string[] | undefined }> = [
+        { input: [], expected: undefined },
+        { input: ['name', 'name', 'locale'], expected: ['locale', 'name'] },
+        {
+          input: ['payload.data.text', 'payload.data.text', 'done'],
+          expected: ['done', 'payload.data.text'],
+        },
+      ];
+
+      for (const { input, expected } of cases) {
+        expect((profileManager as any).normalizeChangedFields(input)).toEqual(expected);
+      }
+    });
   });
 
   describe('getCurrentUserId', () => {

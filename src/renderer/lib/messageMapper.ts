@@ -39,10 +39,10 @@ export function toUIMessage(msg: MessageSnapshot): UIMessage | null {
       parts.push({ type: 'reasoning', text: reasoning.text, state: 'done' });
     }
 
-    // Text part from action.content (if present)
-    const action = data.action as { content?: string } | undefined;
-    if (action?.content) {
-      parts.push({ type: 'text', text: action.content, state: 'done' });
+    // Text part from canonical data.text
+    const text = typeof data.text === 'string' ? data.text : undefined;
+    if (text && text.length > 0) {
+      parts.push({ type: 'text', text, state: 'done' });
     }
 
     return {

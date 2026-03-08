@@ -36,13 +36,18 @@ export function AgentHeader({
   const style = getStatusStyles(currentAgent.status);
 
   return (
-    <div className="h-16 px-6 border-b border-border grid grid-cols-2 gap-6 items-center flex-shrink-0 relative z-[100]">
+    <div
+      data-testid="agent-header"
+      className="h-16 px-6 border-b border-border grid grid-cols-2 gap-6 items-center flex-shrink-0 relative z-[100]"
+    >
       {/* Left: Active Agent Info */}
-      <div className="flex items-center gap-3 min-w-0">
+      <div data-testid="agent-header-left" className="flex items-center gap-3 min-w-0">
         <AgentAvatar status={currentAgent.status} letter={letter} size="md" />
 
         <div className="flex-1 min-w-0">
-          <h3 className="font-semibold text-foreground truncate">{currentAgentName}</h3>
+          <h3 data-testid="agent-header-title" className="font-semibold text-foreground truncate">
+            {currentAgentName}
+          </h3>
           <div className="flex items-center gap-2 text-xs">
             <span className={style.text}>{getStatusText(currentAgent.status)}</span>
             <span className="text-muted-foreground">·</span>
@@ -54,7 +59,11 @@ export function AgentHeader({
       </div>
 
       {/* Right: Chat List */}
-      <div ref={chatListRef} className="flex items-center gap-2 justify-end">
+      <div
+        data-testid="agent-header-right"
+        ref={chatListRef}
+        className="flex items-center gap-2 justify-end"
+      >
         <div
           onClick={onNewChat}
           className="w-8 h-8 rounded-full bg-sky-400 flex items-center justify-center cursor-pointer hover:bg-sky-500 transition-colors group"

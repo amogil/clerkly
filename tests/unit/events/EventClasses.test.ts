@@ -276,6 +276,20 @@ describe('Event Classes', () => {
       expect(typeof event.timestamp).toBe('number');
       expect(event.toPayload()).toEqual({ agent: mockAgentSnapshot });
     });
+
+    /* Preconditions: AgentSnapshot and changed fields provided
+       Action: Create AgentUpdatedEvent with changed fields
+       Assertions: Event payload includes changedFields
+       Requirements: realtime-events.3.3 */
+    it('should include changedFields when provided', () => {
+      const event = new AgentUpdatedEvent(mockAgentSnapshot, ['status', 'updatedAt']);
+
+      expect(event.changedFields).toEqual(['status', 'updatedAt']);
+      expect(event.toPayload()).toEqual({
+        agent: mockAgentSnapshot,
+        changedFields: ['status', 'updatedAt'],
+      });
+    });
   });
 
   describe('AgentArchivedEvent', () => {
@@ -367,6 +381,20 @@ describe('Event Classes', () => {
       expect(event.timestamp).toBeGreaterThan(0);
       expect(typeof event.timestamp).toBe('number');
       expect(event.toPayload()).toEqual({ message: mockMessageSnapshot });
+    });
+
+    /* Preconditions: MessageSnapshot and changed fields provided
+       Action: Create MessageUpdatedEvent with changed fields
+       Assertions: Event payload includes changedFields
+       Requirements: realtime-events.3.3 */
+    it('should include changedFields when provided', () => {
+      const event = new MessageUpdatedEvent(mockMessageSnapshot, ['payload', 'done']);
+
+      expect(event.changedFields).toEqual(['payload', 'done']);
+      expect(event.toPayload()).toEqual({
+        message: mockMessageSnapshot,
+        changedFields: ['payload', 'done'],
+      });
     });
   });
 
