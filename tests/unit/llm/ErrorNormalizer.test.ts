@@ -28,6 +28,7 @@ describe('ErrorNormalizer', () => {
       message: 'Unauthorized',
     });
     expect(normalized.type).toBe('auth');
+    expect(normalized.message).toBe('Invalid API key. Please check your key and try again.');
   });
 
   /* Preconditions: APICallError with statusCode 403
@@ -41,6 +42,7 @@ describe('ErrorNormalizer', () => {
       message: 'Forbidden',
     });
     expect(normalized.type).toBe('auth');
+    expect(normalized.message).toBe('Invalid API key. Please check your key and try again.');
   });
 
   /* Preconditions: APICallError with statusCode 429 and retry-after header
@@ -55,6 +57,7 @@ describe('ErrorNormalizer', () => {
       responseHeaders: { 'retry-after': '7' },
     });
     expect(normalized.type).toBe('rate_limit');
+    expect(normalized.message).toBe('Rate limit exceeded. Please try again later.');
     expect(normalized.retryAfterSeconds).toBe(7);
   });
 
@@ -68,6 +71,7 @@ describe('ErrorNormalizer', () => {
       message: 'fetch failed',
     });
     expect(normalized.type).toBe('network');
+    expect(normalized.message).toBe('Network error. Please check your internet connection.');
   });
 
   /* Preconditions: APICallError with statusCode 503
@@ -81,6 +85,7 @@ describe('ErrorNormalizer', () => {
       message: 'Service unavailable',
     });
     expect(normalized.type).toBe('provider');
+    expect(normalized.message).toBe('Provider service unavailable. Please try again later.');
   });
 
   /* Preconditions: RetryError from SDK
@@ -93,6 +98,7 @@ describe('ErrorNormalizer', () => {
       message: 'Retries exhausted',
     });
     expect(normalized.type).toBe('provider');
+    expect(normalized.message).toBe('Provider service unavailable. Please try again later.');
   });
 
   /* Preconditions: ToolExecutionError from SDK
@@ -135,5 +141,8 @@ describe('ErrorNormalizer', () => {
       new LLMRequestAbortedError('Model response timeout', new Error('aborted'))
     );
     expect(normalized.type).toBe('timeout');
+    expect(normalized.message).toBe(
+      'Model response timeout. The provider took too long to respond. Please try again later.'
+    );
   });
 });

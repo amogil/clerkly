@@ -401,6 +401,25 @@ describe('Settings Component - Test Connection', () => {
     testButton = screen.getByText('Test Connection');
     expect(testButton).toBeDisabled();
   });
+
+  /* Preconditions: Settings screen rendered
+     Action: Inspect LLM provider block content
+     Assertions: API key security text and Test Connection action are visible
+     Requirements: settings.1.25, settings.1.26 */
+  it('should show API key security text and Test Connection button', async () => {
+    render(<Settings />);
+
+    await waitFor(() => {
+      expect(mockLoadLLMProvider).toHaveBeenCalled();
+    });
+
+    expect(
+      screen.getByText(
+        'Your API key is stored securely. It will only be used to communicate with your selected LLM provider.'
+      )
+    ).toBeInTheDocument();
+    expect(screen.getByText('Test Connection')).toBeInTheDocument();
+  });
 });
 
 describe('Settings Component - Error Handling with callApi', () => {

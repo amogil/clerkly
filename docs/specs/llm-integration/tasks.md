@@ -58,12 +58,12 @@
 
 ## Фаза B1.1: Конформанс ошибок и каналов уведомлений (cross-spec)
 
-- [ ] Привести runtime к `error-notifications` целевой модели:
-  - [ ] Chat-flow ошибки (`auth/network/provider/timeout/tool/protocol`) показываются только в чате (`kind:error`), без toast-дубликатов.
-  - [ ] `rate_limit` остаётся transient banner (`agent.rate_limit`) без persisted `kind:error`.
-  - [ ] Background/IPC ошибки вне chat-flow показываются в toast через `callApi()` (если `silent !== true`).
-  - [ ] Race/cancelled ошибки логируются и не показываются пользователю.
-- [ ] Синхронизировать тексты ошибок в `LLMError`/renderer диалогах с `llm-integration.3.5`.
+- [x] Привести runtime к `error-notifications` целевой модели:
+  - [x] Chat-flow ошибки (`auth/network/provider/timeout/tool/protocol`) показываются только в чате (`kind:error`), без toast-дубликатов.
+  - [x] `rate_limit` остаётся transient banner (`agent.rate_limit`) без persisted `kind:error`.
+  - [x] Background/IPC ошибки вне chat-flow показываются в toast через `callApi()` (если `silent !== true`).
+  - [x] Race/cancelled ошибки логируются и не показываются пользователю.
+- [x] Синхронизировать тексты ошибок в `LLMError`/renderer диалогах с `llm-integration.3.5`.
 - [x] Обновить unit-тесты:
   - [x] `tests/unit/utils/apiWrapper.test.ts` (chat suppression vs background toast).
   - [x] `tests/unit/agents/MainPipeline.test.ts` (tool/protocol error mapping, no toast assumptions).
@@ -108,7 +108,7 @@
   - [x] Проверить provider options (`thinkingConfig.includeThoughts` и связанные параметры).
 - [x] `src/main/agents/MainPipeline.ts`:
   - [x] Финализировать loop `model -> tools -> model` на AI SDK control (`stopWhen`/step control).
-  - [ ] Поддержать multi-tool + controlled concurrency.
+  - [x] Поддержать multi-tool + controlled concurrency.
   - [x] Гарантировать корректный persisted lifecycle для `kind:tool_call` (create/update, done=false/true, full arguments).
   - [x] Удалить публикацию/зависимость от отдельного realtime-события `message.tool_call`; использовать только persisted `message.created`/`message.updated`.
   - [x] Гарантировать корректный cancel cleanup (idempotent для in-flight jobs).
@@ -148,10 +148,10 @@
 
 ## Фаза C1: Stream Protocol / UIMessage stream
 
-- [ ] Привести `src/renderer/lib/IPCChatTransport.ts` к тонкому protocol-adapter:
-  - [ ] Оставить только трансляцию доменных realtime-событий в `UIMessageChunk`.
-  - [ ] Убрать лишнюю бизнес-логику из transport (вынести в main/useChat lifecycle).
-  - [ ] Зафиксировать корректный порядок chunk-ов:
+- [x] Привести `src/renderer/lib/IPCChatTransport.ts` к тонкому protocol-adapter:
+  - [x] Оставить только трансляцию доменных realtime-событий в `UIMessageChunk`.
+  - [x] Убрать лишнюю бизнес-логику из transport (вынести в main/useChat lifecycle).
+  - [x] Зафиксировать корректный порядок chunk-ов:
     - [x] `start -> start-step -> reasoning/text deltas -> finish-step -> finish`
   - [x] Гарантировать отсутствие дубликатов между delta-событиями и `message.updated` snapshot.
   - [x] Гарантировать корректное завершение стрима при cancel/hidden/done.
@@ -191,41 +191,41 @@
 
 ## Фаза C3: Tool usage + message persistence (AI SDK UI guides)
 
-- [ ] Применить паттерны AI SDK UI для persistence:
-  - [ ] `validateUIMessages` для восстановленных/передаваемых сообщений.
-  - [ ] `convertToModelMessages` для model input.
-  - [ ] консистентная стратегия `onFinish` persistence + детерминированные message IDs.
-- [ ] Зафиксировать поведение tool parts в persisted истории:
-  - [ ] что сохраняем в БД,
-  - [ ] что участвует в model replay,
-  - [ ] как `tool_call` рендерится в chat UI через `Tool` (включая pending/success/error states).
-  - [ ] какие служебные tool-части НЕ рендерятся пользователю.
-- [ ] Проверить необходимость `sendAutomaticallyWhen` и auto-continue semantics для tool-flow.
+- [x] Применить паттерны AI SDK UI для persistence:
+  - [x] `validateUIMessages` для восстановленных/передаваемых сообщений.
+  - [x] `convertToModelMessages` для model input.
+  - [x] консистентная стратегия `onFinish` persistence + детерминированные message IDs.
+- [x] Зафиксировать поведение tool parts в persisted истории:
+  - [x] что сохраняем в БД,
+  - [x] что участвует в model replay,
+  - [x] как `tool_call` рендерится в chat UI через `Tool` (включая pending/success/error states).
+  - [x] какие служебные tool-части НЕ рендерятся пользователю.
+- [x] Проверить необходимость `sendAutomaticallyWhen` и auto-continue semantics для tool-flow.
 - [x] `src/renderer/lib/messageMapper.ts` / `IPCChatTransport`:
   - [x] корректно маппить persisted `kind:tool_call` в UIMessage tool parts.
   - [x] исключить дублирование tool-call частей между `message.created` и `message.updated`.
-- [ ] Использовать SDK-метрики шагов вместо ручной агрегации usage/timing:
-  - [ ] Брать usage из `result.totalUsage` и `result.steps[*].usage`, а не только из provider-raw envelope.
-  - [ ] Для каждого step сохранять диагностику шага (toolCalls, finishReason, usage) в `llm.pipeline.diagnostic`.
-  - [ ] Latency per step считать в pipeline через `onStepFinish` + локальные timestamps рантайма (SDK не даёт готовый duration-поле).
-  - [ ] Сохранение в `messages.usage_json` оставить в формате `canonical + raw`, где `canonical` заполняется из SDK usage.
+- [x] Использовать SDK-метрики шагов вместо ручной агрегации usage/timing:
+  - [x] Брать usage из `result.totalUsage` и `result.steps[*].usage`, а не только из provider-raw envelope.
+  - [x] Для каждого step сохранять диагностику шага (toolCalls, finishReason, usage) в `llm.pipeline.diagnostic`.
+  - [x] Latency per step считать в pipeline через `onStepFinish` + локальные timestamps рантайма (SDK не даёт готовый duration-поле).
+  - [x] Сохранение в `messages.usage_json` оставить в формате `canonical + raw`, где `canonical` заполняется из SDK usage.
 
 ## Фаза C4: Settings/Test Connection conformance
 
-- [ ] Выполнить migration ссылок на требования `settings.*` после смены нумерации (`settings.2`/`settings.3`):
-  - [ ] production-код: комментарии `Requirements: settings.*` и inline-ссылки.
-  - [ ] unit/functional тесты: structured comments и ссылки на требования.
-  - [ ] документы `requirements/design/tasks` в затронутых спеках: исправить перекрёстные ссылки.
-  - [ ] прогнать проверку отсутствия старых ссылок (`rg \"settings\\.2\\.|settings\\.3\\.\"` по ожидаемому соответствию) и зафиксировать результат.
-- [ ] `src/main/llm/*Provider*.ts`:
+- [x] Выполнить migration ссылок на требования `settings.*` после смены нумерации (`settings.2`/`settings.3`):
+  - [x] production-код: комментарии `Requirements: settings.*` и inline-ссылки.
+  - [x] unit/functional тесты: structured comments и ссылки на требования.
+  - [x] документы `requirements/design/tasks` в затронутых спеках: исправить перекрёстные ссылки.
+  - [x] прогнать проверку отсутствия старых ссылок (`rg \"settings\\.2\\.|settings\\.3\\.\"` по ожидаемому соответствию) и зафиксировать результат.
+- [x] `src/main/llm/*Provider*.ts`:
   - [x] Подтвердить `testConnection()` для OpenAI/Anthropic/Google по `settings.3.5` и timeout 10s.
   - [x] Синхронизировать маппинг ошибок test-connection с доменными сообщениями (`settings.3.8`).
-- [ ] `src/renderer/components/settings/*`:
-  - [ ] Проверить disable/enabled/lifecycle кнопки `Test Connection` по `settings.3.1-3.4`.
-  - [ ] Гарантировать отсутствие сохранения результата теста в БД (`settings.3.10`).
-  - [ ] Проверить обязательный security-текст API key (`settings.1.25`) и наличие кнопки `Test Connection` (`settings.1.26`).
-- [ ] Tests:
-  - [ ] `tests/functional/llm-connection-test.spec.ts` — обновить/добавить кейсы по всем провайдерам и ошибкам.
+- [x] `src/renderer/components/settings/*`:
+  - [x] Проверить disable/enabled/lifecycle кнопки `Test Connection` по `settings.3.1-3.4`.
+  - [x] Гарантировать отсутствие сохранения результата теста в БД (`settings.3.10`).
+  - [x] Проверить обязательный security-текст API key (`settings.1.25`) и наличие кнопки `Test Connection` (`settings.1.26`).
+- [x] Tests:
+  - [x] `tests/functional/llm-connection-test.spec.ts` — обновить/добавить кейсы по всем провайдерам и ошибкам.
   - [x] `tests/unit/llm/*Provider*.test.ts` — маппинг HTTP/timeout/network для testConnection.
 
 ---
@@ -234,7 +234,7 @@
 
 - [x] Удалить переходные/дублирующие ветки streaming и provider parsing, ставшие лишними после AI SDK унификации.
 - [x] Удалить оставшиеся structured-output chat-flow артефакты в коде/тестах/доках.
-- [ ] Удалить неиспользуемые event types/конвертеры, если они дублируют stream protocol.
+- [x] Удалить неиспользуемые event types/конвертеры, если они дублируют stream protocol.
 - [x] Удалить legacy fallback-рендеры в renderer.
 - [x] Миграция legacy LLM payload: `data.action.content` -> `data.text` для исторических сообщений.
   - [x] Добавить SQL-миграцию в `migrations/`:
@@ -248,15 +248,15 @@
 
 ## Фаза E: Тестирование (максимальное покрытие)
 
-- [ ] Полный конформанс с `testing.13` (AI SDK chat-flow contracts):
+- [x] Полный конформанс с `testing.13` (AI SDK chat-flow contracts):
   - [x] `testing.13.1`: unit на sequence `start -> start-step -> delta -> finish-step -> finish` в `IPCChatTransport`.
   - [x] `testing.13.2`: unit на отсутствие дублей между delta и `message.updated` snapshot.
   - [x] `testing.13.3`: unit на рендер persisted `kind:tool_call` как tool-call блока.
   - [x] `testing.13.4`: unit на `ErrorNormalizer` (auth/rate_limit/provider/network/timeout/tool/protocol).
   - [x] `testing.13.5`: unit на multi-tool + continuation `model -> tools -> model`.
-  - [ ] `testing.13.6`: functional на одновременный стриминг reasoning и text.
-  - [ ] `testing.13.7`: functional на `rate_limit` countdown без persisted `kind:error`.
-  - [ ] `testing.13.8`: functional на cancel во время tool execution без `kind:error`.
+  - [x] `testing.13.6`: functional на одновременный стриминг reasoning и text.
+  - [x] `testing.13.7`: functional на `rate_limit` countdown без persisted `kind:error`.
+  - [x] `testing.13.8`: functional на cancel во время tool execution без `kind:error`.
 - [x] Unit: `ErrorNormalizer`
   - [x] покрыть все AI SDK error classes и доменный mapping.
   - [x] покрыть извлечение `retry-after` + fallback.
@@ -276,19 +276,19 @@
   - [x] persisted `kind:tool_call` корректно попадает в UI stream как tool-call part.
   - [x] стабильность mapping при mixed streaming events.
   - [x] `AgentMessage`/`Tool` рендер pending/success/error и корректный вывод input/output.
-- [ ] Functional:
-  - [ ] reasoning и text стримятся одновременно в одном `kind:llm`.
-  - [ ] text стримится инкрементально.
-  - [ ] multi-tool turn продолжается до финального ответа.
-  - [ ] cancel во время tool execution не создаёт `kind:error`.
-  - [ ] `tool_call` отображается как tool-call блок (`Tool`) с корректными input/output/status.
-  - [ ] `tool_call` рендер корректен на основе только `message.created`/`message.updated`.
-  - [ ] `tool_call` в режиме stub переходит `done=false -> done=true` и обновляет UI без отдельного сигнала.
-  - [ ] статус/индикатор корректен для `llm/tool_call` + `done`.
-  - [ ] `changedFields` передаётся в целевых `{entity}.updated` событиях и корректно используется UI.
-  - [ ] chat-flow ошибки не дублируются toast-уведомлениями.
-  - [ ] settings: security-текст и `Test Connection` UI контракт покрыты функциональными тестами.
-  - [ ] helper `expectNoToastError` используется после ключевых действий (testing.12 contract).
+- [x] Functional:
+  - [x] reasoning и text стримятся одновременно в одном `kind:llm`.
+  - [x] text стримится инкрементально.
+  - [x] multi-tool turn продолжается до финального ответа.
+  - [x] cancel во время tool execution не создаёт `kind:error`.
+  - [x] `tool_call` отображается как tool-call блок (`Tool`) с корректными input/output/status.
+  - [x] `tool_call` рендер корректен на основе только `message.created`/`message.updated`.
+  - [x] `tool_call` в режиме stub переходит `done=false -> done=true` и обновляет UI без отдельного сигнала.
+  - [x] статус/индикатор корректен для `llm/tool_call` + `done`.
+  - [x] `changedFields` передаётся в целевых `{entity}.updated` событиях и корректно используется UI.
+  - [x] chat-flow ошибки не дублируются toast-уведомлениями.
+  - [x] settings: security-текст и `Test Connection` UI контракт покрыты функциональными тестами.
+  - [x] helper `expectNoToastError` используется после ключевых действий (testing.12 contract).
 
 ---
 

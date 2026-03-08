@@ -53,10 +53,7 @@ export function AgentMessage({
 
     const errorMessage = errorInfo?.message || 'Unknown error';
     const actionLink = errorInfo?.action_link;
-    const canRetry =
-      errorInfo?.type === 'auth' ||
-      (errorInfo?.type === 'provider' &&
-        errorMessage === 'Invalid response format. Please try again later.');
+    const canRetry = errorInfo?.type === 'auth';
 
     const actionItems: AgentDialogActionItem[] = [];
     // Requirements: llm-integration.3.4.5
