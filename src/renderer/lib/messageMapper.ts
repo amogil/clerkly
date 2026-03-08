@@ -11,6 +11,7 @@ import type { MessageSnapshot } from '../../shared/events/types';
  * - kind: 'user'  → role: 'user',      parts: [{ type: 'text', text }]
  * - kind: 'llm'   → role: 'assistant', parts: [reasoning?, text?]
  * - kind: 'error' → role: 'assistant', parts: [{ type: 'text', text: errorMessage }], metadata: { isError, ... }
+ * - kind: 'tool_call' → role: 'assistant', parts: [{ type: 'text', text: tool summary }], metadata: { isToolCall, ... }
  * - hidden: true  → null (filtered out)
  *
  * Requirements: agents.7.3, llm-integration.3.4, llm-integration.3.8, llm-integration.8.5
@@ -67,6 +68,29 @@ export function toUIMessage(msg: MessageSnapshot): UIMessage | null {
         isError: true,
         errorMessage,
         actionLink,
+      },
+    };
+  }
+
+  if (msg.kind === 'tool_call') {
+    const call = data as {
+      toolName?: string;
+      callId?: string;
+      output?: { content?: string };
+    };
+    const toolName = call.toolName ?? 'tool';
+    const callId = call.callId ?? String(msg.id);
+    const output =
+      call.output && typeof call.output.content === 'string' ? `\n${call.output.content}` : '';
+
+    return {
+      id: String(msg.id),
+      role: 'assistant',
+      parts: [{ type: 'text', text: `[tool_call] ${toolName} (${callId})${output}` }],
+      metadata: {
+        isToolCall: true,
+        toolName,
+        callId,
       },
     };
   }

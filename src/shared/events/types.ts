@@ -156,16 +156,6 @@ export interface MessageLlmTextUpdatedPayload extends BaseEvent {
   timestamp: number;
 }
 
-// Tool call single-shot event
-export interface MessageToolCallPayload extends BaseEvent {
-  agentId: string;
-  llmMessageId: number;
-  callId: string;
-  toolName: string;
-  arguments: Record<string, unknown>;
-  timestamp: number;
-}
-
 // User events
 export type UserLoginPayload = BaseEvent & { userId: string };
 export type UserLogoutPayload = BaseEvent;
@@ -328,7 +318,6 @@ export interface ClerklyEvents {
   [EVENT_TYPES.MESSAGE_UPDATED]: MessageUpdatedPayload;
   [EVENT_TYPES.MESSAGE_LLM_REASONING_UPDATED]: MessageLlmReasoningUpdatedPayload;
   [EVENT_TYPES.MESSAGE_LLM_TEXT_UPDATED]: MessageLlmTextUpdatedPayload;
-  [EVENT_TYPES.MESSAGE_TOOL_CALL]: MessageToolCallPayload;
 
   // User events
   [EVENT_TYPES.USER_LOGIN]: UserLoginPayload;
@@ -413,7 +402,6 @@ export function getEntityId(
     agent?: { id?: string };
     message?: { id?: number };
     messageId?: number;
-    llmMessageId?: number;
   }
 ): string | undefined {
   // Old format: payload.id
@@ -435,10 +423,6 @@ export function getEntityId(
   // Message reasoning payload: payload.messageId
   if ('messageId' in payload && typeof payload.messageId === 'number') {
     return String(payload.messageId);
-  }
-  // Tool call payload: payload.llmMessageId
-  if ('llmMessageId' in payload && typeof payload.llmMessageId === 'number') {
-    return String(payload.llmMessageId);
   }
   return undefined;
 }
@@ -473,7 +457,6 @@ type AgentArchivedType = typeof EVENT_TYPES.AGENT_ARCHIVED;
 type MessageCreatedType = typeof EVENT_TYPES.MESSAGE_CREATED;
 type MessageUpdatedType = typeof EVENT_TYPES.MESSAGE_UPDATED;
 type MessageLlmTextUpdatedType = typeof EVENT_TYPES.MESSAGE_LLM_TEXT_UPDATED;
-type MessageToolCallType = typeof EVENT_TYPES.MESSAGE_TOOL_CALL;
 type UserProfileUpdatedType = typeof EVENT_TYPES.USER_PROFILE_UPDATED;
 
 /**
@@ -837,37 +820,6 @@ export class MessageLlmTextUpdatedEvent extends TypedEventClass<MessageLlmTextUp
       agentId: this.agentId,
       delta: this.delta,
       accumulatedText: this.accumulatedText,
-    };
-  }
-}
-
-/**
- * Message tool call event
- * Emitted once when tool call arguments are fully assembled
- * Requirements: llm-integration.11.1
- */
-export class MessageToolCallEvent extends TypedEventClass<MessageToolCallType> {
-  readonly type = EVENT_TYPES.MESSAGE_TOOL_CALL;
-  readonly timestamp: number;
-
-  constructor(
-    public readonly agentId: string,
-    public readonly llmMessageId: number,
-    public readonly callId: string,
-    public readonly toolName: string,
-    public readonly args: Record<string, unknown>
-  ) {
-    super();
-    this.timestamp = Date.now();
-  }
-
-  toPayload(): EventPayloadWithoutTimestamp<MessageToolCallType> {
-    return {
-      agentId: this.agentId,
-      llmMessageId: this.llmMessageId,
-      callId: this.callId,
-      toolName: this.toolName,
-      arguments: this.args,
     };
   }
 }

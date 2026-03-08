@@ -386,11 +386,11 @@ describe('AgentChat — messages rendering', () => {
     expect(rendered[2]).toHaveAttribute('data-reasoning-streaming', 'false');
   });
 
-  /* Preconditions: status is streaming but llm message already has action
+  /* Preconditions: status is streaming but llm message already has final text
      Action: render AgentChat
      Assertions: reasoning streaming flag is false (streaming reasoning is finished)
      Requirements: llm-integration.7.3 */
-  it('should not mark llm message as reasoning-streaming when action is already present', () => {
+  it('should not mark llm message as reasoning-streaming when text is already present', () => {
     mockUseAgentChatState.isStreaming = true;
     mockUseAgentChatState.rawMessages = [
       makeMessage(1, 'user'),
@@ -399,7 +399,7 @@ describe('AgentChat — messages rendering', () => {
         payload: {
           data: {
             reasoning: { text: 'Thinking' },
-            action: { content: 'Done' },
+            text: 'Done',
           },
         },
       },

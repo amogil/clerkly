@@ -19,7 +19,7 @@ const baseMessage = (overrides: Partial<MessageSnapshot> = {}): MessageSnapshot 
     id: 1,
     agentId: 'agent1',
     kind: 'user',
-    timestamp: '2024-01-01T00:00:00Z',
+    timestamp: new Date('2024-01-01T00:00:00Z').getTime(),
     hidden: false,
     done: true,
     payload: { data: { text: 'Hello' } },
@@ -49,6 +49,61 @@ describe('AgentMessage — user', () => {
   it('should render empty user message without crash', () => {
     render(<AgentMessage message={baseMessage({ kind: 'user', payload: { data: {} } })} />);
     expect(screen.getByTestId('message-user')).toBeInTheDocument();
+  });
+});
+
+describe('AgentMessage — tool_call', () => {
+  /* Preconditions: persisted kind:tool_call with done=false
+     Action: render AgentMessage
+     Assertions: tool block renders header and input, output is hidden while in-progress
+     Requirements: llm-integration.11.3, llm-integration.11.6 */
+  it('should render in-progress tool_call without output block', () => {
+    render(
+      <AgentMessage
+        message={baseMessage({
+          kind: 'tool_call',
+          done: false,
+          payload: {
+            data: {
+              callId: 'call-1',
+              toolName: 'search_docs',
+              arguments: { query: 'streaming' },
+            },
+          },
+        })}
+      />
+    );
+
+    expect(screen.getByTestId('message-tool-call')).toBeInTheDocument();
+    expect(screen.getByText('search_docs')).toBeInTheDocument();
+    expect(screen.getByTestId('message-tool-call-input')).toBeInTheDocument();
+    expect(screen.queryByTestId('message-tool-call-output')).not.toBeInTheDocument();
+  });
+
+  /* Preconditions: persisted kind:tool_call with done=true and output
+     Action: render AgentMessage
+     Assertions: tool output is rendered
+     Requirements: llm-integration.11.2, llm-integration.11.3 */
+  it('should render completed tool_call with output block', () => {
+    render(
+      <AgentMessage
+        message={baseMessage({
+          kind: 'tool_call',
+          done: true,
+          payload: {
+            data: {
+              callId: 'call-1',
+              toolName: 'search_docs',
+              arguments: { query: 'streaming' },
+              output: { status: 'success', content: 'result' },
+            },
+          },
+        })}
+      />
+    );
+
+    expect(screen.getByTestId('message-tool-call-output')).toBeInTheDocument();
+    expect(screen.getByText('result')).toBeInTheDocument();
   });
 });
 

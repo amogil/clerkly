@@ -22,7 +22,6 @@ import {
   MessageUpdatedEvent,
   MessageLlmReasoningUpdatedEvent,
   MessageLlmTextUpdatedEvent,
-  MessageToolCallEvent,
   UserProfileUpdatedEvent,
   isTypedEvent,
   AgentSnapshot,
@@ -459,27 +458,6 @@ describe('Event Classes', () => {
         agentId: 'agent-1',
         delta: 'he',
         accumulatedText: 'hello',
-      });
-    });
-  });
-
-  describe('MessageToolCallEvent', () => {
-    /* Preconditions: Fully assembled tool call fields provided
-       Action: Create MessageToolCallEvent
-       Assertions: Event has correct type and payload
-       Requirements: llm-integration.11.1 */
-    it('should create single-shot tool call event with payload', () => {
-      const event = new MessageToolCallEvent('agent-1', 13, 'call-1', 'search_docs', {
-        query: 'changedFields format',
-      });
-
-      expect(event.type).toBe('message.tool_call');
-      expect(event.toPayload()).toEqual({
-        agentId: 'agent-1',
-        llmMessageId: 13,
-        callId: 'call-1',
-        toolName: 'search_docs',
-        arguments: { query: 'changedFields format' },
       });
     });
   });

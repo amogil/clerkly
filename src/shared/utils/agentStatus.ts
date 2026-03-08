@@ -15,6 +15,7 @@ export const MESSAGE_KIND = {
   USER: 'user',
   LLM: 'llm',
   ERROR: 'error',
+  TOOL_CALL: 'tool_call',
 } as const;
 
 /**

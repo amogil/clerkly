@@ -262,25 +262,5 @@ describe('EventIPCHandlers', () => {
 
       expect(mockDeliverFromIPC).toHaveBeenCalledWith('user.login', payload);
     });
-
-    /* Preconditions: IPC handler registered
-       Action: Receive message.tool_call event
-       Assertions: Event is forwarded correctly
-       Requirements: realtime-events.4.2, realtime-events.3.9 */
-    it('should forward message.tool_call events', () => {
-      const mockEvent = {} as IpcMainEvent;
-      const payload = {
-        timestamp: Date.now(),
-        agentId: 'agent-1',
-        llmMessageId: 77,
-        callId: 'call-1',
-        toolName: 'search_docs',
-        arguments: { query: 'status rules' },
-      };
-
-      ipcHandler(mockEvent, 'message.tool_call', payload);
-
-      expect(mockDeliverFromIPC).toHaveBeenCalledWith('message.tool_call', payload);
-    });
   });
 });

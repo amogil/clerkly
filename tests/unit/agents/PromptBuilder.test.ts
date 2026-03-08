@@ -143,7 +143,7 @@ describe('PromptBuilder.build()', () => {
           kind: 'llm',
           payloadJson: JSON.stringify({
             data: {
-              action: { type: 'text', content: 'Hi there!' },
+              text: 'Hi there!',
             },
           }),
           replyToMessageId: 1,
@@ -174,7 +174,7 @@ describe('PromptBuilder.build()', () => {
               reasoning: { text: 'My internal thoughts', excluded_from_replay: true },
               reasoning_summary: 'summary',
               reasoning_tokens: 123,
-              action: { type: 'text', content: 'Answer' },
+              text: 'Answer',
             },
           }),
           replyToMessageId: null,
@@ -197,7 +197,7 @@ describe('PromptBuilder.build()', () => {
 
 describe('PromptBuilder edge cases', () => {
   describe('llm messages without replayable content', () => {
-    /* Preconditions: LLM message lacks replayable action.content
+    /* Preconditions: LLM message lacks replayable data.text
        Action: Call build(messages)
        Assertions: Message is excluded from replay history
        Requirements: llm-integration.10.2, llm-integration.10.3 */
@@ -208,7 +208,7 @@ describe('PromptBuilder edge cases', () => {
           kind: 'llm',
           payloadJson: JSON.stringify({
             data: {
-              action: { type: 'text' },
+              text: '',
               note: 'Hello',
             },
           }),
@@ -239,9 +239,7 @@ describe('PromptBuilder edge cases', () => {
           id: 2,
           kind: 'llm',
           hidden: true,
-          payloadJson: JSON.stringify({
-            data: { action: { type: 'text', content: 'Hidden llm' } },
-          }),
+          payloadJson: JSON.stringify({ data: { text: 'Hidden llm' } }),
         }),
       ];
 
@@ -267,9 +265,7 @@ describe('PromptBuilder.buildMessages()', () => {
       makeMessage({
         id: 2,
         kind: 'llm',
-        payloadJson: JSON.stringify({
-          data: { action: { type: 'text', content: 'Hi!' } },
-        }),
+        payloadJson: JSON.stringify({ data: { text: 'Hi!' } }),
       }),
     ];
 

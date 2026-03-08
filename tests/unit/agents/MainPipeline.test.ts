@@ -5,7 +5,6 @@ import { MainEventBus } from '../../../src/main/events/MainEventBus';
 import {
   MessageLlmReasoningUpdatedEvent,
   MessageLlmTextUpdatedEvent,
-  MessageToolCallEvent,
   AgentRateLimitEvent,
   LLMPipelineDiagnosticEvent,
 } from '../../../src/shared/events/types';
@@ -60,6 +59,7 @@ function makeMocks() {
   const userMsg = makeMessage(1, 'user');
   const llmMsg = makeMessage(2, 'llm');
   const errorMsg = makeMessage(3, 'error');
+  let nextToolMessageId = 100;
 
   const messageManager = {
     list: jest.fn().mockReturnValue([userMsg]),
@@ -68,6 +68,7 @@ function makeMocks() {
     create: jest.fn().mockImplementation((_agentId: string, kind: string) => {
       if (kind === 'llm') return llmMsg;
       if (kind === 'error') return errorMsg;
+      if (kind === 'tool_call') return makeMessage(nextToolMessageId++, kind);
       return makeMessage(99, kind);
     }),
     update: jest.fn(),
@@ -196,8 +197,8 @@ describe('MainPipeline.run()', () => {
     );
   });
 
-  it('publishes single message.tool_call event and continues tool loop until final text', async () => {
-    const { pipeline, llmProvider, toolExecutor, mockPublish } = makeMocks();
+  it('continues tool loop until final text', async () => {
+    const { pipeline, llmProvider, toolExecutor, messageManager } = makeMocks();
 
     llmProvider.chat
       .mockImplementationOnce(
@@ -230,23 +231,37 @@ describe('MainPipeline.run()', () => {
 
     await pipeline.run('agent-1', 1);
 
-    const toolEvents = mockPublish.mock.calls
-      .map((call: [unknown]) => call[0])
-      .filter((e: unknown) => e instanceof MessageToolCallEvent);
-
-    expect(toolEvents).toHaveLength(1);
-    expect(toolEvents[0]).toMatchObject({
-      agentId: 'agent-1',
-      llmMessageId: 2,
-      callId: 'call-1',
-      toolName: 'search_docs',
-    });
     expect(toolExecutor.executeBatch).toHaveBeenCalledTimes(1);
     expect(llmProvider.chat).toHaveBeenCalledTimes(2);
+    expect(messageManager.create).toHaveBeenCalledWith(
+      'agent-1',
+      'tool_call',
+      expect.objectContaining({
+        data: expect.objectContaining({
+          callId: 'call-1',
+          toolName: 'search_docs',
+          arguments: { query: 'streaming' },
+        }),
+      }),
+      1,
+      false
+    );
+    expect(messageManager.update).toHaveBeenCalledWith(
+      expect.any(Number),
+      'agent-1',
+      expect.objectContaining({
+        data: expect.objectContaining({
+          callId: 'call-1',
+          toolName: 'search_docs',
+          output: expect.objectContaining({ status: 'success', content: 'result' }),
+        }),
+      }),
+      true
+    );
   });
 
   it('executes multi-tool batch and sends deterministic tool transcript ordered by call_id', async () => {
-    const { pipeline, llmProvider, toolExecutor } = makeMocks();
+    const { pipeline, llmProvider, toolExecutor, messageManager } = makeMocks();
 
     llmProvider.chat
       .mockImplementationOnce(
@@ -294,6 +309,15 @@ describe('MainPipeline.run()', () => {
       ],
       undefined
     );
+    const toolCallCreates = (messageManager.create as jest.Mock).mock.calls.filter(
+      (call: unknown[]) => call[1] === 'tool_call'
+    );
+    expect(toolCallCreates).toHaveLength(2);
+
+    const toolCallDoneUpdates = (messageManager.update as jest.Mock).mock.calls.filter(
+      (call: unknown[]) => call[3] === true
+    );
+    expect(toolCallDoneUpdates.length).toBeGreaterThanOrEqual(2);
   });
 
   it('creates finalized llm message from result.text when no text chunks were emitted', async () => {

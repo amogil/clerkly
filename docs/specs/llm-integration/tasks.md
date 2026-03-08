@@ -25,12 +25,12 @@
 - [ ] Renderer использует AI SDK UI (`useChat` + `ChatTransport`) как единственный state machine стриминга.
 - [ ] Поток в renderer строится через UIMessage stream protocol (`UIMessageChunk`) без дублирования snapshot/delta.
 - [ ] Все специализированные ошибки определяются через AI SDK error classes и нормализуются в доменные типы.
-- [ ] UI рендер tool-call полностью зависит от persisted `kind:tool_call` + `message.created`/`message.updated` (single source of truth).
+- [x] UI рендер tool-call полностью зависит от persisted `kind:tool_call` + `message.created`/`message.updated` (single source of truth).
 - [ ] Канонический финал ответа хранится в `payload.data.text`.
-- [ ] Согласованное статусное правило: `kind='llm' && done=true -> awaiting-response`.
+- [x] Согласованное статусное правило: `kind='llm' && done=true -> awaiting-response`.
 - [ ] Для persisted `kind='tool_call'` статус вычисляется по `done`:
-  - [ ] `done=false -> in-progress`
-  - [ ] `done=true -> awaiting-response`
+  - [x] `done=false -> in-progress`
+  - [x] `done=true -> awaiting-response`
 
 ---
 
@@ -101,13 +101,13 @@
 - [ ] `src/main/agents/MainPipeline.ts`:
   - [ ] Финализировать loop `model -> tools -> model` на AI SDK control (`stopWhen`/step control).
   - [ ] Поддержать multi-tool + controlled concurrency.
-  - [ ] Гарантировать корректный persisted lifecycle для `kind:tool_call` (create/update, done=false/true, full arguments).
-  - [ ] Удалить публикацию/зависимость от отдельного realtime-события `message.tool_call`; использовать только persisted `message.created`/`message.updated`.
+  - [x] Гарантировать корректный persisted lifecycle для `kind:tool_call` (create/update, done=false/true, full arguments).
+  - [x] Удалить публикацию/зависимость от отдельного realtime-события `message.tool_call`; использовать только persisted `message.created`/`message.updated`.
   - [ ] Гарантировать корректный cancel cleanup (idempotent для in-flight jobs).
 - [ ] `src/main/tools/*`:
   - [ ] Зафиксировать policy layer: timeout/retry/concurrency cap.
   - [ ] Обеспечить deterministic merge результатов tool batch.
-  - [ ] До появления реального executor реализовать stub-путь: `tool_call` получает placeholder output и переводится в `done=true`.
+  - [x] До появления реального executor реализовать stub-путь: `tool_call` получает placeholder output и переводится в `done=true`.
 
 ## Фаза B2.2: Persisted message lifecycle conformance
 
@@ -127,13 +127,13 @@
 ## Фаза B2.1: Статусы и snapshot-контракты
 
 - [ ] `src/main/agents/AgentManager.ts` / `src/shared/utils/agentStatus.ts`:
-  - [ ] Подтвердить правило `kind='llm' && done=true -> awaiting-response`.
-  - [ ] Для persisted `kind='tool_call'` реализовать/проверить: `done=false -> in-progress`, `done=true -> awaiting-response`.
+  - [x] Подтвердить правило `kind='llm' && done=true -> awaiting-response`.
+  - [x] Для persisted `kind='tool_call'` реализовать/проверить: `done=false -> in-progress`, `done=true -> awaiting-response`.
 - [ ] `src/main/agents/MessageManager.ts` + snapshot converters:
   - [ ] Подтвердить canonical финальный текст только в `payload.data.text`.
   - [ ] Убедиться, что `kind:error`, `kind:tool_call`, `hidden=true` исключаются из model history.
 - [ ] `src/shared/events/types.ts`:
-  - [ ] Удалить типы/константы/классы `message.tool_call` из целевого runtime-контракта.
+  - [x] Удалить типы/константы/классы `message.tool_call` из целевого runtime-контракта.
   - [ ] Проверить optional `changedFields` формат для `{entity}.updated` событий.
 
 ---
@@ -170,14 +170,14 @@
   - [ ] Опираться на lifecycle `useChat` (`status`, `stop`, completion/error hooks).
   - [ ] Убрать лишние ручные костыли hidden/update, если покрываются stream lifecycle.
 - [ ] `src/renderer/lib/messageMapper.ts`:
-  - [ ] Проверить стабильный mapping persisted snapshot -> UIMessage (без legacy fallback).
+  - [x] Проверить стабильный mapping persisted snapshot -> UIMessage (без legacy fallback).
 - [ ] `src/renderer/components/agents/AgentMessage.tsx` и `AgentChat.tsx`:
   - [ ] Подтвердить соответствие AI Elements parts/status.
-  - [ ] Подтвердить отображение `tool_call` через AI Elements `Tool` компонент.
-  - [ ] Удалить fallback чтения ответа из `data.action.content`; использовать только `payload.data.text`.
+  - [x] Подтвердить отображение `tool_call` через AI Elements `Tool` компонент.
+  - [x] Удалить fallback чтения ответа из `data.action.content`; использовать только `payload.data.text`.
 - [ ] `src/renderer/components/ai-elements/tool.tsx`:
-  - [ ] Подключить/обновить `Tool`, `ToolHeader`, `ToolContent`, `ToolInput`, `ToolOutput` по контракту [AI Elements Tool](https://elements.ai-sdk.dev/components/tool).
-  - [ ] Обеспечить отображение `toolName`, аргументов (`input`) и результата/ошибки (`output`) для persisted `kind:tool_call`.
+  - [x] Подключить/обновить `Tool`, `ToolHeader`, `ToolContent`, `ToolInput`, `ToolOutput` по контракту [AI Elements Tool](https://elements.ai-sdk.dev/components/tool).
+  - [x] Обеспечить отображение `toolName`, аргументов (`input`) и результата/ошибки (`output`) для persisted `kind:tool_call`.
 
 ---
 
@@ -194,7 +194,7 @@
   - [ ] какие служебные tool-части НЕ рендерятся пользователю.
 - [ ] Проверить необходимость `sendAutomaticallyWhen` и auto-continue semantics для tool-flow.
 - [ ] `src/renderer/lib/messageMapper.ts` / `IPCChatTransport`:
-  - [ ] корректно маппить persisted `kind:tool_call` в UIMessage tool parts.
+  - [x] корректно маппить persisted `kind:tool_call` в UIMessage tool parts.
   - [ ] исключить дублирование tool-call частей между `message.created` и `message.updated`.
 
 ## Фаза C4: Settings/Test Connection conformance
@@ -223,6 +223,13 @@
 - [ ] Удалить оставшиеся structured-output chat-flow артефакты в коде/тестах/доках.
 - [ ] Удалить неиспользуемые event types/конвертеры, если они дублируют stream protocol.
 - [ ] Удалить legacy fallback-рендеры в renderer.
+- [x] Миграция legacy LLM payload: `data.action.content` -> `data.text` для исторических сообщений.
+  - [x] Добавить SQL-миграцию в `migrations/`:
+    - [x] Для `kind='llm'` переносить `$.data.action.content` в `$.data.text`, если `$.data.text` отсутствует или пуст.
+    - [x] После переноса удалять `$.data.action` из `payload_json`.
+    - [x] Не изменять записи, где `data.text` уже заполнен.
+  - [x] Добавить unit-тесты для миграции в `tests/unit/MigrationRunner.test.ts`.
+  - [x] Проверить, что после миграции исторические ответы корректно отображаются через каноничный `data.text`.
 
 ---
 
@@ -231,7 +238,7 @@
 - [ ] Полный конформанс с `testing.13` (AI SDK chat-flow contracts):
   - [ ] `testing.13.1`: unit на sequence `start -> start-step -> delta -> finish-step -> finish` в `IPCChatTransport`.
   - [ ] `testing.13.2`: unit на отсутствие дублей между delta и `message.updated` snapshot.
-  - [ ] `testing.13.3`: unit на рендер persisted `kind:tool_call` как tool-call блока.
+  - [x] `testing.13.3`: unit на рендер persisted `kind:tool_call` как tool-call блока.
   - [ ] `testing.13.4`: unit на `ErrorNormalizer` (auth/rate_limit/provider/network/timeout/tool/protocol).
   - [ ] `testing.13.5`: unit на multi-tool + continuation `model -> tools -> model`.
   - [ ] `testing.13.6`: functional на одновременный стриминг reasoning и text.
@@ -244,7 +251,7 @@
   - [ ] OpenAI/Anthropic/Google parity для streaming/tool/error/usage.
   - [ ] >=2 tool calls в одном turn.
 - [ ] Unit: `MainPipeline`
-  - [ ] порядок событий в loop и корректный persisted lifecycle `kind:tool_call` (`done=false -> done=true`).
+  - [x] порядок событий в loop и корректный persisted lifecycle `kind:tool_call` (`done=false -> done=true`).
   - [ ] cancel в разных фазах loop, включая in-flight tool jobs.
   - [ ] timeout = 300s и корректный mapping в доменную ошибку.
   - [ ] stub-execution: placeholder output для `tool_call` и финализация `done=true`.
@@ -255,7 +262,7 @@
   - [ ] `IPCChatTransport` protocol ordering.
   - [ ] persisted `kind:tool_call` корректно попадает в UI stream как tool-call part.
   - [ ] стабильность mapping при mixed streaming events.
-  - [ ] `AgentMessage`/`Tool` рендер pending/success/error и корректный вывод input/output.
+  - [x] `AgentMessage`/`Tool` рендер pending/success/error и корректный вывод input/output.
 - [ ] Functional:
   - [ ] reasoning и text стримятся одновременно в одном `kind:llm`.
   - [ ] text стримится инкрементально.
@@ -287,7 +294,7 @@
 - [ ] Специализированные ошибки полностью определяются через AI SDK errors + доменный normalizer.
 - [ ] Stream Protocol реализован корректно, без дублей и без потерь чанков.
 - [ ] Tool loop работает end-to-end (`model -> tools -> model`) для всех провайдеров.
-- [ ] Tool-call UI работает полностью через persisted сообщения и snapshot-события без зависимости от `message.tool_call`.
-- [ ] Отдельное realtime-событие `message.tool_call` удалено из shared events/types/constants, IPC bridge и unit-тестов.
+- [x] Tool-call UI работает полностью через persisted сообщения и snapshot-события без зависимости от `message.tool_call`.
+- [x] Отдельное realtime-событие `message.tool_call` удалено из shared events/types/constants, IPC bridge и unit-тестов.
 - [ ] `payload.data.text` остаётся canonical финальным ответом.
 - [ ] `npm run validate` и полный `npm run test:functional` проходят.

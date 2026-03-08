@@ -61,6 +61,10 @@ export class AgentManager {
       return lastMessage.done ? AGENT_STATUS.AWAITING_RESPONSE : AGENT_STATUS.IN_PROGRESS;
     }
 
+    if (lastMessage.kind === MESSAGE_KIND.TOOL_CALL) {
+      return lastMessage.done ? AGENT_STATUS.AWAITING_RESPONSE : AGENT_STATUS.IN_PROGRESS;
+    }
+
     return AGENT_STATUS.NEW;
   }
 

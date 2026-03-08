@@ -168,22 +168,40 @@ describe('toUIMessage', () => {
 
   // ─── unknown kinds ───────────────────────────────────────────────────────
 
-  /* Preconditions: message with unknown kind (e.g. 'tool_call')
+  /* Preconditions: message with kind 'tool_call'
      Action: call toUIMessage
-     Assertions: returns null (not displayed in chat)
-     Requirements: agents.7.4 */
-  it('should return null for unknown message kinds', () => {
-    const msg = makeSnapshot({ kind: 'tool_call' });
-    expect(toUIMessage(msg)).toBeNull();
+     Assertions: returns assistant message with tool metadata
+     Requirements: llm-integration.11.3 */
+  it('should map tool_call message to assistant summary part', () => {
+    const msg = makeSnapshot({
+      kind: 'tool_call',
+      payload: {
+        data: {
+          callId: 'call-1',
+          toolName: 'search_docs',
+          output: { content: 'result' },
+        },
+      },
+    });
+    const result = toUIMessage(msg);
+    expect(result).not.toBeNull();
+    expect(result!.role).toBe('assistant');
+    expect(result!.parts[0]).toEqual({
+      type: 'text',
+      text: '[tool_call] search_docs (call-1)\nresult',
+    });
+    const meta = result!.metadata as Record<string, unknown>;
+    expect(meta.isToolCall).toBe(true);
+    expect(meta.toolName).toBe('search_docs');
   });
 });
 
 describe('toUIMessages', () => {
-  /* Preconditions: array of mixed messages including hidden and unknown kinds
+  /* Preconditions: array of mixed messages including hidden
      Action: call toUIMessages
-     Assertions: result contains only visible user/llm/error messages
+     Assertions: result contains only visible mapped messages
      Requirements: agents.4.8, agents.13.1 */
-  it('should filter out hidden and unknown messages', () => {
+  it('should filter out hidden messages', () => {
     const msgs: MessageSnapshot[] = [
       makeSnapshot({ id: 1, kind: 'user', payload: { data: { text: 'hi' } } }),
       makeSnapshot({ id: 2, kind: 'user', hidden: true, payload: { data: { text: 'hidden' } } }),
@@ -192,9 +210,10 @@ describe('toUIMessages', () => {
     ];
 
     const result = toUIMessages(msgs);
-    expect(result).toHaveLength(2);
+    expect(result).toHaveLength(3);
     expect(result[0].id).toBe('1');
-    expect(result[1].id).toBe('4');
+    expect(result[1].id).toBe('3');
+    expect(result[2].id).toBe('4');
   });
 
   /* Preconditions: empty array

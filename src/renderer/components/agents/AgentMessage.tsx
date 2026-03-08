@@ -2,6 +2,7 @@ import React from 'react';
 // Requirements: llm-integration.7, llm-integration.3.4.1, llm-integration.3.4.4, agents.4.22, agents.4.9, agents.4.10.1, agents.4.10.2
 import { Message, MessageContent, MessageResponse } from '../ai-elements/message';
 import { Reasoning, ReasoningContent } from '../ai-elements/reasoning';
+import { Tool, ToolContent, ToolHeader, ToolInput, ToolOutput } from '../ai-elements/tool';
 import type { MessageSnapshot } from '../../../shared/events/types';
 import { AgentErrorDialog } from './AgentErrorDialog';
 import type { AgentDialogActionItem } from './AgentDialog';
@@ -118,14 +119,46 @@ export function AgentMessage({
     );
   }
 
-  // Fallback for other kinds
-  return (
-    <Message from="assistant" className="w-full max-w-full">
-      <MessageContent className="w-full">
-        <p className="text-sm leading-relaxed text-foreground whitespace-pre-wrap break-words">
-          {String(message.payload.data?.text || '')}
-        </p>
-      </MessageContent>
-    </Message>
-  );
+  if (message.kind === 'tool_call') {
+    const toolData = message.payload.data as
+      | {
+          callId?: string;
+          toolName?: string;
+          arguments?: Record<string, unknown>;
+          output?: { status?: string; content?: string };
+        }
+      | undefined;
+    const toolName = toolData?.toolName ?? 'tool';
+    const callId = toolData?.callId ?? String(message.id);
+    const toolInput = JSON.stringify(toolData?.arguments ?? {}, null, 2);
+    const toolOutput = toolData?.output?.content ?? '';
+    const toolStatus = message.done ? (toolData?.output?.status ?? 'success') : 'in-progress';
+
+    return (
+      <Message from="assistant" className="w-full max-w-full">
+        <Tool data-testid="message-tool-call">
+          <ToolHeader data-testid="message-tool-call-header">
+            <div className="font-medium text-foreground">{toolName}</div>
+            <div className="text-xs text-muted-foreground">
+              {toolStatus} · {callId}
+            </div>
+          </ToolHeader>
+          <ToolContent>
+            <div>
+              <div className="mb-1 text-xs font-medium text-muted-foreground">Input</div>
+              <ToolInput data-testid="message-tool-call-input">{toolInput}</ToolInput>
+            </div>
+            {message.done ? (
+              <div>
+                <div className="mb-1 text-xs font-medium text-muted-foreground">Output</div>
+                <ToolOutput data-testid="message-tool-call-output">{toolOutput}</ToolOutput>
+              </div>
+            ) : null}
+          </ToolContent>
+        </Tool>
+      </Message>
+    );
+  }
+
+  return null;
 }

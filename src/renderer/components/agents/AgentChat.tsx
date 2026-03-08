@@ -292,10 +292,10 @@ export function AgentChat({
       if (!message) continue;
       if (message.kind !== 'llm' || message.hidden) continue;
       const llmData = message.payload.data as
-        | { reasoning?: { text?: string }; text?: string; action?: { content?: string } }
+        | { reasoning?: { text?: string }; text?: string }
         | undefined;
       const hasReasoning = Boolean(llmData?.reasoning?.text);
-      const hasAction = Boolean(llmData?.text || llmData?.action?.content);
+      const hasAction = Boolean(llmData?.text);
       if (hasReasoning && !hasAction) return message.id;
     }
     return null;

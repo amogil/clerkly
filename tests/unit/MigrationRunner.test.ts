@@ -1170,3 +1170,144 @@ describe('Migration 012: backfill done for historical llm with final action', ()
     expect(secondPass).toEqual(firstPass);
   });
 });
+
+describe('Migration 013: backfill legacy llm data.text from data.action.content', () => {
+  let db: Database.Database;
+  const migrationsPath = path.join(process.cwd(), 'migrations');
+
+  beforeEach(() => {
+    db = new Database(':memory:');
+
+    db.exec(`
+      CREATE TABLE messages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        agent_id TEXT NOT NULL,
+        timestamp TEXT NOT NULL,
+        kind TEXT NOT NULL,
+        payload_json TEXT NOT NULL,
+        hidden INTEGER NOT NULL DEFAULT 0,
+        done INTEGER NOT NULL DEFAULT 0,
+        reply_to_message_id INTEGER,
+        usage_json TEXT
+      );
+    `);
+  });
+
+  afterEach(() => {
+    if (db && db.open) db.close();
+  });
+
+  /* Preconditions: Historical llm rows keep final answer in data.action.content; canonical data.text missing/empty
+     Action: run migration 013
+     Assertions: migration moves value to data.text and removes data.action for migrated rows
+     Requirements: llm-integration.6.6.1 */
+  it('should move data.action.content into canonical data.text for legacy llm rows', () => {
+    db.prepare(
+      `INSERT INTO messages (agent_id, timestamp, kind, payload_json, done) VALUES (?, ?, ?, ?, ?)`
+    ).run(
+      'agent-1',
+      '2026-01-01T00:00:00Z',
+      'llm',
+      JSON.stringify({ data: { action: { type: 'text', content: 'Legacy final answer' } } }),
+      1
+    );
+    db.prepare(
+      `INSERT INTO messages (agent_id, timestamp, kind, payload_json, done) VALUES (?, ?, ?, ?, ?)`
+    ).run(
+      'agent-1',
+      '2026-01-01T00:01:00Z',
+      'llm',
+      JSON.stringify({ data: { text: '', action: { type: 'text', content: 'From empty text' } } }),
+      1
+    );
+
+    const sql = fs.readFileSync(
+      path.join(migrationsPath, '013_backfill_llm_data_text_from_action.sql'),
+      'utf-8'
+    );
+    db.exec(sql.split('-- DOWN')[0]!.replace('-- UP', '').trim());
+
+    const rows = db.prepare('SELECT payload_json FROM messages ORDER BY id').all() as Array<{
+      payload_json: string;
+    }>;
+
+    const first = JSON.parse(rows[0]!.payload_json) as { data: Record<string, unknown> };
+    const second = JSON.parse(rows[1]!.payload_json) as { data: Record<string, unknown> };
+
+    expect(first.data.text).toBe('Legacy final answer');
+    expect(first.data.action).toBeUndefined();
+
+    expect(second.data.text).toBe('From empty text');
+    expect(second.data.action).toBeUndefined();
+  });
+
+  /* Preconditions: llm row already has canonical non-empty data.text
+     Action: run migration 013
+     Assertions: row remains unchanged (canonical text is not overwritten)
+     Requirements: llm-integration.6.6.1 */
+  it('should not overwrite non-empty data.text', () => {
+    const originalPayload = {
+      data: {
+        text: 'Canonical response',
+        action: { type: 'text', content: 'Legacy response' },
+      },
+    };
+
+    db.prepare(
+      `INSERT INTO messages (agent_id, timestamp, kind, payload_json, done) VALUES (?, ?, ?, ?, ?)`
+    ).run('agent-1', '2026-01-01T00:00:00Z', 'llm', JSON.stringify(originalPayload), 1);
+
+    const sql = fs.readFileSync(
+      path.join(migrationsPath, '013_backfill_llm_data_text_from_action.sql'),
+      'utf-8'
+    );
+    db.exec(sql.split('-- DOWN')[0]!.replace('-- UP', '').trim());
+
+    const row = db.prepare('SELECT payload_json FROM messages LIMIT 1').get() as { payload_json: string };
+    expect(JSON.parse(row.payload_json)).toEqual(originalPayload);
+  });
+
+  /* Preconditions: mixed kinds of messages and migration already applied once
+     Action: run migration 013 twice
+     Assertions: non-llm messages unaffected; second run does not change data (idempotent)
+     Requirements: llm-integration.6.6.1 */
+  it('should be idempotent and keep non-llm rows untouched', () => {
+    db.prepare(
+      `INSERT INTO messages (agent_id, timestamp, kind, payload_json, done) VALUES (?, ?, ?, ?, ?)`
+    ).run(
+      'agent-1',
+      '2026-01-01T00:00:00Z',
+      'llm',
+      JSON.stringify({ data: { action: { type: 'text', content: 'Legacy text' } } }),
+      1
+    );
+    db.prepare(
+      `INSERT INTO messages (agent_id, timestamp, kind, payload_json, done) VALUES (?, ?, ?, ?, ?)`
+    ).run(
+      'agent-1',
+      '2026-01-01T00:01:00Z',
+      'user',
+      JSON.stringify({ data: { text: 'User message', action: { content: 'must stay' } } }),
+      1
+    );
+
+    const sql = fs.readFileSync(
+      path.join(migrationsPath, '013_backfill_llm_data_text_from_action.sql'),
+      'utf-8'
+    );
+    const upSql = sql.split('-- DOWN')[0]!.replace('-- UP', '').trim();
+
+    db.exec(upSql);
+    const firstPass = db.prepare('SELECT id, payload_json FROM messages ORDER BY id').all();
+
+    db.exec(upSql);
+    const secondPass = db.prepare('SELECT id, payload_json FROM messages ORDER BY id').all();
+
+    expect(secondPass).toEqual(firstPass);
+
+    const userRow = JSON.parse((secondPass[1] as { payload_json: string }).payload_json) as {
+      data: Record<string, unknown>;
+    };
+    expect(userRow.data.action).toEqual({ content: 'must stay' });
+  });
+});

@@ -131,36 +131,6 @@ describe('Event Types', () => {
     expect(key1).not.toBe(key2);
   });
 
-  /* Preconditions: tool_call payloads with different llmMessageId
-     Action: Generate keys for message.tool_call
-     Assertions: Keys include llmMessageId and differ for different llm messages
-     Requirements: realtime-events.5.5, llm-integration.11.2 */
-  it('should include llmMessageId in tool call event keys', () => {
-    const payload1 = {
-      timestamp: Date.now(),
-      agentId: 'agent-1',
-      llmMessageId: 505,
-      callId: 'call-1',
-      toolName: 'search_docs',
-      arguments: { q: 'a' },
-    };
-    const payload2 = {
-      timestamp: Date.now(),
-      agentId: 'agent-1',
-      llmMessageId: 606,
-      callId: 'call-2',
-      toolName: 'search_docs',
-      arguments: { q: 'b' },
-    };
-
-    const key1 = getEventKey('message.tool_call', payload1);
-    const key2 = getEventKey('message.tool_call', payload2);
-
-    expect(key1).toBe('message.tool_call:505');
-    expect(key2).toBe('message.tool_call:606');
-    expect(key1).not.toBe(key2);
-  });
-
   /* Preconditions: Agent created/updated/archived payloads
      Action: Extract entity ID
      Assertions: ID extracted correctly

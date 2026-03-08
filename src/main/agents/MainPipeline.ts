@@ -10,7 +10,6 @@ import { MainEventBus } from '../events/MainEventBus';
 import {
   MessageLlmReasoningUpdatedEvent,
   MessageLlmTextUpdatedEvent,
-  MessageToolCallEvent,
   AgentRateLimitEvent,
   LLMPipelineDiagnosticEvent,
 } from '../../shared/events/types';
@@ -219,6 +218,7 @@ export class MainPipeline {
     let llmMessageId: number | null = null;
     let accumulatedReasoning = '';
     let accumulatedText = '';
+    const toolCallMessageIds = new Map<string, number>();
     let latestUsage: LLMChatResult['usage'];
 
     for (;;) {
@@ -234,7 +234,8 @@ export class MainPipeline {
         setLastLlmMessageId,
         llmMessageId,
         accumulatedReasoning,
-        accumulatedText
+        accumulatedText,
+        toolCallMessageIds
       );
 
       llmMessageId = streamResult.llmMessageId;
@@ -268,6 +269,13 @@ export class MainPipeline {
         this.handleAbortAfterStreaming(llmMessageId, agentId, clearLastLlmMessageId);
         return;
       }
+      this.finalizeToolCallMessages(
+        agentId,
+        context.replyToMessageId,
+        streamResult.toolCalls,
+        toolResults,
+        toolCallMessageIds
+      );
 
       chatMessages = this.appendToolLoopMessages(chatMessages, streamResult.toolCalls, toolResults);
     }
@@ -289,7 +297,8 @@ export class MainPipeline {
     setLastLlmMessageId: (messageId: number) => void,
     llmMessageId: number | null,
     accumulatedReasoning: string,
-    accumulatedText: string
+    accumulatedText: string,
+    toolCallMessageIds: Map<string, number>
   ): Promise<{
     output: LLMChatResult;
     llmMessageId: number | null;
@@ -353,29 +362,24 @@ export class MainPipeline {
         }
 
         if (chunk.type === 'tool_call') {
-          llmMessageId = this.upsertStreamingMessage(
+          pendingToolCalls.set(chunk.callId, {
+            callId: chunk.callId,
+            toolName: chunk.toolName,
+            arguments: chunk.arguments,
+          });
+          llmMessageId = this.persistInProgressToolCall(
             llmMessageId,
             agentId,
             context.replyToMessageId,
             context.options.model,
             accumulatedReasoning,
             accumulatedText,
-            setLastLlmMessageId
+            setLastLlmMessageId,
+            chunk.callId,
+            chunk.toolName,
+            chunk.arguments,
+            toolCallMessageIds
           );
-          MainEventBus.getInstance().publish(
-            new MessageToolCallEvent(
-              agentId,
-              llmMessageId,
-              chunk.callId,
-              chunk.toolName,
-              chunk.arguments
-            )
-          );
-          pendingToolCalls.set(chunk.callId, {
-            callId: chunk.callId,
-            toolName: chunk.toolName,
-            arguments: chunk.arguments,
-          });
           return;
         }
 
@@ -396,6 +400,56 @@ export class MainPipeline {
       accumulatedText,
       toolCalls: [...pendingToolCalls.values()],
     };
+  }
+
+  /**
+   * Persist in-progress tool call snapshot from model chunk.
+   * Requirements: llm-integration.11.1, llm-integration.11.2
+   */
+  private persistInProgressToolCall(
+    llmMessageId: number | null,
+    agentId: string,
+    replyToMessageId: number,
+    model: string,
+    accumulatedReasoning: string,
+    accumulatedText: string,
+    setLastLlmMessageId: (messageId: number) => void,
+    callId: string,
+    toolName: string,
+    args: Record<string, unknown>,
+    toolCallMessageIds: Map<string, number>
+  ): number | null {
+    const toolPayload = {
+      data: {
+        callId,
+        toolName,
+        arguments: args,
+      },
+    };
+    const existingToolMessageId = toolCallMessageIds.get(callId);
+    if (existingToolMessageId !== undefined) {
+      this.messageManager.update(existingToolMessageId, agentId, toolPayload, false);
+      return llmMessageId;
+    }
+    const toolMessage = this.messageManager.create(
+      agentId,
+      'tool_call',
+      toolPayload,
+      replyToMessageId,
+      false
+    );
+    toolCallMessageIds.set(callId, toolMessage.id);
+
+    // Keep llm progress message visible for reasoning/text stream continuity.
+    return this.upsertStreamingMessage(
+      llmMessageId,
+      agentId,
+      replyToMessageId,
+      model,
+      accumulatedReasoning,
+      accumulatedText,
+      setLastLlmMessageId
+    );
   }
 
   private async executeToolCalls(
@@ -434,6 +488,49 @@ export class MainPipeline {
     };
 
     return [...chatMessages, assistantToolCalls, userToolResults];
+  }
+
+  /**
+   * Finalize persisted tool_call messages with execution result.
+   * Requirements: llm-integration.11.2, llm-integration.11.3
+   */
+  private finalizeToolCallMessages(
+    agentId: string,
+    replyToMessageId: number,
+    toolCalls: ToolCallRequest[],
+    toolResults: ToolCallResult[],
+    toolCallMessageIds: Map<string, number>
+  ): void {
+    const callsById = new Map(toolCalls.map((call) => [call.callId, call]));
+    for (const result of toolResults) {
+      const call = callsById.get(result.callId);
+      const payload = {
+        data: {
+          callId: result.callId,
+          toolName: result.toolName,
+          arguments: call?.arguments ?? {},
+          output: {
+            status: result.status,
+            content: result.output,
+          },
+        },
+      };
+
+      const messageId = toolCallMessageIds.get(result.callId);
+      if (messageId !== undefined) {
+        this.messageManager.update(messageId, agentId, payload, true);
+        continue;
+      }
+
+      const created = this.messageManager.create(
+        agentId,
+        'tool_call',
+        payload,
+        replyToMessageId,
+        true
+      );
+      toolCallMessageIds.set(result.callId, created.id);
+    }
   }
 
   /**

@@ -147,12 +147,7 @@ export class PromptBuilder {
       return text.trim();
     }
 
-    // Legacy fallback for old records persisted before data.text.
-    const action =
-      data?.['action'] && typeof data['action'] === 'object'
-        ? (data['action'] as Record<string, unknown>)
-        : undefined;
-    return typeof action?.['content'] === 'string' ? action['content'].trim() : '';
+    return '';
   }
 
   /**
