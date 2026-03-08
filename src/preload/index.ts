@@ -140,6 +140,14 @@ export interface API {
     createAgentWithOldMessage: (
       minutesAgo: number
     ) => Promise<{ success: boolean; agentId?: string; timestamp?: string; error?: string }>;
+    createAgentMessage: (
+      agentId: string,
+      text: string
+    ) => Promise<{ success: boolean; error?: string }>;
+    setAgentStatus: (
+      agentId: string,
+      status: 'new' | 'in-progress' | 'awaiting-response' | 'error' | 'completed'
+    ) => Promise<{ success: boolean; error?: string }>;
   };
   // Requirements: testing.3.8 - Test IPC methods (only available in test environment)
   ipcRenderer?: {
@@ -685,12 +693,17 @@ if (process.env.NODE_ENV === 'test') {
      * @param text - Message text
      * @returns {Promise<{success: boolean, error?: string}>}
      */
-    // @ts-expect-error - Type will be added to api.test interface
     async createAgentMessage(
       agentId: string,
       text: string
     ): Promise<{ success: boolean; error?: string }> {
       return await ipcRenderer.invoke('test:create-agent-message', agentId, text);
+    },
+    async setAgentStatus(
+      agentId: string,
+      status: 'new' | 'in-progress' | 'awaiting-response' | 'error' | 'completed'
+    ): Promise<{ success: boolean; error?: string }> {
+      return await ipcRenderer.invoke('test:set-agent-status', agentId, status);
     },
   };
 

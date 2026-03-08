@@ -1937,6 +1937,7 @@ import { Logo } from '../logo';
 | `tests/functional/settings-ai-agent.spec.ts` | - | Кросс-фича тест для settings; не используется для покрытия agents.* |
 | `tests/functional/all-agents-page.spec.ts` | agents.5 | - |
 | `tests/functional/agent-status-indicators.spec.ts` | agents.6 | - |
+| `tests/functional/agent-status-all-places.spec.ts` | agents.6.1-6.5 | Проверка консистентного отображения каждого статуса (`new`, `in-progress`, `awaiting-response`, `error`, `completed`) в Header, Agent List tooltip и All Agents |
 | `tests/functional/message-format.spec.ts` | agents.7 | - |
 | `tests/functional/llm-chat.spec.ts` | agents.4.11, agents.4.11.2, agents.7.7, agents.4.24, llm-integration.2, llm-integration.7.2, llm-integration.8.7 | - |
 | `tests/functional/agent-status-calculation.spec.ts` | agents.9 | - |

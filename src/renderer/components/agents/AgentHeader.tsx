@@ -65,6 +65,7 @@ export function AgentHeader({
         className="flex items-center gap-2 justify-end"
       >
         <div
+          data-testid="new-chat-button"
           onClick={onNewChat}
           className="w-8 h-8 rounded-full bg-sky-400 flex items-center justify-center cursor-pointer hover:bg-sky-500 transition-colors group"
           title="New chat"

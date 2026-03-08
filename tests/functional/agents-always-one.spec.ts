@@ -167,9 +167,12 @@ test.describe('Agents - Auto-create First Agent', () => {
     await expect(inputField).toBeVisible();
     await expect(inputField).toBeEnabled();
 
-    // 5. Send button
-    const sendButton = window.locator('[data-testid="prompt-input-send"]');
-    await expect(sendButton).toBeVisible();
+    // 5. Prompt action button (send/stop) scoped to active chat
+    const promptActionButton = window
+      .locator('[data-testid="agent-chat-root"]:not(.pointer-events-none)')
+      .locator('[data-testid="prompt-input-send"], [data-testid="prompt-input-stop"]')
+      .first();
+    await expect(promptActionButton).toBeVisible();
 
     // Verify startup loader does not reappear after chat becomes interactive.
     await inputField.fill('startup-ready');

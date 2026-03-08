@@ -454,6 +454,11 @@
 - `tests/functional/agent-status-indicators.spec.ts` - "should show animation only when agent moves to first position"
 - `tests/functional/agent-status-indicators.spec.ts` - "should not show animation when agent status updates without position change"
 - `tests/functional/agent-status-indicators.spec.ts` - "should show animation when switching back to previous agent"
+- `tests/functional/agent-status-all-places.spec.ts` - "should render \"new\" status consistently in all places"
+- `tests/functional/agent-status-all-places.spec.ts` - "should render \"in-progress\" status consistently in all places"
+- `tests/functional/agent-status-all-places.spec.ts` - "should render \"awaiting-response\" status consistently in all places"
+- `tests/functional/agent-status-all-places.spec.ts` - "should render \"error\" status consistently in all places"
+- `tests/functional/agent-status-all-places.spec.ts` - "should render \"completed\" status consistently in all places"
 
 ### 7. Формат сообщений в чате
 

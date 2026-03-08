@@ -699,14 +699,15 @@ afterEach(() => {
 
 ### Запуск в CI/CD
 
-**Requirements**: testing.4.2
+**Requirements**: testing.4.2, testing.5.5
 
 ```yaml
 # GitHub Actions example
 - name: Run validation (without functional tests)
   run: npm run validate
 
-# Функциональные тесты НЕ запускаются в CI автоматически
+- name: Run functional tests on macOS for pull requests
+  run: npm run test:functional
 ```
 
 ## Разделение Production Code и Reference Code
