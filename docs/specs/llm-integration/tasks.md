@@ -65,7 +65,7 @@
   - [ ] Race/cancelled ошибки логируются и не показываются пользователю.
 - [ ] Синхронизировать тексты ошибок в `LLMError`/renderer диалогах с `llm-integration.3.5`.
 - [ ] Обновить unit-тесты:
-  - [ ] `tests/unit/utils/apiWrapper.test.ts` (chat suppression vs background toast).
+  - [x] `tests/unit/utils/apiWrapper.test.ts` (chat suppression vs background toast).
   - [x] `tests/unit/agents/MainPipeline.test.ts` (tool/protocol error mapping, no toast assumptions).
 
 ## Фаза B1.2: UX-контракты ошибок в чате
