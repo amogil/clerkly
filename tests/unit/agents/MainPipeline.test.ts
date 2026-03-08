@@ -202,42 +202,35 @@ describe('MainPipeline.run()', () => {
     );
   });
 
-  it('continues tool loop until final text', async () => {
+  it('persists tool_call lifecycle from tool_call/tool_result stream chunks and finalizes llm text', async () => {
     const { pipeline, llmProvider, toolExecutor, messageManager } = makeMocks();
 
-    llmProvider.chat
-      .mockImplementationOnce(
-        async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
-          onChunk({ type: 'reasoning', delta: 'Think' });
-          onChunk({
-            type: 'tool_call',
-            callId: 'call-1',
-            toolName: 'search_docs',
-            arguments: { query: 'streaming' },
-          });
-          return {};
-        }
-      )
-      .mockImplementationOnce(
-        async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
-          onChunk({ type: 'text', delta: 'Done' });
-          return { text: 'Done' };
-        }
-      );
-
-    toolExecutor.executeBatch.mockResolvedValue([
-      {
-        callId: 'call-1',
-        toolName: 'search_docs',
-        status: 'success',
-        output: 'result',
-      },
-    ]);
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({ type: 'reasoning', delta: 'Think' });
+        onChunk({
+          type: 'tool_call',
+          callId: 'call-1',
+          toolName: 'search_docs',
+          arguments: { query: 'streaming' },
+        });
+        onChunk({
+          type: 'tool_result',
+          callId: 'call-1',
+          toolName: 'search_docs',
+          arguments: { query: 'streaming' },
+          output: { result: 'ok' },
+          status: 'success',
+        });
+        onChunk({ type: 'text', delta: 'Done' });
+        return { text: 'Done' };
+      }
+    );
 
     await pipeline.run('agent-1', 1);
 
-    expect(toolExecutor.executeBatch).toHaveBeenCalledTimes(1);
-    expect(llmProvider.chat).toHaveBeenCalledTimes(2);
+    expect(toolExecutor.executeBatch).not.toHaveBeenCalled();
+    expect(llmProvider.chat).toHaveBeenCalledTimes(1);
     expect(messageManager.create).toHaveBeenCalledWith(
       'agent-1',
       'tool_call',
@@ -258,62 +251,43 @@ describe('MainPipeline.run()', () => {
         data: expect.objectContaining({
           callId: 'call-1',
           toolName: 'search_docs',
-          output: expect.objectContaining({ status: 'success', content: 'result' }),
+          output: expect.objectContaining({ status: 'success' }),
         }),
       }),
       true
     );
   });
 
-  it('executes multi-tool batch and sends deterministic tool transcript ordered by call_id', async () => {
+  it('handles multiple tool calls from one turn via stream chunks', async () => {
     const { pipeline, llmProvider, toolExecutor, messageManager } = makeMocks();
 
-    llmProvider.chat
-      .mockImplementationOnce(
-        async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
-          onChunk({
-            type: 'tool_call',
-            callId: 'call-b',
-            toolName: 'tool_b',
-            arguments: { q: 2 },
-          });
-          onChunk({
-            type: 'tool_call',
-            callId: 'call-a',
-            toolName: 'tool_a',
-            arguments: { q: 1 },
-          });
-          return {};
-        }
-      )
-      .mockImplementationOnce(async (msgs: ChatMessage[]) => {
-        const lastAssistant = msgs[msgs.length - 2];
-        const lastUser = msgs[msgs.length - 1];
-        expect(lastAssistant?.content).toContain('call_id=call-a');
-        expect(lastAssistant?.content).toContain('call_id=call-b');
-        expect(lastAssistant?.content.indexOf('call_id=call-a')).toBeLessThan(
-          lastAssistant?.content.indexOf('call_id=call-b')
-        );
-        expect(lastUser?.content.indexOf('call_id=call-a')).toBeLessThan(
-          lastUser?.content.indexOf('call_id=call-b')
-        );
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({ type: 'tool_call', callId: 'call-b', toolName: 'tool_b', arguments: { q: 2 } });
+        onChunk({ type: 'tool_call', callId: 'call-a', toolName: 'tool_a', arguments: { q: 1 } });
+        onChunk({
+          type: 'tool_result',
+          callId: 'call-b',
+          toolName: 'tool_b',
+          arguments: { q: 2 },
+          output: { ok: 'B' },
+          status: 'success',
+        });
+        onChunk({
+          type: 'tool_result',
+          callId: 'call-a',
+          toolName: 'tool_a',
+          arguments: { q: 1 },
+          output: { ok: 'A' },
+          status: 'success',
+        });
         return { text: 'final' };
-      });
-
-    toolExecutor.executeBatch.mockResolvedValue([
-      { callId: 'call-b', toolName: 'tool_b', status: 'success', output: 'B' },
-      { callId: 'call-a', toolName: 'tool_a', status: 'success', output: 'A' },
-    ]);
+      }
+    );
 
     await pipeline.run('agent-1', 1);
 
-    expect(toolExecutor.executeBatch).toHaveBeenCalledWith(
-      [
-        { callId: 'call-b', toolName: 'tool_b', arguments: { q: 2 } },
-        { callId: 'call-a', toolName: 'tool_a', arguments: { q: 1 } },
-      ],
-      undefined
-    );
+    expect(toolExecutor.executeBatch).not.toHaveBeenCalled();
     const toolCallCreates = (messageManager.create as jest.Mock).mock.calls.filter(
       (call: unknown[]) => call[1] === 'tool_call'
     );
@@ -325,31 +299,28 @@ describe('MainPipeline.run()', () => {
     expect(toolCallDoneUpdates.length).toBeGreaterThanOrEqual(2);
   });
 
-  it('uses stub-like tool result placeholder and finalizes tool_call with done=true', async () => {
-    const { pipeline, llmProvider, toolExecutor, messageManager } = makeMocks();
+  it('finalizes tool_call with error output when tool_result arrives with error status', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
 
-    llmProvider.chat
-      .mockImplementationOnce(
-        async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
-          onChunk({
-            type: 'tool_call',
-            callId: 'call-stub',
-            toolName: 'unknown_tool',
-            arguments: { foo: 'bar' },
-          });
-          return {};
-        }
-      )
-      .mockImplementationOnce(async () => ({ text: 'final after stub' }));
-
-    toolExecutor.executeBatch.mockResolvedValue([
-      {
-        callId: 'call-stub',
-        toolName: 'unknown_tool',
-        status: 'policy_denied',
-        output: 'Tool "unknown_tool" is not available.',
-      },
-    ]);
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({
+          type: 'tool_call',
+          callId: 'call-stub',
+          toolName: 'unknown_tool',
+          arguments: { foo: 'bar' },
+        });
+        onChunk({
+          type: 'tool_result',
+          callId: 'call-stub',
+          toolName: 'unknown_tool',
+          arguments: { foo: 'bar' },
+          output: { message: 'Tool "unknown_tool" is not available.' },
+          status: 'error',
+        });
+        return { text: 'final after stub' };
+      }
+    );
 
     await pipeline.run('agent-1', 1);
 
@@ -361,8 +332,7 @@ describe('MainPipeline.run()', () => {
           callId: 'call-stub',
           toolName: 'unknown_tool',
           output: expect.objectContaining({
-            status: 'policy_denied',
-            content: 'Tool "unknown_tool" is not available.',
+            status: 'error',
           }),
         }),
       }),
@@ -539,26 +509,20 @@ describe('MainPipeline.run()', () => {
     );
   });
 
-  it('cancels during tool execution without creating kind:error', async () => {
-    const { pipeline, llmProvider, toolExecutor, messageManager } = makeMocks();
+  it('cancels after tool_call streaming without creating kind:error', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
     const controller = new AbortController();
 
-    llmProvider.chat.mockImplementationOnce(
-      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
-        onChunk({ type: 'reasoning', delta: 'Thinking...' });
-        onChunk({
-          type: 'tool_call',
-          callId: 'call-1',
-          toolName: 'search_docs',
-          arguments: { query: 'x' },
-        });
-        return {};
-      }
-    );
-
-    toolExecutor.executeBatch.mockImplementation(async () => {
+    llmProvider.chat.mockImplementation(async (_m, _o, onChunk) => {
+      onChunk({ type: 'reasoning', delta: 'Thinking...' });
+      onChunk({
+        type: 'tool_call',
+        callId: 'call-1',
+        toolName: 'search_docs',
+        arguments: { query: 'x' },
+      });
       controller.abort();
-      return [{ callId: 'call-1', toolName: 'search_docs', status: 'success', output: 'ok' }];
+      return {};
     });
 
     await pipeline.run('agent-1', 1, controller.signal);
@@ -570,26 +534,14 @@ describe('MainPipeline.run()', () => {
     expect(errorCreates).toHaveLength(0);
   });
 
-  it('cancels before second model step in tool loop without creating kind:error', async () => {
-    const { pipeline, llmProvider, toolExecutor, messageManager } = makeMocks();
+  it('cancels before final llm completion without creating kind:error', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
     const controller = new AbortController();
 
-    llmProvider.chat.mockImplementationOnce(
-      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
-        onChunk({ type: 'reasoning', delta: 'Thinking...' });
-        onChunk({
-          type: 'tool_call',
-          callId: 'call-1',
-          toolName: 'search_docs',
-          arguments: { query: 'x' },
-        });
-        return {};
-      }
-    );
-
-    toolExecutor.executeBatch.mockImplementation(async () => {
+    llmProvider.chat.mockImplementation(async (_m, _o, onChunk) => {
+      onChunk({ type: 'reasoning', delta: 'Thinking...' });
       controller.abort();
-      return [{ callId: 'call-1', toolName: 'search_docs', status: 'success', output: 'ok' }];
+      return { text: 'partial' };
     });
 
     await pipeline.run('agent-1', 1, controller.signal);
@@ -617,8 +569,81 @@ describe('MainPipeline.run()', () => {
 
     const optionsArg = (llmProvider.chat as jest.Mock).mock.calls[0][1] as ChatOptions;
     expect(optionsArg.tools).toEqual([
-      { name: 'search_docs', description: 'Search docs', parameters: { type: 'object' } },
+      expect.objectContaining({
+        name: 'search_docs',
+        description: 'Search docs',
+        parameters: { type: 'object' },
+        execute: expect.any(Function),
+      }),
     ]);
+  });
+
+  it('uses tool-provided execute handler when available', async () => {
+    const { pipeline } = makeMocks();
+    const toolExecute = jest.fn().mockResolvedValue({ ok: true });
+    const bind = (
+      pipeline as unknown as {
+        bindToolExecutors: (
+          tools: NonNullable<ChatOptions['tools']>
+        ) => NonNullable<ChatOptions['tools']>;
+      }
+    ).bindToolExecutors.bind(pipeline);
+
+    const [bound] = bind([
+      {
+        name: 'custom_tool',
+        description: 'Custom tool',
+        parameters: { type: 'object' },
+        execute: toolExecute,
+      },
+    ]);
+
+    const output = await bound.execute?.({ x: 1 });
+    expect(output).toEqual({ ok: true });
+    expect(toolExecute).toHaveBeenCalledWith({ x: 1 }, undefined);
+  });
+
+  it('falls back to ToolRunner execution for tools without execute', async () => {
+    const { pipeline, toolExecutor } = makeMocks();
+    const bind = (
+      pipeline as unknown as {
+        bindToolExecutors: (
+          tools: NonNullable<ChatOptions['tools']>
+        ) => NonNullable<ChatOptions['tools']>;
+      }
+    ).bindToolExecutors.bind(pipeline);
+
+    toolExecutor.executeBatch.mockResolvedValueOnce([
+      {
+        callId: 'call-1',
+        toolName: 'fallback_tool',
+        status: 'success',
+        output: 'done',
+      },
+    ]);
+
+    const [bound] = bind([
+      {
+        name: 'fallback_tool',
+        description: 'Fallback tool',
+        parameters: { type: 'object' },
+      },
+    ]);
+
+    const successOutput = await bound.execute?.({ foo: 'bar' });
+    expect(successOutput).toEqual({ status: 'success', content: 'done' });
+    expect(toolExecutor.executeBatch).toHaveBeenCalledTimes(1);
+
+    toolExecutor.executeBatch.mockResolvedValueOnce([
+      {
+        callId: 'call-2',
+        toolName: 'fallback_tool',
+        status: 'policy_denied',
+        output: 'denied',
+      },
+    ]);
+
+    await expect(bound.execute?.({ foo: 'bar' })).rejects.toThrow('denied');
   });
 
   it('handles empty tool registry without calling tool executor', async () => {

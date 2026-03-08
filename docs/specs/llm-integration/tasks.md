@@ -21,7 +21,7 @@
 
 ## Инварианты целевой модели
 
-- [ ] Main process использует AI SDK Core как единственный движок LLM/tool loop.
+- [x] Main process использует AI SDK Core как единственный движок LLM/tool loop.
 - [x] Renderer использует AI SDK UI (`useChat` + `ChatTransport`) как единственный state machine стриминга.
 - [x] Поток в renderer строится через UIMessage stream protocol (`UIMessageChunk`) без дублирования snapshot/delta.
 - [x] Все специализированные ошибки определяются через AI SDK error classes и нормализуются в доменные типы.
@@ -89,8 +89,8 @@
 - [x] `src/main/llm/LLMProviderFactory.ts` и типы:
   - [x] Проверить, что все провайдеры создаются как AI SDK adapters.
   - [x] Удалить остаточные structured-output/legacy типы из chat-flow.
-- [ ] Добавить SDK-native Tool Calling (даже при пустом списке инструментов):
-  - [ ] Перевести orchestration tool-calling на AI SDK `streamText/generateText` (`tools`, `toolChoice`, `stopWhen`) вместо ручной склейки tool-loop.
+- [x] Добавить SDK-native Tool Calling (даже при пустом списке инструментов):
+  - [x] Перевести orchestration tool-calling на AI SDK `streamText/generateText` (`tools`, `toolChoice`, `stopWhen`) вместо ручной склейки tool-loop.
   - [x] Зафиксировать пустой реестр инструментов как валидный стартовый режим (`tools = {}` / `[]` по контракту адаптера).
   - [x] Включить strict-режим для tool schemas (через AI SDK tool strict + provider strict-json-schema опции, где поддерживается).
   - [x] Добавить unit-тест: при пустом tool registry модель не падает и не генерирует runtime-ошибку tool executor.
@@ -106,8 +106,8 @@
 - [x] `src/main/llm/GoogleProvider.ts`:
   - [x] Довести parity (`reasoning`, `text`, `tool_call`, `turn_error`, usage).
   - [x] Проверить provider options (`thinkingConfig.includeThoughts` и связанные параметры).
-- [ ] `src/main/agents/MainPipeline.ts`:
-  - [ ] Финализировать loop `model -> tools -> model` на AI SDK control (`stopWhen`/step control).
+- [x] `src/main/agents/MainPipeline.ts`:
+  - [x] Финализировать loop `model -> tools -> model` на AI SDK control (`stopWhen`/step control).
   - [ ] Поддержать multi-tool + controlled concurrency.
   - [x] Гарантировать корректный persisted lifecycle для `kind:tool_call` (create/update, done=false/true, full arguments).
   - [x] Удалить публикацию/зависимость от отдельного realtime-события `message.tool_call`; использовать только persisted `message.created`/`message.updated`.
@@ -303,10 +303,10 @@
 
 ## Definition of Done
 
-- [ ] AI SDK Core/UI реально используются как основной стек в main/renderer без дублирующей кастомной оркестрации.
+- [x] AI SDK Core/UI реально используются как основной стек в main/renderer без дублирующей кастомной оркестрации.
 - [x] Специализированные ошибки полностью определяются через AI SDK errors + доменный normalizer.
 - [x] Stream Protocol реализован корректно, без дублей и без потерь чанков.
-- [ ] Tool loop работает end-to-end (`model -> tools -> model`) для всех провайдеров.
+- [x] Tool loop работает end-to-end (`model -> tools -> model`) для всех провайдеров.
 - [x] Tool-call UI работает полностью через persisted сообщения и snapshot-события без зависимости от `message.tool_call`.
 - [x] Отдельное realtime-событие `message.tool_call` удалено из shared events/types/constants, IPC bridge и unit-тестов.
 - [x] `payload.data.text` остаётся canonical финальным ответом.

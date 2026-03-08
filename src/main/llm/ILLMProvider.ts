@@ -35,6 +35,7 @@ export interface LLMTool {
   name: string;
   description: string;
   parameters: Record<string, unknown>;
+  execute?: (args: Record<string, unknown>, signal?: AbortSignal) => Promise<unknown> | unknown;
 }
 
 /**
@@ -68,6 +69,14 @@ export type ChatChunk =
       callId: string;
       toolName: string;
       arguments: Record<string, unknown>;
+    }
+  | {
+      type: 'tool_result';
+      callId: string;
+      toolName: string;
+      arguments: Record<string, unknown>;
+      output: unknown;
+      status: 'success' | 'error';
     }
   | {
       type: 'turn_error';

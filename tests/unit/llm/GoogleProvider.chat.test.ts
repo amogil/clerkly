@@ -97,6 +97,48 @@ describe('GoogleProvider.chat()', () => {
     ]);
   });
 
+  it('emits tool_result chunks for successful and failed tool execution parts', async () => {
+    mockSdkResult([
+      {
+        type: 'tool-result',
+        toolCallId: 'tool-1',
+        toolName: 'tool_a',
+        input: { a: 1 },
+        output: { ok: true },
+      },
+      {
+        type: 'tool-error',
+        toolCallId: 'tool-2',
+        toolName: 'tool_b',
+        input: { b: 2 },
+        error: new Error('tool failed'),
+      },
+    ]);
+
+    const chunks: ChatChunk[] = [];
+    await provider.chat(mockMessages, mockOptions, (chunk) => chunks.push(chunk));
+
+    const toolResults = chunks.filter((chunk) => chunk.type === 'tool_result');
+    expect(toolResults).toEqual([
+      {
+        type: 'tool_result',
+        callId: 'tool-1',
+        toolName: 'tool_a',
+        arguments: { a: 1 },
+        output: { ok: true },
+        status: 'success',
+      },
+      {
+        type: 'tool_result',
+        callId: 'tool-2',
+        toolName: 'tool_b',
+        arguments: { b: 2 },
+        output: { message: 'tool failed' },
+        status: 'error',
+      },
+    ]);
+  });
+
   it('passes thinkingConfig and validated function-calling policy to streamText', async () => {
     mockSdkResult([{ type: 'text-delta', text: 'ok' }]);
 

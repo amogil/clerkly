@@ -80,7 +80,8 @@ export class GoogleProvider implements ILLMProvider {
         (globalThis as { ReadableStream?: unknown }).ReadableStream = webStreams.ReadableStream;
       }
 
-      const { streamText, tool, jsonSchema } = await import('ai');
+      const { streamText, tool, jsonSchema, stepCountIs } = await import('ai');
+      const stopWhen = typeof stepCountIs === 'function' ? stepCountIs(5) : undefined;
       const { createGoogleGenerativeAI } = await import('@ai-sdk/google');
 
       const google = createGoogleGenerativeAI({ apiKey: this.apiKey, baseURL });
@@ -94,6 +95,7 @@ export class GoogleProvider implements ILLMProvider {
         model: google.chat(options.model) as unknown as Parameters<typeof streamText>[0]['model'],
         messages: messages as unknown as Parameters<typeof streamText>[0]['messages'],
         tools,
+        ...(stopWhen ? { stopWhen } : {}),
         maxRetries: 0,
         abortSignal: controller.signal,
         providerOptions: {
@@ -141,6 +143,42 @@ export class GoogleProvider implements ILLMProvider {
           });
           continue;
         }
+        if (part.type === 'tool-result') {
+          const args =
+            part.input && typeof part.input === 'object' && !Array.isArray(part.input)
+              ? (part.input as Record<string, unknown>)
+              : {};
+          onChunk({
+            type: 'tool_result',
+            callId: part.toolCallId ?? '',
+            toolName: part.toolName ?? '',
+            arguments: args,
+            output: part.output,
+            status: 'success',
+          });
+          continue;
+        }
+        if (part.type === 'tool-error') {
+          const args =
+            part.input && typeof part.input === 'object' && !Array.isArray(part.input)
+              ? (part.input as Record<string, unknown>)
+              : {};
+          const errorText =
+            typeof part.error === 'string'
+              ? part.error
+              : part.error instanceof Error
+                ? part.error.message
+                : 'Tool execution failed';
+          onChunk({
+            type: 'tool_result',
+            callId: part.toolCallId ?? '',
+            toolName: part.toolName ?? '',
+            arguments: args,
+            output: { message: errorText },
+            status: 'error',
+          });
+          continue;
+        }
         if (part.type === 'error') {
           const message =
             part.error instanceof Error
@@ -180,7 +218,11 @@ export class GoogleProvider implements ILLMProvider {
 
   private buildToolSet(
     options: ChatOptions,
-    toolFactory: (definition: { description: string; inputSchema: unknown }) => unknown,
+    toolFactory: (definition: {
+      description: string;
+      inputSchema: unknown;
+      execute?: (args: Record<string, unknown>, signal?: AbortSignal) => Promise<unknown> | unknown;
+    }) => unknown,
     jsonSchemaFactory: (schema: Record<string, unknown>) => unknown
   ): Record<string, unknown> | undefined {
     if (!options.tools || options.tools.length === 0) {
@@ -192,6 +234,7 @@ export class GoogleProvider implements ILLMProvider {
       toolFactory({
         description: toolDef.description,
         inputSchema: jsonSchemaFactory(toolDef.parameters),
+        execute: toolDef.execute,
       }),
     ]);
     return Object.fromEntries(entries);
