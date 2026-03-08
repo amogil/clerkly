@@ -78,6 +78,39 @@ describe('GoogleProvider.chat()', () => {
     ).rejects.toThrow('Rate limit exceeded. Please try again in 4s');
   });
 
+  it('emits tool_call when functionCall part is streamed', async () => {
+    const reader = buildMockReader([
+      sseEvent({
+        candidates: [
+          {
+            content: {
+              parts: [{ functionCall: { name: 'search_docs', args: { query: 'streaming' } } }],
+            },
+          },
+        ],
+        usageMetadata: {
+          promptTokenCount: 1,
+          candidatesTokenCount: 1,
+          totalTokenCount: 2,
+        },
+      }),
+      'data: [DONE]',
+    ]);
+    fetchMock.mockResolvedValue({ ok: true, body: { getReader: () => reader } });
+
+    const chunks: ChatChunk[] = [];
+    await provider.chat([{ role: 'user', content: 'hi' }], { model: 'gemini-2.5-pro' }, (chunk) =>
+      chunks.push(chunk)
+    );
+
+    expect(chunks).toContainEqual({
+      type: 'tool_call',
+      callId: '',
+      toolName: 'search_docs',
+      arguments: { query: 'streaming' },
+    });
+  });
+
   it('maps HTTP 429 without header using provider message', async () => {
     fetchMock.mockResolvedValue({
       ok: false,

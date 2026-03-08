@@ -17,13 +17,24 @@ import { LLMRequestAbortedError, isAbortLikeError } from './LLMErrors';
 interface AnthropicContentBlockStart {
   type: 'content_block_start';
   index: number;
-  content_block: { type: 'thinking' | 'text'; thinking?: string; text?: string };
+  content_block:
+    | { type: 'thinking'; thinking?: string }
+    | { type: 'text'; text?: string }
+    | {
+        type: 'tool_use';
+        id?: string;
+        name?: string;
+        input?: Record<string, unknown>;
+      };
 }
 
 interface AnthropicContentBlockDelta {
   type: 'content_block_delta';
   index: number;
-  delta: { type: 'thinking_delta'; thinking: string } | { type: 'text_delta'; text: string };
+  delta:
+    | { type: 'thinking_delta'; thinking: string }
+    | { type: 'text_delta'; text: string }
+    | { type: 'input_json_delta'; partial_json: string };
 }
 
 interface AnthropicMessageDelta {
@@ -190,6 +201,10 @@ export class AnthropicProvider implements ILLMProvider {
     let inputTokens = 0;
     let outputTokens = 0;
     let rawUsage: Record<string, unknown> = {};
+    const pendingToolCallsByIndex = new Map<
+      number,
+      { callId: string; toolName: string; inputJsonText: string }
+    >();
 
     try {
       for (;;) {
@@ -232,6 +247,47 @@ export class AnthropicProvider implements ILLMProvider {
             } else if (e.delta.type === 'text_delta') {
               contentAccumulator += e.delta.text;
               onChunk({ type: 'text', delta: e.delta.text });
+            } else if (e.delta.type === 'input_json_delta') {
+              const pending = pendingToolCallsByIndex.get(e.index);
+              if (pending) {
+                pending.inputJsonText += e.delta.partial_json;
+              }
+            }
+          } else if (event.type === 'content_block_start') {
+            const e = event as AnthropicContentBlockStart;
+            if (e.content_block.type === 'tool_use') {
+              const toolCall = {
+                callId: e.content_block.id ?? '',
+                toolName: e.content_block.name ?? '',
+                inputJsonText:
+                  e.content_block.input && Object.keys(e.content_block.input).length > 0
+                    ? JSON.stringify(e.content_block.input)
+                    : '',
+              };
+              pendingToolCallsByIndex.set(e.index, toolCall);
+            }
+          } else if (event.type === 'content_block_stop') {
+            const stopEvent = event as { type: 'content_block_stop'; index?: number };
+            const index = typeof stopEvent.index === 'number' ? stopEvent.index : -1;
+            const pending = pendingToolCallsByIndex.get(index);
+            if (pending) {
+              let args: Record<string, unknown> = {};
+              try {
+                const parsed = JSON.parse(pending.inputJsonText) as unknown;
+                if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+                  args = parsed as Record<string, unknown>;
+                }
+              } catch {
+                args = {};
+              }
+
+              onChunk({
+                type: 'tool_call',
+                callId: pending.callId,
+                toolName: pending.toolName,
+                arguments: args,
+              });
+              pendingToolCallsByIndex.delete(index);
             }
           }
         }

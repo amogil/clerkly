@@ -79,6 +79,37 @@ describe('AnthropicProvider.chat()', () => {
     ).rejects.toThrow('Rate limit exceeded. Please try again in 6s');
   });
 
+  it('emits tool_call when tool_use block is streamed', async () => {
+    const reader = buildMockReader([
+      sseEvent({
+        type: 'content_block_start',
+        index: 0,
+        content_block: { type: 'tool_use', id: 'tool-1', name: 'search_docs' },
+      }),
+      sseEvent({
+        type: 'content_block_delta',
+        index: 0,
+        delta: { type: 'input_json_delta', partial_json: '{"query":"ai sdk"}' },
+      }),
+      sseEvent({ type: 'content_block_stop', index: 0 }),
+      sseEvent({ type: 'message_delta', usage: { output_tokens: 1 } }),
+      'data: [DONE]',
+    ]);
+    fetchMock.mockResolvedValue({ ok: true, body: { getReader: () => reader } });
+
+    const chunks: ChatChunk[] = [];
+    await provider.chat([{ role: 'user', content: 'hi' }], { model: 'claude-sonnet' }, (chunk) =>
+      chunks.push(chunk)
+    );
+
+    expect(chunks).toContainEqual({
+      type: 'tool_call',
+      callId: 'tool-1',
+      toolName: 'search_docs',
+      arguments: { query: 'ai sdk' },
+    });
+  });
+
   it('maps HTTP 429 without header using provider message', async () => {
     fetchMock.mockResolvedValue({
       ok: false,

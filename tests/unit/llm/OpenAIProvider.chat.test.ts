@@ -114,6 +114,54 @@ describe('OpenAIProvider.chat()', () => {
     });
   });
 
+  it('emits multiple tool_call chunks in one turn', async () => {
+    const reader = buildMockReader([
+      sseEvent({
+        type: 'response.function_call_arguments.delta',
+        output_index: 0,
+        call_id: 'call-1',
+        name: 'tool_a',
+        delta: '{"a":1}',
+      }),
+      sseEvent({
+        type: 'response.function_call_arguments.done',
+        output_index: 0,
+      }),
+      sseEvent({
+        type: 'response.function_call_arguments.delta',
+        output_index: 1,
+        call_id: 'call-2',
+        name: 'tool_b',
+        delta: '{"b":2}',
+      }),
+      sseEvent({
+        type: 'response.function_call_arguments.done',
+        output_index: 1,
+      }),
+      sseEvent({ type: 'response.completed', response: { usage: {} } }),
+      'data: [DONE]',
+    ]);
+    fetchMock.mockResolvedValue({ ok: true, body: { getReader: () => reader } });
+
+    const chunks: ChatChunk[] = [];
+    await provider.chat(mockMessages, mockOptions, (chunk) => chunks.push(chunk));
+
+    const toolCalls = chunks.filter((chunk) => chunk.type === 'tool_call');
+    expect(toolCalls).toHaveLength(2);
+    expect(toolCalls).toContainEqual({
+      type: 'tool_call',
+      callId: 'call-1',
+      toolName: 'tool_a',
+      arguments: { a: 1 },
+    });
+    expect(toolCalls).toContainEqual({
+      type: 'tool_call',
+      callId: 'call-2',
+      toolName: 'tool_b',
+      arguments: { b: 2 },
+    });
+  });
+
   it('sends tools in Responses API request when options.tools is provided', async () => {
     const reader = buildMockReader([
       sseEvent({ type: 'response.output_text.delta', delta: 'ok' }),

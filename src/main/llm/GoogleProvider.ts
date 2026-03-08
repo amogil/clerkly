@@ -15,8 +15,12 @@ import { LLMRequestAbortedError, isAbortLikeError } from './LLMErrors';
 // ─── Google Gemini SSE event shapes ──────────────────────────────────────────
 
 interface GeminiPart {
-  text: string;
+  text?: string;
   thought?: boolean;
+  functionCall?: {
+    name?: string;
+    args?: Record<string, unknown>;
+  };
 }
 
 interface GeminiCandidate {
@@ -215,9 +219,19 @@ export class GoogleProvider implements ILLMProvider {
 
           const parts = chunk.candidates?.[0]?.content?.parts ?? [];
           for (const part of parts) {
-            if (part.thought) {
+            if (part.functionCall) {
+              onChunk({
+                type: 'tool_call',
+                callId: '',
+                toolName: part.functionCall.name ?? '',
+                arguments:
+                  part.functionCall.args && typeof part.functionCall.args === 'object'
+                    ? part.functionCall.args
+                    : {},
+              });
+            } else if (part.thought && part.text) {
               onChunk({ type: 'reasoning', delta: part.text });
-            } else {
+            } else if (part.text) {
               contentAccumulator += part.text;
               onChunk({ type: 'text', delta: part.text });
             }

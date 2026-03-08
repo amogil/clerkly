@@ -126,7 +126,7 @@
   - [ ] Гарантировать отдельное хранение `usage_json` (`canonical + raw`) без `provider/model/timestamp`.
   - [ ] Гарантировать, что `kind` не дублируется в `payload_json`.
 - [ ] Unit:
-  - [ ] `MainPipeline` кейсы no-chunk completion / post-stream error / cancel behavior.
+  - [x] `MainPipeline` кейсы no-chunk completion / post-stream error / cancel behavior.
   - [ ] `MessagesRepository` кейсы `reply_to_message_id`, `done`, `usage_json`.
 
 ## Фаза B2.1: Статусы и snapshot-контракты
@@ -259,7 +259,7 @@
   - [x] покрыть извлечение `retry-after` + fallback.
 - [ ] Unit: providers
   - [ ] OpenAI/Anthropic/Google parity для streaming/tool/error/usage.
-  - [ ] >=2 tool calls в одном turn.
+  - [x] >=2 tool calls в одном turn.
 - [ ] Unit: `MainPipeline`
   - [x] порядок событий в loop и корректный persisted lifecycle `kind:tool_call` (`done=false -> done=true`).
   - [x] cancel в разных фазах loop, включая in-flight tool jobs.
