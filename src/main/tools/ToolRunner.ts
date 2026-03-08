@@ -24,22 +24,62 @@ export interface IToolExecutor {
   executeBatch(calls: ToolCallRequest[], signal?: AbortSignal): Promise<ToolCallResult[]>;
 }
 
+export interface ToolRunnerPolicy {
+  maxConcurrency: number;
+  timeoutMs: number;
+  maxRetries: number;
+}
+
+const DEFAULT_POLICY: ToolRunnerPolicy = {
+  maxConcurrency: 3,
+  timeoutMs: 30_000,
+  maxRetries: 0,
+};
+
 /**
  * Executes tool calls with bounded concurrency and deterministic output order.
  * Requirements: llm-integration.11.4
  */
 export class ToolRunner implements IToolExecutor {
+  private readonly policy: ToolRunnerPolicy;
+
   constructor(
     private readonly handlers: Record<string, ToolHandler> = {},
-    private readonly maxConcurrency: number = 3
-  ) {}
+    maxConcurrencyOrPolicy: number | Partial<ToolRunnerPolicy> = DEFAULT_POLICY.maxConcurrency
+  ) {
+    if (typeof maxConcurrencyOrPolicy === 'number') {
+      this.policy = {
+        ...DEFAULT_POLICY,
+        maxConcurrency: this.normalizePositiveInt(
+          maxConcurrencyOrPolicy,
+          DEFAULT_POLICY.maxConcurrency
+        ),
+      };
+      return;
+    }
+
+    this.policy = {
+      maxConcurrency: this.normalizePositiveInt(
+        maxConcurrencyOrPolicy.maxConcurrency ?? DEFAULT_POLICY.maxConcurrency,
+        DEFAULT_POLICY.maxConcurrency
+      ),
+      timeoutMs: this.normalizePositiveInt(
+        maxConcurrencyOrPolicy.timeoutMs ?? DEFAULT_POLICY.timeoutMs,
+        DEFAULT_POLICY.timeoutMs
+      ),
+      maxRetries: this.normalizeNonNegativeInt(
+        maxConcurrencyOrPolicy.maxRetries ?? DEFAULT_POLICY.maxRetries,
+        DEFAULT_POLICY.maxRetries
+      ),
+    };
+  }
 
   async executeBatch(calls: ToolCallRequest[], signal?: AbortSignal): Promise<ToolCallResult[]> {
     if (calls.length === 0) {
       return [];
     }
 
-    const workerCount = Math.max(1, Math.min(this.maxConcurrency, calls.length));
+    const workerCount = Math.max(1, Math.min(this.policy.maxConcurrency, calls.length));
     const pending = [...calls];
     const results: ToolCallResult[] = [];
 
@@ -73,22 +113,68 @@ export class ToolRunner implements IToolExecutor {
       };
     }
 
-    try {
-      const result = await handler(call.arguments, signal);
-      return {
-        callId: call.callId,
-        toolName: call.toolName,
-        status: 'success',
-        output: typeof result === 'string' ? result : JSON.stringify(result),
-      };
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      return {
-        callId: call.callId,
-        toolName: call.toolName,
-        status: 'error',
-        output: message,
-      };
+    let attempt = 0;
+    const maxAttempts = this.policy.maxRetries + 1;
+    for (;;) {
+      try {
+        const result = await this.executeWithTimeout(call, handler, signal);
+        return {
+          callId: call.callId,
+          toolName: call.toolName,
+          status: 'success',
+          output: typeof result === 'string' ? result : JSON.stringify(result),
+        };
+      } catch (error) {
+        const canRetry = !signal?.aborted && attempt + 1 < maxAttempts;
+        if (canRetry) {
+          attempt += 1;
+          continue;
+        }
+
+        const message = error instanceof Error ? error.message : String(error);
+        return {
+          callId: call.callId,
+          toolName: call.toolName,
+          status: 'error',
+          output: message,
+        };
+      }
     }
+  }
+
+  private async executeWithTimeout(
+    call: ToolCallRequest,
+    handler: ToolHandler,
+    signal?: AbortSignal
+  ): Promise<unknown> {
+    const timeoutController = new AbortController();
+    const linkedAbort = () => timeoutController.abort();
+    signal?.addEventListener('abort', linkedAbort);
+
+    const timer = setTimeout(() => timeoutController.abort(), this.policy.timeoutMs);
+
+    try {
+      return await handler(call.arguments, timeoutController.signal);
+    } catch (error) {
+      if (timeoutController.signal.aborted && !signal?.aborted) {
+        throw new Error(`Tool "${call.toolName}" timed out after ${this.policy.timeoutMs}ms.`);
+      }
+      throw error;
+    } finally {
+      clearTimeout(timer);
+      signal?.removeEventListener('abort', linkedAbort);
+    }
+  }
+
+  private normalizePositiveInt(value: number, fallback: number): number {
+    if (!Number.isFinite(value)) return fallback;
+    const normalized = Math.floor(value);
+    return normalized > 0 ? normalized : fallback;
+  }
+
+  private normalizeNonNegativeInt(value: number, fallback: number): number {
+    if (!Number.isFinite(value)) return fallback;
+    const normalized = Math.floor(value);
+    return normalized >= 0 ? normalized : fallback;
   }
 }

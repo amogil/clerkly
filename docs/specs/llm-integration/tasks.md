@@ -111,10 +111,10 @@
   - [ ] Поддержать multi-tool + controlled concurrency.
   - [x] Гарантировать корректный persisted lifecycle для `kind:tool_call` (create/update, done=false/true, full arguments).
   - [x] Удалить публикацию/зависимость от отдельного realtime-события `message.tool_call`; использовать только persisted `message.created`/`message.updated`.
-  - [ ] Гарантировать корректный cancel cleanup (idempotent для in-flight jobs).
+  - [x] Гарантировать корректный cancel cleanup (idempotent для in-flight jobs).
 - [ ] `src/main/tools/*`:
-  - [ ] Зафиксировать policy layer: timeout/retry/concurrency cap.
-  - [ ] Обеспечить deterministic merge результатов tool batch.
+  - [x] Зафиксировать policy layer: timeout/retry/concurrency cap.
+  - [x] Обеспечить deterministic merge результатов tool batch.
   - [x] До появления реального executor реализовать stub-путь: `tool_call` получает placeholder output и переводится в `done=true`.
 
 ## Фаза B2.2: Persisted message lifecycle conformance
@@ -154,7 +154,7 @@
   - [ ] Зафиксировать корректный порядок chunk-ов:
     - [x] `start -> start-step -> reasoning/text deltas -> finish-step -> finish`
   - [x] Гарантировать отсутствие дубликатов между delta-событиями и `message.updated` snapshot.
-  - [ ] Гарантировать корректное завершение стрима при cancel/hidden/done.
+  - [x] Гарантировать корректное завершение стрима при cancel/hidden/done.
 - [ ] Добавить protocol guards:
   - [x] controlled fail на invalid sequence (с диагностикой, без падения процесса).
 

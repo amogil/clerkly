@@ -134,6 +134,33 @@ export class IPCChatTransport implements ChatTransport<UIMessage> {
           (payload: MessageUpdatedPayload) => {
             const msg = payload.message;
             if (msg.agentId !== agentId) return;
+            if (llmMessageId === null && msg.kind === 'llm' && msg.done) {
+              llmMessageId = msg.id;
+              enqueue({ type: 'start', messageId: String(msg.id) });
+              enqueue({ type: 'start-step' });
+
+              const data = msg.payload.data as Record<string, unknown> | undefined;
+              const reasoning = data?.reasoning as { text?: string } | undefined;
+              if (typeof reasoning?.text === 'string' && reasoning.text.length > 0) {
+                const doneReasoningId = `reasoning-${msg.id}`;
+                enqueue({ type: 'reasoning-start', id: doneReasoningId });
+                enqueue({ type: 'reasoning-delta', id: doneReasoningId, delta: reasoning.text });
+                enqueue({ type: 'reasoning-end', id: doneReasoningId });
+              }
+
+              const text = data?.text;
+              if (typeof text === 'string' && text.length > 0) {
+                const doneTextId = `text-${msg.id}`;
+                enqueue({ type: 'text-start', id: doneTextId });
+                enqueue({ type: 'text-delta', id: doneTextId, delta: text });
+                enqueue({ type: 'text-end', id: doneTextId });
+              }
+
+              enqueue({ type: 'finish-step' });
+              enqueue({ type: 'finish' });
+              finish();
+              return;
+            }
             if (msg.id !== llmMessageId) return;
 
             // Hidden = cancelled previous response, close stream without content

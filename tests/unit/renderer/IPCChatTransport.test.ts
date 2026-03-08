@@ -649,6 +649,46 @@ describe('IPCChatTransport', () => {
       expect(textDelta?.delta).toBe('snapshot-only-text');
     });
 
+    it('should finalize stream from done MESSAGE_UPDATED snapshot without MESSAGE_CREATED', async () => {
+      const streamPromise = transport.sendMessages(makeSendOptions());
+      await Promise.resolve();
+
+      emitEvent(EVENT_TYPES.MESSAGE_UPDATED, {
+        message: {
+          id: 778,
+          agentId: 'agent-1',
+          kind: 'llm',
+          timestamp: Date.now(),
+          payload: { data: { reasoning: { text: 'r' }, text: 't' } },
+          hidden: false,
+          done: true,
+        },
+        timestamp: Date.now(),
+      });
+
+      const stream = await streamPromise;
+      const chunks = await collectChunks(stream);
+      const types = chunks.map((chunk) => chunk.type);
+      expect(types).toEqual(
+        expect.arrayContaining([
+          'start',
+          'start-step',
+          'reasoning-start',
+          'reasoning-delta',
+          'reasoning-end',
+          'text-start',
+          'text-delta',
+          'text-end',
+          'finish-step',
+          'finish',
+        ])
+      );
+      const textDelta = chunks.find((chunk) => chunk.type === 'text-delta') as
+        | { type: 'text-delta'; delta: string }
+        | undefined;
+      expect(textDelta?.delta).toBe('t');
+    });
+
     it('should fail controlled on MESSAGE_LLM_TEXT_UPDATED for a different llm message id', async () => {
       const streamPromise = transport.sendMessages(makeSendOptions());
       await Promise.resolve();
