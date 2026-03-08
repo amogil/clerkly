@@ -1222,10 +1222,10 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
 
   /* Preconditions: MockLLMServer returns JSON-like text payload, app authenticated with mock LLM URL
      Action: User sends a message
-     Assertions: Response is shown as plain text, no structured-output retry is performed
+     Assertions: Response is shown as plain text without extra transformation retries
      User-approved mock scenario: yes
      Requirements: llm-integration.5.1, llm-integration.6.5 */
-  test('should treat JSON-like text as plain response without structured-output retry', async () => {
+  test('should treat JSON-like text as plain response without extra retries', async () => {
     mockLLMServer.setStreamingMode(true, {
       content: JSON.stringify({
         action: { type: 'invalid-type', content: 'Broken payload' },
@@ -1236,7 +1236,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     context = await launchWithMockLLM();
     const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
 
-    await messageInput.fill('Trigger invalid structured output');
+    await messageInput.fill('Return JSON-like text without formatting');
     await messageInput.press('Enter');
 
     const actionContent = context.window.locator('[data-testid="message-llm-action"]').last();

@@ -88,7 +88,7 @@
 
 - [ ] `src/main/llm/LLMProviderFactory.ts` и типы:
   - [ ] Проверить, что все провайдеры создаются как AI SDK adapters.
-  - [ ] Удалить остаточные structured-output/legacy типы из chat-flow.
+  - [x] Удалить остаточные structured-output/legacy типы из chat-flow.
 - [ ] Добавить SDK-native Tool Calling (даже при пустом списке инструментов):
   - [ ] Перевести orchestration tool-calling на AI SDK `streamText/generateText` (`tools`, `toolChoice`, `stopWhen`) вместо ручной склейки tool-loop.
   - [ ] Зафиксировать пустой реестр инструментов как валидный стартовый режим (`tools = {}` / `[]` по контракту адаптера).
@@ -230,7 +230,7 @@
 ## Фаза D: Удаление костылей и legacy артефактов
 
 - [ ] Удалить переходные/дублирующие ветки streaming и provider parsing, ставшие лишними после AI SDK унификации.
-- [ ] Удалить оставшиеся structured-output chat-flow артефакты в коде/тестах/доках.
+- [x] Удалить оставшиеся structured-output chat-flow артефакты в коде/тестах/доках.
 - [ ] Удалить неиспользуемые event types/конвертеры, если они дублируют stream protocol.
 - [ ] Удалить legacy fallback-рендеры в renderer.
 - [x] Миграция legacy LLM payload: `data.action.content` -> `data.text` для исторических сообщений.
@@ -262,8 +262,8 @@
   - [ ] >=2 tool calls в одном turn.
 - [ ] Unit: `MainPipeline`
   - [x] порядок событий в loop и корректный persisted lifecycle `kind:tool_call` (`done=false -> done=true`).
-  - [ ] cancel в разных фазах loop, включая in-flight tool jobs.
-  - [ ] timeout = 300s и корректный mapping в доменную ошибку.
+  - [x] cancel в разных фазах loop, включая in-flight tool jobs.
+  - [x] timeout = 300s и корректный mapping в доменную ошибку.
   - [ ] stub-execution: placeholder output для `tool_call` и финализация `done=true`.
 - [ ] Unit: transport/event buses
   - [x] no-drop/no-coalescing regressions для `message.llm.reasoning.updated` и `message.llm.text.updated`.

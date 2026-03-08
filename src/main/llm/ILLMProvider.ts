@@ -41,7 +41,14 @@ export interface LLMTool {
  * Error categories in provider chat stream
  * Requirements: llm-integration.5.1
  */
-export type ChatErrorType = 'auth' | 'rate_limit' | 'provider' | 'network' | 'timeout';
+export type ChatErrorType =
+  | 'auth'
+  | 'rate_limit'
+  | 'provider'
+  | 'network'
+  | 'timeout'
+  | 'tool'
+  | 'protocol';
 
 /**
  * A streaming chunk from the LLM

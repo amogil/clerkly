@@ -3,6 +3,7 @@
 import { OpenAIProvider } from '../../../src/main/llm/OpenAIProvider';
 import type { ChatMessage, ChatOptions, ChatChunk } from '../../../src/main/llm/ILLMProvider';
 import { LLMRequestAbortedError } from '../../../src/main/llm/LLMErrors';
+import { CHAT_TIMEOUT_MS } from '../../../src/main/llm/LLMConfig';
 
 function buildMockReader(lines: string[]) {
   const chunks = lines.map((line) => Buffer.from(`${line}\n`));
@@ -197,6 +198,21 @@ describe('OpenAIProvider.chat()', () => {
     await expect(provider.chat(mockMessages, mockOptions, () => {})).rejects.toBeInstanceOf(
       LLMRequestAbortedError
     );
+  });
+
+  it('uses CHAT_TIMEOUT_MS for abort controller timer', async () => {
+    const setTimeoutSpy = jest.spyOn(global, 'setTimeout');
+    const reader = buildMockReader([
+      sseEvent({ type: 'response.output_text.delta', delta: 'ok' }),
+      sseEvent({ type: 'response.completed', response: { usage: {} } }),
+      'data: [DONE]',
+    ]);
+    fetchMock.mockResolvedValue({ ok: true, body: { getReader: () => reader } });
+
+    await provider.chat(mockMessages, mockOptions, () => {});
+
+    expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), CHAT_TIMEOUT_MS);
+    setTimeoutSpy.mockRestore();
   });
 
   it('extracts reasoning text from object delta and nested part/item shapes', async () => {

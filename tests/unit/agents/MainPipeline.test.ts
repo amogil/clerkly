@@ -472,6 +472,23 @@ describe('MainPipeline.run()', () => {
     expect(errorCreates).toHaveLength(0);
   });
 
+  it('returns early without side effects when already aborted before run', async () => {
+    const { pipeline, messageManager, llmProvider } = makeMocks();
+    const controller = new AbortController();
+    controller.abort();
+
+    await pipeline.run('agent-1', 1, controller.signal);
+
+    expect(llmProvider.chat).not.toHaveBeenCalled();
+    expect(messageManager.create).not.toHaveBeenCalledWith(
+      'agent-1',
+      'error',
+      expect.anything(),
+      expect.anything(),
+      expect.anything()
+    );
+  });
+
   it('cancels during tool execution without creating kind:error', async () => {
     const { pipeline, llmProvider, toolExecutor, messageManager } = makeMocks();
     const controller = new AbortController();
@@ -496,6 +513,38 @@ describe('MainPipeline.run()', () => {
 
     await pipeline.run('agent-1', 1, controller.signal);
 
+    expect(messageManager.hideAndMarkIncomplete).toHaveBeenCalledWith(2, 'agent-1');
+    const errorCreates = (messageManager.create as jest.Mock).mock.calls.filter(
+      (call: unknown[]) => call[1] === 'error'
+    );
+    expect(errorCreates).toHaveLength(0);
+  });
+
+  it('cancels before second model step in tool loop without creating kind:error', async () => {
+    const { pipeline, llmProvider, toolExecutor, messageManager } = makeMocks();
+    const controller = new AbortController();
+
+    llmProvider.chat.mockImplementationOnce(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({ type: 'reasoning', delta: 'Thinking...' });
+        onChunk({
+          type: 'tool_call',
+          callId: 'call-1',
+          toolName: 'search_docs',
+          arguments: { query: 'x' },
+        });
+        return {};
+      }
+    );
+
+    toolExecutor.executeBatch.mockImplementation(async () => {
+      controller.abort();
+      return [{ callId: 'call-1', toolName: 'search_docs', status: 'success', output: 'ok' }];
+    });
+
+    await pipeline.run('agent-1', 1, controller.signal);
+
+    expect(llmProvider.chat).toHaveBeenCalledTimes(1);
     expect(messageManager.hideAndMarkIncomplete).toHaveBeenCalledWith(2, 'agent-1');
     const errorCreates = (messageManager.create as jest.Mock).mock.calls.filter(
       (call: unknown[]) => call[1] === 'error'

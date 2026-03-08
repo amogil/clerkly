@@ -2,6 +2,7 @@
 
 import { AnthropicProvider } from '../../../src/main/llm/AnthropicProvider';
 import type { ChatChunk } from '../../../src/main/llm/ILLMProvider';
+import { CHAT_TIMEOUT_MS } from '../../../src/main/llm/LLMConfig';
 
 function buildMockReader(lines: string[]) {
   const chunks = lines.map((line) => Buffer.from(`${line}\n`));
@@ -101,5 +102,28 @@ describe('AnthropicProvider.chat()', () => {
     ).rejects.toThrow(
       'Model response timeout. The provider took too long to respond. Please try again later.'
     );
+  });
+
+  it('uses CHAT_TIMEOUT_MS for abort controller timer', async () => {
+    const setTimeoutSpy = jest.spyOn(global, 'setTimeout');
+    const reader = buildMockReader([
+      sseEvent({
+        type: 'message_start',
+        message: { usage: { input_tokens: 1, output_tokens: 0 } },
+      }),
+      sseEvent({
+        type: 'content_block_delta',
+        index: 0,
+        delta: { type: 'text_delta', text: 'ok' },
+      }),
+      sseEvent({ type: 'message_delta', usage: { output_tokens: 1 } }),
+      'data: [DONE]',
+    ]);
+    fetchMock.mockResolvedValue({ ok: true, body: { getReader: () => reader } });
+
+    await provider.chat([{ role: 'user', content: 'hi' }], { model: 'claude-sonnet' }, () => {});
+
+    expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), CHAT_TIMEOUT_MS);
+    setTimeoutSpy.mockRestore();
   });
 });

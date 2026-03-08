@@ -40,7 +40,7 @@ interface OpenAIResponsesEvent {
 
 /**
  * OpenAI LLM provider implementation
- * Supports testConnection() and chat() with streaming reasoning + structured output
+ * Supports testConnection() and chat() with streaming reasoning/text + tool calling
  *
  * Requirements: settings.3, llm-integration.3
  */

@@ -2,6 +2,7 @@
 
 import { GoogleProvider } from '../../../src/main/llm/GoogleProvider';
 import type { ChatChunk } from '../../../src/main/llm/ILLMProvider';
+import { CHAT_TIMEOUT_MS } from '../../../src/main/llm/LLMConfig';
 
 function buildMockReader(lines: string[]) {
   const chunks = lines.map((line) => Buffer.from(`${line}\n`));
@@ -100,5 +101,22 @@ describe('GoogleProvider.chat()', () => {
     ).rejects.toThrow(
       'Model response timeout. The provider took too long to respond. Please try again later.'
     );
+  });
+
+  it('uses CHAT_TIMEOUT_MS for abort controller timer', async () => {
+    const setTimeoutSpy = jest.spyOn(global, 'setTimeout');
+    const reader = buildMockReader([
+      sseEvent({
+        candidates: [{ content: { parts: [{ text: 'ok' }] } }],
+        usageMetadata: { promptTokenCount: 1, candidatesTokenCount: 1, totalTokenCount: 2 },
+      }),
+      'data: [DONE]',
+    ]);
+    fetchMock.mockResolvedValue({ ok: true, body: { getReader: () => reader } });
+
+    await provider.chat([{ role: 'user', content: 'hi' }], { model: 'gemini-2.5-pro' }, () => {});
+
+    expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), CHAT_TIMEOUT_MS);
+    setTimeoutSpy.mockRestore();
   });
 });

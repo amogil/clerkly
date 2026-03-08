@@ -33,7 +33,7 @@ describe('Provider chat request formats', () => {
     jest.restoreAllMocks();
   });
 
-  it('OpenAI request does not enforce structured json_schema in chat flow', async () => {
+  it('OpenAI request does not enforce JSON schema response format in chat flow', async () => {
     const provider = new OpenAIProvider('test-key');
     const fetchMock = jest.fn();
     global.fetch = fetchMock as unknown as typeof fetch;
