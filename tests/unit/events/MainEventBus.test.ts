@@ -11,6 +11,7 @@ import {
   AgentArchivedEvent,
   MessageUpdatedEvent,
   MessageLlmReasoningUpdatedEvent,
+  UserProfileUpdatedEvent,
   type MessageSnapshot,
 } from '../../../src/shared/events/types';
 
@@ -211,6 +212,38 @@ describe('MainEventBus', () => {
             name: 'Updated Name',
           }),
           timestamp: expect.any(Number),
+        })
+      );
+    });
+
+    /* Preconditions: EventBus instance exists, agent.updated has unsorted/duplicated changedFields
+       Action: Publish AgentUpdatedEvent with raw changedFields
+       Assertions: changedFields are normalized to dot-path string array (unique, sorted)
+       Requirements: realtime-events.3.3 */
+    it('should normalize changedFields for agent.updated payload', async () => {
+      const bus = MainEventBus.getInstance();
+      const handler = jest.fn();
+
+      bus.subscribe('agent.updated', handler);
+      bus.publish(
+        new AgentUpdatedEvent(
+          {
+            id: 'agent-1',
+            name: 'Updated Name',
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+            archivedAt: null,
+            status: 'new',
+          },
+          [' status ', 'meta.updatedAt', 'status', '', 'meta.updatedAt']
+        )
+      );
+
+      await Promise.resolve();
+
+      expect(handler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          changedFields: ['meta.updatedAt', 'status'],
         })
       );
     });
@@ -630,6 +663,31 @@ describe('MainEventBus', () => {
       expect(handler.mock.calls[0][0].message.payload.data).toEqual({ text: 'new' });
     });
 
+    /* Preconditions: EventBus has subscriber for message.updated
+       Action: Deliver two message.updated events with equal timestamp via IPC
+       Assertions: Both events are delivered (streaming path uses `<` for outdated checks)
+       Requirements: realtime-events.5.5, llm-integration.2 */
+    it('should keep equal-timestamp message.updated events', async () => {
+      const bus = MainEventBus.getInstance();
+      const handler = jest.fn();
+      bus.subscribe('message.updated', handler);
+
+      bus.deliverFromIPC('message.updated', {
+        message: createMessageSnapshot(42, 'chunk-1'),
+        timestamp: 2000,
+      });
+      bus.deliverFromIPC('message.updated', {
+        message: createMessageSnapshot(42, 'chunk-2'),
+        timestamp: 2000,
+      });
+
+      await Promise.resolve();
+
+      expect(handler).toHaveBeenCalledTimes(2);
+      expect(handler.mock.calls[0][0].message.payload.data).toEqual({ text: 'chunk-1' });
+      expect(handler.mock.calls[1][0].message.payload.data).toEqual({ text: 'chunk-2' });
+    });
+
     /* Preconditions: EventBus has subscriber for message.llm.reasoning.updated
        Action: Deliver a newer delta then an older delta for same message via IPC
        Assertions: Older delta is ignored even when reasoning events are non-coalesced
@@ -658,6 +716,62 @@ describe('MainEventBus', () => {
 
       expect(handler).toHaveBeenCalledTimes(1);
       expect(handler.mock.calls[0][0].delta).toBe('new');
+    });
+
+    /* Preconditions: EventBus has subscriber for message.llm.reasoning.updated
+       Action: Deliver two reasoning deltas with equal timestamp via IPC
+       Assertions: Both deltas are delivered (streaming path uses `<` for outdated checks)
+       Requirements: realtime-events.5.5, llm-integration.2 */
+    it('should keep equal-timestamp message.llm.reasoning.updated events', async () => {
+      const bus = MainEventBus.getInstance();
+      const handler = jest.fn();
+      bus.subscribe('message.llm.reasoning.updated', handler);
+
+      bus.deliverFromIPC('message.llm.reasoning.updated', {
+        messageId: 7,
+        agentId: 'agent-1',
+        delta: 'a',
+        accumulatedText: 'a',
+        timestamp: 2000,
+      });
+      bus.deliverFromIPC('message.llm.reasoning.updated', {
+        messageId: 7,
+        agentId: 'agent-1',
+        delta: 'b',
+        accumulatedText: 'ab',
+        timestamp: 2000,
+      });
+
+      await Promise.resolve();
+
+      expect(handler).toHaveBeenCalledTimes(2);
+      expect(handler.mock.calls[0][0].delta).toBe('a');
+      expect(handler.mock.calls[1][0].delta).toBe('b');
+    });
+
+    /* Preconditions: EventBus receives user.profile.updated via IPC with unsorted/duplicated changedFields
+       Action: deliverFromIPC for user.profile.updated
+       Assertions: subscriber gets normalized changedFields (unique, sorted)
+       Requirements: realtime-events.4.4 */
+    it('should normalize changedFields for user.profile.updated delivered from IPC', async () => {
+      const bus = MainEventBus.getInstance();
+      const handler = jest.fn();
+      bus.subscribe('user.profile.updated', handler);
+
+      bus.deliverFromIPC('user.profile.updated', {
+        id: 'user-1',
+        changedFields: [' profile.name ', 'profile.email', 'profile.name', ''],
+        timestamp: 1000,
+      });
+
+      await Promise.resolve();
+
+      expect(handler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: 'user-1',
+          changedFields: ['profile.email', 'profile.name'],
+        })
+      );
     });
   });
 
@@ -816,6 +930,34 @@ describe('additional coverage tests', () => {
 
   afterEach(() => {
     MainEventBus.resetInstance();
+  });
+
+  /* Preconditions: EventBus instance exists, user.profile.updated event class has noisy changedFields
+     Action: Publish UserProfileUpdatedEvent with duplicates and whitespace
+     Assertions: payload changedFields are normalized before local delivery
+     Requirements: realtime-events.3.3 */
+  it('should normalize changedFields for user.profile.updated on publish', async () => {
+    const bus = MainEventBus.getInstance();
+    const handler = jest.fn();
+
+    bus.subscribe('user.profile.updated', handler);
+    bus.publish(
+      new UserProfileUpdatedEvent('user-1', [
+        ' profile.locale ',
+        'profile.name',
+        'profile.name',
+        '',
+      ])
+    );
+
+    await Promise.resolve();
+
+    expect(handler).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'user-1',
+        changedFields: ['profile.locale', 'profile.name'],
+      })
+    );
   });
 
   /* Preconditions: EventBus with IPC error

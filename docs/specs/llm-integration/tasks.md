@@ -158,13 +158,13 @@
 ## Фаза C1.1: Realtime-events conformance
 
 - [ ] `src/main/events/MainEventBus.ts` и bridge:
-  - [ ] Для `agent.updated`, `message.updated`, `user.profile.updated` передавать `changedFields` в формате spec (`dot.path`, unique, sorted) при наличии диффа.
-  - [ ] Сохранить поведение timestamp (`<` only outdated) для стриминговых событий.
+  - [x] Для `agent.updated`, `message.updated`, `user.profile.updated` передавать `changedFields` в формате spec (`dot.path`, unique, sorted) при наличии диффа.
+  - [x] Сохранить поведение timestamp (`<` only outdated) для стриминговых событий.
 - [ ] `src/renderer/events/RendererEventBus.ts`:
-  - [ ] Проверить отсутствие потерь/dedupe для `message.llm.reasoning.updated` и `message.llm.text.updated` в одном timestamp.
+  - [x] Проверить отсутствие потерь/dedupe для `message.llm.reasoning.updated` и `message.llm.text.updated` в одном timestamp.
 - [ ] Unit-тесты:
-  - [ ] `tests/unit/events/MainEventBus.test.ts` — `changedFields` формат и сортировка.
-  - [ ] `tests/unit/events/RendererEventBus.test.ts` — non-coalescing чанков с равным timestamp.
+  - [x] `tests/unit/events/MainEventBus.test.ts` — `changedFields` формат и сортировка.
+  - [x] `tests/unit/events/RendererEventBus.test.ts` — non-coalescing чанков с равным timestamp.
 
 ---
 
@@ -200,7 +200,7 @@
 - [ ] Проверить необходимость `sendAutomaticallyWhen` и auto-continue semantics для tool-flow.
 - [ ] `src/renderer/lib/messageMapper.ts` / `IPCChatTransport`:
   - [x] корректно маппить persisted `kind:tool_call` в UIMessage tool parts.
-  - [ ] исключить дублирование tool-call частей между `message.created` и `message.updated`.
+  - [x] исключить дублирование tool-call частей между `message.created` и `message.updated`.
 - [ ] Использовать SDK-метрики шагов вместо ручной агрегации usage/timing:
   - [ ] Брать usage из `result.totalUsage` и `result.steps[*].usage`, а не только из provider-raw envelope.
   - [ ] Для каждого step сохранять диагностику шага (toolCalls, finishReason, usage) в `llm.pipeline.diagnostic`.
