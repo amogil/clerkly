@@ -146,7 +146,7 @@ export class GoogleProvider implements ILLMProvider {
         ];
         body.toolConfig = {
           functionCallingConfig: {
-            mode: 'AUTO',
+            mode: 'VALIDATED',
           },
         };
       }

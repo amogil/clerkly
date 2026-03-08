@@ -98,7 +98,7 @@ export interface LLMUsage {
 
 /**
  * Provider-level chat result envelope
- * - optional final assistant text (fallback if provider exposes final snapshot)
+ * - optional final assistant text
  * - optional provider usage envelope (canonical/raw)
  * Requirements: llm-integration.5.1, llm-integration.5.6
  */

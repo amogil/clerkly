@@ -149,6 +149,24 @@ describe('OpenAIProvider.chat()', () => {
     expect(responsesMock).toHaveBeenCalledWith('gpt-5-nano');
   });
 
+  it('does not build tool definitions when tools list is empty', async () => {
+    mockSdkResult([{ type: 'text-delta', text: 'ok' }]);
+
+    await provider.chat(
+      mockMessages,
+      {
+        model: 'gpt-5-nano',
+        tools: [],
+      },
+      () => {}
+    );
+
+    const streamArgs = (aiModule.streamText as unknown as jest.Mock).mock.calls[0][0];
+    expect(streamArgs.tools).toBeUndefined();
+    expect(aiModule.tool).not.toHaveBeenCalled();
+    expect(aiModule.jsonSchema).not.toHaveBeenCalled();
+  });
+
   it('emits turn_error and throws when SDK stream yields error part', async () => {
     mockSdkResult([{ type: 'error', error: new Error('broken') }]);
 

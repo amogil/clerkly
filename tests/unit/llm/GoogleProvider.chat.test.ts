@@ -180,7 +180,7 @@ describe('GoogleProvider.chat()', () => {
     });
   });
 
-  it('sends tools with AUTO function-calling policy when tools are provided', async () => {
+  it('sends tools with VALIDATED function-calling policy when tools are provided', async () => {
     const reader = buildMockReader([
       sseEvent({
         candidates: [{ content: { parts: [{ text: 'ok' }] } }],
@@ -219,7 +219,30 @@ describe('GoogleProvider.chat()', () => {
         ],
       },
     ]);
-    expect(body.toolConfig).toEqual({ functionCallingConfig: { mode: 'AUTO' } });
+    expect(body.toolConfig).toEqual({ functionCallingConfig: { mode: 'VALIDATED' } });
+  });
+
+  it('does not send tools/toolConfig when tools list is empty', async () => {
+    const reader = buildMockReader([
+      sseEvent({
+        candidates: [{ content: { parts: [{ text: 'ok' }] } }],
+        usageMetadata: { promptTokenCount: 1, candidatesTokenCount: 1, totalTokenCount: 2 },
+      }),
+      'data: [DONE]',
+    ]);
+    fetchMock.mockResolvedValue({ ok: true, body: { getReader: () => reader } });
+
+    await provider.chat(
+      [{ role: 'user', content: 'hi' }],
+      { model: 'gemini-2.5-pro', tools: [] },
+      () => {}
+    );
+
+    const body = JSON.parse(
+      String((fetchMock.mock.calls[0] as [string, RequestInit])[1].body)
+    ) as Record<string, unknown>;
+    expect(body.tools).toBeUndefined();
+    expect(body.toolConfig).toBeUndefined();
   });
 
   it('maps HTTP 429 without header using provider message', async () => {

@@ -87,13 +87,13 @@
 ## Фаза B2: Main process на AI SDK Core
 
 - [ ] `src/main/llm/LLMProviderFactory.ts` и типы:
-  - [ ] Проверить, что все провайдеры создаются как AI SDK adapters.
+  - [x] Проверить, что все провайдеры создаются как AI SDK adapters.
   - [x] Удалить остаточные structured-output/legacy типы из chat-flow.
 - [ ] Добавить SDK-native Tool Calling (даже при пустом списке инструментов):
   - [ ] Перевести orchestration tool-calling на AI SDK `streamText/generateText` (`tools`, `toolChoice`, `stopWhen`) вместо ручной склейки tool-loop.
-  - [ ] Зафиксировать пустой реестр инструментов как валидный стартовый режим (`tools = {}` / `[]` по контракту адаптера).
-  - [ ] Включить strict-режим для tool schemas (через AI SDK tool strict + provider strict-json-schema опции, где поддерживается).
-  - [ ] Добавить unit-тест: при пустом tool registry модель не падает и не генерирует runtime-ошибку tool executor.
+  - [x] Зафиксировать пустой реестр инструментов как валидный стартовый режим (`tools = {}` / `[]` по контракту адаптера).
+  - [x] Включить strict-режим для tool schemas (через AI SDK tool strict + provider strict-json-schema опции, где поддерживается).
+  - [x] Добавить unit-тест: при пустом tool registry модель не падает и не генерирует runtime-ошибку tool executor.
 - [ ] `src/main/llm/OpenAIProvider.ts`:
   - [x] Финально перевести все streaming/tool semantics на AI SDK primitives.
   - [x] Убрать ручные provider-specific parser ветки, если покрываются AI SDK layer.
@@ -142,7 +142,7 @@
   - [ ] Убедиться, что `kind:error`, `kind:tool_call`, `hidden=true` исключаются из model history.
 - [ ] `src/shared/events/types.ts`:
   - [x] Удалить типы/константы/классы `message.tool_call` из целевого runtime-контракта.
-  - [ ] Проверить optional `changedFields` формат для `{entity}.updated` событий.
+  - [x] Проверить optional `changedFields` формат для `{entity}.updated` событий.
 
 ---
 
@@ -235,7 +235,7 @@
 - [ ] Удалить переходные/дублирующие ветки streaming и provider parsing, ставшие лишними после AI SDK унификации.
 - [x] Удалить оставшиеся structured-output chat-flow артефакты в коде/тестах/доках.
 - [ ] Удалить неиспользуемые event types/конвертеры, если они дублируют stream protocol.
-- [ ] Удалить legacy fallback-рендеры в renderer.
+- [x] Удалить legacy fallback-рендеры в renderer.
 - [x] Миграция legacy LLM payload: `data.action.content` -> `data.text` для исторических сообщений.
   - [x] Добавить SQL-миграцию в `migrations/`:
     - [x] Для `kind='llm'` переносить `$.data.action.content` в `$.data.text`, если `$.data.text` отсутствует или пуст.

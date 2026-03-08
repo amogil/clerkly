@@ -616,6 +616,24 @@ describe('MainPipeline.run()', () => {
     ]);
   });
 
+  it('handles empty tool registry without calling tool executor', async () => {
+    const { pipeline, llmProvider, toolExecutor } = makeMocks();
+    const promptBuilder = (pipeline as unknown as { promptBuilder: PromptBuilder })
+      .promptBuilder as unknown as { build: jest.Mock };
+    promptBuilder.build.mockReturnValue({
+      systemPrompt: 'sys',
+      history: '',
+      tools: [],
+    });
+
+    llmProvider.chat.mockResolvedValue({ text: 'ok' });
+    await pipeline.run('agent-1', 1);
+
+    const optionsArg = (llmProvider.chat as jest.Mock).mock.calls[0][1] as ChatOptions;
+    expect(optionsArg.tools).toEqual([]);
+    expect(toolExecutor.executeBatch).not.toHaveBeenCalled();
+  });
+
   it('publishes diagnostic event on pipeline failures', async () => {
     const { pipeline, llmProvider, mockPublish } = makeMocks();
     llmProvider.chat.mockRejectedValue(new Error('provider blew up'));

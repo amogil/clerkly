@@ -60,31 +60,8 @@ export class MainPipeline {
     private messageManager: MessageManager,
     private settingsManager: AIAgentSettingsManager,
     private promptBuilder: PromptBuilder,
-    private createProvider: (provider: LLMProvider, apiKey: string) => ILLMProvider = (p, k) => {
-      const instance = LLMProviderFactory.createProvider(p);
-      // Recreate with apiKey — OpenAIProvider accepts it in constructor
-      // We use a workaround: cast and reconstruct
-      void instance;
-      const { OpenAIProvider } = require('../llm/OpenAIProvider') as {
-        OpenAIProvider: new (key: string) => ILLMProvider;
-      };
-      const { AnthropicProvider } = require('../llm/AnthropicProvider') as {
-        AnthropicProvider: new (key: string) => ILLMProvider;
-      };
-      const { GoogleProvider } = require('../llm/GoogleProvider') as {
-        GoogleProvider: new (key: string) => ILLMProvider;
-      };
-      switch (p) {
-        case 'openai':
-          return new OpenAIProvider(k);
-        case 'anthropic':
-          return new AnthropicProvider(k);
-        case 'google':
-          return new GoogleProvider(k);
-        default:
-          throw new Error(`Unknown provider: ${p}`);
-      }
-    },
+    private createProvider: (provider: LLMProvider, apiKey: string) => ILLMProvider = (p, k) =>
+      LLMProviderFactory.createProvider(p, k),
     private toolExecutor: IToolExecutor = new ToolRunner({}, 3)
   ) {}
 
