@@ -5,6 +5,16 @@ import { AnthropicProvider } from '../../../src/main/llm/AnthropicProvider';
 import { GoogleProvider } from '../../../src/main/llm/GoogleProvider';
 import type { ChatMessage } from '../../../src/main/llm/ILLMProvider';
 
+jest.mock('ai', () => ({
+  streamText: jest.fn(),
+  tool: jest.fn((definition) => ({ ...definition })),
+  jsonSchema: jest.fn((schema) => schema),
+}));
+
+jest.mock('@ai-sdk/openai', () => ({
+  createOpenAI: jest.fn(),
+}));
+
 function buildMockReader(lines: string[]) {
   const chunks = lines.map((line) => Buffer.from(`${line}\n`));
   let index = 0;
@@ -35,27 +45,22 @@ describe('Provider chat request formats', () => {
 
   it('OpenAI request does not enforce JSON schema response format in chat flow', async () => {
     const provider = new OpenAIProvider('test-key');
-    const fetchMock = jest.fn();
-    global.fetch = fetchMock as unknown as typeof fetch;
-
-    const reader = buildMockReader([
-      sseEvent({ type: 'response.output_text.delta', delta: 'ok' }),
-      sseEvent({ type: 'response.completed', response: { usage: {} } }),
-      'data: [DONE]',
-    ]);
-
-    fetchMock.mockResolvedValue({ ok: true, body: { getReader: () => reader } });
+    const streamTextMock = jest.requireMock('ai').streamText as jest.Mock;
+    const createOpenAIMock = jest.requireMock('@ai-sdk/openai').createOpenAI as jest.Mock;
+    const responsesMock = jest.fn().mockReturnValue({ specificationVersion: 'v3' });
+    createOpenAIMock.mockReturnValue({ responses: responsesMock });
+    streamTextMock.mockReturnValue({
+      fullStream: (async function* () {
+        yield { type: 'text-delta', text: 'ok' };
+      })(),
+      totalUsage: Promise.resolve({}),
+    });
 
     await provider.chat(messages, { model: 'gpt-5-nano' }, () => undefined);
 
-    const body = JSON.parse(String((fetchMock.mock.calls[0]?.[1] as RequestInit).body)) as Record<
-      string,
-      unknown
-    >;
-
-    expect(body.stream).toBe(true);
-    expect(body.input).toEqual(messages);
-    expect(body).not.toHaveProperty('text.format');
+    const streamArgs = streamTextMock.mock.calls[0][0] as Record<string, unknown>;
+    expect(streamArgs.messages).toEqual(messages);
+    expect(streamArgs).not.toHaveProperty('text');
   });
 
   it('Anthropic request does not enforce output_config json_schema in chat flow', async () => {
