@@ -976,9 +976,9 @@ describe('AgentIPCHandlers', () => {
 
     /* Preconditions: Last message is in-flight llm with replyToMessageId
        Action: Invoke messages:cancel with agentId
-       Assertions: In-flight llm and its user message are hidden
+       Assertions: In-flight llm is hidden/incomplete; source user remains visible
        Requirements: llm-integration.8.5, llm-integration.8.7 */
-    it('should hide in-flight llm and its reply-to user message', async () => {
+    it('should hide in-flight llm and keep source user visible', async () => {
       const inFlightLlm: Message = {
         ...mockMessage,
         id: 12,
@@ -994,7 +994,7 @@ describe('AgentIPCHandlers', () => {
 
       expect(result).toEqual({ success: true });
       expect(mockMessageManager.hideAndMarkIncomplete).toHaveBeenCalledWith(12, 'abc123xyz0');
-      expect(mockMessageManager.setHidden).toHaveBeenCalledWith(11, 'abc123xyz0');
+      expect(mockMessageManager.setHidden).not.toHaveBeenCalledWith(11, 'abc123xyz0');
     });
 
     /* Preconditions: Handlers registered, cancelPipeline throws

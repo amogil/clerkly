@@ -1050,7 +1050,9 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
       if (Array.isArray(content)) {
         return content
           .map((part) =>
-            part && typeof part === 'object' && typeof (part as { text?: unknown }).text === 'string'
+            part &&
+            typeof part === 'object' &&
+            typeof (part as { text?: unknown }).text === 'string'
               ? (part as { text: string }).text
               : ''
           )
