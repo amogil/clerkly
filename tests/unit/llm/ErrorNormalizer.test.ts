@@ -30,6 +30,19 @@ describe('ErrorNormalizer', () => {
     expect(normalized.type).toBe('auth');
   });
 
+  /* Preconditions: APICallError with statusCode 403
+     Action: normalizeLLMError
+     Assertions: mapped to auth
+     Requirements: llm-integration.3.10 */
+  it('maps APICallError 403 to auth', () => {
+    const normalized = normalizeLLMError({
+      name: 'APICallError',
+      statusCode: 403,
+      message: 'Forbidden',
+    });
+    expect(normalized.type).toBe('auth');
+  });
+
   /* Preconditions: APICallError with statusCode 429 and retry-after header
      Action: normalizeLLMError
      Assertions: mapped to rate_limit with retryAfterSeconds
@@ -57,6 +70,19 @@ describe('ErrorNormalizer', () => {
     expect(normalized.type).toBe('network');
   });
 
+  /* Preconditions: APICallError with statusCode 503
+     Action: normalizeLLMError
+     Assertions: mapped to provider
+     Requirements: llm-integration.3.10 */
+  it('maps APICallError 5xx to provider', () => {
+    const normalized = normalizeLLMError({
+      name: 'APICallError',
+      statusCode: 503,
+      message: 'Service unavailable',
+    });
+    expect(normalized.type).toBe('provider');
+  });
+
   /* Preconditions: RetryError from SDK
      Action: normalizeLLMError
      Assertions: mapped to provider
@@ -73,9 +99,14 @@ describe('ErrorNormalizer', () => {
      Action: normalizeLLMError
      Assertions: mapped to tool with standardized message
      Requirements: llm-integration.3.5, llm-integration.3.10 */
-  it('maps tool errors to tool category', () => {
+  it.each([
+    'NoSuchToolError',
+    'InvalidToolInputError',
+    'ToolExecutionError',
+    'ToolCallRepairError',
+  ])('maps %s to tool category', (errorName) => {
     const normalized = normalizeLLMError({
-      name: 'ToolExecutionError',
+      name: errorName,
       message: 'tool failed',
     });
     expect(normalized.type).toBe('tool');

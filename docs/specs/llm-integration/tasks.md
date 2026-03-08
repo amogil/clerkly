@@ -70,17 +70,17 @@
 
 ## Фаза B1.2: UX-контракты ошибок в чате
 
-- [ ] `src/renderer/components/agents/*`:
-  - [ ] Для `auth`/missing key ошибок показать действия `Open Settings` (primary) и `Retry` (secondary).
-  - [ ] `Retry` скрывает текущий `kind:error` и повторяет запрос по последнему `kind:user`.
-  - [ ] Диалоги ошибок/уведомлений занимают всю ширину области чата.
-- [ ] `src/main/agents/AgentIPCHandlers.ts`:
-  - [ ] Реализовать `messages:retry-last` и `messages:cancel-retry` под контракт rate-limit.
-  - [ ] Для `Cancel` в rate-limit удалять исходное `kind:user` сообщение из БД и чата.
-- [ ] Functional:
-  - [ ] Кнопки `Open Settings`/`Retry` и их приоритеты.
-  - [ ] `Retry` сценарий для auth/missing-key ошибок.
-  - [ ] `Cancel` сценарий в rate-limit с удалением исходного user message.
+- [x] `src/renderer/components/agents/*`:
+  - [x] Для `auth`/missing key ошибок показать действия `Open Settings` (primary) и `Retry` (secondary).
+  - [x] `Retry` скрывает текущий `kind:error` и повторяет запрос по последнему `kind:user`.
+  - [x] Диалоги ошибок/уведомлений занимают всю ширину области чата.
+- [x] `src/main/agents/AgentIPCHandlers.ts`:
+  - [x] Реализовать `messages:retry-last` и `messages:cancel-retry` под контракт rate-limit.
+  - [x] Для `Cancel` в rate-limit удалять исходное `kind:user` сообщение из БД и чата.
+- [x] Functional:
+  - [x] Кнопки `Open Settings`/`Retry` и их приоритеты.
+  - [x] `Retry` сценарий для auth/missing-key ошибок.
+  - [x] `Cancel` сценарий в rate-limit с удалением исходного user message.
 
 ---
 
@@ -249,14 +249,14 @@
   - [x] `testing.13.1`: unit на sequence `start -> start-step -> delta -> finish-step -> finish` в `IPCChatTransport`.
   - [x] `testing.13.2`: unit на отсутствие дублей между delta и `message.updated` snapshot.
   - [x] `testing.13.3`: unit на рендер persisted `kind:tool_call` как tool-call блока.
-  - [ ] `testing.13.4`: unit на `ErrorNormalizer` (auth/rate_limit/provider/network/timeout/tool/protocol).
-  - [ ] `testing.13.5`: unit на multi-tool + continuation `model -> tools -> model`.
+  - [x] `testing.13.4`: unit на `ErrorNormalizer` (auth/rate_limit/provider/network/timeout/tool/protocol).
+  - [x] `testing.13.5`: unit на multi-tool + continuation `model -> tools -> model`.
   - [ ] `testing.13.6`: functional на одновременный стриминг reasoning и text.
   - [ ] `testing.13.7`: functional на `rate_limit` countdown без persisted `kind:error`.
   - [ ] `testing.13.8`: functional на cancel во время tool execution без `kind:error`.
 - [ ] Unit: `ErrorNormalizer`
-  - [ ] покрыть все AI SDK error classes и доменный mapping.
-  - [ ] покрыть извлечение `retry-after` + fallback.
+  - [x] покрыть все AI SDK error classes и доменный mapping.
+  - [x] покрыть извлечение `retry-after` + fallback.
 - [ ] Unit: providers
   - [ ] OpenAI/Anthropic/Google parity для streaming/tool/error/usage.
   - [ ] >=2 tool calls в одном turn.
@@ -266,12 +266,12 @@
   - [ ] timeout = 300s и корректный mapping в доменную ошибку.
   - [ ] stub-execution: placeholder output для `tool_call` и финализация `done=true`.
 - [ ] Unit: transport/event buses
-  - [ ] no-drop/no-coalescing regressions для `message.llm.reasoning.updated` и `message.llm.text.updated`.
-  - [ ] негативный контракт: отдельное realtime-событие `message.tool_call` отсутствует; UI зависит только от persisted snapshot-событий.
+  - [x] no-drop/no-coalescing regressions для `message.llm.reasoning.updated` и `message.llm.text.updated`.
+  - [x] негативный контракт: отдельное realtime-событие `message.tool_call` отсутствует; UI зависит только от persisted snapshot-событий.
 - [ ] Unit: renderer
-  - [ ] `IPCChatTransport` protocol ordering.
-  - [ ] persisted `kind:tool_call` корректно попадает в UI stream как tool-call part.
-  - [ ] стабильность mapping при mixed streaming events.
+  - [x] `IPCChatTransport` protocol ordering.
+  - [x] persisted `kind:tool_call` корректно попадает в UI stream как tool-call part.
+  - [x] стабильность mapping при mixed streaming events.
   - [x] `AgentMessage`/`Tool` рендер pending/success/error и корректный вывод input/output.
 - [ ] Functional:
   - [ ] reasoning и text стримятся одновременно в одном `kind:llm`.
