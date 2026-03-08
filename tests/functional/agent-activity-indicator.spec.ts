@@ -130,29 +130,31 @@ test.describe('Agent Activity Indicator', () => {
      Requirements: agents.11.1-11.4 */
   test('should show and hide indicator for multiple operations', async () => {
     const messageInput = activeChat(window).textarea;
+    const stopButton = window.locator(
+      '[data-testid="agent-chat-root"]:not(.pointer-events-none) [data-testid="prompt-input-stop"]'
+    );
+    const inProgressIndicators = window.locator('[data-testid="agent-avatar-icon"] > .animate-spin');
 
     // Send first message
     await messageInput.fill('First message');
     await messageInput.press('Enter');
     await expect(activeChat(window).userMessages).toHaveCount(1, { timeout: 5000 });
+    await expect(stopButton).toBeVisible({ timeout: 5000 });
+    await expect(inProgressIndicators.first()).toBeVisible({ timeout: 5000 });
+    await expect(stopButton).toBeHidden({ timeout: 30000 });
+    await expect(inProgressIndicators).toHaveCount(0, { timeout: 5000 });
 
-    // Indicator should be hidden after first completes
-    const activityIndicator = window.locator('[data-testid="activity-indicator"]');
-    let isVisible = await activityIndicator.isVisible().catch(() => false);
-    expect(isVisible).toBe(false);
-
-    // Send second message
+    // Send second message only after first pipeline completed
     await messageInput.fill('Second message');
     await messageInput.press('Enter');
+    await expect(stopButton).toBeVisible({ timeout: 5000 });
+    await expect(inProgressIndicators.first()).toBeVisible({ timeout: 5000 });
+    await expect(stopButton).toBeHidden({ timeout: 30000 });
+    await expect(inProgressIndicators).toHaveCount(0, { timeout: 5000 });
     await expect(activeChat(window).userMessages).toHaveCount(2, { timeout: 5000 });
-
-    // Indicator should be hidden after second completes
-    isVisible = await activityIndicator.isVisible().catch(() => false);
-    expect(isVisible).toBe(false);
-
-    // Both messages should be visible
-    const messages = activeChat(window).messages;
-    const count = await messages.count();
-    expect(count).toBeGreaterThanOrEqual(2);
+    await expect(window.locator('[data-testid="agent-header-left"]')).toContainText(
+      'Awaiting response',
+      { timeout: 5000 }
+    );
   });
 });
