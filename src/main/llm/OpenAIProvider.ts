@@ -114,6 +114,10 @@ export class OpenAIProvider implements ILLMProvider {
         const webStreams = await import('stream/web');
         (globalThis as { TransformStream?: unknown }).TransformStream = webStreams.TransformStream;
       }
+      if (typeof (globalThis as { ReadableStream?: unknown }).ReadableStream === 'undefined') {
+        const webStreams = await import('stream/web');
+        (globalThis as { ReadableStream?: unknown }).ReadableStream = webStreams.ReadableStream;
+      }
 
       const { streamText, tool, jsonSchema } = await import('ai');
       const { createOpenAI } = await import('@ai-sdk/openai');
@@ -121,7 +125,7 @@ export class OpenAIProvider implements ILLMProvider {
       const sdkModel = openai.responses(options.model) as unknown as {
         specificationVersion?: string;
       };
-      if (sdkModel.specificationVersion !== 'v2') {
+      if (!sdkModel.specificationVersion || !['v2', 'v3'].includes(sdkModel.specificationVersion)) {
         return await this.chatWithLegacyTransport(apiUrl, messages, options, onChunk, controller);
       }
       const tools = this.buildToolSet(
@@ -206,7 +210,10 @@ export class OpenAIProvider implements ILLMProvider {
       ) {
         return await this.chatWithLegacyTransport(apiUrl, messages, options, onChunk, controller);
       }
-      if (isAbortLikeError(error)) {
+      if (this.shouldFallbackToLegacyTransport(error)) {
+        return await this.chatWithLegacyTransport(apiUrl, messages, options, onChunk, controller);
+      }
+      if (isAbortLikeError(error) || this.isSdkAbortLikeError(error)) {
         throw new LLMRequestAbortedError(this.mapExceptionToMessage(error), error);
       }
       throw error;
@@ -277,6 +284,34 @@ export class OpenAIProvider implements ILLMProvider {
       }),
     ]);
     return Object.fromEntries(entries);
+  }
+
+  private shouldFallbackToLegacyTransport(error: unknown): boolean {
+    if (!error || typeof error !== 'object') {
+      return false;
+    }
+    if (!('message' in error) || typeof error.message !== 'string') {
+      return false;
+    }
+
+    return error.message.includes('response.headers is not iterable');
+  }
+
+  private isSdkAbortLikeError(error: unknown): boolean {
+    if (!error || typeof error !== 'object') {
+      return false;
+    }
+
+    if ('cause' in error && isAbortLikeError(error.cause)) {
+      return true;
+    }
+
+    if ('message' in error && typeof error.message === 'string') {
+      const message = error.message.toLowerCase();
+      return message.includes('abort') || message.includes('timed out');
+    }
+
+    return false;
   }
 
   /**

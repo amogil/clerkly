@@ -98,6 +98,8 @@
   - [ ] Финально перевести все streaming/tool semantics на AI SDK primitives.
   - [ ] Убрать ручные provider-specific parser ветки, если покрываются AI SDK layer.
   - [ ] Синхронизировать версии `ai` и `@ai-sdk/*` по model-spec (v2/v3), чтобы убрать runtime fallback на legacy transport.
+    - [x] Обновлены npm-зависимости до совместимых версий (`ai@6`, `@ai-sdk/openai@3`, `@ai-sdk/anthropic@3`, `@ai-sdk/google@3`, `@ai-sdk/react@3`).
+    - [ ] Полностью убрать runtime fallback OpenAI на legacy transport после закрытия оставшихся SDK-несовместимостей тестового транспорта.
 - [ ] `src/main/llm/AnthropicProvider.ts`:
   - [x] Довести parity (`reasoning`, `text`, `tool_call`, `turn_error`, usage).
   - [x] Проверить provider options (`thinking`, `sendReasoning`, parallel tool policy).
