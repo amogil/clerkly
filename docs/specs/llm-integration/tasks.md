@@ -264,7 +264,7 @@
   - [x] порядок событий в loop и корректный persisted lifecycle `kind:tool_call` (`done=false -> done=true`).
   - [x] cancel в разных фазах loop, включая in-flight tool jobs.
   - [x] timeout = 300s и корректный mapping в доменную ошибку.
-  - [ ] stub-execution: placeholder output для `tool_call` и финализация `done=true`.
+  - [x] stub-execution: placeholder output для `tool_call` и финализация `done=true`.
 - [ ] Unit: transport/event buses
   - [x] no-drop/no-coalescing regressions для `message.llm.reasoning.updated` и `message.llm.text.updated`.
   - [x] негативный контракт: отдельное realtime-событие `message.tool_call` отсутствует; UI зависит только от persisted snapshot-событий.

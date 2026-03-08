@@ -320,6 +320,51 @@ describe('MainPipeline.run()', () => {
     expect(toolCallDoneUpdates.length).toBeGreaterThanOrEqual(2);
   });
 
+  it('uses stub-like tool result placeholder and finalizes tool_call with done=true', async () => {
+    const { pipeline, llmProvider, toolExecutor, messageManager } = makeMocks();
+
+    llmProvider.chat
+      .mockImplementationOnce(
+        async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+          onChunk({
+            type: 'tool_call',
+            callId: 'call-stub',
+            toolName: 'unknown_tool',
+            arguments: { foo: 'bar' },
+          });
+          return {};
+        }
+      )
+      .mockImplementationOnce(async () => ({ text: 'final after stub' }));
+
+    toolExecutor.executeBatch.mockResolvedValue([
+      {
+        callId: 'call-stub',
+        toolName: 'unknown_tool',
+        status: 'policy_denied',
+        output: 'Tool "unknown_tool" is not available.',
+      },
+    ]);
+
+    await pipeline.run('agent-1', 1);
+
+    expect(messageManager.update).toHaveBeenCalledWith(
+      expect.any(Number),
+      'agent-1',
+      expect.objectContaining({
+        data: expect.objectContaining({
+          callId: 'call-stub',
+          toolName: 'unknown_tool',
+          output: expect.objectContaining({
+            status: 'policy_denied',
+            content: 'Tool "unknown_tool" is not available.',
+          }),
+        }),
+      }),
+      true
+    );
+  });
+
   it('creates finalized llm message from result.text when no text chunks were emitted', async () => {
     const { pipeline, messageManager, llmProvider } = makeMocks();
 
