@@ -54,6 +54,7 @@ type AnthropicSSEEvent =
   | AnthropicContentBlockDelta
   | AnthropicMessageDelta
   | AnthropicMessageStart
+  | { type: 'error'; error?: { message?: string } }
   | { type: string };
 
 /**
@@ -289,6 +290,12 @@ export class AnthropicProvider implements ILLMProvider {
               });
               pendingToolCallsByIndex.delete(index);
             }
+          } else if (event.type === 'error') {
+            const message =
+              (event as { type: 'error'; error?: { message?: string } }).error?.message ??
+              ERROR_MESSAGES.unknown;
+            onChunk({ type: 'turn_error', errorType: 'provider', message });
+            throw new Error(message);
           }
         }
       }

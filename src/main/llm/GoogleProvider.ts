@@ -31,6 +31,9 @@ interface GeminiCandidate {
 
 interface GeminiStreamChunk {
   candidates?: GeminiCandidate[];
+  error?: {
+    message?: string;
+  };
   usageMetadata?: {
     promptTokenCount?: number;
     candidatesTokenCount?: number;
@@ -204,6 +207,11 @@ export class GoogleProvider implements ILLMProvider {
             chunk = JSON.parse(data) as GeminiStreamChunk;
           } catch {
             continue;
+          }
+
+          if (chunk.error?.message) {
+            onChunk({ type: 'turn_error', errorType: 'provider', message: chunk.error.message });
+            throw new Error(chunk.error.message);
           }
 
           if (chunk.usageMetadata) {

@@ -98,10 +98,10 @@
   - [ ] Финально перевести все streaming/tool semantics на AI SDK primitives.
   - [ ] Убрать ручные provider-specific parser ветки, если покрываются AI SDK layer.
 - [ ] `src/main/llm/AnthropicProvider.ts`:
-  - [ ] Довести parity (`reasoning`, `text`, `tool_call`, `turn_error`, usage).
+  - [x] Довести parity (`reasoning`, `text`, `tool_call`, `turn_error`, usage).
   - [ ] Проверить provider options (`thinking`, `sendReasoning`, parallel tool policy).
 - [ ] `src/main/llm/GoogleProvider.ts`:
-  - [ ] Довести parity (`reasoning`, `text`, `tool_call`, `turn_error`, usage).
+  - [x] Довести parity (`reasoning`, `text`, `tool_call`, `turn_error`, usage).
   - [ ] Проверить provider options (`thinkingConfig.includeThoughts` и связанные параметры).
 - [ ] `src/main/agents/MainPipeline.ts`:
   - [ ] Финализировать loop `model -> tools -> model` на AI SDK control (`stopWhen`/step control).
@@ -258,7 +258,7 @@
   - [x] покрыть все AI SDK error classes и доменный mapping.
   - [x] покрыть извлечение `retry-after` + fallback.
 - [ ] Unit: providers
-  - [ ] OpenAI/Anthropic/Google parity для streaming/tool/error/usage.
+  - [x] OpenAI/Anthropic/Google parity для streaming/tool/error/usage.
   - [x] >=2 tool calls в одном turn.
 - [ ] Unit: `MainPipeline`
   - [x] порядок событий в loop и корректный persisted lifecycle `kind:tool_call` (`done=false -> done=true`).

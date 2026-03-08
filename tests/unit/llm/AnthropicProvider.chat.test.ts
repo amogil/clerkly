@@ -110,6 +110,56 @@ describe('AnthropicProvider.chat()', () => {
     });
   });
 
+  it('emits multiple tool_call chunks in one turn', async () => {
+    const reader = buildMockReader([
+      sseEvent({
+        type: 'content_block_start',
+        index: 0,
+        content_block: { type: 'tool_use', id: 'tool-1', name: 'tool_a' },
+      }),
+      sseEvent({
+        type: 'content_block_delta',
+        index: 0,
+        delta: { type: 'input_json_delta', partial_json: '{"a":1}' },
+      }),
+      sseEvent({ type: 'content_block_stop', index: 0 }),
+      sseEvent({
+        type: 'content_block_start',
+        index: 1,
+        content_block: { type: 'tool_use', id: 'tool-2', name: 'tool_b' },
+      }),
+      sseEvent({
+        type: 'content_block_delta',
+        index: 1,
+        delta: { type: 'input_json_delta', partial_json: '{"b":2}' },
+      }),
+      sseEvent({ type: 'content_block_stop', index: 1 }),
+      sseEvent({ type: 'message_delta', usage: { output_tokens: 2 } }),
+      'data: [DONE]',
+    ]);
+    fetchMock.mockResolvedValue({ ok: true, body: { getReader: () => reader } });
+
+    const chunks: ChatChunk[] = [];
+    await provider.chat([{ role: 'user', content: 'hi' }], { model: 'claude-sonnet' }, (chunk) =>
+      chunks.push(chunk)
+    );
+
+    const toolCalls = chunks.filter((chunk) => chunk.type === 'tool_call');
+    expect(toolCalls).toHaveLength(2);
+    expect(toolCalls).toContainEqual({
+      type: 'tool_call',
+      callId: 'tool-1',
+      toolName: 'tool_a',
+      arguments: { a: 1 },
+    });
+    expect(toolCalls).toContainEqual({
+      type: 'tool_call',
+      callId: 'tool-2',
+      toolName: 'tool_b',
+      arguments: { b: 2 },
+    });
+  });
+
   it('maps HTTP 429 without header using provider message', async () => {
     fetchMock.mockResolvedValue({
       ok: false,
@@ -121,6 +171,30 @@ describe('AnthropicProvider.chat()', () => {
     await expect(
       provider.chat([{ role: 'user', content: 'hi' }], { model: 'claude-sonnet' }, () => {})
     ).rejects.toThrow('Please try again in 5.1s');
+  });
+
+  it('emits turn_error chunk when anthropic stream sends error event', async () => {
+    const reader = buildMockReader([
+      sseEvent({
+        type: 'error',
+        error: { message: 'anthropic stream failed' },
+      }),
+      'data: [DONE]',
+    ]);
+    fetchMock.mockResolvedValue({ ok: true, body: { getReader: () => reader } });
+
+    const chunks: ChatChunk[] = [];
+    await expect(
+      provider.chat([{ role: 'user', content: 'hi' }], { model: 'claude-sonnet' }, (chunk) =>
+        chunks.push(chunk)
+      )
+    ).rejects.toThrow('anthropic stream failed');
+
+    expect(chunks).toContainEqual({
+      type: 'turn_error',
+      errorType: 'provider',
+      message: 'anthropic stream failed',
+    });
   });
 
   it('wraps abort-like errors into LLMRequestAbortedError', async () => {

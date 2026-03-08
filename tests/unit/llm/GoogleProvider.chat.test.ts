@@ -111,6 +111,50 @@ describe('GoogleProvider.chat()', () => {
     });
   });
 
+  it('emits multiple tool_call chunks in one turn', async () => {
+    const reader = buildMockReader([
+      sseEvent({
+        candidates: [
+          {
+            content: {
+              parts: [
+                { functionCall: { name: 'tool_a', args: { a: 1 } } },
+                { functionCall: { name: 'tool_b', args: { b: 2 } } },
+              ],
+            },
+          },
+        ],
+        usageMetadata: {
+          promptTokenCount: 1,
+          candidatesTokenCount: 2,
+          totalTokenCount: 3,
+        },
+      }),
+      'data: [DONE]',
+    ]);
+    fetchMock.mockResolvedValue({ ok: true, body: { getReader: () => reader } });
+
+    const chunks: ChatChunk[] = [];
+    await provider.chat([{ role: 'user', content: 'hi' }], { model: 'gemini-2.5-pro' }, (chunk) =>
+      chunks.push(chunk)
+    );
+
+    const toolCalls = chunks.filter((chunk) => chunk.type === 'tool_call');
+    expect(toolCalls).toHaveLength(2);
+    expect(toolCalls).toContainEqual({
+      type: 'tool_call',
+      callId: '',
+      toolName: 'tool_a',
+      arguments: { a: 1 },
+    });
+    expect(toolCalls).toContainEqual({
+      type: 'tool_call',
+      callId: '',
+      toolName: 'tool_b',
+      arguments: { b: 2 },
+    });
+  });
+
   it('maps HTTP 429 without header using provider message', async () => {
     fetchMock.mockResolvedValue({
       ok: false,
@@ -122,6 +166,29 @@ describe('GoogleProvider.chat()', () => {
     await expect(
       provider.chat([{ role: 'user', content: 'hi' }], { model: 'gemini-2.5-pro' }, () => {})
     ).rejects.toThrow('Try again in a moment');
+  });
+
+  it('emits turn_error chunk when google stream contains error payload', async () => {
+    const reader = buildMockReader([
+      sseEvent({
+        error: { message: 'google stream failed' },
+      }),
+      'data: [DONE]',
+    ]);
+    fetchMock.mockResolvedValue({ ok: true, body: { getReader: () => reader } });
+
+    const chunks: ChatChunk[] = [];
+    await expect(
+      provider.chat([{ role: 'user', content: 'hi' }], { model: 'gemini-2.5-pro' }, (chunk) =>
+        chunks.push(chunk)
+      )
+    ).rejects.toThrow('google stream failed');
+
+    expect(chunks).toContainEqual({
+      type: 'turn_error',
+      errorType: 'provider',
+      message: 'google stream failed',
+    });
   });
 
   it('wraps abort-like errors into LLMRequestAbortedError', async () => {
