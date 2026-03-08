@@ -6,6 +6,7 @@
 // Unit tests for useAgentChat hook
 
 import { renderHook, act, waitFor } from '@testing-library/react';
+import { Chat } from '@ai-sdk/react';
 import { EVENT_TYPES } from '../../../src/shared/events/constants';
 import type { MessageSnapshot } from '../../../src/shared/events/types';
 
@@ -145,6 +146,22 @@ describe('useAgentChat hook', () => {
 
       expect(mockList).not.toHaveBeenCalled();
       expect(result.current.rawMessages).toEqual([]);
+    });
+
+    /* Preconditions: agentId provided
+       Action: Hook mounts
+       Assertions: Chat lifecycle hooks onFinish/onError are configured
+       Requirements: llm-integration.2.8 */
+    it('should configure useChat lifecycle hooks in Chat instance', async () => {
+      renderHook(() => useAgentChat('agent-1'));
+
+      await waitFor(() => expect(mockList).toHaveBeenCalledWith('agent-1'));
+
+      const firstCall = (Chat as unknown as jest.Mock).mock.calls[0]?.[0] as
+        | { onFinish?: unknown; onError?: unknown }
+        | undefined;
+      expect(typeof firstCall?.onFinish).toBe('function');
+      expect(typeof firstCall?.onError).toBe('function');
     });
 
     /* Preconditions: agentId provided, API returns success:false

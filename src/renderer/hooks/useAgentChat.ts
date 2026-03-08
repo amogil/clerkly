@@ -60,6 +60,19 @@ export function useAgentChat(agentId: string | null): UseAgentChatResult {
   const [rawMessages, setRawMessages] = useState<MessageSnapshot[]>([]);
   const [isLoading, setIsLoading] = useState(() => Boolean(agentId));
 
+  const syncPersistedMessages = useCallback(async () => {
+    if (!agentId) {
+      setRawMessages([]);
+      return;
+    }
+
+    const result = await window.api.messages.list(agentId);
+    if (result.success && result.data) {
+      const snapshots = result.data as MessageSnapshot[];
+      setRawMessages(snapshots);
+    }
+  }, [agentId]);
+
   // ── Chat instance (stable per agentId) ────────────────────────────────
   // Requirements: agents.13.1 — transport bound to agentId
   const chat = useMemo(() => {
@@ -68,8 +81,15 @@ export function useAgentChat(agentId: string | null): UseAgentChatResult {
       id: agentId,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       transport: new IPCChatTransport(agentId) as any,
+      onFinish: () => {
+        // Align useChat lifecycle with persisted message snapshots.
+        void syncPersistedMessages();
+      },
+      onError: () => {
+        void syncPersistedMessages();
+      },
     });
-  }, [agentId]);
+  }, [agentId, syncPersistedMessages]);
 
   // ── useChat ────────────────────────────────────────────────────────────
   const {

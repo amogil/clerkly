@@ -190,4 +190,22 @@ describe('AnthropicProvider', () => {
       })
     );
   });
+
+  /* Preconditions: testConnection is called
+     Action: call testConnection()
+     Assertions: AbortSignal.timeout called with 10000ms timeout
+     Requirements: settings.3.6 */
+  it('should use 10 second timeout for testConnection', async () => {
+    const timeoutSignal = new AbortController().signal;
+    const timeoutSpy = jest.spyOn(AbortSignal, 'timeout').mockReturnValue(timeoutSignal);
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+    });
+
+    await provider.testConnection('test-key');
+
+    expect(timeoutSpy).toHaveBeenCalledWith(10000);
+    timeoutSpy.mockRestore();
+  });
 });

@@ -1,185 +1,110 @@
 // Requirements: llm-integration.5
 
+import * as aiModule from 'ai';
+import * as anthropicSdkModule from '@ai-sdk/anthropic';
 import { AnthropicProvider } from '../../../src/main/llm/AnthropicProvider';
-import type { ChatChunk } from '../../../src/main/llm/ILLMProvider';
+import type { ChatMessage, ChatOptions, ChatChunk } from '../../../src/main/llm/ILLMProvider';
+import { LLMRequestAbortedError } from '../../../src/main/llm/LLMErrors';
 import { CHAT_TIMEOUT_MS } from '../../../src/main/llm/LLMConfig';
 
-function buildMockReader(lines: string[]) {
-  const chunks = lines.map((line) => Buffer.from(`${line}\n`));
-  let index = 0;
+jest.mock('ai', () => ({
+  streamText: jest.fn(),
+  tool: jest.fn((definition) => ({ ...definition })),
+  jsonSchema: jest.fn((schema) => schema),
+}));
+
+jest.mock('@ai-sdk/anthropic', () => ({
+  createAnthropic: jest.fn(),
+}));
+
+const mockMessages: ChatMessage[] = [{ role: 'user', content: 'Hello' }];
+const mockOptions: ChatOptions = { model: 'claude-sonnet-4-5-20250929' };
+
+function toAsyncIterable<T>(items: T[]): AsyncIterable<T> {
   return {
-    read: jest.fn(async () => {
-      if (index < chunks.length) {
-        return { done: false, value: chunks[index++] };
+    async *[Symbol.asyncIterator]() {
+      for (const item of items) {
+        yield item;
       }
-      return { done: true, value: undefined };
-    }),
-    releaseLock: jest.fn(),
+    },
   };
 }
 
-function sseEvent(event: Record<string, unknown>): string {
-  return `data: ${JSON.stringify(event)}`;
+function mockSdkResult(parts: unknown[], usage: Record<string, number> = {}) {
+  (aiModule.streamText as unknown as jest.Mock).mockReturnValue({
+    fullStream: toAsyncIterable(parts),
+    totalUsage: Promise.resolve(usage),
+  });
 }
 
 describe('AnthropicProvider.chat()', () => {
   let provider: AnthropicProvider;
-  let fetchMock: jest.Mock;
+  let messagesMock: jest.Mock;
 
   beforeEach(() => {
-    provider = new AnthropicProvider('test-key');
-    fetchMock = jest.fn();
-    global.fetch = fetchMock;
+    provider = new AnthropicProvider('test-api-key');
+    messagesMock = jest.fn().mockReturnValue({ specificationVersion: 'v3' });
+    (anthropicSdkModule.createAnthropic as unknown as jest.Mock).mockReturnValue({
+      messages: messagesMock,
+    });
+    (aiModule.streamText as unknown as jest.Mock).mockReset();
+    (aiModule.tool as unknown as jest.Mock).mockClear();
+    (aiModule.jsonSchema as unknown as jest.Mock).mockClear();
   });
 
-  it('maps thinking/text deltas to reasoning/text chunks and returns final text', async () => {
-    const reader = buildMockReader([
-      sseEvent({
-        type: 'message_start',
-        message: { usage: { input_tokens: 12, output_tokens: 0 } },
-      }),
-      sseEvent({
-        type: 'content_block_delta',
-        index: 0,
-        delta: { type: 'thinking_delta', thinking: 'Think' },
-      }),
-      sseEvent({
-        type: 'content_block_delta',
-        index: 1,
-        delta: { type: 'text_delta', text: 'Anthropic answer' },
-      }),
-      sseEvent({ type: 'message_delta', usage: { output_tokens: 8 } }),
-      'data: [DONE]',
-    ]);
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
-    fetchMock.mockResolvedValue({ ok: true, body: { getReader: () => reader } });
+  it('streams reasoning/text chunks and returns usage envelope', async () => {
+    mockSdkResult(
+      [
+        { type: 'reasoning-delta', text: 'Think ' },
+        { type: 'text-delta', text: 'Anthropic' },
+        { type: 'text-delta', text: ' answer' },
+      ],
+      {
+        inputTokens: 12,
+        outputTokens: 8,
+        totalTokens: 20,
+      }
+    );
 
     const chunks: ChatChunk[] = [];
-    const result = await provider.chat(
-      [{ role: 'user', content: 'hi' }],
-      { model: 'claude-sonnet-4-5-20250929' },
-      (chunk) => chunks.push(chunk)
-    );
+    const result = await provider.chat(mockMessages, mockOptions, (chunk) => chunks.push(chunk));
 
     expect(result.text).toBe('Anthropic answer');
-    expect(chunks).toContainEqual({ type: 'reasoning', delta: 'Think' });
     expect(result.usage?.canonical.total_tokens).toBe(20);
+    expect(chunks).toContainEqual({ type: 'reasoning', delta: 'Think ' });
+    expect(chunks).toContainEqual({ type: 'text', delta: 'Anthropic' });
+    expect(chunks).toContainEqual({ type: 'text', delta: ' answer' });
   });
 
-  it('maps HTTP 429 with retry-after header', async () => {
-    fetchMock.mockResolvedValue({
-      ok: false,
-      status: 429,
-      headers: { get: (name: string) => (name.toLowerCase() === 'retry-after' ? '6' : null) },
-      json: async () => ({ error: { message: 'rate limited' } }),
-    });
-
-    await expect(
-      provider.chat([{ role: 'user', content: 'hi' }], { model: 'claude-sonnet' }, () => {})
-    ).rejects.toThrow('Rate limit exceeded. Please try again in 6s');
-  });
-
-  it('emits tool_call when tool_use block is streamed', async () => {
-    const reader = buildMockReader([
-      sseEvent({
-        type: 'content_block_start',
-        index: 0,
-        content_block: { type: 'tool_use', id: 'tool-1', name: 'search_docs' },
-      }),
-      sseEvent({
-        type: 'content_block_delta',
-        index: 0,
-        delta: { type: 'input_json_delta', partial_json: '{"query":"ai sdk"}' },
-      }),
-      sseEvent({ type: 'content_block_stop', index: 0 }),
-      sseEvent({ type: 'message_delta', usage: { output_tokens: 1 } }),
-      'data: [DONE]',
+  it('emits tool_call chunks for multiple calls in one turn', async () => {
+    mockSdkResult([
+      { type: 'tool-call', toolCallId: 'tool-1', toolName: 'tool_a', input: { a: 1 } },
+      { type: 'tool-call', toolCallId: 'tool-2', toolName: 'tool_b', input: { b: 2 } },
+      { type: 'text-delta', text: 'ok' },
     ]);
-    fetchMock.mockResolvedValue({ ok: true, body: { getReader: () => reader } });
 
     const chunks: ChatChunk[] = [];
-    await provider.chat([{ role: 'user', content: 'hi' }], { model: 'claude-sonnet' }, (chunk) =>
-      chunks.push(chunk)
-    );
-
-    expect(chunks).toContainEqual({
-      type: 'tool_call',
-      callId: 'tool-1',
-      toolName: 'search_docs',
-      arguments: { query: 'ai sdk' },
-    });
-  });
-
-  it('emits multiple tool_call chunks in one turn', async () => {
-    const reader = buildMockReader([
-      sseEvent({
-        type: 'content_block_start',
-        index: 0,
-        content_block: { type: 'tool_use', id: 'tool-1', name: 'tool_a' },
-      }),
-      sseEvent({
-        type: 'content_block_delta',
-        index: 0,
-        delta: { type: 'input_json_delta', partial_json: '{"a":1}' },
-      }),
-      sseEvent({ type: 'content_block_stop', index: 0 }),
-      sseEvent({
-        type: 'content_block_start',
-        index: 1,
-        content_block: { type: 'tool_use', id: 'tool-2', name: 'tool_b' },
-      }),
-      sseEvent({
-        type: 'content_block_delta',
-        index: 1,
-        delta: { type: 'input_json_delta', partial_json: '{"b":2}' },
-      }),
-      sseEvent({ type: 'content_block_stop', index: 1 }),
-      sseEvent({ type: 'message_delta', usage: { output_tokens: 2 } }),
-      'data: [DONE]',
-    ]);
-    fetchMock.mockResolvedValue({ ok: true, body: { getReader: () => reader } });
-
-    const chunks: ChatChunk[] = [];
-    await provider.chat([{ role: 'user', content: 'hi' }], { model: 'claude-sonnet' }, (chunk) =>
-      chunks.push(chunk)
-    );
+    await provider.chat(mockMessages, mockOptions, (chunk) => chunks.push(chunk));
 
     const toolCalls = chunks.filter((chunk) => chunk.type === 'tool_call');
-    expect(toolCalls).toHaveLength(2);
-    expect(toolCalls).toContainEqual({
-      type: 'tool_call',
-      callId: 'tool-1',
-      toolName: 'tool_a',
-      arguments: { a: 1 },
-    });
-    expect(toolCalls).toContainEqual({
-      type: 'tool_call',
-      callId: 'tool-2',
-      toolName: 'tool_b',
-      arguments: { b: 2 },
-    });
+    expect(toolCalls).toEqual([
+      { type: 'tool_call', callId: 'tool-1', toolName: 'tool_a', arguments: { a: 1 } },
+      { type: 'tool_call', callId: 'tool-2', toolName: 'tool_b', arguments: { b: 2 } },
+    ]);
   });
 
-  it('sends tools with auto parallel policy when tools are provided', async () => {
-    const reader = buildMockReader([
-      sseEvent({
-        type: 'message_start',
-        message: { usage: { input_tokens: 1, output_tokens: 0 } },
-      }),
-      sseEvent({
-        type: 'content_block_delta',
-        index: 0,
-        delta: { type: 'text_delta', text: 'ok' },
-      }),
-      sseEvent({ type: 'message_delta', usage: { output_tokens: 1 } }),
-      'data: [DONE]',
-    ]);
-    fetchMock.mockResolvedValue({ ok: true, body: { getReader: () => reader } });
+  it('passes tools and anthropic provider options to streamText', async () => {
+    mockSdkResult([{ type: 'text-delta', text: 'ok' }]);
 
     await provider.chat(
-      [{ role: 'user', content: 'hi' }],
+      mockMessages,
       {
-        model: 'claude-sonnet',
+        model: 'claude-sonnet-4-5-20250929',
+        reasoningEffort: 'high',
         tools: [
           {
             name: 'search_docs',
@@ -191,79 +116,48 @@ describe('AnthropicProvider.chat()', () => {
       () => {}
     );
 
-    const body = JSON.parse(
-      String((fetchMock.mock.calls[0] as [string, RequestInit])[1].body)
-    ) as Record<string, unknown>;
-
-    expect(body.tools).toEqual([
-      {
-        name: 'search_docs',
-        description: 'Search docs',
-        input_schema: { type: 'object', properties: { query: { type: 'string' } } },
+    const streamArgs = (aiModule.streamText as unknown as jest.Mock).mock.calls[0][0];
+    expect(streamArgs.providerOptions.anthropic).toEqual({
+      thinking: {
+        type: 'enabled',
+        budgetTokens: 16000,
       },
-    ]);
-    expect(body.tool_choice).toEqual({ type: 'auto', disable_parallel_tool_use: false });
+      disableParallelToolUse: false,
+    });
+    expect(streamArgs.tools).toHaveProperty('search_docs');
+    expect(aiModule.jsonSchema).toHaveBeenCalledWith({
+      type: 'object',
+      properties: { query: { type: 'string' } },
+    });
+    expect(aiModule.tool).toHaveBeenCalled();
+    expect(messagesMock).toHaveBeenCalledWith('claude-sonnet-4-5-20250929');
   });
 
-  it('does not send tools/tool_choice when tools list is empty', async () => {
-    const reader = buildMockReader([
-      sseEvent({
-        type: 'message_start',
-        message: { usage: { input_tokens: 1, output_tokens: 0 } },
-      }),
-      sseEvent({
-        type: 'content_block_delta',
-        index: 0,
-        delta: { type: 'text_delta', text: 'ok' },
-      }),
-      sseEvent({ type: 'message_delta', usage: { output_tokens: 1 } }),
-      'data: [DONE]',
-    ]);
-    fetchMock.mockResolvedValue({ ok: true, body: { getReader: () => reader } });
+  it('does not build tool definitions when tools list is empty', async () => {
+    mockSdkResult([{ type: 'text-delta', text: 'ok' }]);
 
     await provider.chat(
-      [{ role: 'user', content: 'hi' }],
-      { model: 'claude-sonnet', tools: [] },
+      mockMessages,
+      {
+        model: 'claude-sonnet-4-5-20250929',
+        tools: [],
+      },
       () => {}
     );
 
-    const body = JSON.parse(
-      String((fetchMock.mock.calls[0] as [string, RequestInit])[1].body)
-    ) as Record<string, unknown>;
-    expect(body.tools).toBeUndefined();
-    expect(body.tool_choice).toBeUndefined();
+    const streamArgs = (aiModule.streamText as unknown as jest.Mock).mock.calls[0][0];
+    expect(streamArgs.tools).toBeUndefined();
+    expect(aiModule.tool).not.toHaveBeenCalled();
+    expect(aiModule.jsonSchema).not.toHaveBeenCalled();
   });
 
-  it('maps HTTP 429 without header using provider message', async () => {
-    fetchMock.mockResolvedValue({
-      ok: false,
-      status: 429,
-      headers: { get: () => null },
-      json: async () => ({ error: { message: 'Please try again in 5.1s' } }),
-    });
-
-    await expect(
-      provider.chat([{ role: 'user', content: 'hi' }], { model: 'claude-sonnet' }, () => {})
-    ).rejects.toThrow('Please try again in 5.1s');
-  });
-
-  it('emits turn_error chunk when anthropic stream sends error event', async () => {
-    const reader = buildMockReader([
-      sseEvent({
-        type: 'error',
-        error: { message: 'anthropic stream failed' },
-      }),
-      'data: [DONE]',
-    ]);
-    fetchMock.mockResolvedValue({ ok: true, body: { getReader: () => reader } });
+  it('emits turn_error and throws when SDK stream yields error part', async () => {
+    mockSdkResult([{ type: 'error', error: new Error('anthropic stream failed') }]);
 
     const chunks: ChatChunk[] = [];
     await expect(
-      provider.chat([{ role: 'user', content: 'hi' }], { model: 'claude-sonnet' }, (chunk) =>
-        chunks.push(chunk)
-      )
+      provider.chat(mockMessages, mockOptions, (chunk) => chunks.push(chunk))
     ).rejects.toThrow('anthropic stream failed');
-
     expect(chunks).toContainEqual({
       type: 'turn_error',
       errorType: 'provider',
@@ -271,36 +165,23 @@ describe('AnthropicProvider.chat()', () => {
     });
   });
 
-  it('wraps abort-like errors into LLMRequestAbortedError', async () => {
+  it('throws LLMRequestAbortedError when SDK throws abort-like error', async () => {
     const abortError = new Error('aborted');
     (abortError as Error & { name: string }).name = 'AbortError';
-    fetchMock.mockRejectedValue(abortError);
+    (aiModule.streamText as unknown as jest.Mock).mockImplementation(() => {
+      throw abortError;
+    });
 
-    await expect(
-      provider.chat([{ role: 'user', content: 'hi' }], { model: 'claude-sonnet' }, () => {})
-    ).rejects.toThrow(
-      'Model response timeout. The provider took too long to respond. Please try again later.'
+    await expect(provider.chat(mockMessages, mockOptions, () => {})).rejects.toBeInstanceOf(
+      LLMRequestAbortedError
     );
   });
 
   it('uses CHAT_TIMEOUT_MS for abort controller timer', async () => {
     const setTimeoutSpy = jest.spyOn(global, 'setTimeout');
-    const reader = buildMockReader([
-      sseEvent({
-        type: 'message_start',
-        message: { usage: { input_tokens: 1, output_tokens: 0 } },
-      }),
-      sseEvent({
-        type: 'content_block_delta',
-        index: 0,
-        delta: { type: 'text_delta', text: 'ok' },
-      }),
-      sseEvent({ type: 'message_delta', usage: { output_tokens: 1 } }),
-      'data: [DONE]',
-    ]);
-    fetchMock.mockResolvedValue({ ok: true, body: { getReader: () => reader } });
+    mockSdkResult([{ type: 'text-delta', text: 'ok' }]);
 
-    await provider.chat([{ role: 'user', content: 'hi' }], { model: 'claude-sonnet' }, () => {});
+    await provider.chat(mockMessages, mockOptions, () => {});
 
     expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), CHAT_TIMEOUT_MS);
     setTimeoutSpy.mockRestore();

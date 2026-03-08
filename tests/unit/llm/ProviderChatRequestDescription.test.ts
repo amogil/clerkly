@@ -15,22 +15,22 @@ jest.mock('@ai-sdk/openai', () => ({
   createOpenAI: jest.fn(),
 }));
 
-function buildMockReader(lines: string[]) {
-  const chunks = lines.map((line) => Buffer.from(`${line}\n`));
-  let index = 0;
-  return {
-    read: jest.fn(async () => {
-      if (index < chunks.length) {
-        return { done: false, value: chunks[index++] };
-      }
-      return { done: true, value: undefined };
-    }),
-    releaseLock: jest.fn(),
-  };
-}
+jest.mock('@ai-sdk/anthropic', () => ({
+  createAnthropic: jest.fn(),
+}));
 
-function sseEvent(event: Record<string, unknown>): string {
-  return `data: ${JSON.stringify(event)}`;
+jest.mock('@ai-sdk/google', () => ({
+  createGoogleGenerativeAI: jest.fn(),
+}));
+
+function mockStreamTextWithSingleDelta() {
+  const streamTextMock = jest.requireMock('ai').streamText as jest.Mock;
+  streamTextMock.mockReturnValue({
+    fullStream: (async function* () {
+      yield { type: 'text-delta', text: 'ok' };
+    })(),
+    totalUsage: Promise.resolve({}),
+  });
 }
 
 const messages: ChatMessage[] = [
@@ -49,12 +49,7 @@ describe('Provider chat request formats', () => {
     const createOpenAIMock = jest.requireMock('@ai-sdk/openai').createOpenAI as jest.Mock;
     const responsesMock = jest.fn().mockReturnValue({ specificationVersion: 'v3' });
     createOpenAIMock.mockReturnValue({ responses: responsesMock });
-    streamTextMock.mockReturnValue({
-      fullStream: (async function* () {
-        yield { type: 'text-delta', text: 'ok' };
-      })(),
-      totalUsage: Promise.resolve({}),
-    });
+    mockStreamTextWithSingleDelta();
 
     await provider.chat(messages, { model: 'gpt-5-nano' }, () => undefined);
 
@@ -65,63 +60,32 @@ describe('Provider chat request formats', () => {
 
   it('Anthropic request does not enforce output_config json_schema in chat flow', async () => {
     const provider = new AnthropicProvider('test-key');
-    const fetchMock = jest.fn();
-    global.fetch = fetchMock as unknown as typeof fetch;
-
-    const reader = buildMockReader([
-      sseEvent({
-        type: 'message_start',
-        message: { usage: { input_tokens: 1, output_tokens: 0 } },
-      }),
-      sseEvent({
-        type: 'content_block_delta',
-        delta: {
-          type: 'text_delta',
-          text: 'ok',
-        },
-      }),
-      sseEvent({ type: 'message_delta', usage: { output_tokens: 1 } }),
-    ]);
-
-    fetchMock.mockResolvedValue({ ok: true, body: { getReader: () => reader } });
+    const streamTextMock = jest.requireMock('ai').streamText as jest.Mock;
+    const createAnthropicMock = jest.requireMock('@ai-sdk/anthropic').createAnthropic as jest.Mock;
+    const messagesModelMock = jest.fn().mockReturnValue({ specificationVersion: 'v3' });
+    createAnthropicMock.mockReturnValue({ messages: messagesModelMock });
+    mockStreamTextWithSingleDelta();
 
     await provider.chat(messages, { model: 'claude-3-7-sonnet-latest' }, () => undefined);
 
-    const body = JSON.parse(String((fetchMock.mock.calls[0]?.[1] as RequestInit).body)) as Record<
-      string,
-      unknown
-    >;
-
-    expect(body).not.toHaveProperty('output_config');
+    const streamArgs = streamTextMock.mock.calls[0][0] as Record<string, unknown>;
+    expect(streamArgs).not.toHaveProperty('output_config');
   });
 
   it('Google request does not enforce responseSchema in chat flow', async () => {
     const provider = new GoogleProvider('test-key');
-    const fetchMock = jest.fn();
-    global.fetch = fetchMock as unknown as typeof fetch;
-
-    const reader = buildMockReader([
-      sseEvent({
-        candidates: [
-          {
-            content: {
-              parts: [{ text: 'ok' }],
-            },
-          },
-        ],
-        usageMetadata: { promptTokenCount: 1, candidatesTokenCount: 1, totalTokenCount: 2 },
-      }),
-    ]);
-
-    fetchMock.mockResolvedValue({ ok: true, body: { getReader: () => reader } });
+    const streamTextMock = jest.requireMock('ai').streamText as jest.Mock;
+    const createGoogleMock = jest.requireMock('@ai-sdk/google')
+      .createGoogleGenerativeAI as jest.Mock;
+    const chatModelMock = jest.fn().mockReturnValue({ specificationVersion: 'v3' });
+    createGoogleMock.mockReturnValue({ chat: chatModelMock });
+    mockStreamTextWithSingleDelta();
 
     await provider.chat(messages, { model: 'gemini-2.5-flash' }, () => undefined);
 
-    const body = JSON.parse(String((fetchMock.mock.calls[0]?.[1] as RequestInit).body)) as Record<
-      string,
-      unknown
-    >;
-
-    expect((body.generationConfig as Record<string, unknown>).responseSchema).toBeUndefined();
+    const streamArgs = streamTextMock.mock.calls[0][0] as Record<string, unknown>;
+    const generationConfig = (streamArgs as { generationConfig?: Record<string, unknown> })
+      .generationConfig;
+    expect(generationConfig?.responseSchema).toBeUndefined();
   });
 });

@@ -1,199 +1,110 @@
 // Requirements: llm-integration.5
 
+import * as aiModule from 'ai';
+import * as googleSdkModule from '@ai-sdk/google';
 import { GoogleProvider } from '../../../src/main/llm/GoogleProvider';
-import type { ChatChunk } from '../../../src/main/llm/ILLMProvider';
+import type { ChatMessage, ChatOptions, ChatChunk } from '../../../src/main/llm/ILLMProvider';
+import { LLMRequestAbortedError } from '../../../src/main/llm/LLMErrors';
 import { CHAT_TIMEOUT_MS } from '../../../src/main/llm/LLMConfig';
 
-function buildMockReader(lines: string[]) {
-  const chunks = lines.map((line) => Buffer.from(`${line}\n`));
-  let index = 0;
+jest.mock('ai', () => ({
+  streamText: jest.fn(),
+  tool: jest.fn((definition) => ({ ...definition })),
+  jsonSchema: jest.fn((schema) => schema),
+}));
+
+jest.mock('@ai-sdk/google', () => ({
+  createGoogleGenerativeAI: jest.fn(),
+}));
+
+const mockMessages: ChatMessage[] = [{ role: 'user', content: 'Hello' }];
+const mockOptions: ChatOptions = { model: 'gemini-2.5-pro' };
+
+function toAsyncIterable<T>(items: T[]): AsyncIterable<T> {
   return {
-    read: jest.fn(async () => {
-      if (index < chunks.length) {
-        return { done: false, value: chunks[index++] };
+    async *[Symbol.asyncIterator]() {
+      for (const item of items) {
+        yield item;
       }
-      return { done: true, value: undefined };
-    }),
-    releaseLock: jest.fn(),
+    },
   };
 }
 
-function sseEvent(event: Record<string, unknown>): string {
-  return `data: ${JSON.stringify(event)}`;
+function mockSdkResult(parts: unknown[], usage: Record<string, number> = {}) {
+  (aiModule.streamText as unknown as jest.Mock).mockReturnValue({
+    fullStream: toAsyncIterable(parts),
+    totalUsage: Promise.resolve(usage),
+  });
 }
 
 describe('GoogleProvider.chat()', () => {
   let provider: GoogleProvider;
-  let fetchMock: jest.Mock;
+  let chatMock: jest.Mock;
 
   beforeEach(() => {
-    provider = new GoogleProvider('test-key');
-    fetchMock = jest.fn();
-    global.fetch = fetchMock;
+    provider = new GoogleProvider('test-api-key');
+    chatMock = jest.fn().mockReturnValue({ specificationVersion: 'v3' });
+    (googleSdkModule.createGoogleGenerativeAI as unknown as jest.Mock).mockReturnValue({
+      chat: chatMock,
+    });
+    (aiModule.streamText as unknown as jest.Mock).mockReset();
+    (aiModule.tool as unknown as jest.Mock).mockClear();
+    (aiModule.jsonSchema as unknown as jest.Mock).mockClear();
   });
 
-  it('maps thought/text parts to reasoning/text chunks and returns final text', async () => {
-    const reader = buildMockReader([
-      sseEvent({
-        candidates: [
-          {
-            content: {
-              parts: [{ text: 'Let me think', thought: true }, { text: 'Gemini answer' }],
-            },
-          },
-        ],
-        usageMetadata: {
-          promptTokenCount: 3,
-          candidatesTokenCount: 7,
-          totalTokenCount: 10,
-        },
-      }),
-      'data: [DONE]',
-    ]);
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
-    fetchMock.mockResolvedValue({ ok: true, body: { getReader: () => reader } });
+  it('streams reasoning/text chunks and returns usage envelope', async () => {
+    mockSdkResult(
+      [
+        { type: 'reasoning-delta', text: 'Let me think' },
+        { type: 'text-delta', text: 'Gemini' },
+        { type: 'text-delta', text: ' answer' },
+      ],
+      {
+        inputTokens: 3,
+        outputTokens: 7,
+        totalTokens: 10,
+      }
+    );
 
     const chunks: ChatChunk[] = [];
-    const result = await provider.chat(
-      [{ role: 'user', content: 'hi' }],
-      { model: 'gemini-2.5-pro' },
-      (chunk) => chunks.push(chunk)
-    );
+    const result = await provider.chat(mockMessages, mockOptions, (chunk) => chunks.push(chunk));
 
     expect(result.text).toBe('Gemini answer');
-    expect(chunks).toContainEqual({ type: 'reasoning', delta: 'Let me think' });
     expect(result.usage?.canonical.total_tokens).toBe(10);
+    expect(chunks).toContainEqual({ type: 'reasoning', delta: 'Let me think' });
+    expect(chunks).toContainEqual({ type: 'text', delta: 'Gemini' });
+    expect(chunks).toContainEqual({ type: 'text', delta: ' answer' });
   });
 
-  it('maps HTTP 429 with retry-after header', async () => {
-    fetchMock.mockResolvedValue({
-      ok: false,
-      status: 429,
-      headers: { get: (name: string) => (name.toLowerCase() === 'retry-after' ? '4' : null) },
-      json: async () => ({ error: { message: 'rate limited' } }),
-    });
-
-    await expect(
-      provider.chat([{ role: 'user', content: 'hi' }], { model: 'gemini-2.5-pro' }, () => {})
-    ).rejects.toThrow('Rate limit exceeded. Please try again in 4s');
-  });
-
-  it('emits tool_call when functionCall part is streamed', async () => {
-    const reader = buildMockReader([
-      sseEvent({
-        candidates: [
-          {
-            content: {
-              parts: [{ functionCall: { name: 'search_docs', args: { query: 'streaming' } } }],
-            },
-          },
-        ],
-        usageMetadata: {
-          promptTokenCount: 1,
-          candidatesTokenCount: 1,
-          totalTokenCount: 2,
-        },
-      }),
-      'data: [DONE]',
+  it('emits tool_call chunks for multiple calls in one turn', async () => {
+    mockSdkResult([
+      { type: 'tool-call', toolCallId: 'tool-1', toolName: 'tool_a', input: { a: 1 } },
+      { type: 'tool-call', toolCallId: 'tool-2', toolName: 'tool_b', input: { b: 2 } },
+      { type: 'text-delta', text: 'ok' },
     ]);
-    fetchMock.mockResolvedValue({ ok: true, body: { getReader: () => reader } });
 
     const chunks: ChatChunk[] = [];
-    await provider.chat([{ role: 'user', content: 'hi' }], { model: 'gemini-2.5-pro' }, (chunk) =>
-      chunks.push(chunk)
-    );
-
-    expect(chunks).toContainEqual({
-      type: 'tool_call',
-      callId: '',
-      toolName: 'search_docs',
-      arguments: { query: 'streaming' },
-    });
-  });
-
-  it('emits multiple tool_call chunks in one turn', async () => {
-    const reader = buildMockReader([
-      sseEvent({
-        candidates: [
-          {
-            content: {
-              parts: [
-                { functionCall: { name: 'tool_a', args: { a: 1 } } },
-                { functionCall: { name: 'tool_b', args: { b: 2 } } },
-              ],
-            },
-          },
-        ],
-        usageMetadata: {
-          promptTokenCount: 1,
-          candidatesTokenCount: 2,
-          totalTokenCount: 3,
-        },
-      }),
-      'data: [DONE]',
-    ]);
-    fetchMock.mockResolvedValue({ ok: true, body: { getReader: () => reader } });
-
-    const chunks: ChatChunk[] = [];
-    await provider.chat([{ role: 'user', content: 'hi' }], { model: 'gemini-2.5-pro' }, (chunk) =>
-      chunks.push(chunk)
-    );
+    await provider.chat(mockMessages, mockOptions, (chunk) => chunks.push(chunk));
 
     const toolCalls = chunks.filter((chunk) => chunk.type === 'tool_call');
-    expect(toolCalls).toHaveLength(2);
-    expect(toolCalls).toContainEqual({
-      type: 'tool_call',
-      callId: '',
-      toolName: 'tool_a',
-      arguments: { a: 1 },
-    });
-    expect(toolCalls).toContainEqual({
-      type: 'tool_call',
-      callId: '',
-      toolName: 'tool_b',
-      arguments: { b: 2 },
-    });
+    expect(toolCalls).toEqual([
+      { type: 'tool_call', callId: 'tool-1', toolName: 'tool_a', arguments: { a: 1 } },
+      { type: 'tool_call', callId: 'tool-2', toolName: 'tool_b', arguments: { b: 2 } },
+    ]);
   });
 
-  it('sends thinkingConfig.includeThoughts when reasoning is requested', async () => {
-    const reader = buildMockReader([
-      sseEvent({
-        candidates: [{ content: { parts: [{ text: 'ok' }] } }],
-        usageMetadata: { promptTokenCount: 1, candidatesTokenCount: 1, totalTokenCount: 2 },
-      }),
-      'data: [DONE]',
-    ]);
-    fetchMock.mockResolvedValue({ ok: true, body: { getReader: () => reader } });
+  it('passes thinkingConfig and validated function-calling policy to streamText', async () => {
+    mockSdkResult([{ type: 'text-delta', text: 'ok' }]);
 
     await provider.chat(
-      [{ role: 'user', content: 'hi' }],
-      { model: 'gemini-2.5-pro', reasoningEffort: 'low' },
-      () => {}
-    );
-
-    const body = JSON.parse(
-      String((fetchMock.mock.calls[0] as [string, RequestInit])[1].body)
-    ) as Record<string, unknown>;
-    expect((body.generationConfig as Record<string, unknown>).thinkingConfig).toEqual({
-      thinkingBudget: 1024,
-      includeThoughts: true,
-    });
-  });
-
-  it('sends tools with VALIDATED function-calling policy when tools are provided', async () => {
-    const reader = buildMockReader([
-      sseEvent({
-        candidates: [{ content: { parts: [{ text: 'ok' }] } }],
-        usageMetadata: { promptTokenCount: 1, candidatesTokenCount: 1, totalTokenCount: 2 },
-      }),
-      'data: [DONE]',
-    ]);
-    fetchMock.mockResolvedValue({ ok: true, body: { getReader: () => reader } });
-
-    await provider.chat(
-      [{ role: 'user', content: 'hi' }],
+      mockMessages,
       {
         model: 'gemini-2.5-pro',
+        reasoningEffort: 'low',
         tools: [
           {
             name: 'search_docs',
@@ -205,75 +116,51 @@ describe('GoogleProvider.chat()', () => {
       () => {}
     );
 
-    const body = JSON.parse(
-      String((fetchMock.mock.calls[0] as [string, RequestInit])[1].body)
-    ) as Record<string, unknown>;
-    expect(body.tools).toEqual([
-      {
-        functionDeclarations: [
-          {
-            name: 'search_docs',
-            description: 'Search docs',
-            parameters: { type: 'object', properties: { query: { type: 'string' } } },
-          },
-        ],
+    const streamArgs = (aiModule.streamText as unknown as jest.Mock).mock.calls[0][0];
+    expect(streamArgs.providerOptions.google).toEqual({
+      thinkingConfig: {
+        includeThoughts: true,
+        thinkingBudget: 1024,
       },
-    ]);
-    expect(body.toolConfig).toEqual({ functionCallingConfig: { mode: 'VALIDATED' } });
+      functionCallingConfig: {
+        mode: 'VALIDATED',
+      },
+    });
+    expect(streamArgs.tools).toHaveProperty('search_docs');
+    expect(aiModule.tool).toHaveBeenCalled();
+    expect(aiModule.jsonSchema).toHaveBeenCalledWith({
+      type: 'object',
+      properties: { query: { type: 'string' } },
+    });
+    expect(chatMock).toHaveBeenCalledWith('gemini-2.5-pro');
   });
 
-  it('does not send tools/toolConfig when tools list is empty', async () => {
-    const reader = buildMockReader([
-      sseEvent({
-        candidates: [{ content: { parts: [{ text: 'ok' }] } }],
-        usageMetadata: { promptTokenCount: 1, candidatesTokenCount: 1, totalTokenCount: 2 },
-      }),
-      'data: [DONE]',
-    ]);
-    fetchMock.mockResolvedValue({ ok: true, body: { getReader: () => reader } });
+  it('does not build tool definitions when tools list is empty', async () => {
+    mockSdkResult([{ type: 'text-delta', text: 'ok' }]);
 
     await provider.chat(
-      [{ role: 'user', content: 'hi' }],
-      { model: 'gemini-2.5-pro', tools: [] },
+      mockMessages,
+      {
+        model: 'gemini-2.5-pro',
+        tools: [],
+      },
       () => {}
     );
 
-    const body = JSON.parse(
-      String((fetchMock.mock.calls[0] as [string, RequestInit])[1].body)
-    ) as Record<string, unknown>;
-    expect(body.tools).toBeUndefined();
-    expect(body.toolConfig).toBeUndefined();
+    const streamArgs = (aiModule.streamText as unknown as jest.Mock).mock.calls[0][0];
+    expect(streamArgs.tools).toBeUndefined();
+    expect(streamArgs.providerOptions.google.functionCallingConfig).toBeUndefined();
+    expect(aiModule.tool).not.toHaveBeenCalled();
+    expect(aiModule.jsonSchema).not.toHaveBeenCalled();
   });
 
-  it('maps HTTP 429 without header using provider message', async () => {
-    fetchMock.mockResolvedValue({
-      ok: false,
-      status: 429,
-      headers: { get: () => null },
-      json: async () => ({ error: { message: 'Try again in a moment' } }),
-    });
-
-    await expect(
-      provider.chat([{ role: 'user', content: 'hi' }], { model: 'gemini-2.5-pro' }, () => {})
-    ).rejects.toThrow('Try again in a moment');
-  });
-
-  it('emits turn_error chunk when google stream contains error payload', async () => {
-    const reader = buildMockReader([
-      sseEvent({
-        error: { message: 'google stream failed' },
-      }),
-      'data: [DONE]',
-    ]);
-    fetchMock.mockResolvedValue({ ok: true, body: { getReader: () => reader } });
+  it('emits turn_error and throws when SDK stream yields error part', async () => {
+    mockSdkResult([{ type: 'error', error: new Error('google stream failed') }]);
 
     const chunks: ChatChunk[] = [];
     await expect(
-      provider.chat([{ role: 'user', content: 'hi' }], { model: 'gemini-2.5-pro' }, (chunk) =>
-        chunks.push(chunk)
-      )
+      provider.chat(mockMessages, mockOptions, (chunk) => chunks.push(chunk))
     ).rejects.toThrow('google stream failed');
-
     expect(chunks).toContainEqual({
       type: 'turn_error',
       errorType: 'provider',
@@ -281,30 +168,23 @@ describe('GoogleProvider.chat()', () => {
     });
   });
 
-  it('wraps abort-like errors into LLMRequestAbortedError', async () => {
+  it('throws LLMRequestAbortedError when SDK throws abort-like error', async () => {
     const abortError = new Error('aborted');
     (abortError as Error & { name: string }).name = 'AbortError';
-    fetchMock.mockRejectedValue(abortError);
+    (aiModule.streamText as unknown as jest.Mock).mockImplementation(() => {
+      throw abortError;
+    });
 
-    await expect(
-      provider.chat([{ role: 'user', content: 'hi' }], { model: 'gemini-2.5-pro' }, () => {})
-    ).rejects.toThrow(
-      'Model response timeout. The provider took too long to respond. Please try again later.'
+    await expect(provider.chat(mockMessages, mockOptions, () => {})).rejects.toBeInstanceOf(
+      LLMRequestAbortedError
     );
   });
 
   it('uses CHAT_TIMEOUT_MS for abort controller timer', async () => {
     const setTimeoutSpy = jest.spyOn(global, 'setTimeout');
-    const reader = buildMockReader([
-      sseEvent({
-        candidates: [{ content: { parts: [{ text: 'ok' }] } }],
-        usageMetadata: { promptTokenCount: 1, candidatesTokenCount: 1, totalTokenCount: 2 },
-      }),
-      'data: [DONE]',
-    ]);
-    fetchMock.mockResolvedValue({ ok: true, body: { getReader: () => reader } });
+    mockSdkResult([{ type: 'text-delta', text: 'ok' }]);
 
-    await provider.chat([{ role: 'user', content: 'hi' }], { model: 'gemini-2.5-pro' }, () => {});
+    await provider.chat(mockMessages, mockOptions, () => {});
 
     expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), CHAT_TIMEOUT_MS);
     setTimeoutSpy.mockRestore();
