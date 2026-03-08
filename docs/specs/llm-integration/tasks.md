@@ -99,10 +99,10 @@
   - [ ] Убрать ручные provider-specific parser ветки, если покрываются AI SDK layer.
 - [ ] `src/main/llm/AnthropicProvider.ts`:
   - [x] Довести parity (`reasoning`, `text`, `tool_call`, `turn_error`, usage).
-  - [ ] Проверить provider options (`thinking`, `sendReasoning`, parallel tool policy).
+  - [x] Проверить provider options (`thinking`, `sendReasoning`, parallel tool policy).
 - [ ] `src/main/llm/GoogleProvider.ts`:
   - [x] Довести parity (`reasoning`, `text`, `tool_call`, `turn_error`, usage).
-  - [ ] Проверить provider options (`thinkingConfig.includeThoughts` и связанные параметры).
+  - [x] Проверить provider options (`thinkingConfig.includeThoughts` и связанные параметры).
 - [ ] `src/main/agents/MainPipeline.ts`:
   - [ ] Финализировать loop `model -> tools -> model` на AI SDK control (`stopWhen`/step control).
   - [ ] Поддержать multi-tool + controlled concurrency.

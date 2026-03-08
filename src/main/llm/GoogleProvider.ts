@@ -129,6 +129,24 @@ export class GoogleProvider implements ILLMProvider {
           ...(body.generationConfig as object),
           thinkingConfig: {
             thinkingBudget: this.reasoningBudget(options.reasoningEffort),
+            includeThoughts: true,
+          },
+        };
+      }
+
+      if (options.tools && options.tools.length > 0) {
+        body.tools = [
+          {
+            functionDeclarations: options.tools.map((tool) => ({
+              name: tool.name,
+              description: tool.description,
+              parameters: tool.parameters,
+            })),
+          },
+        ];
+        body.toolConfig = {
+          functionCallingConfig: {
+            mode: 'AUTO',
           },
         };
       }

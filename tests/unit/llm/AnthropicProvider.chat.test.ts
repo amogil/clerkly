@@ -160,6 +160,51 @@ describe('AnthropicProvider.chat()', () => {
     });
   });
 
+  it('sends tools with auto parallel policy when tools are provided', async () => {
+    const reader = buildMockReader([
+      sseEvent({
+        type: 'message_start',
+        message: { usage: { input_tokens: 1, output_tokens: 0 } },
+      }),
+      sseEvent({
+        type: 'content_block_delta',
+        index: 0,
+        delta: { type: 'text_delta', text: 'ok' },
+      }),
+      sseEvent({ type: 'message_delta', usage: { output_tokens: 1 } }),
+      'data: [DONE]',
+    ]);
+    fetchMock.mockResolvedValue({ ok: true, body: { getReader: () => reader } });
+
+    await provider.chat(
+      [{ role: 'user', content: 'hi' }],
+      {
+        model: 'claude-sonnet',
+        tools: [
+          {
+            name: 'search_docs',
+            description: 'Search docs',
+            parameters: { type: 'object', properties: { query: { type: 'string' } } },
+          },
+        ],
+      },
+      () => {}
+    );
+
+    const body = JSON.parse(
+      String((fetchMock.mock.calls[0] as [string, RequestInit])[1].body)
+    ) as Record<string, unknown>;
+
+    expect(body.tools).toEqual([
+      {
+        name: 'search_docs',
+        description: 'Search docs',
+        input_schema: { type: 'object', properties: { query: { type: 'string' } } },
+      },
+    ]);
+    expect(body.tool_choice).toEqual({ type: 'auto', disable_parallel_tool_use: false });
+  });
+
   it('maps HTTP 429 without header using provider message', async () => {
     fetchMock.mockResolvedValue({
       ok: false,

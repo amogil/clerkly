@@ -155,6 +155,73 @@ describe('GoogleProvider.chat()', () => {
     });
   });
 
+  it('sends thinkingConfig.includeThoughts when reasoning is requested', async () => {
+    const reader = buildMockReader([
+      sseEvent({
+        candidates: [{ content: { parts: [{ text: 'ok' }] } }],
+        usageMetadata: { promptTokenCount: 1, candidatesTokenCount: 1, totalTokenCount: 2 },
+      }),
+      'data: [DONE]',
+    ]);
+    fetchMock.mockResolvedValue({ ok: true, body: { getReader: () => reader } });
+
+    await provider.chat(
+      [{ role: 'user', content: 'hi' }],
+      { model: 'gemini-2.5-pro', reasoningEffort: 'low' },
+      () => {}
+    );
+
+    const body = JSON.parse(
+      String((fetchMock.mock.calls[0] as [string, RequestInit])[1].body)
+    ) as Record<string, unknown>;
+    expect((body.generationConfig as Record<string, unknown>).thinkingConfig).toEqual({
+      thinkingBudget: 1024,
+      includeThoughts: true,
+    });
+  });
+
+  it('sends tools with AUTO function-calling policy when tools are provided', async () => {
+    const reader = buildMockReader([
+      sseEvent({
+        candidates: [{ content: { parts: [{ text: 'ok' }] } }],
+        usageMetadata: { promptTokenCount: 1, candidatesTokenCount: 1, totalTokenCount: 2 },
+      }),
+      'data: [DONE]',
+    ]);
+    fetchMock.mockResolvedValue({ ok: true, body: { getReader: () => reader } });
+
+    await provider.chat(
+      [{ role: 'user', content: 'hi' }],
+      {
+        model: 'gemini-2.5-pro',
+        tools: [
+          {
+            name: 'search_docs',
+            description: 'Search docs',
+            parameters: { type: 'object', properties: { query: { type: 'string' } } },
+          },
+        ],
+      },
+      () => {}
+    );
+
+    const body = JSON.parse(
+      String((fetchMock.mock.calls[0] as [string, RequestInit])[1].body)
+    ) as Record<string, unknown>;
+    expect(body.tools).toEqual([
+      {
+        functionDeclarations: [
+          {
+            name: 'search_docs',
+            description: 'Search docs',
+            parameters: { type: 'object', properties: { query: { type: 'string' } } },
+          },
+        ],
+      },
+    ]);
+    expect(body.toolConfig).toEqual({ functionCallingConfig: { mode: 'AUTO' } });
+  });
+
   it('maps HTTP 429 without header using provider message', async () => {
     fetchMock.mockResolvedValue({
       ok: false,

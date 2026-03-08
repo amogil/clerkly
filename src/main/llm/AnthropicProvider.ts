@@ -142,6 +142,18 @@ export class AnthropicProvider implements ILLMProvider {
         };
       }
 
+      if (options.tools && options.tools.length > 0) {
+        body.tools = options.tools.map((tool) => ({
+          name: tool.name,
+          description: tool.description,
+          input_schema: tool.parameters,
+        }));
+        body.tool_choice = {
+          type: 'auto',
+          disable_parallel_tool_use: false,
+        };
+      }
+
       const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
