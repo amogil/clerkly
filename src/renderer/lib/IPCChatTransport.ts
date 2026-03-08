@@ -86,10 +86,15 @@ export class IPCChatTransport implements ChatTransport<UIMessage> {
             if (msg.agentId !== agentId) return;
 
             if (msg.kind === 'llm') {
+              if (llmMessageId !== null && llmMessageId !== msg.id) {
+                return;
+              }
               llmMessageId = msg.id;
-              // Start the assistant message stream
-              enqueue({ type: 'start', messageId: String(msg.id) });
-              enqueue({ type: 'start-step' });
+              // Start the assistant message stream only once per message id.
+              if (!textPartId && !reasoningId) {
+                enqueue({ type: 'start', messageId: String(msg.id) });
+                enqueue({ type: 'start-step' });
+              }
 
               // If message already has text content (non-streaming case), emit it now
               const data = msg.payload.data as Record<string, unknown> | undefined;
@@ -160,6 +165,13 @@ export class IPCChatTransport implements ChatTransport<UIMessage> {
           EVENT_TYPES.MESSAGE_LLM_REASONING_UPDATED,
           (payload: MessageLlmReasoningUpdatedPayload) => {
             if (payload.agentId !== agentId) return;
+            if (llmMessageId === null) {
+              llmMessageId = payload.messageId;
+              enqueue({ type: 'start', messageId: String(payload.messageId) });
+              enqueue({ type: 'start-step' });
+            } else if (llmMessageId !== payload.messageId) {
+              return;
+            }
 
             if (!reasoningId) {
               reasoningId = `reasoning-${payload.messageId}`;

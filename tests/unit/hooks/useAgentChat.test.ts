@@ -480,6 +480,28 @@ describe('useAgentChat hook', () => {
       expect(result.current.rawMessages).toContainEqual(updatedSnapshot);
     });
 
+    /* Preconditions: Hook mounted with empty history, updated event arrives before created
+       Action: MESSAGE_UPDATED event with hidden=false
+       Assertions: message is added to rawMessages (upsert behavior)
+       Requirements: realtime-events.9.5 */
+    it('should upsert message into rawMessages when MESSAGE_UPDATED arrives before MESSAGE_CREATED', async () => {
+      const { result } = renderHook(() => useAgentChat('agent-1'));
+      await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+      const updatedHandler = mockSubscribe.mock.calls.find(
+        ([type]: [string]) => type === EVENT_TYPES.MESSAGE_UPDATED
+      )?.[1];
+
+      const updatedSnapshot = makeSnapshot(404, 'tool_call');
+      mockToUIMessage.mockReturnValue(makeUIMessage(404));
+
+      act(() => {
+        updatedHandler({ message: updatedSnapshot, timestamp: Date.now() });
+      });
+
+      expect(result.current.rawMessages).toContainEqual(updatedSnapshot);
+    });
+
     /* Preconditions: Hook mounted, MESSAGE_UPDATED from different agent
        Action: MESSAGE_UPDATED event for other-agent
        Assertions: rawMessages NOT changed

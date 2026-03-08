@@ -134,10 +134,14 @@ export function useAgentChat(agentId: string | null): UseAgentChatResult {
       setRawMessages((prev) => prev.filter((m) => m.id !== payload.message.id));
       setMessages((prev) => prev.filter((m) => m.id !== String(payload.message.id)));
     } else {
-      // Update existing message in rawMessages
-      setRawMessages((prev) =>
-        prev.map((m) => (m.id === payload.message.id ? payload.message : m))
-      );
+      // Upsert in rawMessages to tolerate out-of-order updated/created events.
+      setRawMessages((prev) => {
+        const existingIndex = prev.findIndex((m) => m.id === payload.message.id);
+        if (existingIndex === -1) {
+          return [...prev, payload.message];
+        }
+        return prev.map((m) => (m.id === payload.message.id ? payload.message : m));
+      });
       // Sync UIMessage if it exists (e.g. error message text update)
       const uiMsg = toUIMessage(payload.message);
       if (uiMsg) {

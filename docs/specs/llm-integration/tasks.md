@@ -149,8 +149,8 @@
   - [ ] Оставить только трансляцию доменных realtime-событий в `UIMessageChunk`.
   - [ ] Убрать лишнюю бизнес-логику из transport (вынести в main/useChat lifecycle).
   - [ ] Зафиксировать корректный порядок chunk-ов:
-    - [ ] `start -> start-step -> reasoning/text deltas -> finish-step -> finish`
-  - [ ] Гарантировать отсутствие дубликатов между delta-событиями и `message.updated` snapshot.
+    - [x] `start -> start-step -> reasoning/text deltas -> finish-step -> finish`
+  - [x] Гарантировать отсутствие дубликатов между delta-событиями и `message.updated` snapshot.
   - [ ] Гарантировать корректное завершение стрима при cancel/hidden/done.
 - [ ] Добавить protocol guards:
   - [ ] controlled fail на invalid sequence (с диагностикой, без падения процесса).
@@ -246,8 +246,8 @@
 ## Фаза E: Тестирование (максимальное покрытие)
 
 - [ ] Полный конформанс с `testing.13` (AI SDK chat-flow contracts):
-  - [ ] `testing.13.1`: unit на sequence `start -> start-step -> delta -> finish-step -> finish` в `IPCChatTransport`.
-  - [ ] `testing.13.2`: unit на отсутствие дублей между delta и `message.updated` snapshot.
+  - [x] `testing.13.1`: unit на sequence `start -> start-step -> delta -> finish-step -> finish` в `IPCChatTransport`.
+  - [x] `testing.13.2`: unit на отсутствие дублей между delta и `message.updated` snapshot.
   - [x] `testing.13.3`: unit на рендер persisted `kind:tool_call` как tool-call блока.
   - [ ] `testing.13.4`: unit на `ErrorNormalizer` (auth/rate_limit/provider/network/timeout/tool/protocol).
   - [ ] `testing.13.5`: unit на multi-tool + continuation `model -> tools -> model`.
@@ -313,14 +313,14 @@
 
 ## Дополнительный To Do (по результатам проверки)
 
-- [ ] Перевести текущий mapping `tool_call` с text-summary на полноценные AI SDK tool parts (`tool-input-*` / `tool-output-*`) в `messageMapper` и/или `IPCChatTransport`.
-- [ ] Добавить unit-тесты на формирование именно tool parts (а не text part) для persisted `kind:tool_call`.
-- [ ] Добавить функциональный сценарий на отображение historical `llm` сообщений после миграции `013` (каноничный рендер из `data.text` без `data.action` fallback).
-- [ ] После внедрения tool parts синхронизировать рендер `AgentMessage`/`Tool` так, чтобы UI использовал единый контракт tool-part без дублирующих путей.
+- [x] Перевести текущий mapping `tool_call` с text-summary на полноценные AI SDK tool parts (`tool-input-*` / `tool-output-*`) в `messageMapper` и/или `IPCChatTransport`.
+- [x] Добавить unit-тесты на формирование именно tool parts (а не text part) для persisted `kind:tool_call`.
+- [x] Добавить функциональный сценарий на отображение historical `llm` сообщений после миграции `013` (каноничный рендер из `data.text` без `data.action` fallback).
+- [x] После внедрения tool parts синхронизировать рендер `AgentMessage`/`Tool` так, чтобы UI использовал единый контракт tool-part без дублирующих путей.
 
 ### Отдельные шаги исправления
 
 - [x] Шаг 1. Реализовать AI SDK tool parts для persisted `kind:tool_call` (убрать text-summary путь).
 - [x] Шаг 2. Добавить/обновить unit-тесты, проверяющие именно tool parts контракт.
 - [x] Шаг 3. Добавить functional-тест на исторические `llm` после миграции `013` (рендер только из `data.text`).
-- [ ] Шаг 4. Привести `AgentMessage`/`Tool` к единому пути рендера по tool parts и удалить дубли.
+- [x] Шаг 4. Привести `AgentMessage`/`Tool` к единому пути рендера по tool parts и удалить дубли.

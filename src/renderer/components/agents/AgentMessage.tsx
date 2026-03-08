@@ -3,6 +3,7 @@ import React from 'react';
 import { Message, MessageContent, MessageResponse } from '../ai-elements/message';
 import { Reasoning, ReasoningContent } from '../ai-elements/reasoning';
 import { Tool, ToolContent, ToolHeader, ToolInput, ToolOutput } from '../ai-elements/tool';
+import { toUIMessage } from '../../lib/messageMapper';
 import type { MessageSnapshot } from '../../../shared/events/types';
 import { AgentErrorDialog } from './AgentErrorDialog';
 import type { AgentDialogActionItem } from './AgentDialog';
@@ -120,19 +121,39 @@ export function AgentMessage({
   }
 
   if (message.kind === 'tool_call') {
-    const toolData = message.payload.data as
+    const uiMessage = toUIMessage(message);
+    const toolPart = uiMessage?.parts.find((part) => part.type === 'dynamic-tool') as
       | {
-          callId?: string;
-          toolName?: string;
-          arguments?: Record<string, unknown>;
-          output?: { status?: string; content?: string };
+          type: 'dynamic-tool';
+          toolName: string;
+          toolCallId: string;
+          state: 'input-streaming' | 'input-available' | 'output-available' | 'output-error';
+          input?: unknown;
+          output?: unknown;
+          errorText?: string;
         }
       | undefined;
-    const toolName = toolData?.toolName ?? 'tool';
-    const callId = toolData?.callId ?? String(message.id);
-    const toolInput = JSON.stringify(toolData?.arguments ?? {}, null, 2);
-    const toolOutput = toolData?.output?.content ?? '';
-    const toolStatus = message.done ? (toolData?.output?.status ?? 'success') : 'in-progress';
+
+    if (!toolPart) {
+      return null;
+    }
+
+    const toolName = toolPart.toolName;
+    const callId = toolPart.toolCallId;
+    const toolInput = JSON.stringify(toolPart.input ?? {}, null, 2);
+    const toolStatus =
+      toolPart.state === 'output-error'
+        ? 'error'
+        : toolPart.state === 'output-available'
+          ? 'success'
+          : 'in-progress';
+
+    const toolOutput =
+      toolPart.state === 'output-error'
+        ? (toolPart.errorText ?? 'Tool execution failed')
+        : toolPart.state === 'output-available'
+          ? JSON.stringify(toolPart.output ?? {}, null, 2)
+          : '';
 
     return (
       <Message from="assistant" className="w-full max-w-full">
@@ -148,7 +169,7 @@ export function AgentMessage({
               <div className="mb-1 text-xs font-medium text-muted-foreground">Input</div>
               <ToolInput data-testid="message-tool-call-input">{toolInput}</ToolInput>
             </div>
-            {message.done ? (
+            {toolPart.state === 'output-available' || toolPart.state === 'output-error' ? (
               <div>
                 <div className="mb-1 text-xs font-medium text-muted-foreground">Output</div>
                 <ToolOutput data-testid="message-tool-call-output">{toolOutput}</ToolOutput>

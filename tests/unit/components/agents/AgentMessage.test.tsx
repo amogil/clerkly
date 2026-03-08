@@ -102,8 +102,9 @@ describe('AgentMessage — tool_call', () => {
       />
     );
 
-    expect(screen.getByTestId('message-tool-call-output')).toBeInTheDocument();
-    expect(screen.getByText('result')).toBeInTheDocument();
+    const output = screen.getByTestId('message-tool-call-output');
+    expect(output).toBeInTheDocument();
+    expect(output).toHaveTextContent('"content": "result"');
   });
 });
 

@@ -521,6 +521,96 @@ describe('IPCChatTransport', () => {
       expect(types).toContain('finish');
     });
 
+    it('should not emit duplicate start chunks when MESSAGE_CREATED arrives after text stream start', async () => {
+      const streamPromise = transport.sendMessages(makeSendOptions());
+      await Promise.resolve();
+
+      emitEvent(EVENT_TYPES.MESSAGE_LLM_TEXT_UPDATED, {
+        messageId: 901,
+        agentId: 'agent-1',
+        delta: 'partial',
+        accumulatedText: 'partial',
+        timestamp: Date.now(),
+      });
+
+      emitEvent(EVENT_TYPES.MESSAGE_CREATED, {
+        message: {
+          id: 901,
+          agentId: 'agent-1',
+          kind: 'llm',
+          timestamp: Date.now(),
+          payload: { data: {} },
+          hidden: false,
+          done: false,
+        },
+        timestamp: Date.now(),
+      });
+
+      emitEvent(EVENT_TYPES.MESSAGE_UPDATED, {
+        message: {
+          id: 901,
+          agentId: 'agent-1',
+          kind: 'llm',
+          timestamp: Date.now(),
+          payload: { data: { text: 'partial' } },
+          hidden: false,
+          done: true,
+        },
+        timestamp: Date.now(),
+      });
+
+      const stream = await streamPromise;
+      const chunks = await collectChunks(stream);
+      const startChunks = chunks.filter((chunk) => chunk.type === 'start');
+      const startStepChunks = chunks.filter((chunk) => chunk.type === 'start-step');
+      expect(startChunks).toHaveLength(1);
+      expect(startStepChunks).toHaveLength(1);
+    });
+
+    it('should start stream from reasoning updates when they arrive before MESSAGE_CREATED', async () => {
+      const streamPromise = transport.sendMessages(makeSendOptions());
+      await Promise.resolve();
+
+      emitEvent(EVENT_TYPES.MESSAGE_LLM_REASONING_UPDATED, {
+        messageId: 920,
+        agentId: 'agent-1',
+        delta: 'thinking',
+        accumulatedText: 'thinking',
+        timestamp: Date.now(),
+      });
+
+      emitEvent(EVENT_TYPES.MESSAGE_LLM_TEXT_UPDATED, {
+        messageId: 920,
+        agentId: 'agent-1',
+        delta: 'answer',
+        accumulatedText: 'answer',
+        timestamp: Date.now(),
+      });
+
+      emitEvent(EVENT_TYPES.MESSAGE_UPDATED, {
+        message: {
+          id: 920,
+          agentId: 'agent-1',
+          kind: 'llm',
+          timestamp: Date.now(),
+          payload: { data: { text: 'answer' } },
+          hidden: false,
+          done: true,
+        },
+        timestamp: Date.now(),
+      });
+
+      const stream = await streamPromise;
+      const chunks = await collectChunks(stream);
+      const types = chunks.map((chunk) => chunk.type);
+      expect(types[0]).toBe('start');
+      expect(types[1]).toBe('start-step');
+      expect(types).toContain('reasoning-start');
+      expect(types).toContain('reasoning-delta');
+      expect(types).toContain('reasoning-end');
+      expect(types).toContain('finish');
+    });
+
     it('should use MESSAGE_UPDATED snapshot text when no text stream part exists', async () => {
       const streamPromise = transport.sendMessages(makeSendOptions());
       await Promise.resolve();
