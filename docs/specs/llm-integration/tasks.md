@@ -46,11 +46,11 @@
   - [x] `RetryError` после исчерпания попыток -> `provider`
   - [x] tool ошибки (`NoSuchToolError`, `InvalidToolInputError`, `ToolExecutionError`, `ToolCallRepairError`) -> `tool`
   - [x] stream protocol ошибки (`UIMessageStreamError`) -> `protocol`
-- [ ] Зафиксировать и реализовать retry policy из `llm-integration/design.md`:
+- [x] Зафиксировать и реализовать retry policy из `llm-integration/design.md`:
   - [x] retry только до первого meaningful chunk;
   - [x] максимум 1 retry на запуск `MainPipeline.run()`;
   - [x] после начала стрима retry не выполняется.
-- [ ] Синхронизировать `ErrorNormalizer` с UI контрактом ошибок:
+- [x] Синхронизировать `ErrorNormalizer` с UI контрактом ошибок:
   - [x] `kind:error` payload
   - [x] rate-limit countdown (`agent.rate_limit`)
   - [x] диагностические события (`llm.pipeline.diagnostic`)
@@ -174,9 +174,9 @@
 ## Фаза C2: useChat / transport lifecycle и уменьшение костылей
 
 - [ ] `src/renderer/hooks/useAgentChat.ts`:
-  - [ ] Минимизировать дублирующую синхронизацию `rawMessages` и `messages` (оставить только обязательные metadata-cases).
+  - [x] Минимизировать дублирующую синхронизацию `rawMessages` и `messages` (оставить только обязательные metadata-cases).
   - [ ] Опираться на lifecycle `useChat` (`status`, `stop`, completion/error hooks).
-  - [ ] Убрать лишние ручные костыли hidden/update, если покрываются stream lifecycle.
+  - [x] Убрать лишние ручные костыли hidden/update, если покрываются stream lifecycle.
 - [ ] `src/renderer/lib/messageMapper.ts`:
   - [x] Проверить стабильный mapping persisted snapshot -> UIMessage (без legacy fallback).
 - [ ] `src/renderer/components/agents/AgentMessage.tsx` и `AgentChat.tsx`:
@@ -257,21 +257,21 @@
   - [ ] `testing.13.6`: functional на одновременный стриминг reasoning и text.
   - [ ] `testing.13.7`: functional на `rate_limit` countdown без persisted `kind:error`.
   - [ ] `testing.13.8`: functional на cancel во время tool execution без `kind:error`.
-- [ ] Unit: `ErrorNormalizer`
+- [x] Unit: `ErrorNormalizer`
   - [x] покрыть все AI SDK error classes и доменный mapping.
   - [x] покрыть извлечение `retry-after` + fallback.
-- [ ] Unit: providers
+- [x] Unit: providers
   - [x] OpenAI/Anthropic/Google parity для streaming/tool/error/usage.
   - [x] >=2 tool calls в одном turn.
-- [ ] Unit: `MainPipeline`
+- [x] Unit: `MainPipeline`
   - [x] порядок событий в loop и корректный persisted lifecycle `kind:tool_call` (`done=false -> done=true`).
   - [x] cancel в разных фазах loop, включая in-flight tool jobs.
   - [x] timeout = 300s и корректный mapping в доменную ошибку.
   - [x] stub-execution: placeholder output для `tool_call` и финализация `done=true`.
-- [ ] Unit: transport/event buses
+- [x] Unit: transport/event buses
   - [x] no-drop/no-coalescing regressions для `message.llm.reasoning.updated` и `message.llm.text.updated`.
   - [x] негативный контракт: отдельное realtime-событие `message.tool_call` отсутствует; UI зависит только от persisted snapshot-событий.
-- [ ] Unit: renderer
+- [x] Unit: renderer
   - [x] `IPCChatTransport` protocol ordering.
   - [x] persisted `kind:tool_call` корректно попадает в UI stream как tool-call part.
   - [x] стабильность mapping при mixed streaming events.

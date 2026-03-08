@@ -5,7 +5,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useChat, Chat } from '@ai-sdk/react';
 import { IPCChatTransport } from '../lib/IPCChatTransport';
-import { toUIMessages, toUIMessage } from '../lib/messageMapper';
+import { toUIMessages } from '../lib/messageMapper';
 import { useEventSubscription } from '../events/useEventSubscription';
 import { EVENT_TYPES } from '../../shared/events/constants';
 import type {
@@ -129,10 +129,9 @@ export function useAgentChat(agentId: string | null): UseAgentChatResult {
     if (!payload.message || payload.message.agentId !== agentId) return;
 
     if (payload.message.hidden) {
-      // Remove hidden message from both arrays
+      // Remove hidden message from persisted snapshot list used for rendering.
       // Requirements: llm-integration.3.8, llm-integration.8.5
       setRawMessages((prev) => prev.filter((m) => m.id !== payload.message.id));
-      setMessages((prev) => prev.filter((m) => m.id !== String(payload.message.id)));
     } else {
       // Upsert in rawMessages to tolerate out-of-order updated/created events.
       setRawMessages((prev) => {
@@ -142,12 +141,6 @@ export function useAgentChat(agentId: string | null): UseAgentChatResult {
         }
         return prev.map((m) => (m.id === payload.message.id ? payload.message : m));
       });
-      // Sync UIMessage if it exists (e.g. error message text update)
-      const uiMsg = toUIMessage(payload.message);
-      if (uiMsg) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        setMessages((prev) => prev.map((m) => (m.id === uiMsg.id ? (uiMsg as any) : m)));
-      }
     }
   });
 
