@@ -116,6 +116,7 @@ export class OpenAIProvider implements ILLMProvider {
           typeof streamText
         >[0]['model'],
         messages: messages as unknown as Parameters<typeof streamText>[0]['messages'],
+        sendReasoning: true,
         tools,
         ...(stopWhen ? { stopWhen } : {}),
         maxRetries: 0,

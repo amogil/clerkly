@@ -103,6 +103,7 @@ export class GoogleProvider implements ILLMProvider {
       const result = streamText({
         model: google.chat(options.model) as unknown as Parameters<typeof streamText>[0]['model'],
         messages: messages as unknown as Parameters<typeof streamText>[0]['messages'],
+        sendReasoning: true,
         tools,
         ...(stopWhen ? { stopWhen } : {}),
         maxRetries: 0,
