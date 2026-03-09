@@ -144,10 +144,7 @@ export function AgentMessage({
 
       return (
         <Message from="assistant" className="w-full max-w-full">
-          <div
-            data-testid="message-llm"
-            className="space-y-2 message-llm message-llm-completed"
-          >
+          <div data-testid="message-llm" className="space-y-2 message-llm message-llm-completed">
             <div className="flex items-center gap-2">
               <span
                 data-testid="message-completed-badge"

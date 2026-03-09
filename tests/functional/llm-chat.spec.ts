@@ -230,8 +230,7 @@ test.describe('LLM Chat (real OpenAI)', () => {
         document.querySelectorAll('[data-testid="message-llm-reasoning"]')[
           document.querySelectorAll('[data-testid="message-llm-reasoning"]').length - 1
         ] as HTMLElement | undefined;
-      const getActionCount = () =>
-        document.querySelectorAll('.message-llm-action-response').length;
+      const getActionCount = () => document.querySelectorAll('.message-llm-action-response').length;
 
       const readReasoning = () => (getReasoningNode()?.textContent ?? '').trim();
       const refresh = () => {
@@ -1679,9 +1678,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
      Requirements: agents.7.7 */
   test('should render markdown blockquotes', async () => {
     await renderMarkdownMessage('> Quote');
-    await expect(
-      context.window.locator('.message-llm-action-response blockquote')
-    ).toBeVisible();
+    await expect(context.window.locator('.message-llm-action-response blockquote')).toBeVisible();
   });
 
   /* Preconditions: MockLLMServer returns markdown unordered list
@@ -1743,9 +1740,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
   test('should render markdown fenced code', async () => {
     await renderMarkdownMessage('```js\nconsole.log("hi");\n```');
     await expect(context.window.locator('.message-llm-action-response pre')).toBeVisible();
-    await expect(
-      context.window.locator('.message-llm-action-response pre code')
-    ).toBeVisible();
+    await expect(context.window.locator('.message-llm-action-response pre code')).toBeVisible();
   });
 
   /* Preconditions: MockLLMServer returns markdown table
