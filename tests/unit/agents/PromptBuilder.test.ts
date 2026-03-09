@@ -54,11 +54,11 @@ describe('FullHistoryStrategy', () => {
 describe('PromptBuilder.build()', () => {
   describe('empty history', () => {
     /* Preconditions: No messages
-       Action: Call build([])
+       Action: Call build()
        Assertions: systemPrompt is base prompt and tools are empty
        Requirements: llm-integration.10.4 */
     it('should return base system prompt and empty tools', () => {
-      const result = makeBuilder().build([]);
+      const result = makeBuilder().build();
       expect(result.systemPrompt).toBe('You are a helpful AI assistant.');
       expect(result.tools).toEqual([]);
     });
@@ -66,7 +66,7 @@ describe('PromptBuilder.build()', () => {
 
   describe('system prompt with features', () => {
     /* Preconditions: Two features with system prompt sections
-       Action: Call build([])
+       Action: Call build()
        Assertions: systemPrompt concatenates base + feature sections
        Requirements: llm-integration.10.4 */
     it('should concatenate base prompt with feature sections', () => {
@@ -80,14 +80,14 @@ describe('PromptBuilder.build()', () => {
         getSystemPromptSection: () => 'Feature 2 instructions.',
         getTools: () => [],
       };
-      const result = makeBuilder('Base prompt.', [feature1, feature2]).build([]);
+      const result = makeBuilder('Base prompt.', [feature1, feature2]).build();
       expect(result.systemPrompt).toBe(
         'Base prompt.\n\nFeature 1 instructions.\n\nFeature 2 instructions.'
       );
     });
 
     /* Preconditions: Feature with empty system prompt section
-       Action: Call build([])
+       Action: Call build()
        Assertions: Empty sections are not added
        Requirements: llm-integration.10.4 */
     it('should skip empty feature sections', () => {
@@ -96,14 +96,14 @@ describe('PromptBuilder.build()', () => {
         getSystemPromptSection: () => '',
         getTools: () => [],
       };
-      const result = makeBuilder('Base.', [feature]).build([]);
+      const result = makeBuilder('Base.', [feature]).build();
       expect(result.systemPrompt).toBe('Base.');
     });
   });
 
   describe('tools collection', () => {
     /* Preconditions: Features with tools
-       Action: Call build([])
+       Action: Call build()
        Assertions: tools array contains all tools from all features
        Requirements: llm-integration.10.4 */
     it('should collect tools from all features', () => {
@@ -119,7 +119,7 @@ describe('PromptBuilder.build()', () => {
         getSystemPromptSection: () => '',
         getTools: () => [tool2],
       };
-      const result = makeBuilder('Base.', [feature1, feature2]).build([]);
+      const result = makeBuilder('Base.', [feature1, feature2]).build();
       expect(result.tools).toEqual([tool1, tool2]);
     });
   });
