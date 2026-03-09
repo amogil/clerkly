@@ -689,6 +689,31 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     return ctx;
   }
 
+  type ProviderRequestMessage = {
+    role: string;
+    content: unknown;
+  };
+
+  const getRequestMessages = (body: Record<string, unknown>): ProviderRequestMessage[] =>
+    (body.input ?? body.messages) as ProviderRequestMessage[];
+
+  const contentToText = (content: unknown): string => {
+    if (Array.isArray(content)) {
+      return content
+        .map((part) => {
+          if (part && typeof part === 'object' && typeof (part as { text?: unknown }).text === 'string') {
+            return (part as { text: string }).text;
+          }
+          return '';
+        })
+        .join(' ');
+    }
+    if (content && typeof content === 'object' && typeof (content as { text?: unknown }).text === 'string') {
+      return (content as { text: string }).text;
+    }
+    return typeof content === 'string' ? content : '';
+  };
+
   async function renderMarkdownMessage(markdown: string): Promise<void> {
     mockLLMServer.setStreamingMode(true, {
       content: JSON.stringify({ action: { type: 'text', content: markdown } }),
@@ -1053,23 +1078,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
 
     const lastRequest = mockLLMServer.getLastRequest();
     expect(lastRequest).toBeDefined();
-    const messages: Array<{ role: string; content: unknown }> =
-      lastRequest!.body.input ?? lastRequest!.body.messages;
-    const contentToText = (content: unknown): string => {
-      if (typeof content === 'string') return content;
-      if (Array.isArray(content)) {
-        return content
-          .map((part) =>
-            part &&
-            typeof part === 'object' &&
-            typeof (part as { text?: unknown }).text === 'string'
-              ? (part as { text: string }).text
-              : ''
-          )
-          .join(' ');
-      }
-      return '';
-    };
+    const messages = getRequestMessages(lastRequest!.body as Record<string, unknown>);
 
     // First user message remains part of dialog context
     const hasFirstUser = messages.some(
@@ -1186,15 +1195,14 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     const lastRequest = mockLLMServer.getLastRequest();
     expect(lastRequest).toBeDefined();
 
-    const messages: Array<{ role: string; content: string }> =
-      lastRequest!.body.input ?? lastRequest!.body.messages;
+    const messages = getRequestMessages(lastRequest!.body as Record<string, unknown>);
     expect(messages).toBeDefined();
 
     const priorUserMsg = messages.find(
-      (m) => m.role === 'user' && m.content.includes('First message')
+      (m) => m.role === 'user' && contentToText(m.content).includes('First message')
     );
     const priorAssistantMsg = messages.find(
-      (m) => m.role === 'assistant' && m.content.includes('First response')
+      (m) => m.role === 'assistant' && contentToText(m.content).includes('First response')
     );
     expect(priorUserMsg).toBeDefined();
     expect(priorAssistantMsg).toBeDefined();
@@ -1241,12 +1249,12 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     const lastRequest = mockLLMServer.getLastRequest();
     expect(lastRequest).toBeDefined();
 
-    const messages: Array<{ role: string; content: string }> =
-      lastRequest!.body.input ?? lastRequest!.body.messages;
+    const messages = getRequestMessages(lastRequest!.body as Record<string, unknown>);
     expect(messages).toBeDefined();
 
     const errorInConversation = messages.some(
-      (m) => m.role !== 'system' && m.content.toLowerCase().includes('internal server error')
+      (m) =>
+        m.role !== 'system' && contentToText(m.content).toLowerCase().includes('internal server error')
     );
     expect(errorInConversation).toBe(false);
   });
