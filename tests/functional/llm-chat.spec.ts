@@ -135,13 +135,13 @@ test.describe('LLM Chat (real OpenAI)', () => {
     await messageInput.press('Enter');
 
     // LLM bubble appears
-    const llmBubble = context.window.locator('.message-llm-response');
+    const llmBubble = context.window.locator('.message-llm-response').last();
     await expect(llmBubble).toBeVisible({ timeout: 30000 });
 
     // Reasoning appears (gpt-5-nano with reasoning_effort:low may produce reasoning)
     // We check that if reasoning is present it appears before action
     const reasoning = context.window.locator('[data-testid="message-llm-reasoning"]');
-    const action = context.window.locator('.message-llm-action-response');
+    const action = context.window.locator('.message-llm-action-response').last();
 
     // Action must always appear
     await expect(action).toBeVisible({ timeout: 30000 });
@@ -493,7 +493,7 @@ test.describe('LLM Chat (real OpenAI)', () => {
       timeout: 120000,
     });
 
-    const actionContent = context.window.locator('.message-llm-action-response');
+    const actionContent = context.window.locator('.message-llm-action-response').last();
     await expect(actionContent).toBeVisible({ timeout: 120000 });
 
     await closeElectron(context, false);
@@ -746,7 +746,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     await messageInput.fill('Render markdown');
     await messageInput.press('Enter');
 
-    const actionContent = context.window.locator('.message-llm-action-response');
+    const actionContent = context.window.locator('.message-llm-action-response').last();
     await expect(actionContent).toBeVisible({ timeout: 3000 });
   }
   /* Preconditions: MockLLMServer configured with slow streaming (300ms between chunks),
@@ -853,7 +853,8 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
       timeout: 5000,
     });
 
-    const actionContent = context.window.locator('.message-llm-action-response');
+    const allActionContent = context.window.locator('.message-llm-action-response');
+    const actionContent = allActionContent.last();
     await expect(actionContent).toBeVisible({ timeout: 10000 });
 
     // Wait until reasoning auto-collapses after streaming finishes.
@@ -898,10 +899,11 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     const reasoningTrigger = context.window.locator(
       '[data-testid="message-llm-reasoning-trigger"]'
     );
-    const actionContent = context.window.locator('.message-llm-action-response');
+    const allActionContent = context.window.locator('.message-llm-action-response');
+    const actionContent = allActionContent.last();
 
     await expect(reasoningTrigger).toBeVisible({ timeout: 5000 });
-    await expect(actionContent).toHaveCount(0);
+    await expect(allActionContent).toHaveCount(0);
     await expect
       .poll(async () => await agentAvatarIcon.getAttribute('class'), { timeout: 5000 })
       .toContain('bg-blue-500');
@@ -1041,7 +1043,8 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     await messageInput.press('Enter');
 
     // Wait for second response to appear
-    const actionContent = context.window.locator('.message-llm-action-response');
+    const allActionContent = context.window.locator('.message-llm-action-response');
+    const actionContent = allActionContent.last();
     await expect(actionContent).toBeVisible({ timeout: 15000 });
     await expect(actionContent).toHaveText('Second response', { timeout: 5000 });
 
@@ -1171,7 +1174,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     await expect(errorBubble).toHaveCount(0, { timeout: 10000 });
 
     // LLM response should appear
-    await expect(context.window.locator('.message-llm-response')).toBeVisible({
+    await expect(context.window.locator('.message-llm-response').last()).toBeVisible({
       timeout: 10000,
     });
   });
@@ -1262,7 +1265,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     await messageInput.press('Enter');
 
     // Wait for LLM response
-    const actionContent = context.window.locator('.message-llm-action-response');
+    const actionContent = context.window.locator('.message-llm-action-response').last();
     await expect(actionContent).toBeVisible({ timeout: 15000 });
     await expect(actionContent).toHaveText('Success response', { timeout: 5000 });
 
@@ -1566,7 +1569,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     });
 
     // Wait for auto-retry (countdown ~3 seconds + buffer)
-    const actionContent = context.window.locator('.message-llm-action-response');
+    const actionContent = context.window.locator('.message-llm-action-response').last();
     await expect(actionContent).toBeVisible({ timeout: 15000 });
     await expect(actionContent).toHaveText('Retry response', { timeout: 5000 });
 
@@ -1629,7 +1632,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
      Requirements: agents.7.7 */
   test('should render markdown emphasis', async () => {
     await renderMarkdownMessage('**Bold** and *italic*');
-    const actionContent = context.window.locator('.message-llm-action-response');
+    const actionContent = context.window.locator('.message-llm-action-response').last();
     await expect(actionContent).toContainText('Bold');
     await expect(actionContent.locator('em')).toBeVisible();
   });
@@ -1687,7 +1690,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
      Requirements: agents.7.7 */
   test('should render markdown unordered list', async () => {
     await renderMarkdownMessage('- Item 1\n- Item 2');
-    const actionContent = context.window.locator('.message-llm-action-response');
+    const actionContent = context.window.locator('.message-llm-action-response').last();
     await expect(actionContent.locator('ul')).toBeVisible();
     await expect(actionContent.locator('li')).toHaveCount(2);
   });
@@ -1698,7 +1701,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
      Requirements: agents.7.7 */
   test('should render markdown ordered list', async () => {
     await renderMarkdownMessage('1. First\n2. Second');
-    const actionContent = context.window.locator('.message-llm-action-response');
+    const actionContent = context.window.locator('.message-llm-action-response').last();
     await expect(actionContent.locator('ol')).toBeVisible();
     await expect(actionContent.locator('li')).toHaveCount(2);
   });
@@ -1709,7 +1712,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
      Requirements: agents.7.7 */
   test('should render markdown nested list', async () => {
     await renderMarkdownMessage('- Parent\n  - Child');
-    const actionContent = context.window.locator('.message-llm-action-response');
+    const actionContent = context.window.locator('.message-llm-action-response').last();
     await expect(actionContent.locator('ul')).toHaveCount(2);
   });
 
@@ -1771,7 +1774,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     const imageDataUrl =
       'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+o7m0AAAAASUVORK5CYII=';
     await renderMarkdownMessage(`![Alt](${imageDataUrl})`);
-    const actionContent = context.window.locator('.message-llm-action-response');
+    const actionContent = context.window.locator('.message-llm-action-response').last();
     await expect(actionContent).toContainText(/Image (blocked: Alt|not available)/);
   });
 
@@ -1840,7 +1843,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     await messageInput.fill('Render markdown');
     await messageInput.press('Enter');
 
-    const actionContent = context.window.locator('.message-llm-action-response');
+    const actionContent = context.window.locator('.message-llm-action-response').last();
     await expect(actionContent).toBeVisible({ timeout: 3000 });
 
     await expect(context.window.locator('[data-streamdown="code-block-actions"]')).toBeVisible({
