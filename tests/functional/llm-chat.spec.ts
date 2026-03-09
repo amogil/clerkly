@@ -276,7 +276,17 @@ test.describe('LLM Chat (real OpenAI)', () => {
        click navigates to Settings screen
      Requirements: llm-integration.3.1, llm-integration.3.4, llm-integration.3.5 */
   test('should show error message on invalid api key', async () => {
-    context = await launchWithRealLLM('sk-invalid-key-000000000000');
+    // Use deterministic mock provider 401 response to assert auth error UX contract.
+    mockLLMServer.setSuccess(false);
+    mockLLMServer.setError(401, 'Invalid API key');
+
+    context = await launchElectron(undefined, {
+      CLERKLY_GOOGLE_API_URL: mockOAuthServer.getBaseUrl(),
+      CLERKLY_OPENAI_API_URL: `http://localhost:${mockLLMPort}/v1/responses`,
+      CLERKLY_OPENAI_API_KEY: 'sk-invalid-key-000000000000',
+    });
+    await completeOAuthFlow(context.app, context.window, TEST_CLIENT_ID);
+    await expectAgentsVisible(context.window, 10000);
 
     const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
     await messageInput.fill('Hello');

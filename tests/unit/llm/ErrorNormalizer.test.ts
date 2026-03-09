@@ -88,17 +88,44 @@ describe('ErrorNormalizer', () => {
     expect(normalized.message).toBe('Provider service unavailable. Please try again later.');
   });
 
-  /* Preconditions: RetryError from SDK
+  /* Preconditions: RetryError from SDK without recognizable details
      Action: normalizeLLMError
      Assertions: mapped to provider
      Requirements: llm-integration.3.10 */
-  it('maps RetryError to provider', () => {
+  it('maps generic RetryError to provider', () => {
     const normalized = normalizeLLMError({
       name: 'RetryError',
       message: 'Retries exhausted',
     });
     expect(normalized.type).toBe('provider');
     expect(normalized.message).toBe('Provider service unavailable. Please try again later.');
+  });
+
+  /* Preconditions: RetryError carries auth wording
+     Action: normalizeLLMError
+     Assertions: mapped to auth
+     Requirements: llm-integration.3.10 */
+  it('maps RetryError with auth wording to auth', () => {
+    const normalized = normalizeLLMError({
+      name: 'RetryError',
+      message: 'Unauthorized: invalid api key',
+    });
+    expect(normalized.type).toBe('auth');
+    expect(normalized.message).toBe('Invalid API key. Please check your key and try again.');
+  });
+
+  /* Preconditions: RetryError carries 429 wording
+     Action: normalizeLLMError
+     Assertions: mapped to rate_limit with parsed retryAfterSeconds
+     Requirements: llm-integration.3.7.6, llm-integration.3.10 */
+  it('maps RetryError with 429 wording to rate_limit', () => {
+    const normalized = normalizeLLMError({
+      name: 'RetryError',
+      message: 'Rate limit exceeded. Please try again in 3.2s',
+    });
+    expect(normalized.type).toBe('rate_limit');
+    expect(normalized.message).toBe('Rate limit exceeded. Please try again later.');
+    expect(normalized.retryAfterSeconds).toBe(4);
   });
 
   /* Preconditions: ToolExecutionError from SDK

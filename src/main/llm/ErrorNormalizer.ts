@@ -100,9 +100,6 @@ export function normalizeLLMError(error: unknown): NormalizedLLMError {
   if (name === 'UIMessageStreamError') {
     return { type: 'protocol', message: STANDARD_MESSAGES.protocol };
   }
-  if (name === 'RetryError') {
-    return { type: 'provider', message: STANDARD_MESSAGES.provider };
-  }
 
   if (name === 'APICallError') {
     if (statusCode === undefined) {
@@ -159,6 +156,10 @@ export function normalizeLLMError(error: unknown): NormalizedLLMError {
   }
   if (lower.includes('network') || lower.includes('fetch') || lower.includes('econnreset')) {
     return { type: 'network', message: STANDARD_MESSAGES.network };
+  }
+
+  if (name === 'RetryError') {
+    return { type: 'provider', message: STANDARD_MESSAGES.provider };
   }
 
   return { type: 'provider', message: STANDARD_MESSAGES.provider };
