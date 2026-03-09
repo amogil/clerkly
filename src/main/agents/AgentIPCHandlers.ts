@@ -363,6 +363,11 @@ export class AgentIPCHandlers {
         return { success: true };
       }
 
+      // Ensure renderer receives fresh status even when no message.updated is emitted
+      // (e.g., cancel before first llm chunk).
+      // Requirements: agents.9.2, llm-integration.8.1
+      this.agentManager.publishStatusUpdated(args.agentId);
+
       return { success: true };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -382,14 +387,11 @@ export class AgentIPCHandlers {
       return false;
     }
 
-    // Keep already-sent user message visible when llm has started:
-    // - hide pending user message if generation hasn't produced an llm message yet
-    // - hide only in-flight llm message when present
+    // Keep user message visible on cancel; hide only in-flight llm message when present.
+    // Requirements: llm-integration.8.4, llm-integration.8.6.1, agents.4.24.5
     const lastMessage = this.messageManager.getLastMessage(agentId);
     if (lastMessage && !lastMessage.hidden) {
-      if (lastMessage.kind === 'user') {
-        this.messageManager.setHidden(lastMessage.id, agentId);
-      } else if (lastMessage.kind === 'llm' && !lastMessage.done) {
+      if (lastMessage.kind === 'llm' && !lastMessage.done) {
         this.messageManager.hideAndMarkIncomplete(lastMessage.id, agentId);
       }
     }

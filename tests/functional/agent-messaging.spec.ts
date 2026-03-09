@@ -272,19 +272,42 @@ test.describe('Agent Messaging', () => {
     const messageInput = activeChat(window).textarea;
     const messagesContainer = activeChat(window).messagesArea;
 
-    // Send many messages to create scroll
-    for (let i = 1; i <= 10; i++) {
+    // Send many messages quickly: cancel each in-progress turn except the last one
+    for (let i = 1; i <= 19; i++) {
+      await expect(window.locator('[data-testid="prompt-input-send"]')).toBeVisible({
+        timeout: 10000,
+      });
       await messageInput.fill(`Message ${i}`);
       await messageInput.press('Enter');
       await expect(activeChat(window).userMessages).toHaveCount(i, { timeout: 5000 });
+      await expect(window.locator('[data-testid="prompt-input-stop"]')).toBeVisible({
+        timeout: 10000,
+      });
+      await window.locator('[data-testid="prompt-input-stop"]').click();
     }
+
+    // Ensure we are back in send mode before the final message
+    await expect(window.locator('[data-testid="prompt-input-send"]')).toBeVisible({
+      timeout: 10000,
+    });
+
+    // Last message: wait for full response completion
+    await messageInput.fill('Message 20');
+    await messageInput.press('Enter');
+    await expect(activeChat(window).userMessages).toHaveCount(20, { timeout: 5000 });
+    await expect(window.locator('[data-testid="prompt-input-send"]')).toBeVisible({
+      timeout: 30000,
+    });
 
     // Check that last user message is visible (scrolled into view)
     const lastMessage = activeChat(window).userMessages.last();
     await expect(lastMessage).toBeVisible();
-
     const lastMessageText = await lastMessage.textContent();
-    expect(lastMessageText).toContain('Message 10');
+    expect(lastMessageText).toContain('Message 20');
+
+    // Check that last model response is visible after final message processing
+    const lastLlmMessage = activeChat(window).llmMessages.last();
+    await expect(lastLlmMessage).toBeVisible({ timeout: 10000 });
 
     // Wait for scroll to complete
     await window.waitForFunction(

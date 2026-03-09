@@ -92,7 +92,10 @@ export class AgentManager {
    */
   public toEventAgent(agent: Agent): AgentSnapshot {
     const lastVisible = this.getLatestVisibleMessage(agent.agentId);
-    const status = this.computeAgentStatus(lastVisible);
+    let status = this.computeAgentStatus(lastVisible);
+    if (lastVisible?.kind === MESSAGE_KIND.USER && !this.pipelineControllers.has(agent.agentId)) {
+      status = AGENT_STATUS.AWAITING_RESPONSE;
+    }
 
     return {
       id: agent.agentId,
@@ -167,6 +170,25 @@ export class AgentManager {
    * Requirements: agents.9.2, agents.9.3, agents.12.2
    */
   private handleMessageUpdated(agentId: string): void {
+    try {
+      const updatedAgent = this.dbManager.agents.findById(agentId);
+      if (updatedAgent) {
+        MainEventBus.getInstance().publish(
+          new AgentUpdatedEvent(this.toEventAgent(updatedAgent), ['status'])
+        );
+      }
+    } catch (error) {
+      handleBackgroundError(error, 'Agent Status Update');
+      throw error;
+    }
+  }
+
+  /**
+   * Publish AGENT_UPDATED with recomputed status for a specific agent.
+   * Used when status changes without MESSAGE_UPDATED side effects (e.g., pipeline cancel before first llm chunk).
+   * Requirements: agents.9.2, agents.12.2, llm-integration.8.1
+   */
+  publishStatusUpdated(agentId: string): void {
     try {
       const updatedAgent = this.dbManager.agents.findById(agentId);
       if (updatedAgent) {
