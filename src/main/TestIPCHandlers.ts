@@ -451,10 +451,21 @@ export function registerTestIPCHandlers(
         }
 
         // status === 'completed'
+        // Requirements: agents.9.6
+        // Completed status is derived from a done tool_call(final_answer), not from legacy message kind.
         messageManager.create(
           agentId,
-          'final_answer',
-          { data: { text: 'Status fixture completed', format: 'text' } },
+          'tool_call',
+          {
+            data: {
+              callId: 'status-fixture-final-answer',
+              toolName: 'final_answer',
+              arguments: {
+                text: 'Status fixture completed',
+                summary_points: ['Fixture completion summary'],
+              },
+            },
+          },
           replyToMessageId,
           true
         );
