@@ -4,7 +4,7 @@
 
 Цель: привести систему в соответствие задаче #51 — добавить поддержку тулы `final_answer`, зафиксировать её контракт в спеках/дизайне, реализовать логику статуса `completed`, обновить промпт и покрыть изменения модульными и функциональными тестами.
 
-**Текущий статус:** Фаза 5 — Валидация
+**Текущий статус:** Фаза 6 — Завершена (ожидается только полный functional прогон)
 
 ---
 
@@ -94,8 +94,32 @@
 ## Фаза 5: Валидация
 
 - [x] Прогнать релевантные unit тесты по затронутым модулям.
-- [ ] Прогнать `npm run validate`.
+- [x] Прогнать `npm run validate`.
 - [ ] После подтверждения пользователя — полный прогон `npm run test:functional`.
+
+---
+
+## Фаза 6: Корректировка final_answer контракта (strict + retry)
+
+- [x] Обновить спеки и дизайн под новую семантику `final_answer`:
+  - [x] Основной ответ пользователя остаётся в `kind: llm` (`data.text`).
+  - [x] `final_answer` — completion summary (не дублирует полный ответ).
+  - [x] Лимиты `text`/`summary_points` обязательны по strict-schema инструмента.
+- [x] Перенести retry/repair для невалидного `final_answer` на AI SDK (`maxRetries` + strict tools).
+- [x] Упростить `MainPipeline`: оставить только доменный маппинг финальной ошибки в `kind:error`.
+- [x] Обновить промпт `FinalAnswerFeature`:
+  - [x] Явно запретить дублирование полного ответа в `final_answer.text`.
+  - [x] Зафиксировать лимиты `text`/`summary_points`.
+- [x] Обновить renderer mapping/компоненты:
+  - [x] Убрать fallback для пустого `final_answer.text` (невалидный путь обрабатывается в pipeline).
+  - [x] Оставить `final_answer` как completion summary + `Completed` badge.
+- [x] Добавить/обновить unit тесты:
+  - [x] `MainPipeline`: финальная ошибка провайдера после SDK retry -> `kind:error`.
+  - [x] `PromptBuilder`: обновлённая инструкция и лимиты schema.
+  - [x] renderer tests: completion summary без fallback-пути.
+- [x] Добавить/обновить functional тесты:
+  - [x] сценарий невалидного `final_answer` с последующим успешным retry.
+  - [x] сценарий исчерпания retry и показа `kind:error`.
 
 ---
 
@@ -106,5 +130,6 @@
 - [x] Статус `completed` вычисляется и отображается по согласованному правилу.
 - [x] Добавлены/обновлены модульные тесты для pipeline, статусов, промпта и renderer.
 - [x] Добавлены/обновлены функциональные тесты для user-flow и статусов.
-- [ ] `npm run validate` проходит.
+- [x] `npm run validate` проходит.
 - [ ] (После отдельного подтверждения) полный `npm run test:functional` проходит.
+- [x] Strict-schema `final_answer` в AI SDK + retry/repair policy реализованы и покрыты тестами.

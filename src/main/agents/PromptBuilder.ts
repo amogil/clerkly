@@ -202,9 +202,9 @@ export class FinalAnswerFeature implements AgentFeature {
   getSystemPromptSection(): string {
     return [
       'When you consider the user task completed, call the `final_answer` tool.',
-      'Provide the final user-facing text in `text`.',
-      'Optionally provide `summary_points` as short bullet points (target: up to 10 points, target: up to 200 characters each).',
-      'These limits are guidance for generation quality; if they are exceeded, the response is still accepted.',
+      'Do not duplicate the full final answer in this tool.',
+      'Use `text` only as a short completion summary (max 280 chars).',
+      'Optionally provide `summary_points` as short bullet points (max 10 points, each max 200 characters).',
     ].join(' ');
   }
 
@@ -220,14 +220,18 @@ export class FinalAnswerFeature implements AgentFeature {
           properties: {
             text: {
               type: 'string',
-              description: 'Final user-facing response text.',
+              description: 'Short completion summary text (max 280 characters).',
+              minLength: 1,
+              maxLength: 280,
             },
             summary_points: {
               type: 'array',
               description:
-                'Optional concise summary bullet points (target: up to 10 points, up to 200 characters each).',
+                'Optional concise summary bullet points (max 10 points, max 200 chars each).',
+              maxItems: 10,
               items: {
                 type: 'string',
+                maxLength: 200,
               },
             },
           },

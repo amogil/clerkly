@@ -1579,8 +1579,8 @@ function AgentWelcome({ onPromptClick }: AgentWelcomeProps) {
 
 **Сообщения инструментов (`kind: 'tool_call'`):**
 - Для `toolName !== 'final_answer'` используется AI Elements `Tool` family как отдельный технический блок вызова инструмента.
-- Для `toolName === 'final_answer'` используется обычная ветка assistant-сообщения (`Message`/`MessageContent`), дополненная визуальным `Completed` badge.
-- Если `final_answer` не содержит текста, рендерится fallback: `Модель закончила работу` (без отдельного `kind:error`).
+- Для `toolName === 'final_answer'` используется обычная ветка assistant-сообщения (`Message`/`MessageContent`) как компактный completion summary, дополненный визуальным `Completed` badge.
+- Невалидный `final_answer` не должен попадать в успешный рендер: pipeline запускает retry и при исчерпании лимита создаёт `kind:error`.
 
 ```tsx
 // Requirements: agents.7.4.1, agents.7.4.2, agents.7.4.3
@@ -1596,7 +1596,7 @@ if (message.kind === 'tool_call' && toolName === 'final_answer') {
         </span>
       </div>
       <div data-testid="message-llm-action" className="text-sm leading-relaxed whitespace-pre-wrap break-words w-full">
-        {finalText || 'Модель закончила работу'}
+        {finalText}
       </div>
       {summaryPoints?.length ? (
         <ul data-testid="message-completed-summary" className="list-disc pl-5 text-sm text-muted-foreground">

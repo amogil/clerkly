@@ -12,6 +12,8 @@ import {
 import { LLM_PROVIDERS, ERROR_MESSAGES, CHAT_TIMEOUT_MS } from './LLMConfig';
 import { LLMRequestAbortedError, isAbortLikeError } from './LLMErrors';
 
+const AI_SDK_MAX_RETRIES = 2;
+
 /**
  * Google Gemini LLM provider implementation
  * Uses AI SDK streamText for chat, manual fetch for testConnection
@@ -106,7 +108,7 @@ export class GoogleProvider implements ILLMProvider {
         sendReasoning: true,
         tools,
         ...(stopWhen ? { stopWhen } : {}),
-        maxRetries: 0,
+        maxRetries: AI_SDK_MAX_RETRIES,
         abortSignal: controller.signal,
         onStepFinish: (event: Record<string, unknown>) => {
           const stepIndex =
