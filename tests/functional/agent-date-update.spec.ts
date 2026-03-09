@@ -123,5 +123,10 @@ test.describe('Agents - Date Update on New Message', () => {
     const timestampAfter = await headerTimestamp.textContent();
     expect(timestampAfter).toBeTruthy();
     expect(timestampAfter).not.toBe(timestampBefore);
+
+    // Ensure active turn is fully settled before teardown to avoid flaky app.close() timeout.
+    await expect(window.locator('[data-testid="prompt-input-send"]')).toBeVisible({
+      timeout: 15000,
+    });
   });
 });
