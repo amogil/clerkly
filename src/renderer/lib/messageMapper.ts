@@ -84,10 +84,10 @@ export function toUIMessage(msg: MessageSnapshot): UIMessage | null {
         call.arguments && typeof call.arguments === 'object' && !Array.isArray(call.arguments)
           ? call.arguments
           : {};
-      const text =
-        typeof args.text === 'string' && args.text.trim().length > 0
-          ? args.text
-          : 'Model has completed the task';
+      const text = typeof args.text === 'string' ? args.text.trim() : '';
+      if (!text) {
+        return null;
+      }
       return {
         id: String(msg.id),
         role: 'assistant',

@@ -138,12 +138,12 @@ describe('AgentMessage — tool_call', () => {
     expect(screen.queryByTestId('message-tool-call')).not.toBeInTheDocument();
   });
 
-  /* Preconditions: final_answer without text
+  /* Preconditions: invalid final_answer without text (should be filtered by pipeline)
      Action: render AgentMessage
-     Assertions: fallback text is shown without error block
+     Assertions: component renders nothing for this invalid snapshot
      Requirements: agents.7.4.3, llm-integration.9.6 */
-  it('should render fallback text for final_answer without text', () => {
-    render(
+  it('should not render final_answer block when text is absent', () => {
+    const { container } = render(
       <AgentMessage
         message={baseMessage({
           kind: 'tool_call',
@@ -161,10 +161,7 @@ describe('AgentMessage — tool_call', () => {
       />
     );
 
-    expect(screen.getByTestId('message-llm-action')).toHaveTextContent(
-      'Model has completed the task'
-    );
-    expect(screen.queryByTestId('message-error')).not.toBeInTheDocument();
+    expect(container).toBeEmptyDOMElement();
   });
 });
 

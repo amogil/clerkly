@@ -258,10 +258,9 @@ describe('MainPipeline.run()', () => {
     );
   });
 
-  it('persists final_answer tool_call as completed and keeps arguments without normalization', async () => {
+  it('persists valid final_answer tool_call as completed', async () => {
     const { pipeline, llmProvider, messageManager } = makeMocks();
 
-    const longPoint = 'x'.repeat(240);
     llmProvider.chat.mockImplementation(
       async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
         onChunk({
@@ -269,8 +268,8 @@ describe('MainPipeline.run()', () => {
           callId: 'call-final',
           toolName: 'final_answer',
           arguments: {
-            text: 'Final answer text',
-            summary_points: Array.from({ length: 12 }, (_, i) => `p${i}-${longPoint}`),
+            text: 'Task completed',
+            summary_points: ['Step A done', 'Step B done'],
           },
         });
         return { text: 'assistant text' };
@@ -287,7 +286,70 @@ describe('MainPipeline.run()', () => {
           callId: 'call-final',
           toolName: 'final_answer',
           arguments: expect.objectContaining({
-            text: 'Final answer text',
+            text: 'Task completed',
+          }),
+        }),
+      }),
+      1,
+      true
+    );
+  });
+
+  it('persists final_answer tool_call without local validation retry loop in MainPipeline', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({ type: 'reasoning', delta: 'Thinking...' });
+        onChunk({
+          type: 'tool_call',
+          callId: 'call-final',
+          toolName: 'final_answer',
+          arguments: {
+            text: 'Task completed',
+            summary_points: ['Done'],
+          },
+        });
+        return { text: 'assistant text final' };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    expect(llmProvider.chat).toHaveBeenCalledTimes(1);
+    expect(messageManager.hideAndMarkIncomplete).not.toHaveBeenCalled();
+    expect(messageManager.create).toHaveBeenCalledWith(
+      'agent-1',
+      'tool_call',
+      expect.objectContaining({
+        data: expect.objectContaining({
+          callId: 'call-final',
+          toolName: 'final_answer',
+          arguments: expect.objectContaining({ text: 'Task completed' }),
+        }),
+      }),
+      1,
+      true
+    );
+  });
+
+  it('creates kind:error when provider returns final invalid final_answer failure', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+
+    const invalidToolError = new Error('Tool arguments are invalid');
+    invalidToolError.name = 'InvalidToolInputError';
+    llmProvider.chat.mockRejectedValue(invalidToolError);
+
+    await pipeline.run('agent-1', 1);
+
+    expect(llmProvider.chat).toHaveBeenCalledTimes(2);
+    expect(messageManager.create).toHaveBeenCalledWith(
+      'agent-1',
+      'error',
+      expect.objectContaining({
+        data: expect.objectContaining({
+          error: expect.objectContaining({
+            type: 'tool',
           }),
         }),
       }),

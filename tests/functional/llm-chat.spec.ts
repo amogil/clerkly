@@ -1404,26 +1404,34 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     await expect(context.window.locator('[data-testid="message-completed-badge"]')).toHaveCount(0);
   });
 
-  /* Preconditions: MockLLMServer returns final_answer with summary_points beyond recommended limits
+  /* Preconditions: First model attempt returns invalid final_answer (text too long),
+     second attempt returns valid final_answer
      Action: User sends a message
-     Assertions: UI renders all summary_points as-is (no truncation or dropping)
-     Requirements: llm-integration.11.8 */
-  test('should render final_answer summary_points as-is without normalization', async () => {
-    const longPoint = `LONG-${'x'.repeat(230)}`;
-    const points = Array.from({ length: 12 }, (_, index) =>
-      index === 0 ? longPoint : `Point ${index + 1}`
-    );
-
+     Assertions: Pipeline retries automatically and UI shows completed state from second attempt
+     Requirements: llm-integration.12.2.1, llm-integration.12.2.2 */
+  test('should retry invalid final_answer and complete after corrected retry', async () => {
     mockLLMServer.setStreamingMode(true);
     mockLLMServer.setOpenAIStreamScripts([
       {
         toolCalls: [
           {
-            callId: 'final-oversized',
+            callId: 'final-invalid',
             toolName: 'final_answer',
             arguments: {
-              text: 'Done with oversized summary',
-              summary_points: points,
+              text: `INVALID-${'x'.repeat(290)}`,
+              summary_points: ['Too long text'],
+            },
+          },
+        ],
+      },
+      {
+        toolCalls: [
+          {
+            callId: 'final-valid',
+            toolName: 'final_answer',
+            arguments: {
+              text: 'Task completed',
+              summary_points: ['Validated format', 'Finished successfully'],
             },
           },
         ],
@@ -1436,13 +1444,62 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     await messageInput.fill('Finish with many points');
     await messageInput.press('Enter');
 
-    const summary = context.window.locator('[data-testid="message-completed-summary"]').last();
-    await expect(summary).toBeVisible({ timeout: 15000 });
+    const completedBadge = context.window.locator('[data-testid="message-completed-badge"]').last();
+    await expect(completedBadge).toBeVisible({ timeout: 15000 });
+    await expect(completedBadge).toContainText('Completed');
 
-    const items = summary.locator('li');
-    await expect(items).toHaveCount(12);
-    await expect(items.first()).toContainText(longPoint);
-    await expect(items.last()).toContainText('Point 12');
+    const summary = context.window.locator('[data-testid="message-completed-summary"]').last();
+    await expect(summary).toContainText('Validated format');
+
+    const requestCount = mockLLMServer
+      .getRequestLogs()
+      .filter((entry) => entry.method === 'POST' && entry.path === '/v1/responses').length;
+    expect(requestCount).toBeGreaterThanOrEqual(2);
+  });
+
+  /* Preconditions: Both attempts return invalid final_answer
+     Action: User sends a message
+     Assertions: Retry limit is exhausted and kind:error is shown
+     Requirements: llm-integration.12.2.2, llm-integration.12.3 */
+  test('should show error when invalid final_answer exhausts retry limit', async () => {
+    mockLLMServer.setStreamingMode(true);
+    mockLLMServer.setOpenAIStreamScripts([
+      {
+        toolCalls: [
+          {
+            callId: 'final-invalid-1',
+            toolName: 'final_answer',
+            arguments: {
+              text: `INVALID-${'x'.repeat(290)}`,
+            },
+          },
+        ],
+      },
+      {
+        toolCalls: [
+          {
+            callId: 'final-invalid-2',
+            toolName: 'final_answer',
+            arguments: {
+              text: `INVALID-${'x'.repeat(290)}`,
+            },
+          },
+        ],
+      },
+    ]);
+
+    context = await launchWithMockLLM();
+    const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
+
+    await messageInput.fill('Finish with invalid completion');
+    await messageInput.press('Enter');
+
+    const errorBubble = context.window.locator('[data-testid="message-error"]').last();
+    await expect(errorBubble).toBeVisible({ timeout: 15000 });
+    await expect(errorBubble).toContainText(
+      'Model returned invalid completion format too many times. Please try again.'
+    );
+    await expect(context.window.locator('[data-testid="message-completed-badge"]')).toHaveCount(0);
   });
 
   /* Preconditions: MockLLMServer returns provider error

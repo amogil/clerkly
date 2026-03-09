@@ -284,6 +284,27 @@ describe('toUIMessage', () => {
     expect(result!.parts).toEqual([{ type: 'text', text: 'Final answer text' }]);
     expect((result!.metadata as Record<string, unknown>).isFinalAnswer).toBe(true);
   });
+
+  /* Preconditions: final_answer without text (invalid contract)
+     Action: call toUIMessage
+     Assertions: message is ignored
+     Requirements: llm-integration.9.6 */
+  it('should return null for invalid final_answer without text', () => {
+    const msg = makeSnapshot({
+      kind: 'tool_call',
+      done: true,
+      payload: {
+        data: {
+          callId: 'call-final',
+          toolName: 'final_answer',
+          arguments: {
+            summary_points: ['Point 1'],
+          },
+        },
+      },
+    });
+    expect(toUIMessage(msg)).toBeNull();
+  });
 });
 
 describe('toUIMessages', () => {

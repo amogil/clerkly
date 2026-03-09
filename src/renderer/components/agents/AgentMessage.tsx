@@ -130,9 +130,10 @@ export function AgentMessage({
         toolData.arguments && typeof toolData.arguments === 'object'
           ? toolData.arguments
           : undefined;
-      const finalTextRaw = typeof args?.['text'] === 'string' ? args['text'] : '';
-      const finalText =
-        finalTextRaw.trim().length > 0 ? finalTextRaw : 'Model has completed the task';
+      const finalText = typeof args?.['text'] === 'string' ? args['text'].trim() : '';
+      if (!finalText) {
+        return null;
+      }
       const summaryPointsRaw = args?.['summary_points'];
       const summaryPoints = Array.isArray(summaryPointsRaw)
         ? summaryPointsRaw.filter((point): point is string => typeof point === 'string')

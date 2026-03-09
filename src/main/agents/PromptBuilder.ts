@@ -203,7 +203,7 @@ export class FinalAnswerFeature implements AgentFeature {
     return [
       'When you consider the user task completed, call the `final_answer` tool.',
       'Do not duplicate the full final answer in this tool.',
-      'Use `text` only as a short completion summary (max 280 chars).',
+      'Use `text` only as a short completion summary (max 300 chars).',
       'Optionally provide `summary_points` as short bullet points (max 10 points, each max 200 characters).',
     ].join(' ');
   }
@@ -220,9 +220,9 @@ export class FinalAnswerFeature implements AgentFeature {
           properties: {
             text: {
               type: 'string',
-              description: 'Short completion summary text (max 280 characters).',
+              description: 'Short completion summary text (max 300 characters).',
               minLength: 1,
-              maxLength: 280,
+              maxLength: 300,
             },
             summary_points: {
               type: 'array',

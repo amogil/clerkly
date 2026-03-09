@@ -132,7 +132,19 @@ describe('PromptBuilder.build()', () => {
       const feature = new FinalAnswerFeature();
       const result = makeBuilder('Base.', [feature]).build();
       expect(result.systemPrompt).toContain('final_answer');
+      expect(result.systemPrompt).toContain('Do not duplicate the full final answer');
       expect(result.tools.some((tool) => tool.name === 'final_answer')).toBe(true);
+      const finalAnswerTool = result.tools.find((tool) => tool.name === 'final_answer');
+      expect(finalAnswerTool?.parameters).toMatchObject({
+        properties: {
+          text: expect.objectContaining({ minLength: 1, maxLength: 300 }),
+          summary_points: expect.objectContaining({
+            maxItems: 10,
+            items: expect.objectContaining({ maxLength: 200 }),
+          }),
+        },
+        required: ['text'],
+      });
     });
   });
 
