@@ -14,6 +14,7 @@ import {
 import { createMockOAuthServer } from './helpers/electron';
 import type { MockOAuthServer } from './helpers/mock-oauth-server';
 import { MockLLMServer } from './helpers/mock-llm-server';
+import { resetMockLLMServerState } from './helpers/mock-llm-state';
 
 let context: ElectronTestContext;
 let mockOAuthServer: MockOAuthServer;
@@ -53,10 +54,7 @@ test.afterAll(async () => {
 });
 
 test.beforeEach(async () => {
-  // Clear request logs
-  mockLLMServer.clearRequestLogs();
-  mockLLMServer.setSuccess(true);
-  mockLLMServer.setDelay(0); // Reset delay
+  resetMockLLMServerState(mockLLMServer);
 
   // Launch Electron app with mock servers
   const mockLLMBaseUrl = mockLLMServer.getBaseUrl();

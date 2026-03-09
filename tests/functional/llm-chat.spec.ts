@@ -24,6 +24,7 @@ import {
 } from './helpers/electron';
 import type { MockOAuthServer } from './helpers/mock-oauth-server';
 import { MockLLMServer } from './helpers/mock-llm-server';
+import { resetMockLLMServerState } from './helpers/mock-llm-state';
 
 const TEST_CLIENT_ID = 'test-client-id-12345';
 let mockLLMPort: number;
@@ -47,6 +48,10 @@ test.beforeAll(async () => {
   mockLLMPort = await getFreePort();
   mockLLMServer = new MockLLMServer({ port: mockLLMPort });
   await mockLLMServer.start();
+});
+
+test.beforeEach(() => {
+  resetMockLLMServerState(mockLLMServer);
 });
 
 test.afterAll(async () => {

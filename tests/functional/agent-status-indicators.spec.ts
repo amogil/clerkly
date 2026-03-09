@@ -16,6 +16,7 @@ import {
 } from './helpers/electron';
 import type { MockOAuthServer } from './helpers/mock-oauth-server';
 import { MockLLMServer } from './helpers/mock-llm-server';
+import { resetMockLLMServerState } from './helpers/mock-llm-state';
 
 let electronApp: ElectronApplication;
 let window: Page;
@@ -39,9 +40,7 @@ test.afterAll(async () => {
 });
 
 test.beforeEach(async () => {
-  mockLLMServer.setSuccess(true);
-  mockLLMServer.setDelay(0);
-  mockLLMServer.clearRequestLogs();
+  resetMockLLMServerState(mockLLMServer);
 
   const context = await launchElectron(undefined, {
     CLERKLY_GOOGLE_API_URL: mockServer.getBaseUrl(),
