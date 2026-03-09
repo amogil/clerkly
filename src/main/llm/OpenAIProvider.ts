@@ -182,9 +182,10 @@ export class OpenAIProvider implements ILLMProvider {
             part.input && typeof part.input === 'object' && !Array.isArray(part.input)
               ? (part.input as Record<string, unknown>)
               : {};
+          const callId = this.normalizeToolCallId(part.toolCallId, part.toolName);
           onChunk({
             type: 'tool_call',
-            callId: part.toolCallId ?? '',
+            callId,
             toolName: part.toolName ?? '',
             arguments: args,
           });
@@ -195,9 +196,10 @@ export class OpenAIProvider implements ILLMProvider {
             part.input && typeof part.input === 'object' && !Array.isArray(part.input)
               ? (part.input as Record<string, unknown>)
               : {};
+          const callId = this.normalizeToolCallId(part.toolCallId, part.toolName);
           onChunk({
             type: 'tool_result',
-            callId: part.toolCallId ?? '',
+            callId,
             toolName: part.toolName ?? '',
             arguments: args,
             output: part.output,
@@ -216,9 +218,10 @@ export class OpenAIProvider implements ILLMProvider {
               : part.error instanceof Error
                 ? part.error.message
                 : 'Tool execution failed';
+          const callId = this.normalizeToolCallId(part.toolCallId, part.toolName);
           onChunk({
             type: 'tool_result',
-            callId: part.toolCallId ?? '',
+            callId,
             toolName: part.toolName ?? '',
             arguments: args,
             output: { message: errorText },
@@ -337,5 +340,14 @@ export class OpenAIProvider implements ILLMProvider {
       return ERROR_MESSAGES.timeout;
     }
     return ERROR_MESSAGES.network;
+  }
+
+  private normalizeToolCallId(rawCallId: string | undefined, toolName: string | undefined): string {
+    if (typeof rawCallId === 'string' && rawCallId.trim().length > 0) {
+      return rawCallId;
+    }
+    const safeToolName =
+      typeof toolName === 'string' && toolName.trim().length > 0 ? toolName.trim() : 'tool';
+    return `call-${safeToolName}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
   }
 }
