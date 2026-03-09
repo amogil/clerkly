@@ -228,7 +228,8 @@ test.describe('Agent Status Calculation', () => {
       .poll(async () => await agentAvatar.getAttribute('class'), { timeout: 5000 })
       .toContain('bg-green-500');
 
-    const headerStatus = window.locator('[data-testid="agent-status-text"]');
+    const headerStatus = window.locator('[data-testid="agent-status-text"]').first();
+    await expect(headerStatus).toBeVisible();
     await expect(headerStatus).toHaveText('Completed');
   });
 });
