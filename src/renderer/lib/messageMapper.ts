@@ -85,19 +85,18 @@ export function toUIMessage(msg: MessageSnapshot): UIMessage | null {
           ? call.arguments
           : {};
       const text = typeof args.text === 'string' ? args.text.trim() : '';
-      if (!text) {
-        return null;
-      }
+      const normalizedText = text.length > 0 ? text : 'Done';
+      const summaryPoints = Array.isArray(args.summary_points) ? args.summary_points : [];
       return {
         id: String(msg.id),
         role: 'assistant',
-        parts: [{ type: 'text', text }],
+        parts: [{ type: 'text', text: normalizedText }],
         metadata: {
           isToolCall: true,
           isFinalAnswer: true,
           toolName: call.toolName,
           callId: call.callId ?? String(msg.id),
-          summaryPoints: args.summary_points,
+          summary_points: summaryPoints,
         },
       };
     }

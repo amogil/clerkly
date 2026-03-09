@@ -283,13 +283,14 @@ describe('toUIMessage', () => {
     expect(result!.role).toBe('assistant');
     expect(result!.parts).toEqual([{ type: 'text', text: 'Final answer text' }]);
     expect((result!.metadata as Record<string, unknown>).isFinalAnswer).toBe(true);
+    expect((result!.metadata as Record<string, unknown>).summary_points).toEqual(['Point 1']);
   });
 
-  /* Preconditions: final_answer without text (invalid contract)
+  /* Preconditions: final_answer without text
      Action: call toUIMessage
-     Assertions: message is ignored
+     Assertions: falls back to Done placeholder text
      Requirements: llm-integration.9.6 */
-  it('should return null for invalid final_answer without text', () => {
+  it('should map final_answer without text to Done placeholder', () => {
     const msg = makeSnapshot({
       kind: 'tool_call',
       done: true,
@@ -303,7 +304,34 @@ describe('toUIMessage', () => {
         },
       },
     });
-    expect(toUIMessage(msg)).toBeNull();
+    const result = toUIMessage(msg);
+    expect(result).not.toBeNull();
+    expect(result!.role).toBe('assistant');
+    expect(result!.parts).toEqual([{ type: 'text', text: 'Done' }]);
+    expect((result!.metadata as Record<string, unknown>).summary_points).toEqual(['Point 1']);
+  });
+
+  /* Preconditions: final_answer without summary_points
+     Action: call toUIMessage
+     Assertions: summary_points normalized to empty array
+     Requirements: llm-integration.9.5.1.2 */
+  it('should normalize final_answer summaryPoints to empty array when missing', () => {
+    const msg = makeSnapshot({
+      kind: 'tool_call',
+      done: true,
+      payload: {
+        data: {
+          callId: 'call-final',
+          toolName: 'final_answer',
+          arguments: {
+            text: 'Completed',
+          },
+        },
+      },
+    });
+    const result = toUIMessage(msg);
+    expect(result).not.toBeNull();
+    expect((result!.metadata as Record<string, unknown>).summary_points).toEqual([]);
   });
 });
 

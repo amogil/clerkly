@@ -665,6 +665,7 @@ User отправляет сообщение
 | llm-integration.8.6.1 | ✓ | ✓ |
 | llm-integration.8.7 | ✓ | ✓ |
 | llm-integration.9 | ✓ | ✓ |
+| llm-integration.9.5.1.2 (default contract: `text` отсутствует, `summary_points=[]`) | ✓ | ✓ |
 | llm-integration.10 | ✓ | ✓ |
 | llm-integration.11 | ✓ | ✓ |
 | llm-integration.12 | ✓ | ✓ |

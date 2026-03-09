@@ -333,6 +333,38 @@ describe('MainPipeline.run()', () => {
     );
   });
 
+  it('normalizes final_answer defaults in runtime payload when fields are absent', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({
+          type: 'tool_call',
+          callId: 'call-final-defaults',
+          toolName: 'final_answer',
+          arguments: {},
+        });
+        return { text: '' };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    expect(messageManager.create).toHaveBeenCalledWith(
+      'agent-1',
+      'tool_call',
+      expect.objectContaining({
+        data: expect.objectContaining({
+          callId: 'call-final-defaults',
+          toolName: 'final_answer',
+          arguments: { summary_points: [] },
+        }),
+      }),
+      1,
+      true
+    );
+  });
+
   it('creates kind:error when provider returns final invalid final_answer failure', async () => {
     const { pipeline, llmProvider, messageManager } = makeMocks();
 
@@ -1103,7 +1135,46 @@ describe('MainPipeline.run()', () => {
         data: expect.objectContaining({
           callId: 'call-final',
           toolName: 'final_answer',
-          arguments: { text: 'Final answer text' },
+          arguments: { text: 'Final answer text', summary_points: [] },
+        }),
+      }),
+      true
+    );
+  });
+
+  it('normalizes final_answer defaults during tool_result finalize when fields are absent', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({
+          type: 'tool_call',
+          callId: 'call-final-defaults-result',
+          toolName: 'final_answer',
+          arguments: {},
+        });
+        onChunk({
+          type: 'tool_result',
+          callId: 'call-final-defaults-result',
+          toolName: 'final_answer',
+          arguments: {},
+          output: { ignored: true },
+          status: 'success',
+        });
+        return { text: '' };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    expect(messageManager.update).toHaveBeenCalledWith(
+      expect.any(Number),
+      'agent-1',
+      expect.objectContaining({
+        data: expect.objectContaining({
+          callId: 'call-final-defaults-result',
+          toolName: 'final_answer',
+          arguments: { summary_points: [] },
         }),
       }),
       true

@@ -235,7 +235,6 @@ export class FinalAnswerFeature implements AgentFeature {
               },
             },
           },
-          required: ['text'],
         },
         // Keep execution deterministic and side-effect free.
         execute: async (args: Record<string, unknown>) => args,

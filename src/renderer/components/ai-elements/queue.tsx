@@ -1,15 +1,12 @@
 'use client';
 
+import React from 'react';
 import type { ComponentProps } from 'react';
 
-import { Button } from '@repo/shadcn-ui/components/ui/button';
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from '@repo/shadcn-ui/components/ui/collapsible';
-import { ScrollArea } from '@repo/shadcn-ui/components/ui/scroll-area';
-import { cn } from '@repo/shadcn-ui/lib/utils';
+import { Button } from '../ui/button';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../ui/collapsible';
+import { ScrollArea } from '../ui/scroll-area';
+import { cn } from '../../lib/utils';
 import { ChevronDownIcon, PaperclipIcon } from 'lucide-react';
 
 export interface QueueMessagePart {

@@ -109,9 +109,9 @@ describe('AgentMessage — tool_call', () => {
 
   /* Preconditions: persisted kind:tool_call for final_answer with text + summary_points
      Action: render AgentMessage
-     Assertions: renders assistant-style final message with completed badge and summary list
+     Assertions: renders Final Answer block with header, toggle and summary points
      Requirements: agents.7.4.1, agents.7.4.2, llm-integration.9.7 */
-  it('should render final_answer as assistant message with completed badge', () => {
+  it('should render final_answer as Final Answer block with summary list', () => {
     render(
       <AgentMessage
         message={baseMessage({
@@ -131,19 +131,25 @@ describe('AgentMessage — tool_call', () => {
       />
     );
 
-    expect(screen.getByTestId('message-completed-badge')).toBeInTheDocument();
-    expect(screen.getByTestId('message-llm-action')).toHaveTextContent('Final answer text');
-    expect(screen.getByTestId('message-completed-summary')).toBeInTheDocument();
+    expect(screen.getByTestId('message-final-answer-block')).toBeInTheDocument();
+    expect(screen.getByTestId('message-final-answer-header')).toBeInTheDocument();
+    expect(screen.getByTestId('message-final-answer-title')).toHaveTextContent('Final answer text');
+    expect(screen.getByTestId('message-final-answer-check')).toBeInTheDocument();
+    expect(screen.getByTestId('message-final-answer-toggle')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('message-final-answer-toggle'));
+    expect(screen.getByTestId('message-final-answer-summary')).toBeInTheDocument();
     expect(screen.getByText('Point 1')).toBeInTheDocument();
     expect(screen.queryByTestId('message-tool-call')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('message-completed-badge')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('message-completed-summary')).not.toBeInTheDocument();
   });
 
-  /* Preconditions: invalid final_answer without text (should be filtered by pipeline)
+  /* Preconditions: final_answer without text and with empty summary
      Action: render AgentMessage
-     Assertions: component renders nothing for this invalid snapshot
+     Assertions: fallback Done title is shown and no toggle/summary rendered
      Requirements: agents.7.4.3, llm-integration.9.6 */
-  it('should not render final_answer block when text is absent', () => {
-    const { container } = render(
+  it('should render fallback Done title without toggle when summary is absent', () => {
+    render(
       <AgentMessage
         message={baseMessage({
           kind: 'tool_call',
@@ -153,7 +159,7 @@ describe('AgentMessage — tool_call', () => {
               callId: 'call-final',
               toolName: 'final_answer',
               arguments: {
-                summary_points: ['Done'],
+                summary_points: [],
               },
             },
           },
@@ -161,7 +167,9 @@ describe('AgentMessage — tool_call', () => {
       />
     );
 
-    expect(container).toBeEmptyDOMElement();
+    expect(screen.getByTestId('message-final-answer-title')).toHaveTextContent('Done');
+    expect(screen.queryByTestId('message-final-answer-toggle')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('message-final-answer-summary')).not.toBeInTheDocument();
   });
 });
 
@@ -370,6 +378,38 @@ describe('AgentMessage — error', () => {
     expect(onNavigate).toHaveBeenCalledWith('settings');
   });
 
+  /* Preconditions: auth error with action link
+     Action: render AgentMessage
+     Assertions: Open Settings is first(outline), Retry is second(default)
+     Requirements: agents.4.10.3, agents.4.10.4 */
+  it('should render auth actions in required order and variants', () => {
+    const onNavigate = jest.fn();
+    render(
+      <AgentMessage
+        message={baseMessage({
+          kind: 'error',
+          payload: {
+            data: {
+              error: {
+                type: 'auth',
+                message: 'API key invalid',
+                action_link: { label: 'Open Settings', screen: 'settings' },
+              },
+            },
+          },
+        })}
+        onNavigate={onNavigate}
+      />
+    );
+
+    const buttons = screen.getAllByRole('button');
+    expect(buttons).toHaveLength(2);
+    expect(buttons[0]).toHaveTextContent('Open Settings');
+    expect(buttons[0]).toHaveAttribute('data-variant', 'outline');
+    expect(buttons[1]).toHaveTextContent('Retry');
+    expect(buttons[1]).toHaveAttribute('data-variant', 'default');
+  });
+
   /* Preconditions: kind:error auth
      Action: click Retry button
      Assertions: retryLast called for agent
@@ -395,6 +435,7 @@ describe('AgentMessage — error', () => {
     fireEvent.click(screen.getByTestId('message-error-retry'));
     await Promise.resolve();
     expect(mockRetryLast).toHaveBeenCalledWith('agent1');
+    expect(screen.queryByTestId('message-error')).not.toBeInTheDocument();
   });
 
   /* Preconditions: kind:error with action_link, no onNavigate

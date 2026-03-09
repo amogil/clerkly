@@ -362,11 +362,12 @@ export class MainPipeline {
     toolCallMessageIds: Map<string, number>
   ): number | null {
     const isFinalAnswer = toolName === 'final_answer';
+    const normalizedArgs = isFinalAnswer ? this.normalizeFinalAnswerArguments(args) : args;
     const toolPayload = {
       data: {
         callId,
         toolName,
-        arguments: args,
+        arguments: normalizedArgs,
       },
     };
     const existingToolMessageId = toolCallMessageIds.get(callId);
@@ -410,11 +411,12 @@ export class MainPipeline {
     toolCallMessageIds: Map<string, number>
   ): void {
     if (toolName === 'final_answer') {
+      const normalizedArgs = this.normalizeFinalAnswerArguments(args);
       const payload = {
         data: {
           callId,
           toolName,
-          arguments: args,
+          arguments: normalizedArgs,
         },
       };
       const existingMessageId = toolCallMessageIds.get(callId);
@@ -470,6 +472,19 @@ export class MainPipeline {
       true
     );
     toolCallMessageIds.set(callId, created.id);
+  }
+
+  /**
+   * Normalize final_answer tool arguments for persisted runtime contract.
+   * Requirements: llm-integration.9.5.1.2
+   */
+  private normalizeFinalAnswerArguments(args: Record<string, unknown>): Record<string, unknown> {
+    const normalized: Record<string, unknown> = {};
+    if (typeof args.text === 'string') {
+      normalized.text = args.text;
+    }
+    normalized.summary_points = Array.isArray(args.summary_points) ? args.summary_points : [];
+    return normalized;
   }
 
   /**

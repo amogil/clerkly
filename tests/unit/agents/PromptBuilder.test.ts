@@ -143,7 +143,6 @@ describe('PromptBuilder.build()', () => {
             items: expect.objectContaining({ maxLength: 200 }),
           }),
         },
-        required: ['text'],
       });
     });
   });

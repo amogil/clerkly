@@ -114,12 +114,12 @@ test.describe('LLM Chat (real OpenAI)', () => {
     const responseText = await responseAction.textContent();
     expect(responseText?.trim().length).toBeGreaterThan(0);
 
-    // Final Answer interpretation block is present and non-empty
-    const completedBadge = context.window.locator('[data-testid="message-completed-badge"]').last();
-    await expect(completedBadge).toBeVisible({ timeout: 30000 });
-    const completedAction = context.window.locator('.message-llm-action-completed').last();
-    await expect(completedAction).toBeVisible({ timeout: 30000 });
-    const completedText = await completedAction.textContent();
+    // Final Answer block is present and non-empty
+    const finalAnswerTitle = context.window
+      .locator('[data-testid="message-final-answer-title"]')
+      .last();
+    await expect(finalAnswerTitle).toBeVisible({ timeout: 30000 });
+    const completedText = await finalAnswerTitle.textContent();
     expect(completedText?.trim().length).toBeGreaterThan(0);
   });
 
@@ -321,6 +321,40 @@ test.describe('LLM Chat (real OpenAI)', () => {
       timeout: 5000,
     });
     await expectAgentsHiddenByCss(context.window, 3000);
+  });
+
+  /* Preconditions: App authenticated, invalid API key saved
+     Action: User sends a message and inspects auth error actions
+     Assertions: Open Settings is first(outline), Retry second(default); Retry hides current dialog
+     Requirements: agents.4.10.3, agents.4.10.4, agents.4.10.5 */
+  test('should render auth error actions in order and hide dialog on retry', async () => {
+    mockLLMServer.setSuccess(false);
+    mockLLMServer.setError(401, 'Invalid API key');
+
+    context = await launchElectron(undefined, {
+      CLERKLY_GOOGLE_API_URL: mockOAuthServer.getBaseUrl(),
+      CLERKLY_OPENAI_API_URL: `http://localhost:${mockLLMPort}/v1/responses`,
+      CLERKLY_OPENAI_API_KEY: 'sk-invalid-key-000000000000',
+    });
+    await completeOAuthFlow(context.app, context.window, TEST_CLIENT_ID);
+    await expectAgentsVisible(context.window, 10000);
+
+    const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
+    await messageInput.fill('Hello');
+    await messageInput.press('Enter');
+
+    const errorBubble = context.window.locator('[data-testid="message-error"]').last();
+    await expect(errorBubble).toBeVisible({ timeout: 15000 });
+
+    const buttons = errorBubble.locator('[data-slot="button"]');
+    await expect(buttons).toHaveCount(2);
+    await expect(buttons.nth(0)).toHaveText('Open Settings');
+    await expect(buttons.nth(0)).toHaveAttribute('data-variant', 'outline');
+    await expect(buttons.nth(1)).toHaveText('Retry');
+    await expect(buttons.nth(1)).toHaveAttribute('data-variant', 'default');
+
+    await buttons.nth(1).click();
+    await expect(errorBubble).toBeHidden({ timeout: 5000 });
   });
 
   /* Preconditions: App authenticated with real OpenAI API key, chat has scrollable content
@@ -1350,7 +1384,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
 
   /* Preconditions: MockLLMServer returns a single tool_call(final_answer) with text + summary_points
      Action: User sends a message
-     Assertions: Final answer is rendered, completed badge is visible, status becomes Completed
+     Assertions: Final answer block is rendered with title and summary details
      Requirements: llm-integration.11.8, agents.9.6 */
   test('should render final_answer tool_call as completed assistant response', async () => {
     mockLLMServer.setStreamingMode(true);
@@ -1375,26 +1409,105 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     await messageInput.fill('Finish task');
     await messageInput.press('Enter');
 
-    const completedBadge = context.window.locator('[data-testid="message-completed-badge"]').last();
-    await expect(completedBadge).toBeVisible({ timeout: 15000 });
-    await expect(completedBadge).toContainText('Completed');
-
-    const finalAnswerText = context.window.locator('.message-llm-action-completed', {
-      hasText: 'Final result: task completed.',
-    });
-    await expect(finalAnswerText.first()).toBeVisible({ timeout: 15000 });
-
-    const summary = context.window.locator('[data-testid="message-completed-summary"]').last();
+    const finalAnswerBlock = context.window
+      .locator('[data-testid="message-final-answer-block"]')
+      .last();
+    await expect(finalAnswerBlock).toBeVisible({ timeout: 15000 });
+    await expect(
+      context.window.locator('[data-testid="message-final-answer-title"]').last()
+    ).toContainText('Final result: task completed.');
+    const toggle = context.window.locator('[data-testid="message-final-answer-toggle"]').last();
+    await expect(toggle).toBeVisible({ timeout: 5000 });
+    await toggle.click();
+    const summary = context.window.locator('[data-testid="message-final-answer-summary"]').last();
     await expect(summary).toBeVisible({ timeout: 5000 });
     await expect(summary).toContainText('Validated input data');
     await expect(summary).toContainText('Prepared final response');
 
-    await expect(context.window.locator('[data-testid="message-completed-badge"]')).toHaveCount(1);
+    await expect(context.window.locator('[data-testid="message-final-answer-block"]')).toHaveCount(
+      1
+    );
+    await expect(context.window.locator('[data-testid="message-completed-badge"]')).toHaveCount(0);
+    await expect(context.window.locator('[data-testid="message-completed-summary"]')).toHaveCount(
+      0
+    );
+  });
+
+  /* Preconditions: MockLLMServer returns tool_call(final_answer) with text and no summary_points
+     Action: User sends a message
+     Assertions: Final Answer block is shown without collapsible toggle and summary section
+     Requirements: agents.7.4.3, llm-integration.9.5.1.2 */
+  test('should render non-collapsible final_answer block when summary_points is absent', async () => {
+    mockLLMServer.setStreamingMode(true);
+    mockLLMServer.setOpenAIStreamScripts([
+      {
+        toolCalls: [
+          {
+            callId: 'final-no-summary',
+            toolName: 'final_answer',
+            arguments: {
+              text: 'Completed',
+            },
+          },
+        ],
+      },
+    ]);
+
+    context = await launchWithMockLLM();
+    const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
+
+    await messageInput.fill('Finish task');
+    await messageInput.press('Enter');
+
+    const finalAnswerBlock = context.window
+      .locator('[data-testid="message-final-answer-block"]')
+      .last();
+    await expect(finalAnswerBlock).toBeVisible({ timeout: 15000 });
+    await expect(
+      context.window.locator('[data-testid="message-final-answer-title"]').last()
+    ).toHaveText('Completed');
+    await expect(context.window.locator('[data-testid="message-final-answer-toggle"]')).toHaveCount(
+      0
+    );
+    await expect(
+      context.window.locator('[data-testid="message-final-answer-summary"]')
+    ).toHaveCount(0);
+  });
+
+  /* Preconditions: MockLLMServer returns tool_call(final_answer) without text
+     Action: User sends a message
+     Assertions: Final Answer title falls back to Done
+     Requirements: agents.7.4.3, llm-integration.9.5.1.2 */
+  test('should render Done title when final_answer.text is absent', async () => {
+    mockLLMServer.setStreamingMode(true);
+    mockLLMServer.setOpenAIStreamScripts([
+      {
+        toolCalls: [
+          {
+            callId: 'final-no-text',
+            toolName: 'final_answer',
+            arguments: {
+              summary_points: ['Completed step'],
+            },
+          },
+        ],
+      },
+    ]);
+
+    context = await launchWithMockLLM();
+    const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
+
+    await messageInput.fill('Finish task');
+    await messageInput.press('Enter');
+
+    const title = context.window.locator('[data-testid="message-final-answer-title"]').last();
+    await expect(title).toBeVisible({ timeout: 15000 });
+    await expect(title).toHaveText('Done');
   });
 
   /* Preconditions: MockLLMServer returns regular text response without final_answer tool call
      Action: User sends a message
-     Assertions: Completed badge is absent and status remains Awaiting response
+     Assertions: Final answer block is absent and status remains Awaiting response
      Requirements: llm-integration.11.8, agents.9.2 */
   test('should keep awaiting-response when model does not call final_answer', async () => {
     mockLLMServer.setStreamingMode(true, {
@@ -1411,13 +1524,15 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     const actionContent = context.window.locator('.message-llm-action-response').last();
     await expect(actionContent).toBeVisible({ timeout: 15000 });
 
-    await expect(context.window.locator('[data-testid="message-completed-badge"]')).toHaveCount(0);
+    await expect(context.window.locator('[data-testid="message-final-answer-block"]')).toHaveCount(
+      0
+    );
   });
 
   /* Preconditions: First model attempt returns invalid final_answer (text too long),
      second attempt returns valid final_answer
      Action: User sends a message
-     Assertions: Pipeline retries automatically and UI shows completed state from second attempt
+     Assertions: Pipeline retries automatically and UI shows final answer block from second attempt
      Requirements: llm-integration.12.2.1, llm-integration.12.2.2 */
   test('should retry invalid final_answer and complete after corrected retry', async () => {
     mockLLMServer.setStreamingMode(true);
@@ -1454,11 +1569,14 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     await messageInput.fill('Finish with many points');
     await messageInput.press('Enter');
 
-    const completedBadge = context.window.locator('[data-testid="message-completed-badge"]').last();
-    await expect(completedBadge).toBeVisible({ timeout: 15000 });
-    await expect(completedBadge).toContainText('Completed');
-
-    const summary = context.window.locator('[data-testid="message-completed-summary"]').last();
+    const finalAnswerBlock = context.window
+      .locator('[data-testid="message-final-answer-block"]')
+      .last();
+    await expect(finalAnswerBlock).toBeVisible({ timeout: 15000 });
+    const toggle = context.window.locator('[data-testid="message-final-answer-toggle"]').last();
+    await expect(toggle).toBeVisible({ timeout: 5000 });
+    await toggle.click();
+    const summary = context.window.locator('[data-testid="message-final-answer-summary"]').last();
     await expect(summary).toContainText('Validated format');
 
     const requestCount = mockLLMServer
@@ -1509,12 +1627,14 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     await expect(errorBubble).toContainText(
       'Model returned invalid completion format too many times. Please try again.'
     );
-    await expect(context.window.locator('[data-testid="message-completed-badge"]')).toHaveCount(0);
+    await expect(context.window.locator('[data-testid="message-final-answer-block"]')).toHaveCount(
+      0
+    );
   });
 
   /* Preconditions: MockLLMServer returns provider error
      Action: User sends a message and receives error bubble
-     Assertions: Status is Error and completed badge is absent
+     Assertions: Status is Error and final answer block is absent
      Requirements: llm-integration.3.1, agents.9.5 */
   test('should not switch to completed on error response', async () => {
     mockLLMServer.setSuccess(false);
@@ -1528,9 +1648,13 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
 
     const errorBubble = context.window.locator('[data-testid="message-error"]').last();
     await expect(errorBubble).toBeVisible({ timeout: 15000 });
-    await expect(context.window.locator('[data-testid="message-completed-badge"]')).toHaveCount(0);
+    await expect(context.window.locator('[data-testid="message-final-answer-block"]')).toHaveCount(
+      0
+    );
 
-    await expect(context.window.locator('[data-testid="message-completed-badge"]')).toHaveCount(0);
+    await expect(context.window.locator('[data-testid="message-final-answer-block"]')).toHaveCount(
+      0
+    );
   });
 
   /* Preconditions: MockLLMServer returns 429 with retry-after=3 on first request,

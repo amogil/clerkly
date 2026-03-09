@@ -132,70 +132,70 @@
 - [x] Удалить из `agents` runtime-логику LLM (retry/repair/валидация tool-контрактов на стороне модели).
 ## Фаза 8: Приведение внешнего вида и поведения tool-call к новым требованиям
 
-- [ ] Синхронизировать UI-реализацию `tool_call(final_answer)` с текущими спеками `agents`:
-  - [ ] Заголовок `"Final Answer"`: текст из `final_answer.text` или fallback `Done`.
-  - [ ] Иконка в заголовке: `Check` без круга.
-  - [ ] Тело: только `summary_points`, элементы с `Check` в зелёном круге.
-  - [ ] КОГДА `summary_points` пустой/отсутствует — блок неколлапсируемый (без toggle).
-- [ ] Убрать legacy UI-пути рендера `final_answer` (badge/summary-варианты, не соответствующие текущему контракту).
-- [ ] Добавить/обновить unit-тесты renderer под целевое поведение `Final Answer`:
-  - [ ] Проверка fallback `Done` при отсутствии `text`.
-  - [ ] Проверка отсутствия toggle при пустом `summary_points`.
-  - [ ] Проверка корректных `data-testid` для блока, хедера, title, check, summary, toggle.
-- [ ] Добавить/обновить functional-тесты под целевое поведение `Final Answer` в чате.
-- [ ] Привести UI auth-error диалога к `agents.4.10.3-4.10.5`:
-  - [ ] Фиксированный порядок кнопок: сначала `Open Settings`, затем `Retry`.
-  - [ ] Визуальные варианты: `Open Settings` — `outline`, `Retry` — `default`.
-  - [ ] При нажатии `Retry` текущий error-диалог скрывается до старта повторного запроса.
-- [ ] Добавить/обновить unit-тесты для auth-error диалога:
-  - [ ] Проверка наличия двух действий (`Open Settings`, `Retry`).
-  - [ ] Проверка порядка кнопок и их variants.
-  - [ ] Проверка скрытия диалога перед `retryLast(...)`.
-- [ ] Добавить/обновить functional-тесты auth-error flow:
-  - [ ] Проверка порядка кнопок `Open Settings` -> `Retry`.
-  - [ ] Проверка поведения `Retry` (диалог скрывается перед повтором).
+- [x] Синхронизировать UI-реализацию `tool_call(final_answer)` с текущими спеками `agents`:
+  - [x] Заголовок `"Final Answer"`: текст из `final_answer.text` или fallback `Done`.
+  - [x] Иконка в заголовке: `Check` без круга.
+  - [x] Тело: только `summary_points`, элементы с `Check` в зелёном круге.
+  - [x] КОГДА `summary_points` пустой/отсутствует — блок неколлапсируемый (без toggle).
+- [x] Убрать legacy UI-пути рендера `final_answer` (badge/summary-варианты, не соответствующие текущему контракту).
+- [x] Добавить/обновить unit-тесты renderer под целевое поведение `Final Answer`:
+  - [x] Проверка fallback `Done` при отсутствии `text`.
+  - [x] Проверка отсутствия toggle при пустом `summary_points`.
+  - [x] Проверка корректных `data-testid` для блока, хедера, title, check, summary, toggle.
+- [x] Добавить/обновить functional-тесты под целевое поведение `Final Answer` в чате.
+- [x] Привести UI auth-error диалога к `agents.4.10.3-4.10.5`:
+  - [x] Фиксированный порядок кнопок: сначала `Open Settings`, затем `Retry`.
+  - [x] Визуальные варианты: `Open Settings` — `outline`, `Retry` — `default`.
+  - [x] При нажатии `Retry` текущий error-диалог скрывается до старта повторного запроса.
+- [x] Добавить/обновить unit-тесты для auth-error диалога:
+  - [x] Проверка наличия двух действий (`Open Settings`, `Retry`).
+  - [x] Проверка порядка кнопок и их variants.
+  - [x] Проверка скрытия диалога перед `retryLast(...)`.
+- [x] Добавить/обновить functional-тесты auth-error flow:
+  - [x] Проверка порядка кнопок `Open Settings` -> `Retry`.
+  - [x] Проверка поведения `Retry` (диалог скрывается перед повтором).
 
 ## Фаза 9: Runtime-контракт `final_answer` (default values) и трассировка требований
 
-- [ ] Привести runtime-обработку `final_answer` к `llm-integration.9.5.1.2`:
-  - [ ] При отсутствии `text` не выполнять автоподстановку в runtime-слое `llm-integration`.
-  - [ ] При отсутствии `summary_points` нормализовать до `[]` в runtime-контракте.
-- [ ] Добавить/обновить unit-тесты pipeline/mapper на default-значения `final_answer` (`text` отсутствует, `summary_points=[]`).
-- [ ] Добавить/обновить functional-тест на сценарий `final_answer` без `summary_points` (успешный `completed` без ошибок контракта).
-- [ ] Синхронизировать таблицу покрытия требований в `docs/specs/llm-integration/design.md` с актуальным `requirements.md` (включая `llm-integration.7`).
+- [x] Привести runtime-обработку `final_answer` к `llm-integration.9.5.1.2`:
+  - [x] При отсутствии `text` не выполнять автоподстановку в runtime-слое `llm-integration`.
+  - [x] При отсутствии `summary_points` нормализовать до `[]` в runtime-контракте.
+- [x] Добавить/обновить unit-тесты pipeline/mapper на default-значения `final_answer` (`text` отсутствует, `summary_points=[]`).
+- [x] Добавить/обновить functional-тест на сценарий `final_answer` без `summary_points` (успешный `completed` без ошибок контракта).
+- [x] Синхронизировать таблицу покрытия требований в `docs/specs/llm-integration/design.md` с актуальным `requirements.md` (включая `llm-integration.7`).
 
 ---
 
 ## Фаза 10: Расширение тестового покрытия (приоритет unit)
 
-- [ ] Добавить модульные тесты (`MainPipeline` / `PromptBuilder` / mappers) для `final_answer`:
-  - [ ] `final_answer` без `text` (поле отсутствует) не ломает pipeline и не получает runtime-автоподстановку на LLM-слое.
-  - [ ] `final_answer` без `summary_points` нормализуется до `[]` для runtime-контракта.
-  - [ ] `final_answer` с пустым `summary_points` остаётся успешным `completed` (без перехода в `kind:error`).
-  - [ ] Невалидные лимиты (`text > 300`, `summary_points > 10`, пункт `> 200`) приводят к retry/repair и корректной финальной ошибке при исчерпании.
-- [ ] Добавить модульные тесты статусов (`AgentManager.computeAgentStatus`):
-  - [ ] `tool_call(final_answer, done=true)` -> `completed`.
-  - [ ] `tool_call(non-final, done=true)` -> `awaiting-response`.
-  - [ ] `llm(done=true)` без `final_answer` -> `awaiting-response`.
-  - [ ] `hidden=true` сообщения исключаются из расчёта статуса.
-- [ ] Добавить модульные тесты renderer (`AgentMessage`/mapper):
-  - [ ] Рендер `"Final Answer"` header: title из `final_answer.text`, fallback `Done`.
-  - [ ] Рендер `summary_points` как списка пунктов с индикаторами.
-  - [ ] Отсутствие toggle при пустом/отсутствующем `summary_points`.
-  - [ ] Наличие и корректность `data-testid` для `message-final-answer-*`.
-- [ ] Добавить модульные тесты transport/runtime синхронизации:
-  - [ ] `message.llm.reasoning.updated`/`message.llm.text.updated` не дублируются snapshot-апдейтами.
-  - [ ] `message.updated` с `hidden=true` корректно закрывает активный stream без `kind:error`.
-  - [ ] `tool_call` обрабатывается только через persisted `message.created`/`message.updated`.
-- [ ] Добавить функциональные тесты (`tests/functional/llm-chat.spec.ts`, `agent-status-calculation.spec.ts`):
-  - [ ] `final_answer` с пустым `summary_points` (или отсутствующим) отображается как неколлапсируемый `"Final Answer"`.
-  - [ ] `final_answer` без `text` показывает `Done` в заголовке.
-  - [ ] `kind:error` auth-диалог: есть `Open Settings` + `Retry`, порядок `Open Settings` -> `Retry`, variants `outline/default`.
-  - [ ] При `Retry` auth-ошибки диалог скрывается перед повторным запросом.
-  - [ ] После `tool_call(final_answer, done=true)` статус в UI становится `completed` во всех местах.
-- [ ] Добавить regression-набор после удаления legacy UI-путей:
-  - [ ] Проверка, что `final_answer` больше не рендерится через старый `Completed badge`/legacy summary-блок.
-  - [ ] Проверка, что обычные `tool_call` продолжают рендериться как tool-блоки без деградаций.
+- [x] Добавить модульные тесты (`MainPipeline` / `PromptBuilder` / mappers) для `final_answer`:
+  - [x] `final_answer` без `text` (поле отсутствует) не ломает pipeline и не получает runtime-автоподстановку на LLM-слое.
+  - [x] `final_answer` без `summary_points` нормализуется до `[]` для runtime-контракта.
+  - [x] `final_answer` с пустым `summary_points` остаётся успешным `completed` (без перехода в `kind:error`).
+  - [x] Невалидные лимиты (`text > 300`, `summary_points > 10`, пункт `> 200`) приводят к retry/repair и корректной финальной ошибке при исчерпании.
+- [x] Добавить модульные тесты статусов (`AgentManager.computeAgentStatus`):
+  - [x] `tool_call(final_answer, done=true)` -> `completed`.
+  - [x] `tool_call(non-final, done=true)` -> `awaiting-response`.
+  - [x] `llm(done=true)` без `final_answer` -> `awaiting-response`.
+  - [x] `hidden=true` сообщения исключаются из расчёта статуса.
+- [x] Добавить модульные тесты renderer (`AgentMessage`/mapper):
+  - [x] Рендер `"Final Answer"` header: title из `final_answer.text`, fallback `Done`.
+  - [x] Рендер `summary_points` как списка пунктов с индикаторами.
+  - [x] Отсутствие toggle при пустом/отсутствующем `summary_points`.
+  - [x] Наличие и корректность `data-testid` для `message-final-answer-*`.
+- [x] Добавить модульные тесты transport/runtime синхронизации:
+  - [x] `message.llm.reasoning.updated`/`message.llm.text.updated` не дублируются snapshot-апдейтами.
+  - [x] `message.updated` с `hidden=true` корректно закрывает активный stream без `kind:error`.
+  - [x] `tool_call` обрабатывается только через persisted `message.created`/`message.updated`.
+- [x] Добавить функциональные тесты (`tests/functional/llm-chat.spec.ts`, `agent-status-calculation.spec.ts`):
+  - [x] `final_answer` с пустым `summary_points` (или отсутствующим) отображается как неколлапсируемый `"Final Answer"`.
+  - [x] `final_answer` без `text` показывает `Done` в заголовке.
+  - [x] `kind:error` auth-диалог: есть `Open Settings` + `Retry`, порядок `Open Settings` -> `Retry`, variants `outline/default`.
+  - [x] При `Retry` auth-ошибки диалог скрывается перед повторным запросом.
+  - [x] После `tool_call(final_answer, done=true)` статус в UI становится `completed` во всех местах.
+- [x] Добавить regression-набор после удаления legacy UI-путей:
+  - [x] Проверка, что `final_answer` больше не рендерится через старый `Completed badge`/legacy summary-блок.
+  - [x] Проверка, что обычные `tool_call` продолжают рендериться как tool-блоки без деградаций.
 
 ---
 
@@ -209,7 +209,7 @@
 - [x] `npm run validate` проходит.
 - [ ] (После отдельного подтверждения) полный `npm run test:functional` проходит.
 - [x] Strict-schema `final_answer` в AI SDK + retry/repair policy реализованы и покрыты тестами.
-- [ ] Внешний вид и поведение `tool_call(final_answer)` соответствуют текущим требованиям `agents` и покрыты unit/functional тестами.
-- [ ] Runtime default-контракт `final_answer` (`text` отсутствует, `summary_points=[]`) реализован и покрыт тестами.
-- [ ] Таблица покрытия требований в `llm-integration/design.md` синхронизирована с актуальными требованиями.
-- [ ] Добавлен расширенный набор unit/functional тестов для `final_answer`, статусов, runtime-stream и error-actions без регрессий.
+- [x] Внешний вид и поведение `tool_call(final_answer)` соответствуют текущим требованиям `agents` и покрыты unit/functional тестами.
+- [x] Runtime default-контракт `final_answer` (`text` отсутствует, `summary_points=[]`) реализован и покрыт тестами.
+- [x] Таблица покрытия требований в `llm-integration/design.md` синхронизирована с актуальными требованиями.
+- [x] Добавлен расширенный набор unit/functional тестов для `final_answer`, статусов, runtime-stream и error-actions без регрессий.
