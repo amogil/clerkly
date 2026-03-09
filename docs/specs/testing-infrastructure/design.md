@@ -1294,7 +1294,7 @@ export async function expectNoToastError(window: Page): Promise<void> {
   - `data-testid="message-completed-badge"` — маркер `Completed`;
   - `data-testid="message-completed-summary"` — контейнер списка `summary_points` (ожидается только при непустом `summary_points`).
 - Для проверки обычных tool-calls (не `final_answer`) использовать селекторы tool-call блока, а не assistant bubble.
-- Для сценариев с нарушением лимитов `summary_points` (количество/длина) проверять, что UI показывает значения как пришли от модели (без обрезки/нормализации).
+- Для сценариев невалидного `final_answer` (`text` > 280, `summary_points` > 10, пункт > 200) проверять retry pipeline и итоговый `kind:error` при исчерпании лимита.
 
 ### Покрытие требований
 
