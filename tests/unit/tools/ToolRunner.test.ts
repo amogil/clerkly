@@ -3,6 +3,74 @@
 import { ToolRunner, type ToolCallRequest } from '../../../src/main/tools/ToolRunner';
 
 describe('ToolRunner', () => {
+  it('returns empty result for empty calls list', async () => {
+    const handler = jest.fn();
+    const runner = new ToolRunner({ tracked_tool: handler }, 2);
+
+    const results = await runner.executeBatch([]);
+
+    expect(results).toEqual([]);
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  it('normalizes invalid numeric policy values to defaults', async () => {
+    const runner = new ToolRunner(
+      {
+        tracked_tool: () => 'ok',
+      },
+      {
+        maxConcurrency: 0,
+        timeoutMs: Number.NaN,
+        maxRetries: -1,
+      }
+    );
+
+    const results = await runner.executeBatch([
+      { callId: 'call-1', toolName: 'tracked_tool', arguments: {} },
+    ]);
+
+    expect(results[0]).toMatchObject({
+      callId: 'call-1',
+      toolName: 'tracked_tool',
+      status: 'success',
+      output: 'ok',
+    });
+  });
+
+  it('returns original error when aborted by external signal', async () => {
+    const controller = new AbortController();
+    const runner = new ToolRunner(
+      {
+        abortable_tool: async (_args, signal) => {
+          await new Promise<void>((resolve, reject) => {
+            const timer = setTimeout(resolve, 100);
+            signal?.addEventListener('abort', () => {
+              clearTimeout(timer);
+              reject(new Error('external abort'));
+            });
+          });
+          return 'never';
+        },
+      },
+      { maxConcurrency: 1, timeoutMs: 1_000, maxRetries: 0 }
+    );
+
+    setTimeout(() => controller.abort(), 10);
+    const results = await runner.executeBatch(
+      [{ callId: 'call-1', toolName: 'abortable_tool', arguments: {} }],
+      controller.signal
+    );
+
+    expect(results).toEqual([
+      {
+        callId: 'call-1',
+        toolName: 'abortable_tool',
+        status: 'error',
+        output: 'external abort',
+      },
+    ]);
+  });
+
   it('returns policy_denied for unknown tools', async () => {
     const runner = new ToolRunner({}, 3);
     const results = await runner.executeBatch(

@@ -258,6 +258,32 @@ describe('toUIMessage', () => {
       errorText: 'tool failed',
     });
   });
+
+  /* Preconditions: message with kind 'tool_call' for final_answer
+     Action: call toUIMessage
+     Assertions: maps to assistant text message (not dynamic-tool part)
+     Requirements: llm-integration.9.7, agents.7.4.1 */
+  it('should map final_answer tool_call to assistant text part', () => {
+    const msg = makeSnapshot({
+      kind: 'tool_call',
+      done: true,
+      payload: {
+        data: {
+          callId: 'call-final',
+          toolName: 'final_answer',
+          arguments: {
+            text: 'Final answer text',
+            summary_points: ['Point 1'],
+          },
+        },
+      },
+    });
+    const result = toUIMessage(msg);
+    expect(result).not.toBeNull();
+    expect(result!.role).toBe('assistant');
+    expect(result!.parts).toEqual([{ type: 'text', text: 'Final answer text' }]);
+    expect((result!.metadata as Record<string, unknown>).isFinalAnswer).toBe(true);
+  });
 });
 
 describe('toUIMessages', () => {

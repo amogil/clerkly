@@ -361,6 +361,7 @@ export class MainPipeline {
     args: Record<string, unknown>,
     toolCallMessageIds: Map<string, number>
   ): number | null {
+    const isFinalAnswer = toolName === 'final_answer';
     const toolPayload = {
       data: {
         callId,
@@ -370,7 +371,7 @@ export class MainPipeline {
     };
     const existingToolMessageId = toolCallMessageIds.get(callId);
     if (existingToolMessageId !== undefined) {
-      this.messageManager.update(existingToolMessageId, agentId, toolPayload, false);
+      this.messageManager.update(existingToolMessageId, agentId, toolPayload, isFinalAnswer);
       return llmMessageId;
     }
     const toolMessage = this.messageManager.create(
@@ -378,7 +379,7 @@ export class MainPipeline {
       'tool_call',
       toolPayload,
       replyToMessageId,
-      false
+      isFinalAnswer
     );
     toolCallMessageIds.set(callId, toolMessage.id);
 
@@ -408,6 +409,30 @@ export class MainPipeline {
     status: 'success' | 'error',
     toolCallMessageIds: Map<string, number>
   ): void {
+    if (toolName === 'final_answer') {
+      const payload = {
+        data: {
+          callId,
+          toolName,
+          arguments: args,
+        },
+      };
+      const existingMessageId = toolCallMessageIds.get(callId);
+      if (existingMessageId !== undefined) {
+        this.messageManager.update(existingMessageId, agentId, payload, true);
+        return;
+      }
+      const created = this.messageManager.create(
+        agentId,
+        'tool_call',
+        payload,
+        replyToMessageId,
+        true
+      );
+      toolCallMessageIds.set(callId, created.id);
+      return;
+    }
+
     let outputText: string;
     if (typeof output === 'string') {
       outputText = output;

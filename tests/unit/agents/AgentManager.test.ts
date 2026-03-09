@@ -136,11 +136,11 @@ describe('AgentManager', () => {
       expect(typeof snapshot.archivedAt).toBe('number');
     });
 
-    /* Preconditions: Agent with last message of kind 'user' exists
+    /* Preconditions: Agent with last message of kind 'user' and active pipeline exists
        Action: Call toEventAgent() with agent
        Assertions: Returns AgentSnapshot with status 'in-progress'
        Requirements: realtime-events.9.2, agents.5.1 */
-    it('should compute status as in-progress when last message is from user', () => {
+    it('should compute status as in-progress when last message is from user and pipeline is active', () => {
       const lastMessage = {
         id: 1,
         agentId: mockAgent.agentId,
@@ -153,6 +153,9 @@ describe('AgentManager', () => {
         done: true,
       };
       mockDbManager.messages.getLastByAgent = jest.fn().mockReturnValue(lastMessage);
+      (
+        agentManager as unknown as { pipelineControllers: Map<string, AbortController> }
+      ).pipelineControllers.set(mockAgent.agentId, new AbortController());
 
       const snapshot = (agentManager as any).toEventAgent(mockAgent);
 
@@ -205,11 +208,11 @@ describe('AgentManager', () => {
       expect(snapshot.status).toBe(AGENT_STATUS.IN_PROGRESS);
     });
 
-    /* Preconditions: Agent with last message of kind 'tool_call' and done=true exists
+    /* Preconditions: Agent with last message of kind 'tool_call' and done=true (non-final) exists
        Action: Call toEventAgent() with agent
        Assertions: Returns AgentSnapshot with status 'awaiting-response'
        Requirements: llm-integration.9.4 */
-    it('should compute status as awaiting-response when last message is done tool_call', () => {
+    it('should compute status as awaiting-response when last message is done non-final tool_call', () => {
       const lastMessage = {
         id: 1,
         agentId: mockAgent.agentId,
@@ -226,6 +229,29 @@ describe('AgentManager', () => {
       const snapshot = (agentManager as any).toEventAgent(mockAgent);
 
       expect(snapshot.status).toBe(AGENT_STATUS.AWAITING_RESPONSE);
+    });
+
+    /* Preconditions: Agent with last message of kind 'tool_call' and done=true for final_answer exists
+       Action: Call toEventAgent() with agent
+       Assertions: Returns AgentSnapshot with status 'completed'
+       Requirements: llm-integration.9.4 */
+    it('should compute status as completed when last message is done final_answer tool_call', () => {
+      const lastMessage = {
+        id: 1,
+        agentId: mockAgent.agentId,
+        kind: MESSAGE_KIND.TOOL_CALL,
+        timestamp: '2026-02-15T10:30:00.000Z',
+        payloadJson: JSON.stringify({ data: { callId: 'call-1', toolName: 'final_answer' } }),
+        usageJson: null,
+        replyToMessageId: null,
+        hidden: false,
+        done: true,
+      };
+      mockDbManager.messages.getLastByAgent = jest.fn().mockReturnValue(lastMessage);
+
+      const snapshot = (agentManager as any).toEventAgent(mockAgent);
+
+      expect(snapshot.status).toBe(AGENT_STATUS.COMPLETED);
     });
 
     /* Preconditions: Agent with last message containing error status exists

@@ -365,13 +365,13 @@ export function Settings({ onSignOut, onNavigate }: SettingsProps) {
             <div className="p-6 border-b border-border">
               <div className="flex items-center gap-3">
                 <AlertCircle className="w-5 h-5 text-primary" />
-                <h2 className="font-semibold text-foreground">Система обработки ошибок</h2>
+                <h2 className="font-semibold text-foreground">Error Handling System</h2>
               </div>
             </div>
             <div className="p-6">
               <p className="text-sm text-muted-foreground mb-4">
-                Просмотрите демонстрацию комплексной системы обработки ошибок, включая
-                toast-уведомления, inline-сообщения, состояния ошибок и error boundary.
+                View a demo of the complete error handling system, including toast notifications,
+                inline messages, error states, and error boundary behavior.
               </p>
               <button
                 onClick={() => {
@@ -382,7 +382,7 @@ export function Settings({ onSignOut, onNavigate }: SettingsProps) {
                 className="inline-flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-medium"
               >
                 <AlertCircle className="w-4 h-4" />
-                Открыть демонстрацию ошибок
+                Open Error Handling Demo
               </button>
             </div>
           </div>

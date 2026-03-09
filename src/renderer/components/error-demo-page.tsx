@@ -14,7 +14,7 @@ export function ErrorDemoPage({ onBack }: ErrorDemoPageProps) {
 
   // Trigger error boundary
   if (throwError) {
-    throw new Error('Тестовая ошибка для демонстрации Error Boundary');
+    throw new Error('Test error for Error Boundary demo');
   }
 
   return (
@@ -27,63 +27,59 @@ export function ErrorDemoPage({ onBack }: ErrorDemoPageProps) {
             className="inline-flex items-center gap-2 text-primary hover:underline mb-4"
           >
             <ArrowLeft className="w-4 h-4" />
-            Назад в настройки
+            Back to Settings
           </button>
-          <h1 className="text-3xl font-semibold text-foreground mb-2">
-            Демонстрация обработки ошибок
-          </h1>
-          <p className="text-muted-foreground">Комплексная система обработки ошибок для Clerkly</p>
+          <h1 className="text-3xl font-semibold text-foreground mb-2">Error Handling Demo</h1>
+          <p className="text-muted-foreground">Comprehensive error handling system for Clerkly</p>
         </div>
 
         <div className="grid gap-6">
           {/* Toast Notifications */}
           <div className="bg-card rounded-xl border border-border shadow-sm p-6">
-            <h2 className="text-xl font-semibold text-foreground mb-4">1. Toast уведомления</h2>
+            <h2 className="text-xl font-semibold text-foreground mb-4">1. Toast Notifications</h2>
             <p className="text-sm text-muted-foreground mb-4">
-              Быстрые всплывающие уведомления для немедленной обратной связи
+              Quick pop-up notifications for immediate feedback
             </p>
             <div className="flex flex-wrap gap-3">
               <button
-                onClick={() => showSuccess('Операция успешно выполнена!')}
+                onClick={() => showSuccess('Operation completed successfully!')}
                 className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium"
               >
-                ✓ Успех
+                ✓ Success
               </button>
               <button
-                onClick={() => showError('Произошла ошибка при выполнении операции')}
+                onClick={() => showError('An error occurred while processing the operation')}
                 className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
               >
-                ✕ Ошибка
+                ✕ Error
               </button>
               <button
-                onClick={() => showWarning('Внимание! Это действие требует подтверждения')}
+                onClick={() => showWarning('Warning! This action requires confirmation')}
                 className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors font-medium"
               >
-                ⚠ Предупреждение
+                ⚠ Warning
               </button>
               <button
-                onClick={() => showInfo('Новая функция теперь доступна в настройках')}
+                onClick={() => showInfo('A new feature is now available in Settings')}
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
               >
-                ℹ Информация
+                ℹ Info
               </button>
             </div>
           </div>
 
           {/* Inline Error Messages */}
           <div className="bg-card rounded-xl border border-border shadow-sm p-6">
-            <h2 className="text-xl font-semibold text-foreground mb-4">
-              2. Inline сообщения об ошибках
-            </h2>
+            <h2 className="text-xl font-semibold text-foreground mb-4">2. Inline Error Messages</h2>
             <p className="text-sm text-muted-foreground mb-4">
-              Контекстные ошибки, встроенные в интерфейс
+              Contextual errors embedded directly in the interface
             </p>
 
             <button
               onClick={() => setShowInlineError(!showInlineError)}
               className="mb-4 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-medium"
             >
-              {showInlineError ? 'Скрыть ошибку' : 'Показать inline ошибку'}
+              {showInlineError ? 'Hide Error' : 'Show Inline Error'}
             </button>
 
             {showInlineError && (
@@ -94,10 +90,10 @@ export function ErrorDemoPage({ onBack }: ErrorDemoPageProps) {
                     <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
                     <div className="flex-1">
                       <p className="text-sm font-medium text-red-900 mb-1">
-                        Не удалось сохранить изменения
+                        Failed to save changes
                       </p>
                       <p className="text-xs text-red-700">
-                        Проверьте подключение к интернету и попробуйте снова
+                        Check your internet connection and try again
                       </p>
                     </div>
                     <button
@@ -115,10 +111,10 @@ export function ErrorDemoPage({ onBack }: ErrorDemoPageProps) {
                     <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
                     <div className="flex-1">
                       <p className="text-sm font-medium text-amber-900 mb-1">
-                        Внимание: действие не может быть отменено
+                        Warning: this action cannot be undone
                       </p>
                       <p className="text-xs text-amber-700">
-                        Убедитесь, что вы действительно хотите продолжить
+                        Make sure you really want to continue
                       </p>
                     </div>
                   </div>
@@ -130,9 +126,9 @@ export function ErrorDemoPage({ onBack }: ErrorDemoPageProps) {
                     <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
                     <div className="flex-1">
                       <p className="text-sm font-medium text-green-900 mb-1">
-                        Настройки успешно сохранены
+                        Settings saved successfully
                       </p>
-                      <p className="text-xs text-green-700">Все изменения применены</p>
+                      <p className="text-xs text-green-700">All changes have been applied</p>
                     </div>
                   </div>
                 </div>
@@ -143,10 +139,10 @@ export function ErrorDemoPage({ onBack }: ErrorDemoPageProps) {
                     <Info className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
                     <div className="flex-1">
                       <p className="text-sm font-medium text-blue-900 mb-1">
-                        Новая функция доступна
+                        New feature available
                       </p>
                       <p className="text-xs text-blue-700">
-                        Теперь вы можете автоматически создавать задачи из встреч
+                        You can now automatically create tasks from meetings
                       </p>
                     </div>
                   </div>
@@ -157,16 +153,16 @@ export function ErrorDemoPage({ onBack }: ErrorDemoPageProps) {
 
           {/* Error States */}
           <div className="bg-card rounded-xl border border-border shadow-sm p-6">
-            <h2 className="text-xl font-semibold text-foreground mb-4">3. Состояния ошибок</h2>
+            <h2 className="text-xl font-semibold text-foreground mb-4">3. Error States</h2>
             <p className="text-sm text-muted-foreground mb-4">
-              Полностраничные состояния для критических ситуаций
+              Full-page states for critical situations
             </p>
 
             <button
               onClick={() => setShowErrorState(!showErrorState)}
               className="mb-4 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-medium"
             >
-              {showErrorState ? 'Скрыть состояние ошибки' : 'Показать состояние ошибки'}
+              {showErrorState ? 'Hide Error State' : 'Show Error State'}
             </button>
 
             {showErrorState && (
@@ -178,21 +174,21 @@ export function ErrorDemoPage({ onBack }: ErrorDemoPageProps) {
                     </div>
                   </div>
                   <h3 className="text-xl font-semibold text-foreground mb-2">
-                    Не удалось загрузить данные
+                    Failed to load data
                   </h3>
                   <p className="text-muted-foreground mb-6">
-                    Возникла проблема при загрузке информации. Попробуйте обновить страницу или
-                    вернуться позже.
+                    There was a problem loading the data. Try refreshing the page or come back
+                    later.
                   </p>
                   <div className="flex gap-3 justify-center">
                     <button className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-medium">
-                      Попробовать снова
+                      Try Again
                     </button>
                     <button
                       onClick={() => setShowErrorState(false)}
                       className="px-4 py-2 bg-secondary text-foreground rounded-lg hover:bg-secondary/80 transition-colors font-medium"
                     >
-                      Отмена
+                      Cancel
                     </button>
                   </div>
                 </div>
@@ -204,25 +200,24 @@ export function ErrorDemoPage({ onBack }: ErrorDemoPageProps) {
           <div className="bg-card rounded-xl border border-border shadow-sm p-6">
             <h2 className="text-xl font-semibold text-foreground mb-4">4. Error Boundary</h2>
             <p className="text-sm text-muted-foreground mb-4">
-              Перехват критических ошибок React для предотвращения краша приложения
+              Catch critical React errors to prevent application crashes
             </p>
 
             <button
               onClick={() => setThrowError(true)}
               className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
             >
-              Вызвать критическую ошибку
+              Trigger Critical Error
             </button>
 
             <div className="mt-4 bg-amber-50 border border-amber-200 rounded-lg p-4">
               <div className="flex items-start gap-3">
                 <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
                 <div>
-                  <p className="text-sm font-medium text-amber-900 mb-1">Внимание!</p>
+                  <p className="text-sm font-medium text-amber-900 mb-1">Warning!</p>
                   <p className="text-xs text-amber-700">
-                    Это вызовет критическую ошибку, которая будет перехвачена Error Boundary.
-                    Приложение не упадёт, и пользователь увидит понятное сообщение с возможностью
-                    восстановления.
+                    This will trigger a critical error that will be caught by Error Boundary. The
+                    app will not crash, and the user will see a clear recovery message.
                   </p>
                 </div>
               </div>
@@ -231,9 +226,9 @@ export function ErrorDemoPage({ onBack }: ErrorDemoPageProps) {
 
           {/* Form Validation Example */}
           <div className="bg-card rounded-xl border border-border shadow-sm p-6">
-            <h2 className="text-xl font-semibold text-foreground mb-4">5. Валидация форм</h2>
+            <h2 className="text-xl font-semibold text-foreground mb-4">5. Form Validation</h2>
             <p className="text-sm text-muted-foreground mb-4">
-              Примеры ошибок валидации полей ввода
+              Examples of input field validation errors
             </p>
 
             <div className="space-y-4 max-w-md">
@@ -244,26 +239,24 @@ export function ErrorDemoPage({ onBack }: ErrorDemoPageProps) {
                   defaultValue="invalid-email"
                   className="w-full px-4 py-2 bg-input-background border-2 border-red-300 rounded-lg text-foreground focus:outline-none focus:border-red-500"
                 />
-                <p className="mt-1 text-sm text-red-600">
-                  Пожалуйста, введите корректный email адрес
-                </p>
+                <p className="mt-1 text-sm text-red-600">Please enter a valid email address</p>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-foreground mb-2">Пароль</label>
+                <label className="block text-sm font-medium text-foreground mb-2">Password</label>
                 <input
                   type="password"
                   defaultValue="123"
                   className="w-full px-4 py-2 bg-input-background border-2 border-red-300 rounded-lg text-foreground focus:outline-none focus:border-red-500"
                 />
                 <p className="mt-1 text-sm text-red-600">
-                  Пароль должен содержать минимум 8 символов
+                  Password must contain at least 8 characters
                 </p>
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-foreground mb-2">
-                  Имя проекта
+                  Project Name
                 </label>
                 <input
                   type="text"
@@ -271,35 +264,35 @@ export function ErrorDemoPage({ onBack }: ErrorDemoPageProps) {
                   readOnly
                   className="w-full px-4 py-2 bg-input-background border-2 border-red-300 rounded-lg text-foreground focus:outline-none focus:border-red-500"
                 />
-                <p className="mt-1 text-sm text-red-600">Это поле обязательно для заполнения</p>
+                <p className="mt-1 text-sm text-red-600">This field is required</p>
               </div>
             </div>
           </div>
 
           {/* Usage Guide */}
           <div className="bg-primary/5 rounded-xl border border-primary/20 p-6">
-            <h2 className="text-xl font-semibold text-foreground mb-4">💡 Как использовать</h2>
+            <h2 className="text-xl font-semibold text-foreground mb-4">💡 How to Use</h2>
             <div className="space-y-3 text-sm text-muted-foreground">
               <div>
-                <strong className="text-foreground">Toast уведомления:</strong> Используйте хук{' '}
+                <strong className="text-foreground">Toast notifications:</strong> Use the{' '}
                 <code className="px-2 py-0.5 bg-secondary rounded text-primary">useError()</code>{' '}
-                для показа быстрых уведомлений
+                hook to display quick notifications
               </div>
               <div>
-                <strong className="text-foreground">Inline ошибки:</strong> Встраивайте сообщения об
-                ошибках прямо в интерфейс для контекстной обратной связи
+                <strong className="text-foreground">Inline errors:</strong> Embed error messages
+                directly into the interface for contextual feedback
               </div>
               <div>
-                <strong className="text-foreground">Состояния ошибок:</strong> Показывайте
-                полностраничные состояния при критических сбоях загрузки данных
+                <strong className="text-foreground">Error states:</strong> Show full-page states for
+                critical data loading failures
               </div>
               <div>
-                <strong className="text-foreground">Error Boundary:</strong> Автоматически
-                перехватывает необработанные ошибки React и показывает понятное сообщение
+                <strong className="text-foreground">Error Boundary:</strong> Automatically catches
+                unhandled React errors and shows a clear message
               </div>
               <div>
-                <strong className="text-foreground">Валидация форм:</strong> Визуализируйте ошибки
-                валидации прямо под полями ввода
+                <strong className="text-foreground">Form validation:</strong> Display validation
+                errors directly under input fields
               </div>
             </div>
           </div>

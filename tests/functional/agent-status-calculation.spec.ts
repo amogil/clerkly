@@ -189,4 +189,46 @@ test.describe('Agent Status Calculation', () => {
       .poll(async () => await agentAvatar.getAttribute('class'), { timeout: 5000 })
       .toContain('bg-sky-400');
   });
+
+  /* Preconditions: Agent exists and receives persisted done tool_call(final_answer)
+     Action: Create tool_call message with toolName=final_answer
+     Assertions: Status is computed as completed in header and avatar color
+     Requirements: agents.9.6 */
+  test('should calculate completed status from done final_answer tool_call', async () => {
+    const firstAgentDataTestId = await window
+      .locator('[data-testid^="agent-icon-"]')
+      .first()
+      .getAttribute('data-testid');
+    const agentId = firstAgentDataTestId?.replace('agent-icon-', '');
+    expect(agentId).toBeTruthy();
+
+    await window.evaluate(async (id) => {
+      const api = (window as unknown as { api: any }).api;
+      const result = await api.messages.create(id, 'tool_call', {
+        data: {
+          callId: 'final-1',
+          toolName: 'final_answer',
+          arguments: {
+            text: 'Completed answer',
+            summary_points: ['one', 'two'],
+          },
+        },
+      });
+      if (!result?.success) {
+        throw new Error(result?.error || 'Failed to create final_answer tool_call');
+      }
+    }, agentId as string);
+
+    const agentAvatar = window
+      .locator('[data-testid^="agent-icon-"]')
+      .first()
+      .locator('[data-testid="agent-avatar-icon"]');
+
+    await expect
+      .poll(async () => await agentAvatar.getAttribute('class'), { timeout: 5000 })
+      .toContain('bg-green-500');
+
+    const headerStatus = window.locator('[data-testid="agent-status-text"]');
+    await expect(headerStatus).toHaveText('Completed');
+  });
 });

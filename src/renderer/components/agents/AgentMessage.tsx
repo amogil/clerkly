@@ -118,6 +118,57 @@ export function AgentMessage({
   }
 
   if (message.kind === 'tool_call') {
+    const toolData = message.payload.data as
+      | {
+          toolName?: unknown;
+          arguments?: Record<string, unknown>;
+        }
+      | undefined;
+
+    if (toolData?.toolName === 'final_answer') {
+      const args =
+        toolData.arguments && typeof toolData.arguments === 'object'
+          ? toolData.arguments
+          : undefined;
+      const finalTextRaw = typeof args?.['text'] === 'string' ? args['text'] : '';
+      const finalText =
+        finalTextRaw.trim().length > 0 ? finalTextRaw : 'Model has completed the task';
+      const summaryPointsRaw = args?.['summary_points'];
+      const summaryPoints = Array.isArray(summaryPointsRaw)
+        ? summaryPointsRaw.filter((point): point is string => typeof point === 'string')
+        : [];
+
+      return (
+        <Message from="assistant" className="w-full max-w-full">
+          <div data-testid="message-llm" className="space-y-2">
+            <div className="flex items-center gap-2">
+              <span
+                data-testid="message-completed-badge"
+                className="rounded-full bg-green-500/15 px-2 py-0.5 text-xs font-medium text-green-700"
+              >
+                Completed
+              </span>
+            </div>
+            <MessageContent data-testid="message-llm-action" className="w-full">
+              <MessageResponse className="text-sm leading-relaxed break-words">
+                {finalText}
+              </MessageResponse>
+            </MessageContent>
+            {summaryPoints.length > 0 ? (
+              <ul
+                data-testid="message-completed-summary"
+                className="list-disc pl-5 text-sm text-muted-foreground"
+              >
+                {summaryPoints.map((point, index) => (
+                  <li key={`${index}-${point}`}>{point}</li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
+        </Message>
+      );
+    }
+
     const uiMessage = toUIMessage(message);
     const toolPart = uiMessage?.parts.find((part) => part.type === 'dynamic-tool') as
       | {

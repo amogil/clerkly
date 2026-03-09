@@ -79,6 +79,29 @@ export function toUIMessage(msg: MessageSnapshot): UIMessage | null {
       arguments?: Record<string, unknown>;
       output?: { status?: string; content?: string };
     };
+    if (call.toolName === 'final_answer') {
+      const args =
+        call.arguments && typeof call.arguments === 'object' && !Array.isArray(call.arguments)
+          ? call.arguments
+          : {};
+      const text =
+        typeof args.text === 'string' && args.text.trim().length > 0
+          ? args.text
+          : 'Model has completed the task';
+      return {
+        id: String(msg.id),
+        role: 'assistant',
+        parts: [{ type: 'text', text }],
+        metadata: {
+          isToolCall: true,
+          isFinalAnswer: true,
+          toolName: call.toolName,
+          callId: call.callId ?? String(msg.id),
+          summaryPoints: args.summary_points,
+        },
+      };
+    }
+
     const toolName = call.toolName ?? 'tool';
     const callId = call.callId ?? String(msg.id);
     const input = call.arguments ?? {};

@@ -272,4 +272,92 @@ describe('AppCoordinator', () => {
 
     expect(coordinator.getState().phase).toBe('waiting-for-chats');
   });
+
+  /* Preconditions: coordinator started in unauthorized state
+     Action: emit auth.completed event
+     Assertions: coordinator enters waiting-for-chats with authorized=true
+     Requirements: agents.13.2, navigation.1.3 */
+  it('should transition to waiting-for-chats on auth.completed from unauthenticated state', async () => {
+    jest.useFakeTimers();
+
+    const eventBus = new FakeMainEventBus();
+    const oauthClient = {
+      getAuthStatus: jest.fn().mockResolvedValue({ authorized: false }),
+    };
+    const coordinator = new AppCoordinator(
+      oauthClient as any,
+      { chatsReadyTimeoutMs: 5_000 },
+      eventBus as any
+    );
+
+    await coordinator.start();
+    expect(coordinator.getState().phase).toBe('unauthenticated');
+
+    eventBus.emit(EVENT_TYPES.AUTH_COMPLETED, {
+      userId: 'user-1',
+      profile: { id: 'user-1', email: 'user@example.com', name: 'User' },
+      timestamp: Date.now(),
+    });
+
+    expect(coordinator.getState()).toMatchObject({
+      phase: 'waiting-for-chats',
+      authorized: true,
+      targetScreen: 'agents',
+    });
+  });
+
+  /* Preconditions: coordinator is waiting for chats with active timeout
+     Action: emit auth.signed_out event
+     Assertions: coordinator moves to unauthenticated and timeout is cleared
+     Requirements: agents.13.2, navigation.1.1 */
+  it('should transition to unauthenticated on auth.signed_out and clear timeout', async () => {
+    jest.useFakeTimers();
+
+    const eventBus = new FakeMainEventBus();
+    const oauthClient = {
+      getAuthStatus: jest.fn().mockResolvedValue({ authorized: true }),
+    };
+    const coordinator = new AppCoordinator(
+      oauthClient as any,
+      { chatsReadyTimeoutMs: 100 },
+      eventBus as any
+    );
+
+    await coordinator.start();
+    expect(coordinator.getState().phase).toBe('waiting-for-chats');
+
+    eventBus.emit(EVENT_TYPES.AUTH_SIGNED_OUT, { timestamp: Date.now() });
+    expect(coordinator.getState()).toMatchObject({
+      phase: 'unauthenticated',
+      authorized: false,
+      targetScreen: 'login',
+    });
+
+    jest.advanceTimersByTime(200);
+    expect(coordinator.getState().phase).toBe('unauthenticated');
+  });
+
+  /* Preconditions: coordinator started and currently unauthenticated
+     Action: emit user.profile.updated
+     Assertions: state remains unchanged (event ignored)
+     Requirements: agents.13.2 */
+  it('should ignore user.profile.updated when not authorized', async () => {
+    const eventBus = new FakeMainEventBus();
+    const oauthClient = {
+      getAuthStatus: jest.fn().mockResolvedValue({ authorized: false }),
+    };
+    const coordinator = new AppCoordinator(oauthClient as any, undefined, eventBus as any);
+
+    await coordinator.start();
+    expect(coordinator.getState().phase).toBe('unauthenticated');
+
+    eventBus.emit(EVENT_TYPES.USER_PROFILE_UPDATED, {
+      userId: 'user-1',
+      changedFields: ['name'],
+      profile: { id: 'user-1', email: 'user@example.com', name: 'User' },
+      timestamp: Date.now(),
+    });
+
+    expect(coordinator.getState().phase).toBe('unauthenticated');
+  });
 });

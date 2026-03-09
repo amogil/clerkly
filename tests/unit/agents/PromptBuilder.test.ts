@@ -6,6 +6,7 @@ import {
   PromptBuilder,
   FullHistoryStrategy,
   AgentFeature,
+  FinalAnswerFeature,
 } from '../../../src/main/agents/PromptBuilder';
 import type { LLMTool } from '../../../src/main/llm/ILLMProvider';
 import type { Message } from '../../../src/main/db/schema';
@@ -121,6 +122,17 @@ describe('PromptBuilder.build()', () => {
       };
       const result = makeBuilder('Base.', [feature1, feature2]).build();
       expect(result.tools).toEqual([tool1, tool2]);
+    });
+
+    /* Preconditions: FinalAnswerFeature configured
+       Action: Call build()
+       Assertions: final_answer tool and guidance section are present
+       Requirements: llm-integration.9.2, llm-integration.11.2.1 */
+    it('should include final_answer tool and prompt guidance from FinalAnswerFeature', () => {
+      const feature = new FinalAnswerFeature();
+      const result = makeBuilder('Base.', [feature]).build();
+      expect(result.systemPrompt).toContain('final_answer');
+      expect(result.tools.some((tool) => tool.name === 'final_answer')).toBe(true);
     });
   });
 

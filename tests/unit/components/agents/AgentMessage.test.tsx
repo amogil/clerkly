@@ -106,6 +106,66 @@ describe('AgentMessage — tool_call', () => {
     expect(output).toBeInTheDocument();
     expect(output).toHaveTextContent('"content": "result"');
   });
+
+  /* Preconditions: persisted kind:tool_call for final_answer with text + summary_points
+     Action: render AgentMessage
+     Assertions: renders assistant-style final message with completed badge and summary list
+     Requirements: agents.7.4.1, agents.7.4.2, llm-integration.9.7 */
+  it('should render final_answer as assistant message with completed badge', () => {
+    render(
+      <AgentMessage
+        message={baseMessage({
+          kind: 'tool_call',
+          done: true,
+          payload: {
+            data: {
+              callId: 'call-final',
+              toolName: 'final_answer',
+              arguments: {
+                text: 'Final answer text',
+                summary_points: ['Point 1', 'Point 2'],
+              },
+            },
+          },
+        })}
+      />
+    );
+
+    expect(screen.getByTestId('message-completed-badge')).toBeInTheDocument();
+    expect(screen.getByTestId('message-llm-action')).toHaveTextContent('Final answer text');
+    expect(screen.getByTestId('message-completed-summary')).toBeInTheDocument();
+    expect(screen.getByText('Point 1')).toBeInTheDocument();
+    expect(screen.queryByTestId('message-tool-call')).not.toBeInTheDocument();
+  });
+
+  /* Preconditions: final_answer without text
+     Action: render AgentMessage
+     Assertions: fallback text is shown without error block
+     Requirements: agents.7.4.3, llm-integration.9.6 */
+  it('should render fallback text for final_answer without text', () => {
+    render(
+      <AgentMessage
+        message={baseMessage({
+          kind: 'tool_call',
+          done: true,
+          payload: {
+            data: {
+              callId: 'call-final',
+              toolName: 'final_answer',
+              arguments: {
+                summary_points: ['Done'],
+              },
+            },
+          },
+        })}
+      />
+    );
+
+    expect(screen.getByTestId('message-llm-action')).toHaveTextContent(
+      'Model has completed the task'
+    );
+    expect(screen.queryByTestId('message-error')).not.toBeInTheDocument();
+  });
 });
 
 describe('AgentMessage — llm', () => {

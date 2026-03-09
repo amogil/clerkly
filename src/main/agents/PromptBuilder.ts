@@ -191,3 +191,51 @@ export class PromptBuilder {
     return sorted;
   }
 }
+
+/**
+ * Built-in feature that defines terminal tool call used to mark task completion.
+ * Requirements: llm-integration.9.2, llm-integration.11.2.1
+ */
+export class FinalAnswerFeature implements AgentFeature {
+  name = 'final_answer';
+
+  getSystemPromptSection(): string {
+    return [
+      'When you consider the user task completed, call the `final_answer` tool.',
+      'Provide the final user-facing text in `text`.',
+      'Optionally provide `summary_points` as short bullet points (target: up to 10 points, target: up to 200 characters each).',
+      'These limits are guidance for generation quality; if they are exceeded, the response is still accepted.',
+    ].join(' ');
+  }
+
+  getTools(): LLMTool[] {
+    return [
+      {
+        name: 'final_answer',
+        description:
+          'Marks task completion and returns final user-facing response with optional summary points.',
+        parameters: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            text: {
+              type: 'string',
+              description: 'Final user-facing response text.',
+            },
+            summary_points: {
+              type: 'array',
+              description:
+                'Optional concise summary bullet points (target: up to 10 points, up to 200 characters each).',
+              items: {
+                type: 'string',
+              },
+            },
+          },
+          required: ['text'],
+        },
+        // Keep execution deterministic and side-effect free.
+        execute: async (args: Record<string, unknown>) => args,
+      },
+    ];
+  }
+}

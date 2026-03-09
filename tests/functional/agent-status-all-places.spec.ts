@@ -19,10 +19,15 @@ import {
 import type { MockOAuthServer } from './helpers/mock-oauth-server';
 
 type StatusCase = {
-  status: 'new' | 'in-progress' | 'awaiting-response' | 'error';
-  label: 'New' | 'In progress' | 'Awaiting response' | 'Error';
-  colorClass: 'bg-sky-400' | 'bg-blue-500' | 'bg-amber-500' | 'bg-red-500';
-  textClass: 'text-sky-600' | 'text-blue-600' | 'text-amber-600' | 'text-red-600';
+  status: 'new' | 'in-progress' | 'awaiting-response' | 'error' | 'completed';
+  label: 'New' | 'In progress' | 'Awaiting response' | 'Error' | 'Completed';
+  colorClass: 'bg-sky-400' | 'bg-blue-500' | 'bg-amber-500' | 'bg-red-500' | 'bg-green-500';
+  textClass:
+    | 'text-sky-600'
+    | 'text-blue-600'
+    | 'text-amber-600'
+    | 'text-red-600'
+    | 'text-green-600';
 };
 
 const STATUS_CASES: StatusCase[] = [
@@ -40,6 +45,12 @@ const STATUS_CASES: StatusCase[] = [
     textClass: 'text-amber-600',
   },
   { status: 'error', label: 'Error', colorClass: 'bg-red-500', textClass: 'text-red-600' },
+  {
+    status: 'completed',
+    label: 'Completed',
+    colorClass: 'bg-green-500',
+    textClass: 'text-green-600',
+  },
 ];
 
 let electronApp: ElectronApplication;

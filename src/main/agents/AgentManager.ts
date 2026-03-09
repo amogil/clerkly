@@ -62,10 +62,30 @@ export class AgentManager {
     }
 
     if (lastMessage.kind === MESSAGE_KIND.TOOL_CALL) {
-      return lastMessage.done ? AGENT_STATUS.AWAITING_RESPONSE : AGENT_STATUS.IN_PROGRESS;
+      if (!lastMessage.done) {
+        return AGENT_STATUS.IN_PROGRESS;
+      }
+      return this.extractToolName(lastMessage) === 'final_answer'
+        ? AGENT_STATUS.COMPLETED
+        : AGENT_STATUS.AWAITING_RESPONSE;
     }
 
     return AGENT_STATUS.NEW;
+  }
+
+  /**
+   * Extract tool name from persisted tool_call payload.
+   * Requirements: agents.9.2, llm-integration.9.4
+   */
+  private extractToolName(message: Message): string | null {
+    try {
+      const payload = JSON.parse(message.payloadJson) as {
+        data?: { toolName?: unknown };
+      };
+      return typeof payload?.data?.toolName === 'string' ? payload.data.toolName : null;
+    } catch {
+      return null;
+    }
   }
 
   /**
