@@ -199,6 +199,21 @@
 
 ---
 
+## Фаза 11: Порядок persist `llm` и `tool_call` в одном turn
+
+- [x] Привести `MainPipeline` к контракту `llm-integration.11.1.1-11.1.2`:
+  - [x] Буферизовать `tool_call`/`tool_result` чанки до финализации `kind:llm`.
+  - [x] Финализировать `kind:llm (done=true)` до первого persisted `kind:tool_call` текущего turn.
+  - [x] Выполнять flush buffered tool-calls только после successful completion основного `llm` ответа.
+- [x] Добавить/обновить unit-тесты порядка событий/персиста:
+  - [x] `kind:tool_call` не создаётся в БД до `kind:llm(done=true)` для того же turn.
+  - [x] При error-path buffered tool-calls не персистятся как успешные tool-call сообщения.
+- [x] Добавить/обновить functional-тесты user-flow:
+  - [x] Проверка, что блок `final_answer` появляется только после полного стриминга основного ответа.
+  - [x] Проверка, что до завершения `llm` в UI отсутствует persisted `tool_call` текущего turn.
+
+---
+
 ## Definition of Done
 
 - [x] Спеки и дизайн обновлены под целевую модель `final_answer` без legacy/миграционных оговорок.

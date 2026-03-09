@@ -202,7 +202,7 @@ describe('MainPipeline.run()', () => {
     );
   });
 
-  it('persists tool_call lifecycle from tool_call/tool_result stream chunks and finalizes llm text', async () => {
+  it('persists buffered tool_call after llm finalization in same turn', async () => {
     const { pipeline, llmProvider, toolExecutor, messageManager } = makeMocks();
 
     llmProvider.chat.mockImplementation(
@@ -239,22 +239,35 @@ describe('MainPipeline.run()', () => {
           callId: 'call-1',
           toolName: 'search_docs',
           arguments: { query: 'streaming' },
-        }),
-      }),
-      1,
-      false
-    );
-    expect(messageManager.update).toHaveBeenCalledWith(
-      expect.any(Number),
-      'agent-1',
-      expect.objectContaining({
-        data: expect.objectContaining({
-          callId: 'call-1',
-          toolName: 'search_docs',
           output: expect.objectContaining({ status: 'success' }),
         }),
       }),
+      1,
       true
+    );
+
+    const llmDoneUpdate = (messageManager.update as jest.Mock).mock.calls.find(
+      (call: unknown[]) =>
+        call[3] === true &&
+        typeof call[2] === 'object' &&
+        call[2] !== null &&
+        'data' in (call[2] as Record<string, unknown>)
+    );
+    const toolCallCreate = (messageManager.create as jest.Mock).mock.calls.find(
+      (call: unknown[]) => call[1] === 'tool_call'
+    );
+    expect(llmDoneUpdate).toBeDefined();
+    expect(toolCallCreate).toBeDefined();
+    expect((llmDoneUpdate as unknown[]).length).toBeGreaterThan(0);
+    expect((toolCallCreate as unknown[]).length).toBeGreaterThan(0);
+    expect(
+      (messageManager.update as jest.Mock).mock.invocationCallOrder[
+        (messageManager.update as jest.Mock).mock.calls.indexOf(llmDoneUpdate as unknown[])
+      ]
+    ).toBeLessThan(
+      (messageManager.create as jest.Mock).mock.invocationCallOrder[
+        (messageManager.create as jest.Mock).mock.calls.indexOf(toolCallCreate as unknown[])
+      ]
     );
   });
 
@@ -425,13 +438,18 @@ describe('MainPipeline.run()', () => {
     );
     expect(toolCallCreates).toHaveLength(2);
 
-    const toolCallDoneUpdates = (messageManager.update as jest.Mock).mock.calls.filter(
-      (call: unknown[]) => call[3] === true
-    );
-    expect(toolCallDoneUpdates.length).toBeGreaterThanOrEqual(2);
+    for (const call of toolCallCreates) {
+      expect(call[4]).toBe(true);
+      const payload = call[2] as { data?: Record<string, unknown> };
+      expect(payload.data?.output).toEqual(
+        expect.objectContaining({
+          status: 'success',
+        })
+      );
+    }
   });
 
-  it('finalizes tool_call with error output when tool_result arrives with error status', async () => {
+  it('persists tool_call with error output when tool_result arrives with error status', async () => {
     const { pipeline, llmProvider, messageManager } = makeMocks();
 
     llmProvider.chat.mockImplementation(
@@ -456,9 +474,9 @@ describe('MainPipeline.run()', () => {
 
     await pipeline.run('agent-1', 1);
 
-    expect(messageManager.update).toHaveBeenCalledWith(
-      expect.any(Number),
+    expect(messageManager.create).toHaveBeenCalledWith(
       'agent-1',
+      'tool_call',
       expect.objectContaining({
         data: expect.objectContaining({
           callId: 'call-stub',
@@ -468,6 +486,7 @@ describe('MainPipeline.run()', () => {
           }),
         }),
       }),
+      1,
       true
     );
   });
@@ -510,6 +529,33 @@ describe('MainPipeline.run()', () => {
       1,
       true
     );
+  });
+
+  it('does not persist buffered tool_call when provider fails before completion', async () => {
+    const { pipeline, messageManager, llmProvider } = makeMocks();
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({
+          type: 'tool_call',
+          callId: 'call-fail',
+          toolName: 'search_docs',
+          arguments: { query: 'x' },
+        });
+        throw new Error('Connection dropped');
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    const toolCreates = (messageManager.create as jest.Mock).mock.calls.filter(
+      (call: unknown[]) => call[1] === 'tool_call'
+    );
+    expect(toolCreates).toHaveLength(0);
+    const errorCreates = (messageManager.create as jest.Mock).mock.calls.filter(
+      (call: unknown[]) => call[1] === 'error'
+    );
+    expect(errorCreates).toHaveLength(1);
   });
 
   it('creates auth error with action_link when api key is missing', async () => {
@@ -664,6 +710,10 @@ describe('MainPipeline.run()', () => {
       (call: unknown[]) => call[1] === 'error'
     );
     expect(errorCreates).toHaveLength(0);
+    const toolCreates = (messageManager.create as jest.Mock).mock.calls.filter(
+      (call: unknown[]) => call[1] === 'tool_call'
+    );
+    expect(toolCreates).toHaveLength(0);
   });
 
   it('cancels before final llm completion without creating kind:error', async () => {
@@ -1067,7 +1117,7 @@ describe('MainPipeline.run()', () => {
     );
   });
 
-  it('updates existing tool_call when duplicate callId arrives', async () => {
+  it('keeps latest arguments for duplicate tool_call callId before flush', async () => {
     const { pipeline, llmProvider, messageManager } = makeMocks();
 
     llmProvider.chat.mockImplementation(
@@ -1090,20 +1140,21 @@ describe('MainPipeline.run()', () => {
 
     await pipeline.run('agent-1', 1);
 
-    expect(messageManager.update).toHaveBeenCalledWith(
-      expect.any(Number),
+    expect(messageManager.create).toHaveBeenCalledWith(
       'agent-1',
+      'tool_call',
       expect.objectContaining({
         data: expect.objectContaining({
           callId: 'call-dup',
           arguments: { q: 'v2' },
         }),
       }),
-      false
+      1,
+      true
     );
   });
 
-  it('finalizes final_answer tool_result by updating existing row', async () => {
+  it('persists final_answer tool_result using finalized buffered row', async () => {
     const { pipeline, llmProvider, messageManager } = makeMocks();
 
     llmProvider.chat.mockImplementation(
@@ -1128,9 +1179,9 @@ describe('MainPipeline.run()', () => {
 
     await pipeline.run('agent-1', 1);
 
-    expect(messageManager.update).toHaveBeenCalledWith(
-      expect.any(Number),
+    expect(messageManager.create).toHaveBeenCalledWith(
       'agent-1',
+      'tool_call',
       expect.objectContaining({
         data: expect.objectContaining({
           callId: 'call-final',
@@ -1138,11 +1189,12 @@ describe('MainPipeline.run()', () => {
           arguments: { text: 'Final answer text', summary_points: [] },
         }),
       }),
+      1,
       true
     );
   });
 
-  it('normalizes final_answer defaults during tool_result finalize when fields are absent', async () => {
+  it('normalizes final_answer defaults when tool_result fields are absent', async () => {
     const { pipeline, llmProvider, messageManager } = makeMocks();
 
     llmProvider.chat.mockImplementation(
@@ -1167,9 +1219,9 @@ describe('MainPipeline.run()', () => {
 
     await pipeline.run('agent-1', 1);
 
-    expect(messageManager.update).toHaveBeenCalledWith(
-      expect.any(Number),
+    expect(messageManager.create).toHaveBeenCalledWith(
       'agent-1',
+      'tool_call',
       expect.objectContaining({
         data: expect.objectContaining({
           callId: 'call-final-defaults-result',
@@ -1177,6 +1229,7 @@ describe('MainPipeline.run()', () => {
           arguments: { summary_points: [] },
         }),
       }),
+      1,
       true
     );
   });

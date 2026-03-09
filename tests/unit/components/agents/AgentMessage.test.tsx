@@ -135,6 +135,7 @@ describe('AgentMessage — tool_call', () => {
     expect(screen.getByTestId('message-final-answer-header')).toBeInTheDocument();
     expect(screen.getByTestId('message-final-answer-title')).toHaveTextContent('Final answer text');
     expect(screen.getByTestId('message-final-answer-check')).toBeInTheDocument();
+    expect(screen.getByTestId('message-final-answer-check')).toHaveClass('text-green-600');
     expect(screen.getByTestId('message-final-answer-toggle')).toBeInTheDocument();
     fireEvent.click(screen.getByTestId('message-final-answer-toggle'));
     expect(screen.getByTestId('message-final-answer-summary')).toBeInTheDocument();

@@ -219,8 +219,10 @@ CREATE TABLE messages (
 1) `MainPipeline` получает streaming chunks от провайдера (`reasoning`, `text`).
 2) На первом meaningful chunk создаёт `kind: llm` (`done: 0`).
 3) На каждом чанке обновляет payload `kind: llm`.
-4) На завершении turn финализирует `kind: llm` (`done: 1`).
-5) Отдельно сохраняет `usage_json` (если есть).
+4) `tool_call`/`tool_result` чанки текущего turn буферизуются в памяти до финализации `kind: llm`.
+5) На завершении turn сначала финализирует `kind: llm` (`done: 1`).
+6) После финализации `kind: llm` сохраняет buffered `kind: tool_call` для этого turn.
+7) Отдельно сохраняет `usage_json` (если есть).
 
 #### 2. Runtime transport: stream processing
 1) Runtime-consumer использует единый stream-state контракт диалога.
@@ -452,11 +454,9 @@ class MainPipeline {
       обновляет `kind: llm` (`data.text = accumulatedText`, `done: false`)
       эмитит `message.llm.text.updated { delta, accumulatedText }`
     if chunk.type == 'tool_call':
-      сохраняет/обновляет `kind: tool_call` (аргументы уже собраны полностью)
-      if toolName != 'final_answer' and execution недоступен:
-        сохраняет stub output и завершает `done: true`
+      добавляет tool call в буфер текущего turn (без persist в БД до финализации `kind:llm`)
     if llmMessageId уже существовал до этого чанка: эмитит `message.updated` (snapshot/consistency)
-7. После успешного завершения `provider.chat(...)` обновляет `kind: llm` (`done: true`) и сохраняет `usage_json` отдельным шагом
+7. После успешного завершения `provider.chat(...)` обновляет `kind: llm` (`done: true`), затем flush-ит буфер tool call в persisted `kind: tool_call` (с заглушкой результата для non-final tool при недоступном execution), затем сохраняет `usage_json` отдельным шагом
 8. Если последним видимым сообщением стал `kind: tool_call` с `toolName='final_answer'` и `done=true`, `AgentManager.computeAgentStatus()` возвращает `completed`
 9. Эмитит финальный `message.updated`
 ```
@@ -587,12 +587,14 @@ User отправляет сообщение
               → message.llm.text.updated
               → message.updated
           → [tool_call with full arguments]
-              → MessageManager.create/update(kind: 'tool_call', done: false/true)
-              → обработка persisted snapshot в клиентском runtime
-              → message.created/message.updated
+              → buffer tool-call (no persist yet)
           → [chat completion]
               → MessageManager.update(kind: 'llm', done: true)
               → message.updated
+              → flush buffered tool-calls
+              → MessageManager.create/update(kind: 'tool_call', done: false/true)
+              → обработка persisted snapshot в клиентском runtime
+              → message.created/message.updated
       → [on error]
           → MessageManager.update(kind: 'llm', hidden: true, done: false) [если уже создан]
           → MessageManager.create(kind: 'error', done: true, reply_to_message_id: userMessageId)
@@ -610,6 +612,7 @@ User отправляет сообщение
 - `tests/unit/llm/GoogleProvider.chat.test.ts` — streaming/tool-loop mapping, ошибки, usage
 - `tests/unit/agents/PromptBuilder.test.ts` — формирование массива `messages`, исключения из replay
 - `tests/unit/agents/MainPipeline.test.ts` — мок провайдера, полный цикл, ошибки, события
+- `tests/unit/agents/MainPipeline.test.ts` — порядок persist: `kind:llm(done=true)` фиксируется раньше persisted `kind:tool_call` в одном turn
 - `tests/unit/agents/AgentIPCHandlers.test.ts` — запуск pipeline при kind:user
 - `tests/unit/renderer/IPCChatTransport.test.ts` — обработка delta-stream (`reasoning/text`) и persisted `kind: tool_call` snapshot
 - `tests/unit/events/MainEventBus.test.ts` и `tests/unit/events/RendererEventBus.test.ts` — порядок/доставка streaming событий без потери чанков
@@ -628,6 +631,8 @@ User отправляет сообщение
 - `tests/functional/llm-chat.spec.ts` — "should hide error bubble when user sends next message"
 - `tests/functional/llm-chat.spec.ts` — "should send full conversation history to llm on second message"
 - `tests/functional/llm-chat.spec.ts` — "should exclude error messages from llm history"
+- `tests/functional/llm-chat.spec.ts` — "full llm response streams before final_answer block appears"
+- `tests/functional/llm-chat.spec.ts` — "tool_call block is not persisted/visible before llm done for the same turn"
 
 ### Покрытие Требований
 
@@ -668,6 +673,8 @@ User отправляет сообщение
 | llm-integration.9.5.1.2 (default contract: `text` отсутствует, `summary_points=[]`) | ✓ | ✓ |
 | llm-integration.10 | ✓ | ✓ |
 | llm-integration.11 | ✓ | ✓ |
+| llm-integration.11.1.1 (`tool_call` только после `llm done=true`) | ✓ | ✓ |
+| llm-integration.11.1.2 (до `llm done=true` persisted `tool_call` не создаётся) | ✓ | ✓ |
 | llm-integration.12 | ✓ | ✓ |
 | llm-integration.13 | ✓ | - |
 | llm-integration.14 | ✓ | ✓ |

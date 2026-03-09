@@ -1382,6 +1382,127 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     await expect(context.window.locator('[data-testid="message-user"]')).toHaveCount(1);
   });
 
+  /* Preconditions: MockLLMServer scripted stream emits tool_call(final_answer) before text chunks in SSE order
+     Action: User sends a message and probe tracks when full llm text becomes visible vs when Final Answer block appears
+     Assertions: Full llm response appears no later than Final Answer block (text first, completion block after)
+     Requirements: llm-integration.11.1.1 */
+  test('full llm response streams before final_answer block appears', async () => {
+    mockLLMServer.setStreamingMode(true, { chunkDelayMs: 80 });
+    mockLLMServer.setOpenAIStreamScripts([
+      {
+        reasoning: 'Analyzing request in detail',
+        toolCalls: [
+          {
+            callId: 'final-order-1',
+            toolName: 'final_answer',
+            arguments: {
+              text: 'Done',
+              summary_points: ['Generated final text'],
+            },
+          },
+        ],
+        content:
+          'Streaming response line 1. Streaming response line 2. Streaming response line 3. [END-OF-LLM-TEXT]',
+      },
+    ]);
+
+    context = await launchWithMockLLM();
+    const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
+
+    await context.window.evaluate(() => {
+      (window as Window & { __streamOrderProbe?: any }).__streamOrderProbe = {
+        textCompletedAt: null,
+        finalAnswerVisibleAt: null,
+      };
+    });
+
+    await messageInput.fill('Check llm vs final_answer order');
+    await messageInput.press('Enter');
+
+    await expect
+      .poll(
+        async () =>
+          await context.window.evaluate(() => {
+            const probe = (window as Window & { __streamOrderProbe?: any }).__streamOrderProbe;
+            const now = Date.now();
+            const action = document.querySelectorAll('.message-llm-action-response');
+            const lastAction = action[action.length - 1];
+            const llmText = lastAction?.textContent ?? '';
+            if (!probe.textCompletedAt && llmText.includes('[END-OF-LLM-TEXT]')) {
+              probe.textCompletedAt = now;
+            }
+            if (
+              !probe.finalAnswerVisibleAt &&
+              document.querySelectorAll('[data-testid="message-final-answer-block"]').length > 0
+            ) {
+              probe.finalAnswerVisibleAt = now;
+            }
+            return {
+              textCompletedAt: probe.textCompletedAt,
+              finalAnswerVisibleAt: probe.finalAnswerVisibleAt,
+            };
+          }),
+        { timeout: 15000 }
+      )
+      .toEqual(
+        expect.objectContaining({
+          textCompletedAt: expect.any(Number),
+          finalAnswerVisibleAt: expect.any(Number),
+        })
+      );
+
+    const orderProbe = await context.window.evaluate(() => {
+      return (window as Window & { __streamOrderProbe?: any }).__streamOrderProbe;
+    });
+    expect(orderProbe.textCompletedAt).toBeLessThanOrEqual(orderProbe.finalAnswerVisibleAt);
+  });
+
+  /* Preconditions: MockLLMServer scripted stream emits tool_call(final_answer) before long text chunks
+     Action: User sends a message and observes in-progress phase while Stop is visible
+     Assertions: During in-progress phase Final Answer block is not visible; block appears only after completion
+     Requirements: llm-integration.11.1.2 */
+  test('tool_call block is not persisted/visible before llm done for the same turn', async () => {
+    mockLLMServer.setStreamingMode(true, { chunkDelayMs: 120 });
+    mockLLMServer.setOpenAIStreamScripts([
+      {
+        toolCalls: [
+          {
+            callId: 'final-order-2',
+            toolName: 'final_answer',
+            arguments: {
+              text: 'Completed after stream',
+              summary_points: ['Persisted after llm done'],
+            },
+          },
+        ],
+        content:
+          'Long streaming content chunk A. Long streaming content chunk B. Long streaming content chunk C.',
+      },
+    ]);
+
+    context = await launchWithMockLLM();
+    const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
+
+    await messageInput.fill('Check no early final_answer persist');
+    await messageInput.press('Enter');
+
+    const stopButton = context.window.locator('[data-testid="prompt-input-stop"]');
+    await expect(stopButton).toBeVisible({ timeout: 5000 });
+
+    const actionContent = context.window.locator('.message-llm-action-response').last();
+    await expect(actionContent).toBeVisible({ timeout: 10000 });
+    await expect(context.window.locator('[data-testid="message-final-answer-block"]')).toHaveCount(
+      0
+    );
+
+    await expect(context.window.locator('[data-testid="prompt-input-send"]')).toBeVisible({
+      timeout: 15000,
+    });
+    await expect(
+      context.window.locator('[data-testid="message-final-answer-block"]').last()
+    ).toBeVisible({ timeout: 5000 });
+  });
+
   /* Preconditions: MockLLMServer returns a single tool_call(final_answer) with text + summary_points
      Action: User sends a message
      Assertions: Final answer block is rendered with title and summary details

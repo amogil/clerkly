@@ -404,6 +404,10 @@
 
 11.1. КОГДА модель запрашивает вызов инструмента, ТО `MainPipeline` ДОЛЖЕН дождаться полной сборки аргументов и сохранить/обновить сообщение `kind: tool_call` в `messages`.
 
+11.1.1. КОГДА в одном turn присутствуют и стриминг основного ответа (`reasoning`/`text`), и `tool_call`, ТО обработка `tool_call` в chat-flow ДОЛЖНА выполняться только после финализации основного `kind: llm` сообщения (`done = true`).
+
+11.1.2. ПОКА основной `kind: llm` ответ текущего turn не финализирован, persisted `kind: tool_call` сообщения этого turn НЕ ДОЛЖНЫ создаваться/обновляться в БД.
+
 11.2. При обработке tool call система ДОЛЖНА создавать/обновлять persisted сообщение `kind: tool_call` с полями `callId`, `toolName`, полностью собранными `arguments` и результатом выполнения.
 
 11.2.1. Для `final_answer` инструмент ДОЛЖЕН вызываться в strict-режиме через `Vercel AI SDK`; соблюдение контракта аргументов (`llm-integration.9.5.*`) ДОЛЖНО обеспечиваться схемой инструмента и встроенным retry/repair механизмом SDK.
@@ -424,6 +428,11 @@
   - сохранять диагностически понятный placeholder output,
   - переводить сообщение в `done = true`,
   - эмитить `message.updated` с финальным snapshot.
+
+#### Функциональные Тесты
+
+- `tests/functional/llm-chat.spec.ts` — "full llm response streams before final_answer block appears"
+- `tests/functional/llm-chat.spec.ts` — "tool_call block is not persisted/visible before llm done for the same turn"
 
 ### 12. Надёжность chat-flow и обработка некорректных ответов
 

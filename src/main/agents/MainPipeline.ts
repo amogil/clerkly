@@ -23,6 +23,14 @@ import { ToolRunner } from '../tools/ToolRunner';
 
 import type { LLMProvider } from '../../types';
 
+type BufferedToolCall = {
+  callId: string;
+  toolName: string;
+  args: Record<string, unknown>;
+  resultStatus?: 'success' | 'error';
+  resultOutput?: unknown;
+};
+
 /**
  * Error type categories for kind:error messages
  * Requirements: llm-integration.5.3
@@ -160,7 +168,7 @@ export class MainPipeline {
     let llmMessageId: number | null = null;
     let accumulatedReasoning = '';
     let accumulatedText = '';
-    const toolCallMessageIds = new Map<string, number>();
+    const bufferedToolCalls = new Map<string, BufferedToolCall>();
     const streamResult = await this.callProviderWithStreaming(
       {
         chatMessages: context.baseChatMessages,
@@ -174,7 +182,7 @@ export class MainPipeline {
       llmMessageId,
       accumulatedReasoning,
       accumulatedText,
-      toolCallMessageIds
+      bufferedToolCalls
     );
 
     llmMessageId = streamResult.llmMessageId;
@@ -196,6 +204,7 @@ export class MainPipeline {
       streamResult.output
     );
     setLastLlmMessageId(finalMessageId);
+    this.flushBufferedToolCalls(agentId, context.replyToMessageId, bufferedToolCalls);
     this.persistUsageEnvelope(finalMessageId, agentId, streamResult.output);
     this.publishStepDiagnostics(agentId, userMessageId, streamResult.output);
     this.logger.info(`Pipeline completed for agent ${agentId}`);
@@ -218,7 +227,7 @@ export class MainPipeline {
     llmMessageId: number | null,
     accumulatedReasoning: string,
     accumulatedText: string,
-    toolCallMessageIds: Map<string, number>
+    bufferedToolCalls: Map<string, BufferedToolCall>
   ): Promise<{
     output: LLMChatResult;
     llmMessageId: number | null;
@@ -287,33 +296,19 @@ export class MainPipeline {
 
             if (chunk.type === 'tool_call') {
               meaningfulChunkSeen = true;
-              llmMessageId = this.persistInProgressToolCall(
-                llmMessageId,
-                agentId,
-                context.replyToMessageId,
-                context.options.model,
-                accumulatedReasoning,
-                accumulatedText,
-                setLastLlmMessageId,
-                chunk.callId,
-                chunk.toolName,
-                chunk.arguments,
-                toolCallMessageIds
-              );
+              this.bufferToolCall(bufferedToolCalls, chunk.callId, chunk.toolName, chunk.arguments);
               return;
             }
 
             if (chunk.type === 'tool_result') {
               meaningfulChunkSeen = true;
-              this.finalizeSingleToolCall(
-                agentId,
-                context.replyToMessageId,
+              this.bufferToolResult(
+                bufferedToolCalls,
                 chunk.callId,
                 chunk.toolName,
                 chunk.arguments,
                 chunk.output,
-                chunk.status,
-                toolCallMessageIds
+                chunk.status
               );
               return;
             }
@@ -345,133 +340,110 @@ export class MainPipeline {
   }
 
   /**
-   * Persist in-progress tool call snapshot from model chunk.
-   * Requirements: llm-integration.11.1, llm-integration.11.2
+   * Buffer tool_call chunks until llm finalization.
+   * Requirements: llm-integration.11.1, llm-integration.11.1.1, llm-integration.11.1.2
    */
-  private persistInProgressToolCall(
-    llmMessageId: number | null,
-    agentId: string,
-    replyToMessageId: number,
-    model: string,
-    accumulatedReasoning: string,
-    accumulatedText: string,
-    setLastLlmMessageId: (messageId: number) => void,
+  private bufferToolCall(
+    bufferedToolCalls: Map<string, BufferedToolCall>,
     callId: string,
     toolName: string,
-    args: Record<string, unknown>,
-    toolCallMessageIds: Map<string, number>
-  ): number | null {
-    const isFinalAnswer = toolName === 'final_answer';
-    const normalizedArgs = isFinalAnswer ? this.normalizeFinalAnswerArguments(args) : args;
-    const toolPayload = {
-      data: {
-        callId,
-        toolName,
-        arguments: normalizedArgs,
-      },
-    };
-    const existingToolMessageId = toolCallMessageIds.get(callId);
-    if (existingToolMessageId !== undefined) {
-      this.messageManager.update(existingToolMessageId, agentId, toolPayload, isFinalAnswer);
-      return llmMessageId;
+    args: Record<string, unknown>
+  ): void {
+    const existing = bufferedToolCalls.get(callId);
+    if (existing) {
+      existing.toolName = toolName;
+      existing.args = args;
+      return;
     }
-    const toolMessage = this.messageManager.create(
-      agentId,
-      'tool_call',
-      toolPayload,
-      replyToMessageId,
-      isFinalAnswer
-    );
-    toolCallMessageIds.set(callId, toolMessage.id);
-
-    // Keep llm progress message visible for reasoning/text stream continuity.
-    return this.upsertStreamingMessage(
-      llmMessageId,
-      agentId,
-      replyToMessageId,
-      model,
-      accumulatedReasoning,
-      accumulatedText,
-      setLastLlmMessageId
-    );
+    bufferedToolCalls.set(callId, {
+      callId,
+      toolName,
+      args,
+    });
   }
 
   /**
-   * Finalize persisted tool_call message with tool result emitted by AI SDK stream.
-   * Requirements: llm-integration.11.2, llm-integration.11.3
+   * Buffer tool_result chunks until llm finalization.
+   * Requirements: llm-integration.11.1.1, llm-integration.11.2
    */
-  private finalizeSingleToolCall(
-    agentId: string,
-    replyToMessageId: number,
+  private bufferToolResult(
+    bufferedToolCalls: Map<string, BufferedToolCall>,
     callId: string,
     toolName: string,
     args: Record<string, unknown>,
     output: unknown,
-    status: 'success' | 'error',
-    toolCallMessageIds: Map<string, number>
+    status: 'success' | 'error'
   ): void {
-    if (toolName === 'final_answer') {
-      const normalizedArgs = this.normalizeFinalAnswerArguments(args);
-      const payload = {
-        data: {
-          callId,
-          toolName,
-          arguments: normalizedArgs,
-        },
+    const existing = bufferedToolCalls.get(callId);
+    if (existing) {
+      existing.toolName = toolName;
+      existing.args = args;
+      existing.resultOutput = output;
+      existing.resultStatus = status;
+      return;
+    }
+    bufferedToolCalls.set(callId, {
+      callId,
+      toolName,
+      args,
+      resultOutput: output,
+      resultStatus: status,
+    });
+  }
+
+  /**
+   * Persist buffered tool calls after llm message is finalized.
+   * Requirements: llm-integration.11.1.1, llm-integration.11.1.2, llm-integration.11.2
+   */
+  private flushBufferedToolCalls(
+    agentId: string,
+    replyToMessageId: number,
+    bufferedToolCalls: Map<string, BufferedToolCall>
+  ): void {
+    for (const buffered of bufferedToolCalls.values()) {
+      const isFinalAnswer = buffered.toolName === 'final_answer';
+      const argumentsPayload = isFinalAnswer
+        ? this.normalizeFinalAnswerArguments(buffered.args)
+        : buffered.args;
+      const payloadData: Record<string, unknown> = {
+        callId: buffered.callId,
+        toolName: buffered.toolName,
+        arguments: argumentsPayload,
       };
-      const existingMessageId = toolCallMessageIds.get(callId);
-      if (existingMessageId !== undefined) {
-        this.messageManager.update(existingMessageId, agentId, payload, true);
-        return;
+
+      if (!isFinalAnswer) {
+        const resultStatus = buffered.resultStatus ?? 'error';
+        const resultOutput =
+          buffered.resultOutput ?? `Tool "${buffered.toolName}" is not available.`;
+        payloadData.output = {
+          status: resultStatus,
+          content: this.stringifyToolOutput(resultOutput),
+        };
       }
-      const created = this.messageManager.create(
+
+      this.messageManager.create(
         agentId,
         'tool_call',
-        payload,
+        { data: payloadData },
         replyToMessageId,
         true
       );
-      toolCallMessageIds.set(callId, created.id);
-      return;
     }
+  }
 
-    let outputText: string;
+  /**
+   * Convert tool output payload to stable text for persisted message payload.
+   * Requirements: llm-integration.11.2
+   */
+  private stringifyToolOutput(output: unknown): string {
     if (typeof output === 'string') {
-      outputText = output;
-    } else {
-      try {
-        outputText = JSON.stringify(output);
-      } catch {
-        outputText = String(output);
-      }
+      return output;
     }
-
-    const payload = {
-      data: {
-        callId,
-        toolName,
-        arguments: args,
-        output: {
-          status,
-          content: outputText,
-        },
-      },
-    };
-
-    const messageId = toolCallMessageIds.get(callId);
-    if (messageId !== undefined) {
-      this.messageManager.update(messageId, agentId, payload, true);
-      return;
+    try {
+      return JSON.stringify(output);
+    } catch {
+      return String(output);
     }
-
-    const created = this.messageManager.create(
-      agentId,
-      'tool_call',
-      payload,
-      replyToMessageId,
-      true
-    );
-    toolCallMessageIds.set(callId, created.id);
   }
 
   /**

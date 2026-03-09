@@ -169,7 +169,12 @@ export function AgentMessage({
                     <QueueSectionLabel
                       data-testid="message-final-answer-title"
                       label={title}
-                      icon={<Check data-testid="message-final-answer-check" className="size-4" />}
+                      icon={
+                        <Check
+                          data-testid="message-final-answer-check"
+                          className="size-4 text-green-600"
+                        />
+                      }
                     />
                   </QueueSectionTrigger>
                 </div>
@@ -178,7 +183,12 @@ export function AgentMessage({
                   <QueueSectionLabel
                     data-testid="message-final-answer-title"
                     label={title}
-                    icon={<Check data-testid="message-final-answer-check" className="size-4" />}
+                    icon={
+                      <Check
+                        data-testid="message-final-answer-check"
+                        className="size-4 text-green-600"
+                      />
+                    }
                   />
                 </div>
               )}
