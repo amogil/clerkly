@@ -588,6 +588,7 @@ export class MainPipeline {
     );
 
     if (signalAborted) {
+      this.finalizePendingToolCallsForTurn(agentId, userMessageId, 'Request cancelled.');
       if (lastLlmMessageId !== null) {
         try {
           this.hideIncompleteLlmMessage(lastLlmMessageId, agentId);
@@ -607,6 +608,7 @@ export class MainPipeline {
         // ignore
       }
     }
+    this.finalizePendingToolCallsForTurn(agentId, userMessageId, normalizedError.message);
 
     const errorReplyTo = userMessageId;
 
@@ -640,6 +642,54 @@ export class MainPipeline {
   }
 
   /**
+   * Finalize pending tool_call rows for the current user turn so UI does not keep stale in-progress blocks.
+   * Requirements: llm-integration.11.2, llm-integration.11.3
+   */
+  private finalizePendingToolCallsForTurn(
+    agentId: string,
+    userMessageId: number,
+    errorText: string
+  ): void {
+    const allVisible = this.messageManager.list(agentId);
+    const pendingForTurn = allVisible.filter(
+      (msg) =>
+        msg.kind === 'tool_call' &&
+        !msg.done &&
+        !msg.hidden &&
+        (msg.replyToMessageId ?? null) === userMessageId
+    );
+
+    for (const message of pendingForTurn) {
+      let payload: Record<string, unknown>;
+      try {
+        payload = JSON.parse(message.payloadJson) as Record<string, unknown>;
+      } catch {
+        payload = {};
+      }
+
+      const data =
+        payload.data && typeof payload.data === 'object' && !Array.isArray(payload.data)
+          ? (payload.data as Record<string, unknown>)
+          : {};
+
+      data.output = {
+        status: 'error',
+        content: errorText,
+      };
+
+      this.messageManager.update(
+        message.id,
+        agentId,
+        {
+          ...payload,
+          data,
+        },
+        true
+      );
+    }
+  }
+
+  /**
    * Resolve model and reasoning effort for a given provider.
    * Uses test config when NODE_ENV=test, prod config otherwise.
    * Requirements: llm-integration.5.1, llm-integration.5.8
@@ -659,21 +709,23 @@ export class MainPipeline {
     const runLimited = this.createConcurrencyLimiter(3);
     return tools.map((toolDef) => ({
       ...toolDef,
-      execute: async (args: Record<string, unknown>, signal?: AbortSignal) =>
+      execute: async (args: Record<string, unknown>, executeOptions?: unknown) =>
         runLimited(async () => {
+          const abortSignal = this.extractToolAbortSignal(executeOptions);
+          const toolCallId = this.extractToolCallId(executeOptions);
           if (toolDef.execute) {
-            return toolDef.execute(args, signal);
+            return toolDef.execute(args, abortSignal);
           }
 
           const [result] = await this.toolExecutor.executeBatch(
             [
               {
-                callId: `call-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+                callId: toolCallId ?? `call-${Date.now()}-${Math.random().toString(16).slice(2)}`,
                 toolName: toolDef.name,
                 arguments: args,
               },
             ],
-            signal
+            abortSignal
           );
 
           if (!result) {
@@ -687,6 +739,49 @@ export class MainPipeline {
           throw new Error(result.output);
         }),
     }));
+  }
+
+  private extractToolAbortSignal(executeOptions: unknown): AbortSignal | undefined {
+    if (
+      executeOptions &&
+      typeof executeOptions === 'object' &&
+      'abortSignal' in executeOptions
+    ) {
+      const candidate = (executeOptions as { abortSignal?: unknown }).abortSignal;
+      if (
+        candidate &&
+        typeof candidate === 'object' &&
+        'addEventListener' in candidate &&
+        typeof (candidate as { addEventListener?: unknown }).addEventListener === 'function'
+      ) {
+        return candidate as AbortSignal;
+      }
+    }
+
+    if (
+      executeOptions &&
+      typeof executeOptions === 'object' &&
+      'addEventListener' in executeOptions &&
+      typeof (executeOptions as { addEventListener?: unknown }).addEventListener === 'function'
+    ) {
+      return executeOptions as AbortSignal;
+    }
+
+    return undefined;
+  }
+
+  private extractToolCallId(executeOptions: unknown): string | undefined {
+    if (
+      executeOptions &&
+      typeof executeOptions === 'object' &&
+      'toolCallId' in executeOptions
+    ) {
+      const candidate = (executeOptions as { toolCallId?: unknown }).toolCallId;
+      if (typeof candidate === 'string' && candidate.trim().length > 0) {
+        return candidate;
+      }
+    }
+    return undefined;
   }
 
   private createConcurrencyLimiter(limit: number): <T>(job: () => Promise<T>) => Promise<T> {

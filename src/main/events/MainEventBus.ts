@@ -156,7 +156,8 @@ export class MainEventBus {
     let batchKey = dedupeKey;
     if (
       type === EVENT_TYPES.MESSAGE_UPDATED ||
-      type === EVENT_TYPES.MESSAGE_LLM_REASONING_UPDATED
+      type === EVENT_TYPES.MESSAGE_LLM_REASONING_UPDATED ||
+      type === EVENT_TYPES.MESSAGE_LLM_TEXT_UPDATED
     ) {
       this.nonCoalescedSequence += 1;
       batchKey = `${dedupeKey}:seq:${this.nonCoalescedSequence}`;
@@ -166,7 +167,9 @@ export class MainEventBus {
 
   private isNonCoalescedStreamingType(type: EventType): boolean {
     return (
-      type === EVENT_TYPES.MESSAGE_UPDATED || type === EVENT_TYPES.MESSAGE_LLM_REASONING_UPDATED
+      type === EVENT_TYPES.MESSAGE_UPDATED ||
+      type === EVENT_TYPES.MESSAGE_LLM_REASONING_UPDATED ||
+      type === EVENT_TYPES.MESSAGE_LLM_TEXT_UPDATED
     );
   }
 

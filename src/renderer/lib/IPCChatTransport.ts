@@ -103,10 +103,10 @@ export class IPCChatTransport implements ChatTransport<UIMessage> {
                 enqueue({ type: 'start-step' });
               }
 
-              // If message already has text content (non-streaming case), emit it now
+              // If message is already completed with text (non-streaming case), emit it now.
               const data = msg.payload.data as Record<string, unknown> | undefined;
               const text = data?.text;
-              if (typeof text === 'string' && text.length > 0) {
+              if (msg.done && typeof text === 'string' && text.length > 0) {
                 textPartId = `text-${msg.id}`;
                 enqueue({ type: 'text-start', id: textPartId });
                 enqueue({ type: 'text-delta', id: textPartId, delta: text });
