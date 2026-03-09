@@ -1,8 +1,18 @@
 import React from 'react';
-// Requirements: llm-integration.7, llm-integration.3.4.1, llm-integration.3.4.4, agents.4.22, agents.4.9, agents.4.10.1, agents.4.10.2
+// Requirements: llm-integration.7, llm-integration.3.4.1, llm-integration.3.4.4, agents.4.22, agents.4.9, agents.4.10.1, agents.4.10.2, agents.7.4
+import { Check } from 'lucide-react';
 import { Message, MessageContent, MessageResponse } from '../ai-elements/message';
 import { Reasoning, ReasoningContent } from '../ai-elements/reasoning';
 import { Tool, ToolContent, ToolHeader, ToolInput, ToolOutput } from '../ai-elements/tool';
+import {
+  Queue,
+  QueueItem,
+  QueueItemContent,
+  QueueSection,
+  QueueSectionContent,
+  QueueSectionLabel,
+  QueueSectionTrigger,
+} from '../ai-elements/queue';
 import { toUIMessage } from '../../lib/messageMapper';
 import type { MessageSnapshot } from '../../../shared/events/types';
 import { AgentErrorDialog } from './AgentErrorDialog';
@@ -21,6 +31,8 @@ export function AgentMessage({
   isReasoningStreaming = false,
   onNavigate,
 }: AgentMessageProps) {
+  const [isDismissed, setIsDismissed] = React.useState(false);
+
   const isLlmMessage = message.kind === 'llm';
   const llmData = isLlmMessage
     ? (message.payload.data as Record<string, unknown> | undefined)
@@ -45,6 +57,9 @@ export function AgentMessage({
   }
 
   if (message.kind === 'error') {
+    if (isDismissed) {
+      return null;
+    }
     // Requirements: llm-integration.7, llm-integration.3.4.1, llm-integration.3.4.3 — error bubble with optional actions
     const errorData = message.payload.data as Record<string, unknown> | undefined;
     const errorInfo = errorData?.['error'] as
@@ -56,15 +71,15 @@ export function AgentMessage({
     const canRetry = errorInfo?.type === 'auth';
 
     const actionItems: AgentDialogActionItem[] = [];
-    // Requirements: llm-integration.3.4.5
-    // When both actions are present, Open Settings is primary and shown first.
+    // Requirements: agents.4.10.3, agents.4.10.4, agents.4.10.4.1
+    // Fixed order: Open Settings first, Retry second.
     if (actionLink && onNavigate) {
       actionItems.push({
         id: 'error-open-settings',
         label: actionLink.label,
         onClick: () => onNavigate(actionLink.screen),
         testId: 'message-error-action-link',
-        variant: 'default',
+        variant: 'outline',
       });
     }
     if (canRetry) {
@@ -72,10 +87,13 @@ export function AgentMessage({
         id: 'error-retry',
         label: 'Retry',
         onClick: () => {
+          // Requirements: agents.4.10.5
+          // Hide dialog immediately before launching retry.
+          setIsDismissed(true);
           window.api.messages.retryLast(message.agentId).catch(() => {});
         },
         testId: 'message-error-retry',
-        variant: 'outline',
+        variant: 'default',
       });
     }
 
@@ -134,44 +152,50 @@ export function AgentMessage({
           ? toolData.arguments
           : undefined;
       const finalText = typeof args?.['text'] === 'string' ? args['text'].trim() : '';
-      if (!finalText) {
-        return null;
-      }
       const summaryPointsRaw = args?.['summary_points'];
       const summaryPoints = Array.isArray(summaryPointsRaw)
         ? summaryPointsRaw.filter((point): point is string => typeof point === 'string')
         : [];
+      const hasSummary = summaryPoints.length > 0;
+      const title = finalText || 'Done';
 
       return (
         <Message from="assistant" className="w-full max-w-full">
-          <div data-testid="message-llm" className="space-y-2 message-llm message-llm-completed">
-            <div className="flex items-center gap-2">
-              <span
-                data-testid="message-completed-badge"
-                className="rounded-full bg-green-500/15 px-2 py-0.5 text-xs font-medium text-green-700"
-              >
-                Completed
-              </span>
-            </div>
-            <MessageContent
-              data-testid="message-llm-action"
-              className="w-full message-llm-action message-llm-action-completed"
-            >
-              <MessageResponse className="text-sm leading-relaxed break-words">
-                {finalText}
-              </MessageResponse>
-            </MessageContent>
-            {summaryPoints.length > 0 ? (
-              <ul
-                data-testid="message-completed-summary"
-                className="list-disc pl-5 text-sm text-muted-foreground"
-              >
-                {summaryPoints.map((point, index) => (
-                  <li key={`${index}-${point}`}>{point}</li>
-                ))}
-              </ul>
-            ) : null}
-          </div>
+          <Queue data-testid="message-final-answer-block">
+            <QueueSection defaultOpen={false} disabled={!hasSummary}>
+              {hasSummary ? (
+                <div data-testid="message-final-answer-header">
+                  <QueueSectionTrigger data-testid="message-final-answer-toggle">
+                    <QueueSectionLabel
+                      data-testid="message-final-answer-title"
+                      label={title}
+                      icon={<Check data-testid="message-final-answer-check" className="size-4" />}
+                    />
+                  </QueueSectionTrigger>
+                </div>
+              ) : (
+                <div data-testid="message-final-answer-header">
+                  <QueueSectionLabel
+                    data-testid="message-final-answer-title"
+                    label={title}
+                    icon={<Check data-testid="message-final-answer-check" className="size-4" />}
+                  />
+                </div>
+              )}
+              {hasSummary ? (
+                <QueueSectionContent data-testid="message-final-answer-summary">
+                  {summaryPoints.map((point, index) => (
+                    <QueueItem key={`${index}-${point}`} className="flex-row items-start gap-2">
+                      <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-green-600">
+                        <Check className="h-3 w-3 text-white" />
+                      </span>
+                      <QueueItemContent completed={false}>{point}</QueueItemContent>
+                    </QueueItem>
+                  ))}
+                </QueueSectionContent>
+              ) : null}
+            </QueueSection>
+          </Queue>
         </Message>
       );
     }
