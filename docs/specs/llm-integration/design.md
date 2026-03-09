@@ -151,6 +151,27 @@ CREATE TABLE messages (
 }
 ```
 
+### kind: tool_call (final_answer)
+
+```json
+{
+  "data": {
+    "toolName": "final_answer",
+    "arguments": {
+      "text": "Итоговый ответ модели",
+      "summary_points": ["Сделано A", "Сделано B", "Сделано C"]
+    }
+  }
+}
+```
+
+Для `tool_call(final_answer)` итоговый текст для рендера берётся из `arguments.text`; краткое резюме берётся из `arguments.summary_points`.  
+Ограничения контракта: `summary_points` содержит от 0 до 10 пунктов, каждый пункт — до 200 символов.  
+При нарушении моделью лимитов `summary_points` (количество/длина) данные не нормализуются: сохраняются и отображаются как получены.
+Strict-mode для `final_answer` применяется к форме аргументов (структура/типы), но не превращает превышение лимитов `summary_points` в ошибку pipeline.
+Если `summary_points` отсутствует (или пустой), но `arguments.text` непустой — это успешный `completed`.  
+Если `arguments.text` отсутствует или пустой, UI показывает fallback `Модель закончила работу` и не создаёт `kind:error`.
+
 **UI отображение:** `reply_to_message_id` хранится в колонке `messages.reply_to_message_id` и передаётся в `MessageSnapshot` отдельным полем, не внутри payload. В renderer `kind: error` рендерится как стандартизированный диалог через кастомный `AgentDialog` с intent `error`, единым layout и опциональными действиями. Для ошибок API ключа (auth) диалог показывает "Open Settings" (primary) и "Retry" (secondary); при нажатии "Retry" диалог ошибки скрывается и запрос повторяется. `AgentDialog` поддерживает intent `error`, `warning`, `info`, `confirmation`; диалоги уведомлений (например, rate limit) используют этот же компонент с intent `info`.
 
 ---
@@ -162,7 +183,7 @@ CREATE TABLE messages (
 - `MainPipeline` обрабатывает поток чанков `reasoning` и `text`.
 - Для одного turn создаётся `kind: llm` сообщение.
 - Пока turn не завершён, `done = 0`; после завершения `done = 1`.
-- Tool-calling в чат-flow отображается в чате как `kind: tool_call` блок через persisted `message.created`/`message.updated`.
+- Tool-calling в чат-flow отображается через persisted `message.created`/`message.updated`: `tool_call(final_answer)` визуально рендерится как финальный ответ модели с `Completed` badge, остальные `tool_call` — как tool-call блоки.
 
 ### Usage JSON: отдельный поток сохранения
 
@@ -209,7 +230,7 @@ CREATE TABLE messages (
 2) `IPCChatTransport` работает как protocol-adapter: транслирует realtime-события в `UIMessageChunk` sequence (`start -> start-step -> delta -> finish-step -> finish`).
 3) `message.llm.reasoning.updated` и `message.llm.text.updated` применяются как primary deltas.
 4) `message.updated` используется как snapshot persisted-состояния и финализации.
-5) Рендер `kind: tool_call` выполняется только через persisted snapshot (`message.created`/`message.updated`) с AI Elements `Tool`.
+5) Рендер `kind: tool_call` выполняется только через persisted snapshot (`message.created`/`message.updated`): для `final_answer` используется ветка assistant message с `Completed` badge, для остальных — AI Elements `Tool`.
 
 ### Крайние случаи
 
@@ -239,7 +260,7 @@ CREATE TABLE messages (
 #### Functional tests
 - История передаётся как отдельные сообщения и исключает служебные поля.
 - Reasoning и text стримятся инкрементально.
-- Tool calling сохраняется как `kind: tool_call` в истории чата и отображается по snapshot-событиям.
+- Tool calling сохраняется как `kind: tool_call` в истории чата и отображается по snapshot-событиям (`final_answer` — как assistant message + `Completed` badge, остальные — как tool-call блок).
 
 ---
 
@@ -428,10 +449,14 @@ class MainPipeline {
       эмитит `message.llm.text.updated { delta, accumulatedText }`
     if chunk.type == 'tool_call':
       сохраняет/обновляет `kind: tool_call` (аргументы уже собраны полностью)
-      при отсутствии реального execution сохраняет stub output и завершает `done: true`
+      if toolName == 'final_answer' and done == true:
+        не создаёт `kind:error` даже при пустом тексте; рендер использует fallback `Модель закончила работу`
+      if toolName != 'final_answer' and execution недоступен:
+        сохраняет stub output и завершает `done: true`
     if llmMessageId уже существовал до этого чанка: эмитит `message.updated` (snapshot/consistency)
 7. После успешного завершения `provider.chat(...)` обновляет `kind: llm` (`done: true`) и сохраняет `usage_json` отдельным шагом
-8. Эмитит финальный `message.updated`
+8. Если последним видимым сообщением стал `kind: tool_call` с `toolName='final_answer'` и `done=true`, `AgentManager.computeAgentStatus()` возвращает `completed`
+9. Эмитит финальный `message.updated`
 ```
 
 **Обработка ошибок:**
@@ -561,6 +586,8 @@ User отправляет сообщение
               → message.updated
           → [tool_call with full arguments]
               → MessageManager.create/update(kind: 'tool_call', done: false/true)
+              → if toolName='final_answer' and done=true: UI рендер как assistant message + Completed badge
+              → else: UI рендер как Tool block
               → message.created/message.updated
           → [chat completion]
               → MessageManager.update(kind: 'llm', done: true)
@@ -583,7 +610,7 @@ User отправляет сообщение
 - `tests/unit/agents/PromptBuilder.test.ts` — формирование массива `messages`, исключения из replay
 - `tests/unit/agents/MainPipeline.test.ts` — мок провайдера, полный цикл, ошибки, события
 - `tests/unit/agents/AgentIPCHandlers.test.ts` — запуск pipeline при kind:user
-- `tests/unit/renderer/IPCChatTransport.test.ts` — обработка delta-stream (`reasoning/text`) и отображение persisted `kind: tool_call` как UI tool-call блока
+- `tests/unit/renderer/IPCChatTransport.test.ts` — обработка delta-stream (`reasoning/text`) и отображение persisted `kind: tool_call` (final_answer как assistant message + Completed badge, остальные как tool-call блок)
 - `tests/unit/events/MainEventBus.test.ts` и `tests/unit/events/RendererEventBus.test.ts` — порядок/доставка streaming событий без потери чанков
 - `tests/unit/db/repositories/MessagesRepository.test.ts` — kind как параметр
 - `tests/unit/db/repositories/MessagesRepository.test.ts` — семантика `done` для `kind:llm` и `kind:error`

@@ -148,7 +148,7 @@
 
 3.8. События `message.llm.reasoning.updated` и `message.llm.text.updated` ДОЛЖНЫ передавать инкрементальные delta-данные и идентификатор сообщения, к которому относится update
 
-3.9. Рендер tool-call в UI ДОЛЖЕН строиться по persisted snapshot-событиям `message.created`/`message.updated` для сообщений `kind: tool_call`.
+3.9. Рендер tool-call в UI ДОЛЖЕН строиться по persisted snapshot-событиям `message.created`/`message.updated` для сообщений `kind: tool_call`; `tool_call(final_answer)` ДОЛЖЕН рендериться как ответ модели с `Completed` badge.
 
 **Примечание:** Целевой список типов событий определяется этой спецификацией; `src/shared/events/types.ts` ДОЛЖЕН быть синхронизирован с данным контрактом.
 

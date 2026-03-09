@@ -420,7 +420,10 @@ await expect(element).toContainText('Success');
 
 13.2. THE модульные тесты SHALL покрывать отсутствие дублирования между delta-событиями (`message.llm.reasoning.updated`, `message.llm.text.updated`) и snapshot `message.updated`.
 
-13.3. THE модульные тесты SHALL проверять, что persisted `kind:tool_call` рендерится как отдельный tool-call блок в сообщении ассистента.
+13.3. THE модульные тесты SHALL проверять рендер persisted `kind:tool_call`: `final_answer` как assistant message с `Completed` badge, остальные `tool_call` как отдельный tool-call блок.
+13.3.1. Для `final_answer` тесты SHALL проверять наличие визуального маркера `Completed` и отображение блока краткого резюме при непустом `summary_points`.
+13.3.2. Тесты SHALL проверять контракт `summary_points`: от 0 до 10 пунктов, не более 200 символов на пункт.
+13.3.3. Тесты SHALL проверять, что при нарушении моделью лимитов `summary_points` UI отображает полученные данные без нормализации (без обрезки и без отбрасывания пунктов).
 
 13.4. THE модульные тесты SHALL покрывать ErrorNormalizer для классов ошибок AI SDK и доменного маппинга (`auth`, `rate_limit`, `provider`, `network`, `timeout`, `tool`, `protocol`).
 

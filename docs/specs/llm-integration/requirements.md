@@ -45,7 +45,7 @@
 
 1.6.2. После завершения текущего ответа модели `kind: llm` сообщение ДОЛЖНО иметь `done = true`
 
-1.6.3. Для LLM pipeline canonical финальный ответ ДОЛЖЕН завершаться тем же `kind: llm` сообщением (`done = true`)
+1.6.3. `kind: llm` ДОЛЖЕН оставаться каноничным сообщением для streaming reasoning/text; отдельное завершение задачи фиксируется `kind: tool_call` с `toolName = "final_answer"` и `done = true`.
 
 1.7. `MainPipeline` ДОЛЖЕН проставлять `messages.reply_to_message_id` для каждого создаваемого сообщения:
   - Для первого сообщения в чате агента — `null`
@@ -79,7 +79,9 @@
 
 2.5. Renderer ДОЛЖЕН подписываться на `message.llm.text.updated` для инкрементального отображения text-stream
 
-2.6. Рендер tool-call блока в UI ДОЛЖЕН опираться на persisted сообщения `kind: tool_call` через `message.created`/`message.updated`
+2.6. Рендер tool-call сообщений в UI ДОЛЖЕН опираться на persisted сообщения `kind: tool_call` через `message.created`/`message.updated`.
+
+2.6.1. КОГДА `kind: tool_call` имеет `toolName = "final_answer"`, ТО он ДОЛЖЕН рендериться как ответ модели с визуальным индикатором завершения (`Completed` badge), а не как технический tool-call блок.
 
 2.7. Renderer ДОЛЖЕН подписываться на `message.updated` для общего snapshot-обновления состояния сообщения
 
@@ -282,7 +284,7 @@
 
 7.4. `kind: error` ДОЛЖЕН отображаться как стандартизированный диалог ошибки в чате с текстом ошибки
 
-7.5. Пока текущий LLM turn не завершён (`kind: llm`, `done = false`), агент ДОЛЖЕН иметь статус `in-progress`
+7.5. Вычисление статуса агента в chat-flow ДОЛЖНО выполняться по единому алгоритму из `llm-integration.9.4`.
 
 #### Функциональные Тесты
 
@@ -337,13 +339,39 @@
 
 9.1. LLM pipeline ДОЛЖЕН использовать согласованный набор `kind` из спецификации `agents.7.2.1`
 
-9.2. Финальный ответ ДОЛЖЕН завершаться сообщением `kind: llm` с `done = true` (canonical path)
+9.2. Завершение задачи агентом ДОЛЖНО фиксироваться сообщением `kind: tool_call` с `toolName = "final_answer"` и `done = true`.
 
-9.3. Отдельный тип завершения ответа модели НЕ ДОЛЖЕН использоваться; завершение фиксируется через `kind: llm` и `done = true`
+9.3. КОГДА turn завершён сообщением `kind: llm` с `done = true`, но без `final_answer`, ТО статус ДОЛЖЕН оставаться `awaiting-response`.
 
-9.4. `tool_call` ДОЛЖЕН отображаться в чате как отдельный tool-call блок; для persisted `kind: tool_call` его поле `done` ДОЛЖНО участвовать в вычислении статуса так же, как для `kind: llm`:
-  - `done = false` → `in-progress`
-  - `done = true` → `awaiting-response`
+9.4. Статус агента в chat-flow ДОЛЖЕН вычисляться в одном месте по следующему алгоритму:
+  - из истории исключаются сообщения с `hidden = true`;
+  - ЕСЛИ после фильтрации сообщений нет, ТО статус `new`;
+  - берётся последнее видимое сообщение:
+    - `kind = "error"` → `error`
+    - `kind = "user"` → `in-progress`
+    - `kind = "llm"` и `done = false` → `in-progress`
+    - `kind = "llm"` и `done = true` → `awaiting-response`
+    - `kind = "tool_call"` и `done = false` → `in-progress`
+    - `kind = "tool_call"` и `toolName = "final_answer"` и `done = true` → `completed`
+    - `kind = "tool_call"` и `toolName != "final_answer"` и `done = true` → `awaiting-response`
+
+9.5. `tool_call` с `toolName = "final_answer"` ДОЛЖЕН содержать текст итогового ответа модели и опциональное краткое резюме в `summary_points`.
+
+9.5.1. `summary_points` ДОЛЖЕН содержать от 0 до 10 пунктов.
+
+9.5.2. КАЖДЫЙ пункт `summary_points` ДОЛЖЕН иметь длину не более 200 символов.
+
+9.5.2.1. Ограничения `summary_points` (до 10 пунктов, до 200 символов на пункт) относятся к целевому контракту генерации модели.
+
+9.5.2.2. ЕСЛИ модель нарушает ограничения `summary_points`, система ДОЛЖНА сохранять и отображать полученные данные как есть (без нормализации, без обрезки, без отбрасывания пунктов).
+
+9.5.3. ОТСУТСТВИЕ `summary_points` (или пустой массив) при наличии непустого текста ДОЛЖНО считаться успешным `completed`.
+
+9.6. ЕСЛИ `tool_call` с `toolName = "final_answer"` пришёл без текста или с пустым текстом, система ДОЛЖНА показать fallback-текст `Модель закончила работу` без создания `kind:error`.
+
+9.7. UI контракт для `tool_call(final_answer)` ДОЛЖЕН включать отдельные test ids:
+  - `message-completed-badge`,
+  - `message-completed-summary`.
 
 ---
 
@@ -381,9 +409,11 @@
 
 11.2. При обработке tool call система ДОЛЖНА создавать/обновлять persisted сообщение `kind: tool_call` с полями `callId`, `toolName`, полностью собранными `arguments` и результатом выполнения.
 
-11.3. Выполнение инструмента ДОЛЖНО сопровождаться сохранением сообщения `kind: tool_call` в `messages`; UI чата ДОЛЖЕН рендерить его как отдельный tool-call блок.
+11.2.1. Для `final_answer` инструмент ДОЛЖЕН вызываться в strict-режиме по структуре аргументов (наличие ожидаемых полей и их типов), при этом лимиты `summary_points` (количество/длина) ДОЛЖНЫ трактоваться как контракт генерации модели, а НЕ как runtime-ошибка выполнения tool call.
 
-11.3.1. Сообщения `kind: tool_call` НЕ ДОЛЖНЫ входить в model history (`PromptBuilder`/`listForModelHistory`), но ДОЛЖНЫ отображаться в истории чата как tool-call блоки.
+11.3. Выполнение инструмента ДОЛЖНО сопровождаться сохранением сообщения `kind: tool_call` в `messages`; UI чата ДОЛЖЕН рендерить его как tool-call блок, кроме `toolName = "final_answer"` (для него применяется рендер ответа модели с `Completed` badge).
+
+11.3.1. Сообщения `kind: tool_call` НЕ ДОЛЖНЫ входить в model history (`PromptBuilder`/`listForModelHistory`), но ДОЛЖНЫ отображаться в истории чата (для `final_answer` — в виде ответа модели).
 
 11.3.2. Renderer НЕ ДОЛЖЕН зависеть от каких-либо отдельных realtime-сигналов tool-calling; отображение tool-call блока ДОЛЖНО строиться по persisted `message.created`/`message.updated`.
 
@@ -391,7 +421,7 @@
 
 11.5. После получения результатов инструментов `MainPipeline` ДОЛЖЕН продолжать цикл `model -> tools -> model` до завершения turn или ошибки.
 
-11.6. UI ДОЛЖЕН отображать промежуточные `tool_call` сообщения как отдельные tool-call блоки; параллельно пользователю показывается общий прогресс через статус `in-progress`, который определяется по последнему видимому сообщению (`kind: llm` или `kind: tool_call`) с `done = false`.
+11.6. UI ДОЛЖЕН отображать промежуточные `tool_call` сообщения как отдельные tool-call блоки; `tool_call(final_answer)` ДОЛЖЕН отображаться как финальный ответ модели с `Completed` badge. Параллельно пользователю показывается общий прогресс через статус `in-progress`, который определяется по последнему видимому сообщению (`kind: llm` или `kind: tool_call`) с `done = false`.
 
 11.7. ЕСЛИ реальное выполнение инструмента недоступно, система ДОЛЖНА завершать `kind: tool_call` через заглушку результата:
   - сохранять диагностически понятный placeholder output,

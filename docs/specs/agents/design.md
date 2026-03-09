@@ -517,7 +517,8 @@ function computeAgentStatus(messages: Message[]): AgentStatus {
     return lastMessage.done ? 'awaiting-response' : 'in-progress';
   }
   if (lastMessage.kind === 'tool_call') {
-    return lastMessage.done ? 'awaiting-response' : 'in-progress';
+    if (!lastMessage.done) return 'in-progress';
+    return lastMessage.payload?.data?.toolName === 'final_answer' ? 'completed' : 'awaiting-response';
   }
   return 'new';
 }
@@ -1576,6 +1577,39 @@ function AgentWelcome({ onPromptClick }: AgentWelcomeProps) {
 />
 ```
 
+**Сообщения инструментов (`kind: 'tool_call'`):**
+- Для `toolName !== 'final_answer'` используется AI Elements `Tool` family как отдельный технический блок вызова инструмента.
+- Для `toolName === 'final_answer'` используется обычная ветка assistant-сообщения (`Message`/`MessageContent`), дополненная визуальным `Completed` badge.
+- Если `final_answer` не содержит текста, рендерится fallback: `Модель закончила работу` (без отдельного `kind:error`).
+
+```tsx
+// Requirements: agents.7.4.1, agents.7.4.2, agents.7.4.3
+if (message.kind === 'tool_call' && toolName === 'final_answer') {
+  return (
+    <div data-testid="message-llm" className="space-y-2 w-full">
+      <div className="flex items-center gap-2">
+        <span
+          data-testid="message-completed-badge"
+          className="rounded-full bg-green-500/15 px-2 py-0.5 text-xs font-medium text-green-700"
+        >
+          Completed
+        </span>
+      </div>
+      <div data-testid="message-llm-action" className="text-sm leading-relaxed whitespace-pre-wrap break-words w-full">
+        {finalText || 'Модель закончила работу'}
+      </div>
+      {summaryPoints?.length ? (
+        <ul data-testid="message-completed-summary" className="list-disc pl-5 text-sm text-muted-foreground">
+          {summaryPoints.map((point) => (
+            <li key={point}>{point}</li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
+  );
+}
+```
+
 **Анимация появления:**
 ```tsx
 // Requirements: agents.4.22
@@ -2121,7 +2155,9 @@ await window.locator(`[data-testid="agent-icon-${firstAgentId}"]`).click();
 
 ## AI Elements интеграция (Фаза 9)
 
-Для отображения `tool_call` используется AI Elements `Tool` family (см. [https://elements.ai-sdk.dev/components/tool](https://elements.ai-sdk.dev/components/tool)).
+Для отображения `tool_call` используется смешанная стратегия:
+- AI Elements `Tool` family (см. [https://elements.ai-sdk.dev/components/tool](https://elements.ai-sdk.dev/components/tool)) для всех `tool_call`, кроме `final_answer`.
+- AI Elements `Message` family для `tool_call(final_answer)`, чтобы финал выглядел как обычный ответ модели с `Completed` badge.
 
 ### Архитектура
 
