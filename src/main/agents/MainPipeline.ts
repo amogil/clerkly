@@ -742,11 +742,7 @@ export class MainPipeline {
   }
 
   private extractToolAbortSignal(executeOptions: unknown): AbortSignal | undefined {
-    if (
-      executeOptions &&
-      typeof executeOptions === 'object' &&
-      'abortSignal' in executeOptions
-    ) {
+    if (executeOptions && typeof executeOptions === 'object' && 'abortSignal' in executeOptions) {
       const candidate = (executeOptions as { abortSignal?: unknown }).abortSignal;
       if (
         candidate &&
@@ -771,11 +767,7 @@ export class MainPipeline {
   }
 
   private extractToolCallId(executeOptions: unknown): string | undefined {
-    if (
-      executeOptions &&
-      typeof executeOptions === 'object' &&
-      'toolCallId' in executeOptions
-    ) {
+    if (executeOptions && typeof executeOptions === 'object' && 'toolCallId' in executeOptions) {
       const candidate = (executeOptions as { toolCallId?: unknown }).toolCallId;
       if (typeof candidate === 'string' && candidate.trim().length > 0) {
         return candidate;
