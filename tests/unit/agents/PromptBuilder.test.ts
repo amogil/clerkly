@@ -127,19 +127,28 @@ describe('PromptBuilder.build()', () => {
     /* Preconditions: FinalAnswerFeature configured
        Action: Call build()
        Assertions: final_answer tool and guidance section are present
-       Requirements: llm-integration.9.2, llm-integration.11.2.1 */
+       Requirements: llm-integration.9.2, llm-integration.9.5.1.1.1, llm-integration.9.5.1.1.2, llm-integration.9.5.1.1.3, llm-integration.11.2.1 */
     it('should include final_answer tool and prompt guidance from FinalAnswerFeature', () => {
       const feature = new FinalAnswerFeature();
       const result = makeBuilder('Base.', [feature]).build();
       expect(result.systemPrompt).toContain('final_answer');
-      expect(result.systemPrompt).toContain('Do not duplicate the full final answer');
+      expect(result.systemPrompt).toContain('Use normal assistant text for ongoing dialog');
+      expect(result.systemPrompt).toContain('Call the `final_answer` tool only when you are confident');
+      expect(result.systemPrompt).toContain('explicitly state that the work is completed');
+      expect(result.systemPrompt).toContain('list solved tasks');
       expect(result.tools.some((tool) => tool.name === 'final_answer')).toBe(true);
       const finalAnswerTool = result.tools.find((tool) => tool.name === 'final_answer');
+      expect(finalAnswerTool?.description).toContain('only after task is fully done');
       expect(finalAnswerTool?.parameters).toMatchObject({
         properties: {
-          text: expect.objectContaining({ minLength: 1, maxLength: 300 }),
+          text: expect.objectContaining({
+            minLength: 1,
+            maxLength: 300,
+            description: expect.stringContaining('explicitly says the work is done'),
+          }),
           summary_points: expect.objectContaining({
             maxItems: 10,
+            description: expect.stringContaining('list of solved tasks'),
             items: expect.objectContaining({ maxLength: 200 }),
           }),
         },
