@@ -166,8 +166,8 @@ CREATE TABLE messages (
 ```
 
 Для `tool_call(final_answer)` в UI отображается блок завершения (badge + completion summary), а основной ответ пользователю остаётся в `kind: llm` (`data.text`).
-Контракт `final_answer` валидируется через strict-schema инструмента в AI SDK:
-- `text`: непустая строка длиной `<= 280`;
+Контракт `final_answer` валидируется через strict-schema инструмента в `Vercel AI SDK`:
+- `text`: непустая строка длиной `<= 300`;
 - `summary_points`: опциональный массив длиной `<= 10`;
 - каждый пункт `summary_points`: строка длиной `<= 200`.
 Если `summary_points` отсутствует (или пустой), но `text` валиден — это успешный `completed`.
@@ -248,7 +248,7 @@ CREATE TABLE messages (
 ### Retry policy (невалидный final_answer)
 
 - Невалидный `final_answer` (нарушение лимитов `text`/`summary_points`) считается recoverable-ошибкой контракта.
-- Retry/repair выполняются провайдерным вызовом AI SDK (`maxRetries` + strict tools).
+- Retry/repair выполняются провайдерным вызовом `Vercel AI SDK` (`maxRetries: 2` + strict tools).
 - При исчерпании лимита retry `MainPipeline` обрабатывает финальную ошибку как стандартный `kind:error`.
 
 ### Исключение hidden из истории
