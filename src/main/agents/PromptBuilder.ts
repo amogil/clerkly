@@ -201,10 +201,10 @@ export class FinalAnswerFeature implements AgentFeature {
 
   getSystemPromptSection(): string {
     return [
-      'When you consider the user task completed, call the `final_answer` tool.',
-      'Do not duplicate the full final answer in this tool.',
-      'Use `text` only as a short completion summary (max 300 chars).',
-      'Optionally provide `summary_points` as short bullet points (max 10 points, each max 200 characters).',
+      'Use normal assistant text for ongoing dialog: clarifying questions, intermediate updates, or requests for user input.',
+      'Call the `final_answer` tool only when you are confident the requested work is completed.',
+      'In `final_answer.text`, explicitly state that the work is completed (max 300 chars).',
+      'Use `final_answer.summary_points` to list solved tasks (max 10 points, each max 200 characters).',
     ].join(' ');
   }
 
@@ -213,21 +213,22 @@ export class FinalAnswerFeature implements AgentFeature {
       {
         name: 'final_answer',
         description:
-          'Marks task completion and returns final user-facing response with optional summary points.',
+          'Marks task completion. Use only after task is fully done; text must explicitly confirm completion and summary_points must list solved tasks.',
         parameters: {
           type: 'object',
           additionalProperties: false,
           properties: {
             text: {
               type: 'string',
-              description: 'Short completion summary text (max 300 characters).',
+              description:
+                'Completion confirmation text that explicitly says the work is done (max 300 characters).',
               minLength: 1,
               maxLength: 300,
             },
             summary_points: {
               type: 'array',
               description:
-                'Optional concise summary bullet points (max 10 points, max 200 chars each).',
+                'Optional concise list of solved tasks (max 10 points, max 200 chars each).',
               maxItems: 10,
               items: {
                 type: 'string',
