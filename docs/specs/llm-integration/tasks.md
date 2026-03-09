@@ -35,11 +35,11 @@
 
 - [x] Добавить системную тулу `final_answer` в orchestration layer:
   - [x] Подключить definition тулы в pipeline/tool registry.
-  - [x] Включить strict-схему структуры аргументов для этой тулы (без блокировки ответа при нарушении лимитов `summary_points`).
+  - [x] Включить strict-схему структуры аргументов для этой тулы.
 - [x] Реализовать обработку вызова `final_answer`:
   - [x] Persist `kind: tool_call` для `final_answer` с корректным lifecycle (`done=false -> done=true` либо согласованный целевой путь).
   - [x] Зафиксировать финальный текст ответа в `tool_call(final_answer).arguments.text`.
-  - [x] Обеспечить отсутствие нормализации `summary_points` при нарушении моделью лимитов (сохранять и рендерить как пришло).
+  - [x] Обеспечить strict-валидацию контракта и retry/repair через SDK при нарушении лимитов.
   - [x] Корректно завершать turn в pipeline без legacy fallback.
 - [x] Обновить prompt/prompt builder:
   - [x] Добавить инструкцию модели, когда и как вызывать `final_answer`.
@@ -58,7 +58,7 @@
 - [x] `tests/unit/agents/MainPipeline.test.ts`:
   - [x] Добавить сценарий вызова `final_answer` с корректным завершением turn.
   - [x] Проверить persist lifecycle сообщения `tool_call(final_answer)`.
-  - [x] Проверить запись `arguments.text` и отсутствие нормализации `summary_points` при нарушении лимитов.
+  - [x] Проверить запись `arguments.text` и обработку финальной ошибки после SDK retry.
 - [x] `tests/unit/agents/PromptBuilder.test.ts`:
   - [x] Проверить наличие и корректность инструкции про `final_answer`.
 - [x] `tests/unit/agents/AgentManager.test.ts`:
@@ -67,7 +67,7 @@
 - [x] `tests/unit/components/agents/AgentMessage.test.tsx` и связанные renderer unit:
   - [x] Проверить рендер `tool_call(final_answer)` и финального состояния.
   - [x] Проверить рендер `message-completed-badge` и `message-completed-summary`.
-  - [x] Проверить отображение `summary_points` как есть при нарушении лимитов моделью.
+  - [x] Проверить рендер completion summary для валидного `final_answer`.
   - [x] Проверить отсутствие regressions в обычных `tool_call`.
 - [x] `tests/unit/components/agents-status-colors.test.tsx`:
   - [x] Проверить визуальные атрибуты `completed`.
@@ -86,7 +86,7 @@
   - [x] Проверить отображение `completed` во всех ключевых местах UI.
 - [x] Негативные functional кейсы:
   - [x] Без `final_answer` статус не должен переходить в `completed`.
-  - [x] При `summary_points` > 10 и/или пунктах > 200 символов UI показывает данные как есть (без нормализации).
+  - [x] При невалидном `final_answer` срабатывает retry/repair и при исчерпании лимита создаётся `kind:error`.
   - [x] Ошибки/отмена не должны ложно переводить агента в `completed`.
 
 ---

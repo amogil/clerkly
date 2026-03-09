@@ -241,7 +241,8 @@ CREATE TABLE messages (
 ### Retry policy (recoverable ошибки)
 
 - Повтор допускается только для recoverable ошибок провайдера/транспорта, возникших до появления первого meaningful chunk (`reasoning`/`text`).
-- Максимум один автоматический retry на один запуск `MainPipeline.run()`.
+- Pipeline-level retry ограничен одним повтором на один запуск `MainPipeline.run()`.
+- Дополнительно провайдерный вызов через `Vercel AI SDK` может выполнить внутренние повторы (`maxRetries: 2`).
 - Если после retry ошибка сохраняется, создаётся стандартное `kind:error` сообщение (или `agent.rate_limit` для `429`), дальнейшие повторы не выполняются.
 - После появления первого meaningful chunk повтор не выполняется; применяется обычная ветка обработки post-stream ошибки (скрытие in-flight `kind:llm` + `kind:error`).
 
