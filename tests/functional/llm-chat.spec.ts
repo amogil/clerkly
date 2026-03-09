@@ -701,14 +701,22 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     if (Array.isArray(content)) {
       return content
         .map((part) => {
-          if (part && typeof part === 'object' && typeof (part as { text?: unknown }).text === 'string') {
+          if (
+            part &&
+            typeof part === 'object' &&
+            typeof (part as { text?: unknown }).text === 'string'
+          ) {
             return (part as { text: string }).text;
           }
           return '';
         })
         .join(' ');
     }
-    if (content && typeof content === 'object' && typeof (content as { text?: unknown }).text === 'string') {
+    if (
+      content &&
+      typeof content === 'object' &&
+      typeof (content as { text?: unknown }).text === 'string'
+    ) {
       return (content as { text: string }).text;
     }
     return typeof content === 'string' ? content : '';
@@ -1254,7 +1262,8 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
 
     const errorInConversation = messages.some(
       (m) =>
-        m.role !== 'system' && contentToText(m.content).toLowerCase().includes('internal server error')
+        m.role !== 'system' &&
+        contentToText(m.content).toLowerCase().includes('internal server error')
     );
     expect(errorInConversation).toBe(false);
   });

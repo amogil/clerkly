@@ -30,8 +30,6 @@ export interface HistoryStrategy {
 export interface BuiltPrompt {
   /** Combined system prompt (base + all feature sections) */
   systemPrompt: string;
-  /** Debug string form of serialized history */
-  history: string;
   /** All tools from all features */
   tools: LLMTool[];
 }
@@ -64,14 +62,12 @@ export class PromptBuilder {
   ) {}
 
   /**
-   * Build debug/compat prompt representation from messages
+   * Build provider-agnostic prompt metadata
    * Requirements: llm-integration.4.3
    */
-  build(messages: Message[]): BuiltPrompt {
-    const replayMessages = this.buildHistoryMessages(messages);
+  build(): BuiltPrompt {
     return {
       systemPrompt: this.buildSystemPrompt(),
-      history: replayMessages.map((msg) => `${msg.role}: ${msg.content}`).join('\n'),
       tools: this.collectTools(),
     };
   }

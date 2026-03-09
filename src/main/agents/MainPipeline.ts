@@ -129,7 +129,7 @@ export class MainPipeline {
 
     const messages = this.messageManager.listForModelHistory(agentId);
     const baseChatMessages = this.promptBuilder.buildMessages(messages);
-    const builtPrompt = this.promptBuilder.build(messages);
+    const builtPrompt = this.promptBuilder.build();
     const replyToMessageId = userMessageId;
     const options = {
       ...this.resolveOptions(provider),

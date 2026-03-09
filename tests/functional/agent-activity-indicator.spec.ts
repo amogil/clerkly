@@ -133,7 +133,9 @@ test.describe('Agent Activity Indicator', () => {
     const stopButton = window.locator(
       '[data-testid="agent-chat-root"]:not(.pointer-events-none) [data-testid="prompt-input-stop"]'
     );
-    const inProgressIndicators = window.locator('[data-testid="agent-avatar-icon"] > .animate-spin');
+    const inProgressIndicators = window.locator(
+      '[data-testid="agent-avatar-icon"] > .animate-spin'
+    );
 
     // Send first message
     await messageInput.fill('First message');

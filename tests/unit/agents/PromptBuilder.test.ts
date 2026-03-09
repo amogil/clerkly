@@ -55,11 +55,10 @@ describe('PromptBuilder.build()', () => {
   describe('empty history', () => {
     /* Preconditions: No messages
        Action: Call build([])
-       Assertions: history is empty string, systemPrompt is base prompt
+       Assertions: systemPrompt is base prompt and tools are empty
        Requirements: llm-integration.10.4 */
-    it('should return empty history and base system prompt', () => {
+    it('should return base system prompt and empty tools', () => {
       const result = makeBuilder().build([]);
-      expect(result.history).toBe('');
       expect(result.systemPrompt).toBe('You are a helpful AI assistant.');
       expect(result.tools).toEqual([]);
     });
