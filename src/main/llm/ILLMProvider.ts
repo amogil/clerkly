@@ -35,17 +35,54 @@ export interface LLMTool {
   name: string;
   description: string;
   parameters: Record<string, unknown>;
+  execute?: (args: Record<string, unknown>, signal?: AbortSignal) => Promise<unknown> | unknown;
 }
 
 /**
- * A streaming chunk from the LLM (reasoning only for now)
- * Requirements: llm-integration.5.3
+ * Error categories in provider chat stream
+ * Requirements: llm-integration.5.1
  */
-export interface ChatChunk {
-  type: 'reasoning';
-  delta: string;
-  done: boolean;
-}
+export type ChatErrorType =
+  | 'auth'
+  | 'rate_limit'
+  | 'provider'
+  | 'network'
+  | 'timeout'
+  | 'tool'
+  | 'protocol';
+
+/**
+ * A streaming chunk from the LLM
+ * Requirements: llm-integration.5.1, llm-integration.5.3, llm-integration.5.4, llm-integration.5.5
+ */
+export type ChatChunk =
+  | {
+      type: 'reasoning';
+      delta: string;
+    }
+  | {
+      type: 'text';
+      delta: string;
+    }
+  | {
+      type: 'tool_call';
+      callId: string;
+      toolName: string;
+      arguments: Record<string, unknown>;
+    }
+  | {
+      type: 'tool_result';
+      callId: string;
+      toolName: string;
+      arguments: Record<string, unknown>;
+      output: unknown;
+      status: 'success' | 'error';
+    }
+  | {
+      type: 'turn_error';
+      errorType: ChatErrorType;
+      message: string;
+    };
 
 /**
  * Canonical token usage statistics
@@ -68,24 +105,25 @@ export interface LLMUsage {
   raw: Record<string, unknown>;
 }
 
-/**
- * The final action returned by the LLM
- * Requirements: llm-integration.5.4, llm-integration.5.5
- */
-export interface LLMAction {
-  type: 'text';
-  content: string;
+export interface LLMStepDiagnostic {
+  stepIndex: number;
+  finishReason?: string;
+  toolCallsCount: number;
+  toolResultsCount: number;
+  latencyMs?: number;
+  usage?: Record<string, unknown>;
 }
 
 /**
- * Provider-level chat result envelope:
- * - model structured output (action)
+ * Provider-level chat result envelope
+ * - optional final assistant text
  * - optional provider usage envelope (canonical/raw)
  * Requirements: llm-integration.5.1, llm-integration.5.6
  */
-export interface LLMStructuredOutput {
-  action: LLMAction;
+export interface LLMChatResult {
+  text?: string;
   usage?: LLMUsage;
+  stepDiagnostics?: LLMStepDiagnostic[];
 }
 
 /**
@@ -95,7 +133,7 @@ export interface LLMStructuredOutput {
 export interface ILLMProvider {
   /**
    * Test connection to LLM provider with given API key
-   * Requirements: settings.3.5, settings.3.6, settings.3.7, settings.3.8
+   * Requirements: settings.2.5, settings.2.6, settings.2.7, settings.2.8
    */
   testConnection(apiKey: string): Promise<TestConnectionResult>;
 
@@ -106,14 +144,14 @@ export interface ILLMProvider {
    *
    * @param messages - Chat history
    * @param options - Model and request options
-   * @param onChunk - Callback for streaming reasoning chunks
+   * @param onChunk - Callback for streaming provider chunks
    * @returns Provider-level chat result envelope
    */
   chat(
     messages: ChatMessage[],
     options: ChatOptions,
     onChunk: (chunk: ChatChunk) => void
-  ): Promise<LLMStructuredOutput>;
+  ): Promise<LLMChatResult>;
 
   /**
    * Get the name of this provider

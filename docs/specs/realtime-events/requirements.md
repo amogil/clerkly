@@ -121,9 +121,20 @@
 
 3.2. Событие `{entity}.created` ДОЛЖНО содержать полные данные новой сущности
 
-3.3. Событие `{entity}.updated` ДОЛЖНО содержать:
-   - Полные данные сущности после обновления
-   - Список измененных полей (`changedFields: string[]`) - ОБЯЗАТЕЛЬНО
+3.3. Событие `{entity}.updated` ДОЛЖНО содержать полные данные сущности после обновления.
+
+3.3.1. Событие `{entity}.updated` МОЖЕТ дополнительно содержать список измененных полей (`changedFields: string[]`), если этот контракт включён для конкретной сущности.
+
+3.3.2. ЕСЛИ событие `{entity}.updated` содержит `changedFields`, ТО `changedFields` ДОЛЖНО соответствовать формату:
+   - каждый элемент ДОЛЖЕН быть строковым путём поля snapshot в формате `dot.path`
+   - пути ДОЛЖНЫ использовать имена полей payload snapshot, а не имена колонок БД
+   - массив ДОЛЖЕН содержать уникальные значения (без дубликатов)
+   - массив ДОЛЖЕН быть отсортирован лексикографически (стабильный порядок сериализации/тестов)
+
+3.3.3. Контракт `changedFields` в целевом состоянии ДОЛЖЕН применяться к событиям:
+   - `agent.updated`
+   - `message.updated`
+   - `user.profile.updated`
 
 3.4. Событие `{entity}.deleted` ДОЛЖНО содержать только ID удаленной сущности
 
@@ -131,7 +142,15 @@
 
 3.6. Все события ДОЛЖНЫ содержать timestamp для определения порядка событий
 
-**Примечание:** Полный актуальный список типов событий находится в `src/shared/events/types.ts` — это единый источник истины.
+3.7. Для LLM/Agents чата система ДОЛЖНА поддерживать кастомные chat-события:
+   - `message.llm.reasoning.updated`
+   - `message.llm.text.updated`
+
+3.8. События `message.llm.reasoning.updated` и `message.llm.text.updated` ДОЛЖНЫ передавать инкрементальные delta-данные и идентификатор сообщения, к которому относится update
+
+3.9. Рендер tool-call в UI ДОЛЖЕН строиться по persisted snapshot-событиям `message.created`/`message.updated` для сообщений `kind: tool_call`.
+
+**Примечание:** Целевой список типов событий определяется этой спецификацией; `src/shared/events/types.ts` ДОЛЖЕН быть синхронизирован с данным контрактом.
 
 **Тестируемость:** Да - через модульные тесты типов событий
 
@@ -177,6 +196,8 @@
 - `tests/functional/agent-realtime-events.spec.ts` - "should add message on message.created event"
 - `tests/functional/agent-realtime-events.spec.ts` - "should update message on message.updated event"
 - `tests/unit/App.ipc-integration.test.tsx` - "should log llm.pipeline.diagnostic events to renderer console"
+- `tests/functional/llm-chat.spec.ts` - "reasoning and text stream simultaneously"
+- `tests/functional/llm-chat.spec.ts` - "multiple tool calls in one turn and final response continues"
 
 ### Требование 5: Обработка событий в UI
 

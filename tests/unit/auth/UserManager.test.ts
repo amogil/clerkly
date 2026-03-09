@@ -3,6 +3,7 @@
 import { UserManager } from '../../../src/main/auth/UserManager';
 import { DatabaseManager } from '../../../src/main/DatabaseManager';
 import { TokenStorageManager } from '../../../src/main/auth/TokenStorageManager';
+import { MainEventBus } from '../../../src/main/events/MainEventBus';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
@@ -249,6 +250,97 @@ describe('UserManager', () => {
 
       expect(user2.userId).toBe(user1.userId);
       expect(user2.locale).toBe('ru');
+    });
+
+    /* Preconditions: Existing user updated, MainEventBus is mocked
+       Action: Call findOrCreateUser() with changed profile fields
+       Assertions: user.profile.updated contains changedFields as sorted string array
+       Requirements: realtime-events.3.3.1, realtime-events.3.3.2 */
+    it('should publish user.profile.updated with normalized changedFields array for existing user', () => {
+      const publish = jest.fn();
+      const getInstanceSpy = jest
+        .spyOn(MainEventBus, 'getInstance')
+        .mockReturnValue({ publish } as unknown as MainEventBus);
+
+      const original = {
+        id: 'google-1',
+        email: 'event-existing@example.com',
+        verified_email: true,
+        name: 'Old Name',
+        given_name: 'Old',
+        family_name: 'Name',
+        locale: 'en',
+      };
+      profileManager.findOrCreateUser(original);
+
+      const updated = { ...original, name: 'New Name' };
+      profileManager.findOrCreateUser(updated);
+
+      expect(publish).toHaveBeenCalled();
+      const publishedEvent = publish.mock.calls[publish.mock.calls.length - 1][0] as {
+        type: string;
+        toPayload: () => { id: string; changedFields?: string[] };
+      };
+      expect(publishedEvent.type).toBe('user.profile.updated');
+      expect(publishedEvent.toPayload().changedFields).toEqual(['lastSynced', 'name']);
+      getInstanceSpy.mockRestore();
+    });
+
+    /* Preconditions: New user path, MainEventBus is mocked
+       Action: Call findOrCreateUser() for unknown email
+       Assertions: user.profile.updated contains snapshot field list as sorted string array
+       Requirements: realtime-events.3.3.1, realtime-events.3.3.2 */
+    it('should publish user.profile.updated with sorted snapshot changedFields for new user', () => {
+      const publish = jest.fn();
+      const getInstanceSpy = jest
+        .spyOn(MainEventBus, 'getInstance')
+        .mockReturnValue({ publish } as unknown as MainEventBus);
+
+      const profile = {
+        id: 'google-new',
+        email: 'event-new@example.com',
+        verified_email: true,
+        name: 'Event New User',
+        given_name: 'Event',
+        family_name: 'User',
+        locale: 'ru',
+      };
+
+      profileManager.findOrCreateUser(profile);
+
+      expect(publish).toHaveBeenCalled();
+      const publishedEvent = publish.mock.calls[publish.mock.calls.length - 1][0] as {
+        type: string;
+        toPayload: () => { id: string; changedFields?: string[] };
+      };
+      expect(publishedEvent.type).toBe('user.profile.updated');
+      expect(publishedEvent.toPayload().changedFields).toEqual([
+        'email',
+        'googleId',
+        'lastSynced',
+        'locale',
+        'name',
+      ]);
+      getInstanceSpy.mockRestore();
+    });
+
+    /* Preconditions: normalizeChangedFields receives different shapes
+       Action: Call normalizeChangedFields() with table-driven inputs
+       Assertions: Returns undefined for empty input and returns unique sorted paths otherwise
+       Requirements: realtime-events.3.3.2 */
+    it('should normalize changed fields with dedupe and lexicographic sort', () => {
+      const cases: Array<{ input: string[]; expected: string[] | undefined }> = [
+        { input: [], expected: undefined },
+        { input: ['name', 'name', 'locale'], expected: ['locale', 'name'] },
+        {
+          input: ['payload.data.text', 'payload.data.text', 'done'],
+          expected: ['done', 'payload.data.text'],
+        },
+      ];
+
+      for (const { input, expected } of cases) {
+        expect((profileManager as any).normalizeChangedFields(input)).toEqual(expected);
+      }
     });
   });
 

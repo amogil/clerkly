@@ -11,6 +11,7 @@ import type { MessageSnapshot } from '../../shared/events/types';
  * - kind: 'user'  → role: 'user',      parts: [{ type: 'text', text }]
  * - kind: 'llm'   → role: 'assistant', parts: [reasoning?, text?]
  * - kind: 'error' → role: 'assistant', parts: [{ type: 'text', text: errorMessage }], metadata: { isError, ... }
+ * - kind: 'tool_call' → role: 'assistant', parts: [dynamic-tool part], metadata: { isToolCall, ... }
  * - hidden: true  → null (filtered out)
  *
  * Requirements: agents.7.3, llm-integration.3.4, llm-integration.3.8, llm-integration.8.5
@@ -39,10 +40,10 @@ export function toUIMessage(msg: MessageSnapshot): UIMessage | null {
       parts.push({ type: 'reasoning', text: reasoning.text, state: 'done' });
     }
 
-    // Text part from action.content (if present)
-    const action = data.action as { content?: string } | undefined;
-    if (action?.content) {
-      parts.push({ type: 'text', text: action.content, state: 'done' });
+    // Text part from canonical data.text
+    const text = typeof data.text === 'string' ? data.text : undefined;
+    if (text && text.length > 0) {
+      parts.push({ type: 'text', text, state: 'done' });
     }
 
     return {
@@ -67,6 +68,58 @@ export function toUIMessage(msg: MessageSnapshot): UIMessage | null {
         isError: true,
         errorMessage,
         actionLink,
+      },
+    };
+  }
+
+  if (msg.kind === 'tool_call') {
+    const call = data as {
+      toolName?: string;
+      callId?: string;
+      arguments?: Record<string, unknown>;
+      output?: { status?: string; content?: string };
+    };
+    const toolName = call.toolName ?? 'tool';
+    const callId = call.callId ?? String(msg.id);
+    const input = call.arguments ?? {};
+
+    const toolPart: UIMessage['parts'][number] = msg.done
+      ? call.output?.status === 'error'
+        ? {
+            type: 'dynamic-tool',
+            toolName,
+            toolCallId: callId,
+            state: 'output-error',
+            input,
+            errorText:
+              typeof call.output?.content === 'string' && call.output.content.length > 0
+                ? call.output.content
+                : 'Tool execution failed',
+          }
+        : {
+            type: 'dynamic-tool',
+            toolName,
+            toolCallId: callId,
+            state: 'output-available',
+            input,
+            output: call.output ?? {},
+          }
+      : {
+          type: 'dynamic-tool',
+          toolName,
+          toolCallId: callId,
+          state: 'input-available',
+          input,
+        };
+
+    return {
+      id: String(msg.id),
+      role: 'assistant',
+      parts: [toolPart],
+      metadata: {
+        isToolCall: true,
+        toolName,
+        callId,
       },
     };
   }

@@ -6,6 +6,7 @@
 // Unit tests for useAgentChat hook
 
 import { renderHook, act, waitFor } from '@testing-library/react';
+import { Chat } from '@ai-sdk/react';
 import { EVENT_TYPES } from '../../../src/shared/events/constants';
 import type { MessageSnapshot } from '../../../src/shared/events/types';
 
@@ -38,10 +39,8 @@ jest.mock('../../../src/renderer/lib/IPCChatTransport', () => ({
 
 // Mock messageMapper
 const mockToUIMessages = jest.fn();
-const mockToUIMessage = jest.fn();
 jest.mock('../../../src/renderer/lib/messageMapper', () => ({
   toUIMessages: (...args: unknown[]) => mockToUIMessages(...args),
-  toUIMessage: (...args: unknown[]) => mockToUIMessage(...args),
 }));
 
 // Mock RendererEventBus
@@ -106,8 +105,6 @@ describe('useAgentChat hook', () => {
       data: [],
     });
     mockToUIMessages.mockReturnValue([]);
-    mockToUIMessage.mockReturnValue(null);
-
     // Reset setMessages mock to track calls
     mockSetMessages.mockReset();
   });
@@ -149,6 +146,22 @@ describe('useAgentChat hook', () => {
 
       expect(mockList).not.toHaveBeenCalled();
       expect(result.current.rawMessages).toEqual([]);
+    });
+
+    /* Preconditions: agentId provided
+       Action: Hook mounts
+       Assertions: Chat lifecycle hooks onFinish/onError are configured
+       Requirements: llm-integration.2.8 */
+    it('should configure useChat lifecycle hooks in Chat instance', async () => {
+      renderHook(() => useAgentChat('agent-1'));
+
+      await waitFor(() => expect(mockList).toHaveBeenCalledWith('agent-1'));
+
+      const firstCall = (Chat as unknown as jest.Mock).mock.calls[0]?.[0] as
+        | { onFinish?: unknown; onError?: unknown }
+        | undefined;
+      expect(typeof firstCall?.onFinish).toBe('function');
+      expect(typeof firstCall?.onError).toBe('function');
     });
 
     /* Preconditions: agentId provided, API returns success:false
@@ -423,9 +436,9 @@ describe('useAgentChat hook', () => {
   describe('MESSAGE_UPDATED event', () => {
     /* Preconditions: Hook mounted with 1 message, message becomes hidden
        Action: MESSAGE_UPDATED event with hidden=true
-       Assertions: message removed from rawMessages, setMessages called to remove from UIMessages
+       Assertions: message removed from rawMessages without extra setMessages synchronization
        Requirements: llm-integration.3.8, llm-integration.8.5 */
-    it('should remove hidden message from rawMessages and UIMessages', async () => {
+    it('should remove hidden message from rawMessages without syncing UIMessages', async () => {
       const snapshot = makeSnapshot(1);
       mockList.mockResolvedValue({
         success: true,
@@ -434,6 +447,7 @@ describe('useAgentChat hook', () => {
 
       const { result } = renderHook(() => useAgentChat('agent-1'));
       await waitFor(() => expect(result.current.isLoading).toBe(false));
+      const setMessagesCallsBeforeUpdate = mockSetMessages.mock.calls.length;
 
       const updatedHandler = mockSubscribe.mock.calls.find(
         ([type]: [string]) => type === EVENT_TYPES.MESSAGE_UPDATED
@@ -447,8 +461,7 @@ describe('useAgentChat hook', () => {
       });
 
       expect(result.current.rawMessages).not.toContainEqual(snapshot);
-      // setMessages should have been called to filter out the hidden message
-      expect(mockSetMessages).toHaveBeenCalled();
+      expect(mockSetMessages.mock.calls.length).toBe(setMessagesCallsBeforeUpdate);
     });
 
     /* Preconditions: Hook mounted with 1 message, message content updated
@@ -464,14 +477,34 @@ describe('useAgentChat hook', () => {
 
       const { result } = renderHook(() => useAgentChat('agent-1'));
       await waitFor(() => expect(result.current.isLoading).toBe(false));
+      const setMessagesCallsBeforeUpdate = mockSetMessages.mock.calls.length;
 
       const updatedHandler = mockSubscribe.mock.calls.find(
         ([type]: [string]) => type === EVENT_TYPES.MESSAGE_UPDATED
       )?.[1];
 
       const updatedSnapshot = { ...snapshot, payload: { data: { text: 'updated' } } };
-      const updatedUI = makeUIMessage(1);
-      mockToUIMessage.mockReturnValue(updatedUI);
+      act(() => {
+        updatedHandler({ message: updatedSnapshot, timestamp: Date.now() });
+      });
+
+      expect(result.current.rawMessages).toContainEqual(updatedSnapshot);
+      expect(mockSetMessages.mock.calls.length).toBe(setMessagesCallsBeforeUpdate);
+    });
+
+    /* Preconditions: Hook mounted with empty history, updated event arrives before created
+       Action: MESSAGE_UPDATED event with hidden=false
+       Assertions: message is added to rawMessages (upsert behavior)
+       Requirements: realtime-events.9.5 */
+    it('should upsert message into rawMessages when MESSAGE_UPDATED arrives before MESSAGE_CREATED', async () => {
+      const { result } = renderHook(() => useAgentChat('agent-1'));
+      await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+      const updatedHandler = mockSubscribe.mock.calls.find(
+        ([type]: [string]) => type === EVENT_TYPES.MESSAGE_UPDATED
+      )?.[1];
+
+      const updatedSnapshot = makeSnapshot(404, 'tool_call');
 
       act(() => {
         updatedHandler({ message: updatedSnapshot, timestamp: Date.now() });

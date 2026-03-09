@@ -1,5 +1,5 @@
 import React from 'react';
-import { Check, X, HelpCircle } from 'lucide-react';
+import { X, HelpCircle, Check } from 'lucide-react';
 import {
   isInProgress,
   isAwaitingUser,
@@ -31,10 +31,10 @@ export function AgentAvatar({ status, letter, size = 'md', className = '' }: Age
       data-testid="agent-avatar-icon"
       className={`relative flex-shrink-0 ${dim} rounded-full ${bg} flex items-center justify-center ${className}`}
     >
-      {isCompleted(status) ? (
-        <Check className={`${iconSize} text-white`} />
-      ) : hasError(status) ? (
+      {hasError(status) ? (
         <X className={`${iconSize} text-white`} />
+      ) : isCompleted(status) ? (
+        <Check className={`${iconSize} text-white`} />
       ) : isAwaitingUser(status) ? (
         <>
           <span className={`text-white ${textSize} font-semibold`}>{letter}</span>

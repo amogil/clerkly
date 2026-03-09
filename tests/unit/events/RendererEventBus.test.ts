@@ -14,6 +14,7 @@ import {
   AgentArchivedEvent,
   MessageUpdatedEvent,
   MessageLlmReasoningUpdatedEvent,
+  MessageLlmTextUpdatedEvent,
 } from '../../../src/shared/events/types';
 
 // Mock Logger
@@ -451,6 +452,26 @@ describe('RendererEventBus', () => {
       bus.publish(new MessageLlmReasoningUpdatedEvent(7, 'agent-1', 'b', 'ab'));
 
       expect(handler).toHaveBeenCalledTimes(2);
+      nowSpy.mockRestore();
+    });
+
+    /* Preconditions: Same message receives reasoning and text updates in the same millisecond
+       Action: Publish MessageLlmReasoningUpdatedEvent and MessageLlmTextUpdatedEvent with equal timestamp
+       Assertions: Both events are delivered (no cross-type coalescing)
+       Requirements: realtime-events.5.5, llm-integration.2 */
+    it('should not coalesce reasoning and text streaming events with equal timestamp', () => {
+      const bus = RendererEventBus.getInstance();
+      const reasoningHandler = jest.fn();
+      const textHandler = jest.fn();
+      const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(1234567890);
+
+      bus.subscribe('message.llm.reasoning.updated', reasoningHandler);
+      bus.subscribe('message.llm.text.updated', textHandler);
+      bus.publish(new MessageLlmReasoningUpdatedEvent(7, 'agent-1', 'r1', 'r1'));
+      bus.publish(new MessageLlmTextUpdatedEvent(7, 'agent-1', 't1', 't1'));
+
+      expect(reasoningHandler).toHaveBeenCalledTimes(1);
+      expect(textHandler).toHaveBeenCalledTimes(1);
       nowSpy.mockRestore();
     });
   });

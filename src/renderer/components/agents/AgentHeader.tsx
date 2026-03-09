@@ -45,7 +45,9 @@ export function AgentHeader({
         <AgentAvatar status={currentAgent.status} letter={letter} size="md" />
 
         <div className="flex-1 min-w-0">
-          <h3 className="font-semibold text-foreground truncate">{currentAgentName}</h3>
+          <h3 data-testid="agent-header-title" className="font-semibold text-foreground truncate">
+            {currentAgentName}
+          </h3>
           <div className="flex items-center gap-2 text-xs">
             <span className={style.text}>{getStatusText(currentAgent.status)}</span>
             <span className="text-muted-foreground">·</span>

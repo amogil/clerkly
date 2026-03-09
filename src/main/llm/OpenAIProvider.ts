@@ -1,4 +1,4 @@
-// Requirements: settings.3.5, settings.3.6, settings.3.7, settings.3.8, llm-integration.3
+// Requirements: settings.2.5, settings.2.6, settings.2.7, settings.2.8, llm-integration.3
 
 import {
   ILLMProvider,
@@ -6,41 +6,15 @@ import {
   ChatMessage,
   ChatOptions,
   ChatChunk,
-  LLMStructuredOutput,
+  LLMChatResult,
   LLMUsage,
 } from './ILLMProvider';
 import { LLM_PROVIDERS, ERROR_MESSAGES, CHAT_TIMEOUT_MS } from './LLMConfig';
-import {
-  buildStructuredOutputInstruction,
-  getOpenAIStructuredOutputJsonSchema,
-  InvalidStructuredOutputError,
-  safeParseStructuredOutput,
-} from './StructuredOutputContract';
 import { LLMRequestAbortedError, isAbortLikeError } from './LLMErrors';
-
-interface OpenAIResponsesUsage {
-  input_tokens?: number;
-  output_tokens?: number;
-  total_tokens?: number;
-  input_tokens_details?: { cached_tokens?: number };
-  output_tokens_details?: { reasoning_tokens?: number };
-}
-
-interface OpenAIResponsesEvent {
-  type?: string;
-  delta?: unknown;
-  text?: string;
-  part?: { type?: string; text?: string; delta?: string; content?: unknown };
-  item?: { type?: string; text?: string; delta?: string; content?: unknown };
-  response?: {
-    usage?: OpenAIResponsesUsage;
-  };
-  usage?: OpenAIResponsesUsage;
-}
 
 /**
  * OpenAI LLM provider implementation
- * Supports testConnection() and chat() with streaming reasoning + structured output
+ * Supports testConnection() and chat() with streaming reasoning/text + tool calling
  *
  * Requirements: settings.3, llm-integration.3
  */
@@ -61,7 +35,7 @@ export class OpenAIProvider implements ILLMProvider {
 
   /**
    * Test connection to OpenAI API
-   * Requirements: settings.3.5, settings.3.6, settings.3.7, settings.3.8
+   * Requirements: settings.2.5, settings.2.6, settings.2.7, settings.2.8
    */
   async testConnection(apiKey: string): Promise<TestConnectionResult> {
     try {
@@ -94,72 +68,196 @@ export class OpenAIProvider implements ILLMProvider {
   }
 
   /**
-   * Send a chat request with streaming reasoning and structured output
-   * Requirements: llm-integration.3.1, llm-integration.3.2, llm-integration.3.3
-   *
-   * Structured output JSON schema: { action: { type: "text", content: "..." } }
-   * Reasoning chunks are streamed via onChunk callback.
-   * Action (JSON) is received whole at the end.
+   * Send a chat request with streaming reasoning/text and native tool-calling events.
+   * Requirements: llm-integration.5.1, llm-integration.5.4, llm-integration.5.5, llm-integration.5.7
    */
   async chat(
     messages: ChatMessage[],
     options: ChatOptions,
     onChunk: (chunk: ChatChunk) => void
-  ): Promise<LLMStructuredOutput> {
-    const systemMessages = messages.filter((m) => m.role === 'system');
-    const conversationMessages = messages.filter((m) => m.role !== 'system');
-    const systemBase = systemMessages.map((m) => m.content).join('\n');
-    const structuredInstruction = buildStructuredOutputInstruction();
-    const mergedSystemPrompt = [systemBase, structuredInstruction].filter(Boolean).join('\n\n');
-    const requestMessages: ChatMessage[] = mergedSystemPrompt
-      ? [{ role: 'system', content: mergedSystemPrompt }, ...conversationMessages]
-      : conversationMessages;
-
-    // Allow runtime override via env (used by functional tests with MockLLMServer)
+  ): Promise<LLMChatResult> {
+    // Allow runtime override via env (used by functional tests with MockLLMServer).
+    // AI SDK expects baseURL without trailing `/responses`.
     const apiUrl = process.env.CLERKLY_OPENAI_API_URL ?? this.config.apiUrl;
+    const baseURL = apiUrl.replace(/\/responses\/?$/, '');
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), CHAT_TIMEOUT_MS);
+    const stepDiagnostics: Array<{
+      stepIndex: number;
+      finishReason?: string;
+      toolCallsCount: number;
+      toolResultsCount: number;
+      latencyMs?: number;
+      usage?: Record<string, unknown>;
+    }> = [];
+    const stepStartedAt = new Map<number, number>();
 
     try {
-      const body: Record<string, unknown> = {
-        model: options.model,
-        input: requestMessages,
-        stream: true,
-        text: {
-          format: {
-            type: 'json_schema',
-            strict: true,
-            name: 'structured_output',
-            schema: getOpenAIStructuredOutputJsonSchema(),
-          },
-        },
-        ...(options.reasoningEffort
-          ? { reasoning: { effort: options.reasoningEffort, summary: 'detailed' } }
-          : {}),
-      };
-
-      const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${this.apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(body),
-        signal: controller.signal,
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        const retryAfterSeconds = this.parseRetryAfterHeader(response);
-        if (response.status === 429 && retryAfterSeconds !== null) {
-          throw new Error(`Rate limit exceeded. Please try again in ${retryAfterSeconds}s`);
-        }
-        throw new Error(this.mapErrorToMessage(response.status, errorData));
+      if (typeof (globalThis as { TransformStream?: unknown }).TransformStream === 'undefined') {
+        const webStreams = await import('stream/web');
+        (globalThis as { TransformStream?: unknown }).TransformStream = webStreams.TransformStream;
+      }
+      if (typeof (globalThis as { ReadableStream?: unknown }).ReadableStream === 'undefined') {
+        const webStreams = await import('stream/web');
+        (globalThis as { ReadableStream?: unknown }).ReadableStream = webStreams.ReadableStream;
       }
 
-      return await this.parseStream(response, onChunk);
+      const { streamText, tool, jsonSchema, stepCountIs } = await import('ai');
+      const stopWhen = typeof stepCountIs === 'function' ? stepCountIs(5) : undefined;
+      const { createOpenAI } = await import('@ai-sdk/openai');
+      const openai = createOpenAI({ apiKey: this.apiKey, baseURL });
+      const tools = this.buildToolSet(
+        options,
+        tool as unknown as (definition: { description: string; inputSchema: unknown }) => unknown,
+        jsonSchema as unknown as (schema: Record<string, unknown>) => unknown
+      );
+      const result = streamText({
+        model: openai.responses(options.model) as unknown as Parameters<
+          typeof streamText
+        >[0]['model'],
+        messages: messages as unknown as Parameters<typeof streamText>[0]['messages'],
+        sendReasoning: true,
+        tools,
+        ...(stopWhen ? { stopWhen } : {}),
+        maxRetries: 0,
+        abortSignal: controller.signal,
+        onStepFinish: (event: Record<string, unknown>) => {
+          const stepIndex =
+            typeof event.stepNumber === 'number'
+              ? event.stepNumber
+              : typeof event.stepIndex === 'number'
+                ? event.stepIndex
+                : stepDiagnostics.length;
+          const now = Date.now();
+          const startedAt = stepStartedAt.get(stepIndex) ?? now;
+          const toolCalls = Array.isArray(event.toolCalls) ? event.toolCalls.length : 0;
+          const toolResults = Array.isArray(event.toolResults) ? event.toolResults.length : 0;
+          const usage =
+            event.usage && typeof event.usage === 'object'
+              ? (event.usage as Record<string, unknown>)
+              : undefined;
+          const finishReason =
+            typeof event.finishReason === 'string' ? event.finishReason : undefined;
+          stepDiagnostics.push({
+            stepIndex,
+            finishReason,
+            toolCallsCount: toolCalls,
+            toolResultsCount: toolResults,
+            latencyMs: Math.max(0, now - startedAt),
+            usage,
+          });
+        },
+        experimental_onStepStart: (event: Record<string, unknown>) => {
+          const stepIndex =
+            typeof event.stepNumber === 'number'
+              ? event.stepNumber
+              : typeof event.stepIndex === 'number'
+                ? event.stepIndex
+                : stepDiagnostics.length;
+          stepStartedAt.set(stepIndex, Date.now());
+        },
+        providerOptions: {
+          openai: {
+            ...(options.reasoningEffort ? { reasoningEffort: options.reasoningEffort } : {}),
+            reasoningSummary: 'detailed',
+            strictJsonSchema: true,
+            parallelToolCalls: true,
+          },
+        },
+      } as unknown as Parameters<typeof streamText>[0]);
+
+      let textAccumulator = '';
+      for await (const part of result.fullStream) {
+        if (part.type === 'text-delta') {
+          textAccumulator += part.text;
+          onChunk({ type: 'text', delta: part.text });
+          continue;
+        }
+        if (part.type === 'reasoning-delta') {
+          onChunk({ type: 'reasoning', delta: part.text });
+          continue;
+        }
+        if (part.type === 'tool-call') {
+          const args =
+            part.input && typeof part.input === 'object' && !Array.isArray(part.input)
+              ? (part.input as Record<string, unknown>)
+              : {};
+          const callId = this.normalizeToolCallId(part.toolCallId, part.toolName);
+          onChunk({
+            type: 'tool_call',
+            callId,
+            toolName: part.toolName ?? '',
+            arguments: args,
+          });
+          continue;
+        }
+        if (part.type === 'tool-result') {
+          const args =
+            part.input && typeof part.input === 'object' && !Array.isArray(part.input)
+              ? (part.input as Record<string, unknown>)
+              : {};
+          const callId = this.normalizeToolCallId(part.toolCallId, part.toolName);
+          onChunk({
+            type: 'tool_result',
+            callId,
+            toolName: part.toolName ?? '',
+            arguments: args,
+            output: part.output,
+            status: 'success',
+          });
+          continue;
+        }
+        if (part.type === 'tool-error') {
+          const args =
+            part.input && typeof part.input === 'object' && !Array.isArray(part.input)
+              ? (part.input as Record<string, unknown>)
+              : {};
+          const errorText =
+            typeof part.error === 'string'
+              ? part.error
+              : part.error instanceof Error
+                ? part.error.message
+                : 'Tool execution failed';
+          const callId = this.normalizeToolCallId(part.toolCallId, part.toolName);
+          onChunk({
+            type: 'tool_result',
+            callId,
+            toolName: part.toolName ?? '',
+            arguments: args,
+            output: { message: errorText },
+            status: 'error',
+          });
+          continue;
+        }
+        if (part.type === 'error') {
+          const message =
+            part.error instanceof Error
+              ? part.error.message
+              : typeof part.error === 'string'
+                ? part.error
+                : ERROR_MESSAGES.unknown;
+          onChunk({ type: 'turn_error', errorType: 'provider', message });
+          throw new Error(message);
+        }
+      }
+
+      const totalUsage = await result.totalUsage;
+      const usage: LLMUsage = {
+        canonical: {
+          input_tokens: totalUsage.inputTokens ?? 0,
+          output_tokens: totalUsage.outputTokens ?? 0,
+          total_tokens:
+            totalUsage.totalTokens ??
+            (totalUsage.inputTokens ?? 0) + (totalUsage.outputTokens ?? 0),
+          cached_tokens: totalUsage.cachedInputTokens ?? undefined,
+          reasoning_tokens: totalUsage.reasoningTokens ?? undefined,
+        },
+        raw: totalUsage as unknown as Record<string, unknown>,
+      };
+
+      return { text: textAccumulator, usage, stepDiagnostics };
     } catch (error) {
-      if (isAbortLikeError(error)) {
+      if (isAbortLikeError(error) || this.isSdkAbortLikeError(error)) {
         throw new LLMRequestAbortedError(this.mapExceptionToMessage(error), error);
       }
       throw error;
@@ -168,254 +266,50 @@ export class OpenAIProvider implements ILLMProvider {
     }
   }
 
-  /**
-   * Parse SSE stream, call onChunk for reasoning, return final LLMAction
-   * Requirements: llm-integration.3.2, llm-integration.3.3
-   */
-  private async parseStream(
-    response: Response,
-    onChunk: (chunk: ChatChunk) => void
-  ): Promise<LLMStructuredOutput> {
-    const reader = response.body?.getReader();
-    if (!reader) {
-      throw new Error('No response body');
+  private buildToolSet(
+    options: ChatOptions,
+    toolFactory: (definition: {
+      description: string;
+      inputSchema: unknown;
+      execute?: (args: Record<string, unknown>, signal?: AbortSignal) => Promise<unknown> | unknown;
+    }) => unknown,
+    jsonSchemaFactory: (schema: Record<string, unknown>) => unknown
+  ): Record<string, unknown> | undefined {
+    if (!options.tools || options.tools.length === 0) {
+      return undefined;
     }
 
-    const decoder =
-      typeof TextDecoder !== 'undefined'
-        ? new TextDecoder()
-        : { decode: (v: Uint8Array, _opts?: unknown) => Buffer.from(v).toString('utf-8') };
-    let buffer = '';
-    let contentAccumulator = '';
-    let reasoningAccumulator = '';
-    let usage: LLMUsage | undefined;
-
-    try {
-      for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        // Keep last incomplete line in buffer
-        buffer = lines.pop() ?? '';
-
-        for (const line of lines) {
-          if (!line.startsWith('data: ')) continue;
-          const data = line.slice(6).trim();
-          if (data === '[DONE]') continue;
-
-          let event: OpenAIResponsesEvent;
-          try {
-            event = JSON.parse(data) as OpenAIResponsesEvent;
-          } catch {
-            continue;
-          }
-
-          if (event.type === 'response.output_text.delta' && typeof event.delta === 'string') {
-            contentAccumulator += event.delta;
-          }
-
-          if (this.isReasoningEvent(event)) {
-            const reasoningDelta = this.extractReasoningDelta(event);
-            if (reasoningDelta) {
-              const normalized = this.normalizeReasoningDelta(reasoningDelta, reasoningAccumulator);
-              reasoningAccumulator = normalized.accumulated;
-              if (normalized.delta) {
-                onChunk({ type: 'reasoning', delta: normalized.delta, done: false });
-              }
-            }
-          }
-
-          if (event.type === 'response.completed') {
-            const completedUsage = event.response?.usage ?? event.usage;
-            if (completedUsage) {
-              usage = this.mapResponsesUsage(completedUsage);
-            }
-          }
-        }
-      }
-    } finally {
-      reader.releaseLock();
-    }
-
-    // Signal reasoning done
-    onChunk({ type: 'reasoning', delta: '', done: true });
-
-    // Parse structured output
-    const output = this.parseAction(contentAccumulator);
-    return { ...output, usage };
+    const entries = options.tools.map((toolDef) => [
+      toolDef.name,
+      toolFactory({
+        description: toolDef.description,
+        inputSchema: jsonSchemaFactory(toolDef.parameters),
+        execute: toolDef.execute,
+      }),
+    ]);
+    return Object.fromEntries(entries);
   }
 
-  /**
-   * Parse structured output JSON into structured action
-   * Requirements: llm-integration.3.3
-   */
-  private parseAction(json: string): LLMStructuredOutput {
-    if (!json.trim()) {
-      throw new InvalidStructuredOutputError(json);
-    }
-    try {
-      const parsedJson = JSON.parse(json) as unknown;
-      const parsed = safeParseStructuredOutput(parsedJson);
-      if (!parsed.success) {
-        throw new InvalidStructuredOutputError(json);
-      }
-      return parsed.data;
-    } catch (err) {
-      if (err instanceof InvalidStructuredOutputError) throw err;
-      throw new InvalidStructuredOutputError(json);
-    }
-  }
-
-  private mapResponsesUsage(raw: OpenAIResponsesUsage): LLMUsage {
-    const canonical = {
-      input_tokens: raw.input_tokens ?? 0,
-      output_tokens: raw.output_tokens ?? 0,
-      total_tokens: raw.total_tokens ?? 0,
-      cached_tokens: raw.input_tokens_details?.cached_tokens,
-      reasoning_tokens: raw.output_tokens_details?.reasoning_tokens,
-    };
-
-    return {
-      canonical,
-      raw: raw as Record<string, unknown>,
-    };
-  }
-
-  private extractReasoningDelta(event: OpenAIResponsesEvent): string | null {
-    if (typeof event.delta === 'string' && event.delta.length > 0) {
-      return event.delta;
+  private isSdkAbortLikeError(error: unknown): boolean {
+    if (!error || typeof error !== 'object') {
+      return false;
     }
 
-    if (typeof event.text === 'string' && event.text.length > 0) {
-      return event.text;
-    }
-
-    if (event.delta && typeof event.delta === 'object') {
-      const obj = event.delta as { text?: unknown; delta?: unknown; content?: unknown };
-      if (typeof obj.text === 'string' && obj.text.length > 0) return obj.text;
-      if (typeof obj.delta === 'string' && obj.delta.length > 0) return obj.delta;
-      if (typeof obj.content === 'string' && obj.content.length > 0) return obj.content;
-      if (Array.isArray(obj.content)) {
-        const joined = this.extractTextFromContentParts(obj.content);
-        if (joined.length > 0) return joined;
-      }
-    }
-
-    if (event.part && typeof event.part === 'object') {
-      const partText = this.extractTextFromNode(event.part);
-      if (partText) return partText;
-    }
-
-    if (event.item && typeof event.item === 'object') {
-      const itemText = this.extractTextFromNode(event.item);
-      if (itemText) return itemText;
-    }
-
-    return null;
-  }
-
-  private isReasoningEvent(event: OpenAIResponsesEvent): boolean {
-    if (typeof event.type === 'string' && event.type.includes('reasoning')) {
+    if ('cause' in error && isAbortLikeError(error.cause)) {
       return true;
     }
 
-    const partType = event.part?.type;
-    if (typeof partType === 'string' && partType.includes('reasoning')) {
-      return true;
-    }
-
-    const itemType = event.item?.type;
-    if (typeof itemType === 'string' && itemType.includes('reasoning')) {
-      return true;
-    }
-
-    if (event.delta && typeof event.delta === 'object' && 'type' in event.delta) {
-      const deltaType = (event.delta as { type?: unknown }).type;
-      if (typeof deltaType === 'string' && deltaType.includes('reasoning')) {
-        return true;
-      }
+    if ('message' in error && typeof error.message === 'string') {
+      const message = error.message.toLowerCase();
+      return message.includes('abort') || message.includes('timed out');
     }
 
     return false;
   }
 
-  private extractTextFromNode(node: {
-    text?: unknown;
-    delta?: unknown;
-    content?: unknown;
-  }): string | null {
-    if (typeof node.text === 'string' && node.text.length > 0) return node.text;
-    if (typeof node.delta === 'string' && node.delta.length > 0) return node.delta;
-    if (typeof node.content === 'string' && node.content.length > 0) return node.content;
-    if (Array.isArray(node.content)) {
-      const joined = this.extractTextFromContentParts(node.content);
-      if (joined.length > 0) return joined;
-    }
-    return null;
-  }
-
-  private extractTextFromContentParts(content: unknown[]): string {
-    return content
-      .map((item) =>
-        item && typeof item === 'object' && 'text' in item && typeof item.text === 'string'
-          ? item.text
-          : ''
-      )
-      .join('');
-  }
-
-  private normalizeReasoningDelta(
-    incoming: string,
-    accumulated: string
-  ): { delta: string | null; accumulated: string } {
-    if (!incoming) {
-      return { delta: null, accumulated };
-    }
-
-    if (!accumulated) {
-      return { delta: incoming, accumulated: incoming };
-    }
-
-    if (incoming === accumulated) {
-      return { delta: null, accumulated };
-    }
-
-    if (incoming.startsWith(accumulated)) {
-      const appended = incoming.slice(accumulated.length);
-      if (!appended) {
-        return { delta: null, accumulated };
-      }
-      return { delta: appended, accumulated: incoming };
-    }
-
-    if (accumulated.endsWith(incoming)) {
-      return { delta: null, accumulated };
-    }
-
-    return { delta: incoming, accumulated: accumulated + incoming };
-  }
-
-  private parseRetryAfterHeader(response: Response): number | null {
-    const headers = response.headers as Headers | undefined;
-    if (!headers || typeof headers.get !== 'function') {
-      return null;
-    }
-    const retryAfter = headers.get('retry-after');
-    if (!retryAfter) {
-      return null;
-    }
-    const parsed = Number(retryAfter);
-    if (!Number.isFinite(parsed) || parsed <= 0) {
-      return null;
-    }
-    return Math.ceil(parsed);
-  }
-
   /**
    * Map HTTP status code to user-friendly error message
-   * Requirements: settings.3.8
+   * Requirements: settings.2.8
    */
   private mapErrorToMessage(status: number, errorData: unknown): string {
     const message = ERROR_MESSAGES[status as keyof typeof ERROR_MESSAGES];
@@ -434,7 +328,7 @@ export class OpenAIProvider implements ILLMProvider {
 
   /**
    * Map exception to user-friendly error message
-   * Requirements: settings.3.8
+   * Requirements: settings.2.8
    */
   private mapExceptionToMessage(error: unknown): string {
     if (
@@ -446,5 +340,14 @@ export class OpenAIProvider implements ILLMProvider {
       return ERROR_MESSAGES.timeout;
     }
     return ERROR_MESSAGES.network;
+  }
+
+  private normalizeToolCallId(rawCallId: string | undefined, toolName: string | undefined): string {
+    if (typeof rawCallId === 'string' && rawCallId.trim().length > 0) {
+      return rawCallId;
+    }
+    const safeToolName =
+      typeof toolName === 'string' && toolName.trim().length > 0 ? toolName.trim() : 'tool';
+    return `call-${safeToolName}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
   }
 }

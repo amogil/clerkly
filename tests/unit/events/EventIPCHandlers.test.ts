@@ -94,7 +94,18 @@ describe('EventIPCHandlers', () => {
        Requirements: realtime-events.4.3 */
     it('should not duplicate events from renderer', () => {
       const mockEvent = {} as IpcMainEvent;
-      const payload = { timestamp: Date.now(), id: 'agent-1', changedFields: { name: 'New' } };
+      const payload = {
+        timestamp: Date.now(),
+        agent: {
+          id: 'agent-1',
+          name: 'Agent',
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          archivedAt: null,
+          status: 'in-progress',
+        },
+        changedFields: ['name'],
+      };
 
       ipcHandler(mockEvent, 'agent.updated', payload);
 
@@ -204,8 +215,15 @@ describe('EventIPCHandlers', () => {
       const mockEvent = {} as IpcMainEvent;
       const payload = {
         timestamp: Date.now(),
-        id: 'agent-1',
-        changedFields: { name: 'Updated' },
+        agent: {
+          id: 'agent-1',
+          name: 'Updated',
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          archivedAt: null,
+          status: 'awaiting-response',
+        },
+        changedFields: ['name'],
       };
 
       ipcHandler(mockEvent, 'agent.updated', payload);

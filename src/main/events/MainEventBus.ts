@@ -156,7 +156,8 @@ export class MainEventBus {
     let batchKey = dedupeKey;
     if (
       type === EVENT_TYPES.MESSAGE_UPDATED ||
-      type === EVENT_TYPES.MESSAGE_LLM_REASONING_UPDATED
+      type === EVENT_TYPES.MESSAGE_LLM_REASONING_UPDATED ||
+      type === EVENT_TYPES.MESSAGE_LLM_TEXT_UPDATED
     ) {
       this.nonCoalescedSequence += 1;
       batchKey = `${dedupeKey}:seq:${this.nonCoalescedSequence}`;
@@ -166,8 +167,59 @@ export class MainEventBus {
 
   private isNonCoalescedStreamingType(type: EventType): boolean {
     return (
-      type === EVENT_TYPES.MESSAGE_UPDATED || type === EVENT_TYPES.MESSAGE_LLM_REASONING_UPDATED
+      type === EVENT_TYPES.MESSAGE_UPDATED ||
+      type === EVENT_TYPES.MESSAGE_LLM_REASONING_UPDATED ||
+      type === EVENT_TYPES.MESSAGE_LLM_TEXT_UPDATED
     );
+  }
+
+  // Requirements: realtime-events.3.3, realtime-events.4.4
+  private normalizeChangedFields(fields: unknown): string[] | undefined {
+    if (!Array.isArray(fields)) {
+      return undefined;
+    }
+
+    const normalized = fields
+      .filter((field): field is string => typeof field === 'string')
+      .map((field) => field.trim())
+      .filter((field) => field.length > 0)
+      .filter((field, index, arr) => arr.indexOf(field) === index)
+      .sort((a, b) => a.localeCompare(b));
+
+    return normalized.length > 0 ? normalized : undefined;
+  }
+
+  // Requirements: realtime-events.3.3, realtime-events.4.4
+  private normalizeUpdatedEventPayload<T extends EventType>(
+    type: T,
+    payload: EventPayload<T>
+  ): EventPayload<T> {
+    if (
+      type !== EVENT_TYPES.AGENT_UPDATED &&
+      type !== EVENT_TYPES.MESSAGE_UPDATED &&
+      type !== EVENT_TYPES.USER_PROFILE_UPDATED
+    ) {
+      return payload;
+    }
+
+    const normalizedFields = this.normalizeChangedFields(
+      (payload as EventPayload<EventType> & { changedFields?: unknown }).changedFields
+    );
+    if (normalizedFields === undefined) {
+      if (!('changedFields' in (payload as object))) {
+        return payload;
+      }
+      const payloadWithoutChangedFields = {
+        ...(payload as unknown as Record<string, unknown>),
+      };
+      delete payloadWithoutChangedFields.changedFields;
+      return payloadWithoutChangedFields as unknown as EventPayload<T>;
+    }
+
+    return {
+      ...(payload as unknown as Record<string, unknown>),
+      changedFields: normalizedFields,
+    } as unknown as EventPayload<T>;
   }
 
   /**
@@ -180,28 +232,30 @@ export class MainEventBus {
     dedupeKey: string,
     options?: PublishOptions
   ): void {
+    const normalizedPayload = this.normalizeUpdatedEventPayload(type, payload);
+
     // Timestamp-based deduplication
     // Requirements: realtime-events.5.5
     const lastTimestamp = this.lastEventTimestamps.get(dedupeKey);
     const isOutdated =
       lastTimestamp !== undefined &&
       (this.isNonCoalescedStreamingType(type)
-        ? payload.timestamp < lastTimestamp
-        : payload.timestamp <= lastTimestamp);
+        ? normalizedPayload.timestamp < lastTimestamp
+        : normalizedPayload.timestamp <= lastTimestamp);
     if (isOutdated) {
       this.logger.debug(
-        `Ignoring outdated event: ${type} (${payload.timestamp} not newer than ${lastTimestamp})`
+        `Ignoring outdated event: ${type} (${normalizedPayload.timestamp} not newer than ${lastTimestamp})`
       );
       return;
     }
-    this.lastEventTimestamps.set(dedupeKey, payload.timestamp);
+    this.lastEventTimestamps.set(dedupeKey, normalizedPayload.timestamp);
 
     this.logger.debug(`Publishing event: ${type}`);
 
     // Emit locally with error isolation
     // Requirements: realtime-events.2.7
     try {
-      this.emitter.emit(type, payload as MittEvents[T]);
+      this.emitter.emit(type, normalizedPayload as MittEvents[T]);
     } catch (error) {
       this.logger.error(`Error in event handler for ${type}: ${error}`);
     }
@@ -209,7 +263,7 @@ export class MainEventBus {
     // Broadcast to renderer processes unless localOnly
     // Requirements: realtime-events.4.1
     if (!options?.localOnly) {
-      this.broadcastToRenderer(type, payload);
+      this.broadcastToRenderer(type, normalizedPayload);
     }
   }
 

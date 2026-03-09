@@ -386,11 +386,11 @@ describe('AgentChat — messages rendering', () => {
     expect(rendered[2]).toHaveAttribute('data-reasoning-streaming', 'false');
   });
 
-  /* Preconditions: status is streaming but llm message already has action
+  /* Preconditions: status is streaming but llm message already has final text
      Action: render AgentChat
      Assertions: reasoning streaming flag is false (streaming reasoning is finished)
      Requirements: llm-integration.7.3 */
-  it('should not mark llm message as reasoning-streaming when action is already present', () => {
+  it('should not mark llm message as reasoning-streaming when text is already present', () => {
     mockUseAgentChatState.isStreaming = true;
     mockUseAgentChatState.rawMessages = [
       makeMessage(1, 'user'),
@@ -399,7 +399,7 @@ describe('AgentChat — messages rendering', () => {
         payload: {
           data: {
             reasoning: { text: 'Thinking' },
-            action: { content: 'Done' },
+            text: 'Done',
           },
         },
       },
@@ -410,6 +410,28 @@ describe('AgentChat — messages rendering', () => {
     const rendered = screen.getAllByTestId('agent-message');
     expect(rendered).toHaveLength(2);
     expect(rendered[1]).toHaveAttribute('data-reasoning-streaming', 'false');
+  });
+
+  /* Preconditions: status is streaming and latest llm message has no text yet (done=false)
+     Action: render AgentChat
+     Assertions: llm message receives isReasoningStreaming=true even before first reasoning delta
+     Requirements: llm-integration.2, llm-integration.7.2 */
+  it('should mark in-flight llm without text as reasoning-streaming', () => {
+    mockUseAgentChatState.isStreaming = true;
+    mockUseAgentChatState.rawMessages = [
+      makeMessage(1, 'user'),
+      {
+        ...makeMessage(2, 'llm'),
+        payload: { data: {} },
+        done: false,
+      },
+    ];
+
+    render(<AgentChat {...defaultProps} />);
+
+    const rendered = screen.getAllByTestId('agent-message');
+    expect(rendered).toHaveLength(2);
+    expect(rendered[1]).toHaveAttribute('data-reasoning-streaming', 'true');
   });
 });
 

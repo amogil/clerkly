@@ -208,7 +208,7 @@
 
 4.11. КОГДА сообщение агента (`kind: llm`) содержит блок reasoning, заголовок reasoning-блока ДОЛЖЕН содержать Message Avatar (иконка приложения), текстовый индикатор размышления и управляющий chevron
 
-4.11.1. КОГДА сообщение агента (`kind: llm`) содержит `action.content`, блок с ответом модели ДОЛЖЕН отображаться под reasoning-блоком
+4.11.1. КОГДА сообщение агента (`kind: llm`) содержит текст ответа модели, блок с ответом ДОЛЖЕН отображаться под reasoning-блоком
 
 4.11.2. КОГДА reasoning-фаза завершена и reasoning-блок автоматически свёрнут, иконка в заголовке reasoning-блока ДОЛЖНА оставаться статичной (`animated=false`)
 
@@ -216,7 +216,7 @@
 
 4.13. ДОЛЖЕН выполняться автоскролл к последнему сообщению при появлении новых сообщений
 
-4.13.1. Автоскролл ДОЛЖЕН срабатывать при появлении ЛЮБОГО нового сообщения (user, llm, tool_call, final_answer, и т.д.)
+4.13.1. КОГДА пользователь находится внизу чата, ТО автоскролл ДОЛЖЕН срабатывать при появлении любого нового сообщения, которое отображается в чате (например, `user`, `llm`, `error`)
 
 4.13.2. КОГДА пользователь находится НЕ внизу чата, ТО автоскролл НЕ ДОЛЖЕН принудительно переводить его вниз (включая отправку сообщения пользователем); вместо этого ДОЛЖНА оставаться доступной кнопка перехода вниз
 
@@ -301,6 +301,8 @@
 
 4.24.4. КОГДА статус активного агента отличается от `in-progress`, кнопка ДОЛЖНА отображаться в режиме отправки (`send`)
 
+4.24.5. КОГДА пользователь нажимает `stop` после начала ответа модели (появился `kind: llm`), исходное `kind: user` сообщение этого turn ДОЛЖНО оставаться видимым в чате
+
 #### Функциональные Тесты
 
 - `tests/functional/agent-messaging.spec.ts` - "should send message on Enter key"
@@ -349,7 +351,7 @@
    - Название
    - Описание
    - Статус (текстовое описание с цветом в зависимости от статуса, см. agents.6)
-   - Время последнего обновления (updatedAt), отформатированное через DateTimeFormatter.formatDateTime() (см. settings.2.1)
+   - Время последнего обновления (updatedAt), отформатированное через DateTimeFormatter.formatDateTime() (см. settings.3.1)
 
 5.4. КОГДА пользователь кликает по агенту в All Agents, ТО:
    - Должен открываться чат этого агента
@@ -486,25 +488,23 @@
    }
    ```
 
-7.2.1. Допустимые значения `kind`: `user | llm | error | tool_call | code_exec | final_answer | request_scope | artifact`
+7.2.1. Допустимые значения `kind`: `user | llm | error | tool_call`
+
+7.2.2. Для LLM-интеграции canonical финальный ответ ДОЛЖЕН завершаться сообщением `kind: llm` с `done = true`.
 
 7.3. В UI чата ДОЛЖНЫ отображаться следующие kinds:
    - `user` - сообщение пользователя (справа, серый полупрозрачный фон, тонкая серая рамка, скругленные углы)
-   - `llm` с `action.type = "text"` - текстовый ответ агента (слева)
-   - `final_answer` - финальный ответ агента (слева, с особым оформлением)
+   - `llm` - ответ агента (слева), включая streaming reasoning/text и финальное состояние `done = true`
+   - `tool_call` - отдельный tool-call блок (вызов инструмента и его результат/статус)
 
-7.4. Следующие kinds НЕ ДОЛЖНЫ отображаться как отдельные сообщения в чате:
-   - `tool_call` - вызовы инструментов (могут показываться как индикатор активности)
-   - `code_exec` - выполнение кода (могут показываться как индикатор активности)
-   - `request_scope` - запрос разрешений (показывается в отдельном UI)
-   - `artifact` - артефакты (показываются в отдельном UI)
+7.4. `tool_call` НЕ ДОЛЖЕН отображаться как обычный текстовый bubble (`user`/`llm`); для него ДОЛЖЕН использоваться специализированный tool-call блок.
 
 7.5. Сообщение `user` ДОЛЖНО содержать:
    ```json
    { "data": { "text": "string" } }
    ```
 
-7.6. Сообщение `final_answer` ДОЛЖНО содержать:
+7.6. Сообщение `llm` ДОЛЖНО содержать:
    ```json
    { "data": { "text": "string", "format": "markdown|text" } }
    ```
@@ -553,7 +553,7 @@
    - Иконку статуса (32px)
    - Название агента (с truncate при переполнении)
    - Статус агента (текстовое описание с цветом в зависимости от статуса, см. agents.6)
-   - Время последнего обновления агента (updatedAt), отформатированное через DateTimeFormatter.formatDateTime() (см. settings.2.1)
+   - Время последнего обновления агента (updatedAt), отформатированное через DateTimeFormatter.formatDateTime() (см. settings.3.1)
 
 8.2. Правая часть хедера (50% ширины) ДОЛЖНА отображать список агентов с выравниванием по правому краю (justify-end)
 
@@ -587,8 +587,9 @@
      - `kind = 'user'` → `in-progress`
      - `kind = 'llm'` и `done = false` → `in-progress`
      - `kind = 'llm'` и `done = true` → `awaiting-response`
+     - `kind = 'tool_call'` и `done = false` → `in-progress`
+     - `kind = 'tool_call'` и `done = true` → `awaiting-response`
      - `kind = 'error'` → `error`
-     - `kind = 'final_answer'` → `completed`
 
 9.3. Статус ДОЛЖЕН пересчитываться при получении любого нового сообщения в чате агента
 
@@ -634,17 +635,17 @@
 
 #### Критерии Приемки
 
-11.1. КОГДА агент выполняет `tool_call` или `code_exec`, ТО ДОЛЖЕН отображаться индикатор активности
+11.1. КОГДА активное сообщение `kind: llm` ИЛИ `kind: tool_call` имеет `done = false`, ТО ДОЛЖЕН отображаться индикатор активности (`in-progress`)
 
 11.2. Индикатор активности ДОЛЖЕН показывать анимированный спиннер
 
 11.3. Индикатор ДОЛЖЕН отображаться в области сообщений под последним сообщением
 
-11.4. Индикатор ДОЛЖЕН исчезать когда операция завершена
+11.4. Индикатор ДОЛЖЕН исчезать, когда активное сообщение `kind: llm` ИЛИ `kind: tool_call` переходит в `done = true` ИЛИ скрывается через `hidden: true`
 
 #### Функциональные Тесты
 
-- `tests/functional/agent-activity-indicator.spec.ts` - "should show activity indicator during tool_call"
+- `tests/functional/agent-activity-indicator.spec.ts` - "should show activity indicator while llm message is in-progress"
 - `tests/functional/agent-activity-indicator.spec.ts` - "should hide activity indicator when operation completes"
 
 ---
@@ -664,34 +665,34 @@
 12.1. КОГДА создаётся новый агент, Main процесс ДОЛЖЕН генерировать событие `agent.created`
    - **Генератор:** `AgentManager.create()`
    - **Момент:** После создания агента в БД через `AgentsRepository.create()`
-   - **Payload:** `{ data: { id, name, createdAt, updatedAt } }`
+   - **Payload:** полный snapshot созданного агента
 
 12.2. КОГДА обновляется агент (name, updatedAt), Main процесс ДОЛЖЕН генерировать событие `agent.updated`
    - **Генератор 1:** `AgentManager.update()` - при изменении имени агента
      - **Момент:** После обновления в БД через `AgentsRepository.update()`
-     - **Payload:** `{ id: agentId, changedFields: { name } }`
+     - **Payload:** полный snapshot агента
    - **Генератор 2:** `AgentManager.handleMessageCreated()` - при создании сообщения
      - **Триггер:** Подписка на событие `MESSAGE_CREATED`
      - **Момент:** После обновления `updatedAt` в БД через `AgentsRepository.touch()`
-     - **Payload:** `{ id: agentId, changedFields: { updatedAt } }`
+     - **Payload:** полный snapshot агента
 
 12.3. КОГДА агент архивируется, Main процесс ДОЛЖЕН генерировать событие `agent.archived`
    - **Генератор:** `AgentManager.archive()`
    - **Момент:** После архивирования в БД через `AgentsRepository.archive()`
-   - **Payload:** `{ id: agentId }`
+   - **Payload:** полный snapshot архивированного агента
 
 **События сообщений:**
 
 12.4. КОГДА создаётся новое сообщение в чате, Main процесс ДОЛЖЕН генерировать событие `message.created`
    - **Генератор:** `MessageManager.create()`
    - **Момент:** После создания сообщения в БД через `MessagesRepository.create()`
-   - **Payload:** `{ data: { id, agentId, timestamp, payloadJson } }`
+   - **Payload:** полный snapshot созданного сообщения
    - **Побочный эффект:** Триггерит `AgentManager.handleMessageCreated()` который генерирует `agent.updated`
 
-12.5. КОГДА обновляется сообщение (например, tool_call завершился), Main процесс ДОЛЖЕН генерировать событие `message.updated`
+12.5. КОГДА обновляется сообщение (например, промежуточный/финальный апдейт `kind: llm`), Main процесс ДОЛЖЕН генерировать событие `message.updated`
    - **Генератор:** `MessageManager.update()`
    - **Момент:** После обновления payload в БД через `MessagesRepository.update()`
-   - **Payload:** `{ id: messageId, changedFields: { payloadJson } }`
+   - **Payload:** полный snapshot обновлённого сообщения
 
 **Подписки UI (Renderer):**
 
@@ -703,6 +704,8 @@
 12.7. Компонент чата ДОЛЖЕН подписываться на события:
    - `message.created` — добавить сообщение в чат (если agentId совпадает с активным)
    - `message.updated` — обновить сообщение в чате
+   - `message.llm.reasoning.updated` — применить reasoning delta для активного стриминга
+   - `message.llm.text.updated` — применить text delta для активного стриминга
 
 12.8. При получении `message.created` или `message.updated` ДОЛЖЕН пересчитываться статус агента
 
@@ -796,10 +799,11 @@
 
 ### Доступность
 
-- Каждая иконка агента должна иметь title атрибут
+- Каждая интерактивная иконка агента ДОЛЖНА иметь доступное имя через `aria-label` или `aria-labelledby`
 - Основной контейнер должен иметь data-testid="agents"
 - Поле ввода должно иметь понятный placeholder
 - Тултипы должны показываться при hover с задержкой 2 секунды и содержать полную информацию
+- Нативный HTML-атрибут `title` НЕ ДОЛЖЕН использоваться для agent icons, чтобы избежать двойного тултипа
 
 ## Зависимости
 
@@ -807,7 +811,7 @@
 - `Logo` - компонент логотипа Clerkly (из `src/renderer/components/logo.tsx`). Используется для Application Logo в пустом стейте чата
 - `AgentAvatar` - компонент аватара агента (из `src/renderer/components/agents/AgentAvatar.tsx`). Используется в Active Agent Icon и Agent List Icon
 - `AgentReasoningTrigger` - компонент заголовка reasoning-блока (из `src/renderer/components/agents/AgentReasoningTrigger.tsx`). Используется для отображения Message Avatar в `kind: llm` сообщениях с reasoning
-- `lucide-react` - библиотека иконок (Send, AlertCircle, Check, X, HelpCircle, ArrowLeft, Plus, FileText, Calendar, Video)
+- `lucide-react` - библиотека иконок (Send, AlertCircle, X, HelpCircle, ArrowLeft, Plus, FileText, Calendar, Video)
 
 ### Типы
 - `Agent` - тип агента (agentId, userId, name, createdAt, updatedAt, archivedAt)
@@ -834,7 +838,6 @@
 
 Следующие элементы явно исключены из данной спецификации:
 
-- Интеграция с реальными AI/LLM провайдерами (будет в отдельной спеке)
 - Редактирование названий агентов
 - Экспорт истории чатов
 - Поиск по сообщениям
@@ -842,7 +845,5 @@
 - Группировка агентов по категориям
 - Настройка поведения агентов
 - Управление контекстом агентов
-- request_scope UI (запрос OAuth разрешений)
-- Artifacts UI (отображение артефактов)
 - Busy agent + coalescing (объединение сообщений)
-- Retry при ошибках
+- Retry-механики вне LLM-интеграции (например, общий retry для произвольных UI-ошибок)

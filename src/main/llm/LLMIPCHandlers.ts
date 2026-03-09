@@ -1,4 +1,4 @@
-// Requirements: settings.3.4, settings.3.9
+// Requirements: settings.2.4, settings.2.9
 
 import { ipcMain } from 'electron';
 import { Logger } from '../Logger';
@@ -11,22 +11,22 @@ const logger = Logger.create('LLMIPCHandlers');
 /**
  * Register IPC handlers for LLM operations
  *
- * Requirements: settings.3.4 - Handle llm:test-connection IPC event
- * Requirements: settings.3.9 - Log attempts and results safely
+ * Requirements: settings.2.4 - Handle llm:test-connection IPC event
+ * Requirements: settings.2.9 - Log attempts and results safely
  */
 export function registerLLMIPCHandlers(): void {
-  // Requirements: settings.3.4 - Test connection handler
+  // Requirements: settings.2.4 - Test connection handler
   ipcMain.handle(
     'llm:test-connection',
     async (event, { provider, apiKey }: { provider: LLMProvider; apiKey: string }) => {
       try {
-        // Requirements: settings.3.9 - Log attempt (only first 4 chars of key)
+        // Requirements: settings.2.9 - Log attempt (only first 4 chars of key)
         logger.info(`Testing connection to ${provider} (key: ${apiKey.substring(0, 4)}...)`);
 
         const llmProvider = LLMProviderFactory.createProvider(provider);
         const result = await llmProvider.testConnection(apiKey);
 
-        // Requirements: settings.3.9 - Log result
+        // Requirements: settings.2.9 - Log result
         if (result.success) {
           logger.info(`Connection test successful for ${provider}`);
         } else {

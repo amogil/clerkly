@@ -459,7 +459,7 @@ const api: API = {
   llm: {
     /**
      * Test connection to LLM provider
-     * Requirements: settings.3.4, settings.3.7, settings.3.8
+     * Requirements: settings.2.4, settings.2.7, settings.2.8
      * @param {string} provider - LLM provider ('openai', 'anthropic', or 'google')
      * @param {string} apiKey - API key to test
      * @returns {Promise<{success: boolean, error?: string}>}

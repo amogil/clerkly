@@ -54,12 +54,11 @@ describe('FullHistoryStrategy', () => {
 describe('PromptBuilder.build()', () => {
   describe('empty history', () => {
     /* Preconditions: No messages
-       Action: Call build([])
-       Assertions: history is empty string, systemPrompt is base prompt
+       Action: Call build()
+       Assertions: systemPrompt is base prompt and tools are empty
        Requirements: llm-integration.10.4 */
-    it('should return empty history and base system prompt', () => {
-      const result = makeBuilder().build([]);
-      expect(result.history).toBe('');
+    it('should return base system prompt and empty tools', () => {
+      const result = makeBuilder().build();
       expect(result.systemPrompt).toBe('You are a helpful AI assistant.');
       expect(result.tools).toEqual([]);
     });
@@ -67,7 +66,7 @@ describe('PromptBuilder.build()', () => {
 
   describe('system prompt with features', () => {
     /* Preconditions: Two features with system prompt sections
-       Action: Call build([])
+       Action: Call build()
        Assertions: systemPrompt concatenates base + feature sections
        Requirements: llm-integration.10.4 */
     it('should concatenate base prompt with feature sections', () => {
@@ -81,14 +80,14 @@ describe('PromptBuilder.build()', () => {
         getSystemPromptSection: () => 'Feature 2 instructions.',
         getTools: () => [],
       };
-      const result = makeBuilder('Base prompt.', [feature1, feature2]).build([]);
+      const result = makeBuilder('Base prompt.', [feature1, feature2]).build();
       expect(result.systemPrompt).toBe(
         'Base prompt.\n\nFeature 1 instructions.\n\nFeature 2 instructions.'
       );
     });
 
     /* Preconditions: Feature with empty system prompt section
-       Action: Call build([])
+       Action: Call build()
        Assertions: Empty sections are not added
        Requirements: llm-integration.10.4 */
     it('should skip empty feature sections', () => {
@@ -97,14 +96,14 @@ describe('PromptBuilder.build()', () => {
         getSystemPromptSection: () => '',
         getTools: () => [],
       };
-      const result = makeBuilder('Base.', [feature]).build([]);
+      const result = makeBuilder('Base.', [feature]).build();
       expect(result.systemPrompt).toBe('Base.');
     });
   });
 
   describe('tools collection', () => {
     /* Preconditions: Features with tools
-       Action: Call build([])
+       Action: Call build()
        Assertions: tools array contains all tools from all features
        Requirements: llm-integration.10.4 */
     it('should collect tools from all features', () => {
@@ -120,7 +119,7 @@ describe('PromptBuilder.build()', () => {
         getSystemPromptSection: () => '',
         getTools: () => [tool2],
       };
-      const result = makeBuilder('Base.', [feature1, feature2]).build([]);
+      const result = makeBuilder('Base.', [feature1, feature2]).build();
       expect(result.tools).toEqual([tool1, tool2]);
     });
   });
@@ -143,7 +142,7 @@ describe('PromptBuilder.build()', () => {
           kind: 'llm',
           payloadJson: JSON.stringify({
             data: {
-              action: { type: 'text', content: 'Hi there!' },
+              text: 'Hi there!',
             },
           }),
           replyToMessageId: 1,
@@ -174,7 +173,7 @@ describe('PromptBuilder.build()', () => {
               reasoning: { text: 'My internal thoughts', excluded_from_replay: true },
               reasoning_summary: 'summary',
               reasoning_tokens: 123,
-              action: { type: 'text', content: 'Answer' },
+              text: 'Answer',
             },
           }),
           replyToMessageId: null,
@@ -197,7 +196,7 @@ describe('PromptBuilder.build()', () => {
 
 describe('PromptBuilder edge cases', () => {
   describe('llm messages without replayable content', () => {
-    /* Preconditions: LLM message lacks replayable action.content
+    /* Preconditions: LLM message lacks replayable data.text
        Action: Call build(messages)
        Assertions: Message is excluded from replay history
        Requirements: llm-integration.10.2, llm-integration.10.3 */
@@ -208,7 +207,7 @@ describe('PromptBuilder edge cases', () => {
           kind: 'llm',
           payloadJson: JSON.stringify({
             data: {
-              action: { type: 'text' },
+              text: '',
               note: 'Hello',
             },
           }),
@@ -239,9 +238,7 @@ describe('PromptBuilder edge cases', () => {
           id: 2,
           kind: 'llm',
           hidden: true,
-          payloadJson: JSON.stringify({
-            data: { action: { type: 'text', content: 'Hidden llm' } },
-          }),
+          payloadJson: JSON.stringify({ data: { text: 'Hidden llm' } }),
         }),
       ];
 
@@ -267,9 +264,7 @@ describe('PromptBuilder.buildMessages()', () => {
       makeMessage({
         id: 2,
         kind: 'llm',
-        payloadJson: JSON.stringify({
-          data: { action: { type: 'text', content: 'Hi!' } },
-        }),
+        payloadJson: JSON.stringify({ data: { text: 'Hi!' } }),
       }),
     ];
 
@@ -292,5 +287,34 @@ describe('PromptBuilder.buildMessages()', () => {
     const chatMessages = makeBuilder().buildMessages([]);
     expect(chatMessages).toHaveLength(1);
     expect(chatMessages[0].role).toBe('system');
+  });
+
+  /* Preconditions: History contains kind:tool_call message
+     Action: Call buildMessages() with user + tool_call + llm
+     Assertions: tool_call is excluded from model history
+     Requirements: llm-integration.10.1 */
+  it('should ignore tool_call messages in model history', () => {
+    const msgs = [
+      makeMessage({
+        id: 1,
+        kind: 'user',
+        payloadJson: JSON.stringify({ data: { text: 'Question' } }),
+      }),
+      makeMessage({
+        id: 2,
+        kind: 'tool_call',
+        payloadJson: JSON.stringify({ data: { toolName: 'search_docs' } }),
+      }),
+      makeMessage({
+        id: 3,
+        kind: 'llm',
+        payloadJson: JSON.stringify({ data: { text: 'Answer' } }),
+      }),
+    ];
+
+    const chatMessages = makeBuilder().buildMessages(msgs);
+    expect(chatMessages).toHaveLength(3);
+    expect(chatMessages[1].role).toBe('user');
+    expect(chatMessages[2].role).toBe('assistant');
   });
 });

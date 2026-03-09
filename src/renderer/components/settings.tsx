@@ -193,9 +193,9 @@ export function Settings({ onSignOut, onNavigate }: SettingsProps) {
     return () => clearTimeout(timeoutId);
   }, [apiKey, llmProvider]);
 
-  // Requirements: settings.3.4, error-notifications.2.1 - Handle test connection
+  // Requirements: settings.2.4, error-notifications.2.1 - Handle test connection
   const handleTestConnection = async () => {
-    // Requirements: settings.3.4 - Set testing state
+    // Requirements: settings.2.4 - Set testing state
     setTestingConnection(true);
 
     // Requirements: error-notifications.2.1 - Handle test connection errors
@@ -206,15 +206,15 @@ export function Settings({ onSignOut, onNavigate }: SettingsProps) {
         error?: string;
       }>);
 
-      // Requirements: settings.3.7, settings.3.8 - Reset button state
+      // Requirements: settings.2.7, settings.2.8 - Reset button state
       setTestingConnection(false);
 
       if (result.success) {
-        // Requirements: settings.3.7 - Show success notification
+        // Requirements: settings.2.7 - Show success notification
         showSuccess('Connection successful! Your API key is valid.');
         logger.info(`Connection test successful for ${llmProvider}`);
       } else {
-        // Requirements: settings.3.8 - Show error without context prefix
+        // Requirements: settings.2.8 - Show error without context prefix
         toast.error(result.error || 'Connection test failed');
       }
     } catch (error) {

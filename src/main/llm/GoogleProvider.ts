@@ -1,4 +1,4 @@
-// Requirements: settings.3.5, settings.3.6, settings.3.7, settings.3.8, llm-integration.3
+// Requirements: settings.2.5, settings.2.6, settings.2.7, settings.2.8, llm-integration.3
 
 import {
   ILLMProvider,
@@ -6,43 +6,15 @@ import {
   ChatMessage,
   ChatOptions,
   ChatChunk,
-  LLMStructuredOutput,
+  LLMChatResult,
   LLMUsage,
 } from './ILLMProvider';
 import { LLM_PROVIDERS, ERROR_MESSAGES, CHAT_TIMEOUT_MS } from './LLMConfig';
-import {
-  buildStructuredOutputInstruction,
-  getStructuredOutputJsonSchema,
-  InvalidStructuredOutputError,
-  safeParseStructuredOutput,
-} from './StructuredOutputContract';
 import { LLMRequestAbortedError, isAbortLikeError } from './LLMErrors';
-
-// ─── Google Gemini SSE event shapes ──────────────────────────────────────────
-
-interface GeminiPart {
-  text: string;
-  thought?: boolean;
-}
-
-interface GeminiCandidate {
-  content?: {
-    parts?: GeminiPart[];
-  };
-}
-
-interface GeminiStreamChunk {
-  candidates?: GeminiCandidate[];
-  usageMetadata?: {
-    promptTokenCount?: number;
-    candidatesTokenCount?: number;
-    totalTokenCount?: number;
-  };
-}
 
 /**
  * Google Gemini LLM provider implementation
- * Uses native HTTP+SSE for chat, manual fetch for testConnection
+ * Uses AI SDK streamText for chat, manual fetch for testConnection
  *
  * Requirements: settings.3, llm-integration.3
  */
@@ -60,7 +32,7 @@ export class GoogleProvider implements ILLMProvider {
 
   /**
    * Test connection to Google Generative AI API
-   * Requirements: settings.3.5, settings.3.6, settings.3.7, settings.3.8
+   * Requirements: settings.2.5, settings.2.6, settings.2.7, settings.2.8
    */
   async testConnection(apiKey: string): Promise<TestConnectionResult> {
     try {
@@ -85,86 +57,202 @@ export class GoogleProvider implements ILLMProvider {
   }
 
   /**
-   * Send a chat request with streaming reasoning and structured output
-   * Requirements: llm-integration.3.1, llm-integration.3.2, llm-integration.3.3
-   *
-   * Uses streamGenerateContent endpoint with alt=sse.
-   * Structured output: system instruction tells model to respond with JSON
-   * { action: { type: "text", content: "..." } }
-   * Thinking chunks (thought: true) are streamed via onChunk callback.
+   * Send a chat request with streaming reasoning/text and native tool-calling events.
+   * Requirements: llm-integration.5.1, llm-integration.5.4, llm-integration.5.5, llm-integration.5.7
    */
   async chat(
     messages: ChatMessage[],
     options: ChatOptions,
     onChunk: (chunk: ChatChunk) => void
-  ): Promise<LLMStructuredOutput> {
-    // Build streaming URL: replace generateContent with streamGenerateContent
-    const baseApiUrl = process.env.CLERKLY_GOOGLE_LLM_API_URL ?? this.config.apiUrl;
-    const streamUrl =
-      baseApiUrl.replace('generateContent', 'streamGenerateContent') +
-      `?key=${this.apiKey}&alt=sse`;
-
+  ): Promise<LLMChatResult> {
+    const apiUrl = process.env.CLERKLY_GOOGLE_LLM_API_URL ?? this.config.apiUrl;
+    const baseURL = apiUrl.replace(/\/models\/.*$/, '');
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), CHAT_TIMEOUT_MS);
+    const stepDiagnostics: Array<{
+      stepIndex: number;
+      finishReason?: string;
+      toolCallsCount: number;
+      toolResultsCount: number;
+      latencyMs?: number;
+      usage?: Record<string, unknown>;
+    }> = [];
+    const stepStartedAt = new Map<number, number>();
 
     try {
-      // Separate system messages
-      const systemMessages = messages.filter((m) => m.role === 'system');
-      const conversationMessages = messages.filter((m) => m.role !== 'system');
+      if (typeof (globalThis as { TransformStream?: unknown }).TransformStream === 'undefined') {
+        const webStreams = await import('stream/web');
+        (globalThis as { TransformStream?: unknown }).TransformStream = webStreams.TransformStream;
+      }
+      if (typeof (globalThis as { ReadableStream?: unknown }).ReadableStream === 'undefined') {
+        const webStreams = await import('stream/web');
+        (globalThis as { ReadableStream?: unknown }).ReadableStream = webStreams.ReadableStream;
+      }
 
-      const systemBase = systemMessages.map((m) => m.content).join('\n');
-      const structuredInstruction = buildStructuredOutputInstruction();
-      const systemInstruction = (systemBase ? systemBase + '\n\n' : '') + structuredInstruction;
+      const { streamText, tool, jsonSchema, stepCountIs } = await import('ai');
+      const stopWhen = typeof stepCountIs === 'function' ? stepCountIs(5) : undefined;
+      const { createGoogleGenerativeAI } = await import('@ai-sdk/google');
 
-      // Map to Gemini contents format
-      const contents = conversationMessages.map((m) => ({
-        role: m.role === 'assistant' ? 'model' : 'user',
-        parts: [{ text: m.content }],
-      }));
+      const google = createGoogleGenerativeAI({ apiKey: this.apiKey, baseURL });
+      const tools = this.buildToolSet(
+        options,
+        tool as unknown as (definition: { description: string; inputSchema: unknown }) => unknown,
+        jsonSchema as unknown as (schema: Record<string, unknown>) => unknown
+      );
 
-      const body: Record<string, unknown> = {
-        system_instruction: { parts: [{ text: systemInstruction }] },
-        contents,
-        generationConfig: {
-          responseMimeType: 'application/json',
-          responseSchema: getStructuredOutputJsonSchema(),
+      const result = streamText({
+        model: google.chat(options.model) as unknown as Parameters<typeof streamText>[0]['model'],
+        messages: messages as unknown as Parameters<typeof streamText>[0]['messages'],
+        sendReasoning: true,
+        tools,
+        ...(stopWhen ? { stopWhen } : {}),
+        maxRetries: 0,
+        abortSignal: controller.signal,
+        onStepFinish: (event: Record<string, unknown>) => {
+          const stepIndex =
+            typeof event.stepNumber === 'number'
+              ? event.stepNumber
+              : typeof event.stepIndex === 'number'
+                ? event.stepIndex
+                : stepDiagnostics.length;
+          const now = Date.now();
+          const startedAt = stepStartedAt.get(stepIndex) ?? now;
+          const toolCalls = Array.isArray(event.toolCalls) ? event.toolCalls.length : 0;
+          const toolResults = Array.isArray(event.toolResults) ? event.toolResults.length : 0;
+          const usage =
+            event.usage && typeof event.usage === 'object'
+              ? (event.usage as Record<string, unknown>)
+              : undefined;
+          const finishReason =
+            typeof event.finishReason === 'string' ? event.finishReason : undefined;
+          stepDiagnostics.push({
+            stepIndex,
+            finishReason,
+            toolCallsCount: toolCalls,
+            toolResultsCount: toolResults,
+            latencyMs: Math.max(0, now - startedAt),
+            usage,
+          });
         },
+        experimental_onStepStart: (event: Record<string, unknown>) => {
+          const stepIndex =
+            typeof event.stepNumber === 'number'
+              ? event.stepNumber
+              : typeof event.stepIndex === 'number'
+                ? event.stepIndex
+                : stepDiagnostics.length;
+          stepStartedAt.set(stepIndex, Date.now());
+        },
+        providerOptions: {
+          google: {
+            ...(options.reasoningEffort
+              ? {
+                  thinkingConfig: {
+                    includeThoughts: true,
+                    thinkingBudget: this.reasoningBudget(options.reasoningEffort),
+                  },
+                }
+              : {}),
+            ...(options.tools && options.tools.length > 0
+              ? {
+                  functionCallingConfig: {
+                    mode: 'VALIDATED',
+                  },
+                }
+              : {}),
+          },
+        },
+      } as unknown as Parameters<typeof streamText>[0]);
+
+      let textAccumulator = '';
+      for await (const part of result.fullStream) {
+        if (part.type === 'text-delta') {
+          textAccumulator += part.text;
+          onChunk({ type: 'text', delta: part.text });
+          continue;
+        }
+        if (part.type === 'reasoning-delta') {
+          onChunk({ type: 'reasoning', delta: part.text });
+          continue;
+        }
+        if (part.type === 'tool-call') {
+          const args =
+            part.input && typeof part.input === 'object' && !Array.isArray(part.input)
+              ? (part.input as Record<string, unknown>)
+              : {};
+          onChunk({
+            type: 'tool_call',
+            callId: part.toolCallId ?? '',
+            toolName: part.toolName ?? '',
+            arguments: args,
+          });
+          continue;
+        }
+        if (part.type === 'tool-result') {
+          const args =
+            part.input && typeof part.input === 'object' && !Array.isArray(part.input)
+              ? (part.input as Record<string, unknown>)
+              : {};
+          onChunk({
+            type: 'tool_result',
+            callId: part.toolCallId ?? '',
+            toolName: part.toolName ?? '',
+            arguments: args,
+            output: part.output,
+            status: 'success',
+          });
+          continue;
+        }
+        if (part.type === 'tool-error') {
+          const args =
+            part.input && typeof part.input === 'object' && !Array.isArray(part.input)
+              ? (part.input as Record<string, unknown>)
+              : {};
+          const errorText =
+            typeof part.error === 'string'
+              ? part.error
+              : part.error instanceof Error
+                ? part.error.message
+                : 'Tool execution failed';
+          onChunk({
+            type: 'tool_result',
+            callId: part.toolCallId ?? '',
+            toolName: part.toolName ?? '',
+            arguments: args,
+            output: { message: errorText },
+            status: 'error',
+          });
+          continue;
+        }
+        if (part.type === 'error') {
+          const message =
+            part.error instanceof Error
+              ? part.error.message
+              : typeof part.error === 'string'
+                ? part.error
+                : ERROR_MESSAGES.unknown;
+          onChunk({ type: 'turn_error', errorType: 'provider', message });
+          throw new Error(message);
+        }
+      }
+
+      const totalUsage = await result.totalUsage;
+      const usage: LLMUsage = {
+        canonical: {
+          input_tokens: totalUsage.inputTokens ?? 0,
+          output_tokens: totalUsage.outputTokens ?? 0,
+          total_tokens:
+            totalUsage.totalTokens ??
+            (totalUsage.inputTokens ?? 0) + (totalUsage.outputTokens ?? 0),
+          cached_tokens: totalUsage.cachedInputTokens ?? undefined,
+          reasoning_tokens: totalUsage.reasoningTokens ?? undefined,
+        },
+        raw: totalUsage as unknown as Record<string, unknown>,
       };
 
-      if (options.reasoningEffort) {
-        body.generationConfig = {
-          ...(body.generationConfig as object),
-          thinkingConfig: {
-            thinkingBudget: this.reasoningBudget(options.reasoningEffort),
-          },
-        };
-      }
-
-      const response = await fetch(streamUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-        signal: controller.signal,
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        const retryAfterSeconds = this.parseRetryAfterHeader(response);
-        if (response.status === 429 && retryAfterSeconds !== null) {
-          throw new Error(`Rate limit exceeded. Please try again in ${retryAfterSeconds}s`);
-        }
-        if (response.status === 429) {
-          const providerMessage = this.extractErrorMessage(errorData);
-          if (providerMessage) {
-            throw new Error(providerMessage);
-          }
-        }
-        throw new Error(this.mapErrorToMessage(response.status, errorData));
-      }
-
-      return await this.parseStream(response, onChunk);
+      return { text: textAccumulator, usage, stepDiagnostics };
     } catch (error) {
-      if (isAbortLikeError(error)) {
+      if (isAbortLikeError(error) || this.isSdkAbortLikeError(error)) {
         throw new LLMRequestAbortedError(this.mapExceptionToMessage(error), error);
       }
       throw error;
@@ -173,111 +261,55 @@ export class GoogleProvider implements ILLMProvider {
     }
   }
 
-  /**
-   * Parse Gemini SSE stream, call onChunk for reasoning, return final LLMAction
-   * Requirements: llm-integration.3.2, llm-integration.3.3
-   */
-  private async parseStream(
-    response: Response,
-    onChunk: (chunk: ChatChunk) => void
-  ): Promise<LLMStructuredOutput> {
-    const reader = response.body?.getReader();
-    if (!reader) {
-      throw new Error('No response body');
+  private buildToolSet(
+    options: ChatOptions,
+    toolFactory: (definition: {
+      description: string;
+      inputSchema: unknown;
+      execute?: (args: Record<string, unknown>, signal?: AbortSignal) => Promise<unknown> | unknown;
+    }) => unknown,
+    jsonSchemaFactory: (schema: Record<string, unknown>) => unknown
+  ): Record<string, unknown> | undefined {
+    if (!options.tools || options.tools.length === 0) {
+      return undefined;
     }
 
-    const decoder =
-      typeof TextDecoder !== 'undefined'
-        ? new TextDecoder()
-        : { decode: (v: Uint8Array, _opts?: unknown) => Buffer.from(v).toString('utf-8') };
-
-    let buffer = '';
-    let contentAccumulator = '';
-    let usage: LLMUsage | undefined;
-
-    try {
-      for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() ?? '';
-
-        for (const line of lines) {
-          if (!line.startsWith('data: ')) continue;
-          const data = line.slice(6).trim();
-          if (!data) continue;
-
-          let chunk: GeminiStreamChunk;
-          try {
-            chunk = JSON.parse(data) as GeminiStreamChunk;
-          } catch {
-            continue;
-          }
-
-          if (chunk.usageMetadata) {
-            usage = {
-              canonical: {
-                input_tokens: chunk.usageMetadata.promptTokenCount ?? 0,
-                output_tokens: chunk.usageMetadata.candidatesTokenCount ?? 0,
-                total_tokens: chunk.usageMetadata.totalTokenCount ?? 0,
-              },
-              raw: chunk.usageMetadata as Record<string, unknown>,
-            };
-          }
-
-          const parts = chunk.candidates?.[0]?.content?.parts ?? [];
-          for (const part of parts) {
-            if (part.thought) {
-              onChunk({ type: 'reasoning', delta: part.text, done: false });
-            } else {
-              contentAccumulator += part.text;
-            }
-          }
-        }
-      }
-    } finally {
-      reader.releaseLock();
-    }
-
-    onChunk({ type: 'reasoning', delta: '', done: true });
-
-    return { ...this.parseAction(contentAccumulator), usage };
+    const entries = options.tools.map((toolDef) => [
+      toolDef.name,
+      toolFactory({
+        description: toolDef.description,
+        inputSchema: jsonSchemaFactory(toolDef.parameters),
+        execute: toolDef.execute,
+      }),
+    ]);
+    return Object.fromEntries(entries);
   }
 
-  /**
-   * Map reasoningEffort to Gemini thinking budget tokens
-   */
+  private isSdkAbortLikeError(error: unknown): boolean {
+    if (!error || typeof error !== 'object') {
+      return false;
+    }
+
+    if ('cause' in error && isAbortLikeError(error.cause)) {
+      return true;
+    }
+
+    if ('message' in error && typeof error.message === 'string') {
+      const message = error.message.toLowerCase();
+      return message.includes('abort') || message.includes('timed out');
+    }
+
+    return false;
+  }
+
   private reasoningBudget(effort: 'low' | 'medium' | 'high'): number {
     const budgets = { low: 1024, medium: 8000, high: 16000 };
     return budgets[effort];
   }
 
   /**
-   * Parse structured output JSON into structured action
-   * Requirements: llm-integration.3.3
-   */
-  private parseAction(json: string): LLMStructuredOutput {
-    if (!json.trim()) {
-      throw new InvalidStructuredOutputError(json);
-    }
-    try {
-      const parsedJson = JSON.parse(json) as unknown;
-      const parsed = safeParseStructuredOutput(parsedJson);
-      if (!parsed.success) {
-        throw new InvalidStructuredOutputError(json);
-      }
-      return parsed.data;
-    } catch (err) {
-      if (err instanceof InvalidStructuredOutputError) throw err;
-      throw new InvalidStructuredOutputError(json);
-    }
-  }
-
-  /**
    * Map HTTP status code to user-friendly error message
-   * Requirements: settings.3.8
+   * Requirements: settings.2.8
    */
   private mapErrorToMessage(status: number, errorData: unknown): string {
     const message = ERROR_MESSAGES[status as keyof typeof ERROR_MESSAGES];
@@ -296,7 +328,7 @@ export class GoogleProvider implements ILLMProvider {
 
   /**
    * Map exception to user-friendly error message
-   * Requirements: settings.3.8
+   * Requirements: settings.2.8
    */
   private mapExceptionToMessage(error: unknown): string {
     if (
@@ -308,36 +340,5 @@ export class GoogleProvider implements ILLMProvider {
       return ERROR_MESSAGES.timeout;
     }
     return ERROR_MESSAGES.network;
-  }
-
-  private extractErrorMessage(errorData: unknown): string | null {
-    if (
-      typeof errorData === 'object' &&
-      errorData !== null &&
-      'error' in errorData &&
-      typeof (errorData as { error?: { message?: string } }).error === 'object' &&
-      (errorData as { error?: { message?: string } }).error !== null &&
-      'message' in (errorData as { error: { message?: string } }).error
-    ) {
-      const message = (errorData as { error: { message?: string } }).error.message;
-      return typeof message === 'string' && message.trim().length > 0 ? message : null;
-    }
-    return null;
-  }
-
-  private parseRetryAfterHeader(response: Response): number | null {
-    const headers = response.headers as Headers | undefined;
-    if (!headers || typeof headers.get !== 'function') {
-      return null;
-    }
-    const retryAfter = headers.get('retry-after');
-    if (!retryAfter) {
-      return null;
-    }
-    const parsed = Number(retryAfter);
-    if (!Number.isFinite(parsed) || parsed <= 0) {
-      return null;
-    }
-    return Math.ceil(parsed);
   }
 }

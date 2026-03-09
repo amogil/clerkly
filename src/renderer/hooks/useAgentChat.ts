@@ -5,7 +5,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useChat, Chat } from '@ai-sdk/react';
 import { IPCChatTransport } from '../lib/IPCChatTransport';
-import { toUIMessages, toUIMessage } from '../lib/messageMapper';
+import { toUIMessages } from '../lib/messageMapper';
 import { useEventSubscription } from '../events/useEventSubscription';
 import { EVENT_TYPES } from '../../shared/events/constants';
 import type {
@@ -56,9 +56,31 @@ export interface UseAgentChatResult {
  * Requirements: agents.4, agents.13, llm-integration.2, llm-integration.8
  */
 export function useAgentChat(agentId: string | null): UseAgentChatResult {
+  const sanitizeUIMessages = useCallback(async (messages: UIMessage[]): Promise<UIMessage[]> => {
+    try {
+      const { validateUIMessages } = await import('ai');
+      return await validateUIMessages({ messages });
+    } catch {
+      return messages;
+    }
+  }, []);
+
   // ── Initial history state ──────────────────────────────────────────────
   const [rawMessages, setRawMessages] = useState<MessageSnapshot[]>([]);
   const [isLoading, setIsLoading] = useState(() => Boolean(agentId));
+
+  const syncPersistedMessages = useCallback(async () => {
+    if (!agentId) {
+      setRawMessages([]);
+      return;
+    }
+
+    const result = await window.api.messages.list(agentId);
+    if (result.success && result.data) {
+      const snapshots = result.data as MessageSnapshot[];
+      setRawMessages(snapshots);
+    }
+  }, [agentId]);
 
   // ── Chat instance (stable per agentId) ────────────────────────────────
   // Requirements: agents.13.1 — transport bound to agentId
@@ -68,8 +90,15 @@ export function useAgentChat(agentId: string | null): UseAgentChatResult {
       id: agentId,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       transport: new IPCChatTransport(agentId) as any,
+      onFinish: () => {
+        // Align useChat lifecycle with persisted message snapshots.
+        void syncPersistedMessages();
+      },
+      onError: () => {
+        void syncPersistedMessages();
+      },
     });
-  }, [agentId]);
+  }, [agentId, syncPersistedMessages]);
 
   // ── useChat ────────────────────────────────────────────────────────────
   const {
@@ -96,15 +125,16 @@ export function useAgentChat(agentId: string | null): UseAgentChatResult {
       if (result.success && result.data) {
         const snapshots = result.data as MessageSnapshot[];
         setRawMessages(snapshots);
+        const uiMessages = await sanitizeUIMessages(toUIMessages(snapshots));
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        setMessages(toUIMessages(snapshots) as any);
+        setMessages(uiMessages as any);
       }
     } finally {
       // Ensure loading state renders at least once.
       await new Promise((resolve) => setTimeout(resolve, 0));
       setIsLoading(false);
     }
-  }, [agentId, setMessages]);
+  }, [agentId, sanitizeUIMessages, setMessages]);
 
   useEffect(() => {
     loadInitial();
@@ -129,21 +159,18 @@ export function useAgentChat(agentId: string | null): UseAgentChatResult {
     if (!payload.message || payload.message.agentId !== agentId) return;
 
     if (payload.message.hidden) {
-      // Remove hidden message from both arrays
+      // Remove hidden message from persisted snapshot list used for rendering.
       // Requirements: llm-integration.3.8, llm-integration.8.5
       setRawMessages((prev) => prev.filter((m) => m.id !== payload.message.id));
-      setMessages((prev) => prev.filter((m) => m.id !== String(payload.message.id)));
     } else {
-      // Update existing message in rawMessages
-      setRawMessages((prev) =>
-        prev.map((m) => (m.id === payload.message.id ? payload.message : m))
-      );
-      // Sync UIMessage if it exists (e.g. error message text update)
-      const uiMsg = toUIMessage(payload.message);
-      if (uiMsg) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        setMessages((prev) => prev.map((m) => (m.id === uiMsg.id ? (uiMsg as any) : m)));
-      }
+      // Upsert in rawMessages to tolerate out-of-order updated/created events.
+      setRawMessages((prev) => {
+        const existingIndex = prev.findIndex((m) => m.id === payload.message.id);
+        if (existingIndex === -1) {
+          return [...prev, payload.message];
+        }
+        return prev.map((m) => (m.id === payload.message.id ? payload.message : m));
+      });
     }
   });
 

@@ -1,4 +1,4 @@
-// Requirements: settings.3.5, settings.3.6, settings.3.7, settings.3.8, llm-integration.3
+// Requirements: settings.2.5, settings.2.6, settings.2.7, settings.2.8, llm-integration.3
 
 import {
   ILLMProvider,
@@ -6,54 +6,15 @@ import {
   ChatMessage,
   ChatOptions,
   ChatChunk,
-  LLMStructuredOutput,
+  LLMChatResult,
   LLMUsage,
 } from './ILLMProvider';
 import { LLM_PROVIDERS, ERROR_MESSAGES, CHAT_TIMEOUT_MS } from './LLMConfig';
-import {
-  buildStructuredOutputInstruction,
-  getStructuredOutputJsonSchema,
-  InvalidStructuredOutputError,
-  safeParseStructuredOutput,
-} from './StructuredOutputContract';
 import { LLMRequestAbortedError, isAbortLikeError } from './LLMErrors';
-
-// ─── Anthropic SSE event shapes ───────────────────────────────────────────────
-
-interface AnthropicContentBlockStart {
-  type: 'content_block_start';
-  index: number;
-  content_block: { type: 'thinking' | 'text'; thinking?: string; text?: string };
-}
-
-interface AnthropicContentBlockDelta {
-  type: 'content_block_delta';
-  index: number;
-  delta: { type: 'thinking_delta'; thinking: string } | { type: 'text_delta'; text: string };
-}
-
-interface AnthropicMessageDelta {
-  type: 'message_delta';
-  usage?: Record<string, unknown> & { output_tokens?: number };
-}
-
-interface AnthropicMessageStart {
-  type: 'message_start';
-  message?: {
-    usage?: Record<string, unknown> & { input_tokens?: number; output_tokens?: number };
-  };
-}
-
-type AnthropicSSEEvent =
-  | AnthropicContentBlockStart
-  | AnthropicContentBlockDelta
-  | AnthropicMessageDelta
-  | AnthropicMessageStart
-  | { type: string };
 
 /**
  * Anthropic LLM provider implementation
- * Uses native HTTP+SSE for chat, manual fetch for testConnection
+ * Uses AI SDK streamText for chat, manual fetch for testConnection
  *
  * Requirements: settings.3, llm-integration.3
  */
@@ -71,7 +32,7 @@ export class AnthropicProvider implements ILLMProvider {
 
   /**
    * Test connection to Anthropic API
-   * Requirements: settings.3.5, settings.3.6, settings.3.7, settings.3.8
+   * Requirements: settings.2.5, settings.2.6, settings.2.7, settings.2.8
    */
   async testConnection(apiKey: string): Promise<TestConnectionResult> {
     try {
@@ -102,82 +63,198 @@ export class AnthropicProvider implements ILLMProvider {
   }
 
   /**
-   * Send a chat request with streaming reasoning and structured output
-   * Requirements: llm-integration.3.1, llm-integration.3.2, llm-integration.3.3
-   *
-   * Structured output: system prompt instructs model to respond with JSON
-   * { action: { type: "text", content: "..." } }
-   * Reasoning (thinking) chunks are streamed via onChunk callback.
+   * Send a chat request with streaming reasoning/text and native tool-calling events.
+   * Requirements: llm-integration.5.1, llm-integration.5.4, llm-integration.5.5, llm-integration.5.7
    */
   async chat(
     messages: ChatMessage[],
     options: ChatOptions,
     onChunk: (chunk: ChatChunk) => void
-  ): Promise<LLMStructuredOutput> {
+  ): Promise<LLMChatResult> {
     const apiUrl = process.env.CLERKLY_ANTHROPIC_API_URL ?? this.config.apiUrl;
+    const baseURL = apiUrl.replace(/\/messages\/?$/, '');
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), CHAT_TIMEOUT_MS);
+    const stepDiagnostics: Array<{
+      stepIndex: number;
+      finishReason?: string;
+      toolCallsCount: number;
+      toolResultsCount: number;
+      latencyMs?: number;
+      usage?: Record<string, unknown>;
+    }> = [];
+    const stepStartedAt = new Map<number, number>();
 
     try {
-      // Separate system messages from conversation messages
-      const systemMessages = messages.filter((m) => m.role === 'system');
-      const conversationMessages = messages.filter((m) => m.role !== 'system');
+      if (typeof (globalThis as { TransformStream?: unknown }).TransformStream === 'undefined') {
+        const webStreams = await import('stream/web');
+        (globalThis as { TransformStream?: unknown }).TransformStream = webStreams.TransformStream;
+      }
+      if (typeof (globalThis as { ReadableStream?: unknown }).ReadableStream === 'undefined') {
+        const webStreams = await import('stream/web');
+        (globalThis as { ReadableStream?: unknown }).ReadableStream = webStreams.ReadableStream;
+      }
 
-      // Build system prompt: inject JSON output instruction
-      const systemBase = systemMessages.map((m) => m.content).join('\n');
-      const structuredInstruction = buildStructuredOutputInstruction();
-      const systemPrompt = (systemBase ? systemBase + '\n\n' : '') + structuredInstruction;
+      const { streamText, tool, jsonSchema, stepCountIs } = await import('ai');
+      const stopWhen = typeof stepCountIs === 'function' ? stepCountIs(5) : undefined;
+      const { createAnthropic } = await import('@ai-sdk/anthropic');
 
-      const body: Record<string, unknown> = {
-        model: options.model,
-        max_tokens: 16000,
-        system: systemPrompt,
-        messages: conversationMessages.map((m) => ({ role: m.role, content: m.content })),
-        output_config: {
-          format: {
-            type: 'json_schema',
-            schema: getStructuredOutputJsonSchema(),
+      const anthropic = createAnthropic({ apiKey: this.apiKey, baseURL });
+      const tools = this.buildToolSet(
+        options,
+        tool as unknown as (definition: { description: string; inputSchema: unknown }) => unknown,
+        jsonSchema as unknown as (schema: Record<string, unknown>) => unknown
+      );
+
+      const result = streamText({
+        model: anthropic.messages(options.model) as unknown as Parameters<
+          typeof streamText
+        >[0]['model'],
+        messages: messages as unknown as Parameters<typeof streamText>[0]['messages'],
+        sendReasoning: true,
+        tools,
+        ...(stopWhen ? { stopWhen } : {}),
+        maxRetries: 0,
+        abortSignal: controller.signal,
+        onStepFinish: (event: Record<string, unknown>) => {
+          const stepIndex =
+            typeof event.stepNumber === 'number'
+              ? event.stepNumber
+              : typeof event.stepIndex === 'number'
+                ? event.stepIndex
+                : stepDiagnostics.length;
+          const now = Date.now();
+          const startedAt = stepStartedAt.get(stepIndex) ?? now;
+          const toolCalls = Array.isArray(event.toolCalls) ? event.toolCalls.length : 0;
+          const toolResults = Array.isArray(event.toolResults) ? event.toolResults.length : 0;
+          const usage =
+            event.usage && typeof event.usage === 'object'
+              ? (event.usage as Record<string, unknown>)
+              : undefined;
+          const finishReason =
+            typeof event.finishReason === 'string' ? event.finishReason : undefined;
+          stepDiagnostics.push({
+            stepIndex,
+            finishReason,
+            toolCallsCount: toolCalls,
+            toolResultsCount: toolResults,
+            latencyMs: Math.max(0, now - startedAt),
+            usage,
+          });
+        },
+        experimental_onStepStart: (event: Record<string, unknown>) => {
+          const stepIndex =
+            typeof event.stepNumber === 'number'
+              ? event.stepNumber
+              : typeof event.stepIndex === 'number'
+                ? event.stepIndex
+                : stepDiagnostics.length;
+          stepStartedAt.set(stepIndex, Date.now());
+        },
+        providerOptions: {
+          anthropic: {
+            ...(options.reasoningEffort
+              ? {
+                  thinking: {
+                    type: 'enabled',
+                    budgetTokens: this.reasoningBudget(options.reasoningEffort),
+                  },
+                }
+              : {}),
+            disableParallelToolUse: false,
           },
         },
-        stream: true,
+      } as unknown as Parameters<typeof streamText>[0]);
+
+      let textAccumulator = '';
+      for await (const part of result.fullStream) {
+        if (part.type === 'text-delta') {
+          textAccumulator += part.text;
+          onChunk({ type: 'text', delta: part.text });
+          continue;
+        }
+        if (part.type === 'reasoning-delta') {
+          onChunk({ type: 'reasoning', delta: part.text });
+          continue;
+        }
+        if (part.type === 'tool-call') {
+          const args =
+            part.input && typeof part.input === 'object' && !Array.isArray(part.input)
+              ? (part.input as Record<string, unknown>)
+              : {};
+          onChunk({
+            type: 'tool_call',
+            callId: part.toolCallId ?? '',
+            toolName: part.toolName ?? '',
+            arguments: args,
+          });
+          continue;
+        }
+        if (part.type === 'tool-result') {
+          const args =
+            part.input && typeof part.input === 'object' && !Array.isArray(part.input)
+              ? (part.input as Record<string, unknown>)
+              : {};
+          onChunk({
+            type: 'tool_result',
+            callId: part.toolCallId ?? '',
+            toolName: part.toolName ?? '',
+            arguments: args,
+            output: part.output,
+            status: 'success',
+          });
+          continue;
+        }
+        if (part.type === 'tool-error') {
+          const args =
+            part.input && typeof part.input === 'object' && !Array.isArray(part.input)
+              ? (part.input as Record<string, unknown>)
+              : {};
+          const errorText =
+            typeof part.error === 'string'
+              ? part.error
+              : part.error instanceof Error
+                ? part.error.message
+                : 'Tool execution failed';
+          onChunk({
+            type: 'tool_result',
+            callId: part.toolCallId ?? '',
+            toolName: part.toolName ?? '',
+            arguments: args,
+            output: { message: errorText },
+            status: 'error',
+          });
+          continue;
+        }
+        if (part.type === 'error') {
+          const message =
+            part.error instanceof Error
+              ? part.error.message
+              : typeof part.error === 'string'
+                ? part.error
+                : ERROR_MESSAGES.unknown;
+          onChunk({ type: 'turn_error', errorType: 'provider', message });
+          throw new Error(message);
+        }
+      }
+
+      const totalUsage = await result.totalUsage;
+      const usage: LLMUsage = {
+        canonical: {
+          input_tokens: totalUsage.inputTokens ?? 0,
+          output_tokens: totalUsage.outputTokens ?? 0,
+          total_tokens:
+            totalUsage.totalTokens ??
+            (totalUsage.inputTokens ?? 0) + (totalUsage.outputTokens ?? 0),
+          cached_tokens: totalUsage.cachedInputTokens ?? undefined,
+          reasoning_tokens: totalUsage.reasoningTokens ?? undefined,
+        },
+        raw: totalUsage as unknown as Record<string, unknown>,
       };
 
-      if (options.reasoningEffort) {
-        body.thinking = {
-          type: 'enabled',
-          budget_tokens: this.reasoningBudget(options.reasoningEffort),
-        };
-      }
-
-      const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-          'x-api-key': this.apiKey,
-          'anthropic-version': '2023-06-01',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(body),
-        signal: controller.signal,
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        const retryAfterSeconds = this.parseRetryAfterHeader(response);
-        if (response.status === 429 && retryAfterSeconds !== null) {
-          throw new Error(`Rate limit exceeded. Please try again in ${retryAfterSeconds}s`);
-        }
-        if (response.status === 429) {
-          const providerMessage = this.extractErrorMessage(errorData);
-          if (providerMessage) {
-            throw new Error(providerMessage);
-          }
-        }
-        throw new Error(this.mapErrorToMessage(response.status, errorData));
-      }
-
-      return await this.parseStream(response, onChunk);
+      return { text: textAccumulator, usage, stepDiagnostics };
     } catch (error) {
-      if (isAbortLikeError(error)) {
+      if (isAbortLikeError(error) || this.isSdkAbortLikeError(error)) {
         throw new LLMRequestAbortedError(this.mapExceptionToMessage(error), error);
       }
       throw error;
@@ -186,124 +263,55 @@ export class AnthropicProvider implements ILLMProvider {
     }
   }
 
-  /**
-   * Parse Anthropic SSE stream, call onChunk for reasoning, return final LLMAction
-   * Requirements: llm-integration.3.2, llm-integration.3.3
-   */
-  private async parseStream(
-    response: Response,
-    onChunk: (chunk: ChatChunk) => void
-  ): Promise<LLMStructuredOutput> {
-    const reader = response.body?.getReader();
-    if (!reader) {
-      throw new Error('No response body');
+  private buildToolSet(
+    options: ChatOptions,
+    toolFactory: (definition: {
+      description: string;
+      inputSchema: unknown;
+      execute?: (args: Record<string, unknown>, signal?: AbortSignal) => Promise<unknown> | unknown;
+    }) => unknown,
+    jsonSchemaFactory: (schema: Record<string, unknown>) => unknown
+  ): Record<string, unknown> | undefined {
+    if (!options.tools || options.tools.length === 0) {
+      return undefined;
     }
 
-    const decoder =
-      typeof TextDecoder !== 'undefined'
-        ? new TextDecoder()
-        : { decode: (v: Uint8Array, _opts?: unknown) => Buffer.from(v).toString('utf-8') };
-
-    let buffer = '';
-    let contentAccumulator = '';
-    let inputTokens = 0;
-    let outputTokens = 0;
-    let rawUsage: Record<string, unknown> = {};
-
-    try {
-      for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() ?? '';
-
-        for (const line of lines) {
-          if (!line.startsWith('data: ')) continue;
-          const data = line.slice(6).trim();
-          if (!data) continue;
-
-          let event: AnthropicSSEEvent;
-          try {
-            event = JSON.parse(data) as AnthropicSSEEvent;
-          } catch {
-            continue;
-          }
-
-          if (event.type === 'message_start') {
-            const e = event as AnthropicMessageStart;
-            inputTokens = e.message?.usage?.input_tokens ?? 0;
-            outputTokens = e.message?.usage?.output_tokens ?? 0;
-            if (e.message?.usage && typeof e.message.usage === 'object') {
-              rawUsage = { ...rawUsage, ...(e.message.usage as Record<string, unknown>) };
-            }
-          } else if (event.type === 'message_delta') {
-            const e = event as AnthropicMessageDelta;
-            outputTokens += e.usage?.output_tokens ?? 0;
-            if (e.usage && typeof e.usage === 'object') {
-              rawUsage = { ...rawUsage, ...(e.usage as Record<string, unknown>) };
-            }
-          } else if (event.type === 'content_block_delta') {
-            const e = event as AnthropicContentBlockDelta;
-            if (e.delta.type === 'thinking_delta') {
-              onChunk({ type: 'reasoning', delta: e.delta.thinking, done: false });
-            } else if (e.delta.type === 'text_delta') {
-              contentAccumulator += e.delta.text;
-            }
-          }
-        }
-      }
-    } finally {
-      reader.releaseLock();
-    }
-
-    onChunk({ type: 'reasoning', delta: '', done: true });
-
-    const usage: LLMUsage = {
-      canonical: {
-        input_tokens: inputTokens,
-        output_tokens: outputTokens,
-        total_tokens: inputTokens + outputTokens,
-      },
-      raw: rawUsage,
-    };
-
-    return { ...this.parseAction(contentAccumulator), usage };
+    const entries = options.tools.map((toolDef) => [
+      toolDef.name,
+      toolFactory({
+        description: toolDef.description,
+        inputSchema: jsonSchemaFactory(toolDef.parameters),
+        execute: toolDef.execute,
+      }),
+    ]);
+    return Object.fromEntries(entries);
   }
 
-  /**
-   * Map reasoningEffort to Anthropic thinking budget tokens
-   */
+  private isSdkAbortLikeError(error: unknown): boolean {
+    if (!error || typeof error !== 'object') {
+      return false;
+    }
+
+    if ('cause' in error && isAbortLikeError(error.cause)) {
+      return true;
+    }
+
+    if ('message' in error && typeof error.message === 'string') {
+      const message = error.message.toLowerCase();
+      return message.includes('abort') || message.includes('timed out');
+    }
+
+    return false;
+  }
+
   private reasoningBudget(effort: 'low' | 'medium' | 'high'): number {
     const budgets = { low: 1024, medium: 8000, high: 16000 };
     return budgets[effort];
   }
 
   /**
-   * Parse structured output JSON into structured action
-   * Requirements: llm-integration.3.3
-   */
-  private parseAction(json: string): LLMStructuredOutput {
-    if (!json.trim()) {
-      throw new InvalidStructuredOutputError(json);
-    }
-    try {
-      const parsedJson = JSON.parse(json) as unknown;
-      const parsed = safeParseStructuredOutput(parsedJson);
-      if (!parsed.success) {
-        throw new InvalidStructuredOutputError(json);
-      }
-      return parsed.data;
-    } catch (err) {
-      if (err instanceof InvalidStructuredOutputError) throw err;
-      throw new InvalidStructuredOutputError(json);
-    }
-  }
-
-  /**
    * Map HTTP status code to user-friendly error message
-   * Requirements: settings.3.8
+   * Requirements: settings.2.8
    */
   private mapErrorToMessage(status: number, errorData: unknown): string {
     const message = ERROR_MESSAGES[status as keyof typeof ERROR_MESSAGES];
@@ -322,7 +330,7 @@ export class AnthropicProvider implements ILLMProvider {
 
   /**
    * Map exception to user-friendly error message
-   * Requirements: settings.3.8
+   * Requirements: settings.2.8
    */
   private mapExceptionToMessage(error: unknown): string {
     if (
@@ -334,36 +342,5 @@ export class AnthropicProvider implements ILLMProvider {
       return ERROR_MESSAGES.timeout;
     }
     return ERROR_MESSAGES.network;
-  }
-
-  private extractErrorMessage(errorData: unknown): string | null {
-    if (
-      typeof errorData === 'object' &&
-      errorData !== null &&
-      'error' in errorData &&
-      typeof (errorData as { error?: { message?: string } }).error === 'object' &&
-      (errorData as { error?: { message?: string } }).error !== null &&
-      'message' in (errorData as { error: { message?: string } }).error
-    ) {
-      const message = (errorData as { error: { message?: string } }).error.message;
-      return typeof message === 'string' && message.trim().length > 0 ? message : null;
-    }
-    return null;
-  }
-
-  private parseRetryAfterHeader(response: Response): number | null {
-    const headers = response.headers as Headers | undefined;
-    if (!headers || typeof headers.get !== 'function') {
-      return null;
-    }
-    const retryAfter = headers.get('retry-after');
-    if (!retryAfter) {
-      return null;
-    }
-    const parsed = Number(retryAfter);
-    if (!Number.isFinite(parsed) || parsed <= 0) {
-      return null;
-    }
-    return Math.ceil(parsed);
   }
 }

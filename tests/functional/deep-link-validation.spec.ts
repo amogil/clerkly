@@ -21,7 +21,20 @@ import {
  * Requirements: testing.3.1 - Use real Electron
  * Requirements: testing.3.2 - Do NOT mock Electron API
  * Requirements: testing.3.6 - Show real windows on screen
+ *
+ * LLM usage note (testing.3.13):
+ * This suite validates protocol/deep-link parsing and window activation behavior.
+ * LLM is intentionally not used because network/model behavior is not under test here.
+ * Exception approved by user in this task discussion (2026-03-07).
  */
+
+async function assertLoginUIVisible(context: ElectronTestContext): Promise<void> {
+  const loginScreen = context.window.locator('[data-testid="login-screen"]');
+  await expect(loginScreen).toBeVisible({ timeout: 5000 });
+  await expect(context.window.locator('button:has-text("Continue with Google")')).toBeVisible({
+    timeout: 5000,
+  });
+}
 
 test.describe('Deep Link Validation', () => {
   let context: ElectronTestContext;
@@ -48,6 +61,7 @@ test.describe('Deep Link Validation', () => {
     // Verify app started successfully (protocol handler is registered during startup)
     expect(context.app).toBeDefined();
     expect(context.window.isClosed()).toBe(false);
+    await assertLoginUIVisible(context);
 
     // Verify protocol scheme format
     // Requirements: google-oauth-auth.2.2
@@ -72,6 +86,7 @@ test.describe('Deep Link Validation', () => {
 
     // Clear any existing tokens
     await clearTestTokens(context.window);
+    await assertLoginUIVisible(context);
 
     // Prepare deep link with parameters
     const authCode = 'test_auth_code_extract';
@@ -94,6 +109,7 @@ test.describe('Deep Link Validation', () => {
 
     // Verify app is still responsive (parameters were extracted)
     expect(context.window.isClosed()).toBe(false);
+    await assertLoginUIVisible(context);
 
     console.log('[TEST] Deep link parameters extracted successfully');
 
@@ -114,6 +130,7 @@ test.describe('Deep Link Validation', () => {
 
     // Clear any existing tokens
     await clearTestTokens(context.window);
+    await assertLoginUIVisible(context);
 
     // Prepare deep link with INVALID state
     const authCode = 'test_auth_code_invalid_state';
@@ -135,6 +152,7 @@ test.describe('Deep Link Validation', () => {
 
     // Verify app is still responsive (error was handled gracefully)
     expect(context.window.isClosed()).toBe(false);
+    await assertLoginUIVisible(context);
 
     // Note: In real implementation, this should trigger an error event
     // For now, we verify the app doesn't crash
@@ -158,6 +176,7 @@ test.describe('Deep Link Validation', () => {
 
     // Clear any existing tokens
     await clearTestTokens(context.window);
+    await assertLoginUIVisible(context);
 
     // Prepare deep link with valid parameters
     const authCode = 'test_auth_code_valid_state';
@@ -179,6 +198,7 @@ test.describe('Deep Link Validation', () => {
 
     // Verify app is still responsive and processing continued
     expect(context.window.isClosed()).toBe(false);
+    await assertLoginUIVisible(context);
 
     console.log('[TEST] Valid state parameter accepted, processing continued');
 
@@ -196,6 +216,7 @@ test.describe('Deep Link Validation', () => {
     // Launch the application
     context = await launchElectron();
     await context.window.waitForLoadState('domcontentloaded');
+    await assertLoginUIVisible(context);
 
     // Get initial window state
     const initiallyFocused = await context.app.evaluate(({ BrowserWindow }) => {
@@ -275,6 +296,7 @@ test.describe('Deep Link Validation', () => {
 
     // Verify app initialized successfully and handled the deep link
     expect(context.window.isClosed()).toBe(false);
+    await assertLoginUIVisible(context);
 
     console.log('[TEST] Deep link handled during initialization');
 
@@ -294,6 +316,7 @@ test.describe('Deep Link Validation', () => {
     await context.window.waitForLoadState('domcontentloaded');
 
     // Test various malformed deep links
+    await assertLoginUIVisible(context);
     const malformedLinks = [
       `${PROTOCOL_SCHEME}:/oauth2redirect`, // No parameters
       `${PROTOCOL_SCHEME}:/oauth2redirect?code=`, // Empty code
@@ -317,6 +340,7 @@ test.describe('Deep Link Validation', () => {
 
       // Verify app is still responsive
       expect(context.window.isClosed()).toBe(false);
+      await assertLoginUIVisible(context);
     }
 
     console.log('[TEST] All malformed deep links handled gracefully');

@@ -7,6 +7,12 @@ interface ApiCallOptions {
    * If true, don't show toast notification on error
    */
   silent?: boolean;
+  /**
+   * Error delivery channel for this API call.
+   * - background: show toast on failure (default)
+   * - chat: suppress toast; chat UI owns error rendering
+   */
+  channel?: 'background' | 'chat';
 }
 
 /**
@@ -22,6 +28,8 @@ export async function callApi<T>(
   context: string,
   options?: ApiCallOptions
 ): Promise<T | null> {
+  const shouldShowToast = !options?.silent && (options?.channel ?? 'background') === 'background';
+
   try {
     const result = await apiCall();
 
@@ -35,7 +43,7 @@ export async function callApi<T>(
     if (isNoUserLoggedInError(errorMessage)) {
       return null;
     }
-    if (!options?.silent) {
+    if (shouldShowToast) {
       toast.error(`${context}: ${errorMessage}`);
     }
 
@@ -43,7 +51,7 @@ export async function callApi<T>(
     return null;
   } catch (error) {
     // Requirements: error-notifications.2.4 - Show toast on exception
-    if (!options?.silent) {
+    if (shouldShowToast) {
       const message = error instanceof Error ? error.message : String(error);
       toast.error(`${context}: ${message}`);
     }

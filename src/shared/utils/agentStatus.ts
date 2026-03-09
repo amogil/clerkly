@@ -15,7 +15,7 @@ export const MESSAGE_KIND = {
   USER: 'user',
   LLM: 'llm',
   ERROR: 'error',
-  FINAL_ANSWER: 'final_answer',
+  TOOL_CALL: 'tool_call',
 } as const;
 
 /**
@@ -55,7 +55,7 @@ export function hasError(status: AgentStatus): boolean {
 }
 
 /**
- * Check if agent is completed
+ * Check if agent completed work
  */
 export function isCompleted(status: AgentStatus): boolean {
   return status === 'completed';

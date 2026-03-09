@@ -53,15 +53,15 @@ export class AgentManager {
       return AGENT_STATUS.ERROR;
     }
 
-    if (lastMessage.kind === MESSAGE_KIND.FINAL_ANSWER) {
-      return AGENT_STATUS.COMPLETED;
-    }
-
     if (lastMessage.kind === MESSAGE_KIND.USER) {
       return AGENT_STATUS.IN_PROGRESS;
     }
 
     if (lastMessage.kind === MESSAGE_KIND.LLM) {
+      return lastMessage.done ? AGENT_STATUS.AWAITING_RESPONSE : AGENT_STATUS.IN_PROGRESS;
+    }
+
+    if (lastMessage.kind === MESSAGE_KIND.TOOL_CALL) {
       return lastMessage.done ? AGENT_STATUS.AWAITING_RESPONSE : AGENT_STATUS.IN_PROGRESS;
     }
 
@@ -92,7 +92,10 @@ export class AgentManager {
    */
   public toEventAgent(agent: Agent): AgentSnapshot {
     const lastVisible = this.getLatestVisibleMessage(agent.agentId);
-    const status = this.computeAgentStatus(lastVisible);
+    let status = this.computeAgentStatus(lastVisible);
+    if (lastVisible?.kind === MESSAGE_KIND.USER && !this.pipelineControllers.has(agent.agentId)) {
+      status = AGENT_STATUS.AWAITING_RESPONSE;
+    }
 
     return {
       id: agent.agentId,
@@ -149,7 +152,9 @@ export class AgentManager {
         this.logger.info(`Agent updatedAt updated to message timestamp: ${agentId}`);
 
         // Publish AGENT_UPDATED event for UI with full agent model including status
-        MainEventBus.getInstance().publish(new AgentUpdatedEvent(this.toEventAgent(updatedAgent)));
+        MainEventBus.getInstance().publish(
+          new AgentUpdatedEvent(this.toEventAgent(updatedAgent), ['updatedAt', 'status'])
+        );
       }
     } catch (error) {
       // Use ErrorHandler to show error notification to user
@@ -168,7 +173,28 @@ export class AgentManager {
     try {
       const updatedAgent = this.dbManager.agents.findById(agentId);
       if (updatedAgent) {
-        MainEventBus.getInstance().publish(new AgentUpdatedEvent(this.toEventAgent(updatedAgent)));
+        MainEventBus.getInstance().publish(
+          new AgentUpdatedEvent(this.toEventAgent(updatedAgent), ['status'])
+        );
+      }
+    } catch (error) {
+      handleBackgroundError(error, 'Agent Status Update');
+      throw error;
+    }
+  }
+
+  /**
+   * Publish AGENT_UPDATED with recomputed status for a specific agent.
+   * Used when status changes without MESSAGE_UPDATED side effects (e.g., pipeline cancel before first llm chunk).
+   * Requirements: agents.9.2, agents.12.2, llm-integration.8.1
+   */
+  publishStatusUpdated(agentId: string): void {
+    try {
+      const updatedAgent = this.dbManager.agents.findById(agentId);
+      if (updatedAgent) {
+        MainEventBus.getInstance().publish(
+          new AgentUpdatedEvent(this.toEventAgent(updatedAgent), ['status'])
+        );
       }
     } catch (error) {
       handleBackgroundError(error, 'Agent Status Update');
@@ -263,7 +289,9 @@ export class AgentManager {
     // Requirements: agents.12.2
     const updatedAgent = this.dbManager.agents.findById(agentId);
     if (updatedAgent) {
-      MainEventBus.getInstance().publish(new AgentUpdatedEvent(this.toEventAgent(updatedAgent)));
+      MainEventBus.getInstance().publish(
+        new AgentUpdatedEvent(this.toEventAgent(updatedAgent), ['name', 'updatedAt'])
+      );
     }
   }
 

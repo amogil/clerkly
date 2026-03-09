@@ -7,7 +7,7 @@ import type { ChatOptions } from './ILLMProvider';
 
 /**
  * Per-provider settings for testConnection() and API routing.
- * Requirements: settings.3.5, settings.3.6
+ * Requirements: settings.2.5, settings.2.6
  */
 export interface LLMProviderConfig {
   id: LLMProvider;
@@ -99,7 +99,7 @@ export const CHAT_TIMEOUT_MS = 300_000;
 
 /**
  * User-facing error messages by HTTP status code.
- * Requirements: settings.3.8
+ * Requirements: settings.2.8
  */
 export const ERROR_MESSAGES = {
   401: 'Invalid API key. Please check your key and try again.',

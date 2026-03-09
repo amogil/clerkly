@@ -167,6 +167,32 @@ test.describe('Agent Messaging', () => {
     await expect(messages.first()).toContainText('Test message');
   });
 
+  /* Preconditions: Historical llm message is persisted in canonical format (data.text, no data.action)
+     Action: Insert llm message via test API and open active chat
+     Assertions: Assistant message is rendered from data.text
+     Requirements: llm-integration.6.6.1 */
+  test('should render historical llm message from canonical data.text', async () => {
+    const firstAgentDataTestId = await window
+      .locator('[data-testid^="agent-icon-"]')
+      .first()
+      .getAttribute('data-testid');
+    const activeAgentId = firstAgentDataTestId?.replace('agent-icon-', '');
+    expect(activeAgentId).toBeTruthy();
+
+    const result = await window.evaluate(async (agentId) => {
+      const api = (window as unknown as { api: any }).api;
+      return await api.test.createAgentMessage(agentId, 'Historical canonical response');
+    }, activeAgentId as string);
+
+    expect(result.success).toBe(true);
+
+    const llmAction = window
+      .locator('[data-testid="message-llm-action"]')
+      .filter({ hasText: 'Historical canonical response' });
+    await expect(llmAction).toHaveCount(1, { timeout: 5000 });
+    await expectNoToastError(window);
+  });
+
   /* Preconditions: Agent is active, input field is visible
      Action: Type message and press Shift+Enter
      Assertions: New line is added, message is not sent
@@ -206,19 +232,23 @@ test.describe('Agent Messaging', () => {
      Requirements: agents.4.8 */
   test('should display messages in chronological order', async () => {
     const messageInput = activeChat(window).textarea;
+    const sendButton = window.locator('[data-testid="prompt-input-send"]');
 
     // Send multiple messages
     await messageInput.fill('First message');
     await messageInput.press('Enter');
     await expect(activeChat(window).userMessages).toHaveCount(1, { timeout: 5000 });
+    await expect(sendButton).toBeVisible({ timeout: 30000 });
 
     await messageInput.fill('Second message');
     await messageInput.press('Enter');
     await expect(activeChat(window).userMessages).toHaveCount(2, { timeout: 5000 });
+    await expect(sendButton).toBeVisible({ timeout: 30000 });
 
     await messageInput.fill('Third message');
     await messageInput.press('Enter');
     await expect(activeChat(window).userMessages).toHaveCount(3, { timeout: 5000 });
+    await expect(sendButton).toBeVisible({ timeout: 30000 });
 
     // Get user messages only (LLM responses/errors are out of scope for chronological order test)
     const messages = activeChat(window).userMessages;
@@ -242,19 +272,42 @@ test.describe('Agent Messaging', () => {
     const messageInput = activeChat(window).textarea;
     const messagesContainer = activeChat(window).messagesArea;
 
-    // Send many messages to create scroll
-    for (let i = 1; i <= 10; i++) {
+    // Send many messages quickly: cancel each in-progress turn except the last one
+    for (let i = 1; i <= 19; i++) {
+      await expect(window.locator('[data-testid="prompt-input-send"]')).toBeVisible({
+        timeout: 10000,
+      });
       await messageInput.fill(`Message ${i}`);
       await messageInput.press('Enter');
       await expect(activeChat(window).userMessages).toHaveCount(i, { timeout: 5000 });
+      await expect(window.locator('[data-testid="prompt-input-stop"]')).toBeVisible({
+        timeout: 10000,
+      });
+      await window.locator('[data-testid="prompt-input-stop"]').click();
     }
+
+    // Ensure we are back in send mode before the final message
+    await expect(window.locator('[data-testid="prompt-input-send"]')).toBeVisible({
+      timeout: 10000,
+    });
+
+    // Last message: wait for full response completion
+    await messageInput.fill('Message 20');
+    await messageInput.press('Enter');
+    await expect(activeChat(window).userMessages).toHaveCount(20, { timeout: 5000 });
+    await expect(window.locator('[data-testid="prompt-input-send"]')).toBeVisible({
+      timeout: 30000,
+    });
 
     // Check that last user message is visible (scrolled into view)
     const lastMessage = activeChat(window).userMessages.last();
     await expect(lastMessage).toBeVisible();
-
     const lastMessageText = await lastMessage.textContent();
-    expect(lastMessageText).toContain('Message 10');
+    expect(lastMessageText).toContain('Message 20');
+
+    // Check that last model response is visible after final message processing
+    const lastLlmMessage = activeChat(window).llmMessages.last();
+    await expect(lastLlmMessage).toBeVisible({ timeout: 10000 });
 
     // Wait for scroll to complete
     await window.waitForFunction(

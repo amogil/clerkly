@@ -24,6 +24,7 @@ import {
 } from './helpers/electron';
 import type { MockOAuthServer } from './helpers/mock-oauth-server';
 import { MockLLMServer } from './helpers/mock-llm-server';
+import { resetMockLLMServerState } from './helpers/mock-llm-state';
 
 const TEST_CLIENT_ID = 'test-client-id-12345';
 let mockLLMPort: number;
@@ -47,6 +48,10 @@ test.beforeAll(async () => {
   mockLLMPort = await getFreePort();
   mockLLMServer = new MockLLMServer({ port: mockLLMPort });
   await mockLLMServer.start();
+});
+
+test.beforeEach(() => {
+  resetMockLLMServerState(mockLLMServer);
 });
 
 test.afterAll(async () => {
@@ -104,7 +109,7 @@ test.describe('LLM Chat (real OpenAI)', () => {
     await expect(llmBubble).toBeVisible({ timeout: 30000 });
 
     // Action content is non-empty
-    const actionContent = context.window.locator('[data-testid="message-llm-action"]');
+    const actionContent = context.window.locator('[data-testid="message-llm-action"]').last();
     await expect(actionContent).toBeVisible({ timeout: 30000 });
     const text = await actionContent.textContent();
     expect(text?.trim().length).toBeGreaterThan(0);
@@ -191,7 +196,7 @@ test.describe('LLM Chat (real OpenAI)', () => {
     await expect(messageInput).toBeVisible({ timeout: 10000 });
 
     await messageInput.fill(
-      'Solve this carefully: compare 17! and 2^57, explain each step briefly, then give final answer.'
+      'Solve this carefully: compare 17! and 2^57, explain each step briefly, then give response text.'
     );
     await messageInput.press('Enter');
 
@@ -199,7 +204,7 @@ test.describe('LLM Chat (real OpenAI)', () => {
       '[data-testid="message-llm-reasoning-trigger"]'
     );
     const reasoningContent = context.window.locator('[data-testid="message-llm-reasoning"]').last();
-    const actionContent = context.window.locator('[data-testid="message-llm-action"]');
+    const actionContent = context.window.locator('[data-testid="message-llm-action"]').last();
     const actionCountBeforeRequest = await actionContent.count();
 
     await expect(reasoningTrigger.last()).toBeVisible({ timeout: 45000 });
@@ -276,7 +281,17 @@ test.describe('LLM Chat (real OpenAI)', () => {
        click navigates to Settings screen
      Requirements: llm-integration.3.1, llm-integration.3.4, llm-integration.3.5 */
   test('should show error message on invalid api key', async () => {
-    context = await launchWithRealLLM('sk-invalid-key-000000000000');
+    // Use deterministic mock provider 401 response to assert auth error UX contract.
+    mockLLMServer.setSuccess(false);
+    mockLLMServer.setError(401, 'Invalid API key');
+
+    context = await launchElectron(undefined, {
+      CLERKLY_GOOGLE_API_URL: mockOAuthServer.getBaseUrl(),
+      CLERKLY_OPENAI_API_URL: `http://localhost:${mockLLMPort}/v1/responses`,
+      CLERKLY_OPENAI_API_KEY: 'sk-invalid-key-000000000000',
+    });
+    await completeOAuthFlow(context.app, context.window, TEST_CLIENT_ID);
+    await expectAgentsVisible(context.window, 10000);
 
     const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
     await messageInput.fill('Hello');
@@ -341,7 +356,7 @@ test.describe('LLM Chat (real OpenAI)', () => {
     });
 
     // Wait for LLM response
-    const actionContent = context.window.locator('[data-testid="message-llm-action"]');
+    const actionContent = context.window.locator('[data-testid="message-llm-action"]').last();
     await expect(actionContent).toBeVisible({ timeout: 30000 });
 
     // Wait for autoscroll to complete
@@ -428,7 +443,7 @@ test.describe('LLM Chat (real OpenAI)', () => {
     await messageInput.press('Enter');
 
     // Wait for LLM response
-    await expect(context.window.locator('[data-testid="message-llm-action"]')).toBeVisible({
+    await expect(context.window.locator('[data-testid="message-llm-action"]').last()).toBeVisible({
       timeout: 30000,
     });
 
@@ -679,6 +694,39 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     return ctx;
   }
 
+  type ProviderRequestMessage = {
+    role: string;
+    content: unknown;
+  };
+
+  const getRequestMessages = (body: Record<string, unknown>): ProviderRequestMessage[] =>
+    (body.input ?? body.messages) as ProviderRequestMessage[];
+
+  const contentToText = (content: unknown): string => {
+    if (Array.isArray(content)) {
+      return content
+        .map((part) => {
+          if (
+            part &&
+            typeof part === 'object' &&
+            typeof (part as { text?: unknown }).text === 'string'
+          ) {
+            return (part as { text: string }).text;
+          }
+          return '';
+        })
+        .join(' ');
+    }
+    if (
+      content &&
+      typeof content === 'object' &&
+      typeof (content as { text?: unknown }).text === 'string'
+    ) {
+      return (content as { text: string }).text;
+    }
+    return typeof content === 'string' ? content : '';
+  };
+
   async function renderMarkdownMessage(markdown: string): Promise<void> {
     mockLLMServer.setStreamingMode(true, {
       content: JSON.stringify({ action: { type: 'text', content: markdown } }),
@@ -702,7 +750,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
   test('should interrupt previous request when new message sent during streaming', async () => {
     // First request: slow streaming so we can interrupt it
     mockLLMServer.setStreamingMode(true, {
-      content: '{"action":{"type":"text","content":"First response"}}',
+      content: 'First response '.repeat(20),
       chunkDelayMs: 300,
     });
 
@@ -731,16 +779,12 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     await messageInput.fill('Second message');
     await messageInput.press('Enter');
 
-    // Only one llm bubble should remain (previous one is hidden)
-    const llmBubbles = context.window.locator('[data-testid="message-llm"]');
-    await expect(llmBubbles).toHaveCount(1, { timeout: 5000 });
-    await expect(llmBubbles.first()).toBeVisible({ timeout: 3000 });
-
-    // The visible response should be for the second message
-    const actionContent = llmBubbles.first().locator('[data-testid="message-llm-action"]');
-    await expect(actionContent).toBeVisible({ timeout: 3000 });
-    const text = await actionContent.textContent();
-    expect(text?.trim()).toBe('Second response');
+    // Second response should be rendered and no error message should appear.
+    const secondResponse = context.window
+      .locator('[data-testid="message-llm-action"]')
+      .filter({ hasText: 'Second response' });
+    await expect(secondResponse).toHaveCount(1, { timeout: 5000 });
+    await expect(context.window.locator('[data-testid="message-error"]')).toHaveCount(0);
   });
 
   /* Preconditions: MockLLMServer configured with slow streaming,
@@ -750,7 +794,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
      Requirements: llm-integration.8.1, llm-integration.8.7 */
   test('should cancel active request via stop button without creating error message', async () => {
     mockLLMServer.setStreamingMode(true, {
-      content: '{"action":{"type":"text","content":"Long response"}}',
+      content: 'Long response '.repeat(30),
       chunkDelayMs: 300,
     });
 
@@ -836,7 +880,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     context = await launchWithMockLLM();
     const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
 
-    await messageInput.fill('Show long reasoning and then final answer');
+    await messageInput.fill('Show long reasoning and then response text');
     await messageInput.press('Enter');
 
     const agentAvatarIcon = context.window
@@ -859,6 +903,63 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
       .poll(async () => await agentAvatarIcon.getAttribute('class'), { timeout: 5000 })
       .toContain('bg-amber-500');
 
+    await expectNoToastError(context.window);
+  });
+
+  /* Preconditions: MockLLMServer streams long text response in multiple chunks; app authenticated with mock LLM URL
+     Action: User sends message and waits until response completes
+     Assertions: Final text is rendered in one active llm bubble without duplicate action blocks
+     Requirements: llm-integration.7.3 */
+  test('should keep a single active action block while streamed text is assembling', async () => {
+    mockLLMServer.setStreamingMode(true, {
+      content: JSON.stringify({
+        action: {
+          type: 'text',
+          content:
+            'This is a long streamed response used for deterministic chunk-by-chunk rendering verification.',
+        },
+      }),
+      chunkDelayMs: 120,
+    });
+
+    context = await launchWithMockLLM();
+    const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
+    await messageInput.fill('Stream text in chunks');
+    await messageInput.press('Enter');
+
+    const actionContent = context.window.locator('[data-testid="message-llm-action"]').last();
+    await expect(actionContent).toBeVisible({ timeout: 10000 });
+
+    const bubbleStats = await context.window.evaluate(async () => {
+      const actionCounts: number[] = [];
+      const getNode = () =>
+        document.querySelectorAll('[data-testid="message-llm-action"]')[
+          document.querySelectorAll('[data-testid="message-llm-action"]').length - 1
+        ] as HTMLElement | undefined;
+
+      const startedAt = Date.now();
+      while (Date.now() - startedAt < 8000) {
+        const node = getNode();
+        actionCounts.push(document.querySelectorAll('[data-testid="message-llm-action"]').length);
+        if (node) {
+          // Touch text to ensure node remains readable during updates.
+          node.textContent?.trim();
+        }
+        await new Promise((resolve) => setTimeout(resolve, 120));
+      }
+
+      return {
+        maxActionCount: Math.max(...actionCounts, 0),
+      };
+    });
+
+    await expect(actionContent).toContainText(
+      'This is a long streamed response used for deterministic chunk-by-chunk rendering verification.',
+      {
+        timeout: 10000,
+      }
+    );
+    expect(bubbleStats.maxActionCount).toBe(1);
     await expectNoToastError(context.window);
   });
 
@@ -951,7 +1052,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
   test('should exclude hidden llm messages from model history on next request', async () => {
     // First request: slow streaming so it can be interrupted
     mockLLMServer.setStreamingMode(true, {
-      content: '{"action":{"type":"text","content":"First response"}}',
+      content: 'First response '.repeat(20),
       chunkDelayMs: 300,
     });
 
@@ -964,7 +1065,13 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     await expect(context.window.locator('[data-testid="message"]').first()).toBeVisible({
       timeout: 5000,
     });
-    await context.window.waitForTimeout(500);
+    const firstResponse = context.window
+      .locator('[data-testid="message-llm-action"]')
+      .filter({ hasText: 'First response' });
+    await expect(firstResponse).toBeVisible({ timeout: 5000 });
+    await expect(context.window.locator('[data-testid="prompt-input-stop"]')).toBeVisible({
+      timeout: 5000,
+    });
 
     // Switch to fast second response and clear logs to inspect only second request payload
     mockLLMServer.setStreamingMode(true, {
@@ -984,18 +1091,17 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
 
     const lastRequest = mockLLMServer.getLastRequest();
     expect(lastRequest).toBeDefined();
-    const messages: Array<{ role: string; content: string }> =
-      lastRequest!.body.input ?? lastRequest!.body.messages;
+    const messages = getRequestMessages(lastRequest!.body as Record<string, unknown>);
 
     // First user message remains part of dialog context
     const hasFirstUser = messages.some(
-      (m) => m.role === 'user' && m.content.includes('First message')
+      (m) => m.role === 'user' && contentToText(m.content).includes('First message')
     );
     expect(hasFirstUser).toBe(true);
 
     // Hidden first assistant message must not be replayed
     const hasHiddenAssistantReplay = messages.some(
-      (m) => m.role === 'assistant' && m.content.includes('First response')
+      (m) => m.role === 'assistant' && contentToText(m.content).includes('First response')
     );
     expect(hasHiddenAssistantReplay).toBe(false);
   });
@@ -1102,15 +1208,14 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     const lastRequest = mockLLMServer.getLastRequest();
     expect(lastRequest).toBeDefined();
 
-    const messages: Array<{ role: string; content: string }> =
-      lastRequest!.body.input ?? lastRequest!.body.messages;
+    const messages = getRequestMessages(lastRequest!.body as Record<string, unknown>);
     expect(messages).toBeDefined();
 
     const priorUserMsg = messages.find(
-      (m) => m.role === 'user' && m.content.includes('First message')
+      (m) => m.role === 'user' && contentToText(m.content).includes('First message')
     );
     const priorAssistantMsg = messages.find(
-      (m) => m.role === 'assistant' && m.content.includes('First response')
+      (m) => m.role === 'assistant' && contentToText(m.content).includes('First response')
     );
     expect(priorUserMsg).toBeDefined();
     expect(priorAssistantMsg).toBeDefined();
@@ -1157,24 +1262,23 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     const lastRequest = mockLLMServer.getLastRequest();
     expect(lastRequest).toBeDefined();
 
-    const messages: Array<{ role: string; content: string }> =
-      lastRequest!.body.input ?? lastRequest!.body.messages;
+    const messages = getRequestMessages(lastRequest!.body as Record<string, unknown>);
     expect(messages).toBeDefined();
 
     const errorInConversation = messages.some(
-      (m) => m.role !== 'system' && m.content.toLowerCase().includes('internal server error')
+      (m) =>
+        m.role !== 'system' &&
+        contentToText(m.content).toLowerCase().includes('internal server error')
     );
     expect(errorInConversation).toBe(false);
   });
 
-  /* Preconditions: MockLLMServer always returns invalid structured output payload
-       (schema mismatch), app authenticated with mock LLM URL
+  /* Preconditions: MockLLMServer returns JSON-like text payload, app authenticated with mock LLM URL
      Action: User sends a message
-     Assertions: MainPipeline retries up to 2 times, then renders standardized
-       invalid-format error with Retry action
+     Assertions: Response is shown as plain text without extra transformation retries
      User-approved mock scenario: yes
-     Requirements: llm-integration.12.1, llm-integration.12.2, llm-integration.12.3 */
-  test('should retry invalid structured output and show error with Retry action', async () => {
+     Requirements: llm-integration.5.1, llm-integration.6.5 */
+  test('should treat JSON-like text as plain response without extra retries', async () => {
     mockLLMServer.setStreamingMode(true, {
       content: JSON.stringify({
         action: { type: 'invalid-type', content: 'Broken payload' },
@@ -1185,20 +1289,53 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     context = await launchWithMockLLM();
     const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
 
-    await messageInput.fill('Trigger invalid structured output');
+    await messageInput.fill('Return JSON-like text without formatting');
     await messageInput.press('Enter');
 
-    const errorBubble = context.window.locator('[data-testid="message-error"]');
-    await expect(errorBubble).toBeVisible({ timeout: 15000 });
-    await expect(errorBubble).toContainText('Invalid response format. Please try again later.');
-    await expect(context.window.locator('[data-testid="message-error-retry"]')).toBeVisible({
-      timeout: 5000,
-    });
+    const actionContent = context.window.locator('[data-testid="message-llm-action"]').last();
+    await expect(actionContent).toBeVisible({ timeout: 15000 });
+    await expect(actionContent).toContainText('Broken payload');
 
     const requestCount = mockLLMServer
       .getRequestLogs()
       .filter((entry) => entry.method === 'POST' && entry.path === '/v1/responses').length;
-    expect(requestCount).toBe(3);
+    expect(requestCount).toBe(1);
+  });
+
+  /* Preconditions: MockLLMServer returns tool call on first response and final text on second
+     Action: User sends a message
+     Assertions: tool_call is processed via second model request; chat renders only llm bubble without separate tool_call message
+     Requirements: llm-integration.11.1, llm-integration.11.4, llm-integration.11.6 */
+  test('should continue model -> tools -> model loop and avoid separate tool_call bubble', async () => {
+    mockLLMServer.setStreamingMode(true);
+    mockLLMServer.setOpenAIStreamScripts([
+      {
+        reasoning: 'thinking',
+        toolCalls: [{ callId: 'call-1', toolName: 'search_docs', arguments: { query: 'stream' } }],
+      },
+      {
+        content: 'Tool-assisted answer',
+      },
+    ]);
+
+    context = await launchWithMockLLM();
+    const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
+
+    await messageInput.fill('Use tool');
+    await messageInput.press('Enter');
+
+    const actionContent = context.window.locator('[data-testid="message-llm-action"]').last();
+    await expect(actionContent).toBeVisible({ timeout: 15000 });
+    await expect(actionContent).toContainText('Tool-assisted answer');
+
+    const requestCount = mockLLMServer
+      .getRequestLogs()
+      .filter((entry) => entry.method === 'POST' && entry.path === '/v1/responses').length;
+    expect(requestCount).toBe(2);
+
+    const llmBubbles = context.window.locator('[data-testid="message-llm"]');
+    await expect(llmBubbles).toHaveCount(1);
+    await expect(context.window.locator('[data-testid="message-user"]')).toHaveCount(1);
   });
 
   /* Preconditions: MockLLMServer returns 429 with retry-after=3 on first request,

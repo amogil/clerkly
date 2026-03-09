@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 
-// Requirements: agents.8.1, settings.2.1
+// Requirements: agents.8.1, settings.3.1
 // Simple unit test for date formatting in Agents component
 
 import { DateTimeFormatter } from '../../../src/shared/utils/DateTimeFormatter';
@@ -11,7 +11,7 @@ describe('Agents Component - Date Formatting (Simple)', () => {
   /* Preconditions: DateTimeFormatter exists
      Action: Call formatDateTime with ISO timestamp
      Assertions: Returns formatted date string using OS system settings
-     Requirements: settings.2.1 */
+     Requirements: settings.3.1 */
   it('should format date using DateTimeFormatter', () => {
     const timestamp = new Date('2024-01-16T14:45:00+03:00');
     const formatted = DateTimeFormatter.formatDateTime(timestamp);
@@ -45,7 +45,7 @@ describe('Agents Component - Date Formatting (Simple)', () => {
   /* Preconditions: DateTimeFormatter.formatDateTime exists
      Action: Format both createdAt and updatedAt
      Assertions: Both return valid formatted strings
-     Requirements: settings.2.1 */
+     Requirements: settings.3.1 */
   it('should format both createdAt and updatedAt timestamps', () => {
     const createdAt = new Date('2024-01-15T10:00:00+03:00');
     const updatedAt = new Date('2024-01-16T14:45:00+03:00');
@@ -63,7 +63,7 @@ describe('Agents Component - Date Formatting (Simple)', () => {
 /* Preconditions: Agent timestamp is ISO string
      Action: Convert string to Date before formatting
      Assertions: Formatted result is not ISO string
-     Requirements: agents.8.1, settings.2.1 */
+     Requirements: agents.8.1, settings.3.1 */
 it('should convert ISO string to Date before formatting', () => {
   const isoString = '2024-01-16T14:45:00+03:00';
   const dateObject = new Date(isoString);

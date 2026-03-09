@@ -202,6 +202,34 @@ export interface LLMPipelineDiagnosticPayload extends BaseEvent {
 4. `App` подписывается на `EVENT_TYPES.LLM_PIPELINE_DIAGNOSTIC` и пишет запись в renderer console (Developer Log) через `Logger`.
 5. Toast-уведомления для этого события не показываются.
 
+#### Streaming-события LLM чата
+
+**Requirements:** realtime-events.3.7, realtime-events.3.8, realtime-events.3.9
+
+Для streaming-режима чата используются отдельные типизированные события:
+
+```typescript
+export interface MessageLlmReasoningUpdatedPayload extends BaseEvent {
+  messageId: number;
+  agentId: string;
+  delta: string;
+  accumulatedText: string;
+  timestamp: number;
+}
+
+export interface MessageLlmTextUpdatedPayload extends BaseEvent {
+  messageId: number;
+  agentId: string;
+  delta: string;
+  accumulatedText: string;
+  timestamp: number;
+}
+```
+
+Правило использования:
+- `message.llm.reasoning.updated` и `message.llm.text.updated` — инкрементальные чанки для UI-стриминга.
+- Рендер tool-call блока строится по persisted `message.created`/`message.updated` для `kind: tool_call`.
+
 #### Генерация снапшотов
 
 **Requirements:** realtime-events.9.5, realtime-events.9.6
@@ -462,11 +490,11 @@ export class MainEventBus {
   }
 
   private getEntityKey(type: EventType, payload: any): string | null {
-    if (type.startsWith('agent.') && payload.id) {
-      return `agent:${payload.id}`;
+    if (type.startsWith('agent.') && payload.agent?.id) {
+      return `agent:${payload.agent.id}`;
     }
-    if (type.startsWith('message.') && payload.id) {
-      return `message:${payload.id}`;
+    if (type.startsWith('message.') && payload.message?.id) {
+      return `message:${payload.message.id}`;
     }
     if (type.startsWith('user.') && payload.userId) {
       return `user:${payload.userId}`;
@@ -637,11 +665,11 @@ export class RendererEventBus {
   }
 
   private getEntityKey(type: EventType, payload: any): string | null {
-    if (type.startsWith('agent.') && payload.id) {
-      return `agent:${payload.id}`;
+    if (type.startsWith('agent.') && payload.agent?.id) {
+      return `agent:${payload.agent.id}`;
     }
-    if (type.startsWith('message.') && payload.id) {
-      return `message:${payload.id}`;
+    if (type.startsWith('message.') && payload.message?.id) {
+      return `message:${payload.message.id}`;
     }
     if (type.startsWith('user.') && payload.userId) {
       return `user:${payload.userId}`;
@@ -868,11 +896,15 @@ export const IPC_EVENT_FROM_RENDERER = 'clerkly:event:from-renderer';
 
 **Validates: Requirements realtime-events.2.4**
 
-### Property 5: changedFields обязателен для updated событий
+### Property 5: changedFields (опционально для updated событий)
 
-*Для любого* события типа `{entity}.updated`, payload ДОЛЖЕН содержать поле `changedFields: string[]`.
+*Для любого* события типа `{entity}.updated`, если payload содержит `changedFields`, поле ДОЛЖНО:
+- быть массивом `string[]`;
+- содержать пути snapshot-полей в формате `dot.path` (например: `payload.data.text`, `status`, `updatedAt`);
+- не содержать дубликатов;
+- быть отсортированным лексикографически.
 
-**Validates: Requirements realtime-events.3.3**
+**Validates: Requirements realtime-events.3.3, realtime-events.3.3.1, realtime-events.3.3.2**
 
 ## Edge Cases
 
@@ -975,11 +1007,15 @@ ipcMain.on(IPC_EVENT_FROM_RENDERER, (event, data: AnyEvent) => {
 const eventBus = MainEventBus.getInstance();
 
 eventBus.publish('agent.created', {
-  id: 'agent-123',
-  name: 'My Agent',
-  userId: 'user-456',
-  createdAt: new Date().toISOString(),
-  updatedAt: new Date().toISOString(),
+  agent: {
+    id: 'agent-123',
+    name: 'My Agent',
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+    archivedAt: null,
+    status: 'new',
+  },
+  timestamp: Date.now(),
 });
 ```
 
@@ -991,26 +1027,32 @@ function AgentList() {
   const [agents, setAgents] = useState<Agent[]>([]);
 
   useEventSubscription('agent.created', (event) => {
-    setAgents(prev => [...prev, event.payload]);
+    setAgents(prev => [...prev, event.payload.agent]);
   });
 
   useEventSubscription('agent.archived', (event) => {
-    setAgents(prev => prev.filter(a => a.id !== event.payload.id));
+    setAgents(prev => prev.filter(a => a.id !== event.payload.agent.id));
   });
 
   return <ul>{agents.map(a => <li key={a.id}>{a.name}</li>)}</ul>;
 }
 ```
 
-### 3. Публикация события обновления с changedFields
+### 3. Публикация события обновления (с optional changedFields)
 
 ```typescript
 // Requirements: realtime-events.3.3
 eventBus.publish('agent.updated', {
-  id: 'agent-123',
-  name: 'Updated Name',
-  updatedAt: new Date().toISOString(),
-  changedFields: ['name', 'updatedAt'], // ОБЯЗАТЕЛЬНО
+  agent: {
+    id: 'agent-123',
+    name: 'Updated Name',
+    createdAt: 1705315800000,
+    updatedAt: Date.now(),
+    archivedAt: null,
+    status: 'in-progress',
+  },
+  changedFields: ['name', 'updatedAt'], // опционально; unique + sorted
+  timestamp: Date.now(),
 });
 ```
 
@@ -1073,7 +1115,7 @@ eventBus.publish('user.login', { userId: 'user-123' }, { local: true });
 | Тест | Требование |
 |------|------------|
 | should emit entity.created with full data | realtime-events.3.2 |
-| should emit entity.updated with changedFields | realtime-events.3.3 |
+| should emit entity.updated with full snapshot | realtime-events.3.3 |
 | should emit entity.deleted with ID only | realtime-events.3.4 |
 | should support custom event types | realtime-events.3.5 |
 | should include timestamp in all events | realtime-events.3.6 |
@@ -1500,9 +1542,8 @@ function dbAgentToSnapshot(dbAgent: Agent): AgentSnapshot {
     archivedAt: dbAgent.archivedAt 
       ? new Date(dbAgent.archivedAt).getTime() 
       : null,
-    // Статус НЕ вычисляется здесь - он должен прийти из API
-    // Временно используем 'new' как fallback
-    status: 'new',
+    // Статус приходит из Main Process в snapshot
+    status: dbAgent.status,
   };
 }
 
@@ -1527,25 +1568,7 @@ function dbMessageToSnapshot(dbMessage: Message): MessageSnapshot {
 
 ### Обновление API для возврата снапшотов
 
-**Проблема:** Текущий API возвращает DB модели, но UI нужны снапшоты.
-
-**Решение:** API должен возвращать снапшоты напрямую.
-
-**До (текущее состояние):**
-
-```typescript
-// Main Process
-ipcMain.handle('agents:list', () => {
-  return agentManager.list(); // Возвращает Agent[] из БД
-});
-
-// Renderer
-const result = await window.api.agents.list();
-const agents = result.data as Agent[]; // DB модели
-// Нужно вычислять статус вручную
-```
-
-**После (целевое состояние):**
+Целевой контракт API: обработчик `agents:list` возвращает `AgentSnapshot[]`.
 
 ```typescript
 // Main Process

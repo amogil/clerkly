@@ -1,15 +1,15 @@
-// Requirements: settings.2.1, settings.2.3, clerkly.3.8
+// Requirements: settings.3.1, settings.3.3, clerkly.3.8
 
 /**
  * Shared DateTimeFormatter used across main/renderer/common code.
  *
- * Requirements: settings.2.1, settings.2.3, settings.2.4
+ * Requirements: settings.3.1, settings.3.3, settings.3.4
  */
 export class DateTimeFormatter {
   /**
    * Format date only (no time) using system locale.
    *
-   * Requirements: settings.2.1
+   * Requirements: settings.3.1
    */
   static formatDate(timestamp: number | Date): string {
     try {
@@ -34,7 +34,7 @@ export class DateTimeFormatter {
   /**
    * Format date and time using system locale.
    *
-   * Requirements: settings.2.1
+   * Requirements: settings.3.1
    */
   static formatDateTime(timestamp: number | Date): string {
     try {
@@ -61,7 +61,7 @@ export class DateTimeFormatter {
   /**
    * Format timestamp for logs using fixed format YYYY-MM-DD HH:MM:SS±HH:MM.
    *
-   * Requirements: settings.2.3, clerkly.3.2, clerkly.3.3
+   * Requirements: settings.3.3, clerkly.3.2, clerkly.3.3
    */
   static formatLogTimestamp(timestamp: number | Date): string {
     try {

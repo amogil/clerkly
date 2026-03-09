@@ -119,6 +119,35 @@ describe('apiWrapper', () => {
       expect(toast.error).not.toHaveBeenCalled();
     });
 
+    /* Preconditions: IPC call returns error, call is tagged as chat-flow
+       Action: call callApi() with channel: 'chat'
+       Assertions: returns null, no toast shown (chat UI owns error rendering)
+       Requirements: error-notifications.2.3 */
+    it('should suppress toast for chat-flow errors', async () => {
+      const apiCall = jest.fn().mockResolvedValue({
+        success: false,
+        error: 'Provider error',
+      });
+
+      const result = await callApi(apiCall, 'Sending message', { channel: 'chat' });
+
+      expect(result).toBeNull();
+      expect(toast.error).not.toHaveBeenCalled();
+    });
+
+    /* Preconditions: IPC call throws exception, call is tagged as chat-flow
+       Action: call callApi() with channel: 'chat'
+       Assertions: returns null, no toast shown
+       Requirements: error-notifications.2.3 */
+    it('should suppress toast for chat-flow exceptions', async () => {
+      const apiCall = jest.fn().mockRejectedValue(new Error('Chat pipeline failed'));
+
+      const result = await callApi(apiCall, 'Sending message', { channel: 'chat' });
+
+      expect(result).toBeNull();
+      expect(toast.error).not.toHaveBeenCalled();
+    });
+
     /* Preconditions: IPC call returns success with undefined data
        Action: call callApi()
        Assertions: returns null, toast shown

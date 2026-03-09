@@ -4,7 +4,6 @@
  * Source of truth for all event type definitions in Clerkly
  */
 
-import { User } from '../../types';
 import { EVENT_TYPES } from './constants';
 import { AgentStatus, MessagePayload } from '../utils/agentStatus';
 
@@ -49,11 +48,11 @@ export interface EntityCreatedEvent<T> extends BaseEvent {
  * Event for entity update
  * Requirements: realtime-events.3.3
  */
-export interface EntityUpdatedEvent<T> extends BaseEvent {
+export interface EntityUpdatedEvent extends BaseEvent {
   /** Entity ID */
   id: string;
-  /** Changed fields with new values */
-  changedFields: Partial<T>;
+  /** Changed snapshot fields (dot-path, unique, sorted) */
+  changedFields?: string[];
 }
 
 /**
@@ -86,14 +85,7 @@ export interface AgentSnapshot {
  * Message payload kinds
  * Requirements: agents.7.2
  */
-export type MessageKind =
-  | 'user'
-  | 'llm'
-  | 'tool_call'
-  | 'code_exec'
-  | 'final_answer'
-  | 'request_scope'
-  | 'artifact';
+export type MessageKind = 'user' | 'llm' | 'error' | 'tool_call';
 
 /**
  * Message snapshot for events
@@ -123,6 +115,7 @@ export interface AgentCreatedPayload extends BaseEvent {
 }
 export interface AgentUpdatedPayload extends BaseEvent {
   agent: AgentSnapshot;
+  changedFields?: string[];
   timestamp: number;
 }
 export interface AgentArchivedPayload extends BaseEvent {
@@ -137,6 +130,7 @@ export interface MessageCreatedPayload extends BaseEvent {
 }
 export interface MessageUpdatedPayload extends BaseEvent {
   message: MessageSnapshot;
+  changedFields?: string[];
   timestamp: number;
 }
 
@@ -151,10 +145,21 @@ export interface MessageLlmReasoningUpdatedPayload extends BaseEvent {
   timestamp: number;
 }
 
+// LLM text streaming event
+export interface MessageLlmTextUpdatedPayload extends BaseEvent {
+  messageId: number;
+  agentId: string;
+  /** New text chunk */
+  delta: string;
+  /** Full accumulated text so far */
+  accumulatedText: string;
+  timestamp: number;
+}
+
 // User events
 export type UserLoginPayload = BaseEvent & { userId: string };
 export type UserLogoutPayload = BaseEvent;
-export type UserProfileUpdatedPayload = EntityUpdatedEvent<User>;
+export type UserProfileUpdatedPayload = EntityUpdatedEvent;
 
 // ============================================================================
 // Auth Events
@@ -258,7 +263,7 @@ export interface LLMPipelineDiagnosticPayload extends BaseEvent {
     userMessageId: number;
     signalAborted: boolean;
     errorName: string;
-    errorType: 'auth' | 'rate_limit' | 'provider' | 'network' | 'timeout';
+    errorType: 'auth' | 'rate_limit' | 'provider' | 'network' | 'timeout' | 'tool' | 'protocol';
   };
 }
 
@@ -312,6 +317,7 @@ export interface ClerklyEvents {
   [EVENT_TYPES.MESSAGE_CREATED]: MessageCreatedPayload;
   [EVENT_TYPES.MESSAGE_UPDATED]: MessageUpdatedPayload;
   [EVENT_TYPES.MESSAGE_LLM_REASONING_UPDATED]: MessageLlmReasoningUpdatedPayload;
+  [EVENT_TYPES.MESSAGE_LLM_TEXT_UPDATED]: MessageLlmTextUpdatedPayload;
 
   // User events
   [EVENT_TYPES.USER_LOGIN]: UserLoginPayload;
@@ -450,6 +456,7 @@ type AgentUpdatedType = typeof EVENT_TYPES.AGENT_UPDATED;
 type AgentArchivedType = typeof EVENT_TYPES.AGENT_ARCHIVED;
 type MessageCreatedType = typeof EVENT_TYPES.MESSAGE_CREATED;
 type MessageUpdatedType = typeof EVENT_TYPES.MESSAGE_UPDATED;
+type MessageLlmTextUpdatedType = typeof EVENT_TYPES.MESSAGE_LLM_TEXT_UPDATED;
 type UserProfileUpdatedType = typeof EVENT_TYPES.USER_PROFILE_UPDATED;
 
 /**
@@ -614,7 +621,7 @@ export class LLMPipelineDiagnosticEvent extends TypedEventClass<LLMPipelineDiagn
       userMessageId: number;
       signalAborted: boolean;
       errorName: string;
-      errorType: 'auth' | 'rate_limit' | 'provider' | 'network' | 'timeout';
+      errorType: 'auth' | 'rate_limit' | 'provider' | 'network' | 'timeout' | 'tool' | 'protocol';
     }
   ) {
     super();
@@ -684,13 +691,18 @@ export class AgentUpdatedEvent extends TypedEventClass<AgentUpdatedType> {
   readonly type = EVENT_TYPES.AGENT_UPDATED;
   readonly timestamp: number;
 
-  constructor(public readonly agent: AgentSnapshot) {
+  constructor(
+    public readonly agent: AgentSnapshot,
+    public readonly changedFields?: string[]
+  ) {
     super();
     this.timestamp = Date.now();
   }
 
   toPayload(): EventPayloadWithoutTimestamp<AgentUpdatedType> {
-    return { agent: this.agent };
+    return this.changedFields
+      ? { agent: this.agent, changedFields: this.changedFields }
+      : { agent: this.agent };
   }
 }
 
@@ -737,13 +749,18 @@ export class MessageUpdatedEvent extends TypedEventClass<MessageUpdatedType> {
   readonly type = EVENT_TYPES.MESSAGE_UPDATED;
   readonly timestamp: number;
 
-  constructor(public readonly message: MessageSnapshot) {
+  constructor(
+    public readonly message: MessageSnapshot,
+    public readonly changedFields?: string[]
+  ) {
     super();
     this.timestamp = Date.now();
   }
 
   toPayload(): EventPayloadWithoutTimestamp<MessageUpdatedType> {
-    return { message: this.message };
+    return this.changedFields
+      ? { message: this.message, changedFields: this.changedFields }
+      : { message: this.message };
   }
 }
 
@@ -779,6 +796,35 @@ export class MessageLlmReasoningUpdatedEvent extends TypedEventClass<
 }
 
 /**
+ * Message LLM text updated event
+ * Emitted on each text chunk during LLM streaming
+ * Requirements: llm-integration.5.1
+ */
+export class MessageLlmTextUpdatedEvent extends TypedEventClass<MessageLlmTextUpdatedType> {
+  readonly type = EVENT_TYPES.MESSAGE_LLM_TEXT_UPDATED;
+  readonly timestamp: number;
+
+  constructor(
+    public readonly messageId: number,
+    public readonly agentId: string,
+    public readonly delta: string,
+    public readonly accumulatedText: string
+  ) {
+    super();
+    this.timestamp = Date.now();
+  }
+
+  toPayload(): EventPayloadWithoutTimestamp<MessageLlmTextUpdatedType> {
+    return {
+      messageId: this.messageId,
+      agentId: this.agentId,
+      delta: this.delta,
+      accumulatedText: this.accumulatedText,
+    };
+  }
+}
+
+/**
  * User profile updated event
  */
 export class UserProfileUpdatedEvent extends TypedEventClass<UserProfileUpdatedType> {
@@ -786,13 +832,15 @@ export class UserProfileUpdatedEvent extends TypedEventClass<UserProfileUpdatedT
 
   constructor(
     public readonly id: string,
-    public readonly changedFields: Partial<User>
+    public readonly changedFields?: string[]
   ) {
     super();
   }
 
   toPayload(): EventPayloadWithoutTimestamp<UserProfileUpdatedType> {
-    return { id: this.id, changedFields: this.changedFields };
+    return this.changedFields
+      ? { id: this.id, changedFields: this.changedFields }
+      : { id: this.id };
   }
 }
 

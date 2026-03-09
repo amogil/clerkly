@@ -103,6 +103,34 @@ describe('Event Types', () => {
     expect(key1).not.toBe(key2);
   });
 
+  /* Preconditions: text payloads with different messageId
+     Action: Generate keys for message.llm.text.updated
+     Assertions: Keys include messageId and differ for different messages
+     Requirements: realtime-events.5.5, llm-integration.2 */
+  it('should include messageId in text event keys', () => {
+    const payload1 = {
+      timestamp: Date.now(),
+      messageId: 303,
+      agentId: 'agent-1',
+      delta: 'a',
+      accumulatedText: 'a',
+    };
+    const payload2 = {
+      timestamp: Date.now(),
+      messageId: 404,
+      agentId: 'agent-1',
+      delta: 'b',
+      accumulatedText: 'b',
+    };
+
+    const key1 = getEventKey('message.llm.text.updated', payload1);
+    const key2 = getEventKey('message.llm.text.updated', payload2);
+
+    expect(key1).toBe('message.llm.text.updated:303');
+    expect(key2).toBe('message.llm.text.updated:404');
+    expect(key1).not.toBe(key2);
+  });
+
   /* Preconditions: Agent created/updated/archived payloads
      Action: Extract entity ID
      Assertions: ID extracted correctly

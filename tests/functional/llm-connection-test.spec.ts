@@ -1,7 +1,7 @@
 /* Preconditions: Electron app is launched with authentication
    Action: Test LLM connection testing functionality end-to-end
    Assertions: Verify Test Connection button behavior, success/error notifications, and all providers
-   Requirements: settings.3.1, settings.3.2, settings.3.3, settings.3.4, settings.3.7, settings.3.8 */
+   Requirements: settings.2.1, settings.2.2, settings.2.3, settings.2.4, settings.2.7, settings.2.8 */
 
 import { test, expect } from '@playwright/test';
 import {
@@ -14,6 +14,7 @@ import {
 import { createMockOAuthServer } from './helpers/electron';
 import type { MockOAuthServer } from './helpers/mock-oauth-server';
 import { MockLLMServer } from './helpers/mock-llm-server';
+import { resetMockLLMServerState } from './helpers/mock-llm-state';
 
 let context: ElectronTestContext;
 let mockOAuthServer: MockOAuthServer;
@@ -53,10 +54,7 @@ test.afterAll(async () => {
 });
 
 test.beforeEach(async () => {
-  // Clear request logs
-  mockLLMServer.clearRequestLogs();
-  mockLLMServer.setSuccess(true);
-  mockLLMServer.setDelay(0); // Reset delay
+  resetMockLLMServerState(mockLLMServer);
 
   // Launch Electron app with mock servers
   const mockLLMBaseUrl = mockLLMServer.getBaseUrl();
@@ -92,7 +90,7 @@ test.afterEach(async () => {
 /* Preconditions: App is launched and authenticated, API key field is empty
    Action: Check Test Connection button state
    Assertions: Button is disabled when API key is empty
-   Requirements: settings.3.1 */
+   Requirements: settings.2.2 */
 test('54.1: should disable Test Connection button when API key is empty', async () => {
   // Find Test Connection button
   const testButton = context.window.locator('button:has-text("Test Connection")');
@@ -106,7 +104,7 @@ test('54.1: should disable Test Connection button when API key is empty', async 
 /* Preconditions: App is launched and authenticated
    Action: Enter API key and check Test Connection button state
    Assertions: Button is enabled when API key is filled
-   Requirements: settings.3.1 */
+   Requirements: settings.2.3 */
 test('54.2: should enable Test Connection button when API key is filled', async () => {
   // Enter API key
   const apiKeyInput = context.window.locator('input[placeholder="Enter your API key"]');
@@ -126,7 +124,7 @@ test('54.2: should enable Test Connection button when API key is filled', async 
 /* Preconditions: App is launched and authenticated, API key is filled
    Action: Click Test Connection button
    Assertions: Request sent to correct endpoint with correct parameters
-   Requirements: settings.3.2, settings.3.3, settings.3.5 */
+   Requirements: settings.2.2, settings.2.3, settings.2.5 */
 test('54.3: should send request with correct parameters', async () => {
   // Enter API key
   const apiKeyInput = context.window.locator('input[placeholder="Enter your API key"]');
@@ -148,13 +146,25 @@ test('54.3: should send request with correct parameters', async () => {
   expect(lastRequest?.headers.authorization).toBe('Bearer test-api-key-12345');
   expect(lastRequest?.body.model).toBe('gpt-5-nano');
   expect(lastRequest?.body.max_output_tokens).toBe(16);
-  expect(lastRequest?.body.input?.[0]?.content).toContain('JSON');
+  const firstInputContent = lastRequest?.body.input?.[0]?.content;
+  const firstInputText = Array.isArray(firstInputContent)
+    ? firstInputContent
+        .map((part: unknown) =>
+          part && typeof part === 'object' && typeof (part as { text?: unknown }).text === 'string'
+            ? (part as { text: string }).text
+            : ''
+        )
+        .join(' ')
+    : typeof firstInputContent === 'string'
+      ? firstInputContent
+      : '';
+  expect(firstInputText).toContain('JSON');
 });
 
 /* Preconditions: App is launched and authenticated, valid API key is entered
    Action: Click Test Connection button with successful mock response
    Assertions: Success notification is shown
-   Requirements: settings.3.4, settings.3.7 */
+   Requirements: settings.2.4, settings.2.7 */
 test('54.4: should show success notification on valid API key', async () => {
   // Wait for any initial error toasts to disappear (from loading settings)
   await context.window.waitForTimeout(2000);
@@ -193,7 +203,7 @@ test('54.4: should show success notification on valid API key', async () => {
 /* Preconditions: App is launched and authenticated, invalid API key is entered
    Action: Click Test Connection button with error mock response
    Assertions: Error notification is shown with appropriate message
-   Requirements: settings.3.4, settings.3.8 */
+   Requirements: settings.2.4, settings.2.8 */
 test('54.5: should show error notification on invalid API key', async () => {
   // Set mock server to return error
   mockLLMServer.setSuccess(false);
@@ -222,7 +232,7 @@ test('54.5: should show error notification on invalid API key', async () => {
 /* Preconditions: App is launched and authenticated
    Action: Test connection for each provider (OpenAI, Anthropic, Google)
    Assertions: Each provider sends request to correct endpoint
-   Requirements: settings.3.4, settings.3.5, settings.3.7 */
+   Requirements: settings.2.4, settings.2.5, settings.2.7 */
 test('54.6: should test connection for all providers', async () => {
   const providers = [
     { value: 'openai', name: 'OpenAI', path: '/v1/responses', model: 'gpt-5-nano' },
@@ -277,7 +287,7 @@ test('54.6: should test connection for all providers', async () => {
 /* Preconditions: App is launched and authenticated, API key is filled
    Action: Click Test Connection button, verify button shows "Testing..." during request
    Assertions: Button text changes to "Testing..." and button is disabled during test
-   Requirements: settings.3.2, settings.3.3 */
+   Requirements: settings.2.2, settings.2.3 */
 test('54.7: should show Testing text during connection test', async () => {
   // Set delay to make "Testing..." state visible
   mockLLMServer.setDelay(2000);

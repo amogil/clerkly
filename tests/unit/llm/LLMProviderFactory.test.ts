@@ -11,7 +11,7 @@ describe('LLMProviderFactory', () => {
      Assertions: returns OpenAIProvider instance
      Requirements: settings.3 */
   it('should create OpenAI provider', () => {
-    const provider = LLMProviderFactory.createProvider('openai');
+    const provider = LLMProviderFactory.createProvider('openai', 'openai-key');
     expect(provider).toBeInstanceOf(OpenAIProvider);
     expect(provider.getProviderName()).toBe('OpenAI');
   });
@@ -21,7 +21,7 @@ describe('LLMProviderFactory', () => {
      Assertions: returns AnthropicProvider instance
      Requirements: settings.3 */
   it('should create Anthropic provider', () => {
-    const provider = LLMProviderFactory.createProvider('anthropic');
+    const provider = LLMProviderFactory.createProvider('anthropic', 'anthropic-key');
     expect(provider).toBeInstanceOf(AnthropicProvider);
     expect(provider.getProviderName()).toBe('Anthropic');
   });
@@ -31,9 +31,18 @@ describe('LLMProviderFactory', () => {
      Assertions: returns GoogleProvider instance
      Requirements: settings.3 */
   it('should create Google provider', () => {
-    const provider = LLMProviderFactory.createProvider('google');
+    const provider = LLMProviderFactory.createProvider('google', 'google-key');
     expect(provider).toBeInstanceOf(GoogleProvider);
     expect(provider.getProviderName()).toBe('Google');
+  });
+
+  /* Preconditions: Factory called with API key
+     Action: call createProvider('openai', 'key')
+     Assertions: provider instance stores passed API key
+     Requirements: settings.3 */
+  it('should pass apiKey into provider constructor', () => {
+    const provider = LLMProviderFactory.createProvider('openai', 'factory-key');
+    expect((provider as unknown as { apiKey?: string }).apiKey).toBe('factory-key');
   });
 
   /* Preconditions: Factory called with unknown provider type

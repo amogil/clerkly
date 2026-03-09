@@ -210,7 +210,7 @@ import { PromptBuilder, FullHistoryStrategy } from './agents/PromptBuilder';
 const agentManager = new AgentManager(dbManager);
 const messageManager = new MessageManager(dbManager);
 const promptBuilder = new PromptBuilder(
-  "You are a helpful AI assistant. Always reply in the user's language (detected from the latest user message in the current request). Both your final answer and your reasoning text must be in the user's language. You may respond in Markdown when it improves clarity. Supported Markdown (GFM): headings, paragraphs, bold/italic/strikethrough, links/autolinks, blockquotes, ordered/unordered lists and task lists, tables, horizontal rules, inline code, fenced code blocks with language tags (syntax highlighting), Mermaid diagrams (```mermaid```), and math via KaTeX (inline $...$ or block $$...$$). Do not use footnotes.",
+  "You are a helpful AI assistant. Always reply in the user's language (detected from the latest user message in the current request). Both your response text and your reasoning text must be in the user's language. You may respond in Markdown when it improves clarity. Supported Markdown (GFM): headings, paragraphs, bold/italic/strikethrough, links/autolinks, blockquotes, ordered/unordered lists and task lists, tables, horizontal rules, inline code, fenced code blocks with language tags (syntax highlighting), Mermaid diagrams (```mermaid```), and math via KaTeX (inline $...$ or block $$...$$). Do not use footnotes.",
   [],
   new FullHistoryStrategy()
 );
@@ -296,7 +296,7 @@ app.whenReady().then(async () => {
     settingsIPCHandlers.registerHandlers();
     logger.info('Settings IPC handlers registered');
 
-    // Requirements: settings.3.4, settings.3.9
+    // Requirements: settings.2.4, settings.2.9
     // Register LLM IPC handlers
     registerLLMIPCHandlers();
     logger.info('LLM IPC handlers registered');

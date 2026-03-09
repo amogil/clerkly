@@ -84,7 +84,9 @@ export class MessageManager {
    */
   listForModelHistory(agentId: string): Message[] {
     const messages = this.dbManager.messages.listByAgent(agentId, true);
-    return messages.filter((msg) => !msg.hidden && msg.kind !== 'error');
+    return messages.filter(
+      (msg) => !msg.hidden && msg.kind !== 'error' && msg.kind !== 'tool_call'
+    );
   }
 
   /**
@@ -120,7 +122,9 @@ export class MessageManager {
     // Emit message.updated for each newly hidden error message so renderer hides them
     // Requirements: llm-integration.3.8
     for (const msg of hiddenMessages) {
-      MainEventBus.getInstance().publish(new MessageUpdatedEvent(this.toEventMessage(msg)));
+      MainEventBus.getInstance().publish(
+        new MessageUpdatedEvent(this.toEventMessage(msg), ['hidden'])
+      );
     }
   }
 
@@ -136,7 +140,9 @@ export class MessageManager {
     // Fetch updated message to emit event
     const updated = this.dbManager.messages.getById(messageId, agentId);
     if (updated) {
-      MainEventBus.getInstance().publish(new MessageUpdatedEvent(this.toEventMessage(updated)));
+      MainEventBus.getInstance().publish(
+        new MessageUpdatedEvent(this.toEventMessage(updated), ['hidden'])
+      );
     }
   }
 
@@ -148,7 +154,9 @@ export class MessageManager {
     const updated = this.dbManager.messages.hideAndMarkIncomplete(messageId, agentId);
     if (updated) {
       this.logger.info(`Message hidden+incomplete: ${messageId}`);
-      MainEventBus.getInstance().publish(new MessageUpdatedEvent(this.toEventMessage(updated)));
+      MainEventBus.getInstance().publish(
+        new MessageUpdatedEvent(this.toEventMessage(updated), ['done', 'hidden'])
+      );
     }
   }
 
@@ -210,7 +218,10 @@ export class MessageManager {
       // Fetch updated message to get correct kind for the event
       const updated = this.dbManager.messages.getById(messageId, agentId);
       if (updated) {
-        MainEventBus.getInstance().publish(new MessageUpdatedEvent(this.toEventMessage(updated)));
+        const changedFields = done === undefined ? ['payload'] : ['done', 'payload'];
+        MainEventBus.getInstance().publish(
+          new MessageUpdatedEvent(this.toEventMessage(updated), changedFields)
+        );
       }
     }
   }
@@ -232,7 +243,9 @@ export class MessageManager {
     this.dbManager.messages.setDone(messageId, agentId, done);
     const updated = this.dbManager.messages.getById(messageId, agentId);
     if (updated) {
-      MainEventBus.getInstance().publish(new MessageUpdatedEvent(this.toEventMessage(updated)));
+      MainEventBus.getInstance().publish(
+        new MessageUpdatedEvent(this.toEventMessage(updated), ['done'])
+      );
     }
   }
 }

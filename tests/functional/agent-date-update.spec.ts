@@ -3,7 +3,7 @@
    Assertions: 
    - Agent's updatedAt timestamp is old initially
    - After sending new message, timestamp updates to current time
-   Requirements: agents.8.1, agents.5.3, settings.2.1 */
+   Requirements: agents.8.1, agents.5.3, settings.3.1 */
 
 import { test, expect, ElectronApplication, Page } from '@playwright/test';
 import {
@@ -123,5 +123,10 @@ test.describe('Agents - Date Update on New Message', () => {
     const timestampAfter = await headerTimestamp.textContent();
     expect(timestampAfter).toBeTruthy();
     expect(timestampAfter).not.toBe(timestampBefore);
+
+    // Ensure active turn is fully settled before teardown to avoid flaky app.close() timeout.
+    await expect(window.locator('[data-testid="prompt-input-send"]')).toBeVisible({
+      timeout: 15000,
+    });
   });
 });

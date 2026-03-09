@@ -1,525 +1,276 @@
-// Requirements: llm-integration.3
-// tests/unit/llm/OpenAIProvider.chat.test.ts
-// Unit tests for OpenAIProvider.chat()
+// Requirements: llm-integration.5
 
+import * as aiModule from 'ai';
+import * as openAiSdkModule from '@ai-sdk/openai';
 import { OpenAIProvider } from '../../../src/main/llm/OpenAIProvider';
 import type { ChatMessage, ChatOptions, ChatChunk } from '../../../src/main/llm/ILLMProvider';
-import { InvalidStructuredOutputError } from '../../../src/main/llm/StructuredOutputContract';
 import { LLMRequestAbortedError } from '../../../src/main/llm/LLMErrors';
+import { CHAT_TIMEOUT_MS } from '../../../src/main/llm/LLMConfig';
 
-/**
- * Build a mock response body reader from SSE data lines.
- * Returns a mock that simulates ReadableStream.getReader() in Node.js Jest environment.
- */
-function buildMockReader(lines: string[]) {
-  const chunks = lines.map((line) => Buffer.from(line + '\n'));
-  let index = 0;
-  return {
-    read: jest.fn(async () => {
-      if (index < chunks.length) {
-        return { done: false, value: chunks[index++] };
-      }
-      return { done: true, value: undefined };
-    }),
-    releaseLock: jest.fn(),
-  };
-}
+jest.mock('ai', () => ({
+  streamText: jest.fn(),
+  tool: jest.fn((definition) => ({ ...definition })),
+  jsonSchema: jest.fn((schema) => schema),
+  stepCountIs: jest.fn(() => ({ kind: 'step-count' })),
+}));
 
-function sseResponsesEvent(event: Record<string, unknown>): string {
-  return `data: ${JSON.stringify(event)}`;
-}
+jest.mock('@ai-sdk/openai', () => ({
+  createOpenAI: jest.fn(),
+}));
 
 const mockMessages: ChatMessage[] = [{ role: 'user', content: 'Hello' }];
 const mockOptions: ChatOptions = { model: 'gpt-5-nano' };
 
+function toAsyncIterable<T>(items: T[]): AsyncIterable<T> {
+  return {
+    async *[Symbol.asyncIterator]() {
+      for (const item of items) {
+        yield item;
+      }
+    },
+  };
+}
+
+function mockSdkResult(parts: unknown[], usage: Record<string, number> = {}) {
+  (aiModule.streamText as unknown as jest.Mock).mockReturnValue({
+    fullStream: toAsyncIterable(parts),
+    totalUsage: Promise.resolve(usage),
+  });
+}
+
 describe('OpenAIProvider.chat()', () => {
   let provider: OpenAIProvider;
-  let fetchMock: jest.Mock;
+  let responsesMock: jest.Mock;
 
   beforeEach(() => {
     provider = new OpenAIProvider('test-api-key');
-    fetchMock = jest.fn();
-    global.fetch = fetchMock;
+    responsesMock = jest.fn().mockReturnValue({ specificationVersion: 'v3' });
+    (openAiSdkModule.createOpenAI as unknown as jest.Mock).mockReturnValue({
+      responses: responsesMock,
+    });
+    (aiModule.streamText as unknown as jest.Mock).mockReset();
+    (aiModule.tool as unknown as jest.Mock).mockClear();
+    (aiModule.jsonSchema as unknown as jest.Mock).mockClear();
   });
 
   afterEach(() => {
     jest.restoreAllMocks();
   });
 
-  describe('successful chat without reasoning', () => {
-    /* Preconditions: OpenAI returns structured output with no reasoning
-       Action: Call chat() with messages and options
-       Assertions: Returns LLMAction with correct content; onChunk called once with done:true
-       Requirements: llm-integration.3.1, llm-integration.3.3 */
-    it('should return LLMAction with content', async () => {
-      const actionJson = JSON.stringify({ action: { type: 'text', content: 'Hello back!' } });
-      const reader = buildMockReader([
-        sseResponsesEvent({ type: 'response.output_text.delta', delta: actionJson }),
-        sseResponsesEvent({ type: 'response.completed', response: { usage: {} } }),
-        'data: [DONE]',
-      ]);
-      fetchMock.mockResolvedValue({ ok: true, body: { getReader: () => reader } });
+  it('streams reasoning/text chunks and returns usage envelope', async () => {
+    mockSdkResult(
+      [
+        { type: 'reasoning-delta', text: 'Think ' },
+        { type: 'text-delta', text: 'Hello' },
+        { type: 'text-delta', text: ' world' },
+      ],
+      {
+        inputTokens: 10,
+        outputTokens: 5,
+        totalTokens: 15,
+        cachedInputTokens: 2,
+        reasoningTokens: 1,
+      }
+    );
 
-      const chunks: ChatChunk[] = [];
-      const result = await provider.chat(mockMessages, mockOptions, (c) => chunks.push(c));
+    const chunks: ChatChunk[] = [];
+    const result = await provider.chat(mockMessages, mockOptions, (chunk) => chunks.push(chunk));
 
-      expect(result.action.type).toBe('text');
-      expect(result.action.content).toBe('Hello back!');
-      // Only the done:true sentinel chunk
-      expect(chunks).toHaveLength(1);
-      expect(chunks[0]).toEqual({ type: 'reasoning', delta: '', done: true });
+    expect(result.text).toBe('Hello world');
+    expect(result.usage?.canonical).toEqual({
+      input_tokens: 10,
+      output_tokens: 5,
+      total_tokens: 15,
+      cached_tokens: 2,
+      reasoning_tokens: 1,
     });
+    expect(chunks).toContainEqual({ type: 'reasoning', delta: 'Think ' });
+    expect(chunks).toContainEqual({ type: 'text', delta: 'Hello' });
+    expect(chunks).toContainEqual({ type: 'text', delta: ' world' });
   });
 
-  describe('successful chat with reasoning', () => {
-    /* Preconditions: OpenAI streams reasoning chunks then structured output
-       Action: Call chat() with messages and options
-       Assertions: onChunk called for each reasoning delta; final action returned
-       Requirements: llm-integration.3.2, llm-integration.3.3 */
-    it('should stream reasoning chunks and return final action', async () => {
-      const actionJson = JSON.stringify({ action: { type: 'text', content: 'Answer' } });
-      const reader = buildMockReader([
-        sseResponsesEvent({ type: 'response.reasoning_text.delta', delta: 'Let me think' }),
-        sseResponsesEvent({ type: 'response.reasoning_text.delta', delta: ' about this' }),
-        sseResponsesEvent({ type: 'response.output_text.delta', delta: actionJson }),
-        'data: [DONE]',
-      ]);
-      fetchMock.mockResolvedValue({ ok: true, body: { getReader: () => reader } });
+  it('emits tool_call chunks for multiple calls in one turn', async () => {
+    mockSdkResult([
+      {
+        type: 'tool-call',
+        toolCallId: 'call-1',
+        toolName: 'tool_a',
+        input: { a: 1 },
+      },
+      {
+        type: 'tool-call',
+        toolCallId: 'call-2',
+        toolName: 'tool_b',
+        input: { b: 2 },
+      },
+      { type: 'text-delta', text: 'ok' },
+    ]);
 
-      const chunks: ChatChunk[] = [];
-      const result = await provider.chat(mockMessages, mockOptions, (c) => chunks.push(c));
+    const chunks: ChatChunk[] = [];
+    await provider.chat(mockMessages, mockOptions, (chunk) => chunks.push(chunk));
 
-      expect(result.action.content).toBe('Answer');
+    const toolCalls = chunks.filter((chunk) => chunk.type === 'tool_call');
+    expect(toolCalls).toEqual([
+      { type: 'tool_call', callId: 'call-1', toolName: 'tool_a', arguments: { a: 1 } },
+      { type: 'tool_call', callId: 'call-2', toolName: 'tool_b', arguments: { b: 2 } },
+    ]);
+  });
 
-      const reasoningChunks = chunks.filter((c) => !c.done);
-      expect(reasoningChunks).toHaveLength(2);
-      expect(reasoningChunks[0]).toEqual({ type: 'reasoning', delta: 'Let me think', done: false });
-      expect(reasoningChunks[1]).toEqual({ type: 'reasoning', delta: ' about this', done: false });
+  it('emits tool_result chunks for successful and failed tool execution parts', async () => {
+    mockSdkResult([
+      {
+        type: 'tool-result',
+        toolCallId: 'call-1',
+        toolName: 'tool_a',
+        input: { a: 1 },
+        output: { ok: true },
+      },
+      {
+        type: 'tool-error',
+        toolCallId: 'call-2',
+        toolName: 'tool_b',
+        input: { b: 2 },
+        error: new Error('tool failed'),
+      },
+    ]);
 
-      const doneChunk = chunks.find((c) => c.done);
-      expect(doneChunk).toEqual({ type: 'reasoning', delta: '', done: true });
-    });
+    const chunks: ChatChunk[] = [];
+    await provider.chat(mockMessages, mockOptions, (chunk) => chunks.push(chunk));
 
-    /* Preconditions: OpenAI streams reasoning event where delta is object with text
-       Action: Call chat() and collect chunks
-       Assertions: Extracts text and emits reasoning chunk
-       Requirements: llm-integration.2 */
-    it('should extract reasoning text from object delta shape', async () => {
-      const actionJson = JSON.stringify({ action: { type: 'text', content: 'Answer' } });
-      const reader = buildMockReader([
-        sseResponsesEvent({
-          type: 'response.reasoning_summary_text.delta',
-          delta: { text: 'Let me think' },
-        }),
-        sseResponsesEvent({ type: 'response.output_text.delta', delta: actionJson }),
-        'data: [DONE]',
-      ]);
-      fetchMock.mockResolvedValue({ ok: true, body: { getReader: () => reader } });
+    const toolResults = chunks.filter((chunk) => chunk.type === 'tool_result');
+    expect(toolResults).toEqual([
+      {
+        type: 'tool_result',
+        callId: 'call-1',
+        toolName: 'tool_a',
+        arguments: { a: 1 },
+        output: { ok: true },
+        status: 'success',
+      },
+      {
+        type: 'tool_result',
+        callId: 'call-2',
+        toolName: 'tool_b',
+        arguments: { b: 2 },
+        output: { message: 'tool failed' },
+        status: 'error',
+      },
+    ]);
+  });
 
-      const chunks: ChatChunk[] = [];
-      await provider.chat(mockMessages, mockOptions, (c) => chunks.push(c));
+  it('passes tool definitions and provider options to streamText', async () => {
+    mockSdkResult([{ type: 'text-delta', text: 'ok' }]);
 
-      const reasoningChunks = chunks.filter((c) => !c.done);
-      expect(reasoningChunks).toHaveLength(1);
-      expect(reasoningChunks[0]).toEqual({ type: 'reasoning', delta: 'Let me think', done: false });
-    });
-
-    /* Preconditions: OpenAI streams event where type is generic but part.type marks reasoning
-       Action: Call chat() and collect chunks
-       Assertions: Emits reasoning chunk from nested part content
-       Requirements: llm-integration.2 */
-    it('should extract reasoning text from nested part shape', async () => {
-      const actionJson = JSON.stringify({ action: { type: 'text', content: 'Answer' } });
-      const reader = buildMockReader([
-        sseResponsesEvent({
-          type: 'response.content_part.added',
-          part: { type: 'reasoning_summary_text', text: 'Plan first' },
-        }),
-        sseResponsesEvent({ type: 'response.output_text.delta', delta: actionJson }),
-        'data: [DONE]',
-      ]);
-      fetchMock.mockResolvedValue({ ok: true, body: { getReader: () => reader } });
-
-      const chunks: ChatChunk[] = [];
-      await provider.chat(mockMessages, mockOptions, (c) => chunks.push(c));
-
-      const reasoningChunks = chunks.filter((c) => !c.done);
-      expect(reasoningChunks).toHaveLength(1);
-      expect(reasoningChunks[0]).toEqual({ type: 'reasoning', delta: 'Plan first', done: false });
-    });
-
-    /* Preconditions: OpenAI streams generic event with item.type=reasoning and content parts
-       Action: Call chat() and collect chunks
-       Assertions: Emits reasoning chunk composed from item.content text parts
-       Requirements: llm-integration.2 */
-    it('should extract reasoning text from nested item content parts', async () => {
-      const actionJson = JSON.stringify({ action: { type: 'text', content: 'Answer' } });
-      const reader = buildMockReader([
-        sseResponsesEvent({
-          type: 'response.output_item.added',
-          item: {
-            type: 'reasoning',
-            content: [{ text: 'Think ' }, { text: 'deeper' }],
+    await provider.chat(
+      mockMessages,
+      {
+        model: 'gpt-5-nano',
+        reasoningEffort: 'high',
+        tools: [
+          {
+            name: 'search_docs',
+            description: 'Search docs',
+            parameters: { type: 'object', properties: { query: { type: 'string' } } },
           },
-        }),
-        sseResponsesEvent({ type: 'response.output_text.delta', delta: actionJson }),
-        'data: [DONE]',
-      ]);
-      fetchMock.mockResolvedValue({ ok: true, body: { getReader: () => reader } });
-
-      const chunks: ChatChunk[] = [];
-      await provider.chat(mockMessages, mockOptions, (c) => chunks.push(c));
-
-      const reasoningChunks = chunks.filter((c) => !c.done);
-      expect(reasoningChunks).toHaveLength(1);
-      expect(reasoningChunks[0]).toEqual({ type: 'reasoning', delta: 'Think deeper', done: false });
-    });
-
-    /* Preconditions: OpenAI streams generic event with delta.type=reasoning and delta.content string
-       Action: Call chat() and collect chunks
-       Assertions: Recognizes reasoning via delta.type and emits delta.content
-       Requirements: llm-integration.2 */
-    it('should detect reasoning by delta.type and extract delta content', async () => {
-      const actionJson = JSON.stringify({ action: { type: 'text', content: 'Answer' } });
-      const reader = buildMockReader([
-        sseResponsesEvent({
-          type: 'response.delta',
-          delta: { type: 'reasoning_summary_text', content: 'Structured thought' },
-        }),
-        sseResponsesEvent({ type: 'response.output_text.delta', delta: actionJson }),
-        'data: [DONE]',
-      ]);
-      fetchMock.mockResolvedValue({ ok: true, body: { getReader: () => reader } });
-
-      const chunks: ChatChunk[] = [];
-      await provider.chat(mockMessages, mockOptions, (c) => chunks.push(c));
-
-      const reasoningChunks = chunks.filter((c) => !c.done);
-      expect(reasoningChunks).toHaveLength(1);
-      expect(reasoningChunks[0]).toEqual({
-        type: 'reasoning',
-        delta: 'Structured thought',
-        done: false,
-      });
-    });
-
-    /* Preconditions: OpenAI sends repeated reasoning snapshot events with identical text
-       Action: Call chat() and collect reasoning chunks
-       Assertions: Duplicate snapshots are ignored; reasoning emitted once
-       Requirements: llm-integration.2 */
-    it('should avoid duplicate reasoning when snapshot event repeats', async () => {
-      const actionJson = JSON.stringify({ action: { type: 'text', content: 'Answer' } });
-      const reader = buildMockReader([
-        sseResponsesEvent({
-          type: 'response.content_part.added',
-          part: { type: 'reasoning_summary_text', text: 'Think carefully' },
-        }),
-        sseResponsesEvent({
-          type: 'response.content_part.added',
-          part: { type: 'reasoning_summary_text', text: 'Think carefully' },
-        }),
-        sseResponsesEvent({
-          type: 'response.content_part.added',
-          part: { type: 'reasoning_summary_text', text: 'Think carefully' },
-        }),
-        sseResponsesEvent({ type: 'response.output_text.delta', delta: actionJson }),
-        'data: [DONE]',
-      ]);
-      fetchMock.mockResolvedValue({ ok: true, body: { getReader: () => reader } });
-
-      const chunks: ChatChunk[] = [];
-      await provider.chat(mockMessages, mockOptions, (c) => chunks.push(c));
-
-      const reasoningChunks = chunks.filter((c) => !c.done);
-      expect(reasoningChunks).toHaveLength(1);
-      expect(reasoningChunks[0]).toEqual({
-        type: 'reasoning',
-        delta: 'Think carefully',
-        done: false,
-      });
-    });
-  });
-
-  describe('usage fields', () => {
-    /* Preconditions: OpenAI returns usage in final chunk
-       Action: Call chat()
-       Assertions: usage fields correctly mapped including cached and reasoning tokens
-       Requirements: llm-integration.3.3 */
-    it('should map usage fields correctly', async () => {
-      const actionJson = JSON.stringify({ action: { type: 'text', content: 'Hi' } });
-      const reader = buildMockReader([
-        sseResponsesEvent({ type: 'response.output_text.delta', delta: actionJson }),
-        sseResponsesEvent({
-          type: 'response.completed',
-          response: {
-            usage: {
-              input_tokens: 10,
-              output_tokens: 20,
-              total_tokens: 30,
-              input_tokens_details: { cached_tokens: 5 },
-              output_tokens_details: { reasoning_tokens: 8 },
-            },
-          },
-        }),
-        'data: [DONE]',
-      ]);
-      fetchMock.mockResolvedValue({ ok: true, body: { getReader: () => reader } });
-
-      const result = await provider.chat(mockMessages, mockOptions, () => {});
-
-      expect(result.usage).toEqual({
-        canonical: {
-          input_tokens: 10,
-          output_tokens: 20,
-          total_tokens: 30,
-          cached_tokens: 5,
-          reasoning_tokens: 8,
-        },
-        raw: {
-          input_tokens: 10,
-          output_tokens: 20,
-          total_tokens: 30,
-          input_tokens_details: { cached_tokens: 5 },
-          output_tokens_details: { reasoning_tokens: 8 },
-        },
-      });
-    });
-  });
-
-  describe('network error', () => {
-    /* Preconditions: fetch throws a network error
-       Action: Call chat()
-       Assertions: Throws error (propagates)
-       Requirements: llm-integration.3.4 */
-    it('should throw on network error', async () => {
-      fetchMock.mockRejectedValue(new TypeError('Failed to fetch'));
-
-      await expect(provider.chat(mockMessages, mockOptions, () => {})).rejects.toThrow(
-        'Failed to fetch'
-      );
-    });
-  });
-
-  describe('HTTP 401', () => {
-    /* Preconditions: OpenAI returns 401 Unauthorized
-       Action: Call chat()
-       Assertions: Throws error with auth message
-       Requirements: llm-integration.3.4 */
-    it('should throw on 401 unauthorized', async () => {
-      fetchMock.mockResolvedValue({
-        ok: false,
-        status: 401,
-        json: async () => ({ error: { message: 'Invalid API key' } }),
-      });
-
-      await expect(provider.chat(mockMessages, mockOptions, () => {})).rejects.toThrow(
-        /Invalid API key/
-      );
-    });
-  });
-
-  describe('HTTP 429', () => {
-    /* Preconditions: OpenAI returns 429 rate limit
-       Action: Call chat()
-       Assertions: Throws error with rate limit message
-       Requirements: llm-integration.3.4 */
-    it('should throw on 429 rate limit', async () => {
-      fetchMock.mockResolvedValue({
-        ok: false,
-        status: 429,
-        headers: { get: () => null },
-        json: async () => ({}),
-      });
-
-      await expect(provider.chat(mockMessages, mockOptions, () => {})).rejects.toThrow(
-        /Rate limit/
-      );
-    });
-
-    /* Preconditions: OpenAI returns 429 with retry-after header
-       Action: Call chat()
-       Assertions: Error message uses retry-after seconds from header
-       Requirements: llm-integration.3.7.6 */
-    it('should prioritize retry-after header when present', async () => {
-      fetchMock.mockResolvedValue({
-        ok: false,
-        status: 429,
-        headers: { get: (name: string) => (name === 'retry-after' ? '7' : null) },
-        json: async () => ({ error: { message: 'Please try again in 20s' } }),
-      });
-
-      await expect(provider.chat(mockMessages, mockOptions, () => {})).rejects.toThrow(
-        /Retry again in 7s|try again in 7s/i
-      );
-    });
-
-    /* Preconditions: OpenAI returns 429 with non-numeric retry-after header
-       Action: Call chat()
-       Assertions: Falls back to default rate limit error text
-       Requirements: llm-integration.3.7.6 */
-    it('should ignore invalid retry-after header values', async () => {
-      fetchMock.mockResolvedValue({
-        ok: false,
-        status: 429,
-        headers: { get: (name: string) => (name === 'retry-after' ? 'abc' : null) },
-        json: async () => ({}),
-      });
-
-      await expect(provider.chat(mockMessages, mockOptions, () => {})).rejects.toThrow(
-        /Rate limit exceeded/i
-      );
-    });
-  });
-
-  describe('empty response', () => {
-    /* Preconditions: OpenAI returns stream with no content
-       Action: Call chat()
-       Assertions: Throws error about empty response
-       Requirements: llm-integration.3.4 */
-    it('should throw on empty content', async () => {
-      const reader = buildMockReader(['data: [DONE]']);
-      fetchMock.mockResolvedValue({ ok: true, body: { getReader: () => reader } });
-
-      await expect(provider.chat(mockMessages, mockOptions, () => {})).rejects.toThrow(
-        InvalidStructuredOutputError
-      );
-    });
-  });
-
-  describe('timeout / abort', () => {
-    /* Preconditions: fetch is aborted via AbortController
-       Action: Call chat() when request is aborted
-       Assertions: Throws typed LLMRequestAbortedError with timeout message
-       Requirements: llm-integration.3.4 */
-    it('should throw when request is aborted', async () => {
-      const abortError = new DOMException('The operation was aborted', 'AbortError');
-      fetchMock.mockRejectedValue(abortError);
-
-      const request = provider.chat(mockMessages, mockOptions, () => {});
-      await expect(request).rejects.toBeInstanceOf(LLMRequestAbortedError);
-      await expect(request).rejects.toThrow(
-        'Model response timeout. The provider took too long to respond. Please try again later.'
-      );
-    });
-  });
-
-  describe('no response body', () => {
-    /* Preconditions: fetch returns response with null body
-       Action: Call chat()
-       Assertions: Throws "No response body"
-       Requirements: llm-integration.3.4 */
-    it('should throw when response body is null', async () => {
-      fetchMock.mockResolvedValue({ ok: true, body: null });
-
-      await expect(provider.chat(mockMessages, mockOptions, () => {})).rejects.toThrow(
-        'No response body'
-      );
-    });
-  });
-
-  describe('chunk without choices', () => {
-    /* Preconditions: SSE stream contains irrelevant non-response event
-       Action: Call chat()
-       Assertions: Event is skipped, final action still returned
-       Requirements: llm-integration.3.2 */
-    it('should skip unknown events', async () => {
-      const actionJson = JSON.stringify({ action: { type: 'text', content: 'OK' } });
-      const reader = buildMockReader([
-        sseResponsesEvent({ type: 'response.unknown.delta', delta: 'noop' }),
-        sseResponsesEvent({ type: 'response.output_text.delta', delta: actionJson }),
-        'data: [DONE]',
-      ]);
-      fetchMock.mockResolvedValue({ ok: true, body: { getReader: () => reader } });
-
-      const result = await provider.chat(mockMessages, mockOptions, () => {});
-      expect(result.action.content).toBe('OK');
-    });
-  });
-
-  describe('unknown HTTP error without error.message', () => {
-    /* Preconditions: OpenAI returns unknown status (599) with no error.message in body
-       Action: Call chat()
-       Assertions: Throws generic connection failed message
-       Requirements: llm-integration.3.4 */
-    it('should throw generic error for unknown status with no message', async () => {
-      fetchMock.mockResolvedValue({
-        ok: false,
-        status: 599,
-        json: async () => ({}),
-      });
-
-      await expect(provider.chat(mockMessages, mockOptions, () => {})).rejects.toThrow(
-        /Connection failed/
-      );
-    });
-  });
-
-  describe('content split across multiple chunks', () => {
-    /* Preconditions: JSON content arrives in multiple SSE chunks
-       Action: Call chat()
-       Assertions: Content is correctly accumulated and parsed
-       Requirements: llm-integration.3.2 */
-    it('should accumulate content split across chunks', async () => {
-      const actionJson = JSON.stringify({ action: { type: 'text', content: 'Full answer' } });
-      const part1 = actionJson.slice(0, 10);
-      const part2 = actionJson.slice(10, 25);
-      const part3 = actionJson.slice(25);
-
-      const reader = buildMockReader([
-        sseResponsesEvent({ type: 'response.output_text.delta', delta: part1 }),
-        sseResponsesEvent({ type: 'response.output_text.delta', delta: part2 }),
-        sseResponsesEvent({ type: 'response.output_text.delta', delta: part3 }),
-        'data: [DONE]',
-      ]);
-      fetchMock.mockResolvedValue({ ok: true, body: { getReader: () => reader } });
-
-      const result = await provider.chat(mockMessages, mockOptions, () => {});
-      expect(result.action.content).toBe('Full answer');
-    });
-  });
-
-  describe('structured output contract in request', () => {
-    /* Preconditions: OpenAI provider receives chat request
-       Action: Call chat() and inspect outgoing request body
-       Assertions: Request uses Responses API format with text.format json_schema
-       Requirements: llm-integration.5.7, llm-integration.5.7.1, llm-integration.11 */
-    it('should include text.format json_schema, detailed reasoning summary, and avoid legacy response_format', async () => {
-      const actionJson = JSON.stringify({ action: { type: 'text', content: 'OK' } });
-      const reader = buildMockReader([
-        sseResponsesEvent({ type: 'response.output_text.delta', delta: actionJson }),
-        'data: [DONE]',
-      ]);
-      fetchMock.mockResolvedValue({ ok: true, body: { getReader: () => reader } });
-
-      await provider.chat(
-        [
-          { role: 'system', content: 'Base system prompt' },
-          { role: 'user', content: 'Hello' },
         ],
-        { ...mockOptions, reasoningEffort: 'low' },
-        () => {}
-      );
+      },
+      () => {}
+    );
 
-      const calledUrl = fetchMock.mock.calls[0][0] as string;
-      expect(calledUrl.toLowerCase()).toContain('responses');
-
-      const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string) as {
-        input?: Array<{ role: string; content: string }>;
-        text?: { format?: { type?: string; strict?: boolean; schema?: Record<string, unknown> } };
-        reasoning?: { effort?: string; summary?: string };
-        response_format?: unknown;
-      };
-      expect(body.text?.format?.type).toBe('json_schema');
-      expect(body.text?.format?.strict).toBe(true);
-      expect(body.text?.format?.schema).toBeDefined();
-      const schema = body.text?.format?.schema as Record<string, unknown>;
-      const actionProperties = ((schema.properties as Record<string, unknown>)?.action ??
-        {}) as Record<string, unknown>;
-      expect(actionProperties).toBeDefined();
-      expect(body.response_format).toBeUndefined();
-      expect(Array.isArray(body.input)).toBe(true);
-      expect(body.reasoning?.effort).toBe('low');
-      expect(body.reasoning?.summary).toBe('detailed');
+    const streamArgs = (aiModule.streamText as unknown as jest.Mock).mock.calls[0][0];
+    expect(streamArgs.providerOptions.openai).toEqual({
+      reasoningEffort: 'high',
+      reasoningSummary: 'detailed',
+      strictJsonSchema: true,
+      parallelToolCalls: true,
     });
+    expect(streamArgs.tools).toHaveProperty('search_docs');
+    expect(aiModule.jsonSchema).toHaveBeenCalledWith({
+      type: 'object',
+      properties: { query: { type: 'string' } },
+    });
+    expect(aiModule.tool).toHaveBeenCalled();
+    expect(responsesMock).toHaveBeenCalledWith('gpt-5-nano');
+  });
+
+  it('does not build tool definitions when tools list is empty', async () => {
+    mockSdkResult([{ type: 'text-delta', text: 'ok' }]);
+
+    await provider.chat(
+      mockMessages,
+      {
+        model: 'gpt-5-nano',
+        tools: [],
+      },
+      () => {}
+    );
+
+    const streamArgs = (aiModule.streamText as unknown as jest.Mock).mock.calls[0][0];
+    expect(streamArgs.tools).toBeUndefined();
+    expect(aiModule.tool).not.toHaveBeenCalled();
+    expect(aiModule.jsonSchema).not.toHaveBeenCalled();
+  });
+
+  it('emits turn_error and throws when SDK stream yields error part', async () => {
+    mockSdkResult([{ type: 'error', error: new Error('broken') }]);
+
+    const chunks: ChatChunk[] = [];
+    await expect(
+      provider.chat(mockMessages, mockOptions, (chunk) => chunks.push(chunk))
+    ).rejects.toThrow('broken');
+    expect(chunks).toContainEqual({
+      type: 'turn_error',
+      errorType: 'provider',
+      message: 'broken',
+    });
+  });
+
+  it('throws LLMRequestAbortedError when SDK throws abort-like error', async () => {
+    const abortError = new Error('aborted');
+    (abortError as Error & { name: string }).name = 'AbortError';
+    (aiModule.streamText as unknown as jest.Mock).mockImplementation(() => {
+      throw abortError;
+    });
+
+    await expect(provider.chat(mockMessages, mockOptions, () => {})).rejects.toBeInstanceOf(
+      LLMRequestAbortedError
+    );
+  });
+
+  it('uses CHAT_TIMEOUT_MS for abort controller timer', async () => {
+    const setTimeoutSpy = jest.spyOn(global, 'setTimeout');
+    mockSdkResult([{ type: 'text-delta', text: 'ok' }]);
+
+    await provider.chat(mockMessages, mockOptions, () => {});
+
+    expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), CHAT_TIMEOUT_MS);
+    setTimeoutSpy.mockRestore();
+  });
+
+  it('collects per-step diagnostics from SDK onStep callbacks', async () => {
+    (aiModule.streamText as unknown as jest.Mock).mockImplementation((options) => {
+      options.experimental_onStepStart?.({ stepNumber: 0 });
+      options.onStepFinish?.({
+        stepNumber: 0,
+        finishReason: 'stop',
+        toolCalls: [{ id: 't1' }],
+        toolResults: [{ id: 't1' }],
+        usage: { inputTokens: 1, outputTokens: 2 },
+      });
+      return {
+        fullStream: toAsyncIterable([{ type: 'text-delta', text: 'ok' }]),
+        totalUsage: Promise.resolve({}),
+      };
+    });
+
+    const result = await provider.chat(mockMessages, mockOptions, () => {});
+    expect(result.stepDiagnostics?.[0]).toEqual(
+      expect.objectContaining({
+        stepIndex: 0,
+        finishReason: 'stop',
+        toolCallsCount: 1,
+        toolResultsCount: 1,
+      })
+    );
   });
 });

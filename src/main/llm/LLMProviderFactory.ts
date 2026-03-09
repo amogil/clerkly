@@ -20,14 +20,14 @@ export class LLMProviderFactory {
    * @returns Provider instance
    * @throws Error if provider type is unknown
    */
-  static createProvider(type: LLMProvider): ILLMProvider {
+  static createProvider(type: LLMProvider, apiKey: string = ''): ILLMProvider {
     switch (type) {
       case 'openai':
-        return new OpenAIProvider();
+        return new OpenAIProvider(apiKey);
       case 'anthropic':
-        return new AnthropicProvider();
+        return new AnthropicProvider(apiKey);
       case 'google':
-        return new GoogleProvider();
+        return new GoogleProvider(apiKey);
       default:
         throw new Error(`Unknown provider: ${type}`);
     }

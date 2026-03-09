@@ -15,6 +15,18 @@ interface RequestLog {
   timestamp: number;
 }
 
+interface MockOpenAIToolCall {
+  callId: string;
+  toolName: string;
+  arguments: Record<string, unknown>;
+}
+
+interface MockOpenAIStreamScript {
+  reasoning?: string;
+  content?: string;
+  toolCalls?: MockOpenAIToolCall[];
+}
+
 /**
  * Mock LLM Server
  *
@@ -35,10 +47,10 @@ export class MockLLMServer {
   // Streaming chat response config
   private streamingEnabled: boolean = false;
   private streamingReasoning: string = '';
-  private streamingContent: string =
-    '{"action":{"type":"text","content":"Hello! How can I help?"}}';
+  private streamingContent: string = 'Hello! How can I help?';
   private streamingErrorStatus: number = 0; // 0 = no error
   private streamingChunkDelayMs: number = 0; // delay between chunks (for interrupt tests)
+  private openAIStreamScripts: MockOpenAIStreamScript[] = [];
   private rateLimitEnabled: boolean = false;
   private rateLimitRetryAfterSeconds: number = 10;
 
@@ -168,8 +180,10 @@ export class MockLLMServer {
     // when tests reconfigure the mock while an older stream is still in-flight.
     const streamingErrorStatus = this.streamingErrorStatus;
     const streamingReasoning = this.streamingReasoning;
-    const streamingContent = this.streamingContent;
+    const streamingContent = this.normalizeStreamingContent(this.streamingContent);
     const streamingChunkDelayMs = this.streamingChunkDelayMs;
+    const scriptedResponse =
+      this.openAIStreamScripts.length > 0 ? this.openAIStreamScripts.shift() : null;
 
     if (streamingErrorStatus > 0) {
       res.writeHead(streamingErrorStatus, { 'Content-Type': 'application/json' });
@@ -190,25 +204,187 @@ export class MockLLMServer {
     const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
     const streamAll = async () => {
-      // Stream reasoning chunks (if any)
-      if (streamingReasoning) {
-        const words = streamingReasoning.split(' ');
-        for (const word of words) {
-          sendChunk({ type: 'response.reasoning_text.delta', delta: word + ' ' });
+      const messageItemId = `msg_${Date.now()}`;
+      const reasoningItemId = `rs_${Date.now()}`;
+
+      sendChunk({
+        type: 'response.created',
+        response: {
+          id: `resp_${Date.now()}`,
+          created_at: Math.floor(Date.now() / 1000),
+          model: 'gpt-5-nano',
+          service_tier: null,
+        },
+      });
+
+      if (scriptedResponse) {
+        sendChunk({
+          type: 'response.output_item.added',
+          output_index: 0,
+          item: { type: 'message', id: messageItemId, phase: 'commentary' },
+        });
+
+        if (scriptedResponse.reasoning) {
+          sendChunk({
+            type: 'response.output_item.added',
+            output_index: 1,
+            item: { type: 'reasoning', id: reasoningItemId, encrypted_content: null },
+          });
+          sendChunk({
+            type: 'response.reasoning_summary_part.added',
+            item_id: reasoningItemId,
+            summary_index: 0,
+          });
+          for (const word of scriptedResponse.reasoning.split(' ')) {
+            sendChunk({
+              type: 'response.reasoning_summary_text.delta',
+              item_id: reasoningItemId,
+              summary_index: 0,
+              delta: `${word} `,
+            });
+            if (streamingChunkDelayMs > 0) {
+              await delay(streamingChunkDelayMs);
+            }
+          }
+          sendChunk({
+            type: 'response.reasoning_summary_part.done',
+            item_id: reasoningItemId,
+            summary_index: 0,
+          });
+          sendChunk({
+            type: 'response.output_item.done',
+            output_index: 1,
+            item: { type: 'reasoning', id: reasoningItemId, encrypted_content: null },
+          });
+        }
+
+        for (const [index, toolCall] of (scriptedResponse.toolCalls ?? []).entries()) {
+          const toolOutputIndex = index + 2;
+          sendChunk({
+            type: 'response.output_item.added',
+            output_index: toolOutputIndex,
+            item: {
+              type: 'function_call',
+              id: `fc_${toolCall.callId}`,
+              call_id: toolCall.callId,
+              name: toolCall.toolName,
+              arguments: '',
+            },
+          });
+          sendChunk({
+            type: 'response.function_call_arguments.delta',
+            item_id: `fc_${toolCall.callId}`,
+            output_index: toolOutputIndex,
+            delta: JSON.stringify(toolCall.arguments),
+          });
+          sendChunk({
+            type: 'response.output_item.done',
+            output_index: toolOutputIndex,
+            item: {
+              type: 'function_call',
+              id: `fc_${toolCall.callId}`,
+              call_id: toolCall.callId,
+              name: toolCall.toolName,
+              arguments: JSON.stringify(toolCall.arguments),
+              status: 'completed',
+            },
+          });
           if (streamingChunkDelayMs > 0) {
             await delay(streamingChunkDelayMs);
           }
         }
+
+        const scriptedContent = this.normalizeStreamingContent(scriptedResponse.content ?? '');
+        if (scriptedContent) {
+          const chunks = scriptedContent.match(/[\s\S]{1,20}/g) || [scriptedContent];
+          for (const chunk of chunks) {
+            sendChunk({ type: 'response.output_text.delta', item_id: messageItemId, delta: chunk });
+            if (streamingChunkDelayMs > 0) {
+              await delay(streamingChunkDelayMs);
+            }
+          }
+        }
+
+        sendChunk({
+          type: 'response.output_item.done',
+          output_index: 0,
+          item: { type: 'message', id: messageItemId, phase: 'final_answer' },
+        });
+
+        sendChunk({
+          type: 'response.completed',
+          response: {
+            usage: {
+              input_tokens: 100,
+              output_tokens: 50,
+              total_tokens: 150,
+              input_tokens_details: { cached_tokens: 0 },
+              output_tokens_details: { reasoning_tokens: 10 },
+            },
+          },
+        });
+
+        res.write('data: [DONE]\n\n');
+        res.end();
+        return;
       }
 
-      // Stream content chunks (structured output JSON split into pieces)
-      const contentChunks = streamingContent.match(/.{1,20}/g) || [streamingContent];
+      sendChunk({
+        type: 'response.output_item.added',
+        output_index: 0,
+        item: { type: 'message', id: messageItemId, phase: 'commentary' },
+      });
+
+      // Stream reasoning chunks (if any)
+      if (streamingReasoning) {
+        sendChunk({
+          type: 'response.output_item.added',
+          output_index: 1,
+          item: { type: 'reasoning', id: reasoningItemId, encrypted_content: null },
+        });
+        sendChunk({
+          type: 'response.reasoning_summary_part.added',
+          item_id: reasoningItemId,
+          summary_index: 0,
+        });
+        const words = streamingReasoning.split(' ');
+        for (const word of words) {
+          sendChunk({
+            type: 'response.reasoning_summary_text.delta',
+            item_id: reasoningItemId,
+            summary_index: 0,
+            delta: word + ' ',
+          });
+          if (streamingChunkDelayMs > 0) {
+            await delay(streamingChunkDelayMs);
+          }
+        }
+        sendChunk({
+          type: 'response.reasoning_summary_part.done',
+          item_id: reasoningItemId,
+          summary_index: 0,
+        });
+        sendChunk({
+          type: 'response.output_item.done',
+          output_index: 1,
+          item: { type: 'reasoning', id: reasoningItemId, encrypted_content: null },
+        });
+      }
+
+      // Stream content chunks; include newlines so multiline markdown is preserved.
+      const contentChunks = streamingContent.match(/[\s\S]{1,20}/g) || [streamingContent];
       for (const chunk of contentChunks) {
-        sendChunk({ type: 'response.output_text.delta', delta: chunk });
+        sendChunk({ type: 'response.output_text.delta', item_id: messageItemId, delta: chunk });
         if (streamingChunkDelayMs > 0) {
           await delay(streamingChunkDelayMs);
         }
       }
+
+      sendChunk({
+        type: 'response.output_item.done',
+        output_index: 0,
+        item: { type: 'message', id: messageItemId, phase: 'final_answer' },
+      });
 
       // Final chunk with usage
       sendChunk({
@@ -232,6 +408,17 @@ export class MockLLMServer {
       // Client disconnected — ignore
       res.end();
     });
+  }
+
+  private normalizeStreamingContent(content: string): string {
+    if (!content) return content;
+    try {
+      const parsed = JSON.parse(content) as { action?: { content?: unknown } };
+      const actionText = parsed?.action?.content;
+      return typeof actionText === 'string' ? actionText : content;
+    } catch {
+      return content;
+    }
   }
 
   private handleAnthropic(res: http.ServerResponse): void {
@@ -352,6 +539,10 @@ export class MockLLMServer {
     if (options?.errorStatus !== undefined) this.streamingErrorStatus = options.errorStatus;
     if (options?.errorMessage !== undefined) this.errorMessage = options.errorMessage;
     if (options?.chunkDelayMs !== undefined) this.streamingChunkDelayMs = options.chunkDelayMs;
+  }
+
+  setOpenAIStreamScripts(scripts: MockOpenAIStreamScript[]) {
+    this.openAIStreamScripts = [...scripts];
   }
 
   /** Enable rate limit mode — server returns 429 with retry-after header */

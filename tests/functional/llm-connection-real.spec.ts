@@ -1,7 +1,7 @@
 /* Preconditions: Electron app is launched and authenticated, real OpenAI API key is provided via env
    Action: Run Test Connection against real OpenAI API from Settings screen
    Assertions: Success notification is shown and no error toast appears
-   Requirements: settings.3.4, settings.3.5, settings.3.7, settings.3.8, testing.12.1 */
+   Requirements: settings.2.4, settings.2.5, settings.2.7, settings.2.8, testing.12.1 */
 
 import { test, expect } from '@playwright/test';
 import {
@@ -69,7 +69,7 @@ test.describe('LLM Connection (real OpenAI)', () => {
   /* Preconditions: Settings screen opened, real OpenAI API key is available
      Action: Select OpenAI provider, enter API key, click Test Connection
      Assertions: Success toast appears and error toast is absent
-     Requirements: settings.3.4, settings.3.5, settings.3.7, settings.3.8, testing.12.1 */
+     Requirements: settings.2.4, settings.2.5, settings.2.7, settings.2.8, testing.12.1 */
   test('54.real.1: should validate Test Connection against real OpenAI API', async () => {
     await context.window.selectOption('select:near(:text("LLM Provider"))', 'openai');
 
