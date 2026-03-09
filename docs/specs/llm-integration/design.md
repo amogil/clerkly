@@ -2,8 +2,9 @@
 
 ## Обзор
 
-LLM Integration обеспечивает полный цикл взаимодействия с AI: от отправки user-сообщения до отображения streaming-ответа с reasoning в UI. Архитектура расширяема — `PromptBuilder` с фичами и стратегиями истории позволяет добавлять новые возможности без изменения core-логики.
+LLM Integration обеспечивает полный цикл взаимодействия с AI: от отправки user-сообщения до получения, обработки и сохранения streaming-ответа с reasoning. Архитектура расширяема — `PromptBuilder` с фичами и стратегиями истории позволяет добавлять новые возможности без изменения core-логики.
 Целевая оркестрация выполняется через `Vercel AI SDK` для всех провайдеров (`OpenAI`, `Anthropic`, `Google`) с единым контрактом стриминга и tool-loop.
+Документ `llm-integration` описывает только runtime-логику взаимодействия с LLM и не содержит требований/дизайна интерфейса.
 
 ### Целевая Архитектура LLM Loop
 
@@ -137,7 +138,7 @@ CREATE TABLE messages (
 }
 ```
 
-Для отсутствующего API ключа (dialog тот же, другое сообщение):
+Для отсутствующего API ключа (контракт тот же, другое сообщение):
 
 ```json
 {
@@ -165,15 +166,15 @@ CREATE TABLE messages (
 }
 ```
 
-Для `tool_call(final_answer)` в UI отображается блок завершения (badge + completion summary), а основной ответ пользователю остаётся в `kind: llm` (`data.text`).
 Контракт `final_answer` валидируется через strict-schema инструмента в `Vercel AI SDK`:
-- `text`: непустая строка длиной `<= 300`;
+- `text`: опциональная строка; когда присутствует — непустая и длиной `<= 300`;
 - `summary_points`: опциональный массив длиной `<= 10`;
 - каждый пункт `summary_points`: строка длиной `<= 200`.
-Если `summary_points` отсутствует (или пустой), но `text` валиден — это успешный `completed`.
+- Значения по умолчанию при отсутствии поля в аргументах:
+  - `text`: отсутствует (не подставляется автоматически на runtime-слое `llm-integration`);
+  - `summary_points`: `[]` (пустой список для дальнейшей обработки).
 Невалидный `final_answer` не фиксируется как завершённый: retry/repair выполняется на стороне AI SDK; при исчерпании лимита создаётся `kind:error`.
-
-**UI отображение:** `reply_to_message_id` хранится в колонке `messages.reply_to_message_id` и передаётся в `MessageSnapshot` отдельным полем, не внутри payload. В renderer `kind: error` рендерится как стандартизированный диалог через кастомный `AgentDialog` с intent `error`, единым layout и опциональными действиями. Для ошибок API ключа (auth) диалог показывает "Open Settings" (primary) и "Retry" (secondary); при нажатии "Retry" диалог ошибки скрывается и запрос повторяется. `AgentDialog` поддерживает intent `error`, `warning`, `info`, `confirmation`; диалоги уведомлений (например, rate limit) используют этот же компонент с intent `info`.
+`reply_to_message_id` хранится в колонке `messages.reply_to_message_id` и передаётся в `MessageSnapshot` отдельным полем, не внутри payload.
 
 ---
 
@@ -184,14 +185,14 @@ CREATE TABLE messages (
 - `MainPipeline` обрабатывает поток чанков `reasoning` и `text`.
 - Для одного turn создаётся `kind: llm` сообщение.
 - Пока turn не завершён, `done = 0`; после завершения `done = 1`.
-- Tool-calling в чат-flow отображается через persisted `message.created`/`message.updated`: `tool_call(final_answer)` визуально рендерится как блок завершения (не как дубликат полного ответа), остальные `tool_call` — как tool-call блоки.
+- Tool-calling в chat-flow обрабатывается через persisted `message.created`/`message.updated`.
 
 ### Usage JSON: отдельный поток сохранения
 
 - **Ответственный:** `MainPipeline` + `MessageManager` + `MessagesRepository`.
 - **Контракт провайдера:** каждый провайдер возвращает usage-envelope в едином виде `canonical + raw`.
 - **Отдельный шаг:** после финализации `kind: llm` сообщения pipeline отдельно сохраняет `usage_json` в `messages`.
-- **Устойчивость:** ошибка записи `usage_json` не должна ломать основной ответ в чате.
+- **Устойчивость:** ошибка записи `usage_json` не должна ломать основной ответ.
 - **Без дублирования:** `usage_json` не содержит `provider`, `model`, `captured_at` (они выводятся из записи сообщения).
 
 ### История для модели: формирование входных сообщений
@@ -221,17 +222,12 @@ CREATE TABLE messages (
 4) На завершении turn финализирует `kind: llm` (`done: 1`).
 5) Отдельно сохраняет `usage_json` (если есть).
 
-#### 2. Renderer: первичный рендер
-1) Получает `message.created`/`message.updated`.
-2) `AgentMessage` рендерит `data.text` как Markdown.
-3) Дополнительных post-processing этапов нет.
-
-#### 3. Renderer: stream runtime на AI SDK UI
-1) `useAgentChat` использует `useChat` как единый runtime состояния диалога.
+#### 2. Runtime transport: stream processing
+1) Runtime-consumer использует единый stream-state контракт диалога.
 2) `IPCChatTransport` работает как protocol-adapter: транслирует realtime-события в `UIMessageChunk` sequence (`start -> start-step -> delta -> finish-step -> finish`).
 3) `message.llm.reasoning.updated` и `message.llm.text.updated` применяются как primary deltas.
 4) `message.updated` используется как snapshot persisted-состояния и финализации.
-5) Рендер `kind: tool_call` выполняется только через persisted snapshot (`message.created`/`message.updated`): для `final_answer` используется компактная ветка completion summary с `Completed` badge, для остальных — AI Elements `Tool`.
+5) `kind: tool_call` обрабатывается только через persisted snapshot (`message.created`/`message.updated`).
 
 ### Крайние случаи
 
@@ -268,7 +264,7 @@ CREATE TABLE messages (
 #### Functional tests
 - История передаётся как отдельные сообщения и исключает служебные поля.
 - Reasoning и text стримятся инкрементально.
-- Tool calling сохраняется как `kind: tool_call` в истории чата и отображается по snapshot-событиям (для `final_answer` — completion summary + `Completed` badge; для остальных — tool-call блок).
+- Tool calling сохраняется как `kind: tool_call` в истории сообщений и проходит через snapshot-события.
 
 ---
 
@@ -495,13 +491,13 @@ catch(error):
 `MainPipeline.run()` принимает `AbortSignal` и передаёт его в `provider.chat(...)` (через AI SDK adapter). При отмене:
 - Если `kind: llm` ещё не создан — просто выходим (нет сообщений для очистки)
 - Если `kind: llm` уже создан — помечаем `hidden: true, done: false`, выходим без создания `kind: error`
-- Исходное `kind: user` сообщение отменённого turn не скрывается и остаётся видимым в чате
+- Исходное `kind: user` сообщение отменённого turn не скрывается
 
 **`MessageManager.listForModelHistory()`** фильтрует сообщения с `hidden` — они не попадают во входной массив `messages`.
 
 **`MessageManager.listForModelHistory()`** также фильтрует сообщения с `kind: error` и `kind: tool_call` — они не попадают во входной массив `messages`.
 
-**UI** фильтрует сообщения с `hidden: true` — они не отображаются в чате.
+Клиентский runtime фильтрует сообщения с `hidden: true`.
 
 ### Скрытие kind:error при новом сообщении
 
@@ -516,13 +512,13 @@ messages:create (kind: user):
   4. Запустить MainPipeline.run()
 ```
 
-UI фильтрует сообщения с `hidden: true` — они не отображаются.
+Клиентский runtime фильтрует сообщения с `hidden: true`.
 
-### Rate limit диалог (llm-integration.3.7)
+### Rate limit flow (llm-integration.3.7)
 
 При получении ошибки `rate_limit` `MainPipeline` не создаёт `kind: error` сообщение и эмитит событие `agent.rate_limit` с вычисленным `retryAfterSeconds`.
 
-Renderer подписывается на `agent.rate_limit` и показывает диалог поверх чата. По истечении таймера renderer вызывает IPC `messages:retry-last`: `AgentIPCHandlers` берёт последний `kind:user` из БД и повторяет `MainPipeline.run()` с этим `userMessageId`. При успехе диалог исчезает. При нажатии "Cancel" renderer вызывает IPC `messages:cancel-retry`: `AgentIPCHandlers` удаляет последнее `kind: user` сообщение из БД. Диалоги ошибок и уведомлений занимают всю ширину области чата (llm-integration.3.4.4).
+Клиентский runtime подписывается на `agent.rate_limit`. По истечении таймера вызывается IPC `messages:retry-last`: `AgentIPCHandlers` берёт последний `kind:user` из БД и повторяет `MainPipeline.run()` с этим `userMessageId`. При действии "Cancel" вызывается IPC `messages:cancel-retry`: `AgentIPCHandlers` удаляет последнее `kind: user` сообщение из БД.
 
 ```typescript
 // Новое событие
@@ -564,10 +560,10 @@ interface MessageLlmTextUpdatedPayload {
 - события с одинаковым timestamp НЕ коалесцируются;
 - устаревшим считается только событие с меньшим timestamp (`<`), чтобы не терять чанки в одном миллисекундном тике.
 
-Правило источников данных в renderer:
+Правило источников данных в runtime:
 - `message.llm.reasoning.updated` и `message.llm.text.updated` используются как primary source для delta-стриминга.
 - `message.updated` используется как snapshot source для persisted-состояния и финализации turn.
-- Во время активного стриминга renderer не должен повторно добавлять тот же контент из snapshot, уже применённый через delta-события.
+- Во время активного стриминга runtime не должен повторно добавлять тот же контент из snapshot, уже применённый через delta-события.
 
 События определены в `src/shared/events/types.ts` и `src/shared/events/constants.ts`, а доставка реализована в `MainEventBus`.
 
@@ -592,8 +588,7 @@ User отправляет сообщение
               → message.updated
           → [tool_call with full arguments]
               → MessageManager.create/update(kind: 'tool_call', done: false/true)
-              → if toolName='final_answer' and done=true: UI рендер как completion summary + Completed badge
-              → else: UI рендер как Tool block
+              → обработка persisted snapshot в клиентском runtime
               → message.created/message.updated
           → [chat completion]
               → MessageManager.update(kind: 'llm', done: true)
@@ -616,7 +611,7 @@ User отправляет сообщение
 - `tests/unit/agents/PromptBuilder.test.ts` — формирование массива `messages`, исключения из replay
 - `tests/unit/agents/MainPipeline.test.ts` — мок провайдера, полный цикл, ошибки, события
 - `tests/unit/agents/AgentIPCHandlers.test.ts` — запуск pipeline при kind:user
-- `tests/unit/renderer/IPCChatTransport.test.ts` — обработка delta-stream (`reasoning/text`) и отображение persisted `kind: tool_call` (final_answer как completion summary + Completed badge, остальные как tool-call блок)
+- `tests/unit/renderer/IPCChatTransport.test.ts` — обработка delta-stream (`reasoning/text`) и persisted `kind: tool_call` snapshot
 - `tests/unit/events/MainEventBus.test.ts` и `tests/unit/events/RendererEventBus.test.ts` — порядок/доставка streaming событий без потери чанков
 - `tests/unit/db/repositories/MessagesRepository.test.ts` — kind как параметр
 - `tests/unit/db/repositories/MessagesRepository.test.ts` — семантика `done` для `kind:llm` и `kind:error`
@@ -644,12 +639,11 @@ User отправляет сообщение
 | llm-integration.1.6.2 (завершение `llm` с `done=true`) | ✓ | ✓ |
 | llm-integration.1.7 (`reply_to_message_id` для создаваемых сообщений) | ✓ | ✓ |
 | llm-integration.2 | ✓ | ✓ |
-| llm-integration.2.8 (`useChat` + UIMessage stream protocol) | ✓ | ✓ |
+| llm-integration.2.8 (UIMessage stream protocol compatibility) | ✓ | ✓ |
 | llm-integration.3.1 | ✓ | ✓ |
 | llm-integration.3.1.1 (`error` сохраняется с `done=true`) | ✓ | ✓ |
 | llm-integration.3.2 | ✓ | ✓ |
 | llm-integration.3.4 | ✓ | ✓ |
-| llm-integration.3.4.4 | - | ✓ |
 | llm-integration.3.5 | ✓ | ✓ |
 | llm-integration.3.6 (таймаут 300s) | ✓ | ✓ |
 | llm-integration.3.7 | - | ✓ |

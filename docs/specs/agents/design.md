@@ -3,6 +3,7 @@
 ## Обзор
 
 Agents — основной интерфейс для взаимодействия с AI-агентами в приложении Clerkly. Каждый агент представлен отдельным чатом с независимым контекстом. Компонент предоставляет список агентов, интерфейс чата и навигацию между агентами.
+Этот документ описывает только UI-архитектуру модуля `Agents` и обработку persisted событий/сообщений. Логика взаимодействия с моделью и pipeline описывается в `docs/specs/llm-integration/design.md`.
 
 ## Схема Базы Данных
 
@@ -1506,7 +1507,7 @@ function AgentWelcome({ onPromptClick }: AgentWelcomeProps) {
 
 **Сообщения агента (kind: 'llm'):**
 ```tsx
-// Requirements: agents.4.10, agents.4.10.1, agents.4.22, llm-integration.7, llm-integration.2
+// Requirements: agents.4.10, agents.4.10.1, agents.4.22
 <div data-testid="message-llm" className="space-y-2 w-full">
   {reasoningText && (
     <Reasoning isStreaming={isReasoningStreaming}>
@@ -1532,10 +1533,7 @@ function AgentWelcome({ onPromptClick }: AgentWelcomeProps) {
   - авто-сворачивание после завершения стриминга;
   - возможность ручного раскрытия/сворачивания остаётся.
 - `isReasoningStreaming` вычисляется только для активного LLM-сообщения, чтобы исторические сообщения не переходили в streaming-состояние.
-- Порядок блоков неизменен: reasoning всегда рендерится выше `message-llm-action` (соответствие `llm-integration.7.2-7.3`).
-- Провайдерные адаптеры на базе `Vercel AI SDK` должны нормализовать вариативные provider chunks в единый reasoning delta-контракт, чтобы streaming не терялся при различиях форматов.
-- Настройки reasoning для конкретного провайдера (OpenAI/Anthropic/Google) должны включаться в provider options и не менять renderer-контракт событий.
-- При приёме reasoning-событий провайдера парсер должен исключать повторные/снапшотные чанки, чтобы accumulated reasoning в UI не дублировался.
+- Порядок блоков неизменен: reasoning всегда рендерится выше `message-llm-action`.
 - При активном reasoning без финального `data.text` в сообщении отображается reasoning-блок как единственный индикатор стриминга до появления текста ответа.
 - Визуальный маркер reasoning-сообщения рендерится в заголовке `ReasoningTrigger` (иконка приложения + текстовый индикатор + chevron).
   Этот маркер в рамках спеки считается `Message Avatar` для reasoning-сообщений.
@@ -1548,7 +1546,7 @@ function AgentWelcome({ onPromptClick }: AgentWelcomeProps) {
 
 **Сообщения об ошибке (kind: 'error'):**
 ```tsx
-// Requirements: llm-integration.3.4.1, llm-integration.3.4.3, llm-integration.3.4.4, agents.4.10.2
+// Requirements: llm-integration.3.4.1, llm-integration.3.4.3, agents.4.10.2, agents.4.10.3, agents.4.10.4, agents.4.10.4.1, agents.4.10.5
 <AgentDialog
   intent="error"
   approvalId="error"
@@ -1562,10 +1560,11 @@ function AgentWelcome({ onPromptClick }: AgentWelcomeProps) {
 ```
 
 `AgentDialog` — кастомный диалог уведомлений. Поддерживает intent: `error`, `warning`, `info`, `confirmation`.
+При нажатии `Retry` текущий error-диалог скрывается до старта повторного запроса.
 
 **Диалог rate limit (agent.rate_limit):**
 ```tsx
-// Requirements: llm-integration.3.7, llm-integration.3.4.4, agents.4.10.2
+// Requirements: llm-integration.3.7, agents.4.10.2
 <AgentDialog
   intent="info"
   approvalId="rate-limit"
@@ -1579,33 +1578,51 @@ function AgentWelcome({ onPromptClick }: AgentWelcomeProps) {
 
 **Сообщения инструментов (`kind: 'tool_call'`):**
 - Для `toolName !== 'final_answer'` используется AI Elements `Tool` family как отдельный технический блок вызова инструмента.
-- Для `toolName === 'final_answer'` используется обычная ветка assistant-сообщения (`Message`/`MessageContent`) как компактный completion summary, дополненный визуальным `Completed` badge.
-- Невалидный `final_answer` не должен попадать в успешный рендер: pipeline запускает retry и при исчерпании лимита создаёт `kind:error`.
+- Для `toolName === 'final_answer'` используется отдельный компонент `"Final Answer"` на базе AI Elements `Queue`.
+- Заголовок компонента: `final_answer.text` (fallback: `Done`) + иконка `Check` (без круга).
+- Тело компонента: только `summary_points`, каждый пункт с иконкой `Check` в зелёном круге.
+- Компонент по умолчанию свернут, если `summary_points.length > 0`; при пустом `summary_points` рендерится в неколлапсируемом виде (без toggle).
+- `Agents` не выполняет валидацию/repair `final_answer`; компонент рендерит только persisted payload.
 
 ```tsx
-// Requirements: agents.7.4.1, agents.7.4.2, agents.7.4.3
+// Requirements: agents.7.4.1, agents.7.4.2
 if (message.kind === 'tool_call' && toolName === 'final_answer') {
+  const hasSummary = summaryPoints.length > 0;
+  const title = finalText?.trim() || 'Done';
   return (
-    <div data-testid="message-llm" className="space-y-2 w-full">
-      <div className="flex items-center gap-2">
-        <span
-          data-testid="message-completed-badge"
-          className="rounded-full bg-green-500/15 px-2 py-0.5 text-xs font-medium text-green-700"
-        >
-          Completed
-        </span>
-      </div>
-      <div data-testid="message-llm-action" className="text-sm leading-relaxed whitespace-pre-wrap break-words w-full">
-        {finalText}
-      </div>
-      {summaryPoints?.length ? (
-        <ul data-testid="message-completed-summary" className="list-disc pl-5 text-sm text-muted-foreground">
-          {summaryPoints.map((point) => (
-            <li key={point}>{point}</li>
-          ))}
-        </ul>
-      ) : null}
-    </div>
+    <Queue data-testid="message-final-answer-block">
+      <QueueSection defaultOpen={false} disabled={!hasSummary}>
+        {hasSummary ? (
+          <div data-testid="message-final-answer-header">
+            <QueueSectionTrigger data-testid="message-final-answer-toggle">
+              <QueueSectionLabel
+                data-testid="message-final-answer-title"
+                label={title}
+                icon={<Check data-testid="message-final-answer-check" className="text-green-600" />}
+              />
+            </QueueSectionTrigger>
+          </div>
+        ) : (
+          <div data-testid="message-final-answer-header">
+            <QueueSectionLabel
+              data-testid="message-final-answer-title"
+              label={title}
+              icon={<Check data-testid="message-final-answer-check" className="text-green-600" />}
+            />
+          </div>
+        )}
+        {hasSummary ? (
+          <QueueSectionContent data-testid="message-final-answer-summary">
+            {summaryPoints.map((point) => (
+              <QueueItem key={point}>
+                <QueueItemIndicator completed />
+                <QueueItemContent completed>{point}</QueueItemContent>
+              </QueueItem>
+            ))}
+          </QueueSectionContent>
+        ) : null}
+      </QueueSection>
+    </Queue>
   );
 }
 ```
@@ -2157,7 +2174,7 @@ await window.locator(`[data-testid="agent-icon-${firstAgentId}"]`).click();
 
 Для отображения `tool_call` используется смешанная стратегия:
 - AI Elements `Tool` family (см. [https://elements.ai-sdk.dev/components/tool](https://elements.ai-sdk.dev/components/tool)) для всех `tool_call`, кроме `final_answer`.
-- AI Elements `Message` family для `tool_call(final_answer)`, чтобы финал выглядел как обычный ответ модели с `Completed` badge.
+- AI Elements `Queue` family для `tool_call(final_answer)`: финал отображается отдельным компонентом `Final Answer` (header + список `summary_points`).
 
 ### Архитектура
 
@@ -2209,7 +2226,7 @@ useChat.sendMessage()
         │
         ├─► window.api.messages.create(agentId, 'user', payload)  ──► IPC ──► MessageManager.create()
         │                                                                            │
-        │                                                                            └─► MainPipeline.run()
+        │                                                                            └─► background message processing (см. llm-integration)
         │                                                                                      │
         └─► подписка на IPC события ◄──────────────────────────────────────────────────────────┘
               │
