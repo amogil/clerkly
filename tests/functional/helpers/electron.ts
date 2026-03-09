@@ -493,8 +493,14 @@ export function activeChat(window: Page) {
     messages: chat.locator('[data-testid="message"]'),
     /** User message bubbles */
     userMessages: chat.locator('[data-testid="message-user"]'),
-    /** LLM message bubbles */
-    llmMessages: chat.locator('[data-testid="message-llm"]'),
+    /** Assistant response bubbles (excludes completed-final-answer blocks) */
+    llmMessages: chat.locator('.message-llm-response'),
+    /** Assistant response content blocks (primary model text stream/result) */
+    llmResponseActions: chat.locator('.message-llm-action-response'),
+    /** Completed final-answer bubbles */
+    completedMessages: chat.locator('.message-llm-completed'),
+    /** Completed final-answer content blocks */
+    completedActions: chat.locator('.message-llm-action-completed'),
     /** Error message bubbles */
     errorMessages: chat.locator('[data-testid="message-error"]'),
     /** Scroll-to-bottom button (scoped to active chat to avoid strict-mode violations) */

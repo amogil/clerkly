@@ -187,7 +187,7 @@ test.describe('Agent Messaging', () => {
     expect(result.success).toBe(true);
 
     const llmAction = window
-      .locator('[data-testid="message-llm-action"]')
+      .locator('.message-llm-action-response')
       .filter({ hasText: 'Historical canonical response' });
     await expect(llmAction).toHaveCount(1, { timeout: 5000 });
     await expectNoToastError(window);

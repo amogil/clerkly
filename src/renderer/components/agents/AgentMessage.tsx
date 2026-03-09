@@ -95,7 +95,7 @@ export function AgentMessage({
     // Requirements: llm-integration.7 — llm bubble: reasoning (collapsible) then action, or loading
     return (
       <Message from="assistant" className="w-full max-w-full">
-        <div data-testid="message-llm" className="space-y-2">
+        <div data-testid="message-llm" className="space-y-2 message-llm message-llm-response">
           {(llmReasoning?.text || isReasoningStreaming) && (
             // Requirements: llm-integration.2, llm-integration.7.2 — collapsible reasoning block with streaming state
             <Reasoning isStreaming={isReasoningStreaming}>
@@ -106,7 +106,10 @@ export function AgentMessage({
             </Reasoning>
           )}
           {llmText ? (
-            <MessageContent data-testid="message-llm-action" className="w-full">
+            <MessageContent
+              data-testid="message-llm-action"
+              className="w-full message-llm-action message-llm-action-response"
+            >
               <MessageResponse className="text-sm leading-relaxed break-words">
                 {llmText}
               </MessageResponse>
@@ -141,7 +144,10 @@ export function AgentMessage({
 
       return (
         <Message from="assistant" className="w-full max-w-full">
-          <div data-testid="message-llm" className="space-y-2">
+          <div
+            data-testid="message-llm"
+            className="space-y-2 message-llm message-llm-completed"
+          >
             <div className="flex items-center gap-2">
               <span
                 data-testid="message-completed-badge"
@@ -150,7 +156,10 @@ export function AgentMessage({
                 Completed
               </span>
             </div>
-            <MessageContent data-testid="message-llm-action" className="w-full">
+            <MessageContent
+              data-testid="message-llm-action"
+              className="w-full message-llm-action message-llm-action-completed"
+            >
               <MessageResponse className="text-sm leading-relaxed break-words">
                 {finalText}
               </MessageResponse>

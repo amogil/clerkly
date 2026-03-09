@@ -105,14 +105,22 @@ test.describe('LLM Chat (real OpenAI)', () => {
     });
 
     // LLM response bubble appears (may take time for real API)
-    const llmBubble = context.window.locator('[data-testid="message-llm"]');
-    await expect(llmBubble).toBeVisible({ timeout: 30000 });
+    const llmResponseBubble = context.window.locator('.message-llm-response').last();
+    await expect(llmResponseBubble).toBeVisible({ timeout: 30000 });
 
-    // Action content is non-empty
-    const actionContent = context.window.locator('[data-testid="message-llm-action"]').last();
-    await expect(actionContent).toBeVisible({ timeout: 30000 });
-    const text = await actionContent.textContent();
-    expect(text?.trim().length).toBeGreaterThan(0);
+    // Model response text is non-empty
+    const responseAction = context.window.locator('.message-llm-action-response').last();
+    await expect(responseAction).toBeVisible({ timeout: 30000 });
+    const responseText = await responseAction.textContent();
+    expect(responseText?.trim().length).toBeGreaterThan(0);
+
+    // Final Answer interpretation block is present and non-empty
+    const completedBadge = context.window.locator('[data-testid="message-completed-badge"]').last();
+    await expect(completedBadge).toBeVisible({ timeout: 30000 });
+    const completedAction = context.window.locator('.message-llm-action-completed').last();
+    await expect(completedAction).toBeVisible({ timeout: 30000 });
+    const completedText = await completedAction.textContent();
+    expect(completedText?.trim().length).toBeGreaterThan(0);
   });
 
   /* Preconditions: App authenticated, real OpenAI API key saved
@@ -127,13 +135,13 @@ test.describe('LLM Chat (real OpenAI)', () => {
     await messageInput.press('Enter');
 
     // LLM bubble appears
-    const llmBubble = context.window.locator('[data-testid="message-llm"]');
+    const llmBubble = context.window.locator('.message-llm-response');
     await expect(llmBubble).toBeVisible({ timeout: 30000 });
 
     // Reasoning appears (gpt-5-nano with reasoning_effort:low may produce reasoning)
     // We check that if reasoning is present it appears before action
     const reasoning = context.window.locator('[data-testid="message-llm-reasoning"]');
-    const action = context.window.locator('[data-testid="message-llm-action"]');
+    const action = context.window.locator('.message-llm-action-response');
 
     // Action must always appear
     await expect(action).toBeVisible({ timeout: 30000 });
@@ -173,7 +181,7 @@ test.describe('LLM Chat (real OpenAI)', () => {
     // Seed persistent history in the same user-data-dir.
     await firstInput.fill('Warm up session with a short reply');
     await firstInput.press('Enter');
-    await expect(context.window.locator('[data-testid="message-llm-action"]').last()).toBeVisible({
+    await expect(context.window.locator('.message-llm-action-response').last()).toBeVisible({
       timeout: 90000,
     });
 
@@ -204,7 +212,7 @@ test.describe('LLM Chat (real OpenAI)', () => {
       '[data-testid="message-llm-reasoning-trigger"]'
     );
     const reasoningContent = context.window.locator('[data-testid="message-llm-reasoning"]').last();
-    const actionContent = context.window.locator('[data-testid="message-llm-action"]').last();
+    const actionContent = context.window.locator('.message-llm-action-response').last();
     const actionCountBeforeRequest = await actionContent.count();
 
     await expect(reasoningTrigger.last()).toBeVisible({ timeout: 45000 });
@@ -223,7 +231,7 @@ test.describe('LLM Chat (real OpenAI)', () => {
           document.querySelectorAll('[data-testid="message-llm-reasoning"]').length - 1
         ] as HTMLElement | undefined;
       const getActionCount = () =>
-        document.querySelectorAll('[data-testid="message-llm-action"]').length;
+        document.querySelectorAll('.message-llm-action-response').length;
 
       const readReasoning = () => (getReasoningNode()?.textContent ?? '').trim();
       const refresh = () => {
@@ -356,7 +364,7 @@ test.describe('LLM Chat (real OpenAI)', () => {
     });
 
     // Wait for LLM response
-    const actionContent = context.window.locator('[data-testid="message-llm-action"]').last();
+    const actionContent = context.window.locator('.message-llm-action-response').last();
     await expect(actionContent).toBeVisible({ timeout: 30000 });
 
     // Wait for autoscroll to complete
@@ -443,7 +451,7 @@ test.describe('LLM Chat (real OpenAI)', () => {
     await messageInput.press('Enter');
 
     // Wait for LLM response
-    await expect(context.window.locator('[data-testid="message-llm-action"]').last()).toBeVisible({
+    await expect(context.window.locator('.message-llm-action-response').last()).toBeVisible({
       timeout: 30000,
     });
 
@@ -485,7 +493,7 @@ test.describe('LLM Chat (real OpenAI)', () => {
       timeout: 120000,
     });
 
-    const actionContent = context.window.locator('[data-testid="message-llm-action"]');
+    const actionContent = context.window.locator('.message-llm-action-response');
     await expect(actionContent).toBeVisible({ timeout: 120000 });
 
     await closeElectron(context, false);
@@ -738,7 +746,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     await messageInput.fill('Render markdown');
     await messageInput.press('Enter');
 
-    const actionContent = context.window.locator('[data-testid="message-llm-action"]');
+    const actionContent = context.window.locator('.message-llm-action-response');
     await expect(actionContent).toBeVisible({ timeout: 3000 });
   }
   /* Preconditions: MockLLMServer configured with slow streaming (300ms between chunks),
@@ -781,7 +789,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
 
     // Second response should be rendered and no error message should appear.
     const secondResponse = context.window
-      .locator('[data-testid="message-llm-action"]')
+      .locator('.message-llm-action-response')
       .filter({ hasText: 'Second response' });
     await expect(secondResponse).toHaveCount(1, { timeout: 5000 });
     await expect(context.window.locator('[data-testid="message-error"]')).toHaveCount(0);
@@ -845,7 +853,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
       timeout: 5000,
     });
 
-    const actionContent = context.window.locator('[data-testid="message-llm-action"]');
+    const actionContent = context.window.locator('.message-llm-action-response');
     await expect(actionContent).toBeVisible({ timeout: 10000 });
 
     // Wait until reasoning auto-collapses after streaming finishes.
@@ -890,7 +898,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     const reasoningTrigger = context.window.locator(
       '[data-testid="message-llm-reasoning-trigger"]'
     );
-    const actionContent = context.window.locator('[data-testid="message-llm-action"]');
+    const actionContent = context.window.locator('.message-llm-action-response');
 
     await expect(reasoningTrigger).toBeVisible({ timeout: 5000 });
     await expect(actionContent).toHaveCount(0);
@@ -927,20 +935,20 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     await messageInput.fill('Stream text in chunks');
     await messageInput.press('Enter');
 
-    const actionContent = context.window.locator('[data-testid="message-llm-action"]').last();
+    const actionContent = context.window.locator('.message-llm-action-response').last();
     await expect(actionContent).toBeVisible({ timeout: 10000 });
 
     const bubbleStats = await context.window.evaluate(async () => {
       const actionCounts: number[] = [];
       const getNode = () =>
-        document.querySelectorAll('[data-testid="message-llm-action"]')[
-          document.querySelectorAll('[data-testid="message-llm-action"]').length - 1
+        document.querySelectorAll('.message-llm-action-response')[
+          document.querySelectorAll('.message-llm-action-response').length - 1
         ] as HTMLElement | undefined;
 
       const startedAt = Date.now();
       while (Date.now() - startedAt < 8000) {
         const node = getNode();
-        actionCounts.push(document.querySelectorAll('[data-testid="message-llm-action"]').length);
+        actionCounts.push(document.querySelectorAll('.message-llm-action-response').length);
         if (node) {
           // Touch text to ensure node remains readable during updates.
           node.textContent?.trim();
@@ -1033,12 +1041,12 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     await messageInput.press('Enter');
 
     // Wait for second response to appear
-    const actionContent = context.window.locator('[data-testid="message-llm-action"]');
+    const actionContent = context.window.locator('.message-llm-action-response');
     await expect(actionContent).toBeVisible({ timeout: 15000 });
     await expect(actionContent).toHaveText('Second response', { timeout: 5000 });
 
     // Exactly one llm bubble in DOM — hidden one must not be rendered at all
-    await expect(context.window.locator('[data-testid="message-llm"]')).toHaveCount(1);
+    await expect(context.window.locator('.message-llm-response')).toHaveCount(1);
 
     // No text from the hidden first response anywhere in the chat
     await expect(context.window.locator('text=First response')).toHaveCount(0);
@@ -1066,7 +1074,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
       timeout: 5000,
     });
     const firstResponse = context.window
-      .locator('[data-testid="message-llm-action"]')
+      .locator('.message-llm-action-response')
       .filter({ hasText: 'First response' });
     await expect(firstResponse).toBeVisible({ timeout: 5000 });
     await expect(context.window.locator('[data-testid="prompt-input-stop"]')).toBeVisible({
@@ -1085,7 +1093,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     await messageInput.press('Enter');
 
     // Wait for second response
-    const actionContent = context.window.locator('[data-testid="message-llm-action"]');
+    const actionContent = context.window.locator('.message-llm-action-response');
     await expect(actionContent).toHaveCount(1, { timeout: 15000 });
     await expect(actionContent.first()).toHaveText('Second response', { timeout: 5000 });
 
@@ -1163,7 +1171,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     await expect(errorBubble).toHaveCount(0, { timeout: 10000 });
 
     // LLM response should appear
-    await expect(context.window.locator('[data-testid="message-llm"]')).toBeVisible({
+    await expect(context.window.locator('.message-llm-response')).toBeVisible({
       timeout: 10000,
     });
   });
@@ -1185,7 +1193,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     await messageInput.fill('First message');
     await messageInput.press('Enter');
 
-    const allActionContent = context.window.locator('[data-testid="message-llm-action"]');
+    const allActionContent = context.window.locator('.message-llm-action-response');
     await expect(allActionContent.first()).toBeVisible({ timeout: 15000 });
     await expect(allActionContent.first()).toHaveText('First response', { timeout: 5000 });
 
@@ -1254,7 +1262,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     await messageInput.press('Enter');
 
     // Wait for LLM response
-    const actionContent = context.window.locator('[data-testid="message-llm-action"]');
+    const actionContent = context.window.locator('.message-llm-action-response');
     await expect(actionContent).toBeVisible({ timeout: 15000 });
     await expect(actionContent).toHaveText('Success response', { timeout: 5000 });
 
@@ -1292,7 +1300,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     await messageInput.fill('Return JSON-like text without formatting');
     await messageInput.press('Enter');
 
-    const actionContent = context.window.locator('[data-testid="message-llm-action"]').last();
+    const actionContent = context.window.locator('.message-llm-action-response').last();
     await expect(actionContent).toBeVisible({ timeout: 15000 });
     await expect(actionContent).toContainText('Broken payload');
 
@@ -1324,7 +1332,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     await messageInput.fill('Use tool');
     await messageInput.press('Enter');
 
-    const actionContent = context.window.locator('[data-testid="message-llm-action"]').last();
+    const actionContent = context.window.locator('.message-llm-action-response').last();
     await expect(actionContent).toBeVisible({ timeout: 15000 });
     await expect(actionContent).toContainText('Tool-assisted answer');
 
@@ -1333,7 +1341,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
       .filter((entry) => entry.method === 'POST' && entry.path === '/v1/responses').length;
     expect(requestCount).toBe(2);
 
-    const llmBubbles = context.window.locator('[data-testid="message-llm"]');
+    const llmBubbles = context.window.locator('.message-llm-response');
     await expect(llmBubbles).toHaveCount(1);
     await expect(context.window.locator('[data-testid="message-user"]')).toHaveCount(1);
   });
@@ -1369,7 +1377,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     await expect(completedBadge).toBeVisible({ timeout: 15000 });
     await expect(completedBadge).toContainText('Completed');
 
-    const finalAnswerText = context.window.locator('[data-testid="message-llm-action"]', {
+    const finalAnswerText = context.window.locator('.message-llm-action-completed', {
       hasText: 'Final result: task completed.',
     });
     await expect(finalAnswerText.first()).toBeVisible({ timeout: 15000 });
@@ -1398,7 +1406,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     await messageInput.fill('Respond normally');
     await messageInput.press('Enter');
 
-    const actionContent = context.window.locator('[data-testid="message-llm-action"]').last();
+    const actionContent = context.window.locator('.message-llm-action-response').last();
     await expect(actionContent).toBeVisible({ timeout: 15000 });
 
     await expect(context.window.locator('[data-testid="message-completed-badge"]')).toHaveCount(0);
@@ -1558,7 +1566,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     });
 
     // Wait for auto-retry (countdown ~3 seconds + buffer)
-    const actionContent = context.window.locator('[data-testid="message-llm-action"]');
+    const actionContent = context.window.locator('.message-llm-action-response');
     await expect(actionContent).toBeVisible({ timeout: 15000 });
     await expect(actionContent).toHaveText('Retry response', { timeout: 5000 });
 
@@ -1603,7 +1611,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
      Requirements: agents.7.7 */
   test('should render markdown headings', async () => {
     await renderMarkdownMessage('# Heading');
-    await expect(context.window.locator('[data-testid="message-llm-action"] h1')).toBeVisible();
+    await expect(context.window.locator('.message-llm-action-response h1')).toBeVisible();
   });
 
   /* Preconditions: MockLLMServer returns markdown paragraph
@@ -1612,7 +1620,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
      Requirements: agents.7.7 */
   test('should render markdown paragraphs', async () => {
     await renderMarkdownMessage('Paragraph text');
-    await expect(context.window.locator('[data-testid="message-llm-action"] p')).toBeVisible();
+    await expect(context.window.locator('.message-llm-action-response p')).toBeVisible();
   });
 
   /* Preconditions: MockLLMServer returns markdown emphasis
@@ -1621,7 +1629,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
      Requirements: agents.7.7 */
   test('should render markdown emphasis', async () => {
     await renderMarkdownMessage('**Bold** and *italic*');
-    const actionContent = context.window.locator('[data-testid="message-llm-action"]');
+    const actionContent = context.window.locator('.message-llm-action-response');
     await expect(actionContent).toContainText('Bold');
     await expect(actionContent.locator('em')).toBeVisible();
   });
@@ -1632,7 +1640,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
      Requirements: agents.7.7 */
   test('should render markdown strikethrough', async () => {
     await renderMarkdownMessage('~~Deleted~~');
-    await expect(context.window.locator('[data-testid="message-llm-action"] del')).toBeVisible();
+    await expect(context.window.locator('.message-llm-action-response del')).toBeVisible();
   });
 
   /* Preconditions: MockLLMServer returns markdown link
@@ -1669,7 +1677,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
   test('should render markdown blockquotes', async () => {
     await renderMarkdownMessage('> Quote');
     await expect(
-      context.window.locator('[data-testid="message-llm-action"] blockquote')
+      context.window.locator('.message-llm-action-response blockquote')
     ).toBeVisible();
   });
 
@@ -1679,7 +1687,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
      Requirements: agents.7.7 */
   test('should render markdown unordered list', async () => {
     await renderMarkdownMessage('- Item 1\n- Item 2');
-    const actionContent = context.window.locator('[data-testid="message-llm-action"]');
+    const actionContent = context.window.locator('.message-llm-action-response');
     await expect(actionContent.locator('ul')).toBeVisible();
     await expect(actionContent.locator('li')).toHaveCount(2);
   });
@@ -1690,7 +1698,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
      Requirements: agents.7.7 */
   test('should render markdown ordered list', async () => {
     await renderMarkdownMessage('1. First\n2. Second');
-    const actionContent = context.window.locator('[data-testid="message-llm-action"]');
+    const actionContent = context.window.locator('.message-llm-action-response');
     await expect(actionContent.locator('ol')).toBeVisible();
     await expect(actionContent.locator('li')).toHaveCount(2);
   });
@@ -1701,7 +1709,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
      Requirements: agents.7.7 */
   test('should render markdown nested list', async () => {
     await renderMarkdownMessage('- Parent\n  - Child');
-    const actionContent = context.window.locator('[data-testid="message-llm-action"]');
+    const actionContent = context.window.locator('.message-llm-action-response');
     await expect(actionContent.locator('ul')).toHaveCount(2);
   });
 
@@ -1712,7 +1720,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
   test('should render markdown task list', async () => {
     await renderMarkdownMessage('- [x] Done\n- [ ] Pending');
     await expect(
-      context.window.locator('[data-testid="message-llm-action"] input[type="checkbox"]')
+      context.window.locator('.message-llm-action-response input[type="checkbox"]')
     ).toHaveCount(2);
   });
 
@@ -1722,7 +1730,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
      Requirements: agents.7.7 */
   test('should render markdown inline code', async () => {
     await renderMarkdownMessage('Use `npm install`');
-    await expect(context.window.locator('[data-testid="message-llm-action"] code')).toBeVisible();
+    await expect(context.window.locator('.message-llm-action-response code')).toBeVisible();
   });
 
   /* Preconditions: MockLLMServer returns markdown fenced code
@@ -1731,9 +1739,9 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
      Requirements: agents.7.7 */
   test('should render markdown fenced code', async () => {
     await renderMarkdownMessage('```js\nconsole.log("hi");\n```');
-    await expect(context.window.locator('[data-testid="message-llm-action"] pre')).toBeVisible();
+    await expect(context.window.locator('.message-llm-action-response pre')).toBeVisible();
     await expect(
-      context.window.locator('[data-testid="message-llm-action"] pre code')
+      context.window.locator('.message-llm-action-response pre code')
     ).toBeVisible();
   });
 
@@ -1743,7 +1751,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
      Requirements: agents.7.7 */
   test('should render markdown tables', async () => {
     await renderMarkdownMessage('| A | B |\n|---|---|\n| 1 | 2 |');
-    await expect(context.window.locator('[data-testid="message-llm-action"] table')).toBeVisible();
+    await expect(context.window.locator('.message-llm-action-response table')).toBeVisible();
   });
 
   /* Preconditions: MockLLMServer returns markdown horizontal rule
@@ -1752,7 +1760,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
      Requirements: agents.7.7 */
   test('should render markdown horizontal rule', async () => {
     await renderMarkdownMessage('---');
-    await expect(context.window.locator('[data-testid="message-llm-action"] hr')).toBeVisible();
+    await expect(context.window.locator('.message-llm-action-response hr')).toBeVisible();
   });
 
   /* Preconditions: MockLLMServer returns markdown image
@@ -1763,7 +1771,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     const imageDataUrl =
       'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+o7m0AAAAASUVORK5CYII=';
     await renderMarkdownMessage(`![Alt](${imageDataUrl})`);
-    const actionContent = context.window.locator('[data-testid="message-llm-action"]');
+    const actionContent = context.window.locator('.message-llm-action-response');
     await expect(actionContent).toContainText(/Image (blocked: Alt|not available)/);
   });
 
@@ -1782,7 +1790,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
      Requirements: agents.7.7 */
   test('should render markdown inline math', async () => {
     await renderMarkdownMessage('Inline $$E=mc^2$$');
-    await expect(context.window.locator('[data-testid="message-llm-action"] .katex')).toBeVisible();
+    await expect(context.window.locator('.message-llm-action-response .katex')).toBeVisible();
   });
 
   /* Preconditions: MockLLMServer returns markdown block math
@@ -1792,7 +1800,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
   test('should render markdown block math', async () => {
     await renderMarkdownMessage('$$\n\\sum_{i=1}^{n} i = n(n+1)/2\n$$');
     await expect(
-      context.window.locator('[data-testid="message-llm-action"] .katex-display')
+      context.window.locator('.message-llm-action-response .katex-display')
     ).toBeVisible();
   });
 
@@ -1806,7 +1814,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     await renderMarkdownMessage(markdown);
 
     const emptyParagraphs = await context.window
-      .locator('[data-testid="message-llm-action"] p')
+      .locator('.message-llm-action-response p')
       .evaluateAll(
         (nodes) => nodes.filter((node) => (node.textContent ?? '').trim().length === 0).length
       );
@@ -1832,7 +1840,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     await messageInput.fill('Render markdown');
     await messageInput.press('Enter');
 
-    const actionContent = context.window.locator('[data-testid="message-llm-action"]');
+    const actionContent = context.window.locator('.message-llm-action-response');
     await expect(actionContent).toBeVisible({ timeout: 3000 });
 
     await expect(context.window.locator('[data-streamdown="code-block-actions"]')).toBeVisible({
@@ -1892,7 +1900,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     ].join('\n');
 
     await renderMarkdownMessage(markdown);
-    const actionContent = context.window.locator('[data-testid="message-llm-action"]');
+    const actionContent = context.window.locator('.message-llm-action-response');
 
     await expect(actionContent.locator('h1')).toBeVisible();
     await expect(actionContent.locator('p').first()).toBeVisible();
