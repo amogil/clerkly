@@ -133,15 +133,13 @@
 ## Фаза 8: Приведение внешнего вида и поведения tool-call к новым требованиям
 
 - [x] Синхронизировать UI-реализацию `tool_call(final_answer)` с текущими спеками `agents`:
-  - [x] Заголовок `"Final Answer"`: текст из `final_answer.text` или fallback `Done`.
-  - [x] Иконка в заголовке: `Check` без круга.
-  - [x] Тело: только `summary_points`, элементы с `Check` в зелёном круге.
-  - [x] КОГДА `summary_points` пустой/отсутствует — блок неколлапсируемый (без toggle).
-- [x] Убрать legacy UI-пути рендера `final_answer` (badge/summary-варианты, не соответствующие текущему контракту).
+  - [x] `final_answer` рендерится отдельным UI-блоком.
+  - [x] Блок рендерится как checklist `summary_points`.
+  - [x] Пункты checklist рендерятся с зелёным `Check`.
+- [x] Убрать альтернативные пути рендера `final_answer`, не соответствующие целевому контракту.
 - [x] Добавить/обновить unit-тесты renderer под целевое поведение `Final Answer`:
   - [x] Проверка fallback `Done` при отсутствии `text`.
-  - [x] Проверка отсутствия toggle при пустом `summary_points`.
-  - [x] Проверка корректных `data-testid` для блока, хедера, title, check, summary, toggle.
+  - [x] Проверка корректных `data-testid` для блока, хедера, title, check, summary.
 - [x] Добавить/обновить functional-тесты под целевое поведение `Final Answer` в чате.
 - [x] Привести UI auth-error диалога к `agents.4.10.3-4.10.5`:
   - [x] Фиксированный порядок кнопок: сначала `Open Settings`, затем `Retry`.
@@ -181,15 +179,14 @@
 - [x] Добавить модульные тесты renderer (`AgentMessage`/mapper):
   - [x] Рендер `"Final Answer"` header: title из `final_answer.text`, fallback `Done`.
   - [x] Рендер `summary_points` как списка пунктов с индикаторами.
-  - [x] Отсутствие toggle при пустом/отсутствующем `summary_points`.
   - [x] Наличие и корректность `data-testid` для `message-final-answer-*`.
 - [x] Добавить модульные тесты transport/runtime синхронизации:
   - [x] `message.llm.reasoning.updated`/`message.llm.text.updated` не дублируются snapshot-апдейтами.
   - [x] `message.updated` с `hidden=true` корректно закрывает активный stream без `kind:error`.
   - [x] `tool_call` обрабатывается только через persisted `message.created`/`message.updated`.
 - [x] Добавить функциональные тесты (`tests/functional/llm-chat.spec.ts`, `agent-status-calculation.spec.ts`):
-  - [x] `final_answer` с пустым `summary_points` (или отсутствующим) отображается как неколлапсируемый `"Final Answer"`.
-  - [x] `final_answer` без `text` показывает `Done` в заголовке.
+  - [x] `final_answer` рендерится как всегда раскрытый checklist `summary_points`.
+  - [x] Пустой/отсутствующий `summary_points` обрабатывается как невалидный `final_answer` с retry/repair.
   - [x] `kind:error` auth-диалог: есть `Open Settings` + `Retry`, порядок `Open Settings` -> `Retry`, variants `outline/default`.
   - [x] При `Retry` auth-ошибки диалог скрывается перед повторным запросом.
   - [x] После `tool_call(final_answer, done=true)` статус в UI становится `completed` во всех местах.
@@ -224,6 +221,20 @@
 - [x] Обновить `PromptBuilder`/tool-schema и runtime-нормализацию под `final_answer` без `text`.
 - [x] Обновить UI рендер `final_answer`: заголовок всегда `Done`.
 - [x] Обновить unit/functional тесты под новый контракт `final_answer` без `text`.
+
+## Фаза 14: Final Answer без сворачивания
+
+- [x] Обновить требования и дизайн (`agents`, `testing-infrastructure`): блок `"Final Answer"` всегда раскрыт, контроль сворачивания отсутствует.
+- [x] Обновить renderer (`AgentMessage`): удалить ветки с контролом сворачивания для `final_answer`, рендерить статичный раскрытый блок.
+- [x] Обновить unit/functional тесты под always-expanded контракт и убрать проверки контроля сворачивания.
+
+## Фаза 15: `summary_points` обязателен (без UI fallback)
+
+- [x] Обновить требования/дизайн: `final_answer.summary_points` обязателен и содержит минимум 1 пункт.
+- [x] Удалить UI fallback с автоподстановкой `Done` при пустом/отсутствующем `summary_points`.
+- [ ] Обновить tool schema и prompt-инструкции под `summary_points` как required + `minItems: 1`.
+- [ ] Обновить renderer и тесты под checklist-only рендер без отдельного заголовка `Done`.
+- [ ] Обновить functional сценарии invalid `final_answer` (включая пустой/отсутствующий `summary_points`).
 
 ---
 

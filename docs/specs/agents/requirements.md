@@ -510,23 +510,20 @@
 
 7.4.1. `tool_call` с `toolName = "final_answer"` ДОЛЖЕН отображаться как отдельный компонент `"Final Answer"` (на базе `Queue`), а не как обычный текстовый bubble `kind: llm`.
 
-7.4.1.1. Заголовок компонента `"Final Answer"` для `final_answer` ДОЛЖЕН содержать фиксированный текст `Done` и иконку `Check` (без круга).
+7.4.1.1. Компонент `"Final Answer"` ДОЛЖЕН отображаться как checklist без отдельного заголовка.
 
-7.4.2. Внутри компонента `"Final Answer"` для `tool_call(final_answer)` ДОЛЖНЫ отображаться только пункты `summary_points`; каждый пункт ДОЛЖЕН отображаться с иконкой `Check` в зелёном круге.
+7.4.2. Внутри компонента `"Final Answer"` для `tool_call(final_answer)` ДОЛЖНЫ отображаться пункты `summary_points`; каждый пункт ДОЛЖЕН отображаться с иконкой `Check` в зелёном круге.
 
-7.4.2.1. Компонент `"Final Answer"` ДОЛЖЕН использовать фиксированный заголовок `Done`.
+7.4.2.1. Компонент `"Final Answer"` ДОЛЖЕН всегда отображаться в раскрытом виде и НЕ ДОЛЖЕН поддерживать сворачивание/разворачивание.
 
-7.4.2.2. КОГДА `summary_points` пустой (или отсутствует), компонент `"Final Answer"` ДОЛЖЕН отображаться в неколлапсируемом виде (без toggle-контрола).
+7.4.2.2. КОГДА `summary_points` пустой (или отсутствует), ТО это состояние ДОЛЖНО считаться нарушением контракта `final_answer` (см. `llm-integration.9.5.*`).
 
 7.4.2.3. Контракт и лимиты аргументов `final_answer` задаются в спецификации `llm-integration`; `agents` использует только persisted payload для отображения.
 
 7.4.4. Для `tool_call(final_answer)` UI ДОЛЖЕН иметь отдельные тестовые идентификаторы:
   - `data-testid="message-final-answer-block"` для корневого блока,
-  - `data-testid="message-final-answer-header"` для заголовка,
-  - `data-testid="message-final-answer-title"` для фиксированного текста `Done`,
-  - `data-testid="message-final-answer-check"` для иконки `Check` в заголовке (без круга),
-  - `data-testid="message-final-answer-summary"` для контейнера списка `summary_points`,
-  - `data-testid="message-final-answer-toggle"` для toggle (только когда `summary_points` не пустой).
+  - `data-testid="message-final-answer-summary"` для контейнера checklist,
+  - `data-testid="message-final-answer-item"` для checklist-пункта.
 
 7.5. Сообщение `user` ДОЛЖНО содержать:
    ```json

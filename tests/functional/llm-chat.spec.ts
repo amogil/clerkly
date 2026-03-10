@@ -1511,7 +1511,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
 
   /* Preconditions: MockLLMServer returns a single tool_call(final_answer) with summary_points
      Action: User sends a message
-     Assertions: Final answer block is rendered with title and summary details
+     Assertions: Final answer block is rendered expanded with title and summary details
      Requirements: llm-integration.11.8, agents.9.6 */
   test('should render final_answer tool_call as completed assistant response', async () => {
     mockLLMServer.setStreamingMode(true);
@@ -1542,9 +1542,6 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     await expect(
       context.window.locator('[data-testid="message-final-answer-title"]').last()
     ).toHaveText('Done');
-    const toggle = context.window.locator('[data-testid="message-final-answer-toggle"]').last();
-    await expect(toggle).toBeVisible({ timeout: 5000 });
-    await toggle.click();
     const summary = context.window.locator('[data-testid="message-final-answer-summary"]').last();
     await expect(summary).toBeVisible({ timeout: 5000 });
     await expect(summary).toContainText('Validated input data');
@@ -1557,9 +1554,9 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
 
   /* Preconditions: MockLLMServer returns tool_call(final_answer) without summary_points
      Action: User sends a message
-     Assertions: Final Answer block is shown without collapsible toggle and summary section
+     Assertions: Final Answer block is shown without summary section
      Requirements: agents.7.4.3, llm-integration.9.5.1.2 */
-  test('should render non-collapsible final_answer block when summary_points is absent', async () => {
+  test('should render final_answer block when summary_points is absent', async () => {
     mockLLMServer.setStreamingMode(true);
     mockLLMServer.setOpenAIStreamScripts([
       {
@@ -1586,9 +1583,6 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     await expect(
       context.window.locator('[data-testid="message-final-answer-title"]').last()
     ).toHaveText('Done');
-    await expect(context.window.locator('[data-testid="message-final-answer-toggle"]')).toHaveCount(
-      0
-    );
     await expect(
       context.window.locator('[data-testid="message-final-answer-summary"]')
     ).toHaveCount(0);
@@ -1691,9 +1685,6 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
       .locator('[data-testid="message-final-answer-block"]')
       .last();
     await expect(finalAnswerBlock).toBeVisible({ timeout: 15000 });
-    const toggle = context.window.locator('[data-testid="message-final-answer-toggle"]').last();
-    await expect(toggle).toBeVisible({ timeout: 5000 });
-    await toggle.click();
     const summary = context.window.locator('[data-testid="message-final-answer-summary"]').last();
     await expect(summary).toContainText('Validated format');
 

@@ -1579,49 +1579,26 @@ function AgentWelcome({ onPromptClick }: AgentWelcomeProps) {
 **Сообщения инструментов (`kind: 'tool_call'`):**
 - Для `toolName !== 'final_answer'` используется AI Elements `Tool` family как отдельный технический блок вызова инструмента.
 - Для `toolName === 'final_answer'` используется отдельный компонент `"Final Answer"` на базе AI Elements `Queue`.
-- Заголовок компонента: фиксированный текст `Done` + иконка `Check` (без круга).
-- Тело компонента: только `summary_points`, каждый пункт с иконкой `Check` в зелёном круге.
-- Компонент по умолчанию свернут, если `summary_points.length > 0`; при пустом `summary_points` рендерится в неколлапсируемом виде (без toggle).
+- Компонент не имеет отдельного заголовка; рендерится только checklist `summary_points`.
+- Каждый checklist-пункт рендерится с иконкой `Check` в зелёном круге.
+- Компонент всегда отображается в раскрытом виде; сворачивание/разворачивание не поддерживается.
 - `Agents` не выполняет валидацию/repair `final_answer`; компонент рендерит только persisted payload.
 
 ```tsx
 // Requirements: agents.7.4.1, agents.7.4.2
 if (message.kind === 'tool_call' && toolName === 'final_answer') {
-  const hasSummary = summaryPoints.length > 0;
-  const title = 'Done';
   return (
     <Queue data-testid="message-final-answer-block">
-      <QueueSection defaultOpen={false} disabled={!hasSummary}>
-        {hasSummary ? (
-          <div data-testid="message-final-answer-header">
-            <QueueSectionTrigger data-testid="message-final-answer-toggle">
-              <QueueSectionLabel
-                data-testid="message-final-answer-title"
-                label={title}
-                icon={<Check data-testid="message-final-answer-check" className="text-green-600" />}
-              />
-            </QueueSectionTrigger>
-          </div>
-        ) : (
-          <div data-testid="message-final-answer-header">
-            <QueueSectionLabel
-              data-testid="message-final-answer-title"
-              label={title}
-              icon={<Check data-testid="message-final-answer-check" className="text-green-600" />}
-            />
-          </div>
-        )}
-        {hasSummary ? (
-          <QueueSectionContent data-testid="message-final-answer-summary">
-            {summaryPoints.map((point) => (
-              <QueueItem key={point}>
-                <QueueItemIndicator completed />
-                <QueueItemContent completed>{point}</QueueItemContent>
-              </QueueItem>
-            ))}
-          </QueueSectionContent>
-        ) : null}
-      </QueueSection>
+      {summaryPoints.length > 0 ? (
+        <div data-testid="message-final-answer-summary">
+          {summaryPoints.map((point) => (
+            <QueueItem key={point} data-testid="message-final-answer-item">
+              <QueueItemIndicator completed />
+              <QueueItemContent completed>{point}</QueueItemContent>
+            </QueueItem>
+          ))}
+        </div>
+      ) : null}
     </Queue>
   );
 }

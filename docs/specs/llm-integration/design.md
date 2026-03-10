@@ -166,10 +166,8 @@ CREATE TABLE messages (
 ```
 
 Контракт `final_answer` валидируется через strict-schema инструмента в `Vercel AI SDK`:
-- `summary_points`: опциональный массив длиной `<= 10`;
+- `summary_points`: обязательный массив длиной `1..10`;
 - каждый пункт `summary_points`: строка длиной `<= 200`.
-- Значения по умолчанию при отсутствии поля в аргументах:
-  - `summary_points`: `[]` (пустой список для дальнейшей обработки).
 Невалидный `final_answer` не фиксируется как завершённый: retry/repair выполняется на стороне AI SDK; при исчерпании лимита создаётся `kind:error`.
 `reply_to_message_id` хранится в колонке `messages.reply_to_message_id` и передаётся в `MessageSnapshot` отдельным полем, не внутри payload.
 

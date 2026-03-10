@@ -109,7 +109,7 @@ describe('AgentMessage — tool_call', () => {
 
   /* Preconditions: persisted kind:tool_call for final_answer with summary_points
      Action: render AgentMessage
-     Assertions: renders Final Answer block with header, toggle and summary points
+     Assertions: renders Final Answer block with header and expanded summary points
      Requirements: agents.7.4.1, agents.7.4.2, llm-integration.9.7 */
   it('should render final_answer as Final Answer block with summary list', () => {
     render(
@@ -135,8 +135,6 @@ describe('AgentMessage — tool_call', () => {
     expect(screen.getByTestId('message-final-answer-title')).toHaveTextContent('Done');
     expect(screen.getByTestId('message-final-answer-check')).toBeInTheDocument();
     expect(screen.getByTestId('message-final-answer-check')).toHaveClass('text-green-600');
-    expect(screen.getByTestId('message-final-answer-toggle')).toBeInTheDocument();
-    fireEvent.click(screen.getByTestId('message-final-answer-toggle'));
     expect(screen.getByTestId('message-final-answer-summary')).toBeInTheDocument();
     expect(screen.getByText('Point 1')).toBeInTheDocument();
     expect(screen.queryByTestId('message-tool-call')).not.toBeInTheDocument();
@@ -146,9 +144,9 @@ describe('AgentMessage — tool_call', () => {
 
   /* Preconditions: final_answer with empty summary
      Action: render AgentMessage
-     Assertions: Done title is shown and no toggle/summary rendered
+     Assertions: Done title is shown and summary section is absent
      Requirements: agents.7.4.3, llm-integration.9.6 */
-  it('should render Done title without toggle when summary is absent', () => {
+  it('should render Done title when summary is absent', () => {
     render(
       <AgentMessage
         message={baseMessage({
@@ -168,7 +166,6 @@ describe('AgentMessage — tool_call', () => {
     );
 
     expect(screen.getByTestId('message-final-answer-title')).toHaveTextContent('Done');
-    expect(screen.queryByTestId('message-final-answer-toggle')).not.toBeInTheDocument();
     expect(screen.queryByTestId('message-final-answer-summary')).not.toBeInTheDocument();
   });
 });

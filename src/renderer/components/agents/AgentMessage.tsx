@@ -4,15 +4,7 @@ import { Check } from 'lucide-react';
 import { Message, MessageContent, MessageResponse } from '../ai-elements/message';
 import { Reasoning, ReasoningContent } from '../ai-elements/reasoning';
 import { Tool, ToolContent, ToolHeader, ToolInput, ToolOutput } from '../ai-elements/tool';
-import {
-  Queue,
-  QueueItem,
-  QueueItemContent,
-  QueueSection,
-  QueueSectionContent,
-  QueueSectionLabel,
-  QueueSectionTrigger,
-} from '../ai-elements/queue';
+import { Queue, QueueItem, QueueItemContent } from '../ai-elements/queue';
 import { toUIMessage } from '../../lib/messageMapper';
 import type { MessageSnapshot } from '../../../shared/events/types';
 import { AgentErrorDialog } from './AgentErrorDialog';
@@ -155,55 +147,32 @@ export function AgentMessage({
       const summaryPoints = Array.isArray(summaryPointsRaw)
         ? summaryPointsRaw.filter((point): point is string => typeof point === 'string')
         : [];
-      const hasSummary = summaryPoints.length > 0;
       const title = 'Done';
 
       return (
         <Message from="assistant" className="w-full max-w-full">
           <Queue data-testid="message-final-answer-block">
-            <QueueSection defaultOpen={false} disabled={!hasSummary}>
-              {hasSummary ? (
-                <div data-testid="message-final-answer-header">
-                  <QueueSectionTrigger data-testid="message-final-answer-toggle">
-                    <QueueSectionLabel
-                      data-testid="message-final-answer-title"
-                      label={title}
-                      icon={
-                        <Check
-                          data-testid="message-final-answer-check"
-                          className="size-4 text-green-600"
-                        />
-                      }
-                    />
-                  </QueueSectionTrigger>
-                </div>
-              ) : (
-                <div data-testid="message-final-answer-header">
-                  <QueueSectionLabel
-                    data-testid="message-final-answer-title"
-                    label={title}
-                    icon={
-                      <Check
-                        data-testid="message-final-answer-check"
-                        className="size-4 text-green-600"
-                      />
-                    }
-                  />
-                </div>
-              )}
-              {hasSummary ? (
-                <QueueSectionContent data-testid="message-final-answer-summary">
-                  {summaryPoints.map((point, index) => (
-                    <QueueItem key={`${index}-${point}`} className="flex-row items-start gap-2">
-                      <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-green-600">
-                        <Check className="h-3 w-3 text-white" />
-                      </span>
-                      <QueueItemContent completed={false}>{point}</QueueItemContent>
-                    </QueueItem>
-                  ))}
-                </QueueSectionContent>
-              ) : null}
-            </QueueSection>
+            <div data-testid="message-final-answer-header">
+              <div
+                data-testid="message-final-answer-title"
+                className="flex items-center gap-2 rounded-md bg-muted/40 px-3 py-2 text-sm font-medium text-muted-foreground"
+              >
+                <Check data-testid="message-final-answer-check" className="size-4 text-green-600" />
+                <span>{title}</span>
+              </div>
+            </div>
+            {summaryPoints.length > 0 ? (
+              <div data-testid="message-final-answer-summary">
+                {summaryPoints.map((point, index) => (
+                  <QueueItem key={`${index}-${point}`} className="flex-row items-start gap-2">
+                    <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-green-600">
+                      <Check className="h-3 w-3 text-white" />
+                    </span>
+                    <QueueItemContent completed={false}>{point}</QueueItemContent>
+                  </QueueItem>
+                ))}
+              </div>
+            ) : null}
           </Queue>
         </Message>
       );
