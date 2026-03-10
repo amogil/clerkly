@@ -214,6 +214,12 @@
 
 ---
 
+## Фаза 12: Восстановление контракта `invalid final_answer -> kind:error`
+
+- [ ] Исправить functional-тест `tests/functional/llm-chat.spec.ts` ("should show error when invalid final_answer exhausts retry limit").
+
+---
+
 ## Definition of Done
 
 - [x] Спеки и дизайн обновлены под целевую модель `final_answer` без legacy/миграционных оговорок.
