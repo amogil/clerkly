@@ -137,6 +137,8 @@ Lifecycle:
 2. Navigation hardening:
    - `webContents.setWindowOpenHandler(() => ({ action: 'deny' }))`;
    - обработчики `will-navigate`/`will-redirect` блокируют переходы.
+   - preload/runtime shim перехватывает `window.open`, `location.assign`, `location.replace` и маршрутизирует попытку в bridge как policy-событие;
+   - policy-событие нормализуется в terminal результат tool call: `status="error"` + `error.code="policy_denied"` + диагностический `error.message`, без сетевого egress.
 3. Permission hardening:
    - `session.setPermissionRequestHandler` и `setPermissionCheckHandler` возвращают deny для всех permission-based сетевых каналов.
 4. Runtime hardening в preload/sandbox bridge:
@@ -149,7 +151,7 @@ Lifecycle:
 
 Трассировка в требования и тесты:
 - `code_exec.2.3.1` покрывается блокировкой API/навигации на уровнях runtime (`fetch/xhr/websocket/sendBeacon`) и browser/session (`webRequest`, `window.open`, navigation handlers, permissions, CSP).
-- `code_exec.2.3.2` покрывается требованием контролируемого отказа `status="error"` + `error.code="policy_denied"` без сетевого egress.
+- `code_exec.2.3.2` покрывается требованием контролируемого отказа `status="error"` + `error.code="policy_denied"` без сетевого egress, включая navigation/open попытки (`window.open`, `location.assign`, `location.replace`).
 - Функциональная верификация выполняется сценарием `tests/functional/code_exec.spec.ts` — "should deny browser-level network APIs (fetch/xhr/websocket/sendBeacon/navigation) with policy_denied", где дополнительно проверяется отсутствие исходящего запроса.
 
 ### Валидации main process
