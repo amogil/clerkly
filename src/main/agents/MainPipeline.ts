@@ -253,6 +253,7 @@ export class MainPipeline {
     accumulatedText: string;
   }> {
     let attempts = 0;
+    let invalidFinalAnswerSeen = false;
     for (;;) {
       let meaningfulChunkSeen = false;
 
@@ -346,6 +347,11 @@ export class MainPipeline {
           );
         }
         this.validateFinalAnswerToolCalls(bufferedToolCalls);
+        if (invalidFinalAnswerSeen && !this.hasFinalAnswerToolCall(bufferedToolCalls)) {
+          throw new InvalidFinalAnswerContractError(
+            'Model did not return final_answer after invalid completion retry. Please try again.'
+          );
+        }
 
         return {
           output,
@@ -355,13 +361,13 @@ export class MainPipeline {
         };
       } catch (error) {
         const isInvalidFinalAnswer = error instanceof InvalidFinalAnswerContractError;
+        if (isInvalidFinalAnswer) {
+          invalidFinalAnswerSeen = true;
+        }
         const shouldRetryInvalidFinalAnswer =
           isInvalidFinalAnswer && attempts < MAX_INVALID_FINAL_ANSWER_RETRIES && !signal?.aborted;
         const shouldRetrySilentFailure =
-          !isInvalidFinalAnswer &&
-          attempts < 1 &&
-          !meaningfulChunkSeen &&
-          !signal?.aborted;
+          !isInvalidFinalAnswer && attempts < 1 && !meaningfulChunkSeen && !signal?.aborted;
         const shouldRetry = shouldRetryInvalidFinalAnswer || shouldRetrySilentFailure;
 
         if (!shouldRetry) {
@@ -417,6 +423,19 @@ export class MainPipeline {
         }
       }
     }
+  }
+
+  /**
+   * Determine whether current buffered tool calls include completion marker.
+   * Requirements: llm-integration.9.2, llm-integration.9.6
+   */
+  private hasFinalAnswerToolCall(bufferedToolCalls: Map<string, BufferedToolCall>): boolean {
+    for (const call of bufferedToolCalls.values()) {
+      if (call.toolName === 'final_answer') {
+        return true;
+      }
+    }
+    return false;
   }
 
   /**

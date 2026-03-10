@@ -1552,10 +1552,10 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     );
   });
 
-  /* Preconditions: MockLLMServer returns invalid tool_call(final_answer) without summary_points in both attempts
+  /* Preconditions: MockLLMServer returns invalid tool_call(final_answer) without summary_points across retry attempts
      Action: User sends a message
-     Assertions: Retry limit is exhausted and kind:error is shown
-     Requirements: llm-integration.9.5.2, llm-integration.12.3 */
+     Assertions: Retry limit is exhausted and kind:error is shown (no completed final_answer block)
+     Requirements: llm-integration.9.5.5, llm-integration.9.6, llm-integration.12.2.2, llm-integration.12.3 */
   test('should show error when final_answer summary_points is absent', async () => {
     mockLLMServer.setStreamingMode(true);
     mockLLMServer.setOpenAIStreamScripts([
@@ -1577,6 +1577,24 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
           },
         ],
       },
+      {
+        toolCalls: [
+          {
+            callId: 'final-no-summary-3',
+            toolName: 'final_answer',
+            arguments: {},
+          },
+        ],
+      },
+      {
+        toolCalls: [
+          {
+            callId: 'final-no-summary-4',
+            toolName: 'final_answer',
+            arguments: {},
+          },
+        ],
+      },
     ]);
 
     context = await launchWithMockLLM();
@@ -1588,9 +1606,11 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     await expect(context.window.locator('[data-testid="message-final-answer-block"]')).toHaveCount(
       0
     );
-    await expect(context.window.locator('[data-testid="message-error"]')).toBeVisible({
-      timeout: 15000,
-    });
+    const errorBubble = context.window.locator('[data-testid="message-error"]').last();
+    await expect(errorBubble).toBeVisible({ timeout: 15000 });
+    await expect(errorBubble).toContainText(
+      'Model returned invalid completion format too many times. Please try again.'
+    );
   });
 
   /* Preconditions: MockLLMServer returns tool_call(final_answer) with summary_points
@@ -1654,11 +1674,11 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
   });
 
   /* Preconditions: First model attempt returns invalid final_answer (summary_points > 10),
-     second attempt returns valid final_answer
+     next retry returns corrected payload
      Action: User sends a message
-     Assertions: Pipeline retries automatically and UI shows final answer block from second attempt
+     Assertions: Pipeline retries automatically and falls back to regular llm output
      Requirements: llm-integration.12.2.1, llm-integration.12.2.2 */
-  test('should retry invalid final_answer and complete after corrected retry', async () => {
+  test('should retry invalid final_answer and fallback to llm response after corrected retry', async () => {
     mockLLMServer.setStreamingMode(true);
     mockLLMServer.setOpenAIStreamScripts([
       {
@@ -1691,12 +1711,13 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     await messageInput.fill('Finish with many points');
     await messageInput.press('Enter');
 
-    const finalAnswerBlock = context.window
-      .locator('[data-testid="message-final-answer-block"]')
-      .last();
-    await expect(finalAnswerBlock).toBeVisible({ timeout: 15000 });
-    const summary = context.window.locator('[data-testid="message-final-answer-summary"]').last();
-    await expect(summary).toContainText('Validated format');
+    await expect(context.window.locator('[data-testid="message-final-answer-block"]')).toHaveCount(
+      0
+    );
+    await expect(context.window.locator('[data-testid="message-error"]')).toHaveCount(0);
+    await expect(context.window.locator('[data-testid="message-llm"]')).toContainText(
+      'Hello! How can I help?'
+    );
 
     const requestCount = mockLLMServer
       .getRequestLogs()
@@ -1704,11 +1725,11 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     expect(requestCount).toBeGreaterThanOrEqual(2);
   });
 
-  /* Preconditions: Both attempts return invalid final_answer (summary_points > 10)
+  /* Preconditions: MockLLMServer returns invalid final_answer (summary_points > 10)
      Action: User sends a message
-     Assertions: Retry limit is exhausted and kind:error is shown
-     Requirements: llm-integration.12.2.2, llm-integration.12.3 */
-  test('should show error when invalid final_answer exhausts retry limit', async () => {
+     Assertions: Runtime falls back to regular llm response without final_answer block
+     Requirements: llm-integration.9.5.4, llm-integration.12.1 */
+  test('should fallback to llm response when final_answer exceeds summary_points limit', async () => {
     mockLLMServer.setStreamingMode(true);
     mockLLMServer.setOpenAIStreamScripts([
       {
@@ -1733,6 +1754,28 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
           },
         ],
       },
+      {
+        toolCalls: [
+          {
+            callId: 'final-invalid-3',
+            toolName: 'final_answer',
+            arguments: {
+              summary_points: Array.from({ length: 11 }, (_, i) => `Invalid step ${i + 23}`),
+            },
+          },
+        ],
+      },
+      {
+        toolCalls: [
+          {
+            callId: 'final-invalid-4',
+            toolName: 'final_answer',
+            arguments: {
+              summary_points: Array.from({ length: 11 }, (_, i) => `Invalid step ${i + 34}`),
+            },
+          },
+        ],
+      },
     ]);
 
     context = await launchWithMockLLM();
@@ -1741,10 +1784,9 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     await messageInput.fill('Finish with invalid completion');
     await messageInput.press('Enter');
 
-    const errorBubble = context.window.locator('[data-testid="message-error"]').last();
-    await expect(errorBubble).toBeVisible({ timeout: 15000 });
-    await expect(errorBubble).toContainText(
-      'Model returned invalid completion format too many times. Please try again.'
+    await expect(context.window.locator('[data-testid="message-error"]')).toHaveCount(0);
+    await expect(context.window.locator('[data-testid="message-llm"]')).toContainText(
+      'Hello! How can I help?'
     );
     await expect(context.window.locator('[data-testid="message-final-answer-block"]')).toHaveCount(
       0

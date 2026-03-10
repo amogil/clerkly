@@ -344,7 +344,7 @@ describe('MainPipeline.run()', () => {
     );
   });
 
-  it('persists final_answer arguments payload as provided when fields are absent', async () => {
+  it('creates kind:error when final_answer arguments are missing required summary_points', async () => {
     const { pipeline, llmProvider, messageManager } = makeMocks();
 
     llmProvider.chat.mockImplementation(
@@ -363,12 +363,13 @@ describe('MainPipeline.run()', () => {
 
     expect(messageManager.create).toHaveBeenCalledWith(
       'agent-1',
-      'tool_call',
+      'error',
       expect.objectContaining({
         data: expect.objectContaining({
-          callId: 'call-final-defaults',
-          toolName: 'final_answer',
-          arguments: {},
+          error: expect.objectContaining({
+            type: 'provider',
+            message: expect.stringContaining('invalid completion format'),
+          }),
         }),
       }),
       1,
@@ -1207,7 +1208,7 @@ describe('MainPipeline.run()', () => {
     );
   });
 
-  it('persists final_answer tool_result payload as provided when fields are absent', async () => {
+  it('creates kind:error when final_answer tool_result has missing required summary_points', async () => {
     const { pipeline, llmProvider, messageManager } = makeMocks();
 
     llmProvider.chat.mockImplementation(
@@ -1234,12 +1235,13 @@ describe('MainPipeline.run()', () => {
 
     expect(messageManager.create).toHaveBeenCalledWith(
       'agent-1',
-      'tool_call',
+      'error',
       expect.objectContaining({
         data: expect.objectContaining({
-          callId: 'call-final-defaults-result',
-          toolName: 'final_answer',
-          arguments: {},
+          error: expect.objectContaining({
+            type: 'provider',
+            message: expect.stringContaining('invalid completion format'),
+          }),
         }),
       }),
       1,
