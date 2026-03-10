@@ -3,6 +3,8 @@
 ## Введение
 
 Данный документ описывает требования к инфраструктуре тестирования приложения Clerkly, включая типы тестов, стратегию мокирования и процесс валидации.
+Документ описывает только тестовую инфраструктуру (процессы, инструменты, правила написания и запуска тестов) и SHALL NOT задавать продуктовые UI-контракты или runtime-логику приложения.
+Продуктовые требования определяются профильными спецификациями фич в `docs/specs/*`; `testing-infrastructure` использует их только как внешние источники проверяемых контрактов.
 
 ## Глоссарий
 
@@ -89,6 +91,7 @@
 - `test:clear-tokens` - очистка всех токенов из БД
 - `test:get-token-status` - получение статуса токенов
 - `test:clear-data` - очистка всех данных из БД
+- `test:handle-deep-link` - симуляция обработки OAuth callback/deep link в тестовой среде
 
 3.1.3. THE test IPC handlers SHALL быть доступны ТОЛЬКО в тестовом режиме
 
@@ -287,6 +290,8 @@
 - Тесты производительности
 - Нагрузочное тестирование
 - Тестирование безопасности
+- Продуктовые UI-контракты
+- Runtime-логика приложения
 
 
 ### 10. Helper Функции для Функциональных Тестов
@@ -404,35 +409,3 @@ await expect(element).toContainText('Success');
 12.2. WHEN в DOM присутствует toast-уведомление с типом `error`, THE тест SHALL завершаться с ошибкой, содержащей текст этого уведомления.
 
 12.3. THE проверка toast-ошибок SHALL быть реализована как переиспользуемый helper в модуле тестовых утилит.
-
-### 13. Контракты тестирования AI SDK chat-flow
-
-**ID:** testing.13
-
-**User Story:** Как разработчик, я хочу проверять AI SDK chat-flow контракт на уровне unit/functional тестов, чтобы стриминг, ошибки и tool-loop оставались стабильными.
-
-**Зависимости:** testing.1, testing.3
-
-#### Критерии Приемки
-
-13.1. THE модульные тесты SHALL покрывать stream protocol sequence (`start -> start-step -> delta -> finish-step -> finish`) для renderer transport.
-13.1.1. `start-step` SHALL соответствовать transport chunk `text-start`, а `finish-step` SHALL соответствовать transport chunk `text-end`.
-
-13.2. THE модульные тесты SHALL покрывать отсутствие дублирования между delta-событиями (`message.llm.reasoning.updated`, `message.llm.text.updated`) и snapshot `message.updated`.
-
-13.3. THE модульные тесты SHALL проверять рендер persisted `kind:tool_call`: `final_answer` как отдельный checklist-блок `"Final Answer"` (без отдельного заголовка, только `summary_points`), остальные `tool_call` как отдельный tool-call блок.
-13.3.1. Для `final_answer` тесты SHALL проверять, что checklist-блок всегда отображается раскрытым и не содержит контроля сворачивания.
-13.3.2. Тесты SHALL проверять соблюдение контракта `final_answer` согласно `llm-integration.9.5.*` (`summary_points` обязателен и содержит минимум 1 пункт).
-13.3.3. Тесты SHALL проверять retry-path для невалидного `final_answer` и создание `kind:error` при исчерпании retry-лимита.
-
-13.4. THE модульные тесты SHALL покрывать ErrorNormalizer для классов ошибок AI SDK и доменного маппинга (`auth`, `rate_limit`, `provider`, `network`, `timeout`, `tool`, `protocol`).
-
-13.5. THE модульные тесты SHALL покрывать multi-tool сценарии в одном запросе и продолжение цикла `model -> tools -> model`.
-
-13.6. THE функциональные тесты SHALL проверять одновременный стриминг reasoning и текста в одном `kind:llm` сообщении.
-
-13.7. THE функциональные тесты SHALL проверять `rate_limit` countdown без создания `kind:error` записи в истории.
-
-13.8. THE функциональные тесты SHALL проверять, что cancel во время tool execution НЕ создаёт `kind:error`.
-
-13.9. THE модульные и функциональные тесты SHALL покрывать нормализацию математических делимитеров `\(...\)`, `\[...\]`, `\$...\$` и `\$\$...\$\$` в KaTeX-совместимый формат, включая проверку, что fenced/inline code при нормализации не изменяются.

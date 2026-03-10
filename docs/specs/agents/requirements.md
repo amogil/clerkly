@@ -506,13 +506,13 @@
    - `llm` - ответ агента (слева), включая streaming reasoning/text и финальное состояние `done = true`
    - `tool_call` - вызов инструмента и его результат/статус
 
-7.4. `tool_call` с `toolName != "final_answer"` НЕ ДОЛЖЕН отображаться как обычный текстовый bubble (`user`/`llm`); для него ДОЛЖЕН использоваться специализированный tool-call блок.
+7.4. В текущем scope UI ДОЛЖЕН поддерживать только два типа `tool_call`: `tool_call(final_answer)` и `tool_call(code_exec)`, с раздельными правилами отображения по пунктам `7.4.1`-`7.4.7`.
 
 7.4.1. `tool_call` с `toolName = "final_answer"` ДОЛЖЕН отображаться как отдельный компонент `"Final Answer"` (на базе AI Elements `Queue`), а не как обычный текстовый bubble `kind: llm`.
 
-7.4.1.2. Реализация `"Final Answer"` ДОЛЖНА использовать AI Elements `Queue` как базовый компонент.
-
 7.4.1.1. Компонент `"Final Answer"` ДОЛЖЕН отображаться как checklist без отдельного заголовка.
+
+7.4.1.2. Реализация `"Final Answer"` ДОЛЖНА использовать AI Elements `Queue` как базовый компонент.
 
 7.4.2. Внутри компонента `"Final Answer"` для `tool_call(final_answer)` ДОЛЖНЫ отображаться пункты `summary_points`; каждый пункт ДОЛЖЕН отображаться с иконкой `Check` в зелёном круге.
 
@@ -526,6 +526,18 @@
   - `data-testid="message-final-answer-block"` для корневого блока,
   - `data-testid="message-final-answer-summary"` для контейнера checklist,
   - `data-testid="message-final-answer-item"` для checklist-пункта.
+
+7.4.5. `tool_call` с `toolName = "code_exec"` НЕ ДОЛЖЕН отображаться как обычный текстовый bubble (`user`/`llm`); для него ДОЛЖЕН использоваться специализированный блок выполнения кода.
+
+7.4.6. Блок `tool_call(code_exec)` ДОЛЖЕН отображать статус выполнения и детали результата (включая `stdout`/`stderr` при наличии) на основе persisted payload.
+
+7.4.6.1. Для визуализации `tool_call(code_exec)` ДОЛЖЕН использоваться компонент AI Elements `Tool` (см. [https://elements.ai-sdk.dev/components/tool](https://elements.ai-sdk.dev/components/tool)).
+
+7.4.7. Для `tool_call(code_exec)` UI ДОЛЖЕН иметь отдельные тестовые идентификаторы:
+  - `data-testid="message-code-exec-block"` для корневого блока,
+  - `data-testid="message-code-exec-status"` для статуса,
+  - `data-testid="message-code-exec-stdout"` для секции stdout,
+  - `data-testid="message-code-exec-stderr"` для секции stderr.
 
 7.5. Сообщение `user` ДОЛЖНО содержать:
    ```json
@@ -570,6 +582,9 @@
 - `tests/functional/llm-chat.spec.ts` - "should render math when model returns LaTeX delimiters"
 - `tests/functional/llm-chat.spec.ts` - "should render math when model returns escaped dollar delimiters"
 - `tests/functional/llm-chat.spec.ts` - "should avoid duplicate line breaks between markdown blocks"
+- `tests/functional/llm-chat.spec.ts` - "should render tool_call(final_answer) as checklist block"
+- `tests/functional/llm-chat.spec.ts` - "should keep tool_call(final_answer) checklist always expanded"
+- `tests/functional/code_exec.spec.ts` - "should render tool_call(code_exec) message block in chat"
 
 ---
 
@@ -621,7 +636,7 @@
      - `kind = 'llm'` и `done = true` → `awaiting-response`
      - `kind = 'tool_call'` и `done = false` → `in-progress`
      - `kind = 'tool_call'` и `toolName = 'final_answer'` и `done = true` → `completed`
-     - `kind = 'tool_call'` и `toolName != 'final_answer'` и `done = true` → `awaiting-response`
+     - `kind = 'tool_call'` и `toolName = 'code_exec'` и `done = true` → `in-progress`
      - `kind = 'error'` → `error`
 
 9.3. Статус ДОЛЖЕН пересчитываться при получении любого нового сообщения в чате агента

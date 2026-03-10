@@ -2,7 +2,8 @@
 
 ## Обзор
 
-Данный документ описывает дизайн инфраструктуры тестирования для приложения Clerkly, включая архитектуру тестов, стратегию мокирования, процесс валидации, требования к окружению для запуска различных типов тестов, а также специализированные инструменты для функционального тестирования (Test IPC Handlers, Mock OAuth Server) и режим разработки с поддержкой deep links.
+Данный документ описывает дизайн инфраструктуры тестирования для приложения Clerkly, включая архитектуру тестов, стратегию мокирования, процесс валидации, требования к окружению для запуска различных типов тестов, а также специализированные инструменты для функционального тестирования (Test IPC Handlers, Mock OAuth Server).
+Документ фиксирует только тестовую инфраструктуру и SHALL NOT задавать продуктовые UI-контракты или runtime-логику; такие контракты определяются в профильных спецификациях фич в `docs/specs/*`.
 
 ## Архитектура Тестирования
 
@@ -640,7 +641,7 @@ npm test
 ### Покрытие Требований
 Покрытие требований фиксируется в таблицах покрытия соответствующих спецификаций. Для инфраструктуры тестирования применяются следующие правила:
 - `testing.1.*` покрывается модульными тестами
-- `testing.3.*`, `testing.5.*`, `testing.6.*`, `testing.8.*` покрывается функциональными тестами
+- `testing.3.*`, `testing.5.*`, `testing.6.*`, `testing.8.*`, `testing.9.*`, `testing.10.*`, `testing.11.*`, `testing.12.*` покрывается функциональными тестами
 - `testing.4.*` проверяется скриптом валидации
 
 ## Требования к Окружению
@@ -1018,7 +1019,6 @@ test('should [expected behavior]', () => {
 });
 ```
 
-
 ## Helper Функции для Функциональных Тестов
 
 **Requirements**: testing.10
@@ -1137,13 +1137,13 @@ await expect(messages.first()).toContainText('Test message');
 // ❌ НЕПРАВИЛЬНО
 await createButton.click();
 await window.waitForTimeout(1000);
-const agents = window.locator('[data-testid="agent-icon"]');
-expect(await agents.count()).toBe(2);
+const items = window.locator('[data-testid="list-item"]');
+expect(await items.count()).toBe(2);
 
 // ✅ ПРАВИЛЬНО
 await createButton.click();
-const agents = window.locator('[data-testid="agent-icon"]');
-await expect(agents).toHaveCount(2, { timeout: 2000 });
+const items = window.locator('[data-testid="list-item"]');
+await expect(items).toHaveCount(2, { timeout: 2000 });
 ```
 
 #### 4. Ожидание Изменения Состояния
@@ -1242,71 +1242,13 @@ export async function expectNoToastError(window: Page): Promise<void> {
 
 ### Когда вызывать
 
-- После `completeOAuthFlow` + ожидания `[data-testid="agents"]`
+- После завершения ключевого сценария + ожидания основного контейнера экрана
 - После любого действия, которое может вызвать фоновую ошибку
 
 ### Покрытие требований
 
 | Требование | Описание | Реализация |
 |------------|----------|------------|
-| testing.12.1 | Проверка после ключевых действий | Вызов в `launchWithMockLLM` и аналогичных helpers |
+| testing.12.1 | Проверка после ключевых действий | Вызов `expectNoToastError` в общих functional helpers после ключевых операций |
 | testing.12.2 | Фейл с текстом ошибки | `throw new Error(\`Toast error detected: ${text}\`)` |
 | testing.12.3 | Переиспользуемый helper | `expectNoToastError` в `helpers/electron.ts` |
-
-## AI SDK Chat-Flow Контракты
-
-**Requirements**: testing.13
-
-### Unit: Stream Protocol
-
-- `tests/unit/renderer/IPCChatTransport.test.ts` проверяет порядок `UIMessageChunk`:
-  - `start -> start-step -> reasoning/text deltas -> finish-step -> finish`
-- Отдельные кейсы проверяют отсутствие дублирования между delta-событиями и `message.updated`.
-
-### Unit: Tool Loop и Status
-
-- `tests/unit/agents/MainPipeline.test.ts` покрывает:
-  - несколько `tool_call` в одном запросе;
-  - продолжение `model -> tools -> model`;
-  - cancel во время выполнения tools без `kind:error`.
-- `tests/unit/components/agents-status-colors.test.tsx` покрывает статусные переходы для `llm/tool_call` с `done=true/false`.
-
-### Unit: Error Normalization
-
-- `tests/unit/llm/ErrorNormalizer.test.ts` покрывает mapping AI SDK ошибок:
-  - `APICallError` (401/403/429/5xx),
-  - timeout/abort,
-  - transport-level network,
-  - `NoSuchToolError`, `InvalidToolInputError`, `ToolExecutionError`, `ToolCallRepairError`,
-  - `UIMessageStreamError`.
-
-### Functional: End-to-End Контракты
-
-- `tests/functional/llm-chat.spec.ts` проверяет:
-  - параллельный стриминг reasoning + текста;
-  - отображение persisted `tool_call` по `message.created`/`message.updated` (`final_answer` как отдельный блок `"Final Answer"`, остальные как tool-call блок);
-  - корректный rate-limit countdown без persisted `kind:error`;
-  - отсутствие `kind:error` при cancel во время tool execution.
-
-### Технические детали проверки `final_answer` (для тестов)
-
-- Для проверки завершённого ответа через `final_answer` использовать:
-  - `data-testid="message-final-answer-block"` — корневой блок;
-  - `data-testid="message-final-answer-summary"` — контейнер checklist `summary_points`;
-  - `data-testid="message-final-answer-item"` — checklist-пункты.
-- Блок `final_answer` проверяется как всегда раскрытый checklist без toggle-контрола.
-- Для проверки обычных tool-calls (не `final_answer`) использовать селекторы tool-call блока, а не assistant bubble.
-- Для сценариев невалидного `final_answer` (`summary_points` пустой/отсутствует, `summary_points` > 10, пункт > 200) проверять retry pipeline и итоговый `kind:error` при исчерпании лимита.
-
-### Покрытие требований
-
-| Требование | Модульные тесты | Функциональные тесты |
-|---|---|---|
-| testing.13.1 | ✓ | - |
-| testing.13.2 | ✓ | - |
-| testing.13.3 | ✓ | ✓ |
-| testing.13.4 | ✓ | - |
-| testing.13.5 | ✓ | ✓ |
-| testing.13.6 | - | ✓ |
-| testing.13.7 | ✓ | ✓ |
-| testing.13.8 | ✓ | ✓ |

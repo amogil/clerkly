@@ -519,7 +519,7 @@ function computeAgentStatus(messages: Message[]): AgentStatus {
   }
   if (lastMessage.kind === 'tool_call') {
     if (!lastMessage.done) return 'in-progress';
-    return lastMessage.payload?.data?.toolName === 'final_answer' ? 'completed' : 'awaiting-response';
+    return lastMessage.payload?.data?.toolName === 'final_answer' ? 'completed' : 'in-progress';
   }
   return 'new';
 }
@@ -1577,12 +1577,20 @@ function AgentWelcome({ onPromptClick }: AgentWelcomeProps) {
 ```
 
 **Сообщения инструментов (`kind: 'tool_call'`):**
-- Для `toolName !== 'final_answer'` используется AI Elements `Tool` family как отдельный технический блок вызова инструмента.
+- Для `toolName === 'code_exec'` используется AI Elements `Tool` family как отдельный технический блок вызова инструмента.
 - Для `toolName === 'final_answer'` используется отдельный компонент `"Final Answer"` на базе AI Elements `Queue`.
 - Компонент не имеет отдельного заголовка; рендерится только checklist `summary_points`.
 - Каждый checklist-пункт рендерится с иконкой `Check` в зелёном круге.
 - Компонент всегда отображается в раскрытом виде; сворачивание/разворачивание не поддерживается.
 - `Agents` не выполняет валидацию/repair `final_answer`; компонент рендерит только persisted payload.
+
+**Сообщения выполнения кода (`kind: 'tool_call'`, `toolName: 'code_exec'`):**
+- Используется отдельный блок выполнения кода, не являющийся обычным текстовым bubble.
+- Блок строится на AI Elements `Tool` (см. [https://elements.ai-sdk.dev/components/tool](https://elements.ai-sdk.dev/components/tool)).
+- Блок отображает persisted-статус выполнения (`running | success | error | timeout`).
+- Для security/policy отказов используется `status=error` с соответствующим `error.code` (например, `policy_denied`).
+- При наличии отображаются `stdout` и `stderr` из persisted payload.
+- Рендер строится только по persisted snapshot (`message.created`/`message.updated`) без локальной реконструкции результата.
 
 ```tsx
 // Requirements: agents.7.4.1, agents.7.4.2
@@ -2157,9 +2165,9 @@ await window.locator(`[data-testid="agent-icon-${firstAgentId}"]`).click();
 
 ## AI Elements интеграция (Фаза 9)
 
-Для отображения `tool_call` используется смешанная стратегия:
-- AI Elements `Tool` family (см. [https://elements.ai-sdk.dev/components/tool](https://elements.ai-sdk.dev/components/tool)) для всех `tool_call`, кроме `final_answer`.
-- AI Elements `Queue` family для `tool_call(final_answer)`: финал отображается отдельным компонентом `Final Answer` (header + список `summary_points`).
+Для отображения `tool_call` в текущем scope используется фиксированная стратегия:
+- AI Elements `Tool` family (см. [https://elements.ai-sdk.dev/components/tool](https://elements.ai-sdk.dev/components/tool)) для `tool_call(code_exec)`.
+- AI Elements `Queue` family для `tool_call(final_answer)`: финал отображается отдельным checklist-компонентом `Final Answer` (без отдельного header, только `summary_points`).
 
 ### Архитектура
 
@@ -2253,7 +2261,7 @@ useChat.sendMessage()
 - `MESSAGE_CREATED` (kind: error) → `{ type: 'error', errorText }` + `{ type: 'finish' }`
 - `MESSAGE_UPDATED` с `hidden: true` → закрыть stream (прерывание)
 
-Терминологическое соответствие с `testing.13.1`:
+Терминологическое соответствие с `llm-integration.2.8`:
 - `start-step` в тестовом контракте соответствует chunk-типу `text-start` в transport.
 - `finish-step` в тестовом контракте соответствует chunk-типу `text-end` в transport.
 
@@ -2340,6 +2348,13 @@ interface UseAgentChatResult {
 - В фазе `waiting-for-chats` запускается таймер
 - Если `app:set-chats-ready` не получен вовремя, состояние переходит в `error`
 - Причина перехода публикуется в `reason` для диагностики флейков/регрессий
+
+## Реактивные Подписки
+
+Подробная верхнеуровневая архитектура реактивных UI-подписок, общие паттерны и миграционные шаги вынесены в кросс-фичевую спецификацию `reactive-ui-architecture`:
+- `docs/specs/reactive-ui-architecture/design.md`.
+
+В этой спецификации `agents` фиксируются только компонентные правила и контракты рендера, относящиеся к UI агентов.
 
 ## Установка и обновление AI Elements компонентов
 

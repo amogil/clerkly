@@ -1,5 +1,18 @@
 # Документ Требований: LLM Integration
 
+## Фокус Документа
+
+Этот документ фиксирует только требования к runtime-интеграции с LLM:
+- orchestration turn-цикла `model -> tools -> model` в `MainPipeline`;
+- streaming reasoning/text, обработку ошибок и retry-поведение;
+- persisted/runtime контракты сообщений (`kind`, `done`, `tool_call`, `usage_json`) и их согласованность в chat-flow;
+- канонический реестр tool names для LLM tool-loop (`final_answer`, `code_exec`).
+
+Документ НЕ определяет:
+- UI/рендеринг сообщений и визуальные состояния чата (см. `docs/specs/agents/*`);
+- общий transport/event-bus контракт вне LLM-специфичных требований (см. `docs/specs/realtime-events/*`);
+- sandbox/policy/API контракты исполнения `code_exec` (см. `docs/specs/code_exec/*`).
+
 ## Введение
 
 Данный документ описывает требования к интеграции LLM в приложение Clerkly. Функциональность обеспечивает полный цикл взаимодействия пользователя с AI-агентом: отправка сообщения → вызов LLM → стриминг reasoning и текста ответа → (опционально) вызовы инструментов → сохранение событий и сообщений в целевом runtime-контракте.
@@ -15,6 +28,7 @@
 - **Reasoning** — внутренние "размышления" модели (стримятся в реальном времени)
 - **Assistant text** — пользовательский текстовый ответ модели (стримится инкрементально)
 - **Tool call** — запрос модели на вызов инструмента и получение результата
+- **code_exec** — инструмент выполнения JavaScript-кода в sandbox; в истории хранится как `kind: tool_call` с `toolName = "code_exec"`
 - **kind** — тип сообщения: `user | llm | error | tool_call`
 - **done** — флаг завершённости сообщения в БД (`false` пока сообщение ещё формируется/стримится, `true` после полного получения)
 - **reply_to_message_id** — ссылка на сообщение, на которое даётся ответ (колонка `messages.reply_to_message_id`, null только у первого)
@@ -175,6 +189,10 @@
   - transport-level ошибки без `statusCode` → `network`
   - ошибки tool execution (`NoSuchToolError`, `InvalidToolInputError`, `ToolExecutionError`, `ToolCallRepairError`) → `tool`
   - ошибки stream protocol (`UIMessageStreamError`) → `protocol`
+
+#### Функциональные Тесты
+
+- `tests/functional/llm-chat.spec.ts` — "should show rate limit banner with countdown"
 
 ---
 
@@ -366,7 +384,7 @@
 
 9.6. В целевой модели невалидный `final_answer` НЕ ДОЛЖЕН фиксироваться как успешный `completed`; он ДОЛЖЕН либо быть исправлен через retry, либо завершиться `kind:error` при исчерпании retry-лимита.
 
-9.7. Контракт отображения `tool_call(final_answer)` определяется в спецификации `agents` (см. `agents.7.4.4`) и не дублируется в данном документе.
+9.7. Контракт отображения `kind: tool_call` (в текущем scope: `final_answer`, `code_exec`) определяется только в спецификации `agents` (`agents.7.4.*`) и не дублируется в данном документе.
 
 ---
 
@@ -410,6 +428,8 @@
 
 11.2.1. Для `final_answer` инструмент ДОЛЖЕН вызываться в strict-режиме через `Vercel AI SDK`; соблюдение контракта аргументов (`llm-integration.9.5.*`) ДОЛЖНО обеспечиваться схемой инструмента и встроенным retry/repair механизмом SDK.
 
+11.2.2. КОГДА `tool_call` имеет `toolName = "code_exec"`, ТО обработка ДОЛЖНА выполняться через тот же pipeline `kind: tool_call` (без отдельного `kind`) с форматом полей `callId/toolName/arguments/output`; детальный контракт аргументов/результата задаётся в `code_exec.3.*` и `code_exec.4.*`.
+
 11.3. Выполнение инструмента ДОЛЖНО сопровождаться сохранением сообщения `kind: tool_call` в `messages`; отображение этих сообщений определяется спецификацией `agents`.
 
 11.3.1. Сообщения `kind: tool_call` НЕ ДОЛЖНЫ входить в model history (`PromptBuilder`/`listForModelHistory`), но ДОЛЖНЫ сохраняться в истории сообщений.
@@ -431,6 +451,7 @@
 
 - `tests/functional/llm-chat.spec.ts` — "full llm response streams before final_answer block appears"
 - `tests/functional/llm-chat.spec.ts` — "tool_call block is not persisted/visible before llm done for the same turn"
+- `tests/functional/code_exec.spec.ts` — "should persist code_exec as tool_call via common llm tool pipeline"
 
 ### 12. Надёжность chat-flow и обработка некорректных ответов
 
@@ -455,6 +476,7 @@
 #### Функциональные Тесты
 
 - `tests/functional/llm-chat.spec.ts` — "cancel during tool execution hides in-flight messages and creates no error"
+- `tests/functional/llm-chat.spec.ts` — "should show error when invalid final_answer exhausts retry limit"
 
 ---
 
@@ -501,3 +523,21 @@
 #### Функциональные Тесты
 
 - `tests/functional/llm-chat.spec.ts` — "multiple tool calls in one turn and final response continues"
+
+---
+
+### 15. Канонический реестр tool names
+
+**ID:** llm-integration.15
+
+**User Story:** Как разработчик, я хочу единый канонический список имён инструментов в одном месте, чтобы избежать расхождений между спеками и runtime.
+
+#### Критерии Приемки
+
+15.1. Канонический список `toolName` ДОЛЖЕН фиксироваться в `llm-integration` как source of truth для runtime/tool-loop контракта.
+
+15.2. В текущем scope список `toolName` ДОЛЖЕН состоять ровно из:
+  - `final_answer`
+  - `code_exec`
+
+15.3. Другие спецификации (`agents`, `code_exec`, `realtime-events`) SHALL ссылаться на канонический список из `llm-integration` и SHALL NOT переопределять его независимо.

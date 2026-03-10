@@ -2398,3 +2398,12 @@ test('UI should render within 100ms', () => {
 - Компоненты: Все модульные тесты
 - Стратегия: Раздел "Стратегия модульного тестирования"
 ```
+
+
+---
+
+## Реактивная Архитектура UI
+
+Подробная кросс-фичевая архитектура реактивных UI-подписок вынесена в отдельную спецификацию:
+- `docs/specs/reactive-ui-architecture/requirements.md`
+- `docs/specs/reactive-ui-architecture/design.md`
