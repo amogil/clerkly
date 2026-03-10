@@ -6,6 +6,24 @@ import type { Message } from '../db/schema';
 import type { LLMTool, ChatMessage } from '../llm/ILLMProvider';
 
 /**
+ * Normalize prompt text for stable model input:
+ * - collapses repeated horizontal spaces/tabs
+ * - strips trailing spaces on lines
+ * - collapses 3+ newlines to a single blank line
+ * - trims leading/trailing blank area
+ *
+ * Requirements: llm-integration.4.5
+ */
+export function normalizePromptWhitespace(prompt: string): string {
+  const normalizedByLine = prompt
+    .split('\n')
+    .map((line) => line.replace(/[ \t]{2,}/g, ' ').replace(/[ \t]+$/g, ''))
+    .join('\n');
+
+  return normalizedByLine.replace(/\n{3,}/g, '\n\n').trim();
+}
+
+/**
  * A feature that contributes a system prompt section and/or tools
  * Requirements: llm-integration.4.1
  */
@@ -89,7 +107,7 @@ export class PromptBuilder {
       const section = feature.getSystemPromptSection();
       if (section) parts.push(section);
     }
-    return parts.join('\n\n');
+    return normalizePromptWhitespace(parts.join('\n\n'));
   }
 
   private collectTools(): LLMTool[] {
@@ -189,5 +207,52 @@ export class PromptBuilder {
       sorted[key] = this.sortKeys(record[key]);
     }
     return sorted;
+  }
+}
+
+/**
+ * Built-in feature that defines terminal tool call used to mark task completion.
+ * Requirements: llm-integration.9.2, llm-integration.11.2.1
+ */
+export class FinalAnswerFeature implements AgentFeature {
+  name = 'final_answer';
+
+  getSystemPromptSection(): string {
+    return [
+      'Final Answer tool usage:',
+      '- Use normal assistant text for ongoing dialog: clarifying questions, intermediate updates, or requests for user input.',
+      '- Call the `final_answer` tool only when you are confident the requested work is completed.',
+      '- Use `final_answer.summary_points` to list solved tasks (required: 1 to 10 points, each max 200 characters).',
+    ].join('\n');
+  }
+
+  getTools(): LLMTool[] {
+    return [
+      {
+        name: 'final_answer',
+        description:
+          'Marks task completion. Use only after task is fully done; summary_points must list solved tasks.',
+        parameters: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['summary_points'],
+          properties: {
+            summary_points: {
+              type: 'array',
+              description:
+                'Required concise list of solved tasks (1-10 points, max 200 chars each).',
+              minItems: 1,
+              maxItems: 10,
+              items: {
+                type: 'string',
+                maxLength: 200,
+              },
+            },
+          },
+        },
+        // Keep execution deterministic and side-effect free.
+        execute: async (args: Record<string, unknown>) => args,
+      },
+    ];
   }
 }

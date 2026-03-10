@@ -1,7 +1,7 @@
 // Requirements: clerkly.1
 /**
  * Renderer Process Entry Point
- * Инициализирует React приложение
+ * Initializes React application
  */
 
 import React from 'react';
@@ -15,20 +15,20 @@ const logger = Logger.create('Index');
 
 // Requirements: clerkly.1
 /**
- * Инициализирует renderer process с React
+ * Initializes renderer process with React
  */
 async function initializeRenderer(): Promise<void> {
   logger.info('Clerkly - Initializing Renderer Process');
 
   try {
-    // Получаем root контейнер
+    // Get root container
     const rootContainer = document.getElementById('root');
     if (!rootContainer) {
       throw new Error('Root container not found');
     }
 
     // Requirements: clerkly.1
-    // Инициализируем React приложение
+    // Initialize React application
     const root = ReactDOM.createRoot(rootContainer);
     root.render(
       <React.StrictMode>
@@ -40,7 +40,7 @@ async function initializeRenderer(): Promise<void> {
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     logger.error(`Failed to initialize Renderer Process: ${errorMessage}`);
-    // Показываем ошибку пользователю
+    // Show error to user
     document.body.innerHTML = `
       <div style="padding: 20px; color: red;">
         <h1>Initialization Error</h1>
@@ -51,11 +51,11 @@ async function initializeRenderer(): Promise<void> {
 }
 
 // Requirements: clerkly.1
-// Инициализируем renderer process когда DOM готов
+// Initialize renderer process when DOM is ready
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', initializeRenderer);
 } else {
-  // DOM уже загружен
+  // DOM is already loaded
   initializeRenderer();
 }
 

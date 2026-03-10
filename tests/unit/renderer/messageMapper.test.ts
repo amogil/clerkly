@@ -258,6 +258,97 @@ describe('toUIMessage', () => {
       errorText: 'tool failed',
     });
   });
+
+  /* Preconditions: message with kind 'tool_call' for final_answer
+     Action: call toUIMessage
+     Assertions: maps to assistant metadata message without synthetic text
+     Requirements: llm-integration.9.7, agents.7.4.1 */
+  it('should map final_answer tool_call to assistant text part', () => {
+    const msg = makeSnapshot({
+      kind: 'tool_call',
+      done: true,
+      payload: {
+        data: {
+          callId: 'call-final',
+          toolName: 'final_answer',
+          arguments: {
+            summary_points: ['Point 1'],
+          },
+        },
+      },
+    });
+    const result = toUIMessage(msg);
+    expect(result).not.toBeNull();
+    expect(result!.role).toBe('assistant');
+    expect(result!.parts).toEqual([]);
+    expect((result!.metadata as Record<string, unknown>).isFinalAnswer).toBe(true);
+    expect((result!.metadata as Record<string, unknown>).summary_points).toEqual(['Point 1']);
+  });
+
+  /* Preconditions: final_answer without arguments
+     Action: call toUIMessage
+     Assertions: keeps empty parts and normalizes summary_points to empty array
+     Requirements: llm-integration.9.6 */
+  it('should map final_answer without arguments to empty parts and empty summary points', () => {
+    const msg = makeSnapshot({
+      kind: 'tool_call',
+      done: true,
+      payload: {
+        data: {
+          callId: 'call-final',
+          toolName: 'final_answer',
+          arguments: {},
+        },
+      },
+    });
+    const result = toUIMessage(msg);
+    expect(result).not.toBeNull();
+    expect(result!.role).toBe('assistant');
+    expect(result!.parts).toEqual([]);
+    expect((result!.metadata as Record<string, unknown>).summary_points).toEqual([]);
+  });
+
+  /* Preconditions: final_answer without summary_points field
+     Action: call toUIMessage
+     Assertions: summary_points normalized to empty array
+     Requirements: llm-integration.9.5.1.2 */
+  it('should normalize final_answer summaryPoints to empty array when missing', () => {
+    const msg = makeSnapshot({
+      kind: 'tool_call',
+      done: true,
+      payload: {
+        data: {
+          callId: 'call-final',
+          toolName: 'final_answer',
+          arguments: {},
+        },
+      },
+    });
+    const result = toUIMessage(msg);
+    expect(result).not.toBeNull();
+    expect((result!.metadata as Record<string, unknown>).summary_points).toEqual([]);
+  });
+
+  /* Preconditions: final_answer with non-array summary_points value
+     Action: call toUIMessage
+     Assertions: summary_points normalized to empty array
+     Requirements: llm-integration.9.5.1 */
+  it('should normalize non-array final_answer summary_points to empty array', () => {
+    const msg = makeSnapshot({
+      kind: 'tool_call',
+      done: true,
+      payload: {
+        data: {
+          callId: 'call-final',
+          toolName: 'final_answer',
+          arguments: { summary_points: 'not-array' as unknown as string[] },
+        },
+      },
+    });
+    const result = toUIMessage(msg);
+    expect(result).not.toBeNull();
+    expect((result!.metadata as Record<string, unknown>).summary_points).toEqual([]);
+  });
 });
 
 describe('toUIMessages', () => {

@@ -114,6 +114,24 @@ describe('ErrorNormalizer', () => {
     expect(normalized.message).toBe('Invalid API key. Please check your key and try again.');
   });
 
+  /* Preconditions: RetryError wraps APICallError with 401 status in cause chain
+     Action: normalizeLLMError
+     Assertions: mapped to auth
+     Requirements: llm-integration.3.10 */
+  it('maps RetryError with auth status in cause chain to auth', () => {
+    const normalized = normalizeLLMError({
+      name: 'RetryError',
+      message: 'Retries exhausted',
+      cause: {
+        name: 'APICallError',
+        statusCode: 401,
+        message: 'Unauthorized',
+      },
+    });
+    expect(normalized.type).toBe('auth');
+    expect(normalized.message).toBe('Invalid API key. Please check your key and try again.');
+  });
+
   /* Preconditions: RetryError carries 429 wording
      Action: normalizeLLMError
      Assertions: mapped to rate_limit with parsed retryAfterSeconds

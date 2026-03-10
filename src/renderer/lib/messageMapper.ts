@@ -79,6 +79,26 @@ export function toUIMessage(msg: MessageSnapshot): UIMessage | null {
       arguments?: Record<string, unknown>;
       output?: { status?: string; content?: string };
     };
+    if (call.toolName === 'final_answer') {
+      const args =
+        call.arguments && typeof call.arguments === 'object' && !Array.isArray(call.arguments)
+          ? call.arguments
+          : {};
+      const summaryPoints = Array.isArray(args.summary_points) ? args.summary_points : [];
+      return {
+        id: String(msg.id),
+        role: 'assistant',
+        parts: [],
+        metadata: {
+          isToolCall: true,
+          isFinalAnswer: true,
+          toolName: call.toolName,
+          callId: call.callId ?? String(msg.id),
+          summary_points: summaryPoints,
+        },
+      };
+    }
+
     const toolName = call.toolName ?? 'tool';
     const callId = call.callId ?? String(msg.id);
     const input = call.arguments ?? {};

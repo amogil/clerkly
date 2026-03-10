@@ -3,6 +3,7 @@
 ## Введение
 
 Данный документ описывает требования к интерфейсу "Agents" - основному экрану для взаимодействия с AI-агентами в приложении Clerkly. Компонент предоставляет список агентов (каждый чат - отдельный агент), интерфейс чата для общения с выбранным агентом, и навигацию между различными агентами.
+Документ `agents` фиксирует только поведение интерфейса и отображение persisted данных. Логика взаимодействия с моделью (оркестрация LLM, tool-loop, retry/repair, провайдерные контракты) определяется исключительно в `docs/specs/llm-integration/*`.
 
 ## Глоссарий
 
@@ -205,6 +206,14 @@
 4.10.1. Сообщения агента ДОЛЖНЫ занимать всю ширину области чата
 
 4.10.2. Диалоги уведомлений в чате агента ДОЛЖНЫ занимать всю ширину области чата
+
+4.10.3. КОГДА `kind:error` содержит действия "Open Settings" и "Retry", ТО UI ДОЛЖЕН отображать обе кнопки действий в диалоге ошибки.
+
+4.10.4. КОГДА отображаются действия "Open Settings" и "Retry", ТО порядок кнопок ДОЛЖЕН быть фиксированным: сначала "Open Settings", затем "Retry".
+
+4.10.4.1. Для действий "Open Settings" и "Retry" визуальные варианты ДОЛЖНЫ быть фиксированными: "Open Settings" — `outline`, "Retry" — `default`.
+
+4.10.5. КОГДА пользователь нажимает "Retry" в диалоге ошибки авторизации/ключа, ТО текущий диалог ошибки ДОЛЖЕН скрываться перед запуском повтора запроса.
 
 4.11. КОГДА сообщение агента (`kind: llm`) содержит блок reasoning, заголовок reasoning-блока ДОЛЖЕН содержать Message Avatar (иконка приложения), текстовый индикатор размышления и управляющий chevron
 
@@ -421,7 +430,7 @@
    - Цвет фона: bg-green-500
    - Цвет кольца: ring-green-500/30
    - Цвет текста: text-green-600
-   - Иконка: Check (галочка)
+   - Иконка: `Check` в зелёном круге
    - Текстовое описание: "Completed"
 
 6.6. Все анимации ДОЛЖНЫ быть плавными (60 FPS) и не вызывать задержек в UI
@@ -490,14 +499,33 @@
 
 7.2.1. Допустимые значения `kind`: `user | llm | error | tool_call`
 
-7.2.2. Для LLM-интеграции canonical финальный ответ ДОЛЖЕН завершаться сообщением `kind: llm` с `done = true`.
+7.2.2. Для сценария завершения задачи в истории сообщений ДОЛЖНО присутствовать сообщение `kind: tool_call` c `toolName = "final_answer"` и `done = true`.
 
 7.3. В UI чата ДОЛЖНЫ отображаться следующие kinds:
    - `user` - сообщение пользователя (справа, серый полупрозрачный фон, тонкая серая рамка, скругленные углы)
    - `llm` - ответ агента (слева), включая streaming reasoning/text и финальное состояние `done = true`
-   - `tool_call` - отдельный tool-call блок (вызов инструмента и его результат/статус)
+   - `tool_call` - вызов инструмента и его результат/статус
 
-7.4. `tool_call` НЕ ДОЛЖЕН отображаться как обычный текстовый bubble (`user`/`llm`); для него ДОЛЖЕН использоваться специализированный tool-call блок.
+7.4. `tool_call` с `toolName != "final_answer"` НЕ ДОЛЖЕН отображаться как обычный текстовый bubble (`user`/`llm`); для него ДОЛЖЕН использоваться специализированный tool-call блок.
+
+7.4.1. `tool_call` с `toolName = "final_answer"` ДОЛЖЕН отображаться как отдельный компонент `"Final Answer"` (на базе AI Elements `Queue`), а не как обычный текстовый bubble `kind: llm`.
+
+7.4.1.2. Реализация `"Final Answer"` ДОЛЖНА использовать AI Elements `Queue` как базовый компонент.
+
+7.4.1.1. Компонент `"Final Answer"` ДОЛЖЕН отображаться как checklist без отдельного заголовка.
+
+7.4.2. Внутри компонента `"Final Answer"` для `tool_call(final_answer)` ДОЛЖНЫ отображаться пункты `summary_points`; каждый пункт ДОЛЖЕН отображаться с иконкой `Check` в зелёном круге.
+
+7.4.2.1. Компонент `"Final Answer"` ДОЛЖЕН всегда отображаться в раскрытом виде и НЕ ДОЛЖЕН поддерживать сворачивание/разворачивание.
+
+7.4.2.2. КОГДА `summary_points` пустой (или отсутствует), ТО это состояние ДОЛЖНО считаться нарушением контракта `final_answer` (см. `llm-integration.9.5.*`).
+
+7.4.2.3. Контракт и лимиты аргументов `final_answer` задаются в спецификации `llm-integration`; `agents` использует только persisted payload для отображения.
+
+7.4.4. Для `tool_call(final_answer)` UI ДОЛЖЕН иметь отдельные тестовые идентификаторы:
+  - `data-testid="message-final-answer-block"` для корневого блока,
+  - `data-testid="message-final-answer-summary"` для контейнера checklist,
+  - `data-testid="message-final-answer-item"` для checklist-пункта.
 
 7.5. Сообщение `user` ДОЛЖНО содержать:
    ```json
@@ -510,6 +538,8 @@
    ```
 
 7.7. КОГДА `format = "markdown"`, ТО текст ДОЛЖЕН рендериться с поддержкой Markdown
+
+7.7.1. КОГДА в тексте встречаются математические делимитеры `\(...\)`, `\[...\]` или экранированные dollar-делимитеры `\$...\$` / `\$\$...\$\$`, ТО UI ДОЛЖЕН нормализовать их в KaTeX-совместимый формат (`$...$`/`$$...$$`) до рендера.
 
 7.8. Все timestamps ДОЛЖНЫ включать timezone offset и храниться в часовом поясе пользователя
 
@@ -537,6 +567,8 @@
 - `tests/functional/llm-chat.spec.ts` - "should render markdown mermaid diagrams"
 - `tests/functional/llm-chat.spec.ts` - "should render markdown inline math"
 - `tests/functional/llm-chat.spec.ts` - "should render markdown block math"
+- `tests/functional/llm-chat.spec.ts` - "should render math when model returns LaTeX delimiters"
+- `tests/functional/llm-chat.spec.ts` - "should render math when model returns escaped dollar delimiters"
 - `tests/functional/llm-chat.spec.ts` - "should avoid duplicate line breaks between markdown blocks"
 
 ---
@@ -588,7 +620,8 @@
      - `kind = 'llm'` и `done = false` → `in-progress`
      - `kind = 'llm'` и `done = true` → `awaiting-response`
      - `kind = 'tool_call'` и `done = false` → `in-progress`
-     - `kind = 'tool_call'` и `done = true` → `awaiting-response`
+     - `kind = 'tool_call'` и `toolName = 'final_answer'` и `done = true` → `completed`
+     - `kind = 'tool_call'` и `toolName != 'final_answer'` и `done = true` → `awaiting-response`
      - `kind = 'error'` → `error`
 
 9.3. Статус ДОЛЖЕН пересчитываться при получении любого нового сообщения в чате агента
@@ -641,7 +674,7 @@
 
 11.3. Индикатор ДОЛЖЕН отображаться в области сообщений под последним сообщением
 
-11.4. Индикатор ДОЛЖЕН исчезать, когда активное сообщение `kind: llm` ИЛИ `kind: tool_call` переходит в `done = true` ИЛИ скрывается через `hidden: true`
+11.4. Индикатор ДОЛЖЕН исчезать, когда активное сообщение `kind: llm` ИЛИ `kind: tool_call` переходит в `done = true` ИЛИ скрывается через `hidden: true`; для `tool_call(toolName='final_answer', done=true)` итоговый статус ДОЛЖЕН быть `completed`
 
 #### Функциональные Тесты
 

@@ -102,6 +102,7 @@ describe('AgentIPCHandlers', () => {
       cancelPipeline: jest.fn().mockReturnValue(true),
       setPipelineController: jest.fn(),
       clearPipelineController: jest.fn(),
+      publishStatusUpdated: jest.fn(),
     } as unknown as jest.Mocked<AgentManager>;
 
     mockMessageManager = {
@@ -943,7 +944,7 @@ describe('AgentIPCHandlers', () => {
   describe('messages:cancel handler', () => {
     /* Preconditions: Handlers registered
        Action: Invoke messages:cancel with agentId
-       Assertions: AgentManager.cancelPipeline called, pending user message hidden, success returned
+       Assertions: AgentManager.cancelPipeline called, user message remains visible, status event published
        Requirements: llm-integration.8.1, llm-integration.8.5, llm-integration.8.7 */
     it('should cancel active pipeline and return success', async () => {
       handlers.registerHandlers();
@@ -953,7 +954,9 @@ describe('AgentIPCHandlers', () => {
 
       expect(result).toEqual({ success: true });
       expect(mockAgentManager.cancelPipeline).toHaveBeenCalledWith('abc123xyz0');
-      expect(mockMessageManager.setHidden).toHaveBeenCalledWith(1, 'abc123xyz0');
+      expect(mockMessageManager.setHidden).not.toHaveBeenCalled();
+      expect(mockMessageManager.hideAndMarkIncomplete).not.toHaveBeenCalled();
+      expect(mockAgentManager.publishStatusUpdated).toHaveBeenCalledWith('abc123xyz0');
     });
 
     /* Preconditions: Handlers registered, no active pipeline for agent

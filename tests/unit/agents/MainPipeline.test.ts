@@ -202,7 +202,7 @@ describe('MainPipeline.run()', () => {
     );
   });
 
-  it('persists tool_call lifecycle from tool_call/tool_result stream chunks and finalizes llm text', async () => {
+  it('persists buffered tool_call after llm finalization in same turn', async () => {
     const { pipeline, llmProvider, toolExecutor, messageManager } = makeMocks();
 
     llmProvider.chat.mockImplementation(
@@ -239,21 +239,240 @@ describe('MainPipeline.run()', () => {
           callId: 'call-1',
           toolName: 'search_docs',
           arguments: { query: 'streaming' },
-        }),
-      }),
-      1,
-      false
-    );
-    expect(messageManager.update).toHaveBeenCalledWith(
-      expect.any(Number),
-      'agent-1',
-      expect.objectContaining({
-        data: expect.objectContaining({
-          callId: 'call-1',
-          toolName: 'search_docs',
           output: expect.objectContaining({ status: 'success' }),
         }),
       }),
+      1,
+      true
+    );
+
+    const llmDoneUpdate = (messageManager.update as jest.Mock).mock.calls.find(
+      (call: unknown[]) =>
+        call[3] === true &&
+        typeof call[2] === 'object' &&
+        call[2] !== null &&
+        'data' in (call[2] as Record<string, unknown>)
+    );
+    const toolCallCreate = (messageManager.create as jest.Mock).mock.calls.find(
+      (call: unknown[]) => call[1] === 'tool_call'
+    );
+    expect(llmDoneUpdate).toBeDefined();
+    expect(toolCallCreate).toBeDefined();
+    expect((llmDoneUpdate as unknown[]).length).toBeGreaterThan(0);
+    expect((toolCallCreate as unknown[]).length).toBeGreaterThan(0);
+    expect(
+      (messageManager.update as jest.Mock).mock.invocationCallOrder[
+        (messageManager.update as jest.Mock).mock.calls.indexOf(llmDoneUpdate as unknown[])
+      ]
+    ).toBeLessThan(
+      (messageManager.create as jest.Mock).mock.invocationCallOrder[
+        (messageManager.create as jest.Mock).mock.calls.indexOf(toolCallCreate as unknown[])
+      ]
+    );
+  });
+
+  it('persists valid final_answer tool_call as completed', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({
+          type: 'tool_call',
+          callId: 'call-final',
+          toolName: 'final_answer',
+          arguments: {
+            summary_points: ['Step A done', 'Step B done'],
+          },
+        });
+        return { text: 'assistant text' };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    expect(messageManager.create).toHaveBeenCalledWith(
+      'agent-1',
+      'tool_call',
+      expect.objectContaining({
+        data: expect.objectContaining({
+          callId: 'call-final',
+          toolName: 'final_answer',
+          arguments: expect.objectContaining({
+            summary_points: ['Step A done', 'Step B done'],
+          }),
+        }),
+      }),
+      1,
+      true
+    );
+  });
+
+  it('persists final_answer tool_call without local validation retry loop in MainPipeline', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({ type: 'reasoning', delta: 'Thinking...' });
+        onChunk({
+          type: 'tool_call',
+          callId: 'call-final',
+          toolName: 'final_answer',
+          arguments: {
+            summary_points: ['Done'],
+          },
+        });
+        return { text: 'assistant text final' };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    expect(llmProvider.chat).toHaveBeenCalledTimes(1);
+    expect(messageManager.hideAndMarkIncomplete).not.toHaveBeenCalled();
+    expect(messageManager.create).toHaveBeenCalledWith(
+      'agent-1',
+      'tool_call',
+      expect.objectContaining({
+        data: expect.objectContaining({
+          callId: 'call-final',
+          toolName: 'final_answer',
+          arguments: expect.objectContaining({ summary_points: ['Done'] }),
+        }),
+      }),
+      1,
+      true
+    );
+  });
+
+  it('creates kind:error when final_answer arguments are missing required summary_points', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({
+          type: 'tool_call',
+          callId: 'call-final-defaults',
+          toolName: 'final_answer',
+          arguments: {},
+        });
+        return { text: '' };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    expect(messageManager.create).toHaveBeenCalledWith(
+      'agent-1',
+      'error',
+      expect.objectContaining({
+        data: expect.objectContaining({
+          error: expect.objectContaining({
+            type: 'provider',
+            message: expect.stringContaining('invalid completion format'),
+          }),
+        }),
+      }),
+      1,
+      true
+    );
+  });
+
+  it('accepts plain text on retry after initial empty turn without completion marker', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+    let attempt = 0;
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, _onChunk: (c: ChatChunk) => void) => {
+        attempt += 1;
+        if (attempt === 1) {
+          return { text: '' };
+        }
+        return { text: 'Recovered plain text response' };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    expect(llmProvider.chat).toHaveBeenCalledTimes(2);
+    expect(messageManager.create).toHaveBeenCalledWith(
+      'agent-1',
+      'llm',
+      expect.objectContaining({
+        data: expect.objectContaining({
+          text: 'Recovered plain text response',
+        }),
+      }),
+      1,
+      true
+    );
+    expect(messageManager.create).not.toHaveBeenCalledWith(
+      'agent-1',
+      'error',
+      expect.anything(),
+      expect.anything(),
+      expect.anything()
+    );
+  });
+
+  it('hides last partial llm message when final_answer retry limit is exhausted', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+    let attempt = 0;
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        attempt += 1;
+        onChunk({ type: 'text', delta: 'Partial content' });
+        onChunk({
+          type: 'tool_call',
+          callId: `call-final-${attempt}`,
+          toolName: 'final_answer',
+          arguments: {},
+        });
+        return { text: '' };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    expect(llmProvider.chat).toHaveBeenCalledTimes(2);
+    expect(messageManager.hideAndMarkIncomplete).toHaveBeenCalledTimes(2);
+    expect(messageManager.hideAndMarkIncomplete).toHaveBeenNthCalledWith(2, 2, 'agent-1');
+    expect(messageManager.create).toHaveBeenCalledWith(
+      'agent-1',
+      'error',
+      expect.objectContaining({
+        data: expect.objectContaining({
+          error: expect.objectContaining({
+            message: expect.stringContaining('invalid completion format'),
+          }),
+        }),
+      }),
+      1,
+      true
+    );
+  });
+
+  it('creates kind:error when provider returns final invalid final_answer failure', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+
+    const invalidToolError = new Error('Tool arguments are invalid');
+    invalidToolError.name = 'InvalidToolInputError';
+    llmProvider.chat.mockRejectedValue(invalidToolError);
+
+    await pipeline.run('agent-1', 1);
+
+    expect(llmProvider.chat).toHaveBeenCalledTimes(2);
+    expect(messageManager.create).toHaveBeenCalledWith(
+      'agent-1',
+      'error',
+      expect.objectContaining({
+        data: expect.objectContaining({
+          error: expect.objectContaining({
+            type: 'tool',
+          }),
+        }),
+      }),
+      1,
       true
     );
   });
@@ -293,13 +512,18 @@ describe('MainPipeline.run()', () => {
     );
     expect(toolCallCreates).toHaveLength(2);
 
-    const toolCallDoneUpdates = (messageManager.update as jest.Mock).mock.calls.filter(
-      (call: unknown[]) => call[3] === true
-    );
-    expect(toolCallDoneUpdates.length).toBeGreaterThanOrEqual(2);
+    for (const call of toolCallCreates) {
+      expect(call[4]).toBe(true);
+      const payload = call[2] as { data?: Record<string, unknown> };
+      expect(payload.data?.output).toEqual(
+        expect.objectContaining({
+          status: 'success',
+        })
+      );
+    }
   });
 
-  it('finalizes tool_call with error output when tool_result arrives with error status', async () => {
+  it('persists tool_call with error output when tool_result arrives with error status', async () => {
     const { pipeline, llmProvider, messageManager } = makeMocks();
 
     llmProvider.chat.mockImplementation(
@@ -324,9 +548,9 @@ describe('MainPipeline.run()', () => {
 
     await pipeline.run('agent-1', 1);
 
-    expect(messageManager.update).toHaveBeenCalledWith(
-      expect.any(Number),
+    expect(messageManager.create).toHaveBeenCalledWith(
       'agent-1',
+      'tool_call',
       expect.objectContaining({
         data: expect.objectContaining({
           callId: 'call-stub',
@@ -336,6 +560,7 @@ describe('MainPipeline.run()', () => {
           }),
         }),
       }),
+      1,
       true
     );
   });
@@ -378,6 +603,33 @@ describe('MainPipeline.run()', () => {
       1,
       true
     );
+  });
+
+  it('does not persist buffered tool_call when provider fails before completion', async () => {
+    const { pipeline, messageManager, llmProvider } = makeMocks();
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({
+          type: 'tool_call',
+          callId: 'call-fail',
+          toolName: 'search_docs',
+          arguments: { query: 'x' },
+        });
+        throw new Error('Connection dropped');
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    const toolCreates = (messageManager.create as jest.Mock).mock.calls.filter(
+      (call: unknown[]) => call[1] === 'tool_call'
+    );
+    expect(toolCreates).toHaveLength(0);
+    const errorCreates = (messageManager.create as jest.Mock).mock.calls.filter(
+      (call: unknown[]) => call[1] === 'error'
+    );
+    expect(errorCreates).toHaveLength(1);
   });
 
   it('creates auth error with action_link when api key is missing', async () => {
@@ -532,6 +784,10 @@ describe('MainPipeline.run()', () => {
       (call: unknown[]) => call[1] === 'error'
     );
     expect(errorCreates).toHaveLength(0);
+    const toolCreates = (messageManager.create as jest.Mock).mock.calls.filter(
+      (call: unknown[]) => call[1] === 'tool_call'
+    );
+    expect(toolCreates).toHaveLength(0);
   });
 
   it('cancels before final llm completion without creating kind:error', async () => {
@@ -871,5 +1127,320 @@ describe('MainPipeline.run()', () => {
       (call: unknown[]) => call[1] === 'error'
     );
     expect(errorCreates).toHaveLength(0);
+  });
+
+  it('ignores empty reasoning/text deltas and falls back to output.text', async () => {
+    const { pipeline, llmProvider, messageManager, mockPublish } = makeMocks();
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({ type: 'reasoning', delta: '' });
+        onChunk({ type: 'text', delta: '' });
+        return { text: 'fallback final text' };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    const reasoningEvents = mockPublish.mock.calls
+      .map((call: [unknown]) => call[0])
+      .filter((e: unknown) => e instanceof MessageLlmReasoningUpdatedEvent);
+    const textEvents = mockPublish.mock.calls
+      .map((call: [unknown]) => call[0])
+      .filter((e: unknown) => e instanceof MessageLlmTextUpdatedEvent);
+    expect(reasoningEvents).toHaveLength(0);
+    expect(textEvents).toHaveLength(0);
+
+    expect(messageManager.create).toHaveBeenLastCalledWith(
+      'agent-1',
+      'llm',
+      expect.objectContaining({
+        data: expect.objectContaining({
+          text: 'fallback final text',
+        }),
+      }),
+      1,
+      true
+    );
+  });
+
+  it('retries once when stream emits turn_error before meaningful chunks', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({ type: 'turn_error', errorType: 'provider', message: 'stream error' });
+        return { text: '' };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    expect(llmProvider.chat).toHaveBeenCalledTimes(2);
+    expect(messageManager.create).toHaveBeenCalledWith(
+      'agent-1',
+      'error',
+      expect.objectContaining({
+        data: expect.objectContaining({
+          error: expect.objectContaining({
+            message: 'Provider service unavailable. Please try again later.',
+          }),
+        }),
+      }),
+      1,
+      true
+    );
+  });
+
+  it('keeps latest arguments for duplicate tool_call callId before flush', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({
+          type: 'tool_call',
+          callId: 'call-dup',
+          toolName: 'search_docs',
+          arguments: { q: 'v1' },
+        });
+        onChunk({
+          type: 'tool_call',
+          callId: 'call-dup',
+          toolName: 'search_docs',
+          arguments: { q: 'v2' },
+        });
+        return { text: 'done' };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    expect(messageManager.create).toHaveBeenCalledWith(
+      'agent-1',
+      'tool_call',
+      expect.objectContaining({
+        data: expect.objectContaining({
+          callId: 'call-dup',
+          arguments: { q: 'v2' },
+        }),
+      }),
+      1,
+      true
+    );
+  });
+
+  it('persists final_answer tool_result using finalized buffered row', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({
+          type: 'tool_call',
+          callId: 'call-final',
+          toolName: 'final_answer',
+          arguments: { summary_points: ['Done'] },
+        });
+        onChunk({
+          type: 'tool_result',
+          callId: 'call-final',
+          toolName: 'final_answer',
+          arguments: { summary_points: ['Done'] },
+          output: { ignored: true },
+          status: 'success',
+        });
+        return { text: '' };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    expect(messageManager.create).toHaveBeenCalledWith(
+      'agent-1',
+      'tool_call',
+      expect.objectContaining({
+        data: expect.objectContaining({
+          callId: 'call-final',
+          toolName: 'final_answer',
+          arguments: { summary_points: ['Done'] },
+        }),
+      }),
+      1,
+      true
+    );
+    const finalToolCall = (messageManager.create as jest.Mock).mock.calls.find(
+      (call: unknown[]) =>
+        call[1] === 'tool_call' &&
+        typeof call[2] === 'object' &&
+        call[2] !== null &&
+        (call[2] as { data?: { toolName?: string } }).data?.toolName === 'final_answer'
+    );
+    expect(finalToolCall).toBeDefined();
+    expect((finalToolCall as unknown[])[2]).toEqual(
+      expect.objectContaining({
+        data: expect.not.objectContaining({
+          output: expect.anything(),
+        }),
+      })
+    );
+  });
+
+  it('creates kind:error when final_answer tool_result has missing required summary_points', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({
+          type: 'tool_call',
+          callId: 'call-final-defaults-result',
+          toolName: 'final_answer',
+          arguments: {},
+        });
+        onChunk({
+          type: 'tool_result',
+          callId: 'call-final-defaults-result',
+          toolName: 'final_answer',
+          arguments: {},
+          output: { ignored: true },
+          status: 'success',
+        });
+        return { text: '' };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    expect(messageManager.create).toHaveBeenCalledWith(
+      'agent-1',
+      'error',
+      expect.objectContaining({
+        data: expect.objectContaining({
+          error: expect.objectContaining({
+            type: 'provider',
+            message: expect.stringContaining('invalid completion format'),
+          }),
+        }),
+      }),
+      1,
+      true
+    );
+  });
+
+  it('stores String(output) when tool_result output is non-serializable', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+    const circular: Record<string, unknown> = {};
+    circular['self'] = circular;
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({
+          type: 'tool_result',
+          callId: 'call-circular',
+          toolName: 'search_docs',
+          arguments: { q: 1 },
+          output: circular,
+          status: 'error',
+        });
+        return { text: '' };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    expect(messageManager.create).toHaveBeenCalledWith(
+      'agent-1',
+      'tool_call',
+      expect.objectContaining({
+        data: expect.objectContaining({
+          callId: 'call-circular',
+          output: expect.objectContaining({
+            status: 'error',
+            content: '[object Object]',
+          }),
+        }),
+      }),
+      1,
+      true
+    );
+  });
+
+  it('finalizes pending tool_call rows even when payloadJson is invalid JSON', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+    messageManager.list.mockReturnValue([
+      makeMessage(1, 'user'),
+      {
+        ...makeMessage(33, 'tool_call'),
+        done: false,
+        hidden: false,
+        replyToMessageId: 1,
+        payloadJson: '{broken-json',
+      },
+    ]);
+    llmProvider.chat.mockRejectedValue(new Error('provider failed'));
+
+    await pipeline.run('agent-1', 1);
+
+    expect(messageManager.update).toHaveBeenCalledWith(
+      33,
+      'agent-1',
+      expect.objectContaining({
+        data: expect.objectContaining({
+          output: expect.objectContaining({
+            status: 'error',
+            content: 'Provider service unavailable. Please try again later.',
+          }),
+        }),
+      }),
+      true
+    );
+  });
+
+  it('covers helper branches for execute options and limiter queue', async () => {
+    const { pipeline, toolExecutor } = makeMocks();
+    const signal = new AbortController().signal;
+
+    const extractAbortSignal = (
+      pipeline as unknown as { extractToolAbortSignal: (arg: unknown) => AbortSignal | undefined }
+    ).extractToolAbortSignal.bind(pipeline);
+    const extractToolCallId = (
+      pipeline as unknown as { extractToolCallId: (arg: unknown) => string | undefined }
+    ).extractToolCallId.bind(pipeline);
+    const createLimiter = (
+      pipeline as unknown as {
+        createConcurrencyLimiter: (limit: number) => <T>(job: () => Promise<T>) => Promise<T>;
+      }
+    ).createConcurrencyLimiter.bind(pipeline);
+    const bindToolExecutors = (
+      pipeline as unknown as {
+        bindToolExecutors: (
+          tools: Array<{
+            name: string;
+            execute?: (args: Record<string, unknown>) => Promise<unknown>;
+          }>
+        ) => Array<{
+          execute: (args: Record<string, unknown>, opts?: unknown) => Promise<unknown>;
+        }>;
+      }
+    ).bindToolExecutors.bind(pipeline);
+
+    expect(extractAbortSignal({ abortSignal: signal })).toBe(signal);
+    expect(extractAbortSignal(signal)).toBe(signal);
+    expect(extractToolCallId({ toolCallId: '  ' })).toBeUndefined();
+
+    const limiter = createLimiter(1);
+    const order: string[] = [];
+    await Promise.all([
+      limiter(async () => {
+        order.push('first-start');
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        order.push('first-end');
+      }),
+      limiter(async () => {
+        order.push('second');
+      }),
+    ]);
+    expect(order).toEqual(['first-start', 'first-end', 'second']);
+
+    toolExecutor.executeBatch.mockResolvedValueOnce([]);
+    const bound = bindToolExecutors([{ name: 'tool_without_result' }]);
+    await expect(bound[0].execute({})).rejects.toThrow('returned no result');
   });
 });

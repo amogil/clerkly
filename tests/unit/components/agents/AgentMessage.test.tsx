@@ -106,6 +106,125 @@ describe('AgentMessage — tool_call', () => {
     expect(output).toBeInTheDocument();
     expect(output).toHaveTextContent('"content": "result"');
   });
+
+  /* Preconditions: persisted kind:tool_call for final_answer with summary_points
+     Action: render AgentMessage
+     Assertions: renders Final Answer checklist items without title/header
+     Requirements: agents.7.4.1, agents.7.4.2, llm-integration.9.7 */
+  it('should render final_answer as Final Answer block with summary list', () => {
+    render(
+      <AgentMessage
+        message={baseMessage({
+          kind: 'tool_call',
+          done: true,
+          payload: {
+            data: {
+              callId: 'call-final',
+              toolName: 'final_answer',
+              arguments: {
+                summary_points: ['Point 1', 'Point 2'],
+              },
+            },
+          },
+        })}
+      />
+    );
+
+    expect(screen.getByTestId('message-final-answer-block')).toBeInTheDocument();
+    expect(screen.getByTestId('message-final-answer-summary')).toBeInTheDocument();
+    expect(screen.getAllByTestId('message-final-answer-item')).toHaveLength(2);
+    expect(screen.getByText('Point 1')).toBeInTheDocument();
+    expect(screen.queryByTestId('message-final-answer-title')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('message-tool-call')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('message-completed-badge')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('message-completed-summary')).not.toBeInTheDocument();
+  });
+
+  /* Preconditions: final_answer with empty summary
+     Action: render AgentMessage
+     Assertions: summary container renders with zero checklist items and no title/header
+     Requirements: agents.7.4.3, llm-integration.9.6 */
+  it('should render empty checklist container when summary is absent', () => {
+    render(
+      <AgentMessage
+        message={baseMessage({
+          kind: 'tool_call',
+          done: true,
+          payload: {
+            data: {
+              callId: 'call-final',
+              toolName: 'final_answer',
+              arguments: {
+                summary_points: [],
+              },
+            },
+          },
+        })}
+      />
+    );
+
+    expect(screen.getByTestId('message-final-answer-summary')).toBeInTheDocument();
+    expect(screen.queryAllByTestId('message-final-answer-item')).toHaveLength(0);
+    expect(screen.queryByTestId('message-final-answer-title')).not.toBeInTheDocument();
+  });
+
+  /* Preconditions: final_answer includes mixed summary_points types
+     Action: render AgentMessage
+     Assertions: only string checklist items are rendered
+     Requirements: agents.7.4.2 */
+  it('should render only string summary_points items for final_answer', () => {
+    render(
+      <AgentMessage
+        message={baseMessage({
+          kind: 'tool_call',
+          done: true,
+          payload: {
+            data: {
+              callId: 'call-final-mixed',
+              toolName: 'final_answer',
+              arguments: {
+                summary_points: ['Point 1', 42, null, 'Point 2'],
+              },
+            },
+          },
+        })}
+      />
+    );
+
+    expect(screen.getAllByTestId('message-final-answer-item')).toHaveLength(2);
+    expect(screen.getByText('Point 1')).toBeInTheDocument();
+    expect(screen.getByText('Point 2')).toBeInTheDocument();
+    expect(screen.queryByText('42')).not.toBeInTheDocument();
+  });
+
+  /* Preconditions: final_answer includes long summary item
+     Action: render AgentMessage
+     Assertions: full summary text is rendered without truncation markers
+     Requirements: agents.7.4.2 */
+  it('should render long final_answer summary item as full visible text', () => {
+    const longPoint =
+      'This is a deliberately long checklist entry that should remain fully visible in the final answer block without one-line truncation.';
+
+    render(
+      <AgentMessage
+        message={baseMessage({
+          kind: 'tool_call',
+          done: true,
+          payload: {
+            data: {
+              callId: 'call-final-long',
+              toolName: 'final_answer',
+              arguments: {
+                summary_points: [longPoint],
+              },
+            },
+          },
+        })}
+      />
+    );
+
+    expect(screen.getByText(longPoint)).toBeInTheDocument();
+  });
 });
 
 describe('AgentMessage — llm', () => {
@@ -313,6 +432,38 @@ describe('AgentMessage — error', () => {
     expect(onNavigate).toHaveBeenCalledWith('settings');
   });
 
+  /* Preconditions: auth error with action link
+     Action: render AgentMessage
+     Assertions: Open Settings is first(outline), Retry is second(default)
+     Requirements: agents.4.10.3, agents.4.10.4 */
+  it('should render auth actions in required order and variants', () => {
+    const onNavigate = jest.fn();
+    render(
+      <AgentMessage
+        message={baseMessage({
+          kind: 'error',
+          payload: {
+            data: {
+              error: {
+                type: 'auth',
+                message: 'API key invalid',
+                action_link: { label: 'Open Settings', screen: 'settings' },
+              },
+            },
+          },
+        })}
+        onNavigate={onNavigate}
+      />
+    );
+
+    const buttons = screen.getAllByRole('button');
+    expect(buttons).toHaveLength(2);
+    expect(buttons[0]).toHaveTextContent('Open Settings');
+    expect(buttons[0]).toHaveAttribute('data-variant', 'outline');
+    expect(buttons[1]).toHaveTextContent('Retry');
+    expect(buttons[1]).toHaveAttribute('data-variant', 'default');
+  });
+
   /* Preconditions: kind:error auth
      Action: click Retry button
      Assertions: retryLast called for agent
@@ -338,6 +489,7 @@ describe('AgentMessage — error', () => {
     fireEvent.click(screen.getByTestId('message-error-retry'));
     await Promise.resolve();
     expect(mockRetryLast).toHaveBeenCalledWith('agent1');
+    expect(screen.queryByTestId('message-error')).not.toBeInTheDocument();
   });
 
   /* Preconditions: kind:error with action_link, no onNavigate

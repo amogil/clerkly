@@ -114,7 +114,7 @@ test.describe('Message Text Wrapping', () => {
      Requirements: agents.4.22 */
   test('should have correct CSS classes for agent messages', async () => {
     // Find any agent message by testid
-    const agentMessage = page.locator('[data-testid="message-llm-action"]').first();
+    const agentMessage = page.locator('.message-llm-action-response').first();
 
     if ((await agentMessage.count()) > 0) {
       // Check that agent message has both classes

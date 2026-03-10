@@ -1,329 +1,261 @@
-# Список Задач: LLM Integration — Migration to Vercel AI SDK/UI
+# Список Задач: LLM Integration — Issue #51 (`final_answer`)
 
 ## Обзор
 
-Цель: перейти на полный стек Vercel AI SDK (`ai`, `@ai-sdk/*`, `@ai-sdk/react`) для chat-flow, стриминга reasoning/текста, tool loop и обработки ошибок, убрав дублирующую кастомную оркестрацию и renderer-костыли.
+Цель: привести систему в соответствие задаче #51 — добавить поддержку тулы `final_answer`, зафиксировать её контракт в спеках/дизайне, реализовать логику статуса `completed`, обновить промпт и покрыть изменения модульными и функциональными тестами.
 
-**Текущий статус:** Фаза B (после завершения Фазы A по спекам/дизайну)
-
----
-
-## Фаза A: Синхронизация спецификаций и дизайнов
-
-- [x] Согласовать `docs/specs/llm-integration/{requirements,design}.md` с целевой моделью AI SDK UI/Core без миграционных оговорок.
-- [x] Зафиксировать инвариант статусов для persisted `kind:tool_call` (`done=false -> in-progress`, `done=true -> awaiting-response`) в `agents` и `llm-integration`.
-- [x] Синхронизировать `docs/specs/settings/*` по ID/критериям и контракту `Test Connection`.
-- [x] Переписать `docs/specs/error-notifications/*` под целевую модель: chat errors в истории, toast только для non-chat background ошибок.
-- [x] Добавить AI SDK chat-flow тестовые контракты в `docs/specs/testing-infrastructure/*`.
-- [x] Убрать противоречия в `docs/specs/clerkly/*` по статусу AI-части (не как «будущее»).
+**Текущий статус:** Фаза 8 — В работе
 
 ---
 
-## Инварианты целевой модели
+## Фаза 1: Спеки и дизайн (сначала)
 
-- [x] Main process использует AI SDK Core как единственный движок LLM/tool loop.
-- [x] Renderer использует AI SDK UI (`useChat` + `ChatTransport`) как единственный state machine стриминга.
-- [x] Поток в renderer строится через UIMessage stream protocol (`UIMessageChunk`) без дублирования snapshot/delta.
-- [x] Все специализированные ошибки определяются через AI SDK error classes и нормализуются в доменные типы.
-- [x] UI рендер tool-call полностью зависит от persisted `kind:tool_call` + `message.created`/`message.updated` (single source of truth).
-- [x] Канонический финал ответа хранится в `payload.data.text`.
-- [x] Согласованное статусное правило: `kind='llm' && done=true -> awaiting-response`.
-- [x] Для persisted `kind='tool_call'` статус вычисляется по `done`:
-  - [x] `done=false -> in-progress`
-  - [x] `done=true -> awaiting-response`
-
----
-
-## Фаза B1: Контракты ошибок AI SDK
-
-- [x] Ввести единый `ErrorNormalizer` в main-process (`src/main/llm/*`):
-  - [x] `APICallError` -> классификация по `statusCode`:
-    - [x] `401/403 -> auth`
-    - [x] `429 -> rate_limit` (с извлечением `retry-after` / fallback parsing)
-    - [x] `5xx -> provider`
-  - [x] timeout/abort -> `timeout`
-  - [x] transport-level failures без `statusCode` -> `network`
-  - [x] `RetryError` после исчерпания попыток -> `provider`
-  - [x] tool ошибки (`NoSuchToolError`, `InvalidToolInputError`, `ToolExecutionError`, `ToolCallRepairError`) -> `tool`
-  - [x] stream protocol ошибки (`UIMessageStreamError`) -> `protocol`
-- [x] Зафиксировать и реализовать retry policy из `llm-integration/design.md`:
-  - [x] retry только до первого meaningful chunk;
-  - [x] максимум 1 retry на запуск `MainPipeline.run()`;
-  - [x] после начала стрима retry не выполняется.
-- [x] Синхронизировать `ErrorNormalizer` с UI контрактом ошибок:
-  - [x] `kind:error` payload
-  - [x] rate-limit countdown (`agent.rate_limit`)
-  - [x] диагностические события (`llm.pipeline.diagnostic`)
-- [x] Удалить ad-hoc ветки ошибок, дублирующие ErrorNormalizer.
-
-## Фаза B1.1: Конформанс ошибок и каналов уведомлений (cross-spec)
-
-- [x] Привести runtime к `error-notifications` целевой модели:
-  - [x] Chat-flow ошибки (`auth/network/provider/timeout/tool/protocol`) показываются только в чате (`kind:error`), без toast-дубликатов.
-  - [x] `rate_limit` остаётся transient banner (`agent.rate_limit`) без persisted `kind:error`.
-  - [x] Background/IPC ошибки вне chat-flow показываются в toast через `callApi()` (если `silent !== true`).
-  - [x] Race/cancelled ошибки логируются и не показываются пользователю.
-- [x] Синхронизировать тексты ошибок в `LLMError`/renderer диалогах с `llm-integration.3.5`.
-- [x] Обновить unit-тесты:
-  - [x] `tests/unit/utils/apiWrapper.test.ts` (chat suppression vs background toast).
-  - [x] `tests/unit/agents/MainPipeline.test.ts` (tool/protocol error mapping, no toast assumptions).
-
-## Фаза B1.2: UX-контракты ошибок в чате
-
-- [x] `src/renderer/components/agents/*`:
-  - [x] Для `auth`/missing key ошибок показать действия `Open Settings` (primary) и `Retry` (secondary).
-  - [x] `Retry` скрывает текущий `kind:error` и повторяет запрос по последнему `kind:user`.
-  - [x] Диалоги ошибок/уведомлений занимают всю ширину области чата.
-- [x] `src/main/agents/AgentIPCHandlers.ts`:
-  - [x] Реализовать `messages:retry-last` и `messages:cancel-retry` под контракт rate-limit.
-  - [x] Для `Cancel` в rate-limit удалять исходное `kind:user` сообщение из БД и чата.
-- [x] Functional:
-  - [x] Кнопки `Open Settings`/`Retry` и их приоритеты.
-  - [x] `Retry` сценарий для auth/missing-key ошибок.
-  - [x] `Cancel` сценарий в rate-limit с удалением исходного user message.
+- [x] Обновить `docs/specs/llm-integration/requirements.md`:
+  - [x] Добавить явный контракт тулы `final_answer` (назначение, структура аргументов, условия вызова).
+  - [x] Зафиксировать, что `final_answer` переводит диалог в статус `completed`.
+  - [x] Зафиксировать поведение при отсутствии `final_answer`: turn может завершиться `kind: llm` с `done=true`, но статус остаётся `awaiting-response`.
+  - [x] Обновить список функциональных тестов под новый контракт.
+- [x] Обновить `docs/specs/llm-integration/design.md`:
+  - [x] Описать место `final_answer` в pipeline (`model -> tool_call(final_answer) -> final persisted state`).
+  - [x] Уточнить, как `final_answer` сохраняется в `messages` (kind/payload/done/reply_to_message_id).
+  - [x] Описать влияние на stream lifecycle и завершение ответа.
+- [x] Обновить `docs/specs/agents/requirements.md`:
+  - [x] Зафиксировать правило перехода агента в `completed`, связанное с `final_answer`.
+  - [x] Зафиксировать ожидания UI для статуса `completed` (иконки/лейблы/доступность действий).
+- [x] Обновить `docs/specs/agents/design.md`:
+  - [x] Обновить алгоритм `computeAgentStatus()` с явной веткой `completed` по `final_answer`.
+  - [x] Уточнить источники данных для вычисления статуса (только persisted messages).
+- [x] При необходимости синхронизировать `docs/specs/realtime-events/{requirements,design}.md`:
+  - [x] Обновить контракт snapshot-полей/`changedFields`, если меняется сигнализация перехода в `completed`.
+- [x] Обновить этот `tasks.md` по факту реализации.
 
 ---
 
-## Фаза B2: Main process на AI SDK Core
+## Фаза 2: Реализация кода
 
-- [x] `src/main/llm/LLMProviderFactory.ts` и типы:
-  - [x] Проверить, что все провайдеры создаются как AI SDK adapters.
-  - [x] Удалить остаточные structured-output/legacy типы из chat-flow.
-- [x] Добавить SDK-native Tool Calling (даже при пустом списке инструментов):
-  - [x] Перевести orchestration tool-calling на AI SDK `streamText/generateText` (`tools`, `toolChoice`, `stopWhen`) вместо ручной склейки tool-loop.
-  - [x] Зафиксировать пустой реестр инструментов как валидный стартовый режим (`tools = {}` / `[]` по контракту адаптера).
-  - [x] Включить strict-режим для tool schemas (через AI SDK tool strict + provider strict-json-schema опции, где поддерживается).
-  - [x] Добавить unit-тест: при пустом tool registry модель не падает и не генерирует runtime-ошибку tool executor.
-- [x] `src/main/llm/OpenAIProvider.ts`:
-  - [x] Финально перевести все streaming/tool semantics на AI SDK primitives.
-  - [x] Убрать ручные provider-specific parser ветки, если покрываются AI SDK layer.
-  - [x] Синхронизировать версии `ai` и `@ai-sdk/*` по model-spec (v2/v3), чтобы убрать runtime fallback на legacy transport.
-    - [x] Обновлены npm-зависимости до совместимых версий (`ai@6`, `@ai-sdk/openai@3`, `@ai-sdk/anthropic@3`, `@ai-sdk/google@3`, `@ai-sdk/react@3`).
-    - [x] Полностью убрать runtime fallback OpenAI на legacy transport после закрытия оставшихся SDK-несовместимостей тестового транспорта.
-- [x] `src/main/llm/AnthropicProvider.ts`:
-  - [x] Довести parity (`reasoning`, `text`, `tool_call`, `turn_error`, usage).
-  - [x] Проверить provider options (`thinking`, `sendReasoning`, parallel tool policy).
-- [x] `src/main/llm/GoogleProvider.ts`:
-  - [x] Довести parity (`reasoning`, `text`, `tool_call`, `turn_error`, usage).
-  - [x] Проверить provider options (`thinkingConfig.includeThoughts` и связанные параметры).
-- [x] `src/main/agents/MainPipeline.ts`:
-  - [x] Финализировать loop `model -> tools -> model` на AI SDK control (`stopWhen`/step control).
-  - [x] Поддержать multi-tool + controlled concurrency.
-  - [x] Гарантировать корректный persisted lifecycle для `kind:tool_call` (create/update, done=false/true, full arguments).
-  - [x] Удалить публикацию/зависимость от отдельного realtime-события `message.tool_call`; использовать только persisted `message.created`/`message.updated`.
-  - [x] Гарантировать корректный cancel cleanup (idempotent для in-flight jobs).
-- [x] `src/main/tools/*`:
-  - [x] Зафиксировать policy layer: timeout/retry/concurrency cap.
-  - [x] Обеспечить deterministic merge результатов tool batch.
-  - [x] До появления реального executor реализовать stub-путь: `tool_call` получает placeholder output и переводится в `done=true`.
-
-## Фаза B2.2: Persisted message lifecycle conformance
-
-- [x] `src/main/agents/MainPipeline.ts` + `MessageManager`:
-  - [x] Создавать `kind:llm` на первом meaningful chunk (`reasoning`/`text`) либо при завершении, если чанков не было.
-  - [x] До завершения ответа держать `done=false`, на завершении ставить `done=true`.
-  - [x] На ошибке после старта стрима: скрывать in-flight `kind:llm` (`hidden=true`, `done=false`) и создавать `kind:error`.
-  - [x] На cancel: не создавать `kind:error`; при созданном `kind:llm` скрывать его через `hidden=true`.
-  - [x] Проставлять `reply_to_message_id` для всех сообщений pipeline согласно контракту.
-- [x] `src/main/db/repositories/MessagesRepository.ts`:
-  - [x] Гарантировать отдельное хранение `usage_json` (`canonical + raw`) без `provider/model/timestamp`.
-  - [x] Гарантировать, что `kind` не дублируется в `payload_json`.
-- [x] Unit:
-  - [x] `MainPipeline` кейсы no-chunk completion / post-stream error / cancel behavior.
-  - [x] `MessagesRepository` кейсы `reply_to_message_id`, `done`, `usage_json`.
-
-## Фаза B2.1: Статусы и snapshot-контракты
-
-- [x] `src/main/agents/AgentManager.ts` / `src/shared/utils/agentStatus.ts`:
-  - [x] Подтвердить правило `kind='llm' && done=true -> awaiting-response`.
-  - [x] Для persisted `kind='tool_call'` реализовать/проверить: `done=false -> in-progress`, `done=true -> awaiting-response`.
-- [x] `src/main/agents/MessageManager.ts` + snapshot converters:
-  - [x] Подтвердить canonical финальный текст только в `payload.data.text`.
-  - [x] Убедиться, что `kind:error`, `kind:tool_call`, `hidden=true` исключаются из model history.
-- [x] `src/shared/events/types.ts`:
-  - [x] Удалить типы/константы/классы `message.tool_call` из целевого runtime-контракта.
-  - [x] Проверить optional `changedFields` формат для `{entity}.updated` событий.
+- [x] Добавить системную тулу `final_answer` в orchestration layer:
+  - [x] Подключить definition тулы в pipeline/tool registry.
+  - [x] Включить strict-схему структуры аргументов для этой тулы.
+- [x] Реализовать обработку вызова `final_answer`:
+  - [x] Persist `kind: tool_call` для `final_answer` с корректным lifecycle (`done=false -> done=true` либо согласованный целевой путь).
+  - [x] Зафиксировать финальный текст ответа в `tool_call(final_answer).arguments.text`.
+  - [x] Обеспечить strict-валидацию контракта и retry/repair через SDK при нарушении лимитов.
+  - [x] Корректно завершать turn в pipeline без legacy fallback.
+- [x] Обновить prompt/prompt builder:
+  - [x] Добавить инструкцию модели, когда и как вызывать `final_answer`.
+  - [x] Исключить конфликтующие или устаревшие инструкции.
+- [x] Обновить вычисление статусов:
+  - [x] Добавить/активировать правило вычисления `completed` из persisted-сообщений `final_answer`.
+  - [x] Проверить, что текущие правила `in-progress/awaiting-response/error/new` не ломаются.
+- [x] Проверить renderer mapping:
+  - [x] Убедиться, что рендер `tool_call(final_answer)` и streaming/final `kind: llm` текста соответствует целевой модели.
+  - [x] Убедиться, что нет legacy-путей, противоречащих новому контракту.
 
 ---
 
-## Фаза C1: Stream Protocol / UIMessage stream
+## Фаза 3: Обновление модульных тестов
 
-- [x] Привести `src/renderer/lib/IPCChatTransport.ts` к тонкому protocol-adapter:
-  - [x] Оставить только трансляцию доменных realtime-событий в `UIMessageChunk`.
-  - [x] Убрать лишнюю бизнес-логику из transport (вынести в main/useChat lifecycle).
-  - [x] Зафиксировать корректный порядок chunk-ов:
-    - [x] `start -> start-step -> reasoning/text deltas -> finish-step -> finish`
-  - [x] Гарантировать отсутствие дубликатов между delta-событиями и `message.updated` snapshot.
-  - [x] Гарантировать корректное завершение стрима при cancel/hidden/done.
-- [x] Добавить protocol guards:
-  - [x] controlled fail на invalid sequence (с диагностикой, без падения процесса).
-
-## Фаза C1.1: Realtime-events conformance
-
-- [x] `src/main/events/MainEventBus.ts` и bridge:
-  - [x] Для `agent.updated`, `message.updated`, `user.profile.updated` передавать `changedFields` в формате spec (`dot.path`, unique, sorted) при наличии диффа.
-  - [x] Сохранить поведение timestamp (`<` only outdated) для стриминговых событий.
-- [x] `src/renderer/events/RendererEventBus.ts`:
-  - [x] Проверить отсутствие потерь/dedupe для `message.llm.reasoning.updated` и `message.llm.text.updated` в одном timestamp.
-- [x] Unit-тесты:
-  - [x] `tests/unit/events/MainEventBus.test.ts` — `changedFields` формат и сортировка.
-  - [x] `tests/unit/events/RendererEventBus.test.ts` — non-coalescing чанков с равным timestamp.
+- [x] `tests/unit/agents/MainPipeline.test.ts`:
+  - [x] Добавить сценарий вызова `final_answer` с корректным завершением turn.
+  - [x] Проверить persist lifecycle сообщения `tool_call(final_answer)`.
+  - [x] Проверить запись `arguments.text` и обработку финальной ошибки после SDK retry.
+- [x] `tests/unit/agents/PromptBuilder.test.ts`:
+  - [x] Проверить наличие и корректность инструкции про `final_answer`.
+- [x] `tests/unit/agents/AgentManager.test.ts`:
+  - [x] Добавить/обновить кейсы вычисления `completed` на основе `final_answer`.
+  - [x] Проверить, что соседние статусы не деградируют.
+- [x] `tests/unit/components/agents/AgentMessage.test.tsx` и связанные renderer unit:
+  - [x] Проверить рендер `tool_call(final_answer)` и финального состояния.
+  - [x] Проверить рендер `message-completed-badge` и `message-completed-summary`.
+  - [x] Проверить рендер completion summary для валидного `final_answer`.
+  - [x] Проверить отсутствие regressions в обычных `tool_call`.
+- [x] `tests/unit/components/agents-status-colors.test.tsx`:
+  - [x] Проверить визуальные атрибуты `completed`.
 
 ---
 
-## Фаза C2: useChat / transport lifecycle и уменьшение костылей
+## Фаза 4: Обновление/добавление функциональных тестов
 
-- [x] `src/renderer/hooks/useAgentChat.ts`:
-  - [x] Минимизировать дублирующую синхронизацию `rawMessages` и `messages` (оставить только обязательные metadata-cases).
-  - [x] Опираться на lifecycle `useChat` (`status`, `stop`, completion/error hooks).
-  - [x] Убрать лишние ручные костыли hidden/update, если покрываются stream lifecycle.
-- [x] `src/renderer/lib/messageMapper.ts`:
-  - [x] Проверить стабильный mapping persisted snapshot -> UIMessage (без legacy fallback).
-- [x] `src/renderer/components/agents/AgentMessage.tsx` и `AgentChat.tsx`:
-  - [x] Подтвердить соответствие AI Elements parts/status.
-  - [x] Подтвердить отображение `tool_call` через AI Elements `Tool` компонент.
-  - [x] Удалить fallback чтения ответа из `data.action.content`; использовать только `payload.data.text`.
-- [x] `src/renderer/components/ai-elements/tool.tsx`:
-  - [x] Подключить/обновить `Tool`, `ToolHeader`, `ToolContent`, `ToolInput`, `ToolOutput` по контракту [AI Elements Tool](https://elements.ai-sdk.dev/components/tool).
-  - [x] Обеспечить отображение `toolName`, аргументов (`input`) и результата/ошибки (`output`) для persisted `kind:tool_call`.
-
----
-
-## Фаза C3: Tool usage + message persistence (AI SDK UI guides)
-
-- [x] Применить паттерны AI SDK UI для persistence:
-  - [x] `validateUIMessages` для восстановленных/передаваемых сообщений.
-  - [x] `convertToModelMessages` для model input.
-  - [x] консистентная стратегия `onFinish` persistence + детерминированные message IDs.
-- [x] Зафиксировать поведение tool parts в persisted истории:
-  - [x] что сохраняем в БД,
-  - [x] что участвует в model replay,
-  - [x] как `tool_call` рендерится в chat UI через `Tool` (включая pending/success/error states).
-  - [x] какие служебные tool-части НЕ рендерятся пользователю.
-- [x] Проверить необходимость `sendAutomaticallyWhen` и auto-continue semantics для tool-flow.
-- [x] `src/renderer/lib/messageMapper.ts` / `IPCChatTransport`:
-  - [x] корректно маппить persisted `kind:tool_call` в UIMessage tool parts.
-  - [x] исключить дублирование tool-call частей между `message.created` и `message.updated`.
-- [x] Использовать SDK-метрики шагов вместо ручной агрегации usage/timing:
-  - [x] Брать usage из `result.totalUsage` и `result.steps[*].usage`, а не только из provider-raw envelope.
-  - [x] Для каждого step сохранять диагностику шага (toolCalls, finishReason, usage) в `llm.pipeline.diagnostic`.
-  - [x] Latency per step считать в pipeline через `onStepFinish` + локальные timestamps рантайма (SDK не даёт готовый duration-поле).
-  - [x] Сохранение в `messages.usage_json` оставить в формате `canonical + raw`, где `canonical` заполняется из SDK usage.
-
-## Фаза C4: Settings/Test Connection conformance
-
-- [x] Выполнить migration ссылок на требования `settings.*` после смены нумерации (`settings.2`/`settings.3`):
-  - [x] production-код: комментарии `Requirements: settings.*` и inline-ссылки.
-  - [x] unit/functional тесты: structured comments и ссылки на требования.
-  - [x] документы `requirements/design/tasks` в затронутых спеках: исправить перекрёстные ссылки.
-  - [x] прогнать проверку отсутствия старых ссылок (`rg \"settings\\.2\\.|settings\\.3\\.\"` по ожидаемому соответствию) и зафиксировать результат.
-- [x] `src/main/llm/*Provider*.ts`:
-  - [x] Подтвердить `testConnection()` для OpenAI/Anthropic/Google по `settings.3.5` и timeout 10s.
-  - [x] Синхронизировать маппинг ошибок test-connection с доменными сообщениями (`settings.3.8`).
-- [x] `src/renderer/components/settings/*`:
-  - [x] Проверить disable/enabled/lifecycle кнопки `Test Connection` по `settings.3.1-3.4`.
-  - [x] Гарантировать отсутствие сохранения результата теста в БД (`settings.3.10`).
-  - [x] Проверить обязательный security-текст API key (`settings.1.25`) и наличие кнопки `Test Connection` (`settings.1.26`).
-- [x] Tests:
-  - [x] `tests/functional/llm-connection-test.spec.ts` — обновить/добавить кейсы по всем провайдерам и ошибкам.
-  - [x] `tests/unit/llm/*Provider*.test.ts` — маппинг HTTP/timeout/network для testConnection.
+- [x] `tests/functional/llm-chat.spec.ts`:
+  - [x] Добавить сценарий, где модель завершает через `final_answer`.
+  - [x] Проверить, что пользователь видит корректный финальный ответ.
+  - [x] Проверить, что статус агента становится `completed`.
+- [x] `tests/functional/agent-status-calculation.spec.ts`:
+  - [x] Добавить сценарий вычисления `completed` после `final_answer`.
+- [x] `tests/functional/agent-status-all-places.spec.ts`:
+  - [x] Проверить отображение `completed` во всех ключевых местах UI.
+- [x] Негативные functional кейсы:
+  - [x] Без `final_answer` статус не должен переходить в `completed`.
+  - [x] При невалидном `final_answer` срабатывает retry/repair и при исчерпании лимита создаётся `kind:error`.
+  - [x] Ошибки/отмена не должны ложно переводить агента в `completed`.
 
 ---
 
-## Фаза D: Удаление костылей и legacy артефактов
+## Фаза 5: Валидация
 
-- [x] Удалить переходные/дублирующие ветки streaming и provider parsing, ставшие лишними после AI SDK унификации.
-- [x] Удалить оставшиеся structured-output chat-flow артефакты в коде/тестах/доках.
-- [x] Удалить неиспользуемые event types/конвертеры, если они дублируют stream protocol.
-- [x] Удалить legacy fallback-рендеры в renderer.
-- [x] Миграция legacy LLM payload: `data.action.content` -> `data.text` для исторических сообщений.
-  - [x] Добавить SQL-миграцию в `migrations/`:
-    - [x] Для `kind='llm'` переносить `$.data.action.content` в `$.data.text`, если `$.data.text` отсутствует или пуст.
-    - [x] После переноса удалять `$.data.action` из `payload_json`.
-    - [x] Не изменять записи, где `data.text` уже заполнен.
-  - [x] Добавить unit-тесты для миграции в `tests/unit/MigrationRunner.test.ts`.
-  - [x] Проверить, что после миграции исторические ответы корректно отображаются через каноничный `data.text`.
+- [x] Прогнать релевантные unit тесты по затронутым модулям.
+- [x] Прогнать `npm run validate`.
+- [x] После подтверждения пользователя — полный прогон `npm run test:functional`.
 
 ---
 
-## Фаза E: Тестирование (максимальное покрытие)
+## Фаза 6: Корректировка final_answer контракта (strict + retry)
 
-- [x] Полный конформанс с `testing.13` (AI SDK chat-flow contracts):
-  - [x] `testing.13.1`: unit на sequence `start -> start-step -> delta -> finish-step -> finish` в `IPCChatTransport`.
-  - [x] `testing.13.2`: unit на отсутствие дублей между delta и `message.updated` snapshot.
-  - [x] `testing.13.3`: unit на рендер persisted `kind:tool_call` как tool-call блока.
-  - [x] `testing.13.4`: unit на `ErrorNormalizer` (auth/rate_limit/provider/network/timeout/tool/protocol).
-  - [x] `testing.13.5`: unit на multi-tool + continuation `model -> tools -> model`.
-  - [x] `testing.13.6`: functional на одновременный стриминг reasoning и text.
-  - [x] `testing.13.7`: functional на `rate_limit` countdown без persisted `kind:error`.
-  - [x] `testing.13.8`: functional на cancel во время tool execution без `kind:error`.
-- [x] Unit: `ErrorNormalizer`
-  - [x] покрыть все AI SDK error classes и доменный mapping.
-  - [x] покрыть извлечение `retry-after` + fallback.
-- [x] Unit: providers
-  - [x] OpenAI/Anthropic/Google parity для streaming/tool/error/usage.
-  - [x] >=2 tool calls в одном turn.
-- [x] Unit: `MainPipeline`
-  - [x] порядок событий в loop и корректный persisted lifecycle `kind:tool_call` (`done=false -> done=true`).
-  - [x] cancel в разных фазах loop, включая in-flight tool jobs.
-  - [x] timeout = 300s и корректный mapping в доменную ошибку.
-  - [x] stub-execution: placeholder output для `tool_call` и финализация `done=true`.
-- [x] Unit: transport/event buses
-  - [x] no-drop/no-coalescing regressions для `message.llm.reasoning.updated` и `message.llm.text.updated`.
-  - [x] негативный контракт: отдельное realtime-событие `message.tool_call` отсутствует; UI зависит только от persisted snapshot-событий.
-- [x] Unit: renderer
-  - [x] `IPCChatTransport` protocol ordering.
-  - [x] persisted `kind:tool_call` корректно попадает в UI stream как tool-call part.
-  - [x] стабильность mapping при mixed streaming events.
-  - [x] `AgentMessage`/`Tool` рендер pending/success/error и корректный вывод input/output.
-- [x] Functional:
-  - [x] reasoning и text стримятся одновременно в одном `kind:llm`.
-  - [x] text стримится инкрементально.
-  - [x] multi-tool turn продолжается до финального ответа.
-  - [x] cancel во время tool execution не создаёт `kind:error`.
-  - [x] `tool_call` отображается как tool-call блок (`Tool`) с корректными input/output/status.
-  - [x] `tool_call` рендер корректен на основе только `message.created`/`message.updated`.
-  - [x] `tool_call` в режиме stub переходит `done=false -> done=true` и обновляет UI без отдельного сигнала.
-  - [x] статус/индикатор корректен для `llm/tool_call` + `done`.
-  - [x] `changedFields` передаётся в целевых `{entity}.updated` событиях и корректно используется UI.
-  - [x] chat-flow ошибки не дублируются toast-уведомлениями.
-  - [x] settings: security-текст и `Test Connection` UI контракт покрыты функциональными тестами.
-  - [x] helper `expectNoToastError` используется после ключевых действий (testing.12 contract).
+- [x] Обновить спеки и дизайн под новую семантику `final_answer`:
+  - [x] Основной ответ пользователя остаётся в `kind: llm` (`data.text`).
+  - [x] `final_answer` — completion summary (не дублирует полный ответ).
+  - [x] Лимиты `text`/`summary_points` обязательны по strict-schema инструмента.
+- [x] Перенести retry/repair для невалидного `final_answer` на AI SDK (`maxRetries` + strict tools).
+- [x] Упростить `MainPipeline`: оставить только доменный маппинг финальной ошибки в `kind:error`.
+- [x] Обновить промпт `FinalAnswerFeature`:
+  - [x] Явно запретить дублирование полного ответа в `final_answer.text`.
+  - [x] Зафиксировать лимиты `text`/`summary_points`.
+- [x] Обновить renderer mapping/компоненты:
+  - [x] Убрать fallback для пустого `final_answer.text` (невалидный путь обрабатывается в pipeline).
+  - [x] Оставить `final_answer` как completion summary + `Completed` badge.
+- [x] Добавить/обновить unit тесты:
+  - [x] `MainPipeline`: финальная ошибка провайдера после SDK retry -> `kind:error`.
+  - [x] `PromptBuilder`: обновлённая инструкция и лимиты schema.
+  - [x] renderer tests: completion summary без fallback-пути.
+- [x] Добавить/обновить functional тесты:
+  - [x] сценарий невалидного `final_answer` с последующим успешным retry.
+  - [x] сценарий исчерпания retry и показа `kind:error`.
 
 ---
 
-## Фаза F: Финализация
+## Фаза 7: Согласованность границ спецификаций
 
-- [x] Перепроверить согласованность `requirements.md` vs `design.md` vs `tasks.md` (полнота, непротиворечивость, неизбыточность).
-- [x] `npm run validate`.
-- [ ] После подтверждения пользователя: полный `npm run test:functional`.
-- [ ] Обновить чекбоксы `tasks.md` по факту выполнения.
+- [x] Зафиксировать границу ответственности между спеками:
+  - [x] `llm-integration` описывает только runtime-логику взаимодействия с LLM (без UI-описаний).
+  - [x] `agents` описывает только UI/рендер и статусную визуализацию persisted данных (без model/pipeline логики).
+- [x] Удалить из `llm-integration` интерфейсные детали и оставить только контракты событий/данных/ошибок/flow.
+- [x] Удалить из `agents` runtime-логику LLM (retry/repair/валидация tool-контрактов на стороне модели).
+## Фаза 8: Приведение внешнего вида и поведения tool-call к новым требованиям
+
+- [x] Синхронизировать UI-реализацию `tool_call(final_answer)` с текущими спеками `agents`:
+  - [x] `final_answer` рендерится отдельным UI-блоком.
+  - [x] Блок рендерится как checklist `summary_points`.
+  - [x] Пункты checklist рендерятся с зелёным `Check`.
+- [x] Убрать альтернативные пути рендера `final_answer`, не соответствующие целевому контракту.
+- [x] Добавить/обновить unit-тесты renderer под целевое поведение `Final Answer`:
+  - [x] Проверка fallback `Done` при отсутствии `text`.
+  - [x] Проверка корректных `data-testid` для блока, хедера, title, check, summary.
+- [x] Добавить/обновить functional-тесты под целевое поведение `Final Answer` в чате.
+- [x] Привести UI auth-error диалога к `agents.4.10.3-4.10.5`:
+  - [x] Фиксированный порядок кнопок: сначала `Open Settings`, затем `Retry`.
+  - [x] Визуальные варианты: `Open Settings` — `outline`, `Retry` — `default`.
+  - [x] При нажатии `Retry` текущий error-диалог скрывается до старта повторного запроса.
+- [x] Добавить/обновить unit-тесты для auth-error диалога:
+  - [x] Проверка наличия двух действий (`Open Settings`, `Retry`).
+  - [x] Проверка порядка кнопок и их variants.
+  - [x] Проверка скрытия диалога перед `retryLast(...)`.
+- [x] Добавить/обновить functional-тесты auth-error flow:
+  - [x] Проверка порядка кнопок `Open Settings` -> `Retry`.
+  - [x] Проверка поведения `Retry` (диалог скрывается перед повтором).
+
+## Фаза 9: Runtime-контракт `final_answer` (default values) и трассировка требований
+
+- [x] Привести runtime-обработку `final_answer` к `llm-integration.9.5.1.2`:
+  - [x] При отсутствии `text` не выполнять автоподстановку в runtime-слое `llm-integration`.
+  - [x] При отсутствии `summary_points` нормализовать до `[]` в runtime-контракте.
+- [x] Добавить/обновить unit-тесты pipeline/mapper на default-значения `final_answer` (`text` отсутствует, `summary_points=[]`).
+- [x] Добавить/обновить functional-тест на сценарий `final_answer` без `summary_points` (успешный `completed` без ошибок контракта).
+- [x] Синхронизировать таблицу покрытия требований в `docs/specs/llm-integration/design.md` с актуальным `requirements.md` (включая `llm-integration.7`).
+
+---
+
+## Фаза 10: Расширение тестового покрытия (приоритет unit)
+
+- [x] Добавить модульные тесты (`MainPipeline` / `PromptBuilder` / mappers) для `final_answer`:
+  - [x] `final_answer` без `text` (поле отсутствует) не ломает pipeline и не получает runtime-автоподстановку на LLM-слое.
+  - [x] `final_answer` без `summary_points` нормализуется до `[]` для runtime-контракта.
+  - [x] `final_answer` с пустым `summary_points` остаётся успешным `completed` (без перехода в `kind:error`).
+  - [x] Невалидные лимиты (`text > 300`, `summary_points > 10`, пункт `> 200`) приводят к retry/repair и корректной финальной ошибке при исчерпании.
+- [x] Добавить модульные тесты статусов (`AgentManager.computeAgentStatus`):
+  - [x] `tool_call(final_answer, done=true)` -> `completed`.
+  - [x] `tool_call(non-final, done=true)` -> `awaiting-response`.
+  - [x] `llm(done=true)` без `final_answer` -> `awaiting-response`.
+  - [x] `hidden=true` сообщения исключаются из расчёта статуса.
+- [x] Добавить модульные тесты renderer (`AgentMessage`/mapper):
+  - [x] Рендер `"Final Answer"` header: title из `final_answer.text`, fallback `Done`.
+  - [x] Рендер `summary_points` как списка пунктов с индикаторами.
+  - [x] Наличие и корректность `data-testid` для `message-final-answer-*`.
+- [x] Добавить модульные тесты transport/runtime синхронизации:
+  - [x] `message.llm.reasoning.updated`/`message.llm.text.updated` не дублируются snapshot-апдейтами.
+  - [x] `message.updated` с `hidden=true` корректно закрывает активный stream без `kind:error`.
+  - [x] `tool_call` обрабатывается только через persisted `message.created`/`message.updated`.
+- [x] Добавить функциональные тесты (`tests/functional/llm-chat.spec.ts`, `agent-status-calculation.spec.ts`):
+  - [x] `final_answer` рендерится как всегда раскрытый checklist `summary_points`.
+  - [x] Пустой/отсутствующий `summary_points` обрабатывается как невалидный `final_answer` с retry/repair.
+  - [x] `kind:error` auth-диалог: есть `Open Settings` + `Retry`, порядок `Open Settings` -> `Retry`, variants `outline/default`.
+  - [x] При `Retry` auth-ошибки диалог скрывается перед повторным запросом.
+  - [x] После `tool_call(final_answer, done=true)` статус в UI становится `completed` во всех местах.
+- [x] Добавить regression-набор после удаления legacy UI-путей:
+  - [x] Проверка, что `final_answer` больше не рендерится через старый `Completed badge`/legacy summary-блок.
+  - [x] Проверка, что обычные `tool_call` продолжают рендериться как tool-блоки без деградаций.
+
+---
+
+## Фаза 11: Порядок persist `llm` и `tool_call` в одном turn
+
+- [x] Привести `MainPipeline` к контракту `llm-integration.11.1.1-11.1.2`:
+  - [x] Буферизовать `tool_call`/`tool_result` чанки до финализации `kind:llm`.
+  - [x] Финализировать `kind:llm (done=true)` до первого persisted `kind:tool_call` текущего turn.
+  - [x] Выполнять flush buffered tool-calls только после successful completion основного `llm` ответа.
+- [x] Добавить/обновить unit-тесты порядка событий/персиста:
+  - [x] `kind:tool_call` не создаётся в БД до `kind:llm(done=true)` для того же turn.
+  - [x] При error-path buffered tool-calls не персистятся как успешные tool-call сообщения.
+- [x] Добавить/обновить functional-тесты user-flow:
+  - [x] Проверка, что блок `final_answer` появляется только после полного стриминга основного ответа.
+  - [x] Проверка, что до завершения `llm` в UI отсутствует persisted `tool_call` текущего turn.
+
+---
+
+## Фаза 12: Восстановление контракта `invalid final_answer -> kind:error`
+
+- [x] Исправить functional-тест `tests/functional/llm-chat.spec.ts` ("should show error when invalid final_answer exhausts retry limit").
+
+## Фаза 13: Убрать текстовый ответ из `final_answer`
+
+- [x] Обновить контракт `final_answer` в спеках/дизайне: удалить зависимость от `final_answer.text`, оставить только `summary_points`.
+- [x] Обновить `PromptBuilder`/tool-schema и runtime-нормализацию под `final_answer` без `text`.
+- [x] Обновить UI рендер `final_answer`: заголовок всегда `Done`.
+- [x] Обновить unit/functional тесты под новый контракт `final_answer` без `text`.
+
+## Фаза 14: Final Answer без сворачивания
+
+- [x] Обновить требования и дизайн (`agents`, `testing-infrastructure`): блок `"Final Answer"` всегда раскрыт, контроль сворачивания отсутствует.
+- [x] Обновить renderer (`AgentMessage`): удалить ветки с контролом сворачивания для `final_answer`, рендерить статичный раскрытый блок.
+- [x] Обновить unit/functional тесты под always-expanded контракт и убрать проверки контроля сворачивания.
+
+## Фаза 15: `summary_points` обязателен (без UI fallback)
+
+- [x] Обновить требования/дизайн: `final_answer.summary_points` обязателен и содержит минимум 1 пункт.
+- [x] Удалить UI fallback с автоподстановкой `Done` при пустом/отсутствующем `summary_points`.
+- [x] Обновить tool schema и prompt-инструкции под `summary_points` как required + `minItems: 1`.
+- [x] Обновить renderer и тесты под checklist-only рендер без отдельного заголовка `Done`.
+- [x] Обновить functional сценарии invalid `final_answer` (включая пустой/отсутствующий `summary_points`).
+
+## Фаза 16: Устойчивый рендер математики из реальных ответов модели
+
+- [x] Ужесточить системный промпт: явно требовать только `$...$`/`$$...$$` и запретить `\(...\)`/`\[...\]`.
+- [x] Добавить runtime-нормализацию делимитеров в renderer перед markdown-рендером.
+- [x] Добавить unit-тесты для нормализации делимитеров (включая защиту fenced/inline code).
+- [x] Добавить functional-тест на рендер математики при ответе модели с `\(...\)`/`\[...\]`.
 
 ---
 
 ## Definition of Done
 
-- [x] AI SDK Core/UI реально используются как основной стек в main/renderer без дублирующей кастомной оркестрации.
-- [x] Специализированные ошибки полностью определяются через AI SDK errors + доменный normalizer.
-- [x] Stream Protocol реализован корректно, без дублей и без потерь чанков.
-- [x] Tool loop работает end-to-end (`model -> tools -> model`) для всех провайдеров.
-- [x] Tool-call UI работает полностью через persisted сообщения и snapshot-события без зависимости от `message.tool_call`.
-- [x] Отдельное realtime-событие `message.tool_call` удалено из shared events/types/constants, IPC bridge и unit-тестов.
-- [x] `payload.data.text` остаётся canonical финальным ответом.
-- [ ] `npm run validate` и полный `npm run test:functional` проходят.
-
----
-
-## Дополнительный To Do (по результатам проверки)
-
-- [x] Перевести текущий mapping `tool_call` с text-summary на полноценные AI SDK tool parts (`tool-input-*` / `tool-output-*`) в `messageMapper` и/или `IPCChatTransport`.
-- [x] Добавить unit-тесты на формирование именно tool parts (а не text part) для persisted `kind:tool_call`.
-- [x] Добавить функциональный сценарий на отображение historical `llm` сообщений после миграции `013` (каноничный рендер из `data.text` без `data.action` fallback).
-- [x] После внедрения tool parts синхронизировать рендер `AgentMessage`/`Tool` так, чтобы UI использовал единый контракт tool-part без дублирующих путей.
-
-### Отдельные шаги исправления
-
-- [x] Шаг 1. Реализовать AI SDK tool parts для persisted `kind:tool_call` (убрать text-summary путь).
-- [x] Шаг 2. Добавить/обновить unit-тесты, проверяющие именно tool parts контракт.
-- [x] Шаг 3. Добавить functional-тест на исторические `llm` после миграции `013` (рендер только из `data.text`).
-- [x] Шаг 4. Привести `AgentMessage`/`Tool` к единому пути рендера по tool parts и удалить дубли.
+- [x] Спеки и дизайн обновлены под целевую модель `final_answer` без legacy/миграционных оговорок.
+- [x] Pipeline поддерживает `final_answer` end-to-end в strict режиме.
+- [x] Статус `completed` вычисляется и отображается по согласованному правилу.
+- [x] Добавлены/обновлены модульные тесты для pipeline, статусов, промпта и renderer.
+- [x] Добавлены/обновлены функциональные тесты для user-flow и статусов.
+- [x] `npm run validate` проходит.
+- [x] (После отдельного подтверждения) полный `npm run test:functional` проходит.
+- [x] Strict-schema `final_answer` в AI SDK + retry/repair policy реализованы и покрыты тестами.
+- [x] Внешний вид и поведение `tool_call(final_answer)` соответствуют текущим требованиям `agents` и покрыты unit/functional тестами.
+- [x] Runtime default-контракт `final_answer` (`text` отсутствует, `summary_points=[]`) реализован и покрыт тестами.
+- [x] Таблица покрытия требований в `llm-integration/design.md` синхронизирована с актуальными требованиями.
+- [x] Добавлен расширенный набор unit/functional тестов для `final_answer`, статусов, runtime-stream и error-actions без регрессий.

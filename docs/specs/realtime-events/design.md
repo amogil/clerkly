@@ -228,7 +228,7 @@ export interface MessageLlmTextUpdatedPayload extends BaseEvent {
 
 Правило использования:
 - `message.llm.reasoning.updated` и `message.llm.text.updated` — инкрементальные чанки для UI-стриминга.
-- Рендер tool-call блока строится по persisted `message.created`/`message.updated` для `kind: tool_call`.
+- Рендер tool-call строится по persisted `message.created`/`message.updated` для `kind: tool_call`: `final_answer` отображается как assistant message с `Completed` badge, остальные вызовы — как tool-call блок.
 
 #### Генерация снапшотов
 

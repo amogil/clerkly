@@ -420,7 +420,10 @@ await expect(element).toContainText('Success');
 
 13.2. THE модульные тесты SHALL покрывать отсутствие дублирования между delta-событиями (`message.llm.reasoning.updated`, `message.llm.text.updated`) и snapshot `message.updated`.
 
-13.3. THE модульные тесты SHALL проверять, что persisted `kind:tool_call` рендерится как отдельный tool-call блок в сообщении ассистента.
+13.3. THE модульные тесты SHALL проверять рендер persisted `kind:tool_call`: `final_answer` как отдельный checklist-блок `"Final Answer"` (без отдельного заголовка, только `summary_points`), остальные `tool_call` как отдельный tool-call блок.
+13.3.1. Для `final_answer` тесты SHALL проверять, что checklist-блок всегда отображается раскрытым и не содержит контроля сворачивания.
+13.3.2. Тесты SHALL проверять соблюдение контракта `final_answer` согласно `llm-integration.9.5.*` (`summary_points` обязателен и содержит минимум 1 пункт).
+13.3.3. Тесты SHALL проверять retry-path для невалидного `final_answer` и создание `kind:error` при исчерпании retry-лимита.
 
 13.4. THE модульные тесты SHALL покрывать ErrorNormalizer для классов ошибок AI SDK и доменного маппинга (`auth`, `rate_limit`, `provider`, `network`, `timeout`, `tool`, `protocol`).
 
@@ -431,3 +434,5 @@ await expect(element).toContainText('Success');
 13.7. THE функциональные тесты SHALL проверять `rate_limit` countdown без создания `kind:error` записи в истории.
 
 13.8. THE функциональные тесты SHALL проверять, что cancel во время tool execution НЕ создаёт `kind:error`.
+
+13.9. THE модульные и функциональные тесты SHALL покрывать нормализацию математических делимитеров `\(...\)`, `\[...\]`, `\$...\$` и `\$\$...\$\$` в KaTeX-совместимый формат, включая проверку, что fenced/inline code при нормализации не изменяются.

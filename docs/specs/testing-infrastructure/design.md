@@ -1284,9 +1284,19 @@ export async function expectNoToastError(window: Page): Promise<void> {
 
 - `tests/functional/llm-chat.spec.ts` проверяет:
   - параллельный стриминг reasoning + текста;
-  - отображение persisted `tool_call` как отдельного tool-call блока (по `message.created`/`message.updated`);
+  - отображение persisted `tool_call` по `message.created`/`message.updated` (`final_answer` как отдельный блок `"Final Answer"`, остальные как tool-call блок);
   - корректный rate-limit countdown без persisted `kind:error`;
   - отсутствие `kind:error` при cancel во время tool execution.
+
+### Технические детали проверки `final_answer` (для тестов)
+
+- Для проверки завершённого ответа через `final_answer` использовать:
+  - `data-testid="message-final-answer-block"` — корневой блок;
+  - `data-testid="message-final-answer-summary"` — контейнер checklist `summary_points`;
+  - `data-testid="message-final-answer-item"` — checklist-пункты.
+- Блок `final_answer` проверяется как всегда раскрытый checklist без toggle-контрола.
+- Для проверки обычных tool-calls (не `final_answer`) использовать селекторы tool-call блока, а не assistant bubble.
+- Для сценариев невалидного `final_answer` (`summary_points` пустой/отсутствует, `summary_points` > 10, пункт > 200) проверять retry pipeline и итоговый `kind:error` при исчерпании лимита.
 
 ### Покрытие требований
 
