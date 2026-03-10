@@ -24,6 +24,7 @@ interface ErrorWithStatusCode {
   status?: number;
   responseHeaders?: Headers | Record<string, string> | null;
   headers?: Headers | Record<string, string> | null;
+  cause?: unknown;
 }
 
 const TOOL_ERROR_NAMES = new Set([
@@ -75,6 +76,21 @@ function parseRetryAfterSecondsFromHeaders(
   const seconds = Number(retryAfterValue);
   if (!Number.isFinite(seconds) || seconds <= 0) return undefined;
   return Math.ceil(seconds);
+}
+
+function unwrapCauseChain(error: unknown, maxDepth = 6): ErrorWithStatusCode[] {
+  const chain: ErrorWithStatusCode[] = [];
+  let current: unknown = error;
+  let depth = 0;
+
+  while (current && typeof current === 'object' && depth < maxDepth) {
+    const typed = current as ErrorWithStatusCode;
+    chain.push(typed);
+    current = typed.cause;
+    depth += 1;
+  }
+
+  return chain;
 }
 
 // Requirements: llm-integration.3.10
@@ -159,6 +175,37 @@ export function normalizeLLMError(error: unknown): NormalizedLLMError {
   }
 
   if (name === 'RetryError') {
+    const chain = unwrapCauseChain(error);
+    const rateLimitCause = chain.find((item) => {
+      const itemStatus =
+        typeof item.statusCode === 'number'
+          ? item.statusCode
+          : typeof item.status === 'number'
+            ? item.status
+            : undefined;
+      const itemMessage = (item.message ?? '').toLowerCase();
+      return (
+        itemStatus === 429 ||
+        itemMessage.includes('rate limit') ||
+        itemMessage.includes('too many requests') ||
+        itemMessage.includes('429')
+      );
+    });
+
+    if (rateLimitCause) {
+      const retryAfterSeconds =
+        parseRetryAfterSecondsFromHeaders(rateLimitCause.responseHeaders) ??
+        parseRetryAfterSecondsFromHeaders(rateLimitCause.headers) ??
+        parseRetryAfterSecondsFromText(rateLimitCause.message ?? message) ??
+        parseRetryAfterSecondsFromText(message);
+
+      return {
+        type: 'rate_limit',
+        message: STANDARD_MESSAGES.rateLimit,
+        retryAfterSeconds,
+      };
+    }
+
     return { type: 'provider', message: STANDARD_MESSAGES.provider };
   }
 
