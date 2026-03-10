@@ -17,7 +17,7 @@ export function normalizeMathDelimiters(content: string): string {
 
   const normalizeNonCodeSegment = (segment: string): string =>
     segment
-      .replace(/\\\[([\s\S]*?)\\\]/g, (_match, inner: string) => `$$${inner}$$`)
+      .replace(/\\\[([\s\S]*?)\\\]/g, (_match, inner: string) => `$$\n${inner}\n$$`)
       .replace(/\\\(([\s\S]*?)\\\)/g, (_match, inner: string) => `$${inner}$`);
 
   return content

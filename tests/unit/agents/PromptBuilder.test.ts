@@ -152,9 +152,9 @@ describe('PromptBuilder.build()', () => {
           }),
         },
       });
-      expect((finalAnswerTool?.parameters as Record<string, unknown>).properties).not.toHaveProperty(
-        'text'
-      );
+      expect(
+        (finalAnswerTool?.parameters as Record<string, unknown>).properties
+      ).not.toHaveProperty('text');
     });
   });
 

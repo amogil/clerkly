@@ -12,7 +12,7 @@ describe('normalizeMathDelimiters', () => {
     const output = normalizeMathDelimiters(input);
 
     expect(output).toContain('Inline $E=mc^2$');
-    expect(output).toContain('Block:\n$$\\sum_{i=1}^{n} i$$');
+    expect(output).toContain('Block:\n$$\n\\sum_{i=1}^{n} i\n$$');
   });
 
   /* Preconditions: content contains fenced and inline code with LaTeX-like text

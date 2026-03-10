@@ -31,7 +31,8 @@ export function AgentMessage({
     ? (message.payload.data as Record<string, unknown> | undefined)
     : undefined;
   const llmReasoning = llmData?.['reasoning'] as { text?: string } | undefined;
-  const llmTextRaw = typeof llmData?.['text'] === 'string' ? (llmData['text'] as string) : undefined;
+  const llmTextRaw =
+    typeof llmData?.['text'] === 'string' ? (llmData['text'] as string) : undefined;
   const llmText = llmTextRaw ? normalizeMathDelimiters(llmTextRaw) : undefined;
   const llmReasoningText = llmReasoning?.text
     ? normalizeMathDelimiters(llmReasoning.text)
