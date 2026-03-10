@@ -72,6 +72,10 @@
 
 2.3. Sandbox runtime SHALL NOT иметь прямой доступ к файловой системе, сетевым запросам и БД.
 
+2.3.1. Browser-level сетевые API в sandbox runtime SHALL NOT быть доступны для исходящего трафика: `fetch`, `XMLHttpRequest`, `WebSocket`, `navigator.sendBeacon`, navigation/open redirect (`window.open`, `location.assign`, `location.replace`).
+
+2.3.2. КОГДА sandbox-код пытается использовать запрещённый browser-level сетевой канал, вызов ДОЛЖЕН завершаться контролируемой ошибкой с `status = "error"` и `error.code = "policy_denied"` без выполнения сетевого запроса.
+
 2.4. КОГДА sandbox-код пытается вызвать неразрешённый API, ТО система ДОЛЖНА блокировать доступ и возвращать контролируемую ошибку.
 
 2.5. КОГДА истекает лимит времени исполнения, ТО система ДОЛЖНА прерывать выполнение и возвращать статус timeout.
@@ -111,6 +115,7 @@
 - `tests/functional/code_exec.spec.ts` — "should cancel active code_exec execution"
 - `tests/functional/code_exec.spec.ts` — "should deny main-pipeline-only tools from sandbox JavaScript"
 - `tests/functional/code_exec.spec.ts` — "should allow only tools from sandbox allowlist"
+- `tests/functional/code_exec.spec.ts` — "should deny browser-level network APIs (fetch/xhr/websocket/sendBeacon/navigation) with policy_denied"
 - `tests/functional/code_exec.spec.ts` — "should stop sandbox execution on app close without hanging shutdown"
 - `tests/functional/code_exec.spec.ts` — "should enforce sandbox CPU and memory limits"
 

@@ -639,6 +639,8 @@
      - `kind = 'tool_call'` и `toolName = 'code_exec'` и `done = true` → `in-progress`
      - `kind = 'error'` → `error`
 
+9.2.1. Terminal-статусы `tool_call(code_exec)` (`success | error | timeout | cancelled`) SHALL NOT напрямую маппиться в `completed/error`; до следующего шага tool-loop статус агента ДОЛЖЕН оставаться `in-progress`.
+
 9.3. Статус ДОЛЖЕН пересчитываться при получении любого нового сообщения в чате агента
 
 9.4. Функция определения статуса ДОЛЖНА быть чистой (pure function) и детерминированной

@@ -519,6 +519,7 @@ function computeAgentStatus(messages: Message[]): AgentStatus {
   }
   if (lastMessage.kind === 'tool_call') {
     if (!lastMessage.done) return 'in-progress';
+    // Terminal code_exec result is an intermediate step in tool-loop; keep in-progress until next model step.
     return lastMessage.payload?.data?.toolName === 'final_answer' ? 'completed' : 'in-progress';
   }
   return 'new';

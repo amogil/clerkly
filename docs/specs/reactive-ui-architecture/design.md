@@ -27,6 +27,8 @@
 - детальный рендер и поведение конкретных UI-компонентов (это `docs/specs/agents/*`);
 - transport/typing/delivery контракт event-шины и IPC (это `docs/specs/realtime-events/*`).
 
+Ниже по документу допускаются только иллюстративные feature-specific примеры как non-normative material (для объяснения паттернов). Нормативные требования к конкретным фичам ДОЛЖНЫ оставаться в профильных спеках (`agents/*` и др.).
+
 ### Принципы
 
 **Requirements:** reactive-ui-architecture.1, realtime-events.9.8
