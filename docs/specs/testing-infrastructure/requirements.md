@@ -420,9 +420,9 @@ await expect(element).toContainText('Success');
 
 13.2. THE модульные тесты SHALL покрывать отсутствие дублирования между delta-событиями (`message.llm.reasoning.updated`, `message.llm.text.updated`) и snapshot `message.updated`.
 
-13.3. THE модульные тесты SHALL проверять рендер persisted `kind:tool_call`: `final_answer` как assistant message с `Completed` badge, остальные `tool_call` как отдельный tool-call блок.
-13.3.1. Для `final_answer` тесты SHALL проверять наличие визуального маркера `Completed` и отображение блока краткого резюме при непустом `summary_points`.
-13.3.2. Тесты SHALL проверять соблюдение контракта `final_answer` согласно `llm-integration.9.5.*`.
+13.3. THE модульные тесты SHALL проверять рендер persisted `kind:tool_call`: `final_answer` как отдельный блок `"Final Answer"` (header `Done` + summary_points), остальные `tool_call` как отдельный tool-call блок.
+13.3.1. Для `final_answer` тесты SHALL проверять фиксированный заголовок `Done` и отображение блока краткого резюме при непустом `summary_points`.
+13.3.2. Тесты SHALL проверять соблюдение контракта `final_answer` согласно `llm-integration.9.5.*` (без зависимости от `final_answer.text`).
 13.3.3. Тесты SHALL проверять retry-path для невалидного `final_answer` и создание `kind:error` при исчерпании retry-лимита.
 
 13.4. THE модульные тесты SHALL покрывать ErrorNormalizer для классов ошибок AI SDK и доменного маппинга (`auth`, `rate_limit`, `provider`, `network`, `timeout`, `tool`, `protocol`).

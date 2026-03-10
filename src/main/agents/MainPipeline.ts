@@ -452,9 +452,6 @@ export class MainPipeline {
    */
   private normalizeFinalAnswerArguments(args: Record<string, unknown>): Record<string, unknown> {
     const normalized: Record<string, unknown> = {};
-    if (typeof args.text === 'string') {
-      normalized.text = args.text;
-    }
     normalized.summary_points = Array.isArray(args.summary_points) ? args.summary_points : [];
     return normalized;
   }

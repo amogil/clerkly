@@ -151,13 +151,12 @@ export function AgentMessage({
         toolData.arguments && typeof toolData.arguments === 'object'
           ? toolData.arguments
           : undefined;
-      const finalText = typeof args?.['text'] === 'string' ? args['text'].trim() : '';
       const summaryPointsRaw = args?.['summary_points'];
       const summaryPoints = Array.isArray(summaryPointsRaw)
         ? summaryPointsRaw.filter((point): point is string => typeof point === 'string')
         : [];
       const hasSummary = summaryPoints.length > 0;
-      const title = finalText || 'Done';
+      const title = 'Done';
 
       return (
         <Message from="assistant" className="w-full max-w-full">

@@ -1579,7 +1579,7 @@ function AgentWelcome({ onPromptClick }: AgentWelcomeProps) {
 **Сообщения инструментов (`kind: 'tool_call'`):**
 - Для `toolName !== 'final_answer'` используется AI Elements `Tool` family как отдельный технический блок вызова инструмента.
 - Для `toolName === 'final_answer'` используется отдельный компонент `"Final Answer"` на базе AI Elements `Queue`.
-- Заголовок компонента: `final_answer.text` (fallback: `Done`) + иконка `Check` (без круга).
+- Заголовок компонента: фиксированный текст `Done` + иконка `Check` (без круга).
 - Тело компонента: только `summary_points`, каждый пункт с иконкой `Check` в зелёном круге.
 - Компонент по умолчанию свернут, если `summary_points.length > 0`; при пустом `summary_points` рендерится в неколлапсируемом виде (без toggle).
 - `Agents` не выполняет валидацию/repair `final_answer`; компонент рендерит только persisted payload.
@@ -1588,7 +1588,7 @@ function AgentWelcome({ onPromptClick }: AgentWelcomeProps) {
 // Requirements: agents.7.4.1, agents.7.4.2
 if (message.kind === 'tool_call' && toolName === 'final_answer') {
   const hasSummary = summaryPoints.length > 0;
-  const title = finalText?.trim() || 'Done';
+  const title = 'Done';
   return (
     <Queue data-testid="message-final-answer-block">
       <QueueSection defaultOpen={false} disabled={!hasSummary}>

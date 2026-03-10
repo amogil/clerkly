@@ -218,6 +218,13 @@
 
 - [ ] Исправить functional-тест `tests/functional/llm-chat.spec.ts` ("should show error when invalid final_answer exhausts retry limit").
 
+## Фаза 13: Убрать текстовый ответ из `final_answer`
+
+- [x] Обновить контракт `final_answer` в спеках/дизайне: удалить зависимость от `final_answer.text`, оставить только `summary_points`.
+- [x] Обновить `PromptBuilder`/tool-schema и runtime-нормализацию под `final_answer` без `text`.
+- [x] Обновить UI рендер `final_answer`: заголовок всегда `Done`.
+- [x] Обновить unit/functional тесты под новый контракт `final_answer` без `text`.
+
 ---
 
 ## Definition of Done

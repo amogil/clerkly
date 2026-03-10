@@ -272,33 +272,6 @@ describe('toUIMessage', () => {
           callId: 'call-final',
           toolName: 'final_answer',
           arguments: {
-            text: 'Final answer text',
-            summary_points: ['Point 1'],
-          },
-        },
-      },
-    });
-    const result = toUIMessage(msg);
-    expect(result).not.toBeNull();
-    expect(result!.role).toBe('assistant');
-    expect(result!.parts).toEqual([{ type: 'text', text: 'Final answer text' }]);
-    expect((result!.metadata as Record<string, unknown>).isFinalAnswer).toBe(true);
-    expect((result!.metadata as Record<string, unknown>).summary_points).toEqual(['Point 1']);
-  });
-
-  /* Preconditions: final_answer without text
-     Action: call toUIMessage
-     Assertions: falls back to Done placeholder text
-     Requirements: llm-integration.9.6 */
-  it('should map final_answer without text to Done placeholder', () => {
-    const msg = makeSnapshot({
-      kind: 'tool_call',
-      done: true,
-      payload: {
-        data: {
-          callId: 'call-final',
-          toolName: 'final_answer',
-          arguments: {
             summary_points: ['Point 1'],
           },
         },
@@ -308,10 +281,34 @@ describe('toUIMessage', () => {
     expect(result).not.toBeNull();
     expect(result!.role).toBe('assistant');
     expect(result!.parts).toEqual([{ type: 'text', text: 'Done' }]);
+    expect((result!.metadata as Record<string, unknown>).isFinalAnswer).toBe(true);
     expect((result!.metadata as Record<string, unknown>).summary_points).toEqual(['Point 1']);
   });
 
-  /* Preconditions: final_answer without summary_points
+  /* Preconditions: final_answer without arguments
+     Action: call toUIMessage
+     Assertions: uses fixed Done text and normalizes summary_points to empty array
+     Requirements: llm-integration.9.6 */
+  it('should map final_answer without arguments to Done and empty summary points', () => {
+    const msg = makeSnapshot({
+      kind: 'tool_call',
+      done: true,
+      payload: {
+        data: {
+          callId: 'call-final',
+          toolName: 'final_answer',
+          arguments: {},
+        },
+      },
+    });
+    const result = toUIMessage(msg);
+    expect(result).not.toBeNull();
+    expect(result!.role).toBe('assistant');
+    expect(result!.parts).toEqual([{ type: 'text', text: 'Done' }]);
+    expect((result!.metadata as Record<string, unknown>).summary_points).toEqual([]);
+  });
+
+  /* Preconditions: final_answer without summary_points field
      Action: call toUIMessage
      Assertions: summary_points normalized to empty array
      Requirements: llm-integration.9.5.1.2 */
@@ -323,9 +320,7 @@ describe('toUIMessage', () => {
         data: {
           callId: 'call-final',
           toolName: 'final_answer',
-          arguments: {
-            text: 'Completed',
-          },
+          arguments: {},
         },
       },
     });

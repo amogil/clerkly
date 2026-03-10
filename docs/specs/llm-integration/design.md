@@ -159,7 +159,6 @@ CREATE TABLE messages (
   "data": {
     "toolName": "final_answer",
     "arguments": {
-      "text": "Task completed",
       "summary_points": ["Completed A", "Completed B", "Completed C"]
     }
   }
@@ -167,11 +166,9 @@ CREATE TABLE messages (
 ```
 
 Контракт `final_answer` валидируется через strict-schema инструмента в `Vercel AI SDK`:
-- `text`: опциональная строка; когда присутствует — непустая и длиной `<= 300`;
 - `summary_points`: опциональный массив длиной `<= 10`;
 - каждый пункт `summary_points`: строка длиной `<= 200`.
 - Значения по умолчанию при отсутствии поля в аргументах:
-  - `text`: отсутствует (не подставляется автоматически на runtime-слое `llm-integration`);
   - `summary_points`: `[]` (пустой список для дальнейшей обработки).
 Невалидный `final_answer` не фиксируется как завершённый: retry/repair выполняется на стороне AI SDK; при исчерпании лимита создаётся `kind:error`.
 `reply_to_message_id` хранится в колонке `messages.reply_to_message_id` и передаётся в `MessageSnapshot` отдельным полем, не внутри payload.
@@ -246,7 +243,7 @@ CREATE TABLE messages (
 
 ### Retry policy (невалидный final_answer)
 
-- Невалидный `final_answer` (нарушение лимитов `text`/`summary_points`) считается recoverable-ошибкой контракта.
+- Невалидный `final_answer` (нарушение лимитов `summary_points`) считается recoverable-ошибкой контракта.
 - Retry/repair выполняются провайдерным вызовом `Vercel AI SDK` (`maxRetries: 2` + strict tools).
 - При исчерпании лимита retry `MainPipeline` обрабатывает финальную ошибку как стандартный `kind:error`.
 
@@ -374,7 +371,6 @@ class PromptBuilder {
 Для feature `final_answer` системная инструкция и описание инструмента задают следующую модель поведения:
 - обычный поток `reasoning/text` используется для рабочего диалога (уточнения, вопросы к пользователю, промежуточные сообщения);
 - `final_answer` вызывается только когда модель считает задачу завершённой;
-- `final_answer.text` содержит явное сообщение о завершении работы;
 - `final_answer.summary_points` перечисляет решённые задачи.
 
 `messages` содержит:
@@ -676,7 +672,7 @@ User отправляет сообщение
 | llm-integration.8.6.1 | ✓ | ✓ |
 | llm-integration.8.7 | ✓ | ✓ |
 | llm-integration.9 | ✓ | ✓ |
-| llm-integration.9.5.1.2 (default contract: `text` отсутствует, `summary_points=[]`) | ✓ | ✓ |
+| llm-integration.9.5.1.2 (default contract: `summary_points=[]`) | ✓ | ✓ |
 | llm-integration.10 | ✓ | ✓ |
 | llm-integration.11 | ✓ | ✓ |
 | llm-integration.11.1.1 (`tool_call` только после `llm done=true`) | ✓ | ✓ |

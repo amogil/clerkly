@@ -133,19 +133,15 @@ describe('PromptBuilder.build()', () => {
       const result = makeBuilder('Base.', [feature]).build();
       expect(result.systemPrompt).toContain('final_answer');
       expect(result.systemPrompt).toContain('Use normal assistant text for ongoing dialog');
-      expect(result.systemPrompt).toContain('Call the `final_answer` tool only when you are confident');
-      expect(result.systemPrompt).toContain('explicitly state that the work is completed');
+      expect(result.systemPrompt).toContain(
+        'Call the `final_answer` tool only when you are confident'
+      );
       expect(result.systemPrompt).toContain('list solved tasks');
       expect(result.tools.some((tool) => tool.name === 'final_answer')).toBe(true);
       const finalAnswerTool = result.tools.find((tool) => tool.name === 'final_answer');
       expect(finalAnswerTool?.description).toContain('only after task is fully done');
       expect(finalAnswerTool?.parameters).toMatchObject({
         properties: {
-          text: expect.objectContaining({
-            minLength: 1,
-            maxLength: 300,
-            description: expect.stringContaining('explicitly says the work is done'),
-          }),
           summary_points: expect.objectContaining({
             maxItems: 10,
             description: expect.stringContaining('list of solved tasks'),

@@ -281,7 +281,6 @@ describe('MainPipeline.run()', () => {
           callId: 'call-final',
           toolName: 'final_answer',
           arguments: {
-            text: 'Task completed',
             summary_points: ['Step A done', 'Step B done'],
           },
         });
@@ -299,7 +298,7 @@ describe('MainPipeline.run()', () => {
           callId: 'call-final',
           toolName: 'final_answer',
           arguments: expect.objectContaining({
-            text: 'Task completed',
+            summary_points: ['Step A done', 'Step B done'],
           }),
         }),
       }),
@@ -319,7 +318,6 @@ describe('MainPipeline.run()', () => {
           callId: 'call-final',
           toolName: 'final_answer',
           arguments: {
-            text: 'Task completed',
             summary_points: ['Done'],
           },
         });
@@ -338,7 +336,7 @@ describe('MainPipeline.run()', () => {
         data: expect.objectContaining({
           callId: 'call-final',
           toolName: 'final_answer',
-          arguments: expect.objectContaining({ text: 'Task completed' }),
+          arguments: expect.objectContaining({ summary_points: ['Done'] }),
         }),
       }),
       1,
@@ -1163,13 +1161,13 @@ describe('MainPipeline.run()', () => {
           type: 'tool_call',
           callId: 'call-final',
           toolName: 'final_answer',
-          arguments: { text: 'Final answer text' },
+          arguments: {},
         });
         onChunk({
           type: 'tool_result',
           callId: 'call-final',
           toolName: 'final_answer',
-          arguments: { text: 'Final answer text' },
+          arguments: {},
           output: { ignored: true },
           status: 'success',
         });
@@ -1186,7 +1184,7 @@ describe('MainPipeline.run()', () => {
         data: expect.objectContaining({
           callId: 'call-final',
           toolName: 'final_answer',
-          arguments: { text: 'Final answer text', summary_points: [] },
+          arguments: { summary_points: [] },
         }),
       }),
       1,

@@ -510,11 +510,11 @@
 
 7.4.1. `tool_call` с `toolName = "final_answer"` ДОЛЖЕН отображаться как отдельный компонент `"Final Answer"` (на базе `Queue`), а не как обычный текстовый bubble `kind: llm`.
 
-7.4.1.1. Заголовок компонента `"Final Answer"` для `final_answer` ДОЛЖЕН содержать текст ответа модели из `final_answer.text` и иконку `Check` (без круга).
+7.4.1.1. Заголовок компонента `"Final Answer"` для `final_answer` ДОЛЖЕН содержать фиксированный текст `Done` и иконку `Check` (без круга).
 
 7.4.2. Внутри компонента `"Final Answer"` для `tool_call(final_answer)` ДОЛЖНЫ отображаться только пункты `summary_points`; каждый пункт ДОЛЖЕН отображаться с иконкой `Check` в зелёном круге.
 
-7.4.2.1. Поле `final_answer.text` МОЖЕТ отсутствовать в payload; КОГДА оно отсутствует, компонент `"Final Answer"` ДОЛЖЕН использовать placeholder `Done`.
+7.4.2.1. Компонент `"Final Answer"` ДОЛЖЕН использовать фиксированный заголовок `Done`.
 
 7.4.2.2. КОГДА `summary_points` пустой (или отсутствует), компонент `"Final Answer"` ДОЛЖЕН отображаться в неколлапсируемом виде (без toggle-контрола).
 
@@ -523,7 +523,7 @@
 7.4.4. Для `tool_call(final_answer)` UI ДОЛЖЕН иметь отдельные тестовые идентификаторы:
   - `data-testid="message-final-answer-block"` для корневого блока,
   - `data-testid="message-final-answer-header"` для заголовка,
-  - `data-testid="message-final-answer-title"` для текста ответа модели из `final_answer.text`,
+  - `data-testid="message-final-answer-title"` для фиксированного текста `Done`,
   - `data-testid="message-final-answer-check"` для иконки `Check` в заголовке (без круга),
   - `data-testid="message-final-answer-summary"` для контейнера списка `summary_points`,
   - `data-testid="message-final-answer-toggle"` для toggle (только когда `summary_points` не пустой).

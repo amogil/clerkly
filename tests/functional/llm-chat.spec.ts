@@ -113,7 +113,6 @@ test.describe('LLM Chat (real OpenAI)', () => {
     await expect(responseAction).toBeVisible({ timeout: 30000 });
     const responseText = await responseAction.textContent();
     expect(responseText?.trim().length).toBeGreaterThan(0);
-
   });
 
   /* Preconditions: App authenticated, real OpenAI API key saved
@@ -1405,7 +1404,6 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
             callId: 'final-order-1',
             toolName: 'final_answer',
             arguments: {
-              text: 'Done',
               summary_points: ['Generated final text'],
             },
           },
@@ -1479,7 +1477,6 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
             callId: 'final-order-2',
             toolName: 'final_answer',
             arguments: {
-              text: 'Completed after stream',
               summary_points: ['Persisted after llm done'],
             },
           },
@@ -1512,7 +1509,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     ).toBeVisible({ timeout: 5000 });
   });
 
-  /* Preconditions: MockLLMServer returns a single tool_call(final_answer) with text + summary_points
+  /* Preconditions: MockLLMServer returns a single tool_call(final_answer) with summary_points
      Action: User sends a message
      Assertions: Final answer block is rendered with title and summary details
      Requirements: llm-integration.11.8, agents.9.6 */
@@ -1525,7 +1522,6 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
             callId: 'final-1',
             toolName: 'final_answer',
             arguments: {
-              text: 'Final result: task completed.',
               summary_points: ['Validated input data', 'Prepared final response'],
             },
           },
@@ -1545,7 +1541,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     await expect(finalAnswerBlock).toBeVisible({ timeout: 15000 });
     await expect(
       context.window.locator('[data-testid="message-final-answer-title"]').last()
-    ).toContainText('Final result: task completed.');
+    ).toHaveText('Done');
     const toggle = context.window.locator('[data-testid="message-final-answer-toggle"]').last();
     await expect(toggle).toBeVisible({ timeout: 5000 });
     await toggle.click();
@@ -1557,13 +1553,9 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     await expect(context.window.locator('[data-testid="message-final-answer-block"]')).toHaveCount(
       1
     );
-    await expect(context.window.locator('[data-testid="message-completed-badge"]')).toHaveCount(0);
-    await expect(context.window.locator('[data-testid="message-completed-summary"]')).toHaveCount(
-      0
-    );
   });
 
-  /* Preconditions: MockLLMServer returns tool_call(final_answer) with text and no summary_points
+  /* Preconditions: MockLLMServer returns tool_call(final_answer) without summary_points
      Action: User sends a message
      Assertions: Final Answer block is shown without collapsible toggle and summary section
      Requirements: agents.7.4.3, llm-integration.9.5.1.2 */
@@ -1575,9 +1567,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
           {
             callId: 'final-no-summary',
             toolName: 'final_answer',
-            arguments: {
-              text: 'Completed',
-            },
+            arguments: {},
           },
         ],
       },
@@ -1595,7 +1585,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     await expect(finalAnswerBlock).toBeVisible({ timeout: 15000 });
     await expect(
       context.window.locator('[data-testid="message-final-answer-title"]').last()
-    ).toHaveText('Completed');
+    ).toHaveText('Done');
     await expect(context.window.locator('[data-testid="message-final-answer-toggle"]')).toHaveCount(
       0
     );
@@ -1604,11 +1594,11 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     ).toHaveCount(0);
   });
 
-  /* Preconditions: MockLLMServer returns tool_call(final_answer) without text
+  /* Preconditions: MockLLMServer returns tool_call(final_answer)
      Action: User sends a message
-     Assertions: Final Answer title falls back to Done
+     Assertions: Final Answer title is always Done
      Requirements: agents.7.4.3, llm-integration.9.5.1.2 */
-  test('should render Done title when final_answer.text is absent', async () => {
+  test('should render Done title for final_answer', async () => {
     mockLLMServer.setStreamingMode(true);
     mockLLMServer.setOpenAIStreamScripts([
       {
@@ -1659,7 +1649,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     );
   });
 
-  /* Preconditions: First model attempt returns invalid final_answer (text too long),
+  /* Preconditions: First model attempt returns invalid final_answer (summary_points > 10),
      second attempt returns valid final_answer
      Action: User sends a message
      Assertions: Pipeline retries automatically and UI shows final answer block from second attempt
@@ -1673,8 +1663,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
             callId: 'final-invalid',
             toolName: 'final_answer',
             arguments: {
-              text: `INVALID-${'x'.repeat(320)}`,
-              summary_points: ['Too long text'],
+              summary_points: Array.from({ length: 11 }, (_, i) => `Step ${i + 1}`),
             },
           },
         ],
@@ -1685,7 +1674,6 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
             callId: 'final-valid',
             toolName: 'final_answer',
             arguments: {
-              text: 'Task completed',
               summary_points: ['Validated format', 'Finished successfully'],
             },
           },
@@ -1715,7 +1703,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     expect(requestCount).toBeGreaterThanOrEqual(2);
   });
 
-  /* Preconditions: Both attempts return invalid final_answer
+  /* Preconditions: Both attempts return invalid final_answer (summary_points > 10)
      Action: User sends a message
      Assertions: Retry limit is exhausted and kind:error is shown
      Requirements: llm-integration.12.2.2, llm-integration.12.3 */
@@ -1728,8 +1716,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
             callId: 'final-invalid-1',
             toolName: 'final_answer',
             arguments: {
-              text: `INVALID-${'x'.repeat(320)}`,
-              summary_points: ['Too long text'],
+              summary_points: Array.from({ length: 11 }, (_, i) => `Invalid step ${i + 1}`),
             },
           },
         ],
@@ -1740,7 +1727,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
             callId: 'final-invalid-2',
             toolName: 'final_answer',
             arguments: {
-              text: `INVALID-${'x'.repeat(320)}`,
+              summary_points: Array.from({ length: 11 }, (_, i) => `Invalid step ${i + 12}`),
             },
           },
         ],

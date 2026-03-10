@@ -84,13 +84,11 @@ export function toUIMessage(msg: MessageSnapshot): UIMessage | null {
         call.arguments && typeof call.arguments === 'object' && !Array.isArray(call.arguments)
           ? call.arguments
           : {};
-      const text = typeof args.text === 'string' ? args.text.trim() : '';
-      const normalizedText = text.length > 0 ? text : 'Done';
       const summaryPoints = Array.isArray(args.summary_points) ? args.summary_points : [];
       return {
         id: String(msg.id),
         role: 'assistant',
-        parts: [{ type: 'text', text: normalizedText }],
+        parts: [{ type: 'text', text: 'Done' }],
         metadata: {
           isToolCall: true,
           isFinalAnswer: true,

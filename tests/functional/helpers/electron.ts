@@ -499,7 +499,7 @@ export function activeChat(window: Page) {
     llmResponseActions: chat.locator('.message-llm-action-response'),
     /** Final Answer blocks */
     completedMessages: chat.locator('[data-testid="message-final-answer-block"]'),
-    /** Final Answer title (text from tool_call(final_answer).arguments.text, or Done fallback) */
+    /** Final Answer title (fixed `Done` for tool_call(final_answer)) */
     completedActions: chat.locator('[data-testid="message-final-answer-title"]'),
     /** Error message bubbles */
     errorMessages: chat.locator('[data-testid="message-error"]'),

@@ -107,7 +107,7 @@ describe('AgentMessage — tool_call', () => {
     expect(output).toHaveTextContent('"content": "result"');
   });
 
-  /* Preconditions: persisted kind:tool_call for final_answer with text + summary_points
+  /* Preconditions: persisted kind:tool_call for final_answer with summary_points
      Action: render AgentMessage
      Assertions: renders Final Answer block with header, toggle and summary points
      Requirements: agents.7.4.1, agents.7.4.2, llm-integration.9.7 */
@@ -122,7 +122,6 @@ describe('AgentMessage — tool_call', () => {
               callId: 'call-final',
               toolName: 'final_answer',
               arguments: {
-                text: 'Final answer text',
                 summary_points: ['Point 1', 'Point 2'],
               },
             },
@@ -133,7 +132,7 @@ describe('AgentMessage — tool_call', () => {
 
     expect(screen.getByTestId('message-final-answer-block')).toBeInTheDocument();
     expect(screen.getByTestId('message-final-answer-header')).toBeInTheDocument();
-    expect(screen.getByTestId('message-final-answer-title')).toHaveTextContent('Final answer text');
+    expect(screen.getByTestId('message-final-answer-title')).toHaveTextContent('Done');
     expect(screen.getByTestId('message-final-answer-check')).toBeInTheDocument();
     expect(screen.getByTestId('message-final-answer-check')).toHaveClass('text-green-600');
     expect(screen.getByTestId('message-final-answer-toggle')).toBeInTheDocument();
@@ -145,11 +144,11 @@ describe('AgentMessage — tool_call', () => {
     expect(screen.queryByTestId('message-completed-summary')).not.toBeInTheDocument();
   });
 
-  /* Preconditions: final_answer without text and with empty summary
+  /* Preconditions: final_answer with empty summary
      Action: render AgentMessage
-     Assertions: fallback Done title is shown and no toggle/summary rendered
+     Assertions: Done title is shown and no toggle/summary rendered
      Requirements: agents.7.4.3, llm-integration.9.6 */
-  it('should render fallback Done title without toggle when summary is absent', () => {
+  it('should render Done title without toggle when summary is absent', () => {
     render(
       <AgentMessage
         message={baseMessage({
