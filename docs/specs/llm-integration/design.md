@@ -723,54 +723,161 @@ User отправляет сообщение
 
 ### Покрытие Требований
 
-Правило полноты матрицы покрытия:
-- Матрица использует детерминированное правило `parent-covers-children`: строка для `llm-integration.X` автоматически покрывает все подпункты `llm-integration.X.*`, если для подпункта не задана отдельная строка с более строгим/отличающимся покрытием.
-- Для требований с дополнительными рисками или отдельным контрактом тестирования добавляются явные строки подпунктов (например, `*.1.1`, `*.2.3`, `*.3.1`), которые переопределяют parent-строку по уровню детализации.
-- Отсутствие отдельной строки подпункта в таблице при наличии parent-строки НЕ является пропуском покрытия.
-
 | Требование | Модульные тесты | Функциональные тесты |
 |------------|-----------------|----------------------|
 | llm-integration.1 | ✓ | ✓ |
-| llm-integration.1.8 (AI SDK loop для всех провайдеров) | ✓ | ✓ |
-| llm-integration.1.6.1 (`llm` с `done=false` до завершения ответа) | ✓ | ✓ |
-| llm-integration.1.6.2 (завершение `llm` с `done=true`) | ✓ | ✓ |
-| llm-integration.1.7 (`reply_to_message_id` для создаваемых сообщений) | ✓ | ✓ |
+| llm-integration.1.1 | ✓ | ✓ |
+| llm-integration.1.2 | ✓ | ✓ |
+| llm-integration.1.3 | ✓ | ✓ |
+| llm-integration.1.4 | ✓ | ✓ |
+| llm-integration.1.5 | ✓ | ✓ |
+| llm-integration.1.6 | ✓ | ✓ |
+| llm-integration.1.6.1 | ✓ | ✓ |
+| llm-integration.1.6.2 | ✓ | ✓ |
+| llm-integration.1.6.3 | ✓ | ✓ |
+| llm-integration.1.7 | ✓ | ✓ |
+| llm-integration.1.8 | ✓ | ✓ |
 | llm-integration.2 | ✓ | ✓ |
-| llm-integration.2.8 (UIMessage stream protocol compatibility) | ✓ | ✓ |
+| llm-integration.2.1 | ✓ | ✓ |
+| llm-integration.2.1.1 | ✓ | ✓ |
+| llm-integration.2.1.2 | ✓ | ✓ |
+| llm-integration.2.1.3 | ✓ | ✓ |
+| llm-integration.2.2 | ✓ | ✓ |
+| llm-integration.2.3 | ✓ | ✓ |
+| llm-integration.2.4 | ✓ | ✓ |
+| llm-integration.2.5 | ✓ | ✓ |
+| llm-integration.2.6 | ✓ | ✓ |
+| llm-integration.2.6.1 | ✓ | ✓ |
+| llm-integration.2.7 | ✓ | ✓ |
+| llm-integration.2.8 | ✓ | ✓ |
+| llm-integration.3 | ✓ | ✓ |
 | llm-integration.3.1 | ✓ | ✓ |
-| llm-integration.3.1.1 (`error` сохраняется с `done=true`) | ✓ | ✓ |
+| llm-integration.3.1.1 | ✓ | ✓ |
 | llm-integration.3.2 | ✓ | ✓ |
+| llm-integration.3.3 | ✓ | ✓ |
 | llm-integration.3.4 | ✓ | ✓ |
+| llm-integration.3.4.1 | ✓ | ✓ |
+| llm-integration.3.4.2 | ✓ | ✓ |
+| llm-integration.3.4.3 | ✓ | ✓ |
+| llm-integration.3.4.4 | ✓ | ✓ |
 | llm-integration.3.5 | ✓ | ✓ |
-| llm-integration.3.6 (таймаут 300s) | ✓ | ✓ |
+| llm-integration.3.6 | ✓ | ✓ |
 | llm-integration.3.7 | - | ✓ |
+| llm-integration.3.7.1 | - | ✓ |
+| llm-integration.3.7.2 | - | ✓ |
+| llm-integration.3.7.3 | - | ✓ |
+| llm-integration.3.7.3.1 | - | ✓ |
+| llm-integration.3.7.4 | - | ✓ |
+| llm-integration.3.7.5 | - | ✓ |
+| llm-integration.3.7.6 | - | ✓ |
 | llm-integration.3.8 | - | ✓ |
 | llm-integration.3.9 | ✓ | ✓ |
-| llm-integration.3.10 (нормализация ошибок AI SDK) | ✓ | ✓ |
+| llm-integration.3.10 | ✓ | ✓ |
 | llm-integration.4 | ✓ | - |
-| llm-integration.4.7 (ответ и reasoning на языке пользователя) | ✓ | ✓ |
+| llm-integration.4.1 | ✓ | - |
+| llm-integration.4.2 | ✓ | - |
+| llm-integration.4.3 | ✓ | - |
+| llm-integration.4.4 | ✓ | - |
+| llm-integration.4.5 | ✓ | - |
+| llm-integration.4.5.1 | ✓ | - |
+| llm-integration.4.6 | ✓ | - |
+| llm-integration.4.7 | ✓ | ✓ |
 | llm-integration.5 | ✓ | - |
-| llm-integration.5.8 (модели/`reasoning_effort` для test/prod) | ✓ | ✓ |
-| llm-integration.5.9 (единый AI SDK контракт OpenAI/Anthropic/Google) | ✓ | ✓ |
+| llm-integration.5.1 | ✓ | - |
+| llm-integration.5.2 | ✓ | - |
+| llm-integration.5.2.1 | ✓ | - |
+| llm-integration.5.3 | ✓ | - |
+| llm-integration.5.4 | ✓ | - |
+| llm-integration.5.5 | ✓ | - |
+| llm-integration.5.6 | ✓ | - |
+| llm-integration.5.7 | ✓ | - |
+| llm-integration.5.7.1 | ✓ | - |
+| llm-integration.5.8 | ✓ | ✓ |
+| llm-integration.5.9 | ✓ | ✓ |
 | llm-integration.6 | ✓ | - |
-| llm-integration.6.5 (`done` как отдельный флаг) | ✓ | - |
-| llm-integration.6.6 (`kind:llm` с `data.text` имеет `done = true`) | ✓ | - |
+| llm-integration.6.1 | ✓ | - |
+| llm-integration.6.2 | ✓ | - |
+| llm-integration.6.3 | ✓ | - |
+| llm-integration.6.4 | ✓ | - |
+| llm-integration.6.5 | ✓ | - |
+| llm-integration.6.6 | ✓ | - |
+| llm-integration.6.6.1 | ✓ | - |
 | llm-integration.7 | ✓ | ✓ |
+| llm-integration.7.1 | ✓ | ✓ |
+| llm-integration.7.2 | ✓ | ✓ |
+| llm-integration.7.3 | ✓ | ✓ |
+| llm-integration.7.4 | ✓ | ✓ |
+| llm-integration.7.5 | ✓ | ✓ |
+| llm-integration.8 | ✓ | ✓ |
 | llm-integration.8.1 | ✓ | ✓ |
+| llm-integration.8.2 | ✓ | ✓ |
+| llm-integration.8.3 | ✓ | ✓ |
+| llm-integration.8.4 | ✓ | ✓ |
 | llm-integration.8.5 | ✓ | ✓ |
 | llm-integration.8.6 | ✓ | - |
 | llm-integration.8.6.1 | ✓ | ✓ |
 | llm-integration.8.7 | ✓ | ✓ |
+| llm-integration.8.8 | ✓ | ✓ |
 | llm-integration.9 | ✓ | ✓ |
-| llm-integration.9.5.5 (`summary_points` обязателен и не пустой) | ✓ | ✓ |
+| llm-integration.9.1 | ✓ | ✓ |
+| llm-integration.9.2 | ✓ | ✓ |
+| llm-integration.9.3 | ✓ | ✓ |
+| llm-integration.9.4 | ✓ | ✓ |
+| llm-integration.9.5 | ✓ | ✓ |
+| llm-integration.9.5.1 | ✓ | ✓ |
+| llm-integration.9.5.1.1 | ✓ | ✓ |
+| llm-integration.9.5.2 | ✓ | ✓ |
+| llm-integration.9.5.3 | ✓ | ✓ |
+| llm-integration.9.5.4 | ✓ | ✓ |
+| llm-integration.9.5.5 | ✓ | ✓ |
+| llm-integration.9.6 | ✓ | ✓ |
+| llm-integration.9.7 | ✓ | ✓ |
 | llm-integration.10 | ✓ | ✓ |
+| llm-integration.10.1 | ✓ | ✓ |
+| llm-integration.10.2 | ✓ | ✓ |
+| llm-integration.10.3 | ✓ | ✓ |
+| llm-integration.10.4 | ✓ | ✓ |
 | llm-integration.11 | ✓ | ✓ |
-| llm-integration.11.1.1 (`tool_call` только после `llm done=true`) | ✓ | ✓ |
-| llm-integration.11.1.2 (до `llm done=true` persisted `tool_call` не создаётся) | ✓ | ✓ |
-| llm-integration.11.2.2 (`toolName='code_exec'` обрабатывается через `kind:tool_call` pipeline) | ✓ | - |
-| llm-integration.11.2.3-11.2.3.2 (общая schema validation + bounded retry/repair для tool calls) | ✓ | ✓ |
-| llm-integration.11.3.1-11.3.1.3 (все terminal tool_call включаются в model history в AI SDK tool-result формате; non-terminal исключаются) | ✓ | ✓ |
+| llm-integration.11.1 | ✓ | ✓ |
+| llm-integration.11.1.1 | ✓ | ✓ |
+| llm-integration.11.1.2 | ✓ | ✓ |
+| llm-integration.11.2 | ✓ | ✓ |
+| llm-integration.11.2.1 | ✓ | ✓ |
+| llm-integration.11.2.2 | ✓ | - |
+| llm-integration.11.2.3 | ✓ | ✓ |
+| llm-integration.11.2.3.1 | ✓ | ✓ |
+| llm-integration.11.2.3.2 | ✓ | ✓ |
+| llm-integration.11.3 | ✓ | ✓ |
+| llm-integration.11.3.1 | ✓ | ✓ |
+| llm-integration.11.3.1.1 | ✓ | ✓ |
+| llm-integration.11.3.1.2 | ✓ | ✓ |
+| llm-integration.11.3.1.3 | ✓ | ✓ |
+| llm-integration.11.3.1.3.1 | ✓ | ✓ |
+| llm-integration.11.3.1.3.2 | ✓ | ✓ |
+| llm-integration.11.3.2 | ✓ | ✓ |
+| llm-integration.11.4 | ✓ | ✓ |
+| llm-integration.11.5 | ✓ | ✓ |
+| llm-integration.11.5.1 | ✓ | ✓ |
+| llm-integration.11.6 | ✓ | ✓ |
+| llm-integration.11.7 | ✓ | ✓ |
 | llm-integration.12 | ✓ | ✓ |
+| llm-integration.12.1 | ✓ | ✓ |
+| llm-integration.12.2 | ✓ | ✓ |
+| llm-integration.12.2.1 | ✓ | ✓ |
+| llm-integration.12.2.2 | ✓ | ✓ |
+| llm-integration.12.3 | ✓ | ✓ |
+| llm-integration.12.4 | ✓ | ✓ |
 | llm-integration.13 | ✓ | - |
+| llm-integration.13.1 | ✓ | - |
+| llm-integration.13.2 | ✓ | - |
+| llm-integration.13.3 | ✓ | - |
+| llm-integration.13.4 | ✓ | - |
+| llm-integration.13.5 | ✓ | - |
 | llm-integration.14 | ✓ | ✓ |
+| llm-integration.14.1 | ✓ | ✓ |
+| llm-integration.14.2 | ✓ | ✓ |
+| llm-integration.14.3 | ✓ | ✓ |
 | llm-integration.15 | ✓ | - |
+| llm-integration.15.1 | ✓ | - |
+| llm-integration.15.2 | ✓ | - |
+| llm-integration.15.3 | ✓ | - |
