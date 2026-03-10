@@ -1588,7 +1588,7 @@ function AgentWelcome({ onPromptClick }: AgentWelcomeProps) {
 **Сообщения выполнения кода (`kind: 'tool_call'`, `toolName: 'code_exec'`):**
 - Используется отдельный блок выполнения кода, не являющийся обычным текстовым bubble.
 - Блок строится на AI Elements `Tool` (см. [https://elements.ai-sdk.dev/components/tool](https://elements.ai-sdk.dev/components/tool)).
-- Блок отображает persisted-статус выполнения (`running | success | error | timeout`).
+- Блок отображает persisted-статус выполнения (`running | success | error | timeout | cancelled`).
 - Для security/policy отказов используется `status=error` с соответствующим `error.code` (например, `policy_denied`).
 - При наличии отображаются `stdout` и `stderr` из persisted payload.
 - Рендер строится только по persisted snapshot (`message.created`/`message.updated`) без локальной реконструкции результата.

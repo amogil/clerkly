@@ -38,6 +38,13 @@
   - [ ] Timeout/cancel/cleanup политика.
 - [ ] Добавить sandbox preload bridge с whitelist API.
 - [ ] Добавить policy-валидации main process для sandbox запросов.
+- [ ] Реализовать browser-level egress enforcement (требования `code_exec.2.3.1-2.3.2`) с явной трассировкой `control -> verification`.
+  - [ ] `session.webRequest` deny для исходящих `http/https/ws/wss` и связанных egress-каналов до отправки запроса.
+  - [ ] Navigation/Open hardening: `setWindowOpenHandler(deny)` + блокировка `will-navigate`/`will-redirect`.
+  - [ ] Permission hardening: deny в `setPermissionRequestHandler` и `setPermissionCheckHandler`.
+  - [ ] Runtime hardening bridge/preload: блокировка `fetch`/`XMLHttpRequest`/`WebSocket`/`navigator.sendBeacon` с нормализацией в `status=error`, `error.code=policy_denied`.
+  - [ ] Runtime hardening navigation API: `window.open`/`location.assign`/`location.replace` должны давать terminal `policy_denied`, а не silent deny.
+  - [ ] CSP hardening sandbox-документа: `connect-src 'none'` и запрет внешних источников для сетевых подключений.
 
 #### Фаза 3: LLM и pipeline интеграция
 
@@ -59,6 +66,7 @@
 - [ ] Добавить/обновить functional-тест `code_exec.spec.ts`: невалидные аргументы `code_exec` → bounded retry/repair → финальный `kind:error` в чате.
 - [ ] Добавить/обновить functional-тест `code_exec.spec.ts`: лимит входного кода `30 KiB` и ожидаемая ошибка валидации.
 - [ ] Добавить/обновить functional-тест `code_exec.spec.ts`: лимиты `stdout/stderr` по `10 KiB` и корректные флаги truncation.
+- [ ] Добавить/обновить functional-тест `code_exec.spec.ts`: для `window.open`/`location.assign`/`location.replace` возвращается terminal `policy_denied` (без silent deny и без исходящего запроса).
 - [ ] Добавить/обновить functional-тест `llm-chat.spec.ts`: включение terminal tool results (`final_answer`, `code_exec`, включая `error/timeout/cancelled`) в model history в AI SDK tool-result формате.
 - [ ] Добавить/обновить functional-тест `llm-chat.spec.ts`: non-terminal `tool_call` (`running`) не попадает в model history.
 - [ ] Добавить/обновить functional-тест `llm-chat.spec.ts`: после terminal `tool_call` любого статуса pipeline немедленно продолжает следующий шаг `model`.
