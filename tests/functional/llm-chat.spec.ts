@@ -1674,11 +1674,11 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
   });
 
   /* Preconditions: First model attempt returns invalid final_answer (summary_points > 10),
-     next retry returns corrected payload
+     subsequent attempts do not produce a valid completion marker
      Action: User sends a message
-     Assertions: Pipeline retries automatically and falls back to regular llm output
-     Requirements: llm-integration.12.2.1, llm-integration.12.2.2 */
-  test('should retry invalid final_answer and fallback to llm response after corrected retry', async () => {
+     Assertions: Pipeline retries automatically and ends with kind:error
+     Requirements: llm-integration.12.2.1, llm-integration.12.2.2, llm-integration.12.3 */
+  test('should retry invalid final_answer and end with error when retries do not recover', async () => {
     mockLLMServer.setStreamingMode(true);
     mockLLMServer.setOpenAIStreamScripts([
       {
@@ -1714,9 +1714,10 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     await expect(context.window.locator('[data-testid="message-final-answer-block"]')).toHaveCount(
       0
     );
-    await expect(context.window.locator('[data-testid="message-error"]')).toHaveCount(0);
-    await expect(context.window.locator('[data-testid="message-llm"]')).toContainText(
-      'Hello! How can I help?'
+    const errorBubble = context.window.locator('[data-testid="message-error"]').last();
+    await expect(errorBubble).toBeVisible({ timeout: 15000 });
+    await expect(errorBubble).toContainText(
+      'Model returned invalid completion format too many times. Please try again.'
     );
 
     const requestCount = mockLLMServer
@@ -1727,9 +1728,9 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
 
   /* Preconditions: MockLLMServer returns invalid final_answer (summary_points > 10)
      Action: User sends a message
-     Assertions: Runtime falls back to regular llm response without final_answer block
-     Requirements: llm-integration.9.5.4, llm-integration.12.1 */
-  test('should fallback to llm response when final_answer exceeds summary_points limit', async () => {
+     Assertions: Retry limit is exhausted and kind:error is shown
+     Requirements: llm-integration.9.5.4, llm-integration.9.6, llm-integration.12.2.2, llm-integration.12.3 */
+  test('should show error when invalid final_answer exhausts retry limit', async () => {
     mockLLMServer.setStreamingMode(true);
     mockLLMServer.setOpenAIStreamScripts([
       {
@@ -1784,9 +1785,10 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     await messageInput.fill('Finish with invalid completion');
     await messageInput.press('Enter');
 
-    await expect(context.window.locator('[data-testid="message-error"]')).toHaveCount(0);
-    await expect(context.window.locator('[data-testid="message-llm"]')).toContainText(
-      'Hello! How can I help?'
+    const errorBubble = context.window.locator('[data-testid="message-error"]').last();
+    await expect(errorBubble).toBeVisible({ timeout: 15000 });
+    await expect(errorBubble).toContainText(
+      'Model returned invalid completion format too many times. Please try again.'
     );
     await expect(context.window.locator('[data-testid="message-final-answer-block"]')).toHaveCount(
       0
