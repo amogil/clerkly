@@ -362,7 +362,7 @@ export class MainPipeline {
       } catch (error) {
         const isInvalidFinalAnswer = error instanceof InvalidFinalAnswerContractError;
         if (isInvalidFinalAnswer) {
-          invalidFinalAnswerSeen = true;
+          invalidFinalAnswerSeen = this.hasFinalAnswerToolCall(bufferedToolCalls);
         }
         const shouldRetryInvalidFinalAnswer =
           isInvalidFinalAnswer && attempts < MAX_INVALID_FINAL_ANSWER_RETRIES && !signal?.aborted;
@@ -668,6 +668,13 @@ export class MainPipeline {
     lastLlmMessageId: number | null
   ): void {
     if (error instanceof FinalAnswerRetryExhaustedError) {
+      if (lastLlmMessageId !== null) {
+        try {
+          this.hideIncompleteLlmMessage(lastLlmMessageId, agentId);
+        } catch {
+          // ignore update errors during terminal retry-exhaustion handling
+        }
+      }
       this.finalizePendingToolCallsForTurn(agentId, userMessageId, error.message);
       this.messageManager.create(
         agentId,

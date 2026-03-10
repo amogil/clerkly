@@ -231,6 +231,8 @@ const BASE_SYSTEM_PROMPT = [
   '- inline math: $...$',
   '- block math: $$...$$',
   '- do NOT use \\(...\\) or \\[...\\]',
+  '- do NOT escape math delimiters as \\$...\\$ or \\$\\$...\\$\\$',
+  '- in mixed prose, keep $...$ and $$...$$ unescaped',
   '',
   'Do not use footnotes.',
 ].join('\n');

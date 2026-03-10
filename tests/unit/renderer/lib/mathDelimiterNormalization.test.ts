@@ -37,4 +37,37 @@ describe('normalizeMathDelimiters', () => {
     expect(output).toContain('```tex\n\\(code\\)\n\\[code\\]\n```');
     expect(output).toContain('`\\(inline code\\)`');
   });
+
+  /* Preconditions: model returns escaped dollar math delimiters in plain text
+     Action: normalize content
+     Assertions: escaped delimiters are converted to KaTeX-compatible delimiters
+     Requirements: agents.7.7, llm-integration.4.5 */
+  it('should convert escaped dollar math delimiters in text', () => {
+    const input = 'where \\$v\\$ is Higgs VEV and \\$y_f\\$ is Yukawa coupling';
+    const output = normalizeMathDelimiters(input);
+
+    expect(output).toContain('where $v$ is Higgs VEV and $y_f$ is Yukawa coupling');
+  });
+
+  /* Preconditions: escaped dollar delimiters appear inside fenced and inline code
+     Action: normalize content
+     Assertions: code segments remain unchanged
+     Requirements: agents.7.7 */
+  it('should not rewrite escaped dollar delimiters inside code segments', () => {
+    const input = [
+      'Text \\$a+b\\$',
+      '',
+      '```md',
+      '\\$code\\$',
+      '```',
+      '',
+      '`\\$inline code\\$`',
+    ].join('\n');
+
+    const output = normalizeMathDelimiters(input);
+
+    expect(output).toContain('Text $a+b$');
+    expect(output).toContain('```md\n\\$code\\$\n```');
+    expect(output).toContain('`\\$inline code\\$`');
+  });
 });

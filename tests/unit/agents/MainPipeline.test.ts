@@ -377,6 +377,81 @@ describe('MainPipeline.run()', () => {
     );
   });
 
+  it('accepts plain text on retry after initial empty turn without completion marker', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+    let attempt = 0;
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, _onChunk: (c: ChatChunk) => void) => {
+        attempt += 1;
+        if (attempt === 1) {
+          return { text: '' };
+        }
+        return { text: 'Recovered plain text response' };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    expect(llmProvider.chat).toHaveBeenCalledTimes(2);
+    expect(messageManager.create).toHaveBeenCalledWith(
+      'agent-1',
+      'llm',
+      expect.objectContaining({
+        data: expect.objectContaining({
+          text: 'Recovered plain text response',
+        }),
+      }),
+      1,
+      true
+    );
+    expect(messageManager.create).not.toHaveBeenCalledWith(
+      'agent-1',
+      'error',
+      expect.anything(),
+      expect.anything(),
+      expect.anything()
+    );
+  });
+
+  it('hides last partial llm message when final_answer retry limit is exhausted', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+    let attempt = 0;
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        attempt += 1;
+        onChunk({ type: 'text', delta: 'Partial content' });
+        onChunk({
+          type: 'tool_call',
+          callId: `call-final-${attempt}`,
+          toolName: 'final_answer',
+          arguments: {},
+        });
+        return { text: '' };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    expect(llmProvider.chat).toHaveBeenCalledTimes(2);
+    expect(messageManager.hideAndMarkIncomplete).toHaveBeenCalledTimes(2);
+    expect(messageManager.hideAndMarkIncomplete).toHaveBeenNthCalledWith(2, 2, 'agent-1');
+    expect(messageManager.create).toHaveBeenCalledWith(
+      'agent-1',
+      'error',
+      expect.objectContaining({
+        data: expect.objectContaining({
+          error: expect.objectContaining({
+            message: expect.stringContaining('invalid completion format'),
+          }),
+        }),
+      }),
+      1,
+      true
+    );
+  });
+
   it('creates kind:error when provider returns final invalid final_answer failure', async () => {
     const { pipeline, llmProvider, messageManager } = makeMocks();
 

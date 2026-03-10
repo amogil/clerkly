@@ -8,7 +8,10 @@
  * while preserving fenced and inline code segments.
  */
 export function normalizeMathDelimiters(content: string): string {
-  if (!content || (!content.includes('\\(') && !content.includes('\\['))) {
+  if (
+    !content ||
+    (!content.includes('\\(') && !content.includes('\\[') && !content.includes('\\$'))
+  ) {
     return content;
   }
 
@@ -17,6 +20,8 @@ export function normalizeMathDelimiters(content: string): string {
 
   const normalizeNonCodeSegment = (segment: string): string =>
     segment
+      .replace(/\\\$\$([\s\S]*?)\\\$\$/g, (_match, inner: string) => `$$\n${inner}\n$$`)
+      .replace(/\\\$([^\n]+?)\\\$/g, (_match, inner: string) => `$${inner}$`)
       .replace(/\\\[([\s\S]*?)\\\]/g, (_match, inner: string) => `$$\n${inner}\n$$`)
       .replace(/\\\(([\s\S]*?)\\\)/g, (_match, inner: string) => `$${inner}$`);
 

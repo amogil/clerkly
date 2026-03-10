@@ -1325,6 +1325,37 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     expect(errorInConversation).toBe(false);
   });
 
+  /* Preconditions: MockLLMServer configured for success and captures outgoing request
+     Action: User sends a message
+     Assertions: System prompt contains strict math delimiter instruction ($...$/$$...$$ only, no escaped dollars), including mixed prose guidance
+     Requirements: llm-integration.4.5.1 */
+  test('should include strict math delimiter rules in system prompt', async () => {
+    mockLLMServer.setStreamingMode(true, {
+      content: '{"action":{"type":"text","content":"ok"}}',
+      chunkDelayMs: 0,
+    });
+
+    context = await launchWithMockLLM();
+    const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
+    await messageInput.fill('check prompt');
+    await messageInput.press('Enter');
+
+    const actionContent = context.window.locator('.message-llm-action-response').last();
+    await expect(actionContent).toBeVisible({ timeout: 15000 });
+
+    const lastRequest = mockLLMServer.getLastRequest();
+    expect(lastRequest).toBeDefined();
+    const body = lastRequest!.body as Record<string, unknown>;
+    const systemText = JSON.stringify(body);
+    expect(systemText).toContain('inline math: $...$');
+    expect(systemText).toContain('block math: $$...$$');
+    expect(systemText).toContain('do NOT use \\\\(...\\\\) or \\\\[...\\\\]');
+    expect(systemText).toContain(
+      'do NOT escape math delimiters as \\\\$...\\\\$ or \\\\$\\\\$...\\\\$\\\\$'
+    );
+    expect(systemText).toContain('in mixed prose, keep $...$ and $$...$$ unescaped');
+  });
+
   /* Preconditions: MockLLMServer returns JSON-like text payload, app authenticated with mock LLM URL
      Action: User sends a message
      Assertions: Response is shown as plain text without extra transformation retries
@@ -1512,7 +1543,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
   /* Preconditions: MockLLMServer returns a single tool_call(final_answer) with summary_points
      Action: User sends a message
      Assertions: Final answer block is rendered as checklist with summary details
-     Requirements: llm-integration.11.8, agents.9.6 */
+     Requirements: llm-integration.9.2, llm-integration.9.7, llm-integration.11.6, agents.9.6 */
   test('should render final_answer tool_call as completed assistant response', async () => {
     mockLLMServer.setStreamingMode(true);
     mockLLMServer.setOpenAIStreamScripts([
@@ -1550,6 +1581,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     await expect(context.window.locator('[data-testid="message-final-answer-block"]')).toHaveCount(
       1
     );
+    await expectNoToastError(context.window);
   });
 
   /* Preconditions: MockLLMServer returns invalid tool_call(final_answer) without summary_points across retry attempts
@@ -1611,6 +1643,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     await expect(errorBubble).toContainText(
       'Model returned invalid completion format too many times. Please try again.'
     );
+    await expectNoToastError(context.window);
   });
 
   /* Preconditions: MockLLMServer returns tool_call(final_answer) with summary_points
@@ -1647,12 +1680,13 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     await expect(context.window.locator('[data-testid="message-final-answer-title"]')).toHaveCount(
       0
     );
+    await expectNoToastError(context.window);
   });
 
   /* Preconditions: MockLLMServer returns regular text response without final_answer tool call
      Action: User sends a message
      Assertions: Final answer block is absent and status remains Awaiting response
-     Requirements: llm-integration.11.8, agents.9.2 */
+     Requirements: llm-integration.9.3, llm-integration.11.6, agents.9.2 */
   test('should keep awaiting-response when model does not call final_answer', async () => {
     mockLLMServer.setStreamingMode(true, {
       content: '{"action":{"type":"text","content":"Regular answer without completion tool"}}',
@@ -1671,6 +1705,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     await expect(context.window.locator('[data-testid="message-final-answer-block"]')).toHaveCount(
       0
     );
+    await expectNoToastError(context.window);
   });
 
   /* Preconditions: First model attempt returns invalid final_answer (summary_points > 10),
@@ -1724,6 +1759,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
       .getRequestLogs()
       .filter((entry) => entry.method === 'POST' && entry.path === '/v1/responses').length;
     expect(requestCount).toBeGreaterThanOrEqual(2);
+    await expectNoToastError(context.window);
   });
 
   /* Preconditions: MockLLMServer returns invalid final_answer (summary_points > 10)
@@ -1793,6 +1829,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     await expect(context.window.locator('[data-testid="message-final-answer-block"]')).toHaveCount(
       0
     );
+    await expectNoToastError(context.window);
   });
 
   /* Preconditions: MockLLMServer returns provider error
@@ -2098,6 +2135,18 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     const actionContent = context.window.locator('.message-llm-action-response').last();
     await expect(actionContent.locator('.katex').first()).toBeVisible();
     await expect(actionContent.locator('.katex-display').first()).toBeVisible();
+  });
+
+  /* Preconditions: MockLLMServer returns inline math with escaped dollar delimiters (\$..\$)
+     Action: User sends a message
+     Assertions: escaped dollar delimiters are normalized and rendered as KaTeX inline math
+     Requirements: agents.7.7, llm-integration.4.5 */
+  test('should render math when model returns escaped dollar delimiters', async () => {
+    await renderMarkdownMessage('где \\$v\\$ — ВЭВ Хиггса, \\$y_f\\$ — юкавская константа.');
+    const actionContent = context.window.locator('.message-llm-action-response').last();
+    await expect(actionContent.locator('.katex').first()).toBeVisible();
+    await expect(actionContent).toContainText('где');
+    await expect(actionContent).toContainText('юкавская константа');
   });
 
   /* Preconditions: MockLLMServer returns markdown blocks with separators

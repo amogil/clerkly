@@ -176,6 +176,27 @@ export function normalizeLLMError(error: unknown): NormalizedLLMError {
 
   if (name === 'RetryError') {
     const chain = unwrapCauseChain(error);
+    const authCause = chain.find((item) => {
+      const itemStatus =
+        typeof item.statusCode === 'number'
+          ? item.statusCode
+          : typeof item.status === 'number'
+            ? item.status
+            : undefined;
+      const itemMessage = (item.message ?? '').toLowerCase();
+      return (
+        itemStatus === 401 ||
+        itemStatus === 403 ||
+        itemMessage.includes('invalid api key') ||
+        itemMessage.includes('api key is not set') ||
+        itemMessage.includes('unauthorized') ||
+        itemMessage.includes('forbidden')
+      );
+    });
+    if (authCause) {
+      return { type: 'auth', message: STANDARD_MESSAGES.auth };
+    }
+
     const rateLimitCause = chain.find((item) => {
       const itemStatus =
         typeof item.statusCode === 'number'

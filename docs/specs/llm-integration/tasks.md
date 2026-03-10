@@ -95,7 +95,7 @@
 
 - [x] Прогнать релевантные unit тесты по затронутым модулям.
 - [x] Прогнать `npm run validate`.
-- [ ] После подтверждения пользователя — полный прогон `npm run test:functional`.
+- [x] После подтверждения пользователя — полный прогон `npm run test:functional`.
 
 ---
 
@@ -213,7 +213,7 @@
 
 ## Фаза 12: Восстановление контракта `invalid final_answer -> kind:error`
 
-- [ ] Исправить functional-тест `tests/functional/llm-chat.spec.ts` ("should show error when invalid final_answer exhausts retry limit").
+- [x] Исправить functional-тест `tests/functional/llm-chat.spec.ts` ("should show error when invalid final_answer exhausts retry limit").
 
 ## Фаза 13: Убрать текстовый ответ из `final_answer`
 
@@ -253,7 +253,7 @@
 - [x] Добавлены/обновлены модульные тесты для pipeline, статусов, промпта и renderer.
 - [x] Добавлены/обновлены функциональные тесты для user-flow и статусов.
 - [x] `npm run validate` проходит.
-- [ ] (После отдельного подтверждения) полный `npm run test:functional` проходит.
+- [x] (После отдельного подтверждения) полный `npm run test:functional` проходит.
 - [x] Strict-schema `final_answer` в AI SDK + retry/repair policy реализованы и покрыты тестами.
 - [x] Внешний вид и поведение `tool_call(final_answer)` соответствуют текущим требованиям `agents` и покрыты unit/functional тестами.
 - [x] Runtime default-контракт `final_answer` (`text` отсутствует, `summary_points=[]`) реализован и покрыт тестами.
