@@ -26,6 +26,8 @@
 
 1.1. Система ДОЛЖНА предоставлять модели инструмент `code_exec` в tool-calling контракте.
 
+1.1.1. Контракт `code_exec` (аргументы, формат результата, операционные лимиты) ДОЛЖЕН явно сообщаться модели в prompt/tool-инструкции.
+
 1.2. КОГДА модель вызывает `code_exec`, ТО система ДОЛЖНА запускать переданный JavaScript-код в sandbox runtime активного агента.
 
 1.2.1. КОГДА модель вызывает `code_exec`, ТО вызов ДОЛЖЕН обрабатываться как tool call в рамках существующего tool-loop (`model -> tools -> model`).
@@ -71,13 +73,21 @@
 
 2.8. Система ДОЛЖНА использовать закрытый allowlist тулов, доступных из JavaScript-кода sandbox runtime.
 
-2.8.1. КОГДА JavaScript-код обращается к туле, отсутствующей в allowlist, ТО вызов ДОЛЖЕН завершаться контролируемой ошибкой с `status = "error"` и `error.code = "policy_denied"`.
+2.8.1. КОГДА JavaScript-код обращается к туле, отсутствующей в allowlist, ТО вызов ДОЛЖЕН завершаться контролируемой ошибкой с `status = "error"`, `error.code = "policy_denied"` и `error.message = "Tool is not allowed in sandbox allowlist."`.
 
 2.8.2. Allowlist тулов sandbox runtime ДОЛЖЕН определяться в одном централизованном месте и использоваться как единый источник истины для валидации вызовов.
 
 2.9. Sandbox runtime SHALL NOT поддерживать многопоточность JavaScript (запрещены `Worker`, `SharedWorker`, `ServiceWorker`, `Worklet`).
 
-2.9.1. КОГДА sandbox-код пытается использовать многопоточность, ТО система ДОЛЖНА завершать вызов контролируемой ошибкой с `status = "error"` и `error.code = "policy_denied"`.
+2.9.1. КОГДА sandbox-код пытается использовать многопоточность, ТО система ДОЛЖНА завершать вызов контролируемой ошибкой с `status = "error"`, `error.code = "policy_denied"` и `error.message = "Multithreading APIs are not allowed in sandbox runtime."`.
+
+2.10. КОГДА пользователь закрывает приложение при активном `code_exec`, ТО система ДОЛЖНА принудительно остановить выполнение sandbox-кода и выполнить cleanup sandbox-инстанции без зависаний shutdown-процесса.
+
+2.11. Система ДОЛЖНА ограничивать потребление ресурсов sandbox-выполнения:
+  - лимит CPU;
+  - лимит оперативной памяти.
+
+2.11.1. КОГДА sandbox-выполнение превышает лимит CPU или памяти, ТО вызов ДОЛЖЕН завершаться с `status = "error"` и `error.code = "limit_exceeded"`.
 
 #### Функциональные Тесты
 
@@ -86,6 +96,8 @@
 - `tests/functional/code_exec.spec.ts` — "should cancel active code_exec execution"
 - `tests/functional/code_exec.spec.ts` — "should deny main-pipeline-only tools from sandbox JavaScript"
 - `tests/functional/code_exec.spec.ts` — "should allow only tools from sandbox allowlist"
+- `tests/functional/code_exec.spec.ts` — "should stop sandbox execution on app close without hanging shutdown"
+- `tests/functional/code_exec.spec.ts` — "should enforce sandbox CPU and memory limits"
 
 ### 3. Контракт bridge API для модели
 
@@ -98,8 +110,9 @@
 3.1. Система ДОЛЖНА документировать для модели контракт инструмента `code_exec`:
   - обязательное поле `code` (JavaScript строка);
   - опциональное поле `timeout_ms`;
-  - ожидаемый результат: `status`, `stdout`, `stderr`, `returnValue`, `error`.
+  - ожидаемый результат: `status`, `stdout`, `stderr`, `stdout_truncated`, `stderr_truncated`, `error`.
   - `stdout` ДОЛЖЕН содержать консольный вывод sandbox-кода.
+  - `stderr` ДОЛЖЕН содержать диагностический/error вывод sandbox-кода.
 
 3.1.1. Формальный входной контракт `code_exec` ДОЛЖЕН быть задокументирован как JSON schema:
   - `type: object`
@@ -114,17 +127,24 @@
   - `stderr: string`
   - `stdout_truncated: boolean`
   - `stderr_truncated: boolean`
-  - `returnValue: unknown`
   - `error?: { code: string; message: string }`
 
-3.1.2.1. Поле `error.code` ДОЛЖНО использовать фиксированный словарь значений:
+3.1.2.1. Формальный выходной контракт `code_exec` ДОЛЖЕН быть JSON-объектом (`type: object`).
+
+3.1.2.2. Поле `error.code` ДОЛЖНО использовать фиксированный словарь значений:
   - `policy_denied` — нарушение sandbox policy/allowlist;
   - `sandbox_runtime_error` — ошибка исполнения JavaScript-кода в sandbox;
   - `invalid_tool_arguments` — невалидные входные аргументы инструмента;
-  - `limit_exceeded` — превышение операционных лимитов (размер/частота/конкурентность);
+  - `limit_exceeded` — превышение операционных лимитов (размер/ресурсы/время);
   - `internal_error` — внутренняя ошибка исполнения/bridge/pipeline.
 
-3.1.2.2. Поле `error.message` ДОЛЖНО быть человекочитаемым и достаточным для диагностики причины ошибки моделью.
+3.1.2.3. Поле `error.message` ДОЛЖНО быть человекочитаемым и достаточным для диагностики причины ошибки моделью.
+
+3.1.2.4. КОГДА вызов `code_exec` прерывается пользователем (cancel/stop), ТО отдельное состояние отмены модели НЕ возвращается; lifecycle такого вызова в истории завершается через `messages.hidden = true` по правилам `code_exec.4.5`.
+
+3.1.2.5. КОГДА `status = "success"`, ТО поле `error` НЕ ДОЛЖНО присутствовать в результате.
+
+3.1.2.6. КОГДА `status = "error"` ИЛИ `status = "timeout"`, ТО поле `error` ДОЛЖНО присутствовать и содержать `error.code` и `error.message`.
 
 3.1.3. КОГДА модель явно задаёт `timeout_ms` в вызове `code_exec`, ТО система ДОЛЖНА принимать только диапазон от `10000` до `3600000` миллисекунд (от 10 секунд до 1 часа).
 
@@ -132,7 +152,7 @@
 
 3.1.5. ЕСЛИ модель не передала `timeout_ms`, ТО система ДОЛЖНА использовать значение по умолчанию `60000` миллисекунд.
 
-3.2. Система ДОЛЖНА документировать для модели разрешённые runtime API внутри sandbox (например, `console.log`, ограниченный `tools` bridge) и явно запрещённые поверхности.
+3.2. Система ДОЛЖНА документировать для модели только разрешённые runtime API внутри sandbox (например, `console.log`, ограниченный `tools` bridge).
 
 3.2.1. Разрешённые API консоли ДОЛЖНЫ быть перечислены явно: `console.log`, `console.info`, `console.warn`, `console.error`.
 
@@ -158,7 +178,6 @@ const nums = [1, 2, 3, 4];
 const sum = nums.reduce((a, b) => a + b, 0);
 console.log(`sum=${sum}`);
 console.info('calculation completed');
-return { sum };
 ```
 
 Негативный пример:
@@ -195,7 +214,7 @@ return await window.api.saveData('x', 'y');
 
 4.4. Контракт `code_exec` ДОЛЖЕН быть совместим с существующим stream/snapshot потоком сообщений.
 
-4.5. КОГДА вызов `code_exec` отменяется, ТО сообщение ДОЛЖНО скрываться через `messages.hidden = true`; отдельный статус `cancelled` НЕ ДОЛЖЕН использоваться.
+4.5. КОГДА вызов `code_exec` отменяется, ТО сообщение ДОЛЖНО скрываться через `messages.hidden = true`; отдельное состояние отмены в output НЕ ДОЛЖНО использоваться.
 
 4.6. ПОКА `code_exec` находится в состоянии `status = "running"`, система ДОЛЖНА поддерживать актуальность runtime через `message.updated` (heartbeat/progress update).
 
@@ -207,12 +226,6 @@ return await window.api.saveData('x', 'y');
 4.8. После перехода `code_exec` в terminal-состояние (`success | error | timeout`) дальнейшие изменения `output.status` для этого вызова НЕ ДОЛЖНЫ выполняться.
 
 4.9. КОГДА `tool_call(code_exec)` скрыт через `messages.hidden = true`, ТО для него НЕ ДОЛЖНЫ публиковаться дальнейшие `message.updated` heartbeat/progress апдейты.
-
-4.10. Для существующих persisted `tool_call(code_exec)` записей, в которых отсутствуют новые поля (`stdout_truncated`, `stderr_truncated`, `started_at`, `finished_at`, `duration_ms`), система ДОЛЖНА обеспечивать обратную совместимость чтения.
-
-4.10.1. Для legacy-записей без truncation-флагов при чтении ДОЛЖНЫ использоваться значения по умолчанию: `stdout_truncated = false`, `stderr_truncated = false`.
-
-4.10.2. Для legacy-записей без audit-полей (`started_at`, `finished_at`, `duration_ms`) система ДОЛЖНА выполнять DB-миграцию бэкфилла в рамках внедрения фичи `code_exec`.
 
 #### Функциональные Тесты
 
@@ -228,6 +241,10 @@ return await window.api.saveData('x', 'y');
 
 5.1. Система ДОЛЖНА ограничивать максимальный размер входного поля `code` для одного вызова.
 
+5.1.1. В целевой конфигурации лимит размера входного поля `code` ДОЛЖЕН составлять `262144` байт (`256 KiB`) на один вызов `code_exec`.
+
+5.1.2. Лимит размера входного `code` ДОЛЖЕН быть явно сообщён модели в prompt/tool-инструкции.
+
 5.2. Система ДОЛЖНА ограничивать максимальный объём `stdout` и `stderr`, возвращаемых модели.
 
 5.2.1. КОГДА `stdout` или `stderr` превышают лимит, ТО система ДОЛЖНА усекать соответствующий поток, выставлять флаг `stdout_truncated=true` и/или `stderr_truncated=true`, и сохранять оставшийся поток без изменений.
@@ -236,22 +253,26 @@ return await window.api.saveData('x', 'y');
 
 5.2.3. В целевой конфигурации лимит `stderr` ДОЛЖЕН составлять `1048576` байт (`1 MiB`) на один вызов `code_exec`.
 
-5.2.4. В целевой конфигурации лимит сериализованного `returnValue` ДОЛЖЕН составлять `1048576` байт (`1 MiB`) на один вызов `code_exec`.
+5.2.4. Лимиты `stdout`/`stderr` ДОЛЖНЫ быть явно сообщены модели в prompt/tool-инструкции.
 
-5.2.5. КОГДА сериализованный `returnValue` превышает лимит, ТО вызов ДОЛЖЕН завершаться с `status = "error"` и `error.code = "limit_exceeded"`.
+5.3. КОГДА модель инициирует параллельные `code_exec` tool calls в одном turn, ТО система ДОЛЖНА поддерживать параллельный запуск отдельных sandbox-инстанций (one-call-one-sandbox) с корректной корреляцией по `callId`.
 
-5.3. Система ДОЛЖНА ограничивать число одновременных `code_exec` выполнений на одного агента.
+5.4. Система ДОЛЖНА ограничивать потребление CPU sandbox-выполнения.
 
-5.4. Система ДОЛЖНА ограничивать частоту вызовов `code_exec` на одного агента (rate limit).
+5.4.1. Лимит CPU ДОЛЖЕН быть явно сообщён модели в prompt/tool-инструкции.
 
-5.5. При срабатывании любого лимита система ДОЛЖНА завершать вызов с `status = "error"` (например, `error.code = "policy_denied"` или `error.code = "limit_exceeded"`) либо `status = "timeout"` без падения процесса.
+5.5. Система ДОЛЖНА ограничивать потребление оперативной памяти sandbox-выполнения.
 
-5.6. `stdout`/`stderr` (включая усечённые значения и флаги `stdout_truncated`/`stderr_truncated`) ДОЛЖНЫ сохраняться в persisted `tool_call` и ДОЛЖНЫ храниться без автоматической очистки/архивации в рамках данной фичи.
+5.5.1. Лимит памяти ДОЛЖЕН быть явно сообщён модели в prompt/tool-инструкции.
+
+5.6. При срабатывании любого лимита система ДОЛЖНА завершать вызов с `status = "error"` (например, `error.code = "policy_denied"` или `error.code = "limit_exceeded"`) либо `status = "timeout"` без падения процесса.
+
+5.7. `stdout`/`stderr` (включая усечённые значения и флаги `stdout_truncated`/`stderr_truncated`) ДОЛЖНЫ сохраняться в persisted `tool_call` и ДОЛЖНЫ храниться без автоматической очистки/архивации в рамках данной фичи.
 
 #### Функциональные Тесты
 
 - `tests/functional/code_exec.spec.ts` — "should enforce code_exec payload and output size limits"
-- `tests/functional/code_exec.spec.ts` — "should enforce code_exec per-agent concurrency and rate limits"
+- `tests/functional/code_exec.spec.ts` — "should support parallel code_exec calls with callId correlation"
 
 ### 6. Тестируемость и покрытие
 

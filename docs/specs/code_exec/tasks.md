@@ -63,40 +63,36 @@
 - [ ] `should cancel active code_exec execution (message becomes hidden)`
 - [ ] `should return console output to model after code_exec`
 - [ ] `should enforce code_exec payload and output size limits`
-- [ ] `should enforce code_exec per-agent concurrency and rate limits`
+- [ ] `should support parallel code_exec calls with callId correlation`
 - [ ] `should persist code_exec lifecycle and update via message snapshots`
+- [ ] `should stop sandbox execution on app close without hanging shutdown`
+- [ ] `should enforce sandbox CPU and memory limits`
 
 **DoD: обязательные unit тесты `code_exec`:**
 - [ ] `MainPipeline`: persist lifecycle `running -> terminal (success/error/timeout)` для `tool_call(code_exec)`.
-- [ ] `MainPipeline`: отмена `code_exec` скрывает сообщение через `hidden=true` без отдельного статуса `cancelled`.
+- [ ] `MainPipeline`: отмена `code_exec` скрывает сообщение через `hidden=true` без отдельного состояния отмены в output.
 - [ ] `MainPipeline`: mapping ошибок в фиксированный словарь `error.code`.
 - [ ] `SandboxSessionManager`: timeout enforcement и корректная остановка исполнения.
 - [ ] `SandboxBridge`: allowlist enforcement + `policy_denied` для запрещённых API.
 - [ ] `SandboxRuntime`: разделение `stdout`/`stderr` и сбор `console.*`.
 - [ ] Output limiter: truncation + `stdout_truncated`/`stderr_truncated` флаги.
-- [ ] Output limiter: лимит сериализованного `returnValue` (`1048576` bytes) с ошибкой `limit_exceeded`.
 - [ ] Persist mapper: audit-поля `started_at`, `finished_at`, `duration_ms`.
+- [ ] Lifecycle: принудительная остановка sandbox при закрытии приложения.
+- [ ] Sandbox policy: enforcement лимитов CPU/оперативной памяти.
+- [ ] Prompt/tool layer: явная инструкция модели про лимиты `timeout`, размер `code`, лимиты `stdout/stderr`, CPU/RAM.
 
-#### Фаза 5: DB-миграция и backfill для `code_exec`
-
-- [ ] Добавить DB-миграцию для persisted `tool_call(code_exec)`:
-  - [ ] Backfill `output.stdout_truncated=false` и `output.stderr_truncated=false` для legacy-записей.
-  - [ ] Backfill `output.started_at`, `output.finished_at`, `output.duration_ms` для legacy-записей.
-- [ ] Добавить unit-тесты миграции/backfill.
-- [ ] Добавить functional smoke-тест совместимости чтения legacy `tool_call(code_exec)` без новых полей.
-
-#### Фаза 6: Синхронизация UI-спеков
+#### Фаза 5: Синхронизация UI-спеков
 
 - [x] Обновить `docs/specs/agents/*` требования/дизайн для визуализации `code_exec`.
 - [x] Проверить согласованность `code_exec` и `agents` по границам ответственности.
 - [x] Синхронизировать `docs/specs/llm-integration/*` по `toolName="code_exec"` (без смены контрактов `kind`).
 
-#### Фаза 7: Валидация
+#### Фаза 6: Валидация
 
 - [ ] Запустить `npm run validate`.
 - [ ] После подтверждения пользователя запустить `npm run test:functional`.
 
-#### Фаза 8: UI follow-up по `Final Answer` (перенесено из `llm-integration/tasks.md`)
+#### Фаза 7: UI follow-up по `Final Answer` (перенесено из `llm-integration/tasks.md`)
 
 - [ ] Обновить renderer-компонент `Final Answer`: выровнять текст checklist-пункта по вертикальному центру относительно зелёной иконки `Check`.
 - [ ] Добавить/обновить unit-тест `AgentMessage` на корректное выравнивание контента пункта `message-final-answer-item`.

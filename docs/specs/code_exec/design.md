@@ -26,7 +26,7 @@ UI-визуализация исполнения описывается в `docs
   - проксирует только разрешённые вызовы в main IPC.
 - **"SandboxRuntime" (Sandbox Renderer)**
   - исполняет JavaScript-код;
-  - собирает `stdout/stderr/returnValue/error`;
+  - собирает `stdout/stderr/error`;
   - возвращает результат в main.
 
 ## Контракт данных
@@ -55,7 +55,6 @@ UI-визуализация исполнения описывается в `docs
       "started_at": "2026-03-10T10:00:00+01:00",
       "finished_at": "2026-03-10T10:00:01+01:00",
       "duration_ms": 1000,
-      "returnValue": "undefined",
       "error": {
         "code": "",
         "message": ""
@@ -104,7 +103,13 @@ Lifecycle:
 
 1. Пользователь/система инициирует cancel активного turn.
 2. Активное `code_exec` исполнение прерывается.
-3. Сообщение помечается `hidden=true`; отдельный статус `cancelled` не используется.
+3. Сообщение помечается `hidden=true`; отдельное состояние отмены в output не используется.
+
+### 4. Закрытие приложения во время исполнения
+
+1. Пользователь закрывает приложение при активном `code_exec`.
+2. `SandboxSessionManager` выполняет принудительную остановку sandbox-инстанции.
+3. Shutdown завершается без зависаний, а sandbox resources очищаются.
 
 ## Безопасность
 
@@ -145,28 +150,16 @@ Lifecycle:
 - `code_exec_max_code_bytes`: 262144 bytes
 - `code_exec_max_stdout_bytes`: 1048576 bytes
 - `code_exec_max_stderr_bytes`: 1048576 bytes
-- `code_exec_max_return_value_bytes`: 1048576 bytes
-- `code_exec_max_in_flight_per_agent`: 2
-- `code_exec_rate_limit_per_agent`: 60 вызовов / 60 секунд
+- `code_exec_sandbox_cpu_limit`: задаётся конфигурацией исполнения sandbox
+- `code_exec_sandbox_memory_limit_bytes`: задаётся конфигурацией исполнения sandbox
 
 Правило truncation output:
 - При превышении лимита `stdout` и/или `stderr` соответствующий поток усекается до лимита.
 - Для усечённого потока выставляется флаг `stdout_truncated` и/или `stderr_truncated`.
 - Потоки `stdout` и `stderr` всегда сохраняются и возвращаются раздельно.
 
-Правило лимита `returnValue`:
-- сериализованный `returnValue` ограничен `1048576` bytes;
-- при превышении лимита вызов завершается `status=error` и `error.code='limit_exceeded'`.
-
-## Миграция и обратная совместимость
-
-- В рамках внедрения `code_exec` выполняется DB-миграция persisted `tool_call(code_exec)` для backfill полей:
-  - `payload_json.data.output.stdout_truncated` (default `false`);
-  - `payload_json.data.output.stderr_truncated` (default `false`);
-  - `payload_json.data.output.started_at` (ISO);
-  - `payload_json.data.output.finished_at` (ISO);
-  - `payload_json.data.output.duration_ms` (number).
-- До и во время миграции слой чтения должен поддерживать legacy-записи без этих полей, подставляя безопасные default-значения для truncation-флагов.
+Информирование модели о лимитах:
+- prompt/tool-инструкция явно сообщает модели лимиты `timeout_ms`, `code` size, `stdout/stderr`, а также ограничения CPU/памяти sandbox.
 
 ## Стратегия тестирования
 
