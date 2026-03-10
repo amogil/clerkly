@@ -164,7 +164,7 @@ export function AgentMessage({
                   data-testid="message-final-answer-item"
                   className="flex-row items-start gap-2"
                 >
-                  <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-green-600">
+                  <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-green-600">
                     <Check className="h-3 w-3 text-white" />
                   </span>
                   <QueueItemContent completed={false}>{point}</QueueItemContent>

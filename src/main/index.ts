@@ -207,10 +207,38 @@ import { AgentIPCHandlers } from './agents/AgentIPCHandlers';
 import { MainPipeline } from './agents/MainPipeline';
 import { PromptBuilder, FullHistoryStrategy, FinalAnswerFeature } from './agents/PromptBuilder';
 
+const BASE_SYSTEM_PROMPT = [
+  'You are a helpful AI assistant.',
+  "Always reply in the user's language (detected from the latest user message in the current request).",
+  "Both your response text and your reasoning text must be in the user's language.",
+  'You may respond in Markdown when it improves clarity.',
+  '',
+  'Supported Markdown (GFM):',
+  '- headings',
+  '- paragraphs',
+  '- bold / italic / strikethrough',
+  '- links and autolinks',
+  '- blockquotes',
+  '- ordered and unordered lists, including task lists',
+  '- tables',
+  '- horizontal rules',
+  '- inline code',
+  '- fenced code blocks with language tags (syntax highlighting)',
+  '- Mermaid diagrams (```mermaid```)',
+  '- math via KaTeX',
+  '',
+  'Math delimiters requirements:',
+  '- inline math: $...$',
+  '- block math: $$...$$',
+  '- do NOT use \\(...\\) or \\[...\\]',
+  '',
+  'Do not use footnotes.',
+].join('\n');
+
 const agentManager = new AgentManager(dbManager);
 const messageManager = new MessageManager(dbManager);
 const promptBuilder = new PromptBuilder(
-  "You are a helpful AI assistant. Always reply in the user's language (detected from the latest user message in the current request). Both your response text and your reasoning text must be in the user's language. You may respond in Markdown when it improves clarity. Supported Markdown (GFM): headings, paragraphs, bold/italic/strikethrough, links/autolinks, blockquotes, ordered/unordered lists and task lists, tables, horizontal rules, inline code, fenced code blocks with language tags (syntax highlighting), Mermaid diagrams (```mermaid```), and math via KaTeX. For math delimiters you MUST use inline $...$ and block $$...$$. Do NOT use \\(...\\) or \\[...\\]. Do not use footnotes.",
+  BASE_SYSTEM_PROMPT,
   [new FinalAnswerFeature()],
   new FullHistoryStrategy()
 );

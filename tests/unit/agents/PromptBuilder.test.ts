@@ -7,6 +7,7 @@ import {
   FullHistoryStrategy,
   AgentFeature,
   FinalAnswerFeature,
+  normalizePromptWhitespace,
 } from '../../../src/main/agents/PromptBuilder';
 import type { LLMTool } from '../../../src/main/llm/ILLMProvider';
 import type { Message } from '../../../src/main/db/schema';
@@ -100,6 +101,20 @@ describe('PromptBuilder.build()', () => {
       const result = makeBuilder('Base.', [feature]).build();
       expect(result.systemPrompt).toBe('Base.');
     });
+
+    /* Preconditions: Base/feature prompts contain extra spaces and blank lines
+       Action: Call build()
+       Assertions: systemPrompt is normalized (no trailing spaces, no 3+ newlines, no repeated spaces)
+       Requirements: llm-integration.4.5 */
+    it('should normalize prompt whitespace before returning system prompt', () => {
+      const feature: AgentFeature = {
+        name: 'f1',
+        getSystemPromptSection: () => 'Section   with   extra   spaces.\n\n\nLine 2   ',
+        getTools: () => [],
+      };
+      const result = makeBuilder('Base   prompt.  \n\n\n', [feature]).build();
+      expect(result.systemPrompt).toBe('Base prompt.\n\nSection with extra spaces.\n\nLine 2');
+    });
   });
 
   describe('tools collection', () => {
@@ -132,6 +147,7 @@ describe('PromptBuilder.build()', () => {
       const feature = new FinalAnswerFeature();
       const result = makeBuilder('Base.', [feature]).build();
       expect(result.systemPrompt).toContain('final_answer');
+      expect(result.systemPrompt).toContain('Final Answer tool usage:');
       expect(result.systemPrompt).toContain('Use normal assistant text for ongoing dialog');
       expect(result.systemPrompt).toContain(
         'Call the `final_answer` tool only when you are confident'
@@ -350,5 +366,16 @@ describe('PromptBuilder.buildMessages()', () => {
     expect(chatMessages).toHaveLength(3);
     expect(chatMessages[1].role).toBe('user');
     expect(chatMessages[2].role).toBe('assistant');
+  });
+});
+
+describe('normalizePromptWhitespace', () => {
+  /* Preconditions: Prompt text has repeated spaces, trailing spaces and excessive blank lines
+     Action: Call normalizePromptWhitespace
+     Assertions: Prompt is normalized into compact readable form
+     Requirements: llm-integration.4.5 */
+  it('should normalize repeated spaces and excessive blank lines', () => {
+    const input = 'Line   one.   \n\n\n\nLine   two.\t\t\nLine   three   ';
+    expect(normalizePromptWhitespace(input)).toBe('Line one.\n\nLine two.\nLine three');
   });
 });

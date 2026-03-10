@@ -6,6 +6,24 @@ import type { Message } from '../db/schema';
 import type { LLMTool, ChatMessage } from '../llm/ILLMProvider';
 
 /**
+ * Normalize prompt text for stable model input:
+ * - collapses repeated horizontal spaces/tabs
+ * - strips trailing spaces on lines
+ * - collapses 3+ newlines to a single blank line
+ * - trims leading/trailing blank area
+ *
+ * Requirements: llm-integration.4.5
+ */
+export function normalizePromptWhitespace(prompt: string): string {
+  const normalizedByLine = prompt
+    .split('\n')
+    .map((line) => line.replace(/[ \t]{2,}/g, ' ').replace(/[ \t]+$/g, ''))
+    .join('\n');
+
+  return normalizedByLine.replace(/\n{3,}/g, '\n\n').trim();
+}
+
+/**
  * A feature that contributes a system prompt section and/or tools
  * Requirements: llm-integration.4.1
  */
@@ -89,7 +107,7 @@ export class PromptBuilder {
       const section = feature.getSystemPromptSection();
       if (section) parts.push(section);
     }
-    return parts.join('\n\n');
+    return normalizePromptWhitespace(parts.join('\n\n'));
   }
 
   private collectTools(): LLMTool[] {
@@ -201,10 +219,11 @@ export class FinalAnswerFeature implements AgentFeature {
 
   getSystemPromptSection(): string {
     return [
-      'Use normal assistant text for ongoing dialog: clarifying questions, intermediate updates, or requests for user input.',
-      'Call the `final_answer` tool only when you are confident the requested work is completed.',
-      'Use `final_answer.summary_points` to list solved tasks (required: 1 to 10 points, each max 200 characters).',
-    ].join(' ');
+      'Final Answer tool usage:',
+      '- Use normal assistant text for ongoing dialog: clarifying questions, intermediate updates, or requests for user input.',
+      '- Call the `final_answer` tool only when you are confident the requested work is completed.',
+      '- Use `final_answer.summary_points` to list solved tasks (required: 1 to 10 points, each max 200 characters).',
+    ].join('\n');
   }
 
   getTools(): LLMTool[] {
