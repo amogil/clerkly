@@ -31,6 +31,24 @@ type BufferedToolCall = {
   resultOutput?: unknown;
 };
 
+const FINAL_ANSWER_RETRY_EXHAUSTED_MESSAGE =
+  'Model returned invalid completion format too many times. Please try again.';
+const MAX_INVALID_FINAL_ANSWER_RETRIES = 1;
+
+class InvalidFinalAnswerContractError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'InvalidFinalAnswerContractError';
+  }
+}
+
+class FinalAnswerRetryExhaustedError extends Error {
+  constructor() {
+    super(FINAL_ANSWER_RETRY_EXHAUSTED_MESSAGE);
+    this.name = 'FinalAnswerRetryExhaustedError';
+  }
+}
+
 /**
  * Error type categories for kind:error messages
  * Requirements: llm-integration.5.3
@@ -322,6 +340,12 @@ export class MainPipeline {
         if (!accumulatedText) {
           accumulatedText = output.text || '';
         }
+        if (accumulatedText.trim().length === 0 && bufferedToolCalls.size === 0) {
+          throw new InvalidFinalAnswerContractError(
+            'Model returned no assistant text and no completion tool call'
+          );
+        }
+        this.validateFinalAnswerToolCalls(bufferedToolCalls);
 
         return {
           output,
@@ -330,11 +354,67 @@ export class MainPipeline {
           accumulatedText,
         };
       } catch (error) {
-        const shouldRetry = attempts < 1 && !meaningfulChunkSeen && !signal?.aborted;
+        const isInvalidFinalAnswer = error instanceof InvalidFinalAnswerContractError;
+        const shouldRetryInvalidFinalAnswer =
+          isInvalidFinalAnswer && attempts < MAX_INVALID_FINAL_ANSWER_RETRIES && !signal?.aborted;
+        const shouldRetrySilentFailure =
+          !isInvalidFinalAnswer &&
+          attempts < 1 &&
+          !meaningfulChunkSeen &&
+          !signal?.aborted;
+        const shouldRetry = shouldRetryInvalidFinalAnswer || shouldRetrySilentFailure;
+
         if (!shouldRetry) {
+          if (isInvalidFinalAnswer) {
+            throw new FinalAnswerRetryExhaustedError();
+          }
           throw error;
         }
+
+        if (llmMessageId !== null) {
+          this.hideIncompleteLlmMessage(llmMessageId, agentId);
+          llmMessageId = null;
+        }
+        bufferedToolCalls.clear();
+        accumulatedReasoning = '';
+        accumulatedText = '';
         attempts += 1;
+      }
+    }
+  }
+
+  /**
+   * Enforce strict runtime contract for final_answer.
+   * Requirements: llm-integration.9.5.2, llm-integration.9.5.3, llm-integration.9.5.5, llm-integration.12.2.1
+   */
+  private validateFinalAnswerToolCalls(bufferedToolCalls: Map<string, BufferedToolCall>): void {
+    for (const call of bufferedToolCalls.values()) {
+      if (call.toolName !== 'final_answer') {
+        continue;
+      }
+
+      const summaryPoints = call.args['summary_points'];
+      if (!Array.isArray(summaryPoints)) {
+        throw new InvalidFinalAnswerContractError('final_answer.summary_points is required');
+      }
+
+      if (summaryPoints.length < 1 || summaryPoints.length > 10) {
+        throw new InvalidFinalAnswerContractError(
+          'final_answer.summary_points must contain from 1 to 10 items'
+        );
+      }
+
+      for (const point of summaryPoints) {
+        if (typeof point !== 'string') {
+          throw new InvalidFinalAnswerContractError(
+            'final_answer.summary_points items must be strings'
+          );
+        }
+        if (point.length > 200) {
+          throw new InvalidFinalAnswerContractError(
+            'final_answer.summary_points item length must be <= 200'
+          );
+        }
       }
     }
   }
@@ -568,6 +648,25 @@ export class MainPipeline {
     signal: AbortSignal | undefined,
     lastLlmMessageId: number | null
   ): void {
+    if (error instanceof FinalAnswerRetryExhaustedError) {
+      this.finalizePendingToolCallsForTurn(agentId, userMessageId, error.message);
+      this.messageManager.create(
+        agentId,
+        'error',
+        {
+          data: {
+            error: {
+              type: 'provider',
+              message: error.message,
+            },
+          },
+        },
+        userMessageId,
+        true
+      );
+      return;
+    }
+
     const errorName = error instanceof Error ? error.name : typeof error;
     const errorMessage = error instanceof Error ? error.message : String(error);
     const signalAborted = signal?.aborted ?? false;
