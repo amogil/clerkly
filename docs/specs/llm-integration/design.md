@@ -677,8 +677,10 @@ User отправляет сообщение
 - `tests/functional/llm-chat.spec.ts` — "full llm response streams before final_answer block appears"
 - `tests/functional/llm-chat.spec.ts` — "tool_call block is not persisted/visible before llm done for the same turn"
 - `tests/functional/llm-chat.spec.ts` — "cancel during tool execution hides in-flight messages and creates no error"
+- `tests/functional/llm-chat.spec.ts` — "should show error when invalid final_answer exhausts retry limit"
 - `tests/functional/llm-chat.spec.ts` — "should render math when model returns LaTeX delimiters"
-- `tests/functional/code_exec.spec.ts` — "should persist code_exec as tool_call via common llm tool pipeline"
+
+Примечание: интеграционные functional-сценарии для `toolName='code_exec'` фиксируются в `docs/specs/code_exec/*` и используются для покрытия `llm-integration.11.2.2`.
 
 ### Покрытие Требований
 
@@ -721,7 +723,7 @@ User отправляет сообщение
 | llm-integration.11 | ✓ | ✓ |
 | llm-integration.11.1.1 (`tool_call` только после `llm done=true`) | ✓ | ✓ |
 | llm-integration.11.1.2 (до `llm done=true` persisted `tool_call` не создаётся) | ✓ | ✓ |
-| llm-integration.11.2.2 (`toolName='code_exec'` обрабатывается через `kind:tool_call` pipeline) | ✓ | ✓ |
+| llm-integration.11.2.2 (`toolName='code_exec'` обрабатывается через `kind:tool_call` pipeline) | ✓ | ✓ (через `code_exec`-спеку) |
 | llm-integration.12 | ✓ | ✓ |
 | llm-integration.13 | ✓ | - |
 | llm-integration.14 | ✓ | ✓ |
