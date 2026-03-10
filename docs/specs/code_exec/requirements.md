@@ -28,6 +28,10 @@
 
 1.1.1. Контракт `code_exec` (аргументы, формат результата, операционные лимиты) ДОЛЖЕН явно сообщаться модели в prompt/tool-инструкции.
 
+1.1.2. Prompt/tool-инструкция для модели ДОЛЖНА содержать правило обработки ресурсных ограничений:
+  - при `error.code = "limit_exceeded"` модель ДОЛЖНА уменьшать объём/сложность кода или разбивать задачу на несколько вызовов;
+  - при наличии предупреждения о throttling в `stderr` модель ДОЛЖНА учитывать, что выполнение шло в деградированном режиме.
+
 1.2. КОГДА модель вызывает `code_exec`, ТО система ДОЛЖНА запускать переданный JavaScript-код в sandbox runtime активного агента.
 
 1.2.1. КОГДА модель вызывает `code_exec`, ТО вызов ДОЛЖЕН обрабатываться как tool call в рамках существующего tool-loop (`model -> tools -> model`).
@@ -48,6 +52,11 @@
 
 - `tests/functional/code_exec.spec.ts` — "should execute JavaScript via code_exec tool call"
 - `tests/functional/code_exec.spec.ts` — "should process multiple code_exec calls in one turn"
+
+#### Модульные Тесты
+
+- `tests/unit/agents/PromptBuilder.test.ts` — "should include code_exec tool schema and prompt policy instructions"
+- `tests/unit/agents/MainPipeline.test.ts` — "should process code_exec calls as kind:tool_call in common tool-loop"
 
 ### 2. Безопасность и изоляция исполнения
 
@@ -83,11 +92,17 @@
 
 2.10. КОГДА пользователь закрывает приложение при активном `code_exec`, ТО система ДОЛЖНА принудительно остановить выполнение sandbox-кода и выполнить cleanup sandbox-инстанции без зависаний shutdown-процесса.
 
-2.11. Система ДОЛЖНА ограничивать потребление ресурсов sandbox-выполнения:
-  - лимит CPU;
-  - лимит оперативной памяти.
+2.10.1. Остановка sandbox-кода при shutdown ДОЛЖНА выполняться с timeout завершения `15000` миллисекунд; ЕСЛИ timeout истёк, процесс sandbox ДОЛЖЕН быть принудительно завершён.
 
-2.11.1. КОГДА sandbox-выполнение превышает лимит CPU или памяти, ТО вызов ДОЛЖЕН завершаться с `status = "error"` и `error.code = "limit_exceeded"`.
+2.11. Система ДОЛЖНА ограничивать потребление ресурсов sandbox-выполнения (CPU и оперативная память) в соответствии с лимитами раздела `code_exec.5.4` и `code_exec.5.5`.
+
+2.11.1. Система ДОЛЖНА сообщать модели о лимитах CPU и памяти в prompt/tool-инструкции.
+
+2.11.2. КОГДА sandbox-выполнение приближается к лимитам CPU или памяти, система ДОЛЖНА по возможности ограничивать потребление ресурсов без немедленного падения вызова.
+
+2.11.3. ЕСЛИ ограничение ресурсов не позволяет удержать выполнение в пределах лимитов, вызов ДОЛЖЕН завершаться с `status = "error"` и `error.code = "limit_exceeded"`.
+
+2.11.4. КОГДА применяется best-effort ограничение ресурсов без остановки выполнения, система ДОЛЖНА вернуть модели явный диагностический сигнал в `stderr` о том, что выполнение прошло в режиме ограничений (throttled/degraded mode).
 
 #### Функциональные Тесты
 
@@ -98,6 +113,12 @@
 - `tests/functional/code_exec.spec.ts` — "should allow only tools from sandbox allowlist"
 - `tests/functional/code_exec.spec.ts` — "should stop sandbox execution on app close without hanging shutdown"
 - `tests/functional/code_exec.spec.ts` — "should enforce sandbox CPU and memory limits"
+
+#### Модульные Тесты
+
+- `tests/unit/code_exec/SandboxBridge.test.ts` — "should enforce allowlist and return policy_denied for forbidden APIs"
+- `tests/unit/code_exec/SandboxRuntime.test.ts` — "should deny multithreading APIs and collect stdout/stderr separately"
+- `tests/unit/code_exec/SandboxSessionManager.test.ts` — "should enforce timeout/cancel/cleanup and shutdown forced-kill fallback"
 
 ### 3. Контракт bridge API для модели
 
@@ -122,7 +143,7 @@
   - `properties.timeout_ms: integer`
 
 3.1.2. Формальный выходной контракт `code_exec` ДОЛЖЕН быть задокументирован как структура:
-  - `status: "success" | "error" | "timeout"`
+  - `status: "running" | "success" | "error" | "timeout" | "cancelled"`
   - `stdout: string`
   - `stderr: string`
   - `stdout_truncated: boolean`
@@ -140,11 +161,15 @@
 
 3.1.2.3. Поле `error.message` ДОЛЖНО быть человекочитаемым и достаточным для диагностики причины ошибки моделью.
 
-3.1.2.4. КОГДА вызов `code_exec` прерывается пользователем (cancel/stop), ТО отдельное состояние отмены модели НЕ возвращается; lifecycle такого вызова в истории завершается через `messages.hidden = true` по правилам `code_exec.4.5`.
+3.1.2.3.1. Для `error.code = "limit_exceeded"` поле `error.message` ДОЛЖНО содержать конкретную причину превышения лимита и фактический лимит (например, CPU `1 vCPU`, RAM `2 GiB`, размер `code` `30 KiB`).
 
-3.1.2.5. КОГДА `status = "success"`, ТО поле `error` НЕ ДОЛЖНО присутствовать в результате.
+3.1.2.4. КОГДА вызов `code_exec` прерывается пользователем (cancel/stop), результат ДОЛЖЕН возвращаться с `status = "cancelled"`.
+
+3.1.2.5. КОГДА `status = "running"` ИЛИ `status = "success"`, ТО поле `error` НЕ ДОЛЖНО присутствовать в результате.
 
 3.1.2.6. КОГДА `status = "error"` ИЛИ `status = "timeout"`, ТО поле `error` ДОЛЖНО присутствовать и содержать `error.code` и `error.message`.
+
+3.1.2.7. КОГДА `status = "cancelled"`, ТО поле `error` НЕ ДОЛЖНО присутствовать.
 
 3.1.3. КОГДА модель явно задаёт `timeout_ms` в вызове `code_exec`, ТО система ДОЛЖНА принимать только диапазон от `10000` до `3600000` миллисекунд (от 10 секунд до 1 часа).
 
@@ -194,6 +219,11 @@ return await window.api.saveData('x', 'y');
 - `tests/functional/code_exec.spec.ts` — "should return error with code policy_denied for forbidden API access"
 - `tests/functional/code_exec.spec.ts` — "should return console output to model after code_exec"
 
+#### Модульные Тесты
+
+- `tests/unit/code_exec/CodeExecToolSchema.test.ts` — "should validate code_exec input schema and timeout range/default"
+- `tests/unit/agents/PromptBuilder.test.ts` — "should include allowed API, examples and console usage guidance for code_exec"
+
 ### 4. Контракт хранения и realtime-события
 
 **ID:** code_exec.4
@@ -214,7 +244,9 @@ return await window.api.saveData('x', 'y');
 
 4.4. Контракт `code_exec` ДОЛЖЕН быть совместим с существующим stream/snapshot потоком сообщений.
 
-4.5. КОГДА вызов `code_exec` отменяется, ТО сообщение ДОЛЖНО скрываться через `messages.hidden = true`; отдельное состояние отмены в output НЕ ДОЛЖНО использоваться.
+4.5. КОГДА вызов `code_exec` отменяется, persisted `tool_call(code_exec)` ДОЛЖЕН фиксировать `output.status = "cancelled"` и сообщение НЕ ДОЛЖНО скрываться через `messages.hidden = true`.
+
+4.5.1. КОГДА вызов `code_exec` завершён со статусом `cancelled`, persisted `tool_call(code_exec)` ДОЛЖЕН оставаться видимым в истории и его результат ДОЛЖЕН передаваться модели в последующей работе согласно правилам `llm-integration.11.3.1`.
 
 4.6. ПОКА `code_exec` находится в состоянии `status = "running"`, система ДОЛЖНА поддерживать актуальность runtime через `message.updated` (heartbeat/progress update).
 
@@ -223,13 +255,18 @@ return await window.api.saveData('x', 'y');
   - `finished_at` фиксируется один раз при переходе в terminal-состояние;
   - `duration_ms` вычисляется и фиксируется только при переходе в terminal-состояние.
 
-4.8. После перехода `code_exec` в terminal-состояние (`success | error | timeout`) дальнейшие изменения `output.status` для этого вызова НЕ ДОЛЖНЫ выполняться.
+4.8. После перехода `code_exec` в terminal-состояние (`success | error | timeout | cancelled`) дальнейшие изменения `output.status` для этого вызова НЕ ДОЛЖНЫ выполняться.
 
-4.9. КОГДА `tool_call(code_exec)` скрыт через `messages.hidden = true`, ТО для него НЕ ДОЛЖНЫ публиковаться дальнейшие `message.updated` heartbeat/progress апдейты.
+4.9. После перехода `tool_call(code_exec)` в любой terminal-статус (`success | error | timeout | cancelled`) для него НЕ ДОЛЖНЫ публиковаться дальнейшие `message.updated` heartbeat/progress апдейты.
 
 #### Функциональные Тесты
 
 - `tests/functional/code_exec.spec.ts` — "should persist code_exec lifecycle and update via message snapshots"
+
+#### Модульные Тесты
+
+- `tests/unit/code_exec/CodeExecPersistenceMapper.test.ts` — "should map running/terminal lifecycle with audit fields and done flag"
+- `tests/unit/agents/MainPipeline.test.ts` — "should persist tool_call lifecycle and enforce terminal status immutability"
 
 ### 5. Операционные лимиты
 
@@ -241,17 +278,23 @@ return await window.api.saveData('x', 'y');
 
 5.1. Система ДОЛЖНА ограничивать максимальный размер входного поля `code` для одного вызова.
 
-5.1.1. В целевой конфигурации лимит размера входного поля `code` ДОЛЖЕН составлять `262144` байт (`256 KiB`) на один вызов `code_exec`.
+5.1.1. В целевой конфигурации лимит размера входного поля `code` ДОЛЖЕН составлять `30720` байт (`30 KiB`) на один вызов `code_exec`.
 
 5.1.2. Лимит размера входного `code` ДОЛЖЕН быть явно сообщён модели в prompt/tool-инструкции.
+
+5.1.3. КОГДА размер входного `code` превышает лимит, аргументы `code_exec` ДОЛЖНЫ считаться невалидными на этапе валидации tool call (до запуска sandbox-исполнения).
+
+5.1.4. При невалидных аргументах `code_exec` система ДОЛЖНА возвращать модели ошибку валидации аргументов инструмента и выполнять ограниченный retry/repair по правилам `llm-integration.11.2.3.*`.
+
+5.1.5. ЕСЛИ после исчерпания retry/repair аргументы остаются невалидными, turn ДОЛЖЕН завершаться обычной ошибкой модели (`kind: error` в чате), а НЕ terminal-ошибкой `tool_call`.
 
 5.2. Система ДОЛЖНА ограничивать максимальный объём `stdout` и `stderr`, возвращаемых модели.
 
 5.2.1. КОГДА `stdout` или `stderr` превышают лимит, ТО система ДОЛЖНА усекать соответствующий поток, выставлять флаг `stdout_truncated=true` и/или `stderr_truncated=true`, и сохранять оставшийся поток без изменений.
 
-5.2.2. В целевой конфигурации лимит `stdout` ДОЛЖЕН составлять `1048576` байт (`1 MiB`) на один вызов `code_exec`.
+5.2.2. В целевой конфигурации лимит `stdout` ДОЛЖЕН составлять `10240` байт (`10 KiB`) на один вызов `code_exec`.
 
-5.2.3. В целевой конфигурации лимит `stderr` ДОЛЖЕН составлять `1048576` байт (`1 MiB`) на один вызов `code_exec`.
+5.2.3. В целевой конфигурации лимит `stderr` ДОЛЖЕН составлять `10240` байт (`10 KiB`) на один вызов `code_exec`.
 
 5.2.4. Лимиты `stdout`/`stderr` ДОЛЖНЫ быть явно сообщены модели в prompt/tool-инструкции.
 
@@ -259,13 +302,17 @@ return await window.api.saveData('x', 'y');
 
 5.4. Система ДОЛЖНА ограничивать потребление CPU sandbox-выполнения.
 
-5.4.1. Лимит CPU ДОЛЖЕН быть явно сообщён модели в prompt/tool-инструкции.
+5.4.1. В целевой конфигурации лимит CPU sandbox-выполнения ДОЛЖЕН составлять `1` vCPU.
+
+5.4.2. Лимит CPU ДОЛЖЕН быть явно сообщён модели в prompt/tool-инструкции.
 
 5.5. Система ДОЛЖНА ограничивать потребление оперативной памяти sandbox-выполнения.
 
-5.5.1. Лимит памяти ДОЛЖЕН быть явно сообщён модели в prompt/tool-инструкции.
+5.5.1. В целевой конфигурации лимит оперативной памяти sandbox-выполнения ДОЛЖЕН составлять `2147483648` bytes (`2 GiB`).
 
-5.6. При срабатывании любого лимита система ДОЛЖНА завершать вызов с `status = "error"` (например, `error.code = "policy_denied"` или `error.code = "limit_exceeded"`) либо `status = "timeout"` без падения процесса.
+5.5.2. Лимит памяти ДОЛЖЕН быть явно сообщён модели в prompt/tool-инструкции.
+
+5.6. При срабатывании любого операционного лимита система ДОЛЖНА завершать вызов с `status = "error"` и `error.code = "limit_exceeded"` либо `status = "timeout"` без падения процесса.
 
 5.7. `stdout`/`stderr` (включая усечённые значения и флаги `stdout_truncated`/`stderr_truncated`) ДОЛЖНЫ сохраняться в persisted `tool_call` и ДОЛЖНЫ храниться без автоматической очистки/архивации в рамках данной фичи.
 
@@ -273,6 +320,11 @@ return await window.api.saveData('x', 'y');
 
 - `tests/functional/code_exec.spec.ts` — "should enforce code_exec payload and output size limits"
 - `tests/functional/code_exec.spec.ts` — "should support parallel code_exec calls with callId correlation"
+
+#### Модульные Тесты
+
+- `tests/unit/code_exec/OutputLimiter.test.ts` — "should truncate stdout/stderr and set truncated flags correctly"
+- `tests/unit/code_exec/SandboxSessionManager.test.ts` — "should apply CPU/RAM limit policy and produce limit_exceeded when containment fails"
 
 ### 6. Тестируемость и покрытие
 
@@ -290,6 +342,11 @@ return await window.api.saveData('x', 'y');
 
 6.4. Новые тесты SHALL NOT использовать `.skip()` и `.only()`.
 
+6.5. Детальный тест-план (перечень сценариев, файлов и приоритетов реализации) ДОЛЖЕН задаваться в `docs/specs/code_exec/design.md` и `docs/specs/code_exec/tasks.md`, без дублирования в данном документе.
+
+6.6. Соответствие требований `code_exec.*` тестам ДОЛЖНО фиксироваться в таблице покрытия в `docs/specs/code_exec/design.md`.
+
 #### Функциональные Тесты
 
-- `tests/functional/code_exec.spec.ts` — "should cover success/error/timeout/cancel flows for code_exec"
+- `tests/functional/code_exec.spec.ts` — "code_exec end-to-end execution, limits, lifecycle and policy scenarios"
+- `tests/functional/llm-chat.spec.ts` — "tool-loop continuation and model-history integration for terminal tool results"

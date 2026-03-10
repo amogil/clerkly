@@ -400,7 +400,7 @@
 
 10.2. В историю ДОЛЖНЫ попадать только пользовательские данные сообщения, а служебные поля (`kind`, `reply_to_message_id`, `model`, `reasoning.text`, `reasoning.excluded_from_replay`) НЕ ДОЛЖНЫ передаваться в сериализованный payload.
 
-10.3. Сообщения, которые не должны участвовать в диалоге (`kind:error`, `kind:tool_call`, а также сообщения с флагом `hidden`), НЕ ДОЛЖНЫ попадать в историю.
+10.3. Сообщения `kind:error` и сообщения с флагом `hidden` НЕ ДОЛЖНЫ попадать в историю.
 
 10.4. Системная инструкция и история диалога ДОЛЖНЫ передаваться в модель раздельно, без объединения в один текстовый блок.
 
@@ -430,15 +430,36 @@
 
 11.2.2. КОГДА `tool_call` имеет `toolName = "code_exec"`, ТО обработка ДОЛЖНА выполняться через тот же pipeline `kind: tool_call` (без отдельного `kind`) с форматом полей `callId/toolName/arguments/output`; детальный контракт аргументов/результата задаётся в `code_exec.3.*` и `code_exec.4.*`.
 
+11.2.3. КОГДА аргументы любого `tool_call` не проходят schema/contract validation, система ДОЛЖНА вернуть модели диагностику невалидных аргументов и выполнить bounded retry/repair инструмента в рамках текущего turn.
+
+11.2.3.1. Retry/repair для невалидных аргументов tool call ДОЛЖЕН быть ограничен конечным числом попыток: `maxRetries = 2`.
+
+11.2.3.2. ЕСЛИ после исчерпания retry/repair аргументы остаются невалидными, turn ДОЛЖЕН завершаться обычной ошибкой модели (`kind: error` в чате), а НЕ terminal-ошибкой `tool_call`.
+
 11.3. Выполнение инструмента ДОЛЖНО сопровождаться сохранением сообщения `kind: tool_call` в `messages`; отображение этих сообщений определяется спецификацией `agents`.
 
-11.3.1. Сообщения `kind: tool_call` НЕ ДОЛЖНЫ входить в model history (`PromptBuilder`/`listForModelHistory`), но ДОЛЖНЫ сохраняться в истории сообщений.
+11.3.1. Сообщения `kind: tool_call` ДОЛЖНЫ сохраняться в истории сообщений и ДОЛЖНЫ включаться в model history (`PromptBuilder`/`listForModelHistory`) как результаты вызова инструментов для последующих шагов модели.
+
+11.3.1.1. В model history ДОЛЖНЫ включаться terminal-результаты всех инструментов независимо от `toolName` и terminal-статуса (`success | error | timeout | cancelled`).
+
+11.3.1.2. Non-terminal `tool_call` (например, `status = "running"`) SHALL NOT включаться в model history.
+
+11.3.1.3. Формат включения terminal `tool_call` в model history ДОЛЖЕН соответствовать AI SDK tool-result контракту.
+
+11.3.1.3.1. Для каждого terminal `tool_call` в model history ДОЛЖЕН передаваться structured tool-result с обязательными полями:
+  - `toolCallId` (идентификатор вызова);
+  - `toolName` (имя инструмента);
+  - `result` (нормализованный terminal результат инструмента).
+
+11.3.1.3.2. Поле `result` ДОЛЖНО содержать terminal-статус вызова (`success | error | timeout | cancelled`) и соответствующий output инструмента (включая ошибку, если она есть).
 
 11.3.2. Runtime-поток tool-calling НЕ ДОЛЖЕН требовать отдельного realtime-сигнала; обработка ДОЛЖНА строиться по persisted `message.created`/`message.updated`.
 
 11.4. Система ДОЛЖНА поддерживать несколько tool calls в одном turn, включая контролируемую параллельность.
 
 11.5. После получения результатов инструментов `MainPipeline` ДОЛЖЕН продолжать цикл `model -> tools -> model` до завершения turn или ошибки.
+
+11.5.1. КОГДА `tool_call` завершён terminal-результатом с любым статусом (`success | error | timeout | cancelled`), ТО `MainPipeline` ДОЛЖЕН немедленно передать этот результат в следующий шаг цикла (`model`) в рамках `model -> tools -> model`.
 
 11.6. Промежуточные `tool_call` сообщения ДОЛЖНЫ участвовать в статусной семантике chat-flow: при последнем видимом сообщении (`kind: llm` или `kind: tool_call`) с `done = false` статус ДОЛЖЕН быть `in-progress`; правила отображения определяются спецификацией `agents`.
 
@@ -451,7 +472,10 @@
 
 - `tests/functional/llm-chat.spec.ts` — "full llm response streams before final_answer block appears"
 - `tests/functional/llm-chat.spec.ts` — "tool_call block is not persisted/visible before llm done for the same turn"
-- `tests/functional/code_exec.spec.ts` — "should persist code_exec as tool_call via common llm tool pipeline"
+- `tests/functional/llm-chat.spec.ts` — "should retry tool call on invalid arguments and show kind:error after retry limit"
+- `tests/functional/llm-chat.spec.ts` — "should include terminal code_exec tool_call result in subsequent model history"
+- `tests/functional/llm-chat.spec.ts` — "should include terminal final_answer tool_call result in subsequent model history"
+- `tests/functional/llm-chat.spec.ts` — "should continue model loop immediately after terminal tool_call result regardless of status"
 
 ### 12. Надёжность chat-flow и обработка некорректных ответов
 
@@ -475,7 +499,7 @@
 
 #### Функциональные Тесты
 
-- `tests/functional/llm-chat.spec.ts` — "cancel during tool execution hides in-flight messages and creates no error"
+- `tests/functional/llm-chat.spec.ts` — "cancel during tool execution keeps cancelled code_exec tool_call visible and creates no error"
 - `tests/functional/llm-chat.spec.ts` — "should show error when invalid final_answer exhausts retry limit"
 
 ---

@@ -237,16 +237,40 @@ CREATE TABLE messages (
 Логика передачи истории в модель:
 
 1. Берём всю историю сообщений агента.
-2. Исключаем сообщения `kind:error`, `kind:tool_call` и сообщения с `hidden: true`.
+2. Исключаем сообщения `kind:error` и сообщения с `hidden: true`.
 3. Для каждого сообщения истории:
    - санитизируем `payload`: удаляем `data.model` и всю ветку `data.reasoning*`;
    - определяем `role`: `user` для `kind:user`, `assistant` для `kind:llm`;
+   - для `kind:tool_call` включаем только terminal-состояния (`success|error|timeout|cancelled`) и передаём как tool result-контекст независимо от `toolName`;
    - формируем отдельный элемент входного массива `messages` с текстовым `content`:
      - для `kind:user` передаём текст пользовательского сообщения;
-     - для `kind:llm` передаём только текст ответа.
+     - для `kind:llm` передаём только текст ответа;
+     - для `kind:tool_call` передаём AI SDK-совместимый `tool-result` блок: `toolCallId`, `toolName`, `result` (включая terminal `status` и `output`).
 4. Для всех поддерживаемых провайдеров формируем единый итоговый входной массив сообщений:
    - отдельный элемент `role: system` для системной инструкции;
    - отдельные элементы истории в хронологическом порядке (по одному элементу на каждое сообщение диалога).
+
+Пример terminal tool result в AI SDK-совместимом виде:
+
+```json
+{
+  "role": "tool",
+  "content": [
+    {
+      "type": "tool-result",
+      "toolCallId": "call-123",
+      "toolName": "code_exec",
+      "result": {
+        "status": "cancelled",
+        "output": {
+          "stdout": "",
+          "stderr": ""
+        }
+      }
+    }
+  ]
+}
+```
 
 `reply_to_message_id` в историю для LLM не передаётся.
 
@@ -260,6 +284,7 @@ CREATE TABLE messages (
 5) На завершении turn сначала финализирует `kind: llm` (`done: 1`).
 6) После финализации `kind: llm` сохраняет buffered `kind: tool_call` для этого turn.
 7) Отдельно сохраняет `usage_json` (если есть).
+8) Для каждого terminal `tool_call` результата (`success|error|timeout|cancelled`) pipeline немедленно формирует следующий вызов `model` в цикле `model -> tools -> model` с передачей этого результата в history как AI SDK `tool-result`.
 
 #### 2. Runtime transport: stream processing
 1) Runtime-consumer использует единый stream-state контракт диалога.
@@ -314,8 +339,13 @@ CREATE TABLE messages (
 ```typescript
 // Requirements: llm-integration.5
 interface ChatMessage {
-  role: 'user' | 'assistant' | 'system';
-  content: string;
+  role: 'user' | 'assistant' | 'system' | 'tool';
+  content:
+    | string
+    | Array<
+        | { type: 'text'; text: string }
+        | { type: 'tool-result'; toolCallId: string; toolName: string; result: unknown }
+      >;
 }
 
 interface ChatOptions {
@@ -334,7 +364,7 @@ type ChatChunk =
       toolName: string;
       arguments: Record<string, unknown>;
       output: unknown;
-      status: 'success' | 'error';
+      status: 'success' | 'error' | 'timeout' | 'cancelled';
     }
   | {
       type: 'turn_error';
@@ -415,7 +445,9 @@ class PromptBuilder {
 
 `messages` содержит:
 - один элемент `role: system` с системной инструкцией;
-- затем отдельные элементы истории (`role: user`/`role: assistant`) по одному на сообщение.
+- затем отдельные элементы истории:
+  - `role: user` / `role: assistant` для диалоговых сообщений;
+  - `role: tool` с `tool-result` для terminal `kind: tool_call`.
 
 **Базовая инструкция для system-role:**
 
@@ -503,6 +535,11 @@ class MainPipeline {
 9. Эмитит финальный `message.updated`
 ```
 
+**Валидация аргументов tool call (общий контракт):**
+- Перед фактическим исполнением любого инструмента `MainPipeline` валидирует аргументы по schema/contract.
+- При невалидных аргументах pipeline возвращает модели диагностику ошибки валидации и запускает bounded retry/repair в рамках текущего turn (`maxRetries = 2`).
+- Если после исчерпания retry/repair аргументы остаются невалидными, `MainPipeline` завершает turn через обычное `kind:error` сообщение (без terminal-ошибки `tool_call`).
+
 **Обработка ошибок:**
 
 ```
@@ -537,7 +574,7 @@ catch(error):
 
 **`MessageManager.listForModelHistory()`** фильтрует сообщения с `hidden` — они не попадают во входной массив `messages`.
 
-**`MessageManager.listForModelHistory()`** также фильтрует сообщения с `kind: error` и `kind: tool_call` — они не попадают во входной массив `messages`.
+**`MessageManager.listForModelHistory()`** также фильтрует сообщения с `kind: error`; для `kind: tool_call` включаются только terminal-результаты (`success|error|timeout|cancelled`) независимо от `toolName` и сериализуются в AI SDK `tool-result` формат (`toolCallId`, `toolName`, `result`).
 
 Клиентский runtime фильтрует сообщения с `hidden: true`.
 
@@ -676,11 +713,13 @@ User отправляет сообщение
 - `tests/functional/llm-chat.spec.ts` — "should exclude error messages from llm history"
 - `tests/functional/llm-chat.spec.ts` — "full llm response streams before final_answer block appears"
 - `tests/functional/llm-chat.spec.ts` — "tool_call block is not persisted/visible before llm done for the same turn"
-- `tests/functional/llm-chat.spec.ts` — "cancel during tool execution hides in-flight messages and creates no error"
+- `tests/functional/llm-chat.spec.ts` — "should retry tool call on invalid arguments and show kind:error after retry limit"
+- `tests/functional/llm-chat.spec.ts` — "should include terminal code_exec tool_call result in subsequent model history"
+- `tests/functional/llm-chat.spec.ts` — "should include terminal final_answer tool_call result in subsequent model history"
+- `tests/functional/llm-chat.spec.ts` — "should continue model loop immediately after terminal tool_call result regardless of status"
+- `tests/functional/llm-chat.spec.ts` — "cancel during tool execution keeps cancelled code_exec tool_call visible and creates no error"
 - `tests/functional/llm-chat.spec.ts` — "should show error when invalid final_answer exhausts retry limit"
 - `tests/functional/llm-chat.spec.ts` — "should render math when model returns LaTeX delimiters"
-
-Примечание: интеграционные functional-сценарии для `toolName='code_exec'` фиксируются в `docs/specs/code_exec/*` и используются для покрытия `llm-integration.11.2.2`.
 
 ### Покрытие Требований
 
@@ -723,7 +762,9 @@ User отправляет сообщение
 | llm-integration.11 | ✓ | ✓ |
 | llm-integration.11.1.1 (`tool_call` только после `llm done=true`) | ✓ | ✓ |
 | llm-integration.11.1.2 (до `llm done=true` persisted `tool_call` не создаётся) | ✓ | ✓ |
-| llm-integration.11.2.2 (`toolName='code_exec'` обрабатывается через `kind:tool_call` pipeline) | ✓ | ✓ (через `code_exec`-спеку) |
+| llm-integration.11.2.2 (`toolName='code_exec'` обрабатывается через `kind:tool_call` pipeline) | ✓ | - |
+| llm-integration.11.2.3-11.2.3.2 (общая schema validation + bounded retry/repair для tool calls) | ✓ | ✓ |
+| llm-integration.11.3.1-11.3.1.3 (все terminal tool_call включаются в model history в AI SDK tool-result формате; non-terminal исключаются) | ✓ | ✓ |
 | llm-integration.12 | ✓ | ✓ |
 | llm-integration.13 | ✓ | - |
 | llm-integration.14 | ✓ | ✓ |
