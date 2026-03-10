@@ -508,7 +508,9 @@
 
 7.4. `tool_call` с `toolName != "final_answer"` НЕ ДОЛЖЕН отображаться как обычный текстовый bubble (`user`/`llm`); для него ДОЛЖЕН использоваться специализированный tool-call блок.
 
-7.4.1. `tool_call` с `toolName = "final_answer"` ДОЛЖЕН отображаться как отдельный компонент `"Final Answer"` (на базе `Queue`), а не как обычный текстовый bubble `kind: llm`.
+7.4.1. `tool_call` с `toolName = "final_answer"` ДОЛЖЕН отображаться как отдельный компонент `"Final Answer"` (на базе AI Elements `Queue`), а не как обычный текстовый bubble `kind: llm`.
+
+7.4.1.2. Реализация `"Final Answer"` ДОЛЖНА использовать AI Elements `Queue` как базовый компонент.
 
 7.4.1.1. Компонент `"Final Answer"` ДОЛЖЕН отображаться как checklist без отдельного заголовка.
 

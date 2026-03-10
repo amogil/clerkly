@@ -88,7 +88,7 @@ export function toUIMessage(msg: MessageSnapshot): UIMessage | null {
       return {
         id: String(msg.id),
         role: 'assistant',
-        parts: [{ type: 'text', text: 'Done' }],
+        parts: [],
         metadata: {
           isToolCall: true,
           isFinalAnswer: true,

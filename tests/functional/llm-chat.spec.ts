@@ -1511,7 +1511,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
 
   /* Preconditions: MockLLMServer returns a single tool_call(final_answer) with summary_points
      Action: User sends a message
-     Assertions: Final answer block is rendered expanded with title and summary details
+     Assertions: Final answer block is rendered as checklist with summary details
      Requirements: llm-integration.11.8, agents.9.6 */
   test('should render final_answer tool_call as completed assistant response', async () => {
     mockLLMServer.setStreamingMode(true);
@@ -1539,11 +1539,11 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
       .locator('[data-testid="message-final-answer-block"]')
       .last();
     await expect(finalAnswerBlock).toBeVisible({ timeout: 15000 });
-    await expect(
-      context.window.locator('[data-testid="message-final-answer-title"]').last()
-    ).toHaveText('Done');
     const summary = context.window.locator('[data-testid="message-final-answer-summary"]').last();
     await expect(summary).toBeVisible({ timeout: 5000 });
+    await expect(context.window.locator('[data-testid="message-final-answer-item"]')).toHaveCount(
+      2
+    );
     await expect(summary).toContainText('Validated input data');
     await expect(summary).toContainText('Prepared final response');
 
@@ -1552,17 +1552,26 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     );
   });
 
-  /* Preconditions: MockLLMServer returns tool_call(final_answer) without summary_points
+  /* Preconditions: MockLLMServer returns invalid tool_call(final_answer) without summary_points in both attempts
      Action: User sends a message
-     Assertions: Final Answer block is shown without summary section
-     Requirements: agents.7.4.3, llm-integration.9.5.1.2 */
-  test('should render final_answer block when summary_points is absent', async () => {
+     Assertions: Retry limit is exhausted and kind:error is shown
+     Requirements: llm-integration.9.5.2, llm-integration.12.3 */
+  test('should show error when final_answer summary_points is absent', async () => {
     mockLLMServer.setStreamingMode(true);
     mockLLMServer.setOpenAIStreamScripts([
       {
         toolCalls: [
           {
             callId: 'final-no-summary',
+            toolName: 'final_answer',
+            arguments: {},
+          },
+        ],
+      },
+      {
+        toolCalls: [
+          {
+            callId: 'final-no-summary-2',
             toolName: 'final_answer',
             arguments: {},
           },
@@ -1576,23 +1585,19 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     await messageInput.fill('Finish task');
     await messageInput.press('Enter');
 
-    const finalAnswerBlock = context.window
-      .locator('[data-testid="message-final-answer-block"]')
-      .last();
-    await expect(finalAnswerBlock).toBeVisible({ timeout: 15000 });
-    await expect(
-      context.window.locator('[data-testid="message-final-answer-title"]').last()
-    ).toHaveText('Done');
-    await expect(
-      context.window.locator('[data-testid="message-final-answer-summary"]')
-    ).toHaveCount(0);
+    await expect(context.window.locator('[data-testid="message-final-answer-block"]')).toHaveCount(
+      0
+    );
+    await expect(context.window.locator('[data-testid="message-error"]')).toBeVisible({
+      timeout: 15000,
+    });
   });
 
-  /* Preconditions: MockLLMServer returns tool_call(final_answer)
+  /* Preconditions: MockLLMServer returns tool_call(final_answer) with summary_points
      Action: User sends a message
-     Assertions: Final Answer title is always Done
-     Requirements: agents.7.4.3, llm-integration.9.5.1.2 */
-  test('should render Done title for final_answer', async () => {
+     Assertions: Final Answer is rendered as checklist without synthetic title
+     Requirements: agents.7.4.2, llm-integration.9.5.1 */
+  test('should render checklist-only final_answer block', async () => {
     mockLLMServer.setStreamingMode(true);
     mockLLMServer.setOpenAIStreamScripts([
       {
@@ -1614,9 +1619,14 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     await messageInput.fill('Finish task');
     await messageInput.press('Enter');
 
-    const title = context.window.locator('[data-testid="message-final-answer-title"]').last();
-    await expect(title).toBeVisible({ timeout: 15000 });
-    await expect(title).toHaveText('Done');
+    const summary = context.window.locator('[data-testid="message-final-answer-summary"]').last();
+    await expect(summary).toBeVisible({ timeout: 15000 });
+    await expect(context.window.locator('[data-testid="message-final-answer-item"]')).toHaveCount(
+      1
+    );
+    await expect(context.window.locator('[data-testid="message-final-answer-title"]')).toHaveCount(
+      0
+    );
   });
 
   /* Preconditions: MockLLMServer returns regular text response without final_answer tool call

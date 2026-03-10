@@ -147,32 +147,24 @@ export function AgentMessage({
       const summaryPoints = Array.isArray(summaryPointsRaw)
         ? summaryPointsRaw.filter((point): point is string => typeof point === 'string')
         : [];
-      const title = 'Done';
 
       return (
         <Message from="assistant" className="w-full max-w-full">
           <Queue data-testid="message-final-answer-block">
-            <div data-testid="message-final-answer-header">
-              <div
-                data-testid="message-final-answer-title"
-                className="flex items-center gap-2 rounded-md bg-muted/40 px-3 py-2 text-sm font-medium text-muted-foreground"
-              >
-                <Check data-testid="message-final-answer-check" className="size-4 text-green-600" />
-                <span>{title}</span>
-              </div>
+            <div data-testid="message-final-answer-summary">
+              {summaryPoints.map((point, index) => (
+                <QueueItem
+                  key={`${index}-${point}`}
+                  data-testid="message-final-answer-item"
+                  className="flex-row items-start gap-2"
+                >
+                  <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-green-600">
+                    <Check className="h-3 w-3 text-white" />
+                  </span>
+                  <QueueItemContent completed={false}>{point}</QueueItemContent>
+                </QueueItem>
+              ))}
             </div>
-            {summaryPoints.length > 0 ? (
-              <div data-testid="message-final-answer-summary">
-                {summaryPoints.map((point, index) => (
-                  <QueueItem key={`${index}-${point}`} className="flex-row items-start gap-2">
-                    <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-green-600">
-                      <Check className="h-3 w-3 text-white" />
-                    </span>
-                    <QueueItemContent completed={false}>{point}</QueueItemContent>
-                  </QueueItem>
-                ))}
-              </div>
-            ) : null}
           </Queue>
         </Message>
       );

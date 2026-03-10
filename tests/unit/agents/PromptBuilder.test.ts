@@ -141,10 +141,12 @@ describe('PromptBuilder.build()', () => {
       const finalAnswerTool = result.tools.find((tool) => tool.name === 'final_answer');
       expect(finalAnswerTool?.description).toContain('only after task is fully done');
       expect(finalAnswerTool?.parameters).toMatchObject({
+        required: ['summary_points'],
         properties: {
           summary_points: expect.objectContaining({
+            minItems: 1,
             maxItems: 10,
-            description: expect.stringContaining('list of solved tasks'),
+            description: expect.stringContaining('Required concise list of solved tasks'),
             items: expect.objectContaining({ maxLength: 200 }),
           }),
         },

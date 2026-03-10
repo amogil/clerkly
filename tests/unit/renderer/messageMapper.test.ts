@@ -261,7 +261,7 @@ describe('toUIMessage', () => {
 
   /* Preconditions: message with kind 'tool_call' for final_answer
      Action: call toUIMessage
-     Assertions: maps to assistant text message (not dynamic-tool part)
+     Assertions: maps to assistant metadata message without synthetic text
      Requirements: llm-integration.9.7, agents.7.4.1 */
   it('should map final_answer tool_call to assistant text part', () => {
     const msg = makeSnapshot({
@@ -280,16 +280,16 @@ describe('toUIMessage', () => {
     const result = toUIMessage(msg);
     expect(result).not.toBeNull();
     expect(result!.role).toBe('assistant');
-    expect(result!.parts).toEqual([{ type: 'text', text: 'Done' }]);
+    expect(result!.parts).toEqual([]);
     expect((result!.metadata as Record<string, unknown>).isFinalAnswer).toBe(true);
     expect((result!.metadata as Record<string, unknown>).summary_points).toEqual(['Point 1']);
   });
 
   /* Preconditions: final_answer without arguments
      Action: call toUIMessage
-     Assertions: uses fixed Done text and normalizes summary_points to empty array
+     Assertions: keeps empty parts and normalizes summary_points to empty array
      Requirements: llm-integration.9.6 */
-  it('should map final_answer without arguments to Done and empty summary points', () => {
+  it('should map final_answer without arguments to empty parts and empty summary points', () => {
     const msg = makeSnapshot({
       kind: 'tool_call',
       done: true,
@@ -304,7 +304,7 @@ describe('toUIMessage', () => {
     const result = toUIMessage(msg);
     expect(result).not.toBeNull();
     expect(result!.role).toBe('assistant');
-    expect(result!.parts).toEqual([{ type: 'text', text: 'Done' }]);
+    expect(result!.parts).toEqual([]);
     expect((result!.metadata as Record<string, unknown>).summary_points).toEqual([]);
   });
 

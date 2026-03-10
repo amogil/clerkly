@@ -109,7 +109,7 @@ describe('AgentMessage — tool_call', () => {
 
   /* Preconditions: persisted kind:tool_call for final_answer with summary_points
      Action: render AgentMessage
-     Assertions: renders Final Answer block with header and expanded summary points
+     Assertions: renders Final Answer checklist items without title/header
      Requirements: agents.7.4.1, agents.7.4.2, llm-integration.9.7 */
   it('should render final_answer as Final Answer block with summary list', () => {
     render(
@@ -131,12 +131,10 @@ describe('AgentMessage — tool_call', () => {
     );
 
     expect(screen.getByTestId('message-final-answer-block')).toBeInTheDocument();
-    expect(screen.getByTestId('message-final-answer-header')).toBeInTheDocument();
-    expect(screen.getByTestId('message-final-answer-title')).toHaveTextContent('Done');
-    expect(screen.getByTestId('message-final-answer-check')).toBeInTheDocument();
-    expect(screen.getByTestId('message-final-answer-check')).toHaveClass('text-green-600');
     expect(screen.getByTestId('message-final-answer-summary')).toBeInTheDocument();
+    expect(screen.getAllByTestId('message-final-answer-item')).toHaveLength(2);
     expect(screen.getByText('Point 1')).toBeInTheDocument();
+    expect(screen.queryByTestId('message-final-answer-title')).not.toBeInTheDocument();
     expect(screen.queryByTestId('message-tool-call')).not.toBeInTheDocument();
     expect(screen.queryByTestId('message-completed-badge')).not.toBeInTheDocument();
     expect(screen.queryByTestId('message-completed-summary')).not.toBeInTheDocument();
@@ -144,9 +142,9 @@ describe('AgentMessage — tool_call', () => {
 
   /* Preconditions: final_answer with empty summary
      Action: render AgentMessage
-     Assertions: Done title is shown and summary section is absent
+     Assertions: summary container renders with zero checklist items and no title/header
      Requirements: agents.7.4.3, llm-integration.9.6 */
-  it('should render Done title when summary is absent', () => {
+  it('should render empty checklist container when summary is absent', () => {
     render(
       <AgentMessage
         message={baseMessage({
@@ -165,8 +163,9 @@ describe('AgentMessage — tool_call', () => {
       />
     );
 
-    expect(screen.getByTestId('message-final-answer-title')).toHaveTextContent('Done');
-    expect(screen.queryByTestId('message-final-answer-summary')).not.toBeInTheDocument();
+    expect(screen.getByTestId('message-final-answer-summary')).toBeInTheDocument();
+    expect(screen.queryAllByTestId('message-final-answer-item')).toHaveLength(0);
+    expect(screen.queryByTestId('message-final-answer-title')).not.toBeInTheDocument();
   });
 });
 

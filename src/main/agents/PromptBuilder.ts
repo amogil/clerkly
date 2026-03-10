@@ -203,7 +203,7 @@ export class FinalAnswerFeature implements AgentFeature {
     return [
       'Use normal assistant text for ongoing dialog: clarifying questions, intermediate updates, or requests for user input.',
       'Call the `final_answer` tool only when you are confident the requested work is completed.',
-      'Use `final_answer.summary_points` to list solved tasks (max 10 points, each max 200 characters).',
+      'Use `final_answer.summary_points` to list solved tasks (required: 1 to 10 points, each max 200 characters).',
     ].join(' ');
   }
 
@@ -216,11 +216,13 @@ export class FinalAnswerFeature implements AgentFeature {
         parameters: {
           type: 'object',
           additionalProperties: false,
+          required: ['summary_points'],
           properties: {
             summary_points: {
               type: 'array',
               description:
-                'Optional concise list of solved tasks (max 10 points, max 200 chars each).',
+                'Required concise list of solved tasks (1-10 points, max 200 chars each).',
+              minItems: 1,
               maxItems: 10,
               items: {
                 type: 'string',

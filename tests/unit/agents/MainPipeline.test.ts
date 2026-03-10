@@ -344,7 +344,7 @@ describe('MainPipeline.run()', () => {
     );
   });
 
-  it('normalizes final_answer defaults in runtime payload when fields are absent', async () => {
+  it('persists final_answer arguments payload as provided when fields are absent', async () => {
     const { pipeline, llmProvider, messageManager } = makeMocks();
 
     llmProvider.chat.mockImplementation(
@@ -368,7 +368,7 @@ describe('MainPipeline.run()', () => {
         data: expect.objectContaining({
           callId: 'call-final-defaults',
           toolName: 'final_answer',
-          arguments: { summary_points: [] },
+          arguments: {},
         }),
       }),
       1,
@@ -1161,13 +1161,13 @@ describe('MainPipeline.run()', () => {
           type: 'tool_call',
           callId: 'call-final',
           toolName: 'final_answer',
-          arguments: {},
+          arguments: { summary_points: ['Done'] },
         });
         onChunk({
           type: 'tool_result',
           callId: 'call-final',
           toolName: 'final_answer',
-          arguments: {},
+          arguments: { summary_points: ['Done'] },
           output: { ignored: true },
           status: 'success',
         });
@@ -1184,7 +1184,7 @@ describe('MainPipeline.run()', () => {
         data: expect.objectContaining({
           callId: 'call-final',
           toolName: 'final_answer',
-          arguments: { summary_points: [] },
+          arguments: { summary_points: ['Done'] },
         }),
       }),
       1,
@@ -1192,7 +1192,7 @@ describe('MainPipeline.run()', () => {
     );
   });
 
-  it('normalizes final_answer defaults when tool_result fields are absent', async () => {
+  it('persists final_answer tool_result payload as provided when fields are absent', async () => {
     const { pipeline, llmProvider, messageManager } = makeMocks();
 
     llmProvider.chat.mockImplementation(
@@ -1224,7 +1224,7 @@ describe('MainPipeline.run()', () => {
         data: expect.objectContaining({
           callId: 'call-final-defaults-result',
           toolName: 'final_answer',
-          arguments: { summary_points: [] },
+          arguments: {},
         }),
       }),
       1,

@@ -448,12 +448,10 @@ export class MainPipeline {
 
   /**
    * Normalize final_answer tool arguments for persisted runtime contract.
-   * Requirements: llm-integration.9.5.1.2
+   * Requirements: llm-integration.9.5.1
    */
   private normalizeFinalAnswerArguments(args: Record<string, unknown>): Record<string, unknown> {
-    const normalized: Record<string, unknown> = {};
-    normalized.summary_points = Array.isArray(args.summary_points) ? args.summary_points : [];
-    return normalized;
+    return { ...args };
   }
 
   /**

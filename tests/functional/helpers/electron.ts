@@ -499,8 +499,8 @@ export function activeChat(window: Page) {
     llmResponseActions: chat.locator('.message-llm-action-response'),
     /** Final Answer blocks */
     completedMessages: chat.locator('[data-testid="message-final-answer-block"]'),
-    /** Final Answer title (fixed `Done` for tool_call(final_answer)) */
-    completedActions: chat.locator('[data-testid="message-final-answer-title"]'),
+    /** Final Answer checklist items */
+    completedActions: chat.locator('[data-testid="message-final-answer-item"]'),
     /** Error message bubbles */
     errorMessages: chat.locator('[data-testid="message-error"]'),
     /** Scroll-to-bottom button (scoped to active chat to avoid strict-mode violations) */
