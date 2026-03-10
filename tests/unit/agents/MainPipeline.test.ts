@@ -1190,6 +1190,21 @@ describe('MainPipeline.run()', () => {
       1,
       true
     );
+    const finalToolCall = (messageManager.create as jest.Mock).mock.calls.find(
+      (call: unknown[]) =>
+        call[1] === 'tool_call' &&
+        typeof call[2] === 'object' &&
+        call[2] !== null &&
+        (call[2] as { data?: { toolName?: string } }).data?.toolName === 'final_answer'
+    );
+    expect(finalToolCall).toBeDefined();
+    expect((finalToolCall as unknown[])[2]).toEqual(
+      expect.objectContaining({
+        data: expect.not.objectContaining({
+          output: expect.anything(),
+        }),
+      })
+    );
   });
 
   it('persists final_answer tool_result payload as provided when fields are absent', async () => {

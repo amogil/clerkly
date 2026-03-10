@@ -232,9 +232,9 @@
 
 - [x] Обновить требования/дизайн: `final_answer.summary_points` обязателен и содержит минимум 1 пункт.
 - [x] Удалить UI fallback с автоподстановкой `Done` при пустом/отсутствующем `summary_points`.
-- [ ] Обновить tool schema и prompt-инструкции под `summary_points` как required + `minItems: 1`.
-- [ ] Обновить renderer и тесты под checklist-only рендер без отдельного заголовка `Done`.
-- [ ] Обновить functional сценарии invalid `final_answer` (включая пустой/отсутствующий `summary_points`).
+- [x] Обновить tool schema и prompt-инструкции под `summary_points` как required + `minItems: 1`.
+- [x] Обновить renderer и тесты под checklist-only рендер без отдельного заголовка `Done`.
+- [x] Обновить functional сценарии invalid `final_answer` (включая пустой/отсутствующий `summary_points`).
 
 ---
 

@@ -142,6 +142,7 @@ describe('PromptBuilder.build()', () => {
       expect(finalAnswerTool?.description).toContain('only after task is fully done');
       expect(finalAnswerTool?.parameters).toMatchObject({
         required: ['summary_points'],
+        additionalProperties: false,
         properties: {
           summary_points: expect.objectContaining({
             minItems: 1,
@@ -151,6 +152,9 @@ describe('PromptBuilder.build()', () => {
           }),
         },
       });
+      expect((finalAnswerTool?.parameters as Record<string, unknown>).properties).not.toHaveProperty(
+        'text'
+      );
     });
   });
 

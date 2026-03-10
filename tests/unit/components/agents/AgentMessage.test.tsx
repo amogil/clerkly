@@ -167,6 +167,35 @@ describe('AgentMessage — tool_call', () => {
     expect(screen.queryAllByTestId('message-final-answer-item')).toHaveLength(0);
     expect(screen.queryByTestId('message-final-answer-title')).not.toBeInTheDocument();
   });
+
+  /* Preconditions: final_answer includes mixed summary_points types
+     Action: render AgentMessage
+     Assertions: only string checklist items are rendered
+     Requirements: agents.7.4.2 */
+  it('should render only string summary_points items for final_answer', () => {
+    render(
+      <AgentMessage
+        message={baseMessage({
+          kind: 'tool_call',
+          done: true,
+          payload: {
+            data: {
+              callId: 'call-final-mixed',
+              toolName: 'final_answer',
+              arguments: {
+                summary_points: ['Point 1', 42, null, 'Point 2'],
+              },
+            },
+          },
+        })}
+      />
+    );
+
+    expect(screen.getAllByTestId('message-final-answer-item')).toHaveLength(2);
+    expect(screen.getByText('Point 1')).toBeInTheDocument();
+    expect(screen.getByText('Point 2')).toBeInTheDocument();
+    expect(screen.queryByText('42')).not.toBeInTheDocument();
+  });
 });
 
 describe('AgentMessage — llm', () => {

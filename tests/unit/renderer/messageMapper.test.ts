@@ -328,6 +328,27 @@ describe('toUIMessage', () => {
     expect(result).not.toBeNull();
     expect((result!.metadata as Record<string, unknown>).summary_points).toEqual([]);
   });
+
+  /* Preconditions: final_answer with non-array summary_points value
+     Action: call toUIMessage
+     Assertions: summary_points normalized to empty array
+     Requirements: llm-integration.9.5.1 */
+  it('should normalize non-array final_answer summary_points to empty array', () => {
+    const msg = makeSnapshot({
+      kind: 'tool_call',
+      done: true,
+      payload: {
+        data: {
+          callId: 'call-final',
+          toolName: 'final_answer',
+          arguments: { summary_points: 'not-array' as unknown as string[] },
+        },
+      },
+    });
+    const result = toUIMessage(msg);
+    expect(result).not.toBeNull();
+    expect((result!.metadata as Record<string, unknown>).summary_points).toEqual([]);
+  });
 });
 
 describe('toUIMessages', () => {
