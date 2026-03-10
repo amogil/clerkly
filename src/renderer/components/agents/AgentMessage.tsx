@@ -6,6 +6,7 @@ import { Reasoning, ReasoningContent } from '../ai-elements/reasoning';
 import { Tool, ToolContent, ToolHeader, ToolInput, ToolOutput } from '../ai-elements/tool';
 import { Queue, QueueItem, QueueItemContent } from '../ai-elements/queue';
 import { toUIMessage } from '../../lib/messageMapper';
+import { normalizeMathDelimiters } from '../../lib/mathDelimiterNormalization';
 import type { MessageSnapshot } from '../../../shared/events/types';
 import { AgentErrorDialog } from './AgentErrorDialog';
 import type { AgentDialogActionItem } from './AgentDialog';
@@ -30,7 +31,11 @@ export function AgentMessage({
     ? (message.payload.data as Record<string, unknown> | undefined)
     : undefined;
   const llmReasoning = llmData?.['reasoning'] as { text?: string } | undefined;
-  const llmText = typeof llmData?.['text'] === 'string' ? (llmData['text'] as string) : undefined;
+  const llmTextRaw = typeof llmData?.['text'] === 'string' ? (llmData['text'] as string) : undefined;
+  const llmText = llmTextRaw ? normalizeMathDelimiters(llmTextRaw) : undefined;
+  const llmReasoningText = llmReasoning?.text
+    ? normalizeMathDelimiters(llmReasoning.text)
+    : undefined;
 
   if (message.kind === 'user') {
     return (
@@ -111,7 +116,7 @@ export function AgentMessage({
             <Reasoning isStreaming={isReasoningStreaming}>
               <AgentReasoningTrigger />
               <ReasoningContent data-testid="message-llm-reasoning">
-                {llmReasoning?.text ?? ''}
+                {llmReasoningText ?? ''}
               </ReasoningContent>
             </Reasoning>
           )}

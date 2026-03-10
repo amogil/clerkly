@@ -1633,12 +1633,18 @@ if (message.kind === 'tool_call' && toolName === 'final_answer') {
 - математика через KaTeX (inline и block)
 - сноски не поддерживаются
 
+Перед рендером применяется нормализация мат-делимитеров:
+- `\(...\)` -> `$...$`
+- `\[...\]` -> `$$...$$`
+- fenced code и inline code при нормализации не изменяются
+
 ```typescript
-// Requirements: agents.7.7
+// Requirements: agents.7.7, agents.7.7.1
 import { MessageResponse } from '../ai-elements/message';
+import { normalizeMathDelimiters } from '../../lib/mathDelimiterNormalization';
 
 function MarkdownMessage({ content }: { content: string }) {
-  return <MessageResponse>{content}</MessageResponse>;
+  return <MessageResponse>{normalizeMathDelimiters(content)}</MessageResponse>;
 }
 ```
 

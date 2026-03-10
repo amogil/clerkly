@@ -2045,6 +2045,17 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     ).toBeVisible();
   });
 
+  /* Preconditions: MockLLMServer returns math in LaTeX delimiters \(..\) and \[..]
+     Action: User sends a message
+     Assertions: math is normalized and rendered as KaTeX inline and display
+     Requirements: agents.7.7, llm-integration.4.5 */
+  test('should render math when model returns LaTeX delimiters', async () => {
+    await renderMarkdownMessage('Inline: \\(E=mc^2\\)\n\n\\[\\sum_{i=1}^{n} i\\]');
+    const actionContent = context.window.locator('.message-llm-action-response').last();
+    await expect(actionContent.locator('.katex').first()).toBeVisible();
+    await expect(actionContent.locator('.katex-display').first()).toBeVisible();
+  });
+
   /* Preconditions: MockLLMServer returns markdown blocks with separators
      Action: User sends a message
      Assertions: no empty paragraphs are rendered between blocks

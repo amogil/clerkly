@@ -539,6 +539,8 @@
 
 7.7. КОГДА `format = "markdown"`, ТО текст ДОЛЖЕН рендериться с поддержкой Markdown
 
+7.7.1. КОГДА в тексте встречаются математические делимитеры `\(...\)` или `\[...\]`, ТО UI ДОЛЖЕН нормализовать их в KaTeX-совместимый формат (`$...$`/`$$...$$`) до рендера.
+
 7.8. Все timestamps ДОЛЖНЫ включать timezone offset и храниться в часовом поясе пользователя
 
 #### Функциональные Тесты
@@ -565,6 +567,7 @@
 - `tests/functional/llm-chat.spec.ts` - "should render markdown mermaid diagrams"
 - `tests/functional/llm-chat.spec.ts` - "should render markdown inline math"
 - `tests/functional/llm-chat.spec.ts` - "should render markdown block math"
+- `tests/functional/llm-chat.spec.ts` - "should render math when model returns LaTeX delimiters"
 - `tests/functional/llm-chat.spec.ts` - "should avoid duplicate line breaks between markdown blocks"
 
 ---
