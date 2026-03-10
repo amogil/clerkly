@@ -196,6 +196,35 @@ describe('AgentMessage — tool_call', () => {
     expect(screen.getByText('Point 2')).toBeInTheDocument();
     expect(screen.queryByText('42')).not.toBeInTheDocument();
   });
+
+  /* Preconditions: final_answer includes long summary item
+     Action: render AgentMessage
+     Assertions: full summary text is rendered without truncation markers
+     Requirements: agents.7.4.2 */
+  it('should render long final_answer summary item as full visible text', () => {
+    const longPoint =
+      'This is a deliberately long checklist entry that should remain fully visible in the final answer block without one-line truncation.';
+
+    render(
+      <AgentMessage
+        message={baseMessage({
+          kind: 'tool_call',
+          done: true,
+          payload: {
+            data: {
+              callId: 'call-final-long',
+              toolName: 'final_answer',
+              arguments: {
+                summary_points: [longPoint],
+              },
+            },
+          },
+        })}
+      />
+    );
+
+    expect(screen.getByText(longPoint)).toBeInTheDocument();
+  });
 });
 
 describe('AgentMessage — llm', () => {
