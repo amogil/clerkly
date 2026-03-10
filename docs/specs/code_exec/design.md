@@ -127,6 +127,26 @@ Lifecycle:
 - Лимит времени исполнения обязателен.
 - Многопоточность JavaScript запрещена (`Worker`, `SharedWorker`, `ServiceWorker`, `Worklet`).
 
+### Enforcement browser-level network egress
+
+Для выполнения требований `code_exec.2.3.1-2.3.2` используется multi-layer защита:
+
+1. `session.webRequest` в sandbox partition:
+   - `onBeforeRequest` отменяет любые исходящие запросы (`http/https/ws/wss`, beacon, навигационные загрузки);
+   - отмена выполняется до отправки запроса, гарантия: request не покидает процесс sandbox.
+2. Navigation hardening:
+   - `webContents.setWindowOpenHandler(() => ({ action: 'deny' }))`;
+   - обработчики `will-navigate`/`will-redirect` блокируют переходы.
+3. Permission hardening:
+   - `session.setPermissionRequestHandler` и `setPermissionCheckHandler` возвращают deny для всех permission-based сетевых каналов.
+4. Runtime hardening в preload/sandbox bridge:
+   - блокировка browser-level API `fetch`, `XMLHttpRequest`, `WebSocket`, `navigator.sendBeacon`;
+   - при попытке вызова возвращается контролируемая ошибка `policy_denied`.
+5. CSP:
+   - sandbox document устанавливается с `connect-src 'none'` и запретом внешних источников для сетевых подключений.
+
+Итоговый инвариант: no-request-leaves-sandbox для browser-level egress путей.
+
 ### Валидации main process
 
 - Проверка соответствия `agentId` и sandbox session.
@@ -209,6 +229,7 @@ Lifecycle:
 - `tests/functional/code_exec.spec.ts` — несколько вызовов в одном turn (включая параллельные) и корреляция по `callId`.
 - `tests/functional/code_exec.spec.ts` — timeout/cancel, отсутствие `kind:error` для штатной отмены.
 - `tests/functional/code_exec.spec.ts` — безопасность (`policy_denied`: forbidden API, allowlist, main-pipeline-only tools, multithreading APIs).
+- `tests/functional/code_exec.spec.ts` — browser-level network egress enforcement (`fetch/xhr/websocket/sendBeacon/navigation` блокируются с `policy_denied`, без исходящих запросов).
 - `tests/functional/code_exec.spec.ts` — лимиты `code`/`stdout`/`stderr`, truncated-флаги, `limit_exceeded` для CPU/RAM.
 - `tests/functional/code_exec.spec.ts` — shutdown при закрытии приложения без зависания.
 - `tests/functional/code_exec.spec.ts` — persisted/realtime lifecycle через `message.created/message.updated`.
