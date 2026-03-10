@@ -147,6 +147,11 @@ Lifecycle:
 
 Итоговый инвариант: no-request-leaves-sandbox для browser-level egress путей.
 
+Трассировка в требования и тесты:
+- `code_exec.2.3.1` покрывается блокировкой API/навигации на уровнях runtime (`fetch/xhr/websocket/sendBeacon`) и browser/session (`webRequest`, `window.open`, navigation handlers, permissions, CSP).
+- `code_exec.2.3.2` покрывается требованием контролируемого отказа `status="error"` + `error.code="policy_denied"` без сетевого egress.
+- Функциональная верификация выполняется сценарием `tests/functional/code_exec.spec.ts` — "should deny browser-level network APIs (fetch/xhr/websocket/sendBeacon/navigation) with policy_denied", где дополнительно проверяется отсутствие исходящего запроса.
+
 ### Валидации main process
 
 - Проверка соответствия `agentId` и sandbox session.
