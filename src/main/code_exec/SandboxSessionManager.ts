@@ -233,12 +233,12 @@ export class SandboxSessionManager {
                   code: 'limit_exceeded' as const,
                   message: LIMIT_EXCEEDED_DEGRADED_RUNTIME_MESSAGE,
                 }
-            : this.isNetworkPolicyLikeError(normalized.error.message)
-              ? {
-                  code: 'policy_denied' as const,
-                  message: POLICY_DENIED_NETWORK_MESSAGE,
-                }
-              : normalized.error
+              : this.isNetworkPolicyLikeError(normalized.error.message)
+                ? {
+                    code: 'policy_denied' as const,
+                    message: POLICY_DENIED_NETWORK_MESSAGE,
+                  }
+                : normalized.error
           : normalized.error;
       const base = {
         ...normalized,
