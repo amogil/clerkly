@@ -1,4 +1,4 @@
-name: PR Validation and Functional Tests
+name: PR Validation
 
 on:
   pull_request:
