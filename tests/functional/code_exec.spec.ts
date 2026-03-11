@@ -38,8 +38,12 @@ async function launchWithMockLLM() {
 
 async function sendUserMessage(text: string) {
   const input = window.locator('textarea[placeholder*="Ask"]');
+  await expect(input).toBeVisible({ timeout: 5000 });
+  await input.click();
   await input.fill(text);
+  await expect(input).toHaveValue(text);
   await input.press('Enter');
+  await expect(input).toHaveValue('');
 }
 
 async function getToolCallMessages(agentId: string): Promise<Array<Record<string, unknown>>> {
@@ -321,7 +325,7 @@ test.describe('code_exec tool loop execution', () => {
 
   /* Preconditions: mock model emits code_exec call with code >30KiB
      Action: user sends a message
-     Assertions: oversized payload does not produce successful terminal code_exec
+     Assertions: oversized payload is validated into invalid_tool_arguments with explicit 30KiB limit text
      Requirements: code_exec.5.1.1, code_exec.5.1.3 */
   test('should enforce code size limit for code_exec arguments', async () => {
     const oversizedCode = 'x'.repeat(31 * 1024);
@@ -339,7 +343,8 @@ test.describe('code_exec tool loop execution', () => {
     ]);
 
     await launchWithMockLLM();
-    await sendUserMessage('Run huge code');
+    const promptText = 'Run huge code';
+    await sendUserMessage(promptText);
 
     const requestCount = mockLLMServer
       .getRequestLogs()
@@ -347,14 +352,32 @@ test.describe('code_exec tool loop execution', () => {
     expect(requestCount).toBeGreaterThanOrEqual(1);
 
     const agentId = (await getAgentIdsFromApi(window))[0];
-    const toolCalls = await getToolCallMessages(agentId);
-    const hasSuccessfulCodeExec = toolCalls.some((entry) => {
+    const allMessages = await getAllMessages(agentId);
+    const userTurnMessage = [...allMessages].reverse().find((entry) => {
+      const payload = entry.payload as { data?: { text?: string } };
+      return entry.kind === 'user' && payload?.data?.text === promptText;
+    }) as { id?: number } | undefined;
+    const userMessageId = userTurnMessage?.id;
+    expect(typeof userMessageId).toBe('number');
+
+    const requests = mockLLMServer
+      .getRequestLogs()
+      .filter((entry) => entry.path === '/v1/responses');
+    const serializedRequests = requests.map((entry) => JSON.stringify(entry.body));
+    expect(
+      serializedRequests.some((dump) =>
+        dump.includes('code_exec.code exceeds limit 30720 bytes (30 KiB).')
+      )
+    ).toBe(true);
+    expect(serializedRequests.some((dump) => dump.includes('invalid_tool_arguments'))).toBe(true);
+
+    const hasSuccessCodeExec = (await getToolCallMessages(agentId)).some((entry) => {
       const payload = entry.payload as {
         data?: { toolName?: string; output?: { status?: string } };
       };
       return payload?.data?.toolName === 'code_exec' && payload?.data?.output?.status === 'success';
     });
-    expect(hasSuccessfulCodeExec).toBe(false);
+    expect(hasSuccessCodeExec).toBe(false);
     await expectNoToastError(window);
   });
 
@@ -767,7 +790,15 @@ test.describe('code_exec tool loop execution', () => {
         ],
       },
       {
-        content: '{"action":{"type":"text","content":"first done"}}',
+        toolCalls: [
+          {
+            callId: 'hist-final-1',
+            toolName: 'final_answer',
+            arguments: {
+              summary_points: ['first done'],
+            },
+          },
+        ],
       },
       {
         content: '{"action":{"type":"text","content":"second done"}}',
@@ -776,12 +807,20 @@ test.describe('code_exec tool loop execution', () => {
 
     await launchWithMockLLM();
     await sendUserMessage('First run with code tool');
-    await expect(window.locator('.message-llm-action-response').last()).toContainText(
-      'first done',
-      {
-        timeout: 15000,
-      }
-    );
+    await expect(window.locator('[data-testid="message-final-answer-block"]').last()).toBeVisible({
+      timeout: 15000,
+    });
+    await sendUserMessage('Second turn after code_exec');
+    await expect
+      .poll(async () => {
+        const agentId = (await getAgentIdsFromApi(window))[0];
+        const messages = await getAllMessages(agentId);
+        return messages.some((entry) => {
+          const payload = entry.payload as { data?: { text?: string } };
+          return entry.kind === 'user' && payload?.data?.text === 'Second turn after code_exec';
+        });
+      })
+      .toBe(true);
 
     await expect
       .poll(
@@ -789,12 +828,12 @@ test.describe('code_exec tool loop execution', () => {
           mockLLMServer.getRequestLogs().filter((entry) => entry.path === '/v1/responses').length,
         { timeout: 15000 }
       )
-      .toBeGreaterThanOrEqual(2);
+      .toBeGreaterThanOrEqual(3);
 
     const requests = mockLLMServer
       .getRequestLogs()
       .filter((entry) => entry.path === '/v1/responses');
-    const subsequentRequest = requests[1];
+    const subsequentRequest = requests[2];
     expect(subsequentRequest).toBeDefined();
     const requestDump = JSON.stringify(subsequentRequest?.body);
     expect(requestDump).toContain('code_exec');
@@ -1035,9 +1074,9 @@ test.describe('code_exec tool loop execution', () => {
   });
 
   /* Preconditions: runtime event subscription is active and mock model emits one code_exec success call
-     Action: user sends a message and waits for completion
-     Assertions: both message.created and message.updated are emitted for code_exec lifecycle in same callId
-     Requirements: code_exec.4.2, code_exec.4.3, code_exec.4.6 */
+   Action: user sends a message and waits for completion
+   Assertions: both message.created and message.updated are emitted for code_exec lifecycle in same callId
+   Requirements: code_exec.4.2, code_exec.4.3 */
   test('should publish message.created and message.updated for code_exec lifecycle', async () => {
     mockLLMServer.setStreamingMode(true);
     mockLLMServer.setOpenAIStreamScripts([
@@ -1047,7 +1086,7 @@ test.describe('code_exec tool loop execution', () => {
             callId: 'evt-1',
             toolName: 'code_exec',
             arguments: {
-              code: "console.log('evt')",
+              code: "await new Promise((resolve) => setTimeout(resolve, 1200)); console.log('evt')",
               timeout_ms: 10000,
             },
           },

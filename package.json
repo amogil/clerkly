@@ -19,7 +19,7 @@
     "dev": "npm run build && electron .",
     "dev:app": "npm run build && npx electron-builder --mac --dir && open release/mac-arm64/Clerkly.app",
     "build": "npm run build:main && npm run build:renderer && npm run build:preload",
-    "build:main": "tsc -p tsconfig.main.json",
+    "build:main": "tsc -p tsconfig.main.json && node scripts/inject-oauth-client-secret.js",
     "build:renderer": "vite build",
     "build:preload": "tsc -p tsconfig.preload.json",
     "typecheck": "tsc -p tsconfig.main.json --noEmit && tsc -p tsconfig.preload.json --noEmit && tsc -p tsconfig.renderer.json --noEmit",

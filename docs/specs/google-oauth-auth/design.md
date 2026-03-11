@@ -741,11 +741,13 @@ interface PKCEStorage {
 // src/main/auth/OAuthConfig.ts
 export const OAUTH_CONFIG = {
   clientId: 'YOUR_GOOGLE_CLIENT_ID_HERE', // Replace with your actual Google OAuth Client ID
-  clientSecret: 'YOUR_GOOGLE_CLIENT_SECRET_HERE', // Replace with your actual Google OAuth Client Secret
+  clientSecret: '__CLERKLY_OAUTH_CLIENT_SECRET__',
   redirectUri: 'com.googleusercontent.apps.YOUR_CLIENT_ID:/oauth2redirect', // Reverse client ID format
   scopes: ['openid', 'email', 'profile'],
 } as const;
 ```
+
+`client_secret` должен поступать из переменной окружения `CLERKLY_OAUTH_CLIENT_SECRET` на этапе сборки: build-скрипт заменяет placeholder `__CLERKLY_OAUTH_CLIENT_SECRET__` в собранном `OAuthConfig.js`. Хардкод секрета в исходниках не допускается.
 
 **Важно:** При формировании `redirect_uri` из Client ID, функция `getOAuthConfig()` автоматически удаляет суффикс `.apps.googleusercontent.com` если он присутствует в Client ID, чтобы избежать дублирования в итоговом URL:
 

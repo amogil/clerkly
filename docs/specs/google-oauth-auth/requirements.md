@@ -227,7 +227,7 @@ Token Expiring → OAuthClientManager.refreshAccessToken() → Update Tokens in 
 
 #### Критерии Приемки
 
-1. "OAuth Client" ДОЛЖЕН хранить client_id и client_secret как константы в конфигурационном файле кода
+1. "OAuth Client" ДОЛЖЕН хранить client_id как константу в конфигурационном файле кода И ДОЛЖЕН загружать client_secret из переменной окружения `CLERKLY_OAUTH_CLIENT_SECRET` (на этапе сборки приложения)
 2. "OAuth Client" ДОЛЖЕН использовать redirect_uri в формате "com.googleusercontent.apps.CLIENT_ID:/oauth2redirect" (reverse client ID format), где CLIENT_ID - это числовая часть Client ID без суффикса ".apps.googleusercontent.com"
 3. "OAuth Client" ДОЛЖЕН запрашивать следующие scopes: "openid", "email", "profile"
 4. "OAuth Client" ДОЛЖЕН использовать authorization endpoint: "https://accounts.google.com/o/oauth2/v2/auth"

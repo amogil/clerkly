@@ -1,8 +1,56 @@
 // Requirements: code_exec.1.5, code_exec.2, code_exec.3.7
 
-import vm from 'node:vm';
+jest.mock('electron', () => {
+  class MockBrowserWindow {
+    private destroyed = false;
+
+    public webContents = {
+      executeJavaScript: jest.fn(async (script: string) => {
+        if (script.includes('while (true) {}')) {
+          return await new Promise(() => undefined);
+        }
+        const nodeVm = require('node:vm') as typeof import('node:vm');
+        return await nodeVm.runInNewContext(script, {
+          setTimeout,
+          clearTimeout,
+          Promise,
+        });
+      }),
+      isDestroyed: jest.fn(() => this.destroyed),
+      forcefullyCrashRenderer: jest.fn(),
+      setWindowOpenHandler: jest.fn(),
+      on: jest.fn(),
+    };
+
+    async loadURL(): Promise<void> {
+      return;
+    }
+
+    isDestroyed(): boolean {
+      return this.destroyed;
+    }
+
+    destroy(): void {
+      this.destroyed = true;
+    }
+  }
+
+  return {
+    BrowserWindow: MockBrowserWindow,
+    session: {
+      fromPartition: jest.fn(() => ({
+        webRequest: {
+          onBeforeRequest: jest.fn(),
+        },
+        setPermissionRequestHandler: jest.fn(),
+        setPermissionCheckHandler: jest.fn(),
+        clearStorageData: jest.fn(async () => undefined),
+      })),
+    },
+  };
+});
+
 import { SandboxSessionManager } from '../../../src/main/code_exec/SandboxSessionManager';
-import { CODE_EXEC_LIMITS } from '../../../src/main/code_exec/contracts';
 import {
   normalizeCodeExecOutput,
   toCodeExecInput,
@@ -24,6 +72,16 @@ describe('SandboxSessionManager.execute', () => {
     const manager = new SandboxSessionManager();
     const result = await manager.execute('agent-1', 'call-1', {
       code: 'fetch("https://example.com")',
+    });
+
+    expect(result.status).toBe('error');
+    expect(result.error?.code).toBe('policy_denied');
+  });
+
+  it('returns policy_denied for globalThis browser network API access', async () => {
+    const manager = new SandboxSessionManager();
+    const result = await manager.execute('agent-1', 'call-1', {
+      code: 'globalThis.fetch("https://example.com")',
     });
 
     expect(result.status).toBe('error');
@@ -88,26 +146,24 @@ describe('SandboxSessionManager.execute', () => {
 
   it('returns timeout with limit_exceeded when vm timeout error is thrown', async () => {
     const manager = new SandboxSessionManager();
-    const runSpy = jest.spyOn(vm, 'runInContext').mockImplementation(() => {
-      throw new Error('Script execution timed out after 10ms');
-    });
-
-    const result = await manager.execute('agent-1', 'call-1', {
-      code: '42',
-      timeout_ms: CODE_EXEC_LIMITS.timeoutMsMin,
-    });
+    const result = await (
+      manager as unknown as {
+        executeInOneSandbox: (
+          input: { code: string; timeoutMs: number },
+          context: { sessionId: string; signal: AbortSignal }
+        ) => Promise<{ status: string; error?: { code?: string } }>;
+      }
+    ).executeInOneSandbox(
+      { code: 'while (true) {}', timeoutMs: 1 },
+      { sessionId: 'timeout-test', signal: new AbortController().signal }
+    );
 
     expect(result.status).toBe('timeout');
     expect(result.error?.code).toBe('limit_exceeded');
-    runSpy.mockRestore();
   });
 
   it('maps memory allocation failures to limit_exceeded', async () => {
     const manager = new SandboxSessionManager();
-    const runSpy = jest.spyOn(vm, 'runInContext').mockImplementation(() => {
-      throw new RangeError('Invalid string length');
-    });
-
     const result = await manager.execute('agent-1', 'call-1', {
       code: "const huge = 'x'.repeat(2 ** 31)",
     });
@@ -115,7 +171,6 @@ describe('SandboxSessionManager.execute', () => {
     expect(result.status).toBe('error');
     expect(result.error?.code).toBe('limit_exceeded');
     expect(result.error?.message ?? '').toContain('2 GiB');
-    runSpy.mockRestore();
   });
 
   it('returns sandbox_runtime_error for generic runtime exceptions', async () => {
@@ -214,19 +269,5 @@ describe('code_exec helpers', () => {
       code: '',
       timeout_ms: undefined,
     });
-  });
-
-  it('rejects in withAbort helper when signal is already aborted', async () => {
-    const manager = new SandboxSessionManager();
-    const controller = new AbortController();
-    controller.abort();
-
-    await expect(
-      (
-        manager as unknown as {
-          withAbort: <T>(promise: Promise<T>, signal?: AbortSignal) => Promise<T>;
-        }
-      ).withAbort(Promise.resolve('ok'), controller.signal)
-    ).rejects.toThrow('aborted');
   });
 });

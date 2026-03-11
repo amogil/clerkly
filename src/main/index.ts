@@ -404,15 +404,25 @@ app.on('window-all-closed', () => {
   app.quit();
 });
 
-// Requirements: clerkly.1.2
-// Handle before-quit event
-app.on('before-quit', () => {
+let isQuitCleanupInProgress = false;
+
+app.on('before-quit', async (event) => {
   logger.info('Application quitting...');
-  void sandboxSessionManager.shutdown();
-  ipcMain.removeHandler('app:get-state');
-  ipcMain.removeHandler('app:set-chats-ready');
-  appCoordinator.stop();
-  lifecycleManager.handleWindowClose();
+  if (isQuitCleanupInProgress) {
+    return;
+  }
+  isQuitCleanupInProgress = true;
+  event.preventDefault();
+
+  try {
+    await sandboxSessionManager.shutdown();
+  } finally {
+    ipcMain.removeHandler('app:get-state');
+    ipcMain.removeHandler('app:set-chats-ready');
+    appCoordinator.stop();
+    lifecycleManager.handleWindowClose();
+    app.quit();
+  }
 });
 
 /**

@@ -1,6 +1,6 @@
 // Requirements: code_exec.1.5, code_exec.2, code_exec.5
 
-import vm from 'node:vm';
+import { BrowserWindow, session } from 'electron';
 import { Logger } from '../Logger';
 import {
   CODE_EXEC_LIMITS,
@@ -10,11 +10,18 @@ import {
   validateCodeExecInput,
 } from './contracts';
 import { applyStdStreamLimits } from './OutputLimiter';
-import { createSandboxToolsProxy } from './SandboxBridge';
+import {
+  SANDBOX_DOCUMENT_CSP,
+  attachSandboxNavigationGuards,
+  attachSandboxSessionPolicies,
+} from './SandboxPolicy';
 
 const POLICY_DENIED_NETWORK_MESSAGE =
   'Browser-level network APIs are not allowed in sandbox runtime.';
 const POLICY_DENIED_MULTITHREAD_MESSAGE = 'Multithreading APIs are not allowed in sandbox runtime.';
+const POLICY_DENIED_MAIN_PIPELINE_TOOL_MESSAGE =
+  'Main-pipeline-only tool is denied in sandbox runtime.';
+const POLICY_DENIED_TOOL_ALLOWLIST_MESSAGE = 'Tool is not allowed in sandbox allowlist.';
 const LIMIT_EXCEEDED_MEMORY_MESSAGE = `code_exec memory limit exceeded (${Math.round(
   CODE_EXEC_LIMITS.sandboxMemoryLimitBytes / (1024 * 1024 * 1024)
 )} GiB).`;
@@ -44,16 +51,27 @@ export class SandboxSessionManager {
       );
     }
 
+    const cancelController = new AbortController();
+    const onAbort = () => cancelController.abort();
+    signal?.addEventListener('abort', onAbort, { once: true });
+    if (signal?.aborted) {
+      cancelController.abort();
+    }
+
     const sessionId = `${agentId}:${callId}:${Date.now()}:${Math.random().toString(16).slice(2)}`;
-    const handle = this.createSessionHandle(sessionId);
+    const handle = this.createSessionHandle(sessionId, () => cancelController.abort());
     this.activeSessions.set(sessionId, handle);
 
     try {
       return await this.executeInOneSandbox(
         validated.value as { code: string; timeoutMs: number },
-        signal
+        {
+          sessionId,
+          signal: cancelController.signal,
+        }
       );
     } finally {
+      signal?.removeEventListener('abort', onAbort);
       this.activeSessions.delete(sessionId);
     }
   }
@@ -83,10 +101,11 @@ export class SandboxSessionManager {
     this.activeSessions.clear();
   }
 
-  private createSessionHandle(id: string): SessionHandle {
+  private createSessionHandle(id: string, cancelImpl: () => void): SessionHandle {
     return {
       id,
       cancel: () => {
+        cancelImpl();
         this.logger.info(`Sandbox session cancelled: ${id}`);
       },
     };
@@ -94,99 +113,112 @@ export class SandboxSessionManager {
 
   private async executeInOneSandbox(
     input: { code: string; timeoutMs: number },
-    signal?: AbortSignal
+    context: { sessionId: string; signal: AbortSignal }
   ): Promise<CodeExecToolOutput> {
     const stdoutChunks: string[] = [];
     const stderrChunks: string[] = [];
+    const staticPolicyError = this.detectStaticPolicyViolation(input.code);
+    if (staticPolicyError) {
+      return {
+        status: 'error',
+        stdout: '',
+        stderr: '',
+        stdout_truncated: false,
+        stderr_truncated: false,
+        error: {
+          code: 'policy_denied',
+          message: staticPolicyError,
+        },
+      };
+    }
 
-    const denyPolicy = (message: string): never => {
-      throw new Error(`policy_denied::${message}`);
-    };
+    const partition = `code_exec_${context.sessionId}`;
+    const sandboxSession = session.fromPartition(partition, { cache: false });
+    attachSandboxSessionPolicies(sandboxSession);
 
-    const deniedNetworkApi = () => denyPolicy(POLICY_DENIED_NETWORK_MESSAGE);
-
-    const toolsProxy = createSandboxToolsProxy(denyPolicy);
-
-    const locationProxy = {
-      assign: () => denyPolicy(POLICY_DENIED_NETWORK_MESSAGE),
-      replace: () => denyPolicy(POLICY_DENIED_NETWORK_MESSAGE),
-    };
-
-    const context = vm.createContext({
-      console: {
-        log: (...args: unknown[]) => stdoutChunks.push(args.map(String).join(' ') + '\n'),
-        info: (...args: unknown[]) => stdoutChunks.push(args.map(String).join(' ') + '\n'),
-        warn: (...args: unknown[]) => stderrChunks.push(args.map(String).join(' ') + '\n'),
-        error: (...args: unknown[]) => stderrChunks.push(args.map(String).join(' ') + '\n'),
+    const sandboxWindow = new BrowserWindow({
+      show: false,
+      webPreferences: {
+        sandbox: true,
+        contextIsolation: true,
+        nodeIntegration: false,
+        javascript: true,
+        webSecurity: true,
+        session: sandboxSession,
       },
-      fetch: deniedNetworkApi,
-      XMLHttpRequest: function ForbiddenXMLHttpRequest() {
-        denyPolicy(POLICY_DENIED_NETWORK_MESSAGE);
-      },
-      WebSocket: function ForbiddenWebSocket() {
-        denyPolicy(POLICY_DENIED_NETWORK_MESSAGE);
-      },
-      navigator: {
-        sendBeacon: deniedNetworkApi,
-      },
-      window: {
-        open: () => denyPolicy(POLICY_DENIED_NETWORK_MESSAGE),
-        tools: toolsProxy,
-        location: locationProxy,
-      },
-      location: locationProxy,
-      Worker: function ForbiddenWorker() {
-        denyPolicy(POLICY_DENIED_MULTITHREAD_MESSAGE);
-      },
-      SharedWorker: function ForbiddenSharedWorker() {
-        denyPolicy(POLICY_DENIED_MULTITHREAD_MESSAGE);
-      },
-      ServiceWorker: function ForbiddenServiceWorker() {
-        denyPolicy(POLICY_DENIED_MULTITHREAD_MESSAGE);
-      },
-      Worklet: function ForbiddenWorklet() {
-        denyPolicy(POLICY_DENIED_MULTITHREAD_MESSAGE);
-      },
-      setTimeout,
-      clearTimeout,
     });
+    attachSandboxNavigationGuards(sandboxWindow.webContents);
+
+    const destroySandboxWindow = () => {
+      try {
+        if (!sandboxWindow.webContents.isDestroyed()) {
+          sandboxWindow.webContents.forcefullyCrashRenderer();
+        }
+      } catch {
+        // Best effort renderer termination.
+      }
+      if (!sandboxWindow.isDestroyed()) {
+        sandboxWindow.destroy();
+      }
+    };
 
     try {
-      if (signal?.aborted) {
+      if (context.signal.aborted) {
+        destroySandboxWindow();
         return this.finalizeOutput('cancelled', stdoutChunks, stderrChunks);
       }
 
-      const runtimePromise = Promise.resolve(
-        vm.runInContext(`"use strict";\n(async () => {\n${input.code}\n})()`, context, {
-          timeout: input.timeoutMs,
-        })
+      await sandboxWindow.loadURL(
+        `data:text/html;charset=utf-8,${encodeURIComponent(
+          `<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="${SANDBOX_DOCUMENT_CSP}"></head><body></body></html>`
+        )}`
       );
 
-      const result = await this.withAbort(runtimePromise, signal);
-      if (typeof result !== 'undefined') {
-        stdoutChunks.push(`${String(result)}\n`);
+      const executionScript = this.buildSandboxExecutionScript(input.code);
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('code_exec_timeout')), input.timeoutMs);
+      });
+
+      const runtimePromise = sandboxWindow.webContents.executeJavaScript(executionScript, true);
+      const result = await Promise.race([runtimePromise, timeoutPromise]);
+
+      if (context.signal.aborted) {
+        return this.finalizeOutput('cancelled', stdoutChunks, stderrChunks);
       }
 
-      return this.finalizeOutput('success', stdoutChunks, stderrChunks);
+      const normalized = normalizeCodeExecOutput(result);
+      const limited = applyStdStreamLimits(normalized.stdout, normalized.stderr);
+      const remappedError =
+        normalized.error?.code === 'sandbox_runtime_error' &&
+        typeof normalized.error?.message === 'string'
+          ? this.isMemoryLimitError(normalized.error.message)
+            ? {
+                code: 'limit_exceeded' as const,
+                message: `${LIMIT_EXCEEDED_MEMORY_MESSAGE} ${normalized.error.message}`,
+              }
+            : this.isNetworkPolicyLikeError(normalized.error.message)
+              ? {
+                  code: 'policy_denied' as const,
+                  message: POLICY_DENIED_NETWORK_MESSAGE,
+                }
+              : normalized.error
+          : normalized.error;
+      return {
+        ...normalized,
+        stdout: limited.stdout,
+        stderr: limited.stderr,
+        stdout_truncated: limited.stdout_truncated,
+        stderr_truncated: limited.stderr_truncated,
+        ...(remappedError ? { error: remappedError } : {}),
+      };
     } catch (error) {
-      if (signal?.aborted) {
+      if (context.signal.aborted) {
         return this.finalizeOutput('cancelled', stdoutChunks, stderrChunks);
       }
 
       const message = error instanceof Error ? error.message : String(error);
-      if (message.startsWith('policy_denied::')) {
-        const policyMessage = message.replace('policy_denied::', '');
-        const base = this.finalizeOutput('error', stdoutChunks, stderrChunks);
-        return {
-          ...base,
-          error: {
-            code: 'policy_denied',
-            message: policyMessage,
-          },
-        };
-      }
-
-      if (message.includes('Script execution timed out')) {
+      if (message.includes('code_exec_timeout')) {
+        destroySandboxWindow();
         const base = this.finalizeOutput('timeout', stdoutChunks, stderrChunks);
         return {
           ...base,
@@ -215,7 +247,208 @@ export class SandboxSessionManager {
           message,
         },
       };
+    } finally {
+      destroySandboxWindow();
+      void sandboxSession.clearStorageData().catch(() => undefined);
     }
+  }
+
+  // Requirements: code_exec.2.3, code_exec.2.7-2.9, code_exec.3.7
+  private buildSandboxExecutionScript(code: string): string {
+    const escapedCode = JSON.stringify(code);
+    return `
+      (async () => {
+        const POLICY_DENIED_NETWORK_MESSAGE = ${JSON.stringify(POLICY_DENIED_NETWORK_MESSAGE)};
+        const POLICY_DENIED_MULTITHREAD_MESSAGE = ${JSON.stringify(POLICY_DENIED_MULTITHREAD_MESSAGE)};
+        const POLICY_DENIED_MAIN_PIPELINE_TOOL_MESSAGE = ${JSON.stringify(POLICY_DENIED_MAIN_PIPELINE_TOOL_MESSAGE)};
+        const POLICY_DENIED_TOOL_ALLOWLIST_MESSAGE = ${JSON.stringify(POLICY_DENIED_TOOL_ALLOWLIST_MESSAGE)};
+        const MAIN_PIPELINE_ONLY_TOOLS = new Set(['final_answer', 'code_exec']);
+        const SANDBOX_TOOLS_ALLOWLIST = new Set([]);
+        const stdoutChunks = [];
+        const stderrChunks = [];
+
+        const toLine = (args) =>
+          args
+            .map((value) => {
+              if (typeof value === 'string') return value;
+              try {
+                return JSON.stringify(value);
+              } catch {
+                return String(value);
+              }
+            })
+            .join(' ') + '\\n';
+
+        const denyPolicy = (message) => {
+          throw new Error('policy_denied::' + message);
+        };
+        const deniedNetworkApi = () => denyPolicy(POLICY_DENIED_NETWORK_MESSAGE);
+        const ForbiddenWorkerApi = function ForbiddenWorkerApi() {
+          denyPolicy(POLICY_DENIED_MULTITHREAD_MESSAGE);
+        };
+        const toolsProxy = new Proxy(
+          {},
+          {
+            get(_target, property) {
+              if (typeof property !== 'string') {
+                return undefined;
+              }
+              return () => {
+                if (MAIN_PIPELINE_ONLY_TOOLS.has(property)) {
+                  denyPolicy(POLICY_DENIED_MAIN_PIPELINE_TOOL_MESSAGE);
+                }
+                if (!SANDBOX_TOOLS_ALLOWLIST.has(property)) {
+                  denyPolicy(POLICY_DENIED_TOOL_ALLOWLIST_MESSAGE);
+                }
+              };
+            },
+          }
+        );
+
+        const locationProxy = {
+          assign: () => denyPolicy(POLICY_DENIED_NETWORK_MESSAGE),
+          replace: () => denyPolicy(POLICY_DENIED_NETWORK_MESSAGE),
+        };
+        const windowProxy = {
+          open: () => denyPolicy(POLICY_DENIED_NETWORK_MESSAGE),
+          tools: toolsProxy,
+          location: locationProxy,
+          fetch: deniedNetworkApi,
+          XMLHttpRequest: function ForbiddenXMLHttpRequest() {
+            denyPolicy(POLICY_DENIED_NETWORK_MESSAGE);
+          },
+          WebSocket: function ForbiddenWebSocket() {
+            denyPolicy(POLICY_DENIED_NETWORK_MESSAGE);
+          },
+        };
+        const navigatorProxy = {
+          sendBeacon: deniedNetworkApi,
+        };
+        const consoleProxy = {
+          log: (...args) => stdoutChunks.push(toLine(args)),
+          info: (...args) => stdoutChunks.push(toLine(args)),
+          warn: (...args) => stderrChunks.push(toLine(args)),
+          error: (...args) => stderrChunks.push(toLine(args)),
+        };
+        const safeDefine = (target, property, value) => {
+          try {
+            Object.defineProperty(target, property, {
+              configurable: true,
+              writable: true,
+              value,
+            });
+            return;
+          } catch {
+            // Fallback assignment path for configurable globals.
+          }
+          try {
+            target[property] = value;
+          } catch {
+            // Best effort hardening.
+          }
+        };
+        const hardenGlobalApis = () => {
+          safeDefine(globalThis, 'fetch', deniedNetworkApi);
+          safeDefine(globalThis, 'XMLHttpRequest', windowProxy.XMLHttpRequest);
+          safeDefine(globalThis, 'WebSocket', windowProxy.WebSocket);
+          safeDefine(globalThis, 'Worker', ForbiddenWorkerApi);
+          safeDefine(globalThis, 'SharedWorker', ForbiddenWorkerApi);
+          safeDefine(globalThis, 'ServiceWorker', ForbiddenWorkerApi);
+          safeDefine(globalThis, 'Worklet', ForbiddenWorkerApi);
+          safeDefine(globalThis, 'tools', toolsProxy);
+
+          if (typeof globalThis.window === 'object' && globalThis.window) {
+            safeDefine(globalThis.window, 'open', windowProxy.open);
+            safeDefine(globalThis.window, 'fetch', deniedNetworkApi);
+            safeDefine(globalThis.window, 'XMLHttpRequest', windowProxy.XMLHttpRequest);
+            safeDefine(globalThis.window, 'WebSocket', windowProxy.WebSocket);
+            safeDefine(globalThis.window, 'tools', toolsProxy);
+          }
+
+          if (typeof globalThis.location === 'object' && globalThis.location) {
+            safeDefine(globalThis.location, 'assign', locationProxy.assign);
+            safeDefine(globalThis.location, 'replace', locationProxy.replace);
+          }
+
+          if (typeof globalThis.navigator === 'object' && globalThis.navigator) {
+            safeDefine(globalThis.navigator, 'sendBeacon', deniedNetworkApi);
+          }
+        };
+
+        try {
+          hardenGlobalApis();
+          const userCode = ${escapedCode};
+          const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
+          const fn = new AsyncFunction(
+            'console',
+            'window',
+            'location',
+            'fetch',
+            'XMLHttpRequest',
+            'WebSocket',
+            'navigator',
+            'Worker',
+            'SharedWorker',
+            'ServiceWorker',
+            'Worklet',
+            'setTimeout',
+            'clearTimeout',
+            '"use strict";\\n' + userCode
+          );
+          const result = await fn(
+            consoleProxy,
+            windowProxy,
+            locationProxy,
+            deniedNetworkApi,
+            windowProxy.XMLHttpRequest,
+            windowProxy.WebSocket,
+            navigatorProxy,
+            ForbiddenWorkerApi,
+            ForbiddenWorkerApi,
+            ForbiddenWorkerApi,
+            ForbiddenWorkerApi,
+            setTimeout,
+            clearTimeout
+          );
+          if (typeof result !== 'undefined') {
+            stdoutChunks.push(String(result) + '\\n');
+          }
+          return {
+            status: 'success',
+            stdout: stdoutChunks.join(''),
+            stderr: stderrChunks.join(''),
+            stdout_truncated: false,
+            stderr_truncated: false,
+          };
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          if (message.startsWith('policy_denied::')) {
+            return {
+              status: 'error',
+              stdout: stdoutChunks.join(''),
+              stderr: stderrChunks.join(''),
+              stdout_truncated: false,
+              stderr_truncated: false,
+              error: {
+                code: 'policy_denied',
+                message: message.replace('policy_denied::', ''),
+              },
+            };
+          }
+          return {
+            status: 'error',
+            stdout: stdoutChunks.join(''),
+            stderr: stderrChunks.join(''),
+            stdout_truncated: false,
+            stderr_truncated: false,
+            error: {
+              code: 'sandbox_runtime_error',
+              message,
+            },
+          };
+        }
+      })();
+    `;
   }
 
   // Requirements: code_exec.2.11.3, code_exec.3.1.2.3.1
@@ -227,6 +460,46 @@ export class SandboxSessionManager {
       lower.includes('invalid array length') ||
       lower.includes('invalid string length')
     );
+  }
+
+  // Requirements: code_exec.2.3.2
+  private isNetworkPolicyLikeError(message: string): boolean {
+    const lower = message.toLowerCase();
+    return (
+      lower.includes('policy_denied') ||
+      lower.includes('xmlhttprequest') ||
+      lower.includes('websocket') ||
+      lower.includes('sendbeacon') ||
+      lower.includes('network apis are not allowed')
+    );
+  }
+
+  // Requirements: code_exec.2.3.2, code_exec.2.9.1
+  private detectStaticPolicyViolation(code: string): string | null {
+    const networkPatterns = [
+      /\bfetch\s*\(/,
+      /\bXMLHttpRequest\b/,
+      /\bWebSocket\s*\(/,
+      /\bsendBeacon\s*\(/,
+      /\bwindow\.open\s*\(/,
+      /\blocation\.assign\s*\(/,
+      /\blocation\.replace\s*\(/,
+    ];
+    if (networkPatterns.some((pattern) => pattern.test(code))) {
+      return POLICY_DENIED_NETWORK_MESSAGE;
+    }
+
+    const multithreadingPatterns = [
+      /\bnew\s+Worker\s*\(/,
+      /\bnew\s+SharedWorker\s*\(/,
+      /\bServiceWorker\b/,
+      /\bWorklet\b/,
+    ];
+    if (multithreadingPatterns.some((pattern) => pattern.test(code))) {
+      return POLICY_DENIED_MULTITHREAD_MESSAGE;
+    }
+
+    return null;
   }
 
   private finalizeOutput(
@@ -242,31 +515,6 @@ export class SandboxSessionManager {
       stdout_truncated: limited.stdout_truncated,
       stderr_truncated: limited.stderr_truncated,
     };
-  }
-
-  private withAbort<T>(promise: Promise<T>, signal?: AbortSignal): Promise<T> {
-    if (!signal) {
-      return promise;
-    }
-
-    if (signal.aborted) {
-      return Promise.reject(new Error('aborted'));
-    }
-
-    return new Promise<T>((resolve, reject) => {
-      const onAbort = () => reject(new Error('aborted'));
-      signal.addEventListener('abort', onAbort, { once: true });
-
-      promise
-        .then((value) => {
-          signal.removeEventListener('abort', onAbort);
-          resolve(value);
-        })
-        .catch((error) => {
-          signal.removeEventListener('abort', onAbort);
-          reject(error);
-        });
-    });
   }
 }
 
