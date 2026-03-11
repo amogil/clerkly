@@ -21,12 +21,12 @@ UI-визуализация исполнения описывается в `docs
   - управляет lifecycle sandbox на один вызов `code_exec`;
   - создаёт отдельную sandbox-инстанцию на каждый вызов (без reuse между вызовами);
   - реализует timeout, cancel и гарантированную очистку после завершения вызова.
-- **"SandboxBridge" (Preload для sandbox window)**
-  - предоставляет строго ограниченный API;
-  - проксирует только разрешённые вызовы в main IPC.
+- **"SandboxBridge" (Shared policy module)**
+  - хранит централизованный allowlist/policy-правила sandbox tools;
+  - используется runtime и unit-тестами как единый source of truth.
 - **"SandboxRuntime" (Sandbox Renderer)**
   - исполняет JavaScript-код;
-  - собирает `stdout/stderr/error`;
+  - применяет injected runtime hardening (без preload) и собирает `stdout/stderr/error`;
   - возвращает результат в main.
 
 ## Контракт данных
@@ -121,7 +121,7 @@ Lifecycle:
 
 ### Принципы
 
-- sandbox window запускается с `contextIsolation=true`, `nodeIntegration=false`, sandbox-режимом и отдельным preload.
+- sandbox window запускается с `contextIsolation=true`, `nodeIntegration=false`, sandbox-режимом и injected hardening-скриптом (без preload entry).
 - sandbox API ограничен whitelist-методами.
 - любые привилегированные операции валидируются в main process.
 
@@ -144,11 +144,11 @@ Lifecycle:
 2. Navigation hardening:
    - `webContents.setWindowOpenHandler(() => ({ action: 'deny' }))`;
    - обработчики `will-navigate`/`will-redirect` блокируют переходы.
-   - preload/runtime shim перехватывает `window.open`, `location.assign`, `location.replace` и маршрутизирует попытку в bridge как policy-событие;
+   - runtime hardening перехватывает `window.open`, `location.assign`, `location.replace` и нормализует попытку в policy-denied результат;
    - policy-событие нормализуется в terminal результат tool call: `status="error"` + `error.code="policy_denied"` + диагностический `error.message`, без сетевого egress.
 3. Permission hardening:
    - `session.setPermissionRequestHandler` и `setPermissionCheckHandler` возвращают deny для всех permission-based сетевых каналов.
-4. Runtime hardening в preload/sandbox bridge:
+4. Runtime hardening в sandbox injected script:
    - блокировка browser-level API `fetch`, `XMLHttpRequest`, `WebSocket`, `navigator.sendBeacon`;
    - при попытке вызова возвращается контролируемая ошибка `policy_denied`.
 5. CSP:

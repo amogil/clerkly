@@ -1,11 +1,14 @@
 // Requirements: code_exec.2.1-2.2, code_exec.2.7-2.8.2, code_exec.3.4-3.5
 
-const POLICY_DENIED_TOOL_MESSAGE = 'Tool is not allowed in sandbox allowlist.';
-const POLICY_DENIED_MAIN_PIPELINE_TOOL_MESSAGE =
+export const POLICY_DENIED_TOOL_MESSAGE = 'Tool is not allowed in sandbox allowlist.';
+export const POLICY_DENIED_MAIN_PIPELINE_TOOL_MESSAGE =
   'Main-pipeline-only tool is denied in sandbox runtime.';
 
-const MAIN_PIPELINE_ONLY_TOOLS = new Set(['final_answer', 'code_exec']);
-const SANDBOX_TOOLS_ALLOWLIST = new Set<string>([]);
+export const MAIN_PIPELINE_ONLY_TOOL_NAMES = ['final_answer', 'code_exec'] as const;
+export const SANDBOX_TOOLS_ALLOWLIST: readonly string[] = [];
+
+const MAIN_PIPELINE_ONLY_TOOLS = new Set<string>(MAIN_PIPELINE_ONLY_TOOL_NAMES);
+const SANDBOX_TOOLS_ALLOWLIST_SET = new Set<string>(SANDBOX_TOOLS_ALLOWLIST);
 
 export interface SandboxToolPolicyResult {
   ok: boolean;
@@ -22,7 +25,7 @@ export function validateSandboxToolPolicy(toolName: unknown): SandboxToolPolicyR
     return { ok: false, reason: POLICY_DENIED_MAIN_PIPELINE_TOOL_MESSAGE };
   }
 
-  if (!SANDBOX_TOOLS_ALLOWLIST.has(toolName)) {
+  if (!SANDBOX_TOOLS_ALLOWLIST_SET.has(toolName)) {
     return { ok: false, reason: POLICY_DENIED_TOOL_MESSAGE };
   }
 

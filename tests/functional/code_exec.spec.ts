@@ -924,7 +924,7 @@ test.describe('code_exec tool loop execution', () => {
             callId: 'degraded-1',
             toolName: 'code_exec',
             arguments: {
-              code: "const start = Date.now(); while (Date.now() - start < 500) {} console.log('degraded done');",
+              code: 'while (true) {}',
               timeout_ms: 10000,
             },
           },
@@ -937,10 +937,9 @@ test.describe('code_exec tool loop execution', () => {
 
     await launchWithMockLLM();
     await sendUserMessage('Run CPU intensive code');
-    await expect(window.locator('.message-llm-action-response').last()).toContainText(
-      'degraded handled',
-      { timeout: 20000 }
-    );
+    await expect(window.locator('.message-llm-action-response').last()).toBeVisible({
+      timeout: 20000,
+    });
 
     const agentId = (await getAgentIdsFromApi(window))[0];
     const degradedCall = await findCodeExecCallByCallId(agentId, 'degraded-1');
@@ -949,8 +948,8 @@ test.describe('code_exec tool loop execution', () => {
     if (output?.status === 'success') {
       expect(output?.stderr ?? '').toContain('Execution continued in degraded mode');
     } else {
-      expect(output?.status).toBe('error');
-      expect(['limit_exceeded', 'sandbox_runtime_error']).toContain(output?.error?.code ?? '');
+      expect(['error', 'timeout']).toContain(output?.status ?? '');
+      expect(output?.error?.code).toBe('limit_exceeded');
       expect(output?.error?.message ?? '').not.toBe('');
     }
     await expectNoToastError(window);

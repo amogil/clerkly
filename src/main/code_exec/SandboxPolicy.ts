@@ -3,7 +3,7 @@
 import type { Session, WebContents, Event } from 'electron';
 
 export const SANDBOX_DOCUMENT_CSP =
-  "default-src 'none'; script-src 'self'; connect-src 'none'; img-src 'none'; style-src 'none'; frame-src 'none'; object-src 'none';";
+  "default-src 'none'; script-src 'self' 'unsafe-eval'; connect-src 'none'; img-src 'none'; style-src 'none'; frame-src 'none'; object-src 'none';";
 
 // Requirements: code_exec.2.3.1
 export function isBlockedEgressUrl(url: string): boolean {

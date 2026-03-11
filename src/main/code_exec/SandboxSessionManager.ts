@@ -15,17 +15,22 @@ import {
   attachSandboxNavigationGuards,
   attachSandboxSessionPolicies,
 } from './SandboxPolicy';
+import {
+  MAIN_PIPELINE_ONLY_TOOL_NAMES,
+  POLICY_DENIED_MAIN_PIPELINE_TOOL_MESSAGE,
+  POLICY_DENIED_TOOL_MESSAGE,
+  SANDBOX_TOOLS_ALLOWLIST,
+} from './SandboxBridge';
 
 const POLICY_DENIED_NETWORK_MESSAGE =
   'Browser-level network APIs are not allowed in sandbox runtime.';
 const POLICY_DENIED_MULTITHREAD_MESSAGE = 'Multithreading APIs are not allowed in sandbox runtime.';
-const POLICY_DENIED_MAIN_PIPELINE_TOOL_MESSAGE =
-  'Main-pipeline-only tool is denied in sandbox runtime.';
-const POLICY_DENIED_TOOL_ALLOWLIST_MESSAGE = 'Tool is not allowed in sandbox allowlist.';
 const LIMIT_EXCEEDED_MEMORY_MESSAGE = `code_exec memory limit exceeded (${Math.round(
   CODE_EXEC_LIMITS.sandboxMemoryLimitBytes / (1024 * 1024 * 1024)
 )} GiB).`;
 const LIMIT_EXCEEDED_CPU_MESSAGE = `code_exec CPU limit exceeded (${CODE_EXEC_LIMITS.sandboxCpuLimit} vCPU).`;
+const LIMIT_EXCEEDED_DEGRADED_RUNTIME_MESSAGE =
+  'code_exec terminated while running in degraded mode near CPU/RAM limits.';
 const DEGRADED_MODE_STDERR_MESSAGE =
   '[code_exec] Resource pressure detected near CPU/RAM limits. Execution continued in degraded mode.';
 
@@ -122,20 +127,6 @@ export class SandboxSessionManager {
     const stderrChunks: string[] = [];
     let degradedModeApplied = false;
     let hardLimitReason: string | null = null;
-    const staticPolicyError = this.detectStaticPolicyViolation(input.code);
-    if (staticPolicyError) {
-      return {
-        status: 'error',
-        stdout: '',
-        stderr: '',
-        stdout_truncated: false,
-        stderr_truncated: false,
-        error: {
-          code: 'policy_denied',
-          message: staticPolicyError,
-        },
-      };
-    }
 
     const partition = `code_exec_${context.sessionId}`;
     const sandboxSession = session.fromPartition(partition, { cache: false });
@@ -202,9 +193,26 @@ export class SandboxSessionManager {
       const timeoutPromise = new Promise<never>((_, reject) => {
         timeoutHandle = setTimeout(() => reject(new Error('code_exec_timeout')), input.timeoutMs);
       });
+      const abortPromise = new Promise<never>((_, reject) => {
+        const abortNow = () => {
+          destroySandboxWindow();
+          reject(new Error('code_exec_cancelled'));
+        };
+        if (context.signal.aborted) {
+          abortNow();
+          return;
+        }
+        const onAbort = () => abortNow();
+        context.signal.addEventListener('abort', onAbort, { once: true });
+      });
 
       const runtimePromise = sandboxWindow.webContents.executeJavaScript(executionScript, true);
-      const result = await Promise.race([runtimePromise, timeoutPromise, resourceLimitPromise]);
+      const result = await Promise.race([
+        runtimePromise,
+        timeoutPromise,
+        resourceLimitPromise,
+        abortPromise,
+      ]);
 
       if (context.signal.aborted) {
         return this.finalizeOutput('cancelled', stdoutChunks, stderrChunks);
@@ -220,6 +228,11 @@ export class SandboxSessionManager {
                 code: 'limit_exceeded' as const,
                 message: `${LIMIT_EXCEEDED_MEMORY_MESSAGE} ${normalized.error.message}`,
               }
+            : degradedModeApplied
+              ? {
+                  code: 'limit_exceeded' as const,
+                  message: LIMIT_EXCEEDED_DEGRADED_RUNTIME_MESSAGE,
+                }
             : this.isNetworkPolicyLikeError(normalized.error.message)
               ? {
                   code: 'policy_denied' as const,
@@ -273,6 +286,9 @@ export class SandboxSessionManager {
           },
         };
       }
+      if (message.includes('code_exec_cancelled')) {
+        return this.finalizeOutput('cancelled', stdoutChunks, stderrChunks);
+      }
       if (this.isMemoryLimitError(message)) {
         const base = this.finalizeOutput('error', stdoutChunks, stderrChunks);
         return {
@@ -280,6 +296,16 @@ export class SandboxSessionManager {
           error: {
             code: 'limit_exceeded',
             message: `${LIMIT_EXCEEDED_MEMORY_MESSAGE} ${message}`,
+          },
+        };
+      }
+      if (degradedModeApplied) {
+        const base = this.finalizeOutput('error', stdoutChunks, stderrChunks);
+        return {
+          ...base,
+          error: {
+            code: 'limit_exceeded',
+            message: LIMIT_EXCEEDED_DEGRADED_RUNTIME_MESSAGE,
           },
         };
       }
@@ -310,9 +336,9 @@ export class SandboxSessionManager {
         const POLICY_DENIED_NETWORK_MESSAGE = ${JSON.stringify(POLICY_DENIED_NETWORK_MESSAGE)};
         const POLICY_DENIED_MULTITHREAD_MESSAGE = ${JSON.stringify(POLICY_DENIED_MULTITHREAD_MESSAGE)};
         const POLICY_DENIED_MAIN_PIPELINE_TOOL_MESSAGE = ${JSON.stringify(POLICY_DENIED_MAIN_PIPELINE_TOOL_MESSAGE)};
-        const POLICY_DENIED_TOOL_ALLOWLIST_MESSAGE = ${JSON.stringify(POLICY_DENIED_TOOL_ALLOWLIST_MESSAGE)};
-        const MAIN_PIPELINE_ONLY_TOOLS = new Set(['final_answer', 'code_exec']);
-        const SANDBOX_TOOLS_ALLOWLIST = new Set([]);
+        const POLICY_DENIED_TOOL_ALLOWLIST_MESSAGE = ${JSON.stringify(POLICY_DENIED_TOOL_MESSAGE)};
+        const MAIN_PIPELINE_ONLY_TOOLS = new Set(${JSON.stringify(MAIN_PIPELINE_ONLY_TOOL_NAMES)});
+        const SANDBOX_TOOLS_ALLOWLIST = new Set(${JSON.stringify(SANDBOX_TOOLS_ALLOWLIST)});
         const stdoutChunks = [];
         const stderrChunks = [];
 
@@ -622,34 +648,6 @@ export class SandboxSessionManager {
       stdout_truncated: limited.stdout_truncated,
       stderr_truncated: limited.stderr_truncated,
     };
-  }
-
-  // Requirements: code_exec.2.3.2, code_exec.2.9.1
-  private detectStaticPolicyViolation(code: string): string | null {
-    const networkPatterns = [
-      /\bfetch\s*\(/,
-      /\bXMLHttpRequest\b/,
-      /\bWebSocket\s*\(/,
-      /\bsendBeacon\s*\(/,
-      /\bwindow\.open\s*\(/,
-      /\blocation\.assign\s*\(/,
-      /\blocation\.replace\s*\(/,
-    ];
-    if (networkPatterns.some((pattern) => pattern.test(code))) {
-      return POLICY_DENIED_NETWORK_MESSAGE;
-    }
-
-    const multithreadingPatterns = [
-      /\bnew\s+Worker\s*\(/,
-      /\bnew\s+SharedWorker\s*\(/,
-      /\bServiceWorker\b/,
-      /\bWorklet\b/,
-    ];
-    if (multithreadingPatterns.some((pattern) => pattern.test(code))) {
-      return POLICY_DENIED_MULTITHREAD_MESSAGE;
-    }
-
-    return null;
   }
 
   private finalizeOutput(

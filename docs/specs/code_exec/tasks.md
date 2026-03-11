@@ -42,7 +42,7 @@
 - ✅ Добавлены functional-сценарии browser-level egress deny для `fetch`/`XMLHttpRequest`/`WebSocket`/`navigator.sendBeacon` без исходящего запроса.
 - ✅ Добавлен сценарий `limit_exceeded` для memory-heavy `code_exec` с продолжением pipeline.
 - ✅ Обновлены `SandboxSessionManager` и unit-тесты для нормализации memory-limit ошибок в `error.code=limit_exceeded`.
-- ✅ Синхронизированы `code_exec` requirements/design с фактической реализацией lifecycle и resource-limit semantics (без несуществующего monitor/throttle loop).
+- ✅ Синхронизированы `code_exec` requirements/design с фактической реализацией lifecycle и resource-limit semantics.
 - ✅ Запущен `npm run validate` (успешно).
 - ✅ Закрыт reviewer comment по `invalid_tool_arguments`: зафиксировано, что `code_exec` не запускается, `tool_call(code_exec)` не создаётся и ошибка возвращается как model response validation error.
 - ✅ Унифицирован invalid-tool-args flow в `MainPipeline`: validation-feedback передаётся модели на retry, persisted `tool_call` не создаётся для невалидных аргументов, при исчерпании retry создаётся только `kind:error`.
