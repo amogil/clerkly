@@ -2,8 +2,18 @@
 
 import type { Session, WebContents, Event } from 'electron';
 
-export const SANDBOX_DOCUMENT_CSP =
-  "default-src 'none'; script-src 'self' 'unsafe-eval'; connect-src 'none'; img-src 'none'; style-src 'none'; frame-src 'none'; object-src 'none';";
+const SANDBOX_DOCUMENT_CSP_DIRECTIVES = [
+  "default-src 'none'",
+  // executeJavaScript relies on eval-like execution in isolated sandbox world.
+  "script-src 'self' 'unsafe-eval'",
+  "connect-src 'none'",
+  "img-src 'none'",
+  "style-src 'none'",
+  "frame-src 'none'",
+  "object-src 'none'",
+] as const;
+
+export const SANDBOX_DOCUMENT_CSP = `${SANDBOX_DOCUMENT_CSP_DIRECTIVES.join('; ')};`;
 
 // Requirements: code_exec.2.3.1
 export function isBlockedEgressUrl(url: string): boolean {
