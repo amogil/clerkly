@@ -6,7 +6,53 @@ const path = require('node:path');
 
 const PLACEHOLDER = '__CLERKLY_OAUTH_CLIENT_SECRET__';
 const targetPath = path.resolve(__dirname, '../dist/main/main/auth/OAuthConfig.js');
-const clientSecret = process.env.CLERKLY_OAUTH_CLIENT_SECRET;
+const dotenvPath = path.resolve(__dirname, '../.env');
+
+function readEnvValueFromDotEnv(envFilePath, key) {
+  if (!fs.existsSync(envFilePath)) {
+    return '';
+  }
+  const content = fs.readFileSync(envFilePath, 'utf8');
+  const lines = content.split(/\r?\n/);
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith('#')) {
+      continue;
+    }
+
+    const separatorIndex = line.indexOf('=');
+    if (separatorIndex <= 0) {
+      continue;
+    }
+
+    const envKey = line.slice(0, separatorIndex).trim();
+    if (envKey !== key) {
+      continue;
+    }
+
+    let value = line.slice(separatorIndex + 1).trim();
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      value = value.slice(1, -1);
+    }
+    return value;
+  }
+
+  return '';
+}
+
+let clientSecret = process.env.CLERKLY_OAUTH_CLIENT_SECRET || '';
+if (!clientSecret) {
+  const secretFromDotEnv = readEnvValueFromDotEnv(dotenvPath, 'CLERKLY_OAUTH_CLIENT_SECRET');
+  if (secretFromDotEnv) {
+    process.env.CLERKLY_OAUTH_CLIENT_SECRET = secretFromDotEnv;
+    clientSecret = secretFromDotEnv;
+    console.log('[inject-oauth-client-secret] Loaded CLERKLY_OAUTH_CLIENT_SECRET from .env');
+  }
+}
 
 if (!fs.existsSync(targetPath)) {
   console.warn(`[inject-oauth-client-secret] Skipped: file not found: ${targetPath}`);
@@ -14,10 +60,10 @@ if (!fs.existsSync(targetPath)) {
 }
 
 if (!clientSecret) {
-  console.warn(
-    '[inject-oauth-client-secret] CLERKLY_OAUTH_CLIENT_SECRET is not set. Placeholder was left in build output.'
+  console.error(
+    '[inject-oauth-client-secret] CLERKLY_OAUTH_CLIENT_SECRET is not set in process.env and was not found in .env. Build cannot continue.'
   );
-  process.exit(0);
+  process.exit(1);
 }
 
 const content = fs.readFileSync(targetPath, 'utf8');

@@ -596,7 +596,7 @@ export class MainPipeline {
           error: makeCodeExecError('internal_error', 'code_exec failed.').error,
         };
       }
-      return { ...normalized, status } as Record<string, unknown>;
+      return { ...normalized } as Record<string, unknown>;
     }
 
     const safeOutput = output ?? `Tool "${toolName}" is not available.`;

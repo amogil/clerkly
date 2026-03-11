@@ -418,25 +418,27 @@
 
 #### Критерии Приемки
 
-11.1. КОГДА модель запрашивает вызов инструмента, ТО `MainPipeline` ДОЛЖЕН дождаться полной сборки аргументов и сохранить/обновить сообщение `kind: tool_call` в `messages`.
+11.1. КОГДА модель запрашивает вызов инструмента, ТО `MainPipeline` ДОЛЖЕН дождаться полной сборки аргументов и выполнить schema/contract validation до создания persisted `kind: tool_call`.
 
 11.1.1. КОГДА в одном turn присутствуют и стриминг основного ответа (`reasoning`/`text`), и `tool_call`, ТО обработка `tool_call` в chat-flow ДОЛЖНА выполняться только после финализации основного `kind: llm` сообщения (`done = true`).
 
 11.1.2. ПОКА основной `kind: llm` ответ текущего turn не финализирован, persisted `kind: tool_call` сообщения этого turn НЕ ДОЛЖНЫ создаваться/обновляться в БД.
 
-11.2. При обработке tool call система ДОЛЖНА создавать/обновлять persisted сообщение `kind: tool_call` с полями `callId`, `toolName`, полностью собранными `arguments` и результатом выполнения.
+11.2. При обработке валидного tool call система ДОЛЖНА создавать/обновлять persisted сообщение `kind: tool_call` с полями `callId`, `toolName`, полностью собранными `arguments` и результатом выполнения.
 
 11.2.1. Для `final_answer` инструмент ДОЛЖЕН вызываться в strict-режиме через `Vercel AI SDK`; соблюдение контракта аргументов (`llm-integration.9.5.*`) ДОЛЖНО обеспечиваться схемой инструмента и встроенным retry/repair механизмом SDK.
 
 11.2.2. КОГДА `tool_call` имеет `toolName = "code_exec"`, ТО обработка ДОЛЖНА выполняться через тот же pipeline `kind: tool_call` (без отдельного `kind`) с форматом полей `callId/toolName/arguments/output`; детальный контракт аргументов/результата задаётся в `code_exec.3.*` и `code_exec.4.*`.
 
-11.2.3. КОГДА аргументы любого `tool_call` не проходят schema/contract validation, система ДОЛЖНА вернуть модели диагностику невалидных аргументов и выполнить bounded retry/repair инструмента в рамках текущего turn.
+11.2.3. КОГДА аргументы любого `tool_call` не проходят schema/contract validation, система ДОЛЖНА вернуть модели диагностику невалидных аргументов и выполнить bounded retry/repair инструмента в рамках текущего turn без создания persisted `kind: tool_call`.
 
 11.2.3.1. Retry/repair для невалидных аргументов tool call ДОЛЖЕН быть ограничен конечным числом попыток: `maxRetries = 2`.
 
 11.2.3.2. ЕСЛИ после исчерпания retry/repair аргументы остаются невалидными, turn ДОЛЖЕН завершаться обычной ошибкой модели (`kind: error` в чате), а НЕ terminal-ошибкой `tool_call`.
 
-11.3. Выполнение инструмента ДОЛЖНО сопровождаться сохранением сообщения `kind: tool_call` в `messages`; отображение этих сообщений определяется спецификацией `agents`.
+11.2.3.3. Для невалидных аргументов любого `tool_call` запись `kind: tool_call` НЕ ДОЛЖНА создаваться или обновляться в `messages` на любом шаге retry/repair.
+
+11.3. Выполнение валидного инструмента ДОЛЖНО сопровождаться сохранением сообщения `kind: tool_call` в `messages`; отображение этих сообщений определяется спецификацией `agents`.
 
 11.3.1. Сообщения `kind: tool_call` ДОЛЖНЫ сохраняться в истории сообщений и ДОЛЖНЫ включаться в model history (`PromptBuilder`/`listForModelHistory`) как результаты вызова инструментов для последующих шагов модели.
 
@@ -472,7 +474,7 @@
 
 - `tests/functional/llm-chat.spec.ts` — "full llm response streams before final_answer block appears"
 - `tests/functional/llm-chat.spec.ts` — "tool_call block is not persisted/visible before llm done for the same turn"
-- `tests/functional/llm-chat.spec.ts` — "should retry tool call on invalid arguments and show kind:error after retry limit"
+- `tests/functional/llm-chat.spec.ts` — "should retry tool call on invalid arguments, not persist tool_call, and show kind:error after retry limit"
 - `tests/functional/llm-chat.spec.ts` — "should include terminal code_exec tool_call result in subsequent model history"
 - `tests/functional/llm-chat.spec.ts` — "should include terminal final_answer tool_call result in subsequent model history"
 - `tests/functional/llm-chat.spec.ts` — "should continue model loop immediately after terminal tool_call result regardless of status"

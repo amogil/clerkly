@@ -282,7 +282,7 @@ CREATE TABLE messages (
 3) На каждом чанке обновляет payload `kind: llm`.
 4) `tool_call`/`tool_result` чанки текущего turn (включая `toolName='code_exec'`) буферизуются в памяти до финализации `kind: llm`.
 5) На завершении turn сначала финализирует `kind: llm` (`done: 1`).
-6) После финализации `kind: llm` сохраняет buffered `kind: tool_call` для этого turn.
+6) После финализации `kind: llm` сохраняет buffered `kind: tool_call` только для вызовов, прошедших schema/contract validation.
 7) Отдельно сохраняет `usage_json` (если есть).
 8) Для каждого terminal `tool_call` результата (`success|error|timeout|cancelled`) pipeline немедленно формирует следующий вызов `model` в цикле `model -> tools -> model` с передачей этого результата в history как AI SDK `tool-result`.
 
@@ -530,7 +530,7 @@ class MainPipeline {
     if chunk.type == 'tool_call':
       добавляет tool call в буфер текущего turn (без persist в БД до финализации `kind:llm`)
     if llmMessageId уже существовал до этого чанка: эмитит `message.updated` (snapshot/consistency)
-7. После успешного завершения `provider.chat(...)` обновляет `kind: llm` (`done: true`), затем flush-ит буфер tool call в persisted `kind: tool_call` (в текущем scope: `toolName='final_answer'` и `toolName='code_exec'`; для `code_exec` при недоступном execution допускается заглушка результата), затем сохраняет `usage_json` отдельным шагом
+7. После успешного завершения `provider.chat(...)` обновляет `kind: llm` (`done: true`), затем flush-ит буфер tool call в persisted `kind: tool_call` только для валидных вызовов (в текущем scope: `toolName='final_answer'` и `toolName='code_exec'`; для `code_exec` при недоступном execution допускается заглушка результата), затем сохраняет `usage_json` отдельным шагом
 8. Если последним видимым сообщением стал `kind: tool_call` с `toolName='final_answer'` и `done=true`, `AgentManager.computeAgentStatus()` возвращает `completed`
 9. Эмитит финальный `message.updated`
 ```
@@ -538,6 +538,7 @@ class MainPipeline {
 **Валидация аргументов tool call (общий контракт):**
 - Перед фактическим исполнением любого инструмента `MainPipeline` валидирует аргументы по schema/contract.
 - При невалидных аргументах pipeline возвращает модели диагностику ошибки валидации и запускает bounded retry/repair в рамках текущего turn (`maxRetries = 2`).
+- При невалидных аргументах persisted `kind: tool_call` не создаётся и не обновляется на всех попытках retry/repair.
 - Если после исчерпания retry/repair аргументы остаются невалидными, `MainPipeline` завершает turn через обычное `kind:error` сообщение (без terminal-ошибки `tool_call`).
 
 **Обработка ошибок:**
@@ -713,7 +714,7 @@ User отправляет сообщение
 - `tests/functional/llm-chat.spec.ts` — "should exclude error messages from llm history"
 - `tests/functional/llm-chat.spec.ts` — "full llm response streams before final_answer block appears"
 - `tests/functional/llm-chat.spec.ts` — "tool_call block is not persisted/visible before llm done for the same turn"
-- `tests/functional/llm-chat.spec.ts` — "should retry tool call on invalid arguments and show kind:error after retry limit"
+- `tests/functional/llm-chat.spec.ts` — "should retry tool call on invalid arguments, not persist tool_call, and show kind:error after retry limit"
 - `tests/functional/llm-chat.spec.ts` — "should include terminal code_exec tool_call result in subsequent model history"
 - `tests/functional/llm-chat.spec.ts` — "should include terminal final_answer tool_call result in subsequent model history"
 - `tests/functional/llm-chat.spec.ts` — "should continue model loop immediately after terminal tool_call result regardless of status"

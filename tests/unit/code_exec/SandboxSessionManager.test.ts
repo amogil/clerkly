@@ -1,6 +1,8 @@
 // Requirements: code_exec.1.5, code_exec.2, code_exec.3.7
 
 jest.mock('electron', () => {
+  const getAppMetrics = jest.fn(() => []);
+
   class MockBrowserWindow {
     private destroyed = false;
 
@@ -19,7 +21,9 @@ jest.mock('electron', () => {
       isDestroyed: jest.fn(() => this.destroyed),
       forcefullyCrashRenderer: jest.fn(),
       setWindowOpenHandler: jest.fn(),
+      setBackgroundThrottling: jest.fn(),
       on: jest.fn(),
+      getOSProcessId: jest.fn(() => 4242),
     };
 
     async loadURL(): Promise<void> {
@@ -36,6 +40,9 @@ jest.mock('electron', () => {
   }
 
   return {
+    app: {
+      getAppMetrics,
+    },
     BrowserWindow: MockBrowserWindow,
     session: {
       fromPartition: jest.fn(() => ({
@@ -50,6 +57,7 @@ jest.mock('electron', () => {
   };
 });
 
+import { app } from 'electron';
 import { SandboxSessionManager } from '../../../src/main/code_exec/SandboxSessionManager';
 import {
   normalizeCodeExecOutput,
@@ -57,6 +65,10 @@ import {
 } from '../../../src/main/code_exec/SandboxSessionManager';
 
 describe('SandboxSessionManager.execute', () => {
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
   it('executes code and captures stdout', async () => {
     const manager = new SandboxSessionManager();
     const result = await manager.execute('agent-1', 'call-1', {
@@ -201,6 +213,46 @@ describe('SandboxSessionManager.execute', () => {
     const result = await promise;
     expect(result.status).toBe('cancelled');
   });
+
+  it('adds degraded-mode diagnostic to stderr when near resource limits', async () => {
+    const getAppMetricsMock = app.getAppMetrics as jest.Mock;
+    getAppMetricsMock.mockReturnValue([
+      {
+        pid: 4242,
+        cpu: { percentCPUUsage: 95 },
+        memory: { workingSetSize: 1024 * 1024 },
+      },
+    ]);
+
+    const manager = new SandboxSessionManager();
+    const result = await manager.execute('agent-1', 'call-1', {
+      code: 'await new Promise((resolve) => setTimeout(resolve, 250)); console.log("ok")',
+    });
+
+    expect(result.status).toBe('success');
+    expect(result.stderr).toContain('degraded mode');
+  });
+
+  it('returns limit_exceeded when hard CPU limit is exceeded', async () => {
+    const getAppMetricsMock = app.getAppMetrics as jest.Mock;
+    getAppMetricsMock.mockReturnValue([
+      {
+        pid: 4242,
+        cpu: { percentCPUUsage: 140 },
+        memory: { workingSetSize: 1024 * 1024 },
+      },
+    ]);
+
+    const manager = new SandboxSessionManager();
+    const result = await manager.execute('agent-1', 'call-1', {
+      code: 'await new Promise((resolve) => setTimeout(resolve, 250)); console.log("ok")',
+      timeout_ms: 10000,
+    });
+
+    expect(result.status).toBe('error');
+    expect(result.error?.code).toBe('limit_exceeded');
+    expect(result.error?.message ?? '').toContain('CPU limit exceeded');
+  });
 });
 
 describe('SandboxSessionManager.shutdown', () => {
@@ -269,5 +321,152 @@ describe('code_exec helpers', () => {
       code: '',
       timeout_ms: undefined,
     });
+  });
+});
+
+describe('SandboxSessionManager private helpers', () => {
+  afterEach(() => {
+    jest.useRealTimers();
+    jest.clearAllMocks();
+  });
+
+  it('returns output unchanged when degraded mode is disabled', () => {
+    const manager = new SandboxSessionManager();
+    const output = {
+      status: 'success' as const,
+      stdout: 'ok',
+      stderr: '',
+      stdout_truncated: false,
+      stderr_truncated: false,
+    };
+
+    const result = (
+      manager as unknown as {
+        appendDegradedDiagnostic: (
+          out: typeof output,
+          degradedModeApplied: boolean
+        ) => typeof output;
+      }
+    ).appendDegradedDiagnostic(output, false);
+
+    expect(result).toEqual(output);
+  });
+
+  it('does not append degraded diagnostic for limit_exceeded errors', () => {
+    const manager = new SandboxSessionManager();
+    const output = {
+      status: 'error' as const,
+      stdout: '',
+      stderr: 'original\n',
+      stdout_truncated: false,
+      stderr_truncated: false,
+      error: {
+        code: 'limit_exceeded' as const,
+        message: 'limit',
+      },
+    };
+
+    const result = (
+      manager as unknown as {
+        appendDegradedDiagnostic: (
+          out: typeof output,
+          degradedModeApplied: boolean
+        ) => typeof output;
+      }
+    ).appendDegradedDiagnostic(output, true);
+
+    expect(result).toEqual(output);
+  });
+
+  it('resource monitor returns early for invalid PID and can be stopped twice safely', () => {
+    jest.useFakeTimers();
+    const onNearLimit = jest.fn();
+    const onHardLimitExceeded = jest.fn();
+    const getAppMetricsMock = app.getAppMetrics as jest.Mock;
+    getAppMetricsMock.mockReturnValue([
+      { pid: 4242, cpu: { percentCPUUsage: 200 }, memory: { workingSetSize: 4 * 1024 * 1024 } },
+    ]);
+
+    const manager = new SandboxSessionManager();
+    const stop = (
+      manager as unknown as {
+        startResourceMonitor: (params: {
+          sandboxWindow: {
+            isDestroyed: () => boolean;
+            webContents: {
+              isDestroyed: () => boolean;
+              getOSProcessId: () => number;
+              setBackgroundThrottling: (value: boolean) => void;
+            };
+          };
+          signal: AbortSignal;
+          onNearLimit: () => void;
+          onHardLimitExceeded: (reason: string) => void;
+        }) => () => void;
+      }
+    ).startResourceMonitor({
+      sandboxWindow: {
+        isDestroyed: () => false,
+        webContents: {
+          isDestroyed: () => false,
+          getOSProcessId: () => 0,
+          setBackgroundThrottling: jest.fn(),
+        },
+      },
+      signal: new AbortController().signal,
+      onNearLimit,
+      onHardLimitExceeded,
+    });
+
+    jest.advanceTimersByTime(1000);
+    expect(onNearLimit).not.toHaveBeenCalled();
+    expect(onHardLimitExceeded).not.toHaveBeenCalled();
+
+    stop();
+    stop();
+  });
+
+  it('resource monitor returns early when process metrics for PID are absent', () => {
+    jest.useFakeTimers();
+    const onNearLimit = jest.fn();
+    const onHardLimitExceeded = jest.fn();
+    const getAppMetricsMock = app.getAppMetrics as jest.Mock;
+    getAppMetricsMock.mockReturnValue([]);
+
+    const manager = new SandboxSessionManager();
+    const stop = (
+      manager as unknown as {
+        startResourceMonitor: (params: {
+          sandboxWindow: {
+            isDestroyed: () => boolean;
+            webContents: {
+              isDestroyed: () => boolean;
+              getOSProcessId: () => number;
+              setBackgroundThrottling: (value: boolean) => void;
+            };
+          };
+          signal: AbortSignal;
+          onNearLimit: () => void;
+          onHardLimitExceeded: (reason: string) => void;
+        }) => () => void;
+      }
+    ).startResourceMonitor({
+      sandboxWindow: {
+        isDestroyed: () => false,
+        webContents: {
+          isDestroyed: () => false,
+          getOSProcessId: () => 4242,
+          setBackgroundThrottling: jest.fn(),
+        },
+      },
+      signal: new AbortController().signal,
+      onNearLimit,
+      onHardLimitExceeded,
+    });
+
+    jest.advanceTimersByTime(1000);
+    expect(onNearLimit).not.toHaveBeenCalled();
+    expect(onHardLimitExceeded).not.toHaveBeenCalled();
+    stop();
   });
 });

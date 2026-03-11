@@ -117,12 +117,13 @@
 - `tests/functional/code_exec.spec.ts` — "should allow only tools from sandbox allowlist"
 - `tests/functional/code_exec.spec.ts` — "should deny browser-level network APIs (fetch/xhr/websocket/sendBeacon/navigation) with policy_denied"
 - `tests/functional/code_exec.spec.ts` — "should stop sandbox execution on app close without hanging shutdown"
-- `tests/functional/code_exec.spec.ts` — "should enforce sandbox CPU and memory limits"
+- `tests/functional/code_exec.spec.ts` — "should return limit_exceeded for memory-heavy code_exec and continue loop"
+- `tests/functional/code_exec.spec.ts` — "should surface resource-monitor diagnostics or limit_exceeded under CPU pressure"
 
 #### Модульные Тесты
 
 - `tests/unit/code_exec/SandboxBridge.test.ts` — "should enforce allowlist and return policy_denied for forbidden APIs"
-- `tests/unit/code_exec/SandboxRuntime.test.ts` — "should deny multithreading APIs and collect stdout/stderr separately"
+- `tests/unit/code_exec/SandboxSessionManager.test.ts` — "should deny multithreading APIs and capture stdout/stderr output channels"
 - `tests/unit/code_exec/SandboxSessionManager.test.ts` — "should enforce timeout/cancel/cleanup and shutdown forced-kill fallback"
 
 ### 3. Контракт bridge API для модели
@@ -160,9 +161,10 @@
 3.1.2.2. Поле `error.code` ДОЛЖНО использовать фиксированный словарь значений:
   - `policy_denied` — нарушение sandbox policy/allowlist;
   - `sandbox_runtime_error` — ошибка исполнения JavaScript-кода в sandbox;
-  - `invalid_tool_arguments` — невалидные входные аргументы инструмента;
   - `limit_exceeded` — превышение операционных лимитов (размер/ресурсы/время);
   - `internal_error` — внутренняя ошибка исполнения/bridge/pipeline.
+
+3.1.2.2.1. `invalid_tool_arguments` НЕ ДОЛЖЕН появляться в `output.error.code` для `code_exec`, так как при невалидных аргументах `code_exec` не запускается и persisted `tool_call(code_exec)` не создаётся (см. `llm-integration.11.2.3.*`).
 
 3.1.2.3. Поле `error.message` ДОЛЖНО быть человекочитаемым и достаточным для диагностики причины ошибки моделью.
 
@@ -253,7 +255,13 @@ return await window.api.saveData('x', 'y');
 
 4.5.1. КОГДА вызов `code_exec` завершён со статусом `cancelled`, persisted `tool_call(code_exec)` ДОЛЖЕН оставаться видимым в истории и его результат ДОЛЖЕН передаваться модели в последующей работе согласно правилам `llm-integration.11.3.1`.
 
-4.6. ПОКА `code_exec` находится в состоянии `status = "running"`, система ДОЛЖНА поддерживать актуальность runtime через `message.updated` (heartbeat/progress update).
+4.6. КОГДА выполнение `code_exec` фактически запущено в sandbox runtime, ТО lifecycle-запись `tool_call(code_exec)` ДОЛЖНА начинаться со статуса `running` и публиковаться через `message.created` до terminal `message.updated`.
+
+4.6.1. Для фактически запущенного `code_exec` единственный допустимый начальный status — `running`.
+
+4.6.2. ЕСЛИ у вызова `code_exec` обнаружены `invalid_tool_arguments` на этапе валидации ответа модели, ТО `code_exec` НЕ ДОЛЖЕН запускаться, persisted `tool_call(code_exec)` НЕ ДОЛЖЕН создаваться (запись `code_exec` НЕ ДОЛЖНА появляться в чате), а pipeline ДОЛЖЕН вернуть ошибку ответа модели (model response validation error) в стандартном error-потоке сообщений.
+
+4.6.3. Статусы `success | error | timeout | cancelled` НЕ ДОЛЖНЫ использоваться как начальный status lifecycle-записи `tool_call(code_exec)`, поскольку они обозначают уже завершённое исполнение.
 
 4.7. Audit-поля lifecycle ДОЛЖНЫ быть монотонными:
   - `started_at` фиксируется один раз при старте и далее НЕ ДОЛЖЕН изменяться;
@@ -262,7 +270,7 @@ return await window.api.saveData('x', 'y');
 
 4.8. После перехода `code_exec` в terminal-состояние (`success | error | timeout | cancelled`) дальнейшие изменения `output.status` для этого вызова НЕ ДОЛЖНЫ выполняться.
 
-4.9. После перехода `tool_call(code_exec)` в любой terminal-статус (`success | error | timeout | cancelled`) для него НЕ ДОЛЖНЫ публиковаться дальнейшие `message.updated` heartbeat/progress апдейты.
+4.9. После перехода `tool_call(code_exec)` в любой terminal-статус (`success | error | timeout | cancelled`) для него НЕ ДОЛЖНЫ публиковаться дальнейшие lifecycle `message.updated`.
 
 #### Функциональные Тесты
 

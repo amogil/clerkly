@@ -747,7 +747,12 @@ export const OAUTH_CONFIG = {
 } as const;
 ```
 
-`client_secret` должен поступать из переменной окружения `CLERKLY_OAUTH_CLIENT_SECRET` на этапе сборки: build-скрипт заменяет placeholder `__CLERKLY_OAUTH_CLIENT_SECRET__` в собранном `OAuthConfig.js`. Хардкод секрета в исходниках не допускается.
+`client_secret` должен поступать из `CLERKLY_OAUTH_CLIENT_SECRET` на этапе сборки: build-скрипт заменяет placeholder `__CLERKLY_OAUTH_CLIENT_SECRET__` в собранном `OAuthConfig.js`. Хардкод секрета в исходниках не допускается.
+
+Правила build-time инжекции секрета:
+- сначала используется `process.env.CLERKLY_OAUTH_CLIENT_SECRET`;
+- если переменная не задана, скрипт пытается прочитать значение из `.env` в корне проекта;
+- если значение отсутствует в обоих источниках, сборка завершается с ошибкой (ненулевой код выхода).
 
 **Важно:** При формировании `redirect_uri` из Client ID, функция `getOAuthConfig()` автоматически удаляет суффикс `.apps.googleusercontent.com` если он присутствует в Client ID, чтобы избежать дублирования в итоговом URL:
 
@@ -946,7 +951,7 @@ const effectiveRedirectUri = `com.googleusercontent.apps.${clientIdWithoutSuffix
 
 **Требование 10: Конфигурация OAuth**
 
-10.1-10.6 Конфигурационные параметры
+10.1-10.9 Конфигурационные параметры
   Мысли: Это управление конфигурацией. Это детали реализации.
   Тестируемость: нет
 
@@ -1477,6 +1482,9 @@ logger.error(`${operation} failed: ${error.message}`, {
 | google-oauth-auth.10.4 | ✓ | - |
 | google-oauth-auth.10.5 | ✓ | - |
 | google-oauth-auth.10.6 | ✓ | - |
+| google-oauth-auth.10.7 | ✓ | - |
+| google-oauth-auth.10.8 | ✓ | - |
+| google-oauth-auth.10.9 | ✓ | - |
 | google-oauth-auth.11.1 | ✓ | ✓ |
 | google-oauth-auth.11.2 | ✓ | ✓ |
 | google-oauth-auth.11.3 | ✓ | ✓ |

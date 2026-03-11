@@ -912,6 +912,51 @@ test.describe('code_exec tool loop execution', () => {
     await expectNoToastError(window);
   });
 
+  /* Preconditions: mock model emits CPU-intensive code_exec that can finish under timeout
+     Action: user sends a message
+     Assertions: resource monitor surfaces either degraded-mode diagnostic in stderr or controlled limit_exceeded
+     Requirements: code_exec.2.11.2, code_exec.2.11.4 */
+  test('should surface resource-monitor diagnostics or limit_exceeded under CPU pressure', async () => {
+    mockLLMServer.setStreamingMode(true);
+    mockLLMServer.setOpenAIStreamScripts([
+      {
+        toolCalls: [
+          {
+            callId: 'degraded-1',
+            toolName: 'code_exec',
+            arguments: {
+              code: "const start = Date.now(); while (Date.now() - start < 500) {} console.log('degraded done');",
+              timeout_ms: 10000,
+            },
+          },
+        ],
+      },
+      {
+        content: '{"action":{"type":"text","content":"degraded handled"}}',
+      },
+    ]);
+
+    await launchWithMockLLM();
+    await sendUserMessage('Run CPU intensive code');
+    await expect(window.locator('.message-llm-action-response').last()).toContainText(
+      'degraded handled',
+      { timeout: 20000 }
+    );
+
+    const agentId = (await getAgentIdsFromApi(window))[0];
+    const degradedCall = await findCodeExecCallByCallId(agentId, 'degraded-1');
+    const output = degradedCall?.payload?.data?.output;
+    expect(output).toBeDefined();
+    if (output?.status === 'success') {
+      expect(output?.stderr ?? '').toContain('Execution continued in degraded mode');
+    } else {
+      expect(output?.status).toBe('error');
+      expect(['limit_exceeded', 'sandbox_runtime_error']).toContain(output?.error?.code ?? '');
+      expect(output?.error?.message ?? '').not.toBe('');
+    }
+    await expectNoToastError(window);
+  });
+
   /* Preconditions: mock model emits non-terminating code_exec call
      Action: user sends a message and cancels active run
      Assertions: cancel request succeeds and no kind:error is persisted for this turn

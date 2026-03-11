@@ -4,7 +4,7 @@
 
 Цель: реализовать безопасное выполнение JavaScript-кода моделью через `code_exec` в изолированной sandbox-среде.
 
-**Текущий статус:** Фаза 6 — Валидация (выполнена частично: функциональные сценарии синхронизированы, остаётся полный functional-прогон)
+**Текущий статус:** Фаза 8 — Gap Closure (в работе: синхронизация целевого контракта `invalid tool_call args` между requirements/design/code/tests)
 
 ---
 
@@ -42,10 +42,14 @@
 - ✅ Добавлены functional-сценарии browser-level egress deny для `fetch`/`XMLHttpRequest`/`WebSocket`/`navigator.sendBeacon` без исходящего запроса.
 - ✅ Добавлен сценарий `limit_exceeded` для memory-heavy `code_exec` с продолжением pipeline.
 - ✅ Обновлены `SandboxSessionManager` и unit-тесты для нормализации memory-limit ошибок в `error.code=limit_exceeded`.
+- ✅ Синхронизированы `code_exec` requirements/design с фактической реализацией lifecycle и resource-limit semantics (без несуществующего monitor/throttle loop).
 - ✅ Запущен `npm run validate` (успешно).
+- ✅ Закрыт reviewer comment по `invalid_tool_arguments`: зафиксировано, что `code_exec` не запускается, `tool_call(code_exec)` не создаётся и ошибка возвращается как model response validation error.
 
 ### В Работе
 - 🔄 Ожидает отдельного запуска полного `npm run test:functional` по подтверждению пользователя.
+- 🔄 Follow-up: вернуть обязательный (`SHALL`) degraded/throttled mode для resource limits (`stderr` сигнал при best-effort containment) и синхронизировать код/спеки/покрытие.
+- 🔄 Follow-up: довести до целевого общего контракта по невалидным аргументам любого `tool_call` (без persisted `tool_call`, только retry/repair и затем `kind:error` при исчерпании).
 
 ### Запланировано
 
@@ -82,6 +86,7 @@
 - [x] Добавить unit-тесты main/runtime/pipeline слоёв.
 - [x] Переименовать functional test-файл под каноничное имя `tests/functional/code_exec.spec.ts` (если в коде ещё используется старое имя) и обновить все ссылки/запуски.
 - [x] Добавить/обновить functional-тест `code_exec.spec.ts`: невалидные аргументы `code_exec` → bounded retry/repair → финальный `kind:error` в чате.
+- [x] Зафиксировать в requirements/design трассировку для `invalid_tool_arguments`: без запуска `code_exec`, без persisted `tool_call(code_exec)`, с ошибкой валидации ответа модели.
 - [x] Добавить/обновить functional-тест `code_exec.spec.ts`: лимит входного кода `30 KiB` и ожидаемая ошибка валидации.
 - [x] Добавить/обновить functional-тест `code_exec.spec.ts`: лимиты `stdout/stderr` по `10 KiB` и корректные флаги truncation.
 - [x] Добавить/обновить functional-тест `code_exec.spec.ts`: для `window.open`/`location.assign`/`location.replace` возвращается terminal `policy_denied` (без silent deny и без исходящего запроса).
@@ -102,3 +107,32 @@
 
 - [x] Запустить `npm run validate`.
 - [ ] После подтверждения пользователя запустить `npm run test:functional`.
+
+#### Фаза 7: Resource Degraded Mode (SHALL)
+
+- [ ] Вернуть в `docs/specs/code_exec/requirements.md` и `design.md` обязательное требование degraded/throttled режима при приближении к CPU/RAM лимитам.
+- [ ] Реализовать monitor loop в `SandboxSessionManager` (интервал `monitorIntervalMs`) с best-effort containment.
+- [ ] Добавить обязательный диагностический сигнал в `stderr` при успешном завершении вызова в degraded режиме.
+- [ ] Сохранить terminal fallback: при невозможности удержать лимиты завершать вызов с `status=error`, `error.code=limit_exceeded`.
+- [ ] Добавить/обновить unit-тесты на degraded path и containment-fail path (`limit_exceeded`).
+- [ ] Добавить/обновить functional-тест на наличие degraded/throttled сигнала в `stderr`.
+- [ ] Обновить таблицу покрытия требований в `docs/specs/code_exec/design.md` после реализации.
+
+#### Фаза 8: Invalid Tool Arguments (System Target Behavior)
+
+- [ ] Привести runtime-логику `MainPipeline` к единому контракту: schema/contract validation любого `tool_call` до создания persisted `kind: tool_call`.
+- [ ] Гарантировать, что при `invalid_tool_arguments` не создаются `message.created/message.updated` для `kind: tool_call` и не появляется запись инструмента в истории чата.
+- [ ] Сохранить текущий retry/repair flow (`maxRetries=2`) с возвратом диагностики в модель на каждой невалидной попытке.
+- [ ] Гарантировать terminal fallback: при исчерпании retry/repair создавать только `kind:error` (без terminal `tool_call`).
+- [ ] Унифицировать поведение для обоих инструментов в текущем scope (`final_answer`, `code_exec`) без специальных исключений.
+- [ ] Устранить расхождение `code_exec` контракта ошибок: согласовать `code_exec.3.1.2.2.1` с runtime/тестами (`SandboxSessionManager` сейчас возвращает `invalid_tool_arguments` при прямом вызове), зафиксировав единый boundary (pipeline-level vs tool-runtime-level).
+- [ ] Уточнить вводное требование `code_exec` (`requirements.md`, пункт 0/введение): persisted `tool_call(code_exec)` создаётся только для валидных вызовов, прошедших pre-execution validation.
+- [ ] Добавить/обновить unit-тесты `tests/unit/agents/MainPipeline.test.ts` на отсутствие persist `tool_call` при невалидных аргументах и на `kind:error` после retry-limit.
+- [ ] Добавить/обновить unit-тесты `tests/unit/agents/MainPipeline.test.ts` на отсутствие `message.created/message.updated(kind:tool_call)` при невалидных аргументах на всех retry-попытках.
+- [ ] Добавить/обновить functional-тесты `tests/functional/llm-chat.spec.ts` и `tests/functional/code_exec.spec.ts`: invalid args не создают `tool_call` в чате/истории на всех попытках.
+- [ ] Усилить существующий `tests/functional/code_exec.spec.ts` сценарий invalid args: проверять отсутствие любых persisted `tool_call(code_exec)` (не только отсутствие terminal `success`).
+- [ ] Добавить/обновить functional-сценарий для `final_answer`: invalid arguments не создают persisted `tool_call(final_answer)` и завершаются `kind:error` после retry-limit.
+- [ ] Обновить матрицы покрытия в `docs/specs/llm-integration/design.md` и `docs/specs/code_exec/design.md` с явной трассировкой этого контракта.
+- [ ] Обновить `docs/specs/llm-integration/design.md` coverage-table строкой `llm-integration.11.2.3.3` и привязать к конкретным тестам.
+- [ ] Сверить текстовые названия функциональных тестов в requirements/design с фактическими тест-кейсами в `tests/functional/llm-chat.spec.ts` и `tests/functional/code_exec.spec.ts`.
+- [ ] Прогнать `npm run validate` и после подтверждения пользователя `npm run test:functional`.

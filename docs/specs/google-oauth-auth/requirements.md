@@ -227,13 +227,15 @@ Token Expiring → OAuthClientManager.refreshAccessToken() → Update Tokens in 
 
 #### Критерии Приемки
 
-1. "OAuth Client" ДОЛЖЕН хранить client_id как константу в конфигурационном файле кода И ДОЛЖЕН загружать client_secret из переменной окружения `CLERKLY_OAUTH_CLIENT_SECRET` (на этапе сборки приложения)
-2. "OAuth Client" ДОЛЖЕН использовать redirect_uri в формате "com.googleusercontent.apps.CLIENT_ID:/oauth2redirect" (reverse client ID format), где CLIENT_ID - это числовая часть Client ID без суффикса ".apps.googleusercontent.com"
-3. "OAuth Client" ДОЛЖЕН запрашивать следующие scopes: "openid", "email", "profile"
-4. "OAuth Client" ДОЛЖЕН использовать authorization endpoint: "https://accounts.google.com/o/oauth2/v2/auth"
-5. "OAuth Client" ДОЛЖЕН использовать token endpoint: "https://oauth2.googleapis.com/token"
-6. "OAuth Client" ДОЛЖЕН использовать revoke endpoint: "https://oauth2.googleapis.com/revoke"
-7. "OAuth Client" ДОЛЖЕН включать параметры access_type=offline и prompt=consent для получения refresh token
+1. "OAuth Client" ДОЛЖЕН хранить client_id как константу в конфигурационном файле кода И ДОЛЖЕН загружать client_secret из `CLERKLY_OAUTH_CLIENT_SECRET` (на этапе сборки приложения)
+2. КОГДА `CLERKLY_OAUTH_CLIENT_SECRET` отсутствует в `process.env`, build-time инжектор ДОЛЖЕН попытаться загрузить значение из файла `.env` в корне проекта
+3. ЕСЛИ `CLERKLY_OAUTH_CLIENT_SECRET` отсутствует и в `process.env`, и в `.env`, build-time инжектор ДОЛЖЕН завершать сборку с ошибкой (ненулевой код выхода)
+4. "OAuth Client" ДОЛЖЕН использовать redirect_uri в формате "com.googleusercontent.apps.CLIENT_ID:/oauth2redirect" (reverse client ID format), где CLIENT_ID - это числовая часть Client ID без суффикса ".apps.googleusercontent.com"
+5. "OAuth Client" ДОЛЖЕН запрашивать следующие scopes: "openid", "email", "profile"
+6. "OAuth Client" ДОЛЖЕН использовать authorization endpoint: "https://accounts.google.com/o/oauth2/v2/auth"
+7. "OAuth Client" ДОЛЖЕН использовать token endpoint: "https://oauth2.googleapis.com/token"
+8. "OAuth Client" ДОЛЖЕН использовать revoke endpoint: "https://oauth2.googleapis.com/revoke"
+9. "OAuth Client" ДОЛЖЕН включать параметры access_type=offline и prompt=consent для получения refresh token
 
 **Примечание:** При формировании redirect_uri из Client ID, необходимо удалить суффикс ".apps.googleusercontent.com" если он присутствует, чтобы избежать дублирования в итоговом URL. Например:
 - Client ID: `100365225505-xxx.apps.googleusercontent.com`

@@ -1,6 +1,6 @@
 // Requirements: code_exec.1.5, code_exec.2, code_exec.5
 
-import { BrowserWindow, session } from 'electron';
+import { app, BrowserWindow, session } from 'electron';
 import { Logger } from '../Logger';
 import {
   CODE_EXEC_LIMITS,
@@ -25,6 +25,9 @@ const POLICY_DENIED_TOOL_ALLOWLIST_MESSAGE = 'Tool is not allowed in sandbox all
 const LIMIT_EXCEEDED_MEMORY_MESSAGE = `code_exec memory limit exceeded (${Math.round(
   CODE_EXEC_LIMITS.sandboxMemoryLimitBytes / (1024 * 1024 * 1024)
 )} GiB).`;
+const LIMIT_EXCEEDED_CPU_MESSAGE = `code_exec CPU limit exceeded (${CODE_EXEC_LIMITS.sandboxCpuLimit} vCPU).`;
+const DEGRADED_MODE_STDERR_MESSAGE =
+  '[code_exec] Resource pressure detected near CPU/RAM limits. Execution continued in degraded mode.';
 
 type SessionHandle = {
   id: string;
@@ -117,6 +120,8 @@ export class SandboxSessionManager {
   ): Promise<CodeExecToolOutput> {
     const stdoutChunks: string[] = [];
     const stderrChunks: string[] = [];
+    let degradedModeApplied = false;
+    let hardLimitReason: string | null = null;
     const staticPolicyError = this.detectStaticPolicyViolation(input.code);
     if (staticPolicyError) {
       return {
@@ -161,6 +166,8 @@ export class SandboxSessionManager {
         sandboxWindow.destroy();
       }
     };
+    let stopMonitor: (() => void) | null = null;
+    let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
 
     try {
       if (context.signal.aborted) {
@@ -174,13 +181,30 @@ export class SandboxSessionManager {
         )}`
       );
 
+      let resourceLimitReject: ((reason?: unknown) => void) | null = null;
+      const resourceLimitPromise = new Promise<never>((_, reject) => {
+        resourceLimitReject = reject;
+      });
+      stopMonitor = this.startResourceMonitor({
+        sandboxWindow,
+        signal: context.signal,
+        onNearLimit: () => {
+          degradedModeApplied = true;
+        },
+        onHardLimitExceeded: (reason) => {
+          hardLimitReason = this.extractResourceLimitMessage(reason);
+          destroySandboxWindow();
+          resourceLimitReject?.(new Error(reason));
+        },
+      });
+
       const executionScript = this.buildSandboxExecutionScript(input.code);
       const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error('code_exec_timeout')), input.timeoutMs);
+        timeoutHandle = setTimeout(() => reject(new Error('code_exec_timeout')), input.timeoutMs);
       });
 
       const runtimePromise = sandboxWindow.webContents.executeJavaScript(executionScript, true);
-      const result = await Promise.race([runtimePromise, timeoutPromise]);
+      const result = await Promise.race([runtimePromise, timeoutPromise, resourceLimitPromise]);
 
       if (context.signal.aborted) {
         return this.finalizeOutput('cancelled', stdoutChunks, stderrChunks);
@@ -203,7 +227,7 @@ export class SandboxSessionManager {
                 }
               : normalized.error
           : normalized.error;
-      return {
+      const base = {
         ...normalized,
         stdout: limited.stdout,
         stderr: limited.stderr,
@@ -211,12 +235,33 @@ export class SandboxSessionManager {
         stderr_truncated: limited.stderr_truncated,
         ...(remappedError ? { error: remappedError } : {}),
       };
+      return this.appendDegradedDiagnostic(base, degradedModeApplied);
     } catch (error) {
       if (context.signal.aborted) {
         return this.finalizeOutput('cancelled', stdoutChunks, stderrChunks);
       }
 
       const message = error instanceof Error ? error.message : String(error);
+      if (hardLimitReason) {
+        const base = this.finalizeOutput('error', stdoutChunks, stderrChunks);
+        return {
+          ...base,
+          error: {
+            code: 'limit_exceeded',
+            message: hardLimitReason,
+          },
+        };
+      }
+      if (this.isResourceLimitHardError(message)) {
+        const base = this.finalizeOutput('error', stdoutChunks, stderrChunks);
+        return {
+          ...base,
+          error: {
+            code: 'limit_exceeded',
+            message: this.extractResourceLimitMessage(message),
+          },
+        };
+      }
       if (message.includes('code_exec_timeout')) {
         destroySandboxWindow();
         const base = this.finalizeOutput('timeout', stdoutChunks, stderrChunks);
@@ -248,6 +293,10 @@ export class SandboxSessionManager {
         },
       };
     } finally {
+      stopMonitor?.();
+      if (timeoutHandle) {
+        clearTimeout(timeoutHandle);
+      }
       destroySandboxWindow();
       void sandboxSession.clearStorageData().catch(() => undefined);
     }
@@ -472,6 +521,107 @@ export class SandboxSessionManager {
       lower.includes('sendbeacon') ||
       lower.includes('network apis are not allowed')
     );
+  }
+
+  private isResourceLimitHardError(message: string): boolean {
+    return message.startsWith('code_exec_resource_limit_exceeded::');
+  }
+
+  private extractResourceLimitMessage(message: string): string {
+    return message.replace('code_exec_resource_limit_exceeded::', '');
+  }
+
+  private startResourceMonitor(params: {
+    sandboxWindow: BrowserWindow;
+    signal: AbortSignal;
+    onNearLimit: () => void;
+    onHardLimitExceeded: (reason: string) => void;
+  }): () => void {
+    const cpuSoftLimitPercent = CODE_EXEC_LIMITS.sandboxCpuLimit * 100 * 0.85;
+    const cpuHardLimitPercent = CODE_EXEC_LIMITS.sandboxCpuLimit * 120;
+    const memorySoftLimitBytes = CODE_EXEC_LIMITS.sandboxMemoryLimitBytes * 0.9;
+    const memoryHardLimitBytes = CODE_EXEC_LIMITS.sandboxMemoryLimitBytes;
+
+    let isStopped = false;
+    let nearLimitMarked = false;
+
+    const interval = setInterval(() => {
+      if (isStopped || params.signal.aborted || params.sandboxWindow.isDestroyed()) {
+        return;
+      }
+
+      const webContents = params.sandboxWindow.webContents;
+      if (webContents.isDestroyed()) {
+        return;
+      }
+
+      const pid = webContents.getOSProcessId();
+      if (!pid || pid <= 0) {
+        return;
+      }
+
+      const metrics = app.getAppMetrics();
+      const processMetric = metrics.find((metric) => metric.pid === pid);
+      if (!processMetric) {
+        return;
+      }
+
+      const cpuPercent = processMetric.cpu?.percentCPUUsage ?? 0;
+      const memoryBytes = (processMetric.memory?.workingSetSize ?? 0) * 1024;
+      const nearLimit = cpuPercent >= cpuSoftLimitPercent || memoryBytes >= memorySoftLimitBytes;
+      const hardExceeded = cpuPercent > cpuHardLimitPercent || memoryBytes > memoryHardLimitBytes;
+
+      if (nearLimit && !nearLimitMarked) {
+        nearLimitMarked = true;
+        params.onNearLimit();
+        try {
+          webContents.setBackgroundThrottling(true);
+        } catch {
+          // Best effort containment.
+        }
+      }
+
+      if (hardExceeded) {
+        const reason =
+          cpuPercent > cpuHardLimitPercent
+            ? `${LIMIT_EXCEEDED_CPU_MESSAGE} Observed ${cpuPercent.toFixed(1)}%.`
+            : `${LIMIT_EXCEEDED_MEMORY_MESSAGE} Observed ${Math.round(
+                memoryBytes / (1024 * 1024 * 1024)
+              )} GiB.`;
+        params.onHardLimitExceeded(`code_exec_resource_limit_exceeded::${reason}`);
+      }
+    }, CODE_EXEC_LIMITS.monitorIntervalMs);
+
+    return () => {
+      if (isStopped) {
+        return;
+      }
+      isStopped = true;
+      clearInterval(interval);
+    };
+  }
+
+  private appendDegradedDiagnostic(
+    output: CodeExecToolOutput,
+    degradedModeApplied: boolean
+  ): CodeExecToolOutput {
+    if (!degradedModeApplied) {
+      return output;
+    }
+    if (output.error?.code === 'limit_exceeded' || output.status === 'timeout') {
+      return output;
+    }
+    const nextStderr = output.stderr
+      ? `${output.stderr}${DEGRADED_MODE_STDERR_MESSAGE}\n`
+      : `${DEGRADED_MODE_STDERR_MESSAGE}\n`;
+    const limited = applyStdStreamLimits(output.stdout, nextStderr);
+    return {
+      ...output,
+      stdout: limited.stdout,
+      stderr: limited.stderr,
+      stdout_truncated: limited.stdout_truncated,
+      stderr_truncated: limited.stderr_truncated,
+    };
   }
 
   // Requirements: code_exec.2.3.2, code_exec.2.9.1
