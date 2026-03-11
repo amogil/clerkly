@@ -1,562 +1,562 @@
-# Руководство для Агентов
+# Agent Guide
 
-Здесь описаны все правила, workflow и форматы работы. Эти правила обязательны для исполнения.
-
----
-
-## 1. Быстрый справочник команд
-
-### Валидация
-```bash
-npm run validate          # полная валидация (TypeScript, ESLint, Prettier, unit тесты)
-npm run validate:verbose  # то же, с подробным выводом
-```
-
-### Тесты
-```bash
-npm test                    # unit тесты
-npm run test:unit           # только unit тесты
-npm run test:functional     # функциональные тесты (показывают окна!)
-npm run test:coverage       # тесты с отчетом о покрытии
-```
-
-### Отладка
-```bash
-npm run test:unit -- path/to/test.ts -t "test name"   # конкретный тест
-npm run test:functional:debug -- test.spec.ts          # функциональные с остановкой на первой ошибке
-npx playwright show-report                             # HTML отчет функциональных тестов
-```
-
-### Сборка
-```bash
-npm run rebuild:node      # перебилдить нативные модули для Node.js
-npm run rebuild:electron  # перебилдить нативные модули для Electron
-npm run build             # собрать приложение
-```
+This document describes all rules, workflows, and work formats. These rules are mandatory.
 
 ---
 
-## 2. Обязательный workflow работы
+## 1. Quick Command Reference
 
-Каждая задача ДОЛЖНА выполняться по следующему workflow:
+### Validation
+```bash
+npm run validate          # full validation (TypeScript, ESLint, Prettier, unit tests)
+npm run validate:verbose  # same, with verbose output
+```
 
-### Шаг 1: Сбор контекста
+### Tests
+```bash
+npm test                    # unit tests
+npm run test:unit           # unit tests only
+npm run test:functional     # functional tests (they open windows!)
+npm run test:coverage       # tests with coverage report
+```
 
-1. Получить список всех спецификаций в `docs/specs/`
-2. Определить релевантные спецификации для задачи
-3. Для каждой релевантной спецификации прочитать:
+### Debugging
+```bash
+npm run test:unit -- path/to/test.ts -t "test name"   # specific test
+npm run test:functional:debug -- test.spec.ts          # functional tests, stop on first failure
+npx playwright show-report                             # functional test HTML report
+```
+
+### Build
+```bash
+npm run rebuild:node      # rebuild native modules for Node.js
+npm run rebuild:electron  # rebuild native modules for Electron
+npm run build             # build the application
+```
+
+---
+
+## 2. Mandatory Workflow
+
+Every task MUST be executed using the following workflow:
+
+### Step 1: Gather Context
+
+1. Get the list of all specifications in `docs/specs/`
+2. Identify the specifications relevant to the task
+3. For each relevant specification, read:
    - `requirements.md`
    - `design.md`
-   - `tasks.md` (если файл существует)
-4. Изучить существующий код, связанный с задачей
-5. Изучить существующие тесты
+   - `tasks.md` (if the file exists)
+4. Review existing code related to the task
+5. Review existing tests
 
-### Шаг 2: Формирование плана
+### Step 2: Create a Plan
 
-Сформировать план и **согласовать с пользователем** перед началом работы.
+Create a plan and **get user approval** before starting implementation.
 
-**Запрет:** ДО согласованного плана ЗАПРЕЩЕНО вносить любые изменения в код, тесты или документацию.
+**Prohibition:** Before a plan is approved, it is FORBIDDEN to make any changes to code, tests, or documentation.
 
-**Чеклист допуска к изменениям:**
-- План согласован: да/нет
+**Readiness checklist for making changes:**
+- Plan approved: yes/no
 
 ```
-План действий:
-1. Изменить файл X — добавить функцию Y
-2. Создать тест Z для проверки функции Y
-3. Обновить tasks.md (если используется для этой фичи)
-4. Запустить валидацию
+Action plan:
+1. Modify file X - add function Y
+2. Create test Z to verify function Y
+3. Update tasks.md (if used for this feature)
+4. Run validation
 
-Ожидаемый результат: [описание]
-Риски: [если есть]
+Expected result: [description]
+Risks: [if any]
 ```
 
-### Шаг 3: Выполнение
+### Step 3: Execute
 
-- Выполнять план пошагово
-- После каждого значимого изменения запускать релевантные модульные тесты по правилам разделов 4 и 5
-- Писать код с комментариями требований
-- Писать тесты с правильной структурой (см. раздел 6)
-- **Запрет:** Нельзя без слогласования пользователя удалять или изменять поведение кода, которое зафиксировано в требованиях
+- Execute the plan step by step
+- After each significant change, run relevant unit tests according to sections 4 and 5
+- Write code with requirement comments
+- Write tests with the correct structure (see section 6)
+- **Prohibition:** Do not remove or change behavior defined in requirements without user approval
 
-### Шаг 4: Завершение
+### Step 4: Complete
 
-1. Убедиться, что спецификации и дизайн полны, непротиворечивы и неизбыточны
-2. Убедиться, что все изменения в коде соответствуют требованиям и дизайну
-3. Запустить `npm run validate`
-4. Убедиться, что все проверки проходят:
-   - ✅ TypeScript компиляция
+1. Ensure specs and design are complete, consistent, and non-redundant
+2. Ensure all code changes match the requirements and design
+3. Run `npm run validate`
+4. Ensure all checks pass:
+   - ✅ TypeScript compilation
    - ✅ ESLint
    - ✅ Prettier
-   - ✅ Unit тесты
-   - ✅ Покрытие кода
-5. Спросить пользователя: *"Задача выполнена. Запустить функциональные тесты? (они покажут окна на экране)"*
+   - ✅ Unit tests
+   - ✅ Code coverage
+5. Ask the user: *"Task completed. Run functional tests? (they will open windows on screen)"*
 
-### Шаг 5: Отчёт
+### Step 5: Report
 
-Краткая сводка в конце работы (без создания отдельных файлов):
+Provide a short summary at the end (without creating separate files):
 
 ```
-Задача выполнена.
+Task completed.
 
-Реализовано:
-- [пункт 1]
+Implemented:
+- [item 1]
 
-Изменены файлы:
-- [файл 1]
+Files changed:
+- [file 1]
 
-Добавлены/обновлены тесты:
-- [тест 1]
+Tests added/updated:
+- [test 1]
 
-Осталось сделать:
-- [пункт 1] (если есть)
+Remaining work:
+- [item 1] (if any)
 ```
 
 ---
 
-## 3. Работа со спецификациями
+## 3. Working with Specifications
 
-### Структура спецификаций
+### Specification Structure
 
-Все спецификации находятся в `docs/specs/<feature-name>/`.
-Обязательные файлы фичи:
+All specifications are located in `docs/specs/<feature-name>/`.
+Required files for a feature:
 
 ```
 docs/specs/
   <feature-name>/
-    requirements.md   # Что нужно сделать (требования)
-    design.md         # Как это устроено (архитектура и дизайн)
-    tasks.md          # (опционально) Список задач с прогрессом
+    requirements.md   # What needs to be built (requirements)
+    design.md         # How it is built (architecture and design)
+    tasks.md          # (optional) Task list with progress
 ```
 
-Дополнительно в корне `docs/specs/` может быть `AGENTS-DESIGN.md` — общий архитектурный референс.
+Additionally, `docs/specs/` root may contain `AGENTS-DESIGN.md` - a shared architecture reference.
 
-### Перед началом работы с фичей
+### Before Starting Work on a Feature
 
-ОБЯЗАТЕЛЬНО прочитать:
+You MUST read:
 
 ```
 docs/specs/<feature>/requirements.md
 docs/specs/<feature>/design.md
 ```
 
-Если у фичи есть `tasks.md`, его также нужно прочитать.
+If the feature has `tasks.md`, you must also read it.
 
-Для работы с тестами также прочитать:
+For test-related work, also read:
 ```
 docs/specs/testing-infrastructure/requirements.md
 docs/specs/testing-infrastructure/design.md
 ```
 
-Там описаны: стратегия мокирования, правила helper функций (testing.10), правила ожидания элементов (testing.11), проверка toast-ошибок (testing.12).
+These documents describe: mocking strategy, helper function rules (testing.10), element wait rules (testing.11), and toast error checks (testing.12).
 
 ---
 
-### Формат requirements.md
+### requirements.md Format
 
-Файл требований описывает **что** нужно реализовать с точки зрения пользователя.
+The requirements file describes **what** should be implemented from the user's perspective.
 
-**Структура файла:**
+**File structure:**
 
 ```markdown
-# Документ Требований: <Название Фичи>
+# Requirements Document: <Feature Name>
 
-## Введение
+## Introduction
 
-Краткое описание фичи и её назначения.
+Short description of the feature and its purpose.
 
-## Глоссарий
+## Glossary
 
-- **Термин** — определение
+- **Term** - definition
 
-## Требования
+## Requirements
 
-### 1. <Название группы требований>
+### 1. <Requirement Group Name>
 
 **ID:** <feature-id>.1
 
-**User Story:** Как [роль], я хочу [действие], чтобы [цель].
+**User Story:** As a [role], I want [action], so that [goal].
 
-#### Критерии Приемки
+#### Acceptance Criteria
 
-1.1. [Требование]
-1.2. [Требование]
-1.2.1. КОГДА [условие], ТО [результат]
+1.1. [Requirement]
+1.2. [Requirement]
+1.2.1. WHEN [condition], THEN [result]
 
-#### Функциональные Тесты
+#### Functional Tests
 
-- `tests/functional/<file>.spec.ts` — "название теста"
+- `tests/functional/<file>.spec.ts` - "test name"
 ```
 
-**Правила:**
-- ID требований: `<feature-id>.<группа>.<пункт>` (например, `agents.1.3`)
-- Каждый User Story ДОЛЖЕН иметь секцию "Функциональные Тесты"
-- Язык: русский
-- Критерии приемки пишутся в формате **EARS** (Easy Approach to Requirements Syntax)
+**Rules:**
+- Requirement IDs: `<feature-id>.<group>.<item>` (for example, `agents.1.3`)
+- Every User Story MUST have a "Functional Tests" section
+- Language: Russian
+- Acceptance criteria are written in **EARS** (Easy Approach to Requirements Syntax)
 
 ---
 
-### Разделение требований и дизайна (обязательно)
+### Requirement/Design Separation (mandatory)
 
-- `requirements.md` описывает ТОЛЬКО "что" должен видеть/получать пользователь
-- В `requirements.md` ЗАПРЕЩЕНО указывать детали реализации: названия компонентов, props, классы, DOM-структуру, конкретные значения утилитных классов, размеры/токены, или ссылки на конкретные файлы/компоненты
-- Все детали реализации (компоненты, props, layout, классы, DOM-структура, примеры JSX) ДОЛЖНЫ быть размещены в `design.md`
+- `requirements.md` describes ONLY what the user should see/get
+- `requirements.md` MUST NOT include implementation details: component names, props, classes, DOM structure, specific utility class values, sizes/tokens, or references to specific files/components
+- All implementation details (components, props, layout, classes, DOM structure, JSX examples) MUST be in `design.md`
 
 ---
 
-### Формат EARS для критериев приемки
+### EARS Format for Acceptance Criteria
 
-EARS — стандартный способ писать требования без двусмысленности. Каждое требование использует один из шаблонов:
+EARS is a standard way to write unambiguous requirements. Every requirement uses one of these templates:
 
-#### Шаблоны EARS
+#### EARS Templates
 
-**Ubiquitous (всегда верно)**
+**Ubiquitous (always true)**
 ```
-<субъект> SHALL <действие>
+<subject> SHALL <action>
 ```
-Пример: `Список агентов SHALL отображаться в хедере`
+Example: `Agent list SHALL be displayed in the header`
 
-**Event-driven (реакция на событие)**
+**Event-driven (reaction to an event)**
 ```
-WHEN <триггер>, <субъект> SHALL <действие>
+WHEN <trigger>, <subject> SHALL <action>
 ```
-Пример: `WHEN пользователь нажимает Enter, сообщение SHALL отправляться`
+Example: `WHEN user presses Enter, message SHALL be sent`
 
-**Unwanted behaviour (обработка нежелательного поведения)**
+**Unwanted behavior (handling undesired behavior)**
 ```
-IF <нежелательное условие>, <субъект> SHALL <действие>
+IF <undesired condition>, <subject> SHALL <action>
 ```
-Пример: `IF соединение потеряно, приложение SHALL показать уведомление об ошибке`
+Example: `IF connection is lost, application SHALL show an error notification`
 
-**State-driven (активно в определённом состоянии)**
+**State-driven (active in a specific state)**
 ```
-WHILE <состояние>, <субъект> SHALL <действие>
+WHILE <state>, <subject> SHALL <action>
 ```
-Пример: `WHILE агент выполняет задачу, индикатор SHALL анимироваться`
+Example: `WHILE the agent is working, indicator SHALL animate`
 
-**Optional feature (опциональная функция)**
+**Optional feature**
 ```
-WHERE <условие поддержки>, <субъект> SHALL <действие>
+WHERE <support condition>, <subject> SHALL <action>
 ```
-Пример: `WHERE OAuth включён, кнопка входа SHALL отображаться`
+Example: `WHERE OAuth is enabled, sign-in button SHALL be visible`
 
-**Комбинированные шаблоны** — можно комбинировать:
+**Combined templates** - templates can be combined:
 ```
-WHEN <триггер>, IF <условие>, <субъект> SHALL <действие>
+WHEN <trigger>, IF <condition>, <subject> SHALL <action>
 ```
-Пример: `WHEN пользователь архивирует агента, IF это последний агент, система SHALL создать нового агента автоматически`
+Example: `WHEN user archives an agent, IF it is the last agent, system SHALL create a new agent automatically`
 
-#### Ключевые слова
+#### Keywords
 
-- `SHALL` — обязательное требование (используется вместо "ДОЛЖЕН")
-- `SHOULD` — рекомендуемое (не обязательное)
-- `MAY` — опциональное
-- `SHALL NOT` — запрет
+- `SHALL` - mandatory requirement
+- `SHOULD` - recommended (not mandatory)
+- `MAY` - optional
+- `SHALL NOT` - prohibition
 
-#### Применение в проекте
+#### Usage in this project
 
-В существующих спеках используется русскоязычная адаптация EARS:
+Existing specs use a Russian adaptation of EARS:
 - `КОГДА` = WHEN
 - `ЕСЛИ` = IF
 - `ПОКА` = WHILE
 - `ТО ... ДОЛЖЕН` = SHALL
 
-Оба варианта допустимы. Главное — единообразие внутри одного файла.
+Both variants are allowed. The key is consistency within one file.
 
-**Примеры из реальных спеков:**
+**Examples from real specs:**
 ```
 1.4.1. КОГДА updatedAt агента обновляется, ТО агент ДОЛЖЕН автоматически перемещаться в начало списка
 2.8. КОГДА список агентов пуст, ТО ДОЛЖЕН автоматически создаваться новый агент
 4.3. КОГДА пользователь нажимает Enter (без Shift), ТО сообщение ДОЛЖНО отправляться
 ```
 
-**Чего избегать:**
-- ❌ "Система должна быть быстрой" — нет измеримого критерия
-- ❌ "Список агентов отображается" — нет субъекта и модальности
-- ❌ "Можно создать агента" — неоднозначно, используй SHALL/MAY явно
-- ✅ "WHEN пользователь кликает '+', система SHALL создать нового агента и сделать его активным"
+**What to avoid:**
+- ❌ "System should be fast" - no measurable criterion
+- ❌ "Agent list is displayed" - no subject and modality
+- ❌ "An agent can be created" - ambiguous, use SHALL/MAY explicitly
+- ✅ "WHEN user clicks '+', system SHALL create a new agent and make it active"
 
 ---
 
-### Формат design.md
+### design.md Format
 
-Файл дизайна описывает **как** реализована фича: архитектура, компоненты, потоки данных.
+The design file describes **how** the feature is implemented: architecture, components, data flows.
 
-Структура может варьироваться в зависимости от фичи, но ОБЯЗАТЕЛЬНО должна содержать:
+Structure may vary by feature, but it MUST include:
 
 ```markdown
-# Дизайн: <Название Фичи>
+# Design: <Feature Name>
 
-## Обзор
+## Overview
 
-Краткое описание архитектурного подхода.
+Short description of the architectural approach.
 
-## [Разделы по архитектуре]
+## [Architecture Sections]
 
-Например: "Схема Базы Данных", "Архитектура Main Process", "Архитектура Renderer",
-"Real-time Events", "Алгоритмы", "Компоненты UI" — в зависимости от фичи.
+For example: "Database Schema", "Main Process Architecture", "Renderer Architecture",
+"Real-time Events", "Algorithms", "UI Components" - depending on the feature.
 
-## Стратегия Тестирования
+## Testing Strategy
 
-### Модульные Тесты
+### Unit Tests
 
-- `tests/unit/<path>/<File>.test.ts` — что тестирует
+- `tests/unit/<path>/<File>.test.ts` - what it validates
 
-### Функциональные Тесты
+### Functional Tests
 
-- `tests/functional/<file>.spec.ts` — что тестирует
+- `tests/functional/<file>.spec.ts` - what it validates
 
-### Покрытие Требований
+### Requirements Coverage
 
-| Требование   | Модульные Тесты | Функциональные Тесты |
-|--------------|-----------------|----------------------|
-| feature.1.1  | ✓               | -                    |
-| feature.1.2  | ✓               | ✓                    |
+| Requirement  | Unit Tests | Functional Tests |
+|--------------|------------|------------------|
+| feature.1.1  | ✓          | -                |
+| feature.1.2  | ✓          | ✓                |
 ```
 
-**Правила:**
-- Таблица покрытия ДОЛЖНА присутствовать и включать ВСЕ требования из requirements.md
-- Названия компонентов — на английском, в кавычках при упоминании
-- Язык: русский
+**Rules:**
+- Coverage table MUST exist and include ALL requirements from requirements.md
+- Component names must be in English and enclosed in quotes when mentioned
+- Language: Russian
 
 ---
 
-### Формат tasks.md
+### tasks.md Format
 
-Файл задач описывает **прогресс реализации** фичи.
+The task file describes **implementation progress** for a feature.
 
-**Структура файла:**
+**File structure:**
 
 ```markdown
-# Список Задач: <Название Фичи>
+# Task List: <Feature Name>
 
-## Обзор
+## Overview
 
-Краткое описание и общая оценка трудозатрат.
+Short description and overall effort estimate.
 
-**Текущий статус:** Фаза N — [название]
-
----
-
-## КРИТИЧЕСКИ ВАЖНЫЕ ПРАВИЛА
-
-[Специфичные для фичи правила, которые нельзя нарушать]
+**Current status:** Phase N - [name]
 
 ---
 
-## Текущее Состояние
+## CRITICAL RULES
 
-### Выполнено
-- ✅ Задача 1
-- ✅ Задача 2
+[Feature-specific rules that must not be violated]
 
-### В Работе
-- 🔄 Задача 3
+---
 
-### Запланировано
+## Current State
 
-#### Фаза N: <Название>
+### Completed
+- ✅ Task 1
+- ✅ Task 2
 
-- [ ] Задача A
-  - [ ] Подзадача A.1
-  - [ ] Подзадача A.2
-- [ ] Задача B
+### In Progress
+- 🔄 Task 3
+
+### Planned
+
+#### Phase N: <Name>
+
+- [ ] Task A
+  - [ ] Subtask A.1
+  - [ ] Subtask A.2
+- [ ] Task B
 ```
 
-**Правила обновления tasks.md:**
-- После завершения задачи: переместить в "Выполнено" с ✅
-- После начала задачи: отметить 🔄 в "В Работе"
-- Добавлять краткое описание что было сделано (одна строка)
-- Обновлять "Текущий статус" при завершении фазы
+**Rules for updating tasks.md:**
+- After finishing a task: move it to "Completed" with ✅
+- After starting a task: mark it as 🔄 in "In Progress"
+- Add a short description of what was done (one line)
+- Update "Current status" when a phase is completed
 
 ---
 
-### Создание новой спецификации
+### Creating a New Specification
 
-При создании новой фичи:
+When creating a new feature:
 
-1. Создать папку `docs/specs/<feature-name>/`
-2. Создать `requirements.md` — описать User Stories и критерии приемки
-3. Создать `design.md` — описать архитектуру и компоненты
-4. При необходимости создать `tasks.md` — разбить на фазы и задачи
-5. Согласовать с пользователем перед реализацией
+1. Create folder `docs/specs/<feature-name>/`
+2. Create `requirements.md` - describe User Stories and acceptance criteria
+3. Create `design.md` - describe architecture and components
+4. Create `tasks.md` if needed - split into phases and tasks
+5. Get user approval before implementation
 
-**Именование фичи:** строчные буквы, дефисы (например, `token-management-ui`)
-
----
-
-### Обновление спецификаций
-
-При изменении кода НЕОБХОДИМО обновить соответствующие спецификации:
-
-- Изменилось поведение → обновить `requirements.md`
-- Изменилась архитектура → обновить `design.md`
-- Завершена задача → обновить `tasks.md` (если файл ведётся для этой фичи)
-- Добавлен тест → обновить таблицу покрытия в `design.md`
-
-Спецификации ДОЛЖНЫ быть:
-- **Полными** — покрывать все аспекты функциональности
-- **Непротиворечивыми** — не содержать конфликтующих требований
-- **Актуальными** — отражать текущее состояние кода
+**Feature naming:** lowercase letters with hyphens (for example, `token-management-ui`)
 
 ---
 
-## 4. Стратегия тестирования
+### Updating Specifications
 
-Раздел фиксирует принципы и ограничения тестирования. Конкретные команды и порядок запуска описаны в разделе 5.
+When code changes, you MUST update the corresponding specs:
 
-### Типы тестов
+- Behavior changed -> update `requirements.md`
+- Architecture changed -> update `design.md`
+- Task completed -> update `tasks.md` (if used for this feature)
+- Test added -> update coverage table in `design.md`
 
-| Тип | Расположение | Моки | Цель |
-|-----|-------------|------|------|
-| Unit | `tests/unit/**/*.test.ts` | ✅ Все внешние зависимости | Изолированная логика |
-| Функциональные | `tests/functional/**/*.spec.ts` | ❌ Реальный Electron | End-to-end сценарии |
+Specifications MUST be:
+- **Complete** - cover all aspects of functionality
+- **Consistent** - contain no conflicting requirements
+- **Up to date** - reflect current code state
 
-**Функциональные тесты** используют Playwright, показывают реальные окна и НЕ мокируют Electron API.
+---
 
-**Термины:** в документе используются пары `модульные (unit)` и `функциональные (functional)` как эквивалентные.
+## 4. Testing Strategy
 
-### Правила для функциональных тестов
+This section defines test principles and constraints. Exact commands and run order are described in section 5.
 
-**testing.10 — Helper функции:** Всегда использовать `createMockOAuthServer(port)` из `tests/functional/helpers/electron.ts`. НЕ создавать `MockOAuthServer` напрямую через `new`.
+### Test Types
 
-**testing.11 — Ожидание элементов:** НЕ использовать `waitForTimeout` для ожидания элементов. Использовать локаторы с встроенным ожиданием:
+| Type | Location | Mocks | Goal |
+|-----|----------|-------|------|
+| Unit | `tests/unit/**/*.test.ts` | ✅ All external dependencies | Isolated logic |
+| Functional | `tests/functional/**/*.spec.ts` | ❌ Real Electron | End-to-end scenarios |
+
+**Functional tests** use Playwright, display real windows, and do NOT mock Electron API.
+
+**Terminology:** in this document, `unit` and `functional` are equivalent to their Russian counterparts `модульные` and `функциональные`.
+
+### Rules for Functional Tests
+
+**testing.10 - Helper functions:** Always use `createMockOAuthServer(port)` from `tests/functional/helpers/electron.ts`. Do NOT instantiate `MockOAuthServer` directly via `new`.
+
+**testing.11 - Waiting for elements:** Do NOT use `waitForTimeout` to wait for elements. Use locators with built-in waiting:
 
 ```typescript
-// ❌ НЕПРАВИЛЬНО
+// ❌ WRONG
 await window.waitForTimeout(500);
 await expect(messages).toHaveCount(1);
 
-// ✅ ПРАВИЛЬНО
+// ✅ CORRECT
 await expect(messages.first()).toBeVisible({ timeout: 2000 });
 await expect(messages).toHaveCount(1);
 ```
 
-`waitForTimeout` допустим ТОЛЬКО для анимаций без DOM-индикатора или debounce с известным таймингом — с обязательным комментарием.
+`waitForTimeout` is allowed ONLY for animations without DOM indicators or debounce with known timing - with a mandatory comment.
 
-**testing.12 — Toast-ошибки:** После ключевых действий проверять отсутствие toast-ошибок. Если в DOM есть toast с типом `error` — тест должен упасть с текстом этого уведомления.
+**testing.12 - Toast errors:** After key actions, verify there are no toast errors. If a toast of type `error` exists in DOM, the test must fail with that toast text.
 
-### Правила покрытия кода
+### Code Coverage Rules
 
-Минимальные требования:
+Minimum requirements:
 - Statements: 85%
 - Branches: 80%
 - Functions: 85%
 - Lines: 85%
 
-Исключения: файлы миграций БД, конфигурационные файлы, типы без логики.
+Exceptions: database migration files, config files, types without logic.
 
-### Определения
+### Definitions
 
-- **Краевые случаи** — граничные значения, пустые данные, null/undefined, max/min значения
-- **Исключительные ситуации** — ошибки сети, недоступность ресурсов, таймауты, некорректные входные данные
+- **Edge cases** - boundary values, empty data, null/undefined, max/min values
+- **Exceptional situations** - network failures, unavailable resources, timeouts, invalid inputs
 
 ---
 
-## 5. Запуск тестов
+## 5. Running Tests
 
-Раздел фиксирует команды, порядок запуска и отладку тестов.
+This section defines commands, run order, and debugging for tests.
 
-### Подготовка
+### Preparation
 
-Перед запуском тестов НЕОБХОДИМО перебилдить нативные модули:
+Before running tests, you MUST rebuild native modules:
 
 ```bash
 npm run rebuild:node
 ```
 
-Когда нужно:
-- После переключения версии Node.js
-- После `npm install`
-- При ошибках `ERR_DLOPEN_FAILED` или `MODULE_NOT_FOUND`
-- Перед первым запуском после клонирования репозитория
+When needed:
+- After switching Node.js version
+- After `npm install`
+- On `ERR_DLOPEN_FAILED` or `MODULE_NOT_FOUND` errors
+- Before first run after cloning repository
 
-`npm test` выполняет rebuild автоматически. Для отдельных типов тестов — вручную:
+`npm test` runs rebuild automatically. For separate test types, do it manually:
 
 ```bash
 npm run rebuild:node && npm run test:unit
 ```
 
-### Unit тесты
+### Unit Tests
 
 ```bash
-# Конкретный файл
+# Specific file
 npm run test:unit -- tests/unit/auth/UserProfileManager.test.ts
 
-# Конкретный тест по названию
+# Specific test by name
 npm run test:unit -- -t "should validate token expiration"
 
-# Директория
+# Directory
 npm run test:unit -- tests/unit/auth/
 
-# С подробным выводом
+# Verbose output
 npm run test:unit -- tests/unit/auth/UserProfileManager.test.ts --verbose
 
-# С остановкой на первой ошибке
+# Stop on first failure
 npm run test:unit -- tests/unit/auth/UserProfileManager.test.ts --bail
 ```
 
-**КРИТИЧЕСКИ ВАЖНО**: При падении тестов запускать ТОЛЬКО упавшие тесты, не все подряд.
+**CRITICALLY IMPORTANT**: If tests fail, run ONLY failed tests, not all tests.
 
-### Функциональные тесты
+### Functional Tests
 
-**ВАЖНО**: Показывают реальные окна Electron на экране!
+**IMPORTANT**: They open real Electron windows on screen!
 
 ```bash
-npm run test:functional                                          # все тесты
-npm run test:functional:verbose                                  # подробный вывод
-npm run test:functional:debug                                    # остановка на первой ошибке
-npm run test:functional:single -- navigation.spec.ts             # конкретный файл
-npm run test:functional:single -- --grep "should show login"     # по названию
+npm run test:functional                                          # all tests
+npm run test:functional:verbose                                  # verbose output
+npm run test:functional:debug                                    # stop on first failure
+npm run test:functional:single -- navigation.spec.ts             # specific file
+npm run test:functional:single -- --grep "should show login"     # by test name
 ```
 
-#### Когда запускать функциональные тесты
+#### When to run functional tests
 
-- "Запусти все тесты" → ✅ запустить, предупредив об окнах
-- "Запусти функциональные тесты" → ✅ запустить, предупредив об окнах
-- Завершение задачи агентом → ❌ НЕ запускать автоматически, СПРОСИТЬ пользователя (см. Шаг 4 workflow)
-- Автоматическая валидация → ❌ НЕ запускать
+- "Run all tests" -> ✅ run, after warning about windows
+- "Run functional tests" -> ✅ run, after warning about windows
+- Task completion by agent -> ❌ DO NOT run automatically, ASK user (see Step 4 workflow)
+- Automatic validation -> ❌ DO NOT run
 
-#### Запуск функциональных тестов в фоне
+#### Running functional tests in background
 
-Функциональные тесты долгие (~30 минут). Использовать фоновый запуск через доступные инструменты текущей среды агента и придерживаться правил:
+Functional tests are long (~30 minutes). Use background execution via available tools in the current agent environment and follow these rules:
 
-1. Проверить, что `npm run test:functional` уже не выполняется.
-2. Запустить ровно один экземпляр в фоне.
-3. Мониторить вывод и статус до завершения.
-4. При необходимости остановить процесс через доступный механизм среды.
+1. Verify `npm run test:functional` is not already running.
+2. Start exactly one instance in background.
+3. Monitor output and status until completion.
+4. Stop the process if needed via available environment mechanisms.
 
-### Порядок запуска при "запусти все тесты"
+### Run order for "run all tests"
 
-1. `npm run validate` — быстрые проверки (TypeScript, ESLint, Prettier, unit)
-2. `npm run test:functional` — только если шаг 1 прошел
+1. `npm run validate` - fast checks (TypeScript, ESLint, Prettier, unit)
+2. `npm run test:functional` - only if step 1 passed
 
-При падении на любом шаге — остановиться и сообщить пользователю.
+If any step fails, stop and report to user.
 
-### Отладка упавших тестов
+### Debugging failed tests
 
-#### Unit тесты
+#### Unit tests
 
 ```bash
-# Шаг 1: запустить только упавший тест
+# Step 1: run only failed test
 npm run test:unit -- tests/unit/auth/UserProfileManager.test.ts -t "specific test name"
 
-# Шаг 2: с подробным выводом
+# Step 2: with verbose output
 npm run test:unit -- tests/unit/auth/UserProfileManager.test.ts -t "specific test name" --verbose
 ```
 
-### Параллельный запуск
+### Parallel execution
 
-- ✅ Jest сам параллелит тесты внутри `test:unit`
-- ❌ НЕ запускать функциональные тесты параллельно с чем-либо
+- ✅ Jest already parallelizes tests inside `test:unit`
+- ❌ Do NOT run functional tests in parallel with anything
 
 ---
 
-## 6. Правила написания кода
+## 6. Code Writing Rules
 
-### Комментарии с требованиями
+### Requirement comments
 
-Каждая функция, класс, метод ДОЛЖНЫ иметь комментарий с требованиями:
+Every function, class, and method MUST have a requirements comment:
 
 ```typescript
 // Requirements: feature-id.1.1, feature-id.1.2
@@ -565,14 +565,14 @@ function implementFeature() {
 }
 ```
 
-### Структура тестов
+### Test structure
 
-Каждый тест ДОЛЖЕН содержать структурированный комментарий:
+Every test MUST include a structured comment:
 
 ```typescript
-/* Preconditions: описание начального состояния системы
-   Action: описание выполняемого действия
-   Assertions: описание ожидаемых результатов
+/* Preconditions: description of initial system state
+   Action: description of the action performed
+   Assertions: description of expected results
    Requirements: feature-id.1.1, feature-id.1.2 */
 it("should perform expected behavior", () => {
   // test implementation
@@ -581,25 +581,25 @@ it("should perform expected behavior", () => {
 
 ### Logger
 
-Каждый класс создает свой экземпляр с именем класса:
+Every class creates its own logger instance with class name:
 
 ```typescript
-// ✅ ПРАВИЛЬНО
+// ✅ CORRECT
 this.logger = new Logger('UserProfileManager');
 this.logger.info('User ID set: abc123');
-// Вывод: [UserProfileManager] User ID set: abc123
+// Output: [UserProfileManager] User ID set: abc123
 
-// ❌ НЕПРАВИЛЬНО — дублирование имени класса
+// ❌ WRONG - class name duplication
 this.logger.info('[UserProfileManager] User ID set: abc123');
-// Вывод: [UserProfileManager] [UserProfileManager] User ID set: abc123
+// Output: [UserProfileManager] [UserProfileManager] User ID set: abc123
 ```
 
 ### ErrorHandler
 
-Для ошибок в фоновых процессах использовать `ErrorHandler.handleBackgroundError`:
+For errors in background processes, use `ErrorHandler.handleBackgroundError`:
 
 ```typescript
-// ✅ ПРАВИЛЬНО
+// ✅ CORRECT
 async fetchProfile(): Promise<UserProfile | null> {
   try {
     // ...
@@ -609,83 +609,83 @@ async fetchProfile(): Promise<UserProfile | null> {
   }
 }
 
-// ❌ НЕПРАВИЛЬНО — локальное логирование
+// ❌ WRONG - local logging
 catch (error) {
   this.logger.error('Failed to fetch profile:', error);
 }
 ```
 
-ErrorHandler автоматически фильтрует race condition ошибки (не показывает пользователю), но всегда логирует для отладки.
+ErrorHandler automatically filters race condition errors (does not show them to user), but always logs them for debugging.
 
 ---
 
-## 7. Правила документации
+## 7. Documentation Rules
 
-### Язык
+### Language
 
-| Файл | Язык |
-|------|------|
-| requirements.md | Русский |
-| design.md | Русский |
-| tasks.md (если используется) | Русский |
-| Комментарии в коде | Английский |
-| Названия файлов и переменных | Английский |
+| File | Language |
+|------|----------|
+| requirements.md | Russian |
+| design.md | Russian |
+| tasks.md (if used) | Russian |
+| Code comments | English |
+| File and variable names | English |
 
-### Именование компонентов
+### Component naming
 
-- Названия компонентов — на английском языке
-- Без подчеркиваний
-- При упоминании — в кавычках
+- Component names must be in English
+- No underscores
+- Use quotes when mentioning them
 
 ✅ "Main Process", "OAuth Flow", "Sidebar State"  
 ❌ Главный_Процесс, OAuth_Flow
 
 ---
 
-## 8. Критические запреты
+## 8. Critical Prohibitions
 
-### Отключение тестов
+### Disabling tests
 
-**АБСОЛЮТНЫЙ ЗАПРЕТ** — нельзя использовать `.skip()`, `.only()`, комментировать тесты без явного разрешения пользователя.
+**ABSOLUTE PROHIBITION** - do not use `.skip()`, `.only()`, or comment out tests without explicit user permission.
 
-Перед отключением теста НЕОБХОДИМО:
-1. Объяснить пользователю, почему тест не может быть исправлен
-2. Предложить альтернативы (перенести в функциональные, упростить, исправить код)
-3. Получить явное подтверждение
+Before disabling a test, you MUST:
+1. Explain to the user why the test cannot be fixed
+2. Propose alternatives (move to functional tests, simplify, fix code)
+3. Obtain explicit confirmation
 
-### Создание отчётов и summary файлов
+### Creating reports and summary files
 
-**ЗАПРЕЩЕНО** создавать файлы типа `VALIDATION_REPORT.md`, `SUMMARY.md`, `WORK_REPORT.md` без явного запроса пользователя.
+**FORBIDDEN** to create files like `VALIDATION_REPORT.md`, `SUMMARY.md`, `WORK_REPORT.md` without explicit user request.
 
-Правильный подход: краткая устная сводка в конце работы (2-3 предложения).
+Correct approach: provide a short verbal summary at the end (2-3 sentences).
 
 
-### Переменные окружения
+### Environment variables
 
-**ЗАПРЕЩЕНО** добавлять новые `process.env.VARIABLE_NAME` без явного согласования с пользователем.
+**FORBIDDEN** to add new `process.env.VARIABLE_NAME` without explicit user agreement.
 
-Исключения: переменная уже существует в коде, пользователь явно попросил, стандартные переменные (`NODE_ENV`, `PATH`).
-
----
-
-## 9. Приоритеты при конфликтах
-
-1. **Безопасность данных** — не потерять данные пользователя
-2. **Явные инструкции пользователя** — если пользователь явно попросил, выполнить
-3. **Не мешать пользователю** — не показывать окна без предупреждения
-4. **Эффективность** — не запускать все тесты, если можно запустить один
-5. **Качество кода** — не отключать тесты, исправлять проблемы
+Exceptions: variable already exists in code, user explicitly asked, standard variables (`NODE_ENV`, `PATH`).
 
 ---
 
-## 10. Частые ошибки и решения
+## 9. Priority in Case of Conflicts
 
-| Ошибка | Причина | Решение |
+1. **Data safety** - do not lose user data
+2. **Explicit user instructions** - if the user explicitly requested, execute
+3. **Do not disrupt user** - do not open windows without warning
+4. **Efficiency** - do not run all tests when one test is enough
+5. **Code quality** - do not disable tests, fix problems
+
+---
+
+## 10. Common Errors and Solutions
+
+| Error | Cause | Solution |
 |--------|---------|---------|
-| `Cannot find module 'better-sqlite3'` | Нативный модуль не собран | `npm run rebuild:node` |
-| Тест падает с таймаутом | Тест медленнее 5000ms | `--testTimeout=10000` |
-| Функциональные тесты не запускаются | Нативные модули или сборка | `npm run rebuild:electron && npm run build` |
-| ESLint/Prettier падают | Форматирование | `npm run lint:fix` или `npm run format` |
-| Покрытие ниже требуемого | Недостаточно тестов | `npm run test:coverage`, открыть `coverage/lcov-report/index.html` |
-| `Command timed out after 120000ms` | Функциональные тесты запущены не в фоновом режиме | Использовать фоновый запуск и мониторинг процесса в текущей среде |
-| Запустил тесты дважды | Не проверил, что предыдущий запуск ещё активен | Всегда проверять статус текущего процесса перед повторным запуском |
+| `Cannot find module 'better-sqlite3'` | Native module not built | `npm run rebuild:node` |
+| Test fails with timeout | Test is slower than 5000ms | `--testTimeout=10000` |
+| Functional tests do not start | Native modules or build issue | `npm run rebuild:electron && npm run build` |
+| ESLint/Prettier fails | Formatting issue | `npm run lint:fix` or `npm run format` |
+| Coverage below requirement | Not enough tests | `npm run test:coverage`, open `coverage/lcov-report/index.html` |
+| `Command timed out after 120000ms` | Functional tests were not run in background mode | Use background execution and monitor process in current environment |
+| Tests were started twice | Previous run status was not checked | Always check current process status before restarting |
