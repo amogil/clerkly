@@ -19,9 +19,7 @@ jobs:
   validate:
     if: github.event.pull_request.draft == false && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
-    environment: ci-env
-    env:
-      CLERKLY_OAUTH_CLIENT_SECRET: ${{ secrets.CLERKLY_OAUTH_CLIENT_SECRET }}
+    environment: ci-env-validation
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -36,15 +34,17 @@ jobs:
         run: npm ci
 
       - name: Run validation
-        run: npm run validate:verbose
+        env:
+          CLERKLY_OAUTH_CLIENT_SECRET: ${{ secrets.CLERKLY_OAUTH_CLIENT_SECRET }}
+        run: |
+          test -n "$CLERKLY_OAUTH_CLIENT_SECRET"
+          npm run validate:verbose
 
   functional:
     if: github.event.pull_request.draft == false && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: macos-latest
     timeout-minutes: 90
-    environment: ci-env
-    env:
-      CLERKLY_OAUTH_CLIENT_SECRET: ${{ secrets.CLERKLY_OAUTH_CLIENT_SECRET }}
+    environment: ci-env-functional
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
