@@ -17,8 +17,9 @@ permissions:
 
 jobs:
   validate:
-    if: github.event.pull_request.draft == false
+    if: github.event.pull_request.draft == false && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
+    environment: ci-env
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -36,11 +37,10 @@ jobs:
         run: npm run validate:verbose
 
   functional:
-    if: github.event.pull_request.draft == false && github.event.pull_request.head.repo.full_name == github.repository && needs.validate.result == 'success'
-    needs: validate
+    if: github.event.pull_request.draft == false && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: macos-latest
     timeout-minutes: 90
-    environment: ci-functional
+    environment: ci-env
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
