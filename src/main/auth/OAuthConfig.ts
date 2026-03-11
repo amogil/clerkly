@@ -104,9 +104,7 @@ function getOAuthConfigConstants() {
     clientId: isTest
       ? 'test-client-id-12345'
       : '100365225505-a9mp4sll4948tafotr1va0fvnl5hrpoa.apps.googleusercontent.com',
-    clientSecret: isTest
-      ? 'test-client-secret-67890'
-      : '__CLERKLY_OAUTH_CLIENT_SECRET__',
+    clientSecret: isTest ? 'test-client-secret-67890' : '__CLERKLY_OAUTH_CLIENT_SECRET__',
     // iOS OAuth clients use URL scheme format
     redirectUri: isTest
       ? 'com.googleusercontent.apps.test-client-id-12345:/oauth2redirect'
