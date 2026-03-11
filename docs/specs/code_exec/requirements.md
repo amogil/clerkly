@@ -50,8 +50,8 @@
 
 #### Функциональные Тесты
 
-- `tests/functional/code_exec.spec.ts` — "should execute JavaScript via code_exec tool call"
-- `tests/functional/code_exec.spec.ts` — "should process multiple code_exec calls in one turn"
+- `tests/functional/code_exec.spec.ts` — "should support multiple code_exec calls in one turn with callId correlation"
+- `tests/functional/code_exec.spec.ts` — "should include terminal code_exec tool result in subsequent model history"
 
 #### Модульные Тесты
 
@@ -110,15 +110,16 @@
 
 #### Функциональные Тесты
 
-- `tests/functional/code_exec.spec.ts` — "should deny access to non-whitelisted sandbox APIs"
-- `tests/functional/code_exec.spec.ts` — "should timeout long-running code_exec execution"
-- `tests/functional/code_exec.spec.ts` — "should cancel active code_exec execution"
-- `tests/functional/code_exec.spec.ts` — "should deny main-pipeline-only tools from sandbox JavaScript"
-- `tests/functional/code_exec.spec.ts` — "should allow only tools from sandbox allowlist"
-- `tests/functional/code_exec.spec.ts` — "should deny browser-level network APIs (fetch/xhr/websocket/sendBeacon/navigation) with policy_denied"
-- `tests/functional/code_exec.spec.ts` — "should stop sandbox execution on app close without hanging shutdown"
+- `tests/functional/code_exec.spec.ts` — "should timeout long-running code_exec execution and continue loop"
+- `tests/functional/code_exec.spec.ts` — "should cancel active code_exec execution without persisting kind:error"
+- `tests/functional/code_exec.spec.ts` — "should deny main-pipeline-only and non-allowlisted sandbox tools"
+- `tests/functional/code_exec.spec.ts` — "should return policy_denied for window.open and perform no network request"
+- `tests/functional/code_exec.spec.ts` — "should return policy_denied for location.assign/replace and perform no network request"
+- `tests/functional/code_exec.spec.ts` — "should deny fetch/xhr/websocket/sendBeacon and perform no network request"
+- `tests/functional/code_exec.spec.ts` — "should deny multithreading APIs in sandbox runtime"
+- `tests/functional/code_exec.spec.ts` — "should shutdown without hanging when code_exec is active"
 - `tests/functional/code_exec.spec.ts` — "should return limit_exceeded for memory-heavy code_exec and continue loop"
-- `tests/functional/code_exec.spec.ts` — "should surface resource-monitor diagnostics or limit_exceeded under CPU pressure"
+- `tests/functional/code_exec.spec.ts` — "should execute finite CPU pressure scenario without forced terminal failure"
 
 #### Модульные Тесты
 
@@ -224,9 +225,9 @@ return await window.api.saveData('x', 'y');
 
 #### Функциональные Тесты
 
-- `tests/functional/code_exec.spec.ts` — "should execute code_exec with documented allowed API"
-- `tests/functional/code_exec.spec.ts` — "should return error with code policy_denied for forbidden API access"
-- `tests/functional/code_exec.spec.ts` — "should return console output to model after code_exec"
+- `tests/functional/code_exec.spec.ts` — "should support multiple code_exec calls in one turn with callId correlation"
+- `tests/functional/code_exec.spec.ts` — "should deny main-pipeline-only and non-allowlisted sandbox tools"
+- `tests/functional/code_exec.spec.ts` — "should apply stdout/stderr truncation limits and flags"
 
 #### Модульные Тесты
 
@@ -276,7 +277,8 @@ return await window.api.saveData('x', 'y');
 
 #### Функциональные Тесты
 
-- `tests/functional/code_exec.spec.ts` — "should persist code_exec lifecycle and update via message snapshots"
+- `tests/functional/code_exec.spec.ts` — "should persist lifecycle audit fields for terminal code_exec"
+- `tests/functional/code_exec.spec.ts` — "should publish message.created and message.updated for code_exec lifecycle"
 
 #### Модульные Тесты
 
@@ -333,8 +335,9 @@ return await window.api.saveData('x', 'y');
 
 #### Функциональные Тесты
 
-- `tests/functional/code_exec.spec.ts` — "should enforce code_exec payload and output size limits"
-- `tests/functional/code_exec.spec.ts` — "should support parallel code_exec calls with callId correlation"
+- `tests/functional/code_exec.spec.ts` — "should enforce code size limit for code_exec arguments"
+- `tests/functional/code_exec.spec.ts` — "should apply stdout/stderr truncation limits and flags"
+- `tests/functional/code_exec.spec.ts` — "should support multiple code_exec calls in one turn with callId correlation"
 
 #### Модульные Тесты
 
@@ -363,5 +366,5 @@ return await window.api.saveData('x', 'y');
 
 #### Функциональные Тесты
 
-- `tests/functional/code_exec.spec.ts` — "code_exec end-to-end execution, limits, lifecycle and policy scenarios"
-- `tests/functional/llm-chat.spec.ts` — "tool-loop continuation and model-history integration for terminal tool results"
+- `tests/functional/code_exec.spec.ts` — "should return limit_exceeded for memory-heavy code_exec and continue loop"
+- `tests/functional/llm-chat.spec.ts` — "should continue to next model step after terminal code_exec tool result"

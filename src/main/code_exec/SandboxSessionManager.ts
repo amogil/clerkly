@@ -29,8 +29,6 @@ const LIMIT_EXCEEDED_MEMORY_MESSAGE = `code_exec memory limit exceeded (${Math.r
   CODE_EXEC_LIMITS.sandboxMemoryLimitBytes / (1024 * 1024 * 1024)
 )} GiB).`;
 const LIMIT_EXCEEDED_CPU_MESSAGE = `code_exec CPU limit exceeded (${CODE_EXEC_LIMITS.sandboxCpuLimit} vCPU).`;
-const LIMIT_EXCEEDED_DEGRADED_RUNTIME_MESSAGE =
-  'code_exec terminated while running in degraded mode near CPU/RAM limits.';
 const DEGRADED_MODE_STDERR_MESSAGE =
   '[code_exec] Resource pressure detected near CPU/RAM limits. Execution continued in degraded mode.';
 
@@ -228,17 +226,12 @@ export class SandboxSessionManager {
                 code: 'limit_exceeded' as const,
                 message: `${LIMIT_EXCEEDED_MEMORY_MESSAGE} ${normalized.error.message}`,
               }
-            : degradedModeApplied
+            : this.isNetworkPolicyLikeError(normalized.error.message)
               ? {
-                  code: 'limit_exceeded' as const,
-                  message: LIMIT_EXCEEDED_DEGRADED_RUNTIME_MESSAGE,
+                  code: 'policy_denied' as const,
+                  message: POLICY_DENIED_NETWORK_MESSAGE,
                 }
-              : this.isNetworkPolicyLikeError(normalized.error.message)
-                ? {
-                    code: 'policy_denied' as const,
-                    message: POLICY_DENIED_NETWORK_MESSAGE,
-                  }
-                : normalized.error
+              : normalized.error
           : normalized.error;
       const base = {
         ...normalized,
@@ -299,17 +292,6 @@ export class SandboxSessionManager {
           },
         };
       }
-      if (degradedModeApplied) {
-        const base = this.finalizeOutput('error', stdoutChunks, stderrChunks);
-        return {
-          ...base,
-          error: {
-            code: 'limit_exceeded',
-            message: LIMIT_EXCEEDED_DEGRADED_RUNTIME_MESSAGE,
-          },
-        };
-      }
-
       const base = this.finalizeOutput('error', stdoutChunks, stderrChunks);
       return {
         ...base,
