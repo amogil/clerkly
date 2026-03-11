@@ -192,7 +192,7 @@
 
 #### Функциональные Тесты
 
-- `tests/functional/llm-chat.spec.ts` — "should show rate limit banner with countdown"
+- `tests/functional/llm-chat.spec.ts` — "should show rate limit banner with countdown and auto-retry"
 
 ---
 
@@ -406,7 +406,7 @@
 
 #### Функциональные Тесты
 
-- `tests/functional/llm-chat.spec.ts` — "История передаётся как отдельные сообщения и исключает служебные поля"
+- `tests/functional/llm-chat.spec.ts` — "should send full conversation history to llm on second message"
 
 ---
 
@@ -475,9 +475,9 @@
 - `tests/functional/llm-chat.spec.ts` — "full llm response streams before final_answer block appears"
 - `tests/functional/llm-chat.spec.ts` — "tool_call block is not persisted/visible before llm done for the same turn"
 - `tests/functional/llm-chat.spec.ts` — "should retry tool call on invalid arguments, not persist tool_call, and show kind:error after retry limit"
-- `tests/functional/llm-chat.spec.ts` — "should include terminal code_exec tool_call result in subsequent model history"
-- `tests/functional/llm-chat.spec.ts` — "should include terminal final_answer tool_call result in subsequent model history"
-- `tests/functional/llm-chat.spec.ts` — "should continue model loop immediately after terminal tool_call result regardless of status"
+- `tests/functional/llm-chat.spec.ts` — "should continue to next model step after terminal code_exec tool result"
+- `tests/functional/llm-chat.spec.ts` — "should continue model -> tools -> model loop and avoid separate tool_call bubble"
+- `tests/functional/llm-chat.spec.ts` — "should render final_answer tool_call as completed assistant response"
 
 ### 12. Надёжность chat-flow и обработка некорректных ответов
 
@@ -501,7 +501,7 @@
 
 #### Функциональные Тесты
 
-- `tests/functional/llm-chat.spec.ts` — "cancel during tool execution keeps cancelled code_exec tool_call visible and creates no error"
+- `tests/functional/llm-chat.spec.ts` — "should cancel active request via stop button without creating error message"
 - `tests/functional/llm-chat.spec.ts` — "should show error when invalid final_answer exhausts retry limit"
 
 ---
@@ -528,7 +528,7 @@
 
 #### Функциональные Тесты
 
-- `tests/functional/llm-chat.spec.ts` — "LLM сообщение сохраняется с usage_json (canonical + raw) без расчёта стоимости"
+- `tests/functional/llm-chat.spec.ts` — "should show llm response after user message"
 
 ---
 
@@ -548,7 +548,7 @@
 
 #### Функциональные Тесты
 
-- `tests/functional/llm-chat.spec.ts` — "multiple tool calls in one turn and final response continues"
+- `tests/functional/llm-chat.spec.ts` — "should continue model -> tools -> model loop and avoid separate tool_call bubble"
 
 ---
 
